@@ -8,6 +8,13 @@ sandbox a researcher can trust and a toy.
 """
 
 from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
-from fermentation.parameters.store import ParameterSet, load_parameters
+from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
 
-__all__ = ["Parameter", "ParameterSet", "Provenance", "Uncertainty", "load_parameters"]
+__all__ = [
+    "Parameter",
+    "ParameterSet",
+    "Provenance",
+    "Uncertainty",
+    "default_data_dir",
+    "load_parameters",
+]

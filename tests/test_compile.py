@@ -1,0 +1,148 @@
+"""The scenario → core compile seam: unit conversion, validation, and assembly."""
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from fermentation.runtime.integrate import simulate
+from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.units.convert import brix_to_sugar_gpl, celsius_to_kelvin
+from fermentation.validation import assert_conserved
+
+DATA = Path(__file__).resolve().parents[1] / "src" / "fermentation" / "parameters" / "data"
+WINE_PARAMS = DATA / "wine_generic.yaml"
+
+
+def _wine_scenario(**overrides) -> Scenario:
+    kwargs: dict[str, object] = {
+        "name": "wine-benchmark",
+        "medium": "wine",
+        "initial": {"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.5},
+        "temperature_schedule": [TemperaturePoint(day=0.0, celsius=20.0)],
+        "duration_days": 14.0,
+    }
+    kwargs.update(overrides)
+    return Scenario(**kwargs)
+
+
+def _beer_scenario(**overrides) -> Scenario:
+    kwargs: dict[str, object] = {
+        "name": "beer-benchmark",
+        "medium": "beer",
+        "initial": {
+            "glucose_gpl": 15.0,
+            "maltose_gpl": 70.0,
+            "maltotriose_gpl": 20.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 1.0,
+        },
+        "temperature_schedule": [TemperaturePoint(day=0.0, celsius=20.0)],
+        "duration_days": 7.0,
+    }
+    kwargs.update(overrides)
+    return Scenario(**kwargs)
+
+
+# -- wine: full end-to-end (parameters exist) ---------------------------------
+
+
+def test_wine_compiles_to_canonical_initial_state():
+    compiled = compile_scenario(_wine_scenario())
+    state = compiled.schema.unpack(compiled.y0)
+
+    # Wine has a single sugar slot, so the schema reads S back as a scalar
+    # (size-1 vars collapse to a float on unpack); beer's length-3 S stays a vector.
+    assert state["S"] == pytest.approx(brix_to_sugar_gpl(24.0))
+    assert state["N"] == pytest.approx(250.0 / 1000.0)  # mg/L -> g/L
+    assert state["X"] == pytest.approx(0.5)
+    assert state["E"] == 0.0  # defaulted
+    assert state["CO2"] == 0.0
+    assert state["T"] == pytest.approx(celsius_to_kelvin(20.0))
+
+
+def test_wine_time_span_is_hours():
+    compiled = compile_scenario(_wine_scenario(duration_days=14.0))
+    assert compiled.t_span_h == (0.0, 14.0 * 24.0)
+
+
+def test_wine_loads_provenance_parameters_by_medium_and_strain():
+    compiled = compile_scenario(_wine_scenario())
+    assert "mu_max" in compiled.parameters
+    assert compiled.param_values["mu_max"] == pytest.approx(0.33)
+    # param_values is the plain hot-loop mapping; parameters keeps tiers/provenance.
+    assert compiled.parameters["mu_max"].provenance.source == "author estimate"
+
+
+def test_optional_ethanol_can_be_supplied():
+    compiled = compile_scenario(
+        _wine_scenario(
+            initial={"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.5, "ethanol_gpl": 3.0}
+        )
+    )
+    assert compiled.schema.get(compiled.y0, "E") == pytest.approx(3.0)
+
+
+# -- beer: structural seam (no sourced params yet) ----------------------------
+
+
+def test_beer_sugar_vector_is_packed_in_uptake_order():
+    # Beer params aren't sourced yet, so point at the wine file just to exercise
+    # the seam; we only assert the state layout here.
+    compiled = compile_scenario(_beer_scenario(), parameter_paths=[WINE_PARAMS])
+    assert compiled.schema.get(compiled.y0, "S") == pytest.approx([15.0, 70.0, 20.0])
+    assert compiled.schema.get(compiled.y0, "N") == pytest.approx(200.0 / 1000.0)
+
+
+def test_beer_without_param_file_reports_the_missing_source():
+    with pytest.raises(FileNotFoundError, match="beer_generic.yaml"):
+        compile_scenario(_beer_scenario())
+
+
+# -- validation at the boundary -----------------------------------------------
+
+
+def test_unknown_initial_key_is_rejected():
+    with pytest.raises(ValueError, match="unknown key.*brixx"):
+        compile_scenario(
+            _wine_scenario(initial={"brixx": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.5})
+        )
+
+
+def test_missing_required_key_is_rejected():
+    with pytest.raises(ValueError, match="missing required key 'brix'"):
+        compile_scenario(_wine_scenario(initial={"yan_mgl": 250.0, "pitch_gpl": 0.5}))
+
+
+def test_negative_value_is_rejected():
+    with pytest.raises(ValueError, match="must be >= 0"):
+        compile_scenario(_wine_scenario(initial={"brix": -1.0, "yan_mgl": 250.0, "pitch_gpl": 0.5}))
+
+
+def test_missing_temperature_schedule_is_rejected():
+    with pytest.raises(ValueError, match="temperature_schedule needs at least one point"):
+        compile_scenario(_wine_scenario(temperature_schedule=[]))
+
+
+def test_unknown_medium_is_rejected():
+    with pytest.raises(KeyError, match="Unknown medium 'mead'"):
+        compile_scenario(_wine_scenario(medium="mead"))
+
+
+# -- the seam connects to the runtime -----------------------------------------
+
+
+def test_compiled_scenario_integrates_as_a_constant_baseline():
+    # With no Processes wired, integrating the compiled scenario must succeed and
+    # leave the state unchanged — proving compile() feeds simulate() cleanly.
+    compiled = compile_scenario(_wine_scenario())
+    traj = simulate(
+        compiled.process_set,
+        compiled.param_values,
+        compiled.y0,
+        compiled.t_span_h,
+    )
+    assert traj.success
+    assert np.allclose(traj.y[:, -1], compiled.y0)
+    # Total mass is trivially conserved when nothing happens.
+    assert_conserved(traj, lambda y: float(y.sum()), label="total mass")

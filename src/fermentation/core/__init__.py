@@ -4,8 +4,20 @@ Given a state and a parameter set, the core returns derivatives. That purity is
 what makes it testable against benchmark curves and conservation laws.
 """
 
+from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine_schema
 from fermentation.core.process import Process, ProcessSet
 from fermentation.core.state import StateSchema, StateVector
 from fermentation.core.tiers import Tier
 
-__all__ = ["Process", "ProcessSet", "StateSchema", "StateVector", "Tier"]
+__all__ = [
+    "MEDIA",
+    "Medium",
+    "Process",
+    "ProcessSet",
+    "StateSchema",
+    "StateVector",
+    "Tier",
+    "beer_schema",
+    "get_medium",
+    "wine_schema",
+]

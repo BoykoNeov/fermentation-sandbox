@@ -98,6 +98,17 @@ def _parse_mapping(raw: Mapping[str, Any]) -> list[Parameter]:
     return params
 
 
+def default_data_dir() -> Path:
+    """Filesystem directory holding the packaged parameter YAML files.
+
+    The compile seam locates ``<medium>_<strain>.yaml`` here (and tests read the
+    same files). If the package is ever shipped as a wheel that must read its own
+    bundled data, switch to ``importlib.resources`` — see the deferred item in
+    ``docs/DECISIONS.md``.
+    """
+    return Path(__file__).resolve().parent / "data"
+
+
 def load_parameters(*paths: str | Path) -> ParameterSet:
     """Load and validate one or more YAML parameter files into a ``ParameterSet``.
 

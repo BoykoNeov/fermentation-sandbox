@@ -74,6 +74,36 @@ relaxed signature requirements for tests.
 forcing `-> None` on every pytest function is noise, so tests are exempt from that
 one rule while still being type-checked.
 
+### D-7 — Media live in the core; the compile seam owns the unit boundary
+**Decision:** a `Medium` (`fermentation.core.media`) bundles a beverage family's
+`StateSchema` with the Processes that act on it, held in a `MEDIA` registry.
+`compile_scenario` (`fermentation.scenario.compile`) converts a `Scenario` into a
+`CompiledScenario` record (`y0`, `process_set`, `parameters`/`param_values`,
+`schema`, `t_span_h`).
+**Why / shape:**
+- *Schemas in core, not scenario.* Processes (core) reference variable names like
+  `"S"`/`"N"`; putting the per-medium layout in the core gives them and the
+  compile seam one source of truth, and keeps `Medium` pure (no I/O). The
+  industry-unit *conversion* stays at the boundary (scenario), honouring "convert
+  only at edges" (D-3) — so the `scenario.initial` key vocabulary and all
+  Brix/°C/days conversions live in `compile`, keyed by medium name (kept in sync
+  with `MEDIA` via explicit guards).
+- *A named record, not a bare tuple.* The brief wrote the seam as
+  `(y0, ProcessSet, params)`; a frozen `CompiledScenario` with named fields is
+  less fragile and also carries the `schema`, `t_span_h`, and the full
+  `ParameterSet` (tiers/provenance) alongside the resolved `param_values` the hot
+  loop needs. The function is `compile_scenario`, not `compile`, to avoid
+  shadowing the builtin.
+- *Beer sugars are explicit.* `compile` does **not** split a single OG into
+  glucose/maltose/maltotriose — that wort spectrum is a provenance-backed
+  parameter (the M1 sourcing task), so baking a fixed split into the seam would be
+  a magic number. Until kinetics land, `process_factories` is empty and a compiled
+  medium integrates to a constant baseline (verified by test).
+**Status (M1):** schemas + seam done; Processes register into each `Medium` as
+they are implemented. `beer_generic.yaml` does not exist yet, so beer compiles
+only with an explicit `parameter_paths=` override (a clear `FileNotFoundError`
+otherwise).
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.

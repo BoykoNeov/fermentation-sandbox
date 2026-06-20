@@ -1,9 +1,14 @@
 # Milestone 1 — task checklist
 
-- [ ] Define wine `StateSchema` ({X, S(1), E, N, T, CO2}) and beer schema
-      ({X, S(3), E, N, T, CO2}).
-- [ ] `compile(Scenario) -> (y0, ProcessSet, params)` — the scenario→core seam,
-      converting industry units to canonical at the boundary.
+- [x] Define wine `StateSchema` ({X, S(1), E, N, T, CO2}) and beer schema
+      ({X, S(3), E, N, T, CO2}). → `fermentation.core.media` (`wine_schema`,
+      `beer_schema`, `Medium`, `MEDIA`, `get_medium`).
+- [x] `compile(Scenario) -> (y0, ProcessSet, params)` — the scenario→core seam,
+      converting industry units to canonical at the boundary. →
+      `fermentation.scenario.compile_scenario` returning `CompiledScenario`
+      (`y0`, `process_set`, `parameters`/`param_values`, `schema`, `t_span_h`).
+      Process set is empty until kinetics land; tests in `tests/test_compile.py`,
+      `tests/test_media.py`.
 - [ ] Carbon + mass conservation quantity functions for the real chemistry;
       wire into runtime assertions and tests.
 - [ ] `GrowthNitrogenLimited` Process + unit test.

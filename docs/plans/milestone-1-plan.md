@@ -1,6 +1,9 @@
 # Milestone 1 — Tier-1 validated core
 
-> Status: **not started** (Milestone 0 skeleton complete).
+> Status: **in progress**. Done: medium state schemas + the scenario→core
+> `compile_scenario` seam (`fermentation.core.media`,
+> `fermentation.scenario.compile`). Next: conservation quantity functions, then
+> the kinetic Processes.
 > Goal: single-strain, isothermal, nitrogen-limited primary fermentation that
 > passes the §2.2 wine **and** beer benchmarks (decision D-B).
 
@@ -38,7 +41,7 @@ Build as composable `Process` objects (tag tier honestly — most will start
 
 ## Approach (test-driven)
 
-1. Define the wine and beer `StateSchema`s and a `compile(Scenario) -> (y0,
+1. ✅ Define the wine and beer `StateSchema`s and a `compile(Scenario) -> (y0,
    ProcessSet, params)` step (the scenario→core seam).
 2. Write the carbon/mass conservation quantity functions for the real chemistry.
 3. Implement Processes one at a time, each with its own unit test, behind the

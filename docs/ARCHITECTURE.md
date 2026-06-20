@@ -26,11 +26,11 @@ Package map:
 
 | Layer | Package | Key types |
 |-------|---------|-----------|
-| parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters` |
+| parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` |
 | units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, … |
-| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet` |
+| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema` |
 | runtime | `fermentation.runtime` | `simulate`, `Trajectory` |
-| scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention` |
+| scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
 
 ## The core
@@ -94,6 +94,26 @@ A `Scenario` (schema-validated YAML/JSON, **not** a custom DSL) declares initial
 composition, organism/strain, temperature schedule, vessel, and a timeline of
 interventions. No physics lives here, which keeps sweeps, Monte Carlo, and
 cross-beverage reuse trivial.
+
+## Media and the compile seam
+
+A **`Medium`** (`fermentation.core.media`) names a beverage family and fixes its
+`StateSchema` plus the Processes that act on it. `wine_schema()` has one sugar
+slot; `beer_schema()` has three (`glucose`/`maltose`/`maltotriose`, in uptake
+order). The `MEDIA` registry maps name → `Medium`; processes are empty until the
+M1 kinetics land, so a compiled medium currently integrates to a constant
+baseline.
+
+**`compile_scenario(scenario)`** (`fermentation.scenario.compile`) is the
+scenario→core seam and the *only* place industry units cross into canonical ones
+(°Brix → g/L, °C → K, days → hours). It validates the `scenario.initial`
+vocabulary (per-medium allowed keys, non-negativity, required fields), seeds the
+initial temperature from the schedule, loads `<medium>_<strain>.yaml`, assembles
+the medium's `ProcessSet`, and returns a `CompiledScenario` record (`y0`,
+`process_set`, `parameters` + resolved `param_values`, `schema`, `t_span_h`) that
+drops straight into `simulate`. Beer's three sugars are supplied explicitly rather
+than split from a single OG — that wort spectrum is a provenance-backed parameter,
+not a magic constant in the seam. (See DECISIONS #7.)
 
 ## Validation
 
