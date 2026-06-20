@@ -1,0 +1,76 @@
+[project]
+name = "fermentation-sandbox"
+version = "0.0.1"
+description = "A research-grade simulation engine for wine and beer fermentation, grounded in published science with explicit confidence tiers."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+authors = [{ name = "BoykoNeov" }]
+keywords = ["fermentation", "simulation", "wine", "beer", "kinetics", "ode", "research"]
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.13",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+]
+
+[project.urls]
+Repository = "https://github.com/BoykoNeov/fermentation-sandbox"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fermentation"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py313"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, bugbear, simplify, comprehensions
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "C4"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["N802", "N803", "N806"]  # allow physics-style capitalized names in tests
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
+
+# Tests keep strict type *checking* of their bodies, but are exempt from the
+# requirement to annotate every pytest function signature (noise, not safety).
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "benchmark: validation benchmarks from the handoff (may be skipped until kinetics land)",
+    "slow: long-running integration tests",
+]
+
+[tool.coverage.run]
+source = ["src/fermentation"]
+branch = true

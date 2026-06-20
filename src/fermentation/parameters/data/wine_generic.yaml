@@ -1,0 +1,72 @@
+# Generic wine-yeast kinetic parameters — PLACEHOLDERS.
+#
+# These exist to exercise the parameter schema and the loader. The *values* are
+# order-of-magnitude placeholders, NOT sourced measurements, and are tagged
+# accordingly (tier: speculative, source: "author estimate"). Milestone 1's
+# parameter-sourcing task replaces each with a literature value carrying a real
+# DOI and the conditions it was measured under, and re-tags it (typically
+# plausible or validated). See docs/plans/milestone-1-*.md.
+#
+# Reading list to reconcile against (handoff section 2.1):
+#   Coleman et al. 2007 (10.1128/AEM.00845-07); Cramer et al. 2002;
+#   Malherbe et al. 2004.
+
+mu_max:
+  value: 0.33
+  unit: "1/h"
+  tier: speculative
+  uncertainty: { low: 0.15, high: 0.55, note: "strain- and temperature-dependent" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae, ~20 C, placeholder"
+    notes: "Reconcile vs Coleman et al. 2007 nitrogen-limited model."
+
+K_s:
+  value: 5.0
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.5, high: 25.0, note: "Monod half-saturation for sugar" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae, placeholder"
+    notes: "Often poorly constrained; wide range intentional."
+
+K_n:
+  value: 0.01
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.001, high: 0.05, note: "half-saturation for YAN" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae, placeholder"
+    notes: "Nitrogen limitation is the textbook stuck-ferment mechanism."
+
+Y_ethanol_sugar:
+  value: 0.47
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.46, high: 0.48, note: "realised yield below 0.511 theoretical" }
+  provenance:
+    source: "Gay-Lussac stoichiometry; realised yield, handoff section 2.1"
+    conditions: "after biomass and glycerol diversion"
+    notes: "Theoretical max 0.511 g/g; realised 0.46-0.48 is well established."
+
+ethanol_tolerance:
+  value: 110.0
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 95.0, high: 130.0, note: "~12-16.5% ABV equivalent" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic wine strain, placeholder"
+    notes: "Viability collapses past a strain-specific tolerance."
+
+E_a_growth:
+  value: 50000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 80000.0, note: "Arrhenius activation energy" }
+  provenance:
+    source: "author estimate"
+    conditions: "placeholder for Arrhenius temperature dependence"
+    notes: "Reconcile against fitted Arrhenius constants in the reading list."
