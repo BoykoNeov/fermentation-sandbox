@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from fermentation.core.media import MEDIA
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units.convert import brix_to_sugar_gpl, celsius_to_kelvin
@@ -146,3 +147,24 @@ def test_compiled_scenario_integrates_as_a_constant_baseline():
     assert np.allclose(traj.y[:, -1], compiled.y0)
     # Total mass is trivially conserved when nothing happens.
     assert_conserved(traj, lambda y: float(y.sum()), label="total mass")
+
+
+# -- the compile vocabulary stays in sync with the MEDIA registry -------------
+
+
+@pytest.mark.parametrize("medium", sorted(MEDIA))
+def test_every_registered_medium_compiles(medium):
+    # Guards against a medium added to MEDIA without a matching allowed-keys +
+    # initial-builder entry in compile.py: a new medium must be representable
+    # here, and must then compile, or this fails at test time (not runtime).
+    representative = {
+        "wine": (_wine_scenario(), None),
+        "beer": (_beer_scenario(), [WINE_PARAMS]),
+    }
+    assert medium in representative, (
+        f"MEDIA registers {medium!r} but it has no representative scenario here; "
+        "add one (and its compile vocabulary) so the seam stays covered."
+    )
+    scenario, paths = representative[medium]
+    compiled = compile_scenario(scenario, parameter_paths=paths)
+    assert compiled.y0.shape == (compiled.schema.size,)

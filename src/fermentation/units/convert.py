@@ -30,6 +30,16 @@ def hours_to_days(hours: float) -> float:
     return hours / 24.0
 
 
+def mgl_to_gpl(mg_per_l: float) -> float:
+    """Milligrams per litre -> grams per litre (e.g. YAN reported in mg/L).
+
+    A plain factor of 1000, but routed through ``fermentation.units`` so every
+    industry -> canonical conversion crosses the same boundary (decision D-3)
+    instead of being inlined as a bare literal at the call site.
+    """
+    return mg_per_l / 1000.0
+
+
 def brix_to_sg(brix: float) -> float:
     """Degrees Brix -> specific gravity (20/20 C).
 

@@ -114,14 +114,14 @@ BENCHMARKS: dict[str, BenchmarkSpec] = {
     "wine_dryness": BenchmarkSpec(
         key="wine_dryness",
         description=(
-            "A ~24 Brix must (~240 g/L sugar) at 20 C ferments to dryness with a "
+            "A ~24 Brix must (~264 g/L sugar) at 20 C ferments to dryness with a "
             "visible lag -> exponential -> stationary biomass trajectory."
         ),
         metric="days_to_dryness",
         low=10.0,
         high=14.0,
         unit="day",
-        conditions="~240 g/L initial sugar, 20 C, single wine strain, nitrogen-limited",
+        conditions="~264 g/L initial sugar, 20 C, single wine strain, nitrogen-limited",
         source="handoff section 2.2 (wine benchmark)",
     ),
     "beer_attenuation": BenchmarkSpec(

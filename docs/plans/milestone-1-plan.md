@@ -11,7 +11,8 @@
 
 The skipped tests in `tests/benchmarks/test_milestone1.py` pass for real:
 
-1. **Wine:** ~240 g/L sugar must at 20 °C ferments to dryness in **10–14 days**,
+1. **Wine:** ~264 g/L sugar must (24 °Brix, density-corrected) at 20 °C ferments to
+   dryness in **10–14 days**,
    with a visible lag → exponential → stationary biomass trajectory.
 2. **Beer:** ~1.048 OG ale wort at 20 °C attenuates to ~1.010 in **5–7 days**.
 3. **CO₂:** evolution rate rises to a peak then tails; its integral tracks sugar

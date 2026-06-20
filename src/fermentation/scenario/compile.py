@@ -36,7 +36,12 @@ from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
 from fermentation.scenario.schema import Scenario
-from fermentation.units.convert import brix_to_sugar_gpl, celsius_to_kelvin, days_to_hours
+from fermentation.units.convert import (
+    brix_to_sugar_gpl,
+    celsius_to_kelvin,
+    days_to_hours,
+    mgl_to_gpl,
+)
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
 _Initial = dict[str, float | list[float]]
@@ -99,7 +104,7 @@ def _wine_initial(values: Mapping[str, float], temperature_k: float) -> _Initial
         "X": _require(values, "pitch_gpl", "wine"),
         "S": [brix_to_sugar_gpl(_require(values, "brix", "wine"))],
         "E": _optional(values, "ethanol_gpl", 0.0),
-        "N": _require(values, "yan_mgl", "wine") / 1000.0,  # mg/L -> g/L
+        "N": mgl_to_gpl(_require(values, "yan_mgl", "wine")),
         "T": temperature_k,
         "CO2": 0.0,
     }
@@ -114,7 +119,7 @@ def _beer_initial(values: Mapping[str, float], temperature_k: float) -> _Initial
             _require(values, "maltotriose_gpl", "beer"),
         ],
         "E": _optional(values, "ethanol_gpl", 0.0),
-        "N": _require(values, "yan_mgl", "beer") / 1000.0,  # mg/L -> g/L
+        "N": mgl_to_gpl(_require(values, "yan_mgl", "beer")),
         "T": temperature_k,
         "CO2": 0.0,
     }
