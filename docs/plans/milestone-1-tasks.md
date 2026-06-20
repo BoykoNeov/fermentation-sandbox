@@ -10,6 +10,10 @@
 - [ ] `SugarUptakeToEthanolCO2` Process (Gay-Lussac yield; vector-aware for beer)
       + unit test.
 - [ ] `EthanolInhibition` Process + unit test.
+- [ ] **Wire parameter-tier propagation into `ProcessSet.tier_of`** — each Process
+      declares the params it reads; an output's tier = lowest of (its Processes'
+      tiers, those params' tiers). Closes the D-1 gap so a VALIDATED process on
+      speculative params reports speculative. Add a test asserting exactly this.
 - [ ] `ArrheniusTemperature` modifier hook (isothermal runs for M1) + unit test.
 - [ ] Source + reconcile parameters; replace `wine_generic.yaml` placeholders and
       add `beer_generic.yaml`; re-tag tiers. (Biggest effort — handoff §2.3.)

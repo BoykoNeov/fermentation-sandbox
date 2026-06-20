@@ -32,6 +32,12 @@ the integration hot loop and complicate the math. Deriving the tier from
 contributors still guarantees "the tier travels to every output" — the actual
 prime directive — without the cost.
 **Deviation:** reinterprets handoff §1.2 ("each scalar should carry its tier").
+**Status (M0):** `ProcessSet.tier_of` currently propagates **Process** tiers
+only. A Process must also be capped by the tiers of the *parameters* it consumes
+(a VALIDATED process on speculative params must report speculative, not
+validated). That propagation lands in Milestone 1, when real Processes declare
+the parameters they read — see `milestone-1-tasks.md`. Until then the code's
+guarantee is narrower than this entry's "Processes and parameters" intent.
 
 ### D-2 — Provenance enforced by schema, not convention
 **Decision:** parameters load through Pydantic models that *require*

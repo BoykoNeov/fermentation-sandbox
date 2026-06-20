@@ -145,7 +145,16 @@ class ProcessSet:
     def tier_of(self, variable: str) -> Tier:
         """Derived output tier of ``variable``: the lowest tier among the active
         Processes that touch it. A variable nothing touches is ``VALIDATED`` (it
-        is simply unchanging, which is trivially correct)."""
+        is simply unchanging, which is trivially correct).
+
+        NOTE (Milestone 1): this propagates *Process* tiers only. A Process must
+        also be capped by the tiers of the parameters it consumes — otherwise a
+        VALIDATED process running on speculative placeholder parameters would
+        report a VALIDATED output, which is exactly the credibility-borrowing the
+        tier system exists to prevent. Parameter-tier propagation is wired in when
+        real Processes (which declare the parameters they read) arrive. See
+        docs/DECISIONS.md D-1 and milestone-1-tasks.md.
+        """
         if variable not in self.schema:
             raise KeyError(f"Unknown variable {variable!r}")
         contributing = [p.tier for p in self.active if variable in p.touches]
