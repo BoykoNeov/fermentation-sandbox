@@ -16,7 +16,11 @@ the form; the benchmark stays skipped until sourcing lands.
 import numpy as np
 import pytest
 
-from fermentation.core.kinetics import EthanolInhibition, SugarUptakeToEthanolCO2
+from fermentation.core.kinetics import (
+    EthanolInhibition,
+    GrowthNitrogenLimited,
+    SugarUptakeToEthanolCO2,
+)
 from fermentation.core.media import wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -28,6 +32,7 @@ from fermentation.validation import (
     assert_nonnegative,
     total_carbon,
     total_mass,
+    total_nitrogen,
 )
 
 
@@ -209,3 +214,37 @@ def test_inhibition_slows_fermentation(params):
     )
     assert uninhibited.success and inhibited.success
     assert float(inhibited.series("S")[-1]) > float(uninhibited.series("S")[-1])
+
+
+def test_full_model_growth_uptake_inhibition_conserves_carbon_and_nitrogen(params, store):
+    # The realistic M1 wine configuration: growth + uptake + ethanol inhibition.
+    # The modifier scales uptake's whole vector, so carbon and nitrogen still close
+    # exactly end-to-end (scaling a conserving flux preserves its balances, D-10).
+    schema = wine_schema()
+    ps = ProcessSet(
+        schema,
+        [GrowthNitrogenLimited(), SugarUptakeToEthanolCO2()],
+        modifiers=[EthanolInhibition()],
+        strict=True,
+    )
+    y0 = schema.pack({"X": 0.1, "S": [264.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0})
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 500.0))
+    assert traj.success
+
+    f_c = store.value("biomass_C_fraction")
+    f_n = store.value("biomass_N_fraction")
+    assert_conserved(
+        traj,
+        total_carbon(schema, biomass_carbon_fraction=f_c),
+        rtol=1e-5,
+        atol=1e-6,
+        label="carbon",
+    )
+    assert_conserved(
+        traj,
+        total_nitrogen(schema, biomass_nitrogen_fraction=f_n),
+        rtol=1e-5,
+        atol=1e-6,
+        label="nitrogen",
+    )
+    assert_nonnegative(traj, ("X", "S", "N", "E", "CO2"), atol=1e-7)
