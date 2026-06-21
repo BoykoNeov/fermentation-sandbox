@@ -39,6 +39,26 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier, combine
 
 
+def _reads_tier(reads: tuple[str, ...], param_tiers: Mapping[str, Tier]) -> Tier:
+    """Lowest tier among the parameters in ``reads``, looked up in ``param_tiers``.
+
+    A declared read absent from ``param_tiers`` raises ``KeyError`` rather than
+    defaulting to ``VALIDATED``: an unknown-provenance input is exactly the
+    credibility-borrowing the tier system exists to catch, so it must fail loudly
+    instead of silently reporting a higher tier than reality (D-1).
+    """
+    tiers: list[Tier] = []
+    for name in reads:
+        try:
+            tiers.append(param_tiers[name])
+        except KeyError:
+            raise KeyError(
+                f"declared read {name!r} has no tier in the supplied param_tiers; "
+                f"have {sorted(param_tiers)}"
+            ) from None
+    return combine(tiers)
+
+
 class Process(ABC):
     """Base class for anything that contributes to ``d(state)/dt``.
 
@@ -52,6 +72,11 @@ class Process(ABC):
     tier: Tier
     #: State variable names this Process is allowed to contribute to.
     touches: tuple[str, ...]
+    #: Parameters this Process reads. Declared so :meth:`ProcessSet.tier_of` can
+    #: cap the Process's output tier by the tiers of its inputs (D-1): a VALIDATED
+    #: mechanism running on speculative parameters reports speculative. Defaults to
+    #: empty for parameter-free Processes (e.g. test stand-ins).
+    reads: tuple[str, ...] = ()
 
     @abstractmethod
     def derivatives(
@@ -239,11 +264,12 @@ class ProcessSet:
 
     # -- tier propagation -----------------------------------------------------
 
-    def tier_of(self, variable: str) -> Tier:
+    def tier_of(self, variable: str, param_tiers: Mapping[str, Tier] | None = None) -> Tier:
         """Derived output tier of ``variable``: the lowest tier among the active
-        Processes that touch it *and* the active modifiers that scale any of those
-        Processes. A variable nothing touches is ``VALIDATED`` (it is simply
-        unchanging, which is trivially correct).
+        Processes that touch it, the active modifiers that scale any of those
+        Processes, *and* (when ``param_tiers`` is given) the parameters each of
+        those Processes/modifiers reads. A variable nothing touches is
+        ``VALIDATED`` (it is simply unchanging, which is trivially correct).
 
         A modifier shapes a variable's value just as the Process it scales does
         (an inhibition factor changes the realised flux), so a speculative
@@ -251,13 +277,16 @@ class ProcessSet:
         speculative — the same least-trustworthy-input rule, extended to the
         multiplicative path.
 
-        NOTE (Milestone 1): this propagates *Process and modifier* tiers only. A
-        Process/modifier must also be capped by the tiers of the parameters it
-        consumes — otherwise a VALIDATED process running on speculative placeholder
-        parameters would report a VALIDATED output, which is exactly the
-        credibility-borrowing the tier system exists to prevent. Parameter-tier
-        propagation (each declares its ``reads``) is the next task. See
-        docs/DECISIONS.md D-1 and milestone-1-tasks.md.
+        Parameter-tier propagation (D-1) closes the credibility-borrowing gap: a
+        VALIDATED mechanism running on speculative placeholder parameters must
+        report speculative, not validated. Each Process/modifier declares the
+        parameters it ``reads``; passing ``param_tiers`` (a ``{name: Tier}`` map,
+        e.g. :meth:`ParameterSet.tier_map`) folds the lowest tier of those reads
+        into the result. A declared read missing from ``param_tiers`` raises
+        ``KeyError`` rather than silently counting as validated. With
+        ``param_tiers=None`` the result is the structural (Process/modifier-only)
+        tier — useful, but narrower than the D-1 guarantee, so analysis/reporting
+        paths should pass the map.
         """
         if variable not in self.schema:
             raise KeyError(f"Unknown variable {variable!r}")
@@ -267,18 +296,34 @@ class ProcessSet:
             if variable not in p.touches:
                 continue
             tiers.append(p.tier)
-            tiers.extend(m.tier for m in mods if p.name in m.modifies)
+            if param_tiers is not None:
+                tiers.append(_reads_tier(p.reads, param_tiers))
+            for m in mods:
+                if p.name in m.modifies:
+                    tiers.append(m.tier)
+                    if param_tiers is not None:
+                        tiers.append(_reads_tier(m.reads, param_tiers))
         return combine(tiers)
 
-    def tier_map(self) -> dict[str, Tier]:
-        """Derived tier for every state variable."""
-        return {name: self.tier_of(name) for name in self.schema.names}
+    def tier_map(self, param_tiers: Mapping[str, Tier] | None = None) -> dict[str, Tier]:
+        """Derived tier for every state variable (see :meth:`tier_of` for the role
+        of ``param_tiers``)."""
+        return {name: self.tier_of(name, param_tiers) for name in self.schema.names}
 
-    def overall_tier(self) -> Tier:
+    def overall_tier(self, param_tiers: Mapping[str, Tier] | None = None) -> Tier:
         """Lowest tier across all active Processes — the tier of any output that
         mixes the whole state (e.g. a full time-series export). Includes active
-        modifiers that scale at least one active Process."""
+        modifiers that scale at least one active Process, and (when ``param_tiers``
+        is given) the parameters every active Process/modifier reads."""
         active_names = {p.name for p in self.active}
-        tiers = [p.tier for p in self.active]
-        tiers.extend(m.tier for m in self.active_modifiers if active_names & set(m.modifies))
+        tiers: list[Tier] = []
+        for p in self.active:
+            tiers.append(p.tier)
+            if param_tiers is not None:
+                tiers.append(_reads_tier(p.reads, param_tiers))
+        for m in self.active_modifiers:
+            if active_names & set(m.modifies):
+                tiers.append(m.tier)
+                if param_tiers is not None:
+                    tiers.append(_reads_tier(m.reads, param_tiers))
         return combine(tiers)

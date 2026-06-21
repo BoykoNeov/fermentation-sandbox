@@ -49,10 +49,18 @@
       in `tests/test_process.py`. Held out of `MEDIA` with the other kinetics; the
       placeholder `E_max=110 < E_final` stall is a tuning-task item, benchmark stays
       skipped.
-- [ ] **Wire parameter-tier propagation into `ProcessSet.tier_of`** — each Process
+- [x] **Wire parameter-tier propagation into `ProcessSet.tier_of`** — each Process
       declares the params it reads; an output's tier = lowest of (its Processes'
       tiers, those params' tiers). Closes the D-1 gap so a VALIDATED process on
-      speculative params reports speculative. Add a test asserting exactly this.
+      speculative params reports speculative. → `Process` gained a `reads` attribute
+      (matching `RateModifier`); `tier_of`/`tier_map`/`overall_tier` take an optional
+      `param_tiers` map and fold in the lowest tier of each contributor's `reads`
+      (process *and* modifier), raising `KeyError` on a declared read missing from the
+      map (no silent default to validated). Threaded end-to-end:
+      `simulate(..., param_tiers=...)` → `Trajectory.tier_map`, built via new
+      `ParameterSet.tier_map()`. Decision **D-1** status flipped to closed; tests in
+      `tests/test_process.py` (parameter-tier propagation) +
+      `tests/test_integrate.py::test_trajectory_tier_map_caps_on_param_tiers`.
 - [ ] `ArrheniusTemperature` modifier (isothermal runs for M1) + unit test. Reuses the
       `RateModifier` hook built in D-10 (no new mechanism needed); targets *both* growth
       and uptake, with `factor` possibly >1 above the reference temperature.

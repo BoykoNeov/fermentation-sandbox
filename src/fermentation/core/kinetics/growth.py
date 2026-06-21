@@ -57,9 +57,9 @@ class GrowthNitrogenLimited(Process):
     name = "growth_nitrogen_limited"
     tier = Tier.PLAUSIBLE
     touches = ("X", "S", "N")
-    #: Parameters this Process reads. Declared so the parameter-tier-propagation
-    #: task can cap the Process's output tier by its inputs' tiers (D-1); not yet
-    #: consumed by ``ProcessSet.tier_of`` — see ``docs/plans/milestone-1-tasks.md``.
+    #: Parameters this Process reads. :meth:`ProcessSet.tier_of` folds their tiers
+    #: into the output tier of ``X``/``S``/``N`` (parameter-tier propagation, D-1),
+    #: so a speculative parameter here caps those outputs at speculative.
     reads: tuple[str, ...] = ("mu_max", "K_s", "K_n", "biomass_N_fraction", "biomass_C_fraction")
 
     def derivatives(

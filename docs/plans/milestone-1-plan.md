@@ -9,9 +9,11 @@
 > `GrowthNitrogenLimited` (Monod growth co-limited by sugar and YAN, conserving
 > carbon and nitrogen to machine precision), `SugarUptakeToEthanolCO2` (biomass-
 > catalysed Gay-Lussac flux, D-9), and `EthanolInhibition` (a multiplicative
-> `RateModifier` scaling uptake, D-10). Next: wire parameter-tier propagation into
-> `tier_of`, then the `ArrheniusTemperature` modifier, then source parameters, wire
-> the set into the media, and unskip the benchmarks.
+> `RateModifier` scaling uptake, D-10); and parameter-tier propagation into
+> `tier_of`/`tier_map`/`simulate` (each Process/modifier declares its `reads`; an
+> output's tier is capped by the tiers of those params, closing the D-1 gap). Next:
+> the `ArrheniusTemperature` modifier, then source parameters, wire the set into the
+> media, and unskip the benchmarks.
 > Goal: single-strain, isothermal, nitrogen-limited primary fermentation that
 > passes the §2.2 wine **and** beer benchmarks (decision D-B).
 

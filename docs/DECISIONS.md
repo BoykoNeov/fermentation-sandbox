@@ -32,12 +32,18 @@ the integration hot loop and complicate the math. Deriving the tier from
 contributors still guarantees "the tier travels to every output" — the actual
 prime directive — without the cost.
 **Deviation:** reinterprets handoff §1.2 ("each scalar should carry its tier").
-**Status (M0):** `ProcessSet.tier_of` currently propagates **Process** tiers
-only. A Process must also be capped by the tiers of the *parameters* it consumes
-(a VALIDATED process on speculative params must report speculative, not
-validated). That propagation lands in Milestone 1, when real Processes declare
-the parameters they read — see `milestone-1-tasks.md`. Until then the code's
-guarantee is narrower than this entry's "Processes and parameters" intent.
+**Status (M1):** closed. `ProcessSet.tier_of`/`tier_map`/`overall_tier` now take an
+optional `param_tiers` map and fold in the tiers of the parameters each
+Process/modifier declares it `reads` (Process gained a `reads` attribute matching
+`RateModifier`). A VALIDATED process running on a speculative parameter therefore
+reports speculative — the credibility-borrowing this entry warned about is gone.
+The runtime path carries it end-to-end: `simulate(..., param_tiers=...)` forwards
+into `Trajectory.tier_map` (build the map with `ParameterSet.tier_map()`). Two
+honesty guards: a declared `read` absent from `param_tiers` raises `KeyError`
+rather than defaulting to validated; and `param_tiers=None` yields the *structural*
+(Process/modifier-only) tier — still useful, but narrower, so reporting paths pass
+the map. See `tests/test_process.py` (parameter-tier propagation) and
+`tests/test_integrate.py::test_trajectory_tier_map_caps_on_param_tiers`.
 
 ### D-2 — Provenance enforced by schema, not convention
 **Decision:** parameters load through Pydantic models that *require*
@@ -243,8 +249,8 @@ it onto the *entire contribution vector* of every Process it targets, before sum
   the tiers of the modifiers scaling any Process that touches it, so a speculative
   modifier on a validated Process reports speculative — the same weakest-input rule,
   extended to the multiplicative path. (Parameter-tier propagation — capping by the
-  tiers of the `reads` params — remains the *next* task; modifiers declare `reads`
-  ready for it.)
+  tiers of the `reads` params, including a modifier's own `reads` — is now wired into
+  `tier_of`; see D-1's M1 status.)
 **Deviation from D-9:** D-9 said inhibition would live "inside the uptake rate or in
 the modifier-hook the `ArrheniusTemperature` task introduces" — i.e. it assumed the
 hook would arrive *with* Arrhenius. We build it one task earlier, here, with

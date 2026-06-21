@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from fermentation.core.process import ProcessSet
+from fermentation.core.process import Process, ProcessSet
+from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate
 from fermentation.validation import assert_conserved, assert_nonnegative, max_drift
 
@@ -44,3 +45,43 @@ def test_trajectory_tier_map_propagates(toy_schema, toy_process):
     traj = simulate(ps, params={}, y0=y0, t_span=(0.0, 50.0))
     assert traj.tier_map["S"].label == "validated"
     assert traj.overall_tier().label == "validated"
+
+
+class ParamReadingToy(Process):
+    """A VALIDATED toy that reads one parameter — for the runtime D-1 path test.
+
+    Linear sugar -> ethanol so the run integrates cleanly; the point is the
+    declared ``reads``, which must flow into ``Trajectory.tier_map``.
+    """
+
+    name = "param_reading_toy"
+    tier = Tier.VALIDATED
+    touches = ("S", "E")
+    reads = ("vmax_param",)
+
+    def derivatives(self, t, y, schema, params):
+        d = schema.zeros()
+        s = schema.get(y, "S")
+        if s <= 0:
+            return d
+        d[schema.slice("S")] = -1.0
+        d[schema.slice("E")] = 1.0
+        return d
+
+
+def test_trajectory_tier_map_caps_on_param_tiers(toy_schema):
+    """The tier a *user sees* (Trajectory.tier_map) must reflect parameter tiers,
+    not just Process tiers — that is the D-1 gap simulate now closes."""
+    ps = ProcessSet(toy_schema, [ParamReadingToy()])
+    y0 = toy_schema.pack({"S": 50.0, "E": 0.0, "CO2": 0.0})
+
+    # Without param_tiers: structural only -> validated (over-reports confidence).
+    bare = simulate(ps, params={}, y0=y0, t_span=(0.0, 50.0))
+    assert bare.tier_map["S"] is Tier.VALIDATED
+
+    # With a speculative parameter the process reads, the reported tier drops.
+    capped = simulate(
+        ps, params={}, y0=y0, t_span=(0.0, 50.0), param_tiers={"vmax_param": Tier.SPECULATIVE}
+    )
+    assert capped.tier_map["S"] is Tier.SPECULATIVE
+    assert capped.overall_tier() is Tier.SPECULATIVE

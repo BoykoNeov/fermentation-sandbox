@@ -71,10 +71,11 @@ class SugarUptakeToEthanolCO2(Process):
     name = "sugar_uptake_to_ethanol_co2"
     tier = Tier.PLAUSIBLE
     touches = ("S", "E", "CO2")
-    #: Parameters this Process reads (for parameter-tier propagation, D-1).
-    #: ``K_repression`` is read only on the multi-sugar (beer) path, but is
-    #: declared unconditionally — under D-1 it will conservatively cap wine's
-    #: E/CO2 tier even though wine never represses. See milestone-1-tasks.md.
+    #: Parameters this Process reads; :meth:`ProcessSet.tier_of` folds their tiers
+    #: into the output tier of ``S``/``E``/``CO2`` (parameter-tier propagation, D-1).
+    #: ``K_repression`` is read only on the multi-sugar (beer) path, but is declared
+    #: unconditionally — so it conservatively caps wine's E/CO2 tier too, even though
+    #: wine never represses.
     reads: tuple[str, ...] = ("q_sugar_max", "K_sugar_uptake", "K_repression")
 
     def derivatives(

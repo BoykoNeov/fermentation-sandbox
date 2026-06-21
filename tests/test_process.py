@@ -264,3 +264,85 @@ def test_duplicate_modifier_names_rejected():
     s = schema()
     with pytest.raises(ValueError, match="Duplicate modifier names"):
         ProcessSet(s, [ToyFermentation()], modifiers=[HalfRate(), HalfRate()])
+
+
+# -- parameter-tier propagation (D-1) ----------------------------------------
+
+
+class ParamReadingProcess(Process):
+    """A VALIDATED process that reads one parameter — exercises D-1 tier capping."""
+
+    name = "param_reading"
+    tier = Tier.VALIDATED
+    touches = ("S", "E")
+    reads = ("k_rate",)
+
+    def derivatives(self, t, y, schema, params):
+        return schema.zeros()
+
+
+class ParamReadingModifier(RateModifier):
+    """A VALIDATED modifier reading one parameter, scaling ``param_reading``."""
+
+    name = "param_reading_mod"
+    tier = Tier.VALIDATED
+    modifies = ("param_reading",)
+    reads = ("k_mod",)
+
+    def factor(self, t, y, schema, params):
+        return 1.0
+
+
+def test_speculative_param_caps_validated_process_output():
+    s = schema()
+    ps = ProcessSet(s, [ParamReadingProcess()])
+    # The process is VALIDATED, but it reads a speculative parameter, so the
+    # variables it touches must report speculative — no credibility borrowing (D-1).
+    spec = {"k_rate": Tier.SPECULATIVE}
+    assert ps.tier_of("S", spec) is Tier.SPECULATIVE
+    assert ps.tier_of("E", spec) is Tier.SPECULATIVE
+    assert ps.overall_tier(spec) is Tier.SPECULATIVE
+    assert ps.tier_map(spec) == {"S": Tier.SPECULATIVE, "E": Tier.SPECULATIVE, "X": Tier.VALIDATED}
+    # A variable the process does not touch is unaffected by its reads.
+    assert ps.tier_of("X", spec) is Tier.VALIDATED
+
+
+def test_validated_param_leaves_process_tier_unchanged():
+    s = schema()
+    ps = ProcessSet(s, [ParamReadingProcess()])
+    # Flip the same parameter to VALIDATED and the output stays VALIDATED — the cap
+    # is exactly the lowest input tier, nothing lower invented.
+    val = {"k_rate": Tier.VALIDATED}
+    assert ps.tier_of("S", val) is Tier.VALIDATED
+    assert ps.overall_tier(val) is Tier.VALIDATED
+
+
+def test_param_tiers_omitted_is_structural_only():
+    s = schema()
+    ps = ProcessSet(s, [ParamReadingProcess()])
+    # Without param_tiers the result is the process's own (validated) tier — the
+    # narrower, pre-D-1 structural answer that ignores its reads.
+    assert ps.tier_of("S") is Tier.VALIDATED
+    assert ps.tier_map() == {"S": Tier.VALIDATED, "E": Tier.VALIDATED, "X": Tier.VALIDATED}
+
+
+def test_speculative_param_read_by_modifier_drags_target_down():
+    s = schema()
+    ps = ProcessSet(s, [ParamReadingProcess()], modifiers=[ParamReadingModifier()])
+    # Both process and modifier are VALIDATED, but the modifier reads a speculative
+    # parameter -> every variable the modified process touches goes speculative.
+    tiers = {"k_rate": Tier.VALIDATED, "k_mod": Tier.SPECULATIVE}
+    assert ps.tier_of("S", tiers) is Tier.SPECULATIVE
+    assert ps.tier_of("E", tiers) is Tier.SPECULATIVE
+    # Disabling the modifier removes its speculative read from the variable's tier.
+    ps.disable("param_reading_mod")
+    assert ps.tier_of("S", tiers) is Tier.VALIDATED
+
+
+def test_declared_read_missing_from_param_tiers_raises():
+    s = schema()
+    ps = ProcessSet(s, [ParamReadingProcess()])
+    # k_rate is a declared read but absent from the supplied map: fail loudly rather
+    # than silently treat an unknown-provenance input as validated.
+    with pytest.raises(KeyError, match="k_rate"):
+        ps.tier_of("S", {"unrelated": Tier.VALIDATED})

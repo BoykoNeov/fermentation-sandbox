@@ -71,6 +71,13 @@ class ParameterSet:
         chosen = self._params if names is None else {n: self[n] for n in names}
         return combine(p.tier for p in chosen.values())
 
+    def tier_map(self) -> dict[str, Tier]:
+        """``{name: tier}`` for every parameter — the tier counterpart to
+        :meth:`resolve`. Pass it to ``ProcessSet.tier_of``/``tier_map`` (or
+        ``simulate(..., param_tiers=...)``) so a Process's output tier is capped by
+        the tiers of the parameters it reads (parameter-tier propagation, D-1)."""
+        return {n: p.tier for n, p in self._params.items()}
+
     def merge(self, other: ParameterSet, *, override: bool = False) -> ParameterSet:
         """Combine two sets. By default a name collision is an error; with
         ``override=True``, ``other`` wins (e.g. a strain-specific overlay on top

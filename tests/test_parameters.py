@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from fermentation.core.process import Process, ProcessSet
+from fermentation.core.state import StateSchema, VarSpec
 from fermentation.core.tiers import Tier
 from fermentation.parameters import Parameter, ParameterSet, Uncertainty
 from fermentation.parameters.store import load_parameters
@@ -84,6 +86,34 @@ def test_parameterset_resolve_and_tier():
     assert ps.resolve(["a"]) == {"a": 0.33}
     assert ps.lowest_tier() is Tier.SPECULATIVE
     assert ps.lowest_tier(["a"]) is Tier.VALIDATED
+
+
+def test_parameterset_tier_map_bridges_to_process_tier_propagation():
+    """The production seam D-1 closes: a parameter's YAML tier ->
+    ``ParameterSet.tier_map()`` -> ``ProcessSet.tier_of`` caps a validated process.
+    Every other propagation test hand-builds the ``{name: Tier}`` dict; this one
+    runs it through the real ``ParameterSet`` so the bridge itself is covered."""
+    params = ParameterSet(
+        [
+            Parameter(**good_param(name="k_rate", tier="speculative")),
+            Parameter(**good_param(name="k_other", tier="validated")),
+        ]
+    )
+    assert params.tier_map() == {"k_rate": Tier.SPECULATIVE, "k_other": Tier.VALIDATED}
+
+    class Reader(Process):
+        name = "reader"
+        tier = Tier.VALIDATED
+        touches = ("S",)
+        reads = ("k_rate",)
+
+        def derivatives(self, t, y, schema, params):
+            return schema.zeros()
+
+    pset = ProcessSet(StateSchema([VarSpec("S", "g/L")]), [Reader()])
+    # Structural-only over-reports; the real param tier map drags it to speculative.
+    assert pset.tier_of("S") is Tier.VALIDATED
+    assert pset.tier_of("S", params.tier_map()) is Tier.SPECULATIVE
 
 
 def test_parameterset_duplicate_rejected():

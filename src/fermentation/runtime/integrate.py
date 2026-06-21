@@ -25,7 +25,9 @@ class Trajectory:
 
     ``t`` has shape ``(n_times,)`` in internal hours; ``y`` has shape
     ``(n_vars, n_times)`` matching ``schema``. ``tier_map`` records the derived
-    confidence tier of each variable for honest downstream reporting.
+    confidence tier of each variable for honest downstream reporting — capped by
+    the tiers of the parameters each Process read when ``simulate`` was given
+    ``param_tiers`` (parameter-tier propagation, D-1), otherwise structural only.
     """
 
     schema: StateSchema
@@ -55,6 +57,7 @@ def simulate(
     y0: FloatArray,
     t_span: tuple[float, float],
     *,
+    param_tiers: Mapping[str, Tier] | None = None,
     t_eval: FloatArray | None = None,
     method: str = "BDF",
     rtol: float = 1e-6,
@@ -66,6 +69,12 @@ def simulate(
     Parameters mirror ``scipy.integrate.solve_ivp``; the implicit ``BDF`` default
     is deliberate (see module docstring). Returns a :class:`Trajectory` carrying
     the per-variable tier map derived from the active Processes.
+
+    ``param_tiers`` (a ``{name: Tier}`` map, e.g. ``ParameterSet.tier_map()``) caps
+    each variable's reported tier by the tiers of the parameters its Processes read
+    (parameter-tier propagation, D-1). Omit it and the tier map is structural only
+    — the Processes' own tiers, which over-reports confidence when they run on
+    speculative parameters. Pass it on any path whose tier a user will trust.
     """
     schema = process_set.schema
     y0 = np.asarray(y0, dtype=np.float64)
@@ -92,5 +101,5 @@ def simulate(
         y=sol.y,
         success=bool(sol.success),
         message=str(sol.message),
-        tier_map=process_set.tier_map(),
+        tier_map=process_set.tier_map(param_tiers),
     )
