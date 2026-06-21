@@ -213,6 +213,62 @@ Process. It must live either inside the uptake rate or in the modifier-hook
 mechanism the `ArrheniusTemperature` task introduces. Uptake's rate computation is
 kept isolated so a multiplicative modifier can wrap it. No inhibition is modelled
 yet, so an M1 uptake-only run ferments to complete dryness.
+**Resolved in D-10:** the modifier hook was built here (one task early), with
+`EthanolInhibition` as its first consumer, wrapping uptake's *whole contribution* at
+the `ProcessSet` level — so uptake needed no refactor after all.
+
+### D-10 — Rate modifiers: multiplicative mechanisms scale a Process at the ProcessSet level
+**Decision:** mechanisms that *scale* an existing flux rather than *add* one
+(ethanol inhibition now; Arrhenius temperature next) are `RateModifier` objects, not
+`Process` objects. A `RateModifier` declares `name`, `tier`, `modifies` (names of the
+Processes it scales) and `reads`, and returns a scalar `factor(t, y, schema, params)`.
+`ProcessSet` evaluates each active modifier's factor once per RHS call and multiplies
+it onto the *entire contribution vector* of every Process it targets, before summing.
+`EthanolInhibition` (`fermentation.core.kinetics.inhibition`) scales
+`SugarUptakeToEthanolCO2`.
+**Why this shape:**
+- *Multiplicative, so it cannot be a summed Process.* `ProcessSet` is additive (D-9);
+  an inhibition term that "multiplies onto" uptake cannot be a peer summed into the
+  same total. The modifier hook is the mechanism D-9 anticipated.
+- *Scale the whole vector at the `ProcessSet` level → conservation is free and uptake
+  needs no refactor.* Multiplying a conserving Process's complete `(dS, dE, dCO2)` by
+  one scalar preserves every balance it respects (a uniformly slower carbon-neutral
+  flux is still carbon-neutral), so the carbon/mass checks pass on an inhibited run
+  unchanged. Wrapping at the set level (not inside uptake) leaves uptake untouched and
+  unaware it is being inhibited — cleaner than the in-rate wrap D-9 literally
+  described. The `strict` touches contract still holds (scaling zeros stays zero).
+- *Togglable and tier-tracked like a Process (prime directive #3).* Modifiers share
+  the Processes' name space and enable/disable machinery; a disabled modifier
+  contributes factor 1 and drops out of tier derivation. `tier_of` caps a variable by
+  the tiers of the modifiers scaling any Process that touches it, so a speculative
+  modifier on a validated Process reports speculative — the same weakest-input rule,
+  extended to the multiplicative path. (Parameter-tier propagation — capping by the
+  tiers of the `reads` params — remains the *next* task; modifiers declare `reads`
+  ready for it.)
+**Deviation from D-9:** D-9 said inhibition would live "inside the uptake rate or in
+the modifier-hook the `ArrheniusTemperature` task introduces" — i.e. it assumed the
+hook would arrive *with* Arrhenius. We build it one task earlier, here, with
+`EthanolInhibition` as its first consumer; Arrhenius will *reuse* it (targeting both
+growth and uptake) rather than introduce it. Recorded so the reordering is explicit.
+**Functional form — Levenspiel/Luong "toxic power".** `f = (1 - E/E_max)^n` for
+`0 <= E < E_max`, else `0`, with `E_max = ethanol_tolerance` (existing param, read as
+a *wall*: the flux reaches zero there, matching its "viability collapses past
+tolerance" provenance) and `n = ethanol_inhibition_exponent` (new speculative param).
+`n > 1` (placeholder 2.0) makes the touchdown C¹-smooth (`f'(E_max) = 0`), avoiding
+the derivative kink a raw `n=1` linear form would put in the RHS for the BDF solver —
+the same smoothness argument as D-9's catabolite repression. `E` is clamped `>= 0` and
+`f` clamped at `0`, so a solver excursion cannot amplify the rate (factor > 1) or flip
+it negative (which would *create* sugar).
+**Known tension (tuning-task item; does not block this task):** the *placeholder*
+`E_max = 110` g/L sits below a 24 °Brix must's ~124-135 g/L final ethanol, so an
+inhibited wine run *stalls short of dryness* — opposite of benchmark #1. This is a
+parameter-sourcing problem (a high-alcohol must implies a high-tolerance strain;
+sourcing will likely push `E_max` to ~140-150, above `E_final`, so the ferment
+slows-then-completes), not a flaw in the form: conservation is unaffected (uniform
+scaling), the benchmark is skipped, and the unit tests assert the *mechanism* (smooth,
+monotone, in `[0,1]`, conservation-preserving, togglable), never
+dryness-under-inhibition. `EthanolInhibition` stays out of the `MEDIA` registry with
+the other kinetics until the full set lands.
 
 ## Deferred (decide early in the relevant milestone)
 

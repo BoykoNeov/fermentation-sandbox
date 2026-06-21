@@ -97,7 +97,17 @@ ethanol_tolerance:
   provenance:
     source: "author estimate"
     conditions: "generic wine strain, placeholder"
-    notes: "Viability collapses past a strain-specific tolerance."
+    notes: "Viability collapses past a strain-specific tolerance. Read by the EthanolInhibition modifier as the wall E_max in f = (1 - E/E_max)^n. PLACEHOLDER 110 sits below a 24 Brix must's ~124-135 g/L final ethanol, so an inhibited run currently stalls short of dryness; sourcing a high-tolerance strain (likely ~140-150) is the tuning-task fix (D-10)."
+
+ethanol_inhibition_exponent:
+  value: 2.0
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae, placeholder; Levenspiel 1980 / Luong 1985 inhibition form"
+    notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. n=1 is the raw linear (Ghose-Tyagi) form with a derivative kink at E_max; n>1 keeps the touchdown C1-smooth for the BDF solver and gives the 'tolerant then collapse' viability shape. Reconcile against fitted inhibition models in the reading list."
 
 E_a_growth:
   value: 50000.0

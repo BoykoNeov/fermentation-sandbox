@@ -4,7 +4,7 @@ from collections.abc import Mapping
 
 import pytest
 
-from fermentation.core.process import Process, ProcessSet
+from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import FloatArray, StateSchema, VarSpec
 from fermentation.core.tiers import Tier
 
@@ -146,3 +146,121 @@ def test_enable_disable_unknown_raises():
     ps = ProcessSet(s, [ToyFermentation()])
     with pytest.raises(KeyError):
         ps.disable("nope")
+
+
+# -- rate modifiers (the multiplicative path) --------------------------------
+
+
+class HalfRate(RateModifier):
+    """Scales its target Process's whole contribution by 0.5."""
+
+    name = "half_rate"
+    tier = Tier.PLAUSIBLE
+    modifies = ("toy_fermentation",)
+
+    def factor(self, t, y, schema, params):
+        return 0.5
+
+
+class SpecDamper(RateModifier):
+    """A speculative half-rate modifier, for tier-propagation tests."""
+
+    name = "spec_damper"
+    tier = Tier.SPECULATIVE
+    modifies = ("toy_fermentation",)
+
+    def factor(self, t, y, schema, params):
+        return 0.5
+
+
+def test_modifier_scales_only_its_target_process():
+    s = schema()
+    # ToyFermentation (S, E) is halved; SpeculativeAging (E only) is untouched.
+    ps = ProcessSet(s, [ToyFermentation(rate=2.0), SpeculativeAging()], modifiers=[HalfRate()])
+    y = s.pack({"S": 100.0, "E": 0.0, "X": 1.0})
+    d = ps.total_derivatives(0.0, y, {"Y_ethanol_sugar": 0.47})
+    # Sugar consumption halved: -2.0 -> -1.0.
+    assert s.get(d, "S") == pytest.approx(-1.0)
+    # Ethanol = halved toy yield (2*0.47*0.5) + the *unscaled* aging drain (-1e-3).
+    assert s.get(d, "E") == pytest.approx(2.0 * 0.47 * 0.5 - 1e-3)
+
+
+def test_modifiers_compose_multiplicatively():
+    s = schema()
+    ps = ProcessSet(s, [ToyFermentation(rate=2.0)], modifiers=[HalfRate(), SpecDamper()])
+    y = s.pack({"S": 100.0, "E": 0.0, "X": 1.0})
+    d = ps.total_derivatives(0.0, y, {"Y_ethanol_sugar": 0.47})
+    # 0.5 * 0.5 = 0.25 applied to -2.0.
+    assert s.get(d, "S") == pytest.approx(-0.5)
+
+
+def test_disabled_modifier_contributes_unit_factor():
+    s = schema()
+    ps = ProcessSet(s, [ToyFermentation(rate=2.0)], modifiers=[HalfRate()])
+    y = s.pack({"S": 100.0, "E": 0.0, "X": 1.0})
+    params = {"Y_ethanol_sugar": 0.47}
+    ps.disable("half_rate")
+    d = ps.total_derivatives(0.0, y, params)
+    assert s.get(d, "S") == pytest.approx(-2.0)  # full, unscaled rate restored
+
+
+def test_modifier_drags_target_variable_tier_down():
+    s = schema()
+    # ToyFermentation is VALIDATED; a SPECULATIVE modifier scaling it makes the
+    # variables it touches (S, E) report speculative.
+    ps = ProcessSet(s, [ToyFermentation()], modifiers=[SpecDamper()])
+    assert ps.tier_of("S") is Tier.SPECULATIVE
+    assert ps.tier_of("E") is Tier.SPECULATIVE
+    assert ps.overall_tier() is Tier.SPECULATIVE
+    # X is untouched by the process, so the modifier cannot reach it.
+    assert ps.tier_of("X") is Tier.VALIDATED
+    # Disabling the modifier restores the process's own validated tier.
+    ps.disable("spec_damper")
+    assert ps.tier_of("S") is Tier.VALIDATED
+    assert ps.overall_tier() is Tier.VALIDATED
+
+
+def test_modifier_preserves_strict_touch_contract():
+    s = schema()
+    # Scaling a contribution by a scalar keeps undeclared slots at zero, so strict
+    # mode still passes for a well-behaved process under a modifier.
+    ps = ProcessSet(s, [ToyFermentation(rate=2.0)], modifiers=[HalfRate()], strict=True)
+    y = s.pack({"S": 100.0, "E": 0.0, "X": 1.0})
+    d = ps.total_derivatives(0.0, y, {"Y_ethanol_sugar": 0.47})
+    assert s.get(d, "X") == 0.0
+
+
+def test_modifier_name_clashing_with_process_rejected():
+    s = schema()
+
+    class Clash(RateModifier):
+        name = "toy_fermentation"  # same as the process
+        tier = Tier.PLAUSIBLE
+        modifies = ("toy_fermentation",)
+
+        def factor(self, t, y, schema, params):
+            return 1.0
+
+    with pytest.raises(ValueError, match="clash with process names"):
+        ProcessSet(s, [ToyFermentation()], modifiers=[Clash()])
+
+
+def test_modifier_targeting_unknown_process_rejected():
+    s = schema()
+
+    class BadTarget(RateModifier):
+        name = "bad_target"
+        tier = Tier.PLAUSIBLE
+        modifies = ("nonexistent_process",)
+
+        def factor(self, t, y, schema, params):
+            return 1.0
+
+    with pytest.raises(ValueError, match="unknown process"):
+        ProcessSet(s, [ToyFermentation()], modifiers=[BadTarget()])
+
+
+def test_duplicate_modifier_names_rejected():
+    s = schema()
+    with pytest.raises(ValueError, match="Duplicate modifier names"):
+        ProcessSet(s, [ToyFermentation()], modifiers=[HalfRate(), HalfRate()])

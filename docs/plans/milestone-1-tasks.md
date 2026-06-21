@@ -37,12 +37,25 @@
       `Y_ethanol_sugar` stays the unused Tier-2 hook (D-8). New speculative params
       `q_sugar_max`/`K_sugar_uptake`/`K_repression`. Decision **D-9**; tests in
       `tests/test_kinetics_uptake.py`.
-- [ ] `EthanolInhibition` Process + unit test.
+- [x] `EthanolInhibition` Process + unit test. → `fermentation.core.kinetics.inhibition`.
+      Multiplicative, so **not** a summed Process: introduced the `RateModifier` hook
+      (`fermentation.core.process`) — `ProcessSet` scales each targeted Process's whole
+      contribution vector by the modifier's `factor`, preserving conservation and
+      needing no uptake refactor. Levenspiel/Luong wall form `f = (1 - E/E_max)^n`
+      (`E_max = ethanol_tolerance`; new speculative `ethanol_inhibition_exponent`, `n=2`
+      for a C¹-smooth touchdown), targeting `SugarUptakeToEthanolCO2` only (growth is
+      N-shut-off before E climbs). Modifier tiers wired into `tier_of`. Decision
+      **D-10**; tests in `tests/test_kinetics_inhibition.py` + modifier-mechanism tests
+      in `tests/test_process.py`. Held out of `MEDIA` with the other kinetics; the
+      placeholder `E_max=110 < E_final` stall is a tuning-task item, benchmark stays
+      skipped.
 - [ ] **Wire parameter-tier propagation into `ProcessSet.tier_of`** — each Process
       declares the params it reads; an output's tier = lowest of (its Processes'
       tiers, those params' tiers). Closes the D-1 gap so a VALIDATED process on
       speculative params reports speculative. Add a test asserting exactly this.
-- [ ] `ArrheniusTemperature` modifier hook (isothermal runs for M1) + unit test.
+- [ ] `ArrheniusTemperature` modifier (isothermal runs for M1) + unit test. Reuses the
+      `RateModifier` hook built in D-10 (no new mechanism needed); targets *both* growth
+      and uptake, with `factor` possibly >1 above the reference temperature.
 - [ ] Source + reconcile parameters; replace `wine_generic.yaml` placeholders and
       add `beer_generic.yaml`; re-tag tiers. (Biggest effort — handoff §2.3.)
 - [ ] Tune functional forms + parameters against the curves.

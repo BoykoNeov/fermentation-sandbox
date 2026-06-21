@@ -28,7 +28,7 @@ Package map:
 |-------|---------|-----------|
 | parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` |
 | units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, … |
-| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon fractions, Gay-Lussac split, `sugar_species`); `kinetics` (`GrowthNitrogenLimited`) |
+| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon fractions, Gay-Lussac split, `sugar_species`); `kinetics` (`GrowthNitrogenLimited`, `SugarUptakeToEthanolCO2`, `EthanolInhibition`) |
 | runtime | `fermentation.runtime` | `simulate`, `Trajectory` |
 | scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
@@ -56,6 +56,21 @@ it. Toggling a speculative Process off leaves the validated core intact.
 
 In `strict=True` mode, `ProcessSet` verifies every Process only writes to the
 variables it declared — a cheap guard used in tests.
+
+### Rate modifiers
+Some mechanisms *scale* an existing flux rather than *add* a new one — ethanol
+inhibition slows fermentative uptake; Arrhenius temperature scales every rate
+constant. Because `ProcessSet` **sums** Processes, these cannot be summed Processes
+(they would add to a derivative, not multiply it). A `RateModifier` declares which
+Processes it `modifies` (by name) and returns a scalar `factor`; `ProcessSet`
+multiplies that factor onto the *entire contribution vector* of each targeted
+Process before summing. Scaling a conserving Process's whole contribution by one
+scalar preserves its mass/atom balances, so a modifier never breaks conservation,
+and the `touches` contract still holds (scaling zeros stays zero). Modifiers are
+enabled/disabled and feed `tier_of` exactly like Processes — a speculative modifier
+drags the tier of the variables its target touches down to speculative.
+`EthanolInhibition` is the first modifier; `ArrheniusTemperature` reuses the hook.
+(See DECISIONS #10.)
 
 ## Confidence tiers
 
