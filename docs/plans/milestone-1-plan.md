@@ -4,8 +4,11 @@
 > `compile_scenario` seam (`fermentation.core.media`,
 > `fermentation.scenario.compile`); the carbon/nitrogen/mass conservation quantity
 > functions (`fermentation.validation.total_carbon`/`total_nitrogen`/`total_mass`
-> over the shared `fermentation.core.chemistry` stoichiometry, decision D-8). Next:
-> the kinetic Processes (growth → sugar uptake → ethanol inhibition).
+> over the shared `fermentation.core.chemistry` stoichiometry, decision D-8); the
+> first kinetic Process, `GrowthNitrogenLimited` (`fermentation.core.kinetics`) —
+> Monod growth co-limited by sugar and YAN, conserving carbon and nitrogen to
+> machine precision. Next: sugar uptake → ethanol inhibition, then wire the set
+> into the media and unskip the benchmarks.
 > Goal: single-strain, isothermal, nitrogen-limited primary fermentation that
 > passes the §2.2 wine **and** beer benchmarks (decision D-B).
 

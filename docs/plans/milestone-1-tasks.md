@@ -17,7 +17,16 @@
       passed-in Parameter — `biomass_C_fraction`/`biomass_N_fraction` in the
       store); mass is scoped to the abiotic `S+E+CO2` conversion. Decision D-8;
       tests in `tests/test_chemistry.py`, `tests/test_validation.py`.
-- [ ] `GrowthNitrogenLimited` Process + unit test.
+- [x] `GrowthNitrogenLimited` Process + unit test. → `fermentation.core.kinetics`
+      (`GrowthNitrogenLimited`). Monod growth co-limited by sugar and YAN
+      (`mu = mu_max·S/(K_s+S)·N/(K_n+N)`, `dX/dt = mu·X`); draws nitrogen *and* the
+      biomass carbon skeleton from `N`/`S` so it conserves `total_nitrogen` and
+      `total_carbon` on its own to machine precision (no anabolic CO2 in M1 —
+      D-8). Held **out of the `MEDIA` registry** until the process set is complete
+      (a growth-only medium is a half-model and would break the no-kinetics
+      baseline test). Tests in `tests/test_kinetics_growth.py`. The S-slot→species
+      map moved core-ward to `fermentation.core.chemistry.sugar_species` (core may
+      not import validation), shared by the Process and the carbon check.
 - [ ] `SugarUptakeToEthanolCO2` Process (Gay-Lussac yield; vector-aware for beer)
       + unit test.
 - [ ] `EthanolInhibition` Process + unit test.

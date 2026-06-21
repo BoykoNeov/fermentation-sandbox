@@ -120,6 +120,19 @@ otherwise).
     (`wine_dryness` = days-to-dryness, `beer_attenuation` = days-to-gravity,
     `co2_peak_then_tail` = a CO₂/sugar *ratio*). The realised-yield parameter
     (`Y_ethanol_sugar = 0.47`) stays in the store for when glycerol arrives.
+  - *Biomass carbon is routed from sugar, with no anabolic CO₂ (M1).*
+    `GrowthNitrogenLimited` draws the new biomass's carbon skeleton straight from
+    `S` (`carbon(S) removed = biomass_C_fraction · dX`), so `total_carbon` over
+    `{S, E, CO₂, X}` closes to machine precision under growth alone. Respiratory/
+    anabolic CO₂ is **not** modelled, so the biomass yield-on-sugar is carbon-cheap
+    (~0.82 g/g in isolation). This is immaterial for M1: nitrogen caps biomass near
+    `X₀ + N₀/f_N` (~2–3 g/L for wine), so only ~1–2 % of sugar is diverted to
+    biomass. *Consequence to revisit:* that 1–2 % carbon never appears as CO₂, which
+    eats into the `co2_peak_then_tail` ±5 % budget — a tuning note for when that
+    benchmark is unskipped, not a problem now. Because biomass pulls H/O from the
+    solvent (D-8's biomass-mass point), `total_mass` over `{S, E, CO₂}` does **not**
+    close once growth is active — carbon, not mass, is the invariant to assert on a
+    growth run.
 - **Nitrogen** is the second rigorous invariant: `total_nitrogen` sums free YAN
   `N` plus nitrogen bound in biomass (`biomass_N_fraction · X`). Conserved once
   the nitrogen-limited growth Process exists.
@@ -145,7 +158,10 @@ otherwise).
   core makes them a **single source of truth** shared by the conservation checks
   *and* the sugar-uptake Process, so a check can never disagree with the kinetics
   it audits. The toy test fixture derives its split from the same module for the
-  same reason.
+  same reason. The S-slot→species map (`chemistry.sugar_species`) lives here too,
+  for the same single-source-of-truth reason and because the core kinetics that
+  draw carbon from sugar cannot import the validation layer (one-directional
+  dependency) — `conservation.py` imports it back rather than duplicating it.
 - **Biomass elemental composition** (C-fraction ≈ 0.48, N-fraction ≈ 0.11 from the
   canonical `CH₁.₈O₀.₅N₀.₂` formula) is *empirical and uncertain* and is consumed
   by both the conservation check and the growth Process — so it is a **Parameter**

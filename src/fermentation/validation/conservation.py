@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.runtime.integrate import Trajectory
 
@@ -26,24 +26,6 @@ QuantityFn = Callable[[FloatArray], float]
 # above. Stoichiometric weights come from ``fermentation.core.chemistry`` (a single
 # source of truth shared with the kinetics), so the check cannot disagree with the
 # model it audits. What each balance covers, and why, is decision D-8.
-
-
-def _sugar_species(schema: StateSchema) -> list[str]:
-    """Map the ``S`` slots to chemical species for carbon accounting.
-
-    Beer's ``S`` names its components (glucose/maltose/maltotriose); wine's single
-    lumped slot is treated as a hexose. A multi-slot ``S`` without component names
-    is an error — we cannot weight its carbon without knowing the sugars.
-    """
-    spec = schema.spec("S")
-    if spec.components:
-        return list(spec.components)
-    if spec.size == 1:
-        return ["glucose"]
-    raise ValueError(
-        f"sugar 'S' has {spec.size} slots but no component names; cannot assign "
-        "carbon fractions"
-    )
 
 
 def _weighted_sum(weights: FloatArray) -> QuantityFn:
@@ -73,7 +55,7 @@ def total_carbon(
     """
     w = schema.zeros()
     s_slice = schema.slice("S")
-    for offset, species in enumerate(_sugar_species(schema)):
+    for offset, species in enumerate(sugar_species(schema)):
         w[s_slice.start + offset] = carbon_mass_fraction(species)
     if "E" in schema:
         w[schema.slice("E")] = carbon_mass_fraction("ethanol")

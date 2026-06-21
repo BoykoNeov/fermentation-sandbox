@@ -22,6 +22,8 @@ Standard atomic masses (IUPAC 2021, g/mol): C 12.011, H 1.008, O 15.999.
 
 from __future__ import annotations
 
+from fermentation.core.state import StateSchema
+
 # -- standard atomic masses (IUPAC 2021), g/mol -------------------------------
 _M_C = 12.011
 _M_H = 1.008
@@ -76,6 +78,32 @@ def carbon_mass_fraction(species: str) -> float:
         raise KeyError(
             f"unknown species {species!r}; known: {sorted(MOLAR_MASS)}"
         ) from None
+
+
+def sugar_species(schema: StateSchema) -> list[str]:
+    """Map a schema's ``S`` slots to chemical species names, in slot order.
+
+    Beer's ``S`` names its components (glucose/maltose/maltotriose); wine's single
+    lumped slot is treated as a hexose (glucose). A multi-slot ``S`` without
+    component names is an error — its carbon/mass weights are undefined without
+    knowing which sugars occupy the slots.
+
+    This is the single source of truth shared by every sugar-aware consumer —
+    the carbon-conservation check (:mod:`fermentation.validation.conservation`)
+    and the kinetic Processes that draw carbon from sugar — so a check can never
+    disagree with the kinetics it audits (decision D-8). It lives here, in the
+    core, because the validation layer may not be imported by the core that needs
+    it (the one-directional dependency rule).
+    """
+    spec = schema.spec("S")
+    if spec.components:
+        return list(spec.components)
+    if spec.size == 1:
+        return ["glucose"]
+    raise ValueError(
+        f"sugar 'S' has {spec.size} slots but no component names; cannot assign "
+        "carbon fractions"
+    )
 
 
 # -- Gay-Lussac stoichiometry of one hexose -----------------------------------
