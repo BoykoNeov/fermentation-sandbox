@@ -27,7 +27,8 @@ Benchmarks are quoted in days → convert at the assertion boundary.
 μ_max, K_s (sugar), K_n (nitrogen), ethanol-inhibition constant(s) + tolerance,
 biomass yield, ethanol yield (have ~0.47), Arrhenius A + E_a per rate,
 maintenance/decay rate, max population. Reconcile against:
-- Coleman et al. 2007 — temperature-dependent N-limited wine model (10.1128/AEM.00845-07)
+- Coleman et al. 2007 — temperature-dependent N-limited wine model (10.1128/aem.00670-07;
+  the earlier "00845-07" DOI here was wrong — that is a different paper. Corrected per D-12.)
 - Cramer et al. 2002; Malherbe et al. 2004 — wine kinetics
 - Gee & Ramirez 1988; de Andrés-Toro et al. 1998 — dynamic beer models
 

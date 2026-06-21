@@ -141,11 +141,32 @@ def test_load_shipped_wine_parameters():
     ps = load_parameters(DATA / "wine_generic.yaml")
     assert "mu_max" in ps
     assert "Y_ethanol_sugar" in ps
-    # The realised ethanol yield is the one literature-grounded value.
+    # The realised ethanol yield is literature-grounded.
     assert ps.tier_of("Y_ethanol_sugar") is Tier.PLAUSIBLE
-    # Placeholders are honestly tagged speculative.
-    assert ps.tier_of("mu_max") is Tier.SPECULATIVE
+    # mu_max is now sourced (Coleman 2007), so it is promoted out of speculative.
+    assert ps.tier_of("mu_max") is Tier.PLAUSIBLE
+    # K_s has no literature analogue (Coleman growth is Monod-on-N only) - still speculative.
+    assert ps.tier_of("K_s") is Tier.SPECULATIVE
     assert 0.46 <= ps.value("Y_ethanol_sugar") <= 0.48
+
+
+def test_load_shipped_beer_parameters():
+    ps = load_parameters(DATA / "beer_generic.yaml")
+    # Defines every parameter the medium-agnostic kinetics read.
+    read_params = {
+        "mu_max", "K_s", "K_n", "q_sugar_max", "K_sugar_uptake", "K_repression",
+        "ethanol_tolerance", "ethanol_inhibition_exponent", "E_a_growth",
+        "E_a_uptake", "T_ref", "biomass_C_fraction", "biomass_N_fraction",
+    }
+    assert read_params <= set(ps.names)
+    # Sourced from Zamudio Lara et al. 2022 (open access).
+    assert ps.tier_of("mu_max") is Tier.PLAUSIBLE
+    assert ps.value("mu_max") == pytest.approx(0.098)
+    assert ps.tier_of("K_sugar_uptake") is Tier.PLAUSIBLE
+    # Honestly thinner than wine: transferred/derived values stay speculative.
+    assert ps.tier_of("K_n") is Tier.SPECULATIVE  # transferred from the wine fit
+    assert ps.tier_of("q_sugar_max") is Tier.SPECULATIVE  # derived, growth-coupled origin
+    assert ps.tier_of("E_a_growth") is Tier.SPECULATIVE  # de Andres-Toro primary not read
 
 
 def test_load_rejects_param_missing_provenance(tmp_path):

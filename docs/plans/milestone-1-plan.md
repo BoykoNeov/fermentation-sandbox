@@ -11,9 +11,11 @@
 > catalysed Gay-Lussac flux, D-9), and `EthanolInhibition` (a multiplicative
 > `RateModifier` scaling uptake, D-10); and parameter-tier propagation into
 > `tier_of`/`tier_map`/`simulate` (each Process/modifier declares its `reads`; an
-> output's tier is capped by the tiers of those params, closing the D-1 gap). Next:
-> the `ArrheniusTemperature` modifier, then source parameters, wire the set into the
-> media, and unskip the benchmarks.
+> output's tier is capped by the tiers of those params, closing the D-1 gap); the
+> `ArrheniusTemperature` modifier (D-11); and **sourced parameters** — `wine_generic.yaml`
+> rewritten from Coleman 2007 and `beer_generic.yaml` added from Zamudio Lara 2022, with
+> honest tiers (D-12). Next: **wire the kinetics into the `MEDIA` registry**, tune the
+> functional forms against the curves, and unskip the §2.2 benchmarks.
 > Goal: single-strain, isothermal, nitrogen-limited primary fermentation that
 > passes the §2.2 wine **and** beer benchmarks (decision D-B).
 

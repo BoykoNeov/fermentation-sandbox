@@ -73,8 +73,19 @@
       `E_a_uptake`, `T_ref`. Decision **D-11**; tests in `tests/test_kinetics_arrhenius.py`
       (incl. a 4-modifier full-run carbon/nitrogen closure and a warmer-ferments-faster
       directional check). Held out of `MEDIA` with the other kinetics.
-- [ ] Source + reconcile parameters; replace `wine_generic.yaml` placeholders and
-      add `beer_generic.yaml`; re-tag tiers. (Biggest effort — handoff §2.3.)
+- [x] Source + reconcile parameters; replace `wine_generic.yaml` placeholders and
+      add `beer_generic.yaml`; re-tag tiers. (Biggest effort — handoff §2.3.) →
+      Wine sourced from **Coleman, Fish & Block 2007** (`10.1128/aem.00670-07`, PDF
+      read directly): `mu_max` 0.095/h, `K_n` 0.0088 g/L, `q_sugar_max` 0.85 g/g/h
+      (= β_max/Y_E/S, eq 5), `K_sugar_uptake` 10.3 g/L, all at the 20 °C T_ref;
+      `E_a_growth/uptake` ≈55 kJ/mol derived from the log-linear T-slope
+      (`E_a = a1·R·T_ref²`); `ethanol_tolerance` 142 g/L from the Premier Cuvée /
+      EC-1118 TDS (18% v/v). Beer added from **Zamudio Lara et al. 2022**
+      (`10.3390/foods11223602`, open-access, Tables 5/6): `mu_max` 0.098/h,
+      `K_sugar_uptake` 12 g/L; the rest transferred/derived and kept speculative.
+      Tiers promoted only where a source measures *our* form; `K_s`,
+      `K_repression`, `ethanol_inhibition_exponent` stay speculative. Tests updated
+      (`test_compile.py`, `test_parameters.py`). Decision **D-12**.
 - [ ] Tune functional forms + parameters against the curves.
 - [ ] Unskip & pass `test_wine_24brix_ferments_to_dryness_in_10_to_14_days`.
 - [ ] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`.

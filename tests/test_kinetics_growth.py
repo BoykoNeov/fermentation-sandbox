@@ -27,9 +27,8 @@ from fermentation.validation import (
 
 @pytest.fixture
 def store():
-    # Real (placeholder-tier) wine parameters; the mechanism test reuses them for
-    # beer too — beer_generic.yaml does not exist yet and the kinetics are
-    # medium-agnostic, so this exercises the Process, not beer-specific values.
+    # Real (sourced) wine parameters; the kinetics are medium-agnostic, so the
+    # wine file suffices to exercise the Process mechanism (not beer-specific values).
     return load_parameters(default_data_dir() / "wine_generic.yaml")
 
 

@@ -1,73 +1,85 @@
-# Generic wine-yeast kinetic parameters — PLACEHOLDERS.
+# Generic wine-yeast kinetic parameters — strain Premier Cuvee (S. cerevisiae
+# var. bayanus, the Prise de Mousse / EC-1118 strain).
 #
-# These exist to exercise the parameter schema and the loader. The *values* are
-# order-of-magnitude placeholders, NOT sourced measurements, and are tagged
-# accordingly (tier: speculative, source: "author estimate"). Milestone 1's
-# parameter-sourcing task replaces each with a literature value carrying a real
-# DOI and the conditions it was measured under, and re-tags it (typically
-# plausible or validated). See docs/plans/milestone-1-*.md.
+# SOURCED (Milestone 1 parameter task). The growth and fermentative-uptake
+# constants and their temperature sensitivity come from the keystone wine model:
 #
-# Reading list to reconcile against (handoff section 2.1):
-#   Coleman et al. 2007 (10.1128/AEM.00845-07); Cramer et al. 2002;
-#   Malherbe et al. 2004.
+#   Coleman, M. C., Fish, R., & Block, D. E. (2007). "Temperature-Dependent
+#   Kinetic Model for Nitrogen-Limited Wine Fermentations." Appl. Environ.
+#   Microbiol. 73(18): 5875-5884. doi:10.1128/aem.00670-07.
+#
+# Coleman's model (their eqs 1-8) is structurally close to ours: growth is Monod
+# on nitrogen (mu = mu_max*N/(K_N+N)) and fermentative uptake is Michaelis-Menten
+# on sugar. Its parameters are NOT tabulated at single temperatures; they are
+# log-linear regressions in T (deg C), ln(param) = a0 + a1*T (Table A2; "Log" is
+# the NATURAL log — confirmed by the paper's own statement that mu_max ~ 0.05/h
+# at 11 C, matching exp(-3.92 + 0.0782*11) = 0.047). We evaluate each regression
+# at T_ref = 20 C (the wine benchmark temperature). See docs/DECISIONS.md (D-12).
+#
+# Conditions throughout: Premier Cuvee (Red Star), diluted Chardonnay must,
+# 265-300 g/L sugar, 70-350 mg N/L, isothermal 11-35 C.
+
+# -- Growth (Monod, nitrogen-limited) -----------------------------------------
 
 mu_max:
-  value: 0.33
+  value: 0.095
   unit: "1/h"
-  tier: speculative
-  uncertainty: { low: 0.15, high: 0.55, note: "strain- and temperature-dependent" }
+  tier: plausible
+  uncertainty: { low: 0.04, high: 0.32, note: "11 C -> 0.047/h, 35 C -> 0.31/h (factor ~6); strain/T-dependent" }
   provenance:
-    source: "author estimate"
-    conditions: "generic S. cerevisiae, ~20 C, placeholder"
-    notes: "Reconcile vs Coleman et al. 2007 nitrogen-limited model."
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must, 20 C; Table A2 regression ln(mu_max) = -3.92 + 0.0782*T(degC)"
+    notes: "Evaluated at T_ref = 20 C: exp(-3.92 + 0.0782*20) = 0.095/h. Was placeholder 0.33 (that is ~37 C on this regression). Range spans the measured 11-35 C window."
 
 K_s:
   value: 5.0
   unit: "g/L"
   tier: speculative
-  uncertainty: { low: 0.5, high: 25.0, note: "Monod half-saturation for sugar" }
+  uncertainty: { low: 0.5, high: 25.0, note: "Monod half-saturation for sugar in the GROWTH term" }
   provenance:
     source: "author estimate"
     conditions: "generic S. cerevisiae, placeholder"
-    notes: "Often poorly constrained; wide range intentional."
+    notes: "Coleman's growth is Monod on nitrogen ONLY (no sugar term), so the literature gives no analogue for our growth-stage sugar co-limitation guard. Kept as a speculative guard that growth cannot proceed once sugar is exhausted; high K_sugar_uptake affinity means it rarely binds. Distinct from K_sugar_uptake (the fermentative-flux constant, which IS sourced)."
 
 K_n:
-  value: 0.01
+  value: 0.0088
   unit: "g/L"
-  tier: speculative
-  uncertainty: { low: 0.001, high: 0.05, note: "half-saturation for YAN" }
+  tier: plausible
+  uncertainty: { low: 0.003, high: 0.03, note: "half-saturation for YAN; Coleman Fig 5a spread ~0.005-0.03 g/L" }
   provenance:
-    source: "author estimate"
-    conditions: "generic S. cerevisiae, placeholder"
-    notes: "Nitrogen limitation is the textbook stuck-ferment mechanism."
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; Table A2 ln(K_N) = -4.73 (found temperature-independent)"
+    notes: "exp(-4.73) = 0.00884 g N/L. Nitrogen limitation is the textbook stuck-ferment mechanism. Coleman report K_N as the one growth constant insensitive to T and initial conditions."
 
-# Sugar-uptake (fermentative flux) parameters — PLACEHOLDERS. The uptake Process
-# is biomass-catalysed (rate ~ q_sugar_max * X * Monod(S)), independent of growth,
-# so fermentation continues at a declining rate after nitrogen runs out and the
-# yeast stops dividing — this is what carries a must to dryness. Ethanol/CO2 yields
-# are NOT parameters: M1 uses the theoretical Gay-Lussac split from core.chemistry
-# so carbon and mass conserve exactly (decision D-8); the realised-yield parameter
-# Y_ethanol_sugar below is the Tier-2 (glycerol-diversion) hook, unused in M1.
+# -- Fermentative sugar uptake (Michaelis-Menten, biomass-catalysed) ----------
+# Decoupled from growth (decision D-9): ferments to dryness after N runs out.
+# Ethanol/CO2 yields are NOT parameters in M1 — the uptake uses the theoretical
+# Gay-Lussac split (core.chemistry) so carbon and mass conserve exactly (D-8);
+# Y_ethanol_sugar below is the deferred Tier-2 (glycerol-diversion) hook.
 
 q_sugar_max:
-  value: 1.0
+  value: 0.85
   unit: "g/g/h"   # g sugar consumed per g biomass per hour
-  tier: speculative
-  uncertainty: { low: 0.3, high: 2.5, note: "specific fermentative uptake rate; strain/T-dependent" }
+  tier: plausible
+  uncertainty: { low: 0.4, high: 2.7, note: "11 C -> 0.43, 35 C -> 2.7 g/g/h; specific fermentative uptake, strain/T-dependent" }
   provenance:
-    source: "author estimate"
-    conditions: "generic S. cerevisiae, ~20 C, placeholder"
-    notes: "Sets fermentation speed; reconcile vs Sablayrolles and Coleman et al. 2007 max-rate data."
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must, 20 C; Table A2 ln(beta_max) = -2.30 + 0.0771*T(degC), ln(Y_E/S) = -0.598"
+    notes: "Our uptake rate r is SUGAR consumed; Coleman eq 5 gives dS/dt = -(beta_max/Y_E/S)*[S/(K_S+S)]*X_A, so q_sugar_max = beta_max/Y_E/S = exp(-0.758)/exp(-0.598) = 0.469/0.550 = 0.85 g/g/h. (beta_max alone is the specific ETHANOL rate, eq 4; the 'g sugar' label on their Fig 3c is the loose one, eq 5 is authoritative.) CAVEAT for tuning: M1 applies this rate to TOTAL biomass with no active/inactive split, whereas Coleman's active X_A declines late — so M1 will over-catalyse the tail; revisit when fitting curves, do not pre-compensate the value here."
 
 K_sugar_uptake:
-  value: 2.0
+  value: 10.3
   unit: "g/L"
-  tier: speculative
-  uncertainty: { low: 0.1, high: 10.0, note: "Monod half-saturation for fermentative uptake" }
+  tier: plausible
+  uncertainty: { low: 5.0, high: 15.0, note: "Michaelis-Menten constant for sugar transport" }
   provenance:
-    source: "author estimate"
-    conditions: "generic S. cerevisiae, placeholder"
-    notes: "Transporter affinity is high (low K): rate holds near-max until sugar is nearly gone."
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; Table A2 ln(K_S) = 2.33 (temperature-independent)"
+    notes: "exp(2.33) = 10.3 g/L; the paper rounds it to '~10 g/liter'. Was placeholder 2.0."
 
 K_repression:
   value: 2.0
@@ -77,7 +89,7 @@ K_repression:
   provenance:
     source: "author estimate"
     conditions: "beer wort sequential uptake (glucose > maltose > maltotriose)"
-    notes: "Smooth catabolite repression: a higher sugar is suppressed while a more-preferred one remains. Beer-only — wine has a single sugar slot, so repression never applies."
+    notes: "Smooth catabolite repression: a higher sugar is suppressed while a more-preferred one remains. The form matches the Gee & Ramirez repression factors K'_G/(K'_G+G) etc.; their numeric constants were not accessible. Beer-only - wine has a single sugar slot, so repression never applies (kept here so the wine and beer files share one parameter set)."
 
 Y_ethanol_sugar:
   value: 0.47
@@ -87,17 +99,19 @@ Y_ethanol_sugar:
   provenance:
     source: "Gay-Lussac stoichiometry; realised yield, handoff section 2.1"
     conditions: "after biomass and glycerol diversion"
-    notes: "Theoretical max 0.511 g/g; realised 0.46-0.48 is well established. UNUSED in M1: the uptake Process uses the theoretical split (core.chemistry) for exact carbon/mass closure; this realised value is deferred to the Tier-2 glycerol-diversion Process (D-8)."
+    notes: "Theoretical max 0.511 g/g; realised 0.46-0.48 is well established. UNUSED in M1: the uptake Process uses the theoretical split (core.chemistry) for exact carbon/mass closure; this realised value is deferred to the Tier-2 glycerol-diversion Process (D-8). NB Coleman's fitted Y_E/S ~0.55 g/g exceeds the 0.511 theoretical maximum (a fitting/measurement artefact), so we keep the well-established realised 0.47 rather than their value."
+
+# -- Ethanol inhibition (Luong wall on the uptake flux, decision D-10) ---------
 
 ethanol_tolerance:
-  value: 110.0
+  value: 142.0
   unit: "g/L"
-  tier: speculative
-  uncertainty: { low: 95.0, high: 130.0, note: "~12-16.5% ABV equivalent" }
+  tier: plausible
+  uncertainty: { low: 120.0, high: 150.0, note: "~15-19% ABV equivalent" }
   provenance:
-    source: "author estimate"
-    conditions: "generic wine strain, placeholder"
-    notes: "Viability collapses past a strain-specific tolerance. Read by the EthanolInhibition modifier as the wall E_max in f = (1 - E/E_max)^n. PLACEHOLDER 110 sits below a 24 Brix must's ~124-135 g/L final ethanol, so an inhibited run currently stalls short of dryness; sourcing a high-tolerance strain (likely ~140-150) is the tuning-task fix (D-10)."
+    source: "Lallemand Lalvin EC-1118 / Premier Cuvee technical data sheet (alcohol tolerance 18% v/v)"
+    conditions: "S. cerevisiae var. bayanus (Prise de Mousse), the strain Coleman 2007 used"
+    notes: "18% v/v * 0.789 g/mL = 142 g/L. Read by EthanolInhibition as the wall E_max in f = (1 - E/E_max)^n. CAVEAT on tier: the VALUE is the strain's well-corroborated max-ABV spec (the same strain Coleman fitted), and the semantics line up (max ABV achievable ~ where rate->0 = E_max); but the Luong-wall FORM is our modelling choice, not Coleman's (they instead use an ethanol-driven death term k_d = k'_d*E). A 24 Brix must makes ~135 g/L ethanol at dryness, so this tolerance lets the strain finish - consistent with reality and NOT reverse-engineered from the benchmark."
 
 ethanol_inhibition_exponent:
   value: 2.0
@@ -106,53 +120,55 @@ ethanol_inhibition_exponent:
   uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent" }
   provenance:
     source: "author estimate"
-    conditions: "generic S. cerevisiae, placeholder; Levenspiel 1980 / Luong 1985 inhibition form"
-    notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. n=1 is the raw linear (Ghose-Tyagi) form with a derivative kink at E_max; n>1 keeps the touchdown C1-smooth for the BDF solver and gives the 'tolerant then collapse' viability shape. Reconcile against fitted inhibition models in the reading list."
+    conditions: "generic S. cerevisiae; Levenspiel 1980 / Luong 1985 inhibition form"
+    notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. n=1 is the raw linear (Ghose-Tyagi) form with a derivative kink at E_max; de Andres-Toro et al. 1998 use exactly this n=1 wall (f = 1 - E/(0.5*S0)) for beer. We keep n=2 so the touchdown is C1-smooth for the BDF solver and gives a 'tolerant then collapse' viability shape; the form has literature backing but the exponent itself is our numerical choice, hence speculative."
 
-# Arrhenius temperature dependence — PLACEHOLDERS. The rate constants are scaled by
-# f = exp(-(E_a/R)(1/T - 1/T_ref)), normalised to T_ref so that at T = T_ref the
-# *measured* rate constant (mu_max / q_sugar_max) is used unscaled — no separate
-# pre-exponential A is carried (it would double-book what the rate constant already
-# encodes; decision D-11). Activation energy is PER RATE (growth and fermentation
-# differ in temperature sensitivity): the ArrheniusTemperature.for_growth() modifier
-# reads E_a_growth, .for_uptake() reads E_a_uptake; both share T_ref.
+# -- Arrhenius temperature dependence (per-rate, decision D-11) ----------------
+# f = exp(-(E_a/R)(1/T - 1/T_ref)), normalised so the rate constant is used
+# unscaled at T_ref. Coleman models temperature as a log-linear regression in T,
+# not Arrhenius; we convert the local sensitivity to an equivalent activation
+# energy at T_ref: matching d(ln rate)/dT gives E_a = a1 * R * T_ref^2, where a1
+# is Coleman's Table A2 slope and R = 8.314462618 J/(mol K). See D-12.
 
 E_a_growth:
-  value: 50000.0
+  value: 55900.0
   unit: "J/mol"
-  tier: speculative
-  uncertainty: { low: 30000.0, high: 80000.0, note: "Arrhenius activation energy for growth" }
+  tier: plausible
+  uncertainty: { low: 49000.0, high: 63000.0, note: "from Coleman a1 95% credible region 0.0698-0.0879 /degC" }
   provenance:
-    source: "author estimate"
-    conditions: "placeholder for the Arrhenius temperature dependence of yeast growth"
-    notes: "Read by the ArrheniusTemperature(growth) modifier as E_a in f = exp(-(E_a/R)(1/T - 1/T_ref)). Placeholder 50 kJ/mol gives a ~2x slowdown per 10 C drop (Q10~2), biologically standard. Reconcile against fitted Arrhenius constants in the reading list (Coleman et al. 2007 is temperature-dependent)."
+    source: "Derived from Coleman, Fish & Block 2007 (doi:10.1128/aem.00670-07), Table A2 ln(mu_max) slope"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; equivalent Arrhenius E_a at T_ref = 293.15 K"
+    notes: "E_a = a1*R*T_ref^2 = 0.0782 * 8.314462618 * 293.15^2 = 55,900 J/mol (~Q10 2.1 near 20 C, biologically standard). Coleman's growth is slightly MORE temperature-sensitive than uptake (a1 0.0782 vs 0.0771)."
 
 E_a_uptake:
-  value: 50000.0
+  value: 55100.0
   unit: "J/mol"
-  tier: speculative
-  uncertainty: { low: 30000.0, high: 80000.0, note: "Arrhenius activation energy for fermentative uptake" }
+  tier: plausible
+  uncertainty: { low: 47000.0, high: 63000.0, note: "from Coleman beta_max a1 95% CR 0.0666-0.0885 /degC" }
   provenance:
-    source: "author estimate"
-    conditions: "placeholder for the Arrhenius temperature dependence of fermentative sugar uptake"
-    notes: "Read by the ArrheniusTemperature(uptake) modifier. A SEPARATE parameter from E_a_growth (growth and fermentation can differ in temperature sensitivity), but set equal to it here pending sourcing — the per-rate design lets them diverge once real data lands. Do NOT read a growth-vs-uptake ordering into these placeholders: a higher E_a means a *steeper* temperature dependence (rate falls off faster as T drops), so the ordering must come from fitted data (Sablayrolles; Coleman et al. 2007 max-rate vs temperature), not a guess."
+    source: "Derived from Coleman, Fish & Block 2007 (doi:10.1128/aem.00670-07), Table A2 ln(beta_max) slope"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; equivalent Arrhenius E_a at T_ref = 293.15 K"
+    notes: "E_a = a1*R*T_ref^2 = 0.0771 * 8.314462618 * 293.15^2 = 55,100 J/mol. A SEPARATE parameter from E_a_growth (the per-rate design lets them diverge); here they are close because Coleman's mu_max and beta_max regressions have nearly equal slopes."
 
 T_ref:
   value: 293.15
   unit: "K"
-  tier: speculative
-  uncertainty: { low: 288.15, high: 298.15, note: "calibration temperature the rate constants are anchored to" }
+  tier: plausible
+  uncertainty: { low: 288.15, high: 298.15, note: "the temperature the rate constants are anchored to" }
   provenance:
-    source: "author estimate"
-    conditions: "the temperature mu_max / q_sugar_max are measured at (placeholder ~20 C, matching their conditions)"
-    notes: "Reference temperature in the Arrhenius factor f = exp(-(E_a/R)(1/T - 1/T_ref)); at T = T_ref the measured rate constant is used unscaled. 20 C matches the mu_max/q_sugar_max placeholder conditions. Shared by the growth and uptake Arrhenius modifiers (D-11). When the rate constants are re-sourced, set this to the temperature *they* were measured at."
+    source: "Coleman, Fish & Block 2007 regression evaluation temperature (doi:10.1128/aem.00670-07)"
+    doi: "10.1128/aem.00670-07"
+    conditions: "20 C: the temperature at which mu_max and q_sugar_max are read off Coleman's T-regressions, and the wine benchmark temperature"
+    notes: "Reference temperature in f = exp(-(E_a/R)(1/T - 1/T_ref)); at T = T_ref the rate constants above are used unscaled. Shared by the growth and uptake Arrhenius modifiers (D-11). 20 C is the temperature mu_max/q_sugar_max are evaluated at, so by construction the Arrhenius factor is 1 there."
 
-# Biomass elemental composition. Empirical and shared with the (forthcoming)
-# growth Process, so it lives here as the single source of truth rather than as a
-# code constant — the carbon/nitrogen conservation checks take these values so a
-# check can never disagree with the kinetics (decision D-8). Derived from the
-# canonical dry-yeast formula CH1.8O0.5N0.2 (formula weight ~24.6 g/C-mol):
+# -- Biomass elemental composition (decision D-8) -----------------------------
+# Empirical, shared with the growth Process and the carbon/nitrogen conservation
+# checks (single source of truth). Dry-yeast formula CH1.8O0.5N0.2 (FW ~24.6):
 #   C fraction = 12.011 / 24.626 = 0.488;  N fraction = 0.2*14.007 / 24.626 = 0.114.
+# Corroborated by Coleman 2007: their Y_X/N ~ 9-10 g cell / g N at normal nitrogen
+# implies an N fraction of ~0.10-0.11, consistent with 0.114.
 
 biomass_C_fraction:
   value: 0.488
@@ -162,7 +178,7 @@ biomass_C_fraction:
   provenance:
     source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
     conditions: "S. cerevisiae dry cell weight, carbon mass fraction"
-    notes: "Well-supported across the bioprocess literature; not yet validated against our curves."
+    notes: "Well-supported across the bioprocess literature; not yet validated against our own curves."
 
 biomass_N_fraction:
   value: 0.114
@@ -172,4 +188,4 @@ biomass_N_fraction:
   provenance:
     source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
     conditions: "S. cerevisiae dry cell weight, nitrogen mass fraction"
-    notes: "Drops under nitrogen limitation; the textbook stuck-ferment regime sits at the low end."
+    notes: "Drops under nitrogen limitation; the textbook stuck-ferment regime sits at the low end. Coleman 2007 Y_X/N ~ 9-10 g/g at normal N corroborates (1/9.5 = 0.105)."

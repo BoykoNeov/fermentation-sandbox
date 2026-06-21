@@ -1,0 +1,188 @@
+# Generic ale-yeast kinetic parameters (S. cerevisiae, top-fermenting ale strain).
+#
+# SOURCED (Milestone 1 parameter task). It is HONESTLY THINNER than the wine
+# file: the published beer models are structurally further from ours than
+# Coleman's wine model is. The keystone open-access source is
+#
+#   Zamudio Lara, J. M., Dewasme, L., Hernandez Escoto, H., & Vande Wouwer, A.
+#   (2022). "Parameter Estimation of Dynamic Beer Fermentation Models."
+#   Foods 11(22): 3602. doi:10.3390/foods11223602  (CC-BY; ale fermentation,
+#   Grainfather pilot plant, 17-26 C). Tables 5 and 6 are read directly.
+#
+# Secondary structural reference (Arrhenius form, sequential sugar uptake,
+# n=1 ethanol wall) is de Andres-Toro et al. 1998, "A kinetic model for beer
+# production under industrial operational conditions," Math. Comput. Simul.
+# 48(1):65-74, doi:10.1016/S0378-4754(98)00147-5. Its numeric parameter table is
+# paywalled and was NOT read in-source; values attributed to it below are flagged.
+#
+# Caveats baked into the tiers: (a) Zamudio's growth is Droop-like
+# (mu = mu_max(1 - S_min/S)) and de Andres-Toro's is Monod-on-SUGAR; our growth
+# is Monod-on-nitrogen, so values transfer by magnitude, not by identity.
+# (b) Beer wort has real FAN (~150-250 mg N/L) so N-limited growth is defensible,
+# but no cited beer model fits a nitrogen constant - K_n is transferred from the
+# wine fit. (c) M1 runs are isothermal at 20 C, so the Arrhenius E_a's have NO
+# effect on the benchmark (f = 1 at T_ref); they are Tier-2 readiness only.
+#
+# Conditions throughout: generic ale yeast, ~12-15 Plato wort, isothermal ~20 C.
+
+# -- Growth (Monod, nitrogen-limited) -----------------------------------------
+
+mu_max:
+  value: 0.098
+  unit: "1/h"
+  tier: plausible
+  uncertainty: { low: 0.03, high: 0.21, note: "17 C -> 0.033/h, 26 C -> 0.20/h over the ale range" }
+  provenance:
+    source: "Zamudio Lara et al. 2022, Foods 11(22):3602, Table 5"
+    doi: "10.3390/foods11223602"
+    conditions: "ale yeast, Grainfather pilot plant, 20 C; mu_max = a*ln(T[degC]) + b, a=0.40, b=-1.1 /h"
+    notes: "Evaluated at 20 C: 0.40*ln(20) - 1.1 = 0.098/h. Matches the wine value (0.095/h) - both S. cerevisiae. NB their growth form is Droop-like (1 - S_min/S), so this is a max specific growth rate by magnitude, not an exact Monod mu_max."
+
+K_s:
+  value: 5.0
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.5, high: 25.0, note: "Monod half-saturation for sugar in the GROWTH term" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic ale yeast, placeholder"
+    notes: "No cited beer model fits a separate growth-stage sugar half-saturation (de Andres-Toro folds sugar activation into one Monod term; Zamudio uses a Droop S_min threshold of ~13 g/L instead). Kept as a speculative co-limitation guard, mirroring the wine file."
+
+K_n:
+  value: 0.0088
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.003, high: 0.03, note: "half-saturation for YAN; transferred from the wine fit" }
+  provenance:
+    source: "author estimate (transferred from Coleman 2007 wine K_N, doi:10.1128/aem.00670-07)"
+    conditions: "generic ale yeast; yeast-level nitrogen affinity assumed medium-independent"
+    notes: "The cited beer models (de Andres-Toro, Zamudio) use sugar-limited not nitrogen-limited growth, so no beer-specific K_n exists. Our growth Process is Monod-on-N (medium-agnostic code), so a value is required; we transfer the wine yeast value. Speculative because it is transferred, not beer-sourced."
+
+# -- Fermentative sugar uptake (Michaelis-Menten, biomass-catalysed) -----------
+
+q_sugar_max:
+  value: 1.5
+  unit: "g/g/h"
+  tier: speculative
+  uncertainty: { low: 0.5, high: 3.0, note: "specific fermentative uptake; derived, growth-coupled origin" }
+  provenance:
+    source: "Derived from Zamudio Lara et al. 2022 (doi:10.3390/foods11223602), Table 5"
+    conditions: "ale yeast, 20 C; k_S = 15.3 g sugar / g biomass, mu_max ~ 0.098 /h"
+    notes: "Zamudio's uptake is growth-coupled: dS/dt = -k_S*mu_X*X. The implied max specific uptake is k_S*mu_max = 15.3*0.098 = 1.5 g/g/h. Speculative: their growth is Droop-like (mu_X < mu_max always, so ~1.27 is the realised max at S0=88 g/L) and growth-coupled, whereas our uptake is biomass-catalysed and independent of growth."
+
+K_sugar_uptake:
+  value: 12.0
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 6.0, high: 18.0, note: "Michaelis-Menten constant for sugar; Zamudio CV 9%" }
+  provenance:
+    source: "Zamudio Lara et al. 2022, Foods 11(22):3602, Table 6 (K_S)"
+    doi: "10.3390/foods11223602"
+    conditions: "ale yeast, Grainfather pilot plant; sugar half-saturation of the CO2-based model"
+    notes: "Directly fitted K_S = 12.0 g/L (coefficient of variation 9%). Close to Coleman's wine value (10.3 g/L), as expected for S. cerevisiae sugar transport."
+
+K_repression:
+  value: 2.0
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.5, high: 5.0, note: "more-preferred-sugar conc. at half catabolite repression" }
+  provenance:
+    source: "author estimate"
+    conditions: "ale wort sequential uptake (glucose > maltose > maltotriose)"
+    notes: "Smooth catabolite repression of the higher sugars while a more-preferred one remains. The functional form matches the Gee & Ramirez repression factors K'_G/(K'_G+G) and K'_M/(K'_M+M) (see de Andres-Toro/Gee-Ramirez reviews), but their numeric constants were not accessible in-source, so the value stays an author estimate."
+
+Y_ethanol_sugar:
+  value: 0.46
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.40, high: 0.48, note: "realised yield below 0.511 theoretical" }
+  provenance:
+    source: "Gay-Lussac stoichiometry; corroborated by Zamudio Lara et al. 2022 (doi:10.3390/foods11223602)"
+    conditions: "ale fermentation; realised ethanol per sugar"
+    notes: "Theoretical max 0.511 g/g. Zamudio Table 5 gives k_E/k_S = 6.31/15.3 = 0.41 g/g for their ale (low end, partly reflecting ~12 g/L residual sugar). UNUSED in M1: uptake uses the theoretical Gay-Lussac split for exact carbon/mass closure (D-8); this is the deferred Tier-2 glycerol-diversion hook."
+
+# -- Ethanol inhibition (Luong wall on the uptake flux, decision D-10) ----------
+
+ethanol_tolerance:
+  value: 90.0
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 70.0, high: 100.0, note: "~9-12.7% ABV; ale yeasts are far less tolerant than wine" }
+  provenance:
+    source: "author estimate (generic ale yeast alcohol tolerance ~11-12% ABV)"
+    conditions: "generic top-fermenting ale strain"
+    notes: "Read by EthanolInhibition as the wall E_max. A 1.048 OG wort attenuates to only ~5% ABV (~40 g/L ethanol), well below tolerance, so for the M1 beer benchmark this term is essentially non-limiting. de Andres-Toro instead tie the wall to stoichiometry (E_max = 0.5*S0); we keep a fixed strain tolerance for parity with the wine file. Speculative: no specific strain sourced."
+
+ethanol_inhibition_exponent:
+  value: 2.0
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic ale yeast; Levenspiel 1980 / Luong 1985 inhibition form"
+    notes: "Exponent n in f = (1 - E/E_max)^n. de Andres-Toro et al. 1998 use n=1 (f = 1 - E/(0.5*S0)) for beer; we keep n=2 for a C1-smooth touchdown (BDF solver). Form is literature-backed, exponent is our numerical choice - speculative."
+
+# -- Arrhenius temperature dependence (per-rate, decision D-11) ----------------
+# INERT for M1: runs are isothermal at T_ref so f = 1 and these never bite.
+# Carried for Tier-2 readiness. de Andres-Toro 1998 use mu = A*exp(B/RT) and
+# (per secondary reports) fit E_a ~ 35 kJ/mol for growth and ethanol production -
+# but their primary table was not read in-source, so we do NOT mint that as a
+# sourced value. We carry the verifiable wine-derived value (Coleman 2007) as a
+# yeast-generic placeholder, tagged speculative, with a range wide enough to
+# admit the lower beer figure.
+
+E_a_growth:
+  value: 55900.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 63000.0, note: "spans beer (~35 kJ/mol, de Andres-Toro, secondary) to wine (~56 kJ/mol, Coleman)" }
+  provenance:
+    source: "author estimate (yeast-generic; derived from Coleman 2007 wine fit, doi:10.1128/aem.00670-07)"
+    conditions: "generic ale yeast; equivalent Arrhenius E_a at T_ref = 293.15 K"
+    notes: "INERT at the isothermal 20 C benchmark (f = 1 at T_ref). de Andres-Toro 1998 report a lower beer growth E_a (~3.46e4 J/mol) but their primary parameter table is paywalled and was not directly verified, so we carry the verifiable Coleman-derived value pending primary access. Range admits both."
+
+E_a_uptake:
+  value: 55100.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 63000.0, note: "spans beer (~35 kJ/mol, de Andres-Toro, secondary) to wine (~55 kJ/mol, Coleman)" }
+  provenance:
+    source: "author estimate (yeast-generic; derived from Coleman 2007 wine fit, doi:10.1128/aem.00670-07)"
+    conditions: "generic ale yeast; equivalent Arrhenius E_a at T_ref = 293.15 K"
+    notes: "INERT at the isothermal 20 C benchmark. de Andres-Toro 1998 report a lower beer ethanol-production E_a (~3.50e4 J/mol), secondary and unverified; Coleman-derived value carried pending primary access."
+
+T_ref:
+  value: 293.15
+  unit: "K"
+  tier: plausible
+  uncertainty: { low: 288.15, high: 298.15, note: "ale fermentation reference temperature" }
+  provenance:
+    source: "Zamudio Lara et al. 2022 fermentation conditions (doi:10.3390/foods11223602)"
+    doi: "10.3390/foods11223602"
+    conditions: "20 C: the temperature mu_max is evaluated at, within the ale window (Zamudio 17-26 C; de Andres-Toro 8-24 C)"
+    notes: "Reference temperature in the Arrhenius factor; at T = T_ref the rate constants are used unscaled. By construction f = 1 at the 20 C beer benchmark."
+
+# -- Biomass elemental composition (decision D-8) -----------------------------
+# Same canonical S. cerevisiae formula CH1.8O0.5N0.2 as wine (ale yeast is the
+# same species). Single source of truth for the conservation checks.
+
+biomass_C_fraction:
+  value: 0.488
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.44, high: 0.50, note: "varies with growth conditions" }
+  provenance:
+    source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
+    conditions: "S. cerevisiae dry cell weight, carbon mass fraction (ale yeast is S. cerevisiae)"
+    notes: "Identical to the wine file - this is an organism-level constant, not medium-specific."
+
+biomass_N_fraction:
+  value: 0.114
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.08, high: 0.14, note: "C:N ~4-9 depending on N status" }
+  provenance:
+    source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
+    conditions: "S. cerevisiae dry cell weight, nitrogen mass fraction (ale yeast is S. cerevisiae)"
+    notes: "Identical to the wine file - organism-level constant."

@@ -106,9 +106,10 @@ one rule while still being type-checked.
   a magic number. Until kinetics land, `process_factories` is empty and a compiled
   medium integrates to a constant baseline (verified by test).
 **Status (M1):** schemas + seam done; Processes register into each `Medium` as
-they are implemented. `beer_generic.yaml` does not exist yet, so beer compiles
-only with an explicit `parameter_paths=` override (a clear `FileNotFoundError`
-otherwise).
+they are implemented. Both `wine_generic.yaml` and `beer_generic.yaml` now exist
+with sourced parameters (D-12), so `wine`/`beer` + the default `generic` strain
+compile without an override; an unsourced strain still raises a clear
+`FileNotFoundError`.
 
 ### D-8 — Conservation scope: carbon (+ nitrogen) are the rigorous invariants; mass is scoped to the abiotic conversion
 **Decision (what each balance covers):**
@@ -340,6 +341,71 @@ parameter-tier propagation (D-1) caps the scaled outputs at speculative accordin
 20 °C the rate-constant placeholders are anchored to); `E_a_growth` retained. All
 speculative. **Held out of the `MEDIA` registry** with the other kinetics until the
 full set lands. Tests in `tests/test_kinetics_arrhenius.py`.
+
+### D-12 — Parameter sourcing: keystone literature, honest mapping, honest tiers
+**Decision:** the placeholder kinetic constants are replaced with literature values
+(`wine_generic.yaml` rewritten, `beer_generic.yaml` added), each carrying a real DOI
+where the value traces to text actually read in-source. Keystone sources:
+- **Wine — Coleman, Fish & Block 2007**, *Appl. Environ. Microbiol.* 73(18):5875-5884,
+  `doi:10.1128/aem.00670-07` (PDF read directly). Strain Premier Cuvée (= EC-1118 /
+  Prise de Mousse, *S. cerevisiae* var. *bayanus*), Chardonnay must, 11-35 °C. Its
+  model is structurally close to ours (growth Monod-on-nitrogen, uptake
+  Michaelis-Menten on sugar), so `mu_max`, `K_n`, `q_sugar_max`, `K_sugar_uptake`,
+  and the temperature sensitivity map onto our parameters.
+- **Beer — Zamudio Lara et al. 2022**, *Foods* 11(22):3602,
+  `doi:10.3390/foods11223602` (open-access CC-BY, Tables 5/6 read directly). Real ale
+  fermentation, Grainfather pilot plant, 17-26 °C. Supplies `mu_max` and
+  `K_sugar_uptake`; corroborates the realised yield.
+
+**Three reconciliations worth recording (the task was reconciliation, not transcription):**
+- *Coleman's "Log" is the natural log*, not base-10 — confirmed by the paper's own
+  statement that `mu_max ≈ 0.05/h` at 11 °C matching `exp(-3.92 + 0.0782·11) = 0.047`
+  (base-10 gives 0.0009). All Table A2 regressions are evaluated at **T_ref = 20 °C**
+  (the wine benchmark temperature): e.g. `mu_max = exp(-3.92 + 0.0782·20) = 0.095/h`.
+- *Equivalent Arrhenius `E_a` from a log-linear regression.* Coleman models
+  temperature as `ln(rate) = a0 + a1·T(°C)`, **not** Arrhenius. Matching the local
+  sensitivity `d(ln rate)/dT` of our `f = exp(-(E_a/R)(1/T - 1/T_ref))` to Coleman's
+  slope gives `E_a = a1·R·T_ref²` → growth 55.9 kJ/mol (a1=0.0782), uptake 55.1 kJ/mol
+  (a1=0.0771). Transparent derivation, tier `plausible`. (These are **inert at the
+  isothermal M1 benchmark** — `f = 1` at `T_ref` — so they are Tier-2 readiness only.)
+- *`q_sugar_max` is `β_max / Y_E/S`, not `β_max`.* Coleman eq 5 gives
+  `dS/dt = -(β_max/Y_E/S)·[S/(K_S+S)]·X_A`; our uptake's rate is *sugar* consumed, so
+  `q_sugar_max = β_max/Y_E/S = 0.469/0.550 = 0.85 g/g/h` (β_max alone, eq 4, is the
+  specific *ethanol* rate). Sanity: `0.511 × 0.85 ≈ 0.43 g/g/h` ethanol ≈ Coleman's
+  observed β_max. The value was **not** selected to hit the benchmark timing (the #4
+  trap); the eq-5 coefficient match settles it.
+
+**`ethanol_tolerance` = 142 g/L (wine)** comes from the Premier Cuvée / EC-1118
+technical data sheet (18% v/v × 0.789). This is the *exact strain Coleman used*, so the
+value is sourced independently of the benchmark; it happening to exceed a 24 °Brix
+must's ~135 g/L final ethanol (resolving the D-10 stall) is a consequence, not the
+selection criterion. Tier `plausible` **with the caveat in-file** that the Luong-wall
+*form* is our modelling choice (Coleman instead uses an ethanol-driven death term);
+the value maps cleanly (max ABV achievable ≈ E_max where rate→0).
+
+**Honest tiers (prime directive #1; do not inflate):** only parameters that a source
+measures *in our functional form* are promoted to `plausible`. Staying `speculative`
+even after the sweep: `K_s` (Coleman growth is Monod-on-N only — no sugar term, so no
+analogue for our growth-stage co-limitation guard), `K_repression` (form matches
+Gee-Ramirez catabolite repression but no numeric constant was accessible),
+`ethanol_inhibition_exponent` (de Andrés-Toro use n=1; our n=2 is a C¹-smoothness
+choice). `Y_ethanol_sugar` stays at the well-established realised 0.47 — Coleman's
+fitted 0.55 g/g *exceeds* the 0.511 theoretical maximum (a fitting/measurement
+artefact) so it is not adopted.
+
+**Beer is honestly thinner.** Published beer models are structurally further from ours
+(Zamudio growth is Droop-like; de Andrés-Toro is Monod-on-*sugar*; neither is
+nitrogen-limited), so beer values transfer by magnitude, not identity, and more stay
+`speculative`: `K_n` is transferred from the wine fit (no beer model fits a nitrogen
+constant), `q_sugar_max` is derived from Zamudio's growth-coupled `k_S·mu_max`, and the
+beer `E_a`'s carry the verifiable Coleman-derived value rather than de Andrés-Toro's
+**~35 kJ/mol** — which is consistently *reported* in secondary sources but whose primary
+table (`doi:10.1016/S0378-4754(98)00147-5`, paywalled) was **not read in-source**, so
+its DOI is *not* minted onto an unread number (the uncertainty range admits it).
+
+**Deviation from context doc:** `milestone-1-context.md` lists Coleman as
+`10.1128/AEM.00845-07`; the correct DOI is **`10.1128/aem.00670-07`** (00845-07 is a
+different paper). Corrected here and in the YAML.
 
 ## Deferred (decide early in the relevant milestone)
 

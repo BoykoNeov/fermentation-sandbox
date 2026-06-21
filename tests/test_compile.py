@@ -70,9 +70,10 @@ def test_wine_time_span_is_hours():
 def test_wine_loads_provenance_parameters_by_medium_and_strain():
     compiled = compile_scenario(_wine_scenario())
     assert "mu_max" in compiled.parameters
-    assert compiled.param_values["mu_max"] == pytest.approx(0.33)
+    # Sourced from Coleman 2007 (regression evaluated at the 20 C T_ref).
+    assert compiled.param_values["mu_max"] == pytest.approx(0.095)
     # param_values is the plain hot-loop mapping; parameters keeps tiers/provenance.
-    assert compiled.parameters["mu_max"].provenance.source == "author estimate"
+    assert compiled.parameters["mu_max"].provenance.doi == "10.1128/aem.00670-07"
 
 
 def test_optional_ethanol_can_be_supplied():
@@ -88,16 +89,18 @@ def test_optional_ethanol_can_be_supplied():
 
 
 def test_beer_sugar_vector_is_packed_in_uptake_order():
-    # Beer params aren't sourced yet, so point at the wine file just to exercise
-    # the seam; we only assert the state layout here.
+    # This test only asserts the state layout; the explicit wine-file override keeps
+    # it independent of the beer parameter values (which beer_generic.yaml now holds).
     compiled = compile_scenario(_beer_scenario(), parameter_paths=[WINE_PARAMS])
     assert compiled.schema.get(compiled.y0, "S") == pytest.approx([15.0, 70.0, 20.0])
     assert compiled.schema.get(compiled.y0, "N") == pytest.approx(200.0 / 1000.0)
 
 
 def test_beer_without_param_file_reports_the_missing_source():
-    with pytest.raises(FileNotFoundError, match="beer_generic.yaml"):
-        compile_scenario(_beer_scenario())
+    # beer_generic.yaml now exists; an unsourced strain still has no file, so the
+    # missing-source path is exercised via a strain we have not added.
+    with pytest.raises(FileNotFoundError, match="beer_saison.yaml"):
+        compile_scenario(_beer_scenario(strain="saison"))
 
 
 # -- validation at the boundary -----------------------------------------------
