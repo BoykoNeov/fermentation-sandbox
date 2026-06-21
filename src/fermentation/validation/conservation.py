@@ -13,10 +13,130 @@ from collections.abc import Callable
 
 import numpy as np
 
-from fermentation.core.state import FloatArray
+from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.state import FloatArray, StateSchema
 from fermentation.runtime.integrate import Trajectory
 
 QuantityFn = Callable[[FloatArray], float]
+
+
+# -- conserved-quantity builders for the real chemistry -----------------------
+#
+# Each builder closes over a schema and returns a ``QuantityFn`` for the harness
+# above. Stoichiometric weights come from ``fermentation.core.chemistry`` (a single
+# source of truth shared with the kinetics), so the check cannot disagree with the
+# model it audits. What each balance covers, and why, is decision D-8.
+
+
+def _sugar_species(schema: StateSchema) -> list[str]:
+    """Map the ``S`` slots to chemical species for carbon accounting.
+
+    Beer's ``S`` names its components (glucose/maltose/maltotriose); wine's single
+    lumped slot is treated as a hexose. A multi-slot ``S`` without component names
+    is an error — we cannot weight its carbon without knowing the sugars.
+    """
+    spec = schema.spec("S")
+    if spec.components:
+        return list(spec.components)
+    if spec.size == 1:
+        return ["glucose"]
+    raise ValueError(
+        f"sugar 'S' has {spec.size} slots but no component names; cannot assign "
+        "carbon fractions"
+    )
+
+
+def _weighted_sum(weights: FloatArray) -> QuantityFn:
+    """A ``QuantityFn`` returning ``weights @ y`` (weights precomputed once)."""
+
+    def quantity(y: FloatArray) -> float:
+        return float(weights @ y)
+
+    return quantity
+
+
+def total_carbon(
+    schema: StateSchema, *, biomass_carbon_fraction: float | None = None
+) -> QuantityFn:
+    """Total carbon [g C / L] over sugars, ethanol, CO2 and biomass.
+
+    Carbon is the rigorous conservation invariant (atoms cannot be created or
+    destroyed): the model must route every gram of sugar carbon into ethanol,
+    CO2 or biomass. Each ``S`` slot is weighted by its species' carbon fraction
+    (single-slot ``S`` = hexose); ``E`` and ``CO2`` by theirs.
+
+    Biomass ``X`` contributes ``biomass_carbon_fraction * X``. That fraction is a
+    Parameter the growth Process also reads (decision D-8), so it is *passed in*
+    here to keep the check consistent with the kinetics. If the schema has an
+    ``X`` variable and no fraction is given, this raises rather than silently
+    under-counting carbon (which would report a false conservation violation).
+    """
+    w = schema.zeros()
+    s_slice = schema.slice("S")
+    for offset, species in enumerate(_sugar_species(schema)):
+        w[s_slice.start + offset] = carbon_mass_fraction(species)
+    if "E" in schema:
+        w[schema.slice("E")] = carbon_mass_fraction("ethanol")
+    if "CO2" in schema:
+        w[schema.slice("CO2")] = carbon_mass_fraction("CO2")
+    if "X" in schema:
+        if biomass_carbon_fraction is None:
+            raise ValueError(
+                "schema has biomass 'X'; pass biomass_carbon_fraction (the value "
+                "the growth Process uses) so the carbon check matches the kinetics"
+            )
+        w[schema.slice("X")] = biomass_carbon_fraction
+    return _weighted_sum(w)
+
+
+def total_nitrogen(
+    schema: StateSchema, *, biomass_nitrogen_fraction: float | None = None
+) -> QuantityFn:
+    """Total nitrogen [g N / L]: free YAN plus nitrogen bound in biomass.
+
+    As cells grow they assimilate ``N`` (yeast-assimilable nitrogen) into biomass,
+    so the invariant is ``N + biomass_nitrogen_fraction * X``. Like the biomass
+    carbon fraction, ``biomass_nitrogen_fraction`` is a Parameter the growth
+    Process reads and is passed in (decision D-8); required iff the schema has
+    biomass. Conserved once the nitrogen-limited growth Process exists.
+    """
+    w = schema.zeros()
+    if "N" in schema:
+        w[schema.slice("N")] = 1.0
+    if "X" in schema:
+        if biomass_nitrogen_fraction is None:
+            raise ValueError(
+                "schema has biomass 'X'; pass biomass_nitrogen_fraction (the value "
+                "the growth Process uses) so the nitrogen check matches the kinetics"
+            )
+        w[schema.slice("X")] = biomass_nitrogen_fraction
+    return _weighted_sum(w)
+
+
+def total_mass(schema: StateSchema) -> QuantityFn:
+    """Total mass [g/L] of the abiotic conversion species ``{S, E, CO2}`` — wine only.
+
+    Mass closes only for a *single hexose* (decision D-8): the wine reaction
+    ``C6H12O6 -> 2 C2H5OH + 2 CO2`` is mass-balanced (180.156 = 92.138 + 88.018
+    g/mol), so ``S + E + CO2`` is conserved to solver tolerance. It does **not**
+    generalise, for the same untracked-solvent reason biomass is excluded:
+    di-/trisaccharides *hydrolyse*, pulling water from the solvent into the product
+    pool (maltose adds ~5.3% mass, maltotriose ~7.1%), so ``S + E + CO2`` is not a
+    beer invariant. Carbon carries no such term (water has no carbon) and is the
+    rigorous cross-medium invariant — so this builder **rejects a multi-component
+    sugar** and beer relies on :func:`total_carbon`.
+    """
+    if "S" in schema and schema.spec("S").size > 1:
+        raise ValueError(
+            "total_mass is a hexose/wine check: a multi-component sugar hydrolyses "
+            "(pulling solvent water into S+E+CO2), so mass does not close. Use "
+            "total_carbon, which is conserved across media (decision D-8)."
+        )
+    w = schema.zeros()
+    for name in ("S", "E", "CO2"):
+        if name in schema:
+            w[schema.slice(name)] = 1.0
+    return _weighted_sum(w)
 
 
 def _evaluate(traj: Trajectory, quantity_fn: QuantityFn) -> FloatArray:

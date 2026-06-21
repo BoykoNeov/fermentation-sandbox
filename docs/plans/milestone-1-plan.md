@@ -2,8 +2,10 @@
 
 > Status: **in progress**. Done: medium state schemas + the scenario→core
 > `compile_scenario` seam (`fermentation.core.media`,
-> `fermentation.scenario.compile`). Next: conservation quantity functions, then
-> the kinetic Processes.
+> `fermentation.scenario.compile`); the carbon/nitrogen/mass conservation quantity
+> functions (`fermentation.validation.total_carbon`/`total_nitrogen`/`total_mass`
+> over the shared `fermentation.core.chemistry` stoichiometry, decision D-8). Next:
+> the kinetic Processes (growth → sugar uptake → ethanol inhibition).
 > Goal: single-strain, isothermal, nitrogen-limited primary fermentation that
 > passes the §2.2 wine **and** beer benchmarks (decision D-B).
 

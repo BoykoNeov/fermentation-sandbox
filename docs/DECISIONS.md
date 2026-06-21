@@ -104,6 +104,57 @@ they are implemented. `beer_generic.yaml` does not exist yet, so beer compiles
 only with an explicit `parameter_paths=` override (a clear `FileNotFoundError`
 otherwise).
 
+### D-8 — Conservation scope: carbon (+ nitrogen) are the rigorous invariants; mass is scoped to the abiotic conversion
+**Decision (what each balance covers):**
+- **Carbon** is the primary rigorous invariant. `total_carbon` sums grams of
+  carbon over `{S (per sugar component), E, CO₂, X}`. To make it close *exactly*,
+  M1's sugar→ethanol+CO₂ kinetics use the **theoretical** Gay-Lussac split
+  (`C₆H₁₂O₆ → 2 C₂H₅OH + 2 CO₂`), which is carbon- and mass-balanced by atom
+  count. The realised-yield gap (literature ~0.46–0.48 g ethanol/g sugar vs the
+  0.511 theoretical) is real chemistry — carbon diverted to **glycerol and
+  organic acids** — but those byproducts are Tier-2 and not tracked in M1. So
+  that carbon sink is **deferred**, not lost.
+  - *Visible consequence:* the M1 model's realised ethanol yield reads slightly
+    high (~0.49–0.50, near theoretical) until the glycerol Process lands. This is
+    acceptable because **none of the three M1 benchmarks gate on absolute ABV**
+    (`wine_dryness` = days-to-dryness, `beer_attenuation` = days-to-gravity,
+    `co2_peak_then_tail` = a CO₂/sugar *ratio*). The realised-yield parameter
+    (`Y_ethanol_sugar = 0.47`) stays in the store for when glycerol arrives.
+- **Nitrogen** is the second rigorous invariant: `total_nitrogen` sums free YAN
+  `N` plus nitrogen bound in biomass (`biomass_N_fraction · X`). Conserved once
+  the nitrogen-limited growth Process exists.
+- **Mass** closes only for a single **hexose** (wine): `C₆H₁₂O₆ → 2 C₂H₅OH + 2 CO₂`
+  is mass-balanced (`180.156 = 92.138 + 88.018 g/mol`), so `total_mass` sums
+  `{S, E, CO₂}` and is conserved to solver tolerance there. It does **not**
+  generalise, by the same untracked-solvent-H/O mechanism in two places: (a)
+  di-/trisaccharide uptake *hydrolyses*, pulling water into the product pool —
+  maltose adds ~5.3% mass, maltotriose ~7.1% — so `{S,E,CO₂}` mass is **not** a
+  beer invariant; and (b) dry biomass draws H/O from the solvent, so whole-system
+  dry mass over `{X,S,E,N,CO₂}` does not close (~1–2%) either. **Carbon is the
+  rigorous cross-medium invariant** (water carries no carbon — 12 C in maltose, 12
+  C out), so `total_mass` *rejects a multi-component sugar* and beer relies on
+  `total_carbon`. This narrows the CLAUDE.md "carbon/nitrogen/mass must balance"
+  line: carbon and nitrogen are the enforced **atom** balances across media; mass
+  is the wine/hexose abiotic-conversion check. Recorded here so the scoping is explicit, not silent.
+
+**Why / where constants live:**
+- Stoichiometric constants — molar masses and carbon-atom counts of glucose /
+  maltose / maltotriose / ethanol / CO₂ — are exact consequences of the chemical
+  formulae, so (like the conversion factors in `fermentation.units`, D-3) they
+  live in code with citations: `fermentation.core.chemistry`. Putting them in the
+  core makes them a **single source of truth** shared by the conservation checks
+  *and* the sugar-uptake Process, so a check can never disagree with the kinetics
+  it audits. The toy test fixture derives its split from the same module for the
+  same reason.
+- **Biomass elemental composition** (C-fraction ≈ 0.48, N-fraction ≈ 0.11 from the
+  canonical `CH₁.₈O₀.₅N₀.₂` formula) is *empirical and uncertain* and is consumed
+  by both the conservation check and the growth Process — so it is a **Parameter**
+  (provenance store), not a code constant. `total_carbon`/`total_nitrogen` take the
+  biomass fraction as a **passed-in argument** (the caller resolves it from the
+  store) rather than importing the loader into the core/validation math; if a
+  schema has an `X` variable and no fraction is supplied, the builder raises rather
+  than silently under-counting (which would report a *false* violation).
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.

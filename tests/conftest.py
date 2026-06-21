@@ -6,13 +6,16 @@ from collections.abc import Mapping
 
 import pytest
 
+from fermentation.core.chemistry import CO2_PER_HEXOSE, ETHANOL_PER_HEXOSE
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema, VarSpec
 from fermentation.core.tiers import Tier
 
-# Gay-Lussac mass split: glucose (180) -> 2 ethanol (92) + 2 CO2 (88).
-ETHANOL_FRACTION = 92.0 / 180.0  # 0.5111...
-CO2_FRACTION = 88.0 / 180.0  # 0.4888...
+# Gay-Lussac mass split: glucose -> 2 ethanol + 2 CO2. Derived from the shared
+# stoichiometry in fermentation.core.chemistry (single source of truth) so the
+# toy's flows close to machine precision against total_carbon / total_mass.
+ETHANOL_FRACTION = ETHANOL_PER_HEXOSE  # ~0.5114
+CO2_FRACTION = CO2_PER_HEXOSE  # ~0.4886
 
 
 class MassConservingFermentation(Process):

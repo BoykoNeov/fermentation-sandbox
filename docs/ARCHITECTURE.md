@@ -28,10 +28,10 @@ Package map:
 |-------|---------|-----------|
 | parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` |
 | units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, … |
-| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema` |
+| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon fractions, Gay-Lussac split) |
 | runtime | `fermentation.runtime` | `simulate`, `Trajectory` |
 | scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` |
-| validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
+| validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
 
 ## The core
 
@@ -119,8 +119,13 @@ not a magic constant in the seam. (See DECISIONS #7.)
 
 Two disciplines, both as code:
 - **Conservation invariants** — `assert_conserved` / `assert_nonnegative` take a
-  model-supplied conserved-quantity function (e.g. total carbon) and check it
-  holds to tolerance along a trajectory.
+  model-supplied conserved-quantity function and check it holds to tolerance along
+  a trajectory. The chemistry-specific quantities are built by `total_carbon`,
+  `total_nitrogen`, and `total_mass`, which weight each state variable using the
+  shared stoichiometry in `fermentation.core.chemistry` — so a check can never
+  disagree with the kinetics it audits. Carbon and nitrogen are the rigorous atom
+  balances (the biomass C/N fraction is a passed-in Parameter); mass is scoped to
+  the abiotic `S + E + CO₂` conversion. (See DECISIONS #8.)
 - **Benchmark curves** — the §2.2 acceptance criteria are encoded as
   `BenchmarkSpec` data now; the `tests/benchmarks/` tests are skipped until the
   kinetics exist. `ReferenceSeries` + `compare_series` (RMSE/MAE) are the seam

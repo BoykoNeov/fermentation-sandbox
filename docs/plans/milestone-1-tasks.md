@@ -9,8 +9,14 @@
       (`y0`, `process_set`, `parameters`/`param_values`, `schema`, `t_span_h`).
       Process set is empty until kinetics land; tests in `tests/test_compile.py`,
       `tests/test_media.py`.
-- [ ] Carbon + mass conservation quantity functions for the real chemistry;
-      wire into runtime assertions and tests.
+- [x] Carbon + mass conservation quantity functions for the real chemistry.
+      → `fermentation.validation.total_carbon` / `total_nitrogen` / `total_mass`,
+      weighting state vars by the shared stoichiometry in
+      `fermentation.core.chemistry` (single source of truth with the kinetics).
+      Carbon + nitrogen are the rigorous atom balances (biomass C/N fraction is a
+      passed-in Parameter — `biomass_C_fraction`/`biomass_N_fraction` in the
+      store); mass is scoped to the abiotic `S+E+CO2` conversion. Decision D-8;
+      tests in `tests/test_chemistry.py`, `tests/test_validation.py`.
 - [ ] `GrowthNitrogenLimited` Process + unit test.
 - [ ] `SugarUptakeToEthanolCO2` Process (Gay-Lussac yield; vector-aware for beer)
       + unit test.

@@ -23,6 +23,9 @@ from fermentation.validation.conservation import (
     assert_conserved,
     assert_nonnegative,
     max_drift,
+    total_carbon,
+    total_mass,
+    total_nitrogen,
 )
 
 __all__ = [
@@ -33,4 +36,7 @@ __all__ = [
     "assert_nonnegative",
     "compare_series",
     "max_drift",
+    "total_carbon",
+    "total_mass",
+    "total_nitrogen",
 ]

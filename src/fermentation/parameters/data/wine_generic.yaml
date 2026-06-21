@@ -70,3 +70,30 @@ E_a_growth:
     source: "author estimate"
     conditions: "placeholder for Arrhenius temperature dependence"
     notes: "Reconcile against fitted Arrhenius constants in the reading list."
+
+# Biomass elemental composition. Empirical and shared with the (forthcoming)
+# growth Process, so it lives here as the single source of truth rather than as a
+# code constant — the carbon/nitrogen conservation checks take these values so a
+# check can never disagree with the kinetics (decision D-8). Derived from the
+# canonical dry-yeast formula CH1.8O0.5N0.2 (formula weight ~24.6 g/C-mol):
+#   C fraction = 12.011 / 24.626 = 0.488;  N fraction = 0.2*14.007 / 24.626 = 0.114.
+
+biomass_C_fraction:
+  value: 0.488
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.44, high: 0.50, note: "varies with growth conditions" }
+  provenance:
+    source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
+    conditions: "S. cerevisiae dry cell weight, carbon mass fraction"
+    notes: "Well-supported across the bioprocess literature; not yet validated against our curves."
+
+biomass_N_fraction:
+  value: 0.114
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.08, high: 0.14, note: "C:N ~4-9 depending on N status" }
+  provenance:
+    source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
+    conditions: "S. cerevisiae dry cell weight, nitrogen mass fraction"
+    notes: "Drops under nitrogen limitation; the textbook stuck-ferment regime sits at the low end."
