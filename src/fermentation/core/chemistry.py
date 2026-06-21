@@ -75,9 +75,7 @@ def carbon_mass_fraction(species: str) -> float:
     try:
         return CARBON_ATOMS[species] * _M_C / MOLAR_MASS[species]
     except KeyError:
-        raise KeyError(
-            f"unknown species {species!r}; known: {sorted(MOLAR_MASS)}"
-        ) from None
+        raise KeyError(f"unknown species {species!r}; known: {sorted(MOLAR_MASS)}") from None
 
 
 def sugar_species(schema: StateSchema) -> list[str]:
@@ -101,8 +99,7 @@ def sugar_species(schema: StateSchema) -> list[str]:
     if spec.size == 1:
         return ["glucose"]
     raise ValueError(
-        f"sugar 'S' has {spec.size} slots but no component names; cannot assign "
-        "carbon fractions"
+        f"sugar 'S' has {spec.size} slots but no component names; cannot assign carbon fractions"
     )
 
 
@@ -122,3 +119,50 @@ def sugar_species(schema: StateSchema) -> list[str]:
 ETHANOL_PER_HEXOSE = 2 * M_ETHANOL / M_GLUCOSE
 #: Grams of CO2 evolved per gram of hexose consumed (theoretical, ~0.489).
 CO2_PER_HEXOSE = 2 * M_CO2 / M_GLUCOSE
+
+#: Hexose units released per molecule on complete hydrolysis. Glucose/fructose are
+#: hexoses already; maltose -> 2, maltotriose -> 3. Each released hexose ferments
+#: by Gay-Lussac (-> 2 ethanol + 2 CO2), so a sugar's per-gram ethanol/CO2 yield
+#: scales with its hexose count. The di-/trisaccharide mass gain comes from
+#: hydrolysis water pulled from the solvent (why beer's S+E+CO2 mass does not
+#: close — see ``validation.total_mass`` and decision D-8).
+HEXOSE_UNITS: dict[str, int] = {
+    "glucose": 1,
+    "fructose": 1,
+    "maltose": 2,
+    "maltotriose": 3,
+}
+
+
+def ethanol_yield(species: str) -> float:
+    """Grams of ethanol per gram of ``species`` fermented (theoretical Gay-Lussac).
+
+    Generalises :data:`ETHANOL_PER_HEXOSE` to the di-/trisaccharides: a sugar with
+    ``n`` hexose units yields ``2n`` ethanol per molecule. M1 uses this theoretical
+    split (not the realised ``Y_ethanol_sugar`` parameter) so carbon and mass close
+    exactly — the realised yield, net of glycerol/biomass diversion, is a Tier-2
+    concern (decision D-8). Raises ``KeyError`` for an unknown/unfermentable
+    species so a typo fails loudly.
+    """
+    try:
+        return 2 * HEXOSE_UNITS[species] * M_ETHANOL / MOLAR_MASS[species]
+    except KeyError:
+        raise KeyError(
+            f"no fermentation yield for {species!r}; known: {sorted(HEXOSE_UNITS)}"
+        ) from None
+
+
+def co2_yield(species: str) -> float:
+    """Grams of CO2 per gram of ``species`` fermented (theoretical Gay-Lussac).
+
+    Companion to :func:`ethanol_yield`; for a hexose equals :data:`CO2_PER_HEXOSE`.
+    ``ethanol_yield(s) + co2_yield(s)`` exceeds 1 for di-/trisaccharides by exactly
+    the hydrolysis water taken up — mass closes only when that water is tracked,
+    which M1 does not (decision D-8), so beer relies on the carbon balance.
+    """
+    try:
+        return 2 * HEXOSE_UNITS[species] * M_CO2 / MOLAR_MASS[species]
+    except KeyError:
+        raise KeyError(
+            f"no fermentation yield for {species!r}; known: {sorted(HEXOSE_UNITS)}"
+        ) from None

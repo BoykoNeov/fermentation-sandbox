@@ -8,5 +8,6 @@ baseline holds — see ``docs/plans/milestone-1-tasks.md``).
 """
 
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited
+from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 
-__all__ = ["GrowthNitrogenLimited"]
+__all__ = ["GrowthNitrogenLimited", "SugarUptakeToEthanolCO2"]

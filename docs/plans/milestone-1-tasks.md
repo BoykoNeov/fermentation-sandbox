@@ -27,8 +27,16 @@
       baseline test). Tests in `tests/test_kinetics_growth.py`. The S-slot→species
       map moved core-ward to `fermentation.core.chemistry.sugar_species` (core may
       not import validation), shared by the Process and the carbon check.
-- [ ] `SugarUptakeToEthanolCO2` Process (Gay-Lussac yield; vector-aware for beer)
-      + unit test.
+- [x] `SugarUptakeToEthanolCO2` Process (Gay-Lussac yield; vector-aware for beer)
+      + unit test. → `fermentation.core.kinetics.uptake`. Biomass-catalysed
+      (`r = q_sugar_max·X·S/(K_sugar_uptake+S)`), decoupled from growth so it
+      ferments to dryness after N runs out; beer's slots consumed in preference
+      order via smooth catabolite repression (`Π_{j<i} K_rep/(K_rep+S_j)`).
+      Theoretical Gay-Lussac yields from `chemistry.ethanol_yield`/`co2_yield`
+      (new `HEXOSE_UNITS`) so carbon (wine+beer) and mass (wine) close exactly —
+      `Y_ethanol_sugar` stays the unused Tier-2 hook (D-8). New speculative params
+      `q_sugar_max`/`K_sugar_uptake`/`K_repression`. Decision **D-9**; tests in
+      `tests/test_kinetics_uptake.py`.
 - [ ] `EthanolInhibition` Process + unit test.
 - [ ] **Wire parameter-tier propagation into `ProcessSet.tier_of`** — each Process
       declares the params it reads; an output's tier = lowest of (its Processes'

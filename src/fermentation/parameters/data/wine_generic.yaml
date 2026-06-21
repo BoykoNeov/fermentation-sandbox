@@ -41,6 +41,44 @@ K_n:
     conditions: "generic S. cerevisiae, placeholder"
     notes: "Nitrogen limitation is the textbook stuck-ferment mechanism."
 
+# Sugar-uptake (fermentative flux) parameters — PLACEHOLDERS. The uptake Process
+# is biomass-catalysed (rate ~ q_sugar_max * X * Monod(S)), independent of growth,
+# so fermentation continues at a declining rate after nitrogen runs out and the
+# yeast stops dividing — this is what carries a must to dryness. Ethanol/CO2 yields
+# are NOT parameters: M1 uses the theoretical Gay-Lussac split from core.chemistry
+# so carbon and mass conserve exactly (decision D-8); the realised-yield parameter
+# Y_ethanol_sugar below is the Tier-2 (glycerol-diversion) hook, unused in M1.
+
+q_sugar_max:
+  value: 1.0
+  unit: "g/g/h"   # g sugar consumed per g biomass per hour
+  tier: speculative
+  uncertainty: { low: 0.3, high: 2.5, note: "specific fermentative uptake rate; strain/T-dependent" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae, ~20 C, placeholder"
+    notes: "Sets fermentation speed; reconcile vs Sablayrolles and Coleman et al. 2007 max-rate data."
+
+K_sugar_uptake:
+  value: 2.0
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.1, high: 10.0, note: "Monod half-saturation for fermentative uptake" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae, placeholder"
+    notes: "Transporter affinity is high (low K): rate holds near-max until sugar is nearly gone."
+
+K_repression:
+  value: 2.0
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.5, high: 5.0, note: "more-preferred-sugar conc. at half catabolite repression" }
+  provenance:
+    source: "author estimate"
+    conditions: "beer wort sequential uptake (glucose > maltose > maltotriose)"
+    notes: "Smooth catabolite repression: a higher sugar is suppressed while a more-preferred one remains. Beer-only — wine has a single sugar slot, so repression never applies."
+
 Y_ethanol_sugar:
   value: 0.47
   unit: "g/g"
@@ -49,7 +87,7 @@ Y_ethanol_sugar:
   provenance:
     source: "Gay-Lussac stoichiometry; realised yield, handoff section 2.1"
     conditions: "after biomass and glycerol diversion"
-    notes: "Theoretical max 0.511 g/g; realised 0.46-0.48 is well established."
+    notes: "Theoretical max 0.511 g/g; realised 0.46-0.48 is well established. UNUSED in M1: the uptake Process uses the theoretical split (core.chemistry) for exact carbon/mass closure; this realised value is deferred to the Tier-2 glycerol-diversion Process (D-8)."
 
 ethanol_tolerance:
   value: 110.0

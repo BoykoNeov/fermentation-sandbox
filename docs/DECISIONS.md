@@ -171,6 +171,49 @@ otherwise).
   schema has an `X` variable and no fraction is supplied, the builder raises rather
   than silently under-counting (which would report a *false* violation).
 
+### D-9 — Sugar uptake is biomass-catalysed (decoupled from growth), with smooth catabolite repression for beer
+**Decision:** `SugarUptakeToEthanolCO2` (`fermentation.core.kinetics.uptake`) makes
+the fermentative flux a function of *standing biomass*, not of growth:
+`r = q_sugar_max · X · S/(K_sugar_uptake + S)` per sugar slot. It is a separate
+Process from `GrowthNitrogenLimited`, summed by `ProcessSet`. For beer's multi-sugar
+`S`, slots are consumed in preference order via a **smooth** repression factor
+`Π_{j<i} K_repression/(K_repression + S_j)` (each higher sugar suppressed while a
+more-preferred one remains).
+**Why:**
+- *Decoupled from growth (not Pirt-style `q = μ/Y + m`).* Growth shuts off when YAN
+  runs out (Monod on `N`), but most ethanol in a real primary ferment is made by
+  *non-growing*, nitrogen-starved cells. A growth-coupled uptake would stall at high
+  residual sugar the instant nitrogen ran out — it could never reach dryness. A
+  maintenance term `m·X` "fixes" that only by reintroducing an independent
+  biomass-catalysed flux under another name, with a poorly-constrained coefficient.
+  So uptake is biomass-catalysed outright. Consequence: biomass yield-on-sugar is an
+  *emergent* ratio of the two rates rather than a dialled coefficient — immaterial
+  for M1 (no benchmark probes biomass yield; only ~1–2 % of sugar is diverted to
+  biomass, D-8).
+- *Smooth repression, not a hard switch.* A threshold gate ("don't touch maltose
+  until glucose hits zero") puts a kink in the RHS that the BDF solver dislikes
+  (tiny steps / chatter). A smooth repression factor is the actual mechanism
+  (catabolite repression) *and* keeps the derivative continuous, for a couple of
+  extra lines. Relies on the `S` slot order being the preference order, which
+  `beer_schema` defines. `K_repression` is kept small (~2 g/L placeholder) so the
+  switch is sharp; wine (one slot) never represses.
+- *Theoretical Gay-Lussac yields.* Ethanol/CO₂ yields come from
+  `chemistry.ethanol_yield`/`co2_yield` (theoretical 0.511/0.489 per hexose,
+  generalised to di-/trisaccharides by `HEXOSE_UNITS`), **not** the realised
+  `Y_ethanol_sugar = 0.47`, so carbon (wine+beer) and mass (wine) close exactly.
+  This is the D-8 carbon-first scoping applied to the kinetics; `Y_ethanol_sugar`
+  stays the Tier-2 glycerol-diversion hook, deliberately unread in M1.
+- *Guards mirror `GrowthNitrogenLimited`.* Each `S_i` is clamped to ≥0 before it
+  enters a Monod term or a repression denominator, and the Process returns zeros
+  when `X ≤ 0` — without the clamp a negative solver excursion flips the uptake sign
+  and *creates* sugar (and drives E/CO₂ negative), failing the carbon check.
+**Consequence for the next task (`EthanolInhibition`):** `ProcessSet` is purely
+*additive*, so ethanol inhibition cannot "multiply onto" uptake as a separate summed
+Process. It must live either inside the uptake rate or in the modifier-hook
+mechanism the `ArrheniusTemperature` task introduces. Uptake's rate computation is
+kept isolated so a multiplicative modifier can wrap it. No inhibition is modelled
+yet, so an M1 uptake-only run ferments to complete dryness.
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.
