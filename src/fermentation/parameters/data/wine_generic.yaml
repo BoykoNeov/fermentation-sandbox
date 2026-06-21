@@ -128,14 +128,14 @@ E_a_growth:
     notes: "Read by the ArrheniusTemperature(growth) modifier as E_a in f = exp(-(E_a/R)(1/T - 1/T_ref)). Placeholder 50 kJ/mol gives a ~2x slowdown per 10 C drop (Q10~2), biologically standard. Reconcile against fitted Arrhenius constants in the reading list (Coleman et al. 2007 is temperature-dependent)."
 
 E_a_uptake:
-  value: 60000.0
+  value: 50000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 40000.0, high: 90000.0, note: "Arrhenius activation energy for fermentative uptake" }
+  uncertainty: { low: 30000.0, high: 80000.0, note: "Arrhenius activation energy for fermentative uptake" }
   provenance:
     source: "author estimate"
     conditions: "placeholder for the Arrhenius temperature dependence of fermentative sugar uptake"
-    notes: "Read by the ArrheniusTemperature(uptake) modifier. Separate from E_a_growth because fermentation continues at low temperatures where growth has largely stopped — its temperature response differs. Placeholder 60 kJ/mol (a touch higher than growth). Reconcile vs Sablayrolles / Coleman et al. 2007 max-rate vs temperature data."
+    notes: "Read by the ArrheniusTemperature(uptake) modifier. A SEPARATE parameter from E_a_growth (growth and fermentation can differ in temperature sensitivity), but set equal to it here pending sourcing — the per-rate design lets them diverge once real data lands. Do NOT read a growth-vs-uptake ordering into these placeholders: a higher E_a means a *steeper* temperature dependence (rate falls off faster as T drops), so the ordering must come from fitted data (Sablayrolles; Coleman et al. 2007 max-rate vs temperature), not a guess."
 
 T_ref:
   value: 293.15

@@ -195,25 +195,32 @@ def test_toggling_modifier_off_recovers_unscaled_rate(params):
     )  # more negative -> faster consumption above the reference temperature
 
 
-def test_speculative_activation_energy_drags_output_tier_down(store):
-    # Real path (D-1): the modifier mechanism is plausible, but its placeholder
-    # E_a/T_ref are speculative, so via param-tier propagation the rate it scales
-    # reports speculative. Disabling the modifier restores uptake's own tier.
+def test_speculative_activation_energy_drags_output_tier_down():
+    # Param-tier propagation *through the modifier* (D-1 x D-11), isolated so the
+    # test actually bites: hold uptake's own reads VALIDATED, so any drag below
+    # uptake's PLAUSIBLE tier can only come from the Arrhenius modifier's reads
+    # (E_a_uptake / T_ref). (If the modifier contributed nothing to tier derivation,
+    # the first assertion would read PLAUSIBLE and fail.)
     schema = wine_schema()
-    param_tiers = store.tier_map()
-    ps = ProcessSet(
-        schema,
-        [SugarUptakeToEthanolCO2()],
-        modifiers=[ArrheniusTemperature.for_uptake()],
-    )
-    for var in ("S", "E", "CO2"):
-        assert ps.tier_of(var, param_tiers) is Tier.SPECULATIVE
+    uptake = SugarUptakeToEthanolCO2()
+    ps = ProcessSet(schema, [uptake], modifiers=[ArrheniusTemperature.for_uptake()])
+
+    tiers = dict.fromkeys((*uptake.reads, "E_a_uptake", "T_ref"), Tier.VALIDATED)
+    tiers["E_a_uptake"] = Tier.SPECULATIVE
+    tiers["T_ref"] = Tier.SPECULATIVE
+    assert ps.tier_of("S", tiers) is Tier.SPECULATIVE  # dragged by the modifier alone
+
+    # Disabling the modifier removes that drag: S lifts to uptake's own tier
+    # (PLAUSIBLE here — uptake's reads are all validated, the Process is plausible).
     ps.disable("arrhenius_uptake")
-    # Uptake's own reads (q_sugar_max etc.) are themselves speculative placeholders,
-    # so the structural (no param_tiers) tier is the clean check that the *modifier*
-    # was what we removed: it drops from plausible-modifier-capped back to the
-    # Process's plausible tier.
-    assert ps.tier_of("S") is Tier.PLAUSIBLE
+    assert ps.tier_of("S", tiers) is Tier.PLAUSIBLE
+
+    # Re-enabled, lifting the modifier's own params to validated lifts S the same way
+    # — confirming it was those params, via the modifier, driving the speculative cap.
+    ps.enable("arrhenius_uptake")
+    tiers["E_a_uptake"] = Tier.VALIDATED
+    tiers["T_ref"] = Tier.VALIDATED
+    assert ps.tier_of("S", tiers) is Tier.PLAUSIBLE
 
 
 def test_arrhenius_alone_conserves_carbon_and_mass(params):

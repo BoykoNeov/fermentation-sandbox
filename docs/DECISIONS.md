@@ -300,9 +300,13 @@ f(T) = exp( -(E_a / R) · (1/T - 1/T_ref) )
   `milestone-1-context.md`'s "Arrhenius A + E_a per rate" becomes *E_a + T_ref* per
   rate in practice — `T_ref` plays `A`'s role, anchored to the rate-constant
   provenance.)
-- *Per-rate, not one shared `E_a`.* Growth and fermentation differ in temperature
-  sensitivity (fermentation continues at low T where growth has largely stopped), so a
-  single shared `E_a` would lose real fidelity (prime directive #1). The codebase had
+- *Per-rate, not one shared `E_a`.* Growth and fermentation are distinct processes
+  whose temperature sensitivities are not guaranteed equal, so collapsing them onto one
+  `E_a` would bake in an unjustified assumption rather than let the data decide (prime
+  directive #1). (The M1 placeholders are set equal pending sourcing — the *separate
+  parameters* are the point, not a guessed ordering; and "fermentation continues at low
+  T" is D-9's nitrogen decoupling, a separate effect, not a temperature one.) The
+  codebase had
   already committed to this: `E_a_growth` is a per-process parameter name and the
   context doc says "per rate". The task line's "targets *both* growth and uptake"
   describes the *mechanism*, not an instance count — two instances of a parameterised

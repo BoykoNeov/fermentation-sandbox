@@ -79,7 +79,9 @@
 - [ ] Unskip & pass `test_wine_24brix_ferments_to_dryness_in_10_to_14_days`.
 - [ ] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`.
 - [ ] Unskip & pass `test_co2_integral_tracks_sugar_consumed`.
-- [ ] Directional check: lower T → slower (qualitative; full byproduct check is T2).
+- [x] Directional check: lower T → slower (qualitative; full byproduct check is T2). →
+      `test_warmer_ferments_faster_than_cooler` in `tests/test_kinetics_arrhenius.py`
+      (identical uptake config, warmer run leaves less residual sugar over the span).
 - [ ] Update `docs/ARCHITECTURE.md` + `DECISIONS.md`; promote tiers; commit.
 
 Keep `pytest` / `ruff` / `mypy` green at every step. Do not weaken benchmarks.
