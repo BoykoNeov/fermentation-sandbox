@@ -276,6 +276,67 @@ monotone, in `[0,1]`, conservation-preserving, togglable), never
 dryness-under-inhibition. `EthanolInhibition` stays out of the `MEDIA` registry with
 the other kinetics until the full set lands.
 
+### D-11 — Arrhenius temperature dependence: a per-rate, reference-anchored RateModifier
+**Decision:** temperature dependence is `ArrheniusTemperature`
+(`fermentation.core.kinetics.arrhenius`), a `RateModifier` reusing the D-10 hook (no
+new mechanism). It is **parameterised per rate**: each instance names the Process it
+scales and the activation-energy Parameter it reads. The wine config uses two —
+`ArrheniusTemperature.for_growth()` (reads `E_a_growth`, scales
+`GrowthNitrogenLimited`) and `.for_uptake()` (reads `E_a_uptake`, scales
+`SugarUptakeToEthanolCO2`) — sharing one `T_ref`. The factor is reference-anchored:
+
+```
+f(T) = exp( -(E_a / R) · (1/T - 1/T_ref) )
+```
+
+**Why this shape:**
+- *Reference-anchored, no separate pre-exponential `A`.* Normalising to `T_ref` makes
+  `f = 1` there, so the *measured* rate constant (`mu_max` / `q_sugar_max`) is used
+  unscaled at its calibration temperature; above `T_ref` the factor exceeds 1
+  (faster), below it is < 1 (slower). The measured constants *already* encode
+  `A·exp(-E_a / R·T_ref)`, so carrying a standalone `A` would double-book the
+  pre-exponential and could silently disagree with the rate constant it multiplies.
+  Only `E_a` and `T_ref` are parameters; `A` is deliberately **not** one. (This is why
+  `milestone-1-context.md`'s "Arrhenius A + E_a per rate" becomes *E_a + T_ref* per
+  rate in practice — `T_ref` plays `A`'s role, anchored to the rate-constant
+  provenance.)
+- *Per-rate, not one shared `E_a`.* Growth and fermentation differ in temperature
+  sensitivity (fermentation continues at low T where growth has largely stopped), so a
+  single shared `E_a` would lose real fidelity (prime directive #1). The codebase had
+  already committed to this: `E_a_growth` is a per-process parameter name and the
+  context doc says "per rate". The task line's "targets *both* growth and uptake"
+  describes the *mechanism*, not an instance count — two instances of a parameterised
+  modifier still target both. So this is the established design, not a deviation.
+- *Conservation is free; no clamp.* `exp` is always positive, so the factor scales a
+  targeted Process's whole contribution vector by a single positive scalar — every
+  balance is preserved. Unlike the wall-type inhibition form there is no regime where
+  the factor could go negative, so (unlike D-10) **no clamp is needed**; a defensive
+  one would be inconsistent noise. Under **stacking** (uptake is scaled by ethanol
+  inhibition *and* Arrhenius) the two factors compose to one combined scalar on a
+  conserving vector, so carbon/nitrogen still close exactly (pinned by a 4-modifier
+  full-run test).
+- *Where the gas constant lives.* `R` is a *universal physical constant* (SI-exact
+  since the 2019 redefinition), not a stoichiometric one — so it lives in code with a
+  citation **local to the arrhenius module**, not in `core.chemistry` (whose docstring
+  scopes it to molar masses / carbon counts) and not in the provenance store (which is
+  for empirical, uncertain quantities). Same code-with-citation rule as D-3/D-8.
+- *`name` is per-instance.* `ProcessSet` enforces unique names across Processes *and*
+  modifiers, so `name`/`modifies`/`reads` are set in `__init__` (`"arrhenius_growth"`,
+  `"arrhenius_uptake"`), not as class attributes — the one structural departure from
+  the `EthanolInhibition` template.
+- *Reads `T` from state, not params.* The factor reads `T` from the state vector
+  (Kelvin, D-3), so it is already correct for the non-isothermal temperature dynamics
+  of a later tier. In M1 no Process drives `T`, so a run is isothermal and the factor
+  is constant within it; its job is to make *different-temperature* runs differ in rate
+  (the directional "warmer ferments faster" check the unit tests assert).
+**Tier:** the Arrhenius law is textbook → the *mechanism* is **plausible** (like
+inhibition/growth/uptake). The placeholder `E_a`/`T_ref` are **speculative**;
+parameter-tier propagation (D-1) caps the scaled outputs at speculative accordingly.
+**New parameters:** `E_a_uptake` (60 kJ/mol placeholder) and `T_ref` (293.15 K, the
+20 °C the rate-constant placeholders are anchored to); `E_a_growth` retained. All
+speculative. **Held out of the `MEDIA` registry** with the other kinetics until the
+full set lands. Tests in `tests/test_kinetics_arrhenius.py`.
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.

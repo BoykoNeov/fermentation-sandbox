@@ -69,8 +69,11 @@ scalar preserves its mass/atom balances, so a modifier never breaks conservation
 and the `touches` contract still holds (scaling zeros stays zero). Modifiers are
 enabled/disabled and feed `tier_of` exactly like Processes — a speculative modifier
 drags the tier of the variables its target touches down to speculative.
-`EthanolInhibition` is the first modifier; `ArrheniusTemperature` reuses the hook.
-(See DECISIONS #10.)
+`EthanolInhibition` is the first modifier; `ArrheniusTemperature` reuses the hook,
+parameterised *per rate* (one instance per Process, each its own activation energy)
+and reference-anchored so `f = 1` at `T_ref`. Stacked modifiers on one Process (e.g.
+inhibition × Arrhenius on uptake) compose to a single scalar, so conservation still
+holds. (See DECISIONS #10, #11.)
 
 ## Confidence tiers
 

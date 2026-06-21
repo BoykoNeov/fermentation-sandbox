@@ -109,15 +109,43 @@ ethanol_inhibition_exponent:
     conditions: "generic S. cerevisiae, placeholder; Levenspiel 1980 / Luong 1985 inhibition form"
     notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. n=1 is the raw linear (Ghose-Tyagi) form with a derivative kink at E_max; n>1 keeps the touchdown C1-smooth for the BDF solver and gives the 'tolerant then collapse' viability shape. Reconcile against fitted inhibition models in the reading list."
 
+# Arrhenius temperature dependence — PLACEHOLDERS. The rate constants are scaled by
+# f = exp(-(E_a/R)(1/T - 1/T_ref)), normalised to T_ref so that at T = T_ref the
+# *measured* rate constant (mu_max / q_sugar_max) is used unscaled — no separate
+# pre-exponential A is carried (it would double-book what the rate constant already
+# encodes; decision D-11). Activation energy is PER RATE (growth and fermentation
+# differ in temperature sensitivity): the ArrheniusTemperature.for_growth() modifier
+# reads E_a_growth, .for_uptake() reads E_a_uptake; both share T_ref.
+
 E_a_growth:
   value: 50000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 30000.0, high: 80000.0, note: "Arrhenius activation energy" }
+  uncertainty: { low: 30000.0, high: 80000.0, note: "Arrhenius activation energy for growth" }
   provenance:
     source: "author estimate"
-    conditions: "placeholder for Arrhenius temperature dependence"
-    notes: "Reconcile against fitted Arrhenius constants in the reading list."
+    conditions: "placeholder for the Arrhenius temperature dependence of yeast growth"
+    notes: "Read by the ArrheniusTemperature(growth) modifier as E_a in f = exp(-(E_a/R)(1/T - 1/T_ref)). Placeholder 50 kJ/mol gives a ~2x slowdown per 10 C drop (Q10~2), biologically standard. Reconcile against fitted Arrhenius constants in the reading list (Coleman et al. 2007 is temperature-dependent)."
+
+E_a_uptake:
+  value: 60000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 40000.0, high: 90000.0, note: "Arrhenius activation energy for fermentative uptake" }
+  provenance:
+    source: "author estimate"
+    conditions: "placeholder for the Arrhenius temperature dependence of fermentative sugar uptake"
+    notes: "Read by the ArrheniusTemperature(uptake) modifier. Separate from E_a_growth because fermentation continues at low temperatures where growth has largely stopped — its temperature response differs. Placeholder 60 kJ/mol (a touch higher than growth). Reconcile vs Sablayrolles / Coleman et al. 2007 max-rate vs temperature data."
+
+T_ref:
+  value: 293.15
+  unit: "K"
+  tier: speculative
+  uncertainty: { low: 288.15, high: 298.15, note: "calibration temperature the rate constants are anchored to" }
+  provenance:
+    source: "author estimate"
+    conditions: "the temperature mu_max / q_sugar_max are measured at (placeholder ~20 C, matching their conditions)"
+    notes: "Reference temperature in the Arrhenius factor f = exp(-(E_a/R)(1/T - 1/T_ref)); at T = T_ref the measured rate constant is used unscaled. 20 C matches the mu_max/q_sugar_max placeholder conditions. Shared by the growth and uptake Arrhenius modifiers (D-11). When the rate constants are re-sourced, set this to the temperature *they* were measured at."
 
 # Biomass elemental composition. Empirical and shared with the (forthcoming)
 # growth Process, so it lives here as the single source of truth rather than as a

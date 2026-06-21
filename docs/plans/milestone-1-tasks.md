@@ -61,9 +61,18 @@
       `ParameterSet.tier_map()`. Decision **D-1** status flipped to closed; tests in
       `tests/test_process.py` (parameter-tier propagation) +
       `tests/test_integrate.py::test_trajectory_tier_map_caps_on_param_tiers`.
-- [ ] `ArrheniusTemperature` modifier (isothermal runs for M1) + unit test. Reuses the
-      `RateModifier` hook built in D-10 (no new mechanism needed); targets *both* growth
-      and uptake, with `factor` possibly >1 above the reference temperature.
+- [x] `ArrheniusTemperature` modifier (isothermal runs for M1) + unit test. →
+      `fermentation.core.kinetics.arrhenius`. Reuses the D-10 `RateModifier` hook (no new
+      mechanism). **Parameterised per rate** (growth and fermentation differ in T-
+      sensitivity): `ArrheniusTemperature.for_growth()` (reads `E_a_growth`, scales
+      growth) and `.for_uptake()` (reads `E_a_uptake`, scales uptake) share one `T_ref`.
+      Reference-anchored form `f = exp(-(E_a/R)(1/T - 1/T_ref))` — `f=1` at `T_ref`, >1
+      above (faster), <1 below; always positive so **no clamp** and conservation is free
+      even when stacked with inhibition on uptake. `R` lives in-module (SI-exact, with
+      citation); reads `T` from state (Kelvin) so it is T2-ready. New speculative params
+      `E_a_uptake`, `T_ref`. Decision **D-11**; tests in `tests/test_kinetics_arrhenius.py`
+      (incl. a 4-modifier full-run carbon/nitrogen closure and a warmer-ferments-faster
+      directional check). Held out of `MEDIA` with the other kinetics.
 - [ ] Source + reconcile parameters; replace `wine_generic.yaml` placeholders and
       add `beer_generic.yaml`; re-tag tiers. (Biggest effort — handoff §2.3.)
 - [ ] Tune functional forms + parameters against the curves.
