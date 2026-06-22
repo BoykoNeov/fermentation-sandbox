@@ -434,10 +434,13 @@ validated against our own curves).
 
 **`k'_d` sourcing — and a published-typo correction (Coleman Table A2).** `k'_d` is the
 only *quadratic* Coleman parameter: `ln(k'_d) = a0 + a1·T + a2·T²` (T °C). Table A2 prints
-the `a1` **mean** as `−1.08×10⁻³`, but that value lies **outside its own printed 95 %
-credible region** `[−1.94×10⁻¹, −3.30×10⁻²]` — a posterior mean cannot. The journal
-typesetting dropped the `×10ⁿ` exponent from the `a1` mean column; the true value is
-`−1.08×10⁻¹`. Three independent checks confirm it: (1) it reproduces the paper's stated
+the `a1` **mean** as `−1.08×10⁻³`, but its printed 95 %
+credible region is `[−1.94×10⁻¹, −3.30×10⁻²]` (centre `−1.13×10⁻¹`, half-width `8.1×10⁻²`).
+The corrected `−1.08×10⁻¹` sits **essentially at that centre** — where a near-symmetric
+posterior's mean belongs — whereas the as-printed `−1.08×10⁻³` lands ~1.4 half-widths
+**beyond the upper bound, on the opposite side** of the interval. The journal typesetting
+dropped the `×10ⁿ` exponent from the `a1` mean column; the true value is `−1.08×10⁻¹`.
+Three independent checks confirm it: (1) it reproduces the paper's stated
 **~13× rise** in `k'_d` over 11→35 °C (the as-printed value gives 191×); (2) it keeps
 `k'_d(35 °C) = 4.4×10⁻⁴` under Fig 3b's `6×10⁻⁴` axis (the as-printed value overshoots
 to `1.8×10⁻²`, ~30× off-scale); (3) the **identical defect** appears in the `Log(Y_X/N)`
