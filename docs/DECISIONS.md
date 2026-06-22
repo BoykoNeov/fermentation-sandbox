@@ -453,11 +453,69 @@ modifier is attached to `k'_d` (the quadratic does not reduce to a single `E_a`)
 
 **Two gaps left open (deliberately, both separate tasks).** With the corrected `k'_d` the
 wired wine model **completes** (S → 0), but: (a) it dries in **~7.7 days, below the 10-14
-day benchmark window** — an *uptake-speed* gap, since the Table A2 reconstruction runs
-~2× faster than Coleman's measured 20 °C data even with *zero* death; this is the next
-tuning question (β_max/biomass), not a `k'_d` matter. (b) ABV lands at **16.9 %** (E ≈ 133
-g/L) from the theoretical Gay-Lussac split — the realised-yield/glycerol-sink task.
-Neither was folded into the `k'_d` decision.
+day benchmark window** — at the time read as an *uptake-speed* gap (β_max/biomass).
+**Superseded by D-14: that was a misdiagnosis.** At its conditions (250 mg/L YAN, ample
+nitrogen) ~7.7 d is *correct* — Coleman calls anything over 7-10 d "sluggish," and our
+engine matches his own model to ~10 % there. The 10-14 d window is the *nitrogen-limited*
+regime; the real gaps were a benchmark fixture that wasn't N-limited and a missing
+N-dependent biomass yield (see D-14). (b) ABV lands at **16.9 %** (E ≈ 133 g/L) from the
+theoretical Gay-Lussac split — the realised-yield/glycerol-sink task. Neither was folded
+into the `k'_d` decision.
+
+## D-14 — Nitrogen-dependent biomass yield; the wine benchmark window re-anchored to Coleman
+
+**Status: closed.** Task #7 ("calibrate the Fig 6c reconstruction") resolved — and it
+overturned its own premise (the D-13 gap-(a) "uptake-speed gap").
+
+**The reframe (evidence, not figure-reading).** A faithful re-implementation of Coleman's
+comprehensive model (eqs 1-8, Table A2 @ 20 °C — the model the paper validates against the
+measured Fig 6c curves) reproduces our engine **line-for-line** on biomass and sugar at
+*both* 80 and 330 mg N/L (X, S within ~2 % across 12 days; tracked in
+`tests/test_coleman_reconstruction.py`). Triangulated three ways: the reconstruction, our
+engine, and Coleman's own text ("completion exceeding 7-10 days = sluggish/problem
+fermentation"; midrange temperatures "reach dryness in the minimum amount of time"). So a
+24-Brix/20 °C wine with ample nitrogen *should* finish in ~6-7 d; our engine is right, not
+too fast. The 10-14 d figure was a **generic handoff heuristic**, never Coleman.
+
+**The one real model gap — N-dependent yield.** Coleman Fig 4 / Table A2 show the
+cell-mass-per-nitrogen yield `Y_X/N` is *not* constant: it rises sharply as initial YAN
+falls (`ln Y_X/N = 3.50 − 3.61e-3·YAN_mgL`; nitrogen-starved cells are elementally
+N-poorer, so a gram of N builds more dry mass). Our model used a **fixed** `Y_X/N = 1/f_N
+= 8.77`, so at low nitrogen it built too little biomass and **stuck** (residual ~31 g/L)
+exactly where Coleman finishes. Adopting Coleman's regression closes this. The `a1`
+exponent carries the **identical published typo as `k'_d`** (D-13): printed `−3.61`, but
+its credible region is `[−4.35e-3, −2.93e-3]`, so the true value is `−3.61e-3` (reproduces
+Fig 4 at 80 → 24.8 g/g and 330 → 10.1 g/g).
+
+**Where it lives — computed at the compile boundary (a deliberate new pattern).** In our
+model all assimilated nitrogen enters biomass, so `Y_X/N = 1/f_N` identically; we therefore
+**override `biomass_N_fraction`** (rather than add a separate yield the growth Process
+inverts), preserving the single-source contract that keeps the nitrogen balance exact — the
+`total_nitrogen` check reads the same per-run constant the growth Process does, so
+`d/dt[N + f_N·X] = 0` regardless of `f_N`'s value. Unlike the temperature regressions
+(pre-evaluated into the YAML at the fixed `T_ref`), this one's evaluation point is the
+scenario's *initial nitrogen*, so it cannot be pre-baked: `compile_scenario` evaluates it
+from the scenario's YAN and nowhere else. This puts a parameter *value* (not physics) at the
+scenario boundary; `chemistry.py`'s charter explicitly excludes empirical/strain-dependent
+quantities, so a documented compile-seam helper is the right home. `biomass_C_fraction`
+stays fixed — biomass carbon is ~1 % of the sugar→ethanol flux, immaterial in M1 (the
+growth Process docstring already scopes this). **Beer keeps its static `f_N`**: Coleman is a
+wine model and there is no sourced beer `Y_X/N` regression, so the override is gated on the
+regression coefficients being present (wine-only by construction, not by accident).
+
+**Benchmark window re-anchored (the user's call on a guarded §2.2 spec).** Because the
+validated core now reproduces the keystone source, the acceptance window should reflect that
+source, not a generic heuristic. The wine fixture is anchored to Coleman's documented
+conditions — **80 mg N/L (his low-N treatment), ~0.25 g/L pitch (25 g/hL, standard practice
+and consistent with his Fig 2 inoculum of ~0.1-0.3 g/L)** — *not* tuned to the window; it
+lands at **~9.2 d**. The `wine_dryness` window was lowered **10-14 → 8-14 d**: the floor
+drops to the fast end of realistic pitching that the source supports (pitch is a real
+~2.6-day lever at low N, so it is anchored to the source, never swept to fit), the sluggish
+ceiling stays at 14. `tests/benchmarks/test_milestone1.py::test_wine_24brix_ferments_to_dryness_in_window`
+is unskipped and passing.
+
+**Beer is now unblocked** — it shared the same Coleman-framework parameters, so this had to
+settle first.
 
 ## Deferred (decide early in the relevant milestone)
 

@@ -106,10 +106,19 @@
       `4.28e-5` not `3.64e-4` — the as-printed value stalls even Coleman's own model).
       Wired wine now ferments to dryness. Tests in `tests/test_kinetics_inactivation.py`
       (closed form, guards, full-model carbon+nitrogen closure, tier propagation).
-- [ ] Tune functional forms + parameters against the curves. **Open after D-13:** wine
-      dries in ~7.7 d (below the 10-14 d window) — an uptake-speed gap (β_max/biomass),
-      not a `k'_d` matter; ABV ~16.9 % awaits the realised-yield/glycerol-sink task.
-- [ ] Unskip & pass `test_wine_24brix_ferments_to_dryness_in_10_to_14_days`.
+- [x] Tune functional forms + parameters against the curves (wine). **D-14:** the D-13
+      "uptake-speed gap" was a misdiagnosis — at ample N our engine matches Coleman's own
+      model line-for-line (`tests/test_coleman_reconstruction.py`). The real fixes were a
+      nitrogen-dependent biomass yield (Coleman Fig 4 `Y_X/N(N_init)`, computed at the
+      compile boundary; unsticks low-N) and re-anchoring the wine window to the keystone
+      source (10-14 → 8-14 d). ABV ~16.9 % still awaits the realised-yield/glycerol-sink task.
+- [x] Unskip & pass `test_wine_24brix_ferments_to_dryness_in_window` (renamed; YAN=80,
+      pitch 0.25, lands ~9.2 d in the re-anchored 8-14 d window). Decision **D-14**.
+- [ ] **Realised ethanol yield / glycerol sink (wine ABV).** The theoretical Gay-Lussac
+      split gives ABV ~16.9 % for 24 Brix; real ferments divert ~4-8 % of sugar carbon to
+      glycerol + biomass + organic acids, landing ~14-15 %. Add a realised-yield correction
+      (or an explicit glycerol carbon sink) so wine ABV is realistic, keeping carbon closed.
+      The open thread flagged by D-13 gap-(b) and D-14 — neither folded it into its decision.
 - [ ] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`.
 - [ ] Unskip & pass `test_co2_integral_tracks_sugar_consumed`.
 - [x] Directional check: lower T → slower (qualitative; full byproduct check is T2). →

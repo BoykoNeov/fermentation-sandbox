@@ -232,4 +232,52 @@ biomass_N_fraction:
   provenance:
     source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
     conditions: "S. cerevisiae dry cell weight, nitrogen mass fraction"
-    notes: "Drops under nitrogen limitation; the textbook stuck-ferment regime sits at the low end. Coleman 2007 Y_X/N ~ 9-10 g/g at normal N corroborates (1/9.5 = 0.105)."
+    notes: "The N-REPLETE elemental reference (the regression below gives ~0.114 near 370 mg N/L). Drops under nitrogen limitation; the textbook stuck-ferment regime sits at the low end. Coleman 2007 Y_X/N ~ 9-10 g/g at normal N corroborates (1/9.5 = 0.105). For wine this static value is RECOMPUTED at compile from the Coleman Y_X/N(N_init) regression below, evaluated at the scenario's YAN (decision D-14); it is used as-is only when that regression is absent (e.g. beer)."
+
+# -- Nitrogen-dependent biomass yield (decision D-14) -------------------------
+# Coleman Fig 4 / Table A2: the cell-mass-per-nitrogen yield Y_X/N is NOT a
+# constant. It rises sharply as initial YAN falls because nitrogen-starved cells
+# are elementally nitrogen-poorer, so each gram of N builds more dry mass. Coleman
+# regress the natural log of Y_X/N linearly on the INITIAL nitrogen (mg N/L), not
+# on temperature:
+#     ln(Y_X/N [g cell / g N]) = a0 + a1 * N_init(mg/L)
+# The compile seam evaluates this at the scenario's YAN and sets
+#     biomass_N_fraction = 1 / Y_X/N
+# (in our model all assimilated nitrogen enters biomass, so Y_X/N = 1/f_N
+# identically). The nitrogen atom balance stays exact because the SAME f_N feeds
+# the growth Process and the total_nitrogen conservation check. This regression
+# cannot be pre-baked into a single value the way the temperature regressions are
+# (T_ref is fixed at 20 C; the nitrogen evaluation point is scenario-specific), so
+# it is the one parameter computed at the compile boundary - see docs/DECISIONS.md
+# (D-14). Without this, a nitrogen-limited must builds too little biomass and our
+# wine model STICKS where Coleman's finishes (the D-13 "uptake-speed gap" was a
+# misdiagnosis: at ample N our model already matches Coleman to ~10%).
+
+biomass_N_yield_log_intercept:
+  value: 3.50
+  unit: "dimensionless"   # a0 in ln(Y_X/N [g cell / g N]) = a0 + a1*N_init(mg/L)
+  tier: plausible
+  uncertainty: { low: 3.31, high: 3.70, note: "Table A2 Log(Y_X/N) a0 5%-95% credible region" }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884, Table A2 + Fig 4"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; intercept of the ln(Y_X/N) regression on initial nitrogen"
+    notes: "exp(3.50) = 33.1 g cell/g N is the (unphysical) zero-nitrogen extrapolation; the slope below pulls it down across the real 70-350 mg N/L range. Checks: at 330 mg N/L (Coleman normal-N) Y_X/N = exp(3.50 - 3.61e-3*330) = 10.1 g/g; at 80 mg N/L (low-N) = 24.8 g/g - both match Fig 4."
+
+biomass_N_yield_log_slope:
+  value: -3.61e-3
+  unit: "(mg N/L)^-1"
+  tier: plausible
+  uncertainty: { low: -4.35e-3, high: -2.93e-3, note: "Table A2 Log(Y_X/N) a1 5%-95% CR; typo-corrected exponent" }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884, Table A2 + Fig 4"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; slope of the ln(Y_X/N) regression on initial nitrogen (mg/L)"
+    notes: >-
+      PUBLISHED-TYPO CORRECTION - the IDENTICAL defect already established for k'_d
+      (decision D-13). Table A2 prints the a1 mean for Log(Y_X/N) as -3.61, but its
+      95% credible region is [-4.35e-3, -2.93e-3]; -3.61 lies ~3 orders of magnitude
+      outside it. The journal typesetting dropped the x10^n exponent from the mean
+      column, so the true value is -3.61e-3 (it sits at the centre of the CR and
+      reproduces Fig 4 at both 80 mg/L -> 24.8 g/g and 330 mg/L -> 10.1 g/g). The
+      as-printed -3.61 would collapse Y_X/N to ~0 by 2 mg N/L, which is absurd.

@@ -27,6 +27,7 @@ sourcing task), not a magic constant to bury in the compile step.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,8 @@ from pathlib import Path
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
+from fermentation.core.tiers import combine
+from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
 from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
 from fermentation.scenario.schema import Scenario
 from fermentation.units.convert import (
@@ -42,6 +45,10 @@ from fermentation.units.convert import (
     days_to_hours,
     mgl_to_gpl,
 )
+
+#: Coleman Y_X/N regression coefficients (decision D-14). Present iff a medium
+#: ships the nitrogen-dependent biomass yield; gates the compile-time override.
+_N_YIELD_COEFFS = ("biomass_N_yield_log_intercept", "biomass_N_yield_log_slope")
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
 _Initial = dict[str, float | list[float]]
@@ -176,6 +183,63 @@ def _load_parameters(
     return load_parameters(path)
 
 
+def _apply_nitrogen_dependent_yield(
+    scenario: Scenario, parameters: ParameterSet
+) -> ParameterSet:
+    """Override ``biomass_N_fraction`` from Coleman's ``Y_X/N(N_init)`` regression.
+
+    Coleman, Fish & Block (2007) found the cell-mass-per-nitrogen yield to depend
+    on the *initial* nitrogen (Fig 4 / Table A2): ``ln(Y_X/N) = a0 + a1·YAN``
+    (YAN in mg N/L). This is the one parameter that cannot be pre-evaluated into
+    the YAML the way the temperature regressions are — the evaluation point is the
+    scenario's nitrogen, not a fixed reference — so it is computed here at the
+    compile boundary and nowhere else (decision D-14). Because every assimilated
+    gram of nitrogen enters biomass in our model, ``Y_X/N = 1/f_N`` identically;
+    setting ``biomass_N_fraction = 1/Y_X/N`` leaves the nitrogen balance exact (the
+    ``total_nitrogen`` check reads this same per-run constant).
+
+    Gated on the regression coefficients being present, so a medium without them
+    (beer) keeps the static elemental ``biomass_N_fraction`` untouched.
+    """
+    if not all(name in parameters for name in _N_YIELD_COEFFS):
+        return parameters
+    yan_mgl = scenario.initial.get("yan_mgl")
+    if yan_mgl is None:
+        return parameters
+
+    a0, a1 = (parameters[name] for name in _N_YIELD_COEFFS)
+    y_xn = math.exp(a0.value + a1.value * float(yan_mgl))  # g cell / g N
+    f_n = 1.0 / y_xn
+    override = Parameter(
+        name="biomass_N_fraction",
+        value=f_n,
+        unit="g/g",
+        tier=combine((a0.tier, a1.tier)),
+        uncertainty=Uncertainty(
+            # Bracketing metadata, not a tuned value: f_N = 1/Y_X/N ranges
+            # ~0.039-0.107 across Coleman's 70-350 mg N/L treatment span
+            # (Y_X/N ~25.7 down to ~9.4); [0.03, 0.15] brackets that with margin.
+            low=0.03,
+            high=0.15,
+            note="nitrogen-status-dependent; brackets f_N across Coleman's 70-350 mg N/L range",
+        ),
+        provenance=Provenance(
+            source=a0.provenance.source,
+            doi=a0.provenance.doi,
+            conditions=(
+                f"computed at compile from Coleman Y_X/N regression at YAN={float(yan_mgl):g} mg/L"
+            ),
+            notes=(
+                f"Y_X/N = exp({a0.value} + {a1.value}*{float(yan_mgl):g}) = {y_xn:.2f} g cell/g N; "
+                f"f_N = 1/Y_X/N = {f_n:.4f} g N/g cell. Overrides the static elemental "
+                "biomass_N_fraction so a nitrogen-limited must builds realistically little "
+                "biomass (decision D-14)."
+            ),
+        ),
+    )
+    return parameters.merge(ParameterSet([override]), override=True)
+
+
 def compile_scenario(
     scenario: Scenario,
     *,
@@ -205,6 +269,7 @@ def compile_scenario(
     y0 = medium.schema.pack(builder(scenario.initial, temperature_k))
 
     parameters = _load_parameters(scenario, parameter_paths, data_dir)
+    parameters = _apply_nitrogen_dependent_yield(scenario, parameters)
     process_set = medium.build_process_set(strict=strict)
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 

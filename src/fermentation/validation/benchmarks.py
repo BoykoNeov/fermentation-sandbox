@@ -114,15 +114,25 @@ BENCHMARKS: dict[str, BenchmarkSpec] = {
     "wine_dryness": BenchmarkSpec(
         key="wine_dryness",
         description=(
-            "A ~24 Brix must (~264 g/L sugar) at 20 C ferments to dryness with a "
-            "visible lag -> exponential -> stationary biomass trajectory."
+            "A ~24 Brix must (~264 g/L sugar) at 20 C, nitrogen-limited, ferments to "
+            "dryness with a visible lag -> exponential -> stationary biomass "
+            "trajectory. Window re-anchored to the keystone source the validated core "
+            "reproduces line-for-line (decision D-14): a low-N 24-Brix/20 C wine "
+            "completes in ~8-10.5 d depending on inoculum, below the original generic "
+            "10-14 d heuristic."
         ),
         metric="days_to_dryness",
-        low=10.0,
+        low=8.0,
         high=14.0,
         unit="day",
-        conditions="~264 g/L initial sugar, 20 C, single wine strain, nitrogen-limited",
-        source="handoff section 2.2 (wine benchmark)",
+        conditions=(
+            "~264 g/L initial sugar, 80 mg N/L (Coleman low-N), ~0.25 g/L pitch "
+            "(25 g/hL), 20 C, single wine strain (Premier Cuvee)"
+        ),
+        source=(
+            "handoff section 2.2, re-anchored to Coleman, Fish & Block 2007 "
+            "(doi:10.1128/aem.00670-07) low-N 24-Brix/20 C (decision D-14)"
+        ),
     ),
     "beer_attenuation": BenchmarkSpec(
         key="beer_attenuation",

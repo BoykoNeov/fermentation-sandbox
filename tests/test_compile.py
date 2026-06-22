@@ -1,17 +1,26 @@
 """The scenario → core compile seam: unit conversion, validation, and assembly."""
 
+import math
 from pathlib import Path
 
 import pytest
 
 from fermentation.core.media import MEDIA
+from fermentation.core.tiers import Tier
+from fermentation.parameters.store import load_parameters
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units.convert import brix_to_sugar_gpl, celsius_to_kelvin
-from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
+from fermentation.validation import (
+    assert_conserved,
+    assert_nonnegative,
+    total_carbon,
+    total_nitrogen,
+)
 
 DATA = Path(__file__).resolve().parents[1] / "src" / "fermentation" / "parameters" / "data"
 WINE_PARAMS = DATA / "wine_generic.yaml"
+BEER_PARAMS = DATA / "beer_generic.yaml"
 
 
 def _wine_scenario(**overrides) -> Scenario:
@@ -82,6 +91,77 @@ def test_optional_ethanol_can_be_supplied():
         )
     )
     assert compiled.schema.get(compiled.y0, "E") == pytest.approx(3.0)
+
+
+# -- nitrogen-dependent biomass yield (decision D-14) -------------------------
+
+
+def test_wine_biomass_yield_tracks_initial_nitrogen():
+    # biomass_N_fraction is recomputed at compile from Coleman's Y_X/N(N_init)
+    # regression: a nitrogen-limited must gets MORE biomass per gram N (a smaller
+    # nitrogen mass fraction), which is what unsticks the low-N ferment.
+    low = compile_scenario(
+        _wine_scenario(initial={"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25})
+    )
+    high = compile_scenario(
+        _wine_scenario(initial={"brix": 24.0, "yan_mgl": 330.0, "pitch_gpl": 0.25})
+    )
+    f_low = low.parameters.value("biomass_N_fraction")
+    f_high = high.parameters.value("biomass_N_fraction")
+    assert f_low < f_high  # lower N -> higher yield -> smaller N-fraction
+
+    # Matches the regression exactly: f_N = 1 / exp(a0 + a1 * YAN_mgL).
+    a0 = low.parameters.value("biomass_N_yield_log_intercept")
+    a1 = low.parameters.value("biomass_N_yield_log_slope")
+    assert f_low == pytest.approx(1.0 / math.exp(a0 + a1 * 80.0))
+    assert f_high == pytest.approx(1.0 / math.exp(a0 + a1 * 330.0))
+
+    # Anchored to Coleman's Fig 4 endpoints: the implied Y_X/N (= 1/f_N) is
+    # ~24.8 g cell/g N at 80 mg/L and ~10.1 at 330 mg/L. This is the data guard
+    # for the typo-corrected a1 exponent (decisions D-13/D-14) — the as-printed
+    # -3.61 would put these endpoints wildly off-figure.
+    assert 1.0 / f_low == pytest.approx(24.8, abs=0.15)
+    assert 1.0 / f_high == pytest.approx(10.1, abs=0.15)
+
+    # The override is honestly provenanced (says it was computed) and does not
+    # over-state its tier (plausible, the combine of the two coefficient tiers).
+    overridden = low.parameters["biomass_N_fraction"]
+    assert "computed at compile" in overridden.provenance.conditions
+    assert overridden.provenance.doi == "10.1128/aem.00670-07"
+    assert overridden.tier is Tier.PLAUSIBLE
+
+
+def test_compiled_wine_conserves_nitrogen_with_dynamic_yield():
+    # With biomass_N_fraction computed at compile (D-14), the nitrogen balance must
+    # still close exactly: the growth Process and the total_nitrogen check read the
+    # SAME per-run constant. Guards against a check that hardcodes the old 0.114.
+    compiled = compile_scenario(
+        _wine_scenario(
+            initial={"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25}, duration_days=21.0
+        ),
+        strict=True,
+    )
+    traj = simulate(
+        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h
+    )
+    f_n = compiled.parameters.value("biomass_N_fraction")
+    assert_conserved(
+        traj,
+        total_nitrogen(compiled.schema, biomass_nitrogen_fraction=f_n),
+        rtol=1e-5,
+        atol=1e-8,
+        label="nitrogen",
+    )
+
+
+def test_beer_biomass_yield_is_not_overridden():
+    # The nitrogen-dependent yield is wine-only (Coleman is a wine model); beer
+    # ships no Y_X/N regression, so its biomass_N_fraction stays the static
+    # elemental value rather than being recomputed at compile.
+    compiled = compile_scenario(_beer_scenario(), parameter_paths=[BEER_PARAMS])
+    assert "biomass_N_yield_log_intercept" not in compiled.parameters
+    static = load_parameters(BEER_PARAMS).value("biomass_N_fraction")
+    assert compiled.parameters.value("biomass_N_fraction") == pytest.approx(static)
 
 
 # -- beer: structural seam (no sourced params yet) ----------------------------
