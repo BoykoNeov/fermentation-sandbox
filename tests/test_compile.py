@@ -2,14 +2,13 @@
 
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from fermentation.core.media import MEDIA
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units.convert import brix_to_sugar_gpl, celsius_to_kelvin
-from fermentation.validation import assert_conserved
+from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
 
 DATA = Path(__file__).resolve().parents[1] / "src" / "fermentation" / "parameters" / "data"
 WINE_PARAMS = DATA / "wine_generic.yaml"
@@ -136,10 +135,14 @@ def test_unknown_medium_is_rejected():
 # -- the seam connects to the runtime -----------------------------------------
 
 
-def test_compiled_scenario_integrates_as_a_constant_baseline():
-    # With no Processes wired, integrating the compiled scenario must succeed and
-    # leave the state unchanged — proving compile() feeds simulate() cleanly.
-    compiled = compile_scenario(_wine_scenario())
+def test_compiled_wine_scenario_ferments_and_conserves_carbon():
+    # The wired kinetics make a compiled wine scenario actually ferment — sugar
+    # falls, ethanol and CO2 rise — and the run conserves carbon end-to-end,
+    # proving compile() feeds the *full* Process+modifier set into simulate()
+    # cleanly. (The dryness *timing* is the §2.2 benchmark's job and needs tuning;
+    # here we only assert direction + conservation, so this test does not move with
+    # the tuning.)
+    compiled = compile_scenario(_wine_scenario(duration_days=21.0), strict=True)
     traj = simulate(
         compiled.process_set,
         compiled.param_values,
@@ -147,9 +150,47 @@ def test_compiled_scenario_integrates_as_a_constant_baseline():
         compiled.t_span_h,
     )
     assert traj.success
-    assert np.allclose(traj.y[:, -1], compiled.y0)
-    # Total mass is trivially conserved when nothing happens.
-    assert_conserved(traj, lambda y: float(y.sum()), label="total mass")
+    sugar = traj.series("S")  # wine: 1-D (single slot)
+    assert float(sugar[-1]) < float(sugar[0])  # sugar consumed
+    assert traj.series("E")[-1] > 0.0  # ethanol produced
+    assert traj.series("CO2")[-1] > 0.0  # CO2 evolved
+    assert_conserved(
+        traj,
+        total_carbon(
+            compiled.schema, biomass_carbon_fraction=compiled.parameters.value("biomass_C_fraction")
+        ),
+        rtol=1e-5,
+        atol=1e-6,
+        label="carbon",
+    )
+    assert_nonnegative(traj, ("X", "S", "N", "E", "CO2"), atol=1e-7)
+
+
+def test_compiled_beer_scenario_ferments_and_conserves_carbon():
+    # Same end-to-end check on beer's 3-sugar schema: the shared kinetic set
+    # consumes the wort sugars (sequential uptake lives inside the uptake Process)
+    # and closes carbon across all three slots.
+    compiled = compile_scenario(_beer_scenario(duration_days=14.0), strict=True)
+    traj = simulate(
+        compiled.process_set,
+        compiled.param_values,
+        compiled.y0,
+        compiled.t_span_h,
+    )
+    assert traj.success
+    sugar = traj.series("S")  # beer: 2-D (three slots) x time
+    assert float(sugar[:, -1].sum()) < float(sugar[:, 0].sum())  # total wort sugar consumed
+    assert traj.series("E")[-1] > 0.0
+    assert traj.series("CO2")[-1] > 0.0
+    assert_conserved(
+        traj,
+        total_carbon(
+            compiled.schema, biomass_carbon_fraction=compiled.parameters.value("biomass_C_fraction")
+        ),
+        rtol=1e-5,
+        atol=1e-6,
+        label="carbon",
+    )
 
 
 # -- the compile vocabulary stays in sync with the MEDIA registry -------------

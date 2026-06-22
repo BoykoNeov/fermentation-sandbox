@@ -30,9 +30,15 @@ uptake needs no structural change to also support wine's single lumped sugar.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from fermentation.core.process import Process, ProcessSet
+from fermentation.core.kinetics import (
+    ArrheniusTemperature,
+    EthanolInhibition,
+    GrowthNitrogenLimited,
+    SugarUptakeToEthanolCO2,
+)
+from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import StateSchema, VarSpec
 
 
@@ -79,32 +85,72 @@ def beer_schema() -> StateSchema:
 
 @dataclass(frozen=True)
 class Medium:
-    """A named beverage family: its state schema plus the Processes that act on it.
+    """A named beverage family: its state schema plus the kinetics that act on it.
 
-    ``process_factories`` are zero-argument callables that each build one
-    :class:`Process` (kinetics read their parameters at ``derivatives`` time, not
-    construction time, so no arguments are needed here). The tuple is empty until
-    the validated-core Processes land in Milestone 1; an empty set integrates to a
-    constant trajectory, which is the honest "no kinetics yet" baseline.
+    ``process_factories`` are zero-argument callables that each build one additive
+    :class:`Process`; ``modifier_factories`` likewise build the multiplicative
+    :class:`RateModifier` objects (ethanol inhibition, Arrhenius temperature
+    dependence) that scale those Processes. Both are *factories* rather than shared
+    instances so every ``build_process_set`` call gets fresh objects — two media (or
+    two runs) never share a mutable Process/modifier. Kinetics read their parameters
+    at ``derivatives``/``factor`` time, not construction time, so the factories need
+    no arguments.
+
+    An empty pair of tuples integrates to a constant trajectory — the honest
+    "no kinetics" baseline a bare :class:`Medium` still provides.
     """
 
     name: str
     schema: StateSchema
     process_factories: tuple[Callable[[], Process], ...] = ()
+    modifier_factories: tuple[Callable[[], RateModifier], ...] = field(default=())
 
     def build_process_set(self, *, strict: bool = False) -> ProcessSet:
-        """Assemble this medium's Processes into a :class:`ProcessSet`."""
+        """Assemble this medium's Processes and modifiers into a :class:`ProcessSet`."""
         return ProcessSet(
-            self.schema, [factory() for factory in self.process_factories], strict=strict
+            self.schema,
+            [factory() for factory in self.process_factories],
+            modifiers=[factory() for factory in self.modifier_factories],
+            strict=strict,
         )
+
+
+#: The validated-core primary-fermentation kinetics, as zero-argument factories.
+#: Wine and beer share the *same* mechanism set — biomass growth and fermentative
+#: sugar uptake, scaled by ethanol inhibition and per-rate Arrhenius temperature
+#: dependence. The only structural difference between the two media is the sugar
+#: vector (1 slot vs 3): beer's sequential glucose→maltose→maltotriose uptake is
+#: handled *inside* :class:`~fermentation.core.kinetics.uptake.SugarUptakeToEthanolCO2`
+#: via catabolite repression, so it needs no extra Process here. This is exactly the
+#: stacked configuration whose carbon/nitrogen closure is locked in
+#: ``tests/test_kinetics_arrhenius.py`` (decisions D-8 … D-11).
+_PRIMARY_FERMENTATION_PROCESSES: tuple[Callable[[], Process], ...] = (
+    GrowthNitrogenLimited,
+    SugarUptakeToEthanolCO2,
+)
+_PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
+    EthanolInhibition,
+    ArrheniusTemperature.for_growth,
+    ArrheniusTemperature.for_uptake,
+)
 
 
 #: The registry of known media. Adding a beverage family = adding an entry here
 #: (and, at the I/O boundary, an initial-composition vocabulary in
 #: ``fermentation.scenario.compile``).
 MEDIA: dict[str, Medium] = {
-    "wine": Medium(name="wine", schema=wine_schema()),
-    "beer": Medium(name="beer", schema=beer_schema()),
+    "wine": Medium(
+        name="wine",
+        schema=wine_schema(),
+        process_factories=_PRIMARY_FERMENTATION_PROCESSES,
+        modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
+    ),
+    "beer": Medium(
+        name="beer",
+        schema=beer_schema(),
+        process_factories=_PRIMARY_FERMENTATION_PROCESSES,
+        modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
+    ),
 }
 
 

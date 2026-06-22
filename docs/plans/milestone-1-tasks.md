@@ -86,6 +86,18 @@
       Tiers promoted only where a source measures *our* form; `K_s`,
       `K_repression`, `ethanol_inhibition_exponent` stay speculative. Tests updated
       (`test_compile.py`, `test_parameters.py`). Decision **D-12**.
+- [x] **Wire the validated-core kinetics into the `MEDIA` registry.** `Medium` gained
+      a `modifier_factories` tuple alongside `process_factories`, and
+      `build_process_set` now threads `modifiers=` into the `ProcessSet`. Both wine and
+      beer wire the same mechanism set — `GrowthNitrogenLimited` +
+      `SugarUptakeToEthanolCO2`, scaled by `EthanolInhibition` and the two per-rate
+      `ArrheniusTemperature` modifiers — the stacked config whose carbon/nitrogen
+      closure is already locked in `tests/test_kinetics_arrhenius.py`. The only
+      wine/beer difference is the sugar vector (1 vs 3 slots); beer's sequential uptake
+      lives inside the uptake Process, so no extra Process is needed. The empty-`Medium`
+      "no kinetics" baseline moved to an explicit bare `Medium` (`test_media.py`);
+      `compile→simulate` now ferments end-to-end and conserves carbon for both media
+      (`test_compile.py`).
 - [ ] Tune functional forms + parameters against the curves.
 - [ ] Unskip & pass `test_wine_24brix_ferments_to_dryness_in_10_to_14_days`.
 - [ ] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`.
