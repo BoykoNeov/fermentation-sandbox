@@ -68,6 +68,11 @@ def total_carbon(
                 "the growth Process uses) so the carbon check matches the kinetics"
             )
         w[schema.slice("X")] = biomass_carbon_fraction
+        # Inactivated cells are still biomass of the same composition: ethanol
+        # inactivation moves mass X -> X_dead, so counting both pools at the same
+        # carbon fraction keeps that transfer carbon-neutral (decision D-13).
+        if "X_dead" in schema:
+            w[schema.slice("X_dead")] = biomass_carbon_fraction
     return _weighted_sum(w)
 
 
@@ -92,6 +97,10 @@ def total_nitrogen(
                 "the growth Process uses) so the nitrogen check matches the kinetics"
             )
         w[schema.slice("X")] = biomass_nitrogen_fraction
+        # Inactivated biomass retains its nitrogen: count X_dead so the X -> X_dead
+        # inactivation transfer stays nitrogen-neutral (decision D-13).
+        if "X_dead" in schema:
+            w[schema.slice("X_dead")] = biomass_nitrogen_fraction
     return _weighted_sum(w)
 
 

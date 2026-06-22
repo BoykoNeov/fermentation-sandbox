@@ -49,7 +49,7 @@ def params(store):
 def _wine_y0(
     schema: StateSchema, *, x: float = 2.0, s: float = 264.0, e: float = 0.0
 ) -> FloatArray:
-    return schema.pack({"X": x, "S": [s], "E": e, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    return schema.pack({"X": x, "S": [s], "E": e, "N": 0.0, "T": 293.15, "CO2": 0.0, "X_dead": 0.0})
 
 
 def test_metadata():
@@ -227,7 +227,9 @@ def test_full_model_growth_uptake_inhibition_conserves_carbon_and_nitrogen(param
         modifiers=[EthanolInhibition()],
         strict=True,
     )
-    y0 = schema.pack({"X": 0.1, "S": [264.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0})
+    y0 = schema.pack(
+        {"X": 0.1, "S": [264.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0, "X_dead": 0.0}
+    )
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 500.0))
     assert traj.success
 

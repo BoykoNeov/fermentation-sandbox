@@ -7,15 +7,15 @@ import pytest
 
 from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine_schema
 
-SHARED = ("X", "S", "E", "N", "T", "CO2")
+SHARED = ("X", "S", "E", "N", "T", "CO2", "X_dead")
 
 
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
     assert schema.names == SHARED
     assert schema.spec("S").size == 1
-    # X, S(1), E, N, T, CO2
-    assert schema.size == 6
+    # X, S(1), E, N, T, CO2, X_dead
+    assert schema.size == 7
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -24,14 +24,22 @@ def test_beer_schema_has_three_sequential_sugars():
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
-    # X, S(3), E, N, T, CO2
-    assert schema.size == 8
+    # X, S(3), E, N, T, CO2, X_dead
+    assert schema.size == 9
 
 
 def test_shared_variable_units_are_canonical():
     schema = wine_schema()
     units = {spec.name: spec.unit for spec in schema.specs}
-    assert units == {"X": "g/L", "S": "g/L", "E": "g/L", "N": "g/L", "T": "K", "CO2": "g/L"}
+    assert units == {
+        "X": "g/L",
+        "S": "g/L",
+        "E": "g/L",
+        "N": "g/L",
+        "T": "K",
+        "CO2": "g/L",
+        "X_dead": "g/L",
+    }
 
 
 def test_registry_exposes_wine_and_beer():
@@ -71,9 +79,15 @@ def test_build_process_set_respects_strict_flag():
 
 # -- the registered media now carry the validated-core primary-fermentation kinetics
 
-# Growth + fermentative uptake; ethanol-inhibition + per-rate Arrhenius modifiers.
-EXPECTED_PROCESSES = {"growth_nitrogen_limited", "sugar_uptake_to_ethanol_co2"}
-EXPECTED_MODIFIERS = {"ethanol_inhibition", "arrhenius_growth", "arrhenius_uptake"}
+# Growth + fermentative uptake + ethanol-driven cell inactivation; per-rate
+# Arrhenius modifiers. The Luong ethanol wall (ethanol_inhibition) is retired from
+# the default media in favour of the cumulative inactivation Process (decision D-13).
+EXPECTED_PROCESSES = {
+    "growth_nitrogen_limited",
+    "sugar_uptake_to_ethanol_co2",
+    "ethanol_inactivation",
+}
+EXPECTED_MODIFIERS = {"arrhenius_growth", "arrhenius_uptake"}
 
 
 @pytest.mark.parametrize("medium", ["wine", "beer"])

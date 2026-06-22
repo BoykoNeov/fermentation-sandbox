@@ -159,13 +159,17 @@ def test_total_mass_rejects_multicomponent_sugar():
 def test_total_mass_allows_single_sugar_wine():
     # Wine's single hexose slot is fine; the quantity is well-defined.
     mass = total_mass(wine_schema())
-    y = wine_schema().pack({"X": 1.0, "S": [200.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0})
+    y = wine_schema().pack(
+        {"X": 1.0, "S": [200.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0, "X_dead": 0.0}
+    )
     assert mass(y) == pytest.approx(200.0)
 
 
 def test_total_carbon_value_for_known_wine_state():
     schema = wine_schema()
-    y = schema.pack({"X": 2.0, "S": [100.0], "E": 50.0, "N": 0.3, "T": 293.15, "CO2": 20.0})
+    y = schema.pack(
+        {"X": 2.0, "S": [100.0], "E": 50.0, "N": 0.3, "T": 293.15, "CO2": 20.0, "X_dead": 0.0}
+    )
     carbon = total_carbon(schema, biomass_carbon_fraction=0.488)
     expected = (
         100.0 * carbon_mass_fraction("glucose")
@@ -179,7 +183,10 @@ def test_total_carbon_value_for_known_wine_state():
 def test_total_carbon_beer_uses_per_component_fractions():
     schema = beer_schema()
     y = schema.pack(
-        {"X": 0.0, "S": [10.0, 20.0, 30.0], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0}
+        {
+            "X": 0.0, "S": [10.0, 20.0, 30.0], "E": 0.0, "N": 0.0,
+            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+        }
     )
     carbon = total_carbon(schema, biomass_carbon_fraction=0.488)
     expected = (

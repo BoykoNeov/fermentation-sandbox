@@ -16,12 +16,14 @@ truth to agree on.
 
 The shared variables (decisions D-B / D-4):
 
-    X    biomass               g/L (dry cell weight)
-    S    sugar                 g/L — a *vector*: 1 slot for wine, 3 for beer
-    E    ethanol               g/L
-    N    yeast-assimilable N   g/L
-    T    temperature           K
-    CO2  evolved CO2           g/L
+    X      viable biomass        g/L (dry cell weight)
+    S      sugar                 g/L — a *vector*: 1 slot for wine, 3 for beer
+    E      ethanol               g/L
+    N      yeast-assimilable N   g/L
+    T      temperature           K
+    CO2    evolved CO2           g/L
+    X_dead ethanol-inactivated   g/L (non-viable biomass; carbon/nitrogen still
+                                 counted, but no longer catalytic — decision D-13)
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
@@ -34,7 +36,7 @@ from dataclasses import dataclass, field
 
 from fermentation.core.kinetics import (
     ArrheniusTemperature,
-    EthanolInhibition,
+    EthanolInactivation,
     GrowthNitrogenLimited,
     SugarUptakeToEthanolCO2,
 )
@@ -50,12 +52,13 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
     temperature / evolved CO2.
     """
     return [
-        VarSpec("X", "g/L", description="biomass (dry cell weight)"),
+        VarSpec("X", "g/L", description="viable biomass (dry cell weight)"),
         sugar,
         VarSpec("E", "g/L", description="ethanol"),
         VarSpec("N", "g/L", description="yeast-assimilable nitrogen"),
         VarSpec("T", "K", description="temperature"),
         VarSpec("CO2", "g/L", description="evolved CO2"),
+        VarSpec("X_dead", "g/L", description="ethanol-inactivated (non-viable) biomass"),
     ]
 
 
@@ -116,20 +119,25 @@ class Medium:
 
 
 #: The validated-core primary-fermentation kinetics, as zero-argument factories.
-#: Wine and beer share the *same* mechanism set — biomass growth and fermentative
-#: sugar uptake, scaled by ethanol inhibition and per-rate Arrhenius temperature
-#: dependence. The only structural difference between the two media is the sugar
-#: vector (1 slot vs 3): beer's sequential glucose→maltose→maltotriose uptake is
-#: handled *inside* :class:`~fermentation.core.kinetics.uptake.SugarUptakeToEthanolCO2`
-#: via catabolite repression, so it needs no extra Process here. This is exactly the
-#: stacked configuration whose carbon/nitrogen closure is locked in
-#: ``tests/test_kinetics_arrhenius.py`` (decisions D-8 … D-11).
+#: Wine and beer share the *same* mechanism set — biomass growth, fermentative
+#: sugar uptake, and ethanol-driven cell inactivation (the cumulative viability
+#: brake that sets the fermentation timescale, Coleman 2007), with per-rate
+#: Arrhenius temperature dependence scaling growth and uptake. The only structural
+#: difference between the two media is the sugar vector (1 slot vs 3): beer's
+#: sequential glucose→maltose→maltotriose uptake is handled *inside*
+#: :class:`~fermentation.core.kinetics.uptake.SugarUptakeToEthanolCO2` via catabolite
+#: repression, so it needs no extra Process here.
+#:
+#: The instantaneous Luong ethanol wall (``EthanolInhibition``) is **not** wired in:
+#: the cumulative inactivation Process is the mechanistically-correct ethanol brake,
+#: and stacking an instantaneous wall on top would double-count ethanol toxicity
+#: (decision D-13). The class is retained for optional/strain use.
 _PRIMARY_FERMENTATION_PROCESSES: tuple[Callable[[], Process], ...] = (
     GrowthNitrogenLimited,
     SugarUptakeToEthanolCO2,
+    EthanolInactivation,
 )
 _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
-    EthanolInhibition,
     ArrheniusTemperature.for_growth,
     ArrheniusTemperature.for_uptake,
 )

@@ -90,15 +90,25 @@
       a `modifier_factories` tuple alongside `process_factories`, and
       `build_process_set` now threads `modifiers=` into the `ProcessSet`. Both wine and
       beer wire the same mechanism set — `GrowthNitrogenLimited` +
-      `SugarUptakeToEthanolCO2`, scaled by `EthanolInhibition` and the two per-rate
-      `ArrheniusTemperature` modifiers — the stacked config whose carbon/nitrogen
-      closure is already locked in `tests/test_kinetics_arrhenius.py`. The only
-      wine/beer difference is the sugar vector (1 vs 3 slots); beer's sequential uptake
-      lives inside the uptake Process, so no extra Process is needed. The empty-`Medium`
-      "no kinetics" baseline moved to an explicit bare `Medium` (`test_media.py`);
-      `compile→simulate` now ferments end-to-end and conserves carbon for both media
-      (`test_compile.py`).
-- [ ] Tune functional forms + parameters against the curves.
+      `SugarUptakeToEthanolCO2` + `EthanolInactivation`, scaled by the two per-rate
+      `ArrheniusTemperature` modifiers (the `EthanolInhibition` wall was retired from
+      the default media — see D-13 below). The only wine/beer difference is the sugar
+      vector (1 vs 3 slots); beer's sequential uptake lives inside the uptake Process,
+      so no extra Process is needed. The empty-`Medium` "no kinetics" baseline moved to
+      an explicit bare `Medium` (`test_media.py`); `compile→simulate` now ferments
+      end-to-end and conserves carbon for both media (`test_compile.py`).
+- [x] **Ethanol brake: cumulative cell inactivation replaces the Luong wall (D-13).**
+      New `EthanolInactivation` Process (`fermentation.core.kinetics.inactivation`):
+      `r = k'_d·E·X` moves viable biomass `X → X_dead` (Coleman eqs 2/7). Two-pool
+      `X`/`X_dead` (added to both media schemas) makes the transfer carbon/nitrogen-
+      neutral by construction; `conservation.py` weights `X_dead` like `X`. `k'_d`
+      sourced from Coleman Table A2 **with a published-typo correction** (a1 exponent;
+      `4.28e-5` not `3.64e-4` — the as-printed value stalls even Coleman's own model).
+      Wired wine now ferments to dryness. Tests in `tests/test_kinetics_inactivation.py`
+      (closed form, guards, full-model carbon+nitrogen closure, tier propagation).
+- [ ] Tune functional forms + parameters against the curves. **Open after D-13:** wine
+      dries in ~7.7 d (below the 10-14 d window) — an uptake-speed gap (β_max/biomass),
+      not a `k'_d` matter; ABV ~16.9 % awaits the realised-yield/glycerol-sink task.
 - [ ] Unskip & pass `test_wine_24brix_ferments_to_dryness_in_10_to_14_days`.
 - [ ] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`.
 - [ ] Unskip & pass `test_co2_integral_tracks_sugar_consumed`.

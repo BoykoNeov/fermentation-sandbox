@@ -42,13 +42,15 @@ def params(store):
 def _wine_y0(
     schema: StateSchema, *, x: float = 2.0, s: float = 264.0, e: float = 0.0
 ) -> FloatArray:
-    return schema.pack({"X": x, "S": [s], "E": e, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    return schema.pack({"X": x, "S": [s], "E": e, "N": 0.0, "T": 293.15, "CO2": 0.0, "X_dead": 0.0})
 
 
 def _beer_y0(
     schema: StateSchema, *, x: float = 2.0, s: tuple[float, float, float] = (30.0, 60.0, 10.0)
 ) -> FloatArray:
-    return schema.pack({"X": x, "S": list(s), "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    return schema.pack(
+        {"X": x, "S": list(s), "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0, "X_dead": 0.0}
+    )
 
 
 def test_metadata():
@@ -63,7 +65,7 @@ def test_derivative_matches_closed_form(params):
     # Pin dS, dE, dCO2 to the formula at a known wine state — no solver fuzz.
     schema = wine_schema()
     x, s = 2.0, 200.0
-    y = schema.pack({"X": x, "S": [s], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    y = schema.pack({"X": x, "S": [s], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0, "X_dead": 0.0})
     d = SugarUptakeToEthanolCO2().derivatives(0.0, y, schema, params)
 
     r = params["q_sugar_max"] * x * (s / (params["K_sugar_uptake"] + s))
@@ -86,7 +88,9 @@ def test_negative_sugar_excursion_does_not_create_sugar(params):
     # A clamp guards against solver undershoot below zero: rate must be >= 0, never
     # adding sugar back or driving E/CO2 negative.
     schema = wine_schema()
-    y = schema.pack({"X": 2.0, "S": [-1e-6], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    y = schema.pack(
+        {"X": 2.0, "S": [-1e-6], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0, "X_dead": 0.0}
+    )
     d = SugarUptakeToEthanolCO2().derivatives(0.0, y, schema, params)
     assert np.array_equal(d, schema.zeros())
 
@@ -137,7 +141,10 @@ def test_beer_sequential_uptake_ordering(params):
     u = SugarUptakeToEthanolCO2()
 
     with_glucose = schema.pack(
-        {"X": 2.0, "S": [20.0, 60.0, 10.0], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0}
+        {
+            "X": 2.0, "S": [20.0, 60.0, 10.0], "E": 0.0, "N": 0.0,
+            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+        }
     )
     d1 = u.derivatives(0.0, with_glucose, schema, params)
     rates1 = -d1[schema.slice("S")]  # consumption rates, slot order
@@ -148,7 +155,10 @@ def test_beer_sequential_uptake_ordering(params):
     assert r_tri < r_mal
 
     no_glucose = schema.pack(
-        {"X": 2.0, "S": [0.0, 60.0, 10.0], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0}
+        {
+            "X": 2.0, "S": [0.0, 60.0, 10.0], "E": 0.0, "N": 0.0,
+            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+        }
     )
     d2 = u.derivatives(0.0, no_glucose, schema, params)
     r_mal_after = float(-d2[schema.slice("S")][1])
@@ -200,7 +210,9 @@ def test_combined_growth_and_uptake_conserves_carbon_and_nitrogen(params, store)
     # biomass, which total_mass{S,E,CO2} does not see (decision D-8).
     schema = wine_schema()
     ps = ProcessSet(schema, [GrowthNitrogenLimited(), SugarUptakeToEthanolCO2()], strict=True)
-    y0 = schema.pack({"X": 0.1, "S": [264.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0})
+    y0 = schema.pack(
+        {"X": 0.1, "S": [264.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0, "X_dead": 0.0}
+    )
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 500.0))
     assert traj.success
 

@@ -407,6 +407,55 @@ its DOI is *not* minted onto an unread number (the uncertainty range admits it).
 `10.1128/AEM.00845-07`; the correct DOI is **`10.1128/aem.00670-07`** (00845-07 is a
 different paper). Corrected here and in the YAML.
 
+### D-13 — Ethanol brake: cumulative cell inactivation (two-pool) replaces the Luong wall
+**Decision:** the validated core's ethanol brake is **ethanol-driven cell inactivation**
+(Coleman 2007 eqs 2/7: `dX_A/dt = μ·X_A − k_d·X_A`, `k_d = k'_d·E`), implemented as the
+`EthanolInactivation` Process. It **replaces the Luong wall** (D-10) in the default
+`wine`/`beer` media. `EthanolInhibition` is retained as an optional class (strain/study
+use) but is no longer wired in — keeping both would double-count ethanol toxicity.
+
+**Why the wall could not stay.** The Luong factor `(1 − E/E_max)ⁿ` is *instantaneous and
+reversible*: it scales the present flux by the present ethanol, holds no memory, and
+(for `E_max` below a 24 °Brix must's final ethanol) stalls the ferment short of dryness
+forever. A wine's 10-14 day *timescale* is set by the **irreversible, cumulative** loss
+of catalytic cells as ethanol kills them — a stateful integral of damage, not a function
+of the instantaneous state. Only a cumulative mechanism both decelerates the tail and
+still finishes.
+
+**Two-pool representation (chosen over a φ viability-fraction).** `X` stays the *viable*
+biomass it always was (growth and uptake are catalysed by `X`); an inactivated pool
+`X_dead` is added. Inactivation moves mass `X → X_dead` at equal rate (`r = k'_d·E·X`).
+Because both pools carry the *same* elemental composition, the transfer is **carbon- and
+nitrogen-neutral by construction** — a gram leaving `X` arrives in `X_dead` with the same
+`f_C`/`f_N`, so `total_carbon`/`total_nitrogen` (which weight both pools) are untouched by
+death. A φ-fraction folded into `X` would have made the conservation checks read a
+shrinking carbon pool as mass destruction. Tier `plausible` (sourced mechanism, not yet
+validated against our own curves).
+
+**`k'_d` sourcing — and a published-typo correction (Coleman Table A2).** `k'_d` is the
+only *quadratic* Coleman parameter: `ln(k'_d) = a0 + a1·T + a2·T²` (T °C). Table A2 prints
+the `a1` **mean** as `−1.08×10⁻³`, but that value lies **outside its own printed 95 %
+credible region** `[−1.94×10⁻¹, −3.30×10⁻²]` — a posterior mean cannot. The journal
+typesetting dropped the `×10ⁿ` exponent from the `a1` mean column; the true value is
+`−1.08×10⁻¹`. Three independent checks confirm it: (1) it reproduces the paper's stated
+**~13× rise** in `k'_d` over 11→35 °C (the as-printed value gives 191×); (2) it keeps
+`k'_d(35 °C) = 4.4×10⁻⁴` under Fig 3b's `6×10⁻⁴` axis (the as-printed value overshoots
+to `1.8×10⁻²`, ~30× off-scale); (3) the **identical defect** appears in the `Log(Y_X/N)`
+row (printed `a1` mean `−3.61` vs CR `[−4.35×10⁻³, −2.93×10⁻³]`; corrected `−3.61×10⁻³`
+reproduces Fig 4) — a systematic fault, not a one-off. Corrected value at 20 °C:
+`k'_d = exp(−9.81 − 0.108·20 + 0.00478·400) = 4.28×10⁻⁵ (g/L)⁻¹h⁻¹`. The as-printed
+`3.64×10⁻⁴` stalls *Coleman's own* model at ~108 g/L residual; the corrected value
+reproduces his Fig 6c completion at 20 °C. M1 is isothermal at 20 °C so no Arrhenius
+modifier is attached to `k'_d` (the quadratic does not reduce to a single `E_a`).
+
+**Two gaps left open (deliberately, both separate tasks).** With the corrected `k'_d` the
+wired wine model **completes** (S → 0), but: (a) it dries in **~7.7 days, below the 10-14
+day benchmark window** — an *uptake-speed* gap, since the Table A2 reconstruction runs
+~2× faster than Coleman's measured 20 °C data even with *zero* death; this is the next
+tuning question (β_max/biomass), not a `k'_d` matter. (b) ABV lands at **16.9 %** (E ≈ 133
+g/L) from the theoretical Gay-Lussac split — the realised-yield/glycerol-sink task.
+Neither was folded into the `k'_d` decision.
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.

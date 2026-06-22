@@ -12,11 +12,13 @@ no-kinetics baseline holds — see ``docs/plans/milestone-1-tasks.md``).
 
 from fermentation.core.kinetics.arrhenius import ArrheniusTemperature
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited
+from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 
 __all__ = [
     "ArrheniusTemperature",
+    "EthanolInactivation",
     "EthanolInhibition",
     "GrowthNitrogenLimited",
     "SugarUptakeToEthanolCO2",

@@ -11,10 +11,12 @@
 # Coleman's model (their eqs 1-8) is structurally close to ours: growth is Monod
 # on nitrogen (mu = mu_max*N/(K_N+N)) and fermentative uptake is Michaelis-Menten
 # on sugar. Its parameters are NOT tabulated at single temperatures; they are
-# log-linear regressions in T (deg C), ln(param) = a0 + a1*T (Table A2; "Log" is
-# the NATURAL log — confirmed by the paper's own statement that mu_max ~ 0.05/h
-# at 11 C, matching exp(-3.92 + 0.0782*11) = 0.047). We evaluate each regression
-# at T_ref = 20 C (the wine benchmark temperature). See docs/DECISIONS.md (D-12).
+# regressions in T (deg C), ln(param) = a0 + a1*T (+ a2*T^2 for k'_d only)
+# (Table A2; "Log" is the NATURAL log — confirmed by the paper's own statement
+# that mu_max ~ 0.05/h at 11 C, matching exp(-3.92 + 0.0782*11) = 0.047). We
+# evaluate each regression at T_ref = 20 C (the wine benchmark temperature). One
+# Table A2 exponent is typo-corrected (k'_d a1; see that entry). See
+# docs/DECISIONS.md (D-12).
 #
 # Conditions throughout: Premier Cuvee (Red Star), diluted Chardonnay must,
 # 265-300 g/L sugar, 70-350 mg N/L, isothermal 11-35 C.
@@ -122,6 +124,45 @@ ethanol_inhibition_exponent:
     source: "author estimate"
     conditions: "generic S. cerevisiae; Levenspiel 1980 / Luong 1985 inhibition form"
     notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. n=1 is the raw linear (Ghose-Tyagi) form with a derivative kink at E_max; de Andres-Toro et al. 1998 use exactly this n=1 wall (f = 1 - E/(0.5*S0)) for beer. We keep n=2 so the touchdown is C1-smooth for the BDF solver and gives a 'tolerant then collapse' viability shape; the form has literature backing but the exponent itself is our numerical choice, hence speculative."
+
+# -- Ethanol-driven cell inactivation (the timescale brake, decision D-13) -----
+# Coleman split biomass into active cells X_A and modelled an ethanol-proportional
+# specific death rate (their eqs 2, 7): dX_A/dt = mu*X_A - k_d*X_A, k_d = k'_d*E.
+# This cumulative loss of viable (catalytic) biomass is what sets a wine's 10-14
+# day timescale; it REPLACES the instantaneous Luong wall as the validated-core
+# ethanol brake (D-13). Read by EthanolInactivation, which moves mass X -> X_dead.
+
+k_prime_d:
+  value: 4.28e-5
+  unit: "(g/L)^-1 h^-1"   # k_d = k'_d * E has units 1/h
+  tier: plausible
+  uncertainty: { low: 3.0e-5, high: 4.4e-4, note: "11 C -> 3.0e-5, 35 C -> 4.4e-4 (factor ~15, matching the paper's stated ~13x); quadratic in T" }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884, Table A2"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must, 20 C; Table A2 ln(k'_d) = -9.81 - 0.108*T + 0.00478*T^2 (T in degC, QUADRATIC; a1 exponent typo-corrected - see notes)"
+    notes: >-
+      Evaluated at T_ref = 20 C: exp(-9.81 - 0.108*20 + 0.00478*400) = exp(-10.06)
+      = 4.28e-5 (g/L)^-1 h^-1. At E=100 g/L this gives k_d = 4.3e-3/h (viable-cell
+      half-life ~160 h) - the gentle tail brake that lets a 20 C ferment finish.
+      Verified by reconstruction: this value reproduces Coleman's own Fig 6c
+      completion at 20 C, whereas the as-printed a1 (below) stalls even their model
+      at ~108 g/L residual.
+      PUBLISHED-TYPO CORRECTION (a1 exponent): Table A2 prints the a1 MEAN for
+      Log(k'_d) as -1.08e-3, but that value lies OUTSIDE its own printed 95%
+      credible region [-1.94e-1, -3.30e-2] (a posterior mean cannot). The journal
+      typesetting dropped the x10^n exponent from the a1 mean column; the true value
+      is -1.08e-1, which sits inside the CR. Three independent checks confirm:
+      (1) -1.08e-1 reproduces the paper's stated ~13x rise in k'_d from 11->35 C
+      (the as-printed -1.08e-3 gives 191x); (2) it keeps k'_d(35 C)=4.4e-4 under
+      Fig 3b's 6e-4 axis (the as-printed value overshoots to 1.8e-2, ~30x off the
+      plotted scale); (3) the IDENTICAL defect appears in the Log(Y_X/N) row
+      (printed a1 mean -3.61 vs its CR [-4.35e-3, -2.93e-3]; corrected -3.61e-3
+      reproduces Fig 4), so it is a systematic typesetting fault, not a one-off.
+      k'_d is the only QUADRATIC Coleman parameter and the steepest T-dependence -
+      why high temperature drives stuck fermentations. M1 is isothermal at 20 C so
+      no Arrhenius modifier is attached (the quadratic does not reduce to a single
+      activation energy anyway)."
 
 # -- Arrhenius temperature dependence (per-rate, decision D-11) ----------------
 # f = exp(-(E_a/R)(1/T - 1/T_ref)), normalised so the rate constant is used

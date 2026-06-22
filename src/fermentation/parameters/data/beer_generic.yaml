@@ -123,6 +123,21 @@ ethanol_inhibition_exponent:
     conditions: "generic ale yeast; Levenspiel 1980 / Luong 1985 inhibition form"
     notes: "Exponent n in f = (1 - E/E_max)^n. de Andres-Toro et al. 1998 use n=1 (f = 1 - E/(0.5*S0)) for beer; we keep n=2 for a C1-smooth touchdown (BDF solver). Form is literature-backed, exponent is our numerical choice - speculative."
 
+# -- Ethanol-driven cell inactivation (the timescale brake, decision D-13) -----
+# Read by EthanolInactivation (moves mass X -> X_dead). Beer barely reaches its
+# tolerance (~7% ABV vs wine's ~17%), so this term is far less load-bearing for
+# the beer benchmark than the uptake rate is; beer's pace is set by q_sugar_max.
+
+k_prime_d:
+  value: 4.28e-5
+  unit: "(g/L)^-1 h^-1"
+  tier: speculative
+  uncertainty: { low: 3.0e-5, high: 4.4e-4, note: "transferred from the Coleman wine fit; ale-specific value not sourced" }
+  provenance:
+    source: "author estimate (transferred from Coleman 2007 wine k'_d, doi:10.1128/aem.00670-07, Table A2 at 20 C)"
+    conditions: "generic ale yeast; ethanol inactivation assumed yeast-generic at the species level"
+    notes: "No cited beer model fits an ethanol-driven inactivation constant of our form (de Andres-Toro use a stoichiometric ethanol wall instead), so we transfer the verifiable Coleman wine value (k'_d(20 C) = 4.28e-5; see the wine file for the Table A2 a1 typo correction). Speculative because transferred, not beer-sourced. Largely inert for the M1 beer benchmark: a 1.048 OG wort makes only ~55 g/L ethanol, where k_d = 2.4e-3/h gives a viable-cell half-life of ~290 h - a negligible tail brake, not the dominant control (q_sugar_max sets beer's pace)."
+
 # -- Arrhenius temperature dependence (per-rate, decision D-11) ----------------
 # INERT for M1: runs are isothermal at T_ref so f = 1 and these never bite.
 # Carried for Tier-2 readiness. de Andres-Toro 1998 use mu = A*exp(B/RT) and

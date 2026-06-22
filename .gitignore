@@ -29,3 +29,6 @@ Thumbs.db
 
 # Claude Code local overrides (keep shared settings.json tracked)
 .claude/settings.local.json
+
+# Copyrighted source PDFs read locally for parameter provenance — NOT redistributable
+manual_sources/

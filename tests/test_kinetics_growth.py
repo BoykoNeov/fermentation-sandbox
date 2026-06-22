@@ -40,7 +40,7 @@ def params(store):
 def _wine_y0(
     schema: StateSchema, *, x: float = 0.1, s: float = 264.0, n: float = 0.3
 ) -> FloatArray:
-    return schema.pack({"X": x, "S": [s], "E": 0.0, "N": n, "T": 293.15, "CO2": 0.0})
+    return schema.pack({"X": x, "S": [s], "E": 0.0, "N": n, "T": 293.15, "CO2": 0.0, "X_dead": 0.0})
 
 
 def test_metadata():
@@ -55,7 +55,9 @@ def test_metadata():
 def test_derivative_matches_closed_form(params):
     # Pin dX, dN, dS to the formula at a known wine state — no solver fuzz.
     schema = wine_schema()
-    y = schema.pack({"X": 1.0, "S": [200.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0})
+    y = schema.pack(
+        {"X": 1.0, "S": [200.0], "E": 0.0, "N": 0.3, "T": 293.15, "CO2": 0.0, "X_dead": 0.0}
+    )
     d = GrowthNitrogenLimited().derivatives(0.0, y, schema, params)
 
     mu = params["mu_max"] * (200.0 / (params["K_s"] + 200.0)) * (0.3 / (params["K_n"] + 0.3))
@@ -127,7 +129,10 @@ def test_beer_run_conserves_carbon_through_vector_draw(params, store):
     schema = beer_schema()
     ps = ProcessSet(schema, [GrowthNitrogenLimited()], strict=True)
     y0 = schema.pack(
-        {"X": 0.1, "S": [30.0, 60.0, 10.0], "E": 0.0, "N": 0.25, "T": 293.15, "CO2": 0.0}
+        {
+            "X": 0.1, "S": [30.0, 60.0, 10.0], "E": 0.0, "N": 0.25,
+            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+        }
     )
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 300.0))
     assert traj.success

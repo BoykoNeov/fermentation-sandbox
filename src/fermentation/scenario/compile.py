@@ -107,6 +107,7 @@ def _wine_initial(values: Mapping[str, float], temperature_k: float) -> _Initial
         "N": mgl_to_gpl(_require(values, "yan_mgl", "wine")),
         "T": temperature_k,
         "CO2": 0.0,
+        "X_dead": 0.0,  # no inactivated biomass at pitch
     }
 
 
@@ -122,6 +123,7 @@ def _beer_initial(values: Mapping[str, float], temperature_k: float) -> _Initial
         "N": mgl_to_gpl(_require(values, "yan_mgl", "beer")),
         "T": temperature_k,
         "CO2": 0.0,
+        "X_dead": 0.0,  # no inactivated biomass at pitch
     }
 
 
