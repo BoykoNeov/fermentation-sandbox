@@ -142,8 +142,13 @@ def test_beer_sequential_uptake_ordering(params):
 
     with_glucose = schema.pack(
         {
-            "X": 2.0, "S": [20.0, 60.0, 10.0], "E": 0.0, "N": 0.0,
-            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+            "X": 2.0,
+            "S": [20.0, 60.0, 10.0],
+            "E": 0.0,
+            "N": 0.0,
+            "T": 293.15,
+            "CO2": 0.0,
+            "X_dead": 0.0,
         }
     )
     d1 = u.derivatives(0.0, with_glucose, schema, params)
@@ -156,8 +161,13 @@ def test_beer_sequential_uptake_ordering(params):
 
     no_glucose = schema.pack(
         {
-            "X": 2.0, "S": [0.0, 60.0, 10.0], "E": 0.0, "N": 0.0,
-            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+            "X": 2.0,
+            "S": [0.0, 60.0, 10.0],
+            "E": 0.0,
+            "N": 0.0,
+            "T": 293.15,
+            "CO2": 0.0,
+            "X_dead": 0.0,
         }
     )
     d2 = u.derivatives(0.0, no_glucose, schema, params)

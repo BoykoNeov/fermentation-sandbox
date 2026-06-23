@@ -141,9 +141,7 @@ def test_compiled_wine_conserves_nitrogen_with_dynamic_yield():
         ),
         strict=True,
     )
-    traj = simulate(
-        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h
-    )
+    traj = simulate(compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h)
     f_n = compiled.parameters.value("biomass_N_fraction")
     assert_conserved(
         traj,

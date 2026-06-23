@@ -154,9 +154,19 @@ def test_load_shipped_beer_parameters():
     ps = load_parameters(DATA / "beer_generic.yaml")
     # Defines every parameter the medium-agnostic kinetics read.
     read_params = {
-        "mu_max", "K_s", "K_n", "q_sugar_max", "K_sugar_uptake", "K_repression",
-        "ethanol_tolerance", "ethanol_inhibition_exponent", "E_a_growth",
-        "E_a_uptake", "T_ref", "biomass_C_fraction", "biomass_N_fraction",
+        "mu_max",
+        "K_s",
+        "K_n",
+        "q_sugar_max",
+        "K_sugar_uptake",
+        "K_repression",
+        "ethanol_tolerance",
+        "ethanol_inhibition_exponent",
+        "E_a_growth",
+        "E_a_uptake",
+        "T_ref",
+        "biomass_C_fraction",
+        "biomass_N_fraction",
     }
     assert read_params <= set(ps.names)
     # Sourced from Zamudio Lara et al. 2022 (open access).

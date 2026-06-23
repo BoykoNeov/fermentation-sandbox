@@ -183,9 +183,7 @@ def _load_parameters(
     return load_parameters(path)
 
 
-def _apply_nitrogen_dependent_yield(
-    scenario: Scenario, parameters: ParameterSet
-) -> ParameterSet:
+def _apply_nitrogen_dependent_yield(scenario: Scenario, parameters: ParameterSet) -> ParameterSet:
     """Override ``biomass_N_fraction`` from Coleman's ``Y_X/N(N_init)`` regression.
 
     Coleman, Fish & Block (2007) found the cell-mass-per-nitrogen yield to depend

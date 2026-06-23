@@ -76,11 +76,7 @@ class GrowthNitrogenLimited(Process):
         if x <= 0.0 or s_total <= 0.0 or n <= 0.0:
             return d
 
-        mu = (
-            params["mu_max"]
-            * (s_total / (params["K_s"] + s_total))
-            * (n / (params["K_n"] + n))
-        )
+        mu = params["mu_max"] * (s_total / (params["K_s"] + s_total)) * (n / (params["K_n"] + n))
         dx = mu * x  # biomass growth rate [g/L/h]
         d[schema.slice("X")] = dx
         d[schema.slice("N")] = -params["biomass_N_fraction"] * dx  # YAN into biomass

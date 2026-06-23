@@ -184,8 +184,13 @@ def test_total_carbon_beer_uses_per_component_fractions():
     schema = beer_schema()
     y = schema.pack(
         {
-            "X": 0.0, "S": [10.0, 20.0, 30.0], "E": 0.0, "N": 0.0,
-            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+            "X": 0.0,
+            "S": [10.0, 20.0, 30.0],
+            "E": 0.0,
+            "N": 0.0,
+            "T": 293.15,
+            "CO2": 0.0,
+            "X_dead": 0.0,
         }
     )
     carbon = total_carbon(schema, biomass_carbon_fraction=0.488)

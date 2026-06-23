@@ -97,12 +97,18 @@ def test_wine_run_conserves_carbon_and_nitrogen(params, store):
     f_c = store.value("biomass_C_fraction")
     f_n = store.value("biomass_N_fraction")
     assert_conserved(
-        traj, total_carbon(schema, biomass_carbon_fraction=f_c),
-        rtol=1e-5, atol=1e-6, label="carbon",
+        traj,
+        total_carbon(schema, biomass_carbon_fraction=f_c),
+        rtol=1e-5,
+        atol=1e-6,
+        label="carbon",
     )
     assert_conserved(
-        traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n),
-        rtol=1e-5, atol=1e-6, label="nitrogen",
+        traj,
+        total_nitrogen(schema, biomass_nitrogen_fraction=f_n),
+        rtol=1e-5,
+        atol=1e-6,
+        label="nitrogen",
     )
     assert_nonnegative(traj, ("X", "S", "N"), atol=1e-7)
 
@@ -130,8 +136,13 @@ def test_beer_run_conserves_carbon_through_vector_draw(params, store):
     ps = ProcessSet(schema, [GrowthNitrogenLimited()], strict=True)
     y0 = schema.pack(
         {
-            "X": 0.1, "S": [30.0, 60.0, 10.0], "E": 0.0, "N": 0.25,
-            "T": 293.15, "CO2": 0.0, "X_dead": 0.0,
+            "X": 0.1,
+            "S": [30.0, 60.0, 10.0],
+            "E": 0.0,
+            "N": 0.25,
+            "T": 293.15,
+            "CO2": 0.0,
+            "X_dead": 0.0,
         }
     )
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 300.0))
@@ -139,7 +150,10 @@ def test_beer_run_conserves_carbon_through_vector_draw(params, store):
 
     f_c = store.value("biomass_C_fraction")
     assert_conserved(
-        traj, total_carbon(schema, biomass_carbon_fraction=f_c),
-        rtol=1e-5, atol=1e-6, label="carbon",
+        traj,
+        total_carbon(schema, biomass_carbon_fraction=f_c),
+        rtol=1e-5,
+        atol=1e-6,
+        label="carbon",
     )
     assert_nonnegative(traj, ("X", "S", "N"), atol=1e-7)
