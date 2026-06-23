@@ -644,6 +644,60 @@ always 0 at pitch — so `VarSpec` gained a `default` and `StateSchema.pack` fil
 pools when omitted; substrate/condition vars (X, S, E, N, T, CO2) stay required, preserving the
 typo guard. This let two state variables land without touching ~37 initial-condition call sites.
 
+## D-17 — Tier-promotion sweep: VALIDATED is reserved for independent data; the §2.2 pass earns PLAUSIBLE
+
+**Status: closed.** The final M1 task — a sweep of every Process, modifier and
+parameter now that all three §2.2 benchmarks pass, to decide what moves up.
+**Outcome: promote nothing.** Recorded here with the evidence, because "promote
+nothing" is itself the honest decision (the user's call on the VALIDATED bar), not a
+skipped task.
+
+**The bar — why §2.2 does not clear it.** VALIDATED means "established published
+science *checked against independent benchmark curves*." The §2.2 pass is necessary
+but not sufficient:
+- **No measured time-series exist yet** (D-C). We validate against a published
+  *model* (Coleman 2007) and *benchmark windows*, not raw experimental curves.
+- **The wine window is re-anchored to Coleman** (D-14) — the same source the wine
+  constants come from. Clearing a window derived from your own source is a
+  faithful-implementation cross-check (a strong one — the reconstruction tracks to
+  RMSE ~1.3 g/L), not *independent* validation.
+- **Beer is explicitly weaker** (D-15): the attenuation timescale is set by a
+  speculative `q_sugar_max` chosen at the low end of its range — a plausibility
+  check by the source's own admission.
+
+So passing §2.2 *confirms the PLAUSIBLE tier is earned* (sound mechanism, sourced
+parameters, reproduces the keystone model) but VALIDATED waits for real curves to
+drop into the data-ready harness (`ReferenceSeries`/`compare_series`, D-C). The
+pre-registered "promote once §2.2 passes" language in the growth/uptake/inactivation
+docstrings is rewritten to say this.
+
+**Why the call is also low-stakes — promotion is inert at the output level (verified
+on the real compile path).** Flipping growth/uptake/inactivation to VALIDATED and
+re-deriving tiers changes **nothing** on the param-aware path (the D-1 real guarantee
+that reporting uses) for either medium, and on the structural (`param_tiers=None`)
+path moves exactly one variable — `X_dead` (plausible→validated). Wine flux outputs
+are param-capped: `X`/`S` by `K_s`, and `E`/`CO2`/`Gly`/`Byp` by `K_repression` +
+`Y_byproduct_sugar` (all speculative, D-12); the structural path is held at plausible
+for every flux variable by the two Arrhenius modifiers (D-11). So the tier system
+already reports honestly *regardless* of the mechanism-axis label — promoting the
+Processes would have been a semantic statement about the forms, capped away at the
+outputs anyway. This is parameter-tier propagation (D-1) and modifier-tier capping
+(D-10/D-11) working as designed.
+
+**Clean calls that hold regardless of the bar (the sweep's actual content):**
+- **Arrhenius modifiers stay PLAUSIBLE** — inert at the isothermal `T_ref` benchmark
+  (`f = 1`), so §2.2 never exercises them; an untested mechanism cannot be promoted.
+- **Beer `q_sugar_max` stays SPECULATIVE** (D-15, the weaker beer timescale check).
+- **`K_s`, `K_repression`, `Y_byproduct_sugar`, `ethanol_inhibition_exponent` stay
+  SPECULATIVE** (D-12: no source measures them in our form; `K_s`/`K_repression` are
+  inert guards for wine yet still cap conservatively — the design, not a defect).
+- Everything already PLAUSIBLE (the Coleman/Zamudio-sourced constants; the three
+  mechanisms) stays PLAUSIBLE — earned, not inflated.
+
+**Future promotion trigger.** A parameter/Process moves to VALIDATED when it is
+checked against an *independent measured* dataset for our own functional form — the
+first such time-series to land in `ReferenceSeries` is the cue to revisit this sweep.
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.

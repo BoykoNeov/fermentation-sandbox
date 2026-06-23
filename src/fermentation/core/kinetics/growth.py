@@ -32,8 +32,14 @@ close under growth (sugar leaves without matching E/CO2); carbon is the invarian
 to check, exactly as decision D-8 scopes it.
 
 Tier: **plausible** — a sound, literature-standard mechanism (Monod kinetics,
-nitrogen limitation), not yet validated against the benchmark curves. Promote to
-validated once it reproduces the §2.2 lag→exp→stationary shape.
+nitrogen limitation). The §2.2 wine benchmark now passes and this Process
+reproduces Coleman 2007 line-for-line (``tests/test_coleman_reconstruction.py``),
+which *confirms* the plausible tier is earned — but it is deliberately **not**
+promoted to validated. VALIDATED is reserved for validation against independent
+*measured* time-series (handoff D-C: none exist yet); the §2.2 wine window was
+re-anchored to Coleman, the same source these constants come from, so clearing it
+is a faithful-implementation cross-check, not independent validation. Promote when
+real curves drop into the data-ready harness (decision D-17).
 """
 
 from __future__ import annotations

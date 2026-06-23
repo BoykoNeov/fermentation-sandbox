@@ -141,6 +141,16 @@
 - [x] Directional check: lower T → slower (qualitative; full byproduct check is T2). →
       `test_warmer_ferments_faster_than_cooler` in `tests/test_kinetics_arrhenius.py`
       (identical uptake config, warmer run leaves less residual sugar over the span).
-- [ ] Update `docs/ARCHITECTURE.md` + `DECISIONS.md`; promote tiers; commit.
+- [x] Update `docs/ARCHITECTURE.md` + `DECISIONS.md`; **tier-promotion sweep —
+      promote nothing, record why (D-17)**. VALIDATED is reserved for validation
+      against independent *measured* time-series (D-C: none exist yet); passing §2.2
+      confirms PLAUSIBLE is earned (sound forms, sourced params, reproduces Coleman)
+      but is a faithful-implementation cross-check against a Coleman-anchored window,
+      not independent validation. Verified the call is near-inert: promoting the three
+      core Processes changes no output tier on the param-aware path (wine is param-
+      capped by `K_s`/`K_repression`/`Y_byproduct_sugar`), only `X_dead`'s structural
+      tier. Clean calls: Arrhenius stays plausible (inert at `T_ref`); beer
+      `q_sugar_max` + the speculative guards stay speculative. Pre-registered "promote
+      once §2.2 passes" docstring language rewritten. Decision **D-17**.
 
 Keep `pytest` / `ruff` / `mypy` green at every step. Do not weaken benchmarks.

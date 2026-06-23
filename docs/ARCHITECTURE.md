@@ -87,6 +87,11 @@ parameters*, not of the raw floats flowing through the solver; an output's tier
 is computed at the analysis boundary. This satisfies "the tier travels to every
 output" without polluting the integration hot loop. (See DECISIONS #1.)
 
+No Process or parameter is `VALIDATED` yet: that tier is reserved for checks against
+independent *measured* time-series, which do not exist yet (DECISIONS #C, #17).
+Passing the §2.2 benchmarks earns `PLAUSIBLE` — sound forms, sourced parameters,
+reproduces the keystone model — not `VALIDATED`.
+
 ## Parameters with provenance
 
 Every kinetic/physical constant is a `Parameter` requiring value, units, tier,

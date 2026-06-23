@@ -31,11 +31,14 @@ off by nitrogen limitation long before ethanol climbs high (see
 the benchmarks probe. The Arrhenius modifier (next task) will target both rates.
 
 Tier: **plausible** — a standard, literature-backed inhibition form (Levenspiel
-1980; Luong 1985), not yet validated against the §2.2 benchmark curves. With the
-*placeholder* ``ethanol_tolerance`` (110 g/L, below a 24 °Brix must's ~124-135 g/L
-final ethanol) an inhibited wine run stalls short of dryness; that is a
-parameter-sourcing/tuning concern (a high-alcohol must implies a high-tolerance
-strain), not a flaw in the form — see D-10 and milestone-1-tasks.md.
+1980; Luong 1985). This class is **retired and unwired** from the default media
+(replaced by the cumulative ``EthanolInactivation`` brake, D-13), so the §2.2
+benchmarks never exercise it and the D-17 promotion sweep does not apply to it.
+Historical note from when it was wired (D-10): with the *placeholder*
+``ethanol_tolerance`` (110 g/L, below a 24 °Brix must's ~124-135 g/L final ethanol)
+an inhibited wine run stalled short of dryness — a parameter-sourcing/tuning
+concern (a high-alcohol must implies a high-tolerance strain; D-12 later sourced
+142 g/L), not a flaw in the form.
 """
 
 from __future__ import annotations

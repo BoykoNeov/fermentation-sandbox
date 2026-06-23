@@ -45,10 +45,12 @@ directional "lower T → slower" check). It reads ``T`` from the state vector
 (Kelvin, canonical per D-3) rather than from params, so it is already correct for
 the non-isothermal temperature dynamics of a later tier.
 
-Tier: **plausible** — the Arrhenius law is textbook, literature-standard kinetics,
-not yet validated against the §2.2 benchmark curves. The placeholder ``E_a``
-values are *speculative*; parameter-tier propagation (D-1) caps the scaled
-outputs accordingly.
+Tier: **plausible** — the Arrhenius law is textbook, literature-standard kinetics.
+It stays plausible after the §2.2 promotion sweep precisely because the M1
+benchmarks are isothermal at ``T_ref`` (``f = 1``), so they never exercise this
+modifier — an untested mechanism cannot be promoted on their strength (decision
+D-17). The placeholder ``E_a`` values are *speculative*; parameter-tier propagation
+(D-1) caps the scaled outputs accordingly.
 """
 
 from __future__ import annotations

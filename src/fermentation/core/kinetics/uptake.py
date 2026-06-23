@@ -53,8 +53,13 @@ wine; beer's di-/trisaccharides take up hydrolysis water, so mass does not close
 there and beer relies on the carbon balance (decision D-8).
 
 Tier: **plausible** — a sound, literature-standard mechanism (saturating
-biomass-catalysed uptake, catabolite repression), not yet validated against the
-§2.2 benchmark curves.
+biomass-catalysed uptake, catabolite repression). The §2.2 benchmarks now pass,
+which confirms the plausible tier is earned; it is deliberately **not** promoted to
+validated, which is reserved for validation against independent *measured*
+time-series (handoff D-C: none exist yet; decision D-17). Output tiers stay capped
+at speculative regardless via the parameters this reads (``K_repression`` and
+``Y_byproduct_sugar`` are speculative — D-1 propagation), so the cap is on the
+inputs, not the form.
 """
 
 from __future__ import annotations

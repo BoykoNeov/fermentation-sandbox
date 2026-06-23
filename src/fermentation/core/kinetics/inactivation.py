@@ -45,8 +45,11 @@ ethanol toxicity. :class:`~fermentation.core.kinetics.inhibition.EthanolInhibiti
 is retained for optional/strain use but is no longer wired into the default media.
 
 Tier: **plausible** — a sound, literature-sourced mechanism (Coleman 2007, the same
-fit our growth/uptake constants come from), not yet validated against our own §2.2
-curves. ``k'_d`` itself is sourced (Coleman Table A2, evaluated at the 20 C T_ref).
+fit our growth/uptake constants come from). It sets the wine timescale the §2.2
+dryness benchmark now passes; that confirms the plausible tier is earned but does
+deliberately **not** promote it to validated, which awaits validation against
+independent *measured* time-series (handoff D-C: none exist yet; decision D-17).
+``k'_d`` itself is sourced (Coleman Table A2, evaluated at the 20 C T_ref).
 """
 
 from __future__ import annotations
