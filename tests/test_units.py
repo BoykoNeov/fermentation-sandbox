@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 
 from fermentation.units import (
     abv_from_ethanol,
+    apparent_gravity,
     brix_to_sg,
     brix_to_sugar_gpl,
     celsius_to_kelvin,
@@ -15,6 +16,7 @@ from fermentation.units import (
     hours_to_days,
     kelvin_to_celsius,
     plato_to_sg,
+    real_to_apparent_extract,
     sg_to_brix,
     sg_to_plato,
     sugar_gpl_to_brix,
@@ -98,3 +100,28 @@ def test_abv_monotonic_and_finite(ethanol_gpl):
     abv = abv_from_ethanol(ethanol_gpl)
     assert abv >= 0
     assert math.isfinite(abv)
+
+
+def test_apparent_extract_unchanged_before_fermentation():
+    # With no fermentation real extract == original extract, so the apparent
+    # (hydrometer) extract equals it too — nothing depresses the reading yet.
+    oe = sg_to_plato(1.048)
+    assert real_to_apparent_extract(oe, oe) == pytest.approx(oe)
+
+
+def test_apparent_gravity_1048_to_1010_example():
+    # The canonical brewing example: a 1.048 OG ale that finishes at apparent
+    # 1.010 has a *real* extract near 4.25 P (~1.016). Going the other way, a real
+    # extract of 4.25 P at OG 11.91 P must read ~1.010 apparent.
+    oe = sg_to_plato(1.048)  # ~11.91 P
+    real_extract = 4.25
+    assert real_to_apparent_extract(real_extract, oe) == pytest.approx(2.56, abs=0.1)
+    assert apparent_gravity(real_extract, oe) == pytest.approx(1.010, abs=0.001)
+
+
+def test_apparent_gravity_below_real_when_fermenting():
+    # Once ethanol is present (real extract has dropped below OG) the hydrometer
+    # reads low: apparent gravity < the real-extract gravity.
+    oe = sg_to_plato(1.048)
+    real_extract = 5.0  # partially fermented
+    assert apparent_gravity(real_extract, oe) < plato_to_sg(real_extract)

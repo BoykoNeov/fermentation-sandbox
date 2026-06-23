@@ -517,6 +517,66 @@ is unskipped and passing.
 **Beer is now unblocked** — it shared the same Coleman-framework parameters, so this had to
 settle first.
 
+## D-15 — Beer §2.2 benchmarks: apparent (ethanol-depressed) gravity, and q re-derived
+
+**Status: closed.** The two beer acceptance criteria are live and passing:
+`test_beer_1048_og_attenuates_in_5_to_7_days` and `test_co2_integral_tracks_sugar_consumed`.
+
+**"1.010" is an *apparent* (hydrometer) gravity, not real extract — and that is load-bearing.**
+A fermenting beer's hydrometer reads *below* the true dissolved-solids extract because the
+ethanol present is lighter than water. A 1.048 OG ale that brewers call "FG 1.010" has a
+*real* extract near 4.25 °P (~1.016); the 1.010 is the ethanol-depressed apparent reading. So
+the model's `(sugar, ethanol)` state must be mapped to **apparent** gravity to be compared
+against 1.010. We added the standard Balling/Tabarie relation `RE = 0.1808·OE + 0.8192·AE`
+(degrees Plato) to `units/convert.py` (`real_to_apparent_extract`, `apparent_gravity`), cited
+alongside the existing ASBC polynomials — it is a boundary unit conversion, not physics. This
+is fidelity, not gold-plating: against a *real-extract* gravity the 1.010 target would demand
+an unrealistic ~79 % real degree of fermentation; the apparent correction lets a realistic
+**~66 % RDF all-malt wort** be consistent with 1.010.
+
+**No new state or parameter — the unfermentable extract is implicit.** The model tracks only
+fermentable sugars. Real extract at time *t* = `OG_extract − sugar_consumed(t)`, so the
+unfermentable share is implicitly `OG_extract − S0` and never needs a state slot (it is
+constant — inert to kinetics and conservation) nor a parameter. The wort spec lives in the
+**test fixture** (sourced, like the wine benchmark hardcodes Brix/YAN/pitch): a 1.048 OG
+all-malt ale, fermentable `S0 ≈ 88 g/L` of the ~125 g/L total extract (RDF ~70 %), sugar
+spectrum glucose/maltose/maltotriose ≈ 15/62/23 % of fermentables (typical all-malt split),
+YAN 200 mg/L and pitch 0.6 g/L (typical ale practice). `S0 ≈ 88 g/L` is the initial fermentable
+sugar **measured in our beer source** (Zamudio Lara et al. 2022), not back-solved from 1.010 —
+the discipline of D-14 applied to the wort. The wort finishes at apparent **~1.007**, well
+*below* 1.010 (a ~3.5-point margin), so the crossing lands in the kinetic phase rather than at a
+fragile asymptote where a small parameter nudge would flip the metric to a never-crossing `inf`.
+
+**`q_sugar_max` re-derived 1.5 → 0.5 (still speculative).** At the old 1.5 a 1.048 wort
+attenuated in ~2 d — far inside the 5-7 d window. The 1.5 came from Zamudio's
+`k_S·mu_max = 15.3·0.098`, but that equates the **growth-coupled peak** flux with a sustained
+**catalytic** rate. Zamudio's growth is Droop-like (`mu_X = mu_max(1 − S_min/S)`, sub-maximal
+and declining as sugar falls), so `k_S·mu_max` is only a transient peak; our uptake is
+*decoupled* (all biomass catalytic at `q`, no `mu` factor), whose realised-equivalent is a
+factor ~3 lower, `q ≈ 0.5 g/g/h`. With that sourced `q` the run lands at **~5.5 d**, inside
+the 5-7 d window. Stays **speculative**, uncertainty `[0.3, 1.5]` spanning the realised rate to
+the growth-coupled peak. Beer's `q` is independent of wine's 0.85, so the green wine benchmark
+is untouched.
+
+**Honesty caveat — what this benchmark does and does not validate (recorded, not hidden).** The
+two halves are not equally strong. The **endpoint** (apparent FG ~1.007, ABV ~5.8 %) genuinely
+*falls out* of the sourced wort and the apparent-gravity mapping — that half is real validation.
+The **timescale** is set by a *speculative* `q` chosen at the low end of its independently
+derivable range, so the benchmark confirms `q ≈ 0.5` is *consistent with* 5-7 d, **not** that
+the window emerges unforced: `q` is pinnable only to ~a factor of 2, so beer's timescale test is
+a **weaker validation than wine's** — a plausibility check, consistent with D-12's "beer is
+honestly thinner."
+
+**CO2 benchmark — the measurable channel, with the biomass diversion made visible.** The
+evolved-CO2 integral is compared to the Gay-Lussac CO2 predicted from sugar consumed, summed
+**per species over all three slots** (so the maltose-2×/maltotriose-3× hexose factors are
+exercised). The ratio is **0.977**, deliberately *not* 1.0: ~2-3 % of sugar carbon is routed
+into biomass by growth (no anabolic CO2 in M1), so slightly less CO2 evolves than total sugar
+consumed implies — the `[0.95, 1.05]` window accommodates exactly that diversion. This is the
+§2.2 measurable-channel check, *not* the machine-precision carbon audit (that stays in the
+conservation tests). The test also asserts the spec's qualitative shape with real kinetic
+teeth: d(CO2)/dt rises to an interior peak then tails off.
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.

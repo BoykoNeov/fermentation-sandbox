@@ -80,6 +80,46 @@ def plato_to_sg(plato: float) -> float:
     return 1.0 + plato / (258.6 - (plato / 258.2) * 227.1)
 
 
+# Balling/Tabarie apparent-vs-real extract split. As wort ferments, a hydrometer
+# reads an *apparent* extract below the true (real) dissolved-solids extract,
+# because the ethanol present is less dense than water. Balling's classic relation
+# (1843), also attributed to Tabarie, links the two through the original extract:
+#
+#     RE = 0.1808 * OE + 0.8192 * AE          (degrees Plato)
+#
+# 0.8192 (= 1 - 0.1808) is the share of the apparent reading that is true extract;
+# the 0.1808 * OE term is the ethanol-density correction, which scales with how
+# much extract has fermented (OE - RE). Standard brewing-science references:
+# Balling (1843); de Clerck, "A Textbook of Brewing"; ASBC Methods of Analysis.
+_TABARIE_OE_SHARE = 0.1808
+
+
+def real_to_apparent_extract(real_extract_plato: float, original_extract_plato: float) -> float:
+    """Real (true) extract -> apparent (hydrometer) extract, both in degrees Plato.
+
+    Inverts Balling's ``RE = 0.1808*OE + 0.8192*AE`` for ``AE``. A fermenting
+    beer's hydrometer reads low because the dissolved ethanol is lighter than
+    water; this is the standard correction from the true dissolved-solids extract
+    to the apparent reading. Before any fermentation (``RE == OE``) it returns
+    ``OE`` unchanged.
+    """
+    return (real_extract_plato - _TABARIE_OE_SHARE * original_extract_plato) / (
+        1.0 - _TABARIE_OE_SHARE
+    )
+
+
+def apparent_gravity(real_extract_plato: float, original_extract_plato: float) -> float:
+    """Apparent specific gravity (the hydrometer reading) of a fermenting beer.
+
+    Composes :func:`real_to_apparent_extract` with :func:`plato_to_sg`: the true
+    dissolved-solids extract is depressed to its apparent value by the ethanol
+    present, then expressed as specific gravity. This is the quantity brewers mean
+    by a "final gravity ~1.010" — an apparent, ethanol-depressed reading, not the
+    real extract (which for a 1.048 OG ale finishes nearer 1.016).
+    """
+    return plato_to_sg(real_to_apparent_extract(real_extract_plato, original_extract_plato))
+
+
 def brix_to_sugar_gpl(brix: float, sg: float | None = None) -> float:
     """Degrees Brix -> dissolved sugar concentration in g/L.
 

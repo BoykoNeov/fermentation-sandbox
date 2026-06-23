@@ -61,14 +61,14 @@ K_n:
 # -- Fermentative sugar uptake (Michaelis-Menten, biomass-catalysed) -----------
 
 q_sugar_max:
-  value: 1.5
+  value: 0.5
   unit: "g/g/h"
   tier: speculative
-  uncertainty: { low: 0.5, high: 3.0, note: "specific fermentative uptake; derived, growth-coupled origin" }
+  uncertainty: { low: 0.3, high: 1.5, note: "decoupled-equivalent specific uptake; spans the realised rate up to the growth-coupled peak k_S*mu_max" }
   provenance:
     source: "Derived from Zamudio Lara et al. 2022 (doi:10.3390/foods11223602), Table 5"
     conditions: "ale yeast, 20 C; k_S = 15.3 g sugar / g biomass, mu_max ~ 0.098 /h"
-    notes: "Zamudio's uptake is growth-coupled: dS/dt = -k_S*mu_X*X. The implied max specific uptake is k_S*mu_max = 15.3*0.098 = 1.5 g/g/h. Speculative: their growth is Droop-like (mu_X < mu_max always, so ~1.27 is the realised max at S0=88 g/L) and growth-coupled, whereas our uptake is biomass-catalysed and independent of growth."
+    notes: "Zamudio's uptake is growth-COUPLED: dS/dt = -k_S*mu_X*X with a Droop growth rate mu_X = mu_max*(1 - S_min/S) that is sub-maximal and DECLINES as sugar falls (mu_X -> 0 near S_min ~ 13 g/L). So k_S*mu_max = 15.3*0.098 = 1.5 g/g/h is only the growth-coupled PEAK, reached transiently at high sugar and maximal growth - never a sustained rate (their own realised max at S0=88 g/L is ~1.27). Our uptake is DECOUPLED (q*X*S/(K+S): all biomass catalytic, no mu factor), so reproducing Zamudio's realised attenuation needs q at the realised specific rate, a factor ~3 below the peak: q ~ 0.5 g/g/h. SPECULATIVE - the growth-coupled -> decoupled translation is a magnitude transfer, not an identity, and Zamudio's S_min/yield were not all verified in-source; uncertainty spans the realised rate (0.3) up to the growth-coupled peak (1.5). Re-derived in the beer-benchmark work (decision D-15): the prior value 1.5 made a 1.048 wort attenuate in ~2 d, far inside the 5-7 d benchmark."
 
 K_sugar_uptake:
   value: 12.0

@@ -119,8 +119,18 @@
       glycerol + biomass + organic acids, landing ~14-15 %. Add a realised-yield correction
       (or an explicit glycerol carbon sink) so wine ABV is realistic, keeping carbon closed.
       The open thread flagged by D-13 gap-(b) and D-14 — neither folded it into its decision.
-- [ ] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`.
-- [ ] Unskip & pass `test_co2_integral_tracks_sugar_consumed`.
+- [x] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`. **D-15:** "1.010" is an
+      *apparent* (ethanol-depressed) hydrometer gravity, so model state → gravity goes through
+      the Balling/Tabarie real↔apparent extract relation (new in `units/convert.py`); the
+      unfermentable extract is implicit (`OG_extract − S0`, no new state/param). Sourced 1.048
+      wort, fermentable S0 ≈ 88 g/L (Zamudio's measured value; RDF ~70 %), lands ~5.5 d
+      (apparent FG floor ~1.007, ABV ~5.8 %). `q_sugar_max` re-derived 1.5 → 0.5 (growth-coupled
+      peak → decoupled-equivalent rate), still speculative. Endpoint *falls out* of the wort;
+      the timescale is a *plausibility* check (q pinned only to ~factor 2 — weaker than wine).
+- [x] Unskip & pass `test_co2_integral_tracks_sugar_consumed`. CO2 integral vs per-species
+      Gay-Lussac CO2 from sugar consumed = 0.975 (the ~2-3 % deficit is sugar carbon growth
+      routes to biomass; window `[0.95, 1.05]` accommodates it). Also asserts d(CO2)/dt
+      rises-then-tails. Decision **D-15**.
 - [x] Directional check: lower T → slower (qualitative; full byproduct check is T2). →
       `test_warmer_ferments_faster_than_cooler` in `tests/test_kinetics_arrhenius.py`
       (identical uptake config, warmer run leaves less residual sugar over the span).

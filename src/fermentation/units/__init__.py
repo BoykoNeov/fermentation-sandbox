@@ -20,6 +20,7 @@ sees nothing but the canonical floats above.
 
 from fermentation.units.convert import (
     abv_from_ethanol,
+    apparent_gravity,
     brix_to_sg,
     brix_to_sugar_gpl,
     celsius_to_kelvin,
@@ -27,6 +28,7 @@ from fermentation.units.convert import (
     hours_to_days,
     kelvin_to_celsius,
     plato_to_sg,
+    real_to_apparent_extract,
     sg_to_brix,
     sg_to_plato,
     sugar_gpl_to_brix,
@@ -34,6 +36,7 @@ from fermentation.units.convert import (
 
 __all__ = [
     "abv_from_ethanol",
+    "apparent_gravity",
     "brix_to_sg",
     "brix_to_sugar_gpl",
     "celsius_to_kelvin",
@@ -41,6 +44,7 @@ __all__ = [
     "hours_to_days",
     "kelvin_to_celsius",
     "plato_to_sg",
+    "real_to_apparent_extract",
     "sg_to_brix",
     "sg_to_plato",
     "sugar_gpl_to_brix",
