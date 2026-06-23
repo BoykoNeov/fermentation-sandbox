@@ -225,15 +225,18 @@ def test_speculative_activation_energy_drags_output_tier_down():
 
 def test_arrhenius_alone_conserves_carbon_and_mass(params):
     # Scaling uptake by a single positive factor preserves its balances: a
-    # temperature-scaled wine run still closes carbon and mass exactly.
+    # temperature-scaled wine run still closes carbon and mass exactly. Byproduct
+    # diversion off so this stays the {S,E,CO2} mass check (glycerol breaks mass
+    # closure by design, D-16); the Arrhenius scaling is the subject here.
     schema = wine_schema()
+    p = {**params, "Y_glycerol_sugar": 0.0, "Y_byproduct_sugar": 0.0}
     ps = ProcessSet(
         schema,
         [SugarUptakeToEthanolCO2()],
         modifiers=[ArrheniusTemperature.for_uptake()],
         strict=True,
     )
-    traj = simulate(ps, params=params, y0=_wine_y0(schema, temp=298.15), t_span=(0.0, 500.0))
+    traj = simulate(ps, params=p, y0=_wine_y0(schema, temp=298.15), t_span=(0.0, 500.0))
     assert traj.success
     assert_conserved(
         traj,

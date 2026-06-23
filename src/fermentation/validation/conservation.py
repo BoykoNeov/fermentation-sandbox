@@ -61,6 +61,15 @@ def total_carbon(
         w[schema.slice("E")] = carbon_mass_fraction("ethanol")
     if "CO2" in schema:
         w[schema.slice("CO2")] = carbon_mass_fraction("CO2")
+    # Realised-yield byproduct sinks (decision D-16): the sugar-uptake Process
+    # routes the carbon it diverts from ethanol/CO2 into these pools, so they must
+    # be weighted or carbon would read as destroyed when glycerol is active. The
+    # minor-byproduct lump is carbon-accounted as succinic acid (its representative
+    # species). Both share the one stoichiometry source with the kinetics.
+    if "Gly" in schema:
+        w[schema.slice("Gly")] = carbon_mass_fraction("glycerol")
+    if "Byp" in schema:
+        w[schema.slice("Byp")] = carbon_mass_fraction("succinic_acid")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(
@@ -116,6 +125,14 @@ def total_mass(schema: StateSchema) -> QuantityFn:
     beer invariant. Carbon carries no such term (water has no carbon) and is the
     rigorous cross-medium invariant — so this builder **rejects a multi-component
     sugar** and beer relies on :func:`total_carbon`.
+
+    It stays scoped to ``{S, E, CO2}`` for one further reason (decision D-16): the
+    realised-yield byproduct sinks ``Gly``/``Byp`` are more reduced than the
+    sugar→ethanol+CO2 route and draw redox H/O from the solvent like biomass, so
+    ``{S, E, CO2}`` mass does not close once that diversion is active. This is thus
+    the **validated-core** (byproduct-free) mass check — assert it only on a
+    glycerol-off configuration; ``total_carbon`` (which weights ``Gly``/``Byp``)
+    is the invariant when byproducts are on.
     """
     if "S" in schema and schema.spec("S").size > 1:
         raise ValueError(

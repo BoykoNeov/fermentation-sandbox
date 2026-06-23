@@ -99,7 +99,35 @@ Y_ethanol_sugar:
   provenance:
     source: "Gay-Lussac stoichiometry; corroborated by Zamudio Lara et al. 2022 (doi:10.3390/foods11223602)"
     conditions: "ale fermentation; realised ethanol per sugar"
-    notes: "Theoretical max 0.511 g/g. Zamudio Table 5 gives k_E/k_S = 6.31/15.3 = 0.41 g/g for their ale (low end, partly reflecting ~12 g/L residual sugar). UNUSED in M1: uptake uses the theoretical Gay-Lussac split for exact carbon/mass closure (D-8); this is the deferred Tier-2 glycerol-diversion hook."
+    notes: "Theoretical max 0.511 g/g. Zamudio Table 5 gives k_E/k_S = 6.31/15.3 = 0.41 g/g for their ale (low end, partly reflecting ~12 g/L residual sugar). NOT read directly: uptake uses the theoretical Gay-Lussac split, and beer carries ZERO byproduct diversion in M1 (see below), so beer's realised yield stays theoretical and its CO2 benchmark is unchanged. Documented cross-check only."
+
+# -- Realised-yield byproduct diversion (decision D-16) ------------------------
+# Beer also makes glycerol (~1-2 g/L) and minor byproducts, but quantifying them
+# is out of M1 scope and the beer benchmarks (attenuation timescale, CO2 ratio) do
+# not gate on absolute ethanol. So both diversion yields are held at ZERO: beer
+# uses the pure theoretical Gay-Lussac split and the Gly/Byp pools stay empty. They
+# are present (not omitted) because the shared uptake Process declares them in
+# `reads`; a value is required for every medium (D-1, no silent default).
+
+Y_glycerol_sugar:
+  value: 0.0
+  unit: "g/g"
+  tier: speculative
+  uncertainty: { low: 0.0, high: 0.02, note: "ale glycerol ~1-2 g/L if modelled; held at 0 for M1" }
+  provenance:
+    source: "author estimate (held at zero for M1)"
+    conditions: "generic ale yeast; glycerol diversion deliberately not modelled in M1"
+    notes: "Set to 0 so beer ferments by the pure theoretical split (decision D-16). Real ale glycerol is ~1-2 g/L, lower than wine; quantifying it is deferred. Zero keeps the beer attenuation and CO2-ratio benchmarks exactly as validated under the theoretical yields."
+
+Y_byproduct_sugar:
+  value: 0.0
+  unit: "g/g"
+  tier: speculative
+  uncertainty: { low: 0.0, high: 0.02, note: "minor ale byproducts; held at 0 for M1" }
+  provenance:
+    source: "author estimate (held at zero for M1)"
+    conditions: "generic ale yeast; minor-byproduct diversion deliberately not modelled in M1"
+    notes: "Set to 0 (decision D-16): beer's minor byproducts are out of M1 scope and no beer benchmark gates on absolute ethanol. Present because the shared uptake Process requires it in `reads`."
 
 # -- Ethanol inhibition (Luong wall on the uptake flux, decision D-10) ----------
 

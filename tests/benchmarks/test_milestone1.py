@@ -14,8 +14,8 @@ import pytest
 from fermentation.core.chemistry import co2_yield, sugar_species
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
-from fermentation.units import apparent_gravity, sg_to_plato
-from fermentation.validation import BENCHMARKS
+from fermentation.units import abv_from_ethanol, apparent_gravity, sg_to_plato
+from fermentation.validation import BENCHMARKS, assert_conserved, total_carbon
 
 pytestmark = pytest.mark.benchmark
 
@@ -58,6 +58,54 @@ def test_wine_24brix_ferments_to_dryness_in_window():
     days_to_dryness = _days_to_dryness(scenario)
     assert spec.passes(days_to_dryness), (
         f"days_to_dryness={days_to_dryness:.2f} outside [{spec.low}, {spec.high}] d"
+    )
+
+
+def test_wine_abv_and_glycerol_are_realistic():
+    # Decision D-16: the realised-yield byproduct sink + must-fermentable-fraction
+    # correction make a 24 Brix wine finish at a realistic ABV with realistic
+    # glycerol — *without* tuning to a target. Each input (glycerol/byproduct yields,
+    # fermentable fraction) is independently sourced; ABV and glycerol fall out. This
+    # is a realism regression guard, not a §2.2 acceptance spec (no benchmark gates on
+    # absolute ABV); the bands are the literature ranges with margin, not fitted.
+    scenario = Scenario(
+        name="wine-abv",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=21.0,
+    )
+    compiled = compile_scenario(scenario, strict=True)
+    duration_h = compiled.t_span_h[1]
+    t_eval = np.linspace(0.0, duration_h, int(duration_h) + 1)
+    traj = simulate(
+        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h, t_eval=t_eval
+    )
+    assert traj.success, traj.message
+
+    sugar = np.asarray(traj.series("S"))
+    s0 = float(sugar[0])
+    s_final = float(sugar[-1])
+    ethanol_final = float(traj.series("E")[-1])
+    glycerol_final = float(traj.series("Gly")[-1])
+    byproduct_final = float(traj.series("Byp")[-1])
+    abv = abv_from_ethanol(ethanol_final)
+    realised_yield = ethanol_final / (s0 - s_final)
+
+    # Realistic 24 Brix potential alcohol (~14-15 %), not the 16.9 % the theoretical
+    # split gave before D-16.
+    assert 13.5 <= abv <= 15.5, f"wine ABV {abv:.2f}% outside realistic 13.5-15.5%"
+    # Dry-wine glycerol is 4-10 g/L (Ribereau-Gayon); band carries margin.
+    assert 5.0 <= glycerol_final <= 11.0, f"glycerol {glycerol_final:.2f} g/L outside 5-11"
+    assert byproduct_final > 0.0  # the minor-byproduct lump accumulates too
+    # Emergent realised yield sits in the literature 0.46-0.48 band (here ~0.48),
+    # cross-checking Y_ethanol_sugar without being set to it.
+    assert 0.46 <= realised_yield <= 0.50, f"realised Y_E {realised_yield:.4f} outside 0.46-0.50"
+
+    # Carbon still closes to machine precision with byproducts tracked (D-16).
+    f_c = compiled.parameters.value("biomass_C_fraction")
+    assert_conserved(
+        traj, total_carbon(compiled.schema, biomass_carbon_fraction=f_c), label="carbon"
     )
 
 

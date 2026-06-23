@@ -10,7 +10,7 @@ since growth diverts sugar carbon into biomass).
 import numpy as np
 import pytest
 
-from fermentation.core.chemistry import co2_yield, ethanol_yield
+from fermentation.core.chemistry import carbon_mass_fraction, co2_yield, ethanol_yield
 from fermentation.core.kinetics import GrowthNitrogenLimited, SugarUptakeToEthanolCO2
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import ProcessSet
@@ -57,24 +57,72 @@ def test_metadata():
     u = SugarUptakeToEthanolCO2()
     assert u.name == "sugar_uptake_to_ethanol_co2"
     assert u.tier is Tier.PLAUSIBLE
-    assert set(u.touches) == {"S", "E", "CO2"}
-    assert set(u.reads) == {"q_sugar_max", "K_sugar_uptake", "K_repression"}
+    assert set(u.touches) == {"S", "E", "CO2", "Gly", "Byp"}
+    assert set(u.reads) == {
+        "q_sugar_max",
+        "K_sugar_uptake",
+        "K_repression",
+        "Y_glycerol_sugar",
+        "Y_byproduct_sugar",
+    }
 
 
-def test_derivative_matches_closed_form(params):
-    # Pin dS, dE, dCO2 to the formula at a known wine state — no solver fuzz.
+def test_derivative_matches_theoretical_core_when_no_diversion(params):
+    # With the byproduct yields zeroed, uptake is the pure theoretical Gay-Lussac
+    # core: dS, dE, dCO2 follow the formula and nothing reaches Gly/Byp. Pin it at a
+    # known wine state — no solver fuzz.
     schema = wine_schema()
+    p = {**params, "Y_glycerol_sugar": 0.0, "Y_byproduct_sugar": 0.0}
     x, s = 2.0, 200.0
-    y = schema.pack({"X": x, "S": [s], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0, "X_dead": 0.0})
-    d = SugarUptakeToEthanolCO2().derivatives(0.0, y, schema, params)
+    y = schema.pack({"X": x, "S": [s], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    d = SugarUptakeToEthanolCO2().derivatives(0.0, y, schema, p)
 
-    r = params["q_sugar_max"] * x * (s / (params["K_sugar_uptake"] + s))
+    r = p["q_sugar_max"] * x * (s / (p["K_sugar_uptake"] + s))
     assert schema.get(d, "S") == pytest.approx(-r)
     assert schema.get(d, "E") == pytest.approx(ethanol_yield("glucose") * r)
     assert schema.get(d, "CO2") == pytest.approx(co2_yield("glucose") * r)
-    # Uptake touches S, E, CO2 only — never biomass or nitrogen.
+    assert schema.get(d, "Gly") == 0.0
+    assert schema.get(d, "Byp") == 0.0
+    # Uptake touches S, E, CO2, Gly, Byp only — never biomass or nitrogen.
     assert schema.get(d, "X") == 0.0
     assert schema.get(d, "N") == 0.0
+
+
+def test_glycerol_byproduct_diversion_splits_carbon(params):
+    # With the wine byproduct yields on (decision D-16), the consumed-sugar carbon
+    # splits into ethanol+CO2 (scaled) and the Gly/Byp pools, with dS unchanged. The
+    # carbon deposited in Gly/Byp exactly equals the carbon scaled out of ethanol+CO2.
+    schema = wine_schema()
+    y_gly = params["Y_glycerol_sugar"]
+    y_byp = params["Y_byproduct_sugar"]
+    assert y_gly > 0.0 and y_byp > 0.0  # the wine file ships nonzero diversion
+
+    x, s = 2.0, 200.0
+    y = schema.pack({"X": x, "S": [s], "E": 0.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    d = SugarUptakeToEthanolCO2().derivatives(0.0, y, schema, params)
+    r = params["q_sugar_max"] * x * (s / (params["K_sugar_uptake"] + s))
+
+    # dS is untouched by the diversion (the whole point: dryness is preserved).
+    assert schema.get(d, "S") == pytest.approx(-r)
+    # Byproducts accumulate at their yields.
+    assert schema.get(d, "Gly") == pytest.approx(y_gly * r)
+    assert schema.get(d, "Byp") == pytest.approx(y_byp * r)
+    # Ethanol is scaled below the theoretical split (realised yield < theoretical).
+    cf_gly = carbon_mass_fraction("glycerol")
+    cf_byp = carbon_mass_fraction("succinic_acid")
+    scale = 1.0 - (y_gly * cf_gly + y_byp * cf_byp) / carbon_mass_fraction("glucose")
+    assert 0.0 < scale < 1.0
+    assert schema.get(d, "E") == pytest.approx(ethanol_yield("glucose") * scale * r)
+    assert schema.get(d, "CO2") == pytest.approx(co2_yield("glucose") * scale * r)
+    # Carbon rate balances to zero: nothing created or destroyed instantaneously.
+    c_in = carbon_mass_fraction("glucose") * r
+    c_out = (
+        carbon_mass_fraction("ethanol") * schema.get(d, "E")
+        + carbon_mass_fraction("CO2") * schema.get(d, "CO2")
+        + cf_gly * schema.get(d, "Gly")
+        + cf_byp * schema.get(d, "Byp")
+    )
+    assert c_out == pytest.approx(c_in)
 
 
 def test_no_uptake_without_biomass(params):
@@ -95,13 +143,40 @@ def test_negative_sugar_excursion_does_not_create_sugar(params):
     assert np.array_equal(d, schema.zeros())
 
 
-def test_wine_run_conserves_carbon_and_mass(params):
+def test_wine_run_conserves_carbon_with_byproduct_diversion(params):
+    # Wine's byproduct diversion is on (D-16): carbon still closes to machine
+    # precision because total_carbon weights the Gly/Byp pools the diverted carbon
+    # lands in. Mass over {S,E,CO2} does NOT close here (carbon left for glycerol),
+    # so it is asserted separately on a byproduct-off run below.
     schema = wine_schema()
     ps = ProcessSet(schema, [SugarUptakeToEthanolCO2()], strict=True)
     traj = simulate(ps, params=params, y0=_wine_y0(schema), t_span=(0.0, 500.0))
     assert traj.success
 
-    # No biomass term active on S/E/CO2 here, so both balances close exactly.
+    assert_conserved(
+        traj,
+        total_carbon(schema, biomass_carbon_fraction=0.488),
+        rtol=1e-5,
+        atol=1e-6,
+        label="carbon",
+    )
+    assert_nonnegative(traj, ("S", "E", "CO2", "Gly", "Byp"), atol=1e-7)
+    # Glycerol and byproducts actually accumulate (the diversion is live).
+    assert traj.series("Gly")[-1] > 0.0
+    assert traj.series("Byp")[-1] > 0.0
+    # Biomass-catalysed uptake runs the must to dryness without needing growth.
+    assert traj.series("S")[-1] < 1.0
+
+
+def test_wine_run_without_diversion_conserves_carbon_and_mass(params):
+    # The validated theoretical core (byproduct yields zeroed) closes BOTH carbon
+    # and {S,E,CO2} mass exactly — the togglable-off guarantee (decisions D-8, D-16).
+    schema = wine_schema()
+    p = {**params, "Y_glycerol_sugar": 0.0, "Y_byproduct_sugar": 0.0}
+    ps = ProcessSet(schema, [SugarUptakeToEthanolCO2()], strict=True)
+    traj = simulate(ps, params=p, y0=_wine_y0(schema), t_span=(0.0, 500.0))
+    assert traj.success
+
     assert_conserved(
         traj,
         total_carbon(schema, biomass_carbon_fraction=0.488),
@@ -111,7 +186,9 @@ def test_wine_run_conserves_carbon_and_mass(params):
     )
     assert_conserved(traj, total_mass(schema), rtol=1e-5, atol=1e-6, label="mass")
     assert_nonnegative(traj, ("S", "E", "CO2"), atol=1e-7)
-    # Biomass-catalysed uptake runs the must to dryness without needing growth.
+    # Nothing diverted: the byproduct pools stay empty.
+    assert float(traj.series("Gly")[-1]) == pytest.approx(0.0, abs=1e-9)
+    assert float(traj.series("Byp")[-1]) == pytest.approx(0.0, abs=1e-9)
     assert traj.series("S")[-1] < 1.0
 
 

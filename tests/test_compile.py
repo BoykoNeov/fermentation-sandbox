@@ -62,12 +62,19 @@ def test_wine_compiles_to_canonical_initial_state():
 
     # Wine has a single sugar slot, so the schema reads S back as a scalar
     # (size-1 vars collapse to a float on unpack); beer's length-3 S stays a vector.
-    assert state["S"] == pytest.approx(brix_to_sugar_gpl(24.0))
+    # Initial sugar is the Brix solids scaled by the sourced must_fermentable_fraction
+    # (only ~90-95 % of must solids are fermentable hexose, decision D-16).
+    fermentable_fraction = compiled.parameters["must_fermentable_fraction"].value
+    assert state["S"] == pytest.approx(brix_to_sugar_gpl(24.0) * fermentable_fraction)
+    assert state["S"] < brix_to_sugar_gpl(24.0)  # the correction reduces it
     assert state["N"] == pytest.approx(250.0 / 1000.0)  # mg/L -> g/L
     assert state["X"] == pytest.approx(0.5)
     assert state["E"] == 0.0  # defaulted
     assert state["CO2"] == 0.0
     assert state["T"] == pytest.approx(celsius_to_kelvin(20.0))
+    # Produced-only byproduct pools start empty (decision D-16).
+    assert state["Gly"] == 0.0
+    assert state["Byp"] == 0.0
 
 
 def test_wine_time_span_is_hours():

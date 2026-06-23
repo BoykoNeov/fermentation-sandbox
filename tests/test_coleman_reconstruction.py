@@ -102,11 +102,15 @@ def _our_sugar(n0_mgL: float, *, pitch: float = 0.25) -> tuple[np.ndarray, np.nd
 @pytest.mark.parametrize("n0_mgL", [80.0, 330.0])
 def test_engine_reproduces_coleman_sugar_curve(n0_mgL: float) -> None:
     # Line-for-line agreement on the sugar trajectory at both the low- and
-    # normal-nitrogen ends. The observed RMSE is ~1.3 g/L (~0.5 % of the ~264 g/L
-    # initial sugar) at both N levels; the 2.0 g/L threshold is observed + ~50 %
-    # margin, tight enough to catch any real future divergence (NOT a loose pass).
-    ref = _coleman_reference(n0_mgL)
+    # normal-nitrogen ends. This is a model-vs-model comparison of the *kinetics*,
+    # so both sides must start from the same initial sugar. Our engine now loads the
+    # must_fermentable_fraction-corrected sugar (~245 g/L at 24 Brix, decision D-16),
+    # so we feed that same S0 to the Coleman reference rather than its raw ~264 g/L
+    # default; the glycerol diversion leaves dS untouched, so the curves still track.
+    # Observed RMSE is ~1.3 g/L (~0.5 % of S0) at both N levels; the 2.0 g/L
+    # threshold is observed + ~50 % margin (NOT a loose pass).
     t_h, sugar = _our_sugar(n0_mgL)
+    ref = _coleman_reference(n0_mgL, s0=float(sugar[0]))
     fit = compare_series(t_h, sugar, ref)
     assert fit.rmse < 2.0, f"RMSE {fit.rmse:.2f} g/L vs Coleman at {n0_mgL:.0f} mg N/L"
     # Both finish (the low-N case is the one that used to stick before D-14).

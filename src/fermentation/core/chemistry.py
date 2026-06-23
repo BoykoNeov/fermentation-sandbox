@@ -42,6 +42,14 @@ M_ETHANOL = 2 * _M_C + 6 * _M_H + 1 * _M_O
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
 M_WATER = 2 * _M_H + 1 * _M_O
+#: Glycerol, C3H8O3 — the principal fermentation byproduct (realised-yield sink,
+#: decision D-16).
+M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O
+#: Succinic acid, C4H6O4 — the representative species for the lumped *minor*
+#: byproduct pool (organic acids + higher alcohols). It carries the carbon of the
+#: ``Byp`` state variable so that pool's carbon is accounted from a real formula
+#: rather than an ad-hoc fraction (decision D-16).
+M_SUCCINIC = 4 * _M_C + 6 * _M_H + 4 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -52,6 +60,8 @@ MOLAR_MASS: dict[str, float] = {
     "maltotriose": M_MALTOTRIOSE,
     "ethanol": M_ETHANOL,
     "CO2": M_CO2,
+    "glycerol": M_GLYCEROL,
+    "succinic_acid": M_SUCCINIC,
 }
 
 #: Carbon atoms per molecule, keyed by species name.
@@ -62,6 +72,8 @@ CARBON_ATOMS: dict[str, int] = {
     "maltotriose": 18,
     "ethanol": 2,
     "CO2": 1,
+    "glycerol": 3,
+    "succinic_acid": 4,
 }
 
 
@@ -111,9 +123,11 @@ def sugar_species(schema: StateSchema) -> list[str]:
 # mass-balanced by atom count (2*M_ETHANOL + 2*M_CO2 == M_GLUCOSE to the third
 # decimal). These are the *theoretical* maximum yields; the realised ethanol
 # yield is a few percent lower because cells divert carbon to glycerol, organic
-# acids and biomass (the realised-yield Parameter, and the Tier-2 glycerol
-# Process — see decision D-8). The split is exposed here so the sugar-uptake
-# Process and the carbon-conservation check use one definition.
+# acids and biomass. The sugar-uptake Process applies that realised-yield
+# correction by scaling this theoretical split down and routing the diverted
+# carbon into the ``Gly``/``Byp`` byproduct pools (decision D-16); the split is
+# exposed here so the Process and the carbon-conservation check use one
+# definition.
 
 #: Grams of ethanol produced per gram of hexose consumed (theoretical, ~0.511).
 ETHANOL_PER_HEXOSE = 2 * M_ETHANOL / M_GLUCOSE

@@ -577,6 +577,73 @@ consumed implies — the `[0.95, 1.05]` window accommodates exactly that diversi
 conservation tests). The test also asserts the spec's qualitative shape with real kinetic
 teeth: d(CO2)/dt rises to an interior peak then tails off.
 
+## D-16 — Realised ethanol yield: an explicit glycerol/byproduct carbon sink, plus a must-fermentable-sugar correction
+
+**The two gaps this closes.** Through D-15 a 24 Brix wine fermented to **ABV 16.9 %**
+(E ≈ 134 g/L) — unrealistically high. Two distinct, independently-sourced effects were
+missing (the open thread D-13 gap-(b) and D-14 flagged but did not fold in):
+1. **Realised yield < theoretical.** Real ferments divert a few percent of sugar carbon to
+   glycerol, organic acids and higher alcohols, so realised `Y_E ≈ 0.46–0.48` g/g, not the
+   theoretical Gay-Lussac 0.511 the kinetics used.
+2. **Brix overstates fermentable sugar.** `brix_to_sugar_gpl` treats *all* 24 Brix solids as
+   fermentable hexose (263.8 g/L), but glucose+fructose are only ~90–95 % of ripe-must
+   soluble solids (Ribéreau-Gayon 2006); the rest is acids/minerals/phenolics.
+
+**Decision — source each effect, let ABV fall out (do NOT reverse-engineer `Y_E`).** The
+realised-yield literature value (0.47) alone lands ABV at 15.7 %, *not* 14–15 %; forcing 14 %
+by pushing `Y_E` to ~0.43 would sit below the literature **and** over-attribute carbon to
+glycerol — the exact tuning D-14/D-15 refused. Instead both effects are sourced from *measured
+quantities* and the ABV emerges:
+- **Glycerol sink** — `Y_glycerol_sugar = 0.035` g/g (→ ~8.6 g/L, mid the 4–10 g/L dry-wine
+  range; UC Davis Waterhouse Lab, Scanes 1998, Ribéreau-Gayon). **plausible** (magnitude well
+  corroborated; the constant-fraction *form* is the simplification).
+- **Minor-byproduct lump** — `Y_byproduct_sugar = 0.014` g/g (→ ~3.4 g/L succinic + acetic +
+  2,3-butanediol + higher alcohols). **speculative** (a lump booked at one representative
+  carbon fraction).
+- **Must fermentable fraction** — `must_fermentable_fraction = 0.93` g/g, applied at the
+  compile boundary so wine loads ~245 g/L not 264. **plausible** (Ribéreau-Gayon composition).
+
+Result: realised `Y_E ≈ 0.482` (cross-checks the literature 0.46–0.48, **not** set to it),
+**ABV ≈ 15.0 %**, glycerol ≈ 8.5 g/L, byproducts ≈ 3.4 g/L — all fallout, nothing fitted to a
+target.
+
+**Mechanism — fold the split into uptake's yields, not a competing flux.** A separate
+glycerol Process would *add* sugar consumption and speed dryness toward the 8 d floor. Instead
+`SugarUptakeToEthanolCO2` keeps the sugar flux `dS = −r` **unchanged** and scales the
+theoretical ethanol/CO2 split by `(1 − f_C/c(species))`, depositing the diverted carbon into
+two new state pools, `Gly` (carbon-accounted as glycerol C₃H₈O₃) and `Byp` (as succinic acid
+C₄H₆O₄). The carbon placed in `Gly`/`Byp` **exactly equals** the carbon scaled out of
+ethanol+CO2, so `total_carbon` (which now weights both pools) closes to machine precision for
+*any* yields — algebra: `scale·c(species) + Y_gly·c(gly) + Y_byp·c(byp) = c(species)`,
+identically, for hexose and di/trisaccharides alike.
+
+**Togglable-off = validated core intact (prime directive 3).** Both yields **default to 0**,
+and at 0 the Process *is* the theoretical Gay-Lussac core. So the byproduct diversion is a
+parameter-gated speculative layer over a protected validated core: with it off, wine `{S,E,CO2}`
+mass still closes exactly (`total_mass` is asserted only on a byproduct-off configuration);
+with it on, glycerol/succinic are more reduced than the ethanol route and draw redox H/O from
+the solvent (like biomass), so only **carbon** closes. **Beer carries both yields at 0** —
+its sugar→ethanol stays theoretical and its CO2-ratio benchmark is byte-for-byte untouched.
+
+**Where the fermentable fraction lives.** It is *must composition*, not yeast-strain kinetics,
+but is resolved at the `compile_scenario` boundary like the D-14 nitrogen-dependent yield (its
+evaluation is scenario-specific). It sits in `wine_generic.yaml` for now, flagged as a
+must-constant that would need re-homing if a second wine strain file is added.
+
+**Consequence to watch — the dryness window tightened (a finding, surfaced not tuned).** The
+fermentable-fraction cut (264 → 245 g/L) plus slightly less ethanol (→ less inactivation → more
+viable biomass) move days-to-dryness from **9.2 d to 8.33 d** — still inside the D-14 `[8, 14]`
+window, but with thinner margin. This is reported, **not** tuned away: per D-14 the engine
+matches Coleman's own model line-for-line (the reconstruction test now feeds Coleman the same
+fermentable S₀, so it still tracks to RMSE ~1.3 g/L), so 8.33 d is the *correct* consequence of
+sourced inputs. If a future change breaches 8 d, the question is whether the heuristic window or
+the fraction needs re-examination against Coleman — not whether to nudge a yield.
+
+**New state plumbing.** `Gly`/`Byp` (and, retroactively, `X_dead`) are *produced-only* pools —
+always 0 at pitch — so `VarSpec` gained a `default` and `StateSchema.pack` fills defaulted
+pools when omitted; substrate/condition vars (X, S, E, N, T, CO2) stay required, preserving the
+typo guard. This let two state variables land without touching ~37 initial-condition call sites.
+
 ## Deferred (decide early in the relevant milestone)
 
 - **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.

@@ -44,7 +44,11 @@ rewrite.
 
 Initial v1 contents: viable biomass `X`, sugar(s) `S`, ethanol `E`, yeast
 assimilable nitrogen `N`, temperature `T`, evolved CO₂ (the experimentally
-measurable proxy — a primary validation channel).
+measurable proxy — a primary validation channel). Plus *produced-only* pools that
+are 0 at pitch and only accumulate during fermentation: inactivated biomass
+`X_dead` (D-13), and the realised-yield byproduct sinks `Gly` (glycerol) and
+`Byp` (lumped minor byproducts) (D-16). These declare a `VarSpec.default` so
+`pack` fills them when omitted, while substrate/condition vars stay required.
 
 ### Process
 A `Process` contributes to `d(state)/dt`. It declares `name`, `tier`, and the

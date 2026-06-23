@@ -29,6 +29,15 @@ class VarSpec:
     ``size == 1`` is a scalar (biomass, ethanol, temperature, …); ``size > 1``
     is a vector, used for sequentially-consumed beer sugars (glucose, maltose,
     maltotriose) where ``components`` names each slot.
+
+    ``default`` distinguishes *substrate/condition* inputs from *produced-only*
+    pools. ``None`` (the default) means the variable must be supplied to
+    :meth:`StateSchema.pack` — so a forgotten biomass / sugar / temperature still
+    fails loudly. A non-``None`` default is for pools that are always empty at the
+    start of a ferment and only accumulate during it (inactivated biomass,
+    glycerol, minor byproducts): ``pack`` fills them with the default when omitted,
+    so adding such a pool does not force every initial-condition call site to
+    mention it. The default is broadcast across all ``size`` slots.
     """
 
     name: str
@@ -36,6 +45,7 @@ class VarSpec:
     size: int = 1
     description: str = ""
     components: tuple[str, ...] = ()
+    default: float | None = None
 
     def __post_init__(self) -> None:
         if self.size < 1:
@@ -98,19 +108,25 @@ class StateSchema:
     def pack(self, values: Mapping[str, float | Sequence[float]]) -> FloatArray:
         """Build a flat state array from a name → value(s) mapping.
 
-        Every variable must be supplied exactly once; scalar variables take a
-        number, vector variables take a sequence of the right length.
+        Scalar variables take a number, vector variables take a sequence of the
+        right length. Every variable without a declared :attr:`VarSpec.default`
+        must be supplied; variables *with* a default (produced-only pools) may be
+        omitted and are filled with that default.
         """
         missing = set(self.names) - set(values)
+        required_missing = {name for name in missing if self.spec(name).default is None}
         extra = set(values) - set(self.names)
-        if missing:
-            raise ValueError(f"pack() missing values for: {sorted(missing)}")
+        if required_missing:
+            raise ValueError(f"pack() missing values for: {sorted(required_missing)}")
         if extra:
             raise ValueError(f"pack() got unknown variables: {sorted(extra)}")
 
         arr = np.empty(self._size, dtype=np.float64)
         for spec in self._specs:
-            block = np.atleast_1d(np.asarray(values[spec.name], dtype=np.float64))
+            if spec.name in values:
+                block = np.atleast_1d(np.asarray(values[spec.name], dtype=np.float64))
+            else:  # omitted ⇒ has a default (required_missing already raised)
+                block = np.full(spec.size, spec.default, dtype=np.float64)
             if block.size != spec.size:
                 raise ValueError(
                     f"Variable {spec.name!r} expects {spec.size} value(s), got {block.size}"

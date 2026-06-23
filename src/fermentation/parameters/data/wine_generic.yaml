@@ -101,7 +101,46 @@ Y_ethanol_sugar:
   provenance:
     source: "Gay-Lussac stoichiometry; realised yield, handoff section 2.1"
     conditions: "after biomass and glycerol diversion"
-    notes: "Theoretical max 0.511 g/g; realised 0.46-0.48 is well established. UNUSED in M1: the uptake Process uses the theoretical split (core.chemistry) for exact carbon/mass closure; this realised value is deferred to the Tier-2 glycerol-diversion Process (D-8). NB Coleman's fitted Y_E/S ~0.55 g/g exceeds the 0.511 theoretical maximum (a fitting/measurement artefact), so we keep the well-established realised 0.47 rather than their value."
+    notes: "Theoretical max 0.511 g/g; realised 0.46-0.48 is well established. NOT read directly by the uptake Process: rather than swap this lower constant in (which would destroy carbon and double-count the biomass already modelled separately), the realised yield EMERGES from the explicit byproduct diversion below (decision D-16) - Y_glycerol_sugar + Y_byproduct_sugar scale the theoretical split down, giving an emergent realised Y_E ~ 0.487 that cross-checks this 0.47 (within its 0.46-0.48 band). Kept as that documented target/cross-check. NB Coleman's fitted Y_E/S ~0.55 g/g exceeds the 0.511 theoretical maximum (a fitting/measurement artefact), so we anchor to the well-established realised 0.47 rather than their value."
+
+# -- Realised-yield byproduct diversion (decision D-16) ------------------------
+# Real ferments divert a few percent of sugar carbon away from ethanol/CO2 into
+# glycerol, organic acids and higher alcohols. Rather than lower Y_ethanol_sugar
+# (which would destroy carbon), the uptake Process keeps the theoretical Gay-Lussac
+# split and routes the diverted carbon into the Gly/Byp state pools, carbon-balanced
+# by construction (D-16). These yields are sourced from MEASURED byproduct levels
+# (not back-fitted from a target ABV), so the realised Y_E (~0.487) and the wine ABV
+# fall out. Both default to 0 in code (theoretical core); beer carries 0.
+
+Y_glycerol_sugar:
+  value: 0.035
+  unit: "g/g"   # g glycerol / g sugar consumed
+  tier: plausible
+  uncertainty: { low: 0.02, high: 0.05, note: "spans the 4-10 g/L dry-wine glycerol range at ~245 g/L fermentable sugar" }
+  provenance:
+    source: "UC Davis Waterhouse Lab 'Glycerol' (whats-in-wine); Scanes et al. 1998; Ribereau-Gayon et al., Handbook of Enology"
+    conditions: "S. cerevisiae dry wine; glycerol as a fraction of sugar fermented"
+    notes: "Dry wine glycerol is 4-10 g/L (Ribereau-Gayon; usual 4-9 g/L), formed at ~1:10 of the ethanol. At our ~245 g/L fermentable sugar that is Y_gly ~ 0.016-0.041 g/g; we take 0.035 (-> ~8.6 g/L, mid-range). The MAGNITUDE is well-corroborated (multiple sources, narrow range), hence plausible; the constant-fraction FORM is a simplification (glycerol is front-loaded with growth in reality, not a fixed share of every gram), noted as the speculative aspect. Booked into the Gly pool; carbon-accounted as glycerol (C3H8O3)."
+
+Y_byproduct_sugar:
+  value: 0.014
+  unit: "g/g"   # g minor byproducts (succinic-equivalent) / g sugar consumed
+  tier: speculative
+  uncertainty: { low: 0.008, high: 0.020, note: "lumped succinic + acetic + 2,3-butanediol + higher alcohols, ~2-5 g/L total" }
+  provenance:
+    source: "author estimate lumping measured wine byproducts (succinic 0.5-1.5, acetic 0.3-0.6, 2,3-butanediol 0.5-1.5, higher alcohols 0.15-0.5 g/L); per-g yields e.g. succinic ~0.005, acetic ~0.002 g/g"
+    conditions: "S. cerevisiae dry wine; minor non-glycerol byproducts, carbon-accounted as succinic acid (C4H6O4)"
+    notes: "Glycerol is the dominant byproduct; this lump captures the rest (organic acids + higher alcohols), ~2-5 g/L total -> Y ~ 0.008-0.020 g/g; we take 0.014 (-> ~3.4 g/L). SPECULATIVE: it is a lump of several species with a single representative carbon fraction (succinic acid), not a measured single quantity. Booked into the Byp pool. Together with Y_glycerol_sugar this gives an emergent realised Y_E ~ 0.487, consistent with the literature 0.46-0.48."
+
+must_fermentable_fraction:
+  value: 0.93
+  unit: "g/g"   # g fermentable hexose / g Brix-measured dissolved solids
+  tier: plausible
+  uncertainty: { low: 0.90, high: 0.95, note: "glucose+fructose share of ripe-must soluble solids" }
+  provenance:
+    source: "Ribereau-Gayon et al. 2006, Handbook of Enology (grape must composition)"
+    conditions: "ripe Vitis vinifera must; fraction of refractometric soluble solids that is fermentable hexose"
+    notes: "Brix measures TOTAL dissolved solids as sucrose-equivalent, but in ripe must glucose+fructose are ~90-95% of the soluble solids (the rest is organic acids, minerals, phenolics - not fermentable). brix_to_sugar_gpl therefore OVERSTATES fermentable sugar; this fraction corrects it at the compile boundary (decision D-16): fermentable S0 = brix_to_sugar_gpl(brix) * 0.93. A MUST-COMPOSITION constant, not a yeast-strain kinetic constant - it lives in this file for now but would need re-homing if a second wine strain file is added (it would duplicate). Without it, a 24 Brix must reads 263.8 g/L hexose (ABV ~15.7% even at realised yield); with it, ~245 g/L -> ABV ~14.9%, the realistic potential alcohol of 24 Brix."
 
 # -- Ethanol inhibition (Luong wall on the uptake flux, decision D-10) ---------
 

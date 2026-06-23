@@ -7,15 +7,15 @@ import pytest
 
 from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine_schema
 
-SHARED = ("X", "S", "E", "N", "T", "CO2", "X_dead")
+SHARED = ("X", "S", "E", "N", "T", "CO2", "X_dead", "Gly", "Byp")
 
 
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
     assert schema.names == SHARED
     assert schema.spec("S").size == 1
-    # X, S(1), E, N, T, CO2, X_dead
-    assert schema.size == 7
+    # X, S(1), E, N, T, CO2, X_dead, Gly, Byp
+    assert schema.size == 9
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -24,8 +24,8 @@ def test_beer_schema_has_three_sequential_sugars():
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
-    # X, S(3), E, N, T, CO2, X_dead
-    assert schema.size == 9
+    # X, S(3), E, N, T, CO2, X_dead, Gly, Byp
+    assert schema.size == 11
 
 
 def test_shared_variable_units_are_canonical():
@@ -39,7 +39,19 @@ def test_shared_variable_units_are_canonical():
         "T": "K",
         "CO2": "g/L",
         "X_dead": "g/L",
+        "Gly": "g/L",
+        "Byp": "g/L",
     }
+
+
+def test_produced_only_pools_default_to_zero_when_omitted():
+    # X_dead/Gly/Byp are produced-only pools (VarSpec.default=0), so an initial
+    # state may omit them; substrate/condition vars stay required (see test_state).
+    schema = wine_schema()
+    arr = schema.pack({"X": 0.25, "S": [245.0], "E": 0.0, "N": 0.08, "T": 293.15, "CO2": 0.0})
+    assert schema.get(arr, "X_dead") == 0.0
+    assert schema.get(arr, "Gly") == 0.0
+    assert schema.get(arr, "Byp") == 0.0
 
 
 def test_registry_exposes_wine_and_beer():

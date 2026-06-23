@@ -171,12 +171,15 @@ def test_inhibition_drags_uptake_output_tier_down():
 
 def test_inhibited_run_conserves_carbon_and_mass(params):
     # The architectural guarantee: scaling a conserving flux preserves its
-    # balances. An inhibited wine run still closes carbon and mass exactly.
+    # balances. An inhibited wine run still closes carbon and mass exactly. Run with
+    # the byproduct diversion off so this stays the {S,E,CO2} mass check (glycerol
+    # would break mass closure, by design — decision D-16); inhibition is the subject.
     schema = wine_schema()
+    p = {**params, "Y_glycerol_sugar": 0.0, "Y_byproduct_sugar": 0.0}
     ps = ProcessSet(
         schema, [SugarUptakeToEthanolCO2()], modifiers=[EthanolInhibition()], strict=True
     )
-    traj = simulate(ps, params=params, y0=_wine_y0(schema), t_span=(0.0, 500.0))
+    traj = simulate(ps, params=p, y0=_wine_y0(schema), t_span=(0.0, 500.0))
     assert traj.success
 
     assert_conserved(

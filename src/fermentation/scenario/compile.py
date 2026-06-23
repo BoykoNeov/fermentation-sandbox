@@ -106,19 +106,37 @@ def _optional(values: Mapping[str, float], key: str, default: float) -> float:
     return _nonneg(float(values[key]), key) if key in values else default
 
 
-def _wine_initial(values: Mapping[str, float], temperature_k: float) -> _Initial:
+def _wine_initial(
+    values: Mapping[str, float], temperature_k: float, parameters: ParameterSet
+) -> _Initial:
+    # Brix measures *total* dissolved solids; only ~90-95% of ripe-must solids are
+    # fermentable hexose (the rest is acids/minerals/phenolics). The sourced
+    # must_fermentable_fraction corrects brix_to_sugar_gpl so a 24 Brix must loads
+    # realistic fermentable sugar (~245 g/L, not 264) and the wine ABV is realistic
+    # (decision D-16). Absent ⇒ 1.0 (no correction), so older parameter sets still
+    # compile. Produced-only pools (X_dead, Gly, Byp) default to 0 (see VarSpec).
+    fermentable_fraction = (
+        parameters["must_fermentable_fraction"].value
+        if "must_fermentable_fraction" in parameters
+        else 1.0
+    )
+    sugar_gpl = brix_to_sugar_gpl(_require(values, "brix", "wine")) * fermentable_fraction
     return {
         "X": _require(values, "pitch_gpl", "wine"),
-        "S": [brix_to_sugar_gpl(_require(values, "brix", "wine"))],
+        "S": [sugar_gpl],
         "E": _optional(values, "ethanol_gpl", 0.0),
         "N": mgl_to_gpl(_require(values, "yan_mgl", "wine")),
         "T": temperature_k,
         "CO2": 0.0,
         "X_dead": 0.0,  # no inactivated biomass at pitch
+        "Gly": 0.0,  # no byproducts at pitch (decision D-16)
+        "Byp": 0.0,
     }
 
 
-def _beer_initial(values: Mapping[str, float], temperature_k: float) -> _Initial:
+def _beer_initial(
+    values: Mapping[str, float], temperature_k: float, parameters: ParameterSet
+) -> _Initial:
     return {
         "X": _require(values, "pitch_gpl", "beer"),
         "S": [
@@ -131,10 +149,12 @@ def _beer_initial(values: Mapping[str, float], temperature_k: float) -> _Initial
         "T": temperature_k,
         "CO2": 0.0,
         "X_dead": 0.0,  # no inactivated biomass at pitch
+        "Gly": 0.0,  # beer carries zero byproduct diversion in M1 (decision D-16)
+        "Byp": 0.0,
     }
 
 
-_INITIAL_BUILDERS: dict[str, Callable[[Mapping[str, float], float], _Initial]] = {
+_INITIAL_BUILDERS: dict[str, Callable[[Mapping[str, float], float, ParameterSet], _Initial]] = {
     "wine": _wine_initial,
     "beer": _beer_initial,
 }
@@ -264,10 +284,14 @@ def compile_scenario(
         raise ValueError(f"no initial-composition builder for medium {scenario.medium!r}")
 
     temperature_k = _initial_temperature_kelvin(scenario)
-    y0 = medium.schema.pack(builder(scenario.initial, temperature_k))
 
+    # Parameters are loaded *before* y0 because the wine initial sugar applies a
+    # sourced must_fermentable_fraction (decision D-16), mirroring how the
+    # nitrogen-dependent yield (D-14) is also resolved at this boundary.
     parameters = _load_parameters(scenario, parameter_paths, data_dir)
     parameters = _apply_nitrogen_dependent_yield(scenario, parameters)
+
+    y0 = medium.schema.pack(builder(scenario.initial, temperature_k, parameters))
     process_set = medium.build_process_set(strict=strict)
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 

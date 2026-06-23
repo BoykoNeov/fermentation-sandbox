@@ -114,11 +114,18 @@
       source (10-14 → 8-14 d). ABV ~16.9 % still awaits the realised-yield/glycerol-sink task.
 - [x] Unskip & pass `test_wine_24brix_ferments_to_dryness_in_window` (renamed; YAN=80,
       pitch 0.25, lands ~9.2 d in the re-anchored 8-14 d window). Decision **D-14**.
-- [ ] **Realised ethanol yield / glycerol sink (wine ABV).** The theoretical Gay-Lussac
-      split gives ABV ~16.9 % for 24 Brix; real ferments divert ~4-8 % of sugar carbon to
-      glycerol + biomass + organic acids, landing ~14-15 %. Add a realised-yield correction
-      (or an explicit glycerol carbon sink) so wine ABV is realistic, keeping carbon closed.
-      The open thread flagged by D-13 gap-(b) and D-14 — neither folded it into its decision.
+- [x] **Realised ethanol yield / glycerol sink (wine ABV). D-16.** Theoretical Gay-Lussac
+      gave ABV ~16.9 % for 24 Brix; now ~15.0 %, realised `Y_E ≈ 0.482`. Two independently
+      *sourced* effects (ABV falls out, not reverse-engineered): an explicit glycerol +
+      minor-byproduct carbon sink (`Gly`/`Byp` state pools; `Y_glycerol_sugar = 0.035`,
+      `Y_byproduct_sugar = 0.014`), folded into the uptake *yields* so `dS` is unchanged; and a
+      must-fermentable-sugar correction (`must_fermentable_fraction = 0.93`, applied at compile —
+      only ~93 % of Brix solids are fermentable hexose). Carbon closes for any yields (the
+      diverted carbon is tracked in `Gly`/`Byp`); both yields default 0 = theoretical core
+      (togglable, beer carries 0). `total_mass{S,E,CO2}` is now asserted only byproduct-off.
+      `VarSpec.default` lets the produced-only pools land without touching ~37 pack sites. New
+      realism guard `test_wine_abv_and_glycerol_are_realistic`. NB dryness tightened 9.2 → 8.33 d
+      (still in `[8,14]`; surfaced, not tuned — Coleman reconstruction still tracks at the new S₀).
 - [x] Unskip & pass `test_beer_1048_og_attenuates_in_5_to_7_days`. **D-15:** "1.010" is an
       *apparent* (ethanol-depressed) hydrometer gravity, so model state → gravity goes through
       the Balling/Tabarie real↔apparent extract relation (new in `units/convert.py`); the

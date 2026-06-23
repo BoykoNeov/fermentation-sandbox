@@ -24,9 +24,15 @@ The shared variables (decisions D-B / D-4):
     CO2    evolved CO2           g/L
     X_dead ethanol-inactivated   g/L (non-viable biomass; carbon/nitrogen still
                                  counted, but no longer catalytic — decision D-13)
+    Gly    glycerol              g/L (realised-yield byproduct sink — decision D-16)
+    Byp    minor byproducts      g/L (lumped organic acids / higher alcohols,
+                                 carbon-accounted as succinic acid — decision D-16)
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
+``X_dead``, ``Gly`` and ``Byp`` are *produced-only* pools — always zero at pitch
+and only accumulated by the kinetics — so they declare a default initial of 0
+(`VarSpec.default`) and need not be named at every initial-condition call site.
 """
 
 from __future__ import annotations
@@ -58,7 +64,16 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
         VarSpec("N", "g/L", description="yeast-assimilable nitrogen"),
         VarSpec("T", "K", description="temperature"),
         VarSpec("CO2", "g/L", description="evolved CO2"),
-        VarSpec("X_dead", "g/L", description="ethanol-inactivated (non-viable) biomass"),
+        VarSpec(
+            "X_dead", "g/L", default=0.0, description="ethanol-inactivated (non-viable) biomass"
+        ),
+        VarSpec("Gly", "g/L", default=0.0, description="glycerol (realised-yield byproduct)"),
+        VarSpec(
+            "Byp",
+            "g/L",
+            default=0.0,
+            description="minor byproducts (organic acids/higher alcohols; succinic-equivalent)",
+        ),
     ]
 
 
