@@ -698,14 +698,79 @@ outputs anyway. This is parameter-tier propagation (D-1) and modifier-tier cappi
 checked against an *independent measured* dataset for our own functional form — the
 first such time-series to land in `ReferenceSeries` is the cue to revisit this sweep.
 
+## D-18 — Tier-2 scope: pH is a charge-balance solver (derived-algebraic), byproducts are built first
+
+**Status: open (scoping decision).** This opens Milestone 2 (Tier-2). It records two
+calls made by the project owner at the start of Tier-2 — the pH-richness one is the
+handoff's explicit "open decision for the human" (§7), the build order deviates from
+the handoff's suggested sequence (§6). Detail in `docs/plans/milestone-2-*.md`.
+
+**Call 1 — pH/acid is a full proton/charge-balance solver, not a tracked-pH
+approximation (resolves handoff §7 open decision #3).** Each weak acid in the system
+(tartaric, malic, lactic, acetic, ± carbonic) is tracked as a state concentration;
+at each RHS evaluation the charge-balance equation `Σ(charged species) = 0` is solved
+for `[H⁺]` given those totals and a pKa set, and `pH = −log₁₀[H⁺]` is read out.
+
+**Why charge-balance — the discriminator is prime-directive #-level compositionality,
+not accuracy.** A tracked-pH-with-drift can only produce the two couplings Tier-2
+actually needs — MLF deacidification (pH rises ~0.1–0.3 as malic→lactic) and SO₂
+speciation (molecular fraction governed by pKa ≈ 1.81) — by *scripting* the pH
+response to each event. That directly violates "compositionality over scripting; never
+hardcode the outcome of a specific additive/organism combination" (handoff §5). The
+charge-balance solver makes both *emerge*: MLF consumes malic → recompute `[H⁺]` →
+pH rises as a *consequence*; dose SO₂ → speciation falls out of the current pH. The
+handoff also flags pH as "core infrastructure, not a byproduct — many Tier-2 mechanisms
+are wrong without it" (§3.4). Cost, stated honestly: a pKa set + **per-acid initial
+concentrations** become sourced scenario inputs (like Brix/YAN), and the acids become
+**carbon-accounted state variables**.
+
+**Corollary — pH is a derived algebraic pure function, NOT an integrated state.**
+The derived-vs-integrated question is *not* a separate fork; it falls out of richness.
+Charge-balance ⟹ there is no `dpH/dt`: pH is an instantaneous algebraic function of
+the acid state (a 1-D monotonic root-find, well-behaved for the BDF RHS), keeping the
+core pure exactly as `total_carbon` etc. are pure functions of state. (A tracked
+approximation would instead have made pH an integrated state with a drift Process —
+recorded so this is not re-litigated when the solver is built.)
+
+**Three couplings the pH beat must resolve (named now so they are not discovered late):**
+1. **Evolved vs dissolved CO₂.** The existing `CO2` state is the *cumulative evolved*
+   measurable proxy (D-15), **not** the dissolved pool that carbonic acid needs. The
+   solver must either add/track dissolved CO₂ for carbonic, or justify omitting carbonic
+   for wine (tartaric/malic dominate must buffering) and document the scope.
+2. **Acid carbon vs the D-16 `Byp` sink.** Tracked organic acids carry carbon, and D-16
+   already books `Byp` as succinic (C₄). When acids become explicit state, `total_carbon`
+   weighting and the `Byp` lump must be reconciled so carbon is not double-counted.
+3. **pKa(T).** pKa is temperature-dependent; once byproducts/Arrhenius push runs off
+   `T_ref` the constant-pKa assumption needs either a T-correction or an explicit scoped
+   caveat.
+
+**Call 2 — build byproducts/temperature first, then pH; deviation from handoff §6.**
+The handoff sequence is "pH first (it unblocks the rest), then SO₂, then byproducts."
+We invert the first two: the **temperature-/metabolism-driven byproducts** (§3.2 —
+esters & fusels) are built before the pH solver. Rationale:
+- *It closes the one remaining skipped benchmark* (`test_lower_temperature_is_slower_but_cleaner`),
+  keeping the project's test-driven discipline — every prior decision was anchored to a
+  §2.2 test.
+- *It finally exercises the dormant temperature axis.* The Arrhenius modifiers were built
+  in M1 but are **inert at the isothermal `T_ref` benchmark** (D-11, D-17), so the
+  "warmer ferments faster" machinery has never been exercised by an acceptance test. The
+  benchmark's *"slower"* half works **today** (a constant non-`T_ref` run activates them);
+  only the *"cleaner"* half needs new ester/fusel Processes.
+- *It is the most self-contained Tier-2 physics — esters/fusels depend on T and N only,
+  not on pH.* So building it first costs the pH chain (SO₂/MLF/Brett, which *do* need pH)
+  nothing, and defers the heavy charge-balance commitment until its design is locked.
+
+The **stochastic ensemble wrapper** (handoff §1.6/§6.3 "runtime maturation") is
+physics-free and orthogonal to both; it can be built in parallel at any point. Its API
+shape is an engineering choice, not a scoping gate, so it carries no DECISIONS entry —
+just `docs/plans/milestone-2-*.md`.
+
 ## Deferred (decide early in the relevant milestone)
 
-- **pH / acid model richness** (handoff §3.4, §7): full proton/charge balance vs.
-  a tracked-pH approximation upgraded later. Decide at the **start of Tier-2** —
-  pH feeds SO₂ speciation and microbial growth, so it unblocks much of Tier-2.
-  Not needed for Milestone 1.
-- **Stochastic ensemble API** (handoff §1.6): parameter sampling within
-  provenance bounds as a runtime wrapper. The `Uncertainty` ranges already exist
-  to feed this; design the wrapper during "runtime maturation" (handoff §6.3).
+- ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
+  built after the byproducts beat.
+- ~~**Stochastic ensemble API**~~ — **scoped into Milestone 2** (`milestone-2-plan.md`);
+  physics-free runtime wrapper over the existing `Uncertainty` ranges, buildable in
+  parallel with the byproducts beat.
 - **Packaged parameter-data access:** tests read YAML via filesystem path. If we
   ship a wheel that must read its own data, switch to `importlib.resources`.
