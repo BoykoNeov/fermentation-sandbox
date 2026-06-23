@@ -18,10 +18,17 @@ resumes cleanly. In the first session I completed docs+commit+push but initially
 forgot the memory step — don't repeat that.
 
 **How to apply:** at batch end, in order: (1) write/refresh memory files here +
-update `MEMORY.md`; (2) update affected docs (`docs/ARCHITECTURE.md`,
+update `MEMORY.md`; (1b) **sync the repo's tracked copy** — the memory files are
+version-controlled under `.claude/memory/` (since commit `1c095ab`), so refresh
+them from the live dir before committing:
+`cp ~/.claude/projects/M--claud-projects-Fermentation/memory/*.md .claude/memory/`
+then `git add .claude/memory/`. This is the durable mechanism (the user asked on
+2026-06-23 that memory be tracked *always, with the rest*, not a one-off snapshot)
+— so memory is committed alongside docs/code every checkpoint, behaving like any
+other tracked file; (2) update affected docs (`docs/ARCHITECTURE.md`,
 `docs/DECISIONS.md`, the `docs/plans/milestone-*.md` trio); (3) `git commit` with
-Conventional Commits; (4) `git push`. Memory lives outside the repo, so do it even
-when there is no code to push. See [[project-fermentation-sandbox]].
+Conventional Commits; (4) `git push`. Run the ritual even when there is no code to
+push. See [[project-fermentation-sandbox]].
 
 **Always push directly to `main`, and do NOT ask first** — this is a solo public
 repo with CI on `main` and no PR flow; do **not** branch or open a PR for routine
