@@ -9,7 +9,10 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 These three were the handoff's §7 open questions, resolved with the project owner.
 
 - **D-A — Repository:** public GitHub repo `fermentation-sandbox` under
-  `BoykoNeov`, MIT licensed.
+  `BoykoNeov`, licensed under the Boyko Non-Commercial License v1.0 (BNCL-1.0):
+  free for non-commercial use/modification with attribution, commercial use
+  prohibited unless separately licensed. (Originally MIT; relicensed by the
+  copyright holder.)
 - **D-B — First validation target:** chase the wine (~24 °Brix → dry in 10–14 d)
   **and** beer (~1.048 OG → ~1.010 in 5–7 d) §2.2 benchmarks **in parallel** for
   Milestone 1. The architecture is a shared core regardless; this sets which

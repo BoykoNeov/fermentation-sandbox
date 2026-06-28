@@ -4,7 +4,8 @@ version = "0.0.1"
 description = "A research-grade simulation engine for wine and beer fermentation, grounded in published science with explicit confidence tiers."
 readme = "README.md"
 requires-python = ">=3.13"
-license = "MIT"
+license = "LicenseRef-BNCL-1.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "BoykoNeov" }]
 keywords = ["fermentation", "simulation", "wine", "beer", "kinetics", "ode", "research"]
 dependencies = [

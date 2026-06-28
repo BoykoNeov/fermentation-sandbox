@@ -77,4 +77,7 @@ uv run pytest -m benchmark
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+Boyko Non-Commercial License v1.0 (BNCL-1.0) — see [`LICENSE`](LICENSE) and
+[`NOTICE`](NOTICE). Free to use, modify, and share for **non-commercial
+purposes** with attribution; **commercial use is prohibited** unless separately
+licensed by the copyright holder.
