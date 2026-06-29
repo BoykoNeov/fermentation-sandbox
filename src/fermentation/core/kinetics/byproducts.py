@@ -31,20 +31,24 @@ for pure uptake to exact dryness; growth's sugar draw, the finite dryness cutoff
 and the (un-Arrhenius-scaled) inactivation brake perturb it, so the integrated
 direction is **verified empirically**, not assumed.
 
-**Carbon accounting — produced-only, NOT carbon-routed (decision D-19).** The beat
-plan floated routing these pools' carbon from sugar D-16-style for machine-precision
-closure. We deliberately do **not**, because the carbon is *already in the ledger*:
-the ``Byp`` minor-byproduct lump is explicitly "organic acids / higher alcohols,
-carbon-accounted as succinic acid" — and higher alcohols *are* the fusels — while
-ester carbon merely re-expresses ethanol (``E``) and acid (⊂ ``Byp``) carbon already
-counted. Adding ``esters``/``fusels`` to ``total_carbon`` would therefore
-**double-count**, not close a leak; and routing them from sugar would force carving
-higher alcohols back out of ``Byp`` (re-anchoring the sourced ``Y_byproduct_sugar``
-and risking the realised-yield / ABV realism guard). So these Processes touch *only*
-their own pools, ``total_carbon`` is left untouched, and carbon closure stays
-byte-for-byte what it was. (A future beat that wants rigorous per-species carbon
-routing must first resolve the ``Byp`` double-count, then decrement ``E``/``Byp``/
-sugar accordingly — see D-19.)
+**Carbon accounting — diagnostic pools, deliberately OUTSIDE the ledger (D-19).**
+These pools are *not* in ``total_carbon``, and that is the carbon-correct choice, not
+a leak. The carbon a fusel/ester molecule contains is not missing from the ledger —
+the carbon it *re-expresses* is already booked elsewhere: the ``Byp`` minor-byproduct
+lump is explicitly "organic acids / higher alcohols, carbon-accounted as succinic
+acid" (higher alcohols *are* the fusels), and ester carbon re-expresses ethanol
+(``E``) plus acid (⊂ ``Byp``) carbon already counted. So ``esters``/``fusels`` are
+**diagnostic re-expressions** of carbon the ledger already holds; weighting them in
+``total_carbon`` would **double-count** it. The beat plan floated routing their
+carbon from sugar D-16-style for machine-precision closure; doing so would instead
+force carving higher alcohols back *out* of ``Byp`` (re-anchoring the sourced
+``Y_byproduct_sugar`` and risking the realised-yield / ABV realism guard) for no
+benchmark gain. So these Processes touch *only* their own pools and ``total_carbon``
+is left untouched — closure stays byte-for-byte. **First produced-only pool that is
+not carbon-routed** (contrast ``Gly``/``Byp``/``X_dead``): a future beat wanting
+rigorous per-species carbon routing must first resolve the ``Byp`` double-count, then
+decrement ``E``/``Byp``/sugar accordingly. Do **not** "fix" ``total_carbon`` by
+adding these pools — that reintroduces the double-count (see D-19).
 
 Tiers: :class:`EsterSynthesis` is **plausible** in form (warmth-favoured,
 flux-coupled ester synthesis is the literature-standard direction) with speculative

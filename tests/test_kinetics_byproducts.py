@@ -30,6 +30,7 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
+from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.validation import assert_nonnegative
 
 
@@ -274,6 +275,47 @@ def test_byproducts_do_not_materially_drift_the_core(params):
     assert a.success and b.success
     for var in ("X", "S", "E", "N", "CO2"):
         np.testing.assert_allclose(a.series(var), b.series(var), rtol=1e-4, atol=1e-4)
+
+
+# -- integrated falls-with-temperature property (the load-bearing constraint) --
+
+
+def _wine_run_to_dryness(celsius: float, duration_days: float):
+    """Compile + run the wine medium isothermally; return (reached_dryness, total
+    esters+fusels at run end). End-of-run total ≈ total at dryness because byproduct
+    production stops once the flux dies with the sugar."""
+    sc = Scenario(
+        name=f"wine-{celsius}C",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
+        duration_days=duration_days,
+    )
+    compiled = compile_scenario(sc, strict=True)
+    traj = simulate(
+        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h
+    )
+    assert traj.success, traj.message
+    reached_dryness = float(traj.series("S")[-1]) <= 2.0
+    total_byproducts = float(traj.series("esters")[-1]) + float(traj.series("fusels")[-1])
+    return reached_dryness, total_byproducts
+
+
+def test_integrated_byproduct_total_falls_with_temperature():
+    # THE load-bearing property and the regression guard for the E_a ordering: the
+    # snapshot "rises with T" tests above pass for *any* positive E_a, but the
+    # run-integrated total only falls with temperature when each byproduct E_a
+    # exceeds E_a_uptake (the total scales as exp(-(ΔE_a/R)(1/T - 1/T_ref)); the flux
+    # integral to dryness is fixed). If the sourcing step ever drops an E_a toward
+    # E_a_uptake, this fails — *before* the formal benchmark is unskipped. Both runs
+    # must reach dryness (else the comparison is meaningless), so the colder run gets
+    # a generous duration. Mirrors test_lower_temperature_is_slower_but_cleaner.
+    cold_dry, cold_total = _wine_run_to_dryness(14.0, 60.0)
+    warm_dry, warm_total = _wine_run_to_dryness(25.0, 21.0)
+    assert cold_dry and warm_dry, "both temperatures must reach dryness to compare"
+    assert 0.0 < cold_total < warm_total, (
+        f"colder ferment should be cleaner: cold {cold_total:.4f} vs warm {warm_total:.4f} g/L"
+    )
 
 
 # -- tier propagation ---------------------------------------------------------
