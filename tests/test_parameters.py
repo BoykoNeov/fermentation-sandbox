@@ -152,7 +152,8 @@ def test_load_shipped_wine_parameters():
 
 def test_load_shipped_beer_parameters():
     ps = load_parameters(DATA / "beer_generic.yaml")
-    # Defines every parameter the medium-agnostic kinetics read.
+    # Defines every parameter the medium-agnostic kinetics read — including the
+    # Tier-2 byproduct Processes now wired into both media (decision D-19).
     read_params = {
         "mu_max",
         "K_s",
@@ -167,6 +168,10 @@ def test_load_shipped_beer_parameters():
         "T_ref",
         "biomass_C_fraction",
         "biomass_N_fraction",
+        "k_ester",
+        "E_a_esters",
+        "k_fusel",
+        "E_a_fusels",
     }
     assert read_params <= set(ps.names)
     # Sourced from Zamudio Lara et al. 2022 (open access).

@@ -10,7 +10,8 @@ full set exists (until then they stay out of the ``MEDIA`` registry so the
 no-kinetics baseline holds — see ``docs/plans/milestone-1-tasks.md``).
 """
 
-from fermentation.core.kinetics.arrhenius import ArrheniusTemperature
+from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
+from fermentation.core.kinetics.byproducts import EsterSynthesis, FuselAlcoholsEhrlich
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
@@ -18,8 +19,11 @@ from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 
 __all__ = [
     "ArrheniusTemperature",
+    "EsterSynthesis",
     "EthanolInactivation",
     "EthanolInhibition",
+    "FuselAlcoholsEhrlich",
     "GrowthNitrogenLimited",
     "SugarUptakeToEthanolCO2",
+    "arrhenius_factor",
 ]

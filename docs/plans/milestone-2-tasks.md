@@ -11,19 +11,34 @@ physics-free and can run in parallel. Keep `pytest` / `ruff` / `mypy` green and 
       pools** (`VarSpec.default = 0.0`, the D-16 pattern). Both canonical `compile`
       builders updated to list them (D-16 precedent); no fixture churn. Tier-1 suite +
       §2.2 trio + conservation stay green (193 passed, 1 skipped).
-- [ ] `FuselAlcoholsEhrlich` Process + unit test — additive, produced-only, monotone in
-      T, togglable-off. Ehrlich pathway (amino-acid-derived); flag the non-monotonic-N
-      simplification.
-- [ ] `EsterSynthesis` Process + unit test — additive, produced-only, monotone in T
-      (warmth favours esters), coupled to fermentative flux + N.
-- [ ] Settle the **carbon-accounting sub-decision** (recommend route-from-source, D-16
-      style → machine-precision closure); extend `total_carbon` if pools are
-      carbon-routed.
+- [x] `FuselAlcoholsEhrlich` Process + unit test — additive, produced-only, monotone in
+      T, togglable-off. Ehrlich pathway (amino-acid-derived), N-gated on `N/(K_n+N)`;
+      non-monotonic-N simplification flagged ⇒ Process tier **speculative**. Embeds its
+      own (steeper) Arrhenius factor via the shared `arrhenius_factor` helper.
+- [x] `EsterSynthesis` Process + unit test — additive, produced-only, monotone in T
+      (warmth favours esters), coupled to the fermentative-flux Monod shape (shares
+      `K_sugar_uptake`). Form **plausible**, placeholder rate params cap output at
+      speculative. Both wired into `MEDIA` (wine+beer) as a separate `_BYPRODUCT_PROCESSES`
+      tuple (isolable); `test_media`/`test_parameters` ripples handled. 211 green.
+- [x] **Carbon-accounting sub-decision SETTLED — option (b), and it is carbon-*correct*,
+      not a compromise** (overrides the plan's tentative route-from-source). `Byp` already
+      books "higher alcohols" (= fusels) as succinic, and ester carbon re-expresses
+      ethanol+acid carbon already counted, so adding these pools to `total_carbon` would
+      **double-count**; routing from sugar would force carving fusels out of `Byp`
+      (re-anchoring `Y_byproduct_sugar`, risking the ABV/realised-yield guard) for zero
+      benchmark gain (directional). So: pools NOT carbon-routed, `total_carbon` untouched,
+      closure byte-for-byte. Boundary note recorded for any future router. Formalise in
+      **D-19** at beat close.
 - [ ] Source + reconcile ester/fusel rate + T-sensitivity parameters; replace
       placeholders; tag tiers honestly (`plausible`/`speculative`, directional only).
+      **Hard constraint:** keep each `E_a` > `E_a_uptake` (the ordering that makes the
+      run-integrated total fall with T — verified load-bearing).
 - [ ] Add a multi-temperature comparison; **unskip & pass
       `test_lower_temperature_is_slower_but_cleaner`** (lower T ⇒ longer to dryness AND
       fewer esters+fusels). Confirm the §2.2 trio + carbon conservation stay green.
+      **Direction already verified empirically** (scratch run): wine 14 °C→15.8 d/0.141 g/L
+      vs 25 °C→5.4 d/0.186 g/L; beer 14 °C→10.8 d/0.111 g/L vs 25 °C→4.4 d/0.147 g/L —
+      slower AND cleaner when colder, both media, at dryness and at run end.
 - [ ] Record outcomes in **DECISIONS D-19**; update `milestone-2-plan.md` + ARCHITECTURE.
 
 ## Parallel (physics-free) — stochastic ensemble wrapper

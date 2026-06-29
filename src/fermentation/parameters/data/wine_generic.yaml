@@ -320,3 +320,60 @@ biomass_N_yield_log_slope:
       column, so the true value is -3.61e-3 (it sits at the centre of the CR and
       reproduces Fig 4 at both 80 mg/L -> 24.8 g/g and 330 mg/L -> 10.1 g/g). The
       as-printed -3.61 would collapse Y_X/N to ~0 by 2 mg N/L, which is absurd.
+
+# -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
+# Esters and fusel (higher) alcohols: trace produced-only pools that RISE with
+# temperature. PLACEHOLDER VALUES, tagged speculative pending the dedicated
+# parameter-sourcing step (reading list: de Andres-Toro et al. 1998, Malherbe et
+# al. 2004, and ester/higher-alcohol kinetic literature). These are NOT carbon-routed
+# (D-19): their carbon is already in the ledger (fusels = the "higher alcohols" of the
+# Byp succinic lump; ester carbon re-expresses ethanol+acid carbon), so total_carbon
+# is untouched. The benchmark (warmer => more esters+fusels) is DIRECTIONAL, so these
+# stay speculative and earn no promotion (handoff §3.5).
+#
+# KEY ORDERING CONSTRAINT (decision D-19): each E_a below must EXCEED E_a_uptake
+# (55,100 J/mol). The run-integrated byproduct total scales as
+# exp(-((E_a_byproduct - E_a_uptake)/R)(1/T - 1/T_ref)); only when the difference is
+# positive does the total FALL with temperature (the "cleaner when colder" half of
+# the benchmark). This is also physically correct - ester/fusel-forming steps are
+# more temperature-sensitive than the fermentative flux.
+
+k_ester:
+  value: 4.0e-4
+  unit: "1/h"   # d(esters)/dt = k_ester * X * S/(K_su+S) * f(T); per-biomass ester rate
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "placeholder; tuned so total esters ~0.1-0.15 g/L at 20 C" }
+  provenance:
+    source: "author estimate (placeholder pending ester-kinetics sourcing)"
+    conditions: "S. cerevisiae wine; ester synthesis coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis as the specific ester-formation rate on the fermentative-flux Monod shape (shares K_sugar_uptake). At T_ref the run-integrated total is ~ (k_ester/q_sugar_max)*S0 ~ (4e-4/0.85)*245 ~ 0.12 g/L, the right trace order for total wine esters (~50-200 mg/L). PLACEHOLDER: the magnitude is an order-of-magnitude target, not a sourced fit - the dedicated sourcing step (D-19 reading list) replaces it."
+
+E_a_esters:
+  value: 75000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 60000.0, high: 95000.0, note: "must stay > E_a_uptake (55,100); ester steps more T-sensitive than fermentation" }
+  provenance:
+    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19)"
+    conditions: "S. cerevisiae wine; equivalent Arrhenius activation energy at T_ref = 293.15 K"
+    notes: "Sets the temperature sensitivity of ester synthesis (Q10 ~ 2.8 near 20 C). Deliberately ABOVE E_a_uptake (55,100 J/mol) so warmer ferments make more esters AND so the run-integrated total falls with temperature (see the section header). PLACEHOLDER magnitude pending the ester-kinetics sourcing step; the > E_a_uptake ordering is the load-bearing constraint, not the exact value."
+
+k_fusel:
+  value: 2.5e-3
+  unit: "1/h"   # d(fusels)/dt = k_fusel * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "placeholder; tuned so total fusels ~0.1-0.3 g/L at 20 C" }
+  provenance:
+    source: "author estimate (placeholder pending Ehrlich-pathway kinetics sourcing)"
+    conditions: "S. cerevisiae wine; Ehrlich fusel formation, nitrogen-gated on the fermentative flux"
+    notes: "Read by FuselAlcoholsEhrlich. Higher than k_ester because the N-gate (N/(K_n+N)) front-loads fusel formation into the nitrogen-replete early ferment and so cuts the production window short - the larger rate compensates to land total fusels in the trace ~0.1-0.3 g/L wine range. PLACEHOLDER order-of-magnitude target; replaced by the sourcing step (D-19)."
+
+E_a_fusels:
+  value: 70000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 60000.0, high: 90000.0, note: "must stay > E_a_uptake (55,100); fusel steps more T-sensitive than fermentation" }
+  provenance:
+    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19)"
+    conditions: "S. cerevisiae wine; equivalent Arrhenius activation energy at T_ref = 293.15 K"
+    notes: "Sets the temperature sensitivity of Ehrlich fusel formation. Like E_a_esters it is held ABOVE E_a_uptake (55,100 J/mol) so total fusels fall with temperature (section header). PLACEHOLDER magnitude pending sourcing; the > E_a_uptake ordering is the constraint."

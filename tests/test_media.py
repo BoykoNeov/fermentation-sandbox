@@ -93,16 +93,22 @@ def test_build_process_set_respects_strict_flag():
     assert pset.strict is True
 
 
-# -- the registered media now carry the validated-core primary-fermentation kinetics
+# -- the registered media now carry the validated-core kinetics + Tier-2 byproducts
 
-# Growth + fermentative uptake + ethanol-driven cell inactivation; per-rate
-# Arrhenius modifiers. The Luong ethanol wall (ethanol_inhibition) is retired from
-# the default media in favour of the cumulative inactivation Process (decision D-13).
-EXPECTED_PROCESSES = {
+# Validated core: growth + fermentative uptake + ethanol-driven cell inactivation,
+# with per-rate Arrhenius modifiers. The Luong ethanol wall (ethanol_inhibition) is
+# retired from the default media in favour of the cumulative inactivation Process
+# (decision D-13).
+CORE_PROCESSES = {
     "growth_nitrogen_limited",
     "sugar_uptake_to_ethanol_co2",
     "ethanol_inactivation",
 }
+# Tier-2 aroma byproducts (Milestone 2, decision D-18/D-19): additive, produced-only
+# Processes touching only the esters/fusels pools. Wired in by default but isolable
+# (prime directive #3) — disabling them leaves the validated core byte-for-byte.
+BYPRODUCT_PROCESSES = {"ester_synthesis", "fusel_alcohols_ehrlich"}
+EXPECTED_PROCESSES = CORE_PROCESSES | BYPRODUCT_PROCESSES
 EXPECTED_MODIFIERS = {"arrhenius_growth", "arrhenius_uptake"}
 
 
@@ -110,7 +116,8 @@ EXPECTED_MODIFIERS = {"arrhenius_growth", "arrhenius_uptake"}
 def test_registered_media_wire_the_full_kinetic_set(medium):
     # Wine and beer share the same mechanism set — only the sugar vector differs,
     # and beer's sequential uptake lives inside the uptake Process, so no extra
-    # Process is needed for it.
+    # Process is needed for it. Both media also carry the Tier-2 byproduct Processes
+    # (esters/fusels), which are produced in both wine and beer.
     pset = get_medium(medium).build_process_set(strict=True)
     assert {p.name for p in pset.active} == EXPECTED_PROCESSES
     assert {m.name for m in pset.active_modifiers} == EXPECTED_MODIFIERS

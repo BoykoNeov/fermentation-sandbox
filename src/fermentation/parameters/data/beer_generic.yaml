@@ -229,3 +229,58 @@ biomass_N_fraction:
     source: "canonical yeast elemental formula CH1.8O0.5N0.2 (Roels 1983; Heijnen)"
     conditions: "S. cerevisiae dry cell weight, nitrogen mass fraction (ale yeast is S. cerevisiae)"
     notes: "Identical to the wine file - organism-level constant."
+
+# -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
+# Esters and fusel (higher) alcohols: trace produced-only pools that RISE with
+# temperature (ales are notably estery). PLACEHOLDER VALUES, tagged speculative
+# pending the dedicated parameter-sourcing step. NOT carbon-routed (D-19): their
+# carbon is already in the ledger, so total_carbon is untouched. The benchmark
+# (warmer => more esters+fusels) is DIRECTIONAL. Carried for both media because the
+# shared byproduct Processes declare these in `reads`; a value is required per
+# medium (D-1, no silent default). Values mirror the wine file (byproduct kinetics
+# are yeast-generic at this placeholder stage); beer's lower sugar yields a smaller
+# trace total, directionally correct.
+#
+# KEY ORDERING CONSTRAINT (decision D-19): each E_a must EXCEED E_a_uptake (55,100
+# J/mol) so the run-integrated byproduct total falls with temperature - see the wine
+# file header for the exp(-(dE_a/R)(1/T-1/T_ref)) cancellation argument.
+
+k_ester:
+  value: 4.0e-4
+  unit: "1/h"   # d(esters)/dt = k_ester * X * S/(K_su+S) * f(T)
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "placeholder; beer ester total ~50-150 mg/L at 20 C" }
+  provenance:
+    source: "author estimate (placeholder pending ester-kinetics sourcing; mirrors wine)"
+    conditions: "ale yeast; ester synthesis coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis. Same placeholder as the wine file - ester kinetics are treated yeast-generic until sourced. Beer's lower fermentable sugar (~88 g/L vs wine's ~245) gives a smaller integrated ester total ~ (4e-4/0.5)*88 ~ 0.07 g/L, the right trace order for ale esters. PLACEHOLDER replaced by the D-19 sourcing step (de Andres-Toro et al. 1998 includes byproduct terms for beer specifically)."
+
+E_a_esters:
+  value: 75000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 60000.0, high: 95000.0, note: "must stay > E_a_uptake (55,100); ester steps more T-sensitive than fermentation" }
+  provenance:
+    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19; mirrors wine)"
+    conditions: "ale yeast; equivalent Arrhenius activation energy at T_ref = 293.15 K"
+    notes: "Temperature sensitivity of ester synthesis, held ABOVE E_a_uptake so warmer ferments make more esters and the integrated total falls with temperature. PLACEHOLDER magnitude; the > E_a_uptake ordering is the load-bearing constraint."
+
+k_fusel:
+  value: 2.5e-3
+  unit: "1/h"   # d(fusels)/dt = k_fusel * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "placeholder; beer fusel total ~50-200 mg/L at 20 C" }
+  provenance:
+    source: "author estimate (placeholder pending Ehrlich-pathway kinetics sourcing; mirrors wine)"
+    conditions: "ale yeast; Ehrlich fusel formation, nitrogen-gated on the fermentative flux"
+    notes: "Read by FuselAlcoholsEhrlich. Same placeholder as the wine file. The N-gate front-loads fusels into the nitrogen-replete early ferment; beer's higher wort YAN (~200 mg/L) keeps the gate open a touch longer than a low-N wine must. PLACEHOLDER replaced by the D-19 sourcing step."
+
+E_a_fusels:
+  value: 70000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 60000.0, high: 90000.0, note: "must stay > E_a_uptake (55,100); fusel steps more T-sensitive than fermentation" }
+  provenance:
+    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19; mirrors wine)"
+    conditions: "ale yeast; equivalent Arrhenius activation energy at T_ref = 293.15 K"
+    notes: "Temperature sensitivity of Ehrlich fusel formation, held ABOVE E_a_uptake so total fusels fall with temperature. PLACEHOLDER magnitude; the > E_a_uptake ordering is the constraint."

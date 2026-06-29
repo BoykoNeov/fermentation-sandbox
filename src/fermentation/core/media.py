@@ -48,7 +48,9 @@ from dataclasses import dataclass, field
 
 from fermentation.core.kinetics import (
     ArrheniusTemperature,
+    EsterSynthesis,
     EthanolInactivation,
+    FuselAlcoholsEhrlich,
     GrowthNitrogenLimited,
     SugarUptakeToEthanolCO2,
 )
@@ -175,6 +177,18 @@ _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
     ArrheniusTemperature.for_uptake,
 )
 
+#: Tier-2 temperature-/metabolism-driven aroma byproducts (Milestone 2, decision
+#: D-18/D-19): ester synthesis and Ehrlich-pathway fusel alcohols. Kept as a
+#: *separate* tuple from the validated-core primary set so the speculative beat
+#: stays isolable — disabling these by name leaves the core byte-for-byte (prime
+#: directive #3). They are additive, produced-only Processes that touch only the
+#: ``esters``/``fusels`` pools, so wiring them in does not perturb the §2.2 trio or
+#: carbon conservation (their carbon is already in the ledger — see D-19).
+_BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
+    EsterSynthesis,
+    FuselAlcoholsEhrlich,
+)
+
 
 #: The registry of known media. Adding a beverage family = adding an entry here
 #: (and, at the I/O boundary, an initial-composition vocabulary in
@@ -183,13 +197,13 @@ MEDIA: dict[str, Medium] = {
     "wine": Medium(
         name="wine",
         schema=wine_schema(),
-        process_factories=_PRIMARY_FERMENTATION_PROCESSES,
+        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES,
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),
     "beer": Medium(
         name="beer",
         schema=beer_schema(),
-        process_factories=_PRIMARY_FERMENTATION_PROCESSES,
+        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES,
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),
 }

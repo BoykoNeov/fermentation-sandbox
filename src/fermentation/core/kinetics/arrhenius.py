@@ -73,6 +73,22 @@ from fermentation.core.tiers import Tier
 GAS_CONSTANT = 8.314462618
 
 
+def arrhenius_factor(temp: float, e_a: float, t_ref: float) -> float:
+    """Reference-anchored Arrhenius factor ``exp(-(E_a/R)·(1/T - 1/T_ref))``.
+
+    The dimensionless temperature scaling that is exactly 1 at ``T = T_ref`` (so a
+    rate constant measured at ``T_ref`` is used unscaled), > 1 above and < 1 below.
+    ``temp``/``t_ref`` are in Kelvin, ``e_a`` in J/mol. Always positive (``exp``),
+    so multiplying a conserving flux by it cannot flip a sign or break a balance.
+
+    Shared single source of truth for the Arrhenius shape: the multiplicative
+    :class:`ArrheniusTemperature` modifier (which scales growth/uptake) and the
+    additive Milestone-2 byproduct Processes (which *embed* their own, steeper
+    temperature sensitivity) both call this, so the law is written once (D-11).
+    """
+    return float(math.exp(-(e_a / GAS_CONSTANT) * (1.0 / temp - 1.0 / t_ref)))
+
+
 class ArrheniusTemperature(RateModifier):
     """Arrhenius temperature scaling of one kinetic Process's flux.
 
@@ -120,8 +136,6 @@ class ArrheniusTemperature(RateModifier):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> float:
         temp = float(y[schema.slice("T")][0])  # K, read from state (not params)
-        e_a = params[self._e_a_param]
-        t_ref = params["T_ref"]
         # Always positive (exp), so no clamp: a single positive scalar on a
         # conserving vector cannot break a balance or flip a flux sign (D-11).
-        return float(math.exp(-(e_a / GAS_CONSTANT) * (1.0 / temp - 1.0 / t_ref)))
+        return arrhenius_factor(temp, params[self._e_a_param], params["T_ref"])
