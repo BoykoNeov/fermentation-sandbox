@@ -287,10 +287,24 @@ carbonic needs), **acid carbon vs the D-16 `Byp`=succinic sink** (don't double-c
 **pKa(T)**. Stochastic ensemble wrapper = physics-free runtime layer, parallelizable, no scoping gate.
 Docs-only (no code), committed + pushed to `main` ([[feedback-batch-end-ritual]]).
 
-**Next: the byproducts beat** — add `esters`/`fusels` produced-only pools (D-16 `VarSpec.default`
-pattern) + additive Ehrlich-fusel / ester-synthesis Processes (no `RateModifier` needed); settle the
-carbon-accounting sub-decision (recommend route-from-source, D-16 style); source ester/fusel kinetics
-(de Andrés-Toro 1998 / Malherbe 2004 + ester lit, mostly `speculative`/directional per §3.5); unskip
+**M2 batch 1 (2026-06-29): byproducts beat step 1 — `esters`/`fusels` schema pools landed.**
+Added two produced-only state pools `esters`/`fusels` to the shared wine/beer schema via the D-16
+`VarSpec.default=0.0` pattern (zero at pitch, kinetics-only accumulation). Units **g/L** (canonical, not
+mg/L) so step-2 carbon routing can use `carbon_mass_fraction` directly. **Both canonical `compile`
+builders (`_wine_initial`/`_beer_initial`) list them explicitly** — advisor corrected my "no pack-site
+churn = don't touch compile" lean: the D-16 comments sit on the `Gly`/`Byp` lines *in those builders*, so
+D-16 itself added its pools there; "no churn" meant the ~35 test/scenario fixtures, not the 2 canonical
+builders. No Process fills the pools yet (step 2) → they stay 0.0, conservation unaffected
+(`total_carbon`/`nitrogen`/`mass` weight only named pools on `schema.zeros()`). Representative-species
+choice + how trace ester/fusel carbon is accounted vs the `Byp` succinic sink (no double-count) **deferred
+to D-19** (step 2). `test_media.py` updated (SHARED tuple, wine size 9→11 / beer 11→13, units dict,
+produced-only-default test). 193 passed / 1 skipped (the step-2 benchmark), ruff + mypy clean. Committed
+`0175973`, pushed to `main` ([[feedback-always-commit-push]]).
+
+**Next: byproducts beat step 2 (next session)** — the additive Ehrlich-fusel + ester-synthesis Processes
+(no `RateModifier` needed, produced-only/monotone-in-T, togglable-off); settle the carbon-accounting
+sub-decision (recommend route-from-source, D-16 style); source ester/fusel kinetics (de Andrés-Toro 1998 /
+Malherbe 2004 + ester lit, mostly `speculative`/directional per §3.5); unskip
 `test_lower_temperature_is_slower_but_cleaner`; record as D-19. Then the **pH charge-balance keystone**
 (unblocks SO₂ → MLF → mixed cultures). Full design in `docs/plans/milestone-2-{plan,context,tasks}.md`.
 No real datasets yet — when the first measured time-series lands in the data-ready harness
