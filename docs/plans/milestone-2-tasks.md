@@ -7,8 +7,10 @@ physics-free and can run in parallel. Keep `pytest` / `ruff` / `mypy` green and 
 
 ## Active beat — byproducts + temperature axis
 
-- [ ] Add `esters` and `fusels` to `wine_schema` and `beer_schema` as **produced-only
-      pools** (`VarSpec.default = 0.0`, the D-16 pattern). No pack-site churn.
+- [x] Add `esters` and `fusels` to `wine_schema` and `beer_schema` as **produced-only
+      pools** (`VarSpec.default = 0.0`, the D-16 pattern). Both canonical `compile`
+      builders updated to list them (D-16 precedent); no fixture churn. Tier-1 suite +
+      §2.2 trio + conservation stay green (193 passed, 1 skipped).
 - [ ] `FuselAlcoholsEhrlich` Process + unit test — additive, produced-only, monotone in
       T, togglable-off. Ehrlich pathway (amino-acid-derived); flag the non-monotonic-N
       simplification.

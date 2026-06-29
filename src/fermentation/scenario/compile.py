@@ -114,7 +114,8 @@ def _wine_initial(
     # must_fermentable_fraction corrects brix_to_sugar_gpl so a 24 Brix must loads
     # realistic fermentable sugar (~245 g/L, not 264) and the wine ABV is realistic
     # (decision D-16). Absent ⇒ 1.0 (no correction), so older parameter sets still
-    # compile. Produced-only pools (X_dead, Gly, Byp) default to 0 (see VarSpec).
+    # compile. Produced-only pools (X_dead, Gly, Byp, esters, fusels) default to 0
+    # (see VarSpec) and so start empty at pitch.
     fermentable_fraction = (
         parameters["must_fermentable_fraction"].value
         if "must_fermentable_fraction" in parameters
@@ -131,6 +132,8 @@ def _wine_initial(
         "X_dead": 0.0,  # no inactivated biomass at pitch
         "Gly": 0.0,  # no byproducts at pitch (decision D-16)
         "Byp": 0.0,
+        "esters": 0.0,  # produced-only aroma pools, empty at pitch (decision D-19)
+        "fusels": 0.0,
     }
 
 
@@ -151,6 +154,8 @@ def _beer_initial(
         "X_dead": 0.0,  # no inactivated biomass at pitch
         "Gly": 0.0,  # beer carries zero byproduct diversion in M1 (decision D-16)
         "Byp": 0.0,
+        "esters": 0.0,  # produced-only aroma pools, empty at pitch (decision D-19)
+        "fusels": 0.0,
     }
 
 

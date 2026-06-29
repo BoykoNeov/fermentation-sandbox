@@ -27,12 +27,18 @@ The shared variables (decisions D-B / D-4):
     Gly    glycerol              g/L (realised-yield byproduct sink — decision D-16)
     Byp    minor byproducts      g/L (lumped organic acids / higher alcohols,
                                  carbon-accounted as succinic acid — decision D-16)
+    esters esters                g/L (aroma byproducts; lumped produced-only pool)
+    fusels fusel/higher alcohols g/L (Ehrlich pathway; lumped produced-only pool)
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
-``X_dead``, ``Gly`` and ``Byp`` are *produced-only* pools — always zero at pitch
-and only accumulated by the kinetics — so they declare a default initial of 0
-(`VarSpec.default`) and need not be named at every initial-condition call site.
+``X_dead``, ``Gly``, ``Byp``, ``esters`` and ``fusels`` are *produced-only* pools —
+always zero at pitch and only accumulated by the kinetics — so they declare a default
+initial of 0 (`VarSpec.default`) and need not be named at every initial-condition call
+site. The ``esters``/``fusels`` pools are added in the Milestone-2 byproducts beat as
+empty slots; the Processes that fill them, their representative-species choice, and how
+their (trace) carbon is accounted against the ``Byp`` succinic sink without double-count
+are settled in that beat (decision D-19).
 """
 
 from __future__ import annotations
@@ -73,6 +79,18 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             "g/L",
             default=0.0,
             description="minor byproducts (organic acids/higher alcohols; succinic-equivalent)",
+        ),
+        VarSpec(
+            "esters",
+            "g/L",
+            default=0.0,
+            description="esters (fermentation aroma; lumped produced-only pool)",
+        ),
+        VarSpec(
+            "fusels",
+            "g/L",
+            default=0.0,
+            description="fusel / higher alcohols (Ehrlich pathway; lumped produced-only pool)",
         ),
     ]
 
