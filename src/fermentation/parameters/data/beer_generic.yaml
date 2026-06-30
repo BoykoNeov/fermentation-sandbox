@@ -315,3 +315,38 @@ E_a_fusels:
     source: "brewing consensus (warmer => accelerated Ehrlich amino-acid conversion => more fusels; ester/fusel ratio rises with T). No fusel kinetic model of our form sourced (de Andres-Toro has no fusel term)"
     conditions: "ale yeast; equivalent Arrhenius activation energy at T_ref = 293.15 K"
     notes: "Temperature sensitivity of Ehrlich fusel formation (Q10 ~ 2.6 near 20 C), held ABOVE E_a_uptake so total fusels rise with T, and slightly BELOW E_a_esters because warmth shifts the balance toward esters (the fusel/ester ratio falls with T). Identical to the wine value. ORDERING (> E_a_uptake) is the sourced, load-bearing constraint; the exact magnitude is speculative and banded - the weakest-sourced E_a (no kinetic source measures a fusel activation energy in our form)."
+
+# -- ESTER VOLATILIZATION (gas-stripping sink, decision D-20) ------------------
+# The same CO2-stripping sink as wine (EsterVolatilization: liquid `esters` -> the
+# `esters_gas` headspace pool on the evolving-CO2 stream), but parameterised for the
+# OPPOSITE net direction. The net liquid-ester response is synthesis (E_a_esters) MINUS
+# stripping (E_a_ester_volatil); near QSS [esters] ~ (k_ester/k_ester_volatil) *
+# f_synth(T)/f_volatil(T).
+#
+# BEER: E_a_ester_volatil is held BELOW E_a_esters so SYNTHESIS dominates and liquid
+# esters RISE with temperature - the classic warm-ale ester character (de Andres-Toro
+# 1998 tie ethyl acetate to the strongly T-sensitive growth rate, read via Pilarski &
+# Gerogiorgis 2022 doi:10.3390/pr10112400). This is the deliberate per-medium split from
+# wine (where E_a_ester_volatil > E_a_esters and liquid esters FALL with T): the same
+# mechanism, opposite direction, set entirely by the E_a balance. Magnitude speculative;
+# only the per-medium ordering relative to E_a_esters is sourced. Verified empirically
+# at 14/20/25 C: beer liquid esters rise with T.
+k_ester_volatil:
+  value: 2.0e-3
+  unit: "L/(g*h)"   # d(esters)/dt -= k * X*S/(K_su+S) * f(T) * esters; stripping coeff per unit flux per unit liquid ester
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "order-of-magnitude target; sets QSS liquid ester ~ k_ester/k_ester_volatil ~ 0.2 g/L at T_ref" }
+  provenance:
+    source: "author estimate; no kinetic source measures a CO2-stripping coefficient in our per-flux form. Mechanism (volatile esters carried off on the evolving-CO2 stream) is general; the warm-ale ester rise it must preserve is de Andres-Toro et al. 1998 (read via Pilarski & Gerogiorgis 2022, doi:10.3390/pr10112400)"
+    conditions: "ale yeast; ester stripping coupled to the CO2-evolution (fermentative-flux) proxy, first-order in liquid ester"
+    notes: "Read by EsterVolatilization. Stripping coefficient per unit fermentative flux per unit liquid ester. SPECULATIVE order-of-magnitude target - a flux-coupled stand-in for a full gas-liquid (Henry's-law) balance the model does not carry. Held weaker than wine's so beer synthesis (E_a_esters > E_a_ester_volatil) clearly wins; only mechanism + per-medium E_a ordering are sourced, not magnitude."
+
+E_a_ester_volatil:
+  value: 40000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 20000.0, high: 75000.0, note: "BEER: held BELOW E_a_esters (80,000) so synthesis outruns stripping and liquid esters RISE with T (de Andres-Toro)" }
+  provenance:
+    source: "Direction sourced from de Andres-Toro et al. 1998 (ester formation rides the strongly T-sensitive growth rate; warm ales are estery), read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400) Table 1. Magnitude generic"
+    conditions: "ale yeast; equivalent Arrhenius T-sensitivity of CO2-stripping ester loss at T_ref = 293.15 K"
+    notes: "Held BELOW E_a_esters (80,000 J/mol) - the LOAD-BEARING, sourced ordering for BEER: synthesis is more T-sensitive than stripping, so beer liquid esters RISE with temperature (warm-ale ester character, de Andres-Toro). This is the deliberate OPPOSITE of wine, where E_a_ester_volatil > E_a_esters and liquid esters fall with T (Rollero 2014). The magnitude is generic/speculative (no source measures a stripping activation energy in our form); only the per-medium ordering relative to E_a_esters is sourced and load-bearing. Verified empirically (14/20/25 C) to keep beer liquid esters rising with T."

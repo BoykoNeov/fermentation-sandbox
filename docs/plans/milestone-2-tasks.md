@@ -40,18 +40,27 @@ physics-free and can run in parallel. Keep `pytest` / `ruff` / `mypy` green and 
       wine *liquid* ester fall with T is largely EVAPORATION — a volatilization sink the
       model omits; for wine the warmer⇒more-aroma direction is carried by FUSELS. Full
       record in **DECISIONS → D-19 sourcing step**. 214 green, ruff + mypy clean.
-- [ ] Add a multi-temperature comparison; **unskip & pass
-      `test_lower_temperature_is_slower_but_cleaner`** (lower T ⇒ longer to dryness AND
-      fewer esters+fusels). Confirm the §2.2 trio + carbon conservation stay green.
-      **Direction already verified empirically** (scratch run): wine 14 °C→15.8 d/0.141 g/L
-      vs 25 °C→5.4 d/0.186 g/L; beer 14 °C→10.8 d/0.111 g/L vs 25 °C→4.4 d/0.147 g/L —
-      slower AND cleaner when colder, both media, at dryness and at run end.
-      ⚠ **OWNER DECISION POINT first (D-19):** the combined esters+fusels total still
-      rises with T (passable), but the *wine-ester* half of the premise is confounded by
-      evaporation — unskipping it honestly for wine may want a **volatilization/gas-
-      stripping sink** (future work) before this checkbox.
-- [x] Record outcomes in **DECISIONS D-19** (sourcing-step subsection added). Remaining:
-      update `milestone-2-plan.md` + ARCHITECTURE when the benchmark checkbox closes.
+- [x] **OWNER DECISION (2026-06-30): chose option (B)** — build the volatilization /
+      gas-stripping sink *first*, then unskip the benchmark honestly (rather than pass the
+      combined-total premise as-was). Landed as **decision D-20**.
+- [x] **Volatilization / gas-stripping sink — `EsterVolatilization` (decision D-20).**
+      New bookkeeping pool `esters_gas` (headspace) + a Process that strips liquid
+      `esters` into it on the CO₂-evolution (fermentative-flux) proxy, first-order in
+      liquid ester, **carbon-neutral** (`esters`→`esters_gas`, both ethyl acetate; weighted
+      in `total_carbon` like evolved CO₂ → closure stays machine-precision). Activation
+      energy `E_a_ester_volatil` set **per medium** (the load-bearing split): wine
+      `> E_a_esters` ⇒ liquid esters **fall** with T (Rollero 2014 inversion); beer
+      `< E_a_esters` ⇒ liquid esters **rise** with T (de Andrés-Toro warm-ale character).
+      Esters-only (fusels far less volatile). Schema 11/13→12/14; isolable in
+      `_BYPRODUCT_PROCESSES`. New params `k_ester_volatil`/`E_a_ester_volatil` (both media,
+      all speculative). Verified empirically @ 14/20/25 °C.
+- [x] **Unskipped & passing `test_lower_temperature_is_slower_but_cleaner`** — rewritten
+      honest **per medium** (not a combined total, which would hide the wine inversion):
+      both media slower-to-dryness + fewer **fusels** when colder; **beer** liquid esters
+      fewer when colder; **wine** liquid esters *more* when colder (the D-20 inversion).
+      §2.2 trio + carbon conservation stay green. **222 passed**, ruff + format + mypy clean.
+- [x] Record outcomes in **DECISIONS D-20**. Remaining for this beat: update
+      `milestone-2-plan.md` + ARCHITECTURE if/when the schema-pool count is referenced there.
 
 ## Done — carbon-accounting option (a)/a1 (decision D-19)
 

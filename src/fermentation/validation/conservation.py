@@ -81,6 +81,14 @@ def total_carbon(
         w[schema.slice("esters")] = carbon_mass_fraction("ethyl_acetate")
     if "fusels" in schema:
         w[schema.slice("fusels")] = carbon_mass_fraction("isoamyl_alcohol")
+    # Volatilized esters (decision D-20): the EsterVolatilization sink moves carbon
+    # from the liquid ``esters`` pool into this headspace pool as CO2 strips it, so it
+    # must be weighted at the *same* ethyl-acetate fraction or that liquid→gas transfer
+    # would read as carbon destroyed. This mirrors how evolved ``CO2`` stays counted —
+    # the carbon leaves the liquid but not the ledger, so closure holds to machine
+    # precision while wine's liquid esters honestly fall with temperature.
+    if "esters_gas" in schema:
+        w[schema.slice("esters_gas")] = carbon_mass_fraction("ethyl_acetate")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(

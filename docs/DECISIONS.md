@@ -925,6 +925,91 @@ deliberate M1-band review.
    premise is confounded by evaporation; unskipping it honestly for wine may want the
    volatilization sink first. **Owner decision point** before that checkbox.
 
+### D-20 — ester volatilization (gas-stripping) sink; benchmark unskipped (2026-06-30)
+
+**Owner decision: option (B).** At the D-19 decision point the owner chose to **build the
+volatilization / gas-stripping sink first**, then unskip
+`test_lower_temperature_is_slower_but_cleaner` honestly — rather than pass the benchmark
+on the combined esters+fusels total (option A), which would have hidden the wine-ester
+inversion D-19 surfaced. This closes the byproducts beat.
+
+**What was built.** A new produced-only bookkeeping pool **`esters_gas`** (volatilized
+esters in the headspace) and a Process **`EsterVolatilization`** that strips liquid
+`esters` into it:
+
+```
+d(esters)/dt   -= k_ester_volatil · X·S_total/(K_sugar_uptake+S_total) · f(T) · esters
+d(esters_gas)/dt += (same)        with f(T) = arrhenius_factor(T, E_a_ester_volatil, T_ref)
+```
+
+It rides the **same fermentative-flux proxy** as the CO₂ evolution that does the stripping
+(`_fermentative_flux_shape`), is **first-order in the liquid ester present**, and **stops
+when fermentation stops** (`flux → 0` at dryness — a deliberate omission of slow passive
+post-ferment evaporation, keeping the sink a clean function of the gas stream). Esters-only:
+isoamyl alcohol (bp ~131 °C) is far less volatile than ethyl acetate (~77 °C), so fusels
+stay the warmer⇒more-aroma carrier (Rollero 2014).
+
+**Carbon — a neutral liquid→gas transfer (no sugar draw).** Unlike `EsterSynthesis`/
+`FuselAlcoholsEhrlich` (which draw fresh sugar, a1/D-19), this Process moves carbon already
+in `esters` into `esters_gas`, both booked as ethyl acetate. It touches `esters`/`esters_gas`
+only — never `S`/`E`/`CO2`. `total_carbon` weights `esters_gas` at the same ethyl-acetate
+fraction (the ester analogue of how evolved `CO2` stays counted: carbon leaves the liquid,
+not the ledger), so closure stays at **machine precision** while wine's liquid esters
+honestly fall with T. `esters` is clamped ≥ 0 so a solver undershoot can't strip a negative
+pool into spurious gas.
+
+**The per-medium E_a split (the load-bearing parameterisation, and the trap avoided).**
+Near quasi-steady-state `[esters] ∝ f_synth(T)/f_volatil(T)` — the shared flux cancels, so
+the *direction* is set purely by which activation energy is larger. With `E_a_ester_volatil`
+sourced **per medium** (separate YAMLs), both directions are honest, captured by the E_a
+balance not by two code paths:
+
+| medium | `E_a_ester_volatil` vs `E_a_esters` | net liquid-ester direction | source |
+|--------|-------------------------------------|----------------------------|--------|
+| wine   | **above** (130k > 80k)              | **falls** with T (inversion) | Rollero 2014 — "evaporation largely accounted for the effect of T on liquid ester accumulation" |
+| beer   | **below** (40k < 80k)               | **rises** with T            | de Andrés-Toro 1998 — ester rides the strongly-T-sensitive growth rate; warm ales are estery |
+
+A *single global* stripping E_a above `E_a_esters` would have silently inverted **beer**
+too (breaking the sourced warm-ale expectation) — the trap the per-medium split avoids.
+
+**Honesty caveat on the wine magnitude (not buried).** A pure volatility/Henry's-law Q10 is
+~2–3 (E_a ≈ 50–75 kJ/mol), which is *below* `E_a_esters` and would **not** invert on its
+own. The model's ester *synthesis* (`E_a_esters` = 80k, generic-beer-grounded, monotone-
+rising) is almost certainly **too T-sensitive for wine** (Rollero: wine ester synthesis is
+weak/non-monotonic), so `E_a_ester_volatil` is set above it to reproduce the **net observed
+liquid inversion given the rest of the model** — a lumped, *compensating* value (Q10 ~5.6),
+not a first-principles Henry's constant. All four volatilization params stay **speculative**;
+only the per-medium *ordering* relative to `E_a_esters` is sourced and load-bearing. This is
+documented in the `E_a_ester_volatil` provenance note in both YAMLs.
+
+**Empirical results (verified at 14/20/25 °C, carbon closing to machine precision each run).**
+- *Wine* liquid esters **54 → 45 → 35 mg/L** (fall with T); volatilized `esters_gas`
+  **39 → 69 → 101 mg/L** (rise — the stripped fraction); fusels **45 → 51 → 56 mg/L** (rise).
+  Total *produced* (liquid+gas) still rises with T (synthesis), as claimed.
+- *Beer* liquid esters **57 → 72 → 87 mg/L** (rise with T); fusels **37 → 41 → 46 mg/L**.
+
+**Benchmark, rewritten honest per medium.** `test_lower_temperature_is_slower_but_cleaner`
+is **unskipped** and asserts, reading the **liquid** pools only (the `esters_gas` headspace
+is not aroma in the glass): both media slower-to-dryness + fewer **fusels** when colder
+(the real "cleaner"); **beer** fewer liquid esters when colder; **wine** *more* liquid
+esters when colder (the inversion). Asserting a combined total would hide the inversion the
+sink was built to surface, so each pool's sourced direction is asserted explicitly. The unit
+test `test_integrated_byproduct_total_falls_with_temperature` (which encoded the old
+combined-total premise) is replaced by `test_integrated_wine_aroma_temperature_directions`
+with the same per-pool checks as the E_a-ordering regression guard.
+
+**Scope / impact.** Schema grows 11→12 (wine) and 13→14 (beer). §2.2 trio unmoved (the sink
+is inert at the 20 °C benchmark relative to the bands; it moves carbon between two trace
+pools, never touching `S`/`E`/`CO2`). Isolable (prime directive #3): `EsterVolatilization`
+lives in the `_BYPRODUCT_PROCESSES` tuple, so the validated core is still the ProcessSet
+built without it. **222 tests green** (was 214; +8 net incl. the now-live benchmark), ruff +
+format + mypy clean.
+
+**Still future work (recorded, not built here).** The flux-coupled stripping is a stand-in
+for a full gas–liquid (Henry's-law) balance (cf. Mouret's MODAPEC, Morakul et al.); a
+principled model would carry the partition coefficient explicitly and let passive
+evaporation continue after the cap goes on. The `esters_gas` pool is the hook for that.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

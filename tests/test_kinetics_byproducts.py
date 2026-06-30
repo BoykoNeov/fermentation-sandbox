@@ -12,9 +12,15 @@ built without them; enabling them perturbs only ``dS`` — never ``dX``/``dN``/`
 Ehrlich pathway plus tier propagation (the fusel form is speculative; the ester form
 is plausible but its placeholder rate params cap its output at speculative).
 
-The run-integrated "cleaner when colder" direction (lower T ⇒ fewer total
-esters+fusels) is the *benchmark's* job (``test_lower_temperature_is_slower_but_\
-cleaner``); these unit tests cover the per-Process mechanics it rests on.
+:class:`EsterVolatilization` (decision D-20) adds the CO2-stripping sink that moves
+liquid ``esters`` into the ``esters_gas`` headspace pool — the physics behind wine's
+*falling* liquid ester with warmth (Rollero 2014). Its tests pin the carbon-neutral
+liquid→gas transfer (no sugar draw), the flux/temperature dependence, and the clamp.
+
+The run-integrated "cleaner when colder" direction is the *benchmark's* job
+(``test_lower_temperature_is_slower_but_cleaner``); these unit tests cover the
+per-Process mechanics it rests on, plus the honest per-pool temperature directions
+(fusels rise with T; wine liquid esters fall, beer liquid esters rise).
 """
 
 import numpy as np
@@ -23,6 +29,7 @@ import pytest
 from fermentation.core.chemistry import carbon_mass_fraction
 from fermentation.core.kinetics import (
     EsterSynthesis,
+    EsterVolatilization,
     FuselAlcoholsEhrlich,
     GrowthNitrogenLimited,
     SugarUptakeToEthanolCO2,
@@ -218,6 +225,96 @@ def test_fusel_zero_without_biomass_or_sugar(params):
     ] == pytest.approx(0.0)
 
 
+# -- ester volatilization (gas-stripping sink, decision D-20) -----------------
+
+
+def _wine_y0_with_esters(schema: StateSchema, *, esters: float, **kw) -> FloatArray:
+    """A wine state with the liquid ``esters`` pool pre-loaded (the sink needs ester to
+    strip; the produced-only pool is 0 at pitch so it must be set explicitly here)."""
+    y = _wine_y0(schema, **kw)
+    y[schema.slice("esters")] = esters
+    return y
+
+
+def test_volatilization_metadata():
+    p = EsterVolatilization()
+    assert p.name == "ester_volatilization"
+    # Plausible *form* (CO2 stripping is well-understood physics); speculative params cap it.
+    assert p.tier is Tier.PLAUSIBLE
+    # A pure liquid->gas transfer: touches the liquid pool and the headspace pool only —
+    # never S/E/CO2 (it draws no fresh sugar, unlike synthesis).
+    assert set(p.touches) == {"esters", "esters_gas"}
+    assert set(p.reads) == {"k_ester_volatil", "K_sugar_uptake", "E_a_ester_volatil", "T_ref"}
+
+
+def test_volatilization_derivative_matches_closed_form(params):
+    schema = wine_schema()
+    x, s, t, est = 2.0, 200.0, 293.15, 0.1
+    y = _wine_y0_with_esters(schema, esters=est, x=x, s=s, t=t)
+    d = EsterVolatilization().derivatives(0.0, y, schema, params)
+
+    flux = x * (s / (params["K_sugar_uptake"] + s))
+    f_t = arrhenius_factor(t, params["E_a_ester_volatil"], params["T_ref"])
+    rate = params["k_ester_volatil"] * flux * f_t * est
+    # Liquid loses exactly what the headspace gains — a carbon-neutral transfer.
+    assert schema.get(d, "esters") == pytest.approx(-rate)
+    assert schema.get(d, "esters_gas") == pytest.approx(rate)
+    # Both pools book as ethyl acetate, so the per-RHS carbon residual is exactly zero.
+    carbon_residual = schema.get(d, "esters") * _ESTER_C + schema.get(d, "esters_gas") * _ESTER_C
+    assert carbon_residual == pytest.approx(0.0, abs=0.0)
+    # No fresh sugar drawn, no ethanol/CO2 touched — unlike synthesis (which routes from S).
+    for var in ("X", "S", "E", "N", "CO2", "fusels"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_volatilization_zero_without_liquid_ester(params):
+    # Nothing in the liquid pool to strip ⇒ no flux into the headspace.
+    schema = wine_schema()
+    d = EsterVolatilization().derivatives(0.0, _wine_y0(schema), schema, params)  # esters=0
+    assert np.array_equal(d, schema.zeros())
+
+
+def test_volatilization_zero_without_fermentative_flux(params):
+    # Stripping rides the CO2-evolution (fermentative-flux) proxy: no flux (no biomass or
+    # no sugar) ⇒ no stripping, so liquid esters freeze once the ferment dies (the
+    # deliberate "no passive post-ferment evaporation" simplification).
+    schema = wine_schema()
+    assert np.array_equal(
+        EsterVolatilization().derivatives(
+            0.0, _wine_y0_with_esters(schema, esters=0.1, x=0.0), schema, params
+        ),
+        schema.zeros(),
+    )
+    assert np.array_equal(
+        EsterVolatilization().derivatives(
+            0.0, _wine_y0_with_esters(schema, esters=0.1, s=0.0), schema, params
+        ),
+        schema.zeros(),
+    )
+
+
+def test_volatilization_rises_with_temperature(params):
+    # The stripping rate per unit liquid ester rises with temperature (volatility climbs):
+    # the snapshot property behind the wine inversion (warmer strips more).
+    schema = wine_schema()
+    cold = EsterVolatilization().derivatives(
+        0.0, _wine_y0_with_esters(schema, esters=0.1, t=283.15), schema, params
+    )
+    warm = EsterVolatilization().derivatives(
+        0.0, _wine_y0_with_esters(schema, esters=0.1, t=303.15), schema, params
+    )
+    assert schema.get(warm, "esters_gas") > schema.get(cold, "esters_gas") > 0.0
+
+
+def test_volatilization_negative_ester_does_not_strip(params):
+    # A solver undershoot (esters < 0) must not flip the clamp into spurious gas creation.
+    schema = wine_schema()
+    d = EsterVolatilization().derivatives(
+        0.0, _wine_y0_with_esters(schema, esters=-1e-6), schema, params
+    )
+    assert np.array_equal(d, schema.zeros())
+
+
 # -- integration-level properties ---------------------------------------------
 
 
@@ -232,6 +329,7 @@ def test_both_run_strict_and_stay_nonnegative(params):
             SugarUptakeToEthanolCO2(),
             EsterSynthesis(),
             FuselAlcoholsEhrlich(),
+            EsterVolatilization(),
         ],
         strict=True,
     )
@@ -239,14 +337,18 @@ def test_both_run_strict_and_stay_nonnegative(params):
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 400.0))
     assert traj.success
     # S is now also drawn by the byproduct Processes (a1) — it must stay non-negative
-    # too: the proportional draw vanishes as a slot empties, so it cannot overshoot.
-    assert_nonnegative(traj, ("esters", "fusels", "S"), atol=1e-12)
-    # The aroma pools actually accumulate (the mechanisms are live).
+    # too: the proportional draw vanishes as a slot empties, so it cannot overshoot. The
+    # liquid esters pool, drawn down by the volatilization sink, must also stay >= 0.
+    assert_nonnegative(traj, ("esters", "fusels", "esters_gas", "S"), atol=1e-12)
+    # The aroma pools actually accumulate (the mechanisms are live), and the sink fills
+    # the headspace pool from the liquid esters it strips (D-20).
     assert float(traj.series("esters")[-1]) > 0.0
     assert float(traj.series("fusels")[-1]) > 0.0
+    assert float(traj.series("esters_gas")[-1]) > 0.0
     # Trace, as expected — orders of magnitude below the g/L ethanol flux.
     assert float(traj.series("esters")[-1]) < 1.0
     assert float(traj.series("fusels")[-1]) < 1.0
+    assert float(traj.series("esters_gas")[-1]) < 1.0
 
 
 def test_byproducts_perturb_only_sugar_and_close_carbon_per_rhs(params):
@@ -333,6 +435,7 @@ def test_total_carbon_closes_with_byproducts_on(params, store):
             SugarUptakeToEthanolCO2(),
             EsterSynthesis(),
             FuselAlcoholsEhrlich(),
+            EsterVolatilization(),
         ],
         strict=True,
     )
@@ -341,9 +444,12 @@ def test_total_carbon_closes_with_byproducts_on(params, store):
     assert traj.success
     f_c = store.value("biomass_C_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
-    # Closure is non-trivial only because the pools actually accumulated.
+    # Closure is non-trivial only because the pools actually accumulated — including the
+    # volatilized-ester headspace pool, whose carbon must stay counted (D-20) or the
+    # liquid→gas transfer would read as destroyed.
     assert float(traj.series("esters")[-1]) > 0.0
     assert float(traj.series("fusels")[-1]) > 0.0
+    assert float(traj.series("esters_gas")[-1]) > 0.0
 
 
 def test_total_carbon_closes_with_byproducts_on_beer_multislot():
@@ -363,6 +469,7 @@ def test_total_carbon_closes_with_byproducts_on_beer_multislot():
             SugarUptakeToEthanolCO2(),
             EsterSynthesis(),
             FuselAlcoholsEhrlich(),
+            EsterVolatilization(),
         ],
         strict=True,
     )
@@ -375,19 +482,21 @@ def test_total_carbon_closes_with_byproducts_on_beer_multislot():
     f_c = store.value("biomass_C_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
     # The proportional draw must vanish as each slot empties (glucose first under
-    # sequential uptake), so no sugar slot is driven negative.
-    assert_nonnegative(traj, ("S", "esters", "fusels"), atol=1e-9)
+    # sequential uptake), so no sugar slot is driven negative; the volatilization sink
+    # keeps the liquid esters pool non-negative as it strips into the headspace pool.
+    assert_nonnegative(traj, ("S", "esters", "fusels", "esters_gas"), atol=1e-9)
     assert float(traj.series("esters")[-1]) > 0.0
     assert float(traj.series("fusels")[-1]) > 0.0
+    assert float(traj.series("esters_gas")[-1]) > 0.0
 
 
-# -- integrated falls-with-temperature property (the load-bearing constraint) --
+# -- integrated temperature directions (the load-bearing E_a-ordering guards) --
 
 
 def _wine_run_to_dryness(celsius: float, duration_days: float):
-    """Compile + run the wine medium isothermally; return (reached_dryness, total
-    esters+fusels at run end). End-of-run total ≈ total at dryness because byproduct
-    production stops once the flux dies with the sugar."""
+    """Compile + run the wine medium isothermally; return (reached_dryness, pools) where
+    ``pools`` is a dict of end-of-run liquid esters / fusels / volatilized esters_gas.
+    End-of-run ≈ at-dryness because byproduct production stops once the flux dies."""
     sc = Scenario(
         name=f"wine-{celsius}C",
         medium="wine",
@@ -399,24 +508,42 @@ def _wine_run_to_dryness(celsius: float, duration_days: float):
     traj = simulate(compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h)
     assert traj.success, traj.message
     reached_dryness = float(traj.series("S")[-1]) <= 2.0
-    total_byproducts = float(traj.series("esters")[-1]) + float(traj.series("fusels")[-1])
-    return reached_dryness, total_byproducts
+    pools = {
+        "esters": float(traj.series("esters")[-1]),
+        "fusels": float(traj.series("fusels")[-1]),
+        "esters_gas": float(traj.series("esters_gas")[-1]),
+    }
+    return reached_dryness, pools
 
 
-def test_integrated_byproduct_total_falls_with_temperature():
-    # THE load-bearing property and the regression guard for the E_a ordering: the
-    # snapshot "rises with T" tests above pass for *any* positive E_a, but the
-    # run-integrated total only falls with temperature when each byproduct E_a
-    # exceeds E_a_uptake (the total scales as exp(-(ΔE_a/R)(1/T - 1/T_ref)); the flux
-    # integral to dryness is fixed). If the sourcing step ever drops an E_a toward
-    # E_a_uptake, this fails — *before* the formal benchmark is unskipped. Both runs
-    # must reach dryness (else the comparison is meaningless), so the colder run gets
-    # a generous duration. Mirrors test_lower_temperature_is_slower_but_cleaner.
-    cold_dry, cold_total = _wine_run_to_dryness(14.0, 60.0)
-    warm_dry, warm_total = _wine_run_to_dryness(25.0, 21.0)
+def test_integrated_wine_aroma_temperature_directions():
+    # THE load-bearing regression guard for the per-pool E_a ordering (decisions D-19 +
+    # D-20). The snapshot "rises with T" tests pass for *any* positive E_a; only the
+    # run-integrated pools encode the ordering that matters. The HONEST wine picture
+    # (post-D-20), not a combined total that would hide the ester inversion:
+    #   * FUSELS rise with T (E_a_fusels > E_a_uptake) — the "cleaner when colder"
+    #     direction for the harsh higher alcohols; carries warmer⇒more-aroma for wine.
+    #   * LIQUID esters FALL with T — the inversion: ester volatilization
+    #     (E_a_ester_volatil > E_a_esters) strips them faster than synthesis makes them,
+    #     so the warm ferment's esters end up in the gas, not the wine (Rollero 2014).
+    #   * VOLATILIZED esters_gas rises with T — the stripped fraction the headspace
+    #     pool catches, and the proof the inversion is evaporation, not lost synthesis.
+    # If the sourcing ever drops an E_a below the partner it must exceed, one of these
+    # fails *before* the formal benchmark is unskipped. Both runs must reach dryness.
+    cold_dry, cold = _wine_run_to_dryness(14.0, 90.0)
+    warm_dry, warm = _wine_run_to_dryness(25.0, 30.0)
     assert cold_dry and warm_dry, "both temperatures must reach dryness to compare"
-    assert 0.0 < cold_total < warm_total, (
-        f"colder ferment should be cleaner: cold {cold_total:.4f} vs warm {warm_total:.4f} g/L"
+    assert 0.0 < cold["fusels"] < warm["fusels"], (
+        f"fusels should rise with T (cleaner cold): cold {cold['fusels']:.4f} vs "
+        f"warm {warm['fusels']:.4f} g/L"
+    )
+    assert 0.0 < warm["esters"] < cold["esters"], (
+        f"wine LIQUID esters should fall with T (volatilization inversion, D-20): "
+        f"cold {cold['esters']:.4f} vs warm {warm['esters']:.4f} g/L"
+    )
+    assert 0.0 < cold["esters_gas"] < warm["esters_gas"], (
+        f"volatilized esters_gas should rise with T (more stripping when warm): "
+        f"cold {cold['esters_gas']:.4f} vs warm {warm['esters_gas']:.4f} g/L"
     )
 
 
@@ -440,3 +567,12 @@ def test_fusel_form_is_speculative_regardless_of_params():
     schema = wine_schema()
     ps = ProcessSet(schema, [FuselAlcoholsEhrlich()])
     assert ps.tier_of("fusels") is Tier.SPECULATIVE
+
+
+def test_volatilization_tier_capped_by_placeholder_params(store):
+    # Like EsterSynthesis: the gas-stripping *form* is plausible, but its speculative
+    # rate params cap the esters_gas output at speculative (parameter-tier propagation).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [EsterVolatilization()])
+    assert ps.tier_of("esters_gas") is Tier.PLAUSIBLE
+    assert ps.tier_of("esters_gas", store.tier_map()) is Tier.SPECULATIVE

@@ -54,6 +54,7 @@ from dataclasses import dataclass, field
 from fermentation.core.kinetics import (
     ArrheniusTemperature,
     EsterSynthesis,
+    EsterVolatilization,
     EthanolInactivation,
     FuselAlcoholsEhrlich,
     GrowthNitrogenLimited,
@@ -98,6 +99,13 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             "g/L",
             default=0.0,
             description="fusel / higher alcohols (Ehrlich pathway; lumped produced-only pool)",
+        ),
+        VarSpec(
+            "esters_gas",
+            "g/L",
+            default=0.0,
+            description="esters lost to the headspace by CO2 stripping (volatilized; "
+            "carbon-bookkeeping pool, decision D-20)",
         ),
     ]
 
@@ -192,9 +200,19 @@ _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: sugar (~0.2 % of ``S0``), perturbing only ``dS`` (never ``dE``/``dCO2``). Carbon
 #: still closes to machine precision with them on, and the §2.2 trio stays in band.
 #: See D-19 / milestone-2-tasks.md.
+#:
+#: :class:`EsterVolatilization` (decision D-20) is the gas-stripping sink that moves
+#: liquid ``esters`` into the bookkeeping ``esters_gas`` headspace pool as CO2 sparges
+#: the must — the physics behind wine's "warmer ⇒ *less* liquid ester" (Rollero 2014):
+#: with ``E_a_ester_volatil`` set *per medium* it is held **above** ``E_a_esters`` for
+#: wine (stripping outruns synthesis, liquid esters fall with T) and **below** it for
+#: beer (synthesis dominates, esters rise with T — de Andrés-Toro). The transfer is
+#: carbon-neutral (``esters`` → ``esters_gas``, both booked as ethyl acetate), so it is
+#: in this isolable tuple too and ``total_carbon`` still closes to machine precision.
 _BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterSynthesis,
     FuselAlcoholsEhrlich,
+    EsterVolatilization,
 )
 
 

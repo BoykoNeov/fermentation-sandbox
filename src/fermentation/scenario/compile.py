@@ -134,6 +134,7 @@ def _wine_initial(
         "Byp": 0.0,
         "esters": 0.0,  # produced-only aroma pools, empty at pitch (decision D-19)
         "fusels": 0.0,
+        "esters_gas": 0.0,  # volatilized-ester bookkeeping pool, empty at pitch (D-20)
     }
 
 
@@ -156,6 +157,7 @@ def _beer_initial(
         "Byp": 0.0,
         "esters": 0.0,  # produced-only aroma pools, empty at pitch (decision D-19)
         "fusels": 0.0,
+        "esters_gas": 0.0,  # volatilized-ester bookkeeping pool, empty at pitch (D-20)
     }
 
 

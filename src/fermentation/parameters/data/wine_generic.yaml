@@ -425,3 +425,39 @@ E_a_fusels:
     source: "Direction sourced from primary wine data (Mouret 2015, doi:10.1016/j.bej.2015.07.017: higher alcohols generally produced in larger amounts at higher temperature) + brewing/enology consensus (warmer => accelerated Ehrlich amino-acid conversion => more fusels). No fusel kinetic model of our form exists (de Andres-Toro has no fusel term)"
     conditions: "S. cerevisiae wine; equivalent Arrhenius activation energy at T_ref = 293.15 K"
     notes: "Sets the temperature sensitivity of Ehrlich fusel formation (Q10 ~ 2.6 near 20 C; +36% per 15 C). Held ABOVE E_a_uptake (55,100 J/mol) so total fusels rise with T (section header), and slightly BELOW E_a_esters because warmth shifts the balance toward esters (the fusel/ester ratio falls with T). This is the FUSEL half of the wine benchmark direction - and unlike the wine esters (whose warmer=>more is confounded by evaporation; see E_a_esters), the fusel direction IS supported for total production: Mouret 2015 reports higher alcohols generally rise with T (though compound-specific/non-systematic). ORDERING (> E_a_uptake) is the sourced, load-bearing constraint; the exact magnitude is speculative and banded - no kinetic source measures a fusel-formation activation energy in our form, so this is a bounded estimate, not a fit."
+
+# -- ESTER VOLATILIZATION (gas-stripping sink, decision D-20) ------------------
+# The sink D-19 logged as future work, now built (EsterVolatilization). It moves liquid
+# `esters` into the `esters_gas` headspace pool on the evolving-CO2 stream, so the NET
+# wine liquid-ester temperature response is synthesis (E_a_esters) MINUS stripping
+# (E_a_ester_volatil). Near quasi-steady-state [esters] ~ (k_ester/k_ester_volatil) *
+# f_synth(T)/f_volatil(T) (the shared fermentative flux cancels), so the DIRECTION is set
+# purely by which E_a is larger and the LEVEL by the rate ratio.
+#
+# WINE: E_a_ester_volatil is held ABOVE E_a_esters so stripping outruns synthesis and
+# liquid esters FALL with temperature - the Rollero 2014 (doi:10.1007/s00253-014-6210-9)
+# finding ("evaporation largely accounted for the effect of temperature on the
+# accumulation of esters in liquid"). This is the half of the wine aroma picture that NO
+# value of E_a_esters could reproduce (see E_a_esters note). The MAGNITUDE stays
+# speculative (no kinetic source measures a CO2-stripping coefficient in our per-flux
+# form); only the ordering (E_a_ester_volatil > E_a_esters, for wine) is load-bearing.
+# Verified empirically at 14/20/25 C: wine liquid esters fall with T while fusels rise.
+k_ester_volatil:
+  value: 8.0e-3
+  unit: "L/(g*h)"   # d(esters)/dt -= k * X*S/(K_su+S) * f(T) * esters; stripping coeff per unit flux per unit liquid ester
+  tier: speculative
+  uncertainty: { low: 2.0e-3, high: 3.0e-2, note: "order-of-magnitude target; sets QSS liquid ester ~ k_ester/k_ester_volatil ~ 0.05 g/L (50 mg/L) at T_ref. Strong (most produced ester ends up stripped to gas), reflecting Rollero's evaporation-dominated picture" }
+  provenance:
+    source: "author estimate; no kinetic source measures a CO2-stripping coefficient in our per-flux form. Mechanism (volatile esters carried off on the evolving-CO2 stream) per Rollero/Mouret 2014 (doi:10.1007/s00253-014-6210-9) + Morakul et al. gas-liquid balance"
+    conditions: "S. cerevisiae wine; ester stripping coupled to the CO2-evolution (fermentative-flux) proxy, first-order in liquid ester"
+    notes: "Read by EsterVolatilization. Stripping rate per unit fermentative flux per unit liquid ester; with k_ester=4e-4/h the QSS liquid ester is ~k_ester/k_ester_volatil~0.05 g/L (50 mg/L) at T_ref - the rest of the produced ester is carried off into esters_gas, the evaporation-dominated fate Rollero 2014 reports. SPECULATIVE order-of-magnitude target - the stripping is a flux-coupled stand-in for a full gas-liquid (Henry's-law) balance the model does not carry; magnitude not sourced, only the mechanism and the per-medium E_a ordering are. Verified empirically (14/20/25 C): wine liquid esters ~54/45/35 mg/L (fall with T) while gas accumulates."
+
+E_a_ester_volatil:
+  value: 130000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 85000.0, high: 250000.0, note: "WINE: held ABOVE E_a_esters (80,000) so stripping outruns synthesis and liquid esters fall with T (Rollero 2014). Steeper than a pure Henry's-law Q10 because it must out-sensitise the model's (generic, monotone, likely-too-T-sensitive) ester SYNTHESIS - see notes" }
+  provenance:
+    source: "Direction sourced from primary wine data: Rollero/Mouret 2014 (doi:10.1007/s00253-014-6210-9) - evaporation largely accounts for the fall of liquid ester with temperature; ester volatility (Henry's-law constant) rises with temperature. Magnitude generic"
+    conditions: "S. cerevisiae wine; equivalent Arrhenius T-sensitivity of CO2-stripping ester loss at T_ref = 293.15 K"
+    notes: "Sets how steeply ester stripping rises with temperature (Q10 ~ 5.6 near 20 C). Held ABOVE E_a_esters (80,000 J/mol) - the LOAD-BEARING, sourced ordering: it is what makes wine liquid esters FALL with temperature (stripping T-sensitivity beats synthesis T-sensitivity), reproducing Rollero 2014. HONESTY CAVEAT on the magnitude: a pure volatility/Henry's-law Q10 is ~2-3 (E_a ~50-75 kJ/mol), which is BELOW E_a_esters and would NOT invert on its own. The model's ester SYNTHESIS (E_a_esters=80k, generic-beer-grounded, monotone-rising) is almost certainly too T-sensitive for wine (Rollero: wine ester synthesis is weak/non-monotonic), so this stripping E_a is set above it to reproduce the NET observed LIQUID inversion given the rest of the model - a lumped, compensating value, not a first-principles Henry's constant. WINE-SPECIFIC: beer's value is BELOW its E_a_esters (synthesis wins, warm ales are estery - de Andres-Toro). Magnitude generic/speculative; only the per-medium ordering relative to E_a_esters is sourced and load-bearing. Verified empirically (14/20/25 C) to invert wine liquid esters."

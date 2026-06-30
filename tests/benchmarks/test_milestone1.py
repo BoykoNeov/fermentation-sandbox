@@ -25,6 +25,10 @@ KINETICS_PENDING = "Milestone 1: primary-fermentation kinetics not implemented y
 #: w/v ~ 4 g/L); 2 g/L is a solidly dry wine.
 DRYNESS_GPL = 2.0
 
+#: The §2.2 wine benchmark must (Coleman low-N anchor; see test_wine_*). Shared by the
+#: dryness-window test and the Tier-2 temperature-direction benchmark.
+_WINE_BENCH = {"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25}
+
 
 def _days_to_dryness(scenario: Scenario) -> float:
     """Integrate ``scenario`` and return the day total sugar first falls to
@@ -222,8 +226,72 @@ def test_co2_integral_tracks_sugar_consumed():
     assert rate[-1] < rate[peak], "CO2 evolution rate should tail off below its peak"
 
 
-@pytest.mark.skip(reason=KINETICS_PENDING)
+def _aroma_run(medium: str, initial: dict[str, float], celsius: float, duration_days: float):
+    """Run a medium isothermally; return (days_to_dryness, liquid-pool dict).
+
+    Reads the **liquid** ``esters``/``fusels`` pools only — ``esters_gas`` is the
+    bookkeeping headspace pool (volatilized away), not aroma in the glass (D-20)."""
+    sc = Scenario(
+        name=f"{medium}-{celsius}C",
+        medium=medium,
+        initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
+        duration_days=duration_days,
+    )
+    days = _days_to_dryness(sc)
+    compiled = compile_scenario(sc, strict=True)
+    duration_h = compiled.t_span_h[1]
+    t_eval = np.linspace(0.0, duration_h, int(duration_h) + 1)
+    traj = simulate(
+        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h, t_eval=t_eval
+    )
+    assert traj.success, traj.message
+    pools = {
+        "esters": float(traj.series("esters")[-1]),
+        "fusels": float(traj.series("fusels")[-1]),
+    }
+    return days, pools
+
+
 def test_lower_temperature_is_slower_but_cleaner():
-    # Directional check: lower T -> longer time-to-dryness, fewer fusel/ester
-    # byproducts. Qualitative once byproduct Processes exist (Tier 2).
-    raise NotImplementedError
+    # The §2.2 Tier-2 directional benchmark, honest per medium (decisions D-19 + D-20).
+    # "Cleaner when colder" is real but NOT a single combined ester+fusel total: building
+    # the volatilization sink (D-20) revealed that wine LIQUID esters *invert* — they
+    # rise as T falls — because warm ferments strip esters into the headspace faster than
+    # they synthesise them (Rollero 2014). So the honest, sourced directions are:
+    #
+    #   Both media:  colder ⇒ slower to dryness, AND fewer FUSELS (the harsh higher
+    #                alcohols — the real "cleaner"; fusel synthesis rises with T).
+    #   Beer:        colder ⇒ fewer liquid esters too (synthesis-dominated; warm ales are
+    #                estery — de Andrés-Toro 1998).
+    #   Wine:        colder ⇒ MORE liquid esters (stripping-dominated inversion — the
+    #                warm ferment's esters end up volatilized, not in the wine).
+    #
+    # Reads the liquid pools only; the volatilized esters_gas headspace pool is not aroma
+    # in the glass. Asserting a combined total here would hide the wine inversion that the
+    # sink was built to surface — so we assert each pool's sourced direction explicitly.
+    wine_cold_days, wine_cold = _aroma_run("wine", _WINE_BENCH, 14.0, 90.0)
+    wine_warm_days, wine_warm = _aroma_run("wine", _WINE_BENCH, 25.0, 30.0)
+    beer_cold_days, beer_cold = _aroma_run("beer", dict(_BEER_WORT), 14.0, 40.0)
+    beer_warm_days, beer_warm = _aroma_run("beer", dict(_BEER_WORT), 25.0, 18.0)
+
+    # Slower when colder (both media must actually reach dryness for the comparison).
+    for label, cold_d, warm_d in (
+        ("wine", wine_cold_days, wine_warm_days),
+        ("beer", beer_cold_days, beer_warm_days),
+    ):
+        assert np.isfinite(cold_d) and np.isfinite(warm_d), f"{label}: both must reach dryness"
+        assert cold_d > warm_d, f"{label}: colder should be slower ({cold_d:.1f} vs {warm_d:.1f} d)"
+
+    # Cleaner when colder = fewer FUSELS, both media (the sourced "cleaner" direction).
+    assert 0.0 < wine_cold["fusels"] < wine_warm["fusels"], "wine: colder ⇒ fewer fusels"
+    assert 0.0 < beer_cold["fusels"] < beer_warm["fusels"], "beer: colder ⇒ fewer fusels"
+
+    # Beer liquid esters: synthesis-dominated, so fewer when colder too.
+    assert 0.0 < beer_cold["esters"] < beer_warm["esters"], "beer: colder ⇒ fewer liquid esters"
+
+    # Wine liquid esters: the D-20 inversion — MORE when colder (warm strips them off).
+    assert 0.0 < wine_warm["esters"] < wine_cold["esters"], (
+        "wine: liquid esters should INVERT — more when colder (volatilization-dominated, "
+        f"Rollero 2014): cold {wine_cold['esters']:.4f} vs warm {wine_warm['esters']:.4f} g/L"
+    )
