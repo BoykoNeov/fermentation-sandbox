@@ -19,6 +19,10 @@ from fermentation.core.kinetics.byproducts import (
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
+from fermentation.core.kinetics.malolactic import (
+    MalolacticConversion,
+    cardinal_temperature_factor,
+)
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 
 __all__ = [
@@ -29,6 +33,8 @@ __all__ = [
     "EthanolInhibition",
     "FuselAlcoholsEhrlich",
     "GrowthNitrogenLimited",
+    "MalolacticConversion",
     "SugarUptakeToEthanolCO2",
     "arrhenius_factor",
+    "cardinal_temperature_factor",
 ]

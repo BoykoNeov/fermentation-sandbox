@@ -1242,10 +1242,9 @@ SO₂-sensitive — the first RHS consumer of `molecular_so2`).
 
 ## D-23 — MLF v1 is conversion-only; the amino-acid ledger is a separate yeast/AF beat
 
-**Status: scoped (decided 2026-06-30); implementation deferred to a future session.** Records
-the design call for the next beat — *Oenococcus oeni* malolactic fermentation — and the
-empirical evidence that settles it. No code landed; this is the decision the implementation
-session builds against.
+**Status: scoped 2026-06-30; v1 IMPLEMENTED 2026-07-01 (see "Resolution" below).** Records
+the design call for the beat — *Oenococcus oeni* malolactic fermentation — the empirical
+evidence that settles it, and (Resolution) the open-knob choices made when v1 landed.
 
 **The fork.** MLF converts L-malic acid (C4, diprotic) to L-lactic acid (C3, monoprotic) + CO₂,
 mole-for-mole, deacidifying the wine (pH up ~0.1–0.3). The question was whether v1 should model
@@ -1319,6 +1318,72 @@ empty. More scope → more reason it is a careful separate beat, not a rider on 
   event-driven loop (deferred, see `runtime/integrate.py` docstring). Open knobs for the
   implementation session: the exact inhibition functional forms and their sourcing; whether
   `X_mlf` is explicit or folded into the rate constant.
+
+**Resolution (v1 landed 2026-07-01).** `core/kinetics/malolactic.py`
+(`MalolacticConversion`), `X_mlf` slot on `wine_schema`, `mlf_pitch_gpl` scenario input,
+the *O. oeni* parameter block in `wine_generic.yaml`, and `tests/test_malolactic.py` (13
+tests). 262 green, ruff + mypy clean, §2.2 trio unchanged. The molar turnover is
+
+    r = k_mlf · X_mlf · [malate]/(K_mlf+[malate]) · g_pH · g_EtOH · g_SO₂ · γ(T)   [mol/L/h]
+
+with `d(malic)=−r·M_malic`, `d(lactic)=+r·M_lactic`, `d(CO2)=+r·M_CO2`. Carbon *and* mass
+close on the existing ledger (4 C = 3 C + 1 C; 134.087 = 90.078 + 44.009 g/mol, a clean
+decarboxylation, no water term), so no new conservation code — verified at the RHS level
+(weighted carbon rate ≈ 0) and over a full dosed run.
+
+*The open knobs D-23 left open — chosen, all speculative-tier:*
+- **`X_mlf` explicit** (scales the rate), not folded into `k_mlf` — keeps the later
+  growth beat a clean add-a-Process extension.
+- **Temperature = a cardinal-temperature optimum** (Rosso et al. 1993 CTMI,
+  `cardinal_temperature_factor`; cardinals 8/23/37 °C), *not* a monotone Arrhenius — MLF
+  genuinely declines in the warm, which Arrhenius cannot represent (the load-bearing reason
+  D-23 named "a temperature optimum"). Peak 1 at `T_opt`, 0 outside `[T_min, T_max]`.
+- **pH gate** = smooth logistic `1/(1+10^(pH_half−pH))` (midpoint pH 3.0): rises with pH, so
+  malate→lactate deacidification is *self-reinforcing* (pH↑ ⇒ rate↑), bounded by 1 and
+  self-limited by malate depletion — the emergent coupling the D-18 keystone exists for.
+- **ethanol gate** = the Luong wall `max(0, 1−E/E_max)^n` reused from `EthanolInhibition`
+  (`ethanol_tolerance_mlf` 110 g/L ≈ 14 % ABV, *below* the yeast's 142).
+- **molecular-SO₂ gate** = `exp(−[SO₂]_molecular/s)`, partitioned at the *solved* pH — the
+  first RHS consumer of the D-22 readout. Dosing ~80 mg/L free SO₂ arrests MLF (verified).
+
+*Isolability (prime directive #3), two layers:* (a) **value** — the Process returns a zero
+contribution *before* the per-RHS pH `brentq` whenever `X_mlf ≤ 0` or malate is gone, so an
+undosed run is byte-for-byte the validated core and pays no solve; (b) **tier** — the
+compile seam **disables** the Process when `mlf_pitch_gpl ≤ 0`, because `ProcessSet.tier_of`
+counts *enabled* (not nonzero) processes, so an always-on-but-zero MLF would drag the inert
+`malic`/`lactic` slots from VALIDATED to speculative on every undosed wine run. (`CO2` is
+already speculative via the uptake Process, so it is unaffected either way.) When pitched,
+`malic`/`lactic`/`CO2` correctly become speculative.
+
+**Emergent finding — the ethanol "race-or-stall" (a genuine model behavior, flagged).** A
+24-Brix must reaches ~135 g/L ethanol but `ethanol_tolerance_mlf` is 110, so the ethanol
+gate **arrests MLF once AF ethanol crosses ~110 g/L (~day 4 at 20 °C)**. MLF must therefore
+**complete in that early low-ethanol window or stall permanently** (ethanol never falls) —
+which is *exactly why co-inoculation is used in practice*, and why in this model
+co-inoculation is the only viable mode: post-AF (sequential) MLF is **doubly blocked** — no
+event loop to pitch at day N *and* ethanol already past tolerance — reinforcing D-23's
+co-inoculation scope. `k_mlf` (default 1.5e-2, speculative/order-of-magnitude) is tuned so a
+realistic pitch (test uses 0.2 g/L) converts a malic-rich must to ~complete within that
+window. Two honest caveats: (i) the 110 g/L wall is a speculative simplification — real
+high-alcohol MLF strains tolerate ~15–16 % ABV; (ii) the **headline test is coupled to AF
+timing** — a future change that speeds AF shrinks the MLF window, but the test (ΔpH ≥ 0.1)
+would catch the regression, so the coupling is safe-but-explicit.
+
+**Acceptance — added, not replaced (D-23 "becomes emergent").** The new headline
+`test_headline_mlf_raises_ph_emergently` measures the **no-MLF control difference**
+`pH_final(dosed) − pH_final(off)` = **0.1813** ∈ [0.1, 0.3]: robust because MLF touches only
+`malic`/`lactic`/`CO2` and pH reads neither `CO2` (carbonic omitted, coupling #1) nor any AF
+variable, so the two runs are byte-identical in X/S/E/N/Byp/cation and the gap is *purely*
+the malic→lactic swap at the same final Byp. The original algebraic
+`test_acidbase.test_headline_malic_to_lactic_raises_ph` (0.225) is **retained** — the two
+prove different things (the solver responds to acid dynamics vs the Process *produces* those
+dynamics).
+
+**Minor (noted, not fixed).** The *O. oeni* parameters live in `wine_generic.yaml` (the
+ester/fusel aroma set the precedent for non-yeast mechanisms there, and the wine compile
+loads exactly that file so beer never sees them), but they are bacterium properties, not
+yeast-strain ones — so a *second* wine-strain file would duplicate them, the same re-homing
+caveat already flagged for `must_fermentable_fraction`.
 
 ## Deferred (decide early in the relevant milestone)
 

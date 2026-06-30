@@ -89,14 +89,17 @@ def total_carbon(
     # precision while wine's liquid esters honestly fall with temperature.
     if "esters_gas" in schema:
         w[schema.slice("esters_gas")] = carbon_mass_fraction("ethyl_acetate")
-    # Wine acid slots (decision D-18): the pH charge balance reads these, and a future
-    # MLF Process will move carbon malic (C4) -> lactic (C3) + CO2 (C1) — balanced —
-    # so they are weighted here for that conversion to stay carbon-closing. In D-18 the
-    # acids are inert (no Process touches them, derivatives 0), so this adds a constant
-    # term that drifts 0; ``cation_charge`` is a charge density, not a carbon species,
-    # and stays weight 0 (``schema.zeros``). ``Byp`` weighting is unchanged — the
-    # charge balance only *reads* it (include-by-reading), adding no carbon, so
-    # ``total_carbon`` and the double-count are exactly as before.
+    # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
+    # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
+    # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that
+    # conversion to stay carbon-closing on this same ledger (no new conservation code). On
+    # an undosed run the acids are inert (no active Process touches them, derivatives 0),
+    # so this adds a constant term that drifts 0; ``cation_charge`` is a charge density,
+    # not a carbon species, and stays weight 0 (``schema.zeros``). The ``X_mlf`` catalyst
+    # is likewise unweighted — inert and constant in v1 (it enters the ledger only when the
+    # MLF-growth beat lands). ``Byp`` weighting is unchanged — the charge balance only
+    # *reads* it (include-by-reading), adding no carbon, so ``total_carbon`` and the
+    # double-count are exactly as before.
     if "tartaric" in schema:
         w[schema.slice("tartaric")] = carbon_mass_fraction("tartaric_acid")
     if "malic" in schema:

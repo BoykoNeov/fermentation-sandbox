@@ -462,3 +462,113 @@ dH_ester_volatil:
     source: "Ethyl-acetate Henry's-law solubility constant temperature dependence d(ln kH)/d(1/T) ~ 5300-5700 K (NIST Chemistry WebBook / Sander compilation, doi:10.5194/acp-15-4399-2015) => dissolution enthalpy ~ -46 kJ/mol => gas/liquid partition rises with T with effective enthalpy ~ +45 kJ/mol"
     conditions: "ethyl acetate, gas/liquid (air/water) partition; van't Hoff form anchored at T_ref = 293.15 K"
     notes: "Sets how steeply the ethyl-acetate gas/liquid partition (Henry's-law constant) rises with temperature - the PHYSICAL volatility lever that replaced D-20's fudged E_a_ester_volatil. d(ln kH)/d(1/T) ~ 5500 K (NIST/Sander) gives a dissolution enthalpy ~ -46 kJ/mol, so the air/water partition coefficient rises with T with effective enthalpy ~ +45 kJ/mol (Q10 ~ 1.8) - a real, physical Henry's-law value, NOT tuned to invert wine. MEDIUM-INDEPENDENT (a property of the molecule): the SAME value is used in beer_generic.yaml. The wine/beer direction comes from synthesis E_a_esters, not this. SIMPLIFICATION: the full Morakul 2011 partition is also ethanol-dependent (ln k_i = F1 + F2*E - (F3+F4*E)*R*(1000/T - 1000/T_ref)); we keep only the dominant temperature (van't Hoff) lever and omit the ethanol terms (the F coefficients are not openly available). SPECULATIVE tier because the simplification + the abs value transfer are not fully validated, though the enthalpy itself is sourced."
+
+# -- MALOLACTIC FERMENTATION (Oenococcus oeni), wine-only, conversion-only (decision D-23) --
+# MLF converts L-malic acid (C4, diprotic) to L-lactic acid (C3, monoprotic) + CO2,
+# mole-for-mole, deacidifying the wine (pH up ~0.1-0.3). Read by
+# fermentation.core.kinetics.malolactic.MalolacticConversion - the FIRST RHS consumer of
+# the D-18 pH solver and the D-22 molecular-SO2 readout. The molar turnover is
+#   r = k_mlf * X_mlf * [malate]/(K_mlf+[malate]) * g_pH * g_EtOH * g_SO2 * gamma(T)
+# with d(malic) = -r*M_malic, d(lactic) = +r*M_lactic, d(CO2) = +r*M_CO2 (carbon AND mass
+# close on the existing ledger: 134.087 = 90.078 + 44.009 g/mol, a clean decarboxylation).
+#
+# These describe the BACTERIUM (O. oeni), not the wine yeast strain above - they live here
+# (rather than a separate file) for the same reason the ester/fusel aroma constants do: the
+# wine compile loads exactly this <medium>_<strain>.yaml, beer never sees them (beer has no
+# malic/lactic slots and MLF is never wired there), and the pKa set the gates need is
+# already merged from acidbase.yaml. ALL SPECULATIVE: no kinetic model of this exact
+# per-catalyst flux form is sourced, so k_mlf and every gate/cardinal constant are
+# directional order-of-magnitude estimates (handoff-style directional validation only); the
+# conversion STOICHIOMETRY and the gate DIRECTIONS are the sound part. v1 is conversion-only
+# (no bacterial growth/lag) and CO-INOCULATION (bacteria from t=0); sequential/post-AF MLF
+# needs the unbuilt event loop (decision D-23).
+
+k_mlf:
+  value: 1.5e-2
+  unit: "mol/(g*h)"   # molar malate turnover per g/L O. oeni: r = k_mlf*X_mlf*Monod*gates*gamma(T)
+  tier: speculative
+  uncertainty: { low: 1.0e-3, high: 5.0e-2, note: "order-of-magnitude target: near-complete conversion of a few g/L malate within the low-ethanol co-inoculation window (~first 4 d, before AF ethanol crosses the O. oeni tolerance) at a realistic dose" }
+  provenance:
+    source: "author estimate bounded by practical co-inoculated MLF timescales (Ribereau-Gayon et al., Handbook of Enology Vol. 1, malolactic fermentation; Lonvaud-Funel reviews of O. oeni)"
+    conditions: "S. cerevisiae/O. oeni co-inoculated wine, ~20 C; specific malolactic activity scaling the dosed (constant) X_mlf"
+    notes: "Read by MalolacticConversion as the specific malolactic rate. SPECULATIVE magnitude: no kinetic model of our per-catalyst flux form (r = k_mlf*X_mlf*Monod*gates) is sourced - O. oeni MLF kinetics are usually reported as bulk malate-decline half-lives, not a per-biomass rate constant - so this is tuned, NOT fitted. EMERGENT CONSTRAINT (co-inoculation): a 24 Brix must reaches ~14% ABV (~135 g/L ethanol), which exceeds the O. oeni ethanol_tolerance_mlf (110 g/L), so the ethanol gate ARRESTS MLF once AF ethanol crosses ~110 g/L (~day 4 at 20 C). MLF must therefore largely COMPLETE in that early low-ethanol window - exactly why co-inoculation is used in practice - so k_mlf is set to give near-complete conversion of a malic-rich must within ~4 d at a realistic dose, not a slow weeks-long decline. The dose X_mlf (g/L) sets the absolute timescale linearly, so k_mlf and a realistic pitch trade off; the later MLF-growth beat replaces the constant X_mlf with a dynamic one (decision D-23)."
+
+K_mlf:
+  value: 2.5e-3
+  unit: "mol/L"   # Michaelis-Menten half-saturation in MALATE (molar)
+  tier: speculative
+  uncertainty: { low: 1.0e-3, high: 1.5e-2, note: "malolactic-enzyme malate Km ~ 1-15 mM in the literature; low affinity-constant keeps the Monod term ~1 until malate is nearly gone" }
+  provenance:
+    source: "author estimate in the range of reported malolactic-enzyme (malate) Km values (~mM; e.g. O. oeni malolactic enzyme Km for L-malate of order a few mM, enology/biochemistry literature)"
+    conditions: "O. oeni malolactic enzyme, L-malate; half-saturation in the conversion Monod term"
+    notes: "Read by MalolacticConversion as the malate half-saturation (in mol/L, matching the [malate] the Process computes from g/L via M_malic). Deliberately LOW (high malate affinity) so [malate]/(K_mlf+[malate]) stays near 1 until malate is nearly exhausted, giving a clean near-complete conversion rather than a long substrate-starved tail. SPECULATIVE: the enzyme Km is for the isolated enzyme, not the whole-cell catalyst our X_mlf lumps, and the value is taken mid-range, not fitted."
+
+pH_half_mlf:
+  value: 3.0
+  unit: "pH units"   # logistic gate g_pH = 1/(1 + 10^(pH_half_mlf - pH)); 0.5 at this pH
+  tier: speculative
+  uncertainty: { low: 2.8, high: 3.2, note: "O. oeni MLF strongly inhibited below ~pH 3.0, robust above ~3.2-3.5" }
+  provenance:
+    source: "author estimate encoding the well-established O. oeni pH dependence (Ribereau-Gayon et al., Handbook of Enology Vol. 1; Lonvaud-Funel 1999, Antonie van Leeuwenhoek 76:317-331): MLF slows sharply below pH ~3.0 and proceeds readily above ~3.3"
+    conditions: "O. oeni in wine; midpoint of the smooth logistic pH gate on the conversion rate"
+    notes: "Read by MalolacticConversion: g_pH = 1/(1 + 10^(pH_half_mlf - pH)) rises smoothly with pH (0.5 here, ~0.71 at pH 3.4, ~0.86 at pH 3.8). DIRECTION is well-sourced (low pH inhibits O. oeni, the textbook reason MLF can stick in acidic musts); the exact midpoint and the logistic FORM are the speculative modelling choice. The gate makes the deacidification self-reinforcing (malate->lactate raises pH -> g_pH rises), bounded by 1 and self-limited by malate depletion - the emergent coupling the D-18 keystone exists for."
+
+ethanol_tolerance_mlf:
+  value: 110.0
+  unit: "g/L"   # Luong wall E_max for O. oeni: g_EtOH = max(0, 1 - E/E_max)^n
+  tier: speculative
+  uncertainty: { low: 95.0, high: 125.0, note: "O. oeni ~12-16% ABV tolerance (95-126 g/L); below the yeast's 142 g/L" }
+  provenance:
+    source: "author estimate from O. oeni ethanol-tolerance reports (~13-14% ABV typical for wine MLF strains; Ribereau-Gayon et al., Handbook of Enology Vol. 1; G-Alegria et al. 2004, FEMS Microbiol. Lett. 230:53-61)"
+    conditions: "O. oeni in wine; ethanol wall on the conversion rate (Luong/Levenspiel form, mirroring EthanolInhibition)"
+    notes: "Read by MalolacticConversion as E_max in g_EtOH = max(0, 1 - E/E_max)^n (n = mlf_ethanol_exponent). Set to ~14% ABV (110 g/L), BELOW the yeast ethanol_tolerance (142 g/L) - O. oeni is less ethanol-tolerant than the yeast, the reason high-alcohol musts challenge MLF. v1 is CO-INOCULATION, so ethanol is still low while malate converts and this gate is ~1 over most of the conversion; it matters mainly for late/high-ethanol musts. DIRECTION sourced (ethanol inhibits O. oeni); exact value/form speculative."
+
+mlf_ethanol_exponent:
+  value: 2.0
+  unit: "dimensionless"   # Luong toxic-power exponent n in g_EtOH = (1 - E/E_max)^n
+  tier: speculative
+  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent; n>1 keeps the touchdown C1-smooth at E_max" }
+  provenance:
+    source: "author estimate; Levenspiel 1980 / Luong 1985 inhibition form, matching the yeast ethanol_inhibition_exponent choice"
+    conditions: "O. oeni in wine; exponent of the ethanol wall on the conversion rate"
+    notes: "Exponent n in g_EtOH = (1 - E/E_max)^n. Kept at n=2 (as for the yeast EthanolInhibition) so the rate eases to zero with no derivative kink at E_max - C1-smooth for the BDF solver. The form has literature backing (Luong); the exponent itself is a numerical choice, hence speculative."
+
+molecular_so2_inhib_mlf:
+  value: 2.0e-4
+  unit: "g/L"   # decay scale of g_SO2 = exp(-[SO2]_molecular / molecular_so2_inhib_mlf)
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 5.0e-4, note: "molecular SO2 inhibitory scale ~0.1-0.5 mg/L (1e-4 - 5e-4 g/L); ~0.5-0.8 mg/L molecular strongly arrests MLF" }
+  provenance:
+    source: "author estimate encoding the antimicrobial action of MOLECULAR SO2 on O. oeni (Ribereau-Gayon et al., Handbook of Enology Vol. 1; the same molecular-SO2 antimicrobial basis as the D-22 readout, Usseglio-Tomasset & Bosia 1984)"
+    conditions: "O. oeni in wine; exponential decay scale of the molecular-SO2 inhibition gate on the conversion rate"
+    notes: "Read by MalolacticConversion: g_SO2 = exp(-[SO2]_molecular / s), where [SO2]_molecular (g/L) is partitioned from the dosed free SO2 at the SOLVED pH (D-22) - so this gate is the first RHS consumer of the molecular-SO2 readout, and rising pH (which LOWERS molecular SO2) further frees MLF. Scale ~0.2 mg/L molecular: g_SO2 ~ 0.018 at 0.8 mg/L molecular (strong arrest), ~1 when undosed. DIRECTION strongly sourced (molecular SO2 is THE antimicrobial species winemakers use to control/prevent MLF); the exact scale and exponential FORM are the speculative modelling choice."
+
+T_min_mlf:
+  value: 281.15
+  unit: "K"   # cardinal minimum (8 C) of the Rosso CTMI temperature optimum gamma(T)
+  tier: speculative
+  uncertainty: { low: 277.15, high: 285.15, note: "O. oeni MLF effectively stops by ~4-10 C; T_min ~8 C" }
+  provenance:
+    source: "author estimate from O. oeni MLF cardinal temperatures (winemaking practice: MLF is slow/stalled below ~12-15 C, effectively off near ~4-8 C; Ribereau-Gayon et al., Handbook of Enology Vol. 1)"
+    conditions: "O. oeni in wine; minimum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
+    notes: "Read by MalolacticConversion via cardinal_temperature_factor (Rosso et al. 1993 CTMI). 8 C. Below it gamma(T)=0 (MLF off). DIRECTION sourced (cold stalls MLF); exact cardinal speculative. CTMI uses only temperature DIFFERENCES, so K and C give identical gamma - stored in K for canonical units (D-3)."
+
+T_opt_mlf:
+  value: 296.15
+  unit: "K"   # cardinal optimum (23 C) where gamma(T) = 1
+  tier: speculative
+  uncertainty: { low: 293.15, high: 300.15, note: "O. oeni MLF optimum ~20-25 C" }
+  provenance:
+    source: "author estimate from O. oeni MLF optimum reports (~20-25 C; Ribereau-Gayon et al., Handbook of Enology Vol. 1; winemaking practice runs MLF warm, ~18-22 C, often warmer to speed it)"
+    conditions: "O. oeni in wine; optimum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
+    notes: "Read by MalolacticConversion via cardinal_temperature_factor. 23 C, where gamma(T)=1 (the rate constant k_mlf is read unscaled there, like the Arrhenius factor at T_ref). At the 20 C wine benchmark gamma ~0.93. The OPTIMUM (not a monotone Arrhenius) is the load-bearing scope choice of D-23: MLF DECLINES in the warm, which an Arrhenius factor cannot represent. Exact optimum speculative; the existence of an optimum ~20-25 C is well-established."
+
+T_max_mlf:
+  value: 310.15
+  unit: "K"   # cardinal maximum (37 C) of the CTMI temperature optimum gamma(T)
+  tier: speculative
+  uncertainty: { low: 306.15, high: 315.15, note: "O. oeni growth ceases by ~37-45 C; T_max ~37 C for MLF activity" }
+  provenance:
+    source: "author estimate from O. oeni upper cardinal temperature (growth ceases ~40-45 C; MLF activity falls off well before that; Ribereau-Gayon et al., Handbook of Enology Vol. 1)"
+    conditions: "O. oeni in wine; maximum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
+    notes: "Read by MalolacticConversion via cardinal_temperature_factor. 37 C. Above it gamma(T)=0. This is the cardinal that makes the warm-side DECLINE explicit (the qualitative correctness a monotone Arrhenius lacks). Far above any normal wine ferment, so it shapes only the high-T tail; exact value speculative, direction (a finite upper limit exists) sound."

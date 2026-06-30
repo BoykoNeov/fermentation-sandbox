@@ -149,23 +149,31 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       (acetaldehyde-binding) split — acetaldehyde is an unbuilt §3.2 byproduct; and SO₂'s
       back-reaction on pH (additive via an `extra_acids` map if a mid-ferment dose event is
       built). 249 green. Full record in **DECISIONS → D-22**.
-- [ ] **MLF (*Oenococcus oeni*) v1 — conversion-only (decision D-23).** Now unblocked — the
-      first RHS consumer of `acidbase.molecular_so2` and of pH. Scope (full record in **D-23**):
-      - `X_mlf` **dosed-but-inert catalyst slot** on `wine_schema` (`default=0.0`, isolable),
-        dosed via a new scenario input `mlf_pitch_gpl`; **no growth/death Process in v1** — it is
-        a constant bacterial concentration scaling the rate, so the later growth beat is a clean
-        extension (add a Process touching `X_mlf`), not a refactor.
-      - `MalolacticConversion` Process: malic (C4) → lactic (C3) + CO₂ (C1), mole-for-mole, so
-        **carbon closes on the existing `total_carbon`** (already weighted since D-18; no new
-        conservation code). Touches `malic`/`lactic`/`CO2`; reads `X_mlf`, pH (`ph_of_state`),
-        molecular SO₂ (`molecular_so2`), `E`, `T`. Substrate-limited in malate, scaled by
-        `X_mlf`, gated by pH / ethanol / **molecular SO₂** / T inhibition. Tier **speculative**.
-      - **Acceptance:** the hand-built `test_headline_malic_to_lactic_raises_ph` ΔpH ∈ [0.1, 0.3]
-        (lands 0.225) becomes *emergent* from the Process on a malic-rich must.
-      - **Scope boundary:** runtime has no event mechanism ⇒ v1 = **co-inoculation** (bacteria
-        from t=0); sequential / post-AF MLF (pitch at day N) needs the event-driven loop
-        (deferred). Open knobs for the impl session: inhibition functional forms + sourcing;
-        whether `X_mlf` is explicit or folded into the rate constant.
+- [x] **MLF (*Oenococcus oeni*) v1 — conversion-only (decision D-23). LANDED 2026-07-01.** The
+      first RHS consumer of `acidbase.molecular_so2` and of pH. Full record + open-knob choices in
+      **D-23 → Resolution**. Summary:
+      - `core/kinetics/malolactic.py` `MalolacticConversion`: `r = k_mlf·X_mlf·[malate]/(K_mlf+
+        [malate])·g_pH·g_EtOH·g_SO₂·γ(T)`; malic (C4) → lactic (C3) + CO₂ (C1) mole-for-mole, so
+        **carbon AND mass close on the existing ledger** (no new conservation code). Touches
+        `malic`/`lactic`/`CO2`; tier **speculative**.
+      - `X_mlf` **dosed-but-inert catalyst slot** on `wine_schema` (`default=0.0`), dosed via
+        `mlf_pitch_gpl`; **explicit** (scales the rate, not folded into `k`) so the later growth
+        beat is a clean add-a-Process extension.
+      - **Open knobs chosen (all speculative):** temperature = **cardinal optimum** (Rosso 1993
+        CTMI, `cardinal_temperature_factor`) not Arrhenius; pH gate = logistic; ethanol gate =
+        Luong wall (`ethanol_tolerance_mlf` 110 g/L < yeast's 142); molecular-SO₂ gate =
+        exponential at the solved pH.
+      - **Isolability (2 layers):** value — zero contribution *before* the pH solve when undosed
+        (byte-for-byte core, no wasted `brentq`); tier — compile **disables** the Process when
+        `mlf_pitch_gpl ≤ 0` so inert `malic`/`lactic` stay VALIDATED (`tier_of` counts enabled,
+        not nonzero).
+      - **Acceptance (added, not replaced):** new `test_headline_mlf_raises_ph_emergently` uses
+        the no-MLF **control difference** `pH_final(dosed)−pH_final(off)` = **0.1813** ∈ [0.1,0.3];
+        the algebraic `test_acidbase` headline (0.225) is retained (proves a different thing).
+      - **Emergent ethanol "race-or-stall":** a 24-Brix must (~135 g/L EtOH) crosses the 110 g/L
+        MLF wall ~day 4, so MLF must complete in that early window or stall — co-inoculation is the
+        only viable mode (post-AF doubly blocked: no event loop *and* EtOH > tolerance). 13 new
+        tests; 262 green, ruff + mypy clean, §2.2 trio unchanged.
 - [ ] **Amino-acid ledger — separate yeast/AF beat (decision D-23, deferred).** A toggleable
       `default=0` amino-acid pool contributing to *both* the carbon and nitrogen ledgers,
       implemented as a **separate isolable Process** — a carbon- *and* nitrogen-neutral *swap*

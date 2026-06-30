@@ -14,18 +14,20 @@ SHARED = (
 
 #: Wine appends four charge-active acid + strong-cation slots to the shared set for the
 #: pH charge-balance solver (decision D-18), then the free-SO₂ pool for the molecular-SO₂
-#: readout (decision D-22); beer does not (its acid system is deferred).
+#: readout (decision D-22), then the malolactic-catalyst slot (decision D-23); beer does
+#: not (its acid system, SO₂ and MLF are deferred).
 WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "cation_charge")
 WINE_SO2_SLOTS = ("so2_free",)
+WINE_MLF_SLOTS = ("X_mlf",)
 
 
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
-    assert schema.names == SHARED + WINE_ACID_SLOTS + WINE_SO2_SLOTS
+    assert schema.names == SHARED + WINE_ACID_SLOTS + WINE_SO2_SLOTS + WINE_MLF_SLOTS
     assert schema.spec("S").size == 1
     # 12 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas)
-    # + 4 wine-only acid/cation slots (D-18) + 1 free-SO₂ slot (D-22)
-    assert schema.size == 17
+    # + 4 wine-only acid/cation slots (D-18) + 1 free-SO₂ slot (D-22) + 1 X_mlf slot (D-23)
+    assert schema.size == 18
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -69,6 +71,7 @@ def test_wine_acid_slot_units_are_canonical():
     assert units["lactic"] == "g/L"
     assert units["cation_charge"] == "mol/L"
     assert units["so2_free"] == "g/L"
+    assert units["X_mlf"] == "g/L"
 
 
 def test_produced_only_pools_default_to_zero_when_omitted():
@@ -135,18 +138,24 @@ CORE_PROCESSES = {
 # esters → the esters_gas headspace pool). Wired in by default but isolable (prime
 # directive #3) — disabling them leaves the validated core byte-for-byte.
 BYPRODUCT_PROCESSES = {"ester_synthesis", "fusel_alcohols_ehrlich", "ester_volatilization"}
-EXPECTED_PROCESSES = CORE_PROCESSES | BYPRODUCT_PROCESSES
+# Malolactic fermentation (decision D-23) is wired into the WINE medium only (beer has no
+# malic/lactic slots); it is enabled in a bare build_process_set and disabled at the compile
+# seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic at VALIDATED).
+MLF_PROCESSES = {"malolactic_conversion"}
+EXPECTED_PROCESSES = {
+    "wine": CORE_PROCESSES | BYPRODUCT_PROCESSES | MLF_PROCESSES,
+    "beer": CORE_PROCESSES | BYPRODUCT_PROCESSES,
+}
 EXPECTED_MODIFIERS = {"arrhenius_growth", "arrhenius_uptake"}
 
 
 @pytest.mark.parametrize("medium", ["wine", "beer"])
 def test_registered_media_wire_the_full_kinetic_set(medium):
-    # Wine and beer share the same mechanism set — only the sugar vector differs,
-    # and beer's sequential uptake lives inside the uptake Process, so no extra
-    # Process is needed for it. Both media also carry the Tier-2 byproduct Processes
-    # (esters/fusels), which are produced in both wine and beer.
+    # Wine and beer share the validated core + Tier-2 aroma byproducts (only the sugar
+    # vector differs, and beer's sequential uptake lives inside the uptake Process). Wine
+    # additionally carries the malolactic Process (D-23); beer does not (no malic/lactic).
     pset = get_medium(medium).build_process_set(strict=True)
-    assert {p.name for p in pset.active} == EXPECTED_PROCESSES
+    assert {p.name for p in pset.active} == EXPECTED_PROCESSES[medium]
     assert {m.name for m in pset.active_modifiers} == EXPECTED_MODIFIERS
 
 

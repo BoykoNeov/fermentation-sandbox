@@ -220,6 +220,10 @@ class ProcessSet:
         if name not in self._enabled:
             raise KeyError(f"No process or modifier named {name!r}; have {list(self._enabled)}")
 
+    def __contains__(self, name: object) -> bool:
+        """True if ``name`` is a Process or modifier in this set (enabled or not)."""
+        return name in self._enabled
+
     # -- the hot loop ---------------------------------------------------------
 
     def total_derivatives(self, t: float, y: FloatArray, params: Mapping[str, float]) -> FloatArray:

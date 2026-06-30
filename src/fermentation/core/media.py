@@ -58,6 +58,7 @@ from fermentation.core.kinetics import (
     EthanolInactivation,
     FuselAlcoholsEhrlich,
     GrowthNitrogenLimited,
+    MalolacticConversion,
     SugarUptakeToEthanolCO2,
 )
 from fermentation.core.process import Process, ProcessSet, RateModifier
@@ -113,17 +114,22 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
 def wine_schema() -> StateSchema:
     """Wine state layout: a single lumped fermentable sugar slot, plus the wine-only
     charge-active acid + strong-cation slots the pH charge-balance solver reads
-    (decision D-18) and the free-SO₂ pool the molecular-SO₂ readout reads (decision D-22).
+    (decision D-18), the free-SO₂ pool the molecular-SO₂ readout reads (decision D-22),
+    and the ``X_mlf`` malolactic-catalyst slot (decision D-23).
 
-    These five slots are appended to ``wine_schema`` only (not ``_common_specs``), so
+    These six slots are appended to ``wine_schema`` only (not ``_common_specs``), so
     ``beer_schema`` is untouched — beer's pH is a phosphate-buffered different acid
     system with no sourced data yet, explicitly deferred. ``default=0.0`` is
     load-bearing: existing wine scenarios/tests that name no acids still compile (all
-    five → 0), and with acids, cation and SO₂ at 0 the slots are inert — they contribute
-    0 to every conservation sum, so the validated core and its tests are untouched (prime
-    directive #3). No Process touches them in D-18/D-22, so their derivatives are 0 and
-    the trajectory is constant; they exist so a future MLF Process can deplete ``malic`` /
-    grow ``lactic`` and so the charge balance and ``total_carbon`` can read them. pH is
+    six → 0), and with acids, cation, SO₂ and ``X_mlf`` at 0 the slots are inert — they
+    contribute 0 to every conservation sum, so the validated core and its tests are
+    untouched (prime directive #3). The acid/cation/SO₂ slots have no Process touching
+    them in D-18/D-22; under D-23 :class:`~fermentation.core.kinetics.malolactic.\
+    MalolacticConversion` depletes ``malic`` / grows ``lactic`` / evolves ``CO2`` *only
+    when ``X_mlf`` is dosed* (and is disabled at the compile seam otherwise), so undosed
+    wine runs keep a constant acid trajectory. ``X_mlf`` itself is inert in v1 (no Process
+    grows or kills it) and carbon-free in ``total_carbon`` (constant ⇒ 0 drift); it enters
+    the carbon ledger only when the later MLF-growth beat lands. pH is
     simply not meaningful for a no-acid scenario and is only *computed* when requested
     (``fermentation.analysis``). ``cation_charge`` is a charge density (mol⁺/L), not a
     mass concentration — state is already heterogeneous (``T`` in K) — back-solved from
@@ -158,6 +164,13 @@ def wine_schema() -> StateSchema:
             default=0.0,
             description="free SO2 (molecular+bisulfite+sulfite, as SO2); dosed input, "
             "inert; pH-driven molecular-fraction readout (D-22)",
+        ),
+        VarSpec(
+            "X_mlf",
+            "g/L",
+            default=0.0,
+            description="Oenococcus oeni biomass — dosed-but-inert MLF catalyst "
+            "(scales the malolactic rate; no growth/death in v1, decision D-23)",
         ),
     ]
     return StateSchema(specs)
@@ -263,6 +276,17 @@ _BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterVolatilization,
 )
 
+#: Malolactic fermentation (wine-only, decision D-23): the *Oenococcus oeni* malate →
+#: lactate + CO2 conversion, the first RHS consumer of the D-18 pH solver and the D-22
+#: molecular-SO₂ readout. Kept as its own tuple so it stays **isolable** (prime directive
+#: #3): the conversion contributes zero before the pH solve whenever ``X_mlf`` is undosed
+#: (structural *value* isolability), and the compile seam *disables* it when MLF is not
+#: pitched so the inert ``malic``/``lactic`` slots keep their VALIDATED tier rather than
+#: being dragged to speculative by an enabled-but-zero Process (*tier* isolability —
+#: ``ProcessSet.tier_of`` counts enabled, not nonzero, Processes). Wine-only: beer has no
+#: ``malic``/``lactic`` slots, so it is never wired there.
+_MLF_PROCESSES: tuple[Callable[[], Process], ...] = (MalolacticConversion,)
+
 
 #: The registry of known media. Adding a beverage family = adding an entry here
 #: (and, at the I/O boundary, an initial-composition vocabulary in
@@ -271,7 +295,7 @@ MEDIA: dict[str, Medium] = {
     "wine": Medium(
         name="wine",
         schema=wine_schema(),
-        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES,
+        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES + _MLF_PROCESSES,
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),
     "beer": Medium(

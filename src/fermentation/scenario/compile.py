@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fermentation.core import acidbase
+from fermentation.core.kinetics import MalolacticConversion
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -88,7 +89,8 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
         # tartaric_gpl/malic_gpl/initial_ph are the optional pH-solver inputs (D-18);
         # lactic is produced-only (MLF product) so it is not an input, and the
         # strong cation is back-solved from initial_ph, not given. so2_free_mgl is the
-        # optional free-SO₂ dose for the molecular-SO₂ readout (D-22).
+        # optional free-SO₂ dose for the molecular-SO₂ readout (D-22); mlf_pitch_gpl is the
+        # optional Oenococcus oeni dose that drives malolactic conversion (D-23).
         {
             "brix",
             "yan_mgl",
@@ -98,6 +100,7 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "malic_gpl",
             "initial_ph",
             "so2_free_mgl",
+            "mlf_pitch_gpl",
         }
     ),
     "beer": frozenset(
@@ -167,6 +170,11 @@ def _wine_initial(
         # NOT enter the cation back-solve below — SO₂'s minor bisulfite charge is a
         # scoped omission the inverse anchoring would absorb at t=0 anyway (D-22).
         "so2_free": mgl_to_gpl(_optional(values, "so2_free_mgl", 0.0)),
+        # Oenococcus oeni dose driving malolactic conversion (D-23); g/L, default 0 (no
+        # MLF). Inert catalyst in v1 (no Process grows/kills it) and carbon-free, so an
+        # undosed run is byte-for-byte the validated core; the compile step below disables
+        # the MLF Process entirely when this is 0 (tier + perf isolability).
+        "X_mlf": _optional(values, "mlf_pitch_gpl", 0.0),
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
@@ -361,6 +369,19 @@ def compile_scenario(
 
     y0 = medium.schema.pack(builder(scenario.initial, temperature_k, parameters))
     process_set = medium.build_process_set(strict=strict)
+
+    # MLF isolability (decision D-23): the malolactic Process is wired into the wine medium
+    # but contributes nothing until Oenococcus oeni is pitched. When it is not, DISABLE it
+    # so (a) the inert ``malic``/``lactic`` slots keep their VALIDATED tier — an *enabled*
+    # Process that touches them drops them to speculative even with a zero contribution,
+    # since ``tier_of`` counts enabled, not nonzero, Processes — and (b) no per-RHS pH
+    # ``brentq`` solve is paid on an undosed run. When pitched it is the first RHS consumer
+    # of the D-18 pH solver and the D-22 molecular-SO₂ readout.
+    if MalolacticConversion.name in process_set:
+        mlf_pitch_gpl = float(scenario.initial.get("mlf_pitch_gpl", 0.0) or 0.0)
+        if mlf_pitch_gpl <= 0.0:
+            process_set.disable(MalolacticConversion.name)
+
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 
     return CompiledScenario(
