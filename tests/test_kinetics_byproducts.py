@@ -555,6 +555,28 @@ def test_integrated_wine_aroma_temperature_directions():
         f"volatilized esters_gas should rise with T (more stripping when warm): "
         f"cold {cold['esters_gas']:.4f} vs warm {warm['esters_gas']:.4f} g/L"
     )
+    # THE headline D-21 fidelity claim, locked (prime directive #2: enforced, not just
+    # honoured): wine TOTAL ester production (liquid + volatilized) is ~FLAT in T. It is
+    # the *consequence* of E_a_esters = E_a_uptake (the liquid-falls/gas-rises asserts
+    # above can survive a drift that breaks flatness; this cannot). The 2% band is far
+    # tighter than the tilt even a ~1 kJ/mol drift of either E_a would cause.
+    cold_total = cold["esters"] + cold["esters_gas"]
+    warm_total = warm["esters"] + warm["esters_gas"]
+    assert cold_total == pytest.approx(warm_total, rel=0.02), (
+        f"wine TOTAL ester production should be ~flat in T (D-21 mapping E_a_esters = "
+        f"E_a_uptake): cold {cold_total:.4f} vs warm {warm_total:.4f} g/L"
+    )
+
+
+def test_wine_ester_synthesis_e_a_equals_uptake_for_flat_production(store):
+    # D-21 mapping as a direct executable guard (the cause, paired with the consequence
+    # asserted in ...temperature_directions). Run-integrated wine ester synthesis scales
+    # as arrh(E_a_esters)/arrh(E_a_uptake) (the bare-flux integral to dryness is fixed by
+    # total sugar), so it is T-INDEPENDENT iff E_a_esters = E_a_uptake — the Arrhenius form
+    # of Mouret's flat/weak wine ester production. If a future M1 E_a-band review moves
+    # E_a_uptake, this forces a deliberate re-decision rather than a silent tilt of the
+    # flat-total fidelity claim.
+    assert store.value("E_a_esters") == pytest.approx(store.value("E_a_uptake"))
 
 
 # -- tier propagation ---------------------------------------------------------

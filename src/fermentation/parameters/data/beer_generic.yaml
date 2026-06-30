@@ -332,7 +332,7 @@ k_ester_volatil:
   provenance:
     source: "author estimate (absolute stripping efficiency / gas-volume prefactor not separately sourced). Mechanism + loss form per Morakul et al. 2011 (Process Biochem 46:1125-1131)"
     conditions: "ale yeast; ester stripping coupled to the CO2-evolution (fermentative-flux x arrhenius(E_a_uptake)) proxy, first-order in liquid ester"
-    notes: "Read by EsterVolatilization as the stripping coefficient (absolute magnitude only; the T-dependence is physical+sourced via E_a_uptake gas flow + dH_ester_volatil partition). Lower than wine's so beer's already-dominant synthesis stays clearly on top, and to land beer liquid esters in a sensible range. SPECULATIVE order-of-magnitude target. Verified empirically (14/20/25 C): beer liquid esters ~22/72/181 mg/L (rise with T)."
+    notes: "Read by EsterVolatilization as the stripping coefficient (absolute magnitude only; the T-dependence is physical+sourced via E_a_uptake gas flow + dH_ester_volatil partition). Lower than wine's (2e-3 vs 5e-3) for a PHYSICAL reason, not tuning: k_ester_volatil folds q_sugar_max*co2_yield*scale (the gas-volume prefactor of the CO2 stream) into one constant, and beer's q_sugar_max is 0.5 vs wine's 0.85, so beer's lower stripping coefficient is expected. SPECULATIVE order-of-magnitude target (the residual efficiency/Henry prefactor is not separately sourced). Verified empirically (14/20/25 C): beer liquid esters ~22/72/181 mg/L (rise with T, synthesis-dominated)."
 
 dH_ester_volatil:
   value: 45000.0
