@@ -325,11 +325,14 @@ biomass_N_yield_log_slope:
 # Esters and fusel (higher) alcohols: trace produced-only pools that RISE with
 # temperature. PLACEHOLDER VALUES, tagged speculative pending the dedicated
 # parameter-sourcing step (reading list: de Andres-Toro et al. 1998, Malherbe et
-# al. 2004, and ester/higher-alcohol kinetic literature). These are NOT carbon-routed
-# (D-19): their carbon is already in the ledger (fusels = the "higher alcohols" of the
-# Byp succinic lump; ester carbon re-expresses ethanol+acid carbon), so total_carbon
-# is untouched. The benchmark (warmer => more esters+fusels) is DIRECTIONAL, so these
-# stay speculative and earn no promotion (handoff §3.5).
+# al. 2004, and ester/higher-alcohol kinetic literature). Under INTERIM accounting (b)
+# these are NOT carbon-routed: their carbon is already booked in the ledger (fusels =
+# the "higher alcohols" of the Byp succinic lump; ester carbon re-expresses ethanol+acid
+# carbon), so total_carbon is untouched. The agreed direction is option (a) — route from
+# sugar and weight the pools — deferred to a future session (see milestone-2-tasks.md);
+# decision D-19 records the outcome once (a) lands. The benchmark (warmer => more
+# esters+fusels) is DIRECTIONAL, so these stay speculative and earn no promotion
+# (handoff §3.5).
 #
 # KEY ORDERING CONSTRAINT (decision D-19): each E_a below must EXCEED E_a_uptake
 # (55,100 J/mol). The run-integrated byproduct total scales as

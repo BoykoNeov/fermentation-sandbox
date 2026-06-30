@@ -31,24 +31,30 @@ for pure uptake to exact dryness; growth's sugar draw, the finite dryness cutoff
 and the (un-Arrhenius-scaled) inactivation brake perturb it, so the integrated
 direction is **verified empirically**, not assumed.
 
-**Carbon accounting — diagnostic pools, deliberately OUTSIDE the ledger (D-19).**
-These pools are *not* in ``total_carbon``, and that is the carbon-correct choice, not
-a leak. The carbon a fusel/ester molecule contains is not missing from the ledger —
-the carbon it *re-expresses* is already booked elsewhere: the ``Byp`` minor-byproduct
-lump is explicitly "organic acids / higher alcohols, carbon-accounted as succinic
-acid" (higher alcohols *are* the fusels), and ester carbon re-expresses ethanol
-(``E``) plus acid (⊂ ``Byp``) carbon already counted. So ``esters``/``fusels`` are
-**diagnostic re-expressions** of carbon the ledger already holds; weighting them in
-``total_carbon`` would **double-count** it. The beat plan floated routing their
-carbon from sugar D-16-style for machine-precision closure; doing so would instead
-force carving higher alcohols back *out* of ``Byp`` (re-anchoring the sourced
-``Y_byproduct_sugar`` and risking the realised-yield / ABV realism guard) for no
-benchmark gain. So these Processes touch *only* their own pools and ``total_carbon``
-is left untouched — closure stays byte-for-byte. **First produced-only pool that is
-not carbon-routed** (contrast ``Gly``/``Byp``/``X_dead``): a future beat wanting
-rigorous per-species carbon routing must first resolve the ``Byp`` double-count, then
-decrement ``E``/``Byp``/sugar accordingly. Do **not** "fix" ``total_carbon`` by
-adding these pools — that reintroduces the double-count (see D-19).
+**Carbon accounting — INTERIM (b); option (a) is the agreed target, deferred.**
+As shipped, these pools are *not* in ``total_carbon`` and the Processes touch *only*
+their own pools, so carbon closure stays byte-for-byte. This is **interim option (b)**
+and it is internally consistent precisely because the carbon a fusel/ester molecule
+re-expresses is already booked elsewhere: the ``Byp`` minor-byproduct lump is
+explicitly "organic acids / higher alcohols, carbon-accounted as succinic acid"
+(higher alcohols *are* the fusels), and ester carbon re-expresses ethanol (``E``) plus
+acid (⊂ ``Byp``) carbon already counted — so adding these pools to ``total_carbon``
+*as-is* would **double-count**. **Do not** "fix" ``total_carbon`` by simply weighting
+these pools — that reintroduces the double-count.
+
+The **agreed direction is option (a)** (user call, 2026-06-29): route ester/fusel
+carbon from sugar D-16-style and weight the pools in ``total_carbon``, so they become
+real carbon-accounted state under one consistent rule with ``Gly``/``Byp``. It is
+**deferred to a future session** (not yet implemented) because it must first resolve
+the ``Byp`` double-count above — either carving higher alcohols out of ``Byp`` and
+re-anchoring the sourced ``Y_byproduct_sugar`` (variant a1, touches the realised-yield
+/ ABV guard) or transferring carbon out of the already-booked ``E``/``Byp`` pools
+without a new sugar draw (variant a2, closure-neutral). See
+``docs/plans/milestone-2-tasks.md`` → "Planned next session — carbon-accounting option
+(a)" for the full step plan, the variant fork, and the amino-acid-carbon-source caveat
+(the Ehrlich pathway is amino-acid-derived but ``N`` carries no carbon in the ledger).
+Until (a) lands these remain the **first produced-only pool not carbon-routed**
+(contrast ``Gly``/``Byp``/``X_dead``). Formalise in **D-19** once (a) is in.
 
 Tiers: :class:`EsterSynthesis` is **plausible** in form (warmth-favoured,
 flux-coupled ester synthesis is the literature-standard direction) with speculative
@@ -96,7 +102,8 @@ class EsterSynthesis(Process):
     biomass-catalysed sugar flux (sharing ``K_sugar_uptake``) couples them to that
     flux directly, and the steeper-than-uptake ``E_a_esters`` makes the
     run-integrated total fall with temperature (module docstring). Produced-only:
-    touches ``esters`` alone, carbon left to the existing ledger (D-19).
+    touches ``esters`` alone; carbon left to the existing ledger under interim
+    accounting (b) — see the module docstring for the agreed option-(a) plan.
     """
 
     name = "ester_synthesis"
@@ -130,7 +137,8 @@ class FuselAlcoholsEhrlich(Process):
     (``N/(K_n + N)``, sharing the growth nitrogen half-saturation ``K_n``) on top of
     the fermentative flux — front-loading fusels into the nitrogen-replete early
     ferment, as observed. Steeper-than-uptake ``E_a_fusels`` gives the
-    warmer-is-more direction. Produced-only: touches ``fusels`` alone (D-19).
+    warmer-is-more direction. Produced-only: touches ``fusels`` alone under interim
+    accounting (b) — see the module docstring for the agreed option-(a) plan.
 
     **Known simplification — monotone in nitrogen (why this Process is speculative).**
     The real fusel/nitrogen relationship is *non-monotonic*: higher alcohols rise

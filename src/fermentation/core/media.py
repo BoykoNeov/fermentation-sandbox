@@ -36,9 +36,12 @@ uptake needs no structural change to also support wine's single lumped sugar.
 always zero at pitch and only accumulated by the kinetics — so they declare a default
 initial of 0 (`VarSpec.default`) and need not be named at every initial-condition call
 site. The ``esters``/``fusels`` pools are added in the Milestone-2 byproducts beat as
-empty slots; the Processes that fill them, their representative-species choice, and how
-their (trace) carbon is accounted against the ``Byp`` succinic sink without double-count
-are settled in that beat (decision D-19).
+empty slots; the Processes that fill them are wired below. Their (trace) carbon is left
+out of ``total_carbon`` under **interim accounting (b)** to avoid double-counting the
+``Byp`` succinic sink (which already books the higher alcohols); routing it from sugar
+and weighting the pools (the agreed **option (a)**) is planned for a future session —
+see ``docs/plans/milestone-2-tasks.md`` and the ``kinetics.byproducts`` module
+docstring. Settled as decision D-19 once (a) lands.
 """
 
 from __future__ import annotations
@@ -183,7 +186,9 @@ _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: stays isolable — disabling these by name leaves the core byte-for-byte (prime
 #: directive #3). They are additive, produced-only Processes that touch only the
 #: ``esters``/``fusels`` pools, so wiring them in does not perturb the §2.2 trio or
-#: carbon conservation (their carbon is already in the ledger — see D-19).
+#: carbon conservation — under **interim accounting (b)** their carbon is left out of
+#: ``total_carbon`` (booked against ``Byp``); the agreed **option (a)** (route from
+#: sugar, weight the pools) is planned next session. See D-19 / milestone-2-tasks.md.
 _BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterSynthesis,
     FuselAlcoholsEhrlich,

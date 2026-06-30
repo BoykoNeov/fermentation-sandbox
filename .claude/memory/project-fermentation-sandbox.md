@@ -301,14 +301,51 @@ to D-19** (step 2). `test_media.py` updated (SHARED tuple, wine size 9→11 / be
 produced-only-default test). 193 passed / 1 skipped (the step-2 benchmark), ruff + mypy clean. Committed
 `0175973`, pushed to `main` ([[feedback-always-commit-push]]).
 
-**Next: byproducts beat step 2 (next session)** — the additive Ehrlich-fusel + ester-synthesis Processes
-(no `RateModifier` needed, produced-only/monotone-in-T, togglable-off); settle the carbon-accounting
-sub-decision (recommend route-from-source, D-16 style); source ester/fusel kinetics (de Andrés-Toro 1998 /
-Malherbe 2004 + ester lit, mostly `speculative`/directional per §3.5); unskip
-`test_lower_temperature_is_slower_but_cleaner`; record as D-19. Then the **pH charge-balance keystone**
-(unblocks SO₂ → MLF → mixed cultures). Full design in `docs/plans/milestone-2-{plan,context,tasks}.md`.
-No real datasets yet — when the first measured time-series lands in the data-ready harness
-(`ReferenceSeries`/`compare_series`), that's the cue to revisit the D-17 sweep and promote validated.
+**M2 batch 2 (2026-06-29): byproducts beat step 2 — ester + Ehrlich-fusel Processes landed.** Two
+additive, produced-only Processes filling the step-1 pools: **`EsterSynthesis`** (plausible form —
+`k_ester·X·S/(K_su+S)·f(T)`, coupled to the fermentative-flux Monod shape, warmth-favoured) and
+**`FuselAlcoholsEhrlich`** (speculative form — adds an `N/(K_n+N)` Ehrlich gate; the monotone-N branch is a
+flagged simplification of the real non-monotonic shape). Both embed their **own** Arrhenius factor via a new
+shared `arrhenius_factor` helper (refactored out of `ArrheniusTemperature`; single source of truth, D-11).
+**Load-bearing constraint:** each `E_a` held **above** `E_a_uptake` (55,100 J/mol) so the run-integrated
+byproduct total *falls* with T — the cancellation `total ∝ exp(-(ΔE_a/R)(1/T-1/T_ref))` is T-independent if
+ΔE_a=0. Verified empirically (wine 14°C→0.141 vs 25°C→0.186 g/L; beer 14°C→0.111 vs 25°C→0.147 g/L — slower
+AND cleaner cold). New regression guard `test_integrated_byproduct_total_falls_with_temperature` locks the
+ordering (snapshot rises-with-T tests pass for any positive E_a; only the integrated total distinguishes it,
+and the formal benchmark is still skipped). Wired into `MEDIA` (wine+beer) as a separate `_BYPRODUCT_PROCESSES`
+tuple (isolable, directive #3). Placeholder rate/E_a params in both YAMLs (speculative; real sourcing is the
+next step). 212 passed / 1 skipped; ruff + mypy clean. Committed `0753f2d`+`c4eecdd`, pushed to `main`.
+**Carbon-accounting sub-decision — user chose option (a), DEFERRED (not implemented).** I (and the advisor)
+recommended **(b)**: leave esters/fusels *out* of `total_carbon` because their carbon is already booked
+elsewhere — `Byp` is "organic acids **+ higher alcohols**, as succinic acid" (fusels *are* the higher
+alcohols) and ester carbon re-expresses ethanol+acid carbon; weighting the new pools would double-count. The
+shipped code is this interim (b) (closure byte-for-byte). **User overruled to (a)** (route ester/fusel carbon
+from sugar, weight the pools — one consistent rule with `Gly`/`Byp`, machine-precision closure that includes
+the aroma pools) and then said **"don't implement now, write it as planned work for next session."** So this
+session = **docs-only**: wrote the full (a) plan into `milestone-2-tasks.md` ("Planned next session" section)
+and reframed every "(b) is settled/D-19" comment (byproducts.py module+class docstrings, media.py, both YAMLs)
+to "interim (b); (a) agreed, deferred." **The hard part of (a) = the `Byp` double-count.** **(a1) IS option
+(a) as the user chose it** — route from sugar + redefine `Byp` to organic-acids-only + re-anchor
+`Y_byproduct_sugar` (literal, touches the realised-yield/ABV guard); **implement (a1) unless the user
+redirects.** **(a2)** (transfer carbon out of already-booked `E`/`Byp` pools, *no* new sugar draw,
+closure-neutral, lower blast radius) is a **distinct third option to FLAG for the user**, NOT a flavour of
+(a) — it does not literally route from sugar, so its outcome sits functionally close to the **(b) the user
+rejected**. Do not silently pick (a2) over (a1) (advisor caught me leaning that way — it inverts the user's
+call; their "discuss disagreements" preference says surface it instead). Caveat to flag: the Ehrlich pathway
+is *amino-acid*-derived but `N` carries **no carbon** in `total_carbon`, so "from sugar" is already a
+bookkeeping stand-in, not the metabolic carbon origin (the strongest honest argument for considering (a2)).
+New species for chemistry.py when (a) lands: ethyl acetate C₄H₈O₂, isoamyl alcohol C₅H₁₂O. ABV guard to keep
+green: `test_wine_abv_and_glycerol` asserts ABV∈[13.5,15.5]%, realised Y_E∈[0.46,0.50], glycerol∈[5,11] g/L.
+
+**Next: byproducts beat step 3+ (next session)** — (1) **implement carbon option (a)** per the plan above
+(do (a1)/route-from-sugar — that's what the user chose; surface (a2) only as a flagged lower-risk alternative
+for the user's call, don't default to it); (2) source ester/fusel kinetics
+(de Andrés-Toro 1998 / Malherbe 2004 + ester lit, mostly `speculative`/directional per §3.5; keep each
+`E_a > E_a_uptake`); (3) unskip `test_lower_temperature_is_slower_but_cleaner` (direction already verified);
+(4) record D-19. Then the **pH charge-balance keystone** (unblocks SO₂ → MLF → mixed cultures). Full design in
+`docs/plans/milestone-2-{plan,context,tasks}.md`. No real datasets yet — when the first measured time-series
+lands in the data-ready harness (`ReferenceSeries`/`compare_series`), that's the cue to revisit the D-17 sweep
+and promote validated.
 
 **Don't restate the design here** — it lives in the repo: `docs/DECISIONS.md`
 (all design decisions + rationale), `docs/ARCHITECTURE.md`, and the

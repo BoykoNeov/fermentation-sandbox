@@ -233,9 +233,11 @@ biomass_N_fraction:
 # -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
 # Esters and fusel (higher) alcohols: trace produced-only pools that RISE with
 # temperature (ales are notably estery). PLACEHOLDER VALUES, tagged speculative
-# pending the dedicated parameter-sourcing step. NOT carbon-routed (D-19): their
-# carbon is already in the ledger, so total_carbon is untouched. The benchmark
-# (warmer => more esters+fusels) is DIRECTIONAL. Carried for both media because the
+# pending the dedicated parameter-sourcing step. Under INTERIM accounting (b), NOT
+# carbon-routed: their carbon is already booked in the ledger, so total_carbon is
+# untouched. Agreed direction is option (a) — route from sugar, weight the pools —
+# deferred to a future session (see milestone-2-tasks.md); D-19 records it once (a)
+# lands. The benchmark (warmer => more esters+fusels) is DIRECTIONAL. Carried for both media because the
 # shared byproduct Processes declare these in `reads`; a value is required per
 # medium (D-1, no silent default). Values mirror the wine file (byproduct kinetics
 # are yeast-generic at this placeholder stage); beer's lower sugar yields a smaller
