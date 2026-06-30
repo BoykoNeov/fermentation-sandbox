@@ -835,9 +835,95 @@ wine ferment with byproducts on. The §2.2 realism guards are unmoved: wine **AB
 Beer **CO₂/sugar-consumed ratio 0.975** (was 0.977; still inside [0.95, 1.05]). Wine
 aroma totals ~0.11 g/L esters + ~0.05 g/L fusels (trace, as expected). 213 tests green.
 
-**Scope note.** This is the *carbon-accounting* half of the byproducts beat. Sourcing
-the ester/fusel rate + `E_a` placeholders, and unskipping the directional benchmark
-`test_lower_temperature_is_slower_but_cleaner`, remain the next steps of the beat.
+**Scope note.** This is the *carbon-accounting* half of the byproducts beat. The
+ester/fusel rate + `E_a` placeholders are now sourced (see the sourcing-step record
+below); unskipping the directional benchmark `test_lower_temperature_is_slower_but_\
+cleaner` remains the final step of the beat.
+
+### D-19 sourcing step — ester/fusel rate + E_a placeholders (2026-06-30)
+
+Replaced the four placeholder constants (`k_ester`, `E_a_esters`, `k_fusel`,
+`E_a_fusels`, both media) with literature-bounded values + honest provenance. The
+load-bearing constraint (each `E_a` > `E_a_uptake` = 55,100 J/mol so the run-integrated
+aroma total rises with temperature) is held. Headline: **the E_a ORDERING is now
+sourced; the rate MAGNITUDES and exact E_a values stay speculative (directional only,
+handoff §3.5).** Values: `E_a_esters` 75,000 → **80,000 J/mol**; `E_a_fusels` **70,000**
+(unchanged); `k_ester` **4.0e-4 /h**, `k_fusel` **2.5e-3 /h** (unchanged, order-of-
+magnitude targets). All four stay **speculative**.
+
+**Sources read (all open / provided in-source — none recalled).**
+- *de Andrés-Toro et al. 1998* (Math. Comput. Simul. 48(1):65-74), the canonical beer
+  byproduct model, read IN-SOURCE via the open **CC-BY** reproduction *Pilarski &
+  Gerogiorgis 2022* (Processes 10(11):2400, doi:10.3390/pr10112400) **Table 1**, which
+  transcribes its parameters verbatim. Ethyl acetate (an ester; exactly our
+  `ethyl_acetate` booking species) forms as `dC_EA/dt = Y_EA·μ_x·X_A` — tied to the
+  **growth** rate, with `Y_EA = exp(89.92 − 26589/T)` and `μ_X0 = exp(108.31 −
+  31934/T)` (form `μ = exp(A + B/T)`, T in K; apparent `E_a = −B·R`): apparent
+  `E_a ≈ 221` and `≈ 265 kJ/mol`. **No fusel/higher-alcohol term exists** in this model.
+- *Mouret et al. 2015* (Biochem. Eng. J. 103:211-218, doi:10.1016/j.bej.2015.07.017) and
+  *Rollero/Mouret et al. 2014* (Appl. Microbiol. Biotechnol. 99:2291-2304,
+  doi:10.1007/s00253-014-6210-9) — the wine aroma analog (the actual "Mouret 2014/2015"
+  reading-list items; **provided by the project owner** mid-task). MODAPEC parameterises
+  aroma as two-phase production *yields from sugar*, **linear in T and N₀** (not an
+  Arrhenius per-flux rate), via gas–liquid balances that separate synthesis from
+  evaporation.
+
+**Ordering vs magnitude — and why de Andrés-Toro's magnitude does NOT transfer.** Its
+ester rides on **growth**, while its own **sugar-uptake** term `μ_S0` (A=−41.92,
+B=+11654) has a **NEGATIVE** apparent E_a (≈ −97 kJ/mol — sugar uptake *falls* with T in
+that fit). So its internal ΔE_a (ester − flux) is ~480 kJ/mol *within a model whose flux
+E_a is negative* — incommensurable with our +55,100 J/mol Coleman uptake E_a. Lifting its
+ester E_a and differencing against Coleman would splice two incompatible models. The
+**ordering survives** the mismatch (ester ≫ flux, robustly, in a real fitted model — the
+citation); the **magnitude does not**. So E_a is held GENERIC, beer-grounded, ~80 kJ/mol,
+banded wide (60,000–250,000, all > E_a_uptake). `k_ester`/`k_fusel` are order-of-magnitude
+targets (de Andrés-Toro's `Y_EA·μ_x·X_A` and Mouret's yield form give no constant
+transferable to our flux-coupled `k`). Verified totals at dryness: wine **14 °C → 137.5,
+20 °C → 165.3, 25 °C → 191.8 mg/L** total aroma (esters 114 mg/L at 20 °C — in the
+50–200 mg/L band; fusels ~51 mg/L). Cleaner when colder. 214 tests green, ruff + mypy
+clean; §2.2 trio + carbon conservation unmoved (E_a is inert at the 20 °C benchmark,
+f=1 at T_ref; no k changed).
+
+**WINE ESTER finding — surfaced, not buried (the important correction).** The primary
+wine data *contradicts* a naive "warmer ⇒ more wine esters": Rollero 2014 states
+**"evaporation largely accounted for the effect of temperature on the accumulation of
+esters in liquid,"** and the *total production* (synthesis) our non-volatile `esters`
+pool represents is **weak and non-monotonic in T** (isoamyl acetate quadratic, lowest
+~24 °C; ethyl hexanoate ~T-independent). So **no value of `E_a_esters` reproduces wine
+ester behaviour — the missing physics is a volatilization / gas-stripping sink the model
+does not yet simulate.** We therefore: (i) struck the earlier "+~75% esters per 15 °C"
+brewing-folklore magnitude anchor from the *wine* ester provenance (it is a beer/general
+number that does not transfer); (ii) kept one GENERIC, beer-grounded `E_a_esters` >
+`E_a_uptake` (de Andrés-Toro's beer coupling is real); (iii) documented the wine truth in
+the `E_a_esters` note and the `byproducts.py` tier docstring. **Citing Mouret/Rollero as
+supporting a wine ester rise would be false provenance — they show the opposite for
+liquid and ~flat for synthesis.** For *wine* the warmer⇒more-aroma benchmark direction is
+carried by the **FUSELS**, whose total-production rise with T *is* supported (Mouret
+2015). **Free fusel corroboration:** Mouret/Rollero confirm higher-alcohol synthesis is
+optimal at ~200–300 mg N/L and **non-monotonic in nitrogen** — exactly the simplification
+`FuselAlcoholsEhrlich` flags as the reason it is speculative; now cited in its provenance.
+
+**M1 correction (flagged, not silently rewritten).** The beer file's M1 Arrhenius notes
+cited a secondary "de Andrés-Toro ~35 kJ/mol for growth and ethanol." The in-source
+Table 1 debunks it: growth apparent E_a ≈ **265**, ethanol ≈ **10.5**, sugar ≈ **−97**
+kJ/mol — none is 35, and all are extreme lumped empirical-fit artifacts (which *is why*
+we carry the clean Coleman-derived value, not de Andrés-Toro's). The beer `E_a_growth`/
+`E_a_uptake` **values and bands are unchanged** (M1 not silently rewritten); only the
+notes are corrected. **Open item for the owner:** the beer band low (30,000) was
+justified by the now-debunked "~35 kJ/mol beer figure" — it is retained pending a
+deliberate M1-band review.
+
+**Two items beyond this checkbox (recorded for the owner; NOT built here).**
+1. *Volatilization / gas-stripping sink.* The real mechanism behind "cleaner when colder"
+   for wine esters is evaporative loss (warm, vigorous CO₂ evolution strips volatile
+   acetate/ethyl esters), which this model omits. A gas–liquid balance term (cf. Mouret's
+   MODAPEC, Morakul et al.) is the principled fix — **future work.**
+2. *Benchmark premise.* `test_lower_temperature_is_slower_but_cleaner` (the next, final
+   step of the beat) assumes warmer ⇒ more esters AND fusels. The *combined* esters+fusels
+   total still rises with T in both media (beer esters + both media's fusels carry it), so
+   the directional benchmark is passable as written. But the *wine-ester* half of its
+   premise is confounded by evaporation; unskipping it honestly for wine may want the
+   volatilization sink first. **Owner decision point** before that checkbox.
 
 ## Deferred (decide early in the relevant milestone)
 

@@ -20,16 +20,20 @@ mechanism is one self-contained, independently-togglable object.
 rate is the fermentative-flux Monod shape times its Arrhenius factor, so over a run
 to dryness the *total* produced scales as ``f_byproduct(T) / f_flux(T) =
 exp(-(ΔE_a/R)·(1/T - 1/T_ref))`` (the flux integral to dryness is fixed — the must
-ferments out either way). That total falls with temperature **iff** the byproduct's
+ferments out either way). That total **rises** with temperature — equivalently, falls
+off toward colder T, the "cleaner-when-colder" benchmark — **iff** the byproduct's
 activation energy exceeds the fermentative flux's (``ΔE_a > 0``): a byproduct that
-shared the flux's temperature sensitivity would integrate to a T-independent total
-and the "cleaner-when-colder" half of the benchmark would not hold. So
-``E_a_esters`` / ``E_a_fusels`` are sourced **above** ``E_a_uptake`` — which is also
-the physically-correct ordering (ester/fusel-forming steps are more
-temperature-sensitive than the fermentative flux). The cancellation is exact only
-for pure uptake to exact dryness; growth's sugar draw, the finite dryness cutoff,
-and the (un-Arrhenius-scaled) inactivation brake perturb it, so the integrated
-direction is **verified empirically**, not assumed.
+shared the flux's temperature sensitivity would integrate to a T-independent total and
+the directional benchmark would not hold. So ``E_a_esters`` / ``E_a_fusels`` are held
+**above** ``E_a_uptake``. This ordering is *sourced*, not a first-principles claim:
+the canonical beer model (de Andrés-Toro et al. 1998) ties ester (ethyl-acetate)
+formation to the strongly temperature-sensitive yeast *growth* rate (apparent E_a far
+above any fermentative-flux E_a), and the brewing/enology consensus is that warm
+ferments are estery/fusel-heavy — see the parameter files' provenance (decision D-19
+sourcing step). The exact magnitude stays speculative; only the ordering is
+load-bearing. The cancellation is exact only for pure uptake to exact dryness; growth's
+sugar draw, the finite dryness cutoff, and the (un-Arrhenius-scaled) inactivation brake
+perturb it, so the integrated direction is **verified empirically**, not assumed.
 
 **Carbon accounting — option (a)/a1 (decision D-19): carbon routed from sugar.**
 Each Process draws its species' carbon *out of ``S``* and the pools are weighted in
@@ -67,12 +71,19 @@ asserts where the carbon physically came from. Fusels carry **no CO2 co-product*
 draw a clean 1:1 sugar→pool carbon transfer.
 
 Tiers: :class:`EsterSynthesis` is **plausible** in form (warmth-favoured,
-flux-coupled ester synthesis is the literature-standard direction) with speculative
-rate parameters; :class:`FuselAlcoholsEhrlich` is **speculative** in form because
-its nitrogen dependence is knowingly simplified to a single monotone branch (the
-real Ehrlich relationship is non-monotonic — handoff §3.2). Parameter-tier
-propagation (D-1) caps the pool outputs at speculative regardless. These earn no
-promotion past plausible: the benchmark is a *directional* check (handoff §3.5).
+flux-coupled ester synthesis is the standard direction in the canonical *beer* model,
+de Andrés-Toro 1998) with speculative rate parameters. *Wine caveat:* in wine the
+warmer⇒more-ester direction is weaker and partly confounded — ester *synthesis* is
+non-monotonic in temperature and the observed fall of *liquid* ester with temperature
+is largely **evaporation**, a gas-stripping sink this model does not yet simulate
+(Mouret 2015; Rollero 2014). For wine the warmer⇒more-aroma direction is carried by the
+fusels; a volatilization sink is logged as future work (D-19). :class:`FuselAlcoholsEhrlich`
+is **speculative** in form because its nitrogen dependence is knowingly simplified to a
+single monotone branch (the real Ehrlich relationship is non-monotonic — handoff §3.2,
+corroborated by Mouret 2015 / Rollero 2014: higher-alcohol synthesis is optimal at
+~200–300 mg N/L). Parameter-tier propagation (D-1) caps the pool outputs at speculative
+regardless. These earn no promotion past plausible: the benchmark is a *directional*
+check (handoff §3.5).
 """
 
 from __future__ import annotations
@@ -147,7 +158,7 @@ class EsterSynthesis(Process):
     ethyl esters, ethyl acetate) form alongside fermentation; tying synthesis to the
     biomass-catalysed sugar flux (sharing ``K_sugar_uptake``) couples them to that
     flux directly, and the steeper-than-uptake ``E_a_esters`` makes the
-    run-integrated total fall with temperature (module docstring). The ester carbon
+    run-integrated total rise with temperature (module docstring). The ester carbon
     (booked as ethyl acetate) is routed *out of ``S``* via
     :func:`_draw_carbon_from_sugar` (option a1, D-19), so it touches ``esters`` and
     ``S`` — never ``E``/``CO2`` — and ``total_carbon`` (which now weights ``esters``)

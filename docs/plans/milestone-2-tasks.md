@@ -29,17 +29,29 @@ physics-free and can run in parallel. Keep `pytest` / `ruff` / `mypy` green and 
       glycerol 8.49, beer CO₂ ratio 0.975 — all §2.2 guards in band. Both carbon sources
       flagged as bookkeeping stand-ins (amino-acid fusel skeleton; ester ethanol moiety
       already in `E`); fusels carry no CO₂ co-product. 213 green. Full write-up in **D-19**.
-- [ ] Source + reconcile ester/fusel rate + T-sensitivity parameters; replace
-      placeholders; tag tiers honestly (`plausible`/`speculative`, directional only).
-      **Hard constraint:** keep each `E_a` > `E_a_uptake` (the ordering that makes the
-      run-integrated total fall with T — verified load-bearing).
+- [x] Source + reconcile ester/fusel rate + T-sensitivity parameters; replace
+      placeholders; tag tiers honestly (all four stay `speculative`, directional only).
+      **Hard constraint held:** each `E_a` > `E_a_uptake` (the load-bearing ordering).
+      Sourced via de Andrés-Toro 1998 (read in-source through the open CC-BY Pilarski &
+      Gerogiorgis 2022, doi:10.3390/pr10112400) for the ester ORDERING, and Mouret 2015
+      (doi:10.1016/j.bej.2015.07.017) + Rollero/Mouret 2014 (doi:10.1007/s00253-014-6210-9,
+      owner-provided) for the wine reality. `E_a_esters` 75k→80k, others unchanged.
+      **Key finding surfaced:** wine ester *synthesis* is weak/non-monotonic in T and the
+      wine *liquid* ester fall with T is largely EVAPORATION — a volatilization sink the
+      model omits; for wine the warmer⇒more-aroma direction is carried by FUSELS. Full
+      record in **DECISIONS → D-19 sourcing step**. 214 green, ruff + mypy clean.
 - [ ] Add a multi-temperature comparison; **unskip & pass
       `test_lower_temperature_is_slower_but_cleaner`** (lower T ⇒ longer to dryness AND
       fewer esters+fusels). Confirm the §2.2 trio + carbon conservation stay green.
       **Direction already verified empirically** (scratch run): wine 14 °C→15.8 d/0.141 g/L
       vs 25 °C→5.4 d/0.186 g/L; beer 14 °C→10.8 d/0.111 g/L vs 25 °C→4.4 d/0.147 g/L —
       slower AND cleaner when colder, both media, at dryness and at run end.
-- [ ] Record outcomes in **DECISIONS D-19**; update `milestone-2-plan.md` + ARCHITECTURE.
+      ⚠ **OWNER DECISION POINT first (D-19):** the combined esters+fusels total still
+      rises with T (passable), but the *wine-ester* half of the premise is confounded by
+      evaporation — unskipping it honestly for wine may want a **volatilization/gas-
+      stripping sink** (future work) before this checkbox.
+- [x] Record outcomes in **DECISIONS D-19** (sourcing-step subsection added). Remaining:
+      update `milestone-2-plan.md` + ARCHITECTURE when the benchmark checkbox closes.
 
 ## Done — carbon-accounting option (a)/a1 (decision D-19)
 

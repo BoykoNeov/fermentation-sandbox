@@ -322,63 +322,106 @@ biomass_N_yield_log_slope:
       as-printed -3.61 would collapse Y_X/N to ~0 by 2 mg N/L, which is absurd.
 
 # -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
-# Esters and fusel (higher) alcohols: trace pools that RISE with temperature.
-# PLACEHOLDER VALUES, tagged speculative pending the dedicated parameter-sourcing step
-# (reading list: de Andres-Toro et al. 1998, Malherbe et al. 2004, and ester/
-# higher-alcohol kinetic literature). CARBON ACCOUNTING - option (a)/a1 (decision
-# D-19): the ester/fusel Processes route their carbon OUT OF SUGAR (booked as ethyl
-# acetate / isoamyl alcohol) and total_carbon weights the pools, so they are real
-# carbon-accounted state under one rule with Gly/Byp. The Byp double-count is resolved
-# by carving higher alcohols out of Y_byproduct_sugar above (Byp = organic acids/
-# polyols only now). Both carbon sources are bookkeeping stand-ins: the Ehrlich fusel
-# skeleton is amino-acid carbon (N carries none in the ledger) and an ester's ethanol
-# moiety is already counted in E - exact on the ledger, approximate on the metabolism.
-# The benchmark (warmer => more esters+fusels) is DIRECTIONAL, so these stay
-# speculative and earn no promotion (handoff §3.5).
+# Esters and fusel (higher) alcohols: trace pools whose run-integrated total RISES with
+# temperature (warm ferments are estery/fusel-heavy). SOURCED in the D-19 sourcing step
+# (2026-06-30): the load-bearing E_a ORDERING is now backed by the literature; the rate
+# MAGNITUDES (k_ester/k_fusel) and the exact E_a values remain speculative
+# order-of-magnitude targets (directional validation only - handoff §3.5).
+#
+# THE ORDERING IS SOURCED, THE MAGNITUDE IS NOT - and the split is deliberate:
+#   * de Andres-Toro et al. 1998 (Math. Comput. Simul. 48(1):65-74), the canonical beer
+#     byproduct model, ties ETHYL ACETATE (an ester, and exactly our `ethyl_acetate`
+#     booking species) to the yeast GROWTH rate: dC_EA/dt = Y_EA * mu_x * X_A, with BOTH
+#     Y_EA AND mu_x strongly-T-increasing Arrhenius factors. Read IN-SOURCE via the open
+#     CC-BY reproduction Pilarski & Gerogiorgis 2022 (Processes 10(11):2400,
+#     doi:10.3390/pr10112400) Table 1, which transcribes de Andres-Toro's parameters
+#     verbatim [form mu_i0 = exp(A_i + B_i/T), T in K; apparent E_a = -B_i*R]:
+#       Y_EA  (ester yield)  A=89.92,  B=-26589  -> apparent E_a ~ 221 kJ/mol
+#       mu_X0 (growth)       A=108.31, B=-31934  -> apparent E_a ~ 265 kJ/mol
+#     So ester formation is FAR more temperature-sensitive than the fermentative flux:
+#     the ORDERING (E_a_ester > E_a_uptake) is robustly supported by a real fitted model.
+#   * But the de Andres-Toro MAGNITUDE does NOT transfer to our constraint. Its ester
+#     rides on growth, while its own sugar-uptake term mu_S0 (A=-41.92, B=+11654) has a
+#     NEGATIVE apparent E_a (~ -97 kJ/mol; sugar uptake falls with T in that fit). Its
+#     internal dE_a (ester minus its flux) is ~480 kJ/mol within a model whose flux E_a
+#     is negative - incommensurable with our +55,100 J/mol Coleman uptake E_a. Lifting
+#     its ester E_a and differencing against Coleman would splice two incompatible
+#     models. de Andres-Toro's apparent E_a's are also lumped empirical-fit artifacts
+#     (growth ~265, ethanol ~10.5, sugar ~-97 kJ/mol - none physical), so we do NOT
+#     transcribe their magnitude.
+#   * MAGNITUDE: held GENERIC and beer-grounded at ~80 kJ/mol (a modest dE_a ~25 kJ/mol
+#     above E_a_uptake), NOT split per medium. For BEER this matches the warmer-is-more
+#     consensus (de Andres-Toro; ales estery when warm). For WINE the picture is more
+#     complex - and the honest answer is that an E_a is the WRONG lever. Primary wine data
+#     now read in-source (Mouret et al. 2015, Biochem. Eng. J. 103:211-218,
+#     doi:10.1016/j.bej.2015.07.017; Rollero/Mouret et al. 2014, Appl. Microbiol.
+#     Biotechnol. 99:2291-2304, doi:10.1007/s00253-014-6210-9) show wine ester SYNTHESIS
+#     (total production, via gas-liquid balances) is WEAK and NON-MONOTONIC in temperature
+#     (isoamyl acetate quadratic, lowest ~24 C; ethyl hexanoate ~T-INDEPENDENT). The
+#     strong DECREASE of wine ester LIQUID concentration with temperature is LARGELY
+#     EVAPORATION ("Evaporation largely accounted for the effect of temperature on the
+#     accumulation of esters in liquid" - Rollero 2014) - a gas-stripping sink this model
+#     does NOT yet simulate. So NO value of E_a_esters reproduces wine ester behaviour;
+#     the missing physics is a volatilization loss term (FUTURE WORK, see D-19). For WINE
+#     the "warmer => more aroma" benchmark direction is therefore carried by the FUSELS,
+#     not the esters. We keep one generic E_a_esters > E_a_uptake (beer-grounded) and tell
+#     this wine truth in the E_a_esters note: citing Mouret/Rollero as supporting a wine
+#     ester RISE would be false provenance (they show the opposite for liquid, ~flat for
+#     synthesis); a generic value with an explicit "wine differs, here's how" note is not.
+#
+# CARBON ACCOUNTING - option (a)/a1 (decision D-19): the ester/fusel Processes route
+# their carbon OUT OF SUGAR (booked as ethyl acetate / isoamyl alcohol) and total_carbon
+# weights the pools, so they are real carbon-accounted state under one rule with Gly/Byp.
+# The Byp double-count is resolved by carving higher alcohols out of Y_byproduct_sugar
+# above (Byp = organic acids/polyols only now). Both carbon sources are bookkeeping
+# stand-ins: the Ehrlich fusel skeleton is amino-acid carbon (N carries none in the
+# ledger) and an ester's ethanol moiety is already counted in E - exact on the ledger,
+# approximate on the metabolism.
 #
 # KEY ORDERING CONSTRAINT (decision D-19): each E_a below must EXCEED E_a_uptake
 # (55,100 J/mol). The run-integrated byproduct total scales as
 # exp(-((E_a_byproduct - E_a_uptake)/R)(1/T - 1/T_ref)); only when the difference is
-# positive does the total FALL with temperature (the "cleaner when colder" half of
-# the benchmark). This is also physically correct - ester/fusel-forming steps are
-# more temperature-sensitive than the fermentative flux.
+# positive does the total RISE with temperature (i.e. fall off toward colder T - the
+# "cleaner when colder" half of the benchmark). This ordering is consistent with the
+# de Andres-Toro ester/growth coupling above and the brewing consensus, NOT a
+# first-principles claim about elementary-step activation energies.
 
 k_ester:
   value: 4.0e-4
   unit: "1/h"   # d(esters)/dt = k_ester * X * S/(K_su+S) * f(T); per-biomass ester rate
   tier: speculative
-  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "placeholder; tuned so total esters ~0.1-0.15 g/L at 20 C" }
+  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "order-of-magnitude target for total esters ~50-200 mg/L at 20 C" }
   provenance:
-    source: "author estimate (placeholder pending ester-kinetics sourcing)"
+    source: "author estimate bounded by typical wine ester levels; structurally after de Andres-Toro et al. 1998 (ethyl acetate ~ growth flux), read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400)"
     conditions: "S. cerevisiae wine; ester synthesis coupled to the biomass-catalysed sugar flux"
-    notes: "Read by EsterSynthesis as the specific ester-formation rate on the fermentative-flux Monod shape (shares K_sugar_uptake). At T_ref the run-integrated total is ~ (k_ester/q_sugar_max)*S0 ~ (4e-4/0.85)*245 ~ 0.12 g/L, the right trace order for total wine esters (~50-200 mg/L). PLACEHOLDER: the magnitude is an order-of-magnitude target, not a sourced fit - the dedicated sourcing step (D-19 reading list) replaces it."
+    notes: "Read by EsterSynthesis as the specific ester-formation rate on the fermentative-flux Monod shape (shares K_sugar_uptake). At T_ref the run-integrated total is ~ (k_ester/q_sugar_max)*S0 ~ (4e-4/0.85)*245 ~ 0.12 g/L (~120 mg/L), within the typical 50-200 mg/L range for total wine esters (ethyl acetate dominant). SPECULATIVE on magnitude: de Andres-Toro forms ethyl acetate as Y_EA*mu_x*X_A (a different coupling and unit system from our flux-coupled k_ester), so it gives no directly-transferable rate constant - we keep an order-of-magnitude target landing the trace in the right band, not a sourced fit. The wine aroma model Mouret 2015 BEJ (doi:10.1016/j.bej.2015.07.017) is now read, but it parameterises aroma as two-phase production YIELDS from sugar, linear in T and N0 (not a per-flux Arrhenius rate), so it too yields no constant transferable to our k_ester form."
 
 E_a_esters:
-  value: 75000.0
+  value: 80000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 60000.0, high: 95000.0, note: "must stay > E_a_uptake (55,100); ester steps more T-sensitive than fermentation" }
+  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100); spans brewing-consensus-mild (~80) to de Andres-Toro-steep (~220-265 kJ/mol)" }
   provenance:
-    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19)"
+    source: "Ordering (generic, beer-grounded): de Andres-Toro et al. 1998 ester/growth coupling, read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400) Table 1. Wine reality documented from Mouret 2015 (doi:10.1016/j.bej.2015.07.017) + Rollero 2014 (doi:10.1007/s00253-014-6210-9)"
     conditions: "S. cerevisiae wine; equivalent Arrhenius activation energy at T_ref = 293.15 K"
-    notes: "Sets the temperature sensitivity of ester synthesis (Q10 ~ 2.8 near 20 C). Deliberately ABOVE E_a_uptake (55,100 J/mol) so warmer ferments make more esters AND so the run-integrated total falls with temperature (see the section header). PLACEHOLDER magnitude pending the ester-kinetics sourcing step; the > E_a_uptake ordering is the load-bearing constraint, not the exact value."
+    notes: "GENERIC (beer-grounded) value held ABOVE E_a_uptake (55,100 J/mol). The ORDERING source is BEER: de Andres-Toro tie ethyl acetate to the growth rate via Y_EA=exp(89.92-26589/T), mu_X0=exp(108.31-31934/T) (apparent E_a ~221, ~265 kJ/mol, far above any flux E_a), so warmer BEER ferments are estery. WINE CAVEAT (load-bearing for honesty): primary wine data (Mouret 2015 BEJ; Rollero/Mouret 2014 AMB) show wine ester SYNTHESIS (total production) is WEAK and NON-MONOTONIC in T (isoamyl acetate quadratic, lowest ~24 C; ethyl hexanoate ~T-independent), and the marked fall of wine ester LIQUID concentration with T is LARGELY EVAPORATION - a gas-stripping sink this model does NOT simulate. So this E_a does NOT reproduce wine ester reality, and NO E_a can: the missing physics is a volatilization loss term (FUTURE WORK, D-19). For WINE the warmer=>more-aroma benchmark direction is carried by the FUSELS, not the esters. We keep one generic E_a_esters > E_a_uptake rather than splice in a wine value this lever cannot make right. SPECULATIVE; the magnitude is generic, NOT wine-measured - citing Mouret/Rollero as supporting a wine ester rise would be false provenance (they show the opposite for liquid, ~flat for synthesis)."
 
 k_fusel:
   value: 2.5e-3
   unit: "1/h"   # d(fusels)/dt = k_fusel * X * S/(K_su+S) * N/(K_n+N) * f(T)
   tier: speculative
-  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "placeholder; tuned so total fusels ~0.1-0.3 g/L at 20 C" }
+  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "order-of-magnitude target; trace total fusels (our run ~0.05-0.15 g/L), low end of the 150-400 mg/L wine higher-alcohol range" }
   provenance:
-    source: "author estimate (placeholder pending Ehrlich-pathway kinetics sourcing)"
+    source: "author estimate bounded by typical wine higher-alcohol levels; N-gate structure corroborated by Mouret 2015 (doi:10.1016/j.bej.2015.07.017) + Rollero/Mouret 2014 (doi:10.1007/s00253-014-6210-9)"
     conditions: "S. cerevisiae wine; Ehrlich fusel formation, nitrogen-gated on the fermentative flux"
-    notes: "Read by FuselAlcoholsEhrlich. Higher than k_ester because the N-gate (N/(K_n+N)) front-loads fusel formation into the nitrogen-replete early ferment and so cuts the production window short - the larger rate compensates to land total fusels in the trace ~0.1-0.3 g/L wine range. PLACEHOLDER order-of-magnitude target; replaced by the sourcing step (D-19)."
+    notes: "Read by FuselAlcoholsEhrlich. Higher than k_ester because the N-gate (N/(K_n+N)) front-loads fusel formation into the nitrogen-replete early ferment and so cuts the production window short - the larger rate compensates. Total wine higher alcohols are ~150-400 mg/L; our N-gated trace lands ~0.05-0.15 g/L (low end), front-loaded as Mouret/Sablayrolles observe (higher alcohols are maximal once N is exhausted at the end of growth, ~30% sugar consumption). SPECULATIVE order-of-magnitude target - the WEAKEST-sourced k of the four: no kinetic model of OUR per-flux form exists (de Andres-Toro has no fusel term; Mouret's is a yield-from-sugar form). CORROBORATION (D-19 sourcing step): Mouret 2015 + Rollero 2014 confirm higher-alcohol synthesis is OPTIMAL at ~200-300 mg N/L and NON-MONOTONIC in nitrogen - exactly the non-monotonic-N behaviour our FuselAlcoholsEhrlich knowingly simplifies to a single monotone branch (the documented reason that Process stays speculative)."
 
 E_a_fusels:
   value: 70000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 60000.0, high: 90000.0, note: "must stay > E_a_uptake (55,100); fusel steps more T-sensitive than fermentation" }
+  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100); below E_a_esters as the ester/fusel ratio rises with T" }
   provenance:
-    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19)"
+    source: "Direction sourced from primary wine data (Mouret 2015, doi:10.1016/j.bej.2015.07.017: higher alcohols generally produced in larger amounts at higher temperature) + brewing/enology consensus (warmer => accelerated Ehrlich amino-acid conversion => more fusels). No fusel kinetic model of our form exists (de Andres-Toro has no fusel term)"
     conditions: "S. cerevisiae wine; equivalent Arrhenius activation energy at T_ref = 293.15 K"
-    notes: "Sets the temperature sensitivity of Ehrlich fusel formation. Like E_a_esters it is held ABOVE E_a_uptake (55,100 J/mol) so total fusels fall with temperature (section header). PLACEHOLDER magnitude pending sourcing; the > E_a_uptake ordering is the constraint."
+    notes: "Sets the temperature sensitivity of Ehrlich fusel formation (Q10 ~ 2.6 near 20 C; +36% per 15 C). Held ABOVE E_a_uptake (55,100 J/mol) so total fusels rise with T (section header), and slightly BELOW E_a_esters because warmth shifts the balance toward esters (the fusel/ester ratio falls with T). This is the FUSEL half of the wine benchmark direction - and unlike the wine esters (whose warmer=>more is confounded by evaporation; see E_a_esters), the fusel direction IS supported for total production: Mouret 2015 reports higher alcohols generally rise with T (though compound-specific/non-systematic). ORDERING (> E_a_uptake) is the sourced, load-bearing constraint; the exact magnitude is speculative and banded - no kinetic source measures a fusel-formation activation energy in our form, so this is a bounded estimate, not a fit."

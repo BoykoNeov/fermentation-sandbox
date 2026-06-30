@@ -168,32 +168,44 @@ k_prime_d:
 
 # -- Arrhenius temperature dependence (per-rate, decision D-11) ----------------
 # INERT for M1: runs are isothermal at T_ref so f = 1 and these never bite.
-# Carried for Tier-2 readiness. de Andres-Toro 1998 use mu = A*exp(B/RT) and
-# (per secondary reports) fit E_a ~ 35 kJ/mol for growth and ethanol production -
-# but their primary table was not read in-source, so we do NOT mint that as a
-# sourced value. We carry the verifiable wine-derived value (Coleman 2007) as a
-# yeast-generic placeholder, tagged speculative, with a range wide enough to
-# admit the lower beer figure.
+# Carried for Tier-2 readiness. We carry the verifiable wine-derived value
+# (Coleman 2007) as a yeast-generic placeholder, tagged speculative.
+#
+# CORRECTION (D-19 sourcing step, 2026-06-30): an earlier note here claimed
+# de Andres-Toro 1998 "fit E_a ~ 35 kJ/mol for growth and ethanol production (per
+# secondary reports)". That secondary figure is WRONG. de Andres-Toro's primary
+# table - now read IN-SOURCE via the open CC-BY reproduction Pilarski & Gerogiorgis
+# 2022 (Processes 10(11):2400, doi:10.3390/pr10112400) Table 1, form
+# mu_i0 = exp(A_i + B_i/T), apparent E_a = -B_i*R - gives:
+#   growth  mu_X0 (A=108.31, B=-31934) -> apparent E_a ~ 265 kJ/mol
+#   ethanol mu_e0 (A=3.27,   B=-1267)  -> apparent E_a ~ 10.5 kJ/mol
+#   sugar   mu_S0 (A=-41.92, B=+11655) -> apparent E_a ~ -97 kJ/mol (NEGATIVE)
+# None is ~35 kJ/mol. These are extreme, internally-inconsistent lumped empirical-fit
+# artifacts (the model absorbs lag/growth/death transitions into each apparent E_a),
+# which is precisely why we do NOT adopt de Andres-Toro's temperature sensitivity and
+# carry the clean Coleman-derived value instead. The band low (30,000) below was
+# justified by the now-debunked "~35 kJ/mol beer figure"; it is RETAINED unchanged here
+# (M1 value/band not silently rewritten) pending a deliberate review - flagged in D-19.
 
 E_a_growth:
   value: 55900.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 30000.0, high: 63000.0, note: "spans beer (~35 kJ/mol, de Andres-Toro, secondary) to wine (~56 kJ/mol, Coleman)" }
+  uncertainty: { low: 30000.0, high: 63000.0, note: "low end retained from the now-debunked '~35 kJ/mol beer figure' (see header CORRECTION); high end ~Coleman wine ~56 kJ/mol" }
   provenance:
     source: "author estimate (yeast-generic; derived from Coleman 2007 wine fit, doi:10.1128/aem.00670-07)"
     conditions: "generic ale yeast; equivalent Arrhenius E_a at T_ref = 293.15 K"
-    notes: "INERT at the isothermal 20 C benchmark (f = 1 at T_ref). de Andres-Toro 1998 report a lower beer growth E_a (~3.46e4 J/mol) but their primary parameter table is paywalled and was not directly verified, so we carry the verifiable Coleman-derived value pending primary access. Range admits both."
+    notes: "INERT at the isothermal 20 C benchmark (f = 1 at T_ref). CORRECTION (D-19): de Andres-Toro's primary growth term has apparent E_a ~265 kJ/mol (NOT the ~35 kJ/mol secondary figure once cited here) - an extreme lumped-fit artifact (see header). We carry the clean verifiable Coleman-derived value; the band is unchanged pending a deliberate review (flagged in D-19)."
 
 E_a_uptake:
   value: 55100.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 30000.0, high: 63000.0, note: "spans beer (~35 kJ/mol, de Andres-Toro, secondary) to wine (~55 kJ/mol, Coleman)" }
+  uncertainty: { low: 30000.0, high: 63000.0, note: "low end retained from the now-debunked '~35 kJ/mol beer figure' (see header CORRECTION); high end ~Coleman wine ~55 kJ/mol" }
   provenance:
     source: "author estimate (yeast-generic; derived from Coleman 2007 wine fit, doi:10.1128/aem.00670-07)"
     conditions: "generic ale yeast; equivalent Arrhenius E_a at T_ref = 293.15 K"
-    notes: "INERT at the isothermal 20 C benchmark. de Andres-Toro 1998 report a lower beer ethanol-production E_a (~3.50e4 J/mol), secondary and unverified; Coleman-derived value carried pending primary access."
+    notes: "INERT at the isothermal 20 C benchmark. CORRECTION (D-19): de Andres-Toro's primary ethanol-production term has apparent E_a ~10.5 kJ/mol and its sugar-uptake term is NEGATIVE (~-97 kJ/mol) - NOT the ~35 kJ/mol secondary figure once cited here (see header). We carry the clean verifiable Coleman-derived value; band unchanged pending review (flagged in D-19)."
 
 T_ref:
   value: 293.15
@@ -231,60 +243,75 @@ biomass_N_fraction:
     notes: "Identical to the wine file - organism-level constant."
 
 # -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
-# Esters and fusel (higher) alcohols: trace pools that RISE with temperature (ales
-# are notably estery). PLACEHOLDER VALUES, tagged speculative pending the dedicated
-# parameter-sourcing step. CARBON ACCOUNTING - option (a)/a1 (decision D-19): the
-# ester/fusel Processes route their carbon OUT OF SUGAR (booked as ethyl acetate /
-# isoamyl alcohol) and total_carbon weights the pools. Beer needs NO Byp carve-out:
-# its Y_byproduct_sugar is held at 0 (minor byproducts out of M1 scope), so no higher
-# alcohols were ever booked in beer's Byp to double-count. The fusel/ester pools draw
-# their trace sugar directly; the CO2-ratio benchmark stays in band (the draw is
-# ~0.3% of sugar consumed). The benchmark (warmer => more esters+fusels) is
-# DIRECTIONAL. Carried for both media because the shared byproduct Processes declare
-# these in `reads`; a value is required per medium (D-1, no silent default). Values
-# mirror the wine file (byproduct kinetics are yeast-generic at this placeholder
-# stage); beer's lower sugar yields a smaller trace total, directionally correct.
+# Esters and fusel (higher) alcohols: trace pools whose run-integrated total RISES with
+# temperature (ales are notably estery). SOURCED in the D-19 sourcing step (2026-06-30);
+# see the wine file header for the full argument. Beer is the medium de Andres-Toro
+# actually modelled, so the ester ordering source applies DIRECTLY here (their ethyl
+# acetate is exactly our `ethyl_acetate` booking species). In brief:
+#   * de Andres-Toro et al. 1998 form ETHYL ACETATE as dC_EA/dt = Y_EA*mu_x*X_A (read
+#     in-source via the open CC-BY Pilarski & Gerogiorgis 2022, doi:10.3390/pr10112400,
+#     Table 1): Y_EA=exp(89.92-26589/T) and mu_X0=exp(108.31-31934/T) give apparent
+#     E_a ~221 and ~265 kJ/mol - ester formation is FAR more T-sensitive than the flux.
+#     ORDERING (E_a_ester > E_a_uptake) SOURCED.
+#   * MAGNITUDE not transferred: de Andres-Toro's apparent E_a's are lumped-fit
+#     artifacts (their own sugar-uptake E_a is NEGATIVE, ~-97 kJ/mol), incommensurable
+#     with our uptake E_a. Anchored instead to the brewing consensus (warm ferments
+#     ~+50-75% esters over ~15 C => dE_a ~25 kJ/mol => E_a_ester ~80 kJ/mol).
+# Values MIRROR the wine file (byproduct kinetics are yeast-generic at this stage); the
+# ordering source is if anything STRONGER for beer (de Andres-Toro IS a beer model).
+#
+# CARBON ACCOUNTING - option (a)/a1 (decision D-19): the ester/fusel Processes route
+# their carbon OUT OF SUGAR (booked as ethyl acetate / isoamyl alcohol) and total_carbon
+# weights the pools. Beer needs NO Byp carve-out: its Y_byproduct_sugar is held at 0
+# (minor byproducts out of M1 scope), so no higher alcohols were ever booked in beer's
+# Byp to double-count. The fusel/ester pools draw their trace sugar directly; the
+# CO2-ratio benchmark stays in band (the draw is ~0.3% of sugar consumed). Carried for
+# both media because the shared byproduct Processes declare these in `reads`; a value is
+# required per medium (D-1, no silent default).
 #
 # KEY ORDERING CONSTRAINT (decision D-19): each E_a must EXCEED E_a_uptake (55,100
-# J/mol) so the run-integrated byproduct total falls with temperature - see the wine
-# file header for the exp(-(dE_a/R)(1/T-1/T_ref)) cancellation argument.
+# J/mol) so the run-integrated byproduct total rises with temperature - see the wine
+# file header for the exp(-(dE_a/R)(1/T-1/T_ref)) argument. NB beer's own E_a_uptake is
+# itself a speculative Coleman-carried placeholder (55,100; see that entry), so the
+# constraint is relative to the value in THIS file; the de Andres-Toro ester ordering
+# holds against any plausible fermentative-flux E_a.
 
 k_ester:
   value: 4.0e-4
   unit: "1/h"   # d(esters)/dt = k_ester * X * S/(K_su+S) * f(T)
   tier: speculative
-  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "placeholder; beer ester total ~50-150 mg/L at 20 C" }
+  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "order-of-magnitude target for ale ester total ~50-150 mg/L at 20 C" }
   provenance:
-    source: "author estimate (placeholder pending ester-kinetics sourcing; mirrors wine)"
+    source: "author estimate bounded by typical ale ester levels; structurally after de Andres-Toro et al. 1998 (ethyl acetate ~ growth flux, beer-specific), read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400)"
     conditions: "ale yeast; ester synthesis coupled to the biomass-catalysed sugar flux"
-    notes: "Read by EsterSynthesis. Same placeholder as the wine file - ester kinetics are treated yeast-generic until sourced. Beer's lower fermentable sugar (~88 g/L vs wine's ~245) gives a smaller integrated ester total ~ (4e-4/0.5)*88 ~ 0.07 g/L, the right trace order for ale esters. PLACEHOLDER replaced by the D-19 sourcing step (de Andres-Toro et al. 1998 includes byproduct terms for beer specifically)."
+    notes: "Read by EsterSynthesis. Mirrors the wine file - ester kinetics treated yeast-generic. Beer's lower fermentable sugar (~88 g/L vs wine's ~245) gives a smaller integrated ester total ~ (4e-4/0.5)*88 ~ 0.07 g/L (~70 mg/L), the right trace order for ale esters. SPECULATIVE on magnitude: de Andres-Toro form ethyl acetate as Y_EA*mu_x*X_A (a growth coupling and unit system unlike our flux-coupled k_ester), so it gives no directly-transferable rate constant - an order-of-magnitude target, not a sourced fit."
 
 E_a_esters:
-  value: 75000.0
+  value: 80000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 60000.0, high: 95000.0, note: "must stay > E_a_uptake (55,100); ester steps more T-sensitive than fermentation" }
+  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100); spans brewing-consensus-mild (~80) to de Andres-Toro-steep (~220-265 kJ/mol)" }
   provenance:
-    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19; mirrors wine)"
+    source: "Magnitude: brewing consensus (warm ales ~+50-75% esters over ~15 C). Ordering: de Andres-Toro et al. 1998 (BEER model) ester/growth coupling, read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400) Table 1"
     conditions: "ale yeast; equivalent Arrhenius activation energy at T_ref = 293.15 K"
-    notes: "Temperature sensitivity of ester synthesis, held ABOVE E_a_uptake so warmer ferments make more esters and the integrated total falls with temperature. PLACEHOLDER magnitude; the > E_a_uptake ordering is the load-bearing constraint."
+    notes: "Temperature sensitivity of ester synthesis (Q10 ~ 3 near 20 C; +67% per 15 C), held ABOVE E_a_uptake so warmer ferments make more esters and the integrated total rises with T. ORDERING SOURCED, directly for beer: de Andres-Toro's beer model ties ethyl acetate to growth via Y_EA=exp(89.92-26589/T) and mu_X0=exp(108.31-31934/T) (apparent E_a ~221, ~265 kJ/mol), far above any fermentative-flux E_a. MAGNITUDE anchored to the milder brewing span (~80 kJ/mol), NOT de Andres-Toro's steep growth-coupled lumped-fit value (incommensurable - their sugar-uptake E_a is negative). Identical to the wine value; the > E_a_uptake ordering is the load-bearing, sourced constraint, the exact value banded."
 
 k_fusel:
   value: 2.5e-3
   unit: "1/h"   # d(fusels)/dt = k_fusel * X * S/(K_su+S) * N/(K_n+N) * f(T)
   tier: speculative
-  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "placeholder; beer fusel total ~50-200 mg/L at 20 C" }
+  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "order-of-magnitude target; ale fusel total ~50-200 mg/L at 20 C" }
   provenance:
-    source: "author estimate (placeholder pending Ehrlich-pathway kinetics sourcing; mirrors wine)"
+    source: "author estimate bounded by typical ale higher-alcohol levels; N-gate structure after Mouret/Sablayrolles (wine); no fusel kinetic model of our form sourced (de Andres-Toro has no fusel term)"
     conditions: "ale yeast; Ehrlich fusel formation, nitrogen-gated on the fermentative flux"
-    notes: "Read by FuselAlcoholsEhrlich. Same placeholder as the wine file. The N-gate front-loads fusels into the nitrogen-replete early ferment; beer's higher wort YAN (~200 mg/L) keeps the gate open a touch longer than a low-N wine must. PLACEHOLDER replaced by the D-19 sourcing step."
+    notes: "Read by FuselAlcoholsEhrlich. Mirrors the wine file. The N-gate front-loads fusels into the nitrogen-replete early ferment; beer's higher wort YAN (~200 mg/L) keeps the gate open a touch longer than a low-N wine must. SPECULATIVE order-of-magnitude target - the WEAKEST-sourced of the four (de Andres-Toro models no higher alcohols). CORROBORATION (D-19): the wine aroma studies Mouret 2015 / Rollero 2014 confirm higher-alcohol synthesis is optimal at ~200-300 mg N/L and NON-MONOTONIC in nitrogen - the very behaviour FuselAlcoholsEhrlich knowingly simplifies to one monotone branch (why it stays speculative)."
 
 E_a_fusels:
   value: 70000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 60000.0, high: 90000.0, note: "must stay > E_a_uptake (55,100); fusel steps more T-sensitive than fermentation" }
+  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100); below E_a_esters as the ester/fusel ratio rises with T" }
   provenance:
-    source: "author estimate (placeholder; ordered above E_a_uptake per decision D-19; mirrors wine)"
+    source: "brewing consensus (warmer => accelerated Ehrlich amino-acid conversion => more fusels; ester/fusel ratio rises with T). No fusel kinetic model of our form sourced (de Andres-Toro has no fusel term)"
     conditions: "ale yeast; equivalent Arrhenius activation energy at T_ref = 293.15 K"
-    notes: "Temperature sensitivity of Ehrlich fusel formation, held ABOVE E_a_uptake so total fusels fall with temperature. PLACEHOLDER magnitude; the > E_a_uptake ordering is the constraint."
+    notes: "Temperature sensitivity of Ehrlich fusel formation (Q10 ~ 2.6 near 20 C), held ABOVE E_a_uptake so total fusels rise with T, and slightly BELOW E_a_esters because warmth shifts the balance toward esters (the fusel/ester ratio falls with T). Identical to the wine value. ORDERING (> E_a_uptake) is the sourced, load-bearing constraint; the exact magnitude is speculative and banded - the weakest-sourced E_a (no kinetic source measures a fusel activation energy in our form)."
