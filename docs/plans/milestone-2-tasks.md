@@ -149,9 +149,34 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       (acetaldehyde-binding) split — acetaldehyde is an unbuilt §3.2 byproduct; and SO₂'s
       back-reaction on pH (additive via an `extra_acids` map if a mid-ferment dose event is
       built). 249 green. Full record in **DECISIONS → D-22**.
-- [ ] **MLF (*Oenococcus oeni*)** — second-organism Process on a "pitch MLF" event;
-      malic→lactic+CO₂; pH/ethanol/SO₂/T-sensitive growth. **Now unblocked** — the first RHS
-      consumer of `acidbase.molecular_so2` (SO₂-sensitive growth) and of pH. (Needs pH + SO₂.)
+- [ ] **MLF (*Oenococcus oeni*) v1 — conversion-only (decision D-23).** Now unblocked — the
+      first RHS consumer of `acidbase.molecular_so2` and of pH. Scope (full record in **D-23**):
+      - `X_mlf` **dosed-but-inert catalyst slot** on `wine_schema` (`default=0.0`, isolable),
+        dosed via a new scenario input `mlf_pitch_gpl`; **no growth/death Process in v1** — it is
+        a constant bacterial concentration scaling the rate, so the later growth beat is a clean
+        extension (add a Process touching `X_mlf`), not a refactor.
+      - `MalolacticConversion` Process: malic (C4) → lactic (C3) + CO₂ (C1), mole-for-mole, so
+        **carbon closes on the existing `total_carbon`** (already weighted since D-18; no new
+        conservation code). Touches `malic`/`lactic`/`CO2`; reads `X_mlf`, pH (`ph_of_state`),
+        molecular SO₂ (`molecular_so2`), `E`, `T`. Substrate-limited in malate, scaled by
+        `X_mlf`, gated by pH / ethanol / **molecular SO₂** / T inhibition. Tier **speculative**.
+      - **Acceptance:** the hand-built `test_headline_malic_to_lactic_raises_ph` ΔpH ∈ [0.1, 0.3]
+        (lands 0.225) becomes *emergent* from the Process on a malic-rich must.
+      - **Scope boundary:** runtime has no event mechanism ⇒ v1 = **co-inoculation** (bacteria
+        from t=0); sequential / post-AF MLF (pitch at day N) needs the event-driven loop
+        (deferred). Open knobs for the impl session: inhibition functional forms + sourcing;
+        whether `X_mlf` is explicit or folded into the rate constant.
+- [ ] **Amino-acid ledger — separate yeast/AF beat (decision D-23, deferred).** A toggleable
+      `default=0` amino-acid pool contributing to *both* the carbon and nitrogen ledgers,
+      implemented as a **separate isolable Process** — a carbon- *and* nitrogen-neutral *swap*
+      (refund sugar + ammonium `N`, debit the aa-pool by one aa-mass carrying exactly that C and
+      N) so growth + the Coleman reconstruction stay byte-for-byte. The honest home for the D-19
+      fusel Ehrlich carbon. **Prerequisites before it can ever fund MLF-growth:** (a) a residual-N
+      / satiation model — the model currently strips even a 300 mg/L must to zero (no residual
+      floor, D-23); (b) an autolytic-peptide source to refill the pool post-AF.
+- [ ] **MLF-growth — later composition (decision D-23).** Add a growth Process touching `X_mlf`,
+      funded from the amino-acid ledger + autolysis. Blocked on both aa-ledger prerequisites
+      above; the AF nitrogen-exhaustion evidence (D-23) is why it cannot be folded into v1.
 - [ ] **Mixed cultures / Brett / sour consortium** — resource competition. (After MLF.)
 - [ ] **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal).

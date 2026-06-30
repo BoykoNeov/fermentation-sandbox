@@ -1240,6 +1240,86 @@ down — unscripted, the D-18 coupling working through SO₂. **249 tests green*
 +1 chemistry), ruff + format + mypy clean. This unblocks **MLF** (whose *O. oeni* growth is
 SO₂-sensitive — the first RHS consumer of `molecular_so2`).
 
+## D-23 — MLF v1 is conversion-only; the amino-acid ledger is a separate yeast/AF beat
+
+**Status: scoped (decided 2026-06-30); implementation deferred to a future session.** Records
+the design call for the next beat — *Oenococcus oeni* malolactic fermentation — and the
+empirical evidence that settles it. No code landed; this is the decision the implementation
+session builds against.
+
+**The fork.** MLF converts L-malic acid (C4, diprotic) to L-lactic acid (C3, monoprotic) + CO₂,
+mole-for-mole, deacidifying the wine (pH up ~0.1–0.3). The question was whether v1 should model
+the *bacterium's growth* — and if so, where its biomass carbon comes from. Three paths surfaced:
+(B2) **conversion-only** — run the malate→lactate flux with no bacterial biomass dynamics;
+(B1-malate) growth funded from malate carbon; (B1-aa) growth funded from amino acids — the
+biologically-right source, which requires making nitrogen carry carbon, a change to the protected
+validated core.
+
+**The amino-acid carbon problem, and the toggle that defuses it.** Path B1-aa is the honest one
+— *O. oeni* builds biomass mostly from amino acids/peptides, not hexose — but `N` (YAN) is
+deliberately carbon-free in `total_carbon` (D-19), so making amino acids a carbon source is a
+*non-isolable* change to the core carbon ledger **and** the growth kinetic, violating prime
+directive #3. The owner's proposal — a **toggleable amino-acid ledger** (a `default=0` pool that,
+when populated, contributes to *both* the carbon and nitrogen ledgers) — restores isolability:
+when the pool is empty the carbon term is additively zero and the core is byte-for-byte. The
+advisor refined the *mechanism*: rather than a two-mode fork inside `GrowthNitrogenLimited` (a
+permanent branch through the core's hottest kinetic, with a float-identical collapse you must
+*prove*), implement it as a **separate isolable Process** — a pure *swap* that, for the
+amino-acid-funded fraction of biomass, refunds sugar by the displaced biomass carbon, refunds the
+ammonium `N` pool by the displaced biomass nitrogen, and debits the amino-acid pool by one
+amino-acid mass carrying exactly that C and N. The swap is carbon-neutral **and** nitrogen-neutral
+by construction, leaves growth (and the Coleman reconstruction) byte-for-byte untouched, and
+contributes zero when the pool is empty — isolability is *structural*, not a tested coincidence.
+Its one new input is the amino-acid pool's C:N ratio (a sourced, speculative `Parameter`).
+
+**Why it is nonetheless a *separate* beat, not part of MLF — settled by running the model.** The
+decisive question is whether the amino-acid pool has anything in it *at the MLF pitch point*. It
+does not. A standard 24 Brix wine AF (the §2.2 Coleman anchor, 20 °C) was integrated to
+completion and the lumped `N` trajectory inspected:
+
+| Must | N first < 1 mg/L | N at dryness (pitch point) | Days to dryness |
+|------|------------------|----------------------------|-----------------|
+| 80 mg/L (Coleman low-N) | day 1.29 | ≈ 0 | 8.33 d |
+| 300 mg/L (richly dosed) | day 1.33 | ≈ 0 | 5.17 d |
+
+`N` is driven to the solver floor (~0) within ~1.3 days of pitch and sits there for the entire
+post-AF period — *regardless of dose*. So at the MLF pitch (dryness, day 5–8) there is no
+nitrogen, and the future amino-acid pool would be in exactly the same place (the same uptake that
+drains `N` drains it). **MLF-growth is therefore structurally blocked until something replenishes
+the pool post-AF** — an autolytic-peptide flux (yeast death → peptides → amino-acid pool),
+unbuilt. The toggleable aa-ledger improves *primary-fermentation* (yeast) carbon honesty and is
+the natural home to later re-route the D-19 fusel Ehrlich carbon off its sugar stand-in — but it
+does not feed the bacteria. Hence: **MLF v1 = conversion-only; the amino-acid ledger is its own
+yeast/AF beat; MLF-growth is a still-later composition of the two plus autolysis.**
+
+**A model gap surfaced by the same run (flagged, not fixed).** The model drives even a 300 mg/L
+must to *zero* nitrogen within ~1.3 days — it has no satiation cap, no luxury-uptake ceiling, no
+residual-N floor. Real musts finish with 50–150 mg/L residual YAN plus an unusable **proline**
+tail (yeast cannot assimilate proline anaerobically). So the model *overstates* nitrogen
+exhaustion. This matters for the aa-ledger beat: doing it *honestly* means also modeling that
+yeast stop assimilating when sated, otherwise the post-AF amino-acid residue is artificially
+empty. More scope → more reason it is a careful separate beat, not a rider on MLF.
+
+**MLF v1 scope (what the implementation session builds).**
+- **Carbon closes on the existing ledger** — malic (C4) → lactic (C3) + CO₂ (C1) are already
+  weighted in `total_carbon` (`chemistry.py`, anticipated since D-18); no new conservation code.
+- **`X_mlf` as a dosed-but-inert catalyst slot** on `wine_schema` (`default=0.0`, isolable),
+  dosed via a new scenario input `mlf_pitch_gpl`. In v1 *no Process grows or kills it* — it is a
+  constant bacterial concentration scaling the conversion rate, so the later growth beat is a
+  clean extension (add a growth Process touching `X_mlf`), not a refactor.
+- **`MalolacticConversion` Process** — touches `malic`/`lactic`/`CO2`, reads `X_mlf`, pH
+  (`ph_of_state`), molecular SO₂ (`molecular_so2`), ethanol `E`, and `T`. Flux is substrate-limited
+  in malate, scaled by `X_mlf`, and gated by inhibition factors: low pH, high ethanol,
+  **molecular SO₂** (the first RHS consumer of D-22), and a temperature optimum. Tier
+  **speculative**.
+- **Acceptance gate** — the existing hand-built `test_headline_malic_to_lactic_raises_ph`
+  ΔpH ∈ [0.1, 0.3] (lands 0.225) becomes *emergent* from the Process on a malic-rich must.
+- **Scope boundary** — runtime has no event mechanism, so v1 models **co-inoculation** MLF
+  (bacteria present from t=0). **Sequential / post-AF MLF** (pitch at day N) needs the
+  event-driven loop (deferred, see `runtime/integrate.py` docstring). Open knobs for the
+  implementation session: the exact inhibition functional forms and their sourcing; whether
+  `X_mlf` is explicit or folded into the rate constant.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
