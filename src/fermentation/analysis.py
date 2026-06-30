@@ -18,6 +18,13 @@ state (the D-16 realised-yield diversion grows it 0 → ~3 g/L over a wine ferme
 read by the charge balance (include-by-reading), so with the cation frozen at its pitch
 value pH **drifts mildly down** (~0.05–0.1 units) as fermentation proceeds — a realistic,
 emergent demonstration that the solver responds to acid dynamics with no scripting.
+
+CAVEAT on :func:`titratable_acidity_series` — the *initial* (must) TA is the fidelity-grade
+value; the series **rises** ~3–4 g/L as ``Byp`` accumulates (the whole pool read as
+titratable diprotic succinic), which runs *backwards* to real wine (TA flat-to-declining
+during ferment). That is an upstream pool sizing/booking artifact (D-16/D-19), not the
+solver; treat the end-of-ferment TA as an over-estimate / directional only. See
+:func:`fermentation.core.acidbase.titratable_acidity`.
 """
 
 from __future__ import annotations

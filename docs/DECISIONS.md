@@ -825,6 +825,17 @@ that the open entry above did not yet fix:
   the derived pH/TA tier as `combine(pKa tiers, PLAUSIBLE)` — it must NOT inherit the
   `VALIDATED` default `tier_of` returns for the inert acid slots no Process touches.
 
+**Known TA-series artifact (scoped, not a solver bug).** `titratable_acidity` is exact
+given its inputs, and the *must* (t=0) TA lands in the textbook 6–9 g/L band. But the TA
+*series* **rises** ~3–4 g/L over a ferment because the whole `Byp` pool is read as
+fully-titratable diprotic succinic and `Byp` accumulates to ~3 g/L (D-16/D-19). Real wine
+TA is flat-to-*declining* during ferment (tartrate precipitation, malic metabolism), so the
+end-of-ferment TA is an **over-estimate, directional only** — trust the t=0 value. The
+cause is upstream pool sizing/booking (`Byp` lumps neutral 2,3-butanediol yet is booked
+diprotic; the pool itself exceeds real succinic 0.5–1.5 g/L), bounded as *minor for pH*
+(~1–1.5 mM vs ~20 mM buffer) but *direct and larger for TA*. Fixing it belongs upstream
+(speciate `Byp`, re-source the pool), not in the D-18 solver.
+
 **Acceptance gate (proof-of-purpose, met):** on a malic-rich must (tartaric 4 / malic 4
 g/L, anchored pH 3.4) the full malic→lactic substitution raises pH by **0.225**, inside
 the required MLF band [0.1, 0.3] — MLF-enablement demonstrated *without* an MLF Process

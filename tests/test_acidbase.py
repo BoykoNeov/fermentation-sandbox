@@ -194,6 +194,18 @@ def test_unphysical_initial_ph_raises_at_compile():
         compile_scenario(_wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=2.0))
 
 
+def test_initial_ph_without_pka_params_raises_clearly():
+    # The explicit parameter_paths override is caller-controlled: a caller asking for
+    # initial_ph but NOT including acidbase.yaml must get a clear, actionable error
+    # (the missing-pKa KeyError is caught and re-raised), not a raw KeyError.
+    wine_only = default_data_dir() / "wine_generic.yaml"  # deliberately omit acidbase.yaml
+    with pytest.raises(ValueError, match="acidbase.yaml"):
+        compile_scenario(
+            _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4),
+            parameter_paths=[wine_only],
+        )
+
+
 # -- 8. carbon conservation unchanged by the new acid slots -------------------
 
 
@@ -244,4 +256,12 @@ def test_ph_series_drifts_down_as_byp_accumulates():
     assert ph[0] == pytest.approx(3.4, abs=1e-3)  # anchored at pitch
     drift = ph[0] - ph[-1]
     assert 0.02 <= drift <= 0.15, f"Byp-driven pH drift {drift:.3f} outside the expected mild fall"
+
+    # The MUST (t=0) TA is the fidelity-grade value, in the 6-9 g/L band. The TA SERIES
+    # then RISES as Byp accumulates (whole pool read as titratable diprotic succinic) —
+    # an ACKNOWLEDGED upstream artifact (D-16/D-19 pool booking), backwards to real wine
+    # (TA flat-to-declining during ferment). Pinned here as known/directional, NOT
+    # fidelity: see acidbase.titratable_acidity caveat. Don't "fix" it by changing D-18.
     assert ta.shape == traj.t.shape and np.all(ta > 0.0)
+    assert 6.0 <= ta[0] <= 9.0  # must value is trustworthy
+    assert ta[-1] > ta[0]  # documents the artifact rise (do not assert end-of-ferment band)

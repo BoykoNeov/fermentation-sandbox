@@ -268,8 +268,19 @@ def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, 
     acid contributes ``C_a·(z_max − mean_charge(current pH))`` eq/L of still-titratable
     protons, summed and weighted by the tartaric equivalent weight (M_tartaric/2 ≈ 75.04
     g/eq). Omits the free-[H⁺] term (~0.4 mM, ~0.4 % at must pH) that conventional
-    TA-to-8.2 includes — fine for the plausible tier and the 6–9 g/L band. Uses the same
-    acid state as ``ph_of_state`` (no new state).
+    TA-to-8.2 includes — fine for the plausible tier and the 6–9 g/L must band. Uses the
+    same acid state as ``ph_of_state`` (no new state).
+
+    CAVEAT — trust the *must* (t=0) value, not the end-of-ferment series. The whole ``Byp``
+    pool is read as a fully-titratable diprotic succinic acid, so as ``Byp`` accumulates
+    over a ferment (the D-16/D-19 realised-yield diversion, ~3 g/L) the computed TA *rises*
+    ~3–4 g/L. Real wine TA is flat-to-*declining* during fermentation (tartrate
+    precipitation, malic metabolism), so the end-of-ferment TA here is an **over-estimate,
+    not a fidelity-grade readout**. The cause is upstream pool sizing/booking (``Byp``
+    lumps neutral 2,3-butanediol yet is booked diprotic; the pool itself exceeds real
+    succinic 0.5–1.5 g/L), not this function — which is exact given its inputs. Bounded for
+    *pH* as minor (~1–1.5 mM vs ~20 mM buffer) by D-18; the *TA* impact is direct and
+    larger. Use the t=0 must TA as the band check; treat the series as directional only.
     """
     pka_map = build_pka_map(params)
     totals = _totals_molar(y, schema)
