@@ -13,17 +13,19 @@ SHARED = (
 
 
 #: Wine appends four charge-active acid + strong-cation slots to the shared set for the
-#: pH charge-balance solver (decision D-18); beer does not (its acid system is deferred).
+#: pH charge-balance solver (decision D-18), then the free-SO₂ pool for the molecular-SO₂
+#: readout (decision D-22); beer does not (its acid system is deferred).
 WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "cation_charge")
+WINE_SO2_SLOTS = ("so2_free",)
 
 
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
-    assert schema.names == SHARED + WINE_ACID_SLOTS
+    assert schema.names == SHARED + WINE_ACID_SLOTS + WINE_SO2_SLOTS
     assert schema.spec("S").size == 1
     # 12 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas)
-    # + 4 wine-only acid/cation slots (D-18)
-    assert schema.size == 16
+    # + 4 wine-only acid/cation slots (D-18) + 1 free-SO₂ slot (D-22)
+    assert schema.size == 17
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -59,12 +61,14 @@ def test_shared_variable_units_are_canonical():
 
 def test_wine_acid_slot_units_are_canonical():
     # The D-18 pH-solver slots: acids in g/L (mass concentration, like every other
-    # species), the net strong cation as a charge density in mol/L.
+    # species), the net strong cation as a charge density in mol/L. The D-22 free-SO₂
+    # pool is g/L of SO₂-equivalent (mass concentration).
     units = {spec.name: spec.unit for spec in wine_schema().specs}
     assert units["tartaric"] == "g/L"
     assert units["malic"] == "g/L"
     assert units["lactic"] == "g/L"
     assert units["cation_charge"] == "mol/L"
+    assert units["so2_free"] == "g/L"
 
 
 def test_produced_only_pools_default_to_zero_when_omitted():

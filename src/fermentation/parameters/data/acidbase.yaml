@@ -96,3 +96,36 @@ pKa_succinic_2:
     source: "CRC Handbook of Chemistry and Physics; Boulton et al., Principles and Practices of Winemaking"
     conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
     notes: "Second dissociation of succinic acid. Mostly bound at wine pH. CAVEAT (D-18): Byp also lumps neutral 2,3-butanediol, so reading the whole pool as a diprotic acid slightly OVERSTATES its acid charge (~1-1.5 mM vs the ~20 mM buffer) — a documented minor approximation."
+
+# -- Sulfurous acid, H2SO3 / SO2.H2O (diprotic) — the free-SO2 speciation set ----
+#
+# READOUT-ONLY (decision D-22). Unlike the acids above, these pKas are NOT in the
+# pH-solver's acid set (acidbase.PKA_PARAM_NAMES / build_pka_map) and are NOT read by
+# titratable_acidity. They are read only by the molecular-SO2 readout (acidbase.
+# molecular_so2 / molecular_so2_fraction), which solves pH from the organic acids and
+# then partitions the dosed free SO2 into molecular / bisulfite / sulfite at that pH.
+# Free SO2's own (minor) back-reaction on pH — bisulfite is a charge-active anion — is a
+# scoped omission for beat 1 (the inverse anchoring would absorb it into the fitted
+# cation at t=0 anyway, so the t=0 molecular-SO2 number is identical with or without it;
+# see D-22). OIV titratable acidity explicitly EXCLUDES sulfurous (and carbonic) acid,
+# which the readout-only design gives for free. Add to the charge balance later via an
+# `extra_acids` map if a mid-ferment SO2 addition event is built.
+pKa_sulfurous_1:
+  value: 1.81
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 1.77, high: 1.86, note: "effective wine value; literature 1.77-1.86 at cellar T / ionic strength" }
+  provenance:
+    source: "Usseglio-Tomasset & Bosia (1984), Bull. OIV; carried in Boulton et al., Principles and Practices of Winemaking, and Ribereau-Gayon et al., Handbook of Enology Vol. 1"
+    conditions: "wine-relevant temperature/ionic strength; applied as an apparent constant (decision D-22)"
+    notes: "First dissociation SO2.H2O <-> H+ + HSO3-. THE load-bearing constant: the molecular (undissociated SO2.H2O) fraction of free SO2 is 1/(1 + 10^(pH - pKa1)), and molecular SO2 is the antimicrobial species. With pKa1 ~ 1.81 the molecular fraction falls ~3x per 0.5 pH unit (~6% at pH 3.0, ~2% at pH 3.5, ~0.6% at pH 4.0) — the pH coupling the D-18 charge-balance keystone was built to make emerge. ~0.8 mg/L molecular (the microbial-stability target) needs ~40 mg/L free at pH 3.5."
+
+pKa_sulfurous_2:
+  value: 7.20
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 6.9, high: 7.3, note: "thermodynamic pKa2; well above wine pH so sulfite is negligible there" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics; Usseglio-Tomasset & Bosia (1984); Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C; applied as an apparent constant (decision D-22)"
+    notes: "Second dissociation HSO3- <-> H+ + SO3(2-). Far above wine pH (3-4), so the sulfite fraction is negligible (~1e-4) and the diprotic molecular fraction h^2/D reduces to the monoprotic 1/(1 + 10^(pH - pKa1)) there. Carried for an exact speciation and so the readout is correct up to the pH-8.2 TA endpoint, where sulfite IS partly formed — the reason excluding SO2 from titratable_acidity is load-bearing, not cosmetic (D-22)."

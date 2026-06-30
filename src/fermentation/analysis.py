@@ -1,6 +1,6 @@
-"""Trajectory-level derived observables — the pH/TA readout layer (decision D-18).
+"""Trajectory-level derived observables — the pH/TA/SO₂ readout layer (decisions D-18, D-22).
 
-The scalar pH/TA functions are *pure* and live in the core
+The scalar pH/TA/molecular-SO₂ functions are *pure* and live in the core
 (:mod:`fermentation.core.acidbase`); these *series* helpers map them over a
 :class:`~fermentation.runtime.integrate.Trajectory`, which is a runtime type, so they
 sit one layer up — a thin observable module mirroring how :mod:`fermentation.units`
@@ -60,4 +60,21 @@ def titratable_acidity_series(traj: Trajectory, params: Mapping[str, float]) -> 
             acidbase.titratable_acidity(traj.y[:, i], traj.schema, params)
             for i in range(traj.y.shape[1])
         ]
+    )
+
+
+def molecular_so2_series(traj: Trajectory, params: Mapping[str, float]) -> FloatArray:
+    """Molecular (antimicrobial) SO₂ [g/L] at each stored time (decision D-22).
+
+    Maps :func:`fermentation.core.acidbase.molecular_so2` over the trajectory: at every
+    column it solves pH from the organic acids and partitions the dosed free SO₂, so the
+    molecular fraction tracks the (mildly drifting) pH with no scripting — the SO₂
+    counterpart to :func:`ph_series`. Returns g/L; convert to the conventional mg/L with
+    :func:`fermentation.units.convert.gpl_to_mgl`. Report the tier with
+    :func:`fermentation.core.acidbase.molecular_so2_tier`. With no SO₂ dosed (``so2_free``
+    ≡ 0) this is identically zero — and, because SO₂ is carbon-free and outside the
+    charge balance, dosing it leaves :func:`ph_series` and ``total_carbon`` unchanged.
+    """
+    return np.array(
+        [acidbase.molecular_so2(traj.y[:, i], traj.schema, params) for i in range(traj.y.shape[1])]
     )

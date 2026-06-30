@@ -13,6 +13,15 @@ lactic) and SO₂ speciation (molecular fraction set by pKa) — *emerge* from t
 rather than being scripted per event. This module is the solver + post-hoc readout;
 there is no RHS consumer in D-18 (SO₂/MLF wire pH into rates in later beats).
 
+**SO₂ speciation (decision D-22)** is the first such readout to land: :func:`molecular_so2`
+partitions a dosed free-SO₂ pool into its molecular (antimicrobial) fraction *at the
+solved pH*, delivering the keystone's promised "dose SO₂ → speciation falls out of the
+current pH" coupling. It is **readout-only** — free SO₂ is a state slot but is *not* in
+the charge balance (its minor bisulfite charge would be absorbed by the inverse-anchored
+cation at t=0 regardless; see D-22), so the D-18 solver signatures are untouched. The
+free/bound (acetaldehyde-binding) split and the antimicrobial RHS consumer (suppressing
+MLF/spoilage growth) are deferred to their own beats — still no RHS consumer here.
+
 **Acid speciation (Henderson-Hasselbalch).** Each weak acid's mean anion charge per
 mole at proton concentration ``h`` is a smooth (C∞) function of ``h``:
 
@@ -105,6 +114,18 @@ PKA_PARAM_NAMES: tuple[str, ...] = tuple(
     name for spec in (*ACID_STATE.values(), BYP_AS_SUCCINIC) for name in spec.pka_param_names
 )
 
+#: Free SO₂ — a wine-only state slot (g/L of SO₂-equivalent), dosed at pitch and
+#: **inert in D-22** (no Process touches it ⇒ constant, exactly like the D-18 acids).
+#: Read ONLY by the molecular-SO₂ speciation readout below, never by the pH solver or
+#: :func:`titratable_acidity` (the readout-only design, decision D-22).
+SO2_STATE_KEY = "so2_free"
+
+#: The sulfurous-acid pKa parameter names the molecular-SO₂ readout reads — DELIBERATELY
+#: kept out of :data:`PKA_PARAM_NAMES`. SO₂ does not enter the charge balance in D-22, so
+#: ``build_pka_map`` / :func:`charge_residual` never see these; pH is solved from the
+#: organic acids and the dosed free SO₂ is then partitioned at that pH (readout-only).
+SO2_PKA_PARAM_NAMES: tuple[str, ...] = ("pKa_sulfurous_1", "pKa_sulfurous_2")
+
 
 # -- speciation ---------------------------------------------------------------
 
@@ -125,6 +146,26 @@ def mean_charge(h: float, pkas: tuple[float, ...]) -> float:
         ka2 = 10.0 ** (-pkas[1])
         denom = h * h + ka1 * h + ka1 * ka2
         return float((ka1 * h + 2.0 * ka1 * ka2) / denom)
+    raise ValueError(f"only mono- and diprotic acids supported, got {len(pkas)} pKa(s)")
+
+
+def neutral_fraction(h: float, pkas: tuple[float, ...]) -> float:
+    """Fraction of an acid present as its fully-protonated (neutral) species at ``h``.
+
+    The complement of :func:`mean_charge`'s dissociation: the undissociated H₂A (or HA)
+    share. Monoprotic ``h/(h + Ka)``; diprotic ``h²/D`` with the same partition
+    ``D = h² + Ka₁·h + Ka₁·Ka₂``. Used by the molecular-SO₂ readout (decision D-22): the
+    *molecular* (antimicrobial) fraction of free SO₂ is exactly the undissociated
+    SO₂·H₂O share. Rises smoothly toward 1 as ``h`` rises (lower pH ⇒ more protonated).
+    """
+    if len(pkas) == 1:
+        ka = 10.0 ** (-pkas[0])
+        return float(h / (h + ka))
+    if len(pkas) == 2:
+        ka1 = 10.0 ** (-pkas[0])
+        ka2 = 10.0 ** (-pkas[1])
+        denom = h * h + ka1 * h + ka1 * ka2
+        return float(h * h / denom)
     raise ValueError(f"only mono- and diprotic acids supported, got {len(pkas)} pKa(s)")
 
 
@@ -306,4 +347,62 @@ def ph_tier(params_tier_of: Mapping[str, Tier]) -> Tier:
     returns ``VALIDATED`` for them — which would over-report pH's confidence).
     """
     tiers = [params_tier_of[n] for n in PKA_PARAM_NAMES if n in params_tier_of]
+    return combine([*tiers, Tier.PLAUSIBLE])
+
+
+# -- SO₂ speciation readout (pH-coupled molecular fraction, decision D-22) ------
+
+
+def molecular_so2_fraction(ph: float, pkas: tuple[float, ...]) -> float:
+    """Fraction of free SO₂ present as molecular (antimicrobial) SO₂·H₂O at ``ph``.
+
+    The molecular species is the undissociated acid, so this is just
+    :func:`neutral_fraction` evaluated at ``h = 10⁻ᵖᴴ``. With the sulfurous pKa₁ ≈ 1.81
+    (and pKa₂ ≈ 7.2 negligible at wine pH) it reduces to the textbook
+    ``1/(1 + 10^(pH − pKa₁))`` and falls ~3× per 0.5 pH unit — the pH coupling the D-18
+    charge-balance keystone exists to make emerge ("dose SO₂ → speciation falls out of
+    the current pH"). Bisulfite/sulfite are the remaining ``mean_charge`` share.
+    """
+    return neutral_fraction(10.0 ** (-ph), pkas)
+
+
+def _so2_free(y: FloatArray, schema: StateSchema) -> float:
+    """The free-SO₂ pool (g/L), or 0 if the schema has no :data:`SO2_STATE_KEY` slot."""
+    if SO2_STATE_KEY not in schema:
+        return 0.0
+    return float(y[schema.slice(SO2_STATE_KEY)][0])
+
+
+def molecular_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """Molecular (antimicrobial) SO₂ [g/L] of a state vector — a derived pure function.
+
+    The headline SO₂ readout and the payoff of the D-18 keystone: pH is solved from the
+    organic acids (:func:`ph_of_state` — SO₂ is **not** in the charge balance, decision
+    D-22), then the dosed free SO₂ is partitioned at that pH and the molecular share
+    returned. In-loop signature ``(y, schema, params)`` like :func:`ph_of_state`, so a
+    future RHS consumer (SO₂ antimicrobial suppression of MLF/spoilage growth) is free.
+    Returns 0 when no SO₂ is dosed (or the slot is absent). Free SO₂ is expressed *as
+    SO₂*, so the partition is mass-preserving and the result is g/L molecular SO₂; report
+    in the conventional mg/L via :func:`fermentation.units.convert.gpl_to_mgl`.
+    """
+    free = _so2_free(y, schema)
+    if free <= 0.0:
+        return 0.0
+    ph = ph_of_state(y, schema, params)
+    pkas = tuple(params[n] for n in SO2_PKA_PARAM_NAMES)
+    return free * molecular_so2_fraction(ph, pkas)
+
+
+def molecular_so2_tier(params_tier_of: Mapping[str, Tier]) -> Tier:
+    """Tier of the derived molecular-SO₂ value — computed EXPLICITLY (decision D-22).
+
+    The readout solves pH (so it inherits every pH-solver pKa tier, exactly as
+    :func:`ph_tier`) *and* partitions free SO₂ by the sulfurous pKa(s) — so its tier is
+    the lowest of **both** pKa sets, floored at ``PLAUSIBLE`` (apparent constants applied
+    to wine are extrapolation; SO₂ speciation is never ``VALIDATED`` however good the pKa
+    source). Like :func:`ph_tier` it must NOT read the inert SO₂/acid *state*-slot tiers
+    (which ``tier_of`` reports ``VALIDATED`` for, since no Process touches them).
+    """
+    names = (*PKA_PARAM_NAMES, *SO2_PKA_PARAM_NAMES)
+    tiers = [params_tier_of[n] for n in names if n in params_tier_of]
     return combine([*tiers, Tier.PLAUSIBLE])

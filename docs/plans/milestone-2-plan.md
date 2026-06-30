@@ -116,17 +116,22 @@ kinetic literature. Tiers: `plausible` only where a source measures *our* form; 
 
 ## Scoped but not yet designed (stubs, in dependency order)
 
-- **pH / acid charge-balance solver** — the keystone (DECISIONS D-18). Designed deep at
-  its own beat. Track tartaric/malic/lactic/acetic (± carbonic) as carbon-accounted
-  state; solve `Σ charge = 0` for `[H⁺]` each RHS call; `pH` is a derived pure function.
-  Must resolve the three D-18 couplings (evolved-vs-dissolved CO₂; acid carbon vs the
-  D-16 `Byp`=succinic sink; pKa(T)).
-- **SO₂** — free/bound/molecular equilibrium, **pH-dependent** (molecular fraction via
-  pKa ≈ 1.81 is the antimicrobial one); binds acetaldehyde. Needs pH first.
+- ✅ **pH / acid charge-balance solver** — the keystone (DECISIONS D-18). **Built
+  2026-06-30** (`core.acidbase` + `fermentation.analysis`): tartaric/malic/lactic as
+  carbon-accounted wine state, `Σ charge = 0` solved for `[H⁺]` in pH-space, `pH`/TA derived
+  pure functions; the three D-18 couplings resolved (carbonic omitted <0.1 % below pH 4;
+  `Byp` include-by-reading; constant pKa). See D-18 "Resolution".
+- ✅ **SO₂ — free speciation, readout-only** (DECISIONS D-22). **Built 2026-06-30**: the
+  **molecular** (antimicrobial) fraction is the pH-driven readout `1/(1+10^(pH−pKa₁))`
+  (pKa₁ 1.81), delivered as the derived pure function `acidbase.molecular_so2` over a dosed
+  `so2_free` wine state slot. **Readout-only** — SO₂ is not in the charge balance (anchoring
+  makes in-balance moot at t=0) and is carbon-free, so it leaves pH/carbon untouched.
+  **Deferred:** the free/**bound** acetaldehyde-binding split (acetaldehyde unbuilt) and
+  SO₂'s back-reaction on pH. No RHS consumer yet (wires into MLF/spoilage growth).
 - **Malolactic fermentation (*Oenococcus oeni*)** — a second-organism Process activated
   by a "pitch MLF" event: L-malic → L-lactic + CO₂, deacidifies (pH rises). Its growth
-  is pH/ethanol/SO₂/T-sensitive. Needs pH first; first consumer of the multi-organism
-  competition extension.
+  is pH/ethanol/SO₂/T-sensitive. **Now unblocked** (pH + SO₂ both built); first consumer of
+  the multi-organism competition extension and the first RHS consumer of `molecular_so2`.
 - **Mixed cultures / Brett / sour consortium** — resource competition (extended Monod /
   Lotka–Volterra). After MLF.
 - **Stochastic ensemble wrapper** — physics-free runtime layer sampling each parameter

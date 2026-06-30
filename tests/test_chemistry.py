@@ -19,6 +19,15 @@ def test_molar_masses_match_formulae():
     }
     for actual, expected in masses.items():
         assert actual == pytest.approx(expected, abs=1e-3)
+    # Sulfur dioxide, SO2 (decision D-22) — S 32.06 + 2*O 15.999. Checked to 1e-2
+    # because IUPAC's sulfur mass (32.06) carries fewer significant figures.
+    assert pytest.approx(64.058, abs=1e-2) == chem.M_SO2
+
+
+def test_sulfur_dioxide_is_carbon_free():
+    # SO2 is the only tracked species with no carbon, so it must read 0.0 (not raise)
+    # — the free-SO₂ pool contributes nothing to any carbon sum (decision D-22).
+    assert chem.carbon_mass_fraction("sulfur_dioxide") == 0.0
 
 
 def test_carbon_mass_fraction_known_species():

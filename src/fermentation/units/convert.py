@@ -40,6 +40,17 @@ def mgl_to_gpl(mg_per_l: float) -> float:
     return mg_per_l / 1000.0
 
 
+def gpl_to_mgl(g_per_l: float) -> float:
+    """Grams per litre -> milligrams per litre (the canonical -> industry inverse).
+
+    Free and molecular SO₂ are conventionally reported in mg/L (the ~0.5-0.8 mg/L
+    molecular-SO₂ stability target, the 30-60 mg/L free-SO₂ dose), so the canonical-unit
+    ``acidbase.molecular_so2`` readout (g/L) crosses back to mg/L here rather than via a
+    bare ``*1000`` at the call site (decision D-3).
+    """
+    return g_per_l * 1000.0
+
+
 def brix_to_sg(brix: float) -> float:
     """Degrees Brix -> specific gravity (20/20 C).
 

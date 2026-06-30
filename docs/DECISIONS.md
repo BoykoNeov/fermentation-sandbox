@@ -1158,6 +1158,88 @@ The directional benchmark `test_lower_temperature_is_slower_but_cleaner` passes 
 on liquid pools; the unit guard `test_integrated_wine_aroma_temperature_directions` now also
 asserts `esters_gas` **rises** with T. **222 tests green**, ruff + format + mypy clean.
 
+## D-22 — SO₂ speciation: the pH-coupled molecular fraction, as a readout-only derived function
+
+**Status: settled (built 2026-06-30).** The first consumer of the D-18 pH keystone, and
+the payoff its "dose SO₂ → speciation falls out of the current pH" promise was written
+against. Scope mirrors D-18's own deliverable boundary: **a derived pure-function readout,
+no RHS consumer** (the antimicrobial suppression of MLF/spoilage growth wires in with those
+organisms, exactly as pH had no consumer in D-18).
+
+**What SO₂ does in wine, and what beat 1 covers.** Free SO₂ partitions by pH into
+**molecular** SO₂·H₂O (the antimicrobial species), **bisulfite** HSO₃⁻ (dominant at wine
+pH), and negligible **sulfite** SO₃²⁻; the molecular fraction is
+`1/(1 + 10^(pH − pKa₁))` with pKa₁ ≈ 1.81, so it falls ~3× per 0.5 pH unit. Beat 1 builds
+exactly this **free-SO₂ speciation readout**. The **free/bound split** (SO₂ reversibly
+binds acetaldehyde and other carbonyls) is **deferred** — acetaldehyde is an unbuilt §3.2
+byproduct — which is why the scenario input is **free SO₂ (mg/L)**, the variable winemakers
+actually measure and target, not a total dose (treating a total addition as all-free would
+overestimate molecular SO₂; framing the input as free makes the deferral honest, not a hole).
+
+**The decision: readout-only — SO₂ is a state slot but NOT in the charge balance.** The fork
+was whether sulfurous acid joins the proton/charge balance (so its bisulfite charge nudges
+pH, and dosing SO₂ *acidifies* emergently) or pH is solved from the organic acids and free
+SO₂ partitioned at that pH as a pure readout. **The D-18 inverse anchoring collapses the
+fork at t=0:** `solve_cation_charge` back-solves the strong cation to reproduce `initial_ph`
+*exactly*, so if SO₂ were in the balance at pitch, the fitted cation would simply absorb its
+~0.6–0.8 meq/L of bisulfite charge and pH(t=0) would *still* be `initial_ph`. So the molecular
+SO₂ number at t=0 — the only place fidelity is anchored — is **identical** in both designs;
+the in-balance gain is ~zero where measured and second-order over the run (on top of an
+already directional-only pH drift), while its cost (refactoring the freshly-landed D-18
+signatures `charge_residual`/`solve_ph`/`solve_cation_charge` + the compile anchoring block)
+is real. **Readout-only wins**, and it is still fully compositional — the forward coupling
+D-18 promised is delivered, nothing is scripted. SO₂'s back-reaction on pH is a **scoped
+caveat** (like carbonic in D-18, but smaller relative to its own effect): the reverse coupling
+only becomes *visible* under a mid-ferment SO₂ *addition event* (unbuilt), and when wanted it
+should be added by **generalizing `Byp`'s separate-arg into an `extra_acids: Mapping[str,float]`**
+of non-carbon charge-active species (Byp + SO₂ both entries), not a 5th positional arg.
+
+**What landed.**
+- **`so2_free` state slot** on `wine_schema` only (g/L of SO₂-equivalent; `default=0.0`,
+  inert — no Process touches it, so it is constant exactly like the D-18 acids). Beer is
+  untouched (its acid/SO₂ system is deferred with its pH). Dosed via the optional scenario
+  input `so2_free_mgl` (mg/L → g/L at compile); it does **not** enter the cation back-solve.
+- **`acidbase.molecular_so2(y, schema, params)`** — the headline derived pure function:
+  solves pH from the organic acids (`ph_of_state`), then returns `free_SO₂ × neutral_fraction(pH)`.
+  Plus `molecular_so2_fraction(ph, pkas)` and a new `neutral_fraction(h, pkas)` (the
+  undissociated-species share `h²/D`, the complement of `mean_charge`'s dissociation), and
+  the `molecular_so2_series` analysis helper. Free SO₂ is expressed *as SO₂*, so the
+  partition is mass-preserving and the readout needs no molar conversion; `units.gpl_to_mgl`
+  reports the conventional mg/L.
+- **`pKa_sulfurous_1` = 1.81, `pKa_sulfurous_2` = 7.20** in `acidbase.yaml`, sourced
+  (Usseglio-Tomasset & Bosia 1984, carried in Boulton and Ribéreau-Gayon; CRC for pKa₂),
+  tier **plausible**. **Deliberately kept out of `PKA_PARAM_NAMES`** (the pH-solver acid set):
+  `build_pka_map`/`charge_residual` never see them — the structural guarantee that SO₂ is
+  readout-only.
+- **`M_SO2` = 64.06** chemistry constant (registered with **0 carbon atoms**, so
+  `carbon_mass_fraction("sulfur_dioxide") = 0.0` and the slot is carbon-inert in every sum).
+
+**Two caveats, both load-bearing, both scoped:**
+- **Excluded from titratable acidity.** OIV TA explicitly excludes sulfurous (and carbonic)
+  acid; readout-only gives this for free since SO₂ is not in `ACID_STATE`. This is *not*
+  cosmetic — pKa₂ ≈ 7.2 means sulfite *is* partly formed at the pH-8.2 titration endpoint, so
+  an SO₂-in-`ACID_STATE` design would have wrongly inflated TA.
+- **Back-reaction on pH omitted** (the readout-only choice above); justified by the anchoring
+  argument, additive to restore later.
+
+**Tier = `plausible`, computed explicitly.** `acidbase.molecular_so2_tier` combines **both**
+pKa sets — the pH-solver pKas (the readout solves pH) *and* the sulfurous pKas — floored at
+`PLAUSIBLE`. SO₂ speciation is never `VALIDATED`: apparent constants applied to wine are
+extrapolation, and the acceptance gate checks our implementation against Henderson-Hasselbalch
+(the equation itself), a self-consistency check, not an independent dataset.
+
+**Acceptance (met).** The molecular fraction lands on the textbook curve — **6.07 % / 2.00 %
+/ 0.64 %** at pH 3.0 / 3.5 / 4.0 — and falls ~3× per 0.5 pH unit. The free SO₂ needed for the
+**0.8 mg/L molecular** microbial-stability target reproduces the canonical winemaking table
+(**~13 / 32 / 40 / 50 / 79 / 125 mg/L** at pH 3.0 / 3.4 / 3.5 / 3.6 / 3.8 / 4.0). Prime
+directive #3 is pinned by an **isolability** test: on a shared time grid, dosing 60 mg/L SO₂
+leaves every other state column byte-identical, the pH series identical, and carbon closing —
+SO₂ is genuinely inert and outside both the charge balance and the carbon ledger. The series
+also shows the molecular fraction **rising** late as the emergent `Byp` pH drift pulls pH
+down — unscripted, the D-18 coupling working through SO₂. **249 tests green** (236 → +12 SO₂
++1 chemistry), ruff + format + mypy clean. This unblocks **MLF** (whose *O. oeni* growth is
+SO₂-sensitive — the first RHS consumer of `molecular_so2`).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

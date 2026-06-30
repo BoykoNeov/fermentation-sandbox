@@ -28,6 +28,7 @@ from fermentation.core.state import StateSchema
 _M_C = 12.011
 _M_H = 1.008
 _M_O = 15.999
+_M_S = 32.06
 
 # -- molar masses of tracked species, g/mol (derived from their formulae) -----
 #: Glucose / fructose, C6H12O6 — the lumped wine hexose and beer's first sugar.
@@ -76,6 +77,14 @@ M_MALIC = 4 * _M_C + 6 * _M_H + 5 * _M_O
 #: L-lactic acid, C3H6O3 — the MLF product (produced-only). Monoprotic; the softer
 #: acid that malic deacidifies *into*, the chemistry the pH solver must reproduce.
 M_LACTIC = 3 * _M_C + 6 * _M_H + 3 * _M_O
+#: Sulfur dioxide, SO2 — the ``so2_free`` (free SO₂) state species (decision D-22).
+#: The ONLY carbon-free tracked species, so it contributes nothing to ``total_carbon``
+#: (registered with 0 carbon atoms below; cf. the charge-only ``cation_charge`` slot).
+#: Free SO₂ is conventionally expressed *as SO₂* regardless of speciation, so the
+#: pH-driven molecular/bisulfite/sulfite split is mass-preserving and the readout needs
+#: no molar conversion; this molar mass is carried for completeness as the tracked
+#: species' weight and for the deferred in-balance step (sulfurous-acid mol/L charge).
+M_SO2 = 1 * _M_S + 2 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -93,9 +102,12 @@ MOLAR_MASS: dict[str, float] = {
     "tartaric_acid": M_TARTARIC,
     "malic_acid": M_MALIC,
     "lactic_acid": M_LACTIC,
+    "sulfur_dioxide": M_SO2,
 }
 
-#: Carbon atoms per molecule, keyed by species name.
+#: Carbon atoms per molecule, keyed by species name. ``sulfur_dioxide`` is carried at
+#: **0** so ``carbon_mass_fraction("sulfur_dioxide")`` returns 0.0 (not a KeyError) —
+#: the free-SO₂ pool is correctly carbon-inert in any carbon sum (decision D-22).
 CARBON_ATOMS: dict[str, int] = {
     "glucose": 6,
     "fructose": 6,
@@ -110,6 +122,7 @@ CARBON_ATOMS: dict[str, int] = {
     "tartaric_acid": 4,
     "malic_acid": 4,
     "lactic_acid": 3,
+    "sulfur_dioxide": 0,
 }
 
 

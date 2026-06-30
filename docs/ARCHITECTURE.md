@@ -181,11 +181,21 @@ than be scripted (DECISIONS #18).
   succinic-equivalent acid — zero new carbon, so `total_carbon` is unchanged and the D-16
   double-count is closed.
 - **The observable layer.** Scalar `ph_of_state` / `titratable_acidity` are pure and live
-  in core; the trajectory-series helpers (`ph_series`, `titratable_acidity_series`) need
-  `Trajectory`, so they sit one layer up in the new top-layer `fermentation.analysis` —
-  mirroring how `units` provides scalar conversions and benchmarks map ABV over a series.
-  Tier is reported via `acidbase.ph_tier` (computed explicitly as `plausible`, never the
-  `VALIDATED` default of the inert acid slots).
+  in core; the trajectory-series helpers (`ph_series`, `titratable_acidity_series`,
+  `molecular_so2_series`) need `Trajectory`, so they sit one layer up in the new top-layer
+  `fermentation.analysis` — mirroring how `units` provides scalar conversions and benchmarks
+  map ABV over a series. Tier is reported via `acidbase.ph_tier` (computed explicitly as
+  `plausible`, never the `VALIDATED` default of the inert acid slots).
+- **SO₂ speciation = the first pH consumer, readout-only (D-22).** `wine_schema` appends a
+  fifth slot, `so2_free` (free SO₂ as g/L SO₂-equivalent, dosed via `so2_free_mgl`, inert).
+  `acidbase.molecular_so2` solves pH from the organic acids then returns the **molecular**
+  (antimicrobial) fraction `1/(1+10^(pH−pKa₁))` (sulfurous pKa₁ 1.81) — the D-18 coupling
+  *emerging*, not scripted. It is **readout-only**: SO₂ is deliberately kept out of the
+  charge balance (the inverse anchoring makes in-balance vs readout identical at t=0) and
+  out of titratable acidity (OIV excludes it), and is carbon-free — so dosing it leaves pH
+  and `total_carbon` byte-for-byte (an isolability test pins this). No RHS consumer yet
+  (the antimicrobial brake wires into MLF/spoilage growth). The free/**bound**
+  (acetaldehyde-binding) split is deferred until acetaldehyde exists.
 
 ## Testing & quality gates
 

@@ -113,21 +113,25 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
 def wine_schema() -> StateSchema:
     """Wine state layout: a single lumped fermentable sugar slot, plus the wine-only
     charge-active acid + strong-cation slots the pH charge-balance solver reads
-    (decision D-18).
+    (decision D-18) and the free-SO₂ pool the molecular-SO₂ readout reads (decision D-22).
 
-    These four slots are appended to ``wine_schema`` only (not ``_common_specs``), so
+    These five slots are appended to ``wine_schema`` only (not ``_common_specs``), so
     ``beer_schema`` is untouched — beer's pH is a phosphate-buffered different acid
     system with no sourced data yet, explicitly deferred. ``default=0.0`` is
     load-bearing: existing wine scenarios/tests that name no acids still compile (all
-    four → 0), and with acids and cation at 0 the slots are inert — they contribute 0
-    to every conservation sum, so the validated core and its tests are untouched (prime
-    directive #3). No Process touches them in D-18, so their derivatives are 0 and the
-    trajectory is constant; they exist so a future MLF Process can deplete ``malic`` /
+    five → 0), and with acids, cation and SO₂ at 0 the slots are inert — they contribute
+    0 to every conservation sum, so the validated core and its tests are untouched (prime
+    directive #3). No Process touches them in D-18/D-22, so their derivatives are 0 and
+    the trajectory is constant; they exist so a future MLF Process can deplete ``malic`` /
     grow ``lactic`` and so the charge balance and ``total_carbon`` can read them. pH is
     simply not meaningful for a no-acid scenario and is only *computed* when requested
     (``fermentation.analysis``). ``cation_charge`` is a charge density (mol⁺/L), not a
     mass concentration — state is already heterogeneous (``T`` in K) — back-solved from
     the scenario's measured ``initial_ph`` at compile and held constant (D-18).
+    ``so2_free`` (g/L of SO₂-equivalent) is a dosed input read by ``acidbase.molecular_so2``
+    to partition the antimicrobial molecular fraction at the solved pH; it is **not** in
+    the charge balance (readout-only, D-22) and is carbon-free, so it leaves both pH and
+    ``total_carbon`` unchanged.
     """
     specs = _common_specs(VarSpec("S", "g/L", description="fermentable sugar"))
     specs += [
@@ -147,6 +151,13 @@ def wine_schema() -> StateSchema:
             default=0.0,
             description="net strong-cation charge (K+-dominant), constant; "
             "back-solved from initial_ph (D-18)",
+        ),
+        VarSpec(
+            "so2_free",
+            "g/L",
+            default=0.0,
+            description="free SO2 (molecular+bisulfite+sulfite, as SO2); dosed input, "
+            "inert; pH-driven molecular-fraction readout (D-22)",
         ),
     ]
     return StateSchema(specs)

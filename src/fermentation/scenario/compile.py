@@ -87,8 +87,18 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
     "wine": frozenset(
         # tartaric_gpl/malic_gpl/initial_ph are the optional pH-solver inputs (D-18);
         # lactic is produced-only (MLF product) so it is not an input, and the
-        # strong cation is back-solved from initial_ph, not given.
-        {"brix", "yan_mgl", "pitch_gpl", "ethanol_gpl", "tartaric_gpl", "malic_gpl", "initial_ph"}
+        # strong cation is back-solved from initial_ph, not given. so2_free_mgl is the
+        # optional free-SO₂ dose for the molecular-SO₂ readout (D-22).
+        {
+            "brix",
+            "yan_mgl",
+            "pitch_gpl",
+            "ethanol_gpl",
+            "tartaric_gpl",
+            "malic_gpl",
+            "initial_ph",
+            "so2_free_mgl",
+        }
     ),
     "beer": frozenset(
         {"glucose_gpl", "maltose_gpl", "maltotriose_gpl", "yan_mgl", "pitch_gpl", "ethanol_gpl"}
@@ -152,6 +162,11 @@ def _wine_initial(
         "malic": malic,
         "lactic": 0.0,
         "cation_charge": 0.0,  # back-solved below iff initial_ph is given
+        # Free-SO₂ dose for the molecular-SO₂ readout (D-22); mg/L→g/L, default 0
+        # (no dose). Inert state (readout-only, not in the charge balance), so it does
+        # NOT enter the cation back-solve below — SO₂'s minor bisulfite charge is a
+        # scoped omission the inverse anchoring would absorb at t=0 anyway (D-22).
+        "so2_free": mgl_to_gpl(_optional(values, "so2_free_mgl", 0.0)),
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named

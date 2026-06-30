@@ -136,10 +136,22 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
 
 ## Later beats (stubs, dependency-ordered)
 
-- [ ] **SO₂** — free/bound/molecular equilibrium, pH-driven speciation (pKa ≈ 1.81);
-      acetaldehyde binding. (Needs pH.)
+- [x] **SO₂ — free speciation (molecular fraction), readout-only (decision D-22).** Landed
+      2026-06-30. Free SO₂ is a wine-only `so2_free` state slot (dosed via `so2_free_mgl`,
+      inert), and `acidbase.molecular_so2` solves pH from the organic acids then returns the
+      pH-driven **molecular** (antimicrobial) fraction — `1/(1+10^(pH−pKa₁))`, pKa₁ 1.81
+      sourced (Usseglio-Tomasset & Bosia 1984), tier plausible. **Readout-only:** SO₂ is NOT
+      in the charge balance (the inverse anchoring makes in-balance vs readout give an
+      identical t=0 molecular number — see D-22) and is carbon-free, so dosing it leaves pH
+      and `total_carbon` byte-for-byte (isolability test). Gates the textbook curve (6/2/0.6 %
+      at pH 3.0/3.5/4.0; ~40 mg/L free for 0.8 mg/L molecular at pH 3.5). **No RHS consumer**
+      (antimicrobial suppression wires in with MLF/spoilage). **DEFERRED:** the free/**bound**
+      (acetaldehyde-binding) split — acetaldehyde is an unbuilt §3.2 byproduct; and SO₂'s
+      back-reaction on pH (additive via an `extra_acids` map if a mid-ferment dose event is
+      built). 249 green. Full record in **DECISIONS → D-22**.
 - [ ] **MLF (*Oenococcus oeni*)** — second-organism Process on a "pitch MLF" event;
-      malic→lactic+CO₂; pH/ethanol/SO₂/T-sensitive growth. (Needs pH.)
+      malic→lactic+CO₂; pH/ethanol/SO₂/T-sensitive growth. **Now unblocked** — the first RHS
+      consumer of `acidbase.molecular_so2` (SO₂-sensitive growth) and of pH. (Needs pH + SO₂.)
 - [ ] **Mixed cultures / Brett / sour consortium** — resource competition. (After MLF.)
 - [ ] **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal).
