@@ -32,6 +32,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from fermentation.core import acidbase
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -83,7 +84,12 @@ class CompiledScenario:
 #: Keys accepted in ``Scenario.initial`` per medium. Validated at compile time so
 #: a typo ("brixx") fails loudly instead of being silently ignored.
 _ALLOWED_KEYS: dict[str, frozenset[str]] = {
-    "wine": frozenset({"brix", "yan_mgl", "pitch_gpl", "ethanol_gpl"}),
+    "wine": frozenset(
+        # tartaric_gpl/malic_gpl/initial_ph are the optional pH-solver inputs (D-18);
+        # lactic is produced-only (MLF product) so it is not an input, and the
+        # strong cation is back-solved from initial_ph, not given.
+        {"brix", "yan_mgl", "pitch_gpl", "ethanol_gpl", "tartaric_gpl", "malic_gpl", "initial_ph"}
+    ),
     "beer": frozenset(
         {"glucose_gpl", "maltose_gpl", "maltotriose_gpl", "yan_mgl", "pitch_gpl", "ethanol_gpl"}
     ),
@@ -122,7 +128,14 @@ def _wine_initial(
         else 1.0
     )
     sugar_gpl = brix_to_sugar_gpl(_require(values, "brix", "wine")) * fermentable_fraction
-    return {
+    # pH-solver acid inputs (decision D-18), all optional so acid-free scenarios still
+    # compile (slots default to 0, inert). tartaric/malic are must inputs in g/L;
+    # lactic is produced-only (MLF product), 0 at pitch. The net strong cation is
+    # back-solved from the measured initial_ph so the modelled pH reproduces it at t=0
+    # (inverse anchoring): D-18 predicts pH *changes*, not absolute initial pH.
+    tartaric = _optional(values, "tartaric_gpl", 0.0)
+    malic = _optional(values, "malic_gpl", 0.0)
+    initial: _Initial = {
         "X": _require(values, "pitch_gpl", "wine"),
         "S": [sugar_gpl],
         "E": _optional(values, "ethanol_gpl", 0.0),
@@ -135,7 +148,32 @@ def _wine_initial(
         "esters": 0.0,  # produced-only aroma pools, empty at pitch (decision D-19)
         "fusels": 0.0,
         "esters_gas": 0.0,  # volatilized-ester bookkeeping pool, empty at pitch (D-20)
+        "tartaric": tartaric,
+        "malic": malic,
+        "lactic": 0.0,
+        "cation_charge": 0.0,  # back-solved below iff initial_ph is given
     }
+    if "initial_ph" in values:
+        # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
+        # acids alone; as Byp accumulates during the ferment, pH drifts emergently.
+        acid_gpl = {"tartaric": tartaric, "malic": malic, "lactic": 0.0}
+        totals_molar = {n: g / acidbase.ACID_STATE[n].molar_mass for n, g in acid_gpl.items()}
+        try:
+            initial["cation_charge"] = acidbase.solve_cation_charge(
+                totals_molar,
+                byp_succinic_molar=0.0,
+                pka_map=acidbase.build_pka_map(parameters.resolve()),
+                target_ph=float(values["initial_ph"]),
+            )
+        except ValueError as exc:  # initial_ph below the acid load's intrinsic pH
+            raise ValueError(f"wine scenario.initial['initial_ph'] is unphysical: {exc}") from exc
+        except KeyError as exc:  # acidbase.yaml pKa parameters not loaded
+            raise ValueError(
+                "wine scenario gives 'initial_ph' but the pKa parameters are missing "
+                f"({exc}); include acidbase.yaml in parameter_paths (the default lookup "
+                "merges it automatically)."
+            ) from exc
+    return initial
 
 
 def _beer_initial(
@@ -198,6 +236,8 @@ def _load_parameters(
     data_dir: str | Path | None,
 ) -> ParameterSet:
     if parameter_paths is not None:
+        # Caller-controlled override: a caller wanting the pH solver must include
+        # acidbase.yaml in their paths (the pKa set the charge balance reads, D-18).
         return load_parameters(*parameter_paths)
     base = Path(data_dir) if data_dir is not None else default_data_dir()
     path = base / f"{scenario.medium}_{scenario.strain}.yaml"
@@ -207,6 +247,12 @@ def _load_parameters(
             f"expected {path}. Pass parameter_paths=... or add the YAML "
             "(see the Milestone 1 parameter-sourcing task)."
         )
+    # Merge the shared, medium-agnostic acid/base pKa set alongside the medium file so
+    # every default-lookup scenario can compute pH (decision D-18). The names are
+    # collision-free with the kinetic parameters; load_parameters merges left-to-right.
+    shared = base / "acidbase.yaml"
+    if shared.exists():
+        return load_parameters(path, shared)
     return load_parameters(path)
 
 

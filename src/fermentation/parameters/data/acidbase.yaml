@@ -1,0 +1,98 @@
+# Acid dissociation constants for the wine pH charge-balance solver (decision D-18).
+#
+# SHARED, medium-agnostic parameter file: loaded alongside the <medium>_<strain>.yaml
+# by the compile seam (the store merges paths; these pKa names are collision-free with
+# the kinetic parameters). It holds only the pKa set the proton/charge-balance solver
+# (fermentation.core.acidbase) needs; the ionic product of water Kw is an in-code
+# physical constant (like GAS_CONSTANT), not an empirical parameter.
+#
+# VALUES: standard thermodynamic pKa at 25 C, zero ionic strength (CRC Handbook of
+# Chemistry and Physics; corroborated by Boulton et al., Principles and Practices of
+# Winemaking, and the wine-chemistry literature). These are textbook acid constants.
+#
+# TIER = plausible (NOT validated), uniformly. The pKa MEASUREMENTS are validated
+# science, but applying 25 C / I=0 constants to real wine (ionic strength I ~ 0.05-0.1 M,
+# 10-30 C) is an extrapolation: the concentration-based *apparent* pKa is the standard
+# plausible-tier simplification, and inverse anchoring (the back-solved strong cation)
+# folds the activity-coefficient error into the fitted cation at t=0 so it affects only
+# the buffer-capacity SLOPE, where we claim only directional fidelity. Per decision D-18
+# the derived pH/TA tier is computed EXPLICITLY (acidbase.ph_tier) as the lowest of these
+# pKa tiers floored at plausible, so pH never inherits a VALIDATED default.
+#
+# Acetic acid (pKa 4.76) is folded into the succinic-equivalent Byp read for now (the Byp
+# pool is lumped organic acids/polyols); add a separate `acetic` species only if Byp is
+# later speciated.
+
+# -- Tartaric acid, C4H6O6 (diprotic) — the dominant grape acid -----------------
+pKa_tartaric_1:
+  value: 3.04
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 2.9, high: 3.2, note: "thermodynamic pKa1 at 25 C, I=0; apparent value in wine shifts with ionic strength" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids); Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to wine as an apparent constant (decision D-18)"
+    notes: "First dissociation of tartaric (2,3-dihydroxybutanedioic) acid, the principal grape acid. pKa1 ~ must pH, so tartaric buffers hardest near pitch — the reason the strong-cation term is mandatory (weak acids alone give pH ~2.3 at ~33 mM, real must ~3.3)."
+
+pKa_tartaric_2:
+  value: 4.37
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 4.2, high: 4.5, note: "thermodynamic pKa2 at 25 C, I=0" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics; Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
+    notes: "Second dissociation of tartaric acid. The HT-/T2- equilibrium governs bitartrate (KHT) chemistry; carried here for the charge balance, relevant to a future cold-stabilization Process."
+
+# -- L-malic acid, C4H6O5 (diprotic) — the MLF substrate ------------------------
+pKa_malic_1:
+  value: 3.40
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 3.3, high: 3.5, note: "thermodynamic pKa1 at 25 C, I=0" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics; Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
+    notes: "First dissociation of L-malic (2-hydroxybutanedioic) acid. pKa1 sits right at must pH, so malic buffers strongly there — the reason malolactic fermentation (diprotic malic -> monoprotic lactic) raises pH appreciably (the D-18 headline coupling)."
+
+pKa_malic_2:
+  value: 5.11
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 5.0, high: 5.2, note: "thermodynamic pKa2 at 25 C, I=0" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics; Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
+    notes: "Second dissociation of L-malic acid. Above must pH, so the second proton is mostly bound at wine pH; it still contributes to the diprotic charge term that MLF removes."
+
+# -- L-lactic acid, C3H6O3 (monoprotic) — the MLF product ----------------------
+pKa_lactic:
+  value: 3.86
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 3.7, high: 4.0, note: "thermodynamic pKa at 25 C, I=0" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics; Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
+    notes: "Lactic (2-hydroxypropanoic) acid is MONOPROTIC and weaker than malic's first proton, so converting diprotic malic to monoprotic lactic both removes a dissociable proton and softens the acid — why MLF deacidifies (pH up ~0.1-0.3). The softer perceived acidity at fixed pH is a separate sensory effect, not modelled here."
+
+# -- Succinic acid, C4H6O4 (diprotic) — the Byp-pool representative -------------
+pKa_succinic_1:
+  value: 4.21
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 4.1, high: 4.3, note: "thermodynamic pKa1 at 25 C, I=0" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics; Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
+    notes: "First dissociation of succinic (butanedioic) acid, the representative species the lumped `Byp` minor-byproduct pool is carbon-accounted as (D-16). The charge balance READS the existing Byp pool through these pKas (include-by-reading, D-18 coupling #2): zero new carbon, so total_carbon is unchanged and the former double-count is closed."
+
+pKa_succinic_2:
+  value: 5.64
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 5.5, high: 5.8, note: "thermodynamic pKa2 at 25 C, I=0" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics; Boulton et al., Principles and Practices of Winemaking"
+    conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
+    notes: "Second dissociation of succinic acid. Mostly bound at wine pH. CAVEAT (D-18): Byp also lumps neutral 2,3-butanediol, so reading the whole pool as a diprotic acid slightly OVERSTATES its acid charge (~1-1.5 mM vs the ~20 mM buffer) — a documented minor approximation."

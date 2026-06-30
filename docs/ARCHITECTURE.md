@@ -28,10 +28,11 @@ Package map:
 |-------|---------|-----------|
 | parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` |
 | units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, … |
-| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon fractions, Gay-Lussac split, `sugar_species`); `kinetics` (`GrowthNitrogenLimited`, `SugarUptakeToEthanolCO2`, `EthanolInhibition`) |
+| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon fractions, Gay-Lussac split, `sugar_species`); `acidbase` (`solve_ph`, `ph_of_state`, `titratable_acidity`, `ph_tier`, charge balance); `kinetics` (`GrowthNitrogenLimited`, `SugarUptakeToEthanolCO2`, `EthanolInhibition`) |
 | runtime | `fermentation.runtime` | `simulate`, `Trajectory` |
 | scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
+| analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series` (top-layer observables over a `Trajectory`) |
 
 ## The core
 
@@ -157,6 +158,34 @@ Two disciplines, both as code:
   `BenchmarkSpec` data now; the `tests/benchmarks/` tests are skipped until the
   kinetics exist. `ReferenceSeries` + `compare_series` (RMSE/MAE) are the seam
   for scoring against *real* measured datasets when we obtain them.
+
+## pH as a derived pure function (acid state + charge balance, D-18)
+
+pH is **not** an integrated state — there is no `dpH/dt`. Like `total_carbon` and ABV it
+is an instantaneous, pure algebraic function of state: `fermentation.core.acidbase` solves
+electroneutrality `Σ charge = 0` for `[H⁺]` (a 1-D monotonic root-find in pH-space, via
+`brentq`) given the charge-active acid concentrations and a pKa set, and reports
+`pH = −log₁₀[H⁺]`. Building it as a full proton balance (not a tracked-pH approximation)
+is what makes the Tier-2 couplings — MLF deacidification, SO₂ speciation — *emerge* rather
+than be scripted (DECISIONS #18).
+
+- **Acid state (wine only).** `wine_schema` appends four slots: `tartaric`, `malic`,
+  `lactic` (diprotic/diprotic/monoprotic wine acids, carbon-weighted in `total_carbon` for
+  a future MLF Process) and `cation_charge`, the net strong-cation charge density (mol⁺/L,
+  K⁺-dominant). The cation is **mandatory** (weak acids alone give pH ≈ 2.3 vs a real ~3.3)
+  and **back-solved from a measured `initial_ph`** at the compile seam (inverse anchoring),
+  so the model predicts pH *changes*, not absolute initial pH. `beer_schema` is untouched —
+  beer's acid system is deferred. The slots default to 0, so acid-free scenarios are inert
+  and the validated core is unaffected (prime directive #3).
+- **`Byp` include-by-reading.** The balance reads the existing `Byp` pool as a
+  succinic-equivalent acid — zero new carbon, so `total_carbon` is unchanged and the D-16
+  double-count is closed.
+- **The observable layer.** Scalar `ph_of_state` / `titratable_acidity` are pure and live
+  in core; the trajectory-series helpers (`ph_series`, `titratable_acidity_series`) need
+  `Trajectory`, so they sit one layer up in the new top-layer `fermentation.analysis` —
+  mirroring how `units` provides scalar conversions and benchmarks map ABV over a series.
+  Tier is reported via `acidbase.ph_tier` (computed explicitly as `plausible`, never the
+  `VALIDATED` default of the inert acid slots).
 
 ## Testing & quality gates
 

@@ -115,14 +115,24 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
 - [ ] Tests: determinism preserved for a single (unsampled) run; ensemble spread tracks
       the input uncertainty; core stays reproducible.
 
-## Next beat — pH / acid charge-balance solver (keystone, D-18)
+## pH / acid charge-balance solver (keystone, D-18) — ✅ DONE (2026-06-30)
 
-- [ ] Track tartaric/malic/lactic/acetic (± carbonic) as carbon-accounted state.
-- [ ] Per-RHS `Σ charge = 0` root-find for `[H⁺]`; `pH` as a derived pure function
-      (smooth/fast for BDF). pKa set as parameters.
-- [ ] Resolve the three D-18 couplings: evolved-vs-dissolved CO₂ (carbonic); acid carbon
-      vs the D-16 `Byp`=succinic sink (no double-count); pKa(T).
-- [ ] Per-acid initial concentrations wired through `compile_scenario`.
+- [x] Track tartaric/malic/lactic as carbon-accounted **wine** state (`wine_schema`;
+      acetic folded into the `Byp` succinic read; carbonic scoped out — see #1). Beer acid
+      system explicitly deferred (phosphate-buffered, no sourced data).
+- [x] `Σ charge = 0` root-find for `[H⁺]` solved in pH-space (`brentq`); `pH` and TA as
+      **derived pure functions** of state (`core.acidbase`), smooth/fast for BDF, no
+      `dpH/dt`. pKa set as provenance-backed parameters (`acidbase.yaml`, all plausible).
+- [x] Resolve the three D-18 couplings: **#1 carbonic omitted** (~0.1 % of buffer below
+      pH 4 — scoped); **#2 acid carbon vs `Byp`** = *include-by-reading* (read existing
+      `Byp` as succinic-equiv, zero new carbon, double-count closed); **#3 pKa(T)** =
+      constant pKa (<0.05 units over 10–30 °C — scoped caveat).
+- [x] Per-acid concentrations + measured `initial_ph` wired through `compile_scenario`;
+      strong cation **back-solved** (inverse anchoring). Series readout in the new
+      top-layer `fermentation.analysis`.
+- [x] **ACCEPTANCE GATE:** malic→lactic ΔpH ∈ [0.1, 0.3] on a malic-rich must — lands
+      **0.225** (`tests/test_acidbase.py` headline). Plus the emergent Byp-driven pH
+      down-drift (~0.067) as a second, unscripted demonstration.
 
 ## Later beats (stubs, dependency-ordered)
 

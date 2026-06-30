@@ -12,12 +12,18 @@ SHARED = (
 )  # fmt: skip
 
 
+#: Wine appends four charge-active acid + strong-cation slots to the shared set for the
+#: pH charge-balance solver (decision D-18); beer does not (its acid system is deferred).
+WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "cation_charge")
+
+
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
-    assert schema.names == SHARED
+    assert schema.names == SHARED + WINE_ACID_SLOTS
     assert schema.spec("S").size == 1
-    # X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20)
-    assert schema.size == 12
+    # 12 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas)
+    # + 4 wine-only acid/cation slots (D-18)
+    assert schema.size == 16
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -31,7 +37,9 @@ def test_beer_schema_has_three_sequential_sugars():
 
 
 def test_shared_variable_units_are_canonical():
-    schema = wine_schema()
+    # Beer carries exactly the shared variable set, so it pins the canonical units of
+    # the shared layout (wine adds the D-18 acid/cation slots on top — checked below).
+    schema = beer_schema()
     units = {spec.name: spec.unit for spec in schema.specs}
     assert units == {
         "X": "g/L",
@@ -47,6 +55,16 @@ def test_shared_variable_units_are_canonical():
         "fusels": "g/L",
         "esters_gas": "g/L",
     }
+
+
+def test_wine_acid_slot_units_are_canonical():
+    # The D-18 pH-solver slots: acids in g/L (mass concentration, like every other
+    # species), the net strong cation as a charge density in mol/L.
+    units = {spec.name: spec.unit for spec in wine_schema().specs}
+    assert units["tartaric"] == "g/L"
+    assert units["malic"] == "g/L"
+    assert units["lactic"] == "g/L"
+    assert units["cation_charge"] == "mol/L"
 
 
 def test_produced_only_pools_default_to_zero_when_omitted():

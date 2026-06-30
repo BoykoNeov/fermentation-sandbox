@@ -65,6 +65,17 @@ M_ETHYL_ACETATE = 4 * _M_C + 8 * _M_H + 2 * _M_O
 #: carbon is sourced from sugar as a stand-in — exact on the ledger, approximate on
 #: the metabolism (D-19).
 M_ISOAMYL_OH = 5 * _M_C + 12 * _M_H + 1 * _M_O
+#: Tartaric acid, C4H6O6 — the dominant grape acid and the TA reference species
+#: (equivalent weight M_TARTARIC/2 ≈ 75.04 g/eq). Diprotic; charge-active in the
+#: wine pH solver (decision D-18).
+M_TARTARIC = 4 * _M_C + 6 * _M_H + 6 * _M_O
+#: L-malic acid, C4H6O5 — the second major grape acid and the MLF substrate.
+#: Diprotic; a future MLF Process converts it to lactic + CO2 (4 = 3 + 1 carbons),
+#: so these weights make that conversion carbon-closing (decision D-18).
+M_MALIC = 4 * _M_C + 6 * _M_H + 5 * _M_O
+#: L-lactic acid, C3H6O3 — the MLF product (produced-only). Monoprotic; the softer
+#: acid that malic deacidifies *into*, the chemistry the pH solver must reproduce.
+M_LACTIC = 3 * _M_C + 6 * _M_H + 3 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -79,6 +90,9 @@ MOLAR_MASS: dict[str, float] = {
     "succinic_acid": M_SUCCINIC,
     "ethyl_acetate": M_ETHYL_ACETATE,
     "isoamyl_alcohol": M_ISOAMYL_OH,
+    "tartaric_acid": M_TARTARIC,
+    "malic_acid": M_MALIC,
+    "lactic_acid": M_LACTIC,
 }
 
 #: Carbon atoms per molecule, keyed by species name.
@@ -93,6 +107,9 @@ CARBON_ATOMS: dict[str, int] = {
     "succinic_acid": 4,
     "ethyl_acetate": 4,
     "isoamyl_alcohol": 5,
+    "tartaric_acid": 4,
+    "malic_acid": 4,
+    "lactic_acid": 3,
 }
 
 

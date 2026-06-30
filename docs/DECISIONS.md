@@ -703,7 +703,8 @@ first such time-series to land in `ReferenceSeries` is the cue to revisit this s
 
 ## D-18 — Tier-2 scope: pH is a charge-balance solver (derived-algebraic), byproducts are built first
 
-**Status: open (scoping decision).** This opens Milestone 2 (Tier-2). It records two
+**Status: RESOLVED (solver built 2026-06-30; see "Resolution" at the end of this entry).**
+This opens Milestone 2 (Tier-2). It records two
 calls made by the project owner at the start of Tier-2 — the pH-richness one is the
 handoff's explicit "open decision for the human" (§7), the build order deviates from
 the handoff's suggested sequence (§6). Detail in `docs/plans/milestone-2-*.md`.
@@ -767,6 +768,71 @@ The **stochastic ensemble wrapper** (handoff §1.6/§6.3 "runtime maturation") i
 physics-free and orthogonal to both; it can be built in parallel at any point. Its API
 shape is an engineering choice, not a scoping gate, so it carries no DECISIONS entry —
 just `docs/plans/milestone-2-*.md`.
+
+### Resolution (built 2026-06-30) — the solver, and the choices Call 1 left open
+
+The charge-balance solver is `fermentation.core.acidbase` (pure core, `brentq` in
+pH-space) + the `fermentation.analysis` series layer (top-layer sibling of `validation`,
+imports `Trajectory`). pH/TA are derived **pure functions of state**, exactly as Call 1's
+corollary requires — no `dpH/dt`. Deliverable scope: **solver + post-hoc pH/TA readout,
+no RHS consumer** (SO₂/MLF wire pH into rates in later beats). The owner-confirmed calls
+that the open entry above did not yet fix:
+
+1. **Wine-only acid state.** D-18 acids are all wine acids (`tartaric`/`malic`/`lactic`
+   state slots, appended to `wine_schema` only). Beer pH is a phosphate-buffered
+   different acid system with no sourced data — explicitly **deferred**; `beer_schema` is
+   untouched, and `ACID_STATE` extends to it when the data lands.
+
+2. **A strong-cation term is mandatory, not optional.** Weak acids alone give pH ≈ **2.3**
+   at must tartaric levels (~33 mM, pKa₁ ≈ 3.04); real must is ≈ **3.3**. K⁺ as bitartrate
+   supplies the counter-charge — without it the solver is *qualitatively* wrong. It is
+   carried as a net strong-cation charge density (`cation_charge` state slot, mol⁺/L).
+
+3. **Anchoring = inverse (now).** The scenario gives acid concentrations + a measured
+   `initial_ph`; compile **back-solves the strong-cation charge** (closed form,
+   `solve_cation_charge`) to reproduce it, then stores it as a constant state slot; pH
+   evolves emergently as acids change. Honest claim: **D-18 predicts pH *changes*, not
+   absolute initial pH** (initial pH is an input). This folds activity-coefficient and
+   cation uncertainty into one fitted term (how Boulton's wine-pH model is anchored). The
+   back-solved cation lands in a physical K⁺ range (~25–50 meq/L, i.e. 1–2 g/L ÷ 39.1 —
+   pinned as the unit-conversion guard test, since the round-trip is tautological w.r.t.
+   the g/L↔mol/L factor). *Forward-from-cation is a documented future option* — the core
+   solver is anchoring-agnostic and the cation stays a state slot, so adding a forward
+   `cation_meq_l` input later is additive.
+
+4. **Coupling #2 (acid carbon vs `Byp`) = include-by-reading.** The charge balance reads
+   the *existing* `Byp` pool as its succinic-equivalent (`BYP_AS_SUCCINIC`) — **zero new
+   carbon**, so `total_carbon` is unchanged and the double-count is *closed, not deferred*.
+   The new `tartaric`/`malic`/`lactic` slots are weighted in `total_carbon` (so a future
+   MLF Process, malic C₄ → lactic C₃ + CO₂ C₁, stays carbon-closing) but are inert in
+   D-18 (no Process touches them ⇒ derivatives 0 ⇒ constant), so carbon still closes to
+   machine precision. Caveat: `Byp` lumps neutral 2,3-butanediol, slightly overstating
+   acid charge (~1–1.5 mM vs a ~20 mM buffer — minor).
+
+**The four scope caveats, with numbers (justified scope, not hand-waves):**
+- **Coupling #1 — carbonic omitted.** At pH 3.3 bicarbonate charge ~0.03 mM vs a ~20 mM
+  buffer (~0.1 %); correct to omit below pH ~4. `CO2` state stays the evolved proxy
+  (D-15). Revisit threshold: deacidified/low-acid musts above pH ~4.
+- **Coupling #3 — constant pKa.** Carboxylic ΔH_ionization ≈ 0; the pKa shift over
+  10–30 °C is <0.05 units, inside the pKa uncertainty. (We omit carbonic — the one acid
+  with real T-dependence.)
+- **Ionic strength / activity.** Wine I ≈ 0.05–0.1 M; concentration-based *apparent* pKa
+  is the standard plausible-tier simplification, and inverse anchoring folds the activity
+  error into the fitted cation at t=0, leaving it to affect only the *slope* (buffer
+  capacity), where we claim only directional fidelity.
+- **Tier = `plausible`, computed explicitly.** CRC pKa values are measured (validated),
+  but applying 25 °C / I=0 constants to wine is extrapolation. `acidbase.ph_tier` computes
+  the derived pH/TA tier as `combine(pKa tiers, PLAUSIBLE)` — it must NOT inherit the
+  `VALIDATED` default `tier_of` returns for the inert acid slots no Process touches.
+
+**Acceptance gate (proof-of-purpose, met):** on a malic-rich must (tartaric 4 / malic 4
+g/L, anchored pH 3.4) the full malic→lactic substitution raises pH by **0.225**, inside
+the required MLF band [0.1, 0.3] — MLF-enablement demonstrated *without* an MLF Process
+built. Second, emergent demonstration: with acids constant, the core `Byp` realised-yield
+diversion grows 0 → ~2.9 g/L over a wine ferment, and include-by-reading makes its
+succinate charge count, so the pH *series* drifts mildly **down** (3.40 → 3.33, ~0.067)
+with the cation frozen at pitch — the solver responds to acid dynamics with no scripting.
+This keystone unblocks **SO₂ → MLF → mixed cultures**.
 
 ## D-19 — Aroma byproducts (esters/fusels): carbon routed from sugar (option a1)
 
@@ -1084,7 +1150,8 @@ asserts `esters_gas` **rises** with T. **222 tests green**, ruff + format + mypy
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
-  built after the byproducts beat.
+  built after the byproducts beat; **solver landed 2026-06-30** (`core.acidbase`,
+  `fermentation.analysis`) — see D-18 "Resolution".
 - ~~**Stochastic ensemble API**~~ — **scoped into Milestone 2** (`milestone-2-plan.md`);
   physics-free runtime wrapper over the existing `Uncertainty` ranges, buildable in
   parallel with the byproducts beat.
