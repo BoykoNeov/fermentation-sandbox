@@ -244,18 +244,27 @@ def test_volatilization_metadata():
     # A pure liquid->gas transfer: touches the liquid pool and the headspace pool only —
     # never S/E/CO2 (it draws no fresh sugar, unlike synthesis).
     assert set(p.touches) == {"esters", "esters_gas"}
-    assert set(p.reads) == {"k_ester_volatil", "K_sugar_uptake", "E_a_ester_volatil", "T_ref"}
+    # Physical Henry model (D-21): gas-flow rides E_a_uptake, partition rides the sourced
+    # ethyl-acetate enthalpy dH_ester_volatil — NOT a fudged per-medium E_a_ester_volatil.
+    assert set(p.reads) == {
+        "k_ester_volatil",
+        "K_sugar_uptake",
+        "E_a_uptake",
+        "dH_ester_volatil",
+        "T_ref",
+    }
 
 
 def test_volatilization_derivative_matches_closed_form(params):
     schema = wine_schema()
-    x, s, t, est = 2.0, 200.0, 293.15, 0.1
+    x, s, t, est = 2.0, 200.0, 298.15, 0.1  # off T_ref so both Arrhenius factors bite
     y = _wine_y0_with_esters(schema, esters=est, x=x, s=s, t=t)
     d = EsterVolatilization().derivatives(0.0, y, schema, params)
 
     flux = x * (s / (params["K_sugar_uptake"] + s))
-    f_t = arrhenius_factor(t, params["E_a_ester_volatil"], params["T_ref"])
-    rate = params["k_ester_volatil"] * flux * f_t * est
+    f_gas = arrhenius_factor(t, params["E_a_uptake"], params["T_ref"])  # CO2 gas flow
+    f_part = arrhenius_factor(t, params["dH_ester_volatil"], params["T_ref"])  # partition
+    rate = params["k_ester_volatil"] * flux * f_gas * f_part * est
     # Liquid loses exactly what the headspace gains — a carbon-neutral transfer.
     assert schema.get(d, "esters") == pytest.approx(-rate)
     assert schema.get(d, "esters_gas") == pytest.approx(rate)
@@ -517,19 +526,20 @@ def _wine_run_to_dryness(celsius: float, duration_days: float):
 
 
 def test_integrated_wine_aroma_temperature_directions():
-    # THE load-bearing regression guard for the per-pool E_a ordering (decisions D-19 +
-    # D-20). The snapshot "rises with T" tests pass for *any* positive E_a; only the
-    # run-integrated pools encode the ordering that matters. The HONEST wine picture
-    # (post-D-20), not a combined total that would hide the ester inversion:
+    # THE load-bearing regression guard for the per-pool E_a ordering (decisions D-19 →
+    # D-21). The snapshot "rises with T" tests pass for *any* positive E_a; only the
+    # run-integrated pools encode the ordering that matters. The HONEST wine picture, not
+    # a combined total that would hide the ester inversion:
     #   * FUSELS rise with T (E_a_fusels > E_a_uptake) — the "cleaner when colder"
     #     direction for the harsh higher alcohols; carries warmer⇒more-aroma for wine.
-    #   * LIQUID esters FALL with T — the inversion: ester volatilization
-    #     (E_a_ester_volatil > E_a_esters) strips them faster than synthesis makes them,
-    #     so the warm ferment's esters end up in the gas, not the wine (Rollero 2014).
+    #   * LIQUID esters FALL with T — the inversion: the physical Henry's-law stripping
+    #     (sensitivity E_a_uptake + dH_ester_volatil ~ 100 kJ/mol) outruns wine's WEAK
+    #     synthesis (E_a_esters ~ 15k, Mouret), so the warm ferment's esters end up in the
+    #     gas, not the wine (Rollero 2014). The wine/beer split lives in synthesis (D-21).
     #   * VOLATILIZED esters_gas rises with T — the stripped fraction the headspace
     #     pool catches, and the proof the inversion is evaporation, not lost synthesis.
-    # If the sourcing ever drops an E_a below the partner it must exceed, one of these
-    # fails *before* the formal benchmark is unskipped. Both runs must reach dryness.
+    # If the sourcing ever lifts wine E_a_esters above the stripping sensitivity, the
+    # inversion fails here *before* the formal benchmark. Both runs must reach dryness.
     cold_dry, cold = _wine_run_to_dryness(14.0, 90.0)
     warm_dry, warm = _wine_run_to_dryness(25.0, 30.0)
     assert cold_dry and warm_dry, "both temperatures must reach dryness to compare"

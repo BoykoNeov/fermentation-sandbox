@@ -172,6 +172,8 @@ def test_load_shipped_beer_parameters():
         "E_a_esters",
         "k_fusel",
         "E_a_fusels",
+        "k_ester_volatil",
+        "dH_ester_volatil",
     }
     assert read_params <= set(ps.names)
     # Sourced from Zamudio Lara et al. 2022 (open access).

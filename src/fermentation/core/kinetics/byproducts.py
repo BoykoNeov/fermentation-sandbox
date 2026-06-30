@@ -16,24 +16,31 @@ arrhenius_factor` (the shared Arrhenius shape, D-11) with its *own* activation
 energy — kept in the Process rather than as a separate modifier so each byproduct
 mechanism is one self-contained, independently-togglable object.
 
-**Why the benchmark needs steeper-than-flux activation energies.** Each byproduct
-rate is the fermentative-flux Monod shape times its Arrhenius factor, so over a run
-to dryness the *total* produced scales as ``f_byproduct(T) / f_flux(T) =
-exp(-(ΔE_a/R)·(1/T - 1/T_ref))`` (the flux integral to dryness is fixed — the must
-ferments out either way). That total **rises** with temperature — equivalently, falls
-off toward colder T, the "cleaner-when-colder" benchmark — **iff** the byproduct's
-activation energy exceeds the fermentative flux's (``ΔE_a > 0``): a byproduct that
-shared the flux's temperature sensitivity would integrate to a T-independent total and
-the directional benchmark would not hold. So ``E_a_esters`` / ``E_a_fusels`` are held
-**above** ``E_a_uptake``. This ordering is *sourced*, not a first-principles claim:
-the canonical beer model (de Andrés-Toro et al. 1998) ties ester (ethyl-acetate)
-formation to the strongly temperature-sensitive yeast *growth* rate (apparent E_a far
-above any fermentative-flux E_a), and the brewing/enology consensus is that warm
-ferments are estery/fusel-heavy — see the parameter files' provenance (decision D-19
-sourcing step). The exact magnitude stays speculative; only the ordering is
-load-bearing. The cancellation is exact only for pure uptake to exact dryness; growth's
-sugar draw, the finite dryness cutoff, and the (un-Arrhenius-scaled) inactivation brake
-perturb it, so the integrated direction is **verified empirically**, not assumed.
+**Temperature directions — what rises, what falls, and why (decisions D-19 → D-21).**
+Each *production* rate is the fermentative-flux Monod shape times its Arrhenius factor,
+so over a run to dryness the total produced scales as ``f_byproduct(T) / f_flux(T)``
+(the flux integral to dryness is fixed — the must ferments out either way), which rises
+with T **iff** the byproduct's activation energy exceeds the fermentative flux's.
+
+* **Fusels (both media)** must rise with T for the "cleaner-when-colder" benchmark, so
+  ``E_a_fusels`` is held **above** ``E_a_uptake`` — a *sourced ordering* (Mouret 2015:
+  higher alcohols rise with T; brewing/enology consensus). This is the half of the
+  benchmark that genuinely carries "cleaner cold" for wine.
+* **Esters** are *not* a simple production pool: liquid ester is the balance of
+  synthesis (:class:`EsterSynthesis`, ``E_a_esters``) against the gas-stripping sink
+  (:class:`EsterVolatilization`, stripping sensitivity ``E_a_uptake + dH_ester_volatil``
+  ≈ 100 kJ/mol, the *same physical value in both media*). The wine/beer direction lives
+  in **synthesis ``E_a_esters``, set per medium and sourced** — **beer** steep
+  (de Andrés-Toro 1998, ester ride growth, apparent E_a ~200+ kJ/mol ⇒ synthesis wins ⇒
+  liquid esters *rise* with T) and **wine** weak/~flat (Mouret 2015; Rollero 2014, wine
+  ester synthesis is weak and non-monotonic ⇒ stripping wins ⇒ liquid esters *fall* with
+  T, the Rollero evaporation inversion). See :class:`EsterVolatilization` for why a
+  *sourced* (hence medium-independent) stripping forces the direction into synthesis.
+
+Exact magnitudes stay speculative (directional check only, handoff §3.5); the *orderings*
+are sourced. The integrated directions are **verified empirically** at 14/20/25 °C per
+medium, not assumed — growth's sugar draw, the finite dryness cutoff, the inactivation
+brake, and the stripping dynamics all perturb the clean cancellation.
 
 **Carbon accounting — option (a)/a1 (decision D-19): carbon routed from sugar.**
 Each Process draws its species' carbon *out of ``S``* and the pools are weighted in
@@ -70,16 +77,17 @@ asserts where the carbon physically came from. Fusels carry **no CO2 co-product*
 (the Ehrlich decarboxylation is omitted) — a documented simplification that keeps the
 draw a clean 1:1 sugar→pool carbon transfer.
 
-**The gas-stripping sink (decision D-20).** The observed fall of wine *liquid* ester
-with temperature is largely **evaporation** (Rollero 2014), not reduced synthesis. That
-sink — logged as future work in D-19 — is now built as :class:`EsterVolatilization`,
+**The gas-stripping sink (decisions D-20 → D-21).** The observed fall of wine *liquid*
+ester with temperature is largely **evaporation** (Rollero 2014), not reduced synthesis.
+That sink — logged as future work in D-19 — is built as :class:`EsterVolatilization`,
 which strips liquid ``esters`` into the bookkeeping ``esters_gas`` headspace pool on the
-CO2 stream. With its activation energy ``E_a_ester_volatil`` set *per medium* (above
-``E_a_esters`` for wine, below it for beer), the **net** liquid-ester temperature
-response is honest in both media: wine esters *fall* with warmth (stripping wins), beer
-esters *rise* (synthesis wins). The transfer is carbon-neutral (``esters`` →
-``esters_gas``, both ethyl acetate), so ``total_carbon`` still closes to machine
-precision. See that class for the full rationale.
+evolving-CO2 stream, with a **physical** Henry's-law partition (``dH_ester_volatil`` ≈
+45 kJ/mol, sourced ethyl-acetate gas/liquid partition enthalpy; D-21 replaced D-20's
+fudged per-medium ``E_a_ester_volatil``). Because a sourced stripping is medium-
+independent, the wine/beer direction is carried by **per-medium sourced synthesis
+``E_a_esters``** (beer steep / wine flat), not by the sink. The transfer is carbon-neutral
+(``esters`` → ``esters_gas``, both ethyl acetate), so ``total_carbon`` still closes to
+machine precision. See that class for the full rationale.
 
 Tiers: :class:`EsterSynthesis` is **plausible** in form (warmth-favoured,
 flux-coupled ester synthesis is the standard direction in the canonical *beer* model,
@@ -167,19 +175,24 @@ class EsterSynthesis(Process):
     ``f(T) = arrhenius_factor(T, E_a_esters, T_ref)``. Esters (isoamyl acetate,
     ethyl esters, ethyl acetate) form alongside fermentation; tying synthesis to the
     biomass-catalysed sugar flux (sharing ``K_sugar_uptake``) couples them to that
-    flux directly, and the steeper-than-uptake ``E_a_esters`` makes the
-    run-integrated total rise with temperature (module docstring). The ester carbon
-    (booked as ethyl acetate) is routed *out of ``S``* via
-    :func:`_draw_carbon_from_sugar` (option a1, D-19), so it touches ``esters`` and
-    ``S`` — never ``E``/``CO2`` — and ``total_carbon`` (which now weights ``esters``)
-    closes exactly. See the module docstring for the ester carbon-source caveat.
+    flux directly. ``E_a_esters`` is **sourced per medium** (decision D-21): **steep**
+    for beer (de Andrés-Toro 1998, ester ride growth — synthesis outruns the stripping
+    sink, so beer liquid esters *rise* with T) and **weak/~flat** for wine (Mouret 2015 /
+    Rollero 2014, wine ester synthesis is weak and non-monotonic — so the gas-stripping
+    sink :class:`EsterVolatilization` wins and wine liquid esters *fall* with T). This is
+    only the *synthesis* term; net liquid ester is synthesis minus stripping (see that
+    class and the module docstring). The ester carbon (booked as ethyl acetate) is routed
+    *out of ``S``* via :func:`_draw_carbon_from_sugar` (option a1, D-19), so it touches
+    ``esters`` and ``S`` — never ``E``/``CO2`` — and ``total_carbon`` (which now weights
+    ``esters``) closes exactly. See the module docstring for the ester carbon-source caveat.
     """
 
     name = "ester_synthesis"
     tier = Tier.PLAUSIBLE
     touches = ("esters", "S")
     #: ``K_sugar_uptake`` is shared with the fermentative-uptake flux this tracks;
-    #: ``E_a_esters`` (> ``E_a_uptake``) and ``T_ref`` set the temperature shape.
+    #: ``E_a_esters`` (sourced per medium — steep beer / flat wine, D-21) and ``T_ref``
+    #: set the temperature shape.
     #: Their tiers cap ``esters``'s output tier via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = ("k_ester", "K_sugar_uptake", "E_a_esters", "T_ref")
 
@@ -252,43 +265,44 @@ class FuselAlcoholsEhrlich(Process):
 
 
 class EsterVolatilization(Process):
-    """CO2-stripping loss of liquid esters to the headspace — the wine inversion (D-20).
+    """CO2-stripping loss of liquid esters to the headspace — a physical Henry's-law sink.
 
-    ``d(esters)/dt = -k · X · S_total/(K_sugar_uptake + S_total) · f(T) · esters`` and
-    the equal-and-opposite ``+`` into ``esters_gas``, with ``f(T) =
-    arrhenius_factor(T, E_a_ester_volatil, T_ref)``. Volatile esters (ethyl acetate
-    foremost) partition into the CO2 bubbles streaming out of an active ferment and are
-    carried off; the loss therefore rides the **same fermentative-flux proxy** as the gas
-    evolution that drives it (``_fermentative_flux_shape``, the CO2-production stand-in),
-    is **first-order in the liquid ester present**, and **stops when fermentation stops**
-    (``flux → 0`` at dryness) — a deliberate simplification that omits the slow passive
-    evaporation after the cap goes on, keeping the sink a clean function of the gas stream.
+    ``d(esters)/dt = -k · X·S_total/(K_sugar_uptake+S_total) · f_gas(T) · f_part(T) ·
+    esters`` and the equal-and-opposite ``+`` into ``esters_gas``, where
 
-    **Why this exists — the wine-ester inversion (decision D-20).** The sourcing step
-    (D-19) found that wine *liquid* ester concentration *falls* with temperature, and that
-    this is **largely evaporation**, not reduced synthesis: ester synthesis is weak and
-    non-monotonic in T (Rollero/Mouret 2014; Mouret 2015). No value of ``E_a_esters`` on
-    the synthesis Process could reproduce that — the missing physics was this gas-stripping
-    sink, logged then as future work and built here. With it, the **net** liquid-ester
-    temperature response is the balance of synthesis (``E_a_esters``) against stripping
-    (``E_a_ester_volatil``); near quasi-steady-state ``[esters] ∝
-    f_synth(T)/f_volatil(T)`` (the shared flux cancels), so the *direction* is set purely
-    by which activation energy is larger.
+    * ``f_gas(T) = arrhenius_factor(T, E_a_uptake, T_ref)`` is the **gas-flow** factor: the
+      stripping rides the evolving-CO2 stream, whose rate is the fermentative uptake flux
+      scaled by the *same* Arrhenius factor the uptake Process carries (``E_a_uptake``).
+      The bare ``X·S/(K+S)`` shape times ``f_gas`` is the CO2-evolution proxy; the
+      ``q_sugar_max``/``co2_yield``/realised-yield constants fold into ``k_ester_volatil``.
+    * ``f_part(T) = arrhenius_factor(T, dH_ester_volatil, T_ref)`` is the **gas/liquid
+      partition** factor — a van't Hoff form for the ethyl-acetate Henry's-law constant,
+      which *rises* with temperature (warmer ⇒ more volatile). ``dH_ester_volatil`` is the
+      sourced partition enthalpy (~45 kJ/mol, ethyl acetate; NIST/Sander Henry data), a
+      **physical Q10 ≈ 1.8**, *not* a fitted lever.
 
-    **The per-medium split (the load-bearing parameterisation).** ``E_a_ester_volatil``
-    is sourced *per medium* so each direction is honest, not forced:
+    So the total stripping temperature sensitivity is ``E_a_uptake + dH_ester_volatil`` ≈
+    100 kJ/mol — the same physical value **in both media**, because the Henry's-law
+    partition and the gas flow are properties of the molecule and the ferment, not the
+    beverage (Morakul et al. 2011: the partition coefficient depends only on composition
+    and temperature, not on which medium). The loss is **first-order in the liquid ester
+    present** and **stops when fermentation stops** (``flux → 0`` at dryness) — a
+    deliberate omission of slow passive evaporation after the cap goes on, keeping the
+    sink a clean function of the gas stream (the ester analogue of Morakul's
+    ``L = ∫ C_gas·Q_CO2 dt``).
 
-    * **Wine:** ``E_a_ester_volatil > E_a_esters`` ⇒ stripping outruns synthesis ⇒ liquid
-      esters **fall** with temperature (Rollero 2014: "evaporation largely accounted for
-      the effect of temperature on the accumulation of esters in liquid").
-    * **Beer:** ``E_a_ester_volatil < E_a_esters`` ⇒ synthesis dominates ⇒ liquid esters
-      **rise** with temperature, the classic warm-ale ester character (de Andrés-Toro
-      1998 ties ethyl-acetate formation to the strongly T-sensitive growth rate).
-
-    Both directions are *measured-direction* sourced; the divergence lives in the E_a
-    balance, not in two different code paths. The exact magnitudes stay speculative
-    (directional check only, handoff §3.5) — verified empirically at 14/20/25 °C per
-    medium, because the QSS algebra ignores the finite ferment and the flux shutoff.
+    **Why a shared physical stripping is the faithful model (decisions D-20 → D-21).** D-20
+    first built this sink with a *fudged per-medium* ``E_a_ester_volatil`` (wine above /
+    beer below ``E_a_esters``) to make wine liquid esters fall while beer rises. But a
+    *sourced* Henry's-law stripping is medium-independent, so it cannot push opposite
+    directions by itself. The wine/beer divergence therefore lives where it is genuinely
+    sourced — in ester **synthesis** ``E_a_esters``, set *per medium*: **beer** strongly
+    T-sensitive (de Andrés-Toro 1998, ester ride the growth rate, apparent E_a ~200+
+    kJ/mol) so synthesis outruns stripping and **beer liquid esters rise** with T; **wine**
+    weak/~flat (Mouret 2015; Rollero 2014, wine ester synthesis is weak and non-monotonic
+    in T) so stripping outruns synthesis and **wine liquid esters fall** with T (the
+    Rollero evaporation inversion). Both directions now emerge from *physical + sourced*
+    parameters, not a compensating constant. Verified empirically at 14/20/25 °C.
 
     **Carbon — a neutral liquid→gas transfer (no sugar draw).** Unlike
     :class:`EsterSynthesis`/:class:`FuselAlcoholsEhrlich`, this Process draws **no fresh
@@ -301,20 +315,32 @@ class EsterVolatilization(Process):
     ``esters`` is clamped ≥ 0 so a solver undershoot cannot strip a negative pool into
     spurious gas.
 
-    Tier: **plausible** in form (gas stripping by the evolving CO2 is well-understood
-    physics and the standard explanation for wine's liquid-ester temperature response),
-    with speculative rate parameters that cap the pool outputs at speculative via
-    parameter-tier propagation (D-1).
+    **Documented simplification.** The full Morakul (2011) partition coefficient is also
+    *ethanol-dependent* (``ln k_i = F1 + F2·E − (F3 + F4·E)·R·(1000/T − 1000/T_ref)``); we
+    keep only the dominant temperature (van't Hoff) lever via ``dH_ester_volatil`` and omit
+    the ethanol terms (the ``F`` coefficients are not openly available). Tier: **plausible**
+    in form (gas stripping by the evolving CO2 is well-understood physics, the standard
+    explanation for wine's liquid-ester temperature response), with speculative rate
+    parameters that cap the pool outputs at speculative via parameter-tier propagation
+    (D-1).
     """
 
     name = "ester_volatilization"
     tier = Tier.PLAUSIBLE
     touches = ("esters", "esters_gas")
-    #: ``K_sugar_uptake`` is shared with the fermentative-uptake flux this rides (the CO2
-    #: stream that does the stripping); ``E_a_ester_volatil`` (set *per medium* relative to
-    #: ``E_a_esters``) and ``T_ref`` set the temperature shape. Their tiers cap the pool
-    #: outputs via parameter-tier propagation (D-1).
-    reads: tuple[str, ...] = ("k_ester_volatil", "K_sugar_uptake", "E_a_ester_volatil", "T_ref")
+    #: ``K_sugar_uptake``/``E_a_uptake`` are shared with the fermentative uptake whose CO2
+    #: stream does the stripping (gas-flow factor); ``dH_ester_volatil`` is the sourced
+    #: ethyl-acetate Henry's-law partition enthalpy (gas/liquid factor); ``T_ref`` anchors
+    #: both. Their tiers cap the pool outputs via parameter-tier propagation (D-1). The
+    #: wine/beer direction lives in ``E_a_esters`` (synthesis), not here — this stripping
+    #: is the same physical mechanism in both media.
+    reads: tuple[str, ...] = (
+        "k_ester_volatil",
+        "K_sugar_uptake",
+        "E_a_uptake",
+        "dH_ester_volatil",
+        "T_ref",
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -327,8 +353,9 @@ class EsterVolatilization(Process):
         if esters_liquid <= 0.0:  # nothing in the liquid pool to strip
             return d
         temp = float(y[schema.slice("T")][0])
-        f_t = arrhenius_factor(temp, params["E_a_ester_volatil"], params["T_ref"])
-        rate = params["k_ester_volatil"] * flux * f_t * esters_liquid
+        f_gas = arrhenius_factor(temp, params["E_a_uptake"], params["T_ref"])  # CO2 gas flow
+        f_part = arrhenius_factor(temp, params["dH_ester_volatil"], params["T_ref"])  # partition
+        rate = params["k_ester_volatil"] * flux * f_gas * f_part * esters_liquid
         d[schema.slice("esters")] = -rate
         d[schema.slice("esters_gas")] = rate
         return d

@@ -61,6 +61,20 @@ physics-free and can run in parallel. Keep `pytest` / `ruff` / `mypy` green and 
       §2.2 trio + carbon conservation stay green. **222 passed**, ruff + format + mypy clean.
 - [x] Record outcomes in **DECISIONS D-20**. Remaining for this beat: update
       `milestone-2-plan.md` + ARCHITECTURE if/when the schema-pool count is referenced there.
+- [x] **D-21 follow-up — physical Henry's-law stripping + per-medium SOURCED synthesis E_a
+      (owner chose the rigorous unified build, prototype-first).** Advisor reconcile: a
+      *sourced* Henry's-law stripping is medium-independent (molecule property, Morakul
+      2011), so it cannot invert wine without inverting beer — the direction must live in
+      **synthesis** `E_a_esters`, which is per-medium sourced. Replaced D-20's fudged
+      per-medium `E_a_ester_volatil` with: (i) a shared **physical** partition enthalpy
+      `dH_ester_volatil` = 45 000 J/mol (ethyl-acetate Henry's-law, NIST/Sander; Q10 ≈ 1.8)
+      + the `E_a_uptake` gas-flow factor; (ii) per-medium **sourced** `E_a_esters` — beer
+      **200 000** (de Andrés-Toro steep), wine **55 100 = `E_a_uptake`** (the mapping for
+      *flat* integrated production = Mouret's weak wine ester synthesis). Sourced the
+      enthalpy from Morakul 2011 + NIST/Sander; prototyped (wine falls 73/61/50, total flat
+      114, gas rises; beer rises 22/72/181), then clean impl + **DECISIONS D-21**. No new
+      architecture contract (gas flow = `bare_flux · arrhenius(E_a_uptake)`). 222 green,
+      ruff + format + mypy clean. The byproducts beat is now physically + sourced-honest.
 
 ## Done — carbon-accounting option (a)/a1 (decision D-19)
 

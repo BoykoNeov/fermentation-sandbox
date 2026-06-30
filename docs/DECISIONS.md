@@ -1010,6 +1010,77 @@ for a full gas–liquid (Henry's-law) balance (cf. Mouret's MODAPEC, Morakul et 
 principled model would carry the partition coefficient explicitly and let passive
 evaporation continue after the cap goes on. The `esters_gas` pool is the hook for that.
 
+### D-21 — physical Henry's-law stripping + per-medium sourced synthesis E_a (2026-06-30)
+
+**Owner decision: build the full Henry's-law balance (the rigorous option), then confirm
+the unified build by prototyping.** This supersedes D-20's *parameterisation* (the
+mechanism, gas pool, carbon bookkeeping, and benchmark structure from D-20 all stand);
+what changed is *why* the wine/beer directions diverge and *which* parameters carry them.
+
+**The reconcile that reframed it (advisor, then verified).** D-20 made the wine/beer
+ester-direction split by *fudging the stripping* `E_a_ester_volatil` per medium (wine 130k
+above `E_a_esters`, beer 40k below). But a **sourced Henry's-law stripping is a property of
+the molecule, not the beverage** — the same partition K_H(T) in wine and beer (Morakul et
+al. 2011 explicitly: the partition coefficient depends only on composition and temperature).
+So a physical stripping *cannot* push opposite directions by itself; using one would have
+**silently inverted beer too** (warm ales must stay estery). The direction therefore has to
+live where it is genuinely sourced — in ester **synthesis**, which differs by medium in the
+literature: beer strongly T-sensitive (de Andrés-Toro 1998, ester ride the growth rate,
+apparent E_a ~221–265 kJ/mol), wine weak/non-monotonic (Mouret 2015; Rollero 2014). The two
+options put to the owner (Henry's-law vs per-medium synthesis E_a) were thus **one build**.
+
+**What changed in the model.**
+- `EsterVolatilization` now reads `E_a_uptake` (gas-flow factor — the stripping rides the
+  same Arrhenius-scaled fermentative flux as the CO₂ it travels on) and a new
+  `dH_ester_volatil` (gas/liquid **partition** factor, van't Hoff), instead of the retired
+  `E_a_ester_volatil`. Stripping T-sensitivity = `E_a_uptake + dH_ester_volatil` ≈ 100
+  kJ/mol — **the same physical value in both media**.
+- `dH_ester_volatil` = **45 000 J/mol**, *sourced*: ethyl-acetate Henry's-law solubility
+  constant temperature dependence `d(ln kH)/d(1/T)` ≈ 5300–5700 K (NIST WebBook / Sander
+  compilation, doi:10.5194/acp-15-4399-2015) ⇒ dissolution enthalpy ≈ −46 kJ/mol ⇒ the
+  gas/liquid partition rises with T with effective enthalpy ≈ +45 kJ/mol, **Q10 ≈ 1.8** — a
+  *physical* volatility value, not the fudged Q10 ≈ 5.6 D-20 needed. Identical in both YAMLs.
+- `E_a_esters` is now **sourced per medium** (was a generic 80k both media under D-19):
+  **beer 200 000 J/mol** (de Andrés-Toro steep ester-growth coupling, transferred as an
+  ordering to our flux-coupled term) and **wine 55 100 J/mol** (= `E_a_uptake`). The wine
+  value rests on a clean **mapping**: run-integrated synthesis scales as
+  `arrh(E_a_esters)/arrh(E_a_uptake)` (the bare-flux integral to dryness is fixed by total
+  sugar), so it is **T-independent exactly when `E_a_esters = E_a_uptake`** — the Arrhenius
+  representation of Mouret's *flat/weak* wine ester production. Not a coincidence; the
+  condition for flat integrated production.
+
+**Why this is strictly more faithful (the point of choosing it).** Both directions now
+emerge from **physical + sourced** parameters, with no compensating constant:
+- **Wine:** synthesis flat (`E_a_esters = E_a_uptake`) + steeper physical stripping (~100k)
+  ⇒ liquid esters **fall** with T (Rollero evaporation inversion), total production stays
+  **flat**, and the stripped fraction (`esters_gas`) **rises** with T.
+- **Beer:** synthesis steep (200k ≫ 100k stripping) ⇒ liquid esters **rise** with T
+  (de Andrés-Toro warm-ale character).
+
+D-20 additionally left wine *total* production rising with T (contra Rollero); D-21 fixes
+that too — the `E_a_esters = E_a_uptake` mapping makes it exactly flat.
+
+**Architecture (no new contract).** The only modifier on uptake is
+`ArrheniusTemperature.for_uptake` (the Luong wall is unwired; `EthanolInactivation` is a
+separate Process on `X`), so the gas flow is reproducible as `bare_flux ·
+arrhenius(E_a_uptake)`; `EsterVolatilization` applies that factor itself and folds
+`q_sugar_max·co2_yield·scale·(gas-volume/Henry-prefactor)` into `k_ester_volatil`. No
+two-pass / derivative-passing contract was needed.
+
+**Documented simplification.** The full Morakul (2011) partition is also *ethanol-dependent*
+(`ln k_i = F1 + F2·E − (F3 + F4·E)·R·(1000/T − 1000/T_ref)`); we keep only the dominant
+temperature (van't Hoff) lever via `dH_ester_volatil` and omit the ethanol terms (the `F`
+coefficients are not openly available). All four volatilization/synthesis-E_a params stay
+**speculative** in magnitude; the *orderings and the flat-production mapping* are sourced.
+
+**Empirical results (verified, carbon closing to machine precision every run).** Wine liquid
+esters **73 → 61 → 50 mg/L** (14/20/25 °C, fall), gas **41 → 53 → 64** (rise), total **flat
+~114**; fusels **45 → 51 → 56** (rise). Beer liquid esters **22 → 72 → 181 mg/L** (rise);
+fusels **37 → 41 → 46**. §2.2 trio unmoved (all at 20 °C where every Arrhenius factor = 1).
+The directional benchmark `test_lower_temperature_is_slower_but_cleaner` passes per medium
+on liquid pools; the unit guard `test_integrated_wine_aroma_temperature_directions` now also
+asserts `esters_gas` **rises** with T. **222 tests green**, ruff + format + mypy clean.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
