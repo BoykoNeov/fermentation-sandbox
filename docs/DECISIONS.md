@@ -768,6 +768,77 @@ physics-free and orthogonal to both; it can be built in parallel at any point. I
 shape is an engineering choice, not a scoping gate, so it carries no DECISIONS entry —
 just `docs/plans/milestone-2-*.md`.
 
+## D-19 — Aroma byproducts (esters/fusels): carbon routed from sugar (option a1)
+
+**Status: settled (the carbon-accounting sub-decision of the byproducts beat).** The
+ester (`EsterSynthesis`) and fusel (`FuselAlcoholsEhrlich`) Processes and their trace
+produced-pool schema slots landed earlier in the beat under **interim option (b)** —
+pools *outside* `total_carbon`, touching only their own slot, carbon closure
+byte-for-byte. This entry records the agreed end state: **option (a), variant a1 —
+route ester/fusel carbon *from sugar* and weight the pools in `total_carbon`**, so they
+are real carbon-accounted state under one rule with `Gly`/`Byp` (D-16), not diagnostic
+re-expressions. Project owner's call (2026-06-29), over the advisor/author lean toward
+(b) and the closure-neutral a2 variant.
+
+**What a1 does.** Each byproduct Process draws its species' carbon *out of `S`*
+(`_draw_carbon_from_sugar`, splitting the draw across sugar slots in proportion to each
+slot's carbon content, so wine's 1 slot and beer's 3 are handled by one routine), and
+`total_carbon` weights `esters` as ethyl acetate (C₄H₈O₂) and `fusels` as isoamyl
+alcohol (C₅H₁₂O). The per-RHS carbon removed from sugar exactly equals the carbon
+deposited in the pool, so carbon closes to machine precision.
+
+**The draw touches only `S` — never `E`/`CO2`.** This is the surgical part. The uptake
+Process still ferments `S` to ethanol+CO2 unchanged; the byproducts pull an *additional*
+sliver of `S`. So at the derivative level only `dS` gains a term — `dX`/`dN`/`dE`/`dCO2`
+stay byte-for-byte identical with the byproducts off. The integrated core therefore
+drifts only by the trace sugar they consume (~0.2 % of `S0`).
+
+**The `Byp` double-count, resolved (the hard part).** `Byp` formerly lumped "organic
+acids + higher alcohols" (booked as succinic acid). Fusels *are* higher alcohols, so
+weighting a separate carbon-routed `fusels` pool on top would book that carbon twice.
+Resolution: `Byp` is re-anchored to **organic acids / polyols only** —
+`Y_byproduct_sugar` (wine) reduced 0.014 → 0.012, removing exactly the higher-alcohol
+share (~0.0017 g/g); the higher alcohols now live solely in the `fusels` pool. Beer
+needs no carve-out (its `Y_byproduct_sugar` is 0, so nothing was double-booked).
+
+**Two bookkeeping caveats — the carbon source is accounting, not metabolism.**
+(i) The Ehrlich pathway builds fusels from *amino-acid* skeletons, but `N` (YAN) carries
+no carbon in `total_carbon`, so fusel carbon is sourced from sugar as a stand-in.
+(ii) An ester's ethanol moiety is carbon *already counted in `E`*, so routing ester
+carbon from sugar over-attributes fresh hexose. Both close the ledger exactly; neither
+claims where the carbon physically came from. Fusels carry **no CO2 co-product** (the
+Ehrlich decarboxylation is omitted) — a documented simplification keeping the draw a
+clean 1:1 sugar→pool carbon transfer.
+
+**Tier consequence (noted, not user-facing).** Because the byproduct Processes now
+touch `S`, `ProcessSet.tier_of("S")` folds in their tiers; the *structural-only*
+(`param_tiers=None`) tier of `S` drops PLAUSIBLE → SPECULATIVE when byproducts are on.
+The **param-aware** tier users actually see is *already* SPECULATIVE today (growth reads
+`K_s`, uptake reads `K_repression`/`Y_byproduct_sugar` — all speculative), so a1 changes
+nothing on the headline path. This is the intrinsic price of "real carbon-accounted
+state" and is **not** an a1-vs-a2 discriminator (a2 would drag `E`/`Byp` down the same
+way by touching them). Isolability (prime directive #3) holds structurally: the
+validated core is the ProcessSet built *without* the byproduct tuple.
+
+**Why a1 over (b)/a2.** (b) keeps the pools as unaccounted diagnostics — fine for
+closure but it never lets `total_carbon` *include* the aroma carbon, and it relies on
+the fragile claim "their carbon is booked elsewhere" (which the `Byp` overlap shows was
+only half-true). a2 (transfer carbon out of `E`/`Byp` with no sugar draw) is
+closure-neutral but, by not drawing from sugar, sits functionally next to the rejected
+(b); its only edge is a smaller blast radius. a1 is the most physically literal and
+gives one consistent rule for every produced-only pool — the project's fidelity bar.
+
+**Empirical results (verified, not assumed).** Carbon closes to **1.1×10⁻¹³** on a full
+wine ferment with byproducts on. The §2.2 realism guards are unmoved: wine **ABV
+14.99 %**, realised **Y_E 0.482**, **glycerol 8.49 g/L**, **Byp 2.91 g/L** (the
+`Y_byproduct_sugar` carve and the trace fusel/ester sugar draw nearly cancel on ABV).
+Beer **CO₂/sugar-consumed ratio 0.975** (was 0.977; still inside [0.95, 1.05]). Wine
+aroma totals ~0.11 g/L esters + ~0.05 g/L fusels (trace, as expected). 213 tests green.
+
+**Scope note.** This is the *carbon-accounting* half of the byproducts beat. Sourcing
+the ester/fusel rate + `E_a` placeholders, and unskipping the directional benchmark
+`test_lower_temperature_is_slower_but_cleaner`, remain the next steps of the beat.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

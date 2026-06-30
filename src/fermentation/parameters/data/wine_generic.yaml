@@ -123,14 +123,14 @@ Y_glycerol_sugar:
     notes: "Dry wine glycerol is 4-10 g/L (Ribereau-Gayon; usual 4-9 g/L), formed at ~1:10 of the ethanol. At our ~245 g/L fermentable sugar that is Y_gly ~ 0.016-0.041 g/g; we take 0.035 (-> ~8.6 g/L, mid-range). The MAGNITUDE is well-corroborated (multiple sources, narrow range), hence plausible; the constant-fraction FORM is a simplification (glycerol is front-loaded with growth in reality, not a fixed share of every gram), noted as the speculative aspect. Booked into the Gly pool; carbon-accounted as glycerol (C3H8O3)."
 
 Y_byproduct_sugar:
-  value: 0.014
+  value: 0.012
   unit: "g/g"   # g minor byproducts (succinic-equivalent) / g sugar consumed
   tier: speculative
-  uncertainty: { low: 0.008, high: 0.020, note: "lumped succinic + acetic + 2,3-butanediol + higher alcohols, ~2-5 g/L total" }
+  uncertainty: { low: 0.007, high: 0.018, note: "organic acids + polyols only (succinic + acetic + 2,3-butanediol), ~1.7-4.5 g/L; higher alcohols now in the fusels pool" }
   provenance:
-    source: "author estimate lumping measured wine byproducts (succinic 0.5-1.5, acetic 0.3-0.6, 2,3-butanediol 0.5-1.5, higher alcohols 0.15-0.5 g/L); per-g yields e.g. succinic ~0.005, acetic ~0.002 g/g"
-    conditions: "S. cerevisiae dry wine; minor non-glycerol byproducts, carbon-accounted as succinic acid (C4H6O4)"
-    notes: "Glycerol is the dominant byproduct; this lump captures the rest (organic acids + higher alcohols), ~2-5 g/L total -> Y ~ 0.008-0.020 g/g; we take 0.014 (-> ~3.4 g/L). SPECULATIVE: it is a lump of several species with a single representative carbon fraction (succinic acid), not a measured single quantity. Booked into the Byp pool. Together with Y_glycerol_sugar this gives an emergent realised Y_E ~ 0.487, consistent with the literature 0.46-0.48."
+    source: "author estimate lumping measured wine organic acids/polyols (succinic 0.5-1.5, acetic 0.3-0.6, 2,3-butanediol 0.5-1.5 g/L); per-g yields e.g. succinic ~0.005, acetic ~0.002 g/g"
+    conditions: "S. cerevisiae dry wine; minor non-glycerol byproducts EXCLUDING higher alcohols, carbon-accounted as succinic acid (C4H6O4)"
+    notes: "Glycerol is the dominant byproduct; this lump captures the rest of the ORGANIC ACIDS / POLYOLS (succinic, acetic, 2,3-butanediol), ~1.7-4.5 g/L -> Y ~ 0.007-0.018 g/g; we take 0.012 (-> ~2.9 g/L). DECISION D-19 RE-ANCHOR: was 0.014 and lumped higher alcohols too, but higher alcohols (~0.15-0.5 g/L, ~0.0017 g/g) now have their own carbon-routed `fusels` pool (booked as isoamyl alcohol), so they are carved OUT of Byp here to avoid double-counting that carbon in total_carbon - the reduction is exactly that higher-alcohol share. SPECULATIVE: still a lump of several species with a single representative carbon fraction (succinic acid), not a measured single quantity. Booked into the Byp pool. Together with Y_glycerol_sugar this gives an emergent realised Y_E ~ 0.486, consistent with the literature 0.46-0.48 (the carve-out plus the trace fusel/ester sugar draw nearly cancel, so ABV is essentially unchanged)."
 
 must_fermentable_fraction:
   value: 0.93
@@ -322,17 +322,19 @@ biomass_N_yield_log_slope:
       as-printed -3.61 would collapse Y_X/N to ~0 by 2 mg N/L, which is absurd.
 
 # -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
-# Esters and fusel (higher) alcohols: trace produced-only pools that RISE with
-# temperature. PLACEHOLDER VALUES, tagged speculative pending the dedicated
-# parameter-sourcing step (reading list: de Andres-Toro et al. 1998, Malherbe et
-# al. 2004, and ester/higher-alcohol kinetic literature). Under INTERIM accounting (b)
-# these are NOT carbon-routed: their carbon is already booked in the ledger (fusels =
-# the "higher alcohols" of the Byp succinic lump; ester carbon re-expresses ethanol+acid
-# carbon), so total_carbon is untouched. The agreed direction is option (a) — route from
-# sugar and weight the pools — deferred to a future session (see milestone-2-tasks.md);
-# decision D-19 records the outcome once (a) lands. The benchmark (warmer => more
-# esters+fusels) is DIRECTIONAL, so these stay speculative and earn no promotion
-# (handoff §3.5).
+# Esters and fusel (higher) alcohols: trace pools that RISE with temperature.
+# PLACEHOLDER VALUES, tagged speculative pending the dedicated parameter-sourcing step
+# (reading list: de Andres-Toro et al. 1998, Malherbe et al. 2004, and ester/
+# higher-alcohol kinetic literature). CARBON ACCOUNTING - option (a)/a1 (decision
+# D-19): the ester/fusel Processes route their carbon OUT OF SUGAR (booked as ethyl
+# acetate / isoamyl alcohol) and total_carbon weights the pools, so they are real
+# carbon-accounted state under one rule with Gly/Byp. The Byp double-count is resolved
+# by carving higher alcohols out of Y_byproduct_sugar above (Byp = organic acids/
+# polyols only now). Both carbon sources are bookkeeping stand-ins: the Ehrlich fusel
+# skeleton is amino-acid carbon (N carries none in the ledger) and an ester's ethanol
+# moiety is already counted in E - exact on the ledger, approximate on the metabolism.
+# The benchmark (warmer => more esters+fusels) is DIRECTIONAL, so these stay
+# speculative and earn no promotion (handoff §3.5).
 #
 # KEY ORDERING CONSTRAINT (decision D-19): each E_a below must EXCEED E_a_uptake
 # (55,100 J/mol). The run-integrated byproduct total scales as

@@ -32,16 +32,18 @@ The shared variables (decisions D-B / D-4):
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
-``X_dead``, ``Gly``, ``Byp``, ``esters`` and ``fusels`` are *produced-only* pools —
-always zero at pitch and only accumulated by the kinetics — so they declare a default
-initial of 0 (`VarSpec.default`) and need not be named at every initial-condition call
-site. The ``esters``/``fusels`` pools are added in the Milestone-2 byproducts beat as
-empty slots; the Processes that fill them are wired below. Their (trace) carbon is left
-out of ``total_carbon`` under **interim accounting (b)** to avoid double-counting the
-``Byp`` succinic sink (which already books the higher alcohols); routing it from sugar
-and weighting the pools (the agreed **option (a)**) is planned for a future session —
-see ``docs/plans/milestone-2-tasks.md`` and the ``kinetics.byproducts`` module
-docstring. Settled as decision D-19 once (a) lands.
+``X_dead``, ``Gly``, ``Byp``, ``esters`` and ``fusels`` start at zero at pitch and are
+only accumulated by the kinetics, so they declare a default initial of 0
+(`VarSpec.default`) and need not be named at every initial-condition call site. The
+``esters``/``fusels`` pools are filled by the Tier-2 byproduct Processes wired below.
+Under **decision D-19 (option a1)** those Processes route the aroma carbon *out of
+``S``* and ``total_carbon`` weights the pools (as ethyl acetate / isoamyl alcohol), so
+``esters``/``fusels`` are real carbon-accounted state alongside ``Gly``/``Byp`` — not
+diagnostic re-expressions. The former ``Byp`` double-count (it once lumped higher
+alcohols) is resolved by carving them out of ``Y_byproduct_sugar``; the draw touches
+only ``S`` (never ``E``/``CO2``), so turning the byproducts on perturbs the core only
+by the trace sugar they consume. See ``docs/plans/milestone-2-tasks.md`` and the
+``kinetics.byproducts`` module docstring.
 """
 
 from __future__ import annotations
@@ -182,13 +184,14 @@ _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 
 #: Tier-2 temperature-/metabolism-driven aroma byproducts (Milestone 2, decision
 #: D-18/D-19): ester synthesis and Ehrlich-pathway fusel alcohols. Kept as a
-#: *separate* tuple from the validated-core primary set so the speculative beat
-#: stays isolable — disabling these by name leaves the core byte-for-byte (prime
-#: directive #3). They are additive, produced-only Processes that touch only the
-#: ``esters``/``fusels`` pools, so wiring them in does not perturb the §2.2 trio or
-#: carbon conservation — under **interim accounting (b)** their carbon is left out of
-#: ``total_carbon`` (booked against ``Byp``); the agreed **option (a)** (route from
-#: sugar, weight the pools) is planned next session. See D-19 / milestone-2-tasks.md.
+#: *separate* tuple from the validated-core primary set so the speculative beat stays
+#: **isolable** (prime directive #3): building a ProcessSet without this tuple is the
+#: pure validated core. Under D-19 (option a1) they route aroma carbon out of ``S``
+#: and ``total_carbon`` weights the ``esters``/``fusels`` pools, so they no longer
+#: leave the core byte-for-byte when enabled — turning them on draws a *trace* of
+#: sugar (~0.2 % of ``S0``), perturbing only ``dS`` (never ``dE``/``dCO2``). Carbon
+#: still closes to machine precision with them on, and the §2.2 trio stays in band.
+#: See D-19 / milestone-2-tasks.md.
 _BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterSynthesis,
     FuselAlcoholsEhrlich,

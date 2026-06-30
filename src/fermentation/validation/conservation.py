@@ -70,6 +70,17 @@ def total_carbon(
         w[schema.slice("Gly")] = carbon_mass_fraction("glycerol")
     if "Byp" in schema:
         w[schema.slice("Byp")] = carbon_mass_fraction("succinic_acid")
+    # Aroma byproduct pools (decision D-19): the ester/fusel Processes route their
+    # carbon out of sugar, so these pools must be weighted or carbon would read as
+    # destroyed when they accumulate. Esters book as ethyl acetate, fusels as isoamyl
+    # alcohol — the same representative species the Processes draw against, from the
+    # one chemistry source of truth, so the check matches the kinetics. No overlap
+    # with Byp: under D-19 Byp is organic-acids/polyols only (higher alcohols moved
+    # to the fusels pool), so the former Byp double-count is gone.
+    if "esters" in schema:
+        w[schema.slice("esters")] = carbon_mass_fraction("ethyl_acetate")
+    if "fusels" in schema:
+        w[schema.slice("fusels")] = carbon_mass_fraction("isoamyl_alcohol")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(

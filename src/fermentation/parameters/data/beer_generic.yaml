@@ -231,17 +231,19 @@ biomass_N_fraction:
     notes: "Identical to the wine file - organism-level constant."
 
 # -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
-# Esters and fusel (higher) alcohols: trace produced-only pools that RISE with
-# temperature (ales are notably estery). PLACEHOLDER VALUES, tagged speculative
-# pending the dedicated parameter-sourcing step. Under INTERIM accounting (b), NOT
-# carbon-routed: their carbon is already booked in the ledger, so total_carbon is
-# untouched. Agreed direction is option (a) — route from sugar, weight the pools —
-# deferred to a future session (see milestone-2-tasks.md); D-19 records it once (a)
-# lands. The benchmark (warmer => more esters+fusels) is DIRECTIONAL. Carried for both media because the
-# shared byproduct Processes declare these in `reads`; a value is required per
-# medium (D-1, no silent default). Values mirror the wine file (byproduct kinetics
-# are yeast-generic at this placeholder stage); beer's lower sugar yields a smaller
-# trace total, directionally correct.
+# Esters and fusel (higher) alcohols: trace pools that RISE with temperature (ales
+# are notably estery). PLACEHOLDER VALUES, tagged speculative pending the dedicated
+# parameter-sourcing step. CARBON ACCOUNTING - option (a)/a1 (decision D-19): the
+# ester/fusel Processes route their carbon OUT OF SUGAR (booked as ethyl acetate /
+# isoamyl alcohol) and total_carbon weights the pools. Beer needs NO Byp carve-out:
+# its Y_byproduct_sugar is held at 0 (minor byproducts out of M1 scope), so no higher
+# alcohols were ever booked in beer's Byp to double-count. The fusel/ester pools draw
+# their trace sugar directly; the CO2-ratio benchmark stays in band (the draw is
+# ~0.3% of sugar consumed). The benchmark (warmer => more esters+fusels) is
+# DIRECTIONAL. Carried for both media because the shared byproduct Processes declare
+# these in `reads`; a value is required per medium (D-1, no silent default). Values
+# mirror the wine file (byproduct kinetics are yeast-generic at this placeholder
+# stage); beer's lower sugar yields a smaller trace total, directionally correct.
 #
 # KEY ORDERING CONSTRAINT (decision D-19): each E_a must EXCEED E_a_uptake (55,100
 # J/mol) so the run-integrated byproduct total falls with temperature - see the wine

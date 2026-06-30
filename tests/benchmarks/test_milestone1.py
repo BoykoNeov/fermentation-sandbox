@@ -196,8 +196,10 @@ def test_co2_integral_tracks_sugar_consumed():
     # summed over all three sugar slots (so the maltose 2x / maltotriose 3x hexose
     # factors are exercised; a flat single-hexose yield would mis-weight them).
     # The ratio is slightly BELOW 1: ~2-3% of sugar carbon is routed into biomass
-    # by growth (no anabolic CO2 in M1), so a touch less CO2 is evolved than total
-    # sugar consumed implies. The [0.95, 1.05] window accommodates that diversion —
+    # by growth (no anabolic CO2 in M1), plus (since D-19) a trace routed into the
+    # ester/fusel pools from sugar — together ~2.5% here (ratio 0.977 -> 0.975) — so a
+    # touch less CO2 is evolved than total sugar consumed implies. The [0.95, 1.05]
+    # window accommodates that diversion —
     # this is the measurable-channel check, not the machine-precision carbon audit
     # (that lives in the conservation tests). Run on beer to cover the 3-slot sum.
     spec = BENCHMARKS["co2_peak_then_tail"]

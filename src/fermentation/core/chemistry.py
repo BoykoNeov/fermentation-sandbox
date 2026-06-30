@@ -46,10 +46,25 @@ M_WATER = 2 * _M_H + 1 * _M_O
 #: decision D-16).
 M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O
 #: Succinic acid, C4H6O4 — the representative species for the lumped *minor*
-#: byproduct pool (organic acids + higher alcohols). It carries the carbon of the
-#: ``Byp`` state variable so that pool's carbon is accounted from a real formula
-#: rather than an ad-hoc fraction (decision D-16).
+#: byproduct pool. It carries the carbon of the ``Byp`` state variable so that
+#: pool's carbon is accounted from a real formula rather than an ad-hoc fraction
+#: (decision D-16). Under D-19 ``Byp`` is *organic acids / polyols only*: the higher
+#: alcohols it formerly lumped now have their own carbon-routed ``fusels`` pool, so
+#: there is no double-count between ``Byp`` (succinic) and ``fusels`` (isoamyl).
 M_SUCCINIC = 4 * _M_C + 6 * _M_H + 4 * _M_O
+#: Ethyl acetate, C4H8O2 — the representative species for the lumped ``esters`` aroma
+#: pool, carbon-routed from sugar under decision D-19. BOOKKEEPING CAVEAT: a real
+#: ester's ethanol moiety is carbon already counted in ``E``, so "route ester carbon
+#: from sugar" over-attributes fresh hexose carbon — it closes the ledger exactly but
+#: is an accounting stand-in, not a claim about the metabolic carbon origin (D-19).
+M_ETHYL_ACETATE = 4 * _M_C + 8 * _M_H + 2 * _M_O
+#: Isoamyl alcohol (3-methylbutan-1-ol), C5H12O — the representative species for the
+#: lumped ``fusels`` higher-alcohol pool, carbon-routed from sugar under decision
+#: D-19. BOOKKEEPING CAVEAT: the Ehrlich pathway builds fusels from amino-acid
+#: skeletons, but ``N`` (YAN) carries no carbon in :func:`total_carbon`, so the
+#: carbon is sourced from sugar as a stand-in — exact on the ledger, approximate on
+#: the metabolism (D-19).
+M_ISOAMYL_OH = 5 * _M_C + 12 * _M_H + 1 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -62,6 +77,8 @@ MOLAR_MASS: dict[str, float] = {
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
+    "ethyl_acetate": M_ETHYL_ACETATE,
+    "isoamyl_alcohol": M_ISOAMYL_OH,
 }
 
 #: Carbon atoms per molecule, keyed by species name.
@@ -74,6 +91,8 @@ CARBON_ATOMS: dict[str, int] = {
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,
+    "ethyl_acetate": 4,
+    "isoamyl_alcohol": 5,
 }
 
 
