@@ -1385,13 +1385,87 @@ loads exactly that file so beer never sees them), but they are bacterium propert
 yeast-strain ones — so a *second* wine-strain file would duplicate them, the same re-homing
 caveat already flagged for `must_fermentable_fraction`.
 
+## D-24 — Stochastic ensemble wrapper: Monte-Carlo over provenance bands, in the runtime
+
+**Status: IMPLEMENTED 2026-07-01** (`runtime/ensemble.py`, `tests/test_ensemble.py`, 274 green).
+The last big Milestone-2 item that carried no new physics — the parallel, physics-free beat
+(`milestone-2-tasks.md`) the handoff §1.6 calls for: *"realism and replicate variation come
+from a runtime layer that samples parameters within their provenance-declared uncertainty and
+runs ensembles."* Every `Parameter` has always carried an `Uncertainty` band; until now nothing
+at runtime read it.
+
+**The seam.** `simulate_ensemble(process_set, parameters, y0, t_span, …)` takes the full
+`ParameterSet` (it needs the bands) — the natural distinction from `simulate`, which takes
+resolved floats. It draws `n_members` samples, integrates each with `simulate` on a shared
+`t_eval` grid, and returns an `Ensemble`: the deterministic **nominal** run, the surviving
+**members** `(n_succeeded, n_vars, n_times)`, each member's sampled param map, and the derived
+`tier_map`. Randomness lives **only here**, behind an explicit `seed` — the core stays pure and
+a single unsampled run stays byte-for-byte reproducible (the architecture rule + §1.6 split).
+
+**Choices made (all revisited with the advisor):**
+
+1. **Distribution = triangular `(low, mode=value, high)`**, `uniform` pluggable. "Bounds plus a
+   most-likely value" is the textbook triangular case, and `value` *is* the sourced, benchmarked
+   most-likely estimate — uniform would throw that away (extremes as likely as the best estimate).
+   The reported band uses **outer percentiles (P5/P95 default)**, which keeps the full bracket
+   visible and de-sensitises the result to the shape choice. Zero-width bands (`high ≤ low`) pin to
+   `value` and consume no randomness.
+2. **Plain Monte Carlo**, the method §1.6 names. Latin-hypercube / Sobol would give better tail
+   coverage per member and is a clean future refinement, but §1.6 does not require it.
+3. **Sample only what the *active* Process set `reads`** (union of `Process.reads` +
+   `RateModifier.reads`), intersected with the loaded params. Sampling anything else is a no-op on
+   the trajectory and only dilutes the member count, so the spread means "sensitivity of *this*
+   scenario". `only` overrides the set; `exclude` removes names from it (the pinning escape hatch).
+   A neat consequence: on an undosed (MLF-off) wine run the pKa set is not read, so it is not
+   sampled — the D-18 initial-pH anchor (back-solved at compile from nominal pKa) is untouched.
+   When MLF *is* pitched the pKa set enters scope and the anchor holds only at nominal; that drift
+   is *honest* (pKa uncertainty → uncertainty in the implied cation charge), and `exclude` pins it
+   for a caller who wants the anchor preserved.
+4. **Parameter uncertainty only** — scenario/initial-condition uncertainty (Brix, YAN) is a
+   separate axis; `y0` is held fixed.
+5. **Nominal ≠ median, and both are reported.** The median of nonlinear trajectories is not the
+   trajectory of median parameters; the nominal is the deterministic reference, the median+band is
+   the uncertainty summary.
+
+**Independence caveat — checked against the actual bands, not hand-waved.** Parameters are sampled
+independently, which ignores cross-parameter constraints. The two live groups were enumerated and
+checked against their real `Uncertainty` bands (the advisor's decisive point: overlap decides
+whether the caveat is vacuous, immaterial, or real):
+
+- **Realised-yield partition — vacuous.** The uptake Process does *not* read `Y_ethanol_sugar`;
+  ethanol/CO₂ use the theoretical Gay-Lussac split *scaled down*, and glycerol/byproduct carbon is
+  **carved from** that same flux (`scale = 1 − diverted_c/c(species)`), with a hard `ValueError`
+  guard if `scale < 0`. At band maxima `diverted_c ≈ 0.027` vs `c(glucose) ≈ 0.40` → `scale ≈ 0.93`;
+  super-theoretical yield is structurally unreachable, the guard is a backstop (and a member that
+  tripped it would be *counted as failed*, not silently dropped).
+- **Load-bearing `E_a > E_a_uptake` byproduct ordering — immaterial.** Wine `E_a_esters` [40k,70k]
+  fully overlaps `E_a_uptake` [47k,63k], but the wine ester T-direction is *intentionally null*
+  (nominal `E_a_esters == E_a_uptake`, Mouret-flat, D-21) — scrambling it corrupts no demonstrated
+  result. `E_a_fusels` [60k,250k] overlaps uptake only in [60k,63k], a tail-tail sliver where the
+  triangular joint density ≈ 0. Beer `E_a_esters` [120k,265k] has *no* overlap → safe. Nominal
+  orderings hold for the overwhelming majority; a stray inverted member is honest parameter
+  uncertainty within a *speculative* band, and `exclude` pins the group for a strict ensemble.
+
+**No silent truncation.** A sampled param set can make a member fail — `solve_ivp` returns
+`success=False`, or the RHS *raises* (the uptake guard). Both are caught, recorded in `failures`,
+and counted; the RNG advances one sample per member so reproducibility (including *which* members
+fail) holds. Past `max_failure_fraction` (default 0.5) the driver **raises** rather than return a
+survivorship-biased spread from the lucky survivors.
+
+**Per-member conservation is the crown-jewel invariant.** `Ensemble.member_trajectory(i)`
+reconstructs any member as a `Trajectory` so the deterministic harness (`assert_conserved`, …)
+audits it. Carbon closes for *every* sampled member — but the check must use that member's **own**
+accounting constants (e.g. its sampled `biomass_C_fraction`, which the growth Process draws sugar
+carbon against), which is exactly why `member_params[i]` is stored; auditing with the nominal
+constant reads genuine closure as drift.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
   built after the byproducts beat; **solver landed 2026-06-30** (`core.acidbase`,
   `fermentation.analysis`) — see D-18 "Resolution".
-- ~~**Stochastic ensemble API**~~ — **scoped into Milestone 2** (`milestone-2-plan.md`);
-  physics-free runtime wrapper over the existing `Uncertainty` ranges, buildable in
-  parallel with the byproducts beat.
+- ~~**Stochastic ensemble API**~~ — **decided in D-24 and IMPLEMENTED 2026-07-01**
+  (`runtime/ensemble.py`): triangular Monte-Carlo over the `Uncertainty` bands, scoped to
+  the active Process set's reads, nominal + median + P5/P95 band, per-member conservation.
 - **Packaged parameter-data access:** tests read YAML via filesystem path. If we
   ship a wheel that must read its own data, switch to `importlib.resources`.

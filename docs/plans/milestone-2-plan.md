@@ -134,11 +134,11 @@ kinetic literature. Tiers: `plausible` only where a source measures *our* form; 
   the multi-organism competition extension and the first RHS consumer of `molecular_so2`.
 - **Mixed cultures / Brett / sour consortium** — resource competition (extended Monod /
   Lotka–Volterra). After MLF.
-- **Stochastic ensemble wrapper** — physics-free runtime layer sampling each parameter
-  within its provenance `Uncertainty` band and running ensembles → confidence bands on
-  every output. Lives in `runtime` over `simulate`, outside the deterministic core
-  (handoff §1.6). Buildable in parallel with the byproducts beat; API is an engineering
-  choice (no scoping gate). See `milestone-2-context.md`.
+- ~~**Stochastic ensemble wrapper**~~ — **DONE 2026-07-01 (decision D-24, `runtime/ensemble.py`).**
+  `simulate_ensemble` samples each active-read parameter within its provenance `Uncertainty` band
+  (triangular, seeded), runs Monte-Carlo ensembles over `simulate`, and reports the deterministic
+  nominal + median + P5/P95 band with per-member conservation and no-silent-truncation failure
+  accounting. Lives in `runtime`, core untouched (handoff §1.6). 274 green.
 
 ## Out of scope for Milestone 2 (Tier-3)
 

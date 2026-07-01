@@ -107,13 +107,27 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
   2.91; beer CO₂ ratio 0.975 — all §2.2 guards in band. 213 passed, 1 skipped (the
   directional benchmark, still owned by the next item).
 
-## Parallel (physics-free) — stochastic ensemble wrapper
+## Parallel (physics-free) — stochastic ensemble wrapper ✅ DONE (2026-07-01, decision D-24)
 
-- [ ] Runtime wrapper over `simulate` sampling each parameter within its provenance
-      `Uncertainty` band; run ensembles; aggregate (median + spread). Lives in `runtime`,
-      outside the pure core (handoff §1.6). Tier/uncertainty bands reported on outputs.
-- [ ] Tests: determinism preserved for a single (unsampled) run; ensemble spread tracks
-      the input uncertainty; core stays reproducible.
+- [x] **`runtime/ensemble.py` — `simulate_ensemble` over provenance bands (decision D-24).**
+      Takes the full `ParameterSet` (needs the bands), draws `n_members` triangular
+      `(low, value, high)` samples (uniform pluggable, zero-width pinned), integrates each via
+      `simulate` on a shared `t_eval` grid, returns an `Ensemble`: deterministic **nominal** +
+      surviving **members** + each member's sampled param map + derived `tier_map`. Randomness
+      lives **only here** (seeded), core stays pure. Aggregates: `median()`, `percentile(q)`,
+      `band(name, low=5, high=95)` (outer P5/P95 bracket), `member_trajectory(i)`. Sampling is
+      scoped to the **active** Process set's `reads` (no-op draws avoided; `only`/`exclude`
+      filters, e.g. `exclude` the pKa set to pin the D-18 pH anchor). Failed members
+      (`success=False` *or* a raising RHS) are caught, recorded and counted; past
+      `max_failure_fraction` (0.5) the driver raises rather than return a survivorship-biased
+      spread. Constraint-group band-overlap checked (yield partition vacuous; `E_a` ordering
+      immaterial) — full record in **D-24**.
+- [x] Tests (`tests/test_ensemble.py`, 12): determinism (`nominal` == `simulate` on resolved,
+      byte-for-byte); seed-reproducibility (same seed identical, different differs); spread
+      tracks input band width; `only=[]` degenerate ensemble (members == nominal); **per-member
+      conservation** (mass on a toy, carbon on a real wine scenario, using each member's own
+      accounting constants); failed-member accounting + survivorship threshold; active-reads
+      scoping; tier map unchanged. 274 green, ruff + mypy clean.
 
 ## pH / acid charge-balance solver (keystone, D-18) — ✅ DONE (2026-06-30)
 

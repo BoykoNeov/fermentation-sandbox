@@ -1,0 +1,366 @@
+"""Stochastic ensemble wrapper over the deterministic core (handoff §1.6, D-24).
+
+The core is deterministic: given a state and a resolved ``{name: float}`` parameter
+map it returns derivatives, and a single run is byte-for-byte reproducible. Real
+ferments vary because their *parameters* are uncertain — every :class:`Parameter`
+already carries a provenance-declared :class:`~fermentation.parameters.schema.Uncertainty`
+band, and until now nothing at runtime read it. This module closes that loop: it
+samples each parameter within its band, runs an ensemble of :func:`simulate` calls,
+and reports the deterministic *nominal* trajectory alongside the ensemble *median*
+and inter-percentile *spread*.
+
+**Where randomness lives.** All sampling happens *here*, in the runtime wrapper,
+behind an explicit seed. The core stays pure (no ``Math.random`` in a Process), so a
+single unsampled run remains reproducible and debuggable — exactly the split the
+handoff (§1.6) and the architecture rule require. This wrapper takes the full
+:class:`~fermentation.parameters.store.ParameterSet` (it needs the bands), which is
+the natural seam distinguishing it from :func:`simulate` (which takes resolved
+floats).
+
+**Scope (decision D-24).**
+
+* *Parameter* uncertainty only. Scenario/initial-condition uncertainty (Brix, YAN)
+  is a separate axis and is **not** sampled here — ``y0`` is held fixed.
+* Plain Monte Carlo (the method the handoff §1.6 names). Latin-hypercube / Sobol
+  sampling would give better tail coverage per member and is a clean future
+  refinement, but §1.6 does not require it.
+* Default distribution is **triangular** ``(low, mode=value, high)``: bounds plus a
+  most-likely value is the textbook case for triangular, and ``value`` *is* the
+  sourced, benchmarked most-likely estimate. ``uniform`` is available for a caller
+  who wants to discard the point estimate. The reported band uses outer percentiles
+  (P5/P95 by default), which keeps the full bracket visible and de-sensitises the
+  result to the shape choice.
+* By default only the parameters the **active** Process set ``reads`` are sampled
+  (the rest are no-ops on the trajectory), so the spread means "sensitivity of *this*
+  scenario". ``only`` overrides that set; ``exclude`` removes names from it.
+* The ensemble **median is not the nominal trajectory** (the median of nonlinear
+  trajectories is not the trajectory of median parameters). Both are reported: the
+  nominal is the deterministic reference, the median+band is the uncertainty summary.
+
+**Independence caveat.** Parameters are sampled independently, which ignores any
+cross-parameter correlation or ordering constraint. The two live constraint groups
+were checked against their actual bands (decision D-24) and found immaterial: the
+realised-yield partition cannot exceed the theoretical split (glycerol/byproduct
+carbon is *carved from* the Gay-Lussac flux, with a hard guard in the uptake
+Process), and the load-bearing ``E_a > E_a_uptake`` byproduct ordering is preserved
+for the overwhelming majority of triangular draws (the wine ester direction is
+intentionally null; the fusel/uptake band overlap is a negligible tail). A caller who
+wants a strictly-ordered ensemble can ``exclude`` the offending names to pin them.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import NamedTuple
+
+import numpy as np
+
+from fermentation.core.process import ProcessSet
+from fermentation.core.state import FloatArray, StateSchema
+from fermentation.core.tiers import Tier
+from fermentation.parameters.store import ParameterSet
+from fermentation.runtime.integrate import Trajectory, simulate
+
+#: Supported sampling distributions over a parameter's ``[low, high]`` band.
+DISTRIBUTIONS = ("triangular", "uniform")
+
+
+class Band(NamedTuple):
+    """A named variable's uncertainty band over the shared time grid.
+
+    ``low``/``median``/``high`` each mirror :meth:`Trajectory.series`: a scalar
+    variable comes back as shape ``(n_times,)``, a vector (multi-slot ``S``) as
+    ``(n_slots, n_times)``. ``low``/``high`` are the requested percentiles across the
+    surviving ensemble members; ``nominal`` is the deterministic run for reference.
+    """
+
+    low: FloatArray
+    median: FloatArray
+    high: FloatArray
+    nominal: FloatArray
+
+
+def sample_parameters(
+    parameters: ParameterSet,
+    rng: np.random.Generator,
+    *,
+    distribution: str = "triangular",
+    names: Sequence[str] | None = None,
+) -> dict[str, float]:
+    """Draw one ``{name: float}`` sample from the parameters' uncertainty bands.
+
+    Every parameter starts at its nominal ``value``; each name in ``names`` (or every
+    parameter when ``names`` is ``None``) is then replaced by a draw from its band via
+    ``distribution``. A zero-width band (``high <= low``) is pinned to ``value`` — a
+    no-op draw that consumes no randomness — so a parameter with no stated spread never
+    moves. ``names`` is consumed **in order** (not as a set) so the draw sequence is
+    deterministic for a given seed regardless of hash randomisation.
+
+    The :class:`Parameter` schema guarantees ``low <= value <= high``, which is exactly
+    ``numpy``'s ``triangular(left, mode, right)`` precondition, so no clamping is needed.
+    """
+    if distribution not in DISTRIBUTIONS:
+        raise ValueError(f"unknown distribution {distribution!r}; expected one of {DISTRIBUTIONS}")
+    out = parameters.resolve()
+    target = parameters.names if names is None else names
+    for name in target:
+        p = parameters[name]
+        lo, hi, val = p.uncertainty.low, p.uncertainty.high, p.value
+        if hi <= lo:  # no stated spread ⇒ pinned, and draw nothing (keeps RNG in step)
+            out[name] = val
+            continue
+        if distribution == "triangular":
+            out[name] = float(rng.triangular(lo, val, hi))
+        else:  # uniform
+            out[name] = float(rng.uniform(lo, hi))
+    return out
+
+
+def _active_reads(process_set: ProcessSet) -> set[str]:
+    """Union of parameter names the active Processes and modifiers declare reading."""
+    reads: set[str] = set()
+    for p in process_set.active:
+        reads.update(p.reads)
+    for m in process_set.active_modifiers:
+        reads.update(m.reads)
+    return reads
+
+
+def _resolve_sample_names(
+    process_set: ProcessSet,
+    parameters: ParameterSet,
+    only: Iterable[str] | None,
+    exclude: Iterable[str] | None,
+) -> tuple[str, ...]:
+    """The sorted, deterministic set of parameter names to sample for this run.
+
+    Defaults to the parameters the *active* Process set reads (sampling anything else
+    is a no-op on the trajectory and only dilutes the member count); ``only`` overrides
+    that with an explicit set; ``exclude`` removes names from whichever set was chosen
+    (the escape hatch for pinning, e.g. the pKa set that anchors the D-18 initial pH).
+    Names not present as provenance parameters are dropped. Sorted so the per-member
+    draw order — and thus the seeded reproducibility — does not depend on set ordering.
+    """
+    chosen = set(only) if only is not None else _active_reads(process_set)
+    chosen &= set(parameters.names)
+    if exclude is not None:
+        chosen -= set(exclude)
+    return tuple(sorted(chosen))
+
+
+@dataclass(frozen=True)
+class Ensemble:
+    """Result of a :func:`simulate_ensemble` run.
+
+    ``t`` is the shared time grid (internal hours); ``nominal`` has shape
+    ``(n_vars, n_times)`` and is the deterministic run on the parameters' nominal
+    values; ``members`` has shape ``(n_succeeded, n_vars, n_times)`` — the surviving
+    sampled trajectories, all on the same grid. ``tier_map`` is the derived
+    per-variable confidence tier (a property of provenance, not of the spread, so it is
+    the same as a single deterministic run). ``member_params[i]`` is the full resolved
+    ``{name: float}`` map that produced ``members[i]`` — needed to audit a member with
+    the accounting constants it actually used (e.g. a per-member conservation check must
+    read that member's sampled ``biomass_C_fraction``, not the nominal one, or the
+    genuine closure reads as drift). Sampling is *not silent*: ``n_requested``,
+    ``n_succeeded`` and ``n_failed`` are all reported, so a caller can see how much of
+    the ensemble survived and judge whether the spread is trustworthy.
+    """
+
+    schema: StateSchema
+    t: FloatArray
+    nominal: FloatArray
+    members: FloatArray
+    member_params: tuple[Mapping[str, float], ...]
+    tier_map: Mapping[str, Tier]
+    sampled_names: tuple[str, ...]
+    distribution: str
+    seed: int
+    n_requested: int
+    n_succeeded: int
+    n_failed: int
+    failures: tuple[str, ...]
+
+    # -- shape helpers --------------------------------------------------------
+
+    def _rows(self, block: FloatArray, name: str) -> FloatArray:
+        """Collapse a ``(..., n_slots, n_times)`` block to the :meth:`series` shape."""
+        sl = self.schema.slice(name)
+        sub = block[sl, :]
+        return sub[0] if sub.shape[0] == 1 else sub
+
+    def series_nominal(self, name: str) -> FloatArray:
+        """Deterministic (nominal) time series of one variable — like ``Trajectory.series``."""
+        return self._rows(self.nominal, name)
+
+    # -- aggregates -----------------------------------------------------------
+
+    def median(self) -> FloatArray:
+        """Element-wise median over members, shape ``(n_vars, n_times)``."""
+        return np.median(self.members, axis=0)
+
+    def percentile(self, q: float) -> FloatArray:
+        """Element-wise ``q``-th percentile over members, shape ``(n_vars, n_times)``."""
+        return np.percentile(self.members, q, axis=0)
+
+    def band(self, name: str, *, low: float = 5.0, high: float = 95.0) -> Band:
+        """Low/median/high percentile band plus the nominal series for one variable.
+
+        ``low``/``high`` default to P5/P95 (the outer bracket, per decision D-24). Each
+        field follows :meth:`Trajectory.series` shape conventions.
+        """
+        if not 0.0 <= low <= high <= 100.0:
+            raise ValueError(f"require 0 <= low <= high <= 100, got low={low}, high={high}")
+        lo_block, hi_block = np.percentile(self.members, [low, high], axis=0)
+        med_block = self.median()
+        return Band(
+            low=self._rows(lo_block, name),
+            median=self._rows(med_block, name),
+            high=self._rows(hi_block, name),
+            nominal=self.series_nominal(name),
+        )
+
+    def member_trajectory(self, i: int) -> Trajectory:
+        """Reconstruct member ``i`` as a :class:`Trajectory`.
+
+        Lets a caller reuse the deterministic validation harness (``assert_conserved``,
+        ``assert_nonnegative``, …) on any individual sampled member — the per-member
+        conservation invariant is exactly how the project guards against a sampled
+        parameter set silently breaking a balance.
+        """
+        return Trajectory(
+            schema=self.schema,
+            t=self.t,
+            y=self.members[i],
+            success=True,
+            message="ensemble member",
+            tier_map=self.tier_map,
+        )
+
+    @property
+    def failure_fraction(self) -> float:
+        return self.n_failed / self.n_requested if self.n_requested else 0.0
+
+    def overall_tier(self) -> Tier:
+        return min(self.tier_map.values(), default=Tier.VALIDATED)
+
+
+def simulate_ensemble(
+    process_set: ProcessSet,
+    parameters: ParameterSet,
+    y0: FloatArray,
+    t_span: tuple[float, float],
+    *,
+    n_members: int = 200,
+    seed: int = 0,
+    t_eval: FloatArray | None = None,
+    distribution: str = "triangular",
+    only: Iterable[str] | None = None,
+    exclude: Iterable[str] | None = None,
+    param_tiers: Mapping[str, Tier] | None = None,
+    max_failure_fraction: float = 0.5,
+    method: str = "BDF",
+    rtol: float = 1e-6,
+    atol: float = 1e-9,
+    max_step: float = np.inf,
+) -> Ensemble:
+    """Run a Monte-Carlo ensemble of :func:`simulate` over sampled parameters.
+
+    Draws ``n_members`` parameter samples from ``parameters``' provenance bands (seeded
+    by ``seed``, so the whole ensemble is reproducible), integrates each on the shared
+    ``t_eval`` grid, and returns the deterministic nominal run plus the surviving
+    members. All members use identical solver settings and ``y0``; only the sampled
+    parameters differ.
+
+    ``t_eval`` defaults to 200 evenly spaced points across ``t_span`` (a shared grid is
+    required so members can be aggregated). ``param_tiers`` defaults to
+    ``parameters.tier_map()`` so the reported tiers are honest (D-1) without the caller
+    threading it. See the module docstring for ``distribution``/``only``/``exclude``.
+
+    A sampled parameter set can make a member fail — ``solve_ivp`` may report
+    ``success=False``, or the right-hand side may *raise* (e.g. the uptake carbon-draw
+    guard). Both are caught, recorded in ``failures``, and counted; the RNG still
+    advances one sample per member so reproducibility holds. If more than
+    ``max_failure_fraction`` of members fail, this raises rather than return a
+    survivorship-biased spread from the lucky survivors.
+    """
+    if n_members < 1:
+        raise ValueError(f"n_members must be >= 1, got {n_members}")
+    if distribution not in DISTRIBUTIONS:
+        raise ValueError(f"unknown distribution {distribution!r}; expected one of {DISTRIBUTIONS}")
+
+    grid = np.linspace(t_span[0], t_span[1], 200) if t_eval is None else np.asarray(t_eval, float)
+    tiers = parameters.tier_map() if param_tiers is None else param_tiers
+    nominal_values = parameters.resolve()
+    sampled_names = _resolve_sample_names(process_set, parameters, only, exclude)
+
+    def run(values: Mapping[str, float]) -> Trajectory:
+        return simulate(
+            process_set,
+            values,
+            y0,
+            t_span,
+            param_tiers=tiers,
+            t_eval=grid,
+            method=method,
+            rtol=rtol,
+            atol=atol,
+            max_step=max_step,
+        )
+
+    # Nominal = the deterministic baseline (D-24). Identical solver kwargs + grid, so a
+    # caller can reproduce it byte-for-byte with a plain simulate() on parameters.resolve().
+    nominal = run(nominal_values)
+    if not nominal.success:
+        raise RuntimeError(f"nominal (unsampled) run failed to integrate: {nominal.message}")
+
+    rng = np.random.default_rng(seed)
+    members: list[FloatArray] = []
+    member_params: list[Mapping[str, float]] = []
+    failures: list[str] = []
+    for _ in range(n_members):
+        # Draw every member (advancing the RNG identically whether or not it survives),
+        # so the same seed reproduces the same ensemble including its failures.
+        values = sample_parameters(parameters, rng, distribution=distribution, names=sampled_names)
+        try:
+            traj = run(values)
+        except Exception as exc:  # a sampled RHS can raise (uptake guard, etc.)
+            failures.append(f"raised: {exc}")
+            continue
+        if not traj.success:
+            failures.append(f"solver: {traj.message}")
+            continue
+        if traj.y.shape != nominal.y.shape:  # truncated grid ⇒ unusable for aggregation
+            failures.append(f"shape {traj.y.shape} != nominal {nominal.y.shape}")
+            continue
+        members.append(traj.y)
+        member_params.append(values)
+
+    n_succeeded = len(members)
+    n_failed = n_members - n_succeeded
+    if n_succeeded == 0:
+        raise RuntimeError(
+            f"all {n_members} ensemble members failed to integrate; first failures: {failures[:3]}"
+        )
+    if n_failed / n_members > max_failure_fraction:
+        raise RuntimeError(
+            f"{n_failed}/{n_members} ensemble members failed "
+            f"(> {max_failure_fraction:.0%}); the surviving spread would be "
+            f"survivorship-biased. First failures: {failures[:3]}"
+        )
+
+    return Ensemble(
+        schema=process_set.schema,
+        t=nominal.t,
+        nominal=nominal.y,
+        members=np.stack(members, axis=0),
+        member_params=tuple(member_params),
+        tier_map=nominal.tier_map,
+        sampled_names=sampled_names,
+        distribution=distribution,
+        seed=int(seed),
+        n_requested=n_members,
+        n_succeeded=n_succeeded,
+        n_failed=n_failed,
+        failures=tuple(failures),
+    )
