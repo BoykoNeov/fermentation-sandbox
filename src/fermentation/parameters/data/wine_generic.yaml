@@ -203,6 +203,37 @@ K_amino_acids:
     conditions: "generic S. cerevisiae wine ferment; smooth availability gate aa/(K+aa)"
     notes: "Half-saturation in the smooth availability gate gate(aa) = aa/(K_amino_acids + aa) that ramps assimilation up from an empty pool and down to zero as amino acids are exhausted (the same smooth-Monod shape the fermentative flux uses, keeping the RHS C1 for the BDF solver). Scaled to the g/L range of assimilable nitrogen in must; an estimate, hence speculative."
 
+# -- Yeast autolysis (opt-in, decision D-34) ----------------------------------
+# The autolytic-peptide source that REFILLS the amino-acid pool from dead biomass (X_dead)
+# post-AF — the second prerequisite (after the D-33 fusel re-route) the deferred MLF-with-
+# growth beat needs, since the pool is empty at the MLF pitch point (D-23). YeastAutolysis is
+# the first consumer of X_dead: first-order in dead biomass, it liberates the dead-cell
+# nitrogen as amino acids (arginine) and routes the carbon-rich remainder to the non-
+# assimilable `debris` pool (glucan) so carbon and nitrogen close separately. OPT-IN: wired
+# into wine but DISABLED at the compile seam unless a scenario passes autolysis_rate_per_h
+# (which also overrides k_autolysis), so an undosed wine run is byte-for-byte the validated
+# core. Both parameters are author estimates (speculative); the beat is directional.
+
+k_autolysis:
+  value: 1.0e-3
+  unit: "1/h"   # r = k_autolysis * arrhenius(T, E_a_autolysis) * X_dead  [g X_dead/L/h]
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 1.0e-2, note: "sur-lie autolysis timescale: 1e-3/h ~ 29 d half-life (fast end of months-long sur lie); higher = faster refill" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae wine lees; first-order autolytic release of assimilable amino acids from dead biomass (decision D-34)"
+    notes: "Specific first-order rate at which dead biomass X_dead autolyses into assimilable amino acids + cell-wall debris (r = k_autolysis * f_T * X_dead). Real sur lie autolysis releases amino acids / mannoproteins over months; 1e-3/h (half-life ~29 d) puts a visible refill inside a multi-week post-AF window while staying on the slow end. OPT-IN ONLY: the YeastAutolysis Process is wired into wine but the compile seam DISABLES it unless a scenario passes autolysis_rate_per_h, which also overrides this reference so a demonstration can sweep the timescale; an undosed run does not read this value. Directional (not fit to a release curve), hence speculative."
+
+E_a_autolysis:
+  value: 60000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 40000.0, high: 90000.0, note: "enzymatic (protease/glucanase) autolysis; warmer lees clear faster. Q10 ~ 2.2 near 20 C" }
+  provenance:
+    source: "author estimate; generic enzymatic activation energy (warmer sur lie autolyses faster — brewing/enology consensus)"
+    conditions: "S. cerevisiae wine lees; equivalent Arrhenius activation energy at T_ref = 293.15 K"
+    notes: "Temperature sensitivity of autolytic amino-acid release (f_T = arrhenius(T, E_a_autolysis, T_ref)). Autolysis is driven by intracellular proteases/glucanases, so it accelerates with temperature (the reason warm lees aging clears faster) — a moderate generic enzymatic E_a ~60 kJ/mol (Q10 ~2.2). No kinetic source measures an autolysis activation energy in our form; a bounded estimate, hence speculative. DIRECTION (rises with T) is the load-bearing property; the magnitude is a banded guess."
+
 # -- Ethanol-driven cell inactivation (the timescale brake, decision D-13) -----
 # Coleman split biomass into active cells X_A and modelled an ethanol-proportional
 # specific death rate (their eqs 2, 7): dX_A/dt = mu*X_A - k_d*X_A, k_d = k'_d*E.

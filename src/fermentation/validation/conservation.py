@@ -151,6 +151,15 @@ def total_carbon(
     # is weighted in total_nitrogen below.
     if "amino_acids" in schema:
         w[schema.slice("amino_acids")] = carbon_mass_fraction("arginine")
+    # Cell-wall debris pool (decision D-34): yeast autolysis (YeastAutolysis) turns dead biomass
+    # X_dead into amino acids + this non-assimilable carbon-rich remainder (booked as glucan). The
+    # dead-cell carbon r·f_C splits into the amino acids' carbon and this debris carbon, weighted
+    # at glucan's carbon fraction to keep total_carbon closed through autolysis (the excess carbon
+    # leaves the metabolite pools but stays on the ledger — the esters_gas idiom). Debris is
+    # carbon-only (released nitrogen all goes to amino_acids), so it is absent from
+    # total_nitrogen. On an undosed / autolysis-off run the pool is empty (constant 0 term).
+    if "debris" in schema:
+        w[schema.slice("debris")] = carbon_mass_fraction("glucan")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(

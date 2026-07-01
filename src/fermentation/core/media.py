@@ -82,6 +82,7 @@ from fermentation.core.kinetics import (
     MalolacticConversion,
     OenococcusDiacetylReduction,
     SugarUptakeToEthanolCO2,
+    YeastAutolysis,
 )
 from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import StateSchema, VarSpec
@@ -173,15 +174,16 @@ def wine_schema() -> StateSchema:
     charge-active acid + strong-cation slots the pH charge-balance solver reads
     (decision D-18), the free-SO₂ pool the molecular-SO₂ readout reads (decision D-22),
     the ``X_mlf`` malolactic-catalyst slot (decision D-23), the ``citrate`` slot
-    *O. oeni* co-metabolises into MLF-derived diacetyl (decision D-31), and the dosed
-    ``amino_acids`` pool the amino-acid ledger swap funds biomass from (decision D-32).
+    *O. oeni* co-metabolises into MLF-derived diacetyl (decision D-31), the dosed
+    ``amino_acids`` pool the amino-acid ledger swap funds biomass from (decision D-32), and the
+    ``debris`` pool yeast autolysis routes non-assimilable cell-wall carbon into (decision D-34).
 
-    These eight slots are appended to ``wine_schema`` only (not ``_common_specs``), so
+    These nine slots are appended to ``wine_schema`` only (not ``_common_specs``), so
     ``beer_schema`` is untouched — beer's pH is a phosphate-buffered different acid
     system with no sourced data yet, explicitly deferred. ``default=0.0`` is
     load-bearing: existing wine scenarios/tests that name no acids still compile (all
-    eight → 0), and with acids, cation, SO₂, ``X_mlf``, ``citrate`` and ``amino_acids`` at 0
-    the slots are inert — they
+    nine → 0), and with acids, cation, SO₂, ``X_mlf``, ``citrate``, ``amino_acids`` and
+    ``debris`` at 0 the slots are inert — they
     contribute 0 to every conservation sum, so the validated core and its tests are
     untouched (prime directive #3). The acid/cation/SO₂ slots have no Process touching
     them in D-18/D-22; under D-23 :class:`~fermentation.core.kinetics.malolactic.\
@@ -243,9 +245,18 @@ def wine_schema() -> StateSchema:
             "amino_acids",
             "g/L",
             default=0.0,
-            description="assimilable amino-acid pool (dosed must input; represented as "
-            "arginine). Carbon- AND nitrogen-bearing: the AminoAcidAssimilation swap funds "
-            "a fraction of biomass from it, refunding sugar + ammonium N (decision D-32)",
+            description="assimilable amino-acid pool (dosed must input AND autolysis-refilled; "
+            "represented as arginine). Carbon- AND nitrogen-bearing: the AminoAcidAssimilation "
+            "swap funds a fraction of biomass from it, refunding sugar + ammonium N (D-32); "
+            "YeastAutolysis refills it from dead biomass post-AF (decision D-34)",
+        ),
+        VarSpec(
+            "debris",
+            "g/L",
+            default=0.0,
+            description="non-assimilable cell-wall debris (glucan/mannoprotein; produced-only). "
+            "The carbon-rich remainder yeast autolysis leaves behind after releasing the "
+            "nitrogen-rich amino acids — carbon-accounted as glucan, nitrogen-free (D-34)",
         ),
     ]
     return StateSchema(specs)
@@ -490,6 +501,18 @@ _AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     FuselAminoAcidReroute,
 )
 
+#: Yeast autolysis (wine-only, decision D-34): the autolytic-peptide source that refills the
+#: ``amino_acids`` pool from dead biomass (``X_dead``) post-AF — the second prerequisite (after the
+#: D-33 fusel re-route) the deferred MLF-with-growth beat needs, since the pool is empty at the MLF
+#: pitch point (D-23). The first consumer of ``X_dead``: it liberates the dead-cell nitrogen as
+#: amino acids and routes the carbon-rich remainder to the ``debris`` pool (carbon + nitrogen close
+#: separately). Like the *dosed* MLF organism / carrying cap and UNLIKE the always-on intrinsic
+#: aroma pools, it *consumes* core state (``X_dead``), so it is kept isolable and the compile
+#: seam DISABLES it unless a scenario opts in via ``autolysis_rate_per_h`` — an undosed wine run is
+#: then byte-for-byte the validated core. Wine-only (mirrors the wine-only ``amino_acids`` pool and
+#: nitrogen model, D-30/D-32); beer deferred.
+_AUTOLYSIS_PROCESSES: tuple[Callable[[], Process], ...] = (YeastAutolysis,)
+
 #: Wine growth/uptake Arrhenius modifiers (decision D-32). Identical to
 #: :data:`_PRIMARY_FERMENTATION_MODIFIERS` except the growth Arrhenius *also* scales the
 #: amino-acid swap (``for_growth`` extra target), so the swap's carbon/nitrogen refunds carry
@@ -517,6 +540,7 @@ MEDIA: dict[str, Medium] = {
             + _H2S_PROCESSES
             + _MLF_PROCESSES
             + _AMINO_ACID_PROCESSES
+            + _AUTOLYSIS_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

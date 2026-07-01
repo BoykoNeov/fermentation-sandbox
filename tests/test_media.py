@@ -22,19 +22,27 @@ WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "citrate", "cation_charge")
 WINE_SO2_SLOTS = ("so2_total",)
 WINE_MLF_SLOTS = ("X_mlf",)
 WINE_AMINO_ACID_SLOTS = ("amino_acids",)
+# The non-assimilable cell-wall debris pool yeast autolysis fills (D-34), appended last.
+WINE_DEBRIS_SLOTS = ("debris",)
 
 
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
     assert schema.names == (
-        SHARED + WINE_ACID_SLOTS + WINE_SO2_SLOTS + WINE_MLF_SLOTS + WINE_AMINO_ACID_SLOTS
+        SHARED
+        + WINE_ACID_SLOTS
+        + WINE_SO2_SLOTS
+        + WINE_MLF_SLOTS
+        + WINE_AMINO_ACID_SLOTS
+        + WINE_DEBRIS_SLOTS
     )
     assert schema.spec("S").size == 1
     # 17 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
     # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
     # h2s, D-29) + 3 wine-only acid slots + citrate (D-31) + cation_charge (D-18)
     # + 1 free-SO₂ slot (D-22) + 1 X_mlf slot (D-23) + 1 amino_acids slot (D-32)
-    assert schema.size == 25
+    # + 1 debris slot (D-34)
+    assert schema.size == 26
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -187,6 +195,9 @@ MLF_PROCESSES = {
 # sources a fraction of fusel carbon from amino acids and deaminates, disabled at the compile
 # seam when amino acids are undosed.
 AMINO_ACID_PROCESSES = {"amino_acid_assimilation", "fusel_amino_acid_reroute"}
+# Yeast autolysis (D-34): wine-only, opt-in — present in a bare build, disabled at the compile
+# seam unless a scenario passes autolysis_rate_per_h (the carrying-capacity opt-in pattern).
+AUTOLYSIS_PROCESSES = {"yeast_autolysis"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -196,6 +207,7 @@ EXPECTED_PROCESSES = {
         | H2S_PROCESSES
         | MLF_PROCESSES
         | AMINO_ACID_PROCESSES
+        | AUTOLYSIS_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

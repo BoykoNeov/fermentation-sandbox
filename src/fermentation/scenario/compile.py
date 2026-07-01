@@ -40,6 +40,7 @@ from fermentation.core.kinetics import (
     MalolacticCitrateMetabolism,
     MalolacticConversion,
     OenococcusDiacetylReduction,
+    YeastAutolysis,
 )
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
@@ -104,6 +105,9 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
         # MLF-derived diacetyl (D-31); absent ⇒ 0 (no citrate, the diacetyl branch is silent).
         # amino_acids_gpl is the optional assimilable amino-acid dose the AminoAcidAssimilation
         # swap funds biomass from (D-32); absent ⇒ 0 (the swap Process is disabled, core untouched).
+        # autolysis_rate_per_h is the optional opt-in first-order autolysis rate (1/h) that both
+        # enables YeastAutolysis and overrides its k_autolysis reference (D-34); absent/0 ⇒ the
+        # autolysis Process is disabled (an undosed wine run is byte-for-byte the validated core).
         {
             "brix",
             "yan_mgl",
@@ -117,6 +121,7 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "carrying_capacity_gpl",
             "citrate_gpl",
             "amino_acids_gpl",
+            "autolysis_rate_per_h",
         }
     ),
     "beer": frozenset(
@@ -203,6 +208,10 @@ def _wine_initial(
         # step below disables the swap Process entirely when this is 0, so an undosed run is
         # byte-for-byte the validated core (tier + perf isolability, the MLF/carrying pattern).
         "amino_acids": _optional(values, "amino_acids_gpl", 0.0),
+        # Non-assimilable cell-wall debris pool (decision D-34); produced-only, empty at pitch.
+        # YeastAutolysis routes the carbon-rich remainder of autolysed dead biomass here after
+        # releasing the nitrogen-rich amino acids; inert (weight 0) until autolysis is opted in.
+        "debris": 0.0,
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
@@ -399,6 +408,35 @@ def _override_carrying_capacity(parameters: ParameterSet, cap_gpl: float) -> Par
     return parameters.merge(ParameterSet([override]), override=True)
 
 
+def _override_autolysis_rate(parameters: ParameterSet, rate_per_h: float) -> ParameterSet:
+    """Override the reference ``k_autolysis`` with a scenario opt-in value (decision D-34).
+
+    Reached only when a wine scenario passes ``autolysis_rate_per_h > 0`` (which enables the
+    autolysis Process), so the rate is the scenario's value rather than the YAML reference —
+    letting a demonstration sweep the *sur lie* timescale. Keeps the reference parameter's
+    units/tier/uncertainty (only the operating point moves) and records the override in
+    provenance, mirroring :func:`_override_carrying_capacity`.
+    """
+    base = parameters["k_autolysis"]
+    override = Parameter(
+        name="k_autolysis",
+        value=rate_per_h,
+        unit=base.unit,
+        tier=base.tier,
+        uncertainty=base.uncertainty,
+        provenance=Provenance(
+            source=base.provenance.source,
+            doi=base.provenance.doi,
+            conditions=(
+                f"scenario opt-in override (decision D-34): autolysis_rate_per_h={rate_per_h:g} "
+                f"1/h, replacing the {base.value:g} 1/h YAML reference"
+            ),
+            notes=base.provenance.notes,
+        ),
+    )
+    return parameters.merge(ParameterSet([override]), override=True)
+
+
 def compile_scenario(
     scenario: Scenario,
     *,
@@ -488,6 +526,24 @@ def compile_scenario(
         for aa_process in (AminoAcidAssimilation, FuselAminoAcidReroute):
             if aa_process.name in process_set:
                 process_set.disable(aa_process.name)
+
+    # Autolytic-peptide source (decision D-34): YeastAutolysis refills the amino-acid pool from dead
+    # biomass (X_dead) post-AF — the second MLF-with-growth prerequisite. Like the carrying cap it
+    # *consumes* core state (X_dead), so it ships OPT-IN: absent ``autolysis_rate_per_h`` ⇒ DISABLE
+    # it so (a) X_dead/amino_acids/debris are untouched and the run is byte-for-byte the validated
+    # core, and (b) the enabled-but-inert Process does not drag those outputs to speculative
+    # (``tier_of`` counts enabled, not nonzero, Processes — the MLF/carrying *tier* isolability
+    # argument). Opted in ⇒ enable it and override k_autolysis with the scenario's rate so
+    # demonstrations can sweep the sur-lie timescale.
+    if YeastAutolysis.name in process_set:
+        raw_rate = scenario.initial.get("autolysis_rate_per_h")
+        rate_per_h = (
+            _nonneg(float(raw_rate), "autolysis_rate_per_h") if raw_rate is not None else 0.0
+        )
+        if rate_per_h <= 0.0:
+            process_set.disable(YeastAutolysis.name)
+        else:
+            parameters = _override_autolysis_rate(parameters, rate_per_h)
 
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 

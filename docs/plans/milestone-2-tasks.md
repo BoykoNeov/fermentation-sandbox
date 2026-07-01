@@ -240,9 +240,28 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       `K_amino_acids`); disabled with the swap when `amino_acids_gpl ≤ 0` (undosed = byte-for-byte
       core). 9 new tests (`test_fusel_reroute.py`); **417 green** + 5 benchmark, ruff+mypy clean.
       Full record in **DECISIONS → D-33**.
+- [x] **Yeast autolysis — the autolytic-peptide source (decision D-34). LANDED 2026-07-01.**
+      Prerequisite (b) above. `YeastAutolysis` — the **first consumer of `X_dead`** — refills the
+      `amino_acids` pool from dead biomass post-AF (*sur lie*), so the pool a later MLF-with-growth
+      model draws on is non-empty. First-order in `X_dead`, temperature-accelerated; **nitrogen-
+      anchored**: it liberates the dead-cell nitrogen as amino acids (arginine) and routes the
+      carbon-rich remainder to a new carbon-only **`debris`** pool (glucan). **Advisor-decided
+      fork:** the excess carbon (dead biomass C:N ≈ 4–11 ≫ arginine's ≈ 1.29, so ~86 % of dead-cell
+      carbon can't leave as amino acids) goes to `debris` (cell-wall glucan/mannoprotein — the
+      *sur lie* lees), **not CO₂** (which would falsely claim autolysis respires the cell and would
+      perturb a benchmarked pool). Carbon + nitrogen close *separately*; the excess-carbon split is
+      structurally non-negative (no clamp/kink). **Opt-in** (`autolysis_rate_per_h`, the D-30
+      carrying-cap pattern — consumes core state, so off by default; undosed = byte-for-byte core).
+      Emergent + verified: amino acids rise from empty post-AF, debris outgrows them. New `glucan`
+      species; new wine-only `debris` slot (schema 25→26); new params `k_autolysis`/`E_a_autolysis`
+      (speculative). 11 new tests (`test_autolysis.py`); **428 green** + 5 benchmark, ruff+mypy
+      clean, §2.2 undosed trio unchanged. Full record in **DECISIONS → D-34**.
 - [ ] **MLF-growth — later composition (decision D-23).** Add a growth Process touching `X_mlf`,
-      funded from the amino-acid ledger + autolysis. Blocked on both aa-ledger prerequisites
-      above; the AF nitrogen-exhaustion evidence (D-23) is why it cannot be folded into v1.
+      funded from the amino-acid ledger + autolysis. **Both aa-ledger prerequisites now landed**
+      (D-33 fusel re-route + deamination; D-34 autolysis refill), so the remaining block is the
+      *consumer* Process **plus the event loop** to pitch bacteria post-AF (runtime has no event
+      mechanism — the sequential-MLF block, D-23). The AF nitrogen-exhaustion evidence (D-23) is why
+      it cannot be folded into v1.
 - [ ] **Mixed cultures / Brett / sour consortium** — resource competition. (After MLF.)
 - **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these

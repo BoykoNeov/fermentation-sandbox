@@ -16,6 +16,7 @@ from fermentation.core.kinetics.acetaldehyde import (
 )
 from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
+from fermentation.core.kinetics.autolysis import YeastAutolysis
 from fermentation.core.kinetics.byproducts import (
     EsterSynthesis,
     EsterVolatilization,
@@ -63,6 +64,7 @@ __all__ = [
     "MalolacticConversion",
     "OenococcusDiacetylReduction",
     "SugarUptakeToEthanolCO2",
+    "YeastAutolysis",
     "arrhenius_factor",
     "biomass_growth_rate",
     "cardinal_temperature_factor",

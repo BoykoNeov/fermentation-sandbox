@@ -2150,6 +2150,74 @@ the MLF pitch point, D-23) — is D-34. MLF-growth itself (a bacterial growth Pr
 pool + the event loop) stays deferred beyond both. The full deamination generalisation (a standalone
 excess-aa deamination flux, vs this fusel-coupled release) also remains future work.
 
+## D-34 — Yeast autolysis: the autolytic-peptide source that refills the amino-acid pool
+
+**Status: IMPLEMENTED 2026-07-01** (428 green + 5 benchmark). Builds the *second* of the two
+prerequisites the still-blocked MLF-with-growth beat was deferred on (D-23/D-32) — the first being
+the D-33 fusel re-route. *O. oeni* builds biomass from amino acids/peptides, but the `amino_acids`
+pool (D-32) is **empty at the MLF pitch point**: the same yeast uptake that strips `N` to ~0 by day
+~1.3 would strip any dosed amino acids too (the empirical finding that settles D-23). Real wine
+refills the pool by **autolysis** — dying yeast self-digest and release intracellular amino acids
+(the basis of *sur lie* aging). :class:`YeastAutolysis` is that flux: the **first consumer of the
+`X_dead` pool** (dead biomass from D-13 ethanol inactivation), turning it into assimilable
+`amino_acids`.
+
+**The conservation problem, and why a debris pool (advisor-decided; this was the one blocking fork).**
+Dead biomass is **carbon-rich** (mass C:N `f_C/f_N` ≈ 4–11 across Coleman's nitrogen range) while the
+assimilable amino acids it releases are **nitrogen-rich** (arginine mass C:N ≈ 1.29). So per gram of
+nitrogen liberated, biomass gives up 4–11 g of carbon but arginine holds only ~1.3 g — **most of the
+dead-cell carbon cannot leave as amino acids.** The advisor settled the excess-carbon sink decisively:
+**not CO₂** (that would falsely claim autolysis *respires* the cell — it is enzymatic self-digestion,
+not respiration — and would perturb a benchmarked pool; ~86 % of dead-cell carbon would be wrongly
+mineralised), but a **carbon-only `debris` pool** (booked as glucan, C6H10O5). This is the physically
+*dominant and correct* fate: yeast cell walls (β-glucans/mannoproteins) are ~30 % of dry mass and are
+exactly the non-assimilable material that stays as lees. The `debris` pool is weighted in
+`total_carbon` only (nitrogen-free — all released N goes to amino acids), the `esters_gas` idiom (a
+bookkeeping pool carrying carbon that has left the metabolite pools but not the atom balance).
+
+**The flux — nitrogen-anchored, first-order (`core/kinetics/autolysis.py`).** With `r = k_autolysis ·
+arrhenius(T, E_a_autolysis, T_ref) · X_dead` [g X_dead/L/h] (autolysis is enzymatic, so warmer lees
+clear faster): liberate the dead-cell nitrogen as amino acids (`d[amino_acids] = +r·f_N/y_N`, arginine
+carrying exactly `r·f_N`), debit dead biomass (`d[X_dead] = −r`), and route the C-rich remainder to
+debris (`d[debris] = (r·f_C − r·f_N·y_C/y_N)/c_debris`). Carbon closes (dead-cell carbon `r·f_C` splits
+into the amino acids' carbon and the debris carbon); nitrogen closes (`r·f_N` is exactly what the
+amino-acid pool gains; debris is N-free) — both to machine precision, verified at the RHS level and
+over full runs. The excess-carbon split is **structurally non-negative** (biomass C:N always exceeds
+arginine's over the whole `f_N` range 0.039–0.114), so `f_C > f_N·y_C/y_N` always and the split never
+flips — **no clamp, no C⁰ kink** for the BDF solver (advisor-confirmed). The Process reads `f_N`/`f_C`
+from params (so the compile-time Coleman override, D-14, flows through) and the conservation tests pull
+them from `param_values`, not the raw YAML (advisor).
+
+**Isolability — opt-in (the D-30 carrying-capacity pattern).** Unlike the always-on intrinsic aroma
+pools, autolysis *consumes* core state (`X_dead`) and fills `amino_acids`/`debris`, so it measurably
+perturbs the core and cannot be default-on without breaking the byte-for-byte guarantee and the §2.2
+benchmarks. It ships **wine-only and disabled by default**: the compile seam enables it only when a
+scenario passes `autolysis_rate_per_h` (which also overrides `k_autolysis`, letting a demonstration
+sweep the *sur lie* timescale). Disabled ⇒ excluded from the derivatives *and* tier derivation (an
+undosed wine run is byte-for-byte the validated core, verified). First guard `X_dead ≤ 0 ⇒ 0` (the
+clamped first-order rate cannot overshoot negative). Wine-only, mirroring the wine-only `amino_acids`
+pool / nitrogen model (D-30/D-32); beer deferred.
+
+**Emergent (verified).** With autolysis on and amino acids un-dosed (so nothing consumes the pool —
+the swap/re-route are compile-disabled), `X_dead` accumulates as the ferment ends and then feeds the
+`amino_acids` pool, which **rises from empty** and keeps rising in the post-AF tail — the pool a later
+MLF-with-growth model will draw on. `debris` outgrows `amino_acids` (most autolysed carbon is the
+non-assimilable cell wall), the physically-right proportion.
+
+**Tier: speculative** — first-order autolysis of dead biomass is a standard lumped form, but
+`k_autolysis` (1e-3/h, ~29 d half-life, band [1e-4, 1e-2]) and `E_a_autolysis` (60 kJ/mol, band
+[40k, 90k]) are author estimates and the single-amino-acid / carbon-only-debris lumping is a
+simplification (real autolysate is a mix; mannoproteins retain some nitrogen). New species `glucan`
+(C6H10O5) in `chemistry.py`; new wine-only `debris` slot (schema 25→26); new `autolysis_rate_per_h`
+scenario key. 11 new tests (`tests/test_autolysis.py`), 428 green + 5 benchmark, ruff + mypy clean,
+§2.2 undosed trio unchanged.
+
+**STILL-DEFERRED — MLF-growth itself.** With both prerequisites now in hand (D-33 fusel re-route, D-34
+autolysis refill), the remaining work is the *consumer*: an MLF-with-growth Process feeding a growing
+`X_mlf` from the `amino_acids` pool, plus the **event loop** to pitch bacteria post-AF (runtime has no
+event mechanism — the same block as sequential MLF, D-23). A standalone excess-amino-acid deamination
+flux (vs the D-33 fusel-coupled release) also remains future work.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

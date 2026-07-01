@@ -157,6 +157,18 @@ M_H2S = 2 * _M_H + 1 * _M_S
 #: strictly below growth's sugar-carbon demand for any assimilation fraction ψ ≤ 1, so the
 #: swap never creates hexose (gluconeogenesis) and needs no clamp — decision D-32.
 M_ARGININE = 6 * _M_C + 14 * _M_H + 4 * _M_N + 2 * _M_O
+#: β-glucan / mannoprotein repeat unit, anhydroglucose C6H10O5 (glucose minus one water, the
+#: polysaccharide monomer) — the representative species for the non-assimilable cell-wall
+#: **debris** pool yeast autolysis leaves behind (decision D-34). Dead-cell biomass is C-rich
+#: (mass C:N ≈ 4–11) while the assimilable amino acids it releases are N-rich (arginine C:N ≈
+#: 1.29), so **most of the dead-cell carbon cannot leave as amino acids** — it stays as
+#: cell-wall glucan/mannoprotein (the sur-lie lees). :class:`~fermentation.core.kinetics.\
+#: autolysis.YeastAutolysis` routes that excess carbon here so autolysis conserves carbon *and*
+#: nitrogen separately (nitrogen → ``amino_acids``, the C-rich remainder → ``debris``). Booked
+#: **carbon-only** (registered with 0 nitrogen below): all the released nitrogen goes to the
+#: amino-acid pool, so the glucan remainder is nitrogen-free — a documented simplification (real
+#: mannoproteins retain some protein nitrogen). Carbon fraction 72.066/162.141 ≈ 0.4445.
+M_GLUCAN = 6 * _M_C + 10 * _M_H + 5 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -182,6 +194,7 @@ MOLAR_MASS: dict[str, float] = {
     "diacetyl": M_DIACETYL,
     "butanediol": M_BUTANEDIOL,
     "arginine": M_ARGININE,
+    "glucan": M_GLUCAN,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -210,6 +223,7 @@ CARBON_ATOMS: dict[str, int] = {
     "diacetyl": 4,
     "butanediol": 4,
     "arginine": 6,
+    "glucan": 6,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -241,6 +255,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     "diacetyl": 0,
     "butanediol": 0,
     "arginine": 4,
+    #: Cell-wall debris (glucan) is carbon-only: all dead-cell nitrogen is released as
+    #: assimilable amino acids, so the remainder carries none (decision D-34).
+    "glucan": 0,
 }
 
 
