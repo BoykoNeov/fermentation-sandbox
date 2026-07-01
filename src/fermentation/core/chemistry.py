@@ -77,6 +77,25 @@ M_MALIC = 4 * _M_C + 6 * _M_H + 5 * _M_O
 #: L-lactic acid, C3H6O3 — the MLF product (produced-only). Monoprotic; the softer
 #: acid that malic deacidifies *into*, the chemistry the pH solver must reproduce.
 M_LACTIC = 3 * _M_C + 6 * _M_H + 3 * _M_O
+#: α-acetolactate (2-acetolactic acid), C5H8O4 — the vicinal-diketone (VDK) precursor
+#: reservoir (decision D-26). Yeast excretes it during valine biosynthesis; it then
+#: *spontaneously* (non-enzymatically) oxidatively decarboxylates to diacetyl + CO2,
+#: the slow, temperature-critical step that makes the "diacetyl rest" a rest. The C5→C4
+#: carbon (one carbon leaves as CO2) makes that decarboxylation carbon-closing on the
+#: existing ledger, exactly as malic→lactic+CO2 (D-23). Better grounded than the
+#: ester/fusel sugar stand-ins: α-acetolactate genuinely derives from pyruvate (sugar).
+M_ACETOLACTATE = 5 * _M_C + 8 * _M_H + 4 * _M_O
+#: Diacetyl (2,3-butanedione), C4H6O2 — the flavour-active vicinal diketone (buttery
+#: off-note, the defining lager parameter). Produced by spontaneous decarboxylation of
+#: α-acetolactate and reabsorbed by viable yeast, which reduces it to 2,3-butanediol —
+#: the produce-then-reabsorb time course behind the diacetyl rest (decision D-26).
+M_DIACETYL = 4 * _M_C + 6 * _M_H + 2 * _M_O
+#: 2,3-Butanediol, C4H10O2 — the flavour-inactive terminal product of yeast diacetyl
+#: reduction (via acetoin, lumped here into the diol; decision D-26). The real fate of
+#: reabsorbed diacetyl, so tracking it as its own pool makes the reduction a genuine
+#: carbon-conserving transfer (C4→C4, mole-for-mole) rather than a "returns-to-sugar"
+#: bookkeeping stand-in — the fidelity the owner asked for over closure-only options.
+M_BUTANEDIOL = 4 * _M_C + 10 * _M_H + 2 * _M_O
 #: Sulfur dioxide, SO2 — the ``so2_free`` (free SO₂) state species (decision D-22).
 #: The ONLY carbon-free tracked species, so it contributes nothing to ``total_carbon``
 #: (registered with 0 carbon atoms below; cf. the charge-only ``cation_charge`` slot).
@@ -103,6 +122,9 @@ MOLAR_MASS: dict[str, float] = {
     "malic_acid": M_MALIC,
     "lactic_acid": M_LACTIC,
     "sulfur_dioxide": M_SO2,
+    "alpha_acetolactate": M_ACETOLACTATE,
+    "diacetyl": M_DIACETYL,
+    "butanediol": M_BUTANEDIOL,
 }
 
 #: Carbon atoms per molecule, keyed by species name. ``sulfur_dioxide`` is carried at
@@ -123,6 +145,9 @@ CARBON_ATOMS: dict[str, int] = {
     "malic_acid": 4,
     "lactic_acid": 3,
     "sulfur_dioxide": 0,
+    "alpha_acetolactate": 5,
+    "diacetyl": 4,
+    "butanediol": 4,
 }
 
 

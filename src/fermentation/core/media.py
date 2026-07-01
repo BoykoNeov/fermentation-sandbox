@@ -29,13 +29,18 @@ The shared variables (decisions D-B / D-4):
                                  carbon-accounted as succinic acid — decision D-16)
     esters esters                g/L (aroma byproducts; lumped produced-only pool)
     fusels fusel/higher alcohols g/L (Ehrlich pathway; lumped produced-only pool)
+    acetolactate α-acetolactate  g/L (vicinal-diketone precursor reservoir — decision D-26)
+    diacetyl diacetyl (VDK)      g/L (buttery off-note; produced then reabsorbed — D-26)
+    butanediol 2,3-butanediol    g/L (flavour-inactive diacetyl-reduction product — D-26)
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
-``X_dead``, ``Gly``, ``Byp``, ``esters`` and ``fusels`` start at zero at pitch and are
-only accumulated by the kinetics, so they declare a default initial of 0
+``X_dead``, ``Gly``, ``Byp``, ``esters``, ``fusels`` and the VDK pools
+(``acetolactate``/``diacetyl``/``butanediol``) start at zero at pitch and are only
+accumulated by the kinetics, so they declare a default initial of 0
 (`VarSpec.default`) and need not be named at every initial-condition call site. The
-``esters``/``fusels`` pools are filled by the Tier-2 byproduct Processes wired below.
+``esters``/``fusels`` pools are filled by the Tier-2 byproduct Processes wired below;
+the three VDK pools by the diacetyl-pathway Processes (decision D-26).
 Under **decision D-19 (option a1)** those Processes route the aroma carbon *out of
 ``S``* and ``total_carbon`` weights the pools (as ethyl acetate / isoamyl alcohol), so
 ``esters``/``fusels`` are real carbon-accounted state alongside ``Gly``/``Byp`` — not
@@ -107,6 +112,27 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             default=0.0,
             description="esters lost to the headspace by CO2 stripping (volatilized; "
             "carbon-bookkeeping pool, decision D-20)",
+        ),
+        VarSpec(
+            "acetolactate",
+            "g/L",
+            default=0.0,
+            description="alpha-acetolactate — vicinal-diketone precursor reservoir "
+            "(spontaneously decarboxylates to diacetyl; decision D-26)",
+        ),
+        VarSpec(
+            "diacetyl",
+            "g/L",
+            default=0.0,
+            description="diacetyl (2,3-butanedione) — buttery vicinal diketone; "
+            "produced then yeast-reabsorbed (the diacetyl rest, decision D-26)",
+        ),
+        VarSpec(
+            "butanediol",
+            "g/L",
+            default=0.0,
+            description="2,3-butanediol — flavour-inactive terminal product of "
+            "diacetyl reduction by viable yeast (decision D-26)",
         ),
     ]
 

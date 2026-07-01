@@ -89,6 +89,20 @@ def total_carbon(
     # precision while wine's liquid esters honestly fall with temperature.
     if "esters_gas" in schema:
         w[schema.slice("esters_gas")] = carbon_mass_fraction("ethyl_acetate")
+    # Vicinal-diketone (VDK) pools (decision D-26): the diacetyl pathway routes carbon
+    # sugar → α-acetolactate → diacetyl + CO2 → 2,3-butanediol, every step balanced on
+    # this ledger. α-acetolactate is drawn from sugar (excretion) and booked at its own
+    # C5 fraction; the spontaneous decarboxylation (C5 → C4 + CO2) is carbon-closing like
+    # malic→lactic+CO2; the yeast reduction (diacetyl → butanediol) is a mole-for-mole
+    # C4 → C4 transfer between two weighted pools (like esters → esters_gas). Weighting
+    # all three at their own species' carbon fraction keeps total_carbon closed to machine
+    # precision through the whole produce-then-reabsorb time course.
+    if "acetolactate" in schema:
+        w[schema.slice("acetolactate")] = carbon_mass_fraction("alpha_acetolactate")
+    if "diacetyl" in schema:
+        w[schema.slice("diacetyl")] = carbon_mass_fraction("diacetyl")
+    if "butanediol" in schema:
+        w[schema.slice("butanediol")] = carbon_mass_fraction("butanediol")
     # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
     # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
     # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that

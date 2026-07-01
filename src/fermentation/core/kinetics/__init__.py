@@ -24,8 +24,10 @@ from fermentation.core.kinetics.malolactic import (
     cardinal_temperature_factor,
 )
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
+from fermentation.core.kinetics.vicinal_diketones import AcetolactateExcretion
 
 __all__ = [
+    "AcetolactateExcretion",
     "ArrheniusTemperature",
     "EsterSynthesis",
     "EsterVolatilization",

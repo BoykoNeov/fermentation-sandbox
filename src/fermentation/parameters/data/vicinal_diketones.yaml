@@ -1,0 +1,104 @@
+# Vicinal-diketone (VDK / diacetyl) pathway kinetics (decision D-26).
+#
+# SHARED, medium-agnostic parameter file: loaded alongside the <medium>_<strain>.yaml
+# by the compile seam (the store merges paths; these names are collision-free with the
+# per-medium kinetic parameters). VDK kinetics are shared because the load-bearing step
+# is *non-enzymatic*: the spontaneous oxidative decarboxylation of alpha-acetolactate to
+# diacetyl is a pure chemical rate (temperature/pH-driven), a property of the molecule,
+# not the beverage — so unlike the per-medium ester E_a it belongs in one shared file
+# (like acidbase.yaml). The yeast reduction constants are yeast-generic at this stage.
+#
+# THE PATHWAY (three carbon-closing steps on the existing ledger, decision D-26):
+#
+#   sugar --excretion--> alpha-acetolactate --decarb--> diacetyl + CO2 --reduction--> 2,3-butanediol
+#         (k_acetolactate)       (k_decarb, E_a_decarb)        (k_reduction, E_a_reduction)
+#           C5 drawn from S        C5 -> C4 + C1 (like malic->lactic+CO2)   C4 -> C4 (mole-for-mole)
+#
+# WHY THE "DIACETYL REST" EMERGES (the phenomenon these parameters must reproduce):
+#   * Excretion fills the alpha-acetolactate reservoir DURING active fermentation
+#     (flux-linked; stops at dryness). The reservoir is thus full at end of primary.
+#   * Decarboxylation is SLOW and STRONGLY temperature-dependent (E_a_decarb high) and is
+#     NOT gated on yeast — it keeps converting reservoir -> diacetyl after fermentation.
+#   * Reduction is FAST and gated on VIABLE yeast (X, not X_dead) with NO flux term, so it
+#     clears diacetyl as fast as it forms WHILE live yeast is present, but stops dead once
+#     the yeast is crashed/racked/inactivated.
+#   => Warm rest with live yeast: decarb speeds up, reservoir empties to diacetyl, yeast
+#      reduces it -> beer cleans up FAST. Crash/package too early (reservoir still full,
+#      yeast gone): diacetyl keeps forming with nothing to reduce it -> diacetyl RISES in
+#      the package. This is the actual reason the rest exists; it is why E_a_decarb (not
+#      E_a_reduction) is the load-bearing temperature parameter.
+#
+# TIERS. E_a_decarb carries a SOURCED ORDERING (non-enzymatic, temperature-dependent
+# conversion; warmer => faster — Haukeli & Lie 1978; Krogerus 2013 review) but a
+# SPECULATIVE magnitude/band, exactly as the ester/fusel E_a orderings (D-19/D-21). Every
+# rate constant is an order-of-magnitude estimate (no kinetic model of this exact
+# per-flux excretion / first-order decarb / X-gated reduction form is sourced), so all
+# stay speculative; parameter-tier propagation (D-1) caps the diacetyl/acetolactate/
+# butanediol pool outputs at speculative regardless.
+#
+# CARBON. alpha-acetolactate is drawn from sugar at its C5 carbon fraction (excretion);
+# this is BETTER grounded than the ester/fusel sugar stand-ins because alpha-acetolactate
+# genuinely derives from pyruvate (sugar). The decarb (C5 -> C4 + CO2) and reduction
+# (C4 -> C4) then move that carbon within the ledger, so total_carbon closes to machine
+# precision through the whole produce-then-reabsorb course (decision D-26). Mass carries a
+# small gap (the oxidative decarb consumes O2 and the reduction consumes NAD(P)H, both
+# untracked) — carbon is the invariant here, exactly as for beer's hydrolysis water (D-8).
+#
+# SCOPE (v1). Yeast valine-pathway diacetyl only. MLF-derived diacetyl (Oenococcus from
+# citrate) is explicitly OUT (deferred with the MLF-growth beat), so wine yeast-pathway
+# diacetyl UNDERSTATES real wine diacetyl. Excretion is held temperature-flat (the
+# reservoir size is a weak lever; the temperature-criticality lives in decarb) — a
+# documented simplification. Acetoin is lumped into the 2,3-butanediol terminal pool.
+
+# -- EXCRETION: sugar -> alpha-acetolactate (flux-linked reservoir filling) -------------
+k_acetolactate:
+  value: 2.0e-5
+  unit: "1/h"   # d(acetolactate)/dt = k_acetolactate * X * S/(K_sugar_uptake + S)
+  tier: speculative
+  uncertainty: { low: 5.0e-6, high: 8.0e-5, note: "order-of-magnitude target: peak alpha-acetolactate reservoir ~1-8 mg/L over a primary ferment, giving diacetyl peaks in the ~0.05-1 mg/L range (flavour threshold ~0.1 mg/L lager)" }
+  provenance:
+    source: "author estimate bounded by typical brewing VDK levels (Krogerus 2013 review, J. Inst. Brew. 119:135-143, doi:10.1002/jib.84). alpha-acetolactate is the valine-biosynthesis overflow excreted during active fermentation."
+    conditions: "generic yeast; alpha-acetolactate excretion coupled to the biomass-catalysed sugar (fermentative) flux, shared K_sugar_uptake"
+    notes: "Flux-linked so the reservoir fills during fermentation and stops at dryness. Held TEMPERATURE-FLAT (no explicit Arrhenius) as a documented v1 simplification: real acetolactate formation rises mildly with temperature, but the reservoir SIZE is a weak lever on the rest; the load-bearing temperature dependence is the decarboxylation (E_a_decarb). Magnitude speculative."
+
+# -- DECARBOXYLATION: alpha-acetolactate -> diacetyl + CO2 (spontaneous, T-critical) ----
+k_decarb:
+  value: 5.0e-3
+  unit: "1/h"   # d(acetolactate)/dt = -k_decarb * f(T) * [acetolactate]; first-order, non-enzymatic
+  tier: speculative
+  uncertainty: { low: 1.0e-3, high: 2.0e-2, note: "first-order decarb rate at T_ref=20 C => half-life ln2/k ~ 35-700 h (~1.5-30 days); the diacetyl-rest timescale. Slower at lager temps (see E_a_decarb), faster on a warm rest" }
+  provenance:
+    source: "author estimate of the non-enzymatic decarboxylation rate; mechanism + first-order form + strong temperature dependence per Haukeli & Lie 1978 (J. Inst. Brew.) and Krogerus 2013 review (doi:10.1002/jib.84). Ethanol/pH dependence (Kobayashi et al.) omitted in v1."
+    conditions: "generic wort/must; spontaneous oxidative decarboxylation of alpha-acetolactate outside the cell, first-order in acetolactate, at T_ref = 293.15 K"
+    notes: "The RATE-LIMITING step of VDK removal and the reason a diacetyl rest takes days-to-weeks. Magnitude speculative (order-of-magnitude); the SOURCED, load-bearing claim is the temperature dependence carried by E_a_decarb below (warmer => faster conversion), not this absolute rate."
+
+E_a_decarb:
+  value: 90000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 60000.0, high: 130000.0, note: "Q10 ~2.3-4.2 at 20 C. Held WELL ABOVE E_a_reduction (45k) so decarboxylation is the temperature-critical rate-limiting step: a warm rest speeds it, a cold crash strands the reservoir. This ORDERING is the load-bearing, sourced constraint; the magnitude is speculative and banded" }
+  provenance:
+    source: "SOURCED ORDERING: the alpha-acetolactate -> diacetyl conversion is non-enzymatic and strongly temperature-dependent, accelerating with temperature (Haukeli & Lie 1978; Krogerus 2013 review, doi:10.1002/jib.84 — 'higher fermentation temperatures increase the conversion rate of excess alpha-acetolactate into diacetyl'). Magnitude anchored to a Q10 ~2.5-3 typical of this decarboxylation."
+    conditions: "spontaneous decarboxylation; equivalent Arrhenius activation energy at T_ref = 293.15 K"
+    notes: "Load-bearing: this steep, non-yeast-gated temperature dependence is what makes the diacetyl rest temperature-critical (warm it up to clear faster). Held above E_a_reduction so decarb, not reduction, is rate-limiting. Exact magnitude speculative; the direction and the ordering vs reduction are the sourced claims."
+
+# -- REDUCTION: diacetyl -> 2,3-butanediol (enzymatic, viable-yeast-gated, fast) --------
+k_reduction:
+  value: 5.0e-2
+  unit: "L/(g*h)"   # d(diacetyl)/dt = -k_reduction * X_viable * f(T) * [diacetyl]; first-order in diacetyl and live X
+  tier: speculative
+  uncertainty: { low: 1.0e-2, high: 2.0e-1, note: "with viable X ~1-5 g/L gives a diacetyl half-life of a few hours => yeast clears diacetyl as fast as it forms while present, so diacetyl stays low DURING active ferment and only strands once the yeast is gone" }
+  provenance:
+    source: "author estimate; yeast reduces diacetyl to acetoin/2,3-butanediol via diacetyl reductase (fast relative to the spontaneous decarb), gated on viable cells (Krogerus 2013 review, doi:10.1002/jib.84)"
+    conditions: "generic yeast; enzymatic diacetyl reduction, first-order in diacetyl and in VIABLE biomass X (NOT X_dead), NO fermentative-flux term (must run during the rest when flux ~ 0)"
+    notes: "NO flux term and gated on live X is load-bearing: reduction must continue after sugar is gone (the rest) but STOP when yeast is crashed/racked/ethanol-inactivated. That gating is what makes 'remove the yeast at peak => diacetyl stranded' emerge. Magnitude speculative."
+
+E_a_reduction:
+  value: 45000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 60000.0, note: "held BELOW E_a_decarb (90k) so the spontaneous decarb, not the enzymatic reduction, is the temperature-critical rate-limiting step (the ordering that makes a warm rest work)" }
+  provenance:
+    source: "author estimate; a moderate enzymatic activation energy typical of yeast oxidoreductases, deliberately set below E_a_decarb"
+    conditions: "generic yeast; equivalent Arrhenius activation energy of diacetyl reduction at T_ref = 293.15 K"
+    notes: "Only the ORDERING (E_a_reduction < E_a_decarb) is load-bearing — it keeps decarboxylation rate-limiting so temperature acts on the rest through the reservoir-emptying step. Magnitude speculative and banded."
