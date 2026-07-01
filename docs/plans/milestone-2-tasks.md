@@ -202,14 +202,27 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         MLF wall ~day 4, so MLF must complete in that early window or stall — co-inoculation is the
         only viable mode (post-AF doubly blocked: no event loop *and* EtOH > tolerance). 13 new
         tests; 262 green, ruff + mypy clean, §2.2 trio unchanged.
-- [ ] **Amino-acid ledger — separate yeast/AF beat (decision D-23, deferred).** A toggleable
-      `default=0` amino-acid pool contributing to *both* the carbon and nitrogen ledgers,
-      implemented as a **separate isolable Process** — a carbon- *and* nitrogen-neutral *swap*
-      (refund sugar + ammonium `N`, debit the aa-pool by one aa-mass carrying exactly that C and
-      N) so growth + the Coleman reconstruction stay byte-for-byte. The honest home for the D-19
-      fusel Ehrlich carbon. **Prerequisites before it can ever fund MLF-growth:** (a) a residual-N
-      / satiation model — the model currently strips even a 300 mg/L must to zero (no residual
-      floor, D-23); (b) an autolytic-peptide source to refill the pool post-AF.
+- [x] **Amino-acid ledger — separate yeast/AF beat (decision D-32). LANDED 2026-07-01.** A
+      toggleable `default=0` `amino_acids` wine pool (represented as **arginine**) contributing
+      to *both* the carbon and nitrogen ledgers, implemented as a **separate isolable Process**
+      (`AminoAcidAssimilation`) — a carbon- *and* nitrogen-neutral **swap** (debit the pool,
+      refund sugar carbon + ammonium `N`), biomass untouched, so undosed growth + Coleman stay
+      byte-for-byte. **Nitrogen-anchored** rate `ρ = ψ·gate(aa)·f_N·base_dx/y_N`; the N-rich
+      arginine representative (mass C:N ≈ 1.29 ≪ biomass ≈ 4.3) keeps the carbon refund ≤ 0.30·ψ
+      of growth's draw, so it **never creates hexose** — no clamp needed (advisor's carbon-vs-
+      nitrogen asymmetry: carbon over-refund = gluconeogenesis, non-physical; N over-refund =
+      deamination, deferred with the fusel re-route). **Correctness crux:** the swap anchors to
+      growth's *base* rate, so the wine growth Arrhenius (`for_growth` extra target) and the
+      carrying-capacity modifier both scale it — landed **fail-first** (guard tests proven failing
+      unscaled: `dS = +0.0279` sugar creation at carrying saturation, arrhenius ratio 1.0 vs
+      0.445 — then passing scaled). New per-species nitrogen accounting (`NITROGEN_ATOMS`,
+      `nitrogen_mass_fraction`); `shared biomass_growth_rate` helper. New speculative
+      `amino_acid_assimilation_fraction=0.5` / `K_amino_acids=0.1 g/L` + `amino_acids_gpl`
+      scenario key. Dosed = supplementary-YAN feedback (more biomass), isolability undosed-only.
+      11 new tests; **406 green** + 5 benchmark, ruff+mypy clean. Full record in **DECISIONS →
+      D-32**. **Still-deferred prerequisites for MLF-growth:** (a) the D-19 fusel Ehrlich carbon
+      re-route (needs the deamination branch); (b) an autolytic-peptide source to refill the pool
+      post-AF (it is empty at the MLF pitch point, D-23).
 - [ ] **MLF-growth — later composition (decision D-23).** Add a growth Process touching `X_mlf`,
       funded from the amino-acid ledger + autolysis. Blocked on both aa-ledger prerequisites
       above; the AF nitrogen-exhaustion evidence (D-23) is why it cannot be folded into v1.

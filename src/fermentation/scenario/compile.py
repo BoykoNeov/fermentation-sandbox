@@ -34,6 +34,7 @@ from pathlib import Path
 
 from fermentation.core import acidbase
 from fermentation.core.kinetics import (
+    AminoAcidAssimilation,
     BiomassCarryingCapacity,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
@@ -100,6 +101,8 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
         # residual-nitrogen floor (D-30); absent ⇒ the cap modifier is disabled (core untouched).
         # citrate_gpl is the optional citric-acid must input O. oeni co-metabolises into
         # MLF-derived diacetyl (D-31); absent ⇒ 0 (no citrate, the diacetyl branch is silent).
+        # amino_acids_gpl is the optional assimilable amino-acid dose the AminoAcidAssimilation
+        # swap funds biomass from (D-32); absent ⇒ 0 (the swap Process is disabled, core untouched).
         {
             "brix",
             "yan_mgl",
@@ -112,6 +115,7 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "mlf_pitch_gpl",
             "carrying_capacity_gpl",
             "citrate_gpl",
+            "amino_acids_gpl",
         }
     ),
     "beer": frozenset(
@@ -192,6 +196,12 @@ def _wine_initial(
         # reservoir. Carbon-active (weighted in total_carbon) but not charge-active (kept out
         # of the D-18 pH balance in v1); inert at 0, so an un-dosed run is unchanged.
         "citrate": _optional(values, "citrate_gpl", 0.0),
+        # Assimilable amino-acid dose (decision D-32); g/L, default 0 (no amino-acid ledger).
+        # Carbon- AND nitrogen-bearing (arginine); the AminoAcidAssimilation swap funds a
+        # fraction of biomass from it, refunding sugar + ammonium N. Inert at 0 and the compile
+        # step below disables the swap Process entirely when this is 0, so an undosed run is
+        # byte-for-byte the validated core (tier + perf isolability, the MLF/carrying pattern).
+        "amino_acids": _optional(values, "amino_acids_gpl", 0.0),
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
@@ -460,6 +470,19 @@ def compile_scenario(
             process_set.disable(BiomassCarryingCapacity.name)
         else:
             parameters = _override_carrying_capacity(parameters, cap_gpl)
+
+    # Amino-acid ledger isolability (decision D-32): the AminoAcidAssimilation swap is wired
+    # into the wine medium but contributes nothing until amino acids are dosed. When they are
+    # not, DISABLE it so (a) the empty ``amino_acids`` slot keeps its VALIDATED tier — an
+    # *enabled* speculative Process touching ``S``/``N`` would drag those outputs down even with
+    # a zero contribution (``tier_of`` counts enabled, not nonzero, Processes) — and (b) no
+    # growth-rate recompute is paid on an undosed run. Dosed, the swap funds a fraction of
+    # biomass from amino acids, refunding sugar carbon and ammonium nitrogen; the wine growth
+    # Arrhenius and carrying-capacity modifiers scale it alongside growth so its refunds track
+    # the realised draw and never create sugar (D-32).
+    amino_acids_gpl = float(scenario.initial.get("amino_acids_gpl", 0.0) or 0.0)
+    if amino_acids_gpl <= 0.0 and AminoAcidAssimilation.name in process_set:
+        process_set.disable(AminoAcidAssimilation.name)
 
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 

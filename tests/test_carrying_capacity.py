@@ -24,6 +24,7 @@ import numpy as np
 import pytest
 
 from fermentation.core.kinetics import (
+    AminoAcidAssimilation,
     BiomassCarryingCapacity,
     EthanolInactivation,
     GrowthNitrogenLimited,
@@ -65,7 +66,10 @@ def test_metadata():
     m = BiomassCarryingCapacity()
     assert m.name == "biomass_carrying_capacity"
     assert m.tier is Tier.SPECULATIVE
-    assert m.modifies == (GrowthNitrogenLimited.name,)
+    # Scales growth AND the amino-acid swap (decision D-32): the swap's refunds are anchored to
+    # growth's base rate, so the cap must throttle it alongside growth or a near-saturation cap
+    # would let the refund outrun the realised draw and create sugar.
+    assert m.modifies == (GrowthNitrogenLimited.name, AminoAcidAssimilation.name)
     assert m.reads == ("biomass_carrying_capacity",)
 
 
@@ -96,10 +100,15 @@ def test_cap_drops_growth_output_tier_structurally_only_when_enabled():
     # SPECULATIVE — but ONLY when enabled: a disabled modifier is excluded from tier derivation
     # (the wine-only MLF *tier* isolability argument). Undosed wine keeps growth PLAUSIBLE.
     schema = wine_schema()
-    procs = [GrowthNitrogenLimited(), EthanolInactivation()]
+    # The cap now also targets the amino-acid swap (D-32), so any set carrying it must include
+    # that Process; disable it here (it touches S/N, not X, and is undosed) so this X-tier test
+    # is unchanged.
+    procs = [GrowthNitrogenLimited(), EthanolInactivation(), AminoAcidAssimilation()]
     off = ProcessSet(schema, procs, modifiers=[BiomassCarryingCapacity()])
     off.disable(CAP)
+    off.disable(AminoAcidAssimilation.name)
     on = ProcessSet(schema, procs, modifiers=[BiomassCarryingCapacity()])
+    on.disable(AminoAcidAssimilation.name)
     assert off.tier_of("X") is Tier.PLAUSIBLE
     assert on.tier_of("X") is Tier.SPECULATIVE
 
@@ -111,10 +120,14 @@ def test_param_aware_tier_of_x_is_speculative_either_way():
     # user-facing param-aware tier does not change.
     tier_map = load_parameters(default_data_dir() / "wine_generic.yaml").tier_map()
     schema = wine_schema()
-    growth = [GrowthNitrogenLimited()]
-    off = ProcessSet(schema, growth, modifiers=[BiomassCarryingCapacity()])
+    # Include the amino-acid swap (the cap now targets it, D-32) but disable it — it touches
+    # S/N, not X, so the X tier is unaffected either way.
+    procs = [GrowthNitrogenLimited(), AminoAcidAssimilation()]
+    off = ProcessSet(schema, procs, modifiers=[BiomassCarryingCapacity()])
     off.disable(CAP)
-    on = ProcessSet(schema, growth, modifiers=[BiomassCarryingCapacity()])
+    off.disable(AminoAcidAssimilation.name)
+    on = ProcessSet(schema, procs, modifiers=[BiomassCarryingCapacity()])
+    on.disable(AminoAcidAssimilation.name)
     assert off.tier_of("X", tier_map) is Tier.SPECULATIVE
     assert on.tier_of("X", tier_map) is Tier.SPECULATIVE
 
@@ -148,9 +161,14 @@ def test_enabled_cap_scales_growth_by_the_logistic_factor(full_params):
     # sugar draw — scales by exactly the same factor, so nitrogen/carbon proportions are kept.
     schema = wine_schema()
     k = 2.5
-    off = ProcessSet(schema, [GrowthNitrogenLimited()], modifiers=[BiomassCarryingCapacity()])
+    # Include the amino-acid swap (the cap now targets it, D-32) but disable it — undosed, it
+    # contributes nothing, so growth's scaling is isolated exactly as before.
+    procs = [GrowthNitrogenLimited(), AminoAcidAssimilation()]
+    off = ProcessSet(schema, procs, modifiers=[BiomassCarryingCapacity()])
     off.disable(CAP)
-    on = ProcessSet(schema, [GrowthNitrogenLimited()], modifiers=[BiomassCarryingCapacity()])
+    off.disable(AminoAcidAssimilation.name)
+    on = ProcessSet(schema, procs, modifiers=[BiomassCarryingCapacity()])
+    on.disable(AminoAcidAssimilation.name)
     params_on = {**full_params, "biomass_carrying_capacity": k}
     x = 1.5
     y = _wine_y0(schema, x=x, s=200.0, n=0.2)

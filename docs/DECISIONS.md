@@ -2012,6 +2012,81 @@ depletion (the single-reaction stand-in); the bacterial arrest/death gate and a 
 (so "SO₂ locks diacetyl in" and permanent stranding are not yet demonstrable); citrate in the pH
 charge balance. These follow the MLF-with-growth beat (D-23) and the event loop.
 
+## D-32 — Amino-acid ledger: a nitrogen-anchored, modifier-scaled biomass swap
+
+**Status: IMPLEMENTED 2026-07-01** (406 green + 5 benchmark). Builds the toggleable
+amino-acid ledger D-23 scoped and deferred (the separate yeast/AF beat). Yeast build biomass
+mostly from amino acids, but the validated core sources *all* biomass carbon from sugar and
+*all* biomass nitrogen from the lumped ammonium `N` pool, and `N` is deliberately carbon-free
+in `total_carbon` (D-19). Making amino acids a carbon source is thus a change to the protected
+carbon *and* nitrogen ledgers — restored to isolability by the owner's `default=0` `amino_acids`
+pool, implemented (advisor's refinement, D-23) as a **separate isolable swap Process**, not a
+branch in the core's hottest kinetic.
+
+**The swap (`core/kinetics/amino_acids.py` `AminoAcidAssimilation`, wine-only).** For biomass
+built at the shared `biomass_growth_rate` (extracted from `GrowthNitrogenLimited` so the swap
+anchors to the *identical* rate), it consumes amino acids at `ρ` and **debits** the pool
+(`d[amino_acids]=−ρ`), **refunds ammonium** (`d[N]=+ρ·y_N`), and **refunds sugar carbon**
+(`d[S]+=+ρ·y_C`), leaving biomass `X` untouched. It is a pure transfer aa→S (carbon) and aa→N
+(nitrogen), so **carbon- and nitrogen-neutral by construction** for any `ρ` — the pool is now
+weighted in *both* `total_carbon` (arginine C-fraction) and `total_nitrogen` (arginine
+N-fraction, the first per-species nitrogen accounting: new `NITROGEN_ATOMS` +
+`nitrogen_mass_fraction` in `chemistry.py`). **Bookkeeping caveat (the D-19/D-31 stand-in
+discipline):** mechanically the aa carbon is refunded to *sugar* (biomass carbon still comes
+from growth's sugar draw, and the spared sugar ferments to ethanol) — arginine's carbon skeleton
+is booked as spared hexose, not tracked through arginine catabolism. Carbon-closing and
+defensible (aa-fed biomass really spares sugar for ethanol), but a stand-in; one consequence is
+that dosing aa nudges ethanol up ~0.15–0.3 % of sugar. The §2.2 benchmarks run undosed, so they
+are untouched.
+
+**Nitrogen-anchored rate, N-rich representative (the load-bearing choices).** Amino acids *are*
+part of YAN, so `ρ = ψ·gate(aa)·f_N·base_dx/y_N` with `gate(aa)=aa/(K_amino_acids+aa)` and
+`ψ = amino_acid_assimilation_fraction ∈ [0,1]`. The advisor's decisive framing: **carbon
+over-refund is non-physical** (creates hexose from amino acids = gluconeogenesis, which
+fermenting yeast do not do) but **nitrogen over-refund is physical** (deamination of surplus aa
+to ammonium). Anchoring on nitrogen makes the N refund `ρ·y_N = ψ·gate·f_N·base_dx ≤ f_N·base_dx`
+(never over-refunds N, so no deamination branch in v1), and picking an **N-rich** representative
+amino acid — **arginine** (C₆H₁₄N₄O₂, the dominant *assimilable* grape amino acid, mass C:N ≈
+1.29 ≪ biomass's `f_C/f_N` ≈ 4.3) — makes the carbon refund `≈ 0.30·ψ·gate ≤ 0.30` of growth's
+sugar-carbon draw for **all** ψ ≤ 1. So the carbon cap never binds: no clamp, no C⁰ kink for the
+stiff BDF solver, no sugar creation. A carbon-rich amino acid (leucine ≈ 5.1) would sit at the
+edge and force a clamp — the species choice *is* what keeps v1 clean.
+
+**The correctness crux — modifier scaling (option 2, advisor-forced).** The safety above uses
+growth's *pre-modifier* `base_dx`, but growth's realised biomass is `base_dx·M` where `M` is the
+Arrhenius × (opt-in) carrying-capacity `RateModifier` product `ProcessSet` applies. A swap
+refunding at `base_dx` while growth draws at `M·base_dx` would, at `M < 1` (cold ferment, or the
+carrying cap near saturation with nitrogen still available — the D-30 residual-N regime), refund
+more than the draw and **create sugar**. The fix: the wine growth Arrhenius (`for_growth` gains
+an `*also_scales` target) *and* the carrying-capacity modifier (its `modifies` now names the
+swap) scale the swap too, so refund and draw carry the same `M`:
+`net dS = M·f_C·base_dx·(0.30·ψ·gate − 1) ≤ 0` and `net dN = M·f_N·base_dx·(ψ·gate − 1) ≤ 0`.
+This was landed **fail-first** per the advisor: the guard tests (`net dS/dN ≤ 0` at a carrying-
+saturation state; the swap refund scaling with the growth Arrhenius factor) were written to FAIL
+with the unscaled swap and confirmed failing (`dS = +0.0279`, arrhenius ratio 1.0 vs 0.445),
+then pass once the scaling landed. At `T_ref` `M = 1` and the mismatch never fires — the reason
+a naive T_ref-only test would be vacuous.
+
+**Isolability (undosed-only).** The compile seam disables the swap when `amino_acids_gpl ≤ 0`, so
+an undosed wine run is byte-for-byte the validated core, the empty `amino_acids` slot keeps its
+VALIDATED tier, and folding the swap into the two modifiers' `modifies` is transparent (a modifier
+naming a zero-contribution/disabled Process is a no-op). **Dosed**, the swap *correctly* perturbs
+the run: refunded N/S raise the pools growth reads on the next step, so dosing amino acids behaves
+like **supplementary YAN** (nitrogen lasts longer ⇒ more biomass) — a second-order feedback, not a
+first-order growth edit (growth's derivatives are untouched); the "byte-for-byte" claim is thus
+undosed-only, and the swap's speculative tier drops growth's `S`/`N` outputs to speculative when
+enabled (the D-26/D-30 structural-drop pattern). New speculative params
+`amino_acid_assimilation_fraction=0.5`, `K_amino_acids=0.1 g/L` (author estimates) +
+`amino_acids_gpl` scenario key. 11 new tests.
+
+**Scope (v1) / deferred.** The swap only (primary-fermentation yeast carbon/nitrogen honesty).
+The D-19 **fusel Ehrlich re-route** (drawing fusel carbon from this pool instead of its sugar
+stand-in) is the natural later home but needs the deamination branch (Ehrlich releases aa-N), so
+it is deferred with that carbon-anchored + explicit-deamination generalisation (D-23). MLF-growth
+funded from this pool stays blocked on an **autolytic-peptide source** to refill it post-AF (the
+pool is empty at the MLF pitch point, D-23). Wine-only; beer deferred with the wine-only nitrogen
+model (D-30).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

@@ -67,6 +67,7 @@ from fermentation.core.kinetics import (
     AcetaldehydeReduction,
     AcetolactateDecarboxylation,
     AcetolactateExcretion,
+    AminoAcidAssimilation,
     ArrheniusTemperature,
     BiomassCarryingCapacity,
     DiacetylReduction,
@@ -170,15 +171,16 @@ def wine_schema() -> StateSchema:
     """Wine state layout: a single lumped fermentable sugar slot, plus the wine-only
     charge-active acid + strong-cation slots the pH charge-balance solver reads
     (decision D-18), the free-SO₂ pool the molecular-SO₂ readout reads (decision D-22),
-    the ``X_mlf`` malolactic-catalyst slot (decision D-23), and the ``citrate`` slot
-    *O. oeni* co-metabolises into MLF-derived diacetyl (decision D-31).
+    the ``X_mlf`` malolactic-catalyst slot (decision D-23), the ``citrate`` slot
+    *O. oeni* co-metabolises into MLF-derived diacetyl (decision D-31), and the dosed
+    ``amino_acids`` pool the amino-acid ledger swap funds biomass from (decision D-32).
 
-    These seven slots are appended to ``wine_schema`` only (not ``_common_specs``), so
+    These eight slots are appended to ``wine_schema`` only (not ``_common_specs``), so
     ``beer_schema`` is untouched — beer's pH is a phosphate-buffered different acid
     system with no sourced data yet, explicitly deferred. ``default=0.0`` is
     load-bearing: existing wine scenarios/tests that name no acids still compile (all
-    seven → 0), and with acids, cation, SO₂, ``X_mlf`` and ``citrate`` at 0 the slots are
-    inert — they
+    eight → 0), and with acids, cation, SO₂, ``X_mlf``, ``citrate`` and ``amino_acids`` at 0
+    the slots are inert — they
     contribute 0 to every conservation sum, so the validated core and its tests are
     untouched (prime directive #3). The acid/cation/SO₂ slots have no Process touching
     them in D-18/D-22; under D-23 :class:`~fermentation.core.kinetics.malolactic.\
@@ -235,6 +237,14 @@ def wine_schema() -> StateSchema:
             default=0.0,
             description="Oenococcus oeni biomass — dosed-but-inert MLF catalyst "
             "(scales the malolactic rate; no growth/death in v1, decision D-23)",
+        ),
+        VarSpec(
+            "amino_acids",
+            "g/L",
+            default=0.0,
+            description="assimilable amino-acid pool (dosed must input; represented as "
+            "arginine). Carbon- AND nitrogen-bearing: the AminoAcidAssimilation swap funds "
+            "a fraction of biomass from it, refunding sugar + ammonium N (decision D-32)",
         ),
     ]
     return StateSchema(specs)
@@ -450,6 +460,33 @@ _MLF_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: concerns), mirroring the wine-only MLF wiring; beer carrying capacity is deferred.
 _CARRYING_CAPACITY_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (BiomassCarryingCapacity,)
 
+#: Amino-acid ledger (wine-only, decision D-32): the toggleable ``amino_acids`` pool the
+#: :class:`AminoAcidAssimilation` swap funds a fraction of biomass from — refunding sugar
+#: carbon and ammonium nitrogen so the pool sits on *both* conservation ledgers. Kept in its
+#: own isolable tuple (prime directive #3): like the *dosed* MLF organism (and unlike the
+#: always-on intrinsic aroma pools), it contributes only when amino acids are dosed, so the
+#: compile seam DISABLES it when ``amino_acids_gpl`` ≤ 0 — an undosed wine run is byte-for-byte
+#: the validated core and the empty ``amino_acids`` slot keeps its VALIDATED tier. Dosed, the
+#: swap correctly perturbs the run (refunded N/S act like supplementary YAN) and its speculative
+#: tier drops growth's ``S``/``N`` outputs to speculative. CORRECTNESS COUPLING (decision D-32):
+#: the swap's refund must track growth's *realised* (post-modifier) draw, so the wine growth
+#: Arrhenius (:data:`_WINE_FERMENTATION_MODIFIERS`) and the carrying-capacity modifier both name
+#: it in their ``modifies`` — otherwise a cold ferment or a near-saturation carrying cap (M < 1)
+#: would let the base-rate refund exceed the scaled draw and create sugar. Wine-only; beer
+#: deferred with the wine-only nitrogen model (D-30).
+_AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (AminoAcidAssimilation,)
+
+#: Wine growth/uptake Arrhenius modifiers (decision D-32). Identical to
+#: :data:`_PRIMARY_FERMENTATION_MODIFIERS` except the growth Arrhenius *also* scales the
+#: amino-acid swap (``for_growth`` extra target), so the swap's carbon/nitrogen refunds carry
+#: the same temperature factor as growth's draw (see the correctness coupling above). Beer keeps
+#: the plain :data:`_PRIMARY_FERMENTATION_MODIFIERS` (no amino-acid pool). ``for_uptake`` is
+#: unchanged — the swap tracks *growth*, not the fermentative sugar-uptake flux.
+_WINE_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
+    lambda: ArrheniusTemperature.for_growth(AminoAcidAssimilation.name),
+    ArrheniusTemperature.for_uptake,
+)
+
 
 #: The registry of known media. Adding a beverage family = adding an entry here
 #: (and, at the I/O boundary, an initial-composition vocabulary in
@@ -465,8 +502,9 @@ MEDIA: dict[str, Medium] = {
             + _ACETALDEHYDE_PROCESSES
             + _H2S_PROCESSES
             + _MLF_PROCESSES
+            + _AMINO_ACID_PROCESSES
         ),
-        modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
+        modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),
     "beer": Medium(
         name="beer",

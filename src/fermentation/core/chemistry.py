@@ -29,6 +29,7 @@ _M_C = 12.011
 _M_H = 1.008
 _M_O = 15.999
 _M_S = 32.06
+_M_N = 14.007
 
 # -- molar masses of tracked species, g/mol (derived from their formulae) -----
 #: Glucose / fructose, C6H12O6 — the lumped wine hexose and beer's first sugar.
@@ -141,6 +142,21 @@ M_SO2 = 1 * _M_S + 2 * _M_O
 #: weight) and for the deferred CO₂-stripping volatilization sink; the v1 production kinetics
 #: work in g/L directly and need no molar conversion.
 M_H2S = 2 * _M_H + 1 * _M_S
+#: L-arginine, C6H14N4O2 — the representative species for the assimilable **amino-acid**
+#: pool (decision D-32). Arginine is the *dominant* yeast-assimilable amino acid in grape
+#: must (proline, though more abundant, is not assimilated anaerobically), so it is the
+#: honest single-species stand-in for the lumped ``amino_acids`` pool — the succinic-for-
+#: ``Byp`` / isoamyl-for-``fusels`` idiom (D-16/D-19). Crucially it is the FIRST tracked
+#: species carrying **nitrogen** (four N per molecule; see ``NITROGEN_ATOMS`` below), so the
+#: pool sits on *both* the carbon ledger (``total_carbon``) and the nitrogen ledger
+#: (``total_nitrogen``) — the reason the amino-acid ledger needed a per-species nitrogen
+#: accounting at all (nitrogen was previously tracked only as the elemental ``N`` slot plus
+#: ``f_N·X``). Its mass C:N ratio (72.066 / 56.028 ≈ 1.29) is deliberately **N-rich** and
+#: well below biomass's (``f_C/f_N`` ≈ 4.3): that is the load-bearing property that keeps the
+#: :class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation` carbon refund
+#: strictly below growth's sugar-carbon demand for any assimilation fraction ψ ≤ 1, so the
+#: swap never creates hexose (gluconeogenesis) and needs no clamp — decision D-32.
+M_ARGININE = 6 * _M_C + 14 * _M_H + 4 * _M_N + 2 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -165,6 +181,7 @@ MOLAR_MASS: dict[str, float] = {
     "alpha_acetolactate": M_ACETOLACTATE,
     "diacetyl": M_DIACETYL,
     "butanediol": M_BUTANEDIOL,
+    "arginine": M_ARGININE,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -192,6 +209,38 @@ CARBON_ATOMS: dict[str, int] = {
     "alpha_acetolactate": 5,
     "diacetyl": 4,
     "butanediol": 4,
+    "arginine": 6,
+}
+
+#: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
+#: only as the elemental yeast-assimilable ``N`` slot (g N/L) plus the ``f_N·X`` bound in
+#: biomass, so no species carried nitrogen — until the amino-acid pool (decision D-32).
+#: Every carbon-tracked species is listed here at **0** except ``arginine`` (four N), exactly
+#: mirroring ``CARBON_ATOMS`` so :func:`nitrogen_mass_fraction` returns 0.0 (not a KeyError)
+#: for the carbon-only species and the check-vs-kinetics single-source discipline holds for
+#: nitrogen as it does for carbon.
+NITROGEN_ATOMS: dict[str, int] = {
+    "glucose": 0,
+    "fructose": 0,
+    "maltose": 0,
+    "maltotriose": 0,
+    "ethanol": 0,
+    "acetaldehyde": 0,
+    "CO2": 0,
+    "glycerol": 0,
+    "succinic_acid": 0,
+    "ethyl_acetate": 0,
+    "isoamyl_alcohol": 0,
+    "tartaric_acid": 0,
+    "malic_acid": 0,
+    "lactic_acid": 0,
+    "citric_acid": 0,
+    "sulfur_dioxide": 0,
+    "hydrogen_sulfide": 0,
+    "alpha_acetolactate": 0,
+    "diacetyl": 0,
+    "butanediol": 0,
+    "arginine": 4,
 }
 
 
@@ -204,6 +253,23 @@ def carbon_mass_fraction(species: str) -> float:
     """
     try:
         return CARBON_ATOMS[species] * _M_C / MOLAR_MASS[species]
+    except KeyError:
+        raise KeyError(f"unknown species {species!r}; known: {sorted(MOLAR_MASS)}") from None
+
+
+def nitrogen_mass_fraction(species: str) -> float:
+    """Grams of nitrogen per gram of ``species`` (exact from its formula).
+
+    The nitrogen analogue of :func:`carbon_mass_fraction`, used to weight the
+    amino-acid pool in :func:`~fermentation.validation.conservation.total_nitrogen`
+    and to convert amino-acid mass to refunded ammonium ``N`` in the
+    :class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation` swap
+    (decision D-32). Returns 0.0 for the nitrogen-free species (all but arginine);
+    raises ``KeyError`` for an unknown species so a typo fails loudly rather than
+    silently dropping a nitrogen-bearing term from a conservation check.
+    """
+    try:
+        return NITROGEN_ATOMS[species] * _M_N / MOLAR_MASS[species]
     except KeyError:
         raise KeyError(f"unknown species {species!r}; known: {sorted(MOLAR_MASS)}") from None
 

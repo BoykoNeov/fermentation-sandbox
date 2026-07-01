@@ -106,20 +106,32 @@ class ArrheniusTemperature(RateModifier):
 
     tier = Tier.PLAUSIBLE
 
-    def __init__(self, *, name: str, modifies: str, activation_energy: str) -> None:
+    def __init__(
+        self, *, name: str, modifies: str | tuple[str, ...], activation_energy: str
+    ) -> None:
         #: Per-instance so multiple Arrhenius modifiers coexist in one ProcessSet.
         self.name = name
-        self.modifies = (modifies,)
+        #: One or more Processes scaled by this temperature factor. A single name is
+        #: the common case (one flux); a tuple lets one Arrhenius factor scale several
+        #: Processes that share a temperature sensitivity — e.g. growth *and* the
+        #: amino-acid swap, so the swap's refunds track growth's realised draw (D-32).
+        self.modifies = (modifies,) if isinstance(modifies, str) else tuple(modifies)
         #: The activation-energy Parameter varies per instance; ``T_ref`` is shared.
         self._e_a_param = activation_energy
         self.reads = (activation_energy, "T_ref")
 
     @classmethod
-    def for_growth(cls) -> ArrheniusTemperature:
-        """Arrhenius scaling of biomass growth (reads ``E_a_growth``)."""
+    def for_growth(cls, *also_scales: str) -> ArrheniusTemperature:
+        """Arrhenius scaling of biomass growth (reads ``E_a_growth``).
+
+        ``also_scales`` names extra Processes to scale by the *same* growth factor —
+        used by wine to also scale the amino-acid assimilation swap, so its
+        carbon/nitrogen refunds carry growth's temperature factor and cannot outrun
+        the realised draw (decision D-32). Beer passes none (growth only).
+        """
         return cls(
             name="arrhenius_growth",
-            modifies=GrowthNitrogenLimited.name,
+            modifies=(GrowthNitrogenLimited.name, *also_scales),
             activation_energy="E_a_growth",
         )
 

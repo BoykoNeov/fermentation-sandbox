@@ -52,6 +52,29 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
 
+def biomass_growth_rate(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """Base (pre-modifier) biomass growth rate ``dX/dt = mu·X`` [g/L/h].
+
+    ``mu = mu_max · S_total/(K_s + S_total) · N/(K_n + N)``. The Monod shutoff guards
+    (no biomass, no sugar, or no nitrogen ⇒ 0, clamped ≥ 0 against solver excursions)
+    are the same ones :class:`GrowthNitrogenLimited` applies. Factored out (decision
+    D-32) as the single source of the growth rate so the amino-acid assimilation swap
+    (:class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation`) anchors to
+    the *identical* rate the growth Process builds biomass at — a divergence here would
+    let the swap refund more sugar carbon than growth drew. This returns the **base**
+    rate; the Arrhenius/carrying-capacity :class:`~fermentation.core.process.RateModifier`
+    scaling is applied by :class:`~fermentation.core.process.ProcessSet` to growth *and*
+    the swap alike, so both track the realised rate (decision D-32).
+    """
+    x = float(y[schema.slice("X")][0])
+    n = max(float(y[schema.slice("N")][0]), 0.0)
+    s_total = max(float(y[schema.slice("S")].sum()), 0.0)
+    if x <= 0.0 or s_total <= 0.0 or n <= 0.0:
+        return 0.0
+    mu = params["mu_max"] * (s_total / (params["K_s"] + s_total)) * (n / (params["K_n"] + n))
+    return mu * x
+
+
 class GrowthNitrogenLimited(Process):
     """Monod biomass growth, co-limited by sugar and yeast-assimilable nitrogen.
 
@@ -72,18 +95,14 @@ class GrowthNitrogenLimited(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        x = float(y[schema.slice("X")][0])
-        n = max(float(y[schema.slice("N")][0]), 0.0)
         s_slice = schema.slice("S")
         s_block = y[s_slice]
         s_total = max(float(s_block.sum()), 0.0)
-        # Monod shutoff: no biomass, no sugar, or no nitrogen -> no growth. The
-        # guards also keep the rate non-negative against small solver excursions.
-        if x <= 0.0 or s_total <= 0.0 or n <= 0.0:
+        # Monod shutoff (no biomass/sugar/nitrogen -> no growth) lives in the shared
+        # rate helper, which also clamps the rate non-negative against solver excursions.
+        dx = biomass_growth_rate(y, schema, params)  # biomass growth rate [g/L/h]
+        if dx <= 0.0:
             return d
-
-        mu = params["mu_max"] * (s_total / (params["K_s"] + s_total)) * (n / (params["K_n"] + n))
-        dx = mu * x  # biomass growth rate [g/L/h]
         d[schema.slice("X")] = dx
         d[schema.slice("N")] = -params["biomass_N_fraction"] * dx  # YAN into biomass
 

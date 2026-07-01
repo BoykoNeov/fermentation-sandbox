@@ -70,6 +70,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited
 from fermentation.core.process import RateModifier
 from fermentation.core.state import FloatArray, StateSchema
@@ -88,9 +89,13 @@ class BiomassCarryingCapacity(RateModifier):
 
     name = "biomass_carrying_capacity"
     tier = Tier.SPECULATIVE
-    #: Reference the growth Process by its ``name`` (rename-safe) rather than a bare
-    #: string literal.
-    modifies = (GrowthNitrogenLimited.name,)
+    #: Reference the Processes by ``name`` (rename-safe) rather than bare string literals.
+    #: Scales growth AND the amino-acid assimilation swap by the same logistic factor
+    #: (decision D-32): the swap's carbon/nitrogen refunds are anchored to growth's
+    #: *base* rate, so unless the cap throttles the swap alongside growth, a near-saturation
+    #: cap (factor → 0 with nitrogen still available) would let the refund outrun the
+    #: realised draw and create sugar. Wine-only, like the swap and this modifier itself.
+    modifies = (GrowthNitrogenLimited.name, AminoAcidAssimilation.name)
     reads: tuple[str, ...] = ("biomass_carrying_capacity",)
 
     def factor(

@@ -14,6 +14,7 @@ from fermentation.core.kinetics.acetaldehyde import (
     AcetaldehydeProduction,
     AcetaldehydeReduction,
 )
+from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
 from fermentation.core.kinetics.byproducts import (
     EsterSynthesis,
@@ -21,7 +22,7 @@ from fermentation.core.kinetics.byproducts import (
     FuselAlcoholsEhrlich,
 )
 from fermentation.core.kinetics.carrying_capacity import BiomassCarryingCapacity
-from fermentation.core.kinetics.growth import GrowthNitrogenLimited
+from fermentation.core.kinetics.growth import GrowthNitrogenLimited, biomass_growth_rate
 from fermentation.core.kinetics.hydrogen_sulfide import HydrogenSulfideProduction
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
@@ -44,6 +45,7 @@ __all__ = [
     "AcetaldehydeReduction",
     "AcetolactateDecarboxylation",
     "AcetolactateExcretion",
+    "AminoAcidAssimilation",
     "BiomassCarryingCapacity",
     "DiacetylReduction",
     "ArrheniusTemperature",
@@ -59,6 +61,7 @@ __all__ = [
     "OenococcusDiacetylReduction",
     "SugarUptakeToEthanolCO2",
     "arrhenius_factor",
+    "biomass_growth_rate",
     "cardinal_temperature_factor",
     "malolactic_environmental_gate",
 ]

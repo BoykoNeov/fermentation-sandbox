@@ -13,7 +13,11 @@ from collections.abc import Callable
 
 import numpy as np
 
-from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
+from fermentation.core.chemistry import (
+    carbon_mass_fraction,
+    nitrogen_mass_fraction,
+    sugar_species,
+)
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.runtime.integrate import Trajectory
 
@@ -138,6 +142,15 @@ def total_carbon(
     # so it is a carbon term only — like malic/lactic, weighted here for the conversion.
     if "citrate" in schema:
         w[schema.slice("citrate")] = carbon_mass_fraction("citric_acid")
+    # Amino-acid pool (decision D-32): a dosed, carbon- AND nitrogen-bearing wine pool. The
+    # AminoAcidAssimilation swap debits it and refunds the displaced biomass carbon to sugar
+    # and the displaced biomass nitrogen to ``N`` — a pure carbon/nitrogen-neutral transfer
+    # (aa carbon → S, aa nitrogen → N), so weighting the pool at arginine's carbon fraction
+    # (its representative species) keeps total_carbon closed through the swap. On an undosed
+    # run the pool is empty and the Process is disabled (constant 0 term). Its NITROGEN side
+    # is weighted in total_nitrogen below.
+    if "amino_acids" in schema:
+        w[schema.slice("amino_acids")] = carbon_mass_fraction("arginine")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(
@@ -167,6 +180,13 @@ def total_nitrogen(
     w = schema.zeros()
     if "N" in schema:
         w[schema.slice("N")] = 1.0
+    # Amino-acid pool (decision D-32): the aa pool carries nitrogen (arginine, 4 N per
+    # molecule) and the AminoAcidAssimilation swap moves that nitrogen aa → N (ammonium
+    # refund) mole-for-mole, so weighting the pool at arginine's nitrogen fraction keeps
+    # total_nitrogen closed through the swap. This is the first nitrogen-bearing tracked
+    # species besides biomass; on an undosed run the pool is empty (constant 0 term).
+    if "amino_acids" in schema:
+        w[schema.slice("amino_acids")] = nitrogen_mass_fraction("arginine")
     if "X" in schema:
         if biomass_nitrogen_fraction is None:
             raise ValueError(

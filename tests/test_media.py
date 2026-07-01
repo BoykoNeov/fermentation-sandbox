@@ -21,17 +21,20 @@ SHARED = (
 WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "citrate", "cation_charge")
 WINE_SO2_SLOTS = ("so2_total",)
 WINE_MLF_SLOTS = ("X_mlf",)
+WINE_AMINO_ACID_SLOTS = ("amino_acids",)
 
 
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
-    assert schema.names == SHARED + WINE_ACID_SLOTS + WINE_SO2_SLOTS + WINE_MLF_SLOTS
+    assert schema.names == (
+        SHARED + WINE_ACID_SLOTS + WINE_SO2_SLOTS + WINE_MLF_SLOTS + WINE_AMINO_ACID_SLOTS
+    )
     assert schema.spec("S").size == 1
     # 17 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
     # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
     # h2s, D-29) + 3 wine-only acid slots + citrate (D-31) + cation_charge (D-18)
-    # + 1 free-SO₂ slot (D-22) + 1 X_mlf slot (D-23)
-    assert schema.size == 24
+    # + 1 free-SO₂ slot (D-22) + 1 X_mlf slot (D-23) + 1 amino_acids slot (D-32)
+    assert schema.size == 25
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -176,6 +179,11 @@ MLF_PROCESSES = {
     "malolactic_citrate_metabolism",
     "oenococcus_diacetyl_reduction",
 }
+# Amino-acid ledger (decision D-32) is wired into the WINE medium only (beer has no amino_acids
+# slot); enabled in a bare build_process_set and disabled at the compile seam when amino acids
+# are not dosed (so undosed wine runs keep the empty amino_acids slot at VALIDATED and are
+# byte-for-byte the core).
+AMINO_ACID_PROCESSES = {"amino_acid_assimilation"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -184,6 +192,7 @@ EXPECTED_PROCESSES = {
         | ACETALDEHYDE_PROCESSES
         | H2S_PROCESSES
         | MLF_PROCESSES
+        | AMINO_ACID_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES
@@ -213,6 +222,15 @@ def test_registered_media_wire_the_full_kinetic_set(medium):
     pset = get_medium(medium).build_process_set(strict=True)
     assert {p.name for p in pset.active} == EXPECTED_PROCESSES[medium]
     assert {m.name for m in pset.active_modifiers} == EXPECTED_MODIFIERS[medium]
+
+
+def test_wine_growth_arrhenius_scales_the_amino_acid_swap_but_uptake_does_not():
+    # The amino-acid swap (D-32) anchors to growth's base rate, so the GROWTH Arrhenius must scale
+    # it too (else its refunds outrun the realised draw at M<1 and create sugar); the UPTAKE
+    # Arrhenius must NOT (the swap tracks growth, not the fermentative sugar-uptake flux).
+    mods = {m.name: m for m in get_medium("wine").build_process_set().active_modifiers}
+    assert "amino_acid_assimilation" in mods["arrhenius_growth"].modifies
+    assert "amino_acid_assimilation" not in mods["arrhenius_uptake"].modifies
 
 
 def test_each_build_returns_fresh_kinetic_instances():
