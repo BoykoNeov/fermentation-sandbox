@@ -75,6 +75,7 @@ from fermentation.core.kinetics import (
     EsterVolatilization,
     EthanolInactivation,
     FuselAlcoholsEhrlich,
+    FuselAminoAcidReroute,
     GrowthNitrogenLimited,
     HydrogenSulfideProduction,
     MalolacticCitrateMetabolism,
@@ -474,7 +475,20 @@ _CARRYING_CAPACITY_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (BiomassC
 #: it in their ``modifies`` — otherwise a cold ferment or a near-saturation carrying cap (M < 1)
 #: would let the base-rate refund exceed the scaled draw and create sugar. Wine-only; beer
 #: deferred with the wine-only nitrogen model (D-30).
-_AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (AminoAcidAssimilation,)
+#:
+#: :class:`FuselAminoAcidReroute` (decision D-33) rides in this same dosed, wine-only tuple: it
+#: re-sources a fraction of Ehrlich fusel carbon off its sugar stand-in and onto the ``amino_acids``
+#: pool, **deaminating** the consumed amino acids' nitrogen to ammonium ``N`` — the deamination
+#: branch the fusel re-route was deferred on (D-19/D-32). Unlike the swap it is NOT scaled by the
+#: growth Arrhenius / carrying-cap modifiers: it recomputes the *fusel* production rate (which
+#: carries its own ``E_a_fusels`` Arrhenius and is scaled by no RateModifier), so to refund exactly
+#: what :class:`FuselAlcoholsEhrlich` drew it must stay unscaled too — the producer and re-route
+#: share :func:`~fermentation.core.kinetics.byproducts.fusel_production_rate` and neither is a
+#: modifier target. Disabled with the swap at the compile seam when amino acids are un-dosed.
+_AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
+    AminoAcidAssimilation,
+    FuselAminoAcidReroute,
+)
 
 #: Wine growth/uptake Arrhenius modifiers (decision D-32). Identical to
 #: :data:`_PRIMARY_FERMENTATION_MODIFIERS` except the growth Arrhenius *also* scales the

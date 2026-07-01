@@ -102,8 +102,8 @@ from collections.abc import Mapping
 from fermentation.core.chemistry import (
     carbon_mass_fraction,
     nitrogen_mass_fraction,
-    sugar_species,
 )
+from fermentation.core.kinetics.carbon_routing import refund_carbon_to_sugar
 from fermentation.core.kinetics.growth import biomass_growth_rate
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -113,8 +113,9 @@ from fermentation.core.tiers import Tier
 #: Arginine is the dominant yeast-assimilable amino acid in grape must and is N-rich (mass
 #: C:N ≈ 1.29 ≪ biomass ≈ 4.3), the property that keeps the carbon refund below growth's
 #: demand for any ψ ≤ 1 (see the module docstring). Kept as a module constant so the swap
-#: and the conservation weighting name one species.
-_AMINO_ACID_SPECIES = "arginine"
+#: and the conservation weighting name one species. Public so the D-33 fusel Ehrlich
+#: re-route (which sources fusel carbon from this same pool) references the identical species.
+AMINO_ACID_SPECIES = "arginine"
 
 
 class AminoAcidAssimilation(Process):
@@ -157,8 +158,8 @@ class AminoAcidAssimilation(Process):
             return d  # empty pool ⇒ nothing to assimilate (also the undosed no-op)
 
         gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
-        y_n = nitrogen_mass_fraction(_AMINO_ACID_SPECIES)
-        y_c = carbon_mass_fraction(_AMINO_ACID_SPECIES)
+        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+        y_c = carbon_mass_fraction(AMINO_ACID_SPECIES)
         # ρ [g aa/L/h]: aa consumption anchored to the fraction ψ·gate of biomass
         # nitrogen sourced from the pool. ρ·y_N ≤ f_N·base_dx and ρ·y_C < f_C·base_dx
         # for all ψ·gate ≤ 1 (module docstring), so neither refund exceeds growth's draw.
@@ -172,20 +173,11 @@ class AminoAcidAssimilation(Process):
         d[schema.slice("amino_acids")] = -rho
         d[schema.slice("N")] = rho * y_n  # refund displaced biomass nitrogen to ammonium
 
-        # Refund the displaced biomass carbon to sugar — the inverse of growth's draw.
-        # Distribute across sugar slots by their current carbon content so that
-        # Σ_i (d[S_i]·c_i) = ρ·y_C exactly (the draw_carbon_from_sugar algebra, run in
-        # reverse). base_dx > 0 guarantees s_total > 0, so carbon_total > 0 and the
-        # refund always has somewhere to go (no silent carbon leak). Written explicitly
-        # rather than via a negated draw helper so the S→0 edge is visibly a non-issue.
-        carbon_refund = rho * y_c  # [g C/L/h]
-        s_slice = schema.slice("S")
-        species = sugar_species(schema)
-        s = [max(float(y[s_slice.start + i]), 0.0) for i in range(len(species))]
-        carbon_total = sum(s[i] * carbon_mass_fraction(sp) for i, sp in enumerate(species))
-        if carbon_total <= 0.0:
-            return d
-        for i in range(len(species)):
-            if s[i] > 0.0:
-                d[s_slice.start + i] = carbon_refund * s[i] / carbon_total
+        # Refund the displaced biomass carbon to sugar — the inverse of growth's draw,
+        # distributed across sugar slots by their current carbon content so that
+        # Σ_i (d[S_i]·c_i) = ρ·y_C exactly. base_dx > 0 guarantees s_total > 0, so the
+        # refund always has somewhere to go (no silent carbon leak). Shares the single
+        # carbon-routing helper with the fusel re-route (D-33) so the draw and its inverse
+        # can never drift apart (single source of truth, decision D-8).
+        refund_carbon_to_sugar(d, y, schema, rho * y_c)  # ρ·y_C [g C/L/h]
         return d

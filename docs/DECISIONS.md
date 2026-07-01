@@ -2087,6 +2087,69 @@ funded from this pool stays blocked on an **autolytic-peptide source** to refill
 pool is empty at the MLF pitch point, D-23). Wine-only; beer deferred with the wine-only nitrogen
 model (D-30).
 
+## D-33 — Fusel Ehrlich re-route: sourcing fusel carbon from amino acids, with deamination
+
+**Status: IMPLEMENTED 2026-07-01** (417 green + 5 benchmark). Builds the first of the two
+prerequisites the still-blocked MLF-with-growth beat was deferred on (D-23/D-32): the D-19 fusel
+Ehrlich re-route, now that the amino-acid pool (D-32) gives the model a carbon- *and*
+nitrogen-bearing amino-acid source and the **deamination branch** can therefore close.
+
+**The gap.** :class:`FuselAlcoholsEhrlich` (D-19) books fusel carbon out of *sugar* — a documented
+stand-in, because the real Ehrlich pathway builds higher alcohols from *amino-acid* skeletons
+(transamination → decarboxylation → reduction) and releases the amino group as ammonium. Sugar was
+used only because `N` (YAN) carries no carbon in `total_carbon` (D-19), so there was nowhere else to
+draw it from. The `amino_acids` pool (arginine; D-32) removes that constraint.
+
+**The mechanism — a separate wine-only swap (`core/kinetics/byproducts.py`
+`FuselAminoAcidReroute`).** Mirroring the D-32 `AminoAcidAssimilation` swap, production stays entirely
+in the producer; the re-route only moves the carbon *source*. For the amino-acid-sourced fraction
+`g = aa/(K_amino_acids+aa)` (the same smooth availability gate the swap uses) of the fusel carbon
+`F_c = rate·c_fusel`, it **refunds sugar** by `g·F_c` (undoing the producer's draw for that fraction),
+**debits amino acids** by `g·F_c/c_aa`, and **releases ammonium** `N` by `(g·F_c/c_aa)·y_N` — the
+deamination branch. Carbon closes (the fusel's `F_c` is now `(1−g)·F_c` from sugar + `g·F_c` from
+amino acids); nitrogen closes (amino acids lose exactly the nitrogen `N` gains). Net sugar is
+`−(1−g)·F_c ≤ 0` for all `g ≤ 1`, so it never creates sugar (spared-sugar→ethanol is the D-32
+bookkeeping caveat). The producer and re-route share one `fusel_production_rate` helper (extracted
+this beat) so the sugar refund matches the draw to machine precision — via a shared refund/draw pair
+(`refund_carbon_to_sugar`, the inverse of `draw_carbon_from_sugar`, now the single source both the
+swap and the re-route use).
+
+**Why a separate Process was *forced*, not merely preferred (advisor).** Unlike the D-32 swap (whose
+separation protected the *validated* growth kinetic), `FuselAlcoholsEhrlich` is already speculative
+Tier-2. What forces the split is the **beer `touches` contract**: declaring `amino_acids`/`N` in the
+both-media producer would raise at beer's `ProcessSet` construction (beer has no `amino_acids` slot).
+So the re-route is wine-only and touches only `("S","amino_acids","N")` — **never `fusels`** (the
+warm=more-fusel benchmark is untouched at the derivative level; verified).
+
+**Not modifier-scaled (contrast D-32).** The swap is scaled by the growth Arrhenius/carrying modifiers
+because it anchors to growth's *modified* rate. The re-route anchors to the *fusel* rate, which
+carries its own `E_a_fusels` Arrhenius **inside** the Process and is scaled by no `RateModifier` — so
+the re-route must also stay unmodified, and since both call the one shared helper and neither is a
+modifier target, refund matches draw exactly with no D-32-style `M`-mismatch to guard.
+
+**Documented lump — arginine over-releases nitrogen (advisor caveat).** Sourcing fusel carbon through
+the N-rich representative amino acid deaminates `c_fusel/c_aa·y_N ≈ 0.78 g N per g fusel-carbon` —
+roughly **4× the real leucine→isoamyl-alcohol N:C** (leucine carries one amino group over six
+carbons). Conservation-exact, but a forced consequence of the single-species `amino_acids` lump
+(arginine, chosen N-rich for the D-32 swap), the same class of stand-in as the sugar-carbon fiction it
+replaces. The released N feeds back as supplementary YAN, but fusels are trace so the effect is
+second-order and tiny.
+
+**Isolability (undosed-only, paired with the producer).** The availability gate → 0 at `aa = 0`
+(byte-for-byte the sugar-stand-in producer on an undosed run) and the compile seam disables the
+re-route with the swap when `amino_acids_gpl ≤ 0` (tier isolability; the empty `amino_acids` slot
+keeps VALIDATED). It is only valid while `FuselAlcoholsEhrlich` is active — it refunds sugar that
+producer drew — so the two are kept paired (the same acceptable swap↔producer coupling as D-32's
+swap↔growth; disabling the producer alone would let the re-route create sugar). No new parameters
+(reuses `K_amino_acids`); 9 new tests (`tests/test_fusel_reroute.py`), 417 green + 5 benchmark, ruff
++ mypy clean, §2.2 undosed trio unchanged.
+
+**STILL-DEFERRED for MLF-growth.** This closes the *fusel* half of the D-32-deferred pair. The other
+prerequisite — an **autolytic-peptide source** to refill the amino-acid pool post-AF (it is empty at
+the MLF pitch point, D-23) — is D-34. MLF-growth itself (a bacterial growth Process consuming the
+pool + the event loop) stays deferred beyond both. The full deamination generalisation (a standalone
+excess-aa deamination flux, vs this fusel-coupled release) also remains future work.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

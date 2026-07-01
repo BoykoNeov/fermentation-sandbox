@@ -36,6 +36,7 @@ from fermentation.core import acidbase
 from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     BiomassCarryingCapacity,
+    FuselAminoAcidReroute,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
     OenococcusDiacetylReduction,
@@ -471,18 +472,22 @@ def compile_scenario(
         else:
             parameters = _override_carrying_capacity(parameters, cap_gpl)
 
-    # Amino-acid ledger isolability (decision D-32): the AminoAcidAssimilation swap is wired
-    # into the wine medium but contributes nothing until amino acids are dosed. When they are
-    # not, DISABLE it so (a) the empty ``amino_acids`` slot keeps its VALIDATED tier — an
-    # *enabled* speculative Process touching ``S``/``N`` would drag those outputs down even with
-    # a zero contribution (``tier_of`` counts enabled, not nonzero, Processes) — and (b) no
-    # growth-rate recompute is paid on an undosed run. Dosed, the swap funds a fraction of
-    # biomass from amino acids, refunding sugar carbon and ammonium nitrogen; the wine growth
-    # Arrhenius and carrying-capacity modifiers scale it alongside growth so its refunds track
-    # the realised draw and never create sugar (D-32).
+    # Amino-acid ledger isolability (decisions D-32, D-33): the AminoAcidAssimilation swap and
+    # the FuselAminoAcidReroute are wired into the wine medium but contribute nothing until amino
+    # acids are dosed. When they are not, DISABLE them so (a) the empty ``amino_acids`` slot keeps
+    # its VALIDATED tier — an *enabled* speculative Process touching ``S``/``N`` would drag those
+    # outputs down even with a zero contribution (``tier_of`` counts enabled, not nonzero,
+    # Processes) — and (b) no rate recompute is paid on an undosed run. Dosed, the swap funds a
+    # fraction of biomass from amino acids (refunding sugar carbon and ammonium N, scaled alongside
+    # growth by the wine Arrhenius/carrying modifiers so it never creates sugar, D-32), and the
+    # re-route sources a fraction of Ehrlich fusel carbon from amino acids, deaminating the nitrogen
+    # to ammonium (D-33). The re-route is paired with FuselAlcoholsEhrlich (it refunds sugar that
+    # producer drew), which is always enabled in the wine set, so it is safe to enable here.
     amino_acids_gpl = float(scenario.initial.get("amino_acids_gpl", 0.0) or 0.0)
-    if amino_acids_gpl <= 0.0 and AminoAcidAssimilation.name in process_set:
-        process_set.disable(AminoAcidAssimilation.name)
+    if amino_acids_gpl <= 0.0:
+        for aa_process in (AminoAcidAssimilation, FuselAminoAcidReroute):
+            if aa_process.name in process_set:
+                process_set.disable(aa_process.name)
 
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 

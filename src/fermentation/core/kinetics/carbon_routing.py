@@ -49,6 +49,34 @@ def draw_carbon_from_sugar(
             d[s_slice.start + i] -= carbon * s[i] / carbon_total
 
 
+def refund_carbon_to_sugar(
+    d: FloatArray, y: FloatArray, schema: StateSchema, carbon: float
+) -> None:
+    """Add ``carbon`` [g C/L/h] back to ``S``, split across slots by carbon content.
+
+    The exact inverse of :func:`draw_carbon_from_sugar`: where a byproduct Process *drew*
+    its carbon out of sugar, another Process may *refund* carbon to sugar (e.g. when a
+    fraction of that carbon is instead sourced from the amino-acid pool — the D-33 fusel
+    Ehrlich re-route — or when amino-acid-funded biomass spares sugar for ethanol — the
+    D-32 swap). Each slot ``i`` receives carbon in proportion to the carbon it currently
+    holds, so ``Σ_i (d[S_i]·c_i) = +carbon`` exactly and the refund matches whatever draw
+    it undoes to machine precision. Uses ``+=`` so it composes with any draw the same
+    Process makes. Slots are clamped ≥ 0 (mirroring the draw); with no sugar carbon present
+    (``Σ s_j c_j ≤ 0``) nothing is refunded — callers must guarantee sugar is present (the
+    fermentative flux they track is zero at ``S = 0``, so this edge is never hit in
+    practice). Serves wine's single slot and beer's three identically.
+    """
+    s_slice = schema.slice("S")
+    species = sugar_species(schema)
+    s = [max(float(y[s_slice.start + i]), 0.0) for i in range(len(species))]
+    carbon_total = sum(s[i] * carbon_mass_fraction(sp) for i, sp in enumerate(species))
+    if carbon_total <= 0.0:
+        return
+    for i in range(len(species)):
+        if s[i] > 0.0:
+            d[s_slice.start + i] += carbon * s[i] / carbon_total
+
+
 def fermentative_flux_shape(y: FloatArray, schema: StateSchema, k_sat: float) -> float:
     """Biomass-catalysed sugar Monod term ``X · S_total/(K + S_total)`` [g/L].
 

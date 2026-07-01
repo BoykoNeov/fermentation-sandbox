@@ -77,6 +77,16 @@ asserts where the carbon physically came from. Fusels carry **no CO2 co-product*
 (the Ehrlich decarboxylation is omitted) — a documented simplification that keeps the
 draw a clean 1:1 sugar→pool carbon transfer.
 
+**The fusel sugar stand-in is now re-routable (decision D-33).** When the toggleable
+``amino_acids`` pool (arginine; D-32) is dosed, :class:`FuselAminoAcidReroute` re-sources a
+fraction of the fusel carbon off the sugar stand-in and onto that amino-acid pool — the
+*physically-faithful* Ehrlich source — and **deaminates**, releasing the consumed amino
+acids' nitrogen to the ammonium ``N`` pool. It is a separate wine-only *swap* Process (it
+never touches ``fusels``; production stays here), sharing the one
+:func:`fusel_production_rate` so its sugar refund matches this producer's draw exactly. That
+deamination branch is the prerequisite the re-route was long deferred on (D-19/D-32); see
+:class:`FuselAminoAcidReroute` for the closure algebra and the arginine N-over-release caveat.
+
 **The gas-stripping sink (decisions D-20 → D-21).** The observed fall of wine *liquid*
 ester with temperature is largely **evaporation** (Rollero 2014), not reduced synthesis.
 That sink — logged as future work in D-19 — is built as :class:`EsterVolatilization`,
@@ -108,13 +118,17 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
+from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar as _draw_carbon_from_sugar,
 )
 from fermentation.core.kinetics.carbon_routing import (
     fermentative_flux_shape as _fermentative_flux_shape,
+)
+from fermentation.core.kinetics.carbon_routing import (
+    refund_carbon_to_sugar as _refund_carbon_to_sugar,
 )
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -127,6 +141,34 @@ from fermentation.core.tiers import Tier
 #: can never disagree (cf. the ``Gly``/``Byp`` routing in the uptake Process).
 _ESTER_SPECIES = "ethyl_acetate"
 _FUSEL_SPECIES = "isoamyl_alcohol"
+
+
+def fusel_production_rate(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """Ehrlich fusel-alcohol production rate ``d(fusels)/dt`` [g/L/h] — the shared rate.
+
+    ``k_fusel · X·S_total/(K_sugar_uptake+S_total) · N/(K_n+N) · arrhenius(T, E_a_fusels,
+    T_ref)`` (the fermentative-flux Monod shape, gated on assimilable nitrogen, warmed by a
+    steeper-than-uptake Arrhenius factor). Returns 0 under the same guards
+    :class:`FuselAlcoholsEhrlich` applies (no flux, no nitrogen).
+
+    Factored out (decision D-33) as the single source of the fusel rate so the *producer*
+    (:class:`FuselAlcoholsEhrlich`, which deposits it in the ``fusels`` pool and draws the
+    carbon from sugar) and the *re-route* (:class:`FuselAminoAcidReroute`, which re-sources a
+    fraction of that carbon from the amino-acid pool) compute the **identical** rate. Any
+    divergence between the two would break carbon closure, since the re-route refunds exactly
+    the sugar carbon the producer drew — this helper makes that impossible (the shared
+    ``biomass_growth_rate`` discipline of the D-32 swap, applied to fusels).
+    """
+    flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
+    if flux <= 0.0:
+        return 0.0
+    n = max(float(y[schema.slice("N")][0]), 0.0)
+    if n <= 0.0:  # Ehrlich needs assimilable nitrogen (amino acids)
+        return 0.0
+    nitrogen_gate = n / (params["K_n"] + n)
+    temp = float(y[schema.slice("T")][0])
+    f_t = arrhenius_factor(temp, params["E_a_fusels"], params["T_ref"])
+    return float(params["k_fusel"] * flux * nitrogen_gate * f_t)
 
 
 class EsterSynthesis(Process):
@@ -210,18 +252,109 @@ class FuselAlcoholsEhrlich(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
-        if flux <= 0.0:
+        rate = fusel_production_rate(y, schema, params)  # shared with the re-route (D-33)
+        if rate <= 0.0:
             return d
-        n = max(float(y[schema.slice("N")][0]), 0.0)
-        if n <= 0.0:  # Ehrlich needs assimilable nitrogen (amino acids)
-            return d
-        nitrogen_gate = n / (params["K_n"] + n)
-        temp = float(y[schema.slice("T")][0])
-        f_t = arrhenius_factor(temp, params["E_a_fusels"], params["T_ref"])
-        rate = params["k_fusel"] * flux * nitrogen_gate * f_t
         d[schema.slice("fusels")] = rate
         _draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(_FUSEL_SPECIES))
+        return d
+
+
+class FuselAminoAcidReroute(Process):
+    """Ehrlich fusel carbon re-sourced from amino acids, with deamination (decision D-33).
+
+    The physically-faithful other half of :class:`FuselAlcoholsEhrlich`. That producer books
+    fusel carbon out of **sugar** — a documented bookkeeping stand-in, because the real Ehrlich
+    pathway builds higher alcohols from *amino-acid* skeletons (transamination →
+    decarboxylation → reduction), releasing the amino group as ammonium. Sugar is used only
+    because ``N`` (YAN) carries no carbon in :func:`total_carbon` (D-19), so there was nowhere
+    else to draw it from — *until* the toggleable ``amino_acids`` pool (arginine; D-32) gave
+    the model a carbon- *and* nitrogen-bearing amino-acid source. This Process closes that gap:
+    when amino acids are present it **re-routes** a fraction of the fusel carbon off the sugar
+    stand-in and onto the amino-acid pool, and **deaminates** — releasing the nitrogen the
+    consumed amino acids carried back to the ammonium ``N`` pool. That deamination branch is
+    exactly the prerequisite the fusel re-route was deferred on (D-19/D-32); it also demonstrates
+    the aa→N release path a later MLF-with-growth model needs.
+
+    **A swap, not a producer — it never touches ``fusels``.** Like the D-32
+    :class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation` swap, this leaves the
+    *production* entirely to :class:`FuselAlcoholsEhrlich` (both call the one
+    :func:`fusel_production_rate`); it only moves the carbon *source*. For the amino-acid-sourced
+    fraction ``g = aa/(K_amino_acids + aa)`` (the same smooth availability gate the swap uses,
+    → 0 as the pool empties) of the fusel carbon ``F_c = rate·c_fusel``:
+
+      * **refund sugar** by ``g·F_c`` (undoing the producer's draw for that fraction),
+      * **debit amino acids** by ``g·F_c / c_aa`` (the arginine mass carrying that carbon), and
+      * **release ammonium** ``N`` by ``(g·F_c/c_aa)·y_N`` (deamination).
+
+    Carbon closes: the fusel gains ``F_c`` (from the producer), sourced now as ``(1−g)·F_c`` from
+    sugar + ``g·F_c`` from amino acids. Nitrogen closes: the amino acids lose exactly the nitrogen
+    the ``N`` pool gains. Net sugar is ``−(1−g)·F_c ≤ 0`` for all ``g ≤ 1`` — the re-route never
+    creates sugar (it only *spares* it), so the ABV bookkeeping caveat is the D-32 one (spared
+    sugar ferments to ethanol). **Wine-only** and **forced to be a separate Process**: declaring
+    ``amino_acids``/``N`` in the both-media producer's ``touches`` would break beer's ProcessSet
+    construction (beer has no ``amino_acids`` slot).
+
+    **Isolability (undosed-only, paired with the producer).** The availability gate → 0 at
+    ``aa = 0``, so an undosed wine run is byte-for-byte the sugar-stand-in producer; the compile
+    seam additionally *disables* this Process when ``amino_acids_gpl ≤ 0`` (tier isolability, the
+    D-32 pattern). It is only valid while :class:`FuselAlcoholsEhrlich` is active — it refunds
+    sugar that producer drew — so the two are kept paired (disabling the producer alone would let
+    the re-route create sugar; the same acceptable swap↔producer coupling as D-32's swap↔growth).
+
+    **Documented lump — arginine over-releases nitrogen.** Sourcing fusel carbon through the
+    N-rich representative amino acid deaminates ``c_fusel/c_aa · y_N`` ≈ 0.78 g N per g fusel
+    carbon — roughly **4× the real leucine→isoamyl-alcohol N:C** (leucine carries one amino group
+    over six carbons). This is conservation-exact but a forced consequence of the single-species
+    ``amino_acids`` lump (arginine, chosen N-rich for the D-32 swap), the same class of stand-in
+    as the sugar-carbon fiction it replaces. The released nitrogen feeds back as supplementary YAN,
+    but fusels are trace so the effect is second-order and tiny. Tier **speculative** (it inherits
+    the fusel rate's speculative parameters and the ``amino_acids`` gate estimate).
+    """
+
+    name = "fusel_amino_acid_reroute"
+    tier = Tier.SPECULATIVE
+    #: Refunds carbon to ``S``, debits ``amino_acids``, releases nitrogen to ``N``. Never
+    #: touches ``fusels`` — production stays entirely in :class:`FuselAlcoholsEhrlich`.
+    touches = ("S", "amino_acids", "N")
+    #: Recomputes the fusel rate (so it reads the producer's parameters) plus ``K_amino_acids``
+    #: for the availability gate. Their tiers cap the ``S``/``amino_acids``/``N`` output tier via
+    #: parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_fusel",
+        "K_sugar_uptake",
+        "K_n",
+        "E_a_fusels",
+        "T_ref",
+        "K_amino_acids",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        rate = fusel_production_rate(y, schema, params)  # identical to the producer's (D-33)
+        if rate <= 0.0:
+            return d
+        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
+        if aa <= 0.0:
+            return d  # empty pool ⇒ producer sources all fusel carbon from sugar (undosed no-op)
+
+        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
+        fusel_carbon = rate * carbon_mass_fraction(_FUSEL_SPECIES)  # what the producer drew from S
+        aa_carbon = gate * fusel_carbon  # the fraction re-sourced from amino acids
+        c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
+        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+        aa_mass = aa_carbon / c_aa  # arginine mass consumed to supply that carbon
+
+        d[schema.slice("amino_acids")] = -aa_mass
+        d[schema.slice("N")] = (
+            aa_mass * y_n
+        )  # DEAMINATION: aa nitrogen → ammonium (the D-33 branch)
+        # Refund the producer's sugar draw for the re-sourced fraction (the inverse of its draw),
+        # so net sugar loss is only the (1−g) fraction still taken from sugar. rate > 0 ⇒ flux > 0
+        # ⇒ sugar present, so the refund always lands (no carbon leak).
+        _refund_carbon_to_sugar(d, y, schema, aa_carbon)
         return d
 
 

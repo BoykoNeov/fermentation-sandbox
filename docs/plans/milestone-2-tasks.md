@@ -223,6 +223,23 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       D-32**. **Still-deferred prerequisites for MLF-growth:** (a) the D-19 fusel Ehrlich carbon
       re-route (needs the deamination branch); (b) an autolytic-peptide source to refill the pool
       post-AF (it is empty at the MLF pitch point, D-23).
+- [x] **Fusel Ehrlich re-route — the deamination branch (decision D-33). LANDED 2026-07-01.**
+      Prerequisite (a) above. A separate wine-only *swap* (`FuselAminoAcidReroute`) re-sources a
+      fraction `g = aa/(K_amino_acids+aa)` of Ehrlich fusel carbon off the D-19 sugar stand-in and
+      onto the `amino_acids` pool (arginine), **deaminating** the consumed amino acids' nitrogen to
+      ammonium `N` — the deamination branch the re-route was deferred on. It **never touches
+      `fusels`** (production stays in `FuselAlcoholsEhrlich`; the two share one extracted
+      `fusel_production_rate` so the sugar refund matches the draw exactly, via a shared
+      `refund_carbon_to_sugar` — the inverse of `draw_carbon_from_sugar` now used by both the swap
+      and the re-route). Carbon + nitrogen close by construction; net sugar `−(1−g)·F_c ≤ 0` (never
+      creates sugar). **Separate Process was *forced*** by the beer `touches` contract (can't
+      declare `amino_acids`/`N` in the both-media producer). **Not modifier-scaled** (it anchors to
+      the fusel rate, which carries its own `E_a_fusels` Arrhenius and is scaled by no
+      `RateModifier` — contrast the D-32 swap). Caveat: arginine over-releases N (~4× the real
+      leucine→isoamyl ratio), a forced single-species-lump consequence. No new params (reuses
+      `K_amino_acids`); disabled with the swap when `amino_acids_gpl ≤ 0` (undosed = byte-for-byte
+      core). 9 new tests (`test_fusel_reroute.py`); **417 green** + 5 benchmark, ruff+mypy clean.
+      Full record in **DECISIONS → D-33**.
 - [ ] **MLF-growth — later composition (decision D-23).** Add a growth Process touching `X_mlf`,
       funded from the amino-acid ledger + autolysis. Blocked on both aa-ledger prerequisites
       above; the AF nitrogen-exhaustion evidence (D-23) is why it cannot be folded into v1.

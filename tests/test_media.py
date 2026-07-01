@@ -183,7 +183,10 @@ MLF_PROCESSES = {
 # slot); enabled in a bare build_process_set and disabled at the compile seam when amino acids
 # are not dosed (so undosed wine runs keep the empty amino_acids slot at VALIDATED and are
 # byte-for-byte the core).
-AMINO_ACID_PROCESSES = {"amino_acid_assimilation"}
+# The fusel Ehrlich re-route (D-33) rides in the same dosed, wine-only tuple as the swap: it
+# sources a fraction of fusel carbon from amino acids and deaminates, disabled at the compile
+# seam when amino acids are undosed.
+AMINO_ACID_PROCESSES = {"amino_acid_assimilation", "fusel_amino_acid_reroute"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES

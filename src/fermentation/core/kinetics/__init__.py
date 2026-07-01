@@ -20,6 +20,8 @@ from fermentation.core.kinetics.byproducts import (
     EsterSynthesis,
     EsterVolatilization,
     FuselAlcoholsEhrlich,
+    FuselAminoAcidReroute,
+    fusel_production_rate,
 )
 from fermentation.core.kinetics.carrying_capacity import BiomassCarryingCapacity
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited, biomass_growth_rate
@@ -54,6 +56,7 @@ __all__ = [
     "EthanolInactivation",
     "EthanolInhibition",
     "FuselAlcoholsEhrlich",
+    "FuselAminoAcidReroute",
     "GrowthNitrogenLimited",
     "HydrogenSulfideProduction",
     "MalolacticCitrateMetabolism",
@@ -63,5 +66,6 @@ __all__ = [
     "arrhenius_factor",
     "biomass_growth_rate",
     "cardinal_temperature_factor",
+    "fusel_production_rate",
     "malolactic_environmental_gate",
 ]
