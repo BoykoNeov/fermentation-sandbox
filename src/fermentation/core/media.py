@@ -57,7 +57,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from fermentation.core.kinetics import (
+    AcetolactateDecarboxylation,
+    AcetolactateExcretion,
     ArrheniusTemperature,
+    DiacetylReduction,
     EsterSynthesis,
     EsterVolatilization,
     EthanolInactivation,
@@ -302,6 +305,28 @@ _BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterVolatilization,
 )
 
+#: Vicinal-diketone (VDK / diacetyl) pathway (Milestone 2, decision D-26): the three-step
+#: sugar → α-acetolactate → diacetyl + CO2 → 2,3-butanediol chain that makes the "diacetyl
+#: rest" emerge. Kept as its own isolable tuple (prime directive #3): a ProcessSet built
+#: without it is the prior core. Diacetyl is *intrinsic yeast metabolism* (not a dosed
+#: organism like MLF), so — unlike ``_MLF_PROCESSES`` — it is wired into BOTH media and runs
+#: on every default fermentation, like the ester/fusel byproducts. Turning it on draws only
+#: a *trace* of sugar into the reservoir (α-acetolactate peaks ~mg/L, ~1000× below the ester
+#: draw), so it leaves ``dX``/``dE``/``dCO2``/``dN`` byte-for-byte until the decarb/reduction
+#: move that carbon on; ``total_carbon`` closes to machine precision throughout (each step is
+#: on the weighted ledger). Excretion is temperature-flat; the temperature-criticality of the
+#: rest lives in the spontaneous, non-yeast-gated decarboxylation (``E_a_decarb`` >
+#: ``E_a_reduction``); reduction is gated on VIABLE ``X`` with no flux term, so a warm rest
+#: with live yeast clears diacetyl fast while an early crash strands a rising diacetyl.
+#: SCOPE (v1): yeast valine-pathway diacetyl only — MLF/citrate diacetyl is deferred, so wine
+#: yeast-pathway diacetyl understates real wine diacetyl. VDK params live in the shared
+#: ``vicinal_diketones.yaml`` (the load-bearing decarb step is non-enzymatic, medium-agnostic).
+_VDK_PROCESSES: tuple[Callable[[], Process], ...] = (
+    AcetolactateExcretion,
+    AcetolactateDecarboxylation,
+    DiacetylReduction,
+)
+
 #: Malolactic fermentation (wine-only, decision D-23): the *Oenococcus oeni* malate →
 #: lactate + CO2 conversion, the first RHS consumer of the D-18 pH solver and the D-22
 #: molecular-SO₂ readout. Kept as its own tuple so it stays **isolable** (prime directive
@@ -321,13 +346,15 @@ MEDIA: dict[str, Medium] = {
     "wine": Medium(
         name="wine",
         schema=wine_schema(),
-        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES + _MLF_PROCESSES,
+        process_factories=(
+            _PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES + _VDK_PROCESSES + _MLF_PROCESSES
+        ),
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),
     "beer": Medium(
         name="beer",
         schema=beer_schema(),
-        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES,
+        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES + _VDK_PROCESSES,
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),
 }

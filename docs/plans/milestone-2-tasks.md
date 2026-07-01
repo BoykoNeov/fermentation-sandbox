@@ -214,5 +214,38 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       funded from the amino-acid ledger + autolysis. Blocked on both aa-ledger prerequisites
       above; the AF nitrogen-exhaustion evidence (D-23) is why it cannot be folded into v1.
 - [ ] **Mixed cultures / Brett / sour consortium** — resource competition. (After MLF.)
-- [ ] **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
-      (early transient peak), H₂S (N/S-deficiency signal).
+- **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
+      (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these
+      **one Process per commit, diacetyl first** (decision D-26).
+  - [x] **Diacetyl (VDK) — mechanistic 3-pool "diacetyl rest" (decision D-26). LANDED
+        2026-07-01.** Owner chose the **C-full** fidelity target (the α-acetolactate
+        reservoir is load-bearing — it makes "crash early ⇒ diacetyl rises" and "warm rest
+        clears faster" *emerge*; a 2-pool model reproduces neither) and asked for carbon
+        **closer to reality** than a return-to-sugar stand-in, so carbon flows through the
+        real species `sugar → α-acetolactate → diacetyl + CO₂ → 2,3-butanediol`, every step
+        closing on the existing weighted ledger (draw-from-S ⊕ decarb-via-CO₂ ⊕ neutral
+        C4→C4 transfer). Three Processes (`core/kinetics/vicinal_diketones.py`), one per
+        commit: `AcetolactateExcretion` (flux-linked reservoir, T-flat) → `Acetolactate
+        Decarboxylation` (spontaneous, non-yeast-gated, T-critical, `E_a_decarb` high,
+        sourced ordering Haukeli & Lie 1978 / Krogerus 2013) → `DiacetylReduction`
+        (enzymatic, gated on **viable X**, **no flux term** so it runs during the rest).
+        Wired into **both** media (intrinsic yeast metabolism, isolable but always-on like
+        esters); params in a new **shared** `vicinal_diketones.yaml` (the load-bearing decarb
+        is non-enzymatic ⇒ medium-agnostic). Shared `draw_carbon_from_sugar`/
+        `fermentative_flux_shape` promoted to `carbon_routing.py`. **Emergent + verified
+        empirically:** beer final diacetyl 0.195/0.040/0.001 mg/L at 10/18/25 °C; wine
+        1.011/0.179/0.001 at 14/20/28 °C — warmer monotonically cleaner; warm = peak-then-
+        fall; cold strands diacetyl above threshold with an unconverted reservoir.
+        `total_carbon` closes to machine precision on a default compiled run; §2.2 trio
+        unmoved. All three Processes **speculative** (only the `E_a` ordering sourced).
+        30 new tests; **320 green**, ruff + mypy clean. SCOPE: yeast valine-pathway only —
+        MLF/citrate diacetyl deferred. Full record in **DECISIONS → D-26**.
+  - [ ] **Acetaldehyde** — produce-then-reabsorb on the *main* ethanol pathway (reuses the
+        D-26 shape). Its carbon draw is an even stronger stand-in (main-flux intermediate,
+        not a side-branch); it is the carbonyl that binds SO₂, so it unlocks the D-22
+        deferred free/**bound**-SO₂ split.
+  - [ ] **H₂S** — N/S-deficiency signal; rises when N is *low* (inverse gate vs fusels),
+        off-gassed. Carbon-free ⇒ naturally outside `total_carbon` (the SO₂ precedent);
+        the accounting-easiest of the three.
+  - [ ] **MLF-derived diacetyl** — *Oenococcus* from citrate, a real coupling now that MLF
+        exists (D-23). Deferred out of the D-26 v1 (yeast-pathway only).

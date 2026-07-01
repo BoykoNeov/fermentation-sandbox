@@ -270,13 +270,13 @@ def _load_parameters(
             f"expected {path}. Pass parameter_paths=... or add the YAML "
             "(see the Milestone 1 parameter-sourcing task)."
         )
-    # Merge the shared, medium-agnostic acid/base pKa set alongside the medium file so
-    # every default-lookup scenario can compute pH (decision D-18). The names are
-    # collision-free with the kinetic parameters; load_parameters merges left-to-right.
-    shared = base / "acidbase.yaml"
-    if shared.exists():
-        return load_parameters(path, shared)
-    return load_parameters(path)
+    # Merge the shared, medium-agnostic parameter files alongside the medium file so every
+    # default-lookup scenario can compute pH (acidbase.yaml, decision D-18) and run the
+    # diacetyl pathway (vicinal_diketones.yaml, decision D-26 — the load-bearing decarb step
+    # is non-enzymatic, so its constants are medium-agnostic). The names are collision-free
+    # with the per-medium kinetic parameters; load_parameters merges left-to-right.
+    shared_files = [base / "acidbase.yaml", base / "vicinal_diketones.yaml"]
+    return load_parameters(path, *(f for f in shared_files if f.exists()))
 
 
 def _apply_nitrogen_dependent_yield(scenario: Scenario, parameters: ParameterSet) -> ParameterSet:

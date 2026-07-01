@@ -1499,6 +1499,111 @@ constant reads genuine closure as drift.
    a power-of-two `n_members`** and raises otherwise (no silent unbalanced sequence — the project's
    loud-failure ethos). Samples are drawn up front, so seed reproducibility holds for every sampler.
 
+## D-26 — Diacetyl (vicinal diketones): the mechanistic 3-pool "diacetyl rest"
+
+**Status: IMPLEMENTED 2026-07-01** (320 green). The flagship of the remaining §3.2
+byproducts (diacetyl / acetaldehyde / H₂S). Diacetyl (2,3-butanedione, a buttery off-note)
+is *the* defining lager-quality parameter, and unlike the monotone-accumulate ester/fusel
+pools it is **produced then reabsorbed** — a non-monotonic time course (the "diacetyl rest").
+Built as three commits (one Process each), one beat.
+
+**The forks the owner decided (surfaced before building, per the "discuss disagreements"
+rule).** Two were genuinely the owner's call:
+
+1. **Sequencing:** diacetyl → acetaldehyde → H₂S, one Process per commit (owner chose the
+   incremental order over one big beat). Diacetyl first: it is the flagship *and* the
+   cleanest instance of the new produce-then-reabsorb shape, so it establishes the reusable
+   kinetics before acetaldehyde (the thorniest — it sits on the main ethanol pathway).
+2. **Carbon accounting — "something closer to reality"** than either offered default. The
+   two easy options were (A) route production carbon from sugar and *return* reabsorbed
+   carbon to sugar (a "returns-to-sugar" bookkeeping stand-in), or (B) a carbon-unaccounted
+   trace pool outside `total_carbon`. The owner rejected both and asked for fidelity. The
+   answer: **track the real downstream product.** The true VDK pathway is
+
+   ```
+   sugar → α-acetolactate → diacetyl + CO₂ → 2,3-butanediol
+     (draw from S)   C5      (C5→C4+C1)  C4    (C4→C4)   flavourless
+   ```
+
+   Every step closes carbon on the *existing weighted ledger*: the α-acetolactate draw from
+   sugar is the D-19 option-a1 routing; the decarboxylation `C5 → C4 + CO₂` is carbon-closing
+   exactly like malolactic `malic → lactic + CO₂` (D-23); the reduction `C4 → C4` is a
+   mole-for-mole transfer to a real tracked pool, like `esters → esters_gas` (D-20). No
+   stand-in for the reabsorbed carbon, no vanished mass. `total_carbon` closes to machine
+   precision through the whole produce-then-reabsorb course. (`total_mass` gains a small gap:
+   the oxidative decarb consumes untracked O₂ and the reduction untracked NAD(P)H — carbon is
+   the invariant, as for beer's hydrolysis water, D-8.) The α-acetolactate-from-sugar draw is
+   *better* grounded than the ester/fusel stand-ins — α-acetolactate genuinely derives from
+   pyruvate.
+
+**The fidelity target (the second owner fork): C-full, not C-minimal.** The discriminator
+put to the owner was: *must the model reproduce "crash/package too early ⇒ diacetyl rises"
+and "a warm rest clears it faster"?* Yes ⇒ the **3-pool** model with the α-acetolactate
+**reservoir**, not a 2-pool (diacetyl produced flux-linked, reduced by live yeast). The
+reservoir is **load-bearing, not cosmetic**: in the 2-pool model diacetyl generation dies
+with the sugar, so it can neither strand a *rising* diacetyl after a crash nor make the rest
+temperature-critical. The advisor's earlier "defer the α-acetolactate lag for v1" was
+explicitly reversed here for exactly this reason.
+
+**Why the rest emerges (the three Processes, `core/kinetics/vicinal_diketones.py`):**
+
+- **`AcetolactateExcretion`** fills the reservoir from the fermentative flux (shared
+  `K_sugar_uptake`), so it stops at dryness — the reservoir is full at end of primary.
+  **Temperature-flat** (a documented v1 simplification: the reservoir *size* is a weak lever;
+  the temperature-criticality lives downstream). Draws its C5 carbon out of `S`.
+- **`AcetolactateDecarboxylation`** converts reservoir → diacetyl + CO₂ by a **spontaneous,
+  non-enzymatic, first-order, strongly temperature-dependent** reaction that is **NOT gated
+  on yeast** — so it keeps making diacetyl *after* fermentation, faster when warm. This is
+  the **rate-limiting, temperature-critical** step (`E_a_decarb` held high). Sourced ordering
+  (Haukeli & Lie 1978; Krogerus 2013 review, doi:10.1002/jib.84 — "higher fermentation
+  temperatures increase the conversion rate"); magnitude speculative.
+- **`DiacetylReduction`** is **fast, enzymatic, gated on VIABLE `X` (not `X_dead`), with NO
+  flux term** — so it clears diacetyl as fast as it forms while live yeast is present, but
+  **stops dead** once the yeast is crashed / racked / ethanol-inactivated. The no-flux-term
+  is essential: reduction must run during the rest (flux ≈ 0). `E_a_reduction` is held
+  **below** `E_a_decarb` so decarb stays rate-limiting.
+
+Together these make the defining behaviour *emerge*. **Verified empirically** (not asserted)
+before the acceptance test was written:
+
+| medium | 14/10 °C | 20/18 °C | 28/25 °C |
+|---|---|---|---|
+| **beer** final diacetyl | 0.195 (stranded, reservoir 4.7) | 0.040 | 0.001 mg/L |
+| **wine** final diacetyl | 1.011 (stranded, reservoir 1.1) | 0.179 | 0.001 mg/L |
+
+Warmer ⇒ monotonically cleaner (the headline "warm rest clears it faster"); a warm run shows
+**peak-then-fall** (beer 25 °C peaks 0.076 @ day 4 → clears to 0.001); a cold run **strands**
+diacetyl at its peak with a large **unconverted α-acetolactate reservoir** the warm run
+consumes. The cold cases sit above the ~0.1 mg/L lager flavour threshold (a real off-note),
+the warm cases well below.
+
+**Isolability / wiring.** The three Processes live in their own `_VDK_PROCESSES` tuple. Unlike
+MLF (a *dosed* organism, disabled at compile when unpitched), diacetyl is **intrinsic yeast
+metabolism**, so it is wired into **both** media and runs on every default ferment — like the
+ester/fusel byproducts. Turning it on draws only a *trace* of sugar (α-acetolactate peaks
+~mg/L, ~1000× below the ester draw), so `dX`/`dE`/`dCO₂`/`dN` stay byte-for-byte until the
+decarb/reduction move that carbon on; the §2.2 trio is unmoved. **Tiers:** all three Processes
+**speculative** (rate magnitudes are order-of-magnitude estimates; only the `E_a_decarb >
+E_a_reduction` ordering is sourced), so parameter-tier propagation (D-1) caps the pool outputs
+at speculative regardless.
+
+**Parameters** live in a new **shared, medium-agnostic** `vicinal_diketones.yaml` (merged at
+the compile seam alongside `acidbase.yaml`), because the load-bearing decarboxylation is
+*non-enzymatic* — a molecule property, not a beverage property (contrast the *per-medium*
+ester `E_a`). Also promoted the shared `draw_carbon_from_sugar` / `fermentative_flux_shape`
+helpers out of `byproducts.py` into `core/kinetics/carbon_routing.py` (one source of truth for
+both the aroma and VDK Processes; behaviour unchanged).
+
+**Scope (v1) / deferred.** Yeast valine-pathway diacetyl only — **MLF-derived diacetyl**
+(*Oenococcus* from citrate, a real coupling now that MLF exists, D-23) is explicitly **out**,
+so wine yeast-pathway diacetyl *understates* real wine diacetyl. The α-acetolactate
+extracellular decarboxylation's ethanol/pH dependence (Kobayashi et al.) and its
+excretion temperature dependence are omitted; acetoin is lumped into the terminal
+`butanediol` pool. **Next in the beat (deferred):** acetaldehyde (produce-then-reabsorb on the
+*main* pathway — reuses this shape; its carbon draw is an even stronger stand-in and it is the
+carbonyl that binds SO₂, unlocking the D-22 free/bound split), then H₂S (carbon-free, an
+inverse-low-N gate — the accounting-easiest, following the SO₂ precedent).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

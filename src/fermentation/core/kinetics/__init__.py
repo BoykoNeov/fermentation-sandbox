@@ -27,11 +27,13 @@ from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.kinetics.vicinal_diketones import (
     AcetolactateDecarboxylation,
     AcetolactateExcretion,
+    DiacetylReduction,
 )
 
 __all__ = [
     "AcetolactateDecarboxylation",
     "AcetolactateExcretion",
+    "DiacetylReduction",
     "ArrheniusTemperature",
     "EsterSynthesis",
     "EsterVolatilization",

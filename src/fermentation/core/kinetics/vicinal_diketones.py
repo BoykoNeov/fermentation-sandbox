@@ -78,6 +78,7 @@ from collections.abc import Mapping
 
 from fermentation.core.chemistry import (
     M_ACETOLACTATE,
+    M_BUTANEDIOL,
     M_CO2,
     M_DIACETYL,
     carbon_mass_fraction,
@@ -181,4 +182,59 @@ class AcetolactateDecarboxylation(Process):
         d[schema.slice("acetolactate")] = -r * M_ACETOLACTATE
         d[schema.slice("diacetyl")] = r * M_DIACETYL
         d[schema.slice("CO2")] = r * M_CO2
+        return d
+
+
+class DiacetylReduction(Process):
+    """Enzymatic diacetyl → 2,3-butanediol by *viable* yeast — clears the buttery note.
+
+    ``d(diacetyl)/dt = −L`` and ``d(butanediol)/dt = +L · M_butanediol/M_diacetyl`` with the
+    mass loss ``L = k_reduction · X · f(T) · [diacetyl]`` and ``f(T) = arrhenius_factor(T,
+    E_a_reduction, T_ref)``. The reduction is a mole-for-mole C4 → C4 transfer (diacetyl and
+    butanediol both have four carbons), so weighting ``butanediol`` at its own carbon
+    fraction keeps the transfer carbon-neutral (like ``esters → esters_gas``, D-20); no sugar
+    draw. Mass carries a small gap (the reduction consumes untracked NAD(P)H) — carbon is
+    the invariant. Acetoin, the intermediate, is lumped into the terminal ``butanediol`` pool.
+
+    **Gated on VIABLE biomass ``X`` (not ``X_dead``), with NO fermentative-flux term
+    (decision D-26).** These two choices are the whole game:
+
+    * *Live-yeast gating* — reduction is enzymatic, so it stops the moment the yeast is
+      crashed, racked or ethanol-inactivated (``X → X_dead``). That is what strands diacetyl
+      when the beer is packaged too early: the reservoir keeps decarboxylating (that step is
+      not yeast-gated) but nothing reduces the diacetyl it makes, so diacetyl **rises**.
+    * *No flux term* — reduction must run during the *rest*, after sugar is gone (flux ≈ 0).
+      Coupling it to the fermentative flux (as excretion is) would switch it off exactly when
+      it is needed, and the diacetyl rest would never clear. So reduction reads only viable
+      ``X`` and the diacetyl present.
+
+    ``E_a_reduction`` is held **below** ``E_a_decarb`` so the spontaneous decarboxylation, not
+    this reduction, is the temperature-critical rate-limiting step (the ordering that makes a
+    warm rest work). ``diacetyl`` and ``X`` are clamped ≥ 0 against solver undershoot. Tier
+    **speculative** (rate magnitude estimate).
+    """
+
+    name = "diacetyl_reduction"
+    tier = Tier.SPECULATIVE
+    touches = ("diacetyl", "butanediol")
+    #: ``k_reduction`` sets the enzymatic reduction magnitude; ``E_a_reduction`` (held below
+    #: ``E_a_decarb``) and ``T_ref`` set the temperature shape. Their tiers cap the butanediol
+    #: output tier via parameter-tier propagation (D-1). Reads viable ``X`` from state.
+    reads: tuple[str, ...] = ("k_reduction", "E_a_reduction", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        diacetyl = max(float(y[schema.slice("diacetyl")][0]), 0.0)
+        if diacetyl <= 0.0:  # nothing to reduce
+            return d
+        x_viable = max(float(y[schema.slice("X")][0]), 0.0)
+        if x_viable <= 0.0:  # no viable yeast ⇒ no reduction (diacetyl is stranded)
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_reduction"], params["T_ref"])
+        loss = params["k_reduction"] * x_viable * f_t * diacetyl  # mass loss of diacetyl
+        d[schema.slice("diacetyl")] = -loss
+        d[schema.slice("butanediol")] = loss * M_BUTANEDIOL / M_DIACETYL  # mole-for-mole C4→C4
         return d

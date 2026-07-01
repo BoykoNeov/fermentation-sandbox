@@ -147,13 +147,22 @@ CORE_PROCESSES = {
 # esters → the esters_gas headspace pool). Wired in by default but isolable (prime
 # directive #3) — disabling them leaves the validated core byte-for-byte.
 BYPRODUCT_PROCESSES = {"ester_synthesis", "fusel_alcohols_ehrlich", "ester_volatilization"}
+# Vicinal-diketone (VDK / diacetyl) pathway (decision D-26): the three-step sugar →
+# α-acetolactate → diacetyl + CO2 → 2,3-butanediol chain. Diacetyl is intrinsic yeast
+# metabolism, so — unlike MLF — it is wired into BOTH media by default (isolable but always
+# on, like the ester/fusel byproducts).
+VDK_PROCESSES = {
+    "acetolactate_excretion",
+    "acetolactate_decarboxylation",
+    "diacetyl_reduction",
+}
 # Malolactic fermentation (decision D-23) is wired into the WINE medium only (beer has no
 # malic/lactic slots); it is enabled in a bare build_process_set and disabled at the compile
 # seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic at VALIDATED).
 MLF_PROCESSES = {"malolactic_conversion"}
 EXPECTED_PROCESSES = {
-    "wine": CORE_PROCESSES | BYPRODUCT_PROCESSES | MLF_PROCESSES,
-    "beer": CORE_PROCESSES | BYPRODUCT_PROCESSES,
+    "wine": CORE_PROCESSES | BYPRODUCT_PROCESSES | VDK_PROCESSES | MLF_PROCESSES,
+    "beer": CORE_PROCESSES | BYPRODUCT_PROCESSES | VDK_PROCESSES,
 }
 EXPECTED_MODIFIERS = {"arrhenius_growth", "arrhenius_uptake"}
 
