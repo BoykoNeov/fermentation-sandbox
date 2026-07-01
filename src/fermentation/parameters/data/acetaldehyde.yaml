@@ -1,0 +1,108 @@
+# Acetaldehyde (main-pathway intermediate) kinetics (decision D-27).
+#
+# SHARED, medium-agnostic parameter file: loaded alongside the <medium>_<strain>.yaml by
+# the compile seam (the store merges paths; these names are collision-free with the
+# per-medium kinetic parameters). Acetaldehyde kinetics are shared because acetaldehyde is
+# the obligate intermediate on the MAIN alcoholic-fermentation pathway (pyruvate ->
+# acetaldehyde -> ethanol) — generic yeast metabolism, a property of the pathway rather
+# than the beverage — so, like vicinal_diketones.yaml and acidbase.yaml, its constants live
+# in one shared file.
+#
+# THE MODEL (a transient ethanol-carbon BUFFER, not a draw from sugar — decision D-27):
+#
+#   ethanol (E) --production--> acetaldehyde --reduction--> ethanol (E)
+#      (borrow C2)   (k_acetaldehyde)     (k_acet_reduction, E_a_acet_reduction)  (return C2)
+#
+# Acetaldehyde and ethanol are BOTH two-carbon, and the yeast reduction acetaldehyde ->
+# ethanol is a mole-for-mole C2 -> C2 transfer. The uptake Process ALREADY performs the
+# complete lumped sugar -> ethanol + CO2 conversion (which implicitly includes this
+# intermediate), so drawing FRESH sugar -> acetaldehyde -> NEW ethanol would be a second,
+# parallel sugar->ethanol pathway: net-new ethanol that inflates ABV and the realised yield
+# by an amount that scales with pool turnover (a real double-count, not a trace). The
+# faithful model de-lumps the existing step instead: production HOLDS BACK a transient slice
+# of the ethanol the uptake just made (d[acetaldehyde] += r, d[E] -= r*M_eth/M_acet) and
+# reduction RETURNS it (d[acetaldehyde] -= L, d[E] += L*M_eth/M_acet). Carbon closes to
+# machine precision touching NEITHER sugar NOR CO2; the E endpoint is byte-for-byte the
+# no-acetaldehyde core once the pool is reduced back, so the section-2.2 ABV / realised-yield
+# / CO2 benchmarks are preserved exactly (a tiny transient E dip during the ferment recovers
+# as reduction completes). This is the owner's choice over the draw-from-sugar stand-in the
+# D-26 forward note anticipated; it is MORE faithful (acetaldehyde genuinely is in-transit
+# ethanol carbon), not merely benchmark-safe.
+#
+# WHY THE EARLY PEAK EMERGES (the phenomenon these parameters must reproduce):
+#   * Production is FLUX-LINKED (shared K_sugar_uptake) -> strong during active fermentation,
+#     stops at dryness. Held TEMPERATURE-FLAT as a documented v1 simplification (like the
+#     alpha-acetolactate excretion, D-26): no benchmark asserts an acetaldehyde temperature
+#     direction in v1, and the enzymatic reduction carries the temperature dependence.
+#   * Reduction is enzymatic, FAST, gated on VIABLE yeast (X, not X_dead) with NO flux term,
+#     so it keeps clearing acetaldehyde during the rest and after sugar is gone but STOPS
+#     once the yeast is crashed/racked/ethanol-inactivated.
+#   => Acetaldehyde rises while the flux outruns the still-building reductive capacity,
+#      peaks during active fermentation (the "green apple" transient), and is drawn back down
+#      to a low residual as fermentation slows. A crash before it is cleared STRANDS it (and
+#      leaves the borrowed ethanol carbon parked as acetaldehyde rather than returned to E) —
+#      the same structural pair (flux-linked production, viable-X-gated reduction) as the
+#      diacetyl rest (D-26).
+#
+# QUASI-STEADY SIZING. Setting production = reduction, the X terms cancel (both ride X), so
+# the plateau acetaldehyde ~ k_acetaldehyde * [S/(K+S)] / (k_acet_reduction * f(T)); at T_ref
+# with S/(K+S) ~ 1 that is ~ k_acetaldehyde / k_acet_reduction ~ 0.04 g/L = 40 mg/L, in the
+# real range (wine ~30-80, beer peaks ~20-40 mg/L; flavour threshold ~10-25 mg/L "green
+# apple"). The early overshoot above the plateau (reductive capacity lagging the flux) sits
+# on top. Both rate magnitudes are order-of-magnitude estimates.
+#
+# TIERS. Every rate constant is an order-of-magnitude estimate (no kinetic model of this
+# exact per-flux production / X-gated reduction form is sourced), so both Processes stay
+# speculative; parameter-tier propagation (D-1) caps the acetaldehyde output tier at
+# speculative regardless. Because AcetaldehydeProduction is the first always-on speculative
+# Process to WRITE ethanol E, the structural tier_of("E") drops PLAUSIBLE -> SPECULATIVE, but
+# the param-aware tier users see was already SPECULATIVE (the uptake Process reads speculative
+# params) so there is no headline change — exactly the honest CO2 consequence recorded for
+# D-26. The MECHANISM (acetaldehyde is the obligate main-pathway intermediate, produced then
+# reduced to ethanol by ADH) is textbook (Boulton et al., Principles and Practices of
+# Winemaking; Ribereau-Gayon et al., Handbook of Enology); only the RATE magnitudes are the
+# author's estimates.
+#
+# CARBON. No sugar draw and no CO2 term: acetaldehyde borrows carbon from ethanol
+# (production) and returns it (reduction), both mole-for-mole C2 -> C2, so total_carbon (which
+# weights the acetaldehyde pool at its own C2 fraction) closes to machine precision through
+# the whole produce-then-reabsorb course. Mass carries a small gap (the reduction moves
+# untracked NAD(P)H) — carbon is the invariant, exactly as for the diacetyl reduction (D-26)
+# and beer's hydrolysis water (D-8).
+#
+# SCOPE (v1). The acetaldehyde metabolite only. Acetaldehyde is the principal SO2-binder, so
+# building it as real state UNLOCKS the deferred free/bound-SO2 split (D-22) — but that is a
+# separate READOUT commit (it only needs this state to exist), kept out of this beat per the
+# owner's one-Process-per-commit rhythm.
+
+# -- PRODUCTION: ethanol -> acetaldehyde (flux-linked borrow, temperature-flat) ---------
+k_acetaldehyde:
+  value: 2.0e-3
+  unit: "1/h"   # d(acetaldehyde)/dt = k_acetaldehyde * X * S/(K_sugar_uptake + S); borrowed from E
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 8.0e-3, note: "with k_acet_reduction ~5e-2 gives a quasi-steady plateau ~ k_acetaldehyde/k_acet_reduction ~ 10-160 mg/L; targets a peak in the real ~30-80 mg/L (wine) / ~20-40 mg/L (beer) range, threshold ~10-25 mg/L green apple" }
+  provenance:
+    source: "author estimate bounded by typical acetaldehyde levels (Boulton et al., Principles and Practices of Winemaking; Ribereau-Gayon et al., Handbook of Enology). Acetaldehyde is the obligate main-pathway intermediate (pyruvate -> acetaldehyde -> ethanol) excreted transiently during active fermentation."
+    conditions: "generic yeast; acetaldehyde formation coupled to the biomass-catalysed sugar (fermentative) flux, shared K_sugar_uptake"
+    notes: "MODELLED AS A BORROW FROM ETHANOL, NOT A SUGAR DRAW (decision D-27): the uptake Process already makes the full sugar->ethanol+CO2 conversion, so acetaldehyde de-lumps that step (holds back a transient C2 slice of ethanol) rather than adding a parallel pathway that would inflate ABV. Flux-linked so it stops at dryness; held TEMPERATURE-FLAT as a documented v1 simplification (the enzymatic reduction carries the temperature dependence). Magnitude speculative."
+
+# -- REDUCTION: acetaldehyde -> ethanol (enzymatic, viable-yeast-gated, fast) -----------
+k_acet_reduction:
+  value: 5.0e-2
+  unit: "L/(g*h)"   # d(acetaldehyde)/dt = -k_acet_reduction * X_viable * f(T) * [acetaldehyde]
+  tier: speculative
+  uncertainty: { low: 1.0e-2, high: 2.0e-1, note: "with viable X ~1-5 g/L gives an acetaldehyde half-life of a few hours => yeast clears it as fast as it forms while present, so acetaldehyde peaks during active ferment and only strands once the yeast is gone" }
+  provenance:
+    source: "author estimate; yeast reduces acetaldehyde to ethanol via alcohol dehydrogenase (the last, fast step of the main pathway), gated on viable cells (Boulton et al.; Ribereau-Gayon et al.)"
+    conditions: "generic yeast; enzymatic acetaldehyde reduction, first-order in acetaldehyde and in VIABLE biomass X (NOT X_dead), NO fermentative-flux term (must run during the rest when flux ~ 0)"
+    notes: "NO flux term and gated on live X is load-bearing: reduction must continue after sugar is gone (the produce-then-reabsorb tail) but STOP when yeast is crashed/racked/ethanol-inactivated. That gating is what makes 'crash at peak => acetaldehyde stranded (borrowed ethanol carbon un-returned)' emerge, mirroring the diacetyl reduction (D-26). Magnitude speculative."
+
+E_a_acet_reduction:
+  value: 45000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 60000.0, note: "Q10 ~1.8-2.3 at 20 C; a moderate enzymatic activation energy typical of yeast oxidoreductases (cf. the diacetyl-reduction E_a_reduction 45k, D-26)" }
+  provenance:
+    source: "author estimate; a moderate enzymatic activation energy typical of yeast alcohol/aldehyde dehydrogenases"
+    conditions: "generic yeast; equivalent Arrhenius activation energy of acetaldehyde reduction at T_ref = 293.15 K"
+    notes: "Sets only the temperature shape of the enzymatic clearance (warmer => faster reduction => lower residual acetaldehyde). No benchmark asserts an acetaldehyde temperature DIRECTION in v1; magnitude speculative and banded."

@@ -1618,9 +1618,100 @@ temperature profile, produces the behaviour). A **temperature-ramp** test (cool 
 finish vs cool → cold hold, which `temperature_schedule` already supports) would demonstrate
 the *literal* "warm rest" / "package early" scenarios and is a cheap deferred follow-up.
 **Next in the beat (deferred):** acetaldehyde (produce-then-reabsorb on the *main* pathway —
-reuses this shape; its carbon draw is an even stronger stand-in and it is the carbonyl that
-binds SO₂, unlocking the D-22 free/bound split), then H₂S (carbon-free, an inverse-low-N gate
-— the accounting-easiest, following the SO₂ precedent).
+reuses this shape; it is the carbonyl that binds SO₂, unlocking the D-22 free/bound split) —
+**LANDED in D-27** — then H₂S (carbon-free, an inverse-low-N gate — the accounting-easiest,
+following the SO₂ precedent).
+
+## D-27 — Acetaldehyde: the main-pathway intermediate as a transient ethanol-carbon buffer
+
+**Status: IMPLEMENTED 2026-07-01** (342 green). The second §3.2 aroma beat after diacetyl
+(D-26). Acetaldehyde (ethanal, CH₃CHO) is the obligate intermediate on the *main* alcoholic-
+fermentation pathway (sugar → … → pyruvate → acetaldehyde → ethanol) — the "green apple"
+carbonyl that accumulates to an early peak during vigorous fermentation and is then reduced
+to ethanol. Like diacetyl it is **produced then reabsorbed**, so it reuses the D-26 shape
+(flux-linked production + viable-`X`-gated, no-flux-term reduction), but with **no middle
+reservoir** (acetaldehyde is produced directly, not via a spontaneous-decarb precursor) — two
+Processes, one commit.
+
+**The load-bearing fork the owner decided (the advisor caught my error first).** I had
+half-settled on the D-26 forward note's preview — *"acetaldehyde's carbon **draw** is an even
+stronger **stand-in**"* — i.e. draw carbon from `S`, book it as acetaldehyde, reduce to
+ethanol, mirroring the ester/fusel/acetolactate template. The advisor's decisive catch:
+**that template does not apply here, because acetaldehyde's product is `E` itself, not a side
+pool.** The uptake Process *already* performs the complete lumped sugar → ethanol + CO₂
+conversion (which implicitly includes this intermediate). Drawing *fresh* sugar → acetaldehyde
+→ *new* ethanol is therefore a **second, parallel** sugar→ethanol pathway — **net-new ethanol
+that inflates ABV and realised yield by an amount scaling with pool *turnover*** (cumulative
+acetaldehyde *produced*, not its peak). That is a genuine double-count, not the benchmark-
+neutral trace the D-19 ester draw is (ester carbon lands in a side pool genuinely removed from
+`E`; acetaldehyde carbon returns to `E`). The forward note had applied the side-pool template
+before anyone noticed the product is `E`. Per the "specs aren't gospel / discuss disagreements"
+rule this was surfaced to the owner as a fork, who chose the **buffer** model:
+
+* Because acetaldehyde and ethanol are **both two-carbon**, the reduction acetaldehyde →
+  ethanol is a mole-for-mole C2 → C2 transfer. So `AcetaldehydeProduction` **holds back** a
+  transient slice of the ethanol the uptake just made — reclassifying it as the true
+  intermediate: `d(acetaldehyde)/dt = +r`, `d(E)/dt = −r·M_eth/M_acet`, with `r =
+  k_acetaldehyde · X · S/(K_sugar_uptake + S)`. No fresh sugar, no CO₂.
+* `AcetaldehydeReduction` **returns** it: `d(acetaldehyde)/dt = −L`, `d(E)/dt =
+  +L·M_eth/M_acet`, `L = k_acet_reduction · X_viable · f(T) · [acetaldehyde]`.
+
+This **de-lumps** the existing pathway rather than duplicating it. It is *more* faithful, not
+merely benchmark-safe: acetaldehyde genuinely **is** obligate in-transit ethanol carbon, so
+borrowing from `E` asserts exactly the right provenance; a sugar draw would assert a parallel
+pathway that does not exist.
+
+**Carbon / benchmark consequences.** `total_carbon` (which now weights `acetaldehyde` at its
+C2 fraction) closes to **machine precision** through the whole produce-then-reabsorb course,
+touching **neither `S` nor `CO2`**. The `E` **endpoint** reconverges to the buffer-off core to
+**relative ~1e-8** (the pool fully reduces back), so the §2.2 ABV / realised-yield / CO₂
+benchmarks are preserved to far below any tolerance — verified, all 5 benchmarks unmoved.
+Honest caveats made explicit and pinned by tests: (i) the isolability is **derivative-level**
+(`dS`/`dCO2`/`dN` are byte-for-byte given the same state) — the *integrated* `S`/`CO2`/`N`
+differ by a tiny ~1e-4 relative **second-order path perturbation**, because `E` feeds the
+ethanol-inactivation viability brake, so the transient `E` dip nudges viability; (ii) `total_
+mass` gains a small gap (the reduction moves untracked NAD(P)H) — carbon is the invariant, as
+for the diacetyl reduction (D-26) and beer's hydrolysis water (D-8). One tier consequence (the
+exact D-26 `CO2` parallel, pinned): `AcetaldehydeProduction` is the first always-on speculative
+Process to *write* `E`, so the **structural** `tier_of("E")` drops PLAUSIBLE → SPECULATIVE, but
+the **param-aware** tier users see was already SPECULATIVE (the uptake Process reads speculative
+params), so there is no headline change.
+
+**Emergent, verified empirically before the acceptance test (the D-26 checkpoint discipline).**
+
+| medium | acetaldehyde peak | peak day (of run) | final |
+|---|---|---|---|
+| **wine** 20 °C | 37.5 mg/L | day 2.7 (of 21) | 0.00 mg/L |
+| **beer** 18 °C | 38.2 mg/L | day 1.8 (of 14) | 0.00 mg/L |
+
+The early peak *emerges* (production rides the flux and outruns the still-building reductive
+capacity, then reduction — gated on viable yeast, no flux term — draws it back down as the
+ferment slows), landing in the real range (wine ~30–80, beer peaks ~20–40 mg/L; threshold
+~10–25 mg/L green apple). Warmer clears faster/lower (wine peak 55→37→23 mg/L at 14/20/28 °C,
+via the Arrhenius on the enzymatic reduction). A crash before clearance **strands**
+acetaldehyde (borrowed ethanol carbon un-returned) — the same live-yeast-gating structure as
+the diacetyl rest; demonstrated at the unit level (`X = 0` ⇒ reduction 0).
+
+**Isolability / wiring.** Both Processes live in their own `_ACETALDEHYDE_PROCESSES` tuple.
+Like esters and the VDK pools (and unlike the *dosed* MLF organism), acetaldehyde is intrinsic
+yeast metabolism, so it is wired into **both** media and runs on every default ferment.
+Production is held **temperature-flat** (a documented v1 simplification, like the acetolactate
+excretion, D-26); the enzymatic reduction carries the Arrhenius factor. Both Processes are
+**speculative** (rate magnitudes are order-of-magnitude estimates; only the mechanism —
+acetaldehyde is the obligate main-pathway intermediate reduced to ethanol by ADH — is
+textbook, Boulton et al.; Ribéreau-Gayon et al.).
+
+**Parameters** live in a new **shared, medium-agnostic** `acetaldehyde.yaml` (merged at the
+compile seam alongside `acidbase.yaml`/`vicinal_diketones.yaml`), because acetaldehyde is
+main-pathway yeast metabolism — a property of the pathway, not the beverage.
+
+**Scope (v1) / deferred.** The acetaldehyde metabolite only. Acetaldehyde is the principal
+SO₂-binder, so building it as real state **unlocks the deferred free/bound-SO₂ split** (D-22) —
+but that is a separate **readout** commit (it only needs this state to exist, and carries its
+own fork: does the dosed `so2_free` slot get reinterpreted as *total*, breaking D-22's
+`molecular_so2`, or is a separate total/bound accounting added?), kept out of this beat per the
+owner's one-Process-per-commit rhythm. **Next in the beat:** the SO₂ free/bound binding readout,
+then H₂S (carbon-free, inverse-low-N gate — the accounting-easiest, following the SO₂ precedent).
 
 ## Deferred (decide early in the relevant milestone)
 

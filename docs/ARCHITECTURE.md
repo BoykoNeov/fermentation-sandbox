@@ -195,7 +195,15 @@ than be scripted (DECISIONS #18).
   out of titratable acidity (OIV excludes it), and is carbon-free — so dosing it leaves pH
   and `total_carbon` byte-for-byte (an isolability test pins this). No RHS consumer yet
   (the antimicrobial brake wires into MLF/spoilage growth). The free/**bound**
-  (acetaldehyde-binding) split is deferred until acetaldehyde exists.
+  (acetaldehyde-binding) split was deferred until acetaldehyde exists; acetaldehyde now
+  exists as state (decision D-27), so that binding readout is the next commit.
+- **Acetaldehyde** (`core/kinetics/acetaldehyde.py`, decision D-27) — the obligate main-
+  pathway intermediate, modelled as a transient **ethanol-carbon buffer**: flux-linked
+  production *borrows* a C2 slice of ethanol and viable-yeast-gated reduction *returns* it
+  (both mole-for-mole C2→C2). It de-lumps the uptake Process's single sugar→ethanol step
+  rather than adding a parallel pathway, so carbon closes touching neither `S` nor `CO2` and
+  the `E` endpoint (hence the §2.2 benchmarks) is preserved to relative ~1e-8. The early
+  produce-then-reabsorb peak emerges; a crash strands it (the D-26 live-yeast-gating shape).
 
 ## Testing & quality gates
 

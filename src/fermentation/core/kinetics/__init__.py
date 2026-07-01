@@ -10,6 +10,10 @@ full set exists (until then they stay out of the ``MEDIA`` registry so the
 no-kinetics baseline holds — see ``docs/plans/milestone-1-tasks.md``).
 """
 
+from fermentation.core.kinetics.acetaldehyde import (
+    AcetaldehydeProduction,
+    AcetaldehydeReduction,
+)
 from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
 from fermentation.core.kinetics.byproducts import (
     EsterSynthesis,
@@ -31,6 +35,8 @@ from fermentation.core.kinetics.vicinal_diketones import (
 )
 
 __all__ = [
+    "AcetaldehydeProduction",
+    "AcetaldehydeReduction",
     "AcetolactateDecarboxylation",
     "AcetolactateExcretion",
     "DiacetylReduction",

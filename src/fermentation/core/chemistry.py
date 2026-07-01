@@ -39,6 +39,16 @@ M_MALTOSE = 12 * _M_C + 22 * _M_H + 11 * _M_O
 M_MALTOTRIOSE = 18 * _M_C + 32 * _M_H + 16 * _M_O
 #: Ethanol, C2H6O.
 M_ETHANOL = 2 * _M_C + 6 * _M_H + 1 * _M_O
+#: Acetaldehyde (ethanal), C2H4O — the obligate intermediate on the main ethanol
+#: pathway (pyruvate → acetaldehyde → ethanol), the carbonyl responsible for the early
+#: "green apple" transient and the principal SO₂-binder (decision D-27). Same 2 carbons
+#: as ethanol, so the yeast reduction acetaldehyde → ethanol is a mole-for-mole C2 → C2
+#: transfer: modelling acetaldehyde as a transient buffer that *borrows* ethanol carbon
+#: (production) and *returns* it (reduction) closes carbon to machine precision without
+#: touching ``S`` or ``CO2`` — the faithful de-lumping of the uptake Process's single
+#: sugar→ethanol step, chosen by the owner over a draw-from-sugar stand-in that would
+#: double-count the main pathway and inflate ABV (decision D-27).
+M_ACETALDEHYDE = 2 * _M_C + 4 * _M_H + 1 * _M_O
 #: Carbon dioxide, CO2.
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
@@ -113,6 +123,7 @@ MOLAR_MASS: dict[str, float] = {
     "maltose": M_MALTOSE,
     "maltotriose": M_MALTOTRIOSE,
     "ethanol": M_ETHANOL,
+    "acetaldehyde": M_ACETALDEHYDE,
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
@@ -136,6 +147,7 @@ CARBON_ATOMS: dict[str, int] = {
     "maltose": 12,
     "maltotriose": 18,
     "ethanol": 2,
+    "acetaldehyde": 2,
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,

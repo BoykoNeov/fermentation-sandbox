@@ -32,6 +32,8 @@ The shared variables (decisions D-B / D-4):
     acetolactate α-acetolactate  g/L (vicinal-diketone precursor reservoir — decision D-26)
     diacetyl diacetyl (VDK)      g/L (buttery off-note; produced then reabsorbed — D-26)
     butanediol 2,3-butanediol    g/L (flavour-inactive diacetyl-reduction product — D-26)
+    acetaldehyde acetaldehyde    g/L (main-pathway intermediate; transient ethanol-carbon
+                                 buffer, produced then reduced back to ethanol — D-27)
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
@@ -57,6 +59,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from fermentation.core.kinetics import (
+    AcetaldehydeProduction,
+    AcetaldehydeReduction,
     AcetolactateDecarboxylation,
     AcetolactateExcretion,
     ArrheniusTemperature,
@@ -136,6 +140,13 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             default=0.0,
             description="2,3-butanediol — flavour-inactive terminal product of "
             "diacetyl reduction by viable yeast (decision D-26)",
+        ),
+        VarSpec(
+            "acetaldehyde",
+            "g/L",
+            default=0.0,
+            description="acetaldehyde (ethanal) — main-pathway intermediate; a transient "
+            "ethanol-carbon buffer (produced then yeast-reduced back to ethanol; D-27)",
         ),
     ]
 
@@ -332,6 +343,31 @@ _VDK_PROCESSES: tuple[Callable[[], Process], ...] = (
     DiacetylReduction,
 )
 
+#: Acetaldehyde pathway (Milestone 2, decision D-27): the main-pathway intermediate as a
+#: transient ethanol-carbon *buffer* — flux-linked production that borrows carbon from ``E``
+#: and viable-``X``-gated reduction that returns it. Kept as its own isolable tuple (prime
+#: directive #3): a ProcessSet built without it is the prior core. Like the ester/VDK pools
+#: (and unlike the *dosed* MLF organism), acetaldehyde is intrinsic yeast metabolism, so it
+#: is wired into BOTH media and runs on every default ferment. It touches only
+#: ``acetaldehyde`` and ``E`` (never ``S``/``CO2``/``N``/``X``) at the derivative level, so
+#: ``dS``/``dCO2``/``dN`` are byte-for-byte given the same state; the only integrated coupling
+#: is second-order (``E`` feeds the inactivation viability brake, a ~1e-4 relative path
+#: perturbation). The ``E`` endpoint reconverges to the buffer-off core to relative ~1e-8 (the
+#: pool fully reduces back), so the §2.2 ABV / realised-yield / CO2 benchmarks are preserved to
+#: far below any tolerance. This is the owner's buffer choice (D-27) over a draw-from-sugar
+#: stand-in, which would double-count the uptake
+#: Process's already-complete sugar→ethanol conversion and inflate ABV with net-new ethanol.
+#: One honest tier consequence (the D-26 ``CO2`` parallel): the always-on speculative
+#: production is the first such Process to *write* ``E``, so the *structural* ``tier_of("E")``
+#: drops PLAUSIBLE→SPECULATIVE — but the param-aware tier users see was already SPECULATIVE
+#: (the uptake Process reads speculative params), so there is no headline change. Params live
+#: in the shared, medium-agnostic ``acetaldehyde.yaml`` (main-pathway yeast metabolism, not a
+#: beverage property). SCOPE (v1): the SO₂-binding free/bound split is a separate readout beat.
+_ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
+    AcetaldehydeProduction,
+    AcetaldehydeReduction,
+)
+
 #: Malolactic fermentation (wine-only, decision D-23): the *Oenococcus oeni* malate →
 #: lactate + CO2 conversion, the first RHS consumer of the D-18 pH solver and the D-22
 #: molecular-SO₂ readout. Kept as its own tuple so it stays **isolable** (prime directive
@@ -352,14 +388,23 @@ MEDIA: dict[str, Medium] = {
         name="wine",
         schema=wine_schema(),
         process_factories=(
-            _PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES + _VDK_PROCESSES + _MLF_PROCESSES
+            _PRIMARY_FERMENTATION_PROCESSES
+            + _BYPRODUCT_PROCESSES
+            + _VDK_PROCESSES
+            + _ACETALDEHYDE_PROCESSES
+            + _MLF_PROCESSES
         ),
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),
     "beer": Medium(
         name="beer",
         schema=beer_schema(),
-        process_factories=_PRIMARY_FERMENTATION_PROCESSES + _BYPRODUCT_PROCESSES + _VDK_PROCESSES,
+        process_factories=(
+            _PRIMARY_FERMENTATION_PROCESSES
+            + _BYPRODUCT_PROCESSES
+            + _VDK_PROCESSES
+            + _ACETALDEHYDE_PROCESSES
+        ),
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),
 }

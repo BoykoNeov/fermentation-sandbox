@@ -240,10 +240,28 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         unmoved. All three Processes **speculative** (only the `E_a` ordering sourced).
         30 new tests; **320 green**, ruff + mypy clean. SCOPE: yeast valine-pathway only —
         MLF/citrate diacetyl deferred. Full record in **DECISIONS → D-26**.
-  - [ ] **Acetaldehyde** — produce-then-reabsorb on the *main* ethanol pathway (reuses the
-        D-26 shape). Its carbon draw is an even stronger stand-in (main-flux intermediate,
-        not a side-branch); it is the carbonyl that binds SO₂, so it unlocks the D-22
-        deferred free/**bound**-SO₂ split.
+  - [x] **Acetaldehyde — transient ethanol-carbon buffer (decision D-27). LANDED 2026-07-01.**
+        Produce-then-reabsorb on the *main* ethanol pathway, reusing the D-26 shape (flux-linked
+        production + viable-`X`-gated, no-flux reduction) but with **no middle reservoir** — two
+        Processes (`core/kinetics/acetaldehyde.py`), one commit. **KEY FORK (advisor-caught,
+        owner-decided):** the D-26 preview said "carbon *draw* stand-in", but acetaldehyde's
+        product is `E` itself (the uptake Process already does the full lumped sugar→ethanol),
+        so a draw-from-sugar would be a *second parallel pathway* = net-new ethanol inflating
+        ABV, scaling with pool turnover. Owner chose the **buffer**: production *borrows* a C2
+        slice of ethanol (`d[E] -= r·M_eth/M_acet`), reduction returns it — mole-for-mole C2→C2,
+        so carbon closes to machine precision touching **neither `S` nor `CO2`**, and the `E`
+        endpoint reconverges to the buffer-off core to relative ~1e-8 ⇒ **§2.2 benchmarks
+        preserved to far below tolerance** (all 5 unmoved; a ~1e-4 second-order core drift via
+        the `E`→viability brake aside). More faithful (acetaldehyde *is* in-transit ethanol
+        carbon), not merely benchmark-safe. **Emergent + verified empirically:** wine peak
+        37.5 mg/L @ day 2.7/21, beer 38.2 @ day 1.8/14, both reabsorbed to ~0; warmer clears
+        faster (55→37→23 mg/L @ 14/20/28 °C). Wired into **both** media (intrinsic, always-on,
+        isolable); shared `acetaldehyde.yaml`. Honest caveats pinned: isolability is
+        derivative-level (`S`/`CO2`/`N` drift ~1e-4 via the `E`→viability feedback); structural
+        `tier_of("E")` drops PLAUSIBLE→SPECULATIVE (param-aware unchanged, the D-26 `CO2`
+        parallel). Both Processes speculative. 21 new tests; **342 green**, ruff+mypy clean.
+        SCOPE: metabolite only — the SO₂ free/bound split it unlocks is a separate readout beat.
+        Full record in **DECISIONS → D-27**.
   - [ ] **H₂S** — N/S-deficiency signal; rises when N is *low* (inverse gate vs fusels),
         off-gassed. Carbon-free ⇒ naturally outside `total_carbon` (the SO₂ precedent);
         the accounting-easiest of the three.

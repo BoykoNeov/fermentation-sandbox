@@ -1,0 +1,403 @@
+"""Tests for the acetaldehyde pathway Processes (decision D-27).
+
+Acetaldehyde is the obligate intermediate on the *main* ethanol pathway, so — unlike the
+side-pool aroma byproducts — it is modelled as a transient ethanol-carbon **buffer**, not a
+draw from sugar: production borrows a C2 slice of ethanol and reduction returns it. That
+de-lumps the uptake Process's already-complete sugar→ethanol step instead of adding a
+parallel pathway (which would double-count and inflate ABV).
+
+* **Production** (:class:`AcetaldehydeProduction`): flux-linked, temperature-flat; borrows
+  carbon from ``E`` (``d[acetaldehyde] += r``, ``d[E] -= r·M_eth/M_acet``).
+* **Reduction** (:class:`AcetaldehydeReduction`): enzymatic C2 → C2 to ethanol, gated on
+  *viable* yeast with no flux term — so it clears acetaldehyde during the rest but stops when
+  the yeast is crashed (stranding it, with the borrowed ethanol carbon un-returned).
+
+The unit tests pin each Process's closed form, the borrow/return carbon accounting and the
+guards; the acceptance section verifies the *emergent* early peak (produced during active
+fermentation, then reduced to a low residual), the machine-precision carbon closure on a
+compiled run, and — the buffer's headline guarantee — that the ``E`` endpoint reconverges to
+the no-acetaldehyde core (to relative ~1e-8), so the §2.2 benchmarks are preserved to far
+below any tolerance (a tiny ~1e-4 second-order path drift via the E→viability brake aside).
+"""
+
+import numpy as np
+import pytest
+
+from fermentation.core.chemistry import (
+    M_ACETALDEHYDE,
+    M_ETHANOL,
+    carbon_mass_fraction,
+)
+from fermentation.core.kinetics import (
+    AcetaldehydeProduction,
+    AcetaldehydeReduction,
+    SugarUptakeToEthanolCO2,
+    arrhenius_factor,
+)
+from fermentation.core.media import wine_schema
+from fermentation.core.process import ProcessSet
+from fermentation.core.state import FloatArray, StateSchema
+from fermentation.core.tiers import Tier
+from fermentation.parameters.store import default_data_dir, load_parameters
+from fermentation.runtime import simulate
+from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
+
+#: Carbon fractions the borrow/return books against (mirror the chemistry constants).
+_ACETALDEHYDE_C = carbon_mass_fraction("acetaldehyde")
+_ETHANOL_C = carbon_mass_fraction("ethanol")
+#: The mole-for-mole ethanol⇄acetaldehyde mass ratio used by both Processes.
+_ETH_PER_ACET = M_ETHANOL / M_ACETALDEHYDE
+
+
+@pytest.fixture
+def store():
+    # Wine kinetics PLUS the shared acetaldehyde constants (k_acetaldehyde, k_acet_reduction…).
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "acetaldehyde.yaml",
+    )
+
+
+@pytest.fixture
+def params(store):
+    return store.resolve()
+
+
+def _wine_y0(
+    schema: StateSchema,
+    *,
+    x: float = 2.0,
+    s: float = 200.0,
+    e: float = 50.0,
+    n: float = 0.1,
+    t: float = 293.15,
+    acetaldehyde: float = 0.0,
+) -> FloatArray:
+    y = schema.pack({"X": x, "S": [s], "E": e, "N": n, "T": t, "CO2": 0.0})
+    y[schema.slice("acetaldehyde")] = acetaldehyde
+    return y
+
+
+# -- metadata -----------------------------------------------------------------
+
+
+def test_production_metadata():
+    p = AcetaldehydeProduction()
+    assert p.name == "acetaldehyde_production"
+    # Speculative: rate magnitude is an order-of-magnitude estimate.
+    assert p.tier is Tier.SPECULATIVE
+    # Touches ONLY its own pool and ethanol — the buffer borrows C2 from E, never S/CO2 (D-27).
+    assert set(p.touches) == {"acetaldehyde", "E"}
+    assert set(p.reads) == {"k_acetaldehyde", "K_sugar_uptake"}
+
+
+def test_reduction_metadata():
+    p = AcetaldehydeReduction()
+    assert p.name == "acetaldehyde_reduction"
+    assert p.tier is Tier.SPECULATIVE
+    assert set(p.touches) == {"acetaldehyde", "E"}
+    assert set(p.reads) == {"k_acet_reduction", "E_a_acet_reduction", "T_ref"}
+
+
+# -- production closed form & guards ------------------------------------------
+
+
+def test_production_matches_closed_form(params):
+    schema = wine_schema()
+    x, s = 2.0, 200.0
+    y = _wine_y0(schema, x=x, s=s)
+    d = AcetaldehydeProduction().derivatives(0.0, y, schema, params)
+
+    flux = x * (s / (params["K_sugar_uptake"] + s))
+    rate = params["k_acetaldehyde"] * flux
+    assert schema.get(d, "acetaldehyde") == pytest.approx(rate)
+    # Ethanol is decremented mole-for-mole (C2→C2): the carbon leaving E equals the carbon
+    # entering acetaldehyde, so the borrow is carbon-exact per RHS.
+    assert schema.get(d, "E") == pytest.approx(-rate * _ETH_PER_ACET)
+    assert schema.get(d, "E") * _ETHANOL_C == pytest.approx(
+        -schema.get(d, "acetaldehyde") * _ACETALDEHYDE_C
+    )
+    # Nothing else moves — no sugar draw, no CO2 (the whole point of the buffer model).
+    for var in ("X", "S", "N", "CO2"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_production_is_temperature_flat(params):
+    # Documented v1 simplification (D-27): production carries NO Arrhenius factor — the
+    # temperature dependence lives in the enzymatic reduction. Identical cold vs warm at flux.
+    schema = wine_schema()
+    cold = AcetaldehydeProduction().derivatives(0.0, _wine_y0(schema, t=283.15), schema, params)
+    warm = AcetaldehydeProduction().derivatives(0.0, _wine_y0(schema, t=303.15), schema, params)
+    assert schema.get(cold, "acetaldehyde") == pytest.approx(schema.get(warm, "acetaldehyde"))
+    assert schema.get(cold, "acetaldehyde") > 0.0
+
+
+def test_production_scales_with_fermentative_flux(params):
+    # Coupled to the biomass-catalysed sugar flux (linear in X): twice the biomass ⇒ twice
+    # the borrow.
+    schema = wine_schema()
+    r1 = AcetaldehydeProduction().derivatives(0.0, _wine_y0(schema, x=1.0), schema, params)
+    r2 = AcetaldehydeProduction().derivatives(0.0, _wine_y0(schema, x=2.0), schema, params)
+    assert schema.get(r2, "acetaldehyde") == pytest.approx(2.0 * schema.get(r1, "acetaldehyde"))
+
+
+def test_production_zero_without_biomass_or_sugar(params):
+    schema = wine_schema()
+    no_x = AcetaldehydeProduction().derivatives(0.0, _wine_y0(schema, x=0.0), schema, params)
+    no_s = AcetaldehydeProduction().derivatives(0.0, _wine_y0(schema, s=0.0), schema, params)
+    assert schema.get(no_x, "acetaldehyde") == 0.0
+    assert schema.get(no_s, "acetaldehyde") == 0.0
+    # No borrow ⇒ ethanol untouched too.
+    assert schema.get(no_x, "E") == 0.0
+    assert schema.get(no_s, "E") == 0.0
+
+
+# -- reduction closed form & guards ------------------------------------------
+
+
+def test_reduction_matches_closed_form(params):
+    schema = wine_schema()
+    x, acet = 2.0, 0.04
+    y = _wine_y0(schema, x=x, acetaldehyde=acet)
+    d = AcetaldehydeReduction().derivatives(0.0, y, schema, params)
+
+    f_t = arrhenius_factor(293.15, params["E_a_acet_reduction"], params["T_ref"])
+    loss = params["k_acet_reduction"] * x * f_t * acet
+    assert schema.get(d, "acetaldehyde") == pytest.approx(-loss)
+    # Ethanol gains mole-for-mole (C2→C2): the carbon returned to E equals the carbon lost
+    # from acetaldehyde, so the return is carbon-exact per RHS.
+    assert schema.get(d, "E") == pytest.approx(loss * _ETH_PER_ACET)
+    assert schema.get(d, "E") * _ETHANOL_C == pytest.approx(
+        -schema.get(d, "acetaldehyde") * _ACETALDEHYDE_C
+    )
+    # Never touches sugar/CO2/nitrogen.
+    for var in ("S", "CO2", "N"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_reduction_is_temperature_dependent(params):
+    # Enzymatic ⇒ Arrhenius in T: warmer reduces faster (unlike production, which is flat).
+    schema = wine_schema()
+    cold = AcetaldehydeReduction().derivatives(
+        0.0, _wine_y0(schema, t=283.15, acetaldehyde=0.04), schema, params
+    )
+    warm = AcetaldehydeReduction().derivatives(
+        0.0, _wine_y0(schema, t=303.15, acetaldehyde=0.04), schema, params
+    )
+    warm_rate = abs(float(schema.get(warm, "acetaldehyde")))
+    cold_rate = abs(float(schema.get(cold, "acetaldehyde")))
+    assert warm_rate > cold_rate > 0.0
+
+
+def test_reduction_gated_on_viable_yeast(params):
+    # Gated on VIABLE X (not X_dead), no flux term: with no live yeast the acetaldehyde is
+    # STRANDED — the borrowed ethanol carbon is never returned (the crash-at-peak behaviour).
+    schema = wine_schema()
+    stranded = AcetaldehydeReduction().derivatives(
+        0.0, _wine_y0(schema, x=0.0, acetaldehyde=0.04), schema, params
+    )
+    assert schema.get(stranded, "acetaldehyde") == 0.0
+    assert schema.get(stranded, "E") == 0.0
+
+
+def test_reduction_runs_without_sugar(params):
+    # NO flux term (unlike production): reduction must run during the rest, after sugar is
+    # gone. With S=0 but live yeast and acetaldehyde present, it still clears.
+    schema = wine_schema()
+    d = AcetaldehydeReduction().derivatives(
+        0.0, _wine_y0(schema, s=0.0, acetaldehyde=0.04), schema, params
+    )
+    assert schema.get(d, "acetaldehyde") < 0.0
+    assert schema.get(d, "E") > 0.0
+
+
+def test_reduction_zero_and_clamped_without_acetaldehyde(params):
+    schema = wine_schema()
+    empty = AcetaldehydeReduction().derivatives(
+        0.0, _wine_y0(schema, acetaldehyde=0.0), schema, params
+    )
+    negative = AcetaldehydeReduction().derivatives(
+        0.0, _wine_y0(schema, acetaldehyde=-1e-6), schema, params
+    )
+    assert schema.get(empty, "acetaldehyde") == 0.0
+    # A solver undershoot below zero cannot manufacture ethanol from a negative pool.
+    assert schema.get(negative, "acetaldehyde") == 0.0
+    assert schema.get(negative, "E") == 0.0
+
+
+# -- carbon: borrow then return is exactly neutral ----------------------------
+
+
+def test_production_then_reduction_is_carbon_neutral(params):
+    # The two Processes together move zero net carbon at equal magnitude: what production
+    # borrows from E, reduction can return — the whole buffer is a carbon no-op on E+pool.
+    schema = wine_schema()
+    y = _wine_y0(schema, acetaldehyde=0.04)
+    prod = AcetaldehydeProduction().derivatives(0.0, y, schema, params)
+    red = AcetaldehydeReduction().derivatives(0.0, y, schema, params)
+    for d in (prod, red):
+        moved = schema.get(d, "acetaldehyde") * _ACETALDEHYDE_C + schema.get(d, "E") * _ETHANOL_C
+        assert moved == pytest.approx(0.0, abs=1e-15)
+
+
+# -- acceptance: the emergent early peak, carbon closure, E preservation ------
+
+
+def _run(medium: str, celsius: float, days: float):
+    """Compile+integrate a default ferment; return trajectory, compiled scenario, and the
+    same run with the acetaldehyde Processes disabled (the buffer-off control)."""
+    if medium == "wine":
+        initial = {"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25}
+    else:
+        initial = {
+            "glucose_gpl": 12.0,
+            "maltose_gpl": 66.0,
+            "maltotriose_gpl": 12.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 1.0,
+        }
+    scenario = Scenario(
+        name=f"{medium}-acet",
+        medium=medium,
+        initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
+        duration_days=days,
+    )
+    compiled = compile_scenario(scenario, strict=True)
+    dur = compiled.t_span_h[1]
+    t_eval = np.linspace(0.0, dur, int(dur) + 1)
+    traj = simulate(
+        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h, t_eval=t_eval
+    )
+    assert traj.success, traj.message
+
+    off = compile_scenario(scenario, strict=True)
+    for n in ("acetaldehyde_production", "acetaldehyde_reduction"):
+        off.process_set.disable(n)
+    traj_off = simulate(off.process_set, off.param_values, off.y0, off.t_span_h, t_eval=t_eval)
+    assert traj_off.success, traj_off.message
+    return traj, traj_off, compiled
+
+
+@pytest.mark.parametrize(
+    ("medium", "celsius", "days"),
+    [("wine", 20.0, 21.0), ("beer", 18.0, 14.0)],
+)
+def test_acetaldehyde_produce_then_reabsorb_early_peak(medium, celsius, days):
+    # The defining emergent behaviour (verified empirically before this assertion, D-27):
+    # acetaldehyde rises to a peak DURING active fermentation and is then reduced to a low
+    # residual — the produce-then-reabsorb "green apple" transient, not a monotone pool.
+    traj, _, _ = _run(medium, celsius, days)
+    t_days = traj.t / 24.0
+    acet_mgl = np.asarray(traj.series("acetaldehyde")) * 1000.0  # g/L → mg/L
+    peak_i = int(np.argmax(acet_mgl))
+    peak = float(acet_mgl[peak_i])
+    final = float(acet_mgl[-1])
+
+    # Peak is a real, non-trivial excursion in the observed range (wine ~30-80, beer peaks
+    # ~20-40 mg/L; threshold ~10-25 mg/L green apple) — the band carries margin.
+    assert 10.0 < peak < 100.0, f"{medium} peak {peak:.1f} mg/L off-range"
+    # The peak is EARLY — during active fermentation, well before the end.
+    assert float(t_days[peak_i]) < 0.4 * days, (
+        f"{medium} peak at day {t_days[peak_i]:.1f} not early"
+    )
+    # Reabsorbed: the final residual is a small fraction of the peak (yeast reduced it back).
+    assert final < 0.1 * peak, f"{medium} final {final:.2f} not reabsorbed below peak {peak:.1f}"
+    assert_nonnegative(traj, ("acetaldehyde",), atol=1e-12)
+
+
+def test_carbon_closes_on_a_compiled_run():
+    # With the acetaldehyde buffer wired into the default medium (D-27), a full compiled
+    # ferment still conserves carbon to machine precision — the borrow/return is entirely on
+    # the weighted E+acetaldehyde ledger (no sugar/CO2 term). Non-trivial because the pool
+    # actually accumulates to ~40 mg/L mid-ferment.
+    traj, _, compiled = _run("wine", 20.0, 21.0)
+    f_c = compiled.param_values["biomass_C_fraction"]
+    assert_conserved(
+        traj, total_carbon(compiled.schema, biomass_carbon_fraction=f_c), label="carbon"
+    )
+
+
+@pytest.mark.parametrize(
+    ("medium", "celsius", "days"), [("wine", 20.0, 21.0), ("beer", 18.0, 14.0)]
+)
+def test_ethanol_endpoint_is_preserved_by_the_buffer(medium, celsius, days):
+    # THE HEADLINE GUARANTEE (D-27): because acetaldehyde is a transient buffer that borrows
+    # ethanol carbon and returns it, the final ethanol matches the buffer-off core to a
+    # relative ~1e-8 (the pool fully reduces back), so the §2.2 ABV / realised-yield
+    # benchmarks are preserved to far below any tolerance — the failure mode a draw-from-sugar
+    # model does NOT avoid (it adds net-new ethanol scaling with pool turnover). Not bit-exact
+    # only because ethanol feeds the ethanol-inactivation viability brake, so the transient E
+    # dip perturbs the *path* at second order (see below); the endpoint reconverges once the
+    # pool is reduced.
+    traj, traj_off, _ = _run(medium, celsius, days)
+    e_on = float(traj.series("E")[-1])
+    e_off = float(traj_off.series("E")[-1])
+    assert e_on == pytest.approx(e_off, rel=1e-6), f"{medium} E endpoint on={e_on} off={e_off}"
+
+    # The buffer touches ONLY acetaldehyde and E at the derivative level (the closed-form unit
+    # tests pin dS=dCO2=dN=0). So the other core outputs move only through the second-order
+    # E→viability feedback above — a tiny path difference, not a direct draw — and the ferment
+    # still completes to the same endpoints (compared here, not pointwise: a sub-hour timing
+    # shift during the steep sugar crash makes a fixed-t path comparison spuriously large).
+    def final_total(t: object, name: str) -> float:
+        arr = np.asarray(t.series(name))  # type: ignore[attr-defined]
+        arr = arr if arr.ndim == 1 else arr.sum(axis=0)
+        return float(arr[-1])
+
+    for var in ("S", "CO2", "N"):
+        on = final_total(traj, var)
+        off = final_total(traj_off, var)
+        assert on == pytest.approx(off, rel=1e-3, abs=1e-6), (
+            f"{medium} {var} endpoint on={on} off={off}"
+        )
+
+
+def test_ethanol_carries_a_transient_dip_while_buffered():
+    # The honest flip side of the endpoint guarantee: DURING the ferment ethanol sits a hair
+    # below the buffer-off core (carbon held as acetaldehyde), recovering as reduction
+    # completes. Tiny (~0.04 g/L against ~118 g/L) and in the safe direction.
+    traj, traj_off, _ = _run("wine", 20.0, 21.0)
+    e_on = np.asarray(traj.series("E"))
+    e_off = np.asarray(traj_off.series("E"))
+    dip = e_off - e_on
+    assert dip.max() > 0.0  # there IS a dip while acetaldehyde is elevated
+    assert dip.max() < 0.5  # but it is negligible beside the ~118 g/L ethanol
+
+
+# -- tier propagation ---------------------------------------------------------
+
+
+def test_production_output_tier_is_speculative(store):
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AcetaldehydeProduction()])
+    assert ps.tier_of("acetaldehyde") is Tier.SPECULATIVE
+    assert ps.tier_of("acetaldehyde", store.tier_map()) is Tier.SPECULATIVE
+
+
+def test_reduction_output_tier_is_speculative(store):
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AcetaldehydeReduction()])
+    assert ps.tier_of("acetaldehyde") is Tier.SPECULATIVE
+    assert ps.tier_of("acetaldehyde", store.tier_map()) is Tier.SPECULATIVE
+
+
+def test_ethanol_tier_reflects_the_speculative_buffer(store):
+    # The always-on speculative production is the FIRST byproduct Process to WRITE ethanol E
+    # (esters/fusels/VDK touch S/CO2, MLF is disabled unpitched), so it drops the *structural*
+    # tier_of("E") PLAUSIBLE→SPECULATIVE — the exact D-26 CO2 parallel, pinned here so it can
+    # never regress silently (prime directive #1). Honest: E now genuinely holds a speculative
+    # buffered slice. Crucially the param-aware tier users SEE is UNCHANGED — already
+    # speculative, because the uptake Process itself reads speculative params (E_a_uptake,
+    # realised-yield).
+    schema = wine_schema()
+    tm = store.tier_map()
+    core = ProcessSet(schema, [SugarUptakeToEthanolCO2()])  # the validated ethanol producer
+    with_buffer = ProcessSet(schema, [SugarUptakeToEthanolCO2(), AcetaldehydeProduction()])
+    # Structural tier: PLAUSIBLE for the core alone, dropping to SPECULATIVE with the buffer.
+    assert core.tier_of("E") is Tier.PLAUSIBLE
+    assert with_buffer.tier_of("E") is Tier.SPECULATIVE
+    # Param-aware tier (what users see): SPECULATIVE either way — no headline change.
+    assert core.tier_of("E", tm) is Tier.SPECULATIVE
+    assert with_buffer.tier_of("E", tm) is Tier.SPECULATIVE

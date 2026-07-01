@@ -103,6 +103,14 @@ def total_carbon(
         w[schema.slice("diacetyl")] = carbon_mass_fraction("diacetyl")
     if "butanediol" in schema:
         w[schema.slice("butanediol")] = carbon_mass_fraction("butanediol")
+    # Acetaldehyde (decision D-27): a transient buffer on the main pathway. Production
+    # borrows carbon from ethanol (E) and reduction returns it, both mole-for-mole C2 → C2,
+    # so weighting acetaldehyde at its own carbon fraction keeps that borrow/return
+    # carbon-neutral and total_carbon closed to machine precision through the produce-then-
+    # reabsorb course. No sugar/CO2 term is involved — acetaldehyde de-lumps the uptake
+    # Process's existing sugar→ethanol step rather than adding a parallel pathway.
+    if "acetaldehyde" in schema:
+        w[schema.slice("acetaldehyde")] = carbon_mass_fraction("acetaldehyde")
     # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
     # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
     # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that
