@@ -20,6 +20,7 @@ from fermentation.core.kinetics.byproducts import (
     EsterVolatilization,
     FuselAlcoholsEhrlich,
 )
+from fermentation.core.kinetics.carrying_capacity import BiomassCarryingCapacity
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited
 from fermentation.core.kinetics.hydrogen_sulfide import HydrogenSulfideProduction
 from fermentation.core.kinetics.inactivation import EthanolInactivation
@@ -40,6 +41,7 @@ __all__ = [
     "AcetaldehydeReduction",
     "AcetolactateDecarboxylation",
     "AcetolactateExcretion",
+    "BiomassCarryingCapacity",
     "DiacetylReduction",
     "ArrheniusTemperature",
     "EsterSynthesis",

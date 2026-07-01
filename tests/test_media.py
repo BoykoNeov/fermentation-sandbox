@@ -186,17 +186,26 @@ EXPECTED_PROCESSES = {
         | H2S_PROCESSES
     ),
 }
-EXPECTED_MODIFIERS = {"arrhenius_growth", "arrhenius_uptake"}
+# Per-rate Arrhenius modifiers wire into both media. Wine additionally carries the opt-in
+# biomass carrying-capacity cap (decision D-30) — enabled in a bare build, but disabled at the
+# compile seam unless a scenario passes carrying_capacity_gpl, so an undosed wine run is
+# byte-for-byte the validated core (the wine-only MLF *modifier* parallel).
+CARRYING_CAPACITY_MODIFIER = "biomass_carrying_capacity"
+EXPECTED_MODIFIERS = {
+    "wine": {"arrhenius_growth", "arrhenius_uptake", CARRYING_CAPACITY_MODIFIER},
+    "beer": {"arrhenius_growth", "arrhenius_uptake"},
+}
 
 
 @pytest.mark.parametrize("medium", ["wine", "beer"])
 def test_registered_media_wire_the_full_kinetic_set(medium):
     # Wine and beer share the validated core + Tier-2 aroma byproducts (only the sugar
     # vector differs, and beer's sequential uptake lives inside the uptake Process). Wine
-    # additionally carries the malolactic Process (D-23); beer does not (no malic/lactic).
+    # additionally carries the malolactic Process (D-23) and the opt-in carrying-capacity
+    # modifier (D-30); beer does not (no malic/lactic; carrying cap is wine-only in v1).
     pset = get_medium(medium).build_process_set(strict=True)
     assert {p.name for p in pset.active} == EXPECTED_PROCESSES[medium]
-    assert {m.name for m in pset.active_modifiers} == EXPECTED_MODIFIERS
+    assert {m.name for m in pset.active_modifiers} == EXPECTED_MODIFIERS[medium]
 
 
 def test_each_build_returns_fresh_kinetic_instances():

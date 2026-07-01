@@ -299,5 +299,23 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         makes ~1.8× more H₂S by day 1 despite *less* biomass. SCOPE: produced-only (cumulative
         produced, overstates residual; CO₂-stripping sink deferred — the D-19→D-20 precedent).
         15 new tests; **364 green** + 5 benchmark, ruff+mypy clean.
+  - [x] **Residual-nitrogen floor — opt-in biomass carrying-capacity cap (decision D-30).
+        LANDED 2026-07-01.** Closes the nitrogen gap that muted D-29: growth is the sole N sink
+        and strips YAN to ~0 by day ~1.3 regardless of dose. New `BiomassCarryingCapacity`
+        RateModifier scales growth's whole contribution by a logistic `clamp(1−X/K, 0, 1)` (K =
+        `biomass_carrying_capacity`), so biomass saturates below the N ceiling and dose-dependent
+        residual YAN survives — with `dN=−f_N·dX` preserved, carbon+nitrogen still close.
+        **OPT-IN / disabled by default:** a residual-N floor is a fundamental DEPARTURE from the
+        Coleman anchor (which caps nothing; turning it on in default wine breaks the reconstruction
+        RMSE gate at 80 *and* 330 mg/L), so it is wired into wine but the compile seam DISABLES it
+        unless a scenario passes `carrying_capacity_gpl`. Disabled ⇒ factor 1 + excluded from
+        tiers ⇒ undosed wine byte-for-byte the core (exact 0.0) and growth stays PLAUSIBLE; opt in
+        ⇒ structural tier drops to speculative (no param-aware headline — growth already reads
+        speculative `K_s`). Emergent: H₂S cross-must lever restored (monotone in dose, span widens
+        materially vs the muted core) and dose-dependent residual YAN. New speculative
+        `biomass_carrying_capacity=2.5 g/L` (author estimate) in `wine_generic.yaml` + optional
+        `carrying_capacity_gpl` scenario key (overrides for sweeps). SCOPE: wine-only (beer
+        deferred); MLF-unblock is PROSPECTIVE (MLF v1 has no N gate). 16 new tests; **380 green** +
+        5 benchmark, ruff+mypy clean. Full record in **DECISIONS → D-30**.
   - [ ] **MLF-derived diacetyl** — *Oenococcus* from citrate, a real coupling now that MLF
         exists (D-23). Deferred out of the D-26 v1 (yeast-pathway only).

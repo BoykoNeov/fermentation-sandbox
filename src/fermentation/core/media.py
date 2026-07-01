@@ -66,6 +66,7 @@ from fermentation.core.kinetics import (
     AcetolactateDecarboxylation,
     AcetolactateExcretion,
     ArrheniusTemperature,
+    BiomassCarryingCapacity,
     DiacetylReduction,
     EsterSynthesis,
     EsterVolatilization,
@@ -408,6 +409,20 @@ _H2S_PROCESSES: tuple[Callable[[], Process], ...] = (HydrogenSulfideProduction,)
 #: ``malic``/``lactic`` slots, so it is never wired there.
 _MLF_PROCESSES: tuple[Callable[[], Process], ...] = (MalolacticConversion,)
 
+#: Biomass carrying-capacity cap (wine-only, decision D-30): the opt-in residual-nitrogen
+#: floor. A logistic ``(1 - X/K)`` RateModifier on growth that saturates biomass below the
+#: nitrogen ceiling, leaving a dose-dependent residual of yeast-assimilable nitrogen — which
+#: restores the D-29 cross-must H₂S inverse-N lever (muted in the core because growth strips
+#: YAN to ~0 at every dose). A residual-N floor is a deliberate DEPARTURE from the validated
+#: Coleman 2007 anchor (which caps nothing; ``test_coleman_reconstruction`` pins the match at
+#: 80 *and* 330 mg N/L), so — like the *dosed* MLF organism and unlike the always-on intrinsic
+#: aroma pools — it is kept in its own tuple and the compile seam DISABLES it unless a scenario
+#: opts in via ``carrying_capacity_gpl``. Disabled ⇒ factor 1 *and* excluded from tier
+#: derivation, so an undosed wine run is byte-for-byte the validated core and growth stays
+#: PLAUSIBLE. Wine-only in v1 (the H₂S lever and the prospective MLF-with-growth model are wine
+#: concerns), mirroring the wine-only MLF wiring; beer carrying capacity is deferred.
+_CARRYING_CAPACITY_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (BiomassCarryingCapacity,)
+
 
 #: The registry of known media. Adding a beverage family = adding an entry here
 #: (and, at the I/O boundary, an initial-composition vocabulary in
@@ -424,7 +439,7 @@ MEDIA: dict[str, Medium] = {
             + _H2S_PROCESSES
             + _MLF_PROCESSES
         ),
-        modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
+        modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),
     "beer": Medium(
         name="beer",

@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fermentation.core import acidbase
-from fermentation.core.kinetics import MalolacticConversion
+from fermentation.core.kinetics import BiomassCarryingCapacity, MalolacticConversion
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -91,6 +91,8 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
         # strong cation is back-solved from initial_ph, not given. so2_total_mgl is the
         # optional total-SO₂ dose for the free/bound + molecular-SO₂ readout (D-22/D-28);
         # mlf_pitch_gpl is the optional Oenococcus oeni dose driving malolactic conversion (D-23).
+        # carrying_capacity_gpl is the optional opt-in biomass cap K that enables the
+        # residual-nitrogen floor (D-30); absent ⇒ the cap modifier is disabled (core untouched).
         {
             "brix",
             "yan_mgl",
@@ -101,6 +103,7 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "initial_ph",
             "so2_total_mgl",
             "mlf_pitch_gpl",
+            "carrying_capacity_gpl",
         }
     ),
     "beer": frozenset(
@@ -343,6 +346,35 @@ def _apply_nitrogen_dependent_yield(scenario: Scenario, parameters: ParameterSet
     return parameters.merge(ParameterSet([override]), override=True)
 
 
+def _override_carrying_capacity(parameters: ParameterSet, cap_gpl: float) -> ParameterSet:
+    """Override the reference ``biomass_carrying_capacity`` with a scenario opt-in value.
+
+    Only reached when a wine scenario passes ``carrying_capacity_gpl > 0`` (decision D-30),
+    so the biomass cap modifier is enabled and its cap ``K`` is the scenario's value rather
+    than the YAML reference — letting a demonstration sweep the cap. Keeps the reference
+    parameter's units/tier/uncertainty (the form and confidence are unchanged; only the
+    operating point moves) and records the override in provenance for the audit trail.
+    """
+    base = parameters["biomass_carrying_capacity"]
+    override = Parameter(
+        name="biomass_carrying_capacity",
+        value=cap_gpl,
+        unit=base.unit,
+        tier=base.tier,
+        uncertainty=base.uncertainty,
+        provenance=Provenance(
+            source=base.provenance.source,
+            doi=base.provenance.doi,
+            conditions=(
+                f"scenario opt-in override (decision D-30): carrying_capacity_gpl={cap_gpl:g} g/L, "
+                f"replacing the {base.value:g} g/L YAML reference"
+            ),
+            notes=base.provenance.notes,
+        ),
+    )
+    return parameters.merge(ParameterSet([override]), override=True)
+
+
 def compile_scenario(
     scenario: Scenario,
     *,
@@ -390,6 +422,22 @@ def compile_scenario(
         mlf_pitch_gpl = float(scenario.initial.get("mlf_pitch_gpl", 0.0) or 0.0)
         if mlf_pitch_gpl <= 0.0:
             process_set.disable(MalolacticConversion.name)
+
+    # Residual-nitrogen floor (decision D-30): the biomass carrying-capacity cap is a
+    # deliberate DEPARTURE from the validated Coleman anchor (which caps nothing and strips
+    # YAN to zero at every dose), so it ships OPT-IN. Absent ``carrying_capacity_gpl`` ⇒
+    # DISABLE the modifier so (a) growth's whole contribution is unscaled (factor 1) and the
+    # run is byte-for-byte the validated core, and (b) the enabled-but-inert modifier does not
+    # drag growth's X/S/N outputs from PLAUSIBLE to speculative (``tier_of`` counts enabled,
+    # not nonzero, modifiers — the exact MLF *tier* isolability argument above). Opted in ⇒
+    # enable it and override the reference cap with the scenario's value so demonstrations can
+    # sweep K; growth's outputs then honestly report speculative.
+    if BiomassCarryingCapacity.name in process_set:
+        cap_gpl = float(scenario.initial.get("carrying_capacity_gpl", 0.0) or 0.0)
+        if cap_gpl <= 0.0:
+            process_set.disable(BiomassCarryingCapacity.name)
+        else:
+            parameters = _override_carrying_capacity(parameters, cap_gpl)
 
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 

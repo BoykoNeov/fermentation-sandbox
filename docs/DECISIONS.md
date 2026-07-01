@@ -1859,6 +1859,78 @@ benchmark, ruff + mypy clean. **Next in §3.2:** the aroma beat is essentially c
 fusels, VDK/diacetyl, acetaldehyde, SO₂ speciation, H₂S); candidates are the H₂S CO₂-stripping
 sink or the residual-N floor (which would make this beat's cross-must lever real).
 
+## D-30 — Residual-nitrogen floor: an opt-in biomass carrying-capacity cap on growth
+
+**Status: IMPLEMENTED 2026-07-01** (380 green + 5 benchmark, ruff + mypy clean). The D-29 forward
+note's "residual-N floor" candidate, chosen to make the muted H₂S cross-must lever real. Closes
+the nitrogen-model gap surfaced repeatedly since D-23: `GrowthNitrogenLimited` is the **sole**
+nitrogen sink and its only shutoff is a tiny-`K_n` Monod term, so a wine ferment builds
+`X ≈ X0 + N0/f_N` and strips yeast-assimilable nitrogen (YAN) to ~0 by **day ~1.3 regardless of
+dose**. That erases every downstream low-N signal — most visibly the D-29 H₂S inverse-N gate,
+which reads `N→0` for every must (lever muted to ~5 %).
+
+**The mechanism — a logistic carrying-capacity RateModifier.** Real yeast populations saturate
+*below* the nitrogen ceiling (oxygen/sterol limitation, density effects), leaving YAN unconsumed.
+The textbook lumped form is a logistic cap: growth slows as biomass `X` nears a capacity `K` and
+stops at it. Because this **scales** an existing flux rather than adding one, it is a
+`RateModifier` (`core.kinetics.carrying_capacity.BiomassCarryingCapacity`), not a summed Process:
+
+    factor(X) = clamp(1 − X/K,  0, 1)        K = biomass_carrying_capacity
+
+multiplied onto `GrowthNitrogenLimited`'s **whole** contribution by `ProcessSet`. Linear `1−X/K`
+(not the smoothed `(1−·)**n` ethanol wall) is deliberate — `X` self-limits (growth→0 as `X→K`),
+so the state never gets driven past the wall and there is no derivative kink; the `[0,1]` clamp
+still guards a solver overshoot `X>K` from flipping the factor negative (which would make growth a
+biomass/nitrogen *source*). **Conservation is automatic:** scaling growth's whole contribution by
+one scalar preserves `dN = −f_N·dX` and the proportional carbon-skeleton draw, so `total_nitrogen`
+and `total_carbon` still close to solver tolerance with the cap on (`test_carbon_and_nitrogen_
+close_with_the_cap_on`) — the nitrogen simply stays in the `N` pool once growth saturates. This is
+the crux that makes a cap the right vehicle: less biomass, exact balances, residual N left behind.
+
+**Why OPT-IN, not default — the fundamental Coleman conflict.** Coleman, Fish & Block (2007), the
+keystone wine model, has **no** biomass cap: it consumes all YAN and builds full N-proportional
+biomass at every dose, and `test_coleman_reconstruction` confirms our core reproduces that
+line-for-line at 80 **and** 330 mg N/L. A pre-check (the D-26 checkpoint discipline: measure
+before writing) established the tension is **not** a mechanism artifact but fundamental —
+*restoring the H₂S lever requires residual **assimilable** N that differs by dose, which means not
+consuming it, which means departing from Coleman's zero-residual biomass curve.* No mechanism
+escapes this (a non-assimilable/proline split keeps Coleman intact but leaves assimilable N at
+zero ⇒ lever still muted). The measured cost of turning the cap on in the default wine: Coleman
+RMSE 1.35→up to 9.35 (80 mg/L) and 1.20→up to 27.84 (330 mg/L) vs the <2.0 gate. So per prime
+directive #3 the cap ships **isolable and disabled by default**: wired into the wine medium but
+the compile seam **disables** it unless a scenario opts in via `carrying_capacity_gpl`. Disabled ⇒
+factor 1 **and** excluded from tier derivation (`ProcessSet` counts enabled, not nonzero,
+modifiers — the wine-only MLF *tier* isolability argument, extended to the multiplicative path),
+so an undosed wine run is **byte-for-byte the validated core** (verified *exactly* 0.0 across
+states, `test_disabled_cap_equals_the_uncapped_rhs_exactly`) and growth stays PLAUSIBLE. Opt in
+and growth's `X`/`S`/`N` **structural** tier drops PLAUSIBLE→SPECULATIVE, honestly flagging the
+departure — no param-aware headline (growth already reads the speculative `K_s`, the D-26/D-27
+pattern). Coleman reconstruction, §2.2 dryness/ABV, fusel/ester benchmarks all untouched.
+
+**Provenance + seam.** New `biomass_carrying_capacity` in `wine_generic.yaml` (**speculative**,
+`author estimate`, `2.5 g/L`, band `[2.0, 5.0]` — the cap must bite below the ~2.6–3.0 g/L
+uncapped biomass to leave residual). The value 2.5 is the pre-check cap that restored the lever
+while leaving ~0 residual at low YAN (the correct clinical picture). New optional wine scenario
+key `carrying_capacity_gpl`: **presence enables** the modifier; its value **overrides** the YAML
+reference (so a demonstration can sweep `K`), injected at the compile seam via
+`_override_carrying_capacity` (mirrors the D-14 N-yield override).
+
+**Emergent, verified.** With the cap on (K=2.5): the H₂S endpoint is monotone in dose
+(80 > 150 > 300 mg/L YAN) and its **span widens materially versus the muted core**
+(`test_cap_restores_the_h2s_cross_must_lever`, asserted as ordering + ratio, not brittle absolute
+values); a **dose-dependent residual YAN** survives — low-YAN musts still (nearly) exhaust N while
+high-YAN musts end well above (`test_cap_leaves_dose_dependent_residual_nitrogen`), the correct
+clinical picture the core (~0 at every dose) cannot show. A capped wine still ferments to dryness
+(`test_opt_in_wine_still_reaches_dryness` — less biomass slows the tail but per-cell uptake keeps
+going).
+
+**Scope (v1) / honesty.** **Wine-only** (the H₂S lever and the prospective MLF-with-growth model
+are wine concerns), mirroring the wine-only MLF wiring; beer carrying capacity is deferred. The
+**MLF unblock is PROSPECTIVE, not delivered**: MLF v1 is conversion-only with pH/ethanol/
+molecular-SO₂/cardinal-T gates and **no nitrogen gate** (D-23), so residual N does *not* change
+current MLF behaviour — it enables a *future* MLF-with-growth model. 16 new tests. Next §3.2
+candidate remaining: the H₂S CO₂-stripping sink.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -1872,10 +1944,13 @@ sink or the residual-N floor (which would make this beat's cross-must lever real
   out by the CO₂ stream to µg/L). Add a Henry's-law/gas-flow stripping sink into an `h2s_gas`
   bookkeeping pool — the exact ester D-19 → D-20 precedent (but simpler: carbon-free, so no
   ledger weighting).
-- **Residual-nitrogen / satiation floor** (surfaced in D-23, load-bearing for D-29): the growth
-  Process strips lumped `N` to ~0 regardless of dose (real musts retain ~50–150 mg/L + proline).
-  This mutes the D-29 cross-must H₂S lever (and the MLF-growth beat, D-23). A residual-N floor
-  (or an explicit proline/non-assimilable pool) would make the low-vs-high-YAN H₂S difference
-  real at the cumulative endpoint, not just early.
+- ~~**Residual-nitrogen / satiation floor**~~ — **partially addressed in D-30** (opt-in biomass
+  carrying-capacity cap): a scenario passing `carrying_capacity_gpl` leaves dose-dependent residual
+  YAN and restores the D-29 H₂S lever. **Still deferred:** a *default-on* residual-N model, which is
+  blocked by the fundamental Coleman conflict (D-30) — Coleman consumes all YAN at every dose, so a
+  default residual floor departs from the validated anchor. The real fix is a nitrogen-model
+  redesign (explicit assimilable vs proline/non-assimilable pools + a satiation floor), not a cap
+  bolted onto the Coleman-anchored core. Until then the residual-N lever is opt-in only, and the
+  MLF-with-growth beat (D-23) stays blocked (MLF v1 has no N gate anyway).
 - **Packaged parameter-data access:** tests read YAML via filesystem path. If we
   ship a wheel that must read its own data, switch to `importlib.resources`.

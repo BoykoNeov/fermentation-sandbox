@@ -164,6 +164,16 @@ ethanol_inhibition_exponent:
     conditions: "generic S. cerevisiae; Levenspiel 1980 / Luong 1985 inhibition form"
     notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. n=1 is the raw linear (Ghose-Tyagi) form with a derivative kink at E_max; de Andres-Toro et al. 1998 use exactly this n=1 wall (f = 1 - E/(0.5*S0)) for beer. We keep n=2 so the touchdown is C1-smooth for the BDF solver and gives a 'tolerant then collapse' viability shape; the form has literature backing but the exponent itself is our numerical choice, hence speculative."
 
+biomass_carrying_capacity:
+  value: 2.5
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 2.0, high: 5.0, note: "cap must bite below the ~2.6-3.0 g/L uncapped biomass (X0 + N0/f_N) to leave residual YAN; higher = less residual" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae wine ferment; opt-in residual-nitrogen floor (decision D-30)"
+    notes: "Carrying-capacity cap K in the logistic factor (1 - X/K) that BiomassCarryingCapacity multiplies onto GrowthNitrogenLimited (decision D-30). OPT-IN ONLY: the modifier is wired into the wine medium but the compile seam DISABLES it unless a scenario passes carrying_capacity_gpl, so an undosed run is byte-for-byte the validated Coleman-anchored core and this value is not read there. A residual-N floor is a deliberate DEPARTURE from Coleman 2007 (which caps nothing and strips YAN to zero at every dose - see test_coleman_reconstruction), hence speculative and off-by-default. The value 2.5 g/L was chosen in a pre-check as the cap that restores the D-29 cross-must H2S lever (~1.8x span across 80-300 mg N/L) while leaving ~0 residual at low YAN (the correct clinical picture); scenarios may override it via carrying_capacity_gpl to sweep. Form (logistic) is textbook; the value is an estimate."
+
 # -- Ethanol-driven cell inactivation (the timescale brake, decision D-13) -----
 # Coleman split biomass into active cells X_A and modelled an ethanol-proportional
 # specific death rate (their eqs 2, 7): dX_A/dt = mu*X_A - k_d*X_A, k_d = k'_d*E.
