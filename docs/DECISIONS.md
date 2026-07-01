@@ -1931,6 +1931,87 @@ molecular-SO₂/cardinal-T gates and **no nitrogen gate** (D-23), so residual N 
 current MLF behaviour — it enables a *future* MLF-with-growth model. 16 new tests. Next §3.2
 candidate remaining: the H₂S CO₂-stripping sink.
 
+## D-31 — MLF-derived diacetyl: *Oenococcus oeni* citrate co-metabolism + bacterial reduction
+
+**Status: IMPLEMENTED 2026-07-01** (395 green + 5 benchmark). The real coupling MLF (D-23) makes
+available and the deferred half of the diacetyl story (D-26 built the *yeast* valine-pathway
+diacetyl only). Alongside malate, *O. oeni* co-metabolises **citric acid**, overflowing
+α-acetolactate that decarboxylates to **diacetyl** — the buttery note that defines many post-MLF
+(esp. barrel-aged Chardonnay) wines, and a real winemaking control point (co-inoculation, lees
+contact, and post-MLF SO₂ timing all move it). Two new *O. oeni* Processes in
+`core/kinetics/malolactic.py`, wired into the wine-only `_MLF_PROCESSES` tuple and disabled with
+the malate conversion at the compile seam when *O. oeni* is un-pitched.
+
+**Owner decisions (the three forks put up front, discuss-before-build).** (a) **citrate is a must
+input** (`citrate_gpl`, like `malic`/`tartaric`), so the level is a per-scenario lever; (b) the
+carbon routes **via the shared α-acetolactate reservoir** (`citrate → α-acetolactate + CO₂`),
+reusing the always-on D-26 decarboxylation + reduction so diacetyl *emerges* rather than being a
+second pathway; (c) **add O. oeni's own diacetyl reduction now** (not deferred), so lees-contact
+clearing is modelled.
+
+**Why a citrate pool at all (the load-bearing scope decision).** MLF-diacetyl is a late-MLF,
+often **post-dryness** phenomenon, so its carbon **cannot** come from sugar: the yeast VDK
+stand-in draws α-acetolactate carbon out of `S` via `draw_carbon_from_sugar`, which correctly
+**no-ops at `S=0`** — sourcing from an empty sugar pool would either strand carbon (breaking
+`total_carbon` closure) or stop diacetyl production exactly when this beat needs it. Citrate is
+present independent of sugar, so a dosed `citrate` slot (C6H8O7, added to `chemistry.py`,
+`total_carbon`, the wine schema, and the compile vocabulary) is the **floor** for honest carbon
+closure here, not scope creep (the advisor's decisive framing, confirming the finding).
+
+**Stoichiometry is a lumped fiction — owned.** `MalolacticCitrateMetabolism`:
+`d(citrate) = −r_c·M_citric`, `d(acetolactate) = +r_c·M_acetolactate`, `d(CO2) = +r_c·M_CO2` with
+`r_c = k_citrate·X_mlf·[citrate]/(K_citrate+[citrate])·gate`. Citric acid (6 C) → α-acetolactate
+(5 C) + CO₂ (1 C), so **carbon closes mole-for-mole (6 = 5 + 1)** on the existing ledger, exactly
+like malic → lactic + CO₂ (D-23). *Mass* carries a small gap (192.124 ≠ 132.116 + 44.009), so
+carbon is the invariant (as for the VDK decarb / beer hydrolysis water, D-8). CAVEAT: real citrate
+metabolism is `citrate → acetate + oxaloacetate → pyruvate + CO₂`, ~2 citrate per α-acetolactate,
+with **acetate** (a volatile-acidity contributor) the *dominant* co-product. The single-reaction
+stand-in drops the acetate/lactate branches; `k_citrate` is held **low so citrate stays mostly
+unconsumed** (~6 % at the reference dose) — the *trace diacetyl branch only*, which keeps the
+fiction honest (we do not claim to resolve citrate's full fate).
+
+**Rate — citrate's own Monod × the SHARED environmental gate (NOT malate's `r`).** A new helper
+`malolactic_environmental_gate` factors out `g_pH·g_EtOH·g_SO₂·γ(T)`, now called by *both* the
+malate conversion (a byte-equivalent refactor) and the citrate branch — so SO₂/ethanol/low-pH
+arrest citrate metabolism just as they arrest MLF. Coupling to citrate (not the malate turnover)
+is deliberate: malate's rate → 0 at malate depletion, which would kill exactly the post-malate
+diacetyl peak this pool exists to capture. Each Process solves pH once (a second `brentq` only on
+dosed runs — acceptably cheap, not optimised away).
+
+**Bacterial reduction (owner's fork c).** `OenococcusDiacetylReduction`:
+`L = k_mlf_diacetyl_reduction·X_mlf·f(T)·[diacetyl]` (shared `E_a_reduction`), a mole-for-mole
+C4 → C4 transfer to `butanediol` like the yeast reducer (D-26). It **complements** the yeast
+`DiacetylReduction`: in co-inoculation the yeast (higher rate × biomass) clears diacetyl fast
+while viable; this bacterial reducer keeps clearing it after the yeast is ethanol-inactivated, as
+long as *O. oeni* is present — the realistic lees-contact clean-up, and the reason removing the
+bacteria (SO₂ / racking) locks diacetyl in. **Consequence flagged (advisor):** with *O. oeni*
+dosed, MLF-diacetyl is **not permanently stranded** in v1 (`X_mlf` is a constant, never killed);
+the "package/rack early ⇒ diacetyl locked in" case needs a racking event to remove `X_mlf`,
+deferred to the event loop with the bacterial death/arrest gate (as for MLF conversion, D-23).
+
+**Emergent, verified.** Dosing *O. oeni* + citrate lifts wine diacetyl clearly above the
+yeast-only baseline (peak ~0.28 vs ~0.10 mg/L, ~2.8×, into the buttery range above the ~0.2 mg/L
+threshold), with a **late peak** (~day 5–6, via the reservoir decarb lag, past the early
+low-ethanol conversion window) that then **falls** as reduction clears it — the buttery-then-
+cleaning-up MLF signature. A larger *O. oeni* dose leaves a lower final/peak ratio (bacterial
+clearing). `total_carbon` closes to machine precision throughout.
+
+**Isolability (prime directive #3).** Both Processes are in the dosed, disabled-when-unpitched
+`_MLF_PROCESSES` tuple: an un-pitched (or citrate-free) wine run is **byte-for-byte** the prior
+core, and citrate dosed *without* O. oeni sits inert (diacetyl matches the yeast-only baseline).
+`citrate` keeps its **VALIDATED** tier when un-pitched (nothing active touches it) and drops to
+**speculative** when dosed — the exact `malic`/`lactic` pattern (D-23). All new params
+(`k_citrate`, `K_citrate`, `k_mlf_diacetyl_reduction`) are **speculative** order-of-magnitude
+estimates in `wine_generic.yaml`; both Processes are speculative (`acetolactate`/`diacetyl` were
+already speculative from the yeast VDK pathway, so no new tier headline). Citrate is **carbon-
+active but not charge-active** — kept out of the D-18 pH balance in v1 (a scoped omission the
+inverse anchoring absorbs at t=0, as for SO₂'s bisulfite charge, D-22). 14 new tests.
+
+**Scope (v1) / deferred.** The dominant citrate → acetate/lactate branches and full citrate
+depletion (the single-reaction stand-in); the bacterial arrest/death gate and a racking event
+(so "SO₂ locks diacetyl in" and permanent stranding are not yet demonstrable); citrate in the pH
+charge balance. These follow the MLF-with-growth beat (D-23) and the event loop.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

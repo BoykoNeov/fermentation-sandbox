@@ -1,4 +1,15 @@
-"""Malolactic fermentation (MLF) v1 — conversion-only (decision D-23).
+"""Malolactic fermentation (MLF) — malate conversion (D-23) + citrate → diacetyl (D-31).
+
+This module holds the *Oenococcus oeni* Processes. :class:`MalolacticConversion` (D-23) is the
+malate → lactate + CO2 deacidification. :class:`MalolacticCitrateMetabolism` and
+:class:`OenococcusDiacetylReduction` (D-31) add **MLF-derived diacetyl**: the bacterium
+co-metabolises citric acid into α-acetolactate (feeding the shared VDK reservoir, so diacetyl
+emerges from the existing D-26 machinery) and also reduces diacetyl on the lees. All three share
+the *O. oeni* environmental gate (:func:`malolactic_environmental_gate`) and the compile-seam
+isolability: they are disabled unless *O. oeni* is pitched, so an un-pitched wine run is
+byte-for-byte the validated core and the ``malic``/``lactic``/``citrate`` slots keep their
+VALIDATED tier. See :class:`MalolacticCitrateMetabolism` for the citrate-pool rationale (its
+carbon must survive past sugar-dryness) and the lumped carbon-closing stoichiometry.
 
 *Oenococcus oeni* converts L-malic acid (C4, diprotic) to L-lactic acid (C3,
 monoprotic) plus CO2, mole-for-mole. That single reaction deacidifies the wine
@@ -91,7 +102,16 @@ from fermentation.core.acidbase import (
     molecular_so2_at_ph,
     ph_of_state,
 )
-from fermentation.core.chemistry import M_CO2, M_LACTIC, M_MALIC
+from fermentation.core.chemistry import (
+    M_ACETOLACTATE,
+    M_BUTANEDIOL,
+    M_CITRIC,
+    M_CO2,
+    M_DIACETYL,
+    M_LACTIC,
+    M_MALIC,
+)
+from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -126,6 +146,54 @@ def cardinal_temperature_factor(temp: float, t_min: float, t_opt: float, t_max: 
     return float(numerator / denominator)
 
 
+#: The *O. oeni* environmental-gate parameters, shared by every MLF Process (the malate
+#: conversion and the citrate → diacetyl branch, D-31). Declared once so the two Processes'
+#: ``reads`` tuples and :func:`malolactic_environmental_gate` cannot drift apart.
+_MLF_GATE_READS: tuple[str, ...] = (
+    "pH_half_mlf",
+    "ethanol_tolerance_mlf",
+    "mlf_ethanol_exponent",
+    "molecular_so2_inhib_mlf",
+    "T_min_mlf",
+    "T_opt_mlf",
+    "T_max_mlf",
+)
+
+
+def malolactic_environmental_gate(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
+) -> float:
+    """The shared *O. oeni* environmental gate ``g_pH · g_EtOH · g_SO₂ · γ(T)`` ∈ [0, 1].
+
+    Every *O. oeni* activity — malate conversion (D-23) and citrate → diacetyl (D-31) — is
+    throttled by the *same* environment, so both Processes multiply their rate by this one
+    factor (a shared helper, decision D-31): the pH logistic (rises with pH), the Luong
+    ethanol wall, the molecular-SO₂ exponential, and the Rosso cardinal-temperature optimum.
+    The caller passes the *already-solved* ``ph`` (each Process solves it once via
+    :func:`ph_of_state`, after its cheap ``X_mlf``/substrate guards) so this helper never
+    triggers a second ``brentq``; molecular SO₂ is partitioned at that same pH. See the
+    module docstring for each term's form and sourcing.
+    """
+    gate_ph = 1.0 / (1.0 + 10.0 ** (params["pH_half_mlf"] - ph))
+
+    total_so2 = float(y[schema.slice(SO2_STATE_KEY)][0]) if SO2_STATE_KEY in schema else 0.0
+    if total_so2 > 0.0:
+        molecular_so2 = molecular_so2_at_ph(y, schema, params, ph)
+        gate_so2 = math.exp(-molecular_so2 / params["molecular_so2_inhib_mlf"])
+    else:
+        gate_so2 = 1.0
+
+    e = max(float(y[schema.slice("E")][0]), 0.0)
+    remaining = 1.0 - e / params["ethanol_tolerance_mlf"]
+    gate_eth = remaining ** params["mlf_ethanol_exponent"] if remaining > 0.0 else 0.0
+
+    temp = float(y[schema.slice("T")][0])
+    gamma_t = cardinal_temperature_factor(
+        temp, params["T_min_mlf"], params["T_opt_mlf"], params["T_max_mlf"]
+    )
+    return float(gate_ph * gate_eth * gate_so2 * gamma_t)
+
+
 class MalolacticConversion(Process):
     """Malolactic fermentation v1 — malate → lactate + CO2, catalyst-scaled and gated.
 
@@ -149,17 +217,7 @@ class MalolacticConversion(Process):
     #: SO₂ pKa parameters the gates read through ``acidbase`` are NOT listed (they are all
     #: plausible, and this Process is speculative, so the combined floor is unchanged —
     #: matching the convention that pKa dependence is reported via ``acidbase.ph_tier``).
-    reads: tuple[str, ...] = (
-        "k_mlf",
-        "K_mlf",
-        "pH_half_mlf",
-        "ethanol_tolerance_mlf",
-        "mlf_ethanol_exponent",
-        "molecular_so2_inhib_mlf",
-        "T_min_mlf",
-        "T_opt_mlf",
-        "T_max_mlf",
-    )
+    reads: tuple[str, ...] = ("k_mlf", "K_mlf", *_MLF_GATE_READS)
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -175,35 +233,158 @@ class MalolacticConversion(Process):
             return d
 
         # pH is solved once and reused by both the pH gate and the SO₂ partition (D-22/D-28):
-        # molecular_so2_at_ph(…, ph) avoids a second brentq solve inside acidbase.speciate_so2.
+        # the shared gate takes the solved pH so acidbase.speciate_so2 needs no second brentq.
+        # The gate weakens with the early acetaldehyde peak (which sequesters free SO₂, D-28).
         ph = ph_of_state(y, schema, params)
-        gate_ph = 1.0 / (1.0 + 10.0 ** (params["pH_half_mlf"] - ph))
-
-        # Antimicrobial suppression is by MOLECULAR SO₂, the undissociated share of FREE SO₂.
-        # Under D-28 the dosed slot is *total* SO₂; free = total − acetaldehyde-bound, so as
-        # acetaldehyde peaks it sequesters SO₂ and the suppression correctly weakens (bound SO₂
-        # is not antimicrobial). At acetaldehyde = 0 this equals the D-22 free × fraction(pH).
-        total_so2 = float(y[schema.slice(SO2_STATE_KEY)][0]) if SO2_STATE_KEY in schema else 0.0
-        if total_so2 > 0.0:
-            molecular_so2 = molecular_so2_at_ph(y, schema, params, ph)
-            gate_so2 = math.exp(-molecular_so2 / params["molecular_so2_inhib_mlf"])
-        else:
-            gate_so2 = 1.0
-
-        e = max(float(y[schema.slice("E")][0]), 0.0)
-        remaining = 1.0 - e / params["ethanol_tolerance_mlf"]
-        gate_eth = remaining ** params["mlf_ethanol_exponent"] if remaining > 0.0 else 0.0
-
-        temp = float(y[schema.slice("T")][0])
-        gamma_t = cardinal_temperature_factor(
-            temp, params["T_min_mlf"], params["T_opt_mlf"], params["T_max_mlf"]
-        )
+        gate = malolactic_environmental_gate(y, schema, params, ph)
 
         malate_molar = malic_gpl / M_MALIC
         monod = malate_molar / (params["K_mlf"] + malate_molar)
-        r = params["k_mlf"] * x_mlf * monod * gate_ph * gate_eth * gate_so2 * gamma_t
+        r = params["k_mlf"] * x_mlf * monod * gate
 
         d[schema.slice("malic")] = -r * M_MALIC
         d[schema.slice("lactic")] = r * M_LACTIC
         d[schema.slice("CO2")] = r * M_CO2
+        return d
+
+
+class MalolacticCitrateMetabolism(Process):
+    """MLF-derived diacetyl (decision D-31) — *O. oeni* citrate → α-acetolactate + CO2.
+
+    The real coupling MLF unlocks: alongside malate, *Oenococcus oeni* co-metabolises
+    **citric acid**, overflowing α-acetolactate that (non-enzymatically) decarboxylates to
+    **diacetyl** — the buttery note post-MLF wines carry. This Process is the citrate source;
+    the diacetyl then *emerges* from the existing VDK machinery (decision D-26), which needs no
+    change: the always-on :class:`~fermentation.core.kinetics.vicinal_diketones.\
+    AcetolactateDecarboxylation` converts the reservoir → diacetyl, and both the yeast
+    :class:`~fermentation.core.kinetics.vicinal_diketones.DiacetylReduction` (viable ``X``) and
+    the bacterial :class:`OenococcusDiacetylReduction` (``X_mlf``) clear it. Feeding the shared
+    α-acetolactate reservoir is the *genuine* topology, not merely DRY: the reservoir → diacetyl
+    step is a spontaneous property of the identical molecule regardless of whether the
+    α-acetolactate came from yeast valine overflow or bacterial citrate metabolism.
+
+    **Why a citrate pool at all (the load-bearing scope decision, D-31).** MLF-diacetyl is a
+    late-MLF, often *post-dryness* phenomenon, so its carbon cannot come from sugar: the yeast
+    VDK stand-in draws α-acetolactate carbon out of ``S`` (:func:`~fermentation.core.kinetics.\
+    carbon_routing.draw_carbon_from_sugar`), which correctly no-ops once ``S`` is exhausted — it
+    would either strand carbon (breaking ``total_carbon`` closure) or stop diacetyl production
+    exactly when this beat needs it. Citrate is present independent of sugar, so it is the
+    honest source (a dosed must input, ``citrate`` slot).
+
+    **Stoichiometry — a lumped, carbon-closing stand-in (own the fiction).** With ``r_c``
+    [mol/L/h] the citrate turnover, ``d(citrate)/dt = −r_c·M_citric``,
+    ``d(acetolactate)/dt = +r_c·M_acetolactate``, ``d(CO2)/dt = +r_c·M_CO2``. Citric acid (6 C)
+    → α-acetolactate (5 C) + CO2 (1 C), so **carbon closes mole-for-mole (6 = 5 + 1)** on the
+    existing ledger, exactly like malic → lactic + CO2 (D-23). *Mass* carries a small gap
+    (192.124 ≠ 132.116 + 44.009; the real pathway's untracked acetate/H₂O/redox), so carbon is
+    the invariant, as for beer's hydrolysis water (D-8) and the VDK decarb. CAVEAT: real citrate
+    metabolism is ``citrate → acetate + oxaloacetate → pyruvate + CO2``, ~2 citrate per
+    α-acetolactate, with **acetate** (a volatile-acidity contributor) the *dominant* co-product.
+    The single-reaction stand-in drops the acetate/lactate branches; the rate ``k_citrate`` is
+    held low so citrate stays **mostly unconsumed** — the *trace diacetyl branch only* — which
+    keeps the fiction honest (we do not claim to resolve citrate's full fate).
+
+    **Rate — citrate's own Monod × the shared MLF environmental gate (NOT malate's ``r``).**
+    ``r_c = k_citrate · X_mlf · [citrate]/(K_citrate + [citrate]) · g_pH·g_EtOH·g_SO₂·γ(T)``.
+    Coupling to citrate (not the malate turnover) is deliberate: malate's rate → 0 at malate
+    depletion, which would kill exactly the *post-malate* diacetyl this pool exists to capture.
+    Citrate is metabolised while bacteria are active and depletes on its own timescale, so
+    diacetyl accumulates through and past malate conversion, then falls as reduction clears it —
+    the realistic late peak. The environmental gate is the *same* one MLF conversion uses
+    (:func:`malolactic_environmental_gate`), so SO₂/ethanol/low-pH arrest citrate metabolism
+    just as they arrest MLF. Guards mirror MLF conversion: a zero contribution *before* the pH
+    ``brentq`` when undosed (``X_mlf ≤ 0``) or citrate-exhausted (value + perf isolability; the
+    compile seam additionally disables the Process when MLF is not pitched, for tier
+    isolability, so the dosed ``citrate`` slot keeps its VALIDATED tier undosed — like
+    ``malic``/``lactic``). Tier **speculative** (rate/gate magnitudes are estimates).
+    """
+
+    name = "malolactic_citrate_metabolism"
+    tier = Tier.SPECULATIVE
+    touches = ("citrate", "acetolactate", "CO2")
+    #: The citrate Monod pair plus the shared *O. oeni* environmental-gate parameters. Their
+    #: tiers cap the citrate/acetolactate/CO2 output tier via parameter-tier propagation (D-1);
+    #: ``acetolactate``/``CO2`` are already speculative (the always-on yeast VDK pathway), so
+    #: this adds no new tier headline. pKa/SO₂ params read via ``acidbase`` are omitted for the
+    #: same reason as MalolacticConversion (all plausible; the Process is already speculative).
+    reads: tuple[str, ...] = ("k_citrate", "K_citrate", *_MLF_GATE_READS)
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Early guards BEFORE the pH brentq solve (mirroring MalolacticConversion): no catalyst
+        # or no citrate ⇒ no diacetyl branch, and undosed runs must not pay a per-RHS pH solve.
+        x_mlf = max(float(y[schema.slice("X_mlf")][0]), 0.0) if "X_mlf" in schema else 0.0
+        if x_mlf <= 0.0:
+            return d
+        citrate_gpl = max(float(y[schema.slice("citrate")][0]), 0.0) if "citrate" in schema else 0.0
+        if citrate_gpl <= 0.0:
+            return d
+
+        ph = ph_of_state(y, schema, params)
+        gate = malolactic_environmental_gate(y, schema, params, ph)
+
+        citrate_molar = citrate_gpl / M_CITRIC
+        monod = citrate_molar / (params["K_citrate"] + citrate_molar)
+        r_c = params["k_citrate"] * x_mlf * monod * gate  # citrate turnover, mol/L/h
+
+        d[schema.slice("citrate")] = -r_c * M_CITRIC
+        d[schema.slice("acetolactate")] = r_c * M_ACETOLACTATE  # feeds the shared VDK reservoir
+        d[schema.slice("CO2")] = (
+            r_c * M_CO2
+        )  # citrate C6 → acetolactate C5 + CO2 C1 (carbon-closing)
+        return d
+
+
+class OenococcusDiacetylReduction(Process):
+    """Bacterial diacetyl → 2,3-butanediol by *O. oeni* — lees-contact clearing (D-31).
+
+    ``d(diacetyl)/dt = −L``, ``d(butanediol)/dt = +L·M_butanediol/M_diacetyl`` with the mass
+    loss ``L = k_mlf_diacetyl_reduction · X_mlf · f(T) · [diacetyl]`` and ``f(T) =
+    arrhenius_factor(T, E_a_reduction, T_ref)``. A mole-for-mole C4 → C4 transfer (both weighted
+    at their own carbon fraction), so it is carbon-neutral like the yeast reduction (D-26); no
+    sugar draw. Acetoin is lumped into ``butanediol``.
+
+    **Why add it (the owner's D-31 call).** *O. oeni* reduces diacetyl too, so leaving wine on
+    the lees with active bacteria lowers diacetyl — the real reason a completed MLF left on lees
+    cleans up, and the reason an early post-MLF SO₂ addition (which would kill the bacteria)
+    *locks in* diacetyl. It complements the yeast :class:`~fermentation.core.kinetics.\
+    vicinal_diketones.DiacetylReduction`: in co-inoculation the yeast is still viable and clears
+    diacetyl fast; this bacterial reducer keeps clearing it after the yeast is
+    ethanol-inactivated, as long as *O. oeni* is present.
+
+    **Gated on ``X_mlf`` and temperature only (v1 simplification).** Like the MLF conversion
+    catalyst, ``X_mlf`` is a constant, inert dose in v1 (no Process grows or kills it), so this
+    reduction does not carry the environmental (ethanol/SO₂/pH) arrest gates — bacterial *death*
+    is deferred with the MLF-growth beat. Consequence to flag: with *O. oeni* dosed, MLF-diacetyl
+    is **not** permanently stranded (the realistic lees-contact clearing); the "package/rack
+    early ⇒ diacetyl locked in" case needs a racking event to remove ``X_mlf``, deferred to the
+    event loop (decision D-23/D-31). ``diacetyl`` and ``X_mlf`` are clamped ≥ 0 against solver
+    undershoot. Tier **speculative** (rate magnitude estimate).
+    """
+
+    name = "oenococcus_diacetyl_reduction"
+    tier = Tier.SPECULATIVE
+    touches = ("diacetyl", "butanediol")
+    #: ``k_mlf_diacetyl_reduction`` sets the bacterial reductase magnitude; ``E_a_reduction``
+    #: (shared with the yeast reduction — a generic oxidoreductase activation energy) and
+    #: ``T_ref`` set the temperature shape. Reads the constant catalyst ``X_mlf`` from state.
+    reads: tuple[str, ...] = ("k_mlf_diacetyl_reduction", "E_a_reduction", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        diacetyl = max(float(y[schema.slice("diacetyl")][0]), 0.0)
+        if diacetyl <= 0.0:  # nothing to reduce
+            return d
+        x_mlf = max(float(y[schema.slice("X_mlf")][0]), 0.0) if "X_mlf" in schema else 0.0
+        if x_mlf <= 0.0:  # no bacteria ⇒ no bacterial reduction
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_reduction"], params["T_ref"])
+        loss = params["k_mlf_diacetyl_reduction"] * x_mlf * f_t * diacetyl
+        d[schema.slice("diacetyl")] = -loss
+        d[schema.slice("butanediol")] = loss * M_BUTANEDIOL / M_DIACETYL  # mole-for-mole C4→C4
         return d

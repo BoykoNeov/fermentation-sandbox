@@ -36,6 +36,8 @@ The shared variables (decisions D-B / D-4):
                                  buffer, produced then reduced back to ethanol — D-27)
     h2s      hydrogen sulfide     g/L (sulfidic "rotten egg" off-aroma; produced-only,
                                  de-repressed at low nitrogen; carbon-free — decision D-29)
+    citrate  citric acid          g/L (wine-only must input; O. oeni co-metabolises it into
+                                 MLF-derived diacetyl; carbon-active, not charge-active — D-31)
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
@@ -74,7 +76,9 @@ from fermentation.core.kinetics import (
     FuselAlcoholsEhrlich,
     GrowthNitrogenLimited,
     HydrogenSulfideProduction,
+    MalolacticCitrateMetabolism,
     MalolacticConversion,
+    OenococcusDiacetylReduction,
     SugarUptakeToEthanolCO2,
 )
 from fermentation.core.process import Process, ProcessSet, RateModifier
@@ -166,13 +170,15 @@ def wine_schema() -> StateSchema:
     """Wine state layout: a single lumped fermentable sugar slot, plus the wine-only
     charge-active acid + strong-cation slots the pH charge-balance solver reads
     (decision D-18), the free-SO₂ pool the molecular-SO₂ readout reads (decision D-22),
-    and the ``X_mlf`` malolactic-catalyst slot (decision D-23).
+    the ``X_mlf`` malolactic-catalyst slot (decision D-23), and the ``citrate`` slot
+    *O. oeni* co-metabolises into MLF-derived diacetyl (decision D-31).
 
-    These six slots are appended to ``wine_schema`` only (not ``_common_specs``), so
+    These seven slots are appended to ``wine_schema`` only (not ``_common_specs``), so
     ``beer_schema`` is untouched — beer's pH is a phosphate-buffered different acid
     system with no sourced data yet, explicitly deferred. ``default=0.0`` is
     load-bearing: existing wine scenarios/tests that name no acids still compile (all
-    six → 0), and with acids, cation, SO₂ and ``X_mlf`` at 0 the slots are inert — they
+    seven → 0), and with acids, cation, SO₂, ``X_mlf`` and ``citrate`` at 0 the slots are
+    inert — they
     contribute 0 to every conservation sum, so the validated core and its tests are
     untouched (prime directive #3). The acid/cation/SO₂ slots have no Process touching
     them in D-18/D-22; under D-23 :class:`~fermentation.core.kinetics.malolactic.\
@@ -201,6 +207,13 @@ def wine_schema() -> StateSchema:
         ),
         VarSpec(
             "lactic", "g/L", default=0.0, description="L-lactic acid (produced-only; MLF product)"
+        ),
+        VarSpec(
+            "citrate",
+            "g/L",
+            default=0.0,
+            description="citric acid (must input; O. oeni co-metabolises it during MLF — the "
+            "carbon source for MLF-derived diacetyl; carbon-active but not charge-active, D-31)",
         ),
         VarSpec(
             "cation_charge",
@@ -407,7 +420,21 @@ _H2S_PROCESSES: tuple[Callable[[], Process], ...] = (HydrogenSulfideProduction,)
 #: being dragged to speculative by an enabled-but-zero Process (*tier* isolability —
 #: ``ProcessSet.tier_of`` counts enabled, not nonzero, Processes). Wine-only: beer has no
 #: ``malic``/``lactic`` slots, so it is never wired there.
-_MLF_PROCESSES: tuple[Callable[[], Process], ...] = (MalolacticConversion,)
+#:
+#: MLF-derived diacetyl (decision D-31) adds two more *O. oeni* Processes to this same dosed,
+#: isolable tuple: :class:`MalolacticCitrateMetabolism` co-metabolises the dosed ``citrate`` must
+#: input into α-acetolactate + CO2 (feeding the shared VDK reservoir, so diacetyl emerges from
+#: the always-on D-26 decarboxylation), and :class:`OenococcusDiacetylReduction` clears diacetyl
+#: on the lees (``X_mlf``-gated). Both are disabled at the compile seam with the malate Process
+#: when *O. oeni* is un-pitched, so an un-pitched wine run stays byte-for-byte the validated core
+#: and the ``citrate`` slot keeps its VALIDATED tier (like ``malic``/``lactic``). Citrate — not
+#: sugar — sources this carbon because MLF-diacetyl is a late/post-dryness phenomenon and the
+#: sugar-draw helper no-ops at ``S=0`` (decision D-31; see the malolactic module docstring).
+_MLF_PROCESSES: tuple[Callable[[], Process], ...] = (
+    MalolacticConversion,
+    MalolacticCitrateMetabolism,
+    OenococcusDiacetylReduction,
+)
 
 #: Biomass carrying-capacity cap (wine-only, decision D-30): the opt-in residual-nitrogen
 #: floor. A logistic ``(1 - X/K)`` RateModifier on growth that saturates biomass below the

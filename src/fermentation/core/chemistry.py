@@ -87,6 +87,22 @@ M_MALIC = 4 * _M_C + 6 * _M_H + 5 * _M_O
 #: L-lactic acid, C3H6O3 — the MLF product (produced-only). Monoprotic; the softer
 #: acid that malic deacidifies *into*, the chemistry the pH solver must reproduce.
 M_LACTIC = 3 * _M_C + 6 * _M_H + 3 * _M_O
+#: Citric acid, C6H8O7 — the minor grape acid *Oenococcus oeni* co-metabolises during MLF,
+#: the carbon source for **MLF-derived diacetyl** (decision D-31). A dosed must input
+#: (~0.1–0.5 g/L), present *independent of sugar* so it can fund the diacetyl pool after the
+#: wine is dry — the reason yeast-pathway sugar carbon (which no-ops at ``S=0``) cannot source
+#: this beat. The v1 :class:`~fermentation.core.kinetics.malolactic.MalolacticCitrateMetabolism`
+#: routes it as a lumped, carbon-closing ``citrate (C6) → α-acetolactate (C5) + CO2 (C1)``
+#: stand-in feeding the shared VDK reservoir (6 = 5 + 1), so these weights make that
+#: conversion carbon-closing on the existing ledger. BOOKKEEPING CAVEAT: real citrate
+#: metabolism is ``citrate → acetate + oxaloacetate → pyruvate + CO2`` and takes ~2 citrate
+#: per α-acetolactate, with acetate (a volatile-acidity contributor) as the *dominant*
+#: co-product; the single-reaction stand-in balances carbon exactly but omits the acetate/
+#: lactate branches and full citrate depletion (rate held low so citrate stays mostly
+#: unconsumed — the trace diacetyl branch only, decision D-31). Triprotic; kept OUT of the
+#: D-18 pH charge balance in v1 (a scoped omission the inverse anchoring absorbs at t=0, as
+#: for SO₂'s bisulfite charge, D-22), so it is carbon-active but not charge-active.
+M_CITRIC = 6 * _M_C + 8 * _M_H + 7 * _M_O
 #: α-acetolactate (2-acetolactic acid), C5H8O4 — the vicinal-diketone (VDK) precursor
 #: reservoir (decision D-26). Yeast excretes it during valine biosynthesis; it then
 #: *spontaneously* (non-enzymatically) oxidatively decarboxylates to diacetyl + CO2,
@@ -143,6 +159,7 @@ MOLAR_MASS: dict[str, float] = {
     "tartaric_acid": M_TARTARIC,
     "malic_acid": M_MALIC,
     "lactic_acid": M_LACTIC,
+    "citric_acid": M_CITRIC,
     "sulfur_dioxide": M_SO2,
     "hydrogen_sulfide": M_H2S,
     "alpha_acetolactate": M_ACETOLACTATE,
@@ -169,6 +186,7 @@ CARBON_ATOMS: dict[str, int] = {
     "tartaric_acid": 4,
     "malic_acid": 4,
     "lactic_acid": 3,
+    "citric_acid": 6,
     "sulfur_dioxide": 0,
     "hydrogen_sulfide": 0,
     "alpha_acetolactate": 5,

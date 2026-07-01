@@ -26,8 +26,11 @@ from fermentation.core.kinetics.hydrogen_sulfide import HydrogenSulfideProductio
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
 from fermentation.core.kinetics.malolactic import (
+    MalolacticCitrateMetabolism,
     MalolacticConversion,
+    OenococcusDiacetylReduction,
     cardinal_temperature_factor,
+    malolactic_environmental_gate,
 )
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.kinetics.vicinal_diketones import (
@@ -51,8 +54,11 @@ __all__ = [
     "FuselAlcoholsEhrlich",
     "GrowthNitrogenLimited",
     "HydrogenSulfideProduction",
+    "MalolacticCitrateMetabolism",
     "MalolacticConversion",
+    "OenococcusDiacetylReduction",
     "SugarUptakeToEthanolCO2",
     "arrhenius_factor",
     "cardinal_temperature_factor",
+    "malolactic_environmental_gate",
 ]

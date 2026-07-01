@@ -33,7 +33,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fermentation.core import acidbase
-from fermentation.core.kinetics import BiomassCarryingCapacity, MalolacticConversion
+from fermentation.core.kinetics import (
+    BiomassCarryingCapacity,
+    MalolacticCitrateMetabolism,
+    MalolacticConversion,
+    OenococcusDiacetylReduction,
+)
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -93,6 +98,8 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
         # mlf_pitch_gpl is the optional Oenococcus oeni dose driving malolactic conversion (D-23).
         # carrying_capacity_gpl is the optional opt-in biomass cap K that enables the
         # residual-nitrogen floor (D-30); absent ⇒ the cap modifier is disabled (core untouched).
+        # citrate_gpl is the optional citric-acid must input O. oeni co-metabolises into
+        # MLF-derived diacetyl (D-31); absent ⇒ 0 (no citrate, the diacetyl branch is silent).
         {
             "brix",
             "yan_mgl",
@@ -104,6 +111,7 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "so2_total_mgl",
             "mlf_pitch_gpl",
             "carrying_capacity_gpl",
+            "citrate_gpl",
         }
     ),
     "beer": frozenset(
@@ -177,8 +185,13 @@ def _wine_initial(
         # Oenococcus oeni dose driving malolactic conversion (D-23); g/L, default 0 (no
         # MLF). Inert catalyst in v1 (no Process grows/kills it) and carbon-free, so an
         # undosed run is byte-for-byte the validated core; the compile step below disables
-        # the MLF Process entirely when this is 0 (tier + perf isolability).
+        # the MLF Processes entirely when this is 0 (tier + perf isolability).
         "X_mlf": _optional(values, "mlf_pitch_gpl", 0.0),
+        # Citric acid must input (decision D-31); g/L, default 0 (no citrate ⇒ no MLF-derived
+        # diacetyl). O. oeni co-metabolises it into α-acetolactate feeding the shared VDK
+        # reservoir. Carbon-active (weighted in total_carbon) but not charge-active (kept out
+        # of the D-18 pH balance in v1); inert at 0, so an un-dosed run is unchanged.
+        "citrate": _optional(values, "citrate_gpl", 0.0),
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
@@ -411,17 +424,23 @@ def compile_scenario(
     y0 = medium.schema.pack(builder(scenario.initial, temperature_k, parameters))
     process_set = medium.build_process_set(strict=strict)
 
-    # MLF isolability (decision D-23): the malolactic Process is wired into the wine medium
-    # but contributes nothing until Oenococcus oeni is pitched. When it is not, DISABLE it
-    # so (a) the inert ``malic``/``lactic`` slots keep their VALIDATED tier — an *enabled*
-    # Process that touches them drops them to speculative even with a zero contribution,
-    # since ``tier_of`` counts enabled, not nonzero, Processes — and (b) no per-RHS pH
-    # ``brentq`` solve is paid on an undosed run. When pitched it is the first RHS consumer
-    # of the D-18 pH solver and the D-22 molecular-SO₂ readout.
-    if MalolacticConversion.name in process_set:
-        mlf_pitch_gpl = float(scenario.initial.get("mlf_pitch_gpl", 0.0) or 0.0)
-        if mlf_pitch_gpl <= 0.0:
-            process_set.disable(MalolacticConversion.name)
+    # MLF isolability (decisions D-23, D-31): the malolactic Processes are wired into the wine
+    # medium but contribute nothing until Oenococcus oeni is pitched. When it is not, DISABLE
+    # them all so (a) the inert ``malic``/``lactic``/``citrate`` slots keep their VALIDATED
+    # tier — an *enabled* Process that touches them drops them to speculative even with a zero
+    # contribution, since ``tier_of`` counts enabled, not nonzero, Processes — and (b) no
+    # per-RHS pH ``brentq`` solve is paid on an undosed run. When pitched, MalolacticConversion
+    # is the first RHS consumer of the D-18 pH solver / D-22 molecular-SO₂ readout, and the two
+    # D-31 Processes co-metabolise citrate into diacetyl and reduce it on the lees.
+    mlf_pitch_gpl = float(scenario.initial.get("mlf_pitch_gpl", 0.0) or 0.0)
+    if mlf_pitch_gpl <= 0.0:
+        for mlf_process in (
+            MalolacticConversion,
+            MalolacticCitrateMetabolism,
+            OenococcusDiacetylReduction,
+        ):
+            if mlf_process.name in process_set:
+                process_set.disable(mlf_process.name)
 
     # Residual-nitrogen floor (decision D-30): the biomass carrying-capacity cap is a
     # deliberate DEPARTURE from the validated Coleman anchor (which caps nothing and strips

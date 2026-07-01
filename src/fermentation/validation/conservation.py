@@ -128,6 +128,16 @@ def total_carbon(
         w[schema.slice("malic")] = carbon_mass_fraction("malic_acid")
     if "lactic" in schema:
         w[schema.slice("lactic")] = carbon_mass_fraction("lactic_acid")
+    # Citrate (decision D-31): a dosed must input O. oeni co-metabolises during MLF. The
+    # MalolacticCitrateMetabolism Process (when O. oeni is pitched) routes it as a lumped
+    # citrate (C6) → α-acetolactate (C5) + CO2 (C1) conversion feeding the shared VDK
+    # reservoir — carbon-closing mole-for-mole (6 = 5 + 1) on this same ledger, so weighting
+    # citrate at its citric-acid fraction keeps total_carbon closed through that conversion.
+    # On an undosed run citrate is inert (no active Process touches it, derivative 0), a
+    # constant term that drifts 0. Charge-inactive (kept out of the D-18 pH balance in v1),
+    # so it is a carbon term only — like malic/lactic, weighted here for the conversion.
+    if "citrate" in schema:
+        w[schema.slice("citrate")] = carbon_mass_fraction("citric_acid")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(

@@ -317,5 +317,24 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         `carrying_capacity_gpl` scenario key (overrides for sweeps). SCOPE: wine-only (beer
         deferred); MLF-unblock is PROSPECTIVE (MLF v1 has no N gate). 16 new tests; **380 green** +
         5 benchmark, ruff+mypy clean. Full record in **DECISIONS → D-30**.
-  - [ ] **MLF-derived diacetyl** — *Oenococcus* from citrate, a real coupling now that MLF
-        exists (D-23). Deferred out of the D-26 v1 (yeast-pathway only).
+  - [x] **MLF-derived diacetyl — O. oeni citrate co-metabolism + bacterial reduction (decision
+        D-31). LANDED 2026-07-01.** The real coupling MLF (D-23) unlocks and the deferred half of
+        D-26 (which built yeast valine-pathway diacetyl only). Two new *O. oeni* Processes in
+        `malolactic.py`: `MalolacticCitrateMetabolism` co-metabolises a dosed `citrate` must input
+        (new C6H8O7 species/slot) into α-acetolactate + CO2 feeding the **shared VDK reservoir** —
+        so diacetyl *emerges* from the always-on D-26 decarb + reduction, no new diacetyl kinetics
+        — and `OenococcusDiacetylReduction` clears diacetyl on the lees (`X_mlf`-gated). **Why a
+        citrate pool (load-bearing):** MLF-diacetyl is a late/post-dryness phenomenon, so its
+        carbon can't come from sugar (`draw_carbon_from_sugar` no-ops at `S=0`); citrate is present
+        independent of sugar. Lumped carbon-closing stand-in `citrate C6 → acetolactate C5 + CO2 C1`
+        (6 = 5 + 1; mass gap = untracked acetate/redox); `k_citrate` low so citrate stays mostly
+        unconsumed (the trace diacetyl branch — dominant acetate branch omitted, owned caveat). New
+        shared `malolactic_environmental_gate` helper (g_pH·g_EtOH·g_SO2·γ(T)) used by both the
+        malate conversion and the citrate branch (coupled to citrate's Monod, NOT malate's r, so
+        the post-malate peak survives). Emergent: diacetyl lifts ~2.8× the yeast-only baseline into
+        the buttery range (~0.28 mg/L), peaks late (~day 5–6), then reduction clears it; carbon
+        closes to machine precision. Isolable: un-pitched/citrate-free = byte-for-byte core, citrate
+        VALIDATED→speculative only when dosed. Owner forks: citrate = must input; via shared
+        reservoir; add O. oeni reduction now. Deferred: bacterial arrest/death + racking event (so
+        "SO₂ locks diacetyl in" / permanent stranding), citrate in the pH balance. 14 new tests;
+        **395 green** + 5 benchmark, ruff+mypy clean. Full record in **DECISIONS → D-31**.

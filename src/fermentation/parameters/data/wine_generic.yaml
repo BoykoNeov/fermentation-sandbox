@@ -582,3 +582,67 @@ T_max_mlf:
     source: "author estimate from O. oeni upper cardinal temperature (growth ceases ~40-45 C; MLF activity falls off well before that; Ribereau-Gayon et al., Handbook of Enology Vol. 1)"
     conditions: "O. oeni in wine; maximum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
     notes: "Read by MalolacticConversion via cardinal_temperature_factor. 37 C. Above it gamma(T)=0. This is the cardinal that makes the warm-side DECLINE explicit (the qualitative correctness a monotone Arrhenius lacks). Far above any normal wine ferment, so it shapes only the high-T tail; exact value speculative, direction (a finite upper limit exists) sound."
+
+# -- MLF-DERIVED DIACETYL (Oenococcus oeni citrate co-metabolism), wine-only (decision D-31) --
+# The real coupling MLF unlocks: alongside malate, O. oeni co-metabolises CITRIC ACID and
+# overflows alpha-acetolactate, which decarboxylates to DIACETYL (the buttery note post-MLF
+# wines carry). Read by two Processes in fermentation.core.kinetics.malolactic:
+#   MalolacticCitrateMetabolism: r_c = k_citrate * X_mlf * [citrate]/(K_citrate+[citrate]) * gate
+#     with d(citrate) = -r_c*M_citric, d(acetolactate) = +r_c*M_acetolactate, d(CO2) = +r_c*M_CO2
+#     (citrate C6 -> alpha-acetolactate C5 + CO2 C1; carbon closes 6 = 5 + 1; MASS carries a
+#     small gap - the real acetate/redox branch is untracked, carbon is the invariant, as for
+#     the VDK decarb / beer hydrolysis water D-8). The alpha-acetolactate feeds the SHARED VDK
+#     reservoir, so diacetyl EMERGES from the always-on D-26 decarboxylation + reduction - no new
+#     diacetyl kinetics. 'gate' is the SAME O. oeni environmental gate (g_pH*g_EtOH*g_SO2*gamma(T))
+#     the malate conversion uses, so SO2/ethanol/low-pH arrest citrate metabolism too.
+#   OenococcusDiacetylReduction: L = k_mlf_diacetyl_reduction * X_mlf * f(T) * [diacetyl], the
+#     bacterial reductase that clears diacetyl on the lees (why leaving a completed MLF on lees
+#     cleans up, and why early post-MLF SO2 - killing the bacteria - locks diacetyl in). Uses the
+#     shared E_a_reduction (vicinal_diketones.yaml) for f(T); gated on the constant X_mlf.
+#
+# WHY A CITRATE POOL (the load-bearing scope decision, D-31). MLF-diacetyl is a late-MLF, often
+# POST-DRYNESS phenomenon, so its carbon cannot come from sugar: the yeast VDK stand-in draws
+# alpha-acetolactate carbon out of S, which correctly no-ops at S=0 - it would strand carbon
+# (breaking total_carbon) or stop diacetyl exactly when this beat needs it. Citrate is present
+# independent of sugar, so it is the honest source (a dosed must input, citrate_gpl).
+#
+# STOICHIOMETRY IS A LUMPED FICTION - OWNED. Real citrate metabolism is citrate -> acetate +
+# oxaloacetate -> pyruvate + CO2, ~2 citrate per alpha-acetolactate, with ACETATE (a
+# volatile-acidity contributor) the DOMINANT co-product. The single-reaction stand-in balances
+# carbon exactly but drops the acetate/lactate branches; k_citrate is held LOW so citrate stays
+# MOSTLY UNCONSUMED - the trace diacetyl branch only. ALL SPECULATIVE (order-of-magnitude
+# estimates; no per-catalyst kinetic model of this flux form is sourced). SCOPE (v1): X_mlf is a
+# constant inert catalyst (no bacterial growth/death), so the reduction has no ethanol/SO2 arrest
+# gate and diacetyl is not permanently stranded while O. oeni is present (racking to remove X_mlf
+# needs the deferred event loop). Citrate is carbon-active but NOT charge-active (kept out of the
+# D-18 pH balance in v1; a scoped omission the inverse anchoring absorbs at t=0, as for SO2 D-22).
+
+k_citrate:
+  value: 3.0e-5
+  unit: "mol/(g*h)"   # molar citrate turnover per g/L O. oeni: r_c = k_citrate*X_mlf*Monod*gate
+  tier: speculative
+  uncertainty: { low: 5.0e-6, high: 1.0e-4, note: "order-of-magnitude target: an MLF-derived diacetyl contribution that clearly exceeds the yeast-only baseline (~0.1 mg/L) and lands in the buttery wine range (peak ~0.3 mg/L at the reference dose, above the ~0.2 mg/L threshold), while consuming only a small fraction (~6%) of a ~0.1-0.5 g/L citrate dose (the trace diacetyl branch; the dominant acetate branch is untracked)" }
+  provenance:
+    source: "author estimate; O. oeni citrate co-metabolism yields diacetyl in the ~mg/L range in wine (Ribereau-Gayon et al., Handbook of Enology Vol. 1, malolactic fermentation & diacetyl; Bartowsky & Henschke 2004, Int. J. Food Microbiol. 96:235-252, the O. oeni diacetyl review)"
+    conditions: "S. cerevisiae/O. oeni co-inoculated wine, ~20 C; specific citrate-to-acetolactate activity scaling the dosed (constant) X_mlf, feeding the shared VDK reservoir"
+    notes: "SPECULATIVE magnitude: no per-catalyst kinetic model of citrate->diacetyl of our flux form is sourced (O. oeni diacetyl is usually reported as bulk mg/L yields, not a per-biomass rate), so this is tuned to a plausible diacetyl contribution, NOT fitted. Held LOW so citrate is mostly unconsumed - the trace diacetyl branch only (the dominant acetate/lactate branches are omitted from the single-reaction carbon-closing stand-in). Shares the environmental gate with MalolacticConversion, so ethanol/SO2/low-pH arrest it too - in co-inoculation, production is concentrated in the early low-ethanol window before the ethanol wall (~day 4 at 20 C), then the reservoir decarboxylates on to a late diacetyl peak that reduction clears. Direction (citrate co-metabolism makes diacetyl; more with active bacteria) is sourced; the magnitude is the speculative modelling choice."
+
+K_citrate:
+  value: 1.0e-3
+  unit: "mol/L"   # Michaelis-Menten half-saturation in CITRATE (molar)
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 5.0e-3, note: "citrate lyase / uptake half-saturation of order ~mM; the term stays smooth over a typical ~0.1-0.5 g/L (~0.5-2.6 mM) citrate dose" }
+  provenance:
+    source: "author estimate of order the reported O. oeni citrate-metabolism half-saturation (~mM range; enology/biochemistry literature on citrate lyase and citrate uptake)"
+    conditions: "O. oeni citrate co-metabolism; half-saturation in the citrate Monod term of MalolacticCitrateMetabolism (mol/L, matching the [citrate] the Process computes from g/L via M_citric)"
+    notes: "Read by MalolacticCitrateMetabolism. Because k_citrate is held low (citrate mostly unconsumed), this term stays roughly constant over the ferment, so it mainly sets the initial rate scale rather than shaping a depletion tail. SPECULATIVE: the whole-cell citrate affinity our X_mlf lumps is not the isolated-enzyme Km, and the value is taken mid-range, not fitted."
+
+k_mlf_diacetyl_reduction:
+  value: 2.0e-2
+  unit: "L/(g*h)"   # d(diacetyl)/dt = -k_mlf_diacetyl_reduction * X_mlf * f(T) * [diacetyl]
+  tier: speculative
+  uncertainty: { low: 5.0e-3, high: 1.0e-1, note: "with a dosed X_mlf ~0.1-0.5 g/L gives a bacterial diacetyl half-life of ~days - slower than the yeast reduction (k_reduction 5e-2, viable X ~1-5 g/L), so while the yeast is viable it dominates and O. oeni clearing matters mainly after ethanol-inactivation, on the lees" }
+  provenance:
+    source: "author estimate; O. oeni reduces diacetyl to acetoin/2,3-butanediol via diacetyl reductase, the lees-contact clearing step (Bartowsky & Henschke 2004, Int. J. Food Microbiol. 96:235-252; Ribereau-Gayon et al., Handbook of Enology Vol. 1)"
+    conditions: "O. oeni in wine; enzymatic diacetyl reduction, first-order in diacetyl and in the dosed (constant) X_mlf, using the shared E_a_reduction temperature factor"
+    notes: "Read by OenococcusDiacetylReduction. Complements the yeast DiacetylReduction (D-26): the yeast (higher rate x higher biomass) clears diacetyl fast while viable; this bacterial reducer keeps clearing it after the yeast is ethanol-inactivated, as long as O. oeni is present - the realistic lees-contact clean-up, and the reason removing the bacteria (SO2 / racking) locks diacetyl in. v1 has no bacterial death gate (X_mlf constant), so this does not stop at high ethanol/SO2 - a documented simplification; bacterial arrest/death is deferred with the MLF-growth beat. Magnitude speculative."

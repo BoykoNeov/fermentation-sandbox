@@ -13,11 +13,12 @@ SHARED = (
 )  # fmt: skip
 
 
-#: Wine appends four charge-active acid + strong-cation slots to the shared set for the
-#: pH charge-balance solver (decision D-18), then the free-SO₂ pool for the molecular-SO₂
+#: Wine appends three charge-active acid slots + the citric-acid input + the strong-cation
+#: slot to the shared set (the pH charge-balance solver reads all but citrate, D-18; citrate
+#: is carbon-active-not-charge-active, D-31), then the free-SO₂ pool for the molecular-SO₂
 #: readout (decision D-22), then the malolactic-catalyst slot (decision D-23); beer does
 #: not (its acid system, SO₂ and MLF are deferred).
-WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "cation_charge")
+WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "citrate", "cation_charge")
 WINE_SO2_SLOTS = ("so2_total",)
 WINE_MLF_SLOTS = ("X_mlf",)
 
@@ -28,9 +29,9 @@ def test_wine_schema_has_single_sugar_slot():
     assert schema.spec("S").size == 1
     # 17 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
     # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
-    # h2s, D-29) + 4 wine-only acid/cation slots (D-18) + 1 free-SO₂ slot (D-22)
-    # + 1 X_mlf slot (D-23)
-    assert schema.size == 23
+    # h2s, D-29) + 3 wine-only acid slots + citrate (D-31) + cation_charge (D-18)
+    # + 1 free-SO₂ slot (D-22) + 1 X_mlf slot (D-23)
+    assert schema.size == 24
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -78,6 +79,7 @@ def test_wine_acid_slot_units_are_canonical():
     assert units["tartaric"] == "g/L"
     assert units["malic"] == "g/L"
     assert units["lactic"] == "g/L"
+    assert units["citrate"] == "g/L"  # citric-acid must input (D-31)
     assert units["cation_charge"] == "mol/L"
     assert units["so2_total"] == "g/L"
     assert units["X_mlf"] == "g/L"
@@ -165,10 +167,15 @@ ACETALDEHYDE_PROCESSES = {"acetaldehyde_production", "acetaldehyde_reduction"}
 # flux-linked producer with an inverse-N gate. Intrinsic yeast metabolism, so — like the
 # ester/VDK/acetaldehyde pools — wired into BOTH media by default (isolable but always on).
 H2S_PROCESSES = {"hydrogen_sulfide_production"}
-# Malolactic fermentation (decision D-23) is wired into the WINE medium only (beer has no
-# malic/lactic slots); it is enabled in a bare build_process_set and disabled at the compile
-# seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic at VALIDATED).
-MLF_PROCESSES = {"malolactic_conversion"}
+# Malolactic fermentation (decisions D-23, D-31) is wired into the WINE medium only (beer has
+# no malic/lactic/citrate slots); enabled in a bare build_process_set and disabled at the
+# compile seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic/citrate at
+# VALIDATED). D-31 adds the citrate → diacetyl co-metabolism and the bacterial diacetyl reducer.
+MLF_PROCESSES = {
+    "malolactic_conversion",
+    "malolactic_citrate_metabolism",
+    "oenococcus_diacetyl_reduction",
+}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
