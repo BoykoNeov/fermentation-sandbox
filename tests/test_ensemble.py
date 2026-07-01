@@ -22,7 +22,7 @@ from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
 from fermentation.parameters.store import ParameterSet
 from fermentation.runtime import Ensemble, sample_parameters, simulate, simulate_ensemble
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
-from fermentation.validation import assert_conserved, total_carbon, total_mass
+from fermentation.validation import assert_conserved, total_carbon, total_mass, total_nitrogen
 
 # -- a toy that actually READS a sampled parameter ----------------------------
 #
@@ -317,6 +317,20 @@ def test_wine_ensemble_scopes_to_active_reads_and_conserves_carbon():
         carbon = total_carbon(compiled.schema, biomass_carbon_fraction=fc)
         assert_conserved(
             ens.member_trajectory(i), carbon, rtol=1e-6, atol=1e-6, label=f"carbon[{i}]"
+        )
+
+    # The nitrogen ledger closes per-member too. As cells grow they assimilate free
+    # ``N`` into biomass, so ``N + biomass_N_fraction * X`` is the invariant. Like carbon,
+    # the check must read the member's OWN sampled ``biomass_N_fraction`` (the growth
+    # Process draws N against it, and it is itself sampled) or genuine closure reads as
+    # drift. There is no aa-ledger yet (deferred, D-23) and fusels route carbon — not N —
+    # from sugar, so nothing sinks N except biomass and the balance closes to ~1e-12.
+    nominal_fn = compiled.parameters.value("biomass_N_fraction")
+    for i in range(ens.n_succeeded):
+        fn = ens.member_params[i].get("biomass_N_fraction", nominal_fn)
+        nitrogen = total_nitrogen(compiled.schema, biomass_nitrogen_fraction=fn)
+        assert_conserved(
+            ens.member_trajectory(i), nitrogen, rtol=1e-6, atol=1e-6, label=f"nitrogen[{i}]"
         )
 
     # A real, ordered ethanol band that brackets a plausible dry-wine ABV region.
