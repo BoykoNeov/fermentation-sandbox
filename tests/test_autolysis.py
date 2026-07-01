@@ -253,3 +253,29 @@ def test_carbon_and_nitrogen_close_with_autolysis_on():
     assert_conserved(
         traj, total_nitrogen(compiled.schema, biomass_nitrogen_fraction=f_n), label="nitrogen"
     )
+
+
+def test_autolysis_feeds_the_pool_while_swap_and_reroute_drain_it():
+    # The three-way composition these two beats (D-33 + D-34) exist to enable — the actual
+    # MLF-growth-prerequisite configuration, which every other test isolates apart. Dose BOTH the
+    # amino-acid ledger (enabling the AminoAcidAssimilation swap AND the FuselAminoAcidReroute) AND
+    # autolysis (refilling the pool from X_dead): all three touch ``amino_acids`` at once —
+    # autolysis *feeds* it while the swap + re-route *drain* it. Carbon and nitrogen must still
+    # close over the full run and the pools stay non-negative. Conservation as a TEST of the
+    # composition, not the
+    # assumption that three individually-neutral contributions sum to neutral (conservation is a
+    # TEST, not an assumption — the CLAUDE.md conservation-laws-are-tests convention).
+    traj, compiled = _run(150.0, autolysis_rate_per_h=1e-2, amino_acids_gpl=2.0)
+    ps = compiled.process_set
+    assert ps.is_enabled("amino_acid_assimilation")
+    assert ps.is_enabled("fusel_amino_acid_reroute")
+    assert ps.is_enabled(AUTOLYSIS)
+    f_c = compiled.param_values["biomass_C_fraction"]
+    f_n = compiled.param_values["biomass_N_fraction"]
+    assert_conserved(
+        traj, total_carbon(compiled.schema, biomass_carbon_fraction=f_c), label="carbon"
+    )
+    assert_conserved(
+        traj, total_nitrogen(compiled.schema, biomass_nitrogen_fraction=f_n), label="nitrogen"
+    )
+    assert_nonnegative(traj, ("amino_acids", "debris", "X_dead"))
