@@ -34,6 +34,8 @@ The shared variables (decisions D-B / D-4):
     butanediol 2,3-butanediol    g/L (flavour-inactive diacetyl-reduction product — D-26)
     acetaldehyde acetaldehyde    g/L (main-pathway intermediate; transient ethanol-carbon
                                  buffer, produced then reduced back to ethanol — D-27)
+    h2s      hydrogen sulfide     g/L (sulfidic "rotten egg" off-aroma; produced-only,
+                                 de-repressed at low nitrogen; carbon-free — decision D-29)
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
@@ -70,6 +72,7 @@ from fermentation.core.kinetics import (
     EthanolInactivation,
     FuselAlcoholsEhrlich,
     GrowthNitrogenLimited,
+    HydrogenSulfideProduction,
     MalolacticConversion,
     SugarUptakeToEthanolCO2,
 )
@@ -147,6 +150,13 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             default=0.0,
             description="acetaldehyde (ethanal) — main-pathway intermediate; a transient "
             "ethanol-carbon buffer (produced then yeast-reduced back to ethanol; D-27)",
+        ),
+        VarSpec(
+            "h2s",
+            "g/L",
+            default=0.0,
+            description="hydrogen sulfide (H2S) — 'rotten egg' sulfidic off-aroma; produced-only "
+            "pool, de-repressed at low yeast-assimilable nitrogen; carbon-free (D-29)",
         ),
     ]
 
@@ -368,6 +378,25 @@ _ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
     AcetaldehydeReduction,
 )
 
+#: Hydrogen-sulfide production (Milestone 2, decision D-29): the low-nitrogen "rotten egg"
+#: off-aroma, one flux-linked producer gated by an *inverse*-nitrogen term. Kept as its own
+#: isolable tuple (prime directive #3): a ProcessSet built without it is the prior core. Like
+#: the ester/VDK/acetaldehyde pools (and unlike the *dosed* MLF organism), H₂S is intrinsic
+#: yeast metabolism, so it is wired into BOTH media and runs on every default ferment. This is
+#: the most isolable beat in the model: H₂S is CARBON-FREE (on no conservation ledger) and the
+#: Process touches ONLY ``h2s`` while merely *reading* ``X``/``S``/``N`` — so disabling it
+#: leaves the RHS of every other column byte-for-byte identical (no ``h2s`` consumer exists to
+#: feed anything back); the integrated trajectory then differs only by a ~1e-7 adaptive-solver
+#: mesh artifact, cleaner than the acetaldehyde buffer's *genuine* second-order E→viability
+#: coupling (D-27).
+#: No tier headline either: it writes a fresh pool nothing reads, so no other column's
+#: structural tier drops (contrast the D-26 ``CO2`` / D-27 ``E`` cases). Params live in the
+#: shared, medium-agnostic ``hydrogen_sulfide.yaml`` (sulfate-reduction is generic yeast
+#: metabolism). SCOPE (v1): produced-only (the CO₂-stripping sink is the deferred follow-up,
+#: the ester D-19→D-20 precedent), so ``h2s`` is cumulative-produced (overstates residual);
+#: and the cross-must YAN lever is muted by the upstream N→0 stripping gap (decision D-29).
+_H2S_PROCESSES: tuple[Callable[[], Process], ...] = (HydrogenSulfideProduction,)
+
 #: Malolactic fermentation (wine-only, decision D-23): the *Oenococcus oeni* malate →
 #: lactate + CO2 conversion, the first RHS consumer of the D-18 pH solver and the D-22
 #: molecular-SO₂ readout. Kept as its own tuple so it stays **isolable** (prime directive
@@ -392,6 +421,7 @@ MEDIA: dict[str, Medium] = {
             + _BYPRODUCT_PROCESSES
             + _VDK_PROCESSES
             + _ACETALDEHYDE_PROCESSES
+            + _H2S_PROCESSES
             + _MLF_PROCESSES
         ),
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
@@ -404,6 +434,7 @@ MEDIA: dict[str, Medium] = {
             + _BYPRODUCT_PROCESSES
             + _VDK_PROCESSES
             + _ACETALDEHYDE_PROCESSES
+            + _H2S_PROCESSES
         ),
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),

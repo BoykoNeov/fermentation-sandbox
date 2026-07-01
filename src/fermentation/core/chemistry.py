@@ -114,6 +114,17 @@ M_BUTANEDIOL = 4 * _M_C + 10 * _M_H + 2 * _M_O
 #: no molar conversion; this molar mass is carried for completeness as the tracked
 #: species' weight and for the deferred in-balance step (sulfurous-acid mol/L charge).
 M_SO2 = 1 * _M_S + 2 * _M_O
+#: Hydrogen sulfide, H2S — the "rotten egg" sulfidic off-aroma yeast releases when it
+#: reduces sulfate faster than it can fix the sulfide onto nitrogen skeletons (the sulfate-
+#: reduction sequence outruns the assimilation that needs O-acetylserine/-homoserine), so
+#: production is de-repressed at low yeast-assimilable nitrogen (decision D-29). Like SO₂ it
+#: is **carbon-free** (registered with 0 carbon atoms below), so it contributes nothing to
+#: ``total_carbon`` and its produced-only pool sits on no conservation ledger — the sulfur it
+#: carries is not tracked anywhere else (there is no sulfate/sulfur state), exactly as free
+#: SO₂'s sulfur is not. This molar mass is carried for completeness (the tracked species'
+#: weight) and for the deferred CO₂-stripping volatilization sink; the v1 production kinetics
+#: work in g/L directly and need no molar conversion.
+M_H2S = 2 * _M_H + 1 * _M_S
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -133,14 +144,16 @@ MOLAR_MASS: dict[str, float] = {
     "malic_acid": M_MALIC,
     "lactic_acid": M_LACTIC,
     "sulfur_dioxide": M_SO2,
+    "hydrogen_sulfide": M_H2S,
     "alpha_acetolactate": M_ACETOLACTATE,
     "diacetyl": M_DIACETYL,
     "butanediol": M_BUTANEDIOL,
 }
 
-#: Carbon atoms per molecule, keyed by species name. ``sulfur_dioxide`` is carried at
-#: **0** so ``carbon_mass_fraction("sulfur_dioxide")`` returns 0.0 (not a KeyError) —
-#: the free-SO₂ pool is correctly carbon-inert in any carbon sum (decision D-22).
+#: Carbon atoms per molecule, keyed by species name. The two sulfur species
+#: ``sulfur_dioxide`` and ``hydrogen_sulfide`` are carried at **0** so
+#: ``carbon_mass_fraction(...)`` returns 0.0 (not a KeyError) — the free-SO₂ pool (D-22) and
+#: the H₂S pool (D-29) are correctly carbon-inert in any carbon sum.
 CARBON_ATOMS: dict[str, int] = {
     "glucose": 6,
     "fructose": 6,
@@ -157,6 +170,7 @@ CARBON_ATOMS: dict[str, int] = {
     "malic_acid": 4,
     "lactic_acid": 3,
     "sulfur_dioxide": 0,
+    "hydrogen_sulfide": 0,
     "alpha_acetolactate": 5,
     "diacetyl": 4,
     "butanediol": 4,

@@ -9,7 +9,7 @@ from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine
 
 SHARED = (
     "X", "S", "E", "N", "T", "CO2", "X_dead", "Gly", "Byp", "esters", "fusels", "esters_gas",
-    "acetolactate", "diacetyl", "butanediol", "acetaldehyde",
+    "acetolactate", "diacetyl", "butanediol", "acetaldehyde", "h2s",
 )  # fmt: skip
 
 
@@ -26,10 +26,11 @@ def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
     assert schema.names == SHARED + WINE_ACID_SLOTS + WINE_SO2_SLOTS + WINE_MLF_SLOTS
     assert schema.spec("S").size == 1
-    # 16 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
-    # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — and acetaldehyde, D-27)
-    # + 4 wine-only acid/cation slots (D-18) + 1 free-SO₂ slot (D-22) + 1 X_mlf slot (D-23)
-    assert schema.size == 22
+    # 17 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
+    # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
+    # h2s, D-29) + 4 wine-only acid/cation slots (D-18) + 1 free-SO₂ slot (D-22)
+    # + 1 X_mlf slot (D-23)
+    assert schema.size == 23
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -39,8 +40,8 @@ def test_beer_schema_has_three_sequential_sugars():
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
     # X, S(3), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20),
-    # acetolactate, diacetyl, butanediol (VDK pathway, D-26), acetaldehyde (D-27)
-    assert schema.size == 18
+    # acetolactate, diacetyl, butanediol (VDK pathway, D-26), acetaldehyde (D-27), h2s (D-29)
+    assert schema.size == 19
 
 
 def test_shared_variable_units_are_canonical():
@@ -65,6 +66,7 @@ def test_shared_variable_units_are_canonical():
         "diacetyl": "g/L",
         "butanediol": "g/L",
         "acetaldehyde": "g/L",
+        "h2s": "g/L",
     }
 
 
@@ -159,6 +161,10 @@ VDK_PROCESSES = {
     "diacetyl_reduction",
 }
 ACETALDEHYDE_PROCESSES = {"acetaldehyde_production", "acetaldehyde_reduction"}
+# Hydrogen-sulfide production (decision D-29): the low-nitrogen sulfidic off-aroma, one
+# flux-linked producer with an inverse-N gate. Intrinsic yeast metabolism, so — like the
+# ester/VDK/acetaldehyde pools — wired into BOTH media by default (isolable but always on).
+H2S_PROCESSES = {"hydrogen_sulfide_production"}
 # Malolactic fermentation (decision D-23) is wired into the WINE medium only (beer has no
 # malic/lactic slots); it is enabled in a bare build_process_set and disabled at the compile
 # seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic at VALIDATED).
@@ -169,9 +175,16 @@ EXPECTED_PROCESSES = {
         | BYPRODUCT_PROCESSES
         | VDK_PROCESSES
         | ACETALDEHYDE_PROCESSES
+        | H2S_PROCESSES
         | MLF_PROCESSES
     ),
-    "beer": CORE_PROCESSES | BYPRODUCT_PROCESSES | VDK_PROCESSES | ACETALDEHYDE_PROCESSES,
+    "beer": (
+        CORE_PROCESSES
+        | BYPRODUCT_PROCESSES
+        | VDK_PROCESSES
+        | ACETALDEHYDE_PROCESSES
+        | H2S_PROCESSES
+    ),
 }
 EXPECTED_MODIFIERS = {"arrhenius_growth", "arrhenius_uptake"}
 

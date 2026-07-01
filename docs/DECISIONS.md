@@ -1783,6 +1783,82 @@ precision at every column. 7 new tests (+1 MLF assertion tightened); **349 green
 clean. **Next in the beat:** H₂S (carbon-free, inverse-low-N gate — the accounting-easiest,
 following the SO₂ precedent).
 
+## D-29 — Hydrogen sulfide (H₂S): a carbon-free produced pool with an inverse-nitrogen gate
+
+**Status: IMPLEMENTED 2026-07-01** (364 green + 5 benchmark). The §3.2 aroma beat after the SO₂
+free/bound split (D-28), and — as the D-27/D-28 forward notes anticipated — the **accounting-
+easiest** metabolite yet. H₂S ("rotten egg", sensory threshold ~1–2 µg/L) is released by the
+yeast sulfate-reduction sequence: sulfate → sulfite → sulfide, where the sulfide is normally
+fixed onto **nitrogen** skeletons (O-acetylserine/-homoserine) to build cysteine/methionine.
+When yeast-assimilable nitrogen (YAN) runs low there is no acceptor, so sulfide is excreted as
+H₂S — **de-repression at low nitrogen**, the exact inverse of the Ehrlich fusel gate (`N/(K_n+N)`,
+D-19).
+
+**The model — one Process, one produced-only pool, carbon-free.** New `h2s` state slot (g/L,
+`default=0.0`, in `_common_specs` ⇒ **both** media). One additive Process
+`HydrogenSulfideProduction` (`core.kinetics.hydrogen_sulfide`):
+
+    d(h2s)/dt = k_h2s · X·S_total/(K_sugar_uptake + S_total) · K_h2s_n/(K_h2s_n + N)
+
+flux-linked (shares `K_sugar_uptake`, so it stops at dryness — the sulfate-reduction machinery
+runs while the cell ferments), inverse-N gated (`K_h2s_n/(K_h2s_n+N)`: ~0 when N replete, → 1 as
+N → 0), and held **temperature-flat** (documented v1 simplification, like the α-acetolactate
+excretion D-26 and the acetaldehyde production D-27). Intrinsic yeast metabolism, so wired into
+both media (its own isolable `_H2S_PROCESSES` tuple; unlike the *dosed* MLF organism). Params in
+a new shared, medium-agnostic `hydrogen_sulfide.yaml` (sulfate reduction is generic yeast
+metabolism), merged at the compile seam alongside `acetaldehyde.yaml`/`vicinal_diketones.yaml`.
+
+**Why a separate `K_h2s_n`, not the growth `K_n`.** The gate half-saturation is a **new
+parameter on the YAN scale** (`0.1 g/L`, speculative, band `[0.05, 0.2]`), *deliberately distinct*
+from the growth `K_n` (`0.0088 g/L`). Reusing the growth constant would make a razor-edge gate
+that opens only in a thin sliver at near-zero N; the YAN-scale constant makes the repression a
+smooth, physiologically-relevant function across a must's nitrogen range (H₂S-management practice
+targets YAN ≳ 140–150 mg/L; Ugliano 2009; Jiranek/Henschke). `k_h2s = 2e-6 /h` (speculative, band
+`[5e-7, 1e-5]`) sizes cumulative produced ~0.5 mg/L for a default low-YAN wine.
+
+**The most isolable beat in the model — but precisely stated.** H₂S is **carbon-free** (registered
+with 0 carbon in `chemistry`, like SO₂), so it sits on **no conservation ledger** (its sulfur is
+untracked, exactly as free SO₂'s is — there is no sulfate/sulfur state) and needs **no new
+conservation code**; carbon still closes to machine precision on a compiled run with H₂S wired in.
+The Process **touches only `h2s`** and merely *reads* `X`/`S`/`N`, so disabling it leaves the
+**RHS of every other column byte-for-byte identical — verified *exactly* (0.0)** across states
+(`test_isolable_at_derivative_level`). The *integrated* trajectory then drifts by only ~1e-7
+relative — a **pure adaptive-solver mesh artifact** (adding the `h2s` equation shifts the error-
+controlled step selection), **not a physical coupling**; this is cleaner than the acetaldehyde
+buffer (D-27), whose `E` write feeds a *genuine* second-order `E`→viability perturbation on top
+of the mesh effect. The advisor predicted "byte-for-byte"; the empirics refined it to
+byte-for-byte *at the RHS* + a ~1e-7 mesh artifact at the trajectory level (both pinned:
+`test_isolable_at_derivative_level`, `test_trajectory_isolability_is_solver_mesh_only`). **No tier
+headline either:** unlike the diacetyl decarb (writes shared `CO2`, D-26) and acetaldehyde
+production (writes `E`, D-27), this writes a **fresh pool nothing reads**, so no other column's
+structural tier drops. All-speculative.
+
+**The load-bearing empirical finding (checked BEFORE writing the acceptance test — the D-26
+checkpoint discipline).** The advisor flagged, and a run confirmed, that the defining real
+behaviour — *low-YAN must ⇒ far more H₂S* — is only **partially** reproduced, because the
+nitrogen model strips `N` to ~0 by **day ~1.3 regardless of dose** (the known no-residual-N-floor
+gap, D-23). Once N = 0 the inverse gate is ~1 for the rest of the ferment for **every** must, so
+the **cumulative endpoint lever is muted**: 80 / 150 / 300 mg/L YAN → 0.557 / 0.542 / 0.527 mg/L
+(direction right, only ~5 %). So the acceptance test does **not** assert a hollow
+`low_final ≫ high_final`. What *does* emerge cleanly and is the anchor: **the gate direction**,
+tested two honest ways — (1) at the derivative level, rate(low N) > rate(high N) at fixed flux
+(`test_inverse_nitrogen_gate_direction`); (2) integrated and cross-must, the low-YAN must produces
+**~1.8× more H₂S by day 1** *even though it grows less biomass* (2.14 vs 1.70 g/L X, so the gate
+wins over the higher flux — not a flux artifact). The muted endpoint is pinned as *small on
+purpose* (`test_cross_must_endpoint_lever_is_muted`), documenting the gap rather than papering
+over it.
+
+**Scope (v1) / deferred.** **Produced-only** — no CO₂-stripping volatilization sink yet, so `h2s`
+is *cumulative produced*, which **overstates residual** (real fermentation sweeps most H₂S out
+with the CO₂ stream to µg/L residuals). The stripping sink is the deferred follow-up — the exact
+ester **D-19 (produced-only) → D-20 (Henry's-law sink)** precedent. Yeast-pathway (sulfate-
+reduction) H₂S only; other sulfides/mercaptans and copper-binding are out of scope. The full
+cross-must YAN lever unlocks only when the **residual-N floor** lands (a separate nitrogen-model
+beat; see Deferred). New `M_H2S` in `chemistry` (0 carbon). 15 new tests; **364 green** + 5
+benchmark, ruff + mypy clean. **Next in §3.2:** the aroma beat is essentially complete (esters,
+fusels, VDK/diacetyl, acetaldehyde, SO₂ speciation, H₂S); candidates are the H₂S CO₂-stripping
+sink or the residual-N floor (which would make this beat's cross-must lever real).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -1791,5 +1867,15 @@ following the SO₂ precedent).
 - ~~**Stochastic ensemble API**~~ — **decided in D-24 and IMPLEMENTED 2026-07-01**
   (`runtime/ensemble.py`): triangular Monte-Carlo over the `Uncertainty` bands, scoped to
   the active Process set's reads, nominal + median + P5/P95 band, per-member conservation.
+- **H₂S CO₂-stripping volatilization sink** (D-29 follow-up): H₂S is currently produced-only,
+  so the `h2s` pool is *cumulative produced* and overstates residual (real H₂S is largely swept
+  out by the CO₂ stream to µg/L). Add a Henry's-law/gas-flow stripping sink into an `h2s_gas`
+  bookkeeping pool — the exact ester D-19 → D-20 precedent (but simpler: carbon-free, so no
+  ledger weighting).
+- **Residual-nitrogen / satiation floor** (surfaced in D-23, load-bearing for D-29): the growth
+  Process strips lumped `N` to ~0 regardless of dose (real musts retain ~50–150 mg/L + proline).
+  This mutes the D-29 cross-must H₂S lever (and the MLF-growth beat, D-23). A residual-N floor
+  (or an explicit proline/non-assimilable pool) would make the low-vs-high-YAN H₂S difference
+  real at the cumulative endpoint, not just early.
 - **Packaged parameter-data access:** tests read YAML via filesystem path. If we
   ship a wheel that must read its own data, switch to `importlib.resources`.

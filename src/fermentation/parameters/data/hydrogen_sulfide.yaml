@@ -1,0 +1,73 @@
+# Hydrogen sulfide (H2S) production kinetics (decision D-29).
+#
+# SHARED, medium-agnostic parameter file: loaded alongside the <medium>_<strain>.yaml by the
+# compile seam (the store merges paths; these names are collision-free with the per-medium
+# kinetic parameters). H2S formation is generic yeast metabolism — the sulfate-reduction
+# sequence, a property of the pathway not the beverage — so, like acetaldehyde.yaml and
+# vicinal_diketones.yaml, its constants live in one shared file.
+#
+# THE MODEL (a produced-only, carbon-free pool with an INVERSE-nitrogen gate — decision D-29):
+#
+#   (sulfate, untracked) --production--> h2s        [de-repressed as YAN runs out]
+#                            k_h2s * X*S/(K_su+S) * K_h2s_n/(K_h2s_n + N)
+#
+# Yeast reduces sulfate to sulfide during fermentation; normally the sulfide is fixed onto
+# NITROGEN skeletons (O-acetylserine/-homoserine) to build cysteine/methionine. When yeast-
+# assimilable nitrogen (YAN) runs low there is no acceptor, so the sulfide is excreted as H2S
+# ("rotten egg", sensory threshold ~1-2 ug/L). Production is therefore DE-REPRESSED at low N
+# — the OPPOSITE of the Ehrlich fusel gate N/(K_n+N) (D-19). H2S carries NO carbon (registered
+# with 0 carbon atoms in core.chemistry), so it sits on NO conservation ledger and its
+# production draws from nothing the model tracks (there is no sulfate/sulfur state) — exactly
+# as free SO2's sulfur is untracked (D-22). The Process touches ONLY h2s (reads X/S/N without
+# writing them), so it is the most isolable beat in the model: disabling it leaves the RHS of
+# every other column byte-for-byte identical; the integrated trajectory differs only by a ~1e-7
+# adaptive-solver mesh artifact (not a physical coupling) — cleaner than the acetaldehyde
+# buffer's genuine second-order E->viability coupling (D-27) because nothing downstream reads h2s.
+#
+# TEMPERATURE. Held TEMPERATURE-FLAT as a documented v1 simplification (like the alpha-
+# acetolactate excretion and the acetaldehyde production): real H2S has a strain/temperature
+# dependence but it is not clean or benchmarked, and no benchmark asserts an H2S temperature
+# direction in v1. No Arrhenius factor.
+#
+# TIERS. Both rate constants are order-of-magnitude estimates, so the Process stays speculative;
+# parameter-tier propagation (D-1) caps the h2s output tier at speculative. NO tier headline
+# for any other column: unlike the diacetyl decarboxylation (writes shared CO2, D-26) and the
+# acetaldehyde production (writes E, D-27), this Process writes a FRESH pool nothing reads, so
+# no other column's structural tier drops. The MECHANISM (sulfate-reduction H2S de-repressed at
+# low nitrogen) is textbook (Jiranek/Henschke; Ugliano; Mendes-Ferreira); only the RATE
+# magnitudes are the author's estimates.
+#
+# SCOPE (v1) / HONEST CAVEATS:
+#   * PRODUCED-ONLY. No CO2-stripping volatilization sink yet, so the h2s pool is CUMULATIVE
+#     H2S PRODUCED, which OVERSTATES residual (real fermentation sweeps most H2S out with the
+#     CO2 stream, leaving ug/L residuals). A stripping sink is the deferred follow-up — the
+#     ester D-19 (produced-only) -> D-20 (Henry's-law sink) precedent.
+#   * THE CROSS-MUST YAN LEVER IS MUTED by an upstream model gap. The defining real behaviour
+#     (a low-YAN must makes far more H2S than a high-YAN one) is only PARTIALLY reproduced,
+#     because the nitrogen model strips N to ~0 early (~day 1.3) REGARDLESS OF DOSE (no
+#     residual-N/proline floor). Once N=0 the inverse gate is ~1 for the rest of the ferment
+#     for EVERY must, so cumulative H2S differs little between musts. What DOES emerge cleanly
+#     (the acceptance anchor): WITHIN a run the H2S production rate ramps up as N depletes —
+#     the gate mechanism itself. The cross-must lever becomes real only once the deferred
+#     residual-N floor lands (D-29; the D-23 nitrogen-gap note).
+
+# -- PRODUCTION: sulfate -> H2S (flux-linked, inverse-N gate, temperature-flat) ----------
+k_h2s:
+  value: 2.0e-6
+  unit: "1/h"   # d(h2s)/dt = k_h2s * X * S/(K_sugar_uptake + S) * K_h2s_n/(K_h2s_n + N)
+  tier: speculative
+  uncertainty: { low: 5.0e-7, high: 1.0e-5, note: "cumulative produced ~ k_h2s * integral(flux*gate) ~ k_h2s * S0/q_sugar_max; sized so a default low-YAN wine makes ~0.5-1 mg/L cumulative PRODUCED (overstates residual, which is ug/L after CO2 stripping); order-of-magnitude estimate" }
+  provenance:
+    source: "author estimate; H2S is released by the yeast sulfate-reduction sequence when assimilable nitrogen is insufficient to fix the sulfide (Jiranek, Langridge & Henschke 1995, Appl. Environ. Microbiol.; Ugliano et al. 2009; Mendes-Ferreira et al. 2009)"
+    conditions: "generic yeast; H2S formation coupled to the biomass-catalysed sugar (fermentative) flux, shared K_sugar_uptake, and de-repressed at low YAN"
+    notes: "PRODUCED-ONLY v1 (no CO2-stripping sink), so this magnitude targets cumulative H2S PRODUCED, not residual. Flux-linked so it stops at dryness; held TEMPERATURE-FLAT as a documented v1 simplification. Magnitude speculative."
+
+K_h2s_n:
+  value: 0.1
+  unit: "g/L"   # inverse-nitrogen half-saturation: gate = K_h2s_n/(K_h2s_n + N)
+  tier: speculative
+  uncertainty: { low: 0.05, high: 0.2, note: "half-repression around ~100 mg/L YAN; H2S-management practice targets YAN >~ 140-150 mg/L to suppress sulfide, so the repression half-point sits on the YAN management scale" }
+  provenance:
+    source: "author estimate on the YAN scale; H2S risk rises sharply below ~140-150 mg/L YAN (Ugliano et al. 2009; Henschke & Jiranek nitrogen reviews)"
+    conditions: "generic yeast; nitrogen-repression half-saturation for the INVERSE gate K_h2s_n/(K_h2s_n+N) (gate ~0 when N replete, -> 1 as N -> 0)"
+    notes: "DELIBERATELY DISTINCT from the growth K_n (0.0088 g/L): reusing that would make a razor-edge gate opening only in a thin sliver at near-zero N. The YAN-scale constant makes the repression smooth across a must's nitrogen range. Magnitude speculative; the muted cross-must lever (see file header) is an upstream N-stripping gap, not this value."

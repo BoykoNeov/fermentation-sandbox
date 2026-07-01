@@ -274,14 +274,16 @@ def _load_parameters(
     # Merge the shared, medium-agnostic parameter files alongside the medium file so every
     # default-lookup scenario can compute pH (acidbase.yaml, decision D-18), run the diacetyl
     # pathway (vicinal_diketones.yaml, decision D-26 — the load-bearing decarb step is
-    # non-enzymatic, so its constants are medium-agnostic) and the acetaldehyde buffer
-    # (acetaldehyde.yaml, decision D-27 — main-pathway yeast metabolism, likewise generic).
-    # The names are collision-free with the per-medium kinetic parameters; load_parameters
-    # merges left-to-right.
+    # non-enzymatic, so its constants are medium-agnostic), the acetaldehyde buffer
+    # (acetaldehyde.yaml, decision D-27 — main-pathway yeast metabolism, likewise generic) and
+    # H₂S production (hydrogen_sulfide.yaml, decision D-29 — the sulfate-reduction sequence,
+    # generic yeast metabolism). The names are collision-free with the per-medium kinetic
+    # parameters; load_parameters merges left-to-right.
     shared_files = [
         base / "acidbase.yaml",
         base / "vicinal_diketones.yaml",
         base / "acetaldehyde.yaml",
+        base / "hydrogen_sulfide.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 

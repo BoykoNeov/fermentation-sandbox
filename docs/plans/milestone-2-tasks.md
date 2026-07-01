@@ -281,8 +281,23 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         bisulfite, ≤5 % vs total-free at wine pH). Caveat: acetaldehyde-only binder ⇒ `bound`
         under-estimates ("total" ≈ "free + acetaldehyde-bound"). 7 new tests; **349 green**,
         ruff + mypy clean. Full record in **DECISIONS → D-28**.
-  - [ ] **H₂S** — N/S-deficiency signal; rises when N is *low* (inverse gate vs fusels),
-        off-gassed. Carbon-free ⇒ naturally outside `total_carbon` (the SO₂ precedent);
-        the accounting-easiest of the three.
+  - [x] **H₂S — carbon-free produced pool with an inverse-nitrogen gate (decision D-29).
+        LANDED 2026-07-01.** N/S-deficiency signal ("rotten egg"): yeast reduces sulfate faster
+        than it can fix the sulfide onto nitrogen skeletons, so production is *de-repressed at
+        low N* (inverse of the Ehrlich fusel gate). One flux-linked, temperature-flat Process
+        `HydrogenSulfideProduction` filling a new carbon-free `h2s` slot:
+        `d(h2s)/dt = k_h2s·X·S/(K_su+S)·K_h2s_n/(K_h2s_n+N)`. **Most isolable beat yet:** touches
+        only `h2s` (reads X/S/N, writes none), on no conservation ledger, so disabling it leaves
+        every other column's RHS byte-for-byte exact (integrated ~1e-7 = solver-mesh only, not a
+        physical coupling); no tier headline (writes a fresh pool nothing reads). New shared
+        `hydrogen_sulfide.yaml` with a *separate* `K_h2s_n=0.1 g/L` (YAN scale, NOT the growth
+        `K_n=0.0088` — that would be a razor-edge gate) and `k_h2s=2e-6/h`; both speculative.
+        **Load-bearing empirical check (before the test):** the cross-must cumulative lever is
+        **muted** (80/150/300 mg/L YAN → 0.557/0.542/0.527 mg/L) because N is stripped to ~0 by
+        day ~1.3 regardless of dose (no residual-N floor, D-23 gap) — so the anchor is the *gate
+        direction*: derivative-level rate(low N)>rate(high N), and integrated the low-YAN must
+        makes ~1.8× more H₂S by day 1 despite *less* biomass. SCOPE: produced-only (cumulative
+        produced, overstates residual; CO₂-stripping sink deferred — the D-19→D-20 precedent).
+        15 new tests; **364 green** + 5 benchmark, ruff+mypy clean.
   - [ ] **MLF-derived diacetyl** — *Oenococcus* from citrate, a real coupling now that MLF
         exists (D-23). Deferred out of the D-26 v1 (yeast-pathway only).
