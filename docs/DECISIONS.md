@@ -2209,8 +2209,10 @@ non-assimilable cell wall), the physically-right proportion.
 [40k, 90k]) are author estimates and the single-amino-acid / carbon-only-debris lumping is a
 simplification (real autolysate is a mix; mannoproteins retain some nitrogen). New species `glucan`
 (C6H10O5) in `chemistry.py`; new wine-only `debris` slot (schema 25→26); new `autolysis_rate_per_h`
-scenario key. 11 new tests (`tests/test_autolysis.py`), 428 green + 5 benchmark, ruff + mypy clean,
-§2.2 undosed trio unchanged.
+scenario key. 12 new tests (`tests/test_autolysis.py`) — including an advisor-ordered **three-way
+composition** test (autolysis *feeds* the pool while the D-32 swap and D-33 re-route *drain* it, the
+actual MLF-growth-prerequisite configuration every other test isolates apart: carbon + nitrogen close
+over the full run) — 429 green + 5 benchmark, ruff + mypy clean, §2.2 undosed trio unchanged.
 
 **STILL-DEFERRED — MLF-growth itself.** With both prerequisites now in hand (D-33 fusel re-route, D-34
 autolysis refill), the remaining work is the *consumer*: an MLF-with-growth Process feeding a growing

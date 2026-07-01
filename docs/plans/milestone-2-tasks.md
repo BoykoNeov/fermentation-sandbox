@@ -254,8 +254,10 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       carrying-cap pattern — consumes core state, so off by default; undosed = byte-for-byte core).
       Emergent + verified: amino acids rise from empty post-AF, debris outgrows them. New `glucan`
       species; new wine-only `debris` slot (schema 25→26); new params `k_autolysis`/`E_a_autolysis`
-      (speculative). 11 new tests (`test_autolysis.py`); **428 green** + 5 benchmark, ruff+mypy
-      clean, §2.2 undosed trio unchanged. Full record in **DECISIONS → D-34**.
+      (speculative). 12 new tests (`test_autolysis.py`), incl. an advisor-ordered three-way
+      composition test (autolysis feeds while the D-32 swap + D-33 re-route drain — the actual
+      MLF-growth-prerequisite config); **429 green** + 5 benchmark, ruff+mypy clean, §2.2 undosed
+      trio unchanged. Full record in **DECISIONS → D-34**.
 - [ ] **MLF-growth — later composition (decision D-23).** Add a growth Process touching `X_mlf`,
       funded from the amino-acid ledger + autolysis. **Both aa-ledger prerequisites now landed**
       (D-33 fusel re-route + deamination; D-34 autolysis refill), so the remaining block is the
