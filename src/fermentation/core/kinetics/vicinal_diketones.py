@@ -76,7 +76,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.chemistry import (
+    M_ACETOLACTATE,
+    M_CO2,
+    M_DIACETYL,
+    carbon_mass_fraction,
+)
+from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar,
     fermentative_flux_shape,
@@ -129,4 +135,50 @@ class AcetolactateExcretion(Process):
         rate = params["k_acetolactate"] * flux
         d[schema.slice("acetolactate")] = rate
         draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(_ACETOLACTATE_SPECIES))
+        return d
+
+
+class AcetolactateDecarboxylation(Process):
+    """Spontaneous α-acetolactate → diacetyl + CO2 — the rate-limiting, T-critical step.
+
+    ``d(acetolactate)/dt = −r·M_acetolactate``, ``d(diacetyl)/dt = +r·M_diacetyl``,
+    ``d(CO2)/dt = +r·M_CO2`` with the molar turnover ``r = k_decarb · f(T) ·
+    [acetolactate]/M_acetolactate`` and ``f(T) = arrhenius_factor(T, E_a_decarb, T_ref)``.
+    The oxidative decarboxylation is C5 → C4 + CO2, so carbon closes mole-for-mole on the
+    existing ledger exactly like malolactic ``malic → lactic + CO2`` (D-23); no sugar draw.
+
+    **Non-enzymatic and NOT yeast-gated** — this is the whole point (decision D-26). The
+    reaction proceeds outside the cell whether or not viable yeast is present, so the
+    α-acetolactate reservoir keeps converting to diacetyl *after* fermentation ends. It is
+    **first-order in α-acetolactate** and **strongly temperature-dependent** (``E_a_decarb``
+    held high, above the reduction's ``E_a_reduction``), which makes it the rate-limiting
+    step of VDK removal and the reason a diacetyl rest is temperature-critical: warm it up
+    and the reservoir empties to diacetyl faster (Haukeli & Lie 1978; Krogerus 2013 review;
+    the sourced ordering, magnitude speculative). ``acetolactate`` is clamped ≥ 0 so a
+    solver undershoot cannot manufacture diacetyl. Mass carries a small gap (the oxidative
+    decarb consumes untracked O2) — carbon is the invariant, as for beer's hydrolysis water
+    (D-8). Tier **speculative** (rate magnitude estimate).
+    """
+
+    name = "acetolactate_decarboxylation"
+    tier = Tier.SPECULATIVE
+    touches = ("acetolactate", "diacetyl", "CO2")
+    #: ``k_decarb`` sets the spontaneous conversion magnitude; ``E_a_decarb`` (the sourced,
+    #: load-bearing temperature ordering) and ``T_ref`` set the temperature shape. Their
+    #: tiers cap the diacetyl output tier via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = ("k_decarb", "E_a_decarb", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        acetolactate = max(float(y[schema.slice("acetolactate")][0]), 0.0)
+        if acetolactate <= 0.0:  # nothing in the reservoir to convert
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_decarb"], params["T_ref"])
+        r = params["k_decarb"] * f_t * acetolactate / M_ACETOLACTATE  # molar turnover
+        d[schema.slice("acetolactate")] = -r * M_ACETOLACTATE
+        d[schema.slice("diacetyl")] = r * M_DIACETYL
+        d[schema.slice("CO2")] = r * M_CO2
         return d

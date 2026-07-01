@@ -17,11 +17,18 @@ the following commits.
 import numpy as np
 import pytest
 
-from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.chemistry import (
+    M_ACETOLACTATE,
+    M_CO2,
+    M_DIACETYL,
+    carbon_mass_fraction,
+)
 from fermentation.core.kinetics import (
+    AcetolactateDecarboxylation,
     AcetolactateExcretion,
     GrowthNitrogenLimited,
     SugarUptakeToEthanolCO2,
+    arrhenius_factor,
 )
 from fermentation.core.media import wine_schema
 from fermentation.core.process import ProcessSet
@@ -33,6 +40,8 @@ from fermentation.validation import assert_conserved, assert_nonnegative, total_
 
 #: Carbon fractions the pools book against (mirror the Process/chemistry constants).
 _ACETOLACTATE_C = carbon_mass_fraction("alpha_acetolactate")
+_DIACETYL_C = carbon_mass_fraction("diacetyl")
+_CO2_C = carbon_mass_fraction("CO2")
 _GLUCOSE_C = carbon_mass_fraction("glucose")
 
 
@@ -190,6 +199,134 @@ def test_excretion_perturbs_only_sugar_per_rhs(params):
         assert carbon_residual == pytest.approx(0.0, abs=1e-12)
 
 
+# -- decarboxylation: α-acetolactate -> diacetyl + CO2 (spontaneous, decision D-26) --
+
+
+def _wine_y0_with_acetolactate(schema: StateSchema, *, acetolactate: float, **kw) -> FloatArray:
+    """A wine state with the α-acetolactate reservoir pre-loaded (the decarb needs a
+    reservoir to convert; the produced-only pool is 0 at pitch so it must be set here)."""
+    y = _wine_y0(schema, **kw)
+    y[schema.slice("acetolactate")] = acetolactate
+    return y
+
+
+def test_decarb_metadata():
+    p = AcetolactateDecarboxylation()
+    assert p.name == "acetolactate_decarboxylation"
+    assert p.tier is Tier.SPECULATIVE
+    # Carbon-closing decarboxylation: reservoir -> diacetyl + CO2, no sugar draw.
+    assert set(p.touches) == {"acetolactate", "diacetyl", "CO2"}
+    assert set(p.reads) == {"k_decarb", "E_a_decarb", "T_ref"}
+
+
+def test_decarb_derivative_matches_closed_form_and_closes_carbon(params):
+    schema = wine_schema()
+    ala, t = 0.02, 298.15  # off T_ref so the Arrhenius factor bites
+    y = _wine_y0_with_acetolactate(schema, acetolactate=ala, t=t)
+    d = AcetolactateDecarboxylation().derivatives(0.0, y, schema, params)
+
+    f_t = arrhenius_factor(t, params["E_a_decarb"], params["T_ref"])
+    r = params["k_decarb"] * f_t * ala / M_ACETOLACTATE  # molar turnover
+    assert schema.get(d, "acetolactate") == pytest.approx(-r * M_ACETOLACTATE)
+    assert schema.get(d, "diacetyl") == pytest.approx(r * M_DIACETYL)
+    assert schema.get(d, "CO2") == pytest.approx(r * M_CO2)
+    # Carbon closes mole-for-mole (C5 -> C4 + C1), like malic -> lactic + CO2 (D-23).
+    carbon_residual = (
+        schema.get(d, "acetolactate") * _ACETOLACTATE_C
+        + schema.get(d, "diacetyl") * _DIACETYL_C
+        + schema.get(d, "CO2") * _CO2_C
+    )
+    assert carbon_residual == pytest.approx(0.0, abs=1e-15)
+    # No sugar drawn (unlike excretion), no ethanol/biomass touched.
+    for var in ("X", "S", "E", "N", "butanediol"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_decarb_factor_is_one_at_reference_temperature(params):
+    schema = wine_schema()
+    ala = 0.02
+    y = _wine_y0_with_acetolactate(schema, acetolactate=ala, t=params["T_ref"])
+    d = AcetolactateDecarboxylation().derivatives(0.0, y, schema, params)
+    r = params["k_decarb"] * ala / M_ACETOLACTATE
+    assert schema.get(d, "diacetyl") == pytest.approx(r * M_DIACETYL)
+
+
+def test_decarb_rises_with_temperature(params):
+    # The load-bearing property (D-26): the spontaneous conversion accelerates with
+    # temperature — this is what makes a warm rest clear diacetyl faster.
+    schema = wine_schema()
+    cold = AcetolactateDecarboxylation().derivatives(
+        0.0, _wine_y0_with_acetolactate(schema, acetolactate=0.02, t=283.15), schema, params
+    )
+    warm = AcetolactateDecarboxylation().derivatives(
+        0.0, _wine_y0_with_acetolactate(schema, acetolactate=0.02, t=303.15), schema, params
+    )
+    assert schema.get(warm, "diacetyl") > schema.get(cold, "diacetyl") > 0.0
+
+
+def test_decarb_is_not_yeast_gated(params):
+    # THE mechanistic point (D-26): the reaction is non-enzymatic, so it proceeds with NO
+    # viable yeast (X=0) — the reason the reservoir keeps making diacetyl after a crash.
+    schema = wine_schema()
+    d = AcetolactateDecarboxylation().derivatives(
+        0.0, _wine_y0_with_acetolactate(schema, acetolactate=0.02, x=0.0), schema, params
+    )
+    assert schema.get(d, "diacetyl") > 0.0
+
+
+def test_decarb_first_order_in_acetolactate(params):
+    # First-order: twice the reservoir ⇒ twice the conversion rate.
+    schema = wine_schema()
+    r1 = AcetolactateDecarboxylation().derivatives(
+        0.0, _wine_y0_with_acetolactate(schema, acetolactate=0.01), schema, params
+    )
+    r2 = AcetolactateDecarboxylation().derivatives(
+        0.0, _wine_y0_with_acetolactate(schema, acetolactate=0.02), schema, params
+    )
+    assert schema.get(r2, "diacetyl") == pytest.approx(2.0 * schema.get(r1, "diacetyl"))
+
+
+def test_decarb_zero_and_clamped_without_reservoir(params):
+    schema = wine_schema()
+    # No reservoir ⇒ nothing to convert.
+    assert np.array_equal(
+        AcetolactateDecarboxylation().derivatives(0.0, _wine_y0(schema), schema, params),
+        schema.zeros(),
+    )
+    # Solver undershoot (acetolactate < 0) must not manufacture diacetyl.
+    assert np.array_equal(
+        AcetolactateDecarboxylation().derivatives(
+            0.0, _wine_y0_with_acetolactate(schema, acetolactate=-1e-9), schema, params
+        ),
+        schema.zeros(),
+    )
+
+
+def test_excretion_plus_decarb_accumulates_diacetyl_and_closes_carbon(params, store):
+    # Two steps wired together: the reservoir fills (excretion) and converts to diacetyl +
+    # CO2 (decarb). Diacetyl accumulates (nothing reduces it yet — reduction is commit 3),
+    # stays trace, and carbon closes to machine precision across sugar -> reservoir ->
+    # diacetyl + CO2 (every step is on the weighted ledger).
+    schema = wine_schema()
+    ps = ProcessSet(
+        schema,
+        [
+            GrowthNitrogenLimited(),
+            SugarUptakeToEthanolCO2(),
+            AcetolactateExcretion(),
+            AcetolactateDecarboxylation(),
+        ],
+        strict=True,
+    )
+    y0 = schema.pack({"X": 0.25, "S": [245.0], "E": 0.0, "N": 0.08, "T": 293.15, "CO2": 0.0})
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 400.0))
+    assert traj.success
+    assert_nonnegative(traj, ("acetolactate", "diacetyl", "S"), atol=1e-12)
+    assert 0.0 < float(traj.series("diacetyl")[-1]) < 0.1  # trace, buttery off-note
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
 # -- tier propagation ---------------------------------------------------------
 
 
@@ -199,3 +336,10 @@ def test_excretion_tier_is_speculative(store):
     # Speculative form and speculative params ⇒ the reservoir output is speculative.
     assert ps.tier_of("acetolactate") is Tier.SPECULATIVE
     assert ps.tier_of("acetolactate", store.tier_map()) is Tier.SPECULATIVE
+
+
+def test_decarb_tier_is_speculative(store):
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AcetolactateDecarboxylation()])
+    assert ps.tier_of("diacetyl") is Tier.SPECULATIVE
+    assert ps.tier_of("diacetyl", store.tier_map()) is Tier.SPECULATIVE
