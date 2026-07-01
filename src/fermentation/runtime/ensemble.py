@@ -21,9 +21,17 @@ floats).
 
 * *Parameter* uncertainty only. Scenario/initial-condition uncertainty (Brix, YAN)
   is a separate axis and is **not** sampled here — ``y0`` is held fixed.
-* Plain Monte Carlo (the method the handoff §1.6 names). Latin-hypercube / Sobol
-  sampling would give better tail coverage per member and is a clean future
-  refinement, but §1.6 does not require it.
+* Plain Monte Carlo (``sampler="mc"``, the method the handoff §1.6 names) by default.
+  Latin-hypercube (``"lhs"``) and Sobol (``"sobol"``) low-discrepancy sequences are
+  also available: they stratify the draws so a fixed member budget covers the band —
+  and especially its tails — more evenly than i.i.d. Monte Carlo. They change only *how*
+  the unit hypercube is drawn (via ``scipy.stats.qmc``), then map it through each
+  parameter's inverse CDF; the ``only``/``exclude`` scoping and the failed-member /
+  survivorship accounting are identical across samplers. Only the *varying* parameters
+  take a hypercube dimension (a pinned zero-width band would waste one and degrade Sobol's
+  balance). Sobol's balance property holds at powers of two, so a Sobol run requires
+  ``n_members`` to be a power of two (it raises otherwise rather than silently returning
+  an unbalanced sequence); LHS and MC take any count.
 * Default distribution is **triangular** ``(low, mode=value, high)``: bounds plus a
   most-likely value is the textbook case for triangular, and ``value`` *is* the
   sourced, benchmarked most-likely estimate. ``uniform`` is available for a caller
@@ -55,6 +63,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 import numpy as np
+from scipy.stats import qmc, triang
 
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -64,6 +73,10 @@ from fermentation.runtime.integrate import Trajectory, simulate
 
 #: Supported sampling distributions over a parameter's ``[low, high]`` band.
 DISTRIBUTIONS = ("triangular", "uniform")
+
+#: Supported ensemble sampling strategies. ``"mc"`` is i.i.d. Monte Carlo; ``"lhs"`` and
+#: ``"sobol"`` are low-discrepancy sequences for better (tail) coverage per member.
+SAMPLERS = ("mc", "lhs", "sobol")
 
 
 class Band(NamedTuple):
@@ -115,6 +128,99 @@ def sample_parameters(
         else:  # uniform
             out[name] = float(rng.uniform(lo, hi))
     return out
+
+
+def _inverse_cdf(q: float, lo: float, val: float, hi: float, distribution: str) -> float:
+    """Map a unit-hypercube coordinate ``q ∈ [0, 1]`` to a value in ``[lo, hi]``.
+
+    The inverse CDF (percent-point function) for the chosen band shape: triangular with
+    mode ``val`` (``scipy.stats.triang`` parameterised by ``c = (val-lo)/(hi-lo)``), or
+    uniform. This is the low-discrepancy counterpart to :func:`sample_parameters`'
+    ``rng.triangular``/``rng.uniform`` draws — same distribution, but the coordinate comes
+    from a stratified QMC engine instead of a PRNG. Callers pass only varying bands here
+    (``hi > lo``), so the ``c`` denominator is never zero.
+    """
+    if distribution == "triangular":
+        return float(triang.ppf(q, (val - lo) / (hi - lo), loc=lo, scale=hi - lo))
+    return lo + q * (hi - lo)  # uniform
+
+
+def _qmc_samples(
+    parameters: ParameterSet,
+    sampled_names: Sequence[str],
+    n_members: int,
+    *,
+    seed: int,
+    distribution: str,
+    sampler: str,
+) -> list[dict[str, float]]:
+    """Build ``n_members`` parameter samples from a low-discrepancy (LHS/Sobol) sequence.
+
+    Only the *varying* sampled parameters (``high > low``) take a hypercube dimension;
+    pinned zero-width bands stay at their nominal ``value`` (giving them a QMC column would
+    waste a dimension and, for Sobol, break its balance). Each member starts from the full
+    nominal ``resolve()`` map (so unsampled and pinned names are at nominal, exactly as in
+    the MC path) and has its varying names replaced by the inverse-CDF image of the QMC
+    coordinate. The engine is seeded, so the whole matrix — and thus the ensemble — is
+    reproducible; because the matrix is fixed up front, member ``i`` always uses row ``i``
+    regardless of which members fail.
+    """
+    varying = [
+        n for n in sampled_names if parameters[n].uncertainty.high > parameters[n].uncertainty.low
+    ]
+    base = parameters.resolve()
+    if not varying:  # nothing to stratify ⇒ every member is the nominal run
+        return [dict(base) for _ in range(n_members)]
+
+    d = len(varying)
+    if sampler == "lhs":
+        engine: qmc.QMCEngine = qmc.LatinHypercube(d=d, seed=seed)
+    else:  # sobol
+        if n_members & (n_members - 1) != 0:  # not a power of two
+            raise ValueError(
+                f"sobol sampling needs n_members to be a power of two for its balance "
+                f"property, got {n_members}; use a power of two, or sampler='lhs'/'mc'"
+            )
+        engine = qmc.Sobol(d=d, seed=seed)
+    unit = engine.random(n_members)  # shape (n_members, d), coordinates in [0, 1)
+
+    samples: list[dict[str, float]] = []
+    for i in range(n_members):
+        out = dict(base)
+        for j, name in enumerate(varying):
+            p = parameters[name]
+            out[name] = _inverse_cdf(
+                float(unit[i, j]), p.uncertainty.low, p.value, p.uncertainty.high, distribution
+            )
+        samples.append(out)
+    return samples
+
+
+def _build_samples(
+    parameters: ParameterSet,
+    sampled_names: Sequence[str],
+    n_members: int,
+    *,
+    seed: int,
+    distribution: str,
+    sampler: str,
+) -> list[dict[str, float]]:
+    """The full list of ``n_members`` ``{name: float}`` samples for the chosen sampler.
+
+    ``"mc"`` reproduces the original per-member PRNG draw sequence byte-for-byte (so a
+    seed pins the same ensemble as before this sampler split existed); ``"lhs"``/``"sobol"``
+    delegate to :func:`_qmc_samples`. Precomputing the whole list is equivalent to drawing
+    inside the integration loop — the draw never depends on a member's integration outcome.
+    """
+    if sampler == "mc":
+        rng = np.random.default_rng(seed)
+        return [
+            sample_parameters(parameters, rng, distribution=distribution, names=sampled_names)
+            for _ in range(n_members)
+        ]
+    return _qmc_samples(
+        parameters, sampled_names, n_members, seed=seed, distribution=distribution, sampler=sampler
+    )
 
 
 def _active_reads(process_set: ProcessSet) -> set[str]:
@@ -175,6 +281,7 @@ class Ensemble:
     tier_map: Mapping[str, Tier]
     sampled_names: tuple[str, ...]
     distribution: str
+    sampler: str
     seed: int
     n_requested: int
     n_succeeded: int
@@ -255,6 +362,7 @@ def simulate_ensemble(
     seed: int = 0,
     t_eval: FloatArray | None = None,
     distribution: str = "triangular",
+    sampler: str = "mc",
     only: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
     param_tiers: Mapping[str, Tier] | None = None,
@@ -275,19 +383,24 @@ def simulate_ensemble(
     ``t_eval`` defaults to 200 evenly spaced points across ``t_span`` (a shared grid is
     required so members can be aggregated). ``param_tiers`` defaults to
     ``parameters.tier_map()`` so the reported tiers are honest (D-1) without the caller
-    threading it. See the module docstring for ``distribution``/``only``/``exclude``.
+    threading it. See the module docstring for ``distribution``/``sampler``/``only``/
+    ``exclude``. ``sampler="mc"`` (default) is i.i.d. Monte Carlo; ``"lhs"``/``"sobol"``
+    are low-discrepancy sequences with better per-member (tail) coverage (``"sobol"`` needs
+    a power-of-two ``n_members``).
 
     A sampled parameter set can make a member fail — ``solve_ivp`` may report
     ``success=False``, or the right-hand side may *raise* (e.g. the uptake carbon-draw
-    guard). Both are caught, recorded in ``failures``, and counted; the RNG still
-    advances one sample per member so reproducibility holds. If more than
-    ``max_failure_fraction`` of members fail, this raises rather than return a
-    survivorship-biased spread from the lucky survivors.
+    guard). Both are caught, recorded in ``failures``, and counted; the samples are drawn
+    up front (one per member) so the same seed reproduces the same ensemble including its
+    failures. If more than ``max_failure_fraction`` of members fail, this raises rather
+    than return a survivorship-biased spread from the lucky survivors.
     """
     if n_members < 1:
         raise ValueError(f"n_members must be >= 1, got {n_members}")
     if distribution not in DISTRIBUTIONS:
         raise ValueError(f"unknown distribution {distribution!r}; expected one of {DISTRIBUTIONS}")
+    if sampler not in SAMPLERS:
+        raise ValueError(f"unknown sampler {sampler!r}; expected one of {SAMPLERS}")
 
     grid = np.linspace(t_span[0], t_span[1], 200) if t_eval is None else np.asarray(t_eval, float)
     tiers = parameters.tier_map() if param_tiers is None else param_tiers
@@ -314,14 +427,17 @@ def simulate_ensemble(
     if not nominal.success:
         raise RuntimeError(f"nominal (unsampled) run failed to integrate: {nominal.message}")
 
-    rng = np.random.default_rng(seed)
+    # Draw every member's parameters up front (one row per member, in order). The draw
+    # never depends on integration outcome, so this is equivalent to drawing inside the
+    # loop — and it makes the same seed reproduce the same ensemble including its failures,
+    # for MC and the QMC samplers alike.
+    samples = _build_samples(
+        parameters, sampled_names, n_members, seed=seed, distribution=distribution, sampler=sampler
+    )
     members: list[FloatArray] = []
     member_params: list[Mapping[str, float]] = []
     failures: list[str] = []
-    for _ in range(n_members):
-        # Draw every member (advancing the RNG identically whether or not it survives),
-        # so the same seed reproduces the same ensemble including its failures.
-        values = sample_parameters(parameters, rng, distribution=distribution, names=sampled_names)
+    for values in samples:
         try:
             traj = run(values)
         except Exception as exc:  # a sampled RHS can raise (uptake guard, etc.)
@@ -358,6 +474,7 @@ def simulate_ensemble(
         tier_map=nominal.tier_map,
         sampled_names=sampled_names,
         distribution=distribution,
+        sampler=sampler,
         seed=int(seed),
         n_requested=n_members,
         n_succeeded=n_succeeded,

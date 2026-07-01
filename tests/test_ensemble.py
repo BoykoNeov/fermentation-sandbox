@@ -217,6 +217,120 @@ def test_band_brackets_are_ordered_and_contain_median():
         ens.band("E", low=90.0, high=10.0)
 
 
+# -- LHS / Sobol low-discrepancy samplers -------------------------------------
+
+
+def _mean_e_at(pset: ParameterSet, sampler: str, *, n: int, seed: int, idx: int) -> float:
+    ps = _toy_ps()
+    y0 = _toy_y0(ps.schema)
+    grid = _short_grid()
+    ens = simulate_ensemble(
+        ps, pset, y0, (0.0, 100.0), n_members=n, seed=seed, t_eval=grid, sampler=sampler
+    )
+    return float(np.mean(ens.members[:, ps.schema.slice("E").start, idx]))
+
+
+def test_qmc_samplers_run_conserve_and_stay_in_band():
+    for sampler in ("lhs", "sobol"):
+        ps, pset = _toy_ps(), _toy_pset()
+        y0 = _toy_y0(ps.schema)
+        grid = _short_grid()
+        ens = simulate_ensemble(
+            ps, pset, y0, (0.0, 100.0), n_members=32, seed=0, t_eval=grid, sampler=sampler
+        )
+        assert ens.sampler == sampler
+        assert ens.n_succeeded == 32
+        conserved = total_mass(ps.schema)
+        for i in range(ens.n_succeeded):
+            # The crown-jewel per-member invariant is sampler-agnostic.
+            assert_conserved(ens.member_trajectory(i), conserved, rtol=1e-5, atol=1e-6)
+            # Draws respect the provenance bands, same as MC.
+            assert 3.0 <= ens.member_params[i]["vmax"] <= 7.0
+            assert 4.0 <= ens.member_params[i]["ks"] <= 6.0
+
+
+def test_qmc_center_matches_mc():
+    # A low-discrepancy sequence should not shift the center — only cover the band more
+    # evenly. The median trajectory must agree with MC to a loose tolerance.
+    ps, pset = _toy_ps(), _toy_pset()
+    y0 = _toy_y0(ps.schema)
+    grid = _short_grid()
+    mc = simulate_ensemble(ps, pset, y0, (0.0, 100.0), n_members=128, seed=1, t_eval=grid)
+    for sampler in ("lhs", "sobol"):
+        q = simulate_ensemble(
+            ps, pset, y0, (0.0, 100.0), n_members=128, seed=1, t_eval=grid, sampler=sampler
+        )
+        e_mc = mc.median()[ps.schema.slice("E").start]
+        e_q = q.median()[ps.schema.slice("E").start]
+        assert np.allclose(e_mc, e_q, atol=1.0)
+
+
+def test_qmc_reduces_estimator_variance():
+    # The point of LHS/Sobol: at a fixed member budget the estimator (here the ensemble
+    # mean of E) is far more stable seed-to-seed than i.i.d. MC. Observed ~8x; assert a
+    # comfortable margin so this is not flaky.
+    pset = _toy_pset()
+    idx = 12
+    seeds = range(12)
+    mc_std = np.std([_mean_e_at(pset, "mc", n=24, seed=s, idx=idx) for s in seeds])
+    lhs_std = np.std([_mean_e_at(pset, "lhs", n=24, seed=s, idx=idx) for s in seeds])
+    assert mc_std > 0.0
+    assert lhs_std < 0.5 * mc_std
+
+
+def test_qmc_reproducible_by_seed():
+    ps, pset = _toy_ps(), _toy_pset()
+    y0 = _toy_y0(ps.schema)
+    grid = _short_grid()
+    for sampler in ("lhs", "sobol"):
+        a = simulate_ensemble(
+            ps, pset, y0, (0.0, 100.0), n_members=16, seed=7, t_eval=grid, sampler=sampler
+        )
+        b = simulate_ensemble(
+            ps, pset, y0, (0.0, 100.0), n_members=16, seed=7, t_eval=grid, sampler=sampler
+        )
+        c = simulate_ensemble(
+            ps, pset, y0, (0.0, 100.0), n_members=16, seed=8, t_eval=grid, sampler=sampler
+        )
+        assert np.array_equal(a.members, b.members)
+        assert not np.array_equal(a.members, c.members)
+
+
+def test_qmc_pins_zero_width_bands():
+    # A zero-width read parameter is in sampled_names but must NOT take a QMC dimension —
+    # it stays at its nominal value in every member while the real band still varies.
+    ps = _toy_ps()
+    pset = _toy_pset(ks_band=(5.0, 5.0))
+    y0 = _toy_y0(ps.schema)
+    grid = _short_grid()
+    ens = simulate_ensemble(
+        ps, pset, y0, (0.0, 100.0), n_members=16, seed=0, t_eval=grid, sampler="lhs"
+    )
+    assert "ks" in ens.sampled_names  # read, so in scope
+    assert all(mp["ks"] == 5.0 for mp in ens.member_params)  # but pinned, never drawn
+    assert np.std([mp["vmax"] for mp in ens.member_params]) > 0.0  # the real band varied
+
+
+def test_sobol_requires_power_of_two():
+    ps, pset = _toy_ps(), _toy_pset()
+    y0 = _toy_y0(ps.schema)
+    grid = _short_grid()
+    with pytest.raises(ValueError, match="power of two"):
+        simulate_ensemble(
+            ps, pset, y0, (0.0, 100.0), n_members=100, seed=0, t_eval=grid, sampler="sobol"
+        )
+
+
+def test_unknown_sampler_raises():
+    ps, pset = _toy_ps(), _toy_pset()
+    y0 = _toy_y0(ps.schema)
+    grid = _short_grid()
+    with pytest.raises(ValueError, match="unknown sampler"):
+        simulate_ensemble(
+            ps, pset, y0, (0.0, 100.0), n_members=8, seed=0, t_eval=grid, sampler="halton"
+        )
+
+
 # -- per-member conservation (the crown-jewel invariant) ----------------------
 
 
@@ -280,7 +394,12 @@ def _wine_scenario(**overrides) -> Scenario:
     return Scenario(**kwargs)
 
 
-def test_wine_ensemble_scopes_to_active_reads_and_conserves_carbon():
+@pytest.mark.parametrize("sampler", ["mc", "lhs", "sobol"])
+def test_wine_ensemble_scopes_to_active_reads_and_conserves_carbon(sampler):
+    # The crown-jewel per-member conservation is enforced on EVERY sampler path (not just
+    # the MC one it was born on): LHS/Sobol produce member_params via a different mechanism
+    # (inverse-CDF, varying/pinned split), so carbon and nitrogen must be shown to close
+    # there too. n_members=8 is a power of two, valid for Sobol.
     compiled = compile_scenario(_wine_scenario())
     grid = np.linspace(0.0, compiled.t_span_h[1], 20)
     ens = simulate_ensemble(
@@ -288,6 +407,7 @@ def test_wine_ensemble_scopes_to_active_reads_and_conserves_carbon():
         compiled.parameters,
         compiled.y0,
         compiled.t_span_h,
+        sampler=sampler,
         n_members=8,
         seed=0,
         t_eval=grid,
