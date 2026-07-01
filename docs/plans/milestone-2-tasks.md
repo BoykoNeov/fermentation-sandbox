@@ -129,6 +129,20 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       accounting constants); failed-member accounting + survivorship threshold; active-reads
       scoping; tier map unchanged. 274 green, ruff + mypy clean.
 
+## Ensemble follow-ups — attribution, LHS/Sobol, per-member N ✅ DONE (2026-07-01, decision D-25)
+
+- [x] **Per-member nitrogen conservation** (`tests/test_ensemble.py`). Crown-jewel invariant
+      extended from carbon to N. Probed first — closes ~1e-12 using each member's own sampled
+      `biomass_N_fraction`; biomass is the only N sink (aa-ledger deferred D-23; fusels route C, not N).
+- [x] **Spread attribution** (`analysis.attribute_spread`, `tests/test_attribution.py`, 7). SRC²
+      variance decomposition post-hoc from `member_params` (no extra runs); shares roll up by
+      parameter tier; `1 − R²` reported as the explicit nonlinear/interaction `unexplained` bucket;
+      `method="srrc"` rank fallback. Wine: ethanol spread driven by `k_prime_d`/`q_sugar_max`.
+- [x] **LHS/Sobol samplers** (`simulate_ensemble(sampler=…)`). `"mc"` default byte-identical;
+      `"lhs"`/`"sobol"` via `scipy.stats.qmc` + inverse-CDF, ~8× lower estimator variance at fixed
+      budget, center unshifted. Only varying params take a hypercube dim; Sobol needs power-of-two
+      `n_members` (raises otherwise). 288 green, ruff + mypy clean. Full record in **D-25**.
+
 ## pH / acid charge-balance solver (keystone, D-18) — ✅ DONE (2026-06-30)
 
 - [x] Track tartaric/malic/lactic as carbon-accounted **wine** state (`wine_schema`;

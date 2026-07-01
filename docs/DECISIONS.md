@@ -1410,8 +1410,8 @@ a single unsampled run stays byte-for-byte reproducible (the architecture rule +
    The reported band uses **outer percentiles (P5/P95 default)**, which keeps the full bracket
    visible and de-sensitises the result to the shape choice. Zero-width bands (`high ≤ low`) pin to
    `value` and consume no randomness.
-2. **Plain Monte Carlo**, the method §1.6 names. Latin-hypercube / Sobol would give better tail
-   coverage per member and is a clean future refinement, but §1.6 does not require it.
+2. **Plain Monte Carlo** by default, the method §1.6 names. Latin-hypercube / Sobol give better
+   tail coverage per member; added as opt-in `sampler=` strategies in **D-25** (MC stays default).
 3. **Sample only what the *active* Process set `reads`** (union of `Process.reads` +
    `RateModifier.reads`), intersected with the loaded params. Sampling anything else is a no-op on
    the trajectory and only dilutes the member count, so the spread means "sensitivity of *this*
@@ -1458,6 +1458,46 @@ audits it. Carbon closes for *every* sampled member — but the check must use t
 accounting constants (e.g. its sampled `biomass_C_fraction`, which the growth Process draws sugar
 carbon against), which is exactly why `member_params[i]` is stored; auditing with the nominal
 constant reads genuine closure as drift.
+
+## D-25 — Ensemble follow-ups: spread attribution, LHS/Sobol, per-member nitrogen
+
+**Status: IMPLEMENTED 2026-07-01** (288 green). Three natural extensions of the D-24 ensemble —
+*not gaps in it*, but the questions it makes askable. Built in the advisor-recommended order
+(cheap probe first, refactor last), each committed separately.
+
+1. **Per-member nitrogen conservation** (`tests/test_ensemble.py`). The D-24 crown-jewel
+   (per-member carbon closure) extended to the nitrogen ledger. **Probed before trusting:** N
+   closes to ~1e-12 across every member using that member's **own** sampled `biomass_N_fraction`
+   (the growth Process draws N against it) — expected, since the aa-ledger is deferred (D-23) and
+   fusels route *carbon*, not N, from sugar, so biomass is the only N sink. A failure here would
+   have been a real N-leak finding, not a test to force green.
+
+2. **Spread attribution by parameter and tier** (`analysis.attribute_spread`,
+   `tests/test_attribution.py`). A first-order variance decomposition computed **post-hoc from one
+   ensemble's stored `member_params`** — no extra integrations (OAT would need N extra ensembles and
+   is a known-poor sensitivity method). Standardized-regression coefficients (SRC): because D-24
+   samples parameters *independently*, the SRC² are near-orthogonal and ≈ sum to the regression R²,
+   giving a genuine variance split; shares roll up by parameter `Tier`. **R² < 1 is expected** (the
+   model is nonlinear — Monod/logistic/Arrhenius), so `1 − R²` is reported explicitly as the
+   `unexplained` interaction/nonlinearity bucket — the budget never reads as "everything explained".
+   `method="srrc"` rank-transforms first (robust fallback for monotone-but-curved responses). Needs
+   n≳50–100 members for a stable fit (underdetermined fits raise). Lives one layer up in
+   `analysis.py` (top-level observable over a runtime `Ensemble`), *not* core — attribution needs
+   parameter tiers, passed in via `ParameterSet.tier_map()` (the Ensemble's `tier_map` is per state
+   *variable*). On the wine ferment: ethanol spread is driven by `k_prime_d` (inactivation) and
+   `q_sugar_max`; SRC R²≈0.6, SRRC≈0.72 surfacing the competing `Y_glycerol_sugar` sink.
+
+3. **LHS / Sobol samplers** (`simulate_ensemble(sampler=…)`). `"mc"` stays the default and is
+   **byte-identical** to before (same seeded PRNG sequence); `"lhs"` and `"sobol"` draw a stratified
+   unit hypercube via `scipy.stats.qmc` then map it through each parameter's inverse CDF (triangular
+   via `scipy.stats.triang`, `c=(value−low)/(high−low)`; or uniform). At a fixed member budget the
+   estimator is ~8× more stable seed-to-seed than i.i.d. MC on the toy, with the **center unshifted**
+   (the point: tighter tails, not a moved mean). Design constraints, all from the advisor:
+   `only`/`exclude` scoping and the failed-member/survivorship accounting are **sampler-agnostic**;
+   only *varying* parameters take a hypercube dimension (a pinned zero-width band stays at nominal —
+   giving it a column wastes a dimension, unbalances Sobol, and divides `c` by zero); **Sobol requires
+   a power-of-two `n_members`** and raises otherwise (no silent unbalanced sequence — the project's
+   loud-failure ethos). Samples are drawn up front, so seed reproducibility holds for every sampler.
 
 ## Deferred (decide early in the relevant milestone)
 
