@@ -433,7 +433,10 @@ def compile_scenario(
     # enable it and override the reference cap with the scenario's value so demonstrations can
     # sweep K; growth's outputs then honestly report speculative.
     if BiomassCarryingCapacity.name in process_set:
-        cap_gpl = float(scenario.initial.get("carrying_capacity_gpl", 0.0) or 0.0)
+        raw_cap = scenario.initial.get("carrying_capacity_gpl")
+        # A negative cap is a typo, not an intent — raise loudly like every other initial key
+        # (the _nonneg gate), rather than silently disabling. Absent or 0 ⇒ opt out (disable).
+        cap_gpl = _nonneg(float(raw_cap), "carrying_capacity_gpl") if raw_cap is not None else 0.0
         if cap_gpl <= 0.0:
             process_set.disable(BiomassCarryingCapacity.name)
         else:

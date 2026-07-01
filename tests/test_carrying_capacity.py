@@ -207,6 +207,20 @@ def test_opt_in_enables_and_overrides_the_cap_value():
     assert compiled.param_values["biomass_carrying_capacity"] == pytest.approx(2.2)
 
 
+def test_negative_cap_raises_like_the_other_initial_keys():
+    # A negative cap is a typo, not "opt out" — it must raise loudly (the _nonneg gate every
+    # other initial key gets), not silently disable.
+    scenario = Scenario(
+        name="wine-cap-neg",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25, "carrying_capacity_gpl": -1.0},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=21.0,
+    )
+    with pytest.raises(ValueError, match="carrying_capacity_gpl"):
+        compile_scenario(scenario, strict=True)
+
+
 def test_carbon_and_nitrogen_close_with_the_cap_on():
     # The crux: scaling growth's whole contribution keeps dN = -f_N·dX and the carbon-skeleton
     # draw proportional, so BOTH atom balances still close to solver tolerance with the cap
