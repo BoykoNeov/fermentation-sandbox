@@ -1581,11 +1581,24 @@ the warm cases well below.
 MLF (a *dosed* organism, disabled at compile when unpitched), diacetyl is **intrinsic yeast
 metabolism**, so it is wired into **both** media and runs on every default ferment — like the
 ester/fusel byproducts. Turning it on draws only a *trace* of sugar (α-acetolactate peaks
-~mg/L, ~1000× below the ester draw), so `dX`/`dE`/`dCO₂`/`dN` stay byte-for-byte until the
-decarb/reduction move that carbon on; the §2.2 trio is unmoved. **Tiers:** all three Processes
-**speculative** (rate magnitudes are order-of-magnitude estimates; only the `E_a_decarb >
-E_a_reduction` ordering is sourced), so parameter-tier propagation (D-1) caps the pool outputs
-at speculative regardless.
+~mg/L, roughly an order of magnitude below the ester draw), so `dX`/`dE`/`dCO₂`/`dN` stay
+byte-for-byte until the decarb/reduction move that carbon on; the §2.2 trio is unmoved.
+**Tiers:** all three Processes **speculative** (rate magnitudes are order-of-magnitude
+estimates; only the `E_a_decarb > E_a_reduction` ordering is sourced), so parameter-tier
+propagation (D-1) caps the pool outputs at speculative regardless.
+
+**One honest tier consequence — the D-19 `S` parallel, made explicit (not silent).** The
+decarboxylation is always-on, speculative, and the *first* such Process to write the shared
+`CO2` slot (uptake aside; esters/fusels touch `S`, MLF is disabled unpitched). So on a default
+run the *structural* `tier_of("CO2")` drops **PLAUSIBLE → SPECULATIVE** — exactly as
+`tier_of("S")` did when the D-19 byproducts landed. But the **param-aware tier users actually
+see was already SPECULATIVE** (the uptake Process reads speculative params — `E_a_uptake`,
+realised-yield), so there is **no headline change**, and the drop is *honest*: the `CO2` pool
+now genuinely contains a speculative decarb trace (real evolved CO₂ that belongs there —
+sequestering it into a side pool to protect the tier would understate CO₂, a worse
+dishonesty). Accepted as the correct behaviour, and **pinned by a test** (`test_vicinal_
+diketones.py`) so it can never regress silently — the beer CO₂-ratio value stays in-band and
+its user-facing tier is unchanged.
 
 **Parameters** live in a new **shared, medium-agnostic** `vicinal_diketones.yaml` (merged at
 the compile seam alongside `acidbase.yaml`), because the load-bearing decarboxylation is
@@ -1599,10 +1612,15 @@ both the aroma and VDK Processes; behaviour unchanged).
 so wine yeast-pathway diacetyl *understates* real wine diacetyl. The α-acetolactate
 extracellular decarboxylation's ethanol/pH dependence (Kobayashi et al.) and its
 excretion temperature dependence are omitted; acetoin is lumped into the terminal
-`butanediol` pool. **Next in the beat (deferred):** acetaldehyde (produce-then-reabsorb on the
-*main* pathway — reuses this shape; its carbon draw is an even stronger stand-in and it is the
-carbonyl that binds SO₂, unlocking the D-22 free/bound split), then H₂S (carbon-free, an
-inverse-low-N gate — the accounting-easiest, following the SO₂ precedent).
+`butanediol` pool. The acceptance gate demonstrates the rest via **isothermal** comparisons +
+the natural end-of-ferment ethanol inactivation (a legitimate proxy — the mechanism, not the
+temperature profile, produces the behaviour). A **temperature-ramp** test (cool ferment → warm
+finish vs cool → cold hold, which `temperature_schedule` already supports) would demonstrate
+the *literal* "warm rest" / "package early" scenarios and is a cheap deferred follow-up.
+**Next in the beat (deferred):** acetaldehyde (produce-then-reabsorb on the *main* pathway —
+reuses this shape; its carbon draw is an even stronger stand-in and it is the carbonyl that
+binds SO₂, unlocking the D-22 free/bound split), then H₂S (carbon-free, an inverse-low-N gate
+— the accounting-easiest, following the SO₂ precedent).
 
 ## Deferred (decide early in the relevant milestone)
 

@@ -558,3 +558,23 @@ def test_reduction_tier_is_speculative(store):
     ps = ProcessSet(schema, [DiacetylReduction()])
     assert ps.tier_of("butanediol") is Tier.SPECULATIVE
     assert ps.tier_of("butanediol", store.tier_map()) is Tier.SPECULATIVE
+
+
+def test_co2_tier_reflects_the_speculative_decarb_trace(store):
+    # The always-on speculative decarboxylation is the FIRST byproduct Process to write the
+    # shared CO2 slot (esters/fusels touch S; MLF is disabled unpitched), so it drops the
+    # *structural* tier_of("CO2") PLAUSIBLE→SPECULATIVE — the exact D-19 `S` parallel, made
+    # explicit here so it can never regress silently (prime directive #1). This is honest:
+    # the CO2 pool genuinely holds a speculative decarb trace (real evolved CO2, so it belongs
+    # there). Crucially the param-aware tier users SEE is UNCHANGED — already speculative,
+    # because the uptake Process itself reads speculative params (E_a_uptake, realised-yield).
+    schema = wine_schema()
+    tm = store.tier_map()
+    core = ProcessSet(schema, [SugarUptakeToEthanolCO2()])  # the validated CO2 producer
+    with_decarb = ProcessSet(schema, [SugarUptakeToEthanolCO2(), AcetolactateDecarboxylation()])
+    # Structural tier: PLAUSIBLE for the core alone, dropping to SPECULATIVE with the decarb.
+    assert core.tier_of("CO2") is Tier.PLAUSIBLE
+    assert with_decarb.tier_of("CO2") is Tier.SPECULATIVE
+    # Param-aware tier (what users see): SPECULATIVE either way — no headline change from VDK.
+    assert core.tier_of("CO2", tm) is Tier.SPECULATIVE
+    assert with_decarb.tier_of("CO2", tm) is Tier.SPECULATIVE

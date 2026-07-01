@@ -311,11 +311,16 @@ _BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: without it is the prior core. Diacetyl is *intrinsic yeast metabolism* (not a dosed
 #: organism like MLF), so — unlike ``_MLF_PROCESSES`` — it is wired into BOTH media and runs
 #: on every default fermentation, like the ester/fusel byproducts. Turning it on draws only
-#: a *trace* of sugar into the reservoir (α-acetolactate peaks ~mg/L, ~1000× below the ester
-#: draw), so it leaves ``dX``/``dE``/``dCO2``/``dN`` byte-for-byte until the decarb/reduction
-#: move that carbon on; ``total_carbon`` closes to machine precision throughout (each step is
-#: on the weighted ledger). Excretion is temperature-flat; the temperature-criticality of the
-#: rest lives in the spontaneous, non-yeast-gated decarboxylation (``E_a_decarb`` >
+#: a *trace* of sugar into the reservoir (α-acetolactate peaks ~mg/L, roughly an order of
+#: magnitude below the ester draw), so it leaves ``dX``/``dE``/``dCO2``/``dN`` byte-for-byte
+#: until the decarb/reduction move that carbon on; ``total_carbon`` closes to machine
+#: precision throughout (each step is on the weighted ledger). One honest tier consequence
+#: (D-26, the D-19 ``S`` parallel): the always-on speculative decarboxylation touches the
+#: shared ``CO2`` slot, so the *structural* ``tier_of("CO2")`` drops PLAUSIBLE→SPECULATIVE —
+#: but the param-aware tier users see was *already* SPECULATIVE (the uptake Process reads
+#: speculative params), so there is no headline change, and the CO2 pool genuinely does hold
+#: a speculative decarb trace. Excretion is temperature-flat; the temperature-criticality of
+#: the rest lives in the spontaneous, non-yeast-gated decarboxylation (``E_a_decarb`` >
 #: ``E_a_reduction``); reduction is gated on VIABLE ``X`` with no flux term, so a warm rest
 #: with live yeast clears diacetyl fast while an early crash strands a rising diacetyl.
 #: SCOPE (v1): yeast valine-pathway diacetyl only — MLF/citrate diacetyl is deferred, so wine

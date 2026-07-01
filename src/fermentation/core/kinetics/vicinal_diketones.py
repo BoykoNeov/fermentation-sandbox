@@ -58,8 +58,8 @@ analogous to beer's hydrolysis water (D-8). Carbon is the invariant here.
 PROCESSES`` tuple (``fermentation.core.media``), so a ProcessSet built without them is the
 prior core. Diacetyl is intrinsic yeast metabolism (not a dosed organism like MLF), so it
 is wired into *both* media and runs on every default fermentation — like esters, turning
-it on draws only a *trace* of sugar into the reservoir (α-acetolactate peaks ~mg/L, so the
-draw is ~1000× smaller than the ester draw and utterly negligible on ``dS``), leaving
+it on draws only a *trace* of sugar into the reservoir (α-acetolactate peaks ~mg/L, roughly
+an order of magnitude below the ester draw — negligible on ``dS``), leaving
 ``dX``/``dE``/``dCO2``/``dN`` byte-for-byte until the decarb/reduction move that carbon on.
 
 **Tiers.** ``E_a_decarb`` carries a **sourced ordering** (the α-acetolactate → diacetyl
