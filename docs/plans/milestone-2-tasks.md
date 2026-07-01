@@ -262,6 +262,25 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         parallel). Both Processes speculative. 21 new tests; **342 green**, ruff+mypy clean.
         SCOPE: metabolite only — the SO₂ free/bound split it unlocks is a separate readout beat.
         Full record in **DECISIONS → D-27**.
+  - [x] **SO₂ free/bound split — total conserved, free/bound/molecular derived (decision D-28).
+        LANDED 2026-07-01.** The readout unlocked by acetaldehyde becoming real state (D-27).
+        **Owner-decided fork:** the dosed slot is reinterpreted as **total** SO₂ (rename
+        `so2_free`→`so2_total`, conserved/inert) and free/bound are DERIVED at the solved pH by
+        the acetaldehyde-bisulfite binding equilibrium (`bound_so2_molar` solves `(A−x)(C−x)β −
+        Kx = 0` referenced to bisulfite; `free = total − bound`, `molecular = free × fraction`).
+        Option chosen for **conservation** (pinning free would make total grow as acetaldehyde
+        rises with no dose — incoherent, and no dip). **Emergent + verified:** dosing 50 mg/L
+        total, free SO₂ dips 50→0.9 mg/L at the acetaldehyde peak (day 1.7) then recovers to 50;
+        `free+bound==total` to machine precision. At acetaldehyde=0 it collapses to D-22 exactly
+        (regression anchor). **Readout-only** (the bound-acetaldehyde-protected-from-ADH RHS
+        coupling stays deferred, like D-22 keeping SO₂ out of the charge balance). The one live
+        consumer — the MLF antimicrobial gate — now reads the derived free-molecular SO₂ (bound
+        SO₂ is not antimicrobial), so a small MLF slip appears during the transient binding
+        window (`test_so2_dose_suppresses_mlf_in_a_run` updated, documented). New shared param
+        `K_acetaldehyde_so2=1.5e-6 mol/L` (Burroughs & Sparks 1973; plausible; basis pinned to
+        bisulfite, ≤5 % vs total-free at wine pH). Caveat: acetaldehyde-only binder ⇒ `bound`
+        under-estimates ("total" ≈ "free + acetaldehyde-bound"). 7 new tests; **349 green**,
+        ruff + mypy clean. Full record in **DECISIONS → D-28**.
   - [ ] **H₂S** — N/S-deficiency signal; rises when N is *low* (inverse gate vs fusels),
         off-gassed. Carbon-free ⇒ naturally outside `total_carbon` (the SO₂ precedent);
         the accounting-easiest of the three.

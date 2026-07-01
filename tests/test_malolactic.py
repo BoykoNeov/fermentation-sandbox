@@ -206,7 +206,7 @@ def test_so2_dose_suppresses_mlf_unit(params):
 
     common = {"target_ph": 3.4, "malic": 4.0, "tartaric": 4.0, "X_mlf": 0.2}
     y_clean = _wine_state(schema, params, **common)
-    y_so2 = _wine_state(schema, params, so2_free=mgl_to_gpl(80.0), **common)
+    y_so2 = _wine_state(schema, params, so2_total=mgl_to_gpl(80.0), **common)
     rate_clean = -float(
         MalolacticConversion().derivatives(0.0, y_clean, schema, params)[schema.slice("malic")][0]
     )
@@ -218,17 +218,28 @@ def test_so2_dose_suppresses_mlf_unit(params):
 
 
 def test_so2_dose_suppresses_mlf_in_a_run():
-    # The integration-level demonstration: SO₂ leaves pH/carbon untouched (D-22 readout-only)
-    # yet, as the first RHS consumer of molecular SO₂, it gates MLF — so the dosed-SO₂ run
-    # barely deacidifies relative to the same MLF dose without SO₂.
+    # The integration-level demonstration: SO₂ leaves pH/carbon untouched (D-22/D-28
+    # readout-only) yet, as the first RHS consumer of molecular SO₂, it gates MLF — so the
+    # dosed-SO₂ run barely deacidifies relative to the same MLF dose without SO₂.
+    #
+    # D-28 nuance (the emergent acetaldehyde–SO₂ competition): the early acetaldehyde peak
+    # transiently sequesters free SO₂ (free crashes toward ~0 near day 2), so the molecular
+    # antimicrobial pool briefly weakens and a *small* slice of MLF slips through during that
+    # window — ~0.1 g/L malic (a few %), vs the uninhibited run that consumes it all. Once
+    # acetaldehyde is reduced, free SO₂ recovers and MLF is arrested again. So the dosed run
+    # is *strongly* suppressed, not perfectly blocked — the faithful behaviour.
     c_off, t_off = _run()
     c_on, t_on = _run(mlf_pitch_gpl=0.2)
-    c_so2, t_so2 = _run(mlf_pitch_gpl=0.2, so2_free_mgl=80.0)
+    c_so2, t_so2 = _run(mlf_pitch_gpl=0.2, so2_total_mgl=80.0)
     ph_off = ph_series(t_off, c_off.param_values)
     ph_on = ph_series(t_on, c_on.param_values)
     ph_so2 = ph_series(t_so2, c_so2.param_values)
 
-    assert t_so2.series("malic")[-1] > 3.9  # MLF essentially blocked
+    malic0 = t_off.series("malic")[0]
+    # SO₂ retains the great majority of malic (only the transient acetaldehyde-window slip):
+    assert t_so2.series("malic")[-1] > 3.8
+    assert (malic0 - t_so2.series("malic")[-1]) < 0.2  # < ~0.2 g/L converted (a few %)
+    assert t_on.series("malic")[-1] < 0.5  # …vs the uninhibited MLF consuming ~all of it
     assert (ph_on[-1] - ph_off[-1]) > 0.1  # uninhibited MLF deacidifies
     assert (ph_so2[-1] - ph_off[-1]) == pytest.approx(0.0, abs=0.01)  # SO₂ arrests it
 

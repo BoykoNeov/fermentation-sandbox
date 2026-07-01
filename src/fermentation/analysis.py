@@ -71,19 +71,48 @@ def titratable_acidity_series(traj: Trajectory, params: Mapping[str, float]) -> 
 
 
 def molecular_so2_series(traj: Trajectory, params: Mapping[str, float]) -> FloatArray:
-    """Molecular (antimicrobial) SO₂ [g/L] at each stored time (decision D-22).
+    """Molecular (antimicrobial) SO₂ [g/L] at each stored time (decisions D-22, D-28).
 
     Maps :func:`fermentation.core.acidbase.molecular_so2` over the trajectory: at every
-    column it solves pH from the organic acids and partitions the dosed free SO₂, so the
-    molecular fraction tracks the (mildly drifting) pH with no scripting — the SO₂
-    counterpart to :func:`ph_series`. Returns g/L; convert to the conventional mg/L with
-    :func:`fermentation.units.convert.gpl_to_mgl`. Report the tier with
-    :func:`fermentation.core.acidbase.molecular_so2_tier`. With no SO₂ dosed (``so2_free``
+    column it solves pH from the organic acids, splits the dosed *total* SO₂ into
+    acetaldehyde-bound vs free (D-28), and partitions the free share into its molecular
+    fraction — so the readout tracks both the (mildly drifting) pH and the transient
+    acetaldehyde-binding dip with no scripting. Returns g/L; convert to the conventional
+    mg/L with :func:`fermentation.units.convert.gpl_to_mgl`. Report the tier with
+    :func:`fermentation.core.acidbase.molecular_so2_tier`. With no SO₂ dosed (``so2_total``
     ≡ 0) this is identically zero — and, because SO₂ is carbon-free and outside the
     charge balance, dosing it leaves :func:`ph_series` and ``total_carbon`` unchanged.
     """
     return np.array(
         [acidbase.molecular_so2(traj.y[:, i], traj.schema, params) for i in range(traj.y.shape[1])]
+    )
+
+
+def free_so2_series(traj: Trajectory, params: Mapping[str, float]) -> FloatArray:
+    """Free SO₂ [g/L] at each stored time — total minus acetaldehyde-bound (decision D-28).
+
+    The analytically-measured free SO₂: maps :func:`fermentation.core.acidbase.free_so2`
+    over the trajectory. During active fermentation the acetaldehyde peak sequesters SO₂ so
+    free **dips** below the dosed total, then recovers as acetaldehyde is reduced — the
+    emergent D-28 coupling. Equals the (constant) total whenever acetaldehyde is 0. g/L;
+    convert with :func:`fermentation.units.convert.gpl_to_mgl`.
+    """
+    return np.array(
+        [acidbase.free_so2(traj.y[:, i], traj.schema, params) for i in range(traj.y.shape[1])]
+    )
+
+
+def bound_so2_series(traj: Trajectory, params: Mapping[str, float]) -> FloatArray:
+    """Acetaldehyde-bound SO₂ [g/L] at each stored time (decision D-28).
+
+    The complement of :func:`free_so2_series`: maps
+    :func:`fermentation.core.acidbase.bound_so2` over the trajectory. Rises with the early
+    acetaldehyde peak and relaxes as it is reduced; ``free + bound`` equals the conserved
+    dosed total at every column. g/L. CAVEAT (D-28): acetaldehyde-only binder, so this
+    **under**-estimates real bound SO₂ (pyruvate / α-ketoglutarate / sugars unmodelled).
+    """
+    return np.array(
+        [acidbase.bound_so2(traj.y[:, i], traj.schema, params) for i in range(traj.y.shape[1])]
     )
 
 

@@ -186,17 +186,20 @@ than be scripted (DECISIONS #18).
   `fermentation.analysis` — mirroring how `units` provides scalar conversions and benchmarks
   map ABV over a series. Tier is reported via `acidbase.ph_tier` (computed explicitly as
   `plausible`, never the `VALIDATED` default of the inert acid slots).
-- **SO₂ speciation = the first pH consumer, readout-only (D-22).** `wine_schema` appends a
-  fifth slot, `so2_free` (free SO₂ as g/L SO₂-equivalent, dosed via `so2_free_mgl`, inert).
-  `acidbase.molecular_so2` solves pH from the organic acids then returns the **molecular**
-  (antimicrobial) fraction `1/(1+10^(pH−pKa₁))` (sulfurous pKa₁ 1.81) — the D-18 coupling
-  *emerging*, not scripted. It is **readout-only**: SO₂ is deliberately kept out of the
-  charge balance (the inverse anchoring makes in-balance vs readout identical at t=0) and
-  out of titratable acidity (OIV excludes it), and is carbon-free — so dosing it leaves pH
-  and `total_carbon` byte-for-byte (an isolability test pins this). No RHS consumer yet
-  (the antimicrobial brake wires into MLF/spoilage growth). The free/**bound**
-  (acetaldehyde-binding) split was deferred until acetaldehyde exists; acetaldehyde now
-  exists as state (decision D-27), so that binding readout is the next commit.
+- **SO₂ speciation = the first pH consumer, readout-only (D-22, D-28).** `wine_schema` appends
+  a slot `so2_total` (total SO₂ as g/L SO₂-equivalent, dosed via `so2_total_mgl`, conserved/
+  inert). `acidbase.speciate_so2` solves pH from the organic acids, then (D-28) splits the
+  total into acetaldehyde-**bound** vs **free** via the bisulfite binding equilibrium
+  (`bound_so2_molar` solves `(A−x)(C−x)β − Kx = 0`; new `bisulfite_fraction`), and returns the
+  **molecular** (antimicrobial) fraction `1/(1+10^(pH−pKa₁))` (sulfurous pKa₁ 1.81) of *free* —
+  the D-18 coupling *emerging*, not scripted. It is **readout-only**: SO₂ is kept out of the
+  charge balance (the inverse anchoring makes in-balance vs readout identical at t=0) and out
+  of titratable acidity (OIV excludes it), and is carbon-free — so dosing it leaves pH and
+  `total_carbon` byte-for-byte (an isolability test pins this). At acetaldehyde=0 the split
+  collapses to D-22 exactly (`free == total`). The lone RHS consumer is the MLF antimicrobial
+  gate, which reads the *derived* free-molecular SO₂ (bound SO₂ is not antimicrobial), so the
+  early acetaldehyde peak transiently sequesters SO₂ and relaxes suppression — an emergent
+  competition. The bound-acetaldehyde-protected-from-ADH feedback stays deferred (readout-only).
 - **Acetaldehyde** (`core/kinetics/acetaldehyde.py`, decision D-27) — the obligate main-
   pathway intermediate, modelled as a transient **ethanol-carbon buffer**: flux-linked
   production *borrows* a C2 slice of ethanol and viable-yeast-gated reduction *returns* it

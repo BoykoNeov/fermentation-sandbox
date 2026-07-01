@@ -87,8 +87,8 @@ import math
 from collections.abc import Mapping
 
 from fermentation.core.acidbase import (
-    SO2_PKA_PARAM_NAMES,
-    molecular_so2_fraction,
+    SO2_STATE_KEY,
+    molecular_so2_at_ph,
     ph_of_state,
 )
 from fermentation.core.chemistry import M_CO2, M_LACTIC, M_MALIC
@@ -174,15 +174,18 @@ class MalolacticConversion(Process):
         if malic_gpl <= 0.0:
             return d
 
-        # pH is solved once and reused by both the pH gate and the SO₂ partition (D-22):
-        # molecular_so2_fraction(pH, …) avoids a second solve inside acidbase.molecular_so2.
+        # pH is solved once and reused by both the pH gate and the SO₂ partition (D-22/D-28):
+        # molecular_so2_at_ph(…, ph) avoids a second brentq solve inside acidbase.speciate_so2.
         ph = ph_of_state(y, schema, params)
         gate_ph = 1.0 / (1.0 + 10.0 ** (params["pH_half_mlf"] - ph))
 
-        free_so2 = float(y[schema.slice("so2_free")][0]) if "so2_free" in schema else 0.0
-        if free_so2 > 0.0:
-            so2_pkas = tuple(params[n] for n in SO2_PKA_PARAM_NAMES)
-            molecular_so2 = free_so2 * molecular_so2_fraction(ph, so2_pkas)
+        # Antimicrobial suppression is by MOLECULAR SO₂, the undissociated share of FREE SO₂.
+        # Under D-28 the dosed slot is *total* SO₂; free = total − acetaldehyde-bound, so as
+        # acetaldehyde peaks it sequesters SO₂ and the suppression correctly weakens (bound SO₂
+        # is not antimicrobial). At acetaldehyde = 0 this equals the D-22 free × fraction(pH).
+        total_so2 = float(y[schema.slice(SO2_STATE_KEY)][0]) if SO2_STATE_KEY in schema else 0.0
+        if total_so2 > 0.0:
+            molecular_so2 = molecular_so2_at_ph(y, schema, params, ph)
             gate_so2 = math.exp(-molecular_so2 / params["molecular_so2_inhib_mlf"])
         else:
             gate_so2 = 1.0

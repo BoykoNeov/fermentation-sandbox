@@ -88,9 +88,9 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
     "wine": frozenset(
         # tartaric_gpl/malic_gpl/initial_ph are the optional pH-solver inputs (D-18);
         # lactic is produced-only (MLF product) so it is not an input, and the
-        # strong cation is back-solved from initial_ph, not given. so2_free_mgl is the
-        # optional free-SO₂ dose for the molecular-SO₂ readout (D-22); mlf_pitch_gpl is the
-        # optional Oenococcus oeni dose that drives malolactic conversion (D-23).
+        # strong cation is back-solved from initial_ph, not given. so2_total_mgl is the
+        # optional total-SO₂ dose for the free/bound + molecular-SO₂ readout (D-22/D-28);
+        # mlf_pitch_gpl is the optional Oenococcus oeni dose driving malolactic conversion (D-23).
         {
             "brix",
             "yan_mgl",
@@ -99,7 +99,7 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "tartaric_gpl",
             "malic_gpl",
             "initial_ph",
-            "so2_free_mgl",
+            "so2_total_mgl",
             "mlf_pitch_gpl",
         }
     ),
@@ -165,11 +165,12 @@ def _wine_initial(
         "malic": malic,
         "lactic": 0.0,
         "cation_charge": 0.0,  # back-solved below iff initial_ph is given
-        # Free-SO₂ dose for the molecular-SO₂ readout (D-22); mg/L→g/L, default 0
-        # (no dose). Inert state (readout-only, not in the charge balance), so it does
-        # NOT enter the cation back-solve below — SO₂'s minor bisulfite charge is a
-        # scoped omission the inverse anchoring would absorb at t=0 anyway (D-22).
-        "so2_free": mgl_to_gpl(_optional(values, "so2_free_mgl", 0.0)),
+        # Total-SO₂ dose for the free/bound + molecular-SO₂ readout (D-22/D-28); mg/L→g/L,
+        # default 0 (no dose). Inert/conserved state (readout-only, not in the charge
+        # balance), so it does NOT enter the cation back-solve below — SO₂'s minor bisulfite
+        # charge is a scoped omission the inverse anchoring would absorb at t=0 anyway (D-22).
+        # Free/bound are derived from this total + acetaldehyde at the solved pH (D-28).
+        "so2_total": mgl_to_gpl(_optional(values, "so2_total_mgl", 0.0)),
         # Oenococcus oeni dose driving malolactic conversion (D-23); g/L, default 0 (no
         # MLF). Inert catalyst in v1 (no Process grows/kills it) and carbon-free, so an
         # undosed run is byte-for-byte the validated core; the compile step below disables

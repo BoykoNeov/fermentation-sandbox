@@ -1,19 +1,32 @@
-"""Free-SO₂ speciation: the pH-coupled molecular fraction readout (decision D-22).
+"""SO₂ speciation: the pH-coupled molecular fraction (D-22) and free/bound split (D-28).
 
 Ranked headline-first. The keystone payoff is ``test_headline_molecular_fraction_falls_with_ph``:
 the antimicrobial *molecular* SO₂ fraction falls ~3× per 0.5 pH unit and lands on the
 textbook ~6 % / 2 % / 0.6 % at pH 3.0 / 3.5 / 4.0 — the coupling the D-18 charge-balance
 solver was built to make *emerge* ("dose SO₂ → speciation falls out of the current pH").
-The rest pin a real-world anchor (~0.8 mg/L molecular at 40 mg/L free, pH 3.5), the
+Sections 1–9 pin a real-world anchor (~0.8 mg/L molecular at 40 mg/L free, pH 3.5), the
 neutral-fraction algebra, the compile/readout plumbing, the explicit ``plausible`` tier,
 and — prime directive #3 — that SO₂ is **readout-only**: dosing it leaves pH and carbon
 byte-for-byte unchanged (it is not in the charge balance and is carbon-free).
+
+Section 10 adds the **D-28 free/bound split** now that acetaldehyde is real state (D-27):
+the dosed slot is *total* SO₂ and free/bound are derived by the acetaldehyde-bisulfite
+binding equilibrium. Its own headline is
+``test_emergent_free_so2_dips_at_acetaldehyde_peak_then_recovers`` — the early acetaldehyde
+peak transiently sequesters SO₂, crashing free/molecular, which recover as acetaldehyde is
+reduced; and the regression anchor ``test_binding_recovers_d22_at_zero_acetaldehyde`` pins
+that at acetaldehyde = 0 the split collapses to D-22 exactly (free == total).
 """
 
 import numpy as np
 import pytest
 
-from fermentation.analysis import molecular_so2_series, ph_series
+from fermentation.analysis import (
+    bound_so2_series,
+    free_so2_series,
+    molecular_so2_series,
+    ph_series,
+)
 from fermentation.core import acidbase
 from fermentation.core.chemistry import M_MALIC, M_TARTARIC
 from fermentation.core.media import beer_schema, wine_schema
@@ -138,11 +151,12 @@ def test_neutral_fraction_rejects_triprotic():
 
 def test_molecular_so2_pure_function(params):
     compiled = compile_scenario(
-        _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.5, so2_free_mgl=40.0)
+        _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.5, so2_total_mgl=40.0)
     )
     y0, schema = compiled.y0, compiled.schema
-    # the dose was converted mg/L → g/L into the so2_free slot
-    assert schema.get(y0, "so2_free") == pytest.approx(mgl_to_gpl(40.0))
+    # the dose was converted mg/L → g/L into the so2_total slot; at pitch acetaldehyde=0 so
+    # free == total and molecular = total × fraction(pH) — the D-22 curve recovered exactly.
+    assert schema.get(y0, "so2_total") == pytest.approx(mgl_to_gpl(40.0))
 
     ph0 = acidbase.ph_of_state(y0, schema, params)  # solved from the organic acids only
     so2_pka = tuple(params[n] for n in acidbase.SO2_PKA_PARAM_NAMES)
@@ -159,12 +173,12 @@ def test_molecular_so2_pure_function(params):
 def test_molecular_so2_zero_without_dose(params):
     schema = wine_schema()
     cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4)
-    y = _wine_state(schema, tartaric=6.0, malic=3.0, cation_charge=cation)  # so2_free → 0
+    y = _wine_state(schema, tartaric=6.0, malic=3.0, cation_charge=cation)  # so2_total → 0
     assert acidbase.molecular_so2(y, schema, params) == 0.0
 
 
 def test_molecular_so2_zero_when_slot_absent(params):
-    # Beer has no so2_free slot (D-22 is wine-only); the readout returns 0, not raises.
+    # Beer has no so2_total slot (D-22 is wine-only); the readout returns 0, not raises.
     schema = beer_schema()
     y = schema.pack(
         {"X": 0.5, "S": [60.0, 100.0, 20.0], "E": 0.0, "N": 0.2, "T": 293.15, "CO2": 0.0}
@@ -185,13 +199,13 @@ def test_molecular_so2_tier_is_plausible(pset):
 
 
 def test_dosing_so2_does_not_change_ph(params):
-    # SO₂ is NOT in the charge balance (D-22), so dosing it cannot move the solved pH:
-    # ph_of_state reads only the organic acids + cation + Byp, never so2_free.
+    # SO₂ is NOT in the charge balance (D-22/D-28), so dosing it cannot move the solved pH:
+    # ph_of_state reads only the organic acids + cation + Byp, never so2_total.
     schema = wine_schema()
     cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4)
     dry = _wine_state(schema, tartaric=6.0, malic=3.0, cation_charge=cation)
     dosed = _wine_state(
-        schema, tartaric=6.0, malic=3.0, cation_charge=cation, so2_free=mgl_to_gpl(80.0)
+        schema, tartaric=6.0, malic=3.0, cation_charge=cation, so2_total=mgl_to_gpl(80.0)
     )
     assert acidbase.ph_of_state(dosed, schema, params) == acidbase.ph_of_state(dry, schema, params)
 
@@ -205,14 +219,14 @@ def test_so2_does_not_perturb_carbon_or_the_core_trajectory():
         _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4), strict=True
     )
     dosed = compile_scenario(
-        _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4, so2_free_mgl=60.0),
+        _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4, so2_total_mgl=60.0),
         strict=True,
     )
     traj0 = simulate(base.process_set, base.param_values, base.y0, base.t_span_h, t_eval=t_eval)
     traj1 = simulate(dosed.process_set, dosed.param_values, dosed.y0, dosed.t_span_h, t_eval=t_eval)
 
     for name in base.schema.names:
-        if name == "so2_free":
+        if name == "so2_total":
             continue  # the only slot that differs (constant 0 vs constant 0.06 g/L)
         assert np.allclose(traj0.series(name), traj1.series(name), rtol=1e-9, atol=1e-12), name
     assert np.allclose(
@@ -231,7 +245,7 @@ def test_molecular_so2_series_tracks_ph_drift():
     # molecular SO₂ is recomputed off the solved pH at each column, so as Byp accrues and
     # pH drifts down (D-18 emergent), the molecular fraction drifts *up* — unscripted.
     compiled = compile_scenario(
-        _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4, so2_free_mgl=50.0)
+        _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4, so2_total_mgl=50.0)
     )
     traj = simulate(compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h)
     mol = molecular_so2_series(traj, compiled.param_values)
@@ -245,3 +259,126 @@ def test_molecular_so2_series_tracks_ph_drift():
     assert ph[-1] < ph[0]
     assert mol[-1] > mol[0]
     assert np.all(mol > 0.0)
+
+
+# == 10. D-28: free/bound SO₂ split (acetaldehyde binding) ======================
+
+
+def test_bisulfite_fraction_dominates_free_so2_at_wine_ph(so2_pka):
+    # Bisulfite HSO₃⁻ is the reactive binder and the dominant free-SO₂ species at wine pH:
+    # β ≈ 0.94–0.99, so the bisulfite-vs-total-free reference basis for K differs ≤ ~6%
+    # (the D-28 provenance claim). neutral + bisulfite ≈ 1 (sulfite negligible below pKa₂).
+    for ph in (3.0, 3.4, 3.5, 4.0):
+        h = 10.0 ** (-ph)
+        beta = acidbase.bisulfite_fraction(h, so2_pka)
+        neutral = acidbase.neutral_fraction(h, so2_pka)
+        assert 0.93 < beta < 0.995
+        assert neutral + beta == pytest.approx(1.0, abs=1e-3)  # sulfite ~1e-4 at wine pH
+    # monoprotic branch = α₁, and triprotic is rejected like the sibling fractions
+    assert acidbase.bisulfite_fraction(1e-3, (1.81,)) == pytest.approx(
+        10.0**-1.81 / (10.0**-1.81 + 1e-3)
+    )
+    with pytest.raises(ValueError, match="mono- and diprotic"):
+        acidbase.bisulfite_fraction(1e-3, (1.8, 7.2, 9.0))
+
+
+def test_binding_equilibrium_algebra_solves_and_conserves(so2_pka):
+    # bound_so2_molar is pure algebra: solve (A−x)(C−x)β − Kx = 0 for the physical root.
+    beta = acidbase.bisulfite_fraction(10.0**-3.4, so2_pka)
+    k = 1.5e-6
+    a, c = 9.0e-4, 7.8e-4  # ~40 mg/L acetaldehyde, ~50 mg/L SO₂ (mol/L)
+    x = acidbase.bound_so2_molar(c, a, beta, k)
+    assert 0.0 < x < min(a, c)  # cannot bind more than either pool holds
+    # x actually satisfies the equilibrium it claims to solve
+    assert (a - x) * (c - x) * beta - k * x == pytest.approx(0.0, abs=1e-14)
+    # degenerate inputs → no binding (guards the brentq-free quadratic)
+    assert acidbase.bound_so2_molar(0.0, a, beta, k) == 0.0
+    assert acidbase.bound_so2_molar(c, 0.0, beta, k) == 0.0
+    assert acidbase.bound_so2_molar(c, a, 0.0, k) == 0.0
+
+
+def test_binding_recovers_d22_at_zero_acetaldehyde(params):
+    # THE regression anchor: with no acetaldehyde, bound = 0 and free == total, so the whole
+    # D-22 readout (molecular = total × fraction(pH)) is reproduced byte-for-byte — the
+    # input-semantics change (free → total) is invisible at the dosing moment.
+    schema = wine_schema()
+    cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.5)
+    dose = mgl_to_gpl(40.0)
+    y = _wine_state(schema, tartaric=6.0, malic=3.0, cation_charge=cation, so2_total=dose)
+    spec = acidbase.speciate_so2(y, schema, params)
+    assert spec.bound == 0.0
+    assert spec.free == spec.total == pytest.approx(dose)
+    ph = acidbase.ph_of_state(y, schema, params)
+    pkas = tuple(params[n] for n in acidbase.SO2_PKA_PARAM_NAMES)
+    assert spec.molecular == pytest.approx(dose * acidbase.molecular_so2_fraction(ph, pkas))
+
+
+def test_acetaldehyde_sequesters_so2_near_stoichiometric(params):
+    # With comparable molar acetaldehyde and SO₂, binding is near-stoichiometric: bound
+    # approaches the smaller pool, free (and molecular) crash toward ~0 — the mechanism
+    # behind the emergent dip. free + bound conserves total exactly.
+    schema = wine_schema()
+    cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4)
+    total = mgl_to_gpl(50.0)
+    dry = _wine_state(schema, tartaric=6.0, malic=3.0, cation_charge=cation, so2_total=total)
+    peak = _wine_state(
+        schema, tartaric=6.0, malic=3.0, cation_charge=cation,
+        so2_total=total, acetaldehyde=mgl_to_gpl(37.0),
+    )  # fmt: skip
+    s_dry = acidbase.speciate_so2(dry, schema, params)
+    s_peak = acidbase.speciate_so2(peak, schema, params)
+    assert s_dry.bound == 0.0 and s_dry.free == pytest.approx(total)
+    assert s_peak.free < 0.05 * total  # free crashes at the peak (SO₂ ≈ limiting)
+    assert s_peak.molecular < 0.05 * s_dry.molecular  # antimicrobial pool collapses
+    # conservation: free + bound == total, at both states, exactly
+    assert s_peak.free + s_peak.bound == pytest.approx(total)
+    assert s_dry.free + s_dry.bound == pytest.approx(total)
+
+
+def test_speciate_matches_scalar_wrappers(params):
+    # speciate_so2 (one pH solve) and the scalar convenience wrappers agree.
+    schema = wine_schema()
+    cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4)
+    y = _wine_state(
+        schema, tartaric=6.0, malic=3.0, cation_charge=cation,
+        so2_total=mgl_to_gpl(60.0), acetaldehyde=mgl_to_gpl(30.0),
+    )  # fmt: skip
+    spec = acidbase.speciate_so2(y, schema, params)
+    assert acidbase.bound_so2(y, schema, params) == pytest.approx(spec.bound)
+    assert acidbase.free_so2(y, schema, params) == pytest.approx(spec.free)
+    assert acidbase.molecular_so2(y, schema, params) == pytest.approx(spec.molecular)
+    # molecular_so2_at_ph reuses a supplied pH and agrees with the full solve
+    assert acidbase.molecular_so2_at_ph(y, schema, params, spec.ph) == pytest.approx(spec.molecular)
+
+
+def test_emergent_free_so2_dips_at_acetaldehyde_peak_then_recovers():
+    # THE D-28 headline: over a real ferment the early acetaldehyde peak transiently binds
+    # SO₂ — free (analytically-measured) SO₂ crashes toward ~0 near the peak, then RECOVERS
+    # to the dosed total as acetaldehyde is reduced back to ethanol (D-27). Unscripted: the
+    # dosed total slot is constant; the dip emerges from the binding equilibrium tracking the
+    # acetaldehyde state. free + bound conserves total at every column.
+    compiled = compile_scenario(
+        _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4, so2_total_mgl=50.0)
+    )
+    traj = simulate(compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h)
+    free = free_so2_series(traj, compiled.param_values)
+    bound = bound_so2_series(traj, compiled.param_values)
+    acet = traj.series("acetaldehyde")
+    total = mgl_to_gpl(50.0)
+
+    assert free[0] == pytest.approx(total)  # no acetaldehyde at pitch ⇒ all free
+    assert free.min() < 0.15 * total  # deep dip at the peak (SO₂ nearly all bound)
+    assert free[-1] == pytest.approx(total, rel=1e-3)  # recovers as acetaldehyde clears
+    # the free minimum coincides with the acetaldehyde maximum (the causal link)
+    assert abs(int(np.argmin(free)) - int(np.argmax(acet))) <= 1
+    assert bound.max() > 0.8 * total  # nearly all SO₂ is bound at the peak
+    assert np.allclose(free + bound, total)  # conservation at every column
+
+
+def test_speciation_tier_drops_with_binding_constant(pset, params):
+    # The tier now folds in the binding constant K too (D-28): all plausible ⇒ plausible,
+    # but a speculative K drags the whole speciation readout to speculative.
+    assert acidbase.molecular_so2_tier(pset.tier_map()) is Tier.PLAUSIBLE
+    tiers = dict(pset.tier_map())
+    tiers[acidbase.SO2_BINDING_PARAM] = Tier.SPECULATIVE
+    assert acidbase.molecular_so2_tier(tiers) is Tier.SPECULATIVE

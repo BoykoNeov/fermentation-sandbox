@@ -18,7 +18,7 @@ SHARED = (
 #: readout (decision D-22), then the malolactic-catalyst slot (decision D-23); beer does
 #: not (its acid system, SO₂ and MLF are deferred).
 WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "cation_charge")
-WINE_SO2_SLOTS = ("so2_free",)
+WINE_SO2_SLOTS = ("so2_total",)
 WINE_MLF_SLOTS = ("X_mlf",)
 
 
@@ -77,7 +77,7 @@ def test_wine_acid_slot_units_are_canonical():
     assert units["malic"] == "g/L"
     assert units["lactic"] == "g/L"
     assert units["cation_charge"] == "mol/L"
-    assert units["so2_free"] == "g/L"
+    assert units["so2_total"] == "g/L"
     assert units["X_mlf"] == "g/L"
 
 

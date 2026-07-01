@@ -1713,6 +1713,76 @@ own fork: does the dosed `so2_free` slot get reinterpreted as *total*, breaking 
 owner's one-Process-per-commit rhythm. **Next in the beat:** the SO₂ free/bound binding readout,
 then H₂S (carbon-free, inverse-low-N gate — the accounting-easiest, following the SO₂ precedent).
 
+## D-28 — SO₂ free/bound split: total conserved, free/bound/molecular derived at the solved pH
+
+**Status: IMPLEMENTED 2026-07-01** (349 green). The readout the D-27 forward note anticipated,
+unlocked now that acetaldehyde is real state. Acetaldehyde is the principal SO₂ binder in wine:
+bisulfite HSO₃⁻ reacts with the carbonyl to a stable hydroxysulphonate adduct, so a share of
+dosed SO₂ is **bound** (not antimicrobial, not analytically "free"). D-22 deferred this because
+acetaldehyde was unbuilt and framed the dosed slot as *free* SO₂ to keep that deferral honest.
+
+**The fork (D-27-flagged), decided by the owner: reinterpret the slot as TOTAL, derive free/bound.**
+Two options were surfaced (per "discuss disagreements"): (1) rename `so2_free`→`so2_total`
+(conserved, inert) and derive `bound = f(total, acetaldehyde, pH)`, `free = total − bound`,
+`molecular = free × neutral_fraction(pH)`; or (2) keep `so2_free` pinned and add `bound`/`total`
+additively. **Option 1 chosen — the decisive reason is conservation:** option 2 is non-conserving
+(with free pinned and `bound = f(free, acetaldehyde)`, `total = free + bound` *grows as
+acetaldehyde rises with no SO₂ added* — incoherent for a single dose, and it flattens molecular
+instead of dipping, killing the payoff). Option 1 gives the real must chemistry — "added SO₂ gets
+used up, then released": the early acetaldehyde peak sequesters SO₂ → free/molecular crash →
+recover as acetaldehyde is reduced (D-27). At acetaldehyde = 0 the split collapses to D-22 exactly
+(`free == total`), so the input-semantics change is invisible at the dosing moment (regression
+anchor pinned; the D-22 6.07/2.00/0.64 % curve and the free-for-0.8-molecular table survive).
+
+**The binding equilibrium (`acidbase.bound_so2_molar`, pure algebra).** Referenced to **bisulfite**
+(the reactive nucleophile): `K = [free acetaldehyde]·[HSO₃⁻] / [adduct]` with `[HSO₃⁻] = free_SO₂ ·
+bisulfite_fraction(pH)`, so pH enters mechanistically (new `acidbase.bisulfite_fraction`, the HA⁻
+share `Ka₁·h/D`). With `A` = total acetaldehyde, `C` = total SO₂, `β` = bisulfite fraction, the 1:1
+adduct `x` solves `(A−x)(C−x)·β − K·x = 0` — a quadratic whose *smaller* root is physical (clamped
+to `[0, min(A,C)]`). pH is solved from the organic acids **first** (SO₂ still out of the charge
+balance, D-22), so there is no circularity: `β` uses the organic-acid pH. Readouts:
+`speciate_so2` (one pH solve → `So2Speciation(total, bound, free, molecular, …)`), thin scalar
+wrappers `bound_so2`/`free_so2`/`molecular_so2`, and `molecular_so2_at_ph` for in-loop reuse.
+
+**The one live consumer: the MLF antimicrobial gate.** MLF suppression is by *molecular* SO₂ —
+the undissociated share of **free** SO₂ — so the gate (D-23) now reads the *derived* free-molecular
+pool via `molecular_so2_at_ph` instead of the raw slot (bound SO₂ is not antimicrobial). This is a
+correct consequence of the split, not new scope: it makes the emergent competition visible in a run
+— dosing 80 mg/L SO₂ still *strongly* suppresses MLF (~0.13 g/L malic slips through, pH rise 0.12→
+0.005), but the transient acetaldehyde peak (free crashes to ~0.9 mg/L near day 2) briefly relaxes
+suppression, so it is not a perfect block. `test_so2_dose_suppresses_mlf_in_a_run` updated to this
+faithful behaviour (threshold `>3.9`→`>3.8`, with the mechanism documented — *not* a weakening for CI).
+
+**Readout-only, like D-22 (the deferred RHS coupling).** The split does **not** feed back into the
+acetaldehyde reduction — bound acetaldehyde is notionally protected from ADH, but the D-27 reduction
+still consumes it. That RHS coupling (and SO₂'s own bisulfite back-reaction on pH, still deferred
+from D-22) is the scoped omission, caveated. Isolability holds **on a run with no live consumer**:
+`so2_total` is inert (no Process touches it) and free/bound are pure readouts, so on an MLF-*off*
+ferment dosing SO₂ leaves every other state column and pH byte-for-byte and carbon closing (the
+D-22 isolability test survives verbatim under the rename). This is **conditional, not
+unconditional**: once MLF is dosed, SO₂ *does* change the trajectory — that is the whole point of
+the gate, pinned by `test_so2_dose_suppresses_mlf_in_a_run`. The two tests together are the honest
+statement: SO₂ is inert until a consumer reads it, then it acts through that consumer alone.
+
+**The parameter.** New `K_acetaldehyde_so2 = 1.5e-6 mol/L` in the shared `acidbase.yaml`, tier
+**plausible**, band `[2e-7, 2.1e-6]` (order-of-magnitude literature scatter). Source: Burroughs &
+Sparks (1973), the canonical carbonyl-bisulphite dissociation constants; apparent Kd 1.5e-6 (pH 3.3)
+–2.06e-6 (pH 3.5) across the wine literature; Blouin (1966) "~0.04 % free acetaldehyde at 30 mg/L
+free SO₂" as a shape anchor. **Basis pinned (advisor-flagged as load-bearing):** referenced to
+bisulfite; the literature apparents are usually per *total free* SO₂ at a stated pH, but at wine pH
+bisulfite is ~0.94–0.99 of free SO₂ (`bisulfite_fraction`), so the two bases differ ≤5 % — inside
+the band. Honest overclaim caveated: acetaldehyde is the *principal* but not sole binder (pyruvate,
+α-ketoglutarate, sugars also bind), so modelled `bound` under-estimates and the "total" slot is
+really "free + acetaldehyde-bound" — free/molecular slightly over-estimate the protective pool.
+
+**Tier.** `molecular_so2_tier` now folds in the binding `K` alongside both pKa sets, floored at
+`PLAUSIBLE` (never `VALIDATED`; covers free/bound/molecular alike). **Emergent + verified before
+the acceptance test:** dosing 50 mg/L total SO₂ into a 20 °C wine ferment, free SO₂ dips 50 → 0.9
+mg/L at the acetaldehyde peak (day 1.7) and recovers to 50; `free + bound == total` to machine
+precision at every column. 7 new tests (+1 MLF assertion tightened); **349 green**, ruff + mypy
+clean. **Next in the beat:** H₂S (carbon-free, inverse-low-N gate — the accounting-easiest,
+following the SO₂ precedent).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

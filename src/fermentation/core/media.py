@@ -174,10 +174,10 @@ def wine_schema() -> StateSchema:
     (``fermentation.analysis``). ``cation_charge`` is a charge density (mol⁺/L), not a
     mass concentration — state is already heterogeneous (``T`` in K) — back-solved from
     the scenario's measured ``initial_ph`` at compile and held constant (D-18).
-    ``so2_free`` (g/L of SO₂-equivalent) is a dosed input read by ``acidbase.molecular_so2``
-    to partition the antimicrobial molecular fraction at the solved pH; it is **not** in
-    the charge balance (readout-only, D-22) and is carbon-free, so it leaves both pH and
-    ``total_carbon`` unchanged.
+    ``so2_total`` (g/L of SO₂-equivalent) is a dosed input read by ``acidbase.speciate_so2``
+    to derive the free/bound split (acetaldehyde-bound vs free) and the antimicrobial
+    molecular fraction at the solved pH; it is **not** in the charge balance (readout-only,
+    D-22/D-28) and is carbon-free, so it leaves both pH and ``total_carbon`` unchanged.
     """
     specs = _common_specs(VarSpec("S", "g/L", description="fermentable sugar"))
     specs += [
@@ -199,11 +199,11 @@ def wine_schema() -> StateSchema:
             "back-solved from initial_ph (D-18)",
         ),
         VarSpec(
-            "so2_free",
+            "so2_total",
             "g/L",
             default=0.0,
-            description="free SO2 (molecular+bisulfite+sulfite, as SO2); dosed input, "
-            "inert; pH-driven molecular-fraction readout (D-22)",
+            description="total SO2 (as SO2); dosed input, inert/conserved; free/bound "
+            "split + molecular-fraction readout derived at solved pH (D-22/D-28)",
         ),
         VarSpec(
             "X_mlf",
