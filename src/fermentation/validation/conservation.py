@@ -182,9 +182,8 @@ def total_carbon(
     # C8 transfer between two weighted pools like diacetyl → butanediol. Weighting all three at
     # their representative species (p-coumaric / 4-vinylphenol / 4-ethylphenol) keeps total_carbon
     # closed through the whole precursor → intermediate → product chain. On an undosed / un-pitched
-    # run the pools are empty and the Processes disabled (constant 0 terms). X_brett is NOT weighted
-    # yet — it is a constant, inert catalyst in pt1 (no Process grows or kills it), exactly like
-    # X_mlf before the MLF-growth beat; BrettGrowth (D-40 pt2) promotes it to weighted biomass.
+    # run the pools are empty and the Processes disabled (constant 0 terms). X_brett/X_brett_dead
+    # are weighted as biomass in the X block below (decision D-40 pt2, the X_mlf D-38 precedent).
     if "hydroxycinnamics" in schema:
         w[schema.slice("hydroxycinnamics")] = carbon_mass_fraction("p_coumaric_acid")
     if "vinylphenols" in schema:
@@ -219,6 +218,20 @@ def total_carbon(
         # weighted at the SAME biomass_carbon_fraction or that death would read as carbon destroyed.
         if "X_mlf_dead" in schema:
             w[schema.slice("X_mlf_dead")] = biomass_carbon_fraction
+        # Brett biomass X_brett (decision D-40 pt2): BrettGrowth builds it from the amino-acid pool,
+        # drawing the carbon shortfall from ETHANOL, so X_brett carries carbon and must be weighted
+        # or that growth would read as carbon destroyed. Booked at the SAME biomass_carbon_fraction
+        # the growth stoichiometry draws against (Brett ≈ yeast elemental composition, a v1
+        # simplification), so carbon closes exactly. Supersedes the pt1 "X_brett is carbon-free"
+        # scoping: on a no-growth run X_brett is constant, so the added term is a constant offset
+        # that drifts 0; a co-inoculation dose / pitch_brett flow now carries this biomass carbon.
+        if "X_brett" in schema:
+            w[schema.slice("X_brett")] = biomass_carbon_fraction
+        # Non-viable Brett biomass X_brett_dead (decision D-40 pt3): BrettDeath moves X_brett into
+        # it under SO₂, so — like the X → X_dead / X_mlf → X_mlf_dead transfers — it is weighted at
+        # the same fraction so that death reads as carbon-neutral.
+        if "X_brett_dead" in schema:
+            w[schema.slice("X_brett_dead")] = biomass_carbon_fraction
     return _weighted_sum(w)
 
 
@@ -266,6 +279,16 @@ def total_nitrogen(
         # nitrogen-neutral (the yeast X → X_dead precedent, D-13).
         if "X_mlf_dead" in schema:
             w[schema.slice("X_mlf_dead")] = biomass_nitrogen_fraction
+        # Brett biomass X_brett (decision D-40 pt2): BrettGrowth assimilates the amino-acid pool's
+        # nitrogen (arginine) into biomass, so X_brett carries nitrogen, weighted at the same
+        # biomass_nitrogen_fraction the growth draws against — the pool loses exactly the nitrogen
+        # X_brett gains, so total_nitrogen closes. Constant (⇒ 0 drift) on a no-growth run.
+        if "X_brett" in schema:
+            w[schema.slice("X_brett")] = biomass_nitrogen_fraction
+        # Non-viable Brett biomass X_brett_dead (decision D-40 pt3): retains its nitrogen, counted
+        # at the same fraction so the X_brett → X_brett_dead death transfer is nitrogen-neutral.
+        if "X_brett_dead" in schema:
+            w[schema.slice("X_brett_dead")] = biomass_nitrogen_fraction
     return _weighted_sum(w)
 
 

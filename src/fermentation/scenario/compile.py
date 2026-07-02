@@ -37,6 +37,7 @@ from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     BiomassCarryingCapacity,
     BrettDecarboxylation,
+    BrettGrowth,
     BrettVinylphenolReduction,
     FuselAminoAcidReroute,
     MalolacticCitrateMetabolism,
@@ -1056,6 +1057,16 @@ def compile_scenario(
     # arrests growth via the ethanol wall, a normal-ABV sequential MLF can still grow (D-38).
     if MalolacticGrowth.name in process_set and amino_acids_gpl <= 0.0:
         process_set.disable(MalolacticGrowth.name)
+
+    # Brett-growth isolability (decision D-40 pt2). BrettGrowth builds X_brett from the amino-acid
+    # pool (drawing the carbon shortfall from ethanol, so Brett grows in a dry wine), so — exactly
+    # like MalolacticGrowth — it is keyed on amino acids being dosed, NOT on the Brett pitch (the
+    # Process's own ``X_brett ≤ 0`` guard handles "Brett present"; whether it then grows is left to
+    # the emergent SO₂/temperature gate). Disable it when amino_acids_gpl ≤ 0 so the empty
+    # amino_acids / X_brett slots keep their tier and no rate recompute is paid undosed. This keeps
+    # every pitched-but-not-aa-dosed Brett run (e.g. the pt1 headline) with growth disabled.
+    if BrettGrowth.name in process_set and amino_acids_gpl <= 0.0:
+        process_set.disable(BrettGrowth.name)
 
     # Autolytic-peptide source (decision D-34): YeastAutolysis refills the amino-acid pool from dead
     # biomass (X_dead) post-AF — the second MLF-with-growth prerequisite. Like the carrying cap it

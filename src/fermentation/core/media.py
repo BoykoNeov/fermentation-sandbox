@@ -71,6 +71,7 @@ from fermentation.core.kinetics import (
     ArrheniusTemperature,
     BiomassCarryingCapacity,
     BrettDecarboxylation,
+    BrettGrowth,
     BrettVinylphenolReduction,
     DiacetylReduction,
     EsterSynthesis,
@@ -556,6 +557,17 @@ _BRETT_PROCESSES: tuple[Callable[[], Process], ...] = (
     BrettVinylphenolReduction,
 )
 
+#: *Brettanomyces* growth (wine-only, decision D-40 pt2). Makes ``X_brett`` dynamic:
+#: :class:`BrettGrowth` builds Brett biomass from the ``amino_acids`` pool (D-32, autolysis-refilled
+#: D-34) — but draws its carbon shortfall from **ethanol**, not sugar, so Brett grows in a *dry*
+#: finished wine (its post-AF/barrel niche), and the phenol spoilage then *accelerates* as the
+#: population multiplies (decarboxylase/reductase are linear in ``X_brett``). Kept in its OWN tuple,
+#: DELIBERATELY SEPARATE from ``_BRETT_PROCESSES`` because it is gated on a different feature:
+#: amino-acid fuel, NOT the Brett pitch (the exact ``_MLF_GROWTH_PROCESSES`` split). The compile
+#: seam disables it when ``amino_acids_gpl ≤ 0``; the Process's own ``X_brett ≤ 0`` guard keeps it
+#: inert until Brett is present. Wine-only.
+_BRETT_GROWTH_PROCESSES: tuple[Callable[[], Process], ...] = (BrettGrowth,)
+
 #: Biomass carrying-capacity cap (wine-only, decision D-30): the opt-in residual-nitrogen
 #: floor. A logistic ``(1 - X/K)`` RateModifier on growth that saturates biomass below the
 #: nitrogen ceiling, leaving a dose-dependent residual of yeast-assimilable nitrogen — which
@@ -650,6 +662,7 @@ MEDIA: dict[str, Medium] = {
             + _MLF_PROCESSES
             + _MLF_GROWTH_PROCESSES
             + _BRETT_PROCESSES
+            + _BRETT_GROWTH_PROCESSES
             + _AMINO_ACID_PROCESSES
             + _AUTOLYSIS_PROCESSES
         ),

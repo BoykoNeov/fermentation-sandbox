@@ -222,6 +222,11 @@ MLF_GROWTH_PROCESSES = {"malolactic_growth"}
 # disabled at the compile seam unless a scenario pitches Brett (brett_pitch_gpl>0 or a pitch_brett
 # intervention), so an unpitched wine run is byte-for-byte the validated core (the MLF pattern).
 BRETT_PROCESSES = {"brett_decarboxylation", "brett_vinylphenol_reduction"}
+# Brett growth (decision D-40 pt2, makes X_brett dynamic) is wired into the WINE medium only;
+# enabled in a bare build and disabled at the compile seam unless a scenario BOTH pitches Brett AND
+# doses amino acids — a stricter gate than the phenol Processes, so it is a SEPARATE tuple (avoids
+# dragging the amino_acids/E tier on pitched-but-not-aa-dosed runs), mirroring MLF_GROWTH_PROCESSES.
+BRETT_GROWTH_PROCESSES = {"brett_growth"}
 # Yeast autolysis (D-34): wine-only, opt-in — present in a bare build, disabled at the compile
 # seam unless a scenario passes autolysis_rate_per_h (the carrying-capacity opt-in pattern).
 AUTOLYSIS_PROCESSES = {"yeast_autolysis"}
@@ -236,6 +241,7 @@ EXPECTED_PROCESSES = {
         | MLF_PROCESSES
         | MLF_GROWTH_PROCESSES
         | BRETT_PROCESSES
+        | BRETT_GROWTH_PROCESSES
         | AMINO_ACID_PROCESSES
         | AUTOLYSIS_PROCESSES
     ),

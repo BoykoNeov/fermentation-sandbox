@@ -19,6 +19,7 @@ from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius
 from fermentation.core.kinetics.autolysis import YeastAutolysis
 from fermentation.core.kinetics.brett import (
     BrettDecarboxylation,
+    BrettGrowth,
     BrettVinylphenolReduction,
     brett_environmental_gate,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "AminoAcidAssimilation",
     "BiomassCarryingCapacity",
     "BrettDecarboxylation",
+    "BrettGrowth",
     "BrettVinylphenolReduction",
     "DiacetylReduction",
     "ArrheniusTemperature",

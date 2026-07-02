@@ -317,8 +317,17 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         compile gate, `X_brett`(_dead) in `_LEES_SLOTS`. Carbon closes on the existing ledger.
         11 new tests (`test_brett.py`), incl. the emergent Brett-gated headline + SO₂/rack levers +
         post-AF pitch ethanol-tolerance. All params `speculative`. Full record in **DECISIONS → D-40**.
-  - [ ] **pt2** — `BrettGrowth` (dynamic `X_brett`, nitrogen-anchored); **pt3** — `BrettDeath` (SO₂
-        kill + full acceptance gate); **pt4** — POF+ yeast opt-in strain + emergent reservoir test.
+  - [x] **pt2 — `BrettGrowth`, dynamic `X_brett`. LANDED 2026-07-02.** Nitrogen-anchored on
+        `amino_acids`; carbon shortfall drawn from **ethanol** (owner fork) so Brett grows in a *dry*
+        finished wine → volatile phenols accelerate **autocatalytically**. No sugar Monod; an
+        intrinsic logistic carrying-capacity brake `(1 − X_brett/K)` is the only ceiling (Brett has
+        no self-arrest, unlike MLF). An early build blew up under **BDF** (`X_brett`→23, aa→−4.5)
+        because the `E≤0` guard had no smooth shadow — fixed with the ethanol Monod `E/(K_E_brett+E)`
+        (also physically right: Brett grows on ethanol). Regression pinned under BDF + a
+        BDF/RK45/LSODA agreement test. Growth gated at the compile seam on pitch **and** aa dose.
+        4 new params, 10 new tests. Full record in **DECISIONS → D-40 (pt2)**.
+  - [ ] **pt3** — `BrettDeath` (SO₂ kill + full acceptance gate); **pt4** — POF+ yeast opt-in strain
+        + emergent reservoir test.
 - **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these
       **one Process per commit, diacetyl first** (decision D-26).

@@ -23,6 +23,7 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics.brett import (
     BrettDecarboxylation,
+    BrettGrowth,
     BrettVinylphenolReduction,
     brett_environmental_gate,
 )
@@ -32,7 +33,12 @@ from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.scenario.schema import Intervention
-from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
+from fermentation.validation import (
+    assert_conserved,
+    assert_nonnegative,
+    total_carbon,
+    total_nitrogen,
+)
 
 
 @pytest.fixture
@@ -282,3 +288,218 @@ def test_temperature_optimum_warmer_than_mlf(params):
 def test_processes_are_speculative():
     assert BrettDecarboxylation.tier is Tier.SPECULATIVE
     assert BrettVinylphenolReduction.tier is Tier.SPECULATIVE
+
+
+# =============================================================================
+# pt2 — BrettGrowth: X_brett becomes dynamic (decision D-40 pt2)
+# =============================================================================
+#
+# Ranked headline-first. The payoff is the *autocatalytic* spoilage — a growing Brett population
+# makes 4-EP accelerate over a barrel's months (``test_growth_accelerates_phenols``). The crown
+# regression is ``test_growth_bounded_and_amino_acids_nonneg_under_bdf`` + its solver cross-check:
+# an early build drove X_brett to 23 g/L and amino_acids to −4.5 g/L because BrettGrowth's ``E ≤ 0``
+# guard had no smooth *shadow* (unlike the amino-acid Monod and the (1−X/K) brake), so the BDF
+# Jacobian straddled an on/off step at E=0 during primary AF and the autocatalytic mode blew up.
+# The ethanol Monod ``E/(K_E_brett+E)`` is that shadow; these tests pin the fix under the *default
+# BDF solver* (RK45/LSODA never saw the bug — they build no Jacobian).
+
+
+def _run_dry_post_af(*, method: str = "BDF", days: float = 200.0, **initial_extra):
+    """A *finished* wine (no sugar, full-strength ethanol) pitched with Brett — Brett's real niche.
+
+    ``brix=0``/``ethanol_gpl≈90`` puts the ethanol Monod at ≈1 from t0 (no near-zero cover), so a
+    dosed low amino-acid pool is the tight resource — the case that discriminates "fixed the whole
+    BDF blow-up class" from "fixed only the E-crossing instance". Solver ``method`` is explicit so
+    the regression can cross-check BDF against the non-stiff solvers.
+    """
+    initial: dict[str, float] = {
+        "brix": 0.0,
+        "ethanol_gpl": 90.0,
+        "yan_mgl": 250.0,
+        "pitch_gpl": 0.2,
+        "brett_pitch_gpl": 0.05,
+        "tartaric_gpl": 3.0,
+        "malic_gpl": 2.0,
+        "initial_ph": 3.5,
+    }
+    initial.update(initial_extra)
+    sc = Scenario(
+        name="brett-dry-post-af",
+        medium="wine",
+        initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=25.0)],
+        interventions=[],
+        duration_days=days,
+    )
+    compiled = compile_scenario(sc, strict=True)
+    traj = compiled.run(t_eval=np.linspace(0.0, days * 24.0, 500), method=method)
+    return compiled, traj
+
+
+# -- 8. HEADLINE: growth makes spoilage autocatalytic --------------------------
+
+
+def test_growth_accelerates_phenols():
+    """A growing Brett population (amino acids dosed) spoils *more* than a constant catalyst.
+
+    Same Brett pitch and same precursor; the only difference is the amino-acid fuel that lets
+    ``X_brett`` grow. The dynamic-population run must end with **more** ethylphenols *and* a higher
+    ``X_brett`` than the constant-catalyst control — the "it gets worse the longer the barrel sits"
+    dynamic a fixed catalyst (pt1) cannot produce.
+    """
+    _, dynamic = _run(
+        days=120.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0
+    )
+    _, constant = _run(
+        days=120.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05
+    )  # no aa ⇒ no growth
+
+    assert dynamic.series("X_brett")[-1] > 2.0 * constant.series("X_brett")[-1]  # population grew
+    assert dynamic.series("ethylphenols")[-1] > constant.series("ethylphenols")[-1]  # more spoilage
+    # The constant control's X_brett is genuinely constant (growth disabled without amino acids).
+    xb_const = constant.series("X_brett")
+    assert float(np.max(xb_const) - np.min(xb_const)) == pytest.approx(0.0, abs=1e-12)
+
+
+# -- 9. CROWN REGRESSION: no runaway; amino_acids >= 0 under the default BDF ---
+
+
+def test_growth_bounded_and_amino_acids_nonneg_under_bdf():
+    """The X_brett=23 / amino_acids=−4.5 blow-up must not recur — under the DEFAULT BDF solver.
+
+    A finished wine (ethanol Monod ≈1, no near-zero cover) with a small amino-acid pool: the
+    carrying-capacity brake must bound ``X_brett`` and the pool must never go meaningfully negative.
+    ``assert_nonnegative`` is the real gate (it is what caught the original bug); ``atol=1e-8`` sits
+    an order of magnitude above the integrator's own ``atol=1e-9`` solver noise.
+    """
+    compiled, traj = _run_dry_post_af(method="BDF", amino_acids_gpl=0.05, hydroxycinnamic_gpl=0.1)
+    k = compiled.param_values["brett_carrying_capacity"]
+    xb = traj.series("X_brett")
+    assert float(np.max(xb)) <= k * 1.01  # brake holds: bounded by the carrying capacity
+    assert xb[-1] > xb[0]  # but it did grow (the process is active, not just inert)
+    assert_nonnegative(traj, ("X_brett", "amino_acids", "E"), atol=1e-8)
+
+
+def test_growth_bdf_matches_nonstiff_solvers():
+    """BDF must agree with RK45 and LSODA — the bug was a BDF-only Jacobian artefact.
+
+    The original runaway was invisible to every non-stiff solver (they build no Jacobian, so never
+    straddled the E=0 step). Encoding "all three solvers agree" is the direct regression on the
+    *class* of bug: if the ethanol-Monod shadow ever regresses, BDF diverges from RK45/LSODA here.
+    """
+    finals = {}
+    for method in ("BDF", "RK45", "LSODA"):
+        _, traj = _run_dry_post_af(method=method, amino_acids_gpl=0.05, hydroxycinnamic_gpl=0.1)
+        finals[method] = traj.series("X_brett")[-1]
+    assert finals["BDF"] == pytest.approx(finals["RK45"], rel=1e-3)
+    assert finals["BDF"] == pytest.approx(finals["LSODA"], rel=1e-3)
+
+
+# -- 10. conservation with growth active --------------------------------------
+
+
+def test_growth_conserves_carbon_and_nitrogen():
+    """total_carbon and total_nitrogen close while growth builds X_brett from amino acids + E."""
+    compiled, traj = _run_dry_post_af(method="BDF", amino_acids_gpl=0.1, hydroxycinnamic_gpl=0.1)
+    carbon = total_carbon(
+        compiled.schema, biomass_carbon_fraction=compiled.param_values["biomass_C_fraction"]
+    )
+    nitrogen = total_nitrogen(
+        compiled.schema, biomass_nitrogen_fraction=compiled.param_values["biomass_N_fraction"]
+    )
+    assert_conserved(traj, carbon, label="carbon")
+    assert_conserved(traj, nitrogen, label="nitrogen")
+
+
+# -- 11. stoichiometry, touches, and the ethanol carbon source ----------------
+
+
+def test_growth_draws_ethanol_not_sugar_or_ammonium(schema, params):
+    """Growth builds X_brett from amino acids + ETHANOL; touches neither sugar S nor ammonium N."""
+    y = _state(schema, X_brett=0.1, amino_acids=0.5, E=90.0)
+    d = BrettGrowth().derivatives(0.0, y, schema, params)
+
+    assert d[schema.slice("X_brett")][0] > 0.0  # biomass grows
+    assert d[schema.slice("amino_acids")][0] < 0.0  # nitrogen fuel consumed
+    assert d[schema.slice("E")][0] < 0.0  # carbon shortfall drawn from ethanol
+    assert float(d[schema.slice("S")].sum()) == 0.0  # NOT sugar (Brett's dry-wine niche)
+    assert d[schema.slice("N")][0] == 0.0  # NOT ammonium (nitrogen-anchored on amino acids)
+    assert set(BrettGrowth.touches) == {"X_brett", "amino_acids", "E"}
+
+
+def test_growth_needs_ethanol_the_carbon_source(schema, params):
+    """The ethanol Monod: no ethanol ⇒ ≈no growth; ample ethanol ⇒ growth — Brett feeds on ethanol.
+
+    Also the smooth shadow of the ``E ≤ 0`` guard: growth eases to zero as E → 0 (rather than
+    switching off at a step), which is what keeps the BDF Jacobian well-conditioned.
+    """
+    dry = BrettGrowth().derivatives(
+        0.0, _state(schema, X_brett=0.1, amino_acids=0.5, E=0.0), schema, params
+    )
+    wet = BrettGrowth().derivatives(
+        0.0, _state(schema, X_brett=0.1, amino_acids=0.5, E=90.0), schema, params
+    )
+    assert float(dry[schema.slice("X_brett")][0]) == 0.0  # no ethanol ⇒ no growth
+    assert float(wet[schema.slice("X_brett")][0]) > 0.0  # ethanol present ⇒ growth
+
+    # Smoothness of the shadow: a tiny ethanol level gives a tiny (but continuous, nonzero) rate —
+    # no on/off step for the finite-difference Jacobian to straddle.
+    trace = BrettGrowth().derivatives(
+        0.0, _state(schema, X_brett=0.1, amino_acids=0.5, E=0.05), schema, params
+    )
+    r_trace = float(trace[schema.slice("X_brett")][0])
+    r_wet = float(wet[schema.slice("X_brett")][0])
+    assert 0.0 < r_trace < r_wet  # ramps up with ethanol availability, not a cliff
+
+
+# -- 12. carrying-capacity brake ----------------------------------------------
+
+
+def test_growth_brake_shuts_off_at_carrying_capacity(schema, params):
+    """(1 − X/K): growth eases to 0 as X_brett → K and is exactly 0 at/above it (no runaway)."""
+    k = params["brett_carrying_capacity"]
+    below = BrettGrowth().derivatives(
+        0.0, _state(schema, X_brett=0.5 * k, amino_acids=0.5, E=90.0), schema, params
+    )
+    at_cap = BrettGrowth().derivatives(
+        0.0, _state(schema, X_brett=k, amino_acids=0.5, E=90.0), schema, params
+    )
+    over = BrettGrowth().derivatives(
+        0.0, _state(schema, X_brett=1.5 * k, amino_acids=0.5, E=90.0), schema, params
+    )
+    assert float(below[schema.slice("X_brett")][0]) > 0.0  # growing below the cap
+    assert float(at_cap[schema.slice("X_brett")][0]) == pytest.approx(0.0, abs=1e-15)  # shut at K
+    assert float(over[schema.slice("X_brett")][0]) == 0.0  # clamped, never a biomass source
+
+
+# -- 13. guards ---------------------------------------------------------------
+
+
+def test_growth_guards_zero_without_catalyst_fuel_or_ethanol(schema, params):
+    """Zero contribution when there is no Brett, no amino-acid fuel, or no ethanol."""
+    no_brett = _state(schema, X_brett=0.0, amino_acids=0.5, E=90.0)
+    no_aa = _state(schema, X_brett=0.1, amino_acids=0.0, E=90.0)
+    no_e = _state(schema, X_brett=0.1, amino_acids=0.5, E=0.0)
+    assert not np.any(BrettGrowth().derivatives(0.0, no_brett, schema, params))
+    assert not np.any(BrettGrowth().derivatives(0.0, no_aa, schema, params))
+    assert not np.any(BrettGrowth().derivatives(0.0, no_e, schema, params))
+
+
+# -- 14. isolability + tier ---------------------------------------------------
+
+
+def test_growth_disabled_without_amino_acids(schema):
+    """Pitched Brett, no amino-acid dose ⇒ growth disabled at the compile seam ⇒ X_brett constant.
+
+    The phenol pathway still runs (constant catalyst), but with no fuel the growth Process is
+    disabled, so ``X_brett`` never changes and the ``amino_acids``/``E`` slots keep their tier — the
+    stricter growth gate is isolable from the pt1 phenol gate (mirrors MLF growth vs conversion).
+    """
+    compiled, traj = _run(hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.3)  # pitched, no amino acids
+    xb = traj.series("X_brett")
+    assert float(np.max(xb) - np.min(xb)) == pytest.approx(0.0, abs=1e-12)
+    assert "brett_growth" not in {p.name for p in compiled.process_set.active}
+
+
+def test_growth_is_speculative():
+    assert BrettGrowth.tier is Tier.SPECULATIVE

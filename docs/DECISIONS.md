@@ -2653,13 +2653,13 @@ is complete.**
 
 ## D-40 — Brettanomyces volatile phenols: the mixed-culture beat that closes Milestone 2
 
-**Status: pt1 IMPLEMENTED 2026-07-02** (ruff + mypy clean; full suite green — see commit). The last
-unchecked M2 physics beat ("Mixed cultures / Brett / sour consortium"). *Brettanomyces bruxellensis*
-is the canonical wine spoilage yeast: it decarboxylates grape-must **hydroxycinnamic acids**
-(p-coumaric, ferulic) to **vinylphenols**, then reduces those to the **ethylphenols** (4-ethylphenol
-"barnyard", 4-ethylguaiacol "clove") that define Brett character. Built as a multi-commit arc
-mirroring the MLF arc (conversion → growth → death): **pt1 = the phenol pathway with a dosed
-catalyst** (this entry); pt2 `BrettGrowth` (dynamic `X_brett`), pt3 `BrettDeath` (the SO₂ kill), pt4
+**Status: pt1 + pt2 IMPLEMENTED 2026-07-02** (ruff + mypy clean; full suite green — see commits). The
+last unchecked M2 physics beat ("Mixed cultures / Brett / sour consortium"). *Brettanomyces
+bruxellensis* is the canonical wine spoilage yeast: it decarboxylates grape-must **hydroxycinnamic
+acids** (p-coumaric, ferulic) to **vinylphenols**, then reduces those to the **ethylphenols**
+(4-ethylphenol "barnyard", 4-ethylguaiacol "clove") that define Brett character. Built as a
+multi-commit arc mirroring the MLF arc (conversion → growth → death): **pt1 = the phenol pathway with
+a dosed catalyst**, **pt2 = `BrettGrowth`** (dynamic `X_brett`); pt3 `BrettDeath` (the SO₂ kill), pt4
 the POF+ yeast opt-in + emergent reservoir test — to follow.
 
 **Two owner forks (decided by the user, pros/cons presented).** (1) *Pathway fidelity* → **3-pool +
@@ -2718,6 +2718,65 @@ stoichiometry/`touches`, guards, unpitched tier isolability, the warm temperatur
 `speculative` tier. Two `test_media.py` composition assertions updated for the 5 new wine slots + 2
 Brett Processes. All params `speculative` (author estimates; no per-catalyst kinetic model of this
 flux form is sourced — Brett phenols are reported as bulk mg/L end-yields).
+
+**pt2 — `BrettGrowth`: `X_brett` becomes dynamic (IMPLEMENTED 2026-07-02).** The Brett twin of
+`MalolacticGrowth`, with one load-bearing difference: **Brett grows on ETHANOL, not sugar**, so it
+builds up in a *dry, finished* wine — its real post-AF/barrel niche. Because the decarboxylase and
+reductase are linear in `X_brett`, a growing population makes the volatile-phenol spoilage
+**accelerate autocatalytically** over the months a barrel sits — the "it gets worse the longer you
+leave it" dynamic a constant catalyst cannot produce. `dX_brett/dt = μ_max_brett · X_brett ·
+aa/(K_aa_brett+aa) · E/(K_E_brett+E) · g_SO₂·γ(T) · (1 − X_brett/K)`.
+
+- **Owner fork — carbon source → ETHANOL-drawn (decided by the user, pros/cons presented).** New
+  biomass is nitrogen-anchored on the `amino_acids` pool (D-32, autolysis-refilled D-34), consuming
+  `ρ = f_N·dX_brett/y_N` of arginine; the carbon **shortfall** `f_C·dX_brett − ρ·y_C` (arginine is
+  N-rich, so it under-supplies carbon) is drawn from **ethanol `E`**, not sugar. That is the
+  mechanistic reason Brett thrives where the wine is *dry*. Both ledgers close exactly; touches
+  `(X_brett, amino_acids, E)` — **not** `S` (Brett skips sugar) and **not** `N` (no ammonium release,
+  the D-38 anchoring choice). v1 models only the biomass-assimilation branch; the acetic-acid
+  overflow (Brett's real ethanol-oxidation "volatile acidity" product) is a deferred pool, so the
+  ethanol drawdown here is a lower bound on true consumption.
+
+- **The carrying-capacity brake — required, because Brett has no self-arrest (the numeric crux).**
+  `MalolacticGrowth` is self-limiting (its sugar Monod vanishes as sugar is consumed *and* its gate
+  carries an ethanol wall). Brett deliberately has **neither** (dry-wine, ethanol-tolerant niche), so
+  amino-acid Monod alone is *not* a ceiling: an autolysis-refilled aa pool would grow `X_brett`
+  exponentially without bound. So `BrettGrowth` carries an intrinsic **logistic carrying capacity**
+  `(1 − X_brett/K)` (`brett_carrying_capacity`), the same lumped form as the D-30 yeast
+  `BiomassCarryingCapacity` (real Brett saturates at a finite cell density) — but *intrinsic and
+  always-on*, not the opt-in isolable modifier D-30 is. Bounding `X_brett` small keeps the
+  amino-acid draw rate small, so the pool depletes *smoothly* to a positive residual rather than
+  overshooting negative.
+
+- **The advisor-caught BDF blow-up + the fix (fidelity, not preference).** The first `BrettGrowth`
+  drove `X_brett` → **23 g/L** and `amino_acids` → **−4.5 g/L** under the default **BDF** solver —
+  yet **RK45 and LSODA both gave the correct bounded answer** (`X_brett` → ~0.1, aa ≥ 0). The RHS was
+  *correct*; BDF was mis-integrating. Root cause (advisor's diagnosis): every hard guard must be
+  shadowed by a *smooth* factor that reaches zero first — `aa` is shadowed by its Monod, the brake by
+  `(1−X/K)`, but the **`E ≤ 0` guard had no shadow**, so `∂f_X/∂E` was a step at `E = 0`. BDF's
+  finite-difference Jacobian straddled that step as ethanol rose through zero during primary AF,
+  corrupting the Newton solve into an autocatalytic blow-up (the aa negativity is a *consequence* of
+  the X blow-up, not an independent failure); RK45/LSODA build no Jacobian and never saw it. **Fix:
+  the ethanol Monod `E/(K_E_brett+E)` is that missing smooth shadow** — and it is *also* physically
+  right (Brett grows *on* ethanol, so growth scales with ethanol availability: ≈0 in an unfermented
+  must, ≈1 in a finished wine, `K_E_brett` = 2 g/L kept small so it is ≈1 across the working range).
+  So growth is now gated by ethanol availability, refining the pt1-era "amino-acid fuel + SO₂/temp"
+  story. The regression is pinned **under BDF specifically** (`test_growth_bounded_..._under_bdf`
+  asserts `assert_nonnegative` at `atol=1e-8` — the assertion that *caught* the bug — plus a
+  BDF-vs-RK45-vs-LSODA agreement test that directly encodes "all three solvers agree").
+
+- **Isolability (stricter gate than pt1).** `BrettGrowth` is wired into the wine medium but disabled
+  at the compile seam unless a scenario **both** pitches Brett **and** doses amino acids (a stricter
+  gate than the pt1 phenol Processes, so it is a separate tuple — avoids dragging the `amino_acids`/`E`
+  tier onto pitched-but-not-aa-dosed runs, mirroring `MalolacticGrowth` vs `MalolacticConversion`).
+  `X_brett` promotes from the pt1 carbon-free constant catalyst to weighted biomass with **no verb
+  change** — the pitch/rack `ExternalFlow` auto-books its conservation flow (the exact `X_mlf`
+  D-23 → D-38 path). **+10 tests** (`test_brett.py`): autocatalytic acceleration headline, the two
+  BDF regressions, carbon+nitrogen closure, ethanol-drawn `touches`, the ethanol-availability Monod
+  (+ its smoothness), the carrying-capacity brake, growth guards, the aa-gated compile-seam
+  isolability, and the `speculative` tier. New params `mu_max_brett`, `K_aa_brett`, `K_E_brett`,
+  `brett_carrying_capacity` — all `speculative` (Brett is a characteristically slow grower; no
+  per-organism kinetic values sourced).
 
 ## Deferred (decide early in the relevant milestone)
 

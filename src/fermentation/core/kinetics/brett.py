@@ -72,7 +72,10 @@ from fermentation.core.chemistry import (
     M_ETHYLPHENOL,
     M_P_COUMARIC,
     M_VINYLPHENOL,
+    carbon_mass_fraction,
+    nitrogen_mass_fraction,
 )
+from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.malolactic import cardinal_temperature_factor
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -228,4 +231,159 @@ class BrettVinylphenolReduction(Process):
         d[schema.slice("ethylphenols")] = (
             loss * M_ETHYLPHENOL / M_VINYLPHENOL
         )  # mole-for-mole C8→C8
+        return d
+
+
+class BrettGrowth(Process):
+    """*Brettanomyces* biomass growth — makes ``X_brett`` dynamic (decision D-40 pt2).
+
+    The Brett twin of :class:`~fermentation.core.kinetics.malolactic.MalolacticGrowth`, with one
+    load-bearing difference: **Brett grows on ETHANOL, not sugar**, so it can build up in a *dry,
+    finished* wine — its actual niche as a post-AF/barrel spoiler. Because the decarboxylase and
+    reductase are linear in ``X_brett``, a growing population makes the volatile-phenol spoilage
+    **accelerate autocatalytically** over the months a barrel sits — the "it gets worse the longer
+    you leave it" dynamic a constant catalyst (pt1) cannot produce.
+
+    **Rate — the growth law, environmentally gated, carrying-capacity-braked.**
+
+        dX_brett/dt = μ_max_brett · X_brett · aa/(K_aa_brett + aa) · E/(K_E_brett + E)
+                                    · g_SO₂ · γ(T) · (1 − X_brett/K)
+
+    Michaelis–Menten in the ``amino_acids`` pool (the nitrogen fuel, refilled post-AF by autolysis,
+    D-34 — the honest way a dry wine feeds Brett) **and** in ethanol ``E`` (its carbon/energy
+    source, below), scaled by the shared Brett gate. **No sugar Monod** (unlike MLF): Brett does not
+    need sugar present, so growth is *not* self-limited to the sugar window — the ethanol Monod
+    ``E/(K_E_brett + E)`` is ≈1 across the whole normal-wine ethanol range (``K_E_brett`` ~ a few
+    g/L), so a finished dry wine feeds Brett fully while an unfermented must (E ≈ 0) does not. That
+    ethanol availability, plus the amino-acid fuel and SO₂/temperature environment, is what makes
+    ``pitch_brett`` into a high-ethanol post-AF wine grow rather than sit inert. (The ethanol Monod
+    is also the *smooth shadow* of the ``E ≤ 0`` guard — it drives the rate to zero continuously as
+    ``E → 0`` so the BDF Jacobian never straddles an on/off step during primary AF, mirroring how
+    the amino-acid Monod shadows the ``aa`` guard and the ``(1 − X/K)`` brake shadows the cap.)
+
+    **Carrying-capacity brake — the load-bearing difference from MLF (decision D-40 pt2).** MLF
+    growth is *self-arresting*: its sugar Monod ``S/(K_s + S)`` vanishes as sugar is consumed and
+    its gate carries an ethanol wall, so ``O. oeni`` cannot run away. Brett deliberately has
+    **neither** (that is its dry-wine, ethanol-tolerant niche), so amino-acid Monod alone is *not*
+    a brake — a barrel with a refilled amino-acid pool would grow ``X_brett`` exponentially with no
+    ceiling, driving the amino-acid pool negative on a solver overshoot. So Brett carries an
+    intrinsic **logistic carrying capacity** ``(1 − X_brett/K)`` (``K = brett_carrying_capacity``),
+    the same lumped form as the D-30 yeast :class:`~fermentation.core.kinetics.carrying_capacity.\
+    BiomassCarryingCapacity` — real Brett saturates at a finite cell density (nutrient/quorum
+    limits). Linear ``1 − X/K`` (not a smoothed power) is deliberate: ``X_brett`` self-limits, so
+    growth → 0 as ``X_brett → K`` and the state never gets driven past the wall — no derivative
+    kink for the BDF solver, and no runaway. The factor is clamped ``≥ 0`` so a solver excursion
+    ``X_brett > K`` cannot flip growth into a biomass/nitrogen *source*. Because ``K`` bounds
+    ``X_brett`` small (realistic Brett biomass), the amino-acid draw rate ``ρ ∝ dX_brett`` stays
+    small, so the pool depletes *smoothly* to a positive residual rather than overshooting negative
+    — the brake is what makes the nitrogen ledger physically honest (it bounds X, MLF's environment
+    does the same job there). This is intrinsic and always-on, **not** the opt-in isolable modifier
+    D-30 is (which exists to depart from the Coleman anchor); it is a plain factor in the rate.
+
+    **Conservation — nitrogen-anchored, carbon shortfall from ETHANOL (decision D-40, owner fork).**
+    New biomass needs ``f_N·dX_brett`` nitrogen and ``f_C·dX_brett`` carbon. All the nitrogen comes
+    from amino acids, consuming ``ρ = f_N·dX_brett/y_N`` of the pool (``y_N``/``y_C`` = arginine's
+    nitrogen/carbon mass fractions). That arginine carries only ``ρ·y_C`` carbon — less than biomass
+    needs (arginine is N-rich) — so the **shortfall** ``f_C·dX_brett − ρ·y_C`` is drawn from
+    **ethanol** ``E`` (``d[E] −= shortfall / c_ethanol``, where ``c_ethanol`` is ethanol's carbon
+    fraction, so exactly ``shortfall`` grams of carbon leave ``E``). This mirrors MLF's growth
+    stoichiometry but sources the shortfall from ethanol instead of sugar — the mechanistic reason
+    Brett thrives where the wine is dry. Carbon closes (``X_brett`` gains ``f_C·dX_brett`` =
+    amino-acid carbon ``ρ·y_C`` + ethanol shortfall); nitrogen closes (``X_brett`` gains
+    ``f_N·dX_brett`` = amino-acid nitrogen ``ρ·y_N``). The shortfall coefficient
+    ``f_C − f_N·y_C/y_N`` is **structurally positive** (biomass C:N ≫ arginine's), so no clamp and
+    no C⁰ kink. Touches ``(X_brett, amino_acids, E)`` — **not** ``S`` (Brett skips sugar) and
+    **not** ``N`` (nitrogen from amino acids, no ammonium release; the D-38 anchoring choice).
+
+    **v1 simplification (owned).** Real Brett *oxidizes* most of the ethanol it consumes to
+    acetaldehyde/**acetic acid** (its volatile-acidity/"vinegar" side), assimilating only a fraction
+    as biomass — this Process models the biomass-assimilation branch only (carbon-closing), and the
+    acetic-acid overflow is a deferred pool. So the ethanol *drawdown* here is a lower bound on
+    Brett's true ethanol consumption, and no volatile acidity is produced yet (decision D-40).
+
+    Guards mirror MLF growth: a zero contribution before any pH work when there is no catalyst
+    (``X_brett ≤ 0``), no amino-acid fuel, or no ethanol (the shortfall must never target an empty
+    ``E``). Tier **speculative** (``μ_max_brett``/``K_aa_brett`` are author estimates and the
+    bacterial-≈-yeast composition is a simplification).
+    """
+
+    name = "brett_growth"
+    tier = Tier.SPECULATIVE
+    #: Builds ``X_brett`` from the ``amino_acids`` pool, drawing the carbon shortfall from ``E``.
+    #: Does NOT touch ``S`` (Brett grows in dry wine) or ``N`` (nitrogen from amino acids).
+    touches = ("X_brett", "amino_acids", "E")
+    #: ``mu_max_brett``/``K_aa_brett`` are the Brett growth rate + amino-acid half-saturation;
+    #: ``biomass_N_fraction``/``biomass_C_fraction`` are the composition biomass is built (and
+    #: weighted) at, so carbon/nitrogen close. The shared Brett gate params throttle growth by
+    #: SO₂/temperature. Their tiers cap the ``X_brett``/``amino_acids``/``E`` output tiers (D-1).
+    reads: tuple[str, ...] = (
+        "mu_max_brett",
+        "K_aa_brett",
+        "K_E_brett",
+        "brett_carrying_capacity",
+        "biomass_N_fraction",
+        "biomass_C_fraction",
+        *_BRETT_GATE_READS,
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Early guards BEFORE any pH solve: no catalyst, no amino-acid fuel, or no ethanol (the
+        # carbon shortfall must never target an empty E) ⇒ no growth, and no wasted pH solve.
+        x_brett = max(float(y[schema.slice("X_brett")][0]), 0.0) if "X_brett" in schema else 0.0
+        if x_brett <= 0.0:
+            return d
+        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0) if "amino_acids" in schema else 0.0
+        if aa <= 0.0:
+            return d
+        e = max(float(y[schema.slice("E")][0]), 0.0)
+        if e <= 0.0:
+            return d
+
+        ph = ph_of_state(y, schema, params) if _needs_ph_solve(y, schema) else 0.0
+        gate = brett_environmental_gate(y, schema, params, ph)
+
+        # Logistic carrying-capacity brake (decision D-40 pt2): unlike MLF, Brett has no sugar
+        # Monod / ethanol wall to self-arrest growth, so this is the ONLY ceiling. Clamp >= 0 so a
+        # solver excursion X_brett > K cannot flip growth into a biomass/nitrogen source; growth
+        # eases to 0 as X_brett -> K (no kink, no runaway, no negative amino-acid overshoot).
+        brake = 1.0 - x_brett / params["brett_carrying_capacity"]
+        if brake <= 0.0:  # at/above the carrying capacity, growth is fully shut down
+            return d
+
+        aa_monod = aa / (params["K_aa_brett"] + aa)
+        # Ethanol-availability Monod (decision D-40 pt2). Brett grows ON ethanol, so growth scales
+        # with how much ethanol is present: ~0 during early AF (E small) and ~1 in a finished wine
+        # (E >> K_E_brett). This is ALSO the smooth "shadow" the hard `if e <= 0` guard needs: like
+        # the amino-acid Monod and the (1 - X/K) brake, it drives the rate to zero SMOOTHLY as E→0,
+        # so BDF's finite-difference Jacobian never straddles an on/off step at E=0 (which otherwise
+        # corrupts the implicit solve into an autocatalytic X_brett blow-up during primary AF, when
+        # E rises through zero — RK45/LSODA build no Jacobian and never saw it). K_E_brett is small
+        # (~a few g/L), so this is ≈1 across the whole normal-wine ethanol range and only smooths
+        # the near-zero crossing — Brett's dry-finished-wine niche is preserved.
+        e_monod = e / (params["K_E_brett"] + e)
+        dx_brett = (
+            params["mu_max_brett"] * x_brett * aa_monod * e_monod * gate * brake
+        )  # [g X_brett/L/h]
+        if dx_brett <= 0.0:
+            return d
+
+        f_n = params["biomass_N_fraction"]
+        f_c = params["biomass_C_fraction"]
+        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+        y_c = carbon_mass_fraction(AMINO_ACID_SPECIES)
+        # Nitrogen-anchored: consume the arginine that carries the new biomass's nitrogen. Its
+        # carbon (rho*y_C) falls short of the biomass carbon demand (f_C*dx_brett) because arginine
+        # is N-rich, so the positive shortfall is drawn from ETHANOL (not sugar — Brett's niche is
+        # the dry wine). Both ledgers close exactly: X_brett gains f_N*dx_brett N (= rho*y_N) and
+        # f_C*dx_brett C (= rho*y_C amino acid + ethanol shortfall). Shortfall coeff > 0
+        # structurally (biomass C:N >> arginine's), so no clamp needed (decision D-40).
+        rho = f_n * dx_brett / y_n  # [g arginine/L/h] consumed to supply the biomass nitrogen
+        shortfall = f_c * dx_brett - rho * y_c  # [g C/L/h] biomass carbon not covered by arginine
+        d[schema.slice("X_brett")] = dx_brett
+        d[schema.slice("amino_acids")] = -rho
+        # Remove `shortfall` grams of carbon from ethanol: g ethanol = g C / (g C/g ethanol).
+        d[schema.slice("E")] = -shortfall / carbon_mass_fraction("ethanol")
         return d

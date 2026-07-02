@@ -878,3 +878,65 @@ T_max_brett:
     source: "author estimate from Brettanomyces upper cardinal temperature (growth ceases ~40-45 C)"
     conditions: "Brettanomyces in wine; maximum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
     notes: "Read by brett_environmental_gate via cardinal_temperature_factor. 45 C. Above it gamma(T)=0. Far above any normal wine ferment/cellar, so it shapes only the high-T tail; exact value speculative, direction (a finite upper limit exists) sound."
+
+# -- BRETT GROWTH (Brettanomyces biomass, wine-only, decision D-40 pt2) --------------------------
+# BrettGrowth (fermentation.core.kinetics.brett) makes the X_brett catalyst DYNAMIC:
+#   dX_brett/dt = mu_max_brett * X_brett * aa/(K_aa_brett+aa) * g_SO2*gamma(T)
+# Because the decarboxylase/reductase are linear in X_brett, growth makes the volatile-phenol
+# spoilage ACCELERATE as the population multiplies over the months a barrel sits. Nitrogen-anchored
+# on the amino-acid pool (D-32, autolysis-refilled D-34); the carbon shortfall is drawn from
+# ETHANOL, not sugar (owner fork, D-40) - the mechanistic reason Brett thrives in a DRY finished
+# wine (its post-AF/barrel niche), where a sugar-anchored growth (MLF's) could not run. NO sugar
+# Monod - growth is gated only by amino-acid fuel + the SO2/temperature environment, so a post-AF
+# pitch_brett into a high-ethanol wine grows rather than sitting inert. X_brett is now weighted as
+# real biomass in total_carbon/total_nitrogen (Brett ~ yeast composition, a v1 simplification).
+# Gated at compile on amino_acids_gpl>0 (NOT the pitch - the X_brett<=0 guard handles that).
+# ALL SPECULATIVE: no per-catalyst kinetic model of Brett growth of this form is sourced.
+
+mu_max_brett:
+  value: 8.0e-3
+  unit: "1/h"   # Brett max specific growth rate: dX_brett/dt = mu_max_brett*X_brett*Monod(aa)*gate
+  tier: speculative
+  uncertainty: { low: 2.0e-3, high: 2.0e-2, note: "Brett is a SLOW grower (a defining trait vs S. cerevisiae); a specific growth rate ~2e-3 - 2e-2 /h gives a doubling time of ~1.5-15 d, so a small barrel inoculum multiplies over WEEKS-MONTHS - the timescale on which Brett spoilage worsens, and on which an SO2 addition can still catch it" }
+  provenance:
+    source: "author estimate; Brettanomyces bruxellensis is a characteristically slow-growing spoilage yeast (doubling times of days, much slower than S. cerevisiae; Brettanomyces/Dekkera physiology reviews, e.g. Wedral et al. 2010, the Brettanomyces review)"
+    conditions: "Brettanomyces in wine, ~20 C; max specific growth rate scaling X_brett, read unscaled at the temperature optimum (gamma(T)=1) and near-saturating amino acids"
+    notes: "Read by BrettGrowth as the Brett mu_max. SPECULATIVE: no kinetic model of our amino-acid-anchored, ethanol-carbon-sourced growth form is sourced (Brett growth is reported as bulk OD/CFU timescales), so it is tuned to a realistic slow (days-doubling) buildup, NOT fitted. Kept LOW to encode Brett's defining slow growth: the population builds over the months a barrel ages, so the spoilage worsens with time and an SO2 addition partway through can still arrest it. Gated by the same g_SO2*gamma(T) as the phenol Processes (no sugar Monod - Brett grows in a dry wine on ethanol carbon), so SO2/temperature throttle growth too."
+
+K_aa_brett:
+  value: 5.0e-3
+  unit: "g/L"   # amino-acid half-saturation in the Brett growth Monod term aa/(K_aa_brett+aa)
+  tier: speculative
+  uncertainty: { low: 1.0e-3, high: 2.0e-2, note: "amino-acid availability half-saturation; ramps Brett growth up from an empty pool and down as amino acids are exhausted, over a typical autolysis-refilled ~0.01-0.1 g/L amino-acid range" }
+  provenance:
+    source: "author estimate of order the reported yeast amino-acid uptake half-saturation (~mg/L range); no Brett-specific value sourced"
+    conditions: "Brettanomyces in wine; half-saturation in the smooth availability gate aa/(K_aa_brett+aa) on the Brett growth rate"
+    notes: "Read by BrettGrowth: gate(aa) = aa/(K_aa_brett+aa) ramps Brett growth up from an empty amino-acid pool and down to zero as amino acids are exhausted (the same smooth-Monod shape the MLF growth and yeast swap use, keeping the RHS C1 for the BDF solver). A SEPARATE parameter from K_aa_mlf (the per-organism design lets them diverge); an estimate, hence speculative. Brett famously scavenges trace nutrients, so it is taken of the same order but not tuned to a source."
+
+K_E_brett:
+  value: 2.0
+  unit: "g/L"   # ethanol half-saturation in the Brett growth Monod term E/(K_E_brett+E)
+  tier: speculative
+  uncertainty: { low: 0.5, high: 5.0, note: "ethanol-availability half-saturation; small vs any finished wine (~80-120 g/L ethanol) so the Monod is ~1 across the normal range and only ramps growth down toward an unfermented must (E~0). Bounds the near-zero crossing, not the working range" }
+  provenance:
+    source: "author estimate; Brettanomyces grows on ethanol as a carbon/energy source, so growth scales with ethanol availability (Brettanomyces/Dekkera physiology reviews, e.g. Wedral et al. 2010). No Brett-specific half-saturation sourced"
+    conditions: "Brettanomyces in wine; half-saturation in the smooth availability gate E/(K_E_brett+E) on the Brett growth rate"
+    notes: "Read by BrettGrowth: gate(E) = E/(K_E_brett+E) makes growth ~0 in an unfermented must (E~0) and ~1 in a finished wine (E >> K_E_brett) - Brett's post-AF/barrel niche - AND is the smooth shadow of the E<=0 growth guard (like aa/(K_aa_brett+aa) shadows the amino-acid guard and (1-X/K) shadows the carrying-capacity cap), so the BDF Jacobian never straddles an on/off step at E=0 during primary AF. Kept small so it does not otherwise change growth in the working ethanol range."
+
+# Brett carrying capacity - the logistic ceiling on X_brett (decision D-40 pt2).
+# Unlike MLF, Brett growth has NO sugar Monod and NO ethanol wall to self-arrest (that is its
+# dry-wine, ethanol-tolerant niche), so the amino-acid Monod alone is not a brake: an autolysis-
+# refilled amino-acid pool would let X_brett grow exponentially with no ceiling and drive the pool
+# negative on a solver step. This intrinsic logistic factor (1 - X_brett/K) - the same lumped form
+# as the D-30 yeast biomass_carrying_capacity - bounds X_brett to a realistic Brett cell density,
+# which keeps the amino-acid draw rate small so the pool depletes SMOOTHLY to a positive residual.
+# Real Brett saturates at a finite density (nutrient/quorum limits); the cap value is an estimate.
+brett_carrying_capacity:
+  value: 0.5
+  unit: "g/L"   # logistic carrying capacity K in the Brett growth brake (1 - X_brett/K)
+  tier: speculative
+  uncertainty: { low: 0.1, high: 1.0, note: "Brett spoilage populations of ~1e6-1e7 CFU/mL correspond to a dry biomass of order 0.05-0.5 g/L; the cap sets the plateau X_brett approaches over a barrel's months and, with it, the ceiling on volatile-phenol production and on the amino-acid draw" }
+  provenance:
+    source: "author estimate; Brettanomyces bruxellensis spoilage densities (~1e6-1e7 CFU/mL) scaled to dry cell weight (order 0.05-0.5 g/L; Brettanomyces/Dekkera physiology reviews, e.g. Wedral et al. 2010)"
+    conditions: "Brettanomyces in wine; logistic carrying capacity bounding X_brett in the growth brake (1 - X_brett/brett_carrying_capacity)"
+    notes: "Read by BrettGrowth: the ONLY ceiling on Brett biomass (no sugar Monod / ethanol wall, unlike MLF). Linear 1 - X/K, clamped >= 0, mirrors the D-30 biomass_carrying_capacity form but is intrinsic and always-on (not the opt-in isolable modifier D-30 is). A SEPARATE parameter from that yeast cap (per-organism). Bounds X_brett small so the amino-acid draw stays small and the pool never overshoots negative."
