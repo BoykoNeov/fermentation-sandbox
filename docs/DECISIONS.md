@@ -2273,6 +2273,17 @@ in stable list order; events at `t0` seed the run before segment 0; events at/af
 rejected (the boundary decides whether a late scenario intervention is an error). **Isolability:**
 `events=()` is a single `simulate` call with identical arguments — byte-for-byte a plain run.
 
+**The run chokepoint (`CompiledScenario.run`).** Storing `events` on the compiled scenario is not
+enough — a hand-wired `simulate(cs.process_set, cs.param_values, cs.y0, cs.t_span_h)` *silently
+ignores* them, and because the boundary injects `temperature_ramp_rate = slope_0` into
+`param_values`, plain `simulate` would apply the *first* segment's slope for the whole run (correct
+for a single-slope ramp, **wrong** for any multi-knot ramp or hold). So the compiled scenario grows
+a single `run()` entry point that always dispatches through `simulate_scheduled(events=cs.events)`
+— which, since `events=()` is byte-for-byte a plain `simulate`, is the right call for *every*
+scenario (advisor-flagged gap; the same routing D-36 needs). **Caveat (deferred):** the stochastic
+`simulate_ensemble` wraps the un-scheduled `simulate` and takes no `events`, so it shares the
+multi-segment footgun; an ensemble-over-`simulate_scheduled` is a D-36 follow-up.
+
 **The temperature ramp (`core/kinetics/temperature.py`, `TemperatureRamp`).** One Process,
 `dT/dt = temperature_ramp_rate` (K/h), touching only `T`. Wired into **both** media (cellar
 temperature is not a beverage property). The compile boundary (`_temperature_ramp_schedule`) turns
@@ -2307,10 +2318,11 @@ the true time-varying `T`, not a constant, which is the whole point of activatin
 **Tests.** `tests/test_schedule.py` (9) pins the verb-agnostic driver with toy Processes
 (isolability, exact per-segment param integration, mutation + ledger, mid-run reconfiguration + tier
 travel, day-0 seeding, same-instant ordering, out-of-window rejection). `tests/test_temperature_ramp.py`
-(11) pins the temperature path (isothermal no-op, single-knot/flat → no events, collinear → one
+(13) pins the temperature path (isothermal no-op, single-knot/flat → no events, collinear → one
 segment, slope-change → one event, hold before/after, exact analytic line, scheduled==plain when
-isothermal, VALIDATED unsampled rate, the emergent bound). `test_media` expects the always-on
-`temperature_ramp` in both media. 449 green + 5 benchmark, ruff + mypy clean.
+isothermal, the end-to-end `run()` multi-knot ramp→hold through the chokepoint, VALIDATED unsampled
+rate, the emergent bound). `test_media` expects the always-on `temperature_ramp` in both media.
+451 green + 5 benchmark, ruff + mypy clean.
 
 **Deferred → D-36.** Discrete winemaking interventions (the verb registry at the compile boundary:
 `add_dap`/`add_so2`/`rack`/`pitch_mlf`), the external-flow ledger's winemaking payoff (a DAP dose's

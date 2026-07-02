@@ -49,7 +49,7 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier, combine
 from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
 from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
-from fermentation.runtime.schedule import ScheduledEvent
+from fermentation.runtime.schedule import ScheduledEvent, ScheduledTrajectory, simulate_scheduled
 from fermentation.scenario.schema import Scenario
 from fermentation.units.convert import (
     brix_to_sugar_gpl,
@@ -93,6 +93,36 @@ class CompiledScenario:
     def param_values(self) -> dict[str, float]:
         """Resolved ``{name: value}`` mapping for the integration hot loop."""
         return self.parameters.resolve()
+
+    def run(self, **kwargs: object) -> ScheduledTrajectory:
+        """Integrate this scenario, **honouring its timed events** (decision D-35).
+
+        The single "run a compiled scenario" entry point. It always dispatches through
+        :func:`~fermentation.runtime.simulate_scheduled` with the compiled ``events``, so a
+        temperature ramp (and, from D-36, a dosing/pitching schedule) is applied correctly —
+        a multi-knot ramp changes slope at its breakpoints, a hold holds. With no events this
+        is byte-for-byte a plain :func:`~fermentation.runtime.simulate` (an empty schedule is a
+        single segment), so it is always the right call.
+
+        This exists because a hand-wired ``simulate(cs.process_set, cs.param_values, cs.y0,
+        cs.t_span_h)`` **silently ignores** ``events``: the injected ``temperature_ramp_rate``
+        would then apply the *first* segment's slope for the whole run — correct only for a
+        single-slope ramp. ``param_tiers`` defaults to the scenario's own tier map for honest
+        D-1 reporting; ``t_eval``/solver kwargs pass straight through.
+
+        (The stochastic :func:`~fermentation.runtime.simulate_ensemble` wraps the *un*-scheduled
+        :func:`simulate` and so shares that footgun for a multi-segment schedule; an
+        ensemble-over-``simulate_scheduled`` is a deferred follow-up, D-35 → D-36.)
+        """
+        kwargs.setdefault("param_tiers", self.parameters.tier_map())
+        return simulate_scheduled(
+            self.process_set,
+            self.param_values,
+            self.y0,
+            self.t_span_h,
+            events=self.events,
+            **kwargs,  # type: ignore[arg-type]
+        )
 
 
 # -- initial-composition vocabulary (the industry-unit boundary) --------------

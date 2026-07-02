@@ -141,6 +141,42 @@ def test_ramp_integrates_temperature_exactly_to_the_analytic_line():
     assert np.allclose(traj.series("T"), expected, atol=1e-10, rtol=0.0)
 
 
+def test_run_routes_a_multi_knot_ramp_then_hold_end_to_end():
+    # The end-to-end wiring D-36 leans on: compile a 3-knot ramp→hold and run it through the
+    # CompiledScenario.run() chokepoint (which dispatches to simulate_scheduled with cs.events).
+    # T must track the piecewise line ACROSS the interior breakpoint — the one composition a
+    # hand-wired plain simulate() would get silently wrong (it applies slope_0 for the whole run).
+    schedule = [
+        TemperaturePoint(day=0.0, celsius=20.0),
+        TemperaturePoint(day=3.0, celsius=26.0),
+        TemperaturePoint(day=6.0, celsius=26.0),
+    ]
+    cs = compile_scenario(_wine(schedule, days=6.0))
+    assert len(cs.events) == 1  # the ramp→hold slope change at day 3
+    traj = cs.run()
+    assert traj.success
+
+    t = traj.t
+    t_break = days_to_hours(3.0)
+    slope = (celsius_to_kelvin(26.0) - celsius_to_kelvin(20.0)) / t_break
+    expected = np.where(
+        t <= t_break,
+        celsius_to_kelvin(20.0) + slope * t,
+        celsius_to_kelvin(26.0),  # held after the last knot
+    )
+    assert np.allclose(traj.series("T"), expected, atol=1e-9, rtol=0.0)
+
+
+def test_run_with_no_events_matches_plain_simulate():
+    # The chokepoint is byte-for-byte a plain simulate on an isothermal scenario.
+    cs = compile_scenario(_wine([TemperaturePoint(day=0.0, celsius=20.0)]))
+    grid = np.linspace(*cs.t_span_h, 120)
+    plain = simulate(cs.process_set, cs.param_values, cs.y0, cs.t_span_h, t_eval=grid)
+    run = cs.run(t_eval=grid)
+    assert np.array_equal(run.t, plain.t)
+    assert np.array_equal(run.y, plain.y)
+
+
 def test_isothermal_scenario_scheduled_equals_plain_simulate():
     # No events ⇒ simulate_scheduled is a single simulate call with identical args.
     cs = compile_scenario(_wine([TemperaturePoint(day=0.0, celsius=20.0)]))
