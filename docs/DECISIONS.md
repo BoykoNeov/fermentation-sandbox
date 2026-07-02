@@ -2566,6 +2566,76 @@ post-AF pitch is ethanol-arrested); the no-catalyst/no-fuel/no-sugar guards; nev
 capping `X_mlf` (discriminated on an aa-dosed *unpitched* run where growth is the only enabled
 `X_mlf` toucher). `test_interventions` / `test_media` updated for the promotion + the new Process.
 
+## D-39 — MLF death: `X_mlf` dies under SO₂ (`MalolacticDeath`); the MLF arc closes
+
+**Status: COMMIT 1 IMPLEMENTED 2026-07-02** (504 green, ruff + mypy clean). The counterpart to the
+D-38 growth beat that completes the MLF arc (D-23 → D-31 → D-38 → D-39): a new `MalolacticDeath`
+Process moves viable `X_mlf` into a new non-viable `X_mlf_dead` pool, so bacterial biomass now
+*declines* and the *O. oeni* activities that scale with `X_mlf` — malate conversion, citrate →
+diacetyl, and above all `OenococcusDiacetylReduction` — wind down as the bacteria die. This is the
+mechanism the D-31 reducer flagged as deferred: **SO₂ (or a rack) removes the bacteria that clear
+diacetyl on the lees, so it is locked in.** (Rack-removes-`X_mlf` is commit 2 of this decision.)
+
+**The death law — SO₂-driven, Arrhenius temperature.**
+`r_death = k_death_mlf · X_mlf · (1 − g_SO₂) · arrhenius(T, E_a_death_mlf, T_ref)` with
+`g_SO₂ = exp(−[SO₂]_molecular / molecular_so2_inhib_mlf)` — **the same `g_SO₂` the conversion gate
+uses** (D-22 antimicrobial readout, partitioned at the solved pH). Death is **exactly 0 without
+SO₂** and rises toward its Arrhenius ceiling as molecular SO₂ accumulates. Temperature enters via
+its **own Arrhenius factor** (warm accelerates the kill, cold slows it — the autolysis shape),
+**not** the cardinal γ(T): γ(T) → 0 in the cold, which would spuriously make cold *kill*, whereas
+cold in fact *preserves* bacteria. To supply that driver the shared MLF gate was split (no behaviour
+change) into `malolactic_toxicity_gate` (pH·ethanol·SO₂) × `cardinal_temperature_factor` (γ(T)), with
+the multiplication grouped exactly as before so the three growth/conversion consumers are
+byte-for-byte unchanged (`test_environmental_gate_is_toxicity_times_gamma` pins the identity).
+
+- **The crux — driver form, decided on empirical evidence (advisor-reconciled, owner's fidelity bar).**
+  The first draft drove death by **`1 − toxicity`** (the full pH·ethanol·SO₂ gate), on the theory that
+  accumulating ethanol would supply a natural post-AF die-off "for free." A probe **killed that form**:
+  the Luong ethanol wall already drives `1 − toxicity` to **~0.92 at ordinary post-AF ethanol (~75
+  g/L, no SO₂)**, so death was near-maximal *from ethanol alone* — *O. oeni* died in ~1 week, when in
+  reality it persists for weeks-to-months in dry wine and is cleared deliberately by SO₂/racking. No
+  power transform `(1 − tox)^p` rescues it: 0.92 cannot be mapped both ~0 (slow baseline) *and* kept
+  clearly below the SO₂-elevated 0.996 (the SO₂:baseline ratio maxed at ~1.4× even at p=4). Ethanol's
+  wall is a "can't grow" signal, not a "dying" one; coupling death to it was the bug. **Fix: a driver
+  with no ethanol term — molecular SO₂ only.** This *decouples* `k_death_mlf` from the (unsulfited)
+  early-pitch conversion test, so k was **re-tuned up** from the artifact 0.02/h to **0.05/h** — a
+  full-SO₂-kill half-life ~14 h, so a stabilizing dose (~40 mg/L free ⇒ ~0.8 mg/L molecular) crashes
+  the population ~90 % in ~2 d, verified directly. Co-inoc-vs-post-AF dominance now rests entirely on
+  the *growth* gate's `g_EtOH`, where it belongs; a high-ABV post-AF pitch simply sits **inert**.
+
+**v1 tradeoff (owned, not hidden).** Without SO₂ bacteria **never die** in v1 — they persist and keep
+clearing diacetyl on the lees (the honest D-31 "leave on lees cleans up" case). The slow ethanol/age
+decline of *O. oeni* over weeks-to-months is real but **deferred to v2** (a benign-environment
+baseline mortality). Less realistic than a slow decline, far more realistic than the 1-week ethanol
+wipeout — and it makes the D-31 SO₂/rack lever **unconfounded**: only a deliberate winemaking action
+removes viable bacteria. The kill-scale reuses `molecular_so2_inhib_mlf` (arrest-scale = kill-scale,
+bacteriostatic ≈ bacteriocidal); a separate `molecular_so2_death_scale` is the v2 refinement.
+
+**Conservation — a carbon/nitrogen-neutral transfer (the D-13 pattern).** Since D-38 both `X_mlf` and
+`X_mlf_dead` are weighted in `total_carbon`/`total_nitrogen` at the *same* biomass fractions, so the
+`X_mlf → X_mlf_dead` move (`d[X_mlf] = −r`, `d[X_mlf_dead] = +r`) is C- and N-neutral **by
+construction** — the yeast `EthanolInactivation` `X → X_dead` precedent (D-13). No new conservation
+code, no sugar draw; touches only `(X_mlf, X_mlf_dead)`. The new `X_mlf_dead` slot is the tenth wine
+slot (schema size 26 → 27); `conservation.py` weights it at the biomass fractions guarded on presence.
+
+**Gating.** `MalolacticDeath` is **pitch-gated** (enabled with the other `_MLF_PROCESSES` /
+`_MLF_GATED_PROCESSES` when `mlf_pitch_gpl > 0`), NOT amino-acid-gated like growth — bacteria die
+whether or not they were growing. An `so2_total ≤ 0` guard before the pH `brentq` makes an unsulfited
+pitched run pay no solve and contribute byte-for-byte zero (mirrors the `total_so2 > 0` shortcut in
+the toxicity gate). On a pitched run `X_mlf`/`X_mlf_dead` report **speculative** (honest: a population
+that can be sulfited has a speculative trajectory). New speculative params `k_death_mlf` (0.05/h),
+`E_a_death_mlf` (60 kJ/mol = `E_a_autolysis`); reuses `T_ref` + `molecular_so2_inhib_mlf`.
+
+**Tests (commit 1, +8).** In `test_malolactic.py`: the SUPERSEDING integration test (no-SO₂ pitched
+run is byte-for-byte inert — death exactly 0 — then a mid-run `add_so2` crashes `X_mlf` monotonically
+to <10 %); RHS-level death-is-zero-without-SO₂, the neutral `d[X_mlf] = −d[X_mlf_dead]` transfer, the
+`(X_mlf, X_mlf_dead)` `touches` contract, more-SO₂-kills-faster, the load-bearing
+**cold-preserves-via-Arrhenius-not-γ(T)** case (dying below `T_min_mlf` where γ(T)=0, warm faster),
+carbon+nitrogen closure over a death-active run, the speculative tier, and the gate-split identity.
+`test_media` updated for the tenth slot + the new pitch-gated Process. **Commit 2 (pending):** extend
+the `rack` verb to physically remove viable `X_mlf` + settled `X_mlf_dead` (the other half of the
+D-31 "rack locks in diacetyl" lever), booking the biomass C/N as an external flow.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

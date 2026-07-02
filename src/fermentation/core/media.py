@@ -80,6 +80,7 @@ from fermentation.core.kinetics import (
     HydrogenSulfideProduction,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
+    MalolacticDeath,
     MalolacticGrowth,
     OenococcusDiacetylReduction,
     SugarUptakeToEthanolCO2,
@@ -178,22 +179,26 @@ def wine_schema() -> StateSchema:
     the ``X_mlf`` malolactic-catalyst slot (decision D-23), the ``citrate`` slot
     *O. oeni* co-metabolises into MLF-derived diacetyl (decision D-31), the dosed
     ``amino_acids`` pool the amino-acid ledger swap funds biomass from (decision D-32), and the
-    ``debris`` pool yeast autolysis routes non-assimilable cell-wall carbon into (decision D-34).
+    ``debris`` pool yeast autolysis routes non-assimilable cell-wall carbon into (decision D-34),
+    and the ``X_mlf_dead`` pool bacterial death settles killed *O. oeni* biomass into (D-39).
 
-    These nine slots are appended to ``wine_schema`` only (not ``_common_specs``), so
+    These ten slots are appended to ``wine_schema`` only (not ``_common_specs``), so
     ``beer_schema`` is untouched — beer's pH is a phosphate-buffered different acid
     system with no sourced data yet, explicitly deferred. ``default=0.0`` is
     load-bearing: existing wine scenarios/tests that name no acids still compile (all
-    nine → 0), and with acids, cation, SO₂, ``X_mlf``, ``citrate``, ``amino_acids`` and
-    ``debris`` at 0 the slots are inert — they
+    ten → 0), and with acids, cation, SO₂, ``X_mlf``, ``X_mlf_dead``, ``citrate``,
+    ``amino_acids`` and ``debris`` at 0 the slots are inert — they
     contribute 0 to every conservation sum, so the validated core and its tests are
     untouched (prime directive #3). The acid/cation/SO₂ slots have no Process touching
     them in D-18/D-22; under D-23 :class:`~fermentation.core.kinetics.malolactic.\
     MalolacticConversion` depletes ``malic`` / grows ``lactic`` / evolves ``CO2`` *only
     when ``X_mlf`` is dosed* (and is disabled at the compile seam otherwise), so undosed
-    wine runs keep a constant acid trajectory. ``X_mlf`` itself is inert in v1 (no Process
-    grows or kills it) and carbon-free in ``total_carbon`` (constant ⇒ 0 drift); it enters
-    the carbon ledger only when the later MLF-growth beat lands. pH is
+    wine runs keep a constant acid trajectory. Once *O. oeni* is pitched ``X_mlf`` is real
+    biomass (weighted in ``total_carbon``/``total_nitrogen`` at the biomass fractions since the
+    MLF-growth beat, D-38): :class:`~fermentation.core.kinetics.malolactic.MalolacticGrowth`
+    grows it and :class:`~fermentation.core.kinetics.malolactic.MalolacticDeath` kills it into
+    the ``X_mlf_dead`` lees (a carbon/nitrogen-neutral transfer, both pools weighted at the same
+    fractions — decision D-39). On an un-pitched run both slots stay 0 (constant ⇒ 0 drift). pH is
     simply not meaningful for a no-acid scenario and is only *computed* when requested
     (``fermentation.analysis``). ``cation_charge`` is a charge density (mol⁺/L), not a
     mass concentration — state is already heterogeneous (``T`` in K) — back-solved from
@@ -240,8 +245,17 @@ def wine_schema() -> StateSchema:
             "X_mlf",
             "g/L",
             default=0.0,
-            description="Oenococcus oeni biomass — dosed-but-inert MLF catalyst "
-            "(scales the malolactic rate; no growth/death in v1, decision D-23)",
+            description="Oenococcus oeni viable biomass — the malolactic catalyst (scales the "
+            "malolactic rate). Dosed at pitch; grown from amino acids (MalolacticGrowth, D-38) "
+            "and killed off into X_mlf_dead by toxicity/temperature (MalolacticDeath, D-39)",
+        ),
+        VarSpec(
+            "X_mlf_dead",
+            "g/L",
+            default=0.0,
+            description="non-viable Oenococcus oeni biomass — the settled bacterial lees "
+            "MalolacticDeath moves X_mlf into (carbon/nitrogen still counted at the biomass "
+            "fractions, but no longer catalytic; racked off with the other lees, decision D-39)",
         ),
         VarSpec(
             "amino_acids",
@@ -454,10 +468,19 @@ _H2S_PROCESSES: tuple[Callable[[], Process], ...] = (HydrogenSulfideProduction,)
 #: and the ``citrate`` slot keeps its VALIDATED tier (like ``malic``/``lactic``). Citrate — not
 #: sugar — sources this carbon because MLF-diacetyl is a late/post-dryness phenomenon and the
 #: sugar-draw helper no-ops at ``S=0`` (decision D-31; see the malolactic module docstring).
+#: :class:`MalolacticDeath` (decision D-39) rides in this same pitch-gated tuple: it moves viable
+#: ``X_mlf`` into ``X_mlf_dead`` under chemical stress (``1 − toxicity``) with its own Arrhenius
+#: temperature factor, so bacteria die off as ethanol accumulates or SO₂ is dosed — the mechanism
+#: that lets an SO₂ addition (or a rack removing the bacteria) *lock in* MLF-derived diacetyl by
+#: halting :class:`OenococcusDiacetylReduction`. It is pitch-gated (not amino-acid-gated like
+#: growth): bacteria die whether or not they were growing, so it belongs with the conversion set,
+#: disabled at the compile seam on an un-pitched run. The transfer is carbon/nitrogen-neutral (both
+#: pools weighted at the biomass fractions since D-38), so it adds no conservation code.
 _MLF_PROCESSES: tuple[Callable[[], Process], ...] = (
     MalolacticConversion,
     MalolacticCitrateMetabolism,
     OenococcusDiacetylReduction,
+    MalolacticDeath,
 )
 
 #: Malolactic *growth* (wine-only, the deferred MLF-growth beat, decision D-38). Makes ``X_mlf``

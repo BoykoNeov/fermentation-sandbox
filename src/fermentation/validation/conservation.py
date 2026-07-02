@@ -199,6 +199,11 @@ def total_carbon(
         # bacterial-biomass carbon.
         if "X_mlf" in schema:
             w[schema.slice("X_mlf")] = biomass_carbon_fraction
+        # Non-viable bacterial biomass X_mlf_dead (decision D-39): MalolacticDeath moves X_mlf into
+        # it under stress, so — exactly like the yeast X → X_dead transfer (D-13) — it must be
+        # weighted at the SAME biomass_carbon_fraction or that death would read as carbon destroyed.
+        if "X_mlf_dead" in schema:
+            w[schema.slice("X_mlf_dead")] = biomass_carbon_fraction
     return _weighted_sum(w)
 
 
@@ -241,6 +246,11 @@ def total_nitrogen(
         # on a conversion-only run; a co-inoculation dose / pitch_mlf flow now carries it.
         if "X_mlf" in schema:
             w[schema.slice("X_mlf")] = biomass_nitrogen_fraction
+        # Non-viable bacterial biomass X_mlf_dead (decision D-39): retains its nitrogen, counted at
+        # the same biomass_nitrogen_fraction so the X_mlf → X_mlf_dead death transfer is
+        # nitrogen-neutral (the yeast X → X_dead precedent, D-13).
+        if "X_mlf_dead" in schema:
+            w[schema.slice("X_mlf_dead")] = biomass_nitrogen_fraction
     return _weighted_sum(w)
 
 

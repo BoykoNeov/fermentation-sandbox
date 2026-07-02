@@ -39,6 +39,7 @@ from fermentation.core.kinetics import (
     FuselAminoAcidReroute,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
+    MalolacticDeath,
     MalolacticGrowth,
     OenococcusDiacetylReduction,
     YeastAutolysis,
@@ -64,16 +65,19 @@ from fermentation.units.convert import (
 #: ships the nitrogen-dependent biomass yield; gates the compile-time override.
 _N_YIELD_COEFFS = ("biomass_N_yield_log_intercept", "biomass_N_yield_log_slope")
 
-#: The malolactic Processes gated on an *Oenococcus oeni* pitch (decisions D-23, D-31):
-#: malate→lactate conversion, the citrate co-metabolism feeding the diacetyl reservoir, and
-#: the bacterial diacetyl reduction. They are wired into the wine medium but contribute nothing
-#: until bacteria are present, so the compile step DISABLES them when unpitched and the
-#: ``pitch_mlf`` intervention (decision D-36) re-enables *exactly* this set at its breakpoint —
-#: a single source of truth so the compile-time gate and the mid-run pitch cannot drift apart.
+#: The malolactic Processes gated on an *Oenococcus oeni* pitch (decisions D-23, D-31, D-39):
+#: malate→lactate conversion, the citrate co-metabolism feeding the diacetyl reservoir, the
+#: bacterial diacetyl reduction, and bacterial death/decay. They are wired into the wine medium
+#: but contribute nothing until bacteria are present, so the compile step DISABLES them when
+#: unpitched and the ``pitch_mlf`` intervention (decision D-36) re-enables *exactly* this set at
+#: its breakpoint — a single source of truth so the compile-time gate and the mid-run pitch cannot
+#: drift apart. :class:`MalolacticDeath` (D-39) is pitch-gated too (bacteria die whether or not
+#: amino acids were dosed), unlike :class:`MalolacticGrowth`, which is amino-acid-gated below.
 _MLF_GATED_PROCESSES = (
     MalolacticConversion,
     MalolacticCitrateMetabolism,
     OenococcusDiacetylReduction,
+    MalolacticDeath,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.

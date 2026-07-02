@@ -20,7 +20,7 @@ SHARED = (
 #: not (its acid system, SO₂ and MLF are deferred).
 WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "citrate", "cation_charge")
 WINE_SO2_SLOTS = ("so2_total",)
-WINE_MLF_SLOTS = ("X_mlf",)
+WINE_MLF_SLOTS = ("X_mlf", "X_mlf_dead")
 WINE_AMINO_ACID_SLOTS = ("amino_acids",)
 # The non-assimilable cell-wall debris pool yeast autolysis fills (D-34), appended last.
 WINE_DEBRIS_SLOTS = ("debris",)
@@ -40,9 +40,9 @@ def test_wine_schema_has_single_sugar_slot():
     # 17 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
     # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
     # h2s, D-29) + 3 wine-only acid slots + citrate (D-31) + cation_charge (D-18)
-    # + 1 free-SO₂ slot (D-22) + 1 X_mlf slot (D-23) + 1 amino_acids slot (D-32)
-    # + 1 debris slot (D-34)
-    assert schema.size == 26
+    # + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead slots (D-23 catalyst / D-39 bacterial lees)
+    # + 1 amino_acids slot (D-32) + 1 debris slot (D-34)
+    assert schema.size == 27
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -94,6 +94,7 @@ def test_wine_acid_slot_units_are_canonical():
     assert units["cation_charge"] == "mol/L"
     assert units["so2_total"] == "g/L"
     assert units["X_mlf"] == "g/L"
+    assert units["X_mlf_dead"] == "g/L"  # bacterial lees (D-39)
 
 
 def test_produced_only_pools_default_to_zero_when_omitted():
@@ -186,10 +187,13 @@ TEMPERATURE_PROCESSES = {"temperature_ramp"}
 # no malic/lactic/citrate slots); enabled in a bare build_process_set and disabled at the
 # compile seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic/citrate at
 # VALIDATED). D-31 adds the citrate → diacetyl co-metabolism and the bacterial diacetyl reducer.
+# D-39 adds bacterial death/decay to this same pitch-gated tuple (moves X_mlf → X_mlf_dead under
+# chemical stress; pitch-gated, not amino-acid-gated like growth, since bacteria die regardless).
 MLF_PROCESSES = {
     "malolactic_conversion",
     "malolactic_citrate_metabolism",
     "oenococcus_diacetyl_reduction",
+    "malolactic_death",
 }
 # Amino-acid ledger (decision D-32) is wired into the WINE medium only (beer has no amino_acids
 # slot); enabled in a bare build_process_set and disabled at the compile seam when amino acids

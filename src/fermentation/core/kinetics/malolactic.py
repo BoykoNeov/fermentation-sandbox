@@ -162,33 +162,40 @@ def cardinal_temperature_factor(temp: float, t_min: float, t_opt: float, t_max: 
     return float(numerator / denominator)
 
 
-#: The *O. oeni* environmental-gate parameters, shared by every MLF Process (the malate
-#: conversion and the citrate → diacetyl branch, D-31). Declared once so the two Processes'
-#: ``reads`` tuples and :func:`malolactic_environmental_gate` cannot drift apart.
-_MLF_GATE_READS: tuple[str, ...] = (
+#: The *toxicity* half of the *O. oeni* environmental gate: the pH logistic, the Luong ethanol
+#: wall, and the molecular-SO₂ exponential — every term that goes to 0 under an *adverse* chemical
+#: environment (low pH, high ethanol, high SO₂). Split out from the temperature cardinals (D-39)
+#: because :class:`MalolacticDeath` is driven by ``1 − toxicity`` (stress kills bacteria) but must
+#: NOT reuse the cardinal γ(T): γ(T)→0 in the *cold*, which would make cold *kill* bacteria when it
+#: in fact preserves them — death carries its own Arrhenius factor instead (see that class).
+_MLF_TOXICITY_READS: tuple[str, ...] = (
     "pH_half_mlf",
     "ethanol_tolerance_mlf",
     "mlf_ethanol_exponent",
     "molecular_so2_inhib_mlf",
-    "T_min_mlf",
-    "T_opt_mlf",
-    "T_max_mlf",
 )
+#: The cardinal-temperature parameters of the growth/conversion gate (Rosso optimum γ(T)).
+_MLF_TEMP_READS: tuple[str, ...] = ("T_min_mlf", "T_opt_mlf", "T_max_mlf")
+#: The full *O. oeni* environmental-gate parameters, shared by the growth/conversion Processes (the
+#: malate conversion and the citrate → diacetyl branch, D-31). Declared once so those Processes'
+#: ``reads`` tuples and :func:`malolactic_environmental_gate` cannot drift apart. Order preserved
+#: from before the D-39 toxicity/temperature split so every consumer's ``reads`` is byte-identical.
+_MLF_GATE_READS: tuple[str, ...] = (*_MLF_TOXICITY_READS, *_MLF_TEMP_READS)
 
 
-def malolactic_environmental_gate(
+def malolactic_toxicity_gate(
     y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
 ) -> float:
-    """The shared *O. oeni* environmental gate ``g_pH · g_EtOH · g_SO₂ · γ(T)`` ∈ [0, 1].
+    """The *chemical-toxicity* factor ``g_pH · g_EtOH · g_SO₂`` ∈ (0, 1] (decision D-39).
 
-    Every *O. oeni* activity — malate conversion (D-23) and citrate → diacetyl (D-31) — is
-    throttled by the *same* environment, so both Processes multiply their rate by this one
-    factor (a shared helper, decision D-31): the pH logistic (rises with pH), the Luong
-    ethanol wall, the molecular-SO₂ exponential, and the Rosso cardinal-temperature optimum.
-    The caller passes the *already-solved* ``ph`` (each Process solves it once via
-    :func:`ph_of_state`, after its cheap ``X_mlf``/substrate guards) so this helper never
-    triggers a second ``brentq``; molecular SO₂ is partitioned at that same pH. See the
-    module docstring for each term's form and sourcing.
+    The temperature-independent half of the *O. oeni* environmental gate: the pH logistic (rises
+    with pH), the Luong ethanol wall, and the molecular-SO₂ exponential. It is ≈1 in a benign
+    environment (near-neutral pH, low ethanol, no SO₂) and →0 as any stressor bites. Growth and
+    conversion multiply it by the cardinal γ(T) (:func:`malolactic_environmental_gate`); bacterial
+    *death* keys off ``1 − toxicity`` — high ethanol / low pH / SO₂ raise the death rate — with its
+    own Arrhenius temperature factor rather than γ(T) (which would spuriously kill in the cold).
+    The caller passes the *already-solved* ``ph`` so molecular SO₂ is partitioned without a second
+    ``brentq``. See the module docstring for each term's form and sourcing.
     """
     gate_ph = 1.0 / (1.0 + 10.0 ** (params["pH_half_mlf"] - ph))
 
@@ -203,11 +210,33 @@ def malolactic_environmental_gate(
     remaining = 1.0 - e / params["ethanol_tolerance_mlf"]
     gate_eth = remaining ** params["mlf_ethanol_exponent"] if remaining > 0.0 else 0.0
 
+    return float(gate_ph * gate_eth * gate_so2)
+
+
+def malolactic_environmental_gate(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
+) -> float:
+    """The shared *O. oeni* environmental gate ``g_pH · g_EtOH · g_SO₂ · γ(T)`` ∈ [0, 1].
+
+    Every *O. oeni* growth/conversion activity — malate conversion (D-23), citrate → diacetyl
+    (D-31) and bacterial growth (D-38) — is throttled by the *same* environment, so they multiply
+    their rate by this one factor (a shared helper, decision D-31): the :func:`malolactic_\
+    toxicity_gate` chemistry (pH · ethanol · SO₂) times the Rosso cardinal-temperature optimum
+    γ(T). The caller passes the *already-solved* ``ph`` (each Process solves it once via
+    :func:`ph_of_state`, after its cheap ``X_mlf``/substrate guards) so this helper never
+    triggers a second ``brentq``; molecular SO₂ is partitioned at that same pH. See the
+    module docstring for each term's form and sourcing.
+
+    Since the D-39 split this is ``toxicity · γ(T)`` with the multiplication grouped exactly as
+    before (``((g_pH·g_EtOH)·g_SO₂)·γ(T)``), so the three growth/conversion consumers' rates are
+    byte-for-byte unchanged.
+    """
+    toxicity = malolactic_toxicity_gate(y, schema, params, ph)
     temp = float(y[schema.slice("T")][0])
     gamma_t = cardinal_temperature_factor(
         temp, params["T_min_mlf"], params["T_opt_mlf"], params["T_max_mlf"]
     )
-    return float(gate_ph * gate_eth * gate_so2 * gamma_t)
+    return float(toxicity * gamma_t)
 
 
 class MalolacticConversion(Process):
@@ -516,4 +545,109 @@ class MalolacticGrowth(Process):
         d[schema.slice("amino_acids")] = -rho
         shortfall = f_c * dx_mlf - rho * y_c  # [g C/L/h] biomass carbon not covered by arginine
         draw_carbon_from_sugar(d, y, schema, shortfall)
+        return d
+
+
+class MalolacticDeath(Process):
+    """*Oenococcus oeni* death — the **SO₂-driven** bacterial kill (decision D-39).
+
+    The counterpart to :class:`MalolacticGrowth` that completes the MLF arc (D-23 → D-31 → D-38):
+    it moves viable ``X_mlf`` into the non-viable ``X_mlf_dead`` pool, so bacterial biomass
+    *declines* when the wine is sulfited and the *O. oeni* activities that scale with ``X_mlf`` —
+    malate conversion (D-23), citrate → diacetyl and, above all,
+    :class:`OenococcusDiacetylReduction` (D-31) — wind down as the bacteria die. That is the
+    mechanism behind the winemaking headline the D-31 reducer flagged as deferred: an early
+    post-MLF **SO₂ addition kills the bacteria**, so diacetyl stops being cleared on the lees and is
+    **locked in** (a rack that draws the bacteria off the lees does the same physically — decision
+    D-39, the ``rack`` extension).
+
+    **Rate — molecular-SO₂-driven, Arrhenius temperature.**
+
+        r_death = k_death_mlf · X_mlf · (1 − g_SO₂) · arrhenius(T, E_a_death_mlf, T_ref)
+        g_SO₂   = exp(−[SO₂]_molecular / molecular_so2_inhib_mlf)
+
+    The driver is ``1 − g_SO₂`` — the *molecular-SO₂* term alone, the **same** ``g_SO₂`` the
+    conversion/growth gate uses (D-22 antimicrobial readout, partitioned at the solved pH). Death
+    is **exactly 0 without SO₂** (``g_SO₂ = 1``) and rises toward its Arrhenius ceiling as molecular
+    SO₂ accumulates. Temperature enters through its own Arrhenius factor (enzymatic/chemical
+    mortality, faster when warm — the same ``E_a``/``T_ref`` shape autolysis uses), **not** the
+    cardinal γ(T): γ(T) →0 in the cold, which would make cold *kill* bacteria, whereas cold in fact
+    preserves them. So warm accelerates the SO₂ kill and cold slows it to dormancy (decision D-39).
+
+    **Why SO₂ alone, not the full toxicity gate (the D-39 crux, empirically settled).** An earlier
+    draft drove death by ``1 − toxicity`` (pH·ethanol·SO₂). A probe killed it: the Luong ethanol
+    wall already drives ``1 − toxicity`` to ~0.92 at ordinary post-AF ethanol (~75 g/L), so death
+    was near-maximal *from ethanol alone* — bacteria died in ~1 week, when in reality *O. oeni*
+    persists for weeks-to-months in dry wine and is cleared deliberately by **SO₂ (or racking)**.
+    Ethanol's wall is a "can't grow" signal, not a "dying" signal; coupling death to it was the bug.
+    No power transform of 0.92 can be both ~0 (slow baseline) and clearly below the SO₂-elevated
+    value, so the fix is a driver that contains **no ethanol term** — molecular SO₂ only (decision
+    D-39). The co-inoculation-vs-post-AF-pitch dominance now rests entirely on the *growth* gate's
+    ``g_EtOH`` (high-ABV post-AF ⇒ γ·g_EtOH ≈ 0 ⇒ no growth), which is where it belongs — a
+    high-ABV post-AF pitch simply sits **inert** (no growth, no conversion, no death until SO₂).
+
+    **v1 tradeoff (owned, not hidden).** Without SO₂, bacteria **never die** in v1 — they persist
+    and keep clearing diacetyl on the lees (the D-31 "leave on lees cleans up" case). The slow
+    ethanol/age-driven decline of *O. oeni* over weeks-to-months is real but **deferred to v2** (a
+    benign-environment baseline mortality; see the ``k_death_mlf`` note). Less realistic than a slow
+    decline, far more realistic than the 1-week ethanol wipeout — and it makes the D-31 SO₂/rack
+    lever **unconfounded**: the only thing that removes viable bacteria is a deliberate action.
+
+    **Conservation — a carbon/nitrogen-neutral transfer (the D-13 pattern).** Since D-38 both
+    ``X_mlf`` and ``X_mlf_dead`` are weighted in ``total_carbon``/``total_nitrogen`` at the *same*
+    biomass fractions, so moving a gram from one to the other (``d[X_mlf] = −r``,
+    ``d[X_mlf_dead] = +r``) is carbon- and nitrogen-neutral **by construction** — exactly like the
+    yeast :class:`~fermentation.core.kinetics.inactivation.EthanolInactivation` transfer
+    ``X → X_dead``. No new conservation code, no sugar draw; touches only ``(X_mlf, X_mlf_dead)``.
+
+    **Isolability.** ``X_mlf ≤ 0`` (undosed / un-pitched) *or* no total SO₂ returns a zero
+    contribution *before* the pH ``brentq`` — the ``so2_total ≤ 0`` guard is exact (death is
+    identically 0 without SO₂, mirroring the ``total_so2 > 0`` shortcut inside the toxicity gate),
+    so a pitched-but-unsulfited run pays no per-RHS pH solve and its contribution is byte-for-byte
+    zero. The compile seam enables this Process with the other pitch-gated MLF Processes
+    (:data:`~fermentation.core.media._MLF_PROCESSES`) — it needs no amino acids (bacteria die
+    whether or not they were growing), so it is pitch-gated, not amino-acid-gated like growth.
+    Consequence: on any *pitched* run ``X_mlf``/``X_mlf_dead`` report **speculative** (this enabled
+    Process touches them) — honest, since a pitched population that can be sulfited has a
+    speculative trajectory. Tier **speculative** (``k_death_mlf``/``E_a_death_mlf`` are estimates,
+    and the SO₂-driven form with arrest-scale reused as kill-scale is a modelling choice).
+    """
+
+    name = "malolactic_death"
+    tier = Tier.SPECULATIVE
+    #: Viable bacteria leave ``X_mlf``; the same mass enters the non-viable ``X_mlf_dead`` pool.
+    #: Declaring both keeps the carbon/nitrogen-neutral transfer inside the ``touches`` contract.
+    touches = ("X_mlf", "X_mlf_dead")
+    #: ``k_death_mlf`` sets the death magnitude at full SO₂ kill; ``E_a_death_mlf``/``T_ref`` its
+    #: Arrhenius temperature shape; ``molecular_so2_inhib_mlf`` is the SO₂ decay scale (reused from
+    #: the conversion gate — arrest-scale = kill-scale, a documented simplification). NOT the
+    #: pH/ethanol toxicity params (death drops them, D-39). Their tiers cap the ``X_mlf``/
+    #: ``X_mlf_dead`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = ("k_death_mlf", "E_a_death_mlf", "T_ref", "molecular_so2_inhib_mlf")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Early guards BEFORE the pH brentq (the SO₂ partition reads the solved pH): no catalyst ⇒
+        # no bacteria to kill; no total SO₂ ⇒ death is identically 0 (g_SO₂ = 1, so 1 − g_SO₂ = 0).
+        # The so2_total ≤ 0 guard is EXACT, not an approximation, so an unsulfited pitched run pays
+        # no per-RHS pH solve and its contribution is byte-for-byte zero (mirrors the tox gate).
+        x_mlf = max(float(y[schema.slice("X_mlf")][0]), 0.0) if "X_mlf" in schema else 0.0
+        if x_mlf <= 0.0:
+            return d
+        total_so2 = float(y[schema.slice(SO2_STATE_KEY)][0]) if SO2_STATE_KEY in schema else 0.0
+        if total_so2 <= 0.0:
+            return d
+
+        ph = ph_of_state(y, schema, params)
+        molecular_so2 = molecular_so2_at_ph(y, schema, params, ph)
+        g_so2 = math.exp(-molecular_so2 / params["molecular_so2_inhib_mlf"])  # (0, 1]; 1 = no SO₂
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_death_mlf"], params["T_ref"])
+        # SO₂ drives death: 1 − g_SO₂ ∈ [0, 1) rises with molecular SO₂. Arrhenius (not the cardinal
+        # γ(T)) carries temperature, so cold preserves rather than kills (D-39).
+        r_death = params["k_death_mlf"] * x_mlf * (1.0 - g_so2) * f_t  # [g X_mlf/L/h]
+        d[schema.slice("X_mlf")] = -r_death
+        d[schema.slice("X_mlf_dead")] = r_death  # carbon/nitrogen-neutral: same biomass fractions
         return d

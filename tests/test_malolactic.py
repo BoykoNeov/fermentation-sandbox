@@ -28,15 +28,24 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics.malolactic import (
     MalolacticConversion,
+    MalolacticDeath,
     cardinal_temperature_factor,
+    malolactic_environmental_gate,
+    malolactic_toxicity_gate,
 )
 from fermentation.core.media import wine_schema
 from fermentation.core.state import StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime.integrate import simulate
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
-from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
+from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
+from fermentation.units.convert import mgl_to_gpl
+from fermentation.validation import (
+    assert_conserved,
+    assert_nonnegative,
+    total_carbon,
+    total_nitrogen,
+)
 
 
 @pytest.fixture
@@ -202,8 +211,6 @@ def test_ethanol_above_tolerance_arrests_mlf(params):
 
 def test_so2_dose_suppresses_mlf_unit(params):
     schema = wine_schema()
-    from fermentation.units.convert import mgl_to_gpl
-
     common = {"target_ph": 3.4, "malic": 4.0, "tartaric": 4.0, "X_mlf": 0.2}
     y_clean = _wine_state(schema, params, **common)
     y_so2 = _wine_state(schema, params, so2_total=mgl_to_gpl(80.0), **common)
@@ -297,12 +304,185 @@ def test_undosed_keeps_malic_lactic_validated_dosed_makes_speculative(pset):
     assert on.tier_of("lactic", tm) is Tier.SPECULATIVE
 
 
-def test_x_mlf_is_inert_over_a_run():
-    # v1: no Process grows or kills the catalyst, so its concentration is constant.
-    compiled, traj = _run(mlf_pitch_gpl=0.2)
-    x_mlf = traj.series("X_mlf")
-    assert np.allclose(x_mlf, x_mlf[0], rtol=0.0, atol=1e-12)
-    assert x_mlf[0] == pytest.approx(0.2)
+def test_so2_kills_pitched_bacteria_and_no_so2_is_inert():
+    # SUPERSEDES the v1 "X_mlf is inert" premise (decision D-39): MalolacticDeath is the SO₂-driven
+    # kill. On a pitched, amino-acid-free run (growth disabled) the only possible mover of X_mlf is
+    # death, so this isolates it: WITHOUT SO₂ the catalyst is INERT (death is identically 0 —
+    # O. oeni persists, the honest v1 tradeoff), and an ``add_so2`` dose CRASHES X_mlf toward zero
+    # over ~1–3 days (the D-31 lever: SO₂ removes the bacteria that clear diacetyl on the lees).
+    # (a) no SO₂ ⇒ X_mlf flat: no growth (no amino acids) AND no death (no SO₂), so it never moves.
+    _c, t_clean = _run(mlf_pitch_gpl=0.2)
+    x_clean = t_clean.series("X_mlf")
+    assert x_clean[0] == pytest.approx(0.2)  # the pitched dose
+    assert np.all(np.abs(x_clean - x_clean[0]) < 1e-9)  # byte-for-byte inert — death is exactly 0
+
+    # (b) add SO₂ mid-run ⇒ X_mlf is inert until the dose, then declines monotonically to near-zero.
+    dosed = Scenario(
+        name="wine-mlf-so2",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 250.0,
+            "pitch_gpl": 0.5,
+            "tartaric_gpl": 4.0,
+            "malic_gpl": 4.0,
+            "initial_ph": 3.4,
+            "mlf_pitch_gpl": 0.2,
+        },  # fmt: skip
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[Intervention(day=6.0, action="add_so2", params={"so2_mgl": 50.0})],
+        duration_days=21.0,
+    )
+    traj = compile_scenario(dosed, strict=True).run()
+    t_h, x_mlf = traj.t, traj.series("X_mlf")
+    i6 = int(np.searchsorted(t_h, 6.0 * 24.0))  # index just at/after the day-6 SO₂ dose
+    assert x_mlf[i6] == pytest.approx(0.2, abs=1e-3)  # inert until the dose (death 0 without SO₂)
+    post = x_mlf[i6:]
+    assert np.all(np.diff(post) <= 1e-12)  # monotone non-increasing once SO₂ is present
+    assert x_mlf[-1] < 0.1 * x_mlf[i6]  # SO₂ crashed the population by the run's end
+
+
+# -- 8b. MalolacticDeath — the SO₂-driven bacterial kill (decision D-39) -----------
+
+
+def _death_state(
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    so2_mgl: float = 0.0,
+    temp_k: float = 293.15,
+    x_mlf: float = 0.2,
+    x_mlf_dead: float = 0.0,
+):
+    """A pitched wine state for exercising MalolacticDeath at the RHS level."""
+    slots = {"X_mlf": x_mlf, "X_mlf_dead": x_mlf_dead, "T": temp_k, "malic": 2.0, "tartaric": 4.0}
+    if so2_mgl > 0.0:
+        slots["so2_total"] = mgl_to_gpl(so2_mgl)
+    return _wine_state(schema, params, target_ph=3.4, **slots)
+
+
+def test_death_is_exactly_zero_without_so2(params):
+    # The v1 tradeoff, enforced: death is driven by molecular SO₂ ALONE, so an unsulfited pitched
+    # run has an identically-zero death contribution (O. oeni persists) — no ethanol/pH decay.
+    schema = wine_schema()
+    y = _death_state(schema, params, so2_mgl=0.0, x_mlf=0.2)
+    d = MalolacticDeath().derivatives(0.0, y, schema, params)
+    assert float(d[schema.slice("X_mlf")][0]) == 0.0
+    assert float(d[schema.slice("X_mlf_dead")][0]) == 0.0
+
+
+def test_so2_drives_death_as_a_neutral_transfer(params):
+    # With SO₂ dosed, viable X_mlf leaves and the SAME mass enters X_mlf_dead — the D-13 X→X_dead
+    # transfer. d[X_mlf] = −d[X_mlf_dead] exactly, so (both weighted at the biomass fractions since
+    # D-38) the move is carbon- and nitrogen-neutral by construction.
+    schema = wine_schema()
+    y = _death_state(schema, params, so2_mgl=80.0, x_mlf=0.2)
+    d = MalolacticDeath().derivatives(0.0, y, schema, params)
+    dx = float(d[schema.slice("X_mlf")][0])
+    dxd = float(d[schema.slice("X_mlf_dead")][0])
+    assert dx < 0.0 and dxd > 0.0  # bacteria die
+    assert dxd == pytest.approx(-dx)  # mass-conserving transfer (neutral in both ledgers)
+
+
+def test_death_touches_only_the_x_mlf_pools(params):
+    schema = wine_schema()
+    y = _death_state(schema, params, so2_mgl=80.0, x_mlf=0.2)
+    d = MalolacticDeath().derivatives(0.0, y, schema, params)
+    touched = {n for n in schema.names if np.any(d[schema.slice(n)] != 0.0)}
+    assert touched == {"X_mlf", "X_mlf_dead"}
+
+
+def test_more_so2_kills_faster(params):
+    # Monotone in the antimicrobial dose: a larger SO₂ addition ⇒ higher molecular SO₂ ⇒ a larger
+    # 1 − g_SO₂ ⇒ a faster kill. (The D-31 lever's strength scales with the sulfite dose.)
+    schema = wine_schema()
+    rate_lo = -float(
+        MalolacticDeath().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=20.0), schema, params
+        )[schema.slice("X_mlf")][0]
+    )
+    rate_hi = -float(
+        MalolacticDeath().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=60.0), schema, params
+        )[schema.slice("X_mlf")][0]
+    )
+    assert 0.0 < rate_lo < rate_hi
+
+
+def test_cold_preserves_bacteria_via_arrhenius_not_gamma(params):
+    # The load-bearing D-39 choice: death carries its OWN Arrhenius factor, not the cardinal γ(T).
+    # Below T_min_mlf (8 °C) γ(T) = 0 — if death reused γ(T), cold would spuriously HALT the kill.
+    # Instead Arrhenius merely SLOWS it: a sulfited culture in the cold still dies (just slower),
+    # and warmer ⇒ faster. Cold preserving bacteria is the correct direction γ(T) cannot supply.
+    schema = wine_schema()
+    t_below_min = 278.15  # 5 °C, below T_min_mlf = 281.15 K (8 °C) ⇒ cardinal γ(T) = 0
+    assert cardinal_temperature_factor(t_below_min, 281.15, 296.15, 310.15) == 0.0
+    rate_cold = -float(
+        MalolacticDeath().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=80.0, temp_k=t_below_min), schema, params
+        )[schema.slice("X_mlf")][0]
+    )
+    rate_warm = -float(
+        MalolacticDeath().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=80.0, temp_k=298.15), schema, params
+        )[schema.slice("X_mlf")][0]
+    )
+    assert rate_cold > 0.0  # still dying below T_min — proves Arrhenius, not γ(T)
+    assert rate_warm > rate_cold  # warm accelerates the kill (Arrhenius direction)
+
+
+def test_death_run_conserves_carbon_and_nitrogen():
+    # Integration-level closure with death ACTIVE: pitch O. oeni, add SO₂ mid-run so X_mlf → dead.
+    # The X_mlf → X_mlf_dead transfer is carbon/nitrogen-neutral (both weighted, D-38), SO₂ carries
+    # neither element, and malate→lactate+CO₂ is carbon-closing — so both ledgers close to machine
+    # precision across the sulfite jump (final == initial + Σ external flows; SO₂ adds no C/N).
+    scen = Scenario(
+        name="wine-mlf-death",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 250.0,
+            "pitch_gpl": 0.5,
+            "tartaric_gpl": 4.0,
+            "malic_gpl": 4.0,
+            "initial_ph": 3.4,
+            "mlf_pitch_gpl": 0.2,
+        },  # fmt: skip
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[Intervention(day=6.0, action="add_so2", params={"so2_mgl": 60.0})],
+        duration_days=21.0,
+    )
+    cs = compile_scenario(scen, strict=True)
+    traj = cs.run()
+    f_c = cs.param_values["biomass_C_fraction"]
+    f_n = cs.param_values["biomass_N_fraction"]
+    carbon = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    nitrogen = total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n)
+    # SO₂ is carbon/nitrogen-free, so the run-wide balances close with no external-flow correction.
+    assert_conserved(traj, carbon, rtol=1e-6, atol=1e-9, label="total carbon (MLF death on)")
+    assert_conserved(traj, nitrogen, rtol=1e-6, atol=1e-9, label="total nitrogen (MLF death on)")
+    assert_nonnegative(traj, ("X_mlf", "X_mlf_dead"))
+
+
+def test_death_tier_is_speculative():
+    assert MalolacticDeath.tier is Tier.SPECULATIVE
+
+
+def test_environmental_gate_is_toxicity_times_gamma(params):
+    # The D-39 refactor invariant: splitting the gate into toxicity × γ(T) left the growth/
+    # conversion consumers byte-for-byte — the full gate is exactly the product of its two halves.
+    schema = wine_schema()
+    y = _wine_state(schema, params, target_ph=3.4, malic=2.0, tartaric=4.0, X_mlf=0.2, E=40.0)
+    ph = acidbase.ph_of_state(y, schema, params)
+    toxicity = malolactic_toxicity_gate(y, schema, params, ph)
+    gamma = cardinal_temperature_factor(
+        float(y[schema.slice("T")][0]),
+        params["T_min_mlf"],
+        params["T_opt_mlf"],
+        params["T_max_mlf"],
+    )
+    full = malolactic_environmental_gate(y, schema, params, ph)
+    assert full == toxicity * gamma  # exact — same multiplication grouping as before the split
 
 
 # -- 9. tier is speculative -------------------------------------------------------

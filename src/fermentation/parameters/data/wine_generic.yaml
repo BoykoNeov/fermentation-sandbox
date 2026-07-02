@@ -676,6 +676,57 @@ K_aa_mlf:
     conditions: "O. oeni in wine; half-saturation in the smooth availability gate aa/(K_aa_mlf+aa) on the bacterial growth rate"
     notes: "Read by MalolacticGrowth: gate(aa) = aa/(K_aa_mlf+aa) ramps bacterial growth up from an empty amino-acid pool and down to zero as amino acids are exhausted (the same smooth-Monod shape the yeast swap and fermentative flux use, keeping the RHS C1 for the BDF solver). A SEPARATE parameter from the yeast K_amino_acids (the per-organism design lets them diverge), taken slightly lower here as O. oeni is a fastidious amino-acid auxotroph; an estimate, hence speculative."
 
+# -- MALOLACTIC DEATH (Oenococcus oeni SO2-driven kill, wine-only, decision D-39) --
+# MalolacticDeath (fermentation.core.kinetics.malolactic) is the counterpart of MalolacticGrowth
+# that completes the MLF arc: it moves viable X_mlf into the non-viable X_mlf_dead pool when the
+# wine is SULFITED, so bacteria DECLINE and the O. oeni activities that scale with X_mlf wind down.
+#   r_death = k_death_mlf * X_mlf * (1 - g_SO2) * arrhenius(T, E_a_death_mlf, T_ref)
+#   g_SO2   = exp(-[SO2]_molecular / molecular_so2_inhib_mlf)   (the SAME term the conversion gate uses)
+# The driver is 1 - g_SO2 - MOLECULAR SO2 ALONE, NOT the full toxicity gate. Death is EXACTLY 0
+# without SO2 (g_SO2 = 1) and rises toward its Arrhenius ceiling as molecular SO2 accumulates.
+# Temperature enters through the Arrhenius factor (warm accelerates the kill, cold slows it - the
+# autolysis shape), NOT the cardinal gamma(T) (which -> 0 in the cold and would spuriously make cold
+# KILL bacteria; cold in fact PRESERVES them). The transfer X_mlf -> X_mlf_dead is CARBON- AND
+# NITROGEN-NEUTRAL (both pools weighted at the biomass fractions since D-38, the yeast X -> X_dead
+# precedent D-13), so it adds no conservation code.
+# WHY SO2 ALONE (the D-39 crux, empirically settled): an earlier draft used 1 - TOXICITY
+# (pH*ethanol*SO2). A probe killed it - the Luong ethanol wall already drives 1-toxicity to ~0.92 at
+# ordinary post-AF ethanol (~75 g/L), so death was near-maximal FROM ETHANOL ALONE (bacteria gone in
+# ~1 week), when in reality O. oeni PERSISTS for weeks-to-months in dry wine and is cleared
+# deliberately by SO2 or racking. Ethanol's wall is a "can't grow" signal, not a "dying" one; no
+# power transform of 0.92 is both ~0 (slow baseline) and clearly below the SO2-elevated value, so the
+# driver must contain NO ethanol term. Co-inoculation-vs-post-AF dominance now rests entirely on the
+# GROWTH gate's g_EtOH (high-ABV post-AF -> gamma*g_EtOH ~ 0 -> no growth); a high-ABV post-AF pitch
+# simply sits INERT (no growth, no conversion, no death until sulfited).
+# V1 TRADEOFF (owned): without SO2, bacteria NEVER die in v1 - they persist and keep clearing
+# diacetyl on the lees (the D-31 "leave on lees cleans up" case). The slow ethanol/age decline of
+# O. oeni over weeks-months is real but DEFERRED to v2 (a benign-environment baseline mortality).
+# Less realistic than a slow decline, far more realistic than the 1-week ethanol wipeout - and it
+# makes the D-31 SO2/rack lever UNCONFOUNDED (only a deliberate action removes viable bacteria).
+# BOTH PARAMS SPECULATIVE (author estimates; no per-catalyst mortality law of this form is sourced).
+# Pitch-gated at compile (mlf_pitch_gpl>0), NOT amino-acid-gated - bacteria die whether or not they
+# were growing.
+
+k_death_mlf:
+  value: 5.0e-2
+  unit: "1/h"   # O. oeni specific death rate at FULL SO2 kill: r_death = k_death_mlf*X_mlf*(1-g_SO2)*f(T)
+  tier: speculative
+  uncertainty: { low: 2.0e-2, high: 1.0e-1, note: "specific mortality at a full molecular-SO2 kill ⇒ a bacterial half-life of ~7-35 h; a stabilizing SO2 addition (~30-50 mg/L free, ~0.6-1.0 mg/L molecular) crashes the population over ~1-3 d, while an unsulfited wine sees ZERO death (bacteria persist on lees)" }
+  provenance:
+    source: "author estimate; O. oeni is cleared from wine by SO2 addition within days - the standard tool to arrest MLF and stabilize a wine (Ribereau-Gayon et al., Handbook of Enology Vol. 1, malolactic fermentation & SO2 management; Bartowsky & Henschke 2004, Int. J. Food Microbiol. 96:235-252, on removing O. oeni to preserve/lock diacetyl)"
+    conditions: "O. oeni in wine, ~20 C; specific death rate at a full molecular-SO2 kill (1 - g_SO2 = 1) scaling the viable X_mlf, read unscaled at T_ref by the Arrhenius factor"
+    notes: "Read by MalolacticDeath as the death magnitude at a full SO2 kill. VALUE 0.05/h ⇒ a full-kill half-life of ~14 h (ln2/0.05); at a stabilizing dose (~40 mg/L free ⇒ ~0.8 mg/L molecular ⇒ g_SO2 ~ 0.02 ⇒ 1-g_SO2 ~ 0.98) the population drops ~90% in ~2 d - the physically-reasonable SO2-kill timescale, chosen on that physics, NOT to clear a test threshold. RE-TUNED UP from the 0.02/h of the abandoned (1-toxicity) draft: because death is now EXACTLY 0 without SO2, k no longer couples to the (unsulfited) early-pitch conversion, so it can take its true SO2-kill value. SPECULATIVE: no per-catalyst kinetic model of O. oeni SO2 mortality is sourced (viability is reported as CFU decline curves, not this rate constant), so it is tuned - NOT fitted - so a stabilizing SO2 dose crashes X_mlf within ~1-3 d while an unsulfited run leaves it untouched. DIRECTION is sourced (SO2 kills O. oeni; the basis of using SO2 to arrest MLF and lock diacetyl); the magnitude is the speculative modelling choice. SIMPLIFICATION: reuses molecular_so2_inhib_mlf as the kill scale (arrest-scale = kill-scale, bacteriostatic ~ bacteriocidal); a separate molecular_so2_death_scale is the v2 refinement. NOTE: killing the bacteria removes BOTH the diacetyl sink (reduction) AND source (citrate co-metabolism), so a single-run 'SO2 locks in diacetyl' demonstration is confounded in this model - the death MECHANISM is validated on X_mlf directly. A benign-environment baseline mortality (death without SO2) is deferred to v2."
+
+E_a_death_mlf:
+  value: 60000.0
+  unit: "J/mol"   # Arrhenius activation energy for the temperature dependence of bacterial death
+  tier: speculative
+  uncertainty: { low: 40000.0, high: 90000.0, note: "generic biological/enzymatic-process activation energy (Q10 ~2 at 20 C); brackets the ~40-90 kJ/mol range the model's other enzymatic E_a (E_a_reduction 45k, E_a_autolysis 60k, E_a_decarb 90k) span" }
+  provenance:
+    source: "author estimate; no sourced Arrhenius fit for O. oeni death rate - taken equal to E_a_autolysis (60 kJ/mol), a generic enzymatic/biological-process activation energy (Q10 ~2.3 at 20 C), consistent with warm accelerating and cold slowing cell mortality"
+    conditions: "O. oeni in wine; temperature factor arrhenius(T, E_a_death_mlf, T_ref) on the death rate, = 1 at T_ref (20 C)"
+    notes: "Read by MalolacticDeath. Gives the temperature dependence of bacterial mortality so that warm lees clear/kill the culture faster and cold PRESERVES it (dormancy) - the physically correct direction the cardinal gamma(T) cannot supply for death (gamma(T) -> 0 in the cold would make cold kill, the opposite of reality). SPECULATIVE: the magnitude is an estimate equal to the autolysis E_a; the DIRECTION (warm accelerates, cold preserves) is sound. Uses the shared T_ref (20 C) so the factor is 1 at the wine benchmark temperature, like every other Arrhenius rate."
+
 # -- MLF-DERIVED DIACETYL (Oenococcus oeni citrate co-metabolism), wine-only (decision D-31) --
 # The real coupling MLF unlocks: alongside malate, O. oeni co-metabolises CITRIC ACID and
 # overflows alpha-acetolactate, which decarboxylates to DIACETYL (the buttery note post-MLF
