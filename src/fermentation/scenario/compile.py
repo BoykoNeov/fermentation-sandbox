@@ -633,11 +633,46 @@ def _verb_add_dap(
     )
 
 
+def _verb_add_so2(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_so2`` — dose total SO₂ onto the conserved ``so2_total`` slot (decision D-36).
+
+    Doses total sulfur dioxide by the industry unit (``so2_mgl``, mg/L) and converts to the
+    canonical g/L jump on ``so2_total`` — the same slot the initial ``so2_total_mgl`` addition
+    lands on (D-22/D-28). Free/bound/molecular SO₂ are then re-derived at the solved pH from that
+    total (D-28), so a mid-ferment addition raises the antimicrobial molecular fraction from that
+    time forward. SO₂ carries neither carbon nor nitrogen, so this flow perturbs neither elemental
+    ledger — the single-run carbon and nitrogen balances still close with no correction term.
+    """
+    _iv_check_keys(iv, frozenset({"so2_mgl"}), "add_so2")
+    so2_mgl = _iv_float(iv, "so2_mgl", "add_so2")
+    if "so2_total" not in schema:
+        raise ValueError(
+            f"intervention 'add_so2' at day {iv.day:g} needs a 'so2_total' slot, but medium "
+            f"{schema!r} has none (SO₂ is a wine-only pool, decision D-22)"
+        )
+    added_gpl = mgl_to_gpl(so2_mgl)
+    so2_slice = schema.slice("so2_total")
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[so2_slice] += added_gpl
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_so2@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
 #: action verb → compiler turning one :class:`Intervention` into a :class:`ScheduledEvent`.
 _INTERVENTION_VERBS: dict[
     str, Callable[[Intervention, StateSchema, ParameterSet], ScheduledEvent]
 ] = {
     "add_dap": _verb_add_dap,
+    "add_so2": _verb_add_so2,
 }
 
 

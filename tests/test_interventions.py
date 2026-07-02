@@ -153,6 +153,77 @@ def test_dap_dose_lowers_net_cumulative_h2s():
     assert dosed.series("h2s")[-1] < undosed.series("h2s")[-1]
 
 
+# -- add_so2: lands on so2_total, rides neither elemental ledger ---------------
+
+
+def _so2(day: float, so2_mgl: float) -> Intervention:
+    return Intervention(day=day, action="add_so2", params={"so2_mgl": so2_mgl})
+
+
+def test_add_so2_lands_on_so2_total_and_books_one_flow():
+    cs = compile_scenario(_wine([_so2(5.0, 40.0)]))
+    traj = cs.run()
+
+    assert len(traj.external_flows) == 1
+    flow = traj.external_flows[0]
+    assert flow.label == "add_so2@5d"
+    schema = cs.schema
+    # 40 mg/L → 0.040 g/L on so2_total; nothing else moves.
+    assert flow.delta[schema.slice("so2_total")][0] == pytest.approx(0.040, rel=1e-12)
+    others = np.delete(flow.delta, schema.slice("so2_total").start)
+    assert np.count_nonzero(others) == 0
+
+
+def test_add_so2_perturbs_neither_carbon_nor_nitrogen():
+    cs = compile_scenario(_wine([_so2(5.0, 50.0)]))
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+
+    # SO₂ carries neither element, so the dose contributes nothing to either ledger and both
+    # single-run balances still close with no correction term (unlike the DAP nitrogen jump).
+    assert all(c_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
+    assert all(n_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
+    assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0), abs=1e-6)
+    assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0), abs=1e-9)
+
+
+def test_add_so2_raises_the_molecular_so2_readout():
+    from fermentation.analysis import molecular_so2_series
+
+    cs = compile_scenario(_wine([_so2(5.0, 60.0)]))
+    traj = cs.run()
+    params = cs.param_values
+    mol = molecular_so2_series(traj.as_trajectory(), params)
+
+    # Before the day-5 dose there is no SO₂ (so2_total ≡ 0 ⇒ molecular ≡ 0); after it, the
+    # readout is positive — the dose feeds the free/molecular partition from that time forward.
+    before = mol[np.argmin(np.abs(traj.t - 4.5 * 24.0))]
+    after = mol[np.argmin(np.abs(traj.t - 6.0 * 24.0))]
+    assert before == pytest.approx(0.0, abs=1e-15)
+    assert after > 0.0
+
+
+def test_add_so2_requires_an_so2_slot():
+    beer = Scenario(
+        name="no-so2",
+        medium="beer",
+        initial={
+            "glucose_gpl": 90.0,
+            "maltose_gpl": 140.0,
+            "maltotriose_gpl": 20.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 2.0,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=18.0)],
+        interventions=[_so2(3.0, 40.0)],
+        duration_days=10.0,
+    )
+    with pytest.raises(ValueError, match="needs a 'so2_total' slot"):
+        compile_scenario(beer)
+
+
 # -- vocabulary discipline: loud failures --------------------------------------
 
 
