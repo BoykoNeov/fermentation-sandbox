@@ -2330,6 +2330,93 @@ emergent H₂S-gate response, D-29), reconciling the compile-time MLF disable-ga
 pitch, and — separately — the stochastic ensemble wrapping `simulate_scheduled` (it wraps `simulate`
 today).
 
+## D-36 — Discrete winemaking interventions: the verb registry at the compile boundary
+
+**Status: IMPLEMENTED 2026-07-02** (475 green + 5 benchmark). The winemaking payoff of the D-35
+event loop. `Scenario.interventions` — a declarative timeline of verbs (`day`, `action`, `params`
+in industry units) — was declared since Milestone 1 but *never consumed*: `compile_scenario` turned
+only the temperature schedule into events. This activates it. Built one verb per commit on the
+unchanged D-35 driver (`add_dap` → `add_so2` → `rack` → `pitch_mlf`); nothing in `runtime` or `core`
+changed — all four verbs are pure vocabulary at the scenario→core compile seam (D-3).
+
+**The registry (`scenario/compile.py`, `_INTERVENTION_VERBS`).** Each action name maps to a compiler
+`(Intervention, StateSchema, ParameterSet) → ScheduledEvent`. A verb owns the *meaning*: which
+canonical slot a dose lands on, which unit conversion applies, which Processes a pitch enables. The
+driver stays verb-agnostic — it just segments-and-restarts and books each state jump as an
+`ExternalFlow`. `_compile_interventions` dispatches the timeline, merges the resulting events with
+the temperature-ramp events into the single `events` tuple `simulate_scheduled` sorts by time, and
+enforces the `_ALLOWED_KEYS` discipline: an unknown verb, a day at/after the run duration, a missing
+or unknown param, or a negative dose each raise at the boundary with a scenario-level message. New
+verbs are added here and nowhere else. **Isolability:** no interventions ⇒ empty events ⇒ (absent a
+ramp) byte-for-byte a plain `simulate`.
+
+**`add_dap` — the headline, a *timing* effect a static dose cannot produce.** Doses diammonium
+phosphate by mass (`dap_gpl`) and converts to the assimilable-N jump on the lumped `N` slot via a
+new sourced `dap_nitrogen_fraction` (exact (NH₄)₂HPO₄ stoichiometry, 28.014/132.06 = 0.2121 g N/g,
+VALIDATED with a zero-width band; new shared `additions.yaml`, the `must_fermentable_fraction`
+precedent — a boundary conversion constant, not a magic number). **Phosphate is dropped** (no
+phosphorus pool; P is non-limiting) — a scoped omission. The D-29 *static* N→H₂S lever was muted
+(~5% span) because N strips to ~0 by day ~1.3 at every dose; a **mid-ferment** DAP dose is
+categorically different — it restores N *while sugar (hence the flux the inverse gate
+`K_h2s_n/(K_h2s_n+N)` multiplies) is still present*, so the H₂S production **rate drops immediately**
+after the dose (verified: ~0.6× the undosed rate just after a day-2 dose) and recovers as the new N
+is consumed. A competing effect is present and honest — the extra N feeds growth ⇒ more biomass ⇒
+more flux later — but **net cumulative H₂S falls** (gate closure dominates), the realistic direction
+(DAP is the standard H₂S-management lever). Emergent, not imposed: the model has no "DAP lowers H₂S"
+term. Dose in the **active window** — a post-dryness dose lands where the flux is ~0 and shows
+nothing.
+
+**`add_so2` — rides neither elemental ledger.** Doses total SO₂ (`so2_mgl`) onto the conserved
+`so2_total` slot (the same slot the initial `so2_total_mgl` addition uses, D-22/D-28); free/bound/
+molecular SO₂ are re-derived at the solved pH, so a mid-ferment addition raises the antimicrobial
+molecular fraction from that time forward (verified: molecular readout 0 pre-dose → positive
+post-dose). SO₂ carries neither carbon nor nitrogen, so the flow perturbs **neither** balance —
+both close with no correction term (contrast the DAP nitrogen jump). Raises on a medium without an
+`so2_total` slot (beer).
+
+**`rack` — the ledger's removal side.** Draws the wine off a fraction ∈ [0, 1] of its settled lees:
+`X_dead` and (when autolysis is opted in, D-34) the cell-wall `debris` (`_LEES_SLOTS`, a single
+source of truth). Viable biomass `X` and every dissolved species (sugar, ethanol, YAN, glycerol,
+byproducts, acids, SO₂) are **left untouched** — a normal post-AF rack settles dead yeast, and a
+concentration model has no volume change on racking, so touching the dissolved pools would be
+physically wrong. Books the negative jump as an `ExternalFlow`. Both racked pools carry carbon (and
+`X_dead` carries nitrogen), so the removal is a negative term in both ledgers.
+
+**Crown-jewel ledger test (the payoff D-35's external-flow machinery was built for).** A run with
+*both* an injection (DAP, +N) and a removal (rack, −C/−N) satisfies the run-wide identity
+`final == initial + Σ external_flows` for carbon **and** nitrogen to machine precision — and the
+ledger is non-trivial (rack removes carbon, DAP adds nitrogen). The continuous ODE closes exactly
+within every segment; the ledger is the correction term across the jumps.
+
+**`pitch_mlf` — the driver's third effect (in-place reconfiguration).** Inoculates *Oenococcus oeni*
+mid-run: it both **mutates** `X_mlf` (the bacterial catalyst dose, `pitch_gpl`) and **reconfigures**
+the Process set to enable `_MLF_GATED_PROCESSES` — malate→lactate conversion, the citrate
+co-metabolism, and the bacterial diacetyl reduction (D-23/D-31). That tuple is now a **single source
+of truth** shared with the compile-time disable-gate, so a sequential mid-run pitch is *symmetric*
+with an initial co-inoculation and the two cannot drift. `X_mlf` is an inert carbon-/nitrogen-free
+catalyst, so the pitch perturbs neither ledger. Because the Processes are enabled only from the
+breakpoint, `simulate_scheduled` min-combines the per-segment tier maps (D-35): the malate/lactate/
+citrate slots report **speculative for the whole run**, and revert to VALIDATED when unpitched
+(disabled ⇒ inert). **Honest scope, verified:** a 22-Brix must (finishing ~107 g/L ethanol) converts
+most of its malate under an **early** pitch (day 1: 3.0 → 0.69 g/L) but **stalls** under a *post-AF*
+pitch (day 15: 3.0 → 2.97) — past the Luong ethanol wall (~110 g/L) the environmental gate keeps
+conversion near zero. The verb makes pitch timing a *scenario* choice; it does not change the
+kinetics (malolactic still completes only under co-inoculation / early pitch, D-23).
+
+**Tests.** `tests/test_interventions.py` (24) pins all four verbs: the dose lands on the right slot
+and books one flow; the H₂S rate-drop + net-suppression headline; SO₂ perturbs neither ledger and
+raises the molecular readout; rack removes only the lees and leaves the wine; the combined DAP+rack
+carbon/nitrogen crown-jewel; pitch_mlf enables exactly the gated set, catalyst is ledger-free, early
+converts / late stalls, tier travels; and the vocabulary discipline (unknown verb, out-of-window
+day, bad params) + isolability. 475 green + 5 benchmark, ruff + mypy clean.
+
+**Deferred.** The stochastic `simulate_ensemble` still wraps the un-scheduled `simulate`, so it
+takes no `events` — an ensemble over a multi-segment schedule is the remaining D-35→D-36 follow-up.
+An **MLF-with-growth** consumer Process composed with a `pitch_mlf` event is now unblocked (the loop
+exists, the tier travels, autolysis + the amino-acid ledger refill the pool D-32/D-34) but stays
+future work. Other addition verbs (acid/tannin/nutrient blends, chaptalization, cold-stabilisation
+racking with a viable-`X` removal fraction) slot into `_INTERVENTION_VERBS` when needed.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

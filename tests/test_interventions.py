@@ -293,6 +293,115 @@ def test_dap_dose_and_rack_conserve_carbon_and_nitrogen_across_all_jumps():
     assert sum(n_of(f.delta) for f in traj.external_flows) != pytest.approx(0.0, abs=1e-6)
 
 
+# -- pitch_mlf: mutate the catalyst + reconfigure the Process set --------------
+
+
+_MLF_NAMES = (
+    "malolactic_conversion",
+    "malolactic_citrate_metabolism",
+    "oenococcus_diacetyl_reduction",
+)
+
+
+def _mlf_wine(interventions: list[Intervention]) -> Scenario:
+    return Scenario(
+        name="mlf-test",
+        medium="wine",
+        initial={
+            "brix": 22.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 0.25,
+            "malic_gpl": 3.0,
+            "initial_ph": 3.5,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=22.0)],
+        interventions=interventions,
+        duration_days=25.0,
+    )
+
+
+def _pitch(day: float, pitch_gpl: float = 0.1) -> Intervention:
+    return Intervention(day=day, action="pitch_mlf", params={"pitch_gpl": pitch_gpl})
+
+
+def test_pitch_mlf_mutates_catalyst_and_enables_exactly_the_gated_set():
+    cs = compile_scenario(_mlf_wine([_pitch(1.0, 0.1)]))
+    # Unpitched at compile: the gated Processes are all disabled.
+    assert all(not cs.process_set.is_enabled(name) for name in _MLF_NAMES)
+
+    traj = cs.run()
+    # The pitch enabled exactly the gated set (symmetric with the compile-time disable).
+    assert all(cs.process_set.is_enabled(name) for name in _MLF_NAMES)
+
+    assert len(traj.external_flows) == 1
+    flow = traj.external_flows[0]
+    assert flow.label == "pitch_mlf@1d"
+    schema = cs.schema
+    # The whole jump is the X_mlf catalyst dose; nothing else moves.
+    assert flow.delta[schema.slice("X_mlf")][0] == pytest.approx(0.1, rel=1e-12)
+    others = np.delete(flow.delta, schema.slice("X_mlf").start)
+    assert np.count_nonzero(others) == 0
+
+
+def test_pitch_mlf_catalyst_perturbs_neither_ledger():
+    cs = compile_scenario(_mlf_wine([_pitch(1.0, 0.1)]))
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+    # X_mlf is an inert carbon-/nitrogen-free catalyst (D-23): the pitch flow is on neither ledger.
+    flow = traj.external_flows[0]
+    assert c_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+    assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+
+
+def test_early_pitch_converts_malic_but_post_af_pitch_stalls():
+    # The honest headline (decisions D-23, D-31): pitch timing is now a scenario choice, and only
+    # an early/co-inoculation pitch completes — a post-AF pitch lands past the Luong ethanol wall,
+    # so the environmental gate keeps malate conversion near zero. EMERGENT from the gate, not
+    # imposed: the same Process, only the pitch time differs.
+    early = compile_scenario(_mlf_wine([_pitch(1.0)])).run()
+    late = compile_scenario(_mlf_wine([_pitch(15.0)])).run()
+    unpitched = compile_scenario(_mlf_wine([])).run()
+
+    malic0 = 3.0
+    early_malic = early.series("malic")[-1]
+    late_malic = late.series("malic")[-1]
+    assert unpitched.series("malic")[-1] == pytest.approx(malic0, abs=1e-9)  # inert, unchanged
+    assert early_malic < 0.5 * malic0  # early pitch converts most of the malate
+    assert late_malic > 0.9 * malic0  # post-AF pitch stalls at the ethanol wall
+    assert early_malic < late_malic
+
+
+def test_mid_run_pitch_drags_malolactic_tiers_for_the_whole_run():
+    # tier travels (D-35): the Processes are enabled only from the breakpoint, but min-combining
+    # the per-segment tier maps reports the touched slots speculative for the WHOLE trajectory.
+    unpitched = compile_scenario(_mlf_wine([])).run()
+    pitched = compile_scenario(_mlf_wine([_pitch(1.0)])).run()
+    for name in ("malic", "lactic"):
+        assert unpitched.tier_map[name] is Tier.VALIDATED  # disabled ⇒ inert ⇒ validated
+        assert pitched.tier_map[name] is Tier.SPECULATIVE  # enabled mid-run ⇒ speculative run-wide
+
+
+def test_pitch_mlf_requires_an_x_mlf_slot():
+    beer = Scenario(
+        name="no-mlf",
+        medium="beer",
+        initial={
+            "glucose_gpl": 90.0,
+            "maltose_gpl": 140.0,
+            "maltotriose_gpl": 20.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 2.0,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=18.0)],
+        interventions=[_pitch(3.0)],
+        duration_days=10.0,
+    )
+    with pytest.raises(ValueError, match="needs an 'X_mlf' slot"):
+        compile_scenario(beer)
+
+
 # -- vocabulary discipline: loud failures --------------------------------------
 
 

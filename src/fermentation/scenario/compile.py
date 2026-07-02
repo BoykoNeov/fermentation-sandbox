@@ -62,6 +62,18 @@ from fermentation.units.convert import (
 #: ships the nitrogen-dependent biomass yield; gates the compile-time override.
 _N_YIELD_COEFFS = ("biomass_N_yield_log_intercept", "biomass_N_yield_log_slope")
 
+#: The malolactic Processes gated on an *Oenococcus oeni* pitch (decisions D-23, D-31):
+#: malate→lactate conversion, the citrate co-metabolism feeding the diacetyl reservoir, and
+#: the bacterial diacetyl reduction. They are wired into the wine medium but contribute nothing
+#: until bacteria are present, so the compile step DISABLES them when unpitched and the
+#: ``pitch_mlf`` intervention (decision D-36) re-enables *exactly* this set at its breakpoint —
+#: a single source of truth so the compile-time gate and the mid-run pitch cannot drift apart.
+_MLF_GATED_PROCESSES = (
+    MalolacticConversion,
+    MalolacticCitrateMetabolism,
+    OenococcusDiacetylReduction,
+)
+
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
 _Initial = dict[str, float | list[float]]
 
@@ -83,10 +95,11 @@ class CompiledScenario:
     process_set: ProcessSet
     parameters: ParameterSet
     t_span_h: tuple[float, float]
-    #: Timed interventions compiled from the scenario (decision D-35), in canonical hours,
-    #: ready to hand to :func:`fermentation.runtime.simulate_scheduled`. Currently the
-    #: temperature-schedule slope-change events; discrete winemaking verbs join this list
-    #: as they are wired. Empty ⇒ an un-scheduled run (plain :func:`simulate` suffices).
+    #: Timed interventions compiled from the scenario, in canonical hours, ready to hand to
+    #: :func:`fermentation.runtime.simulate_scheduled`: the temperature-schedule slope-change
+    #: events (decision D-35) merged with the discrete winemaking verbs — ``add_dap`` / ``add_so2``
+    #: / ``rack`` / ``pitch_mlf`` (decision D-36). Empty ⇒ an un-scheduled run (plain
+    #: :func:`simulate` suffices).
     events: tuple[ScheduledEvent, ...] = field(default_factory=tuple)
 
     @property
@@ -707,6 +720,55 @@ def _verb_rack(iv: Intervention, schema: StateSchema, parameters: ParameterSet) 
     )
 
 
+def _verb_pitch_mlf(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``pitch_mlf`` — inoculate *Oenococcus oeni* mid-run, enabling malolactic fermentation.
+
+    The verb that exercises the driver's third effect (in-place reconfiguration): it both
+    **mutates** ``X_mlf`` (adds the bacterial catalyst dose, ``pitch_gpl`` g/L) and
+    **reconfigures** the Process set to enable :data:`_MLF_GATED_PROCESSES` — *exactly* the set an
+    unpitched compile disables, so a sequential mid-run pitch is symmetric with an initial
+    co-inoculation. ``X_mlf`` is an inert carbon-/nitrogen-free catalyst (decision D-23), so the
+    dose perturbs neither elemental ledger.
+
+    Because the Processes are enabled only from the breakpoint onward, ``simulate_scheduled``
+    min-combines the per-segment tier maps (D-35): the malate/lactate/citrate slots the enabled
+    speculative Processes touch report speculative for the *whole* run, not just the back half.
+
+    Honest scope (decisions D-23, D-31): a *post-AF* pitch lands past the Luong ethanol wall
+    (~110 g/L; a 24-Brix wine finishes near ~135), so the environmental gate keeps conversion
+    near zero — malolactic must be co-inoculated or pitched early to complete. This verb makes
+    that timing a *scenario* choice; it does not change the kinetics.
+    """
+    _iv_check_keys(iv, frozenset({"pitch_gpl"}), "pitch_mlf")
+    pitch_gpl = _iv_float(iv, "pitch_gpl", "pitch_mlf")
+    if "X_mlf" not in schema:
+        raise ValueError(
+            f"intervention 'pitch_mlf' at day {iv.day:g} needs an 'X_mlf' slot, but medium "
+            f"{schema!r} has none (malolactic fermentation is wine-only, decision D-23)"
+        )
+    x_mlf_slice = schema.slice("X_mlf")
+    gated_names = tuple(p.name for p in _MLF_GATED_PROCESSES)
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[x_mlf_slice] += pitch_gpl
+        return out
+
+    def reconfigure(ps: ProcessSet) -> None:
+        for name in gated_names:
+            if name in ps:
+                ps.enable(name)
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"pitch_mlf@{iv.day:g}d",
+        mutate=mutate,
+        reconfigure=reconfigure,
+    )
+
+
 #: action verb → compiler turning one :class:`Intervention` into a :class:`ScheduledEvent`.
 _INTERVENTION_VERBS: dict[
     str, Callable[[Intervention, StateSchema, ParameterSet], ScheduledEvent]
@@ -714,6 +776,7 @@ _INTERVENTION_VERBS: dict[
     "add_dap": _verb_add_dap,
     "add_so2": _verb_add_so2,
     "rack": _verb_rack,
+    "pitch_mlf": _verb_pitch_mlf,
 }
 
 
@@ -789,13 +852,12 @@ def compile_scenario(
     # per-RHS pH ``brentq`` solve is paid on an undosed run. When pitched, MalolacticConversion
     # is the first RHS consumer of the D-18 pH solver / D-22 molecular-SO₂ readout, and the two
     # D-31 Processes co-metabolise citrate into diacetyl and reduce it on the lees.
+    # An initial ``mlf_pitch_gpl`` co-inoculates at t0; a mid-run ``pitch_mlf`` intervention
+    # (decision D-36) instead leaves this 0 and re-enables the same _MLF_GATED_PROCESSES at its
+    # breakpoint. Either way, an unpitched compile disables them here.
     mlf_pitch_gpl = float(scenario.initial.get("mlf_pitch_gpl", 0.0) or 0.0)
     if mlf_pitch_gpl <= 0.0:
-        for mlf_process in (
-            MalolacticConversion,
-            MalolacticCitrateMetabolism,
-            OenococcusDiacetylReduction,
-        ):
+        for mlf_process in _MLF_GATED_PROCESSES:
             if mlf_process.name in process_set:
                 process_set.disable(mlf_process.name)
 
