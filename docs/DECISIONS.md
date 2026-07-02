@@ -2566,9 +2566,10 @@ post-AF pitch is ethanol-arrested); the no-catalyst/no-fuel/no-sugar guards; nev
 capping `X_mlf` (discriminated on an aa-dosed *unpitched* run where growth is the only enabled
 `X_mlf` toucher). `test_interventions` / `test_media` updated for the promotion + the new Process.
 
-## D-39 — MLF death: `X_mlf` dies under SO₂ (`MalolacticDeath`); the MLF arc closes
+## D-39 — MLF death: `X_mlf` dies under SO₂ (`MalolacticDeath`) + rack removes it; the MLF arc closes
 
-**Status: COMMIT 1 IMPLEMENTED 2026-07-02** (504 green, ruff + mypy clean). The counterpart to the
+**Status: IMPLEMENTED 2026-07-02** (506 green, ruff + mypy clean) — two commits, one beat each:
+commit 1 the `MalolacticDeath` Process, commit 2 the `rack`-removes-`X_mlf` extension. The counterpart to the
 D-38 growth beat that completes the MLF arc (D-23 → D-31 → D-38 → D-39): a new `MalolacticDeath`
 Process moves viable `X_mlf` into a new non-viable `X_mlf_dead` pool, so bacterial biomass now
 *declines* and the *O. oeni* activities that scale with `X_mlf` — malate conversion, citrate →
@@ -2632,9 +2633,23 @@ to <10 %); RHS-level death-is-zero-without-SO₂, the neutral `d[X_mlf] = −d[X
 `(X_mlf, X_mlf_dead)` `touches` contract, more-SO₂-kills-faster, the load-bearing
 **cold-preserves-via-Arrhenius-not-γ(T)** case (dying below `T_min_mlf` where γ(T)=0, warm faster),
 carbon+nitrogen closure over a death-active run, the speculative tier, and the gate-split identity.
-`test_media` updated for the tenth slot + the new pitch-gated Process. **Commit 2 (pending):** extend
-the `rack` verb to physically remove viable `X_mlf` + settled `X_mlf_dead` (the other half of the
-D-31 "rack locks in diacetyl" lever), booking the biomass C/N as an external flow.
+`test_media` updated for the tenth slot + the new pitch-gated Process.
+
+**Commit 2 — `rack` removes viable `X_mlf` + settled `X_mlf_dead` (the D-31 lever's physical half).**
+Both *O. oeni* pools join `_LEES_SLOTS`, so a `rack` draws them off with the lees — the physical twin
+of the SO₂ kill: racking early strands diacetyl (the deferred D-31 "rack ⇒ locked in" case). This is
+a deliberate **asymmetry with yeast**, owned in the docstring: a rack leaves viable *yeast* `X`
+untouched (it ferments in *suspension*, so racking gross lees leaves it working), but *O. oeni*
+carries out MLF *on the lees* and goes with them. Both bacterial pools carry biomass C/N (weighted
+since D-38), so — like `X_dead` — their removal books a negative C/N `ExternalFlow`; the run-wide
+`final == initial + Σ flows` identity closes to machine precision for both elements (SO₂ carries
+neither, so only the rack moves the ledger). No kinetics change — a `_LEES_SLOTS` + docstring edit.
+The single-run "rack strands diacetyl" demo is confounded exactly as the death case is (removing
+bacteria drops both the diacetyl sink *and* its citrate source), so it is validated on the `X_mlf`/
+`X_mlf_dead` removal + conservation directly, not on a diacetyl curve. **+2 tests** (`test_
+interventions`, 506 green): rack removes both pools while leaving viable yeast + dissolved species
+untouched; and C/N closure across a dose-then-rack MLF run. **The MLF arc (D-23 → D-31 → D-38 → D-39)
+is complete.**
 
 ## Deferred (decide early in the relevant milestone)
 

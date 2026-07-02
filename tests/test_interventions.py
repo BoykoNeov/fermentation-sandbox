@@ -296,6 +296,72 @@ def test_dap_dose_and_rack_conserve_carbon_and_nitrogen_across_all_jumps():
     assert sum(n_of(f.delta) for f in traj.external_flows) != pytest.approx(0.0, abs=1e-6)
 
 
+# -- rack removes O. oeni off the lees — both viable X_mlf and settled X_mlf_dead (D-39) --
+
+
+def _mlf_so2_rack(rack_fraction: float) -> Scenario:
+    # Co-inoculate O. oeni with amino acids (so X_mlf grows), SO₂ at day 5 to kill some bacteria
+    # (so X_mlf_dead accumulates while viable X_mlf remains), then a day-7 rack draws both off.
+    return Scenario(
+        name="mlf-rack",
+        medium="wine",
+        initial={
+            "brix": 22.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 0.25,
+            "malic_gpl": 3.0,
+            "initial_ph": 3.5,
+            "mlf_pitch_gpl": 0.2,
+            "amino_acids_gpl": 1.0,
+        },  # fmt: skip
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=22.0)],
+        interventions=[
+            Intervention(day=5.0, action="add_so2", params={"so2_mgl": 40.0}),
+            _rack(7.0, rack_fraction),
+        ],
+        duration_days=14.0,
+    )
+
+
+def test_rack_removes_both_oenococcus_pools_and_leaves_viable_yeast():
+    # decision D-39: racking draws O. oeni off the lees — BOTH viable X_mlf and settled X_mlf_dead —
+    # the physical twin of the SO₂ kill (the deferred D-31 "rack early ⇒ diacetyl locked in" lever).
+    # Viable YEAST X is left untouched: it ferments in suspension, so a rack leaves it working.
+    cs = compile_scenario(_mlf_so2_rack(0.8))
+    traj = cs.run()
+    schema = cs.schema
+    rack_flow = next(f for f in traj.external_flows if f.label == "rack@7d")
+
+    # both bacterial pools are non-empty at the rack (viable remnant + SO₂-killed dead) and drop
+    x_mlf, x_mlf_dead = traj.series("X_mlf"), traj.series("X_mlf_dead")
+    i_pre = int(np.searchsorted(traj.t, 7.0 * 24.0)) - 1
+    assert x_mlf[i_pre] > 0.0 and x_mlf_dead[i_pre] > 0.0
+    for name in ("X_mlf", "X_mlf_dead"):
+        assert rack_flow.delta[schema.slice(name)][0] < 0.0  # bacteria drawn off with the lees
+    # viable yeast and every dissolved species stay with the racked-off liquid (untouched)
+    for name in ("X", "S", "E", "N", "malic", "so2_total"):
+        assert np.all(rack_flow.delta[schema.slice(name)] == 0.0)
+
+
+def test_rack_on_an_mlf_run_conserves_carbon_and_nitrogen():
+    # Racking O. oeni off the lees removes biomass carbon AND nitrogen (both X_mlf pools weighted
+    # since D-38), booked as a negative external flow — so the run-wide identity still closes to
+    # machine precision for BOTH elements (SO₂ carries neither, so only the rack moves the ledger).
+    cs = compile_scenario(_mlf_so2_rack(0.8))
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+
+    for quantity, tol in ((c_of, 1e-6), (n_of, 1e-9)):
+        injected = sum(quantity(f.delta) for f in traj.external_flows)
+        assert quantity(traj.y[:, -1]) == pytest.approx(quantity(cs.y0) + injected, abs=tol)
+    # the rack removed biomass carbon AND nitrogen — a non-trivial ledger move, not a wash
+    rack_flow = next(f for f in traj.external_flows if f.label == "rack@7d")
+    assert c_of(rack_flow.delta) < 0.0
+    assert n_of(rack_flow.delta) < 0.0
+
+
 # -- pitch_mlf: mutate the catalyst + reconfigure the Process set --------------
 
 

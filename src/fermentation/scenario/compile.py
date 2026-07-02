@@ -708,23 +708,39 @@ def _verb_add_so2(
     )
 
 
-#: The settled-solids pools racking removes: inactivated biomass and (if autolysis is opted in)
-#: the non-assimilable cell-wall debris. Dissolved species (sugar, ethanol, acids, glycerol,
-#: byproducts, SO₂, YAN) stay with the racked-off liquid — a concentration model has no volume
-#: change on racking, so touching them would be physically wrong (decision D-36).
-_LEES_SLOTS = ("X_dead", "debris")
+#: The lees-associated pools racking removes: inactivated yeast biomass ``X_dead`` and (if autolysis
+#: is opted in) the non-assimilable cell-wall ``debris`` (decision D-36); plus **both** *O. oeni*
+#: pools — settled dead ``X_mlf_dead`` **and viable ``X_mlf``** (decision D-39). Racking viable
+#: bacteria is the deliberate **asymmetry with yeast**: a rack leaves viable yeast ``X`` untouched
+#: because it works in *suspension* during AF (racking gross lees leaves it fermenting), but
+#: *O. oeni* carries out MLF *on the lees* and is drawn off with them — so racking removes the
+#: bacteria that clear diacetyl, the physical twin of the SO₂ kill (the other half of the D-31
+#: "rack/SO₂ locks in diacetyl" lever, D-39). Both bacterial pools carry biomass carbon and nitrogen
+#: (weighted since D-38), so their removal books a negative C/N external flow like ``X_dead``.
+#: Dissolved species (sugar, ethanol, acids, glycerol, byproducts, SO₂, YAN) stay with the
+#: racked-off liquid — a concentration model has no volume change on racking, so touching them
+#: would be physically wrong (decision D-36).
+_LEES_SLOTS = ("X_dead", "debris", "X_mlf", "X_mlf_dead")
 
 
 def _verb_rack(iv: Intervention, schema: StateSchema, parameters: ParameterSet) -> ScheduledEvent:
-    """``rack`` — draw the wine off a fraction of its settled lees (decision D-36).
+    """``rack`` — draw the wine off a fraction of its lees (decisions D-36, D-39).
 
-    Removes ``fraction`` ∈ [0, 1] of each settled-solids pool (:data:`_LEES_SLOTS`: inactivated
-    biomass ``X_dead`` and, when autolysis is opted in, the cell-wall ``debris``), booking the
-    negative jump as an :class:`~fermentation.runtime.schedule.ExternalFlow` (the ledger's
-    removal side). Viable biomass ``X`` and every dissolved species are left untouched — a normal
-    post-AF rack settles dead yeast, and a concentration model has no volume change on racking.
-    Both racked pools carry carbon (and ``X_dead`` carries nitrogen), so the removal shows up as a
-    negative term in the run-wide carbon and nitrogen ledgers.
+    Removes ``fraction`` ∈ [0, 1] of each lees-associated pool (:data:`_LEES_SLOTS`: inactivated
+    yeast ``X_dead`` and, when autolysis is opted in, the cell-wall ``debris``; plus both *O. oeni*
+    pools — viable ``X_mlf`` and settled dead ``X_mlf_dead``), booking the negative jump as an
+    :class:`~fermentation.runtime.schedule.ExternalFlow` (the ledger's removal side). Viable
+    **yeast** ``X`` and every dissolved species are left untouched — a normal post-AF rack settles
+    dead yeast, and a concentration model has no volume change on racking.
+
+    **Racking removes viable *O. oeni* (the D-39 asymmetry, the D-31 lever's physical half).**
+    Unlike viable yeast — which ferments in suspension, so a rack leaves it working — *O. oeni*
+    carries out MLF on the lees and is drawn off with them. So racking removes the bacteria that
+    clear diacetyl, the physical twin of the SO₂ kill (:class:`~fermentation.core.kinetics.\
+    malolactic.MalolacticDeath`): the deferred D-31 "rack early ⇒ diacetyl locked in" case. Both
+    bacterial pools carry biomass carbon and nitrogen (weighted since D-38), so — like ``X_dead`` —
+    their removal shows up as a negative term in the run-wide carbon and nitrogen ledgers
+    (``X_dead``/``X_mlf``/``X_mlf_dead`` all carry N; every racked pool carries C).
     """
     _iv_check_keys(iv, frozenset({"fraction"}), "rack")
     fraction = _iv_float(iv, "fraction", "rack")
@@ -757,8 +773,10 @@ def _verb_pitch_mlf(
     **mutates** ``X_mlf`` (adds the bacterial catalyst dose, ``pitch_gpl`` g/L) and
     **reconfigures** the Process set to enable :data:`_MLF_GATED_PROCESSES` — *exactly* the set an
     unpitched compile disables, so a sequential mid-run pitch is symmetric with an initial
-    co-inoculation. ``X_mlf`` is an inert carbon-/nitrogen-free catalyst (decision D-23), so the
-    dose perturbs neither elemental ledger.
+    co-inoculation. Since D-38 ``X_mlf`` is real bacterial biomass carrying carbon and nitrogen (no
+    longer the inert catalyst of D-23), so the pitch's state jump adds biomass C/N — booked as an
+    :class:`~fermentation.runtime.schedule.ExternalFlow`, exactly like the ``add_dap`` dose, so the
+    run-wide ledgers still close.
 
     Because the Processes are enabled only from the breakpoint onward, ``simulate_scheduled``
     min-combines the per-segment tier maps (D-35): the malate/lactate/citrate slots the enabled
