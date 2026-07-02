@@ -258,12 +258,38 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       composition test (autolysis feeds while the D-32 swap + D-33 re-route drain — the actual
       MLF-growth-prerequisite config); **429 green** + 5 benchmark, ruff+mypy clean, §2.2 undosed
       trio unchanged. Full record in **DECISIONS → D-34**.
+## Event loop (runtime, decision D-35) — the time-driven mechanism
+
+- [x] **Event-loop driver + temperature ramp (decision D-35). LANDED 2026-07-02.** The runtime's
+      first *time-driven* mechanism, built verb-agnostic so temperature scheduling and discrete
+      interventions share it. `runtime/schedule.py` `simulate_scheduled` segments a run at
+      `ScheduledEvent` breakpoints and restarts the pure `simulate` after each state mutation /
+      Process-set reconfiguration / parameter update; carries an **external-flow ledger**
+      (`final == initial + Σ flows` across the discontinuities — conservation-as-test held) and
+      **min-combines the per-segment tier map** so a late-enabled speculative Process drags its
+      variables' tier for the whole run. Isolability: `events=()` is byte-for-byte a plain
+      `simulate`. **Owner chose the proper temperature ramp now** (not deferred, not a staircase):
+      `TemperatureRamp` drives `dT/dt = temperature_ramp_rate` along the piecewise-**linear**
+      schedule; the compile boundary segments only at knots where the slope *changes* (collinear
+      knots → one segment; flat/single-knot → none, byte-for-byte core) and mints a VALIDATED,
+      un-sampled rate parameter only when it ramps. Always-enabled with a `0.0` isothermal default
+      (reasoned deviation from the advisor's disable-gate — same guarantees, simpler). BDF
+      integrates the constant-slope `T` exactly (verified to 1e-10). Emergent: a warming ramp
+      ferments *between* the cold/hot isothermal bounds (Arrhenius reads the true `T(t)`). 20 tests
+      (`test_schedule.py` 9 + `test_temperature_ramp.py` 11); 449 green + 5 benchmark.
+- [ ] **Discrete winemaking interventions (decision D-36).** On the same driver: the verb registry
+      at the compile boundary (`add_dap`/`add_so2`/`rack`/`pitch_mlf`), the external-flow ledger's
+      payoff (a mid-ferment DAP dose's emergent H₂S-gate response, D-29), and reconciling the
+      compile-time MLF disable-gate with a *later* pitch. Ensemble-over-`simulate_scheduled` is a
+      separate follow-up (the ensemble wraps `simulate` today).
+
+## Later beats (dependency-ordered)
+
 - [ ] **MLF-growth — later composition (decision D-23).** Add a growth Process touching `X_mlf`,
-      funded from the amino-acid ledger + autolysis. **Both aa-ledger prerequisites now landed**
-      (D-33 fusel re-route + deamination; D-34 autolysis refill), so the remaining block is the
-      *consumer* Process **plus the event loop** to pitch bacteria post-AF (runtime has no event
-      mechanism — the sequential-MLF block, D-23). The AF nitrogen-exhaustion evidence (D-23) is why
-      it cannot be folded into v1.
+      funded from the amino-acid ledger + autolysis. **All prerequisites now landed** (D-33 fusel
+      re-route + deamination; D-34 autolysis refill; D-35 event loop for the post-AF pitch), so the
+      remaining block is the *consumer* Process itself (composed with a `pitch_mlf` intervention,
+      D-36). The AF nitrogen-exhaustion evidence (D-23) is why it cannot be folded into v1.
 - [ ] **Mixed cultures / Brett / sour consortium** — resource competition. (After MLF.)
 - **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these

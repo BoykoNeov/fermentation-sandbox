@@ -36,6 +36,7 @@ from fermentation.core.kinetics.malolactic import (
     cardinal_temperature_factor,
     malolactic_environmental_gate,
 )
+from fermentation.core.kinetics.temperature import TemperatureRamp
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.kinetics.vicinal_diketones import (
     AcetolactateDecarboxylation,
@@ -64,6 +65,7 @@ __all__ = [
     "MalolacticConversion",
     "OenococcusDiacetylReduction",
     "SugarUptakeToEthanolCO2",
+    "TemperatureRamp",
     "YeastAutolysis",
     "arrhenius_factor",
     "biomass_growth_rate",

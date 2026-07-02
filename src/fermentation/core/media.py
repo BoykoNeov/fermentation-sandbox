@@ -82,6 +82,7 @@ from fermentation.core.kinetics import (
     MalolacticConversion,
     OenococcusDiacetylReduction,
     SugarUptakeToEthanolCO2,
+    TemperatureRamp,
     YeastAutolysis,
 )
 from fermentation.core.process import Process, ProcessSet, RateModifier
@@ -513,6 +514,16 @@ _AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: nitrogen model, D-30/D-32); beer deferred.
 _AUTOLYSIS_PROCESSES: tuple[Callable[[], Process], ...] = (YeastAutolysis,)
 
+#: Temperature-schedule ramp (decision D-35): the single Process that drives ``T`` along a
+#: piecewise-linear temperature schedule (``dT/dt = temperature_ramp_rate``). Medium-agnostic —
+#: cellar temperature is not a beverage property — so wired into BOTH media, and (unlike the
+#: dosed/opt-in gated tuples) kept ALWAYS ENABLED: it reads the slope with a ``0.0`` isothermal
+#: default, so an un-ramped run contributes exactly ``0.0`` to ``dT/dt`` and is byte-for-byte the
+#: pre-ramp core (``T`` stays VALIDATED). The per-segment slope is supplied by the runtime event
+#: loop (``simulate_scheduled``); the scenario compile boundary injects the provenance-backed
+#: ``temperature_ramp_rate`` parameter and the slope-change events only when the schedule ramps.
+_TEMPERATURE_PROCESSES: tuple[Callable[[], Process], ...] = (TemperatureRamp,)
+
 #: Wine growth/uptake Arrhenius modifiers (decision D-32). Identical to
 #: :data:`_PRIMARY_FERMENTATION_MODIFIERS` except the growth Arrhenius *also* scales the
 #: amino-acid swap (``for_growth`` extra target), so the swap's carbon/nitrogen refunds carry
@@ -534,6 +545,7 @@ MEDIA: dict[str, Medium] = {
         schema=wine_schema(),
         process_factories=(
             _PRIMARY_FERMENTATION_PROCESSES
+            + _TEMPERATURE_PROCESSES
             + _BYPRODUCT_PROCESSES
             + _VDK_PROCESSES
             + _ACETALDEHYDE_PROCESSES
@@ -549,6 +561,7 @@ MEDIA: dict[str, Medium] = {
         schema=beer_schema(),
         process_factories=(
             _PRIMARY_FERMENTATION_PROCESSES
+            + _TEMPERATURE_PROCESSES
             + _BYPRODUCT_PROCESSES
             + _VDK_PROCESSES
             + _ACETALDEHYDE_PROCESSES

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fermentation.core import acidbase
@@ -42,12 +42,14 @@ from fermentation.core.kinetics import (
     OenococcusDiacetylReduction,
     YeastAutolysis,
 )
+from fermentation.core.kinetics.temperature import RAMP_RATE
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
-from fermentation.core.tiers import combine
+from fermentation.core.tiers import Tier, combine
 from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
 from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
+from fermentation.runtime.schedule import ScheduledEvent
 from fermentation.scenario.schema import Scenario
 from fermentation.units.convert import (
     brix_to_sugar_gpl,
@@ -81,6 +83,11 @@ class CompiledScenario:
     process_set: ProcessSet
     parameters: ParameterSet
     t_span_h: tuple[float, float]
+    #: Timed interventions compiled from the scenario (decision D-35), in canonical hours,
+    #: ready to hand to :func:`fermentation.runtime.simulate_scheduled`. Currently the
+    #: temperature-schedule slope-change events; discrete winemaking verbs join this list
+    #: as they are wired. Empty ⇒ an un-scheduled run (plain :func:`simulate` suffices).
+    events: tuple[ScheduledEvent, ...] = field(default_factory=tuple)
 
     @property
     def param_values(self) -> dict[str, float]:
@@ -437,6 +444,88 @@ def _override_autolysis_rate(parameters: ParameterSet, rate_per_h: float) -> Par
     return parameters.merge(ParameterSet([override]), override=True)
 
 
+def _temperature_ramp_schedule(
+    scenario: Scenario, t_end_h: float
+) -> tuple[float, tuple[ScheduledEvent, ...]]:
+    """Compile ``temperature_schedule`` into an initial slope + slope-change events.
+
+    A temperature schedule is a piecewise-*linear* ramp between its ``(day, celsius)``
+    knots (decision D-35): between two knots ``dT/dt`` is a single constant, and the
+    :class:`~fermentation.core.kinetics.temperature.TemperatureRamp` Process writes that
+    constant into ``dT/dt``. This converts the knots (industry units) into canonical hours
+    and Kelvin and returns ``(initial_slope, events)`` where ``events`` restart the
+    integrator only at the interior knots where the slope **changes** — so collinear knots
+    (a straight ramp given by three points) produce a single segment, and a flat or
+    single-knot schedule produces no events and a zero initial slope (isothermal). ``T`` is
+    held at the nearest knot's value outside the schedule's span (slope 0 before the first
+    knot and after the last).
+    """
+    knots = sorted(scenario.temperature_schedule, key=lambda p: p.day)
+    times = [days_to_hours(p.day) for p in knots]
+    temps = [celsius_to_kelvin(p.celsius) for p in knots]
+
+    def slope_after(t: float) -> float:
+        # Slope of the segment starting at t. Held flat outside the schedule's span.
+        if t < times[0] or t >= times[-1]:
+            return 0.0
+        for i in range(len(times) - 1):
+            if times[i] <= t < times[i + 1]:
+                dt = times[i + 1] - times[i]
+                return (temps[i + 1] - temps[i]) / dt if dt > 0.0 else 0.0
+        return 0.0
+
+    initial_slope = slope_after(0.0)
+    events: list[ScheduledEvent] = []
+    prev = initial_slope
+    for bt in sorted({t for t in times if 0.0 < t < t_end_h}):
+        s = slope_after(bt)
+        # Only a genuine slope change opens a new segment (collinear knots do not); isclose
+        # absorbs float noise so a straight multi-point ramp stays one segment.
+        if not math.isclose(s, prev, rel_tol=1e-12, abs_tol=1e-15):
+            events.append(
+                ScheduledEvent(
+                    time_h=bt,
+                    label=f"temperature_ramp@{bt / 24.0:g}d",
+                    param_update={RAMP_RATE: s},
+                )
+            )
+            prev = s
+    return initial_slope, tuple(events)
+
+
+def _inject_temperature_ramp_rate(parameters: ParameterSet, slope_k_per_h: float) -> ParameterSet:
+    """Register the scenario's initial temperature-ramp slope as a provenance-backed parameter.
+
+    Reached only when the schedule actually ramps (decision D-35). The rate is a
+    scenario-*exact* set-point forcing, not an empirical kinetic constant, so it is
+    VALIDATED with a zero-width band (never swept by the ensemble) — but prime directive #2
+    still requires it to travel as a :class:`Parameter` with provenance, so it is minted
+    here at the boundary (the D-14/D-30/D-34 pattern) rather than inlined. This value seeds
+    the first segment; later segments' slopes are supplied by the ``simulate_scheduled``
+    events. ``TemperatureRamp`` reads it with a ``0.0`` default, so an un-ramped scenario
+    needs no such parameter at all.
+    """
+    param = Parameter(
+        name=RAMP_RATE,
+        value=slope_k_per_h,
+        unit="K/h",
+        tier=Tier.VALIDATED,
+        uncertainty=Uncertainty(
+            low=slope_k_per_h,
+            high=slope_k_per_h,
+            note="scenario-exact temperature set-point schedule; not an uncertain parameter",
+        ),
+        provenance=Provenance(
+            source="scenario temperature_schedule",
+            conditions=(
+                f"initial piecewise-linear ramp slope {slope_k_per_h:g} K/h (decision D-35)"
+            ),
+            notes="later intervals' slopes are supplied by simulate_scheduled events",
+        ),
+    )
+    return parameters.merge(ParameterSet([param]), override=True)
+
+
 def compile_scenario(
     scenario: Scenario,
     *,
@@ -547,6 +636,15 @@ def compile_scenario(
 
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 
+    # Temperature schedule (decision D-35): compile the piecewise-linear ramp into the
+    # TemperatureRamp's initial slope + slope-change events. Only when it actually ramps do
+    # we mint the provenance-backed rate parameter and emit events — a flat/single-knot
+    # schedule leaves ``temperature_ramp_rate`` absent, so the always-enabled TemperatureRamp
+    # reads its 0.0 default and an isothermal run is byte-for-byte the pre-ramp core.
+    initial_slope, events = _temperature_ramp_schedule(scenario, t_span_h[1])
+    if initial_slope != 0.0 or events:
+        parameters = _inject_temperature_ramp_rate(parameters, initial_slope)
+
     return CompiledScenario(
         scenario=scenario,
         schema=medium.schema,
@@ -554,4 +652,5 @@ def compile_scenario(
         process_set=process_set,
         parameters=parameters,
         t_span_h=t_span_h,
+        events=events,
     )

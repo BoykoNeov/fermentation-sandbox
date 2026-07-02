@@ -178,6 +178,10 @@ ACETALDEHYDE_PROCESSES = {"acetaldehyde_production", "acetaldehyde_reduction"}
 # flux-linked producer with an inverse-N gate. Intrinsic yeast metabolism, so — like the
 # ester/VDK/acetaldehyde pools — wired into BOTH media by default (isolable but always on).
 H2S_PROCESSES = {"hydrogen_sulfide_production"}
+# Temperature-schedule ramp (decision D-35): drives T along a piecewise-linear schedule.
+# Medium-agnostic, so wired into BOTH media, and always enabled (it reads the slope with a
+# 0.0 isothermal default, so an un-ramped run is byte-for-byte the pre-ramp core).
+TEMPERATURE_PROCESSES = {"temperature_ramp"}
 # Malolactic fermentation (decisions D-23, D-31) is wired into the WINE medium only (beer has
 # no malic/lactic/citrate slots); enabled in a bare build_process_set and disabled at the
 # compile seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic/citrate at
@@ -201,6 +205,7 @@ AUTOLYSIS_PROCESSES = {"yeast_autolysis"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
+        | TEMPERATURE_PROCESSES
         | BYPRODUCT_PROCESSES
         | VDK_PROCESSES
         | ACETALDEHYDE_PROCESSES
@@ -211,6 +216,7 @@ EXPECTED_PROCESSES = {
     ),
     "beer": (
         CORE_PROCESSES
+        | TEMPERATURE_PROCESSES
         | BYPRODUCT_PROCESSES
         | VDK_PROCESSES
         | ACETALDEHYDE_PROCESSES

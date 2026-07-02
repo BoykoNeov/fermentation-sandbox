@@ -2220,6 +2220,104 @@ autolysis refill), the remaining work is the *consumer*: an MLF-with-growth Proc
 event mechanism — the same block as sequential MLF, D-23). A standalone excess-amino-acid deamination
 flux (vs the D-33 fusel-coupled release) also remains future work.
 
+## D-35 — Event loop: segment-and-restart scheduling, and temperature as a driven ramp
+
+**Status: IMPLEMENTED 2026-07-02** (449 green + 5 benchmark). The runtime gains its first
+*time-driven* mechanism — the thing MLF-with-growth (D-23), a mid-ferment DAP/SO₂ dose, racking,
+and a real temperature schedule all need but the model never had. Built in two parts on one
+driver: the **verb-agnostic scheduling driver**, and the **temperature ramp** as its first client.
+Discrete winemaking interventions (DAP/SO₂/racking/pitching) are the follow-up (D-36) on the same
+driver.
+
+**Scope fork (owner-decided, against the advisor's default).** Temperature scheduling was inert
+too (only the earliest knot seeded the initial `T`; nothing drove it), so it was a live question
+whether this beat includes it. The advisor recommended *deferring* temperature as a separate,
+invasive "continuous forcing" beat. The owner chose to **do the ramp properly now** — and a
+segmentation insight dissolved the invasiveness: a piecewise-*linear* schedule has a **constant
+slope between knots**, so if the driver already restarts the integrator at breakpoints, temperature
+is just a per-segment constant `dT/dt`. `T` stays an ordinary integrated state; every Process keeps
+reading `y[T]` unchanged (the Arrhenius modifier was already written for a time-varying `T`, D-11);
+nothing in core is refactored. The advisor endorsed this on reconsideration.
+
+**The driver (`runtime/schedule.py`, `simulate_scheduled`).** Walks a run as segments separated by
+`ScheduledEvent` breakpoints, calling the unchanged pure `simulate` on each segment and, at each
+breakpoint, applying any of three opaque effects: a **state mutation** (`(schema, y) → y'`, a
+dose/racking jump), an **in-place Process-set reconfiguration** (`enable`/`disable`, e.g. pitching
+an organism mid-run), and/or a **parameter update** (a value in force from that time forward — how
+the temperature slope changes per segment). It is **verb-agnostic**: it knows nothing about DAP or
+temperature; the winemaking *vocabulary* + unit conversion live at the scenario compile boundary
+(D-3), so runtime drives time, the boundary owns meaning, core stays pure physics.
+
+Three properties are load-bearing:
+- **Segment-and-restart, not `solve_ivp(events=…)`.** SciPy events detect zero-crossings and can
+  terminate, but cannot mutate-and-resume. A dose is a genuine discontinuity, so the only correct
+  approach is stop → jump → fresh `solve_ivp`. BDF re-initialising its order at each restart is
+  *correct at a discontinuity*, not a perf bug. Because `dT/dt` is constant within a segment (a
+  degree-1 polynomial), BDF integrates `T` **exactly** to round-off — verified `T(t)` matches the
+  analytic line to `1e-10` — but *only because we segment at slope changes* (a segment spanning a
+  slope discontinuity would not be exact).
+- **External-flow ledger (conservation across a jump, a prime directive).** A dose injects mass
+  from *outside* the system, so the single-run invariant becomes `final == initial + Σ inputs −
+  Σ outputs`. Each mutation books its post-minus-pre **state delta** as an `ExternalFlow`; the
+  continuous ODE still closes exactly *within* every segment, and the ledger is the correction term
+  across the jumps. Booking the raw delta keeps the driver free of per-verb chemistry (the existing
+  `total_carbon`/`total_nitrogen` weight it). The temperature ramp uses no mutations, so its ledger
+  is empty — the machinery lands here, its winemaking payoff arrives in D-36.
+- **Tier travels.** Per-segment `tier_map` snapshots are `combine`d (min) across segments, so a
+  speculative Process enabled only for the back half of a run drags its variables to that tier for
+  the *whole* trajectory (a run is only as trustworthy as its least-trustworthy segment).
+
+Breakpoint times are emitted **once, post-mutation**, so a dose reads as a clean jump and the time
+axis stays strictly monotone (downstream percentile/interp assume that). Same-instant events apply
+in stable list order; events at `t0` seed the run before segment 0; events at/after `t_end` are
+rejected (the boundary decides whether a late scenario intervention is an error). **Isolability:**
+`events=()` is a single `simulate` call with identical arguments — byte-for-byte a plain run.
+
+**The temperature ramp (`core/kinetics/temperature.py`, `TemperatureRamp`).** One Process,
+`dT/dt = temperature_ramp_rate` (K/h), touching only `T`. Wired into **both** media (cellar
+temperature is not a beverage property). The compile boundary (`_temperature_ramp_schedule`) turns
+the `(day, °C)` knots into canonical hours/Kelvin, computes the piecewise-constant slope, and emits
+a slope-change event only at interior knots where the slope **actually changes** — so **collinear
+knots produce one segment** and a **flat/single-knot schedule produces none**. `T` is held (slope 0)
+before the first knot and after the last. When (and only when) the schedule ramps, the boundary
+mints a provenance-backed `temperature_ramp_rate` `Parameter` (the D-14/D-30/D-34 injection idiom)
+for the first segment; later slopes ride the events. `CompiledScenario` gained an `events` field
+carrying them.
+
+**Reasoned deviation from the advisor on the disable-gate.** The advisor suggested *disabling*
+`TemperatureRamp` when flat (mirroring the MLF/carrying/aa gates) for structural byte-for-byte. It
+is instead **always enabled**, reading the rate with a `0.0` isothermal default and declaring **no
+`reads`**. This gives the *same* two guarantees more simply: numerically, an un-ramped run adds
+`0.0 + 0.0 == 0.0` to the `T` slot (byte-for-byte, verified against the untouched §2.2 benchmarks);
+tier-wise, `tier_of("T")` is `combine([VALIDATED])` = VALIDATED — no drop, because both the Process
+*and* the rate are VALIDATED (a set-point schedule is an exact input, not an empirical constant).
+The advisor's disable-gate rationale ("an always-enabled ramp would drop `tier_of("T")`") only bites
+when the Process/param is below VALIDATED, which is not the case here. Declaring no `reads` is
+deliberate: the `reads` mechanism exists for D-1 *credibility* propagation, and a value exact by
+construction borrows no credibility — declaring it would only force `temperature_ramp_rate` into
+every `param_tiers` map (KeyError landmines across the bare-build test fixtures) and pointlessly
+sweep it in the stochastic ensemble. The `0.0` `.get` default also shields hand-built param maps in
+unit tests. Net: no gating logic, no injected-when-disabled parameter, and the isothermal path is
+provably the pre-ramp core.
+
+**Emergent (verified).** A run ramping 14 → 30 °C finishes with residual sugar **between** the
+cold-held and hot-held isothermal bounds (`hot < ramp < cold`) — proof the Arrhenius kinetics read
+the true time-varying `T`, not a constant, which is the whole point of activating the schedule.
+
+**Tests.** `tests/test_schedule.py` (9) pins the verb-agnostic driver with toy Processes
+(isolability, exact per-segment param integration, mutation + ledger, mid-run reconfiguration + tier
+travel, day-0 seeding, same-instant ordering, out-of-window rejection). `tests/test_temperature_ramp.py`
+(11) pins the temperature path (isothermal no-op, single-knot/flat → no events, collinear → one
+segment, slope-change → one event, hold before/after, exact analytic line, scheduled==plain when
+isothermal, VALIDATED unsampled rate, the emergent bound). `test_media` expects the always-on
+`temperature_ramp` in both media. 449 green + 5 benchmark, ruff + mypy clean.
+
+**Deferred → D-36.** Discrete winemaking interventions (the verb registry at the compile boundary:
+`add_dap`/`add_so2`/`rack`/`pitch_mlf`), the external-flow ledger's winemaking payoff (a DAP dose's
+emergent H₂S-gate response, D-29), reconciling the compile-time MLF disable-gate with a *later*
+pitch, and — separately — the stochastic ensemble wrapping `simulate_scheduled` (it wraps `simulate`
+today).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
