@@ -10,6 +10,7 @@ is how we catch a model that quietly creates or destroys mass.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Protocol
 
 import numpy as np
 
@@ -19,9 +20,26 @@ from fermentation.core.chemistry import (
     sugar_species,
 )
 from fermentation.core.state import FloatArray, StateSchema
-from fermentation.runtime.integrate import Trajectory
 
 QuantityFn = Callable[[FloatArray], float]
+
+
+class TrajectoryLike(Protocol):
+    """The subset of a trajectory these kinetics-agnostic checks read.
+
+    Structural so both a plain :class:`~fermentation.runtime.integrate.Trajectory` and a
+    :class:`~fermentation.runtime.schedule.ScheduledTrajectory` (and an ensemble member
+    reconstructed as either) satisfy it — the harness never needs the scheduling extras,
+    only the state grid.
+    """
+
+    @property
+    def schema(self) -> StateSchema: ...
+    @property
+    def t(self) -> FloatArray: ...
+    @property
+    def y(self) -> FloatArray: ...
+    def series(self, name: str) -> FloatArray: ...
 
 
 # -- conserved-quantity builders for the real chemistry -----------------------
@@ -244,18 +262,18 @@ def total_mass(schema: StateSchema) -> QuantityFn:
     return _weighted_sum(w)
 
 
-def _evaluate(traj: Trajectory, quantity_fn: QuantityFn) -> FloatArray:
+def _evaluate(traj: TrajectoryLike, quantity_fn: QuantityFn) -> FloatArray:
     return np.array([quantity_fn(traj.y[:, i]) for i in range(traj.y.shape[1])])
 
 
-def max_drift(traj: Trajectory, quantity_fn: QuantityFn) -> float:
+def max_drift(traj: TrajectoryLike, quantity_fn: QuantityFn) -> float:
     """Maximum absolute deviation of ``quantity_fn`` from its initial value."""
     q = _evaluate(traj, quantity_fn)
     return float(np.max(np.abs(q - q[0]))) if q.size else 0.0
 
 
 def assert_conserved(
-    traj: Trajectory,
+    traj: TrajectoryLike,
     quantity_fn: QuantityFn,
     *,
     rtol: float = 1e-6,
@@ -281,7 +299,9 @@ def assert_conserved(
         )
 
 
-def assert_nonnegative(traj: Trajectory, variables: tuple[str, ...], *, atol: float = 1e-9) -> None:
+def assert_nonnegative(
+    traj: TrajectoryLike, variables: tuple[str, ...], *, atol: float = 1e-9
+) -> None:
     """Assert the named variables never go meaningfully negative.
 
     Concentrations and biomass are physical and must stay >= 0; a small negative

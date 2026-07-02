@@ -208,6 +208,32 @@ class ProcessSet:
         self._require(name)
         return self._enabled[name]
 
+    def enabled_snapshot(self) -> dict[str, bool]:
+        """A copy of the current enable/disable state, for save-and-restore.
+
+        A :func:`~fermentation.runtime.simulate_scheduled` ``reconfigure`` mutates this
+        set in place and does **not** restore it (a mid-run pitch is meant to persist for
+        the rest of that run). A caller that replays a reconfiguring schedule many times
+        over the *same* set — the stochastic ensemble running one member per draw — must
+        reset the set to its pre-run state between runs, or a member's ``enable`` leaks
+        into the next member's pre-event segments. :meth:`enabled_snapshot` /
+        :meth:`restore_enabled` are that reset primitive.
+        """
+        return dict(self._enabled)
+
+    def restore_enabled(self, snapshot: Mapping[str, bool]) -> None:
+        """Restore an enable/disable state captured by :meth:`enabled_snapshot`.
+
+        The snapshot must name exactly this set's Processes and modifiers (guards against
+        restoring a foreign or stale snapshot after the set's membership changed).
+        """
+        if set(snapshot) != set(self._enabled):
+            raise ValueError(
+                f"snapshot names {sorted(snapshot)} do not match this set's members "
+                f"{sorted(self._enabled)}"
+            )
+        self._enabled = dict(snapshot)
+
     @property
     def active(self) -> tuple[Process, ...]:
         return tuple(p for n, p in self._processes.items() if self._enabled[n])

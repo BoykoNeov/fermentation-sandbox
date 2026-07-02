@@ -49,6 +49,7 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier, combine
 from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
 from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
+from fermentation.runtime.ensemble import Ensemble, simulate_ensemble
 from fermentation.runtime.schedule import ScheduledEvent, ScheduledTrajectory, simulate_scheduled
 from fermentation.scenario.schema import Intervention, Scenario
 from fermentation.units.convert import (
@@ -123,14 +124,36 @@ class CompiledScenario:
         single-slope ramp. ``param_tiers`` defaults to the scenario's own tier map for honest
         D-1 reporting; ``t_eval``/solver kwargs pass straight through.
 
-        (The stochastic :func:`~fermentation.runtime.simulate_ensemble` wraps the *un*-scheduled
-        :func:`simulate` and so shares that footgun for a multi-segment schedule; an
-        ensemble-over-``simulate_scheduled`` is a deferred follow-up, D-35 → D-36.)
+        The stochastic sibling is :meth:`run_ensemble`, which threads the same ``events`` into
+        :func:`~fermentation.runtime.simulate_ensemble` (decision D-37).
         """
         kwargs.setdefault("param_tiers", self.parameters.tier_map())
         return simulate_scheduled(
             self.process_set,
             self.param_values,
+            self.y0,
+            self.t_span_h,
+            events=self.events,
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    def run_ensemble(self, **kwargs: object) -> Ensemble:
+        """Run a stochastic ensemble of this scenario, **honouring its timed events** (D-37).
+
+        The uncertainty-band counterpart to :meth:`run`: it hands the compiled ``events`` to
+        :func:`~fermentation.runtime.simulate_ensemble` so every sampled member is integrated
+        through the same schedule (temperature ramp + dosing/pitching), then reports the nominal
+        run plus the median + spread over the parameters' provenance bands. Passes the full
+        :class:`~fermentation.parameters.store.ParameterSet` (the ensemble needs the *bands*, not
+        just resolved floats) and defaults ``param_tiers`` to the scenario's own tier map. Sampling
+        scope, per-member Process-set isolation, and the per-member external-flow ledger are all
+        handled by :func:`simulate_ensemble`; ``n_members``/``seed``/``sampler``/``t_eval`` and the
+        solver kwargs pass straight through.
+        """
+        kwargs.setdefault("param_tiers", self.parameters.tier_map())
+        return simulate_ensemble(
+            self.process_set,
+            self.parameters,
             self.y0,
             self.t_span_h,
             events=self.events,

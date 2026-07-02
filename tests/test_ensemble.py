@@ -20,8 +20,20 @@ from fermentation.core.state import FloatArray, StateSchema, VarSpec
 from fermentation.core.tiers import Tier
 from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
 from fermentation.parameters.store import ParameterSet
-from fermentation.runtime import Ensemble, sample_parameters, simulate, simulate_ensemble
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.runtime import (
+    Ensemble,
+    ScheduledEvent,
+    sample_parameters,
+    simulate,
+    simulate_ensemble,
+    simulate_scheduled,
+)
+from fermentation.scenario import (
+    Intervention,
+    Scenario,
+    TemperaturePoint,
+    compile_scenario,
+)
 from fermentation.validation import assert_conserved, total_carbon, total_mass, total_nitrogen
 
 # -- a toy that actually READS a sampled parameter ----------------------------
@@ -457,3 +469,192 @@ def test_wine_ensemble_scopes_to_active_reads_and_conserves_carbon(sampler):
     e_band = ens.band("E")
     assert np.all(e_band.low <= e_band.high + 1e-9)
     assert e_band.median[-1] > 100.0  # ~130-150 g/L ethanol by day 14
+
+
+# -- scheduled ensembles: an ensemble over a multi-segment schedule (D-37) -----
+#
+# ``events`` threads the D-35/D-36 intervention machinery through the stochastic wrapper:
+# every sampled member is integrated through the SAME schedule, so the spread is the
+# parameter-uncertainty band of a scheduled scenario. These tests pin the three things
+# scheduling adds — schedule-union sampling scope, per-member Process-set isolation, and the
+# per-member across-jumps conservation ledger — plus the un-scheduled isolability.
+
+
+def test_unscheduled_ensemble_has_empty_ledger_and_default_bounds():
+    # Isolability: with no events the ensemble is byte-for-byte the pre-scheduling one, and the
+    # new fields degenerate cleanly — empty flows, a single [t0, t_end] segment.
+    ps, pset = _toy_ps(), _toy_pset()
+    y0 = _toy_y0(ps.schema)
+    grid = _short_grid()
+    ens = simulate_ensemble(ps, pset, y0, (0.0, 100.0), n_members=5, seed=0, t_eval=grid)
+    assert ens.segment_bounds == (0.0, 100.0)
+    assert ens.member_flows == ((),) * ens.n_succeeded
+    assert ens.nominal_flows == ()
+    # member_trajectory / nominal_trajectory still audit (empty ledger ⇒ constant total).
+    conserved = total_mass(ps.schema)
+    for i in range(ens.n_succeeded):
+        assert_conserved(ens.member_trajectory(i), conserved, rtol=1e-5, atol=1e-6)
+    assert np.array_equal(ens.nominal_trajectory().y, ens.nominal)
+
+
+def _dap_rack_scenario() -> Scenario:
+    # An injection (DAP, +N at day 2) AND a removal (rack, −C/−N at day 15) on one run — the
+    # only scenario that populates both sides of the external-flow ledger. Autolysis is opted
+    # in so the rack has a non-empty debris pool to draw off.
+    return Scenario(
+        name="dap-rack-ensemble",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 100.0, "pitch_gpl": 0.25, "autolysis_rate_per_h": 0.002},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[
+            Intervention(day=2.0, action="add_dap", params={"dap_gpl": 0.4}),
+            Intervention(day=15.0, action="rack", params={"fraction": 0.8}),
+        ],
+        duration_days=20.0,
+    )
+
+
+def test_scheduled_ensemble_conserves_across_jumps_per_member():
+    # The crown-jewel ledger (D-36) extended to the ensemble: EVERY sampled member satisfies
+    # the run-wide identity final == initial + Σ external_flows for carbon AND nitrogen, read
+    # with that member's OWN sampled accounting fractions. The flows are member-dependent (a
+    # rack removes a fraction of the sampled lees mass), so they must be stored per member.
+    cs = compile_scenario(_dap_rack_scenario())
+    grid = np.linspace(0.0, cs.t_span_h[1], 30)
+    ens = cs.run_ensemble(n_members=8, seed=0, t_eval=grid)
+
+    # Both breakpoints (DAP@2d, rack@15d) are in the shared segment bounds; two flows per member.
+    assert len(ens.segment_bounds) == 4  # t0, 48h, 360h, t_end
+    assert all(len(flows) == 2 for flows in ens.member_flows)  # one dose + one rack each
+
+    nominal_fc = cs.parameters.value("biomass_C_fraction")
+    nominal_fn = cs.parameters.value("biomass_N_fraction")
+    rack_carbon = []
+    for i in range(ens.n_succeeded):
+        fc = ens.member_params[i].get("biomass_C_fraction", nominal_fc)
+        fn = ens.member_params[i].get("biomass_N_fraction", nominal_fn)
+        c_of = total_carbon(cs.schema, biomass_carbon_fraction=fc)
+        n_of = total_nitrogen(cs.schema, biomass_nitrogen_fraction=fn)
+        traj = ens.member_trajectory(i)  # a ScheduledTrajectory carrying THIS member's flows
+        for quantity, tol in ((c_of, 1e-6), (n_of, 1e-9)):
+            injected = sum(quantity(f.delta) for f in traj.external_flows)
+            initial = quantity(cs.y0)
+            final = quantity(traj.y[:, -1])
+            assert final == pytest.approx(initial + injected, abs=tol)
+        rack_carbon.append(c_of(traj.external_flows[1].delta))  # flows[1] is the rack
+
+    # The rack removal is genuinely member-dependent — the lees mass at rack time varies with
+    # the sampled death/growth kinetics, so storing one nominal ledger would have been wrong.
+    assert all(rc < 0.0 for rc in rack_carbon)  # racking removes carbon
+    assert np.std(rack_carbon) > 0.0  # …and by a member-varying amount
+
+
+def _pitch_wine_scenario() -> Scenario:
+    return Scenario(
+        name="pitch-ensemble",
+        medium="wine",
+        initial={
+            "brix": 22.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 0.25,
+            "malic_gpl": 3.0,
+            "initial_ph": 3.5,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=22.0)],
+        interventions=[Intervention(day=1.0, action="pitch_mlf", params={"pitch_gpl": 0.1})],
+        duration_days=25.0,
+    )
+
+
+_MLF_NAMES = (
+    "malolactic_conversion",
+    "malolactic_citrate_metabolism",
+    "oenococcus_diacetyl_reduction",
+)
+
+
+def test_scheduled_ensemble_samples_mid_run_enabled_reads():
+    # A pitch_mlf schedule enables the malolactic Processes only from the breakpoint. Their
+    # kinetics drive the back half of the run, but they are DISABLED at t0 — so sampling only
+    # the t0-active reads would silently miss exactly the parameters the pitched half depends
+    # on. The ensemble unions reads across the whole schedule (D-37): k_mlf is in scope even
+    # though no t0-active Process reads it.
+    cs = compile_scenario(_pitch_wine_scenario())
+    t0_reads: set[str] = set()
+    for p in cs.process_set.active:
+        t0_reads.update(p.reads)
+    assert "k_mlf" not in t0_reads  # disabled at t0 ⇒ absent from the naive scope
+    ens = cs.run_ensemble(n_members=6, seed=0, t_eval=np.linspace(0.0, cs.t_span_h[1], 20))
+    assert "k_mlf" in ens.sampled_names  # …but the schedule-union scope picks it up
+
+
+def test_scheduled_ensemble_restores_process_set_and_travels_tier():
+    cs = compile_scenario(_pitch_wine_scenario())
+    assert all(not cs.process_set.is_enabled(n) for n in _MLF_NAMES)  # unpitched at compile
+    ens = cs.run_ensemble(n_members=6, seed=1, t_eval=np.linspace(0.0, cs.t_span_h[1], 20))
+    # The ensemble reset the shared set before every member and leaves it PRISTINE — unlike a
+    # single cs.run(), whose enable persists. This isolation is what stops one member's pitch
+    # from leaking into the next member's pre-pitch segments.
+    assert all(not cs.process_set.is_enabled(n) for n in _MLF_NAMES)
+    # Tier travels across the mid-run reconfiguration (D-35): the malate/lactate slots the
+    # pitched speculative Processes touch report speculative for the WHOLE ensemble.
+    for name in ("malic", "lactic"):
+        assert ens.tier_map[name] is Tier.SPECULATIVE
+
+
+class _UngatedExtraFlux(Process):
+    """A speculative Process, disabled at t0, that adds a constant ungated flux once enabled.
+
+    Unlike ``pitch_mlf`` — whose enabled Processes are gated by the ``X_mlf`` catalyst and so
+    contribute nothing until the pitch *mutation* — this one acts the instant it is enabled,
+    with no state gate. That makes a leaked enable numerically *visible*, which is exactly what
+    the isolation invariant needs to be tested against.
+    """
+
+    name = "ungated_extra_flux"
+    tier = Tier.SPECULATIVE
+    touches = ("E",)
+
+    def derivatives(self, t, y, schema, params):
+        d = schema.zeros()
+        d[schema.slice("E")] = 1.0  # constant, ungated
+        return d
+
+
+def _iso_ps() -> ProcessSet:
+    """A fresh toy set with the ungated extra flux present but disabled (the t0 configuration)."""
+    schema = _toy_schema()
+    ps = ProcessSet(schema, [ParamFermentation(), _UngatedExtraFlux()])
+    ps.disable("ungated_extra_flux")
+    return ps
+
+
+def test_scheduled_ensemble_isolates_members_from_each_others_reconfigure():
+    # The load-bearing invariant: the reconfigure is reset before EVERY member, so no member's
+    # enable leaks into the next member's pre-event segments. Tested with an UNGATED reconfigure
+    # (see _UngatedExtraFlux) so a leak is numerically visible — pitch_mlf's leak is inert
+    # (X_mlf-gated), so per-member conservation cannot catch this and a byte-for-byte comparison
+    # to independent fresh-set runs is the only discriminating check. Fails without the reset.
+    event = ScheduledEvent(
+        time_h=50.0,
+        label="enable_extra",
+        reconfigure=lambda ps: ps.enable("ungated_extra_flux"),
+    )
+    pset = _toy_pset()
+    y0 = _toy_y0(_toy_schema())
+    grid = _short_grid()
+    ens = simulate_ensemble(
+        _iso_ps(), pset, y0, (0.0, 100.0), n_members=4, seed=0, t_eval=grid, events=[event]
+    )
+    assert ens.n_succeeded == 4
+    for i in range(ens.n_succeeded):
+        ref = simulate_scheduled(
+            _iso_ps(),  # a pristine set: extra disabled until the day-50 reconfigure
+            ens.member_params[i],
+            y0,
+            (0.0, 100.0),
+            events=[event],
+            param_tiers=pset.tier_map(),
+            t_eval=grid,
+        )
+        assert np.array_equal(ens.members[i], ref.y)  # a leaked prior-member enable breaks this

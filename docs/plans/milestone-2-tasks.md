@@ -277,11 +277,15 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       integrates the constant-slope `T` exactly (verified to 1e-10). Emergent: a warming ramp
       ferments *between* the cold/hot isothermal bounds (Arrhenius reads the true `T(t)`). 20 tests
       (`test_schedule.py` 9 + `test_temperature_ramp.py` 11); 449 green + 5 benchmark.
-- [ ] **Discrete winemaking interventions (decision D-36).** On the same driver: the verb registry
-      at the compile boundary (`add_dap`/`add_so2`/`rack`/`pitch_mlf`), the external-flow ledger's
-      payoff (a mid-ferment DAP dose's emergent H₂S-gate response, D-29), and reconciling the
-      compile-time MLF disable-gate with a *later* pitch. Ensemble-over-`simulate_scheduled` is a
-      separate follow-up (the ensemble wraps `simulate` today).
+- [x] **Discrete winemaking interventions (decision D-36). LANDED 2026-07-02.** On the same driver:
+      the verb registry at the compile boundary (`add_dap`/`add_so2`/`rack`/`pitch_mlf`), the
+      external-flow ledger's payoff (a mid-ferment DAP dose's emergent H₂S-gate response, D-29), and
+      reconciling the compile-time MLF disable-gate with a *later* pitch.
+- [x] **Ensemble over a scheduled run (decision D-37). LANDED 2026-07-02.** `simulate_ensemble` gained
+      an `events` param and routes through `simulate_scheduled` (was wrapping `simulate`); new
+      `CompiledScenario.run_ensemble`. Handles per-member Process-set isolation (snapshot/restore),
+      schedule-union sampling scope (mid-run-enabled reads), and a per-member external-flow ledger.
+      481 green + 5 benchmark.
 
 ## Later beats (dependency-ordered)
 

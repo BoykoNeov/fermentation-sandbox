@@ -2412,12 +2412,77 @@ temperature schedule *and* a DAP dose — the realistic scenario, and the only t
 `events` populated); and the vocabulary discipline (unknown verb, out-of-window day, bad params) +
 isolability. 476 green + 5 benchmark, ruff + mypy clean.
 
-**Deferred.** The stochastic `simulate_ensemble` still wraps the un-scheduled `simulate`, so it
-takes no `events` — an ensemble over a multi-segment schedule is the remaining D-35→D-36 follow-up.
-An **MLF-with-growth** consumer Process composed with a `pitch_mlf` event is now unblocked (the loop
-exists, the tier travels, autolysis + the amino-acid ledger refill the pool D-32/D-34) but stays
-future work. Other addition verbs (acid/tannin/nutrient blends, chaptalization, cold-stabilisation
-racking with a viable-`X` removal fraction) slot into `_INTERVENTION_VERBS` when needed.
+**Deferred.** ~~The stochastic `simulate_ensemble` still wraps the un-scheduled `simulate`~~ —
+**resolved in D-37** (ensemble over a multi-segment schedule). An **MLF-with-growth** consumer
+Process composed with a `pitch_mlf` event is now unblocked (the loop exists, the tier travels,
+autolysis + the amino-acid ledger refill the pool D-32/D-34) but stays future work. Other addition
+verbs (acid/tannin/nutrient blends, chaptalization, cold-stabilisation racking with a viable-`X`
+removal fraction) slot into `_INTERVENTION_VERBS` when needed.
+
+## D-37 — Stochastic ensemble over a scheduled run: `simulate_ensemble(events=…)`
+
+**Status: IMPLEMENTED 2026-07-02** (481 green + 5 benchmark, ruff + mypy clean). The last
+D-35→D-36 follow-up. `simulate_ensemble` wrapped the *un*-scheduled `simulate`, so an ensemble
+could not honour a temperature ramp or a dosing/pitching timeline — it shared the multi-segment
+footgun D-35's `CompiledScenario.run()` was created to avoid. This routes the wrapper through
+`simulate_scheduled` and adds an `events` parameter (default `()`), plus a
+`CompiledScenario.run_ensemble(**kwargs)` that threads the compiled `events` — the stochastic
+sibling of `run()`. With `events=()` it is byte-for-byte the previous ensemble (a no-event
+`simulate_scheduled` is a single `simulate` segment), so every pre-existing ensemble test stays
+green unchanged; the nominal run routes through the same path so its min-combined `tier_map` is
+consistent with the members.
+
+Three interactions the naive "just call `simulate_scheduled`" would get wrong, each handled:
+
+* **Process-set isolation (the load-bearing one).** A `reconfigure` event (`pitch_mlf`) mutates the
+  shared `ProcessSet._enabled` in place and is deliberately *not* self-restoring — a mid-run pitch
+  persists for the rest of *that* run (D-35), a contract `test_interventions` pins on `cs.run()`.
+  But an ensemble replays the schedule N times over the *same* set, so member i's `enable` would
+  leak into member i+1's pre-pitch segments. Fix: a new public `ProcessSet.enabled_snapshot()` /
+  `restore_enabled()` primitive; the ensemble captures the pristine state once and resets before
+  every member (nominal included), and leaves the set pristine when done — a *batch* is side-effect-
+  free on the set, distinct from a single *run* whose enable persists. Isolation lives in the
+  wrapper, not in `simulate_scheduled` (moving it there would break the persist-within-a-run
+  contract). *Subtlety, tested honestly:* for the **current** `pitch_mlf` verb the leak is
+  numerically **inert** — the enabled MLF Processes are gated by the `X_mlf` catalyst, still 0 until
+  the pitch *mutation*, so a leaked pre-pitch enable contributes zero flux and per-member conservation
+  cannot catch it. The reset is therefore **defensive** for a future catalyst-free `reconfigure`, and
+  its guard test uses a synthetic *ungated* enable so the leak is observable (byte-for-byte against
+  independent fresh-set runs; the test fails if the per-member reset is removed).
+* **Sampling scope must span the schedule.** `_resolve_sample_names` scoped to the *`t0`*-active
+  reads, but a `pitch_mlf` enables the malolactic Processes only from the breakpoint — their
+  kinetics (`k_mlf`, …) are disabled at `t0` and would be silently dropped from the sampled set,
+  under-sampling exactly the parameters the pitched back half depends on. New `_schedule_reads`
+  unions the active reads across every `reconfigure` in the schedule (replaying them onto a snapshot,
+  then restoring). Over-covering is safe (sampling a param no active Process reads is a documented
+  no-op, D-24); under-covering silently narrows the reported spread, so the union is strictly right.
+* **The external-flow ledger is member-dependent.** DAP/SO₂/pitch inject fixed masses, but `rack`
+  removes a *fraction of the settled lees*, whose mass at rack time depends on each member's sampled
+  death/growth kinetics — so every member's removal `delta` differs. `Ensemble` gained `member_flows`
+  (per member) + `segment_bounds` (scenario-fixed, stored once) + `nominal_flows`, and
+  `member_trajectory(i)` / `nominal_trajectory()` now return a `ScheduledTrajectory` carrying them, so
+  the across-jumps identity `final == initial + Σ flows` is auditable *per draw* — the crown-jewel
+  D-36 conservation guard, extended to the whole ensemble rather than just the nominal.
+
+**Type seam.** Because `member_trajectory` now returns a `ScheduledTrajectory`, the kinetics-agnostic
+conservation helpers (`assert_conserved`, `max_drift`, `assert_nonnegative`) were re-typed against a
+new structural `TrajectoryLike` Protocol (schema/`t`/`y`/`series`, read-only) — they never needed the
+scheduling extras, only the state grid, so both trajectory types satisfy it and no call site changed.
+
+**Caveat (documented, not built for).** A parameter that is *both* sampled and overwritten by an
+event's `param_update` would use its sampled value pre-event and the fixed compile-time value after.
+No current verb hits this: the only `param_update` payload is `temperature_ramp_rate`, which declares
+no `reads` and is VALIDATED, so it is never sampled (D-35). A future forcing parameter that is both
+uncertain and event-driven would need pinning via `exclude`.
+
+**Tests.** `tests/test_ensemble.py` gained 5: un-scheduled isolability (empty ledger, single
+`[t0, t_end]` segment, `member_/nominal_trajectory` still audit); the DAP+rack crown-jewel identity
+*per member* with member-dependent rack removal (`np.std(rack_carbon) > 0`); schedule-union scope
+(`k_mlf` sampled under a `pitch_mlf` despite being absent from the `t0` reads); process-set post-run
+pristine + tier travel (`malic`/`lactic` speculative run-wide); and the discriminating **isolation**
+guard (an *ungated* toy `reconfigure` so a leaked enable is numerically visible — each member equals
+an independent fresh-set run byte-for-byte; verified to fail when the per-member reset is removed).
+481 green + 5 benchmark, ruff + mypy clean.
 
 ## Deferred (decide early in the relevant milestone)
 

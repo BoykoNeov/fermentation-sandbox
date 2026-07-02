@@ -5,9 +5,11 @@ map it returns derivatives, and a single run is byte-for-byte reproducible. Real
 ferments vary because their *parameters* are uncertain — every :class:`Parameter`
 already carries a provenance-declared :class:`~fermentation.parameters.schema.Uncertainty`
 band, and until now nothing at runtime read it. This module closes that loop: it
-samples each parameter within its band, runs an ensemble of :func:`simulate` calls,
-and reports the deterministic *nominal* trajectory alongside the ensemble *median*
-and inter-percentile *spread*.
+samples each parameter within its band, runs an ensemble of :func:`simulate_scheduled`
+calls (a plain :func:`simulate` when no ``events`` are passed), and reports the
+deterministic *nominal* trajectory alongside the ensemble *median* and inter-percentile
+*spread*. Passing ``events`` makes it the uncertainty band of a *scheduled* scenario — a
+temperature ramp, a DAP dose, a mid-run pitch — replayed under every draw (decision D-37).
 
 **Where randomness lives.** All sampling happens *here*, in the runtime wrapper,
 behind an explicit seed. The core stays pure (no ``Math.random`` in a Process), so a
@@ -69,7 +71,12 @@ from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import ParameterSet
-from fermentation.runtime.integrate import Trajectory, simulate
+from fermentation.runtime.schedule import (
+    ExternalFlow,
+    ScheduledEvent,
+    ScheduledTrajectory,
+    simulate_scheduled,
+)
 
 #: Supported sampling distributions over a parameter's ``[low, high]`` band.
 DISTRIBUTIONS = ("triangular", "uniform")
@@ -233,22 +240,49 @@ def _active_reads(process_set: ProcessSet) -> set[str]:
     return reads
 
 
+def _schedule_reads(process_set: ProcessSet, events: Sequence[ScheduledEvent]) -> set[str]:
+    """Reads of every Process active at *any* point across a scheduled run.
+
+    ``_active_reads`` alone reflects only the ``t0`` set — but a ``reconfigure`` event
+    (a mid-run ``pitch_mlf``) enables Processes that were disabled at compile time, and
+    those Processes' ``reads`` drive the *back half* of the run. Sampling only the ``t0``
+    reads would under-sample exactly the parameters a pitched schedule's later segments
+    depend on. So this replays every event's ``reconfigure`` onto a throwaway copy of the
+    enable state and unions the reads at each configuration, then restores the set. Over-
+    covering is safe (a sampled parameter no active Process reads is already a documented
+    no-op, D-24); under-covering silently narrows the reported spread.
+    """
+    snapshot = process_set.enabled_snapshot()
+    try:
+        reads = _active_reads(process_set)
+        for e in events:
+            if e.reconfigure is not None:
+                e.reconfigure(process_set)
+                reads |= _active_reads(process_set)
+    finally:
+        process_set.restore_enabled(snapshot)
+    return reads
+
+
 def _resolve_sample_names(
     process_set: ProcessSet,
     parameters: ParameterSet,
     only: Iterable[str] | None,
     exclude: Iterable[str] | None,
+    events: Sequence[ScheduledEvent] = (),
 ) -> tuple[str, ...]:
     """The sorted, deterministic set of parameter names to sample for this run.
 
-    Defaults to the parameters the *active* Process set reads (sampling anything else
-    is a no-op on the trajectory and only dilutes the member count); ``only`` overrides
-    that with an explicit set; ``exclude`` removes names from whichever set was chosen
-    (the escape hatch for pinning, e.g. the pKa set that anchors the D-18 initial pH).
-    Names not present as provenance parameters are dropped. Sorted so the per-member
-    draw order — and thus the seeded reproducibility — does not depend on set ordering.
+    Defaults to the parameters the active Process set reads across the *whole schedule*
+    (sampling anything else is a no-op on the trajectory and only dilutes the member
+    count); ``only`` overrides that with an explicit set; ``exclude`` removes names from
+    whichever set was chosen (the escape hatch for pinning, e.g. the pKa set that anchors
+    the D-18 initial pH). Names not present as provenance parameters are dropped. Sorted
+    so the per-member draw order — and thus the seeded reproducibility — does not depend
+    on set ordering. With ``events=()`` the schedule union is just the ``t0`` reads, so an
+    un-scheduled run samples exactly the names it did before scheduling existed.
     """
-    chosen = set(only) if only is not None else _active_reads(process_set)
+    chosen = set(only) if only is not None else _schedule_reads(process_set, events)
     chosen &= set(parameters.names)
     if exclude is not None:
         chosen -= set(exclude)
@@ -271,6 +305,14 @@ class Ensemble:
     genuine closure reads as drift). Sampling is *not silent*: ``n_requested``,
     ``n_succeeded`` and ``n_failed`` are all reported, so a caller can see how much of
     the ensemble survived and judge whether the spread is trustworthy.
+
+    For a *scheduled* ensemble (``events`` passed to :func:`simulate_ensemble`, D-37),
+    ``segment_bounds`` are the shared breakpoint times and ``member_flows[i]`` is member
+    ``i``'s own across-jumps external-flow ledger (member-dependent — a ``rack`` removes a
+    fraction of the *sampled* lees mass). :meth:`member_trajectory` /
+    :meth:`nominal_trajectory` reconstruct full :class:`ScheduledTrajectory` objects from
+    them so the ``final == initial + Σ flows`` identity is auditable per draw. All three
+    are empty / ``(t0, t_end)`` for an un-scheduled ensemble.
     """
 
     schema: StateSchema
@@ -287,6 +329,20 @@ class Ensemble:
     n_succeeded: int
     n_failed: int
     failures: tuple[str, ...]
+    #: Breakpoint times of the (optional) intervention schedule, ``t_span`` ends included.
+    #: Scenario-fixed — the same for every member and the nominal — so stored once. Just
+    #: ``(t0, t_end)`` for an un-scheduled ensemble (``events=()``).
+    segment_bounds: tuple[float, ...] = ()
+    #: Per-member external-flow ledger (``member_flows[i]`` produced ``members[i]``). The
+    #: flows are **member-dependent**: a ``rack`` removes a *fraction of the settled lees*,
+    #: whose mass at rack time depends on that member's sampled death/growth kinetics, so
+    #: each member's removal delta differs. Storing them per member keeps the across-jumps
+    #: conservation identity (``final == initial + Σ flows``) auditable for every draw, not
+    #: just the nominal. Empty tuples for an un-scheduled ensemble.
+    member_flows: tuple[tuple[ExternalFlow, ...], ...] = ()
+    #: External-flow ledger of the deterministic nominal run (its own, since the flows
+    #: depend on the trajectory). Lets :meth:`nominal_trajectory` audit the nominal identity.
+    nominal_flows: tuple[ExternalFlow, ...] = ()
 
     # -- shape helpers --------------------------------------------------------
 
@@ -327,21 +383,45 @@ class Ensemble:
             nominal=self.series_nominal(name),
         )
 
-    def member_trajectory(self, i: int) -> Trajectory:
-        """Reconstruct member ``i`` as a :class:`Trajectory`.
+    def member_trajectory(self, i: int) -> ScheduledTrajectory:
+        """Reconstruct member ``i`` as a :class:`ScheduledTrajectory`.
 
         Lets a caller reuse the deterministic validation harness (``assert_conserved``,
         ``assert_nonnegative``, …) on any individual sampled member — the per-member
         conservation invariant is exactly how the project guards against a sampled
-        parameter set silently breaking a balance.
+        parameter set silently breaking a balance. The reconstruction carries the member's
+        own ``external_flows`` and the shared ``segment_bounds``, so a *scheduled* member's
+        across-jumps identity (``final == initial + Σ flows``) is checkable too, not just
+        the constant-total balance of an un-scheduled run (whose flows are empty).
         """
-        return Trajectory(
+        return ScheduledTrajectory(
             schema=self.schema,
             t=self.t,
             y=self.members[i],
             success=True,
             message="ensemble member",
             tier_map=self.tier_map,
+            segment_bounds=self.segment_bounds,
+            external_flows=self.member_flows[i] if self.member_flows else (),
+        )
+
+    def nominal_trajectory(self) -> ScheduledTrajectory:
+        """Reconstruct the deterministic nominal run as a :class:`ScheduledTrajectory`.
+
+        Carries the nominal run's own ``external_flows`` and the ``segment_bounds``, so the
+        nominal across-jumps conservation identity is auditable with the same harness as the
+        members. For an un-scheduled ensemble the flows are empty and this is the plain
+        nominal trajectory.
+        """
+        return ScheduledTrajectory(
+            schema=self.schema,
+            t=self.t,
+            y=self.nominal,
+            success=True,
+            message="ensemble nominal",
+            tier_map=self.tier_map,
+            segment_bounds=self.segment_bounds,
+            external_flows=self.nominal_flows,
         )
 
     @property
@@ -367,18 +447,19 @@ def simulate_ensemble(
     exclude: Iterable[str] | None = None,
     param_tiers: Mapping[str, Tier] | None = None,
     max_failure_fraction: float = 0.5,
+    events: Iterable[ScheduledEvent] = (),
     method: str = "BDF",
     rtol: float = 1e-6,
     atol: float = 1e-9,
     max_step: float = np.inf,
 ) -> Ensemble:
-    """Run a Monte-Carlo ensemble of :func:`simulate` over sampled parameters.
+    """Run a Monte-Carlo ensemble of :func:`simulate_scheduled` over sampled parameters.
 
     Draws ``n_members`` parameter samples from ``parameters``' provenance bands (seeded
     by ``seed``, so the whole ensemble is reproducible), integrates each on the shared
     ``t_eval`` grid, and returns the deterministic nominal run plus the surviving
-    members. All members use identical solver settings and ``y0``; only the sampled
-    parameters differ.
+    members. All members use identical solver settings, ``y0``, and ``events``; only the
+    sampled parameters differ.
 
     ``t_eval`` defaults to 200 evenly spaced points across ``t_span`` (a shared grid is
     required so members can be aggregated). ``param_tiers`` defaults to
@@ -387,6 +468,25 @@ def simulate_ensemble(
     ``exclude``. ``sampler="mc"`` (default) is i.i.d. Monte Carlo; ``"lhs"``/``"sobol"``
     are low-discrepancy sequences with better per-member (tail) coverage (``"sobol"`` needs
     a power-of-two ``n_members``).
+
+    **Scheduled ensembles (D-37).** ``events`` are timed interventions (a temperature
+    ramp, a DAP dose, a mid-run ``pitch_mlf``) handed to :func:`simulate_scheduled`: every
+    member is integrated through the *same* schedule, so the spread is the parameter-
+    uncertainty band of a *scheduled* scenario. Three consequences follow, all handled
+    here: (1) sampling scope is the union of reads across the whole schedule, so a Process
+    a ``reconfigure`` enables mid-run has its parameters sampled too (not just the ``t0``
+    set); (2) a ``reconfigure`` mutates ``process_set`` in place and is *not* self-
+    restoring, so the set is reset to its pre-run enable state before every member (else
+    one member's ``pitch`` leaks into the next member's pre-event segments); (3) each
+    member's ``external_flows`` are stored per member (they are member-dependent — a
+    ``rack`` removes a fraction of the *sampled* lees mass), keeping the across-jumps
+    identity auditable draw by draw. With ``events=()`` this is byte-for-byte the previous
+    un-scheduled ensemble (``simulate_scheduled`` with no events is a single ``simulate``
+    segment). **Caveat:** a parameter that is *both* sampled and overwritten by an event's
+    ``param_update`` uses its sampled value pre-event and the fixed compile-time value
+    after — no current verb hits this (``temperature_ramp_rate`` declares no ``reads`` and
+    is VALIDATED, so it is never sampled), but a future one could, and would need pinning
+    via ``exclude``.
 
     A sampled parameter set can make a member fail — ``solve_ivp`` may report
     ``success=False``, or the right-hand side may *raise* (e.g. the uptake carbon-draw
@@ -402,17 +502,25 @@ def simulate_ensemble(
     if sampler not in SAMPLERS:
         raise ValueError(f"unknown sampler {sampler!r}; expected one of {SAMPLERS}")
 
+    events = tuple(events)
     grid = np.linspace(t_span[0], t_span[1], 200) if t_eval is None else np.asarray(t_eval, float)
     tiers = parameters.tier_map() if param_tiers is None else param_tiers
     nominal_values = parameters.resolve()
-    sampled_names = _resolve_sample_names(process_set, parameters, only, exclude)
+    sampled_names = _resolve_sample_names(process_set, parameters, only, exclude, events)
 
-    def run(values: Mapping[str, float]) -> Trajectory:
-        return simulate(
+    # A reconfigure event mutates process_set in place and does not restore it (D-35); the
+    # pristine pre-run enable state is captured once and reset before every run so members
+    # cannot leak an enable into one another (the isolation the shared-set ensemble needs).
+    pristine = process_set.enabled_snapshot()
+
+    def run(values: Mapping[str, float]) -> ScheduledTrajectory:
+        process_set.restore_enabled(pristine)
+        return simulate_scheduled(
             process_set,
             values,
             y0,
             t_span,
+            events=events,
             param_tiers=tiers,
             t_eval=grid,
             method=method,
@@ -421,8 +529,9 @@ def simulate_ensemble(
             max_step=max_step,
         )
 
-    # Nominal = the deterministic baseline (D-24). Identical solver kwargs + grid, so a
-    # caller can reproduce it byte-for-byte with a plain simulate() on parameters.resolve().
+    # Nominal = the deterministic baseline (D-24). Identical solver kwargs + grid + events,
+    # so a caller reproduces it byte-for-byte with simulate_scheduled on parameters.resolve()
+    # (and, with events=(), with a plain simulate()).
     nominal = run(nominal_values)
     if not nominal.success:
         raise RuntimeError(f"nominal (unsampled) run failed to integrate: {nominal.message}")
@@ -436,6 +545,7 @@ def simulate_ensemble(
     )
     members: list[FloatArray] = []
     member_params: list[Mapping[str, float]] = []
+    member_flows: list[tuple[ExternalFlow, ...]] = []
     failures: list[str] = []
     for values in samples:
         try:
@@ -451,6 +561,13 @@ def simulate_ensemble(
             continue
         members.append(traj.y)
         member_params.append(values)
+        member_flows.append(traj.external_flows)
+
+    # The ensemble is a batch that reset the shared set before every member; leave it in
+    # the pristine pre-run state rather than the last member's reconfigured one, so it is
+    # side-effect-free on process_set (unlike a single simulate_scheduled run, whose enable
+    # is meant to persist — a distinction between a batch and a run).
+    process_set.restore_enabled(pristine)
 
     n_succeeded = len(members)
     n_failed = n_members - n_succeeded
@@ -480,4 +597,7 @@ def simulate_ensemble(
         n_succeeded=n_succeeded,
         n_failed=n_failed,
         failures=tuple(failures),
+        segment_bounds=nominal.segment_bounds,
+        member_flows=tuple(member_flows),
+        nominal_flows=nominal.external_flows,
     )
