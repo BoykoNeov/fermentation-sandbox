@@ -20,15 +20,27 @@ pH, by molecular (antimicrobial) SO₂, by ethanol, and by a temperature optimum
 the deacidification feedback (pH ↑ ⇒ rate ↑, self-limited as malate depletes) and the
 SO₂/ethanol arrest of MLF *emerge* from the model rather than being scripted.
 
-**v1 is conversion-only (decision D-23).** *O. oeni* builds biomass mostly from amino
-acids/peptides, but the lumped ``N`` (YAN) is carbon-free in :func:`total_carbon`
-(D-19) and is driven to ~0 within ~1.3 d of the AF pitch *regardless of dose* (the
-empirical finding that settles D-23), so there is no nitrogen at the MLF pitch point to
-fund bacterial growth. Modelling MLF-growth honestly therefore needs a separate
-amino-acid ledger *and* an autolytic-peptide refill source, both deferred. So in v1 the
-bacterium is a **dosed-but-inert catalyst**: ``X_mlf`` is a constant concentration that
-*scales* the conversion rate, and **no Process grows or kills it**. The later growth beat
-is then a clean extension (add a Process touching ``X_mlf``), not a refactor.
+**Conversion was built first (v1, decision D-23); MLF-growth is now landed as a clean
+extension.** *O. oeni* builds biomass mostly from amino acids/peptides, but the lumped
+``N`` (YAN) is carbon-free in :func:`total_carbon` (D-19) and is driven to ~0 within
+~1.3 d of the AF pitch *regardless of dose* (the empirical finding that settles D-23), so
+there is no free nitrogen at the MLF pitch point to fund bacterial growth. Modelling
+MLF-growth honestly therefore needed a separate amino-acid ledger (D-32) *and* an
+autolytic-peptide refill source (D-34) — both since landed. So :class:`Malolactic
+Conversion` treats the bacterium as a **catalyst that scales the conversion rate**, and
+:class:`MalolacticGrowth` (the deferred growth beat, now built) makes ``X_mlf`` *dynamic*:
+it consumes the ``amino_acids`` pool to build bacterial biomass, which — since conversion
+is linear in ``X_mlf`` — *accelerates* deacidification autocatalytically. Growth was a
+pure add-a-Process extension (no refactor of the conversion), exactly as v1 promised.
+
+**X_mlf is promoted from an inert carbon-/nitrogen-free catalyst to real biomass.** With
+:class:`MalolacticGrowth` active, ``X_mlf`` gains carbon and nitrogen, so it is now
+weighted in ``total_carbon``/``total_nitrogen`` at the biomass fractions (bacterial
+elemental composition approximated by the yeast's, a documented v1 simplification — the
+same fractions the growth stoichiometry draws against, so conservation closes exactly).
+A co-inoculation dose or a ``pitch_mlf`` intervention therefore now adds bacterial-biomass
+carbon/nitrogen to the run (booked as an external flow for the intervention), superseding
+the v1 "dosing X_mlf leaves total_carbon byte-for-byte" claim (decision D-38).
 
 **Carbon (and mass) close on the existing ledger — no new conservation code.** With
 ``r`` [mol/L/h] the malate turnover,
@@ -110,8 +122,12 @@ from fermentation.core.chemistry import (
     M_DIACETYL,
     M_LACTIC,
     M_MALIC,
+    carbon_mass_fraction,
+    nitrogen_mass_fraction,
 )
+from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
+from fermentation.core.kinetics.carbon_routing import draw_carbon_from_sugar
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -387,4 +403,117 @@ class OenococcusDiacetylReduction(Process):
         loss = params["k_mlf_diacetyl_reduction"] * x_mlf * f_t * diacetyl
         d[schema.slice("diacetyl")] = -loss
         d[schema.slice("butanediol")] = loss * M_BUTANEDIOL / M_DIACETYL  # mole-for-mole C4→C4
+        return d
+
+
+class MalolacticGrowth(Process):
+    """*Oenococcus oeni* biomass growth — the deferred MLF-growth beat (decision D-23).
+
+    Makes the ``X_mlf`` catalyst *dynamic*: it grows on the assimilable ``amino_acids`` pool
+    (D-32, refilled by autolysis D-34), and because :class:`MalolacticConversion` is linear in
+    ``X_mlf`` the deacidification then **accelerates autocatalytically** as bacteria multiply —
+    the realistic MLF the constant-``X_mlf`` v1 could not produce. This is the pure
+    add-a-Process extension v1 promised: no change to the conversion kinetics.
+
+    **Rate — the bacterial growth law, environmentally gated.**
+
+        dX_mlf/dt = μ_max_mlf · X_mlf · aa/(K_aa_mlf + aa) · S/(K_s + S) · g_pH·g_EtOH·g_SO₂·γ(T)
+
+    Michaelis–Menten in the amino-acid pool (the nitrogen/carbon fuel) *and* in total sugar
+    (the energy source O. oeni ferments during co-fermentation, so growth self-limits to the
+    sugar-present window and never draws its carbon shortfall from an empty ``S`` — see below),
+    scaled by the *same* :func:`malolactic_environmental_gate` the conversion uses. The ethanol
+    wall in that gate is what makes co-inoculation the *dominant* MLF-growth mode **emergently**:
+    a post-AF pitch into a high-ABV must lands past the O. oeni ethanol tolerance, so γ·g_EtOH ≈ 0
+    and bacteria cannot build up — while a normal-ABV sequential MLF, where g_EtOH is small but
+    nonzero, still grows. This is left to the gate, not hard-coded (the compile seam gates only on
+    amino-acid fuel, mirroring how conversion trusts its ethanol gate rather than a pitch rule;
+    decision D-38).
+
+    **Conservation — nitrogen-anchored, carbon shortfall from sugar (decision D-38).**
+    New bacterial biomass needs ``f_N·dX_mlf`` nitrogen and ``f_C·dX_mlf`` carbon (``f_N``/``f_C``
+    the biomass fractions ``X_mlf`` is weighted at, so this closes exactly). All the nitrogen is
+    taken from amino acids, consuming ``ρ = f_N·dX_mlf/y_N`` of the pool (``y_N``/``y_C`` =
+    arginine's nitrogen/carbon mass fractions). That arginine carries only ``ρ·y_C`` carbon —
+    less than biomass needs, because arginine (mass C:N ≈ 1.29) is far more nitrogen-rich than
+    biomass (C:N ≈ 4–11) — so the **shortfall** ``f_C·dX_mlf − ρ·y_C = dX_mlf·(f_C − f_N·y_C/y_N)``
+    is drawn from sugar (:func:`~fermentation.core.kinetics.carbon_routing.draw_carbon_from_\
+    sugar`). This is the mirror image of yeast growth (nitrogen from a nitrogen pool, carbon from
+    sugar; :class:`~fermentation.core.kinetics.growth.GrowthNitrogenLimited`) and of D-34 autolysis
+    (which routes the *excess* carbon of the reverse split to debris). The shortfall coefficient
+    ``f_C − f_N·y_C/y_N`` is **structurally positive** across Coleman's whole ``f_N`` range (biomass
+    C:N always exceeds arginine's), so no clamp and no C⁰ kink for the BDF solver. Carbon closes
+    (``X_mlf`` gains ``f_C·dX_mlf`` = amino-acid carbon ``ρ·y_C`` + sugar shortfall); nitrogen
+    closes (``X_mlf`` gains ``f_N·dX_mlf`` = amino-acid nitrogen ``ρ·y_N``). Touches
+    ``(X_mlf, amino_acids, S)`` — notably **not** ``N``: unlike the C-anchored alternative it
+    releases no artificial ammonium (the anchoring fork, decision D-38).
+
+    Guards mirror the conversion: a zero contribution *before* the pH ``brentq`` when there is no
+    catalyst (``X_mlf ≤ 0``), no amino-acid fuel, or no sugar (so the shortfall never targets an
+    empty ``S``). Tier **speculative** (``μ_max_mlf``/``K_aa_mlf`` are author estimates and the
+    bacterial-≈-yeast composition is a simplification).
+    """
+
+    name = "malolactic_growth"
+    tier = Tier.SPECULATIVE
+    #: Builds bacterial biomass ``X_mlf`` from the ``amino_acids`` pool, drawing the carbon
+    #: shortfall from ``S``. Does NOT touch ``N`` (nitrogen is sourced from amino acids, not the
+    #: ammonium pool — the D-38 anchoring choice).
+    touches = ("X_mlf", "amino_acids", "S")
+    #: ``mu_max_mlf``/``K_aa_mlf`` are the bacterial growth rate + amino-acid half-saturation;
+    #: ``K_s`` (reused from yeast growth) sets the sugar Monod; ``biomass_N_fraction``/
+    #: ``biomass_C_fraction`` are the composition the biomass is built at (and weighted at in the
+    #: conservation checks — the same fractions, so carbon/nitrogen close). The shared MLF
+    #: environmental-gate parameters throttle growth by pH/ethanol/SO₂/temperature. Their tiers
+    #: cap the ``X_mlf``/``amino_acids``/``S`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "mu_max_mlf",
+        "K_aa_mlf",
+        "K_s",
+        "biomass_N_fraction",
+        "biomass_C_fraction",
+        *_MLF_GATE_READS,
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Early guards BEFORE the pH brentq solve (mirroring MalolacticConversion): no catalyst,
+        # no amino-acid fuel, or no sugar (the carbon shortfall must never target an empty S) ⇒
+        # no growth, and no wasted per-RHS pH solve on an undosed/unpitched run.
+        x_mlf = max(float(y[schema.slice("X_mlf")][0]), 0.0) if "X_mlf" in schema else 0.0
+        if x_mlf <= 0.0:
+            return d
+        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0) if "amino_acids" in schema else 0.0
+        if aa <= 0.0:
+            return d
+        s_total = max(float(y[schema.slice("S")].sum()), 0.0)
+        if s_total <= 0.0:
+            return d
+
+        ph = ph_of_state(y, schema, params)
+        gate = malolactic_environmental_gate(y, schema, params, ph)
+
+        aa_monod = aa / (params["K_aa_mlf"] + aa)
+        s_monod = s_total / (params["K_s"] + s_total)
+        dx_mlf = params["mu_max_mlf"] * x_mlf * aa_monod * s_monod * gate  # [g X_mlf/L/h]
+        if dx_mlf <= 0.0:
+            return d
+
+        f_n = params["biomass_N_fraction"]
+        f_c = params["biomass_C_fraction"]
+        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+        y_c = carbon_mass_fraction(AMINO_ACID_SPECIES)
+        # Nitrogen-anchored: consume the arginine that carries the new biomass's nitrogen. Its
+        # carbon (rho*y_C) falls short of the biomass carbon demand (f_C*dx_mlf) because arginine
+        # is N-rich, so the positive shortfall is drawn from sugar. Both ledgers close exactly:
+        # X_mlf gains f_N*dx_mlf N (= rho*y_N, the amino-acid N) and f_C*dx_mlf C (= rho*y_C amino
+        # acid + shortfall sugar). The shortfall coefficient (f_C - f_N*y_C/y_N) > 0 structurally
+        # (biomass C:N >> arginine's), so no clamp is needed (decision D-38).
+        rho = f_n * dx_mlf / y_n  # [g arginine/L/h] consumed to supply the biomass nitrogen
+        d[schema.slice("X_mlf")] = dx_mlf
+        d[schema.slice("amino_acids")] = -rho
+        shortfall = f_c * dx_mlf - rho * y_c  # [g C/L/h] biomass carbon not covered by arginine
+        draw_carbon_from_sugar(d, y, schema, shortfall)
         return d

@@ -80,6 +80,7 @@ from fermentation.core.kinetics import (
     HydrogenSulfideProduction,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
+    MalolacticGrowth,
     OenococcusDiacetylReduction,
     SugarUptakeToEthanolCO2,
     TemperatureRamp,
@@ -459,6 +460,20 @@ _MLF_PROCESSES: tuple[Callable[[], Process], ...] = (
     OenococcusDiacetylReduction,
 )
 
+#: Malolactic *growth* (wine-only, the deferred MLF-growth beat, decision D-38). Makes ``X_mlf``
+#: dynamic: :class:`MalolacticGrowth` builds O. oeni biomass from the ``amino_acids`` pool (D-32,
+#: autolysis-refilled D-34), which — since :class:`MalolacticConversion` is linear in ``X_mlf`` —
+#: accelerates deacidification autocatalytically. Kept in its OWN tuple, DELIBERATELY SEPARATE
+#: from ``_MLF_PROCESSES`` because it is gated on a different feature: amino-acid fuel, NOT the
+#: pitch. The compile seam disables it when ``amino_acids_gpl ≤ 0`` (the swap/re-route gate), which
+#: alone prevents the tier-isolability regression — every pitched-but-not-aa-dosed D-23/D-31 run
+#: keeps it disabled, so it never drags the ``amino_acids``/``S``/``X_mlf`` tier via ``tier_of``.
+#: It is NOT additionally gated on the pitch: the Process's own ``X_mlf ≤ 0`` guard keeps it inert
+#: until bacteria are present, and whether post-pitch bacteria GROW is left to the emergent
+#: environmental gate (the ethanol wall etc.), mirroring how conversion trusts its gate rather than
+#: a compile rule — so co-inoculation dominance is emergent, not hard-coded (D-38). Wine-only.
+_MLF_GROWTH_PROCESSES: tuple[Callable[[], Process], ...] = (MalolacticGrowth,)
+
 #: Biomass carrying-capacity cap (wine-only, decision D-30): the opt-in residual-nitrogen
 #: floor. A logistic ``(1 - X/K)`` RateModifier on growth that saturates biomass below the
 #: nitrogen ceiling, leaving a dose-dependent residual of yeast-assimilable nitrogen — which
@@ -551,6 +566,7 @@ MEDIA: dict[str, Medium] = {
             + _ACETALDEHYDE_PROCESSES
             + _H2S_PROCESSES
             + _MLF_PROCESSES
+            + _MLF_GROWTH_PROCESSES
             + _AMINO_ACID_PROCESSES
             + _AUTOLYSIS_PROCESSES
         ),

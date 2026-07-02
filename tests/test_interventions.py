@@ -346,16 +346,22 @@ def test_pitch_mlf_mutates_catalyst_and_enables_exactly_the_gated_set():
     assert np.count_nonzero(others) == 0
 
 
-def test_pitch_mlf_catalyst_perturbs_neither_ledger():
+def test_pitch_mlf_flow_carries_bacterial_biomass_carbon_and_nitrogen():
+    # Since the MLF-growth beat (decision D-38) promoted X_mlf from an inert carbon-/
+    # nitrogen-free catalyst to real bacterial biomass, X_mlf is weighted in both ledgers, so a
+    # pitch_mlf dose adds bacterial-biomass carbon AND nitrogen — booked on the external flow (the
+    # run-wide ledger final == initial + Σ flows still closes; that is checked in test_schedule).
     cs = compile_scenario(_mlf_wine([_pitch(1.0, 0.1)]))
     traj = cs.run()
     schema = cs.schema
-    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
-    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
-    # X_mlf is an inert carbon-/nitrogen-free catalyst (D-23): the pitch flow is on neither ledger.
+    f_c = cs.param_values["biomass_C_fraction"]
+    f_n = cs.param_values["biomass_N_fraction"]
+    c_of = total_carbon(schema, biomass_carbon_fraction=f_c)
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=f_n)
     flow = traj.external_flows[0]
-    assert c_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
-    assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+    # The 0.1 g/L X_mlf dose carries exactly its biomass carbon/nitrogen and nothing else.
+    assert c_of(flow.delta) == pytest.approx(0.1 * f_c, rel=1e-12)
+    assert n_of(flow.delta) == pytest.approx(0.1 * f_n, rel=1e-12)
 
 
 def test_early_pitch_converts_malic_but_post_af_pitch_stalls():

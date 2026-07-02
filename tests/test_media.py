@@ -199,6 +199,12 @@ MLF_PROCESSES = {
 # sources a fraction of fusel carbon from amino acids and deaminates, disabled at the compile
 # seam when amino acids are undosed.
 AMINO_ACID_PROCESSES = {"amino_acid_assimilation", "fusel_amino_acid_reroute"}
+# Malolactic growth (decision D-23, the deferred growth beat) is wired into the WINE medium only;
+# enabled in a bare build_process_set and disabled at the compile seam unless a scenario BOTH
+# co-inoculates O. oeni AND doses amino acids (mlf_pitch_gpl>0 AND amino_acids_gpl>0) — a stricter
+# gate than conversion, so it is a SEPARATE tuple from MLF_PROCESSES (avoids dragging amino_acids/S
+# tier on pitched-but-not-aa-dosed runs).
+MLF_GROWTH_PROCESSES = {"malolactic_growth"}
 # Yeast autolysis (D-34): wine-only, opt-in — present in a bare build, disabled at the compile
 # seam unless a scenario passes autolysis_rate_per_h (the carrying-capacity opt-in pattern).
 AUTOLYSIS_PROCESSES = {"yeast_autolysis"}
@@ -211,6 +217,7 @@ EXPECTED_PROCESSES = {
         | ACETALDEHYDE_PROCESSES
         | H2S_PROCESSES
         | MLF_PROCESSES
+        | MLF_GROWTH_PROCESSES
         | AMINO_ACID_PROCESSES
         | AUTOLYSIS_PROCESSES
     ),

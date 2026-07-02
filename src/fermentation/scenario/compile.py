@@ -39,6 +39,7 @@ from fermentation.core.kinetics import (
     FuselAminoAcidReroute,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
+    MalolacticGrowth,
     OenococcusDiacetylReduction,
     YeastAutolysis,
 )
@@ -919,6 +920,22 @@ def compile_scenario(
         for aa_process in (AminoAcidAssimilation, FuselAminoAcidReroute):
             if aa_process.name in process_set:
                 process_set.disable(aa_process.name)
+
+    # MLF-growth isolability (decision D-38, the deferred growth beat). MalolacticGrowth builds
+    # bacterial biomass X_mlf from the amino-acid pool, so the FEATURE it represents (amino-acid-fed
+    # bacterial growth) is keyed on amino acids being dosed — the SAME gate as the swap/re-route
+    # above. Disable it when amino_acids_gpl ≤ 0 so (a) the empty amino_acids slot / X_mlf keep
+    # their tier — an enabled speculative Process touching them would drag tier_of even with a zero
+    # contribution — and (b) no rate recompute is paid undosed. This alone prevents the D-23/D-31
+    # tier regression: those tests pitch O. oeni but dose NO amino acids, so growth stays disabled.
+    # NOT additionally gated on the pitch: "bacteria present" is runtime state the Process's own
+    # ``X_mlf ≤ 0`` guard handles (zero until a co-inoculation dose or a mid-run pitch_mlf mutation
+    # adds X_mlf), and — mirroring how MalolacticConversion trusts its ethanol gate rather than a
+    # compile rule — whether post-pitch bacteria then GROW is left to the emergent environmental
+    # gate (g_EtOH·γ(T)·…). So co-inoculation-dominance is emergent, not hard-coded: a high-ABV must
+    # arrests growth via the ethanol wall, a normal-ABV sequential MLF can still grow (D-38).
+    if MalolacticGrowth.name in process_set and amino_acids_gpl <= 0.0:
+        process_set.disable(MalolacticGrowth.name)
 
     # Autolytic-peptide source (decision D-34): YeastAutolysis refills the amino-acid pool from dead
     # biomass (X_dead) post-AF — the second MLF-with-growth prerequisite. Like the carrying cap it

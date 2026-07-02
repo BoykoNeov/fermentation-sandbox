@@ -139,11 +139,9 @@ def total_carbon(
     # conversion to stay carbon-closing on this same ledger (no new conservation code). On
     # an undosed run the acids are inert (no active Process touches them, derivatives 0),
     # so this adds a constant term that drifts 0; ``cation_charge`` is a charge density,
-    # not a carbon species, and stays weight 0 (``schema.zeros``). The ``X_mlf`` catalyst
-    # is likewise unweighted — inert and constant in v1 (it enters the ledger only when the
-    # MLF-growth beat lands). ``Byp`` weighting is unchanged — the charge balance only
-    # *reads* it (include-by-reading), adding no carbon, so ``total_carbon`` and the
-    # double-count are exactly as before.
+    # not a carbon species, and stays weight 0 (``schema.zeros``). ``Byp`` weighting is
+    # unchanged — the charge balance only *reads* it (include-by-reading), adding no carbon,
+    # so ``total_carbon`` and the double-count are exactly as before.
     if "tartaric" in schema:
         w[schema.slice("tartaric")] = carbon_mass_fraction("tartaric_acid")
     if "malic" in schema:
@@ -190,6 +188,17 @@ def total_carbon(
         # carbon fraction keeps that transfer carbon-neutral (decision D-13).
         if "X_dead" in schema:
             w[schema.slice("X_dead")] = biomass_carbon_fraction
+        # Bacterial biomass X_mlf (decision D-38): once MalolacticGrowth is active it
+        # builds O. oeni biomass from the amino-acid pool, drawing the carbon shortfall from
+        # sugar, so X_mlf carries carbon and must be weighted or that growth would read as
+        # carbon destroyed. Booked at the SAME biomass_carbon_fraction the growth stoichiometry
+        # draws against (bacterial ≈ yeast elemental composition, a documented v1 simplification),
+        # so carbon closes exactly. This supersedes the v1 "X_mlf is carbon-free" scoping (D-23):
+        # on a conversion-only run X_mlf is still constant, so the added term is a constant offset
+        # that drifts 0 (closure holds); a co-inoculation dose / pitch_mlf flow now carries this
+        # bacterial-biomass carbon.
+        if "X_mlf" in schema:
+            w[schema.slice("X_mlf")] = biomass_carbon_fraction
     return _weighted_sum(w)
 
 
@@ -225,6 +234,13 @@ def total_nitrogen(
         # inactivation transfer stays nitrogen-neutral (decision D-13).
         if "X_dead" in schema:
             w[schema.slice("X_dead")] = biomass_nitrogen_fraction
+        # Bacterial biomass X_mlf (decision D-38): MalolacticGrowth builds it by
+        # assimilating the amino-acid pool's nitrogen (arginine), so X_mlf carries nitrogen and
+        # is weighted at the SAME biomass_nitrogen_fraction the growth draws against — the pool
+        # loses exactly the nitrogen X_mlf gains, so total_nitrogen closes. Constant (⇒ 0 drift)
+        # on a conversion-only run; a co-inoculation dose / pitch_mlf flow now carries it.
+        if "X_mlf" in schema:
+            w[schema.slice("X_mlf")] = biomass_nitrogen_fraction
     return _weighted_sum(w)
 
 

@@ -289,11 +289,23 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
 
 ## Later beats (dependency-ordered)
 
-- [ ] **MLF-growth — later composition (decision D-23).** Add a growth Process touching `X_mlf`,
-      funded from the amino-acid ledger + autolysis. **All prerequisites now landed** (D-33 fusel
-      re-route + deamination; D-34 autolysis refill; D-35 event loop for the post-AF pitch), so the
-      remaining block is the *consumer* Process itself (composed with a `pitch_mlf` intervention,
-      D-36). The AF nitrogen-exhaustion evidence (D-23) is why it cannot be folded into v1.
+- [x] **MLF-growth — dynamic `X_mlf` (decision D-38, resolves the D-23 deferral). LANDED 2026-07-02.**
+      New `MalolacticGrowth` Process makes the `X_mlf` catalyst dynamic: it grows O. oeni biomass on
+      the `amino_acids` pool (D-32/D-34), and since `MalolacticConversion` is linear in `X_mlf`,
+      deacidification *accelerates autocatalytically*. **Nitrogen-anchored, carbon shortfall from
+      sugar** (mirrors yeast growth / inverts D-34 autolysis; structurally-positive shortfall, no
+      clamp) — the higher-fidelity fork over C-anchored/ADI-deamination (owner away; advisor-picked,
+      may revisit). `X_mlf` **promoted to real biomass** (now weighted in both ledgers at the biomass
+      fractions), superseding the v1 "carbon-free catalyst" claim; the `pitch_mlf` flow now carries
+      bacterial C/N (`test_interventions` updated). Gated on **amino acids alone**
+      (`amino_acids_gpl>0`, the swap/re-route gate) in its OWN tuple — that alone prevents a tier
+      regression on pitched-but-not-aa-dosed D-23/D-31 runs; NOT gated on the pitch, so
+      co-inoculation dominance is **emergent** from the ethanol gate (a high-ABV post-AF pitch is
+      arrested; a normal-ABV sequential MLF can still grow), matching how conversion is gated. New
+      speculative `mu_max_mlf`/`K_aa_mlf`. Scope: growth-only (no bacterial death/decay yet). 15 new
+      tests (`test_mlf_growth.py`), incl. the fail-first autocatalysis acceptance (growth on vs the
+      Process disabled). **496 green** + 5 benchmark, ruff + mypy clean. Full record in
+      **DECISIONS → D-38**.
 - [ ] **Mixed cultures / Brett / sour consortium** — resource competition. (After MLF.)
 - **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these

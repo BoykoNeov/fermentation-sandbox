@@ -32,6 +32,7 @@ from fermentation.core.kinetics.inhibition import EthanolInhibition
 from fermentation.core.kinetics.malolactic import (
     MalolacticCitrateMetabolism,
     MalolacticConversion,
+    MalolacticGrowth,
     OenococcusDiacetylReduction,
     cardinal_temperature_factor,
     malolactic_environmental_gate,
@@ -63,6 +64,7 @@ __all__ = [
     "HydrogenSulfideProduction",
     "MalolacticCitrateMetabolism",
     "MalolacticConversion",
+    "MalolacticGrowth",
     "OenococcusDiacetylReduction",
     "SugarUptakeToEthanolCO2",
     "TemperatureRamp",

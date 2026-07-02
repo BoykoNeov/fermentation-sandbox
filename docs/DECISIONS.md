@@ -2484,6 +2484,88 @@ guard (an *ungated* toy `reconfigure` so a leaked enable is numerically visible 
 an independent fresh-set run byte-for-byte; verified to fail when the per-member reset is removed).
 481 green + 5 benchmark, ruff + mypy clean.
 
+## D-38 — MLF-growth: `X_mlf` becomes dynamic bacterial biomass (resolves the D-23 deferral)
+
+**Status: IMPLEMENTED 2026-07-02** (496 green + 5 benchmark, ruff + mypy clean). The long-deferred
+MLF-with-growth beat D-23 scoped out and D-32/D-33/D-34 built the prerequisites for. `X_mlf` was a
+dosed-but-**inert** catalyst (constant, carbon-/nitrogen-free) that merely *scaled* the
+`MalolacticConversion` rate; D-23 promised the growth beat would be "a clean add-a-Process
+extension." This delivers exactly that: a new `MalolacticGrowth` Process makes `X_mlf` dynamic, so —
+because conversion is **linear in `X_mlf`** — deacidification now *accelerates autocatalytically* as
+the bacteria multiply. No refactor of the conversion kinetics.
+
+**The growth law.** `dX_mlf/dt = μ_max_mlf · X_mlf · aa/(K_aa_mlf+aa) · S/(K_s+S) ·
+g_pH·g_EtOH·g_SO₂·γ(T)` — Michaelis–Menten in the amino-acid fuel *and* in sugar (the fermentable
+energy O. oeni co-metabolises), scaled by the **same** `malolactic_environmental_gate` conversion
+uses. Reusing that gate is load-bearing: the Luong ethanol wall makes co-inoculation the *dominant*
+MLF-growth mode **emergently** — a post-AF pitch into a high-ABV must lands past the O. oeni ethanol
+tolerance so γ·g_EtOH ≈ 0 and bacteria cannot build up, while a normal-ABV sequential MLF (g_EtOH
+small but nonzero) still grows. New speculative params `mu_max_mlf` (0.05/h) and `K_aa_mlf`
+(0.05 g/L); it reuses `K_s` and the biomass fractions.
+
+**Conservation — nitrogen-anchored, carbon shortfall from sugar (the anchoring fork).** New
+bacterial biomass needs `f_N·dX_mlf` nitrogen and `f_C·dX_mlf` carbon. All the nitrogen comes from
+the `amino_acids` pool (arginine), consuming `ρ = f_N·dX_mlf/y_N`; that arginine carries only `ρ·y_C`
+carbon — *less* than the biomass needs, because arginine (mass C:N ≈ 1.29) is far more N-rich than
+biomass (C:N ≈ 4–11) — so the **shortfall** `f_C·dX_mlf − ρ·y_C = dX_mlf·(f_C − f_N·y_C/y_N)` is
+drawn from sugar. This is the mirror of yeast `GrowthNitrogenLimited` (N from a N-pool, C from
+sugar) and the inverse of D-34 autolysis (which routes the *excess* carbon to debris). The shortfall
+coefficient is **structurally positive** across Coleman's whole `f_N` range → no clamp, no C⁰ kink.
+Touches `(X_mlf, amino_acids, S)` — notably **not** `N`.
+
+- **Fork decided (owner away — advisor-recommended, higher-fidelity branch chosen; owner may
+  revisit).** The alternative was **C-anchored**: consume arginine for the biomass *carbon* and
+  deaminate the over-supplied nitrogen to ammonium `N` (the real O. oeni arginine-deiminase pathway).
+  It conserves just as cleanly and works even after sugar is gone. It was **rejected** because the
+  demo regime (co-inoculation) has abundant sugar (245→~45 g/L across the growth window, since the
+  ethanol wall isn't crossed until ~day 4), so the "no sugar at MLF" premise that would have favoured
+  it does not hold; and it carries two fictions the N-anchored branch avoids — booking *all* biomass
+  carbon as arginine-derived (ADI actually *excretes* that carbon as ornithine/CO₂, it doesn't build
+  biomass), and dumping a large artificial ammonium surplus. Gate-on-sugar then self-limits growth to
+  the window it is physical in. This is a discuss-disagreements fork; the anchoring can be swapped
+  later if the owner prefers the ADI reading.
+
+**`X_mlf` promoted from inert catalyst to real biomass.** For the growth to conserve, `X_mlf` is now
+**weighted in `total_carbon`/`total_nitrogen`** at the biomass fractions (bacterial ≈ yeast elemental
+composition — a documented v1 simplification; the *same* fractions the growth stoichiometry draws
+against, so closure is exact). Consequence, superseding the v1 "dosing X_mlf leaves total_carbon
+byte-for-byte" claim: a co-inoculation dose / `pitch_mlf` flow now carries bacterial-biomass
+carbon/nitrogen (booked on the D-36 external-flow ledger, which still closes; `test_interventions`
+updated accordingly). On a conversion-only run `X_mlf` is constant, so the added ledger term is a
+constant offset that still drifts to zero — every existing MLF/ensemble closure test stays green.
+
+**Gating — its own tuple, keyed on amino acids alone, NOT the pitch (advisor-corrected).** The
+compile seam disables `MalolacticGrowth` when `amino_acids_gpl ≤ 0` — the *same* gate as the D-32
+swap / D-33 re-route, keyed on the feature (amino-acid-fed bacterial growth), not on the pitch. This
+alone prevents the tier-isolability regression: every existing D-23/D-31 test pitches O. oeni but
+doses *no* amino acids, so growth stays disabled and never drags the `amino_acids`/`S`/`X_mlf` tier
+via `tier_of`. It is kept in its own tuple (not `_MLF_GATED_PROCESSES`) precisely because that gate
+differs from conversion's. It is deliberately **not** additionally gated on the pitch: "bacteria
+present" is runtime state the Process's own `X_mlf ≤ 0` guard handles, and whether post-pitch
+bacteria then *grow* is left to the emergent environmental gate — mirroring how `MalolacticConversion`
+trusts its ethanol gate rather than a compile rule. So co-inoculation dominance is **emergent** (a
+high-ABV post-AF pitch is ethanol-arrested; a normal-ABV sequential MLF can still grow), not a
+hard-coded co-inoc-only rule. *(An earlier draft gated on `pitch AND aa` and attributed co-inoc-only
+to the ethanol wall as a compile fact — corrected here: that conflated the tier feature with runtime
+state and mis-stated the physics.)* No existing test doses amino acids under an MLF pitch, so no
+trajectory shifted.
+
+**Scope / caveats (owned).** (1) Bacterial biomass composition = yeast's (incl. the Coleman `f_N`
+override) — a lump; a dedicated bacterial `f_N`/`f_C` is deferred. (2) v1 is **growth-only**: no
+bacterial death/decay (so the D-31 "SO₂/rack locks in diacetyl by killing the bacteria" case still
+needs a death Process + the deferred rack-removes-`X_mlf`). (3) All-biomass-carbon-from-arginine-
+or-sugar is a stand-in, not a claim about O. oeni's carbon metabolism.
+
+**Tests.** `tests/test_mlf_growth.py` (15): the fail-first acceptance (same co-inoc+aa scenario,
+growth on vs the growth Process disabled — the fixed-`X_mlf` control — day-3 malate halved,
+`X_mlf` multiplied several-fold, gap vanishes without the Process); carbon+nitrogen closure over a
+growing run; the `(X_mlf, amino_acids, S)` `touches` contract; derivative-level stoichiometry
+closure; the aa-keyed gate matrix + the emergent mid-run-pitch case (early pitch grows, late
+post-AF pitch is ethanol-arrested); the no-catalyst/no-fuel/no-sugar guards; never-creates-sugar
+(sugar carbon drawn < biomass carbon built); the ethanol-wall arrest; and the speculative tier
+capping `X_mlf` (discriminated on an aa-dosed *unpitched* run where growth is the only enabled
+`X_mlf` toucher). `test_interventions` / `test_media` updated for the promotion + the new Process.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

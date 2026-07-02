@@ -643,6 +643,39 @@ T_max_mlf:
     conditions: "O. oeni in wine; maximum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
     notes: "Read by MalolacticConversion via cardinal_temperature_factor. 37 C. Above it gamma(T)=0. This is the cardinal that makes the warm-side DECLINE explicit (the qualitative correctness a monotone Arrhenius lacks). Far above any normal wine ferment, so it shapes only the high-T tail; exact value speculative, direction (a finite upper limit exists) sound."
 
+# -- MALOLACTIC GROWTH (Oenococcus oeni biomass, wine-only, the deferred growth beat, decision D-23) --
+# MalolacticGrowth (fermentation.core.kinetics.malolactic) makes the X_mlf catalyst DYNAMIC:
+#   dX_mlf/dt = mu_max_mlf * X_mlf * aa/(K_aa_mlf+aa) * S/(K_s+S) * g_pH*g_EtOH*g_SO2*gamma(T)
+# Because MalolacticConversion is linear in X_mlf, growth makes deacidification ACCELERATE
+# autocatalytically as bacteria multiply. Nitrogen-anchored: new bacterial biomass takes its
+# nitrogen from the amino_acids pool (arginine; D-32/D-34) and its carbon shortfall from sugar
+# (the mirror of yeast growth) - carbon and nitrogen close on the existing weighted ledger, with
+# X_mlf now weighted at the biomass fractions (bacterial ~ yeast composition, a v1 simplification).
+# Reuses K_s (sugar Monod) and the biomass_C/N_fraction composition above, and the shared MLF
+# environmental gate. BOTH SPECULATIVE (author estimates; no per-catalyst bacterial growth law is
+# sourced, and the bacterial-composition ~ yeast assumption is a lump). v1 is CO-INOCULATION only
+# (the ethanol wall blocks a post-AF pitch), gated at compile on mlf_pitch_gpl>0 AND amino_acids_gpl>0.
+
+mu_max_mlf:
+  value: 5.0e-2
+  unit: "1/h"   # O. oeni max specific growth rate: dX_mlf/dt = mu_max_mlf*X_mlf*Monod(aa)*Monod(S)*gates
+  tier: speculative
+  uncertainty: { low: 2.0e-2, high: 1.0e-1, note: "O. oeni doubling time in wine ~12-35 h under favourable co-inoculation conditions ⇒ mu_max ~0.02-0.06/h; wider band for the whole-cell lumped rate" }
+  provenance:
+    source: "author estimate from O. oeni growth timescales in wine (doubling times of order 0.5-1.5 d in co-inoculation; Ribereau-Gayon et al., Handbook of Enology Vol. 1; Lonvaud-Funel 1999, Antonie van Leeuwenhoek 76:317-331)"
+    conditions: "S. cerevisiae/O. oeni co-inoculated wine, ~20 C, amino-acid- and sugar-replete early window; maximum specific growth rate scaling the amino-acid- and sugar-gated bacterial growth law"
+    notes: "Read by MalolacticGrowth as the bacterial mu_max. SPECULATIVE: no kinetic model of our amino-acid-anchored per-catalyst growth form is sourced - O. oeni growth is usually reported as bulk OD/CFU timescales, not this rate constant - so it is tuned to give a realistic several-fold X_mlf increase within the low-ethanol co-inoculation window (the regime the D-23 conversion beat established as the only viable MLF window), NOT fitted. The growth is gated identically to conversion (same environmental gate) plus Monod terms on the amino-acid fuel and on sugar (the fermentable energy source O. oeni co-metabolises), so it self-limits to the sugar-present, low-ethanol early window."
+
+K_aa_mlf:
+  value: 5.0e-2
+  unit: "g/L"   # amino-acid half-saturation in the bacterial growth Monod term aa/(K_aa_mlf+aa)
+  tier: speculative
+  uncertainty: { low: 2.0e-2, high: 2.0e-1, note: "half-saturation on the assimilable amino-acid pool; scaled to the g/L range of must amino acids, same order as K_amino_acids (yeast swap)" }
+  provenance:
+    source: "author estimate, same rationale as K_amino_acids (the yeast amino-acid swap half-saturation): scaled to the g/L range of assimilable amino acids in must"
+    conditions: "O. oeni in wine; half-saturation in the smooth availability gate aa/(K_aa_mlf+aa) on the bacterial growth rate"
+    notes: "Read by MalolacticGrowth: gate(aa) = aa/(K_aa_mlf+aa) ramps bacterial growth up from an empty amino-acid pool and down to zero as amino acids are exhausted (the same smooth-Monod shape the yeast swap and fermentative flux use, keeping the RHS C1 for the BDF solver). A SEPARATE parameter from the yeast K_amino_acids (the per-organism design lets them diverge), taken slightly lower here as O. oeni is a fastidious amino-acid auxotroph; an estimate, hence speculative."
+
 # -- MLF-DERIVED DIACETYL (Oenococcus oeni citrate co-metabolism), wine-only (decision D-31) --
 # The real coupling MLF unlocks: alongside malate, O. oeni co-metabolises CITRIC ACID and
 # overflows alpha-acetolactate, which decarboxylates to DIACETYL (the buttery note post-MLF
