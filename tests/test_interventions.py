@@ -224,6 +224,75 @@ def test_add_so2_requires_an_so2_slot():
         compile_scenario(beer)
 
 
+# -- rack: remove settled lees, leave the wine ---------------------------------
+
+
+def _rack(day: float, fraction: float) -> Intervention:
+    return Intervention(day=day, action="rack", params={"fraction": fraction})
+
+
+def test_rack_removes_settled_lees_and_leaves_the_wine_untouched():
+    # Autolysis opted in so debris (the second lees pool) is non-empty at racking.
+    sc = Scenario(
+        name="rack-test",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 150.0, "pitch_gpl": 0.25, "autolysis_rate_per_h": 0.002},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[_rack(15.0, 0.9)],
+        duration_days=20.0,
+    )
+    cs = compile_scenario(sc)
+    traj = cs.run()
+    schema = cs.schema
+
+    assert len(traj.external_flows) == 1
+    flow = traj.external_flows[0]
+    assert flow.label == "rack@15d"
+
+    # The settled pools drop (negative delta), and 90% of each is removed.
+    for name in ("X_dead", "debris"):
+        sl = schema.slice(name)
+        assert flow.delta[sl][0] < 0.0
+    # Everything that stays with the racked-off liquid is untouched (zero delta): viable biomass,
+    # sugar, ethanol, YAN, glycerol, byproducts, acids, SO₂.
+    for name in ("X", "S", "E", "N", "Gly", "Byp", "esters", "fusels", "tartaric", "so2_total"):
+        assert np.all(flow.delta[schema.slice(name)] == 0.0)
+
+
+def test_rack_fraction_out_of_range_raises():
+    with pytest.raises(ValueError, match=r"fraction must be in \[0, 1\]"):
+        compile_scenario(_wine([_rack(10.0, 1.5)]))
+
+
+def test_dap_dose_and_rack_conserve_carbon_and_nitrogen_across_all_jumps():
+    # The crown-jewel ledger the D-35 external-flow machinery was built for: a run with an
+    # injection (DAP, +N) AND a removal (rack, −C/−N) still satisfies the run-wide identity
+    # final == initial + Σ external_flows for BOTH elements, to machine precision.
+    sc = Scenario(
+        name="dap-and-rack",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 100.0, "pitch_gpl": 0.25, "autolysis_rate_per_h": 0.002},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[_dap(2.0, 0.4), _rack(15.0, 0.8)],
+        duration_days=20.0,
+    )
+    cs = compile_scenario(sc)
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+    assert len(traj.external_flows) == 2  # one dose, one rack
+
+    for quantity, tol in ((c_of, 1e-6), (n_of, 1e-9)):
+        injected = sum(quantity(f.delta) for f in traj.external_flows)
+        initial = quantity(cs.y0)
+        final = quantity(traj.y[:, -1])
+        assert final == pytest.approx(initial + injected, abs=tol)
+    # And the ledger is not trivially zero: the rack removed carbon, the DAP added nitrogen.
+    assert sum(c_of(f.delta) for f in traj.external_flows) < 0.0
+    assert sum(n_of(f.delta) for f in traj.external_flows) != pytest.approx(0.0, abs=1e-6)
+
+
 # -- vocabulary discipline: loud failures --------------------------------------
 
 

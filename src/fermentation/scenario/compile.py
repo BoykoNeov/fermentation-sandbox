@@ -667,12 +667,53 @@ def _verb_add_so2(
     )
 
 
+#: The settled-solids pools racking removes: inactivated biomass and (if autolysis is opted in)
+#: the non-assimilable cell-wall debris. Dissolved species (sugar, ethanol, acids, glycerol,
+#: byproducts, SO₂, YAN) stay with the racked-off liquid — a concentration model has no volume
+#: change on racking, so touching them would be physically wrong (decision D-36).
+_LEES_SLOTS = ("X_dead", "debris")
+
+
+def _verb_rack(iv: Intervention, schema: StateSchema, parameters: ParameterSet) -> ScheduledEvent:
+    """``rack`` — draw the wine off a fraction of its settled lees (decision D-36).
+
+    Removes ``fraction`` ∈ [0, 1] of each settled-solids pool (:data:`_LEES_SLOTS`: inactivated
+    biomass ``X_dead`` and, when autolysis is opted in, the cell-wall ``debris``), booking the
+    negative jump as an :class:`~fermentation.runtime.schedule.ExternalFlow` (the ledger's
+    removal side). Viable biomass ``X`` and every dissolved species are left untouched — a normal
+    post-AF rack settles dead yeast, and a concentration model has no volume change on racking.
+    Both racked pools carry carbon (and ``X_dead`` carries nitrogen), so the removal shows up as a
+    negative term in the run-wide carbon and nitrogen ledgers.
+    """
+    _iv_check_keys(iv, frozenset({"fraction"}), "rack")
+    fraction = _iv_float(iv, "fraction", "rack")
+    if fraction > 1.0:
+        raise ValueError(
+            f"intervention 'rack' at day {iv.day:g}: fraction must be in [0, 1], got {fraction:g}"
+        )
+    slices = [schema.slice(name) for name in _LEES_SLOTS if name in schema]
+    retained = 1.0 - fraction
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        for sl in slices:
+            out[sl] *= retained
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"rack@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
 #: action verb → compiler turning one :class:`Intervention` into a :class:`ScheduledEvent`.
 _INTERVENTION_VERBS: dict[
     str, Callable[[Intervention, StateSchema, ParameterSet], ScheduledEvent]
 ] = {
     "add_dap": _verb_add_dap,
     "add_so2": _verb_add_so2,
+    "rack": _verb_rack,
 }
 
 
