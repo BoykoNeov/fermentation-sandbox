@@ -149,6 +149,14 @@ class SpreadAttribution:
     budget is readable as fractions of total spread. ``per_param_signed`` keeps the signed
     SRC so a caller can see *direction* (does raising this parameter raise or lower the
     output). Pinned parameters (zero-variance draws) are excluded — they explain nothing.
+
+    **Degenerate (empty-budget) case.** When nothing varied — no parameter was sampled, or
+    every sampled band was pinned — there is no variance to attribute: ``per_param`` and
+    ``per_tier`` are empty and both ``r_squared`` and ``unexplained`` are ``0.0``. This is a
+    deliberate exception to the sum-to-1 invariant above (an empty budget, not a budget that
+    is entirely unexplained). ``unexplained`` is not keyed off exact-float output spread,
+    because byte-identical member inputs need not produce byte-identical solver output across
+    platforms (threaded-BLAS reduction order), and a hair of numerical noise is not real spread.
     """
 
     variable: str
@@ -222,7 +230,11 @@ def attribute_spread(
 
     empty_tiers: dict[Tier, float] = {}
     if not names or np.std(y) == 0.0:
-        # Nothing varied, or the output has no spread — no variance to attribute.
+        # Nothing varied, or the output has no spread — no variance to attribute, so the
+        # budget is empty and unexplained is 0.0 (an empty budget, not an all-unexplained
+        # one). Do NOT key unexplained off np.std(y) > 0: with no sampled parameter varying,
+        # any residual y-spread is solver noise across byte-identical inputs (threaded-BLAS
+        # reduction order differs by platform), not attributable variance.
         return SpreadAttribution(
             variable=variable,
             slot=slot,
@@ -233,7 +245,7 @@ def attribute_spread(
             per_param={},
             per_param_signed={},
             per_tier=empty_tiers,
-            unexplained=1.0 if np.std(y) > 0.0 else 0.0,
+            unexplained=0.0,
         )
     if n <= len(names):
         raise ValueError(
