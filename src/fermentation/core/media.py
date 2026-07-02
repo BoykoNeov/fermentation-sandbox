@@ -70,6 +70,7 @@ from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     ArrheniusTemperature,
     BiomassCarryingCapacity,
+    BrettDeath,
     BrettDecarboxylation,
     BrettGrowth,
     BrettVinylphenolReduction,
@@ -546,15 +547,21 @@ _MLF_GROWTH_PROCESSES: tuple[Callable[[], Process], ...] = (MalolacticGrowth,)
 #: ``ethylphenols`` — Brett carries BOTH enzymes, so a dosed culture spoils POF-negative wine
 #: unaided (the canonical funk mechanism). Kept in its own tuple so it stays **isolable** (prime
 #: directive #3), mirroring the *dosed* MLF organism (and unlike the always-on intrinsic aroma
-#: pools): both Processes contribute zero before any pH work when ``X_brett`` is undosed, and the
+#: pools): the Processes contribute zero before any pH work when ``X_brett`` is undosed, and the
 #: compile seam DISABLES them when Brett is not pitched so the inert ``hydroxycinnamics``/
 #: ``vinylphenols``/``ethylphenols`` slots keep their VALIDATED tier (``tier_of`` counts enabled,
-#: not nonzero, Processes — the D-23 MLF pattern). :class:`BrettGrowth` (D-40 pt2, amino-acid-gated)
-#: and :class:`BrettDeath` (D-40 pt3, SO₂ lever) join the arc in later commits. Wine-only: beer has
-#: no ``hydroxycinnamics``/phenol slots, so Brett is never wired there.
+#: not nonzero, Processes — the D-23 MLF pattern). :class:`BrettGrowth` (D-40 pt2) is amino-acid-
+#: gated in its own tuple below; :class:`BrettDeath` (D-40 pt3, the SO₂ lever) rides in THIS
+#: pitch-gated tuple — Brett dies whether or not it was growing, so it belongs with the phenol
+#: Processes, disabled at the compile seam on an unpitched run (mirroring how
+#: :class:`~fermentation.core.kinetics.malolactic.MalolacticDeath` sits in ``_MLF_PROCESSES``, not
+#: the amino-acid-gated growth tuple). The ``X_brett → X_brett_dead`` transfer is carbon/nitrogen-
+#: neutral (both pools weighted at the biomass fractions since pt2), so it adds no new ledger code.
+#: Wine-only: beer has no ``hydroxycinnamics``/phenol slots, so Brett is never wired there.
 _BRETT_PROCESSES: tuple[Callable[[], Process], ...] = (
     BrettDecarboxylation,
     BrettVinylphenolReduction,
+    BrettDeath,
 )
 
 #: *Brettanomyces* growth (wine-only, decision D-40 pt2). Makes ``X_brett`` dynamic:

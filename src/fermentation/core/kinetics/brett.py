@@ -76,15 +76,18 @@ from fermentation.core.chemistry import (
     nitrogen_mass_fraction,
 )
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.malolactic import cardinal_temperature_factor
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
-#: The *Brettanomyces* environmental-gate parameters, shared by the decarboxylase and reductase
-#: Processes (and, from D-40 pt3, the SO₂ scale by :class:`BrettDeath`). Declared once so the
-#: Processes' ``reads`` tuples and :func:`brett_environmental_gate` cannot drift apart. Only SO₂ and
-#: the temperature cardinals — no pH/ethanol terms (Brett is acid- and ethanol-tolerant, D-40).
+#: The *Brettanomyces* environmental-gate parameters, shared by the decarboxylase, reductase and
+#: growth Processes. Declared once so the Processes' ``reads`` tuples and
+#: :func:`brett_environmental_gate` cannot drift apart. Only SO₂ and the temperature cardinals — no
+#: pH/ethanol terms (Brett is acid- and ethanol-tolerant, D-40). :class:`BrettDeath` (pt3) does NOT
+#: splat this tuple: it uses an *Arrhenius* temperature factor, not the cardinal γ(T), so it reads
+#: only ``molecular_so2_inhib_brett`` (the SO₂ scale) explicitly, not the ``T_*_brett`` cardinals.
 _BRETT_GATE_READS: tuple[str, ...] = (
     "molecular_so2_inhib_brett",
     "T_min_brett",
@@ -386,4 +389,112 @@ class BrettGrowth(Process):
         d[schema.slice("amino_acids")] = -rho
         # Remove `shortfall` grams of carbon from ethanol: g ethanol = g C / (g C/g ethanol).
         d[schema.slice("E")] = -shortfall / carbon_mass_fraction("ethanol")
+        return d
+
+
+class BrettDeath(Process):
+    """*Brettanomyces* death — the **SO₂-driven** spoilage-yeast kill (decision D-40 pt3).
+
+    The counterpart to :class:`BrettGrowth` that completes the Brett arc (pt1 pathway → pt2 growth →
+    pt3 death): it moves viable ``X_brett`` into the non-viable ``X_brett_dead`` pool, so the
+    spoilage population *declines* when the wine is sulfited and the volatile-phenol activities that
+    scale with ``X_brett`` — :class:`BrettDecarboxylation` and :class:`BrettVinylphenolReduction` —
+    wind down as Brett dies. That is the mechanism behind the winemaker's headline lever: a
+    **molecular-SO₂ addition kills Brett**, so 4-EP production *stops rising* (the produced-only
+    ``ethylphenols`` readout has no sink, so killing Brett simply halts the accrual — a clean,
+    unconfounded lever, unlike the MLF diacetyl "lock-in" which kills both a source and a sink). A
+    rack that draws Brett off the lees does the same physically (:data:`~fermentation.scenario.\
+    compile._LEES_SLOTS` already carries ``X_brett``/``X_brett_dead`` since pt1) — the two ways a
+    winemaker removes an established Brett contamination.
+
+    **Rate — molecular-SO₂-driven, Arrhenius temperature (the :class:`~fermentation.core.kinetics.\
+    malolactic.MalolacticDeath` form).**
+
+        r_death = k_death_brett · X_brett · (1 − g_SO₂) · arrhenius(T, E_a_death_brett, T_ref)
+        g_SO₂   = exp(−[SO₂]_molecular / molecular_so2_inhib_brett)
+
+    The driver is ``1 − g_SO₂`` — the **same** molecular-SO₂ term the decarboxylase/reductase gate
+    uses (D-22 antimicrobial readout, partitioned at the solved pH). Death is **exactly 0 without
+    SO₂** (``g_SO₂ = 1``) and rises toward its Arrhenius ceiling as molecular SO₂ accumulates.
+    Temperature enters through its own **Arrhenius** factor (enzymatic/chemical mortality, faster
+    when warm — the shape autolysis and MLF death share), **not** the cardinal γ(T): γ(T) → 0 in the
+    *cold*, which would make cold *kill* Brett, whereas cold in fact **preserves** it (part of why
+    Brett is so hard to eradicate from a cool cellar). So warm accelerates the SO₂ kill and cold
+    slows it toward dormancy.
+
+    **Why SO₂ alone is the natural driver for Brett (contrast :class:`MalolacticDeath`).** MLF death
+    had to *drop* an ethanol/pH toxicity driver because *O. oeni*'s Luong ethanol wall spuriously
+    made bacteria "die" from ordinary post-AF ethanol (the D-39 crux). Brett has **no such wall** —
+    the Brett gate (:func:`brett_environmental_gate`) carries no ethanol or pH term at all — because
+    Brett is ethanol- and acid-tolerant. So "molecular SO₂ alone kills Brett" is not a
+    correction of a confounder but the *directly correct* physics: the winemaker's ~0.5–0.8 mg/L
+    molecular-SO₂ Brett-control target is the real-world expression of this term. Without SO₂ (or a
+    rack) Brett persists indefinitely in v1 — the honest reflection of how tenacious a barrel Brett
+    infection is; a slow benign-environment senescence is a deferred v2 refinement (see
+    ``k_death_brett`` provenance).
+
+    **Conservation — a carbon/nitrogen-neutral transfer (the D-13 pattern).** Since pt2 both
+    ``X_brett`` and ``X_brett_dead`` are weighted in ``total_carbon``/``total_nitrogen`` at the
+    *same* biomass fractions, so moving a gram from one to the other (``d[X_brett] = −r``,
+    ``d[X_brett_dead] = +r``) is carbon- and nitrogen-neutral **by construction** — exactly like the
+    yeast :class:`~fermentation.core.kinetics.inactivation.EthanolInactivation` transfer
+    ``X → X_dead`` and the bacterial ``X_mlf → X_mlf_dead`` kill. No new conservation code, and no
+    ``S``/``E`` draw; touches only ``(X_brett, X_brett_dead)``.
+
+    **Isolability.** ``X_brett ≤ 0`` (undosed / unpitched) *or* no total SO₂ returns a zero
+    contribution *before* the pH ``brentq`` — the ``so2_total ≤ 0`` guard is exact (death is
+    identically 0 without SO₂, since ``1 − g_SO₂ = 0`` there), so a pitched-but-unsulfited run pays
+    no per-RHS pH solve and its contribution is byte-for-byte zero. The compile seam enables this
+    Process with the other **pitch-gated** Brett Processes (:data:`~fermentation.scenario.compile.\
+    _BRETT_GATED_PROCESSES`) — it needs no amino acids (Brett dies whether or not it grew), so it
+    is pitch-gated, not amino-acid-gated like :class:`BrettGrowth`. Consequence: on any *pitched*
+    run ``X_brett``/``X_brett_dead`` report **speculative** (this enabled Process touches them) —
+    honest, since a pitched population that can be sulfited has a speculative trajectory. Tier
+    **speculative** (``k_death_brett``/``E_a_death_brett`` are estimates, and the SO₂-driven form —
+    with the arrest-scale reused as kill-scale — is a modelling choice).
+    """
+
+    name = "brett_death"
+    tier = Tier.SPECULATIVE
+    #: Viable Brett leaves ``X_brett``; the same mass enters the non-viable ``X_brett_dead`` pool.
+    #: Declaring both keeps the carbon/nitrogen-neutral transfer inside the ``touches`` contract.
+    touches = ("X_brett", "X_brett_dead")
+    #: ``k_death_brett`` sets the magnitude at full kill; ``E_a_death_brett``/``T_ref`` set the
+    #: Arrhenius temperature shape; ``molecular_so2_inhib_brett`` is the SO₂ decay scale (reused
+    #: from the metabolic gate — arrest-scale = kill-scale, a documented simplification). NOT the
+    #: ``_BRETT_GATE_READS`` cardinals: death uses Arrhenius, not γ(T), so it must not read
+    #: ``T_min/T_opt/T_max_brett`` (mirrors :class:`MalolacticDeath.reads`). Their tiers cap the
+    #: ``X_brett``/``X_brett_dead`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_death_brett",
+        "E_a_death_brett",
+        "T_ref",
+        "molecular_so2_inhib_brett",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Early guards BEFORE any pH solve (the SO₂ partition reads the solved pH): no catalyst ⇒ no
+        # Brett to kill; no total SO₂ ⇒ death is identically 0 (g_SO₂ = 1, so 1 − g_SO₂ = 0). The
+        # so2_total ≤ 0 guard is EXACT, not an approximation, so an unsulfited pitched run pays no
+        # per-RHS pH solve and its contribution is byte-for-byte zero (mirrors MalolacticDeath).
+        x_brett = max(float(y[schema.slice("X_brett")][0]), 0.0) if "X_brett" in schema else 0.0
+        if x_brett <= 0.0:
+            return d
+        total_so2 = float(y[schema.slice(SO2_STATE_KEY)][0]) if SO2_STATE_KEY in schema else 0.0
+        if total_so2 <= 0.0:
+            return d
+
+        ph = ph_of_state(y, schema, params)
+        molecular_so2 = molecular_so2_at_ph(y, schema, params, ph)
+        g_so2 = math.exp(-molecular_so2 / params["molecular_so2_inhib_brett"])  # (0, 1]; 1 = no SO₂
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_death_brett"], params["T_ref"])
+        # SO₂ drives death: 1 − g_SO₂ ∈ [0, 1) rises with molecular SO₂. Arrhenius (not the cardinal
+        # γ(T)) carries temperature, so cold preserves rather than kills Brett (decision D-40 pt3).
+        r_death = params["k_death_brett"] * x_brett * (1.0 - g_so2) * f_t  # [g X_brett/L/h]
+        d[schema.slice("X_brett")] = -r_death
+        d[schema.slice("X_brett_dead")] = r_death  # carbon/nitrogen-neutral: same biomass fractions
         return d

@@ -22,17 +22,20 @@ from fermentation.core.chemistry import (
     carbon_mass_fraction,
 )
 from fermentation.core.kinetics.brett import (
+    BrettDeath,
     BrettDecarboxylation,
     BrettGrowth,
     BrettVinylphenolReduction,
     brett_environmental_gate,
 )
+from fermentation.core.kinetics.malolactic import cardinal_temperature_factor
 from fermentation.core.media import wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.scenario.schema import Intervention
+from fermentation.units.convert import mgl_to_gpl
 from fermentation.validation import (
     assert_conserved,
     assert_nonnegative,
@@ -503,3 +506,176 @@ def test_growth_disabled_without_amino_acids(schema):
 
 def test_growth_is_speculative():
     assert BrettGrowth.tier is Tier.SPECULATIVE
+
+
+# =============================================================================
+# pt3 — BrettDeath: the SO₂-driven Brett kill (decision D-40 pt3)
+# =============================================================================
+#
+# Ranked headline-first. The payoff is ``test_so2_crashes_growing_brett_population``: a molecular
+# SO₂ dose does not merely PAUSE a growing Brett population (its growth gate's g_SO₂ already does
+# that) — it KILLS it, so ``X_brett`` DECLINES into ``X_brett_dead`` and the volatile-phenol accrual
+# is curtailed vs the un-sulfited control. The rest mirror the ``MalolacticDeath`` RHS suite (D-39):
+# death is exactly 0 without SO₂, is a carbon/nitrogen-neutral X_brett→X_brett_dead transfer, is
+# monotone in the SO₂ dose, carries an ARRHENIUS temperature factor (not the cardinal γ(T), so cold
+# preserves rather than kills), closes both ledgers at the integration level, and is speculative.
+
+
+def _death_state(
+    schema: StateSchema,
+    params,
+    *,
+    so2_mgl: float = 0.0,
+    temp_k: float = 293.15,
+    x_brett: float = 0.2,
+    x_brett_dead: float = 0.0,
+) -> FloatArray:
+    """A pitched wine state for exercising BrettDeath at the RHS level (the MLF `_death_state`)."""
+    overrides: dict[str, float | list[float]] = {
+        "X_brett": x_brett,
+        "X_brett_dead": x_brett_dead,
+        "T": temp_k,
+    }
+    if so2_mgl > 0.0:
+        overrides["so2_total"] = mgl_to_gpl(so2_mgl)
+    return _state(schema, **overrides)
+
+
+def test_death_is_exactly_zero_without_so2(schema, params):
+    """Death is driven by molecular SO₂ ALONE, so an unsulfited pitched run never kills Brett.
+
+    The v1 tradeoff, enforced at the RHS: without SO₂ the population is inert (Brett persists in the
+    barrel) — no ethanol/pH decay term, unlike a naive copy of an ethanol-tolerance organism.
+    """
+    y = _death_state(schema, params, so2_mgl=0.0, x_brett=0.2)
+    d = BrettDeath().derivatives(0.0, y, schema, params)
+    assert float(d[schema.slice("X_brett")][0]) == 0.0
+    assert float(d[schema.slice("X_brett_dead")][0]) == 0.0
+
+
+def test_so2_drives_death_as_a_neutral_transfer(schema, params):
+    """With SO₂ dosed, viable X_brett leaves and the SAME mass enters X_brett_dead (the D-13 idiom).
+
+    ``d[X_brett] = −d[X_brett_dead]`` exactly, so — both weighted at the biomass fractions since
+    pt2 — the move is carbon- and nitrogen-neutral by construction.
+    """
+    y = _death_state(schema, params, so2_mgl=80.0, x_brett=0.2)
+    d = BrettDeath().derivatives(0.0, y, schema, params)
+    dx = float(d[schema.slice("X_brett")][0])
+    dxd = float(d[schema.slice("X_brett_dead")][0])
+    assert dx < 0.0 and dxd > 0.0  # Brett dies
+    assert dxd == pytest.approx(-dx)  # mass-conserving transfer (neutral in both ledgers)
+
+
+def test_death_touches_only_the_x_brett_pools(schema, params):
+    y = _death_state(schema, params, so2_mgl=80.0, x_brett=0.2)
+    d = BrettDeath().derivatives(0.0, y, schema, params)
+    touched = {n for n in schema.names if np.any(d[schema.slice(n)] != 0.0)}
+    assert touched == {"X_brett", "X_brett_dead"}
+    assert set(BrettDeath.touches) == {"X_brett", "X_brett_dead"}
+
+
+def test_more_so2_kills_faster(schema, params):
+    """Monotone in the antimicrobial dose: more SO₂ ⇒ higher molecular SO₂ ⇒ larger 1 − g_SO₂."""
+    rate_lo = -float(
+        BrettDeath().derivatives(0.0, _death_state(schema, params, so2_mgl=20.0), schema, params)[
+            schema.slice("X_brett")
+        ][0]
+    )
+    rate_hi = -float(
+        BrettDeath().derivatives(0.0, _death_state(schema, params, so2_mgl=60.0), schema, params)[
+            schema.slice("X_brett")
+        ][0]
+    )
+    assert 0.0 < rate_lo < rate_hi
+
+
+def test_cold_preserves_brett_via_arrhenius_not_gamma(schema, params):
+    """Death carries its OWN Arrhenius factor, not the cardinal γ(T) — so cold preserves, not kills.
+
+    Below ``T_min_brett`` the cardinal γ(T) = 0; if death reused it, cold would spuriously HALT the
+    SO₂ kill. Arrhenius instead merely SLOWS it: a sulfited Brett culture in a cold cellar still
+    dies (just slower), and warmer ⇒ faster — the "cold *preserves* a Brett infection" direction
+    γ(T) cannot supply. So Brett survives cold storage; it is cleared by SO₂, not by chilling.
+    """
+    t_below_min = 278.15  # 5 °C, below T_min_brett (10 °C) ⇒ cardinal γ(T) = 0
+    assert (
+        cardinal_temperature_factor(
+            t_below_min, params["T_min_brett"], params["T_opt_brett"], params["T_max_brett"]
+        )
+        == 0.0
+    )
+    rate_cold = -float(
+        BrettDeath().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=80.0, temp_k=t_below_min), schema, params
+        )[schema.slice("X_brett")][0]
+    )
+    rate_warm = -float(
+        BrettDeath().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=80.0, temp_k=298.15), schema, params
+        )[schema.slice("X_brett")][0]
+    )
+    assert rate_cold > 0.0  # still dying below T_min — proves Arrhenius, not γ(T)
+    assert rate_warm > rate_cold  # warm accelerates the kill (Arrhenius direction)
+
+
+# -- HEADLINE: SO₂ crashes a growing Brett population (not just arrests it) ----
+
+
+def test_so2_crashes_growing_brett_population():
+    """A molecular-SO₂ dose KILLS a growing Brett population — it does not merely pause it.
+
+    Brett is dosed with amino acids so ``X_brett`` grows autocatalytically (pt2). A mid-run SO₂
+    addition then both arrests growth (g_SO₂ in the growth gate) AND kills it off (BrettDeath).
+    The unambiguous *death* signal — distinct from growth-arrest, which the g_SO₂ gate alone would
+    give — is that ``X_brett_dead`` **accumulates** and ``X_brett`` **falls below its value at the
+    dose**; the winemaking payoff is that ethylphenols end **lower** than the un-sulfited control.
+    """
+    dose_day = 40.0
+    so2 = [Intervention(day=dose_day, action="add_so2", params={"so2_mgl": 80.0})]
+    _, sulfited = _run(
+        days=140.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0,
+        interventions=so2,
+    )  # fmt: skip
+    _, control = _run(
+        days=140.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0
+    )  # no SO₂: Brett keeps growing and spoiling
+
+    xb = sulfited.series("X_brett")
+    xbd = sulfited.series("X_brett_dead")
+    xb_at_dose = float(np.interp(dose_day * 24.0, sulfited.t, xb))
+
+    # Death, not mere arrest: the dead pool fills and the viable pool declines past the dose point.
+    assert xbd[-1] > 0.0
+    assert xb[-1] < xb_at_dose
+    # The control (no SO₂) keeps growing — the population was genuinely rising when SO₂ hit it.
+    assert control.series("X_brett")[-1] > xb_at_dose
+    # Winemaking payoff: killing Brett curtails the volatile-phenol spoilage.
+    assert sulfited.series("ethylphenols")[-1] < control.series("ethylphenols")[-1]
+
+
+def test_death_run_conserves_carbon_and_nitrogen():
+    """total_carbon and total_nitrogen close with death ACTIVE (SO₂ dosed mid-run, X_brett → dead).
+
+    The X_brett → X_brett_dead transfer is carbon/nitrogen-neutral (both weighted since pt2), SO₂
+    carries neither element, and growth draws from the weighted amino-acid/ethanol pools — so both
+    run-wide ledgers close across the sulfite jump (final == initial + Σ external flows).
+    """
+    so2 = [Intervention(day=40.0, action="add_so2", params={"so2_mgl": 80.0})]
+    compiled, traj = _run(
+        days=120.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0,
+        interventions=so2,
+    )  # fmt: skip
+    carbon = total_carbon(
+        compiled.schema, biomass_carbon_fraction=compiled.param_values["biomass_C_fraction"]
+    )
+    nitrogen = total_nitrogen(
+        compiled.schema, biomass_nitrogen_fraction=compiled.param_values["biomass_N_fraction"]
+    )
+    assert_conserved(traj, carbon, label="carbon (Brett death on)")
+    assert_conserved(traj, nitrogen, label="nitrogen (Brett death on)")
+    assert_nonnegative(traj, ("X_brett", "X_brett_dead"))
+
+
+def test_death_is_speculative():
+    assert BrettDeath.tier is Tier.SPECULATIVE

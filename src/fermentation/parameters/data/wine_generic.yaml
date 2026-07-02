@@ -940,3 +940,48 @@ brett_carrying_capacity:
     source: "author estimate; Brettanomyces bruxellensis spoilage densities (~1e6-1e7 CFU/mL) scaled to dry cell weight (order 0.05-0.5 g/L; Brettanomyces/Dekkera physiology reviews, e.g. Wedral et al. 2010)"
     conditions: "Brettanomyces in wine; logistic carrying capacity bounding X_brett in the growth brake (1 - X_brett/brett_carrying_capacity)"
     notes: "Read by BrettGrowth: the ONLY ceiling on Brett biomass (no sugar Monod / ethanol wall, unlike MLF). Linear 1 - X/K, clamped >= 0, mirrors the D-30 biomass_carrying_capacity form but is intrinsic and always-on (not the opt-in isolable modifier D-30 is). A SEPARATE parameter from that yeast cap (per-organism). Bounds X_brett small so the amino-acid draw stays small and the pool never overshoots negative."
+
+# -- BRETT DEATH (Brettanomyces SO2-driven kill, wine-only, decision D-40 pt3) -------------------
+# BrettDeath (fermentation.core.kinetics.brett) completes the Brett arc (pt1 pathway -> pt2 growth
+# -> pt3 death): it moves viable X_brett into the non-viable X_brett_dead pool when the wine is
+# SULFITED, so the spoilage population DECLINES and the volatile-phenol activities that scale with
+# X_brett (decarboxylase + reductase) wind down.
+#   r_death = k_death_brett * X_brett * (1 - g_SO2) * arrhenius(T, E_a_death_brett, T_ref)
+#   g_SO2   = exp(-[SO2]_molecular / molecular_so2_inhib_brett)   (the SAME term the metabolic gate uses)
+# The driver is 1 - g_SO2 - MOLECULAR SO2 ALONE. Death is EXACTLY 0 without SO2 (g_SO2 = 1) and rises
+# toward its Arrhenius ceiling as molecular SO2 accumulates. Temperature enters through the Arrhenius
+# factor (warm accelerates the kill, cold slows it - the autolysis/MLF-death shape), NOT the cardinal
+# gamma(T) (which -> 0 in the cold and would spuriously make cold KILL Brett; cold in fact PRESERVES
+# it, part of why Brett is so hard to eradicate from a cool cellar). The transfer X_brett ->
+# X_brett_dead is CARBON- AND NITROGEN-NEUTRAL (both pools weighted at the biomass fractions since
+# pt2, the yeast X -> X_dead precedent D-13), so it adds no conservation code.
+# WHY SO2 ALONE IS NATURAL FOR BRETT (contrast MalolacticDeath D-39): MLF death had to DROP an
+# ethanol/pH toxicity driver because O. oeni's Luong ethanol wall made bacteria spuriously "die" from
+# ordinary post-AF ethanol. Brett has NO such wall - the Brett gate carries no ethanol/pH term at all
+# (Brett is ethanol- and acid-tolerant) - so "molecular SO2 alone kills Brett" is not a correction of
+# a confounder but the DIRECTLY correct physics: the winemaker's ~0.5-0.8 mg/L molecular-SO2
+# Brett-control target is the real-world expression of this term. Without SO2 (or a rack) Brett
+# PERSISTS indefinitely in v1 - the honest reflection of how tenacious a barrel Brett infection is; a
+# slow benign-environment senescence is a deferred v2 refinement.
+# BOTH PARAMS SPECULATIVE (author estimates; no per-catalyst mortality law of this form is sourced).
+# Pitch-gated at compile (brett_pitch_gpl>0), NOT amino-acid-gated - Brett dies whether or not it grew.
+
+k_death_brett:
+  value: 3.0e-2
+  unit: "1/h"   # Brett specific death rate at FULL SO2 kill: r_death = k_death_brett*X_brett*(1-g_SO2)*f(T)
+  tier: speculative
+  uncertainty: { low: 1.0e-2, high: 8.0e-2, note: "specific mortality at a full molecular-SO2 kill => a Brett half-life of ~9-70 h; a stabilizing molecular-SO2 dose (~0.5-0.8 mg/L, the Brett-control target) crashes the population over ~1-4 d, while an unsulfited wine sees ZERO death (Brett persists in the barrel)" }
+  provenance:
+    source: "author estimate; molecular SO2 is the winemaker's primary tool against established Brettanomyces - maintaining ~0.5-0.8 mg/L molecular SO2 suppresses and clears it, though Brett is notably SO2-tolerant relative to other spoilage organisms (Ribereau-Gayon et al., Handbook of Enology Vol. 1, SO2 & microbial stabilization; Wedral et al. 2010, the Brettanomyces review)"
+    conditions: "Brettanomyces bruxellensis in wine, ~20 C; specific death rate at a full molecular-SO2 kill (1 - g_SO2 = 1) scaling the viable X_brett, read unscaled at T_ref by the Arrhenius factor"
+    notes: "Read by BrettDeath as the death magnitude at a full SO2 kill. VALUE 0.03/h => a full-kill half-life of ~23 h (ln2/0.03); at a strong molecular-SO2 dose (1-g_SO2 ~ 1) the population drops ~90% in ~3 d - a physically-reasonable SO2-kill timescale for a SO2-tolerant organism, chosen on that physics, NOT to clear a test threshold. Set BELOW k_death_mlf (0.05/h): Brett is more SO2-tolerant than O. oeni, so it dies more slowly at the same molecular SO2. Because death is EXACTLY 0 without SO2, k does not couple to the unsulfited spoilage trajectory, so it can take its true SO2-kill value. SPECULATIVE: no per-catalyst kinetic model of Brett SO2 mortality is sourced (viability is reported as CFU decline curves, not this rate constant), so it is tuned - NOT fitted. DIRECTION is sourced (molecular SO2 kills/suppresses Brett; the basis of using SO2 to control it); the magnitude is the speculative modelling choice. SIMPLIFICATION: reuses molecular_so2_inhib_brett as the kill scale (arrest-scale = kill-scale, bacteriostatic ~ bacteriocidal); a separate molecular_so2_brett_death_scale is the v2 refinement. A benign-environment baseline senescence (death without SO2) is deferred to v2."
+
+E_a_death_brett:
+  value: 60000.0
+  unit: "J/mol"   # Arrhenius activation energy for the temperature dependence of Brett death
+  tier: speculative
+  uncertainty: { low: 40000.0, high: 90000.0, note: "generic biological/enzymatic-process activation energy (Q10 ~2 at 20 C); brackets the ~40-90 kJ/mol range the model's other enzymatic E_a (E_a_reduction 45k, E_a_autolysis 60k, E_a_death_mlf 60k, E_a_decarb 90k) span" }
+  provenance:
+    source: "author estimate; no sourced Arrhenius fit for Brettanomyces death rate - taken equal to E_a_death_mlf / E_a_autolysis (60 kJ/mol), a generic enzymatic/biological-process activation energy (Q10 ~2.3 at 20 C), consistent with warm accelerating and cold slowing cell mortality"
+    conditions: "Brettanomyces in wine; temperature factor arrhenius(T, E_a_death_brett, T_ref) on the death rate, = 1 at T_ref (20 C)"
+    notes: "Read by BrettDeath. Gives the temperature dependence of Brett mortality so that a warm sulfited wine clears the culture faster and cold PRESERVES it (dormancy) - the physically correct direction the cardinal gamma(T) cannot supply for death (gamma(T) -> 0 in the cold would make cold kill, the opposite of reality). SPECULATIVE: the magnitude is an estimate equal to the MLF death / autolysis E_a; the DIRECTION (warm accelerates, cold preserves) is sound. Uses the shared T_ref (20 C) so the factor is 1 at the wine benchmark temperature, like every other Arrhenius rate."

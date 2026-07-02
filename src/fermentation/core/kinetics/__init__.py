@@ -18,6 +18,7 @@ from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
 from fermentation.core.kinetics.autolysis import YeastAutolysis
 from fermentation.core.kinetics.brett import (
+    BrettDeath,
     BrettDecarboxylation,
     BrettGrowth,
     BrettVinylphenolReduction,
@@ -60,6 +61,7 @@ __all__ = [
     "AcetolactateExcretion",
     "AminoAcidAssimilation",
     "BiomassCarryingCapacity",
+    "BrettDeath",
     "BrettDecarboxylation",
     "BrettGrowth",
     "BrettVinylphenolReduction",

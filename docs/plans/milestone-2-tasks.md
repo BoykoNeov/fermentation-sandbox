@@ -326,8 +326,21 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         (also physically right: Brett grows on ethanol). Regression pinned under BDF + a
         BDF/RK45/LSODA agreement test. Growth gated at the compile seam on pitch **and** aa dose.
         4 new params, 10 new tests. Full record in **DECISIONS → D-40 (pt2)**.
-  - [ ] **pt3** — `BrettDeath` (SO₂ kill + full acceptance gate); **pt4** — POF+ yeast opt-in strain
-        + emergent reservoir test.
+  - [x] **pt3 — `BrettDeath`, the SO₂-driven kill. LANDED 2026-07-02.** Completes the arc's
+        control lever: moves viable `X_brett` → `X_brett_dead` on molecular SO₂ (`r = k_death_brett·
+        X_brett·(1−g_SO₂)·arrhenius(T)`), so a sulfite addition doesn't just *pause* Brett (the gate's
+        `g_SO₂` already does that) — it **kills** it, and the produced-only `ethylphenols` accrual
+        halts. Mirrors `MalolacticDeath` (D-39): **SO₂ alone** drives death (Brett's gate has no
+        ethanol/pH term to confound, so this is *directly* correct, not a confounder-fix like MLF's);
+        **Arrhenius** temperature, not the cardinal γ(T) (so cold *preserves*, matching why Brett
+        survives cold cellars). Carbon/nitrogen-neutral transfer (both pools weighted since pt2 — no
+        new ledger code). Pitch-gated in `_BRETT_PROCESSES`/`_BRETT_GATED_PROCESSES` (Brett dies
+        whether or not it grew, unlike growth); racking already removes it (pt1 `_LEES_SLOTS`). New
+        speculative `k_death_brett`/`E_a_death_brett`. 8 new tests (incl. the integration headline —
+        SO₂ crashes a *growing* population: `X_brett_dead` accumulates, `X_brett` falls below the
+        dose, ethylphenols end below the un-sulfited control). **535 green** + 5 benchmark, ruff +
+        mypy clean. Full record in **DECISIONS → D-40 (pt3)**.
+  - [ ] **pt4** — POF+ yeast opt-in strain + emergent reservoir test.
 - **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these
       **one Process per commit, diacetyl first** (decision D-26).

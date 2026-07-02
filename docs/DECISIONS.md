@@ -2653,14 +2653,14 @@ is complete.**
 
 ## D-40 — Brettanomyces volatile phenols: the mixed-culture beat that closes Milestone 2
 
-**Status: pt1 + pt2 IMPLEMENTED 2026-07-02** (ruff + mypy clean; full suite green — see commits). The
+**Status: pt1 + pt2 + pt3 IMPLEMENTED 2026-07-02** (ruff + mypy clean; full suite green — see commits). The
 last unchecked M2 physics beat ("Mixed cultures / Brett / sour consortium"). *Brettanomyces
 bruxellensis* is the canonical wine spoilage yeast: it decarboxylates grape-must **hydroxycinnamic
 acids** (p-coumaric, ferulic) to **vinylphenols**, then reduces those to the **ethylphenols**
 (4-ethylphenol "barnyard", 4-ethylguaiacol "clove") that define Brett character. Built as a
 multi-commit arc mirroring the MLF arc (conversion → growth → death): **pt1 = the phenol pathway with
-a dosed catalyst**, **pt2 = `BrettGrowth`** (dynamic `X_brett`); pt3 `BrettDeath` (the SO₂ kill), pt4
-the POF+ yeast opt-in + emergent reservoir test — to follow.
+a dosed catalyst**, **pt2 = `BrettGrowth`** (dynamic `X_brett`), **pt3 = `BrettDeath`** (the SO₂
+kill); pt4 the POF+ yeast opt-in + emergent reservoir test — to follow.
 
 **Two owner forks (decided by the user, pros/cons presented).** (1) *Pathway fidelity* → **3-pool +
 POF+ yeast**: the `vinylphenols` intermediate earns its own state slot because it carries *emergent*
@@ -2777,6 +2777,60 @@ aa/(K_aa_brett+aa) · E/(K_E_brett+E) · g_SO₂·γ(T) · (1 − X_brett/K)`.
   isolability, and the `speculative` tier. New params `mu_max_brett`, `K_aa_brett`, `K_E_brett`,
   `brett_carrying_capacity` — all `speculative` (Brett is a characteristically slow grower; no
   per-organism kinetic values sourced).
+
+**pt3 — `BrettDeath`: the SO₂-driven kill (IMPLEMENTED 2026-07-02).** Completes the Brett arc
+(pt1 pathway → pt2 growth → pt3 death), the twin of `MalolacticDeath` (D-39). It moves viable
+`X_brett` into the non-viable `X_brett_dead` pool under molecular SO₂, so the spoilage population
+*declines* when the wine is sulfited and the phenol activities that scale with `X_brett`
+(decarboxylase + reductase) wind down. `r_death = k_death_brett · X_brett · (1 − g_SO₂) ·
+arrhenius(T, E_a_death_brett, T_ref)`, `g_SO₂ = exp(−[SO₂]_molecular / molecular_so2_inhib_brett)`.
+
+- **SO₂ alone is the *natural* driver for Brett (contrast the D-39 crux).** `MalolacticDeath` had to
+  *drop* an ethanol/pH toxicity driver because *O. oeni*'s Luong ethanol wall spuriously made
+  bacteria "die" from ordinary post-AF ethanol. Brett has **no such wall** — its gate
+  (`brett_environmental_gate`) carries no ethanol or pH term at all, because Brett is ethanol- and
+  acid-tolerant — so "molecular SO₂ alone kills Brett" is not a confounder-correction but the
+  *directly correct* physics: the winemaker's ~0.5–0.8 mg/L molecular-SO₂ Brett-control target is the
+  real-world expression of this term. Without SO₂ (or a rack) Brett persists indefinitely in v1 — an
+  honest reflection of how tenacious a barrel Brett infection is; a slow benign-environment
+  senescence is a deferred v2 refinement.
+
+- **Arrhenius temperature, not the cardinal γ(T) (the load-bearing D-39 choice reused).** Death
+  carries its own Arrhenius factor (warm accelerates the kill, cold slows it toward dormancy), **not**
+  the metabolic gate's cardinal γ(T): γ(T) → 0 in the *cold*, which would make cold *kill* Brett,
+  whereas cold in fact **preserves** it — part of why Brett is so hard to eradicate from a cool
+  cellar, and why it is cleared by SO₂, not by chilling. `test_cold_preserves_brett_via_arrhenius_\
+  not_gamma` pins this: below `T_min_brett` (where γ(T) = 0) death is still > 0 and rises with warmth.
+
+- **Conservation — a carbon/nitrogen-neutral transfer (D-13), no new ledger code.** Since pt2 both
+  `X_brett` and `X_brett_dead` are weighted in `total_carbon`/`total_nitrogen` at the same biomass
+  fractions, so `d[X_brett] = −r`, `d[X_brett_dead] = +r` is neutral in both ledgers by construction
+  (the yeast `X → X_dead` and bacterial `X_mlf → X_mlf_dead` precedent). Touches only
+  `(X_brett, X_brett_dead)`.
+
+- **Isolability + wiring.** Guards return zero *before* the pH `brentq` when `X_brett ≤ 0` or
+  `so2_total ≤ 0` (the SO₂ guard is exact — death is identically 0 without SO₂), so a
+  pitched-but-unsulfited run is byte-for-byte inert. `BrettDeath` is **pitch-gated** (in
+  `_BRETT_PROCESSES`/`_BRETT_GATED_PROCESSES`), not amino-acid-gated like `BrettGrowth` — Brett dies
+  whether or not it was growing, exactly as `MalolacticDeath` sits in `_MLF_PROCESSES` rather than the
+  growth tuple. Racking already removes both pools (pt1 `_LEES_SLOTS`), so the physical twin of the
+  SO₂ kill needed no new work. `reads` lists `molecular_so2_inhib_brett` explicitly (**not** the
+  `_BRETT_GATE_READS` cardinals) — death uses Arrhenius, so it must not pull in `T_*_brett`.
+  Consequence: on any *pitched* run `X_brett`/`X_brett_dead` report **speculative** (an enabled
+  Process touches them) — honest, matching MLF; no test asserted them VALIDATED on a pitched run.
+
+- **Headline + tests.** `test_so2_crashes_growing_brett_population` is the arc payoff and the
+  advisor-sharpened discriminator: with amino acids dosed `X_brett` grows autocatalytically, then a
+  mid-run SO₂ addition **kills** it — the unambiguous death signal (distinct from the growth gate's
+  mere arrest) is that `X_brett_dead` *accumulates* **and** `X_brett` falls below its value at the
+  dose, while the un-sulfited control keeps growing; ethylphenols end lower. **+8 tests** (`test_\
+  brett.py`): the headline, the MLF-death-mirrored RHS suite (zero-without-SO₂, neutral transfer,
+  `touches`, more-SO₂-kills-faster, cold-preserves-via-Arrhenius), integration-level carbon+nitrogen
+  closure, and the `speculative` tier. `test_media.py` `BRETT_PROCESSES` gains `brett_death`. New
+  params `k_death_brett` (0.03/h, below `k_death_mlf` — Brett is more SO₂-tolerant than *O. oeni*) and
+  `E_a_death_brett` (60 kJ/mol, = `E_a_death_mlf`/`E_a_autolysis`), both `speculative` (no per-catalyst
+  Brett mortality law is sourced; direction — SO₂ kills, cold preserves — is sound). **535 green** +
+  5 benchmark, ruff + mypy clean. pt4 (POF+ yeast opt-in strain + emergent reservoir test) remains.
 
 ## Deferred (decide early in the relevant milestone)
 
