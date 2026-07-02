@@ -18,7 +18,13 @@ resumes cleanly. In the first session I completed docs+commit+push but initially
 forgot the memory step — don't repeat that.
 
 **How to apply:** at batch end, in order: (1) write/refresh memory files here +
-update `MEMORY.md`; (1b) **sync the repo's tracked copy** — the memory files are
+update `MEMORY.md`. **The full per-decision narrative goes in `docs/DECISIONS.md`
+ONLY — memory gets a *distilled status update / pointer*, never a copy.** Do not
+append the batch write-up to [[project-fermentation-sandbox]] or to a `MEMORY.md`
+index line; instead update the project file's short status block and bump the
+current D-number. `MEMORY.md` index entries stay one line (~200 chars). This is
+the guardrail that keeps memory from re-bloating — the decision log is the archive,
+memory is the boot context. (1b) **sync the repo's tracked copy** — the memory files are
 version-controlled under `.claude/memory/` (since commit `1c095ab`), so refresh
 them from the live dir before committing:
 `cp ~/.claude/projects/M--claud-projects-Fermentation/memory/*.md .claude/memory/`

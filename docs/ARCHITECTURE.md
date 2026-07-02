@@ -1,8 +1,12 @@
 # Architecture
 
-This describes the implemented skeleton (Milestone 0) and how the layers fit
-together. The original brief is [`FERMENTATION_SIM_HANDOFF.md`](FERMENTATION_SIM_HANDOFF.md);
-the design decisions and where we deviated from it are in [`DECISIONS.md`](DECISIONS.md).
+This describes how the layers fit together. Milestones 0 and 1 are complete
+(the tested skeleton, then single-strain isothermal primary fermentation passing
+both §2.2 benchmarks); Milestone 2 (pH, aroma byproducts, SO₂, MLF, temperature
+scheduling, discrete interventions, stochastic ensembles) is in progress. The
+original brief is [`FERMENTATION_SIM_HANDOFF.md`](FERMENTATION_SIM_HANDOFF.md);
+the per-decision record and where we deviated from it are in
+[`DECISIONS.md`](DECISIONS.md) (D-1 … D-37), which is the canonical archive.
 
 ## Layering
 
@@ -28,9 +32,9 @@ Package map:
 |-------|---------|-----------|
 | parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` |
 | units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, … |
-| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon fractions, Gay-Lussac split, `sugar_species`); `acidbase` (`solve_ph`, `ph_of_state`, `titratable_acidity`, `ph_tier`, charge balance); `kinetics` (`GrowthNitrogenLimited`, `SugarUptakeToEthanolCO2`, `EthanolInhibition`) |
-| runtime | `fermentation.runtime` | `simulate`, `Trajectory` |
-| scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` |
+| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon/nitrogen fractions, Gay-Lussac split, `sugar_species`); `acidbase` (`solve_ph`, `ph_of_state`, `titratable_acidity`, `ph_tier`, `speciate_so2`, charge balance); `kinetics` (growth, uptake, ethanol inhibition, Arrhenius, esters/fusels, acetaldehyde, vicinal diketones, H₂S, malolactic, amino-acid ledger, autolysis, temperature ramp, carrying-capacity cap) |
+| runtime | `fermentation.runtime` | `simulate`, `Trajectory`; `simulate_scheduled`, `ScheduledEvent`, `ScheduledTrajectory` (event loop); `simulate_ensemble`, `Ensemble` (stochastic wrapper) |
+| scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` (`.run` / `.run_ensemble`); intervention verbs `add_dap` / `add_so2` / `rack` / `pitch_mlf` |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
 | analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series` (top-layer observables over a `Trajectory`) |
 
@@ -50,6 +54,15 @@ are 0 at pitch and only accumulate during fermentation: inactivated biomass
 `X_dead` (D-13), and the realised-yield byproduct sinks `Gly` (glycerol) and
 `Byp` (lumped minor byproducts) (D-16). These declare a `VarSpec.default` so
 `pack` fills them when omitted, while substrate/condition vars stay required.
+
+Milestone 2 grows the vector further with additive, isolable pools introduced by
+their respective Processes — aroma byproducts (`esters`/`fusels` and their gas
+sinks, `acetaldehyde`, diacetyl's α-acetolactate/`diacetyl`/butanediol pools,
+`h2s`), the wine acid/SO₂ system (`tartaric`/`malic`/`lactic`/`cation_charge`,
+`so2_total`), and the MLF/nitrogen machinery (`X_mlf`, `citrate`, `amino_acids`,
+`debris`). Each defaults to 0 (or is dosed at the compile seam) so a scenario that
+doesn't use it stays byte-for-byte the validated core (prime directive #3); most
+are detailed in the pH/aroma sections below and in `DECISIONS.md`.
 
 ### Process
 A `Process` contributes to `d(state)/dt`. It declares `name`, `tier`, and the
@@ -113,8 +126,23 @@ the far side of `fermentation.units`. (See DECISIONS #3.)
 `simulate(process_set, params, y0, t_span)` wraps `solve_ivp` with an implicit
 adaptive method (BDF by default — fermentation is stiff) and returns a
 `Trajectory` carrying the time grid, the state history, and the derived tier map.
-The event-driven loop (interventions, phase switching) and the stochastic
-ensemble wrapper layer on top of this without changing the core.
+
+Two wrappers layer on top of this without changing the pure core:
+- **Event loop** (`simulate_scheduled`, D-35) — segments a run at `ScheduledEvent`
+  breakpoints (mutate / reconfigure / param_update) and restarts `simulate` per
+  segment (a dose is a real discontinuity; BDF order-restart is correct — not
+  `solve_ivp(events=)`, which can't mutate-and-resume). It carries an external-flow
+  ledger so conservation across a jump is `final == initial + Σ flows`, and
+  min-combines the per-segment tier map. `events=()` is byte-for-byte plain
+  `simulate`. Temperature scheduling (a driven `TemperatureRamp`) and the discrete
+  intervention verbs (D-36) both ride this one mechanism; `CompiledScenario.run()`
+  always dispatches through it.
+- **Stochastic ensemble** (`simulate_ensemble`, D-24/25/37) — Monte-Carlo over the
+  parameters' `Uncertainty` bands (triangular default; LHS/Sobol via `qmc`), scoped
+  to the active Process set's reads, returning nominal + median + P5/P95 band and
+  per-member conservation. Randomness lives *only* here (seeded), keeping the core
+  pure and reproducible. `simulate_ensemble(events=…)` runs the ensemble over a
+  scheduled run (D-37).
 
 ## Scenarios as data
 
@@ -128,9 +156,9 @@ cross-beverage reuse trivial.
 A **`Medium`** (`fermentation.core.media`) names a beverage family and fixes its
 `StateSchema` plus the Processes that act on it. `wine_schema()` has one sugar
 slot; `beer_schema()` has three (`glucose`/`maltose`/`maltotriose`, in uptake
-order). The `MEDIA` registry maps name → `Medium`; processes are empty until the
-M1 kinetics land, so a compiled medium currently integrates to a constant
-baseline.
+order). The `MEDIA` registry maps name → `Medium`; each medium fixes the Processes
+that act on it (the M1 kinetics core plus the M2 Tier-2 mechanisms, speculative
+ones staying isolable/togglable per prime directive #3).
 
 **`compile_scenario(scenario)`** (`fermentation.scenario.compile`) is the
 scenario→core seam and the *only* place industry units cross into canonical ones
@@ -155,9 +183,11 @@ Two disciplines, both as code:
   balances (the biomass C/N fraction is a passed-in Parameter); mass is scoped to
   the abiotic `S + E + CO₂` conversion. (See DECISIONS #8.)
 - **Benchmark curves** — the §2.2 acceptance criteria are encoded as
-  `BenchmarkSpec` data now; the `tests/benchmarks/` tests are skipped until the
-  kinetics exist. `ReferenceSeries` + `compare_series` (RMSE/MAE) are the seam
-  for scoring against *real* measured datasets when we obtain them.
+  `BenchmarkSpec` data; the wine and beer `tests/benchmarks/` now **pass** (5
+  benchmark tests), gated behind the `benchmark` pytest marker so they run via
+  `uv run pytest -m benchmark` rather than in the default suite. `ReferenceSeries`
+  + `compare_series` (RMSE/MAE) are the seam for scoring against *real* measured
+  datasets when we obtain them.
 
 ## pH as a derived pure function (acid state + charge balance, D-18)
 
