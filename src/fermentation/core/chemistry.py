@@ -169,6 +169,33 @@ M_ARGININE = 6 * _M_C + 14 * _M_H + 4 * _M_N + 2 * _M_O
 #: amino-acid pool, so the glucan remainder is nitrogen-free — a documented simplification (real
 #: mannoproteins retain some protein nitrogen). Carbon fraction 72.066/162.141 ≈ 0.4445.
 M_GLUCAN = 6 * _M_C + 10 * _M_H + 5 * _M_O
+#: p-Coumaric acid (4-hydroxycinnamic acid), C9H8O3 — the representative species for the lumped
+#: **hydroxycinnamics** must-precursor pool (decision D-40, Brett volatile phenols). Grape must
+#: carries free hydroxycinnamic acids (p-coumaric + ferulic, ~10–200 mg/L); *Brettanomyces*
+#: (and POF+ *S. cerevisiae*) decarboxylate them to 4-vinylphenol/4-vinylguaiacol, which Brett
+#: then reduces to the 4-ethylphenol/4-ethylguaiacol "barnyard"/"clove" off-aromas. The two
+#: precursors and their two product chains are **lumped** (fork-2 choice, D-40): p-coumaric is the
+#: honest single-species stand-in (the dominant 4-EP branch), the arginine-for-``amino_acids`` /
+#: succinic-for-``Byp`` idiom (D-16/D-32). Decarboxylation p-coumaric (9 C) → 4-vinylphenol (8 C)
+#: + CO2 (1 C) is carbon-closing mole-for-mole on the existing ledger (9 = 8 + 1), exactly like
+#: malic → lactic + CO2 (D-23). BOOKKEEPING CAVEAT: lumping p-coumaric for the (larger) ferulic
+#: slightly under-counts the 4-EG branch's carbon; exact on the ledger, approximate on provenance.
+M_P_COUMARIC = 9 * _M_C + 8 * _M_H + 3 * _M_O
+#: 4-Vinylphenol, C8H8O — the representative species for the lumped **vinylphenols** shared
+#: intermediate pool (4-vinylphenol + 4-vinylguaiacol; decision D-40). The decarboxylase product
+#: and the reductase substrate: a *shared reservoir* POF+ yeast fills but cannot clear (it lacks
+#: the reductase) and *Brettanomyces* drains — the emergent yeast/Brett coupling (the α-acetolactate
+#: reservoir parallel, D-26/D-31). Reduction 4-vinylphenol (8 C) → 4-ethylphenol (8 C) is a
+#: mole-for-mole C8 → C8 transfer (two H added from NADH, no carbon change), carbon-neutral between
+#: two weighted pools like diacetyl → butanediol (D-26). Itself a medicinal off-aroma readout.
+M_VINYLPHENOL = 8 * _M_C + 8 * _M_H + 1 * _M_O
+#: 4-Ethylphenol, C8H10O — the representative species for the lumped **ethylphenols** end-product
+#: pool (4-ethylphenol "horse-sweat/barnyard" + 4-ethylguaiacol "clove/smoky"; decision D-40). The
+#: terminal Brett volatile-phenol readout, produced-only. Same 8 carbons as its 4-vinylphenol
+#: precursor, so the vinylphenol → ethylphenol reduction is carbon-conserving (C8 → C8) and
+#: ``total_carbon`` closes to machine precision through the whole precursor → intermediate →
+#: product chain.
+M_ETHYLPHENOL = 8 * _M_C + 10 * _M_H + 1 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -195,6 +222,9 @@ MOLAR_MASS: dict[str, float] = {
     "butanediol": M_BUTANEDIOL,
     "arginine": M_ARGININE,
     "glucan": M_GLUCAN,
+    "p_coumaric_acid": M_P_COUMARIC,
+    "vinylphenol": M_VINYLPHENOL,
+    "ethylphenol": M_ETHYLPHENOL,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -224,6 +254,9 @@ CARBON_ATOMS: dict[str, int] = {
     "butanediol": 4,
     "arginine": 6,
     "glucan": 6,
+    "p_coumaric_acid": 9,
+    "vinylphenol": 8,
+    "ethylphenol": 8,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -258,6 +291,11 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: Cell-wall debris (glucan) is carbon-only: all dead-cell nitrogen is released as
     #: assimilable amino acids, so the remainder carries none (decision D-34).
     "glucan": 0,
+    #: The Brett volatile-phenol species are nitrogen-free (hydroxycinnamic acids and their
+    #: vinyl-/ethyl-phenol products carry no nitrogen; decision D-40).
+    "p_coumaric_acid": 0,
+    "vinylphenol": 0,
+    "ethylphenol": 0,
 }
 
 

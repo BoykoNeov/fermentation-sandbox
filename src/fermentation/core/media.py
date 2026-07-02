@@ -70,6 +70,8 @@ from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     ArrheniusTemperature,
     BiomassCarryingCapacity,
+    BrettDecarboxylation,
+    BrettVinylphenolReduction,
     DiacetylReduction,
     EsterSynthesis,
     EsterVolatilization,
@@ -273,6 +275,46 @@ def wine_schema() -> StateSchema:
             description="non-assimilable cell-wall debris (glucan/mannoprotein; produced-only). "
             "The carbon-rich remainder yeast autolysis leaves behind after releasing the "
             "nitrogen-rich amino acids — carbon-accounted as glucan, nitrogen-free (D-34)",
+        ),
+        VarSpec(
+            "hydroxycinnamics",
+            "g/L",
+            default=0.0,
+            description="lumped hydroxycinnamic-acid must precursors (p-coumaric + ferulic; booked "
+            "as p-coumaric). Decarboxylated to vinylphenols by Brettanomyces (and POF+ yeast); the "
+            "Brett volatile-phenol substrate (decision D-40)",
+        ),
+        VarSpec(
+            "vinylphenols",
+            "g/L",
+            default=0.0,
+            description="lumped 4-vinylphenol / 4-vinylguaiacol — the shared decarboxylase→"
+            "reductase intermediate reservoir (produced-only). POF+ yeast fills it but cannot "
+            "clear it; Brettanomyces reduces it to ethylphenols (decision D-40)",
+        ),
+        VarSpec(
+            "ethylphenols",
+            "g/L",
+            default=0.0,
+            description="lumped 4-ethylphenol / 4-ethylguaiacol — the terminal Brett "
+            "volatile-phenol off-aromas ('barnyard'/'clove'; produced-only readout, decision "
+            "D-40)",
+        ),
+        VarSpec(
+            "X_brett",
+            "g/L",
+            default=0.0,
+            description="Brettanomyces bruxellensis viable biomass — the spoilage catalyst scaling "
+            "the decarboxylase/reductase rates. Dosed at pitch; grown (BrettGrowth, D-40 pt2) and "
+            "killed off into X_brett_dead by SO₂ (BrettDeath, D-40 pt3)",
+        ),
+        VarSpec(
+            "X_brett_dead",
+            "g/L",
+            default=0.0,
+            description="non-viable Brettanomyces biomass — the settled lees BrettDeath moves "
+            "X_brett into (carbon/nitrogen still counted at the biomass fractions, no longer "
+            "catalytic; racked off with the other lees, decision D-40)",
         ),
     ]
     return StateSchema(specs)
@@ -497,6 +539,23 @@ _MLF_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: a compile rule — so co-inoculation dominance is emergent, not hard-coded (D-38). Wine-only.
 _MLF_GROWTH_PROCESSES: tuple[Callable[[], Process], ...] = (MalolacticGrowth,)
 
+#: *Brettanomyces* volatile-phenol spoilage (wine-only, decision D-40): the mixed-culture beat that
+#: closes Milestone 2. :class:`BrettDecarboxylation` takes must ``hydroxycinnamics`` →
+#: ``vinylphenols`` + CO2 and :class:`BrettVinylphenolReduction` reduces ``vinylphenols`` →
+#: ``ethylphenols`` — Brett carries BOTH enzymes, so a dosed culture spoils POF-negative wine
+#: unaided (the canonical funk mechanism). Kept in its own tuple so it stays **isolable** (prime
+#: directive #3), mirroring the *dosed* MLF organism (and unlike the always-on intrinsic aroma
+#: pools): both Processes contribute zero before any pH work when ``X_brett`` is undosed, and the
+#: compile seam DISABLES them when Brett is not pitched so the inert ``hydroxycinnamics``/
+#: ``vinylphenols``/``ethylphenols`` slots keep their VALIDATED tier (``tier_of`` counts enabled,
+#: not nonzero, Processes — the D-23 MLF pattern). :class:`BrettGrowth` (D-40 pt2, amino-acid-gated)
+#: and :class:`BrettDeath` (D-40 pt3, SO₂ lever) join the arc in later commits. Wine-only: beer has
+#: no ``hydroxycinnamics``/phenol slots, so Brett is never wired there.
+_BRETT_PROCESSES: tuple[Callable[[], Process], ...] = (
+    BrettDecarboxylation,
+    BrettVinylphenolReduction,
+)
+
 #: Biomass carrying-capacity cap (wine-only, decision D-30): the opt-in residual-nitrogen
 #: floor. A logistic ``(1 - X/K)`` RateModifier on growth that saturates biomass below the
 #: nitrogen ceiling, leaving a dose-dependent residual of yeast-assimilable nitrogen — which
@@ -590,6 +649,7 @@ MEDIA: dict[str, Medium] = {
             + _H2S_PROCESSES
             + _MLF_PROCESSES
             + _MLF_GROWTH_PROCESSES
+            + _BRETT_PROCESSES
             + _AMINO_ACID_PROCESSES
             + _AUTOLYSIS_PROCESSES
         ),

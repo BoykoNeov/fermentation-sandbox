@@ -176,6 +176,21 @@ def total_carbon(
     # total_nitrogen. On an undosed / autolysis-off run the pool is empty (constant 0 term).
     if "debris" in schema:
         w[schema.slice("debris")] = carbon_mass_fraction("glucan")
+    # Brett volatile-phenol pools (decision D-40): the decarboxylase routes carbon hydroxycinnamics
+    # (p-coumaric, C9) → vinylphenols (C8) + CO2 (C1), carbon-closing mole-for-mole like malic →
+    # lactic + CO2; the reductase moves vinylphenols (C8) → ethylphenols (C8), a mole-for-mole C8 →
+    # C8 transfer between two weighted pools like diacetyl → butanediol. Weighting all three at
+    # their representative species (p-coumaric / 4-vinylphenol / 4-ethylphenol) keeps total_carbon
+    # closed through the whole precursor → intermediate → product chain. On an undosed / un-pitched
+    # run the pools are empty and the Processes disabled (constant 0 terms). X_brett is NOT weighted
+    # yet — it is a constant, inert catalyst in pt1 (no Process grows or kills it), exactly like
+    # X_mlf before the MLF-growth beat; BrettGrowth (D-40 pt2) promotes it to weighted biomass.
+    if "hydroxycinnamics" in schema:
+        w[schema.slice("hydroxycinnamics")] = carbon_mass_fraction("p_coumaric_acid")
+    if "vinylphenols" in schema:
+        w[schema.slice("vinylphenols")] = carbon_mass_fraction("vinylphenol")
+    if "ethylphenols" in schema:
+        w[schema.slice("ethylphenols")] = carbon_mass_fraction("ethylphenol")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(

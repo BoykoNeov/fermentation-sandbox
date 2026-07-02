@@ -306,7 +306,19 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       tests (`test_mlf_growth.py`), incl. the fail-first autocatalysis acceptance (growth on vs the
       Process disabled). **496 green** + 5 benchmark, ruff + mypy clean. Full record in
       **DECISIONS → D-38**.
-- [ ] **Mixed cultures / Brett / sour consortium** — resource competition. (After MLF.)
+- [ ] **Mixed cultures / Brett / sour consortium** — the volatile-phenol spoilage beat (decision
+      D-40). Multi-commit arc mirroring MLF (pathway → growth → death → POF+ yeast).
+  - [x] **pt1 — Brett phenol pathway, dosed catalyst. LANDED 2026-07-02.** `BrettDecarboxylation`
+        (hydroxycinnamics → vinylphenols + CO2) + `BrettVinylphenolReduction` (vinylphenols →
+        ethylphenols); Brett carries **both** enzymes so it spoils POF- wine unaided (the canonical
+        funk). Gate = `g_SO₂ · γ(T)` only (Brett is acid- + ethanol-tolerant — no MLF pH/ethanol
+        walls); warm optimum (32 °C). 5 new wine slots (`hydroxycinnamics`/`vinylphenols`/
+        `ethylphenols`/`X_brett`/`X_brett_dead`), `pitch_brett` verb, `_BRETT_GATED_PROCESSES`
+        compile gate, `X_brett`(_dead) in `_LEES_SLOTS`. Carbon closes on the existing ledger.
+        11 new tests (`test_brett.py`), incl. the emergent Brett-gated headline + SO₂/rack levers +
+        post-AF pitch ethanol-tolerance. All params `speculative`. Full record in **DECISIONS → D-40**.
+  - [ ] **pt2** — `BrettGrowth` (dynamic `X_brett`, nitrogen-anchored); **pt3** — `BrettDeath` (SO₂
+        kill + full acceptance gate); **pt4** — POF+ yeast opt-in strain + emergent reservoir test.
 - **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these
       **one Process per commit, diacetyl first** (decision D-26).

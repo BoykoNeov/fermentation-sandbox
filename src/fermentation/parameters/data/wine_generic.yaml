@@ -790,3 +790,91 @@ k_mlf_diacetyl_reduction:
     source: "author estimate; O. oeni reduces diacetyl to acetoin/2,3-butanediol via diacetyl reductase, the lees-contact clearing step (Bartowsky & Henschke 2004, Int. J. Food Microbiol. 96:235-252; Ribereau-Gayon et al., Handbook of Enology Vol. 1)"
     conditions: "O. oeni in wine; enzymatic diacetyl reduction, first-order in diacetyl and in the dosed (constant) X_mlf, using the shared E_a_reduction temperature factor"
     notes: "Read by OenococcusDiacetylReduction. Complements the yeast DiacetylReduction (D-26): the yeast (higher rate x higher biomass) clears diacetyl fast while viable; this bacterial reducer keeps clearing it after the yeast is ethanol-inactivated, as long as O. oeni is present - the realistic lees-contact clean-up, and the reason removing the bacteria (SO2 / racking) locks diacetyl in. v1 has no bacterial death gate (X_mlf constant), so this does not stop at high ethanol/SO2 - a documented simplification; bacterial arrest/death is deferred with the MLF-growth beat. Magnitude speculative."
+
+# -- BRETTANOMYCES VOLATILE PHENOLS (wine-only, decision D-40) -----------------------------------
+# The mixed-culture beat that closes Milestone 2. Brettanomyces bruxellensis is the canonical wine
+# spoilage yeast: it decarboxylates grape-must HYDROXYCINNAMIC ACIDS (p-coumaric, ferulic) to
+# VINYLPHENOLS, then reduces those to the ETHYLPHENOLS (4-ethylphenol "barnyard", 4-ethylguaiacol
+# "clove") that define Brett character. Read by two Processes in fermentation.core.kinetics.brett:
+#   BrettDecarboxylation: r = k_brett_decarb * X_brett * [hc]/(K_hydroxycinnamic+[hc]) * gate
+#     with d(hydroxycinnamics) = -r*M_p_coumaric, d(vinylphenols) = +r*M_vinylphenol,
+#     d(CO2) = +r*M_CO2 (p-coumaric C9 -> vinylphenol C8 + CO2 C1; carbon closes 9 = 8 + 1).
+#   BrettVinylphenolReduction: L = k_brett_reduction * X_brett * gate * [vinylphenols], with
+#     d(vinylphenols) = -L, d(ethylphenols) = +L*M_ethylphenol/M_vinylphenol (mole-for-mole C8->C8).
+# Brett carries BOTH enzymes, so a dosed culture spoils POF-negative wine unaided (the canonical
+# funk). 'gate' = g_SO2 * gamma(T) - the Brett environmental gate has NO pH or ethanol term (Brett
+# is acid- AND ethanol-tolerant, unlike O. oeni; copying the MLF gate would arrest it where it
+# thrives, decision D-40). X_brett is a constant inert catalyst in pt1 (BrettGrowth D-40 pt2 makes
+# it dynamic). ALL SPECULATIVE: no per-catalyst kinetic model of this flux form is sourced (Brett
+# volatile phenols are reported as bulk mg/L end-yields, not per-biomass rate constants), so these
+# are tuned to a plausible slow (weeks-months) spoilage, NOT fitted.
+
+k_brett_decarb:
+  value: 5.0e-6
+  unit: "mol/(g*h)"   # molar hydroxycinnamate turnover per g/L X_brett: r = k_brett_decarb*X_brett*Monod*gate
+  tier: speculative
+  uncertainty: { low: 1.0e-6, high: 2.0e-5, note: "order-of-magnitude target: a dosed X_brett ~0.1-0.5 g/L converts a must hydroxycinnamic pool (~50-150 mg/L) over WEEKS-MONTHS (Brett spoilage is slow), not hours - the timescale that makes an SO2/rack control meaningfully interrupt it" }
+  provenance:
+    source: "author estimate; Brettanomyces cinnamate decarboxylase converts hydroxycinnamic acids to vinylphenols (Chatonnet et al. 1992, J. Sci. Food Agric. 60:165-178; Dias et al. 2003, Food Microbiol. 20:377-384 - the canonical 4-ethylphenol spoilage studies)"
+    conditions: "Brettanomyces bruxellensis in wine, ~20 C; specific decarboxylase activity scaling the dosed (constant, pt1) X_brett"
+    notes: "Read by BrettDecarboxylation as the specific decarboxylase rate. SPECULATIVE magnitude: no per-catalyst kinetic model of our flux form is sourced (Brett phenols are reported as bulk end-yields), so it is tuned to a slow weeks-months spoilage at a realistic dose, NOT fitted. The dose X_brett (g/L) sets the absolute timescale linearly, so k_brett_decarb and a realistic pitch trade off (the growth beat D-40 pt2 makes X_brett dynamic). DIRECTION sourced (Brett decarboxylates hydroxycinnamic acids); magnitude is the speculative choice."
+
+K_hydroxycinnamic:
+  value: 5.0e-4
+  unit: "mol/L"   # Michaelis-Menten half-saturation in hydroxycinnamic precursor (molar)
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 2.0e-3, note: "decarboxylase / uptake half-saturation of order ~mM; near a typical must hydroxycinnamic pool (~50-150 mg/L ~ 0.3-0.9 mM), so the term is O(1) and declines as the precursor is consumed - a genuine depletion tail, not a near-constant scale" }
+  provenance:
+    source: "author estimate of order the reported hydroxycinnamate-decarboxylase half-saturation (~mM range; enzyme kinetics on cinnamate decarboxylase / p-coumaric acid uptake)"
+    conditions: "Brettanomyces in wine; half-saturation in the precursor Monod term of BrettDecarboxylation (mol/L, matching the [hc] the Process computes from g/L via M_p_coumaric)"
+    notes: "Read by BrettDecarboxylation. Sets where the precursor Monod [hc]/(K+[hc]) rolls off, giving a near-complete conversion of the must hydroxycinnamic pool over the ferment rather than an abrupt stop. SPECULATIVE: the whole-cell precursor affinity our X_brett lumps is not the isolated-enzyme Km, taken mid-range, not fitted."
+
+k_brett_reduction:
+  value: 5.0e-2
+  unit: "L/(g*h)"   # d(vinylphenols)/dt = -k_brett_reduction * X_brett * gate * [vinylphenols]
+  tier: speculative
+  uncertainty: { low: 1.0e-2, high: 1.5e-1, note: "held ABOVE the decarboxylase turnover so the shared vinylphenol reservoir is drained to ethylphenol faster than it fills - in Brett (which has both enzymes) the intermediate does not pile up, so ethylphenols track the decarboxylation; the reservoir only strands when Brett is absent and a POF+ yeast made the vinylphenol (D-40 pt4)" }
+  provenance:
+    source: "author estimate; Brettanomyces vinylphenol reductase reduces vinylphenols to ethylphenols, the second and Brett-specific step S. cerevisiae lacks (Chatonnet et al. 1992; Dias et al. 2003)"
+    conditions: "Brettanomyces in wine, ~20 C; enzymatic vinylphenol reduction, first-order in vinylphenol and in the dosed (constant, pt1) X_brett, throttled by the shared Brett SO2/temperature gate"
+    notes: "Read by BrettVinylphenolReduction. Set ABOVE k_brett_decarb so vinylphenol turns to ethylphenol faster than it is made - so in Brett the intermediate stays low and 4-EP accumulates (the reservoir strands only when a POF+ yeast fills it with no Brett present, the D-40 pt4 emergent case). Uses the SAME g_SO2*gamma(T) gate as the decarboxylase, so SO2 arrests both steps. Magnitude speculative; direction (Brett reduces vinylphenol to ethylphenol) sourced."
+
+molecular_so2_inhib_brett:
+  value: 2.0e-4
+  unit: "g/L"   # decay scale of g_SO2 = exp(-[SO2]_molecular / molecular_so2_inhib_brett)
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 5.0e-4, note: "molecular SO2 inhibitory scale ~0.1-0.5 mg/L; ~0.5-0.8 mg/L molecular strongly suppresses Brett - the basis of the winemaker's ~0.5-0.8 mg/L molecular SO2 target to control Brettanomyces" }
+  provenance:
+    source: "author estimate encoding the antimicrobial action of MOLECULAR SO2 on Brettanomyces (the same molecular-SO2 antimicrobial basis as the D-22 readout; the ~0.5-0.8 mg/L molecular SO2 target is the standard Brett-control guideline, Ribereau-Gayon et al., Handbook of Enology Vol. 1)"
+    conditions: "Brettanomyces in wine; exponential decay scale of the molecular-SO2 inhibition gate on the decarboxylase/reductase rates"
+    notes: "Read by brett_environmental_gate: g_SO2 = exp(-[SO2]_molecular / s), where [SO2]_molecular (g/L) is partitioned from the dosed free SO2 at the SOLVED pH (D-22). Scale ~0.2 mg/L: g_SO2 ~ 0.018 at 0.8 mg/L molecular (strong suppression), ~1 when undosed. Taken equal to molecular_so2_inhib_mlf - both organisms respond to molecular SO2 on a similar ~0.1-0.5 mg/L scale (a v1 simplification; a Brett-specific scale is a v2 refinement). DIRECTION strongly sourced (molecular SO2 is THE tool to control Brett); exact scale and exponential FORM speculative. This same scale is reused as the SO2 KILL scale by BrettDeath (D-40 pt3)."
+
+T_min_brett:
+  value: 283.15
+  unit: "K"   # cardinal minimum (10 C) of the Rosso CTMI temperature optimum gamma(T)
+  tier: speculative
+  uncertainty: { low: 279.15, high: 286.15, note: "Brettanomyces growth is slow but not zero in cold cellars; T_min ~8-12 C - Brett persists (slowly) at barrel-cellar temperatures, part of why it is hard to eradicate" }
+  provenance:
+    source: "author estimate from Brettanomyces cardinal temperatures (grows ~10-40 C, optimum warm; slow persistence in cool cellars; Brettanomyces/Dekkera physiology reviews)"
+    conditions: "Brettanomyces in wine; minimum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
+    notes: "Read by brett_environmental_gate via cardinal_temperature_factor (Rosso et al. 1993 CTMI). 10 C. Below it gamma(T)=0. DIRECTION sourced (cold slows Brett); exact cardinal speculative. CTMI uses only temperature DIFFERENCES, so K and C give identical gamma (D-3)."
+
+T_opt_brett:
+  value: 305.15
+  unit: "K"   # cardinal optimum (32 C) where gamma(T) = 1 - WARMER than O. oeni's 23 C
+  tier: speculative
+  uncertainty: { low: 298.15, high: 308.15, note: "Brettanomyces optimum ~25-32 C, distinctly WARMER than O. oeni MLF (~20-25 C) - warm cellars/late-season barrels favour Brett" }
+  provenance:
+    source: "author estimate from Brettanomyces growth optimum reports (~28-32 C; distinctly warmer than the O. oeni MLF optimum)"
+    conditions: "Brettanomyces in wine; optimum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
+    notes: "Read by brett_environmental_gate via cardinal_temperature_factor. 32 C, where gamma(T)=1 (k_brett_decarb/k_brett_reduction read unscaled there). At a 20 C cellar gamma ~0.6, at a cool 15 C barrel cellar ~0.4 - so Brett is SLOW but active at cellar temperatures and faster in a warm room, the realistic direction. WARMER optimum than O. oeni is the load-bearing contrast (Brett is a warm-tolerant spoiler). Exact optimum speculative; a warm optimum ~28-32 C is well-established."
+
+T_max_brett:
+  value: 318.15
+  unit: "K"   # cardinal maximum (45 C) of the CTMI temperature optimum gamma(T)
+  tier: speculative
+  uncertainty: { low: 313.15, high: 322.15, note: "Brettanomyces growth ceases by ~40-45 C; T_max ~45 C" }
+  provenance:
+    source: "author estimate from Brettanomyces upper cardinal temperature (growth ceases ~40-45 C)"
+    conditions: "Brettanomyces in wine; maximum cardinal temperature of the CTMI gamma(T) factor (stored in K, sourced in C)"
+    notes: "Read by brett_environmental_gate via cardinal_temperature_factor. 45 C. Above it gamma(T)=0. Far above any normal wine ferment/cellar, so it shapes only the high-T tail; exact value speculative, direction (a finite upper limit exists) sound."

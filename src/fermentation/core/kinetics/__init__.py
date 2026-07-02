@@ -17,6 +17,11 @@ from fermentation.core.kinetics.acetaldehyde import (
 from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
 from fermentation.core.kinetics.autolysis import YeastAutolysis
+from fermentation.core.kinetics.brett import (
+    BrettDecarboxylation,
+    BrettVinylphenolReduction,
+    brett_environmental_gate,
+)
 from fermentation.core.kinetics.byproducts import (
     EsterSynthesis,
     EsterVolatilization,
@@ -54,6 +59,8 @@ __all__ = [
     "AcetolactateExcretion",
     "AminoAcidAssimilation",
     "BiomassCarryingCapacity",
+    "BrettDecarboxylation",
+    "BrettVinylphenolReduction",
     "DiacetylReduction",
     "ArrheniusTemperature",
     "EsterSynthesis",
@@ -74,6 +81,7 @@ __all__ = [
     "YeastAutolysis",
     "arrhenius_factor",
     "biomass_growth_rate",
+    "brett_environmental_gate",
     "cardinal_temperature_factor",
     "fusel_production_rate",
     "malolactic_environmental_gate",

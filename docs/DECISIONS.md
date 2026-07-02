@@ -2651,6 +2651,74 @@ interventions`, 506 green): rack removes both pools while leaving viable yeast +
 untouched; and C/N closure across a dose-then-rack MLF run. **The MLF arc (D-23 → D-31 → D-38 → D-39)
 is complete.**
 
+## D-40 — Brettanomyces volatile phenols: the mixed-culture beat that closes Milestone 2
+
+**Status: pt1 IMPLEMENTED 2026-07-02** (ruff + mypy clean; full suite green — see commit). The last
+unchecked M2 physics beat ("Mixed cultures / Brett / sour consortium"). *Brettanomyces bruxellensis*
+is the canonical wine spoilage yeast: it decarboxylates grape-must **hydroxycinnamic acids**
+(p-coumaric, ferulic) to **vinylphenols**, then reduces those to the **ethylphenols** (4-ethylphenol
+"barnyard", 4-ethylguaiacol "clove") that define Brett character. Built as a multi-commit arc
+mirroring the MLF arc (conversion → growth → death): **pt1 = the phenol pathway with a dosed
+catalyst** (this entry); pt2 `BrettGrowth` (dynamic `X_brett`), pt3 `BrettDeath` (the SO₂ kill), pt4
+the POF+ yeast opt-in + emergent reservoir test — to follow.
+
+**Two owner forks (decided by the user, pros/cons presented).** (1) *Pathway fidelity* → **3-pool +
+POF+ yeast**: the `vinylphenols` intermediate earns its own state slot because it carries *emergent*
+behaviour — a POF+ *S. cerevisiae* fills a shared reservoir it cannot clear (it has the decarboxylase
+but not the reductase), and only Brett drains it, so "no Brett ⇒ vinylphenol strands" emerges (the
+α-acetolactate-reservoir parallel, D-26/D-31). (2) *Phenol scope* → **lumped 4-EP + 4-EG**: one
+`ethylphenols` pool from a lumped hydroxycinnamic precursor (booked as p-coumaric / 4-vinylphenol /
+4-ethylphenol representative species). The two compose coherently — depth on the pathway (where
+behaviour lives), lumping on the readout (the same mechanism twice with different sensory labels).
+
+- **The advisor's blind-spot fix (fidelity, not preference).** The initial fork framing gated
+  decarboxylation to *yeast only*, which would produce **nothing** for the canonical case the beat is
+  named for: a **POF-negative wine spoiled by Brett alone** (yeast makes no vinylphenol → nothing to
+  reduce). Reality: **Brett carries BOTH enzymes** — that is *why* it spoils normal wine unaided. So
+  the Process set is the *union*: **Brett gets its own decarboxylase** (`BrettDecarboxylation`,
+  `X_brett`-gated) *and* its reductase (`BrettVinylphenolReduction`), and the POF+ *yeast*
+  decarboxylase becomes a separate **opt-in strain** Process (pt4, default OFF) — not gated on
+  precursor presence (a POF- yeast in hydroxycinnamic-rich must must make no vinylphenol). The
+  headline acceptance test is therefore the *canonical* case, not the POF+ reservoir.
+
+**Carbon closes on the existing ledger — no new conservation code.** `BrettDecarboxylation`:
+p-coumaric (C9) → vinylphenol (C8) + CO2 (C1), carbon-closing mole-for-mole (9 = 8 + 1, the malic →
+lactic + CO2 idiom, D-23). `BrettVinylphenolReduction`: vinylphenol (C8) → ethylphenol (C8), a
+mole-for-mole C8 → C8 transfer between two weighted pools (the diacetyl → butanediol idiom, D-26).
+`total_carbon` weights all three phenol pools at their representative species, so the Processes touch
+only `hydroxycinnamics`/`vinylphenols`/`ethylphenols`/`CO2` and add nothing to the harness (verified
+closing to machine precision through the full precursor → intermediate → product chain).
+
+**The Brett environmental gate — SO₂ and temperature only (the advisor's explicit warning).** Unlike
+*O. oeni*, Brett is markedly **acid-tolerant** (spoils low-pH wine) and **ethanol-tolerant** (a
+full-strength-wine barrel spoiler), so copying the MLF gate's pH logistic + Luong ethanol wall would
+spuriously arrest Brett exactly where it thrives. So `gate = g_SO₂ · γ(T)` — **no pH, no ethanol
+term**: molecular SO₂ (the D-22 antimicrobial readout) is the winemaker's lever, and a **cardinal
+temperature optimum warmer than *O. oeni*'s** (`T_opt_brett` 32 °C vs MLF's 23 °C — Brett is a
+warm-tolerant spoiler). The ethanol tolerance is asserted at the integration level:
+`test_pitch_brett_post_af_at_high_ethanol` pitches Brett into a *finished* ~14 % ABV wine and confirms
+4-EP still rises — the property that would silently die if anyone re-added an ethanol wall.
+
+**Isolability + the compile seam (the MLF pattern).** `X_brett` is a constant, **carbon-free** dosed
+catalyst in pt1 (weighted as real biomass only when `BrettGrowth` lands, pt2 — the exact `X_mlf`
+D-23 → D-38 path). The Processes are wired into the wine medium but return zero before any pH work
+when `X_brett ≤ 0` or the substrate is absent; the compile seam **disables** them unless Brett is
+pitched (`brett_pitch_gpl` co-inoculation, or a mid-run `pitch_brett` intervention re-enabling the
+same `_BRETT_GATED_PROCESSES` at its breakpoint), so an unpitched wine run is byte-for-byte the
+validated core and the phenol slots keep their **VALIDATED** tier (`tier_of` counts enabled, not
+nonzero, Processes). Both `X_brett`/`X_brett_dead` join `_LEES_SLOTS`, so racking draws Brett off the
+lees (the spoilage twin of the SO₂ kill). Wine-only (beer has no phenol slots).
+
+**Headline acceptance gate — a control-difference (parallels `test_headline_mlf_...`).** A POF-
+wine + dosed hydroxycinnamics accumulates `ethylphenols` **only when Brett is pitched** (the no-Brett
+control stays exactly 0); an SO₂ dose suppresses 4-EP >10× (metabolic arrest), and a rack removes
+`X_brett` and halts production at the breakpoint. **+11 tests** (`test_brett.py`): headline, post-AF
+`pitch_brett` verb + ethanol tolerance, SO₂/rack levers, carbon closure, per-Process
+stoichiometry/`touches`, guards, unpitched tier isolability, the warm temperature optimum, and the
+`speculative` tier. Two `test_media.py` composition assertions updated for the 5 new wine slots + 2
+Brett Processes. All params `speculative` (author estimates; no per-catalyst kinetic model of this
+flux form is sourced — Brett phenols are reported as bulk mg/L end-yields).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

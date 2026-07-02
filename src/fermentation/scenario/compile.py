@@ -36,6 +36,8 @@ from fermentation.core import acidbase
 from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     BiomassCarryingCapacity,
+    BrettDecarboxylation,
+    BrettVinylphenolReduction,
     FuselAminoAcidReroute,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
@@ -78,6 +80,17 @@ _MLF_GATED_PROCESSES = (
     MalolacticCitrateMetabolism,
     OenococcusDiacetylReduction,
     MalolacticDeath,
+)
+
+#: The *Brettanomyces* Processes gated on a Brett pitch (decision D-40): hydroxycinnamate
+#: decarboxylation and vinylphenol reduction (:class:`BrettDeath` joins in D-40 pt3). Wired into
+#: the wine medium but contributing nothing until Brett is present, so the compile step DISABLES
+#: them when unpitched and the ``pitch_brett`` intervention re-enables *exactly* this set at its
+#: breakpoint — one source of truth so the compile-time gate and the mid-run pitch cannot drift
+#: apart (the ``_MLF_GATED_PROCESSES`` pattern).
+_BRETT_GATED_PROCESSES = (
+    BrettDecarboxylation,
+    BrettVinylphenolReduction,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -200,6 +213,8 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "citrate_gpl",
             "amino_acids_gpl",
             "autolysis_rate_per_h",
+            "hydroxycinnamic_gpl",
+            "brett_pitch_gpl",
         }
     ),
     "beer": frozenset(
@@ -290,6 +305,19 @@ def _wine_initial(
         # YeastAutolysis routes the carbon-rich remainder of autolysed dead biomass here after
         # releasing the nitrogen-rich amino acids; inert (weight 0) until autolysis is opted in.
         "debris": 0.0,
+        # Lumped hydroxycinnamic-acid must precursors (decision D-40); g/L, default 0. Real must
+        # carries ~10-200 mg/L (p-coumaric + ferulic); defaulted 0 for isolability (an undosed
+        # run is byte-for-byte the validated core), so a Brett scenario doses it. Carbon-active
+        # (weighted in total_carbon as p-coumaric); Brettanomyces decarboxylates it to vinylphenols.
+        "hydroxycinnamics": _optional(values, "hydroxycinnamic_gpl", 0.0),
+        "vinylphenols": 0.0,  # shared decarboxylase→reductase intermediate, empty at pitch (D-40)
+        "ethylphenols": 0.0,  # terminal Brett volatile-phenol readout, empty at pitch (D-40)
+        # Brettanomyces dose driving the volatile-phenol spoilage (decision D-40); g/L, default 0
+        # (no Brett). Constant inert catalyst in pt1 and carbon-free, so an undosed run is
+        # byte-for-byte the validated core; the compile step below disables the Brett Processes
+        # entirely when this is 0 (tier + perf isolability, the mlf_pitch_gpl pattern).
+        "X_brett": _optional(values, "brett_pitch_gpl", 0.0),
+        "X_brett_dead": 0.0,  # non-viable Brett lees, empty until BrettDeath (D-40 pt3)
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
@@ -720,7 +748,16 @@ def _verb_add_so2(
 #: Dissolved species (sugar, ethanol, acids, glycerol, byproducts, SO₂, YAN) stay with the
 #: racked-off liquid — a concentration model has no volume change on racking, so touching them
 #: would be physically wrong (decision D-36).
-_LEES_SLOTS = ("X_dead", "debris", "X_mlf", "X_mlf_dead")
+#:
+#: **Both *Brettanomyces* pools** — viable ``X_brett`` and settled dead ``X_brett_dead`` — are
+#: racked off too (decision D-40), the same lees-organism asymmetry as *O. oeni*: Brett colonises
+#: the lees, so drawing the wine off them removes the spoilage catalyst and halts volatile-phenol
+#: production — the physical twin of the SO₂ kill (:class:`~fermentation.core.kinetics.brett.\
+#: BrettDeath`, pt3). ``X_brett`` is carbon-free in pt1 (constant catalyst, unweighted), so its
+#: removal books no C/N flow yet; :class:`~fermentation.core.kinetics.brett.BrettGrowth` (pt2)
+#: promotes both pools to weighted biomass, and the same ExternalFlow machinery then books their
+#: removal like ``X_mlf`` (D-38/D-39).
+_LEES_SLOTS = ("X_dead", "debris", "X_mlf", "X_mlf_dead", "X_brett", "X_brett_dead")
 
 
 def _verb_rack(iv: Intervention, schema: StateSchema, parameters: ParameterSet) -> ScheduledEvent:
@@ -815,6 +852,53 @@ def _verb_pitch_mlf(
     )
 
 
+def _verb_pitch_brett(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``pitch_brett`` — inoculate *Brettanomyces* mid-run, enabling volatile-phenol spoilage.
+
+    The Brett twin of :func:`_verb_pitch_mlf`: it both **mutates** ``X_brett`` (adds the spoilage
+    dose, ``pitch_gpl`` g/L) and **reconfigures** the Process set to enable
+    :data:`_BRETT_GATED_PROCESSES` — *exactly* the set an unpitched compile disables, so a mid-run
+    contamination is symmetric with an initial co-inoculation. The realistic Brett scenario is a
+    *post-AF* contamination in the cellar/barrel, which this verb expresses as a scenario choice.
+
+    Because the Processes are enabled only from the breakpoint onward, ``simulate_scheduled``
+    min-combines the per-segment tier maps (D-35): the ``vinylphenols``/``ethylphenols`` slots the
+    enabled speculative Processes touch report speculative for the whole run. ``X_brett`` is a
+    carbon-free catalyst in pt1, so the pitch's state jump adds no biomass carbon/nitrogen (no
+    ExternalFlow needed); :class:`~fermentation.core.kinetics.brett.BrettGrowth` (pt2) makes it
+    weighted biomass, at which point the pitch books an :class:`~fermentation.runtime.schedule.\
+    ExternalFlow` like ``pitch_mlf`` (D-38).
+    """
+    _iv_check_keys(iv, frozenset({"pitch_gpl"}), "pitch_brett")
+    pitch_gpl = _iv_float(iv, "pitch_gpl", "pitch_brett")
+    if "X_brett" not in schema:
+        raise ValueError(
+            f"intervention 'pitch_brett' at day {iv.day:g} needs an 'X_brett' slot, but medium "
+            f"{schema!r} has none (Brettanomyces spoilage is wine-only, decision D-40)"
+        )
+    x_brett_slice = schema.slice("X_brett")
+    gated_names = tuple(p.name for p in _BRETT_GATED_PROCESSES)
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[x_brett_slice] += pitch_gpl
+        return out
+
+    def reconfigure(ps: ProcessSet) -> None:
+        for name in gated_names:
+            if name in ps:
+                ps.enable(name)
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"pitch_brett@{iv.day:g}d",
+        mutate=mutate,
+        reconfigure=reconfigure,
+    )
+
+
 #: action verb → compiler turning one :class:`Intervention` into a :class:`ScheduledEvent`.
 _INTERVENTION_VERBS: dict[
     str, Callable[[Intervention, StateSchema, ParameterSet], ScheduledEvent]
@@ -823,6 +907,7 @@ _INTERVENTION_VERBS: dict[
     "add_so2": _verb_add_so2,
     "rack": _verb_rack,
     "pitch_mlf": _verb_pitch_mlf,
+    "pitch_brett": _verb_pitch_brett,
 }
 
 
@@ -906,6 +991,19 @@ def compile_scenario(
         for mlf_process in _MLF_GATED_PROCESSES:
             if mlf_process.name in process_set:
                 process_set.disable(mlf_process.name)
+
+    # Brett isolability (decision D-40): the volatile-phenol Processes are wired into the wine
+    # medium but contribute nothing until Brettanomyces is pitched. When it is not, DISABLE them so
+    # (a) the inert ``hydroxycinnamics``/``vinylphenols``/``ethylphenols`` slots keep their
+    # VALIDATED tier (an *enabled* zero-contribution Process still drags them to speculative via
+    # ``tier_of``) and (b) no per-RHS pH ``brentq`` is paid on an unpitched run. An initial
+    # ``brett_pitch_gpl`` co-inoculates at t0; a mid-run ``pitch_brett`` intervention instead leaves
+    # this 0 and re-enables the same _BRETT_GATED_PROCESSES at its breakpoint (the MLF pattern).
+    brett_pitch_gpl = float(scenario.initial.get("brett_pitch_gpl", 0.0) or 0.0)
+    if brett_pitch_gpl <= 0.0:
+        for brett_process in _BRETT_GATED_PROCESSES:
+            if brett_process.name in process_set:
+                process_set.disable(brett_process.name)
 
     # Residual-nitrogen floor (decision D-30): the biomass carrying-capacity cap is a
     # deliberate DEPARTURE from the validated Coleman anchor (which caps nothing and strips

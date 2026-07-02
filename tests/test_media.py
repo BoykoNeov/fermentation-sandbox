@@ -22,8 +22,15 @@ WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "citrate", "cation_charge")
 WINE_SO2_SLOTS = ("so2_total",)
 WINE_MLF_SLOTS = ("X_mlf", "X_mlf_dead")
 WINE_AMINO_ACID_SLOTS = ("amino_acids",)
-# The non-assimilable cell-wall debris pool yeast autolysis fills (D-34), appended last.
+# The non-assimilable cell-wall debris pool yeast autolysis fills (D-34).
 WINE_DEBRIS_SLOTS = ("debris",)
+# Brettanomyces volatile-phenol slots (decision D-40), appended last: the lumped hydroxycinnamic
+# precursor, the shared vinylphenol intermediate reservoir, the ethylphenol readout, and the
+# viable/dead Brett biomass pools (X_brett a constant catalyst in pt1; X_brett_dead filled by
+# BrettDeath, pt3).
+WINE_BRETT_SLOTS = (
+    "hydroxycinnamics", "vinylphenols", "ethylphenols", "X_brett", "X_brett_dead",
+)  # fmt: skip
 
 
 def test_wine_schema_has_single_sugar_slot():
@@ -35,14 +42,16 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_MLF_SLOTS
         + WINE_AMINO_ACID_SLOTS
         + WINE_DEBRIS_SLOTS
+        + WINE_BRETT_SLOTS
     )
     assert schema.spec("S").size == 1
     # 17 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
     # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
     # h2s, D-29) + 3 wine-only acid slots + citrate (D-31) + cation_charge (D-18)
     # + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead slots (D-23 catalyst / D-39 bacterial lees)
-    # + 1 amino_acids slot (D-32) + 1 debris slot (D-34)
-    assert schema.size == 27
+    # + 1 amino_acids slot (D-32) + 1 debris slot (D-34) + 5 Brett slots (hydroxycinnamics,
+    # vinylphenols, ethylphenols, X_brett, X_brett_dead — decision D-40)
+    assert schema.size == 32
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -209,6 +218,10 @@ AMINO_ACID_PROCESSES = {"amino_acid_assimilation", "fusel_amino_acid_reroute"}
 # gate than conversion, so it is a SEPARATE tuple from MLF_PROCESSES (avoids dragging amino_acids/S
 # tier on pitched-but-not-aa-dosed runs).
 MLF_GROWTH_PROCESSES = {"malolactic_growth"}
+# Brettanomyces volatile phenols (decision D-40): wine-only, pitch-gated — present in a bare build,
+# disabled at the compile seam unless a scenario pitches Brett (brett_pitch_gpl>0 or a pitch_brett
+# intervention), so an unpitched wine run is byte-for-byte the validated core (the MLF pattern).
+BRETT_PROCESSES = {"brett_decarboxylation", "brett_vinylphenol_reduction"}
 # Yeast autolysis (D-34): wine-only, opt-in — present in a bare build, disabled at the compile
 # seam unless a scenario passes autolysis_rate_per_h (the carrying-capacity opt-in pattern).
 AUTOLYSIS_PROCESSES = {"yeast_autolysis"}
@@ -222,6 +235,7 @@ EXPECTED_PROCESSES = {
         | H2S_PROCESSES
         | MLF_PROCESSES
         | MLF_GROWTH_PROCESSES
+        | BRETT_PROCESSES
         | AMINO_ACID_PROCESSES
         | AUTOLYSIS_PROCESSES
     ),
