@@ -50,7 +50,7 @@ from fermentation.core.tiers import Tier, combine
 from fermentation.parameters.schema import Parameter, Provenance, Uncertainty
 from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
 from fermentation.runtime.schedule import ScheduledEvent, ScheduledTrajectory, simulate_scheduled
-from fermentation.scenario.schema import Scenario
+from fermentation.scenario.schema import Intervention, Scenario
 from fermentation.units.convert import (
     brix_to_sugar_gpl,
     celsius_to_kelvin,
@@ -352,11 +352,15 @@ def _load_parameters(
     # H₂S production (hydrogen_sulfide.yaml, decision D-29 — the sulfate-reduction sequence,
     # generic yeast metabolism). The names are collision-free with the per-medium kinetic
     # parameters; load_parameters merges left-to-right.
+    # additions.yaml carries the industry-unit → canonical conversion constants the
+    # discrete-intervention verb registry reads at this boundary (decision D-36); like the
+    # others it is medium-agnostic and collision-free.
     shared_files = [
         base / "acidbase.yaml",
         base / "vicinal_diketones.yaml",
         base / "acetaldehyde.yaml",
         base / "hydrogen_sulfide.yaml",
+        base / "additions.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 
@@ -556,6 +560,115 @@ def _inject_temperature_ramp_rate(parameters: ParameterSet, slope_k_per_h: float
     return parameters.merge(ParameterSet([param]), override=True)
 
 
+# -- discrete-intervention verb registry (the winemaking vocabulary boundary) -----------------
+#
+# ``scenario.interventions`` is a declarative timeline of winemaking verbs in industry units
+# (decision D-36). This registry is where each verb's *meaning* lives — which canonical state
+# slot a dose lands on, which unit conversion applies, which Processes a pitch enables — exactly
+# the layer that owns the initial-composition vocabulary and the temperature-schedule compile
+# above (decision D-3). The runtime driver (``simulate_scheduled``) stays verb-agnostic: a verb
+# compiles to an opaque :class:`ScheduledEvent` and the driver just segments-and-restarts around
+# it, booking each state jump as an :class:`~fermentation.runtime.schedule.ExternalFlow` for the
+# conservation ledger. New verbs are added here and nowhere else.
+
+
+def _iv_check_keys(iv: Intervention, allowed: frozenset[str], verb: str) -> None:
+    unknown = set(iv.params) - allowed
+    if unknown:
+        raise ValueError(
+            f"intervention {verb!r} at day {iv.day:g} has unknown param(s) {sorted(unknown)}; "
+            f"allowed: {sorted(allowed)}"
+        )
+
+
+def _iv_float(iv: Intervention, key: str, verb: str) -> float:
+    """Read a required numeric intervention param, non-negative (the ``_nonneg`` discipline)."""
+    if key not in iv.params:
+        raise ValueError(
+            f"intervention {verb!r} at day {iv.day:g} is missing required param {key!r}"
+        )
+    try:
+        value = float(iv.params[key])
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"intervention {verb!r} param {key!r} must be a number, got {iv.params[key]!r}"
+        ) from None
+    return _nonneg(value, key)
+
+
+def _verb_add_dap(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_dap`` — dose diammonium phosphate, injecting assimilable nitrogen (decision D-36).
+
+    Doses DAP by mass (``dap_gpl``, faithful to the commercial additive) and converts to the
+    assimilable-nitrogen jump on the lumped ``N`` slot via the sourced ``dap_nitrogen_fraction``
+    (exact (NH₄)₂HPO₄ stoichiometry, VALIDATED). Phosphate is dropped — the model tracks no
+    phosphorus pool. The headline consequence is a *timing* effect the static D-29 lever could
+    not produce: restoring N mid-ferment momentarily closes the inverse H₂S gate
+    ``K_h2s_n/(K_h2s_n+N)`` while sugar (hence the flux the gate multiplies) is still present.
+    """
+    _iv_check_keys(iv, frozenset({"dap_gpl"}), "add_dap")
+    dap_gpl = _iv_float(iv, "dap_gpl", "add_dap")
+    try:
+        n_fraction = parameters["dap_nitrogen_fraction"].value
+    except KeyError as exc:  # additions.yaml not loaded (caller-supplied parameter_paths)
+        raise ValueError(
+            "intervention 'add_dap' needs 'dap_nitrogen_fraction' but it is missing "
+            f"({exc}); include additions.yaml in parameter_paths (the default lookup merges "
+            "it automatically)."
+        ) from None
+    added_n_gpl = dap_gpl * n_fraction
+    n_slice = schema.slice("N")
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[n_slice] += added_n_gpl
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_dap@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
+#: action verb → compiler turning one :class:`Intervention` into a :class:`ScheduledEvent`.
+_INTERVENTION_VERBS: dict[
+    str, Callable[[Intervention, StateSchema, ParameterSet], ScheduledEvent]
+] = {
+    "add_dap": _verb_add_dap,
+}
+
+
+def _compile_interventions(
+    scenario: Scenario, schema: StateSchema, parameters: ParameterSet, t_end_h: float
+) -> tuple[ScheduledEvent, ...]:
+    """Compile ``scenario.interventions`` into timed :class:`ScheduledEvent`\\ s (decision D-36).
+
+    Each verb is looked up in :data:`_INTERVENTION_VERBS`; an unknown action raises loudly (the
+    ``_ALLOWED_KEYS`` discipline). An intervention at or after the run duration is rejected here
+    with a scenario-level message rather than deferred to ``simulate_scheduled``'s window check,
+    so the error names the scenario and the verb.
+    """
+    events: list[ScheduledEvent] = []
+    for iv in scenario.interventions:
+        verb = _INTERVENTION_VERBS.get(iv.action)
+        if verb is None:
+            raise ValueError(
+                f"scenario {scenario.name!r}: unknown intervention action {iv.action!r}; "
+                f"known verbs: {sorted(_INTERVENTION_VERBS)}"
+            )
+        if days_to_hours(iv.day) >= t_end_h:
+            raise ValueError(
+                f"scenario {scenario.name!r}: intervention {iv.action!r} at day {iv.day:g} is "
+                f"at or beyond the run duration ({scenario.duration_days:g} d); interventions "
+                "must fall within the run"
+            )
+        events.append(verb(iv, schema, parameters))
+    return tuple(events)
+
+
 def compile_scenario(
     scenario: Scenario,
     *,
@@ -671,9 +784,16 @@ def compile_scenario(
     # we mint the provenance-backed rate parameter and emit events — a flat/single-knot
     # schedule leaves ``temperature_ramp_rate`` absent, so the always-enabled TemperatureRamp
     # reads its 0.0 default and an isothermal run is byte-for-byte the pre-ramp core.
-    initial_slope, events = _temperature_ramp_schedule(scenario, t_span_h[1])
-    if initial_slope != 0.0 or events:
+    initial_slope, ramp_events = _temperature_ramp_schedule(scenario, t_span_h[1])
+    if initial_slope != 0.0 or ramp_events:
         parameters = _inject_temperature_ramp_rate(parameters, initial_slope)
+
+    # Discrete winemaking interventions (decision D-36): compile the declarative timeline of
+    # verbs into timed events and merge with the ramp's slope-change events into the single
+    # ``events`` tuple ``simulate_scheduled`` sorts by time. Empty ⇒ the temp-only path is
+    # unchanged (byte-for-byte core when there is no ramp either).
+    intervention_events = _compile_interventions(scenario, medium.schema, parameters, t_span_h[1])
+    events = (*ramp_events, *intervention_events)
 
     return CompiledScenario(
         scenario=scenario,

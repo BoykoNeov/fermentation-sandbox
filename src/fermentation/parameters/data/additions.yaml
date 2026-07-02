@@ -1,0 +1,33 @@
+# Winemaking-addition conversion constants (decision D-36).
+#
+# SHARED, medium-agnostic parameter file: loaded alongside the <medium>_<strain>.yaml by the
+# compile seam (the store merges paths; these names are collision-free with the per-medium
+# kinetic parameters). These are NOT physics — no Process reads them in the ODE hot loop. They
+# are the *industry-unit → canonical-unit* conversion constants the discrete-intervention verb
+# registry uses at the scenario→core compile boundary (the same role must_fermentable_fraction
+# plays for Brix, decision D-16): a winemaker doses a *mass* of a commercial additive, and the
+# verb converts that to the canonical state jump the runtime's external-flow ledger books.
+#
+# They live in a Parameter file (not inlined in compile.py) because prime directive #2 admits no
+# magic numbers even for exact stoichiometry — the value must travel with its provenance. A
+# stoichiometric mass fraction is *exact*, so it is VALIDATED with a zero-width uncertainty band
+# (never swept by the stochastic ensemble); it is a physical constant, not an estimate.
+
+# -- DAP (diammonium phosphate) nitrogen content (add_dap verb) ------------------------------
+#
+# Diammonium phosphate (NH4)2HPO4 is the standard fermentation nitrogen supplement. The add_dap
+# verb doses it by mass (dap_gpl) and converts to the assimilable-nitrogen jump on the lumped N
+# slot via this fraction. Both ammonium groups are immediately assimilable YAN, so the whole
+# nitrogen content counts. The PHOSPHATE is a scoped omission — the model tracks no phosphorus
+# pool (P is not limiting in normal must), so the dose's phosphate is dropped; add_dap injects
+# only the nitrogen. Molar mass (NH4)2HPO4 = 132.06 g/mol; 2 N = 28.014 g/mol; fraction =
+# 28.014 / 132.06 = 0.2121 g N / g DAP.
+dap_nitrogen_fraction:
+  value: 0.2121
+  unit: "g/g"   # g assimilable nitrogen / g diammonium phosphate
+  tier: validated
+  uncertainty: { low: 0.2121, high: 0.2121, note: "exact stoichiometry; not an uncertain parameter" }
+  provenance:
+    source: "exact stoichiometry of diammonium phosphate (NH4)2HPO4"
+    conditions: "commercial DAP fermentation supplement; both ammonium groups counted as immediately assimilable YAN"
+    notes: "M((NH4)2HPO4) = 132.06 g/mol, 2 N = 28.014 g/mol -> 28.014/132.06 = 0.2121 g N/g DAP. Phosphate is DROPPED (no phosphorus pool in the model; P is non-limiting in normal must), so add_dap injects nitrogen only (decision D-36)."
