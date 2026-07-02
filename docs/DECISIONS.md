@@ -2332,7 +2332,7 @@ today).
 
 ## D-36 — Discrete winemaking interventions: the verb registry at the compile boundary
 
-**Status: IMPLEMENTED 2026-07-02** (475 green + 5 benchmark). The winemaking payoff of the D-35
+**Status: IMPLEMENTED 2026-07-02** (476 green + 5 benchmark). The winemaking payoff of the D-35
 event loop. `Scenario.interventions` — a declarative timeline of verbs (`day`, `action`, `params`
 in industry units) — was declared since Milestone 1 but *never consumed*: `compile_scenario` turned
 only the temperature schedule into events. This activates it. Built one verb per commit on the
@@ -2403,12 +2403,14 @@ pitch (day 15: 3.0 → 2.97) — past the Luong ethanol wall (~110 g/L) the envi
 conversion near zero. The verb makes pitch timing a *scenario* choice; it does not change the
 kinetics (malolactic still completes only under co-inoculation / early pitch, D-23).
 
-**Tests.** `tests/test_interventions.py` (24) pins all four verbs: the dose lands on the right slot
+**Tests.** `tests/test_interventions.py` (25) pins all four verbs: the dose lands on the right slot
 and books one flow; the H₂S rate-drop + net-suppression headline; SO₂ perturbs neither ledger and
 raises the molecular readout; rack removes only the lees and leaves the wine; the combined DAP+rack
 carbon/nitrogen crown-jewel; pitch_mlf enables exactly the gated set, catalyst is ledger-free, early
-converts / late stalls, tier travels; and the vocabulary discipline (unknown verb, out-of-window
-day, bad params) + isolability. 475 green + 5 benchmark, ruff + mypy clean.
+converts / late stalls, tier travels; the ramp+intervention **merge on one driver** (a multi-knot
+temperature schedule *and* a DAP dose — the realistic scenario, and the only test with both sides of
+`events` populated); and the vocabulary discipline (unknown verb, out-of-window day, bad params) +
+isolability. 476 green + 5 benchmark, ruff + mypy clean.
 
 **Deferred.** The stochastic `simulate_ensemble` still wraps the un-scheduled `simulate`, so it
 takes no `events` — an ensemble over a multi-segment schedule is the remaining D-35→D-36 follow-up.

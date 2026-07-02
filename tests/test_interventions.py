@@ -138,9 +138,12 @@ def test_mid_ferment_dap_dose_drops_the_h2s_production_rate():
     # Just before the day-2 dose the two runs are identical (same N history); just after, the
     # restored N re-represses the inverse gate K_h2s_n/(K_h2s_n+N) while sugar (the flux the
     # gate multiplies) is still present ⇒ the dosed production rate falls below the undosed one.
+    # Pre-dose the two runs are the same physics; the tolerance is loose because the dosed run
+    # restarts BDF at day 2, so its adaptive step sequence on [0, 48h] is not byte-identical to
+    # the undosed run's single [0, 336h] integration (a mesh artifact, not a physical difference).
     assert _rate_at(rate_d, dosed.t, 1.8) == pytest.approx(
-        _rate_at(rate_u, undosed.t, 1.8), rel=1e-6
-    )  # identical pre-dose
+        _rate_at(rate_u, undosed.t, 1.8), rel=1e-3
+    )  # ~identical pre-dose
     assert _rate_at(rate_d, dosed.t, 2.1) < 0.75 * _rate_at(rate_u, undosed.t, 2.1)  # gate closes
 
 
@@ -429,6 +432,58 @@ def test_add_dap_unknown_param_raises():
 def test_add_dap_negative_dose_raises():
     with pytest.raises(ValueError, match="must be >= 0"):
         compile_scenario(_wine([_dap(2.0, -0.4)]))
+
+
+# -- the merge: a temperature ramp AND an intervention on the one driver -------
+
+
+def test_ramp_events_and_intervention_events_merge_on_one_driver():
+    # The realistic winemaking scenario — a fermentation temperature schedule AND a dosing
+    # timeline — and the literal embodiment of the D-35→D-36 claim that both ride the same
+    # driver. Every other test populates only one side of ``events``; this exercises the merge.
+    from fermentation.units.convert import celsius_to_kelvin
+
+    sc = Scenario(
+        name="ramp-and-dose",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 100.0, "pitch_gpl": 0.25},
+        # 16 → 24 °C over days 0–4, then down to 18 °C by day 12: two interior slope changes.
+        temperature_schedule=[
+            TemperaturePoint(day=0.0, celsius=16.0),
+            TemperaturePoint(day=4.0, celsius=24.0),
+            TemperaturePoint(day=12.0, celsius=18.0),
+        ],
+        interventions=[_dap(2.0, 0.4)],
+        duration_days=14.0,
+    )
+    cs = compile_scenario(sc)
+    # Both sides are genuinely populated: ramp slope-change events AND the DAP dose.
+    labels = [e.label for e in cs.events]
+    assert any(lbl.startswith("temperature_ramp@") for lbl in labels)
+    assert "add_dap@2d" in labels
+
+    traj = cs.run()
+    assert traj.success
+    schema = cs.schema
+
+    # The dose (which touches only N) did not perturb the temperature path: after the day-2 dose,
+    # still on the first ramp leg (t < day 4), T follows the analytic line 16 + slope·t exactly
+    # (BDF integrates a constant slope to round-off, D-35). Assert at the actual grid time so the
+    # coarse default grid does not turn the ramp offset into a spurious failure.
+    idx = np.argmin(np.abs(traj.t - 3.0 * 24.0))
+    t_h = traj.t[idx]
+    assert 0.0 <= t_h < 4.0 * 24.0
+    expected_t = celsius_to_kelvin(16.0 + (24.0 - 16.0) / (4.0 * 24.0) * t_h)
+    assert traj.series("T")[idx] == pytest.approx(expected_t, abs=1e-6)
+
+    # The DAP flow still lands on N, and the nitrogen ledger still closes across the jump.
+    dap_flows = [f for f in traj.external_flows if f.label == "add_dap@2d"]
+    assert len(dap_flows) == 1
+    dap_n = dap_flows[0].delta[schema.slice("N")][0]
+    assert dap_n == pytest.approx(0.4 * _DAP_N_FRACTION, rel=1e-12)
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+    injected = sum(n_of(f.delta) for f in traj.external_flows)
+    assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0) + injected, abs=1e-9)
 
 
 # -- isolability: no interventions ⇒ byte-for-byte a plain run -----------------
