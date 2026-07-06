@@ -51,6 +51,7 @@ def full_params():
         base / "acidbase.yaml",
         base / "vicinal_diketones.yaml",
         base / "acetaldehyde.yaml",
+        base / "keto_acids.yaml",
         base / "hydrogen_sulfide.yaml",
     ).resolve()
 

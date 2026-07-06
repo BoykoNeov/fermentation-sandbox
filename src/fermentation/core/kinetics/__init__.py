@@ -41,6 +41,10 @@ from fermentation.core.kinetics.hydrogen_sulfide import (
 )
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
+from fermentation.core.kinetics.keto_acids import (
+    PyruvateExcretion,
+    PyruvateReassimilation,
+)
 from fermentation.core.kinetics.malolactic import (
     MalolacticCitrateMetabolism,
     MalolacticConversion,
@@ -91,6 +95,8 @@ __all__ = [
     "MalolacticGrowth",
     "MalolacticSenescence",
     "OenococcusDiacetylReduction",
+    "PyruvateExcretion",
+    "PyruvateReassimilation",
     "SugarUptakeToEthanolCO2",
     "TemperatureRamp",
     "YeastAutolysis",

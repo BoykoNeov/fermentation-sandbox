@@ -211,6 +211,7 @@ def test_isolable_at_derivative_level():
         base / "acidbase.yaml",
         base / "vicinal_diketones.yaml",
         base / "acetaldehyde.yaml",
+        base / "keto_acids.yaml",
         base / "hydrogen_sulfide.yaml",
     ).resolve()
     m = get_medium("wine")

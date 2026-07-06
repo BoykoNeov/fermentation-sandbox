@@ -94,6 +94,8 @@ from fermentation.core.kinetics import (
     MalolacticGrowth,
     MalolacticSenescence,
     OenococcusDiacetylReduction,
+    PyruvateExcretion,
+    PyruvateReassimilation,
     SugarUptakeToEthanolCO2,
     TemperatureRamp,
     YeastAutolysis,
@@ -346,6 +348,16 @@ def wine_schema() -> StateSchema:
             "drawing carbon from amino_acids and deaminating the nitrogen to N (Option A, D-45); "
             "carbon-accounted as methanethiol, nitrogen-free. Copper-fined out by add_copper",
         ),
+        VarSpec(
+            "pyruvate",
+            "g/L",
+            default=0.0,
+            description="excreted overflow pyruvate (C3 keto-acid; excreted-then-reassimilated). "
+            "PyruvateExcretion draws it from sugar during active ferment; the flux-linked "
+            "(co-metabolic) PyruvateReassimilation returns it to ethanol+CO2 and stops at dryness, "
+            "freezing a persistent finished-wine residual — the second-strongest SO2-binding "
+            "carbonyl after acetaldehyde (D-49)",
+        ),
     ]
     return StateSchema(specs)
 
@@ -500,6 +512,36 @@ _VDK_PROCESSES: tuple[Callable[[], Process], ...] = (
 _ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
     AcetaldehydeProduction,
     AcetaldehydeReduction,
+)
+
+#: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
+#: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
+#: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
+#: fills during active ferment and stops at dryness); :class:`PyruvateReassimilation` returns
+#: it to ``E``/``CO2``, *also* flux-linked (co-metabolic — NOT the no-flux ADH idiom), so both
+#: terms die at dryness and the pool **freezes** at the quasi-steady plateau
+#: ``k_pyruvate_excretion / k_pyruvate_reassimilation`` as a **persistent finished-wine
+#: residual** — crash- and duration-independent (a no-flux viable-``X`` gate would instead
+#: drain it to ~0 over the long tail, since a clean ferment ends with the yeast still viable).
+#: That stranded residual is the carbonyl that will share dosed SO₂ with acetaldehyde in the
+#: D-51 multi-carbonyl binding equilibrium (decision D-49, option A). Modelled as
+#: an *excreted side pool*, NOT acetaldehyde's on-pathway precursor (the intracellular flux
+#: pyruvate never persists and never binds SO₂ — see the ``keto_acids`` module docstring for
+#: why the "route acetaldehyde through pyruvate" rework was rejected as unphysical), so
+#: acetaldehyde / D-27 / D-47 / D-48 stay untouched. Kept in its own isolable tuple (prime
+#: directive #3): a ProcessSet built without it is the prior core. Unlike the byte-for-byte-
+#: isolable acetaldehyde buffer, excretion touches ``S`` and re-assimilation touches
+#: ``E``/``CO2``, so turning it on routes a *trace* slice of sugar carbon on a detour to
+#: ethanol; the only endpoint difference from the pool-off core is the stranded residual
+#: (a few tens of mg/L of sugar carbon parked as pyruvate rather than fermented on), ≪ 0.1 %
+#: of ABV, so the §2.2 CO2/ABV/realised-yield benchmarks are preserved far below tolerance.
+#: WINE-ONLY (v1): the SO₂-binding competition it exists for is a wine readout and no §2.2
+#: beer benchmark asserts a keto-acid level — beer overflow pyruvate is deferred. Params live
+#: in the shared, medium-agnostic ``keto_acids.yaml`` (overflow-pyruvate metabolism is generic
+#: yeast, not a beverage property; α-ketoglutarate — D-50 — will join the same file).
+_KETO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
+    PyruvateExcretion,
+    PyruvateReassimilation,
 )
 
 #: Hydrogen-sulfide production + CO₂-stripping (Milestone 2, decisions D-29 / D-42): the
@@ -742,6 +784,7 @@ MEDIA: dict[str, Medium] = {
             + _BYPRODUCT_PROCESSES
             + _VDK_PROCESSES
             + _ACETALDEHYDE_PROCESSES
+            + _KETO_ACID_PROCESSES
             + _H2S_PROCESSES
             + _MLF_PROCESSES
             + _MLF_GROWTH_PROCESSES

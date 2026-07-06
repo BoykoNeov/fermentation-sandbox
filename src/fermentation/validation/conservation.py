@@ -133,6 +133,20 @@ def total_carbon(
     # Process's existing sugar→ethanol step rather than adding a parallel pathway.
     if "acetaldehyde" in schema:
         w[schema.slice("acetaldehyde")] = carbon_mass_fraction("acetaldehyde")
+    # Excreted overflow pyruvate (decision D-49): PyruvateExcretion draws its carbon out of
+    # sugar (C3, booked at pyruvate's fraction) and PyruvateReassimilation returns it to
+    # ethanol + CO2 (C3 → C2 + C1, one mole each — carbon-closing like malic → lactic + CO2),
+    # so the pool must be weighted here or the excrete-then-reassimilate course would read as
+    # carbon created (during excretion) then destroyed (during re-assimilation). Weighted at
+    # pyruvate's own carbon fraction — the SAME chemistry source the draw books against — so
+    # the carbon into pyruvate equals the carbon out of S and total_carbon closes to machine
+    # precision through the whole time course, leaving only the stranded residual as sugar
+    # carbon parked as pyruvate. Re-assimilation returns to E/CO2 (not S) deliberately:
+    # post-dryness S is 0, so a refund-to-sugar would be a no-op that destroys carbon. On a
+    # keto-acid-pool-off run the pool is empty (constant 0 term). Nitrogen-free (a keto-acid),
+    # so it is absent from total_nitrogen.
+    if "pyruvate" in schema:
+        w[schema.slice("pyruvate")] = carbon_mass_fraction("pyruvate")
     # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
     # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
     # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that

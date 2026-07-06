@@ -50,6 +50,16 @@ M_ETHANOL = 2 * _M_C + 6 * _M_H + 1 * _M_O
 #: sugar→ethanol step, chosen by the owner over a draw-from-sugar stand-in that would
 #: double-count the main pathway and inflate ABV (decision D-27).
 M_ACETALDEHYDE = 2 * _M_C + 4 * _M_H + 1 * _M_O
+#: Pyruvic acid, C3H4O3 — the terminal glycolytic keto-acid and the immediate precursor of
+#: acetaldehyde (pyruvate → acetaldehyde + CO2 → ethanol). Yeast **excretes** overflow pyruvate
+#: during active fermentation (an extracellular residual, 10s–100s mg/L, peaking mid-ferment and
+#: slowly re-assimilated), and that persistent excreted pool is — after acetaldehyde — the second
+#: strongest SO₂-binding carbonyl in wine (decision D-49). Modelled as an **excreted side pool**
+#: (drawn from sugar like the D-19/D-26 byproducts, viable-yeast-gated re-assimilation returning
+#: its carbon to ethanol + CO2 — a carbon-closing C3 → C2 + C1 step, like malic → lactic + CO2),
+#: NOT as an on-pathway intermediate: the intracellular flux pyruvate never persists and never
+#: binds SO₂, so conflating the two would be unphysical (the rejected D-27-rework, D-49).
+M_PYRUVATE = 3 * _M_C + 4 * _M_H + 3 * _M_O
 #: Carbon dioxide, CO2.
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
@@ -217,6 +227,7 @@ MOLAR_MASS: dict[str, float] = {
     "maltotriose": M_MALTOTRIOSE,
     "ethanol": M_ETHANOL,
     "acetaldehyde": M_ACETALDEHYDE,
+    "pyruvate": M_PYRUVATE,
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
@@ -250,6 +261,10 @@ CARBON_ATOMS: dict[str, int] = {
     "maltotriose": 18,
     "ethanol": 2,
     "acetaldehyde": 2,
+    #: Pyruvate (C3H4O3) carries three carbons — the excreted overflow-pyruvate SO₂-binder pool
+    #: sits on ``total_carbon`` (decision D-49); its re-assimilation is a carbon-closing
+    #: C3 → C2 (ethanol) + C1 (CO2) step.
+    "pyruvate": 3,
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,
@@ -288,6 +303,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     "maltotriose": 0,
     "ethanol": 0,
     "acetaldehyde": 0,
+    #: Pyruvate is nitrogen-free (a keto-acid), so the excreted-pyruvate pool is absent from
+    #: total_nitrogen (decision D-49).
+    "pyruvate": 0,
     "CO2": 0,
     "glycerol": 0,
     "succinic_acid": 0,

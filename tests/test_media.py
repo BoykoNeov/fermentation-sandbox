@@ -33,6 +33,9 @@ WINE_BRETT_SLOTS = (
 )  # fmt: skip
 # The carbon-bearing volatile-thiol pool AutolyticMercaptan fills (decision D-45), appended last.
 WINE_MERCAPTAN_SLOTS = ("mercaptans",)
+# The excreted overflow-pyruvate keto-acid pool (decision D-49), appended last: the
+# second-strongest SO₂-binding carbonyl after acetaldehyde.
+WINE_KETO_ACID_SLOTS = ("pyruvate",)
 
 
 def test_wine_schema_has_single_sugar_slot():
@@ -46,6 +49,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_DEBRIS_SLOTS
         + WINE_BRETT_SLOTS
         + WINE_MERCAPTAN_SLOTS
+        + WINE_KETO_ACID_SLOTS
     )
     assert schema.spec("S").size == 1
     # 18 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
@@ -54,8 +58,8 @@ def test_wine_schema_has_single_sugar_slot():
     # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
     # (D-34) + 5 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols, X_brett,
-    # X_brett_dead — decision D-40) + 1 mercaptans slot (D-45)
-    assert schema.size == 34
+    # X_brett_dead — decision D-40) + 1 mercaptans slot (D-45) + 1 pyruvate slot (D-49)
+    assert schema.size == 35
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -250,6 +254,12 @@ POF_PROCESSES = {"yeast_pof_decarboxylation"}
 # carrying-capacity opt-in pattern). AutolyticHydrogenSulfide feeds the shared h2s pool the sulfide
 # dead cells release, on the same autolysis flux (decision D-44).
 AUTOLYSIS_PROCESSES = {"yeast_autolysis", "autolytic_hydrogen_sulfide", "autolytic_mercaptan"}
+# Excreted keto-acid overflow pool (decision D-49): wine-only, always-on intrinsic yeast
+# metabolism (like the acetaldehyde/VDK/H₂S pools, not a dosed organism) — but wine-only because
+# the SO₂-binding competition it exists for is a wine readout (no §2.2 beer benchmark asserts a
+# keto-acid level). Excretion draws pyruvate from sugar; the flux-linked reassimilation returns
+# it to ethanol+CO₂ and freezes the finished-wine residual at dryness.
+KETO_ACID_PROCESSES = {"pyruvate_excretion", "pyruvate_reassimilation"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -265,6 +275,7 @@ EXPECTED_PROCESSES = {
         | POF_PROCESSES
         | AMINO_ACID_PROCESSES
         | AUTOLYSIS_PROCESSES
+        | KETO_ACID_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

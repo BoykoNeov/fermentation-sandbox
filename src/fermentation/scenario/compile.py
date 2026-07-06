@@ -445,6 +445,7 @@ def _load_parameters(
         base / "acidbase.yaml",
         base / "vicinal_diketones.yaml",
         base / "acetaldehyde.yaml",
+        base / "keto_acids.yaml",
         base / "hydrogen_sulfide.yaml",
         base / "additions.yaml",
     ]

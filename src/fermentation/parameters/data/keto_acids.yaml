@@ -1,0 +1,95 @@
+# Excreted keto-acid overflow kinetics (decision D-49) — the non-acetaldehyde SO2-binders.
+#
+# SHARED, medium-agnostic parameter file: loaded alongside the <medium>_<strain>.yaml by the
+# compile seam (the store merges paths; these names are collision-free with the per-medium
+# kinetic parameters). Overflow-pyruvate excretion is generic yeast metabolism — a property of
+# the pathway, not the beverage — so, like acetaldehyde.yaml and vicinal_diketones.yaml, its
+# constants live in one shared file (alpha-ketoglutarate, D-50, will join this file).
+#
+# THE MODEL (an EXCRETED SIDE POOL, not acetaldehyde's on-pathway precursor — decision D-49):
+#
+#   S --excretion--> pyruvate --reassimilation--> ethanol (E) + CO2
+#    (draw C3)  (k_pyruvate_excretion)  (k_pyruvate_reassimilation)  (release C3 -> C2 + C1)
+#
+# Yeast EXCRETES overflow pyruvate during active fermentation; it persists in the finished wine
+# (10s-100s mg/L, Jackowetz & Mira de Orduna 2013) as a real, measured SO2-binding carbonyl — the
+# strongest after acetaldehyde. This is modelled as an excreted side pool, NOT by routing
+# acetaldehyde's carbon through its metabolic precursor pyruvate: that "max fidelity" rework was
+# designed and REJECTED (see the keto_acids module docstring) because it conflates the
+# intracellular flux intermediate (never persists, never binds SO2) with the extracellular
+# excreted residual (persists, binds SO2), and its persistence mechanism ("SO2 shields pyruvate
+# from pyruvate decarboxylase") is not real and would make dosed SO2 SUPPRESS acetaldehyde — the
+# opposite of the D-48 over-production. So acetaldehyde / D-27 / D-47 / D-48 stay untouched.
+#
+# WHY THE FROZEN RESIDUAL EMERGES (the phenomenon these parameters must reproduce):
+#   * Excretion is FLUX-LINKED (shared K_sugar_uptake) -> strong during active fermentation,
+#     stops at dryness. Held TEMPERATURE-FLAT as a documented v1 simplification (like the
+#     acetaldehyde production D-27 and alpha-acetolactate excretion D-26).
+#   * Reassimilation is ALSO FLUX-LINKED (co-metabolic, shared K_sugar_uptake) — NOT the no-flux
+#     ADH idiom (D-27). Overflow-pyruvate reassimilation tracks ACTIVE fermentation, so it clears
+#     pyruvate while the yeast ferments and STOPS AT DRYNESS. This is load-bearing: a normal ferment
+#     finishes with the yeast still VIABLE (~0.4 g/L here), so a viable-X no-flux gate would drain
+#     the pool to ~0 over the long post-dryness tail — a crash-dependent residual a clean ferment
+#     never strands. Flux-linking pegs the residual to END-OF-FERMENTATION, not yeast death.
+#   => Both terms ride X*S/(K+S), so the pool rises monotonically to the quasi-steady plateau
+#      k_pyruvate_excretion / k_pyruvate_reassimilation and FREEZES there at dryness — a persistent
+#      finished-wine residual that is crash- AND duration-independent. The residual is set HERE (by
+#      the excretion/reassimilation RATIO), NOT by SO2 (decision D-49, owner's option A).
+#
+# V1 SIMPLIFICATION (documented, in-idiom with the temperature-flat calls). Because both terms ride
+# the same flux shape, the pool rises monotonically to the plateau rather than showing the real
+# mid-ferment PEAK-THEN-DECLINE (overflow pyruvate's exponential-growth excretion transient).
+# Nothing reads the peak — D-51 reads only the finished-wine residual — so the transient is dropped
+# in v1; the growth-coupled excretion that would restore it (option B) is deferred.
+#
+# QUASI-STEADY SIZING. Setting excretion = reassimilation, the X*S/(K+S) flux cancels (both ride
+# it), so the plateau pyruvate ~ k_pyruvate_excretion / k_pyruvate_reassimilation = 3e-3 / 1e-1 =
+# 0.03 g/L = 30 mg/L — squarely in the real finished-wine range (Jackowetz & Mira de Orduna 2013,
+# ~10s mg/L commonly, up to 100s). The approach to the plateau is fast (rate k_reassim*X*phi ~
+# 0.1*2*1 ~ 0.2/h, time constant ~5 h) so the pool reaches the plateau within a day and holds it
+# until dryness freezes it, making the residual robustly ~= the ratio. Both magnitudes are
+# order-of-magnitude estimates; it is their RATIO that is calibrated to the residual.
+#
+# TIERS. Both rate constants are order-of-magnitude estimates, so both Processes stay speculative;
+# parameter-tier propagation (D-1) caps the pyruvate output tier at speculative regardless. The
+# excreted-overflow MECHANISM (yeast excretes pyruvate during active fermentation, re-assimilating
+# it late) is textbook (Boulton et al., Principles and Practices of Winemaking; Ribereau-Gayon et
+# al., Handbook of Enology; Jackowetz & Mira de Orduna 2013 for the finished-wine residual range);
+# only the RATE magnitudes are the author's estimates.
+#
+# CARBON. Excretion draws pyruvate carbon out of sugar (C3, at pyruvate's fraction) and
+# reassimilation returns it to ethanol + CO2 (C3 -> C2 + C1, one mole each — carbon-closing like
+# malic -> lactic + CO2, D-23), so total_carbon (which weights the pyruvate pool at its own C3
+# fraction) closes to machine precision through the whole excrete-then-reassimilate course.
+# Reassimilation returns to E/CO2 (not S) deliberately: post-dryness S is 0, so a refund-to-sugar
+# would be a no-op that DESTROYS carbon exactly when reassimilation is doing its work. Mass carries
+# the usual small gap (the oxidation moves untracked NAD(P)H / O) — carbon is the invariant, as for
+# the diacetyl rest (D-26) and the acetaldehyde buffer (D-27).
+#
+# SCOPE (v1). Wine-only (the SO2-binding competition is a wine readout; no S2.2 beer benchmark
+# asserts a keto-acid level). The pyruvate metabolite only — alpha-ketoglutarate follows (D-50).
+# The SO2 pyruvate binds is a SEPARATE readout beat (the D-51 multi-carbonyl equilibrium generalises
+# the D-28 free/bound split over acetaldehyde + pyruvate + alpha-KG); this beat only builds the pool
+# that binding will read, kept out per the one-Process-per-commit rhythm (the D-27 -> D-22 precedent).
+
+# -- EXCRETION: sugar -> pyruvate (flux-linked draw, temperature-flat) -------------------
+k_pyruvate_excretion:
+  value: 3.0e-3
+  unit: "1/h"   # d(pyruvate)/dt = k_pyruvate_excretion * X * S/(K_sugar_uptake + S); carbon drawn from S
+  tier: speculative
+  uncertainty: { low: 1.0e-3, high: 1.0e-2, note: "with k_pyruvate_reassimilation 1e-1 the quasi-steady frozen residual ~ k_pyruvate_excretion/k_pyruvate_reassimilation ~ 10-100 mg/L; nominal 3e-3/1e-1 = 30 mg/L in the real finished-wine range (Jackowetz & Mira de Orduna 2013). It is the RATIO to k_pyruvate_reassimilation, not either magnitude alone, that sets the residual" }
+  provenance:
+    source: "author estimate bounded by typical overflow-pyruvate levels (Jackowetz & Mira de Orduna 2013, Am. J. Enol. Vitic. — finished-wine pyruvate 10s-100s mg/L; Boulton et al., Principles and Practices of Winemaking). Yeast excretes overflow pyruvate during active fermentation."
+    conditions: "generic yeast; overflow-pyruvate excretion coupled to the biomass-catalysed sugar (fermentative) flux, shared K_sugar_uptake"
+    notes: "MODELLED AS A DRAW FROM SUGAR into an EXCRETED SIDE POOL (decision D-49), NOT as routing acetaldehyde's carbon through its precursor pyruvate (rejected: conflates the intracellular flux intermediate with the extracellular excreted residual — see the keto_acids module docstring). Flux-linked so it stops at dryness leaving a full overflow pool; held TEMPERATURE-FLAT as a documented v1 simplification. Magnitude speculative."
+
+# -- REASSIMILATION: pyruvate -> ethanol + CO2 (flux-linked / co-metabolic) --------------
+k_pyruvate_reassimilation:
+  value: 1.0e-1
+  unit: "L/(g*h)"   # d(pyruvate)/dt = -k_pyruvate_reassimilation * X * S/(K_sugar_uptake+S) * [pyruvate]; returned to E + CO2
+  tier: speculative
+  uncertainty: { low: 3.0e-2, high: 3.0e-1, note: "sets the approach speed to (and, with k_pyruvate_excretion, the level of) the frozen plateau; fast enough (k*X*phi ~ 0.2/h) that the pool reaches the plateau within a day and holds it to dryness, so the residual robustly ~= k_pyruvate_excretion/k_pyruvate_reassimilation. It is the RATIO, not this magnitude alone, that sets the residual" }
+  provenance:
+    source: "author estimate; yeast co-metabolically re-assimilates excreted overflow pyruvate during active fermentation, oxidising it back into central metabolism (Boulton et al.; Ribereau-Gayon et al.). Tracks the fermentative flux, so it stops at dryness and freezes the finished-wine residual (Jackowetz & Mira de Orduna 2013)."
+    conditions: "generic yeast; overflow-pyruvate re-assimilation, first-order in pyruvate and FLUX-LINKED (co-metabolic — shares the X*S/(K_sugar_uptake+S) fermentative shape with excretion), so it dies at dryness"
+    notes: "Returns carbon to ETHANOL + CO2, not sugar (C3 -> C2 + C1, one mole each — carbon-closing): that is pyruvate's real forward metabolic fate, and a refund-to-sugar would be a no-op at post-dryness S=0 anyway. FLUX-LINKING is load-bearing and DELIBERATELY the OPPOSITE of the no-flux ADH acetaldehyde reduction (D-27): a normal ferment finishes with the yeast still viable, so a no-flux viable-X gate would drain overflow pyruvate to ~0 over the long tail (a crash-dependent residual a clean ferment never strands). Co-metabolic flux-linking pegs the residual to END-OF-FERMENTATION (the dryness freeze), not yeast death — crash- and duration-independent (decision D-49, option A). Magnitude speculative."

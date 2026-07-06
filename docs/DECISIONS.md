@@ -3443,6 +3443,73 @@ peak lift scales with dose (the total-SO₂ signature). `test_production_metadat
 `k_acet_so2_induced` in `reads`; the MLF band is *unchanged* (D-48 sized to keep it). Full suite **610
 passed (incl. the 5 §2.2 benchmarks)**; ruff + mypy clean. Validated core byte-for-byte preserved.
 
+## D-49 — Excreted keto-acid overflow pool (pyruvate): the second SO₂-binding carbonyl, as a side pool not an on-pathway precursor
+
+**The task and where it came from.** D-48 flagged that the model's finished-wine acetaldehyde stranding
+overshoots the field regression `W_acet = −4.4 + 0.39·W_tSO₂` by **1.3–1.5×** and named it "a D-47/D-28
+binding-calibration question." Investigating it established the overshoot is a **real missing mechanism,
+not a mis-calibration**: the model routes *100 % of bound SO₂ onto acetaldehyde*, but real wine shares
+dosed SO₂ with **competing carbonyls** — chiefly the excreted keto-acids **pyruvate** and
+**α-ketoglutarate** (Jackowetz & Mira de Orduña 2013). A pre-check (multi-carbonyl partition at each
+end-state free-SO₂ level, sourced competitor pools) confirmed that sharing SO₂ with persistent
+finished-wine keto-acids pulls the slope from ~0.56 down toward the field ~0.39 at a typical 50 mg/L dose.
+The owner chose to **build the competitor pools** (per-species, dynamic, D-19 side-pool idiom). D-49 is
+the first: pyruvate. (α-KG = D-50; the coupled multi-carbonyl SO₂ equilibrium that reads them = D-51.)
+
+**The load-bearing modelling choice: an EXCRETED SIDE POOL, not acetaldehyde's on-pathway precursor.**
+The owner's initial instinct (and a first advisor recommendation) was the "maximum-fidelity" rework:
+route acetaldehyde's carbon *through* pyruvate, its real metabolic precursor (pyruvate → acetaldehyde +
+CO₂ → ethanol). This was **designed and then rejected** (the advisor retracted its own recommendation on
+review). It conflates two physically distinct pools: acetaldehyde's precursor is the **intracellular flux
+intermediate** (enormous flux, vanishing pool, never persists, never measured), whereas the SO₂-binding
+pyruvate is the **extracellular excreted overflow residual** (small flux, persistent, measured). One pool
+cannot be both, and the persistence mechanism the rework needed — "SO₂ shields pyruvate from pyruvate
+decarboxylase" — is not real (PDC is intracellular; the excreted residual never meets it). Worse, that
+shielding would make dosed SO₂ *sequester acetaldehyde's precursor* and **suppress** acetaldehyde — the
+exact opposite of the SO₂-induced over-production D-48 just shipped. So the excreted-overflow side pool is
+the **more** faithful structure for the quantity that matters here, and **acetaldehyde / D-27 / D-47 / D-48
+stay entirely untouched.**
+
+**The model.** `S --excretion--> pyruvate --reassimilation--> ethanol + CO₂`, the D-19/D-26 byproduct idiom.
+`PyruvateExcretion` (flux-linked, temperature-flat) draws pyruvate's carbon *out of `S`* at the C3 fraction
+while the yeast ferments — stops at dryness. `PyruvateReassimilation` returns it to `E`+`CO2`
+(`C3 → C2 + C1`, one mole each — carbon-closing like malic → lactic + CO₂, D-23). Carbon returns to `E`/`CO2`
+**not `S`** deliberately: post-dryness `S = 0`, so a refund-to-sugar would be a no-op that *destroys* carbon.
+Both processes are **wine-only** (v1) — the SO₂ competition is a wine readout; no §2.2 beer benchmark asserts
+a keto-acid level. Both **speculative** (rate magnitudes are estimates); the excreted-overflow *mechanism* is
+textbook.
+
+**The mid-build mechanism correction (the crux — flux-link the reassimilation, not viable-X-gate it).** The
+first build borrowed the acetaldehyde-reduction template: reassimilation gated on **viable X with no flux
+term**. It failed empirically — the finished-wine residual came out **0.0 mg/L**. Cause: a clean ferment
+finishes with the yeast **still viable** (~0.4 g/L here), so a no-flux viable-X gate keeps clearing pyruvate
+over the long post-dryness tail and drains the pool to ~0. The residual had been (wrongly) pegged to *yeast
+death*; a normal ferment doesn't crash. The advisor confirmed this is a **mechanism bug, not tuning**, and
+the diagnosis: overflow-pyruvate re-assimilation is **co-metabolic** (tracks active fermentation), the
+*opposite* of ADH (which genuinely keeps reducing acetaldehyde through the post-ferment rest). Fix:
+**flux-link the reassimilation** (share excretion's `X·S/(K+S)` shape). At dryness both terms die and the
+pool **freezes** at its dryness value — a residual pegged to *end-of-fermentation*, hence **crash- and
+duration-independent** (verified: 30.0 mg/L at both 21 and 40 days). Consequence, documented as a v1
+simplification: because both terms ride the same flux shape the pool rises *monotonically* to the plateau
+`k_pyruvate_excretion / k_pyruvate_reassimilation` rather than showing the real mid-ferment peak-then-decline
+— but **nothing reads the peak** (D-51 reads only the residual), so the transient is dropped and the growth-
+coupled excretion that would restore it (option B) is deferred. Sizing is by the **ratio** (3e-3 / 1e-1 =
+0.03 g/L = 30 mg/L), in the real finished-wine range.
+
+**Isolability (prime directive #3).** Own `_KETO_ACID_PROCESSES` tuple; a ProcessSet without it is the prior
+core. Unlike the byte-for-byte acetaldehyde buffer, the pool routes a *trace* of sugar carbon on a detour to
+ethanol (parking only the ~30 mg/L residual), so the ABV/CO₂ endpoints are **not** bit-identical to the
+pool-off core — but the delta is **rel ~4.4e-5** (≪ 0.1 %), so the §2.2 benchmarks are preserved far below
+tolerance. Carbon closes to **machine precision** (pool weighted at its C3 fraction in `total_carbon`).
+
+**Verification.** New `test_keto_acids.py` (19 tests): closed forms + carbon-exact draw/release, the dryness-
+freeze (reassimilation stops at `S=0` — the load-bearing difference from ADH), the persistent residual in the
+finished-wine range *with the yeast still viable*, duration-independence (21 vs 40 days), machine-precision
+carbon closure, the ≪0.1 % ABV/CO₂ isolability delta, wine-only wiring, and speculative tier propagation. Six
+existing `full_params`/schema tests updated for the new shared YAML + state slot (mechanical). Full suite
+**629 passed (incl. the 5 §2.2 benchmarks)**; ruff + mypy clean. **Next:** D-50 (α-KG, same structure), then
+D-51 (the coupled multi-carbonyl SO₂ equilibrium that reads both pools — where the overshoot actually drops).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
