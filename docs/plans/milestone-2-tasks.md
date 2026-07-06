@@ -457,6 +457,33 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         section (unsulfited byte-for-byte, rate-throttle, post-AF strands ≪ pitch, carbon closes,
         BDF/RK45/LSODA agreement). **606 green** + 5 benchmark, ruff+mypy clean. Full record in
         **DECISIONS → D-47**.
+  - [x] **SO₂-induced acetaldehyde over-production — the transient-peak half (decision D-48).
+        LANDED 2026-07-06.** Adds `+k_acet_so2_induced·flux·so2_total` to `AcetaldehydeProduction`
+        (glyceropyruvic redox pull, Han 2020), a carbon-exact borrow from E, exact `so2_total>0`
+        guard. **The task premise was refuted by data:** D-47 protection *alone* already delivers
+        1.3–1.5× the field 0.39 mg/mg end-state slope — the end state is capped by the D-28 binding
+        equilibrium, not production — so no additive end-state term fits. Owner chose to scope D-48
+        to the transient PEAK. Driver = **total** SO₂ (free collapses to ~0 at the peak ⇒ inert
+        there). Magnitude sized by a cross-process constraint: the largest k (4e-3) keeping the
+        emergent SO₂ MLF brake in its literature partial-brake regime. **610 green** + 5 benchmark,
+        ruff+mypy clean. Full record in **DECISIONS → D-48**.
+  - [x] **Excreted overflow-pyruvate pool — the first competing SO₂-binding carbonyl (decision
+        D-49). LANDED 2026-07-07.** Part 1 of the D-47/D-28 overshoot fix: the 1.3–1.5× overshoot is
+        a real missing mechanism — the model routes 100 % of bound SO₂ onto acetaldehyde, but real
+        wine shares it with competing carbonyls (pyruvate, α-KG; Jackowetz & Mira de Orduña 2013).
+        Built as an **excreted side pool** (D-19/D-26 idiom), NOT acetaldehyde's on-pathway precursor
+        (that rework conflates the intracellular flux intermediate with the extracellular excreted
+        residual and would make dosed SO₂ *suppress* acetaldehyde — rejected). `PyruvateExcretion`
+        draws C3 from `S`; `PyruvateReassimilation` is **flux-linked (co-metabolic, NOT the no-flux
+        ADH gate)**, returning to E+CO₂ (C3→C2+C1), so both terms die at dryness and the pool
+        **freezes** at the plateau `k_exc/k_reassim` — a persistent residual pegged to end-of-ferment,
+        crash- AND duration-independent (30.0 mg/L at 21 and 40 d). A no-flux viable-X gate drained it
+        to ~0 (clean ferment ends with yeast viable) — the mid-build mechanism fix, advisor-confirmed.
+        Wine-only; both speculative; carbon closes to machine precision; ABV/CO₂ endpoints preserved
+        to rel ~4.4e-5 (≪0.1 %). New `test_keto_acids.py` (19) + 6 existing tests updated for the new
+        shared `keto_acids.yaml` + `pyruvate` slot (wine 34→35). **629 green** + 5 benchmark,
+        ruff+mypy clean. **Next:** D-50 (α-KG), D-51 (coupled multi-carbonyl SO₂ equilibrium — where
+        the slope correction lands). Full record in **DECISIONS → D-49**.
   - [x] **H₂S — carbon-free produced pool with an inverse-nitrogen gate (decision D-29).
         LANDED 2026-07-01.** N/S-deficiency signal ("rotten egg"): yeast reduces sulfate faster
         than it can fix the sulfide onto nitrogen skeletons, so production is *de-repressed at
