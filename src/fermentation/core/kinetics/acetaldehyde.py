@@ -101,6 +101,21 @@ the D-27 core (the ``so2_total > 0`` guard is exact) and no §2.2 benchmark dose
 (speculative): bound acetaldehyde is treated inert-to-ADH — real adduct slowly dissociates and
 degrades over months, so the stranding is an *upper bound* on persistence; at field (sub-
 stoichiometric) doses the model reproduces the observed ~0.76× degradation-rate slowdown.
+
+**SO₂-induced over-production — a transient-peak bump on production (decision D-48).** Protection
+(D-47) shields *existing* acetaldehyde from ADH; separately, trapping the terminal electron acceptor
+makes the yeast excrete *more* of it (the glyceropyruvic redox pull — Han 2020). The D-47 note left
+this unmodelled; D-48 adds it as an SO₂-gated term on :class:`AcetaldehydeProduction`,
+``+k_acet_so2_induced·flux·so2_total`` (again a carbon-exact borrow from ``E``). It is deliberately
+scoped to the **transient peak only**: the finished-wine end state is capped by the SO₂-binding
+equilibrium (not production), and D-47 protection *alone* already reproduces the field ~0.39 mg/mg
+total-acetaldehyde-vs-total-SO₂ slope (indeed 1.3–1.5× it — a defensible thermodynamic-binding vs
+net-field-regression gap), so an *additive* end-state bump would overshoot; D-48 must not, and does
+not, move the stranded residual. Driver is **total** SO₂: free SO₂ collapses to ~0 at the peak (all
+sulfite bound), so it is empirically inert on the very observable this targets; total SO₂ is
+open-loop but flux-gated, so flux→0 at dryness caps its integral (no runaway; verified). Magnitude
+is **speculative and unanchored** (no field data sizes the peak elevation) — kept small. The
+``so2_total > 0`` guard is exact, so an unsulfited run is byte-for-byte the D-27/D-47 core.
 """
 
 from __future__ import annotations
@@ -143,21 +158,23 @@ class AcetaldehydeProduction(Process):
     Coupled to the flux (so production stops at dryness) and held **temperature-flat**
     (a documented v1 simplification, like the α-acetolactate excretion, D-26): the
     interesting temperature dependence lives in the enzymatic reduction, and no benchmark
-    asserts an acetaldehyde temperature direction in v1. ``E`` is not clamped here — net
+    asserts an acetaldehyde temperature direction in v1. Under dosed SO₂ an **induced
+    over-production** term (D-48, ``+k_acet_so2_induced·flux·so2_total``) lifts the transient
+    peak — also flux-gated and a carbon-exact ``E`` borrow. ``E`` is not clamped here — net
     ``dE`` stays positive throughout because the uptake ethanol rate rides the *same*
-    flux with a far larger coefficient — but the borrow itself cannot drive ``E`` below
-    the uptake's own deposit, so no guard is needed. Tier **speculative** (rate magnitude
-    estimate).
+    flux with a far larger coefficient (the base + induced borrow stays ≳100× below the
+    uptake deposit), so no guard is needed. Tier **speculative** (rate magnitude estimate).
     """
 
     name = "acetaldehyde_production"
     tier = Tier.SPECULATIVE
     touches = ("acetaldehyde", "E")
     #: ``K_sugar_uptake`` is shared with the fermentative-uptake flux this tracks;
-    #: ``k_acetaldehyde`` sets the borrow magnitude (and, with ``k_acet_reduction``, the
-    #: quasi-steady peak). Their tiers cap ``acetaldehyde``'s output tier via
-    #: parameter-tier propagation (D-1).
-    reads: tuple[str, ...] = ("k_acetaldehyde", "K_sugar_uptake")
+    #: ``k_acetaldehyde`` sets the base borrow magnitude (and, with ``k_acet_reduction``, the
+    #: quasi-steady peak); ``k_acet_so2_induced`` sets the SO₂-induced over-production bump
+    #: (decision D-48), which reads the *total* SO₂ **state** slot directly (no param, no pH
+    #: solve). Their tiers cap ``acetaldehyde``'s output tier via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = ("k_acetaldehyde", "K_sugar_uptake", "k_acet_so2_induced")
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -166,8 +183,31 @@ class AcetaldehydeProduction(Process):
         flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
         if flux <= 0.0:
             return d
-        rate = params["k_acetaldehyde"] * flux  # mass rate of acetaldehyde formation
+        rate = params["k_acetaldehyde"] * flux  # base borrow (D-27), SO₂-independent
+        # SO₂-INDUCED OVER-PRODUCTION (decision D-48) — the *transient-peak* half of the elevation.
+        # Trapping the terminal electron acceptor (acetaldehyde) makes the yeast intensify the
+        # glyceropyruvic redox pull and excrete *more* acetaldehyde in active ferment (Han 2020).
+        # Scoped to the mid-ferment PEAK, which has no end-state literature anchor: D-47 protection
+        # ALONE already reproduces the finished-wine ~0.39 mg/mg total-acetaldehyde-vs-total-SO₂
+        # slope (the end state is capped by the SO₂-binding equilibrium, NOT production), so an
+        # additive end-state bump would overshoot — this term must not, and does not, move it (the
+        # stranded residual is unchanged). Driver is TOTAL SO₂ (owner's Option-3 call): free SO₂
+        # collapses to ~0 at the peak (all sulfite bound), so it is empirically inert on the very
+        # observable this targets; total SO₂ is open-loop yet STABLE — flux-gated, so the flux → 0
+        # at dryness caps its time-integral (no runaway; verified). Reads the total SO₂
+        # **state** slot directly — no param, no per-RHS pH ``brentq``. Still a borrow from
+        # ``E`` (carbon-exact C2, like the base term); the diverted glycerol carbon reality shows
+        # parks here as acetaldehyde (no glycerol pool; a v1 simplification that leaves the
+        # ethanol-yield reduction slightly understated). The guard is EXACT: an unsulfited run is
+        # byte-for-byte the D-27/D-47 core.
+        if SO2_STATE_KEY in schema:
+            so2_total = float(y[schema.slice(SO2_STATE_KEY)][0])
+            if so2_total > 0.0:
+                rate += params["k_acet_so2_induced"] * flux * so2_total  # total SO₂, flux-capped
         d[schema.slice("acetaldehyde")] = rate
+        # Net ``dE`` stays positive: uptake deposits ethanol at ≈ q_sugar_max·ethanol_yield·flux
+        # (~0.41·flux), ≳100× the largest induced borrow (~8e-4·flux even at a 200 mg/L dose), so
+        # the borrow cannot drive ``E`` below the uptake's own deposit — no clamp needed (verified).
         d[schema.slice("E")] = -rate * _ETHANOL_PER_ACETALDEHYDE  # borrow C2 from ethanol
         return d
 

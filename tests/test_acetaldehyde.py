@@ -93,7 +93,8 @@ def test_production_metadata():
     assert p.tier is Tier.SPECULATIVE
     # Touches ONLY its own pool and ethanol — the buffer borrows C2 from E, never S/CO2 (D-27).
     assert set(p.touches) == {"acetaldehyde", "E"}
-    assert set(p.reads) == {"k_acetaldehyde", "K_sugar_uptake"}
+    # ``k_acet_so2_induced`` is the D-48 SO₂-induced over-production coefficient (total-SO₂ driven).
+    assert set(p.reads) == {"k_acetaldehyde", "K_sugar_uptake", "k_acet_so2_induced"}
 
 
 def test_reduction_metadata():
@@ -563,3 +564,93 @@ def test_ethanol_tier_reflects_the_speculative_buffer(store):
     # Param-aware tier (what users see): SPECULATIVE either way — no headline change.
     assert core.tier_of("E", tm) is Tier.SPECULATIVE
     assert with_buffer.tier_of("E", tm) is Tier.SPECULATIVE
+
+
+# == D-48: SO₂-induced over-production — the transient-peak half of the elevation ==============
+#
+# D-47 protection shields *existing* acetaldehyde from ADH; D-48 adds the other half — trapping the
+# terminal electron acceptor makes the yeast over-excrete acetaldehyde (the glyceropyruvic redox
+# pull, Han 2020). It is scoped to the transient PEAK, not the end state: the finished-wine residual
+# is capped by the SO₂-binding equilibrium (D-28), and D-47 protection ALONE already meets the field
+# ~0.39 mg/mg total-acetaldehyde-vs-total-SO₂ slope, so an additive end-state bump would overshoot —
+# D-48 leaves the stranded residual unchanged. Driver is TOTAL SO₂ (free SO₂ collapses to ~0 at the
+# peak, so it is empirically inert there); the term is flux-gated (no runaway) and a carbon-exact
+# borrow from E. The ``so2_total > 0`` guard is EXACT — an unsulfited run is byte-for-byte the core.
+
+
+def _induced_run(so2_mgl: float, k_induced: float | None = None) -> np.ndarray:
+    """A default wine ferment at a pitch SO₂ dose. ``k_induced=None`` uses the SHIPPED
+    ``k_acet_so2_induced`` (so the tests track the YAML value); a float overrides it."""
+    initial: dict[str, float] = {
+        "brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.5,
+        "tartaric_gpl": 6.0, "malic_gpl": 3.0, "initial_ph": 3.4,
+    }  # fmt: skip
+    if so2_mgl > 0.0:
+        initial["so2_total_mgl"] = so2_mgl
+    c = compile_scenario(
+        Scenario(
+            name="wine-so2-induced", medium="wine", initial=initial,
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)], duration_days=21.0,
+        ),
+        strict=True,
+    )  # fmt: skip
+    pv = dict(c.param_values)  # the property returns a fresh resolve() — mutate a copy
+    if k_induced is not None:
+        pv["k_acet_so2_induced"] = k_induced
+    traj = simulate(c.process_set, pv, c.y0, c.t_span_h)
+    return np.asarray(traj.series("acetaldehyde"))
+
+
+def test_induced_term_is_exact_when_undosed(params):
+    # The so2_total>0 guard is EXACT: with no SO₂ the induced term is skipped entirely and the
+    # production derivative is byte-for-byte the D-27 base borrow — no dependence on
+    # k_acet_so2_induced whatsoever. Pin with == (not approx): the branch is simply not taken.
+    schema = wine_schema()
+    y = _wine_y0(schema, x=2.0, s=200.0)  # so2_total slot defaults to 0
+    d = AcetaldehydeProduction().derivatives(0.0, y, schema, params)
+    flux = 2.0 * (200.0 / (params["K_sugar_uptake"] + 200.0))
+    assert schema.get(d, "acetaldehyde") == params["k_acetaldehyde"] * flux  # exact base only
+
+
+def test_induced_production_closed_form(params):
+    # With SO₂ dosed, production = base borrow + k_acet_so2_induced·flux·so2_total, all borrowed
+    # from E mole-for-mole (carbon-exact). SO₂ is read-only; nothing but acetaldehyde and E moves.
+    schema = wine_schema()
+    x, s, so2 = 2.0, 200.0, mgl_to_gpl(100.0)
+    y = _wine_y0(schema, x=x, s=s)
+    y[schema.slice("so2_total")] = so2
+    d = AcetaldehydeProduction().derivatives(0.0, y, schema, params)
+    flux = x * (s / (params["K_sugar_uptake"] + s))
+    rate = params["k_acetaldehyde"] * flux + params["k_acet_so2_induced"] * flux * so2
+    assert schema.get(d, "acetaldehyde") == pytest.approx(rate)
+    assert schema.get(d, "E") == pytest.approx(-rate * _ETH_PER_ACET)  # C2 borrow from ethanol
+    # carbon-exact: the carbon leaving E equals the carbon entering acetaldehyde, per RHS
+    assert schema.get(d, "E") * _ETHANOL_C == pytest.approx(
+        -schema.get(d, "acetaldehyde") * _ACETALDEHYDE_C
+    )
+    for var in ("X", "S", "N", "CO2", "so2_total"):
+        assert schema.get(d, var) == 0.0  # no sugar/CO2 draw; SO₂ is not consumed here
+
+
+def test_induced_over_production_lifts_the_peak_not_the_end_state():
+    # THE D-48 HEADLINE: the SO₂-induced bump raises the transient acetaldehyde PEAK but leaves the
+    # finished-wine residual unchanged — the end state is capped by the SO₂-binding equilibrium
+    # (an over-produced slice is reduced back; only the bound pool survives), so this is a genuine
+    # peak-only effect, not a double-count of the end state D-47 already delivers.
+    dose = 50.0
+    off = _induced_run(dose, 0.0)  # D-47 protection only
+    on = _induced_run(dose)  # + D-48 induced over-production (shipped k)
+    peak_off, peak_on = gpl_to_mgl(off.max()), gpl_to_mgl(on.max())
+    end_off, end_on = gpl_to_mgl(off[-1]), gpl_to_mgl(on[-1])
+    assert peak_on > peak_off + 2.0  # a real, non-trivial peak lift (~+3.8 mg/L at 50 mg/L)
+    assert end_on == pytest.approx(end_off, abs=0.5)  # end state / stranded residual unchanged
+
+
+def test_induced_peak_lift_scales_with_dose():
+    # Driven by TOTAL SO₂, so a larger dose lifts the peak more (near dose-proportional). Confirms
+    # the driver is the dosed SO₂ state, not a saturating free-SO₂ readout (which is inert here).
+    # Uses the SHIPPED k (None) so it tracks the YAML value, not a hardcoded coefficient.
+    lift_50 = gpl_to_mgl(_induced_run(50.0).max()) - gpl_to_mgl(_induced_run(50.0, 0.0).max())
+    lift_200 = gpl_to_mgl(_induced_run(200.0).max()) - gpl_to_mgl(_induced_run(200.0, 0.0).max())
+    assert lift_50 > 1.0
+    assert lift_200 > 2.5 * lift_50  # 4× the dose ⇒ a substantially larger peak lift

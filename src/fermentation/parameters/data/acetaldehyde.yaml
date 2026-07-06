@@ -86,6 +86,45 @@ k_acetaldehyde:
     conditions: "generic yeast; acetaldehyde formation coupled to the biomass-catalysed sugar (fermentative) flux, shared K_sugar_uptake"
     notes: "MODELLED AS A BORROW FROM ETHANOL, NOT A SUGAR DRAW (decision D-27): the uptake Process already makes the full sugar->ethanol+CO2 conversion, so acetaldehyde de-lumps that step (holds back a transient C2 slice of ethanol) rather than adding a parallel pathway that would inflate ABV. Flux-linked so it stops at dryness; held TEMPERATURE-FLAT as a documented v1 simplification (the enzymatic reduction carries the temperature dependence). Magnitude speculative."
 
+# -- SO2-INDUCED OVER-PRODUCTION: the redox-pull peak bump (decision D-48) ----------------
+# Trapping acetaldehyde — the terminal electron acceptor of alcoholic fermentation — makes the
+# yeast intensify the glyceropyruvic pathway (glycerol regenerates NAD+ instead) and excrete MORE
+# acetaldehyde during active ferment (Han et al. 2020, Food Chemistry; Ribereau-Gayon et al.,
+# Handbook of Enology). This adds an SO2-gated term to AcetaldehydeProduction:
+#
+#   d(acetaldehyde)/dt += k_acet_so2_induced * X*S/(K_sugar_uptake+S) * total_SO2   (borrowed from E)
+#
+# SCOPED TO THE TRANSIENT PEAK, NOT THE END STATE (owner's Option-3 call, D-48). Empirical finding
+# that reshaped this beat: D-47 protection ALONE already delivers finished-wine acetaldehyde at
+# 1.3-1.5x the field slope W_acet = -4.4 + 0.39*W_tSO2 mg/L (increments 25.7/56.1/119.0 mg/L at
+# 50/100/200 mg/L SO2 vs 0.39*dose = 19.5/39/78). The end state is CAPPED BY THE SO2-BINDING
+# EQUILIBRIUM (D-28), not by production — an induced production bump is reduced away (only the bound
+# fraction survives, and that pool is saturated), so it leaves the end state unchanged. There is thus
+# NO under-shoot for an additive end-state term to fill; a bump there would only overshoot. D-48
+# instead targets the mid-ferment PEAK (a real, distinct, transient phenomenon with no end-state
+# anchor): the yeast's active-ferment over-excretion, which ADH later clears.
+#
+# DRIVER = TOTAL SO2 (owner's Option-3 call). Free SO2 was rejected: it collapses to ~0 at the peak
+# (nearly all sulfite bound to the rising acetaldehyde), so it is EMPIRICALLY INERT on the very peak
+# this targets (peak lift +0.1..+1.4 mg/L across all doses/k — structurally, its negative feedback
+# self-quenches exactly when the term is needed). Total SO2 is open-loop but STABLE in practice: the
+# term is flux-gated, so the fermentative flux -> 0 at dryness caps its time-integral (no runaway;
+# verified empirically — end stranding flat 25.7->25.8 at 50 mg/L, no divergence at 200 mg/L). Read
+# from the total SO2 STATE slot directly — no param, no per-RHS pH brentq. Still a BORROW FROM E
+# (carbon-exact C2, like the base term), so carbon closes to machine precision at any magnitude; the
+# diverted glycerol carbon reality shows parks here as acetaldehyde (no glycerol pool — a v1
+# simplification, ethanol-yield reduction slightly understated). EXACT undosed guard (so2_total>0):
+# an unsulfited run is byte-for-byte the D-27/D-47 core.
+k_acet_so2_induced:
+  value: 4.0e-3
+  unit: "L/(g*h)"   # d(acetaldehyde)/dt += k_acet_so2_induced * X * S/(K+S) * total_SO2[g/L]; borrowed from E
+  tier: speculative
+  uncertainty: { low: 2.0e-3, high: 6.0e-3, note: "No DIRECT peak field data (the 0.39 mg/mg correlation is END-STATE, which this term does not move), so magnitude is bounded by a CROSS-PROCESS reality constraint instead: the raised acetaldehyde peak sequesters SO2 and weakens the molecular-SO2 MLF brake, and k is sized to the LARGEST value keeping that brake in its literature 'SO2 remains a partial brake, more than half the malic retained' regime (malic >= 2.0/4.0 g/L in the 80 mg/L SO2 + 0.2 g/L O.oeni run). That ceiling is ~5e-3 (malic ~2.03, at the floor); nominal 4e-3 keeps a safe margin (malic ~2.09, the MLF test back inside its original 2.0-3.0 band). At 4e-3 a 50 mg/L pitch dose lifts the acetaldehyde peak ~+3.8 mg/L (71.6->75.4), dose-scaling to ~+15 at 200 mg/L; end state and stranded residual unchanged. Band 2e-3 (fainter) to 6e-3 (just past the MLF-brake ceiling)." }
+  provenance:
+    source: "author estimate; magnitude bounded by a CROSS-PROCESS constraint, not a direct peak measurement (the total-acetaldehyde vs total-SO2 field correlation ~0.39 mg/mg is end-state and is already met by D-47 protection alone, so it does not size this transient-peak term). Sizing anchor: the largest k keeping the emergent SO2 MLF brake in its literature 'partial brake, >half the malic retained' regime (bound SO2 is not antimicrobial; Ribereau-Gayon et al., Handbook of Enology). Mechanism sourced: SO2 traps the terminal electron acceptor acetaldehyde, so glycerol synthesis intensifies to regenerate NAD+ and acetaldehyde over-excretion rises during active ferment (Han et al. 2020, Food Chemistry; Jackowetz & Mira de Orduna)."
+    conditions: "generic yeast; extra acetaldehyde formation coupled to the biomass-catalysed fermentative flux (shared K_sugar_uptake) and driven by TOTAL SO2 (state slot), temperature-flat like the base production. Targets the transient mid-ferment PEAK only; the finished-wine end state is capped by the D-28 binding equilibrium and is left unchanged."
+    notes: "MODELLED AS A BORROW FROM ETHANOL, NOT A SUGAR DRAW (the D-27 invariant): carbon closes to machine precision at any magnitude; reality's diverted glycerol carbon parks as acetaldehyde (no glycerol pool). TOTAL-SO2 driver (owner's Option-3 choice): free SO2 is empirically inert on the peak (collapses to ~0 there); total SO2 is open-loop but flux-gated so its integral is capped (no runaway). Magnitude co-constrained by the SO2 MLF brake (D-48 sizing): 4e-3 keeps that brake in its literature partial-brake regime. EXACT undosed guard => byte-for-byte the D-27/D-47 core when no SO2 is dosed. Magnitude speculative."
+
 # -- REDUCTION: acetaldehyde -> ethanol (enzymatic, viable-yeast-gated, fast) -----------
 k_acet_reduction:
   value: 5.0e-2

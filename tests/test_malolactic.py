@@ -232,7 +232,7 @@ def test_so2_dose_suppresses_mlf_in_a_run():
     # stoichiometrically AND is then locked in (D-47: bound acetaldehyde is protected from ADH),
     # so free SO₂ stays chronically depressed (here it ends ~21 % of the 80 mg/L dose) rather
     # than recovering. The molecular antimicrobial pool is therefore weak for the whole run, and
-    # a *substantial* slice of MLF proceeds: ~1.7 g/L malic (~42 %) is converted, vs the
+    # a *substantial* slice of MLF proceeds: ~1.9 g/L malic (~48 %) is converted, vs the
     # uninhibited run consuming all of it and the un-pitched run converting none. This is the
     # faithful "bound SO₂ is not antimicrobial" consequence — dosing SO₂ into acetaldehyde-rich
     # fermenting must is a far weaker MLF brake than the same dose in a cleared wine.
@@ -246,8 +246,10 @@ def test_so2_dose_suppresses_mlf_in_a_run():
     assert t_off.series("malic")[-1] == pytest.approx(4.0)  # no bacteria ⇒ no conversion
     assert t_on.series("malic")[-1] < 0.5  # uninhibited MLF consumes ~all of it
     # SO₂ still suppresses — it retains more than half the malic — but only PARTIALLY, because
-    # stranded acetaldehyde sequesters most of the antimicrobial pool (the D-47 emergent effect):
-    assert 2.0 < t_so2.series("malic")[-1] < 3.0  # ~1.7 g/L (~42 %) slips through
+    # stranded acetaldehyde sequesters most of the antimicrobial pool (the D-47/D-48 emergent
+    # effect — D-48's induced over-production raises the peak, weakening the brake a little more;
+    # its k is sized to KEEP this "more than half retained" regime, so the band is unchanged):
+    assert 2.0 < t_so2.series("malic")[-1] < 3.0  # ~2.1 g/L remains (~48 % converted slips through)
     assert t_so2.series("malic")[-1] > 5.0 * t_on.series("malic")[-1]  # …yet well above uninhibited
     assert (ph_on[-1] - ph_off[-1]) > 0.15  # uninhibited MLF deacidifies fully
     assert 0.03 < (ph_so2[-1] - ph_off[-1]) < 0.12  # SO₂ run deacidifies only partially

@@ -3344,13 +3344,13 @@ would move no tier (the MLF-gate precedent). No new parameters.
 dissociates and degrades over months, so the stranding is an **upper bound on persistence** (the
 literature's own "not metabolized *during fermentation*"). Dosing SO₂ at pitch is also the *maximal*-
 stranding scenario; the common cellar case (SO₂ post-AF, into a wine the yeast already cleared) strands
-almost nothing — pinned by `test_post_af_so2_dose_strands_far_less_than_a_pitch_dose`. **One mechanism
-deliberately omitted:** the model's elevated acetaldehyde is **protection-only** (throttled reduction).
-Reality *superimposes* an **SO₂-induced over-production** component — a redox pull where the yeast
-excretes *more* acetaldehyde because SO₂ mops it up (Han 2020) — which we do not model (production stays
-SO₂-independent). So the "72 vs 37 mg/L peak" the model shows under-attributes the real elevation:
-protection explains part of it, induced production the rest. A future beat could add an SO₂-gated bump
-to `AcetaldehydeProduction`; today it is out of scope.
+almost nothing — pinned by `test_post_af_so2_dose_strands_far_less_than_a_pitch_dose`. **Second mechanism
+(the induced-over-production half): now modelled in D-48.** D-47 elevates acetaldehyde by *protection
+only* (throttled reduction); reality *superimposes* an **SO₂-induced over-production** — a redox pull
+where the yeast excretes *more* acetaldehyde because SO₂ traps it (Han 2020). This note originally
+scoped that out; **D-48 adds it as a total-SO₂-gated bump to `AcetaldehydeProduction`, scoped to the
+transient PEAK** (the end state is already at/above the field slope from protection alone — see D-48 for
+why an additive *end-state* term would overshoot).
 
 **Downstream test consequences (all faithful, re-pinned to measured output).**
 - `test_so2_dose_suppresses_mlf_in_a_run`: SO₂ dosed *during* AF is now only a **partial** MLF brake
@@ -3367,6 +3367,81 @@ throttles the rate to the free share (comparable-molar and excess); post-AF stra
 closes on a stranding run; BDF vs RK45/LSODA agreement (the rate is now nonlinear in acetaldehyde/SO₂ via
 the `bound_so2_molar` quadratic root on an always-on RHS). Full suite **606 passed (incl. the 5 §2.2
 benchmarks)**; ruff + mypy clean. Validated core byte-for-byte preserved.
+
+## D-48 — SO₂-induced over-production: a total-SO₂-gated bump on acetaldehyde production, scoped to the transient peak
+
+**The task and the reversal it forced.** D-47's caveat scoped out the "induced over-production" half of
+the SO₂ acetaldehyde elevation ("today it is out of scope"); this beat was authorised to add it — an
+SO₂-gated bump to `AcetaldehydeProduction` capturing the redox pull where trapping the terminal electron
+acceptor (acetaldehyde) makes the yeast intensify the glyceropyruvic pathway and excrete *more* of it
+(Han 2020). Building it surfaced a finding that **reshaped the beat before any code shipped**, and it is
+the crux of this decision.
+
+**The empirical finding (why the naïve framing was wrong).** The premise behind the task — that D-47
+captured only "protection" and a "production half" was missing from the finished-wine level — is
+**contradicted by the model's own numbers**. With the induced bump OFF (D-47 protection only), end-state
+acetaldehyde increments per SO₂ dose are **25.7 / 56.1 / 119.0 mg/L at 50 / 100 / 200 mg/L SO₂**, versus
+the field correlation `W_acet = −4.4 + 0.39·W_tSO₂` (0.39 mg/mg ⇒ 19.5 / 39 / 78). D-47 protection
+**alone already delivers 1.3–1.5× the full field slope** — there is no under-shoot for an additive
+end-state term to fill; a bump there would only overshoot. The structural reason: **the finished-wine
+level is capped by the SO₂-binding equilibrium (D-28), not by production.** An over-produced slice of
+acetaldehyde is reduced back once flux → 0 (D-27 borrow-from-E); only the *bound* fraction survives, and
+that pool is saturated — so *any* production driver (free or total SO₂) leaves the end state ~unchanged
+(25.7 → 25.8). (The 1.3–1.5× overshoot is itself defensible: thermodynamic 1:1 adduct binding *should*
+exceed a net-field regression whose wines bleed acetaldehyde and SO₂ to sinks the model omits; R = 0.837,
+−4.4 intercept — a loose anchor. Whether to trim D-47's binding calibration toward the field slope is
+left as a possible separate beat, not folded in here.)
+
+**Owner fork (three options presented with pros/cons).** Given the finding, the owner chose **Option 3 —
+scope D-48 to the transient PEAK, not the end state.** The mid-ferment peak *is* a real, distinct,
+measurable phenomenon (active-ferment over-excretion, later cleared by ADH) with **no end-state literature
+anchor**, so D-48 models it without double-counting the end state D-47 already delivers. (Option 1, don't
+build, was the runner-up; Option 2, re-split D-47+D-48 to sum to 0.39, was rejected as *illusory* — you
+cannot redistribute an end state that is set by the binding equilibrium, not production.)
+
+**Driver = TOTAL SO₂ (reverses the owner's earlier free-SO₂ choice).** The owner had initially picked
+**free** SO₂ (a stability premise: negative feedback, self-limiting). The data refuted that premise *for
+this observable*: free SO₂ **collapses to ~0 at the peak** (nearly all sulfite bound to the rising
+acetaldehyde), so a free-SO₂ driver is **empirically inert on the very peak it targets** (+0.1..+1.4 mg/L
+across all doses/k — it self-quenches exactly when needed). Surfaced back to the owner, who switched to
+**total** SO₂. Total SO₂ is open-loop but **stable in practice**: the term is flux-gated, so the
+fermentative flux → 0 at dryness caps its time-integral (no runaway — verified empirically to 200 mg/L,
+end-stranding flat). Feedback topology, for the record: free = negative feedback (stable *because* inert);
+total = open-loop (stable via the flux cap); bound-acetaldehyde = positive feedback (most faithful but
+reintroduces runaway — rejected).
+
+**The term.** `d[acetaldehyde] += k_acet_so2_induced · flux · so2_total`, guarded on `so2_total > 0`, a
+**carbon-exact borrow from E** exactly like the base production (the diverted glycerol carbon reality
+shows parks here as acetaldehyde — no glycerol pool, a v1 simplification leaving the ethanol-yield
+reduction slightly understated). It reads the **total SO₂ state slot directly** — no param, no per-RHS pH
+`brentq` (cleaner than the free-SO₂ variant would have been). Net `dE` stays positive (base + induced
+borrow is ≳100× below the uptake ethanol deposit). New parameter `k_acet_so2_induced` (shared
+`acetaldehyde.yaml`), **value 4.0e-3 L/(g·h), tier speculative**. At 50 mg/L it lifts the peak **~+3.8
+mg/L (71.6 → 75.4)**, dose-scaling to ~+15 at 200; end state and stranded residual **unchanged**. The
+`so2_total > 0` guard is **exact** — an unsulfited run is byte-for-byte the D-27/D-47 core (and no §2.2
+benchmark doses SO₂).
+
+**Sizing the unanchored knob — a cross-process reality constraint (owner asked "what is closer to
+reality").** There is no direct field anchor on the *peak* elevation (the 0.39 slope is end-state and
+already met by D-47), so the initial value (1e-2) was unanchored — and building it exposed that D-48 is
+**not contained to the peak**: the raised acetaldehyde sequesters SO₂ *during* the ferment, weakening the
+molecular-SO₂ MLF brake (a real, textbook effect — "bound SO₂ is not antimicrobial"). At 1e-2 that brake
+retained only 44 % of the malic (`test_so2_dose_suppresses_mlf_in_a_run` 2.3 → 1.76 g/L), crossing below
+the literature "SO₂ remains a **partial** brake, *more than half* the malic retained" regime the D-47 work
+established. This was surfaced to the owner (it is a bigger scope leak than the driver fork), who directed
+sizing by reality. **Resolution: k is set to the largest value keeping the MLF brake in that
+>half-retained regime.** Measured ceiling ≈ 5e-3 (malic 2.03, at the 2.0 floor); **nominal 4e-3** keeps a
+safe margin (malic **2.09, ~48 % converted**) — the MLF test lands back **inside its original
+`2.0 < malic < 3.0` band, so the D-48 change no longer perturbs it** (the earlier `1.3 < malic < 2.3`
+re-pin is reverted). This represents *both* real phenomena — the induced peak over-production **and** the
+partial MLF-weakening — at the largest self-consistent magnitude, rather than letting a free knob push a
+validated observable out of its literature regime.
+
+**Verification.** New `test_acetaldehyde.py` D-48 section: exact-when-undosed (base only, `==`); dosed
+closed form (base + induced, carbon-exact, SO₂ read-only); peak lifts while end state is unchanged;
+peak lift scales with dose (the total-SO₂ signature). `test_production_metadata` now pins
+`k_acet_so2_induced` in `reads`; the MLF band is *unchanged* (D-48 sized to keep it). Full suite **610
+passed (incl. the 5 §2.2 benchmarks)**; ruff + mypy clean. Validated core byte-for-byte preserved.
 
 ## Deferred (decide early in the relevant milestone)
 
@@ -3397,6 +3472,13 @@ benchmarks)**; ruff + mypy clean. Validated core byte-for-byte preserved.
   ~0.76× degradation slowdown at field doses — literature-grounded). Owner chose bake-in default-on;
   the D-22/D-28 "SO₂ readout-only" invariant is **intentionally retired** for sulfited runs (undosed =
   byte-for-byte D-27, no benchmark doses SO₂, carbon still closes, pH still not a charge actor). See D-47.
+- ~~**SO₂-induced acetaldehyde over-production (the D-47 caveat's deferred "production half")**~~ —
+  **decided + IMPLEMENTED in D-48 (2026-07-06)**: a total-SO₂-gated bump to `AcetaldehydeProduction`
+  (`k_acet_so2_induced`), scoped to the **transient peak** after the data showed D-47 protection *alone*
+  already meets/exceeds the field 0.39 mg/mg end-state slope (end state is capped by the D-28 binding
+  equilibrium, not production). Driver is **total** SO₂ — free SO₂ is empirically inert on the peak
+  (collapses to ~0 there). Carbon-exact borrow from E; exact undosed guard; magnitude speculative and
+  unanchored. See D-48.
 - ~~**Residual-nitrogen / satiation floor**~~ — **addressed in D-30 (opt-in cap) and RESOLVED in
   D-43 (2026-07-06): the "default-on N redesign" is declined.** A spike + a mass-balance argument
   (D-43) proved that **default-on residual *assimilable* N is Coleman-incompatible regardless of
