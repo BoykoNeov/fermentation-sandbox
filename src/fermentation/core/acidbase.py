@@ -24,9 +24,12 @@ acetaldehyde peak *emergently* sequesters SO₂ and depresses free/molecular, wh
 as acetaldehyde is reduced. It remains **readout-only** — total SO₂ is a state slot but is
 *not* in the charge balance (its minor bisulfite charge would be absorbed by the inverse-
 anchored cation at t=0 regardless; see D-22), so the D-18 solver signatures are untouched,
-and the split does **not** feed back into the acetaldehyde reduction (bound acetaldehyde is
-notionally protected from ADH; that RHS coupling is deferred). At acetaldehyde = 0 the split
-collapses to D-22 exactly (``free == total``). The one live consumer is the pre-existing MLF
+and the split feeds back into the acetaldehyde reduction (**decision D-47**): bound acetaldehyde
+is protected from alcohol dehydrogenase, so :func:`free_acetaldehyde` gates the reduction onto the
+unbound share and SO₂ **locks in** acetaldehyde — the D-22/D-28 "SO₂ is readout-only" invariant is
+intentionally retired for sulfited runs (an *un*-dosed run is still byte-for-byte the D-27 core, and
+no §2.2 benchmark doses SO₂). At acetaldehyde = 0 the split collapses to D-22 exactly (``free ==
+total``). The one live consumer is the pre-existing MLF
 antimicrobial gate, which now reads the *derived* free-molecular SO₂ via
 :func:`molecular_so2_at_ph` (bound SO₂ is not antimicrobial — a correct consequence, D-28).
 
@@ -560,6 +563,35 @@ def molecular_so2_at_ph(
     if total <= 0.0:
         return 0.0
     return _speciate_at_ph(total, _acetaldehyde_molar(y, schema), ph, params).molecular
+
+
+def free_acetaldehyde(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
+) -> float:
+    """Acetaldehyde NOT bound to SO₂ [g/L] at an already-solved ``ph`` — the ADH-reducible pool.
+
+    The RHS side of the D-28 free/bound split (decision D-47). The acetaldehyde-bisulfite
+    adduct (1-hydroxyethanesulphonate) is **protected from alcohol dehydrogenase** — the
+    literature is explicit that "acetaldehyde bound to SO₂ could not be metabolized by yeast
+    during fermentation; only free acetaldehyde could impact metabolism" — so the enzymatic
+    reduction (:class:`fermentation.core.kinetics.acetaldehyde.AcetaldehydeReduction`) acts on
+    this free share alone. ``free = total_acetaldehyde − bound``, with ``bound`` from the *same*
+    :func:`bound_so2_molar` equilibrium the SO₂ readout uses (1:1 adduct ⇒ bound SO₂ mol/L =
+    bound acetaldehyde mol/L), so the RHS coupling and the free/bound readout can never drift.
+
+    Returns the **total** acetaldehyde (g/L) whenever no SO₂ is dosed or no acetaldehyde is
+    present — the binding vanishes and the reduction is byte-for-byte the D-27 core. In-loop
+    signature ``(y, schema, params, ph)`` like :func:`molecular_so2_at_ph`; the caller supplies
+    the already-solved pH so this never triggers a second ``brentq``. Clamped ≥ 0.
+    """
+    acet_molar = _acetaldehyde_molar(y, schema)
+    total_so2 = _so2_total(y, schema)
+    if acet_molar <= 0.0 or total_so2 <= 0.0:
+        return acet_molar * M_ACETALDEHYDE  # no binding ⇒ all acetaldehyde is reducible (D-27)
+    pkas = tuple(params[n] for n in SO2_PKA_PARAM_NAMES)
+    beta = bisulfite_fraction(10.0 ** (-ph), pkas)
+    bound_molar = bound_so2_molar(total_so2 / M_SO2, acet_molar, beta, params[SO2_BINDING_PARAM])
+    return max(acet_molar - bound_molar, 0.0) * M_ACETALDEHYDE
 
 
 def molecular_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:

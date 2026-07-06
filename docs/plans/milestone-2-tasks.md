@@ -439,6 +439,24 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         bisulfite, ≤5 % vs total-free at wine pH). Caveat: acetaldehyde-only binder ⇒ `bound`
         under-estimates ("total" ≈ "free + acetaldehyde-bound"). 7 new tests; **349 green**,
         ruff + mypy clean. Full record in **DECISIONS → D-28**.
+  - [x] **SO₂-bound acetaldehyde protected from ADH — the D-28 free/bound RHS coupling (decision
+        D-47). LANDED 2026-07-06.** Lands the coupling D-28 deferred as readout-only: alcohol
+        dehydrogenase reduces only *free* acetaldehyde (`acidbase.free_acetaldehyde`), so dosed SO₂
+        **locks in** acetaldehyde — a sulfited wine strands a residual (~27 mg/L at a 50 mg/L pitch
+        dose, ~0.78 mol per mol SO₂) and its free SO₂ stays depressed. Mechanism + magnitude
+        **literature-grounded** (Han et al. 2020; K=1.5e-6 = the literature value; the ~0.76×
+        degradation slowdown reproduced at sub-stoichiometric field doses). Owner chose **bake-in,
+        default-on** (MLF SO₂-gate precedent); this **intentionally retires the D-22/D-28 "SO₂
+        readout-only" invariant** for sulfited runs — but undosed runs are byte-for-byte D-27 (exact
+        `so2_total>0` guard), no §2.2 benchmark doses SO₂, carbon still closes, and pH is still not a
+        charge actor (SO₂ couples only via charge-free acetaldehyde). Emergent downstream: SO₂ dosed
+        *during* AF is now only a **partial** MLF brake (stranded acetaldehyde sequesters the
+        antimicrobial pool — "bound SO₂ isn't antimicrobial"), and molecular SO₂ nets *down* over the
+        run. CAVEAT (speculative): bound acetaldehyde treated inert-to-ADH ⇒ upper bound on
+        persistence. No new params. Rewrote 3 SO₂/MLF tests + added a D-47 `test_acetaldehyde.py`
+        section (unsulfited byte-for-byte, rate-throttle, post-AF strands ≪ pitch, carbon closes,
+        BDF/RK45/LSODA agreement). **606 green** + 5 benchmark, ruff+mypy clean. Full record in
+        **DECISIONS → D-47**.
   - [x] **H₂S — carbon-free produced pool with an inverse-nitrogen gate (decision D-29).
         LANDED 2026-07-01.** N/S-deficiency signal ("rotten egg"): yeast reduces sulfate faster
         than it can fix the sulfide onto nitrogen skeletons, so production is *de-repressed at

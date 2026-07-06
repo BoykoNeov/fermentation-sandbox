@@ -84,16 +84,34 @@ at speculative regardless. Because :class:`AcetaldehydeProduction` is the first
 always-on speculative Process to *write* ``E``, the *structural* ``tier_of("E")`` drops
 PLAUSIBLE → SPECULATIVE — but the param-aware tier users see was *already* speculative
 (the uptake Process reads speculative params), so there is no headline change, exactly
-the honest ``CO2`` consequence recorded for D-26. **Scope (v1):** the SO₂-binding
-free/bound split is a separate readout commit (it only needs this state to exist).
-Production is held temperature-flat (a documented simplification, like the acetolactate
-excretion, D-26); the enzymatic reduction carries an Arrhenius factor.
+the honest ``CO2`` consequence recorded for D-26. Production is held temperature-flat (a
+documented simplification, like the acetolactate excretion, D-26); the enzymatic reduction
+carries an Arrhenius factor.
+
+**SO₂ protection — the reduction reads free, not total (decision D-47).** The D-28 free/bound
+SO₂ split is fed back into this RHS: the acetaldehyde-bisulfite adduct is protected from
+alcohol dehydrogenase (literature: bound acetaldehyde "could not be metabolized by yeast during
+fermentation; only free acetaldehyde could impact metabolism"), so :class:`AcetaldehydeReduction`
+reduces only the unbound share (:func:`fermentation.core.acidbase.free_acetaldehyde`). Dosed SO₂
+therefore **locks in** acetaldehyde — a sulfited wine strands a residual acetaldehyde pool
+(≈ the SO₂ molar amount, capped at what is present) and its free SO₂ stays depressed, both
+*emergent* from the binding equilibrium tracking the acetaldehyde state. This intentionally retires
+the D-22/D-28 "SO₂ is readout-only" invariant *for sulfited runs*; an un-dosed run is byte-for-byte
+the D-27 core (the ``so2_total > 0`` guard is exact) and no §2.2 benchmark doses SO₂. CAVEAT
+(speculative): bound acetaldehyde is treated inert-to-ADH — real adduct slowly dissociates and
+degrades over months, so the stranding is an *upper bound* on persistence; at field (sub-
+stoichiometric) doses the model reproduces the observed ~0.76× degradation-rate slowdown.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
+from fermentation.core.acidbase import (
+    SO2_STATE_KEY,
+    free_acetaldehyde,
+    ph_of_state,
+)
 from fermentation.core.chemistry import M_ACETALDEHYDE, M_ETHANOL
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import fermentative_flux_shape
@@ -175,6 +193,16 @@ class AcetaldehydeReduction(Process):
     pair makes acetaldehyde rise to an early peak and then be drawn back down as
     fermentation slows. ``acetaldehyde`` and ``X`` are clamped ≥ 0 against solver
     undershoot. Tier **speculative** (rate magnitude estimate).
+
+    **SO₂-bound acetaldehyde is protected from ADH (decision D-47).** When SO₂ is dosed
+    (``so2_total > 0``) the loss reads the *free* (unbound) acetaldehyde
+    (:func:`fermentation.core.acidbase.free_acetaldehyde`) rather than the total — the
+    hydroxysulphonate adduct cannot be reduced — so SO₂ locks acetaldehyde in. The guard is
+    exact: an unsulfited run pays no per-RHS pH ``brentq`` and is byte-for-byte the D-27 core.
+    ``touches`` is unchanged (still only ``acetaldehyde``/``E``); ``reads`` is unchanged too —
+    the SO₂/pH params are read *inside* :func:`free_acetaldehyde`/:func:`ph_of_state` and the
+    output is already speculative, so declaring them would not move any tier (the MLF-gate
+    precedent, D-39).
     """
 
     name = "acetaldehyde_reduction"
@@ -195,9 +223,19 @@ class AcetaldehydeReduction(Process):
         x_viable = max(float(y[schema.slice("X")][0]), 0.0)
         if x_viable <= 0.0:  # no viable yeast ⇒ no reduction (acetaldehyde is stranded)
             return d
+        # SO₂-bound acetaldehyde is protected from ADH (decision D-47): reduce only the *free*
+        # share. The ``so2_total > 0`` guard is EXACT — an unsulfited run pays no per-RHS pH
+        # ``brentq`` and its contribution is byte-for-byte the D-27 core (the MLF/Brett SO₂-gate
+        # isolability idiom). When dosed, SO₂ binds acetaldehyde near-stoichiometrically and
+        # *locks it in*: the reducible pool shrinks toward the excess of acetaldehyde over SO₂.
+        reducible = acetaldehyde
+        if SO2_STATE_KEY in schema and float(y[schema.slice(SO2_STATE_KEY)][0]) > 0.0:
+            reducible = free_acetaldehyde(y, schema, params, ph_of_state(y, schema, params))
+            if reducible <= 0.0:  # all acetaldehyde bound ⇒ nothing ADH can reach this step
+                return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_acet_reduction"], params["T_ref"])
-        loss = params["k_acet_reduction"] * x_viable * f_t * acetaldehyde  # mass loss
+        loss = params["k_acet_reduction"] * x_viable * f_t * reducible  # mass loss (free only)
         d[schema.slice("acetaldehyde")] = -loss
         d[schema.slice("E")] = loss * _ETHANOL_PER_ACETALDEHYDE  # return C2 to ethanol
         return d

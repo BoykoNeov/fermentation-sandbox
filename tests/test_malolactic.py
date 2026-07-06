@@ -226,16 +226,16 @@ def test_so2_dose_suppresses_mlf_unit(params):
 
 
 def test_so2_dose_suppresses_mlf_in_a_run():
-    # The integration-level demonstration: SO₂ leaves pH/carbon untouched (D-22/D-28
-    # readout-only) yet, as the first RHS consumer of molecular SO₂, it gates MLF — so the
-    # dosed-SO₂ run barely deacidifies relative to the same MLF dose without SO₂.
-    #
-    # D-28 nuance (the emergent acetaldehyde–SO₂ competition): the early acetaldehyde peak
-    # transiently sequesters free SO₂ (free crashes toward ~0 near day 2), so the molecular
-    # antimicrobial pool briefly weakens and a *small* slice of MLF slips through during that
-    # window — ~0.1 g/L malic (a few %), vs the uninhibited run that consumes it all. Once
-    # acetaldehyde is reduced, free SO₂ recovers and MLF is arrested again. So the dosed run
-    # is *strongly* suppressed, not perfectly blocked — the faithful behaviour.
+    # The integration-level demonstration: SO₂ gates MLF as the first RHS consumer of molecular
+    # SO₂ — but only *partially*, because of the emergent acetaldehyde–SO₂ competition made
+    # dynamic by D-47. When SO₂ is dosed at pitch, the yeast's acetaldehyde binds it near-
+    # stoichiometrically AND is then locked in (D-47: bound acetaldehyde is protected from ADH),
+    # so free SO₂ stays chronically depressed (here it ends ~21 % of the 80 mg/L dose) rather
+    # than recovering. The molecular antimicrobial pool is therefore weak for the whole run, and
+    # a *substantial* slice of MLF proceeds: ~1.7 g/L malic (~42 %) is converted, vs the
+    # uninhibited run consuming all of it and the un-pitched run converting none. This is the
+    # faithful "bound SO₂ is not antimicrobial" consequence — dosing SO₂ into acetaldehyde-rich
+    # fermenting must is a far weaker MLF brake than the same dose in a cleared wine.
     c_off, t_off = _run()
     c_on, t_on = _run(mlf_pitch_gpl=0.2)
     c_so2, t_so2 = _run(mlf_pitch_gpl=0.2, so2_total_mgl=80.0)
@@ -243,13 +243,14 @@ def test_so2_dose_suppresses_mlf_in_a_run():
     ph_on = ph_series(t_on, c_on.param_values)
     ph_so2 = ph_series(t_so2, c_so2.param_values)
 
-    malic0 = t_off.series("malic")[0]
-    # SO₂ retains the great majority of malic (only the transient acetaldehyde-window slip):
-    assert t_so2.series("malic")[-1] > 3.8
-    assert (malic0 - t_so2.series("malic")[-1]) < 0.2  # < ~0.2 g/L converted (a few %)
-    assert t_on.series("malic")[-1] < 0.5  # …vs the uninhibited MLF consuming ~all of it
-    assert (ph_on[-1] - ph_off[-1]) > 0.1  # uninhibited MLF deacidifies
-    assert (ph_so2[-1] - ph_off[-1]) == pytest.approx(0.0, abs=0.01)  # SO₂ arrests it
+    assert t_off.series("malic")[-1] == pytest.approx(4.0)  # no bacteria ⇒ no conversion
+    assert t_on.series("malic")[-1] < 0.5  # uninhibited MLF consumes ~all of it
+    # SO₂ still suppresses — it retains more than half the malic — but only PARTIALLY, because
+    # stranded acetaldehyde sequesters most of the antimicrobial pool (the D-47 emergent effect):
+    assert 2.0 < t_so2.series("malic")[-1] < 3.0  # ~1.7 g/L (~42 %) slips through
+    assert t_so2.series("malic")[-1] > 5.0 * t_on.series("malic")[-1]  # …yet well above uninhibited
+    assert (ph_on[-1] - ph_off[-1]) > 0.15  # uninhibited MLF deacidifies fully
+    assert 0.03 < (ph_so2[-1] - ph_off[-1]) < 0.12  # SO₂ run deacidifies only partially
 
 
 # -- 7. cardinal-temperature optimum (peaks at T_opt, declines warm, 0 outside) ----

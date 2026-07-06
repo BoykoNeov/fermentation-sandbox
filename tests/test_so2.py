@@ -28,7 +28,7 @@ from fermentation.analysis import (
     ph_series,
 )
 from fermentation.core import acidbase
-from fermentation.core.chemistry import M_MALIC, M_TARTARIC
+from fermentation.core.chemistry import M_ACETALDEHYDE, M_MALIC, M_SO2, M_TARTARIC
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -210,10 +210,19 @@ def test_dosing_so2_does_not_change_ph(params):
     assert acidbase.ph_of_state(dosed, schema, params) == acidbase.ph_of_state(dry, schema, params)
 
 
-def test_so2_does_not_perturb_carbon_or_the_core_trajectory():
-    # The strongest isolability claim: on a *shared* time grid, dosing SO₂ leaves every
-    # other state column byte-identical and the pH series identical — and carbon still
-    # closes (so2_free is carbon-free, weight 0). 236 → still green.
+def test_so2_coupling_strands_acetaldehyde_but_spares_the_core_ferment():
+    # D-47 RETIRED the "SO₂ is readout-only" invariant: dosing SO₂ now feeds back into the
+    # acetaldehyde reduction (bound acetaldehyde is protected from ADH). This test pins the
+    # *footprint* of that coupling on a shared time grid — it is confined to acetaldehyde:
+    #   • acetaldehyde diverges order-unity — the undosed run clears it to ~0, the dosed run
+    #     STRANDS a locked-in residual (~33 mg/L for a 60 mg/L dose);
+    #   • every OTHER column (sugar, ethanol, biomass, CO₂, the acids) still agrees to a
+    #     second-order ≤2e-3 — the only ripple is the borrowed-ethanol-carbon dip feeding the
+    #     E→viability brake (the D-27 note), NOT a rewrite of the core ferment;
+    #   • pH is unmoved to ~2e-6 — SO₂ is still NOT in the charge balance (D-22/D-28), it now
+    #     couples only through acetaldehyde, and acetaldehyde is not a charge species;
+    #   • carbon STILL closes (the one surviving invariant — the reduction only throttles the
+    #     acetaldehyde→E transfer, it neither creates nor routes carbon).
     t_eval = np.linspace(0.0, 14.0 * 24.0, 60)
     base = compile_scenario(
         _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4), strict=True
@@ -225,12 +234,24 @@ def test_so2_does_not_perturb_carbon_or_the_core_trajectory():
     traj0 = simulate(base.process_set, base.param_values, base.y0, base.t_span_h, t_eval=t_eval)
     traj1 = simulate(dosed.process_set, dosed.param_values, dosed.y0, dosed.t_span_h, t_eval=t_eval)
 
+    # acetaldehyde: the intended order-unity divergence (undosed clears; dosed strands).
+    assert traj0.series("acetaldehyde")[-1] < 1e-6  # undosed: fully reduced back to ethanol
+    assert traj1.series("acetaldehyde")[-1] > 0.02  # dosed: ~33 mg/L locked in by SO₂
+
+    # every other column stays within the second-order E→viability ripple (was byte-identical
+    # under the retired readout-only invariant; now ≤1e-3 of each column's own scale, driven by
+    # the tiny borrowed-C dip). Compared as a fraction of the column scale, NOT elementwise: a
+    # second-order shift in the timing of sugar exhaustion makes pointwise relative diffs blow up
+    # on steep fronts (S, E) even when the trajectories are everywhere within a thousandth.
     for name in base.schema.names:
-        if name == "so2_total":
-            continue  # the only slot that differs (constant 0 vs constant 0.06 g/L)
-        assert np.allclose(traj0.series(name), traj1.series(name), rtol=1e-9, atol=1e-12), name
+        if name in ("so2_total", "acetaldehyde"):
+            continue
+        a, b = traj0.series(name), traj1.series(name)
+        scale = np.max(np.abs(b))
+        assert np.max(np.abs(a - b)) <= 1e-3 * scale + 1e-6, name
+    # pH essentially unmoved: SO₂ couples via acetaldehyde, which carries no charge.
     assert np.allclose(
-        ph_series(traj0, base.param_values), ph_series(traj1, dosed.param_values), atol=1e-12
+        ph_series(traj0, base.param_values), ph_series(traj1, dosed.param_values), atol=1e-4
     )
     carbon = total_carbon(
         dosed.schema, biomass_carbon_fraction=dosed.parameters["biomass_C_fraction"].value
@@ -241,23 +262,38 @@ def test_so2_does_not_perturb_carbon_or_the_core_trajectory():
 # -- 9. the analysis series tracks the (mildly drifting) pH with no scripting ---
 
 
-def test_molecular_so2_series_tracks_ph_drift():
-    # molecular SO₂ is recomputed off the solved pH at each column, so as Byp accrues and
-    # pH drifts down (D-18 emergent), the molecular fraction drifts *up* — unscripted.
+def test_molecular_so2_series_falls_as_stranded_acetaldehyde_binds_free_so2():
+    # Two competing effects set the molecular-SO₂ trajectory, and D-47 flips which one wins:
+    #   • the molecular *fraction* still rises as pH drifts down (the D-18/D-22 pH coupling —
+    #     lower pH ⇒ more undissociated antimicrobial SO₂·H₂O), and
+    #   • but the *free* SO₂ pool is now chronically depressed, because the acetaldehyde the
+    #     yeast stranded (D-47: protected from ADH) stays bound to most of the dose.
+    # Free falls ~4.5× while the fraction rises only ~1.16×, so molecular SO₂ (= free × fraction)
+    # nets DOWN over the run — the opposite of the readout-only era, where free recovered to the
+    # dosed total and molecular tracked the rising fraction upward. Unscripted: both effects fall
+    # out of the state, not a schedule.
     compiled = compile_scenario(
         _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4, so2_total_mgl=50.0)
     )
     traj = simulate(compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h)
     mol = molecular_so2_series(traj, compiled.param_values)
+    free = free_so2_series(traj, compiled.param_values)
     ph = ph_series(traj, compiled.param_values)
+    so2_pka = tuple(compiled.param_values[n] for n in acidbase.SO2_PKA_PARAM_NAMES)
     assert mol.shape == traj.t.shape
     # per-column consistency with the scalar pure function
     assert mol[0] == pytest.approx(
         acidbase.molecular_so2(traj.y[:, 0], traj.schema, compiled.param_values)
     )
-    # pH drifts down over the ferment ⇒ molecular SO₂ rises (more antimicrobial late).
-    assert ph[-1] < ph[0]
-    assert mol[-1] > mol[0]
+    assert ph[-1] < ph[0]  # pH still drifts down (Byp accrual, D-18)
+    # the pH-driven molecular *fraction* still rises (the D-22 coupling survives) …
+    assert acidbase.molecular_so2_fraction(ph[-1], so2_pka) > acidbase.molecular_so2_fraction(
+        ph[0], so2_pka
+    )
+    # … but free SO₂ ends far below the dose (stranded acetaldehyde holds it bound) …
+    assert free[-1] < 0.4 * free[0]
+    # … so absolute molecular SO₂ nets DOWN — the free depression dominates (the D-47 flip).
+    assert mol[-1] < mol[0]
     assert np.all(mol > 0.0)
 
 
@@ -351,12 +387,16 @@ def test_speciate_matches_scalar_wrappers(params):
     assert acidbase.molecular_so2_at_ph(y, schema, params, spec.ph) == pytest.approx(spec.molecular)
 
 
-def test_emergent_free_so2_dips_at_acetaldehyde_peak_then_recovers():
-    # THE D-28 headline: over a real ferment the early acetaldehyde peak transiently binds
-    # SO₂ — free (analytically-measured) SO₂ crashes toward ~0 near the peak, then RECOVERS
-    # to the dosed total as acetaldehyde is reduced back to ethanol (D-27). Unscripted: the
-    # dosed total slot is constant; the dip emerges from the binding equilibrium tracking the
-    # acetaldehyde state. free + bound conserves total at every column.
+def test_emergent_free_so2_dips_then_locks_in_a_stranded_acetaldehyde_residual():
+    # THE D-47 headline (supersedes the D-28 "free recovers to total"): over a real ferment the
+    # acetaldehyde peak binds SO₂ near-stoichiometrically — free (analytically-measured) SO₂
+    # crashes toward ~0 near the peak — and because bound acetaldehyde is now PROTECTED FROM ADH
+    # (D-47), the acetaldehyde never fully clears: it is LOCKED IN. Free SO₂ therefore only
+    # *partially* recovers (the excess acetaldehyde above the SO₂ molar pool reduces away, but the
+    # ~stoichiometric remainder stays bound), settling at ~0.22× the dose. The stranded
+    # acetaldehyde ends at ~0.78 mol per mol SO₂ — the sub-to-near-stoichiometric field regime the
+    # literature reports. Unscripted: the dosed total slot is constant; everything emerges from the
+    # binding equilibrium tracking the acetaldehyde state. free + bound conserves total everywhere.
     compiled = compile_scenario(
         _wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4, so2_total_mgl=50.0)
     )
@@ -367,12 +407,21 @@ def test_emergent_free_so2_dips_at_acetaldehyde_peak_then_recovers():
     total = mgl_to_gpl(50.0)
 
     assert free[0] == pytest.approx(total)  # no acetaldehyde at pitch ⇒ all free
-    assert free.min() < 0.15 * total  # deep dip at the peak (SO₂ nearly all bound)
-    assert free[-1] == pytest.approx(total, rel=1e-3)  # recovers as acetaldehyde clears
+    assert free.min() < 0.05 * total  # deep dip at the peak (SO₂ nearly all bound)
+    # free PARTIALLY recovers from the dip (excess acetaldehyde clears) but locks in far below the
+    # dose — the coupling's signature, NOT the readout-only-era recovery to the full total.
+    assert free.min() < free[-1] < 0.4 * total
+    assert free[-1] > 5.0 * free.min()  # materially higher than the peak dip …
+    assert bound[-1] > 0.5 * total  # … yet most of the dose stays bound (locked in)
     # the free minimum coincides with the acetaldehyde maximum (the causal link)
     assert abs(int(np.argmin(free)) - int(np.argmax(acet))) <= 1
-    assert bound.max() > 0.8 * total  # nearly all SO₂ is bound at the peak
+    assert bound.max() > 0.9 * total  # nearly all SO₂ is bound at the peak
     assert np.allclose(free + bound, total)  # conservation at every column
+    # the stranded acetaldehyde ends near-stoichiometric with the SO₂ pool (literature: ~0.5–1:1)
+    stranded_molar = acet[-1] / M_ACETALDEHYDE
+    so2_molar = total / M_SO2
+    assert 0.5 < stranded_molar / so2_molar < 1.0
+    assert gpl_to_mgl(acet[-1]) > 20.0  # ~27 mg/L locked in (a sensorily-relevant residual)
 
 
 def test_speciation_tier_drops_with_binding_constant(pset, params):

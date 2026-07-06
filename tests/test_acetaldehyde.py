@@ -23,9 +23,12 @@ below any tolerance (a tiny ~1e-4 second-order path drift via the E→viability 
 import numpy as np
 import pytest
 
+from fermentation.core import acidbase
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
     M_ETHANOL,
+    M_MALIC,
+    M_TARTARIC,
     carbon_mass_fraction,
 )
 from fermentation.core.kinetics import (
@@ -40,7 +43,8 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
+from fermentation.units.convert import gpl_to_mgl, mgl_to_gpl
 from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
 
 #: Carbon fractions the borrow/return books against (mirror the chemistry constants).
@@ -316,6 +320,164 @@ def test_carbon_closes_on_a_compiled_run():
     f_c = compiled.param_values["biomass_C_fraction"]
     assert_conserved(
         traj, total_carbon(compiled.schema, biomass_carbon_fraction=f_c), label="carbon"
+    )
+
+
+# == D-47: SO₂-bound acetaldehyde is protected from ADH (the free/bound RHS coupling) ==========
+#
+# The D-28 free/bound SO₂ split now feeds back into the reduction: alcohol dehydrogenase reduces
+# only UNBOUND acetaldehyde (literature: "acetaldehyde bound to SO₂ could not be metabolized by
+# yeast during fermentation; only free acetaldehyde could impact metabolism"). So dosed SO₂ locks
+# acetaldehyde in. This retires the D-22/D-28 "SO₂ is readout-only" invariant for sulfited runs;
+# an unsulfited run is byte-for-byte the D-27 core (the ``so2_total > 0`` guard is exact).
+
+
+@pytest.fixture
+def params_so2(store):
+    # Reduction's SO₂ protection needs the sulfurous pKas + binding K + the pH-solver pKas, which
+    # live in acidbase.yaml — layer it over the wine + acetaldehyde kinetics.
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "acetaldehyde.yaml",
+        default_data_dir() / "acidbase.yaml",
+    ).resolve()
+
+
+def _sulfitable_state(
+    schema: StateSchema, params, *, acetaldehyde_mgl: float, so2_mgl: float, x: float = 1.0
+) -> FloatArray:
+    """A mid-ferment wine state at pH ~3.4 with viable yeast, dosed acetaldehyde and (maybe) SO₂."""
+    tartaric, malic = 6.0, 3.0
+    totals = {"tartaric": tartaric / M_TARTARIC, "malic": malic / M_MALIC, "lactic": 0.0}
+    cation = acidbase.solve_cation_charge(totals, 0.0, acidbase.build_pka_map(params), 3.4)
+    y = schema.pack(
+        {
+            "X": x, "S": [150.0], "E": 40.0, "N": 0.1, "T": 293.15, "CO2": 0.0,
+            "tartaric": tartaric, "malic": malic, "cation_charge": cation,
+        }
+    )  # fmt: skip
+    y[schema.slice("acetaldehyde")] = mgl_to_gpl(acetaldehyde_mgl)
+    if so2_mgl > 0.0:
+        y[schema.slice("so2_total")] = mgl_to_gpl(so2_mgl)
+    return y
+
+
+def _reduction_rate(schema: StateSchema, params, y: FloatArray) -> float:
+    """Mass rate of acetaldehyde reduction (g/L/h) at ``y`` — positive = clearing."""
+    d = AcetaldehydeReduction().derivatives(0.0, y, schema, params)
+    return -float(d[schema.slice("acetaldehyde")][0])
+
+
+def test_unsulfited_reduction_is_byte_for_byte_the_closed_form(params_so2):
+    # The guard is EXACT: with no SO₂ dosed, the reduction reads the *total* acetaldehyde — the
+    # D-27 closed form — so the coupling is inert (no pH brentq, no protection). free == total.
+    schema = wine_schema()
+    y = _sulfitable_state(schema, params_so2, acetaldehyde_mgl=50.0, so2_mgl=0.0)
+    acet = float(y[schema.slice("acetaldehyde")][0])
+    f_t = arrhenius_factor(293.15, params_so2["E_a_acet_reduction"], params_so2["T_ref"])
+    closed_form = params_so2["k_acet_reduction"] * 1.0 * f_t * acet
+    assert _reduction_rate(schema, params_so2, y) == pytest.approx(closed_form)
+    # free_acetaldehyde returns the whole pool when SO₂ is absent (the readout side of the guard)
+    ph = acidbase.ph_of_state(y, schema, params_so2)
+    assert acidbase.free_acetaldehyde(y, schema, params_so2, ph) == pytest.approx(acet)
+
+
+def test_so2_throttles_the_reduction_to_the_free_share(params_so2):
+    # Dosed SO₂ binds acetaldehyde and protects it: the reduction rate falls to (free/total) of
+    # the unsulfited rate. Near-stoichiometric SO₂ throttles it hard; a large excess ~arrests it.
+    schema = wine_schema()
+    y_clean = _sulfitable_state(schema, params_so2, acetaldehyde_mgl=50.0, so2_mgl=0.0)
+    y_comparable = _sulfitable_state(schema, params_so2, acetaldehyde_mgl=50.0, so2_mgl=60.0)
+    y_excess = _sulfitable_state(schema, params_so2, acetaldehyde_mgl=50.0, so2_mgl=400.0)
+    r_clean = _reduction_rate(schema, params_so2, y_clean)
+    r_comparable = _reduction_rate(schema, params_so2, y_comparable)
+    r_excess = _reduction_rate(schema, params_so2, y_excess)
+    assert r_clean > 0.0
+    assert r_comparable < 0.5 * r_clean  # comparable molar SO₂ ⇒ most acetaldehyde bound
+    assert r_excess < 0.02 * r_clean  # SO₂ ≫ acetaldehyde ⇒ reduction ~fully arrested
+    # the rate is exactly k·X·f(T)·free — pin it against the free-acetaldehyde readout
+    ph = acidbase.ph_of_state(y_comparable, schema, params_so2)
+    free = acidbase.free_acetaldehyde(y_comparable, schema, params_so2, ph)
+    f_t = arrhenius_factor(293.15, params_so2["E_a_acet_reduction"], params_so2["T_ref"])
+    assert r_comparable == pytest.approx(params_so2["k_acet_reduction"] * 1.0 * f_t * free)
+
+
+def _so2_wine_run(so2_at_pitch: float = 0.0, so2_late: tuple[float, float] | None = None):
+    """A default wine ferment, optionally dosed SO₂ at pitch and/or via a late ``add_so2``."""
+    initial: dict[str, float] = {
+        "brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.5,
+        "tartaric_gpl": 6.0, "malic_gpl": 3.0, "initial_ph": 3.4,
+    }  # fmt: skip
+    if so2_at_pitch > 0.0:
+        initial["so2_total_mgl"] = so2_at_pitch
+    interventions = []
+    if so2_late is not None:
+        day, mgl = so2_late
+        interventions.append(Intervention(day=day, action="add_so2", params={"so2_mgl": mgl}))
+    scenario = Scenario(
+        name="wine-so2-acet", medium="wine", initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=21.0, interventions=interventions,
+    )  # fmt: skip
+    c = compile_scenario(scenario, strict=True)
+    traj = c.run()  # the intervention-aware runner (segment-and-restart at each add_so2)
+    return traj, c
+
+
+def test_post_af_so2_dose_strands_far_less_than_a_pitch_dose():
+    # SCENARIO REALISM (the literature scoping): a 50 mg/L SO₂ dose at PITCH is sequestered by the
+    # acetaldehyde peak and locks in a large residual; the SAME dose added POST-AF (day 16, after
+    # the yeast has cleared acetaldehyde) finds little to bind, so it strands almost nothing and
+    # its free SO₂ stays near the full dose. This is why SO₂ timing matters in the cellar.
+    pitch, c_p = _so2_wine_run(so2_at_pitch=50.0)
+    late, c_l = _so2_wine_run(so2_late=(16.0, 50.0))
+    acet_pitch = gpl_to_mgl(pitch.series("acetaldehyde")[-1])
+    acet_late = gpl_to_mgl(late.series("acetaldehyde")[-1])
+    assert acet_pitch > 20.0  # pitch dose locks in a sensorily-relevant residual
+    assert acet_late < 1.0  # post-AF dose strands ~nothing (acetaldehyde already gone)
+    assert acet_pitch > 20.0 * acet_late
+    # free SO₂ endpoint: depressed for the pitch dose, ~full for the late dose
+    total = mgl_to_gpl(50.0)
+    free_pitch = acidbase.free_so2(pitch.y[:, -1], pitch.schema, c_p.param_values)
+    free_late = acidbase.free_so2(late.y[:, -1], late.schema, c_l.param_values)
+    assert free_pitch < 0.4 * total
+    assert free_late > 0.9 * total
+
+
+def test_carbon_closes_on_a_sulfited_run():
+    # Carbon is the SURVIVING invariant (D-47 retired only the trajectory-isolation one): the
+    # reduction throttle only slows the acetaldehyde→E transfer, it neither creates nor routes
+    # carbon, so a sulfited ferment that strands acetaldehyde still closes to machine precision.
+    traj, c = _so2_wine_run(so2_at_pitch=50.0)
+    assert gpl_to_mgl(traj.series("acetaldehyde")[-1]) > 20.0  # genuinely strands (non-trivial)
+    f_c = c.param_values["biomass_C_fraction"]
+    assert_conserved(traj, total_carbon(c.schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+@pytest.mark.parametrize("method", ["RK45", "LSODA"])
+def test_sulfited_reduction_agrees_across_solvers(method):
+    # The reduction rate is now nonlinear in acetaldehyde/SO₂ (the bound_so2_molar quadratic root
+    # + clamps) on an always-on RHS, and it runs under BDF's num_jac probe. Pin that the stranded
+    # acetaldehyde endpoint agrees across BDF (default) and the RK45/LSODA references — no stiff
+    # artefact, no probe-induced divergence (the D-40 pt2 idiom).
+    bdf, _ = _so2_wine_run(so2_at_pitch=50.0)
+    ref_c = compile_scenario(
+        Scenario(
+            name="wine-so2-ref", medium="wine",
+            initial={
+                "brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.5, "tartaric_gpl": 6.0,
+                "malic_gpl": 3.0, "initial_ph": 3.4, "so2_total_mgl": 50.0,
+            },
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)], duration_days=21.0,
+        ),
+        strict=True,
+    )  # fmt: skip
+    ref = simulate(
+        ref_c.process_set, ref_c.param_values, ref_c.y0, ref_c.t_span_h, method=method
+    )
+    assert ref.success, ref.message
+    assert gpl_to_mgl(bdf.series("acetaldehyde")[-1]) == pytest.approx(
+        gpl_to_mgl(ref.series("acetaldehyde")[-1]), rel=5e-3, abs=0.5
     )
 
 

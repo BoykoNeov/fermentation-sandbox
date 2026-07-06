@@ -3291,6 +3291,77 @@ holds it at 0), not a correctness issue, and it would not fix the two genuinely 
 (2) num_jac probes every state var outside its physical range; a future Process with a `log`/`sqrt`/bracket
 that assumes a physical domain could be the next `solve_ph` — harden reactively when exposed, not speculatively.
 
+## D-47 — SO₂-bound acetaldehyde is protected from ADH: the D-28 free/bound split feeds back into the RHS
+
+**The deferred coupling.** D-28 built the free/bound SO₂ split (acetaldehyde-bisulfite binding
+equilibrium) but left it **readout-only**: the split did *not* feed back into the acetaldehyde
+reduction. The deferred note said "bound acetaldehyde is notionally protected from ADH; that RHS
+coupling is deferred." This decision lands it (owner-authorised beat; owner chose the wiring, below).
+
+**Physics — reduce only the free (unbound) acetaldehyde.** Alcohol dehydrogenase reduces
+acetaldehyde → ethanol, but the acetaldehyde-bisulfite adduct (1-hydroxyethanesulphonate) is not a
+substrate. The literature is explicit: *"acetaldehyde bound to SO₂ could not be metabolized by yeast
+during fermentation; only free acetaldehyde could impact metabolism"* — a stable 1:1 complex (Han et
+al. 2020, *Food Chemistry*; S. Afr. J. Enol. Vitic. 2018). So `AcetaldehydeReduction` now reads the
+**free** share, `free = total_acetaldehyde − bound`, with `bound` from the *same* `bound_so2_molar`
+equilibrium the SO₂ readout uses (1:1 ⇒ bound SO₂ mol/L = bound acetaldehyde mol/L). Binding is fast
+(98 % in ~90 min) relative to the enzymatic reduction, so the instantaneous-equilibrium (QSS) split is
+justified. New pure helper `acidbase.free_acetaldehyde(y, schema, params, ph)`.
+
+**The emergent consequence — SO₂ locks in acetaldehyde.** Because bound acetaldehyde is protected,
+a sulfited wine no longer clears its acetaldehyde: it strands a residual. Measured (50 mg/L dose at
+pitch): acetaldehyde peaks *higher* than the unsulfited run (72 vs 37 mg/L — reduction is throttled
+from early on) and ends at **~27 mg/L stranded** (0.78 mol per mol SO₂), with free SO₂ pinned at ~22 %
+of the dose. This is **near-stoichiometric at the stoichiometric edge** (50 mg/L SO₂ ≈ acetaldehyde
+molar); at *sub*-stoichiometric field doses the model reduces to the observed ~0.76× degradation-rate
+slowdown (Han 2020) and the ~366 µg-acetaldehyde-per-mg-SO₂ (~0.5:1 molar) field figure — so the
+mechanism is grounded across the regime, not just qualitatively. The binding constant itself is unchanged
+(`K_acetaldehyde_so2 = 1.5e-6`, the D-28 value, which is the literature K at pH 3.3 exactly).
+
+**The retired invariant (the load-bearing change).** D-22/D-28 advertised "**SO₂ is readout-only** —
+dosing it perturbs nothing else." **D-47 intentionally retires that for sulfited runs.** SO₂ now couples
+into the acetaldehyde trajectory (and, through the SO₂ readout the MLF/Brett gates consume, into those
+too). It is preserved *exactly* where it still holds:
+- **Undosed runs are byte-for-byte the D-27 core.** The `so2_total > 0` guard is exact — no dose ⇒ no
+  per-RHS pH `brentq`, no protection (the MLF/Brett SO₂-gate isolability idiom, D-39). **No §2.2
+  benchmark doses SO₂**, so the acceptance suite is untouched.
+- **Carbon still closes to machine precision.** The reduction only *throttles* the acetaldehyde→E
+  transfer; it neither creates nor routes carbon.
+- **pH is still not a charge actor** (~2e-6 drift): SO₂ couples only via acetaldehyde, which carries no
+  charge — the D-22/D-28 "SO₂ not in the charge balance" claim is intact.
+- **Footprint on the core ferment is second-order** (≤1e-3 of each column's scale): the only ripple is
+  the borrowed-ethanol-carbon dip feeding the E→viability brake (the D-27 note). Acetaldehyde itself
+  diverges order-unity (the intended stranding); everything else moves only at the E→viability level.
+
+**Owner fork (surfaced before building): bake-in default-on vs opt-in toggle.** Owner chose **bake-in,
+default-on** — protection lives in `AcetaldehydeReduction`, active whenever SO₂ is dosed, matching the
+MLF SO₂-gate precedent and acetaldehyde's "intrinsic, always-on" framing (D-27). `touches` unchanged
+(still `acetaldehyde`/`E`); `reads` unchanged too — the SO₂/pH params are read *inside*
+`free_acetaldehyde`/`ph_of_state` and the acetaldehyde/E output is already speculative, so declaring them
+would move no tier (the MLF-gate precedent). No new parameters.
+
+**CAVEAT (speculative).** Bound acetaldehyde is treated **inert-to-ADH** — real adduct slowly
+dissociates and degrades over months, so the stranding is an **upper bound on persistence** (the
+literature's own "not metabolized *during fermentation*"). Dosing SO₂ at pitch is also the *maximal*-
+stranding scenario; the common cellar case (SO₂ post-AF, into a wine the yeast already cleared) strands
+almost nothing — pinned by `test_post_af_so2_dose_strands_far_less_than_a_pitch_dose`.
+
+**Downstream test consequences (all faithful, re-pinned to measured output).**
+- `test_so2_dose_suppresses_mlf_in_a_run`: SO₂ dosed *during* AF is now only a **partial** MLF brake
+  (retains malic 2.3/4.0, ΔpH +0.07) not a near-total one — stranded acetaldehyde sequesters most of the
+  antimicrobial pool ("bound SO₂ is not antimicrobial", emergent and dynamic). The counterintuitive
+  direction the change predicts.
+- `test_molecular_so2_series_…`: molecular SO₂ now nets **down** over the run (free depressed by stranding
+  dominates the pH-fraction rise) — the flip of the readout-only-era direction.
+- The former byte-identical isolation test is refocused as
+  `test_so2_coupling_strands_acetaldehyde_but_spares_the_core_ferment`.
+
+**Verification.** New `test_acetaldehyde.py` D-47 section: unsulfited byte-for-byte closed form; SO₂
+throttles the rate to the free share (comparable-molar and excess); post-AF strands ≪ pitch; carbon
+closes on a stranding run; BDF vs RK45/LSODA agreement (the rate is now nonlinear in acetaldehyde/SO₂ via
+the `bound_so2_molar` quadratic root on an always-on RHS). Full suite **606 passed (incl. the 5 §2.2
+benchmarks)**; ruff + mypy clean. Validated core byte-for-byte preserved.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -3314,6 +3385,12 @@ that assumes a physical domain could be the next `solve_ph` — harden reactivel
   autolysis-linked with carbon drawn from `amino_acids` + N deaminated (Option A, the D-33 idiom),
   and copper binding it stoichiometrically (Cu(SR)₂, 1 Cu:2 thiol, H₂S-first). See D-45. The
   reductive-sulfur beat (H₂S + mercaptans, autolytic sources + copper fining) is now **complete**.
+- ~~**SO₂-bound acetaldehyde protected from ADH (the D-28 free/bound RHS coupling)**~~ — **decided +
+  IMPLEMENTED in D-47 (2026-07-06)**: `AcetaldehydeReduction` reduces only the free (unbound) share
+  (`acidbase.free_acetaldehyde`), so dosed SO₂ *locks in* acetaldehyde (near-stoichiometric stranding;
+  ~0.76× degradation slowdown at field doses — literature-grounded). Owner chose bake-in default-on;
+  the D-22/D-28 "SO₂ readout-only" invariant is **intentionally retired** for sulfited runs (undosed =
+  byte-for-byte D-27, no benchmark doses SO₂, carbon still closes, pH still not a charge actor). See D-47.
 - ~~**Residual-nitrogen / satiation floor**~~ — **addressed in D-30 (opt-in cap) and RESOLVED in
   D-43 (2026-07-06): the "default-on N redesign" is declined.** A spike + a mass-balance argument
   (D-43) proved that **default-on residual *assimilable* N is Coleman-incompatible regardless of
