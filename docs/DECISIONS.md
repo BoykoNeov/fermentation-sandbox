@@ -3244,6 +3244,53 @@ byte-for-byte the validated core (the **5 §2.2 benchmarks pass unchanged, run n
 ``mercaptans`` slot is a permanently-zero column there). +27 tests (new ``test_mercaptans.py`` +
 copper-binds-both in ``test_interventions.py``); **594 passed (incl. the 5 §2.2 benchmarks)**.
 
+## D-46 — Harden `solve_ph` to be total over ℝ: clamp when the electroneutral pH lies outside [0, 14]
+
+**What broke.** After D-45 shipped, three `test_brett.py` integration tests
+(`test_growth_accelerates_phenols`, `test_so2_crashes_growing_brett_population`,
+`test_death_run_conserves_carbon_and_nitrogen`) went **red on `main`** — all three raise
+`ValueError: f(a) and f(b) must have different signs` from `brentq` inside `acidbase.solve_ph`,
+reached via `BrettDecarboxylation.derivatives → ph_of_state`. They were **green at the D-45
+parent** (1241ba1). So D-45 regressed them.
+
+**Root cause — a latent fragility D-45 exposed, not a new bug.** The failure is *not* in the D-44/D-45
+derivatives: no-op'ing both `AutolyticHydrogenSulfide` and `AutolyticMercaptan` still reproduces it.
+The only remaining change is that D-45 **appended the `mercaptans` state slot** (wine 33→34), and that
+extra dimension shifts BDF's adaptive step sequence. The mechanism, isolated empirically:
+
+- **RK45 and LSODA succeed**; the `cation_charge` slot is **constant at 0.0254 mol/L** (nothing writes
+  it — it is a compile-time back-solve, D-18). BDF alone fails.
+- The failing state has `cation_charge = 3.81 mol/L` — two orders of magnitude above physical. This is
+  **BDF's `num_jac` Jacobian probe** perturbing the `cation_charge` slot far outside its physical range.
+- At that unphysical cation, `charge_residual` is **positive across the whole [0, 14] bracket** (the cation
+  swamps all acid buffering), so `brentq` finds no sign change and throws.
+
+`solve_ph`'s fixed `[0, 14]` bracket implicitly assumed a physiological cation. `num_jac` probes *every*
+state variable outside its physical range; `cation_charge` is the first that feeds a bracketed root-find,
+so `solve_ph` was the first core helper to be **partial** (throwing on a valid-for-num_jac input) rather
+than total. Any slot addition that reshuffles BDF stepping could trigger it — D-45 happened to be the one.
+
+**Fix — make `solve_ph` total.** `charge_residual` is strictly monotone *decreasing* in pH, so
+residual(0) is its max and residual(14) its min. Evaluate both ends first: both-positive ⇒ the
+electroneutral pH is **above 14** (return 14.0); both-negative ⇒ **below 0** (return 0.0); otherwise the
+single interior root exists and `brentq` finds it exactly as before. This is **exact, not a band-aid** —
+returning the boundary *is* the correct "root lies outside the physical window," and a physiological cation
+falls straight through to the identical `brentq` call ⇒ **bit-for-bit pH, byte-for-byte trajectories**
+(RK45/LSODA prove the real trajectory never leaves the bracket). The clamp activates only on the num_jac
+probe, which affects only the Jacobian (Newton convergence), never the solution — the RHS stays exact.
+
+**Verification.** +3 direct unit tests in `test_acidbase.py` pin the totality at the *function* level
+(huge cation → 14.0; strongly-negative cation → 0.0; physiological → unclamped interior root == anchored
+target) — the Brett tests only catch it incidentally through a 120-day integration, so a future refactor
+that stops triggering the probe must not silently un-total the solver. Full suite **600 passed (incl. the
+5 §2.2 benchmarks, run not inferred)**; ruff + mypy clean. Validated core byte-for-byte preserved.
+
+**Noted, not acted on.** (1) `_needs_ph_solve` fires on `so2_total > 0`, so num_jac probing `so2_total`
+off exact zero triggers a pH solve in an *un*-sulfited run — a probe-only perf smell (the real trajectory
+holds it at 0), not a correctness issue, and it would not fix the two genuinely SO₂-dosed tests anyway.
+(2) num_jac probes every state var outside its physical range; a future Process with a `log`/`sqrt`/bracket
+that assumes a physical domain could be the next `solve_ph` — harden reactively when exposed, not speculatively.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

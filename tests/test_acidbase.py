@@ -145,6 +145,39 @@ def test_ph_is_smooth_in_acid(pka):
     assert np.max(np.abs(d2)) < 1e-2  # no derivative jump on a fine grid
 
 
+# -- 4b. totality: solve_ph clamps a non-physiological probe cation, never raises (D-46) --
+# BDF's num_jac perturbs the ``cation_charge`` state slot far outside its ~0.03 mol/L range
+# while building the Jacobian, which can push ``charge_residual`` positive (or negative) across
+# the whole [0, 14] bracket. ``solve_ph`` must stay a TOTAL, bounded function and clamp to the
+# window rather than let ``brentq`` throw "f(a) and f(b) must have different signs". The three
+# Brett integration tests only catch this incidentally (a 120-day run happens to drive the
+# probe there); these pin it at the function level so a refactor cannot silently un-total it.
+
+
+def test_solve_ph_clamps_huge_probe_cation_to_14(pka):
+    # A probe cation two orders of magnitude above the physical ~0.03 mol/L: no acid load can
+    # neutralise it, so the electroneutral pH lies above the window ⇒ clamp to 14, not raise.
+    totals = {"tartaric": 6.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
+    assert acidbase.solve_ph(totals, 3.81, 0.0, pka) == 14.0
+
+
+def test_solve_ph_clamps_negative_probe_cation_to_0(pka):
+    # The mirror probe: a large acid load with a strongly NEGATIVE strong-cation charge is
+    # net-negative even fully protonated ⇒ electroneutral pH below the window ⇒ clamp to 0.
+    totals = {"tartaric": 6.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
+    assert acidbase.solve_ph(totals, -2.0, 0.0, pka) == 0.0
+
+
+def test_solve_ph_physiological_cation_falls_through_to_brentq(pka):
+    # The untouched path: a physiological cation still returns an interior root, unclamped and
+    # bit-for-bit identical to the brentq result (the clamp branches are never taken).
+    totals = {"tartaric": 6.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
+    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 3.4)
+    ph = acidbase.solve_ph(totals, cation, 0.0, pka)
+    assert 0.0 < ph < 14.0
+    assert ph == pytest.approx(3.4, abs=1e-6)  # inverts solve_cation_charge exactly
+
+
 # -- 5. round-trip: a compiled scenario reproduces its measured initial_ph -----
 # NB tautological w.r.t. the g/L→mol/L factor (solve_cation_charge / solve_ph are
 # inverses applying the same conversion, so a unit bug cancels). Test 6 is the guard.

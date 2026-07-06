@@ -252,20 +252,27 @@ def solve_ph(
     byp_succinic_molar: float,
     pka_map: Mapping[str, tuple[float, ...]],
 ) -> float:
-    """Solve ``charge_residual = 0`` for pH over the bracket ``[0, 14]``.
+    """Solve ``charge_residual = 0`` for pH, clamped to the physical window ``[0, 14]``.
 
-    The wide bracket guarantees a sign change (positive net charge at pH 0, negative at
-    pH 14), so ``brentq`` converges on the single root without an initial guess.
+    ``charge_residual`` is strictly monotone *decreasing* in pH (cation/[H⁺] fall, anion
+    charge rises), so residual(0) is its maximum and residual(14) its minimum. For a
+    physiological cation the curve crosses zero exactly once inside the bracket and
+    ``brentq`` finds it. This function is *also* called with a NON-physiological cation:
+    BDF's ``num_jac`` perturbs the ``cation_charge`` state slot far outside its ~0.03 mol/L
+    range while probing the Jacobian, which can push the whole curve positive (cation
+    swamps all buffering ⇒ the electroneutral pH lies *above* 14) or negative (an acid load
+    with no counter-cation ⇒ *below* 0). Returning the boundary is then the exact answer —
+    the root lies outside the physical window — and keeps ``ph_of_state`` a TOTAL, bounded
+    function of state so the Jacobian probe cannot raise (D-46). The real trajectory never
+    leaves the bracket (RK45/LSODA hold ``cation_charge`` constant), so every physiological
+    call falls through to the identical ``brentq`` — bit-for-bit pH, byte-for-byte curves.
     """
-    return float(
-        brentq(
-            charge_residual,
-            0.0,
-            14.0,
-            args=(totals_molar, cation, byp_succinic_molar, pka_map),
-            xtol=1e-10,
-        )
-    )
+    args = (totals_molar, cation, byp_succinic_molar, pka_map)
+    if charge_residual(0.0, *args) <= 0.0:
+        return 0.0  # net-negative even fully protonated ⇒ electroneutral pH ≤ 0
+    if charge_residual(14.0, *args) >= 0.0:
+        return 14.0  # still net-positive at pH 14 ⇒ electroneutral pH ≥ 14
+    return float(brentq(charge_residual, 0.0, 14.0, args=args, xtol=1e-10))
 
 
 def solve_cation_charge(
