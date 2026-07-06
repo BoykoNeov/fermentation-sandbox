@@ -36,6 +36,7 @@ from fermentation.core import acidbase
 from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     AutolyticHydrogenSulfide,
+    AutolyticMercaptan,
     BiomassCarryingCapacity,
     BrettDeath,
     BrettDecarboxylation,
@@ -755,19 +756,33 @@ def _verb_add_so2(
 def _verb_add_copper(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet
 ) -> ScheduledEvent:
-    """``add_copper`` — copper-fine dissolved H₂S out of the wine (decision D-44).
+    """``add_copper`` — copper-fine reductive sulfur (H₂S + mercaptans) out of the wine (D-44/D-45).
 
-    The remediation half of the reductive-fault beat: copper (Cu²⁺, dosed as copper sulfate)
-    precipitates dissolved sulfide as insoluble copper sulfide (Cu²⁺ + H₂S → CuS↓ + 2 H⁺, 1:1 mol),
-    which settles out with the lees — the standard fix for the sur-lie "reduction" that
-    :class:`~fermentation.core.kinetics.hydrogen_sulfide.AutolyticHydrogenSulfide` (D-44) builds up
-    un-stripped post-dryness. Doses copper by the industry unit (``copper_mgl``, mg/L Cu), converts
-    to the mass of H₂S it can bind via the sourced ``copper_h2s_binding`` (stoichiometric CuS), and
-    removes ``min(h2s_present, capacity)`` from the ``h2s`` pool — copper in excess simply clears
-    all dissolved H₂S, the real outcome. H₂S is carbon-free (D-29), so — like ``add_so2`` — this
-    removal perturbs neither elemental ledger. SCOPE (v1): the removal lever only. Residual
-    copper (excess Cu left in the wine) is untracked, and copper binding of *mercaptans* is deferred
-    with the mercaptan pool (decision D-44).
+    The remediation half of the reductive-fault beat. Copper (Cu²⁺, dosed as copper sulfate)
+    precipitates the dissolved reductive-sulfur compounds as insoluble copper salts that settle out
+    with the lees — the standard fix for the sur-lie "reduction"
+    :class:`~fermentation.core.kinetics.hydrogen_sulfide.AutolyticHydrogenSulfide` (D-44) and
+    :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan` (D-45) build up un-stripped
+    post-dryness. Doses copper by the industry unit (``copper_mgl``, mg/L Cu) and binds, in **order
+    of affinity**:
+
+    1. **H₂S first** — copper sulfide (Cu²⁺ + H₂S → CuS↓ + 2 H⁺, **1:1 mol**), CuS being far more
+       insoluble (Ksp ~10⁻³⁶) than the mercaptide, so sulfide is bound preferentially. Capacity
+       ``copper·copper_h2s_binding``; removes ``min(h2s, capacity)``.
+    2. **Mercaptans with the leftover copper** — copper mercaptide (Cu²⁺ + 2 RSH → Cu(SR)₂↓ + 2 H⁺,
+       **1:2 mol**, so a gram of Cu binds ~2.8× the thiol mass it does sulfide), capacity
+       ``copper_left·copper_mercaptan_binding``; removes ``min(mercaptans, capacity)``.
+
+    Copper in excess simply clears all dissolved reductive sulfur (the real outcome). **Ledger:**
+    H₂S is carbon-free (D-29), so its removal perturbs neither elemental balance (the ``add_so2``
+    precedent); **mercaptans carry carbon** (methanethiol, D-45), so removing them removes carbon
+    from the wine as the precipitated mercaptide — a **negative external flow** the driver books
+    (the racking-debris precedent), so the run-wide identity ``final == initial + Σ flows`` still
+    holds. **On a default (autolysis-off) wine ``mercaptans ≡ 0``, so add_copper is carbon-neutral
+    there** — the carbon flow appears only once the D-45 pool is non-empty. SCOPE (v1): the removal
+    lever only. Residual copper (excess Cu left in the wine) is untracked; copper is imperfect on
+    mercaptans and useless on the disulfides they oxidise to (see ``copper_mercaptan_binding``). The
+    ``mercaptans`` slot is wine-only, so on a medium without it copper binds H₂S alone.
     """
     _iv_check_keys(iv, frozenset({"copper_mgl"}), "add_copper")
     copper_mgl = _iv_float(iv, "copper_mgl", "add_copper")
@@ -777,21 +792,32 @@ def _verb_add_copper(
             f"{schema!r} has none"
         )
     try:
-        binding = parameters["copper_h2s_binding"].value
+        binding_h2s = parameters["copper_h2s_binding"].value
     except KeyError as exc:  # additions.yaml not loaded (caller-supplied parameter_paths)
         raise ValueError(
             "intervention 'add_copper' needs 'copper_h2s_binding' but it is missing "
             f"({exc}); include additions.yaml in parameter_paths (the default lookup merges "
             "it automatically)."
         ) from None
-    capacity_gpl = mgl_to_gpl(copper_mgl) * binding  # g/L H₂S this copper dose can bind
+    copper_gpl = mgl_to_gpl(copper_mgl)  # g/L Cu dosed
     h2s_slice = schema.slice("h2s")
+    # Mercaptans are wine-only; bind them with leftover copper iff the slot exists (D-45).
+    has_mercaptans = "mercaptans" in schema
+    binding_merc = parameters["copper_mercaptan_binding"].value if has_mercaptans else 0.0
+    merc_slice = schema.slice("mercaptans") if has_mercaptans else None
 
     def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
         out = y.copy()
-        present = max(float(out[h2s_slice][0]), 0.0)  # clamp: don't "remove" solver undershoot
-        removed = min(present, capacity_gpl)
-        out[h2s_slice] = float(out[h2s_slice][0]) - removed
+        # 1. H₂S first (higher affinity). Clamp present ≥ 0 so a solver undershoot is not "removed".
+        h2s_present = max(float(out[h2s_slice][0]), 0.0)
+        removed_h2s = min(h2s_present, copper_gpl * binding_h2s)
+        out[h2s_slice] = float(out[h2s_slice][0]) - removed_h2s
+        # 2. Mercaptans with the copper left after binding H₂S (its stoichiometric share).
+        if merc_slice is not None:
+            copper_left = max(copper_gpl - removed_h2s / binding_h2s, 0.0)
+            merc_present = max(float(out[merc_slice][0]), 0.0)
+            removed_merc = min(merc_present, copper_left * binding_merc)
+            out[merc_slice] = float(out[merc_slice][0]) - removed_merc
         return out
 
     return ScheduledEvent(
@@ -1147,13 +1173,14 @@ def compile_scenario(
     if BrettGrowth.name in process_set and amino_acids_gpl <= 0.0:
         process_set.disable(BrettGrowth.name)
 
-    # Autolytic source (decisions D-34, D-44): YeastAutolysis refills the amino-acid pool from dead
-    # biomass (X_dead) post-AF — the second MLF-with-growth prerequisite — and the D-44
-    # AutolyticHydrogenSulfide feeds the shared h2s pool the sulfide those self-digesting cells
-    # release, a yield on the SAME autolysis flux. Both *consume/read* core state gated on
-    # autolysis, so they ship OPT-IN TOGETHER: absent ``autolysis_rate_per_h`` ⇒ DISABLE both so
-    # (a) the X_dead/amino_acids/debris/h2s columns are untouched and the run is byte-for-byte the
-    # validated core, and (b) the inert
+    # Autolytic source (decisions D-34, D-44, D-45): YeastAutolysis refills the amino-acid pool from
+    # dead biomass (X_dead) post-AF — the second MLF-with-growth prerequisite — AutolyticHydrogen-
+    # Sulfide (D-44) feeds the shared h2s pool the sulfide those self-digesting cells release, and
+    # AutolyticMercaptan (D-45) feeds the mercaptans pool their thiols (drawing carbon from
+    # amino_acids, deaminating N) — all three yields on the SAME autolysis flux. They *consume/read*
+    # core state gated on autolysis, so they ship OPT-IN TOGETHER: absent ``autolysis_rate_per_h`` ⇒
+    # DISABLE all three so (a) the X_dead/amino_acids/debris/h2s/mercaptans/N columns are untouched
+    # and the run is byte-for-byte the validated core, and (b) the inert
     # Processes do not drag those outputs to speculative (``tier_of`` counts enabled, not nonzero,
     # Processes — the MLF/carrying *tier* isolability argument). Opted in ⇒ enable them and override
     # k_autolysis with the scenario's rate so demonstrations can sweep the sur-lie timescale — the
@@ -1164,7 +1191,11 @@ def compile_scenario(
             _nonneg(float(raw_rate), "autolysis_rate_per_h") if raw_rate is not None else 0.0
         )
         if rate_per_h <= 0.0:
-            for autolysis_process in (YeastAutolysis, AutolyticHydrogenSulfide):
+            for autolysis_process in (
+                YeastAutolysis,
+                AutolyticHydrogenSulfide,
+                AutolyticMercaptan,
+            ):
                 if autolysis_process.name in process_set:
                     process_set.disable(autolysis_process.name)
         else:

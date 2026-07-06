@@ -3172,6 +3172,78 @@ H₂S→thiol step, so a fabricated conversion rate is exactly what fidelity rej
 pool-with-carbon vs. copper-on-h2s-only for v1; and if pooled, autolysis-linked vs. H₂S-linked
 formation.
 
+## D-45 — Mercaptan (thiol) pool + copper mercaptide (the D-44 deferred fork; owner chose Option A)
+
+**Status: IMPLEMENTED 2026-07-06** (594 passed incl. the 5 §2.2 benchmarks, ruff + mypy clean). The
+D-44 deferred mercaptan-pool fork, resolved with the owner: **build a carbon-bearing pool** (not h2s-only
+only), formed **autolysis-linked with carbon drawn from ``amino_acids`` and the nitrogen deaminated**
+(Option A), and copper binding it **stoichiometrically** (Cu(SR)₂, 1 Cu : 2 thiol). The H₂S→thiol
+formation route was rejected as chemically murky (owner + advisor).
+
+**The pool — lumped ``mercaptans`` booked as methanethiol (CH₃SH, C1, N-free).** Methanethiol is the
+dominant reduction thiol (cooked-cabbage, threshold ~2–3 µg/L; ethanethiol its sibling), the honest
+single-species stand-in (the arginine-for-``amino_acids`` idiom). New ``M_METHANETHIOL`` in
+``chemistry`` registered in all three dicts (1 carbon, 0 nitrogen). New ``mercaptans`` slot in
+``wine_schema`` (wine 33→34; beer unchanged — wine-only, with ``amino_acids``), weighted in
+``total_carbon`` (as methanethiol) and **absent from ``total_nitrogen``** (N-free).
+
+**Part 1 — `AutolyticMercaptan` (`core/kinetics/mercaptans.py`), Option A.** A yield on the shared
+autolysis flux, but — because methanethiol carries carbon (unlike H₂S) — it draws that carbon from
+``amino_acids`` and **deaminates** the nitrogen to ``N`` (the exact D-33 ``FuselAminoAcidReroute``
+idiom):
+
+    r_merc         = y_mercaptan · autolysis_flux(y) · [aa/(K_amino_acids+aa)]     [g MeSH/L/h]
+    d[mercaptans]  = +r_merc
+    d[amino_acids] = −(r_merc·c_merc)/c_aa       (arginine mass carrying that carbon)
+    d[N]           = +(that mass)·y_N            (DEAMINATION → ammonium)
+
+* **Conservation closes on both ledgers by construction** (advisor-verified): carbon into
+  ``mercaptans`` (``r_merc·c_merc``) equals carbon out of ``amino_acids`` (``aa_mass·c_aa``) — the
+  draw is sized to match; all the arginine nitrogen leaving ``amino_acids`` lands in ``N`` (MeSH is
+  N-free). Both to machine precision; **no new conservation code beyond weighting ``mercaptans`` in
+  ``total_carbon``**. Pinned at the derivative level *and* on a full autolysis-on compiled run.
+* **PROVENANCE CAVEAT — the arginine lump, not literal methionine (advisor #1).** Real methanethiol
+  is from methionine degradation, and Option A's rationale was "methionine is a released amino acid"
+  — but ``amino_acids`` is booked as *arginine*, so the carbon/N drawn are arginine's. The model
+  deaminates ~0.66 mol N per mol MeSH vs. methionine's ~1 (same order, no gross artifact). Documented
+  as the arginine-for-``amino_acids`` stand-in: **exact on the ledger, approximate on provenance** —
+  *not* faithful methionine chemistry.
+* **New TIER consequence — a structural drop on ``N`` (advisor #2, the D-27 ``E`` parallel).**
+  ``AutolyticMercaptan`` is the **first autolysis-gated Process to write ``N``** (via deamination), so
+  an autolysis-on run drops the *structural* ``tier_of("N")`` PLAUSIBLE→SPECULATIVE — **even on an
+  autolysis-on / amino-dose-off run**, where the other N-writer (``FuselAminoAcidReroute``) stays
+  disabled. Verified by run (default N tier = plausible; autolysis-on = speculative) and pinned
+  (``test_is_the_first_autolysis_gated_n_writer``). The param-aware tier was typically already
+  speculative, so no headline change.
+* **Availability gate + not-flux-linked.** ``aa/(K_amino_acids+aa)`` ramps production to 0 as the
+  pool empties (solver-safe, can't drive ``amino_acids`` negative); the D-34 refill keeps it
+  non-empty. First-order in ``X_dead`` (not fermentation flux), so — like the D-44 H₂S source — it
+  accumulates un-stripped post-dryness. New speculative ``y_mercaptan`` = **1e-5 g MeSH/g biomass**
+  (~0.6 % of the biomass-methionine ceiling; set *below* the H₂S yield since reduction skews to H₂S).
+
+**Part 2 — `add_copper` extended to bind mercaptans (Cu(SR)₂, 1 Cu : 2 thiol).** Copper binds **H₂S
+first** (CuS Ksp ~10⁻³⁶ ≫ mercaptide, so sulfide is preferential), then binds mercaptans with the
+**leftover** copper. New ``copper_mercaptan_binding`` = **1.514 g MeSH/g Cu** (= 2·M_MeSH/M_Cu;
+plausible, **banded down hard** to ~20 % — copper is notably incomplete on mercaptans and useless on
+the disulfides they oxidise to, advisor #3). **Ledger:** removing carbon-free H₂S is neutral (D-44),
+but **removing mercaptans removes carbon** from the wine as the precipitated mercaptide — a *negative
+external flow* the driver books (the racking-debris precedent), so ``final == initial + Σ flows``
+still holds (verified; conservation-across-jump uses the flow identity, **not** ``assert_conserved``,
+advisor #4). The pre-existing "copper is ledger-neutral" test still passes *because default wine has
+``mercaptans ≡ 0``* — its comment now says so.
+
+**Shared `autolysis_flux` helper (advisor, non-blocking).** Three Processes now recompute
+``k_autolysis·f_T·X_dead``; extracted into one ``autolysis_flux(y, schema, params)`` in
+``autolysis.py`` (the ``fusel_production_rate`` single-source idiom), so ``YeastAutolysis`` (D-34),
+``AutolyticHydrogenSulfide`` (D-44) and ``AutolyticMercaptan`` (D-45) share one clock and one
+``autolysis_rate_per_h`` override.
+
+**Isolability + verification.** Opt-in and wine-only: disabled **together with** the other two
+autolysis Processes at the compile seam absent ``autolysis_rate_per_h`` — an undosed wine run is
+byte-for-byte the validated core (the **5 §2.2 benchmarks pass unchanged, run not inferred**; the
+``mercaptans`` slot is a permanently-zero column there). +27 tests (new ``test_mercaptans.py`` +
+copper-binds-both in ``test_interventions.py``); **594 passed (incl. the 5 §2.2 benchmarks)**.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -3189,8 +3261,12 @@ formation.
   **decided + IMPLEMENTED in D-44 (2026-07-06)**: `AutolyticHydrogenSulfide` is a yield on the D-34
   autolysis flux (opt-in, wine-only) whose non-flux-linked form makes it accumulate un-stripped as
   *residual* post-dryness — the reductive fault; `add_copper` precipitates it as CuS (stoichiometric,
-  ledger-neutral). See D-44. **Still open:** a **mercaptan pool** (carbon-bearing thiols + copper
-  binding of them) — taken to the owner as a scope decision (D-44), *not* auto-built.
+  ledger-neutral). See D-44.
+- ~~**Mercaptan (thiol) pool + copper mercaptide**~~ (the D-44 open fork) — **decided + IMPLEMENTED
+  in D-45 (2026-07-06)**: owner chose a carbon-bearing `mercaptans` pool (methanethiol), formed
+  autolysis-linked with carbon drawn from `amino_acids` + N deaminated (Option A, the D-33 idiom),
+  and copper binding it stoichiometrically (Cu(SR)₂, 1 Cu:2 thiol, H₂S-first). See D-45. The
+  reductive-sulfur beat (H₂S + mercaptans, autolytic sources + copper fining) is now **complete**.
 - ~~**Residual-nitrogen / satiation floor**~~ — **addressed in D-30 (opt-in cap) and RESOLVED in
   D-43 (2026-07-06): the "default-on N redesign" is declined.** A spike + a mass-balance argument
   (D-43) proved that **default-on residual *assimilable* N is Coleman-incompatible regardless of

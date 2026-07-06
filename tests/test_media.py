@@ -31,6 +31,8 @@ WINE_DEBRIS_SLOTS = ("debris",)
 WINE_BRETT_SLOTS = (
     "hydroxycinnamics", "vinylphenols", "ethylphenols", "X_brett", "X_brett_dead",
 )  # fmt: skip
+# The carbon-bearing volatile-thiol pool AutolyticMercaptan fills (decision D-45), appended last.
+WINE_MERCAPTAN_SLOTS = ("mercaptans",)
 
 
 def test_wine_schema_has_single_sugar_slot():
@@ -43,6 +45,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_AMINO_ACID_SLOTS
         + WINE_DEBRIS_SLOTS
         + WINE_BRETT_SLOTS
+        + WINE_MERCAPTAN_SLOTS
     )
     assert schema.spec("S").size == 1
     # 18 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
@@ -51,8 +54,8 @@ def test_wine_schema_has_single_sugar_slot():
     # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
     # (D-34) + 5 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols, X_brett,
-    # X_brett_dead — decision D-40)
-    assert schema.size == 33
+    # X_brett_dead — decision D-40) + 1 mercaptans slot (D-45)
+    assert schema.size == 34
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -246,7 +249,7 @@ POF_PROCESSES = {"yeast_pof_decarboxylation"}
 # build, disabled together at the compile seam unless a scenario passes autolysis_rate_per_h (the
 # carrying-capacity opt-in pattern). AutolyticHydrogenSulfide feeds the shared h2s pool the sulfide
 # dead cells release, on the same autolysis flux (decision D-44).
-AUTOLYSIS_PROCESSES = {"yeast_autolysis", "autolytic_hydrogen_sulfide"}
+AUTOLYSIS_PROCESSES = {"yeast_autolysis", "autolytic_hydrogen_sulfide", "autolytic_mercaptan"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES

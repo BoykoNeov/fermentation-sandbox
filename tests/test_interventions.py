@@ -662,8 +662,10 @@ def test_add_copper_perturbs_neither_carbon_nor_nitrogen():
     schema = cs.schema
     c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
     n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
-    # H₂S carries neither element (carbon-free, D-29), so the removal contributes nothing to either
-    # ledger and both single-run balances still close with no correction term (the add_so2 case).
+    # On this DEFAULT wine (autolysis off) mercaptans ≡ 0, so copper binds only the carbon-free H₂S:
+    # the removal contributes nothing to either ledger and both balances close with no correction
+    # term (the add_so2 case). Once the D-45 mercaptan pool is non-empty, mercaptan removal DOES
+    # book a carbon flow (test_add_copper_mercaptan_removal_books_a_carbon_flow) — hence "default".
     assert all(c_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
     assert all(n_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
     assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0), abs=1e-6)
@@ -711,3 +713,87 @@ def test_add_copper_clears_the_autolytic_reduction():
 def test_add_copper_missing_param_raises():
     with pytest.raises(ValueError, match="missing required param 'copper_mgl'"):
         compile_scenario(_wine([Intervention(day=5.0, action="add_copper", params={})]))
+
+
+# -- add_copper also binds mercaptans (H₂S-first partition, carbon-bearing removal, D-45) -------
+
+_COPPER_MERC_BINDING = 1.514  # g MeSH / g Cu, stoichiometric Cu(SR)₂ 1:2 (additions.yaml, D-45)
+
+
+def test_add_copper_binds_h2s_first_then_mercaptans():
+    # Verb-level partition (D-45): copper binds H₂S first (CuS far more insoluble), then binds
+    # mercaptans with the LEFTOVER copper (Cu(SR)₂, 1 Cu : 2 thiol). Applied to a hand-built state
+    # so both removals are exact.
+    cs = compile_scenario(_wine([_copper(5.0, 0.5)]))
+    ev = _copper_event(cs, 5.0)
+    schema = cs.schema
+    h2s, merc = schema.slice("h2s"), schema.slice("mercaptans")
+    copper_gpl = mgl_to_gpl(0.5)
+    b_h2s = cs.param_values["copper_h2s_binding"]
+    b_merc = cs.param_values["copper_mercaptan_binding"]
+    assert b_merc == pytest.approx(_COPPER_MERC_BINDING, rel=1e-12)
+
+    # H₂S below its share (fully removed), leaving copper over for mercaptans
+    y = cs.y0.copy()
+    y[h2s] = 1.0e-5  # 10 µg/L H₂S, well under the ~268 µg/L H₂S capacity
+    y[merc] = 1.0e-3  # 1 mg/L mercaptans, above the leftover-copper capacity
+    out = ev.mutate(schema, y)
+    assert float(out[h2s][0]) == pytest.approx(0.0, abs=1e-18)  # all H₂S bound first
+    copper_left = copper_gpl - 1.0e-5 / b_h2s  # copper after the (tiny) H₂S bind
+    expected_merc_removed = copper_left * b_merc
+    assert float(out[merc][0]) == pytest.approx(1.0e-3 - expected_merc_removed, rel=1e-9)
+
+
+def test_add_copper_h2s_consumes_copper_before_mercaptans():
+    # If H₂S alone soaks up ALL the copper, none is left for mercaptans (the affinity order).
+    cs = compile_scenario(_wine([_copper(5.0, 0.001)]))  # tiny dose: ~0.5 µg/L H₂S capacity
+    ev = _copper_event(cs, 5.0)
+    schema = cs.schema
+    h2s, merc = schema.slice("h2s"), schema.slice("mercaptans")
+    y = cs.y0.copy()
+    y[h2s] = 1.0e-3  # 1 mg/L H₂S ≫ capacity ⇒ soaks all copper
+    y[merc] = 1.0e-4
+    out = ev.mutate(schema, y)
+    assert float(out[h2s][0]) < 1.0e-3  # some H₂S removed
+    assert float(out[merc][0]) == pytest.approx(1.0e-4, abs=1e-18)  # mercaptans untouched
+
+
+def test_add_copper_mercaptan_removal_books_a_carbon_flow():
+    # Mercaptans carry carbon (methanethiol, D-45), so removing them removes carbon from the wine as
+    # the precipitated mercaptide — a NEGATIVE carbon external flow (unlike the carbon-free H₂S
+    # removal). The run-wide identity final == initial + Σ flows must still hold (the racking-debris
+    # crown-jewel pattern), even though total_carbon(state) legitimately drops at the dose.
+    sc = Scenario(
+        name="reduction-cu-carbon",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 80.0, "pitch_gpl": 0.25, "autolysis_rate_per_h": 0.002},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[_copper(38.0, 0.5)],
+        duration_days=40.0,
+    )
+    cs = compile_scenario(sc)
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+    assert len(traj.external_flows) == 1
+    flow = traj.external_flows[0]
+    # copper fining removed carbon (mercaptans left the wine) but no nitrogen (thiols are N-free)
+    assert c_of(flow.delta) < 0.0
+    assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+    # crown-jewel: carbon closes across the jump once the external flow is counted
+    assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0) + c_of(flow.delta), abs=1e-6)
+    assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0), abs=1e-9)
+
+
+def test_add_copper_clears_both_h2s_and_mercaptans():
+    # THE full remediation headline (D-45): a copper fining of a reductive wine drops BOTH the
+    # accumulated H₂S residual and the mercaptans toward zero — copper clears reduction.
+    grid = np.linspace(0.0, 40.0 * 24.0, 401)
+    no_cu = compile_scenario(_autolysis_wine([])).run(t_eval=grid)
+    fined = compile_scenario(_autolysis_wine([_copper(38.0, 0.5)])).run(t_eval=grid)
+    for pool in ("h2s", "mercaptans"):
+        built = np.asarray(no_cu.series(pool))
+        cleared = np.asarray(fined.series(pool))
+        assert built[-1] > 1.0e-6, pool  # the fault really built up
+        assert cleared[-1] < 0.25 * built[-1], pool  # copper cleared ~all of it

@@ -54,3 +54,26 @@ copper_h2s_binding:
     source: "stoichiometry of copper sulfide precipitation Cu2+ + H2S -> CuS(s) + 2 H+ (1:1 mol); the standard copper-fining remediation for reductive H2S (general enology; Rankine)"
     conditions: "copper(II) fining of dissolved H2S in wine; g H2S bound per g Cu dosed, at (idealised) stoichiometric completion"
     notes: "Read by the add_copper verb to convert a copper dose (copper_mgl) into the H2S mass it removes. M(H2S) = 34.076, M(Cu) = 63.546 => 34.076/63.546 = 0.536 g H2S/g Cu at 1:1 stoichiometry. VALUE sits at the stoichiometric ceiling (near-complete binding, the demonstration lever); tier PLAUSIBLE (not validated like dap_nitrogen_fraction) because real copper fining is NOT perfectly stoichiometric — the 1:1-and-complete assumption is a model idealisation, banded down for imperfect efficiency. Residual copper is untracked (v1 scope, decision D-44)."
+
+# -- Copper mercaptan-binding capacity (add_copper verb, decision D-45) ----------------------
+#
+# Copper also precipitates MERCAPTANS (thiols) as copper mercaptide (Cu2+ + 2 RSH -> Cu(SR)2(s) +
+# 2 H+, a 1:2 Cu:thiol reaction), the SECOND half of copper fining. The add_copper verb binds H2S
+# FIRST (CuS is far more insoluble, Ksp ~1e-36, so sulfide is preferentially bound) and then binds
+# mercaptans with the LEFTOVER copper via this factor. Removing mercaptans removes CARBON from the
+# wine (methanethiol carries carbon, D-45), booked as a negative external flow (the racking-debris
+# precedent), so the run-wide ledger identity still holds. M(methanethiol CH3SH) = 48.107 g/mol,
+# M(Cu) = 63.546 g/mol, 1 Cu : 2 thiol => 2*48.107/63.546 = 1.514 g MeSH bound / g Cu (a gram of
+# copper binds ~2.8x the thiol mass it does sulfide, since sulfide is 1:1). BANDED HARD: copper
+# fining is notably LESS effective on mercaptans than on H2S (slower, incomplete) and USELESS on
+# the disulfides mercaptans oxidise to (a real limitation of copper as a reduction fix), so the
+# effective binding can be well below stoichiometric.
+copper_mercaptan_binding:
+  value: 1.514
+  unit: "g/g"   # g methanethiol bound per g copper (Cu), stoichiometric Cu(SR)2 (1:2 mol)
+  tier: plausible
+  uncertainty: { low: 0.3, high: 1.514, note: "1.514 = stoichiometric 1:2 Cu(SR)2 ceiling (2*M_MeSH/M_Cu); copper fining is markedly INCOMPLETE for mercaptans (and useless on the disulfides they oxidise to), so effective binding is often well below stoichiometric — banded down HARD to ~20% (0.3). Cannot EXCEED the ceiling (1 Cu binds at most 2 thiol)" }
+  provenance:
+    source: "stoichiometry of copper mercaptide precipitation Cu2+ + 2 RSH -> Cu(SR)2(s) + 2 H+ (1:2 mol); copper fining of reductive thiols (general enology; Rankine). The incompleteness/disulfide caveat: copper is an imperfect mercaptan fix (Swiegers et al. 2005; Ugliano volatile-sulfur reviews)"
+    conditions: "copper(II) fining of dissolved mercaptans (methanethiol stand-in) in wine; g MeSH bound per g Cu, bound with copper LEFT after H2S, at (idealised) stoichiometric completion"
+    notes: "Read by the add_copper verb (D-45) to convert leftover copper into the mercaptan mass it removes. M(MeSH) = 48.107, M(Cu) = 63.546, Cu(SR)2 is 1 Cu : 2 thiol => 2*48.107/63.546 = 1.514 g MeSH/g Cu. VALUE at the stoichiometric ceiling (the user-chosen stoichiometric lever); tier PLAUSIBLE and banded DOWN HARDER than copper_h2s_binding because real copper fining is notably less complete for mercaptans than for sulfide and cannot touch the disulfides they oxidise to. Residual copper is untracked (v1 scope, decision D-45)."

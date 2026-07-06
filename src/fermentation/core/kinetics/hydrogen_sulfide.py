@@ -98,6 +98,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
+from fermentation.core.kinetics.autolysis import autolysis_flux
 from fermentation.core.kinetics.carbon_routing import fermentative_flux_shape
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -278,11 +279,8 @@ class AutolyticHydrogenSulfide(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        x_dead = max(float(y[schema.slice("X_dead")][0]), 0.0)
-        if x_dead <= 0.0:
+        r_autolysis = autolysis_flux(y, schema, params)  # [g X_dead/L/h] — the shared D-34 flux
+        if r_autolysis <= 0.0:
             return d  # no dead cells ⇒ nothing to autolyse (clamped, so no negative overshoot)
-        temp = float(y[schema.slice("T")][0])
-        f_t = arrhenius_factor(temp, params["E_a_autolysis"], params["T_ref"])
-        r_autolysis = params["k_autolysis"] * f_t * x_dead  # [g X_dead/L/h] — YeastAutolysis' rate
         d[schema.slice("h2s")] = params["y_h2s_autolysis"] * r_autolysis
         return d

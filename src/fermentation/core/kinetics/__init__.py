@@ -16,7 +16,7 @@ from fermentation.core.kinetics.acetaldehyde import (
 )
 from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
-from fermentation.core.kinetics.autolysis import YeastAutolysis
+from fermentation.core.kinetics.autolysis import YeastAutolysis, autolysis_flux
 from fermentation.core.kinetics.brett import (
     BrettDeath,
     BrettDecarboxylation,
@@ -52,6 +52,7 @@ from fermentation.core.kinetics.malolactic import (
     malolactic_environmental_gate,
     malolactic_toxicity_gate,
 )
+from fermentation.core.kinetics.mercaptans import AutolyticMercaptan
 from fermentation.core.kinetics.temperature import TemperatureRamp
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.kinetics.vicinal_diketones import (
@@ -67,6 +68,7 @@ __all__ = [
     "AcetolactateExcretion",
     "AminoAcidAssimilation",
     "AutolyticHydrogenSulfide",
+    "AutolyticMercaptan",
     "BiomassCarryingCapacity",
     "BrettDeath",
     "BrettDecarboxylation",
@@ -94,6 +96,7 @@ __all__ = [
     "YeastAutolysis",
     "YeastPOFDecarboxylation",
     "arrhenius_factor",
+    "autolysis_flux",
     "biomass_growth_rate",
     "brett_environmental_gate",
     "cardinal_temperature_factor",

@@ -82,6 +82,28 @@ from fermentation.core.tiers import Tier
 _DEBRIS_SPECIES = "glucan"
 
 
+def autolysis_flux(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """The first-order autolysis rate ``r = k_autolysis · arrhenius(T, E_a_autolysis, T_ref) ·
+    X_dead`` [g X_dead/L/h].
+
+    The **single source of truth** for the autolytic flux: :class:`YeastAutolysis` (decision D-34)
+    runs it, and the two autolysis-coupled reductive-sulfur yields recompute it — the carbon-free
+    :class:`~fermentation.core.kinetics.hydrogen_sulfide.AutolyticHydrogenSulfide` (H₂S, D-44) and
+    the carbon-bearing :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan` (thiols,
+    D-45). Sharing one helper (the :func:`~fermentation.core.kinetics.byproducts.\
+    fusel_production_rate` producer/re-route idiom) keeps all three on one clock, so the D-34
+    ``autolysis_rate_per_h`` opt-in (which overrides ``k_autolysis``) drives every branch of the
+    same self-digestion. ``X_dead`` is clamped ≥ 0 so a solver undershoot cannot drive a negative
+    rate; returns ``0.0`` when there is no dead biomass to autolyse.
+    """
+    x_dead = max(float(y[schema.slice("X_dead")][0]), 0.0)
+    if x_dead <= 0.0:
+        return 0.0
+    temp = float(y[schema.slice("T")][0])
+    f_t = arrhenius_factor(temp, params["E_a_autolysis"], params["T_ref"])
+    return params["k_autolysis"] * f_t * x_dead
+
+
 class YeastAutolysis(Process):
     """Autolysis of dead biomass into assimilable amino acids + cell-wall debris (decision D-34).
 
@@ -114,13 +136,9 @@ class YeastAutolysis(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        x_dead = max(float(y[schema.slice("X_dead")][0]), 0.0)
-        if x_dead <= 0.0:
+        r = autolysis_flux(y, schema, params)  # [g X_dead/L/h] — the shared autolytic flux (D-34)
+        if r <= 0.0:
             return d  # no dead cells ⇒ nothing to autolyse (clamped, so no negative overshoot)
-
-        temp = float(y[schema.slice("T")][0])
-        f_t = arrhenius_factor(temp, params["E_a_autolysis"], params["T_ref"])
-        r = params["k_autolysis"] * f_t * x_dead  # [g X_dead/L/h] autolysed
 
         f_n = params["biomass_N_fraction"]
         f_c = params["biomass_C_fraction"]

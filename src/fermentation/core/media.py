@@ -73,6 +73,7 @@ from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     ArrheniusTemperature,
     AutolyticHydrogenSulfide,
+    AutolyticMercaptan,
     BiomassCarryingCapacity,
     BrettDeath,
     BrettDecarboxylation,
@@ -335,6 +336,15 @@ def wine_schema() -> StateSchema:
             description="non-viable Brettanomyces biomass — the settled lees BrettDeath moves "
             "X_brett into (carbon/nitrogen still counted at the biomass fractions, no longer "
             "catalytic; racked off with the other lees, decision D-40)",
+        ),
+        VarSpec(
+            "mercaptans",
+            "g/L",
+            default=0.0,
+            description="lumped volatile thiols (methanethiol stand-in) — the carbon-bearing "
+            "reductive off-aroma. AutolyticMercaptan fills it as a yield on the autolysis flux, "
+            "drawing carbon from amino_acids and deaminating the nitrogen to N (Option A, D-45); "
+            "carbon-accounted as methanethiol, nitrogen-free. Copper-fined out by add_copper",
         ),
     ]
     return StateSchema(specs)
@@ -682,8 +692,20 @@ _AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: **non-flux-linked** form is the point: the D-42 CO₂-stripping sink gates off at dryness, so this
 #: autolytic H₂S accumulates un-stripped as *residual* — the sur-lie "reduction" fault. Carbon-free,
 #: touches only ``h2s`` (nothing reads it back), so like the D-34 refill it stays isolable and drops
-#: to the validated core when autolysis is un-opted. Both are disabled together at the compile seam.
-_AUTOLYSIS_PROCESSES: tuple[Callable[[], Process], ...] = (YeastAutolysis, AutolyticHydrogenSulfide)
+#: to the validated core when autolysis is un-opted.
+#:
+#: :class:`AutolyticMercaptan` (decision D-45) rides here too — the *carbon-bearing* twin: it fills
+#: the ``mercaptans`` (thiol) pool on the same autolysis flux, but draws the mercaptan carbon from
+#: ``amino_acids`` and **deaminates** the nitrogen to ``N`` (Option A, the D-33 idiom — methanethiol
+#: carries carbon, unlike H₂S, so it cannot draw from nothing). Also non-flux-linked ⇒ accumulates
+#: un-stripped post-dryness. It is the **first autolysis-gated ``N``-writer**, so an autolysis-on
+#: run drops the structural ``tier_of("N")`` to speculative (the D-27 ``E`` parallel). All three
+#: Processes are disabled together at the compile seam absent ``autolysis_rate_per_h``.
+_AUTOLYSIS_PROCESSES: tuple[Callable[[], Process], ...] = (
+    YeastAutolysis,
+    AutolyticHydrogenSulfide,
+    AutolyticMercaptan,
+)
 
 #: Temperature-schedule ramp (decision D-35): the single Process that drives ``T`` along a
 #: piecewise-linear temperature schedule (``dT/dt = temperature_ramp_rate``). Medium-agnostic —

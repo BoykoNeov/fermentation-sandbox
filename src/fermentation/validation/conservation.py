@@ -176,6 +176,19 @@ def total_carbon(
     # total_nitrogen. On an undosed / autolysis-off run the pool is empty (constant 0 term).
     if "debris" in schema:
         w[schema.slice("debris")] = carbon_mass_fraction("glucan")
+    # Mercaptan (thiol) pool (decision D-45): AutolyticMercaptan draws carbon from the amino-acid
+    # pool into this pool (deaminating the nitrogen to N), so — unlike the carbon-free h2s — it
+    # carries carbon and must be weighted or that draw would read as carbon destroyed. Booked at
+    # methanethiol's carbon fraction (its representative species, the same one the Process draws
+    # against), so total_carbon closes to machine precision through the transfer: the carbon into
+    # mercaptans equals the carbon out of amino_acids. Nitrogen-free (the arginine N is deaminated
+    # to the N pool), so it is absent from total_nitrogen. On an undosed / autolysis-off run the
+    # pool is empty and the Process disabled (constant 0 term). NOTE: the add_copper verb (D-45)
+    # removes mercaptans as precipitated copper mercaptide — carbon that legitimately LEAVES the
+    # wine, booked as a negative external flow (the racking-debris precedent), so the run-wide
+    # identity final == initial + Σ flows still holds even though total_carbon(state) drops.
+    if "mercaptans" in schema:
+        w[schema.slice("mercaptans")] = carbon_mass_fraction("methanethiol")
     # Brett volatile-phenol pools (decision D-40): the decarboxylase routes carbon hydroxycinnamics
     # (p-coumaric, C9) → vinylphenols (C8) + CO2 (C1), carbon-closing mole-for-mole like malic →
     # lactic + CO2; the reductase moves vinylphenols (C8) → ethylphenols (C8), a mole-for-mole C8 →

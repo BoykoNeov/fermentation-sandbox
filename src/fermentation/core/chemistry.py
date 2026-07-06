@@ -142,6 +142,17 @@ M_SO2 = 1 * _M_S + 2 * _M_O
 #: weight) and for the deferred CO₂-stripping volatilization sink; the v1 production kinetics
 #: work in g/L directly and need no molar conversion.
 M_H2S = 2 * _M_H + 1 * _M_S
+#: Methanethiol (methyl mercaptan), CH3SH ≡ CH4S — the representative species for the lumped
+#: **mercaptans** (volatile thiol) pool (decision D-45). Methanethiol is the dominant "reduction"
+#: thiol (cooked-cabbage / rotten, sensory threshold ~2–3 µg/L; its onion/rubber sibling is
+#: ethanethiol), the honest single-species stand-in for the lumped pool — the arginine-for-
+#: ``amino_acids`` / p-coumaric-for-``hydroxycinnamics`` idiom (D-32/D-40). **Unlike H₂S it carries
+#: carbon** (one C), so — registered with 1 carbon below — the ``mercaptans`` pool sits on
+#: ``total_carbon`` (contrast the carbon-free ``h2s``/SO₂). Nitrogen-free: methanethiol has no N,
+#: so the autolytic-thiol Process (:class:`~fermentation.core.kinetics.mercaptans.\
+#: AutolyticMercaptan`) **deaminates** the arginine nitrogen it draws back to the ``N`` pool (D-33
+#: idiom). Carbon fraction 12.011/48.107 ≈ 0.2497.
+M_METHANETHIOL = 1 * _M_C + 4 * _M_H + 1 * _M_S
 #: L-arginine, C6H14N4O2 — the representative species for the assimilable **amino-acid**
 #: pool (decision D-32). Arginine is the *dominant* yeast-assimilable amino acid in grape
 #: must (proline, though more abundant, is not assimilated anaerobically), so it is the
@@ -217,6 +228,7 @@ MOLAR_MASS: dict[str, float] = {
     "citric_acid": M_CITRIC,
     "sulfur_dioxide": M_SO2,
     "hydrogen_sulfide": M_H2S,
+    "methanethiol": M_METHANETHIOL,
     "alpha_acetolactate": M_ACETOLACTATE,
     "diacetyl": M_DIACETYL,
     "butanediol": M_BUTANEDIOL,
@@ -249,6 +261,9 @@ CARBON_ATOMS: dict[str, int] = {
     "citric_acid": 6,
     "sulfur_dioxide": 0,
     "hydrogen_sulfide": 0,
+    #: Methanethiol (CH3SH) carries ONE carbon — unlike the carbon-free H₂S/SO₂ — so the lumped
+    #: ``mercaptans`` pool sits on ``total_carbon`` (decision D-45).
+    "methanethiol": 1,
     "alpha_acetolactate": 5,
     "diacetyl": 4,
     "butanediol": 4,
@@ -284,6 +299,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     "citric_acid": 0,
     "sulfur_dioxide": 0,
     "hydrogen_sulfide": 0,
+    #: Methanethiol is nitrogen-free: the autolytic-thiol Process deaminates the arginine nitrogen
+    #: it draws back to the ``N`` pool, so the mercaptan itself carries none (decision D-45).
+    "methanethiol": 0,
     "alpha_acetolactate": 0,
     "diacetyl": 0,
     "butanediol": 0,
