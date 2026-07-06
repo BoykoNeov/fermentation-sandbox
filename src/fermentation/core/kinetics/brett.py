@@ -14,8 +14,12 @@ hydroxycinnamics all the way to 4-ethylphenol with no help. *S. cerevisiae* has 
 decarboxylase (and only if POF+, the uncommon case), never the reductase — so a POF+ yeast can
 fill the shared ``vinylphenols`` reservoir during AF but cannot clear it; if Brett is absent the
 vinylphenol *strands* (the emergent yeast/Brett coupling, the α-acetolactate-reservoir parallel of
-D-26/D-31). The POF+ yeast decarboxylase is a separate opt-in strain Process (decision D-40 pt4);
-this module is Brett, which spoils POF-negative wine unaided.
+D-26/D-31). That POF+ yeast decarboxylase is :class:`YeastPOFDecarboxylation` (decision D-40 pt4) —
+a **separate opt-in strain** Process living in this module: it shares the phenol species and the
+carbon routing with :class:`BrettDecarboxylation`, but its catalyst is *viable yeast* (coupled to
+the fermentative flux) rather than ``X_brett``, and it is enabled by a POF+ strain opt-in, wholly
+independent of the Brett pitch. The rest of this module is Brett, which spoils POF-negative wine
+unaided.
 
 **Carbon closes on the existing ledger — no new conservation code.** With ``r`` [mol/L/h] the
 decarboxylase turnover and ``L`` [g/L/h] the reductase mass flux,
@@ -77,6 +81,7 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
+from fermentation.core.kinetics.carbon_routing import fermentative_flux_shape
 from fermentation.core.kinetics.malolactic import cardinal_temperature_factor
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -497,4 +502,93 @@ class BrettDeath(Process):
         r_death = params["k_death_brett"] * x_brett * (1.0 - g_so2) * f_t  # [g X_brett/L/h]
         d[schema.slice("X_brett")] = -r_death
         d[schema.slice("X_brett_dead")] = r_death  # carbon/nitrogen-neutral: same biomass fractions
+        return d
+
+
+class YeastPOFDecarboxylation(Process):
+    """POF+ *S. cerevisiae* cinnamate decarboxylase — hydroxycinnamics → vinylphenols + CO2 (pt4).
+
+    The *yeast* half of the volatile-phenol story (decision D-40 pt4). A **POF+**
+    (phenolic-off-flavour-positive) primary-fermentation strain carries the cinnamate
+    decarboxylase — the *same* enzyme :class:`BrettDecarboxylation` models — but **not** the
+    vinylphenol reductase, so during AF it takes must ``hydroxycinnamics`` → ``vinylphenols`` + CO2
+    and there it **stops**: it fills the shared reductase reservoir it cannot drain. If Brett is
+    absent the ``vinylphenols`` *strand* (nothing reduces them to ethylphenols — the emergent
+    yeast/Brett coupling this 3-pool design was chosen for, the α-acetolactate-reservoir parallel
+    of D-26/D-31, DECISIONS D-40); if Brett arrives later, :class:`BrettVinylphenolReduction` drains
+    that pre-filled reservoir, so a POF+ AF gives a subsequent Brett contamination a *head start*.
+
+    **Same reaction as Brett's decarboxylase, different catalyst.** The chemistry — p-coumaric (9 C)
+    → vinylphenol (8 C) + CO2 (1 C), carbon-closing mole-for-mole (9 = 8 + 1) — and the carbon
+    routing are **identical** to :class:`BrettDecarboxylation` (it reuses ``M_P_COUMARIC``/
+    ``M_VINYLPHENOL``/``M_CO2``), so it touches only ``hydroxycinnamics``/``vinylphenols``/``CO2``
+    and closes on the existing ledger with no new conservation code; when both this and Brett are
+    active they draw the *same* ``hydroxycinnamics`` pool (both close 9 = 8 + 1). The difference is
+    the catalyst and its rate law:
+
+        r = k_pof_decarb · X · S_total/(K_sugar_uptake + S_total) · [hc]/(K_hydroxycinnamic + [hc])
+
+    — **flux-coupled** to active fermentation via the shared :func:`~fermentation.core.kinetics.\
+    carbon_routing.fermentative_flux_shape` (the ester/α-acetolactate idiom, D-19/D-26), not scaled
+    by ``X_brett``. POF decarboxylation is a *primary-fermentation* phenomenon: the flux term makes
+    production track the yeast's fermentative activity and **stop at dryness** (``S → 0`` ⇒ rate 0),
+    leaving whatever hydroxycinnamics remain for a later Brett. The precursor Monod (shared
+    ``K_hydroxycinnamic``) rolls production off as the pool is consumed. **No Brett SO₂/temperature
+    gate** — this is yeast metabolism during AF, before any Brett or sulfite lever applies.
+
+    **Temperature-flat (v1 scoped simplification).** Like :class:`~fermentation.core.kinetics.\
+    vicinal_diketones.AcetolactateExcretion`, this flux-coupled producer carries **no explicit
+    Arrhenius factor**: temperature already enters through the AF-flux trajectory it couples to (a
+    warm ferment fluxes faster ⇒ more vinylphenol per hour), and no pt4 behaviour needs POF's
+    *intrinsic* temperature direction, so an unsourced ``E_a_pof`` would buy nothing (prime
+    directive #2). The ester beat carried its own Arrhenius only because temperature was *that*
+    beat's subject; here the subject is the reservoir.
+
+    **Isolability — a separate opt-in strain, wholly independent of the Brett pitch.** POF+ is a
+    binary *strain* trait, so it is enabled by its own compile-seam opt-in (``pof_positive``), NOT
+    by ``brett_pitch_gpl`` — a POF+ ferment need not have Brett, and a POF-negative wine (the
+    default) must make **no** vinylphenol. The Process is wired into the wine medium's own
+    ``_POF_PROCESSES`` tuple and **disabled** unless the strain is opted in, so a default (POF−) run
+    is byte-for-byte the validated core and the phenol slots keep their VALIDATED tier (the
+    Brett-unpitched pattern; ``tier_of`` counts enabled, not nonzero, Processes). Returns a zero
+    contribution before any work when there is no precursor or no fermentative flux (post-AF). On a
+    POF+ run ``vinylphenols`` reports **speculative** (this enabled Process touches it) — honest —
+    while ``ethylphenols`` stays VALIDATED at 0 unless Brett (the only reductase) is also present.
+
+    Tier **speculative**: ``k_pof_decarb`` is an author estimate (no per-strain POF decarboxylase
+    rate of this flux-coupled form is sourced), and the reaction is lumped as for Brett. Wine-only.
+    """
+
+    name = "yeast_pof_decarboxylation"
+    tier = Tier.SPECULATIVE
+    touches = ("hydroxycinnamics", "vinylphenols", "CO2")
+    #: ``k_pof_decarb`` sets the POF decarboxylase magnitude; ``K_sugar_uptake`` (shared with the
+    #: fermentative-uptake flux this tracks) and ``K_hydroxycinnamic`` (shared with Brett's
+    #: decarboxylase — same whole-cell precursor affinity) shape it. Their tiers cap the
+    #: hydroxycinnamics/vinylphenols/CO2 output tier via parameter-tier propagation (D-1). CO2 is
+    #: already speculative (the always-on VDK decarboxylation), so this adds no new tier headline.
+    reads: tuple[str, ...] = ("k_pof_decarb", "K_hydroxycinnamic", "K_sugar_uptake")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # No precursor ⇒ nothing to decarboxylate; no fermentative flux (post-AF, S→0, or crashed
+        # yeast) ⇒ POF production has stopped and the reservoir simply waits for Brett.
+        hc_gpl = max(float(y[schema.slice("hydroxycinnamics")][0]), 0.0)
+        if hc_gpl <= 0.0:
+            return d
+        flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
+        if flux <= 0.0:
+            return d
+
+        hc_molar = hc_gpl / M_P_COUMARIC
+        monod = hc_molar / (params["K_hydroxycinnamic"] + hc_molar)
+        r = params["k_pof_decarb"] * flux * monod  # POF decarboxylase turnover, mol/L/h
+
+        d[schema.slice("hydroxycinnamics")] = -r * M_P_COUMARIC
+        d[schema.slice("vinylphenols")] = r * M_VINYLPHENOL  # fills the shared reductase reservoir
+        d[schema.slice("CO2")] = (
+            r * M_CO2
+        )  # p-coumaric C9 → vinylphenol C8 + CO2 C1 (carbon-closing, same as Brett's decarboxylase)
         return d

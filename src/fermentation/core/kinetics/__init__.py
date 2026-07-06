@@ -22,6 +22,7 @@ from fermentation.core.kinetics.brett import (
     BrettDecarboxylation,
     BrettGrowth,
     BrettVinylphenolReduction,
+    YeastPOFDecarboxylation,
     brett_environmental_gate,
 )
 from fermentation.core.kinetics.byproducts import (
@@ -83,6 +84,7 @@ __all__ = [
     "SugarUptakeToEthanolCO2",
     "TemperatureRamp",
     "YeastAutolysis",
+    "YeastPOFDecarboxylation",
     "arrhenius_factor",
     "biomass_growth_rate",
     "brett_environmental_gate",

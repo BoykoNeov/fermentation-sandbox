@@ -340,7 +340,26 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         SO₂ crashes a *growing* population: `X_brett_dead` accumulates, `X_brett` falls below the
         dose, ethylphenols end below the un-sulfited control). **535 green** + 5 benchmark, ruff +
         mypy clean. Full record in **DECISIONS → D-40 (pt3)**.
-  - [ ] **pt4** — POF+ yeast opt-in strain + emergent reservoir test.
+  - [x] **pt4 — `YeastPOFDecarboxylation`, POF+ yeast opt-in + emergent reservoir. LANDED 2026-07-06.**
+        Closes the Brett arc + the last M2 physics beat. A POF+ (phenolic-off-flavour-positive) primary
+        *S. cerevisiae* carries the cinnamate decarboxylase — the *same* reaction as
+        `BrettDecarboxylation` (must `hydroxycinnamics` → `vinylphenols` + CO2, carbon-closing 9 = 8 + 1,
+        same routing/species) — but **not** the reductase, so during AF it fills the shared reservoir it
+        cannot drain: with no Brett the `vinylphenols` **strand** (`ethylphenols` stays exactly 0 +
+        VALIDATED), and a later Brett gets a **head start** on the pre-filled reservoir (the emergent
+        yeast/Brett coupling, D-26/D-31 parallel). **Forks (owner-decided):** (1) separate opt-in
+        Process, not a strain-flag (isolability); (2) pure-enable key **`pof_positive`** (binary strain
+        trait; rate stays YAML), **wholly independent of `brett_pitch_gpl`**; (3) carbon routes from
+        `hydroxycinnamics` (forced — same reaction). **Rate flux-coupled** (`EsterSynthesis`/
+        `AcetolactateExcretion` idiom: catalyst = viable yeast `X` via `fermentative_flux_shape`, NOT
+        `X_brett`), so it runs during AF and stops at dryness; **temperature-flat** (no `E_a_pof`, the
+        `AcetolactateExcretion` precedent). **Test-design crux (advisor):** stranding is the PRIMARY
+        headline (timing-independent control-difference); the head-start is an **early-time /
+        time-to-threshold** claim, since conservation forces the *asymptotic* ethylphenols **equal** (same
+        total precursor). New speculative `k_pof_decarb` (2.5e-6 mol/(g·h) → ~49 % of the must
+        hydroxycinnamic pool converted during AF). 8 new `test_brett.py` tests + `test_media.py`
+        `POF_PROCESSES`. **543 green** + 5 benchmark, ruff + mypy clean. Full record in **DECISIONS →
+        D-40 (pt4)**.
 - **Remaining §3.2 byproducts** — diacetyl (VDK, the lager rest), acetaldehyde
       (early transient peak), H₂S (N/S-deficiency signal). Owner chose to build these
       **one Process per commit, diacetyl first** (decision D-26).

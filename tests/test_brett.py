@@ -26,6 +26,7 @@ from fermentation.core.kinetics.brett import (
     BrettDecarboxylation,
     BrettGrowth,
     BrettVinylphenolReduction,
+    YeastPOFDecarboxylation,
     brett_environmental_gate,
 )
 from fermentation.core.kinetics.malolactic import cardinal_temperature_factor
@@ -679,3 +680,197 @@ def test_death_run_conserves_carbon_and_nitrogen():
 
 def test_death_is_speculative():
     assert BrettDeath.tier is Tier.SPECULATIVE
+
+
+# =============================================================================
+# pt4 — YeastPOFDecarboxylation: the POF+ yeast opt-in + emergent reservoir (decision D-40 pt4)
+# =============================================================================
+#
+# Ranked headline-first. The PRIMARY payoff is the STRANDING test
+# (``test_pof_strands_vinylphenols_without_brett``): a POF+ strain (opted in, NO Brett)
+# decarboxylates must hydroxycinnamics into ``vinylphenols`` DURING AF, but - lacking the
+# reductase - cannot take them to ethylphenols, so the reservoir *strands* (``ethylphenols`` stays
+# exactly 0 and VALIDATED). It is the timing-independent control-difference, the parallel of the pt1
+# headline. The SECONDARY payoff is the emergent HEAD START (``test_pof_gives_brett_a_head_start``):
+# a Brett contamination arriving after a POF+ AF finds a pre-filled vinylphenol reservoir and
+# reaches a given 4-EP level SOONER than into a POF-negative wine. That is deliberately an
+# EARLY-TIME (kinetic) claim, NOT an endpoint one: with the same total hydroxycinnamics in both
+# arms, conservation forces the *asymptotic* ethylphenols EQUAL (all hc -> ep eventually), so the
+# difference is only that POF+ has vinylphenol pre-made and ready to reduce. The rest pin the
+# decarboxylase stoichiometry / carbon closure / ``touches``, the flux-coupled guards, the
+# POF-independent-of-Brett compile gate (a POF+ ferment need not have Brett), the default (POF-)
+# isolability, and the ``speculative`` tier.
+
+
+# -- 15. HEADLINE: POF+ fills the reservoir but strands it (no Brett reductase) ---
+
+
+def test_pof_strands_vinylphenols_without_brett():
+    """POF+ yeast makes ``vinylphenols`` during AF; with no Brett they **strand** (ep stays 0).
+
+    The emergent yeast/Brett coupling the 3-pool design was chosen for (the α-acetolactate-reservoir
+    parallel, D-26/D-31). A POF+ strain carries the decarboxylase but not the reductase, so it fills
+    the shared reservoir it cannot drain: ``vinylphenols`` rise and remain, while ``ethylphenols``
+    stays **exactly 0** — nothing reduces vinylphenol without Brett. Tier is the honest consequence:
+    ``vinylphenols`` reports speculative (the enabled POF Process touches it) while ``ethylphenols``
+    stays **VALIDATED at 0** (no enabled Process touches it — the reductase is Brett's, and Brett is
+    absent).
+    """
+    compiled, traj = _run(hydroxycinnamic_gpl=0.1, pof_positive=1.0)  # POF+, no Brett
+
+    vp = traj.series("vinylphenols")
+    ep = traj.series("ethylphenols")
+    hc = traj.series("hydroxycinnamics")
+
+    assert float(np.max(vp)) > 1e-3  # a real reservoir accumulates during AF
+    assert vp[-1] > 0.5 * float(np.max(vp))  # and it STRANDS (no reductase to drain it)
+    assert float(np.max(np.abs(ep))) == 0.0  # no Brett ⇒ no ethylphenols at all
+    assert hc[-1] < 0.9 * hc[0]  # the precursor is genuinely consumed into vinylphenol
+
+    # Tier isolability of the stranding: vinylphenol is touched (speculative); ethylphenol is not.
+    assert compiled.process_set.tier_of("vinylphenols") is Tier.SPECULATIVE
+    assert compiled.process_set.tier_of("ethylphenols") is Tier.VALIDATED
+
+
+# -- 16. SECONDARY: a POF+ AF gives a later Brett a head start (early-time claim) --
+
+
+def _run_brett_pitched_post_af(*, pof: bool, days: float = 120.0, pitch_day: float = 10.0):
+    """Ferment (POF+ or POF-), then pitch Brett post-AF - the head-start comparison's two arms."""
+    interventions = [Intervention(day=pitch_day, action="pitch_brett", params={"pitch_gpl": 0.3})]
+    if pof:
+        return _run(
+            days=days, interventions=interventions, hydroxycinnamic_gpl=0.1, pof_positive=1.0
+        )
+    return _run(days=days, interventions=interventions, hydroxycinnamic_gpl=0.1)
+
+
+def test_pof_gives_brett_a_head_start():
+    """Brett into a POF+ (pre-filled reservoir) wine reaches 4-EP SOONER than into a POF− wine.
+
+    The emergent coupling's winemaking meaning: a POF+ primary ferment hands a subsequent Brett
+    contamination a running start, because the vinylphenol is already made and only needs reducing.
+
+    This is asserted as an **early-time / time-to-threshold** claim, NOT an endpoint one. With the
+    same total hydroxycinnamics in both arms, conservation forces the asymptotic ethylphenols EQUAL
+    (all hc → ep eventually); the POF+ advantage is purely kinetic (vinylphenol pre-made). Asserting
+    higher *final* ep would be wrong — the arms converge.
+    """
+    pitch_day = 10.0
+    _, pos = _run_brett_pitched_post_af(pof=True, pitch_day=pitch_day)
+    _, neg = _run_brett_pitched_post_af(pof=False, pitch_day=pitch_day)
+
+    t = pos.t
+    ep_pos = pos.series("ethylphenols")
+    ep_neg = neg.series("ethylphenols")
+
+    # Early-time: shortly after the pitch the POF+ arm is far ahead (vinylphenol ready to reduce).
+    probe_h = (pitch_day + 3.0) * 24.0
+    ep_pos_early = float(np.interp(probe_h, t, ep_pos))
+    ep_neg_early = float(np.interp(probe_h, t, ep_neg))
+    assert ep_pos_early > 1e-3  # POF+ is already producing 4-EP from the pre-made reservoir
+    assert ep_pos_early > 5.0 * ep_neg_early  # a clear head start over the from-scratch POF− arm
+
+    # Time-to-threshold (half the POF− endpoint): POF+ crosses it comfortably sooner.
+    thr = 0.5 * ep_neg[-1]
+    t_pos = t[np.argmax(ep_pos >= thr)]
+    t_neg = t[np.argmax(ep_neg >= thr)]
+    assert t_pos < t_neg - 5.0 * 24.0  # at least ~5 days sooner
+
+
+# -- 17. per-Process stoichiometry + touches ----------------------------------
+
+
+def test_pof_decarboxylation_stoichiometry_and_touches(schema, params):
+    """Same reaction as Brett's decarboxylase: hc down, vinylphenols + CO₂ up, carbon flux sums 0.
+
+    Catalyst is viable yeast via the fermentative flux (``X``/``S`` present in ``_state``), not
+    ``X_brett`` — so the RHS is nonzero here with no Brett dosed at all.
+    """
+    y = _state(schema, hydroxycinnamics=0.1)  # X=0.1, S=[200] ⇒ fermentative flux > 0, no X_brett
+    d = YeastPOFDecarboxylation().derivatives(0.0, y, schema, params)
+
+    assert d[schema.slice("hydroxycinnamics")][0] < 0.0
+    assert d[schema.slice("vinylphenols")][0] > 0.0
+    assert d[schema.slice("CO2")][0] > 0.0
+    # Carbon flux across the three touched slots must cancel (9 C = 8 C + 1 C).
+    c_flux = (
+        d[schema.slice("hydroxycinnamics")][0] * carbon_mass_fraction("p_coumaric_acid")
+        + d[schema.slice("vinylphenols")][0] * carbon_mass_fraction("vinylphenol")
+        + d[schema.slice("CO2")][0] * carbon_mass_fraction("CO2")
+    )
+    assert c_flux == pytest.approx(0.0, abs=1e-12)
+    assert set(YeastPOFDecarboxylation.touches) == {"hydroxycinnamics", "vinylphenols", "CO2"}
+
+
+# -- 18. guards: flux-coupled, no X_brett needed ------------------------------
+
+
+def test_pof_guards_zero_without_precursor_or_flux(schema, params):
+    """Zero without precursor, and zero post-AF (no fermentative flux: S=0 or dead yeast)."""
+    no_hc = _state(schema, hydroxycinnamics=0.0)
+    assert not np.any(YeastPOFDecarboxylation().derivatives(0.0, no_hc, schema, params))
+
+    no_sugar = _state(schema, hydroxycinnamics=0.1, S=[0.0])  # dryness ⇒ flux 0 ⇒ POF stops
+    assert not np.any(YeastPOFDecarboxylation().derivatives(0.0, no_sugar, schema, params))
+
+    no_yeast = _state(schema, hydroxycinnamics=0.1, X=0.0)  # crashed yeast ⇒ flux 0
+    assert not np.any(YeastPOFDecarboxylation().derivatives(0.0, no_yeast, schema, params))
+
+
+# -- 19. carbon closes with POF active (alone, and alongside Brett) -----------
+
+
+def test_pof_carbon_closes(schema):
+    """total_carbon closes with POF decarboxylation active — alone and composed with Brett."""
+    compiled, traj = _run(hydroxycinnamic_gpl=0.12, pof_positive=1.0)  # POF+ only
+    fn = total_carbon(
+        compiled.schema, biomass_carbon_fraction=compiled.param_values["biomass_C_fraction"]
+    )
+    assert_conserved(traj, fn, label="carbon (POF+)")
+    assert_nonnegative(traj, ("hydroxycinnamics", "vinylphenols", "ethylphenols"))
+
+    # Both decarboxylases active: POF+ yeast and pitched Brett draw the same hydroxycinnamic pool.
+    compiled2, traj2 = _run(hydroxycinnamic_gpl=0.12, pof_positive=1.0, brett_pitch_gpl=0.3)
+    fn2 = total_carbon(
+        compiled2.schema, biomass_carbon_fraction=compiled2.param_values["biomass_C_fraction"]
+    )
+    assert_conserved(traj2, fn2, label="carbon (POF+ and Brett)")
+
+
+# -- 20. isolability: POF- default is inert + keeps VALIDATED tier ------------
+
+
+def test_pof_negative_default_is_inert(schema):
+    """No POF opt-in ⇒ phenol slots stay exactly 0 and keep VALIDATED — byte-for-byte the core.
+
+    A POF-negative wine (the default) must make no vinylphenol even with hydroxycinnamics dosed: the
+    POF Process is disabled at the compile seam, so nothing touches the phenol slots. This is a
+    SEPARATE gate from the Brett pitch — here Brett is also absent, but the POF gate alone suffices.
+    """
+    compiled, traj = _run(hydroxycinnamic_gpl=0.1)  # precursor dosed, POF off, no Brett
+    assert float(np.max(np.abs(traj.series("vinylphenols")))) == 0.0
+    assert float(np.max(np.abs(traj.series("ethylphenols")))) == 0.0
+    assert compiled.process_set.tier_of("vinylphenols") is Tier.VALIDATED
+    assert "yeast_pof_decarboxylation" not in {p.name for p in compiled.process_set.active}
+
+
+def test_pof_gate_is_independent_of_the_brett_pitch(schema):
+    """POF+ enables its decarboxylase with NO Brett pitch; Brett-only leaves POF disabled.
+
+    The two gates are orthogonal (decision D-40 pt4): ``pof_positive`` enables the yeast
+    decarboxylase, ``brett_pitch_gpl`` enables the Brett Processes — neither implies the other.
+    """
+    pof_only, _ = _run(hydroxycinnamic_gpl=0.1, pof_positive=1.0)
+    brett_only, _ = _run(hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.3)
+
+    pof_active = {p.name for p in pof_only.process_set.active}
+    brett_active = {p.name for p in brett_only.process_set.active}
+    assert "yeast_pof_decarboxylation" in pof_active
+    assert "brett_decarboxylation" not in pof_active  # POF+ does not enable Brett
+    assert "yeast_pof_decarboxylation" not in brett_active  # a Brett pitch does not make yeast POF+
+    assert "brett_decarboxylation" in brett_active
+
+
+def test_pof_is_speculative():
+    assert YeastPOFDecarboxylation.tier is Tier.SPECULATIVE

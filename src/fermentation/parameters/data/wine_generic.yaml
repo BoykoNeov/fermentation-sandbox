@@ -985,3 +985,34 @@ E_a_death_brett:
     source: "author estimate; no sourced Arrhenius fit for Brettanomyces death rate - taken equal to E_a_death_mlf / E_a_autolysis (60 kJ/mol), a generic enzymatic/biological-process activation energy (Q10 ~2.3 at 20 C), consistent with warm accelerating and cold slowing cell mortality"
     conditions: "Brettanomyces in wine; temperature factor arrhenius(T, E_a_death_brett, T_ref) on the death rate, = 1 at T_ref (20 C)"
     notes: "Read by BrettDeath. Gives the temperature dependence of Brett mortality so that a warm sulfited wine clears the culture faster and cold PRESERVES it (dormancy) - the physically correct direction the cardinal gamma(T) cannot supply for death (gamma(T) -> 0 in the cold would make cold kill, the opposite of reality). SPECULATIVE: the magnitude is an estimate equal to the MLF death / autolysis E_a; the DIRECTION (warm accelerates, cold preserves) is sound. Uses the shared T_ref (20 C) so the factor is 1 at the wine benchmark temperature, like every other Arrhenius rate."
+
+# -- POF+ YEAST DECARBOXYLASE (wine-only, decision D-40 pt4) -------------------------------------
+# YeastPOFDecarboxylation (fermentation.core.kinetics.brett) is the YEAST half of the volatile-phenol
+# story: a POF+ (phenolic-off-flavour-positive) primary S. cerevisiae strain carries the cinnamate
+# decarboxylase - the SAME reaction as BrettDecarboxylation, drawing must hydroxycinnamics into
+# vinylphenols + CO2 (p-coumaric C9 -> vinylphenol C8 + CO2 C1; carbon closes 9 = 8 + 1) - but NOT
+# the reductase, so it FILLS the shared vinylphenol reservoir it cannot drain. With no Brett the
+# vinylphenols STRAND (nothing reduces them to ethylphenol); a Brett contamination arriving later
+# gets a HEAD START on the pre-filled reservoir (the emergent yeast/Brett coupling, D-26/D-31
+# parallel). Rate:
+#   r = k_pof_decarb * X * S_total/(K_sugar_uptake+S_total) * [hc]/(K_hydroxycinnamic+[hc])
+# FLUX-COUPLED to the yeast's fermentative activity (catalyst = viable X via fermentative_flux_shape,
+# NOT X_brett), so POF decarboxylation runs during active fermentation and STOPS at dryness (S->0) -
+# a primary-fermentation phenomenon. Reuses K_hydroxycinnamic (same whole-cell precursor affinity as
+# Brett) and K_sugar_uptake (the shared fermentative-flux half-saturation). NO Brett SO2/temperature
+# gate (this is yeast metabolism during AF), and TEMPERATURE-FLAT (no E_a_pof: temperature enters via
+# the AF-flux trajectory, the AcetolactateExcretion precedent; no pt4 behaviour needs POF's intrinsic
+# temperature direction, so an unsourced E_a would buy nothing). Enabled by the pof_positive opt-in
+# (a binary strain trait), WHOLLY INDEPENDENT of the Brett pitch; a POF-negative default wine makes
+# no vinylphenol. SPECULATIVE: no per-strain POF decarboxylase rate of this flux-coupled form is
+# sourced (the DIRECTION - POF+ yeast decarboxylates hydroxycinnamics to vinylphenols during AF - is
+# well established, Chatonnet et al. 1992 / 1997; Suarez et al. 2007 review).
+k_pof_decarb:
+  value: 2.5e-6
+  unit: "mol/(g*h)"   # molar hydroxycinnamate turnover per (g/L) fermentative flux: r = k_pof_decarb*flux*Monod
+  tier: speculative
+  uncertainty: { low: 1.0e-6, high: 2.0e-5, note: "order-of-magnitude target: a POF+ yeast converts a PARTIAL fraction (~30-70%) of a typical must hydroxycinnamic pool (~50-150 mg/L) to vinylphenols over the days-long primary fermentation, leaving a real stranded reservoir when Brett is absent (not a near-complete or near-zero conversion). Coupled to the fermentative flux (X*S/(K+S)), which is O(1-10 g/L) during AF, so this scales like the Brett decarboxylase k but off a larger, sugar-linked activity that vanishes at dryness" }
+  provenance:
+    source: "author estimate; POF+ Saccharomyces cerevisiae expresses a cinnamate/ferulic-acid decarboxylase (PAD1/FDC1) that converts hydroxycinnamic acids to vinylphenols during fermentation (Chatonnet et al. 1992, J. Sci. Food Agric. 60:165-178; Chatonnet et al. 1997; Suarez et al. 2007, Food Chem. 102:10-21 - the 4-ethylphenol/POF review). No per-strain flux-coupled rate of this form is sourced"
+    conditions: "POF+ S. cerevisiae in wine during active fermentation, ~20 C; specific decarboxylase activity scaling the biomass-catalysed fermentative flux X*S/(K_sugar_uptake+S)"
+    notes: "Read by YeastPOFDecarboxylation. Set of the same order as k_brett_decarb (both are a lumped whole-cell cinnamate-decarboxylase turnover), but multiplies the fermentative FLUX (O(1-10 g/L) during AF) rather than the dosed X_brett (O(0.1-0.5 g/L)), and shuts off at dryness - so it fills the vinylphenol reservoir during primary fermentation only. Tuned for a partial conversion of the must hydroxycinnamic pool, leaving a stranded reservoir the emergent-coupling test relies on. SPECULATIVE: magnitude an estimate; the direction (POF+ yeast makes vinylphenols during AF) is well established."

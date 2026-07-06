@@ -2830,7 +2830,73 @@ arrhenius(T, E_a_death_brett, T_ref)`, `g_SO₂ = exp(−[SO₂]_molecular / mol
   params `k_death_brett` (0.03/h, below `k_death_mlf` — Brett is more SO₂-tolerant than *O. oeni*) and
   `E_a_death_brett` (60 kJ/mol, = `E_a_death_mlf`/`E_a_autolysis`), both `speculative` (no per-catalyst
   Brett mortality law is sourced; direction — SO₂ kills, cold preserves — is sound). **535 green** +
-  5 benchmark, ruff + mypy clean. pt4 (POF+ yeast opt-in strain + emergent reservoir test) remains.
+  5 benchmark, ruff + mypy clean.
+
+**pt4 — `YeastPOFDecarboxylation`: the POF+ yeast opt-in + emergent reservoir (IMPLEMENTED 2026-07-06).**
+Closes the Brett arc (and Milestone 2's last physics beat). A **POF+** (phenolic-off-flavour-positive)
+primary *S. cerevisiae* strain carries the cinnamate decarboxylase — the *same* reaction as
+`BrettDecarboxylation`, drawing must `hydroxycinnamics` into `vinylphenols` + CO2 (p-coumaric C9 →
+vinylphenol C8 + CO2 C1, carbon-closing 9 = 8 + 1) — but **not** the reductase, so during AF it fills
+the shared `vinylphenols` reservoir it cannot drain. With no Brett the vinylphenols **strand**
+(`ethylphenols` stays 0); a Brett contamination arriving later gets a **head start** on the pre-filled
+reservoir. This is the emergent yeast/Brett coupling the 3-pool design was chosen for (the
+α-acetolactate-reservoir parallel, D-26/D-31), and the advisor's blind-spot fix realised: the union of
+enzymes, with the POF+ yeast decarboxylase a separate opt-in.
+
+- **Fork 1 (Process vs strain-flag) → separate opt-in Process** (settled at D-40; a strain flag baked
+  into the always-on primary set would break byte-for-byte core isolability, prime directive #3). New
+  `YeastPOFDecarboxylation` in `brett.py`, its own wine-only `_POF_PROCESSES` tuple, disabled by
+  default at the compile seam.
+- **Fork 2 (opt-in mechanism) → pure-enable key `pof_positive`** (owner-decided, pros/cons presented;
+  advisor flagged it a genuine fork). POF+ is a *binary strain trait*, so the key only enables the
+  Process (present/>0 ⇒ on); the rate stays the YAML `k_pof_decarb` — chosen over the D-34 autolysis
+  rate-override idiom for fidelity (no physical "half-POF" strain) over pattern-uniformity. The gate is
+  **wholly independent of `brett_pitch_gpl`** (a POF+ ferment need not have Brett; a POF-negative
+  default wine must make no vinylphenol) — a distinct compile-seam branch, `test_pof_gate_is_\
+  independent_of_the_brett_pitch` pins the orthogonality.
+- **Fork 3 (carbon routing) → from `hydroxycinnamics`, identical to `BrettDecarboxylation`** (forced:
+  it *is* the same chemical reaction, yeast-catalysed). Reuses `M_P_COUMARIC`/`M_VINYLPHENOL`/`M_CO2`,
+  `touches=("hydroxycinnamics","vinylphenols","CO2")`, closes on the existing ledger with no new
+  conservation code. When POF+ and Brett are both active they draw the *same* `hydroxycinnamics` pool
+  (both close 9 = 8 + 1) — verified by `test_pof_carbon_closes` (POF+ alone, and POF+ with Brett).
+- **Rate — flux-coupled, a graft of three tested precedents.** `r = k_pof_decarb · X · S/(K_sugar_\
+  uptake+S) · [hc]/(K_hydroxycinnamic+[hc])`: rate structure ← `EsterSynthesis`/`AcetolactateExcretion`
+  (`fermentative_flux_shape`, catalyst = viable yeast, NOT `X_brett`); carbon routing ← `BrettDecarbox\
+  ylation`; gating ← the autolysis opt-in tuple. POF decarboxylation is a *primary-fermentation*
+  phenomenon, so the flux term makes it track fermentative activity and **stop at dryness** (S→0 ⇒
+  rate 0), leaving the reservoir for a later Brett — which is exactly what pre-fills it during AF. Reuses
+  `K_hydroxycinnamic` (same whole-cell precursor affinity as Brett) and `K_sugar_uptake`. **No** Brett
+  SO₂/temperature gate (this is yeast metabolism during AF).
+- **Fork (temperature) → temperature-flat, no `E_a_pof`** (owner-decided). Cites `AcetolactateExcretion`
+  (explicitly T-flat): temperature already enters through the AF-flux trajectory, and no pt4 behaviour
+  needs POF's *intrinsic* temperature direction, so an unsourced `E_a` would buy nothing (prime
+  directive #2). The ester beat carried its own Arrhenius only because temperature was *that* beat's
+  subject.
+- **The test-design crux (advisor-caught, load-bearing).** The **stranding** test is the PRIMARY
+  headline (`test_pof_strands_vinylphenols_without_brett`, the pt1 control-difference parallel): POF+
+  opted in, Brett never pitched ⇒ `vinylphenols` accumulate and strand, `ethylphenols` stays **exactly
+  0 and VALIDATED** (no enabled Process touches it — the reductase is Brett's), while `vinylphenols`
+  honestly reports speculative — timing-independent and unambiguous. The **head-start** comparison
+  (`test_pof_gives_brett_a_head_start`) is the richer SECONDARY test, framed as an **early-time /
+  time-to-threshold** claim, NOT an endpoint one: with the same total hydroxycinnamics in both arms,
+  conservation forces the *asymptotic* ethylphenols **equal** (all hc → ep eventually), so asserting
+  higher *final* ep would be wrong (the arms converge — measured: ~30× ahead at day-12, ~30 days sooner
+  to threshold, but only 1.07× at day-120 as POF− catches up). Asserted at day pitch+3 (POF+ > 5× POF−)
+  and via time-to-threshold.
+- **Empirical tuning.** `k_pof_decarb` = 2.5e-6 mol/(g·h) (speculative) lands ~49 % conversion of a
+  100 mg/L must hydroxycinnamic pool during AF (vp ≈ 36 mg/L stranded, hc_resid ≈ 50 mg/L) — a clean
+  midpoint leaving a real stranded reservoir *and* residual precursor for the head-start arm. Sourced
+  direction (POF+ yeast decarboxylates hydroxycinnamics to vinylphenols during AF — Chatonnet 1992/1997;
+  Suárez 2007 review; PAD1/FDC1); magnitude an estimate.
+- **Isolability + tests.** A POF-negative default run is byte-for-byte the validated core with all three
+  phenol slots VALIDATED (`test_pof_negative_default_is_inert`). **+8 tests** (`test_brett.py`):
+  stranding headline, head-start, decarboxylase stoichiometry/`touches`, flux-coupled guards (no
+  precursor / dryness / dead yeast all → zero), carbon closure (alone + with Brett), the
+  POF-independent-of-Brett gate + default isolability, and the `speculative` tier. `test_media.py`
+  wine kinetic-set gains `yeast_pof_decarboxylation` (a new `POF_PROCESSES` set). New param
+  `k_pof_decarb` (speculative). **543 green** + 5 benchmark, ruff + mypy clean. **D-40 (and the last M2
+  physics beat) complete.** Deferred v2: POF conversion efficiency vs fermentation temperature (would
+  add `E_a_pof`); vinylguaiacol/vinylphenol split (currently lumped, as for Brett).
 
 ## Deferred (decide early in the relevant milestone)
 

@@ -47,6 +47,7 @@ from fermentation.core.kinetics import (
     MalolacticGrowth,
     OenococcusDiacetylReduction,
     YeastAutolysis,
+    YeastPOFDecarboxylation,
 )
 from fermentation.core.kinetics.temperature import RAMP_RATE
 from fermentation.core.media import get_medium
@@ -220,6 +221,12 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "autolysis_rate_per_h",
             "hydroxycinnamic_gpl",
             "brett_pitch_gpl",
+            # pof_positive is a binary POF+ strain opt-in (decision D-40 pt4): present/>0 enables
+            # YeastPOFDecarboxylation (the yeast cinnamate decarboxylase filling vinylphenols during
+            # AF), WHOLLY INDEPENDENT of brett_pitch_gpl. Absent/0 ⇒ a POF-negative wine — the
+            # Process stays disabled and the run is byte-for-byte the validated core. Not a state
+            # slot: it is a compile-time gate only, never packed into y0.
+            "pof_positive",
         }
     ),
     "beer": frozenset(
@@ -1009,6 +1016,20 @@ def compile_scenario(
         for brett_process in _BRETT_GATED_PROCESSES:
             if brett_process.name in process_set:
                 process_set.disable(brett_process.name)
+
+    # POF+ yeast decarboxylase isolability (decision D-40 pt4): YeastPOFDecarboxylation is the yeast
+    # cinnamate decarboxylase filling ``vinylphenols`` from must ``hydroxycinnamics`` during AF.
+    # POF+ is a BINARY STRAIN TRAIT, gated on its own opt-in ``pof_positive`` and WHOLLY INDEPENDENT
+    # of the Brett pitch (a POF+ ferment need not have Brett; a POF-negative wine must make no
+    # vinylphenol). Absent/<=0 => DISABLE it so (a) the empty ``vinylphenols`` slot keeps its
+    # VALIDATED tier - an *enabled* zero-contribution Process would drag it to speculative via
+    # ``tier_of`` - and (b) no wasted flux/Monod recompute is paid on a POF- run, which is then
+    # byte-for-byte the validated core (the Brett-unpitched pattern). Opted in => the Process runs;
+    # ``vinylphenols`` honestly reports speculative, while ``ethylphenols`` stays VALIDATED at 0
+    # unless Brett (the only reductase) is also present - the emergent stranding.
+    pof_positive = float(scenario.initial.get("pof_positive", 0.0) or 0.0)
+    if pof_positive <= 0.0 and YeastPOFDecarboxylation.name in process_set:
+        process_set.disable(YeastPOFDecarboxylation.name)
 
     # Residual-nitrogen floor (decision D-30): the biomass carrying-capacity cap is a
     # deliberate DEPARTURE from the validated Coleman anchor (which caps nothing and strips

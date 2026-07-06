@@ -90,6 +90,7 @@ from fermentation.core.kinetics import (
     SugarUptakeToEthanolCO2,
     TemperatureRamp,
     YeastAutolysis,
+    YeastPOFDecarboxylation,
 )
 from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import StateSchema, VarSpec
@@ -575,6 +576,23 @@ _BRETT_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: inert until Brett is present. Wine-only.
 _BRETT_GROWTH_PROCESSES: tuple[Callable[[], Process], ...] = (BrettGrowth,)
 
+#: POF+ yeast decarboxylase (wine-only, decision D-40 pt4). :class:`YeastPOFDecarboxylation` is the
+#: *yeast* half of the volatile-phenol story: a POF+ (phenolic-off-flavour-positive) primary strain
+#: carries the cinnamate decarboxylase - the same reaction as :class:`BrettDecarboxylation`, drawing
+#: the same ``hydroxycinnamics`` pool 9 = 8 + 1 into ``vinylphenols`` + CO2 - but **not** the
+#: reductase, so it fills the shared reservoir it cannot drain (``vinylphenols`` strand with no
+#: Brett; a later Brett gets a head start on the pre-filled reservoir - the emergent yeast/Brett
+#: coupling, the D-26/D-31 parallel). Flux-coupled to the yeast's fermentative activity (catalyst =
+#: viable ``X``, not ``X_brett``) so it runs during AF and stops at dryness; temperature-flat (the
+#: :class:`~fermentation.core.kinetics.vicinal_diketones.AcetolactateExcretion` precedent). Kept in
+#: its OWN tuple, DELIBERATELY SEPARATE from ``_BRETT_PROCESSES``, because POF+ is a *binary strain
+#: trait* gated on its own opt-in (``pof_positive``), WHOLLY INDEPENDENT of the Brett pitch: a POF+
+#: ferment need not have Brett, and a POF-negative default wine must make no vinylphenol. The
+#: compile seam DISABLES it unless the strain is opted in, so a default (POF-) run is byte-for-byte
+#: validated core and the phenol slots keep their VALIDATED tier (``tier_of`` counts enabled, not
+#: nonzero, Processes - the Brett-unpitched pattern). Wine-only (beer has no phenol slots).
+_POF_PROCESSES: tuple[Callable[[], Process], ...] = (YeastPOFDecarboxylation,)
+
 #: Biomass carrying-capacity cap (wine-only, decision D-30): the opt-in residual-nitrogen
 #: floor. A logistic ``(1 - X/K)`` RateModifier on growth that saturates biomass below the
 #: nitrogen ceiling, leaving a dose-dependent residual of yeast-assimilable nitrogen — which
@@ -670,6 +688,7 @@ MEDIA: dict[str, Medium] = {
             + _MLF_GROWTH_PROCESSES
             + _BRETT_PROCESSES
             + _BRETT_GROWTH_PROCESSES
+            + _POF_PROCESSES
             + _AMINO_ACID_PROCESSES
             + _AUTOLYSIS_PROCESSES
         ),
