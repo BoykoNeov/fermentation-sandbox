@@ -34,7 +34,10 @@ from fermentation.core.kinetics.byproducts import (
 )
 from fermentation.core.kinetics.carrying_capacity import BiomassCarryingCapacity
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited, biomass_growth_rate
-from fermentation.core.kinetics.hydrogen_sulfide import HydrogenSulfideProduction
+from fermentation.core.kinetics.hydrogen_sulfide import (
+    HydrogenSulfideProduction,
+    HydrogenSulfideVolatilization,
+)
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
 from fermentation.core.kinetics.malolactic import (
@@ -77,6 +80,7 @@ __all__ = [
     "FuselAminoAcidReroute",
     "GrowthNitrogenLimited",
     "HydrogenSulfideProduction",
+    "HydrogenSulfideVolatilization",
     "MalolacticCitrateMetabolism",
     "MalolacticConversion",
     "MalolacticDeath",

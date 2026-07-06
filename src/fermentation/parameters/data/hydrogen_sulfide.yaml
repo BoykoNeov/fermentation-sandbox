@@ -38,10 +38,12 @@
 # magnitudes are the author's estimates.
 #
 # SCOPE (v1) / HONEST CAVEATS:
-#   * PRODUCED-ONLY. No CO2-stripping volatilization sink yet, so the h2s pool is CUMULATIVE
-#     H2S PRODUCED, which OVERSTATES residual (real fermentation sweeps most H2S out with the
-#     CO2 stream, leaving ug/L residuals). A stripping sink is the deferred follow-up — the
-#     ester D-19 (produced-only) -> D-20 (Henry's-law sink) precedent.
+#   * RESIDUAL vs CUMULATIVE (D-42). The CO2-stripping sink (HydrogenSulfideVolatilization) now
+#     sweeps most H2S out with the CO2 stream, so the h2s pool is the RESIDUAL (dissolved, ug/L)
+#     H2S reality shows, and h2s + h2s_gas is cumulative produced. Carbon-free, so BOTH pools are
+#     on NO ledger and the liquid->gas transfer is neutral by construction (contrast esters_gas,
+#     weighted in total_carbon). The ester D-19 (produced-only) -> D-20/D-21 (Henry's-law sink)
+#     precedent, but simpler (no weighting). See the STRIPPING section below.
 #   * THE CROSS-MUST YAN LEVER IS MUTED by an upstream model gap. The defining real behaviour
 #     (a low-YAN must makes far more H2S than a high-YAN one) is only PARTIALLY reproduced,
 #     because the nitrogen model strips N to ~0 early (~day 1.3) REGARDLESS OF DOSE (no
@@ -71,3 +73,45 @@ K_h2s_n:
     source: "author estimate on the YAN scale; H2S risk rises sharply below ~140-150 mg/L YAN (Ugliano et al. 2009; Henschke & Jiranek nitrogen reviews)"
     conditions: "generic yeast; nitrogen-repression half-saturation for the INVERSE gate K_h2s_n/(K_h2s_n+N) (gate ~0 when N replete, -> 1 as N -> 0)"
     notes: "DELIBERATELY DISTINCT from the growth K_n (0.0088 g/L): reusing that would make a razor-edge gate opening only in a thin sliver at near-zero N. The YAN-scale constant makes the repression smooth across a must's nitrogen range. Magnitude speculative; the muted cross-must lever (see file header) is an upstream N-stripping gap, not this value."
+
+# -- STRIPPING: dissolved H2S -> headspace, swept out by the CO2 stream (decision D-42) ----
+# A Henry's-law CO2-stripping sink, the exact structural mirror of EsterVolatilization
+# (D-20/D-21) but CARBON-FREE, so simpler (neither h2s nor h2s_gas is on any ledger, so the
+# liquid->gas transfer needs no weighting to stay neutral). H2S is FAR more volatile than ethyl
+# acetate, so the CO2 stream sweeps ~all of it out, leaving the ug/L RESIDUAL reality shows
+# (this lifts the D-29 produced-only overstatement):
+#
+#   d(h2s)/dt -= k_h2s_volatil * X*S/(K_sugar_uptake+S) * f_gas(T) * f_part(T) * h2s   (into h2s_gas)
+#     f_gas(T)  = arrhenius(T, E_a_uptake)     -> the CO2 GAS-FLOW factor (rides the CO2 stream)
+#     f_part(T) = arrhenius(T, dH_h2s_volatil) -> the gas/liquid PARTITION (van't Hoff Henry's-law)
+#
+# Because production AND stripping share the fermentative flux, the RESIDUAL quasi-steady-state
+#   h2s_ss = k_h2s * gate / (k_h2s_volatil * f_gas * f_part)
+# has the FLUX CANCEL: residual H2S tracks the inverse-N gate and temperature, NOT the ferment
+# speed. It RISES as N depletes (gate opens) then FREEZES at dryness (both terms gate off with
+# the flux). MEDIUM-AGNOSTIC (one physical mechanism), so both constants live here in the shared
+# file (no per-medium split, unlike the ester dH whose SYNTHESIS direction differs by beverage).
+# HONESTY: production is held temperature-flat (D-29) while stripping RISES with T, so the model
+# predicts residual H2S FALLS with a warmer ferment - physically reasonable (warm purges sulfide)
+# but UNBENCHMARKED and reality is mixed (warmth also raises production/N-demand, held flat here);
+# directional/speculative only.
+
+k_h2s_volatil:
+  value: 1.0
+  unit: "L/(g*h)"   # d(h2s)/dt -= k_h2s_volatil * flux[g/L] * f_gas * f_part * h2s[g/L]
+  tier: speculative
+  uncertainty: { low: 0.2, high: 5.0, note: "sets the absolute stripping magnitude; at T_ref with the gate open, residual h2s_ss = k_h2s/k_h2s_volatil = 2e-6/1.0 = 2 ug/L against ~0.5-1 mg/L produced (~99.8% stripped) - the ug/L residual reality shows; order-of-magnitude target, the T-dependence is physical (E_a_uptake + dH_h2s_volatil)" }
+  provenance:
+    source: "author estimate; sized so the residual dissolved H2S sits at the ug/L sensory scale (threshold ~1-2 ug/L; Rauhut; Swiegers et al. 2005) while cumulative produced stays at the ~mg/L D-29 magnitude - i.e. ~99%+ of produced H2S is swept out by the CO2 stream, as real ferments do"
+    conditions: "generic yeast/ferment; H2S stripping coupled to the biomass-catalysed CO2-evolution (fermentative) flux, shared K_sugar_uptake; first-order in dissolved h2s"
+    notes: "Read by HydrogenSulfideVolatilization as the absolute stripping coefficient (folds the CO2 gas-volume prefactor and the Henry's-law efficiency into one number, since the bare flux shape omits them). The T-DEPENDENCE is physical+sourced (E_a_uptake gas flow + dH_h2s_volatil partition); this constant only sets the MAGNITUDE. Far larger than k_ester_volatil (~5e-3) because H2S is far more volatile than ethyl acetate. SPECULATIVE order-of-magnitude target."
+
+dH_h2s_volatil:
+  value: 17500.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 16600.0, high: 19100.0, note: "H2S gas/liquid partition enthalpy from Sander -d(ln kH)/d(1/T) = 2000-2300 K across sources => 16.6-19.1 kJ/mol; midpoint ~2100 K -> ~17.5 kJ/mol. A PHYSICAL Henry's-law volatility value (Q10 ~ 1.3), not a fitted lever. Weaker than the ester's +45 kJ/mol" }
+  provenance:
+    source: "H2S Henry's-law solubility constant temperature dependence -d(ln kH)/d(1/T) ~ 2000-2300 K (Sander, Compilation of Henry's law constants, doi:10.5194/acp-15-4399-2015; sources incl. Wilhelm et al. 1977, Carroll & Mather 1989, De Bruyn et al. 1995) => dissolution enthalpy ~ -17.5 kJ/mol (exothermic) => gas/liquid partition RISES with T with effective enthalpy ~ +17.5 kJ/mol"
+    conditions: "H2S, gas/liquid (air/water) partition; van't Hoff form anchored at the medium's T_ref"
+    notes: "Sets how steeply the H2S gas/liquid partition (Henry's-law constant) rises with temperature - the PHYSICAL volatility lever (the same role dH_ester_volatil plays for esters, D-21). H2S dissolution is EXOTHERMIC (-d ln kH/d(1/T) ~ 2100 K, Sander), so the air/water partition coefficient rises with T with effective enthalpy ~ +17.5 kJ/mol (Q10 ~ 1.3) - a real, physical Henry's-law value. MEDIUM-INDEPENDENT (a property of the molecule): unlike esters there is no per-medium split, since H2S has no medium-dependent synthesis direction to carry. The enthalpy magnitude is sourced; SPECULATIVE tier because the abs-value transfer into this lumped stripping model (like dH_ester_volatil) is not separately validated."

@@ -457,6 +457,25 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         makes ~1.8× more H₂S by day 1 despite *less* biomass. SCOPE: produced-only (cumulative
         produced, overstates residual; CO₂-stripping sink deferred — the D-19→D-20 precedent).
         15 new tests; **364 green** + 5 benchmark, ruff+mypy clean.
+  - [x] **H₂S CO₂-stripping sink — `HydrogenSulfideVolatilization` (decision D-42). LANDED
+        2026-07-06.** Lifts the D-29 produced-only overstatement: a flux-linked, first-order
+        Henry's-law sink sweeps the volatile `h2s` into a new carbon-free `h2s_gas` headspace pool
+        on the CO₂ stream (`-k_h2s_volatil·flux·f_gas(E_a_uptake)·f_part(dH_h2s_volatil)·h2s`), so
+        `h2s` is now the µg/L **residual** reality shows and `h2s + h2s_gas` is cumulative produced.
+        The **exact ester D-20/D-21 precedent** but **carbon-free** ⇒ *simpler* (both pools on no
+        ledger, transfer neutral by construction — **no `conservation.py` change**; the produced-
+        total invariant replaces the ester carbon-closure test). **Flux cancels in the residual**
+        (`h2s_ss = k_h2s·gate/(k_h2s_volatil·f_gas·f_part)`) ⇒ residual tracks the gate + T, rises
+        as N depletes then freezes at dryness. New speculative `k_h2s_volatil=1.0 L/(g·h)` (→ ~99.7%
+        stripped, residual 3.73/2.00/0.91 µg/L @ 14/20/28 °C) + **sourced** `dH_h2s_volatil=17.5
+        kJ/mol` (Sander −d ln kH/d(1/T) ≈ 2100 K; exothermic ⇒ +sign, Q10 ≈ 1.3). Honest artifact
+        flagged: T-flat production + T-rising stripping ⇒ residual *falls* with a warmer ferment
+        (unbenchmarked, directional only). Always-on both media in `_H2S_PROCESSES`; params in the
+        shared `hydrogen_sulfide.yaml` (medium-agnostic). New `h2s_gas` slot (wine 32→33, beer
+        19→20). 8 new sink tests + flipped run-level assertions (h2s→h2s+h2s_gas across
+        `test_hydrogen_sulfide`/`test_carrying_capacity`/`test_interventions`). **561 green** + 5
+        benchmark, ruff+mypy clean. Full record in **DECISIONS → D-42**. **The §3.2 aroma beat is
+        complete; Milestone 2 physics closes.**
   - [x] **Residual-nitrogen floor — opt-in biomass carrying-capacity cap (decision D-30).
         LANDED 2026-07-01.** Closes the nitrogen gap that muted D-29: growth is the sole N sink
         and strips YAN to ~0 by day ~1.3 regardless of dose. New `BiomassCarryingCapacity`

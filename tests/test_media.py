@@ -9,7 +9,7 @@ from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine
 
 SHARED = (
     "X", "S", "E", "N", "T", "CO2", "X_dead", "Gly", "Byp", "esters", "fusels", "esters_gas",
-    "acetolactate", "diacetyl", "butanediol", "acetaldehyde", "h2s",
+    "acetolactate", "diacetyl", "butanediol", "acetaldehyde", "h2s", "h2s_gas",
 )  # fmt: skip
 
 
@@ -45,13 +45,14 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_BRETT_SLOTS
     )
     assert schema.spec("S").size == 1
-    # 17 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
+    # 18 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
     # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
-    # h2s, D-29) + 3 wine-only acid slots + citrate (D-31) + cation_charge (D-18)
-    # + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead slots (D-23 catalyst / D-39 bacterial lees)
-    # + 1 amino_acids slot (D-32) + 1 debris slot (D-34) + 5 Brett slots (hydroxycinnamics,
-    # vinylphenols, ethylphenols, X_brett, X_brett_dead — decision D-40)
-    assert schema.size == 32
+    # h2s + h2s_gas, D-29 production / D-42 CO2-stripping sink) + 3 wine-only acid slots
+    # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead
+    # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
+    # (D-34) + 5 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols, X_brett,
+    # X_brett_dead — decision D-40)
+    assert schema.size == 33
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -61,8 +62,9 @@ def test_beer_schema_has_three_sequential_sugars():
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
     # X, S(3), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20),
-    # acetolactate, diacetyl, butanediol (VDK pathway, D-26), acetaldehyde (D-27), h2s (D-29)
-    assert schema.size == 19
+    # acetolactate, diacetyl, butanediol (VDK pathway, D-26), acetaldehyde (D-27),
+    # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink)
+    assert schema.size == 20
 
 
 def test_shared_variable_units_are_canonical():
@@ -88,6 +90,7 @@ def test_shared_variable_units_are_canonical():
         "butanediol": "g/L",
         "acetaldehyde": "g/L",
         "h2s": "g/L",
+        "h2s_gas": "g/L",
     }
 
 
@@ -184,10 +187,12 @@ VDK_PROCESSES = {
     "diacetyl_reduction",
 }
 ACETALDEHYDE_PROCESSES = {"acetaldehyde_production", "acetaldehyde_reduction"}
-# Hydrogen-sulfide production (decision D-29): the low-nitrogen sulfidic off-aroma, one
-# flux-linked producer with an inverse-N gate. Intrinsic yeast metabolism, so — like the
-# ester/VDK/acetaldehyde pools — wired into BOTH media by default (isolable but always on).
-H2S_PROCESSES = {"hydrogen_sulfide_production"}
+# Hydrogen-sulfide production + CO₂-stripping (decisions D-29 / D-42): the low-nitrogen sulfidic
+# off-aroma. A flux-linked producer with an inverse-N gate (D-29), plus the Henry's-law stripping
+# sink that sweeps volatile H₂S into the h2s_gas headspace pool (D-42, the ester D-20/D-21
+# precedent). Intrinsic yeast metabolism, so — like the ester/VDK/acetaldehyde pools — both are
+# wired into BOTH media by default (isolable but always on).
+H2S_PROCESSES = {"hydrogen_sulfide_production", "hydrogen_sulfide_volatilization"}
 # Temperature-schedule ramp (decision D-35): drives T along a piecewise-linear schedule.
 # Medium-agnostic, so wired into BOTH media, and always enabled (it reads the slope with a
 # 0.0 isothermal default, so an un-ramped run is byte-for-byte the pre-ramp core).

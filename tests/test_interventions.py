@@ -128,12 +128,19 @@ def _rate_at(rate: np.ndarray, t_axis: np.ndarray, day: float) -> float:
     return float(rate[np.argmin(np.abs(t_axis - day * 24.0))])
 
 
+def _produced_h2s(traj: ScheduledTrajectory) -> np.ndarray:
+    # Cumulative H₂S produced = residual (h2s) + swept-to-gas (h2s_gas). The D-42 CO2-stripping
+    # sink holds the residual pool at a quasi-steady µg/L level, so the PRODUCTION RATE is the
+    # gradient of the produced SUM, not of the residual pool alone.
+    return np.asarray(traj.series("h2s")) + np.asarray(traj.series("h2s_gas"))
+
+
 def test_mid_ferment_dap_dose_drops_the_h2s_production_rate():
     undosed, dosed = _run_pair()
     # The dosed run has an extra grid point (the inserted day-2 breakpoint), so each run's
     # production rate is differenced against its OWN time axis.
-    rate_u = np.gradient(undosed.series("h2s"), undosed.t)
-    rate_d = np.gradient(dosed.series("h2s"), dosed.t)
+    rate_u = np.gradient(_produced_h2s(undosed), undosed.t)
+    rate_d = np.gradient(_produced_h2s(dosed), dosed.t)
 
     # Just before the day-2 dose the two runs are identical (same N history); just after, the
     # restored N re-represses the inverse gate K_h2s_n/(K_h2s_n+N) while sugar (the flux the
@@ -152,8 +159,10 @@ def test_dap_dose_lowers_net_cumulative_h2s():
     # Net over the whole ferment the gate closure dominates the competing extra-biomass flux
     # (more N ⇒ more growth ⇒ more flux later), so a DAP addition reduces total H₂S — the
     # realistic direction (DAP is the standard H₂S-management lever). This is EMERGENT, not
-    # imposed: the model has no explicit "DAP lowers H₂S" term (decision D-36 / D-29).
-    assert dosed.series("h2s")[-1] < undosed.series("h2s")[-1]
+    # imposed: the model has no explicit "DAP lowers H₂S" term (decision D-36 / D-29). Read
+    # cumulative PRODUCED (h2s + h2s_gas), since the D-42 stripping sink now splits produced H₂S
+    # between the residual and headspace pools.
+    assert _produced_h2s(dosed)[-1] < _produced_h2s(undosed)[-1]
 
 
 # -- add_so2: lands on so2_total, rides neither elemental ledger ---------------

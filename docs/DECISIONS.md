@@ -2959,6 +2959,85 @@ control difference in which senescence cancels); `test_media` wine kinetic-set g
 Deferred further-v2: ethanol/starvation modulation of the baseline; a `BrettSenescence` twin (the same
 pattern) for the D-40 arc.
 
+## D-42 — H₂S CO₂-stripping sink (`HydrogenSulfideVolatilization`): residual vs cumulative produced
+
+**Status: IMPLEMENTED 2026-07-06** (561 green + 5 benchmark, ruff + mypy clean). The D-29 forward
+note's deferred follow-up, and the last open item on the aroma beat: H₂S production (D-29) was
+**produced-only**, so the `h2s` pool was *cumulative produced* (~0.5–1 mg/L) and **overstated
+residual** — real fermentation sweeps ~all H₂S out with the CO₂ stream, leaving the µg/L residuals
+the sensory threshold (~1–2 µg/L) sits on. This beat adds the CO₂-stripping sink that lifts the
+overstatement, the **exact ester D-20/D-21 precedent** (Henry's-law gas stripping) but **carbon-free**,
+so *simpler*: neither pool is on any conservation ledger, so the liquid→gas transfer is neutral by
+construction (no weighting, unlike `esters`→`esters_gas` in `total_carbon`).
+
+**The mechanism — a flux-linked, first-order Henry's-law sink (the ester mirror).**
+`HydrogenSulfideVolatilization` (in `core/kinetics/hydrogen_sulfide.py`) moves dissolved `h2s` into a
+new carbon-free `h2s_gas` headspace pool:
+
+    d(h2s)/dt = -k_h2s_volatil · X·S/(K_sugar_uptake+S) · f_gas(T) · f_part(T) · h2s   (into h2s_gas)
+      f_gas(T)  = arrhenius(T, E_a_uptake)     — the CO₂ GAS-FLOW factor (stripping rides the CO₂ stream)
+      f_part(T) = arrhenius(T, dH_h2s_volatil) — the gas/liquid PARTITION (van't Hoff Henry's-law)
+
+* **First-order in dissolved H₂S, flux-linked, stops at dryness** (`flux → 0`), exactly the ester
+  sink: all produced H₂S is co-temporal with a CO₂ stream that can strip it (production is likewise
+  flux-linked). The problematic *post-fermentation / autolytic* H₂S that persists **because** no CO₂
+  sweeps it is out of scope (the ester sink's omission of slow passive post-cap evaporation).
+* **The flux cancels in the residual (the load-bearing structural point, advisor-confirmed).** Because
+  production and stripping share the fermentative flux, the residual quasi-steady-state
+  `h2s_ss = k_h2s·gate / (k_h2s_volatil·f_gas·f_part)` has the flux **cancel** — residual H₂S tracks
+  the inverse-N gate and temperature, **not the ferment speed**. It **rises as `N` depletes** (the gate
+  opens) then **freezes at dryness** (both terms gate off with the flux together). Verified empirically:
+  residual rises monotonically to a plateau then holds (final == running max).
+
+**Magnitude (prototyped to the physical anchor).** `k_h2s_volatil` = **1.0 L/(g·h)** (speculative)
+sizes the stripping so residual sits at the µg/L sensory scale while cumulative produced stays at the
+D-29 mg/L magnitude: at `T_ref` with the gate open, `h2s_ss = k_h2s/k_h2s_volatil = 2e-6/1.0 = 2 µg/L`
+against ~0.5–1 mg/L produced ⇒ **~99.6–99.7 % stripped** (verified: residual 3.73 / 2.00 / 0.91 µg/L,
+produced 0.89 / 0.56 / 0.31 mg/L at 14/20/28 °C). ~100× the ester coefficient (5e-3) — physically right,
+H₂S is far more volatile than ethyl acetate.
+
+**`dH_h2s_volatil` sourced, value AND sign (advisor sharpening #2 — the one figure not recalled).**
+`dH_h2s_volatil` = **17 500 J/mol** (plausible-in-form/speculative-magnitude), from the Sander Henry's-law
+compilation (doi:10.5194/acp-15-4399-2015): −d ln kH/d(1/T) ≈ **2000–2300 K** across sources (Wilhelm
+1977, Carroll & Mather 1989, De Bruyn 1995), midpoint ~2100 K ⇒ dissolution enthalpy ~−17.5 kJ/mol
+(**exothermic** ⇒ Henry volatility **rises** with T), so a **positive** dH in `arrhenius_factor` (same
+sign as the ester's +45 kJ/mol, weaker lever, Q10 ≈ 1.3). **Honesty consequence flagged:** production is
+held T-flat (D-29) while stripping rises with T, so the model emits an emergent *"residual H₂S falls with
+a warmer ferment"* (3.73 → 0.91 µg/L, 14 → 28 °C). Physically reasonable (warm ferments purge sulfide)
+but **unbenchmarked** and reality is mixed (warmth also raises production / N-demand, held flat here) —
+tagged directional/speculative and named as an artifact of the T-flat production choice.
+
+**Isolability + conservation (advisor sharpening #1 — the ledger trap avoided).** Both `h2s` and `h2s_gas`
+are carbon-free and on **no** ledger (unlike `esters_gas`, which *is* weighted in `total_carbon`), so the
+transfer is neutral on every conservation sum **by construction** — **no `conservation.py` change**. The
+carbon-closure test is *not* ported; its replacement is the produced-total invariant:
+`h2s + h2s_gas` (sink on) equals the sink-off `h2s` trajectory to ~1e-5 (`test_produced_total_is_invariant_
+to_stripping`). Isolability holds two ways: dropping the whole `_H2S_PROCESSES` tuple leaves every other
+column byte-for-byte (nothing reads `h2s`/`h2s_gas`); dropping **just** the sink recovers the D-29
+produced-only `h2s` byte-for-byte (`h2s_gas` stays exactly 0). Both are **always-on in both media** (the
+ester/VDK/acetaldehyde intrinsic-metabolism pattern) — the sink Process joins the producer in
+`_H2S_PROCESSES`. **Params in the shared `hydrogen_sulfide.yaml`** (medium-agnostic — one physical
+mechanism, no per-medium split, unlike the ester `dH` whose *synthesis* direction differs by beverage).
+
+**Tier.** The sink Process is **plausible** in form (CO₂-stripping by the evolving gas is well-understood
+Henry's-law physics, the standard explanation for the µg/L residual), with speculative rate params that
+cap `h2s`/`h2s_gas` at speculative via parameter-tier propagation (D-1) — no headline change (`h2s` was
+already speculative from production; `h2s_gas` is a fresh pool nothing reads, so no other column's tier
+drops).
+
+**Schema + the v1 assertions that flip (advisor sharpening #3).** New `h2s_gas` slot in `_common_specs`
+(both media: wine schema 32→33, beer 19→20). New `test_hydrogen_sulfide.py` sink section (+8): the neutral
+liquid→gas transfer, first-order-in-`h2s`, stop-at-dryness, the ≥0 guard, the physical T-partition lever,
+the produced-total invariant, residual-rises-then-freezes-and-produced-plateaus, and residual-falls-with-a-
+warmer-ferment. **Flipped run-level assertions updated, not weakened** — every place that read `h2s` meaning
+"produced" now reads `h2s + h2s_gas`: the ex-`..._produced_only_and_plateaus` test becomes the residual/
+produced split; the low-YAN-early and muted-cross-must levers (`test_hydrogen_sulfide`), the D-30
+cap-restores-the-lever (`test_carrying_capacity`), and the two DAP-intervention H₂S tests
+(`test_interventions` — production *rate* is now the gradient of the produced sum). **The §3.2 aroma beat
+is complete** (esters, fusels, VDK/diacetyl, acetaldehyde, SO₂ free/bound speciation, H₂S production +
+stripping); Milestone 2 physics closes. Deferred: the post-fermentation / autolytic H₂S source (persists
+un-stripped); a copper-binding / mercaptan model.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -2967,11 +3046,11 @@ pattern) for the D-40 arc.
 - ~~**Stochastic ensemble API**~~ — **decided in D-24 and IMPLEMENTED 2026-07-01**
   (`runtime/ensemble.py`): triangular Monte-Carlo over the `Uncertainty` bands, scoped to
   the active Process set's reads, nominal + median + P5/P95 band, per-member conservation.
-- **H₂S CO₂-stripping volatilization sink** (D-29 follow-up): H₂S is currently produced-only,
-  so the `h2s` pool is *cumulative produced* and overstates residual (real H₂S is largely swept
-  out by the CO₂ stream to µg/L). Add a Henry's-law/gas-flow stripping sink into an `h2s_gas`
-  bookkeeping pool — the exact ester D-19 → D-20 precedent (but simpler: carbon-free, so no
-  ledger weighting).
+- ~~**H₂S CO₂-stripping volatilization sink**~~ (D-29 follow-up) — **decided + IMPLEMENTED in
+  D-42 (2026-07-06)**: `HydrogenSulfideVolatilization` sweeps the volatile `h2s` into a new
+  carbon-free `h2s_gas` headspace pool on the CO₂-evolution flux, so `h2s` is now the µg/L
+  *residual* reality shows and `h2s + h2s_gas` is cumulative produced. The exact ester D-20/D-21
+  precedent but simpler (carbon-free ⇒ no ledger weighting). See D-42.
 - ~~**Residual-nitrogen / satiation floor**~~ — **partially addressed in D-30** (opt-in biomass
   carrying-capacity cap): a scenario passing `carrying_capacity_gpl` leaves dose-dependent residual
   YAN and restores the D-29 H₂S lever. **Still deferred:** a *default-on* residual-N model, which is

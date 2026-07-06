@@ -210,6 +210,13 @@ def _final_mgl(traj, name: str) -> float:
     return float(traj.series(name)[-1]) * 1000.0
 
 
+def _final_produced_h2s_mgl(traj) -> float:
+    # Cumulative H₂S produced = residual (h2s) + swept-to-gas (h2s_gas); the D-42 CO2-stripping
+    # sink splits produced between the two pools, so the cross-must LEVER (a produced quantity)
+    # reads the sum, not the µg/L residual pool alone.
+    return float(traj.series("h2s")[-1] + traj.series("h2s_gas")[-1]) * 1000.0
+
+
 def test_default_compile_disables_the_cap():
     # No carrying_capacity_gpl ⇒ the modifier is present (wired into wine) but DISABLED, so an
     # undosed run is the validated core.
@@ -274,8 +281,8 @@ def test_cap_restores_the_h2s_cross_must_lever():
     # residual N, so the gate stays partly shut at high YAN ⇒ H₂S is monotonically ordered by
     # dose and its span widens materially versus the core. Asserted as ordering + ratio (not
     # brittle absolute values — speculative-on-speculative).
-    core = {yan: _final_mgl(_run(yan)[0], "h2s") for yan in (80.0, 150.0, 300.0)}
-    cap = {yan: _final_mgl(_run(yan, cap_gpl=2.5)[0], "h2s") for yan in (80.0, 150.0, 300.0)}
+    core = {yan: _final_produced_h2s_mgl(_run(yan)[0]) for yan in (80.0, 150.0, 300.0)}
+    cap = {yan: _final_produced_h2s_mgl(_run(yan, cap_gpl=2.5)[0]) for yan in (80.0, 150.0, 300.0)}
 
     # Monotone in dose: less nitrogen ⇒ more sulfide.
     assert cap[80.0] > cap[150.0] > cap[300.0]

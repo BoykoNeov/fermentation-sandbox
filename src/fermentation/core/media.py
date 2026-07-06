@@ -34,8 +34,11 @@ The shared variables (decisions D-B / D-4):
     butanediol 2,3-butanediol    g/L (flavour-inactive diacetyl-reduction product — D-26)
     acetaldehyde acetaldehyde    g/L (main-pathway intermediate; transient ethanol-carbon
                                  buffer, produced then reduced back to ethanol — D-27)
-    h2s      hydrogen sulfide     g/L (sulfidic "rotten egg" off-aroma; produced-only,
-                                 de-repressed at low nitrogen; carbon-free — decision D-29)
+    h2s      hydrogen sulfide     g/L (sulfidic "rotten egg" off-aroma; the *residual*
+                                 dissolved pool, de-repressed at low nitrogen; carbon-free
+                                 — decisions D-29 production / D-42 CO2-stripping sink)
+    h2s_gas  H2S swept to gas     g/L (headspace bookkeeping; h2s + h2s_gas = cumulative
+                                 produced; carbon-free, on no ledger — decision D-42)
     citrate  citric acid          g/L (wine-only must input; O. oeni co-metabolises it into
                                  MLF-derived diacetyl; carbon-active, not charge-active — D-31)
 
@@ -82,6 +85,7 @@ from fermentation.core.kinetics import (
     FuselAminoAcidReroute,
     GrowthNitrogenLimited,
     HydrogenSulfideProduction,
+    HydrogenSulfideVolatilization,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
     MalolacticDeath,
@@ -172,8 +176,17 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             "h2s",
             "g/L",
             default=0.0,
-            description="hydrogen sulfide (H2S) — 'rotten egg' sulfidic off-aroma; produced-only "
-            "pool, de-repressed at low yeast-assimilable nitrogen; carbon-free (D-29)",
+            description="hydrogen sulfide (H2S) — 'rotten egg' sulfidic off-aroma; the *residual* "
+            "(dissolved) pool, de-repressed at low yeast-assimilable nitrogen; carbon-free "
+            "(D-29 production; D-42 CO2-stripping sink makes this residual, not cumulative)",
+        ),
+        VarSpec(
+            "h2s_gas",
+            "g/L",
+            default=0.0,
+            description="hydrogen sulfide swept out of the liquid by the CO2 stream "
+            "(headspace bookkeeping pool; carbon-free, on no ledger; h2s + h2s_gas is "
+            "cumulative H2S produced — decision D-42)",
         ),
     ]
 
@@ -478,24 +491,30 @@ _ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
     AcetaldehydeReduction,
 )
 
-#: Hydrogen-sulfide production (Milestone 2, decision D-29): the low-nitrogen "rotten egg"
-#: off-aroma, one flux-linked producer gated by an *inverse*-nitrogen term. Kept as its own
-#: isolable tuple (prime directive #3): a ProcessSet built without it is the prior core. Like
-#: the ester/VDK/acetaldehyde pools (and unlike the *dosed* MLF organism), H₂S is intrinsic
-#: yeast metabolism, so it is wired into BOTH media and runs on every default ferment. This is
-#: the most isolable beat in the model: H₂S is CARBON-FREE (on no conservation ledger) and the
-#: Process touches ONLY ``h2s`` while merely *reading* ``X``/``S``/``N`` — so disabling it
-#: leaves the RHS of every other column byte-for-byte identical (no ``h2s`` consumer exists to
-#: feed anything back); the integrated trajectory then differs only by a ~1e-7 adaptive-solver
-#: mesh artifact, cleaner than the acetaldehyde buffer's *genuine* second-order E→viability
-#: coupling (D-27).
-#: No tier headline either: it writes a fresh pool nothing reads, so no other column's
-#: structural tier drops (contrast the D-26 ``CO2`` / D-27 ``E`` cases). Params live in the
-#: shared, medium-agnostic ``hydrogen_sulfide.yaml`` (sulfate-reduction is generic yeast
-#: metabolism). SCOPE (v1): produced-only (the CO₂-stripping sink is the deferred follow-up,
-#: the ester D-19→D-20 precedent), so ``h2s`` is cumulative-produced (overstates residual);
-#: and the cross-must YAN lever is muted by the upstream N→0 stripping gap (decision D-29).
-_H2S_PROCESSES: tuple[Callable[[], Process], ...] = (HydrogenSulfideProduction,)
+#: Hydrogen-sulfide production + CO₂-stripping (Milestone 2, decisions D-29 / D-42): the
+#: low-nitrogen "rotten egg" off-aroma. :class:`HydrogenSulfideProduction` (D-29) is one
+#: flux-linked producer gated by an *inverse*-nitrogen term; :class:`HydrogenSulfideVolatilization`
+#: (D-42) is the CO₂-stripping sink that sweeps the volatile H₂S out of the liquid ``h2s`` pool
+#: into the ``h2s_gas`` headspace pool as the ferment sparges CO₂ — so ``h2s`` is now the
+#: *residual* (dissolved, µg/L) pool and ``h2s + h2s_gas`` is cumulative produced (the ester
+#: D-19→D-20→D-21 precedent, but carbon-free, so *simpler*: neither pool is on any ledger).
+#: Kept as their own isolable tuple (prime directive #3): a ProcessSet built without it is the
+#: prior core, and dropping *just* the sink recovers the D-29 produced-only ``h2s`` byte-for-byte
+#: (``h2s_gas`` stays 0). Like the ester/VDK/acetaldehyde pools (and unlike the *dosed* MLF
+#: organism), H₂S is intrinsic yeast metabolism, so both run on every default ferment in BOTH
+#: media. This is the most isolable beat in the model: H₂S is CARBON-FREE (on no conservation
+#: ledger) and the Processes touch ONLY ``h2s``/``h2s_gas`` while merely *reading* ``X``/``S``/
+#: ``N``/``T`` — so disabling them leaves the RHS of every other column byte-for-byte identical
+#: (nothing reads ``h2s``/``h2s_gas`` to feed anything back); the integrated trajectory then
+#: differs only by a ~1e-7 adaptive-solver mesh artifact, cleaner than the acetaldehyde buffer's
+#: *genuine* second-order E→viability coupling (D-27). No tier headline either: they write pools
+#: nothing reads, so no other column's structural tier drops (contrast the D-26 ``CO2`` / D-27
+#: ``E`` cases). Params live in the shared, medium-agnostic ``hydrogen_sulfide.yaml`` (both
+#: sulfate-reduction and the Henry's-law stripping are generic, medium-agnostic physics).
+_H2S_PROCESSES: tuple[Callable[[], Process], ...] = (
+    HydrogenSulfideProduction,
+    HydrogenSulfideVolatilization,
+)
 
 #: Malolactic fermentation (wine-only, decision D-23): the *Oenococcus oeni* malate →
 #: lactate + CO2 conversion, the first RHS consumer of the D-18 pH solver and the D-22
