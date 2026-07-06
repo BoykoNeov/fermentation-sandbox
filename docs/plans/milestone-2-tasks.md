@@ -494,6 +494,17 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         `carrying_capacity_gpl` scenario key (overrides for sweeps). SCOPE: wine-only (beer
         deferred); MLF-unblock is PROSPECTIVE (MLF v1 has no N gate). 16 new tests; **380 green** +
         5 benchmark, ruff+mypy clean. Full record in **DECISIONS → D-30**.
+  - [x] **Default-on N redesign — DECLINED (decision D-43, spike 2026-07-06).** A decision-forcing
+        spike + a mass-balance argument proved **default-on residual *assimilable* N is
+        Coleman-incompatible regardless of mechanism** (two-pool, cell-quota, satiation): Coleman
+        builds biomass by ~day 1.3, pinning external assimilable N to ~0 by then for every dose, so
+        no biomass-preserving N model can widen the H₂S lever or leave a late-window residual
+        without cutting biomass and breaking the Coleman sugar curve. The deferred note's two
+        mechanisms have *opposite* Coleman-compatibility (proline split = Coleman-safe but inert;
+        residual-assimilable floor = inherently opt-in). Decision: keep the D-30 opt-in cap as-is,
+        no refactor. If the H₂S cross-must lever is ever wanted default-on, re-point the *H₂S gate*
+        onto a dose-correlated proxy (an H₂S-model change), not the N model. No source change; the
+        negative result is the deliverable. Full record in **DECISIONS → D-43**.
   - [x] **MLF-derived diacetyl — O. oeni citrate co-metabolism + bacterial reduction (decision
         D-31). LANDED 2026-07-01.** The real coupling MLF (D-23) unlocks and the deferred half of
         D-26 (which built yeast valine-pathway diacetyl only). Two new *O. oeni* Processes in

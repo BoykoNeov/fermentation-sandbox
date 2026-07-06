@@ -3038,6 +3038,71 @@ is complete** (esters, fusels, VDK/diacetyl, acetaldehyde, SO₂ free/bound spec
 stripping); Milestone 2 physics closes. Deferred: the post-fermentation / autolytic H₂S source (persists
 un-stripped); a copper-binding / mercaptan model.
 
+## D-43 — Nitrogen redesign: a spike proves default-on residual *assimilable* N is Coleman-incompatible (the redesign as scoped is not worth building)
+
+**Status: DECIDED (not built) 2026-07-06** — a decision-forcing pre-check (the D-26/D-30
+"measure before writing" discipline) that resolves, and closes, the recurring "nitrogen-model
+redesign" thread carried in the Deferred section since D-23/D-29/D-30. **Outcome: do not build
+the large N-model refactor the backlog implied; record why, keep the D-30 opt-in cap, correct the
+deferred-note framing.** No source change; the throwaway spike lives outside the repo
+(`M:\claud_projects\temp\n_redesign_spike`).
+
+**What was on the table.** The Deferred "residual-nitrogen / satiation floor" note called for "a
+nitrogen-model redesign (explicit assimilable vs proline/non-assimilable pools + a satiation
+floor)" to make a *default-on* residual-N model possible — motivated by the muted D-29 H₂S
+cross-must lever (D-30) and a prospective MLF-with-growth N gate (D-23). The advisor's sharpening:
+D-30's *opt-in biomass cap* conflated two separable levers — **total N consumed** (cutting it
+reduces biomass → breaks Coleman's sugar curve) versus **N depletion *timing*** (untested). The
+untested hypothesis: a preferential/two-pool or cell-quota model that consumes ~all N eventually
+(preserving total biomass → preserving Coleman sugar) but drains it *later*, so N persists at
+dose-dependent levels through days 1.5–4 and high-YAN musts suppress H₂S longer — a timing lever,
+not a total lever.
+
+**The spike.** Standalone scipy, built on the exact Coleman eqs 1–8 RHS the engine matches to
+RMSE ~1.3 (`test_coleman_reconstruction`), sweeping two mechanisms: (A) preferential two-pool
+(growth reads a fast pool, a slow pool refills it) and (B) a Droop cell-quota (uptake → internal
+quota, growth from quota — the textbook decoupling). Measured Coleman sugar RMSE at 80 & 330 mg N/L
+vs the H₂S cross-must span at 80/150/300. **Results:** (A) *stalls* — throttling N access throttles
+biomass, ferment sticks (~135 g/L residual sugar). (B) finishes and *does* leave dose-dependent
+residual N (N@day1.5 ≈ 44 vs 235 mg/L at 80 vs 300), but exposes a clean **anti-correlation** —
+lower sugar RMSE ⟺ faster uptake ⟺ less residual ⟺ weaker lever; the Pareto frontier never enters
+(RMSE<2, span≫muted). (Caveat, owned: the spike's Droop variant dropped Coleman's active-biomass/
+ethanol-death submodel `k_d=k'_d·E`, so its absolute RMSE floor is *contaminated* and NOT citable
+as proof — only the anti-correlation direction is clean. The real proof is the argument below.)
+
+**The airtight refutation is mass balance, not the sweep.** Coleman builds biomass fast:
+`μ ≈ μ_max ≈ 0.095/h` (`K_N=0.0088` is negligible whenever N>0), so growth is essentially done by
+~day 1.3. To match Coleman's *sugar* curve you must match that biomass trajectory; mass balance then
+pins `∫uptake = Δbiomass/Y_XN` on that same fast schedule ⟹ **external assimilable N ≈ 0 by ~day
+1.3 for every dose**. A quota/luxury buffer can only make external N drain *faster*, never slower,
+while biomass stays on Coleman's schedule. So the H₂S-flux window (days ~2–8, biomass high + sugar
+present) sees N ≈ 0 regardless of dose — the dose-dependent residual N lives in days 1–3, the flux
+weight lives in days 2–8. The only way to widen the lever is a *permanent* residual assimilable N
+(the D-30 cap: N never reaches 0 at high dose), which necessarily means less biomass ⇒ breaks
+Coleman (D-30 measured sugar RMSE 27.84 at 330). **Conclusion: you cannot hold Coleman AND widen
+the H₂S lever via the N model, regardless of mechanism.**
+
+**The reframe that dissolves the apparent D-30-vs-note contradiction.** The deferred note bundled
+**two mechanisms with opposite Coleman-compatibility**: (1) an **assimilable-vs-proline split** is
+Coleman-*safe* — Coleman's `n0` *is* YAN (assimilable); proline was never in it, so growth-on-YAN
+leaves the sugar curve untouched and it is *default-on-able* — but proline does **not** feed the
+H₂S gate (correct: not assimilable anaerobically) and nothing reads it today, so it is honest
+bookkeeping / inert scaffolding until a consumer exists; (2) a **satiation floor leaving residual
+*assimilable* N** breaks Coleman (the 27.84), is what the lever needs, and is inherently *opt-in*.
+D-30 ("can't be default-on") is right for the **lever**; the note's "real fix" is right for
+**fidelity**. Different axes, both correct.
+
+**Strategic consequence.** The backlog premise "nitrogen redesign unblocks default residual-N /
+MLF-with-growth" **largely does not hold on the assimilable axis** — the reason the big build was
+declined. The genuine forks, for the record: (a) default-on proline/total-N accounting (honest but
+inert until a consumer exists); (b) if the H₂S cross-must lever is the goal, re-point the *gate*
+onto a dose-correlated proxy (initial-YAN / intracellular-N-status) — an **H₂S-model** change, not
+an N-model one — the clean path to a default-on lever; (c) keep residual-assimilable-N / satiation
+**opt-in** (the existing D-30 cap, possibly reformed) — **chosen**; (d) re-anchor away from Coleman
+(the only route to default-on residual assimilable N; milestone-scale and data-gated — needs a
+dataset with measured residual YAN + sugar). Owner picked (c): keep the D-30 cap as-is, no N-model
+build. The negative result **is** the deliverable — it closes a question open since D-23.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -3051,13 +3116,18 @@ un-stripped); a copper-binding / mercaptan model.
   carbon-free `h2s_gas` headspace pool on the CO₂-evolution flux, so `h2s` is now the µg/L
   *residual* reality shows and `h2s + h2s_gas` is cumulative produced. The exact ester D-20/D-21
   precedent but simpler (carbon-free ⇒ no ledger weighting). See D-42.
-- ~~**Residual-nitrogen / satiation floor**~~ — **partially addressed in D-30** (opt-in biomass
-  carrying-capacity cap): a scenario passing `carrying_capacity_gpl` leaves dose-dependent residual
-  YAN and restores the D-29 H₂S lever. **Still deferred:** a *default-on* residual-N model, which is
-  blocked by the fundamental Coleman conflict (D-30) — Coleman consumes all YAN at every dose, so a
-  default residual floor departs from the validated anchor. The real fix is a nitrogen-model
-  redesign (explicit assimilable vs proline/non-assimilable pools + a satiation floor), not a cap
-  bolted onto the Coleman-anchored core. Until then the residual-N lever is opt-in only, and the
-  MLF-with-growth beat (D-23) stays blocked (MLF v1 has no N gate anyway).
+- ~~**Residual-nitrogen / satiation floor**~~ — **addressed in D-30 (opt-in cap) and RESOLVED in
+  D-43 (2026-07-06): the "default-on N redesign" is declined.** A spike + a mass-balance argument
+  (D-43) proved that **default-on residual *assimilable* N is Coleman-incompatible regardless of
+  mechanism** — Coleman builds biomass by ~day 1.3, which pins external assimilable N to ~0 by then
+  for every dose, so no biomass-preserving N model (two-pool, cell-quota, satiation) can widen the
+  H₂S lever or leave a late-window residual without cutting biomass and breaking the Coleman sugar
+  curve. The deferred note's two mechanisms have *opposite* Coleman-compatibility: a proline/
+  non-assimilable split is Coleman-safe but **inert** (nothing reads proline; it does not feed the
+  assimilable H₂S gate), while a residual-*assimilable*-N floor is inherently **opt-in**. Decision:
+  keep the D-30 opt-in `carrying_capacity_gpl` cap as-is; do not build the refactor. The residual-N
+  lever stays opt-in. If the H₂S cross-must lever is ever wanted default-on, the clean route is
+  re-pointing the *H₂S gate* onto a dose-correlated proxy (an H₂S-model change), not the N model —
+  see D-43 forks (a)–(d).
 - **Packaged parameter-data access:** tests read YAML via filesystem path. If we
   ship a wheel that must read its own data, switch to `importlib.resources`.
