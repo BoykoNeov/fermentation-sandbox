@@ -586,12 +586,15 @@ class MalolacticDeath(Process):
     ``g_EtOH`` (high-ABV post-AF ⇒ γ·g_EtOH ≈ 0 ⇒ no growth), which is where it belongs — a
     high-ABV post-AF pitch simply sits **inert** (no growth, no conversion, no death until SO₂).
 
-    **v1 tradeoff (owned, not hidden).** Without SO₂, bacteria **never die** in v1 — they persist
-    and keep clearing diacetyl on the lees (the D-31 "leave on lees cleans up" case). The slow
-    ethanol/age-driven decline of *O. oeni* over weeks-to-months is real but **deferred to v2** (a
-    benign-environment baseline mortality; see the ``k_death_mlf`` note). Less realistic than a slow
-    decline, far more realistic than the 1-week ethanol wipeout — and it makes the D-31 SO₂/rack
-    lever **unconfounded**: the only thing that removes viable bacteria is a deliberate action.
+    **Scope: SO₂-driven acute kill only — the slow baseline decline is now :class:`Malolactic
+    Senescence` (v2, D-41).** This Process is the *deliberate-action* lever: death is **exactly 0
+    without SO₂**, so it stays unconfounded by ethanol (the D-39 crux) and keeps ``k_death_mlf`` at
+    its true SO₂-kill magnitude. The slow ethanol/age decline of *O. oeni* over weeks-to-months —
+    which v1 deferred, letting unsulfited bacteria persist forever — is now supplied by the separate
+    :class:`MalolacticSenescence` baseline mortality (built as its own isolable Process so this SO₂
+    kill remains byte-for-byte as D-39 built it). Total *O. oeni* mortality is therefore
+    ``r_sen + r_death`` (benign baseline + SO₂-induced); a stabilizing SO₂ dose still dominates,
+    crashing the population in ~1–3 d on top of the ~2-month benign half-life.
 
     **Conservation — a carbon/nitrogen-neutral transfer (the D-13 pattern).** Since D-38 both
     ``X_mlf`` and ``X_mlf_dead`` are weighted in ``total_carbon``/``total_nitrogen`` at the *same*
@@ -650,4 +653,88 @@ class MalolacticDeath(Process):
         r_death = params["k_death_mlf"] * x_mlf * (1.0 - g_so2) * f_t  # [g X_mlf/L/h]
         d[schema.slice("X_mlf")] = -r_death
         d[schema.slice("X_mlf_dead")] = r_death  # carbon/nitrogen-neutral: same biomass fractions
+        return d
+
+
+class MalolacticSenescence(Process):
+    """*Oenococcus oeni* benign senescence — the slow baseline mortality (MLF **v2**, D-41).
+
+    Lifts the owned v1 tradeoff of :class:`MalolacticDeath` (D-39): *"without SO₂, bacteria never
+    die."* In reality *O. oeni* does not persist forever in an untreated dry wine — over
+    **weeks-to-months** the population slowly declines from age, ethanol stress, low pH and nutrient
+    exhaustion even with **no SO₂ and no rack**. This Process is that decline: a small, always-on
+    (when pitched) baseline mortality that moves viable ``X_mlf`` into the same non-viable
+    ``X_mlf_dead`` pool the SO₂ kill uses, so a pitched wine left alone eventually loses its
+    bacteria (and the ``X_mlf``-scaled activities — conversion, citrate → diacetyl, lees-contact
+    diacetyl reduction — fade with them) instead of holding a viable culture indefinitely.
+
+    **Rate — a constant specific rate, Arrhenius temperature, and nothing else.**
+
+        r_sen = k_senescence_mlf · X_mlf · arrhenius(T, E_a_death_mlf, T_ref)
+
+    * **Constant ``k_senescence_mlf``** (t½ ≈ 8 weeks at ``T_ref``) — a *baseline* first-order
+      mortality, ~100× below the full-SO₂-kill ``k_death_mlf``. It is deliberately
+      **environment-free** (no pH, ethanol, or SO₂ term). "Benign" *means* environment-independent,
+      and — the load-bearing reason (the D-39 crux) — **any ethanol term reintroduces the wipeout
+      bug**: the Luong wall drives ``1 − g_EtOH`` to ~0.92 at ordinary post-AF ethanol, which
+      coupled to a mortality rate kills the culture in ~1 week, not the ~2 months reality shows. So
+      senescence carries no ethanol driver; the ethanol/starvation *modulation* of the baseline
+      stays a documented deferral (see the ``k_senescence_mlf`` provenance). The SO₂-driven acute
+      kill remains :class:`MalolacticDeath`'s job — total *O. oeni* mortality is now
+      ``r_sen + r_death`` (baseline + SO₂-induced), the two built as **separate isolable Processes**
+      (prime directive #3) so the SO₂ lever stays byte-for-byte as D-39 built it and this baseline
+      toggles off independently.
+    * **Arrhenius ``arrhenius(T, E_a_death_mlf, T_ref)`` — NOT the cardinal γ(T)** (the reused D-39
+      choice). Warm accelerates senescence, cold slows it to dormancy — the physically correct
+      direction. The cardinal γ(T) peaks at ``T_opt_mlf`` (23 °C) and vanishes past ``T_max_mlf``,
+      which would make senescence *maximal at the growth optimum* and *switch off* in the warm —
+      exactly backwards for a decline. Reuses ``E_a_death_mlf``/``T_ref`` (no new temperature
+      params); the factor is 1 at the 20 °C benchmark, like every other Arrhenius rate.
+
+    **Conservation — the carbon/nitrogen-neutral transfer, no new code (the D-13/D-39 pattern).**
+    Both ``X_mlf`` and ``X_mlf_dead`` are weighted in ``total_carbon``/``total_nitrogen`` at the
+    *same* biomass fractions (since D-38/D-39), so ``d[X_mlf] = −r_sen``, ``d[X_mlf_dead] = +r_sen``
+    is C- and N-neutral by construction — identical to the SO₂ kill and the yeast ``X → X_dead``
+    inactivation. ``X_mlf_dead`` is a **terminal sink** here: :class:`~fermentation.core.kinetics.\
+    autolysis.YeastAutolysis` reads only the yeast ``X_dead`` pool, so senescing bacteria do **not**
+    refuel the ``amino_acids`` pool (no self-cancelling recycling loop). Touches ``(X_mlf,
+    X_mlf_dead)`` only.
+
+    **Isolability + performance.** ``X_mlf ≤ 0`` (undosed / un-pitched) returns a zero contribution.
+    Unlike :class:`MalolacticDeath` this Process reads **no SO₂ and no pH**, so it never triggers a
+    ``brentq`` — it is strictly cheaper than the SO₂ kill. Pitch-gated at the compile seam (enabled
+    with the other ``_MLF_PROCESSES`` when ``mlf_pitch_gpl > 0``), NOT amino-acid-gated: bacteria
+    age whether or not they were growing. **This supersedes the v1 "no-SO₂ pitched run is
+    byte-for-byte inert" property** — a pitched, unsulfited run now shows a slow monotone ``X_mlf``
+    decline, which is the point of v2. Tier **speculative** (``k_senescence_mlf`` is an author
+    estimate; the constant-rate baseline form is a modelling choice).
+    """
+
+    name = "malolactic_senescence"
+    tier = Tier.SPECULATIVE
+    #: Viable bacteria leave ``X_mlf`` for the same non-viable ``X_mlf_dead`` pool the SO₂ kill
+    #: fills. Declaring both keeps the carbon/nitrogen-neutral transfer in the ``touches`` contract.
+    touches = ("X_mlf", "X_mlf_dead")
+    #: ``k_senescence_mlf`` sets the baseline mortality magnitude; ``E_a_death_mlf``/``T_ref`` its
+    #: Arrhenius temperature shape (shared with :class:`MalolacticDeath` — the same warm-accelerates
+    #: mortality direction). NO SO₂/pH/ethanol params (senescence is environment-free, D-41). Their
+    #: tiers cap the ``X_mlf``/``X_mlf_dead`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = ("k_senescence_mlf", "E_a_death_mlf", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Single guard: no catalyst ⇒ no bacteria to age. No SO₂/pH read ⇒ NO brentq (unlike the SO₂
+        # kill), so an undosed run is byte-for-byte zero at zero solve cost.
+        x_mlf = max(float(y[schema.slice("X_mlf")][0]), 0.0) if "X_mlf" in schema else 0.0
+        if x_mlf <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_death_mlf"], params["T_ref"])
+        # Constant baseline mortality: environment-free (no pH/ethanol/SO₂ — "benign"), warm-
+        # accelerated by Arrhenius (NOT γ(T), which would spuriously peak at the growth optimum).
+        r_sen = params["k_senescence_mlf"] * x_mlf * f_t  # [g X_mlf/L/h]
+        d[schema.slice("X_mlf")] = -r_sen
+        d[schema.slice("X_mlf_dead")] = r_sen  # carbon/nitrogen-neutral: same biomass fractions
         return d

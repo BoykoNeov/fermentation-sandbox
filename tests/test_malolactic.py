@@ -29,6 +29,7 @@ from fermentation.core.chemistry import (
 from fermentation.core.kinetics.malolactic import (
     MalolacticConversion,
     MalolacticDeath,
+    MalolacticSenescence,
     cardinal_temperature_factor,
     malolactic_environmental_gate,
     malolactic_toxicity_gate,
@@ -304,19 +305,22 @@ def test_undosed_keeps_malic_lactic_validated_dosed_makes_speculative(pset):
     assert on.tier_of("lactic", tm) is Tier.SPECULATIVE
 
 
-def test_so2_kills_pitched_bacteria_and_no_so2_is_inert():
-    # SUPERSEDES the v1 "X_mlf is inert" premise (decision D-39): MalolacticDeath is the SO₂-driven
-    # kill. On a pitched, amino-acid-free run (growth disabled) the only possible mover of X_mlf is
-    # death, so this isolates it: WITHOUT SO₂ the catalyst is INERT (death is identically 0 —
-    # O. oeni persists, the honest v1 tradeoff), and an ``add_so2`` dose CRASHES X_mlf toward zero
-    # over ~1–3 days (the D-31 lever: SO₂ removes the bacteria that clear diacetyl on the lees).
-    # (a) no SO₂ ⇒ X_mlf flat: no growth (no amino acids) AND no death (no SO₂), so it never moves.
+def test_so2_crashes_bacteria_over_the_slow_senescence_baseline():
+    # The v2 (D-41) picture, superseding the v1 "no-SO₂ pitched run is byte-for-byte inert" premise:
+    # on a pitched, amino-acid-free run (growth disabled) the two movers of X_mlf are the benign
+    # senescence baseline (MalolacticSenescence, always on when pitched) and the SO₂-driven kill
+    # (MalolacticDeath, 0 without SO₂). So WITHOUT SO₂ the catalyst declines SLOWLY (weeks-to-months
+    # senescence — no longer inert), and an ``add_so2`` dose CRASHES it toward zero within ~1–3 days
+    # (the D-31 lever) — a rate ~100× the baseline, so the two timescales are cleanly separated.
+    # (a) no SO₂ ⇒ X_mlf declines slowly & monotonically (senescence), retaining most over the run.
     _c, t_clean = _run(mlf_pitch_gpl=0.2)
     x_clean = t_clean.series("X_mlf")
     assert x_clean[0] == pytest.approx(0.2)  # the pitched dose
-    assert np.all(np.abs(x_clean - x_clean[0]) < 1e-9)  # byte-for-byte inert — death is exactly 0
+    assert np.all(np.diff(x_clean) <= 1e-12)  # monotone non-increasing — senescence only, no SO₂
+    assert x_clean[-1] < 0.98 * x_clean[0]  # NOT inert: it has measurably declined (v1 superseded)
+    assert x_clean[-1] > 0.6 * x_clean[0]  # ...but only slowly (~2-month half-life over a 21-d run)
 
-    # (b) add SO₂ mid-run ⇒ X_mlf is inert until the dose, then declines monotonically to near-zero.
+    # (b) add SO₂ mid-run ⇒ gentle senescence until the dose, then a sharp crash to near-zero.
     dosed = Scenario(
         name="wine-mlf-so2",
         medium="wine",
@@ -336,10 +340,10 @@ def test_so2_kills_pitched_bacteria_and_no_so2_is_inert():
     traj = compile_scenario(dosed, strict=True).run()
     t_h, x_mlf = traj.t, traj.series("X_mlf")
     i6 = int(np.searchsorted(t_h, 6.0 * 24.0))  # index just at/after the day-6 SO₂ dose
-    assert x_mlf[i6] == pytest.approx(0.2, abs=1e-3)  # inert until the dose (death 0 without SO₂)
+    assert x_mlf[i6] > 0.9 * 0.2  # only a gentle senescence decline before the dose (slow baseline)
     post = x_mlf[i6:]
     assert np.all(np.diff(post) <= 1e-12)  # monotone non-increasing once SO₂ is present
-    assert x_mlf[-1] < 0.1 * x_mlf[i6]  # SO₂ crashed the population by the run's end
+    assert x_mlf[-1] < 0.1 * x_mlf[i6]  # SO₂ crashed the population (fast kill dominates baseline)
 
 
 # -- 8b. MalolacticDeath — the SO₂-driven bacterial kill (decision D-39) -----------
@@ -466,6 +470,143 @@ def test_death_run_conserves_carbon_and_nitrogen():
 
 def test_death_tier_is_speculative():
     assert MalolacticDeath.tier is Tier.SPECULATIVE
+
+
+# -- 8c. MalolacticSenescence — the benign baseline mortality (MLF v2, decision D-41) --
+
+
+def test_senescence_is_a_neutral_transfer_without_so2(params):
+    # The v2 headline, DISTINGUISHING senescence from the SO₂ kill: even with NO SO₂, viable X_mlf
+    # ages into X_mlf_dead — a nonzero contribution where MalolacticDeath is identically zero. It is
+    # the same D-13 neutral transfer: d[X_mlf] = −d[X_mlf_dead] exactly (both weighted at the
+    # biomass fractions ⇒ carbon- and nitrogen-neutral), so it adds no conservation code.
+    schema = wine_schema()
+    y = _death_state(schema, params, so2_mgl=0.0, x_mlf=0.2)
+    d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+    dx = float(d[schema.slice("X_mlf")][0])
+    dxd = float(d[schema.slice("X_mlf_dead")][0])
+    assert dx < 0.0 and dxd > 0.0  # bacteria age/die even with no SO₂ (v1 "never die" superseded)
+    assert dxd == pytest.approx(-dx)  # mass-conserving transfer (neutral in both ledgers)
+
+
+def test_senescence_is_zero_without_bacteria(params):
+    schema = wine_schema()
+    y = _death_state(schema, params, x_mlf=0.0)
+    d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+    assert float(d[schema.slice("X_mlf")][0]) == 0.0
+    assert float(d[schema.slice("X_mlf_dead")][0]) == 0.0
+
+
+def test_senescence_touches_only_the_x_mlf_pools(params):
+    schema = wine_schema()
+    y = _death_state(schema, params, x_mlf=0.2)
+    d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+    touched = {n for n in schema.names if np.any(d[schema.slice(n)] != 0.0)}
+    assert touched == {"X_mlf", "X_mlf_dead"}
+
+
+def test_senescence_is_environment_free(params):
+    # The load-bearing D-41 property (the D-39 crux reused): the benign baseline carries NO SO₂ and
+    # NO ethanol term — "benign" MEANS environment-independent, and any ethanol driver would
+    # reintroduce the Luong-wall wipeout that deferred this to v2. So at a FIXED temperature the
+    # senescence rate is identical whether SO₂ is absent or high, and whether ethanol is low or near
+    # the O. oeni wall.
+    schema = wine_schema()
+
+    def rate(y) -> float:
+        d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+        return -float(d[schema.slice("X_mlf")][0])
+
+    # SO₂ independence: a heavy sulfite dose does NOT change the baseline (only the SO₂ kill sees).
+    r_no_so2 = rate(_death_state(schema, params, so2_mgl=0.0, x_mlf=0.2))
+    r_hi_so2 = rate(_death_state(schema, params, so2_mgl=80.0, x_mlf=0.2))
+    assert r_no_so2 > 0.0
+    assert r_hi_so2 == pytest.approx(r_no_so2, rel=1e-12)
+    # Ethanol independence: low vs near-wall ethanol give the SAME baseline (no ethanol term).
+    lo = _wine_state(schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=10.0, malic=2.0)
+    hi = _wine_state(schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=120.0, malic=2.0)
+    assert rate(hi) == pytest.approx(rate(lo), rel=1e-12)
+
+
+def test_senescence_warm_accelerates_cold_preserves_via_arrhenius(params):
+    # Like MalolacticDeath, senescence carries the Arrhenius factor, NOT the cardinal γ(T): below
+    # T_min_mlf (γ(T) = 0) it still proceeds (cold merely SLOWS it — dormancy, not immortality),
+    # and warm accelerates it. γ(T) would spuriously make senescence PEAK at the 23 °C growth
+    # optimum and switch OFF in the warm — backwards for a decline (the D-41 rationale).
+    schema = wine_schema()
+
+    def rate(tk: float) -> float:
+        y = _death_state(schema, params, temp_k=tk, x_mlf=0.2)
+        d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+        return -float(d[schema.slice("X_mlf")][0])
+
+    t_below_min = 278.15  # 5 °C, below T_min_mlf = 8 °C ⇒ cardinal γ(T) = 0
+    assert cardinal_temperature_factor(t_below_min, 281.15, 296.15, 310.15) == 0.0
+    assert rate(t_below_min) > 0.0  # still aging below T_min — proves Arrhenius, not γ(T)
+    assert rate(298.15) > rate(t_below_min)  # warm accelerates senescence (Arrhenius direction)
+
+
+def test_senescence_is_slow_relative_to_the_so2_kill(params):
+    # The two timescales are cleanly separated by ~100×: the benign baseline is far below a full SO₂
+    # kill, so a stabilizing SO₂ dose dominates the trajectory (crash in days) while the baseline is
+    # the weeks-to-months persistence limit. Compared at the same X_mlf and temperature.
+    schema = wine_schema()
+    r_sen = -float(
+        MalolacticSenescence().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=0.0, x_mlf=0.2), schema, params
+        )[schema.slice("X_mlf")][0]
+    )
+    r_kill = -float(
+        MalolacticDeath().derivatives(
+            0.0, _death_state(schema, params, so2_mgl=80.0, x_mlf=0.2), schema, params
+        )[schema.slice("X_mlf")][0]
+    )
+    assert 0.0 < r_sen < 0.1 * r_kill  # baseline is a small fraction of the acute SO₂ kill
+
+
+def test_senescence_run_conserves_carbon_and_nitrogen():
+    # Integration-level closure with senescence ACTIVE and NO SO₂: pitch O. oeni, leave it untreated
+    # so the ONLY X_mlf mover is the senescence baseline (growth off — no amino acids; death 0 — no
+    # SO₂). The X_mlf → X_mlf_dead transfer is carbon/nitrogen-neutral (both weighted, D-38), so
+    # both ledgers close to machine precision with no external flow (nothing is dosed after t0).
+    scen = Scenario(
+        name="wine-mlf-senescence",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 250.0,
+            "pitch_gpl": 0.5,
+            "tartaric_gpl": 4.0,
+            "malic_gpl": 4.0,
+            "initial_ph": 3.4,
+            "mlf_pitch_gpl": 0.2,
+        },  # fmt: skip
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=21.0,
+    )
+    cs = compile_scenario(scen, strict=True)
+    assert cs.process_set.is_enabled("malolactic_senescence")  # pitch-gated, enabled by the pitch
+    traj = cs.run()
+    x_mlf = traj.series("X_mlf")
+    assert x_mlf[-1] < x_mlf[0]  # senescence has moved viable biomass into the dead pool
+    f_c = cs.param_values["biomass_C_fraction"]
+    f_n = cs.param_values["biomass_N_fraction"]
+    carbon = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    nitrogen = total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n)
+    assert_conserved(traj, carbon, rtol=1e-6, atol=1e-9, label="total carbon (MLF senescence on)")
+    assert_conserved(traj, nitrogen, rtol=1e-6, atol=1e-9, label="total N (MLF senescence on)")
+    assert_nonnegative(traj, ("X_mlf", "X_mlf_dead"))
+
+
+def test_senescence_needs_no_ph_solve(params):
+    # Performance/isolability: unlike MalolacticDeath (which reads molecular SO₂ at the solved pH),
+    # senescence reads no SO₂ and no pH, so its reads tuple excludes every acidbase/SO₂ parameter —
+    # it never triggers a brentq. Pin the declared reads so a future SO₂/pH coupling can't slip in.
+    assert set(MalolacticSenescence.reads) == {"k_senescence_mlf", "E_a_death_mlf", "T_ref"}
+
+
+def test_senescence_tier_is_speculative():
+    assert MalolacticSenescence.tier is Tier.SPECULATIVE
 
 
 def test_environmental_gate_is_toxicity_times_gamma(params):

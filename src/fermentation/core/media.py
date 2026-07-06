@@ -86,6 +86,7 @@ from fermentation.core.kinetics import (
     MalolacticConversion,
     MalolacticDeath,
     MalolacticGrowth,
+    MalolacticSenescence,
     OenococcusDiacetylReduction,
     SugarUptakeToEthanolCO2,
     TemperatureRamp,
@@ -251,16 +252,18 @@ def wine_schema() -> StateSchema:
             "g/L",
             default=0.0,
             description="Oenococcus oeni viable biomass — the malolactic catalyst (scales the "
-            "malolactic rate). Dosed at pitch; grown from amino acids (MalolacticGrowth, D-38) "
-            "and killed off into X_mlf_dead by toxicity/temperature (MalolacticDeath, D-39)",
+            "malolactic rate). Dosed at pitch; grown from amino acids (MalolacticGrowth, D-38); "
+            "killed off into X_mlf_dead by molecular SO₂ (MalolacticDeath, D-39) and by benign "
+            "baseline senescence (MalolacticSenescence, D-41)",
         ),
         VarSpec(
             "X_mlf_dead",
             "g/L",
             default=0.0,
-            description="non-viable Oenococcus oeni biomass — the settled bacterial lees "
-            "MalolacticDeath moves X_mlf into (carbon/nitrogen still counted at the biomass "
-            "fractions, but no longer catalytic; racked off with the other lees, decision D-39)",
+            description="non-viable Oenococcus oeni biomass — the settled bacterial lees the SO₂ "
+            "kill (MalolacticDeath, D-39) and benign senescence (MalolacticSenescence, D-41) move "
+            "X_mlf into (carbon/nitrogen still counted at the biomass fractions, but no longer "
+            "catalytic; racked off with the other lees)",
         ),
         VarSpec(
             "amino_acids",
@@ -514,18 +517,23 @@ _H2S_PROCESSES: tuple[Callable[[], Process], ...] = (HydrogenSulfideProduction,)
 #: sugar — sources this carbon because MLF-diacetyl is a late/post-dryness phenomenon and the
 #: sugar-draw helper no-ops at ``S=0`` (decision D-31; see the malolactic module docstring).
 #: :class:`MalolacticDeath` (decision D-39) rides in this same pitch-gated tuple: it moves viable
-#: ``X_mlf`` into ``X_mlf_dead`` under chemical stress (``1 − toxicity``) with its own Arrhenius
-#: temperature factor, so bacteria die off as ethanol accumulates or SO₂ is dosed — the mechanism
-#: that lets an SO₂ addition (or a rack removing the bacteria) *lock in* MLF-derived diacetyl by
-#: halting :class:`OenococcusDiacetylReduction`. It is pitch-gated (not amino-acid-gated like
-#: growth): bacteria die whether or not they were growing, so it belongs with the conversion set,
-#: disabled at the compile seam on an un-pitched run. The transfer is carbon/nitrogen-neutral (both
-#: pools weighted at the biomass fractions since D-38), so it adds no conservation code.
+#: ``X_mlf`` into ``X_mlf_dead`` under **molecular SO₂** (``1 − g_SO₂``) with its own Arrhenius
+#: temperature factor, so bacteria die off when SO₂ is dosed — the mechanism that lets an SO₂
+#: addition (or a rack removing the bacteria) *lock in* MLF-derived diacetyl by halting
+#: :class:`OenococcusDiacetylReduction`. :class:`MalolacticSenescence` (MLF v2, decision D-41) rides
+#: alongside it: the *benign baseline* mortality (``k_senescence_mlf · X_mlf · arrhenius(T)``, no
+#: SO₂/pH/ethanol term) that lifts the v1 "unsulfited bacteria never die" tradeoff — over
+#: weeks-to-months a pitched, untreated culture slowly declines into the same ``X_mlf_dead`` pool.
+#: Both are pitch-gated (not amino-acid-gated like growth): bacteria age and die whether or not they
+#: were growing, so they belong with the conversion set, disabled at the compile seam on an
+#: un-pitched run. Both transfers are carbon/nitrogen-neutral (both pools weighted at the biomass
+#: fractions since D-38/D-39), so they add no conservation code.
 _MLF_PROCESSES: tuple[Callable[[], Process], ...] = (
     MalolacticConversion,
     MalolacticCitrateMetabolism,
     OenococcusDiacetylReduction,
     MalolacticDeath,
+    MalolacticSenescence,
 )
 
 #: Malolactic *growth* (wine-only, the deferred MLF-growth beat, decision D-38). Makes ``X_mlf``

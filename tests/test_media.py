@@ -197,12 +197,15 @@ TEMPERATURE_PROCESSES = {"temperature_ramp"}
 # compile seam when O. oeni is not pitched (so undosed wine runs keep malic/lactic/citrate at
 # VALIDATED). D-31 adds the citrate → diacetyl co-metabolism and the bacterial diacetyl reducer.
 # D-39 adds bacterial death/decay to this same pitch-gated tuple (moves X_mlf → X_mlf_dead under
-# chemical stress; pitch-gated, not amino-acid-gated like growth, since bacteria die regardless).
+# molecular SO₂). D-41 (MLF v2) adds the benign senescence baseline — a slow, always-on-when-pitched
+# mortality into the same X_mlf_dead pool. Both are pitch-gated, not amino-acid-gated like growth,
+# since bacteria die/age whether or not they were growing.
 MLF_PROCESSES = {
     "malolactic_conversion",
     "malolactic_citrate_metabolism",
     "oenococcus_diacetyl_reduction",
     "malolactic_death",
+    "malolactic_senescence",
 }
 # Amino-acid ledger (decision D-32) is wired into the WINE medium only (beer has no amino_acids
 # slot); enabled in a bare build_process_set and disabled at the compile seam when amino acids

@@ -208,14 +208,15 @@ def total_carbon(
         # carbon destroyed. Booked at the SAME biomass_carbon_fraction the growth stoichiometry
         # draws against (bacterial ≈ yeast elemental composition, a documented v1 simplification),
         # so carbon closes exactly. This supersedes the v1 "X_mlf is carbon-free" scoping (D-23):
-        # on a conversion-only run X_mlf is still constant, so the added term is a constant offset
-        # that drifts 0 (closure holds); a co-inoculation dose / pitch_mlf flow now carries this
-        # bacterial-biomass carbon.
+        # on a conversion-only run X_mlf only ever moves into X_mlf_dead (death D-39 / senescence
+        # D-41 — both to an equally-weighted pool), so the added term stays closure-neutral; a
+        # co-inoculation dose / pitch_mlf flow now carries this bacterial-biomass carbon.
         if "X_mlf" in schema:
             w[schema.slice("X_mlf")] = biomass_carbon_fraction
-        # Non-viable bacterial biomass X_mlf_dead (decision D-39): MalolacticDeath moves X_mlf into
-        # it under stress, so — exactly like the yeast X → X_dead transfer (D-13) — it must be
-        # weighted at the SAME biomass_carbon_fraction or that death would read as carbon destroyed.
+        # Non-viable bacterial biomass X_mlf_dead (decisions D-39/D-41): the SO₂ kill AND the benign
+        # senescence baseline both move X_mlf into it, so — like the yeast X → X_dead transfer
+        # (D-13) — it must be weighted at the SAME biomass_carbon_fraction or that loss would read
+        # as carbon destroyed. (Terminal sink: autolysis reads only yeast X_dead, not X_mlf_dead.)
         if "X_mlf_dead" in schema:
             w[schema.slice("X_mlf_dead")] = biomass_carbon_fraction
         # Brett biomass X_brett (decision D-40 pt2): BrettGrowth builds it from the amino-acid pool,
@@ -270,13 +271,14 @@ def total_nitrogen(
         # Bacterial biomass X_mlf (decision D-38): MalolacticGrowth builds it by
         # assimilating the amino-acid pool's nitrogen (arginine), so X_mlf carries nitrogen and
         # is weighted at the SAME biomass_nitrogen_fraction the growth draws against — the pool
-        # loses exactly the nitrogen X_mlf gains, so total_nitrogen closes. Constant (⇒ 0 drift)
-        # on a conversion-only run; a co-inoculation dose / pitch_mlf flow now carries it.
+        # loses exactly the nitrogen X_mlf gains, so total_nitrogen closes. On a conversion-only run
+        # X_mlf only moves into X_mlf_dead (death/senescence), so closure holds; a co-inoculation
+        # dose / pitch_mlf flow now carries it.
         if "X_mlf" in schema:
             w[schema.slice("X_mlf")] = biomass_nitrogen_fraction
-        # Non-viable bacterial biomass X_mlf_dead (decision D-39): retains its nitrogen, counted at
-        # the same biomass_nitrogen_fraction so the X_mlf → X_mlf_dead death transfer is
-        # nitrogen-neutral (the yeast X → X_dead precedent, D-13).
+        # Non-viable bacterial biomass X_mlf_dead (decisions D-39/D-41): retains its nitrogen, at
+        # the same biomass_nitrogen_fraction so BOTH the X_mlf → X_mlf_dead death AND senescence
+        # transfers are nitrogen-neutral (the yeast X → X_dead precedent, D-13).
         if "X_mlf_dead" in schema:
             w[schema.slice("X_mlf_dead")] = biomass_nitrogen_fraction
         # Brett biomass X_brett (decision D-40 pt2): BrettGrowth assimilates the amino-acid pool's

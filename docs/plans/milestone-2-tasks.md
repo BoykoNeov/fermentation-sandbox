@@ -306,6 +306,18 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       tests (`test_mlf_growth.py`), incl. the fail-first autocatalysis acceptance (growth on vs the
       Process disabled). **496 green** + 5 benchmark, ruff + mypy clean. Full record in
       **DECISIONS → D-38**.
+- [x] **MLF v2 — benign senescence (`MalolacticSenescence`, decision D-41). LANDED 2026-07-06.** Lifts
+      the D-39 v1 tradeoff ("no SO₂ ⇒ bacteria never die"): a new pitch-gated Process gives *O. oeni* a
+      small always-on **baseline mortality** (`r_sen = k_senescence_mlf·X_mlf·arrhenius(T)`), so a
+      pitched, untreated dry wine slowly declines over **weeks-to-months** into the same `X_mlf_dead`
+      pool. **Environment-free** (no pH/ethanol/SO₂ term — the D-39 Luong-wall-wipeout crux reused) and
+      **Arrhenius, not γ(T)** (warm accelerates, cold preserves). Separate isolable Process ⇒ the D-39
+      SO₂ kill stays byte-for-byte; total mortality is now `r_sen + r_death`. New speculative
+      `k_senescence_mlf` (5e-4/h, t½ ~58 d, ~100× below the SO₂ kill), reuses `E_a_death_mlf`/`T_ref`;
+      no `brentq` (reads no SO₂/pH). C/N-neutral transfer, `X_mlf_dead` a terminal sink (autolysis
+      reads only yeast `X_dead`). §2.2 + the 0.1813 deacidification control-difference unmoved. **552
+      green** + 5 benchmark, ruff + mypy clean. Full record in **DECISIONS → D-41**. The MLF arc
+      (D-23 → D-31 → D-38 → D-39 → D-41) is complete.
 - [ ] **Mixed cultures / Brett / sour consortium** — the volatile-phenol spoilage beat (decision
       D-40). Multi-commit arc mirroring MLF (pathway → growth → death → POF+ yeast).
   - [x] **pt1 — Brett phenol pathway, dosed catalyst. LANDED 2026-07-02.** `BrettDecarboxylation`

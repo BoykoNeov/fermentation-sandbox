@@ -45,6 +45,7 @@ from fermentation.core.kinetics import (
     MalolacticConversion,
     MalolacticDeath,
     MalolacticGrowth,
+    MalolacticSenescence,
     OenococcusDiacetylReduction,
     YeastAutolysis,
     YeastPOFDecarboxylation,
@@ -76,13 +77,15 @@ _N_YIELD_COEFFS = ("biomass_N_yield_log_intercept", "biomass_N_yield_log_slope")
 #: but contribute nothing until bacteria are present, so the compile step DISABLES them when
 #: unpitched and the ``pitch_mlf`` intervention (decision D-36) re-enables *exactly* this set at
 #: its breakpoint — a single source of truth so the compile-time gate and the mid-run pitch cannot
-#: drift apart. :class:`MalolacticDeath` (D-39) is pitch-gated too (bacteria die whether or not
-#: amino acids were dosed), unlike :class:`MalolacticGrowth`, which is amino-acid-gated below.
+#: drift apart. :class:`MalolacticDeath` (D-39) and :class:`MalolacticSenescence` (MLF v2, D-41) are
+#: pitch-gated too (bacteria die/age whether or not amino acids were dosed), unlike
+#: :class:`MalolacticGrowth`, which is amino-acid-gated below.
 _MLF_GATED_PROCESSES = (
     MalolacticConversion,
     MalolacticCitrateMetabolism,
     OenococcusDiacetylReduction,
     MalolacticDeath,
+    MalolacticSenescence,
 )
 
 #: The *Brettanomyces* Processes gated on a Brett pitch (decision D-40): hydroxycinnamate

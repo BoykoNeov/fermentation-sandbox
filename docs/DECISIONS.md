@@ -2604,10 +2604,11 @@ byte-for-byte unchanged (`test_environmental_gate_is_toxicity_times_gamma` pins 
   the population ~90 % in ~2 d, verified directly. Co-inoc-vs-post-AF dominance now rests entirely on
   the *growth* gate's `g_EtOH`, where it belongs; a high-ABV post-AF pitch simply sits **inert**.
 
-**v1 tradeoff (owned, not hidden).** Without SO₂ bacteria **never die** in v1 — they persist and keep
-clearing diacetyl on the lees (the honest D-31 "leave on lees cleans up" case). The slow ethanol/age
-decline of *O. oeni* over weeks-to-months is real but **deferred to v2** (a benign-environment
-baseline mortality). Less realistic than a slow decline, far more realistic than the 1-week ethanol
+**v1 tradeoff (owned, not hidden; → RESOLVED in D-41).** Without SO₂ bacteria **never die** in v1 —
+they persist and keep clearing diacetyl on the lees (the honest D-31 "leave on lees cleans up" case).
+The slow ethanol/age decline of *O. oeni* over weeks-to-months was then **deferred to v2** — and is
+now landed as the separate `MalolacticSenescence` baseline mortality (**D-41**), leaving this SO₂ kill
+byte-for-byte unchanged. Less realistic than a slow decline, far more realistic than the 1-week ethanol
 wipeout — and it makes the D-31 SO₂/rack lever **unconfounded**: only a deliberate winemaking action
 removes viable bacteria. The kill-scale reuses `molecular_so2_inhib_mlf` (arrest-scale = kill-scale,
 bacteriostatic ≈ bacteriocidal); a separate `molecular_so2_death_scale` is the v2 refinement.
@@ -2897,6 +2898,66 @@ enzymes, with the POF+ yeast decarboxylase a separate opt-in.
   `k_pof_decarb` (speculative). **543 green** + 5 benchmark, ruff + mypy clean. **D-40 (and the last M2
   physics beat) complete.** Deferred v2: POF conversion efficiency vs fermentation temperature (would
   add `E_a_pof`); vinylguaiacol/vinylphenol split (currently lumped, as for Brett).
+
+## D-41 — MLF v2: benign senescence (`MalolacticSenescence`) — the slow baseline *O. oeni* decline
+
+**Status: IMPLEMENTED 2026-07-06** (552 green + 5 benchmark, ruff + mypy clean). Lifts the owned
+v1 tradeoff of D-39 (*"without SO₂, bacteria never die"*): a new **`MalolacticSenescence`** Process
+gives *Oenococcus oeni* a small, always-on-when-pitched **baseline mortality** so a pitched, untreated
+dry wine slowly loses its bacteria over **weeks-to-months** (age / ethanol / low-pH / nutrient stress)
+even with no SO₂ and no rack — instead of holding a viable culture forever. It moves viable `X_mlf`
+into the *same* non-viable `X_mlf_dead` pool the D-39 SO₂ kill uses, so the `X_mlf`-scaled activities
+(conversion, citrate → diacetyl, lees-contact diacetyl reduction) fade as the population ages.
+
+**The law — a constant baseline rate, Arrhenius temperature, and nothing else.**
+`r_sen = k_senescence_mlf · X_mlf · arrhenius(T, E_a_death_mlf, T_ref)`. Total *O. oeni* mortality is
+now `r_sen + r_death` (benign baseline + SO₂-induced), the two built as **separate isolable Processes**
+so the D-39 SO₂ lever stays **byte-for-byte** as built and this baseline toggles off independently
+(prime directive #3).
+
+- **Environment-free — the load-bearing D-39 crux, reused (advisor-confirmed).** Senescence carries
+  **no pH, ethanol, or SO₂ term**. "Benign" *means* environment-independent, and the reason is exactly
+  the bug that deferred this to v2: coupling death to ethanol via the Luong wall drives `1 − g_EtOH` to
+  ~0.92 at ordinary post-AF ethanol, wiping the culture out in ~1 week instead of the ~2 months reality
+  shows. A **constant** baseline dodges it. The ethanol/starvation *modulation* of the baseline stays a
+  documented deferral (a further v2 refinement), NOT reintroduced here.
+- **Arrhenius, NOT the cardinal γ(T) (the D-39 temperature choice reused).** Warm accelerates the
+  decline, cold slows it to dormancy — the physically correct direction. γ(T) peaks at `T_opt_mlf`
+  (23 °C) and vanishes past `T_max_mlf`, which would make senescence *maximal at the growth optimum*
+  and *switch off* in the warm — backwards for a decline. Reuses `E_a_death_mlf`/`T_ref` (no new
+  temperature param); factor 1 at the 20 °C benchmark.
+- **Magnitude.** New speculative `k_senescence_mlf` = **5e-4/h** ⇒ half-life ~**58 d** (~8 weeks) at
+  `T_ref`, ~100× below the full-SO₂-kill `k_death_mlf` (0.05/h). Negligible over the ~4-day
+  co-inoculation MLF window (~5 % `X_mlf` loss over 96 h), so the **§2.2 benchmarks and the D-23
+  deacidification control-difference (asserted range [0.1, 0.3], nominal 0.1813) still pass**
+  (verified: 5/5 benchmark green — the ~5 % loss leaves it essentially unmoved, well inside the
+  range); a stabilizing SO₂ dose still crashes the population in ~1–3 d on top of it.
+
+**Conservation — the carbon/nitrogen-neutral transfer, no new code (the D-13/D-39 pattern).** Both
+`X_mlf` and `X_mlf_dead` are weighted at the *same* biomass fractions (since D-38/D-39), so
+`d[X_mlf] = −r_sen`, `d[X_mlf_dead] = +r_sen` is C- and N-neutral by construction. **`X_mlf_dead` is a
+terminal sink** (advisor blind-spot #3, verified): `YeastAutolysis` reads only the yeast `X_dead`
+pool, so senescing bacteria do **not** refuel `amino_acids` — no self-cancelling recycling loop.
+Touches only `(X_mlf, X_mlf_dead)`.
+
+**Isolability + performance.** Reads no SO₂ and no pH, so it **never triggers a `brentq`** — strictly
+cheaper than the SO₂ kill (`X_mlf ≤ 0` guard only). Pitch-gated: added to the *single source of truth*
+`_MLF_GATED_PROCESSES` (compile) / `_MLF_PROCESSES` (media), so it is disabled unpitched and re-enabled
+by a `pitch_mlf` intervention exactly like the D-39 death — bacteria age whether or not amino acids
+were dosed. On a pitched run `X_mlf`/`X_mlf_dead` stay **speculative** (already so under D-39).
+
+**Tests + the v1 assertions that flip (advisor blind-spot #1).** New `test_malolactic.py` section
+(+9): the v2-headline neutral-transfer-without-SO₂, environment-free (SO₂- *and* ethanol-independent
+rate), warm-accelerates/cold-preserves-via-Arrhenius, slow-relative-to-the-SO₂-kill (~100×), the
+`(X_mlf, X_mlf_dead)` `touches`, no-pH-solve `reads` pin, C/N closure over a senescence-active
+(no-SO₂, no-growth) run, and the speculative tier. **Flipped v1 assertions updated, not weakened:**
+the ex-`..._no_so2_is_inert` integration test becomes *slow senescence decline + sharp SO₂ crash*; the
+two growth-isolation tests (`test_mlf_growth`) disable senescence (or difference it out — the mid-run
+`pitch_mlf` re-enables the whole gated set, so the growth signal is isolated as a growth-on−off
+control difference in which senescence cancels); `test_media` wine kinetic-set gains
+`malolactic_senescence`. **The MLF arc (D-23 → D-31 → D-38 → D-39 → D-41) closes its last deferral.**
+Deferred further-v2: ethanol/starvation modulation of the baseline; a `BrettSenescence` twin (the same
+pattern) for the D-40 arc.
 
 ## Deferred (decide early in the relevant milestone)
 

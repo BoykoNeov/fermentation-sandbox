@@ -88,11 +88,17 @@ def test_growth_accelerates_conversion():
     # identical and the ONLY difference is bacterial growth — isolating the autocatalysis.
     grow = compile_scenario(_wine_scenario(mlf_pitch_gpl=0.05, amino_acids_gpl=2.0), strict=True)
     assert grow.process_set.is_enabled("malolactic_growth")
+    # Disable the benign senescence baseline (MLF v2, D-41) in BOTH runs: it erodes X_mlf on its own
+    # slow timescale regardless of growth, which would confound this GROWTH-isolation contrast (the
+    # fixed-X_mlf control below could no longer be exactly constant). Senescence is exercised on its
+    # own in test_malolactic; here we isolate growth's autocatalysis (the control disables growth).
+    grow.process_set.disable("malolactic_senescence")
     t_eval = np.linspace(0.0, 14.0 * 24.0, 400)
     t_on = simulate(grow.process_set, grow.param_values, grow.y0, grow.t_span_h, t_eval=t_eval)
 
     fixed = compile_scenario(_wine_scenario(mlf_pitch_gpl=0.05, amino_acids_gpl=2.0), strict=True)
     fixed.process_set.disable("malolactic_growth")  # fixed-X_mlf control
+    fixed.process_set.disable("malolactic_senescence")  # ...held truly fixed (no baseline decay)
     t_off = simulate(fixed.process_set, fixed.param_values, fixed.y0, fixed.t_span_h, t_eval=t_eval)
 
     # X_mlf multiplies several-fold under growth; constant in the control.
@@ -165,7 +171,13 @@ def test_mid_run_pitch_growth_is_emergently_gated_by_ethanol():
     # ~110 g/L O. oeni wall) does not. Co-inoculation dominance is emergent, not hard-coded (D-38).
     from fermentation.scenario.schema import Intervention
 
-    def _post_pitch_growth(day: float) -> tuple[float, float]:
+    # Isolate the GROWTH signal as a control DIFFERENCE (growth-on minus growth-off) at each pitch
+    # day. Since MLF v2 (D-41) the benign senescence baseline also moves X_mlf, and it is re-enabled
+    # by the mid-run pitch_mlf (part of _MLF_GATED_PROCESSES), so it can't simply be toggled off for
+    # the run — but it acts in BOTH the growth-on and growth-off arms, so it cancels in their
+    # difference. Growth is amino-acid-gated (NOT in _MLF_GATED_PROCESSES), so disabling it survives
+    # the pitch. The residual = growth's net contribution, cleanly separated from senescence.
+    def _end_x_mlf(day: float, *, growth: bool) -> float:
         base = _wine_scenario(days=21.0, amino_acids_gpl=2.0)
         sc = Scenario(
             name=base.name, medium=base.medium, strain=base.strain, initial=base.initial,
@@ -174,18 +186,23 @@ def test_mid_run_pitch_growth_is_emergently_gated_by_ethanol():
         )  # fmt: skip
         cs = compile_scenario(sc, strict=True)
         assert cs.process_set.is_enabled("malolactic_growth")  # enabled by aa, regardless of pitch
+        if not growth:
+            cs.process_set.disable("malolactic_growth")  # survives pitch_mlf (aa-gated, not pitch)
         tr = cs.run(t_eval=np.linspace(0.0, 21.0 * 24.0, 500))
-        x = tr.series("X_mlf")
-        just_after = float(np.interp((day + 0.2) * 24.0, tr.t, x))  # X_mlf right after the pitch
-        return just_after, float(x[-1])
+        return float(tr.series("X_mlf")[-1])
 
-    early_post, early_end = _post_pitch_growth(2.0)  # E ~64 g/L at pitch — below the wall
-    late_post, late_end = _post_pitch_growth(8.0)  # E ~115 g/L at pitch — past the wall
-    # Early pitch: bacteria grow measurably after the pitch (well above solver noise). Late pitch:
-    # ethanol-arrested (flat). The gap is the emergent co-inoculation advantage, not a rule.
-    assert early_end - early_post > 1e-4
-    assert late_end == pytest.approx(late_post, abs=1e-5)
-    assert early_end - early_post > late_end - late_post
+    early_gain = _end_x_mlf(2.0, growth=True) - _end_x_mlf(
+        2.0, growth=False
+    )  # E ~64 g/L (below wall)
+    late_gain = _end_x_mlf(8.0, growth=True) - _end_x_mlf(
+        8.0, growth=False
+    )  # E ~115 g/L (past wall)
+    # Early pitch: growth measurably ADDS biomass over the no-growth baseline (well above solver
+    # noise). Late pitch: ethanol-arrested, so growth adds nothing. The gap is the emergent
+    # co-inoculation advantage, not a hard-coded rule — senescence-independent (it cancels out).
+    assert early_gain > 1e-4
+    assert late_gain == pytest.approx(0.0, abs=1e-5)
+    assert early_gain > late_gain  # the emergent early-vs-late growth advantage
 
 
 # -- 5. derivative-level guards + never-creates-sugar ------------------------------
