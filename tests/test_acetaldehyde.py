@@ -642,7 +642,9 @@ def test_induced_over_production_lifts_the_peak_not_the_end_state():
     on = _induced_run(dose)  # + D-48 induced over-production (shipped k)
     peak_off, peak_on = gpl_to_mgl(off.max()), gpl_to_mgl(on.max())
     end_off, end_on = gpl_to_mgl(off[-1]), gpl_to_mgl(on[-1])
-    assert peak_on > peak_off + 2.0  # a real, non-trivial peak lift (~+3.8 mg/L at 50 mg/L)
+    # Threshold +1.5 holds across the whole documented uncertainty band (at the band low 2e-3 the
+    # lift is ~+1.9; shipped 4e-3 gives ~+3.8) — so retuning k anywhere in-band keeps this green.
+    assert peak_on > peak_off + 1.5  # a real, non-trivial peak lift (~+3.8 mg/L at shipped k)
     assert end_on == pytest.approx(end_off, abs=0.5)  # end state / stranded residual unchanged
 
 
