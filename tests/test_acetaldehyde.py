@@ -333,7 +333,7 @@ def test_carbon_closes_on_a_compiled_run():
 
 
 @pytest.fixture
-def params_so2(store):
+def params_so2():
     # Reduction's SO₂ protection needs the sulfurous pKas + binding K + the pH-solver pKas, which
     # live in acidbase.yaml — layer it over the wine + acetaldehyde kinetics.
     return load_parameters(

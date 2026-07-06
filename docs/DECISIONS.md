@@ -3344,7 +3344,13 @@ would move no tier (the MLF-gate precedent). No new parameters.
 dissociates and degrades over months, so the stranding is an **upper bound on persistence** (the
 literature's own "not metabolized *during fermentation*"). Dosing SO₂ at pitch is also the *maximal*-
 stranding scenario; the common cellar case (SO₂ post-AF, into a wine the yeast already cleared) strands
-almost nothing — pinned by `test_post_af_so2_dose_strands_far_less_than_a_pitch_dose`.
+almost nothing — pinned by `test_post_af_so2_dose_strands_far_less_than_a_pitch_dose`. **One mechanism
+deliberately omitted:** the model's elevated acetaldehyde is **protection-only** (throttled reduction).
+Reality *superimposes* an **SO₂-induced over-production** component — a redox pull where the yeast
+excretes *more* acetaldehyde because SO₂ mops it up (Han 2020) — which we do not model (production stays
+SO₂-independent). So the "72 vs 37 mg/L peak" the model shows under-attributes the real elevation:
+protection explains part of it, induced production the rest. A future beat could add an SO₂-gated bump
+to `AcetaldehydeProduction`; today it is out of scope.
 
 **Downstream test consequences (all faithful, re-pinned to measured output).**
 - `test_so2_dose_suppresses_mlf_in_a_run`: SO₂ dosed *during* AF is now only a **partial** MLF brake
