@@ -3103,6 +3103,75 @@ an N-model one — the clean path to a default-on lever; (c) keep residual-assim
 dataset with measured residual YAN + sugar). Owner picked (c): keep the D-30 cap as-is, no N-model
 build. The negative result **is** the deliverable — it closes a question open since D-23.
 
+## D-44 — Post-fermentation / autolytic H₂S source + copper fining (the two D-42 deferred items)
+
+**Status: IMPLEMENTED 2026-07-06** (578 green + 5 benchmark, ruff + mypy clean). The two follow-ups
+D-42 named at close (line "Deferred: the post-fermentation / autolytic H₂S source … a copper-binding /
+mercaptan model"): the *reductive-fault* H₂S the flux-linked D-29/D-42 pair could not represent, and
+its standard remediation. Ships in two parts; the **mercaptan pool is deliberately deferred** to a
+scope decision (below).
+
+**Part 1 — `AutolyticHydrogenSulfide` (`core/kinetics/hydrogen_sulfide.py`): a yield on the autolysis
+flux.** As dead yeast self-digest they release intracellular sulfide (cysteine/methionine/GSH). This
+is that release, coupled to the **same** first-order autolysis flux `YeastAutolysis` (D-34) runs:
+
+    d(h2s)/dt = y_h2s_autolysis · (k_autolysis · arrhenius(T, E_a_autolysis, T_ref) · X_dead)
+
+* **Yield-on-flux, not an independent rate (advisor steer).** It *recomputes* `YeastAutolysis`' own
+  rate internally and scales by a yield `y_h2s_autolysis` [g H₂S / g biomass autolysed] — the D-33
+  `FuselAminoAcidReroute` recompute-the-producer idiom. So the `autolysis_rate_per_h` opt-in (which
+  *overrides* `k_autolysis` to sweep the sur-lie timescale, D-34) moves **peptide and sulfide release
+  on one clock**; an independent constant would desynchronise the two halves of one self-digestion.
+* **Why this is the reductive fault — the load-bearing contrast with D-29/D-42.** Unlike the D-29
+  producer, this source is **not flux-linked** (first-order in `X_dead`, which persists post-dryness).
+  The D-42 CO₂-stripping sink *is* flux-linked, so it **gates off at dryness** and cannot sweep this
+  H₂S — post-fermentation autolytic sulfide **accumulates as residual**, the un-stripped "reduction"
+  that develops on the lees and calls for racking / aeration / copper. Verified: with autolysis opted
+  in the residual keeps rising deep post-dryness (day 15 → 40), > 5× the stripped-to-µg/L default;
+  the default run still freezes at dryness (final == running max) — the rise is the new source, not
+  the run length.
+* **HONESTY CAVEAT #1 — emergent post-dryness, not an AF/post-AF switch.** `X_dead` accumulates
+  *during* AF too (D-13 inactivation), so the Process fires whenever `X_dead > 0` and autolysis is on
+  — including late AF, where the sink is still active and *does* strip the fresh release. The
+  "persists un-stripped" character is **emergent** (flux→0 gates the sink off), not hard-coded.
+* **HONESTY CAVEAT #2 — `h2s_gas` semantics broaden.** With autolysis on, `h2s + h2s_gas` ("cumulative
+  produced", D-42) now sums sulfate-reduction *and* the stripped fraction of autolytic H₂S; the
+  residual `h2s` additionally holds the un-stripped autolytic accumulation. Not a defect — the pools
+  stay individually meaningful — but the D-42 "produced total" reading is no longer purely
+  sulfate-reduction once the opt-in is set.
+* **Magnitude anchored on biomass sulfur (advisor's provenance point).** `y_h2s_autolysis` = **2e-5**
+  g H₂S / g biomass (speculative). Ceiling: all biomass S (~0.1–0.4 % dry wt) leaving as H₂S is
+  y_max ≈ 1.06 · 2.5e-3 ≈ 2.6e-3; the model's 2e-5 is ~**1 %** of that — the trace released as free
+  sulfide, the rest retained in released S-amino acids / peptides / GSH (untracked). Band 2e-6–2.6e-4.
+* **Isolability + tier.** Carbon-free, touches **only** `h2s` (nothing reads it back), so the D-34
+  isolability holds: opt-in and **wine-only**, disabled *together with* `YeastAutolysis` at the compile
+  seam absent `autolysis_rate_per_h`. An undosed wine run is byte-for-byte the validated core — the 5
+  §2.2 benchmarks pass unchanged (**run, not inferred**). Both autolysis Processes now sit in
+  `_AUTOLYSIS_PROCESSES`. Speculative (already speculative on `h2s` from D-29 ⇒ no tier headline).
+
+**Part 2 — `add_copper` intervention (`scenario/compile.py`): copper-fine H₂S out.** The remediation.
+Copper (Cu²⁺, dosed as copper sulfate) precipitates dissolved sulfide as insoluble CuS (Cu²⁺ + H₂S →
+CuS↓ + 2 H⁺, **1:1 mol**), settling out with the lees. The verb doses `copper_mgl` (mg/L Cu), converts
+to the bindable H₂S mass via the sourced `copper_h2s_binding` = M_H2S/M_Cu = **0.536 g H₂S/g Cu**
+(additions.yaml, plausible — stoichiometry exact, complete-binding an idealisation, banded to ~50 %
+efficiency), and removes `min(h2s_present, capacity)` — copper in excess simply clears all dissolved
+H₂S, the real outcome. **Ledger-neutral by construction** (H₂S carbon/nitrogen-free ⇒ removal books a
+zero-weight external flow, the `add_so2` precedent — no `conservation.py` change). Guard: a negative
+`h2s` undershoot is left untouched (copper never *adds* H₂S). Verified end-to-end: a day-38 fining of a
+reductive (autolysing) wine collapses the accumulated residual to < 25 % of the un-fined run. **SCOPE
+(v1):** the removal lever only — residual copper (excess Cu, a haze/toxicity concern) is untracked, and
+copper binding of *mercaptans* is deferred with the mercaptan pool.
+
+**Deferred — the mercaptan pool (taken to the owner, D-44).** Copper also binds mercaptans
+(methanethiol / ethanethiol), the *other* reductive off-aromas. Two forks make this a scope decision,
+not a detail: (a) mercaptans genuinely **carry carbon** (unlike H₂S), so a `mercaptans` pool must be a
+real `total_carbon` species (+ copper removal then books a carbon flow like racking debris) — a
+carbon-free lump would violate the exact-from-formula discipline and is **not on the table**; and (b)
+formation is genuinely murky — methanethiol is mostly methionine-degradation / autolysis, *not* a clean
+H₂S→thiol step, so a fabricated conversion rate is exactly what fidelity rejects. Owner to choose:
+pool-with-carbon vs. copper-on-h2s-only for v1; and if pooled, autolysis-linked vs. H₂S-linked
+formation.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -3116,6 +3185,12 @@ build. The negative result **is** the deliverable — it closes a question open 
   carbon-free `h2s_gas` headspace pool on the CO₂-evolution flux, so `h2s` is now the µg/L
   *residual* reality shows and `h2s + h2s_gas` is cumulative produced. The exact ester D-20/D-21
   precedent but simpler (carbon-free ⇒ no ledger weighting). See D-42.
+- ~~**Post-fermentation / autolytic H₂S source + copper fining**~~ (the two D-42 deferred items) —
+  **decided + IMPLEMENTED in D-44 (2026-07-06)**: `AutolyticHydrogenSulfide` is a yield on the D-34
+  autolysis flux (opt-in, wine-only) whose non-flux-linked form makes it accumulate un-stripped as
+  *residual* post-dryness — the reductive fault; `add_copper` precipitates it as CuS (stoichiometric,
+  ledger-neutral). See D-44. **Still open:** a **mercaptan pool** (carbon-bearing thiols + copper
+  binding of them) — taken to the owner as a scope decision (D-44), *not* auto-built.
 - ~~**Residual-nitrogen / satiation floor**~~ — **addressed in D-30 (opt-in cap) and RESOLVED in
   D-43 (2026-07-06): the "default-on N redesign" is declined.** A spike + a mass-balance argument
   (D-43) proved that **default-on residual *assimilable* N is Coleman-incompatible regardless of

@@ -58,6 +58,26 @@ slot, D-26) and the acetaldehyde production (which writes ``E``, D-27), this Pro
   ``h2s + h2s_gas`` is cumulative produced (the ester D-19 produced-only → D-20/D-21 Henry's-law
   sink precedent, but carbon-free). Dropping *just* the sink recovers this module's original
   D-29 produced-only ``h2s`` pool byte-for-byte (``h2s_gas`` stays 0).
+* **Autolytic (sur-lie reduction) H₂S — now modelled (decision D-44).**
+  :class:`AutolyticHydrogenSulfide` is a *second* producer feeding the same ``h2s`` pool, but from
+  yeast **autolysis** rather than fermentative sulfate reduction: as dead cells self-digest they
+  release intracellular sulfide, a **yield on the autolysis flux** ``d(h2s) = y_h2s_autolysis ·
+  (k_autolysis·f_T·X_dead)`` (the D-33 :class:`~fermentation.core.kinetics.byproducts.\
+  FuselAminoAcidReroute` recompute-the-producer's-rate idiom, so a sur-lie timescale sweep keeps
+  peptide *and* sulfide release on one clock). The headline that makes this the *reductive*-fault
+  H₂S: it is **not flux-linked**, so the CO₂-stripping sink (which gates off at dryness with the
+  fermentative flux) cannot sweep it — post-dryness autolytic H₂S **accumulates as residual**,
+  exactly the "reduction" that develops on the lees and needs racking / aeration / **copper**. It
+  is opt-in and wine-only, riding the D-34 ``autolysis_rate_per_h`` gate (an undosed wine run is
+  byte-for-byte the validated core). NB it fires whenever ``X_dead > 0`` *and* autolysis is on —
+  including late AF (``X_dead`` accumulates during AF via D-13 inactivation), where the sink *does*
+  still strip it; the "persists un-stripped" character is **emergent post-dryness only**.
+* **Copper fining — now a removal lever (decision D-44).** The ``add_copper`` intervention
+  (``fermentation.scenario.compile``) binds dissolved H₂S as insoluble copper sulfide (Cu²⁺ + H₂S
+  → CuS↓, 1:1 mol) and removes it from the ``h2s`` pool — the standard remediation for the
+  autolytic reduction above. Carbon-free, so (like ``add_so2``) the removal perturbs no elemental
+  ledger. Residual copper (excess Cu left in the wine) and copper binding of *mercaptans* are out
+  of scope in v1 (the mercaptan pool is deferred; see below).
 * **The cross-must YAN lever is muted by an upstream model gap.** The defining real behaviour
   — a low-YAN must makes far more H₂S than a high-YAN one — is only *partially* reproduced,
   because the nitrogen model strips ``N`` to ~0 early (by ~day 1.3) *regardless of dose* (no
@@ -66,8 +86,11 @@ slot, D-26) and the acetaldehyde production (which writes ``E``, D-27), this Pro
   *does* emerge cleanly and is the acceptance anchor: **within a run, the H₂S production rate
   ramps up as N depletes** — the gate mechanism itself. The cross-must lever becomes real only
   once the deferred residual-N floor lands (see decision D-29 and the D-23 nitrogen-gap note).
-* Yeast-pathway (sulfate-reduction) H₂S only; other sulfides / mercaptans and the
-  copper-binding chemistry are out of scope.
+* **Mercaptans (thiols) still out of scope.** Copper also binds mercaptans (methanethiol /
+  ethanethiol), the other reductive off-aromas; unlike H₂S these carry carbon (so a ``mercaptans``
+  pool would sit on ``total_carbon``), and their formation is genuinely murky (methionine
+  degradation / autolysis, not a clean H₂S → thiol step). A mercaptan pool + copper-binds-thiols is
+  deferred pending a scope decision (decision D-44).
 """
 
 from __future__ import annotations
@@ -201,4 +224,65 @@ class HydrogenSulfideVolatilization(Process):
         rate = params["k_h2s_volatil"] * flux * f_gas * f_part * h2s_liquid
         d[schema.slice("h2s")] = -rate
         d[schema.slice("h2s_gas")] = rate
+        return d
+
+
+class AutolyticHydrogenSulfide(Process):
+    """Autolytic (sur-lie reduction) H₂S — a yield on the autolysis flux (decision D-44).
+
+    ``d(h2s)/dt = y_h2s_autolysis · (k_autolysis · arrhenius(T, E_a_autolysis, T_ref) · X_dead)``.
+    As dead yeast self-digest they release intracellular sulfide (from cysteine/methionine/
+    glutathione); this is that release, **coupled to the same first-order autolysis flux**
+    :class:`~fermentation.core.kinetics.autolysis.YeastAutolysis` runs (``r = k_autolysis·f_T·
+    X_dead``). It **recomputes** that producer's rate internally and multiplies by a yield
+    ``y_h2s_autolysis`` [g H₂S per g biomass autolysed] — the D-33
+    :class:`~fermentation.core.kinetics.byproducts.FuselAminoAcidReroute` idiom — so the scenario's
+    ``autolysis_rate_per_h`` opt-in (which *overrides* ``k_autolysis`` to sweep the sur-lie
+    timescale, D-34) moves peptide release **and** sulfide release on one clock. If it read an
+    independent rate constant instead, sweeping the timescale would desynchronise the two halves of
+    the same self-digestion.
+
+    **Why this is the *reductive*-fault H₂S (the load-bearing contrast with D-29/D-42).** Unlike
+    :class:`HydrogenSulfideProduction`, this source is **not** flux-linked — it is first-order in
+    ``X_dead``, which persists (and grows, via D-13 inactivation) after dryness. The CO₂-stripping
+    sink :class:`HydrogenSulfideVolatilization` *is* flux-linked, so it **gates off at dryness**
+    (``flux → 0``) and cannot sweep this H₂S out — post-fermentation autolytic sulfide therefore
+    **accumulates as residual** in the ``h2s`` pool, the un-stripped "reduction" that develops on
+    the lees and calls for racking / aeration / copper fining (the ``add_copper`` verb). HONEST
+    SCOPE: because ``X_dead`` also accumulates *during* AF, the Process fires whenever ``X_dead >
+    0`` and autolysis is enabled — including late AF, where the sink is still active and *does*
+    strip the freshly-released sulfide; the "persists un-stripped" behaviour is **emergent
+    post-dryness**, not a hard-coded AF/post-AF switch.
+
+    Touches **only ``h2s``** (carbon-free ⇒ no ledger, no draw from ``X_dead`` — the sulfur it
+    carries is untracked, exactly as the D-29 sulfate is); reads ``X_dead``/``T`` and the autolysis
+    constants without writing them. Opt-in and **wine-only**, riding the D-34 autolysis gate: absent
+    ``autolysis_rate_per_h`` it is disabled at the compile seam, so an undosed wine run is
+    byte-for-byte the validated core. First guard ``X_dead ≤ 0 ⇒ 0`` (no dead cells ⇒ nothing to
+    autolyse; the clamped pool cannot overshoot negative). Tier **speculative** (the yield magnitude
+    is an author estimate anchored on biomass sulfur content; parameter-tier propagation caps the
+    ``h2s`` output at speculative — already speculative from D-29, so no headline change).
+    """
+
+    name = "autolytic_hydrogen_sulfide"
+    tier = Tier.SPECULATIVE
+    touches = ("h2s",)
+    #: ``y_h2s_autolysis`` sets the g-H₂S-per-g-biomass-autolysed yield; ``k_autolysis``/
+    #: ``E_a_autolysis``/``T_ref`` are the *same* autolysis constants
+    #: :class:`~fermentation.core.kinetics.autolysis.YeastAutolysis` reads, so the two coupled
+    #: fluxes share one rate (and one ``autolysis_rate_per_h`` override). Their tiers cap the
+    #: ``h2s`` output tier via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = ("y_h2s_autolysis", "k_autolysis", "E_a_autolysis", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        x_dead = max(float(y[schema.slice("X_dead")][0]), 0.0)
+        if x_dead <= 0.0:
+            return d  # no dead cells ⇒ nothing to autolyse (clamped, so no negative overshoot)
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_autolysis"], params["T_ref"])
+        r_autolysis = params["k_autolysis"] * f_t * x_dead  # [g X_dead/L/h] — YeastAutolysis' rate
+        d[schema.slice("h2s")] = params["y_h2s_autolysis"] * r_autolysis
         return d

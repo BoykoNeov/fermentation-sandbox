@@ -72,6 +72,7 @@ from fermentation.core.kinetics import (
     AcetolactateExcretion,
     AminoAcidAssimilation,
     ArrheniusTemperature,
+    AutolyticHydrogenSulfide,
     BiomassCarryingCapacity,
     BrettDeath,
     BrettDecarboxylation,
@@ -663,7 +664,7 @@ _AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     FuselAminoAcidReroute,
 )
 
-#: Yeast autolysis (wine-only, decision D-34): the autolytic-peptide source that refills the
+#: Yeast autolysis (wine-only, decisions D-34, D-44): the autolytic-peptide source that refills the
 #: ``amino_acids`` pool from dead biomass (``X_dead``) post-AF — the second prerequisite (after the
 #: D-33 fusel re-route) the deferred MLF-with-growth beat needs, since the pool is empty at the MLF
 #: pitch point (D-23). The first consumer of ``X_dead``: it liberates the dead-cell nitrogen as
@@ -673,7 +674,16 @@ _AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: seam DISABLES it unless a scenario opts in via ``autolysis_rate_per_h`` — an undosed wine run is
 #: then byte-for-byte the validated core. Wine-only (mirrors the wine-only ``amino_acids`` pool and
 #: nitrogen model, D-30/D-32); beer deferred.
-_AUTOLYSIS_PROCESSES: tuple[Callable[[], Process], ...] = (YeastAutolysis,)
+#:
+#: :class:`AutolyticHydrogenSulfide` (decision D-44) rides in this same opt-in tuple: it feeds the
+#: shared ``h2s`` pool a **yield on the autolysis flux** (``y_h2s_autolysis·k_autolysis·f_T·
+#: X_dead``) — the sulfide dead cells release as they self-digest. Sharing the gate keeps peptide
+#: and sulfide release on one clock (both read the ``autolysis_rate_per_h`` override), and its
+#: **non-flux-linked** form is the point: the D-42 CO₂-stripping sink gates off at dryness, so this
+#: autolytic H₂S accumulates un-stripped as *residual* — the sur-lie "reduction" fault. Carbon-free,
+#: touches only ``h2s`` (nothing reads it back), so like the D-34 refill it stays isolable and drops
+#: to the validated core when autolysis is un-opted. Both are disabled together at the compile seam.
+_AUTOLYSIS_PROCESSES: tuple[Callable[[], Process], ...] = (YeastAutolysis, AutolyticHydrogenSulfide)
 
 #: Temperature-schedule ramp (decision D-35): the single Process that drives ``T`` along a
 #: piecewise-linear temperature schedule (``dT/dt = temperature_ramp_rate``). Medium-agnostic —

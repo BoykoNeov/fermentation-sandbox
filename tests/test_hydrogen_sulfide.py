@@ -34,9 +34,11 @@ import pytest
 
 from fermentation.core.chemistry import carbon_mass_fraction
 from fermentation.core.kinetics import (
+    AutolyticHydrogenSulfide,
     HydrogenSulfideProduction,
     HydrogenSulfideVolatilization,
 )
+from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.media import get_medium, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -483,3 +485,197 @@ def test_volatilization_output_tier(store):
     schema = wine_schema()
     ps = ProcessSet(schema, [HydrogenSulfideVolatilization()])
     assert ps.tier_of("h2s_gas", store.tier_map()) is Tier.SPECULATIVE
+
+
+# -- autolytic (sur-lie reduction) H₂S source (AutolyticHydrogenSulfide, decision D-44) --------
+#
+# The post-fermentation / autolytic H₂S the D-42 sink deliberately left out of scope: as dead
+# yeast self-digest they release intracellular sulfide, a YIELD on the SAME first-order autolysis
+# flux YeastAutolysis runs (d(h2s) = y_h2s_autolysis · k_autolysis · f_T · X_dead). Because it is
+# first-order in X_dead (not flux-linked), the flux-linked CO₂-stripping sink cannot sweep it, so
+# post-dryness it accumulates as RESIDUAL — the reductive fault. Opt-in and wine-only, riding the
+# D-34 autolysis_rate_per_h gate.
+
+
+def _autolytic_y0(
+    schema: StateSchema, *, x_dead: float = 1.5, s: float = 200.0, x: float = 2.0, t: float = 293.15
+) -> FloatArray:
+    # A post-AF-ish state: dead biomass to autolyse, ethanol high, nitrogen exhausted.
+    return schema.pack(
+        {"X": x, "S": [s], "E": 100.0, "N": 0.0, "T": t, "CO2": 0.0, "X_dead": x_dead}
+    )
+
+
+def _autolytic_rate(params: Mapping[str, float], *, x_dead: float, t: float) -> float:
+    # y_h2s_autolysis · (k_autolysis · arrhenius(T, E_a_autolysis) · X_dead) — the yield times
+    # YeastAutolysis' own flux (the coupling that keeps peptide + sulfide release on one clock).
+    f_t = arrhenius_factor(t, params["E_a_autolysis"], params["T_ref"])
+    return params["y_h2s_autolysis"] * params["k_autolysis"] * f_t * x_dead
+
+
+def test_autolytic_metadata():
+    p = AutolyticHydrogenSulfide()
+    assert p.name == "autolytic_hydrogen_sulfide"
+    assert p.tier is Tier.SPECULATIVE
+    assert set(p.touches) == {"h2s"}
+    assert set(p.reads) == {"y_h2s_autolysis", "k_autolysis", "E_a_autolysis", "T_ref"}
+
+
+def test_autolytic_matches_closed_form(params):
+    schema = wine_schema()
+    d = AutolyticHydrogenSulfide().derivatives(
+        0.0, _autolytic_y0(schema, x_dead=1.5), schema, params
+    )
+    assert schema.get(d, "h2s") == pytest.approx(_autolytic_rate(params, x_dead=1.5, t=293.15))
+    assert schema.get(d, "h2s") > 0.0
+    # carbon-free autolytic release: touches ONLY h2s — X_dead is NOT drawn (the sulfur is
+    # untracked, exactly as the D-29 sulfate is), so nothing else on the state moves.
+    for name in schema.names:
+        if name == "h2s":
+            continue
+        assert schema.get(d, name) == pytest.approx(0.0, abs=1e-18), name
+
+
+def test_autolytic_scales_with_dead_biomass(params):
+    # First-order in X_dead: twice the dead biomass ⇒ twice the sulfide release.
+    schema = wine_schema()
+    r1 = AutolyticHydrogenSulfide().derivatives(
+        0.0, _autolytic_y0(schema, x_dead=1.0), schema, params
+    )
+    r2 = AutolyticHydrogenSulfide().derivatives(
+        0.0, _autolytic_y0(schema, x_dead=2.0), schema, params
+    )
+    assert schema.get(r2, "h2s") == pytest.approx(2.0 * schema.get(r1, "h2s"))
+
+
+def test_autolytic_is_the_yield_on_the_autolysis_flux(params):
+    # THE coupling (D-44): the rate is EXACTLY y_h2s_autolysis times YeastAutolysis' own flux
+    # r = k_autolysis·f_T·X_dead — the FuselAminoAcidReroute recompute-the-producer idiom — so the
+    # autolysis_rate_per_h override (which moves k_autolysis) drives both halves of one digestion.
+    schema = wine_schema()
+    r_autolysis = (
+        params["k_autolysis"]
+        * arrhenius_factor(293.15, params["E_a_autolysis"], params["T_ref"])
+        * 1.5
+    )
+    d = AutolyticHydrogenSulfide().derivatives(
+        0.0, _autolytic_y0(schema, x_dead=1.5), schema, params
+    )
+    assert schema.get(d, "h2s") == pytest.approx(params["y_h2s_autolysis"] * r_autolysis)
+
+
+def test_autolytic_is_not_flux_linked(params):
+    # THE contrast with the D-29/D-42 flux-linked producer+sink: this source does NOT stop at
+    # dryness — it reads only X_dead and T, independent of sugar and of viable X. So it fires at
+    # S=0 and X=0 (post-fermentation), which is exactly why the flux-linked stripping sink (off at
+    # dryness) cannot sweep it and the sulfide accumulates un-stripped as residual.
+    schema = wine_schema()
+    dry = AutolyticHydrogenSulfide().derivatives(
+        0.0, _autolytic_y0(schema, s=0.0, x=0.0), schema, params
+    )
+    assert schema.get(dry, "h2s") == pytest.approx(_autolytic_rate(params, x_dead=1.5, t=293.15))
+    assert schema.get(dry, "h2s") > 0.0
+
+
+def test_autolytic_rises_with_temperature(params):
+    # Autolysis is enzymatic (shares E_a_autolysis), so — UNLIKE the temperature-flat D-29
+    # production — warmer lees release sulfide faster.
+    schema = wine_schema()
+    cold = AutolyticHydrogenSulfide().derivatives(
+        0.0, _autolytic_y0(schema, t=283.15), schema, params
+    )
+    warm = AutolyticHydrogenSulfide().derivatives(
+        0.0, _autolytic_y0(schema, t=303.15), schema, params
+    )
+    assert schema.get(warm, "h2s") > schema.get(cold, "h2s") > 0.0
+
+
+def test_autolytic_zero_without_dead_biomass(params):
+    # No dead cells ⇒ nothing to autolyse; a solver undershoot to X_dead < 0 is clamped (no
+    # negative-overshoot production).
+    schema = wine_schema()
+    p = AutolyticHydrogenSulfide()
+    assert (
+        schema.get(p.derivatives(0.0, _autolytic_y0(schema, x_dead=0.0), schema, params), "h2s")
+        == 0.0
+    )
+    assert (
+        schema.get(p.derivatives(0.0, _autolytic_y0(schema, x_dead=-1e-6), schema, params), "h2s")
+        == 0.0
+    )
+
+
+def test_autolytic_output_tier_is_speculative(store):
+    # The yield magnitude is a speculative author estimate (biomass-S anchored), so parameter-tier
+    # propagation (D-1) caps the h2s output at speculative — already speculative from D-29.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AutolyticHydrogenSulfide()])
+    assert ps.tier_of("h2s", store.tier_map()) is Tier.SPECULATIVE
+
+
+# -- autolytic H₂S: integrated (opt-in isolability + post-dryness accumulation) ----------------
+
+
+def _run_autolysis(*, rate_per_h: float = 2.0e-3, yan_mgl: float = 80.0, days: float = 40.0):
+    """Compile+integrate a wine ferment WITH autolysis opted in (autolysis_rate_per_h), so both
+    YeastAutolysis and AutolyticHydrogenSulfide are enabled; daily grid."""
+    scenario = Scenario(
+        name="wine-h2s-autolysis",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": yan_mgl,
+            "pitch_gpl": 0.25,
+            "autolysis_rate_per_h": rate_per_h,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=days,
+    )
+    compiled = compile_scenario(scenario, strict=True)
+    dur = compiled.t_span_h[1]
+    t_eval = np.linspace(0.0, dur, int(days) + 1)
+    traj = simulate(
+        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h, t_eval=t_eval
+    )
+    assert traj.success, traj.message
+    return traj, compiled
+
+
+def test_autolytic_disabled_without_opt_in():
+    # Opt-in isolability (D-44/D-34): a default wine run (no autolysis_rate_per_h) has BOTH
+    # autolysis Processes disabled, so the h2s pool is exactly the D-29/D-42 flux-linked residual —
+    # the validated core is untouched (verified byte-for-byte by the existing D-42 tests, which
+    # never opt into autolysis).
+    _, compiled = _run(80.0)
+    active = {p.name for p in compiled.process_set.active}
+    assert "autolytic_hydrogen_sulfide" not in active
+    assert "yeast_autolysis" not in active
+
+
+def test_autolytic_enabled_together_when_opted_in():
+    # The opt-in enables BOTH halves of the same self-digestion (they share the gate + k_autolysis).
+    _, compiled = _run_autolysis()
+    active = {p.name for p in compiled.process_set.active}
+    assert "autolytic_hydrogen_sulfide" in active
+    assert "yeast_autolysis" in active
+
+
+def test_autolytic_h2s_accumulates_un_stripped_post_dryness():
+    # THE reductive-fault headline (D-44): with autolysis opted in, the h2s RESIDUAL keeps RISING
+    # well after dryness — unlike the default run, where it FREEZES (D-42) because production AND
+    # stripping are both flux-gated. The autolytic source is first-order in X_dead (not flux-
+    # linked), so the flux-linked stripping sink cannot sweep it: post-fermentation sulfide accrues
+    # un-stripped — the sur-lie "reduction" that calls for racking / aeration / copper.
+    on, _ = _run_autolysis(rate_per_h=2.0e-3, days=40.0)
+    off, _ = _run(80.0, days=40.0)
+    h2s_on = np.asarray(on.series("h2s"))
+    h2s_off = np.asarray(off.series("h2s"))
+    # the autolytic source builds a MUCH larger residual than the stripped-to-µg/L default
+    assert h2s_on[-1] > 5.0 * h2s_off[-1]
+    # and it is still RISING deep in the post-dryness window (day 15 → day 40, both well past the
+    # ~day-10 dryness of a 24-Brix wine) — the un-stripped accumulation
+    i15 = int(np.argmin(np.abs(on.t / 24.0 - 15.0)))
+    assert h2s_on[-1] > 1.5 * float(h2s_on[i15]) > 0.0
+    # sanity: the default run really did FREEZE at dryness (final ≈ its running max), so the rise is
+    # the autolytic source, not the run length
+    assert h2s_off[-1] == pytest.approx(float(h2s_off.max()), rel=1e-2)

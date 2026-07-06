@@ -26,9 +26,11 @@ from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate
 from fermentation.runtime.schedule import ScheduledTrajectory
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
+from fermentation.units.convert import mgl_to_gpl
 from fermentation.validation.conservation import total_carbon, total_nitrogen
 
 _DAP_N_FRACTION = 0.2121  # exact (NH4)2HPO4 stoichiometry (additions.yaml)
+_COPPER_H2S_BINDING = 0.536  # g H2S bound / g Cu, stoichiometric CuS 1:1 (additions.yaml, D-44)
 
 
 def _wine(
@@ -589,3 +591,123 @@ def test_no_interventions_is_byte_for_byte_plain_simulate():
     )
     assert np.array_equal(scheduled.y, plain.y)
     assert scheduled.external_flows == ()
+
+
+# -- add_copper: copper-fine dissolved H₂S out of the wine (decision D-44) -----
+#
+# The remediation half of the reductive-fault beat. Copper (Cu²⁺) precipitates dissolved sulfide
+# as insoluble CuS (1:1 mol), so add_copper removes min(h2s_present, capacity) from the h2s pool,
+# where capacity = (copper g/L) · copper_h2s_binding. H₂S is carbon-free, so — like add_so2 — the
+# removal rides neither elemental ledger. This is the standard fix for the un-stripped autolytic
+# reduction the D-44 AutolyticHydrogenSulfide source builds up post-dryness.
+
+
+def _copper(day: float, copper_mgl: float) -> Intervention:
+    return Intervention(day=day, action="add_copper", params={"copper_mgl": copper_mgl})
+
+
+def _copper_event(cs, day: float):
+    return next(e for e in cs.events if e.label == f"add_copper@{day:g}d")
+
+
+def test_add_copper_removes_stoichiometric_h2s():
+    # Verb-level, applied to a hand-built state so the removal is exact and not confounded by
+    # concurrent production: copper binds H₂S 1:1 as CuS, so a dose removes min(present, capacity).
+    cs = compile_scenario(_wine([_copper(5.0, 0.05)]))
+    ev = _copper_event(cs, 5.0)
+    schema = cs.schema
+    h2s = schema.slice("h2s")
+    capacity = mgl_to_gpl(0.05) * cs.param_values["copper_h2s_binding"]  # ~26.8 µg/L
+    assert capacity == pytest.approx(mgl_to_gpl(0.05) * _COPPER_H2S_BINDING, rel=1e-12)
+
+    # present ≫ capacity ⇒ partial removal of EXACTLY the capacity (copper is the limiting reagent)
+    high = cs.y0.copy()
+    high[h2s] = 1.0e-3  # 1 mg/L dissolved, far above capacity
+    assert float(ev.mutate(schema, high)[h2s][0]) == pytest.approx(1.0e-3 - capacity, rel=1e-12)
+
+    # present < capacity ⇒ ALL of it removed, and no more (the pool floors at 0, not negative)
+    low = cs.y0.copy()
+    low[h2s] = 1.0e-5  # 10 µg/L, below capacity
+    assert float(ev.mutate(schema, low)[h2s][0]) == pytest.approx(0.0, abs=1e-18)
+
+
+def test_add_copper_does_not_strip_a_negative_undershoot():
+    # Guard symmetry with the kinetics' ≥0 clamps: if a solver undershoot left h2s < 0, copper must
+    # not "remove" a negative amount (which would ADD H₂S). The clamp leaves it untouched.
+    cs = compile_scenario(_wine([_copper(5.0, 0.5)]))
+    ev = _copper_event(cs, 5.0)
+    schema = cs.schema
+    h2s = schema.slice("h2s")
+    y = cs.y0.copy()
+    y[h2s] = -1.0e-9
+    assert float(ev.mutate(schema, y)[h2s][0]) == pytest.approx(-1.0e-9, rel=1e-12)
+
+
+def test_add_copper_lands_on_h2s_and_books_one_flow():
+    cs = compile_scenario(_wine([_copper(5.0, 0.5)]))
+    traj = cs.run()
+    assert len(traj.external_flows) == 1
+    flow = traj.external_flows[0]
+    assert flow.label == "add_copper@5d"
+    schema = cs.schema
+    # Removal only: the h2s delta is ≤ 0 (copper never adds H₂S) and EVERY other slot delta is 0.
+    assert flow.delta[schema.slice("h2s")][0] <= 0.0
+    others = np.delete(flow.delta, schema.slice("h2s").start)
+    assert np.count_nonzero(others) == 0
+
+
+def test_add_copper_perturbs_neither_carbon_nor_nitrogen():
+    cs = compile_scenario(_wine([_copper(5.0, 0.5)]))
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+    # H₂S carries neither element (carbon-free, D-29), so the removal contributes nothing to either
+    # ledger and both single-run balances still close with no correction term (the add_so2 case).
+    assert all(c_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
+    assert all(n_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
+    assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0), abs=1e-6)
+    assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0), abs=1e-9)
+
+
+def _autolysis_wine(interventions: list[Intervention]) -> Scenario:
+    # A wine with autolysis opted in, so AutolyticHydrogenSulfide builds an un-stripped reductive
+    # H₂S residual post-dryness (decision D-44) — the fault the copper fining below remediates.
+    return Scenario(
+        name="reduction-cu",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 80.0,
+            "pitch_gpl": 0.25,
+            "autolysis_rate_per_h": 0.002,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=interventions,
+        duration_days=40.0,
+    )
+
+
+def test_add_copper_clears_the_autolytic_reduction():
+    # THE remediation headline (D-44): a copper fining late in a reductive (autolysing) wine
+    # precipitates the accumulated H₂S residual and drops the h2s pool toward zero — copper clears
+    # reduction. Compared against the same wine with NO copper (identical up to the dose).
+    grid = np.linspace(0.0, 40.0 * 24.0, 401)
+    no_cu = compile_scenario(_autolysis_wine([])).run(t_eval=grid)
+    fined = compile_scenario(_autolysis_wine([_copper(38.0, 0.5)])).run(t_eval=grid)
+    h2s_nocu = np.asarray(no_cu.series("h2s"))
+    h2s_cu = np.asarray(fined.series("h2s"))
+
+    # the reductive residual really did build up (not a µg/L trace) — this is the fault to fix
+    assert h2s_nocu[-1] > 1.0e-5  # > 10 µg/L, well above the stripped-default residual
+    # before the day-38 fining the two runs share the same H₂S history
+    i_before = int(np.argmin(np.abs(fined.t / 24.0 - 37.0)))
+    assert h2s_cu[i_before] == pytest.approx(h2s_nocu[i_before], rel=1e-2)
+    # after it, the fined run's residual collapses — copper removed ~all the dissolved H₂S
+    assert h2s_cu[-1] < h2s_cu[i_before]
+    assert h2s_cu[-1] < 0.25 * h2s_nocu[-1]
+
+
+def test_add_copper_missing_param_raises():
+    with pytest.raises(ValueError, match="missing required param 'copper_mgl'"):
+        compile_scenario(_wine([Intervention(day=5.0, action="add_copper", params={})]))

@@ -234,6 +234,37 @@ E_a_autolysis:
     conditions: "S. cerevisiae wine lees; equivalent Arrhenius activation energy at T_ref = 293.15 K"
     notes: "Temperature sensitivity of autolytic amino-acid release (f_T = arrhenius(T, E_a_autolysis, T_ref)). Autolysis is driven by intracellular proteases/glucanases, so it accelerates with temperature (the reason warm lees aging clears faster) — a moderate generic enzymatic E_a ~60 kJ/mol (Q10 ~2.2). No kinetic source measures an autolysis activation energy in our form; a bounded estimate, hence speculative. DIRECTION (rises with T) is the load-bearing property; the magnitude is a banded guess."
 
+# -- Autolytic (sur-lie reduction) H2S yield (opt-in, decision D-44) -----------
+# AutolyticHydrogenSulfide (fermentation.core.kinetics.hydrogen_sulfide) feeds the SHARED h2s pool
+# the sulfide dead yeast release as they self-digest — a YIELD on the SAME first-order autolysis
+# flux YeastAutolysis runs: d(h2s) = y_h2s_autolysis * (k_autolysis * f_T * X_dead). It recomputes
+# that producer's rate internally (the D-33 FuselAminoAcidReroute idiom) so the autolysis_rate_per_h
+# opt-in — which overrides k_autolysis to sweep the sur-lie timescale (D-34) — moves peptide release
+# AND sulfide release on ONE clock. THE HEADLINE (why this is the reductive-fault H2S): unlike the
+# D-29 flux-linked producer, this source is first-order in X_dead (which persists post-dryness), and
+# the D-42 CO2-stripping sink is flux-linked, so it gates OFF at dryness and cannot sweep this H2S —
+# post-fermentation autolytic sulfide ACCUMULATES as residual, the un-stripped "reduction" that
+# develops on the lees (racking/aeration/copper remediate it). OPT-IN with YeastAutolysis (both
+# disabled at the compile seam unless autolysis_rate_per_h is set), wine-only. Carbon-free (h2s is on
+# no ledger, D-29), so the sulfur it carries is untracked exactly as the sulfate is.
+#
+# MAGNITUDE — anchored on biomass sulfur content. Yeast dry biomass is ~0.1-0.4% sulfur (w/w, in
+# cysteine/methionine/glutathione); if ALL of it left as H2S the ceiling would be y_max ~ 1.06 (g
+# H2S/g S) * 2.5e-3 (g S/g) ~ 2.6e-3 g H2S/g biomass. Only a TRACE actually leaves as sulfide (most
+# stays in released S-amino acids/peptides/GSH), so y_h2s_autolysis = 2e-5 is ~1% of that ceiling —
+# for a few g/L of X_dead fully autolysed, ~tens-to-100 ug/L cumulative autolytic H2S, a clear
+# reductive signal well above the ~1-2 ug/L threshold yet far below the total-S ceiling. Directional
+# (not fit to a release curve) and the release fraction is a guess, hence speculative.
+y_h2s_autolysis:
+  value: 2.0e-5
+  unit: "g/g"   # g H2S released per g dead biomass (X_dead) autolysed
+  tier: speculative
+  uncertainty: { low: 2.0e-6, high: 2.6e-4, note: "release fraction of biomass sulfur as H2S: 2e-6 (~0.08% of the ~2.6e-3 g H2S/g total-S ceiling) to 2.6e-4 (~10%); default 2e-5 ~ 1% of biomass S released as sulfide, the rest retained in S-amino acids/peptides/GSH" }
+  provenance:
+    source: "author estimate anchored on yeast biomass sulfur content (~0.1-0.4% dry weight, cysteine/methionine/glutathione; general enology/microbiology) and the reductive-fault magnitude of sur-lie H2S (~tens of ug/L; Rauhut; Swiegers et al. 2005)"
+    conditions: "generic S. cerevisiae wine lees; g H2S per g dead biomass autolysed, released on the same first-order autolysis flux as the D-34 amino-acid refill"
+    notes: "Read by AutolyticHydrogenSulfide as the yield on the autolysis flux (d(h2s) = y_h2s_autolysis * k_autolysis * f_T * X_dead). Ceiling y_max ~ 2.6e-3 g H2S/g biomass = ALL biomass sulfur (~2.5e-3 g S/g) leaving as H2S (1.06 g H2S/g S); the model's 2e-5 is ~1% of that ceiling — the trace released as free sulfide during self-digestion, the rest retained in released S-amino acids / peptides / glutathione (untracked). OPT-IN ONLY (disabled with YeastAutolysis unless autolysis_rate_per_h is set); an undosed run does not read this value. Directional, hence speculative."
+
 # -- Ethanol-driven cell inactivation (the timescale brake, decision D-13) -----
 # Coleman split biomass into active cells X_A and modelled an ethanol-proportional
 # specific death rate (their eqs 2, 7): dX_A/dt = mu*X_A - k_d*X_A, k_d = k'_d*E.

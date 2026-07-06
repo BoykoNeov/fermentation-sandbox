@@ -242,9 +242,11 @@ BRETT_GROWTH_PROCESSES = {"brett_growth"}
 # tuple from the Brett Processes: it is gated on the (binary) POF+ strain trait, WHOLLY INDEPENDENT
 # of the Brett pitch — a POF+ ferment need not have Brett, and a POF- wine makes no vinylphenol.
 POF_PROCESSES = {"yeast_pof_decarboxylation"}
-# Yeast autolysis (D-34): wine-only, opt-in — present in a bare build, disabled at the compile
-# seam unless a scenario passes autolysis_rate_per_h (the carrying-capacity opt-in pattern).
-AUTOLYSIS_PROCESSES = {"yeast_autolysis"}
+# Yeast autolysis (D-34) + autolytic H₂S source (D-44): wine-only, opt-in — both present in a bare
+# build, disabled together at the compile seam unless a scenario passes autolysis_rate_per_h (the
+# carrying-capacity opt-in pattern). AutolyticHydrogenSulfide feeds the shared h2s pool the sulfide
+# dead cells release, on the same autolysis flux (decision D-44).
+AUTOLYSIS_PROCESSES = {"yeast_autolysis", "autolytic_hydrogen_sulfide"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES

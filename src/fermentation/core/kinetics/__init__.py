@@ -35,6 +35,7 @@ from fermentation.core.kinetics.byproducts import (
 from fermentation.core.kinetics.carrying_capacity import BiomassCarryingCapacity
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited, biomass_growth_rate
 from fermentation.core.kinetics.hydrogen_sulfide import (
+    AutolyticHydrogenSulfide,
     HydrogenSulfideProduction,
     HydrogenSulfideVolatilization,
 )
@@ -65,6 +66,7 @@ __all__ = [
     "AcetolactateDecarboxylation",
     "AcetolactateExcretion",
     "AminoAcidAssimilation",
+    "AutolyticHydrogenSulfide",
     "BiomassCarryingCapacity",
     "BrettDeath",
     "BrettDecarboxylation",

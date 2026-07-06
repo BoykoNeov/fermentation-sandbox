@@ -31,3 +31,26 @@ dap_nitrogen_fraction:
     source: "exact stoichiometry of diammonium phosphate (NH4)2HPO4"
     conditions: "commercial DAP fermentation supplement; both ammonium groups counted as immediately assimilable YAN"
     notes: "M((NH4)2HPO4) = 132.06 g/mol, 2 N = 28.014 g/mol -> 28.014/132.06 = 0.2121 g N/g DAP. Phosphate is DROPPED (no phosphorus pool in the model; P is non-limiting in normal must), so add_dap injects nitrogen only (decision D-36)."
+
+# -- Copper H2S-binding capacity (add_copper verb, decision D-44) ----------------------------
+#
+# Copper fining (copper sulfate) is the standard remediation for a reductive (H2S) fault: Cu(2+)
+# precipitates dissolved sulfide as insoluble copper sulfide (Cu2+ + H2S -> CuS(s) + 2 H+), a 1:1
+# molar reaction, and the CuS drops out with the lees. The add_copper verb doses copper by mass
+# (copper_mgl, mg/L Cu, the industry unit) and converts to the mass of H2S it can bind via this
+# factor; the verb then removes min(h2s_present, capacity) from the h2s pool (copper in excess
+# simply removes all dissolved H2S — the real "clears reduction" outcome). H2S is carbon-free, so
+# the removal perturbs neither elemental ledger (the add_so2 precedent). SCOPE (v1): the removal
+# lever only — RESIDUAL copper (excess Cu left in the wine, a haze/toxicity concern with its own
+# legal limit) is NOT tracked, and copper binding of MERCAPTANS (the other reductive off-aroma) is
+# deferred with the mercaptan pool (decision D-44). M(H2S) = 34.076 g/mol, M(Cu) = 63.546 g/mol =>
+# stoichiometric ceiling 34.076/63.546 = 0.536 g H2S bound / g Cu.
+copper_h2s_binding:
+  value: 0.536
+  unit: "g/g"   # g H2S bound per g copper (Cu), stoichiometric CuS (1:1 mol)
+  tier: plausible
+  uncertainty: { low: 0.27, high: 0.536, note: "0.536 = stoichiometric 1:1 CuS ceiling (M_H2S/M_Cu); real fining is imperfect (kinetics, competing ligands, colloidal CuS re-dissolution), so effective binding can be lower — banded down to ~50% efficiency (0.27). Cannot EXCEED the ceiling (1 Cu binds at most 1 H2S)" }
+  provenance:
+    source: "stoichiometry of copper sulfide precipitation Cu2+ + H2S -> CuS(s) + 2 H+ (1:1 mol); the standard copper-fining remediation for reductive H2S (general enology; Rankine)"
+    conditions: "copper(II) fining of dissolved H2S in wine; g H2S bound per g Cu dosed, at (idealised) stoichiometric completion"
+    notes: "Read by the add_copper verb to convert a copper dose (copper_mgl) into the H2S mass it removes. M(H2S) = 34.076, M(Cu) = 63.546 => 34.076/63.546 = 0.536 g H2S/g Cu at 1:1 stoichiometry. VALUE sits at the stoichiometric ceiling (near-complete binding, the demonstration lever); tier PLAUSIBLE (not validated like dap_nitrogen_fraction) because real copper fining is NOT perfectly stoichiometric — the 1:1-and-complete assumption is a model idealisation, banded down for imperfect efficiency. Residual copper is untracked (v1 scope, decision D-44)."

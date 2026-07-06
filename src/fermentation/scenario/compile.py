@@ -35,6 +35,7 @@ from pathlib import Path
 from fermentation.core import acidbase
 from fermentation.core.kinetics import (
     AminoAcidAssimilation,
+    AutolyticHydrogenSulfide,
     BiomassCarryingCapacity,
     BrettDeath,
     BrettDecarboxylation,
@@ -751,6 +752,55 @@ def _verb_add_so2(
     )
 
 
+def _verb_add_copper(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_copper`` — copper-fine dissolved H₂S out of the wine (decision D-44).
+
+    The remediation half of the reductive-fault beat: copper (Cu²⁺, dosed as copper sulfate)
+    precipitates dissolved sulfide as insoluble copper sulfide (Cu²⁺ + H₂S → CuS↓ + 2 H⁺, 1:1 mol),
+    which settles out with the lees — the standard fix for the sur-lie "reduction" that
+    :class:`~fermentation.core.kinetics.hydrogen_sulfide.AutolyticHydrogenSulfide` (D-44) builds up
+    un-stripped post-dryness. Doses copper by the industry unit (``copper_mgl``, mg/L Cu), converts
+    to the mass of H₂S it can bind via the sourced ``copper_h2s_binding`` (stoichiometric CuS), and
+    removes ``min(h2s_present, capacity)`` from the ``h2s`` pool — copper in excess simply clears
+    all dissolved H₂S, the real outcome. H₂S is carbon-free (D-29), so — like ``add_so2`` — this
+    removal perturbs neither elemental ledger. SCOPE (v1): the removal lever only. Residual
+    copper (excess Cu left in the wine) is untracked, and copper binding of *mercaptans* is deferred
+    with the mercaptan pool (decision D-44).
+    """
+    _iv_check_keys(iv, frozenset({"copper_mgl"}), "add_copper")
+    copper_mgl = _iv_float(iv, "copper_mgl", "add_copper")
+    if "h2s" not in schema:  # both current media carry h2s; guard for symmetry with add_so2
+        raise ValueError(
+            f"intervention 'add_copper' at day {iv.day:g} needs an 'h2s' slot, but medium "
+            f"{schema!r} has none"
+        )
+    try:
+        binding = parameters["copper_h2s_binding"].value
+    except KeyError as exc:  # additions.yaml not loaded (caller-supplied parameter_paths)
+        raise ValueError(
+            "intervention 'add_copper' needs 'copper_h2s_binding' but it is missing "
+            f"({exc}); include additions.yaml in parameter_paths (the default lookup merges "
+            "it automatically)."
+        ) from None
+    capacity_gpl = mgl_to_gpl(copper_mgl) * binding  # g/L H₂S this copper dose can bind
+    h2s_slice = schema.slice("h2s")
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        present = max(float(out[h2s_slice][0]), 0.0)  # clamp: don't "remove" solver undershoot
+        removed = min(present, capacity_gpl)
+        out[h2s_slice] = float(out[h2s_slice][0]) - removed
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_copper@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
 #: The lees-associated pools racking removes: inactivated yeast biomass ``X_dead`` and (if autolysis
 #: is opted in) the non-assimilable cell-wall ``debris`` (decision D-36); plus **both** *O. oeni*
 #: pools — settled dead ``X_mlf_dead`` **and viable ``X_mlf``** (decision D-39). Racking viable
@@ -920,6 +970,7 @@ _INTERVENTION_VERBS: dict[
 ] = {
     "add_dap": _verb_add_dap,
     "add_so2": _verb_add_so2,
+    "add_copper": _verb_add_copper,
     "rack": _verb_rack,
     "pitch_mlf": _verb_pitch_mlf,
     "pitch_brett": _verb_pitch_brett,
@@ -1096,21 +1147,26 @@ def compile_scenario(
     if BrettGrowth.name in process_set and amino_acids_gpl <= 0.0:
         process_set.disable(BrettGrowth.name)
 
-    # Autolytic-peptide source (decision D-34): YeastAutolysis refills the amino-acid pool from dead
-    # biomass (X_dead) post-AF — the second MLF-with-growth prerequisite. Like the carrying cap it
-    # *consumes* core state (X_dead), so it ships OPT-IN: absent ``autolysis_rate_per_h`` ⇒ DISABLE
-    # it so (a) X_dead/amino_acids/debris are untouched and the run is byte-for-byte the validated
-    # core, and (b) the enabled-but-inert Process does not drag those outputs to speculative
-    # (``tier_of`` counts enabled, not nonzero, Processes — the MLF/carrying *tier* isolability
-    # argument). Opted in ⇒ enable it and override k_autolysis with the scenario's rate so
-    # demonstrations can sweep the sur-lie timescale.
+    # Autolytic source (decisions D-34, D-44): YeastAutolysis refills the amino-acid pool from dead
+    # biomass (X_dead) post-AF — the second MLF-with-growth prerequisite — and the D-44
+    # AutolyticHydrogenSulfide feeds the shared h2s pool the sulfide those self-digesting cells
+    # release, a yield on the SAME autolysis flux. Both *consume/read* core state gated on
+    # autolysis, so they ship OPT-IN TOGETHER: absent ``autolysis_rate_per_h`` ⇒ DISABLE both so
+    # (a) the X_dead/amino_acids/debris/h2s columns are untouched and the run is byte-for-byte the
+    # validated core, and (b) the inert
+    # Processes do not drag those outputs to speculative (``tier_of`` counts enabled, not nonzero,
+    # Processes — the MLF/carrying *tier* isolability argument). Opted in ⇒ enable them and override
+    # k_autolysis with the scenario's rate so demonstrations can sweep the sur-lie timescale — the
+    # override drives BOTH the peptide refill and the sulfide yield (they read one k_autolysis).
     if YeastAutolysis.name in process_set:
         raw_rate = scenario.initial.get("autolysis_rate_per_h")
         rate_per_h = (
             _nonneg(float(raw_rate), "autolysis_rate_per_h") if raw_rate is not None else 0.0
         )
         if rate_per_h <= 0.0:
-            process_set.disable(YeastAutolysis.name)
+            for autolysis_process in (YeastAutolysis, AutolyticHydrogenSulfide):
+                if autolysis_process.name in process_set:
+                    process_set.disable(autolysis_process.name)
         else:
             parameters = _override_autolysis_rate(parameters, rate_per_h)
 
