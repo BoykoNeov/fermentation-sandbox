@@ -874,3 +874,71 @@ def test_pof_gate_is_independent_of_the_brett_pitch(schema):
 
 def test_pof_is_speculative():
     assert YeastPOFDecarboxylation.tier is Tier.SPECULATIVE
+
+
+# -- 21. E_a_pof: intrinsic rate rises with warmth, but NET conversion falls (decision D-54) --
+
+
+def test_pof_own_rate_rises_with_warmth(schema, params):
+    """The decarboxylase's OWN rate (fixed flux/precursor) is faster warm than cold — E_a_pof > 0.
+
+    Isolates the raw Arrhenius direction from the flux-coupling effect: at the SAME flux and
+    precursor concentration, only T differs, so this pins that ``E_a_pof`` itself is a genuine
+    positive (enzyme-accelerates-with-warmth) term — not the net finished-wine direction, which the
+    flux-coupling flips (see ``test_pof_net_conversion_falls_with_warmer_fermentation``).
+    """
+    y_cold = _state(schema, hydroxycinnamics=0.1, T=285.15)  # 12 C
+    y_warm = _state(schema, hydroxycinnamics=0.1, T=301.15)  # 28 C
+    r_cold = float(
+        YeastPOFDecarboxylation().derivatives(0.0, y_cold, schema, params)[schema.slice("CO2")][0]
+    )
+    r_warm = float(
+        YeastPOFDecarboxylation().derivatives(0.0, y_warm, schema, params)[schema.slice("CO2")][0]
+    )
+    assert r_warm > r_cold > 0.0
+
+
+def _pof_run_at_temperature(
+    *, celsius: float, days: float = 60.0, hydroxycinnamic_gpl: float = 0.1
+):
+    """A POF+, no-Brett wine ferment held isothermal at ``celsius`` (net-conversion-vs-T probe)."""
+    initial: dict[str, float] = {
+        "brix": 22.0,
+        "yan_mgl": 250.0,
+        "pitch_gpl": 0.2,
+        "tartaric_gpl": 3.0,
+        "malic_gpl": 2.0,
+        "initial_ph": 3.5,
+        "hydroxycinnamic_gpl": hydroxycinnamic_gpl,
+        "pof_positive": 1.0,
+    }
+    sc = Scenario(
+        name="wine-pof-temperature",
+        medium="wine",
+        initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
+        interventions=[],
+        duration_days=days,
+    )
+    compiled = compile_scenario(sc, strict=True)
+    traj = compiled.run(t_eval=np.linspace(0.0, days * 24.0, 400))
+    return compiled, traj
+
+
+def test_pof_net_conversion_falls_with_warmer_fermentation():
+    """The NET (finished-must) vinylphenol conversion is HIGHER from a cooler ferment (D-54).
+
+    POF decarboxylation is flux-coupled, so a warmer ferment finishes faster and gives the
+    decarboxylase a shorter time window to act — and that shrinking window outweighs the enzyme's
+    own (smaller) Arrhenius acceleration (``E_a_pof < E_a_uptake``, by design). Net result: a cool
+    ferment strands MORE vinylphenol than a warm one, matching the sourced real-world direction
+    (cooler wheat-beer fermentation retains more clove/4-vinylguaiacol character — the same Pad1/
+    Fdc1 enzyme). Both runs reach dryness comfortably within the shared 60-day window, so this
+    compares two frozen (post-dryness) totals, not two different-length integration windows.
+    """
+    _, cool = _pof_run_at_temperature(celsius=12.0)
+    _, warm = _pof_run_at_temperature(celsius=28.0)
+
+    vp_cool = float(cool.series("vinylphenols")[-1])
+    vp_warm = float(warm.series("vinylphenols")[-1])
+    assert vp_cool > vp_warm > 0.0

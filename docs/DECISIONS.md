@@ -3871,6 +3871,68 @@ assertion flip, and surfaced the "D-52 is now inert" honesty point before it cou
 absorbed. Three advisor calls across one feature arc, each catching something the previous pass
 missed — the discipline compounds.
 
+## D-54 — POF v2 pt1: `E_a_pof` temperature dependence, direction-checked before calibrated
+
+**Status: IMPLEMENTED 2026-07-07** (all Brett/POF tests green, ruff + mypy clean). With M2 physics
+complete through D-53, the owner picked "POF v2" (temperature dependence for conversion efficiency,
+plus splitting the lumped vinylphenol/vinylguaiacol pool) as the next work. The two pieces are
+independent and sequenced separately (advisor guidance, matching the per-D-record discipline); this
+entry is pt1 (`E_a_pof`) only — the pool split is a separate, larger decision (D-55+).
+
+**The crux worth remembering — cloning a nearby `E_a_*` precedent would have picked the WRONG
+ordering.** `YeastPOFDecarboxylation` was deliberately temperature-flat at D-40 pt4 ("no pt4 behaviour
+needs POF's intrinsic direction"). The naive v2 move — add `arrhenius(T, E_a_pof)` to the rate,
+magnitude cloned from a neighbouring decarboxylase `E_a` (e.g. `E_a_decarb` = 90 kJ/mol) — was
+**caught by `advisor()` before any code was written**: `YeastPOFDecarboxylation`'s rate is
+**flux-coupled** (`r ∝ fermentative_flux_shape`, which itself rides `E_a_uptake`), and this codebase
+already has a named framework for exactly this interaction — the D-19 "KEY ORDERING CONSTRAINT"
+governing `E_a_esters`/`E_a_fusels`: a flux-coupled byproduct's **net** (time-integrated-to-dryness)
+total scales as `exp(-((E_a_byproduct − E_a_uptake)/R)(1/T−1/T_ref))`, because a warmer ferment also
+finishes *faster*, shrinking the production window. So the net finished-wine direction is set by
+`E_a_pof` **relative to** `E_a_uptake` (55,100 J/mol), not by `E_a_pof` in isolation — cloning a
+positive value blind would have picked a direction by accident, the exact D-53 failure mode
+(magnitude-by-analogy, direction unchecked) one decision later.
+
+**Research resolved the direction, not an owner preference (the D-53 discipline applied
+prospectively).** WebSearch found: (1) Edlin et al. 1998 (hydroxycinnamate decarboxylase purified
+from *Brettanomyces anomalus* — the same enzyme family) puts the enzyme's own thermal optimum at
+40 °C, well above any wine/beer ferment temperature, supporting a genuine positive intrinsic
+`E_a_pof`; (2) brewing practice on this *exact* enzyme (Pad1/Fdc1, the same POF+ trait, well
+corroborated across independent wheat-beer/Weizen fermentation-temperature sources — Brewing Science
+Institute, Northern Brewer, Brülosophy trials) is unambiguous that **cooler fermentation retains more
+clove/4-vinylguaiacol character; warmer fermentation favours esters over phenolics**. Net conversion
+therefore **falls** with warmer temperature — the *opposite* ordering from esters/fusels (which need
+`E_a > E_a_uptake` to *rise* with T), because the sourced real-world direction here is the reverse of
+theirs. This literature is beer/Weizen-sourced, not wine-specific; extended to this model's wine POF+
+yeast by the same enzyme-identity argument the module's own docstring already makes for `k_pof_decarb`.
+
+**The fix.** `E_a_pof` = 25,000 J/mol (uncertainty 10,000–40,000, chosen so even the high end stays
+below `E_a_uptake`'s own low uncertainty bound of 47,000 — the sourced direction must survive the
+joint uncertainty band, not just the point estimate), embedded in `YeastPOFDecarboxylation.derivatives`
+via `arrhenius_factor(T, E_a_pof, T_ref)` (the same `BrettDeath`/`AcetolactateDecarboxylation` embedded-
+call idiom, not a `ProcessSet` `RateModifier`). **Honest continuity note:** v1's implicit `E_a_pof = 0`
+already had `0 < E_a_uptake`, so the *emergent direction* was accidentally already correct before this
+change — v2 replaces an implicit "enzyme rate is T-invariant" placeholder (a stronger, more obviously
+false claim) with a genuine sourced-direction intrinsic term, sized to preserve and reinforce that same
+direction rather than risk reversing it.
+
+**Two new tests, split to isolate the two effects.** `test_pof_own_rate_rises_with_warmth` calls
+`.derivatives()` directly at fixed flux/precursor, isolating the raw Arrhenius direction (pins
+`E_a_pof > 0`). `test_pof_net_conversion_falls_with_warmer_fermentation` runs full POF+ (no Brett)
+scenarios to dryness at 12 °C vs 28 °C over a shared 60-day window and compares frozen post-dryness
+`vinylphenols` totals — empirically confirming the *net* direction the algebra predicts, not just
+asserting it. Both pass. `test_pof_decarboxylation_stoichiometry_and_touches` (which calls
+`.derivatives()` at the default `T = T_ref`, where `arrhenius_factor = 1` exactly) is numerically
+unaffected — no re-pin needed. 39/39 `test_brett.py` green, ruff + mypy clean.
+
+**Method beat worth remembering.** One `advisor()` call, before any code, caught a wrong-by-default
+generalization (treat every new `E_a_*` like the nearest existing one) that this codebase's *own*
+D-19 framework already had the tools to refute — the miss would have been not reading the codebase's
+existing ordering-constraint machinery closely enough, the same category of miss D-52's pass 1 caught
+(checking prior decisions before reasoning from first principles). Research then resolved the
+direction empirically rather than picking a plausible number, continuing the D-53 discipline forward
+rather than only applying it in hindsight.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

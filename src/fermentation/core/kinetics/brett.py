@@ -536,13 +536,28 @@ class YeastPOFDecarboxylation(Process):
     ``K_hydroxycinnamic``) rolls production off as the pool is consumed. **No Brett SO₂/temperature
     gate** — this is yeast metabolism during AF, before any Brett or sulfite lever applies.
 
-    **Temperature-flat (v1 scoped simplification).** Like :class:`~fermentation.core.kinetics.\
-    vicinal_diketones.AcetolactateExcretion`, this flux-coupled producer carries **no explicit
-    Arrhenius factor**: temperature already enters through the AF-flux trajectory it couples to (a
-    warm ferment fluxes faster ⇒ more vinylphenol per hour), and no pt4 behaviour needs POF's
-    *intrinsic* temperature direction, so an unsourced ``E_a_pof`` would buy nothing (prime
-    directive #2). The ester beat carried its own Arrhenius only because temperature was *that*
-    beat's subject; here the subject is the reservoir.
+    **Temperature-dependent (v2, decision D-54) — net conversion FALLS with warmer fermentation.**
+    The rate now carries its own Arrhenius factor ``arrhenius(T, E_a_pof, T_ref)`` — a real enzyme
+    genuinely speeds up with warmth (``E_a_pof > 0``; Edlin et al. 1998 puts a homologous
+    hydroxycinnamate decarboxylase's own thermal optimum at 40 °C, well above any wine/beer ferment
+    temperature). But because this Process is **flux-coupled** (``r ∝ fermentative_flux_shape``,
+    which itself rides the sugar-uptake Arrhenius ``E_a_uptake``), a warmer ferment also finishes
+    *faster* — shrinking the time window POF has to act. The D-19 flux-coupled-byproduct ordering
+    constraint (the same one governing ``E_a_esters``/``E_a_fusels``) says the **net** finished-wine
+    conversion (the time-integral of ``r`` to dryness) scales as
+    ``exp(-((E_a_pof − E_a_uptake)/R)·(1/T − 1/T_ref))`` — so whether total vinylphenol production
+    rises or falls with temperature depends on ``E_a_pof`` **relative to** ``E_a_uptake``, not on
+    ``E_a_pof`` alone. ``E_a_pof`` is set BELOW ``E_a_uptake`` (55,100 J/mol) — the *opposite*
+    ordering from esters/fusels (set above ``E_a_uptake`` so their totals rise with T) — because the
+    sourced real-world direction here is opposite theirs: brewing practice on this *exact* enzyme
+    (Pad1/Fdc1 hydroxycinnamate decarboxylase, the same POF+ trait) is unambiguous — cooler
+    wheat-beer fermentation retains more clove/4-vinylguaiacol character, warmer fermentation
+    favours esters over phenolics. This supersedes D-40 pt4's "temperature-flat" choice: that was a
+    reasoned v1 simplification (no pt4 behaviour needed POF's intrinsic direction, and the implicit
+    ``E_a_pof = 0 < E_a_uptake`` already fell with warmer T through the flux-window effect alone, so
+    the v1 *direction* was accidentally already right) — v2 replaces the implicit T-invariant
+    placeholder with a genuine (if still speculative) intrinsic enzyme temperature term, sized to
+    preserve and reinforce that same direction rather than risk reversing it.
 
     **Isolability — a separate opt-in strain, wholly independent of the Brett pitch.** POF+ is a
     binary *strain* trait, so it is enabled by its own compile-seam opt-in (``pof_positive``), NOT
@@ -564,10 +579,18 @@ class YeastPOFDecarboxylation(Process):
     touches = ("hydroxycinnamics", "vinylphenols", "CO2")
     #: ``k_pof_decarb`` sets the POF decarboxylase magnitude; ``K_sugar_uptake`` (shared with the
     #: fermentative-uptake flux this tracks) and ``K_hydroxycinnamic`` (shared with Brett's
-    #: decarboxylase — same whole-cell precursor affinity) shape it. Their tiers cap the
+    #: decarboxylase — same whole-cell precursor affinity) shape it. ``E_a_pof``/``T_ref`` (D-54)
+    #: give the decarboxylase its own Arrhenius temperature term — see the class docstring for why
+    #: this is set BELOW ``E_a_uptake`` rather than read from it here. Their tiers cap the
     #: hydroxycinnamics/vinylphenols/CO2 output tier via parameter-tier propagation (D-1). CO2 is
     #: already speculative (the always-on VDK decarboxylation), so this adds no new tier headline.
-    reads: tuple[str, ...] = ("k_pof_decarb", "K_hydroxycinnamic", "K_sugar_uptake")
+    reads: tuple[str, ...] = (
+        "k_pof_decarb",
+        "K_hydroxycinnamic",
+        "K_sugar_uptake",
+        "E_a_pof",
+        "T_ref",
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -584,7 +607,9 @@ class YeastPOFDecarboxylation(Process):
 
         hc_molar = hc_gpl / M_P_COUMARIC
         monod = hc_molar / (params["K_hydroxycinnamic"] + hc_molar)
-        r = params["k_pof_decarb"] * flux * monod  # POF decarboxylase turnover, mol/L/h
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_pof"], params["T_ref"])
+        r = params["k_pof_decarb"] * flux * monod * f_t  # POF decarboxylase turnover, mol/L/h
 
         d[schema.slice("hydroxycinnamics")] = -r * M_P_COUMARIC
         d[schema.slice("vinylphenols")] = r * M_VINYLPHENOL  # fills the shared reductase reservoir

@@ -1113,7 +1113,7 @@ E_a_death_brett:
     conditions: "Brettanomyces in wine; temperature factor arrhenius(T, E_a_death_brett, T_ref) on the death rate, = 1 at T_ref (20 C)"
     notes: "Read by BrettDeath. Gives the temperature dependence of Brett mortality so that a warm sulfited wine clears the culture faster and cold PRESERVES it (dormancy) - the physically correct direction the cardinal gamma(T) cannot supply for death (gamma(T) -> 0 in the cold would make cold kill, the opposite of reality). SPECULATIVE: the magnitude is an estimate equal to the MLF death / autolysis E_a; the DIRECTION (warm accelerates, cold preserves) is sound. Uses the shared T_ref (20 C) so the factor is 1 at the wine benchmark temperature, like every other Arrhenius rate."
 
-# -- POF+ YEAST DECARBOXYLASE (wine-only, decision D-40 pt4) -------------------------------------
+# -- POF+ YEAST DECARBOXYLASE (wine-only, decision D-40 pt4, temperature dependence D-54) --------
 # YeastPOFDecarboxylation (fermentation.core.kinetics.brett) is the YEAST half of the volatile-phenol
 # story: a POF+ (phenolic-off-flavour-positive) primary S. cerevisiae strain carries the cinnamate
 # decarboxylase - the SAME reaction as BrettDecarboxylation, drawing must hydroxycinnamics into
@@ -1122,18 +1122,25 @@ E_a_death_brett:
 # vinylphenols STRAND (nothing reduces them to ethylphenol); a Brett contamination arriving later
 # gets a HEAD START on the pre-filled reservoir (the emergent yeast/Brett coupling, D-26/D-31
 # parallel). Rate:
-#   r = k_pof_decarb * X * S_total/(K_sugar_uptake+S_total) * [hc]/(K_hydroxycinnamic+[hc])
+#   r = k_pof_decarb * arrhenius(T, E_a_pof) * X * S_total/(K_sugar_uptake+S_total) * [hc]/(K_hydroxycinnamic+[hc])
 # FLUX-COUPLED to the yeast's fermentative activity (catalyst = viable X via fermentative_flux_shape,
 # NOT X_brett), so POF decarboxylation runs during active fermentation and STOPS at dryness (S->0) -
 # a primary-fermentation phenomenon. Reuses K_hydroxycinnamic (same whole-cell precursor affinity as
 # Brett) and K_sugar_uptake (the shared fermentative-flux half-saturation). NO Brett SO2/temperature
-# gate (this is yeast metabolism during AF), and TEMPERATURE-FLAT (no E_a_pof: temperature enters via
-# the AF-flux trajectory, the AcetolactateExcretion precedent; no pt4 behaviour needs POF's intrinsic
-# temperature direction, so an unsourced E_a would buy nothing). Enabled by the pof_positive opt-in
-# (a binary strain trait), WHOLLY INDEPENDENT of the Brett pitch; a POF-negative default wine makes
-# no vinylphenol. SPECULATIVE: no per-strain POF decarboxylase rate of this flux-coupled form is
-# sourced (the DIRECTION - POF+ yeast decarboxylates hydroxycinnamics to vinylphenols during AF - is
-# well established, Chatonnet et al. 1992 / 1997; Suarez et al. 2007 review).
+# gate (this is yeast metabolism during AF).
+# TEMPERATURE (decision D-54, v2 - supersedes D-40 pt4's "temperature-flat"): the rate now carries
+# its OWN Arrhenius factor E_a_pof (the enzyme genuinely speeds up with warmth), but because r is
+# FLUX-COUPLED, the NET finished-wine conversion (time-integral of r to dryness) is governed by the
+# D-19 flux-coupled-byproduct ordering constraint: it scales as
+# exp(-((E_a_pof - E_a_uptake)/R)(1/T-1/T_ref)) because a warmer ferment also finishes faster,
+# shrinking POF's time window. E_a_pof is set BELOW E_a_uptake (55,100 J/mol) - the OPPOSITE
+# ordering from E_a_esters/E_a_fusels (set above E_a_uptake so their totals RISE with T) - because
+# the sourced real-world direction here is the opposite of theirs: net conversion FALLS with
+# warmer fermentation. Enabled by the pof_positive opt-in (a binary strain trait), WHOLLY
+# INDEPENDENT of the Brett pitch; a POF-negative default wine makes no vinylphenol. SPECULATIVE: no
+# per-strain POF decarboxylase rate of this flux-coupled form is sourced (the DIRECTION - POF+ yeast
+# decarboxylates hydroxycinnamics to vinylphenols during AF - is well established, Chatonnet et al.
+# 1992 / 1997; Suarez et al. 2007 review).
 k_pof_decarb:
   value: 2.5e-6
   unit: "mol/(g*h)"   # molar hydroxycinnamate turnover per (g/L) fermentative flux: r = k_pof_decarb*flux*Monod
@@ -1143,3 +1150,13 @@ k_pof_decarb:
     source: "author estimate; POF+ Saccharomyces cerevisiae expresses a cinnamate/ferulic-acid decarboxylase (PAD1/FDC1) that converts hydroxycinnamic acids to vinylphenols during fermentation (Chatonnet et al. 1992, J. Sci. Food Agric. 60:165-178; Chatonnet et al. 1997; Suarez et al. 2007, Food Chem. 102:10-21 - the 4-ethylphenol/POF review). No per-strain flux-coupled rate of this form is sourced"
     conditions: "POF+ S. cerevisiae in wine during active fermentation, ~20 C; specific decarboxylase activity scaling the biomass-catalysed fermentative flux X*S/(K_sugar_uptake+S)"
     notes: "Read by YeastPOFDecarboxylation. Set of the same order as k_brett_decarb (both are a lumped whole-cell cinnamate-decarboxylase turnover), but multiplies the fermentative FLUX (O(1-10 g/L) during AF) rather than the dosed X_brett (O(0.1-0.5 g/L)), and shuts off at dryness - so it fills the vinylphenol reservoir during primary fermentation only. Tuned for a partial conversion of the must hydroxycinnamic pool, leaving a stranded reservoir the emergent-coupling test relies on. SPECULATIVE: magnitude an estimate; the direction (POF+ yeast makes vinylphenols during AF) is well established."
+
+E_a_pof:
+  value: 25000.0
+  unit: "J/mol"   # Arrhenius activation energy on the POF decarboxylase's OWN catalytic rate (embedded in r, D-54)
+  tier: speculative
+  uncertainty: { low: 10000.0, high: 40000.0, note: "kept comfortably BELOW E_a_uptake's own uncertainty floor (47,000) so the net finished-wine conversion falls with warmer fermentation across the full parameter range, not just at the point estimate - the sourced direction must survive the uncertainty band" }
+  provenance:
+    source: "Direction that the enzyme's OWN rate rises with warmth (well below any thermal denaturation optimum) from Edlin et al. 1998 (Appl. Microbiol. Biotechnol. 49:511-517): a hydroxycinnamate decarboxylase purified from Brettanomyces anomalus - the same enzyme family as this model's cinnamate/ferulic-acid decarboxylase - has an activity optimum at 40 C, i.e. still rising through the whole 10-35 C wine/beer fermentation range. The E_a_pof < E_a_uptake ORDERING (which sets the sign of the NET, finished-wine direction) is set by real-world practice on this exact enzyme: POF+ (Pad1/Fdc1) wheat-beer (Weizen) fermentation is unambiguous and widely corroborated - cooler fermentation retains more clove/4-vinylguaiacol character, warmer fermentation favours esters over phenolics (Brewing Science Institute wheat-beer fermentation guidance; Northern Brewer; Brulosophy fermentation-temperature exBEERiments). Extended by analogy from beer to this model's wine POF+ yeast: the SAME PAD1/FDC1 enzyme, as this module's own docstring already establishes for k_pof_decarb's direction."
+    conditions: "POF+ S. cerevisiae in wine during active fermentation; Arrhenius factor on the decarboxylase's own molar turnover r (embedded in YeastPOFDecarboxylation.derivatives, not a ProcessSet RateModifier), reads the shared T_ref"
+    notes: "Read by YeastPOFDecarboxylation. Per the D-19 flux-coupled-byproduct ordering constraint (see E_a_esters/E_a_fusels): because POF decarboxylation is coupled to the fermentative flux (fermentative_flux_shape), its NET finished-wine conversion (the time-integral of r to dryness) scales as exp(-((E_a_pof-E_a_uptake)/R)(1/T-1/T_ref)) - a warmer ferment finishes faster, shrinking the integration window. E_a_pof is kept POSITIVE (the enzyme genuinely accelerates with warmth, per Edlin et al.) but set BELOW E_a_uptake (55,100 J/mol) so the shrinking-window effect dominates and net conversion still FALLS with warmer fermentation - the OPPOSITE ordering from E_a_esters/E_a_fusels (set ABOVE E_a_uptake so their totals RISE with T), because the sourced real-world direction for THIS byproduct is opposite theirs. Supersedes the D-40 pt4 'temperature-flat' choice: that was a reasoned v1 simplification (no pt4 behaviour needed POF's intrinsic direction, and the implicit E_a_pof=0 already fell with warmer T through the flux-window effect alone, so the v1 direction was accidentally already right) - this v2 refinement replaces the implicit T-invariant placeholder with a genuine (if still speculative) intrinsic enzyme temperature term, sized to preserve and reinforce that same correct direction."
