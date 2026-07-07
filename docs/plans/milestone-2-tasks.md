@@ -629,3 +629,25 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         reservoir; add O. oeni reduction now. Deferred: bacterial arrest/death + racking event (so
         "SO₂ locks diacetyl in" / permanent stranding), citrate in the pH balance. 14 new tests;
         **395 green** + 5 benchmark, ruff+mypy clean. Full record in **DECISIONS → D-31**.
+  - [x] **MLF v2 refinement — bounded ethanol/starvation stress multiplier on `MalolacticSenescence`
+        (decision D-52). LANDED 2026-07-07.** With M2 physics all complete through D-51, closes one
+        of the two remaining MLF v2 deferrals (`BrettSenescence` stays open — see below). Owner asked
+        for "whichever is closer to reality"; an advisor call reversed the first-pass pick
+        (`BrettSenescence`) after verifying against DECISIONS D-40 pt3 that Brett's *persistence* is
+        already an intentional fidelity choice, not a gap — so a senescence twin would be a downgrade,
+        not a gain. `MalolacticSenescence`'s rate gains a bounded stress multiplier:
+        `stress = 1 + k_senescence_ethanol_scale·[E/(E+ethanol_tolerance_mlf)] +
+        k_senescence_starvation_scale·[K_aa_mlf/(K_aa_mlf+amino_acids)]`, both terms smooth Monod-type
+        factors in **[0,1)** (not the Luong wall's near-binary shape that caused the D-39 wipeout),
+        capped at 1+1.0+0.5=2.5× — worst-case half-life ~23 d, verified empirically at the RHS level,
+        nowhere near the ~1-week wipeout regime. Reuses `ethanol_tolerance_mlf`/`K_aa_mlf` (no new
+        concentration scales); only two new dimensionless ceiling params. Reads no SO₂/pH — still
+        cheaper than the SO₂ kill. Genuine side effect measured and banded honestly (the D-51
+        discipline): `test_headline_citrate_lifts_and_then_clears_diacetyl`'s final/peak ratio rose to
+        ~0.861 (less viable bacterial reductase late in a 30-d run) — band widened to 0.90 with the
+        measured value recorded, not loosened blindly. 3 net new/split tests in `test_malolactic.py`
+        + 2 tests re-measured (not weakened) + the diacetyl band update. **653 green** + 5 benchmark,
+        ruff+mypy clean. **Deferred:** a `BrettSenescence` twin for the D-40 arc remains open, but is
+        now framed as a *declined-by-default* option (Brett's persistence is the honest model) rather
+        than a straightforward extension — revisit only if a source is found that Brett *does* decay
+        benignly in practice. Full record in **DECISIONS → D-52**.

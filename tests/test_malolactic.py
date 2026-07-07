@@ -12,6 +12,7 @@ undosed run is byte-for-byte the validated core *and* keeps ``malic``/``lactic``
 VALIDATED tier (the Process is disabled at compile when MLF is not pitched).
 """
 
+import math
 from collections.abc import Mapping
 
 import numpy as np
@@ -318,19 +319,25 @@ def test_undosed_keeps_malic_lactic_validated_dosed_makes_speculative(pset):
 def test_so2_crashes_bacteria_over_the_slow_senescence_baseline():
     # The v2 (D-41) picture, superseding the v1 "no-SO₂ pitched run is byte-for-byte inert" premise:
     # on a pitched, amino-acid-free run (growth disabled) the two movers of X_mlf are the benign
-    # senescence baseline (MalolacticSenescence, always on when pitched) and the SO₂-driven kill
-    # (MalolacticDeath, 0 without SO₂). So WITHOUT SO₂ the catalyst declines SLOWLY (weeks-to-months
-    # senescence — no longer inert), and an ``add_so2`` dose CRASHES it toward zero within ~1–3 days
-    # (the D-31 lever) — a rate ~100× the baseline, so the two timescales are cleanly separated.
+    # senescence baseline (MalolacticSenescence, always on when pitched — since D-52 modulated by a
+    # BOUNDED ethanol/starvation stress factor, up to 2.5× as fermentation ethanol rises and the
+    # amino-acid pool empties, D-52) and the SO₂-driven kill (MalolacticDeath, 0 without SO₂). So
+    # WITHOUT SO₂ the catalyst declines SLOWLY (weeks-scale senescence, faster than the D-41
+    # environment-free baseline but still no longer inert), and an ``add_so2`` dose CRASHES it
+    # toward zero within ~1–3 days (the D-31 lever) — still a rate orders of magnitude above even
+    # the fully-stressed baseline, so the two timescales stay cleanly separated.
     # (a) no SO₂ ⇒ X_mlf declines slowly & monotonically (senescence), retaining most over the run.
     _c, t_clean = _run(mlf_pitch_gpl=0.2)
     x_clean = t_clean.series("X_mlf")
     assert x_clean[0] == pytest.approx(0.2)  # the pitched dose
     assert np.all(np.diff(x_clean) <= 1e-12)  # monotone non-increasing — senescence only, no SO₂
     assert x_clean[-1] < 0.98 * x_clean[0]  # NOT inert: it has measurably declined (v1 superseded)
-    assert x_clean[-1] > 0.6 * x_clean[0]  # ...but only slowly (~2-month half-life over a 21-d run)
+    # MEASURED ratio ~0.608 (D-52: stress ramps 1.5x -> ~2.0x as ethanol rises then holds, vs the
+    # D-41 environment-free ~0.71 at the same 21 d) — banded around the measured value, not just
+    # threshold-checked, so a regression in the stress-multiplier magnitude is caught either way.
+    assert 0.55 * x_clean[0] < x_clean[-1] < 0.65 * x_clean[0]
 
-    # (b) add SO₂ mid-run ⇒ gentle senescence until the dose, then a sharp crash to near-zero.
+    # (b) add SO₂ mid-run ⇒ gentle-but-D-52-stressed senescence until the dose, then a sharp crash.
     dosed = Scenario(
         name="wine-mlf-so2",
         medium="wine",
@@ -350,7 +357,9 @@ def test_so2_crashes_bacteria_over_the_slow_senescence_baseline():
     traj = compile_scenario(dosed, strict=True).run()
     t_h, x_mlf = traj.t, traj.series("X_mlf")
     i6 = int(np.searchsorted(t_h, 6.0 * 24.0))  # index just at/after the day-6 SO₂ dose
-    assert x_mlf[i6] > 0.9 * 0.2  # only a gentle senescence decline before the dose (slow baseline)
+    # MEASURED ratio ~0.875 at day 6 (D-52 stress is already ramping as AF ethanol rises and
+    # amino acids empty — faster than D-41's environment-free ~0.95, still far above the crash).
+    assert 0.8 * 0.2 < x_mlf[i6] < 0.95 * 0.2
     post = x_mlf[i6:]
     assert np.all(np.diff(post) <= 1e-12)  # monotone non-increasing once SO₂ is present
     assert x_mlf[-1] < 0.1 * x_mlf[i6]  # SO₂ crashed the population (fast kill dominates baseline)
@@ -515,27 +524,78 @@ def test_senescence_touches_only_the_x_mlf_pools(params):
     assert touched == {"X_mlf", "X_mlf_dead"}
 
 
-def test_senescence_is_environment_free(params):
-    # The load-bearing D-41 property (the D-39 crux reused): the benign baseline carries NO SO₂ and
-    # NO ethanol term — "benign" MEANS environment-independent, and any ethanol driver would
-    # reintroduce the Luong-wall wipeout that deferred this to v2. So at a FIXED temperature the
-    # senescence rate is identical whether SO₂ is absent or high, and whether ethanol is low or near
-    # the O. oeni wall.
+def test_senescence_is_so2_independent(params):
+    # Retained from D-41's environment-free property (the D-39 crux reused): the benign baseline
+    # still carries NO SO₂ term at all — only the acute :class:`MalolacticDeath` kill sees SO₂. D-52
+    # adds ethanol/starvation stress (see below) but SO₂ independence is untouched.
     schema = wine_schema()
 
     def rate(y) -> float:
         d = MalolacticSenescence().derivatives(0.0, y, schema, params)
         return -float(d[schema.slice("X_mlf")][0])
 
-    # SO₂ independence: a heavy sulfite dose does NOT change the baseline (only the SO₂ kill sees).
     r_no_so2 = rate(_death_state(schema, params, so2_mgl=0.0, x_mlf=0.2))
     r_hi_so2 = rate(_death_state(schema, params, so2_mgl=80.0, x_mlf=0.2))
     assert r_no_so2 > 0.0
     assert r_hi_so2 == pytest.approx(r_no_so2, rel=1e-12)
-    # Ethanol independence: low vs near-wall ethanol give the SAME baseline (no ethanol term).
-    lo = _wine_state(schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=10.0, malic=2.0)
-    hi = _wine_state(schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=120.0, malic=2.0)
-    assert rate(hi) == pytest.approx(rate(lo), rel=1e-12)
+
+
+def test_senescence_ethanol_stress_is_bounded(params):
+    # D-52 lifts the D-41 "environment-free" deferral: senescence now RISES with ethanol stress
+    # (a real effect the D-41 baseline knowingly omitted), but the rise is a smooth, BOUNDED
+    # Monod-type factor — not the Luong wall's near-binary collapse that caused the D-39 wipeout. So
+    # higher ethanol must raise the rate, but the ratio against the zero-stress floor can never
+    # exceed the design ceiling (1 + k_senescence_ethanol_scale + k_senescence_starvation_scale).
+    schema = wine_schema()
+
+    def rate(e: float, aa: float) -> float:
+        y = _wine_state(
+            schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=e, malic=2.0, amino_acids=aa
+        )
+        d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+        return -float(d[schema.slice("X_mlf")][0])
+
+    floor = rate(0.0, 10.0)  # no ethanol, amino acids abundant ⇒ stress == 1 (pure baseline)
+    lo = rate(10.0, 10.0)
+    hi = rate(120.0, 10.0)  # at/above ethanol_tolerance_mlf (~110 g/L) — the O. oeni ethanol wall
+    assert floor > 0.0
+    assert floor < lo < hi  # monotone rising with ethanol stress (the D-52 lift)
+    ceiling = 1.0 + params["k_senescence_ethanol_scale"] + params["k_senescence_starvation_scale"]
+    assert hi / floor < ceiling  # BOUNDED — never approaches the full ceiling at finite E
+
+
+def test_senescence_starvation_stress_tracks_amino_acid_depletion(params):
+    # D-52's second stress term reuses the growth fuel pool: senescence is faster once amino acids
+    # are exhausted (the ~1.3 d post-pitch norm, D-23) than while the pool is replete — the term
+    # tracks the real nutrient dynamic rather than acting as a flat multiplier.
+    schema = wine_schema()
+
+    def rate(aa: float) -> float:
+        y = _wine_state(
+            schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=0.0, malic=2.0, amino_acids=aa
+        )
+        d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+        return -float(d[schema.slice("X_mlf")][0])
+
+    r_starved = rate(0.0)
+    r_replete = rate(10.0)  # well above K_aa_mlf (0.05 g/L) ⇒ starvation term ≈ 0
+    assert r_starved > r_replete > 0.0
+
+
+def test_senescence_no_wipeout_at_worst_case_combined_stress(params):
+    # The D-52 wipeout guard, verified empirically (not just threshold-checked, per the D-51/D-48
+    # project discipline): even at the WORST case simultaneously — saturating ethanol AND amino
+    # acids fully exhausted — the resulting half-life must stay in the weeks range, nowhere near the
+    # ~1-week D-39 wipeout regime that deferred ethanol coupling to v2 in the first place.
+    schema = wine_schema()
+    y = _wine_state(
+        schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=1.0e4, malic=2.0, amino_acids=0.0
+    )
+    d = MalolacticSenescence().derivatives(0.0, y, schema, params)
+    r_worst = -float(d[schema.slice("X_mlf")][0])
+    specific_rate = r_worst / 0.2  # [1/h], independent of the X_mlf dose used above
+    half_life_h = math.log(2.0) / specific_rate
+    assert half_life_h > 14.0 * 24.0  # > 2 weeks — comfortably clear of the ~1-week wipeout regime
 
 
 def test_senescence_warm_accelerates_cold_preserves_via_arrhenius(params):
@@ -610,9 +670,18 @@ def test_senescence_run_conserves_carbon_and_nitrogen():
 
 def test_senescence_needs_no_ph_solve(params):
     # Performance/isolability: unlike MalolacticDeath (which reads molecular SO₂ at the solved pH),
-    # senescence reads no SO₂ and no pH, so its reads tuple excludes every acidbase/SO₂ parameter —
-    # it never triggers a brentq. Pin the declared reads so a future SO₂/pH coupling can't slip in.
-    assert set(MalolacticSenescence.reads) == {"k_senescence_mlf", "E_a_death_mlf", "T_ref"}
+    # senescence reads no SO₂ and no pH — even with the D-52 stress terms, E/amino_acids are read
+    # directly off state — so its reads tuple excludes every acidbase/SO₂ parameter and it never
+    # triggers a brentq. Pin the declared reads so a future SO₂/pH coupling can't slip in.
+    assert set(MalolacticSenescence.reads) == {
+        "k_senescence_mlf",
+        "E_a_death_mlf",
+        "T_ref",
+        "k_senescence_ethanol_scale",
+        "ethanol_tolerance_mlf",
+        "k_senescence_starvation_scale",
+        "K_aa_mlf",
+    }
 
 
 def test_senescence_tier_is_speculative():

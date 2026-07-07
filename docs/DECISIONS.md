@@ -2956,8 +2956,9 @@ two growth-isolation tests (`test_mlf_growth`) disable senescence (or difference
 `pitch_mlf` re-enables the whole gated set, so the growth signal is isolated as a growth-on−off
 control difference in which senescence cancels); `test_media` wine kinetic-set gains
 `malolactic_senescence`. **The MLF arc (D-23 → D-31 → D-38 → D-39 → D-41) closes its last deferral.**
-Deferred further-v2: ethanol/starvation modulation of the baseline; a `BrettSenescence` twin (the same
-pattern) for the D-40 arc.
+Deferred further-v2: ~~ethanol/starvation modulation of the baseline~~ (**IMPLEMENTED in D-52**, see
+below); a `BrettSenescence` twin (the same pattern) for the D-40 arc remains open — **deliberately
+declined** in D-52's framing, see that entry.
 
 ## D-42 — H₂S CO₂-stripping sink (`HydrogenSulfideVolatilization`): residual vs cumulative produced
 
@@ -3668,6 +3669,92 @@ late SO₂ dose that used to be assumed "nearly all free." `test_malolactic.py`'
 updated per the side effect above. **650 passed** (646 + 4 new D-51 tests, incl. the 5 §2.2
 benchmarks), ruff + mypy clean. Validated core untouched; only the SO₂ speciation readout and its
 three downstream consumers (`free_acetaldehyde`, the MLF gate, and the speciation dataclass) moved.
+
+## D-52 — MLF v2 refinement: a bounded ethanol/starvation stress multiplier on `MalolacticSenescence`
+
+**Status: IMPLEMENTED 2026-07-07** (653 passed incl. the 5 §2.2 benchmarks, ruff + mypy clean). With
+M2 physics beats all complete through D-51, the owner asked for "whichever [MLF v2 deferred item] is
+closer to reality," delegating a fidelity judgment among three open candidates: a `BrettSenescence`
+twin (D-40 arc), a separate `molecular_so2_death_scale`, or lifting D-41's "environment-free"
+ethanol/starvation-modulation deferral.
+
+**The advisor caught a wrong initial pick, verified against the repo before building (the
+"discuss disagreements" discipline).** The first-pass read favoured `BrettSenescence` — "Brett only
+dies via SO₂ today, so it never declines on its own, which reads as a missing mechanism." An advisor
+call reversed this: *Brett's defining real-world trait is persistence* (VBNC survival in barrel/bottle
+for years, the textbook "low-and-slow" spoiler), and DECISIONS already says so explicitly (D-40 pt3:
+"Without SO₂ (or a rack) Brett persists indefinitely in v1 — an **honest reflection** of how tenacious
+a barrel Brett infection is"). A senescence twin would therefore be a fidelity *downgrade*, not a gain.
+The advisor's counter-pick — ethanol/starvation modulation of `MalolacticSenescence` — was verified
+against the actual functional form in `malolactic.py` before committing: `r_sen` is a *tiny* rate
+(~100× below `k_death_mlf`) with no multiplier at all, so a *bounded* stress factor could scale it
+without reproducing the D-39 wipeout (which came from multiplying a *large*, full-kill-calibrated rate
+by an unbounded `1 − toxicity` ≈ 0.92). Both premises were confirmed by reading the source before any
+code changed — the third-option `molecular_so2_death_scale` split was ruled out immediately as pure
+parameter architecture with zero fidelity gain.
+
+**The model — two smooth, capped Monod-type stress terms, not a re-run of the Luong wall.**
+
+    r_sen = k_senescence_mlf · X_mlf · arrhenius(T, E_a_death_mlf, T_ref) · stress
+    stress = 1 + k_senescence_ethanol_scale·[E/(E+ethanol_tolerance_mlf)]
+               + k_senescence_starvation_scale·[K_aa_mlf/(K_aa_mlf+amino_acids)]
+
+Each bracketed term is a Monod-type factor in **[0, 1)** by construction — no clamp needed, C¹ for the
+BDF solver — unlike the Luong wall's near-binary "1 at zero stress, 0 at the tolerance wall" shape that
+caused D-39's wipeout. `stress` is therefore hard-capped at
+`1 + k_senescence_ethanol_scale + k_senescence_starvation_scale` regardless of how far ethanol or
+nutrient depletion runs. **Reuses existing concentration scales** rather than adding new ones:
+`ethanol_tolerance_mlf` and `K_aa_mlf` (already read by `MalolacticGrowth`/`MalolacticConversion`) are
+the two terms' half-saturation points — the same "arrest-scale reused as a death-adjacent scale"
+simplification `MalolacticDeath` already makes with `molecular_so2_inhib_mlf`. Only two new
+*dimensionless ceiling* parameters are introduced. The starvation term reuses the growth fuel pool
+(`amino_acids`) **inverted** (rises as the pool depletes): it is ≈1 (near-max) once amino acids are
+exhausted — the D-23 finding places that at ~1.3 d post-pitch regardless of dose — and falls back
+whenever autolysis (D-34) refills the pool, so it tracks the real nutrient-refill dynamic already in
+the model rather than acting as a flat add-on.
+
+**Magnitude sizing — empirically bounded, not fitted.** `k_senescence_ethanol_scale` = 1.0,
+`k_senescence_starvation_scale` = 0.5 (both speculative, author estimates; direction — ethanol/
+nutrient stress accelerates O. oeni decline — is sourced from the same Ribereau-Gayon/Bartowsky &
+Henschke references `k_senescence_mlf` already cites). Combined ceiling 2.5× the baseline ⇒ a
+worst-case half-life of ~23 d (~3.3 weeks) even at simultaneously saturating ethanol and full amino-
+acid exhaustion — verified directly at the RHS level (`test_senescence_no_wipeout_at_worst_case_
+combined_stress`, E=1e4 g/L, amino_acids=0), never approaching the ~1-week D-39 wipeout regime. At
+typical post-AF dry-wine conditions (E≈100–130 g/L, amino_acids≈0) the measured stress factor is
+≈2.0×, giving a ~29 d effective half-life — comfortably "weeks," faster than D-41's flat ~58 d but
+nowhere near catastrophic.
+
+**Isolability + performance preserved.** Still reads **no SO₂ and no pH** — `E`/`amino_acids` are read
+directly off state, no equilibrium solve — so the Process remains strictly cheaper than the SO₂ kill,
+exactly as D-41 built it. `touches` unchanged (`X_mlf`, `X_mlf_dead`); the carbon/nitrogen-neutral
+transfer needs no new conservation code (D-13/D-39 pattern, unchanged). Pitch-gated at compile, not
+amino-acid-gated (unchanged from D-41).
+
+**A genuine, honestly-measured side effect on MLF-derived diacetyl clearing (the D-51 discipline
+reused).** `OenococcusDiacetylReduction`'s lees-contact clearing scales with viable `X_mlf`; faster
+senescence late in a long (30 d) run leaves less bacterial reductase around, so
+`test_headline_citrate_lifts_and_then_clears_diacetyl`'s final/peak diacetyl ratio rose from
+comfortably under its old 0.85 threshold to a measured **0.861** (X_mlf retains only ~0.49× its dose by
+day 30, vs a slower D-41-only decline). This is real and expected — the more realistic senescence
+means less bacteria on the lees to clear diacetyl late in the wine's life — not a bug; the test band
+was widened to 0.90 with the measured value and explanation recorded, following the exact discipline
+D-51 used for its own MLF SO₂-gate side effect (verify first, then band to what's actually measured,
+never loosen blindly).
+
+**Verification.** `tests/test_malolactic.py`: the single D-41-era `test_senescence_is_environment_
+free`, which pinned the now-superseded "environment-free" invariant, was split into four tests rather
+than deleted — `test_senescence_is_so2_independent` (SO₂ independence retained, unchanged),
+`test_senescence_ethanol_stress_is_bounded` (monotone rise with ethanol, ratio against the
+zero-stress floor strictly below the design ceiling), `test_senescence_starvation_stress_tracks_
+amino_acid_depletion` (starved > replete), and `test_senescence_no_wipeout_at_worst_case_combined_
+stress` (the empirical wipeout guard, half-life > 2 weeks at the worst case) — a net +3 tests in that
+file. Two more existing tests were updated in place, not weakened: `test_senescence_needs_no_ph_
+solve`'s reads-tuple pin was extended for the four new params, and the integration-level `test_so2_
+crashes_bacteria_over_the_slow_senescence_baseline` had its no-SO₂ decline bands re-measured and
+tightened around the new values (day-21 ratio ~0.608 vs D-41's ~0.71; day-6 pre-dose ratio ~0.875 vs
+~0.95) rather than loosened past a threshold. `tests/test_mlf_diacetyl.py`'s headline clearing test
+band was widened per the side effect above (measured, not blind). **653 passed** (650 + 3 net new
+tests, incl. the 5 §2.2 benchmarks), ruff + mypy clean.
 
 ## Deferred (decide early in the relevant milestone)
 

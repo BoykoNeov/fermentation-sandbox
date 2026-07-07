@@ -657,7 +657,7 @@ class MalolacticDeath(Process):
 
 
 class MalolacticSenescence(Process):
-    """*Oenococcus oeni* benign senescence — the slow baseline mortality (MLF **v2**, D-41).
+    """*Oenococcus oeni* benign senescence — the slow baseline mortality (MLF **v2**, D-41/D-52).
 
     Lifts the owned v1 tradeoff of :class:`MalolacticDeath` (D-39): *"without SO₂, bacteria never
     die."* In reality *O. oeni* does not persist forever in an untreated dry wine — over
@@ -668,46 +668,65 @@ class MalolacticSenescence(Process):
     bacteria (and the ``X_mlf``-scaled activities — conversion, citrate → diacetyl, lees-contact
     diacetyl reduction — fade with them) instead of holding a viable culture indefinitely.
 
-    **Rate — a constant specific rate, Arrhenius temperature, and nothing else.**
+    **Rate — a baseline rate scaled by a bounded ethanol/starvation stress multiplier, Arrhenius
+    temperature (D-52).**
 
-        r_sen = k_senescence_mlf · X_mlf · arrhenius(T, E_a_death_mlf, T_ref)
+        r_sen = k_senescence_mlf · X_mlf · arrhenius(T, E_a_death_mlf, T_ref) · stress
+        stress = 1 + k_senescence_ethanol_scale·[E/(E+ethanol_tolerance_mlf)]
+                   + k_senescence_starvation_scale·[K_aa_mlf/(K_aa_mlf+amino_acids)]
 
-    * **Constant ``k_senescence_mlf``** (t½ ≈ 8 weeks at ``T_ref``) — a *baseline* first-order
-      mortality, ~100× below the full-SO₂-kill ``k_death_mlf``. It is deliberately
-      **environment-free** (no pH, ethanol, or SO₂ term). "Benign" *means* environment-independent,
-      and — the load-bearing reason (the D-39 crux) — **any ethanol term reintroduces the wipeout
-      bug**: the Luong wall drives ``1 − g_EtOH`` to ~0.92 at ordinary post-AF ethanol, which
-      coupled to a mortality rate kills the culture in ~1 week, not the ~2 months reality shows. So
-      senescence carries no ethanol driver; the ethanol/starvation *modulation* of the baseline
-      stays a documented deferral (see the ``k_senescence_mlf`` provenance). The SO₂-driven acute
-      kill remains :class:`MalolacticDeath`'s job — total *O. oeni* mortality is now
-      ``r_sen + r_death`` (baseline + SO₂-induced), the two built as **separate isolable Processes**
-      (prime directive #3) so the SO₂ lever stays byte-for-byte as D-39 built it and this baseline
-      toggles off independently.
+    * **Constant baseline ``k_senescence_mlf``** (t½ ≈ 8 weeks at ``T_ref``, ``stress`` = 1) —
+      ~100× below the full-SO₂-kill ``k_death_mlf``.
+    * **The D-52 stress multiplier — lifts the D-41 "environment-free" deferral, without
+      reintroducing the D-39 wipeout bug.** D-39's crux was a *large* rate (``k_death_mlf``,
+      calibrated to represent a full SO₂ kill) multiplied by ``1 − toxicity`` ≈ 0.92 at ordinary
+      post-AF ethanol — near-maximal death *from ethanol alone*. Here the multiplier scales the
+      **tiny** senescence baseline instead, and both stress terms are smooth Monod-type factors
+      bounded in **[0, 1)** by construction (no clamp needed, C¹ for the BDF solver) rather than the
+      Luong wall's near-binary "1 at zero stress, 0 at the tolerance wall" shape. ``stress`` is
+      therefore hard-capped at ``1 + k_senescence_ethanol_scale + k_senescence_starvation_scale``
+      regardless of how far ``E`` or nutrient depletion runs — at the shipped values (1.0/0.5) that
+      ceiling is 2.5×, i.e. a worst-case half-life of ~23 d (~3.3 weeks), never approaching the
+      ~1-week wipeout regime. Reuses ``ethanol_tolerance_mlf`` and ``K_aa_mlf`` as the two terms'
+      half-saturation points — the same "arrest-scale reused as a death-adjacent scale"
+      simplification :class:`MalolacticDeath` already makes with ``molecular_so2_inhib_mlf`` — so no
+      new concentration-scale parameters are introduced, only the two dimensionless ceilings.
+    * **Starvation term reuses the growth fuel pool** (``amino_acids``, the same pool
+      :class:`MalolacticGrowth` draws on): it is ≈1 (near-max stress) once amino acids are
+      exhausted — which the D-23 finding places at ~1.3 d post-pitch regardless of dose — and falls
+      back toward 0 whenever autolysis (D-34) refills the pool, so the term is not a flat add-on but
+      tracks the real nutrient-refill dynamic already in the model.
     * **Arrhenius ``arrhenius(T, E_a_death_mlf, T_ref)`` — NOT the cardinal γ(T)** (the reused D-39
       choice). Warm accelerates senescence, cold slows it to dormancy — the physically correct
       direction. The cardinal γ(T) peaks at ``T_opt_mlf`` (23 °C) and vanishes past ``T_max_mlf``,
       which would make senescence *maximal at the growth optimum* and *switch off* in the warm —
       exactly backwards for a decline. Reuses ``E_a_death_mlf``/``T_ref`` (no new temperature
       params); the factor is 1 at the 20 °C benchmark, like every other Arrhenius rate.
+    * The SO₂-driven acute kill remains :class:`MalolacticDeath`'s job — total *O. oeni* mortality
+      is therefore ``r_sen + r_death`` (stress-modulated baseline + SO₂-induced), the two built as
+      **separate isolable Processes** (prime directive #3) so the SO₂ lever stays byte-for-byte as
+      D-39 built it and this baseline toggles off independently.
 
     **Conservation — the carbon/nitrogen-neutral transfer, no new code (the D-13/D-39 pattern).**
     Both ``X_mlf`` and ``X_mlf_dead`` are weighted in ``total_carbon``/``total_nitrogen`` at the
     *same* biomass fractions (since D-38/D-39), so ``d[X_mlf] = −r_sen``, ``d[X_mlf_dead] = +r_sen``
     is C- and N-neutral by construction — identical to the SO₂ kill and the yeast ``X → X_dead``
     inactivation. ``X_mlf_dead`` is a **terminal sink** here: :class:`~fermentation.core.kinetics.\
-    autolysis.YeastAutolysis` reads only the yeast ``X_dead`` pool, so senescing bacteria do **not**
+autolysis.YeastAutolysis` reads only the yeast ``X_dead`` pool, so senescing bacteria do **not**
     refuel the ``amino_acids`` pool (no self-cancelling recycling loop). Touches ``(X_mlf,
-    X_mlf_dead)`` only.
+    X_mlf_dead)`` only — reading ``E``/``amino_acids`` for the D-52 stress terms adds no new touched
+    state.
 
     **Isolability + performance.** ``X_mlf ≤ 0`` (undosed / un-pitched) returns a zero contribution.
-    Unlike :class:`MalolacticDeath` this Process reads **no SO₂ and no pH**, so it never triggers a
-    ``brentq`` — it is strictly cheaper than the SO₂ kill. Pitch-gated at the compile seam (enabled
-    with the other ``_MLF_PROCESSES`` when ``mlf_pitch_gpl > 0``), NOT amino-acid-gated: bacteria
-    age whether or not they were growing. **This supersedes the v1 "no-SO₂ pitched run is
-    byte-for-byte inert" property** — a pitched, unsulfited run now shows a slow monotone ``X_mlf``
-    decline, which is the point of v2. Tier **speculative** (``k_senescence_mlf`` is an author
-    estimate; the constant-rate baseline form is a modelling choice).
+    This Process still reads **no SO₂ and no pH**, so it never triggers a ``brentq`` — it remains
+    strictly cheaper than the SO₂ kill even with the D-52 stress terms (``E``/``amino_acids`` are
+    read directly off state, no equilibrium solve). Pitch-gated at the compile seam (enabled with
+    the other ``_MLF_PROCESSES`` when ``mlf_pitch_gpl > 0``), NOT amino-acid-gated: bacteria age
+    whether or not they were growing. **This supersedes the v1 "no-SO₂ pitched run is byte-for-byte
+    inert" property** — a pitched, unsulfited run now shows a slow monotone ``X_mlf`` decline, which
+    is the point of v2. Tier **speculative** (``k_senescence_mlf`` and the D-52 stress-ceiling
+    parameters are author estimates; direction — ethanol/starvation stress accelerates decline — is
+    sourced, magnitude is a modelling choice).
     """
 
     name = "malolactic_senescence"
@@ -716,10 +735,21 @@ class MalolacticSenescence(Process):
     #: fills. Declaring both keeps the carbon/nitrogen-neutral transfer in the ``touches`` contract.
     touches = ("X_mlf", "X_mlf_dead")
     #: ``k_senescence_mlf`` sets the baseline mortality magnitude; ``E_a_death_mlf``/``T_ref`` its
-    #: Arrhenius temperature shape (shared with :class:`MalolacticDeath` — the same warm-accelerates
-    #: mortality direction). NO SO₂/pH/ethanol params (senescence is environment-free, D-41). Their
-    #: tiers cap the ``X_mlf``/``X_mlf_dead`` output tiers via parameter-tier propagation (D-1).
-    reads: tuple[str, ...] = ("k_senescence_mlf", "E_a_death_mlf", "T_ref")
+    #: Arrhenius temperature shape (shared with :class:`MalolacticDeath`). The D-52 stress terms
+    #: read ``ethanol_tolerance_mlf``/``K_aa_mlf`` (half-saturation scales reused from the
+    #: conversion/growth gates) and their own dimensionless ceilings
+    #: ``k_senescence_ethanol_scale``/``k_senescence_starvation_scale``. Still NO SO₂/pH params.
+    #: Their tiers cap the ``X_mlf``/``X_mlf_dead`` output tiers via parameter-tier propagation
+    #: (D-1).
+    reads: tuple[str, ...] = (
+        "k_senescence_mlf",
+        "E_a_death_mlf",
+        "T_ref",
+        "k_senescence_ethanol_scale",
+        "ethanol_tolerance_mlf",
+        "k_senescence_starvation_scale",
+        "K_aa_mlf",
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -732,9 +762,23 @@ class MalolacticSenescence(Process):
             return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_death_mlf"], params["T_ref"])
-        # Constant baseline mortality: environment-free (no pH/ethanol/SO₂ — "benign"), warm-
-        # accelerated by Arrhenius (NOT γ(T), which would spuriously peak at the growth optimum).
-        r_sen = params["k_senescence_mlf"] * x_mlf * f_t  # [g X_mlf/L/h]
+
+        # D-52 bounded stress multiplier: two smooth Monod-type terms in [0, 1), each capped by its
+        # own dimensionless ceiling, so `stress` cannot exceed 1 + ethanol_scale + starvation_scale
+        # regardless of how far E or nutrient depletion runs (no clamp needed — the wipeout guard).
+        e = max(float(y[schema.slice("E")][0]), 0.0)
+        ethanol_stress = e / (e + params["ethanol_tolerance_mlf"])
+        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0) if "amino_acids" in schema else 0.0
+        starvation_stress = params["K_aa_mlf"] / (params["K_aa_mlf"] + aa)
+        stress = (
+            1.0
+            + params["k_senescence_ethanol_scale"] * ethanol_stress
+            + params["k_senescence_starvation_scale"] * starvation_stress
+        )
+
+        # Stress-modulated baseline mortality: warm-accelerated by Arrhenius (NOT γ(T), which would
+        # spuriously peak at the growth optimum), scaled up (bounded) by ethanol/starvation stress.
+        r_sen = params["k_senescence_mlf"] * x_mlf * f_t * stress  # [g X_mlf/L/h]
         d[schema.slice("X_mlf")] = -r_sen
         d[schema.slice("X_mlf_dead")] = r_sen  # carbon/nitrogen-neutral: same biomass fractions
         return d
