@@ -144,6 +144,44 @@ def brett_environmental_gate(
     return float(gate_so2 * gamma_t)
 
 
+#: The ethanol-toxicity survival-factor parameters, shared by :class:`BrettGrowth` (as an upper
+#: growth wall) and :class:`BrettEthanolToxicity` (as the death driver, decision D-58). Declared
+#: once so the two Processes' ``reads`` tuples and :func:`brett_ethanol_survival_factor` cannot
+#: drift apart — the ``_BRETT_GATE_READS`` pattern.
+_BRETT_ETHANOL_TOXICITY_READS: tuple[str, ...] = (
+    "brett_ethanol_toxicity_onset",
+    "brett_ethanol_toxicity_ceiling",
+    "brett_ethanol_toxicity_exponent",
+)
+
+
+def brett_ethanol_survival_factor(e: float, params: Mapping[str, float]) -> float:
+    """The *Brettanomyces* ethanol-toxicity survival factor ∈ [0, 1] (decision D-58).
+
+    Sourced from Barata et al. 2008 (Int. J. Food Microbiol. 121(2):201–207): Brett grows normally
+    up to ``brett_ethanol_toxicity_onset`` (~14% v/v, 110 g/L) and is fully arrested by
+    ``brett_ethanol_toxicity_ceiling`` (~15% v/v, 118 g/L) — a THRESHOLD effect, deliberately
+    unlike the O. oeni Luong wall (:func:`~fermentation.core.kinetics.malolactic.\
+    malolactic_toxicity_gate`), which decays continuously from ``E = 0``. A whole-range Luong wall
+    would be the wrong functional form here: Brett is documented (D-40) as markedly MORE
+    ethanol-tolerant than O. oeni, so a wall with a similar shape would spuriously suppress Brett
+    across the entire normal wine ethanol range (~90–105 g/L) where it in fact thrives — exactly
+    the mistake the Brett environmental gate already avoids by carrying no ethanol term at all
+    (D-40). This factor is 1 (no effect) for ``E ≤ onset`` — so it is a genuine zero contribution,
+    not just a small one, across ordinary wine strength — and eases smoothly (C1, no BDF kink, the
+    D-40 pt2 shadow idiom) to 0 by the ceiling.
+
+    ``BrettGrowth`` multiplies this into its rate as an upper wall (reconciling ethanol's dual
+    role — carbon SOURCE at low concentration via the existing ``E/(K_E_brett+E)`` Monod, toxin at
+    high concentration via this factor — on the SAME state variable). ``BrettEthanolToxicity``
+    drives death off ``1 − this factor`` (the ``BrettDeath`` ``1 − g_SO₂`` idiom).
+    """
+    onset = params["brett_ethanol_toxicity_onset"]
+    span = params["brett_ethanol_toxicity_ceiling"] - onset
+    remaining = 1.0 - max(0.0, e - onset) / span
+    return remaining ** params["brett_ethanol_toxicity_exponent"] if remaining > 0.0 else 0.0
+
+
 def _needs_ph_solve(y: FloatArray, schema: StateSchema) -> bool:
     """Whether the SO₂ partition (and thus a ``brentq``) is needed — true iff SO₂ is dosed.
 
@@ -409,6 +447,18 @@ class BrettGrowth(Process):
     ``E → 0`` so the BDF Jacobian never straddles an on/off step during primary AF, mirroring how
     the amino-acid Monod shadows the ``aa`` guard and the ``(1 − X/K)`` brake shadows the cap.)
 
+    **Ethanol-toxicity upper wall (decision D-58) — ethanol's dual role on one state variable.**
+    Real Brett tolerance is bounded: Barata et al. 2008 measured growth at ~8% v/v ethanol and
+    full arrest by ~14.5–15% (:func:`brett_ethanol_survival_factor`). The rate multiplies by this
+    shared factor — 1 (no effect) up to ``brett_ethanol_toxicity_onset`` (above normal wine
+    strength, so ordinary finished wine is unaffected), easing to 0 by
+    ``brett_ethanol_toxicity_ceiling``. Combined with ``e_monod`` above, ethanol's net effect on
+    growth is a *hump*: rises as a carbon source at low concentration, flat across the normal wine
+    range, eases toward 0 near Barata's ceiling — the reconciliation of "ethanol as fuel" and
+    "ethanol as toxin" on the same state variable, rather than two independent, potentially
+    double-counting mechanisms. :class:`BrettEthanolToxicity` reuses the same factor (as
+    ``1 −`` it) to drive a matching death term.
+
     **Carrying-capacity brake — the load-bearing difference from MLF (decision D-40 pt2).** MLF
     growth is *self-arresting*: its sugar Monod ``S/(K_s + S)`` vanishes as sugar is consumed and
     its gate carries an ethanol wall, so ``O. oeni`` cannot run away. Brett deliberately has
@@ -472,6 +522,7 @@ class BrettGrowth(Process):
         "biomass_N_fraction",
         "biomass_C_fraction",
         *_BRETT_GATE_READS,
+        *_BRETT_ETHANOL_TOXICITY_READS,
     )
 
     def derivatives(
@@ -512,8 +563,15 @@ class BrettGrowth(Process):
         # (~a few g/L), so this is ≈1 across the whole normal-wine ethanol range and only smooths
         # the near-zero crossing — Brett's dry-finished-wine niche is preserved.
         e_monod = e / (params["K_E_brett"] + e)
+        # Ethanol-toxicity upper wall (decision D-58): reconciles ethanol's dual role on this SAME
+        # state variable — carbon source at low concentration (e_monod, above) and toxin at high
+        # concentration (this factor). Exactly 1 (no effect) across ordinary wine strength (Barata's
+        # onset ~14% v/v is above typical finished-wine ethanol), easing to 0 by ~15% v/v — the
+        # combined shape is the classic "hump": rises via e_monod, flat across the normal range,
+        # eases toward 0 near Barata's measured growth ceiling. See brett_ethanol_survival_factor.
+        e_toxicity_wall = brett_ethanol_survival_factor(e, params)
         dx_brett = (
-            params["mu_max_brett"] * x_brett * aa_monod * e_monod * gate * brake
+            params["mu_max_brett"] * x_brett * aa_monod * e_monod * e_toxicity_wall * gate * brake
         )  # [g X_brett/L/h]
         if dx_brett <= 0.0:
             return d
@@ -640,6 +698,98 @@ class BrettDeath(Process):
         # SO₂ drives death: 1 − g_SO₂ ∈ [0, 1) rises with molecular SO₂. Arrhenius (not the cardinal
         # γ(T)) carries temperature, so cold preserves rather than kills Brett (decision D-40 pt3).
         r_death = params["k_death_brett"] * x_brett * (1.0 - g_so2) * f_t  # [g X_brett/L/h]
+        d[schema.slice("X_brett")] = -r_death
+        d[schema.slice("X_brett_dead")] = r_death  # carbon/nitrogen-neutral: same biomass fractions
+        return d
+
+
+class BrettEthanolToxicity(Process):
+    """*Brettanomyces* ethanol-toxicity death — the sourced alternative to a declined senescence
+    (decision D-58).
+
+    D-52 declined a generic ``BrettSenescence`` twin of :class:`~fermentation.core.kinetics.\
+    malolactic.MalolacticSenescence`: no literature source shows Brett declining from elapsed time
+    alone. D-58's follow-up research (two independent literature agents) re-confirmed that, but
+    surfaced a real, DIFFERENT, sourced mechanism this Process closes: Barata et al. 2008 measured
+    Brett growing normally up to ~14% v/v ethanol and fully arrested by ~14.5–15%, in closed-system
+    model wine WITHOUT SO₂ — a threshold effect on *ethanol concentration*, not a function of
+    elapsed time, so it is not the senescence D-52 declined.
+
+    **Rate — the same ``1 − survival`` idiom as :class:`BrettDeath`'s ``1 − g_SO₂``.**
+
+        r_death = k_death_brett · X_brett · (1 − survival(E)) · arrhenius(T, E_a_death_brett, T_ref)
+        survival(E) = brett_ethanol_survival_factor(E, params)  — see that function's docstring
+
+    Exactly 0 for ``E ≤ brett_ethanol_toxicity_onset`` (~110 g/L, ~14% v/v) — so ordinary
+    finished wine (typically ~90–105 g/L) sees no contribution at all, not merely a small one —
+    rising to the full ``k_death_brett`` rate by ``brett_ethanol_toxicity_ceiling`` (~118 g/L,
+    ~15% v/v). **Reuses** ``k_death_brett``/``E_a_death_brett``/``T_ref`` rather than introducing
+    new death-magnitude/temperature params — Barata's data was measured at one fixed 25 °C, so no
+    independent activation energy is sourced, and reusing the existing SO₂-kill scale as the
+    ethanol-kill scale mirrors :class:`BrettDeath`'s own documented "arrest-scale = kill-scale"
+    simplification. Needs **no** SO₂ — unlike :class:`BrettDeath`, this fires on an unsulfited
+    high-ethanol wine, which is exactly its point (the mechanism Barata measured requires no
+    sulfite).
+
+    **Scope limitation (documented, not silently assumed).** Barata's most-cited headline
+    number — a 12% v/v ethanol, no-SO₂, 50-day population crash — is explicitly described in the
+    source as bloom-on-trace-carbon *then* starvation-plus-ethanol-stress: a confounded result
+    mixing substrate exhaustion (an unrelated, unmodelled mechanism here) with ethanol toxicity.
+    12% v/v (~95 g/L) is *below* ``brett_ethanol_toxicity_onset``, so this Process alone predicts
+    no decline at that concentration — it models only the distinct, unconfounded per-concentration
+    boundary data (growth at ~8%, death onset ~14%, ceiling ~14.5–15%), not the
+    starvation-confounded 12% result. A starvation-driven decline mechanism, if ever wanted, is a
+    separate, not-yet-scoped addition.
+
+    **Conservation — carbon/nitrogen-neutral transfer (the** :class:`BrettDeath` **pattern).** Same
+    ``(X_brett, X_brett_dead)`` transfer at the same biomass fractions, so no new conservation code.
+
+    **Isolability.** ``X_brett ≤ 0`` *or* ``E ≤ brett_ethanol_toxicity_onset`` returns a zero
+    contribution — the ethanol guard is EXACT (survival ≡ 1 at or below onset), so an ordinary-
+    strength wine (pitched or not) pays no cost beyond the guard check and its contribution is
+    byte-for-byte zero. No pH solve is ever needed (no SO₂ term). Pitch-gated (added to
+    :data:`~fermentation.scenario.compile._BRETT_GATED_PROCESSES` alongside :class:`BrettDeath` —
+    Brett dies whether or not it grew), NOT amino-acid-gated. Tier **speculative** (the reused
+    death-rate/temperature params are estimates; the survival-factor boundaries are sourced but the
+    functional form/exponent are modelling choices).
+    """
+
+    name = "brett_ethanol_toxicity"
+    tier = Tier.SPECULATIVE
+    #: Same carbon/nitrogen-neutral transfer as :class:`BrettDeath` — both pools already weighted
+    #: at the biomass fractions (D-40 pt3), so declaring both keeps the transfer inside ``touches``.
+    touches = ("X_brett", "X_brett_dead")
+    #: ``k_death_brett``/``E_a_death_brett``/``T_ref`` are REUSED from :class:`BrettDeath`
+    #: (documented simplification — no independent ethanol-death rate/temperature law is sourced);
+    #: the ethanol survival-factor params are new (D-58). Their tiers cap the
+    #: ``X_brett``/``X_brett_dead`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_death_brett",
+        "E_a_death_brett",
+        "T_ref",
+        *_BRETT_ETHANOL_TOXICITY_READS,
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Early guards: no catalyst ⇒ no Brett to kill; E at/below the toxicity onset ⇒ survival ≡ 1
+        # so death is identically 0 (EXACT guard, not an approximation — ordinary-strength wine is
+        # unaffected). No pH solve is ever needed (no SO₂ term in this Process).
+        x_brett = max(float(y[schema.slice("X_brett")][0]), 0.0) if "X_brett" in schema else 0.0
+        if x_brett <= 0.0:
+            return d
+        e = max(float(y[schema.slice("E")][0]), 0.0)
+        if e <= params["brett_ethanol_toxicity_onset"]:
+            return d
+
+        survival = brett_ethanol_survival_factor(e, params)
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_death_brett"], params["T_ref"])
+        # Ethanol toxicity drives death: 1 - survival rises from 0 at the onset to 1 at the ceiling.
+        # Same Arrhenius temperature factor as BrettDeath (reused, decision D-58).
+        r_death = params["k_death_brett"] * x_brett * (1.0 - survival) * f_t  # [g X_brett/L/h]
         d[schema.slice("X_brett")] = -r_death
         d[schema.slice("X_brett_dead")] = r_death  # carbon/nitrogen-neutral: same biomass fractions
         return d

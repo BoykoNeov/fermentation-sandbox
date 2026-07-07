@@ -4267,10 +4267,9 @@ half-wrong; the data reshaped it into "fix one sourced bug, measure, then let th
 much smaller residual is worth a new mechanism" — the same D-48/D-49/D-51 pattern this project keeps
 hitting when a delegated diagnosis is checked against current code rather than trusted at face value.
 
-## D-58 — MLF v2 sub-items research: `BrettSenescence` twin re-confirmed declined; ethanol-toxicity death surfaced as a genuine gap
+## D-58 — MLF v2 sub-items research: `BrettSenescence` twin re-confirmed declined; ethanol-toxicity death built
 
-**Status: RESEARCH LANDED, no code changed yet — the ethanol-toxicity death term is an open fork for
-the owner.** Picked up the two remaining D-52 "MLF v2 further refinements" sub-items
+**Status: IMPLEMENTED (2026-07-08).** Picked up the two remaining D-52 "MLF v2 further refinements" sub-items
 (`BrettSenescence` twin; a separate `molecular_so2_death_scale` for `MalolacticDeath`) as the next
 task. Before building either, two independent literature-research agents (opposite angles — one
 hunting for evidence a Brett senescence mechanism is needed, one hunting for evidence the model's
@@ -4317,22 +4316,67 @@ ethanol purely as a carbon source (Monod, D-40 pt2) with no upper wall — unlik
 against copying the MLF gate (Brett is markedly more ethanol-tolerant, so an MLF-style wall would be
 wrong — but Barata shows tolerance is bounded, not unlimited).
 
-**Not built — this is scope expansion past the original two MLF-v2 sub-items, and a genuine design
-fork, not a parameter add.** `BrettGrowth` already uses ethanol as a carbon *source* (low-concentration
-regime); Barata's toxicity is a *high*-concentration effect on the *same* state variable, so a death
-term has to be reconciled with the growth term (e.g. a smooth toxicity factor on death, sourced at
-Barata's measured boundaries — grow ~8%, death onset ~14%, ceiling ~14.5–15% v/v — used as sourced
-values, not tuned to fit Barata's curve, to avoid consuming Brett's only literature anchor as a fit
-target rather than a validation source), not simply layered on top. **Owner's call whether to build
-it.** The separate `molecular_so2_death_scale` split (the other original D-52 sub-item) remains
-available but still zero-fidelity-gain per D-52's own reasoning — deprioritized, not revisited here.
+**Built (owner chose to build, not defer).** `BrettGrowth` already uses ethanol as a carbon
+*source* (low-concentration regime); Barata's toxicity is a *high*-concentration effect on the
+*same* state variable, so the death term is reconciled with the growth term rather than layered on
+top. Implementation (`fermentation.core.kinetics.brett`):
+
+- **`brett_ethanol_survival_factor(E, params)`** — a shared helper, ∈ [0, 1]. Deliberately NOT the
+  standard whole-range Luong wall (`(1 − E/E_max)^n`, decaying continuously from `E = 0`) that MLF
+  uses: a Luong wall centered near Barata's ~118 g/L ceiling would already suppress Brett
+  substantially at ordinary wine strength (~90–105 g/L) — the exact mistake the Brett gate's
+  no-ethanol-term design already avoids (D-40). Instead a **threshold** form: exactly 1 (no effect)
+  for `E ≤ brett_ethanol_toxicity_onset`, easing smoothly (C1, `n = 2`, no BDF kink) to 0 by
+  `brett_ethanol_toxicity_ceiling`. Sourced boundaries: onset 110 g/L (~14% v/v, Barata's death
+  onset), ceiling 118 g/L (~15% v/v, Barata's growth ceiling) — both via the codebase's standard
+  ethanol-density conversion, used as fixed values, not fit to Barata's curve.
+- **`BrettGrowth`** multiplies this factor into its rate as an upper wall, alongside the existing
+  low-concentration ethanol Monod — the combined shape is a *hump* (source at low E, flat across
+  normal wine strength, arrested near the ceiling), the reconciliation the design fork called for.
+  Verified this leaves ordinary wine strength byte-for-byte unaffected: a probe run of the standard
+  22-Brix test scenario tops out at E ≈ 106.6 g/L, safely below the 110 g/L onset, so the existing
+  `test_pitch_brett_post_af_at_high_ethanol` integration test (which explicitly asserts "no ethanol
+  wall arrests Brett at full-strength wine ethanol") needed no change.
+- **`BrettEthanolToxicity`** — a new sibling `Process` to `BrettDeath`, NOT an added term inside it
+  (keeps `BrettDeath`'s existing "exactly 0 without SO₂" docstring/tests byte-for-byte true).
+  `r_death = k_death_brett · X_brett · (1 − survival(E)) · arrhenius(T, E_a_death_brett, T_ref)` —
+  the `BrettDeath` `1 − g_SO₂` idiom, reusing `k_death_brett`/`E_a_death_brett`/`T_ref` rather than
+  sourcing new magnitude/temperature params (Barata measured at one fixed 25 °C, so no independent
+  activation energy exists; reuse mirrors `BrettDeath`'s own documented arrest-scale = kill-scale
+  simplification). Needs no SO₂ — the entire point. Pitch-gated alongside `BrettDeath` in
+  `_BRETT_GATED_PROCESSES`/`_BRETT_PROCESSES`. Exact zero guard at/below onset (no pH solve ever).
+- **Scope limitation, documented not silently dropped:** Barata's most-cited number (a 12% v/v,
+  no-SO₂, 50-day crash) is explicitly confounded in the source — bloom-on-trace-carbon *then*
+  starvation-plus-ethanol-stress — and 12% v/v (~95 g/L) sits below the onset, so this Process alone
+  predicts no decline there. Only the distinct, unconfounded per-concentration boundary data (grow
+  ~8%, death onset ~14%, ceiling ~14.5–15%) is modelled; a starvation-driven decline mechanism, if
+  ever wanted, is separate and not scoped here.
+- **New params (wine-only):** `brett_ethanol_toxicity_onset` (110 g/L), `brett_ethanol_toxicity_ceiling`
+  (118 g/L), `brett_ethanol_toxicity_exponent` (2.0) — all speculative, sourced from Barata et al. 2008.
+  No new state slots (reuses `X_brett`/`X_brett_dead`/`E`).
+- **Tests (12 new, `tests/test_brett.py`):** exact-zero guard at/below onset, neutral transfer,
+  touches, monotonicity onset→ceiling, reused-Arrhenius warm-accelerates direction, no-catalyst
+  guard, speculative tier, the survival-factor helper's own boundary values (direct unit tests), the
+  growth wall leaving normal wine strength unaffected, the growth wall arresting growth at the
+  ceiling, and a headline integration test: an unsulfited 26-Brix (~13% ABV, above onset) scenario
+  crashes a growing Brett population (`X_brett_dead` fills, `X_brett` declines from its peak) while
+  a 22-Brix (~11% ABV, below onset) control keeps growing — plus a carbon/nitrogen conservation test
+  with the mechanism active. The separate `molecular_so2_death_scale` split (the other original
+  D-52 sub-item) remains available but still zero-fidelity-gain per D-52's own reasoning —
+  deprioritized, not built here.
+
+**Full-suite result:** 676 passed (664 + 12 new), ruff + mypy clean, no existing test's assertion
+needed to change (the onset threshold sits above every existing scenario's finished-wine ethanol).
 
 **Method beat:** two parallel Opus research agents, deliberately opposite-angle (one arguing
 "decline exists", one arguing "persistence is real") to avoid one-sided confirmation, then a
 same-session advisor() pass that caught a self-contradiction in the second agent's report (claiming
 both "the existing brake already covers this" and "this is genuinely missing physics" — those can't
 both be true) before it reached the owner — resolved by reading the actual `BrettGrowth`/`BrettDeath`
-code rather than trusting the agent's synthesis.
+code rather than trusting the agent's synthesis. A second advisor-flagged risk (a standard Luong
+wall would suppress Brett at ordinary wine strength, contradicting its established ethanol-tolerant
+niche) was verified empirically (the 22-Brix E≈106.6 g/L probe) before committing to the threshold
+functional form over the more obvious wholesale-reuse of the MLF Luong wall.
 
 ## Deferred (decide early in the relevant milestone)
 
@@ -4410,11 +4454,7 @@ code rather than trusting the agent's synthesis.
   decline traces to SO₂, ethanol toxicity, or substrate exhaustion). D-40/D-52's "persists
   indefinitely" wording should be read as "no positive evidence for spontaneous decline without SO₂,"
   not literal immortality. See D-58.
-- **Brett ethanol-toxicity death gate — new, sourced, not yet built (D-58, 2026-07-07).** Barata et
-  al. 2008 measured Brett growth at 8% v/v ethanol and death onset at ~14% (ceiling ~14.5–15%) in
-  closed-system model wine without SO₂ — a bloom-then-decline dynamic the current model structurally
-  cannot reproduce, since `BrettGrowth`'s only ceiling is a logistic plateau brake and `BrettDeath` is
-  SO₂-only. Would need a death term reconciled with `BrettGrowth`'s existing ethanol-as-carbon-source
-  Monod on the same state variable (low-concentration source, high-concentration toxin), sourced at
-  Barata's measured boundaries rather than fit to reproduce Barata's curve (to avoid spending Brett's
-  only literature anchor as a fit target). Owner's call whether to build it. See D-58.
+- ~~Brett ethanol-toxicity death gate~~ — **IMPLEMENTED in D-58 (2026-07-08).** `BrettEthanolToxicity`
+  (a new sibling `Process` to `BrettDeath`) plus a `BrettGrowth` upper wall, both driven by a shared
+  threshold survival factor sourced at Barata et al. 2008's boundaries (onset ~14% v/v/110 g/L,
+  ceiling ~14.5–15%/118 g/L). No SO₂ needed — the point of the mechanism. See D-58.

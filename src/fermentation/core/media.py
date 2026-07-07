@@ -79,6 +79,7 @@ from fermentation.core.kinetics import (
     BiomassCarryingCapacity,
     BrettDeath,
     BrettDecarboxylation,
+    BrettEthanolToxicity,
     BrettGrowth,
     BrettVinylphenolReduction,
     ColemanQuadraticDeathTemperature,
@@ -363,15 +364,16 @@ def wine_schema() -> StateSchema:
             default=0.0,
             description="Brettanomyces bruxellensis viable biomass — the spoilage catalyst scaling "
             "the decarboxylase/reductase rates. Dosed at pitch; grown (BrettGrowth, D-40 pt2) and "
-            "killed off into X_brett_dead by SO₂ (BrettDeath, D-40 pt3)",
+            "killed off into X_brett_dead by SO₂ (BrettDeath, D-40 pt3) or high ethanol "
+            "(BrettEthanolToxicity, D-58)",
         ),
         VarSpec(
             "X_brett_dead",
             "g/L",
             default=0.0,
-            description="non-viable Brettanomyces biomass — the settled lees BrettDeath moves "
-            "X_brett into (carbon/nitrogen still counted at the biomass fractions, no longer "
-            "catalytic; racked off with the other lees, decision D-40)",
+            description="non-viable Brettanomyces biomass — the settled lees BrettDeath/"
+            "BrettEthanolToxicity move X_brett into (carbon/nitrogen still counted at the biomass "
+            "fractions, no longer catalytic; racked off with the other lees, decisions D-40/D-58)",
         ),
         VarSpec(
             "mercaptans",
@@ -696,8 +698,9 @@ _MLF_GROWTH_PROCESSES: tuple[Callable[[], Process], ...] = (MalolacticGrowth,)
 #: compile seam DISABLES them when Brett is not pitched so the inert ``hydroxycinnamics``/
 #: ``vinylphenols``/``ethylphenols`` slots keep their VALIDATED tier (``tier_of`` counts enabled,
 #: not nonzero, Processes — the D-23 MLF pattern). :class:`BrettGrowth` (D-40 pt2) is amino-acid-
-#: gated in its own tuple below; :class:`BrettDeath` (D-40 pt3, the SO₂ lever) rides in THIS
-#: pitch-gated tuple — Brett dies whether or not it was growing, so it belongs with the phenol
+#: gated in its own tuple below; :class:`BrettDeath` (D-40 pt3, the SO₂ lever) and
+#: :class:`BrettEthanolToxicity` (D-58, the ethanol-toxicity lever — needs no SO₂) both ride in THIS
+#: pitch-gated tuple — Brett dies whether or not it was growing, so they belong with the phenol
 #: Processes, disabled at the compile seam on an unpitched run (mirroring how
 #: :class:`~fermentation.core.kinetics.malolactic.MalolacticDeath` sits in ``_MLF_PROCESSES``, not
 #: the amino-acid-gated growth tuple). The ``X_brett → X_brett_dead`` transfer is carbon/nitrogen-
@@ -707,6 +710,7 @@ _BRETT_PROCESSES: tuple[Callable[[], Process], ...] = (
     BrettDecarboxylation,
     BrettVinylphenolReduction,
     BrettDeath,
+    BrettEthanolToxicity,
 )
 
 #: *Brettanomyces* growth (wine-only, decision D-40 pt2). Makes ``X_brett`` dynamic:

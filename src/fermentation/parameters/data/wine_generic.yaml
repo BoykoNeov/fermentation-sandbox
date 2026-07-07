@@ -1186,6 +1186,65 @@ E_a_death_brett:
     conditions: "Brettanomyces in wine; temperature factor arrhenius(T, E_a_death_brett, T_ref) on the death rate, = 1 at T_ref (20 C)"
     notes: "Read by BrettDeath. Gives the temperature dependence of Brett mortality so that a warm sulfited wine clears the culture faster and cold PRESERVES it (dormancy) - the physically correct direction the cardinal gamma(T) cannot supply for death (gamma(T) -> 0 in the cold would make cold kill, the opposite of reality). SPECULATIVE: the magnitude is an estimate equal to the MLF death / autolysis E_a; the DIRECTION (warm accelerates, cold preserves) is sound. Uses the shared T_ref (20 C) so the factor is 1 at the wine benchmark temperature, like every other Arrhenius rate."
 
+# -- BRETT ETHANOL TOXICITY (wine-only, decision D-58) -------------------------------------------
+# BrettEthanolToxicity (fermentation.core.kinetics.brett) closes a real gap D-58's research surfaced:
+# D-52 correctly declined a generic age-based "BrettSenescence" (no source shows Brett declining from
+# elapsed time alone), but Barata et al. 2008 (Int. J. Food Microbiol. 121(2):201-207) measured a
+# DIFFERENT, real mechanism in closed-system model wine WITHOUT SO2: Brett grows normally at ~8% v/v
+# ethanol, death onset by ~14%, and an upper growth ceiling ~14.5-15% - a bloom-then-death dynamic the
+# model previously could not reproduce (BrettGrowth's only ceiling was a logistic PLATEAU brake, never
+# a decline; BrettDeath is SO2-only, exactly 0 without SO2). This is a genuinely different driver from
+# the declined senescence idea: threshold-gated on ethanol CONCENTRATION, not on elapsed time, and
+# ZERO below Barata's onset (so normal-strength wine, ~90-105 g/L / 11-13% ABV, is unaffected).
+# Shared survival factor (fermentation.core.kinetics.brett.brett_ethanol_survival_factor), reused by
+# BOTH BrettGrowth (as an upper multiplicative wall easing growth to 0 near the ceiling - the
+# reconciliation with BrettGrowth's existing ethanol-as-CARBON-SOURCE Monod on the same state
+# variable, source at low E, toxin at high E) and BrettEthanolToxicity (driving death via
+# 1 - survival, the BrettDeath 1-g_SO2 idiom):
+#   remaining = 1 - max(0, E - brett_ethanol_toxicity_onset) / (brett_ethanol_toxicity_ceiling -
+#               brett_ethanol_toxicity_onset)
+#   survival  = max(0, remaining) ^ brett_ethanol_toxicity_exponent
+# Exactly 1 (no effect) for E <= onset; eases smoothly (C1, no BDF kink, the D-40 pt2 shadow idiom) to
+# 0 by the ceiling. k_death_brett/E_a_death_brett/T_ref are REUSED (not new params) for the toxicity
+# death magnitude/temperature shape - a documented simplification (Barata ran at one fixed 25 C, so no
+# independent activation energy is sourced; reusing the existing SO2-kill scale as the ethanol-kill
+# scale mirrors D-40 pt3's own "arrest-scale = kill-scale" reuse). SCOPE LIMITATION (documented, not
+# silently assumed): Barata's headline 12%-ethanol/no-SO2 50-day decline is explicitly described in
+# the source as bloom-on-trace-carbon THEN starvation-plus-ethanol-stress - a confounded result this
+# model does NOT attempt to reproduce (12% / ~95 g/L is below brett_ethanol_toxicity_onset, so this
+# mechanism alone predicts no decline there); only the distinct, unconfounded per-concentration
+# boundary data (grow at 8%, death onset ~14%, ceiling ~14.5-15%) is modelled. Pitch-gated (Brett dies
+# whether or not it grew, the BrettDeath convention), NOT amino-acid-gated.
+brett_ethanol_toxicity_onset:
+  value: 110.0
+  unit: "g/L"   # ~14% v/v; ethanol survival factor is exactly 1 (no effect) at or below this
+  tier: speculative
+  uncertainty: { low: 100.0, high: 115.0, note: "Barata et al. 2008 Table 2: death observed by ~14% v/v; per-strain variability means the true onset could sit slightly lower or higher" }
+  provenance:
+    source: "Barata, Caldeira, Botelheiro, Pagliara, Malfeito-Ferreira & Loureiro (2008), 'Survival patterns of Dekkera bruxellensis in wines and inhibitory effect of sulphur dioxide', Int. J. Food Microbiol. 121(2):201-207, doi:10.1016/j.ijfoodmicro.2007.11.020 — Table 2, ethanol boundary conditions in synthetic model wine, no SO2"
+    conditions: "Brettanomyces bruxellensis in model wine, pH 3.50, 25 C, no SO2, no residual sugar; ethanol concentration (g/L) below which Barata's data shows no toxicity effect"
+    notes: "Read by BrettGrowth (as the upper wall's onset) and BrettEthanolToxicity (as the death threshold). 110 g/L = 14% v/v via the standard ethanol density conversion (abv_from_ethanol / _ETHANOL_DENSITY_GPML = 0.78924 g/mL), matching Barata's ~14% death-onset boundary. Coincidentally equal to ethanol_tolerance_mlf (110 g/L) - a numerical coincidence, not a shared mechanism: that param is an O. oeni Luong-wall E_max (effect starts at E=0 and grows continuously), this one is a threshold (zero effect below it). SOURCED value, not fit to any model behaviour."
+
+brett_ethanol_toxicity_ceiling:
+  value: 118.0
+  unit: "g/L"   # ~15% v/v; ethanol survival factor is 0 (growth fully arrested / death at its ceiling rate) at or above this
+  tier: speculative
+  uncertainty: { low: 114.0, high: 120.0, note: "Barata et al. 2008: upper growth ceiling reported as ~14.5-15% v/v" }
+  provenance:
+    source: "Barata et al. 2008 (see brett_ethanol_toxicity_onset) — Table 2, upper growth ceiling ~14.5-15% v/v"
+    conditions: "Brettanomyces bruxellensis in model wine, no SO2; ethanol concentration (g/L) at or above which growth is fully arrested"
+    notes: "Read by BrettGrowth/BrettEthanolToxicity as the far end of the survival-factor ramp. 118 g/L = ~14.95% v/v, the midpoint of Barata's reported 14.5-15% ceiling range via the same density conversion as brett_ethanol_toxicity_onset. The 8 g/L onset-to-ceiling span is deliberately narrow (Barata's data supports a fairly sharp cutoff near the ceiling, not a gradual decline starting at ordinary wine strength — see the module-level note on why a standard whole-range Luong wall, as used for O. oeni, would be the wrong functional form here)."
+
+brett_ethanol_toxicity_exponent:
+  value: 2.0
+  unit: "dimensionless"   # toxic-power exponent n in survival = max(0, remaining)^n
+  tier: speculative
+  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent; n>1 keeps the touchdown C1-smooth, matching every other Luong-form exponent in this codebase (mlf_ethanol_exponent, ethanol_inhibition_exponent)" }
+  provenance:
+    source: "author estimate; Levenspiel 1980 / Luong 1985 inhibition form, matching mlf_ethanol_exponent and the yeast ethanol_inhibition_exponent choice"
+    conditions: "Brettanomyces in wine; exponent of the shared ethanol survival-factor ramp between the onset and ceiling"
+    notes: "Kept at n=2 (the codebase-wide convention) so the ramp eases to 0 with no derivative kink at the ceiling - C1-smooth for the BDF solver, the same reasoning as mlf_ethanol_exponent/ethanol_inhibition_exponent. The FORM has literature backing (Luong); the exponent itself is a numerical choice, hence speculative."
+
 # -- POF+ YEAST DECARBOXYLASE (wine-only, decision D-40 pt4, temperature dependence D-54) --------
 # YeastPOFDecarboxylation (fermentation.core.kinetics.brett) is the YEAST half of the volatile-phenol
 # story: a POF+ (phenolic-off-flavour-positive) primary S. cerevisiae strain carries the cinnamate

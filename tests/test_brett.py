@@ -26,10 +26,12 @@ from fermentation.core.chemistry import (
 from fermentation.core.kinetics.brett import (
     BrettDeath,
     BrettDecarboxylation,
+    BrettEthanolToxicity,
     BrettGrowth,
     BrettVinylphenolReduction,
     YeastPOFDecarboxylation,
     brett_environmental_gate,
+    brett_ethanol_survival_factor,
 )
 from fermentation.core.kinetics.malolactic import cardinal_temperature_factor
 from fermentation.core.media import wine_schema
@@ -797,6 +799,199 @@ def test_death_run_conserves_carbon_and_nitrogen():
 
 def test_death_is_speculative():
     assert BrettDeath.tier is Tier.SPECULATIVE
+
+
+# =============================================================================
+# D-58 — BrettEthanolToxicity: the sourced ethanol-toxicity kill (no SO₂ needed)
+# =============================================================================
+#
+# D-52 declined a generic age-based "BrettSenescence"; D-58's research re-confirmed that but
+# surfaced a real, DIFFERENT, sourced mechanism (Barata et al. 2008): Brett grows normally to ~14%
+# v/v ethanol and is fully arrested by ~14.5-15%, no SO₂ required. Ranked headline-first. The payoff
+# is ``test_headline_high_ethanol_crashes_unsulfited_brett_population``: an UNSULFITED, high-ethanol
+# (~13% ABV) wine crashes a growing Brett population purely on ethanol, contrasting with a normal-
+# strength (~11% ABV) control that keeps growing — the "no SO₂ needed" headline. The rest pin the
+# exact-zero guard at/below the onset (ordinary wine strength is unaffected), the neutral transfer,
+# monotonicity between onset and ceiling, the reused Arrhenius temperature shape, the growth wall's
+# reconciliation with BrettGrowth's existing ethanol-as-carbon-source Monod, the survival-factor
+# helper's own boundary values, touches/reads, and the speculative tier.
+
+
+def _ethanol_toxicity_state(
+    schema: StateSchema,
+    *,
+    e_gpl: float,
+    temp_k: float = 293.15,
+    x_brett: float = 0.2,
+    x_brett_dead: float = 0.0,
+) -> FloatArray:
+    """A pitched wine state for exercising BrettEthanolToxicity at the RHS level."""
+    return _state(schema, X_brett=x_brett, X_brett_dead=x_brett_dead, E=e_gpl, T=temp_k)
+
+
+def test_ethanol_toxicity_is_exactly_zero_at_or_below_onset(schema, params):
+    """Ordinary wine strength (E <= onset, ~14% v/v) sees NO contribution — a genuine zero, not a
+    small one, so a typical ~11-13% ABV wine is completely unaffected by this Process."""
+    onset = params["brett_ethanol_toxicity_onset"]
+    for e in (90.0, onset - 1.0, onset):
+        y = _ethanol_toxicity_state(schema, e_gpl=e)
+        d = BrettEthanolToxicity().derivatives(0.0, y, schema, params)
+        assert float(d[schema.slice("X_brett")][0]) == 0.0
+        assert float(d[schema.slice("X_brett_dead")][0]) == 0.0
+
+
+def test_ethanol_toxicity_kills_above_onset_as_a_neutral_transfer(schema, params):
+    """Above the onset, viable X_brett leaves and the SAME mass enters X_brett_dead (the BrettDeath
+    idiom) — carbon/nitrogen-neutral by construction, no SO₂ dosed."""
+    onset = params["brett_ethanol_toxicity_onset"]
+    y = _ethanol_toxicity_state(schema, e_gpl=onset + 5.0)
+    d = BrettEthanolToxicity().derivatives(0.0, y, schema, params)
+    dx = float(d[schema.slice("X_brett")][0])
+    dxd = float(d[schema.slice("X_brett_dead")][0])
+    assert dx < 0.0 and dxd > 0.0
+    assert dxd == pytest.approx(-dx)
+
+
+def test_ethanol_toxicity_touches_only_the_x_brett_pools(schema, params):
+    onset = params["brett_ethanol_toxicity_onset"]
+    y = _ethanol_toxicity_state(schema, e_gpl=onset + 5.0)
+    d = BrettEthanolToxicity().derivatives(0.0, y, schema, params)
+    touched = {n for n in schema.names if np.any(d[schema.slice(n)] != 0.0)}
+    assert touched == {"X_brett", "X_brett_dead"}
+    assert set(BrettEthanolToxicity.touches) == {"X_brett", "X_brett_dead"}
+
+
+def test_higher_ethanol_kills_faster_up_to_the_ceiling(schema, params):
+    """Monotone toxicity between the onset and the ceiling: more ethanol => more death."""
+    onset = params["brett_ethanol_toxicity_onset"]
+    ceiling = params["brett_ethanol_toxicity_ceiling"]
+    mid = (onset + ceiling) / 2.0
+    rate_lo = -float(
+        BrettEthanolToxicity().derivatives(
+            0.0, _ethanol_toxicity_state(schema, e_gpl=mid), schema, params
+        )[schema.slice("X_brett")][0]
+    )
+    rate_hi = -float(
+        BrettEthanolToxicity().derivatives(
+            0.0, _ethanol_toxicity_state(schema, e_gpl=ceiling), schema, params
+        )[schema.slice("X_brett")][0]
+    )
+    assert 0.0 < rate_lo < rate_hi
+    # At (or above) the ceiling, toxicity is at its full k_death_brett-scaled rate (survival = 0).
+    assert rate_hi == pytest.approx(params["k_death_brett"] * 0.2, rel=1e-9)
+
+
+def test_ethanol_toxicity_warmer_kills_faster(schema, params):
+    """Reuses BrettDeath's Arrhenius factor (D-58): warm accelerates, mirroring the SO₂ kill."""
+    ceiling = params["brett_ethanol_toxicity_ceiling"]
+    rate_cold = -float(
+        BrettEthanolToxicity().derivatives(
+            0.0, _ethanol_toxicity_state(schema, e_gpl=ceiling, temp_k=283.15), schema, params
+        )[schema.slice("X_brett")][0]
+    )
+    rate_warm = -float(
+        BrettEthanolToxicity().derivatives(
+            0.0, _ethanol_toxicity_state(schema, e_gpl=ceiling, temp_k=303.15), schema, params
+        )[schema.slice("X_brett")][0]
+    )
+    assert 0.0 < rate_cold < rate_warm
+
+
+def test_ethanol_toxicity_needs_no_catalyst_or_ph_solve(schema, params):
+    """No X_brett ⇒ zero contribution; the Process never solves pH (no SO₂ term at all)."""
+    y = _ethanol_toxicity_state(schema, e_gpl=130.0, x_brett=0.0)
+    d = BrettEthanolToxicity().derivatives(0.0, y, schema, params)
+    assert float(d[schema.slice("X_brett")][0]) == 0.0
+    assert float(d[schema.slice("X_brett_dead")][0]) == 0.0
+
+
+def test_ethanol_toxicity_is_speculative():
+    assert BrettEthanolToxicity.tier is Tier.SPECULATIVE
+
+
+def test_survival_factor_boundary_values(params):
+    """Direct unit tests of brett_ethanol_survival_factor: 1 at/below onset, 0 at/above ceiling."""
+    onset = params["brett_ethanol_toxicity_onset"]
+    ceiling = params["brett_ethanol_toxicity_ceiling"]
+    assert brett_ethanol_survival_factor(0.0, params) == 1.0
+    assert brett_ethanol_survival_factor(onset, params) == 1.0
+    assert brett_ethanol_survival_factor(ceiling, params) == 0.0
+    assert brett_ethanol_survival_factor(ceiling + 50.0, params) == 0.0  # clamped, no overshoot
+    mid_value = brett_ethanol_survival_factor((onset + ceiling) / 2.0, params)
+    assert 0.0 < mid_value < 1.0
+
+
+def test_growth_wall_leaves_normal_wine_strength_unaffected(schema, params):
+    """BrettGrowth at ordinary wine strength (E <= onset) is UNCHANGED by the D-58 wall — the
+    growth-rate direction test this codebase's own `test_pitch_brett_post_af_at_high_ethanol`
+    integration test depends on (no wall at full-strength wine ethanol, ~106 g/L < onset)."""
+    onset = params["brett_ethanol_toxicity_onset"]
+    y_below = _state(schema, X_brett=0.1, amino_acids=1.0, E=onset - 20.0)
+    y_at_onset = _state(schema, X_brett=0.1, amino_acids=1.0, E=onset)
+    d_below = BrettGrowth().derivatives(0.0, y_below, schema, params)
+    d_at_onset = BrettGrowth().derivatives(0.0, y_at_onset, schema, params)
+    assert float(d_below[schema.slice("X_brett")][0]) > 0.0
+    assert float(d_at_onset[schema.slice("X_brett")][0]) > 0.0
+
+
+def test_growth_wall_arrests_growth_near_the_ceiling(schema, params):
+    """Above the onset, BrettGrowth eases toward 0 as E approaches the ceiling (decision D-58) —
+    the reconciliation of ethanol-as-carbon-source (low E) and ethanol-as-toxin (high E) on the
+    SAME state variable."""
+    ceiling = params["brett_ethanol_toxicity_ceiling"]
+    onset = params["brett_ethanol_toxicity_onset"]
+    y_mid = _state(schema, X_brett=0.1, amino_acids=1.0, E=(onset + ceiling) / 2.0)
+    y_ceiling = _state(schema, X_brett=0.1, amino_acids=1.0, E=ceiling)
+    rate_mid = float(
+        BrettGrowth().derivatives(0.0, y_mid, schema, params)[schema.slice("X_brett")][0]
+    )
+    rate_ceiling = float(
+        BrettGrowth().derivatives(0.0, y_ceiling, schema, params)[schema.slice("X_brett")][0]
+    )
+    assert rate_mid > 0.0
+    assert rate_ceiling == 0.0  # survival factor is exactly 0 at the ceiling: growth fully arrested
+
+
+# -- HEADLINE: high ethanol crashes an unsulfited, growing Brett population ---
+
+
+def test_headline_high_ethanol_crashes_unsulfited_brett_population():
+    """A HIGH-ethanol wine (~13% ABV, above brett_ethanol_toxicity_onset) crashes a growing,
+    UNSULFITED Brett population — the D-58 headline: no SO₂ needed, unlike BrettDeath.
+
+    Contrasts with a normal-strength (~11% ABV, brix 22, below onset) control that keeps growing —
+    the same population, the same amino-acid dose, differing only in must sugar/ethanol.
+    """
+    _, high_ethanol = _run(
+        days=140.0, brix=26.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0
+    )
+    _, normal = _run(
+        days=140.0, brix=22.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0
+    )
+
+    xb_high = high_ethanol.series("X_brett")
+    xbd_high = high_ethanol.series("X_brett_dead")
+
+    assert xbd_high[-1] > 0.0  # the dead pool fills, purely from ethanol toxicity (no SO₂ dosed)
+    assert xb_high[-1] < float(np.max(xb_high))  # viable population declines from its peak
+    # The normal-strength control (below onset) keeps growing rather than crashing.
+    assert normal.series("X_brett")[-1] >= float(np.max(normal.series("X_brett"))) * 0.999
+
+
+def test_ethanol_toxicity_run_conserves_carbon_and_nitrogen():
+    """total_carbon/total_nitrogen close with the ethanol-toxicity kill ACTIVE (no SO₂ dosed)."""
+    compiled, traj = _run(
+        days=140.0, brix=26.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0
+    )
+    carbon = total_carbon(
+        compiled.schema, biomass_carbon_fraction=compiled.param_values["biomass_C_fraction"]
+    )
+    nitrogen = total_nitrogen(
+        compiled.schema, biomass_nitrogen_fraction=compiled.param_values["biomass_N_fraction"]
+    )
+    assert_conserved(traj, carbon, label="carbon (Brett ethanol toxicity on)")
+    assert_conserved(traj, nitrogen, label="nitrogen (Brett ethanol toxicity on)")
+    assert_nonnegative(traj, ("X_brett", "X_brett_dead"))
 
 
 # =============================================================================

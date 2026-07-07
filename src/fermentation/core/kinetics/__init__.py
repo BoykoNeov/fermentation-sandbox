@@ -24,10 +24,12 @@ from fermentation.core.kinetics.autolysis import YeastAutolysis, autolysis_flux
 from fermentation.core.kinetics.brett import (
     BrettDeath,
     BrettDecarboxylation,
+    BrettEthanolToxicity,
     BrettGrowth,
     BrettVinylphenolReduction,
     YeastPOFDecarboxylation,
     brett_environmental_gate,
+    brett_ethanol_survival_factor,
 )
 from fermentation.core.kinetics.byproducts import (
     EsterSynthesis,
@@ -84,6 +86,7 @@ __all__ = [
     "BiomassCarryingCapacity",
     "BrettDeath",
     "BrettDecarboxylation",
+    "BrettEthanolToxicity",
     "BrettGrowth",
     "BrettVinylphenolReduction",
     "DiacetylReduction",
@@ -114,6 +117,7 @@ __all__ = [
     "autolysis_flux",
     "biomass_growth_rate",
     "brett_environmental_gate",
+    "brett_ethanol_survival_factor",
     "cardinal_temperature_factor",
     "fusel_production_rate",
     "malolactic_environmental_gate",

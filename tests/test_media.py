@@ -242,9 +242,11 @@ MLF_GROWTH_PROCESSES = {"malolactic_growth"}
 # Brettanomyces volatile phenols (decision D-40): wine-only, pitch-gated — present in a bare build,
 # disabled at the compile seam unless a scenario pitches Brett (brett_pitch_gpl>0 or a pitch_brett
 # intervention), so an unpitched wine run is byte-for-byte the validated core (the MLF pattern).
-# brett_death (D-40 pt3) is pitch-gated too (Brett dies whether or not it grew), so it rides in this
-# same tuple — the MalolacticDeath-in-_MLF_PROCESSES precedent.
-BRETT_PROCESSES = {"brett_decarboxylation", "brett_vinylphenol_reduction", "brett_death"}
+# brett_death (D-40 pt3) and brett_ethanol_toxicity (D-58) are pitch-gated too (Brett dies whether
+# or not it grew), so they ride in this same tuple — the MalolacticDeath-in-_MLF_PROCESSES pattern.
+BRETT_PROCESSES = {
+    "brett_decarboxylation", "brett_vinylphenol_reduction", "brett_death", "brett_ethanol_toxicity",
+}  # fmt: skip
 # Brett growth (decision D-40 pt2, makes X_brett dynamic) is wired into the WINE medium only;
 # enabled in a bare build and disabled at the compile seam unless a scenario BOTH pitches Brett AND
 # doses amino acids — a stricter gate than the phenol Processes, so it is a SEPARATE tuple (avoids

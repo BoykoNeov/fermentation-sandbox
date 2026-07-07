@@ -40,6 +40,7 @@ from fermentation.core.kinetics import (
     BiomassCarryingCapacity,
     BrettDeath,
     BrettDecarboxylation,
+    BrettEthanolToxicity,
     BrettGrowth,
     BrettVinylphenolReduction,
     FuselAminoAcidReroute,
@@ -91,17 +92,20 @@ _MLF_GATED_PROCESSES = (
 )
 
 #: The *Brettanomyces* Processes gated on a Brett pitch (decision D-40): hydroxycinnamate
-#: decarboxylation, vinylphenol reduction, and (D-40 pt3) the SO₂-driven :class:`BrettDeath`. Wired
-#: into the wine medium but contributing nothing until Brett is present, so compile DISABLES them
-#: (unpitched) and the ``pitch_brett`` intervention re-enables *exactly* this set at its
-#: breakpoint — one source of truth so the compile-time gate and the mid-run pitch cannot drift
-#: apart (the ``_MLF_GATED_PROCESSES`` pattern). :class:`BrettDeath` is pitch-gated too (Brett dies
-#: whether or not amino acids were dosed), unlike :class:`BrettGrowth`, which is amino-acid-gated
-#: below (the exact :class:`MalolacticDeath` vs :class:`MalolacticGrowth` split).
+#: decarboxylation, vinylphenol reduction, the SO₂-driven :class:`BrettDeath` (D-40 pt3), and the
+#: ethanol-toxicity :class:`BrettEthanolToxicity` (D-58). Wired into the wine medium but
+#: contributing nothing until Brett is present, so compile DISABLES them (unpitched) and the
+#: ``pitch_brett`` intervention re-enables *exactly* this set at its breakpoint — one source of
+#: truth so the compile-time gate and the mid-run pitch cannot drift apart (the
+#: ``_MLF_GATED_PROCESSES`` pattern). :class:`BrettDeath`/:class:`BrettEthanolToxicity` are
+#: pitch-gated too (Brett dies whether or not amino acids were dosed), unlike :class:`BrettGrowth`,
+#: which is amino-acid-gated below (the exact :class:`MalolacticDeath` vs
+#: :class:`MalolacticGrowth` split).
 _BRETT_GATED_PROCESSES = (
     BrettDecarboxylation,
     BrettVinylphenolReduction,
     BrettDeath,
+    BrettEthanolToxicity,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
