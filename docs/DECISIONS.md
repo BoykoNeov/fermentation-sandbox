@@ -4267,6 +4267,73 @@ half-wrong; the data reshaped it into "fix one sourced bug, measure, then let th
 much smaller residual is worth a new mechanism" — the same D-48/D-49/D-51 pattern this project keeps
 hitting when a delegated diagnosis is checked against current code rather than trusted at face value.
 
+## D-58 — MLF v2 sub-items research: `BrettSenescence` twin re-confirmed declined; ethanol-toxicity death surfaced as a genuine gap
+
+**Status: RESEARCH LANDED, no code changed yet — the ethanol-toxicity death term is an open fork for
+the owner.** Picked up the two remaining D-52 "MLF v2 further refinements" sub-items
+(`BrettSenescence` twin; a separate `molecular_so2_death_scale` for `MalolacticDeath`) as the next
+task. Before building either, two independent literature-research agents (opposite angles — one
+hunting for evidence a Brett senescence mechanism is needed, one hunting for evidence the model's
+existing "persists indefinitely without SO₂" framing is correct) were run in parallel, mirroring the
+D-53 method that overturned the analogous MLF senescence premise.
+
+**Finding 1 — `BrettSenescence` twin: D-52's decision holds, converged from both angles.** Neither
+agent found evidence for a generic, free-running, age-based decline mechanism. Every measured decline
+in unsulfited Brett traces to a specific stressor: molecular SO₂ (Serpaggi et al. 2012 — VBNC loss of
+culturability is SO₂-induced and *reversible* on pH shift, not an aging phenomenon), substrate
+exhaustion (Vigentini et al. 2008 — decline only on fructose depletion, not with fructose present),
+or ethanol toxicity (Barata et al. 2008, below). No source describes decline attributable to elapsed
+time alone. **Do not build a generic `BrettSenescence` twin** — same conclusion as D-52, now
+literature-checked rather than reasoned from folk wisdom alone.
+
+**Finding 2 — the "persists indefinitely" wording is an overstatement; soften it.** Barata et al.
+2008 (*Int. J. Food Microbiol.* 121(2):201–207, doi:10.1016/j.ijfoodmicro.2007.11.020 — full text
+verified) directly contradicts *literal* indefinite persistence: in closed-system model wine (12%
+v/v ethanol, pH 3.50, no residual sugar, 25 °C, no SO₂) Brett populations bloomed to ~10^8 CFU/mL
+then declined to complete loss of culturability by ~1200 h (~50 days) — growth at 8% v/v ethanol,
+death at 14%, upper growth ceiling ~14.5–15% (their Table 2). Plate-count "death" is complicated by a
+VBNC state (counts ran >10× below methylene-blue-active cells, and resuscitation is strain-dependent)
+and Cibrario et al. 2019's "decades" persistence (doi:10.1371/journal.pone.0222749) is cellar/genotype
+re-isolation across vintages, not continuous single-population viability. **Two-layer verdict:**
+literal "one population persists forever" is unsupported; operational/reservoir tenacity (VBNC +
+resurrection + cellar/biofilm reservoir across vintages) is well-supported. D-40/D-52's "persists
+indefinitely — the honest reflection of tenacity" should be read/quoted going forward as "no positive
+evidence for spontaneous decline without SO₂; SO₂, ethanol toxicity, and substrate exhaustion account
+for observed die-off" — tighter to the evidence, same practical conclusion at the model's ≤30-day,
+cellar-temperature run horizon (D-53's "empirically inert at these timescales" logic applies here
+too).
+
+**Finding 3 — a genuine, sourced, currently-missing mechanism surfaced as a side effect: Brett has no
+ethanol-toxicity upper gate.** Checked directly against `brett.py` (not asserted): `BrettGrowth`'s
+only ceiling is the intrinsic logistic carrying-capacity brake `(1 − X_brett/K)`, which drives growth
+to zero as `X_brett → K` — a **plateau**, never a decline. `BrettDeath` (D-40 pt3) is SO₂-driven only
+(`total_so2 ≤ 0` returns identically zero). So today's model, run dry/unsulfited/high-ethanol, would
+plateau at the carrying capacity — it structurally **cannot** reproduce Barata's bloom-then-death
+dynamic, because nothing in the model currently gates on ethanol toxicity. This is a real gap, not
+something the existing brake already covers (an advisor-flagged contradiction in the first-draft
+research report, verified against the code before writing this record). `BrettGrowth` already treats
+ethanol purely as a carbon source (Monod, D-40 pt2) with no upper wall — unlike MLF's
+`ethanol_tolerance_mlf` Luong-wall gate, deliberately omitted from Brett per D-40's design warning
+against copying the MLF gate (Brett is markedly more ethanol-tolerant, so an MLF-style wall would be
+wrong — but Barata shows tolerance is bounded, not unlimited).
+
+**Not built — this is scope expansion past the original two MLF-v2 sub-items, and a genuine design
+fork, not a parameter add.** `BrettGrowth` already uses ethanol as a carbon *source* (low-concentration
+regime); Barata's toxicity is a *high*-concentration effect on the *same* state variable, so a death
+term has to be reconciled with the growth term (e.g. a smooth toxicity factor on death, sourced at
+Barata's measured boundaries — grow ~8%, death onset ~14%, ceiling ~14.5–15% v/v — used as sourced
+values, not tuned to fit Barata's curve, to avoid consuming Brett's only literature anchor as a fit
+target rather than a validation source), not simply layered on top. **Owner's call whether to build
+it.** The separate `molecular_so2_death_scale` split (the other original D-52 sub-item) remains
+available but still zero-fidelity-gain per D-52's own reasoning — deprioritized, not revisited here.
+
+**Method beat:** two parallel Opus research agents, deliberately opposite-angle (one arguing
+"decline exists", one arguing "persistence is real") to avoid one-sided confirmation, then a
+same-session advisor() pass that caught a self-contradiction in the second agent's report (claiming
+both "the existing brake already covers this" and "this is genuinely missing physics" — those can't
+both be true) before it reached the owner — resolved by reading the actual `BrettGrowth`/`BrettDeath`
+code rather than trusting the agent's synthesis.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4338,3 +4405,16 @@ hitting when a delegated diagnosis is checked against current code rather than t
   Bisson-sourced nitrogen-gated transporter mechanism could still chase, but D-57 judged it no
   longer clearly worth the calibration/validation-firewall risk at this size — owner's call whether
   to pursue further or accept it as a documented model limit. See D-57 (supersedes this framing).
+- ~~`BrettSenescence` twin~~ — **RE-CONFIRMED DECLINED in D-58 (2026-07-07)** via two independent
+  literature-research agents: no source shows Brett declining from elapsed time alone (every observed
+  decline traces to SO₂, ethanol toxicity, or substrate exhaustion). D-40/D-52's "persists
+  indefinitely" wording should be read as "no positive evidence for spontaneous decline without SO₂,"
+  not literal immortality. See D-58.
+- **Brett ethanol-toxicity death gate — new, sourced, not yet built (D-58, 2026-07-07).** Barata et
+  al. 2008 measured Brett growth at 8% v/v ethanol and death onset at ~14% (ceiling ~14.5–15%) in
+  closed-system model wine without SO₂ — a bloom-then-decline dynamic the current model structurally
+  cannot reproduce, since `BrettGrowth`'s only ceiling is a logistic plateau brake and `BrettDeath` is
+  SO₂-only. Would need a death term reconciled with `BrettGrowth`'s existing ethanol-as-carbon-source
+  Monod on the same state variable (low-concentration source, high-concentration toxin), sourced at
+  Barata's measured boundaries rather than fit to reproduce Barata's curve (to avoid spending Brett's
+  only literature anchor as a fit target). Owner's call whether to build it. See D-58.
