@@ -216,20 +216,29 @@ than be scripted (DECISIONS #18).
   `fermentation.analysis` — mirroring how `units` provides scalar conversions and benchmarks
   map ABV over a series. Tier is reported via `acidbase.ph_tier` (computed explicitly as
   `plausible`, never the `VALIDATED` default of the inert acid slots).
-- **SO₂ speciation = the first pH consumer, readout-only (D-22, D-28).** `wine_schema` appends
-  a slot `so2_total` (total SO₂ as g/L SO₂-equivalent, dosed via `so2_total_mgl`, conserved/
-  inert). `acidbase.speciate_so2` solves pH from the organic acids, then (D-28) splits the
-  total into acetaldehyde-**bound** vs **free** via the bisulfite binding equilibrium
-  (`bound_so2_molar` solves `(A−x)(C−x)β − Kx = 0`; new `bisulfite_fraction`), and returns the
-  **molecular** (antimicrobial) fraction `1/(1+10^(pH−pKa₁))` (sulfurous pKa₁ 1.81) of *free* —
+- **SO₂ speciation = the first pH consumer, readout-only (D-22, D-28, D-51).** `wine_schema`
+  appends a slot `so2_total` (total SO₂ as g/L SO₂-equivalent, dosed via `so2_total_mgl`,
+  conserved/inert). `acidbase.speciate_so2` solves pH from the organic acids, then splits the
+  total into **bound** vs **free** via a competitive-Langmuir carbonyl-bisulfite equilibrium:
+  `bound_so2_molar` takes a tuple of `(molar_concentration, Kd)` per carbonyl and solves one
+  shared "reactive bisulfite" root `h` via `brentq`, from which each carbonyl's bound share is
+  `Aᵢ·h/(Kᵢ+h)` — reducing exactly to the original D-28 single-carbonyl closed form
+  `(A−x)(C−x)β − Kx = 0` when only one carbonyl is active. **D-51** (2026-07-07) generalised D-28
+  from acetaldehyde alone to **acetaldehyde + pyruvate + α-ketoglutarate together**, all worked in
+  **moles** (`M_ACETALDEHYDE`/`M_PYRUVATE`/`M_ALPHA_KETOGLUTARATE`), since bisulfite competition
+  is molar and the three carbonyls have very different molar masses; `free_acetaldehyde` reads
+  back only acetaldehyde's own bound share, so competing keto-acid pools measurably reduce
+  acetaldehyde's SO₂ protection. Returns the **molecular** (antimicrobial) fraction
+  `1/(1+10^(pH−pKa₁))` (sulfurous pKa₁ 1.81) of *free* —
   the D-18 coupling *emerging*, not scripted. It is **readout-only**: SO₂ is kept out of the
   charge balance (the inverse anchoring makes in-balance vs readout identical at t=0) and out
   of titratable acidity (OIV excludes it), and is carbon-free — so dosing it leaves pH and
-  `total_carbon` byte-for-byte (an isolability test pins this). At acetaldehyde=0 the split
+  `total_carbon` byte-for-byte (an isolability test pins this). At all carbonyls=0 the split
   collapses to D-22 exactly (`free == total`). The lone RHS consumer is the MLF antimicrobial
   gate, which reads the *derived* free-molecular SO₂ (bound SO₂ is not antimicrobial), so the
-  early acetaldehyde peak transiently sequesters SO₂ and relaxes suppression — an emergent
-  competition. The bound-acetaldehyde-protected-from-ADH feedback stays deferred (readout-only).
+  early acetaldehyde peak *and* the always-on keto-acid pools transiently/persistently sequester
+  SO₂ and relax suppression — an emergent competition. The bound-acetaldehyde-protected-from-ADH
+  feedback stays deferred (readout-only).
 - **Acetaldehyde** (`core/kinetics/acetaldehyde.py`, decision D-27) — the obligate main-
   pathway intermediate, modelled as a transient **ethanol-carbon buffer**: flux-linked
   production *borrows* a C2 slice of ethanol and viable-yeast-gated reduction *returns* it

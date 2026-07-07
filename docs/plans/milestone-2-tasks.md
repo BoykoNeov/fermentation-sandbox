@@ -511,6 +511,37 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         schema-size/`EXPECTED_PROCESSES` updates. **646 green** + 5 benchmark, ruff+mypy clean.
         **Next:** D-51 (coupled multi-carbonyl SO₂ equilibrium reading acetaldehyde + pyruvate + α-KG
         together). Full record in **DECISIONS → D-50**.
+  - [x] **Coupled multi-carbonyl SO₂ equilibrium — the actual D-48 overshoot fix, worked in moles
+        (decision D-51). LANDED 2026-07-07.** Generalises D-28's single-carbonyl closed-form
+        quadratic to N competing carbonyls sharing one bisulfite pool: `bound_so2_molar` now takes
+        `(molar_concentration, Kd)` tuples and solves one shared "reactive bisulfite" root via
+        `brentq`, each carbonyl's bound share `Aᵢ·h/(Kᵢ+h)` — verified to reduce EXACTLY to the old
+        D-28 quadratic at n=1. Wires acetaldehyde + pyruvate + α-KG together, all in **moles**
+        (`M_ACETALDEHYDE`/`M_PYRUVATE`/`M_ALPHA_KETOGLUTARATE`) per the D-50 calibration-pending
+        flag. Sourced `K_pyruvate_so2` (5.55e-4 mol/L) and `K_alpha_kg_so2` (1.4e-4 mol/L) from
+        Burroughs & Sparks (1973) — the same paper whose acetaldehyde Kd (1.5e-6) matches the
+        pre-existing `K_acetaldehyde_so2` exactly, a direct cross-check. **The honest finding (the
+        task's other half — re-derive the residual ratio against the field slope, don't inherit
+        it): D-51 is a real but PARTIAL fix.** Measured end-state acetaldehyde-vs-SO₂ overshoot at
+        the nominal 30/20 mg/L residuals drops from D-48's 1.32/1.44/1.53× (at 50/100/200 mg/L SO₂)
+        to **1.15/1.32/1.45×** — competition genuinely narrows the gap, concentrated at low dose
+        where the finite keto-acid capacity isn't yet saturated. Pushing both residuals to the top
+        of their already-sourced literature uncertainty bands (pyruvate 100 mg/L, α-KG 70 mg/L —
+        verified the frozen state actually lands there) narrows it further (0.86/1.10/1.29×) but
+        still does NOT close it, especially at 200 mg/L — a structural mismatch (finite-capacity
+        Langmuir competitors saturate; the field regression is empirically linear across the tested
+        dose range), not a value not yet found. Per the owner's own guardrail ("do not force-fit
+        beyond the literature-sourced pool ranges") and advisor concurrence, **shipped the nominal
+        D-49/D-50 residuals (30/20 mg/L) unchanged** — tuning one ferment's pool to match a
+        237-wine ensemble regression would trade documented provenance for a weaker fitted number.
+        One genuine regression-adjacent side effect, fixed honestly: the always-on keto-acid pools
+        now ALSO compete for bisulfite in `test_malolactic.py`'s SO₂-dosed MLF run (previously only
+        acetaldehyde bound), lowering free SO₂ (~21%→~15% of an 80 mg/L dose) and letting MLF edge
+        just past halfway converted (~51%, was ~48%) — test band and docstring updated to the
+        measured value, not loosened blindly. **650 green** (646 + 4 new D-51 tests) + 5 benchmark,
+        ruff+mypy clean. **Deferred:** closing the remaining ~1.1-1.5× gap needs a different
+        structure (not more pool mass) — flagged for a future milestone, not blocking M2. Full
+        record in **DECISIONS → D-51**.
   - [x] **H₂S — carbon-free produced pool with an inverse-nitrogen gate (decision D-29).
         LANDED 2026-07-01.** N/S-deficiency signal ("rotten egg"): yeast reduces sulfate faster
         than it can fix the sulfide onto nitrogen skeletons, so production is *de-repressed at

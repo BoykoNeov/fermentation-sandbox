@@ -3575,6 +3575,100 @@ in `validation/conservation.py` (caught immediately by the carbon-conservation t
 multi-carbonyl SO₂ equilibrium that reads acetaldehyde + pyruvate + α-KG together — the beat both
 keto-acid pools exist to feed.
 
+## D-51 — Coupled multi-carbonyl SO₂ equilibrium, worked in moles: the actual D-48 overshoot fix — and an honest partial one
+
+**The task and where it came from.** D-50 flagged both keto-acid residuals (pyruvate 30 mg/L,
+α-KG 20 mg/L) as order-of-magnitude author estimates the multi-carbonyl equilibrium must
+**re-derive against the field slope**, not inherit as settled — and flagged that the equilibrium
+must work in **moles**, since SO₂ binds molar concentration and α-KG's higher molar mass
+(146.1 vs pyruvate's 88.06 g/mol) means its 20 mg/L residual is only ~40% of pyruvate's molar
+contribution despite being ~67% of it by mass. This beat does both: generalises D-28's
+single-carbonyl equilibrium to the coupled three-carbonyl case, and empirically re-derives (rather
+than assumes) whether the D-49/D-50 residual sizing actually closes the D-48 overshoot.
+
+**The model: one shared root-find, not a multi-dimensional solve.** D-28's `bound_so2_molar` was a
+closed-form quadratic for a single 1:1 carbonyl-bisulfite adduct. Generalising naively to N
+competing carbonyls sharing one bisulfite pool would need an N-dimensional simultaneous solve —
+but every carbonyl's bound fraction can be written as a Langmuir partition of one shared "reactive
+bisulfite" variable `h`: `bound_i = A_i·h/(K_i+h)`, with `h` the unique root of the strictly
+monotone-decreasing residual `β·total − β·Σᵢ(A_i·h/(K_i+h)) − h = 0` over `[0, β·total]` (guaranteed
+sign change ⇒ `brentq` always finds it). This collapses the whole system to a single 1-D root-find
+per RHS evaluation — consistent with the existing `solve_ph` precedent in `acidbase.py`. Verified
+(20-trial random numeric check + a dedicated regression-anchor unit test) to reduce **exactly** to
+the old D-28 quadratic when only one carbonyl is active — the isolability proof for prime directive
+#3, done algebraically rather than via a toggle. `bound_so2_molar`'s signature changed from
+mass-based scalars to a tuple of `(molar_concentration, Kd)` pairs, working natively in mol/L via
+the existing `M_ACETALDEHYDE`/`M_PYRUVATE`/`M_ALPHA_KETOGLUTARATE` molar masses (chemistry.py, from
+D-49/D-50) — resolving the D-50 calibration-pending mole-vs-mass flag. `free_acetaldehyde` reads
+back only acetaldehyde's own bound share from the shared solve, so competing keto-acid pools
+measurably reduce acetaldehyde's SO₂ protection — the mechanism by which D-51 addresses the
+overshoot.
+
+**New sourced parameters, cross-checked against the existing one.** `K_pyruvate_so2` (5.55e-4
+mol/L) and `K_alpha_kg_so2` (1.4e-4 mol/L), both from Burroughs & Sparks (1973), *Sulphite-binding
+power of wines and ciders I* — apparent dissociation constants at pH 3.3 for pyruvic acid and
+2-ketoglutaric acid respectively. This is the same paper the pre-existing `K_acetaldehyde_so2`
+traces to, and its acetaldehyde value (1.5e-6 mol/L) matches this codebase's independently-sourced
+`K_acetaldehyde_so2` exactly — a direct sourcing cross-check, not a coincidence to lean on but a
+confidence signal. Both new params tier `plausible`, uncertainty bands spanning a secondary review's
+looser rounding plus the same pH-drift caveat `K_acetaldehyde_so2`'s band already carries.
+
+**The empirical re-derivation — the honest finding.** Measured end-state total-acetaldehyde-vs-SO₂
+increments at 50/100/200 mg/L SO₂ doses (the same dose ladder D-48 used) on the standard 21-day
+acceptance run, at the **shipped nominal** D-49/D-50 residuals (30/20 mg/L):
+
+| dose (mg/L) | D-48 (acetaldehyde-only) | D-51 (multi-carbonyl) | field target (0.39·dose) | D-48 overshoot | D-51 overshoot |
+|---|---|---|---|---|---|
+| 50  | 25.7  | 22.3  | 19.5 | 1.32× | 1.15× |
+| 100 | 56.1  | 51.4  | 39.0 | 1.44× | 1.32× |
+| 200 | 119.0 | 113.0 | 78.0 | 1.53× | 1.45× |
+
+**D-51 is a real but PARTIAL fix.** Competition genuinely narrows the D-48 overshoot at every dose,
+concentrated at the low end where the finite keto-acid capacity isn't yet saturated — but it does
+not close it. A sensitivity check pushed both residuals to the **top of their already-sourced
+literature uncertainty bands** (pyruvate → 100 mg/L via `k_pyruvate_excretion`=1e-2, α-KG → 70 mg/L
+via `k_alpha_kg_excretion`=7e-3 — frozen state verified to land exactly there, not just threshold-
+checked) and got 0.86×/1.10×/1.29×: the 50 mg/L point *undershoots* while 200 mg/L is still 1.29×
+over. That crossover is the tell — no single scaling of finite-capacity Langmuir competitors can
+match a response that stays linear (constant 0.39 mg/mg) across a dose range where binding sites
+saturate. This is **structural, not a value not yet found**: more pool mass buys a bigger low-dose
+win at the cost of a high-dose miss, it doesn't uniformly close the gap. Per the owner's explicit
+guardrail — "do not force-fit beyond the literature-sourced pool ranges" — and advisor concurrence,
+**the shipped D-49/D-50 residuals (30/20 mg/L) are unchanged.** The field's 0.39 mg/mg is an
+*ensemble* regression over 237 wines with varying carbonyl levels and pH (Jackowetz & Mira de
+Orduña 2013); tuning one ferment's pool size to chase it is a category mismatch, not a calibration,
+and would trade a documented author-estimate for a fitted number whose only justification is
+proximity to a plot — provenance this project ranks below a genuine fit. **This reshapes the task's
+own premise** (named "the actual fix for the D-48 overshoot"): the data says D-51 is real, correct,
+and load-bearing progress, not a closure — the same "task premise refined by data" shape as D-48
+itself. Closing the remaining gap needs a different structure (e.g. a mechanism that scales with
+dose rather than a fixed-capacity pool), deferred to a future milestone, not blocking M2.
+
+**A genuine side effect, fixed honestly, not loosened blindly.** The always-on keto-acid pools now
+also compete for bisulfite in `test_malolactic.py`'s SO₂-dosed MLF integration test (previously the
+equilibrium only knew about acetaldehyde) — adding binding capacity lowers overall free/molecular
+SO₂ (~21%→~15% of an 80 mg/L dose), weakening the MLF brake a little further and letting malic
+conversion edge just past the halfway mark (~51%, was ~48%). Verified via a standalone run before
+editing (not guessed); the test's band and docstring were updated to the measured value with an
+explanation, following the same discipline as the D-47/D-48 caveat in `test_post_af_so2_dose_...`.
+
+**Isolability (prime directive #3).** No new state, no new carbon flow — D-51 is a pure readout
+generalisation over pools D-49/D-50 already built, exactly like D-28 itself. No `total_carbon`
+change needed. The algebraic n=1 reduction (proven, not just tested at default params) is the
+isolability guarantee: any ProcessSet lacking the keto-acid pools sees `bound_so2_molar` called
+with zero-molar competitor entries, which fall out of the shared solve exactly as if they were
+never passed.
+
+**Verification.** `test_so2.py`: fixed the `bound_so2_molar` call sites for the new tuple API, added
+a D-51 section (regression-anchor reduction-to-D-28 test, competition-conserves-and-binds-less
+test, order-independence/clamping test — all pure algebra) plus a state-level integration test
+(keto-acid pools present widen bound SO₂ and free more acetaldehyde). `test_acetaldehyde.py`'s
+post-AF-dose test updated for the real consequence that residual keto acids now bind ~34% of a
+late SO₂ dose that used to be assumed "nearly all free." `test_malolactic.py`'s SO₂-dosed MLF band
+updated per the side effect above. **650 passed** (646 + 4 new D-51 tests, incl. the 5 §2.2
+benchmarks), ruff + mypy clean. Validated core untouched; only the SO₂ speciation readout and its
+three downstream consumers (`free_acetaldehyde`, the MLF gate, and the speciation dataclass) moved.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -3626,3 +3720,13 @@ keto-acid pools exist to feed.
   see D-43 forks (a)–(d).
 - **Packaged parameter-data access:** tests read YAML via filesystem path. If we
   ship a wheel that must read its own data, switch to `importlib.resources`.
+- **The residual D-51 overshoot (1.15–1.45× the field 0.39 mg/mg slope, worst at high SO₂
+  dose):** D-51 (2026-07-07) proved this is *not* closeable by resizing the pyruvate/α-KG pools
+  within their literature-sourced ranges — a sensitivity check at the top of both bands still
+  undershoots at 50 mg/L while missing 200 mg/L by 1.29×, the signature of finite-capacity
+  Langmuir competitors saturating against a field regression that stays linear across the tested
+  dose range. Closing it needs a different structure — candidates not yet designed: a binder
+  whose effective capacity scales with dose (e.g. a fourth carbonyl pool that itself responds to
+  SO₂, or a non-adduct binding mode), or accepting the gap as an honest model limit and
+  documenting it in user-facing guidance instead of chasing it further. Not blocking M2; revisit
+  if a future milestone needs the finished-wine SO₂/acetaldehyde slope tighter than ~1.1–1.5×.

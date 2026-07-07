@@ -130,7 +130,7 @@ pKa_sulfurous_2:
     conditions: "25 C; applied as an apparent constant (decision D-22)"
     notes: "Second dissociation HSO3- <-> H+ + SO3(2-). Far above wine pH (3-4), so the sulfite fraction is negligible (~1e-4) and the diprotic molecular fraction h^2/D reduces to the monoprotic 1/(1 + 10^(pH - pKa1)) there. Carried for an exact speciation and so the readout is correct up to the pH-8.2 TA endpoint, where sulfite IS partly formed — the reason excluding SO2 from titratable_acidity is load-bearing, not cosmetic (D-22)."
 
-# -- Acetaldehyde-bisulfite binding: the free/bound SO2 split (decision D-28) ----
+# -- Carbonyl-bisulfite binding: the free/bound SO2 split (decisions D-28, D-51) -
 #
 # Now that acetaldehyde exists as real state (decision D-27), the dosed SO2 slot is
 # reinterpreted as TOTAL SO2 (conserved, inert) and the free/bound split is DERIVED at
@@ -141,10 +141,17 @@ pKa_sulfurous_2:
 # referenced to BISULFITE (the reactive nucleophile), so pH enters via the bisulfite
 # fraction of free SO2. Free = total - bound; molecular = free * neutral_fraction(pH), so
 # D-22's molecular-SO2 readout survives unchanged at acetaldehyde = 0 (total == free).
-# READOUT-ONLY, like D-22: the split does not feed back into the acetaldehyde reduction
-# (bound acetaldehyde is notionally protected from ADH; that RHS coupling is deferred). The
-# one live consumer is the pre-existing MLF antimicrobial gate, which now reads the DERIVED
-# free-molecular SO2 (bound SO2 is not antimicrobial), a correct consequence of the split.
+#
+# D-51 GENERALIZES this to a COUPLED MULTI-CARBONYL equilibrium: acetaldehyde is not the
+# only bisulfite binder in real wine — the excreted keto-acid pools pyruvate (D-49) and
+# alpha-ketoglutarate (D-50) compete for the SAME shared bisulfite pool. All three carbonyls
+# now solve ONE equilibrium (acidbase.bound_so2_molar, a competitive-Langmuir partition over
+# a single reactive-bisulfite root, N=1 reduces EXACTLY to the original D-28 quadratic).
+# READOUT-ONLY, like D-22/D-28: the split does not add new state or touch conservation. The
+# live consumers are the MLF antimicrobial gate (free-molecular SO2, D-28) and the
+# acetaldehyde-reduction ADH protection (D-47) — the latter now reads a SMALLER
+# acetaldehyde-bound share than the single-carbonyl D-28/D-47 form, because pyruvate/alpha-KG
+# now soak up some of the dosed SO2 too.
 K_acetaldehyde_so2:
   value: 1.5e-6
   unit: "mol/L"
@@ -153,4 +160,39 @@ K_acetaldehyde_so2:
   provenance:
     source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders (the canonical carbonyl-bisulphite dissociation constants); apparent Kd 1.5e-6 (pH 3.3) - 2.06e-6 (pH 3.5) reported across the wine literature (e.g. Food Chemistry 2020, doi 10.1016/j.foodchem.2020.127173; AJEV 76:0760008, 2025); Blouin (1966) via SciELO S2224-79042018000200001"
     conditions: "wine, ~pH 3.3-3.5, cellar temperature; apparent (concentration-based) dissociation constant"
-    notes: "Dissociation constant of the acetaldehyde-hydroxysulphonate adduct, the strongest carbonyl-SO2 bond in wine (acetaldehyde is the principal SO2 binder). REFERENCED TO BISULFITE HSO3- (the reactive species), so the binding solver uses [HSO3-] = free_SO2 * bisulfite_fraction(pH) and pH enters the equilibrium mechanistically. The literature apparent constants are usually quoted per TOTAL free SO2 at a stated pH; at wine pH bisulfite is ~0.94-0.99 of free SO2, so the bisulfite-vs-total-free basis differs by <=5% (well inside the order-of-magnitude band). tier=plausible: measured constants applied to wine as apparent values, with a wide band. SCOPE: acetaldehyde-only binder — real bound SO2 also sits on pyruvate / a-ketoglutarate / sugars, so the modelled bound UNDERESTIMATES and the 'total' slot is really 'free + acetaldehyde-bound' (a slight overclaim on the name), caveated in acidbase.speciate_so2."
+    notes: "Dissociation constant of the acetaldehyde-hydroxysulphonate adduct, the strongest carbonyl-SO2 bond in wine (acetaldehyde is the principal SO2 binder). REFERENCED TO BISULFITE HSO3- (the reactive species), so the binding solver uses [HSO3-] = free_SO2 * bisulfite_fraction(pH) and pH enters the equilibrium mechanistically. The literature apparent constants are usually quoted per TOTAL free SO2 at a stated pH; at wine pH bisulfite is ~0.94-0.99 of free SO2, so the bisulfite-vs-total-free basis differs by <=5% (well inside the order-of-magnitude band). tier=plausible: measured constants applied to wine as apparent values, with a wide band. SCOPE (pre-D-51): acetaldehyde-only binder — real bound SO2 also sits on pyruvate / alpha-ketoglutarate / sugars; D-51 adds the two keto-acid binders below to the SAME equilibrium (sugars remain unmodelled, so the 'total' slot is still a slight overclaim on the name, now smaller)."
+
+# -- Pyruvate-bisulfite binding (decision D-51) -- the second-strongest carbonyl binder --
+#
+# Pyruvate (CH3-CO-COOH) + HSO3- <-> its alpha-hydroxysulphonate adduct, the SAME 1:1
+# equilibrium form as acetaldehyde, referenced to bisulfite for the SAME reason. Roughly
+# 370x WEAKER than acetaldehyde (Kd two orders of magnitude larger), consistent with
+# pyruvate binding SO2 far less avidly per mole -- but its excreted-overflow pool (D-49,
+# nominal ~30 mg/L residual) is persistent and measured, so it still competes materially
+# for the shared bisulfite pool at typical dosed-SO2 concentrations (verified: captures a
+# double-digit percent share of total SO2 at a 50 mg/L dose alongside alpha-KG, D-51).
+K_pyruvate_so2:
+  value: 5.55e-4
+  unit: "mol/L"
+  tier: plausible
+  uncertainty: { low: 1.5e-4, high: 2.0e-3, note: "Burroughs & Sparks report 5.55e-4 at pH 3.3; a later secondary review rounds pyruvate's Kd to ~2e-4 mol/L, order-of-magnitude consistent. Band spans both plus apparent-pKa pH drift across the wine range (3.3-3.8, same drift acetaldehyde's band carries)." }
+  provenance:
+    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I: equilibrium constants for the dissociation of carbonyl bisulphite compounds (J. Sci. Food Agric. 24:187-198) -- apparent Kd 5.55e-4 mol/L at pH 3.3, the same canonical source as K_acetaldehyde_so2 (a direct cross-check: that paper's acetaldehyde value 1.5e-6 matches this codebase's independently-sourced K_acetaldehyde_so2 exactly)."
+    conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like K_acetaldehyde_so2"
+    notes: "Second-strongest carbonyl-SO2 binder in wine after acetaldehyde (Jackowetz & Mira de Orduna 2013). Competes with acetaldehyde and alpha-ketoglutarate for the SAME shared bisulfite pool in the D-51 multi-carbonyl equilibrium (acidbase.bound_so2_molar) -- a competitive-Langmuir partition, NOT an independent binding (three carbonyls cannot each claim the same free SO2). tier=plausible: a measured constant applied to wine as an apparent value, banded for pH-drift and the secondary-source scatter."
+
+# -- Alpha-ketoglutarate-bisulfite binding (decision D-51) -- the third carbonyl binder --
+#
+# Alpha-ketoglutarate (2-oxoglutaric acid) + HSO3- <-> its adduct, the SAME 1:1 form.
+# Roughly 93x weaker than acetaldehyde but slightly STRONGER than pyruvate (smaller Kd),
+# so per mole it is the second-most-avid binder even though its excreted pool (D-50,
+# nominal ~20 mg/L residual) is smaller than pyruvate's.
+K_alpha_kg_so2:
+  value: 1.4e-4
+  unit: "mol/L"
+  tier: plausible
+  uncertainty: { low: 4.0e-5, high: 5.0e-4, note: "Burroughs & Sparks report 1.4e-4 at pH 3.3; a later secondary review rounds oxoglutaric acid's Kd to ~5e-4 mol/L, order-of-magnitude consistent (the wider end of this band covers it). Band also spans the same apparent-pKa pH-drift margin as the other two binding constants." }
+  provenance:
+    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I (J. Sci. Food Agric. 24:187-198) -- apparent Kd 1.4e-4 mol/L at pH 3.3 for 2-ketoglutaric acid, the same canonical source and cross-checked acetaldehyde value as K_pyruvate_so2."
+    conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like K_acetaldehyde_so2"
+    notes: "Third carbonyl-SO2 binder in the D-51 multi-carbonyl equilibrium, sharing the same bisulfite pool as acetaldehyde and pyruvate (acidbase.bound_so2_molar). tier=plausible: a measured constant applied to wine as an apparent value, banded for pH-drift and secondary-source scatter."

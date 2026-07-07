@@ -33,6 +33,17 @@ total``). The one live consumer is the pre-existing MLF
 antimicrobial gate, which now reads the *derived* free-molecular SO₂ via
 :func:`molecular_so2_at_ph` (bound SO₂ is not antimicrobial — a correct consequence, D-28).
 
+**Multi-carbonyl competition (decision D-51).** Acetaldehyde is not the only carbonyl that binds
+SO₂ in real wine: the excreted keto-acid overflow pools pyruvate (D-49) and α-ketoglutarate (D-50)
+persist in finished wine and compete for the *same* shared bisulfite pool (Burroughs & Sparks 1973;
+Jackowetz & Mira de Orduña 2013). :func:`bound_so2_molar` generalizes the D-28 single-carbonyl
+quadratic to a competitive-Langmuir partition over all three carbonyls at once — one shared
+"reactive bisulfite" root, solved by ``brentq`` — which reduces *exactly* to the original D-28
+quadratic when only one carbonyl is present (byte-for-byte on a keto-acid-pool-off run). The
+practical effect: acetaldehyde's bound (and hence ADH-protected) share is now *smaller* than the
+D-28/D-47 single-carbonyl form, because pyruvate/α-KG soak up part of the dosed SO₂ — the mechanism
+D-48's finished-wine overshoot flagged as missing.
+
 **Acid speciation (Henderson-Hasselbalch).** Each weak acid's mean anion charge per
 mole at proton concentration ``h`` is a smooth (C∞) function of ``h``:
 
@@ -66,7 +77,6 @@ the in-loop signature ``(y, schema, params)`` matches ``Process.derivatives`` /
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -74,8 +84,10 @@ from scipy.optimize import brentq
 
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
+    M_ALPHA_KETOGLUTARATE,
     M_LACTIC,
     M_MALIC,
+    M_PYRUVATE,
     M_SO2,
     M_SUCCINIC,
     M_TARTARIC,
@@ -148,9 +160,21 @@ SO2_STATE_KEY = "so2_total"
 #: (decision D-28). Built as real state in D-27; absent ⇒ no binding ⇒ free == total.
 ACETALDEHYDE_KEY = "acetaldehyde"
 
+#: The excreted keto-acid state slots (g/L) that compete with acetaldehyde for the shared
+#: bisulfite pool (decision D-51). Built as real state in D-49/D-50; wine-only and absent
+#: whenever the ``_KETO_ACID_PROCESSES`` tuple is off (or on the beer schema), in which case
+#: they contribute zero binding and the equilibrium collapses to the D-28 acetaldehyde-only form.
+PYRUVATE_KEY = "pyruvate"
+ALPHA_KG_KEY = "alpha_ketoglutarate"
+
 #: The acetaldehyde-bisulfite adduct dissociation constant (mol/L), referenced to bisulfite
 #: HSO₃⁻ (decision D-28). Read only by the binding solver, never by the pH balance.
 SO2_BINDING_PARAM = "K_acetaldehyde_so2"
+
+#: The pyruvate- and α-ketoglutarate-bisulfite adduct dissociation constants (mol/L), the two
+#: competing carbonyl binders D-51 adds to the same equilibrium (Burroughs & Sparks 1973).
+PYRUVATE_SO2_BINDING_PARAM = "K_pyruvate_so2"
+ALPHA_KG_SO2_BINDING_PARAM = "K_alpha_kg_so2"
 
 #: The sulfurous-acid pKa parameter names the molecular-SO₂ readout reads — DELIBERATELY
 #: kept out of :data:`PKA_PARAM_NAMES`. SO₂ does not enter the charge balance in D-22, so
@@ -445,44 +469,83 @@ def _acetaldehyde_molar(y: FloatArray, schema: StateSchema) -> float:
     return max(float(y[schema.slice(ACETALDEHYDE_KEY)][0]), 0.0) / M_ACETALDEHYDE
 
 
-def bound_so2_molar(
-    total_molar: float, acetaldehyde_molar: float, bisulfite_frac: float, k_diss: float
-) -> float:
-    """Bound SO₂ (= bound acetaldehyde) [mol/L] from the acetaldehyde-bisulfite equilibrium.
-
-    Solves ``K = A_free · [HSO₃⁻] / x`` with ``A_free = A − x``, ``[HSO₃⁻] = (C − x)·β``
-    (bisulfite is the reactive share ``β`` of *free* SO₂), ``x`` the 1:1 adduct — i.e.
-
-        ``(A − x)(C − x)·β − K·x = 0``   (A = total acetaldehyde, C = total SO₂, mol/L)
-
-    a quadratic ``β·x² − [β(A+C) + K]·x + β·A·C = 0`` whose **smaller** root is the physical
-    one (the larger exceeds ``max(A, C)``). Returns ``x`` clamped to ``[0, min(A, C)]`` — you
-    cannot bind more SO₂ than either pool holds. Zero if either pool or ``β`` is zero. Pure
-    algebra (no state) so the equilibrium is unit-testable in isolation.
-    """
-    if total_molar <= 0.0 or acetaldehyde_molar <= 0.0 or bisulfite_frac <= 0.0:
+def _pyruvate_molar(y: FloatArray, schema: StateSchema) -> float:
+    """The excreted-overflow pyruvate pool as mol/L, or 0 if the :data:`PYRUVATE_KEY` slot
+    is absent (decision D-51: the second SO₂ binder, built as real state in D-49)."""
+    if PYRUVATE_KEY not in schema:
         return 0.0
-    a = acetaldehyde_molar
-    c = total_molar
-    qb = -(bisulfite_frac * (a + c) + k_diss)
-    qc = bisulfite_frac * a * c
-    disc = qb * qb - 4.0 * bisulfite_frac * qc
-    root = (-qb - math.sqrt(max(disc, 0.0))) / (2.0 * bisulfite_frac)
-    return min(max(root, 0.0), min(a, c))
+    return max(float(y[schema.slice(PYRUVATE_KEY)][0]), 0.0) / M_PYRUVATE
+
+
+def _alpha_kg_molar(y: FloatArray, schema: StateSchema) -> float:
+    """The excreted-overflow α-ketoglutarate pool as mol/L, or 0 if the :data:`ALPHA_KG_KEY`
+    slot is absent (decision D-51: the third SO₂ binder, built as real state in D-50)."""
+    if ALPHA_KG_KEY not in schema:
+        return 0.0
+    return max(float(y[schema.slice(ALPHA_KG_KEY)][0]), 0.0) / M_ALPHA_KETOGLUTARATE
+
+
+def bound_so2_molar(
+    total_molar: float,
+    carbonyls: tuple[tuple[float, float], ...],
+    bisulfite_frac: float,
+) -> tuple[float, ...]:
+    """Bound SO₂ [mol/L] for each of N carbonyls competing for one shared bisulfite pool.
+
+    Generalizes the D-28 single-carbonyl equilibrium to a competitive-Langmuir partition
+    (decision D-51): every carbonyl ``i`` forms a 1:1 adduct with bisulfite,
+    ``K_i = (A_i − x_i)·[HSO₃⁻] / x_i``, and all of them draw on the SAME unbound-SO₂ pool
+    ``u = C − Σx_i`` (``C`` = total SO₂, mol/L), whose reactive bisulfite share is
+    ``h = u·β``. Solving each adduct for its own bound amount gives the Langmuir form
+    ``x_i = A_i·h / (K_i + h)``, and substituting into the shared-pool definition of ``h``
+    collapses the whole system to ONE monotone equation in ``h``:
+
+        ``β·C − β·Σᵢ(A_i·h/(K_i+h)) − h = 0``
+
+    (strictly decreasing: the sum term rises with ``h``, ``−h`` falls), so a single
+    ``brentq`` root-find over ``[0, β·C]`` — where the sign change is guaranteed — replaces
+    the old per-carbonyl quadratic. With one carbonyl this reduces *exactly* to the D-28
+    quadratic root (test-verified), so a keto-acid-pool-off run is byte-for-byte the D-28/
+    D-47 form. ``carbonyls`` is an ordered ``(species_molar, k_diss)`` sequence (e.g.
+    ``(acetaldehyde_molar, K_acetaldehyde_so2)``); the return tuple matches its order and
+    length. Each entry is clamped to ``[0, min(A_i, C)]``. Zero for every entry when
+    ``total_molar``/``bisulfite_frac`` is zero, or (per-entry) when that carbonyl's own molar
+    amount or ``K`` is zero. Pure algebra (no state) so the equilibrium is unit-testable in
+    isolation.
+    """
+    n = len(carbonyls)
+    if total_molar <= 0.0 or bisulfite_frac <= 0.0:
+        return (0.0,) * n
+    active = [(a, k) for a, k in carbonyls if a > 0.0 and k > 0.0]
+    if not active:
+        return (0.0,) * n
+
+    def shared_bisulfite_residual(h: float) -> float:
+        bound_sum = sum(a * h / (k + h) for a, k in active)
+        return bisulfite_frac * total_molar - bisulfite_frac * bound_sum - h
+
+    h_max = bisulfite_frac * total_molar
+    h = brentq(shared_bisulfite_residual, 0.0, h_max, xtol=1e-14)
+    return tuple(
+        min(max(a * h / (k + h), 0.0), min(a, total_molar)) if a > 0.0 and k > 0.0 else 0.0
+        for a, k in carbonyls
+    )
 
 
 @dataclass(frozen=True)
 class So2Speciation:
-    """The full free/bound/molecular SO₂ split of one state vector (decision D-28).
+    """The full free/bound/molecular SO₂ split of one state vector (decisions D-28, D-51).
 
     All concentrations are g/L expressed *as SO₂* (mass-preserving): ``total`` is the dosed
-    conserved slot, ``bound`` the acetaldehyde-hydroxysulphonate adduct, ``free = total −
-    bound`` the analytically-measured free SO₂, and ``molecular`` the antimicrobial
-    (undissociated SO₂·H₂O) share of *free* at ``ph``. ``molecular_fraction`` is that share
-    of free (the D-22 curve). CAVEAT (D-28): ``bound`` is acetaldehyde-only — real wine also
-    binds SO₂ to pyruvate / α-ketoglutarate / sugars — so ``bound`` under-estimates and
-    ``free``/``molecular`` slightly over-estimate the protective pool; the ``total`` slot is
-    really "free + acetaldehyde-bound".
+    conserved slot, ``bound`` the combined acetaldehyde/pyruvate/α-ketoglutarate-hydroxysulphonate
+    adducts (decision D-51 — the three carbonyls share ONE bisulfite pool, see
+    :func:`bound_so2_molar`), ``free = total − bound`` the analytically-measured free SO₂, and
+    ``molecular`` the antimicrobial (undissociated SO₂·H₂O) share of *free* at ``ph``.
+    ``molecular_fraction`` is that share of free (the D-22 curve). CAVEAT (D-51, narrower than
+    the pre-D-51 D-28 caveat): ``bound`` still omits SUGARS, the remaining known wine SO₂
+    binder — so ``bound`` still under-estimates and ``free``/``molecular`` still slightly
+    over-estimate the protective pool, just by less than before; the ``total`` slot is really
+    "free + acetaldehyde/pyruvate/α-KG-bound".
     """
 
     ph: float
@@ -493,8 +556,39 @@ class So2Speciation:
     molecular_fraction: float
 
 
+def _bound_molar_split(
+    total_so2_molar: float,
+    acetaldehyde_molar: float,
+    pyruvate_molar: float,
+    alpha_kg_molar: float,
+    bisulfite_frac: float,
+    params: Mapping[str, float],
+) -> tuple[float, float, float]:
+    """The 3-carbonyl coupled bind (decision D-51) — the one place all three ``K``s meet.
+
+    Shared by :func:`_speciate_at_ph` (which only needs the *sum*, for ``bound``) and
+    :func:`free_acetaldehyde` (which needs acetaldehyde's *own* share of that sum) so the two
+    call sites can never disagree about how the SO₂ is partitioned across carbonyls.
+    """
+    acet, pyr, akg = bound_so2_molar(
+        total_so2_molar,
+        (
+            (acetaldehyde_molar, params[SO2_BINDING_PARAM]),
+            (pyruvate_molar, params[PYRUVATE_SO2_BINDING_PARAM]),
+            (alpha_kg_molar, params[ALPHA_KG_SO2_BINDING_PARAM]),
+        ),
+        bisulfite_frac,
+    )
+    return acet, pyr, akg
+
+
 def _speciate_at_ph(
-    total: float, acetaldehyde_molar: float, ph: float, params: Mapping[str, float]
+    total: float,
+    acetaldehyde_molar: float,
+    pyruvate_molar: float,
+    alpha_kg_molar: float,
+    ph: float,
+    params: Mapping[str, float],
 ) -> So2Speciation:
     """Split a known total SO₂ (g/L) at an already-solved ``ph`` — the shared inner kernel.
 
@@ -505,10 +599,11 @@ def _speciate_at_ph(
     """
     pkas = tuple(params[n] for n in SO2_PKA_PARAM_NAMES)
     h = 10.0 ** (-ph)
-    bound_molar = bound_so2_molar(
-        total / M_SO2, acetaldehyde_molar, bisulfite_fraction(h, pkas), params[SO2_BINDING_PARAM]
+    beta = bisulfite_fraction(h, pkas)
+    acet, pyr, akg = _bound_molar_split(
+        total / M_SO2, acetaldehyde_molar, pyruvate_molar, alpha_kg_molar, beta, params
     )
-    bound = bound_molar * M_SO2
+    bound = (acet + pyr + akg) * M_SO2
     free = max(total - bound, 0.0)
     frac = molecular_so2_fraction(ph, pkas)
     return So2Speciation(
@@ -519,14 +614,17 @@ def _speciate_at_ph(
 def speciate_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> So2Speciation:
     """Full free/bound/molecular SO₂ split of a state vector — a derived pure function.
 
-    The headline D-28 readout: pH is solved from the organic acids (:func:`ph_of_state` —
-    SO₂ is **not** in the charge balance, decisions D-22/D-28), the dosed total SO₂ is split
-    into acetaldehyde-bound vs free at that pH (the binding equilibrium), and the free pool
-    partitioned into its molecular antimicrobial share. In-loop signature ``(y, schema,
-    params)`` like :func:`ph_of_state`. Returns an all-zero split (at the solved pH) when no
-    SO₂ is dosed or the slot is absent. At acetaldehyde = 0 the bound term vanishes and
+    The headline D-28 readout, generalized by D-51 to three competing carbonyls: pH is solved
+    from the organic acids (:func:`ph_of_state` — SO₂ is **not** in the charge balance,
+    decisions D-22/D-28), the dosed total SO₂ is split into acetaldehyde/pyruvate/α-KG-bound
+    vs free at that pH (the coupled binding equilibrium), and the free pool partitioned into
+    its molecular antimicrobial share. In-loop signature ``(y, schema, params)`` like
+    :func:`ph_of_state`. Returns an all-zero split (at the solved pH) when no SO₂ is dosed or
+    the slot is absent. At acetaldehyde = pyruvate = α-KG = 0 the bound term vanishes and
     ``free == total`` — so D-22's molecular-SO₂ curve is reproduced exactly (the regression
-    anchor). Report the conventional mg/L via :func:`fermentation.units.convert.gpl_to_mgl`.
+    anchor), and on a keto-acid-pool-off run (pyruvate/α-KG slots absent from the schema) this
+    is byte-for-byte the pre-D-51 acetaldehyde-only split. Report the conventional mg/L via
+    :func:`fermentation.units.convert.gpl_to_mgl`.
     """
     total = _so2_total(y, schema)
     ph = ph_of_state(y, schema, params)
@@ -535,34 +633,42 @@ def speciate_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float]
         return So2Speciation(
             ph=ph, total=0.0, bound=0.0, free=0.0, molecular=0.0, molecular_fraction=frac
         )
-    return _speciate_at_ph(total, _acetaldehyde_molar(y, schema), ph, params)
+    return _speciate_at_ph(
+        total, _acetaldehyde_molar(y, schema), _pyruvate_molar(y, schema),
+        _alpha_kg_molar(y, schema), ph, params,
+    )  # fmt: skip
 
 
 def bound_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
-    """Acetaldehyde-bound SO₂ [g/L] of a state vector (decision D-28) — 0 when undosed."""
+    """Combined acetaldehyde/pyruvate/α-KG-bound SO₂ [g/L] (decisions D-28, D-51) — 0 when
+    undosed."""
     return speciate_so2(y, schema, params).bound
 
 
 def free_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
-    """Free SO₂ [g/L] of a state vector — total minus acetaldehyde-bound (decision D-28)."""
+    """Free SO₂ [g/L] of a state vector — total minus the combined carbonyl-bound share
+    (decisions D-28, D-51)."""
     return speciate_so2(y, schema, params).free
 
 
 def molecular_so2_at_ph(
     y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
 ) -> float:
-    """Molecular (antimicrobial) SO₂ [g/L] at an **already-solved** ``ph`` (decision D-28).
+    """Molecular (antimicrobial) SO₂ [g/L] at an **already-solved** ``ph`` (decisions D-28, D-51).
 
     For in-loop consumers that have solved pH themselves (the MLF antimicrobial gate reuses
-    its single brentq solve): free = total − acetaldehyde-bound at ``ph``, then the molecular
-    share of free. Returns 0 when no SO₂ is dosed. The bound term reads acetaldehyde from the
-    same state, so as acetaldehyde peaks it sequesters SO₂ and the antimicrobial free pool
-    (correctly) drops — bound SO₂ is not antimicrobial.
+    its single brentq solve): free = total − (acetaldehyde+pyruvate+α-KG)-bound at ``ph``, then
+    the molecular share of free. Returns 0 when no SO₂ is dosed. The bound term reads all three
+    carbonyls from the same state, so as any of them peaks it sequesters SO₂ and the
+    antimicrobial free pool (correctly) drops — bound SO₂ is not antimicrobial.
     """
     total = _so2_total(y, schema)
     if total <= 0.0:
         return 0.0
-    return _speciate_at_ph(total, _acetaldehyde_molar(y, schema), ph, params).molecular
+    return _speciate_at_ph(
+        total, _acetaldehyde_molar(y, schema), _pyruvate_molar(y, schema),
+        _alpha_kg_molar(y, schema), ph, params,
+    ).molecular  # fmt: skip
 
 
 def free_acetaldehyde(
@@ -570,19 +676,24 @@ def free_acetaldehyde(
 ) -> float:
     """Acetaldehyde NOT bound to SO₂ [g/L] at an already-solved ``ph`` — the ADH-reducible pool.
 
-    The RHS side of the D-28 free/bound split (decision D-47). The acetaldehyde-bisulfite
-    adduct (1-hydroxyethanesulphonate) is **protected from alcohol dehydrogenase** — the
-    literature is explicit that "acetaldehyde bound to SO₂ could not be metabolized by yeast
-    during fermentation; only free acetaldehyde could impact metabolism" — so the enzymatic
-    reduction (:class:`fermentation.core.kinetics.acetaldehyde.AcetaldehydeReduction`) acts on
-    this free share alone. ``free = total_acetaldehyde − bound``, with ``bound`` from the *same*
-    :func:`bound_so2_molar` equilibrium the SO₂ readout uses (1:1 adduct ⇒ bound SO₂ mol/L =
-    bound acetaldehyde mol/L), so the RHS coupling and the free/bound readout can never drift.
+    The RHS side of the D-28 free/bound split (decision D-47), reading the D-51 multi-carbonyl
+    equilibrium. The acetaldehyde-bisulfite adduct (1-hydroxyethanesulphonate) is **protected
+    from alcohol dehydrogenase** — the literature is explicit that "acetaldehyde bound to SO₂
+    could not be metabolized by yeast during fermentation; only free acetaldehyde could impact
+    metabolism" — so the enzymatic reduction
+    (:class:`fermentation.core.kinetics.acetaldehyde.AcetaldehydeReduction`) acts on this free
+    share alone. ``free = total_acetaldehyde − bound``, with ``bound`` acetaldehyde's OWN share
+    of the same :func:`_bound_molar_split` the SO₂ readout uses — pyruvate and α-KG now compete
+    for the shared bisulfite pool too (decision D-51), so this ``bound`` is *smaller* than the
+    pre-D-51 acetaldehyde-only form whenever a keto-acid pool is present, leaving MORE free
+    acetaldehyde for ADH (the mechanism behind D-51's smaller finished-wine stranding).
 
     Returns the **total** acetaldehyde (g/L) whenever no SO₂ is dosed or no acetaldehyde is
-    present — the binding vanishes and the reduction is byte-for-byte the D-27 core. In-loop
-    signature ``(y, schema, params, ph)`` like :func:`molecular_so2_at_ph`; the caller supplies
-    the already-solved pH so this never triggers a second ``brentq``. Clamped ≥ 0.
+    present — the binding vanishes and the reduction is byte-for-byte the D-27 core (unaffected
+    by whether pyruvate/α-KG pools exist, since with no acetaldehyde there is nothing here to
+    protect). In-loop signature ``(y, schema, params, ph)`` like :func:`molecular_so2_at_ph`;
+    the caller supplies the already-solved pH so this never triggers a second ``brentq``.
+    Clamped ≥ 0.
     """
     acet_molar = _acetaldehyde_molar(y, schema)
     total_so2 = _so2_total(y, schema)
@@ -590,34 +701,45 @@ def free_acetaldehyde(
         return acet_molar * M_ACETALDEHYDE  # no binding ⇒ all acetaldehyde is reducible (D-27)
     pkas = tuple(params[n] for n in SO2_PKA_PARAM_NAMES)
     beta = bisulfite_fraction(10.0 ** (-ph), pkas)
-    bound_molar = bound_so2_molar(total_so2 / M_SO2, acet_molar, beta, params[SO2_BINDING_PARAM])
-    return max(acet_molar - bound_molar, 0.0) * M_ACETALDEHYDE
+    bound_acet, _, _ = _bound_molar_split(
+        total_so2 / M_SO2, acet_molar, _pyruvate_molar(y, schema), _alpha_kg_molar(y, schema),
+        beta, params,
+    )  # fmt: skip
+    return max(acet_molar - bound_acet, 0.0) * M_ACETALDEHYDE
 
 
 def molecular_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
     """Molecular (antimicrobial) SO₂ [g/L] of a state vector — a derived pure function.
 
-    The D-22 headline, now reading the D-28 free/bound split: pH is solved from the organic
-    acids, the dosed *total* SO₂ split into acetaldehyde-bound vs free, and the molecular
-    share of **free** returned (bound SO₂ is not antimicrobial). Convenience wrapper over
-    :func:`speciate_so2`. Returns 0 when no SO₂ is dosed (or the slot is absent); at
-    acetaldehyde = 0 it collapses to the exact D-22 ``free × fraction(pH)``.
+    The D-22 headline, now reading the D-51 multi-carbonyl free/bound split: pH is solved from
+    the organic acids, the dosed *total* SO₂ split into acetaldehyde/pyruvate/α-KG-bound vs
+    free, and the molecular share of **free** returned (bound SO₂ is not antimicrobial).
+    Convenience wrapper over :func:`speciate_so2`. Returns 0 when no SO₂ is dosed (or the slot
+    is absent); at acetaldehyde = pyruvate = α-KG = 0 it collapses to the exact D-22
+    ``free × fraction(pH)``.
     """
     return speciate_so2(y, schema, params).molecular
 
 
 def molecular_so2_tier(params_tier_of: Mapping[str, Tier]) -> Tier:
-    """Tier of the derived SO₂-speciation values — computed EXPLICITLY (decisions D-22/D-28).
+    """Tier of the derived SO₂-speciation values — computed EXPLICITLY (decisions D-22/D-28/D-51).
 
     The readout solves pH (so it inherits every pH-solver pKa tier, exactly as
-    :func:`ph_tier`), partitions by the sulfurous pKa(s), *and* (D-28) splits free/bound by
-    the acetaldehyde-bisulfite binding constant — so its tier is the lowest of **all three**
-    parameter sets (pH pKas, sulfurous pKas, binding ``K``), floored at ``PLAUSIBLE`` (apparent
-    constants applied to wine are extrapolation; SO₂ speciation is never ``VALIDATED`` however
-    good the source). Covers ``molecular``/``free``/``bound`` alike (they share these inputs).
-    Like :func:`ph_tier` it must NOT read the inert SO₂/acetaldehyde/acid *state*-slot tiers
-    (which ``tier_of`` reports ``VALIDATED`` for, since no Process touches them).
+    :func:`ph_tier`), partitions by the sulfurous pKa(s), *and* (D-28/D-51) splits free/bound by
+    all three carbonyl-bisulfite binding constants — so its tier is the lowest of **all these**
+    parameter sets (pH pKas, sulfurous pKas, the 3 binding ``K``s), floored at ``PLAUSIBLE``
+    (apparent constants applied to wine are extrapolation; SO₂ speciation is never ``VALIDATED``
+    however good the source). Covers ``molecular``/``free``/``bound`` alike (they share these
+    inputs). Like :func:`ph_tier` it must NOT read the inert SO₂/acetaldehyde/keto-acid/acid
+    *state*-slot tiers (which ``tier_of`` reports ``VALIDATED`` for, since no Process touches
+    them directly here).
     """
-    names = (*PKA_PARAM_NAMES, *SO2_PKA_PARAM_NAMES, SO2_BINDING_PARAM)
+    names = (
+        *PKA_PARAM_NAMES,
+        *SO2_PKA_PARAM_NAMES,
+        SO2_BINDING_PARAM,
+        PYRUVATE_SO2_BINDING_PARAM,
+        ALPHA_KG_SO2_BINDING_PARAM,
+    )
     tiers = [params_tier_of[n] for n in names if n in params_tier_of]
     return combine([*tiers, Tier.PLAUSIBLE])

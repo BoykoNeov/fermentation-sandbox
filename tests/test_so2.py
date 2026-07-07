@@ -319,18 +319,77 @@ def test_bisulfite_fraction_dominates_free_so2_at_wine_ph(so2_pka):
 
 
 def test_binding_equilibrium_algebra_solves_and_conserves(so2_pka):
-    # bound_so2_molar is pure algebra: solve (A−x)(C−x)β − Kx = 0 for the physical root.
+    # bound_so2_molar is pure algebra: solve (A−x)(C−x)β − Kx = 0 for the physical root — the
+    # n=1 case of the D-51 multi-carbonyl solver (a 1-tuple of (molar, K)).
     beta = acidbase.bisulfite_fraction(10.0**-3.4, so2_pka)
     k = 1.5e-6
     a, c = 9.0e-4, 7.8e-4  # ~40 mg/L acetaldehyde, ~50 mg/L SO₂ (mol/L)
-    x = acidbase.bound_so2_molar(c, a, beta, k)
+    (x,) = acidbase.bound_so2_molar(c, ((a, k),), beta)
     assert 0.0 < x < min(a, c)  # cannot bind more than either pool holds
     # x actually satisfies the equilibrium it claims to solve
     assert (a - x) * (c - x) * beta - k * x == pytest.approx(0.0, abs=1e-14)
-    # degenerate inputs → no binding (guards the brentq-free quadratic)
-    assert acidbase.bound_so2_molar(0.0, a, beta, k) == 0.0
-    assert acidbase.bound_so2_molar(c, 0.0, beta, k) == 0.0
-    assert acidbase.bound_so2_molar(c, a, 0.0, k) == 0.0
+    # degenerate inputs → no binding (guards the brentq-free early-exit paths)
+    assert acidbase.bound_so2_molar(0.0, ((a, k),), beta) == (0.0,)
+    assert acidbase.bound_so2_molar(c, ((0.0, k),), beta) == (0.0,)
+    assert acidbase.bound_so2_molar(c, ((a, k),), 0.0) == (0.0,)
+
+
+# == D-51: the coupled multi-carbonyl equilibrium (pyruvate + α-ketoglutarate compete too) =====
+
+
+def test_multi_carbonyl_reduces_exactly_to_the_single_carbonyl_form(so2_pka):
+    # THE regression anchor: with only one carbonyl present (the other two molar amounts are 0),
+    # the N-carbonyl solver must reproduce the ORIGINAL D-28 quadratic root exactly — a
+    # keto-acid-pool-off run is byte-for-byte the pre-D-51 form.
+    beta = acidbase.bisulfite_fraction(10.0**-3.4, so2_pka)
+    c, a = 7.8e-4, 9.0e-4
+    k_acet = 1.5e-6
+    x_multi, x_pyr_zero, x_akg_zero = acidbase.bound_so2_molar(
+        c, ((a, k_acet), (0.0, 5.55e-4), (0.0, 1.4e-4)), beta
+    )
+    assert x_pyr_zero == 0.0 and x_akg_zero == 0.0  # zero-molar carbonyls contribute nothing
+    qb = -(beta * (a + c) + k_acet)
+    disc = qb * qb - 4.0 * beta * beta * a * c
+    x_single = (-qb - disc**0.5) / (2.0 * beta)
+    assert x_multi == pytest.approx(min(max(x_single, 0.0), min(a, c)), abs=1e-12)
+
+
+def test_multi_carbonyl_competition_conserves_and_binds_less_acetaldehyde(so2_pka):
+    # With pyruvate/α-KG present alongside acetaldehyde, all three compete for ONE shared
+    # bisulfite pool: acetaldehyde's bound share must be SMALLER than if it had the pool to
+    # itself (some SO₂ goes to the competitors instead), and the three bound amounts + the
+    # remaining free SO₂ must conserve the total exactly.
+    beta = acidbase.bisulfite_fraction(10.0**-3.4, so2_pka)
+    total = 7.8e-4  # ~50 mg/L SO₂ (mol/L)
+    acet, pyr, akg = 5.8e-4, 3.4e-4, 1.4e-4  # ~ D-47/D-49/D-50 finished-wine molar levels
+    k_acet, k_pyr, k_akg = 1.5e-6, 5.55e-4, 1.4e-4
+    (x_acet_alone,) = acidbase.bound_so2_molar(total, ((acet, k_acet),), beta)
+    x_acet, x_pyr, x_akg = acidbase.bound_so2_molar(
+        total, ((acet, k_acet), (pyr, k_pyr), (akg, k_akg)), beta
+    )
+    assert x_acet < x_acet_alone  # competitors soak up some of what acetaldehyde would have taken
+    assert x_pyr > 0.0 and x_akg > 0.0  # weaker binders still capture a real, non-zero share
+    free = total - (x_acet + x_pyr + x_akg)
+    assert free >= 0.0
+    assert x_acet + x_pyr + x_akg + free == pytest.approx(total)  # conservation, exactly
+    # each species still satisfies ITS OWN adduct equilibrium at the shared reactive bisulfite h
+    h = beta * free
+    for x, a, k in ((x_acet, acet, k_acet), (x_pyr, pyr, k_pyr), (x_akg, akg, k_akg)):
+        assert (a - x) * h - k * x == pytest.approx(0.0, abs=1e-12)
+
+
+def test_multi_carbonyl_order_independent_and_clamped(so2_pka):
+    # The return tuple tracks input ORDER (not a fixed acetaldehyde/pyruvate/α-KG position), and
+    # every entry stays within its own physical bound regardless of how the others are sized.
+    beta = acidbase.bisulfite_fraction(10.0**-3.4, so2_pka)
+    total = 5.0e-4
+    carbonyls = ((3.0e-4, 5.55e-4), (1.0e-6, 1.5e-6), (2.0e-4, 1.4e-4))
+    x_pyr, x_acet, x_akg = acidbase.bound_so2_molar(total, carbonyls, beta)
+    reordered = ((1.0e-6, 1.5e-6), (2.0e-4, 1.4e-4), (3.0e-4, 5.55e-4))
+    x_acet2, x_akg2, x_pyr2 = acidbase.bound_so2_molar(total, reordered, beta)
+    assert (x_acet2, x_pyr2, x_akg2) == pytest.approx((x_acet, x_pyr, x_akg))
+    for x, (a, _) in zip((x_pyr, x_acet, x_akg), carbonyls, strict=True):
+        assert 0.0 <= x <= min(a, total)
 
 
 def test_binding_recovers_d22_at_zero_acetaldehyde(params):
@@ -369,6 +428,37 @@ def test_acetaldehyde_sequesters_so2_near_stoichiometric(params):
     # conservation: free + bound == total, at both states, exactly
     assert s_peak.free + s_peak.bound == pytest.approx(total)
     assert s_dry.free + s_dry.bound == pytest.approx(total)
+
+
+def test_keto_acid_pools_widen_the_bound_so2_and_free_more_acetaldehyde(params):
+    # THE D-51 wiring headline, at the state level (not just the pure-algebra tests above):
+    # adding pyruvate/α-KG to an otherwise-identical state must (a) bind MORE total SO₂ than
+    # acetaldehyde alone would, and (b) leave acetaldehyde itself LESS protected (free_acetaldehyde
+    # rises) — competitors soak up part of the shared bisulfite pool acetaldehyde used to have to
+    # itself. A keto-acid-pool-off state (the slots simply absent from ``slots``, defaulting to 0
+    # via ``_wine_state``) is unaffected — this is the isolability the D-49/D-50 build promised.
+    schema = wine_schema()
+    cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4)
+    total = mgl_to_gpl(50.0)
+    acet = mgl_to_gpl(60.0)
+    acet_only = _wine_state(
+        schema, tartaric=6.0, malic=3.0, cation_charge=cation, so2_total=total, acetaldehyde=acet
+    )
+    with_keto = _wine_state(
+        schema, tartaric=6.0, malic=3.0, cation_charge=cation, so2_total=total, acetaldehyde=acet,
+        pyruvate=mgl_to_gpl(30.0), alpha_ketoglutarate=mgl_to_gpl(20.0),
+    )  # fmt: skip
+    s_acet_only = acidbase.speciate_so2(acet_only, schema, params)
+    s_with_keto = acidbase.speciate_so2(with_keto, schema, params)
+    assert s_with_keto.bound > s_acet_only.bound  # keto acids add to the bound total
+    assert s_with_keto.free < s_acet_only.free  # so free (and hence molecular) is further depressed
+    assert s_with_keto.free + s_with_keto.bound == pytest.approx(total)  # still conserves exactly
+
+    ph = acidbase.ph_of_state(with_keto, schema, params)
+    free_acet_only = acidbase.free_acetaldehyde(acet_only, schema, params, ph)
+    free_with_keto = acidbase.free_acetaldehyde(with_keto, schema, params, ph)
+    assert free_with_keto > free_acet_only  # acetaldehyde itself is LESS bound (more ADH-reducible)
+    assert free_with_keto <= mgl_to_gpl(60.0)  # never exceeds the total acetaldehyde present
 
 
 def test_speciate_matches_scalar_wrappers(params):

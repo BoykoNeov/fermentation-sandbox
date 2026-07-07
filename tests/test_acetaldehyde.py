@@ -428,21 +428,31 @@ def _so2_wine_run(so2_at_pitch: float = 0.0, so2_late: tuple[float, float] | Non
 def test_post_af_so2_dose_strands_far_less_than_a_pitch_dose():
     # SCENARIO REALISM (the literature scoping): a 50 mg/L SO₂ dose at PITCH is sequestered by the
     # acetaldehyde peak and locks in a large residual; the SAME dose added POST-AF (day 16, after
-    # the yeast has cleared acetaldehyde) finds little to bind, so it strands almost nothing and
-    # its free SO₂ stays near the full dose. This is why SO₂ timing matters in the cellar.
+    # the yeast has cleared acetaldehyde) finds no acetaldehyde to bind, so it strands ~none of
+    # THAT carbonyl. This is why SO₂ timing matters in the cellar for acetaldehyde specifically.
+    #
+    # POST-D-51 CAVEAT (real physics, not a regression): a post-AF dose is no longer near-FULLY
+    # free. The frozen pyruvate/α-KG residual (D-49/D-50, ~30/20 mg/L by day 16, unaffected by
+    # SO₂ timing since it freezes at dryness) still competes for the shared bisulfite pool even
+    # with acetaldehyde absent, so ~34 % of a late 50 mg/L dose binds to those keto acids —
+    # matching the real-world observation that post-ferment SO₂ additions are never fully "free,"
+    # just far less bound than a pitch dose that also catches the acetaldehyde peak.
     pitch, c_p = _so2_wine_run(so2_at_pitch=50.0)
     late, c_l = _so2_wine_run(so2_late=(16.0, 50.0))
     acet_pitch = gpl_to_mgl(pitch.series("acetaldehyde")[-1])
     acet_late = gpl_to_mgl(late.series("acetaldehyde")[-1])
     assert acet_pitch > 20.0  # pitch dose locks in a sensorily-relevant residual
-    assert acet_late < 1.0  # post-AF dose strands ~nothing (acetaldehyde already gone)
+    assert acet_late < 1.0  # post-AF dose strands ~nothing of acetaldehyde (already gone)
     assert acet_pitch > 20.0 * acet_late
-    # free SO₂ endpoint: depressed for the pitch dose, ~full for the late dose
+    # free SO₂ endpoint: depressed for the pitch dose, LESS depressed (but not ~full) for the late
+    # dose — the late dose still loses a real share to residual pyruvate/α-KG (decision D-51).
     total = mgl_to_gpl(50.0)
     free_pitch = acidbase.free_so2(pitch.y[:, -1], pitch.schema, c_p.param_values)
     free_late = acidbase.free_so2(late.y[:, -1], late.schema, c_l.param_values)
     assert free_pitch < 0.4 * total
-    assert free_late > 0.9 * total
+    assert free_late > 0.5 * total  # far less bound than the pitch dose …
+    assert free_late < 0.8 * total  # … but a real ~1/3 still binds the frozen keto-acid residual
+    assert free_late > 2.0 * free_pitch  # timing still matters a lot — the headline survives
 
 
 def test_carbon_closes_on_a_sulfited_run():
