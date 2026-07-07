@@ -956,6 +956,41 @@ K_hydroxycinnamic:
     conditions: "Brettanomyces in wine; half-saturation in the precursor Monod term of BrettDecarboxylation (mol/L, matching the [hc] the Process computes from g/L via M_p_coumaric)"
     notes: "Read by BrettDecarboxylation. Sets where the precursor Monod [hc]/(K+[hc]) rolls off, giving a near-complete conversion of the must hydroxycinnamic pool over the ferment rather than an abrupt stop. SPECULATIVE: the whole-cell precursor affinity our X_brett lumps is not the isolated-enzyme Km, taken mid-range, not fitted."
 
+# -- FERULIC-ACID BRANCH (decision D-55 - the D-40 pt4 "vinylguaiacol/vinylphenol split" deferral) -
+# The p-coumaric branch above (k_brett_decarb/K_hydroxycinnamic) and this ferulic branch are the
+# SAME enzyme (Brettanomyces hydroxycinnamate decarboxylase / POF+ yeast Pad1-Fdc1) acting on a
+# second, genuinely distinct substrate (ferulic acid, C10, vs p-coumaric's C9) - not a fixed-ratio
+# split of the same pool, because the two decarboxylate to different-carbon-count products
+# (ferulic 10C -> vinylguaiacol 9C + CO2 1C; p-coumaric 9C -> vinylphenol 8C + CO2 1C). The two
+# k/K values below are RATIO-DERIVED, not independently re-estimated: Edlin et al. 1998 (Appl.
+# Microbiol. Biotechnol. 49:511-517) purified a hydroxycinnamate decarboxylase from Brettanomyces
+# anomalus (the same enzyme family) and report PAIRED kinetics for both substrates in the SAME
+# assay - Vmax 13,494 (ferulic) vs 22,256 (p-coumaric) nmol/min/mg, Km 1.15 (ferulic) vs 1.55
+# (p-coumaric) mM. Those ratios (~0.606x rate, ~0.742x half-saturation) are real, sourced, paired
+# data, applied to this model's own (still author-estimated) absolute k_brett_decarb/
+# K_hydroxycinnamic scale - the RATIO is sourced even though the absolute magnitude it scales
+# remains speculative, same epistemic status as k_brett_decarb itself.
+
+k_brett_decarb_ferulic:
+  value: 3.0e-6
+  unit: "mol/(g*h)"   # molar ferulate turnover per g/L X_brett: r = k_brett_decarb_ferulic*X_brett*Monod*gate
+  tier: speculative
+  uncertainty: { low: 6.0e-7, high: 1.2e-5, note: "= k_brett_decarb's own band (1.0e-6 to 2.0e-5) scaled by the sourced 0.606x Vmax(ferulic)/Vmax(p-coumaric) ratio (Edlin et al. 1998)" }
+  provenance:
+    source: "Edlin et al. 1998 (Appl. Microbiol. Biotechnol. 49:511-517): paired Vmax for a homologous hydroxycinnamate decarboxylase on ferulic (13,494 nmol/min/mg) vs p-coumaric acid (22,256 nmol/min/mg) in the SAME assay - a directly comparable ratio (~0.606x) even though neither absolute Vmax transfers to this model's lumped whole-cell flux form"
+    conditions: "Brettanomyces bruxellensis in wine, ~20 C; specific decarboxylase activity on ferulic acid scaling the dosed X_brett, the ferulic-branch analogue of k_brett_decarb"
+    notes: "Read by BrettDecarboxylation's ferulic branch (decision D-55). VALUE = k_brett_decarb * 0.606 (the sourced Vmax ratio) - the RATIO between the two branches is real paired data, even though the absolute scale it is applied to (k_brett_decarb itself) remains an unranked author estimate. DIRECTION and RELATIVE magnitude sourced; absolute magnitude speculative (inherited)."
+
+K_hydroxycinnamic_ferulic:
+  value: 3.7e-4
+  unit: "mol/L"   # Michaelis-Menten half-saturation in ferulic-acid precursor (molar)
+  tier: speculative
+  uncertainty: { low: 7.4e-5, high: 1.5e-3, note: "= K_hydroxycinnamic's own band (1.0e-4 to 2.0e-3) scaled by the sourced 0.742x Km(ferulic)/Km(p-coumaric) ratio (Edlin et al. 1998) - ferulic has slightly HIGHER affinity (lower Km) than p-coumaric for this enzyme" }
+  provenance:
+    source: "Edlin et al. 1998 (Appl. Microbiol. Biotechnol. 49:511-517): paired Km for the same hydroxycinnamate decarboxylase on both substrates in the same assay, 1.15 mM (ferulic) vs 1.55 mM (p-coumaric) - a directly comparable ratio (~0.742x)"
+    conditions: "Brettanomyces bruxellensis (and POF+ S. cerevisiae) in wine; half-saturation in the ferulic-acid precursor Monod term of the ferulic branch (mol/L)"
+    notes: "Read by BrettDecarboxylation and YeastPOFDecarboxylation's ferulic branch (decision D-55). VALUE = K_hydroxycinnamic * 0.742 (the sourced Km ratio) - like k_brett_decarb_ferulic, the RATIO is real paired data even though the absolute scale (K_hydroxycinnamic itself) is a whole-cell-affinity estimate, not fitted."
+
 k_brett_reduction:
   value: 5.0e-2
   unit: "L/(g*h)"   # d(vinylphenols)/dt = -k_brett_reduction * X_brett * gate * [vinylphenols]
@@ -1160,3 +1195,13 @@ E_a_pof:
     source: "Direction that the enzyme's OWN rate rises with warmth (well below any thermal denaturation optimum) from Edlin et al. 1998 (Appl. Microbiol. Biotechnol. 49:511-517): a hydroxycinnamate decarboxylase purified from Brettanomyces anomalus - the same enzyme family as this model's cinnamate/ferulic-acid decarboxylase - has an activity optimum at 40 C, i.e. still rising through the whole 10-35 C wine/beer fermentation range. The E_a_pof < E_a_uptake ORDERING (which sets the sign of the NET, finished-wine direction) is set by real-world practice on this exact enzyme: POF+ (Pad1/Fdc1) wheat-beer (Weizen) fermentation is unambiguous and widely corroborated - cooler fermentation retains more clove/4-vinylguaiacol character, warmer fermentation favours esters over phenolics (Brewing Science Institute wheat-beer fermentation guidance; Northern Brewer; Brulosophy fermentation-temperature exBEERiments). Extended by analogy from beer to this model's wine POF+ yeast: the SAME PAD1/FDC1 enzyme, as this module's own docstring already establishes for k_pof_decarb's direction."
     conditions: "POF+ S. cerevisiae in wine during active fermentation; Arrhenius factor on the decarboxylase's own molar turnover r (embedded in YeastPOFDecarboxylation.derivatives, not a ProcessSet RateModifier), reads the shared T_ref"
     notes: "Read by YeastPOFDecarboxylation. Per the D-19 flux-coupled-byproduct ordering constraint (see E_a_esters/E_a_fusels): because POF decarboxylation is coupled to the fermentative flux (fermentative_flux_shape), its NET finished-wine conversion (the time-integral of r to dryness) scales as exp(-((E_a_pof-E_a_uptake)/R)(1/T-1/T_ref)) - a warmer ferment finishes faster, shrinking the integration window. E_a_pof is kept POSITIVE (the enzyme genuinely accelerates with warmth, per Edlin et al.) but set BELOW E_a_uptake (55,100 J/mol) so the shrinking-window effect dominates and net conversion still FALLS with warmer fermentation - the OPPOSITE ordering from E_a_esters/E_a_fusels (set ABOVE E_a_uptake so their totals RISE with T), because the sourced real-world direction for THIS byproduct is opposite theirs. Supersedes the D-40 pt4 'temperature-flat' choice: that was a reasoned v1 simplification (no pt4 behaviour needed POF's intrinsic direction, and the implicit E_a_pof=0 already fell with warmer T through the flux-window effect alone, so the v1 direction was accidentally already right) - this v2 refinement replaces the implicit T-invariant placeholder with a genuine (if still speculative) intrinsic enzyme temperature term, sized to preserve and reinforce that same correct direction."
+
+k_pof_decarb_ferulic:
+  value: 1.5e-6
+  unit: "mol/(g*h)"   # molar ferulate turnover per (g/L) fermentative flux: r = k_pof_decarb_ferulic*flux*Monod
+  tier: speculative
+  uncertainty: { low: 6.0e-7, high: 1.2e-5, note: "= k_pof_decarb's own band (1.0e-6 to 2.0e-5) scaled by the SAME sourced 0.606x Vmax(ferulic)/Vmax(p-coumaric) ratio (Edlin et al. 1998) as k_brett_decarb_ferulic - the same enzyme family, Pad1/Fdc1, this module's own long-standing equivalence (D-40 pt4)" }
+  provenance:
+    source: "Same Edlin et al. 1998 (Appl. Microbiol. Biotechnol. 49:511-517) Vmax ratio (ferulic/p-coumaric ~0.606) as k_brett_decarb_ferulic, applied here because YeastPOFDecarboxylation models the SAME cinnamate/ferulic-acid decarboxylase (Pad1/Fdc1) as BrettDecarboxylation"
+    conditions: "POF+ S. cerevisiae in wine during active fermentation; specific decarboxylase activity on ferulic acid scaling the fermentative flux, the ferulic-branch analogue of k_pof_decarb"
+    notes: "Read by YeastPOFDecarboxylation's ferulic branch (decision D-55). VALUE = k_pof_decarb * 0.606 (the sourced ratio, reused from the Brett branch since it is the same enzyme). K_hydroxycinnamic_ferulic (defined in the Brett section above) is shared between both Processes, exactly as K_hydroxycinnamic already is."

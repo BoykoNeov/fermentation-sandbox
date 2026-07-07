@@ -74,7 +74,9 @@ from fermentation.core.acidbase import (
 from fermentation.core.chemistry import (
     M_CO2,
     M_ETHYLPHENOL,
+    M_FERULIC,
     M_P_COUMARIC,
+    M_VINYLGUAIACOL,
     M_VINYLPHENOL,
     carbon_mass_fraction,
     nitrogen_mass_fraction,
@@ -140,59 +142,138 @@ def _needs_ph_solve(y: FloatArray, schema: StateSchema) -> bool:
     return total_so2 > 0.0
 
 
+def _decarboxylation_branch(
+    precursor_gpl: float,
+    precursor_molar_mass: float,
+    product_molar_mass: float,
+    k: float,
+    k_half_saturation: float,
+    activity: float,
+) -> tuple[float, float, float]:
+    """One hydroxycinnamate-decarboxylase branch: precursor → product + CO2 (decision D-55).
+
+    Shared by both :class:`BrettDecarboxylation` and :class:`YeastPOFDecarboxylation`, and by both
+    the p-coumaric branch (``hydroxycinnamics`` → ``vinylphenols``) and the ferulic branch
+    (``ferulic_acid`` → ``vinylguaiacols``) within each — the two branches are the *same* reaction
+    on a different substrate, differing only in molar masses and the rate/half-saturation
+    parameters (:class:`BrettDecarboxylation`'s docstring covers the D-55 fork for why this is a
+    genuine second precursor pool, not a fixed-ratio split of the existing one).
+
+    ``activity`` folds in everything upstream of the precursor Monod that both branches share
+    equally (the catalyst/flux magnitude, and any gate/Arrhenius factor) — ``X_brett · gate`` for
+    Brett, ``flux · arrhenius(T, E_a_pof)`` for POF — so this helper only computes the Monod
+    turnover and the resulting carbon-closing mass flux: ``r = k · activity · [precursor]/
+    (k_half_saturation + [precursor])`` (mol/L/h), returned as
+    ``(d_precursor, d_product, d_CO2)`` in g/L/h.
+
+    Returns exactly ``(0.0, 0.0, 0.0)`` if the precursor is exhausted or ``activity ≤ 0`` — the
+    same value+perf isolability guard each caller already applies before this helper runs.
+    """
+    if precursor_gpl <= 0.0 or activity <= 0.0:
+        return 0.0, 0.0, 0.0
+    precursor_molar = precursor_gpl / precursor_molar_mass
+    monod = precursor_molar / (k_half_saturation + precursor_molar)
+    r = k * activity * monod  # mol/L/h
+    return (
+        -r * precursor_molar_mass,
+        r * product_molar_mass,
+        r * M_CO2,
+    )
+
+
 class BrettDecarboxylation(Process):
-    """*Brettanomyces* cinnamate decarboxylase — hydroxycinnamics → vinylphenols + CO2 (D-40).
+    """*Brettanomyces* cinnamate decarboxylase — two branches to vinylphenols/CO2 (D-40, D-55).
 
     ``d(hydroxycinnamics)/dt = −r·M_p_coumaric``, ``d(vinylphenols)/dt = +r·M_vinylphenol``,
     ``d(CO2)/dt = +r·M_CO2`` with the molar turnover ``r = k_brett_decarb · X_brett · [hc]/(K_
     hydroxycinnamic + [hc]) · g_SO₂ · γ(T)`` (Michaelis–Menten in the precursor, catalyst-scaled,
     gated). p-coumaric (9 C) → vinylphenol (8 C) + CO2 (1 C) closes carbon mole-for-mole on the
     existing ledger. The vinylphenol it makes feeds the shared reservoir
-    :class:`BrettVinylphenolReduction` (and a POF+ yeast, D-40 pt4) drains. Touches only
-    ``hydroxycinnamics``/``vinylphenols``/``CO2``; reads the (constant, in pt1) catalyst
-    ``X_brett`` plus the gate state (T, SO₂, solved pH).
+    :class:`BrettVinylphenolReduction` (and a POF+ yeast, D-40 pt4) drains.
 
-    Returns a zero contribution before any pH work when undosed (``X_brett ≤ 0``) or when the
-    precursor is exhausted — structural value-isolability and no wasted ``brentq`` (the compile
+    **Ferulic-acid branch (decision D-55) — a genuine second precursor, not a split of the
+    first.** ``hydroxycinnamics`` is booked as p-coumaric acid specifically (9 carbons); ferulic
+    acid is a distinct 10-carbon molecule whose decarboxylation (10 = 9 + 1, to 4-vinylguaiacol)
+    cannot be represented as a fixed fraction of the p-coumaric flow without breaking carbon
+    closure (a 9-carbon precursor cannot yield a 9-carbon product + CO2). So the ferulic branch
+    reads its own state (``ferulic_acid``), its own Monod pair (``k_brett_decarb_ferulic``/
+    ``K_hydroxycinnamic_ferulic`` — ratio-derived from Edlin et al. 1998's paired kinetics on the
+    same enzyme, not independently re-estimated), and writes its own product pool
+    (``vinylguaiacols``), which :class:`BrettVinylphenolReduction` also drains (Tchobanov et al.
+    2008 confirm the same reductase acts on both vinylguaiacol and vinylphenol). Both branches
+    share the *same* catalyst/gate (``X_brett · gate`` — the enzyme and its environmental
+    sensitivity do not depend on which substrate it happens to be processing), computed once and
+    passed to :func:`_decarboxylation_branch` for each substrate.
+
+    Touches ``hydroxycinnamics``/``vinylphenols``/``ferulic_acid``/``vinylguaiacols``/``CO2``;
+    reads the (constant, in pt1) catalyst ``X_brett`` plus the gate state (T, SO₂, solved pH).
+
+    Returns a zero contribution before any pH work when undosed (``X_brett ≤ 0``) or when BOTH
+    precursors are exhausted — structural value-isolability and no wasted ``brentq`` (the compile
     seam additionally disables the Process when Brett is not pitched, for tier isolability).
     Tier **speculative** (rate/gate magnitudes are estimates).
     """
 
     name = "brett_decarboxylation"
     tier = Tier.SPECULATIVE
-    touches = ("hydroxycinnamics", "vinylphenols", "CO2")
-    #: The decarboxylase Monod pair plus the shared Brett environmental-gate parameters. Their
-    #: tiers cap the hydroxycinnamics/vinylphenols/CO2 output tier via parameter-tier propagation
-    #: (D-1). CO2 is already speculative (the always-on VDK decarboxylation), so this adds no new
-    #: tier headline. pKa/SO₂ params read via ``acidbase`` are omitted (all plausible; the Process
-    #: is already speculative — the MalolacticConversion convention).
-    reads: tuple[str, ...] = ("k_brett_decarb", "K_hydroxycinnamic", *_BRETT_GATE_READS)
+    touches = ("hydroxycinnamics", "vinylphenols", "ferulic_acid", "vinylguaiacols", "CO2")
+    #: The decarboxylase Monod pairs (p-coumaric and, D-55, ferulic) plus the shared Brett
+    #: environmental-gate parameters. Their tiers cap the touched-pool output tiers via
+    #: parameter-tier propagation (D-1). CO2 is already speculative (the always-on VDK
+    #: decarboxylation), so this adds no new tier headline. pKa/SO₂ params read via ``acidbase``
+    #: are omitted (all plausible; the Process is already speculative — the MalolacticConversion
+    #: convention).
+    reads: tuple[str, ...] = (
+        "k_brett_decarb",
+        "K_hydroxycinnamic",
+        "k_brett_decarb_ferulic",
+        "K_hydroxycinnamic_ferulic",
+        *_BRETT_GATE_READS,
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Early guards BEFORE any pH solve: no catalyst or no precursor ⇒ no conversion, and an
-        # unsulfited/undosed run must not pay a per-RHS pH solve for a zero (or γ(T)-only) result.
+        # Early guards BEFORE any pH solve: no catalyst, or BOTH precursors exhausted, ⇒ no
+        # conversion, and an unsulfited/undosed run must not pay a per-RHS pH solve for a zero (or
+        # γ(T)-only) result.
         x_brett = max(float(y[schema.slice("X_brett")][0]), 0.0) if "X_brett" in schema else 0.0
         if x_brett <= 0.0:
             return d
         hc_gpl = max(float(y[schema.slice("hydroxycinnamics")][0]), 0.0)
-        if hc_gpl <= 0.0:
+        fa_gpl = max(float(y[schema.slice("ferulic_acid")][0]), 0.0)
+        if hc_gpl <= 0.0 and fa_gpl <= 0.0:
             return d
 
         ph = ph_of_state(y, schema, params) if _needs_ph_solve(y, schema) else 0.0
         gate = brett_environmental_gate(y, schema, params, ph)
+        activity = x_brett * gate  # shared by both branches — same catalyst, same environment
 
-        hc_molar = hc_gpl / M_P_COUMARIC
-        monod = hc_molar / (params["K_hydroxycinnamic"] + hc_molar)
-        r = params["k_brett_decarb"] * x_brett * monod * gate  # decarboxylase turnover, mol/L/h
+        d_hc, d_vp, d_co2_pc = _decarboxylation_branch(
+            hc_gpl,
+            M_P_COUMARIC,
+            M_VINYLPHENOL,
+            params["k_brett_decarb"],
+            params["K_hydroxycinnamic"],
+            activity,
+        )
+        d_fa, d_vg, d_co2_fer = _decarboxylation_branch(
+            fa_gpl,
+            M_FERULIC,
+            M_VINYLGUAIACOL,
+            params["k_brett_decarb_ferulic"],
+            params["K_hydroxycinnamic_ferulic"],
+            activity,
+        )
 
-        d[schema.slice("hydroxycinnamics")] = -r * M_P_COUMARIC
-        d[schema.slice("vinylphenols")] = r * M_VINYLPHENOL  # feeds the shared reductase reservoir
-        d[schema.slice("CO2")] = (
-            r * M_CO2
-        )  # p-coumaric C9 → vinylphenol C8 + CO2 C1 (carbon-closing)
+        d[schema.slice("hydroxycinnamics")] = d_hc
+        d[schema.slice("vinylphenols")] = d_vp  # feeds the shared reservoir
+        d[schema.slice("ferulic_acid")] = d_fa
+        d[schema.slice("vinylguaiacols")] = d_vg  # feeds the ferulic-branch shared reservoir
+        # p-coumaric C9 → vinylphenol C8 + CO2 C1, and ferulic C10 → vinylguaiacol C9 + CO2 C1
+        # (both carbon-closing); CO2 sums both branches' contributions.
+        d[schema.slice("CO2")] = d_co2_pc + d_co2_fer
         return d
 
 
@@ -521,20 +602,33 @@ class YeastPOFDecarboxylation(Process):
     **Same reaction as Brett's decarboxylase, different catalyst.** The chemistry — p-coumaric (9 C)
     → vinylphenol (8 C) + CO2 (1 C), carbon-closing mole-for-mole (9 = 8 + 1) — and the carbon
     routing are **identical** to :class:`BrettDecarboxylation` (it reuses ``M_P_COUMARIC``/
-    ``M_VINYLPHENOL``/``M_CO2``), so it touches only ``hydroxycinnamics``/``vinylphenols``/``CO2``
-    and closes on the existing ledger with no new conservation code; when both this and Brett are
-    active they draw the *same* ``hydroxycinnamics`` pool (both close 9 = 8 + 1). The difference is
-    the catalyst and its rate law:
+    ``M_VINYLPHENOL``/``M_CO2`` and :func:`_decarboxylation_branch`), so it touches only
+    ``hydroxycinnamics``/``vinylphenols``/``ferulic_acid``/``vinylguaiacols``/``CO2`` and closes
+    on the existing ledger with no new conservation code; when both this and Brett are active they
+    draw the *same* ``hydroxycinnamics``/``ferulic_acid`` pools (both close 9 = 8 + 1 and
+    10 = 9 + 1). The difference is the catalyst and its rate law:
 
-        r = k_pof_decarb · X · S_total/(K_sugar_uptake + S_total) · [hc]/(K_hydroxycinnamic + [hc])
+        r = k_pof_decarb · flux(T) · S_total/(K_sugar_uptake + S_total)
+              · [hc]/(K_hydroxycinnamic + [hc])
 
     — **flux-coupled** to active fermentation via the shared :func:`~fermentation.core.kinetics.\
     carbon_routing.fermentative_flux_shape` (the ester/α-acetolactate idiom, D-19/D-26), not scaled
     by ``X_brett``. POF decarboxylation is a *primary-fermentation* phenomenon: the flux term makes
     production track the yeast's fermentative activity and **stop at dryness** (``S → 0`` ⇒ rate 0),
-    leaving whatever hydroxycinnamics remain for a later Brett. The precursor Monod (shared
-    ``K_hydroxycinnamic``) rolls production off as the pool is consumed. **No Brett SO₂/temperature
-    gate** — this is yeast metabolism during AF, before any Brett or sulfite lever applies.
+    leaving whatever hydroxycinnamics/ferulic acid remain for a later Brett. The precursor Monod
+    (shared ``K_hydroxycinnamic``/``K_hydroxycinnamic_ferulic``, decision D-55) rolls production off
+    as each pool is consumed. **No Brett SO₂/temperature gate** — this is yeast metabolism during
+    AF, before any Brett or sulfite lever applies.
+
+    **Ferulic-acid branch (decision D-55).** Same fork as :class:`BrettDecarboxylation`'s: a genuine
+    second precursor pool (``ferulic_acid``, 10 carbons), not a fixed-ratio split of
+    ``hydroxycinnamics`` (9 carbons) — the two decarboxylate to different-carbon-count products, so
+    only a real second pool stays carbon-exact. Uses ``k_pof_decarb_ferulic``/
+    ``K_hydroxycinnamic_ferulic`` (the same Edlin et al. 1998 ratio applied to
+    :class:`BrettDecarboxylation`'s ferulic branch — same enzyme family, Pad1/Fdc1), writing to
+    ``vinylguaiacols`` (the ferulic-branch counterpart to ``vinylphenols``). Both branches share the
+    *same* flux/Arrhenius activity (``flux · arrhenius(T, E_a_pof)``), computed once and passed to
+    :func:`_decarboxylation_branch` for each substrate.
 
     **Temperature-dependent (v2, decision D-54) — net conversion FALLS with warmer fermentation.**
     The rate now carries its own Arrhenius factor ``arrhenius(T, E_a_pof, T_ref)`` — a real enzyme
@@ -576,17 +670,20 @@ class YeastPOFDecarboxylation(Process):
 
     name = "yeast_pof_decarboxylation"
     tier = Tier.SPECULATIVE
-    touches = ("hydroxycinnamics", "vinylphenols", "CO2")
-    #: ``k_pof_decarb`` sets the POF decarboxylase magnitude; ``K_sugar_uptake`` (shared with the
-    #: fermentative-uptake flux this tracks) and ``K_hydroxycinnamic`` (shared with Brett's
-    #: decarboxylase — same whole-cell precursor affinity) shape it. ``E_a_pof``/``T_ref`` (D-54)
-    #: give the decarboxylase its own Arrhenius temperature term — see the class docstring for why
-    #: this is set BELOW ``E_a_uptake`` rather than read from it here. Their tiers cap the
-    #: hydroxycinnamics/vinylphenols/CO2 output tier via parameter-tier propagation (D-1). CO2 is
-    #: already speculative (the always-on VDK decarboxylation), so this adds no new tier headline.
+    touches = ("hydroxycinnamics", "vinylphenols", "ferulic_acid", "vinylguaiacols", "CO2")
+    #: ``k_pof_decarb``/``k_pof_decarb_ferulic`` (D-55) set the POF decarboxylase magnitude on
+    #: each branch; ``K_sugar_uptake`` (shared with the fermentative-uptake flux this tracks) and
+    #: ``K_hydroxycinnamic``/``K_hydroxycinnamic_ferulic`` (shared with Brett's decarboxylase —
+    #: same whole-cell precursor affinities) shape them. ``E_a_pof``/``T_ref`` (D-54) give the
+    #: decarboxylase its own Arrhenius temperature term (shared by both branches — see the class
+    #: docstring for why this is set BELOW ``E_a_uptake`` rather than read from it here). Their
+    #: tiers cap the touched-pool output tiers via parameter-tier propagation (D-1). CO2 is already
+    #: speculative (the always-on VDK decarboxylation), so this adds no new tier headline.
     reads: tuple[str, ...] = (
         "k_pof_decarb",
         "K_hydroxycinnamic",
+        "k_pof_decarb_ferulic",
+        "K_hydroxycinnamic_ferulic",
         "K_sugar_uptake",
         "E_a_pof",
         "T_ref",
@@ -596,24 +693,43 @@ class YeastPOFDecarboxylation(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # No precursor ⇒ nothing to decarboxylate; no fermentative flux (post-AF, S→0, or crashed
-        # yeast) ⇒ POF production has stopped and the reservoir simply waits for Brett.
+        # No precursor in EITHER branch ⇒ nothing to decarboxylate; no fermentative flux (post-AF,
+        # S→0, or crashed yeast) ⇒ POF production has stopped and the reservoirs simply wait for
+        # Brett.
         hc_gpl = max(float(y[schema.slice("hydroxycinnamics")][0]), 0.0)
-        if hc_gpl <= 0.0:
+        fa_gpl = max(float(y[schema.slice("ferulic_acid")][0]), 0.0)
+        if hc_gpl <= 0.0 and fa_gpl <= 0.0:
             return d
         flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
         if flux <= 0.0:
             return d
 
-        hc_molar = hc_gpl / M_P_COUMARIC
-        monod = hc_molar / (params["K_hydroxycinnamic"] + hc_molar)
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_pof"], params["T_ref"])
-        r = params["k_pof_decarb"] * flux * monod * f_t  # POF decarboxylase turnover, mol/L/h
+        activity = flux * f_t  # shared by both branches — same catalyst, same temperature term
 
-        d[schema.slice("hydroxycinnamics")] = -r * M_P_COUMARIC
-        d[schema.slice("vinylphenols")] = r * M_VINYLPHENOL  # fills the shared reductase reservoir
-        d[schema.slice("CO2")] = (
-            r * M_CO2
-        )  # p-coumaric C9 → vinylphenol C8 + CO2 C1 (carbon-closing, same as Brett's decarboxylase)
+        d_hc, d_vp, d_co2_pc = _decarboxylation_branch(
+            hc_gpl,
+            M_P_COUMARIC,
+            M_VINYLPHENOL,
+            params["k_pof_decarb"],
+            params["K_hydroxycinnamic"],
+            activity,
+        )
+        d_fa, d_vg, d_co2_fer = _decarboxylation_branch(
+            fa_gpl,
+            M_FERULIC,
+            M_VINYLGUAIACOL,
+            params["k_pof_decarb_ferulic"],
+            params["K_hydroxycinnamic_ferulic"],
+            activity,
+        )
+
+        d[schema.slice("hydroxycinnamics")] = d_hc
+        d[schema.slice("vinylphenols")] = d_vp  # fills the shared reductase reservoir
+        d[schema.slice("ferulic_acid")] = d_fa
+        d[schema.slice("vinylguaiacols")] = d_vg  # fills the ferulic-branch shared reservoir
+        # p-coumaric C9 → vinylphenol C8 + CO2 C1, and ferulic C10 → vinylguaiacol C9 + CO2 C1
+        # (both carbon-closing, same as Brett's decarboxylase); CO2 sums both branches.
+        d[schema.slice("CO2")] = d_co2_pc + d_co2_fer
         return d

@@ -213,6 +213,8 @@ def test_decarboxylation_stoichiometry_and_touches(schema, params):
     assert d[schema.slice("hydroxycinnamics")][0] < 0.0
     assert d[schema.slice("vinylphenols")][0] > 0.0
     assert d[schema.slice("CO2")][0] > 0.0
+    assert d[schema.slice("ferulic_acid")][0] == 0.0  # undosed branch is exactly inert
+    assert d[schema.slice("vinylguaiacols")][0] == 0.0
     # Carbon flux across the three touched slots must cancel (9 C = 8 C + 1 C).
     c_flux = (
         d[schema.slice("hydroxycinnamics")][0] * carbon_mass_fraction("p_coumaric_acid")
@@ -220,7 +222,52 @@ def test_decarboxylation_stoichiometry_and_touches(schema, params):
         + d[schema.slice("CO2")][0] * carbon_mass_fraction("CO2")
     )
     assert c_flux == pytest.approx(0.0, abs=1e-12)
-    assert set(BrettDecarboxylation.touches) == {"hydroxycinnamics", "vinylphenols", "CO2"}
+    assert set(BrettDecarboxylation.touches) == {
+        "hydroxycinnamics",
+        "vinylphenols",
+        "ferulic_acid",
+        "vinylguaiacols",
+        "CO2",
+    }
+
+
+def test_decarboxylation_ferulic_branch_stoichiometry(schema, params):
+    """The D-55 ferulic branch: ferulic_acid down, vinylguaiacols + CO₂ up, carbon flux sums to 0.
+
+    A genuinely distinct precursor (10 C) from p-coumaric's ``hydroxycinnamics`` (9 C), so this
+    checks its own carbon-closing reaction (10 = 9 + 1), both alone and composed with the
+    p-coumaric branch running simultaneously (both draw the same catalyst/gate, independently).
+    """
+    y = _state(schema, X_brett=0.3, ferulic_acid=0.05)  # no hydroxycinnamics dosed
+    d = BrettDecarboxylation().derivatives(0.0, y, schema, params)
+
+    assert d[schema.slice("ferulic_acid")][0] < 0.0
+    assert d[schema.slice("vinylguaiacols")][0] > 0.0
+    assert d[schema.slice("CO2")][0] > 0.0
+    assert d[schema.slice("hydroxycinnamics")][0] == 0.0  # undosed branch is exactly inert
+    assert d[schema.slice("vinylphenols")][0] == 0.0
+    c_flux = (
+        d[schema.slice("ferulic_acid")][0] * carbon_mass_fraction("ferulic_acid")
+        + d[schema.slice("vinylguaiacols")][0] * carbon_mass_fraction("vinylguaiacol")
+        + d[schema.slice("CO2")][0] * carbon_mass_fraction("CO2")
+    )
+    assert c_flux == pytest.approx(0.0, abs=1e-12)
+
+    # Both branches active simultaneously: each is independent (same catalyst/gate, distinct pools).
+    y_pcoumaric_only = _state(schema, X_brett=0.3, hydroxycinnamics=0.1)
+    d_pcoumaric_only = BrettDecarboxylation().derivatives(0.0, y_pcoumaric_only, schema, params)
+
+    y_both = _state(schema, X_brett=0.3, hydroxycinnamics=0.1, ferulic_acid=0.05)
+    d_both = BrettDecarboxylation().derivatives(0.0, y_both, schema, params)
+    assert d_both[schema.slice("hydroxycinnamics")][0] < 0.0
+    assert d_both[schema.slice("ferulic_acid")][0] < 0.0
+    assert d_both[schema.slice("vinylphenols")][0] > 0.0
+    assert d_both[schema.slice("vinylguaiacols")][0] > 0.0
+    # The p-coumaric branch's own rate is unaffected by the ferulic branch running alongside it
+    # (independent Monod terms sharing only the catalyst/gate `activity`, not each other's pool).
+    assert d_both[schema.slice("hydroxycinnamics")][0] == pytest.approx(
+        d_pcoumaric_only[schema.slice("hydroxycinnamics")][0], rel=1e-9
+    )
 
 
 def test_reduction_is_carbon_neutral_transfer(schema, params):
@@ -793,6 +840,8 @@ def test_pof_decarboxylation_stoichiometry_and_touches(schema, params):
     assert d[schema.slice("hydroxycinnamics")][0] < 0.0
     assert d[schema.slice("vinylphenols")][0] > 0.0
     assert d[schema.slice("CO2")][0] > 0.0
+    assert d[schema.slice("ferulic_acid")][0] == 0.0  # undosed branch is exactly inert
+    assert d[schema.slice("vinylguaiacols")][0] == 0.0
     # Carbon flux across the three touched slots must cancel (9 C = 8 C + 1 C).
     c_flux = (
         d[schema.slice("hydroxycinnamics")][0] * carbon_mass_fraction("p_coumaric_acid")
@@ -800,7 +849,36 @@ def test_pof_decarboxylation_stoichiometry_and_touches(schema, params):
         + d[schema.slice("CO2")][0] * carbon_mass_fraction("CO2")
     )
     assert c_flux == pytest.approx(0.0, abs=1e-12)
-    assert set(YeastPOFDecarboxylation.touches) == {"hydroxycinnamics", "vinylphenols", "CO2"}
+    assert set(YeastPOFDecarboxylation.touches) == {
+        "hydroxycinnamics",
+        "vinylphenols",
+        "ferulic_acid",
+        "vinylguaiacols",
+        "CO2",
+    }
+
+
+def test_pof_decarboxylation_ferulic_branch_stoichiometry(schema, params):
+    """The D-55 ferulic branch for POF+ yeast: ferulic_acid down, vinylguaiacols + CO₂ up.
+
+    Same carbon-closing form (10 = 9 + 1) as the Brett ferulic branch, but flux-coupled (no
+    X_brett needed) — the POF+ yeast decarboxylase analogue of
+    ``test_decarboxylation_ferulic_branch_stoichiometry``.
+    """
+    y = _state(schema, ferulic_acid=0.05)  # no hydroxycinnamics dosed
+    d = YeastPOFDecarboxylation().derivatives(0.0, y, schema, params)
+
+    assert d[schema.slice("ferulic_acid")][0] < 0.0
+    assert d[schema.slice("vinylguaiacols")][0] > 0.0
+    assert d[schema.slice("CO2")][0] > 0.0
+    assert d[schema.slice("hydroxycinnamics")][0] == 0.0
+    assert d[schema.slice("vinylphenols")][0] == 0.0
+    c_flux = (
+        d[schema.slice("ferulic_acid")][0] * carbon_mass_fraction("ferulic_acid")
+        + d[schema.slice("vinylguaiacols")][0] * carbon_mass_fraction("vinylguaiacol")
+        + d[schema.slice("CO2")][0] * carbon_mass_fraction("CO2")
+    )
+    assert c_flux == pytest.approx(0.0, abs=1e-12)
 
 
 # -- 18. guards: flux-coupled, no X_brett needed ------------------------------
