@@ -4368,6 +4368,28 @@ top. Implementation (`fermentation.core.kinetics.brett`):
 **Full-suite result:** 676 passed (664 + 12 new), ruff + mypy clean, no existing test's assertion
 needed to change (the onset threshold sits above every existing scenario's finished-wine ethanol).
 
+**Post-implementation advisor pass caught two more honest gaps, both fixed in docstrings (not
+re-engineered):**
+
+1. **A real C1 discontinuity at the onset, mis-described as fully smooth.** The shifted-threshold
+   survival factor is C1 at the ceiling (derivative → 0 from both sides, verified numerically) but
+   NOT at the onset — the flat pre-onset region (derivative 0) meets the power-law ramp (derivative
+   `−n/span`, e.g. −0.25 at the shipped n=2/span=8) with a finite jump. The original docstring
+   claimed blanket "C1, no BDF kink" — true only at the ceiling. Corrected to state both facts
+   precisely rather than overclaim. Verified benign (not the D-40 pt2 C0-step pathology that
+   actually caused a solver blow-up): a bounded Jacobian entry, and the full suite — including the
+   headline test, which integrates straight through `E = onset` — passes without incident. Not
+   re-engineered into a two-breakpoint smootherstep (would fix a cosmetic claim, not a real problem)
+   — the docstring now says so explicitly instead.
+2. **A magnitude tension, not re-tuned.** Reusing `k_death_brett` (0.03/h) gives a ~23 h full-kill
+   half-life at the ceiling — much faster than real 14–15% ABV reds being famously Brett-prone
+   (self-clearing in a day would contradict that folk wisdom) and than the multi-week timescale of
+   Barata's own 12%-condition decline (though that number is the starvation-confounded result
+   already excluded from this Process's scope, not a clean ethanol-only rate). Barata's Table 2
+   reports boundary *concentrations* (grow/death-onset/ceiling), not a decline *rate* at any one
+   level, so there is no sourced number to replace the reuse with — flagged in the docstring as the
+   value to revisit if a future source supplies one, not silently tuned down now.
+
 **Method beat:** two parallel Opus research agents, deliberately opposite-angle (one arguing
 "decline exists", one arguing "persistence is real") to avoid one-sided confirmation, then a
 same-session advisor() pass that caught a self-contradiction in the second agent's report (claiming
@@ -4376,7 +4398,9 @@ both be true) before it reached the owner — resolved by reading the actual `Br
 code rather than trusting the agent's synthesis. A second advisor-flagged risk (a standard Luong
 wall would suppress Brett at ordinary wine strength, contradicting its established ethanol-tolerant
 niche) was verified empirically (the 22-Brix E≈106.6 g/L probe) before committing to the threshold
-functional form over the more obvious wholesale-reuse of the MLF Luong wall.
+functional form over the more obvious wholesale-reuse of the MLF Luong wall. A THIRD post-build
+advisor() pass (above) caught the C1-claim overclaim and the death-rate magnitude tension — both
+fixed by honest documentation, not by silently absorbing or re-tuning.
 
 ## Deferred (decide early in the relevant milestone)
 

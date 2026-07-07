@@ -168,8 +168,16 @@ def brett_ethanol_survival_factor(e: float, params: Mapping[str, float]) -> floa
     across the entire normal wine ethanol range (~90–105 g/L) where it in fact thrives — exactly
     the mistake the Brett environmental gate already avoids by carrying no ethanol term at all
     (D-40). This factor is 1 (no effect) for ``E ≤ onset`` — so it is a genuine zero contribution,
-    not just a small one, across ordinary wine strength — and eases smoothly (C1, no BDF kink, the
-    D-40 pt2 shadow idiom) to 0 by the ceiling.
+    not just a small one, across ordinary wine strength — and eases to 0 by the ceiling with a
+    **C1-smooth touchdown there** (``n = 2``, the D-40 pt2 shadow idiom: derivative → 0 from both
+    sides at the ceiling, verified numerically). **Honest caveat, advisor-caught:** unlike the
+    ceiling, the ONSET is not C1 — the left derivative is 0 (flat) but the right derivative is
+    ``−n/span`` (a finite jump, e.g. −0.25 at the default n=2/span=8), a genuine first-derivative
+    kink where the flat pre-onset region meets the power-law ramp. This is a much milder pathology
+    than the C0 on/off step that caused the D-40 pt2 BDF blow-up (a bounded Jacobian entry, not an
+    unbounded one), and the full test suite integrates through it (the ``brix=26`` headline test
+    crosses ``E = onset``) without incident — but it is NOT the "no kink anywhere" claim a plain
+    reading of "C1-smooth" would suggest, so it is called out explicitly rather than overclaimed.
 
     ``BrettGrowth`` multiplies this into its rate as an upper wall (reconciling ethanol's dual
     role — carbon SOURCE at low concentration via the existing ``E/(K_E_brett+E)`` Monod, toxin at
@@ -740,6 +748,17 @@ class BrettEthanolToxicity(Process):
     boundary data (growth at ~8%, death onset ~14%, ceiling ~14.5–15%), not the
     starvation-confounded 12% result. A starvation-driven decline mechanism, if ever wanted, is a
     separate, not-yet-scoped addition.
+
+    **Magnitude caveat (advisor-flagged, not re-tuned).** Reusing ``k_death_brett`` (0.03/h) gives
+    a full-kill half-life of ~23 h at the ceiling — MUCH faster than the multi-week timescale
+    Barata's own 12%-condition decline ran over (though that timescale is itself the
+    starvation-confounded result above, not a clean ethanol-only measurement) and arguably in
+    tension with real 14–15% ABV reds being famously Brett-prone rather than self-clearing in a
+    day. The reuse is a documented simplification (no independent ethanol-kill rate is sourced),
+    kept because Barata's Table 2 does not report a decline *rate* at any single ethanol level to
+    source a different one from — only the growth/death/ceiling boundaries. If a future source
+    gives a rate, this is the value to replace; not re-tuned here to avoid inventing an unsourced
+    number.
 
     **Conservation — carbon/nitrogen-neutral transfer (the** :class:`BrettDeath` **pattern).** Same
     ``(X_brett, X_brett_dead)`` transfer at the same biomass fractions, so no new conservation code.
