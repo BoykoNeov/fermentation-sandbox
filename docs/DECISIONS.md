@@ -3672,7 +3672,7 @@ three downstream consumers (`free_acetaldehyde`, the MLF gate, and the speciatio
 
 ## D-52 — MLF v2 refinement: a bounded ethanol/starvation stress multiplier on `MalolacticSenescence`
 
-**Status: IMPLEMENTED 2026-07-07** (653 passed incl. the 5 §2.2 benchmarks, ruff + mypy clean). With
+**Status: IMPLEMENTED 2026-07-07** (654 passed incl. the 5 §2.2 benchmarks, ruff + mypy clean). With
 M2 physics beats all complete through D-51, the owner asked for "whichever [MLF v2 deferred item] is
 closer to reality," delegating a fidelity judgment among three open candidates: a `BrettSenescence`
 twin (D-40 arc), a separate `molecular_so2_death_scale`, or lifting D-41's "environment-free"
@@ -3717,12 +3717,34 @@ the model rather than acting as a flat add-on.
 `k_senescence_starvation_scale` = 0.5 (both speculative, author estimates; direction — ethanol/
 nutrient stress accelerates O. oeni decline — is sourced from the same Ribereau-Gayon/Bartowsky &
 Henschke references `k_senescence_mlf` already cites). Combined ceiling 2.5× the baseline ⇒ a
-worst-case half-life of ~23 d (~3.3 weeks) even at simultaneously saturating ethanol and full amino-
-acid exhaustion — verified directly at the RHS level (`test_senescence_no_wipeout_at_worst_case_
-combined_stress`, E=1e4 g/L, amino_acids=0), never approaching the ~1-week D-39 wipeout regime. At
-typical post-AF dry-wine conditions (E≈100–130 g/L, amino_acids≈0) the measured stress factor is
-≈2.0×, giving a ~29 d effective half-life — comfortably "weeks," faster than D-41's flat ~58 d but
-nowhere near catastrophic.
+worst-case half-life of ~23 d (~3.3 weeks) **at T_ref** even at simultaneously saturating ethanol and
+full amino-acid exhaustion — verified directly at the RHS level (`test_senescence_no_wipeout_at_
+worst_case_stress_at_benchmark_temperature`, E=1e4 g/L, amino_acids=0), never approaching the
+~1-week D-39 wipeout regime. **Temperature is a separate stress axis** (advisor-caught: the first
+version of this bound implicitly fixed T=20 °C and its name overclaimed "worst case" — a warm cellar
+legitimately shortens the half-life further via the shared Arrhenius factor, e.g. to ~10 d at 30 °C;
+that is correct physics, not a wipeout regression). Split into two tests: the T_ref half-life bound
+above, plus `test_senescence_warm_worst_case_stress_stays_far_below_the_so2_kill`, which proves the
+invariant that actually holds at *any* temperature — chronic senescence stays far below the acute
+SO₂ kill because both share `arrhenius(T, E_a_death_mlf, T_ref)`, so their ratio is
+temperature-invariant by construction (verified numerically at 30 °C). At typical post-AF dry-wine
+conditions (E≈100–130 g/L, amino_acids≈0, T_ref) the measured stress factor is ≈2.0×, giving a ~29 d
+effective half-life — comfortably "weeks," faster than D-41's flat ~58 d but nowhere near
+catastrophic.
+
+**Owner-flagged open question (advisor-raised, not resolved here — a fidelity call, not a
+provenance footnote).** D-41 calibrated `k_senescence_mlf=5e-4` so a *typical* unsulfited wine loses
+~half its O. oeni over ~2 months. But in an ordinary pitched run the starvation term saturates almost
+immediately (amino acids ≈0 by ~day 1.3, the D-23 finding) and the ethanol term adds ~+0.5 post-AF,
+so `stress≈2×` is close to the *typical* case, not the exception — meaning the *typical*-wine
+half-life this decision actually produces is now ~29 d, not D-41's ~2 months. `k_senescence_mlf` was
+left unchanged (5e-4), so it has silently shifted from "the typical-wine rate" to "a benign floor
+that rarely applies in practice." Whether the literature's *typical* dry-unsulfited decline is closer
+to ~2 months (in which case `k_senescence_mlf` should drop to ~2.5e-4 so the *typical*-stress case
+re-anchors on D-41's original target) or closer to weeks-to-a-month (in which case the shipped value
+is right or even conservative) is an empirical/owner judgment this decision does not make — flagged
+for the owner, not decided here, following the same "re-derive, don't inherit" discipline D-48/D-50/
+D-51 already established for calibration questions like this one.
 
 **Isolability + performance preserved.** Still reads **no SO₂ and no pH** — `E`/`amino_acids` are read
 directly off state, no equilibrium solve — so the Process remains strictly cheaper than the SO₂ kill,
@@ -3742,18 +3764,21 @@ D-51 used for its own MLF SO₂-gate side effect (verify first, then band to wha
 never loosen blindly).
 
 **Verification.** `tests/test_malolactic.py`: the single D-41-era `test_senescence_is_environment_
-free`, which pinned the now-superseded "environment-free" invariant, was split into four tests rather
+free`, which pinned the now-superseded "environment-free" invariant, was split into five tests rather
 than deleted — `test_senescence_is_so2_independent` (SO₂ independence retained, unchanged),
 `test_senescence_ethanol_stress_is_bounded` (monotone rise with ethanol, ratio against the
 zero-stress floor strictly below the design ceiling), `test_senescence_starvation_stress_tracks_
-amino_acid_depletion` (starved > replete), and `test_senescence_no_wipeout_at_worst_case_combined_
-stress` (the empirical wipeout guard, half-life > 2 weeks at the worst case) — a net +3 tests in that
-file. Two more existing tests were updated in place, not weakened: `test_senescence_needs_no_ph_
+amino_acid_depletion` (starved > replete), `test_senescence_no_wipeout_at_worst_case_stress_at_
+benchmark_temperature` (the empirical wipeout guard at T_ref, half-life > 2 weeks), and — added after
+an advisor pass caught that the wipeout guard's name overclaimed "worst case" while implicitly fixing
+T=20 °C — `test_senescence_warm_worst_case_stress_stays_far_below_the_so2_kill` (proves the
+temperature-invariant ratio against the acute SO₂ kill instead, verified at 30 °C) — a net +4 tests in
+that file. Two more existing tests were updated in place, not weakened: `test_senescence_needs_no_ph_
 solve`'s reads-tuple pin was extended for the four new params, and the integration-level `test_so2_
 crashes_bacteria_over_the_slow_senescence_baseline` had its no-SO₂ decline bands re-measured and
 tightened around the new values (day-21 ratio ~0.608 vs D-41's ~0.71; day-6 pre-dose ratio ~0.875 vs
 ~0.95) rather than loosened past a threshold. `tests/test_mlf_diacetyl.py`'s headline clearing test
-band was widened per the side effect above (measured, not blind). **653 passed** (650 + 3 net new
+band was widened per the side effect above (measured, not blind). **654 passed** (650 + 4 net new
 tests, incl. the 5 §2.2 benchmarks), ruff + mypy clean.
 
 ## Deferred (decide early in the relevant milestone)

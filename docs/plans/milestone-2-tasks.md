@@ -639,15 +639,24 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         `stress = 1 + k_senescence_ethanol_scale·[E/(E+ethanol_tolerance_mlf)] +
         k_senescence_starvation_scale·[K_aa_mlf/(K_aa_mlf+amino_acids)]`, both terms smooth Monod-type
         factors in **[0,1)** (not the Luong wall's near-binary shape that caused the D-39 wipeout),
-        capped at 1+1.0+0.5=2.5× — worst-case half-life ~23 d, verified empirically at the RHS level,
-        nowhere near the ~1-week wipeout regime. Reuses `ethanol_tolerance_mlf`/`K_aa_mlf` (no new
-        concentration scales); only two new dimensionless ceiling params. Reads no SO₂/pH — still
-        cheaper than the SO₂ kill. Genuine side effect measured and banded honestly (the D-51
-        discipline): `test_headline_citrate_lifts_and_then_clears_diacetyl`'s final/peak ratio rose to
-        ~0.861 (less viable bacterial reductase late in a 30-d run) — band widened to 0.90 with the
-        measured value recorded, not loosened blindly. 3 net new/split tests in `test_malolactic.py`
-        + 2 tests re-measured (not weakened) + the diacetyl band update. **653 green** + 5 benchmark,
-        ruff+mypy clean. **Deferred:** a `BrettSenescence` twin for the D-40 arc remains open, but is
+        capped at 1+1.0+0.5=2.5× **at T_ref** — worst-case half-life ~23 d, verified empirically at the
+        RHS level, nowhere near the ~1-week wipeout regime. **A second advisor pass** (post-commit)
+        caught that the wipeout test implicitly fixed T=20 °C while claiming "worst case" — split into
+        a T_ref-scoped test plus a warm-temperature test proving the invariant that actually holds at
+        any temperature (chronic senescence stays far below the acute SO₂ kill, temperature-invariant
+        ratio by construction). Reuses `ethanol_tolerance_mlf`/`K_aa_mlf` (no new concentration
+        scales); only two new dimensionless ceiling params. Reads no SO₂/pH — still cheaper than the
+        SO₂ kill. Genuine side effect measured and banded honestly (the D-51 discipline):
+        `test_headline_citrate_lifts_and_then_clears_diacetyl`'s final/peak ratio rose to ~0.861 (less
+        viable bacterial reductase late in a 30-d run) — band widened to 0.90 with the measured value
+        recorded, not loosened blindly. **OWNER-FLAGGED OPEN QUESTION (advisor-raised, unresolved):**
+        `k_senescence_mlf` (5e-4, unchanged) was D-41-calibrated so a *typical* wine loses ~half its
+        O. oeni over ~2 months — but stress≈2× is now close to the *typical* case (not the exception),
+        so the typical-wine half-life this produces is actually ~29 d. Whether to re-anchor `k` to
+        ~2.5e-4 so typical-stress lands back on D-41's original target is a fidelity call routed to the
+        owner, not decided here. 4 net new/split tests in `test_malolactic.py` + 2 tests re-measured
+        (not weakened) + the diacetyl band update. **654 green** + 5 benchmark, ruff+mypy clean.
+        **Deferred:** a `BrettSenescence` twin for the D-40 arc remains open, but is
         now framed as a *declined-by-default* option (Brett's persistence is the honest model) rather
         than a straightforward extension — revisit only if a source is found that Brett *does* decay
         benignly in practice. Full record in **DECISIONS → D-52**.

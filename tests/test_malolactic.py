@@ -582,11 +582,14 @@ def test_senescence_starvation_stress_tracks_amino_acid_depletion(params):
     assert r_starved > r_replete > 0.0
 
 
-def test_senescence_no_wipeout_at_worst_case_combined_stress(params):
+def test_senescence_no_wipeout_at_worst_case_stress_at_benchmark_temperature(params):
     # The D-52 wipeout guard, verified empirically (not just threshold-checked, per the D-51/D-48
-    # project discipline): even at the WORST case simultaneously — saturating ethanol AND amino
-    # acids fully exhausted — the resulting half-life must stay in the weeks range, nowhere near the
-    # ~1-week D-39 wipeout regime that deferred ethanol coupling to v2 in the first place.
+    # project discipline): at the wine benchmark T_ref (20 °C, Arrhenius factor 1) — the scope this
+    # bound covers — even the WORST case simultaneously (saturating ethanol AND amino acids fully
+    # exhausted) keeps the half-life in the weeks range, nowhere near the ~1-week D-39 wipeout
+    # regime that deferred ethanol coupling to v2 in the first place. Temperature is a SEPARATE
+    # stress axis (a warm cellar legitimately shortens this further via Arrhenius — see
+    # ``test_senescence_warm_worst_case_stress_stays_far_below_the_so2_kill`` for that axis).
     schema = wine_schema()
     y = _wine_state(
         schema, params, target_ph=3.4, X_mlf=0.2, T=293.15, E=1.0e4, malic=2.0, amino_acids=0.0
@@ -595,7 +598,31 @@ def test_senescence_no_wipeout_at_worst_case_combined_stress(params):
     r_worst = -float(d[schema.slice("X_mlf")][0])
     specific_rate = r_worst / 0.2  # [1/h], independent of the X_mlf dose used above
     half_life_h = math.log(2.0) / specific_rate
-    assert half_life_h > 14.0 * 24.0  # > 2 weeks — comfortably clear of the ~1-week wipeout regime
+    assert half_life_h > 14.0 * 24.0  # > 2 weeks at T_ref — clear of the ~1-week wipeout regime
+
+
+def test_senescence_warm_worst_case_stress_stays_far_below_the_so2_kill(params):
+    # Temperature is a separate stress axis from ethanol/starvation (Arrhenius, the D-39/D-41
+    # precedent): a warm cellar legitimately shortens the worst-case combined-stress half-life
+    # further than the T_ref bound above — that is correct physics (warm accelerates senescence),
+    # NOT a re-emergence of the D-39 ethanol-at-normal-temperature wipeout bug. The invariant that
+    # actually holds at ANY temperature is the one D-41 established (test_senescence_is_slow_
+    # relative_to_the_so2_kill): the chronic senescence baseline, even fully stressed, stays far
+    # below the acute SO₂-driven kill — both share the same arrhenius(T, E_a_death_mlf, T_ref)
+    # factor, so the ratio is temperature-invariant by construction, verified here at a warm 30 °C.
+    schema = wine_schema()
+    warm = 303.15  # 30 °C
+    y_sen = _wine_state(
+        schema, params, target_ph=3.4, X_mlf=0.2, T=warm, E=1.0e4, malic=2.0, amino_acids=0.0
+    )
+    r_worst_warm = -float(
+        MalolacticSenescence().derivatives(0.0, y_sen, schema, params)[schema.slice("X_mlf")][0]
+    )
+    y_kill = _death_state(schema, params, so2_mgl=80.0, x_mlf=0.2, temp_k=warm)
+    r_kill_warm = -float(
+        MalolacticDeath().derivatives(0.0, y_kill, schema, params)[schema.slice("X_mlf")][0]
+    )
+    assert 0.0 < r_worst_warm < 0.1 * r_kill_warm  # chronic stays far below the kill, even warm
 
 
 def test_senescence_warm_accelerates_cold_preserves_via_arrhenius(params):
