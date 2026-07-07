@@ -484,6 +484,33 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         shared `keto_acids.yaml` + `pyruvate` slot (wine 34→35). **629 green** + 5 benchmark,
         ruff+mypy clean. **Next:** D-50 (α-KG), D-51 (coupled multi-carbonyl SO₂ equilibrium — where
         the slope correction lands). Full record in **DECISIONS → D-49**.
+  - [x] **Alpha-ketoglutarate — the third excreted keto-acid SO₂-binder, same structure (decision
+        D-50). LANDED 2026-07-07.** `AlphaKetoglutarateExcretion`/`AlphaKetoglutarateReassimilation`
+        mirror the D-49 pyruvate pair exactly (flux-linked excretion draws C5 from `S`; flux-linked
+        co-metabolic reassimilation freezes a persistent residual at dryness). **The one fork:** the
+        reassimilation carbon destination. Advisor-caught insight — pyruvate's `C3→C2(ethanol)+
+        C1(CO2)` mole-for-mole split is nearly-isolable *because* it happens to equal the Gay-Lussac
+        2:1 fermentation carbon ratio, not because "return to E" is inherently safe; routing α-KG to
+        succinate/`Byp` (the "more faithful" α-KG-dehydrogenase reaction) instead would divert
+        reassimilation *throughput* (~10–20× the residual) permanently away from ethanol, threatening
+        the §2.2 ABV/CO₂ benchmarks — and isn't actually more faithful anyway, since α-KG
+        dehydrogenase is repressed under the same anaerobic conditions that make α-KG overflow, and
+        the real dominant fate is N-coupled glutamate synthesis (unmodelled). **Decision: mirror
+        pyruvate's E+CO2 destination, but fix the ratio** — C5 doesn't divide 1:1 like pyruvate's C3,
+        so reassimilation returns carbon at the same 2:1 Gay-Lussac ratio (5/3 mol ethanol + 5/3 mol
+        CO2 per mole) rather than mole-for-mole. Residual sized lower than pyruvate's 30 mg/L
+        (nominal ~20, **measured 20.0 mg/L exactly** on the acceptance run, pyruvate unchanged at
+        30.0). New `total_carbon` weighting term (`alpha_ketoglutarate`, own C5 fraction). Wine-only;
+        both speculative; carbon closes to machine precision; combined ABV/CO₂ isolability delta
+        **measured** rel ~7.3e-5 (≪0.1 %, roughly double pyruvate-alone's ~4e-5, as expected from two
+        detours). **CALIBRATION-PENDING flag for D-51:** both residuals are order-of-magnitude
+        estimates the multi-carbonyl equilibrium must re-derive against the field slope, not inherit
+        as settled — and D-51 must work in **moles** (SO₂ binds molar concentration): α-KG's higher
+        molar mass means 20 mg/L is only ~40% of pyruvate's molar contribution despite being 67% of
+        it by mass. 17 new `test_keto_acids.py` tests (36 total) + `test_media.py`
+        schema-size/`EXPECTED_PROCESSES` updates. **646 green** + 5 benchmark, ruff+mypy clean.
+        **Next:** D-51 (coupled multi-carbonyl SO₂ equilibrium reading acetaldehyde + pyruvate + α-KG
+        together). Full record in **DECISIONS → D-50**.
   - [x] **H₂S — carbon-free produced pool with an inverse-nitrogen gate (decision D-29).
         LANDED 2026-07-01.** N/S-deficiency signal ("rotten egg"): yeast reduces sulfate faster
         than it can fix the sulfide onto nitrogen skeletons, so production is *de-repressed at

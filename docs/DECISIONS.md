@@ -3510,6 +3510,71 @@ existing `full_params`/schema tests updated for the new shared YAML + state slot
 **629 passed (incl. the 5 §2.2 benchmarks)**; ruff + mypy clean. **Next:** D-50 (α-KG, same structure), then
 D-51 (the coupled multi-carbonyl SO₂ equilibrium that reads both pools — where the overshoot actually drops).
 
+## D-50 — Excreted keto-acid overflow pool (alpha-ketoglutarate): the third SO₂-binding carbonyl, same structure as D-49 with one fix
+
+**The task.** D-49 built pyruvate, the first excreted-overflow SO₂-binding keto-acid, and named α-KG
+as "same structure" next. This beat builds it: `AlphaKetoglutarateExcretion` /
+`AlphaKetoglutarateReassimilation` in `keto_acids.py`, a new wine-only `alpha_ketoglutarate` state slot
+(schema 35→36), wired into `_KETO_ACID_PROCESSES` alongside pyruvate.
+
+**The one design fork: the reassimilation carbon destination.** Two options were considered before
+writing code (advisor-consulted): (a) mirror pyruvate exactly — return carbon to `E`/`CO2`; (b) the
+"more faithful" route via the *real* α-ketoglutarate-dehydrogenase reaction, α-KG (C5) → succinate (C4)
++ CO2 (C1), landing in the existing `Byp` (succinic-acid-booked) pool. **Rejected (b).** The advisor's
+key diagnosis: pyruvate's `C3 → C2(ethanol) + C1(CO2)` reassimilation is *nearly isolable* not because
+"return to E" is inherently safe, but because that mole-for-mole split **happens to be exactly the
+Gay-Lussac fermentation carbon ratio** (2 carbon to ethanol : 1 carbon to CO2) — so the detour is
+stoichiometrically indistinguishable from the main pathway, and pool-on/off differs only by the frozen
+residual (rel ~4e-5 endpoint delta, D-49). Routing to succinate/`Byp` instead would divert
+reassimilation **throughput** — not just the residual, but ~10–20× more (the pool cycles many times
+per ferment) — permanently away from ethanol, large enough to threaten both the §2.2 ABV/CO₂
+benchmarks and any `Byp` assertion. Worse, the "fidelity" justification doesn't hold either way: α-KG
+dehydrogenase is largely *repressed* under the anaerobic conditions that make α-KG overflow in the
+first place, and the real dominant reassimilation fate is glutamate synthesis (α-KG + NH4+ →
+glutamate, N-coupled, not modelled in v1) — so neither the ethanol/CO2 route nor the succinate route is
+"more biochemically true"; both are lumped carbon-closing stand-ins (the fusel/ester idiom, D-19), and
+fidelity is not the tiebreaker. Decision: **route to E+CO2, mirroring pyruvate**, but fix the ratio —
+C5 does not divide 1:1 like pyruvate's C3, so mole-for-mole would give a CO2-heavy 1+4 split. Instead
+the Process returns carbon at the **same 2:1 Gay-Lussac ratio**: `5/3` mol ethanol + `5/3` mol CO2 per
+mole of α-KG (`C5 → C(10/3)` ethanol-carbon + `C(5/3)` CO2-carbon) — carbon-exact, and the general form
+(`carbon_atoms/3` mol each) reduces to pyruvate's mole-for-mole case when `carbon_atoms == 3`.
+
+**Everything else mirrors D-49 exactly.** Flux-linked excretion (temperature-flat, draws C5 from `S`)
++ flux-linked co-metabolic reassimilation (stops at dryness, freezing the residual — crash- and
+duration-independent, verified at 21 vs 40 days). Both speculative; wine-only (v1, no §2.2 beer
+benchmark asserts a keto-acid level). **Residual sized lower than pyruvate's ~30 mg/L**: nominal ratio
+`k_alpha_kg_excretion / k_alpha_kg_reassimilation` = 2.0e-3 / 1.0e-1 = 0.02 g/L = 20 mg/L (α-KG is
+typically somewhat less abundant in finished wine than pyruvate per the same D-49 sources, Jackowetz &
+Mira de Orduña 2013). New `total_carbon` weighting term for `alpha_ketoglutarate` (own C5 fraction,
+mirroring the pyruvate term) — caught before it could silently fail the carbon-conservation test.
+
+**Isolability.** Same own `_KETO_ACID_PROCESSES` tuple as pyruvate; a ProcessSet without it is the
+prior core. Not byte-for-byte (routes a trace of sugar carbon on a detour), but the ABV/CO2 endpoint
+delta with both keto-acid pools on is **measured** (not just threshold-checked) at rel **~7.3e-5** —
+roughly double pyruvate-alone's ~4e-5 (D-49), as expected from two detours, still ≪0.1 %. Carbon
+closes to machine precision. The residual also lands exactly on the ratio's design target: α-KG
+freezes at **20.0 mg/L** (pyruvate unchanged at 30.0 mg/L) on the standard 21-day acceptance run.
+
+**CALIBRATION-PENDING flag for D-51 (advisor-raised).** Both keto-acid residuals (pyruvate 30 mg/L,
+α-KG 20 mg/L) are honest order-of-magnitude author estimates, not fits — D-51 must not inherit them
+as settled. Two things D-51 needs to re-derive, not assume: (1) the residual *ratio* between the two
+pools may need to shift once the multi-carbonyl SO₂ equilibrium is actually fit to the field 0.39
+mg/mg slope (D-48); (2) SO₂ binds molar concentration, not mass — α-KG's higher molar mass
+(146.1 vs pyruvate's 88.06 g/mol) means 20 mg/L α-KG is only ≈0.137 mmol/L vs pyruvate's ≈0.341
+mmol/L, i.e. α-KG's molar contribution to the binding competition is ~40% of pyruvate's despite
+being ~67% of it by mass — D-51's equilibrium must work in moles, not the mg/L this beat reports.
+
+**Verification.** Extended `test_keto_acids.py` with 17 new tests mirroring D-49's suite for α-KG
+(metadata, closed forms incl. an explicit non-mole-for-mole regression guard, dryness freeze,
+carbon-neutral draw/release, wine-only wiring, tier propagation), now 36 tests total; plus updated
+acceptance tests to cover both pools together (persistent residual in range, duration-independence,
+carbon closure, ABV/CO2 isolability). `test_media.py` schema-size/slot-tuple/`EXPECTED_PROCESSES`
+updated (wine schema 35→36). A new `total_carbon` weighting term for `alpha_ketoglutarate` was needed
+in `validation/conservation.py` (caught immediately by the carbon-conservation test, not silently).
+**646 passed (incl. the 5 §2.2 benchmarks)**, ruff + mypy clean. **Next: D-51**, the coupled
+multi-carbonyl SO₂ equilibrium that reads acetaldehyde + pyruvate + α-KG together — the beat both
+keto-acid pools exist to feed.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

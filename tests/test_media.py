@@ -33,9 +33,9 @@ WINE_BRETT_SLOTS = (
 )  # fmt: skip
 # The carbon-bearing volatile-thiol pool AutolyticMercaptan fills (decision D-45), appended last.
 WINE_MERCAPTAN_SLOTS = ("mercaptans",)
-# The excreted overflow-pyruvate keto-acid pool (decision D-49), appended last: the
-# second-strongest SO₂-binding carbonyl after acetaldehyde.
-WINE_KETO_ACID_SLOTS = ("pyruvate",)
+# The excreted keto-acid overflow pools (decisions D-49, D-50), appended last: pyruvate then
+# alpha-ketoglutarate, the second- and third-strongest SO₂-binding carbonyls after acetaldehyde.
+WINE_KETO_ACID_SLOTS = ("pyruvate", "alpha_ketoglutarate")
 
 
 def test_wine_schema_has_single_sugar_slot():
@@ -58,8 +58,9 @@ def test_wine_schema_has_single_sugar_slot():
     # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
     # (D-34) + 5 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols, X_brett,
-    # X_brett_dead — decision D-40) + 1 mercaptans slot (D-45) + 1 pyruvate slot (D-49)
-    assert schema.size == 35
+    # X_brett_dead — decision D-40) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate
+    # D-49, alpha_ketoglutarate D-50)
+    assert schema.size == 36
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -259,7 +260,10 @@ AUTOLYSIS_PROCESSES = {"yeast_autolysis", "autolytic_hydrogen_sulfide", "autolyt
 # the SO₂-binding competition it exists for is a wine readout (no §2.2 beer benchmark asserts a
 # keto-acid level). Excretion draws pyruvate from sugar; the flux-linked reassimilation returns
 # it to ethanol+CO₂ and freezes the finished-wine residual at dryness.
-KETO_ACID_PROCESSES = {"pyruvate_excretion", "pyruvate_reassimilation"}
+KETO_ACID_PROCESSES = {
+    "pyruvate_excretion", "pyruvate_reassimilation",
+    "alpha_kg_excretion", "alpha_kg_reassimilation",
+}  # fmt: skip
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES

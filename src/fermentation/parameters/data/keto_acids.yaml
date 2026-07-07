@@ -1,10 +1,10 @@
-# Excreted keto-acid overflow kinetics (decision D-49) — the non-acetaldehyde SO2-binders.
+# Excreted keto-acid overflow kinetics (decisions D-49, D-50) — the non-acetaldehyde SO2-binders.
 #
 # SHARED, medium-agnostic parameter file: loaded alongside the <medium>_<strain>.yaml by the
 # compile seam (the store merges paths; these names are collision-free with the per-medium
-# kinetic parameters). Overflow-pyruvate excretion is generic yeast metabolism — a property of
+# kinetic parameters). Overflow keto-acid excretion is generic yeast metabolism — a property of
 # the pathway, not the beverage — so, like acetaldehyde.yaml and vicinal_diketones.yaml, its
-# constants live in one shared file (alpha-ketoglutarate, D-50, will join this file).
+# constants live in one shared file: pyruvate (D-49) and alpha-ketoglutarate (D-50).
 #
 # THE MODEL (an EXCRETED SIDE POOL, not acetaldehyde's on-pathway precursor — decision D-49):
 #
@@ -67,10 +67,58 @@
 # the diacetyl rest (D-26) and the acetaldehyde buffer (D-27).
 #
 # SCOPE (v1). Wine-only (the SO2-binding competition is a wine readout; no S2.2 beer benchmark
-# asserts a keto-acid level). The pyruvate metabolite only — alpha-ketoglutarate follows (D-50).
-# The SO2 pyruvate binds is a SEPARATE readout beat (the D-51 multi-carbonyl equilibrium generalises
-# the D-28 free/bound split over acetaldehyde + pyruvate + alpha-KG); this beat only builds the pool
-# that binding will read, kept out per the one-Process-per-commit rhythm (the D-27 -> D-22 precedent).
+# asserts a keto-acid level). The SO2 these keto-acids bind is a SEPARATE readout beat (the D-51
+# multi-carbonyl equilibrium generalises the D-28 free/bound split over acetaldehyde + pyruvate +
+# alpha-KG); this beat (and D-50 below) only build the pools that binding will read, kept out per
+# the one-Process-per-commit rhythm (the D-27 -> D-22 precedent).
+#
+# -- ALPHA-KETOGLUTARATE (decision D-50) -------------------------------------------------------
+#
+# SAME excreted-side-pool structure as pyruvate above:
+#
+#   S --excretion--> alpha_ketoglutarate --reassimilation--> ethanol (E) + CO2
+#    (draw C5)  (k_alpha_kg_excretion)  (k_alpha_kg_reassimilation)  (release C5 -> ethanol+CO2)
+#
+# ONE load-bearing difference: pyruvate's reassimilation is C3 -> C2(ethanol) + C1(CO2)
+# mole-for-mole, which happens to BE the Gay-Lussac fermentation carbon ratio (2 carbon to
+# ethanol : 1 carbon to CO2) exactly, because pyruvate's 3 carbons = one Gay-Lussac unit. Alpha-KG's
+# C5 does NOT divide evenly 1:1, so its reassimilation returns carbon at the SAME 2:1 ratio instead
+# of mole-for-mole (5/3 mol ethanol + 5/3 mol CO2 per mole alpha-KG) -- see the
+# AlphaKetoglutarateReassimilation docstring for why copying pyruvate's mole-for-mole form would
+# have been wrong (it would divert reassimilation THROUGHPUT, not just the residual, away from
+# ethanol at a volume large enough to threaten the S2.2 ABV/CO2 benchmarks).
+#
+# RESIDUAL TARGET. Alpha-ketoglutarate is typically somewhat LESS abundant in finished wine than
+# pyruvate (Jackowetz & Mira de Orduna 2013), so the nominal ratio here targets ~20 mg/L (vs
+# pyruvate's ~30): k_alpha_kg_excretion / k_alpha_kg_reassimilation = 2.0e-3 / 1.0e-1 = 0.02 g/L.
+# Both magnitudes are order-of-magnitude author estimates; the RATIO sets the residual, exactly as
+# for pyruvate.
+#
+# TIERS / SCOPE. Both speculative; wine-only (v1); the excreted-overflow mechanism is textbook
+# (yeast de-represses alpha-KG-dehydrogenase-bypassing overflow under fermentative/anaerobic
+# conditions), only the rate magnitudes are estimates.
+
+# -- EXCRETION: sugar -> alpha_ketoglutarate (flux-linked draw, temperature-flat) --------
+k_alpha_kg_excretion:
+  value: 2.0e-3
+  unit: "1/h"   # d(alpha_ketoglutarate)/dt = k_alpha_kg_excretion * X * S/(K_sugar_uptake + S); carbon drawn from S
+  tier: speculative
+  uncertainty: { low: 7.0e-4, high: 7.0e-3, note: "with k_alpha_kg_reassimilation 1e-1 the quasi-steady frozen residual ~ k_alpha_kg_excretion/k_alpha_kg_reassimilation ~ 7-70 mg/L; nominal 2e-3/1e-1 = 20 mg/L, somewhat below the pyruvate residual (Jackowetz & Mira de Orduna 2013). It is the RATIO to k_alpha_kg_reassimilation, not either magnitude alone, that sets the residual" }
+  provenance:
+    source: "author estimate bounded by typical finished-wine keto-acid levels (Jackowetz & Mira de Orduna 2013, Am. J. Enol. Vitic.; Ribereau-Gayon et al., Handbook of Enology), set somewhat below the pyruvate residual per the same sources. Yeast excretes overflow alpha-ketoglutarate during active fermentation (alpha-KG-dehydrogenase is de-repressed under fermentative/anaerobic conditions, the same overflow phenomenon as pyruvate)."
+    conditions: "generic yeast; overflow-alpha-ketoglutarate excretion coupled to the biomass-catalysed sugar (fermentative) flux, shared K_sugar_uptake"
+    notes: "SAME excreted-side-pool structure as pyruvate (decision D-49/D-50), NOT an on-pathway TCA-cycle rework: alpha-KG's real reassimilation fate (glutamate synthesis, N-coupled) is not modelled in v1, so the carbon destination is a lumped stand-in like pyruvate's, not a metabolic claim. Flux-linked so it stops at dryness leaving a full overflow pool; held TEMPERATURE-FLAT as a documented v1 simplification. Magnitude speculative."
+
+# -- REASSIMILATION: alpha_ketoglutarate -> ethanol + CO2 (flux-linked / co-metabolic, Gay-Lussac split) --
+k_alpha_kg_reassimilation:
+  value: 1.0e-1
+  unit: "L/(g*h)"   # d(alpha_ketoglutarate)/dt = -k_alpha_kg_reassimilation * X * S/(K_sugar_uptake+S) * [alpha_ketoglutarate]; returned to E + CO2 at the 2:1 Gay-Lussac carbon split (NOT mole-for-mole)
+  tier: speculative
+  uncertainty: { low: 3.0e-2, high: 3.0e-1, note: "sets the approach speed to (and, with k_alpha_kg_excretion, the level of) the frozen plateau; fast enough that the pool reaches the plateau within a day and holds it to dryness, so the residual robustly ~= k_alpha_kg_excretion/k_alpha_kg_reassimilation. It is the RATIO, not this magnitude alone, that sets the residual" }
+  provenance:
+    source: "author estimate; yeast co-metabolically re-assimilates excreted overflow alpha-ketoglutarate during active fermentation (Boulton et al.; Ribereau-Gayon et al.). Tracks the fermentative flux, so it stops at dryness and freezes the finished-wine residual (Jackowetz & Mira de Orduna 2013)."
+    conditions: "generic yeast; overflow-alpha-ketoglutarate re-assimilation, first-order in alpha_ketoglutarate and FLUX-LINKED (co-metabolic — shares the X*S/(K_sugar_uptake+S) fermentative shape with excretion), so it dies at dryness"
+    notes: "Returns carbon to ETHANOL + CO2 at the Gay-Lussac 2:1 carbon ratio (5/3 mol ethanol + 5/3 mol CO2 per mole alpha-KG) -- NOT mole-for-mole like pyruvate's C3 -> C2+C1 (that form only coincides with mole-for-mole because 3 carbons is exactly one Gay-Lussac unit; C5 does not divide evenly 1:1). Getting this wrong would divert reassimilation THROUGHPUT (not just the residual, ~10-20x larger) away from ethanol into CO2, large enough to threaten the S2.2 ABV/CO2 benchmarks -- see the AlphaKetoglutarateReassimilation docstring. FLUX-LINKING is load-bearing and DELIBERATELY the OPPOSITE of the no-flux ADH acetaldehyde reduction (D-27), exactly mirroring pyruvate's reasoning (D-49): a normal ferment finishes with the yeast still viable, so a no-flux viable-X gate would drain overflow alpha-KG to ~0 over the long tail. Co-metabolic flux-linking pegs the residual to END-OF-FERMENTATION (the dryness freeze), crash- and duration-independent. Magnitude speculative."
 
 # -- EXCRETION: sugar -> pyruvate (flux-linked draw, temperature-flat) -------------------
 k_pyruvate_excretion:

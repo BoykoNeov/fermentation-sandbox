@@ -147,6 +147,13 @@ def total_carbon(
     # so it is absent from total_nitrogen.
     if "pyruvate" in schema:
         w[schema.slice("pyruvate")] = carbon_mass_fraction("pyruvate")
+    # Excreted overflow alpha-ketoglutarate (decision D-50): the SAME excreted-side-pool
+    # structure as pyruvate above, weighted here at its own C5 carbon fraction so the
+    # excrete-then-reassimilate course (S -> alpha_ketoglutarate -> E + CO2, at the Gay-Lussac
+    # 2:1 split — NOT mole-for-mole, see AlphaKetoglutarateReassimilation) closes to machine
+    # precision. Nitrogen-free, so absent from total_nitrogen.
+    if "alpha_ketoglutarate" in schema:
+        w[schema.slice("alpha_ketoglutarate")] = carbon_mass_fraction("alpha_ketoglutarate")
     # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
     # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
     # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that

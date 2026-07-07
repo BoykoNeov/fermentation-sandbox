@@ -42,6 +42,8 @@ from fermentation.core.kinetics.hydrogen_sulfide import (
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
 from fermentation.core.kinetics.keto_acids import (
+    AlphaKetoglutarateExcretion,
+    AlphaKetoglutarateReassimilation,
     PyruvateExcretion,
     PyruvateReassimilation,
 )
@@ -70,6 +72,8 @@ __all__ = [
     "AcetaldehydeReduction",
     "AcetolactateDecarboxylation",
     "AcetolactateExcretion",
+    "AlphaKetoglutarateExcretion",
+    "AlphaKetoglutarateReassimilation",
     "AminoAcidAssimilation",
     "AutolyticHydrogenSulfide",
     "AutolyticMercaptan",

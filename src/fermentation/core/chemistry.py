@@ -60,6 +60,15 @@ M_ACETALDEHYDE = 2 * _M_C + 4 * _M_H + 1 * _M_O
 #: NOT as an on-pathway intermediate: the intracellular flux pyruvate never persists and never
 #: binds SO₂, so conflating the two would be unphysical (the rejected D-27-rework, D-49).
 M_PYRUVATE = 3 * _M_C + 4 * _M_H + 3 * _M_O
+#: α-Ketoglutaric acid (2-oxoglutaric acid), C5H6O5 — the second excreted overflow keto-acid
+#: SO₂-binder (decision D-50), after pyruvate (D-49). Real yeast physiology de-represses α-KG
+#: dehydrogenase under fermentative/anaerobic conditions, so it (like pyruvate) overflows to an
+#: extracellular excreted residual rather than cycling through the TCA cycle; its "real" forward
+#: fate is largely glutamate synthesis (α-KG + NH4+ → glutamate, an N-coupled route this v1 does
+#: not model), so — exactly like pyruvate's C3 → C2(ethanol) + C1(CO2) — the reassimilation carbon
+#: destination is a carbon-closing lumped stand-in, not a metabolic claim (see the ``keto_acids``
+#: module docstring). Modelled with the SAME excreted-side-pool structure as pyruvate.
+M_ALPHA_KETOGLUTARATE = 5 * _M_C + 6 * _M_H + 5 * _M_O
 #: Carbon dioxide, CO2.
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
@@ -228,6 +237,7 @@ MOLAR_MASS: dict[str, float] = {
     "ethanol": M_ETHANOL,
     "acetaldehyde": M_ACETALDEHYDE,
     "pyruvate": M_PYRUVATE,
+    "alpha_ketoglutarate": M_ALPHA_KETOGLUTARATE,
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
@@ -265,6 +275,10 @@ CARBON_ATOMS: dict[str, int] = {
     #: sits on ``total_carbon`` (decision D-49); its re-assimilation is a carbon-closing
     #: C3 → C2 (ethanol) + C1 (CO2) step.
     "pyruvate": 3,
+    #: α-Ketoglutarate (C5H6O5) carries five carbons — the second excreted keto-acid SO₂-binder
+    #: (decision D-50); its reassimilation is carbon-closing at the Gay-Lussac 2:1 split
+    #: (5/3 mol ethanol + 5/3 mol CO2 per mole, C5 → C(10/3) ethanol-carbon + C(5/3) CO2-carbon).
+    "alpha_ketoglutarate": 5,
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,
@@ -306,6 +320,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: Pyruvate is nitrogen-free (a keto-acid), so the excreted-pyruvate pool is absent from
     #: total_nitrogen (decision D-49).
     "pyruvate": 0,
+    #: α-Ketoglutarate is nitrogen-free as tracked here (a keto-acid); its real reassimilation
+    #: fate is N-coupled (glutamate synthesis), but that coupling is not modelled in v1 (D-50).
+    "alpha_ketoglutarate": 0,
     "CO2": 0,
     "glycerol": 0,
     "succinic_acid": 0,

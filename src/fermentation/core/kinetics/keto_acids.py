@@ -1,12 +1,12 @@
-"""Excreted keto-acid overflow pools — the non-acetaldehyde SO₂-binding carbonyls (D-49).
+"""Excreted keto-acid overflow pools — the non-acetaldehyde SO₂-binding carbonyls (D-49, D-50).
 
 Acetaldehyde is the *principal* SO₂-binder in wine, but it is not the only one: yeast
-excretes **overflow keto-acids** — pyruvate first, α-ketoglutarate next — during active
+excretes **overflow keto-acids** — pyruvate (D-49) and α-ketoglutarate (D-50) — during active
 fermentation, and those persist in the finished wine (10s–100s mg/L) as real, measured
-SO₂-binding carbonyls (Jackowetz & Mira de Orduña 2013; Burroughs & Sparks 1973). This
-module builds the first, pyruvate (α-ketoglutarate follows in D-50), as an **excreted side
-pool**, so the free/bound-SO₂ split (D-28) and the acetaldehyde protection (D-47) can share
-SO₂ across *all* the carbonyls that really compete for it (the D-51 multi-carbonyl binding).
+SO₂-binding carbonyls (Jackowetz & Mira de Orduña 2013; Burroughs & Sparks 1973). Both are built
+as **excreted side pools** with the SAME structure, so the free/bound-SO₂ split (D-28) and the
+acetaldehyde protection (D-47) can share SO₂ across *all* the carbonyls that really compete for
+it (the D-51 multi-carbonyl binding, still to come).
 
 **Why a side pool, not an on-pathway intermediate (the load-bearing modelling choice, D-49).**
 The tempting "faithful" model — route acetaldehyde's carbon *through* pyruvate (its real
@@ -72,6 +72,30 @@ speculative regardless. The excreted-overflow *mechanism* (yeast excretes pyruva
 active fermentation, re-assimilating it late) is textbook; only the RATE magnitudes are the
 author's estimates, tuned so the pool peaks in the real ~100s mg/L range and settles to a
 ~10–40 mg/L finished-wine residual.
+
+**α-Ketoglutarate (decision D-50) — same structure, ONE load-bearing difference in the carbon
+split.** :class:`AlphaKetoglutarateExcretion` / :class:`AlphaKetoglutarateReassimilation` mirror
+the pyruvate pair exactly (flux-linked excretion draws C5 out of ``S``; flux-linked co-metabolic
+reassimilation returns it, stopping at dryness to freeze a persistent residual). Pyruvate's
+reassimilation happens to route ``C3 → C2(ethanol) + C1(CO2)`` mole-for-mole — which is *exactly*
+the Gay-Lussac fermentation carbon ratio (2 ethanol-carbon : 1 CO2-carbon), so the detour is
+stoichiometrically indistinguishable from the main pathway and the pool-on/off ABV/CO₂ delta is
+only the frozen residual (rel ~4e-5, D-49). Naively copying that as "1 mole ethanol + 1 mole
+CO2 per mole substrate" for a C5 species would instead route a CO2-heavy 1+4 split, permanently
+diverting reassimilation *throughput* (not just the residual — throughput is ~10–20× the residual,
+since the pool cycles many times over the ferment) away from ethanol into CO2, which would blow
+past the §2.2 ABV/CO₂ tolerance. So α-KG's reassimilation returns carbon **at the same 2:1
+Gay-Lussac ratio**: ``5/3`` mol ethanol + ``5/3`` mol CO2 per mole of α-KG consumed
+(``C5 → C(10/3)`` ethanol-carbon + ``C(5/3)`` CO2-carbon — carbon-exact, and reduces to
+pyruvate's mole-for-mole case when the carbon count is 3). Neither destination (ethanol/CO2
+here, vs. a tempting succinate/Byp route via the *real* α-KG-dehydrogenase reaction) is more
+"biochemically true": α-KG dehydrogenase is largely repressed under the anaerobic conditions
+that make α-KG overflow in the first place, and the actual dominant reassimilation fate is the
+N-coupled glutamate synthesis route (not modelled in v1) — so both are lumped carbon-closing
+stand-ins (the fusel/ester idiom, D-19), and the ethanol/CO2 route is chosen here because it
+preserves isolability, matching pyruvate exactly.
+Residual sized *lower* than pyruvate's ~30 mg/L (nominal ~20 mg/L): α-ketoglutarate is typically
+somewhat less abundant in finished wine than pyruvate (Jackowetz & Mira de Orduña 2013).
 """
 
 from __future__ import annotations
@@ -79,6 +103,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fermentation.core.chemistry import (
+    CARBON_ATOMS,
+    M_ALPHA_KETOGLUTARATE,
     M_CO2,
     M_ETHANOL,
     M_PYRUVATE,
@@ -96,6 +122,13 @@ from fermentation.core.tiers import Tier
 #: carbon mass fraction weights both the sugar draw here and the pool in ``total_carbon`` —
 #: one chemistry source of truth, so the draw and the conservation check cannot disagree.
 _PYRUVATE_SPECIES = "pyruvate"
+
+#: The species whose C5 formula carbon-accounts the ``alpha_ketoglutarate`` pool (decision D-50).
+_ALPHA_KG_SPECIES = "alpha_ketoglutarate"
+#: Carbon atoms per mole of α-KG — sets the Gay-Lussac reassimilation split unit count (see
+#: :class:`AlphaKetoglutarateReassimilation`): one chemistry source of truth, so a formula change
+#: there automatically keeps the split carbon-exact here.
+_ALPHA_KG_CARBON_ATOMS = CARBON_ATOMS[_ALPHA_KG_SPECIES]
 
 
 class PyruvateExcretion(Process):
@@ -197,4 +230,79 @@ class PyruvateReassimilation(Process):
         d[schema.slice("pyruvate")] = -loss
         d[schema.slice("E")] = r * M_ETHANOL
         d[schema.slice("CO2")] = r * M_CO2
+        return d
+
+
+class AlphaKetoglutarateExcretion(Process):
+    """Overflow-α-ketoglutarate excretion — the second excreted keto-acid pool (decision D-50).
+
+    ``d(alpha_ketoglutarate)/dt = k_alpha_kg_excretion · X · S_total/(K_sugar_uptake + S_total)``,
+    carbon drawn *out of ``S``* (booked at α-KG's C5 fraction). Identical structure to
+    :class:`PyruvateExcretion` — flux-linked to the same fermentative flux (shared
+    ``K_sugar_uptake``), temperature-flat (v1), stops at dryness. See the module docstring for
+    why α-KG shares pyruvate's excreted-side-pool structure rather than an on-pathway rework.
+    """
+
+    name = "alpha_kg_excretion"
+    tier = Tier.SPECULATIVE
+    touches = ("alpha_ketoglutarate", "S")
+    reads: tuple[str, ...] = ("k_alpha_kg_excretion", "K_sugar_uptake")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
+        if flux <= 0.0:
+            return d
+        rate = params["k_alpha_kg_excretion"] * flux
+        d[schema.slice("alpha_ketoglutarate")] = rate
+        draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(_ALPHA_KG_SPECIES))
+        return d
+
+
+class AlphaKetoglutarateReassimilation(Process):
+    """Co-metabolic re-assimilation of overflow α-ketoglutarate — freezes the residual (D-50).
+
+    ``d(alpha_ketoglutarate)/dt = −L`` with ``L = k_alpha_kg_reassimilation ·
+    X · S/(K_sugar_uptake+S) · [alpha_ketoglutarate]``, flux-linked exactly like
+    :class:`PyruvateReassimilation` (co-metabolic, stops at dryness, freezes the residual).
+
+    **THE one load-bearing difference from pyruvate: the carbon split.** Pyruvate's C3 →
+    C2(ethanol) + C1(CO2) is mole-for-mole *because* 3 carbons is exactly one Gay-Lussac
+    fermentation unit (2 carbon to ethanol : 1 carbon to CO2) — that coincidence is what keeps
+    the detour stoichiometrically identical to the main pathway (module docstring). α-KG's C5
+    does **not** divide evenly into that ratio 1:1, so this Process returns carbon at the SAME
+    2:1 ratio rather than mole-for-mole: ``units = molar_turnover · (carbon_atoms/3)`` moles each
+    of ethanol and CO2 (``C5 → C(10/3)`` ethanol-carbon + ``C(5/3)`` CO2-carbon), which is
+    carbon-exact and reduces to pyruvate's case when ``carbon_atoms == 3``. Getting this wrong
+    (e.g. "1 mole ethanol + 1 mole CO2 per mole α-KG", a CO2-heavy 1+4 split) would permanently
+    divert reassimilation *throughput* — not just the frozen residual — away from ethanol, at a
+    volume (~10–20× the residual, since the pool cycles many times per ferment) large enough to
+    threaten the §2.2 ABV/CO₂ benchmarks.
+    """
+
+    name = "alpha_kg_reassimilation"
+    tier = Tier.SPECULATIVE
+    touches = ("alpha_ketoglutarate", "E", "CO2")
+    reads: tuple[str, ...] = ("k_alpha_kg_reassimilation", "K_sugar_uptake")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        alpha_kg = max(float(y[schema.slice("alpha_ketoglutarate")][0]), 0.0)
+        if alpha_kg <= 0.0:  # nothing to re-assimilate
+            return d
+        flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
+        if flux <= 0.0:  # dryness / no viable yeast ⇒ re-assimilation stops, pool is frozen
+            return d
+        loss = params["k_alpha_kg_reassimilation"] * flux * alpha_kg  # mass loss of alpha-KG
+        molar_turnover = loss / M_ALPHA_KETOGLUTARATE
+        # Gay-Lussac carbon split (NOT mole-for-mole — see the class docstring): 2 mol
+        # ethanol-carbon-equivalent : 1 mol CO2-carbon-equivalent per 3 carbons fermented.
+        units = molar_turnover * (_ALPHA_KG_CARBON_ATOMS / 3.0)
+        d[schema.slice("alpha_ketoglutarate")] = -loss
+        d[schema.slice("E")] = units * M_ETHANOL
+        d[schema.slice("CO2")] = units * M_CO2
         return d

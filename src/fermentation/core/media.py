@@ -70,6 +70,8 @@ from fermentation.core.kinetics import (
     AcetaldehydeReduction,
     AcetolactateDecarboxylation,
     AcetolactateExcretion,
+    AlphaKetoglutarateExcretion,
+    AlphaKetoglutarateReassimilation,
     AminoAcidAssimilation,
     ArrheniusTemperature,
     AutolyticHydrogenSulfide,
@@ -358,6 +360,17 @@ def wine_schema() -> StateSchema:
             "freezing a persistent finished-wine residual — the second-strongest SO2-binding "
             "carbonyl after acetaldehyde (D-49)",
         ),
+        VarSpec(
+            "alpha_ketoglutarate",
+            "g/L",
+            default=0.0,
+            description="excreted overflow alpha-ketoglutarate (C5 keto-acid; excreted-then-"
+            "reassimilated, same structure as pyruvate). AlphaKetoglutarateExcretion draws it "
+            "from sugar during active ferment; the flux-linked (co-metabolic) "
+            "AlphaKetoglutarateReassimilation returns it to ethanol+CO2 at the Gay-Lussac 2:1 "
+            "carbon split and stops at dryness, freezing a persistent finished-wine residual — "
+            "the third SO2-binding carbonyl, after acetaldehyde and pyruvate (D-50)",
+        ),
     ]
     return StateSchema(specs)
 
@@ -536,12 +549,27 @@ _ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: (a few tens of mg/L of sugar carbon parked as pyruvate rather than fermented on), ≪ 0.1 %
 #: of ABV, so the §2.2 CO2/ABV/realised-yield benchmarks are preserved far below tolerance.
 #: WINE-ONLY (v1): the SO₂-binding competition it exists for is a wine readout and no §2.2
-#: beer benchmark asserts a keto-acid level — beer overflow pyruvate is deferred. Params live
-#: in the shared, medium-agnostic ``keto_acids.yaml`` (overflow-pyruvate metabolism is generic
-#: yeast, not a beverage property; α-ketoglutarate — D-50 — will join the same file).
+#: beer benchmark asserts a keto-acid level — beer overflow pyruvate/α-KG is deferred. Params
+#: live in the shared, medium-agnostic ``keto_acids.yaml`` (overflow-keto-acid metabolism is
+#: generic yeast, not a beverage property).
+#:
+#: :class:`AlphaKetoglutarateExcretion` / :class:`AlphaKetoglutarateReassimilation` (decision
+#: D-50) add the third SO₂-binding carbonyl with the SAME structure: excretion draws the C5
+#: pool from ``S``, flux-linked co-metabolic reassimilation returns it and freezes a lower
+#: (~20 mg/L nominal) persistent residual at dryness. The one load-bearing difference from
+#: pyruvate: the reassimilation carbon split. Pyruvate's C3 → C2(ethanol) + C1(CO2) is
+#: mole-for-mole *because* 3 carbons is exactly one Gay-Lussac fermentation unit (2 carbon to
+#: ethanol : 1 carbon to CO2) — the coincidence that keeps its detour stoichiometrically
+#: identical to the main pathway. α-KG's C5 does not divide evenly 1:1, so its reassimilation
+#: returns carbon at the SAME 2:1 ratio instead (5/3 mol ethanol + 5/3 mol CO2 per mole), not
+#: mole-for-mole — copying pyruvate's form naively would have diverted reassimilation
+#: *throughput* (not just the residual, ~10–20× larger) away from ethanol, large enough to
+#: threaten the §2.2 ABV/CO₂ benchmarks. See the ``keto_acids`` module docstring.
 _KETO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     PyruvateExcretion,
     PyruvateReassimilation,
+    AlphaKetoglutarateExcretion,
+    AlphaKetoglutarateReassimilation,
 )
 
 #: Hydrogen-sulfide production + CO₂-stripping (Milestone 2, decisions D-29 / D-42): the
