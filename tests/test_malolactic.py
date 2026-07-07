@@ -316,28 +316,29 @@ def test_undosed_keeps_malic_lactic_validated_dosed_makes_speculative(pset):
     assert on.tier_of("lactic", tm) is Tier.SPECULATIVE
 
 
-def test_so2_crashes_bacteria_over_the_slow_senescence_baseline():
-    # The v2 (D-41) picture, superseding the v1 "no-SO₂ pitched run is byte-for-byte inert" premise:
-    # on a pitched, amino-acid-free run (growth disabled) the two movers of X_mlf are the benign
-    # senescence baseline (MalolacticSenescence, always on when pitched — since D-52 modulated by a
-    # BOUNDED ethanol/starvation stress factor, up to 2.5× as fermentation ethanol rises and the
-    # amino-acid pool empties, D-52) and the SO₂-driven kill (MalolacticDeath, 0 without SO₂). So
-    # WITHOUT SO₂ the catalyst declines SLOWLY (weeks-scale senescence, faster than the D-41
-    # environment-free baseline but still no longer inert), and an ``add_so2`` dose CRASHES it
-    # toward zero within ~1–3 days (the D-31 lever) — still a rate orders of magnitude above even
-    # the fully-stressed baseline, so the two timescales stay cleanly separated.
-    # (a) no SO₂ ⇒ X_mlf declines slowly & monotonically (senescence), retaining most over the run.
+def test_so2_crashes_bacteria_over_the_near_stable_senescence_baseline():
+    # The v2/D-53 picture, superseding BOTH the v1 "no-SO₂ pitched run is byte-for-byte inert"
+    # premise AND D-52's original "weeks-scale decline" expectation: a real-wine literature check
+    # (D-53) found O. oeni populations STABLE for 3-5 months in real SO₂-free wine, so
+    # MalolacticSenescence's baseline is now deliberately tiny — on a pitched run the two movers
+    # of X_mlf are a near-imperceptible benign senescence baseline (MalolacticSenescence, D-52's
+    # bounded ethanol/starvation stress multiplier is structurally unchanged but now scales a much
+    # smaller rate) and the SO₂-driven kill (MalolacticDeath, 0 without SO₂). So WITHOUT SO₂ the
+    # catalyst is very nearly flat over a 21-day run (matching the real-wine "stable" finding), and
+    # an ``add_so2`` dose still CRASHES it toward zero within ~1–3 days (the D-31 lever) — a rate
+    # many orders of magnitude above even the fully-stressed baseline.
+    # (a) no SO₂ ⇒ X_mlf declines slightly & monotonically (senescence), staying close to its dose.
     _c, t_clean = _run(mlf_pitch_gpl=0.2)
     x_clean = t_clean.series("X_mlf")
     assert x_clean[0] == pytest.approx(0.2)  # the pitched dose
     assert np.all(np.diff(x_clean) <= 1e-12)  # monotone non-increasing — senescence only, no SO₂
-    assert x_clean[-1] < 0.98 * x_clean[0]  # NOT inert: it has measurably declined (v1 superseded)
-    # MEASURED ratio ~0.608 (D-52: stress ramps 1.5x -> ~2.0x as ethanol rises then holds, vs the
-    # D-41 environment-free ~0.71 at the same 21 d) — banded around the measured value, not just
-    # threshold-checked, so a regression in the stress-multiplier magnitude is caught either way.
-    assert 0.55 * x_clean[0] < x_clean[-1] < 0.65 * x_clean[0]
+    assert x_clean[-1] < x_clean[0]  # NOT literally inert — a nonzero (if tiny) decline exists
+    # MEASURED ratio ~0.990 over 21 d (D-53: k_senescence_mlf dropped ~50x so even typical D-52
+    # stress gives a multi-year half-life) — banded around the measured value, not just threshold-
+    # checked, so a regression in either the baseline magnitude or the stress multiplier is caught.
+    assert 0.98 * x_clean[0] < x_clean[-1] < 0.995 * x_clean[0]
 
-    # (b) add SO₂ mid-run ⇒ gentle-but-D-52-stressed senescence until the dose, then a sharp crash.
+    # (b) add SO₂ mid-run ⇒ near-flat senescence until the dose, then a sharp crash.
     dosed = Scenario(
         name="wine-mlf-so2",
         medium="wine",
@@ -357,9 +358,9 @@ def test_so2_crashes_bacteria_over_the_slow_senescence_baseline():
     traj = compile_scenario(dosed, strict=True).run()
     t_h, x_mlf = traj.t, traj.series("X_mlf")
     i6 = int(np.searchsorted(t_h, 6.0 * 24.0))  # index just at/after the day-6 SO₂ dose
-    # MEASURED ratio ~0.875 at day 6 (D-52 stress is already ramping as AF ethanol rises and
-    # amino acids empty — faster than D-41's environment-free ~0.95, still far above the crash).
-    assert 0.8 * 0.2 < x_mlf[i6] < 0.95 * 0.2
+    # MEASURED ratio ~0.997 at day 6 — essentially unchanged from the pitch dose, consistent with
+    # the real-wine "stable" finding over a window this short.
+    assert 0.99 * 0.2 < x_mlf[i6] < 1.0 * 0.2
     post = x_mlf[i6:]
     assert np.all(np.diff(post) <= 1e-12)  # monotone non-increasing once SO₂ is present
     assert x_mlf[-1] < 0.1 * x_mlf[i6]  # SO₂ crashed the population (fast kill dominates baseline)

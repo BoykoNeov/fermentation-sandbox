@@ -649,14 +649,38 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         SO₂ kill. Genuine side effect measured and banded honestly (the D-51 discipline):
         `test_headline_citrate_lifts_and_then_clears_diacetyl`'s final/peak ratio rose to ~0.861 (less
         viable bacterial reductase late in a 30-d run) — band widened to 0.90 with the measured value
-        recorded, not loosened blindly. **OWNER-FLAGGED OPEN QUESTION (advisor-raised, unresolved):**
-        `k_senescence_mlf` (5e-4, unchanged) was D-41-calibrated so a *typical* wine loses ~half its
-        O. oeni over ~2 months — but stress≈2× is now close to the *typical* case (not the exception),
-        so the typical-wine half-life this produces is actually ~29 d. Whether to re-anchor `k` to
-        ~2.5e-4 so typical-stress lands back on D-41's original target is a fidelity call routed to the
-        owner, not decided here. 4 net new/split tests in `test_malolactic.py` + 2 tests re-measured
-        (not weakened) + the diacetyl band update. **654 green** + 5 benchmark, ruff+mypy clean.
+        recorded, not loosened blindly. **OWNER-FLAGGED OPEN QUESTION — RESOLVED in D-53 (see below):**
+        `k_senescence_mlf` (5e-4, unchanged at ship time) was D-41-calibrated so a *typical* wine
+        loses ~half its O. oeni over ~2 months — but stress≈2× is close to the *typical* case, so the
+        typical-wine half-life D-52 actually produced was ~29 d. Owner asked for research rather than
+        picking a number; D-53 found real-wine CFU data does not support ANY weeks-to-months
+        spontaneous decline, corrected the magnitude ~50x down, not just re-anchored. 4 net new/split
+        tests in `test_malolactic.py` + 2 tests re-measured (not weakened) + the diacetyl band update.
+        **654 green** + 5 benchmark, ruff+mypy clean.
         **Deferred:** a `BrettSenescence` twin for the D-40 arc remains open, but is
         now framed as a *declined-by-default* option (Brett's persistence is the honest model) rather
         than a straightforward extension — revisit only if a source is found that Brett *does* decay
         benignly in practice. Full record in **DECISIONS → D-52**.
+  - [x] **Correction: `k_senescence_mlf` magnitude was wrong by ~50× (decision D-53). LANDED
+        2026-07-07.** Owner asked for deep research rather than picking a number to close D-52's
+        open calibration question. Finding: real, unsulfited finished wine shows **no detectable
+        spontaneous O. oeni decline for 3–5 months** (Windholtz et al. 2025, OENO One, doi:10.20870/
+        oeno-one.2025.59.3.9346; Millet 2001 thesis) — the steep decline D-41's citations implied is
+        actually **SO₂-driven** (Kioroglou et al. 2020, doi:10.3389/fmicb.2020.562560), i.e. already
+        `MalolacticDeath`'s (D-39) territory, not spontaneous senescence. D-41's citations supported
+        general "SO₂ controls spoilage LAB" practice, not a specific weeks-to-months claim — a
+        misread that propagated uncaught into D-52. Fix: `k_senescence_mlf` 5e-4 → **1e-5** (a round,
+        upper-bound-consistent value, not a fit — no source measures decline past 5 months); worst-
+        case D-52 combined stress now gives a multi-year half-life. **D-52's stress-multiplier
+        mechanism is completely unchanged** — only the baseline it scales was wrong. **Honest
+        consequence surfaced to the owner, not buried:** at this magnitude D-52 is now empirically
+        inert on every timescale the model simulates. Owner chose to keep the structure (least
+        churn) over stripping it back to D-41's flat form. **Test consequence was an assertion
+        flip, not a re-band:** `test_so2_crashes_bacteria_over_the_slow_senescence_baseline`
+        asserted a *measurable* decline that the new evidence contradicts — renamed and flipped to
+        assert near-stability (measured ~0.990 at day 21, was ~0.608); the diacetyl clearing test's
+        rationale was corrected too (ratio reverts to ~0.742, closer to D-41's original picture).
+        **654 green** (same count, tests reassigned not added), ruff+mypy clean. **Method beat:**
+        the third `advisor()` call in the D-52/D-53 arc — each pass caught something the previous
+        one missed (wrong pick → test-scope gap → now a magnitude correction the owner's research
+        request itself surfaced). Full record in **DECISIONS → D-53**.

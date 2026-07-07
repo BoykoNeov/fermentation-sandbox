@@ -109,12 +109,11 @@ def test_headline_citrate_lifts_and_then_clears_diacetyl():
     # …and it is a LATE peak (after the early low-ethanol conversion window), not an initial spike
     assert peak_day > 3.0
     # …then it clears: the final diacetyl is meaningfully below its own peak (reduction wins).
-    # MEASURED ratio ~0.861 (was comfortably <0.85 before D-52): the bounded ethanol/starvation
-    # stress multiplier on MalolacticSenescence makes X_mlf decline faster late in a long run
-    # (~0.49× its dose by day 30, vs a slower D-41 decline), leaving less viable bacterial
-    # reductase around to keep clearing diacetyl on the lees — a genuine, honest side effect of
-    # the more realistic senescence, not a bug (measured before loosening, the D-51 discipline).
-    assert float(dia_mlf[-1]) < 0.90 * peak_mlf
+    # MEASURED ratio ~0.742 (D-53-corrected: X_mlf stays ~98.6% viable by day 30 — a real-wine
+    # literature check found no support for D-52's faster senescence, so k_senescence_mlf dropped
+    # ~50x — plenty of bacterial reductase remains on the lees to keep clearing diacetyl, closer to
+    # D-41's original clean-clearing picture than D-52's transient 0.861 measurement).
+    assert float(dia_mlf[-1]) < 0.80 * peak_mlf
 
 
 def test_citrate_is_mostly_unconsumed_the_trace_branch():

@@ -3781,6 +3781,96 @@ tightened around the new values (day-21 ratio ~0.608 vs D-41's ~0.71; day-6 pre-
 band was widened per the side effect above (measured, not blind). **654 passed** (650 + 4 net new
 tests, incl. the 5 §2.2 benchmarks), ruff + mypy clean.
 
+## D-53 — Correction: `k_senescence_mlf` magnitude was wrong by ~50×, per real-wine literature
+
+**Status: IMPLEMENTED 2026-07-07** (654 passed incl. the 5 §2.2 benchmarks, ruff + mypy clean). D-52
+delegated a follow-up fidelity question to the owner ("re-anchor `k_senescence_mlf` to compensate for
+typical stress, or leave it?") rather than deciding unilaterally. The owner asked for research before
+deciding — this is that research's outcome, and it overturned the question's own premise.
+
+**The deep-research finding (5 search angles, 22 sources fetched, 25 claims adversarially verified
+3-vote).** Real, finished, unsulfited (SO₂-free) wine shows **no detectable spontaneous decline** in
+O. oeni populations for 3–5 months post-MLF:
+
+- **Windholtz, Miot-Sertier, Maupeu et al. 2025**, *OENO One* 59(3), doi:10.20870/
+  oeno-one.2025.59.3.9346 — real Bordeaux red wine, 6 SO₂-management modalities tracked vatting →
+  bottling (5 months). SO₂-free modalities: "high and stable population levels of around 10⁵
+  CFU/mL" from end-of-MLF through 5 months.
+- **Millet 2001** (Univ. Bordeaux 2 doctoral thesis, cited within Windholtz et al.) — 3 Bordeaux
+  varieties in oak barrels, 0/30/50 mg/L SO₂ over 3 months. At 0 mg/L SO₂: population "maintained at
+  around 10⁶ CFU/mL," even at pH 3.75–3.95; only 50 mg/L SO₂ was sufficient to inhibit it.
+- **By contrast, Kioroglou, Mas & Portillo 2020**, *Frontiers in Microbiology*, doi:10.3389/
+  fmicb.2020.562560 — the steep decline (10⁵–10⁶ → 10³–10⁴ CFU/mL by 3 months, undetectable by 12)
+  is documented **only in wines that received SO₂**. That decline is `MalolacticDeath`'s (D-39)
+  territory, not spontaneous senescence — a category error in the original D-41 framing.
+- Acute ethanol/pH-shock mechanistic studies (da Silveira et al. 2002, doi:10.1128/
+  aem.68.12.6087-6093.2002; Bastard et al. 2016, doi:10.3389/fmicb.2016.00613) confirm the *direction*
+  (ethanol damages the membrane, worse at low pH) but operate on minutes-to-4-hours timescales under
+  artificially harsh conditions (12–16% ethanol, pH 3.2) — several tempting extrapolations from this
+  acute data to the weeks/months spontaneous-decline question were explicitly checked and **refuted**
+  (0-3 adversarial votes) as overreach.
+
+No survived source measures an actual first-order decay constant or CFU curve for spontaneous decline
+beyond ~5 months — the evidence base is "no significant decline detected within the observed window,"
+an upper bound, not a fitted point estimate.
+
+**Diagnosis: D-41's original citations were misread, not wrong on their face.** Ribereau-Gayon
+(Handbook of Enology) and Bartowsky & Henschke 2004 support the *general winemaking practice* that
+"SO₂ is needed to reliably control spoilage LAB" — true, and the basis of `MalolacticDeath`. D-41
+over-read that into a *specific* "O. oeni spontaneously declines over weeks-to-months without
+intervention" claim, which the direct CFU evidence above does not support. The mistake propagated
+into D-52's calibration target ("typical wine loses half its O. oeni over ~2 months") without being
+independently re-checked — exactly the failure mode the project's "re-derive, don't inherit" discipline
+(D-48/D-50/D-51) exists to catch, and this time it wasn't caught until the owner asked for it.
+
+**The fix — magnitude only, mechanism untouched.** `k_senescence_mlf`: 5.0e-4 → **1.0e-5** (a round
+number per advisor guidance — the data gives an upper bound, not a precision target; any value keeping
+decline within CFU-measurement noise over ~5 months at typical D-52 stress is equally faithful to the
+evidence). At `stress=1`, half-life is now ~2888 d (~7.9 y); at D-52's typical post-AF stress (~2×)
+it's ~3.96 y; even D-52's worst-case combined-stress ceiling (2.5×, unchanged) gives ~3.16 y — all far
+beyond the 3–5 month window the literature actually measured as "stable," a deliberately conservative
+choice given no source pins the true value more precisely. D-52's stress-multiplier *mechanism*
+(bounded Monod-type ethanol/starvation terms, the wipeout-avoidance structure) is **completely
+unchanged** — only the baseline rate it scales was corrected. `k_senescence_ethanol_scale` (1.0) and
+`k_senescence_starvation_scale` (0.5) are untouched as dimensionless ceilings; their provenance notes
+were updated to point at the new baseline's resulting half-lives.
+
+**Honest consequence, surfaced to the owner before proceeding (not buried in a re-band).** At this
+magnitude, D-52's stress multiplier is now **empirically inert on every timescale this model
+simulates** — even worst-case combined stress gives a multi-year half-life, invisible in any real run
+(the model's longest integration test is 30 days). This is the *correct* closest-to-reality outcome
+(spontaneous senescence genuinely is negligible at these timescales), but it changes what D-52 "does."
+Two structural options were put to the owner — (a) keep the stress-multiplier structure as a
+documented slow long-tail mechanism (decline beyond 5 months is genuinely unmeasured, so the mechanism
+remains defensible even though it's unobservable at simulated timescales), or (b) simplify by
+stripping the machinery back to D-41's flat-rate form, since two extra parameters now model something
+no test can see. **Owner chose (a), the least-churn default** — keep + recalibrate.
+
+**Test consequence — an assertion flip, not a re-band (advisor-caught: rerunning-and-rebanding would
+have been the wrong instinct here).** The integration test asserting a *measurable* decline
+(`test_so2_crashes_bacteria_over_the_slow_senescence_baseline`, D-52's day-21 ratio ~0.608 / day-6
+~0.875) now directly contradicts the corrected evidence — those numbers described the wrong physics,
+not just an imprecise band. Renamed to `test_so2_crashes_bacteria_over_the_near_stable_senescence_
+baseline` and flipped to assert *near-stability* (measured day-21 ratio ~0.990, day-6 ~0.997),
+still checking a nonzero (if tiny) monotone decline exists structurally, plus the SO₂ crash
+mechanism is unaffected. `test_mlf_diacetyl.py`'s headline clearing test comment, which attributed
+its ~0.861 final/peak ratio to D-52's faster senescence, was corrected: with X_mlf now ~98.6% viable
+at day 30, the measured ratio reverts to ~0.742 (closer to D-41's original clean-clearing picture),
+and the band tightened from 0.90 back to 0.80 to match. All other D-52 RHS-level tests (ethanol-bound,
+starvation-tracks, no-wipeout, warm-vs-kill-ratio, SO₂-independence) are unaffected — they test
+direction/ratios that are magnitude-independent of `k_senescence_mlf`. **654 passed** (unchanged
+count — one test renamed and reassigned, none added/removed), ruff + mypy clean.
+
+**Method beat worth remembering — the third `advisor()` call in this arc, and the value of asking
+before assuming.** D-52 shipped a plausible-looking calibration (owner-delegated "closer to reality")
+that turned out to rest on a misread citation. The owner declining to pick a number and asking for
+research first — rather than accepting either of the two options originally offered — is what caught
+it: neither "re-anchor to ~2 months" nor "leave it at ~29 days" was defensible once real CFU data was
+checked. A third advisor call (post-research) then caught that the fix wasn't a simple re-band but an
+assertion flip, and surfaced the "D-52 is now inert" honesty point before it could be silently
+absorbed. Three advisor calls across one feature arc, each catching something the previous pass
+missed — the discipline compounds.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),

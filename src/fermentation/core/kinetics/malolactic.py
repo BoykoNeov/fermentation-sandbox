@@ -657,16 +657,19 @@ class MalolacticDeath(Process):
 
 
 class MalolacticSenescence(Process):
-    """*Oenococcus oeni* benign senescence — the slow baseline mortality (MLF **v2**, D-41/D-52).
+    """*Oenococcus oeni* benign senescence — slow baseline mortality (MLF **v2**, D-41/D-52/D-53).
 
     Lifts the owned v1 tradeoff of :class:`MalolacticDeath` (D-39): *"without SO₂, bacteria never
-    die."* In reality *O. oeni* does not persist forever in an untreated dry wine — over
-    **weeks-to-months** the population slowly declines from age, ethanol stress, low pH and nutrient
-    exhaustion even with **no SO₂ and no rack**. This Process is that decline: a small, always-on
-    (when pitched) baseline mortality that moves viable ``X_mlf`` into the same non-viable
-    ``X_mlf_dead`` pool the SO₂ kill uses, so a pitched wine left alone eventually loses its
-    bacteria (and the ``X_mlf``-scaled activities — conversion, citrate → diacetyl, lees-contact
-    diacetyl reduction — fade with them) instead of holding a viable culture indefinitely.
+    die."* This Process is a small, always-on (when pitched) baseline mortality that moves viable
+    ``X_mlf`` into the same non-viable ``X_mlf_dead`` pool the SO₂ kill uses, so a pitched wine left
+    alone can in principle lose its bacteria (and the ``X_mlf``-scaled activities — conversion,
+    citrate → diacetyl, lees-contact diacetyl reduction — fade with them) instead of holding a
+    viable culture indefinitely. **D-53 correction (2026-07-07):** a real-wine literature check
+    found no support for the D-41 "weeks-to-months spontaneous decline" premise — Windholtz et al.
+    2025 (OENO One) and the Millet 2001 thesis both show O. oeni populations *stable* for 3–5
+    months in real SO₂-free wine, and the steep decline the original citations pointed at turns out
+    to be SO₂-driven (:class:`MalolacticDeath`'s territory), not spontaneous. The magnitude below is
+    corrected accordingly — see the ``k_senescence_mlf`` provenance for full sourcing.
 
     **Rate — a baseline rate scaled by a bounded ethanol/starvation stress multiplier, Arrhenius
     temperature (D-52).**
@@ -675,8 +678,9 @@ class MalolacticSenescence(Process):
         stress = 1 + k_senescence_ethanol_scale·[E/(E+ethanol_tolerance_mlf)]
                    + k_senescence_starvation_scale·[K_aa_mlf/(K_aa_mlf+amino_acids)]
 
-    * **Constant baseline ``k_senescence_mlf``** (t½ ≈ 8 weeks at ``T_ref``, ``stress`` = 1) —
-      ~100× below the full-SO₂-kill ``k_death_mlf``.
+    * **Constant baseline ``k_senescence_mlf``** (t½ ≈ 7.9 years at ``T_ref``, ``stress`` = 1;
+      D-53-corrected from D-41's original ~8-week value — see below) — deliberately tiny, well
+      below the full-SO₂-kill ``k_death_mlf``.
     * **The D-52 stress multiplier — lifts the D-41 "environment-free" deferral, without
       reintroducing the D-39 wipeout bug.** D-39's crux was a *large* rate (``k_death_mlf``,
       calibrated to represent a full SO₂ kill) multiplied by ``1 − toxicity`` ≈ 0.92 at ordinary
@@ -686,8 +690,11 @@ class MalolacticSenescence(Process):
       Luong wall's near-binary "1 at zero stress, 0 at the tolerance wall" shape. ``stress`` is
       therefore hard-capped at ``1 + k_senescence_ethanol_scale + k_senescence_starvation_scale``
       regardless of how far ``E`` or nutrient depletion runs — at the shipped values (1.0/0.5) that
-      ceiling is 2.5×, i.e. a worst-case half-life of ~23 d (~3.3 weeks), never approaching the
-      ~1-week wipeout regime. Reuses ``ethanol_tolerance_mlf`` and ``K_aa_mlf`` as the two terms'
+      ceiling is 2.5×. **Post-D-53** even that worst case gives a multi-year half-life (~3.16 y):
+      the stress mechanism is unchanged from D-52, but it now scales a baseline small enough that
+      senescence is honestly negligible on every timescale this model simulates — the D-39
+      wipeout regime (~1 week) is nowhere close on any axis. Reuses ``ethanol_tolerance_mlf`` and
+      ``K_aa_mlf`` as the two terms'
       half-saturation points — the same "arrest-scale reused as a death-adjacent scale"
       simplification :class:`MalolacticDeath` already makes with ``molecular_so2_inhib_mlf`` — so no
       new concentration-scale parameters are introduced, only the two dimensionless ceilings.
@@ -722,11 +729,13 @@ autolysis.YeastAutolysis` reads only the yeast ``X_dead`` pool, so senescing bac
     strictly cheaper than the SO₂ kill even with the D-52 stress terms (``E``/``amino_acids`` are
     read directly off state, no equilibrium solve). Pitch-gated at the compile seam (enabled with
     the other ``_MLF_PROCESSES`` when ``mlf_pitch_gpl > 0``), NOT amino-acid-gated: bacteria age
-    whether or not they were growing. **This supersedes the v1 "no-SO₂ pitched run is byte-for-byte
-    inert" property** — a pitched, unsulfited run now shows a slow monotone ``X_mlf`` decline, which
-    is the point of v2. Tier **speculative** (``k_senescence_mlf`` and the D-52 stress-ceiling
-    parameters are author estimates; direction — ethanol/starvation stress accelerates decline — is
-    sourced, magnitude is a modelling choice).
+    whether or not they were growing. **Supersedes the v1 "no-SO₂ pitched run is byte-for-byte
+    inert" property in structure, not in observable magnitude**: a pitched, unsulfited run shows a
+    slow monotone ``X_mlf`` decline in principle, but post-D-53 that decline is honestly negligible
+    at the timescales this model simulates — matching the real-wine finding of no detectable
+    spontaneous die-off within 3–5 months. Tier **speculative** (``k_senescence_mlf`` and the D-52
+    stress-ceiling parameters are author estimates; direction — ethanol/starvation stress
+    accelerates decline — is sourced, magnitude is upper-bound-derived, not fitted).
     """
 
     name = "malolactic_senescence"

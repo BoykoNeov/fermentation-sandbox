@@ -789,46 +789,50 @@ E_a_death_mlf:
     conditions: "O. oeni in wine; temperature factor arrhenius(T, E_a_death_mlf, T_ref) on the death rate, = 1 at T_ref (20 C)"
     notes: "Read by MalolacticDeath. Gives the temperature dependence of bacterial mortality so that warm lees clear/kill the culture faster and cold PRESERVES it (dormancy) - the physically correct direction the cardinal gamma(T) cannot supply for death (gamma(T) -> 0 in the cold would make cold kill, the opposite of reality). SPECULATIVE: the magnitude is an estimate equal to the autolysis E_a; the DIRECTION (warm accelerates, cold preserves) is sound. Uses the shared T_ref (20 C) so the factor is 1 at the wine benchmark temperature, like every other Arrhenius rate. ALSO read by MalolacticSenescence (D-41), which reuses this same warm-accelerates/cold-preserves Arrhenius shape for the benign baseline decline (no new temperature param)."
 
-# -- MALOLACTIC SENESCENCE (Oenococcus oeni benign baseline mortality, wine-only, MLF v2, decisions D-41/D-52) --
+# -- MALOLACTIC SENESCENCE (Oenococcus oeni benign baseline mortality, wine-only, MLF v2, decisions D-41/D-52/D-53) --
 # MalolacticSenescence (fermentation.core.kinetics.malolactic) LIFTS the owned v1 tradeoff of
-# MalolacticDeath (D-39): "without SO2, bacteria NEVER die." In reality O. oeni does not persist
-# forever in an untreated dry wine - over WEEKS-TO-MONTHS the population slowly declines from age,
-# ethanol stress, low pH and nutrient exhaustion even with NO SO2 and NO rack. This is that decline:
+# MalolacticDeath (D-39): "without SO2, bacteria NEVER die." This is that decline:
 #   r_sen = k_senescence_mlf * X_mlf * arrhenius(T, E_a_death_mlf, T_ref) * stress
 #   stress = 1 + k_senescence_ethanol_scale*[E/(E+ethanol_tolerance_mlf)]
 #              + k_senescence_starvation_scale*[K_aa_mlf/(K_aa_mlf+amino_acids)]
 # a small, always-on (when pitched) baseline first-order mortality moving viable X_mlf into the SAME
 # non-viable X_mlf_dead pool the SO2 kill uses (a carbon/nitrogen-neutral transfer, both pools
 # weighted at the biomass fractions since D-38/D-39 - no new conservation code). Total O. oeni
-# mortality is now r_sen + r_death (stress-modulated baseline + SO2-induced), built as SEPARATE
+# mortality is r_sen + r_death (stress-modulated baseline + SO2-induced), built as SEPARATE
 # isolable Processes so the D-39 SO2 lever stays byte-for-byte and this baseline toggles independently.
-# D-52 LIFTS the D-41 "environment-free" deferral WITHOUT reintroducing the D-39 wipeout bug: D-39's
-# crux was a LARGE rate (k_death_mlf, calibrated for a full SO2 kill) multiplied by 1-toxicity ~0.92 at
-# ordinary post-AF ethanol - near-maximal death from ethanol alone. Here the multiplier scales the TINY
-# senescence baseline instead, and both stress terms are smooth Monod-type factors bounded in [0,1) -
-# not the Luong wall's near-binary shape - so `stress` is hard-capped at 1+ethanol_scale+starvation_scale
-# regardless of how far E or nutrient depletion runs (at the shipped 1.0/0.5 scales, ceiling 2.5x =>
-# worst-case half-life ~23 d / ~3.3 weeks, nowhere near the ~1-week wipeout regime). Reuses
-# ethanol_tolerance_mlf and K_aa_mlf as the two stress terms' half-saturation points (the same
-# "arrest-scale reused as a death-adjacent scale" simplification MalolacticDeath already makes with
-# molecular_so2_inhib_mlf), so only two new dimensionless ceiling parameters are introduced. ARRHENIUS
-# temperature (NOT the cardinal gamma(T)): warm accelerates the decline, cold slows it to dormancy -
-# gamma(T) peaks at T_opt_mlf (23 C) and vanishes past T_max_mlf, which would make senescence MAXIMAL
-# at the growth optimum and switch OFF in the warm, exactly backwards. Pitch-gated at compile
-# (mlf_pitch_gpl>0), NOT amino-acid-gated (bacteria age whether or not they grew). Reads no SO2/pH =>
-# NO brentq (cheaper than the SO2 kill), even with the D-52 stress terms (E/amino_acids read directly
-# off state). SUPERSEDES the v1 "no-SO2 pitched run is byte-for-byte inert" property: a pitched
-# unsulfited run now shows a slow monotone X_mlf decline - the point of v2.
+# D-52 lifted the D-41 "environment-free" deferral with a BOUNDED [0,1)-capped stress multiplier
+# (not the Luong wall's near-binary shape that caused the D-39 wipeout) - see k_senescence_ethanol_scale
+# and k_senescence_starvation_scale for that mechanism, still valid and unchanged.
+# D-53 CORRECTED THE MAGNITUDE (not the mechanism): D-41's original k_senescence_mlf assumed O. oeni
+# spontaneously declines over WEEKS-TO-MONTHS without SO2 - a real-wine literature check (deep research,
+# 2026-07-07) found this UNSUPPORTED. Windholtz et al. 2025 (OENO One 59(3), doi:10.20870/
+# oeno-one.2025.59.3.9346) and the Millet 2001 thesis it cites both show O. oeni/LAB populations STABLE
+# at ~10^5-10^6 CFU/mL for 3-5 MONTHS in real, finished, SO2-free wine - no detectable spontaneous
+# die-off. The steep decline the original citations pointed at (10^5-10^6 -> 10^3-10^4 CFU/mL by 3
+# months, undetectable by 12) is documented ONLY when SO2 IS added (Kioroglou et al. 2020, Frontiers
+# in Microbiology, doi:10.3389/fmicb.2020.562560) - i.e. it is MalolacticDeath's (D-39) territory, not
+# this Process's. D-41's citations (Ribereau-Gayon Handbook of Enology; Bartowsky & Henschke 2004)
+# conflated "SO2 is needed to reliably CONTROL spoilage LAB in general winemaking practice" (true) with
+# "an already-stable wine spontaneously declines over weeks-months without it" (not supported) -
+# CORRECTED here. k_senescence_mlf dropped ~50x (5e-4 -> 1e-5/h) so even D-52's worst-case combined
+# stress (2.5x ceiling, unchanged) gives a multi-year half-life - i.e. this baseline is now honestly
+# NEGLIGIBLE on every timescale this model simulates, an upper-bound-consistent (not fitted) value,
+# since no source measures spontaneous decline kinetics past 5 months. ARRHENIUS temperature (NOT the
+# cardinal gamma(T)): warm accelerates the decline, cold slows it to dormancy - gamma(T) peaks at
+# T_opt_mlf (23 C) and vanishes past T_max_mlf, which would make senescence MAXIMAL at the growth
+# optimum and switch OFF in the warm, exactly backwards. Pitch-gated at compile (mlf_pitch_gpl>0), NOT
+# amino-acid-gated (bacteria age whether or not they grew). Reads no SO2/pH => NO brentq (cheaper than
+# the SO2 kill), even with the D-52 stress terms (E/amino_acids read directly off state).
 
 k_senescence_mlf:
-  value: 5.0e-4
-  unit: "1/h"   # O. oeni benign baseline specific death rate: r_sen = k_senescence_mlf*X_mlf*arrhenius(T)
+  value: 1.0e-5
+  unit: "1/h"   # O. oeni benign baseline specific death rate: r_sen = k_senescence_mlf*X_mlf*arrhenius(T)*stress
   tier: speculative
-  uncertainty: { low: 3.0e-4, high: 1.5e-3, note: "benign-environment specific mortality => an O. oeni half-life of ~3 weeks (high) to ~3 months (low) in an untreated dry wine at 20 C; ~100x below the full-SO2-kill k_death_mlf (0.05/h), so a stabilizing SO2 dose still dominates the trajectory" }
+  uncertainty: { low: 2.0e-6, high: 3.0e-5, note: "upper-bound-derived from 'no significant decline detected in 3-5 months' in real SO2-free wine (Windholtz et al. 2025; Millet 2001) - the TRUE spontaneous decay constant is unmeasured past 5 months and could be far smaller; this is not a fitted point estimate" }
   provenance:
-    source: "author estimate; O. oeni viability declines over weeks-to-months in dry, unsulfited wine as age/ethanol/low-pH/nutrient stress accumulate (Ribereau-Gayon et al., Handbook of Enology Vol. 1, on O. oeni persistence and the need for SO2 to reliably clear it; Bartowsky & Henschke 2004, Int. J. Food Microbiol. 96:235-252). No per-catalyst baseline-mortality law of this form is sourced - viability is reported as CFU decline curves, not this rate constant - so the value is a physically-anchored estimate, hence speculative."
-    conditions: "O. oeni in wine, ~20 C; benign-environment (no SO2) specific death rate scaling the viable X_mlf, read unscaled at T_ref by the shared Arrhenius factor arrhenius(T, E_a_death_mlf, T_ref)"
-    notes: "Read by MalolacticSenescence (MLF v2, D-41) as the benign baseline mortality magnitude AT stress=1 (no ethanol/starvation stress; see k_senescence_ethanol_scale/k_senescence_starvation_scale, D-52). VALUE 5e-4/h => a half-life of ~58 d (ln2/5e-4 ~1386 h ~8.2 weeks) at T_ref, stress=1 - so a pitched, unsulfited wine loses ~half its O. oeni over ~2 months at baseline, the WEEKS-TO-MONTHS decline D-39 deferred, before the D-52 stress terms shorten it further under ethanol/nutrient pressure. Chosen on that physics, NOT to clear a threshold. ~100x below k_death_mlf (0.05/h) so it is negligible over the ~4-day co-inoculation MLF window (over 96 h, ~5% X_mlf loss - it does NOT perturb the D-23 deacidification control-difference or the growth beat's several-fold X_mlf rise) and a stabilizing SO2 dose still crashes the population in ~1-3 d on top of it. HISTORICAL NOTE (D-41): this baseline was originally made ENVIRONMENT-FREE (no ethanol term) because the Luong wall drives 1-g_EtOH to ~0.92 at ordinary post-AF ethanol, which coupled to a mortality rate of THIS magnitude would still only give a ~1-week half-life if applied directly as a 0-1 gate - the wipeout bug. D-52 lifts that deferral safely by scaling (not gating) this small baseline through a bounded [0,1)-capped stress multiplier instead of a near-binary wall; see k_senescence_ethanol_scale for the resolution. DIRECTION is sourced (unsulfited O. oeni eventually dies; SO2 is needed to clear it reliably); the magnitude is the speculative modelling choice."
+    source: "D-53 CORRECTION (2026-07-07, deep research): Windholtz, Miot-Sertier, Maupeu et al. 2025, 'Influence of sulphur dioxide management on microbial populations during wine ageing,' OENO One 59(3), doi:10.20870/oeno-one.2025.59.3.9346 - real Bordeaux red wine, SO2-free modalities show O. oeni/LAB 'high and stable population levels of around 10^5 CFU/mL' from end-of-MLF through 5 months of ageing to bottling; and Millet 2001 (Univ. Bordeaux 2 doctoral thesis, cited therein), which at 0 mg/L SO2 found the population 'maintained at around 10^6 CFU/mL' over 3 months across three Bordeaux varieties, even at pH 3.75-3.95. Both are real-wine, no-SO2, CFU-based studies - the most direct evidence available. Contrast: Kioroglou, Mas & Portillo 2020, Frontiers in Microbiology, doi:10.3389/fmicb.2020.562560, shows the steep 10^5-10^6 -> 10^3-10^4 CFU/mL decline by 3 months (undetectable by 12) ONLY in wines that DID receive SO2 - that decline belongs to MalolacticDeath (D-39), not this baseline. SUPERSEDES the D-41 citations (Ribereau-Gayon Handbook of Enology; Bartowsky & Henschke 2004), which supported general SO2-for-spoilage-control practice, not a specific weeks-to-months spontaneous decline claim - that inference is not supported by direct CFU evidence and is corrected here."
+    conditions: "O. oeni in real finished wine, SO2-free, ~20 C; benign-environment specific death rate scaling the viable X_mlf, read unscaled at T_ref by the shared Arrhenius factor arrhenius(T, E_a_death_mlf, T_ref), stress=1 (D-52's stress multiplier is separate, see below)"
+    notes: "Read by MalolacticSenescence (MLF v2, D-41/D-52/D-53) as the benign baseline mortality magnitude AT stress=1. VALUE 1e-5/h => a half-life of ~2888 d (~7.9 y) at T_ref, stress=1; at D-52's TYPICAL post-AF stress (~2x: ethanol near ethanol_tolerance_mlf + amino acids exhausted) the effective half-life is still ~3.96 y, and even D-52's WORST-CASE combined stress ceiling (2.5x) gives ~3.16 y - all far beyond the 3-5 month window Windholtz/Millet actually measured as 'stable,' so this value is DELIBERATELY conservative (upper-bound-consistent), not a fit to a specific decay curve (none exists past 5 months in the surviving literature). PRACTICAL CONSEQUENCE: on every timescale this model actually simulates (days to a few months), spontaneous senescence is now honestly NEGLIGIBLE - a pitched, unsulfited run is very close to flat, matching the real-wine finding, while a stabilizing SO2 dose (MalolacticDeath, D-39, unchanged) still crashes the population in ~1-3 d. HISTORICAL NOTE (D-41, corrected by D-53): the original ~2-month-half-life value was an author estimate that over-read general SO2-for-spoilage-control literature as a specific spontaneous-decline timescale; no real-wine CFU study supports it. D-52's stress-multiplier MECHANISM is unaffected by this correction (ethanol/starvation stress is still the right direction, still bounded to avoid the D-39 wipeout) - only the baseline magnitude it scales was wrong."
 
 k_senescence_ethanol_scale:
   value: 1.0
@@ -836,9 +840,9 @@ k_senescence_ethanol_scale:
   tier: speculative
   uncertainty: { low: 0.5, high: 2.0, note: "order-of-magnitude ceiling on how much ethanol stress can accelerate the benign baseline; bounded well below the SO2-kill magnitude by construction" }
   provenance:
-    source: "author estimate (D-52); direction sourced from the general observation that ethanol stress accelerates O. oeni senescence in dry wine (Ribereau-Gayon et al., Handbook of Enology Vol. 1; Bartowsky & Henschke 2004, Int. J. Food Microbiol. 96:235-252, the same sources as k_senescence_mlf's direction), magnitude is a modelling choice"
+    source: "author estimate (D-52); direction sourced from the general mechanistic literature that ethanol damages the O. oeni cell membrane (da Silveira et al. 2002, Appl. Environ. Microbiol. 68(12):6087-6093, doi:10.1128/aem.68.12.6087-6093.2002 - acute flow-cytometric membrane-integrity assay), though that evidence is on minutes-to-hours acute-shock timescales and does not itself supply a weeks/months rate; magnitude is a modelling choice, D-53-corrected against k_senescence_mlf's new upper-bound-derived magnitude"
     conditions: "O. oeni in wine; dimensionless ceiling on the ethanol term of the MalolacticSenescence stress multiplier, stress = 1 + k_senescence_ethanol_scale*[E/(E+ethanol_tolerance_mlf)] + starvation term"
-    notes: "Read by MalolacticSenescence (D-52) as the ethanol-stress ceiling. The bracketed term is a smooth Monod-type factor in E (half-saturation = the existing ethanol_tolerance_mlf, reused rather than adding a new concentration scale - the same 'arrest-scale reused as a death-adjacent scale' simplification k_death_mlf's molecular_so2_inhib_mlf reuse already makes), bounded in [0,1) so the ethanol contribution to `stress` can never exceed this ceiling no matter how high E runs. VALUE 1.0 => at saturating ethanol the baseline rate at most DOUBLES (stress contribution from this term -> 1.0); at typical dry-wine ethanol (~100-130 g/L, near ethanol_tolerance_mlf=110) the term is ~0.5, so a typical stressed half-life is ~29-39 d, comfortably in the weeks range and nowhere near the ~1-week D-39 wipeout regime this design deliberately avoids (see k_senescence_mlf's historical note). Combined with k_senescence_starvation_scale the total ceiling is 2.5x (worst-case half-life ~23 d). SPECULATIVE: no per-organism ethanol-stress-vs-senescence-rate curve is sourced for O. oeni; this is a bounded, physically-motivated shape, not a fit."
+    notes: "Read by MalolacticSenescence (D-52) as the ethanol-stress ceiling. The bracketed term is a smooth Monod-type factor in E (half-saturation = the existing ethanol_tolerance_mlf, reused rather than adding a new concentration scale - the same 'arrest-scale reused as a death-adjacent scale' simplification k_death_mlf's molecular_so2_inhib_mlf reuse already makes), bounded in [0,1) so the ethanol contribution to `stress` can never exceed this ceiling no matter how high E runs. VALUE 1.0 => at saturating ethanol the baseline rate at most DOUBLES. Post-D-53, that doubling acts on a MUCH smaller baseline (k_senescence_mlf=1e-5/h), so even the fully-saturated ethanol term leaves senescence negligible on model timescales (see k_senescence_mlf's notes for the resulting half-lives) - the mechanism (direction, bounded shape) is unchanged from D-52, only what it scales was corrected. SPECULATIVE: no per-organism ethanol-stress-vs-senescence-rate curve is sourced for O. oeni; this is a bounded, physically-motivated shape, not a fit."
 
 k_senescence_starvation_scale:
   value: 0.5
@@ -846,9 +850,9 @@ k_senescence_starvation_scale:
   tier: speculative
   uncertainty: { low: 0.2, high: 1.0, note: "order-of-magnitude ceiling on how much nutrient starvation can accelerate the benign baseline; set lower than the ethanol ceiling as a smaller, secondary stressor" }
   provenance:
-    source: "author estimate (D-52); direction sourced from the general observation that nutrient exhaustion accelerates bacterial senescence (the same Ribereau-Gayon/Bartowsky & Henschke sources as k_senescence_ethanol_scale), magnitude is a modelling choice"
+    source: "author estimate (D-52); direction sourced from the general observation that nutrient exhaustion accelerates bacterial senescence, magnitude is a modelling choice, D-53-corrected against k_senescence_mlf's new upper-bound-derived magnitude"
     conditions: "O. oeni in wine; dimensionless ceiling on the nutrient-starvation term of the MalolacticSenescence stress multiplier, stress = 1 + ethanol term + k_senescence_starvation_scale*[K_aa_mlf/(K_aa_mlf+amino_acids)]"
-    notes: "Read by MalolacticSenescence (D-52) as the starvation-stress ceiling. The bracketed term reuses K_aa_mlf (MalolacticGrowth's amino-acid half-saturation) as the concentration scale, INVERTED so it rises toward 1 as amino_acids are depleted rather than falling - the same fuel pool the growth beat reads, so the term tracks real nutrient dynamics (near-max once amino acids are exhausted at ~1.3 d post-pitch per the D-23 finding, falling back whenever autolysis, D-34, refills the pool) rather than acting as a flat multiplier. VALUE 0.5, LOWER than k_senescence_ethanol_scale (1.0): starvation is modelled as a smaller secondary stressor since amino-acid depletion alone (without accompanying ethanol) is a milder condition than the high-ethanol post-AF regime. Combined ceiling with the ethanol term is 2.5x baseline (worst-case half-life ~23 d / ~3.3 weeks). SPECULATIVE: no per-organism starvation-vs-senescence-rate curve is sourced; this is a bounded, physically-motivated shape, not a fit."
+    notes: "Read by MalolacticSenescence (D-52) as the starvation-stress ceiling. The bracketed term reuses K_aa_mlf (MalolacticGrowth's amino-acid half-saturation) as the concentration scale, INVERTED so it rises toward 1 as amino_acids are depleted rather than falling - the same fuel pool the growth beat reads, so the term tracks real nutrient dynamics (near-max once amino acids are exhausted at ~1.3 d post-pitch per the D-23 finding, falling back whenever autolysis, D-34, refills the pool) rather than acting as a flat multiplier. VALUE 0.5, LOWER than k_senescence_ethanol_scale (1.0): starvation is modelled as a smaller secondary stressor. Combined ceiling with the ethanol term is still 2.5x baseline - post-D-53 that now means a multi-year worst-case half-life rather than the ~23 d D-52 originally computed (see k_senescence_mlf's notes); the mechanism is unchanged, only the baseline it scales was corrected. SPECULATIVE: no per-organism starvation-vs-senescence-rate curve is sourced; this is a bounded, physically-motivated shape, not a fit."
 
 # -- MLF-DERIVED DIACETYL (Oenococcus oeni citrate co-metabolism), wine-only (decision D-31) --
 # The real coupling MLF unlocks: alongside malate, O. oeni co-metabolises CITRIC ACID and
