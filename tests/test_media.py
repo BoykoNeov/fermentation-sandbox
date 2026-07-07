@@ -24,12 +24,16 @@ WINE_MLF_SLOTS = ("X_mlf", "X_mlf_dead")
 WINE_AMINO_ACID_SLOTS = ("amino_acids",)
 # The non-assimilable cell-wall debris pool yeast autolysis fills (D-34).
 WINE_DEBRIS_SLOTS = ("debris",)
-# Brettanomyces volatile-phenol slots (decision D-40), appended last: the lumped hydroxycinnamic
-# precursor, the shared vinylphenol intermediate reservoir, the ethylphenol readout, and the
-# viable/dead Brett biomass pools (X_brett a constant catalyst in pt1; X_brett_dead filled by
-# BrettDeath, pt3).
+# Brettanomyces volatile-phenol slots (decision D-40), appended last: the p-coumaric-branch
+# precursor/intermediate/readout (hydroxycinnamics/vinylphenols/ethylphenols), the ferulic-branch
+# precursor/intermediate/readout split out at decision D-55 (ferulic_acid/vinylguaiacols/
+# ethylguaiacols — a genuinely distinct molecule, not a fixed-ratio split of the p-coumaric pool),
+# and the viable/dead Brett biomass pools (X_brett a constant catalyst in pt1; X_brett_dead filled
+# by BrettDeath, pt3).
 WINE_BRETT_SLOTS = (
-    "hydroxycinnamics", "vinylphenols", "ethylphenols", "X_brett", "X_brett_dead",
+    "hydroxycinnamics", "vinylphenols", "ethylphenols",
+    "ferulic_acid", "vinylguaiacols", "ethylguaiacols",
+    "X_brett", "X_brett_dead",
 )  # fmt: skip
 # The carbon-bearing volatile-thiol pool AutolyticMercaptan fills (decision D-45), appended last.
 WINE_MERCAPTAN_SLOTS = ("mercaptans",)
@@ -57,10 +61,11 @@ def test_wine_schema_has_single_sugar_slot():
     # h2s + h2s_gas, D-29 production / D-42 CO2-stripping sink) + 3 wine-only acid slots
     # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
-    # (D-34) + 5 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols, X_brett,
-    # X_brett_dead — decision D-40) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate
-    # D-49, alpha_ketoglutarate D-50)
-    assert schema.size == 36
+    # (D-34) + 8 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols — the p-coumaric
+    # branch, D-40; ferulic_acid, vinylguaiacols, ethylguaiacols — the ferulic branch, D-55;
+    # X_brett, X_brett_dead) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate D-49,
+    # alpha_ketoglutarate D-50)
+    assert schema.size == 39
 
 
 def test_beer_schema_has_three_sequential_sugars():

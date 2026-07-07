@@ -226,6 +226,25 @@ M_VINYLPHENOL = 8 * _M_C + 8 * _M_H + 1 * _M_O
 #: ``total_carbon`` closes to machine precision through the whole precursor → intermediate →
 #: product chain.
 M_ETHYLPHENOL = 8 * _M_C + 10 * _M_H + 1 * _M_O
+#: Ferulic acid (4-hydroxy-3-methoxycinnamic acid), C10H10O4 — the second Brett volatile-phenol
+#: precursor, split out from the ``hydroxycinnamics`` (p-coumaric) lump (decision D-55, the D-40
+#: pt4 "vinylguaiacol/vinylphenol split" deferral). Decarboxylation ferulic (10 C) → 4-vinylguaiacol
+#: (9 C) + CO2 (1 C) closes carbon mole-for-mole (10 = 9 + 1), the same idiom as p-coumaric → 4-
+#: vinylphenol + CO2 (9 = 8 + 1). A genuinely distinct molecule (not a fixed-fraction split of the
+#: p-coumaric pool) — required because ferulic carries a different carbon count, so no fixed ratio
+#: on the existing ``hydroxycinnamics`` output could stay carbon-exact.
+M_FERULIC = 10 * _M_C + 10 * _M_H + 4 * _M_O
+#: 4-Vinylguaiacol (2-methoxy-4-vinylphenol), C9H10O2 — ferulic acid's decarboxylation product, the
+#: ferulic-branch counterpart to ``vinylphenol`` (decision D-55). Reduced by the same Brett
+#: vinylphenol reductase (Tchobanov et al. 2008 confirm the enzyme acts on both 4-vinylguaiacol and
+#: 4-vinylphenol) to 4-ethylguaiacol, a mole-for-mole C9 → C9 transfer (two H added from NADH, no
+#: carbon change) — the "clove/smoky" volatile-phenol readout.
+M_VINYLGUAIACOL = 9 * _M_C + 10 * _M_H + 2 * _M_O
+#: 4-Ethylguaiacol (4-ethyl-2-methoxyphenol), C9H12O2 — the ferulic-branch terminal Brett
+#: volatile-phenol product (decision D-55), the "clove/smoky" counterpart to ``ethylphenol``'s
+#: "horse-sweat/barnyard". Same 9 carbons as its 4-vinylguaiacol precursor, so the reduction step is
+#: carbon-conserving (C9 → C9) and ``total_carbon`` closes to machine precision.
+M_ETHYLGUAIACOL = 9 * _M_C + 12 * _M_H + 2 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -258,6 +277,9 @@ MOLAR_MASS: dict[str, float] = {
     "p_coumaric_acid": M_P_COUMARIC,
     "vinylphenol": M_VINYLPHENOL,
     "ethylphenol": M_ETHYLPHENOL,
+    "ferulic_acid": M_FERULIC,
+    "vinylguaiacol": M_VINYLGUAIACOL,
+    "ethylguaiacol": M_ETHYLGUAIACOL,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -301,6 +323,12 @@ CARBON_ATOMS: dict[str, int] = {
     "p_coumaric_acid": 9,
     "vinylphenol": 8,
     "ethylphenol": 8,
+    #: Ferulic (10 C) -> vinylguaiacol (9 C) + CO2 (1 C); vinylguaiacol -> ethylguaiacol is a
+    #: mole-for-mole C9 -> C9 transfer (decision D-55, the ferulic-acid branch of the Brett/POF
+    #: volatile-phenol pathway, split out from the p-coumaric-only ``hydroxycinnamics`` lump).
+    "ferulic_acid": 10,
+    "vinylguaiacol": 9,
+    "ethylguaiacol": 9,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -349,6 +377,10 @@ NITROGEN_ATOMS: dict[str, int] = {
     "p_coumaric_acid": 0,
     "vinylphenol": 0,
     "ethylphenol": 0,
+    #: The ferulic-acid branch is likewise nitrogen-free (decision D-55).
+    "ferulic_acid": 0,
+    "vinylguaiacol": 0,
+    "ethylguaiacol": 0,
 }
 
 

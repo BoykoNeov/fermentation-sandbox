@@ -305,25 +305,56 @@ def wine_schema() -> StateSchema:
             "hydroxycinnamics",
             "g/L",
             default=0.0,
-            description="lumped hydroxycinnamic-acid must precursors (p-coumaric + ferulic; booked "
-            "as p-coumaric). Decarboxylated to vinylphenols by Brettanomyces (and POF+ yeast); the "
-            "Brett volatile-phenol substrate (decision D-40)",
+            description="p-coumaric-acid must precursor (the p-coumaric branch of the Brett/POF "
+            "volatile-phenol pathway; decision D-40). Decarboxylated to vinylphenols by "
+            "Brettanomyces (and POF+ yeast). Split from ferulic_acid at decision D-55 — the two "
+            "precursors are genuinely distinct molecules (9 C vs 10 C), not a fixed-ratio lump",
         ),
         VarSpec(
             "vinylphenols",
             "g/L",
             default=0.0,
-            description="lumped 4-vinylphenol / 4-vinylguaiacol — the shared decarboxylase→"
-            "reductase intermediate reservoir (produced-only). POF+ yeast fills it but cannot "
-            "clear it; Brettanomyces reduces it to ethylphenols (decision D-40)",
+            description="4-vinylphenol — the p-coumaric-branch decarboxylase→reductase "
+            "intermediate reservoir (produced-only). POF+ yeast fills it but cannot clear it; "
+            "Brettanomyces reduces it to ethylphenols (decision D-40; split from vinylguaiacols "
+            "at D-55)",
         ),
         VarSpec(
             "ethylphenols",
             "g/L",
             default=0.0,
-            description="lumped 4-ethylphenol / 4-ethylguaiacol — the terminal Brett "
-            "volatile-phenol off-aromas ('barnyard'/'clove'; produced-only readout, decision "
-            "D-40)",
+            description="4-ethylphenol — the p-coumaric-branch terminal Brett volatile-phenol "
+            "off-aroma ('horse-sweat/barnyard'; produced-only readout, decision D-40; split from "
+            "ethylguaiacols at D-55)",
+        ),
+        VarSpec(
+            "ferulic_acid",
+            "g/L",
+            default=0.0,
+            description="ferulic-acid must precursor — the second Brett/POF volatile-phenol "
+            "branch, split out from the p-coumaric-only hydroxycinnamics pool because ferulic is "
+            "a genuinely distinct molecule (10 C, vs p-coumaric's 9 C), not a fixed-ratio split "
+            "(decision D-55). Decarboxylated to vinylguaiacols by Brettanomyces (and POF+ yeast), "
+            "the same enzyme (Pad1/Fdc1) as the p-coumaric branch, at a literature-sourced "
+            "slower relative rate (Edlin et al. 1998)",
+        ),
+        VarSpec(
+            "vinylguaiacols",
+            "g/L",
+            default=0.0,
+            description="4-vinylguaiacol — the ferulic-branch decarboxylase→reductase "
+            "intermediate reservoir (produced-only; decision D-55), the counterpart to "
+            "vinylphenols. POF+ yeast fills it but cannot clear it; Brettanomyces reduces it to "
+            "ethylguaiacols (Tchobanov et al. 2008 confirm the same reductase acts on both "
+            "vinylguaiacol and vinylphenol)",
+        ),
+        VarSpec(
+            "ethylguaiacols",
+            "g/L",
+            default=0.0,
+            description="4-ethylguaiacol — the ferulic-branch terminal Brett volatile-phenol "
+            "off-aroma ('clove/smoky'; produced-only readout, decision D-55), the counterpart to "
+            "ethylphenols",
         ),
         VarSpec(
             "X_brett",

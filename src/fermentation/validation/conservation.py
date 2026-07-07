@@ -224,6 +224,16 @@ def total_carbon(
         w[schema.slice("vinylphenols")] = carbon_mass_fraction("vinylphenol")
     if "ethylphenols" in schema:
         w[schema.slice("ethylphenols")] = carbon_mass_fraction("ethylphenol")
+    # The ferulic-acid branch (decision D-55): a genuinely distinct precursor/intermediate/product
+    # chain from the p-coumaric branch above (different carbon counts: 10 C -> 9 C + CO2, vs 9 C ->
+    # 8 C + CO2), weighted the same way at its own representative species so total_carbon closes
+    # through this chain too. On an undosed run these pools are empty and the Processes disabled.
+    if "ferulic_acid" in schema:
+        w[schema.slice("ferulic_acid")] = carbon_mass_fraction("ferulic_acid")
+    if "vinylguaiacols" in schema:
+        w[schema.slice("vinylguaiacols")] = carbon_mass_fraction("vinylguaiacol")
+    if "ethylguaiacols" in schema:
+        w[schema.slice("ethylguaiacols")] = carbon_mass_fraction("ethylguaiacol")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(
