@@ -4019,6 +4019,118 @@ and no benchmark doses them).
 **Closes the last D-40 pt4 deferral.** Both "POF v2" items from the deferred list — `E_a_pof`
 temperature dependence (D-54) and the vinylguaiacol/vinylphenol split (D-55) — are now done.
 
+## D-56 — First independent-data validation attempt (Varela et al. 2004): the model runs 2–4× too fast, diagnosed not fixed
+
+**Status: DOCUMENTED 2026-07-07** (no core-code change; a real-data regression benchmark added). With
+M2 physics complete through D-55, the owner picked "validation against real data" as the next
+direction. This is the first time the project checked a core M1 output against a dataset genuinely
+independent of the papers its own parameters were fit to.
+
+**The independence discipline, fixed before any comparison ran.** Per `CLAUDE.md`'s tier definition
+(`VALIDATED` = checked against independent measured data, `combine()`/`Tier.tiers.py`) and the
+project's own prior honesty about it (D-C/D-46: reproducing Coleman, Fish & Block 2007 is a
+consistency check, not validation, since that paper *is* where `mu_max`/`K_n`/`q_sugar_max`/
+`K_sugar_uptake`/`biomass_N_yield_log_*` etc. come from) — any candidate dataset first had to pass the
+test "were any of the model's parameters derived from this dataset or its source?" A deep-research
+sweep (104 sub-agents, 21 sources, 25 adversarially-verified claims) surfaced two genuinely
+independent wine candidates: Varela, Pizarro & Agosin 2004 (*Appl. Environ. Microbiol.* 70(6):3392-
+3400, doi:10.1128/AEM.70.6.3392-3400.2004, Pontificia Universidad Católica de Chile — no author/lab
+overlap with Coleman or any other cited source) and Palma et al. 2012 (Lisbon). Both turned out to be
+figure-only for their raw time-series (direct WebFetch of both PMC articles found no numeric table for
+the actual sugar/biomass/ethanol curves — Palma's "Table 1" is glucose-transport Km/Vmax, not a
+fermentation time series), but **Varela's Table 1 gives exact endpoint values with real replicate-
+based uncertainty** (3 independent experiments each): 300 mg N/L (well-fed) reaches dryness in
+170 ± 12 h with 5.8 ± 0.1 g/L final biomass; 50 mg N/L (severely N-deficient) takes 700 ± 10 h with
+1.5 ± 0.1 g/L biomass. Owner chose the endpoint check over digitizing figures — no digitization-error
+uncertainty to carry, and a genuinely out-of-sample test (50 mg N/L sits below Coleman's fitted
+70–350 mg N/L range).
+
+**Setup: same strain, so this is a clean two-lab comparison.** Varela used *S. cerevisiae* EC1118
+(Prise de Mousse) — the *same* strain `wine_generic.yaml`'s header already declares this model is
+calibrated on (Premier Cuvee/EC-1118), removing the strain-difference hypothesis. Isothermal 28°C
+(inside Coleman's 11–35°C fit range), synthetic must (120 g/L glucose + 120 g/L fructose = 240 g/L,
+100% fermentable — `must_fermentable_fraction=0.93` is a real-grape-must correction that under-loads
+a pure-sugar must by ~7%, noted but not fixed for this probe), 10⁶ cells/mL inoculum (converted to
+`pitch_gpl≈0.018` via the standard ~18 pg/cell dry-weight figure — an order-of-magnitude conversion,
+not exact, but the plausible range can't explain a 2–4× gap on its own).
+
+**The result: the model runs 2–4× too fast, worse at low N — and this decomposes into THREE distinct,
+separable findings, not one bug.**
+
+1. **A uniform ~2× gap present even in-range** (N=300, both T and N inside Coleman's fit window): model
+   83 h vs. Varela's measured 170 ± 12 h. This traces to an **already-documented** M1 simplification —
+   `q_sugar_max`'s own provenance note (`wine_generic.yaml:73`) says the rate is "applied to TOTAL
+   biomass with no active/inactive split, whereas Coleman's active X_A declines late — so M1 will
+   over-catalyse the tail." Not a new discovery; an independent dataset confirming a known caveat has
+   real, measurable cost.
+2. **An additional ~2× gap specific to severe N-deficiency** (N=50, below Coleman's 70–350 mg N/L
+   floor — genuine extrapolation): model 176 h vs. Varela's 700 ± 10 h, i.e. ~4× total vs. Varela.
+   **Isolated cleanly via a biomass-hours integral:** because `K_sugar_uptake` (10.3 g/L) is tiny next
+   to S (~100s g/L) for most of the run, sugar consumed ≈ `q_sugar_max_eff(T) · ∫X dt`, and since S₀ is
+   identical (240 g/L) for both N conditions, the model's own structure forces `∫X dt` to dryness to be
+   *nearly identical* between them (183.6 vs 183.7 g·h/L, confirmed numerically) — meaning **duration
+   in this model is set entirely by how fast biomass X(t) builds**, i.e. by nitrogen-limited growth
+   kinetics, not sugar-uptake rate. The model's N50/N300 duration ratio is 2.12×; Varela's real ratio is
+   4.12×. Literature-consistent explanation (Bisson's stuck/sluggish-fermentation review, via search
+   snippet — full-text PDF extraction failed, so this is *not* yet a citable primary source): hexose-
+   transporter turnover/degradation accelerates under nitrogen deficiency, reducing per-cell
+   fermentative capacity beyond what a lower biomass ceiling alone predicts — a mechanism absent from
+   this model.
+3. **A separate, genuine cross-study biomass-yield gap at N=300** (model 42% low: `Y_X/N` computed from
+   the Coleman regression at YAN=300 gives 11.2 g cell/g N vs. Varela's implied 19.3 g/g; at N=50 the
+   model is much closer, 27.7 vs. 30 g/g — only 8% low). Confirmed to be the model behaving exactly as
+   designed (`X_max = Y_X/N · N0` reproduces the simulated peak biomass to 3 significant figures at both
+   N levels), not a bug — a real difference between Coleman's Chardonnay-must lab strain-N-yield
+   relationship and Varela's synthetic-must EC1118 fermentations. **Explicitly not to be "fixed" by
+   raising the model's biomass** — more biomass would make the duration mismatch *worse*, not better,
+   since the model already over-catalyses (finding 1).
+
+**A single-term fix was prototyped and disproved — the firewall that stopped further tuning.** Per
+Bisson's mechanism, a candidate fix is an ethanol-driven, nitrogen-gated decline in effective
+`q_sugar_max` (`q_eff = q_sugar_max · exp(-k_decay · severity(N₀) · E)`, `severity = K_sev/(K_sev+N₀)`).
+Monkeypatch-prototyped (no core files touched) and swept over a parameter grid: **no single-term fit
+gets within 15% of both targets simultaneously** (best combined relative error ~60%), and there is a
+structural reason, not just a sweep gap — narrowing `K_sev` to differentiate N=300 from N=50 leaves
+N=300 under-corrected; widening `K_sev` to fix N=300's magnitude collapses the N-differentiation needed
+to stretch the ratio to 4.12×. **At least two distinct effects are needed**, confirming findings 1 and
+2 above are mechanistically separate, not one bug wearing two faces. The sweep was stopped there
+deliberately: Varela is the project's only independent wine dataset, and it can only be a *validation*
+set if it is never used as a *calibration* set — tuning ≥2 free parameters against 2 data points is a
+guaranteed fit that proves nothing and burns the one check the project has. **If a two-mechanism build
+is ever undertaken, the parameters must be sourced independently from Bisson's primary literature (the
+review's cited 3.6×/10× specific-uptake fold-changes, transporter turnover rates) — not fit to
+Varela — and then checked against a held-out condition or a third dataset**, preserving the
+validation/calibration firewall. Not started; a candidate future task, not scheduled.
+
+**What shipped: a real-data regression benchmark, not a physics fix.** `tests/benchmarks/
+test_validation_varela2004.py` runs both conditions and asserts the model's *current* characterized
+behavior (duration + biomass at each N level, and the gap ratio to Varela's measured values) stays
+within the diagnosed bands — so a future change that silently widens *or* closes the gap gets caught
+either way, and the honest "how far off are we" number stays live in the suite instead of decaying into
+a stale doc comment. No `BENCHMARKS`/`ReferenceSeries` entry (Varela's data is two endpoints with
+replicate uncertainty, not a fittable time series — the existing `compare_series` RMSE machinery
+doesn't apply; a plain benchmark test in the `test_milestone1.py` "realism regression guard" style
+fits better). No tier promotion: none of `growth.py`/`uptake.py`/`inhibition.py`/`arrhenius.py` moved
+off `PLAUSIBLE` — matching an aggregate endpoint doesn't license per-parameter tier bumps (non-
+identifiability: many different parameter combinations could reproduce the same duration/biomass pair),
+and separately, `ProcessSet.tier_of`'s honest `param_tiers` path already floors wine `S`/`X` at
+`SPECULATIVE` today via `K_s`/`K_repression`/`Y_byproduct_sugar` (all `speculative`, "author estimate"
+placeholders) regardless of any Process-class tier — so an end-to-end `VALIDATED` output was never
+reachable from this comparison alone, independent of the fit-quality question. §2.2 benchmarks
+untouched; undosed default runs unaffected (this is a new, additional scenario, not a change to any
+existing one).
+
+**Method beat worth remembering: three advisor() passes, each catching a different failure mode in
+real time.** Pass 1 (before running anything) caught that promoting a Process's tier is not what
+"validation" mechanically does in this codebase — traced `ProcessSet.tier_of`'s actual `min()`-combine
+behavior before writing a line of benchmark code. Pass 2 (after the first probe run) caught a
+confounded 20°C-vs-28°C comparison that was about to misattribute the whole gap to Arrhenius
+temperature extrapolation — the only valid same-temperature comparison was 28°C vs. 28°C, and D-14
+already established the model reproduces Coleman's own 11–35°C shape line-for-line, which the wrong
+framing would have silently contradicted. Pass 3 (mid-sweep) caught the validation/calibration firewall
+before a "good enough" two-parameter fit could be mistaken for a validated mechanism. Each catch was a
+premise correction the transcript shows in full, not a rubber stamp.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4080,3 +4192,12 @@ temperature dependence (D-54) and the vinylguaiacol/vinylphenol split (D-55) —
   SO₂, or a non-adduct binding mode), or accepting the gap as an honest model limit and
   documenting it in user-facing guidance instead of chasing it further. Not blocking M2; revisit
   if a future milestone needs the finished-wine SO₂/acetaldehyde slope tighter than ~1.1–1.5×.
+- **The D-56 Varela 2004 fermentation-rate gap (model 2× too fast in-range, 4× at severe N-
+  deficiency):** diagnosed into two separable mechanisms — a uniform tail-over-catalysis gap
+  (`q_sugar_max` applied to total not active biomass, already documented) and an N-gated capacity-
+  decline gap specific to severe nitrogen deficiency (Bisson transporter-turnover physics, absent
+  from the model) — but NOT fixed; a single-term fix was prototyped and structurally disproved. If
+  ever built: source the mechanism parameters independently from Bisson's primary literature (not
+  fit to Varela — that would burn the project's only independent wine dataset), then validate
+  against a held-out condition or a third dataset. Not blocking; owner's call whether/when to
+  revisit. See D-56.
