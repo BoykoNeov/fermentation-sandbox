@@ -331,9 +331,47 @@ k_prime_d:
       (printed a1 mean -3.61 vs its CR [-4.35e-3, -2.93e-3]; corrected -3.61e-3
       reproduces Fig 4), so it is a systematic typesetting fault, not a one-off.
       k'_d is the only QUADRATIC Coleman parameter and the steepest T-dependence -
-      why high temperature drives stuck fermentations. M1 is isothermal at 20 C so
-      no Arrhenius modifier is attached (the quadratic does not reduce to a single
-      activation energy anyway)."
+      why high temperature drives stuck fermentations. M1 was isothermal at 20 C so
+      no temperature modifier was attached; M2 added non-isothermal scenarios
+      without revisiting this, leaving k_prime_d silently frozen at its 20 C value
+      for any other temperature. D-56's Varela 2004 comparison (28 C, long
+      nitrogen-limited runs) exposed the resulting gap; D-57 closes it with
+      k_prime_d_a1/k_prime_d_a2 below (Coleman's own quadratic regression,
+      the form a single activation energy cannot reproduce - see
+      ColemanQuadraticDeathTemperature)."
+
+k_prime_d_a1:
+  value: -0.108
+  unit: "1/degC"
+  tier: plausible
+  uncertainty: { low: -0.194, high: -0.033, note: "Coleman Table A2 a1 95% credible region for Log(k'_d), degC^-1 (the typo-corrected -1.08e-1, see k_prime_d notes)" }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884, Table A2"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; ln(k'_d) = -9.81 - 0.108*T + 0.00478*T^2 (T in degC)"
+    notes: "Linear coefficient of Coleman's quadratic ln(k'_d) regression (decision D-57). Read by ColemanQuadraticDeathTemperature together with k_prime_d_a2, normalised to T_ref so the -9.81 intercept cancels (k_prime_d already IS the T_ref-evaluated value)."
+
+k_prime_d_a2:
+  value: 0.00478
+  unit: "1/degC^2"
+  tier: plausible
+  uncertainty: { low: 0.00397, high: 0.00559, note: "Coleman Table A2 a2 95% credible region for Log(k'_d), degC^-2" }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884, Table A2"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; ln(k'_d) = -9.81 - 0.108*T + 0.00478*T^2 (T in degC)"
+    notes: "Quadratic coefficient - the term that makes k'_d Coleman's steepest, curvature-bearing T-dependence (decision D-57). Positive, so the regression accelerates upward at both temperature extremes around its ~11.3 C vertex (-a1/(2*a2)); see k_prime_d_t_floor for the low-T clamp this makes necessary."
+
+k_prime_d_t_floor:
+  value: 11.0
+  unit: "degC"
+  tier: plausible
+  uncertainty: { low: 11.0, high: 11.0, note: "not a fitted quantity - the floor of Coleman's own studied temperature range" }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; the paper's fitted/reported temperature range is 11-35 C"
+    notes: "ColemanQuadraticDeathTemperature clamps T to this floor before evaluating the quadratic (decision D-57): below the ~11.3 C vertex the regression turns around and predicts MORE death as it gets COLDER, an extrapolation artifact outside Coleman's studied range, not a real effect. No ceiling clamp - the quadratic's upward acceleration above 11.3 C is the sourced, physically-correct 'heat causes stuck fermentations' direction and Coleman's fit already runs to 35 C."
 
 # -- Arrhenius temperature dependence (per-rate, decision D-11) ----------------
 # f = exp(-(E_a/R)(1/T - 1/T_ref)), normalised so the rate constant is used

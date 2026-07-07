@@ -81,6 +81,7 @@ from fermentation.core.kinetics import (
     BrettDecarboxylation,
     BrettGrowth,
     BrettVinylphenolReduction,
+    ColemanQuadraticDeathTemperature,
     DiacetylReduction,
     EsterSynthesis,
     EsterVolatilization,
@@ -461,8 +462,11 @@ class Medium:
 #: Wine and beer share the *same* mechanism set — biomass growth, fermentative
 #: sugar uptake, and ethanol-driven cell inactivation (the cumulative viability
 #: brake that sets the fermentation timescale, Coleman 2007), with per-rate
-#: Arrhenius temperature dependence scaling growth and uptake. The only structural
-#: difference between the two media is the sugar vector (1 slot vs 3): beer's
+#: temperature dependence scaling all three — Arrhenius for growth/uptake,
+#: Coleman's own quadratic regression for death (``ColemanQuadraticDeathTemperature``,
+#: decision D-57 — a single Arrhenius E_a cannot reproduce that curvature). The
+#: only structural difference between the two media is the sugar vector (1 slot
+#: vs 3): beer's
 #: sequential glucose→maltose→maltotriose uptake is handled *inside*
 #: :class:`~fermentation.core.kinetics.uptake.SugarUptakeToEthanolCO2` via catabolite
 #: repression, so it needs no extra Process here.
@@ -479,6 +483,7 @@ _PRIMARY_FERMENTATION_PROCESSES: tuple[Callable[[], Process], ...] = (
 _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
     ArrheniusTemperature.for_growth,
     ArrheniusTemperature.for_uptake,
+    ColemanQuadraticDeathTemperature,
 )
 
 #: Tier-2 temperature-/metabolism-driven aroma byproducts (Milestone 2, decision
@@ -827,6 +832,7 @@ _TEMPERATURE_PROCESSES: tuple[Callable[[], Process], ...] = (TemperatureRamp,)
 _WINE_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
     lambda: ArrheniusTemperature.for_growth(AminoAcidAssimilation.name),
     ArrheniusTemperature.for_uptake,
+    ColemanQuadraticDeathTemperature,
 )
 
 

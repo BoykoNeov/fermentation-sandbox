@@ -4131,6 +4131,142 @@ framing would have silently contradicted. Pass 3 (mid-sweep) caught the validati
 before a "good enough" two-parameter fit could be mistaken for a validated mechanism. Each catch was a
 premise correction the transcript shows in full, not a rubber stamp.
 
+## D-57 — Correction: D-56 finding 1 was misdiagnosed (a stale note); the real bug was `k_prime_d`'s missing quadratic temperature scaling, fixed and sourced from Coleman's own regression
+
+**Status: LANDED 2026-07-07.** Owner picked up D-56's "two-mechanism uptake-decline build" as the
+next task: source Bisson transporter-turnover parameters independently to fix the extra ~2× gap at
+severe nitrogen deficiency. Before building anything, the mechanism-1 premise ("`q_sugar_max`
+applies to TOTAL biomass with no active/inactive split") was checked against the *current* code
+rather than taken from the D-56 record — it did not hold up, and that check reshaped the entire task.
+
+**Mechanism 1 does not exist as a fixable gap — it was already fixed in D-13, three commits before
+the note that "diagnosed" it was even written.** `wine_generic.yaml`'s `q_sugar_max` caveat ("M1
+applies this rate to TOTAL biomass with no active/inactive split") was added in commit `5da7725`
+(D-12); `EthanolInactivation` — which splits `X` (viable) from `X_dead` and is what both
+`GrowthNitrogenLimited` and `SugarUptakeToEthanolCO2` already read exclusively — landed in the very
+next commit, `c244ae6` (D-13). Structural check: this model's `dX/dt = mu·X − k'_d·E·X` is
+byte-for-byte Coleman's own eq. 2 for his active pool `X_A` (`test_coleman_reconstruction.py`
+already proves line-for-line agreement); Coleman's separate "total biomass" `x` (his eq. 1, no
+death term) is used by *nothing* in his own eqs. 1–8, so the model correctly never tracks it
+either. The note describes a pre-D-13 model that no longer exists. Advisor-caught before any
+Bisson literature search was spent chasing a mechanism that was never missing.
+
+**The real, sourced bug: `k_prime_d` — Coleman's death-rate constant and the one parameter his fit
+found QUADRATIC in temperature — shipped with no temperature modifier at all.** The D-12 provenance
+note says so explicitly: "M1 is isothermal at 20 C so no Arrhenius modifier is attached (the
+quadratic does not reduce to a single activation energy anyway)." Correct scoping *for M1* — but M2
+added non-isothermal scenarios (temperature ramps, D-35/36) without anyone revisiting this, so every
+non-20 C wine/beer run since has driven growth and uptake with Arrhenius scaling while leaving death
+frozen at the 20 C rate. Decisive check (advisor-directed): integrate Coleman's own eqs. 1–8
+(already sitting in `test_coleman_reconstruction.py`) at Varela's exact 28 C/S0/pitch/N0 inputs, with
+`k_prime_d` frozen at its 20 C value exactly as the engine does — this reproduces the engine's
+numbers almost exactly (N=300: 78.5 h vs engine 83 h; N=50: 164.5 h vs engine 176 h), while the
+*correctly* temperature-scaled Coleman reference gives N=300: 84.5 h (barely different — short run,
+death is a minor contributor by dryness) and N=50: 283 h (much longer — 40+ days of compounding
+ethanol exposure at the wrong, too-gentle death rate). The asymmetry (fermentation-*driving*
+processes correctly accelerate at 28 C, the fermentation-*braking* one doesn't) is exactly why D-56
+read the gap as "worse at low N": it isn't a missing nitrogen-transporter mechanism, it's a death
+rate quietly stuck at the wrong temperature on any long run.
+
+**Fix: `ColemanQuadraticDeathTemperature`, a new `RateModifier` implementing the regression
+directly, not an Arrhenius approximation.** `arrhenius.py` already had a per-rate `E_a` form
+(D-11), but the D-12 note is explicit that a single activation energy cannot reproduce a quadratic's
+curvature — so this modifier evaluates Coleman's `ln(k'_d) = a0 + a1·T_C + a2·T_C²` directly,
+normalised to `T_ref` so the intercept `a0` cancels (`k_prime_d` itself already IS the T_ref-evaluated
+value): `factor(T) = exp(a1·(T_C−T_ref_C) + a2·(T_C²−T_ref_C²))`, exactly 1 at `T = T_ref` (same
+reference-anchored pattern as `ArrheniusTemperature`, D-11). Two new sourced parameters,
+`k_prime_d_a1`/`k_prime_d_a2` (Coleman Table A2's linear/quadratic coefficients, tier PLAUSIBLE for
+wine, transferred/SPECULATIVE for beer — same pattern as `k_prime_d` itself in each file), plus
+`k_prime_d_t_floor` (11 C, Coleman's own studied-range floor): the quadratic's vertex sits at
+~11.3 C, below which it unphysically predicts *more* death as it gets *colder* — an extrapolation
+artifact outside Coleman's fitted range, not a real effect, so temperature is clamped to the floor
+before the quadratic is evaluated (no ceiling clamp — the upward acceleration above 11.3 C is the
+sourced, physically-correct "heat causes stuck fermentations" direction and Coleman's own fit runs
+to 35 C). Wired into both wine and beer's shared `_PRIMARY_FERMENTATION_MODIFIERS` (`EthanolInactivation`
+is a shared Process, D-13); at `T = T_ref = 20 C` the factor is exactly 1, so §2.2, the Coleman
+reconstruction, and every other 20 C-anchored test are untouched by construction.
+
+**Measured before/after against Varela (the D-56 comparison this was meant to improve):**
+
+| condition | pre-D-57 | post-D-57 | Varela (real) |
+|---|---|---|---|
+| N=300 hours-to-dryness | 83.0 h | 89.0 h | 170 h |
+| N=300 gap ratio | 2.05x | 1.91x | — |
+| N=50 hours-to-dryness | 176.0 h | 314.0 h | 700 h |
+| N=50 gap ratio | 3.98x | 2.23x | — |
+| N50/N300 duration ratio | 2.12x | 3.53x | 4.12x |
+
+The N=300 in-range comparison barely moves (short run, death immaterial by dryness — exactly the
+"inert on short/high-N runs" prediction), confirming that residual ~1.9x gap is a genuine
+Coleman-vs-Varela cross-study difference the engine faithfully reproduces (Coleman's own reference
+model, run at 28 C with Varela's inputs, gives 84.5 h — matching the engine, not Varela). The N=50
+gap narrows from ~4x to ~2.2x, and the central D-56 structural finding (model under-predicts how
+much severe N-deficiency slows fermentation, relative to an in-range baseline) survives but shrinks:
+the model's N50/N300 ratio was 1.94x too small relative to Varela's 4.12x pre-fix; it is now only
+1.17x too small. **This residual is left as an open, honestly small gap — a Bisson-sourced
+nitrogen-gated transporter-capacity mechanism (D-56's original proposal) is no longer clearly
+warranted at this size, chasing a ~1.17x residual against a single out-of-range data point risks the
+same overfitting the D-56 calibration/validation firewall was built to prevent. Owner's call whether
+to pursue it further or accept this as a documented model limit** (see Deferred, below — updated
+from D-56's framing).
+
+**A second, independent correction surfaced while finishing this comparison properly (advisor-caught
+before commit): the benchmark's biomass assertion was reading the wrong state variable, unrelated to
+the `k_prime_d` fix itself.** `_run_varela_condition` compared Varela's biomass to viable `X` alone.
+Checked directly against the paper (WebFetch of the primary source, not assumed): Varela measures
+TOTAL dry cell weight by gravimetric filtration ("dried...to a constant weight at 85 C") — dead and
+viable cells combined, not a viable count. Because `EthanolInactivation` only *transfers* mass
+between `X`/`X_dead` (D-13), `X + X_dead` is exactly conserved once nitrogen-limited growth stops
+(~40 h in, confirmed flat to 5 significant figures for the rest of both runs) — so it is both the
+methodologically-correct comparison and a strictly more robust one than a viable-only reading, which
+depends on exactly when death has progressed to at the dryness-crossing instant. Corrected: total
+biomass comes out ~3.38 g/L at N=300 (42% below Varela's 5.8) and ~1.40 g/L at N=50 (7% below
+Varela's 1.5) — reproducing D-56 finding 3's already-documented Y_X/N cross-study numbers almost
+exactly, which the old viable-only reading had never actually been measuring. The biomass assertions
+now cleanly guard that growth-yield finding, separate from the duration assertions' death/uptake
+timing — a cleaner split than before, and independent of whether the `k_prime_d` fix above landed at
+all (total biomass is unchanged by it, being mass-neutral under the death transfer).
+
+**A related tension worth flagging, not fixing:** at N=50 the model's own viable/dead split implies
+~94–98% of biomass is "dead" by the time dryness arrives, while Varela separately reports **>97%
+viability throughout** (LIVE/DEAD membrane-integrity fluorescence staining). Read carefully before
+treating this as a new crisis: Coleman's own reference model shows the *identical* near-total `X_A`
+crash at N=50 (0.099 g/L of a ~1.4 g/L total, matching the engine) — so this is a Coleman-vs-Varela
+divergence the engine faithfully reproduces, not a new model defect. More importantly, `X_dead` is
+documented (`inactivation.py`) as loss of *catalytic* (fermentative) capacity — the classical yeast
+**vitality** concept — which is a different quantity from LIVE/DEAD's **viability** (membrane
+integrity); the two are not expected to agree, and `k_prime_d` was fit to Coleman's sugar curves
+(D-13/D-14), never to a viability count. Changing `k_prime_d`'s magnitude to chase agreement with a
+viability assay it was never fit against would break the Coleman line-for-line reconstruction and is
+out of scope here — flagged for whoever next touches death-rate calibration or wants a user-facing
+"% viable yeast" output, not actioned by D-57.
+
+**Test consequences (measured, re-banded, not loosened blindly — the D-46/D-51/D-53 discipline):**
+`test_validation_varela2004.py`'s three tests re-banded to the new measured values/ratios above (and
+its docstring rewritten to state the corrected diagnosis, not the stale one). `test_media.py`'s
+`EXPECTED_MODIFIERS` gained `coleman_death_temperature` for both media. One genuine downstream
+consequence, not a bug: `test_vicinal_diketones.py::test_warmer_ferment_is_cleaner_the_diacetyl_rest`
+asserted wine's 28 C/45-day run clears diacetyl below the ~0.1 mg/L lager-perceptibility threshold;
+post-fix it measures 0.162 mg/L (was ~0.03) because the now-correctly-faster warm-ferment death
+leaves less viable/reductase-capable biomass surviving to day 45 than the old, under-scaled death
+rate did. The monotonic "warmer is cleaner" direction and a large (~3x) magnitude both still hold and
+are what the re-banded assertion now checks; the sub-perceptibility claim was retired as no longer
+true for isolated-yeast reductase at this exact duration (real wine also gets MLF bacterial diacetyl
+reduction, unmodelled here). 664 passed (unchanged count — a fix, not new tests), ruff+mypy clean.
+
+**Method beat worth remembering: two advisor() passes, each correcting a premise the transcript would
+otherwise have carried forward uncritically.** Pass 1 caught that mechanism 1 (the task's whole
+starting premise) was stale documentation, not a live bug — verified with a probe run showing `X`
+already declines substantially via inactivation before the advisor call, then confirmed structurally
+against Coleman's own eqs. via `test_coleman_reconstruction.py`. Pass 2, after the `k_prime_d`
+discovery, directed the single decisive check (Coleman's own reference model at 28 C with Varela's
+inputs, both with and without the temperature-scaling bug) that turned "this looks like a T-scaling
+bug" into a demonstrated, quantified one — and flagged the blast-radius grep and the honest-residual
+framing before declaring the fix complete. Both times the initial "two-mechanism build" framing was
+half-wrong; the data reshaped it into "fix one sourced bug, measure, then let the owner decide if a
+much smaller residual is worth a new mechanism" — the same D-48/D-49/D-51 pattern this project keeps
+hitting when a delegated diagnosis is checked against current code rather than trusted at face value.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4192,12 +4328,13 @@ premise correction the transcript shows in full, not a rubber stamp.
   SO₂, or a non-adduct binding mode), or accepting the gap as an honest model limit and
   documenting it in user-facing guidance instead of chasing it further. Not blocking M2; revisit
   if a future milestone needs the finished-wine SO₂/acetaldehyde slope tighter than ~1.1–1.5×.
-- **The D-56 Varela 2004 fermentation-rate gap (model 2× too fast in-range, 4× at severe N-
-  deficiency):** diagnosed into two separable mechanisms — a uniform tail-over-catalysis gap
-  (`q_sugar_max` applied to total not active biomass, already documented) and an N-gated capacity-
-  decline gap specific to severe nitrogen deficiency (Bisson transporter-turnover physics, absent
-  from the model) — but NOT fixed; a single-term fix was prototyped and structurally disproved. If
-  ever built: source the mechanism parameters independently from Bisson's primary literature (not
-  fit to Varela — that would burn the project's only independent wine dataset), then validate
-  against a held-out condition or a third dataset. Not blocking; owner's call whether/when to
-  revisit. See D-56.
+- ~~The D-56 Varela 2004 fermentation-rate gap~~ — **D-56's mechanism-1 diagnosis was WRONG (stale
+  note; already fixed in D-13) and mechanism 2 was substantially CLOSED in D-57 (2026-07-07)** by
+  fixing a real, sourced bug (`k_prime_d`'s missing quadratic temperature scaling) instead of
+  building a novel Bisson mechanism. Gaps narrowed: N=300 ~2.05x→1.91x (barely moves, confirming a
+  genuine Coleman-vs-Varela cross-study difference, not a model defect); N=50 ~3.98x→2.23x; the
+  N50/N300 ratio shortfall against Varela's real 4.12x fell from ~1.94x-too-small to
+  ~1.17x-too-small. **What remains is a small, honestly-documented residual** (that ~1.17x), which a
+  Bisson-sourced nitrogen-gated transporter mechanism could still chase, but D-57 judged it no
+  longer clearly worth the calibration/validation-firewall risk at this size — owner's call whether
+  to pursue further or accept it as a documented model limit. See D-57 (supersedes this framing).

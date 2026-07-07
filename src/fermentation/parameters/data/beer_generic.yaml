@@ -166,6 +166,36 @@ k_prime_d:
     conditions: "generic ale yeast; ethanol inactivation assumed yeast-generic at the species level"
     notes: "No cited beer model fits an ethanol-driven inactivation constant of our form (de Andres-Toro use a stoichiometric ethanol wall instead), so we transfer the verifiable Coleman wine value (k'_d(20 C) = 4.28e-5; see the wine file for the Table A2 a1 typo correction). Speculative because transferred, not beer-sourced. Largely inert for the M1 beer benchmark: a 1.048 OG wort makes only ~55 g/L ethanol, where k_d = 2.4e-3/h gives a viable-cell half-life of ~290 h - a negligible tail brake, not the dominant control (q_sugar_max sets beer's pace)."
 
+k_prime_d_a1:
+  value: -0.108
+  unit: "1/degC"
+  tier: speculative
+  uncertainty: { low: -0.194, high: -0.033, note: "transferred from the Coleman wine fit (Table A2), same as k_prime_d itself; ale-specific value not sourced" }
+  provenance:
+    source: "author estimate (transferred from Coleman 2007 wine k'_d regression, doi:10.1128/aem.00670-07, Table A2)"
+    conditions: "generic ale yeast; ethanol inactivation assumed yeast-generic at the species level, same transfer rationale as k_prime_d"
+    notes: "Read by ColemanQuadraticDeathTemperature together with k_prime_d_a2 (decision D-57). Beer's short, high-nitrogen, near-T_ref ferments make this modifier largely inert (same reasoning as k_prime_d's own note); carried for consistency and any future warm/long beer scenario."
+
+k_prime_d_a2:
+  value: 0.00478
+  unit: "1/degC^2"
+  tier: speculative
+  uncertainty: { low: 0.00397, high: 0.00559, note: "transferred from the Coleman wine fit (Table A2); ale-specific value not sourced" }
+  provenance:
+    source: "author estimate (transferred from Coleman 2007 wine k'_d regression, doi:10.1128/aem.00670-07, Table A2)"
+    conditions: "generic ale yeast; ethanol inactivation assumed yeast-generic at the species level, same transfer rationale as k_prime_d"
+    notes: "Quadratic coefficient, transferred (decision D-57); see wine_generic.yaml's k_prime_d_a2 for the vertex/floor rationale, identical here."
+
+k_prime_d_t_floor:
+  value: 11.0
+  unit: "degC"
+  tier: speculative
+  uncertainty: { low: 11.0, high: 11.0, note: "transferred from Coleman's studied wine range; ale fermentation range not separately sourced" }
+  provenance:
+    source: "author estimate (transferred from Coleman, Fish & Block 2007's 11-35 C studied range, doi:10.1128/aem.00670-07)"
+    conditions: "generic ale yeast; the a1/a2 coefficients transferred above are themselves only validated over Coleman's 11-35 C wine range"
+    notes: "Low-T clamp for the transferred quadratic (decision D-57); see wine_generic.yaml's k_prime_d_t_floor for the vertex-extrapolation rationale."
+
 # -- Arrhenius temperature dependence (per-rate, decision D-11) ----------------
 # INERT for M1: runs are isothermal at T_ref so f = 1 and these never bite.
 # Carried for Tier-2 readiness. We carry the verifiable wine-derived value

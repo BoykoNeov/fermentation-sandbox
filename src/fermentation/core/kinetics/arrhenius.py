@@ -8,6 +8,13 @@ mechanism *scales* an existing flux rather than *adding* one, so it is a
 :class:`~fermentation.core.kinetics.inhibition.EthanolInhibition`), not a summed
 :class:`~fermentation.core.process.Process`. Decision **D-11**.
 
+This module also holds :class:`ColemanQuadraticDeathTemperature` (decision D-57),
+which scales :class:`~fermentation.core.kinetics.inactivation.EthanolInactivation`.
+It is *not* Arrhenius-shaped (Coleman's own ``k'_d`` regression is quadratic in
+°C, not exponential in 1/T) but lives here because its role — a per-rate,
+reference-anchored temperature factor on a primary-fermentation Process — is the
+same concern this module owns.
+
 **Reference-anchored form (no separate pre-exponential).** Rather than carry an
 absolute pre-exponential ``A``, the factor is normalised to a reference
 temperature ``T_ref`` — the temperature the rate constants were measured at::
@@ -59,6 +66,7 @@ import math
 from collections.abc import Mapping
 
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited
+from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.process import RateModifier
 from fermentation.core.state import FloatArray, StateSchema
@@ -151,3 +159,81 @@ class ArrheniusTemperature(RateModifier):
         # Always positive (exp), so no clamp: a single positive scalar on a
         # conserving vector cannot break a balance or flip a flux sign (D-11).
         return arrhenius_factor(temp, params[self._e_a_param], params["T_ref"])
+
+
+#: Kelvin/Celsius offset (exact, SI-defined). Local to this module for the same
+#: reason ``GAS_CONSTANT`` is (D-3/D-8's "code-with-citation" rule): the
+#: :class:`ColemanQuadraticDeathTemperature` regression below is Coleman's own,
+#: written directly in degrees C (their Table A2), so it needs this conversion —
+#: nothing else in ``core`` does, by design (canonical internal temperature is
+#: Kelvin; Celsius only appears at I/O edges per ``CLAUDE.md``, except here where
+#: the *source regression itself* is in Celsius).
+_KELVIN_OFFSET = 273.15
+
+
+class ColemanQuadraticDeathTemperature(RateModifier):
+    """Coleman's own quadratic temperature regression for ethanol-driven death.
+
+    ``k'_d`` (:class:`~fermentation.core.kinetics.inactivation.EthanolInactivation`'s
+    rate constant) is the one Coleman 2007 Table A2 parameter that is **quadratic**
+    in temperature (°C), not log-linear like ``mu_max``/``beta_max`` — "the only
+    QUADRATIC Coleman parameter and the steepest T-dependence" (wine_generic.yaml's
+    ``k_prime_d`` provenance note). A single-``E_a`` Arrhenius tangent (the
+    :class:`ArrheniusTemperature` form above) cannot reproduce a quadratic's
+    curvature, so this modifier implements the regression directly rather than
+    approximating it — decision **D-57**.
+
+    ``ln(k'_d(T)) = a0 + a1·T_C + a2·T_C²`` (Coleman Table A2); the intercept
+    ``a0`` cancels when normalised to ``T_ref`` (the temperature ``k_prime_d``
+    itself is evaluated at, 20 C), leaving::
+
+        factor(T) = exp( a1·(T_C - T_ref_C) + a2·(T_C² - T_ref_C²) )
+
+    which is exactly 1 at ``T = T_ref`` (the measured ``k_prime_d`` used unscaled),
+    matching the reference-anchored pattern :class:`ArrheniusTemperature` uses (D-11).
+
+    **Why this was missing until D-57, and why it matters.** ``k_prime_d`` shipped
+    with *no* temperature modifier at all (D-11/D-12): "M1 is isothermal at 20 C so
+    no Arrhenius modifier is attached." That was correct scoping *for M1* — but M2
+    added non-isothermal scenarios (temperature ramps, D-35/36) without anyone
+    revisiting this, so every non-20 C wine/beer run since has driven growth and
+    uptake with Arrhenius scaling while leaving death frozen at the 20 C rate. That
+    asymmetry is inert on short/high-nitrogen runs (death is a minor contributor by
+    the time dryness arrives) but compounds badly on long/nitrogen-limited runs at
+    T != T_ref, exactly the regime D-56's Varela 2004 comparison (28 C) exposed:
+    most of what D-56 read as a missing nitrogen-gated capacity-decline mechanism
+    was this simpler, sourced T-scaling gap (see D-57 for the measured before/after).
+
+    **Unphysical extrapolation guard.** The quadratic's vertex sits at ~11.3 C
+    (``-a1/(2a2)``); below it the curve turns around and predicts *more* death as
+    it gets *colder*, which is backwards. Coleman's own fitted range floors at
+    11 C, so ``T_C`` is clamped to ``k_prime_d_t_floor`` before the quadratic is
+    evaluated — a cold-cellar/lagering scenario gets the floor's (still gentle)
+    death rate instead of a runaway one. No ceiling clamp: Coleman's fit runs to
+    35 C and the quadratic keeps accelerating in the physically-correct direction
+    above that (steeper death at higher T is exactly the "why heat causes stuck
+    fermentations" mechanism this Process exists for).
+    """
+
+    name = "coleman_death_temperature"
+    tier = Tier.PLAUSIBLE
+    modifies = (EthanolInactivation.name,)
+    #: ``T_ref`` is shared with :class:`ArrheniusTemperature`; the other three are
+    #: this modifier's own (parameter-tier propagation caps ``X``/``X_dead`` by
+    #: whichever tier is lowest, so wine's PLAUSIBLE/beer's SPECULATIVE `k_prime_d_a*`
+    #: sourcing correctly floors each medium's output tier, D-1).
+    reads = ("k_prime_d_a1", "k_prime_d_a2", "k_prime_d_t_floor", "T_ref")
+
+    def factor(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> float:
+        temp_c = float(y[schema.slice("T")][0]) - _KELVIN_OFFSET
+        t_ref_c = params["T_ref"] - _KELVIN_OFFSET
+        # Clamp only the low end (see class docstring); Coleman's fit has no
+        # physically-motivated ceiling within fermentation-relevant temperatures.
+        temp_c = max(temp_c, params["k_prime_d_t_floor"])
+        a1 = params["k_prime_d_a1"]
+        a2 = params["k_prime_d_a2"]
+        # Always positive (exp): a single positive scalar on a conserving
+        # X -> X_dead transfer cannot break the carbon/nitrogen balance (D-11).
+        return float(math.exp(a1 * (temp_c - t_ref_c) + a2 * (temp_c**2 - t_ref_c**2)))

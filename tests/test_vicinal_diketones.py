@@ -486,9 +486,25 @@ def test_warmer_ferment_is_cleaner_the_diacetyl_rest(medium, temps, days):
         f"{medium} final diacetyl should fall with T (warm rest cleaner): "
         f"{dict(zip(temps, finals, strict=True))} mg/L"
     )
-    # The cold run leaves a perceptible buttery note (above the ~0.1 mg/L lager threshold);
-    # the warmest clears it well below — a real, not merely numeric, difference.
-    assert finals[0] > 0.1 > finals[-1]
+    # The cold run leaves a perceptible buttery note (above the ~0.1 mg/L lager threshold).
+    assert finals[0] > 0.1
+    # D-57 gave EthanolInactivation its (previously missing) real Coleman quadratic
+    # temperature scaling, so warm ferments now correctly lose viable/reductase-capable
+    # biomass faster than before (when death was silently frozen at the 20 C rate at
+    # EVERY temperature). Wine's 28 C run no longer clears diacetyl below the ~0.1 mg/L
+    # perceptibility threshold on isolated yeast reductase alone (0.162 mg/L measured,
+    # was ~0.03 pre-D-57) -- a real, sourced physics change, not a loosened pass. The
+    # practical "warm it up" claim still holds as a large, measured reduction (~3x cold
+    # vs warm here); asserting sub-perceptibility would need additional reductase
+    # capacity this isolated-yeast scenario doesn't model (e.g. MLF bacteria). Beer's
+    # much lower ethanol tolerance keeps k_prime_d inert (see beer_generic.yaml), so its
+    # warm run still clears comfortably below threshold — no relative-margin needed there.
+    if medium == "wine":
+        assert finals[0] / finals[-1] > 2.5, (
+            f"warm rest should still cut diacetyl by a large factor: {finals}"
+        )
+    else:
+        assert finals[-1] < 0.1
 
 
 def test_warm_rest_shows_peak_then_fall_and_clears():

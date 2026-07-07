@@ -301,8 +301,13 @@ EXPECTED_PROCESSES = {
 # byte-for-byte the validated core (the wine-only MLF *modifier* parallel).
 CARRYING_CAPACITY_MODIFIER = "biomass_carrying_capacity"
 EXPECTED_MODIFIERS = {
-    "wine": {"arrhenius_growth", "arrhenius_uptake", CARRYING_CAPACITY_MODIFIER},
-    "beer": {"arrhenius_growth", "arrhenius_uptake"},
+    "wine": {
+        "arrhenius_growth",
+        "arrhenius_uptake",
+        "coleman_death_temperature",
+        CARRYING_CAPACITY_MODIFIER,
+    },
+    "beer": {"arrhenius_growth", "arrhenius_uptake", "coleman_death_temperature"},
 }
 
 

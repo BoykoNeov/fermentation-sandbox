@@ -15,7 +15,11 @@ from fermentation.core.kinetics.acetaldehyde import (
     AcetaldehydeReduction,
 )
 from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
-from fermentation.core.kinetics.arrhenius import ArrheniusTemperature, arrhenius_factor
+from fermentation.core.kinetics.arrhenius import (
+    ArrheniusTemperature,
+    ColemanQuadraticDeathTemperature,
+    arrhenius_factor,
+)
 from fermentation.core.kinetics.autolysis import YeastAutolysis, autolysis_flux
 from fermentation.core.kinetics.brett import (
     BrettDeath,
@@ -84,6 +88,7 @@ __all__ = [
     "BrettVinylphenolReduction",
     "DiacetylReduction",
     "ArrheniusTemperature",
+    "ColemanQuadraticDeathTemperature",
     "EsterSynthesis",
     "EsterVolatilization",
     "EthanolInactivation",
