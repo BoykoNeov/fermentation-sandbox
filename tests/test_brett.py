@@ -17,7 +17,9 @@ import numpy as np
 import pytest
 
 from fermentation.core.chemistry import (
+    M_ETHYLGUAIACOL,
     M_ETHYLPHENOL,
+    M_VINYLGUAIACOL,
     M_VINYLPHENOL,
     carbon_mass_fraction,
 )
@@ -202,6 +204,36 @@ def test_carbon_closes_through_the_chain():
     assert_nonnegative(traj, ("hydroxycinnamics", "vinylphenols", "ethylphenols"))
 
 
+def test_carbon_closes_through_the_ferulic_branch():
+    """The D-55 ferulic branch, end-to-end: total_carbon closes with BOTH branches active.
+
+    Dosing ferulic_acid_gpl alongside hydroxycinnamic_gpl exercises the full pipeline (scenario
+    dosing -> decarboxylation -> reduction) for the second precursor, not just the per-Process
+    derivatives() calls above — a genuine wiring check the unit-level tests can't catch (e.g. a
+    typo in the compile-seam initial-condition key, or a slot the reduction step forgot to drain).
+    """
+    compiled, traj = _run(hydroxycinnamic_gpl=0.15, ferulic_acid_gpl=0.08, brett_pitch_gpl=0.4)
+    fn = total_carbon(
+        compiled.schema, biomass_carbon_fraction=compiled.param_values["biomass_C_fraction"]
+    )
+    assert_conserved(traj, fn, label="carbon (ferulic branch)")
+    assert_nonnegative(
+        traj,
+        (
+            "hydroxycinnamics",
+            "vinylphenols",
+            "ethylphenols",
+            "ferulic_acid",
+            "vinylguaiacols",
+            "ethylguaiacols",
+        ),
+    )
+    # Both branches actually ran and reduced through to their terminal readouts.
+    assert float(traj.series("ethylphenols")[-1]) > 0.0
+    assert float(traj.series("ethylguaiacols")[-1]) > 0.0
+    assert float(traj.series("ferulic_acid")[-1]) < 0.08  # genuinely consumed
+
+
 # -- 3. per-Process stoichiometry + touches -----------------------------------
 
 
@@ -281,7 +313,45 @@ def test_reduction_is_carbon_neutral_transfer(schema, params):
     moles_consumed = -dvp / M_VINYLPHENOL
     moles_produced = dep / M_ETHYLPHENOL
     assert moles_produced == pytest.approx(moles_consumed, rel=1e-12)
-    assert set(BrettVinylphenolReduction.touches) == {"vinylphenols", "ethylphenols"}
+    assert d[schema.slice("vinylguaiacols")][0] == 0.0  # undosed branch is exactly inert
+    assert d[schema.slice("ethylguaiacols")][0] == 0.0
+    assert set(BrettVinylphenolReduction.touches) == {
+        "vinylphenols",
+        "ethylphenols",
+        "vinylguaiacols",
+        "ethylguaiacols",
+    }
+
+
+def test_reduction_ferulic_branch_is_carbon_neutral_transfer(schema, params):
+    """vinylguaiacol → ethylguaiacol is mole-for-mole (C9 → C9) — the D-55 ferulic-branch analogue.
+
+    Tchobanov et al. 2008 directly confirm Brett's vinylphenol reductase acts on 4-vinylguaiacol
+    too, reusing the same k_brett_reduction (no differential rate sourced between the two
+    substrates — a documented simplification, unlike the decarboxylase branches' sourced ratio).
+    """
+    y = _state(schema, X_brett=0.3, vinylguaiacols=0.02)
+    d = BrettVinylphenolReduction().derivatives(0.0, y, schema, params)
+
+    dvg = d[schema.slice("vinylguaiacols")][0]
+    deg = d[schema.slice("ethylguaiacols")][0]
+    assert dvg < 0.0 and deg > 0.0
+    moles_consumed = -dvg / M_VINYLGUAIACOL
+    moles_produced = deg / M_ETHYLGUAIACOL
+    assert moles_produced == pytest.approx(moles_consumed, rel=1e-12)
+    assert d[schema.slice("vinylphenols")][0] == 0.0
+    assert d[schema.slice("ethylphenols")][0] == 0.0
+
+    # Both branches active simultaneously, independently (same catalyst/gate, distinct pools).
+    y_vp_only = _state(schema, X_brett=0.3, vinylphenols=0.02)
+    d_vp_only = BrettVinylphenolReduction().derivatives(0.0, y_vp_only, schema, params)
+
+    y_both = _state(schema, X_brett=0.3, vinylphenols=0.02, vinylguaiacols=0.02)
+    d_both = BrettVinylphenolReduction().derivatives(0.0, y_both, schema, params)
+    assert d_both[schema.slice("vinylphenols")][0] == pytest.approx(
+        d_vp_only[schema.slice("vinylphenols")][0], rel=1e-9
+    )
+    assert d_both[schema.slice("vinylguaiacols")][0] == pytest.approx(dvg, rel=1e-9)
 
 
 # -- 4. guards ----------------------------------------------------------------
@@ -777,6 +847,28 @@ def test_pof_strands_vinylphenols_without_brett():
     # Tier isolability of the stranding: vinylphenol is touched (speculative); ethylphenol is not.
     assert compiled.process_set.tier_of("vinylphenols") is Tier.SPECULATIVE
     assert compiled.process_set.tier_of("ethylphenols") is Tier.VALIDATED
+
+
+def test_pof_strands_vinylguaiacols_too_without_brett():
+    """The D-55 ferulic branch strands identically to the p-coumaric branch (decision D-55).
+
+    Same mechanism as ``test_pof_strands_vinylphenols_without_brett``: POF+ yeast decarboxylates
+    ferulic_acid to vinylguaiacols during AF but has no reductase, so with no Brett present
+    ethylguaiacols stays exactly 0 too — the reduction step is entirely Brett's, for both branches.
+    """
+    compiled, traj = _run(ferulic_acid_gpl=0.06, pof_positive=1.0)  # POF+, no Brett, no hc dosed
+
+    vg = traj.series("vinylguaiacols")
+    eg = traj.series("ethylguaiacols")
+    fa = traj.series("ferulic_acid")
+
+    assert float(np.max(vg)) > 1e-3  # a real reservoir accumulates during AF
+    assert vg[-1] > 0.5 * float(np.max(vg))  # and it STRANDS (no reductase to drain it)
+    assert float(np.max(np.abs(eg))) == 0.0  # no Brett ⇒ no ethylguaiacols at all
+    assert fa[-1] < 0.9 * fa[0]  # the precursor is genuinely consumed into vinylguaiacol
+
+    assert compiled.process_set.tier_of("vinylguaiacols") is Tier.SPECULATIVE
+    assert compiled.process_set.tier_of("ethylguaiacols") is Tier.VALIDATED
 
 
 # -- 16. SECONDARY: a POF+ AF gives a later Brett a head start (early-time claim) --

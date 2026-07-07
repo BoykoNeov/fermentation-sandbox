@@ -1,11 +1,18 @@
-"""*Brettanomyces / Dekkera* — the volatile-phenol spoilage pathway (decision D-40).
+"""*Brettanomyces / Dekkera* — the volatile-phenol spoilage pathway (decision D-40, split D-55).
 
 This module holds the *Brettanomyces bruxellensis* Processes, the mixed-culture beat that
 closes Milestone 2. Brett is the canonical wine spoilage yeast: it decarboxylates grape-must
-**hydroxycinnamic acids** (p-coumaric, ferulic) to **vinylphenols**, then reduces those to the
-**ethylphenols** (4-ethylphenol "horse-sweat/barnyard", 4-ethylguaiacol "clove/smoky") that
-define Brett character. Both precursor pair and product pair are **lumped** (fork-2, D-40):
-``hydroxycinnamics`` (booked as p-coumaric), ``vinylphenols``, ``ethylphenols``.
+**hydroxycinnamic acids** (p-coumaric, ferulic) to **vinylphenols** (4-vinylphenol,
+4-vinylguaiacol), then reduces those to the **ethylphenols** (4-ethylphenol "horse-sweat/
+barnyard", 4-ethylguaiacol "clove/smoky") that define Brett character. D-40 originally **lumped**
+both the precursor pair and the product pair into one p-coumaric-booked chain
+(``hydroxycinnamics``/``vinylphenols``/``ethylphenols``); decision D-55 split it into two
+genuinely distinct parallel chains — p-coumaric (``hydroxycinnamics``/``vinylphenols``/
+``ethylphenols``) and ferulic (``ferulic_acid``/``vinylguaiacols``/``ethylguaiacols``) — because
+ferulic acid is a different-carbon-count molecule (10 C vs p-coumaric's 9 C) that cannot be
+represented as a fixed-ratio split of the p-coumaric flow without breaking carbon closure. Both
+chains share the same enzymes, catalysts and gates; only the substrate-specific rate constants
+differ (ratio-derived from paired literature kinetics, not independently re-estimated).
 
 **Brett carries BOTH enzymes — that is why it spoils normal wine on its own.** Cinnamate
 decarboxylase (:class:`BrettDecarboxylation`) *and* vinylphenol reductase
@@ -29,9 +36,12 @@ decarboxylase turnover and ``L`` [g/L/h] the reductase mass flux,
 
 p-coumaric (9 C) → vinylphenol (8 C) + CO2 (1 C) closes mole-for-mole (9 = 8 + 1, the malic →
 lactic + CO2 idiom, D-23); vinylphenol (8 C) → ethylphenol (8 C) is a mole-for-mole C8 → C8
-transfer between two weighted pools (the diacetyl → butanediol idiom, D-26). :func:`~fermentation.
-validation.conservation.total_carbon` weights all three phenol pools, so the Processes touch only
-``hydroxycinnamics``/``vinylphenols``/``ethylphenols``/``CO2`` and add nothing to the harness.
+transfer between two weighted pools (the diacetyl → butanediol idiom, D-26). The ferulic branch
+(decision D-55) is the identical shape on its own substrate: ferulic (10 C) → vinylguaiacol (9 C)
++ CO2 (1 C) closes 10 = 9 + 1, and vinylguaiacol (9 C) → ethylguaiacol (9 C) is a mole-for-mole
+C9 → C9 transfer. :func:`~fermentation.validation.conservation.total_carbon` weights all six
+phenol pools, so the Processes touch only ``hydroxycinnamics``/``vinylphenols``/``ferulic_acid``/
+``vinylguaiacols``/``ethylphenols``/``ethylguaiacols``/``CO2`` and add nothing to the harness.
 
 **Environmental gate — SO₂ and temperature only (decision D-40).** Unlike *O. oeni*, Brett is
 markedly **acid-tolerant** (it spoils low-pH wine) and **ethanol-tolerant** (a full-strength-wine
@@ -50,15 +60,17 @@ unsulfited run skips it (the ``so2_total ≤ 0`` shortcut) and gate = γ(T).
 
 **Isolability.** ``X_brett`` is a dosed catalyst in v1 pt1 (constant; :class:`BrettGrowth`, pt2,
 makes it dynamic). Each Process returns a zero contribution before any SO₂/pH work when there is no
-catalyst (``X_brett ≤ 0``) or no substrate, so an unpitched wine run is byte-for-byte the validated
-core; the compile seam additionally *disables* the Processes when Brett is not pitched, so the
-inert ``hydroxycinnamics``/``vinylphenols``/``ethylphenols`` slots keep their VALIDATED tier
+catalyst (``X_brett ≤ 0``) or no substrate in EITHER branch, so an unpitched wine run is
+byte-for-byte the validated core; the compile seam additionally *disables* the Processes when
+Brett is not pitched, so the inert phenol slots (both branches) keep their VALIDATED tier
 (``tier_of`` counts enabled, not nonzero, Processes — the D-23 MLF pattern). Wine-only.
 
 Tier: **speculative**. The decarboxylase → reductase topology and the gate *directions* are sound,
 but every rate/gate/cardinal magnitude is an author estimate (no per-catalyst kinetic model of this
-flux form is sourced), and v1 lumps the two phenol branches. Parameter-tier propagation (D-1) caps
-the phenol-pool outputs at speculative regardless.
+flux form is sourced). The D-40 lumping is now (D-55) split into two genuinely distinct parallel
+chains with paired-literature-sourced *relative* rates, though each chain's absolute magnitude
+remains an author estimate. Parameter-tier propagation (D-1) caps the phenol-pool outputs at
+speculative regardless.
 """
 
 from __future__ import annotations
@@ -73,6 +85,7 @@ from fermentation.core.acidbase import (
 )
 from fermentation.core.chemistry import (
     M_CO2,
+    M_ETHYLGUAIACOL,
     M_ETHYLPHENOL,
     M_FERULIC,
     M_P_COUMARIC,
@@ -277,8 +290,30 @@ class BrettDecarboxylation(Process):
         return d
 
 
+def _reduction_branch(
+    intermediate_gpl: float,
+    intermediate_molar_mass: float,
+    product_molar_mass: float,
+    k: float,
+    activity: float,
+) -> tuple[float, float]:
+    """One vinylphenol-reductase branch: intermediate → product, first-order (decision D-55).
+
+    Shared by both the vinylphenol → ethylphenol branch and the vinylguaiacol → ethylguaiacol
+    branch within :class:`BrettVinylphenolReduction` — the same reductase (Tchobanov et al. 2008
+    confirm it acts on both substrates) reducing a different intermediate, differing only in molar
+    masses. ``activity`` folds in the catalyst/gate term both branches share equally
+    (``X_brett · gate``). Returns ``(d_intermediate, d_product)`` in g/L/h, exactly
+    ``(0.0, 0.0)`` if there is nothing to reduce or ``activity ≤ 0``.
+    """
+    if intermediate_gpl <= 0.0 or activity <= 0.0:
+        return 0.0, 0.0
+    loss = k * activity * intermediate_gpl  # [g intermediate/L/h]
+    return -loss, loss * product_molar_mass / intermediate_molar_mass
+
+
 class BrettVinylphenolReduction(Process):
-    """*Brettanomyces* vinylphenol reductase — vinylphenols → ethylphenols (decision D-40).
+    """*Brettanomyces* vinylphenol reductase — two branches to ethylphenols (D-40, D-55).
 
     ``d(vinylphenols)/dt = −L``, ``d(ethylphenols)/dt = +L·M_ethylphenol/M_vinylphenol`` with the
     mass flux ``L = k_brett_reduction · X_brett · g_SO₂ · γ(T) · [vinylphenols]`` (first-order in
@@ -288,17 +323,29 @@ class BrettVinylphenolReduction(Process):
     step *S. cerevisiae* lacks (even POF+), so it is what makes the shared ``vinylphenols``
     reservoir clear only when Brett is present — the emergent coupling (D-40 pt4).
 
+    **Ferulic-branch reduction (decision D-55) — sourced enzyme identity, unsourced rate ratio.**
+    Reduces ``vinylguaiacols → ethylguaiacols`` (a mole-for-mole C9 → C9 transfer, same form as
+    vinylphenols → ethylphenols) alongside the p-coumaric branch above, via the shared
+    :func:`_reduction_branch` helper. Tchobanov et al. 2008 directly confirm Brett's vinylphenol
+    reductase acts on *both* 4-vinylguaiacol and 4-vinylphenol — so, unlike the decarboxylase
+    branches (which have a sourced *relative* rate from Edlin et al. 1998), this reuses the *same*
+    ``k_brett_reduction`` for both substrates: the enzyme-identity claim is sourced, but no paired
+    vinylguaiacol-vs-vinylphenol rate comparison was found, so the reuse is a documented
+    simplification (not yet a sourced ratio like the decarboxylase branches). Both branches share
+    the same catalyst/gate ``activity = X_brett · gate``, computed once.
+
     Guarded like the decarboxylase: a zero contribution before any pH work when there is no
-    catalyst (``X_brett ≤ 0``) or no vinylphenol to reduce (value + perf isolability; compile-seam
-    disable gives tier isolability). Tier **speculative** (rate magnitude estimate).
+    catalyst (``X_brett ≤ 0``) or nothing to reduce in EITHER branch (value + perf isolability;
+    compile-seam disable gives tier isolability). Tier **speculative** (rate magnitude estimate).
     """
 
     name = "brett_vinylphenol_reduction"
     tier = Tier.SPECULATIVE
-    touches = ("vinylphenols", "ethylphenols")
-    #: ``k_brett_reduction`` sets the reductase magnitude; the shared Brett environmental-gate
-    #: parameters throttle it by SO₂/temperature. Their tiers cap the vinylphenols/ethylphenols
-    #: output tier via parameter-tier propagation (D-1). Reads the constant catalyst ``X_brett``.
+    touches = ("vinylphenols", "ethylphenols", "vinylguaiacols", "ethylguaiacols")
+    #: ``k_brett_reduction`` sets the reductase magnitude (reused for both branches, decision
+    #: D-55 — see the class docstring for why); the shared Brett environmental-gate parameters
+    #: throttle it by SO₂/temperature. Their tiers cap the touched-pool output tiers via
+    #: parameter-tier propagation (D-1). Reads the constant catalyst ``X_brett``.
     reads: tuple[str, ...] = ("k_brett_reduction", *_BRETT_GATE_READS)
 
     def derivatives(
@@ -306,20 +353,32 @@ class BrettVinylphenolReduction(Process):
     ) -> FloatArray:
         d = schema.zeros()
         vinylphenols = max(float(y[schema.slice("vinylphenols")][0]), 0.0)
-        if vinylphenols <= 0.0:  # nothing to reduce
+        vinylguaiacols = max(float(y[schema.slice("vinylguaiacols")][0]), 0.0)
+        if vinylphenols <= 0.0 and vinylguaiacols <= 0.0:  # nothing to reduce in either branch
             return d
         x_brett = max(float(y[schema.slice("X_brett")][0]), 0.0) if "X_brett" in schema else 0.0
-        if x_brett <= 0.0:  # no Brett ⇒ no reduction (the reservoir strands)
+        if x_brett <= 0.0:  # no Brett ⇒ no reduction (both reservoirs strand)
             return d
 
         ph = ph_of_state(y, schema, params) if _needs_ph_solve(y, schema) else 0.0
         gate = brett_environmental_gate(y, schema, params, ph)
+        activity = x_brett * gate  # shared by both branches — same catalyst, same environment
 
-        loss = params["k_brett_reduction"] * x_brett * gate * vinylphenols  # [g vinylphenol/L/h]
-        d[schema.slice("vinylphenols")] = -loss
-        d[schema.slice("ethylphenols")] = (
-            loss * M_ETHYLPHENOL / M_VINYLPHENOL
-        )  # mole-for-mole C8→C8
+        d_vp, d_ep = _reduction_branch(
+            vinylphenols, M_VINYLPHENOL, M_ETHYLPHENOL, params["k_brett_reduction"], activity
+        )
+        d_vg, d_eg = _reduction_branch(
+            vinylguaiacols,
+            M_VINYLGUAIACOL,
+            M_ETHYLGUAIACOL,
+            params["k_brett_reduction"],
+            activity,
+        )
+
+        d[schema.slice("vinylphenols")] = d_vp  # mole-for-mole C8→C8
+        d[schema.slice("ethylphenols")] = d_ep
+        d[schema.slice("vinylguaiacols")] = d_vg  # mole-for-mole C9→C9
+        d[schema.slice("ethylguaiacols")] = d_eg
         return d
 
 

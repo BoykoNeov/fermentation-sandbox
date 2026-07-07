@@ -225,6 +225,11 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "amino_acids_gpl",
             "autolysis_rate_per_h",
             "hydroxycinnamic_gpl",
+            # Ferulic-acid must precursor (decision D-55) — the second, genuinely distinct
+            # volatile-phenol branch split out from hydroxycinnamic_gpl (which is booked as
+            # p-coumaric acid specifically). Absent ⇒ 0 (that branch is inert), exactly mirroring
+            # hydroxycinnamic_gpl's own isolability.
+            "ferulic_acid_gpl",
             "brett_pitch_gpl",
             # pof_positive is a binary POF+ strain opt-in (decision D-40 pt4): present/>0 enables
             # YeastPOFDecarboxylation (the yeast cinnamate decarboxylase filling vinylphenols during
@@ -329,6 +334,13 @@ def _wine_initial(
         "hydroxycinnamics": _optional(values, "hydroxycinnamic_gpl", 0.0),
         "vinylphenols": 0.0,  # shared decarboxylase→reductase intermediate, empty at pitch (D-40)
         "ethylphenols": 0.0,  # terminal Brett volatile-phenol readout, empty at pitch (D-40)
+        # Ferulic-acid branch (decision D-55): a genuinely distinct second precursor pool, split
+        # out from hydroxycinnamics because ferulic acid (10 C) is a different molecule from
+        # p-coumaric (9 C) whose decarboxylation cannot be a fixed-ratio split of the p-coumaric
+        # flow without breaking carbon closure. Same isolability shape as the p-coumaric branch.
+        "ferulic_acid": _optional(values, "ferulic_acid_gpl", 0.0),
+        "vinylguaiacols": 0.0,  # ferulic-branch decarboxylase→reductase intermediate (D-55)
+        "ethylguaiacols": 0.0,  # ferulic-branch terminal Brett volatile-phenol readout (D-55)
         # Brettanomyces dose driving the volatile-phenol spoilage (decision D-40); g/L, default 0
         # (no Brett). Constant inert catalyst in pt1 and carbon-free, so an undosed run is
         # byte-for-byte the validated core; the compile step below disables the Brett Processes
@@ -1085,13 +1097,15 @@ def compile_scenario(
             if mlf_process.name in process_set:
                 process_set.disable(mlf_process.name)
 
-    # Brett isolability (decision D-40): the volatile-phenol Processes are wired into the wine
-    # medium but contribute nothing until Brettanomyces is pitched. When it is not, DISABLE them so
-    # (a) the inert ``hydroxycinnamics``/``vinylphenols``/``ethylphenols`` slots keep their
-    # VALIDATED tier (an *enabled* zero-contribution Process still drags them to speculative via
-    # ``tier_of``) and (b) no per-RHS pH ``brentq`` is paid on an unpitched run. An initial
-    # ``brett_pitch_gpl`` co-inoculates at t0; a mid-run ``pitch_brett`` intervention instead leaves
-    # this 0 and re-enables the same _BRETT_GATED_PROCESSES at its breakpoint (the MLF pattern).
+    # Brett isolability (decision D-40, D-55): the volatile-phenol Processes are wired into the
+    # wine medium but contribute nothing until Brettanomyces is pitched. When it is not, DISABLE
+    # them so (a) the inert ``hydroxycinnamics``/``vinylphenols``/``ethylphenols`` slots AND their
+    # D-55 ferulic-branch counterparts (``ferulic_acid``/``vinylguaiacols``/``ethylguaiacols``)
+    # keep their VALIDATED tier (an *enabled* zero-contribution Process still drags them to
+    # speculative via ``tier_of``) and (b) no per-RHS pH ``brentq`` is paid on an unpitched run. An
+    # initial ``brett_pitch_gpl`` co-inoculates at t0; a mid-run ``pitch_brett`` intervention
+    # instead leaves this 0 and re-enables the same _BRETT_GATED_PROCESSES at its breakpoint (the
+    # MLF pattern).
     brett_pitch_gpl = float(scenario.initial.get("brett_pitch_gpl", 0.0) or 0.0)
     if brett_pitch_gpl <= 0.0:
         for brett_process in _BRETT_GATED_PROCESSES:
