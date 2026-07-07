@@ -3933,6 +3933,92 @@ existing ordering-constraint machinery closely enough, the same category of miss
 direction empirically rather than picking a plausible number, continuing the D-53 discipline forward
 rather than only applying it in hindsight.
 
+## D-55 — POF v2 pt2: splitting the lumped vinylphenol/vinylguaiacol pool into a real ferulic branch
+
+**Status: IMPLEMENTED 2026-07-07** (46 `test_brett.py` tests green, full suite + ruff + mypy clean,
+across 3 commits). D-40's original design deliberately lumped both the precursor pair (p-coumaric +
+ferulic hydroxycinnamic acids, booked as p-coumaric) and the product pair (4-vinylphenol +
+4-vinylguaiacol, and downstream 4-ethylphenol + 4-ethylguaiacol) into three single pools
+(`hydroxycinnamics`/`vinylphenols`/`ethylphenols`). The owner chose to split it, "your call" on how
+to break the work into pieces — this closes that arc.
+
+**The scope-collapsing fact, caught before any code was written.** The three candidate designs
+initially considered were: (a) split only the product pools by a fixed ratio on the existing single
+precursor, (b) keep the lumped ratio but relabel a fraction as "vinylguaiacol", or (c) build a
+genuine second precursor pool. Options (a)/(b) collapse immediately on inspection of the actual
+molar masses already in the codebase: `hydroxycinnamics` is *literally* booked as p-coumaric acid
+(9 carbons; `M_P_COUMARIC` is used for every unit conversion), and ferulic acid is a **different,
+10-carbon molecule** whose decarboxylation is `10 C → 9 C (vinylguaiacol) + 1 C (CO2)`, not
+`9 C → 9 C + 0 C`. A 9-carbon precursor cannot yield a 9-carbon product plus a CO2 molecule without
+manufacturing a carbon out of nothing — so any fixed-ratio split of the *existing* pool's output
+breaks carbon closure by construction, the one invariant this codebase enforces as a test
+(`assert_conserved`), not a suggestion. Only a genuine second precursor pool is carbon-exact and
+species-faithful. This left one real design, not three co-equal options — surfaced to the owner as
+a binary (full split vs. document-as-limit, the D-51 precedent) rather than offering fake choices.
+
+**The split, mechanically (3 commits, each independently green).**
+
+1. **Scaffolding (chemistry + state, no behaviour change).** New species `M_FERULIC` (C10H10O4,
+   194.19 g/mol), `M_VINYLGUAIACOL` (C9H10O2, 150.18 g/mol), `M_ETHYLGUAIACOL` (C9H12O2, 152.19
+   g/mol) in `chemistry.py`, verified against known real molar masses and carbon closure
+   (`10 = 9 + 1`) by direct computation, not just formula arithmetic. Three new wine-only state
+   slots (`ferulic_acid`/`vinylguaiacols`/`ethylguaiacols`, schema size 36 → 39), their
+   `total_carbon` weighting, and the `test_media.py` schema-shape assertions updated in the same
+   commit (tightly coupled to the slot count, unlike the later Process-behaviour tests).
+2. **Decarboxylation branch.** `BrettDecarboxylation` and `YeastPOFDecarboxylation` both gained a
+   second, independent branch (`ferulic_acid → vinylguaiacols + CO2`) via a shared
+   `_decarboxylation_branch` helper (factored out to avoid 4×-duplicating the Monod/molar-mass
+   arithmetic across 2 Processes × 2 branches). Both branches share the *same* catalyst/gate
+   (`X_brett · gate` for Brett, `flux · arrhenius(T, E_a_pof)` for POF) — the enzyme and its
+   environmental sensitivity don't depend on which substrate it happens to be processing.
+3. **Reduction branch + scenario wiring.** `BrettVinylphenolReduction` gained the
+   `vinylguaiacols → ethylguaiacols` branch via a shared `_reduction_branch` helper, and
+   `ferulic_acid_gpl` was wired into the scenario compiler's `_ALLOWED_KEYS`/`_wine_initial` so
+   scenarios can dose the new precursor exactly like `hydroxycinnamic_gpl`.
+
+**Relative kinetics are sourced, not cloned — the same discipline D-54 established.** Edlin et al.
+1998 (*Appl. Microbiol. Biotechnol.* 49:511-517) purified a hydroxycinnamate decarboxylase from
+*Brettanomyces anomalus* (the same enzyme family as this model's decarboxylase) and report **paired**
+Vmax/Km for both substrates in the *same* assay: Vmax 13,494 (ferulic) vs 22,256 (p-coumaric)
+nmol/min/mg; Km 1.15 (ferulic) vs 1.55 (p-coumaric) mM. Those ratios (~0.606× rate, ~0.742×
+half-saturation) are real, paired, sourced data — applied to this model's own already-speculative
+absolute `k_brett_decarb`/`K_hydroxycinnamic` scale, so the *ratio* between the two branches carries
+real evidentiary weight even though the absolute magnitude it scales remains an author estimate (the
+same "ratio sourced, absolute speculative" pattern D-49/D-50's keto-acid pools used). New params:
+`k_brett_decarb_ferulic`, `K_hydroxycinnamic_ferulic`, `k_pof_decarb_ferulic` (all ratio-derived,
+uncertainty bands scaled by the same ratio as their point estimates). `E_a_pof` (D-54) and the Brett
+environmental gate are **reused as-is** for the ferulic branch (same enzyme, same organism — no new
+temperature/SO₂ parameters needed).
+
+**One honest gap, surfaced rather than papered over.** Tchobanov et al. 2008 (*FEMS Microbiol.
+Lett.* 284:213-217) directly confirm Brett's vinylphenol reductase acts on **both** 4-vinylguaiacol
+and 4-vinylphenol — upgrading what D-40 had left as an unstated assumption to a sourced fact. But
+that paper reports absolute kinetics for vinylguaiacol only (Km 0.14 mM, Vmax 1900 U/mg), with no
+paired p-coumaric-branch number to derive a relative rate the way Edlin et al. 1998 allowed for the
+decarboxylase. So `k_brett_reduction` is **reused unchanged** for both branches — a documented
+simplification (enzyme identity sourced; relative rate not), distinct in kind from the
+decarboxylase branches' sourced ratio. Similarly, no clean paired p-coumaric:ferulic *concentration*
+ratio was found in must/wine literature, so `ferulic_acid` is dosed independently per-scenario
+(default 0, like `hydroxycinnamics` itself) rather than forced to any fixed ratio of the p-coumaric
+dose.
+
+**New tests, mirroring the existing per-branch pattern at every level:** per-Process stoichiometry
+and carbon-closure for the ferulic branch alone and composed with the p-coumaric branch (both
+Brett's decarboxylase/reductase and POF+'s decarboxylase), a POF+-no-Brett stranding test for
+vinylguaiacols (mirroring the pt4 headline), and a full-scenario end-to-end carbon-closure test
+dosing both `hydroxycinnamic_gpl` and `ferulic_acid_gpl` together through the whole
+compile→decarboxylate→reduce pipeline (a wiring-level check the per-Process unit tests can't catch
+— e.g. a typo in the new scenario dosing key, or a slot the reduction step forgot to drain). All
+existing `touches` assertions updated to the grown tuples (5 slots per decarboxylase Process, 4 per
+the reductase). `test_wine_schema_has_single_sugar_slot`'s slot count and `WINE_BRETT_SLOTS` tuple
+updated in the scaffolding commit. 44 `test_brett.py` tests total (8 net new: 2 from D-54's
+`E_a_pof`, 6 from this split), 5 §2.2 benchmarks unaffected (undosed default runs stay
+byte-for-byte the validated core — `ferulic_acid`/`vinylguaiacols`/`ethylguaiacols` default to 0
+and no benchmark doses them).
+
+**Closes the last D-40 pt4 deferral.** Both "POF v2" items from the deferred list — `E_a_pof`
+temperature dependence (D-54) and the vinylguaiacol/vinylphenol split (D-55) — are now done.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
