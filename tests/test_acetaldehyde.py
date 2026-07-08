@@ -483,9 +483,7 @@ def test_sulfited_reduction_agrees_across_solvers(method):
         ),
         strict=True,
     )  # fmt: skip
-    ref = simulate(
-        ref_c.process_set, ref_c.param_values, ref_c.y0, ref_c.t_span_h, method=method
-    )
+    ref = simulate(ref_c.process_set, ref_c.param_values, ref_c.y0, ref_c.t_span_h, method=method)
     assert ref.success, ref.message
     assert gpl_to_mgl(bdf.series("acetaldehyde")[-1]) == pytest.approx(
         gpl_to_mgl(ref.series("acetaldehyde")[-1]), rel=5e-3, abs=0.5
