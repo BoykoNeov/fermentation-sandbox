@@ -4534,7 +4534,8 @@ three conditions digitized: CF (320 mg N/L) and LF (90 mg N/L); RF (LF refed wit
 target (`add_dap` timing fidelity), out of scope for a first glucose+ethanol pass.
 
 **Headline finding — the CF/LF absolute-timing gap not only persists on a second
-dataset, it *flips direction*, and both directions are protocol-confounded:** at 20°C
+dataset, it *flips direction*; the timing gap and the yield gap have DIFFERENT,
+deliberately NOT conflated explanations, and neither is a fidelity signal:** at 20°C
 (Palma's fermentation temp — exactly the engine's/Coleman's `T_ref`, so zero Arrhenius
 extrapolation uncertainty, cleaner than Varela's 28°C), the engine reaches CF dryness at
 ~138 h against Palma's real ~72 h — ~1.9x *slower*, the opposite direction from Varela's
@@ -4543,48 +4544,64 @@ model** (the same eqs-1-8 reconstruction `test_coleman_reconstruction.py` uses, 
 Palma's exact inputs: S0=200 g/L, N0=320 mg/L, pitch=0.018 g/L, 20°C): it dries at ~140 h,
 ~1.5% from the engine's ~138 h — **the engine faithfully reproduces Coleman at Palma's
 own inputs**, so the gap to Palma is a genuine Coleman-vs-Palma difference, not an engine
-defect (the exact D-57 argument, transplanted to a new dataset). Two independent,
-non-engine confounds explain it: (1) Palma's real ethanol yield is only ~0.39-0.40 g/g
-glucose consumed at both N levels (computed from the digitized endpoints: CF 78.9 g/L
-ethanol / ~199 g/L consumed; LF ~45.0 g/L / ~120 g/L) — well below the ~0.46-0.51 g/g
-anaerobic range the engine itself uses (~0.48), consistent with a shaken, cotton-
-stoppered 500 mL Erlenmeyer flask (120 rpm) diverting carbon to respiration and/or
-losing ethanol to evaporation over a multi-day shake — a real protocol difference from
-the engine's anaerobic-vinification target regime; (2) Varela's real CF (28°C, warmer)
-took *longer* (170 h) than Palma's real CF (20°C, cooler, 72 h) — anti-Arrhenius between
-the two "independent" datasets themselves, meaning real inter-study spread in
-fermentation rate is at least as large as either dataset's gap to the engine (the same
-"gap is at or below the reference data's own discriminating power" shape D-59 reached for
-the SO₂ overshoot). **Absolute CF/LF duration and ethanol level are therefore
-characterized as regression guards (observed value + margin), never asserted as
-agreement targets against Palma's raw numbers** — advisor flagged this framing risk
-before the test was finalized (the initial framing leaned toward "model too slow," which
-would have buried the more defensible, protocol-confound reading).
+defect (the exact D-57 argument, transplanted to a new dataset). **The timing gap's
+best-supported explanation is strain, not protocol:** at 200 g/L glucose, S. cerevisiae is
+strongly Crabtree-repressed and ferments even under full aeration, so respiratory carbon
+diversion cannot explain a ~2x rate difference at this sugar level — PYCC 4072 (Palma)
+and Prise de Mousse (Coleman/Varela) are simply different strains with different
+fermentation rates, and this dataset's whole value is being the first strain-independent
+check, so a gap here is expected, not a red flag. **Separately, the yield gap has its own,
+narrower explanation:** Palma's real ethanol yield is only ~0.39-0.40 g/g glucose
+consumed at both N levels (computed from the digitized endpoints: CF 78.9 g/L ethanol /
+~199 g/L consumed; LF ~45.0 g/L / ~120 g/L) — well below the ~0.46-0.51 g/g anaerobic
+range the engine itself uses (~0.48) — consistent with ethanol evaporating from a shaken,
+cotton-stoppered 500 mL Erlenmeyer flask (120 rpm) over a multi-day shake; evaporation
+affects the reported ethanol *level*, not the glucose-consumption *rate*, so it explains
+the yield gap only, not the timing gap. A third, weaker data point — Varela's real CF
+(28°C, warmer) took *longer* (170 h) than Palma's real CF (20°C, cooler, 72 h) — shows the
+two "independent" datasets disagree with each other by ~2.4x, at least as much as either
+disagrees with the engine (the same "gap is at or below the reference data's own
+discriminating power" shape D-59 reached for the SO₂ overshoot); this is NOT read as a
+clean temperature (anti-Arrhenius) comparison, since Varela and Palma are also different
+strains — strain is confounded with temperature here, so no temperature-specific claim is
+made. **Absolute CF/LF duration and ethanol level are therefore characterized as
+regression guards (observed value + margin), never asserted as agreement targets against
+Palma's raw numbers.**
 
 **The regime-robust finding — corroborated on an independent strain:** comparing each
-condition's own glucose-consumed *fraction* at 144 h (a ratio that cancels the shared
-yield/aeration confound, since both conditions share one flask protocol) shows the engine
-still under-predicts how much severe nitrogen limitation suppresses fermentation
-progress. Real Palma: CF ~99.5% consumed, LF only ~60% (residual ~80 g/L, still visibly
-decelerating 122→80 g/L between 96-144 h — far from dry, deliberately NOT called
-"arrested", per D-58's overclaim lesson) — ratio ~1.66. Engine: CF ~99.7%, LF ~79%
-(residual ~41 g/L) — ratio only ~1.26. Same direction and shape as D-56/D-57's Varela
-finding and D-59's "model never reproduces arrest" framing, now independent of strain —
-this is the load-bearing signal in this dataset, not the absolute timing. Test
+condition's own glucose-consumed *fraction* at 144 h (a ratio that cancels the yield/
+evaporation confound, since both conditions share one flask protocol and only sugar
+consumed — not ethanol produced — is compared) shows the engine still under-predicts how
+much severe nitrogen limitation suppresses fermentation progress. Real Palma: CF ~99.5%
+consumed, LF only ~60% (residual ~80 g/L, still visibly decelerating 122→80 g/L between
+96-144 h — far from dry, deliberately NOT called "arrested", per D-58's overclaim lesson)
+— ratio ~1.66. Engine: CF ~99.7%, LF ~79% (residual ~41 g/L) — ratio only ~1.26. Same
+direction and shape as D-56/D-57's Varela finding and D-59's "model never reproduces
+arrest" framing, now independent of strain — this is the load-bearing signal in this
+dataset, not the absolute timing. Test
 `test_palma2012_lf_vs_cf_progress_ratio_understates_palma` asserts the engine's ratio
 stays below Palma's real ~1.66; the other two tests characterize CF's absolute duration
 (band [125,150] h, gap-ratio band [1.7,2.15]x) and LF's absolute residual at 144 h (band
 [35,48] g/L) as regression guards, matching the Varela file's established idiom
 (observed + margin, not a loose pass; do not force-fit).
 
-**Method note:** advisor caught the framing risk before the test file was written, not
-after — the transcript already contained the "shaken flask / suspiciously fast /
-aeration" read, but the draft summary was about to headline "model runs too slow,"
-which reads as a fidelity gap rather than the better-supported protocol-confound
-explanation. The Coleman-reconstruction cross-check (run as a one-off probe script, not
-added as a fourth permanent test — `test_coleman_reconstruction.py` already carries the
-general Coleman-fidelity claim; re-deriving it a third time in-repo would be redundant)
-was the decisive piece of evidence, exactly mirroring how the Varela file cites the same
+**Method note — two advisor() catches, not one:** the first (during the build, before
+the test file was finalized) flagged that the draft summary was heading toward "model
+runs too slow" as the headline, which reads as a fidelity gap rather than the
+better-supported protocol/strain reading. The second (after commit, reviewing the
+finished docstring) caught that the fix for the first catch had gone too far the other
+way: it bundled the timing gap and the yield gap under one "shaken flask → respiration
+and/or evaporation" story, but respiration cannot explain the timing gap at 200 g/L
+glucose (Crabtree repression) — the two gaps needed separate explanations (strain for
+timing, evaporation for yield only), which this entry and the test docstring now reflect.
+This is the same overclaim discipline as D-58's "arrested" → "far from dry" softening,
+applied a second time, to explanations rather than to the headline finding itself — a
+reminder that the discipline has to be re-applied at each layer of the writeup, not just
+the first one checked. The Coleman-reconstruction cross-check (run as a one-off probe
+script, not added as a fourth permanent test — `test_coleman_reconstruction.py` already
+carries the general Coleman-fidelity claim; re-deriving it a third time in-repo would be
+redundant) was the decisive piece of evidence for the strain explanation, exactly
+mirroring how the Varela file cites the same
 reconstruction for its own 300 mg N/L point. 3 new tests, 679 passed (676+3), ruff+mypy
 clean. No source code changed — this is a benchmark-only addition, no physics touched.
 

@@ -32,7 +32,8 @@ engine's/Coleman's T_ref**, so unlike Varela (28 C) this comparison carries no
 Arrhenius extrapolation uncertainty at all.
 
 **Headline finding -- the CF/LF absolute timing gap flips direction from
-Varela, and both are protocol-confounded, not a fidelity signal:**
+Varela, and the two gaps (timing, yield) have DIFFERENT, deliberately NOT
+conflated explanations -- neither is a fidelity signal:**
 the engine reaches CF dryness at ~138 h against Palma's real ~72 h (text:
 "consumed approximately after 3 days") -- i.e. the engine runs ~1.9x *slower*
 here, the OPPOSITE direction from Varela (where the engine ran ~1.9x *faster*
@@ -42,30 +43,41 @@ Palma's exact S0=200 g/L, N0=320 mg/L, pitch=0.018 g/L, 20 C): it dries at
 ~140 h, ~1.5% from the engine's ~138 h -- **the engine is faithfully
 reproducing Coleman at Palma's own inputs**, so the gap to Palma's real data is
 a genuine Coleman-vs-Palma difference, not an engine bug (the exact D-57
-argument, transplanted to a new dataset). Two independent confounds explain
-it, not a single one: (1) Palma's real ethanol yield is only
-~0.39-0.40 g ethanol / g glucose consumed at both N levels (CF: 78.9 g/L
-ethanol on ~199 g/L consumed; LF: ~45.0 g/L on ~120 g/L consumed) -- well below
-the anaerobic ~0.46-0.51 g/g range the engine itself uses (~0.48 here),
-consistent with a shaken, cotton-stoppered 500 mL Erlenmeyer flask (120 rpm)
-diverting some carbon to respiration and/or losing ethanol to evaporation over
-a multi-day shake -- a real protocol difference from the engine's anaerobic-
-vinification target regime, not a kinetic one. (2) Varela's real CF (28 C,
-warmer) took LONGER (170 h) than Palma's real CF (20 C, cooler, 72 h) --
-anti-Arrhenius between the two "independent" datasets themselves, meaning
-real inter-study spread in fermentation rate is at least as large as either
-dataset's gap to the engine (the same "gap is at or below the reference
-data's own discriminating power" conclusion D-59 reached for the SO2
-overshoot). **Absolute CF/LF duration and ethanol level are therefore
-characterized here as regression guards (observed value + margin), not
-asserted as agreement targets** -- do not tighten these into a pass/fail
-against Palma's raw numbers.
+argument, transplanted to a new dataset). **The timing gap's best-supported
+explanation is strain, not protocol:** at 200 g/L glucose S. cerevisiae is
+strongly Crabtree-repressed and ferments even under full aeration, so
+respiratory carbon diversion cannot explain a 2x rate difference at this sugar
+level -- ruling out "the flask was aerobic" as the timing story. PYCC 4072
+(Palma) and Prise de Mousse (Coleman/Varela) are simply different strains with
+different fermentation rates; this dataset's whole value is being the first
+strain-independent check, so the gap is expected, not a red flag.
+**Separately, the yield gap has its own, narrower explanation:** Palma's real
+ethanol yield is only ~0.39-0.40 g ethanol / g glucose consumed at both N
+levels (CF: 78.9 g/L ethanol on ~199 g/L consumed; LF: ~45.0 g/L on ~120 g/L
+consumed) -- well below the anaerobic ~0.46-0.51 g/g range the engine itself
+uses (~0.48 here) -- consistent with ethanol evaporating from a shaken,
+cotton-stoppered 500 mL Erlenmeyer flask (120 rpm) over a multi-day shake.
+Evaporation affects the reported ethanol *level*, not the glucose-consumption
+*rate*, so it explains the yield gap only, not the timing gap above. A third,
+weaker data point -- Varela's real CF (28 C, warmer) took LONGER (170 h) than
+Palma's real CF (20 C, cooler, 72 h) -- shows the two "independent" reference
+datasets disagree with each other by ~2.4x, at least as much as either
+disagrees with the engine (the same "gap is at or below the reference data's
+own discriminating power" shape D-59 reached for the SO2 overshoot); this is
+NOT a clean temperature (anti-Arrhenius) comparison, since Varela and Palma are
+also different strains -- strain is confounded with temperature here, so no
+temperature-specific claim is made. **Absolute CF/LF duration and ethanol
+level are therefore characterized here as regression guards (observed value +
+margin), not asserted as agreement targets** -- do not tighten these into a
+pass/fail against Palma's raw numbers.
 
 **The regime-robust finding -- corroborated on an independent strain:** the
 engine still under-predicts how much severe nitrogen limitation suppresses
-fermentation PROGRESS, a relative comparison that cancels the yield/aeration
+fermentation PROGRESS, a relative comparison that cancels the yield/evaporation
 confound (both conditions share the same flask protocol; only sugar consumed,
-not ethanol produced, is compared). Real Palma LF is only ~60% through its
+not ethanol produced, is compared -- comparing sugar rather than ethanol is
+what insulates this finding from the evaporation confound above). Real Palma
+LF is only ~60% through its
 glucose by 144 h (residual ~80 g/L) and still visibly decelerating (122 to 80
 g/L between 96 and 144 h) -- far from dry, NOT a clean plateau (careful:
 this is weaker than "arrested", per D-58's overclaim lesson) -- while real
@@ -74,7 +86,7 @@ consumed-fraction ratio at 144 h of ~1.66. The engine's LF is much further
 along (~79% consumed, residual ~41 g/L) against its own CF's ~99.7%, a ratio of
 only ~1.26. **Same direction and same shape as D-56/D-57's Varela finding and
 D-59's "model never reproduces arrest" framing, now independent of strain**:
-this is the load-bearing, aeration-independent signal in this dataset, not the
+this is the load-bearing, confound-independent signal in this dataset, not the
 absolute timing.
 """
 
@@ -166,10 +178,13 @@ def test_palma2012_cf_duration_characterized():
     # SLOWER than Palma's real ~72 h (opposite direction from Varela's ~1.9x too FAST at
     # 300 mg N/L, 28 C). Cross-checked against Coleman's own reference model (module
     # docstring): it dries at ~140 h here, ~1.5% from the engine's own ~138 h -- proof
-    # this is a genuine Coleman-vs-Palma difference (confounded by a real ~0.39 g/g
-    # ethanol yield in Palma's shaken flask, well under the ~0.48 g/g anaerobic value
-    # the engine uses), not an engine defect. This is a regression guard on the engine's
-    # OWN characterized behaviour, not a pass/fail against Palma.
+    # this is a genuine Coleman-vs-Palma difference, not an engine defect -- best
+    # explained by strain (PYCC 4072 vs Coleman/Varela's Prise de Mousse), since at this
+    # 200 g/L glucose level S. cerevisiae is Crabtree-repressed and ferments even under
+    # full aeration (see module docstring: the timing gap and the separate ~0.39 g/g
+    # ethanol-yield gap have different causes, deliberately not conflated). This is a
+    # regression guard on the engine's OWN characterized behaviour, not a pass/fail
+    # against Palma.
     t_h, sugar = _run_palma_condition(320.0, duration_days=15.0)
     hours = _hours_to_dryness(t_h, sugar, 15.0)
     assert 125.0 <= hours <= 150.0, (
@@ -204,7 +219,7 @@ def test_palma2012_lf_far_from_dry_at_144h_characterized():
 
 
 def test_palma2012_lf_vs_cf_progress_ratio_understates_palma():
-    # The regime-robust, aeration/yield-confound-independent finding: compare each
+    # The regime-robust, yield/evaporation-confound-independent finding: compare each
     # condition's OWN glucose-consumed fraction at 144 h (both CF and LF share the same
     # flask protocol, so a systematic yield/evaporation confound cancels in the ratio).
     # Real Palma: CF is ~99.5% consumed, LF only ~60% -- ratio ~1.66. The engine's CF is
