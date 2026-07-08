@@ -4515,6 +4515,83 @@ to build the Speers/Reid lager cross-regime beer check or defer beer validation 
 not yet chosen which to start; UX and new-physics-scope remain the other two untouched top-level
 directions from D-55's "next milestone" fork.
 
+## D-60 — Palma 2012 digitization: second independent-data benchmark built, strain-independent N-gap corroborated, absolute timing gap flips direction (confounded, not a fidelity signal)
+
+Owner picked up D-59's "Palma 2012 digitization" recommendation directly. Built
+`tests/benchmarks/test_validation_palma2012.py`, the project's second independent-data
+validation file (after Varela 2004, D-56/D-57) and its first against a genuinely
+different strain (PYCC 4072, not Coleman/Varela's Prise de Mousse — D-59 Finding 0).
+
+**Digitization:** Figure 1 (panels C glucose, D ethanol) was fetched as its original
+CC-BY image via the PMC Open Access S3 mirror (`PMC3503800.1/1475-2859-11-99-1.jpg` —
+the legacy FTP `oa_package` tarball route is now deprecated/404; PMC's own web viewer is
+behind a proof-of-work JS gate that blocks `curl`; the S3 bucket, discovered via the
+`oa.fcgi` API's stale-but-still-resolvable-through-the-new-layout link, was the working
+path) and read off against a pixel grid calibrated to the panels' own axis ticks, at the
+paper's confirmed real sampling times (0,6,24,48,72,80,96,144 h). Two of the paper's
+three conditions digitized: CF (320 mg N/L) and LF (90 mg N/L); RF (LF refed with DAP at
+72 h) deliberately deferred — a discrete mid-run intervention is a different validation
+target (`add_dap` timing fidelity), out of scope for a first glucose+ethanol pass.
+
+**Headline finding — the CF/LF absolute-timing gap not only persists on a second
+dataset, it *flips direction*, and both directions are protocol-confounded:** at 20°C
+(Palma's fermentation temp — exactly the engine's/Coleman's `T_ref`, so zero Arrhenius
+extrapolation uncertainty, cleaner than Varela's 28°C), the engine reaches CF dryness at
+~138 h against Palma's real ~72 h — ~1.9x *slower*, the opposite direction from Varela's
+~1.9x too *fast* at 300 mg N/L/28°C. **Cross-checked against Coleman's own reference
+model** (the same eqs-1-8 reconstruction `test_coleman_reconstruction.py` uses, re-run at
+Palma's exact inputs: S0=200 g/L, N0=320 mg/L, pitch=0.018 g/L, 20°C): it dries at ~140 h,
+~1.5% from the engine's ~138 h — **the engine faithfully reproduces Coleman at Palma's
+own inputs**, so the gap to Palma is a genuine Coleman-vs-Palma difference, not an engine
+defect (the exact D-57 argument, transplanted to a new dataset). Two independent,
+non-engine confounds explain it: (1) Palma's real ethanol yield is only ~0.39-0.40 g/g
+glucose consumed at both N levels (computed from the digitized endpoints: CF 78.9 g/L
+ethanol / ~199 g/L consumed; LF ~45.0 g/L / ~120 g/L) — well below the ~0.46-0.51 g/g
+anaerobic range the engine itself uses (~0.48), consistent with a shaken, cotton-
+stoppered 500 mL Erlenmeyer flask (120 rpm) diverting carbon to respiration and/or
+losing ethanol to evaporation over a multi-day shake — a real protocol difference from
+the engine's anaerobic-vinification target regime; (2) Varela's real CF (28°C, warmer)
+took *longer* (170 h) than Palma's real CF (20°C, cooler, 72 h) — anti-Arrhenius between
+the two "independent" datasets themselves, meaning real inter-study spread in
+fermentation rate is at least as large as either dataset's gap to the engine (the same
+"gap is at or below the reference data's own discriminating power" shape D-59 reached for
+the SO₂ overshoot). **Absolute CF/LF duration and ethanol level are therefore
+characterized as regression guards (observed value + margin), never asserted as
+agreement targets against Palma's raw numbers** — advisor flagged this framing risk
+before the test was finalized (the initial framing leaned toward "model too slow," which
+would have buried the more defensible, protocol-confound reading).
+
+**The regime-robust finding — corroborated on an independent strain:** comparing each
+condition's own glucose-consumed *fraction* at 144 h (a ratio that cancels the shared
+yield/aeration confound, since both conditions share one flask protocol) shows the engine
+still under-predicts how much severe nitrogen limitation suppresses fermentation
+progress. Real Palma: CF ~99.5% consumed, LF only ~60% (residual ~80 g/L, still visibly
+decelerating 122→80 g/L between 96-144 h — far from dry, deliberately NOT called
+"arrested", per D-58's overclaim lesson) — ratio ~1.66. Engine: CF ~99.7%, LF ~79%
+(residual ~41 g/L) — ratio only ~1.26. Same direction and shape as D-56/D-57's Varela
+finding and D-59's "model never reproduces arrest" framing, now independent of strain —
+this is the load-bearing signal in this dataset, not the absolute timing. Test
+`test_palma2012_lf_vs_cf_progress_ratio_understates_palma` asserts the engine's ratio
+stays below Palma's real ~1.66; the other two tests characterize CF's absolute duration
+(band [125,150] h, gap-ratio band [1.7,2.15]x) and LF's absolute residual at 144 h (band
+[35,48] g/L) as regression guards, matching the Varela file's established idiom
+(observed + margin, not a loose pass; do not force-fit).
+
+**Method note:** advisor caught the framing risk before the test file was written, not
+after — the transcript already contained the "shaken flask / suspiciously fast /
+aeration" read, but the draft summary was about to headline "model runs too slow,"
+which reads as a fidelity gap rather than the better-supported protocol-confound
+explanation. The Coleman-reconstruction cross-check (run as a one-off probe script, not
+added as a fourth permanent test — `test_coleman_reconstruction.py` already carries the
+general Coleman-fidelity claim; re-deriving it a third time in-repo would be redundant)
+was the decisive piece of evidence, exactly mirroring how the Varela file cites the same
+reconstruction for its own 300 mg N/L point. 3 new tests, 679 passed (676+3), ruff+mypy
+clean. No source code changed — this is a benchmark-only addition, no physics touched.
+
+**Open / still not done:** RF (refeed) digitization, deferred as noted above; beer
+independent validation (Speers/Reid lager cross-check, D-59) still undecided; the N50
+viable-biomass-vs-Varela diagnostic (D-59's other recommended next step) not yet run.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4604,13 +4681,15 @@ directions from D-55's "next milestone" fork.
   (a new sibling `Process` to `BrettDeath`) plus a `BrettGrowth` upper wall, both driven by a shared
   threshold survival factor sourced at Barata et al. 2008's boundaries (onset ~14% v/v/110 g/L,
   ceiling ~14.5–15%/118 g/L). No SO₂ needed — the point of the mechanism. See D-58.
-- **A second independent wine validation dataset (Palma 2012) and a beer-side independent check** —
-  **researched in D-59 (2026-07-08), not yet built.** Palma, Madeira, Mendes-Ferreira & Sá-Correia
-  2012 (*Microbial Cell Factories* 11:99) uses a strain genuinely independent of Coleman/Varela's
-  shared Prise de Mousse lineage, with n=3 replicates + SD error bars making digitization noise small
-  relative to the model's gaps — glucose + ethanol curves only (skip CFU biomass). **Earmarked for
-  validation use only — do not also mine it for a per-cell N-transporter mechanism** (D-59's advisor-
-  caught firewall conflict; see D-59 and the D-56/57 bullet above). Beer has no publicly-accessible
-  independent in-regime dataset at all (its two richest candidates are its own fit sources); the only
-  option found is an off-regime lager dataset (Speers et al. 2003) usable as a cross-regime Arrhenius
-  stress test, or defer beer validation until a better dataset surfaces. See D-59.
+- ~~A second independent wine validation dataset (Palma 2012)~~ — **BUILT in D-60
+  (2026-07-08).** `tests/benchmarks/test_validation_palma2012.py` digitizes CF (320 mg
+  N/L) and LF (90 mg N/L) glucose+ethanol curves (strain PYCC 4072, genuinely independent
+  of Coleman/Varela's Prise de Mousse lineage). Corroborates the D-56/D-57 N-sensitivity
+  shortfall on an independent strain; the absolute CF/LF timing gap flips direction from
+  Varela and is protocol-confounded (shaken-flask yield ~0.39 g/g vs the engine's ~0.48),
+  cross-checked engine-faithful-to-Coleman at Palma's inputs. RF (refeed) left digitized-
+  not-yet-built. See D-60. **Beer-side independent check still open:** no publicly-
+  accessible independent in-regime dataset exists (its two richest candidates are its own
+  fit sources); the only option found is an off-regime lager dataset (Speers et al. 2003)
+  usable as a cross-regime Arrhenius stress test, or defer beer validation until a better
+  dataset surfaces. See D-59.
