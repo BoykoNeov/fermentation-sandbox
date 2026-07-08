@@ -4402,6 +4402,119 @@ functional form over the more obvious wholesale-reuse of the MLF Luong wall. A T
 advisor() pass (above) caught the C1-claim overclaim and the death-rate magnitude tension — both
 fixed by honest documentation, not by silently absorbing or re-tuning.
 
+## D-59 — Validation-direction research sweep: strain collision found, SO₂ overshoot closed to a documented limit, N-gap and beer paths scoped
+
+**Status: RESEARCH ONLY (2026-07-08), no code changes.** M2 physics + refinements complete through
+D-58; owner was asked to pick the next direction among validation / UX / new physics scope (all three
+had been sitting as open candidates since D-55). Owner picked **validation**, then asked to research
+all three of its own open sub-threads before committing to any build: (1) the D-56/57 residual
+N-specific rate gap (~1.17×), (2) the D-51 residual SO₂/acetaldehyde overshoot (1.15–1.45×), (3)
+broadening validation coverage beyond the single Varela 2004 check. Run as **6 parallel Opus research
+agents, 2 per thread, deliberately opposite-angle** (a "pursue"/mechanism-feasibility agent and a
+"skeptic"/cost-and-firewall agent per thread) — the same method D-53 and D-58 used to avoid one-sided
+confirmation. All agents were literature-research only (WebSearch/WebFetch), explicitly barred from
+touching code.
+
+**Finding 0 — the highest-leverage discovery, cuts across all three threads: Coleman 2007 (the
+model's fit source) and Varela 2004 (the model's only independent validation) are the SAME strain
+lineage (Prise de Mousse / EC1118 derivatives).** Surfaced by the coverage-research agent while
+checking Palma 2012's strain against the other two. This means the project's "independent"
+validation has, until now, effectively been on one strain twice — a materially weaker validation
+posture than it looked. It reframes threads 1 and 2 (both checked only against Varela) as validated
+against a narrower base than assumed, and makes strain-independent coverage (Palma, below) the
+single highest-value forward move — ahead of either mechanism build.
+
+**Finding 1 — N-specific gap (D-56/57): do NOT build a transporter mechanism yet; the real gap is
+qualitative, not the 1.17× ratio.** The "pursue" agent found a genuinely firewall-safe candidate
+mechanism (Salmon 1989 — sugar-transport catabolite inactivation triggered by N-exhaustion; Palma
+2012 — per-cell glucose-uptake Vmax falls to ~20% of initial under N limitation, a threshold/
+switching response, not proportional Monod decay), independent of Varela 2004. But both agents
+converge on not building it now, for two separate reasons: (a) **Varela's own paper's central thesis,
+and the model's Cramer 2002 → Coleman 2007 lineage, attribute the N-rate effect to viable-cell
+biomass, not per-cell rate** — so per-cell inactivation may be the wrong lever entirely; (b) **there
+is no third independent, in-regime, numeric severe-deficiency dataset** to check a new mechanism
+against without re-using Varela, which would be circular (Varela is the project's only independent
+wine-kinetics check). The skeptic agent additionally found the target itself is soft: Varela's 4.12×
+ratio combines **two different endpoint definitions** — N=300's "170 h" is time-to-true-dryness,
+N=50's "700 h" is time-to-93%-consumption of a fermentation that never went dry, arresting at **16
+g/L residual sugar**. **The model does not reproduce this arrest at all — it always finishes dry.**
+That qualitative miss, not the 1.17× ratio, is the real finding; the ratio is downstream of it. Cross-
+strain variability in N-sensitivity is documented at >2.5× (Gutiérrez et al. 2012, 23 strains),
+comfortably swamping the residual. **Recommended next step (not yet run): a zero-cost internal
+diagnostic** — compare the model's N50 viable-biomass trajectory against Varela's measured cell
+counts. If biomass matches and rate is still fast, a per-cell term is justified (source from Salmon
+1989, NOT Palma — see Finding 3). If biomass runs too high, the fix is recalibrating existing death/
+yield terms, not a new mechanism.
+
+**Finding 2 — SO₂/acetaldehyde overshoot (D-51): real two-agent consensus, close it out as a
+documented limit.** Two independent, mutually reinforcing arguments:
+- **Affinity arithmetic is decisive on its own.** Acetaldehyde's SO₂-binding affinity is 100–370×
+  tighter than its pyruvate/α-KG competitors (Burroughs & Sparks 1973 Kd values); at these bisulfite
+  concentrations acetaldehyde is already ~99% bound. Freeing enough at the 200 mg/L dose to match the
+  field slope would require pulling free bisulfite down ~200×, which would need a competing pool on
+  the order of tens of mol/L — physically impossible. **No Langmuir-type binder pool, of any affinity
+  or size, can close the high-dose end** — independent of whether the field anchor itself is right.
+- **The field anchor is a category mismatch.** The "0.39 mg/mg, linear across 50–200 mg/L" reference
+  traces to a **cross-sectional regression across ~12 heterogeneous commercial wines, measured only to
+  ~124 mg/L** (Marrufo-Curtido, Ferreira & Escudero 2022, *Foods* 11(3):476 — the equation
+  `−4.4 + 0.39·W_tSO2` appears there verbatim, quoted from prior survey work; the repo currently
+  attributes it to Jackowetz & Mira de Orduña 2013, which should be reconciled). It is a population
+  survey with a documented pH confound, not a within-wine SO₂ titration, and "linear to 200 mg/L" was
+  never tested for curvature — it's an extrapolated straight-line fit. Separately, the broader
+  controlled-dose-response literature (Cornell Research Focus 2011-3; Jackowetz et al. 2011; an OENO
+  One industrial-strain study) reports a 0.2–0.5 mg/mg range (2.5× strain-driven spread) with study-to-
+  study averages already disagreeing by ~1.2× — comparable to or larger than the model's 1.15–1.45×
+  deviation. **The gap is at or below the reference data's own discriminating power.**
+- **Decision: accept the D-51 residual (1.15–1.45×) as a documented, structurally-explained model
+  limit. No fourth binder pool.** Two cheap loose ends worth doing, not building: reconcile the D-51
+  citation (Jackowetz & Mira de Orduña 2013 → Marrufo-Curtido et al. 2022 for the exact equation), and
+  optionally print acetaldehyde's bound fraction at the 200 mg/L dose (should read ~0.99) to confirm
+  the "production, not binding, is the real remaining lever" claim — the D-48 `k_acet_so2_induced`
+  coefficient, not the binding equilibrium, is where the residual slope actually lives if it's ever
+  revisited.
+
+**Finding 3 — broadening coverage: Palma 2012 is a genuine strain-independent validation candidate,
+worth digitizing; beer-side independent validation is currently blocked by data access, not by
+absence of a target.** Palma, Madeira, Mendes-Ferreira & Sá-Correia 2012, *Microbial Cell Factories*
+11:99 (doi:10.1186/1475-2859-11-99) uses strain **PYCC 4072** — different from Coleman/Varela's Prise
+de Mousse lineage (Finding 0) — at 320 vs 90 mg N/L, with **n=3 replicates and SD error bars on
+Figure 1**, so digitization noise (~2–5% of axis range) stays well under the model's 1.17–2× gaps.
+Glucose and ethanol curves (linear axes, ~8 points each) are directly usable; biomass is CFU/mL (log
+scale) and not worth converting. A complementary no-digitization dataset (MDPI 2024, *Fermentation*
+10(8):386, real density-time tables) was also found but has nitrogen as a *fitted* parameter, not
+measured — useful only as a trajectory-shape sanity check, not a nitrogen-mechanism validator. **Beer
+side:** no genuinely independent, in-regime (isothermal ale, ~1.048 OG), numeric time-series dataset
+is publicly accessible — the two richest candidates (Zamudio Lara et al. 2022, de Andrés-Toro et al.
+1998) are confirmed via `beer_generic.yaml` provenance and D-15/D-19 to be the model's own beer fit
+sources (circular if reused). The right-regime data that exists (Reid et al. 2021's two ale datasets,
+bracketing the benchmark almost exactly) is proprietary and never published numerically. The only
+usable independent option found is a **lager** dataset (Speers et al. 2003, reconstructable via Reid
+et al. 2021 Table 2's fitted logistic parameters) — off-regime, but usable as an explicit cross-regime
+Arrhenius-scaling stress test rather than a same-regime validation. Beer independent validation is
+recommended **deferred** pending an accessible in-regime dataset, mirroring how wine validation waited
+for Varela.
+
+**Advisor catch — Palma 2012 was assigned two mutually exclusive roles by two different agents, and
+neither could see the conflict from inside its own scope.** The N-gap "pursue" agent (Finding 1)
+proposed sourcing a per-cell transporter-inactivation mechanism's parameters from Palma's Vmax
+measurements; the coverage agent (Finding 3) independently proposed the same paper's fermentation
+curves as a validation dataset. Under the project's validation/calibration firewall these are
+incompatible — sourcing a mechanism from Palma and then validating the resulting model against
+Palma's own data would be self-confirming. **Resolved: reserve Palma for validation** (it's additive
+— raises future validation power rather than spending it — and it's the only strain-independent
+option available); if a per-cell N-transporter mechanism is ever built, it must source from Salmon
+1989 instead (weaker parameterization, but firewall-clean). Recorded here so this constraint survives
+across sessions: **Palma 2012's fermentation curves are earmarked for validation use; do not also
+mine it for kinetic mechanism parameters.**
+
+**Net outcome: no code changed this session.** Recommended next steps, in order of cost, none yet
+started: (1) the N50 viable-biomass-vs-Varela diagnostic (internal, zero new code beyond a comparison
+script); (2) Palma 2012 digitization as a second independent wine validation point (glucose + ethanol
+only); (3) the D-51 citation reconciliation + optional bound-fraction print; (4) a decision on whether
+to build the Speers/Reid lager cross-regime beer check or defer beer validation entirely. Owner has
+not yet chosen which to start; UX and new-physics-scope remain the other two untouched top-level
+directions from D-55's "next milestone" fork.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4453,16 +4566,19 @@ fixed by honest documentation, not by silently absorbing or re-tuning.
   see D-43 forks (a)–(d).
 - **Packaged parameter-data access:** tests read YAML via filesystem path. If we
   ship a wheel that must read its own data, switch to `importlib.resources`.
-- **The residual D-51 overshoot (1.15–1.45× the field 0.39 mg/mg slope, worst at high SO₂
-  dose):** D-51 (2026-07-07) proved this is *not* closeable by resizing the pyruvate/α-KG pools
-  within their literature-sourced ranges — a sensitivity check at the top of both bands still
-  undershoots at 50 mg/L while missing 200 mg/L by 1.29×, the signature of finite-capacity
-  Langmuir competitors saturating against a field regression that stays linear across the tested
-  dose range. Closing it needs a different structure — candidates not yet designed: a binder
-  whose effective capacity scales with dose (e.g. a fourth carbonyl pool that itself responds to
-  SO₂, or a non-adduct binding mode), or accepting the gap as an honest model limit and
-  documenting it in user-facing guidance instead of chasing it further. Not blocking M2; revisit
-  if a future milestone needs the finished-wine SO₂/acetaldehyde slope tighter than ~1.1–1.5×.
+- ~~The residual D-51 overshoot (1.15–1.45× the field 0.39 mg/mg slope, worst at high SO₂ dose)~~
+  — **RESOLVED (accepted, not closed) in D-59 (2026-07-08).** Two independent research angles
+  converged: an affinity-arithmetic argument (acetaldehyde ~99% bound at these bisulfite levels,
+  100–370× tighter than its competitors — no binder pool of any capacity/affinity can free enough
+  at high dose) makes a fourth binder pool structurally unable to help regardless of the field
+  anchor; separately the field "0.39, linear to 200 mg/L" anchor turned out to be a cross-sectional
+  survey regression across ~12 wines measured only to ~124 mg/L (not a within-wine titration),
+  sitting inside the broader literature's own 0.2–0.5 mg/mg / ~1.2×-study-disagreement envelope.
+  **Decision: accept 1.15–1.45× as a documented, structurally-explained model limit — no new binder
+  pool.** Two cheap follow-ups flagged, not yet done: reconcile the D-51 citation (the exact
+  regression equation traces to Marrufo-Curtido et al. 2022, not Jackowetz & Mira de Orduña 2013 as
+  currently cited) and optionally confirm acetaldehyde's ~99% bound fraction at 200 mg/L in-model.
+  See D-59.
 - ~~The D-56 Varela 2004 fermentation-rate gap~~ — **D-56's mechanism-1 diagnosis was WRONG (stale
   note; already fixed in D-13) and mechanism 2 was substantially CLOSED in D-57 (2026-07-07)** by
   fixing a real, sourced bug (`k_prime_d`'s missing quadratic temperature scaling) instead of
@@ -4472,7 +4588,13 @@ fixed by honest documentation, not by silently absorbing or re-tuning.
   ~1.17x-too-small. **What remains is a small, honestly-documented residual** (that ~1.17x), which a
   Bisson-sourced nitrogen-gated transporter mechanism could still chase, but D-57 judged it no
   longer clearly worth the calibration/validation-firewall risk at this size — owner's call whether
-  to pursue further or accept it as a documented model limit. See D-57 (supersedes this framing).
+  to pursue further or accept it as a documented model limit. **D-59 (2026-07-08) sharpened this:**
+  the real gap is qualitative, not the ratio — Varela's N50 case is a *stuck* fermentation (arrested
+  at 16 g/L residual sugar, never dry) and the model always finishes dry. A firewall-safe mechanism
+  candidate exists (Salmon 1989 sugar-transport catabolite inactivation; NOT Palma 2012, which D-59
+  earmarked for validation use instead — see below), but both D-59 research angles recommend running
+  a cheap internal diagnostic first (model N50 viable-biomass vs. Varela's measured cells) before
+  building anything — not yet run. See D-59.
 - ~~`BrettSenescence` twin~~ — **RE-CONFIRMED DECLINED in D-58 (2026-07-07)** via two independent
   literature-research agents: no source shows Brett declining from elapsed time alone (every observed
   decline traces to SO₂, ethanol toxicity, or substrate exhaustion). D-40/D-52's "persists
@@ -4482,3 +4604,13 @@ fixed by honest documentation, not by silently absorbing or re-tuning.
   (a new sibling `Process` to `BrettDeath`) plus a `BrettGrowth` upper wall, both driven by a shared
   threshold survival factor sourced at Barata et al. 2008's boundaries (onset ~14% v/v/110 g/L,
   ceiling ~14.5–15%/118 g/L). No SO₂ needed — the point of the mechanism. See D-58.
+- **A second independent wine validation dataset (Palma 2012) and a beer-side independent check** —
+  **researched in D-59 (2026-07-08), not yet built.** Palma, Madeira, Mendes-Ferreira & Sá-Correia
+  2012 (*Microbial Cell Factories* 11:99) uses a strain genuinely independent of Coleman/Varela's
+  shared Prise de Mousse lineage, with n=3 replicates + SD error bars making digitization noise small
+  relative to the model's gaps — glucose + ethanol curves only (skip CFU biomass). **Earmarked for
+  validation use only — do not also mine it for a per-cell N-transporter mechanism** (D-59's advisor-
+  caught firewall conflict; see D-59 and the D-56/57 bullet above). Beer has no publicly-accessible
+  independent in-regime dataset at all (its two richest candidates are its own fit sources); the only
+  option found is an off-regime lager dataset (Speers et al. 2003) usable as a cross-regime Arrhenius
+  stress test, or defer beer validation until a better dataset surfaces. See D-59.
