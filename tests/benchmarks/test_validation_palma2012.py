@@ -16,11 +16,11 @@ calibrated to the panels' own axis tick marks, at the paper's actual sampling
 times (0, 6, 24, 48, 72, 80, 96, 144 h, confirmed from Methods). The paper
 reports n=3 replicates with SD error bars on Figure 1, so digitization noise
 (~2-5% of axis range, D-59) is well under the gaps this file characterizes.
-Two of the paper's three conditions are digitized here -- CF (complete
-fermentation, 320 mg N/L) and LF (nitrogen-limited, 90 mg N/L); the third, RF
-(LF refed with DAP at 72 h), is a discrete mid-run intervention and is left for
-whoever next wants to exercise ``add_dap`` timing fidelity specifically --
-out of scope for a first glucose+ethanol pass (D-59's own scoping).
+All three of the paper's conditions are now digitized -- CF (complete
+fermentation, 320 mg N/L), LF (nitrogen-limited, 90 mg N/L), and RF (the LF
+broth refed with 230 mg N/L of DAP at 72 h). RF was deferred at first (D-60) as a
+discrete mid-run intervention and built in D-62 as the ``add_dap`` timing-fidelity
+target D-60 flagged it for; its findings are in their own section below.
 
 **Conditions (from Methods, not assumed):** synthetic grape-must medium,
 glucose as the SOLE sugar (200 g/L, no fructose split -- this maps directly
@@ -88,6 +88,31 @@ only ~1.26. **Same direction and same shape as D-56/D-57's Varela finding and
 D-59's "model never reproduces arrest" framing, now independent of strain**:
 this is the load-bearing, confound-independent signal in this dataset, not the
 absolute timing.
+
+**RF (the DAP-refeed condition, built D-62) -- the nitrogen-sensitivity gap
+surfaces AGAIN through a dynamic intervention, and the engine inverts Palma's
+within-study ordering:** Palma split the sluggish LF broth at 72 h and refed one
+half with 230 mg N/L of DAP (RF); the engine reproduces this with the ``add_dap``
+verb (1.1 g/L DAP -> +233 mg N/L, Palma's 230 rounded). The refeed RESCUES the
+fermentation to dryness in both -- engine RF dries ~108 h while its LF control is
+still ~41 g/L at 144 h (Palma real: RF dry ~117 h, LF ~80 g/L at 144 h) -- a
+confound-robust check (RF vs LF differ ONLY by the dose) that also confirms the
+``add_dap`` event actually fires through ``compiled.run()``. **But the
+load-bearing RF finding is the within-study RF-vs-CF ordering** (the same
+confound-cancelling axis as the CF:LF ratio, NOT the cross-study 108-vs-117 h
+closeness -- that closeness carries the exact ~1.9x strain confound that makes the
+engine's absolute CF timing untrustworthy, so it is characterized as a regression
+guard, never read as agreement). Palma's real RF finishes AFTER its CF
+(RF/CF ~ 117/72 ~ 1.6) because Palma's LF genuinely stalls, so the refed culture
+starts far behind. The engine finishes RF at-or-BEFORE CF (~108 vs ~138 h,
+RF/CF ~ 0.78): because it under-penalizes the LF stall (its LF is only mildly
+behind CF at 72 h), the refed nitrogen drives a large LATE viable-biomass burst
+(X ~ 2.1 -> ~7.6 g/L, peaking ~89 h, while the CF's X already declines from its
+~61 h peak) that clears the remaining sugar fast. So the engine INVERTS Palma's
+within-study ordering -- the SAME D-56/D-57/D-59/D-60 nitrogen-sensitivity
+shortfall, now surfaced through a dynamic refeed rather than a static contrast.
+The inversion (engine RF < CF; Palma RF > CF) holds with wide margin on both
+sides, robust to digitization slop.
 """
 
 from __future__ import annotations
@@ -96,8 +121,7 @@ import numpy as np
 import pytest
 from scipy.optimize import brentq
 
-from fermentation.runtime.integrate import simulate
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 from fermentation.units import brix_to_sugar_gpl
 
 pytestmark = pytest.mark.benchmark
@@ -143,22 +167,46 @@ _PALMA_CF_HOURS_TO_DRYNESS = 72.0
 #: CF is already fully dry by 144 h; LF is far from it.
 _PALMA_GLUCOSE_GPL_144H = {320.0: 1.0, 90.0: 80.0}
 
+#: Palma's RF (refed) condition (Methods): after 72 h the sluggish LF broth was split and
+#: assimilable nitrogen was added to one half -- 230 mg N/L, dosed as 1.1 g/L of
+#: (NH4)2HPO4. Faithful to the additive, the engine doses the SAME 1.1 g/L DAP; the model's
+#: exact-stoichiometry dap_nitrogen_fraction (0.2121, VALIDATED) turns that into +233 mg N/L
+#: -- Palma's stated 230 is the identical dose rounded (1.1 * 0.2121 * 1000 = 233.3). The
+#: refeed is dosed on day 3.0 (= 72 h) via the add_dap verb.
+_RF_REFEED_DAY = 3.0
+_RF_DAP_GPL = 1.1
 
-def _run_palma_condition(yan_mgl: float, duration_days: float) -> tuple[np.ndarray, np.ndarray]:
-    """Run the wine scenario at Palma's conditions; return (t_hours, total_sugar_gpl)."""
+#: Palma's real RF reaches dryness ~115-120 h (Figure 1C, filled triangles ▲) -- i.e. AFTER
+#: its own CF's ~72 h. The within-study RF/CF ratio (~117/72 ~ 1.6, RF slower than CF) is the
+#: confound-robust axis the RF test uses; the digitized midpoint is pinned here for that
+#: ordering comparison, NOT as an absolute agreement target (see the RF test docstring).
+_PALMA_RF_HOURS_TO_DRYNESS = 117.0
+
+
+def _run_palma_condition(
+    yan_mgl: float,
+    duration_days: float,
+    interventions: list[Intervention] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Run the wine scenario at Palma's conditions; return (t_hours, total_sugar_gpl).
+
+    Routed through ``compiled.run()`` (not a bare ``simulate``) so a mid-run ``add_dap``
+    refeed (the RF condition) actually fires -- a hand-wired ``simulate`` silently drops
+    ``events`` (see compile.py). With no interventions this is byte-for-byte a plain
+    ``simulate`` (an empty schedule is a single segment), so CF/LF are unchanged.
+    """
     scenario = Scenario(
         name=f"palma2012-{yan_mgl:g}mgN",
         medium="wine",
         initial={"brix": _BRIX, "yan_mgl": yan_mgl, "pitch_gpl": _PITCH_GPL_RESEARCH},
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=_TEMPERATURE_C)],
+        interventions=interventions or [],
         duration_days=duration_days,
     )
     compiled = compile_scenario(scenario, strict=True)
     duration_h = compiled.t_span_h[1]
     t_eval = np.linspace(0.0, duration_h, int(duration_h) + 1)
-    traj = simulate(
-        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h, t_eval=t_eval
-    )
+    traj = compiled.run(t_eval=t_eval)
     assert traj.success, traj.message
     sugar = np.asarray(traj.series("S"))
     total_sugar = sugar if sugar.ndim == 1 else sugar.sum(axis=0)
@@ -245,3 +293,76 @@ def test_palma2012_lf_vs_cf_progress_ratio_understates_palma():
         "nitrogen limitation suppresses fermentation progress, now confirmed on an "
         "independent strain -- see D-56/D-57/D-59/D-60)"
     )
+
+
+def _run_palma_rf() -> tuple[np.ndarray, np.ndarray]:
+    """RF = LF (90 mg N/L) with the 72 h DAP refeed applied (Palma Methods)."""
+    refeed = [Intervention(day=_RF_REFEED_DAY, action="add_dap", params={"dap_gpl": _RF_DAP_GPL})]
+    return _run_palma_condition(90.0, duration_days=20.0, interventions=refeed)
+
+
+def test_palma2012_rf_refeed_rescues_the_sluggish_lf_to_dryness():
+    # Palma's RF condition: the nitrogen-limited LF broth refed with DAP at 72 h. This is the
+    # add_dap timing-fidelity target D-60 deferred RF for. The claim here is confound-robust
+    # in the same way the CF:LF ratio is -- RF and LF differ ONLY by the 72 h dose, so the
+    # strain and evaporation confounds that muddy the absolute CF/LF numbers cancel: restoring
+    # nitrogen RESCUES the sluggish fermentation to dryness. The engine reproduces this -- RF
+    # reaches dryness (~108 h) while its own LF control is still ~41 g/L at 144 h (Palma real:
+    # RF dry ~117 h, LF ~80 g/L at 144 h -- same qualitative rescue). This also pins that the
+    # add_dap event actually FIRES through compiled.run(): a bare simulate() silently drops the
+    # schedule, in which case RF would be byte-identical to LF and this test would fail.
+    lf_t, lf_s = _run_palma_condition(90.0, duration_days=20.0)
+    rf_t, rf_s = _run_palma_rf()
+
+    rf_hours = _hours_to_dryness(rf_t, rf_s, 20.0)
+    # The refeed drives RF dry while the LF control is nowhere near it at the same clock time.
+    assert rf_hours <= 144.0, f"RF should reach dryness in-window; got {rf_hours:.1f} h"
+    lf_144 = float(np.interp(144.0, lf_t, lf_s))
+    assert lf_144 > DRYNESS_GPL, (
+        f"LF control should still be far from dry at 144 h (got {lf_144:.1f} g/L) -- if it is "
+        "dry, the rescue contrast is gone and the add_dap effect can no longer be isolated"
+    )
+
+    # Absolute RF dryness is a regression guard on the engine's OWN characterized value
+    # (~108 h), NOT asserted against Palma's ~117 h: that 108-vs-117 closeness is a CROSS-study
+    # comparison and carries the very same ~1.9x strain confound that makes the engine's CF run
+    # ~1.9x slower than Palma's (test_palma2012_cf_duration_characterized) -- so it must not be
+    # read as timing agreement. If this band moves, record why (new decision), don't re-fit it.
+    assert 95.0 <= rf_hours <= 120.0, (
+        f"RF: hours_to_dryness={rf_hours:.1f} outside characterized [95, 120] h"
+    )
+
+
+def test_palma2012_rf_vs_cf_ordering_is_inverted_relative_to_palma():
+    # The load-bearing RF finding -- the within-study RF-vs-CF ordering, which (like the CF:LF
+    # ratio test) cancels the strain/evaporation confound by comparing two conditions of the
+    # SAME study rather than engine-vs-Palma across studies.
+    #
+    # Palma's real RF finishes AFTER its CF (RF/CF ~ 117/72 ~ 1.6) because Palma's LF genuinely
+    # stalls, so the refed culture starts far behind and, even fully re-nitrogened, only catches
+    # up well after the never-stalled CF is done. The engine gets this BACKWARDS: it finishes RF
+    # at-or-BEFORE CF (~108 vs ~138 h, RF/CF ~ 0.78). The mechanism is verified, not inferred:
+    # because the engine under-penalizes the LF stall (its LF is only mildly behind CF at 72 h,
+    # not stalled -- the same N-under-suppression gap of D-56/D-57/D-59/D-60), the refed nitrogen
+    # drives a large LATE biomass burst (viable X rises ~2.1 -> ~7.6 g/L, peaking ~89 h, while the
+    # CF's X already declines from its ~61 h peak) that clears the remaining sugar fast. So the
+    # engine INVERTS Palma's within-study ordering -- the D-56/D-57/D-59/D-60 nitrogen-sensitivity
+    # shortfall, now surfaced through a DYNAMIC refeed intervention rather than a static contrast.
+    #
+    # This inversion (engine RF < CF; Palma RF > CF) is robust to digitization slop: engine
+    # 108 < 138 and Palma 117 > 72 both hold with wide margin.
+    cf_t, cf_s = _run_palma_condition(320.0, duration_days=15.0)
+    rf_t, rf_s = _run_palma_rf()
+    cf_hours = _hours_to_dryness(cf_t, cf_s, 15.0)
+    rf_hours = _hours_to_dryness(rf_t, rf_s, 20.0)
+
+    assert rf_hours < cf_hours, (
+        f"engine RF dries at {rf_hours:.0f} h, CF at {cf_hours:.0f} h -- the engine finishes RF "
+        "at-or-before CF (it under-penalizes the LF stall, so the refed culture is barely "
+        "behind). Palma's real RF finishes well AFTER CF (~117 vs ~72 h); if this assertion "
+        "flips, the engine has stopped inverting Palma's within-study ordering -- a real change "
+        "in the nitrogen-limitation kinetics worth a new decision, not a silent re-band."
+    )
+    # Palma's real ordering is the opposite -- pinned as literals so the inversion is explicit
+    # and this test fails loudly if someone edits the digitized anchors the wrong way.
+    assert _PALMA_RF_HOURS_TO_DRYNESS > _PALMA_CF_HOURS_TO_DRYNESS

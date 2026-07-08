@@ -4741,6 +4741,66 @@ both closed as documented, structurally-explained model limits. Remaining open v
 (unchanged from D-60): Palma RF digitization, beer independent validation (Speers/Reid lager cross-
 regime check or defer), and the optional Varela Figure-1 biomass-time-series digitization noted above.
 
+## D-62 — Palma 2012 RF (refeed) condition built: the DAP-refeed rescue is reproduced, but the engine INVERTS Palma's within-study RF-vs-CF ordering (same N-under-suppression gap, now via a dynamic intervention)
+
+**Status: BENCHMARK-ONLY (2026-07-08), no physics/source-code changed.** Picked up the RF
+digitization D-60 deferred — the third Palma 2012 condition, and the `add_dap` timing-fidelity
+target D-60 explicitly flagged RF for. Two new tests in `tests/benchmarks/test_validation_palma2012.py`
+(681 passed = 679+2, ruff+mypy clean). The D-60 digitization workspace survived in
+`M:\claud_projects\temp\palma2012` (fig1.jpg, fulltext.xml, methods_dump.txt, calibrated panels),
+so no re-fetch was needed. Advisor consulted before writing — it reframed the finding decisively.
+
+**RF protocol (Palma Methods, verified against the fulltext, not assumed):** after 72 h the sluggish
+LF broth (90 mg N/L) was split and one half refed with **230 mg N/L as 1.1 g/L (NH₄)₂HPO₄** (RF); the
+other half stayed as the LF control. The engine reproduces this faithfully-to-the-additive: `add_dap`
+1.1 g/L DAP, which the model's exact-stoichiometry `dap_nitrogen_fraction` (0.2121, VALIDATED) turns
+into +233 mg N/L — Palma's stated 230 is the identical dose rounded.
+
+**A real probe bug caught before it became a false finding.** The first probe ran RF through a bare
+`simulate(process_set, …)` and found RF byte-identical to LF — which *looked* like "the engine
+ignores the refeed", a headline-grade fidelity gap. It was wrong: `simulate` silently drops the
+compiled `events`; the refeed must go through `compiled.run()` (→ `simulate_scheduled`). Verified by
+inspecting the N slot: through `.run()`, N_RF jumps 0.00→0.233 g/L at 72 h; through bare `simulate`
+it never moved. `_run_palma_condition` was unified onto `.run()` (byte-for-byte identical for the
+CF/LF no-event case per the compile.py contract, and confirmed empirically — CF/LF bands unmoved).
+
+**Advisor's load-bearing reframe (applied):** the engine RF dries at ~108 h vs Palma's real ~117 h —
+tempting to read as "RF timing agrees" (unlike CF's ~1.9× gap). **The advisor flagged this closeness
+as a CROSS-study comparison carrying the exact same ~1.9× strain confound that makes the engine's CF
+timing untrustworthy — coincidental, not a signal. Do NOT build the test on it.** The confound-robust
+axis is the **within-study RF-vs-CF ordering** (the same axis as the existing CF:LF ratio test):
+- **Palma real:** RF finishes AFTER CF (RF/CF ~ 117/72 ~ **1.6**) — LF genuinely stalls, so the refed
+  culture starts far behind and only catches up well after the never-stalled CF is done.
+- **Engine:** RF finishes at-or-BEFORE CF (~108 vs ~138 h, RF/CF ~ **0.78**) — it under-penalizes the
+  LF stall (engine LF is only mildly behind CF at 72 h, not stalled), so the refed culture is barely
+  behind and beats CF.
+
+**The engine INVERTS Palma's within-study ordering** (engine RF<CF; Palma RF>CF, both with wide margin
+→ robust to digitization slop). This is the **same D-56/D-57/D-59/D-60 nitrogen-sensitivity shortfall
+— the engine under-predicts how much severe N-limitation suppresses fermentation — now surfaced
+through a DYNAMIC refeed intervention rather than a static contrast.** That the same gap reappears on
+a fourth, mechanistically-different probe strengthens the D-61 verdict that it is a genuine, coherent
+model limit (not an artifact of any one comparison).
+
+**Mechanism VERIFIED, not inferred (the D-60 lesson applied):** re-ran the *corrected* (`.run()`) RF
+and inspected viable biomass X directly — after the 72 h refeed X_RF rises **2.1 → ~7.6 g/L, peaking
+~89 h**, while X_CF already declines from its **~61 h** peak (~3.3 g/L). So the engine's fast RF finish
+is driven by a large *late* biomass burst on the refed nitrogen (an observation, not a story bolted on
+after). Note: RF's ~7.6 g/L peak exceeds CF's ~3.3 g/L on nearly-equal total N (323 vs 320 mg/L)
+because a late N dump lands when sugar is still abundant (~152 g/L) — a state-dependent biomass-yield
+consequence of the timing, worth flagging but not itself a defect.
+
+**Test design (matches the D-60/Varela idiom — observed + margin, never force-fit against Palma):**
+`test_palma2012_rf_refeed_rescues_the_sluggish_lf_to_dryness` asserts the confound-robust rescue (RF
+reaches dryness; the LF control is still ~41 g/L at 144 h — RF vs LF differ ONLY by the dose, so
+strain/evaporation cancel) plus an absolute RF-dryness regression guard ([95,120] h, explicitly NOT
+vs Palma's 117 h). `test_palma2012_rf_vs_cf_ordering_is_inverted_relative_to_palma` asserts the
+discriminating within-study inversion (engine RF<CF; Palma's digitized RF>CF pinned as literals).
+
+**Open / still not done (unchanged from D-60/D-61):** beer independent validation (Speers/Reid lager
+cross-regime check or defer); optional Varela Figure-1 biomass-time-series digitization. The Palma 2012
+dataset is now fully exercised (all three conditions built).
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4845,8 +4905,11 @@ regime check or defer), and the optional Varela Figure-1 biomass-time-series dig
   of Coleman/Varela's Prise de Mousse lineage). Corroborates the D-56/D-57 N-sensitivity
   shortfall on an independent strain; the absolute CF/LF timing gap flips direction from
   Varela and is protocol-confounded (shaken-flask yield ~0.39 g/g vs the engine's ~0.48),
-  cross-checked engine-faithful-to-Coleman at Palma's inputs. RF (refeed) left digitized-
-  not-yet-built. See D-60. **Beer-side independent check still open:** no publicly-
+  cross-checked engine-faithful-to-Coleman at Palma's inputs. **RF (refeed) BUILT in D-62
+  (2026-07-08):** the DAP-refeed rescue is reproduced, but the engine inverts Palma's
+  within-study RF-vs-CF ordering (engine RF<CF ~108<138 h; Palma RF>CF ~117>72 h) — the
+  same N-under-suppression gap via a dynamic intervention; all three Palma conditions now
+  built. See D-60, D-62. **Beer-side independent check still open:** no publicly-
   accessible independent in-regime dataset exists (its two richest candidates are its own
   fit sources); the only option found is an off-regime lager dataset (Speers et al. 2003)
   usable as a cross-regime Arrhenius stress test, or defer beer validation until a better
