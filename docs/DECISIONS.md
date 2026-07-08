@@ -3637,7 +3637,18 @@ win at the cost of a high-dose miss, it doesn't uniformly close the gap. Per the
 guardrail — "do not force-fit beyond the literature-sourced pool ranges" — and advisor concurrence,
 **the shipped D-49/D-50 residuals (30/20 mg/L) are unchanged.** The field's 0.39 mg/mg is an
 *ensemble* regression over 237 wines with varying carbonyl levels and pH (Jackowetz & Mira de
-Orduña 2013); tuning one ferment's pool size to chase it is a category mismatch, not a calibration,
+Orduña 2013)
+**[CITATION CORRECTED in D-61: this attribution conflates two different papers. The exact slope
+equation `W_acetaldehyde = −4.4 + 0.39·W_tSO₂` (R = 0.837, p < 0.001) comes from Marrufo-Curtido,
+Ferreira & Escudero 2022, *Foods* 11(3):476 — a 12-wine forced-oxidation study over a 20–124 mg/L
+total-SO₂ range, NOT a within-wine titration. Jackowetz & Mira de Orduña 2013 is the separate
+237-wine "Survey of SO₂ binding carbonyls" (Food Control 32(2):687–692), which reports average
+binder *concentrations* (acetaldehyde 25/40, pyruvate 14/25, α-KG 74/31 mg/L red/white) — the
+correct source for the finished-wine keto-acid *ranges* the D-49/D-50 residuals are anchored to,
+but it does not report this slope. The "ensemble regression over 237 wines" phrasing is thus wrong
+on both the wine count and the paper; the category-mismatch argument it supports is unaffected —
+if anything strengthened, since the true anchor is a 12-wine cross-sectional survey to only 124
+mg/L. See D-61.]**; tuning one ferment's pool size to chase it is a category mismatch, not a calibration,
 and would trade a documented author-estimate for a fitted number whose only justification is
 proximity to a plot — provenance this project ranks below a genuine fit. **This reshapes the task's
 own premise** (named "the actual fix for the D-48 overshoot"): the data says D-51 is real, correct,
@@ -4609,6 +4620,127 @@ clean. No source code changed — this is a benchmark-only addition, no physics 
 independent validation (Speers/Reid lager cross-check, D-59) still undecided; the N50
 viable-biomass-vs-Varela diagnostic (D-59's other recommended next step) not yet run.
 
+## D-61 — N50 biomass diagnostic run (D-59 Finding 1 gate): biomass is not the culprit, so DON'T build the Salmon per-cell mechanism; + two D-59 loose ends closed
+
+**Status: DIAGNOSTIC + DOC/PROVENANCE ONLY (2026-07-08), no physics changed.** Picked up
+D-59's top-ranked cheap next step: the internal diagnostic D-59 Finding 1 set as the **gate**
+before any stuck-fermentation / per-cell-rate mechanism build. Ran as a throwaway script
+(`M:\claud_projects\temp\d61_varela_n50_biomass_diagnostic.py`, kept out of git per repo
+etiquette — a one-shot diagnostic, not a permanent test; `test_validation_varela2004.py`
+already guards the numbers it leans on). Advisor consulted before interpreting.
+
+**The gate D-59 set:** compare the model's N50 *active/viable* biomass trajectory against
+Varela's cells. If active biomass ≈ Varela's viable **and** the model still finishes ~2.2× fast
+→ a per-cell N-gated rate term is justified (source Salmon 1989, firewall-clean; NOT Palma —
+D-59 reserved Palma for validation). If active biomass runs **too high** → the fix is
+recalibrating existing death/yield, not a new mechanism.
+
+**Advisor's load-bearing correction to the gate (applied):** the comparison variable is the
+whole diagnostic, not a footnote. Three *different physical quantities* are in play — model `X`
+is **catalytic vitality** (fermentative capacity), Varela's >97% is **membrane viability**,
+Varela's 1.5 g/L is **gravimetric total DCW**. Naively reading "model viable runs low → build
+the per-cell term" off a vitality-vs-viability comparison would *manufacture* a false verdict
+the Varela docstring itself warns against. So the diagnostic reports the **mean active `X`
+across the 10%→90% sugar-consumption window** (the biomass actually fermenting), anchored on the
+clean gravimetric-to-gravimetric **total** comparison, with the active figure as caveated
+support only.
+
+**Numbers (28 °C, research pitch 0.018 g/L, 240 g/L sugar — same setup as the Varela benchmark):**
+
+| quantity | N=300 | N=50 | Varela |
+|---|---|---|---|
+| hours to dryness (model) | 89 h | 314 h (min S 0.85) | 170 h / 700 h* |
+| model-vs-Varela speed gap | 1.91× fast | 2.23× fast | — |
+| total biomass X+X_dead (model) | 3.38 | **1.40** | 5.8 / **1.5** DCW |
+| mean active X in 10–90% window | 2.99 | **0.96** | ~5.63 / **~1.46** (DCW×97%) |
+| active X across the window | 2.52→2.45 | **1.38→0.46** | (>97% viable throughout) |
+| active fraction at 90% consumed | 72% | **33%** | >97% |
+
+*Varela N50 never reaches dryness — it arrests at 16 g/L residual; "700 h" is time-to-93%-
+consumption. The model always finishes dry (the qualitative miss D-59 Finding 1 flagged as the
+*real* gap, downstream of the capacity-loss timing).
+
+**Verdict — the gate *as D-59 posed it* is unevaluable, not un-fired; reframed onto the one clean
+quantity it still hardens D-59's tentative "don't build yet" into "don't build":**
+0. **D-59's gate rests on a category error.** It keyed both branches on *model-viable* vs
+   *Varela-viable* cells (viable ≈ Varela → build per-cell; viable too high → recalibrate). But
+   model `X` is **catalytic vitality** and Varela's >97% is **membrane viability** — the exact
+   incomparable pair the advisor flagged. So the gate as literally posed **cannot be evaluated**;
+   reading a verdict off model-`X`-vs-Varela-viability would manufacture an artifact. This is the
+   most useful thing the diagnostic surfaced, and it is why the entry does not report a "biomass
+   matches → build" firing even though total biomass does match (see next).
+1. **Reframe onto the one clean, comparable quantity — total gravimetric biomass — and it MATCHES**
+   at N50 (1.40 vs 1.5 g/L, ~7% low; reproduces D-56 finding 3's yield near-match). So the residual
+   is **not a biomass-quantity error** in either direction: the model does not have *too much*
+   biomass (ruling out "recalibrate death/yield to kill more," on evidence, not merely on the
+   frozen-`k_prime_d` Coleman-reconstruction cost of D-57), and total is not low either.
+2. **That localizes the residual to per-cell rate / capacity-loss timing** — nominally the "build"
+   locus. Supporting (cross-strain-consistent) evidence: the model has *less* total biomass than
+   Varela at BOTH N levels yet finishes faster (N300: total 3.38 vs 5.8, 1.91× fast; N50: 1.40 vs
+   1.5, 2.23× fast), so the fast-finish is a per-cell *rate* feature present even in-range. That
+   rate is **Coleman's own fitted rate** — the engine reproduces Coleman line-for-line
+   (`test_coleman_reconstruction.py`; ~84.5 h at the N300 inputs, matching). Coleman and Varela are
+   the **same strain** (D-59 Finding 0), so the gap is a genuine **Coleman-vs-Varela cross-lab
+   difference**; a per-cell term calibrated to close it would calibrate the model *away from its own
+   fit source* toward a different lab — a validation/calibration-firewall breach.
+3. **The load-bearing reason not to build: that build locus is already occupied by `X_dead`, and
+   Varela cannot adjudicate its timing.** Varela's arrest at 16 g/L is loss of fermentative capacity
+   in membrane-viable cells — exactly what `X_dead` (catalytic-vitality loss, `inactivation.py`)
+   represents. A Salmon 1989 catabolite-inactivation term would be **largely redundant** with
+   existing machinery. The real open question is whether `X_dead`'s *timing/magnitude* under
+   N-limitation is off (the model keeps enough active `X` — 1.38→0.46 g/L across the window — to
+   grind to dryness where Varela arrests). But **model-vs-Varela cannot settle that**, because the
+   only Varela quantity bearing on it (>97% membrane viability) is not comparable to `X_dead`
+   (vitality) — the same category error as point 0 — and there is no third independent in-regime
+   dataset to break the tie without re-using Varela.
+
+**Decision: accept the D-56/D-57 residual N-gap as a documented model limit; do NOT build the
+Salmon per-cell mechanism.** Reached from internal evidence (points 0–3), landing on the same
+"documented limit, not a free action" outcome the advisor flagged as the honest possibility.
+
+**Honest limitation of the diagnostic (per advisor's verify-first point):** it compares the model
+trajectory against Varela's **endpoints + the single >97% viability figure**, not a digitized
+viable-cell *time series* — the Varela benchmark only carries endpoints. The total-biomass anchor
+is robust anyway (flat from ~40 h onward, so the endpoint is representative of the plateau), so
+the gate is answerable now. A future strengthening could digitize Varela 2004's Figure-1 biomass-
+over-time curve to check *when* biomass diverges; not blocking, and it would not change verdict
+points 1–3 (they rest on the plateau + the in-range N300 result).
+
+**Loose end A — D-59's acetaldehyde bound-fraction check (confirmed in-model).** Built a second
+throwaway script (`M:\claud_projects\temp\d59_acetaldehyde_bound_fraction.py`) driving
+`acidbase.speciate_so2` / `free_acetaldehyde` at a realistic finished-wine state (pH 3.4,
+pyruvate ~30 / α-KG ~20 mg/L competitors) across the benchmark SO₂ doses. At the 200 mg/L dose
+with acetaldehyde tracking the field increments (25.7/56.1/119 mg/L), the model reports
+acetaldehyde **98.5% / 99.0% / 99.4% bound** — the ~0.99 D-59 Finding 2's affinity-arithmetic
+argument predicted, confirming in-model *why* no fourth binder pool can free enough to move the
+high-dose slope (acetaldehyde is already essentially fully sequestered; the residual slope lives
+in D-48's `k_acet_so2_induced` production term, not the binding equilibrium). Only an unphysical
+acetaldehyde overload (200 mg/L, carbonyl moles > SO₂ moles) drops it to 69%.
+
+**Loose end B — D-59's D-51 citation reconciliation (done).** Verified against both primary
+sources (WebFetch of the Marrufo-Curtido PMC full text; search-confirmed the Jackowetz survey
+scope): the exact slope equation `W_acetaldehyde = −4.4 + 0.39·W_tSO₂` (R = 0.837, p < 0.001) is
+from **Marrufo-Curtido, Ferreira & Escudero 2022, *Foods* 11(3):476** — a **12-wine** forced-
+oxidation cross-sectional survey over a **20–124 mg/L** total-SO₂ range (NOT a within-wine
+titration). The repo's D-51 entry attributed it to **Jackowetz & Mira de Orduña 2013**, which is
+the *separate* 237-wine "Survey of SO₂ binding carbonyls" (Food Control 32(2):687–692) reporting
+average binder *concentrations* (acetaldehyde 25/40, pyruvate 14/25, α-KG 74/31 mg/L red/white) —
+the correct anchor for the finished-wine keto-acid *ranges* (D-49/D-50) but not for this slope.
+Fixed: (a) a bracketed `[CITATION CORRECTED in D-61…]` note appended in place at the D-51 entry
+(preserving the append-only log); (b) the correct Marrufo-Curtido attribution added to the two
+live provenance strings in `acetaldehyde.yaml` where the 0.39 equation appears without a cite.
+The category-mismatch argument D-51 built on the anchor is **unaffected — if anything strengthened**
+(the true anchor is a 12-wine survey to only 124 mg/L, weaker discriminating power than an
+imagined 237-wine regression). Jackowetz cites elsewhere (keto-acid ranges, pyruvate-as-second-
+binder in `acidbase.yaml`) are legitimate and left as-is. `acetaldehyde.yaml` still loads; 31/31
+acetaldehyde tests green.
+
+**Net: no physics/source-code changed.** One DECISIONS correction note, two YAML provenance-string
+fixes, two throwaway diagnostic scripts (out of git). The N-gap and SO₂-overshoot threads are now
+both closed as documented, structurally-explained model limits. Remaining open validation threads
+(unchanged from D-60): Palma RF digitization, beer independent validation (Speers/Reid lager cross-
+regime check or defer), and the optional Varela Figure-1 biomass-time-series digitization noted above.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4669,10 +4801,12 @@ viable-biomass-vs-Varela diagnostic (D-59's other recommended next step) not yet
   survey regression across ~12 wines measured only to ~124 mg/L (not a within-wine titration),
   sitting inside the broader literature's own 0.2–0.5 mg/mg / ~1.2×-study-disagreement envelope.
   **Decision: accept 1.15–1.45× as a documented, structurally-explained model limit — no new binder
-  pool.** Two cheap follow-ups flagged, not yet done: reconcile the D-51 citation (the exact
-  regression equation traces to Marrufo-Curtido et al. 2022, not Jackowetz & Mira de Orduña 2013 as
-  currently cited) and optionally confirm acetaldehyde's ~99% bound fraction at 200 mg/L in-model.
-  See D-59.
+  pool.** Both cheap follow-ups **DONE in D-61 (2026-07-08):** the D-51 citation is reconciled (the
+  slope equation is Marrufo-Curtido et al. 2022, *Foods* 11(3):476, verified against the primary
+  source; Jackowetz & Mira de Orduña 2013 is the separate 237-wine concentration survey — fixed in
+  the D-51 note + `acetaldehyde.yaml` provenance), and the in-model bound fraction at 200 mg/L SO₂
+  reads **98.5–99.4%** at realistic acetaldehyde levels, confirming the affinity-arithmetic argument.
+  See D-59, D-61.
 - ~~The D-56 Varela 2004 fermentation-rate gap~~ — **D-56's mechanism-1 diagnosis was WRONG (stale
   note; already fixed in D-13) and mechanism 2 was substantially CLOSED in D-57 (2026-07-07)** by
   fixing a real, sourced bug (`k_prime_d`'s missing quadratic temperature scaling) instead of
@@ -4688,7 +4822,14 @@ viable-biomass-vs-Varela diagnostic (D-59's other recommended next step) not yet
   candidate exists (Salmon 1989 sugar-transport catabolite inactivation; NOT Palma 2012, which D-59
   earmarked for validation use instead — see below), but both D-59 research angles recommend running
   a cheap internal diagnostic first (model N50 viable-biomass vs. Varela's measured cells) before
-  building anything — not yet run. See D-59.
+  building anything. **DIAGNOSTIC RUN in D-61 (2026-07-08) — verdict: DON'T build the Salmon
+  mechanism.** Total biomass matches Varela at N50 (1.40 vs 1.5 g/L) so biomass is not the culprit;
+  the fast-finish is a per-cell *rate* feature present even in-range (model has *less* biomass than
+  Varela at both N levels yet finishes faster), and that rate is Coleman's own fitted rate (same
+  strain as Varela, D-59 Finding 0) — so the gap is a Coleman-vs-Varela cross-lab difference, and
+  the model already encodes Varela's arrest phenomenon as `X_dead` (catalytic-vitality loss). A
+  Salmon per-cell term would be redundant and would calibrate the model away from its own fit
+  source. **Accepted as a documented model limit.** See D-59, D-61.
 - ~~`BrettSenescence` twin~~ — **RE-CONFIRMED DECLINED in D-58 (2026-07-07)** via two independent
   literature-research agents: no source shows Brett declining from elapsed time alone (every observed
   decline traces to SO₂, ethanol toxicity, or substrate exhaustion). D-40/D-52's "persists
