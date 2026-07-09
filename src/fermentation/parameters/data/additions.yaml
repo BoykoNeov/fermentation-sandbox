@@ -77,3 +77,27 @@ copper_mercaptan_binding:
     source: "stoichiometry of copper mercaptide precipitation Cu2+ + 2 RSH -> Cu(SR)2(s) + 2 H+ (1:2 mol); copper fining of reductive thiols (general enology; Rankine). The incompleteness/disulfide caveat: copper is an imperfect mercaptan fix (Swiegers et al. 2005; Ugliano volatile-sulfur reviews)"
     conditions: "copper(II) fining of dissolved mercaptans (methanethiol stand-in) in wine; g MeSH bound per g Cu, bound with copper LEFT after H2S, at (idealised) stoichiometric completion"
     notes: "Read by the add_copper verb (D-45) to convert leftover copper into the mercaptan mass it removes. M(MeSH) = 48.107, M(Cu) = 63.546, Cu(SR)2 is 1 Cu : 2 thiol => 2*48.107/63.546 = 1.514 g MeSH/g Cu. VALUE at the stoichiometric ceiling (the user-chosen stoichiometric lever); tier PLAUSIBLE and banded DOWN HARDER than copper_h2s_binding because real copper fining is notably less complete for mercaptans than for sulfide and cannot touch the disulfides they oxidise to. Residual copper is untracked (v1 scope, decision D-45)."
+
+# -- Sucrose -> hexose inversion mass gain (add_sugar / chaptalization verb, decision D-65) ---
+#
+# Chaptalization (and beer priming/adjunct) doses SUCROSE, the standard table sugar. Sucrose is
+# not fermented as such: yeast invertase hydrolyses it near-instantly (fast relative to the
+# ferment) into glucose + fructose, both directly fermentable hexoses. The add_sugar verb models
+# that inversion at the dose (a state mutation via events, decision D-65 — NOT a kinetic pool),
+# converting the dosed sucrose mass to the hexose-equivalent mass it yields via this factor, then
+# adding it to the fermentable sugar slot (wine's lumped hexose S; beer's GLUCOSE slot, with
+# fructose lumped as glucose-equivalent — they are isomers, so carbon and mass are exact). The
+# extra mass over 1.0 is the hydrolysis WATER incorporated (the same di-/tri-saccharide "mass gain
+# from solvent water" the beer sugar spectrum already carries; chemistry.HEXOSE_UNITS / M_WATER).
+# Carbon is unchanged by hydrolysis (water carries none), so the flow books exactly the sucrose's
+# carbon and total_carbon closes to machine precision. Sucrose C12H22O11 (an isomer of maltose,
+# same M = 342.30) + H2O -> 2 C6H12O6 (2 * 180.16 = 360.32); ratio = 360.32/342.30 = 1.0526.
+sucrose_inversion_mass_ratio:
+  value: 1.0526
+  unit: "g/g"   # g fermentable hexose produced / g sucrose dosed (inversion + hydrolysis water)
+  tier: validated
+  uncertainty: { low: 1.0526, high: 1.0526, note: "exact stoichiometry; not an uncertain parameter" }
+  provenance:
+    source: "exact stoichiometry of sucrose inversion C12H22O11 + H2O -> glucose + fructose (2 hexose)"
+    conditions: "chaptalization / priming: commercial sucrose dosed by mass, hydrolysed by yeast invertase to two fermentable hexoses; g hexose-equivalent per g sucrose"
+    notes: "M(sucrose C12H22O11) = 342.30 g/mol (isomer of maltose), 2 x M(glucose C6H12O6) = 360.32 g/mol -> 360.32/342.30 = 1.0526 g hexose/g sucrose. The +0.0526 is hydrolysis water pulled from the solvent (chemistry.M_WATER; the same mass gain beer's maltose/maltotriose carry, decision D-8). Read by the add_sugar verb (decision D-65) to convert a sucrose dose (sugar_gpl) into the hexose jump on the fermentable S slot. Carbon is conserved through inversion (water is carbon-free), so the external flow books exactly the sucrose carbon and total_carbon closes to machine precision. Instantaneous inversion at the dose (invertase is fast vs the ferment); a kinetic sucrose pool is deferred (v1 scope)."

@@ -5084,3 +5084,97 @@ at moderate gravity — and the "higher gravity → lower utilization" direction
 claimed); (b) dry-hop / whirlpool (post-boil, sub-100 °C) bitterness; (c) pH- and hop-form (pellet
 vs whole vs extract) dependence; (d) polyphenol / oxidized-alpha (humulinone) bitterness. Only kettle
 iso-alpha bitterness is modelled. See milestone-2-tasks.md.
+
+## D-65 — §3.3 acid/sugar adjustments: the last §3.3 additive, two compile-seam verbs (`add_acid` general over the D-18 acids, `add_sugar` = sucrose inverted to hexose), both pure state mutations booked as external flows — no new Processes
+
+**Status: BUILT (2026-07-10).** The closing beat of §3.3 "additives with clear mechanisms" —
+owner-selected as the natural continuation of D-64 (hop bittering). The other three §3.3 additives
+were already built: SO₂ (D-22/D-28, `add_so2` in D-36), nutrient DAP (`add_dap`, D-36), hop
+bittering (D-64). This lands the fourth — **acid/sugar adjustments (tartaric acid additions,
+chaptalization)** — which the handoff brief calls "simple state mutations via events," and that is
+exactly what they are: two new intervention verbs at the compile→core seam, **no new Processes, no
+new physics in the ODE**, riding the D-35/D-36 external-flow ledger the sibling verbs already use.
+Full suite green (717 = 704 prior + 13 new tests in `test_interventions.py`), ruff + mypy clean.
+One `advisor()` before writing (design endorsed, gotchas applied) and three owner forks decided by
+`AskUserQuestion` before any code (below). No source file outside the verb registry + one new
+`additions.yaml` param was touched; every prior benchmark unchanged.
+
+**Two verbs, both the "add a species to its slot, book the external flow" idiom (the `add_dap` +N /
+copper mercaptan −C precedent):**
+
+1. **`add_acid {acid, gpl}`** — dose a charge-active organic acid. General over the D-18
+   `acidbase.ACID_STATE` set (tartaric/malic/lactic): `params` names the `acid` and dose `gpl`, the
+   whole mass lands on that acid's state slot. Those slots are wine-only (D-18), so the verb is
+   **wine-only by slot presence** — a beer scenario raises ("needs a 'tartaric' slot"). The
+   **load-bearing modelling choice**: the dose is the *pure acid* (it brings its own protons, no
+   counter-cation), so it is added to the acid slot but **NOT to `cation_charge`**. The D-18 charge
+   balance then re-solves the SAME back-anchored strong cation against MORE anion, so **pH drops and
+   TA rises — emergently**, straight out of the keystone, not scripted. (Potassium bitartrate, which
+   *does* add a counter-cation, would be a different verb — deferred.) Each acid carries carbon
+   (tartaric/malic C4, lactic C3, all weighted in `total_carbon`), so the dose is a **positive**
+   carbon external flow (opposite sign to the D-45 copper mercaptan −C removal) and nitrogen-free;
+   the crown-jewel identity `final == initial + Σ flows` still closes to machine precision.
+
+2. **`add_sugar {sugar_gpl}`** — chaptalize (and beer priming/adjunct). The dose is **sucrose** by
+   mass, and the verb **inverts it AT THE DOSE** (a state mutation, NOT a kinetic pool — yeast
+   invertase is fast vs the ferment) to hexose-equivalent via the exact new
+   `sucrose_inversion_mass_ratio` (~1.0526). The +5.26% over the sucrose mass is hydrolysis water
+   (C₁₂H₂₂O₁₁ + H₂O → 2 C₆H₁₂O₆; sucrose is an isomer of maltose, M = 342.30) — the SAME
+   di-/tri-saccharide mass gain beer's wort sugars already carry (D-8, `chemistry.HEXOSE_UNITS` /
+   `M_WATER`). The hexose lands on the fermentable sugar slot: wine's single lumped `S`, or beer's
+   **glucose** component *specifically* (found by name via `chemistry.sugar_species(schema).index
+   ("glucose")`, never broadcast across the maltose/maltotriose slots — the advisor-flagged 3-vector
+   trap). Fructose from the inversion lumps as glucose-equivalent — exact on carbon and mass since
+   they are isomers. More sugar ⇒ higher finished ethanol/ABV once it ferments out (emergent, no
+   explicit ABV term). Carbon is conserved through inversion (water is carbon-free), so the flow
+   books exactly the sucrose carbon (a positive flow); nitrogen-free; ledger closes.
+
+**Three owner forks, decided up front by `AskUserQuestion` (owner chose the more capable option on
+all three, over the recommended lighter defaults):**
+- **Acid verb shape** → *general* `add_acid {acid, gpl}` over the ACID_STATE set (NOT a tartaric-only
+  verb): any charge-active acid slot can be dosed; `test_add_acid_is_general_over_the_charge_active_
+  acids` exercises malic.
+- **Sugar dose basis** → *sucrose with explicit inversion* (NOT dose-as-hexose): the verb models the
+  invertase mass gain via the new stoichiometric ratio, rather than treating `sugar_gpl` as
+  already-hexose.
+- **Sugar scope** → *wine + beer* (NOT wine-only): beer priming/adjunct is real, so the verb targets
+  the glucose slot explicitly in both media; `test_add_sugar_on_beer_targets_glucose_only` pins that
+  the inverted hexose lands on glucose alone.
+
+**The one new parameter — `sucrose_inversion_mass_ratio` in `additions.yaml`.** Value 1.0526,
+**VALIDATED with a zero-width uncertainty band** (exact stoichiometry, never swept by the ensemble) —
+the `dap_nitrogen_fraction` precedent (prime directive #2 admits no magic numbers even for exact
+stoichiometry; the value travels with its derivation in the provenance notes). It is a unit-conversion
+constant read only by the verb at the compile boundary, not physics in the hot loop. No other new
+params — `add_acid` needs none (the acids are already carbon-weighted and pKa-sourced from D-18).
+
+**No tier movement (unlike `pitch_mlf`).** Neither verb enables a Process; both touch inert slots (the
+acid slots and `S` have no derivative-touching Process gated on them here). So no tier drags —
+`test_add_acid_moves_no_tier` asserts the acid/sugar/ethanol tiers are byte-identical dosed-vs-undosed.
+pH's tier is already the PLAUSIBLE-floored pKa tier (D-18), unchanged by a dose.
+
+**Isolability & conservation (the discipline every verb inherits).** A scenario with no interventions
+is byte-for-byte a plain run (the pre-existing `test_no_interventions_is_byte_for_byte_plain_simulate`
+still passes). Carbon closes across the jump for both verbs as a *positive* external flow
+(`test_add_acid_books_a_positive_carbon_flow_and_no_nitrogen`,
+`test_add_sugar_books_positive_carbon_and_no_nitrogen`), the mirror of the copper mercaptan −C removal.
+The concentration-model no-volume-change caveat (shared by every verb) applies — stated once, not
+re-litigated.
+
+**The pH headline is asserted directionally, not to a magnitude (advisor point).** `acidbase.py` claims
+directional/slope fidelity for its concentration-based *apparent* pKa simplification, so
+`test_add_acid_lowers_ph_and_raises_ta` asserts pH↓ + TA↑ at a realistic ~2 g/L tartaric dose within a
+sane band (< 1.0 pH unit), not a tight pH-delta that would over-claim. pH does not feed back into the
+yeast kinetics in v1 (D-18), so the S/E/X trajectories are identical dosed-vs-undosed — only tartaric
+(and the derived pH/TA readouts) move, a clean isolation. D-46 (`solve_ph` is total) guarantees even
+an extreme acid dose cannot crash the solver.
+
+**DEFERRED (v1 scope):** (a) potassium bitartrate / K-tartrate additions (deacidification via a
+counter-cation — a different, cation-moving verb); (b) a kinetic sucrose pool with an explicit
+invertase Process (instantaneous inversion at the dose is an excellent approximation — invertase is
+fast relative to the ferment — and honours the brief's "simple state mutation" framing); (c) direct
+glucose/fructose dosing (the sucrose form is the standard chaptalization sugar; a `form` param is a
+trivial future extension); (d) volume change on addition (the engine is concentration-based;
+volume-tracking is the D-64 `batch_volume_liters` frontier, not extended here). **§3.3 is now
+COMPLETE** — all four "additives with clear mechanisms" (SO₂, DAP nutrient, hops, acid/sugar) built.
+The next-direction frontier (Tier-3 sensory/OAV, aging, or UX) is the owner's call.

@@ -706,3 +706,23 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
       whirlpool bitterness, hop-form/pH effects, oxidized-alpha (humulinone) bitterness. One advisor
       call before writing (shape endorsed; 5 sharpening points applied). Full record in **DECISIONS
       → D-64**.
+
+- [x] **§3.3 Acid/sugar adjustments (decision D-65). LANDED 2026-07-10 — §3.3 now COMPLETE.** The
+      last of the four "additives with clear mechanisms," owner-selected as the natural continuation
+      of D-64. Two new intervention verbs at the compile→core seam, **no new Processes** (the brief's
+      "simple state mutations via events"), riding the D-35/D-36 external-flow ledger: (1) **`add_acid
+      {acid, gpl}`** — general over the D-18 charge-active acids (tartaric/malic/lactic), wine-only by
+      slot presence; the pure acid lands on its slot but NOT on `cation_charge`, so the charge balance
+      re-solves and **pH drops / TA rises emergently** (potassium-bitartrate deacidification deferred).
+      (2) **`add_sugar {sugar_gpl}`** — chaptalization: doses SUCROSE, inverted AT THE DOSE to
+      hexose-equivalent (×~1.0526, the hydrolysis-water mass gain) onto wine's `S` or beer's GLUCOSE
+      slot specifically (fructose lumped as glucose-equiv — isomers, exact carbon); more sugar ⇒
+      higher finished ethanol, emergent. Both book **positive** carbon external flows (the copper
+      mercaptan −C mirror), nitrogen-free, ledger closes to machine precision. **Three owner forks
+      decided by AskUserQuestion up front** (all chose the more capable option): general acid verb,
+      sucrose-with-inversion, wine+beer scope. One new param — `sucrose_inversion_mass_ratio` in
+      `additions.yaml`, VALIDATED exact stoichiometry, zero-width band (the `dap_nitrogen_fraction`
+      precedent). **No tier movement** (neither verb enables a Process; inert slots). `tests/
+      test_interventions.py` +13 (50 total); **717 green**, ruff+mypy clean; every prior benchmark
+      unchanged. **DEFERRED (v1):** K-tartrate deacidification, kinetic sucrose/invertase pool, direct
+      glucose/fructose dosing, volume change. Full record in **DECISIONS → D-65**.

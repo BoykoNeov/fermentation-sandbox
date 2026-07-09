@@ -22,6 +22,8 @@ This module pins the first verb, ``add_dap``:
 import numpy as np
 import pytest
 
+from fermentation.core import acidbase
+from fermentation.core.chemistry import carbon_mass_fraction
 from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate
 from fermentation.runtime.schedule import ScheduledTrajectory
@@ -797,3 +799,237 @@ def test_add_copper_clears_both_h2s_and_mercaptans():
         cleared = np.asarray(fined.series(pool))
         assert built[-1] > 1.0e-6, pool  # the fault really built up
         assert cleared[-1] < 0.25 * built[-1], pool  # copper cleared ~all of it
+
+
+# -- add_acid: dose a charge-active organic acid; pH drops, TA rises (decision D-65) -----------
+#
+# The §3.3 acidulation verb, general over the D-18 charge-active acids (tartaric/malic/lactic).
+# The dose is the PURE acid (own protons, no counter-cation), so it lands on the acid slot but NOT
+# on cation_charge — the D-18 charge balance re-solves the same fixed strong cation against more
+# anion, so pH DROPS and TA RISES *emergently* (potassium bitartrate, which adds a counter-cation,
+# would be different). Each acid carries carbon, so the dose is a POSITIVE carbon external flow
+# (the add_dap +N precedent, opposite sign to the copper mercaptan −C removal) and nitrogen-free.
+
+
+def _acid(day: float, acid: str, gpl: float) -> Intervention:
+    return Intervention(day=day, action="add_acid", params={"acid": acid, "gpl": gpl})
+
+
+def test_add_acid_lands_on_the_named_acid_slot_and_leaves_cation_untouched():
+    cs = compile_scenario(_wine([_acid(3.0, "tartaric", 1.5)]))
+    traj = cs.run()
+    schema = cs.schema
+
+    assert len(traj.external_flows) == 1
+    flow = traj.external_flows[0]
+    assert flow.label == "add_acid@3d"
+    # The whole dose lands on the tartaric slot; every other slot delta is zero — crucially
+    # cation_charge is UNTOUCHED (the load-bearing modelling choice that makes pH drop).
+    assert flow.delta[schema.slice("tartaric")][0] == pytest.approx(1.5, rel=1e-12)
+    others = np.delete(flow.delta, schema.slice("tartaric").start)
+    assert np.count_nonzero(others) == 0
+    assert flow.delta[schema.slice("cation_charge")][0] == 0.0
+
+
+def test_add_acid_is_general_over_the_charge_active_acids():
+    # Owner chose the general add_acid {acid, gpl} over a tartaric-only verb (decision D-65): any
+    # D-18 charge-active acid slot can be dosed. Malic starts at 0 in this must but its slot exists.
+    cs = compile_scenario(_wine([_acid(3.0, "malic", 2.0)]))
+    traj = cs.run()
+    schema = cs.schema
+    flow = traj.external_flows[0]
+    assert flow.delta[schema.slice("malic")][0] == pytest.approx(2.0, rel=1e-12)
+    others = np.delete(flow.delta, schema.slice("malic").start)
+    assert np.count_nonzero(others) == 0
+
+
+def test_add_acid_books_a_positive_carbon_flow_and_no_nitrogen():
+    # Tartaric (C4H6O6) is carbon-weighted in total_carbon (D-18), so the dose ADDS carbon — a
+    # positive external flow (the mirror of the copper mercaptan −C removal). Nitrogen-free. The
+    # crown-jewel identity final == initial + Σ flows still closes for both elements.
+    cs = compile_scenario(_wine([_acid(3.0, "tartaric", 1.5)]))
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+    flow = traj.external_flows[0]
+
+    # the flow carries exactly the dosed acid's carbon (1.5 g/L × tartaric carbon fraction) and no N
+    assert c_of(flow.delta) == pytest.approx(1.5 * carbon_mass_fraction("tartaric_acid"), rel=1e-12)
+    assert c_of(flow.delta) > 0.0
+    assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+    # crown-jewel: carbon closes across the jump once the positive external flow is counted
+    assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0) + c_of(flow.delta), abs=1e-6)
+    assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0), abs=1e-9)
+
+
+def _ph_ta(traj, params, schema) -> tuple[float, float]:
+    y_final = traj.y[:, -1]
+    return (
+        acidbase.ph_of_state(y_final, schema, params),
+        acidbase.titratable_acidity(y_final, schema, params),
+    )
+
+
+def test_add_acid_lowers_ph_and_raises_ta():
+    # THE headline (D-65): a tartaric addition acidifies — pH DROPS and TA RISES vs an otherwise
+    # identical undosed wine. Emergent from the D-18 charge balance (more anion, same cation), NOT
+    # scripted. Direction + a loose band only: acidbase.py claims directional/slope fidelity for the
+    # concentration-based apparent pKa, so a tight pH-delta would over-claim. pH does not feed back
+    # into the yeast kinetics (D-18), so S/E/X are identical dosed-vs-undosed, only tartaric moves.
+    undosed = compile_scenario(_wine([], days=14.0)).run()
+    dosed = compile_scenario(_wine([_acid(1.0, "tartaric", 2.0)], days=14.0)).run()
+
+    base = compile_scenario(_wine([]))
+    params, schema = base.param_values, base.schema
+    ph_u, ta_u = _ph_ta(undosed, params, schema)
+    ph_d, ta_d = _ph_ta(dosed, params, schema)
+
+    assert ph_d < ph_u  # acidification lowers pH
+    assert ph_u - ph_d < 1.0  # but within a sane band (a ~2 g/L tartaric bump, not a collapse)
+    assert ta_d > ta_u  # and raises titratable acidity
+
+
+def test_add_acid_moves_no_tier():
+    # Unlike pitch_mlf, add_acid enables no Processes and touches an inert slot, so no tier moves:
+    # the acid slots stay VALIDATED (no Process touches them) and the derived pH tier is unchanged.
+    undosed = compile_scenario(_wine([])).run()
+    dosed = compile_scenario(_wine([_acid(1.0, "tartaric", 2.0)])).run()
+    for name in ("tartaric", "malic", "S", "E"):
+        assert dosed.tier_map[name] is undosed.tier_map[name]
+
+
+def test_add_acid_unknown_acid_raises():
+    with pytest.raises(ValueError, match="unknown acid 'citric'"):
+        compile_scenario(_wine([_acid(3.0, "citric", 1.0)]))
+
+
+def test_add_acid_on_beer_raises_wine_only():
+    beer = Scenario(
+        name="no-acid",
+        medium="beer",
+        initial={
+            "glucose_gpl": 90.0,
+            "maltose_gpl": 140.0,
+            "maltotriose_gpl": 20.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 2.0,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=18.0)],
+        interventions=[_acid(3.0, "tartaric", 1.0)],
+        duration_days=10.0,
+    )
+    with pytest.raises(ValueError, match="needs a 'tartaric' slot"):
+        compile_scenario(beer)
+
+
+def test_add_acid_missing_and_negative_params_raise():
+    with pytest.raises(ValueError, match="missing required param 'acid'"):
+        compile_scenario(_wine([Intervention(day=3.0, action="add_acid", params={"gpl": 1.0})]))
+    with pytest.raises(ValueError, match="missing required param 'gpl'"):
+        compile_scenario(
+            _wine([Intervention(day=3.0, action="add_acid", params={"acid": "tartaric"})])
+        )
+    with pytest.raises(ValueError, match="must be >= 0"):
+        compile_scenario(_wine([_acid(3.0, "tartaric", -1.0)]))
+
+
+# -- add_sugar: chaptalize (dose sucrose, inverted to fermentable hexose) (decision D-65) -------
+#
+# Sucrose is dosed by mass and inverted AT THE DOSE (invertase is fast vs the ferment) to hexose-
+# equivalent via the exact sucrose_inversion_mass_ratio (~1.0526; the +5.26 % is hydrolysis water).
+# The hexose lands on the fermentable sugar slot (wine's lumped S; beer's glucose specifically).
+# More sugar ⇒ higher finished ethanol once it ferments out (emergent). Carbon is conserved through
+# inversion, so the flow books exactly the sucrose carbon (a positive flow, add_dap precedent).
+
+_SUCROSE_INVERSION_RATIO = 1.0526  # g hexose / g sucrose (additions.yaml, D-65)
+
+
+def _sugar(day: float, sugar_gpl: float) -> Intervention:
+    return Intervention(day=day, action="add_sugar", params={"sugar_gpl": sugar_gpl})
+
+
+def test_add_sugar_inverts_sucrose_onto_the_hexose_slot():
+    cs = compile_scenario(_wine([_sugar(2.0, 20.0)]))
+    frac = cs.parameters["sucrose_inversion_mass_ratio"]
+    assert frac.tier is Tier.VALIDATED  # exact stoichiometry
+    assert frac.uncertainty.low == frac.value == frac.uncertainty.high  # zero-width band
+
+    traj = cs.run()
+    schema = cs.schema
+    flow = traj.external_flows[0]
+    assert flow.label == "add_sugar@2d"
+    # 20 g/L sucrose → 20 × 1.0526 g/L hexose on the single lumped S slot; nothing else moves.
+    expected_hexose = 20.0 * _SUCROSE_INVERSION_RATIO
+    assert flow.delta[schema.slice("S")][0] == pytest.approx(expected_hexose, rel=1e-4)
+    others = np.delete(flow.delta, schema.slice("S").start)
+    assert np.count_nonzero(others) == 0
+
+
+def test_add_sugar_books_positive_carbon_and_no_nitrogen():
+    # The inverted hexose carries carbon (weighted at the glucose fraction), so the dose is a
+    # positive carbon external flow; sugar is nitrogen-free. Carbon closes across the jump. Because
+    # inversion is carbon-conserving (water carries none), the booked carbon equals the sucrose's.
+    cs = compile_scenario(_wine([_sugar(2.0, 20.0)]))
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+    flow = traj.external_flows[0]
+
+    assert c_of(flow.delta) > 0.0
+    assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+    # crown-jewel: carbon closes across the jump once the positive external flow is counted
+    assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0) + c_of(flow.delta), abs=1e-6)
+    assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0), abs=1e-9)
+
+
+def test_add_sugar_raises_finished_ethanol():
+    # THE headline: chaptalizing lifts the finished ethanol once the added sugar ferments out.
+    # Dosed early in a modest must and run long, so both runs finish dry; the dosed run then has
+    # strictly more ethanol (the extra hexose fermented) — emergent, no explicit ABV term.
+    grid = np.linspace(0.0, 20.0 * 24.0, 401)
+    undosed = compile_scenario(_wine([], yan_mgl=200.0, days=20.0)).run(t_eval=grid)
+    dosed = compile_scenario(
+        _wine([_sugar(1.0, 30.0)], yan_mgl=200.0, days=20.0)
+    ).run(t_eval=grid)
+
+    # both finished dry (added sugar fermented out, not stranded), and the dosed run made more EtOH
+    assert dosed.series("S")[-1] < 5.0  # g/L residual — dry
+    assert dosed.series("E")[-1] > undosed.series("E")[-1]
+
+
+def test_add_sugar_on_beer_targets_glucose_only():
+    # Owner chose wine + beer scope (decision D-65). Beer's S is a 3-vector (glucose/maltose/
+    # maltotriose); add_sugar must land the inverted hexose on the GLUCOSE slot alone, never
+    # broadcast — fructose from the inversion lumps as glucose-equivalent (isomers, exact carbon).
+    beer = Scenario(
+        name="prime",
+        medium="beer",
+        initial={
+            "glucose_gpl": 90.0,
+            "maltose_gpl": 140.0,
+            "maltotriose_gpl": 20.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 2.0,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=18.0)],
+        interventions=[_sugar(1.0, 10.0)],
+        duration_days=10.0,
+    )
+    cs = compile_scenario(beer)
+    traj = cs.run()
+    schema = cs.schema
+    flow = traj.external_flows[0]
+    s_start = schema.slice("S").start
+    # the inverted hexose lands on the first (glucose) sugar slot; maltose/maltotriose are untouched
+    assert flow.delta[s_start] == pytest.approx(10.0 * _SUCROSE_INVERSION_RATIO, rel=1e-4)
+    assert flow.delta[s_start + 1] == 0.0
+    assert flow.delta[s_start + 2] == 0.0
+
+
+def test_add_sugar_missing_and_negative_params_raise():
+    with pytest.raises(ValueError, match="missing required param 'sugar_gpl'"):
+        compile_scenario(_wine([Intervention(day=2.0, action="add_sugar", params={})]))
+    with pytest.raises(ValueError, match="must be >= 0"):
+        compile_scenario(_wine([_sugar(2.0, -10.0)]))

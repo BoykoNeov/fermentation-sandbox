@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fermentation.core import acidbase
+from fermentation.core.chemistry import sugar_species
 from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     AutolyticHydrogenSulfide,
@@ -733,6 +734,20 @@ def _iv_float(iv: Intervention, key: str, verb: str) -> float:
     return _nonneg(value, key)
 
 
+def _iv_str(iv: Intervention, key: str, verb: str) -> str:
+    """Read a required string intervention param (the categorical sibling of :func:`_iv_float`)."""
+    if key not in iv.params:
+        raise ValueError(
+            f"intervention {verb!r} at day {iv.day:g} is missing required param {key!r}"
+        )
+    value = iv.params[key]
+    if not isinstance(value, str):
+        raise ValueError(
+            f"intervention {verb!r} param {key!r} must be a string, got {value!r}"
+        )
+    return value
+
+
 def _verb_add_dap(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet
 ) -> ScheduledEvent:
@@ -1041,6 +1056,107 @@ def _verb_pitch_brett(
     )
 
 
+def _verb_add_acid(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_acid`` — dose a charge-active organic acid onto its slot (decision D-65, §3.3).
+
+    The general acidulation verb over the D-18 charge-active acids
+    (:data:`~fermentation.core.acidbase.ACID_STATE` — tartaric/malic/lactic): ``params`` names the
+    ``acid`` and its dose ``gpl``, and the whole mass lands on that acid's state slot. Because
+    those slots are wine-only (D-18), this is wine-only by slot presence — a beer scenario has no
+    ``tartaric``/``malic``/``lactic`` slot and raises. The dose is the pure acid (it brings its own
+    protons, no counter-cation), so it is NOT added to ``cation_charge``; the pH charge balance
+    then re-solves the SAME back-anchored strong cation against MORE diprotic/monoprotic anion, so
+    pH **drops** and titratable acidity **rises** — the standard acidulation outcome, *emergent*
+    from the D-18 keystone rather than scripted (potassium bitartrate, which adds a counter-cation,
+    would be a different verb). Each acid carries carbon (tartaric/malic C4, lactic C3, all weighted
+    in ``total_carbon``), so the dose is a POSITIVE carbon external flow (the ``add_dap`` +N
+    precedent, opposite sign to the copper mercaptan −C removal) and nitrogen-free; the run-wide
+    ledger ``final == initial + Σ flows`` still closes to machine precision. Concentration model:
+    no volume change on the addition (the shared verb caveat). The acid slot is inert (no Process),
+    so no tier moves — pH's tier is already the PLAUSIBLE-floored pKa tier (D-18).
+    """
+    _iv_check_keys(iv, frozenset({"acid", "gpl"}), "add_acid")
+    acid = _iv_str(iv, "acid", "add_acid")
+    gpl = _iv_float(iv, "gpl", "add_acid")
+    if acid not in acidbase.ACID_STATE:
+        raise ValueError(
+            f"intervention 'add_acid' at day {iv.day:g}: unknown acid {acid!r}; the charge-active "
+            f"acids are {sorted(acidbase.ACID_STATE)} (decision D-18)"
+        )
+    if acid not in schema:
+        raise ValueError(
+            f"intervention 'add_acid' at day {iv.day:g} needs a {acid!r} slot, but medium "
+            f"{schema!r} has none (the organic-acid slots are wine-only, decision D-18)"
+        )
+    acid_slice = schema.slice(acid)
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[acid_slice] += gpl
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_acid@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
+def _verb_add_sugar(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_sugar`` — chaptalize: dose sucrose, inverted to fermentable hexose (decision D-65).
+
+    Chaptalization (and beer priming/adjunct) doses SUCROSE by mass (``sugar_gpl``, the commercial
+    additive). Sucrose is not fermented as such: yeast invertase hydrolyses it near-instantly into
+    glucose + fructose, so the verb inverts it AT THE DOSE (a state mutation, not a kinetic pool —
+    invertase is fast vs the ferment) via the exact ``sucrose_inversion_mass_ratio`` (~1.0526; the
+    +5.26 % over the sucrose mass is hydrolysis water, the same di-/tri-saccharide mass gain beer's
+    wort sugars carry, D-8). The hexose-equivalent lands on the fermentable sugar slot: wine's
+    single lumped hexose ``S``, or beer's **glucose** component specifically (found by name, not
+    broadcast across the maltose/maltotriose slots) — fructose is lumped as glucose-equivalent,
+    exact on carbon and mass since the two are isomers. More fermentable sugar ⇒ a higher finished
+    ethanol/ABV once it ferments out (emergent, not imposed). Carbon is conserved through inversion
+    (water is carbon-free), so the flow books exactly the sucrose carbon (a POSITIVE carbon external
+    flow, the ``add_dap`` precedent) and nitrogen-free; the run-wide ledger still closes to machine
+    precision. Concentration model: no volume change (the shared verb caveat).
+    """
+    _iv_check_keys(iv, frozenset({"sugar_gpl"}), "add_sugar")
+    sugar_gpl = _iv_float(iv, "sugar_gpl", "add_sugar")
+    if "S" not in schema:
+        raise ValueError(
+            f"intervention 'add_sugar' at day {iv.day:g} needs an 'S' slot, but medium "
+            f"{schema!r} has none"
+        )
+    try:
+        ratio = parameters["sucrose_inversion_mass_ratio"].value
+    except KeyError as exc:  # additions.yaml not loaded (caller-supplied parameter_paths)
+        raise ValueError(
+            "intervention 'add_sugar' needs 'sucrose_inversion_mass_ratio' but it is missing "
+            f"({exc}); include additions.yaml in parameter_paths (the default lookup merges "
+            "it automatically)."
+        ) from None
+    hexose_gpl = sugar_gpl * ratio
+    # Target the glucose/hexose slot by name (wine's lumped S is treated as glucose), never a
+    # broadcast across beer's 3-wide S — fructose from the inversion lumps as glucose-equivalent.
+    species = sugar_species(schema)
+    glucose_offset = species.index("glucose")
+    glucose_index = schema.slice("S").start + glucose_offset
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[glucose_index] += hexose_gpl
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_sugar@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
 #: action verb → compiler turning one :class:`Intervention` into a :class:`ScheduledEvent`.
 _INTERVENTION_VERBS: dict[
     str, Callable[[Intervention, StateSchema, ParameterSet], ScheduledEvent]
@@ -1048,6 +1164,8 @@ _INTERVENTION_VERBS: dict[
     "add_dap": _verb_add_dap,
     "add_so2": _verb_add_so2,
     "add_copper": _verb_add_copper,
+    "add_acid": _verb_add_acid,
+    "add_sugar": _verb_add_sugar,
     "rack": _verb_rack,
     "pitch_mlf": _verb_pitch_mlf,
     "pitch_brett": _verb_pitch_brett,
