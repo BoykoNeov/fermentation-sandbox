@@ -92,6 +92,7 @@ from fermentation.core.kinetics import (
     GrowthNitrogenLimited,
     HydrogenSulfideProduction,
     HydrogenSulfideVolatilization,
+    IsoAlphaAcidLoss,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
     MalolacticDeath,
@@ -415,17 +416,26 @@ def beer_schema() -> StateSchema:
     Glucose is taken up first, then maltose, then maltotriose — the order the
     ``components`` tuple records and the sugar-uptake Process will honour.
     """
-    return StateSchema(
-        _common_specs(
-            VarSpec(
-                "S",
-                "g/L",
-                size=3,
-                description="fermentable sugars (sequential uptake)",
-                components=("glucose", "maltose", "maltotriose"),
-            )
+    specs = _common_specs(
+        VarSpec(
+            "S",
+            "g/L",
+            size=3,
+            description="fermentable sugars (sequential uptake)",
+            components=("glucose", "maltose", "maltotriose"),
         )
     )
+    # Iso-alpha-acids (isohumulones) — the bitter compounds (decision D-64). Made in the boil
+    # by thermal isomerization of hop alpha-acids (computed at the compile seam and wired at
+    # t=0, like initial_ph), then lost during fermentation by yeast adsorption (IsoAlphaAcidLoss).
+    # BEER-ONLY (appended here, not in _common_specs, so wine_schema is untouched). Off the carbon
+    # ledger (exogenous hop-derived mass, like dosed SO2), so it never perturbs total_carbon.
+    # Default 0 ⇒ an unhopped beer carries no bitterness and the loss Process is inert/disabled.
+    # 1 IBU ≈ 1 mg/L iso-alpha, so the ibu_series readout is this slot × 1000.
+    specs.append(
+        VarSpec("iso_alpha", "g/L", default=0.0, description="iso-alpha-acids (bitterness)")
+    )
+    return StateSchema(specs)
 
 
 @dataclass(frozen=True)
@@ -564,6 +574,19 @@ _ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
     AcetaldehydeProduction,
     AcetaldehydeReduction,
 )
+
+#: Hop bittering (BEER-ONLY, decision D-64): the §3.3 additive beat. The boil isomerization of
+#: alpha-acids to iso-alpha-acids is a wort-side compile-seam calc (``iso_alpha_from_boil``,
+#: wired into ``iso_alpha`` at t=0 like ``initial_ph``), NOT a Process — the only *dynamic*
+#: content is :class:`IsoAlphaAcidLoss`, the fermentation-time adsorption of iso-alpha onto
+#: viable yeast (the ~5-20% wort-to-beer bitterness drop). Kept in its own isolable tuple (prime
+#: directive #3) and wired into the BEER medium only (wine has no ``iso_alpha`` slot). It touches
+#: ``iso_alpha`` alone — OFF the carbon ledger (exogenous hop-derived mass, like dosed SO2), so
+#: the whole beat leaves ``total_carbon`` byte-for-byte unchanged. On an unhopped beer
+#: ``iso_alpha`` starts 0 and the term is inert; the compile seam additionally DISABLES it when
+#: no hops are scheduled, so the empty ``iso_alpha`` slot keeps its VALIDATED tier and no flux is
+#: paid (the MLF/Brett isolability pattern). Params live in the shared ``hops.yaml``.
+_HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
@@ -875,6 +898,7 @@ MEDIA: dict[str, Medium] = {
             + _VDK_PROCESSES
             + _ACETALDEHYDE_PROCESSES
             + _H2S_PROCESSES
+            + _HOPS_PROCESSES
         ),
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),

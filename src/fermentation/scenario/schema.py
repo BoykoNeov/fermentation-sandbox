@@ -8,7 +8,7 @@ arrives with Milestone 1; the schema is defined now so the seam is stable.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class TemperaturePoint(BaseModel):
@@ -18,6 +18,28 @@ class TemperaturePoint(BaseModel):
 
     day: float = Field(ge=0.0, description="Time since pitch, in days.")
     celsius: float
+
+
+class HopAddition(BaseModel):
+    """One hop addition to the boil (decision D-64).
+
+    Bitterness (iso-alpha-acids) is created in the boil by thermal isomerization of the hop's
+    alpha-acids, at a rate that depends on the contact time. Each addition names its
+    alpha-acid content, mass, and boil contact time; the compile seam runs the Malowicki
+    closed-form isomerization for each and sums the resulting iso-alpha into the initial
+    ``iso_alpha`` state. Beer-only. Dry-hop / whirlpool (post-boil) additions are a documented
+    v1 deferral — every addition here is treated as a kettle (boiling) addition.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    alpha_acid_percent: float = Field(
+        gt=0.0, le=100.0, description="Alpha-acid content of the hop, % w/w (e.g. 5.0 for 5% AA)."
+    )
+    grams: float = Field(gt=0.0, description="Mass of hop added, grams.")
+    boil_minutes: float = Field(
+        ge=0.0, description="Contact time in the boil, minutes (0 ⇒ no isomerization)."
+    )
 
 
 class Intervention(BaseModel):
@@ -56,6 +78,18 @@ class Scenario(BaseModel):
     initial: dict[str, float] = Field(default_factory=dict)
     temperature_schedule: list[TemperaturePoint] = Field(default_factory=list)
     interventions: list[Intervention] = Field(default_factory=list)
+    #: Hop schedule for bitterness (beer, decision D-64). Each addition isomerizes in the boil
+    #: into the initial ``iso_alpha`` state at the compile seam. Empty ⇒ an unhopped beer (the
+    #: bitterness beat is inert and the loss Process disabled). Requires ``batch_volume_liters``.
+    hops: list[HopAddition] = Field(default_factory=list)
+    #: Wort volume [L] — the batch size hop *mass* is diluted into (grams → g/L). Genuinely new
+    #: to the engine, which is otherwise volume-agnostic (concentration-based); only hop dosing
+    #: needs an absolute mass→concentration conversion. v1 uses ONE volume for boil and fermenter
+    #: (kettle-loss/evaporation folded into ``hop_utilization_efficiency``). Required iff ``hops``.
+    batch_volume_liters: float | None = Field(default=None, gt=0.0)
+    #: Boil temperature [°C]. Default 100 (sea-level boil); lower for a whirlpool/high-altitude
+    #: boil, which slows isomerization (the Malowicki Arrhenius temperature dependence).
+    boil_celsius: float = Field(default=100.0, gt=0.0)
     duration_days: float = Field(default=14.0, gt=0.0)
 
     @field_validator("name", "medium")
@@ -64,3 +98,12 @@ class Scenario(BaseModel):
         if not v.strip():
             raise ValueError("must not be empty")
         return v
+
+    @model_validator(mode="after")
+    def _hops_need_volume(self) -> Scenario:
+        if self.hops and self.batch_volume_liters is None:
+            raise ValueError(
+                "scenario has 'hops' but no 'batch_volume_liters'; hop mass (grams) needs a "
+                "wort volume to become a concentration (decision D-64)"
+            )
+        return self

@@ -40,6 +40,11 @@ from fermentation.core.kinetics.byproducts import (
 )
 from fermentation.core.kinetics.carrying_capacity import BiomassCarryingCapacity
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited, biomass_growth_rate
+from fermentation.core.kinetics.hops import (
+    IsoAlphaAcidLoss,
+    boil_rate_constants,
+    iso_alpha_fraction,
+)
 from fermentation.core.kinetics.hydrogen_sulfide import (
     AutolyticHydrogenSulfide,
     HydrogenSulfideProduction,
@@ -101,6 +106,7 @@ __all__ = [
     "GrowthNitrogenLimited",
     "HydrogenSulfideProduction",
     "HydrogenSulfideVolatilization",
+    "IsoAlphaAcidLoss",
     "MalolacticCitrateMetabolism",
     "MalolacticConversion",
     "MalolacticDeath",
@@ -116,10 +122,12 @@ __all__ = [
     "arrhenius_factor",
     "autolysis_flux",
     "biomass_growth_rate",
+    "boil_rate_constants",
     "brett_environmental_gate",
     "brett_ethanol_survival_factor",
     "cardinal_temperature_factor",
     "fusel_production_rate",
+    "iso_alpha_fraction",
     "malolactic_environmental_gate",
     "malolactic_toxicity_gate",
 ]

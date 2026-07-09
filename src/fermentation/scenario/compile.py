@@ -44,6 +44,7 @@ from fermentation.core.kinetics import (
     BrettGrowth,
     BrettVinylphenolReduction,
     FuselAminoAcidReroute,
+    IsoAlphaAcidLoss,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
     MalolacticDeath,
@@ -53,6 +54,7 @@ from fermentation.core.kinetics import (
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
+from fermentation.core.kinetics.hops import iso_alpha_fraction
 from fermentation.core.kinetics.temperature import RAMP_RATE
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
@@ -404,6 +406,33 @@ _INITIAL_BUILDERS: dict[str, Callable[[Mapping[str, float], float, ParameterSet]
 }
 
 
+def _iso_alpha_at_pitch(scenario: Scenario, parameters: ParameterSet) -> float:
+    """Iso-alpha-acids [g/L] delivered to the fermenter from the boil (decision D-64).
+
+    For each hop addition, runs the Malowicki closed-form isomerization
+    (:func:`~fermentation.core.kinetics.hops.iso_alpha_fraction`) at the scenario's boil
+    temperature, weights it by that addition's *dissolved* alpha concentration (hop mass /
+    ``batch_volume_liters``; full dissolution assumed — extraction incompleteness is folded into
+    ``hop_utilization_efficiency``), sums the additions, and applies the kettle->fermenter
+    utilization efficiency. Evaluated once here at the compile boundary because the boil is a
+    wort-side input (373 K, no yeast), not a fermentation phase — running it through the
+    integrator would drive the yeast-free wort at boiling temperature. The result seeds the
+    ``iso_alpha`` state; :class:`~fermentation.core.kinetics.hops.IsoAlphaAcidLoss` then reduces
+    it during fermentation. ``batch_volume_liters`` is guaranteed present by the scenario
+    validator whenever ``hops`` is non-empty.
+    """
+    volume = scenario.batch_volume_liters
+    if volume is None:  # defensive; the schema validator already enforces this
+        raise ValueError("hop bittering needs 'batch_volume_liters' (decision D-64)")
+    boil_temp_k = celsius_to_kelvin(scenario.boil_celsius)
+    resolved = parameters.resolve()
+    total_iso_gpl = 0.0
+    for hop in scenario.hops:
+        alpha0_gpl = (hop.alpha_acid_percent / 100.0) * hop.grams / volume
+        total_iso_gpl += alpha0_gpl * iso_alpha_fraction(hop.boil_minutes, boil_temp_k, resolved)
+    return total_iso_gpl * resolved["hop_utilization_efficiency"]
+
+
 def _validate_initial_keys(scenario: Scenario) -> None:
     allowed = _ALLOWED_KEYS.get(scenario.medium)
     if allowed is None:
@@ -464,6 +493,11 @@ def _load_parameters(
         base / "keto_acids.yaml",
         base / "hydrogen_sulfide.yaml",
         base / "additions.yaml",
+        # Hop bittering kinetics (decision D-64): the Malowicki boil isomerization constants and
+        # the iso-alpha loss/utilization parameters. Beer-only in effect (only beer carries an
+        # iso_alpha slot and the hop Process/boil calc), but loaded universally like the other
+        # shared files — collision-free names, inert for wine.
+        base / "hops.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 
@@ -1083,6 +1117,23 @@ def compile_scenario(
 
     y0 = medium.schema.pack(builder(scenario.initial, temperature_k, parameters))
     process_set = medium.build_process_set(strict=strict)
+
+    # Hop bittering (decision D-64): the boil isomerization is a wort-side calc, run once here and
+    # wired into ``iso_alpha`` at t=0 (like the measured ``initial_ph`` back-solve, D-18). When
+    # hops are scheduled, seed the state; when they are NOT, DISABLE the fermentation loss so the
+    # empty ``iso_alpha`` slot keeps its VALIDATED tier (an enabled speculative Process touching it
+    # would drag ``tier_of`` even with a zero contribution) and no flux is paid — the MLF/Brett
+    # isolability pattern. Guard that hops are only given for a medium that HAS a bitterness model
+    # (beer): a wine scenario with hops is a user error, not a silently-ignored field.
+    if scenario.hops:
+        if "iso_alpha" not in medium.schema:
+            raise ValueError(
+                f"scenario has 'hops' but medium {scenario.medium!r} has no bitterness model "
+                "(no 'iso_alpha' state); hop bittering is beer-only (decision D-64)"
+            )
+        y0[medium.schema.slice("iso_alpha")] = _iso_alpha_at_pitch(scenario, parameters)
+    elif IsoAlphaAcidLoss.name in process_set:
+        process_set.disable(IsoAlphaAcidLoss.name)
 
     # MLF isolability (decisions D-23, D-31): the malolactic Processes are wired into the wine
     # medium but contribute nothing until Oenococcus oeni is pitched. When it is not, DISABLE

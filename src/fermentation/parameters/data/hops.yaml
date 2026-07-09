@@ -1,0 +1,141 @@
+# Hop bittering — alpha-acid isomerization to iso-alpha-acids, and iso-alpha loss (decision D-64).
+#
+# SHARED, medium-agnostic parameter file (loaded alongside the <medium>_<strain>.yaml by the
+# compile seam, like acidbase.yaml / vicinal_diketones.yaml). Hop bittering is a BEER concern
+# in practice, but the load-bearing chemistry — the thermal isomerization of humulones to
+# isohumulones — is a property of the bitter-acid molecule and the boil, not of the beverage,
+# so its constants live in one shared file with collision-free names. Only the beer medium
+# carries an ``iso_alpha`` state slot and the loss Process that read these; loading the file
+# for wine is inert (no hop Process, no iso_alpha slot).
+#
+# THE PHYSICS (decision D-64). Hop bittering has two physically distinct regimes:
+#
+#   1. THE BOIL (~373 K, ~60-90 min, PRE-fermentation, no yeast). Alpha-acids (humulones)
+#      isomerize to iso-alpha-acids (isohumulones — the actual bitter compounds) in a
+#      CONSECUTIVE first-order reaction, and the iso-alpha-acids themselves then degrade:
+#
+#          alpha --k1--> iso-alpha --k2--> uncharacterized degradation products
+#
+#      Malowicki & Shellhammer 2005 (J. Agric. Food Chem. 53(11):4434-4439, PubMed 15913306,
+#      doi:10.1021/jf0481296) measured BOTH rate constants as Arrhenius functions of temperature
+#      over 90-130 C, first-order, in a pH 5.2 model wort buffer with pure alpha-acid:
+#
+#          k1 = 7.9e11 * exp(-11858/T)  min^-1   Ea = 98.6 kJ/mol   (isomerization)
+#          k2 = 4.1e12 * exp(-12994/T)  min^-1   Ea = 108.0 kJ/mol  (iso-alpha degradation)
+#          (T in Kelvin; the exponent term is Ea/R, e.g. 11858 K * 8.314 J/mol/K = 98.6 kJ/mol.)
+#
+#      The engine evaluates the CLOSED-FORM consecutive-first-order solution at the compile
+#      seam (``iso_alpha_from_boil``), summed over the hop schedule — NOT a boil ODE phase,
+#      which would pollute the (yeast-free) fermentation integration. This is the same
+#      wort-side-input treatment the engine already gives ``initial_ph`` (a measured/derived
+#      value wired at t=0). At 60 min / 100 C the closed form converts ~48% of alpha to
+#      iso-alpha (still on the RISING limb; the iso-alpha peak is ~2-3 h out), matching
+#      brewing practice.
+#
+#   2. FERMENTATION (the engine's native regime). Iso-alpha-acids are LOST during fermentation
+#      — adsorbed onto yeast cell walls and scavenged into the krausen/foam — typically ~5-20%.
+#      This is the ``IsoAlphaAcidLoss`` Process (first-order in iso-alpha AND in viable X, so
+#      no yeast => no loss). It is the dynamic content of the beat: the reason hops belong in
+#      the *fermentation* engine and not a spreadsheet, and why finished-beer IBU is below the
+#      end-of-boil value.
+#
+# CARBON. Iso-alpha-acids are EXOGENOUS (they enter via hops, not from the sugar/carbon ledger),
+# at the mg/L scale, and never touch S/E/CO2/N. Like dosed SO2 (D-22) they are OFF the
+# ``total_carbon`` ledger entirely, so the whole beat leaves the carbon invariant byte-for-byte
+# unchanged. The fermentation loss removes iso-alpha from solution (adsorption), which is a real
+# physical loss of hop-derived mass, not a conversion within the fermentation carbon budget.
+#
+# IBU. 1 IBU is, by definition, ~1 mg/L of iso-alpha-acids (BU = International Bitterness Unit,
+# an absorbance readout that tracks iso-alpha for normally-hopped beer). The ``ibu_series``
+# readout is therefore ``iso_alpha [g/L] * 1000``. Dry-hop / whirlpool (post-boil, sub-100 C)
+# bitterness contributions are explicitly DEFERRED (v1 models kettle bitterness only).
+#
+# THE UTILIZATION GAP, and why an efficiency coefficient exists (decision D-64, the load-bearing
+# modeling choice). Malowicki's kinetics describe the isomerization REACTION of *dissolved*
+# alpha-acid faithfully (~48% at 60 min/100 C in the kettle). But finished-beer utilization is
+# only ~25-30% at 60 min (typical brewing-text values; cross-checked against the Tinseth model,
+# which gives ~23% at SG 1.050). The ~2x gap is a chain of physical losses NOT in Malowicki's
+# pure-buffer numbers: incomplete extraction of alpha from the hop material, break/trub
+# adhesion, foam loss, and the kettle->fermenter transfer. Reporting raw kettle iso-alpha would
+# OVERPREDICT finished IBU ~2x — a correspondence-with-reality failure (prime directive #1), not
+# an acceptable simplification. So a lumped ``hop_utilization_efficiency`` multiplies the
+# end-of-boil iso-alpha down to the value delivered to the fermenter; the separate fermentation
+# adsorption loss above then carries it to the finished value. Both are SPECULATIVE (author
+# estimates banded from typical utilization), so parameter-tier propagation (D-1) caps the
+# finished-IBU readout at speculative even though the boil kinetics themselves are sourced
+# (plausible). The efficiency is set from literature-typical utilization, NOT fitted to Tinseth
+# — Tinseth agreement is an independent cross-CHECK (fit-vs-fit), which keeps the validation
+# firewall intact (the D-17/D-57 discipline).
+#
+# DEFERRED (v1 scope, documented): (a) the gravity-dependence of utilization (higher wort
+# gravity lowers hop utilization — Tinseth's "bigness factor"; Malowicki's pure buffer has no
+# gravity term and no mechanistic sourced form is available, so ``hop_utilization_efficiency``
+# is gravity-flat and anchored at moderate gravity); (b) dry-hop / whirlpool bitterness;
+# (c) pH- and hop-form (pellet vs whole vs extract) dependence of utilization; (d) polyphenol /
+# oxidized-alpha (humulinone) bitterness. Only kettle iso-alpha bitterness is modeled.
+
+# -- BOIL ISOMERIZATION: alpha -> iso-alpha (Malowicki & Shellhammer 2005, SOURCED) -----------
+A_iso:
+  value: 7.9e11
+  unit: "1/min"   # Arrhenius pre-exponential of k1 = A_iso * exp(-Ea_iso/(R*T)); T in K
+  tier: plausible
+  uncertainty: { low: 5.0e11, high: 1.2e12, note: "band on the reported pre-exponential; the paired Ea_iso is the load-bearing sensitivity. At 373.15 K gives k1 ~0.0125 /min, ~48% alpha->iso conversion at 60 min" }
+  provenance:
+    source: "Malowicki & Shellhammer 2005, J. Agric. Food Chem. 53(11):4434-4439 (PubMed 15913306): k1 = 7.9e11 * exp(-11858/T) min^-1 for first-order isomerization of hop alpha-acids to iso-alpha-acids in a pH 5.2 model wort-boiling system, 90-130 C."
+    doi: "10.1021/jf0481296"
+    conditions: "pure alpha-acid, pH 5.2 aqueous buffer, 90-130 C; measured by HPLC. Absolute Arrhenius form (pre-exponential + Ea), NOT the reference-anchored form used for the fermentation-rate modifiers (D-11) — the boil kinetics have a measured A, so no T_ref normalization is needed."
+    notes: "Sourced/measured kinetics — the strongest-grounded number in this file. The exponent 11858 K equals Ea_iso/R (98600/8.314). Isomerization is the alpha->iso step; iso then degrades per k2 (A_iso_degradation/Ea_iso_degradation). Tier plausible (not validated): the reaction is measured, but its mapping to real wort — extraction, gravity, hop form — is an honest-mapping step carried by hop_utilization_efficiency."
+
+Ea_iso:
+  value: 98600.0
+  unit: "J/mol"
+  tier: plausible
+  uncertainty: { low: 90000.0, high: 108000.0, note: "Malowicki's reported 98.6 kJ/mol for isomerization; band brackets it toward the degradation Ea. Steep (Q10 ~2.6 at 100 C) — bittering is strongly boil-temperature-dependent (whirlpool/altitude)" }
+  provenance:
+    source: "Malowicki & Shellhammer 2005 (doi:10.1021/jf0481296): activation energy 98.6 kJ/mol for alpha-acid isomerization (the 11858 K exponent of k1 times R = 8.314)."
+    conditions: "pH 5.2 model wort, 90-130 C"
+    notes: "Load-bearing temperature sensitivity of the boil. Used in the absolute Arrhenius k1 = A_iso*exp(-Ea_iso/(R*T)); T in Kelvin. Only exercised when boil_celsius departs from the reference 100 C (whirlpool, altitude); a standard 100 C boil uses k1 at 373.15 K."
+
+# -- BOIL DEGRADATION: iso-alpha -> uncharacterized products (Malowicki 2005, SOURCED) --------
+A_iso_degradation:
+  value: 4.1e12
+  unit: "1/min"   # Arrhenius pre-exponential of k2 = A_iso_degradation * exp(-Ea_iso_degradation/(R*T))
+  tier: plausible
+  uncertainty: { low: 2.5e12, high: 6.0e12, note: "band on the reported pre-exponential. At 373.15 K gives k2 ~0.0031 /min (k2 < k1, so iso-alpha accumulates on the rising limb through a 60-90 min boil)" }
+  provenance:
+    source: "Malowicki & Shellhammer 2005 (doi:10.1021/jf0481296): k2 = 4.1e12 * exp(-12994/T) min^-1 for the first-order loss of iso-alpha-acids to uncharacterized degradation products, same model wort system."
+    doi: "10.1021/jf0481296"
+    conditions: "pure iso-alpha-acid, pH 5.2 aqueous buffer, 90-130 C; HPLC. Absolute Arrhenius form."
+    notes: "The second step of the consecutive reaction; makes the iso-alpha vs boil-time curve peak (~2-3 h at 100 C) rather than saturate. Below k1 at boil temperatures, so a standard 60-90 min boil is on the RISING limb (longer boil => more iso-alpha, up to the peak). Tier plausible (measured)."
+
+Ea_iso_degradation:
+  value: 108000.0
+  unit: "J/mol"
+  tier: plausible
+  uncertainty: { low: 98000.0, high: 120000.0, note: "Malowicki's reported 108.0 kJ/mol for iso-alpha degradation; held ABOVE Ea_iso so degradation's temperature sensitivity exceeds isomerization's (the sourced ordering)" }
+  provenance:
+    source: "Malowicki & Shellhammer 2005 (doi:10.1021/jf0481296): activation energy 108.0 kJ/mol for iso-alpha degradation (the 12994 K exponent of k2 times R)."
+    conditions: "pH 5.2 model wort, 90-130 C"
+    notes: "Used in k2 = A_iso_degradation*exp(-Ea_iso_degradation/(R*T)); T in Kelvin. Ea_iso_degradation > Ea_iso is Malowicki's measured ordering."
+
+# -- KETTLE->FERMENTER UTILIZATION EFFICIENCY (non-fermentation losses, SPECULATIVE) ----------
+hop_utilization_efficiency:
+  value: 0.55
+  unit: "dimensionless"   # end-of-boil iso-alpha delivered to the fermenter = boil iso-alpha * this
+  tier: speculative
+  uncertainty: { low: 0.4, high: 0.75, note: "lumps extraction incompleteness + break/trub adhesion + foam loss + kettle->fermenter transfer. With the ~48% Malowicki kettle conversion and the ~13% fermentation adsorption loss, 0.55 gives ~23% effective utilization at 60 min/SG1.050 — matching typical brewing-text utilization and the Tinseth cross-check (~23%)" }
+  provenance:
+    source: "author estimate, anchored to typical brewing-literature hop utilization (~25-30% at 60 min boil, moderate gravity; e.g. Tinseth utilization model, Palmer 'How to Brew') and cross-checked (not fitted) against Tinseth for a canonical recipe."
+    conditions: "moderate wort gravity (~SG 1.050); gravity-flat in v1 (the gravity-dependence of utilization is a documented deferral). Applied once at the compile seam to the end-of-boil iso-alpha before the fermentation loss."
+    notes: "The load-bearing modeling choice (D-64): without it the model overpredicts finished IBU ~2x vs Malowicki's dissolved-alpha kettle kinetics. SPECULATIVE and banded, set from literature-typical utilization rather than fitted to Tinseth (firewall discipline, D-17/D-57). Parameter-tier propagation (D-1) caps the finished-IBU readout at speculative through this input."
+
+# -- FERMENTATION LOSS: iso-alpha adsorption onto yeast (SPECULATIVE) -------------------------
+k_iso_alpha_loss:
+  value: 2.5e-4
+  unit: "L/(g*h)"   # d(iso_alpha)/dt = -k_iso_alpha_loss * X_viable * iso_alpha (first-order in both)
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 1.5e-3, note: "over a typical primary the viable-biomass exposure integrates to integral(X dt) ~500-600 g*h/L (measured ~566 for a moderate 10-day ale ferment); 2.5e-4 then gives ~13% total iso-alpha loss — mid-range of the ~5-20% wort-to-beer bitterness drop reported in brewing. The band [1e-4, 1.5e-3] spans ~5-30% loss" }
+  provenance:
+    source: "author estimate; iso-alpha-acids are lost during fermentation by adsorption onto yeast cell walls and scavenging into the krausen/foam (the standard brewing account of the ~5-20% wort-to-beer bitterness drop). First-order in iso-alpha and in VIABLE biomass X."
+    conditions: "generic ale/lager yeast; gated on viable X (not X_dead), so a crashed/racked ferment stops losing iso-alpha. No temperature term in v1 (a documented simplification; the dominant lever is contact with growing biomass)."
+    notes: "The dynamic content of the beat — makes finished-beer IBU fall below the end-of-boil value, and makes that drop depend on how much yeast the beer sees. Magnitude speculative; the mechanism (yeast-adsorption, X-gated) is the sourced-standard account. Off the carbon ledger (adsorptive removal of exogenous hop mass, not a fermentation-carbon conversion)."

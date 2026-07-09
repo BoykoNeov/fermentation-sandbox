@@ -116,6 +116,27 @@ def bound_so2_series(traj: Trajectory, params: Mapping[str, float]) -> FloatArra
     )
 
 
+def ibu_series(traj: Trajectory) -> FloatArray:
+    """International Bitterness Units (IBU) at each stored time (decision D-64).
+
+    IBU is, by definition, ~1 mg/L of iso-alpha-acids, so this is simply the ``iso_alpha``
+    state (g/L) times 1000. The trajectory starts at the boil-derived iso-alpha wired in at the
+    compile seam and **declines** as :class:`~fermentation.core.kinetics.hops.IsoAlphaAcidLoss`
+    adsorbs it onto viable yeast during fermentation — so the finished-beer IBU is below the
+    end-of-boil value, the ~5-20% wort-to-beer bitterness drop. Requires a beer trajectory (the
+    ``iso_alpha`` slot is beer-only); an unhopped beer is identically zero.
+
+    TIER (decision D-64, derived not asserted — pass ``ParameterSet.tier_map()`` to
+    ``ProcessSet.tier_of('iso_alpha', ...)`` for the reported tier): the boil isomerization
+    kinetics are sourced (Malowicki 2005, plausible), but the finished value also depends on the
+    speculative ``hop_utilization_efficiency`` and ``IsoAlphaAcidLoss``, so parameter-tier
+    propagation (D-1) caps the finished IBU at **speculative**. Unlike carbon, iso-alpha is off
+    the conservation ledger, so this readout adds no invariant and dosing hops leaves
+    ``total_carbon`` byte-for-byte unchanged.
+    """
+    return np.asarray(traj.series("iso_alpha"), dtype=np.float64) * 1000.0
+
+
 # -- ensemble spread attribution (sensitivity) --------------------------------
 #
 # Which sampled parameters *drive* an ensemble's output spread, and how does that

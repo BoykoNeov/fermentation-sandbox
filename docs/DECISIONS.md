@@ -4994,3 +4994,93 @@ reference data is Speers/Reid lager — disjoint sources, so the comparison is n
   read in-source (2026-07-09) — temperature is brand-dependent, the ferments free-rise
   (non-isothermal), and Table I tabulates no temperature values, so it is not the controlled
   series the ratio test needs. Deferral now rests on the data structure, not access. See D-59, D-63.
+
+## D-64 — Hop bittering → IBU: the boil isomerization is a sourced wort-side compile-seam calc (Malowicki closed form), the fermentation loss is the only Process, iso-alpha is off the carbon ledger, and a utilization coefficient is ADDED (not fitted) to avoid a 2× IBU overprediction
+
+**Status: BUILT (2026-07-10).** The §3.3 "additives with clear mechanisms" beat, owner-selected off
+the post-D-63 menu (over the sensory/OAV Tier-3 capstone, aging chemistry, and the deferred-tail
+options). New: `parameters/data/hops.yaml`, `core/kinetics/hops.py`, `analysis.ibu_series`,
+`scenario.schema.HopAddition` + three `Scenario` fields, the compile-seam boil calc, a beer-only
+`iso_alpha` state slot + `IsoAlphaAcidLoss` Process, and `tests/test_hops.py` (20 tests). Full
+suite green (704 = 684 prior + 20 new, ruff+mypy clean); `test_media.py`'s three structural
+assertions (beer schema names/size, canonical units, expected process set) were updated to include
+the new slot/Process — a structural reflection, not a benchmark weakening. Advisor consulted once
+before writing (the shape was endorsed; five sharpening points applied — see below).
+
+**The physics has two regimes, handled in the two places they belong.** Bitterness is *iso*-alpha-
+acids (isohumulones), which do not pre-exist in the hop:
+1. **The boil** (~373 K, 60–90 min, PRE-fermentation, no yeast): a CONSECUTIVE first-order reaction
+   `alpha --k1--> iso-alpha --k2--> degradation`, both constants measured by Malowicki & Shellhammer
+   2005 (*J. Agric. Food Chem.* 53(11):4434-4439, doi:10.1021/jf0481296) over 90–130 °C:
+   `k1 = 7.9e11·exp(-11858/T)` min⁻¹ (Ea 98.6 kJ/mol), `k2 = 4.1e12·exp(-12994/T)` min⁻¹ (Ea 108.0
+   kJ/mol), T in K. Modelled by the CLOSED-FORM intermediate `[iso]/[a0] = k1/(k2-k1)·(e^{-k1 t} -
+   e^{-k2 t})`, evaluated **once at the compile seam** per hop addition and summed — NOT a boil ODE
+   phase (running the boil through the integrator would drive the yeast-free wort at 373 K). This is
+   the same wort-side-input treatment `initial_ph` gets (D-18): only the *result* (iso-alpha
+   delivered to the fermenter) enters the state. At 60 min/100 °C the closed form gives 47.6% of
+   alpha as iso-alpha, still on the RISING limb (k2<k1, peak ~3 h) — matching brewing practice.
+2. **Fermentation** (the engine's native regime): `IsoAlphaAcidLoss` removes iso-alpha by adsorption
+   onto viable yeast (`d(iso_alpha)/dt = -k_iso_alpha_loss·X_viable·iso_alpha`, X-gated so a crashed/
+   racked beer stops losing bitterness) — the ~5–20% wort-to-beer drop. This is the *dynamic content*
+   of the beat and the reason hops touch the ODE at all; a crash mid-ferment strands the bitterness.
+
+**Off the carbon ledger (the accounting choice).** Iso-alpha-acids are exogenous (they arrive via
+hops, mg/L scale) and touch only `iso_alpha` — never S/E/CO2/N. Like dosed SO2 (D-22) they are
+absent from `total_carbon`/`total_nitrogen` (an unreferenced slot gets weight 0 in `conservation`),
+so the whole beat leaves the carbon invariant **byte-for-byte unchanged** — asserted directly:
+`test_hopping_leaves_total_carbon_byte_for_byte` runs a hopped and an unhopped beer and checks the
+carbon *series* are identical to 1e-9. The fermentation loss is adsorptive removal of hop-derived
+mass, not a conversion within the fermentation carbon budget.
+
+**The load-bearing modeling decision — a utilization coefficient is ADDED, not fitted (advisor point
+2).** Malowicki's kinetics describe the isomerization of *dissolved* alpha faithfully (~48% at 60
+min/100 °C in the kettle), but finished-beer utilization is only ~25–30% (typical brewing texts;
+Tinseth ~23% at SG 1.050). The ~2× gap is a chain of physical losses NOT in Malowicki's pure-buffer
+numbers: incomplete extraction from the hop material, break/trub adhesion, foam loss, and the
+kettle→fermenter transfer. Reporting raw kettle iso-alpha would OVERPREDICT finished IBU ~2× — a
+correspondence-with-reality failure (prime directive #1), not an acceptable simplification. So a
+lumped `hop_utilization_efficiency` (0.55, banded [0.4, 0.75]) multiplies the end-of-boil iso-alpha
+down to the fermenter-delivered value; `IsoAlphaAcidLoss` (~13% on a typical primary) then carries
+it to the finished value. **Set from literature-typical utilization, NOT fitted to Tinseth** — the
+Tinseth comparison is an independent cross-CHECK (fit-vs-fit, §3.5), which keeps the validation
+firewall intact (the D-17/D-57 discipline). Composed effective utilization = 0.476·0.55·0.868 ≈ 22.7%
+vs Tinseth 23.1%; the canonical recipe (1 oz 5% AA, 60 min, 5 gal, SG 1.050) finishes at ~17.0 IBU
+vs Tinseth ~17.3. `test_finished_ibu_is_in_the_tinseth_ballpark` checks three recipes within ~30%.
+
+**Volume is a genuinely new scenario quantity (advisor point 4).** Hop *mass* (grams) → g/L needs a
+wort volume, which the otherwise concentration-based (volume-agnostic) engine did not track. Added
+`Scenario.batch_volume_liters` (required iff `hops` is non-empty — a `model_validator` enforces it)
+plus `Scenario.hops: list[HopAddition]` (alpha_acid_percent, grams, boil_minutes) and
+`Scenario.boil_celsius` (default 100; lower for a whirlpool/altitude, which slows isomerization via
+the Malowicki Arrhenius). v1 uses ONE volume for boil and fermenter (kettle-loss/evaporation folded
+into the efficiency) — a documented simplification.
+
+**Tiers derive, they are not asserted (advisor point 5; D-1).** The boil constants are sourced/
+measured → **plausible** (not validated: the mapping to real wort — extraction, gravity, hop form —
+is an honest-mapping step). But the finished `iso_alpha` also reads the speculative
+`hop_utilization_efficiency` and the speculative `IsoAlphaAcidLoss`, so parameter-tier propagation
+caps the finished-IBU readout at **speculative** — verified by `tier_of("iso_alpha")` = SPECULATIVE
+on a hopped run, VALIDATED on an unhopped run (the loss Process is disabled at the compile seam when
+no hops are scheduled, the MLF/Brett isolability pattern, so the empty slot keeps its tier and pays
+no flux).
+
+**Isolability (prime directive #3).** `_HOPS_PROCESSES` is wired into the BEER medium only (wine has
+no `iso_alpha` slot); hops on a non-beer medium is a loud `ValueError`, not a silently-ignored field.
+An unhopped beer is byte-for-byte the prior beer core (iso_alpha starts 0, loss disabled).
+
+**Sourcing note (advisor point 1 — BLOCKED until resolved).** The Malowicki constants were taken
+from the paper/corroborating sources, NOT recall: the ACS abstract + a secondary review + internal
+consistency (`exponent·R = stated Ea` for BOTH k1 and k2: 11858·8.314 = 98.6 kJ/mol, 12994·8.314 =
+108.0 kJ/mol) triangulate the values. The open-access thesis (Oregon State) is a scanned image and
+unreadable via fetch, but the abstract-level values are unambiguous and independently reproduced.
+The advisor's loose "Ea ~50 kJ/mol" sanity guess was wrong (the measured value is 98.6); the advisor
+explicitly said to trust the paper if units check out, and they do — a case of primary-source
+evidence correctly overriding an advisor heuristic.
+
+**DEFERRED (v1 scope, documented in hops.yaml):** (a) the gravity-dependence of utilization (higher
+wort gravity lowers hop utilization — Tinseth's bigness factor; Malowicki's pure buffer has no
+gravity term and no mechanistic sourced form is available, so the efficiency is gravity-flat, anchored
+at moderate gravity — and the "higher gravity → lower utilization" directional property is NOT
+claimed); (b) dry-hop / whirlpool (post-boil, sub-100 °C) bitterness; (c) pH- and hop-form (pellet
+vs whole vs extract) dependence; (d) polyphenol / oxidized-alpha (humulinone) bitterness. Only kettle
+iso-alpha bitterness is modelled. See milestone-2-tasks.md.

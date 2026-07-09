@@ -41,6 +41,11 @@ WINE_MERCAPTAN_SLOTS = ("mercaptans",)
 # alpha-ketoglutarate, the second- and third-strongest SO₂-binding carbonyls after acetaldehyde.
 WINE_KETO_ACID_SLOTS = ("pyruvate", "alpha_ketoglutarate")
 
+# Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
+# fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
+# slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
+BEER_HOP_SLOTS = ("iso_alpha",)
+
 
 def test_wine_schema_has_single_sugar_slot():
     schema = wine_schema()
@@ -70,19 +75,21 @@ def test_wine_schema_has_single_sugar_slot():
 
 def test_beer_schema_has_three_sequential_sugars():
     schema = beer_schema()
-    assert schema.names == SHARED
+    assert schema.names == SHARED + BEER_HOP_SLOTS
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
-    # X, S(3), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20),
+    # 18 shared (X, S(3), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20),
     # acetolactate, diacetyl, butanediol (VDK pathway, D-26), acetaldehyde (D-27),
-    # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink)
-    assert schema.size == 20
+    # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink)) + 1 beer-only iso_alpha bitterness slot
+    # (D-64) — S occupies 3 slots, so 18 shared names span 20 slots, + iso_alpha = 21
+    assert schema.size == 21
 
 
 def test_shared_variable_units_are_canonical():
-    # Beer carries exactly the shared variable set, so it pins the canonical units of
-    # the shared layout (wine adds the D-18 acid/cation slots on top — checked below).
+    # Beer carries the shared variable set plus its one beer-only iso_alpha slot (D-64), so it
+    # pins the canonical units of the shared layout (wine adds the D-18 acid/cation slots on top
+    # — checked below).
     schema = beer_schema()
     units = {spec.name: spec.unit for spec in schema.specs}
     assert units == {
@@ -104,6 +111,7 @@ def test_shared_variable_units_are_canonical():
         "acetaldehyde": "g/L",
         "h2s": "g/L",
         "h2s_gas": "g/L",
+        "iso_alpha": "g/L",  # beer-only bitterness slot (D-64)
     }
 
 
@@ -271,6 +279,11 @@ KETO_ACID_PROCESSES = {
     "pyruvate_excretion", "pyruvate_reassimilation",
     "alpha_kg_excretion", "alpha_kg_reassimilation",
 }  # fmt: skip
+# Hop bittering (decision D-64) is wired into the BEER medium only (wine has no iso_alpha slot).
+# The boil isomerization is a compile-seam calc, not a Process; the only dynamic member is the
+# fermentation-time iso-alpha loss. It is present in a bare build_process_set and disabled at the
+# compile seam when no hops are scheduled (the MLF/Brett isolability pattern).
+HOP_PROCESSES = {"iso_alpha_acid_loss"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -295,6 +308,7 @@ EXPECTED_PROCESSES = {
         | VDK_PROCESSES
         | ACETALDEHYDE_PROCESSES
         | H2S_PROCESSES
+        | HOP_PROCESSES
     ),
 }
 # Per-rate Arrhenius modifiers wire into both media. Wine additionally carries the opt-in

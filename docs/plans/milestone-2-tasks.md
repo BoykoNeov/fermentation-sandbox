@@ -684,3 +684,25 @@ Summary (full record in `docs/DECISIONS.md` → D-19):
         the third `advisor()` call in the D-52/D-53 arc — each pass caught something the previous
         one missed (wrong pick → test-scope gap → now a magnitude correction the owner's research
         request itself surfaced). Full record in **DECISIONS → D-53**.
+
+- [x] **§3.3 Hop bittering → IBU (decision D-64). LANDED 2026-07-10.** The "additives with clear
+      mechanisms" beat, owner-selected off the post-D-63 menu. Two-regime physics in the two places
+      each belongs: (1) the **boil** isomerization `alpha --k1--> iso-alpha --k2--> degradation` is a
+      wort-side CLOSED-FORM compile-seam calc (Malowicki & Shellhammer 2005, sourced Arrhenius k1/k2;
+      doi:10.1021/jf0481296), wired into a new beer-only `iso_alpha` state at t=0 like `initial_ph` —
+      NOT a boil ODE phase; (2) the **fermentation** loss `IsoAlphaAcidLoss` (X-gated first-order
+      adsorption, the only Process) makes finished IBU fall below the end-of-boil value. **Off the
+      carbon ledger** (exogenous hop mass, like dosed SO2) ⇒ `total_carbon` byte-for-byte unchanged
+      (asserted directly). **A `hop_utilization_efficiency` (0.55, spec) is ADDED, not fitted** — set
+      from literature-typical utilization to avoid the ~2× finished-IBU overprediction of raw kettle
+      kinetics (a fidelity failure), with Tinseth as an independent fit-vs-fit *check* (canonical
+      recipe ~17.0 IBU vs Tinseth ~17.3), preserving the firewall. New scenario surface:
+      `HopAddition` + `hops`/`batch_volume_liters` (the genuinely-new volume quantity)/`boil_celsius`.
+      **Tier derives, not asserted:** sourced boil kinetics plausible, capped speculative at the
+      finished pool by the loss/efficiency inputs (D-1). Isolable/beer-only: hops on wine is a loud
+      error; unhopped beer disables the loss (VALIDATED slot), byte-for-byte the prior core. New
+      `hops.yaml` + `core/kinetics/hops.py` + `analysis.ibu_series`; `tests/test_hops.py` (20 tests);
+      **704 green**, ruff+mypy clean. **DEFERRED (v1):** gravity-dependence of utilization, dry-hop/
+      whirlpool bitterness, hop-form/pH effects, oxidized-alpha (humulinone) bitterness. One advisor
+      call before writing (shape endorsed; 5 sharpening points applied). Full record in **DECISIONS
+      → D-64**.
