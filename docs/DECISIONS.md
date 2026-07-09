@@ -4801,6 +4801,68 @@ discriminating within-study inversion (engine RF<CF; Palma's digitized RF>CF pin
 cross-regime check or defer); optional Varela Figure-1 biomass-time-series digitization. The Palma 2012
 dataset is now fully exercised (all three conditions built).
 
+## D-63 — Beer-side independent check: the accessible lager data is single-temperature (confounded), so build an honest cross-regime Arrhenius stress test — NOT a lager validation — and defer the confound-cancelling ratio test pending Speers 2003's controlled series
+
+**Status: BENCHMARK-ONLY (2026-07-09), no physics/source-code changed.** Owner picked up the D-59
+beer-validation fork, choosing the Speers/Reid lager option over continued defer. New file
+`tests/benchmarks/test_beer_temperature_response.py` (3 tests; 684 passed = 681+3, ruff+mypy clean).
+Advisor consulted twice — once on framing before any web research, once on the concrete test design;
+both reframes applied. This is the first benchmark ever to exercise the beer Arrhenius `E_a`'s, which
+have been **inert in every prior benchmark** (all isothermal at `T_ref` = 20 °C, so f = 1).
+
+**The data investigation decided the whole design.** The advisor's linchpin: the test forks entirely
+on whether the source spans more than one temperature.
+- **Accessible source is single-temperature.** The only freely reconstructable lager curve is Reid,
+  Josey, MacIntosh, Maskell & Speers 2021 (*Fermentation* 7(1):13, doi:10.3390/fermentation7010013),
+  Table 2 — Australian lager, OE **14.1 °P, single starting temperature 10 °C**, 3-parameter ADF
+  logistic B = 0.06372 h⁻¹, midpoint M = 51.22 h (≈ 2.1 d). Fetched via the Heriot-Watt open-access
+  mirror (`pure.hw.ac.uk`, `pdftotext`); MDPI/ResearchGate/academia.edu all 403 the fetcher.
+- **Multi-temperature signal is paywalled AND likely confounded.** The temperature effect (rate ↑
+  with starting temp, p<0.01) lives in Speers, Rogers & Smith 2003 (*J. Inst. Brew.* 109(3):229–235,
+  doi:10.1002/j.2050-0416.2003.tb00163.x), which is Wiley-paywalled (no accessible free full text),
+  and its effect is a regression across many **industrial** batches (brand/wort/pitch co-vary with
+  temperature) — so even if obtained it may not be a clean controlled series.
+
+**Why a single-temperature lager band would be dishonest (advisor's call, D-59's defer sharpened).**
+Comparing "engine ale-yeast Arrhenius extrapolated to 10 °C" vs "real lager yeast (*S. pastorianus*)
+in a 14.1 °P industrial wort at 10 °C" conflates the Arrhenius law with the organism + wort +
+pitch-rate difference. Empirically the engine's low-pitch (0.6 g/L homebrew-like) 10 °C run hits its
+attenuation midpoint at ~6.2 d — **~2.9× slower** than Speers' ~2.1 d industrial midpoint, a gap
+dominated by pitch + organism. Guarding that gap as a regression band would guard the confound. The
+file therefore **deliberately does not** assert the engine reproduces the 51 h midpoint.
+
+**What was built instead — three claims from the engine's OWN 20 °C vs 10 °C runs** (midpoints 2.79 d
+and 6.21 d; the 2.23× slowdown matches the E_a-predicted 2.22–2.25× almost exactly). The advisor's
+key correction: split the recovered number (apparent E_a ≈ **55.3 kJ/mol**, round-tripping the input
+E_a_uptake 55.1 / E_a_growth 55.9 kJ/mol) into two labeled claims, because one band conflates two
+purposes:
+1. **Wiring / regression guard** — apparent E_a ≈ input (band [50, 60] kJ/mol). Guards, on beer and
+   over a full ferment composing BOTH growth and uptake, that the Arrhenius modifiers stay wired into
+   fermentation timing — the **D-57 frozen-modifier bug class**. Not a strict duplicate of the
+   existing Arrhenius tests, which are directional-only, uptake-only, and on wine.
+2. **Reality check (the honest headline)** — the SAME E_a sits inside the empirically observed range
+   for *S. cerevisiae* alcoholic fermentation (~35–100 kJ/mol; free-cell ~62–97, some ~35). This is
+   the **only reality-touching claim**, and it has teeth: it excludes the ~265 kJ/mol de Andrés-Toro
+   lumped-fit artifact the beer file explicitly rejects, while staying humble about the organism gap.
+3. **Cross-regime order-of-magnitude anchor (CONFOUNDED, loose)** — 10 °C reaches 90 % attenuation in
+   a "cold lager ~1–2 weeks" window [5, 25] d (engine ~12 d). Deliberately loose; only catches an
+   order-of-magnitude-wrong temperature model. The low-pitch assumption is why the engine sits at the
+   slow end and misses Speers' fast industrial timing.
+
+**Naming (advisor):** NOT `test_validation_speers2003` — Speers is not load-bearing in any assertion
+(the [5,25] d band is our own cold-lager judgment, and the engine intentionally misses 51 h). Named
+`test_beer_temperature_response` for what it does.
+
+**The confound-cancelling ratio test — the version with genuine signal — is DEFERRED.** A rate *ratio*
+across two temperatures cancels the lager-vs-ale absolute-kinetics difference, isolating the
+temperature axis; it needs Speers 2003's *controlled* temperature series (fitted rate/midpoint at ≥2
+temperatures on one wort+yeast). The reusable helper `_apparent_activation_energy` is the drop-in
+point. **Owner is hunting the Speers 2003 PDF in parallel** — if it turns out to be a controlled
+series, the real test drops straight in.
+
+**Firewall (prime directive 2): clean.** Engine E_a's derive from the Coleman 2007 wine fit; the
+reference data is Speers/Reid lager — disjoint sources, so the comparison is not self-confirming.
+
 ## Deferred (decide early in the relevant milestone)
 
 - ~~**pH / acid model richness**~~ — **decided in D-18** (full charge-balance solver),
@@ -4909,8 +4971,12 @@ dataset is now fully exercised (all three conditions built).
   (2026-07-08):** the DAP-refeed rescue is reproduced, but the engine inverts Palma's
   within-study RF-vs-CF ordering (engine RF<CF ~108<138 h; Palma RF>CF ~117>72 h) — the
   same N-under-suppression gap via a dynamic intervention; all three Palma conditions now
-  built. See D-60, D-62. **Beer-side independent check still open:** no publicly-
-  accessible independent in-regime dataset exists (its two richest candidates are its own
-  fit sources); the only option found is an off-regime lager dataset (Speers et al. 2003)
-  usable as a cross-regime Arrhenius stress test, or defer beer validation until a better
-  dataset surfaces. See D-59.
+  built. See D-60, D-62. ~~**Beer-side independent check still open**~~ — **PARTIALLY ADDRESSED
+  in D-63 (2026-07-09).** No publicly-accessible independent in-regime dataset exists (its two
+  richest candidates are its own fit sources); the accessible off-regime lager reconstruction
+  (Reid 2021 / Speers 2003) is single-temperature (10 °C), which is confounded by organism +
+  pitch. Built `test_beer_temperature_response.py` — an honest cross-regime Arrhenius *stress
+  test* (engine's own apparent E_a ~55 kJ/mol sits in the literature yeast range; excludes the
+  265 kJ/mol artifact), NOT a lager validation. **The confound-cancelling ratio test stays
+  deferred** pending Speers 2003's controlled temperature series (owner hunting the paywalled
+  PDF). See D-59, D-63.
