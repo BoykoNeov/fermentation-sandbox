@@ -4840,10 +4840,13 @@ purposes:
    over a full ferment composing BOTH growth and uptake, that the Arrhenius modifiers stay wired into
    fermentation timing — the **D-57 frozen-modifier bug class**. Not a strict duplicate of the
    existing Arrhenius tests, which are directional-only, uptake-only, and on wine.
-2. **Reality check (the honest headline)** — the SAME E_a sits inside the empirically observed range
-   for *S. cerevisiae* alcoholic fermentation (~35–100 kJ/mol; free-cell ~62–97, some ~35). This is
-   the **only reality-touching claim**, and it has teeth: it excludes the ~265 kJ/mol de Andrés-Toro
-   lumped-fit artifact the beer file explicitly rejects, while staying humble about the organism gap.
+2. **Reality check (the honest headline)** — the SAME E_a sits inside the range commonly reported for
+   *S. cerevisiae* alcoholic fermentation (order ~40–90 kJ/mol, well under ~100; band [35, 100] a
+   deliberately generous envelope, exact per-study figures NOT read in-source — the primary kinetic
+   papers 403'd, only Reid 2021's B/M were read from an opened PDF). This is the **only reality-
+   touching claim**, and it has teeth: the engine's ~55 kJ/mol lands inside while the ~265 kJ/mol de
+   Andrés-Toro lumped-fit artifact the beer file rejects is excluded by an order of magnitude — a
+   verdict robust to the exact edges, while staying humble about the organism gap.
 3. **Cross-regime order-of-magnitude anchor (CONFOUNDED, loose)** — 10 °C reaches 90 % attenuation in
    a "cold lager ~1–2 weeks" window [5, 25] d (engine ~12 d). Deliberately loose; only catches an
    order-of-magnitude-wrong temperature model. The low-pitch assumption is why the engine sits at the

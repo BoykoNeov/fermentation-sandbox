@@ -55,14 +55,18 @@ runs):**
      and on wine; this is the quantitative, whole-ferment, beer extension.
 
   2. *Reality check* (:func:`test_beer_temperature_sensitivity_within_literature_
-     range`) — the SAME recovered E_a sits inside the empirically observed range
-     of apparent activation energies for S. cerevisiae alcoholic fermentation
-     (~35–100 kJ/mol; free-cell values commonly ~62–97 kJ/mol, e.g. immobilised-
-     cell kinetic studies, with lower ~35 kJ/mol also reported). This is the only
-     reality-touching claim, and it is the one with teeth: it excludes the
-     ~265 kJ/mol lumped-fit artifact the beer file explicitly rejected (de
-     Andrés-Toro 1998; see beer_generic.yaml header) while staying humble about
-     the lager/ale organism gap.
+     range`) — the SAME recovered E_a sits inside the range commonly reported for
+     S. cerevisiae alcoholic-fermentation apparent activation energy, which is of
+     order ~40–90 kJ/mol and well under ~100 kJ/mol (kinetic modelling studies of
+     ethanol fermentation; exact bounds vary with strain, immobilisation and
+     temperature range, so the band [35, 100] kJ/mol is a deliberately generous
+     envelope, not a fitted value — the specific per-study figures were not read
+     in-source here). This is the only reality-touching claim, and it is the one
+     with teeth: the engine's ~55 kJ/mol lands inside while the ~265 kJ/mol
+     lumped-fit artifact the beer file explicitly rejected (de Andrés-Toro 1998;
+     see beer_generic.yaml header) is excluded by an order of magnitude — a
+     verdict robust to the exact band edges, staying humble about the lager/ale
+     organism gap.
 
   3. *Cross-regime order-of-magnitude anchor* (:func:`test_cold_lager_completes_
      in_cross_regime_order_of_magnitude`) — the engine at 10 °C reaches near-
@@ -103,9 +107,11 @@ _S0 = _BEER_WORT["glucose_gpl"] + _BEER_WORT["maltose_gpl"] + _BEER_WORT["maltot
 _E_A_UPTAKE = 55100.0  # J/mol
 _E_A_GROWTH = 55900.0  # J/mol
 
-#: Independent literature range for S. cerevisiae alcoholic-fermentation apparent
-#: activation energy (see docstring for sources). The engine's ~55 kJ/mol sits
-#: inside; the rejected de Andrés-Toro ~265 kJ/mol artifact sits far outside.
+#: Deliberately generous envelope for S. cerevisiae alcoholic-fermentation
+#: apparent activation energy (commonly reported ~40-90 kJ/mol, well under
+#: ~100 kJ/mol; see docstring). Not a fitted value -- the engine's ~55 kJ/mol
+#: sits inside and the rejected de Andrés-Toro ~265 kJ/mol artifact sits far
+#: outside, a verdict robust to the exact edges.
 _E_A_LITERATURE_LOW = 35000.0  # J/mol
 _E_A_LITERATURE_HIGH = 100000.0  # J/mol
 
@@ -188,8 +194,8 @@ def test_arrhenius_modifier_composes_over_full_beer_ferment():
 
 def test_beer_temperature_sensitivity_within_literature_range():
     # CLAIM 2 (reality check -- the honest headline). The SAME recovered E_a must
-    # sit inside the empirically observed S. cerevisiae fermentation E_a range
-    # (~35-100 kJ/mol; see module docstring for sources). This is the only
+    # sit inside the commonly-reported S. cerevisiae fermentation E_a envelope
+    # (order ~40-90 kJ/mol, band [35,100]; see module docstring). This is the only
     # reality-touching assertion: it excludes the ~265 kJ/mol de Andres-Toro
     # lumped-fit artifact the beer file rejects, while making no claim about
     # absolute lager kinetics (organism gap). Distinct from claim 1: if the input
