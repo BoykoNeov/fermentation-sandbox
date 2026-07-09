@@ -4856,12 +4856,21 @@ purposes:
 (the [5,25] d band is our own cold-lager judgment, and the engine intentionally misses 51 h). Named
 `test_beer_temperature_response` for what it does.
 
-**The confound-cancelling ratio test — the version with genuine signal — is DEFERRED.** A rate *ratio*
-across two temperatures cancels the lager-vs-ale absolute-kinetics difference, isolating the
-temperature axis; it needs Speers 2003's *controlled* temperature series (fitted rate/midpoint at ≥2
-temperatures on one wort+yeast). The reusable helper `_apparent_activation_energy` is the drop-in
-point. **Owner is hunting the Speers 2003 PDF in parallel** — if it turns out to be a controlled
-series, the real test drops straight in.
+**The confound-cancelling ratio test — the version with genuine signal — is DEFERRED, now on
+EVIDENCE from the primary source, not access failure.** A rate *ratio* across two temperatures cancels
+the lager-vs-ale absolute-kinetics difference, isolating the temperature axis; it needs a *controlled*
+temperature series (fitted rate/midpoint at ≥2 temperatures on one wort+yeast). **Owner obtained the
+paywalled Speers 2003 PDF mid-session and it was read in-source (2026-07-09) — it is NOT such a
+series, exactly as the advisor predicted.** Three disqualifying facts from the paper: (1) "the
+starting temperature was **brand dependent**, the data for each brand was pooled" — temperature
+co-varies with brand, i.e. with wort/gravity/yeast; (2) fermentations "were started at various
+specified temperatures and **allowed to free rise to set temperatures**" — non-isothermal, so no
+single temperature per curve for an Arrhenius fit; (3) Table I tabulates only P/B/M/P₀ with **no
+per-brand temperature values at all** — temperature enters only as a regression factor (p<0.01 on
+rate, p<0.001 on midpoint), so not even raw (T, rate) pairs are recoverable. A ratio built from it
+would still carry the full brand confound. The deferral therefore stands on the data's structure, not
+on access. The reusable helper `_apparent_activation_energy` remains the drop-in point should a
+genuinely controlled isothermal series (same wort+yeast, ≥2 temperatures) ever surface.
 
 **Firewall (prime directive 2): clean.** Engine E_a's derive from the Coleman 2007 wine fit; the
 reference data is Speers/Reid lager — disjoint sources, so the comparison is not self-confirming.
@@ -4981,5 +4990,7 @@ reference data is Speers/Reid lager — disjoint sources, so the comparison is n
   pitch. Built `test_beer_temperature_response.py` — an honest cross-regime Arrhenius *stress
   test* (engine's own apparent E_a ~55 kJ/mol sits in the literature yeast range; excludes the
   265 kJ/mol artifact), NOT a lager validation. **The confound-cancelling ratio test stays
-  deferred** pending Speers 2003's controlled temperature series (owner hunting the paywalled
-  PDF). See D-59, D-63.
+  deferred on EVIDENCE:** owner obtained the paywalled Speers 2003 PDF mid-session and it was
+  read in-source (2026-07-09) — temperature is brand-dependent, the ferments free-rise
+  (non-isothermal), and Table I tabulates no temperature values, so it is not the controlled
+  series the ratio test needs. Deferral now rests on the data structure, not access. See D-59, D-63.
