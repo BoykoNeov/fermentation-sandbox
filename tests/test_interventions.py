@@ -977,6 +977,11 @@ def test_add_sugar_books_positive_carbon_and_no_nitrogen():
     n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
     flow = traj.external_flows[0]
 
+    # the flow books EXACTLY the inverted hexose's carbon (20 g/L sucrose × ratio × glucose
+    # fraction) — which equals the dosed sucrose's carbon, since inversion is carbon-conserving
+    # (hydrolysis water carries none): the docstring's "books exactly the sucrose carbon" claim.
+    expected_c = 20.0 * _SUCROSE_INVERSION_RATIO * carbon_mass_fraction("glucose")
+    assert c_of(flow.delta) == pytest.approx(expected_c, rel=1e-4)
     assert c_of(flow.delta) > 0.0
     assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
     # crown-jewel: carbon closes across the jump once the positive external flow is counted
