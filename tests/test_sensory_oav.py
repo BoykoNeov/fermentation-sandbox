@@ -130,7 +130,7 @@ def test_profile_reading_tier_is_speculative_even_when_pool_is_validated(thresho
 
 
 def test_profile_compound_set_matches_the_medium(thresholds):
-    """Beer profiles the 5 common pools; wine adds the 5 wine-only pools — never mismatched."""
+    """Beer profiles the 5 common pools; wine adds the 9 wine-only pools — never mismatched."""
     beer = sensory_profile(_traj(beer_schema(), {}), thresholds)
     wine = sensory_profile(_traj(wine_schema(), {}), thresholds)
     assert set(beer.readings) == {"diacetyl", "acetaldehyde", "h2s", "esters", "fusels"}
@@ -140,7 +140,15 @@ def test_profile_compound_set_matches_the_medium(thresholds):
         "mercaptans",
         "methional",
         "phenylacetaldehyde",
+        # The four oak extractives (D-77) — the non-oxidative barrel/chip axis. Note the oak
+        # *ceiling* slots are NOT aroma pools, so they must NOT appear in the profile.
+        "whiskey_lactone",
+        "vanillin",
+        "guaiacol",
+        "eugenol",
     }
+    # The set-and-hold ceiling slots are read by OakExtraction but are not aroma compounds.
+    assert "vanillin_ceiling" not in wine.readings
     # The wine-only pools are absent from the beer profile (not silently zero-filled).
     assert "ethylphenols" not in beer.readings
     assert beer.medium == "beer"

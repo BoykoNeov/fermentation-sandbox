@@ -6107,3 +6107,107 @@ the pre-D-76 helper) + 3 new tests (the emergent pathway fires without a dose; t
 silent; carbon **and** nitrogen close on the triple-draw compose). **Next:** oak extraction (a separate aging axis,
 no O₂ — diffusion-limited vanillin / whiskey lactones / gallotannins), the deferred beat 1b (descriptor
 projection), or the deferred non-oxidative Maillard Strecker route.
+
+## D-77 — `OakExtraction` built: the barrel/chip aroma-extractive axis — the FIRST non-oxidative aging Process, a separate axis (no O₂) (§4.1)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, the sixth aging Process and the FIRST that is not oxidative.** Every
+prior aging beat (D-71→D-75) lived on the shared dissolved-O₂ budget; oak extraction is a **separate axis** —
+diffusion-driven, drawing **no O₂**, orthogonal to the browning/acetaldehyde/SO₂/Strecker competition. As a
+finished wine sits in oak (barrel or chips/staves), four wood extractives diffuse in and rise toward a saturation
+ceiling: **whiskey lactone** ("coconut", light-toast dominant), **vanillin** ("vanilla", medium-toast peak),
+**guaiacol** ("smoky/toasty", heavy-toast — the *oak/toast* guaiacol, distinct from the Brett 4-ethylguaiacol of
+D-55) and **eugenol** ("clove", heavy-toast). Four new wine-only aroma pools the D-67 lens reads + four thresholds.
+**Two `advisor()` passes** (design + a reconcile that overturned half the design recipe) and **two owner forks**
+(answered via `AskUserQuestion`). 838 tests (+17), `ruff`/`mypy`/`pytest` green.
+
+**The kinetic form — first-order approach to a ceiling FROM BELOW, the inverse of EsterHydrolysis.**
+`d(C_i)/dt = k_oak_extraction · f(T) · max(0, ceiling_i − C_i)` per extractive `i` — the exact mirror of D-69's
+`max(0, esters − esters_eq)` net decay (which approaches a floor from *above*). `f(T)` is a **deliberately weak**
+warmer-extracts-faster factor: extraction is **diffusion-limited**, not a chemical reaction, so `E_a_oak_extraction`
+= 20 kJ/mol (its own param), well below the ~50–60 kJ/mol reaction E_a's of every oxidative sibling — a
+near-T-independent first cut is defensible with the provenance note. **One shared `k_oak_extraction`** across all
+four this beat: the *ceilings* carry the toast **profile** (which compound dominates); per-compound rates are a
+documented refinement.
+
+**Owner forks (2), answered before building.** **(1) Compound set → 4 (`+eugenol`)** over the advisor-recommended
+3 (whiskey lactone / vanillin / guaiacol). Eugenol co-varies with guaiacol (both lignin thermal-degradation
+phenols, heavy-toast) so it adds little toast-*discrimination*, but the owner took the richer clove note; it is a
+byte-for-byte-trivial pool alongside guaiacol. Whiskey lactone is a single lumped **cis+trans** pool (the cis/trans
+split, different thresholds, is beyond Tier-3). **(2) Wine-only wired** (advisor's rec, against my earlier
+medium-agnostic lean): the physics is medium-agnostic (barrel-beer exists) but — exactly like `StreckerDegradation`
+(D-75), whose physics is *also* medium-agnostic yet went wine-only — medium-agnostic physics does **not** force
+medium-agnostic *wiring*. Wine-only is **free** here (unlike D-74's A420, which was forced medium-agnostic by the
+shared `k_ethanol_oxidation` reduction): oak touches only new slots, so no shared-budget forcing. Barrel-beer is a
+trivial later extension (wire `OakExtraction` + the 8 slots into `beer_schema`).
+
+**The design crux — a plumbing conflict that overturned half the advisor's own recipe (2nd advisor pass).** The
+advisor's first-pass fork-5 recipe was: `oak.yaml` holds toast-specific *yields*; the `add_oak` verb computes
+`ceiling_i = oak_gpl × yield_i(toast)` and **mints each as a provenance-backed derived `Parameter`** (the
+`_inject_temperature_ramp_rate` pattern) so directive #2 (provenance) and D-1 (tier map) hold. **Primary-source
+evidence contradicted it:** an intervention verb has signature `(iv, schema, parameters) → ScheduledEvent` and
+**cannot inject into the compiled `ParameterSet`** — its only param channel is `ScheduledEvent.param_update`, typed
+`Mapping[str, float]` (plain floats, no provenance, and *absent from the `param_tiers` snapshot* taken once at
+compile). Worse than a style nit: if `begin_aging` fires before `add_oak`, `OakExtraction` integrates a segment
+reading `params["C_sat_*"]` that don't exist → **`KeyError` mid-integrate**. Surfaced this in a reconcile
+`advisor()` call; the advisor **agreed and dropped the mint-params half**, keeping only the load-bearing verb half.
+
+**Resolution — ceilings are SET-AND-HOLD off-ledger STATE slots the `add_oak` verb writes (the `cation_charge`
+idiom), NOT injected params.** Each `<compound>_ceiling` is a constant wine-only state slot **no Process touches**;
+`add_oak {oak_gpl, toast}` reads the provenance-backed `oak_yield_<compound>_<toast>` from `oak.yaml`, computes
+`oak_gpl × yield`, and writes the ceiling (a `+=` dose — a second `add_oak` raises it, the deferred fill-number's
+coarse form). `OakExtraction` (enabled by `begin_aging`) reads the ceiling from state and rises the extractive
+toward it. This achieves **every goal the advisor's param recipe targeted, via a blessed mechanism**: provenance
+lives in the yields (the *dose* needs none — like `o2`/`so2`/`amino_acids`, all dosed off-ledger state slots), D-1
+is *moot* because every oak pool floors at SPECULATIVE regardless of param tiers, and there is **no KeyError
+window** (an un-dosed enabled Process gates on state before touching params). Cost: 8 wine-only slots (4 extracted
++ 4 ceiling) vs 4-slot+4-param; slots are cheap, the seam is a clone of `add_oxygen`/`add_acid`. **Verb, not a
+`scenario.initial` opt-in:** oak is an aging-phase *substrate* and the axis already doses its substrate (O₂) with a
+verb; the categorical `toast` → `_iv_str` is precedented by `add_acid {acid, gpl}`, while a *string* in
+`scenario.initial` (all-numeric today) would be unprecedented.
+
+**Off EVERY ledger — the `iso_alpha` precedent, the cleanest aging Process yet.** The extractives are **exogenous
+wood-derived** mass, tracked like the hop-derived `iso_alpha` (D-64): their carbon comes from an *untracked* oak
+source, so booking a mass would demand a wood carbon pool that does not exist. So — like `iso_alpha`/`o2`/`A420` —
+all 8 oak slots are off `total_carbon`/`total_mass`/`total_nitrogen`, and `OakExtraction` moves **nothing
+conserved**: it touches only the 4 extracted slots and, a pure g/L transfer, needs **no `chemistry.py` species
+registration** (no molar-mass conversion in the RHS — cleaner than the O₂ Processes, which at least convert via
+`M_O2`). End-to-end carbon **and** nitrogen close to machine precision with the oak axis fully active (the `add_oak`
+ceiling jump carries neither element).
+
+**The undershoot guard is load-bearing (the advisor's build gotcha).** Because the floor is **0** (unlike
+`esters_eq > 0`), `max(0, ceiling − C)` **alone** is insufficient: an un-dosed compound has `ceiling = 0`, and a
+solver undershoot `C = −ε` would give `max(0, 0 − (−ε)) = ε > 0` and **fabricate extract**. So the Process gates on
+an **explicit `ceiling ≤ 0 → skip`** (the `o2 ≤ 0` idiom for a zero floor), *before* reading any oak param — which
+also makes an enabled-but-undosed Process a hard no-op even when `oak.yaml` is absent (the Strecker/Sulfite
+substrate-gate-before-params discipline; the fix for a real test regression where a bare wine `ProcessSet` without
+`oak.yaml` KeyError'd).
+
+**Toast selects the profile (the load-bearing sourced ordering).** Light toast → whiskey lactone (coconut)
+dominant; vanillin peaks at medium (lignin thermal release); guaiacol + eugenol (smoky/clove) rise monotonically
+with toast (lignin pyrolysis). The magnitudes are speculative author estimates (a ~4 g/L oak dose lands the
+extractives in observed oak-aged-wine ranges: whiskey lactone ~30–120, vanillin ~40–200, guaiacol ~2–60, eugenol
+~1–25 µg/L across toast); the **ordering** is the sourced claim. A discriminating test pins it (light > medium >
+heavy for lactone; heavy > medium > light for guaiacol/eugenol; vanillin peaks at medium — not a monotone).
+
+**Scope (v1), flagged loudly.** **Ellagitannins** (the milestone plan names them) are **deferred**: they are
+astringent tannins *and* O₂ scavengers, so they would couple into the O₂ sub-axis and **violate "no O₂"** — a
+different beat. `oak_gpl` is the **generalized oak-contact dose** subsuming chips-g/L and barrel surface-to-volume
+ratio (ceilings scale linearly with it); **barrel age / fill number** (a used barrel extracts less) is deferred (a
+ceiling multiplier < 1). Non-oxidative **Maillard** browning of oak sugars is out of scope.
+
+**Sensory + isolability (the three-case test).** The four extractives join the D-67 wine OAV set (`guaiacol` is the
+oak smoky note, explicitly distinct from the Brett `ethylguaiacols`); the **ceiling slots are NOT aroma pools** and
+are excluded from `oav.py`. Isolability, three cases (all tested): **(a)** no `begin_aging` → full byte-for-byte
+pre-aging core (oak Process disabled at compile); **(b)** `begin_aging` but no `add_oak` → oak pools *identically 0*
+but tier reports **SPECULATIVE** like the rest of the enabled aging axis (correct — `tier_of` counts enabled, not
+nonzero, Processes; zero value + speculative tier is not a bug); **(c)** dosed → extractives rise toward the
+toast-correct ceilings, all three ledgers flat.
+
+**Regression surface.** New: `OakExtraction` in `aging.py`, `oak.yaml` (`k_oak_extraction` + weak
+`E_a_oak_extraction` + 12 toast-specific yields, all speculative), 8 wine-only slots, the `add_oak` verb, 4 OAV
+`AromaCompound`s + 4 `threshold_<compound>_wine`. `_AGING_GATED_PROCESSES` grows by one (disable/`begin_aging`
+symmetry). No `chemistry.py` change (off every ledger). Three existing enumeration tests updated for the new
+slots/process/compounds; every default / un-aged / un-oaked / oxidative-aging trajectory is byte-for-byte
+unchanged. +9 Process tests + 8 scenario tests. **Next:** the deferred beat 1b (descriptor projection), the
+non-oxidative Maillard Strecker route, ellagitannin astringency (couples to O₂), or barrel-beer oak (trivial
+extension).

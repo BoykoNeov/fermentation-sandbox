@@ -6,7 +6,10 @@ Process acts on a *finished* wine/beer over months-to-years: fermentation is don
 sugar is gone, the yeast racked or crashed, and the chemistry that remains is spontaneous
 (hydrolysis, oxidation, condensation), not metabolic. This module holds the aging
 Processes; :class:`EsterHydrolysis` is the first, :class:`OxidativeAcetaldehyde` the second,
-:class:`SulfiteOxidation` the third, and :class:`PhenolicBrowning` the fourth.
+:class:`SulfiteOxidation` the third, :class:`PhenolicBrowning` the fourth,
+:class:`StreckerDegradation` the fifth, and :class:`OakExtraction` (D-77) the sixth — the first
+**non-oxidative** aging Process and a **separate axis** (barrel/chip aroma extraction, drawing no
+O₂, orthogonal to the whole oxidative sub-axis below).
 
 **The oxidative sub-axis (D-71).** :class:`OxidativeAcetaldehyde` opens the *oxidative* half of
 the aging axis on a **dissolved-O₂ pool** (``o2``, a new carbon-free state slot, off every
@@ -237,6 +240,19 @@ _PHENYLACETALDEHYDE_SPECIES = "phenylacetaldehyde"
 #: carboxyl carbon. On the carbon ledger (unlike ``o2``), so it is a genuine product term the carbon
 #: bookkeeping must route, not an off-ledger emission (D-75).
 _CO2_PER_STRECKER_ALDEHYDE = 1.0
+
+#: The four oak extractives and their set-and-hold ceiling slots (decision D-77). Each extracted
+#: aroma pool (the first element) rises toward its own saturation ceiling (the second element); the
+#: ceiling slots are **constant state** written *only* by the ``add_oak`` verb (``oak_gpl`` ×
+#: toast-specific yield) and read — never written — here, the ``cation_charge`` set-and-hold idiom.
+#: Whiskey lactone (coconut, light-toast dominant), vanillin (vanilla, medium-toast peak), guaiacol
+#: (smoky, heavy-toast) and eugenol (clove, heavy-toast) — the toast ordering the ceilings encode.
+_OAK_COMPOUND_CEILINGS: tuple[tuple[str, str], ...] = (
+    ("whiskey_lactone", "whiskey_lactone_ceiling"),
+    ("vanillin", "vanillin_ceiling"),
+    ("guaiacol", "guaiacol_ceiling"),
+    ("eugenol", "eugenol_ceiling"),
+)
 
 
 class EsterHydrolysis(Process):
@@ -779,4 +795,106 @@ class StreckerDegradation(Process):
         d[schema.slice("CO2")] = co2_rate
         d[schema.slice("amino_acids")] = -aa_mass
         d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine N → ammonium (D-45)
+        return d
+
+
+class OakExtraction(Process):
+    """Non-oxidative aging: oak extractives diffuse into the wine toward a ceiling (decision D-77).
+
+    The sixth aging Process, the **first non-oxidative** one, and a **separate axis** from the
+    O₂ sub-axis (D-71–D-75): it draws **no O₂**, takes no share of the shared ``o2`` budget, and is
+    orthogonal to the browning/acetaldehyde/SO₂/Strecker competition. As a finished wine sits in oak
+    (barrel or chips/staves), four wood extractives diffuse in and rise toward a saturation ceiling:
+    **whiskey lactone** (β-methyl-γ-octalactone, "coconut", the signature oak-lactone note,
+    LIGHT-toast dominant), **vanillin** ("vanilla", MEDIUM-toast peak), **guaiacol** (a lignin-
+    pyrolysis "smoky/toasty" phenol, HEAVY-toast dominant — the oak/toast note, *distinct* from the
+    Brett 4-ethylguaiacol of D-55) and **eugenol** ("clove/spice", HEAVY-toast). Unlike the other
+    five aging Processes these products move **no** pool the D-67 OAV lens already reads, so this
+    beat adds **four new aroma pools** (the D-77 four-compound fork; eugenol co-varies w/ guaiacol).
+
+    ``d(C_i)/dt = k_oak_extraction · f(T) · max(0, ceiling_i − C_i)`` per extractive ``i`` — a
+    **first-order approach FROM BELOW** to a per-compound ceiling, the exact inverse of
+    :class:`EsterHydrolysis`'s ``max(0, esters − esters_eq)`` net decay toward a floor. ``f(T) =
+    arrhenius_factor(T, E_a_oak_extraction, T_ref)`` is the *weak* warmer-extracts-faster factor
+    (diffusion-limited, so ``E_a_oak_extraction`` is deliberately low — well below the reaction
+    E_a's of the oxidative Processes). One **shared** ``k_oak_extraction`` across all four this beat
+    (the ceilings carry the toast *profile*; per-compound rates are a documented refinement).
+
+    **The ceiling is set at the dose, in a set-and-hold state slot (the ``cation_charge`` idiom).**
+    Each ``ceiling_i`` lives in its own wine-only state slot that **no Process touches** — it is
+    written *only* by the :func:`~fermentation.scenario.compile._verb_add_oak` verb, which computes
+    ``ceiling_i = oak_gpl · oak_yield_<compound>_<toast>`` (the provenance-backed toast-specific
+    yields in ``oak.yaml``) and holds it constant. So the *dose* (oak_gpl, toast) is a scenario
+    choice — like every dosed input — while the *physics* (rate, activation energy, per-gram yields)
+    is provenance-backed data. This Process reads the ceiling from state and rises ``C_i`` to it.
+
+    **Off every ledger — the iso_alpha precedent, cleaner than the O₂ Processes.** The four
+    extractives are **exogenous wood-derived** mass, tracked like the hop-derived ``iso_alpha``
+    (D-64): their carbon comes from an *untracked* oak source, so booking them as a mass would need
+    a wood carbon pool that does not exist. So — like ``iso_alpha``/``o2``/``A420`` — the extracted
+    slots (and the ceiling slots) are off ``total_carbon``/``total_mass``/``total_nitrogen``, and
+    this Process **moves nothing conserved**: it touches only the four extracted slots and, being a
+    pure g/L transfer, needs **no** ``chemistry.py`` species registration (no molar-mass conversion
+    in the RHS — unlike the O₂ Processes, which at least convert via ``M_O2``). ``d(C_i)/dt ≥ 0``
+    always (monotone rise; ``C_i`` approaches but never exceeds its ceiling).
+
+    **Isolable + gated on the ceiling (prime directive #3).** Wine-only (the oak slots are
+    wine-only, appended to ``wine_schema``), so — like :class:`SulfiteOxidation` /
+    :class:`StreckerDegradation` — it is wired into the *wine* medium only; the ``"whiskey_lactone"
+    not in schema`` guard makes it a hard no-op besides. Wired **disabled at the compile seam**
+    (aging is post-ferment); ``begin_aging`` enables it with the other aging Processes. With **no**
+    oak dosed every ``ceiling_i`` is 0, so — via the explicit ``ceiling_i ≤ 0`` guard — the
+    contribution is byte-for-byte zero (the ``max(0, …)`` alone would not suffice: the floor here is
+    **0**, so a solver undershoot ``C_i = −ε`` would give ``max(0, ε) > 0`` and fabricate extract;
+    the guard blocks it, the o2≤0 idiom for a zero floor). So a ``begin_aging`` run with no
+    ``add_oak`` is byte-for-byte the case without oak — an aged wine that never saw wood. Tier
+    **speculative** (the extraction *form* — diffusion-limited approach to a ceiling, warmer-faster
+    — is sourced; every magnitude, the yields especially, is an order-of-magnitude estimate).
+    **Scope (v1):** ellagitannins are deferred (they are O₂ scavengers, would violate "no O₂");
+    ``oak_gpl`` is the generalized oak-contact dose subsuming chips-g/L and barrel surface-to-volume
+    ratio (barrel fill-number depletion deferred); whiskey lactone is a lumped cis+trans pool.
+    """
+
+    name = "oak_extraction"
+    tier = Tier.SPECULATIVE
+    #: Writes only the four extracted-compound slots (the ceiling slots are read, never written — a
+    #: set-and-hold constant the ``add_oak`` verb owns). Off every ledger (exogenous wood-derived
+    #: mass, the iso_alpha precedent), so nothing conserved moves.
+    touches = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+    #: ``k_oak_extraction``/``E_a_oak_extraction`` are this Process's own (oak.yaml, D-77); and
+    #: ``T_ref`` is shared with every Arrhenius rate. The per-compound ceilings ride in *state* (by
+    #: ``add_oak``), not params, so they are not in ``reads``. Tiers cap the four extracted pools'
+    #: output tiers via parameter-tier propagation (D-1), flooring them at speculative.
+    reads: tuple[str, ...] = ("k_oak_extraction", "E_a_oak_extraction", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (the oak extractives are appended to wine_schema): a hard no-op on any
+        # schema without them, belt-and-suspenders to the wine-only wiring.
+        if "whiskey_lactone" not in schema:
+            return d
+        # Gate on STATE (the ceilings) BEFORE reading any oak param — so an un-oaked wine (every
+        # ceiling 0) is byte-for-byte inert even when oak.yaml is not loaded (the Strecker/Sulfite
+        # substrate-gate-before-params discipline; an enabled-but-undosed Process mustn't KeyError).
+        # The EXPLICIT ceiling ≤ 0 guard is load-bearing — the floor is 0 (unlike esters_eq > 0), so
+        # ``max(0, ceiling − C)`` alone would let a solver undershoot C = −ε fabricate extract.
+        active: list[tuple[str, float]] = []
+        for compound, ceiling_name in _OAK_COMPOUND_CEILINGS:
+            ceiling = float(y[schema.slice(ceiling_name)][0])
+            if ceiling <= 0.0:  # no oak dosed for this compound ⇒ inert
+                continue
+            conc = float(y[schema.slice(compound)][0])
+            gap = ceiling - conc  # remaining headroom below the saturation ceiling
+            if gap <= 0.0:  # already at/above the ceiling ⇒ no further extraction (monotone rise)
+                continue
+            active.append((compound, gap))
+        if not active:  # nothing to extract ⇒ return before touching oak params
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_oak_extraction"], params["T_ref"])
+        k = params["k_oak_extraction"]
+        for compound, gap in active:
+            d[schema.slice(compound)] = k * f_t * gap  # first-order approach from below, off-ledger
         return d

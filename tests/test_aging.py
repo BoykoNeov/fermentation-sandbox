@@ -33,6 +33,7 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics import (
     EsterHydrolysis,
+    OakExtraction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     StreckerDegradation,
@@ -1114,3 +1115,201 @@ def test_strecker_tier_floored_at_speculative(store):
     for pool in _STRECKER_TOUCHES:
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# OakExtraction (decision D-77) — the WINE-ONLY, NON-oxidative barrel/chip aroma-extraction axis, a
+# SEPARATE axis from the oxidative sub-axis (draws NO O₂). Four wood extractives — whiskey_lactone
+# (coconut), vanillin (vanilla), guaiacol (smoky), eugenol (clove) — diffuse into the wine and rise
+# toward per-compound SET-AND-HOLD ceilings (the cation_charge idiom, set by the add_oak verb):
+# d(C_i)/dt = k_oak_extraction·f(T)·max(0, ceiling_i − C_i), the inverse of EsterHydrolysis's decay.
+# OFF EVERY LEDGER (exogenous wood-derived, the iso_alpha precedent) — touches only the extracted
+# slots, moves nothing conserved, needs no chemistry.py registration. These tests pin the closed
+# form, the first-order-in-gap linearity, the ceiling ≤ 0 guard (undosed AND undershoot — the floor
+# is 0, so max() alone is insufficient), the monotone approach + saturation over an integrated
+# segment, the warmer-faster ordering, the wine-only no-op on beer, the off-every-ledger invariance
+# (carbon AND mass AND nitrogen flat), and the speculative tier floor.
+
+_OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+
+
+@pytest.fixture
+def oak_store():
+    # Wine params + the oak.yaml extraction constants (k_oak_extraction, the weak diffusion
+    # E_a_oak_extraction, T_ref), the shared_files the D-77 compile seam wires. (The plain ``store``
+    # fixture omits oak.yaml; OakExtraction reads its own rate/E_a from here.)
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml", default_data_dir() / "oak.yaml"
+    )
+
+
+@pytest.fixture
+def oak_params(oak_store):
+    return oak_store.resolve()
+
+
+def _oak_wine(
+    schema: StateSchema,
+    *,
+    ceilings: dict[str, float] | None = None,
+    t: float = 293.15,
+    **kw,
+) -> FloatArray:
+    """A finished, racked wine at the start of oak aging: the four ceiling slots pre-set (as the
+    add_oak verb would, oak_gpl × toast yield), the extracted pools starting at 0. ``ceilings`` maps
+    a compound name to its ceiling g/L; any extra pool via kwargs."""
+    y = _aged_wine(schema, esters=0.0, t=t)
+    for compound, ceiling in (ceilings or {}).items():
+        y[schema.slice(f"{compound}_ceiling")] = ceiling
+    for name, val in kw.items():
+        y[schema.slice(name)] = val
+    return y
+
+
+def test_oak_metadata():
+    p = OakExtraction()
+    assert p.name == "oak_extraction"
+    assert p.tier is Tier.SPECULATIVE
+    # Writes ONLY the four extracted-compound slots (the ceilings are read, never written — a
+    # set-and-hold constant the add_oak verb owns). Off every ledger, so nothing conserved moves.
+    assert set(p.touches) == {"whiskey_lactone", "vanillin", "guaiacol", "eugenol"}
+    # Only its own shared rate/E_a + T_ref; the per-compound ceilings ride in STATE, not params.
+    assert set(p.reads) == {"k_oak_extraction", "E_a_oak_extraction", "T_ref"}
+
+
+def test_oak_matches_closed_form(oak_params):
+    schema = wine_schema()
+    t = 298.15  # off T_ref so the Arrhenius factor bites
+    # Distinct ceilings and a partial pre-fill so each compound's gap is unambiguous.
+    ceilings = {
+        "whiskey_lactone": 8.0e-5,
+        "vanillin": 2.0e-4,
+        "guaiacol": 1.5e-5,
+        "eugenol": 8.0e-6,
+    }
+    y = _oak_wine(schema, ceilings=ceilings, t=t)
+    y[schema.slice("vanillin")] = 5.0e-5  # partly extracted already ⇒ gap = ceiling − conc
+    d = OakExtraction().derivatives(0.0, y, schema, oak_params)
+
+    f_t = arrhenius_factor(t, oak_params["E_a_oak_extraction"], oak_params["T_ref"])
+    k = oak_params["k_oak_extraction"]
+    for compound, ceiling in ceilings.items():
+        conc = 5.0e-5 if compound == "vanillin" else 0.0
+        assert schema.get(d, compound) == pytest.approx(k * f_t * (ceiling - conc))
+    # Extraction touches nothing else — no O₂ (a separate axis), no sugar/ethanol/CO2, no ceilings.
+    for var in ("X", "S", "E", "N", "CO2", "o2", "A420", "acetaldehyde"):
+        assert schema.get(d, var) == 0.0
+    for compound in _OAK_COMPOUNDS:
+        assert (
+            schema.get(d, f"{compound}_ceiling") == 0.0
+        )  # ceilings are set-and-hold (never moved)
+
+
+def test_oak_is_first_order_in_the_gap(oak_params):
+    # First-order approach from below: twice the gap (ceiling − conc) ⇒ twice the instantaneous
+    # extraction rate. This linearity is what makes each compound SATURATE at its ceiling.
+    schema = wine_schema()
+    near = OakExtraction().derivatives(
+        0.0, _oak_wine(schema, ceilings={"vanillin": 2.0e-4}, vanillin=1.6e-4), schema, oak_params
+    )
+    far = OakExtraction().derivatives(
+        0.0, _oak_wine(schema, ceilings={"vanillin": 2.0e-4}, vanillin=1.2e-4), schema, oak_params
+    )
+    # gap_far = 8e-5 = 2 × gap_near (4e-5), so the rate is doubled.
+    assert schema.get(far, "vanillin") == pytest.approx(2.0 * schema.get(near, "vanillin"))
+    assert schema.get(far, "vanillin") > schema.get(near, "vanillin") > 0.0  # both extracting
+
+
+def test_oak_inert_without_dose_and_on_undershoot(oak_params):
+    # No oak dosed (every ceiling 0) ⇒ byte-for-byte inert: a begin_aging run with no add_oak is the
+    # case without oak. And the EXPLICIT ceiling ≤ 0 guard is load-bearing — the floor is 0 (unlike
+    # esters_eq > 0), so a solver undershoot conc = −ε must NOT flip max(0, ceiling − conc) into
+    # spurious extraction. Both the undosed and the undershoot case return byte-for-byte zero.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [OakExtraction()], strict=True)
+    assert np.array_equal(ps.total_derivatives(0.0, _oak_wine(schema), oak_params), schema.zeros())
+    # Undershoot on an UNDOSED compound (ceiling 0, conc = −ε): the ceiling ≤ 0 guard blocks it.
+    undershoot = _oak_wine(schema)
+    undershoot[schema.slice("guaiacol")] = -1e-9
+    assert np.array_equal(
+        OakExtraction().derivatives(0.0, undershoot, schema, oak_params), schema.zeros()
+    )
+
+
+def test_oak_stops_at_the_ceiling(oak_params):
+    # At/above the ceiling the gap ≤ 0 ⇒ no further extraction (monotone rise, never overshoots).
+    schema = wine_schema()
+    at_ceiling = _oak_wine(schema, ceilings={"vanillin": 2.0e-4}, vanillin=2.0e-4)
+    d = OakExtraction().derivatives(0.0, at_ceiling, schema, oak_params)
+    assert schema.get(d, "vanillin") == 0.0
+
+
+def test_oak_rises_with_temperature(oak_params):
+    # The sourced (but deliberately WEAK — diffusion-limited) ordering E_a_oak_extraction > 0: a
+    # warmer barrel extracts a little faster. Still monotone in T even at the low diffusion E_a.
+    schema = wine_schema()
+    cold = OakExtraction().derivatives(
+        0.0, _oak_wine(schema, ceilings={"vanillin": 2.0e-4}, t=283.15), schema, oak_params
+    )
+    warm = OakExtraction().derivatives(
+        0.0, _oak_wine(schema, ceilings={"vanillin": 2.0e-4}, t=303.15), schema, oak_params
+    )
+    assert schema.get(warm, "vanillin") > schema.get(cold, "vanillin") > 0.0
+
+
+def test_oak_is_wine_only_noop_on_beer(oak_params):
+    # WINE-ONLY: the oak slots are appended to wine_schema (beer has none), so the
+    # "whiskey_lactone" not in schema guard makes this a hard no-op on beer even if wired there.
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    assert np.array_equal(OakExtraction().derivatives(0.0, yb, beer, oak_params), beer.zeros())
+
+
+def test_integrated_oak_saturates_and_moves_nothing_conserved(oak_params, oak_store):
+    # Run a long oak-aging segment (racked, dry wine) with ONLY OakExtraction and the four ceilings
+    # pre-set. Over the span every extractive rises MONOTONICALLY to a PLATEAU at its ceiling
+    # (saturating — the barrel aroma builds then levels), and — because the extractives + ceilings
+    # are ALL off every ledger — this Process moves NOTHING conserved: total_carbon, total_mass AND
+    # total_nitrogen are all exactly flat (the cleanest possible aging Process — the iso_alpha/A420
+    # off-ledger invariance, extended to carbon AND mass AND nitrogen together).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [OakExtraction()], strict=True)
+    ceilings = {
+        "whiskey_lactone": 8.0e-5,
+        "vanillin": 2.0e-4,
+        "guaiacol": 6.0e-5,
+        "eugenol": 2.5e-5,
+    }
+    y0 = _oak_wine(schema, ceilings=ceilings, t=298.15)
+    traj = simulate(ps, params=oak_params, y0=y0, t_span=(0.0, 24.0 * 365.0))  # ~1 year
+    assert traj.success, traj.message
+
+    for compound, ceiling in ceilings.items():
+        series = np.asarray(traj.series(compound), dtype=float)
+        # Rose from 0, monotonically, toward (never past) the ceiling.
+        assert series[0] == 0.0
+        assert np.all(np.diff(series) >= -1e-18)  # monotone rise
+        assert series[-1] <= ceiling + 1e-15  # never overshoots
+        assert (
+            series[-1] >= 0.5 * ceiling
+        )  # reached most of the ceiling over a year (sanity anchor)
+        # The set-and-hold ceiling never moved.
+        assert float(traj.series(f"{compound}_ceiling")[-1]) == pytest.approx(ceiling)
+    assert_nonnegative(traj, _OAK_COMPOUNDS, atol=1e-15)
+    # ALL THREE ledgers flat — oak extraction moves nothing conserved (exogenous wood-derived mass,
+    # off every ledger). X=0 throughout, so the biomass terms are inert.
+    f_c = oak_store.value("biomass_C_fraction")
+    f_n = oak_store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+
+
+def test_oak_tier_floored_at_speculative(oak_store):
+    # Speculative in FORM (Tier-3 frontier): each extracted pool it writes is speculative even pre-
+    # the (speculative) oak parameter tiers cap it. Non-vacuous across all four extractives.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [OakExtraction()])
+    for pool in _OAK_COMPOUNDS:
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, oak_store.tier_map()) is Tier.SPECULATIVE

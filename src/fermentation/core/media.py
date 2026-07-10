@@ -99,6 +99,7 @@ from fermentation.core.kinetics import (
     MalolacticDeath,
     MalolacticGrowth,
     MalolacticSenescence,
+    OakExtraction,
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
@@ -455,6 +456,80 @@ def wine_schema() -> StateSchema:
             "SAME quinone-driven Strecker route. Produced-only, carbon from amino_acids + CO₂, "
             "nitrogen deaminated to N. Read by the OAV lens (threshold_phenylacetaldehyde_wine)",
         ),
+        # Oak extraction — the barrel/chip aroma-extractive aging axis (decision D-77). Four
+        # extracted aroma pools (rising toward their ceilings) + four SET-AND-HOLD ceiling slots
+        # (the cation_charge idiom — state written ONLY by the add_oak verb, never by a Process).
+        # OakExtraction is a SEPARATE, non-oxidative aging axis (draws no O₂). All eight slots are
+        # OFF EVERY LEDGER (exogenous WOOD-derived mass, like the hop-derived iso_alpha, D-64), so
+        # they never perturb total_carbon/total_mass/total_nitrogen. default=0 ⇒ an un-oaked wine
+        # carries no ceiling and OakExtraction is byte-for-byte inert (the ceiling ≤ 0 guard). Wine.
+        VarSpec(
+            "whiskey_lactone",
+            "g/L",
+            default=0.0,
+            description="whiskey lactone (β-methyl-γ-octalactone, cis+trans lumped) — the "
+            "'coconut' oak-lactone note (decision D-77), LIGHT-toast dominant. Produced-only: "
+            "OakExtraction rises it toward whiskey_lactone_ceiling (oak diffusion). Off every "
+            "ledger (wood-derived). Read by the OAV lens (threshold_whiskey_lactone_wine)",
+        ),
+        VarSpec(
+            "vanillin",
+            "g/L",
+            default=0.0,
+            description="vanillin — the 'vanilla' oak extractive (decision D-77), MEDIUM-toast "
+            "peak (lignin thermal release). Produced-only: OakExtraction rises it toward "
+            "vanillin_ceiling. Off every ledger (wood-derived). OAV lens (threshold_vanillin_wine)",
+        ),
+        VarSpec(
+            "guaiacol",
+            "g/L",
+            default=0.0,
+            description="guaiacol — the 'smoky/toasty' oak extractive (decision D-77), HEAVY-toast "
+            "dominant (lignin pyrolysis). DISTINCT from the Brett 4-ethylguaiacol (D-55). "
+            "Produced-only: OakExtraction rises it toward guaiacol_ceiling. Off every ledger "
+            "(exogenous wood-derived). Read by the OAV lens (threshold_guaiacol_wine)",
+        ),
+        VarSpec(
+            "eugenol",
+            "g/L",
+            default=0.0,
+            description="eugenol — the 'clove/spice' oak extractive (decision D-77), HEAVY-toast "
+            "(co-varies with guaiacol). Produced-only: OakExtraction rises it toward "
+            "eugenol_ceiling. Off every ledger (wood-derived). OAV lens (threshold_eugenol_wine)",
+        ),
+        VarSpec(
+            "whiskey_lactone_ceiling",
+            "g/L",
+            default=0.0,
+            description="SET-AND-HOLD saturation ceiling for whiskey_lactone (decision D-77): "
+            "oak_gpl × oak_yield_whiskey_lactone_<toast>, written ONLY by the add_oak verb "
+            "(constant state no Process touches, the cation_charge idiom). OakExtraction reads it. "
+            "Off every ledger. Default 0 ⇒ no oak ⇒ inert",
+        ),
+        VarSpec(
+            "vanillin_ceiling",
+            "g/L",
+            default=0.0,
+            description="SET-AND-HOLD saturation ceiling for vanillin (decision D-77): "
+            "oak_gpl × oak_yield_vanillin_<toast>, written ONLY by add_oak. Off every ledger. "
+            "Default 0 ⇒ inert",
+        ),
+        VarSpec(
+            "guaiacol_ceiling",
+            "g/L",
+            default=0.0,
+            description="SET-AND-HOLD saturation ceiling for guaiacol (decision D-77): "
+            "oak_gpl × oak_yield_guaiacol_<toast>, written ONLY by add_oak. Off every ledger. "
+            "Default 0 ⇒ inert",
+        ),
+        VarSpec(
+            "eugenol_ceiling",
+            "g/L",
+            default=0.0,
+            description="SET-AND-HOLD saturation ceiling for eugenol (decision D-77): "
+            "oak_gpl × oak_yield_eugenol_<toast>, written ONLY by add_oak. Off every ledger. "
+            "Default 0 ⇒ inert",
+        ),
     ]
     return StateSchema(specs)
 
@@ -697,6 +772,23 @@ _OXIDATIVE_SO2_PROCESSES: tuple[Callable[[], Process], ...] = (SulfiteOxidation,
 #: seam and re-enabled by ``begin_aging`` (its name rides in
 #: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in ``aging.yaml``.
 _STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (StreckerDegradation,)
+
+#: WINE-ONLY oak-extraction aging Process (decision D-77) — the barrel/chip aroma-extractive axis.
+#: :class:`OakExtraction` is the first **non-oxidative** aging Process and a **separate axis**: it
+#: draws NO O₂ (unlike every D-71→D-75 oxidative sibling), so it takes no share of the shared ``o2``
+#: budget. As a finished wine sits in oak, four wood extractives — ``whiskey_lactone`` (coconut),
+#: ``vanillin`` (vanilla), ``guaiacol`` (smoky) and ``eugenol`` (clove) — diffuse in and rise toward
+#: a per-compound saturation ceiling (first-order approach from below, the inverse of
+#: :class:`EsterHydrolysis`). The ceilings are SET-AND-HOLD wine-only state slots the ``add_oak``
+#: verb writes (``oak_gpl`` × toast-specific yield); this Process reads them and rises the extracted
+#: pools toward them. Wired into the *wine* medium only (the oak slots are wine-only, appended to
+#: ``wine_schema``), like ``_OXIDATIVE_SO2_PROCESSES``/``_STRECKER_PROCESSES``. OFF EVERY LEDGER
+#: (exogenous wood-derived mass, the ``iso_alpha`` precedent), so it moves nothing conserved and — a
+#: pure g/L transfer — needs no ``chemistry.py`` species registration. Kept in its OWN tuple
+#: (isolable, directive #3): DISABLED at the compile seam and re-enabled by ``begin_aging`` (its
+#: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no oak dosed every
+#: ceiling is 0 ⇒ byte-for-byte inert (the ceiling ≤ 0 guard). Params live in ``oak.yaml``.
+_OAK_PROCESSES: tuple[Callable[[], Process], ...] = (OakExtraction,)
 
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
@@ -998,6 +1090,7 @@ MEDIA: dict[str, Medium] = {
             + _AGING_PROCESSES
             + _OXIDATIVE_SO2_PROCESSES
             + _STRECKER_PROCESSES
+            + _OAK_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

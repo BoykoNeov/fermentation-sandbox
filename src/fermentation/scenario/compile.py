@@ -52,6 +52,7 @@ from fermentation.core.kinetics import (
     MalolacticDeath,
     MalolacticGrowth,
     MalolacticSenescence,
+    OakExtraction,
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
@@ -121,8 +122,10 @@ _BRETT_GATED_PROCESSES = (
 #: oxidation), :class:`PhenolicBrowning` (the O₂-driven browning, D-74, accumulating ``A420``) and
 #: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72) and :class:`StreckerDegradation`
 #: (the O₂/amino-acid-driven Strecker aldehydes, D-75). The first three are medium-agnostic
-#: (wired into both media); :class:`SulfiteOxidation` and :class:`StreckerDegradation` are wine-only
-#: (they read wine-only ``so2_total``/pH and ``amino_acids``/``N`` slots respectively), so on beer
+#: (wired into both media); :class:`SulfiteOxidation`, :class:`StreckerDegradation` and
+#: :class:`OakExtraction` (the NON-oxidative barrel/chip aroma extraction, D-77 — a separate axis
+#: drawing no O2) are wine-only (they read wine-only ``so2_total``/pH, ``amino_acids``/``N`` and the
+#: oak ceiling/extractive slots respectively), so on beer
 #: they are simply absent from the ProcessSet — both the compile-disable and the begin_aging-enable
 #: loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
@@ -136,6 +139,7 @@ _AGING_GATED_PROCESSES = (
     PhenolicBrowning,
     SulfiteOxidation,
     StreckerDegradation,
+    OakExtraction,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -533,6 +537,12 @@ def _load_parameters(
         # shared files; INERT until a begin_aging intervention enables the Process (which is
         # disabled at compile), so an un-aged scenario carries the params but never reads them.
         base / "aging.yaml",
+        # Oak extraction (decision D-77): the barrel/chip aroma-extractive constants —
+        # k_oak_extraction, the weak diffusion E_a_oak_extraction, and the 12 toast-specific
+        # yields the add_oak verb reads to set each ceiling. Wine-only in effect (only wine carries
+        # the oak slots + wires OakExtraction), but loaded universally like the other shared files —
+        # collision-free names, inert for beer; INERT until an add_oak dose + begin_aging enable.
+        base / "oak.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 
@@ -983,6 +993,83 @@ def _verb_add_oxygen(
     )
 
 
+#: The oak toast levels :func:`_verb_add_oak` accepts (decision D-77) and the four extractives it
+#: doses. The categorical ``toast`` selects the per-gram yield set (``oak_yield_<compound>_<toast>``
+#: in oak.yaml); the compound → ceiling-slot pairing mirrors ``aging._OAK_COMPOUND_CEILINGS``.
+_OAK_TOASTS = ("light", "medium", "heavy")
+_OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+
+
+def _verb_add_oak(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_oak`` — put the wine in oak, setting each extractive's saturation ceiling (D-77).
+
+    The oak-extraction substrate lever, the aging-axis sibling of ``add_oxygen``: ``params`` names
+    the oak-contact dose ``oak_gpl`` (the generalized chips-g/L / barrel surface-to-volume dose) and
+    the categorical ``toast`` (``light``/``medium``/``heavy`` — the ``add_acid`` string-param move).
+    For each of the four extractives it computes the **saturation ceiling** ``oak_gpl ·
+    oak_yield_<compound>_<toast>`` (the provenance-backed toast-specific per-gram yields in
+    ``oak.yaml``) and writes it to that compound's **set-and-hold** ceiling state slot. The
+    :class:`~fermentation.core.kinetics.aging.OakExtraction` Process (enabled by ``begin_aging``)
+    then rises the extracted pools toward those ceilings — so the toast selects the aroma *profile*
+    (light → coconut-dominant, medium → vanilla, heavy → smoky/clove) and ``oak_gpl`` scales the
+    ceilings linearly.
+
+    **The add_oxygen pattern (a dosed off-ledger substrate), NOT begin_aging.** Like ``add_oxygen``,
+    this verb only doses — it does **not** enable the Process (``begin_aging`` does, alongside the
+    other aging Processes). So the natural usage is ``begin_aging`` at the ferment/aging boundary,
+    plus ``add_oak`` for the oak charge; a second ``add_oak`` **raises** the ceilings (a fresh
+    charge / more chips — the ``+=`` dose idiom, the deferred fill-number's coarse form). The
+    ceiling slots are **off every ledger** (wood-derived, the ``iso_alpha`` precedent), so the
+    jump perturbs no elemental balance — the run-wide carbon/nitrogen ledgers close with **no**
+    correction term (like ``add_oxygen``; unlike carbon-bearing ``add_acid``/``add_sugar``).
+    Concentration model: no volume change on the addition (the shared verb caveat).
+
+    **Wine-only** (the oak slots are appended to ``wine_schema``): a beer scenario has no
+    ``whiskey_lactone`` slot and raises. Guards that ``oak.yaml`` is loaded (the ``add_dap``
+    discipline) so a caller-supplied ``parameter_paths`` without it fails loudly HERE at compile,
+    not as a bare ``KeyError`` when the verb reads a yield.
+    """
+    _iv_check_keys(iv, frozenset({"oak_gpl", "toast"}), "add_oak")
+    oak_gpl = _iv_float(iv, "oak_gpl", "add_oak")
+    toast = _iv_str(iv, "toast", "add_oak")
+    if toast not in _OAK_TOASTS:
+        raise ValueError(
+            f"intervention 'add_oak' at day {iv.day:g}: unknown toast {toast!r}; the oak toast "
+            f"levels are {sorted(_OAK_TOASTS)} (decision D-77)"
+        )
+    if "whiskey_lactone" not in schema:  # the oak slots are wine-only (appended to wine_schema)
+        raise ValueError(
+            f"intervention 'add_oak' at day {iv.day:g} needs a 'whiskey_lactone' slot, but medium "
+            f"{schema!r} has none (oak extraction is wine-only in v1, decision D-77)"
+        )
+    ceiling_deltas: dict[str, float] = {}
+    for compound in _OAK_COMPOUNDS:
+        yield_name = f"oak_yield_{compound}_{toast}"
+        try:
+            yield_val = parameters[yield_name].value
+        except KeyError:  # oak.yaml not loaded (caller-supplied parameter_paths)
+            raise ValueError(
+                f"intervention 'add_oak' needs {yield_name!r} but it is missing; include oak.yaml "
+                "in parameter_paths (the default lookup merges it automatically, decision D-77)."
+            ) from None
+        ceiling_deltas[f"{compound}_ceiling"] = oak_gpl * yield_val
+    slices = {name: schema.slice(name) for name in ceiling_deltas}
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        for name, delta in ceiling_deltas.items():
+            out[slices[name]] += delta  # += so a second oak charge raises the ceiling (refill)
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_oak@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
 #: The lees-associated pools racking removes: inactivated yeast biomass ``X_dead`` and (if autolysis
 #: is opted in) the non-assimilable cell-wall ``debris`` (decision D-36); plus **both** *O. oeni*
 #: pools — settled dead ``X_mlf_dead`` **and viable ``X_mlf``** (decision D-39). Racking viable
@@ -1295,8 +1382,10 @@ def _verb_begin_aging(
     # would otherwise surface as a KeyError deep in an aging Process's derivatives rather than a
     # clear compile-time scenario error. Guards ALL aging Processes' params (D-70 hydrolysis +
     # D-71 ethanol oxidation + D-72 SO₂ oxidation + D-74 phenolic browning), since begin_aging
-    # enables all of them. The D-72/D-74 params ride in the same shared aging.yaml, so guarding
-    # them is beer-safe (present in every medium) even though SulfiteOxidation itself is wine-only.
+    # enables all of them, incl. the D-77 non-oxidative oak axis (k_oak_extraction/E_a). The D-72/
+    # D-74 aging.yaml + D-77 oak.yaml params ride in every medium's shared files, so guarding is
+    # beer-safe (present in every medium) even though SulfiteOxidation/StreckerDegradation/
+    # OakExtraction are wine-only.
     for name in (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
@@ -1309,6 +1398,12 @@ def _verb_begin_aging(
         "k_browning",
         "E_a_browning",
         "y_a420_per_o2",
+        # Oak extraction (D-77): the non-oxidative barrel/chip axis begin_aging also enables. Only
+        # the shared rate + activation energy are guarded here (the 12 toast-specific yields are
+        # guarded at the add_oak verb, which is the only reader that needs them); k_oak_extraction/
+        # E_a_oak_extraction are read by OakExtraction on every enabled aging segment.
+        "k_oak_extraction",
+        "E_a_oak_extraction",
     ):
         if name not in parameters:
             raise ValueError(
@@ -1339,6 +1434,7 @@ _INTERVENTION_VERBS: dict[
     "add_acid": _verb_add_acid,
     "add_sugar": _verb_add_sugar,
     "add_oxygen": _verb_add_oxygen,
+    "add_oak": _verb_add_oak,
     "rack": _verb_rack,
     "pitch_mlf": _verb_pitch_mlf,
     "pitch_brett": _verb_pitch_brett,

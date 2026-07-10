@@ -49,9 +49,25 @@
 > the aging phase); a discriminating measurement decided it — the pre-dryness active-ferment release is ~15 mg/L
 > (bounded-small), the ~385 mg/L breakpoint pool is legit post-dryness sur-lie, so autolysis-from-t0 needs no
 > re-gating. Carbon + nitrogen close on the new triple-draw compose (autolysis refills while Strecker + mercaptan
-> draw). Test-only change (helper kwarg + 3 scenario tests); zero production code. Next: oak extraction (a
-> separate axis, no O₂); beat 1b (descriptor projection) and the non-oxidative Maillard Strecker route still
-> deferred.
+> draw). Test-only change (helper kwarg + 3 scenario tests); zero production code.
+>
+> **D-77 built `OakExtraction` — the barrel/chip aroma-extractive axis, the FIRST NON-oxidative aging Process and a
+> SEPARATE axis (draws no O₂). Four wood extractives — `whiskey_lactone` (coconut, light-toast), `vanillin` (vanilla,
+> medium peak), `guaiacol` (smoky, heavy — the OAK guaiacol, distinct from Brett 4-EG), `eugenol` (clove, heavy) —
+> diffuse in and rise toward a per-compound saturation ceiling: `d(C_i)/dt = k_oak·f(T)·max(0, ceiling_i − C_i)`, the
+> inverse of EsterHydrolysis's decay-to-floor. `E_a_oak_extraction` deliberately WEAK (20 kJ/mol — diffusion, not
+> reaction). The ceilings are SET-AND-HOLD off-ledger STATE slots the new `add_oak {oak_gpl, toast}` verb writes
+> (`oak_gpl × toast-specific yield` from `oak.yaml`), enabled by `begin_aging`. KEY DESIGN TURN: the advisor's
+> first-pass "mint the ceilings as provenance-backed params in the verb" recipe was overturned by primary-source
+> evidence (verbs can't inject into the compiled ParameterSet; `param_update` is plain floats absent from
+> `param_tiers`, and `begin_aging`-before-`add_oak` would KeyError mid-integrate) — a 2nd advisor pass agreed and
+> dropped it; the state-slot dose (the `cation_charge`/`add_oxygen` idiom) meets every goal (provenance in the
+> yields, D-1 moot since all oak pools floor SPECULATIVE, no KeyError window). OFF EVERY LEDGER (exogenous
+> wood-derived, the `iso_alpha` precedent — cleanest aging Process, no `chemistry.py` change). Owner forks: 4
+> compounds (+eugenol) and WINE-ONLY wired (like Strecker — medium-agnostic physics ≠ agnostic wiring). Explicit
+> `ceiling ≤ 0` undershoot guard (the floor is 0, so `max()` alone fabricates extract). 8 wine-only slots, 838
+> tests. Next: beat 1b (descriptor projection), non-oxidative Maillard Strecker, ellagitannin astringency (couples
+> to O₂), or barrel-beer oak — all deferred.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

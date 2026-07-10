@@ -29,6 +29,7 @@ import pytest
 
 from fermentation.core.kinetics.aging import (
     EsterHydrolysis,
+    OakExtraction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     StreckerDegradation,
@@ -115,6 +116,10 @@ def _begin_aging(day: float) -> Intervention:
 
 def _add_oxygen(day: float, o2_mgl: float) -> Intervention:
     return Intervention(day=day, action="add_oxygen", params={"o2_mgl": o2_mgl})
+
+
+def _add_oak(day: float, oak_gpl: float, toast: str) -> Intervention:
+    return Intervention(day=day, action="add_oak", params={"oak_gpl": oak_gpl, "toast": toast})
 
 
 def _add_so2(day: float, so2_mgl: float) -> Intervention:
@@ -730,3 +735,147 @@ def test_sur_lie_strecker_closes_carbon_and_nitrogen_end_to_end():
         ("amino_acids", "debris", "methional", "phenylacetaldehyde", "mercaptans", "h2s"),
         atol=1e-9,
     )
+
+
+# -- OakExtraction (decision D-77) — the NON-oxidative barrel/chip aroma axis, end to end -------
+
+_OAK_EXTRACTIVES = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+_OAK_CEILINGS = tuple(f"{c}_ceiling" for c in _OAK_EXTRACTIVES)
+
+
+def test_oak_extraction_gated_by_begin_aging_wine_only():
+    # OakExtraction rides the same aging tuple: wired into the WINE medium, DISABLED at compile,
+    # enabled by the SAME begin_aging reconfigure as the rest of the aging axis. Beer has no oak
+    # slots, so it is simply absent from the beer set (the SulfiteOxidation/StreckerDegradation
+    # wine-only pattern).
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    assert OakExtraction.name in cs.process_set
+    assert not cs.process_set.is_enabled(OakExtraction.name)  # off at compile (post-ferment)
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(OakExtraction.name)  # begin_aging turns it on too
+    # Wine-only: absent from the beer set entirely.
+    assert OakExtraction.name not in compile_scenario(_beer([_begin_aging(14.0)])).process_set
+
+
+def test_oak_params_ride_in_every_compiled_scenario():
+    # oak.yaml is in shared_files, so the extraction constants are present even on an un-oaked
+    # scenario — inert (read by nothing until add_oak + begin_aging), but loaded.
+    cs = compile_scenario(_wine([]))
+    for name in ("k_oak_extraction", "E_a_oak_extraction", "oak_yield_vanillin_medium"):
+        assert name in cs.parameters
+
+
+def test_add_oak_sets_the_ceilings_from_toast_yields():
+    # add_oak is a pure dose onto the SET-AND-HOLD ceiling slots (the add_oxygen pattern): it
+    # mutates the four ceilings to oak_gpl × oak_yield_<compound>_<toast>, reconfigures nothing, and
+    # — the oak slots being off every ledger — perturbs no elemental balance. Medium toast at 4 g/L.
+    cs = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium")])
+    )
+    event = next(e for e in cs.events if e.label.startswith("add_oak"))
+    assert event.reconfigure is None and event.mutate is not None  # dose only (begin_aging enables)
+    after = event.mutate(cs.schema, cs.y0.copy())
+    for compound in _OAK_EXTRACTIVES:
+        expected = 4.0 * cs.param_values[f"oak_yield_{compound}_medium"]
+        assert cs.schema.get(after, f"{compound}_ceiling") == pytest.approx(expected)
+        assert cs.schema.get(after, compound) == 0.0  # the extractive itself starts empty
+
+
+def test_toast_selects_the_aroma_profile():
+    # The load-bearing toast ORDERING (D-77): light toast is whiskey-lactone (coconut) dominant;
+    # heavy toast is guaiacol (smoky) + eugenol (clove) dominant; vanillin peaks at medium. Compare
+    # the finished ceilings across toast levels at the same oak dose — a discriminating check that
+    # the categorical toast genuinely reshapes the profile, not just its scale.
+    def ceilings(toast: str) -> dict[str, float]:
+        cs = compile_scenario(
+            _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, toast)])
+        )
+        event = next(e for e in cs.events if e.label.startswith("add_oak"))
+        assert event.mutate is not None
+        after = event.mutate(cs.schema, cs.y0.copy())
+        return {c: float(cs.schema.get(after, f"{c}_ceiling")) for c in _OAK_EXTRACTIVES}
+
+    light, medium, heavy = ceilings("light"), ceilings("medium"), ceilings("heavy")
+    # Whiskey lactone (coconut) falls with toast; guaiacol + eugenol (smoky/clove) rise with toast.
+    assert light["whiskey_lactone"] > medium["whiskey_lactone"] > heavy["whiskey_lactone"]
+    assert heavy["guaiacol"] > medium["guaiacol"] > light["guaiacol"]
+    assert heavy["eugenol"] > medium["eugenol"] > light["eugenol"]
+    # Vanillin (vanilla) peaks at medium toast (lignin thermal release), not at the extremes.
+    assert medium["vanillin"] > light["vanillin"] and medium["vanillin"] > heavy["vanillin"]
+
+
+def test_oak_extraction_builds_the_extractives_end_to_end():
+    # The end-to-end payoff: an oaked aged wine finishes with the four extractives risen from 0
+    # toward their ceilings, while the otherwise-identical un-oaked aged wine has none — a clean A/B
+    # (both share the identical ferment + aging; the only difference is the add_oak dose).
+    oaked = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium")])
+    ).run()
+    plain = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()
+    assert oaked.success and plain.success
+    for compound in _OAK_EXTRACTIVES:
+        oaked_end = float(oaked.series(compound)[-1])
+        ceiling = float(oaked.series(f"{compound}_ceiling")[-1])
+        assert 0.0 < oaked_end <= ceiling + 1e-15  # rose from 0, toward (not past) the ceiling
+        assert float(plain.series(compound)[-1]) == 0.0  # un-oaked wine extracts nothing
+
+
+def test_un_oaked_aging_leaves_the_oak_pools_zero_but_speculative():
+    # The three-case isolability (D-77): begin_aging WITHOUT add_oak leaves every oak extractive and
+    # ceiling identically 0 (byte-for-byte the case without oak) — BUT the pools still report
+    # SPECULATIVE like the rest of the enabled aging axis (the Process is enabled, just un-dosed;
+    # tier_of counts enabled, not nonzero, Processes). Zero value, speculative tier — both correct.
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    traj = cs.run()
+    assert traj.success
+    for name in _OAK_EXTRACTIVES + _OAK_CEILINGS:
+        assert np.max(np.abs(traj.series(name))) == 0.0  # identically zero — no oak dosed
+    for compound in _OAK_EXTRACTIVES:
+        assert traj.tier_map[compound] is Tier.SPECULATIVE  # enabled aging axis ⇒ speculative floor
+
+
+def test_oaked_run_closes_every_ledger_end_to_end():
+    # Oak extractives + ceilings are ALL off every ledger (exogenous wood-derived, the iso_alpha
+    # precedent), so add_oak injects nothing conserved (its ExternalFlow carries no carbon/nitrogen)
+    # and OakExtraction moves nothing conserved — the whole ferment+aging trajectory closes carbon
+    # AND nitrogen to machine precision with the oak axis fully active.
+    cs = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "heavy")])
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    n_of = total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n)
+    # The add_oak ceiling jump carries neither element (off every ledger).
+    assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert all(n_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert_conserved(traj.as_trajectory(), c_of, label="carbon")
+    assert_conserved(traj.as_trajectory(), n_of, label="nitrogen")
+    assert_nonnegative(traj.as_trajectory(), _OAK_EXTRACTIVES, atol=1e-15)
+
+
+def test_oak_extraction_raises_the_oak_oavs():
+    # The sensory payoff: oak aging lifts the four oak-extractive OAVs from 0. Read the finished
+    # OAV series through the D-67 lens — each rises above 0 with oak, stays 0 without (the readout
+    # is a pure consumer of the trajectory; the ceiling slots are NOT aroma pools, so unread).
+    thresholds = load_thresholds()
+    oaked = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 6.0, "medium")])
+    ).run()
+    plain = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()
+    for compound in _OAK_EXTRACTIVES:
+        assert float(oav_series(oaked.as_trajectory(), thresholds, compound)[-1]) > 0.0
+        assert float(oav_series(plain.as_trajectory(), thresholds, compound)[-1]) == 0.0
+
+
+def test_add_oak_rejects_unknown_toast_and_wrong_medium():
+    # The vocabulary boundary (loud errors): an unknown toast is a typo, rejected loudly; oak is
+    # wine-only, so a beer scenario with add_oak names the wine-only constraint (not a bare error).
+    with pytest.raises(ValueError, match="unknown toast"):
+        compile_scenario(_wine([_add_oak(_FERMENT_DAYS, 4.0, "charred")]))
+    with pytest.raises(ValueError, match="wine-only"):
+        compile_scenario(_beer([_add_oak(14.0, 4.0, "medium")]))

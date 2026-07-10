@@ -16,6 +16,7 @@ from fermentation.core.kinetics.acetaldehyde import (
 )
 from fermentation.core.kinetics.aging import (
     EsterHydrolysis,
+    OakExtraction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     StreckerDegradation,
@@ -105,6 +106,7 @@ __all__ = [
     "ArrheniusTemperature",
     "ColemanQuadraticDeathTemperature",
     "EsterHydrolysis",
+    "OakExtraction",
     "OxidativeAcetaldehyde",
     "PhenolicBrowning",
     "StreckerDegradation",

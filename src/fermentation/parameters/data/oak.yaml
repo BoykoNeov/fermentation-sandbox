@@ -1,0 +1,220 @@
+# Oak extraction — the barrel/chip aroma-extractive aging axis (decision D-77, §4.1).
+#
+# SHARED, but WINE-ONLY in effect: like aging.yaml this file is medium-agnostic in its names
+# (collision-free) and merged into every compiled scenario's ParameterSet at compile.py's
+# shared_files, but only the WINE medium carries the oak state slots and wires OakExtraction, so
+# the params are inert for beer (the hops.yaml / wine-only-wiring precedent). Barrel-beer oak is a
+# trivial later extension (wire OakExtraction + the 8 slots into beer_schema).
+#
+# THE PROCESS (fermentation.core.kinetics.aging.OakExtraction, WINE-ONLY):
+#
+#   d(C_i)/dt = k_oak_extraction * f(T) * max(0, ceiling_i - C_i)   # per extractive i
+#
+# a FIRST-ORDER APPROACH FROM BELOW to a per-compound saturation ceiling — the exact inverse of
+# EsterHydrolysis's `max(0, esters - esters_eq)` net decay toward a floor. As a finished wine sits
+# in oak (barrel or chips/staves), four wood extractives diffuse into the wine and rise toward a
+# ceiling set by the oak-contact dose and toast level: WHISKEY LACTONE (cis/trans β-methyl-γ-
+# octalactone, "coconut", the signature oak-lactone note, LIGHT-toast dominant), VANILLIN
+# ("vanilla", from lignin, MEDIUM-toast peak), GUAIACOL ("smoky/toasty", a lignin-pyrolysis phenol,
+# HEAVY-toast dominant) and EUGENOL ("clove/spice", HEAVY-toast). Each is a NEW aroma pool the D-67
+# OAV lens did not previously read (2 -> 4 new wine slots + 4 thresholds).
+#
+# THE CEILING IS SET AT THE DOSE, NOT HERE. add_oak {oak_gpl, toast} computes each ceiling as
+# `oak_gpl * oak_yield_<compound>_<toast>` (g extractive / L) and writes it to a SET-AND-HOLD
+# ceiling state slot (the cation_charge idiom — constant state no Process touches, only the verb
+# writes). So this file holds the PHYSICS (the shared rate + activation energy + the toast-specific
+# per-gram yields); the scenario supplies the DOSE. Un-dosed => every ceiling is 0 => the Process is
+# byte-for-byte inert (the ceiling<=0 guard), so a begin_aging run with no add_oak is byte-for-byte
+# the case without oak (prime directive #3), exactly like an un-oxygenated aging is the reductive case.
+#
+# A SEPARATE AXIS, NO O2 (the D-77 scope). Unlike the four oxidative aging Processes (D-71..D-75),
+# oak extraction is DIFFUSION-driven, not oxidation-driven: it consumes NO o2, draws no share of the
+# shared O2 budget, and is orthogonal to the browning/acetaldehyde/SO2/Strecker competition. It
+# touches ONLY the four extracted-compound slots — OFF EVERY LEDGER (exogenous WOOD-derived mass,
+# like the hop-derived iso_alpha, D-64; the extractives' carbon comes from an UNTRACKED oak source,
+# so booking it as a mass would demand a wood carbon pool that does not exist). So OakExtraction
+# moves NOTHING conserved — total_carbon/total_mass/total_nitrogen all stay flat (cleaner even than
+# PhenolicBrowning, which at least reads o2). Pure g/L transfer, so — like iso_alpha — it needs no
+# chemistry.py species registration (no molar-mass conversion in the RHS).
+#
+# SCOPE (v1), flagged loudly:
+#   * ELLAGITANNINS (the milestone plan names them) are DEFERRED: they are astringent tannins AND
+#     O2 scavengers, so they would couple into the o2 sub-axis (violating "no O2") — a different
+#     beat. Only the four volatile aroma extractives are modelled here.
+#   * oak_gpl is the GENERALIZED oak-contact dose, subsuming chips-g/L and barrel surface-to-volume
+#     ratio (higher S:V or more chips => more contact => proportionally higher ceilings — the
+#     ceilings scale LINEARLY with oak_gpl). BARREL AGE / FILL NUMBER (a used barrel extracts less)
+#     is DEFERRED: it would be a ceiling multiplier < 1, a later refinement.
+#   * SHARED k_oak_extraction across all four compounds this beat — the ceilings carry the toast
+#     PROFILE (which compound dominates), the rate is common. Per-compound extraction rates (lactone
+#     is slower than vanillin in reality) are a documented refinement, not this beat.
+#   * WHISKEY LACTONE is a single lumped pool (cis + trans isomers together) — the cis/trans split
+#     (different thresholds) is beyond Tier-3.
+#
+# TIER. ALL speculative — the extraction FORM (first-order diffusion-limited approach to a
+# saturation ceiling, warmer-faster) is sourced, but every magnitude (rate, activation energy, and
+# especially the toast-specific yields) is an order-of-magnitude author estimate, and the aging axis
+# is the Tier-3 frontier. The Process floors its outputs at speculative regardless of input tiers
+# (parameter-tier propagation, D-1). Load-bearing sourced claims: (1) oak yields these four
+# extractives with the stated TOAST ORDERING (lactone light -> vanillin medium -> guaiacol/eugenol
+# heavy), (2) extraction approaches a ceiling (diffusion-limited, saturating), (3) warmer extracts
+# faster (E_a > 0, but WEAKLY — diffusion, see below).
+
+# -- FIRST-ORDER EXTRACTION RATE: extractives diffuse into the wine toward the ceiling ----------
+k_oak_extraction:
+  value: 5.0e-4
+  unit: "1/h"   # d(C_i)/dt = k_oak_extraction * f(T) * max(0, ceiling_i - C_i)
+  tier: speculative
+  uncertainty: { low: 2.0e-4, high: 2.0e-3, note: "first-order approach rate at T_ref = 20 C => half-life to the ceiling ln2/k ~ 350-3500 h (~2 weeks to ~5 months) for the gap below the ceiling — the observed timescale over which barrel/chip aroma extractives build toward their plateau. Shared across the four compounds (the ceilings carry the toast profile); per-compound rates are a documented refinement." }
+  provenance:
+    source: "author estimate anchored to the timescale over which oak aroma compounds are extracted into wine in barrel/chip aging (barrel-aging and oak-chip contact studies — e.g. Spillman, Sefton & Gawel 2004; whiskey-lactone/vanillin extraction rises over weeks-to-months then plateaus as the accessible wood is exhausted)."
+    conditions: "generic wine at cellar temperature; first-order in the gap (ceiling - concentration), shared across all four extractives, at T_ref = 293.15 K. The wood-diffusion physics is lumped into this single constant."
+    notes: "SOURCED FORM (first-order diffusion-limited approach to a saturation ceiling => SATURATING extractive, not unbounded) + SPECULATIVE magnitude (order-of-magnitude, banded to the weeks-to-months barrel-extraction timescale). The load-bearing sourced claim is that extraction SATURATES (approaches a ceiling), not this absolute rate."
+
+# -- ACTIVATION ENERGY: warmer extracts faster, but WEAKLY (diffusion-limited) -----------------
+# DELIBERATELY LOW and its OWN parameter (prime directive #2): oak extraction is DIFFUSION-limited,
+# not a chemical reaction, so its temperature sensitivity is WEAK — well below the 50-60 kJ/mol of
+# the reaction-driven ester-hydrolysis / oxidation / browning / Strecker E_a's. A near-T-independent
+# first cut is defensible; a small positive E_a keeps the honest "warmer barrels extract a little
+# faster" direction without over-claiming a strong Arrhenius dependence a diffusion process does not have.
+E_a_oak_extraction:
+  value: 20000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 10000.0, high: 35000.0, note: "Q10 ~1.3-1.6 at 20 C — a WEAK temperature dependence, deliberately well below the reaction E_a's (~50-60 kJ/mol). Diffusion coefficients rise with temperature but far more gently than reaction rates (liquid-diffusion activation energies ~10-25 kJ/mol). The SOURCED, load-bearing claim is only the SIGN (warmer extracts a little faster); the magnitude is speculative, banded, and intentionally small." }
+  provenance:
+    source: "SOURCED ORDERING: diffusion-limited extraction accelerates with temperature but WEAKLY (liquid-phase diffusion activation energies ~10-25 kJ/mol; warmer barrels/cellars extract oak aroma somewhat faster). Distinct from the reaction-driven aging E_a's — a diffusion process, not a chemical reaction, so a much lower E_a."
+    conditions: "equivalent Arrhenius activation energy of the aggregate oak-extractive diffusion at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster) is the sourced, load-bearing claim, and it is DELIBERATELY WEAK — diffusion is far less temperature-sensitive than the reaction-driven aging steps. Its OWN parameter (not reused from any reaction E_a) per prime directive #2 AND because the value genuinely differs (diffusion, not reaction). A T-independent first cut (E_a -> 0) would also be defensible."
+
+# =============================================================================================
+# TOAST-SPECIFIC PER-GRAM YIELDS: ceiling_i = oak_gpl * oak_yield_<compound>_<toast> (g extr./L).
+#
+# Units g extractive / g oak. The add_oak verb reads the (compound, toast) pair and multiplies by
+# the oak_gpl dose to set each ceiling state slot, so the ceilings scale LINEARLY with the oak dose.
+# The values below are anchored so a ~4 g/L oak-chip-equivalent dose lands the extractives in their
+# observed oak-aged-wine ranges (whiskey lactone ~30-120, vanillin ~40-200, guaiacol ~2-60, eugenol
+# ~1-25 ug/L across toast levels), then vary with toast:
+#   * LIGHT toast  -> whiskey lactone DOMINANT (coconut); little guaiacol/eugenol (they need pyrolysis)
+#   * MEDIUM toast -> vanillin PEAK (lignin thermally releases vanillin); lactone falling; phenols rising
+#   * HEAVY toast  -> guaiacol + eugenol DOMINANT (smoky/clove, lignin pyrolysis products); vanillin and
+#                     lactone DEGRADED by over-toasting
+# This toast ORDERING is the load-bearing sourced claim (Chatonnet et al. on barrel-toast effects on
+# oak volatiles; Spillman et al.); the exact magnitudes are speculative author estimates, banded wide.
+# ALL speculative. Each compound's three toast values share one provenance block for brevity below.
+
+# -- WHISKEY LACTONE (coconut) — LIGHT-toast dominant, degraded by heavy toast -----------------
+oak_yield_whiskey_lactone_light:
+  value: 3.0e-5
+  unit: "g/g"   # g whiskey lactone / g oak; * oak_gpl => ceiling (g/L). ~120 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 1.0e-5, high: 9.0e-5, note: "coconut oak-lactone yield at LIGHT toast (its peak) — light/untoasted oak retains the most intact β-methyl-γ-octalactone; ~120 ug/L ceiling at a 4 g/L oak dose, in the oak-aged-white/red range. Lumped cis+trans." }
+  provenance:
+    source: "author estimate anchored to whiskey-lactone (β-methyl-γ-octalactone, 'coconut') levels in oak-aged wine and to the toast ordering (Chatonnet et al. barrel-toast studies; Spillman et al. 2004): oak lactone is HIGHEST in light/untoasted oak and DEGRADES with heavier toast (thermal breakdown), the inverse of the guaiacol/eugenol pyrolysis phenols."
+    conditions: "g whiskey lactone (cis+trans lumped) extractable per g oak at LIGHT toast; * oak_gpl => the saturation ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (lactone peaks light, falls with toast). Lumped cis+trans (the cis/trans split is beyond Tier-3, D-77). Doubly caveated: order-of-magnitude yield AND a fixed dose->ceiling linearity."
+oak_yield_whiskey_lactone_medium:
+  value: 2.0e-5
+  unit: "g/g"   # ~80 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 7.0e-6, high: 6.0e-5, note: "coconut lactone at MEDIUM toast — falling from the light-toast peak as toasting begins to degrade it; ~80 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_whiskey_lactone_light — lactone declines from light to heavy toast (Chatonnet barrel-toast ordering)."
+    conditions: "g whiskey lactone / g oak at MEDIUM toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering. Lumped cis+trans."
+oak_yield_whiskey_lactone_heavy:
+  value: 7.5e-6
+  unit: "g/g"   # ~30 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 2.0e-6, high: 3.0e-5, note: "coconut lactone at HEAVY toast — largely thermally degraded, its lowest level; ~30 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_whiskey_lactone_light — lactone is lowest at heavy toast (thermal breakdown)."
+    conditions: "g whiskey lactone / g oak at HEAVY toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering. Lumped cis+trans."
+
+# -- VANILLIN (vanilla) — MEDIUM-toast peak (lignin thermal release) ---------------------------
+oak_yield_vanillin_light:
+  value: 1.0e-5
+  unit: "g/g"   # ~40 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 3.0e-6, high: 3.0e-5, note: "vanillin at LIGHT toast — modest (little lignin thermally degraded yet); ~40 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate anchored to vanillin levels in oak-aged wine and the toast ordering (Chatonnet; Spillman): vanillin is released by MODERATE thermal degradation of lignin, PEAKING at medium toast and falling at heavy toast (over-pyrolysis converts it onward to guaiacol-type phenols)."
+    conditions: "g vanillin / g oak at LIGHT toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (vanillin peaks at MEDIUM toast)."
+oak_yield_vanillin_medium:
+  value: 5.0e-5
+  unit: "g/g"   # ~200 ug/L at 4 g/L oak (the vanillin peak)
+  tier: speculative
+  uncertainty: { low: 2.0e-5, high: 1.5e-4, note: "vanillin at MEDIUM toast — ITS PEAK (lignin thermally releases vanillin); ~200 ug/L ceiling at 4 g/L oak, the strong 'vanilla' of a medium-toast barrel." }
+  provenance:
+    source: "author estimate; see oak_yield_vanillin_light — vanillin is HIGHEST at medium toast (the vanilla signature of medium-toast oak)."
+    conditions: "g vanillin / g oak at MEDIUM toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (vanillin peaks medium)."
+oak_yield_vanillin_heavy:
+  value: 3.0e-5
+  unit: "g/g"   # ~120 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 1.0e-5, high: 9.0e-5, note: "vanillin at HEAVY toast — falling from the medium peak (over-toasting degrades it toward guaiacol-type phenols); ~120 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_vanillin_light — vanillin falls from medium to heavy toast."
+    conditions: "g vanillin / g oak at HEAVY toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering."
+
+# -- GUAIACOL (smoky/toasty) — HEAVY-toast dominant (lignin pyrolysis) --------------------------
+oak_yield_guaiacol_light:
+  value: 5.0e-7
+  unit: "g/g"   # ~2 ug/L at 4 g/L oak (little smoky character in light oak)
+  tier: speculative
+  uncertainty: { low: 1.0e-7, high: 2.0e-6, note: "guaiacol at LIGHT toast — minimal (pyrolysis phenols need heat); ~2 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate anchored to guaiacol ('smoky/toasty') levels in oak-aged wine and the toast ordering (Chatonnet barrel-toast studies): guaiacol is a lignin-PYROLYSIS product, RISING strongly with toast level (lowest light, highest heavy) — the inverse of the whiskey lactone ordering. This guaiacol is the oak/toast smoky note, DISTINCT from the Brett 4-ethylguaiacol (D-55)."
+    conditions: "g guaiacol / g oak at LIGHT toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (guaiacol rises with toast). Distinct molecule from the Brett ethylguaiacol pool."
+oak_yield_guaiacol_medium:
+  value: 3.75e-6
+  unit: "g/g"   # ~15 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 1.0e-6, high: 1.2e-5, note: "guaiacol at MEDIUM toast — rising; ~15 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_guaiacol_light — guaiacol rises from light to heavy toast (pyrolysis)."
+    conditions: "g guaiacol / g oak at MEDIUM toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering."
+oak_yield_guaiacol_heavy:
+  value: 1.5e-5
+  unit: "g/g"   # ~60 ug/L at 4 g/L oak (strong smoky/toasty character)
+  tier: speculative
+  uncertainty: { low: 4.0e-6, high: 5.0e-5, note: "guaiacol at HEAVY toast — ITS PEAK (strong smoky/toasty note of a heavily-toasted barrel); ~60 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_guaiacol_light — guaiacol is HIGHEST at heavy toast."
+    conditions: "g guaiacol / g oak at HEAVY toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (guaiacol peaks heavy)."
+
+# -- EUGENOL (clove/spice) — HEAVY-toast dominant (co-varies with guaiacol) ---------------------
+oak_yield_eugenol_light:
+  value: 2.5e-7
+  unit: "g/g"   # ~1 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 5.0e-8, high: 1.0e-6, note: "eugenol at LIGHT toast — minimal; ~1 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate anchored to eugenol ('clove/spice') levels in oak-aged wine and the toast ordering: eugenol is a lignin thermal-degradation phenol that CO-VARIES with guaiacol (both rise with toast, lowest light, highest heavy). It adds a distinct clove note but tracks the guaiacol toast ordering (the D-77 fork-4th compound)."
+    conditions: "g eugenol / g oak at LIGHT toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (eugenol rises with toast, co-varying with guaiacol)."
+oak_yield_eugenol_medium:
+  value: 2.0e-6
+  unit: "g/g"   # ~8 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 5.0e-7, high: 6.0e-6, note: "eugenol at MEDIUM toast — rising; ~8 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_eugenol_light — eugenol rises with toast (co-varies with guaiacol)."
+    conditions: "g eugenol / g oak at MEDIUM toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering."
+oak_yield_eugenol_heavy:
+  value: 6.25e-6
+  unit: "g/g"   # ~25 ug/L at 4 g/L oak (clove/spice of a heavily-toasted barrel)
+  tier: speculative
+  uncertainty: { low: 1.5e-6, high: 2.0e-5, note: "eugenol at HEAVY toast — ITS PEAK (clove/spice of a heavily-toasted barrel); ~25 ug/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_eugenol_light — eugenol is HIGHEST at heavy toast (co-varying with guaiacol)."
+    conditions: "g eugenol / g oak at HEAVY toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (eugenol peaks heavy)."

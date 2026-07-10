@@ -195,3 +195,44 @@ threshold_phenylacetaldehyde_wine:
     source: "wine aroma literature: phenylacetaldehyde perception threshold ~1 µg/L in wine (Escudero et al. 2000, 2002; the honey/floral marker of aged white and dessert wines)"
     conditions: "measured in/near wine matrix; phenylacetaldehyde, a single molecule (the phenylalanine-derived Strecker aldehyde)"
     notes: "Single-molecule pool — clean OAV, matrix-matched. The pleasant-valence Strecker aldehyde (contrast methional's off-note); the two share the D-75 Strecker Process. Wine-only pool. Same arginine-lump provenance caveat as methional."
+
+# -- Oak extractives (decision D-77): the barrel/chip aroma markers (non-oxidative aging axis) -----
+threshold_whiskey_lactone_wine:
+  value: 54.0
+  unit: "ug/L"   # whiskey lactone (cis oak lactone), 'coconut / oak'
+  tier: speculative
+  uncertainty: { low: 20.0, high: 120.0, note: "cis-whiskey-lactone (the more potent isomer) wine odour threshold ~54-67 µg/L; trans is much higher (~460 µg/L). Band widened for the cis+trans lump (this pool is both isomers), so the effective threshold depends on the cis:trans ratio — directional only." }
+  provenance:
+    source: "wine oak-volatile literature: cis-β-methyl-γ-octalactone ('whiskey/oak lactone', coconut) perception threshold ~54-67 µg/L in wine (e.g. wine-matrix oak-volatile studies; Spillman et al. 2004); trans isomer ~460 µg/L"
+    conditions: "measured in/near wine matrix; whiskey lactone — the pool LUMPS cis+trans, but the threshold is the potent cis value (a mild lump caveat, not the full D-66 multi-molecule lump)"
+    notes: "Effectively single-marker (cis dominates perception), but the pool carries both isomers, so flagged: the OAV rides on the cis:trans mix. Wine-only pool. The signature 'coconut' oak-lactone note, LIGHT-toast dominant (D-77)."
+
+threshold_vanillin_wine:
+  value: 200.0
+  unit: "ug/L"   # vanillin, 'vanilla'
+  tier: speculative
+  uncertainty: { low: 60.0, high: 400.0, note: "vanillin wine odour threshold ~200-320 µg/L (matrix-dependent; lower in white, higher in red where it binds). Band spans the reported range." }
+  provenance:
+    source: "wine oak-volatile literature: vanillin perception threshold ~200-320 µg/L in wine (Boidron/Chatonnet oak-volatile studies; the vanilla signature of medium-toast oak)"
+    conditions: "measured in/near wine matrix; vanillin, a single molecule"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. Wine-only pool. MEDIUM-toast peak (lignin thermal release, D-77)."
+
+threshold_guaiacol_wine:
+  value: 20.0
+  unit: "ug/L"   # guaiacol, 'smoky / toasty' (oak/toast — NOT the Brett ethylguaiacol)
+  tier: speculative
+  uncertainty: { low: 8.0, high: 75.0, note: "guaiacol wine odour threshold ~20-75 µg/L (a potent smoky phenol). Band spans reported wine values." }
+  provenance:
+    source: "wine oak/smoke-volatile literature: guaiacol (2-methoxyphenol, 'smoky/toasty/medicinal') perception threshold ~20-75 µg/L in wine (oak-toast and smoke-taint studies)"
+    conditions: "measured in/near wine matrix; guaiacol, a single molecule — the OAK/toast smoky note, DISTINCT from the Brett 4-ethylguaiacol (threshold_ethylguaiacols_wine, a different molecule)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. Wine-only pool. HEAVY-toast dominant (lignin pyrolysis, D-77). NOT to be confused with the Brett 4-ethylguaiacol pool."
+
+threshold_eugenol_wine:
+  value: 15.0
+  unit: "ug/L"   # eugenol, 'clove / spice'
+  tier: speculative
+  uncertainty: { low: 5.0, high: 40.0, note: "eugenol wine odour threshold ~6-15 µg/L (a potent clove phenol; some panels report higher). Band widened accordingly." }
+  provenance:
+    source: "wine oak-volatile literature: eugenol ('clove/spice') perception threshold ~6-15 µg/L in wine (oak-volatile studies; the clove note of toasted oak)"
+    conditions: "measured in/near wine matrix; eugenol, a single molecule"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. Wine-only pool. HEAVY-toast (co-varies with guaiacol, D-77)."
