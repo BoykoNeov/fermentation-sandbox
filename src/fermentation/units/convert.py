@@ -51,6 +51,27 @@ def gpl_to_mgl(g_per_l: float) -> float:
     return g_per_l * 1000.0
 
 
+def gpl_to_ugl(g_per_l: float) -> float:
+    """Grams per litre -> micrograms per litre (the canonical -> odor-threshold unit).
+
+    Literature odor-detection (perception) thresholds are reported in µg/L–mg/L, so the
+    sensory OAV readout (:mod:`fermentation.sensory.oav`) compares a state concentration
+    (canonical g/L) against a µg/L threshold. Both sides must share a unit for the ratio to
+    be dimensionless, so the state concentration crosses to µg/L here rather than via a bare
+    ``*1e6`` at the call site (decision D-3). A plain factor of one million.
+    """
+    return g_per_l * 1_000_000.0
+
+
+def ugl_to_gpl(ug_per_l: float) -> float:
+    """Micrograms per litre -> grams per litre (the odor-threshold -> canonical inverse).
+
+    The inverse of :func:`gpl_to_ugl`, for reading a µg/L literature figure back into the
+    canonical g/L state unit (decision D-3).
+    """
+    return ug_per_l / 1_000_000.0
+
+
 def brix_to_sg(brix: float) -> float:
     """Degrees Brix -> specific gravity (20/20 C).
 

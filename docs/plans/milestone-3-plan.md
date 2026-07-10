@@ -1,6 +1,9 @@
 # Milestone 3 — Tier-3 (speculative frontier): sensory/OAV + aging chemistry
 
-> Status: **scoping**. Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
+> Status: **beat 1a built (D-67)** — the OAV sensory readout ships (`fermentation.sensory`
+> + `sensory.yaml` + `tests/test_sensory_oav.py`, 729 tests green). Remaining: beat 1b
+> (descriptor projection) and the aging-chemistry beats below. Milestone 1 (Tier-1 validated
+> core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
 > **Tier-3**, the handoff's §4 frontier: "real chemistry, but integrating it into a

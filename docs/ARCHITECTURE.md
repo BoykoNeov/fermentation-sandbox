@@ -36,7 +36,8 @@ Package map:
 | runtime | `fermentation.runtime` | `simulate`, `Trajectory`; `simulate_scheduled`, `ScheduledEvent`, `ScheduledTrajectory` (event loop); `simulate_ensemble`, `Ensemble` (stochastic wrapper) |
 | scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` (`.run` / `.run_ensemble`); intervention verbs `add_dap` / `add_so2` / `rack` / `pitch_mlf` |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
-| analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series` (top-layer observables over a `Trajectory`) |
+| analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series`, `molecular_so2_series`, `ibu_series` (top-layer observables over a `Trajectory`) |
+| sensory | `fermentation.sensory` | `oav_series`, `sensory_profile`, `oav_tier`, `load_thresholds`, `AROMA_COMPOUNDS` — the speculative Tier-3 OAV aroma readout over a `Trajectory` (D-67) |
 
 ## The core
 
@@ -246,6 +247,39 @@ than be scripted (DECISIONS #18).
   rather than adding a parallel pathway, so carbon closes touching neither `S` nor `CO2` and
   the `E` endpoint (hence the §2.2 benchmarks) is preserved to relative ~1e-8. The early
   produce-then-reabsorb peak emerges; a crash strands it (the D-26 live-yeast-gating shape).
+
+## The sensory / OAV readout — the speculative Tier-3 aroma lens (D-67)
+
+`fermentation.sensory` is a **top-layer readout** (sibling of `analysis`) that maps
+Odor-Activity-Values over a finished `Trajectory`: `OAV_i = concentration_i / threshold_i`
+for each aroma-active pool the chemistry already tracks (`esters`, `fusels`, `diacetyl`,
+`acetaldehyde`, `h2s`; wine adds `ethylphenols`/`ethylguaiacols`/`mercaptans`). It adds **no
+state, no Process, no ledger entry** — the full suite stays byte-for-byte green (isolation by
+construction). Opened as the first beat of Milestone 3 (`docs/plans/milestone-3-plan.md`).
+
+- **The §4.2 cardinal rule / firewall.** The sensory layer consumes the chemistry; the
+  chemistry never imports it back. Thresholds load **standalone** (`load_thresholds()` reads
+  `parameters/data/sensory.yaml`) and are **never** merged into any `CompiledScenario` at the
+  compile seam — no RHS reads a perception threshold, so the chemistry never even sees these
+  numbers (a stronger isolation than any Tier-2 readout, which *is* merged because a Process
+  reads it). A deliberate consequence (D-24): thresholds sit **outside** the ensemble sweep.
+- **The tier floor (§4.3 credibility firewall).** `oav_tier(input, threshold)` returns
+  `combine(input, threshold, SPECULATIVE)` → **always speculative, even for a validated
+  input**. The explicit `SPECULATIVE` is not redundant with the threshold's tier: the sensory
+  *mapping itself* is the canonical speculative case (`Tier` docstring). A pure-function test
+  (`oav_tier(VALIDATED, VALIDATED) is SPECULATIVE`) proves the floor non-vacuously — a
+  real-trajectory test would be a tautology since every aroma pool is speculative/plausible.
+- **Matrix-specific thresholds, µg/L.** Keys are `threshold_<pool>_<beer|wine>` because
+  ethanol/matrix shift odor thresholds; each `conditions` records the **measurement matrix**
+  (not the same as the application medium — a water/model-solution measurement is flagged as a
+  matrix gap in `notes`). Stored in µg/L (the literature unit), crossed to canonical g/L at
+  the boundary via `units.convert.ugl_to_gpl`. `sensory_profile` reports **per-compound** OAVs
+  + above-threshold flags (never a summed scalar — summing assumes contested additivity).
+- **Lumped pools (D-66).** `esters`/`fusels`/`mercaptans` are read against one named
+  representative's threshold (isoamyl acetate / isoamyl alcohol / methanethiol), with the
+  "assumes fixed lump composition" honesty cost flagged in provenance. `iso_alpha`/IBU is
+  excluded — a *taste*, already read out by `ibu_series` (D-64). Descriptor-space projection
+  ("smells like leather and banana") is the deferred, even-more-speculative beat 1b.
 
 ## Testing & quality gates
 

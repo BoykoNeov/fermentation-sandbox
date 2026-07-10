@@ -1,0 +1,176 @@
+# Odor perception (detection) thresholds — the sensory / OAV readout layer (decision D-67).
+#
+# STANDALONE, NOT a compile-seam file. Unlike acidbase.yaml / vicinal_diketones.yaml (merged
+# into every CompiledScenario at compile.py's `shared_files` because a *Process/RHS* reads
+# them), NO right-hand side reads a perception threshold: the sensory layer is a pure readout
+# that consumes a finished Trajectory. So this file is loaded on its own by
+# fermentation.sensory.oav.load_thresholds() and is NEVER merged into param_values — the
+# chemistry never even sees these numbers. This is a stronger isolation than any Tier-2
+# readout, and it is why dosing/aroma chemistry stays byte-for-byte unchanged by the readout.
+#
+# OAV = concentration / threshold (dimensionless). Both sides in µg/L: state concentration is
+# canonical g/L, crossed to µg/L at the sensory boundary via units.convert.gpl_to_ugl; every
+# threshold below is stored in µg/L so the ratio is directly dimensionless.
+#
+# TIER. ALL thresholds are `speculative`, and — more fundamentally — the OAV *mapping itself*
+# is the canonical speculative case (tiers.py docstring names "sensory mapping"). So the
+# readout floors every output at speculative regardless of these tiers (oav_tier combines in
+# Tier.SPECULATIVE explicitly): even a validated input concentration reads speculative through
+# this lens. Odor thresholds swing by orders of magnitude with panel, reference, and matrix, so
+# the uncertainty bands are wide (often a factor of several) and honest.
+#
+# MATRIX (a provenance requirement, §4.2). Ethanol and the wine/beer matrix shift odor
+# thresholds substantially, so a threshold is matrix-specific: keys are `threshold_<pool>_beer`
+# and `threshold_<pool>_wine`. `conditions` records the MATRIX THE VALUE WAS MEASURED IN, which
+# is NOT the same as the application medium the key is filed under — where a key is backed by a
+# water/model-solution measurement rather than the real medium, that MATRIX GAP is flagged in
+# `notes`. (The sensory layer selects the key set by medium; it does not claim the measurement
+# matrix equals the medium.)
+#
+# LUMPED POOLS (the D-66 owner call). `esters`, `fusels` and `mercaptans` are single g/L pools
+# that really mix several molecules whose thresholds span orders of magnitude. Each is assigned
+# the threshold of ONE named representative compound — the stand-in its VarSpec description
+# already names — and the "assumes fixed lump composition" honesty cost is flagged loudly in
+# that threshold's `notes`. Single-molecule pools (diacetyl, acetaldehyde, h2s, 4-EP, 4-EG)
+# carry no such assumption and are the cleaner OAVs.
+#
+# iso_alpha / IBU is DELIBERATELY ABSENT — it is a TASTE (bitterness), not an odor, already read
+# out directly as IBU (analysis.ibu_series, D-64). An odor-threshold OAV does not apply to it.
+
+# =====================================================================================
+# BEER matrix (Meilgaard beer-flavour thresholds) — the 5 common aroma-active pools.
+# =====================================================================================
+
+threshold_diacetyl_beer:
+  value: 100.0
+  unit: "ug/L"   # ~0.10 mg/L, the classic lager "buttery" flavour threshold
+  tier: speculative
+  uncertainty: { low: 30.0, high: 200.0, note: "commonly cited 0.10-0.15 mg/L in lager; lower in pale lager, higher in ales where malt masks it" }
+  provenance:
+    source: "Meilgaard 1975, 'Flavor chemistry of beer' (MBAA Tech. Q. 12:151-168), diacetyl (2,3-butanedione) beer flavour threshold ~0.10-0.15 mg/L; corroborated by Krogerus 2013 review (doi:10.1002/jib.84)"
+    conditions: "measured in beer (matrix-matched); 2,3-butanedione, the single molecule of the diacetyl pool"
+    notes: "Single-molecule pool — clean OAV, no lump-composition assumption. Matrix-matched (measured in beer)."
+
+threshold_acetaldehyde_beer:
+  value: 10000.0
+  unit: "ug/L"   # ~10 mg/L, 'green apple' / fresh-cut
+  tier: speculative
+  uncertainty: { low: 5000.0, high: 25000.0, note: "Meilgaard ~10 mg/L; some panels report up to ~25 mg/L in beer" }
+  provenance:
+    source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), acetaldehyde beer flavour threshold ~10 mg/L"
+    conditions: "measured in beer (matrix-matched); acetaldehyde (ethanal), the single molecule of the pool"
+    notes: "Single-molecule pool — clean OAV. Matrix-matched (measured in beer)."
+
+threshold_h2s_beer:
+  value: 5.0
+  unit: "ug/L"   # 'rotten egg'; a very low, potent threshold
+  tier: speculative
+  uncertainty: { low: 1.0, high: 15.0, note: "H2S is extremely potent; reports span ~1-10 µg/L in beer" }
+  provenance:
+    source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), hydrogen sulfide beer flavour threshold ~5 µg/L (0.005 mg/L)"
+    conditions: "measured in beer (matrix-matched); hydrogen sulfide (H2S), the single molecule of the residual dissolved pool"
+    notes: "Single-molecule pool — clean OAV. Matrix-matched. The most potent (lowest-threshold) aroma pool tracked."
+
+threshold_esters_beer:
+  value: 1200.0
+  unit: "ug/L"   # isoamyl acetate, 'banana'
+  tier: speculative
+  uncertainty: { low: 500.0, high: 2500.0, note: "isoamyl acetate ~1.0-1.6 mg/L in beer; band widened further for the fixed-lump-composition assumption below" }
+  provenance:
+    source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), isoamyl acetate (3-methylbutyl acetate) beer flavour threshold ~1.0-1.6 mg/L"
+    conditions: "measured in beer (matrix-matched); isoamyl acetate, the representative of the LUMPED esters pool (the pool's named stand-in)"
+    notes: "LUMPED POOL — assumes the esters pool is compositionally dominated by isoamyl acetate. Real ester mixes (ethyl acetate, ethyl hexanoate, ...) have thresholds spanning orders of magnitude, so this OAV is only as meaningful as that fixed-composition assumption (D-66). Band widened accordingly."
+
+threshold_fusels_beer:
+  value: 50000.0
+  unit: "ug/L"   # isoamyl alcohol (3-methylbutan-1-ol), 'solventy/fusel'
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 70000.0, note: "isoamyl alcohol ~50-70 mg/L in beer; band also carries the fixed-lump-composition assumption" }
+  provenance:
+    source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), isoamyl alcohol (3-methylbutan-1-ol) beer flavour threshold ~50 mg/L"
+    conditions: "measured in beer (matrix-matched); isoamyl alcohol, the representative of the LUMPED fusels pool (the Ehrlich higher-alcohol stand-in)"
+    notes: "LUMPED POOL — assumes the fusels pool is dominated by isoamyl alcohol. Propanol/isobutanol/2-phenylethanol have different thresholds, so the OAV rides on the fixed-composition assumption (D-66)."
+
+# =====================================================================================
+# WINE matrix — the 5 common pools + 3 wine-only (ethylphenols, ethylguaiacols, mercaptans).
+# =====================================================================================
+
+threshold_diacetyl_wine:
+  value: 200.0
+  unit: "ug/L"   # ~0.2 mg/L in red wine; 'buttery'
+  tier: speculative
+  uncertainty: { low: 100.0, high: 900.0, note: "Martineau: ~0.1 mg/L in Chardonnay, ~0.2 mg/L in Pinot noir, up to ~0.9 mg/L in some reds where fruit masks it" }
+  provenance:
+    source: "Martineau, Acree & Henick-Kling 1995 (Food Research International 28:139-143), sensory threshold of diacetyl ~0.2 mg/L (red), ~0.1 mg/L (Chardonnay)"
+    conditions: "measured in wine (matrix-matched); 2,3-butanedione; threshold is strongly cultivar/matrix dependent"
+    notes: "Single-molecule pool — clean OAV. Matrix-matched (measured in wine). Value taken at the red-wine ~0.2 mg/L; wide band spans white-to-red matrix variation."
+
+threshold_acetaldehyde_wine:
+  value: 100000.0
+  unit: "ug/L"   # ~100 mg/L; 'bruised apple / sherry (oxidative)'
+  tier: speculative
+  uncertainty: { low: 10000.0, high: 125000.0, note: "wine acetaldehyde odor threshold is contested and matrix-bound; reports span ~10-125 mg/L. Very wide band reflects genuine disagreement" }
+  provenance:
+    source: "wine aroma-threshold literature (Guth 1997 model-wine descriptors; general enology references cite ~100 mg/L for the aroma detection threshold in wine)"
+    conditions: "measured in/near wine matrix; acetaldehyde (ethanal), single molecule"
+    notes: "Single-molecule pool. Threshold is unusually contested for wine (binding to SO2 and matrix effects confound panels), hence the very wide band. Treat directionally."
+
+threshold_h2s_wine:
+  value: 1.6
+  unit: "ug/L"   # 'rotten egg'; extremely potent in wine
+  tier: speculative
+  uncertainty: { low: 1.0, high: 15.0, note: "Goniak & Noble report ~1.1-1.6 µg/L in wine; other panels up to ~10 µg/L" }
+  provenance:
+    source: "Goniak & Noble 1987 (Am. J. Enol. Vitic. 38:223-227), hydrogen sulfide detection threshold ~1.6 µg/L in wine"
+    conditions: "measured in wine (matrix-matched); hydrogen sulfide (H2S), single molecule"
+    notes: "Single-molecule pool — clean OAV. Matrix-matched. The most potent aroma pool tracked in wine."
+
+threshold_esters_wine:
+  value: 30.0
+  unit: "ug/L"   # isoamyl acetate, 'banana/fruity'; model wine (10% ethanol)
+  tier: speculative
+  uncertainty: { low: 10.0, high: 150.0, note: "Guth ~30 µg/L in model wine; band widened for both matrix (model vs real wine) and the fixed-lump-composition assumption" }
+  provenance:
+    source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032), isoamyl acetate odor threshold ~30 µg/L in model wine (10% ethanol)"
+    conditions: "MATRIX GAP — measured in 10% ethanol MODEL wine, not real wine; isoamyl acetate as the representative of the LUMPED esters pool"
+    notes: "LUMPED POOL + MATRIX GAP: assumes the esters pool is dominated by isoamyl acetate AND uses a model-solution (not real-wine) threshold. Doubly caveated; directional only."
+
+threshold_fusels_wine:
+  value: 30000.0
+  unit: "ug/L"   # isoamyl alcohol (3-methylbutan-1-ol), 'fusel/solventy'; model wine
+  tier: speculative
+  uncertainty: { low: 10000.0, high: 60000.0, note: "Guth ~30 mg/L in model wine; band carries matrix + fixed-lump-composition uncertainty" }
+  provenance:
+    source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032), 3-methylbutanol (isoamyl alcohol) odor threshold ~30 mg/L in model wine (10% ethanol)"
+    conditions: "MATRIX GAP — measured in 10% ethanol MODEL wine; isoamyl alcohol as the representative of the LUMPED fusels pool"
+    notes: "LUMPED POOL + MATRIX GAP: fixed-composition assumption plus a model-solution threshold. Directional only."
+
+threshold_ethylphenols_wine:
+  value: 425.0
+  unit: "ug/L"   # 4-ethylphenol, 'horse-sweat / barnyard' (Brett)
+  tier: speculative
+  uncertainty: { low: 130.0, high: 620.0, note: "Chatonnet ~425 µg/L in red wine; the ~230 µg/L 4-EP + 4-EG combined 'Brett character' onset is lower" }
+  provenance:
+    source: "Chatonnet, Dubourdieu, Boidron & Pons 1992 (J. Sci. Food Agric. 60:165-178), 4-ethylphenol perception threshold ~425 µg/L in red wine"
+    conditions: "measured in RED WINE (matrix-matched); 4-ethylphenol, single molecule"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. One of the FIRMEST thresholds tracked (well-characterised Brett spoilage marker). Wine-only pool."
+
+threshold_ethylguaiacols_wine:
+  value: 110.0
+  unit: "ug/L"   # 4-ethylguaiacol, 'clove / smoky' (Brett)
+  tier: speculative
+  uncertainty: { low: 30.0, high: 200.0, note: "Chatonnet ~110 µg/L in red wine" }
+  provenance:
+    source: "Chatonnet, Dubourdieu, Boidron & Pons 1992 (J. Sci. Food Agric. 60:165-178), 4-ethylguaiacol perception threshold ~110 µg/L in red wine"
+    conditions: "measured in RED WINE (matrix-matched); 4-ethylguaiacol, single molecule"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. Firmly characterised (Chatonnet). Wine-only pool."
+
+threshold_mercaptans_wine:
+  value: 3.0
+  unit: "ug/L"   # methanethiol, 'reductive / drains / rotten cabbage'
+  tier: speculative
+  uncertainty: { low: 1.5, high: 10.0, note: "methanethiol in wine ~1.8-3.1 µg/L; band widened for the fixed-lump-composition assumption" }
+  provenance:
+    source: "wine volatile-thiol literature (methanethiol / methyl mercaptan detection threshold ~1.8-3.1 µg/L in wine; e.g. Mestres et al. 2000 review, J. Chromatogr. A 881:569-581)"
+    conditions: "measured in/near wine matrix; methanethiol, the representative of the LUMPED mercaptans pool (the pool's named stand-in)"
+    notes: "LUMPED POOL — assumes the volatile-thiol pool is dominated by methanethiol. Ethanethiol/H2S-adjacent thiols differ, so the OAV rides on the fixed-composition assumption (D-66). Wine-only pool."

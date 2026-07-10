@@ -5244,3 +5244,65 @@ core's credibility" concern is answered by the loud provenance note + the specul
 (red wine) from the spoilage literature already cited in the VDK/Brett beats.
 
 **Next:** beat 1a build — `fermentation.sensory.oav` + `sensory.yaml` + tests, recorded at D-67.
+
+---
+
+## D-67 — Beat 1a built: the OAV sensory readout (`fermentation.sensory`), first Tier-3 code
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, first build beat** (the scoping is D-66). Ships
+the sensory/OAV layer the D-66 plan named — `fermentation.sensory.oav` + `sensory.yaml` +
+`tests/test_sensory_oav.py` — as a **pure, isolated, speculative readout**. 729 tests green
+(717 → +12), `ruff`/`mypy` clean. One `advisor()` pass before writing shaped the build; its one
+blocking catch (below) is folded in.
+
+**What landed.**
+- **`fermentation.sensory`** (new top-layer package, sibling of `analysis`): `oav_series(traj,
+  thresholds, pool)` = `conc / threshold` over a `Trajectory` (dimensionless); `sensory_profile`
+  → a `SensoryProfile` of **per-compound** `OAVReading`s (OAV, static descriptor, above-threshold
+  flag, lumped flag, tier) at a chosen time; `oav_tier`, `medium_of`, `load_thresholds`,
+  `AROMA_COMPOUNDS`. Aroma set is medium-specific (beer = 5 common pools; wine = those + 4-EP/
+  4-EG/mercaptans), medium inferred from the schema signature (`iso_alpha`→beer, `tartaric`→wine).
+- **`parameters/data/sensory.yaml`** — 13 matrix-specific perception thresholds (5 beer + 8 wine),
+  all µg/L, all `speculative`, sourced: diacetyl/acetaldehyde/h2s/isoamyl-acetate(esters)/isoamyl-
+  alcohol(fusels) in beer (Meilgaard 1975); the same 5 + 4-EP/4-EG (Chatonnet 1992) + methanethiol
+  (mercaptans) in wine (Guth 1997 model wine, Goniak & Noble 1987 H₂S, Martineau 1995 diacetyl).
+- **`units.convert`** — added `gpl_to_ugl`/`ugl_to_gpl` (the g/L↔µg/L boundary, D-3); OAV crosses
+  the *scalar* threshold µg/L→g/L so both sides compare in canonical g/L.
+
+**The advisor's blocking catch — the tier-floor test was vacuous as first sketched.** Every aroma
+pool is produced by a speculative/plausible Process, so `traj.tier_map[pool]` is never VALIDATED
+and `combine([anything, SPECULATIVE])` is trivially SPECULATIVE — a floor test over a real
+trajectory would prove nothing. **Fix:** factored a **pure** `oav_tier(input_tier, threshold_tier)
+= combine([input, threshold, SPECULATIVE])` and assert `oav_tier(VALIDATED, VALIDATED) is
+SPECULATIVE` **directly** — the only way to show the mapping caps a validated input. A second
+end-to-end test pins an *untouched* pool's trajectory tier to VALIDATED and confirms the profile
+reading still reads speculative. The explicit `SPECULATIVE` term is documented as **not** redundant
+with the threshold's own tier: the sensory *mapping* is speculative, so the floor must hold even if
+a threshold were later mislabelled plausible.
+
+**Isolation, stated explicitly (so it reads as a choice, not luck).**
+- **Byte-for-byte green by construction:** nothing lower imports `sensory`; the readout adds no
+  state slot / RHS / ledger entry; `sensory.yaml` is **not** in `compile.py`'s `shared_files`, so
+  it never enters any `CompiledScenario.param_values` and cannot perturb the chemistry. The full
+  729-test suite passing is the end-to-end proof.
+- **Thresholds sit outside the D-24 ensemble sweep** — a *deliberate* consequence of the standalone
+  load: `simulate_ensemble` samples only compiled-scenario params, so it does not propagate
+  threshold uncertainty into an OAV band. Defensible (the OAV is already floored speculative);
+  recorded here so it never later reads as an oversight.
+
+**Sourcing discipline (advisor (2), applied).** `conditions` records the **measurement matrix**,
+which is *not* the application medium: the wine `esters`/`fusels` thresholds are Guth **model-wine**
+(10% ethanol) values, flagged as a **matrix gap** in `notes`; beer thresholds are matrix-matched
+(measured in beer). Widest uncertainty bands on the 3 lumped representatives (matrix *plus* the
+fixed-composition assumption); firmest on the single-molecule wine phenols 4-EP/4-EG (Chatonnet).
+The "matrix matches medium" test checks **set selection** (which pools the profile reports), not
+measurement provenance. The golden test (diacetyl at 2× threshold → OAV ≈ 2) is named to make clear
+it validates **plumbing** (arithmetic + the unit crossing), not the threshold magnitude.
+
+**Deferred (unchanged from D-66):** sub-beat **1b** descriptor-space projection (kept out so the
+sourced-ratio layer stays honest — `descriptor` is a *static* per-compound label, never a synthesised
+"smells like X"); then the aging-chemistry beats (§4.1) on a years-scale phase, each validated by
+this OAV lens.
+
+**Next:** beat 1b (descriptor projection) *or* open the first aging Process — owner's call at the
+next batch.
