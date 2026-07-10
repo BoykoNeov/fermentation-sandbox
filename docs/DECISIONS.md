@@ -5692,3 +5692,103 @@ byte-for-byte (the Process is disabled at compile, and gated to zero without bot
 remaining O₂ sinks (phenolic browning / Strecker — each an *always-on* sink that WOULD need the D-71 rate
 refactor, so build with that in view), oak extraction (a separate axis, no O₂), or the deferred beat 1b
 (descriptor projection) — each on the `begin_aging` segment, validated by the D-67 OAV lens.
+
+## D-73 — O₂ sub-axis reworked for *always-on* sinks: `k_ethanol_oxidation` is a **share**, not the total (§4.1)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, an enabling rework of the D-71 oxidative sub-axis — no new
+Process, no new state, no new verb.** Reworks how `OxidativeAcetaldehyde` (D-71) accounts for the shared
+`o2` budget so the next **always-on** O₂ sink (phenolic browning, Strecker degradation) can be added without
+double-counting. Redefines `k_ethanol_oxidation` from the *total* O₂-depletion rate → the **ethanol-oxidation
+share**, reframes `y_acetaldehyde_per_o2` as the route's *true* per-O₂ yield (re-baselined 1.0 → 1.5), and
+rewrites the "whole-flux / unmodeled-sinks" docstrings + `aging.yaml` provenance. **782 tests green**
+(byte-for-byte on structure; only the `y` value moved, and every aging test reads `y` from params or asserts
+*relative* magnitudes, so all stay green), `ruff`/`mypy` clean. **One `advisor()` pass before writing** (it
+caught the validation hole and the yield-coherence trap below), and the **scope fork was put to the owner**
+(per "surface design decisions before building"): *seam-prep only* vs *re-baseline the numbers now* — the
+owner chose **re-baseline now, with a note, until browning is built**.
+
+**Why this is a defect fix, not a rename (the load-bearing point).** The two framings were already
+**inconsistent in-tree**: D-71's docstring called `k_ethanol_oxidation` "the *total* O₂-depletion rate"
+(`OxidativeAcetaldehyde` drains the whole flux), but D-72's `k_so2_oxidation` provenance *already* compared
+against it as "the ethanol *route* rate that SO₂ out-competes 8–16×" — i.e. a **share**. "Ethanol share"
+reconciles them. So this is not preparing-for-the-future cosmetics; it removes a live contradiction.
+
+**The architecture — keep it additive; do NOT build a shared-total-rate.** Each O₂ consumer owns its own
+rate constant (first-order or bilinear in `[o2]`); `ProcessSet` sums them, so the pool depletes **once** and
+the O₂ splits among the sinks by `kᵢ / Σk`. This is exactly the pattern `SulfiteOxidation` established at
+D-72 — D-73 only extends it to *always-on* sinks and fixes the naming/magnitude so they compose. The
+tempting alternative — a single `k_o2_total` with per-sink fractions — was **rejected**: it would couple the
+Processes (each needing the others' rates), break the independent-derivative contract, and can't represent a
+substrate-gated sink whose share varies with its substrate. No new machinery; the summing already exists.
+
+**The yield-coherence fix (the advisor's must-fix).** The old `y_acetaldehyde_per_o2 = 1.0` carried a
+*muddled* rationale — "kept below the mechanistic max to leave headroom for unmodeled sinks." But cutting the
+yield never freed O₂ for anything: the O₂ **partition lives in the rate constants, not in `y`**. Under the
+clean reframe, `y` is the ethanol route's *own* per-O₂ conversion (competing fates are now explicit sibling
+Processes), so it should sit near the coupled-oxidation yield, not at the floor. Re-baselined **1.0 → 1.5**
+(mid-to-upper of the sourced ~1–2 band: the H₂O₂ arm reliably gives ~1 acetaldehyde per O₂, the catalytic
+o-quinone arm adds a partial second equivalent). Sanity re-anchored: ~40 mg/L cumulative O₂ × 1.5 ≈ **82
+mg/L** acetaldehyde (fresh ~10–40, moderately oxidised ~100–300) — in range.
+
+**The owner's "with a note, until browning is built" — the interim caveat, recorded loudly.** Re-baselining
+`y` *upward* while ethanol oxidation is still the **sole always-on** O₂ sink means it transiently receives the
+whole always-on O₂ flux → aged-with-O₂ acetaldehyde is an **upper estimate**, higher than before this rework.
+This is accepted, on the owner's call, *with the caveat flagged in three live spots* (the `OxidativeAcetaldehyde`
+docstring, the `y_acetaldehyde_per_o2` provenance, and the module docstring): when the always-on browning /
+Strecker sinks land, `k_ethanol_oxidation` is **reduced to its true share** (their sum holds the empirical
+total O₂-depletion timescale — the anchor) and the acetaldehyde partitions down. `k_ethanol_oxidation`'s
+**value stays 5.0e-4** now (its "share" currently *equals* the "total", the sole-sink identity), so O₂
+*depletion* is unchanged; only the acetaldehyde *yield* moved.
+
+**The acceptance test is a worked drop-in, not pytest (the advisor's hole).** "782 byte-for-byte green"
+cannot verify this rework — nothing functional changed and **no always-on sink exists yet** to exercise the
+new property. The seam is closed iff Browning slots in cleanly *on paper*. It does:
+
+```python
+class PhenolicBrowning(Process):          # always-on O₂ sink, wine (o-diphenols are a wine pool)
+    name = "phenolic_browning"; tier = Tier.SPECULATIVE
+    touches = ("o2", ...)                  # see "where the O₂ goes" below
+    def derivatives(self, t, y, schema, params):
+        d = schema.zeros(); o2 = float(y[schema.slice("o2")][0])
+        if o2 <= 0.0: return d
+        f_t = arrhenius_factor(..., params["E_a_browning"], params["T_ref"])
+        d[schema.slice("o2")] = -params["k_browning"] * f_t * o2   # its OWN share, first-order in o2
+        ...                                                        # + its product term
+        return d
+```
+
+- **No double-count.** `ProcessSet` sums `OxidativeAcetaldehyde` + `SulfiteOxidation` + `PhenolicBrowning`,
+  each drawing its own `−kᵢ·f(T)·[o2]` (SO₂'s bilinear), so total depletion is `(k_ethanol + k_browning +
+  k_so2·[HSO₃⁻])·f(T)·[o2]` and O₂ is consumed **once**. To hold the calibrated total O₂-scavenging
+  timescale, `k_ethanol_oxidation` is **reduced** at that build so `k_ethanol + k_browning ≈ 5.0e-4` (the
+  present sole-sink value; browning then diverts O₂ from acetaldehyde exactly as SO₂ does — the *always-on*
+  analogue of SO₂'s protection, and the acetaldehyde partition `k_ethanol/Σk` emerges for free). **This is
+  the reduction D-73 made possible and D-71 could not express under "total rate".**
+- **Where the O₂ goes (scoped honestly).** This rework closes the **O₂-accounting** seam — an always-on sink
+  can now consume its `o2` share without perturbing the others. Whether browning's *product* is representable
+  is a **separate** question: it produces brown melanoidin/quinone polymers, for which **no state pool
+  exists**. So Browning lands cleanly today as a **pure O₂ diverter** (no product pool — it suppresses
+  acetaldehyde, the visible/sensory payoff being the acetaldehyde it *prevents*), and gains a browning-index
+  (`A420`) pool only if/when that readout is wanted (a D-67-style diagnostic, off the ledger). Strecker
+  likewise needs new aldehyde aroma pools for its products. **D-73 permits the O₂ accounting, not the product
+  side** — the product pools are their own future beats.
+
+**Supersession discipline (the advisor's must-not).** The D-71/D-72 entries are **left as written** (true when
+written); this D-73 entry *supersedes* D-71's "total rate" framing. The **live** docstrings + `aging.yaml`
+provenance are updated to the share framing (they must describe the code as it is now); the decision log is
+**appended, never rewritten**. The stale "consumes the WHOLE flux / remainder = unmodeled sinks" language was
+removed from the `aging.py` module + class docstrings, the `derivatives` comments, and `aging.yaml` (three
+regions), and the `add_oxygen` verb docstring now names both O₂ consumers.
+
+**§4.3 firewall / tier.** Unchanged — still speculative in FORM (Tier-3 frontier). The `y` bump is a
+speculative-magnitude re-estimate within the sourced band; the sourced load-bearing claims (O₂ is the
+rate-limiter; warmer oxidises faster) are untouched.
+
+**Regression surface.** **Zero structural churn** — no schema change, no new/removed Process, no `touches`
+change, so `test_media.py` goldens are untouched. The only numerical move is `y_acetaldehyde_per_o2` 1.0 →
+1.5; every aging test reads it from params (closed-form, saturation-ceiling) or asserts *relative* magnitudes
+(oxidative > reductive; more-SO₂ ⇒ less acetaldehyde; OAV climbs), so all 782 stay green — the change is
+*invisible to the suite by construction*, which is exactly why the worked drop-in above is the real
+acceptance artifact. **Next:** `PhenolicBrowning` / Strecker as *always-on* O₂ sinks (now unblocked — reduce
+`k_ethanol_oxidation` to its share as each lands, per the drop-in), oak extraction (a separate axis, no O₂),
+or the deferred beat 1b (descriptor projection).

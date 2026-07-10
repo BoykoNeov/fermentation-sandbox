@@ -923,11 +923,13 @@ def _verb_add_oxygen(
     and converts to the canonical g/L jump on the ``o2`` slot — the ingress a finished wine/beer
     takes up in bottle, under micro-oxygenation, or across a barrel. One dose models a single
     exposure (a bottle's total ingress); repeated doses model continuous micro-ox / barrel aging.
-    The dosed O₂ is then consumed by
-    :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde`
-    (once ``begin_aging`` has enabled it), oxidising ethanol → acetaldehyde at the sourced molar
-    yield — so a dose raises the finished-wine acetaldehyde ('sherry'/oxidised) and, via the D-47
-    binding equilibrium, is mopped up by any dosed SO₂ for free.
+    The dosed O₂ is then drawn down by the oxidative aging Processes (once ``begin_aging`` has
+    enabled them), each taking its own share of the shared ``o2`` pool (D-73):
+    :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde` oxidises ethanol → acetaldehyde
+    at its per-O₂ yield, while :class:`~fermentation.core.kinetics.aging.SulfiteOxidation` (wine)
+    diverts O₂ to spend free SO₂ — so a dose raises the finished-wine acetaldehyde
+    ('sherry'/oxidised) except insofar as SO₂ intercepts the O₂, and any acetaldehyde formed is
+    further mopped up by dosed SO₂ via the D-47 binding equilibrium for free.
 
     **The add_so2 pattern exactly** (a carbon-free dosed pool): O₂ carries neither carbon nor
     nitrogen and the ``o2`` slot is off every conservation ledger (``total_carbon``/``total_mass``/

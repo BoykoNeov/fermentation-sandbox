@@ -17,11 +17,17 @@ bottle-aging reality a first-order-in-ethanol rate could never reproduce (it wou
 unbounded). O₂ enters via a dedicated ``add_oxygen`` dosing verb (one dose = a bottle's
 ingress; repeated = micro-oxygenation / barrel), and a ``begin_aging`` run with **no** O₂ dosed
 is purely *reductive* aging (screwcap/inert) — byte-for-byte the :class:`EsterHydrolysis`-only
-aging, since the Process contributes exactly zero at ``o2 = 0``. Because oxidative aging is
-fundamentally a competition for a finite O₂ budget, the ``o2`` pool is the shared substrate the
-whole future oxidative sub-axis (phenolic browning, Strecker degradation, SO₂ consumption) will
-draw down — this Process claims only a speculative *yield* of it (``y_acetaldehyde_per_o2``,
-below the mechanistic max), leaving the remainder as unmodeled oxidative sinks (D-71).
+aging, since the Process contributes exactly zero at ``o2 = 0``. Oxidative aging is
+fundamentally a competition for a finite O₂ budget: the ``o2`` pool is the shared substrate the
+whole oxidative sub-axis draws down, and **each O₂ consumer owns its own rate constant and draws
+its own share** — ``ProcessSet`` sums them, so the pool depletes *once* and the O₂ splits among
+the sinks by ``kᵢ / Σk`` (the additive pattern :class:`SulfiteOxidation` established at D-72,
+extended to *always-on* sinks at **D-73**). So :class:`OxidativeAcetaldehyde` consumes only its
+**ethanol-oxidation share** (``k_ethanol_oxidation``), not the whole flux, and
+``y_acetaldehyde_per_o2`` is the *true* per-O₂ stoichiometric yield of that route alone — the
+competition lives in the rate constants, not in a sub-unity yield. The future sinks (phenolic
+browning, Strecker degradation) slot in as further shares (D-73 reworked D-71's original
+"whole-flux / total-rate" framing so an always-on sink adds cleanly, without double-counting).
 
 **The first of those sinks: SO₂ scavenging (D-72).** :class:`SulfiteOxidation` is the first
 sibling to claim its share of that ``o2`` budget. Dissolved O₂ oxidises free **bisulfite** (the
@@ -254,9 +260,12 @@ class OxidativeAcetaldehyde(Process):
     and per the D-68 selection criterion — this Process moves an OAV the lens already reads and
     needs **no new aroma pool**; the one new slot is the ``o2`` *substrate*.
 
-    ``d(o2)/dt = −r_O2`` with ``r_O2 = k_ethanol_oxidation · f(T) · [O2]`` (first-order in the
-    dissolved-O₂ pool, ``f(T) = arrhenius_factor(T, E_a_ethanol_oxidation, T_ref)`` the sourced
-    warmer-oxidises-faster factor). The oxidised carbon lands as acetaldehyde at a molar **yield**::
+    ``d(o2)/dt = −r_O2`` with ``r_O2 = k_ethanol_oxidation · f(T) · [O2]`` — first-order in the
+    dissolved-O₂ pool, where ``k_ethanol_oxidation`` is this route's **share** of the total
+    O₂-depletion rate (D-73; *not* the whole rate — see the ledger paragraph below and
+    :class:`SulfiteOxidation`), and ``f(T) = arrhenius_factor(T, E_a_ethanol_oxidation, T_ref)`` the
+    sourced warmer-oxidises-faster factor. The oxidised carbon lands as acetaldehyde at a molar
+    **yield**::
 
         d(acetaldehyde)/dt = +y_acetaldehyde_per_o2 · (r_O2 / M_O2) · M_acetaldehyde
         d(E)/dt            = −d(acetaldehyde)/dt · M_ethanol / M_acetaldehyde
@@ -280,14 +289,28 @@ class OxidativeAcetaldehyde(Process):
     ``X``, which is 0 in a racked/finished wine — so oxidation does not fight it: the acetaldehyde
     accumulates, correctly (a live-yeast ferment would instead reduce it straight back).
 
-    **The O₂ pool is off every ledger, and only a *yield* of it becomes acetaldehyde.** ``o2`` is
-    carbon-free (``total_carbon``/``total_mass``/``total_nitrogen`` weight only their named pools,
-    so ``o2`` contributes 0 to each, like ``h2s``/``iso_alpha``). The Process consumes the **whole**
-    O₂ flux ``r_O2`` but routes only ``y_acetaldehyde_per_o2`` mol/mol into acetaldehyde — the
-    remainder is the oxidative power spent on **unmodeled sinks** (phenolic browning, Strecker,
-    SO₂ consumption) the future O₂ sub-axis will claim. Because O₂ carries no carbon, "spending" it
-    without tracking every product is not a conservation violation — the carbon that *does* move
-    (into acetaldehyde) is borrowed carbon-exactly from ``E``.
+    **The O₂ pool is off every ledger; this Process draws its ethanol-oxidation *share* of it
+    (D-73).** ``o2`` is carbon-free (``total_carbon``/``total_mass``/``total_nitrogen`` weight only
+    their named pools, so ``o2`` contributes 0 to each, like ``h2s``/``iso_alpha``). The Process
+    consumes ``r_O2 = k_ethanol_oxidation · f(T) · [O2]`` — its **own share** of the shared O₂
+    budget, not the whole flux — and every mol it consumes yields ``y_acetaldehyde_per_o2`` mol
+    acetaldehyde, the *true* per-O₂ stoichiometric yield of the ethanol route. Sibling sinks
+    (:class:`SulfiteOxidation` today; phenolic browning / Strecker to come) each draw their **own**
+    share via their own rate constant, and ``ProcessSet`` summing splits the finite O₂ among them by
+    ``kᵢ / Σk`` — so the pool depletes *once*, and the competition that suppresses acetaldehyde
+    lives in the rate constants, not in a shaded-down yield. Because O₂ carries no carbon,
+    "spending" it is not a conservation violation; the carbon that *does* move (into acetaldehyde)
+    is borrowed carbon-exactly from ``E``.
+
+    *Interim over-attribution, until browning/Strecker are built (D-73).* ``k_ethanol_oxidation`` is
+    the ethanol-oxidation *share*, but ethanol oxidation is presently the **sole always-on** O₂
+    sink, so its share currently *equals* the whole always-on flux — an oxygen-dosed aging routes
+    all its always-on O₂ here and aged acetaldehyde is an **upper estimate**. When the always-on
+    browning / Strecker sinks land, ``k_ethanol_oxidation`` is reduced to its true share (their sum
+    holds the empirical total O₂-depletion timescale — the anchor) and the acetaldehyde partitions
+    down. (This is the *always-on* case D-71 flagged and D-72 deferred: substrate-gated
+    :class:`SulfiteOxidation` needed no such re-baseline — it is simply zero without SO₂ — so it
+    already composes cleanly.)
 
     *Mass carries the standing gap, scoped out by construction.* ``total_mass`` weights only
     ``{S, E, CO2}`` (the byproduct-free validated-core check, D-8/D-16): this Process debits ``E``
@@ -332,11 +355,13 @@ class OxidativeAcetaldehyde(Process):
             return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_ethanol_oxidation"], params["T_ref"])
-        r_o2 = params["k_ethanol_oxidation"] * f_t * o2  # g O2/L/h consumed (first-order in O2)
-        # A molar yield of the consumed O₂ becomes acetaldehyde; the rest is unmodeled oxidative
-        # sinks (the future O₂ sub-axis, D-71). moles O2 = r_o2/M_O2 ⇒ acetaldehyde mass rate below.
+        # This route's SHARE of the O₂-depletion rate (D-73), not the whole flux: sibling sinks draw
+        # their own shares and ProcessSet sums, so O₂ splits by kᵢ/Σk and the pool depletes once.
+        r_o2 = params["k_ethanol_oxidation"] * f_t * o2  # g O2/L/h consumed by the ethanol route
+        # Every mol O₂ this route consumes yields y_acetaldehyde_per_o2 mol acetaldehyde — the TRUE
+        # per-O₂ yield of the route (D-73), not shaded for competitors. moles O2 = r_o2/M_O2.
         acet_rate = params["y_acetaldehyde_per_o2"] * (r_o2 / M_O2) * M_ACETALDEHYDE  # g/L/h
-        d[schema.slice("o2")] = -r_o2  # the whole O₂ flux is consumed (off every ledger)
+        d[schema.slice("o2")] = -r_o2  # this route's O₂ share is consumed (off every ledger)
         d[schema.slice("acetaldehyde")] = acet_rate
         # Carbon-exact C2 borrow from ethanol (the D-27 reduction reversed). No clamp needed: during
         # aging E ~ 100 g/L and acet_rate is trace, so this never drives E negative.

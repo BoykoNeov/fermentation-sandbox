@@ -101,28 +101,42 @@ esters_eq:
 # ethanol -> acetaldehyde; Wildenradt & Singleton 1974) — the phenolic catalyst is folded into
 # k_ethanol_oxidation in v1 (a documented lump; no general phenol pool is tracked).
 #
+# SHARES, NOT THE WHOLE FLUX (the D-73 rework). Each O2 consumer draws its OWN share of the shared
+# o2 pool via its own rate constant; ProcessSet SUMS them, so the pool depletes ONCE and the O2
+# splits among the sinks by k_i / sum(k) (the pattern SulfiteOxidation established at D-72). So
+# k_ethanol_oxidation is the ETHANOL-OXIDATION SHARE of the total O2-depletion rate, NOT the total
+# (D-71 originally framed it as the total — D-73 supersedes that; see the k_ethanol_oxidation and
+# y_acetaldehyde_per_o2 entries below). y_acetaldehyde_per_o2 is then the TRUE per-O2 stoichiometric
+# yield of the ethanol route ALONE — the sink competition lives in the k's, NOT in a sub-unity yield.
+#
 # LEDGER. o2 is CARBON-FREE and off every conservation ledger (total_carbon/total_mass/
-# total_nitrogen weight only their named pools) — like h2s/iso_alpha. The Process consumes the WHOLE
-# O2 flux but routes only y_acetaldehyde_per_o2 mol/mol into acetaldehyde; the remainder is the
-# oxidative power spent on UNMODELED SINKS (phenolic browning, Strecker, SO2 consumption) the future
-# O2 sub-axis will claim. The carbon that DOES move (into acetaldehyde) is borrowed carbon-exactly
-# from E (C2 -> C2, the D-27 reduction reversed), so total_carbon closes to machine precision. MASS
-# carries the standing E<->acetaldehyde gap (the D-27 seam), scoped out because total_mass ({S,E,CO2})
-# is never asserted on an aging run.
+# total_nitrogen weight only their named pools) — like h2s/iso_alpha. The carbon that DOES move
+# (E -> acetaldehyde) is borrowed carbon-exactly (C2 -> C2, the D-27 reduction reversed), so
+# total_carbon closes to machine precision. MASS carries the standing E<->acetaldehyde gap (the D-27
+# seam), scoped out because total_mass ({S,E,CO2}) is never asserted on an aging run.
 #
 # TIER. ALL speculative — the oxidation FORM (O2-limited, warmer-faster) is sourced, but every
 # magnitude is an order-of-magnitude estimate and the aging axis is the Tier-3 frontier.
 
-# -- FIRST-ORDER O2 CONSUMPTION RATE: ethanol oxidation is O2-limited ---------------------
+# -- ETHANOL-OXIDATION SHARE OF THE O2-DEPLETION RATE (first-order in o2, O2-limited) -----
+# D-73: this is the ETHANOL-OXIDATION SHARE of the total O2-depletion rate, NOT the total (D-71
+# framed it as the total; D-73 supersedes that). Each always-on O2 sink owns its own first-order-in-
+# o2 rate; ProcessSet sums them, so the pool depletes once and O2 splits by k_i/sum(k). The empirical
+# TOTAL O2-scavenging timescale (weeks-to-months) is the ANCHOR the shares partition. TODAY ethanol
+# oxidation is the SOLE always-on O2 sink, so its share EQUALS the total => value stays 5.0e-4 and the
+# depletion timescale is unchanged. When phenolic browning / Strecker land (each an always-on sink
+# with its own k), THIS value is REDUCED so k_ethanol_oxidation + k_browning + ... ~ 5.0e-4 stays the
+# total (see the D-73 worked drop-in). Substrate-gated sinks (SO2, D-72) add on top without touching
+# this, since they are zero without their substrate.
 k_ethanol_oxidation:
   value: 5.0e-4
-  unit: "1/h"   # d(o2)/dt = -k_ethanol_oxidation * f(T) * [o2]  (first-order in the o2 pool)
+  unit: "1/h"   # d(o2)/dt = -k_ethanol_oxidation * f(T) * [o2]  (ethanol route's share of O2 depletion)
   tier: speculative
-  uncertainty: { low: 1.0e-4, high: 2.0e-3, note: "first-order O2-consumption rate at T_ref = 20 C => half-life ln2/k ~ 350-7000 h (~2 weeks to ~10 months) for the dissolved-O2 charge. Wine consumes a saturating O2 dose (~6-8 mg/L) over weeks-to-months at cellar temperature; the acetaldehyde it yields then persists. Sets how fast a dose of oxygen is 'used up', not the total effect (that is the dose x yield)." }
+  uncertainty: { low: 1.0e-4, high: 2.0e-3, note: "ethanol-oxidation share of the first-order O2-consumption rate at T_ref = 20 C. While ethanol oxidation is the sole always-on O2 sink this share IS the total => half-life ln2/k ~ 350-7000 h (~2 weeks to ~10 months) for the dissolved-O2 charge (wine scavenges a saturating O2 dose over weeks-to-months at cellar temperature). As always-on sinks (browning/Strecker) are added, this share is reduced so their sum reproduces that total depletion timescale — the total is the anchor, the shares partition it (D-73)." }
   provenance:
-    source: "author estimate anchored to the timescale over which dissolved oxygen is consumed in stored wine (Singleton 1987, oxidation of wines; Wildenradt & Singleton 1974, 'The production of aldehydes as a result of oxidation of polyphenolic compounds and its relation to wine aging'). A saturating O2 charge is scavenged over weeks-to-months at cellar temperature; the rate here is the pseudo-first-order O2-depletion constant, folding the o-diphenol/Fe catalyst concentration into k (no general phenol pool tracked in v1)."
-    conditions: "generic wine/beer at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool at T_ref = 293.15 K. The catalytic phenol/metal chemistry is lumped into this constant (the acetaldehyde-yield split is y_acetaldehyde_per_o2)."
-    notes: "SOURCED FORM (O2-limited, first-order in the finite O2 pool => SATURATING acetaldehyde, not the unbounded ethanol-first alternative — the D-71 design crux) + SPECULATIVE magnitude (order-of-magnitude, banded to the weeks-to-months O2-scavenging timescale). The load-bearing sourced claims are (1) O2 is the rate-limiter and (2) warmer oxidises faster (E_a_ethanol_oxidation)."
+    source: "author estimate anchored to the timescale over which dissolved oxygen is consumed in stored wine (Singleton 1987, oxidation of wines; Wildenradt & Singleton 1974, 'The production of aldehydes as a result of oxidation of polyphenolic compounds and its relation to wine aging'). A saturating O2 charge is scavenged over weeks-to-months at cellar temperature; this rate is the ethanol-oxidation share of the pseudo-first-order O2-depletion constant, folding the o-diphenol/Fe catalyst concentration into k (no general phenol pool tracked in v1)."
+    conditions: "generic wine/beer at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool at T_ref = 293.15 K, the ethanol route's share of the total depletion. The catalytic phenol/metal chemistry is lumped into this constant; the per-O2 acetaldehyde yield of the route is y_acetaldehyde_per_o2."
+    notes: "SOURCED FORM (O2-limited, first-order in the finite O2 pool => SATURATING acetaldehyde, not the unbounded ethanol-first alternative — the D-71 design crux) + SPECULATIVE magnitude (order-of-magnitude, banded to the weeks-to-months O2-scavenging timescale). The load-bearing sourced claims are (1) O2 is the rate-limiter and (2) warmer oxidises faster (E_a_ethanol_oxidation). D-73: this is the ethanol SHARE of the depletion rate — currently == the total (sole always-on sink), reduced when browning/Strecker add their shares."
 
 # -- ACTIVATION ENERGY: warmer aging oxidises faster (sourced ordering) -------------------
 E_a_ethanol_oxidation:
@@ -135,16 +149,24 @@ E_a_ethanol_oxidation:
     conditions: "equivalent Arrhenius activation energy of the aggregate O2-consumption / ethanol-oxidation at T_ref = 293.15 K"
     notes: "Only the DIRECTION (E_a > 0, warmer => faster) is the sourced, load-bearing claim — why warm/hot storage oxidises (maderises) wine faster and cold cellars slow it. Exact magnitude speculative and banded around a Q10 ~2, deliberately a touch below the ester-hydrolysis E_a (oxidation's temperature sensitivity is broadly comparable-to-slightly-lower)."
 
-# -- ACETALDEHYDE YIELD: mol acetaldehyde produced per mol O2 consumed --------------------
+# -- ACETALDEHYDE YIELD: mol acetaldehyde per mol O2 consumed BY THE ETHANOL ROUTE --------
+# D-73: this is the TRUE per-O2 stoichiometric yield of the ethanol-oxidation route ALONE, NOT a
+# sub-unity fudge for competing sinks. The sink competition now lives in the rate constants (each
+# sink draws its own O2 share via its own k; ProcessSet sums), so this yield is the ethanol route's
+# OWN conversion of the O2 it consumes — free to sit near the coupled-oxidation mechanistic yield.
+# Re-baselined 1.0 -> 1.5 (D-73). NOTE (interim, until browning is built): because ethanol oxidation
+# is currently the SOLE always-on O2 sink, it transiently receives the whole always-on O2 flux, so
+# aged-with-O2 acetaldehyde is an UPPER estimate; when browning/Strecker land and divert their O2
+# share (k reduced), the acetaldehyde partitions down to its true fraction.
 y_acetaldehyde_per_o2:
-  value: 1.0
-  unit: "mol/mol"   # acetaldehyde produced per O2 consumed; the rest = unmodeled oxidative sinks
+  value: 1.5
+  unit: "mol/mol"   # acetaldehyde produced per O2 consumed by the ethanol-oxidation route (true yield)
   tier: speculative
-  uncertainty: { low: 0.5, high: 2.0, note: "coupled oxidation yields up to ~1-2 mol acetaldehyde per mol O2 (1 O2 -> 1 H2O2 -> up to 1-2 oxidation equivalents), but phenolic browning / Strecker / SO2 consumption COMPETE for the same O2, so the realised acetaldehyde yield is BELOW the mechanistic max. Kept at ~1 to leave headroom for the future O2-sub-axis sinks. Sanity: a ~40 mg/L (~0.04 g/L) cumulative O2 exposure x this yield => ~55 mg/L acetaldehyde (fresh wine ~10-40, oxidised ~100-300 mg/L) — in range." }
+  uncertainty: { low: 1.0, high: 2.0, note: "coupled oxidation yields ~1-2 mol acetaldehyde per mol O2. The H2O2 arm (1 O2 -> 1 H2O2 -> 1 acetaldehyde) reliably gives ~1; the theoretical ceiling of 2 needs FULL coupling (O2's four-electron reduction O2->H2O2->H2O driving two 2-electron ethanol oxidations, the o-quinone re-oxidising a second ethanol). In real wine that ceiling is not reached — the quinone is usually reduced by OTHER diphenols/sulfite rather than ethanol, and H2O2 partitions to non-ethanol fates — so realised yield sits NEARER 1. Central 1.5 is a mid-band estimate, not the best case. Now that competing O2 sinks are EXPLICIT siblings (each with its own k), this is the ethanol route's OWN yield, not shaded down for them (D-73). Sanity: a ~40 mg/L (~0.04 g/L) cumulative O2 exposure x 1.5 => ~82 mg/L acetaldehyde (fresh wine ~10-40, moderately oxidised ~100-300 mg/L) — in range for an oxidative aging." }
   provenance:
-    source: "author estimate from the coupled-oxidation stoichiometry (Wildenradt & Singleton 1974: polyphenol oxidation by O2 generates H2O2, which oxidises ethanol to acetaldehyde; ~1-2 acetaldehyde per O2 mechanistic max). Set at the low end of the band because competing O2 sinks (o-diphenol browning, Strecker degradation of amino acids, direct SO2 oxidation) are not yet modelled — they will claim their share of the o2 pool as the sub-axis grows."
-    conditions: "mol acetaldehyde per mol O2 consumed, generic wine/beer; a lumped realised yield, deliberately below the mechanistic max to leave the remaining O2 for the future unmodeled oxidative sinks (D-71)."
-    notes: "SPECULATIVE magnitude. Deliberately BELOW the mechanistic ceiling so an additive future browning/Strecker/SO2 O2-sink does not double-count the O2 budget. The acetaldehyde it produces then binds any dosed SO2 via the D-47 equilibrium FOR FREE (SO2 mops up oxidative acetaldehyde — correct, and handled by the existing readout)."
+    source: "author estimate from the coupled-oxidation stoichiometry (Wildenradt & Singleton 1974: polyphenol oxidation by O2 generates H2O2, which oxidises ethanol to acetaldehyde). Per O2, the H2O2 arm gives ~1 acetaldehyde reliably; up to ~2 is possible only if the catalytic o-diphenol/o-quinone couple carries a fully-coupled second oxidation, which real wine approaches but does not reach (competing quinone reductants and H2O2 fates). Central 1.5 is the mid-band estimate for the ETHANOL ROUTE ALONE — above the reliable ~1, below the ~2 best case."
+    conditions: "mol acetaldehyde per mol O2 consumed by the ethanol-oxidation route, generic wine/beer; the route's true per-O2 yield at T_ref = 293.15 K. Competing O2 sinks (o-diphenol browning, Strecker degradation, direct SO2 oxidation) draw their OWN O2 share via their own rate constants (SO2, D-72; browning/Strecker to come, D-73), NOT out of this yield."
+    notes: "SPECULATIVE magnitude. D-73 re-baseline 1.0 -> 1.5: the old 1.0 was the sub-unity 'leave headroom for unmodeled sinks' framing, which was muddled — cutting the yield never freed O2 for other sinks (the O2 partition lives in the k's, not here). With competition moved to explicit sibling rate constants this is the ethanol route's genuine yield (mid-to-upper coupled-oxidation band). INTERIM CAVEAT: until browning/Strecker are built to divert their O2 share, ethanol oxidation gets the whole always-on flux, so aged-with-O2 acetaldehyde is an upper estimate. The acetaldehyde it produces still binds any dosed SO2 via the D-47 equilibrium for free (SO2 mops up oxidative acetaldehyde — handled by the existing readout)."
 
 # ======================================================================================
 # SULFITE OXIDATION (decision D-72, the FIRST oxidative sub-axis sink to claim its share of the
