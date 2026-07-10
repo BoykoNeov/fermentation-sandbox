@@ -17,6 +17,7 @@ from fermentation.core.kinetics.acetaldehyde import (
 from fermentation.core.kinetics.aging import (
     EsterHydrolysis,
     OxidativeAcetaldehyde,
+    PhenolicBrowning,
     SulfiteOxidation,
 )
 from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
@@ -104,6 +105,7 @@ __all__ = [
     "ColemanQuadraticDeathTemperature",
     "EsterHydrolysis",
     "OxidativeAcetaldehyde",
+    "PhenolicBrowning",
     "SulfiteOxidation",
     "EsterSynthesis",
     "EsterVolatilization",

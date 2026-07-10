@@ -1,7 +1,10 @@
 # Milestone 3 — Tier-3 (speculative frontier): sensory/OAV + aging chemistry
 
 > Status: **beat 1a built (D-67); aging axis opened (D-68); first aging Process built (D-69);
-> aging-phase scenario wiring landed (D-70); oxidative aging axis opened (D-71).**
+> aging-phase scenario wiring landed (D-70); oxidative aging axis opened (D-71); SO₂ scavenging
+> — the first O₂ sink — built (D-72); O₂ sub-axis reworked for always-on sinks (D-73);
+> `PhenolicBrowning` — the first always-on sink, and the first VISIBLE oxidative product (the
+> `A420` browning index) — built (D-74).**
 > The OAV sensory readout ships (`fermentation.sensory` + `sensory.yaml` + `tests/test_sensory_oav.py`).
 > **D-69 built `EsterHydrolysis` (`core/kinetics/aging.py` + shared `aging.yaml` + `tests/test_aging.py`):
 > net decay of the `esters` pool toward a lower equilibrium floor, Arrhenius warmer-ages-faster, released
@@ -22,8 +25,14 @@
 > ethanol-first form, so `o2` is the shared substrate the whole future oxidative sub-axis (browning /
 > Strecker / SO₂ consumption) will draw down. Carbon closes machine-precision (E→acetaldehyde, the D-27
 > reduction reversed; O₂ off every ledger); reductive aging (`begin_aging` with no `add_oxygen`) is
-> byte-for-byte the ester-only case.** Next: the next oxidative sub-axis Process (browning / Strecker /
-> SO₂ consumption) or oak extraction; beat 1b (descriptor projection) still deferred.
+> byte-for-byte the ester-only case.** D-72 built `SulfiteOxidation` (the first O₂ sink, wine-only,
+> substrate-gated: "SO₂ protects until exhausted"); D-73 reworked the O₂ sub-axis so `k_ethanol_oxidation`
+> is a *share* not the total, letting *always-on* sinks compose; D-74 built `PhenolicBrowning` — the first
+> always-on sink and the first VISIBLE oxidative product: medium-agnostic, dominant O₂ share (diverts O₂
+> from — and suppresses — oxidative acetaldehyde), accumulating a new `A420` browning-index state slot (an
+> optical absorbance, off every ledger; the `iso_alpha` pattern, not the D-67 post-hoc OAV). Next: Strecker
+> degradation (the next always-on O₂ sink; needs new aldehyde aroma pools) or oak extraction; beat 1b
+> (descriptor projection) still deferred.
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

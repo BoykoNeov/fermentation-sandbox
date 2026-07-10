@@ -54,6 +54,7 @@ from fermentation.core.kinetics import (
     MalolacticSenescence,
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
+    PhenolicBrowning,
     SulfiteOxidation,
     YeastAutolysis,
     YeastPOFDecarboxylation,
@@ -114,18 +115,25 @@ _BRETT_GATED_PROCESSES = (
     BrettEthanolToxicity,
 )
 
-#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72): :class:`EsterHydrolysis`
-#: (the ester-fade), :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol oxidation) and
-#: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72). The first two are wired into both
-#: media; :class:`SulfiteOxidation` is wine-only (reads wine-only ``so2_total``/pH slots), so on
-#: beer it is simply absent from the ProcessSet — both the compile-disable and the
+#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72/D-74):
+#: :class:`EsterHydrolysis` (the ester-fade), :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol
+#: oxidation), :class:`PhenolicBrowning` (the O₂-driven browning, D-74, accumulating ``A420``) and
+#: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72). The first three are
+#: medium-agnostic
+#: (wired into both media); :class:`SulfiteOxidation` is wine-only (reads wine-only ``so2_total``/pH
+#: slots), so on beer it is simply absent from the ProcessSet — both the compile-disable and the
 #: ``begin_aging``-enable loops guard with ``name in process_set``, so listing it here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
 #: ``begin_aging`` verb re-enables exactly this tuple at its breakpoint and the compile seam
 #: disables exactly this tuple — one list,
 #: so the enable/disable stay symmetric as the aging axis grows. Their shared aging.yaml parameters
 #: are guarded together at the verb boundary.
-_AGING_GATED_PROCESSES = (EsterHydrolysis, OxidativeAcetaldehyde, SulfiteOxidation)
+_AGING_GATED_PROCESSES = (
+    EsterHydrolysis,
+    OxidativeAcetaldehyde,
+    PhenolicBrowning,
+    SulfiteOxidation,
+)
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
 _Initial = dict[str, float | list[float]]
@@ -924,12 +932,19 @@ def _verb_add_oxygen(
     takes up in bottle, under micro-oxygenation, or across a barrel. One dose models a single
     exposure (a bottle's total ingress); repeated doses model continuous micro-ox / barrel aging.
     The dosed O₂ is then drawn down by the oxidative aging Processes (once ``begin_aging`` has
-    enabled them), each taking its own share of the shared ``o2`` pool (D-73):
-    :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde` oxidises ethanol → acetaldehyde
-    at its per-O₂ yield, while :class:`~fermentation.core.kinetics.aging.SulfiteOxidation` (wine)
-    diverts O₂ to spend free SO₂ — so a dose raises the finished-wine acetaldehyde
-    ('sherry'/oxidised) except insofar as SO₂ intercepts the O₂, and any acetaldehyde formed is
-    further mopped up by dosed SO₂ via the D-47 binding equilibrium for free.
+    enabled them), each taking its own share of the shared ``o2`` pool (D-73/D-74):
+    :class:`~fermentation.core.kinetics.aging.PhenolicBrowning` (medium-agnostic, the DOMINANT sink)
+    oxidises phenolics to brown pigment, accumulating the ``A420`` browning index;
+    :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde` (medium-agnostic) oxidises
+    ethanol → acetaldehyde at its per-O₂ yield; and
+    :class:`~fermentation.core.kinetics.aging.SulfiteOxidation` (wine) diverts O₂ to spend free SO₂
+    —
+    so a dose **browns** the finished wine/beer and raises its acetaldehyde ('sherry'/oxidised),
+    with
+    browning taking most of the O₂ (suppressing the acetaldehyde) and SO₂ intercepting O₂ while it
+    lasts; any acetaldehyde formed is further mopped up by dosed SO₂ via the D-47 binding
+    equilibrium
+    for free.
 
     **The add_so2 pattern exactly** (a carbon-free dosed pool): O₂ carries neither carbon nor
     nitrogen and the ``o2`` slot is off every conservation ledger (``total_carbon``/``total_mass``/
@@ -1235,17 +1250,21 @@ def _verb_begin_aging(
     """``begin_aging`` — start the post-fermentation aging phase (decisions D-70/D-71, §4.1).
 
     The aging-axis wiring: it **reconfigures** the Process set to enable the aging Processes
-    (:data:`_AGING_GATED_PROCESSES` — :class:`~fermentation.core.kinetics.aging.EsterHydrolysis`
-    and :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde`) from its ``day`` onward —
+    (:data:`_AGING_GATED_PROCESSES` — :class:`~fermentation.core.kinetics.aging.EsterHydrolysis`,
+    :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde`,
+    :class:`~fermentation.core.kinetics.aging.PhenolicBrowning` and the wine-only
+    :class:`~fermentation.core.kinetics.aging.SulfiteOxidation`) from its ``day`` onward —
     the ``pitch_mlf`` reconfigure pattern MINUS the state mutation (aging inoculates nothing; it
-    just switches on the spontaneous chemistry the compile seam left off). Both are wired into both
+    just switches on the spontaneous chemistry the compile seam left off). All are wired into their
     media but DISABLED at compile (aging is inherently post-ferment — there is no aging at t0), so
     this verb is the *only* way to turn them on; before the breakpoint the run is byte-for-byte the
     pre-aging model and after it the young fruity acetate esters hydrolyse back toward equilibrium
     (fading the ester OAV, raising the fusel OAV, drifting VA/pH up) and — if oxygen has been dosed
-    (``add_oxygen``) — dissolved O₂ oxidises ethanol to acetaldehyde (the 'sherry'/oxidised note).
-    With no oxygen dosed the oxidation Process is inert (``o2 = 0``), so ``begin_aging`` alone is
-    purely *reductive* aging — byte-for-byte the ester-hydrolysis-only case (D-71).
+    (``add_oxygen``) — dissolved O₂ **browns** the wine/beer (raising the ``A420`` index, D-74) and
+    oxidises ethanol to acetaldehyde (the 'sherry'/oxidised note). With no oxygen dosed the
+    O₂-driven
+    Processes are inert (``o2 = 0``), so ``begin_aging`` alone is purely *reductive* aging —
+    byte-for-byte the ester-hydrolysis-only case (D-71/D-74).
 
     **The aging span is expressed by ``duration_days``** (this is a pure reconfigure with no
     "how long" of its own): put ``begin_aging`` at the ferment/aging boundary day and set
@@ -1268,13 +1287,13 @@ def _verb_begin_aging(
     """
     _iv_check_keys(iv, frozenset(), "begin_aging")
     # No schema-slot requirement — the aging Processes are medium-agnostic (esters/fusels/Byp/
-    # acetaldehyde/o2 exist in both media). Guard the aging params are present (the add_dap/
+    # acetaldehyde/o2/A420 exist in both media). Guard the aging params are present (the add_dap/
     # additions.yaml pattern): the reconfigure takes effect at runtime, so an absent aging.yaml
     # would otherwise surface as a KeyError deep in an aging Process's derivatives rather than a
     # clear compile-time scenario error. Guards ALL aging Processes' params (D-70 hydrolysis +
-    # D-71 ethanol oxidation + D-72 SO₂ oxidation), since begin_aging enables all of them. The
-    # D-72 params ride in the same shared aging.yaml, so guarding them is beer-safe (present in
-    # every medium) even though SulfiteOxidation itself is wine-only.
+    # D-71 ethanol oxidation + D-72 SO₂ oxidation + D-74 phenolic browning), since begin_aging
+    # enables all of them. The D-72/D-74 params ride in the same shared aging.yaml, so guarding
+    # them is beer-safe (present in every medium) even though SulfiteOxidation itself is wine-only.
     for name in (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
@@ -1284,6 +1303,9 @@ def _verb_begin_aging(
         "y_acetaldehyde_per_o2",
         "k_so2_oxidation",
         "E_a_so2_oxidation",
+        "k_browning",
+        "E_a_browning",
+        "y_a420_per_o2",
     ):
         if name not in parameters:
             raise ValueError(

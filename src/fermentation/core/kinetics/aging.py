@@ -6,7 +6,7 @@ Process acts on a *finished* wine/beer over months-to-years: fermentation is don
 sugar is gone, the yeast racked or crashed, and the chemistry that remains is spontaneous
 (hydrolysis, oxidation, condensation), not metabolic. This module holds the aging
 Processes; :class:`EsterHydrolysis` is the first, :class:`OxidativeAcetaldehyde` the second,
-and :class:`SulfiteOxidation` the third.
+:class:`SulfiteOxidation` the third, and :class:`PhenolicBrowning` the fourth.
 
 **The oxidative sub-axis (D-71).** :class:`OxidativeAcetaldehyde` opens the *oxidative* half of
 the aging axis on a **dissolved-O₂ pool** (``o2``, a new carbon-free state slot, off every
@@ -25,9 +25,14 @@ the sinks by ``kᵢ / Σk`` (the additive pattern :class:`SulfiteOxidation` esta
 extended to *always-on* sinks at **D-73**). So :class:`OxidativeAcetaldehyde` consumes only its
 **ethanol-oxidation share** (``k_ethanol_oxidation``), not the whole flux, and
 ``y_acetaldehyde_per_o2`` is the *true* per-O₂ stoichiometric yield of that route alone — the
-competition lives in the rate constants, not in a sub-unity yield. The future sinks (phenolic
-browning, Strecker degradation) slot in as further shares (D-73 reworked D-71's original
-"whole-flux / total-rate" framing so an always-on sink adds cleanly, without double-counting).
+competition lives in the rate constants, not in a sub-unity yield. :class:`PhenolicBrowning`
+(**D-74**) is the first always-on sink to land in that seam: the *dominant* O₂ consumer
+(``k_browning``), it diverts most of the always-on flux to brown pigment and correspondingly
+suppresses oxidative acetaldehyde — the reduction of ``k_ethanol_oxidation`` (5.0e-4 → 2.0e-4, so
+``k_ethanol + k_browning`` holds the calibrated total O₂-depletion rate) that D-73 made possible and
+D-71 could not express under "total rate". A further Strecker-degradation sink would slot in the
+same way (D-73 reworked D-71's original "whole-flux / total-rate" framing so an always-on sink adds
+cleanly, without double-counting).
 
 **The first of those sinks: SO₂ scavenging (D-72).** :class:`SulfiteOxidation` is the first
 sibling to claim its share of that ``o2`` budget. Dissolved O₂ oxidises free **bisulfite** (the
@@ -37,6 +42,31 @@ ethanol oxidation: **while free SO₂ lasts, oxidative acetaldehyde is suppresse
 acetaldehyde climbs** (the classic wine threshold, emergent, nothing extra built). It decrements
 the existing ``so2_total`` slot (no new pool) at the Danilewicz 2:1 mol SO₂:O₂ stoichiometry, and
 self-throttles as D-47 acetaldehyde–SO₂ binding erodes the free pool.
+
+**The first *always-on* sink: phenolic browning (D-74).** :class:`PhenolicBrowning` is the second
+oxidative sibling and the first **always-on** claimant of the ``o2`` budget (SO₂ oxidation is
+*substrate-gated* — zero without dosed SO₂; browning runs whenever O₂ is present). As a finished
+wine/beer takes up O₂, dissolved O₂ oxidises **phenolics** (o-diphenols → o-quinones, which
+polymerise to brown melanoidin/quinone pigment) — the gold→amber→brown of an aged/maderised white
+wine, and oxidative darkening in beer. This is in fact the *dominant* O₂ consumer in wine oxidation
+(phenol autoxidation is the primary O₂ sink; ethanol oxidation to acetaldehyde is a *secondary*
+H₂O₂ fate), so ``k_browning`` is set the **larger** share and — competing for the same ``o2`` pool
+via ``ProcessSet`` summing, exactly like SO₂ — it **diverts most of the always-on O₂ away from
+ethanol oxidation, suppressing oxidative acetaldehyde**: the always-on analogue of SO₂'s protection
+(SO₂ suppresses *until spent*; browning suppresses *permanently*, as a co-resident sink). Unlike the
+other three aging Processes it has **no aroma product the D-67 OAV lens already reads**, so — the
+D-68 selection criterion inverted — it needs **one new observable**: the ``A420`` browning index (an
+optical **absorbance** at 420 nm, dimensionless AU, **not** a pigment mass). ``A420`` is a *state
+slot* (the ``iso_alpha`` off-ledger-pool pattern, **not** the D-67 post-hoc OAV series): browning
+pigment is **cumulative and irreversible** and its O₂ flux is *dynamic* (SO₂ competes, temperature
+varies), so it must be **integrated** along the run — it cannot be reconstructed post-hoc from
+(dosed − remaining) O₂. Because ``A420`` is an optical index rather than a mass, its carbon (which
+would come from an *untracked* phenol pool) is sidestepped by construction: this Process touches
+only ``{o2, A420}`` — **both off every ledger** — so it moves *nothing* conserved (cleaner even than
+:class:`OxidativeAcetaldehyde`, which still borrows carbon E→acetaldehyde). ``d(A420)/dt ≥ 0``
+always (monotonic; no clamp). Medium-agnostic (both media carry autoxidising polyphenols and brown
+oxidatively — D-74 supersedes D-73's provisional "wine-only" parenthetical), so wired into both
+media like :class:`OxidativeAcetaldehyde`.
 
 **Off during the ferment, on during an aging segment (D-68/D-70).** These Processes ARE wired
 into both media's ProcessSet (D-70) but **disabled at the compile seam** — a ``begin_aging``
@@ -295,22 +325,32 @@ class OxidativeAcetaldehyde(Process):
     consumes ``r_O2 = k_ethanol_oxidation · f(T) · [O2]`` — its **own share** of the shared O₂
     budget, not the whole flux — and every mol it consumes yields ``y_acetaldehyde_per_o2`` mol
     acetaldehyde, the *true* per-O₂ stoichiometric yield of the ethanol route. Sibling sinks
-    (:class:`SulfiteOxidation` today; phenolic browning / Strecker to come) each draw their **own**
-    share via their own rate constant, and ``ProcessSet`` summing splits the finite O₂ among them by
+    (:class:`SulfiteOxidation` and the dominant always-on :class:`PhenolicBrowning`, D-74; Strecker
+    to
+    come) each draw their **own** share via their own rate constant, and ``ProcessSet`` summing
+    splits
+    the finite O₂ among them by
     ``kᵢ / Σk`` — so the pool depletes *once*, and the competition that suppresses acetaldehyde
     lives in the rate constants, not in a shaded-down yield. Because O₂ carries no carbon,
     "spending" it is not a conservation violation; the carbon that *does* move (into acetaldehyde)
     is borrowed carbon-exactly from ``E``.
 
-    *Interim over-attribution, until browning/Strecker are built (D-73).* ``k_ethanol_oxidation`` is
-    the ethanol-oxidation *share*, but ethanol oxidation is presently the **sole always-on** O₂
-    sink, so its share currently *equals* the whole always-on flux — an oxygen-dosed aging routes
-    all its always-on O₂ here and aged acetaldehyde is an **upper estimate**. When the always-on
-    browning / Strecker sinks land, ``k_ethanol_oxidation`` is reduced to its true share (their sum
-    holds the empirical total O₂-depletion timescale — the anchor) and the acetaldehyde partitions
-    down. (This is the *always-on* case D-71 flagged and D-72 deferred: substrate-gated
-    :class:`SulfiteOxidation` needed no such re-baseline — it is simply zero without SO₂ — so it
-    already composes cleanly.)
+    *Ethanol oxidation is now the secondary always-on sink (D-74).* ``k_ethanol_oxidation`` is the
+    ethanol-oxidation *share*, and as of **D-74** it is no longer the whole always-on flux:
+    :class:`PhenolicBrowning` is a co-resident always-on O₂ sink, and the *dominant* one (phenol
+    autoxidation is the primary O₂ consumer; ethanol oxidation is the secondary H₂O₂ fate). So
+    ``k_ethanol_oxidation`` was **reduced 5.0e-4 → 2.0e-4** (browning takes the larger 3.0e-4 share)
+    with ``k_ethanol + k_browning = 5.0e-4`` holding the empirical total O₂-depletion timescale —
+    the
+    anchor — unchanged. Aged acetaldehyde is therefore **lower** than the D-73 sole-sink estimate:
+    with no SO₂ the ethanol route's share of a fully-consumed O₂ charge is ``k_ethanol / (k_ethanol
+    +
+    k_browning) = 0.4``, so the cumulative acetaldehyde is ~40 % of the sole-sink value (the
+    "partitions
+    down" D-73 promised, now realised). The D-72 substrate-gated :class:`SulfiteOxidation` needed no
+    such re-baseline — it is simply zero without SO₂ — so the *always-on* re-baseline D-71 flagged
+    and
+    D-72 deferred is exactly what D-73 enabled and D-74 spent.
 
     *Mass carries the standing gap, scoped out by construction.* ``total_mass`` weights only
     ``{S, E, CO2}`` (the byproduct-free validated-core check, D-8/D-16): this Process debits ``E``
@@ -465,4 +505,117 @@ class SulfiteOxidation(Process):
         d[schema.slice("o2")] = -r_o2
         # 2 mol SO₂ oxidised per mol O₂ (Danilewicz coupled oxidation): moles O₂ = r_o2 / M_O2.
         d[schema.slice(SO2_STATE_KEY)] = -_SO2_PER_O2 * (r_o2 / M_O2) * M_SO2
+        return d
+
+
+class PhenolicBrowning(Process):
+    """Oxidative aging: dissolved O₂ oxidises phenolics → brown pigment (decision D-74).
+
+    The second **oxidative** aging Process and the first **always-on** sink on the O₂ sub-axis (SO₂
+    oxidation is *substrate-gated* — zero without dosed SO₂; browning runs whenever O₂ is present).
+    As a finished wine/beer takes up oxygen, dissolved O₂ oxidises **phenolics** (o-diphenols →
+    o-quinones, polymerising to brown melanoidin/quinone pigment) — the gold→amber→brown of an aged
+    / maderised white wine, and the oxidative darkening of stale beer. This is the **dominant** O₂
+    consumer in wine oxidation: phenol autoxidation is the *primary* O₂ sink, while ethanol
+    oxidation
+    to acetaldehyde (:class:`OxidativeAcetaldehyde`) is a *secondary* H₂O₂ fate — so ``k_browning``
+    is
+    the **larger** share of the shared O₂ budget, and browning **diverts most of the always-on O₂
+    away from ethanol oxidation, suppressing oxidative acetaldehyde**. That suppression is the
+    always-on analogue of SO₂'s protection (D-72): SO₂ suppresses *until it is spent*; browning, a
+    co-resident always-on sink, suppresses *permanently* (the acetaldehyde partition ``k_ethanol /
+    Σk`` emerges from ``ProcessSet`` summing, for free). Landing browning is what the D-73 rework
+    enabled — ``k_ethanol_oxidation`` was reduced 5.0e-4 → 2.0e-4 so ``k_ethanol + k_browning``
+    still
+    holds the calibrated total O₂-depletion timescale (the anchor); under D-71's "total rate"
+    framing
+    this always-on sink could not have been added without double-counting.
+
+    ``d(o2)/dt = −r_O2`` with ``r_O2 = k_browning · f(T) · [O2]`` — first-order in the dissolved-O₂
+    pool (its **own share**, like :class:`OxidativeAcetaldehyde`), ``f(T) = arrhenius_factor(T,
+    E_a_browning, T_ref)`` the sourced warmer-browns-faster factor. The O₂ it consumes accumulates
+    the
+    browning index::
+
+        d(A420)/dt = +y_a420_per_o2 · (r_O2 / M_O2)
+
+    **The new observable is an optical index, not an aroma or a mass (the D-74 crux).** Unlike the
+    other three aging Processes, browning moves **no** pool the D-67 OAV lens already reads — its
+    product is brown *pigment*, seen not smelled — so (the D-68 "reuse an existing pool" criterion
+    inverted) it needs one new observable: ``A420``, the **absorbance at 420 nm** (dimensionless AU,
+    1 cm path — the standard analytical browning measure), **not** a pigment concentration. Two
+    consequences follow. (1) ``A420`` is a **state slot** (the ``iso_alpha`` off-ledger-pool
+    pattern),
+    **not** a post-hoc readout like the D-67 OAV series: browning pigment is *cumulative and
+    irreversible* and its O₂ flux is *dynamic* (SO₂ competes for O₂, temperature varies the rate),
+    so
+    it must be **integrated** along the trajectory — it cannot be reconstructed after the run from
+    (dosed − remaining) O₂. (2) Because ``A420`` is an **optical index rather than a mass**, the
+    conservation question dissolves: the pigment's carbon would come from an *untracked* phenol
+    pool,
+    but an absorbance carries none, so ``A420`` is off every ledger by construction (like ``o2`` /
+    ``iso_alpha``). This Process therefore touches only ``{o2, A420}`` — **both off every ledger** —
+    and moves **nothing conserved at all**: it is the *cleanest* aging Process on the books (even
+    :class:`OxidativeAcetaldehyde` still borrows carbon E→acetaldehyde). ``d(A420)/dt ≥ 0`` always
+    (monotonic accumulation — no clamp; a solver undershoot ``o2 < 0`` is caught by the guard).
+
+    **Medium-agnostic (D-74 supersedes D-73's provisional "wine-only").** D-73's worked drop-in
+    tentatively marked browning "wine — o-diphenols are a wine pool", but there is no o-diphenol
+    pool
+    (the catalyst is lumped into ``k_browning``, as in :class:`OxidativeAcetaldehyde`), and both
+    wine
+    and beer carry autoxidising polyphenols that consume O₂ and brown oxidatively — so browning is a
+    property of the molecules, not the biology (the shared-``aging.yaml`` discipline), and is wired
+    into **both** media like :class:`OxidativeAcetaldehyde`. This is also *forced* to be
+    consistent: the
+    ``k_ethanol_oxidation`` reduction lives in the **shared** ``aging.yaml`` and applies to both
+    media,
+    so a wine-only browning sink would leave beer's total O₂-depletion rate silently halved below
+    the
+    anchor — the very in-tree inconsistency the D-73 rework existed to remove. Medium-agnostic
+    browning
+    keeps beer's O₂ budget whole (beer runs browning too, records its own ``A420``).
+
+    **Isolable + O₂-gated (prime directive #3).** Wired into both media's ``_AGING_PROCESSES`` tuple
+    but **disabled at the compile seam** (aging is post-ferment); ``begin_aging`` enables it with
+    the other aging Processes. With no O₂ dosed the ``o2 ≤ 0`` guard is exact and the contribution
+    is byte-for-byte zero (``A420`` stays 0), so a ``begin_aging`` run without ``add_oxygen`` is
+    purely *reductive* aging — unchanged by this Process. Tier **speculative** (the aging axis is
+    the Tier-3 frontier; the browning *form* — O₂-limited, warmer-faster — is sourced, the rate and
+    per-O₂ absorbance yield are order-of-magnitude estimates).
+    """
+
+    name = "phenolic_browning"
+    #: Consumes its share of the dissolved-O₂ substrate and books the oxidised phenol as the
+    #: ``A420`` browning index — both slots off every ledger, so nothing conserved moves; it touches
+    #: those two and nothing else (the cleanest aging Process — not even a carbon borrow).
+    tier = Tier.SPECULATIVE
+    touches = ("o2", "A420")
+    #: ``k_browning``/``E_a_browning``/``y_a420_per_o2`` are this Process's own (aging.yaml, D-74);
+    #: ``T_ref`` is shared with every Arrhenius rate. Tiers cap the ``o2``/``A420`` output tiers via
+    #: parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = ("k_browning", "E_a_browning", "y_a420_per_o2", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        o2 = float(y[schema.slice("o2")][0])
+        # No oxidant ⇒ no browning: reductive/un-oxygenated aging is byte-for-byte the case without
+        # this Process (A420 stays 0). ``<= 0`` also absorbs a solver undershoot (o2 < 0 ⇒ no
+        # spurious browning), which keeps d(A420)/dt ≥ 0 (A420 monotonic, never reversed).
+        if o2 <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_browning"], params["T_ref"])
+        # This route's SHARE of the O₂-depletion rate (the larger, dominant share — D-74),
+        # first-order
+        # in o2 like the ethanol route; ProcessSet sums the sinks so the pool depletes once.
+        r_o2 = params["k_browning"] * f_t * o2  # g O2/L/h consumed by the browning route
+        d[schema.slice("o2")] = -r_o2  # this route's O₂ share is consumed (off every ledger)
+        # Every mol O₂ this route consumes raises the A420 absorbance index by y_a420_per_o2 (AU per
+        # mol O₂/L). moles O₂ = r_o2 / M_O2. A420 is an optical index (off every ledger), not a
+        # mass —
+        # so nothing conserved moves and no carbon is borrowed (unlike the ethanol route).
+        d[schema.slice("A420")] = params["y_a420_per_o2"] * (r_o2 / M_O2)
         return d

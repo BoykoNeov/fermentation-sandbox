@@ -101,6 +101,7 @@ from fermentation.core.kinetics import (
     MalolacticSenescence,
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
+    PhenolicBrowning,
     PyruvateExcretion,
     PyruvateReassimilation,
     SugarUptakeToEthanolCO2,
@@ -205,10 +206,24 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             "g/L",
             default=0.0,
             description="dissolved oxygen — the OXIDATIVE-aging substrate (decision D-71). Dosed "
-            "post-ferment by add_oxygen (bottle ingress / micro-oxygenation); consumed by "
-            "OxidativeAcetaldehyde, which oxidises ethanol → acetaldehyde at a molar yield (the "
-            "'sherry'/oxidised note). Carbon-free and on NO ledger (like h2s/iso_alpha). Default 0 "
-            "⇒ an un-oxygenated (reductive) aging is byte-for-byte the ester-hydrolysis-only case",
+            "post-ferment by add_oxygen (bottle ingress / micro-oxygenation); drawn down by the "
+            "always-on O₂ sinks OxidativeAcetaldehyde (→ acetaldehyde, the 'sherry'/oxidised note) "
+            "and PhenolicBrowning (→ brown pigment, D-74), plus wine's SulfiteOxidation. "
+            "Carbon-free and on NO ledger (like h2s/iso_alpha). Default 0 ⇒ an un-oxygenated "
+            "(reductive) aging is byte-for-byte the ester-hydrolysis-only case",
+        ),
+        VarSpec(
+            "A420",
+            "AU",
+            default=0.0,
+            description="oxidative-browning index — absorbance at 420 nm, the standard measure of "
+            "wine/beer browning (decision D-74). Accumulated by PhenolicBrowning as dissolved O₂ "
+            "oxidises phenolics to brown quinone/melanoidin pigment (the gold→amber→brown of aged "
+            "white wine; oxidative darkening in beer). An OPTICAL INDEX (dimensionless AU, 1 cm "
+            "path), NOT a pigment mass — so carbon-free and on NO ledger (like o2/iso_alpha), and "
+            "its carbon (from untracked phenols) is sidestepped by construction. Cumulative and "
+            "monotonic (d(A420)/dt ≥ 0). Default 0 ⇒ a reductive/un-oxygenated aging is byte-for-"
+            "byte the case without browning",
         ),
     ]
 
@@ -602,14 +617,19 @@ _ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
 _HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 
 #: Aging chemistry — the slow post-fermentation "years" axis (Milestone 3 / Tier-3, decisions
-#: D-68..D-71). Two Processes: :class:`EsterHydrolysis` (D-69, the first §4.1 Process — young
-#: fruity acetate esters hydrolyse back toward equilibrium with age, releasing carbon 5:2 into
-#: ``fusels`` + ``Byp``) and :class:`OxidativeAcetaldehyde` (D-71, the first OXIDATIVE Process —
-#: dissolved O₂ oxidises ethanol → acetaldehyde, the 'sherry'/oxidised note, saturating as the
-#: ``o2`` charge is spent). BOTH MEDIUM-AGNOSTIC — hydrolysis and oxidation are properties of the
-#: molecules and the wine/beer pH, not the biology (the ``vicinal_diketones.yaml`` / shared-file
-#: pattern), and ``esters``/``fusels``/``Byp``/``acetaldehyde``/``o2`` exist in both schemas — so
-#: both are wired into BOTH media. Kept in their OWN isolable tuple (prime directive #3): a
+#: D-68..D-74). Three medium-agnostic Processes: :class:`EsterHydrolysis` (D-69, the first §4.1
+#: Process — young fruity acetate esters hydrolyse back toward equilibrium with age, releasing
+#: carbon 5:2 into ``fusels`` + ``Byp``), :class:`OxidativeAcetaldehyde` (D-71, the first OXIDATIVE
+#: Process — dissolved O₂ oxidises ethanol → acetaldehyde, the 'sherry'/oxidised note, saturating as
+#: the ``o2`` charge is spent) and :class:`PhenolicBrowning` (D-74, the second always-on O₂ sink —
+#: O₂ oxidises phenolics to brown pigment, accumulating the ``A420`` browning index; the dominant
+#: O₂ consumer, so it diverts O₂ from — and suppresses — oxidative acetaldehyde). ALL
+#: MEDIUM-AGNOSTIC
+#: — hydrolysis and oxidation are properties of the molecules and the wine/beer pH, not the biology
+#: (the ``vicinal_diketones.yaml`` / shared-file pattern); ``esters``/``fusels``/``Byp``/
+#: ``acetaldehyde``/``o2``/``A420`` exist in both schemas, and both wine and beer carry autoxidising
+#: polyphenols that consume O₂ and brown (D-74) — so all three are wired into BOTH media. Kept in
+#: their OWN isolable tuple (prime directive #3): a
 #: ProcessSet built without it is the pre-aging model. Unlike the always-on intrinsic aroma pools,
 #: aging is INHERENTLY post-ferment (there is no aging at t0), so the compile seam DISABLES the
 #: whole tuple unconditionally and a ``begin_aging`` intervention (decision D-70, the ``pitch_mlf``
@@ -620,11 +640,16 @@ _HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 #: ``acetaldehyde`` (``ester_synthesis``, ``ester_volatilization``, ``fusel_alcohols_ehrlich``, the
 #: ``Byp`` uptake routing, and ``acetaldehyde_production``/``_reduction``) is fermentative-flux- or
 #: viable-``X``-gated and quiescent at ``S ≈ 0`` / ``X = 0``, so the aging signal is UNCONFOUNDED —
-#: only the aging Processes move those pools (Stance A, D-70). :class:`OxidativeAcetaldehyde` adds
-#: a further gate: it is inert unless O₂ is dosed (``add_oxygen``), so a ``begin_aging`` run with no
-#: oxygen is purely *reductive* aging — byte-for-byte the ester-hydrolysis-only case (D-71). Params
-#: live in the shared, medium-agnostic ``aging.yaml``.
-_AGING_PROCESSES: tuple[Callable[[], Process], ...] = (EsterHydrolysis, OxidativeAcetaldehyde)
+#: only the aging Processes move those pools (Stance A, D-70). :class:`OxidativeAcetaldehyde` and
+#: :class:`PhenolicBrowning` add a further gate: both are inert unless O₂ is dosed (``add_oxygen``),
+#: so a ``begin_aging`` run with no oxygen is purely *reductive* aging — byte-for-byte the
+#: ester-hydrolysis-only case (D-71/D-74; ``o2 ≤ 0`` ⇒ both contribute zero, ``A420`` stays 0).
+#: Params live in the shared, medium-agnostic ``aging.yaml``.
+_AGING_PROCESSES: tuple[Callable[[], Process], ...] = (
+    EsterHydrolysis,
+    OxidativeAcetaldehyde,
+    PhenolicBrowning,
+)
 
 #: WINE-ONLY oxidative-aging Processes that draw on wine-only state (decision D-72). Unlike the
 #: medium-agnostic ``_AGING_PROCESSES`` above, :class:`SulfiteOxidation` reads ``so2_total`` and the

@@ -30,6 +30,7 @@ import pytest
 from fermentation.core.kinetics.aging import (
     EsterHydrolysis,
     OxidativeAcetaldehyde,
+    PhenolicBrowning,
     SulfiteOxidation,
 )
 from fermentation.core.media import get_medium
@@ -425,3 +426,93 @@ def test_so2_dosed_oxidative_run_closes_carbon_end_to_end():
     assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
     assert_conserved(traj.as_trajectory(), c_of, label="carbon")
     assert_nonnegative(traj.as_trajectory(), ("o2", "so2_total", "acetaldehyde"), atol=1e-9)
+
+
+# -- PhenolicBrowning (decision D-74) — the first ALWAYS-ON O₂ sink, end to end ------------
+
+
+def test_phenolic_browning_disabled_and_gated_with_begin_aging():
+    # PhenolicBrowning rides the same aging tuple: wired into the medium, DISABLED at compile,
+    # enabled by the SAME begin_aging reconfigure as the other aging Processes (one gate).
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    assert PhenolicBrowning.name in cs.process_set
+    assert not cs.process_set.is_enabled(PhenolicBrowning.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(PhenolicBrowning.name)  # begin_aging turns it on too
+
+
+def test_oxidative_aging_browns_the_wine_end_to_end():
+    # The D-74 payoff: an oxygen-dosed aged wine finishes BROWNED (A420 climbs from 0) — the
+    # gold→amber→brown of oxidative aging — while the otherwise-identical reductive (no-O₂) aged
+    # wine
+    # never browns (A420 stays exactly 0, the byte-for-byte reductive isolability).
+    o2_dose = 60.0  # mg/L cumulative aerobic exposure
+    oxidative = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, o2_dose)])
+    ).run()
+    reductive = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()  # no O₂ dosed
+    assert oxidative.success and reductive.success
+
+    # Oxidative aging builds visible brown; reductive aging browns none.
+    assert float(oxidative.series("A420")[-1]) > 0.0
+    assert float(reductive.series("A420")[-1]) == 0.0
+
+
+def test_reductive_aging_leaves_a420_at_zero_byte_for_byte():
+    # Isolability (D-74): begin_aging WITHOUT add_oxygen is purely reductive — browning is inert at
+    # o2=0, so A420 stays exactly 0, the same as an un-aged run (which never even enables browning).
+    reductive = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()
+    plain = compile_scenario(_wine([])).run()
+    assert reductive.success and plain.success
+    assert float(reductive.series("A420")[-1]) == 0.0
+    assert float(plain.series("A420")[-1]) == 0.0
+
+
+def test_browning_suppresses_oxidative_acetaldehyde_end_to_end():
+    # The headline competition, end to end: browning is the DOMINANT always-on O₂ sink, so an
+    # oxygen-dosed aged wine finishes with the O₂ SPLIT between brown pigment (A420 > 0) and
+    # acetaldehyde — the acetaldehyde suppressed to its ~40% ethanol share (the balance browned).
+    # Isolating browning off would raise acetaldehyde; here we assert the co-resident sinks coexist:
+    # both observables are positive, and the O₂ is (largely) consumed by their sum.
+    o2_dose = 60.0
+    aged = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, o2_dose)])
+    ).run()
+    assert aged.success
+    # Both oxidative products form (O₂ split between them) and the dosed O₂ is largely spent by the
+    # two summed sinks (browning taking the majority).
+    assert float(aged.series("A420")[-1]) > 0.0
+    assert float(aged.series("acetaldehyde")[-1]) > 0.0
+    assert float(aged.series("o2")[-1]) < 0.5 * (o2_dose / 1000.0)
+
+
+def test_begin_aging_browns_the_beer_scenario():
+    # MEDIUM-AGNOSTIC end to end (D-74, superseding D-73's provisional wine-only): beer carries
+    # autoxidising polyphenols and browns too, and A420 exists in the beer schema — so an
+    # oxygen-dosed aged beer browns (A420 climbs), the beer-side smoke coverage for browning.
+    day = 14.0
+    oxidative = compile_scenario(_beer([_begin_aging(day), _add_oxygen(day, 40.0)])).run()
+    reductive = compile_scenario(_beer([_begin_aging(day)])).run()
+    assert oxidative.success and reductive.success
+    assert float(oxidative.series("A420")[-1]) > 0.0
+    assert float(reductive.series("A420")[-1]) == 0.0
+
+
+def test_browned_run_closes_carbon_end_to_end():
+    # PhenolicBrowning touches only o2 + A420, BOTH off every ledger — so it moves nothing
+    # conserved.
+    # An oxygen-dosed aged run (browning + oxidative acetaldehyde + ester hydrolysis all active)
+    # still
+    # closes total_carbon exactly: the O₂ dose flow is carbon-free, browning adds no carbon term,
+    # and
+    # the only on-ledger moves (E→acetaldehyde, the ester 5:2 transfer) close to machine precision.
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)]))
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert_conserved(traj.as_trajectory(), c_of, label="carbon")
+    assert_nonnegative(traj.as_trajectory(), ("o2", "A420", "acetaldehyde"), atol=1e-9)

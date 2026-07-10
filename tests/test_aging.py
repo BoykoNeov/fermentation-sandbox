@@ -30,12 +30,13 @@ from fermentation.core.chemistry import (
 from fermentation.core.kinetics import (
     EsterHydrolysis,
     OxidativeAcetaldehyde,
+    PhenolicBrowning,
     SulfiteOxidation,
     arrhenius_factor,
 )
 from fermentation.core.kinetics.aging import _SO2_PER_O2
 from fermentation.core.media import beer_schema, wine_schema
-from fermentation.core.process import ProcessSet
+from fermentation.core.process import Process, ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
@@ -632,3 +633,214 @@ def test_sulfite_oxidation_tier_floored_at_speculative(so2_store):
     for pool in ("o2", "so2_total"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, so2_store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# PhenolicBrowning (decision D-74) — the first ALWAYS-ON sink on the shared ``o2`` budget (D-71):
+# dissolved O₂ oxidises phenolics → brown pigment, accumulating the ``A420`` browning index (an
+# optical absorbance, dimensionless AU — NOT a mass). First-order in [o2] (its OWN, DOMINANT share
+# ``k_browning`` > ``k_ethanol_oxidation``), Arrhenius warmer-faster. Touches only ``o2`` +
+# ``A420``,
+# BOTH off every ledger — so it moves NOTHING conserved (the cleanest aging Process; not even a
+# carbon borrow). MEDIUM-AGNOSTIC (both media brown; ``A420`` exists in both schemas). These tests
+# pin
+# the closed form, the first-order-in-O₂ linearity, the monotonic A420 accumulation + saturation,
+# the
+# medium-agnostic run on beer, the reductive-aging isolability (inert without O₂), the
+# off-every-ledger
+# invariance (carbon AND mass both flat), the headline O₂-diversion (browning suppresses oxidative
+# acetaldehyde — the always-on analogue of the D-72 SO₂ threshold), the warmer-faster ordering, and
+# the speculative tier floor.
+
+
+def test_browning_metadata():
+    p = PhenolicBrowning()
+    assert p.name == "phenolic_browning"
+    assert p.tier is Tier.SPECULATIVE
+    # Consumes its O₂ share and books the oxidised phenol as the A420 browning index — both off
+    # every
+    # ledger, so nothing conserved moves. Touches those two and nothing else (not even a carbon
+    # borrow).
+    assert set(p.touches) == {"o2", "A420"}
+    assert set(p.reads) == {"k_browning", "E_a_browning", "y_a420_per_o2", "T_ref"}
+
+
+def test_browning_matches_closed_form(params):
+    schema = wine_schema()
+    o2, t = 0.03, 298.15  # off T_ref so the Arrhenius factor bites
+    y = _aged_wine(schema, esters=0.0, t=t, o2=o2)
+    d = PhenolicBrowning().derivatives(0.0, y, schema, params)
+    f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
+    r_o2 = params["k_browning"] * f_t * o2
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
+    # Touches ONLY o2 + A420 — nothing else moves (not even E/acetaldehyde: browning borrows no
+    # carbon).
+    for var in schema.names:
+        if var not in ("o2", "A420"):
+            assert schema.get(d, var) == 0.0
+
+
+def test_browning_is_dominant_share_over_ethanol_oxidation(params):
+    # The load-bearing D-74 ordering: browning is the DOMINANT always-on O₂ sink, so at the same
+    # [o2]
+    # it draws a larger O₂ rate than ethanol oxidation (k_browning > k_ethanol_oxidation), and the
+    # two
+    # shares sum to the calibrated always-on total (5.0e-4) that holds the O₂-depletion timescale.
+    assert params["k_browning"] > params["k_ethanol_oxidation"]
+    assert params["k_browning"] + params["k_ethanol_oxidation"] == pytest.approx(5.0e-4)
+    schema = wine_schema()
+    y = _aged_wine(schema, esters=0.0, o2=0.03)
+    brown = PhenolicBrowning().derivatives(0.0, y, schema, params)
+    ethanol = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
+    assert -schema.get(brown, "o2") > -schema.get(ethanol, "o2") > 0.0
+
+
+def test_browning_is_first_order_in_oxygen(params):
+    # First-order in the O₂ pool (its own share of the shared substrate): twice the dissolved O₂ ⇒
+    # twice the instantaneous browning rate. This linearity is what makes A420 SATURATE as O₂ is
+    # spent.
+    schema = wine_schema()
+    lo = PhenolicBrowning().derivatives(0.0, _aged_wine(schema, o2=0.02), schema, params)
+    hi = PhenolicBrowning().derivatives(0.0, _aged_wine(schema, o2=0.04), schema, params)
+    assert schema.get(hi, "A420") == pytest.approx(2.0 * schema.get(lo, "A420"))
+
+
+def test_browning_inert_without_oxygen(params):
+    # No oxidant ⇒ no browning: a reductive/un-oxygenated aging is byte-for-byte the case without
+    # this
+    # Process (A420 stays 0). The o2 ≤ 0 guard also absorbs a solver undershoot (o2 < 0 ⇒ no
+    # spurious
+    # browning), keeping d(A420)/dt ≥ 0 (A420 monotonic, never reversed).
+    schema = wine_schema()
+    assert np.array_equal(
+        PhenolicBrowning().derivatives(0.0, _aged_wine(schema, o2=0.0), schema, params),
+        schema.zeros(),
+    )
+    assert np.array_equal(
+        PhenolicBrowning().derivatives(0.0, _aged_wine(schema, o2=-1e-6), schema, params),
+        schema.zeros(),
+    )
+
+
+def test_browning_rises_with_temperature(params):
+    # The sourced ordering (E_a_browning > 0): warmer storage browns (maderises) faster — more O₂
+    # consumed and more A420 built per hour when warm.
+    schema = wine_schema()
+    cold = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, o2=0.03, t=283.15), schema, params
+    )
+    warm = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, o2=0.03, t=303.15), schema, params
+    )
+    assert schema.get(warm, "o2") < schema.get(cold, "o2") < 0.0
+    assert schema.get(warm, "A420") > schema.get(cold, "A420") > 0.0
+
+
+def test_browning_is_medium_agnostic_on_beer(params):
+    # MEDIUM-AGNOSTIC (D-74, superseding D-73's provisional "wine-only"): both media carry
+    # autoxidising
+    # polyphenols and brown, and A420 exists in both schemas — so browning runs on beer too, at the
+    # same closed form (o2/A420/T are shared slots; the shared aging.yaml params apply to both
+    # media).
+    beer = beer_schema()
+    o2, t = 0.03, 298.15
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": t, "CO2": 0.0})
+    yb[beer.slice("o2")] = o2
+    d = PhenolicBrowning().derivatives(0.0, yb, beer, params)
+    f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
+    r_o2 = params["k_browning"] * f_t * o2
+    assert beer.get(d, "o2") == pytest.approx(-r_o2)
+    assert beer.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
+
+
+def test_integrated_browning_accumulates_a420_and_saturates(params, store):
+    # Run a long aging segment (racked, dry wine) with ONLY PhenolicBrowning and a dosed O₂ charge.
+    # Over the span the O₂ is consumed (depletes toward 0), A420 rises MONOTONICALLY to a PLATEAU
+    # (saturating as the O₂ charge is spent — the browning of an aged wine), and — because o2 + A420
+    # are BOTH off every ledger — this Process moves NOTHING conserved: total_carbon AND total_mass
+    # are both exactly flat (unusually strong: not even the E→acetaldehyde borrow
+    # OxidativeAcetaldehyde
+    # carries). A420's ceiling is y_a420_per_o2·(o2_0/M_O2) (every mol O₂ builds that much
+    # absorbance).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [PhenolicBrowning()], strict=True)
+    o2_0 = 0.04  # ~40 mg/L cumulative O₂ exposure
+    y0 = _aged_wine(schema, esters=0.0, t=298.15, o2=o2_0)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))  # ~1 year
+    assert traj.success, traj.message
+
+    a420 = traj.series("A420")
+    o2_end = float(traj.series("o2")[-1])
+    a420_end = float(a420[-1])
+    # A420 rose from 0 and the O₂ charge is largely spent.
+    assert o2_end < 0.1 * o2_0
+    assert a420_end > 0.0
+    # Monotone accumulation (d(A420)/dt ≥ 0 everywhere — no reversal).
+    assert np.all(np.diff(np.asarray(a420, dtype=float)) >= -1e-15)
+    # Saturating bound: A420 cannot exceed the yield-limited ceiling y·(o2_0/M_O2), and once O₂ is
+    # ~spent it has reached most of it (a browned wine, a sanity anchor not a pinned magnitude).
+    ceiling = params["y_a420_per_o2"] * (o2_0 / M_O2)
+    assert a420_end <= ceiling + 1e-12
+    assert a420_end >= 0.5 * ceiling
+    assert_nonnegative(traj, ("o2", "A420"), atol=1e-12)
+    # BOTH ledgers flat — browning moves nothing conserved (the cleanest aging Process).
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+
+
+def test_browning_diverts_o2_and_suppresses_acetaldehyde(params, store):
+    # THE HEADLINE (D-74): browning is a co-resident always-on O₂ sink, so putting it alongside
+    # OxidativeAcetaldehyde over the same fixed O₂ charge DIVERTS most of the O₂ to brown pigment
+    # and
+    # correspondingly SUPPRESSES the oxidative acetaldehyde — the always-on analogue of the D-72 SO₂
+    # threshold (but permanent: browning is not spent). Same k_ethanol_oxidation in both runs; the
+    # only difference is whether browning competes for the O₂.
+    schema = wine_schema()
+    o2_0 = 0.04  # ~40 mg/L O₂ charge
+    # A LONG span so BOTH runs fully plateau (the O₂ charge is spent): the ethanol-only run depletes
+    # O₂ at the slower k_ethanol_oxidation alone, so it needs the long tail to reach its ceiling —
+    # only once both have plateaued does the clean partition ratio k_ethanol/(k_ethanol+k_browning)
+    # hold (in finite time the slower run lags its ceiling and the ratio reads high).
+    span = (0.0, 24.0 * 365.0 * 5.0)
+
+    def run(processes: list[Process]) -> Trajectory:
+        ps = ProcessSet(schema, processes, strict=True)
+        y0 = _aged_wine(schema, esters=0.0, t=298.15, o2=o2_0)
+        traj = simulate(ps, params=params, y0=y0, t_span=span)
+        assert traj.success, traj.message
+        return traj
+
+    ethanol_only = run([OxidativeAcetaldehyde()])
+    with_browning = run([OxidativeAcetaldehyde(), PhenolicBrowning()])
+
+    acet_alone = float(ethanol_only.series("acetaldehyde")[-1])
+    acet_diverted = float(with_browning.series("acetaldehyde")[-1])
+    # Browning diverts O₂ ⇒ LESS oxidative acetaldehyde, and it builds visible brown (A420 > 0)
+    # where
+    # the ethanol-only run browns none. The suppression tracks the share: browning takes
+    # ~k_browning /
+    # (k_browning + k_ethanol) of the O₂, so acetaldehyde falls toward the ethanol share ~40%.
+    assert acet_diverted < acet_alone
+    assert float(with_browning.series("A420")[-1]) > 0.0
+    assert float(ethanol_only.series("A420")[-1]) == 0.0
+    share_ethanol = params["k_ethanol_oxidation"] / (
+        params["k_ethanol_oxidation"] + params["k_browning"]
+    )
+    assert acet_diverted == pytest.approx(share_ethanol * acet_alone, rel=0.05)
+    # Carbon still closes (E → acetaldehyde the only on-ledger move; o2/A420 off every ledger).
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(
+        with_browning, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon"
+    )
+
+
+def test_browning_tier_floored_at_speculative(store):
+    # Speculative in FORM (Tier-3 frontier): the pools it writes are speculative even before the
+    # (speculative) aging parameter tiers cap them. Non-vacuous: o2/A420 both speculative.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [PhenolicBrowning()])
+    for pool in ("o2", "A420"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
