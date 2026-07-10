@@ -6054,8 +6054,17 @@ settled it** and was brought to the owner, who chose A.
 * The pool at the `begin_aging` breakpoint is **~385 mg/L**, but that is dominated by **legit post-dryness sur-lie
   autolysis** (day 6 → 30, the wine sitting on its lees) — correct chemistry, *not* an artifact. It keeps climbing
   to ~830 mg/L over the aging tail.
-* Strecker fires **strongly** from that autolytic nitrogen: **methional ~154 µg/L, phenylacetaldehyde ~1006 µg/L**
-  (thresholds ~0.5–1 µg/L), phenylacetaldehyde-dominant per D-75's `f_methional = 0.15`.
+* Strecker fires from that autolytic nitrogen (both aldehydes well above their ~0.5–1 µg/L thresholds,
+  phenylacetaldehyde-dominant per D-75's `f_methional = 0.15`) — the **directional** result that closes the beat.
+  The **absolute level is NOT a prediction** (Tier-3 discipline — "directional, never magnitudes"): the compose
+  produces **methional ~154 µg/L / phenylacetaldehyde ~1006 µg/L**, which is **~8× D-75's `~18 / ~120 µg/L`
+  dosed literature anchor** (the top of the observed oxidised-white-wine range). That is **not a regression** —
+  it is the expected consequence of the substrate flood: D-75 calibrated `k_strecker` against the *dosed* case
+  (only ~11.6 mg/L `amino_acids` survives to aging), whereas the compose fills the pool to **385 → 831 mg/L**
+  (~33–70× the substrate) because autolysis fully digests ~2.4 g/L `X_dead` and books **all** its nitrogen as
+  the arginine `amino_acids` lump (D-34); an O₂-gated (sub-linear) sink then turns ~35–70× substrate into ~8×
+  aldehyde. The level scales with the speculative `autolysis_rate_per_h` and that lump, so it is an
+  order-of-magnitude figure, honestly above the anchor — recorded, not shipped as a fidelity claim.
 * The competing `amino_acids` sink `AutolyticMercaptan` (D-45, also enabled by the autolysis opt-in) draws only
   **~26 µg/L** of thiol — numerically negligible vs the ~830 mg/L pool, so Strecker effectively gets the whole
   pool (H₂S sibling is carbon-free, no competition).
@@ -6079,6 +6088,17 @@ turning autolysis on is exactly what lights the pathway. Two standing consequenc
 beat: autolysis-from-t0 drags `amino_acids`/`N`/`debris`/`h2s`/`mercaptans` to **speculative for the whole run**
 (accepted D-34), and **`rack` before aging removes `X_dead`** (the autolysis substrate) — sur-lie means *on the
 lees*, so a racked wine has no autolytic refill (physically correct).
+
+**Open item (flag, not fix) — does the autolysis→arginine lump over-feed Strecker at the D-34/D-75 seam?** The
+~8×-anchor level above is driven by two speculative lumps meeting for the first time: D-34 books **100 % of
+autolysed dead-cell nitrogen as assimilable arginine** (real autolysate is a mix — amino acids, peptides,
+nucleotides, mannoproteins, the last retaining some N; the D-34 tier note already carries this), and D-75 draws
+Strecker carbon from that same arginine lump. So the `amino_acids` pool the sink sees post-autolysis is an
+**upper bound** on what is really Strecker-available, and `k_strecker` was never calibrated against an autolytic
+(vs dosed) substrate. Whether the honest fix is a smaller assimilable-N fraction in autolysate, a separate
+Strecker-available sub-pool, or an autolytic re-calibration of `k_strecker` is **deferred** — this beat's remit
+was the *composition*, not a re-calibration, and the directional result stands regardless. Recorded so a future
+sur-lie/oak beat revisits it rather than inheriting the level as validated.
 
 **Regression surface.** **Zero** production-code change: no new Process, parameter, chemistry species, or state
 slot; every default / un-aged / reductive / dosed-Strecker trajectory is byte-for-byte unchanged. Test-only: the

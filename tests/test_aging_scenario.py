@@ -680,7 +680,11 @@ def test_sur_lie_autolysis_feeds_strecker_without_a_dose():
     assert aged.success
     # Autolysis refilled the pool with no dose (measured ~0.83 g/L at the end of the sur-lie tail).
     assert float(aged.series("amino_acids")[-1]) > 0.1
-    # Both Strecker aldehydes emerge from that autolytic nitrogen, phenylacetaldehyde-dominant.
+    # Both Strecker aldehydes emerge from that autolytic nitrogen, phenylacetaldehyde-dominant. This
+    # is a DIRECTIONAL assertion only (Tier-3 discipline): the absolute level (~154/1006 µg/L) runs
+    # ~8× the D-75 dosed literature anchor because the autolytic pool (~0.4–0.8 g/L) floods the sink
+    # vs the ~11.6 mg/L dosed case k_strecker was calibrated against — an order-of-magnitude figure,
+    # not a prediction (the arginine-lump over-feed is a recorded open item, DECISIONS D-76).
     methional = float(aged.series("methional")[-1])
     phenyl = float(aged.series("phenylacetaldehyde")[-1])
     assert phenyl > methional > 0.0

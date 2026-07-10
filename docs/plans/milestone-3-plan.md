@@ -42,8 +42,10 @@
 > **D-76 closed the emergent SUR-LIE → Strecker pathway with NO new physics: lees autolysis (`YeastAutolysis`,
 > D-34) and `StreckerDegradation` (D-75) simply COMPOSE — opting into `autolysis_rate_per_h` + `add_oxygen` +
 > `begin_aging` with no `amino_acids_gpl` dose lets dead lees self-digest, refilling `amino_acids` from the
-> wine's own dead yeast, which the Strecker route degrades (methional/phenylacetaldehyde fire strongly from the
-> physically-real nitrogen source). Owner fork (chose A: verify + document + test) over B (re-gate autolysis to
+> wine's own dead yeast, which the Strecker route degrades (both aldehydes emerge from the physically-real
+> nitrogen source — the DIRECTIONAL result; the absolute level runs ~8× the D-75 dosed literature anchor, an
+> order-of-magnitude figure not a prediction, a recorded open item in D-76). Owner fork (chose A: verify +
+> document + test) over B (re-gate autolysis to
 > the aging phase); a discriminating measurement decided it — the pre-dryness active-ferment release is ~15 mg/L
 > (bounded-small), the ~385 mg/L breakpoint pool is legit post-dryness sur-lie, so autolysis-from-t0 needs no
 > re-gating. Carbon + nitrogen close on the new triple-draw compose (autolysis refills while Strecker + mercaptan
