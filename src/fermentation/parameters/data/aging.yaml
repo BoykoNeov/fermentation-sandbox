@@ -133,7 +133,10 @@ esters_eq:
 # The two shares carry the SAME E_a (same coupled-oxidation cascade — see E_a_browning), so their
 # sum is exactly 5.0e-4 * f(T) at every temperature, not just at T_ref. Substrate-gated sinks (SO2,
 # D-72) add on top without touching this, since they are zero without their substrate. A further
-# always-on Strecker sink would reduce this share again (its k joining the 5.0e-4 sum).
+# Strecker sink was FORECAST here to "reduce this share again (its k joining the 5.0e-4 sum)", but
+# D-75 SUPERSEDES that: StreckerDegradation is SUBSTRATE-GATED (on amino_acids) and wine-only, so it
+# adds ON TOP without re-baselining the anchor (the SulfiteOxidation rule), and this value is
+# UNCHANGED. See the STRECKER DEGRADATION section below and decision D-75.
 k_ethanol_oxidation:
   value: 2.0e-4
   unit: "1/h"   # d(o2)/dt = -k_ethanol_oxidation * f(T) * [o2]  (ethanol route's share of O2 depletion)
@@ -325,3 +328,121 @@ y_a420_per_o2:
     source: "author estimate: no standard tabulated A420-per-O2 exists, so this is anchored to the observed white-wine browning index range (A420 at 420 nm, 1 cm; Singleton 1987 and standard enology practice: fresh white ~0.05-0.1 AU, oxidised/browned ~0.3-0.6+ AU) divided by a plausible cumulative browning-route O2 exposure. Lumps the whole o-quinone -> melanoidin/xanthylium pigment-forming chemistry into a single per-O2 absorbance coefficient (no phenol/pigment speciation tracked in v1)."
     conditions: "AU of A420 (dimensionless absorbance, 1 cm path) per mol O2 consumed by the browning route, generic wine/beer at T_ref = 293.15 K. Beer browning (oxidative staling darkening) is the same o-diphenol autoxidation, less dominant than in white wine; the same coefficient is used medium-agnostically as an order-of-magnitude stand-in."
     notes: "SPECULATIVE magnitude (the most speculative parameter in this file -- an order-of-magnitude author estimate for an untabulated quantity, banded an order of magnitude). The load-bearing claim is only that oxidative aging produces VISIBLE, monotonic browning (A420 climbs with O2 exposure) -- not the exact absorbance. A420 is an optical index off every ledger, so this yield moves nothing conserved (the pigment's carbon comes from an untracked phenol pool -- sidestepped by using an absorbance, not a mass)."
+
+# ======================================================================================
+# STRECKER DEGRADATION (decision D-75, the WINE-ONLY, SUBSTRATE-GATED oxidative aging sink that
+# produces the Strecker aldehydes). The oxidative-aroma axis: aged wine smells of cooked potato +
+# honey.
+#
+# THE PROCESS (fermentation.core.kinetics.aging.StreckerDegradation, WINE-ONLY):
+#
+#   gate       = amino_acids / (K_amino_acids + amino_acids)              # smooth availability, [0,1)
+#   d(o2)/dt   = -k_strecker * f(T) * [o2] * gate                         # O2-limited, aa-gated
+#   n_ald      = y_strecker_per_o2 * (r_o2 / M_O2)                        # mol total aldehyde /L/h
+#   d(methional)/dt          = +f_methional     * n_ald * M_methional     # the cooked-potato share
+#   d(phenylacetaldehyde)/dt = +(1-f_methional) * n_ald * M_phenylacetaldehyde  # the honey share
+#   d(CO2)/dt      = +n_ald * M_CO2                                       # 1 CO2 per aldehyde (decarb)
+#   d(amino_acids)/dt = -(product carbon rate) / c_arginine               # arginine sized to product C
+#   d(N)/dt           = +(that arginine mass) * y_N_arginine              # DEAMINATION -> ammonium
+#
+# As a finished wine takes up oxygen, the o-quinones of phenol autoxidation (the PhenolicBrowning
+# cascade, D-74) oxidatively deaminate + decarboxylate amino acids to STRECKER ALDEHYDES: methional
+# (from methionine, "cooked potato" -- the classic OXIDATIVE off-note) and phenylacetaldehyde (from
+# phenylalanine, "honey/floral" -- pleasant). These are aroma compounds the D-67 OAV lens did NOT
+# previously read (no existing pool), so -- unlike ester hydrolysis / oxidative acetaldehyde -- this
+# beat adds TWO new observable pools (owner fork D-75: two pools, not one lumped, since the two
+# aldehydes have OPPOSITE sensory valence).
+#
+# SUBSTRATE-GATED, ADDS ON TOP -- NO RE-BASELINE (the D-75 crux, superseding the D-71..D-74 forward-
+# guess). D-71..D-74 forecast Strecker as "the next ALWAYS-ON O2 sink -- reduce k_ethanol_oxidation
+# again to its share." That guess assumed a significant, medium-agnostic sink. It is WRONG for
+# Strecker: gating the O2 draw on amino_acids makes Strecker DOUBLY substrate-gated (on o2 AND
+# amino_acids), exactly like SulfiteOxidation (o2 AND SO2). D-72 established the load-bearing rule --
+# a substrate-gated sink adds on top WITHOUT any re-baseline (zero without its substrate => the
+# default/beer trajectory is byte-for-byte preserved). So k_ethanol_oxidation + k_browning = 5.0e-4
+# is UNTOUCHED; k_strecker is a small wine-only draw that only fires when amino_acids is present
+# (dosed nutrient, or -- future -- lees autolysis refill). "Trace" is only the secondary reassurance
+# that even at full aa gate the extra draw is within the anchor band.
+#
+# THE INHERITED QUINONE DOUBLE-COUNT LUMP (documented, not fixed). Mechanistically the O2 is consumed
+# at the phenol-oxidation step (browning's draw), making o-quinones that then do the Strecker
+# deamination (the quinone acting as the oxidant, regenerated). A separate k_strecker [o2] draw thus
+# formally DOUBLE-COUNTS the shared quinone step. But browning and ethanol-oxidation ALREADY
+# double-count it against each other (both independent [o2] draws for one coupled cascade) -- the
+# additive-share v1 lump accepted at D-73. Strecker following suit is CONSISTENT; a two-stage
+# (O2 -> quinone pool -> {pigment, aldehyde, acetaldehyde}) rework is deliberately OUT OF SCOPE for
+# v1 (it is a larger structural beat). SCOPE: this is the OXIDATIVE (quinone-driven) Strecker route
+# only; the non-oxidative Maillard/sugar-dicarbonyl route (sweet wines, thermal) is deferred, which
+# keeps Strecker honestly on the o2 sub-axis.
+#
+# LEDGERS. o2 is off every ledger (D-71); the amino-acid draw + deamination is the EXACT D-45
+# mercaptans idiom (carbon from amino_acids as arginine, nitrogen deaminated to N, product N-free),
+# extended with a CO2 decarboxylation term. CARBON closes to machine precision: C out of amino_acids
+# (arginine) == C into methional + phenylacetaldehyde + CO2 (the draw is sized to match, the
+# EsterHydrolysis multi-product split idiom). NITROGEN closes: all arginine N -> N pool, products
+# N-free. The arginine-for-amino_acids stand-in is exact on the ledger, approximate on provenance
+# (the drawn carbon/nitrogen is arginine's, not methionine's/phenylalanine's) -- the same honest
+# stand-in mercaptans carries. TIER consequence (the D-45 note): Strecker WRITES N (deamination), so
+# an enabled run drops structural tier_of("N") PLAUSIBLE->SPECULATIVE. total_mass ({S,E,CO2}) sees
+# the CO2 term with no matching S/E debit, but it is never asserted on an aging run (aroma pools
+# active) -- the standing OxidativeAcetaldehyde scope-out. WINE-ONLY (amino_acids + N-deamination
+# read wine-only slots), disabled at compile until begin_aging.
+#
+# TIER. ALL speculative -- the Strecker FORM (O2-linked, amino-acid-driven, warmer-faster, aldehyde
+# = amino acid minus CO2) is sourced, but every magnitude is an order-of-magnitude estimate and the
+# aging axis is the Tier-3 frontier. Load-bearing SOURCED claims: (1) Strecker aldehydes are the
+# markers of oxidative aging/staling, (2) they need both O2 (via quinones) and amino acids, (3)
+# warmer ages faster (E_a > 0).
+
+# -- STRECKER O2-DRAW RATE CONSTANT (first-order in o2, additionally aa-gated) ------------
+# A SMALL wine-only ADD-ON sink (NOT part of the 5.0e-4 always-on anchor -- substrate-gated, so it
+# adds on top like SulfiteOxidation, D-72). Its O2 draw is throttled by the amino_acids availability
+# gate aa/(K_amino_acids+aa), so at cellar residual-aa levels (~tens of mg/L) it is a minor
+# perturbation to the total O2 budget -- within the anchor's own uncertainty band. Strecker aldehydes
+# are a minor O2 fate vs visible browning, so this is deliberately well below k_browning/k_ethanol.
+k_strecker:
+  value: 5.0e-5
+  unit: "1/h"   # d(o2)/dt = -k_strecker * f(T) * [o2] * gate  (Strecker route's aa-gated O2 draw)
+  tier: speculative
+  uncertainty: { low: 1.0e-5, high: 2.0e-4, note: "Strecker-route O2-draw constant at T_ref = 20 C, at FULL amino-acid availability (gate -> 1). ~10% of the 5.0e-4 always-on total, but substrate-gated on amino_acids so the realised draw at cellar residual-aa (~10-40 mg/L => gate ~0.1-0.3) is ~1-3% of the O2 -- a minor add-on, NOT re-baselined into the anchor (unlike browning, D-74). The amino_acids pool is the true limiting reagent (finite dosed/lees-derived aa => finite Strecker aldehyde); the aldehyde LEVEL is set by the O2xaa product and y_strecker_per_o2, and lands strongly OAV-positive (µg/L-mg/L vs ~0.5-1 µg/L thresholds) across this whole band, so the exact rate is not load-bearing." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that Strecker aldehyde formation is a MINOR fate of the oxidative O2 flux (secondary to phenol autoxidation/browning and to ethanol oxidation), gated on amino-acid availability (Escudero et al. 2000, 2002 on oxidation-derived aldehydes in wine aroma; the Strecker mechanism requires both an alpha-dicarbonyl -- here the phenol-oxidation o-quinone -- and an amino acid). Folds the quinone/dicarbonyl catalyst into k (no dicarbonyl pool tracked in v1, as with k_browning/k_ethanol_oxidation)."
+    conditions: "generic wine at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool, additionally gated by the amino-acid availability fraction aa/(K_amino_acids+aa), at T_ref = 293.15 K. A wine-only ADD-ON sink (substrate-gated, not part of the k_ethanol_oxidation + k_browning = 5.0e-4 anchor)."
+    notes: "SOURCED FORM (O2-limited AND amino-acid-gated => doubly substrate-gated, warmer-faster) + SPECULATIVE magnitude. Load-bearing sourced claims: Strecker aldehydes are the oxidative-aging markers and require BOTH O2 (via quinones) and amino acids. This is deliberately a SMALL add-on (not re-baselined into the anchor) -- the D-75 correction to the D-71..D-74 'reduce k_ethanol again' forward-guess, which wrongly assumed a significant medium-agnostic sink."
+
+# -- ACTIVATION ENERGY: warmer aging forms Strecker aldehydes faster (sourced ordering) ---
+E_a_strecker:
+  value: 50000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 70000.0, note: "Q10 ~1.5-2.6 at 20 C. Strecker degradation / oxidative-staling activation energies ~30-70 kJ/mol (beer staling aldehyde formation is strongly temperature-accelerated). The SOURCED, load-bearing claim is the SIGN (warmer => faster Strecker aldehyde accumulation, so warm storage stales/oxidises faster); the magnitude is speculative and banded. Its OWN parameter (not reused from E_a_browning) per prime directive #2: Strecker degradation is a distinct reaction, so it gets its own provenance entry even though the band coincides with the other oxidative E_a's." }
+  provenance:
+    source: "SOURCED ORDERING: Strecker degradation and oxidative staling accelerate with temperature (textbook Arrhenius; beer-staling aldehyde formation is a canonical warm-storage marker -- e.g. methional, 2-/3-methylbutanal rise with temperature and time). Warm storage stales/oxidises faster is the well-established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate quinone-driven Strecker degradation at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster Strecker aldehydes) is the sourced, load-bearing claim. Exact magnitude speculative and banded around a Q10 ~2, mirroring the other oxidative E_a's, but kept a SEPARATE parameter -- distinct reaction, distinct provenance (prime directive #2, the E_a_so2_oxidation / E_a_browning precedent)."
+
+# -- STRECKER ALDEHYDE YIELD: mol total aldehyde per mol O2 consumed by the Strecker route -
+y_strecker_per_o2:
+  value: 0.5
+  unit: "mol/mol"   # total Strecker aldehyde (methional + phenylacetaldehyde) per O2 consumed by the route
+  tier: speculative
+  uncertainty: { low: 0.1, high: 1.5, note: "mol total Strecker aldehyde per mol O2 the Strecker route consumes. Lumps the quinone-mediated stoichiometry (one O2 -> one o-quinone can deaminate roughly one amino acid in the coupled scheme, but the realised yield depends on competing quinone fates -- pigment polymerisation, reduction). Central 0.5 is a mid-band estimate; the aldehyde level lands strongly OAV-positive across the whole band (the amino_acids cap and the ~0.5-1 µg/L thresholds are what matter, not this exact yield)." }
+  provenance:
+    source: "author estimate from the Strecker stoichiometry (one alpha-dicarbonyl -- here an o-quinone from one O2 -- deaminates + decarboxylates one amino acid to one aldehyde + CO2), discounted for the competing quinone fates (browning polymerisation, re-reduction) that keep the realised per-O2 aldehyde yield well below 1 (Escudero et al. 2000; Rizzi 2006 Strecker mechanism review)."
+    conditions: "mol total Strecker aldehyde per mol O2 consumed by the Strecker route, generic wine; split between methional and phenylacetaldehyde by f_methional, at T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude. The per-O2 yield lumps the quinone-mediated Strecker stoichiometry; the amino_acids pool is the hard cap on total aldehyde (finite aa => finite aldehyde), so this yield sets the RATE of approach to that cap, not the ceiling."
+
+# -- ALDEHYDE COMPOSITION: methional (cooked-potato) mol share of the Strecker output ------
+# The mol fraction of the Strecker aldehyde output that is methional; the remainder (1 - f_methional)
+# is phenylacetaldehyde (honey). Reflects the relative methionine:phenylalanine Strecker flux in the
+# amino-acid pool. NOT a stoichiometric constant (contrast the EsterHydrolysis 5:2 carbon split, which
+# is fixed by the named reaction) -- it is an empirical composition estimate, so it is a YAML parameter.
+f_methional:
+  value: 0.6
+  unit: "1"   # mol fraction methional of total Strecker aldehyde (rest -> phenylacetaldehyde)
+  tier: speculative
+  uncertainty: { low: 0.3, high: 0.8, note: "methional mol share of the Strecker aldehyde output; the rest is phenylacetaldehyde. Methional-leaning central (0.6) because methional is the more potent/notable OXIDATIVE marker and its ~0.5 µg/L threshold is lower, but the true split depends on the must's methionine:phenylalanine ratio and the amino_acids-as-arginine lump makes it approximate. Both aldehydes land OAV-positive across this band, so the split shifts the BALANCE of the two notes, not whether either is perceptible." }
+  provenance:
+    source: "author estimate of the relative methionine- vs phenylalanine-derived Strecker flux (both amino acids are present in must; methional and phenylacetaldehyde are the two dominant oxidation-derived Strecker aldehydes in aged white wine -- Escudero et al. 2000, 2002). A single fixed split stands in for what is really a must-composition-dependent ratio."
+    conditions: "generic wine; mol fraction of the lumped Strecker aldehyde output booked as methional (C4H8OS) vs phenylacetaldehyde (C8H8O), at T_ref = 293.15 K. The amino_acids pool is booked as arginine, so this split is a composition stand-in, not literal methionine:phenylalanine chemistry (the D-45 arginine-lump caveat)."
+    notes: "SPECULATIVE magnitude. Sets the BALANCE between methional's cooked-potato off-note and phenylacetaldehyde's honey note (opposite sensory valence -- the reason the owner chose TWO pools over one lump, D-75). Off the stoichiometric-constant track (contrast the 5:2 ester split): an empirical composition estimate, hence a YAML parameter."

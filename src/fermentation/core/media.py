@@ -104,6 +104,7 @@ from fermentation.core.kinetics import (
     PhenolicBrowning,
     PyruvateExcretion,
     PyruvateReassimilation,
+    StreckerDegradation,
     SugarUptakeToEthanolCO2,
     SulfiteOxidation,
     TemperatureRamp,
@@ -434,6 +435,26 @@ def wine_schema() -> StateSchema:
             "carbon split and stops at dryness, freezing a persistent finished-wine residual — "
             "the third SO2-binding carbonyl, after acetaldehyde and pyruvate (D-50)",
         ),
+        VarSpec(
+            "methional",
+            "g/L",
+            default=0.0,
+            description="methional — the 'cooked-potato' Strecker aldehyde "
+            "of methionine, the principal OXIDATIVE off-note of aged wine/stale beer (decision "
+            "D-75). Produced-only: StreckerDegradation forms it as dissolved O₂ (via the phenol "
+            "autoxidation quinones) oxidatively deaminates + decarboxylates amino acids; carbon "
+            "drawn from amino_acids (arginine stand-in), the nitrogen deaminated to N, one CO₂ "
+            "released per aldehyde. Read by the D-67 OAV lens (threshold_methional_wine)",
+        ),
+        VarSpec(
+            "phenylacetaldehyde",
+            "g/L",
+            default=0.0,
+            description="phenylacetaldehyde — the 'honey/floral' Strecker aldehyde of "
+            "phenylalanine (decision D-75), the pleasant-valence counterpart to methional from the "
+            "SAME quinone-driven Strecker route. Produced-only, carbon from amino_acids + CO₂, "
+            "nitrogen deaminated to N. Read by the OAV lens (threshold_phenylacetaldehyde_wine)",
+        ),
     ]
     return StateSchema(specs)
 
@@ -662,6 +683,20 @@ _AGING_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: aging axis it is DISABLED at the compile seam and re-enabled by ``begin_aging`` (its name rides
 #: in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in ``aging.yaml``.
 _OXIDATIVE_SO2_PROCESSES: tuple[Callable[[], Process], ...] = (SulfiteOxidation,)
+
+#: WINE-ONLY Strecker-degradation aging Process (decision D-75). Like ``_OXIDATIVE_SO2_PROCESSES``,
+#: :class:`StreckerDegradation` reads wine-only state (``amino_acids`` + the ``N``-deamination),
+#: so it is wired into the *wine* medium only. It is the third oxidative sibling on shared ``o2``
+#: budget (after ``OxidativeAcetaldehyde``/``PhenolicBrowning``): dissolved O₂ — via the phenol-
+#: oxidation quinones — degrades amino acids to the Strecker aldehydes ``methional`` (cooked-potato)
+#: and ``phenylacetaldehyde`` (honey), drawing carbon from ``amino_acids`` and deaminating the
+#: nitrogen to ``N`` (the D-45 mercaptan idiom + a CO₂ decarboxylation term). DOUBLY substrate-gated
+#: (on ``o2`` AND ``amino_acids``), so — like ``SulfiteOxidation`` — it adds on top of the O₂ budget
+#: WITHOUT re-baselining the anchor (superseding the D-71→D-74 forward-guess; see the Process
+#: docstring and D-75). Kept in its OWN tuple (isolable, directive #3): DISABLED at the compile
+#: seam and re-enabled by ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in ``aging.yaml``.
+_STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (StreckerDegradation,)
 
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
@@ -962,6 +997,7 @@ MEDIA: dict[str, Medium] = {
             + _AUTOLYSIS_PROCESSES
             + _AGING_PROCESSES
             + _OXIDATIVE_SO2_PROCESSES
+            + _STRECKER_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

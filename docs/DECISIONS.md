@@ -5890,3 +5890,106 @@ degradation (the next always-on O₂ sink — reduce `k_ethanol_oxidation` again
 needs new aldehyde aroma pools for its products), oak extraction (a separate axis, no O₂), or beat 1b
 (descriptor projection). A `PhenolicBrowning` product-pool beyond the A420 index (real melanoidin speciation)
 would need a tracked phenol pool — deliberately out of scope (the optical index is the faithful v1 observable).
+
+## D-75 — `StreckerDegradation` built: the O₂/amino-acid Strecker aldehydes (cooked-potato + honey), a WINE-ONLY *substrate-gated* sink (§4.1)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, the fifth aging Process and the third oxidative sibling on
+the shared `o2` budget** (after `OxidativeAcetaldehyde` D-71 and `PhenolicBrowning` D-74). `StreckerDegradation`
+(WINE-ONLY) models the oxidative Strecker route: dissolved O₂ — via the o-quinones of phenol autoxidation (the
+browning cascade) — oxidatively deaminates and decarboxylates amino acids to **Strecker aldehydes**,
+**methional** (from methionine, the "cooked-potato" *oxidative off-note*, the marker of an oxidised/maderised
+white wine and of stale beer) and **phenylacetaldehyde** (from phenylalanine, the "honey/floral" note of aged
+white/dessert wines). It is the first aging Process to add **aroma pools the D-67 OAV lens did not previously
+read** (two new single-molecule state slots + two new `sensory.yaml` thresholds). All new tests pass (13 unit +
+6 scenario), `ruff`/`mypy` clean, the full suite green. **One `advisor()` pass before writing** (it surfaced the
+`amino_acids`-availability blocker, reframed the substrate-gate justification, and prescribed the CO₂ decarb
+term), and **two forks were put to the owner** (per "surface design decisions before building"): the pool
+granularity and the O₂-accounting divergence.
+
+**The verified blocker — `amino_acids` is 0 post-ferment unless dosed (must-verify, not assume).** The advisor
+flagged that the whole design produces *nothing* if the `amino_acids` pool is spent when `begin_aging` fires.
+Checked on a representative trajectory: with **no** amino-acid dose the pool is **0** at the aging-segment start
+(`AminoAcidAssimilation` draws it down during ferment); with a modest must dose (0.5 g/L) **~11.6 mg/L** survives
+into the aging segment and holds constant across it. So Strecker is **substrate-gated exactly like `mercaptans`**
+(needs autolysis dosed) **and `SulfiteOxidation`** (needs SO₂ dosed): silent by default (physically correct — a
+wine with no residual amino acids / no lees makes no Strecker), exercisable by dosing `amino_acids_gpl` (the
+nutrient-rich / aged-on-lees case where Strecker aldehydes actually form). A future lees-autolysis refill would
+make it fire on an un-dosed sur-lie aging; deferred.
+
+**Owner fork 1 — TWO pools, not one lumped (opposite sensory valence).** Methional is an off-note (cooked
+potato), phenylacetaldehyde is *pleasant* (honey) — lumping them under one threshold would be sensorially
+incoherent. The owner chose **two single-molecule pools** (`methional`, `phenylacetaldehyde`) over the
+esters/fusels-style single lump. Cost: two new wine slots + two thresholds + a composition split parameter
+(`f_methional`, the methional mol share). Booked at each aldehyde's own carbon fraction (methional C4H8OS,
+phenylacetaldehyde C8H8O), read by the D-67 lens with descriptors "cooked potato / oxidative" and "honey /
+floral".
+
+**Owner fork 2 — "closer to reality" ⇒ SUBSTRATE-GATED, add on top, NO re-baseline (supersedes the D-71→D-74
+forward-guess).** D-71→D-74 repeatedly forecast Strecker as "the next *always-on* O₂ sink — reduce
+`k_ethanol_oxidation` again to its share." **That guess is wrong for Strecker.** Gating the O₂ draw on
+`amino_acids` (`r_o2 = k_strecker·f(T)·[o2]·[aa/(K+aa)]`) makes Strecker **doubly substrate-gated** (on `o2` AND
+`amino_acids`), exactly like `SulfiteOxidation` (on `o2` AND SO₂). D-72's load-bearing rule: **a substrate-gated
+sink adds on top of the shared O₂ budget without any re-baseline** — zero without its substrate ⇒ the
+default/beer trajectory is byte-for-byte preserved. So `k_ethanol_oxidation + k_browning = 5.0e-4` is
+**untouched**; `k_strecker` is a small wine-only draw that fires only when `amino_acids` is present. The
+alternative offered (re-baseline the shared `k_ethanol` for Strecker) was flagged as re-introducing the exact
+in-tree inconsistency the D-73/D-74 rework removed (it would wrongly cut *beer's* O₂ budget for a wine-only sink
+that is zero by default). The owner chose "closer to reality" — i.e. the substrate-gated add-on. The
+D-71→D-74 forward-notes are **retired** here (supersession discipline): the `k_ethanol_oxidation` provenance note
+that said "a further always-on Strecker sink would reduce this share again" is corrected in-tree to point at this
+decision. Gating the **O₂ draw itself** (not just the aldehyde) on `aa` is load-bearing (advisor): O₂/carbon/N
+all vanish together as `aa` empties, so the sink reverts cleanly and never "assigns" O₂ to a product that
+cannot form.
+
+**Carbon + nitrogen close by construction — the D-45 mercaptan idiom + a decarboxylation CO₂ term.** The aldehyde
+carbon is drawn from `amino_acids` (booked as arginine) and the amino-acid nitrogen **deaminated** to the `N`
+pool, exactly as `AutolyticMercaptan` (D-45) does; the Strecker **decarboxylation** adds a product that idiom did
+not have — **1 mol CO₂ per mol aldehyde** (the carboxyl carbon, on the carbon ledger — do **not** skip it, the
+advisor's must-fix). The arginine draw is *sized to the total product carbon* (methional + phenylacetaldehyde +
+CO₂), so `total_carbon` closes to machine precision (the `EsterHydrolysis` multi-product split idiom); all the
+arginine N lands in `N` and the products are N-free, so `total_nitrogen` closes. Verified per-RHS (residual <
+1e-18) and end-to-end over the full ferment+aging trajectory (both ledgers flat; the O₂ dose flow is carbon- AND
+nitrogen-free). The **arginine-for-`amino_acids` stand-in** is exact on the ledger, approximate on provenance
+(the drawn C/N is arginine's, not methionine's/phenylalanine's) — the same honest stand-in `mercaptans` carries.
+Tier consequence (the D-45 note): Strecker **writes `N`** (deamination), so an enabled run drops structural
+`tier_of("N")` PLAUSIBLE→SPECULATIVE. `total_mass` ({S,E,CO2}) sees the CO₂ term with no matching S/E debit, but
+is never asserted on an aging run (the standing `OxidativeAcetaldehyde` scope-out).
+
+**The inherited quinone double-count lump (documented, not fixed).** Mechanistically the O₂ is consumed at the
+phenol-oxidation step (browning's draw), making the o-quinones that then do the Strecker deamination — so a
+separate `k_strecker` `[o2]` draw formally double-counts that shared quinone step. But browning and
+ethanol-oxidation **already** double-count it against each other (both independent `[o2]` draws for one coupled
+cascade) — the additive-share v1 lump accepted at D-73. Strecker following suit is *consistent*; a two-stage
+(O₂ → quinone pool → {pigment, aldehyde, acetaldehyde}) rework is deliberately **out of scope** (a larger
+structural beat). **Scope:** this is the *oxidative* (quinone-driven) Strecker route only; the non-oxidative
+Maillard/sugar-dicarbonyl route (sweet wines, thermal) is deferred, keeping Strecker honestly on the `o2`
+sub-axis.
+
+**Magnitudes (all speculative, Tier-3 frontier).** `k_strecker = 5.0e-5 /h` (a small add-on, ~10 % of the 5.0e-4
+always-on total at full aa gate, but aa-throttled to a minor in-band perturbation at cellar residual-aa);
+`E_a_strecker = 50 kJ/mol` (its own param per prime directive #2; warmer-faster, the canonical beer-staling
+direction); `y_strecker_per_o2 = 0.5 mol/mol` (the quinone-mediated per-O₂ aldehyde yield, discounted for
+competing quinone fates); `f_methional = 0.6` (methional-dominant mol split, an empirical composition estimate —
+hence a YAML param, unlike the stoichiometric 5:2 ester split). Thresholds: `threshold_methional_wine = 0.5
+µg/L` (very potent), `threshold_phenylacetaldehyde_wine = 1.0 µg/L`. Verified end-to-end: a 40–60 mg/L O₂ +
+0.5 g/L amino-acid aged wine reaches **~350 µg/L methional / ~270 µg/L phenylacetaldehyde** (OAV ~700 / ~270) —
+strongly threshold-positive, and the `amino_acids` pool is the hard cap on total aldehyde.
+
+**§4.3 firewall.** Speculative in FORM (the Strecker *form* — O₂-linked, amino-acid-driven, warmer-faster,
+aldehyde = amino acid − CO₂ — is sourced; the magnitudes are estimates). Writing `N`/`CO2` (plausible-tier pools)
+from a speculative Process is the accepted D-27/D-45 precedent; isolable (disable the Process and the drift
+vanishes).
+
+**Regression surface.** Two new wine-only state slots (wine 41→43, beer untouched), two new chemistry species,
+two new `sensory.yaml` thresholds, two new `AromaCompound`s (wine aroma set 8→10), four new `aging.yaml` params.
+`test_media.py` goldens updated (wine size + `WINE_STRECKER_SLOTS` + `WINE_AGING_PROCESSES` gains
+`strecker_degradation`); `k_ethanol_oxidation` **unchanged** (the whole point — no re-baseline), so every default
+/ un-aged / reductive / no-amino-acid trajectory stays byte-for-byte. New tests: `StreckerDegradation` unit
+(closed form, carbon + nitrogen closure per-RHS, double-substrate isolability, first-order-in-O₂ + saturating aa
+gate, methional-dominant split, wine-only no-op on beer, warmer-faster, integrated saturation alongside the
+co-resident always-on sinks, the speculative tier floor incl. the structural N-write) + scenario (compile-seam
+gate wine-only, aldehydes climb with O₂+amino-acid dose / 0 without either substrate, carbon **and** nitrogen
+close end to end, both Strecker OAVs climb through the D-67 lens). **Next:** oak extraction (a separate aging
+axis, no O₂ — diffusion-limited vanillin / whiskey lactones / gallotannins), the deferred beat 1b (descriptor
+projection), a lees-autolysis `amino_acids` refill (would make Strecker fire on un-dosed sur-lie aging), or the
+deferred non-oxidative Maillard Strecker route.

@@ -84,14 +84,19 @@ _COMMON: tuple[AromaCompound, ...] = (
     AromaCompound("fusels", "isoamyl alcohol", "solventy / fusel", lumped=True),
 )
 
-#: The three wine-only pools appended in ``wine_schema`` (Brett phenols + volatile thiols).
+#: The five wine-only pools appended in ``wine_schema`` (Brett phenols + volatile thiols + the two
+#: Strecker aldehydes). ``methional`` and ``phenylacetaldehyde`` (decision D-75) are single-molecule
+#: pools with OPPOSITE valence — methional the cooked-potato oxidative off-note, phenylacetaldehyde
+#: the honey note — read against their own matrix-specific thresholds.
 _WINE_ONLY: tuple[AromaCompound, ...] = (
     AromaCompound("ethylphenols", "4-ethylphenol", "horse-sweat / barnyard", lumped=False),
     AromaCompound("ethylguaiacols", "4-ethylguaiacol", "clove / smoky", lumped=False),
     AromaCompound("mercaptans", "methanethiol", "reductive / drains", lumped=True),
+    AromaCompound("methional", "methional", "cooked potato / oxidative", lumped=False),
+    AromaCompound("phenylacetaldehyde", "phenylacetaldehyde", "honey / floral", lumped=False),
 )
 
-#: Medium -> its ordered aroma set. Beer = the 5 common pools; wine = those + 3 wine-only.
+#: Medium -> its ordered aroma set. Beer = the 5 common pools; wine = those + 5 wine-only.
 AROMA_COMPOUNDS: Mapping[str, tuple[AromaCompound, ...]] = {
     "beer": _COMMON,
     "wine": _COMMON + _WINE_ONLY,

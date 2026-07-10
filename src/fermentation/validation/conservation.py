@@ -234,6 +234,19 @@ def total_carbon(
         w[schema.slice("vinylguaiacols")] = carbon_mass_fraction("vinylguaiacol")
     if "ethylguaiacols" in schema:
         w[schema.slice("ethylguaiacols")] = carbon_mass_fraction("ethylguaiacol")
+    # Strecker aldehyde pools (decision D-75): StreckerDegradation draws carbon from the amino-acid
+    # pool into methional (C4) + phenylacetaldehyde (C8) and releases the acid's carboxyl carbon
+    # as CO2 (deaminating the nitrogen to N), so — like the mercaptans draw — these carry carbon and
+    # must be weighted or the transfer would read as carbon destroyed. Booked at each aldehyde's own
+    # carbon fraction (its representative species, the same one the Process deposits against), so
+    # total_carbon closes to machine precision: the carbon into methional + phenylacetaldehyde + CO2
+    # equals the carbon out of amino_acids. Nitrogen-free (arginine N deaminated to N), so both are
+    # absent from total_nitrogen. On a reductive / amino-acid-free run the pools are empty and the
+    # Process contributes zero (constant 0 terms).
+    if "methional" in schema:
+        w[schema.slice("methional")] = carbon_mass_fraction("methional")
+    if "phenylacetaldehyde" in schema:
+        w[schema.slice("phenylacetaldehyde")] = carbon_mass_fraction("phenylacetaldehyde")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(

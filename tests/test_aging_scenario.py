@@ -31,6 +31,7 @@ from fermentation.core.kinetics.aging import (
     EsterHydrolysis,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
+    StreckerDegradation,
     SulfiteOxidation,
 )
 from fermentation.core.media import get_medium
@@ -38,7 +39,12 @@ from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 from fermentation.sensory import load_thresholds, oav_series
-from fermentation.validation.conservation import assert_conserved, assert_nonnegative, total_carbon
+from fermentation.validation.conservation import (
+    assert_conserved,
+    assert_nonnegative,
+    total_carbon,
+    total_nitrogen,
+)
 
 # A short, dry-by-then ferment (14 d at 20 C takes a 24-Brix must to dryness), then a warm aging
 # tail. begin_aging sits well past dryness so the flux-gated ester producers are quiescent and the
@@ -48,11 +54,22 @@ _FERMENT_DAYS = 30.0
 _AGING_DAYS = 150.0
 
 
-def _wine(interventions: list[Intervention], *, aging_celsius: float = 25.0) -> Scenario:
+def _wine(
+    interventions: list[Intervention],
+    *,
+    aging_celsius: float = 25.0,
+    amino_acids_gpl: float = 0.0,
+) -> Scenario:
+    # amino_acids_gpl (default 0, byte-for-byte the pre-D-75 helper) doses the assimilable amino
+    # must input the StreckerDegradation Process (D-75) draws its aldehyde carbon from; a residual
+    # survives to the aging segment (AminoAcidAssimilation only draws it during active ferment).
+    initial: dict[str, float] = {"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25}
+    if amino_acids_gpl > 0.0:
+        initial["amino_acids_gpl"] = amino_acids_gpl
     return Scenario(
         name="aging-test",
         medium="wine",
-        initial={"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25},
+        initial=initial,
         # A gentle 20->aging_celsius ramp across the ferment window (the two knots compile to one
         # linear segment), held flat at the warmer aging temperature for the tail (schedule holds
         # the last knot). The ferment reaches dryness well before the begin_aging breakpoint, so
@@ -516,3 +533,115 @@ def test_browned_run_closes_carbon_end_to_end():
     assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
     assert_conserved(traj.as_trajectory(), c_of, label="carbon")
     assert_nonnegative(traj.as_trajectory(), ("o2", "A420", "acetaldehyde"), atol=1e-9)
+
+
+# -- StreckerDegradation (decision D-75) — the O₂/amino-acid Strecker aldehydes, end to end ----
+
+
+def test_strecker_gated_by_begin_aging_wine_only():
+    # StreckerDegradation is WINE-ONLY (reads wine-only amino_acids + deaminates to N) — present in
+    # the wine set, absent from beer — and rides the aging gate: disabled at compile, then on by
+    # begin_aging (the SulfiteOxidation pattern).
+    assert StreckerDegradation.name in get_medium("wine").build_process_set()
+    assert StreckerDegradation.name not in get_medium("beer").build_process_set()
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], amino_acids_gpl=0.5))
+    assert StreckerDegradation.name in cs.process_set
+    assert not cs.process_set.is_enabled(StreckerDegradation.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(StreckerDegradation.name)  # begin_aging turns it on
+
+
+def test_strecker_produces_aldehydes_with_oxygen_and_amino_acids():
+    # The end-to-end payoff: an oxygen-dosed, amino-acid-dosed aged wine finishes with BOTH Strecker
+    # aldehydes accumulated (methional the cooked-potato off-note, phenylacetaldehyde the honey),
+    # methional-dominant (f_methional = 0.6), and the dosed O₂ largely consumed over the aging tail.
+    o2_dose = 60.0
+    aged = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, o2_dose)],
+            amino_acids_gpl=0.5,
+        )
+    ).run()
+    assert aged.success
+    methional = float(aged.series("methional")[-1])
+    phenyl = float(aged.series("phenylacetaldehyde")[-1])
+    # Both aldehydes form, at aroma-relevant (µg/L-scale) levels; methional dominates the split.
+    assert methional > phenyl > 0.0
+    # The dosed O₂ is largely consumed by the end of the aging tail (Strecker rides the shared O₂
+    # alongside the dominant browning + ethanol-oxidation sinks).
+    assert float(aged.series("o2")[-1]) < 0.5 * (o2_dose / 1000.0)
+
+
+def test_strecker_silent_without_amino_acids():
+    # Isolability (the D-75 substrate gate): an oxygen-dosed aged run with NO amino acids makes
+    # NO Strecker aldehydes — the amino_acids ≤ 0 guard is exact — so a nutrient-free aging is
+    # byte-for-byte the case without this Process (methional/phenylacetaldehyde stay 0).
+    aged = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)])  # no amino_acids_gpl
+    ).run()
+    assert aged.success
+    assert float(aged.series("methional")[-1]) == 0.0
+    assert float(aged.series("phenylacetaldehyde")[-1]) == 0.0
+
+
+def test_strecker_silent_reductive():
+    # The other substrate gate: an amino-acid-dosed but REDUCTIVE (no add_oxygen) aging makes no
+    # Strecker aldehydes — the o2 ≤ 0 guard is exact — so reductive aging is unchanged.
+    aged = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], amino_acids_gpl=0.5)).run()
+    assert aged.success
+    assert float(aged.series("methional")[-1]) == 0.0
+    assert float(aged.series("phenylacetaldehyde")[-1]) == 0.0
+
+
+def test_strecker_closes_carbon_and_nitrogen_end_to_end():
+    # StreckerDegradation draws carbon from amino_acids into methional + phenylacetaldehyde + CO₂,
+    # deaminates the nitrogen to N — so BOTH ledgers must close end to end. The O₂ dose flow is
+    # carbon- AND nitrogen-free (o2 off every ledger), the amino-acid dose is a t0 initial (not a
+    # flow), so total_carbon and total_nitrogen are both flat (final == initial) across the whole
+    # ferment + aging + Strecker trajectory.
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],
+            amino_acids_gpl=0.5,
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    n_of = total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n)
+    # Every external flow (the O₂ dose) injects zero carbon AND zero nitrogen (o2 off every ledger).
+    assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert all(n_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert_conserved(traj.as_trajectory(), c_of, label="carbon")
+    assert_conserved(traj.as_trajectory(), n_of, label="nitrogen")
+    assert_nonnegative(
+        traj.as_trajectory(), ("o2", "amino_acids", "methional", "phenylacetaldehyde"), atol=1e-9
+    )
+
+
+def test_strecker_raises_the_strecker_oavs():
+    # Close the design loop through the STATED acceptance lens (milestone-3-plan: aging Processes
+    # "validated by the D-67 OAV lens"). The whole point of D-75 was to add the two Strecker aromas
+    # the lens now reads — so assert BOTH OAVs climb positive on the oxygen+amino-acid-dosed run vs
+    # the reductive baseline (which is byte-for-byte 0). methional's low (~0.5 µg/L) threshold makes
+    # its OAV the larger of the two.
+    thresholds = load_thresholds()
+    aged = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],
+            amino_acids_gpl=0.5,
+        )
+    ).run()
+    reductive = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], amino_acids_gpl=0.5)).run()
+    assert aged.success and reductive.success
+
+    for pool in ("methional", "phenylacetaldehyde"):
+        oav_aged = float(oav_series(aged.as_trajectory(), thresholds, pool)[-1])
+        oav_red = float(oav_series(reductive.as_trajectory(), thresholds, pool)[-1])
+        assert oav_aged > 0.0
+        assert oav_red == 0.0  # reductive aging raises neither aroma
+        assert oav_aged > oav_red

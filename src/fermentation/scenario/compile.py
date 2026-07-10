@@ -55,6 +55,7 @@ from fermentation.core.kinetics import (
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
+    StreckerDegradation,
     SulfiteOxidation,
     YeastAutolysis,
     YeastPOFDecarboxylation,
@@ -118,11 +119,12 @@ _BRETT_GATED_PROCESSES = (
 #: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72/D-74):
 #: :class:`EsterHydrolysis` (the ester-fade), :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol
 #: oxidation), :class:`PhenolicBrowning` (the O₂-driven browning, D-74, accumulating ``A420``) and
-#: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72). The first three are
-#: medium-agnostic
-#: (wired into both media); :class:`SulfiteOxidation` is wine-only (reads wine-only ``so2_total``/pH
-#: slots), so on beer it is simply absent from the ProcessSet — both the compile-disable and the
-#: ``begin_aging``-enable loops guard with ``name in process_set``, so listing it here is beer-safe.
+#: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72) and :class:`StreckerDegradation`
+#: (the O₂/amino-acid-driven Strecker aldehydes, D-75). The first three are medium-agnostic
+#: (wired into both media); :class:`SulfiteOxidation` and :class:`StreckerDegradation` are wine-only
+#: (they read wine-only ``so2_total``/pH and ``amino_acids``/``N`` slots respectively), so on beer
+#: they are simply absent from the ProcessSet — both the compile-disable and the begin_aging-enable
+#: loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
 #: ``begin_aging`` verb re-enables exactly this tuple at its breakpoint and the compile seam
 #: disables exactly this tuple — one list,
@@ -133,6 +135,7 @@ _AGING_GATED_PROCESSES = (
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     SulfiteOxidation,
+    StreckerDegradation,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.

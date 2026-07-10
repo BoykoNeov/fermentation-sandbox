@@ -173,11 +173,16 @@ from collections.abc import Mapping
 from fermentation.core.acidbase import SO2_STATE_KEY, bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
+    M_CO2,
     M_ETHANOL,
+    M_METHIONAL,
     M_O2,
+    M_PHENYLACETALDEHYDE,
     M_SO2,
     carbon_mass_fraction,
+    nitrogen_mass_fraction,
 )
+from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -220,6 +225,18 @@ _ETHANOL_PER_ACETALDEHYDE = M_ETHANOL / M_ACETALDEHYDE
 #: *binding* (which reversibly sequesters ``so2_total`` without removing it): this route
 #: *oxidises* SO₂ to sulfate and permanently removes it, so the two do not double-count.
 _SO2_PER_O2 = 2.0  # mol SO₂ oxidised per mol O₂ consumed via the sulfite-scavenging route
+
+#: The two Strecker-aldehyde product species (decision D-75), from the one chemistry source.
+#: Each is a single-molecule pool (not a lump): methional is the methionine-derived "cooked-potato"
+#: oxidative off-note (C4H8OS), phenylacetaldehyde the phenylalanine-derived "honey" note (C8H8O).
+#: Naming them here keeps the carbon draw and the ``total_carbon`` weighting on one species (D-19).
+_METHIONAL_SPECIES = "methional"
+_PHENYLACETALDEHYDE_SPECIES = "phenylacetaldehyde"
+
+#: The Strecker decarboxylation releases exactly **1 mol CO₂ per mol aldehyde** — the amino acid's
+#: carboxyl carbon. On the carbon ledger (unlike ``o2``), so it is a genuine product term the carbon
+#: bookkeeping must route, not an off-ledger emission (D-75).
+_CO2_PER_STRECKER_ALDEHYDE = 1.0
 
 
 class EsterHydrolysis(Process):
@@ -618,4 +635,148 @@ class PhenolicBrowning(Process):
         # mass —
         # so nothing conserved moves and no carbon is borrowed (unlike the ethanol route).
         d[schema.slice("A420")] = params["y_a420_per_o2"] * (r_o2 / M_O2)
+        return d
+
+
+class StreckerDegradation(Process):
+    """Oxidative aging: O₂ (via quinones) degrades amino acids → Strecker aldehydes (D-75).
+
+    The fifth aging Process and the **third** oxidative sibling on the O₂ sub-axis, after
+    :class:`OxidativeAcetaldehyde` (D-71) and :class:`PhenolicBrowning` (D-74). As a finished wine
+    takes up oxygen, the **o-quinones** that phenol autoxidation produces (the browning cascade)
+    oxidatively deaminate and decarboxylate amino acids to **Strecker aldehydes** — **methional**
+    (from methionine, the "cooked-potato" *oxidative off-note*, one of the sharpest markers of an
+    oxidised/maderised white wine and of stale beer) and **phenylacetaldehyde** (from phenylalanine,
+    the "honey/floral" note of aged white and dessert wines). Unlike the other four aging Processes,
+    these products move **no** pool the D-67 OAV lens already reads, so this beat adds **two new
+    aroma pools** — two, not one lumped, because the two aldehydes have **opposite sensory valence**
+    (methional off, phenylacetaldehyde pleasant), the owner's D-75 fork.
+
+    **Doubly substrate-gated — adds on top, NO re-baseline (the D-75 crux).** The rate is gated on
+    the dissolved-O₂ pool **and** the amino-acid pool::
+
+        gate = amino_acids / (K_amino_acids + amino_acids)              # smooth availability, [0,1)
+        r_O2 = k_strecker · f(T) · [o2] · gate                         # O₂-limited AND aa-gated
+        n_ald = y_strecker_per_o2 · (r_O2 / M_O2)                      # mol total aldehyde /L/h
+
+    Because the O₂ draw itself carries the ``gate``, Strecker is **substrate-gated exactly like**
+    :class:`SulfiteOxidation` (which is gated on ``o2`` AND SO₂). D-72 established the load-bearing
+    rule: a substrate-gated sink **adds on top of the shared O₂ budget without any re-baseline** —
+    zero without its substrate, so the default/beer trajectory is byte-for-byte preserved and
+    ``k_ethanol_oxidation + k_browning = 5.0e-4`` is **untouched** (``k_strecker`` is a small extra
+    wine-only draw that only fires when ``amino_acids`` is present — dosed nutrient, or future lees
+    autolysis refill). This **supersedes** the D-71→D-74 forward-guess ("the next *always-on* sink —
+    reduce ``k_ethanol_oxidation`` again to its share"), which wrongly assumed a significant,
+    medium-agnostic sink. The ``amino_acids`` pool is the true **limiting reagent** (finite amino
+    acid ⇒ finite Strecker aldehyde — the accumulation saturates as the pool is drawn down), so the
+    aldehyde *level* is threshold-relevant (µg/L–mg/L vs ~0.5–1 µg/L thresholds) across the whole
+    speculative parameter band while the O₂ draw stays a minor, in-band perturbation.
+
+    **Carbon + nitrogen close by construction — the D-45 mercaptans idiom + a CO₂ term.** The
+    aldehyde carbon is drawn from ``amino_acids`` (booked as arginine) and the amino-acid nitrogen
+    is **deaminated** back to the ``N`` pool, exactly as
+    :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan` does; the Strecker
+    **decarboxylation** adds one product this idiom did not have — **1 mol CO₂ per mol aldehyde**
+    (:data:`_CO2_PER_STRECKER_ALDEHYDE`, the acid's carboxyl carbon), on the carbon ledger. The
+    arginine draw is *sized to the product carbon* (methional + phenylacetaldehyde + CO₂), so
+    ``total_carbon`` closes to machine precision (the :class:`EsterHydrolysis` multi-product split
+    idiom); all the arginine nitrogen lands in ``N`` and the products are nitrogen-free, so
+    ``total_nitrogen`` closes. The arginine-for-``amino_acids`` stand-in is **exact on the ledger,
+    approximate on provenance** (the drawn C/N is arginine's, not methionine/phenylalanine) — the
+    same honest stand-in mercaptans carries. ``o2`` is off every ledger (D-71), so spending it moves
+    nothing conserved. ``total_mass`` ({S,E,CO2}) sees the CO₂ term with no matching S/E debit, but
+    it is never asserted on an aging run (the aroma pools are active) — the standing
+    :class:`OxidativeAcetaldehyde` scope-out.
+
+    **The inherited quinone double-count lump (documented, not fixed).** Mechanistically the O₂ is
+    consumed at the phenol-oxidation step (:class:`PhenolicBrowning`'s draw), making the o-quinones
+    that then do the Strecker deamination — so a separate ``k_strecker`` ``[o2]`` draw formally
+    double-counts that shared quinone step. But :class:`PhenolicBrowning` and
+    :class:`OxidativeAcetaldehyde` **already** double-count it against each other (both independent
+    ``[o2]`` draws for one coupled cascade) — the additive-share v1 lump accepted at D-73. Strecker
+    following suit is *consistent*; a two-stage (O₂ → quinone pool → {pigment, aldehyde,
+    acetaldehyde}) rework is deliberately out of scope. **Scope:** this is the *oxidative*
+    (quinone-driven) Strecker route only; the non-oxidative Maillard/sugar-dicarbonyl route (sweet
+    wines, thermal) is deferred, keeping Strecker honestly on the ``o2`` sub-axis.
+
+    **Wine-only + isolable + doubly O₂/aa-gated (prime directive #3).** ``amino_acids`` and the
+    ``N``-deamination read wine-only slots (beer's amino-acid pool is not tracked, D-32), so — like
+    :class:`SulfiteOxidation` — this is wired into the *wine* medium only; the
+    ``"amino_acids" not in schema`` guard makes it a hard no-op besides. Wired **disabled at the
+    compile seam** (aging is post-ferment); ``begin_aging`` enables it with the other aging
+    Processes. With no O₂ or amino acids the ``o2 ≤ 0`` / ``aa ≤ 0`` guards return byte-for-byte
+    zero, so a reductive (no ``add_oxygen``) or an amino-acid-free aging is exactly the case without
+    this Process. **First aging Process to write ``N``** (via the deamination), so an enabled run
+    drops structural ``tier_of("N")`` PLAUSIBLE→SPECULATIVE (the D-45 note). Tier **speculative**
+    (the Strecker *form* — O₂-linked, amino-acid-driven, warmer-faster, aldehyde = acid − CO₂ —
+    is sourced; every magnitude is an order-of-magnitude estimate).
+    """
+
+    name = "strecker_degradation"
+    tier = Tier.SPECULATIVE
+    #: Consumes its aa-gated share of the dissolved-O₂ substrate; books the two Strecker aldehydes
+    #: (``methional``/``phenylacetaldehyde``) + the decarboxylation ``CO2``, drawing the carbon from
+    #: ``amino_acids`` (arginine), deaminating its nitrogen to ``N``. Touches those six and nothing
+    #: else — ``o2`` is off every ledger; the C/N transfer closes exactly.
+    touches = ("o2", "methional", "phenylacetaldehyde", "CO2", "amino_acids", "N")
+    #: ``k_strecker``/``E_a_strecker``/``y_strecker_per_o2``/``f_methional`` are this Process's own
+    #: (aging.yaml, D-75); ``K_amino_acids`` is the *shared* availability half-saturation (the same
+    #: constant the mercaptan/reroute gates read); ``T_ref`` is shared with every Arrhenius rate.
+    #: Their tiers cap the output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_strecker",
+        "E_a_strecker",
+        "y_strecker_per_o2",
+        "f_methional",
+        "K_amino_acids",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (beer's amino-acid pool is not tracked, D-32): a hard no-op on any schema
+        # without them, belt-and-suspenders to the wine-only wiring.
+        if "amino_acids" not in schema or "o2" not in schema:
+            return d
+        o2 = float(y[schema.slice("o2")][0])
+        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
+        # No O₂ or amino acids ⇒ no Strecker: reductive/amino-acid-free aging is byte-for-byte
+        # the case without this Process. ``<= 0`` also absorbs solver undershoot (o2 < 0 ⇒ no draw).
+        if o2 <= 0.0 or aa <= 0.0:
+            return d
+        # Smooth availability gate (the D-33 swap/reroute idiom): throttles the O₂ draw down to
+        # 0 as the pool empties, so O₂/carbon/N vanish together; amino_acids never goes negative.
+        gate = aa / (params["K_amino_acids"] + aa)  # in [0, 1)
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_strecker"], params["T_ref"])
+        # This route's aa-gated SHARE of the O₂-depletion rate — a SMALL wine-only add-on (NOT in
+        # the 5.0e-4 always-on anchor; substrate-gated, adds on top like SulfiteOxidation, D-72).
+        r_o2 = params["k_strecker"] * f_t * o2 * gate  # g O2/L/h consumed by the Strecker route
+        n_ald = params["y_strecker_per_o2"] * (r_o2 / M_O2)  # mol total Strecker aldehyde/L/h
+        f_meth = params["f_methional"]  # mol fraction methional; the rest is phenylacetaldehyde
+        meth_rate = f_meth * n_ald * M_METHIONAL  # g methional/L/h
+        phenyl_rate = (1.0 - f_meth) * n_ald * M_PHENYLACETALDEHYDE  # g phenylacetaldehyde/L/h
+        co2_rate = _CO2_PER_STRECKER_ALDEHYDE * n_ald * M_CO2  # 1 CO₂ per aldehyde (decarb)
+
+        # Draw the product carbon (aldehydes + CO₂, all on-ledger) from amino_acids sized to
+        # match, and deaminate the arginine nitrogen to N (the D-45 idiom + CO₂ decarb): carbon
+        # out of amino_acids == carbon into products, and all arginine N lands in N (products are
+        # N-free), so total_carbon and total_nitrogen both close to machine precision.
+        product_carbon = (
+            meth_rate * carbon_mass_fraction(_METHIONAL_SPECIES)
+            + phenyl_rate * carbon_mass_fraction(_PHENYLACETALDEHYDE_SPECIES)
+            + co2_rate * carbon_mass_fraction("CO2")
+        )  # g C/L/h into the products
+        c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
+        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+        aa_mass = product_carbon / c_aa  # arginine mass consumed to supply that carbon
+
+        d[schema.slice("o2")] = -r_o2  # this route's aa-gated O₂ share (off every ledger)
+        d[schema.slice("methional")] = meth_rate
+        d[schema.slice("phenylacetaldehyde")] = phenyl_rate
+        d[schema.slice("CO2")] = co2_rate
+        d[schema.slice("amino_acids")] = -aa_mass
+        d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine N → ammonium (D-45)
         return d

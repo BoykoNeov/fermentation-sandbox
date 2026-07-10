@@ -22,19 +22,25 @@ import pytest
 from fermentation.core.acidbase import bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
+    M_CO2,
     M_ETHANOL,
+    M_METHIONAL,
     M_O2,
+    M_PHENYLACETALDEHYDE,
     M_SO2,
     carbon_mass_fraction,
+    nitrogen_mass_fraction,
 )
 from fermentation.core.kinetics import (
     EsterHydrolysis,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
+    StreckerDegradation,
     SulfiteOxidation,
     arrhenius_factor,
 )
 from fermentation.core.kinetics.aging import _SO2_PER_O2
+from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import Process, ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -46,6 +52,7 @@ from fermentation.validation import (
     assert_nonnegative,
     total_carbon,
     total_mass,
+    total_nitrogen,
 )
 
 #: Carbon fractions of the three pools the transfer touches (mirror the Process constants).
@@ -58,6 +65,12 @@ _BYP_SHARE = 2.0 / 7.0
 #: Carbon fractions of the two pools the oxidation transfer moves carbon between (E → acetaldehyde).
 _ETHANOL_C = carbon_mass_fraction("ethanol")
 _ACET_C = carbon_mass_fraction("acetaldehyde")
+#: Carbon fractions of the Strecker pools + the amino-acid source (D-75), for the closure checks.
+_METHIONAL_C = carbon_mass_fraction("methional")
+_PHENYLACET_C = carbon_mass_fraction("phenylacetaldehyde")
+_CO2_C = carbon_mass_fraction("CO2")
+_AA_C = carbon_mass_fraction(AMINO_ACID_SPECIES)
+_AA_N = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
 
 
 @pytest.fixture
@@ -842,5 +855,262 @@ def test_browning_tier_floored_at_speculative(store):
     schema = wine_schema()
     ps = ProcessSet(schema, [PhenolicBrowning()])
     for pool in ("o2", "A420"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# StreckerDegradation (decision D-75) — the WINE-ONLY, DOUBLY substrate-gated oxidative aging sink
+# that produces the Strecker aldehydes methional (cooked-potato off-note) + phenylacetaldehyde
+# (honey). Dissolved O2 — via the phenol-oxidation quinones — degrades amino acids: the carbon is
+# drawn from ``amino_acids`` (arginine stand-in), the nitrogen deaminated to ``N``, one CO2 released
+# per aldehyde (the D-45 mercaptan idiom + a decarboxylation term). Gated on BOTH ``o2`` AND
+# ``amino_acids`` (the O2 draw itself carries the availability gate), so — like SulfiteOxidation —
+# it ADDS ON TOP of the shared o2 budget WITHOUT re-baselining (superseding the D-71..D-74
+# "reduce k_ethanol again" forward-guess). These tests pin the closed form, carbon AND nitrogen
+# closure per-RHS, the double-substrate isolability (inert without O2 or without amino acids), the
+# first-order-in-O2 linearity + aa-availability gate, the methional:phenylacetaldehyde split, the
+# wine-only no-op on beer, the warmer-faster ordering, the integrated saturation + closure, and the
+# speculative tier floor (incl. the structural N-write).
+
+_STRECKER_TOUCHES = {"o2", "methional", "phenylacetaldehyde", "CO2", "amino_acids", "N"}
+
+
+def _strecker_wine(
+    schema: StateSchema, *, aa: float = 0.05, o2: float = 0.03, t: float = 293.15, **kw
+) -> FloatArray:
+    """A finished, racked wine at the start of aging with dosed amino acids + O2 — the two Strecker
+    substrates. ``esters`` defaults to 0 (irrelevant here); any extra pool via kwargs."""
+    y = _aged_wine(schema, esters=0.0, t=t, o2=o2, amino_acids=aa)
+    for name, val in kw.items():
+        y[schema.slice(name)] = val
+    return y
+
+
+def _strecker_closed_form(
+    schema: StateSchema, params: dict[str, float], y: FloatArray, t: float
+) -> dict[str, float]:
+    """The Process's own algebra, recomputed independently for the closed-form assertions."""
+    o2 = float(y[schema.slice("o2")][0])
+    aa = float(y[schema.slice("amino_acids")][0])
+    gate = aa / (params["K_amino_acids"] + aa)
+    f_t = arrhenius_factor(t, params["E_a_strecker"], params["T_ref"])
+    r_o2 = params["k_strecker"] * f_t * o2 * gate
+    n_ald = params["y_strecker_per_o2"] * (r_o2 / M_O2)
+    f_meth = params["f_methional"]
+    return {
+        "o2": -r_o2,
+        "methional": f_meth * n_ald * M_METHIONAL,
+        "phenylacetaldehyde": (1.0 - f_meth) * n_ald * M_PHENYLACETALDEHYDE,
+        "CO2": n_ald * M_CO2,
+    }
+
+
+def test_strecker_metadata():
+    p = StreckerDegradation()
+    assert p.name == "strecker_degradation"
+    # Speculative: the aging axis is the Tier-3 frontier (form sourced, magnitudes estimated).
+    assert p.tier is Tier.SPECULATIVE
+    # Consumes its aa-gated O2 share; books the two aldehydes + the decarboxylation CO2, drawing
+    # carbon from amino_acids and deaminating the nitrogen to N. Touches those six and nothing else.
+    assert set(p.touches) == _STRECKER_TOUCHES
+    assert set(p.reads) == {
+        "k_strecker",
+        "E_a_strecker",
+        "y_strecker_per_o2",
+        "f_methional",
+        "K_amino_acids",
+        "T_ref",
+    }
+
+
+def test_strecker_matches_closed_form(params):
+    schema = wine_schema()
+    aa, o2, t = 0.05, 0.03, 298.15  # off T_ref so the Arrhenius factor bites
+    y = _strecker_wine(schema, aa=aa, o2=o2, t=t)
+    d = StreckerDegradation().derivatives(0.0, y, schema, params)
+    cf = _strecker_closed_form(schema, params, y, t)
+
+    assert cf["methional"] > 0.0  # the products are live (guards against a vacuous pass)
+    assert schema.get(d, "o2") == pytest.approx(cf["o2"])
+    assert schema.get(d, "methional") == pytest.approx(cf["methional"])
+    assert schema.get(d, "phenylacetaldehyde") == pytest.approx(cf["phenylacetaldehyde"])
+    assert schema.get(d, "CO2") == pytest.approx(cf["CO2"])
+    # amino_acids drawn sized to the product carbon; nitrogen deaminated to N.
+    product_carbon = (
+        cf["methional"] * _METHIONAL_C
+        + cf["phenylacetaldehyde"] * _PHENYLACET_C
+        + cf["CO2"] * _CO2_C
+    )
+    aa_mass = product_carbon / _AA_C
+    assert schema.get(d, "amino_acids") == pytest.approx(-aa_mass)
+    assert schema.get(d, "N") == pytest.approx(aa_mass * _AA_N)
+    # Touches nothing else — no ethanol/esters/fusels/acetaldehyde, no sugar, no biomass.
+    for var in ("X", "S", "E", "esters", "fusels", "Byp", "acetaldehyde"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_strecker_carbon_closes_per_rhs(params):
+    # CARBON closes to machine precision: the arginine carbon leaving amino_acids equals the carbon
+    # entering methional + phenylacetaldehyde + CO2 (the draw is sized to match) — a pure on-ledger
+    # transfer, off-ledger o2 aside.
+    schema = wine_schema()
+    d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=298.15), schema, params)
+    carbon_residual = (
+        schema.get(d, "methional") * _METHIONAL_C
+        + schema.get(d, "phenylacetaldehyde") * _PHENYLACET_C
+        + schema.get(d, "CO2") * _CO2_C
+        + schema.get(d, "amino_acids") * _AA_C
+    )
+    assert carbon_residual == pytest.approx(0.0, abs=1e-18)
+
+
+def test_strecker_nitrogen_closes_per_rhs(params):
+    # NITROGEN closes: all the arginine nitrogen leaving amino_acids lands in the N pool (the
+    # aldehydes are nitrogen-free — the deamination, the D-45 mercaptan idiom).
+    schema = wine_schema()
+    d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=298.15), schema, params)
+    nitrogen_residual = schema.get(d, "amino_acids") * _AA_N + schema.get(d, "N") * 1.0
+    assert nitrogen_residual == pytest.approx(0.0, abs=1e-18)
+
+
+def test_strecker_inert_without_oxygen(params):
+    # No oxidant ⇒ no Strecker: a reductive begin_aging (no add_oxygen) is byte-for-byte the case
+    # without this Process. Also the o2<0 solver-undershoot guard.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [StreckerDegradation()], strict=True)
+    assert np.array_equal(
+        ps.total_derivatives(0.0, _strecker_wine(schema, o2=0.0), params), schema.zeros()
+    )
+    assert np.array_equal(
+        StreckerDegradation().derivatives(0.0, _strecker_wine(schema, o2=-1e-6), schema, params),
+        schema.zeros(),
+    )
+
+
+def test_strecker_inert_without_amino_acids(params):
+    # No amino acids ⇒ no Strecker: an amino-acid-free aging is byte-for-byte the case without this
+    # Process (the substrate gate that makes it ADD ON TOP with no re-baseline, D-75). Also aa<0.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [StreckerDegradation()], strict=True)
+    assert np.array_equal(
+        ps.total_derivatives(0.0, _strecker_wine(schema, aa=0.0), params), schema.zeros()
+    )
+    assert np.array_equal(
+        StreckerDegradation().derivatives(0.0, _strecker_wine(schema, aa=-1e-6), schema, params),
+        schema.zeros(),
+    )
+
+
+def test_strecker_first_order_in_oxygen(params):
+    # First-order in the O2 pool (at fixed amino acids, so the availability gate is held constant):
+    # doubling [o2] doubles the instantaneous O2 draw and every product rate.
+    schema = wine_schema()
+    base = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, o2=0.02), schema, params)
+    dbl = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, o2=0.04), schema, params)
+    for pool in ("o2", "methional", "phenylacetaldehyde", "CO2", "amino_acids", "N"):
+        assert schema.get(dbl, pool) == pytest.approx(2.0 * schema.get(base, pool))
+
+
+def test_strecker_availability_gate_saturates(params):
+    # The amino-acid availability gate aa/(K+aa) throttles the draw at low aa and SATURATES toward a
+    # ceiling at high aa (the smooth swap/reroute gate, D-33). At aa >> K the rate approaches the
+    # ungated k*f*[o2]; at aa == K it is ~half that — a monotone, saturating aa dependence.
+    schema = wine_schema()
+    k = params["K_amino_acids"]
+    low = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, aa=0.1 * k), schema, params)
+    mid = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, aa=k), schema, params)
+    high = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, aa=100.0 * k), schema, params
+    )
+    # Monotone increasing O2 draw magnitude with amino acids, but saturating (not linear).
+    assert 0.0 < -schema.get(low, "o2") < -schema.get(mid, "o2") < -schema.get(high, "o2")
+    # mid (aa = K) is ~half the high-aa ceiling (gate = 0.5 vs -> 1); low (aa = 0.1K) far below.
+    assert -schema.get(mid, "o2") == pytest.approx(0.5 * -schema.get(high, "o2"), rel=0.02)
+
+
+def test_strecker_split_methional_dominant(params):
+    # The mol split between the two aldehydes is f_methional : (1 - f_methional); with the default
+    # f_methional = 0.6 methional dominates. Verified as a MOLAR ratio (independent of the two
+    # differing molar masses).
+    schema = wine_schema()
+    d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema), schema, params)
+    meth_mol = schema.get(d, "methional") / M_METHIONAL
+    phenyl_mol = schema.get(d, "phenylacetaldehyde") / M_PHENYLACETALDEHYDE
+    f_meth = params["f_methional"]
+    assert meth_mol / phenyl_mol == pytest.approx(f_meth / (1.0 - f_meth))
+    assert meth_mol > phenyl_mol > 0.0  # methional-dominant (the cooked-potato oxidative marker)
+    # One CO2 per aldehyde (the decarboxylation) — total aldehyde mol equals CO2 mol.
+    assert (meth_mol + phenyl_mol) == pytest.approx(schema.get(d, "CO2") / M_CO2)
+
+
+def test_strecker_rises_with_temperature(params):
+    # The sourced ordering (E_a_strecker > 0): warmer storage forms Strecker aldehydes faster — the
+    # canonical warm-storage staling/oxidation direction.
+    schema = wine_schema()
+    cold = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=283.15), schema, params)
+    warm = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=303.15), schema, params)
+    assert schema.get(warm, "methional") > schema.get(cold, "methional") > 0.0
+    assert schema.get(warm, "o2") < schema.get(cold, "o2") < 0.0  # more O2 drawn when warm
+
+
+def test_strecker_is_wine_only_noop_on_beer(params):
+    # WINE-ONLY: amino_acids + the N-deamination read wine-only slots (beer's amino-acid pool is not
+    # tracked, D-32), so the "amino_acids not in schema" guard makes this a hard no-op on beer even
+    # though o2 exists in both media.
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    yb[beer.slice("o2")] = 0.03
+    assert np.array_equal(StreckerDegradation().derivatives(0.0, yb, beer, params), beer.zeros())
+
+
+def test_integrated_strecker_saturates_and_closes(params, store):
+    # Integrate Strecker ALONGSIDE the dominant always-on O2 sinks (OxidativeAcetaldehyde +
+    # PhenolicBrowning — its real co-residents, which deplete the shared o2 charge on the ~weeks-
+    # months timescale) over a warm ~1-year aging segment with a fixed O2 + amino-acid charge. The
+    # Strecker aldehydes ACCUMULATE and SATURATE as the O2 is spent — a bounded, substrate-limited
+    # climb, not the unbounded rise a rate first-order in ethanol would give. This also exercises
+    # D-75 headline: Strecker ADDS ON TOP of the shared budget (its own aa-gated share) without
+    # perturbing the sibling sinks. Carbon AND nitrogen both close to machine precision.
+    schema = wine_schema()
+    ps = ProcessSet(
+        schema,
+        [OxidativeAcetaldehyde(), PhenolicBrowning(), StreckerDegradation()],
+        strict=True,
+    )
+    y0 = _strecker_wine(schema, aa=0.05, o2=0.04, t=298.15)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success, traj.message
+
+    meth = traj.series("methional")
+    phenyl = traj.series("phenylacetaldehyde")
+    # Both aldehydes accumulate (monotone, produced-only) and end well above zero.
+    assert meth[-1] > meth[0] == 0.0
+    assert phenyl[-1] > phenyl[0] == 0.0
+    # Saturation (by TIME, robust to a non-uniform solver mesh): the second-half gain is a small
+    # fraction of the first-half gain — the O2 charge is spent, so production has plateaued rather
+    # than climbing linearly (the D-71 saturating-vs-unbounded distinction, inherited via the shared
+    # o2 pool).
+    mid = int(np.searchsorted(traj.t, 0.5 * traj.t[-1]))
+    first_half = meth[mid] - meth[0]
+    second_half = meth[-1] - meth[mid]
+    assert 0.0 < second_half < 0.2 * first_half
+    # Non-negative pools; carbon + nitrogen close (off-ledger o2/A420 aside; acetaldehyde from E).
+    assert_nonnegative(
+        traj, ("o2", "amino_acids", "methional", "phenylacetaldehyde", "N"), atol=1e-9
+    )
+    f_c = store.value("biomass_C_fraction")
+    f_n = store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+
+
+def test_strecker_tier_floored_at_speculative(store):
+    # Speculative in FORM (Tier-3 frontier): every pool it writes is speculative even before the
+    # (speculative) aging parameter tiers cap them. Non-vacuous across all six touched pools —
+    # including the structural N-write (the first aging Process to write N, the D-45 note).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [StreckerDegradation()])
+    for pool in _STRECKER_TOUCHES:
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE

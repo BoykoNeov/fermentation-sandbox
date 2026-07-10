@@ -4,7 +4,8 @@
 > aging-phase scenario wiring landed (D-70); oxidative aging axis opened (D-71); SO₂ scavenging
 > — the first O₂ sink — built (D-72); O₂ sub-axis reworked for always-on sinks (D-73);
 > `PhenolicBrowning` — the first always-on sink, and the first VISIBLE oxidative product (the
-> `A420` browning index) — built (D-74).**
+> `A420` browning index) — built (D-74); `StreckerDegradation` — the Strecker aldehydes
+> (methional/phenylacetaldehyde), a wine-only substrate-gated O₂ sink — built (D-75).**
 > The OAV sensory readout ships (`fermentation.sensory` + `sensory.yaml` + `tests/test_sensory_oav.py`).
 > **D-69 built `EsterHydrolysis` (`core/kinetics/aging.py` + shared `aging.yaml` + `tests/test_aging.py`):
 > net decay of the `esters` pool toward a lower equilibrium floor, Arrhenius warmer-ages-faster, released
@@ -30,9 +31,16 @@
 > is a *share* not the total, letting *always-on* sinks compose; D-74 built `PhenolicBrowning` — the first
 > always-on sink and the first VISIBLE oxidative product: medium-agnostic, dominant O₂ share (diverts O₂
 > from — and suppresses — oxidative acetaldehyde), accumulating a new `A420` browning-index state slot (an
-> optical absorbance, off every ledger; the `iso_alpha` pattern, not the D-67 post-hoc OAV). Next: Strecker
-> degradation (the next always-on O₂ sink; needs new aldehyde aroma pools) or oak extraction; beat 1b
-> (descriptor projection) still deferred.
+> optical absorbance, off every ledger; the `iso_alpha` pattern, not the D-67 post-hoc OAV). **D-75 built
+> `StreckerDegradation` — the O₂/amino-acid Strecker aldehydes methional (cooked-potato off-note) +
+> phenylacetaldehyde (honey), the first aging Process to add aroma pools the D-67 lens did not read (two new
+> wine slots + thresholds). CRUX (owner fork, superseding the D-71→D-74 forward-guess): gating the O₂ draw on
+> `amino_acids` makes it DOUBLY substrate-gated (o2 AND amino_acids), like `SulfiteOxidation`, so it ADDS ON
+> TOP with NO re-baseline of `k_ethanol_oxidation` — the "reduce k_ethanol again" note is retired. Carbon +
+> nitrogen close (the D-45 mercaptan draw+deaminate idiom + a CO₂ decarb term); wine-only, silent without both
+> substrates. Owner also chose TWO pools over one lump (opposite sensory valence). Next: oak extraction (a
+> separate axis, no O₂); beat 1b (descriptor projection) and the non-oxidative Maillard Strecker route still
+> deferred.
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

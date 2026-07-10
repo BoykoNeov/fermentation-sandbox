@@ -253,6 +253,21 @@ M_VINYLGUAIACOL = 9 * _M_C + 10 * _M_H + 2 * _M_O
 #: "horse-sweat/barnyard". Same 9 carbons as its 4-vinylguaiacol precursor, so the reduction step is
 #: carbon-conserving (C9 → C9) and ``total_carbon`` closes to machine precision.
 M_ETHYLGUAIACOL = 9 * _M_C + 12 * _M_H + 2 * _M_O
+#: Methional (3-(methylthio)propanal), C4H8OS — the Strecker aldehyde of **methionine**, the
+#: potent "cooked-potato" oxidative off-note and one of the principal markers of oxidatively-aged
+#: wine and stale beer (decision D-75). Formed when the o-quinones of phenol autoxidation
+#: (the ``PhenolicBrowning`` cascade) oxidatively deaminate + decarboxylate methionine: the amino
+#: acid loses its carboxyl carbon as CO₂, so the aldehyde carries **4** carbons to methionine's 5.
+#: Sulfur-bearing (from methionine's thioether) like ``methanethiol``, and **nitrogen-free** — the
+#: Strecker Process deaminates the drawn amino-acid nitrogen back to the ``N`` pool, exactly as
+#: :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan` does (D-45).
+M_METHIONAL = 4 * _M_C + 8 * _M_H + 1 * _M_O + 1 * _M_S
+#: Phenylacetaldehyde (2-phenylacetaldehyde), C8H8O — the Strecker aldehyde of **phenylalanine**,
+#: the "honey/floral" note of aged white and dessert wines (decision D-75). The pleasant-valence
+#: counterpart to methional's off-note, produced by the same quinone-driven Strecker degradation
+#: (phenylalanine's 9 carbons → an 8-carbon aldehyde + CO₂). Nitrogen-free (the amino-acid nitrogen
+#: is deaminated to ``N``), so it sits on ``total_carbon`` but not ``total_nitrogen``.
+M_PHENYLACETALDEHYDE = 8 * _M_C + 8 * _M_H + 1 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -288,6 +303,8 @@ MOLAR_MASS: dict[str, float] = {
     "ferulic_acid": M_FERULIC,
     "vinylguaiacol": M_VINYLGUAIACOL,
     "ethylguaiacol": M_ETHYLGUAIACOL,
+    "methional": M_METHIONAL,
+    "phenylacetaldehyde": M_PHENYLACETALDEHYDE,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -337,6 +354,13 @@ CARBON_ATOMS: dict[str, int] = {
     "ferulic_acid": 10,
     "vinylguaiacol": 9,
     "ethylguaiacol": 9,
+    #: Methional (C4H8OS) carries FOUR carbons — methionine (5 C) loses its carboxyl carbon as CO₂
+    #: in the Strecker decarboxylation, so the aldehyde is C4 (decision D-75). Sulfur-bearing but
+    #: carbon-tracked (the ``methanethiol`` idiom): the ``methional`` pool sits on ``total_carbon``.
+    "methional": 4,
+    #: Phenylacetaldehyde (C8H8O) carries EIGHT carbons — phenylalanine (9 C) → an 8-carbon Strecker
+    #: aldehyde + CO₂ (decision D-75), the honey-note counterpart to methional.
+    "phenylacetaldehyde": 8,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -389,6 +413,11 @@ NITROGEN_ATOMS: dict[str, int] = {
     "ferulic_acid": 0,
     "vinylguaiacol": 0,
     "ethylguaiacol": 0,
+    #: The Strecker aldehydes are nitrogen-free: the Process deaminates the drawn amino-acid
+    #: nitrogen back to the ``N`` pool (the D-45 mercaptan idiom), so methional/phenylacetaldehyde
+    #: themselves carry none — absent from ``total_nitrogen`` (decision D-75).
+    "methional": 0,
+    "phenylacetaldehyde": 0,
 }
 
 

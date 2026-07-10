@@ -40,6 +40,10 @@ WINE_MERCAPTAN_SLOTS = ("mercaptans",)
 # The excreted keto-acid overflow pools (decisions D-49, D-50), appended last: pyruvate then
 # alpha-ketoglutarate, the second- and third-strongest SO₂-binding carbonyls after acetaldehyde.
 WINE_KETO_ACID_SLOTS = ("pyruvate", "alpha_ketoglutarate")
+# The two Strecker-aldehyde aroma pools (decision D-75), appended last: methional (potato) and
+# phenylacetaldehyde (honey), the oxidative-aging markers StreckerDegradation produces from amino
+# acids. Wine-only (the Process reads wine-only amino_acids and deaminates to N).
+WINE_STRECKER_SLOTS = ("methional", "phenylacetaldehyde")
 
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
@@ -59,6 +63,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_BRETT_SLOTS
         + WINE_MERCAPTAN_SLOTS
         + WINE_KETO_ACID_SLOTS
+        + WINE_STRECKER_SLOTS
     )
     assert schema.spec("S").size == 1
     # 20 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
@@ -71,8 +76,8 @@ def test_wine_schema_has_single_sugar_slot():
     # (D-34) + 8 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols — the p-coumaric
     # branch, D-40; ferulic_acid, vinylguaiacols, ethylguaiacols — the ferulic branch, D-55;
     # X_brett, X_brett_dead) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate D-49,
-    # alpha_ketoglutarate D-50)
-    assert schema.size == 41
+    # alpha_ketoglutarate D-50) + 2 Strecker-aldehyde slots (methional, phenylacetaldehyde — D-75)
+    assert schema.size == 43
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -300,9 +305,11 @@ HOP_PROCESSES = {"iso_alpha_acid_loss"}
 # t0 co-inoculation path).
 AGING_PROCESSES = {"ester_hydrolysis", "oxidative_acetaldehyde", "phenolic_browning"}
 # WINE-ONLY aging: sulfite_oxidation (D-72, the O₂-driven SO₂ scavenging) reads wine-only so2_total
-# acid-pH slots (beer's pH/SO₂ system is deferred, D-18), so — like the MLF/Brett Processes — it is
-# wired into the wine medium only. Same compile-seam disable / begin_aging re-enable as the rest.
-WINE_AGING_PROCESSES = {"sulfite_oxidation"}
+# acid-pH slots (beer's pH/SO₂ system is deferred, D-18); strecker_degradation (D-75, the O₂/amino-
+# acid-driven Strecker aldehydes methional + phenylacetaldehyde) reads wine-only amino_acids and
+# deaminates to N — so — like the MLF/Brett Processes — both are wired into the wine medium only.
+# Same compile-seam disable / begin_aging re-enable as the rest.
+WINE_AGING_PROCESSES = {"sulfite_oxidation", "strecker_degradation"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES

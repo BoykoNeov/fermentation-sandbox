@@ -174,3 +174,24 @@ threshold_mercaptans_wine:
     source: "wine volatile-thiol literature (methanethiol / methyl mercaptan detection threshold ~1.8-3.1 µg/L in wine; e.g. Mestres et al. 2000 review, J. Chromatogr. A 881:569-581)"
     conditions: "measured in/near wine matrix; methanethiol, the representative of the LUMPED mercaptans pool (the pool's named stand-in)"
     notes: "LUMPED POOL — assumes the volatile-thiol pool is dominated by methanethiol. Ethanethiol/H2S-adjacent thiols differ, so the OAV rides on the fixed-composition assumption (D-66). Wine-only pool."
+
+# -- Strecker aldehydes (decision D-75): the oxidative-aging aroma markers ------------------
+threshold_methional_wine:
+  value: 0.5
+  unit: "ug/L"   # methional, 'cooked potato / oxidative' (the oxidative-aging off-note)
+  tier: speculative
+  uncertainty: { low: 0.3, high: 1.0, note: "methional perception threshold in wine ~0.5 µg/L (a very potent odorant); band ~0.3-1 µg/L across the literature" }
+  provenance:
+    source: "wine aroma literature: methional (3-(methylthio)propanal) perception threshold ~0.5 µg/L in wine (Escudero et al. 2000, 2002; Ferreira et al. — methional the marker of oxidative/aged 'cooked-potato' character in white wine)"
+    conditions: "measured in/near wine matrix; methional, a single molecule (the methionine-derived Strecker aldehyde)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. One of the sharpest oxidative-aging markers; very potent (low threshold). Wine-only pool. The D-45-style arginine-lump means the MODELLED methional is booked from arginine carbon, not literal methionine — exact on the ledger, approximate on provenance (decision D-75)."
+
+threshold_phenylacetaldehyde_wine:
+  value: 1.0
+  unit: "ug/L"   # phenylacetaldehyde, 'honey / floral' (the pleasant Strecker note)
+  tier: speculative
+  uncertainty: { low: 0.5, high: 5.0, note: "phenylacetaldehyde perception threshold in wine ~1 µg/L (reported ~1-5 µg/L depending on matrix); band widened accordingly" }
+  provenance:
+    source: "wine aroma literature: phenylacetaldehyde perception threshold ~1 µg/L in wine (Escudero et al. 2000, 2002; the honey/floral marker of aged white and dessert wines)"
+    conditions: "measured in/near wine matrix; phenylacetaldehyde, a single molecule (the phenylalanine-derived Strecker aldehyde)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. The pleasant-valence Strecker aldehyde (contrast methional's off-note); the two share the D-75 Strecker Process. Wine-only pool. Same arginine-lump provenance caveat as methional."
