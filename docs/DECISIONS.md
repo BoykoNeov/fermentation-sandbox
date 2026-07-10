@@ -5965,15 +5965,39 @@ structural beat). **Scope:** this is the *oxidative* (quinone-driven) Strecker r
 Maillard/sugar-dicarbonyl route (sweet wines, thermal) is deferred, keeping Strecker honestly on the `o2`
 sub-axis.
 
-**Magnitudes (all speculative, Tier-3 frontier).** `k_strecker = 5.0e-5 /h` (a small add-on, ~10 % of the 5.0e-4
-always-on total at full aa gate, but aa-throttled to a minor in-band perturbation at cellar residual-aa);
-`E_a_strecker = 50 kJ/mol` (its own param per prime directive #2; warmer-faster, the canonical beer-staling
-direction); `y_strecker_per_o2 = 0.5 mol/mol` (the quinone-mediated per-O₂ aldehyde yield, discounted for
-competing quinone fates); `f_methional = 0.6` (methional-dominant mol split, an empirical composition estimate —
-hence a YAML param, unlike the stoichiometric 5:2 ester split). Thresholds: `threshold_methional_wine = 0.5
-µg/L` (very potent), `threshold_phenylacetaldehyde_wine = 1.0 µg/L`. Verified end-to-end: a 40–60 mg/L O₂ +
-0.5 g/L amino-acid aged wine reaches **~350 µg/L methional / ~270 µg/L phenylacetaldehyde** (OAV ~700 / ~270) —
-strongly threshold-positive, and the `amino_acids` pool is the hard cap on total aldehyde.
+**Magnitudes (all speculative, Tier-3 frontier).** `k_strecker = 1.0e-5 /h` (a small add-on, ~2 % of the 5.0e-4
+always-on total at full aa gate, aa-throttled to well under 1 % of the O₂ at cellar residual-aa — a minor in-band
+perturbation); `E_a_strecker = 50 kJ/mol` (its own param per prime directive #2; warmer-faster, the canonical
+beer-staling direction); `y_strecker_per_o2 = 0.5 mol/mol` (the quinone-mediated per-O₂ aldehyde yield, discounted
+for competing quinone fates); `f_methional = 0.15` (**phenylacetaldehyde**-dominant mol split — see the follow-up
+correction below — an empirical composition estimate, hence a YAML param, unlike the stoichiometric 5:2 ester
+split). Thresholds: `threshold_methional_wine = 0.5 µg/L` (very potent), `threshold_phenylacetaldehyde_wine = 1.0
+µg/L`. Verified end-to-end: a 40–60 mg/L O₂ + 0.5 g/L amino-acid aged wine reaches **~18 µg/L methional / ~120
+µg/L phenylacetaldehyde** (OAV ~37 / ~120) — both in the observed oxidised-white-wine range (methional the potent
+low-µg/L marker, phenylacetaldehyde the honey majority), and the `amino_acids` pool is the hard cap on total
+aldehyde.
+
+**Follow-up correction (same day, advisor-flagged before finalizing) — the split was backwards, and the level too
+high.** The completion `advisor()` pass caught a fidelity miss none of the (relative/threshold-only) tests could:
+the initial `f_methional = 0.6` and `k_strecker = 5.0e-5` produced **~350 µg/L methional (OAV ~700)**, ~1–2 orders
+above oxidised-wine reality. Two errors, both corrected in `aging.yaml` (calibration only — no structural or test-
+logic change beyond flipping the now-wrong dominance assertions): **(1)** the `f_methional` provenance justified
+methional-dominance *by its low ~0.5 µg/L threshold* — but the split is a **production** quantity (relative
+methionine-vs-phenylalanine Strecker flux = abundance × reactivity), and **potency is already carried by the OAV
+threshold**, so folding it into the split double-counts it. Phenylalanine is one of the more abundant must amino
+acids while methionine is a minor one, so the flux favours **phenylacetaldehyde** ⇒ `f_methional` 0.6 → **0.15**
+(and the provenance rewritten to justify the split by flux, not potency). **(2)** the total was ~5× too high ⇒
+`k_strecker` 5.0e-5 → **1.0e-5** (re-banded), landing methional ~18 µg/L and phenylacetaldehyde ~120 µg/L — both
+in range. This is the D-71 sanity-anchoring discipline (anchor the *produced level* to literature) applied late;
+recorded here rather than silently amended. Tests `test_strecker_split_methional_dominant` →
+`..._phenylacetaldehyde_dominant` and the scenario dominance assertion flipped (they read `f_methional` from
+params, so no other change).
+
+**SO₂-binding carbonyls, note-and-deferred.** Methional and phenylacetaldehyde are aldehydes and thus (like
+acetaldehyde/pyruvate/α-KG, D-49/D-50/D-51) SO₂-binding carbonyls, but are **not** added to the D-51 multi-carbonyl
+bisulfite equilibrium: at their µg/L levels they are ~0.1–0.3 % of the acetaldehyde molar pool — quantitatively
+negligible — so their omission does not perturb the free/molecular-SO₂ readout. Recorded so it is not silently
+forgotten if a future beat revisits the carbonyl set.
 
 **§4.3 firewall.** Speculative in FORM (the Strecker *form* — O₂-linked, amino-acid-driven, warmer-faster,
 aldehyde = amino acid − CO₂ — is sourced; the magnitudes are estimates). Writing `N`/`CO2` (plausible-tier pools)

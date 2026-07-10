@@ -401,10 +401,10 @@ y_a420_per_o2:
 # perturbation to the total O2 budget -- within the anchor's own uncertainty band. Strecker aldehydes
 # are a minor O2 fate vs visible browning, so this is deliberately well below k_browning/k_ethanol.
 k_strecker:
-  value: 5.0e-5
+  value: 1.0e-5
   unit: "1/h"   # d(o2)/dt = -k_strecker * f(T) * [o2] * gate  (Strecker route's aa-gated O2 draw)
   tier: speculative
-  uncertainty: { low: 1.0e-5, high: 2.0e-4, note: "Strecker-route O2-draw constant at T_ref = 20 C, at FULL amino-acid availability (gate -> 1). ~10% of the 5.0e-4 always-on total, but substrate-gated on amino_acids so the realised draw at cellar residual-aa (~10-40 mg/L => gate ~0.1-0.3) is ~1-3% of the O2 -- a minor add-on, NOT re-baselined into the anchor (unlike browning, D-74). The amino_acids pool is the true limiting reagent (finite dosed/lees-derived aa => finite Strecker aldehyde); the aldehyde LEVEL is set by the O2xaa product and y_strecker_per_o2, and lands strongly OAV-positive (µg/L-mg/L vs ~0.5-1 µg/L thresholds) across this whole band, so the exact rate is not load-bearing." }
+  uncertainty: { low: 3.0e-6, high: 5.0e-5, note: "Strecker-route O2-draw constant at T_ref = 20 C, at FULL amino-acid availability (gate -> 1). ~2% of the 5.0e-4 always-on total, but substrate-gated on amino_acids so the realised draw at cellar residual-aa (~10-40 mg/L => gate ~0.1-0.3) is well under 1% of the O2 -- a minor add-on, NOT re-baselined into the anchor (unlike browning, D-74). CALIBRATED to land the produced aldehydes in the observed oxidised-white-wine range (D-75 follow-up, advisor-flagged): at a 40-60 mg/L O2 + ~0.5 g/L amino-acid dose this gives phenylacetaldehyde ~tens-to-~100 µg/L (honey; can reach hundreds in strongly oxidised/botrytized whites) and methional ~single-digit-to-tens µg/L (the potent low-µg/L oxidative marker), both OAV-positive -- NOT the ~350 µg/L methional the pre-calibration 5.0e-5 x 0.6-split gave. The amino_acids pool is the true limiting reagent (finite dosed/lees-derived aa => finite aldehyde)." }
   provenance:
     source: "author estimate anchored to the ORDERING that Strecker aldehyde formation is a MINOR fate of the oxidative O2 flux (secondary to phenol autoxidation/browning and to ethanol oxidation), gated on amino-acid availability (Escudero et al. 2000, 2002 on oxidation-derived aldehydes in wine aroma; the Strecker mechanism requires both an alpha-dicarbonyl -- here the phenol-oxidation o-quinone -- and an amino acid). Folds the quinone/dicarbonyl catalyst into k (no dicarbonyl pool tracked in v1, as with k_browning/k_ethanol_oxidation)."
     conditions: "generic wine at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool, additionally gated by the amino-acid availability fraction aa/(K_amino_acids+aa), at T_ref = 293.15 K. A wine-only ADD-ON sink (substrate-gated, not part of the k_ethanol_oxidation + k_browning = 5.0e-4 anchor)."
@@ -434,15 +434,20 @@ y_strecker_per_o2:
 
 # -- ALDEHYDE COMPOSITION: methional (cooked-potato) mol share of the Strecker output ------
 # The mol fraction of the Strecker aldehyde output that is methional; the remainder (1 - f_methional)
-# is phenylacetaldehyde (honey). Reflects the relative methionine:phenylalanine Strecker flux in the
-# amino-acid pool. NOT a stoichiometric constant (contrast the EsterHydrolysis 5:2 carbon split, which
-# is fixed by the named reaction) -- it is an empirical composition estimate, so it is a YAML parameter.
+# is phenylacetaldehyde (honey). This is a PRODUCTION quantity -- the relative methionine- vs
+# phenylalanine-derived Strecker FLUX (amino-acid abundance x reactivity) -- NOT a perceptibility
+# quantity (potency is already carried by the per-compound thresholds in the OAV, so folding it in
+# here would DOUBLE-COUNT it -- the D-75 follow-up correction). Phenylalanine is one of the MORE
+# abundant amino acids in grape must while methionine is typically a MINOR one, so the flux favours
+# phenylacetaldehyde => f_methional < 0.5 (methional the minority product). NOT a stoichiometric
+# constant (contrast the EsterHydrolysis 5:2 carbon split, fixed by a named reaction) -- an empirical
+# composition estimate, so a YAML parameter.
 f_methional:
-  value: 0.6
+  value: 0.15
   unit: "1"   # mol fraction methional of total Strecker aldehyde (rest -> phenylacetaldehyde)
   tier: speculative
-  uncertainty: { low: 0.3, high: 0.8, note: "methional mol share of the Strecker aldehyde output; the rest is phenylacetaldehyde. Methional-leaning central (0.6) because methional is the more potent/notable OXIDATIVE marker and its ~0.5 µg/L threshold is lower, but the true split depends on the must's methionine:phenylalanine ratio and the amino_acids-as-arginine lump makes it approximate. Both aldehydes land OAV-positive across this band, so the split shifts the BALANCE of the two notes, not whether either is perceptible." }
+  uncertainty: { low: 0.05, high: 0.35, note: "methional mol share of the Strecker aldehyde output; the rest is phenylacetaldehyde. Phenylacetaldehyde-DOMINANT (central 0.15) because the split is set by amino-acid FLUX (abundance x reactivity), and phenylalanine is one of the more abundant must amino acids while methionine is a minor one -- so most of the Strecker flux goes to phenylacetaldehyde. (An earlier 0.6 was WRONG: it justified methional-dominance by its lower ~0.5 µg/L threshold, but potency belongs in the OAV threshold, not the production split -- a double-count, corrected here.) The exact ratio is must-composition-dependent and the amino_acids-as-arginine lump makes it approximate; band spans phenylacetaldehyde-dominant to roughly-even." }
   provenance:
-    source: "author estimate of the relative methionine- vs phenylalanine-derived Strecker flux (both amino acids are present in must; methional and phenylacetaldehyde are the two dominant oxidation-derived Strecker aldehydes in aged white wine -- Escudero et al. 2000, 2002). A single fixed split stands in for what is really a must-composition-dependent ratio."
+    source: "author estimate of the relative phenylalanine- vs methionine-derived Strecker flux. Phenylalanine is consistently among the most abundant amino acids in grape must (tens+ mg/L) while methionine is a minor sulfur amino acid (low mg/L) -- so oxidation-derived phenylacetaldehyde generally exceeds methional in must-derived Strecker degradation (Escudero et al. 2000, 2002; Ferreira -- both aldehydes are the dominant oxidation-derived Strecker markers of aged white wine, with methional the potent low-µg/L trace and phenylacetaldehyde reaching tens-to-hundreds of µg/L)."
     conditions: "generic wine; mol fraction of the lumped Strecker aldehyde output booked as methional (C4H8OS) vs phenylacetaldehyde (C8H8O), at T_ref = 293.15 K. The amino_acids pool is booked as arginine, so this split is a composition stand-in, not literal methionine:phenylalanine chemistry (the D-45 arginine-lump caveat)."
-    notes: "SPECULATIVE magnitude. Sets the BALANCE between methional's cooked-potato off-note and phenylacetaldehyde's honey note (opposite sensory valence -- the reason the owner chose TWO pools over one lump, D-75). Off the stoichiometric-constant track (contrast the 5:2 ester split): an empirical composition estimate, hence a YAML parameter."
+    notes: "SPECULATIVE magnitude. Sets the BALANCE between phenylacetaldehyde's honey note (the majority product) and methional's cooked-potato off-note (opposite sensory valence -- the reason the owner chose TWO pools over one lump, D-75). The split is PRODUCTION flux only; per-compound perceptibility lives in threshold_methional_wine / threshold_phenylacetaldehyde_wine (so it is not double-counted here). Off the stoichiometric-constant track (contrast the 5:2 ester split): an empirical composition estimate, hence a YAML parameter."

@@ -1029,17 +1029,17 @@ def test_strecker_availability_gate_saturates(params):
     assert -schema.get(mid, "o2") == pytest.approx(0.5 * -schema.get(high, "o2"), rel=0.02)
 
 
-def test_strecker_split_methional_dominant(params):
+def test_strecker_split_phenylacetaldehyde_dominant(params):
     # The mol split between the two aldehydes is f_methional : (1 - f_methional); with the default
-    # f_methional = 0.6 methional dominates. Verified as a MOLAR ratio (independent of the two
-    # differing molar masses).
+    # f_methional = 0.15 PHENYLACETALDEHYDE dominates (the split is production flux — phenylalanine
+    # is far more abundant in must than methionine; potency lives in the OAV threshold, not here).
     schema = wine_schema()
     d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema), schema, params)
     meth_mol = schema.get(d, "methional") / M_METHIONAL
     phenyl_mol = schema.get(d, "phenylacetaldehyde") / M_PHENYLACETALDEHYDE
     f_meth = params["f_methional"]
     assert meth_mol / phenyl_mol == pytest.approx(f_meth / (1.0 - f_meth))
-    assert meth_mol > phenyl_mol > 0.0  # methional-dominant (the cooked-potato oxidative marker)
+    assert phenyl_mol > meth_mol > 0.0  # phenylacetaldehyde-dominant (the more abundant precursor)
     # One CO2 per aldehyde (the decarboxylation) — total aldehyde mol equals CO2 mol.
     assert (meth_mol + phenyl_mol) == pytest.approx(schema.get(d, "CO2") / M_CO2)
 

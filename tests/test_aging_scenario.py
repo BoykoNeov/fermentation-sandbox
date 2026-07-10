@@ -556,7 +556,8 @@ def test_strecker_gated_by_begin_aging_wine_only():
 def test_strecker_produces_aldehydes_with_oxygen_and_amino_acids():
     # The end-to-end payoff: an oxygen-dosed, amino-acid-dosed aged wine finishes with BOTH Strecker
     # aldehydes accumulated (methional the cooked-potato off-note, phenylacetaldehyde the honey),
-    # methional-dominant (f_methional = 0.6), and the dosed O₂ largely consumed over the aging tail.
+    # phenylacetaldehyde-dominant (f_methional = 0.15 — phenylalanine is the more abundant must
+    # precursor), and the dosed O₂ largely consumed over the aging tail.
     o2_dose = 60.0
     aged = compile_scenario(
         _wine(
@@ -567,8 +568,9 @@ def test_strecker_produces_aldehydes_with_oxygen_and_amino_acids():
     assert aged.success
     methional = float(aged.series("methional")[-1])
     phenyl = float(aged.series("phenylacetaldehyde")[-1])
-    # Both aldehydes form, at aroma-relevant (µg/L-scale) levels; methional dominates the split.
-    assert methional > phenyl > 0.0
+    # Both aldehydes form, at aroma-relevant (µg/L-scale) levels; phenylacetaldehyde dominates the
+    # split, methional the potent low-µg/L minority. Both land in the oxidised-white-wine range.
+    assert phenyl > methional > 0.0
     # The dosed O₂ is largely consumed by the end of the aging tail (Strecker rides the shared O₂
     # alongside the dominant browning + ethanol-oxidation sinks).
     assert float(aged.series("o2")[-1]) < 0.5 * (o2_dose / 1000.0)
@@ -627,8 +629,8 @@ def test_strecker_raises_the_strecker_oavs():
     # Close the design loop through the STATED acceptance lens (milestone-3-plan: aging Processes
     # "validated by the D-67 OAV lens"). The whole point of D-75 was to add the two Strecker aromas
     # the lens now reads — so assert BOTH OAVs climb positive on the oxygen+amino-acid-dosed run vs
-    # the reductive baseline (which is byte-for-byte 0). methional's low (~0.5 µg/L) threshold makes
-    # its OAV the larger of the two.
+    # the reductive baseline (which is byte-for-byte 0). Both clear their thresholds; the split is
+    # phenylacetaldehyde-dominant so both are perceptible without asserting an ordering here.
     thresholds = load_thresholds()
     aged = compile_scenario(
         _wine(
