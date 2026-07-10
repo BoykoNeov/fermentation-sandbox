@@ -6118,7 +6118,7 @@ ceiling: **whiskey lactone** ("coconut", light-toast dominant), **vanillin** ("v
 **guaiacol** ("smoky/toasty", heavy-toast — the *oak/toast* guaiacol, distinct from the Brett 4-ethylguaiacol of
 D-55) and **eugenol** ("clove", heavy-toast). Four new wine-only aroma pools the D-67 lens reads + four thresholds.
 **Two `advisor()` passes** (design + a reconcile that overturned half the design recipe) and **two owner forks**
-(answered via `AskUserQuestion`). 838 tests (+17), `ruff`/`mypy`/`pytest` green.
+(answered via `AskUserQuestion`). 838 tests (+18), `ruff`/`mypy`/`pytest` green.
 
 **The kinetic form — first-order approach to a ceiling FROM BELOW, the inverse of EsterHydrolysis.**
 `d(C_i)/dt = k_oak_extraction · f(T) · max(0, ceiling_i − C_i)` per extractive `i` — the exact mirror of D-69's
@@ -6208,6 +6208,6 @@ toast-correct ceilings, all three ledgers flat.
 `AromaCompound`s + 4 `threshold_<compound>_wine`. `_AGING_GATED_PROCESSES` grows by one (disable/`begin_aging`
 symmetry). No `chemistry.py` change (off every ledger). Three existing enumeration tests updated for the new
 slots/process/compounds; every default / un-aged / un-oaked / oxidative-aging trajectory is byte-for-byte
-unchanged. +9 Process tests + 8 scenario tests. **Next:** the deferred beat 1b (descriptor projection), the
+unchanged. +9 Process tests + 9 scenario tests. **Next:** the deferred beat 1b (descriptor projection), the
 non-oxidative Maillard Strecker route, ellagitannin astringency (couples to O₂), or barrel-beer oak (trivial
 extension).
