@@ -38,7 +38,16 @@
 > `amino_acids` makes it DOUBLY substrate-gated (o2 AND amino_acids), like `SulfiteOxidation`, so it ADDS ON
 > TOP with NO re-baseline of `k_ethanol_oxidation` — the "reduce k_ethanol again" note is retired. Carbon +
 > nitrogen close (the D-45 mercaptan draw+deaminate idiom + a CO₂ decarb term); wine-only, silent without both
-> substrates. Owner also chose TWO pools over one lump (opposite sensory valence). Next: oak extraction (a
+> substrates. Owner also chose TWO pools over one lump (opposite sensory valence).**
+> **D-76 closed the emergent SUR-LIE → Strecker pathway with NO new physics: lees autolysis (`YeastAutolysis`,
+> D-34) and `StreckerDegradation` (D-75) simply COMPOSE — opting into `autolysis_rate_per_h` + `add_oxygen` +
+> `begin_aging` with no `amino_acids_gpl` dose lets dead lees self-digest, refilling `amino_acids` from the
+> wine's own dead yeast, which the Strecker route degrades (methional/phenylacetaldehyde fire strongly from the
+> physically-real nitrogen source). Owner fork (chose A: verify + document + test) over B (re-gate autolysis to
+> the aging phase); a discriminating measurement decided it — the pre-dryness active-ferment release is ~15 mg/L
+> (bounded-small), the ~385 mg/L breakpoint pool is legit post-dryness sur-lie, so autolysis-from-t0 needs no
+> re-gating. Carbon + nitrogen close on the new triple-draw compose (autolysis refills while Strecker + mercaptan
+> draw). Test-only change (helper kwarg + 3 scenario tests); zero production code. Next: oak extraction (a
 > separate axis, no O₂); beat 1b (descriptor projection) and the non-oxidative Maillard Strecker route still
 > deferred.
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2

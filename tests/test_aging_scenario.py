@@ -59,13 +59,19 @@ def _wine(
     *,
     aging_celsius: float = 25.0,
     amino_acids_gpl: float = 0.0,
+    autolysis_rate_per_h: float = 0.0,
 ) -> Scenario:
     # amino_acids_gpl (default 0, byte-for-byte the pre-D-75 helper) doses the assimilable amino
     # must input the StreckerDegradation Process (D-75) draws its aldehyde carbon from; a residual
     # survives to the aging segment (AminoAcidAssimilation only draws it during active ferment).
+    # autolysis_rate_per_h (default 0, byte-for-byte the pre-D-76 helper) instead opts into lees
+    # autolysis (D-34): dead biomass self-digests post-dryness, REFILLING amino_acids from the
+    # physically-real nitrogen source — the emergent sur-lie → Strecker pathway (D-76), no dose.
     initial: dict[str, float] = {"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25}
     if amino_acids_gpl > 0.0:
         initial["amino_acids_gpl"] = amino_acids_gpl
+    if autolysis_rate_per_h > 0.0:
+        initial["autolysis_rate_per_h"] = autolysis_rate_per_h
     return Scenario(
         name="aging-test",
         medium="wine",
@@ -647,3 +653,76 @@ def test_strecker_raises_the_strecker_oavs():
         assert oav_aged > 0.0
         assert oav_red == 0.0  # reductive aging raises neither aroma
         assert oav_aged > oav_red
+
+
+# -- D-76: the emergent sur-lie → Strecker pathway (autolysis refills amino_acids, no dose) -----
+#
+# D-75 exercised Strecker by DOSING amino_acids_gpl (an artificial nutrient add). D-76 closes the
+# physically-real loop: opting into lees autolysis (D-34, autolysis_rate_per_h) lets dead biomass
+# self-digest post-dryness and REFILL amino_acids — the very substrate the O₂/quinone Strecker
+# route (D-75) draws — so Strecker is non-silent from the sur-lie nitrogen source, not a dose. No
+# new physics: the refill Process (D-34) and the consumer (D-75) simply COMPOSE. The A-vs-B design
+# fork (owner-decided: A) is recorded in DECISIONS D-76; the measurement behind it is that the
+# active-ferment (pre-dryness) release is small (~15 mg/L) while the aging pool is dominated by
+# legit post-dryness sur-lie autolysis, so autolysis-from-t0 needs no re-gating.
+
+
+def test_sur_lie_autolysis_feeds_strecker_without_a_dose():
+    # The D-76 headline: with NO amino_acids_gpl, opting into autolysis + O₂ + begin_aging still
+    # makes BOTH Strecker aldehydes — dead lees autolyse, refilling amino_acids (D-34), which the
+    # Strecker route (D-75) degrades. The nitrogen is the wine's own dead yeast, not a dose.
+    aged = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],
+            autolysis_rate_per_h=1.0e-3,  # sur-lie refill; NO amino_acids_gpl dose
+        )
+    ).run()
+    assert aged.success
+    # Autolysis refilled the pool with no dose (measured ~0.83 g/L at the end of the sur-lie tail).
+    assert float(aged.series("amino_acids")[-1]) > 0.1
+    # Both Strecker aldehydes emerge from that autolytic nitrogen, phenylacetaldehyde-dominant.
+    methional = float(aged.series("methional")[-1])
+    phenyl = float(aged.series("phenylacetaldehyde")[-1])
+    assert phenyl > methional > 0.0
+
+
+def test_sur_lie_pathway_is_autolysis_driven_not_an_artifact():
+    # The isolability contrast proving the pathway IS the autolysis refill: the same O₂-dosed aged
+    # scenario with NEITHER autolysis NOR a dose keeps amino_acids exactly 0 (no producer) and
+    # makes NO Strecker aldehydes — turning autolysis on is exactly what lights the pathway.
+    plain = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)])  # no autolysis/dose
+    ).run()
+    assert plain.success
+    assert float(plain.series("amino_acids")[-1]) == 0.0
+    assert float(plain.series("methional")[-1]) == 0.0
+    assert float(plain.series("phenylacetaldehyde")[-1]) == 0.0
+
+
+def test_sur_lie_strecker_closes_carbon_and_nitrogen_end_to_end():
+    # The NEW conservation combination D-76 introduces: autolysis REFILLS amino_acids (releasing
+    # dead-cell N as arginine, routing the C-rich remainder to debris) WHILE StreckerDegradation
+    # AND AutolyticMercaptan both DRAW it (arginine C → aldehydes/thiol + CO₂, N deaminated back to
+    # N). D-34 and D-75 each pinned their half; this pins them COMPOSED. Both ledgers stay flat
+    # (final == initial): the O₂ dose is the only external flow and carries neither element.
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],
+            autolysis_rate_per_h=1.0e-3,
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    n_of = total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n)
+    assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert all(n_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert_conserved(traj.as_trajectory(), c_of, label="carbon")
+    assert_conserved(traj.as_trajectory(), n_of, label="nitrogen")
+    assert_nonnegative(
+        traj.as_trajectory(),
+        ("amino_acids", "debris", "methional", "phenylacetaldehyde", "mercaptans", "h2s"),
+        atol=1e-9,
+    )

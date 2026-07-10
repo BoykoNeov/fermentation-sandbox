@@ -6017,3 +6017,73 @@ close end to end, both Strecker OAVs climb through the D-67 lens). **Next:** oak
 axis, no O₂ — diffusion-limited vanillin / whiskey lactones / gallotannins), the deferred beat 1b (descriptor
 projection), a lees-autolysis `amino_acids` refill (would make Strecker fire on un-dosed sur-lie aging), or the
 deferred non-oxidative Maillard Strecker route.
+
+## D-76 — The emergent **sur-lie → Strecker** pathway: lees autolysis (D-34) refills `amino_acids` and feeds `StreckerDegradation` (D-75) with **no new physics** (§4.1)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, a COMPOSITION beat — no new Process, parameter, or state slot.** D-75
+closed with "a lees-autolysis `amino_acids` refill (would make Strecker fire on un-dosed sur-lie aging)" as a next
+item. This beat delivers exactly that, and the finding is that it needs **zero new code**: the refill Process
+(`YeastAutolysis`, D-34) and the consumer (`StreckerDegradation`, D-75) already **compose**. Opting into lees
+autolysis (`autolysis_rate_per_h`) + O₂ (`add_oxygen`) + `begin_aging`, with **no** `amino_acids_gpl` dose, lets
+dead biomass self-digest post-dryness, refilling `amino_acids` from the wine's own dead yeast — the O₂/quinone
+Strecker route then degrades it. So Strecker is non-silent from the **physically-real sur-lie nitrogen source**,
+not an artificial nutrient dose. **One `advisor()` pass** (recommended Framing A — verify + document + test — over
+re-gating autolysis) and **one owner fork** (chose A). The whole change is 3 scenario tests + this entry + the
+plan status note (ARCHITECTURE needs nothing — no new module or structure). Full suite green, `ruff`/`mypy` clean.
+
+**The gap it closes.** D-75's `StreckerDegradation` is doubly substrate-gated (on `o2` AND `amino_acids`), and
+`amino_acids` is 0 post-ferment unless dosed (`AminoAcidAssimilation` strips it during AF, D-32). So D-75 was
+*exercised* by dosing `amino_acids_gpl` — an artificial input. Real oxidised sur-lie wines instead source that
+nitrogen from **autolysing lees**: dead yeast (`X_dead`, filled by D-13 ethanol-inactivation) self-digest and
+release assimilable amino acids (D-34). Composing the two lights the pathway from the honest source.
+
+**Owner fork — Framing A (compose + verify + document) over Framing B (re-gate autolysis to the aging phase).**
+The design question: `YeastAutolysis` is enabled **from t0** (a whole-run opt-in, D-34), so it fires during the
+*back half of active fermentation* too, where the released amino acids have no consumer (the swap is compile-gated
+on the *dose*, not on pool presence) and would accumulate "early." **Framing B** would re-gate autolysis to switch
+on only at `begin_aging` (keeping `amino_acids ≈ 0` through the ferment). **Framing A** leaves the settled D-34
+gate alone and simply documents + tests the compose. The advisor recommended A; **a discriminating measurement
+settled it** and was brought to the owner, who chose A.
+
+**The measurement (A-vs-B, decided by data).** On the representative compose (24 Brix must, `autolysis_rate_per_h
+= 1e-3`, 40 mg/L O₂, `begin_aging` at day 30):
+
+* Dryness (`S ≈ 0`) is at **~day 6**. The `amino_acids` released during *active fermentation* (the pre-dryness
+  window, the only genuinely-wrong "early" release Framing B targets) is **~15 mg/L** — bounded-small, because
+  `X_dead` is still building and the window is short.
+* The pool at the `begin_aging` breakpoint is **~385 mg/L**, but that is dominated by **legit post-dryness sur-lie
+  autolysis** (day 6 → 30, the wine sitting on its lees) — correct chemistry, *not* an artifact. It keeps climbing
+  to ~830 mg/L over the aging tail.
+* Strecker fires **strongly** from that autolytic nitrogen: **methional ~154 µg/L, phenylacetaldehyde ~1006 µg/L**
+  (thresholds ~0.5–1 µg/L), phenylacetaldehyde-dominant per D-75's `f_methional = 0.15`.
+* The competing `amino_acids` sink `AutolyticMercaptan` (D-45, also enabled by the autolysis opt-in) draws only
+  **~26 µg/L** of thiol — numerically negligible vs the ~830 mg/L pool, so Strecker effectively gets the whole
+  pool (H₂S sibling is carbon-free, no competition).
+
+So the pre-active-ferment inflation Framing B worried about is real but **~15 mg/L** — a fidelity gain far too
+small to justify re-opening two settled gates (D-34's autolysis opt-in and D-32's dose-gate). If a caller wants A
+and B to coincide by construction, they place `begin_aging` at dryness (~day 6–7) rather than day 30; the pool is
+then ~15–20 mg/L and the two framings are near-identical.
+
+**Conservation — the NEW combination this compose introduces.** Autolysis **refills** `amino_acids` (releasing
+dead-cell N as arginine, routing the C-rich remainder to `debris`) *while* `StreckerDegradation` **and**
+`AutolyticMercaptan` both **draw** it (arginine C → aldehydes/thiol + CO₂, N deaminated back to `N`). D-34 and D-75
+each pinned their half; verified here that they close **composed** — `total_carbon` and `total_nitrogen` both flat
+(final == initial) end-to-end over the full ferment + aging trajectory (the O₂ dose is the only external flow and
+carries neither element), non-negativity holds on `amino_acids`/`debris`/`methional`/`phenylacetaldehyde`/
+`mercaptans`/`h2s`.
+
+**Isolability (unchanged, and the pathway is provably autolysis-driven).** With NEITHER autolysis NOR a dose, the
+same O₂-dosed aged run keeps `amino_acids` **exactly 0** (no producer) and makes **no** Strecker aldehydes —
+turning autolysis on is exactly what lights the pathway. Two standing consequences carry over, not new to this
+beat: autolysis-from-t0 drags `amino_acids`/`N`/`debris`/`h2s`/`mercaptans` to **speculative for the whole run**
+(accepted D-34), and **`rack` before aging removes `X_dead`** (the autolysis substrate) — sur-lie means *on the
+lees*, so a racked wine has no autolytic refill (physically correct).
+
+**Regression surface.** **Zero** production-code change: no new Process, parameter, chemistry species, or state
+slot; every default / un-aged / reductive / dosed-Strecker trajectory is byte-for-byte unchanged. Test-only: the
+`test_aging_scenario.py` `_wine` helper gains an optional `autolysis_rate_per_h` kwarg (default 0 ⇒ byte-for-byte
+the pre-D-76 helper) + 3 new tests (the emergent pathway fires without a dose; the autolysis-off contrast is
+silent; carbon **and** nitrogen close on the triple-draw compose). **Next:** oak extraction (a separate aging axis,
+no O₂ — diffusion-limited vanillin / whiskey lactones / gallotannins), the deferred beat 1b (descriptor
+projection), or the deferred non-oxidative Maillard Strecker route.
