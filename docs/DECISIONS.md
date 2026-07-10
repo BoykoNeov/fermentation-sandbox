@@ -5178,3 +5178,69 @@ trivial future extension); (d) volume change on addition (the engine is concentr
 volume-tracking is the D-64 `batch_volume_liters` frontier, not extended here). **§3.3 is now
 COMPLETE** — all four "additives with clear mechanisms" (SO₂, DAP nutrient, hops, acid/sugar) built.
 The next-direction frontier (Tier-3 sensory/OAV, aging, or UX) is the owner's call.
+
+## D-66 — Milestone 3 (Tier-3) opened: two calls before any code — (1) build the sensory/OAV readout layer FIRST, aging chemistry second (inverting handoff §6-step-5 order); (2) lumped aroma pools get a representative-compound threshold per lump
+
+**Status: SCOPING (2026-07-10).** Owner selected the next-direction frontier left open at D-65:
+Tier-3 — the handoff §4 "frontier" where the chemistry is real but "integrating it into a
+trustworthy prediction is *not solved science*." This entry records the milestone-opening design
+calls (the plan is `docs/plans/milestone-3-plan.md`, mirroring how M2 opened with D-18); **no code
+yet** — Tier-3 is `speculative`, isolated, and must never perturb the validated core (prime
+directive #3). One `advisor()` pass shaped both calls before writing; the second call was put to the
+owner by `AskUserQuestion` (the load-bearing fidelity fork). Preconditions confirmed clean: §3.3 /
+all of Tier-2 settled, 717 green, `media.py` fully mature (Brett/MLF/keto-acids/autolysis all
+landed) — the plan can state "Tier-2 settled" as fact, not assumption.
+
+**Call 1 — sensory/OAV FIRST, aging chemistry SECOND (invert handoff §6 step 5's "aging then
+sensory").** Rationale: the sensory layer is a **pure readout** over aroma-active compounds the
+model *already* tracks (`esters`, `fusels`, `diacetyl`, `acetaldehyde`, `h2s`, `ethylphenols` =
+4-EP, `ethylguaiacols` = 4-EG, `mercaptans`), so it adds **no new ODE physics and zero risk to the
+validated core**, and once built it becomes the **acceptance lens for aging** — every aging Process's
+effect on the aroma profile is then immediately visible. Aging chemistry is the heavier piece (new
+speculative RHS Processes on a years-scale phase, phase-based integration per handoff §7, scattered
+parameter sourcing), so it is second, one Process at a time behind its own tests. The handoff order
+is reference-not-gospel (CLAUDE.md); the owner's own framing ("sensory/OAV, aging chemistry") put
+sensory first too. Not burned on an `AskUserQuestion` — the architecture and the owner's phrasing
+already agreed.
+
+**Call 2 — lumped aroma pools use a representative-compound threshold per lump** (owner decision via
+`AskUserQuestion`, over the single-compound-only alternative). OAV = concentration ÷ per-compound
+perception threshold, but `esters`/`fusels`/`mercaptans` are single lumped g/L pools mixing molecules
+whose thresholds span ~3 orders of magnitude (isoamyl acetate vs ethyl hexanoate vs ethyl acetate).
+Options weighed: **(a)** assign each lump one *named representative* compound's threshold — the
+stand-in its `VarSpec` already names (fusels → isoamyl alcohol; mercaptans → the "methanethiol
+stand-in" it literally is; esters → isoamyl acetate) — compute OAV uniformly, and carry **"assumes
+fixed lump composition"** loudly in provenance; **(b)** compute OAV only for the single-molecule pools
+(diacetyl, acetaldehyde, h2s, 4-EP, 4-EG) and treat the lumps as descriptor-qualitative; **(c)** split
+the lumps into constituent esters — **rejected**, that is a *chemistry*-layer change to serve sensory,
+which inverts the §4.2 cardinal rule (chemistry never depends on the sensory layer). **Owner chose (a)**
+— keeps the dominant young-product aromas (esters, fusels) in the numeric readout; the honesty cost is
+the fixed-composition assumption, flagged at the source (the §4.3 "don't let speculation borrow the
+core's credibility" concern is answered by the loud provenance note + the speculative tier floor).
+
+**Architectural decisions baked into the plan (beat 1 = OAV ratio):**
+- **Placement:** a new top-layer package `fermentation.sensory`, sibling of `fermentation.analysis`;
+  consumes a `runtime.Trajectory` + a threshold table, imported by **nothing lower** (one-directional
+  rule; §4.2 cardinal rule).
+- **Thresholds load DIRECTLY into the sensory layer, NOT through the compile seam.** Unlike
+  `acidbase.yaml` / `vicinal_diketones.yaml` (merged into every `CompiledScenario` at `compile.py`'s
+  `shared_files` *because a Process reads them*), **no RHS reads a perception threshold** — so a new
+  `sensory.yaml` is loaded by the sensory module standalone, never merged into `param_values`. A
+  stronger isolation than any Tier-2 readout: the chemistry never even sees the sensory params.
+- **Tier floor:** every OAV output tier = `Tier.combine(chemistry_input_tier, SPECULATIVE)` →
+  **speculative even over a validated input** (the sensory mapping is itself the canonical speculative
+  case named in the `Tier` docstring). Enforces the §4.3 firewall at the API.
+- **Matrix-specificity is a provenance requirement:** ethanol/matrix shift most odor thresholds, so
+  each threshold's `conditions` records the matrix (wine ≠ beer ≠ water/model), and any fallback is
+  flagged as a matrix gap.
+- **`iso_alpha`/IBU excluded** — it is a *taste* (bitterness), already a direct mg/L→IBU readout
+  (D-64), not an odor threshold; not shoehorned into an OAV.
+- **Descriptor-space projection is DEFERRED** to a separate, even-more-speculative sub-beat (1b): the
+  OAV *ratio* is a defensible sourced number; "OAVs → smells like leather and banana" is a further
+  heuristic leap, fenced behind a swappable seam so beat 1a stays honest.
+
+**Reading list (to source at build, all `speculative`):** Guth 1997, Francis & Newton 2005, Meilgaard
+1975, Ferreira et al. 2000 (odor thresholds); diacetyl ~0.1 mg/L (lager) and 4-EP/4-EG ~425/110 µg/L
+(red wine) from the spoilage literature already cited in the VDK/Brett beats.
+
+**Next:** beat 1a build — `fermentation.sensory.oav` + `sensory.yaml` + tests, recorded at D-67.
