@@ -74,8 +74,11 @@ scenario / validation  →  runtime  →  core  →  parameters / units
 
 1. `OAV_i(t) = concentration_i(t) / threshold_i` for each aroma-active compound, mapped
    over a trajectory (mirroring `analysis.ibu_series` / `molecular_so2_series`): an
-   `oav_series(traj, thresholds, compound)` per compound plus a small struct/aggregate
-   over all active compounds at a chosen time (e.g. finished-wine profile). Dimensionless.
+   `oav_series(traj, thresholds, compound)` per compound plus a finished-profile view over
+   the medium's active compounds at a chosen time. Dimensionless. **The aggregate reports
+   per-compound OAVs and flags which exceed 1 (above-threshold) — NOT a single summed
+   scalar**: summing OAVs assumes perceptual additivity, which is contested, so a summed
+   number would over-claim (settle the exact aggregate shape in D-67).
 2. A `sensory.yaml` provenance file with **real, sourced perception thresholds** (see
    sourcing below), each carrying value, unit, `source`, `conditions` (**the matrix** —
    see below), `uncertainty`, `tier: speculative`.
@@ -90,18 +93,24 @@ scenario / validation  →  runtime  →  core  →  parameters / units
 
 ### Compounds and their thresholds
 
-Aroma-active pools already in state (`core/media.py`), classified by how cleanly OAV applies:
+Aroma-active pools already in state (`core/media.py`), classified by medium and by how
+cleanly OAV applies. **The set is medium-specific** (mirroring the beer-only `iso_alpha`):
+`_common_specs` (both media) carries only `esters`, `fusels`, `diacetyl`, `acetaldehyde`,
+`h2s`; `ethylphenols`, `ethylguaiacols`, and `mercaptans` are appended in `wine_schema`
+**only**. So the **beer OAV set = the 5 common compounds**; the **wine OAV set = those 5
++ 4-EP + 4-EG + mercaptans**. A beer `oav_series` must not reach for the three wine-only
+slots (they do not exist in the beer schema).
 
-| Pool | Representative compound (threshold key) | Descriptor | Note |
-|------|-----------------------------------------|-----------|------|
-| `diacetyl` | 2,3-butanedione | buttery | single molecule — clean OAV |
-| `acetaldehyde` | acetaldehyde | green apple / bruised | single molecule — clean OAV |
-| `h2s` | hydrogen sulfide | rotten egg | single molecule — clean OAV |
-| `ethylphenols` | 4-ethylphenol | horse-sweat / barnyard | single molecule — clean OAV |
-| `ethylguaiacols` | 4-ethylguaiacol | clove / smoky | single molecule — clean OAV |
-| `esters` | **isoamyl acetate** (stand-in) | banana / fruity | **lumped** → representative threshold |
-| `fusels` | **isoamyl alcohol** (3-methylbutan-1-ol, stand-in) | solventy / fusel | **lumped** → representative threshold |
-| `mercaptans` | **methanethiol** (stand-in, already the pool's named stand-in) | reductive / drains | **lumped** → representative threshold |
+| Pool | Medium | Representative compound (threshold key) | Descriptor | Note |
+|------|--------|-----------------------------------------|-----------|------|
+| `diacetyl` | wine + beer | 2,3-butanedione | buttery | single molecule — clean OAV |
+| `acetaldehyde` | wine + beer | acetaldehyde | green apple / bruised | single molecule — clean OAV |
+| `h2s` | wine + beer | hydrogen sulfide | rotten egg | single molecule — clean OAV |
+| `esters` | wine + beer | **isoamyl acetate** (stand-in) | banana / fruity | **lumped** → representative threshold |
+| `fusels` | wine + beer | **isoamyl alcohol** (3-methylbutan-1-ol, stand-in) | solventy / fusel | **lumped** → representative threshold |
+| `ethylphenols` | **wine only** | 4-ethylphenol | horse-sweat / barnyard | single molecule — clean OAV |
+| `ethylguaiacols` | **wine only** | 4-ethylguaiacol | clove / smoky | single molecule — clean OAV |
+| `mercaptans` | **wine only** | **methanethiol** (stand-in, already the pool's named stand-in) | reductive / drains | **lumped** → representative threshold |
 
 - **The lumped-pool call (D-66, owner-chosen).** `esters`/`fusels`/`mercaptans` are single
   g/L pools that really mix several molecules whose thresholds span ~3 orders of magnitude.
@@ -188,3 +197,8 @@ uncertainty bands.
   would be motivated on its own merits, never to serve the sensory layer — §4.2).
 - **Aging multi-scale stiffness** (handoff §7): the years phase must use phase-based Process
   activation and an appropriate step regime; do not integrate aging at ferment resolution.
+- **Thresholds sit outside the D-24 ensemble sweep** — a deliberate consequence of loading
+  `sensory.yaml` standalone rather than through the compile seam: `simulate_ensemble` samples
+  only compiled-scenario params, so it will *not* propagate threshold uncertainty into the OAV
+  band. Defensible for a speculative readout (the OAV floor is already speculative), but state
+  it explicitly in D-67 so it never later reads as an oversight, not a choice.
