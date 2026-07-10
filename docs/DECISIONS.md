@@ -5306,3 +5306,73 @@ this OAV lens.
 
 **Next:** beat 1b (descriptor projection) *or* open the first aging Process — owner's call at the
 next batch.
+
+---
+
+## D-68 — Aging axis OPENED: ester hydrolysis chosen as the first §4.1 Process (scoping + owner forks; no RHS yet)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, second beat opened** (after D-67 shipped the OAV
+sensory readout). Owner picked "the first aging Process (§4.1)" as the direction; this entry records
+the scoping — the Process chosen, two owner forks, the confirmed phase-attachment mechanism, and one
+carbon-closure crux surfaced at design time and deferred to the build (D-69). **No RHS written yet**
+(mirrors D-66 scoping → D-67 build): the crux below materially affects fidelity and wanted an advisor
+pass that was rate-limited this turn.
+
+**Process chosen — ester hydrolysis (advisor-affirmed).** The only §4.1 candidate that needs **no new
+extraction driver and no new state pool to start**: it acts on the `esters` pool already tracked,
+exercises the aging-phase pipeline on tractable chemistry, and — the payoff — moves an OAV the D-67
+lens already reads (young fruity esters fade with age). Consistency win: D-67's sensory representative
+for `esters` is **isoamyl acetate**, an acetate ester, exactly the class that hydrolyses and fades on
+aging — so "net ester decay" is coherent with a choice already on record. The heavier candidates
+(oxidation needs O₂-ingress modelling; oak extraction / tannin–anthocyanin need new pools) come later,
+one Process at a time, validated by the OAV lens.
+
+**Owner fork 1 (the direction):** first aging Process (§4.1) over beat 1b (descriptor projection) or
+pausing — via `AskUserQuestion`.
+
+**Owner fork 2 (carbon routing) — FAITHFUL SPLIT → `fusels` + `Byp`** (via `AskUserQuestion`, over "new
+inert aging-products pool" and "→ Byp only"). Conservation is back in force (unlike the D-67 readout,
+this is the first aging RHS *on the carbon ledger*): the carbon released by a decaying ester **must** be
+routed. Owner chose the literal chemistry — isoamyl acetate + H₂O → isoamyl alcohol (→ `fusels`) +
+acetic acid (→ `Byp`) — accepting that it (a) emergently **raises the fusel OAV** and drifts **pH/VA**
+up with age (both real aging phenomena), a mild §4.3 firewall tension since a speculative aging Process
+then touches the plausible-tier pH readout; and (b) uses `Byp` (succinic, C4 diprotic) as a stand-in
+for acetic acid (C2 monoprotic). Isolability (togglability) is preserved regardless.
+
+**Phase attachment — CONFIRMED, reuses the existing reconfigure mechanism (no new integration infra).**
+`simulate_scheduled` already segments the timeline and a `ScheduledEvent.reconfigure` callback mutates
+the `ProcessSet` in place; `ProcessSet.enable`/`disable` exist (the D-35/36 event precedent, e.g.
+`pitch_mlf`). So an aging phase attaches as a **post-fermentation scheduled segment**: a `begin_aging`
+event enables `EsterHydrolysis` (off during ferment) over a long span with the solver free to take
+large steps (the §7 multi-scale concern — do not integrate years at ferment resolution — is answered by
+the segment restart + large `max_step`, not new machinery). Open sub-questions for D-69: yeast state
+during aging (racked/yeast-gone vs on-lees — decides whether ferment Processes are disabled or idle);
+and the scenario-level expression of "then age N months" (extend `duration_days` + an `age`/`begin_aging`
+verb, the D-36 intervention precedent).
+
+**The carbon-closure crux surfaced at design time (the D-69 build must resolve).** The chemistry ledger
+(`core.chemistry`) has **no `isoamyl_acetate` species** — the `esters` pool is carbon-weighted as
+**ethyl acetate** (C4: 2C ethyl + 2C acetyl; `_ESTER_SPECIES` in `byproducts.py`), `fusels` as isoamyl
+alcohol (C5), `Byp` as succinic (C4). So the owner's fork-2 framing (isoamyl acetate, C7 → C5 + C2) and
+the pool's *ledger* stand-in (ethyl acetate, whose literal hydrolysis alcohol is **ethanol**, not a
+fusel) disagree. Carbon leaving `esters` per gram decayed is **ledger-fixed** at `rate·c(ethyl_acetate)`;
+the open question is the **split ratio** of that carbon between `fusels` and `Byp`:
+- **5:2** (isoamyl-acetate molecular ratio, matches the owner's stated reaction + the D-67 OAV
+  representative) — but mixes stand-ins (pool mass = ethyl acetate, split = isoamyl acetate);
+- **1:1** (ethyl-acetate-consistent: acetyl 2C : alkyl 2C — matches the pool's own ledger structure,
+  a single documented stand-in: ethanol-carbon routed to `fusels` rather than `E`).
+Both close carbon by construction (the split ratio only re-partitions a fixed released-carbon budget
+between two trace pools, so it is second-order on outputs); the choice is a fidelity/consistency call to
+settle with the advisor at build. **Proposed RHS form** (advisor's framing, carried forward):
+`d(esters)/dt = −k·f_T·max(0, esters − esters_eq)` — **net decay toward a lower equilibrium, decay-only**
+(the bidirectional reality — ethyl esters of fatty acids slowly *form* on aging while acetates hydrolyse
+— is the deferred half; framed as "net decay toward a lower equilibrium," the same fixed-composition
+honesty the D-67 sensory lump carries — **not** decay-to-zero, which over-strips). Arrhenius `f_T`
+(warm aging degrades faster). Tier **speculative**; the ethyl-acetate-pool / isoamyl-acetate-reaction
+mismatch documented loudly (the D-19 "bookkeeping stand-in, not a metabolic claim" precedent).
+
+**Decomposition:** **D-69 = the `EsterHydrolysis` physics** — the Process + a new `aging.yaml` params
+file + direct unit/conservation tests (tested via `ProcessSet`, the D-64 loss-Process pattern), split
+ratio resolved with the advisor. **D-70 = the aging-phase scenario wiring** — the `age N months` verb +
+reconfigure enable + the §7 slow-phase integration end-to-end. **Next:** D-69 build (settle the 5:2-vs-1:1
+split with the advisor first).
