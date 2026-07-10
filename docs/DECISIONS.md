@@ -5376,3 +5376,66 @@ file + direct unit/conservation tests (tested via `ProcessSet`, the D-64 loss-Pr
 ratio resolved with the advisor. **D-70 = the aging-phase scenario wiring** — the `age N months` verb +
 reconfigure enable + the §7 slow-phase integration end-to-end. **Next:** D-69 build (settle the 5:2-vs-1:1
 split with the advisor first).
+
+## D-69 — `EsterHydrolysis` built: the first aging RHS (§4.1), 5:2 carbon split (advisor-settled)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, aging beat built** (the D-68 scoping → this build,
+mirroring D-66 → D-67). Ships the first §4.1 aging Process — `fermentation.core.kinetics.aging.
+EsterHydrolysis` + a new shared `aging.yaml` + `tests/test_aging.py` — as a **speculative,
+isolable, on-ledger** aging RHS. **742 tests green** (729 → +13), `ruff`/`mypy` clean. One
+`advisor()` pass before writing settled the deferred split crux (below); its three build "musts"
+(conservation test, don't touch the esters weighting, `esters_eq` a positive parameter) are all met.
+
+**What landed.**
+- **`EsterHydrolysis`** (new `core/kinetics/aging.py`, the home for the aging axis): `d(esters)/dt
+  = −k_ester_hydrolysis·f(T)·max(0, esters − esters_eq)` — first-order **net decay toward a lower
+  equilibrium floor** (not decay-to-zero; below the floor the rate is 0, the reverse ester-formation
+  half deferred), `f(T) = arrhenius_factor(T, E_a_ester_hydrolysis, T_ref)` giving the sourced
+  warmer-ages-faster direction. **No fermentative-flux gate** (aging runs when the flux is zero — it
+  is temperature/pool-driven), unlike every M2 producer. `touches = ("esters","fusels","Byp")`,
+  tier **speculative**.
+- **`aging.yaml`** (shared, medium-agnostic like `vicinal_diketones.yaml` — ester hydrolysis is a
+  molecule/pH property, not biology): `k_ester_hydrolysis` (1e-4/h, half-life ~3 mo–2.6 yr band),
+  `E_a_ester_hydrolysis` (60 kJ/mol, Q10~2), `esters_eq` (5 mg/L floor). All **speculative**; the
+  sourced parts are the *form* (first-order approach to equilibrium — Ramey & Ough 1980; Marais 1978)
+  and the *direction* (E_a>0). **Not yet in the compile seam** — `EsterHydrolysis` is off the ferment
+  ProcessSet and enabled only in a post-ferment segment (D-70), so the tests load `aging.yaml`
+  directly; byte-for-byte isolation of the ferment is thereby preserved (prime directive #3).
+
+**The split crux — resolved 5:2 (advisor flipped my initial 1:1 lean).** D-68 deferred the fusels:Byp
+carbon split to this build's advisor pass. My going-in lean was **1:1** (ethyl-acetate-consistent),
+on a "single documented stand-in" argument. The advisor showed that argument is **illusory**: the
+esters pool's ethyl-acetate *mass* weighting is fixed by D-19 and immovable regardless of split, so
+1:1 buys no reduction in stand-ins — the split is the one free variable, and there is no "clean"
+choice, only *which representative it honors*. The discriminator is **what the Process is FOR**: it is
+a **sensory** Process (its whole D-68 reason to exist is to fade the ester OAV and raise the fusel OAV),
+and D-67 already commits `esters`'→isoamyl acetate, `fusels`'→isoamyl alcohol. The coherent chemistry
+connecting those two committed representatives is **isoamyl acetate → isoamyl alcohol (5 C) + acetic
+acid (2 C) = 5:2**. 1:1's hidden cost: its alcohol product is *ethanol* (ethyl acetate's real alcohol),
+routed into the isoamyl-alcohol-weighted `fusels` pool and read through the isoamyl-alcohol OAV — it
+would **fabricate the fusel-aroma rise out of the wrong molecule**, bending the exact quantity the
+Process exists to move. 5:2's cost is **narrative-only** and invisible to every conservation test (the
+*debited* molecule is ethyl acetate, the *split* molecule isoamyl acetate — a stand-in seam this
+Process **inherits** from D-19/D-67, not one it invents). Bending narrative honesty to preserve sensory
+honesty is the right trade for a sensory Process; 5:2 also gives the stronger fusel-OAV rise the owner
+asked for (5/7 vs 1/2). **D-68 delegated this call to the advisor pass, so it commits without kicking
+back to the owner** — documented loudly in the Process docstring.
+
+**Carbon closure (the D-68 "conservation is back in force" requirement).** The carbon leaving `esters`
+per unit decayed is ledger-fixed at `rate·c(ethyl_acetate)`; that budget is split 5:2 and re-deposited
+via each product pool's *own* carbon fraction (`fusels`→isoamyl alcohol, `Byp`→succinic), so
+`total_carbon` closes to **machine precision for any split summing to 1** (the `esters→esters_gas`
+transfer precedent, but C4→C5-partial+C4-partial across two differently-weighted pools). Verified
+per-RHS (`abs=1e-15`) and over an integrated ~1-year wine aging segment *and* a beer multi-slot run.
+The 5:2 split constants are **code-with-citation** (stoichiometry of the named stand-in reaction, like
+the chemistry carbon counts), not empirical YAML params.
+
+**§4.3 firewall tension — documented, owner-accepted (D-68 fork 2), not relitigated.** The
+speculative-tier `EsterHydrolysis` touches `Byp`, which the *plausible*-tier pH/TA readout reads (the
+acetic-acid product drifts VA/pH up with age — a real aging phenomenon the owner chose the literal
+chemistry for). Isolability preserved (disable ⇒ drift vanishes). `Byp` is the succinic (C4 diprotic)
+stand-in for acetic acid (C2 monoprotic), the same D-16 pool stand-in.
+
+**Next: D-70** — the aging-phase scenario wiring: an `age N months` verb, the `begin_aging` reconfigure
+that enables `EsterHydrolysis` over a long segment, `aging.yaml` into `compile.py`'s `shared_files`, and
+the §7 slow-phase (large-`max_step`) integration end-to-end.

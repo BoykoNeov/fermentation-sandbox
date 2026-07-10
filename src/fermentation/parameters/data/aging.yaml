@@ -1,0 +1,77 @@
+# Aging chemistry — ester hydrolysis kinetics (decision D-69, the first §4.1 aging Process).
+#
+# SHARED, medium-agnostic parameter file (the vicinal_diketones.yaml / acidbase.yaml pattern):
+# these names are collision-free with the per-medium kinetic parameters, and — like the
+# non-enzymatic VDK decarboxylation — acid-catalysed ester hydrolysis is a property of the
+# MOLECULE and the wine/beer pH, not of the beverage's biology, so its rate constant and
+# activation energy live in ONE shared file rather than per medium. (D-69 does NOT yet merge
+# this file into the compile seam: EsterHydrolysis is off during the ferment and is enabled
+# only in a post-fermentation aging segment — that wiring, and this file's addition to
+# compile.py's shared_files, is D-70. For D-69 the params are loaded directly by the tests.)
+#
+# THE PROCESS (fermentation.core.kinetics.aging.EsterHydrolysis):
+#
+#   d(esters)/dt = -k_ester_hydrolysis * f(T) * max(0, esters - esters_eq)
+#
+# a first-order NET decay of the lumped ``esters`` pool toward a lower equilibrium floor
+# ``esters_eq`` (NOT decay-to-zero), warmed by an Arrhenius factor f(T) = arrhenius_factor(
+# T, E_a_ester_hydrolysis, T_ref) so warm aging degrades the fruity acetate esters faster.
+# The released ester carbon (ledger-fixed at c(ethyl_acetate), the D-19 esters mass weighting)
+# is routed to ``fusels`` (the alcohol product) + ``Byp`` (the acid product) — see the Process
+# docstring for the 5:2 split and the stand-in seam it inherits.
+#
+# CARBON is the invariant (closes to machine precision); MASS carries a small (~4.5%) documented
+# gap — splitting a carbon-exact budget across pools with heterogeneous fixed weightings is not
+# mass-conserving (real hydrolysis consumes untracked water). The same stand-in gap as D-8 (beer
+# hydrolysis water) / D-16 (Byp/Gly redox, which scopes total_mass to {S,E,CO2}) / D-26 (VDK
+# O2/NAD(P)H). See the EsterHydrolysis docstring.
+#
+# WHY "NET DECAY TOWARD A LOWER EQUILIBRIUM" (the honest v1 scope, D-68):
+#   * Acetate esters (isoamyl acetate, the D-67 esters representative; ethyl acetate) form
+#     ABOVE their hydrolysis equilibrium during fermentation, so on aging they HYDROLYSE back
+#     toward equilibrium — the fruity "banana/pear" young-wine character fades (Ramey & Ough
+#     1980; Marais 1978). This is the half v1 models.
+#   * The DEFERRED half: ethyl esters of fatty acids (ethyl hexanoate/octanoate) are BELOW
+#     equilibrium young and slowly FORM on aging. The bidirectional equilibrium is not
+#     modelled; framing the lumped pool as "net decay toward a lower floor" is the same
+#     fixed-composition honesty the D-67 sensory lump carries (the pool is dominated by the
+#     hydrolysing acetate esters). Below esters_eq the rate is zero (no spurious formation).
+#
+# TIER. ALL speculative. Ester hydrolysis is real, textbook acid-catalysed chemistry and the
+# WARMER-IS-FASTER direction (E_a_ester_hydrolysis > 0) is a sourced ordering, but every
+# magnitude here is an order-of-magnitude estimate and the whole aging axis is the Tier-3
+# speculative frontier (milestone-3-plan.md). The Process floors its outputs at speculative
+# regardless of input tiers (parameter-tier propagation, D-1).
+
+# -- FIRST-ORDER HYDROLYSIS RATE: esters -> alcohol + acid, toward equilibrium -----------
+k_ester_hydrolysis:
+  value: 1.0e-4
+  unit: "1/h"   # d(esters)/dt = -k_ester_hydrolysis * f(T) * max(0, esters - esters_eq)
+  tier: speculative
+  uncertainty: { low: 3.0e-5, high: 3.0e-4, note: "first-order rate at T_ref = 20 C => half-life ln2/k ~ 2300-23000 h (~3 months to ~2.6 years) for the excess above equilibrium — the observed timescale over which young wine's fruity acetate esters fade. Slower cold-cellar aging, faster warm (see E_a_ester_hydrolysis)" }
+  provenance:
+    source: "author estimate anchored to the acetate-ester hydrolysis timescale in wine (Ramey & Ough 1980, 'Volatile ester hydrolysis or formation during storage of model solutions and wines', J. Agric. Food Chem. 28:928-934 — first-order approach to an esterification equilibrium; Marais 1978 review of ester changes on wine aging). Acetate esters half-lives of order months-to-a-year at cellar temperature."
+    conditions: "generic wine/beer at cellar pH (~3.2-4.4); first-order in the lumped esters excess over equilibrium, at T_ref = 293.15 K. Represents the aggregate hydrolysis of the acetate-ester-dominated lump (isoamyl acetate the D-67 representative), not a single molecule."
+    notes: "SOURCED FORM (first-order approach to equilibrium, Ramey & Ough) + SPECULATIVE magnitude (order-of-magnitude, banded to the months-to-year acetate-ester half-life). The load-bearing sourced claim is the warmer-is-faster ORDERING carried by E_a_ester_hydrolysis, not this absolute rate."
+
+# -- ACTIVATION ENERGY: warmer aging hydrolyses faster (sourced ordering) ----------------
+E_a_ester_hydrolysis:
+  value: 60000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 40000.0, high: 80000.0, note: "Q10 ~1.7-2.9 at 20 C. Typical of acid-catalysed ester hydrolysis (~50-70 kJ/mol). The SOURCED, load-bearing claim is the sign (warmer => faster aging degradation, the owner's stated aging direction); the magnitude is speculative and banded" }
+  provenance:
+    source: "SOURCED ORDERING: acid-catalysed ester hydrolysis accelerates with temperature (textbook Arrhenius kinetics; ester hydrolysis activation energies ~50-70 kJ/mol, e.g. ethyl acetate acid hydrolysis). Warmer storage degrades young esters faster is the well-established direction (Marais 1978; Ramey & Ough 1980 measured faster hydrolysis at higher storage T)."
+    conditions: "equivalent Arrhenius activation energy of the aggregate ester hydrolysis at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster) is the sourced, load-bearing claim — it is why warm cellars age wine 'faster' and why cold storage preserves fruity esters. Exact magnitude speculative and banded around a Q10 ~2."
+
+# -- EQUILIBRIUM FLOOR: the residuum the pool decays TOWARD, not to zero ------------------
+esters_eq:
+  value: 0.005
+  unit: "g/L"   # the lower equilibrium the lumped esters pool relaxes toward (net decay floor)
+  tier: speculative
+  uncertainty: { low: 0.001, high: 0.02, note: "the hydrolysis equilibrium level of the lumped ester pool, ~1-20 mg/L as ethyl-acetate-equivalent — well below typical young-wine ester levels (tens of mg/L) so most of the fruity acetate fraction hydrolyses, a residuum remains" }
+  provenance:
+    source: "author estimate: the esterification/hydrolysis equilibrium leaves a nonzero residual ester concentration (Ramey & Ough 1980 — esters approach an equilibrium set by their acid+alcohol, not zero). A single absolute floor stands in for what is really a per-ester, composition- and acid/alcohol-concentration-dependent equilibrium."
+    conditions: "generic wine/beer; the lumped ester pool's aggregate equilibrium, booked as ethyl-acetate-equivalent g/L (the D-19 esters mass weighting)"
+    notes: "CRUDE STAND-IN, flagged loudly: a fixed absolute equilibrium replaces the true composition-dependent one — the aging analogue of the D-67 fixed-lump-composition assumption. Its role is only to make the decay NET (toward a lower floor) rather than decay-to-zero, which would over-strip the pool (D-68). Below this floor the rate is zero (the reverse ester FORMATION half is the deferred bidirectional term)."

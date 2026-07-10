@@ -14,6 +14,7 @@ from fermentation.core.kinetics.acetaldehyde import (
     AcetaldehydeProduction,
     AcetaldehydeReduction,
 )
+from fermentation.core.kinetics.aging import EsterHydrolysis
 from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.arrhenius import (
     ArrheniusTemperature,
@@ -97,6 +98,7 @@ __all__ = [
     "DiacetylReduction",
     "ArrheniusTemperature",
     "ColemanQuadraticDeathTemperature",
+    "EsterHydrolysis",
     "EsterSynthesis",
     "EsterVolatilization",
     "EthanolInactivation",

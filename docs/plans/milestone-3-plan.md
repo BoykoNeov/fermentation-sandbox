@@ -1,12 +1,14 @@
 # Milestone 3 — Tier-3 (speculative frontier): sensory/OAV + aging chemistry
 
-> Status: **beat 1a built (D-67); aging axis opened (D-68).** The OAV sensory readout ships
-> (`fermentation.sensory` + `sensory.yaml` + `tests/test_sensory_oav.py`, 729 tests green).
-> **D-68 opened the aging chemistry (§4.1): owner picked ester hydrolysis as the first Process
-> + the faithful carbon split → `fusels` + `Byp`; phase attachment via the existing
-> `simulate_scheduled` reconfigure mechanism confirmed.** Next: D-69 builds the `EsterHydrolysis`
-> physics (resolve the ethyl-acetate-ledger vs isoamyl-acetate 5:2/1:1 split with the advisor),
-> then D-70 wires the aging-phase scenario verb. Beat 1b (descriptor projection) remains deferred.
+> Status: **beat 1a built (D-67); aging axis opened (D-68); first aging Process built (D-69).**
+> The OAV sensory readout ships (`fermentation.sensory` + `sensory.yaml` + `tests/test_sensory_oav.py`).
+> **D-69 built `EsterHydrolysis` (`core/kinetics/aging.py` + shared `aging.yaml` + `tests/test_aging.py`,
+> 742 tests green): net decay of the `esters` pool toward a lower equilibrium floor, Arrhenius
+> warmer-ages-faster, released carbon split 5:2 → `fusels` + `Byp` (the advisor settled the
+> ethyl-acetate-ledger vs isoamyl-acetate crux at 5:2 — the sensory-coherent choice; carbon closes to
+> machine precision). Still OFF the ferment ProcessSet (isolable).** Next: D-70 wires the aging-phase
+> scenario verb (`age N months` + `begin_aging` reconfigure + `aging.yaml` into the compile seam + the
+> §7 slow-phase integration). Beat 1b (descriptor projection) remains deferred.
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
