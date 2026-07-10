@@ -27,10 +27,11 @@ verb-params) at the vocabulary boundary.
 import numpy as np
 import pytest
 
-from fermentation.core.kinetics.aging import EsterHydrolysis
+from fermentation.core.kinetics.aging import EsterHydrolysis, OxidativeAcetaldehyde
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
+from fermentation.sensory import load_thresholds, oav_series
 from fermentation.validation.conservation import assert_conserved, assert_nonnegative, total_carbon
 
 # A short, dry-by-then ferment (14 d at 20 C takes a 24-Brix must to dryness), then a warm aging
@@ -81,6 +82,10 @@ def _beer(interventions: list[Intervention]) -> Scenario:
 
 def _begin_aging(day: float) -> Intervention:
     return Intervention(day=day, action="begin_aging")
+
+
+def _add_oxygen(day: float, o2_mgl: float) -> Intervention:
+    return Intervention(day=day, action="add_oxygen", params={"o2_mgl": o2_mgl})
 
 
 # -- the compile-seam enable/disable gate -------------------------------------
@@ -242,3 +247,113 @@ def test_begin_aging_drives_the_beer_scenario_path():
     assert esters_plain > 0.0  # the beer ferment made ester to hydrolyse
     assert float(aged.series("esters")[-1]) < esters_plain  # aging fades it
     assert float(aged.series("fusels")[-1]) > float(plain.series("fusels")[-1])
+
+
+# -- oxidative aging: the O₂ substrate + add_oxygen (decision D-71) ------------
+
+
+def test_oxidative_acetaldehyde_disabled_and_gated_with_ester_hydrolysis():
+    # OxidativeAcetaldehyde rides the same aging tuple: wired into the medium, DISABLED at compile,
+    # enabled by the SAME begin_aging reconfigure as EsterHydrolysis (one gate for the aging axis).
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    assert OxidativeAcetaldehyde.name in cs.process_set
+    assert not cs.process_set.is_enabled(OxidativeAcetaldehyde.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(OxidativeAcetaldehyde.name)  # begin_aging turns it on too
+
+
+def test_add_oxygen_doses_the_o2_slot():
+    # add_oxygen is a pure carbon-free dose onto the o2 slot (the add_so2 pattern): it mutates o2,
+    # reconfigures nothing, and — the o2 pool being off every ledger — books no external flow.
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 40.0)]))
+    dose_events = [e for e in cs.events if e.label.startswith("add_oxygen")]
+    assert len(dose_events) == 1
+    event = dose_events[0]
+    assert event.reconfigure is None and event.mutate is not None
+    before = cs.y0.copy()
+    after = event.mutate(cs.schema, before)
+    # 40 mg/L O₂ = 0.04 g/L lands on the o2 slot; nothing else moves.
+    assert cs.schema.get(after, "o2") - cs.schema.get(before, "o2") == pytest.approx(0.04)
+
+
+def test_oxidative_aging_raises_acetaldehyde_and_depletes_oxygen():
+    # The end-to-end payoff: an oxygen-dosed aged wine finishes with HIGHER acetaldehyde (the
+    # 'sherry'/oxidised note) than the otherwise-identical reductive (no-O₂) aged wine, and the
+    # dosed O₂ is consumed over the aging tail — the saturating O₂-limited oxidation, end to end.
+    o2_dose = 60.0  # mg/L — a generous cumulative aerobic exposure
+    oxidative = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, o2_dose)])
+    ).run()
+    reductive = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()  # no O₂ dosed
+    assert oxidative.success and reductive.success
+
+    # Oxidation raises acetaldehyde above the reductive-aging baseline.
+    assert float(oxidative.series("acetaldehyde")[-1]) > float(reductive.series("acetaldehyde")[-1])
+    # The dosed O₂ is largely consumed by the end of the aging tail.
+    assert float(oxidative.series("o2")[-1]) < 0.5 * (o2_dose / 1000.0)
+    # The reductive run never accrued any O₂ (byte-for-byte no oxidation substrate).
+    assert float(reductive.series("o2")[-1]) == 0.0
+
+
+def test_reductive_aging_leaves_acetaldehyde_byte_for_byte():
+    # Isolability (D-71): a begin_aging run WITHOUT add_oxygen is purely reductive aging — the
+    # oxidation Process is inert at o2=0 — so acetaldehyde ends exactly where the un-aged run leaves
+    # it (aging draws no acetaldehyde via ester hydrolysis, and viable-X-gated production/reduction
+    # are quiescent post-dryness). The oxidation Process cannot move acetaldehyde without O₂.
+    reductive = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()
+    plain = compile_scenario(_wine([])).run()
+    assert reductive.success and plain.success
+    assert float(reductive.series("acetaldehyde")[-1]) == pytest.approx(
+        float(plain.series("acetaldehyde")[-1]), rel=1e-9
+    )
+
+
+def test_oxygen_dosed_run_closes_carbon_end_to_end():
+    # add_oxygen mutates the o2 slot, so the runtime books an external flow for it — but o2 is off
+    # every ledger, so that flow is CARBON-FREE (the add_so2/add_dap idiom), and the oxidation
+    # transfers E → acetaldehyde carbon-exactly. So total_carbon is flat (final == initial, no
+    # ledger correction) across the whole ferment+aging+oxidation trajectory.
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)]))
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    # The O₂ dose flow exists but injects zero carbon (o2 is off the carbon ledger).
+    assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert_conserved(traj.as_trajectory(), c_of, label="carbon")
+    assert_nonnegative(traj.as_trajectory(), ("o2", "acetaldehyde"), atol=1e-9)
+
+
+def test_oxidative_aging_raises_the_acetaldehyde_oav():
+    # Close the design loop through the STATED acceptance lens (milestone-3-plan: aging Processes
+    # are "validated by the D-67 OAV lens"). The whole justification for this Process (D-71) was
+    # that it moves an OAV the lens already reads — so assert the acetaldehyde OAV itself climbs on
+    # the oxygen-dosed run vs the reductive baseline, not merely the raw pool. OAV = conc/threshold,
+    # so it tracks the pool, but this ties the built behaviour to the reason it was built.
+    thresholds = load_thresholds()
+    oxidative = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)])
+    ).run()
+    reductive = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()
+    assert oxidative.success and reductive.success
+
+    oav_ox = float(oav_series(oxidative.as_trajectory(), thresholds, "acetaldehyde")[-1])
+    oav_red = float(oav_series(reductive.as_trajectory(), thresholds, "acetaldehyde")[-1])
+    # Oxidative aging lifts the acetaldehyde OAV (the 'oxidised' aroma the lens reads) to a positive
+    # value above the reductive baseline — the sensory signature of the O₂-driven ethanol oxidation.
+    # (The reductive baseline sits at ~0, a hair negative only from solver undershoot near an empty
+    # pool, so compare against it directly rather than pinning its sign.)
+    assert oav_ox > 0.0
+    assert oav_ox > oav_red
+
+
+def test_add_oxygen_rejects_unknown_params():
+    # The verb takes exactly {o2_mgl}; a stray param is a typo, rejected loudly (verb registry
+    # discipline).
+    scenario = _wine(
+        [Intervention(day=_FERMENT_DAYS, action="add_oxygen", params={"o2_mgl": 40.0, "ppm": 5})]
+    )
+    with pytest.raises(ValueError, match="unknown param"):
+        compile_scenario(scenario)

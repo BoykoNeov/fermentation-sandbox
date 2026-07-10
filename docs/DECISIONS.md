@@ -5512,3 +5512,91 @@ trustworthy as its least-trustworthy segment. No `KeyError` risk: the aging para
 Both are count/contents changes only — disabled ⇒ skipped, so every un-aged *trajectory* stays
 byte-for-byte. **Next:** beat 1b (descriptor projection) or the next §4.1 aging Process (oxidation / oak
 extraction), each on the same `begin_aging` segment, validated by the D-67 OAV lens.
+
+## D-71 — `OxidativeAcetaldehyde` built: the oxidative aging axis opens on a dissolved-O₂ pool (§4.1)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, the second §4.1 aging Process and the head of the OXIDATIVE
+sub-axis** (D-69/D-70 built the *hydrolytic* half). Ships `OxidativeAcetaldehyde` (`core/kinetics/aging.py`),
+a new dissolved-oxygen state slot `o2` (both media), an `add_oxygen` dosing verb, three `aging.yaml`
+oxidation params, and oxidation tests in `test_aging.py` + `test_aging_scenario.py`. **768 tests green**
+(752 → +16), `ruff`/`mypy` clean. One `advisor()` pass before writing settled the design crux, and the
+**O₂-pool-vs-unbounded fork was put to the owner** (per "surface design decisions before building") — the
+owner chose the dissolved-O₂ pool, so this beat *opens an axis*, not just a leaf Process.
+
+**The chemistry (owner-endorsed as the right first oxidation Process).** As a finished wine/beer takes up
+oxygen (bottle ingress, micro-oxygenation, barrel), O₂ oxidises ethanol → **acetaldehyde** — the
+'sherry'/bruised-apple/nutty **oxidised** note. Like `EsterHydrolysis` (and per the D-68 selection
+criterion), it moves an OAV the **D-67 lens already reads** (the same `acetaldehyde` pool the D-27 buffer
+fills, 'green apple' fresh vs 'oxidised' when it climbs) and needs **no new aroma pool** — the one new slot
+is the `o2` *substrate*.
+
+**The advisor crux — O₂, not ethanol, is the rate-limiting reactant (this set the whole design).** My
+first instinct was a rate first-order in ethanol (mirroring `EsterHydrolysis`). The advisor caught this as
+a **fidelity defect**: ethanol sits at ~100 g/L, essentially constant across aging, so a rate first-order
+in ethanol is a *constant rate in disguise* — acetaldehyde would rise **linearly and unbounded**, pinning
+the kinetic limit on the wrong species. Mechanistically it is **coupled oxidation** (Wildenradt & Singleton
+1974): O₂ oxidises o-diphenols → quinones + H₂O₂, then H₂O₂ oxidises ethanol → acetaldehyde — so O₂ is both
+the driver and the natural bound. Making the rate **first-order in a finite `o2` pool** gives the correct
+**saturating** behaviour (acetaldehyde plateaus as the O₂ charge is spent — bottle-aging reality). The
+phenolic catalyst is folded into `k_ethanol_oxidation` in v1 (a documented lump; no general phenol pool
+tracked).
+
+**The fork put to the owner — dissolved-O₂ pool (Approach B) vs unbounded ethanol-first (Approach A).**
+Because "oxidation done right" is *bigger* than `EsterHydrolysis` (a new state slot + a dosing verb + a
+yield param = the **foundation of an O₂ sub-axis**, not a leaf Process), and per the owner's
+"discuss-disagreements / surface design decisions before building" norm, the choice was surfaced. **Owner
+chose B.** Rationale: correct driver + saturating bound, *and* the `o2` pool is the **shared substrate** the
+whole future oxidative sub-axis (phenolic browning, Strecker, SO₂ consumption) will draw down — build it
+now and those slot in as extra O₂ sinks; build ethanol-first and the foundation gets redone.
+
+**What landed.**
+- **`o2` state slot** (`_common_specs`, both media, default 0, g/L): the dissolved-oxygen aging substrate.
+  **Carbon-free and off EVERY ledger** — `total_carbon`/`total_mass`/`total_nitrogen` weight only their
+  explicitly-named pools, so `o2` contributes 0 to each with no registration (the `h2s`/`iso_alpha`
+  precedent). `M_O2` added to `chemistry.py` as a plain constant (like `M_WATER`), used only for the
+  g/L-O₂ → moles conversion that sets the yield.
+- **`OxidativeAcetaldehyde`** (`_AGING_PROCESSES`, both media): `d(o2)/dt = −k_ethanol_oxidation·f(T)·[o2]`
+  (first-order in O₂, Arrhenius warmer-faster), `d(acetaldehyde)/dt = +y_acetaldehyde_per_o2·(r_O2/M_O2)·
+  M_acetaldehyde`, `d(E)/dt = −that·M_ethanol/M_acetaldehyde`. The `E → acetaldehyde` transfer is the
+  **clean reverse of the D-27 reduction** (both C2, mole-for-mole), so `total_carbon` closes to **machine
+  precision**; the standing E↔acetaldehyde mass gap is scoped out (`total_mass` = `{S,E,CO2}` is never
+  asserted on an aging run). During aging `X=0`, so `AcetaldehydeReduction` (viable-X-gated) is inert —
+  oxidation does not fight it, acetaldehyde accumulates.
+- **The whole O₂ flux is consumed, only a *yield* becomes acetaldehyde.** `y_acetaldehyde_per_o2` (~1 mol/mol,
+  banded 0.5–2, below the mechanistic max) — the remainder is the oxidative power spent on **unmodeled
+  sinks** the future sub-axis will claim. Because O₂ is carbon-free, "spending" it without tracking every
+  product is *not* a conservation violation; the carbon that does move (into acetaldehyde) is borrowed
+  carbon-exactly from `E`. Sanity: ~40 mg/L cumulative O₂ × yield ≈ 55 mg/L acetaldehyde (fresh ~10–40,
+  oxidised ~100–300) — in range, verified against literature, not hardcoded.
+- **The seam the NEXT oxidative Process inherits (flagged for the next author).** `k_ethanol_oxidation`
+  is presently the **total** O₂-depletion rate — `OxidativeAcetaldehyde` alone drains the *entire* `o2`
+  flux (`d(o2)/dt = −k·f(T)·o2`), with the sub-unity yield absorbing "unmodeled fate." When browning /
+  Strecker / direct-SO₂-consumption Processes are added, they must **not** each independently drain the
+  full pool (that would over-consume O₂). The clean refactor at that point: make `k_ethanol_oxidation` the
+  *ethanol-oxidation share* of a common O₂-depletion rate and have each O₂ consumer draw its own share, so
+  the pool depletes once across all sinks. Recorded here so the seam is explicit, not a surprise.
+- **`add_oxygen` verb** (the `add_so2` pattern): doses `o2_mgl` → g/L onto the `o2` slot, carbon-free. One
+  dose = a bottle's ingress; repeated = micro-ox/barrel. The runtime books an external flow for the mutate
+  delta, but it is **carbon/nitrogen-free** (o2 off every ledger), so the single-run carbon ledger still
+  closes with no correction term.
+- **`begin_aging` now gates BOTH aging Processes** (`_AGING_GATED_PROCESSES = (EsterHydrolysis,
+  OxidativeAcetaldehyde)`): one tuple drives the enable (verb reconfigure) and the compile-seam disable, so
+  they stay symmetric as the axis grows; the param guard covers both Processes' params.
+
+**Isolability — a second gate makes reductive aging free.** Oxidation is inert at `o2 = 0` (exact guard),
+so a `begin_aging` run **without** `add_oxygen` is purely **reductive** aging (screwcap/inert — a real
+case) — byte-for-byte the `EsterHydrolysis`-only aging. A test pins that acetaldehyde ends exactly where
+the un-aged run leaves it (the oxidation Process cannot move acetaldehyde without O₂). An un-aged run stays
+byte-for-byte the pre-aging core (both aging Processes disabled at compile).
+
+**§4.3 firewall / tier.** Speculative in FORM (Tier-3 frontier); the oxidation *form* (O₂-limited,
+warmer-faster) is sourced, magnitudes are estimates. `o2`/`acetaldehyde`/`E` floor at speculative when the
+Process is enabled (non-vacuous — proven for all three). `acetaldehyde`'s tier was **already** speculative
+(the D-27 buffer), so the only *new* tier consequence is `o2` going speculative in an aged-with-oxygen run.
+
+**Regression surface.** The new `o2` slot bumped the schema golden tests (`test_media.py`: SHARED +`o2`,
+wine size 39→40, beer 21→22) and `EXPECTED_PROCESSES` gained `oxidative_acetaldehyde`; both count/contents
+changes only — every default (un-aged) *trajectory* stays byte-for-byte (the slot is 0, the Process
+disabled). **Next:** the next oxidative sub-axis Process drawing the same `o2` budget (phenolic browning /
+Strecker / direct SO₂ consumption), oak extraction, or the deferred beat 1b (descriptor projection) — each
+on the `begin_aging` segment, validated by the D-67 OAV lens.

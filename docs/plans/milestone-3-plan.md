@@ -1,7 +1,7 @@
 # Milestone 3 — Tier-3 (speculative frontier): sensory/OAV + aging chemistry
 
 > Status: **beat 1a built (D-67); aging axis opened (D-68); first aging Process built (D-69);
-> aging-phase scenario wiring landed (D-70).**
+> aging-phase scenario wiring landed (D-70); oxidative aging axis opened (D-71).**
 > The OAV sensory readout ships (`fermentation.sensory` + `sensory.yaml` + `tests/test_sensory_oav.py`).
 > **D-69 built `EsterHydrolysis` (`core/kinetics/aging.py` + shared `aging.yaml` + `tests/test_aging.py`):
 > net decay of the `esters` pool toward a lower equilibrium floor, Arrhenius warmer-ages-faster, released
@@ -13,8 +13,17 @@
 > advisor reframe: the load-bearing call was the deferred "what runs during aging" — settled Stance A
 > (leave the ferment set on) because every producer of `esters`/`fusels`/`Byp` is fermentative-flux-gated
 > and quiescent at dryness, so the aging signal is unconfounded. §7 slow-phase = the segment restart (no
-> new machinery). An un-aged run is byte-for-byte the pre-aging core (isolable).** Next: beat 1b
-> (descriptor projection) or the next §4.1 aging Process (oxidation / oak extraction). Beat 1b deferred.
+> new machinery). An un-aged run is byte-for-byte the pre-aging core (isolable).**
+> **D-71 opened the OXIDATIVE aging axis: `OxidativeAcetaldehyde` (dissolved O₂ oxidises ethanol →
+> acetaldehyde, the 'sherry'/oxidised note the D-67 lens already reads) on a new carbon-free `o2` state
+> pool + an `add_oxygen` dosing verb + 3 `aging.yaml` params (768 tests). Advisor crux: O₂, not ethanol,
+> is the rate-limiter — first-order in the finite `o2` pool ⇒ SATURATING acetaldehyde, not the unbounded
+> ethanol-first alternative; the owner chose the dissolved-O₂ pool (Approach B) over the smaller
+> ethanol-first form, so `o2` is the shared substrate the whole future oxidative sub-axis (browning /
+> Strecker / SO₂ consumption) will draw down. Carbon closes machine-precision (E→acetaldehyde, the D-27
+> reduction reversed; O₂ off every ledger); reductive aging (`begin_aging` with no `add_oxygen`) is
+> byte-for-byte the ester-only case.** Next: the next oxidative sub-axis Process (browning / Strecker /
+> SO₂ consumption) or oak extraction; beat 1b (descriptor projection) still deferred.
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

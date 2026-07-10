@@ -19,8 +19,13 @@ D-64 loss-Process pattern), off the fermentation ProcessSet so isolability is pr
 import numpy as np
 import pytest
 
-from fermentation.core.chemistry import carbon_mass_fraction
-from fermentation.core.kinetics import EsterHydrolysis, arrhenius_factor
+from fermentation.core.chemistry import (
+    M_ACETALDEHYDE,
+    M_ETHANOL,
+    M_O2,
+    carbon_mass_fraction,
+)
+from fermentation.core.kinetics import EsterHydrolysis, OxidativeAcetaldehyde, arrhenius_factor
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -41,6 +46,9 @@ _BYP_C = carbon_mass_fraction("succinic_acid")
 #: The 5:2 split, from the isoamyl-acetate stand-in reaction (isoamyl alcohol 5 C : acetic 2 C).
 _FUSEL_SHARE = 5.0 / 7.0
 _BYP_SHARE = 2.0 / 7.0
+#: Carbon fractions of the two pools the oxidation transfer moves carbon between (E → acetaldehyde).
+_ETHANOL_C = carbon_mass_fraction("ethanol")
+_ACET_C = carbon_mass_fraction("acetaldehyde")
 
 
 @pytest.fixture
@@ -273,5 +281,141 @@ def test_tier_floored_at_speculative(store):
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterHydrolysis()])
     for pool in ("esters", "fusels", "Byp"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# OxidativeAcetaldehyde (decision D-71) — the first OXIDATIVE aging Process: dissolved O₂
+# oxidises ethanol → acetaldehyde on the ``o2`` substrate pool. O₂-limited (first-order in the
+# finite o2 pool ⇒ SATURATING, not the unbounded ethanol-first alternative), Arrhenius warmer-
+# faster, a molar yield ``y_acetaldehyde_per_o2`` of the consumed O₂ becoming acetaldehyde and the
+# oxidised carbon borrowed carbon-exactly from ``E`` (the D-27 reduction reversed). These tests pin
+# the closed form, the O₂-off-ledger carbon closure (E → acetaldehyde), the reductive-aging
+# isolability (inert at ``o2 = 0``), the warmer-faster ordering, the saturating depletion over an
+# integrated segment, and the speculative tier floor.
+
+
+def test_oxidation_metadata():
+    p = OxidativeAcetaldehyde()
+    assert p.name == "oxidative_acetaldehyde"
+    assert p.tier is Tier.SPECULATIVE
+    # Consumes the O₂ substrate, books the oxidised carbon as acetaldehyde borrowed from E.
+    assert set(p.touches) == {"o2", "acetaldehyde", "E"}
+    assert set(p.reads) == {
+        "k_ethanol_oxidation",
+        "E_a_ethanol_oxidation",
+        "y_acetaldehyde_per_o2",
+        "T_ref",
+    }
+
+
+def test_oxidation_matches_closed_form(params):
+    schema = wine_schema()
+    o2, t = 0.03, 298.15  # off T_ref so the Arrhenius factor bites
+    y = _aged_wine(schema, esters=0.0, t=t, o2=o2)  # esters=0 so only oxidation moves anything
+    d = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
+
+    f_t = arrhenius_factor(t, params["E_a_ethanol_oxidation"], params["T_ref"])
+    r_o2 = params["k_ethanol_oxidation"] * f_t * o2
+    acet_rate = params["y_acetaldehyde_per_o2"] * (r_o2 / M_O2) * M_ACETALDEHYDE
+
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "acetaldehyde") == pytest.approx(acet_rate)
+    # Carbon-exact C2 borrow from ethanol (the reduction reversed).
+    assert schema.get(d, "E") == pytest.approx(-acet_rate * M_ETHANOL / M_ACETALDEHYDE)
+    # Oxidation touches nothing else — no sugar, no CO2, no esters/fusels/Byp, no biomass.
+    for var in ("X", "S", "N", "CO2", "esters", "fusels", "Byp"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_oxidation_carbon_closes_per_rhs(params):
+    # O₂ is OFF every ledger, so the only on-ledger movement is E → acetaldehyde, both C2 — the
+    # carbon lost from ethanol equals the carbon gained as acetaldehyde, to machine precision.
+    schema = wine_schema()
+    d = OxidativeAcetaldehyde().derivatives(
+        0.0, _aged_wine(schema, esters=0.0, t=298.15, o2=0.03), schema, params
+    )
+    carbon_residual = schema.get(d, "E") * _ETHANOL_C + schema.get(d, "acetaldehyde") * _ACET_C
+    assert carbon_residual == pytest.approx(0.0, abs=1e-15)
+
+
+def test_oxidation_inert_without_oxygen(params):
+    # Reductive aging (screwcap/inert) + the exact isolability guard: with no dissolved O₂ the
+    # Process contributes byte-for-byte zero, so a begin_aging run with no add_oxygen is the
+    # ester-hydrolysis-only case. Cannot oxidise ethanol out of an empty O₂ pool.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [OxidativeAcetaldehyde()], strict=True)
+    y = _aged_wine(schema, esters=0.0, o2=0.0)
+    assert np.array_equal(ps.total_derivatives(0.0, y, params), schema.zeros())
+
+
+def test_oxidation_solver_undershoot_does_not_create_acetaldehyde(params):
+    # A solver undershoot (o2 < 0) must not flip into spurious acetaldehyde production: the
+    # ``o2 <= 0`` guard returns zeros (no oxidant ⇒ no oxidation).
+    schema = wine_schema()
+    d = OxidativeAcetaldehyde().derivatives(0.0, _aged_wine(schema, o2=-1e-6), schema, params)
+    assert np.array_equal(d, schema.zeros())
+
+
+def test_oxidation_rises_with_temperature(params):
+    # The sourced ordering (E_a_ethanol_oxidation > 0): warmer storage oxidises (maderises) faster
+    # — more O₂ consumed and more acetaldehyde made per hour when warm.
+    schema = wine_schema()
+    cold = OxidativeAcetaldehyde().derivatives(
+        0.0, _aged_wine(schema, o2=0.03, t=283.15), schema, params
+    )
+    warm = OxidativeAcetaldehyde().derivatives(
+        0.0, _aged_wine(schema, o2=0.03, t=303.15), schema, params
+    )
+    # Warmer ⇒ faster O₂ depletion (more negative) and a larger acetaldehyde gain.
+    assert schema.get(warm, "o2") < schema.get(cold, "o2") < 0.0
+    assert schema.get(warm, "acetaldehyde") > schema.get(cold, "acetaldehyde") > 0.0
+
+
+def test_oxidation_is_first_order_in_oxygen(params):
+    # First-order in the O₂ pool (the D-71 crux — O₂, not ethanol, is the rate-limiter): twice the
+    # dissolved O₂ ⇒ twice the instantaneous oxidation rate. This linearity is what makes the pool
+    # SATURATE (the rate falls as O₂ is spent), unlike a constant ethanol-first rate.
+    schema = wine_schema()
+    lo = OxidativeAcetaldehyde().derivatives(0.0, _aged_wine(schema, o2=0.02), schema, params)
+    hi = OxidativeAcetaldehyde().derivatives(0.0, _aged_wine(schema, o2=0.04), schema, params)
+    assert schema.get(hi, "acetaldehyde") == pytest.approx(2.0 * schema.get(lo, "acetaldehyde"))
+
+
+def test_integrated_oxidation_saturates_and_closes_carbon(params, store):
+    # Run a long aging segment (racked, dry wine — X=0, S=0) with ONLY OxidativeAcetaldehyde and a
+    # dosed O₂ charge. Over the span the O₂ is consumed (depletes toward 0), acetaldehyde rises to a
+    # PLATEAU (saturating, not unbounded — the whole point of the O₂-limited form), and total_carbon
+    # closes to machine precision (E → acetaldehyde, O₂ off the ledger).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [OxidativeAcetaldehyde()], strict=True)
+    o2_0 = 0.04  # ~40 mg/L cumulative O₂ exposure
+    y0 = _aged_wine(schema, esters=0.0, t=298.15, o2=o2_0)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))  # ~1 year
+    assert traj.success, traj.message
+
+    o2_end = float(traj.series("o2")[-1])
+    acet_end = float(traj.series("acetaldehyde")[-1])
+    # The O₂ charge is largely consumed and acetaldehyde has risen from nothing.
+    assert o2_end < 0.1 * o2_0
+    assert acet_end > 0.0
+    # Saturating bound: acetaldehyde cannot exceed the yield-limited ceiling y·(o2_0/M_O2)·M_acet.
+    ceiling = params["y_acetaldehyde_per_o2"] * (o2_0 / M_O2) * M_ACETALDEHYDE
+    assert acet_end <= ceiling + 1e-12
+    # And it lands in the oxidised-wine ballpark (tens–hundreds of mg/L) — a sanity anchor, not a
+    # pinned magnitude (the yield is speculative): ≥ half the ceiling once O₂ is ~spent.
+    assert acet_end >= 0.5 * ceiling
+    assert_nonnegative(traj, ("o2", "acetaldehyde"), atol=1e-12)
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+def test_oxidation_tier_floored_at_speculative(store):
+    # Speculative in FORM (Tier-3 frontier), so the pools it writes are speculative even before the
+    # (speculative) aging parameter tiers cap them. Non-vacuous: o2/acetaldehyde/E all speculative.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [OxidativeAcetaldehyde()])
+    for pool in ("o2", "acetaldehyde", "E"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE

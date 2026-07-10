@@ -73,6 +73,14 @@ M_ALPHA_KETOGLUTARATE = 5 * _M_C + 6 * _M_H + 5 * _M_O
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
 M_WATER = 2 * _M_H + 1 * _M_O
+#: Dioxygen, O2 — the dissolved-oxygen aging substrate (decision D-71, the first §4.1
+#: OXIDATIVE aging Process). Carried as a plain molar mass (like ``M_WATER``), NOT registered
+#: in ``MOLAR_MASS``/``CARBON_ATOMS`` below: the ``o2`` state pool is **carbon-free and off
+#: every conservation ledger** (``total_carbon``/``total_mass``/``total_nitrogen`` weight only
+#: their explicitly-named pools), exactly like the untracked hydrolysis water — so O₂ needs no
+#: species registration, only this weight to convert the g/L O₂ consumed into the moles that set
+#: the acetaldehyde yield (``y_acetaldehyde_per_o2`` mol acetaldehyde per mol O₂).
+M_O2 = 2 * _M_O
 #: Glycerol, C3H8O3 — the principal fermentation byproduct (realised-yield sink,
 #: decision D-16).
 M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O

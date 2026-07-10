@@ -9,7 +9,7 @@ from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine
 
 SHARED = (
     "X", "S", "E", "N", "T", "CO2", "X_dead", "Gly", "Byp", "esters", "fusels", "esters_gas",
-    "acetolactate", "diacetyl", "butanediol", "acetaldehyde", "h2s", "h2s_gas",
+    "acetolactate", "diacetyl", "butanediol", "acetaldehyde", "h2s", "h2s_gas", "o2",
 )  # fmt: skip
 
 
@@ -61,16 +61,17 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_KETO_ACID_SLOTS
     )
     assert schema.spec("S").size == 1
-    # 18 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
-    # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27, and
-    # h2s + h2s_gas, D-29 production / D-42 CO2-stripping sink) + 3 wine-only acid slots
+    # 19 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
+    # acetolactate, diacetyl, butanediol — the VDK pathway, D-26 — acetaldehyde, D-27,
+    # h2s + h2s_gas, D-29 production / D-42 CO2-stripping sink, and o2 — the dissolved-oxygen
+    # aging substrate, D-71) + 3 wine-only acid slots
     # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
     # (D-34) + 8 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols — the p-coumaric
     # branch, D-40; ferulic_acid, vinylguaiacols, ethylguaiacols — the ferulic branch, D-55;
     # X_brett, X_brett_dead) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate D-49,
     # alpha_ketoglutarate D-50)
-    assert schema.size == 39
+    assert schema.size == 40
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -79,11 +80,12 @@ def test_beer_schema_has_three_sequential_sugars():
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
-    # 18 shared (X, S(3), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20),
+    # 19 shared (X, S(3), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20),
     # acetolactate, diacetyl, butanediol (VDK pathway, D-26), acetaldehyde (D-27),
-    # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink)) + 1 beer-only iso_alpha bitterness slot
-    # (D-64) — S occupies 3 slots, so 18 shared names span 20 slots, + iso_alpha = 21
-    assert schema.size == 21
+    # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink), o2 (D-71 aging substrate)) + 1 beer-only
+    # iso_alpha bitterness slot (D-64) — S occupies 3 slots, so 19 shared names span 21 slots,
+    # + iso_alpha = 22
+    assert schema.size == 22
 
 
 def test_shared_variable_units_are_canonical():
@@ -111,6 +113,7 @@ def test_shared_variable_units_are_canonical():
         "acetaldehyde": "g/L",
         "h2s": "g/L",
         "h2s_gas": "g/L",
+        "o2": "g/L",  # dissolved-oxygen aging substrate (D-71)
         "iso_alpha": "g/L",  # beer-only bitterness slot (D-64)
     }
 
@@ -284,13 +287,14 @@ KETO_ACID_PROCESSES = {
 # fermentation-time iso-alpha loss. It is present in a bare build_process_set and disabled at the
 # compile seam when no hops are scheduled (the MLF/Brett isolability pattern).
 HOP_PROCESSES = {"iso_alpha_acid_loss"}
-# Aging chemistry (Milestone 3 / Tier-3, decisions D-68/D-69/D-70): the first §4.1 aging Process,
-# ester_hydrolysis. Medium-agnostic (ester hydrolysis is a molecule/pH property, and
-# esters/fusels/Byp exist in both schemas), so present in a bare build_process_set for BOTH media —
+# Aging chemistry (Milestone 3 / Tier-3, decisions D-68..D-71): the two §4.1 aging Processes,
+# ester_hydrolysis (D-69) and oxidative_acetaldehyde (D-71, the O₂-driven oxidation). Both
+# medium-agnostic (hydrolysis/oxidation are molecule/pH properties, and esters/fusels/Byp/
+# acetaldehyde/o2 exist in both schemas), so present in a bare build_process_set for BOTH media —
 # but DISABLED unconditionally at the compile seam (aging is inherently post-ferment, no aging at
 # t0), re-enabled only by a begin_aging intervention. An un-aged run is byte-for-byte the pre-aging
 # core (the MLF/Brett isolability pattern, but with no t0 co-inoculation path).
-AGING_PROCESSES = {"ester_hydrolysis"}
+AGING_PROCESSES = {"ester_hydrolysis", "oxidative_acetaldehyde"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES

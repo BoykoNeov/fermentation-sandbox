@@ -53,6 +53,7 @@ from fermentation.core.kinetics import (
     MalolacticGrowth,
     MalolacticSenescence,
     OenococcusDiacetylReduction,
+    OxidativeAcetaldehyde,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -111,6 +112,14 @@ _BRETT_GATED_PROCESSES = (
     BrettDeath,
     BrettEthanolToxicity,
 )
+
+#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71): :class:`EsterHydrolysis` (the
+#: ester-fade) and :class:`OxidativeAcetaldehyde` (the O₂-driven oxidation). Both are wired into
+#: both media but DISABLED unconditionally at compile (aging is inherently post-ferment); the
+#: ``begin_aging`` verb re-enables exactly this tuple at its breakpoint, and the compile seam
+#: disables exactly this tuple — one list, so the enable/disable stay symmetric as the aging axis
+#: grows. Their shared aging.yaml parameters are guarded together at the verb boundary.
+_AGING_GATED_PROCESSES = (EsterHydrolysis, OxidativeAcetaldehyde)
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
 _Initial = dict[str, float | list[float]]
@@ -899,6 +908,55 @@ def _verb_add_copper(
     )
 
 
+def _verb_add_oxygen(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_oxygen`` — dose dissolved oxygen onto the ``o2`` aging substrate (decision D-71).
+
+    The oxidative-aging substrate lever: doses dissolved O₂ by the industry unit (``o2_mgl``, mg/L)
+    and converts to the canonical g/L jump on the ``o2`` slot — the ingress a finished wine/beer
+    takes up in bottle, under micro-oxygenation, or across a barrel. One dose models a single
+    exposure (a bottle's total ingress); repeated doses model continuous micro-ox / barrel aging.
+    The dosed O₂ is then consumed by
+    :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde`
+    (once ``begin_aging`` has enabled it), oxidising ethanol → acetaldehyde at the sourced molar
+    yield — so a dose raises the finished-wine acetaldehyde ('sherry'/oxidised) and, via the D-47
+    binding equilibrium, is mopped up by any dosed SO₂ for free.
+
+    **The add_so2 pattern exactly** (a carbon-free dosed pool): O₂ carries neither carbon nor
+    nitrogen and the ``o2`` slot is off every conservation ledger (``total_carbon``/``total_mass``/
+    ``total_nitrogen`` weight only their named pools), so this flow perturbs no elemental balance —
+    the single-run carbon and nitrogen ledgers still close with **no** external-flow correction
+    term (unlike the carbon-bearing ``add_acid``/``add_sugar`` doses). Concentration model: no
+    volume change on the addition (the shared verb caveat).
+
+    Medium-agnostic (``o2`` is in ``_common_specs``, so both media carry it). Ordering note: dosing
+    O₂ *without* a ``begin_aging`` leaves it inert in the slot — the oxidation Process stays
+    disabled until the aging phase begins — so the natural usage is ``begin_aging`` at the
+    ferment/aging boundary plus ``add_oxygen`` for each exposure over the aging tail.
+    """
+    _iv_check_keys(iv, frozenset({"o2_mgl"}), "add_oxygen")
+    o2_mgl = _iv_float(iv, "o2_mgl", "add_oxygen")
+    if "o2" not in schema:  # both current media carry o2; guard for symmetry with add_so2
+        raise ValueError(
+            f"intervention 'add_oxygen' at day {iv.day:g} needs an 'o2' slot, but medium "
+            f"{schema!r} has none (the dissolved-oxygen aging substrate, decision D-71)"
+        )
+    added_gpl = mgl_to_gpl(o2_mgl)
+    o2_slice = schema.slice("o2")
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[o2_slice] += added_gpl
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_oxygen@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
 #: The lees-associated pools racking removes: inactivated yeast biomass ``X_dead`` and (if autolysis
 #: is opted in) the non-assimilable cell-wall ``debris`` (decision D-36); plus **both** *O. oeni*
 #: pools — settled dead ``X_mlf_dead`` **and viable ``X_mlf``** (decision D-39). Racking viable
@@ -1166,16 +1224,20 @@ def _verb_add_sugar(
 def _verb_begin_aging(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet
 ) -> ScheduledEvent:
-    """``begin_aging`` — start the post-fermentation aging phase (decision D-70, §4.1).
+    """``begin_aging`` — start the post-fermentation aging phase (decisions D-70/D-71, §4.1).
 
-    The aging-axis wiring: it **reconfigures** the Process set to enable
-    :class:`~fermentation.core.kinetics.aging.EsterHydrolysis` from its ``day`` onward — the
-    ``pitch_mlf`` reconfigure pattern MINUS the state mutation (aging inoculates nothing; it just
-    switches on a spontaneous chemistry the compile seam left off). ``EsterHydrolysis`` is wired
-    into both media but DISABLED at compile (aging is inherently post-ferment — there is no aging
-    at t0), so this verb is the *only* way to turn it on; before the breakpoint the run is
-    byte-for-byte the pre-aging model and after it the young fruity acetate esters hydrolyse back
-    toward equilibrium (fading the ester OAV, raising the fusel OAV, drifting VA/pH up).
+    The aging-axis wiring: it **reconfigures** the Process set to enable the aging Processes
+    (:data:`_AGING_GATED_PROCESSES` — :class:`~fermentation.core.kinetics.aging.EsterHydrolysis`
+    and :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde`) from its ``day`` onward —
+    the ``pitch_mlf`` reconfigure pattern MINUS the state mutation (aging inoculates nothing; it
+    just switches on the spontaneous chemistry the compile seam left off). Both are wired into both
+    media but DISABLED at compile (aging is inherently post-ferment — there is no aging at t0), so
+    this verb is the *only* way to turn them on; before the breakpoint the run is byte-for-byte the
+    pre-aging model and after it the young fruity acetate esters hydrolyse back toward equilibrium
+    (fading the ester OAV, raising the fusel OAV, drifting VA/pH up) and — if oxygen has been dosed
+    (``add_oxygen``) — dissolved O₂ oxidises ethanol to acetaldehyde (the 'sherry'/oxidised note).
+    With no oxygen dosed the oxidation Process is inert (``o2 = 0``), so ``begin_aging`` alone is
+    purely *reductive* aging — byte-for-byte the ester-hydrolysis-only case (D-71).
 
     **The aging span is expressed by ``duration_days``** (this is a pure reconfigure with no
     "how long" of its own): put ``begin_aging`` at the ferment/aging boundary day and set
@@ -1197,21 +1259,31 @@ def _verb_begin_aging(
     ``k_ester_hydrolysis``.
     """
     _iv_check_keys(iv, frozenset(), "begin_aging")
-    # No schema-slot requirement — the Process is medium-agnostic (esters/fusels/Byp exist in both
-    # media). Guard the aging params are present (the add_dap/additions.yaml pattern): the
-    # reconfigure takes effect at runtime, so an absent aging.yaml would otherwise surface as a
-    # KeyError deep in EsterHydrolysis.derivatives rather than a clear compile-time scenario error.
-    for name in ("k_ester_hydrolysis", "E_a_ester_hydrolysis", "esters_eq"):
+    # No schema-slot requirement — the aging Processes are medium-agnostic (esters/fusels/Byp/
+    # acetaldehyde/o2 exist in both media). Guard the aging params are present (the add_dap/
+    # additions.yaml pattern): the reconfigure takes effect at runtime, so an absent aging.yaml
+    # would otherwise surface as a KeyError deep in an aging Process's derivatives rather than a
+    # clear compile-time scenario error. Guards BOTH aging Processes' params (D-70 hydrolysis +
+    # D-71 oxidation), since begin_aging enables both.
+    for name in (
+        "k_ester_hydrolysis",
+        "E_a_ester_hydrolysis",
+        "esters_eq",
+        "k_ethanol_oxidation",
+        "E_a_ethanol_oxidation",
+        "y_acetaldehyde_per_o2",
+    ):
         if name not in parameters:
             raise ValueError(
                 f"intervention 'begin_aging' at day {iv.day:g} needs {name!r} but it is missing; "
                 "include aging.yaml in parameter_paths (the default lookup merges it "
-                "automatically, decision D-70)."
+                "automatically, decisions D-70/D-71)."
             )
 
     def reconfigure(ps: ProcessSet) -> None:
-        if EsterHydrolysis.name in ps:
-            ps.enable(EsterHydrolysis.name)
+        for aging_process in _AGING_GATED_PROCESSES:
+            if aging_process.name in ps:
+                ps.enable(aging_process.name)
 
     return ScheduledEvent(
         time_h=days_to_hours(iv.day),
@@ -1229,6 +1301,7 @@ _INTERVENTION_VERBS: dict[
     "add_copper": _verb_add_copper,
     "add_acid": _verb_add_acid,
     "add_sugar": _verb_add_sugar,
+    "add_oxygen": _verb_add_oxygen,
     "rack": _verb_rack,
     "pitch_mlf": _verb_pitch_mlf,
     "pitch_brett": _verb_pitch_brett,
@@ -1453,16 +1526,18 @@ def compile_scenario(
         else:
             parameters = _override_autolysis_rate(parameters, rate_per_h)
 
-    # Aging isolability (decision D-70): EsterHydrolysis is wired into both media but aging is
-    # INHERENTLY post-ferment — there is no aging at t0 — so unlike the pitch-gated MLF/Brett
-    # tuples (which can co-inoculate at t0) it is DISABLED unconditionally here. The ONLY way to
-    # turn it on is a ``begin_aging`` intervention, which re-enables it at its breakpoint (the
-    # pitch_mlf reconfigure pattern). Disabled ⇒ skipped by ``active``/``tier_of``/strict, so an
-    # un-aged scenario is byte-for-byte the pre-aging core and the esters/fusels/Byp pools keep
-    # their pre-aging tier (prime directive #3). aging.yaml's params ride in every ParameterSet
+    # Aging isolability (decisions D-70/D-71): the aging Processes (EsterHydrolysis +
+    # OxidativeAcetaldehyde) are wired into both media but aging is INHERENTLY post-ferment — there
+    # is no aging at t0 — so unlike the pitch-gated MLF/Brett tuples (which can co-inoculate at t0)
+    # they are DISABLED unconditionally here. The ONLY way to turn them on is a ``begin_aging``
+    # intervention, which re-enables exactly this tuple at its breakpoint (the pitch_mlf reconfigure
+    # pattern). Disabled ⇒ skipped by ``active``/``tier_of``/strict, so an un-aged scenario is
+    # byte-for-byte the pre-aging core and the esters/fusels/Byp/acetaldehyde/o2 pools keep their
+    # pre-aging tier (prime directive #3). aging.yaml's params ride in every ParameterSet
     # (shared_files) but are read by nothing until a begin_aging event fires.
-    if EsterHydrolysis.name in process_set:
-        process_set.disable(EsterHydrolysis.name)
+    for aging_process in _AGING_GATED_PROCESSES:
+        if aging_process.name in process_set:
+            process_set.disable(aging_process.name)
 
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 
