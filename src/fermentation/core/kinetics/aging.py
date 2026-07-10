@@ -5,8 +5,8 @@ byproduct Processes (which *produce* aroma pools during active fermentation), an
 Process acts on a *finished* wine/beer over months-to-years: fermentation is done, the
 sugar is gone, the yeast racked or crashed, and the chemistry that remains is spontaneous
 (hydrolysis, oxidation, condensation), not metabolic. This module holds the aging
-Processes; :class:`EsterHydrolysis` is the first and :class:`OxidativeAcetaldehyde` the
-second.
+Processes; :class:`EsterHydrolysis` is the first, :class:`OxidativeAcetaldehyde` the second,
+and :class:`SulfiteOxidation` the third.
 
 **The oxidative sub-axis (D-71).** :class:`OxidativeAcetaldehyde` opens the *oxidative* half of
 the aging axis on a **dissolved-O₂ pool** (``o2``, a new carbon-free state slot, off every
@@ -22,6 +22,15 @@ fundamentally a competition for a finite O₂ budget, the ``o2`` pool is the sha
 whole future oxidative sub-axis (phenolic browning, Strecker degradation, SO₂ consumption) will
 draw down — this Process claims only a speculative *yield* of it (``y_acetaldehyde_per_o2``,
 below the mechanistic max), leaving the remainder as unmodeled oxidative sinks (D-71).
+
+**The first of those sinks: SO₂ scavenging (D-72).** :class:`SulfiteOxidation` is the first
+sibling to claim its share of that ``o2`` budget. Dissolved O₂ oxidises free **bisulfite** (the
+reactive antioxidant HSO₃⁻ — *not* molecular SO₂, which is the antimicrobial form) to sulfate,
+so — competing for the same ``o2`` pool via ``ProcessSet`` summing — SO₂ diverts O₂ away from
+ethanol oxidation: **while free SO₂ lasts, oxidative acetaldehyde is suppressed; once it is spent,
+acetaldehyde climbs** (the classic wine threshold, emergent, nothing extra built). It decrements
+the existing ``so2_total`` slot (no new pool) at the Danilewicz 2:1 mol SO₂:O₂ stoichiometry, and
+self-throttles as D-47 acetaldehyde–SO₂ binding erodes the free pool.
 
 **Off during the ferment, on during an aging segment (D-68/D-70).** These Processes ARE wired
 into both media's ProcessSet (D-70) but **disabled at the compile seam** — a ``begin_aging``
@@ -125,10 +134,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from fermentation.core.acidbase import SO2_STATE_KEY, bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
     M_ETHANOL,
     M_O2,
+    M_SO2,
     carbon_mass_fraction,
 )
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
@@ -161,6 +172,18 @@ _BYP_CARBON_SHARE = _ACETIC_ACID_CARBONS / (_ISOAMYL_ALCOHOL_CARBONS + _ACETIC_A
 #: debit by this molar-mass ratio makes the borrow carbon-exact: ``M_acet·cf_acet == M_eth·cf_eth·
 #: (M_acet/M_eth) == 2·M_C`` per mole, so ``total_carbon`` closes to machine precision (D-71).
 _ETHANOL_PER_ACETALDEHYDE = M_ETHANOL / M_ACETALDEHYDE
+
+#: O₂ : SO₂ stoichiometry of sulfite oxidation — **2 mol SO₂ oxidised per mol O₂ consumed**
+#: (decision D-72). The Danilewicz coupled-oxidation mechanism spends a bisulfite at *two* steps
+#: per O₂ reduced: one HSO₃⁻ reduces the o-quinone back to the o-diphenol (regenerating the
+#: catalyst) and one scavenges the resulting H₂O₂ (HSO₃⁻ + H₂O₂ → HSO₄⁻ + H₂O), so 2 SO₂ : 1 O₂.
+#: This is also exactly the classic winemaking "~4 mg SO₂ consumed per mg O₂" mass rule of thumb
+#: (2·M_SO2/M_O2 = 2·64/32 = 4). A code-with-citation constant like the chemistry carbon counts
+#: (Danilewicz 2003/2007 oxygen-reduction mechanism; Boulton et al. 1996), NOT an uncertain YAML
+#: parameter — it is reaction stoichiometry, not a rate. Distinct from the D-47 acetaldehyde–SO₂
+#: *binding* (which reversibly sequesters ``so2_total`` without removing it): this route
+#: *oxidises* SO₂ to sulfate and permanently removes it, so the two do not double-count.
+_SO2_PER_O2 = 2.0  # mol SO₂ oxidised per mol O₂ consumed via the sulfite-scavenging route
 
 
 class EsterHydrolysis(Process):
@@ -244,8 +267,8 @@ class OxidativeAcetaldehyde(Process):
     limit on the wrong species. Making the rate first-order in the finite ``o2`` pool instead gives
     the correct **saturating** behaviour: as the O₂ charge is consumed the pool decays toward zero
     and acetaldehyde plateaus, the bottle-aging reality. (Mechanistically the real path is *coupled*
-    oxidation — O₂ oxidises o-diphenols → quinones + H₂O₂, then H₂O₂ oxidises ethanol → acetaldehyde,
-    Wildenradt & Singleton 1974; the phenolic catalyst is folded into ``k_ethanol_oxidation`` in
+    oxidation — O₂ oxidises o-diphenols → quinones + H₂O₂, then H₂O₂ oxidises ethanol → acetaldehyde
+    (Wildenradt & Singleton 1974); the phenolic catalyst is folded into ``k_ethanol_oxidation`` in
     v1, a documented lump since no general phenol pool is tracked.)
 
     **Carbon — the clean reverse of the D-27 reduction.** Ethanol and acetaldehyde are both C2, so
@@ -287,8 +310,8 @@ class OxidativeAcetaldehyde(Process):
     #: nothing else — ``o2`` is off every ledger, so only the ``E → acetaldehyde`` transfer is on
     #: the carbon books, and it closes exactly.
     touches = ("o2", "acetaldehyde", "E")
-    #: ``k_ethanol_oxidation``/``E_a_ethanol_oxidation``/``y_acetaldehyde_per_o2`` are this Process's
-    #: own (aging.yaml, D-71); ``T_ref`` is shared with every Arrhenius rate. Their tiers cap the
+    #: ``k_ethanol_oxidation``/``E_a_ethanol_oxidation``/``y_acetaldehyde_per_o2`` are this
+    #: Process's own (aging.yaml, D-71); ``T_ref`` is shared with every Arrhenius rate. Tiers cap
     #: ``o2``/``acetaldehyde``/``E`` output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         "k_ethanol_oxidation",
@@ -318,4 +341,103 @@ class OxidativeAcetaldehyde(Process):
         # Carbon-exact C2 borrow from ethanol (the D-27 reduction reversed). No clamp needed: during
         # aging E ~ 100 g/L and acet_rate is trace, so this never drives E negative.
         d[schema.slice("E")] = -acet_rate * _ETHANOL_PER_ACETALDEHYDE
+        return d
+
+
+class SulfiteOxidation(Process):
+    """Oxidative aging: dissolved O₂ oxidises free bisulfite → sulfate, spending SO₂ (D-72).
+
+    The second **oxidative** aging Process and the first *sibling* on the O₂ sub-axis opened by
+    :class:`OxidativeAcetaldehyde` (D-71). SO₂ is wine's antioxidant precisely because bisulfite is
+    a *faster* O₂ scavenger than ethanol: as O₂ is taken up it is preferentially spent oxidising the
+    free bisulfite pool (HSO₃⁻ → sulfate) rather than ethanol, so **while free SO₂ lasts, O₂ is
+    diverted and little oxidative acetaldehyde forms; once SO₂ is exhausted, acetaldehyde climbs** —
+    the celebrated wine-chemistry threshold, and the payoff of putting both sinks on one shared
+    ``o2`` budget. There is nothing to build for the diversion itself: this Process and
+    :class:`OxidativeAcetaldehyde` both draw down the same ``o2`` pool, so ``ProcessSet`` summing
+    makes the O₂ split between them by their rates — the fraction reaching acetaldehyde is
+    ``k_eth / (k_eth + k_so2·[HSO₃⁻])``, small while SO₂ is present, → 1 once it is gone. **No new
+    pool** is needed (the D-68 selection criterion): it decrements the existing ``so2_total`` slot.
+
+    ``d(o2)/dt = −r`` with ``r = k_so2_oxidation · f(T) · [O2] · [HSO₃⁻]`` (**bilinear** in the
+    dissolved-O₂ pool and the free-bisulfite driver, ``f(T) = arrhenius_factor(T, E_a_so2_oxidation,
+    T_ref)`` the sourced warmer-oxidises-faster factor), and::
+
+        d(so2_total)/dt = −_SO2_PER_O2 · (r / M_O2) · M_SO2
+
+    consumes **2 mol SO₂ per mol O₂** (:data:`_SO2_PER_O2` — the Danilewicz mechanism: one bisulfite
+    reduces the o-quinone, one scavenges the H₂O₂; = the classic ~4 mg-SO₂-per-mg-O₂ mass rule).
+
+    **The driver is free BISULFITE, not molecular SO₂ (the D-72 crux).** Molecular SO₂·H₂O is the
+    reactive *antimicrobial* form (D-22); the HSO₃⁻ anion is the reactive *antioxidant* nucleophile
+    (the reducer of quinones and scavenger of H₂O₂ — Danilewicz; this codebase's own
+    :func:`~fermentation.core.acidbase.bisulfite_fraction` already names HSO₃⁻ "the reactive
+    nucleophile"). So the rate reads :func:`~fermentation.core.acidbase.bisulfite_so2_at_ph` =
+    ``free_SO₂ · bisulfite_fraction(pH)``, using only **free** SO₂ (bound bisulfite is already
+    spent). Because bisulfite is ~0.94–0.99 of free across wine pH, the pH-coupling is mild — but a
+    *stronger* coupling enters through **free** SO₂: as the sibling :class:`OxidativeAcetaldehyde`
+    produces acetaldehyde, that acetaldehyde binds SO₂ (D-47), free SO₂ falls, and this scavenging
+    rate **self-throttles**. Oxidation thus erodes SO₂'s protective capacity two ways — oxidative
+    removal here + binding via D-47 — an emergent feedback the bilinear form buys over a plain
+    SO₂-presence gate.
+
+    **Off every ledger, no conservation term.** Both ``o2`` (D-71) and ``so2_total`` (a dosed,
+    carbon-free input — D-22/D-28) are off ``total_carbon``/``total_mass``/``total_nitrogen`` (there
+    is no sulfur ledger), so oxidising SO₂ to untracked sulfate moves no conserved quantity — this
+    Process touches only those two slots and asserts nothing. Distinct from the D-47 binding, which
+    *repartitions* ``so2_total`` (free ⇄ bound, reversible) without removing it: oxidation
+    *removes* it (→ sulfate), so booking 2:1 here does not double-count the binding readout.
+
+    **Wine-only + isolable + doubly substrate-gated (prime directive #3).** ``so2_total`` and the
+    acid/cation pH slots are wine-only (beer's pH system is deferred, D-18), so — like the MLF and
+    Brett Processes — this is wired into the *wine* medium only; the ``SO2_STATE_KEY not in schema``
+    guard makes it a hard no-op on beer besides. Wired **disabled at the compile seam** (aging is
+    post-ferment); ``begin_aging`` enables it alongside :class:`EsterHydrolysis` /
+    :class:`OxidativeAcetaldehyde` (:data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`).
+    With no O₂ *or* no SO₂ dosed the ``o2 ≤ 0`` / ``so2_total ≤ 0`` guards return byte-for-byte zero
+    (and skip the pH solve), so a reductive aging (no ``add_oxygen``) or an unsulfited aging is
+    exactly the case without this Process. Tier **speculative** (the aging axis is the Tier-3
+    frontier; the *form* — O₂-limited, bisulfite-driven, warmer-faster, 2:1 stoichiometry — is
+    sourced, the rate *magnitude* an order-of-magnitude estimate).
+    """
+
+    name = "sulfite_oxidation"
+    tier = Tier.SPECULATIVE
+    #: Consumes the dissolved-O₂ substrate and oxidises the free-bisulfite share of ``so2_total`` to
+    #: (untracked) sulfate — both slots off every ledger, so nothing conserved moves; it touches
+    #: those two and nothing else.
+    touches = ("o2", "so2_total")
+    #: ``k_so2_oxidation``/``E_a_so2_oxidation`` are its own (aging.yaml, D-72); ``T_ref`` is shared
+    #: with every Arrhenius rate. The pKa/binding params read through ``acidbase`` (to
+    #: derive free bisulfite at the solved pH) are omitted — all plausible, and the Process is
+    #: already speculative, so they add no tier headline (the MalolacticConversion/brett rule).
+    reads: tuple[str, ...] = ("k_so2_oxidation", "E_a_so2_oxidation", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (beer's pH/SO₂ system is deferred, D-18): a hard no-op on any schema
+        # without them, belt-and-suspenders to the wine-only wiring.
+        if SO2_STATE_KEY not in schema or "o2" not in schema:
+            return d
+        o2 = float(y[schema.slice("o2")][0])
+        so2_total = float(y[schema.slice(SO2_STATE_KEY)][0])
+        # No oxidant OR no SO₂ ⇒ no scavenging: reductive/unsulfited aging is byte-for-byte the
+        # case without this Process, and neither guard pays a per-RHS pH solve for a zero result.
+        # ``<= 0`` also absorbs solver undershoot (o2 < 0 / so2_total < 0 ⇒ no spurious use).
+        if o2 <= 0.0 or so2_total <= 0.0:
+            return d
+        ph = ph_of_state(y, schema, params)
+        # The reactive ANTIOXIDANT species is free bisulfite HSO₃⁻ (not molecular SO₂ — that is the
+        # antimicrobial form); it self-throttles as acetaldehyde binds SO₂ (D-47) and free falls.
+        bisulfite = bisulfite_so2_at_ph(y, schema, params, ph)  # g/L as SO₂
+        if bisulfite <= 0.0:  # all free SO₂ sequestered by carbonyls ⇒ nothing reactive left
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_so2_oxidation"], params["T_ref"])
+        r_o2 = params["k_so2_oxidation"] * f_t * o2 * bisulfite  # g O2/L/h via the SO₂ route
+        d[schema.slice("o2")] = -r_o2
+        # 2 mol SO₂ oxidised per mol O₂ (Danilewicz coupled oxidation): moles O₂ = r_o2 / M_O2.
+        d[schema.slice(SO2_STATE_KEY)] = -_SO2_PER_O2 * (r_o2 / M_O2) * M_SO2
         return d

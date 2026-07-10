@@ -5600,3 +5600,95 @@ changes only — every default (un-aged) *trajectory* stays byte-for-byte (the s
 disabled). **Next:** the next oxidative sub-axis Process drawing the same `o2` budget (phenolic browning /
 Strecker / direct SO₂ consumption), oak extraction, or the deferred beat 1b (descriptor projection) — each
 on the `begin_aging` segment, validated by the D-67 OAV lens.
+
+## D-72 — `SulfiteOxidation` built: SO₂ scavenging is the first sink on the shared O₂ budget (§4.1)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, the third §4.1 aging Process and the first *sibling* on the
+D-71 oxidative sub-axis** — the first O₂ sink to claim its share of the shared `o2` budget. Ships
+`SulfiteOxidation` (`core/kinetics/aging.py`, **wine-only**), a new `bisulfite_so2_at_ph` helper in
+`acidbase.py`, two `aging.yaml` params + one code-with-citation stoichiometry constant, and SO₂-oxidation
+tests in `test_aging.py` + `test_aging_scenario.py`. **782 tests green** (+13 SO₂-oxidation, full suite incl.
+benchmarks confirmed), `ruff`/`mypy` clean. **Two
+`advisor()` passes before writing** — one on the design, one *reconciling a chemistry-species correction I
+raised against the advisor's own earlier framing* — and the axis + rate-form fork was **put to the owner**
+(who chose SO₂ consumption + the bilinear form). The reason this was the right first pick: it reuses the
+existing `so2_total` pool (no new aroma pool), is non-regressive, and delivers a **celebrated wine-chemistry
+threshold for free**.
+
+**The chemistry — "SO₂ protects until exhausted, then acetaldehyde climbs."** SO₂ is wine's antioxidant
+because **bisulfite (HSO₃⁻) is a faster O₂ scavenger than ethanol**. Both `SulfiteOxidation` and the D-71
+`OxidativeAcetaldehyde` draw down the *same* `o2` pool, so `ProcessSet` summing splits the O₂ between them by
+their rates: the fraction reaching acetaldehyde is `k_eth / (k_eth + k_so2·[HSO₃⁻])` — small while free SO₂
+lasts (O₂ diverted to SO₂, oxidative acetaldehyde suppressed), → 1 once SO₂ is spent (acetaldehyde climbs).
+End-to-end verified: at ~40 mg/L O₂, 0/30/100/300 mg/L SO₂ give ~55/46/22/0.7 mg/L acetaldehyde, with SO₂
+consumed at the classic **~4 mg SO₂ per mg O₂** mass rule — all emergent, nothing extra built for the
+diversion itself.
+
+**The D-71 "refactor needed" prediction turned out UNNECESSARY (the key design finding).** D-71 flagged a
+seam: `k_ethanol_oxidation` is presently the *total* O₂-depletion rate (`OxidativeAcetaldehyde` drains the
+whole flux), and it warned that adding a second O₂ sink would over-consume O₂ unless `k_ethanol_oxidation`
+were refactored into an "ethanol share of a common rate." **The advisor showed this refactor is a phantom
+for a *substrate-gated* sink.** SO₂ oxidation is gated on its own substrate (`so2_total > 0`), so: (a) with
+no SO₂ dosed it contributes **byte-for-byte zero** → D-71's reductive *and* oxidative curves are unchanged
+(nothing to regress against); (b) with SO₂ present, the two first-order-in-O₂ rates simply **sum**, which is
+*physically correct* — competing reactions split a finite pool by `kᵢ/Σk`, and O₂ (off every ledger) is
+consumed exactly once, so summing is **not** double-counting. So I did **not** refactor D-71; the sub-axis
+grows by *adding gated sinks*, not by re-partitioning a shared rate. (The refactor only becomes real for an
+*always-on* sink like phenolic browning — which is exactly why those are worse first picks.)
+
+**The advisor reconcile — bisulfite, not molecular SO₂ (a correction I raised against the advisor).** The
+owner-facing fork I wrote (following the advisor's first pass) framed the bilinear driver as "molecular
+SO₂." Digging into `acidbase.py` I found its own `bisulfite_fraction` docstring already names **HSO₃⁻ "the
+reactive nucleophile"**, and the primary literature (Danilewicz) is explicit that molecular SO₂·H₂O is the
+reactive *antimicrobial* form while **bisulfite is the reactive *antioxidant*** (the reducer of o-quinones
+and scavenger of H₂O₂). I surfaced the conflict in a second advisor pass; the advisor **took the correction**
+(its "molecular is the reactive form" parenthetical conflated the two). This corrected a *label in the
+option I presented*, not the owner's actual decision (bilinear-over-gated = faithful-over-simple still
+holds), so per the "adapt on primary-source contradiction" norm I proceeded without a blocking re-ask and
+flagged it visibly. Net fidelity *gain*: `bisulfite_fraction` is ~0.94–0.99 across wine pH (mild pH
+coupling), but a **stronger** coupling enters through *free* SO₂ — as `OxidativeAcetaldehyde` makes
+acetaldehyde that binds SO₂ (D-47), free SO₂ falls and this scavenging **self-throttles**. Oxidation erodes
+SO₂'s protective capacity two ways (oxidative removal here + D-47 binding) — the emergent feedback the
+bilinear form buys over a plain SO₂-presence gate.
+
+**What landed.**
+- **`SulfiteOxidation`** (wine-only, `_OXIDATIVE_SO2_PROCESSES`, wired into the *wine* medium only like
+  `_MLF_PROCESSES`/`_BRETT_PROCESSES`): `d(o2)/dt = −k_so2_oxidation·f(T)·[o2]·[HSO₃⁻]` (bilinear, Arrhenius
+  warmer-faster), `d(so2_total)/dt = −2·(r_O2/M_O2)·M_SO2`. Touches only `o2`/`so2_total` — **both off every
+  ledger** (no sulfur ledger; oxidising SO₂ to untracked sulfate moves nothing conserved), so no conservation
+  term and nothing asserted. Wine-only because `so2_total` + the acid/cation pH slots are wine-only (D-18);
+  an `SO2_STATE_KEY not-in-schema` guard makes it a hard no-op on beer besides.
+- **Wine-only, not the shared `_AGING_PROCESSES`.** Unlike `EsterHydrolysis`/`OxidativeAcetaldehyde` (both
+  media), this reads wine-only state, so it follows the MLF/Brett wine-only wiring. It still rides the aging
+  gate: added to `_AGING_GATED_PROCESSES`, disabled at compile, enabled by `begin_aging` (both loops guard
+  `name in process_set`, so listing a wine-only Process there is beer-safe).
+- **`bisulfite_so2_at_ph`** (`acidbase.py`): `free_SO₂ · bisulfite_fraction(pH)` at an already-solved pH —
+  the reactive antioxidant driver, mirroring `molecular_so2_at_ph` (the antimicrobial one), using *free* SO₂
+  (bound bisulfite is already spent). Solves pH once via the hot-loop `_at_ph` discipline.
+- **Stoichiometry as a code constant, not a parameter.** `_SO2_PER_O2 = 2.0` (mol SO₂ per mol O₂) — the
+  Danilewicz coupled-oxidation mechanism spends one bisulfite reducing the o-quinone and one scavenging the
+  H₂O₂ per O₂, = the classic ~4 mg-SO₂-per-mg-O₂ mass rule (`2·M_SO2/M_O2 = 4`). Reaction stoichiometry, so a
+  code-with-citation constant like the chemistry carbon counts, not an uncertain YAML magic number. Distinct
+  from D-47 **binding** (reversible free↔bound repartition of `so2_total`): this **oxidises** SO₂ to sulfate
+  and removes it, so the two do not double-count.
+- **`aging.yaml`** gains `k_so2_oxidation` (0.2 L/(g·h), banded — the load-bearing claim is the ORDERING,
+  bisulfite out-competing ethanol for O₂, not the magnitude) and its own `E_a_so2_oxidation` (a separate
+  param from the ethanol one per prime-directive #2 — distinct reaction, distinct provenance). Both
+  speculative.
+
+**Isolability + tier.** Doubly substrate-gated: inert at `o2 ≤ 0` **or** `so2_total ≤ 0` (both return
+byte-for-byte zero and skip the pH solve), so a reductive (no-O₂) *or* an unsulfited aging is exactly the
+case without this Process, and an un-aged run stays byte-for-byte the pre-aging core. Speculative in FORM
+(Tier-3 frontier; the oxidation *form* — O₂-limited, bisulfite-driven, warmer-faster, 2:1 — is sourced, the
+rate *magnitude* an estimate); `o2`/`so2_total` floor at speculative when enabled (non-vacuous).
+
+**§4.3 firewall.** Decrementing `so2_total` nudges the *plausible*-tier molecular-SO₂ / antimicrobial and
+pH/free-SO₂ readouts — the same accepted precedent as `EsterHydrolysis → Byp → pH` (D-68 fork 2). Isolable
+(disable the Process and the drift vanishes); documented, owner-precedented.
+
+**Regression surface.** `test_media.py`'s `EXPECTED_PROCESSES[wine]` gains `sulfite_oxidation` (a new
+wine-only entry); beer is untouched. Every default (un-aged / no-SO₂ / reductive) trajectory stays
+byte-for-byte (the Process is disabled at compile, and gated to zero without both substrates). **Next:** the
+remaining O₂ sinks (phenolic browning / Strecker — each an *always-on* sink that WOULD need the D-71 rate
+refactor, so build with that in view), oak extraction (a separate axis, no O₂), or the deferred beat 1b
+(descriptor projection) — each on the `begin_aging` segment, validated by the D-67 OAV lens.

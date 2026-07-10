@@ -54,6 +54,7 @@ from fermentation.core.kinetics import (
     MalolacticSenescence,
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
+    SulfiteOxidation,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -113,13 +114,18 @@ _BRETT_GATED_PROCESSES = (
     BrettEthanolToxicity,
 )
 
-#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71): :class:`EsterHydrolysis` (the
-#: ester-fade) and :class:`OxidativeAcetaldehyde` (the O₂-driven oxidation). Both are wired into
-#: both media but DISABLED unconditionally at compile (aging is inherently post-ferment); the
-#: ``begin_aging`` verb re-enables exactly this tuple at its breakpoint, and the compile seam
-#: disables exactly this tuple — one list, so the enable/disable stay symmetric as the aging axis
-#: grows. Their shared aging.yaml parameters are guarded together at the verb boundary.
-_AGING_GATED_PROCESSES = (EsterHydrolysis, OxidativeAcetaldehyde)
+#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72): :class:`EsterHydrolysis`
+#: (the ester-fade), :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol oxidation) and
+#: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72). The first two are wired into both
+#: media; :class:`SulfiteOxidation` is wine-only (reads wine-only ``so2_total``/pH slots), so on
+#: beer it is simply absent from the ProcessSet — both the compile-disable and the
+#: ``begin_aging``-enable loops guard with ``name in process_set``, so listing it here is beer-safe.
+#: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
+#: ``begin_aging`` verb re-enables exactly this tuple at its breakpoint and the compile seam
+#: disables exactly this tuple — one list,
+#: so the enable/disable stay symmetric as the aging axis grows. Their shared aging.yaml parameters
+#: are guarded together at the verb boundary.
+_AGING_GATED_PROCESSES = (EsterHydrolysis, OxidativeAcetaldehyde, SulfiteOxidation)
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
 _Initial = dict[str, float | list[float]]
@@ -1263,8 +1269,10 @@ def _verb_begin_aging(
     # acetaldehyde/o2 exist in both media). Guard the aging params are present (the add_dap/
     # additions.yaml pattern): the reconfigure takes effect at runtime, so an absent aging.yaml
     # would otherwise surface as a KeyError deep in an aging Process's derivatives rather than a
-    # clear compile-time scenario error. Guards BOTH aging Processes' params (D-70 hydrolysis +
-    # D-71 oxidation), since begin_aging enables both.
+    # clear compile-time scenario error. Guards ALL aging Processes' params (D-70 hydrolysis +
+    # D-71 ethanol oxidation + D-72 SO₂ oxidation), since begin_aging enables all of them. The
+    # D-72 params ride in the same shared aging.yaml, so guarding them is beer-safe (present in
+    # every medium) even though SulfiteOxidation itself is wine-only.
     for name in (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
@@ -1272,6 +1280,8 @@ def _verb_begin_aging(
         "k_ethanol_oxidation",
         "E_a_ethanol_oxidation",
         "y_acetaldehyde_per_o2",
+        "k_so2_oxidation",
+        "E_a_so2_oxidation",
     ):
         if name not in parameters:
             raise ValueError(

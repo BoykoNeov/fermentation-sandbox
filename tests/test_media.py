@@ -287,14 +287,18 @@ KETO_ACID_PROCESSES = {
 # fermentation-time iso-alpha loss. It is present in a bare build_process_set and disabled at the
 # compile seam when no hops are scheduled (the MLF/Brett isolability pattern).
 HOP_PROCESSES = {"iso_alpha_acid_loss"}
-# Aging chemistry (Milestone 3 / Tier-3, decisions D-68..D-71): the two §4.1 aging Processes,
-# ester_hydrolysis (D-69) and oxidative_acetaldehyde (D-71, the O₂-driven oxidation). Both
-# medium-agnostic (hydrolysis/oxidation are molecule/pH properties, and esters/fusels/Byp/
-# acetaldehyde/o2 exist in both schemas), so present in a bare build_process_set for BOTH media —
-# but DISABLED unconditionally at the compile seam (aging is inherently post-ferment, no aging at
-# t0), re-enabled only by a begin_aging intervention. An un-aged run is byte-for-byte the pre-aging
-# core (the MLF/Brett isolability pattern, but with no t0 co-inoculation path).
+# Aging chemistry (Milestone 3 / Tier-3, decisions D-68..D-72): the medium-agnostic §4.1 aging
+# Processes, ester_hydrolysis (D-69) and oxidative_acetaldehyde (D-71, the O₂-driven ethanol
+# oxidation). Both medium-agnostic (hydrolysis/oxidation are molecule/pH properties, and esters/
+# fusels/Byp/acetaldehyde/o2 exist in both schemas), so present in a bare build_process_set for BOTH
+# media — but DISABLED unconditionally at the compile seam (aging is inherently post-ferment, no
+# aging at t0), re-enabled only by a begin_aging intervention. An un-aged run is byte-for-byte the
+# pre-aging core (the MLF/Brett isolability pattern, but with no t0 co-inoculation path).
 AGING_PROCESSES = {"ester_hydrolysis", "oxidative_acetaldehyde"}
+# WINE-ONLY aging: sulfite_oxidation (D-72, the O₂-driven SO₂ scavenging) reads wine-only so2_total
+# acid-pH slots (beer's pH/SO₂ system is deferred, D-18), so — like the MLF/Brett Processes — it is
+# wired into the wine medium only. Same compile-seam disable / begin_aging re-enable as the rest.
+WINE_AGING_PROCESSES = {"sulfite_oxidation"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -312,6 +316,7 @@ EXPECTED_PROCESSES = {
         | AUTOLYSIS_PROCESSES
         | KETO_ACID_PROCESSES
         | AGING_PROCESSES
+        | WINE_AGING_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

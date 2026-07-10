@@ -671,6 +671,37 @@ def molecular_so2_at_ph(
     ).molecular  # fmt: skip
 
 
+def bisulfite_so2_at_ph(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
+) -> float:
+    """Free bisulfite (HSO₃⁻) SO₂ [g/L as SO₂] at an **already-solved** ``ph`` (decision D-72).
+
+    The reactive **antioxidant** nucleophile — distinct from :func:`molecular_so2_at_ph`, the
+    reactive *antimicrobial* species. Molecular SO₂·H₂O is what kills microbes (D-22/D-28); the
+    HSO₃⁻ bisulfite anion is what reduces o-quinones and scavenges H₂O₂ during oxidation (the
+    Danilewicz coupled-oxidation nucleophile — this module's own :func:`bisulfite_fraction`
+    docstring already commits to "HSO₃⁻ … the reactive nucleophile"). So the O₂-scavenging aging
+    Process (:class:`~fermentation.core.kinetics.aging.SulfiteOxidation`, D-72) reads *this*, not
+    the molecular fraction: ``free = total − (acetaldehyde+pyruvate+α-KG)-bound`` at ``ph`` (only
+    **free** SO₂ can react — bound bisulfite is already spent), then the bisulfite share of free
+    (:func:`bisulfite_fraction`, ~0.94–0.99 across wine pH, so this is essentially free SO₂). As
+    the sibling :class:`~fermentation.core.kinetics.aging.OxidativeAcetaldehyde` makes acetaldehyde
+    that binds SO₂ (D-47), the bound term rises, free (and thus this) falls, and the scavenging
+    rate self-throttles — the emergent oxidation↔SO₂ feedback. Returns 0 when no SO₂ is dosed.
+    In-loop signature ``(y, schema, params, ph)`` like :func:`molecular_so2_at_ph` — the caller
+    supplies the already-solved pH, so this never triggers a second ``brentq``.
+    """
+    total = _so2_total(y, schema)
+    if total <= 0.0:
+        return 0.0
+    spec = _speciate_at_ph(
+        total, _acetaldehyde_molar(y, schema), _pyruvate_molar(y, schema),
+        _alpha_kg_molar(y, schema), ph, params,
+    )  # fmt: skip
+    pkas = tuple(params[n] for n in SO2_PKA_PARAM_NAMES)
+    return spec.free * bisulfite_fraction(10.0 ** (-ph), pkas)
+
+
 def free_acetaldehyde(
     y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
 ) -> float:

@@ -104,6 +104,7 @@ from fermentation.core.kinetics import (
     PyruvateExcretion,
     PyruvateReassimilation,
     SugarUptakeToEthanolCO2,
+    SulfiteOxidation,
     TemperatureRamp,
     YeastAutolysis,
     YeastPOFDecarboxylation,
@@ -625,6 +626,18 @@ _HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 #: live in the shared, medium-agnostic ``aging.yaml``.
 _AGING_PROCESSES: tuple[Callable[[], Process], ...] = (EsterHydrolysis, OxidativeAcetaldehyde)
 
+#: WINE-ONLY oxidative-aging Processes that draw on wine-only state (decision D-72). Unlike the
+#: medium-agnostic ``_AGING_PROCESSES`` above, :class:`SulfiteOxidation` reads ``so2_total`` and the
+#: acid/cation pH slots — all wine-only (beer's pH/SO₂ system is deferred, D-18) — so it is wired
+#: into the *wine* medium only, exactly like ``_MLF_PROCESSES``/``_BRETT_PROCESSES``. It is the
+#: first sink to claim its share of the shared ``o2`` budget opened by ``OxidativeAcetaldehyde``
+#: (D-71): dissolved O₂ oxidises free bisulfite → sulfate, so while free SO₂ lasts O₂ is diverted
+#: from ethanol oxidation and oxidative acetaldehyde is suppressed — the "SO₂ protects until
+#: exhausted" threshold, emergent from the two Processes summing over ``o2``. Like the rest of the
+#: aging axis it is DISABLED at the compile seam and re-enabled by ``begin_aging`` (its name rides
+#: in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in ``aging.yaml``.
+_OXIDATIVE_SO2_PROCESSES: tuple[Callable[[], Process], ...] = (SulfiteOxidation,)
+
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
 #: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
@@ -923,6 +936,7 @@ MEDIA: dict[str, Medium] = {
             + _AMINO_ACID_PROCESSES
             + _AUTOLYSIS_PROCESSES
             + _AGING_PROCESSES
+            + _OXIDATIVE_SO2_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

@@ -145,3 +145,65 @@ y_acetaldehyde_per_o2:
     source: "author estimate from the coupled-oxidation stoichiometry (Wildenradt & Singleton 1974: polyphenol oxidation by O2 generates H2O2, which oxidises ethanol to acetaldehyde; ~1-2 acetaldehyde per O2 mechanistic max). Set at the low end of the band because competing O2 sinks (o-diphenol browning, Strecker degradation of amino acids, direct SO2 oxidation) are not yet modelled — they will claim their share of the o2 pool as the sub-axis grows."
     conditions: "mol acetaldehyde per mol O2 consumed, generic wine/beer; a lumped realised yield, deliberately below the mechanistic max to leave the remaining O2 for the future unmodeled oxidative sinks (D-71)."
     notes: "SPECULATIVE magnitude. Deliberately BELOW the mechanistic ceiling so an additive future browning/Strecker/SO2 O2-sink does not double-count the O2 budget. The acetaldehyde it produces then binds any dosed SO2 via the D-47 equilibrium FOR FREE (SO2 mops up oxidative acetaldehyde — correct, and handled by the existing readout)."
+
+# ======================================================================================
+# SULFITE OXIDATION (decision D-72, the FIRST oxidative sub-axis sink to claim its share of the
+# shared o2 budget opened at D-71). The head of the "SO2 protects until exhausted" threshold.
+#
+# THE PROCESS (fermentation.core.kinetics.aging.SulfiteOxidation, WINE-ONLY):
+#
+#   d(o2)/dt        = -k_so2_oxidation * f(T) * [o2] * [HSO3-]        # BILINEAR, Arrhenius
+#   d(so2_total)/dt = -2 * (r_o2 / M_O2) * M_SO2                      # 2 mol SO2 per mol O2
+#
+# where [HSO3-] is the FREE-bisulfite driver (free_SO2 * bisulfite_fraction(pH); acidbase.
+# bisulfite_so2_at_ph). SO2 is wine's antioxidant because bisulfite scavenges O2 FASTER than
+# ethanol does: competing for the SAME o2 pool (ProcessSet summing, not a new mechanism), the O2 is
+# preferentially spent oxidising bisulfite -> sulfate rather than ethanol, so WHILE FREE SO2 LASTS
+# oxidative acetaldehyde is suppressed and ONCE IT IS EXHAUSTED acetaldehyde climbs (the celebrated
+# threshold, emergent). No new pool: it decrements the existing so2_total slot.
+#
+# WHY BISULFITE, NOT MOLECULAR SO2 (the D-72 crux). Molecular SO2.H2O is the reactive ANTIMICROBIAL
+# form (D-22); the HSO3- anion is the reactive ANTIOXIDANT nucleophile (reduces o-quinones, scavenges
+# H2O2 — Danilewicz; acidbase.bisulfite_fraction already names HSO3- "the reactive nucleophile"). At
+# wine pH bisulfite is ~0.94-0.99 of free, so the pH-coupling is mild — but a STRONGER coupling
+# enters through FREE SO2: as the sibling OxidativeAcetaldehyde makes acetaldehyde, that acetaldehyde
+# binds SO2 (D-47), free SO2 falls, and this scavenging self-throttles (the emergent feedback the
+# bilinear form buys over a plain SO2-presence gate).
+#
+# STOICHIOMETRY is a CODE constant, not a parameter (aging.py _SO2_PER_O2 = 2): the Danilewicz
+# coupled oxidation spends one bisulfite reducing the o-quinone and one scavenging the H2O2 per O2,
+# = 2 mol SO2 : 1 mol O2 = the classic "~4 mg SO2 per mg O2" mass rule. Distinct from D-47 BINDING
+# (reversible free<->bound repartition of so2_total): this OXIDISES SO2 to sulfate and removes it,
+# so the two do not double-count.
+#
+# LEDGER. Both o2 (D-71) and so2_total (D-22/D-28) are carbon-free and off every conservation ledger
+# (there is no sulfur ledger), so oxidising SO2 to untracked sulfate moves nothing conserved — no
+# carbon/mass/nitrogen term, nothing asserted. WINE-ONLY (so2_total + the acid-pH slots are wine-only,
+# D-18; wired into the wine medium only, like MLF/Brett), and disabled at compile until begin_aging.
+#
+# TIER. ALL speculative — the oxidation FORM (O2-limited, bisulfite-driven, warmer-faster, 2:1) is
+# sourced, but the rate MAGNITUDE is an order-of-magnitude estimate and the aging axis is the Tier-3
+# frontier. The load-bearing SOURCED claims are (1) bisulfite scavenges O2 faster than ethanol (=>
+# SO2 protective), (2) the 2:1 stoichiometry, (3) warmer oxidises faster (E_a_so2_oxidation > 0).
+
+# -- BILINEAR O2xBISULFITE SCAVENGING RATE: SO2 out-competes ethanol for O2 ---------------
+k_so2_oxidation:
+  value: 0.2
+  unit: "L/(g*h)"   # d(o2)/dt = -k_so2_oxidation * f(T) * [o2] * [HSO3-]  (bilinear, both g/L)
+  tier: speculative
+  uncertainty: { low: 0.05, high: 2.0, note: "bimolecular O2xbisulfite rate constant at T_ref = 20 C. The LOAD-BEARING claim is the ORDERING, not the magnitude: at cellar free SO2 (~20-40 mg/L => [HSO3-] ~0.02-0.04 g/L) the pseudo-first-order O2 rate k_so2_oxidation*[HSO3-] ~ 0.004-0.008 /h is ~8-16x the ethanol-oxidation k_ethanol_oxidation (5e-4 /h), so SO2 wins the great majority of the O2 while present. As SO2 depletes the route slows and ethanol takes over — the threshold. Absolute O2-scavenging speed banded loosely (real sulfite autoxidation is metal/o-diphenol-catalysed, days-to-weeks); the threshold is set by STOICHIOMETRY (2:1, mass-limited), robust to this magnitude." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that free bisulfite is a faster O2 scavenger than ethanol in wine (Danilewicz 2003/2007, oxygen-reduction mechanism; Boulton et al. 1996, Principles and Practices of Winemaking — SO2 protects wine by intercepting the O2/H2O2/quinone oxidation cascade). The bimolecular constant folds the metal/o-diphenol catalysis into k (no explicit catalyst pool tracked in v1, as with k_ethanol_oxidation)."
+    conditions: "generic wine at cellar pH/temperature; bilinear in the dissolved-o2 pool and the free-bisulfite driver (free_SO2 * bisulfite_fraction(pH)) at T_ref = 293.15 K."
+    notes: "SOURCED FORM (bilinear O2xbisulfite, bisulfite out-competing ethanol for O2 => SO2 protective while present, acetaldehyde suppressed then climbing — the D-72 threshold) + SPECULATIVE magnitude. The mass-limited 2:1 stoichiometry (_SO2_PER_O2, code constant) — not this rate — sets HOW MUCH O2 a given SO2 charge neutralises (~1 mg O2 per ~4 mg SO2); this rate only sets how sharply SO2 wins the competition."
+
+# -- ACTIVATION ENERGY: warmer aging oxidises SO2 faster (sourced ordering) ---------------
+E_a_so2_oxidation:
+  value: 50000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 70000.0, note: "Q10 ~1.5-2.6 at 20 C. Sulfite autoxidation / wine oxidation activation energies ~30-70 kJ/mol. The SOURCED, load-bearing claim is the SIGN (warmer => faster SO2 loss to oxidation, so warm storage burns through the protective SO2 faster); the magnitude is speculative and banded. Its OWN parameter (not reused from E_a_ethanol_oxidation) per prime directive #2: sulfite autoxidation is a distinct reaction from ethanol oxidation, so its temperature dependence gets its own provenance entry even though the two bands coincide." }
+  provenance:
+    source: "SOURCED ORDERING: sulfite autoxidation and the coupled wine-oxidation cascade accelerate with temperature (textbook Arrhenius; wine oxidation activation energies ~30-70 kJ/mol, Danilewicz 2003; Boulton et al. 1996). Warm storage consumes protective SO2 faster is the well-established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate O2xbisulfite scavenging at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster SO2 oxidation) is the sourced, load-bearing claim. Exact magnitude speculative and banded around a Q10 ~2, mirroring E_a_ethanol_oxidation (the two oxidation reactions have comparable temperature sensitivity), but kept a SEPARATE parameter — distinct reaction, distinct provenance (prime directive #2)."

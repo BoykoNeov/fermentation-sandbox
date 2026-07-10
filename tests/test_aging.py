@@ -19,19 +19,27 @@ D-64 loss-Process pattern), off the fermentation ProcessSet so isolability is pr
 import numpy as np
 import pytest
 
+from fermentation.core.acidbase import bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
     M_ETHANOL,
     M_O2,
+    M_SO2,
     carbon_mass_fraction,
 )
-from fermentation.core.kinetics import EsterHydrolysis, OxidativeAcetaldehyde, arrhenius_factor
+from fermentation.core.kinetics import (
+    EsterHydrolysis,
+    OxidativeAcetaldehyde,
+    SulfiteOxidation,
+    arrhenius_factor,
+)
+from fermentation.core.kinetics.aging import _SO2_PER_O2
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
-from fermentation.runtime import simulate
+from fermentation.runtime import Trajectory, simulate
 from fermentation.validation import (
     assert_conserved,
     assert_nonnegative,
@@ -419,3 +427,208 @@ def test_oxidation_tier_floored_at_speculative(store):
     for pool in ("o2", "acetaldehyde", "E"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# SulfiteOxidation (decision D-72) — the first oxidative sub-axis SINK to claim its share of the
+# shared ``o2`` budget (D-71): dissolved O₂ oxidises free BISULFITE (HSO₃⁻ — the antioxidant
+# nucleophile, NOT molecular SO₂ the antimicrobial form) → sulfate, consuming protective SO₂ at the
+# Danilewicz 2:1 mol SO₂:O₂ stoichiometry. Bilinear in [o2]·[HSO₃⁻], Arrhenius warmer-faster. Both
+# ``o2`` and ``so2_total`` are off every ledger (no sulfur ledger), so nothing conserved moves.
+# WINE-ONLY (so2_total + the acid-pH slots are wine-only, D-18). These tests pin the closed form and
+# the 2:1 stoichiometry, prove the SO₂-protection THRESHOLD (with the sibling OxidativeAcetaldehyde,
+# SO₂ suppresses oxidative acetaldehyde until it is spent, then acetaldehyde climbs), the
+# double-substrate isolability (inert without O₂ or without SO₂), the wine-only no-op on beer, the
+# warmer-faster ordering, and the speculative tier floor.
+
+
+@pytest.fixture
+def so2_store():
+    # Wine + the acidbase/acetaldehyde/keto-acid pKa + SO₂-binding params SulfiteOxidation's
+    # pH/bisulfite readout reads (D-72), merged with aging.yaml — the shared_files set the D-72
+    # compile seam wires. (The plain ``store`` fixture omits them: EsterHydrolysis/
+    # OxidativeAcetaldehyde never solve pH, but this Process does.)
+    d = default_data_dir()
+    return load_parameters(
+        d / "wine_generic.yaml",
+        d / "acidbase.yaml",
+        d / "acetaldehyde.yaml",
+        d / "keto_acids.yaml",
+        d / "aging.yaml",
+    )
+
+
+@pytest.fixture
+def so2_params(so2_store):
+    return so2_store.resolve()
+
+
+def _sulfited_wine(
+    schema: StateSchema, *, so2: float = 0.03, o2: float = 0.03, t: float = 293.15, **kw
+) -> FloatArray:
+    """A finished, racked wine at the start of aging with a real acid load (so pH solves into the
+    wine range), dosed SO₂ and O₂. ``tartaric`` + a ``cation_charge`` set an acidic ~pH 3.3; the
+    dosed ``so2_total``/``o2`` are the substrates. ``acetaldehyde`` defaults to 0 so free SO₂ ==
+    total (no binding) and the bisulfite driver is unambiguous unless a test sets otherwise."""
+    y = _aged_wine(schema, esters=0.0, t=t, so2_total=so2, o2=o2, tartaric=4.0, cation_charge=0.012)
+    for name, val in kw.items():
+        y[schema.slice(name)] = val
+    return y
+
+
+def test_sulfite_oxidation_metadata():
+    p = SulfiteOxidation()
+    assert p.name == "sulfite_oxidation"
+    assert p.tier is Tier.SPECULATIVE
+    # Consumes the O₂ substrate and oxidises the free-bisulfite share of so2_total — both off every
+    # ledger, so nothing conserved moves. Touches those two and nothing else.
+    assert set(p.touches) == {"o2", "so2_total"}
+    # Only its OWN aging params + shared T_ref; the plausible pKa/binding params read via acidbase
+    # are omitted (Process already speculative — the MalolacticConversion/brett convention).
+    assert set(p.reads) == {"k_so2_oxidation", "E_a_so2_oxidation", "T_ref"}
+
+
+def test_sulfite_oxidation_matches_closed_form(so2_params):
+    schema = wine_schema()
+    so2, o2, t = 0.03, 0.03, 298.15  # off T_ref so the Arrhenius factor bites
+    y = _sulfited_wine(schema, so2=so2, o2=o2, t=t)
+    d = SulfiteOxidation().derivatives(0.0, y, schema, so2_params)
+
+    ph = ph_of_state(y, schema, so2_params)
+    bisulfite = bisulfite_so2_at_ph(y, schema, so2_params, ph)  # the reactive HSO₃⁻ driver, g/L
+    f_t = arrhenius_factor(t, so2_params["E_a_so2_oxidation"], so2_params["T_ref"])
+    r_o2 = so2_params["k_so2_oxidation"] * f_t * o2 * bisulfite  # bilinear g O₂/L/h
+
+    assert bisulfite > 0.0  # the driver is live (guards against a vacuous pass)
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "so2_total") == pytest.approx(-_SO2_PER_O2 * (r_o2 / M_O2) * M_SO2)
+    # Touches nothing else — not ethanol/acetaldehyde/esters, no sugar, no CO2, no biomass.
+    for var in ("X", "S", "E", "N", "CO2", "acetaldehyde", "esters", "fusels", "Byp"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_sulfite_oxidation_two_to_one_stoichiometry(so2_params):
+    # 2 mol SO₂ oxidised per mol O₂ consumed (the Danilewicz quinone-reduction + peroxide-scavenging
+    # mechanism), which is exactly the classic ~4:1 SO₂:O₂ MASS rule (2·M_SO2/M_O2 = 4). A pure code
+    # constant, not a fitted parameter — verified in both molar and mass form.
+    schema = wine_schema()
+    d = SulfiteOxidation().derivatives(0.0, _sulfited_wine(schema), schema, so2_params)
+    moles_o2 = schema.get(d, "o2") / M_O2
+    moles_so2 = schema.get(d, "so2_total") / M_SO2
+    assert moles_so2 / moles_o2 == pytest.approx(_SO2_PER_O2)  # 2 mol SO₂ per mol O₂
+    assert schema.get(d, "so2_total") / schema.get(d, "o2") == pytest.approx(2.0 * M_SO2 / M_O2)
+    assert schema.get(d, "so2_total") / schema.get(d, "o2") == pytest.approx(4.0, rel=1e-3)
+
+
+def test_sulfite_oxidation_bilinear_in_both_substrates(so2_params):
+    # Bilinear: with acetaldehyde = 0 (free SO₂ == total, no binding), doubling either O₂ or SO₂
+    # doubles the instantaneous rate. This is what makes SO₂ out-compete ethanol for O₂ in
+    # proportion to how much free SO₂ remains — the mechanism behind the depletion threshold.
+    schema = wine_schema()
+    base = SulfiteOxidation().derivatives(
+        0.0, _sulfited_wine(schema, so2=0.03, o2=0.03), schema, so2_params
+    )
+    dbl_o2 = SulfiteOxidation().derivatives(
+        0.0, _sulfited_wine(schema, so2=0.03, o2=0.06), schema, so2_params
+    )
+    dbl_so2 = SulfiteOxidation().derivatives(
+        0.0, _sulfited_wine(schema, so2=0.06, o2=0.03), schema, so2_params
+    )
+    assert schema.get(dbl_o2, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
+    # Doubling total SO₂ doubles free bisulfite (acetaldehyde = 0 ⇒ free = total), hence the rate.
+    assert schema.get(dbl_so2, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
+
+
+def test_sulfite_oxidation_inert_without_oxygen(so2_params):
+    # No oxidant ⇒ no scavenging (and no wasted pH solve): a reductive begin_aging (no add_oxygen)
+    # is byte-for-byte the case without this Process. Also the o2<0 solver-undershoot guard.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [SulfiteOxidation()], strict=True)
+    assert np.array_equal(
+        ps.total_derivatives(0.0, _sulfited_wine(schema, o2=0.0), so2_params), schema.zeros()
+    )
+    assert np.array_equal(
+        SulfiteOxidation().derivatives(0.0, _sulfited_wine(schema, o2=-1e-6), schema, so2_params),
+        schema.zeros(),
+    )
+
+
+def test_sulfite_oxidation_inert_without_so2(so2_params):
+    # No SO₂ ⇒ no scavenging: an unsulfited aging is byte-for-byte the case without this Process
+    # (only OxidativeAcetaldehyde then acts on the o2 pool). Also the so2<0 undershoot guard.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [SulfiteOxidation()], strict=True)
+    assert np.array_equal(
+        ps.total_derivatives(0.0, _sulfited_wine(schema, so2=0.0), so2_params), schema.zeros()
+    )
+    assert np.array_equal(
+        SulfiteOxidation().derivatives(0.0, _sulfited_wine(schema, so2=-1e-6), schema, so2_params),
+        schema.zeros(),
+    )
+
+
+def test_sulfite_oxidation_rises_with_temperature(so2_params):
+    # The sourced ordering (E_a_so2_oxidation > 0): warmer storage oxidises the protective SO₂
+    # faster — warm cellars burn through SO₂ (and lose oxidative protection) faster.
+    schema = wine_schema()
+    cold = SulfiteOxidation().derivatives(0.0, _sulfited_wine(schema, t=283.15), schema, so2_params)
+    warm = SulfiteOxidation().derivatives(0.0, _sulfited_wine(schema, t=303.15), schema, so2_params)
+    assert schema.get(warm, "so2_total") < schema.get(cold, "so2_total") < 0.0
+    assert schema.get(warm, "o2") < schema.get(cold, "o2") < 0.0
+
+
+def test_sulfite_oxidation_is_wine_only_noop_on_beer(so2_params):
+    # WINE-ONLY: so2_total + the acid-pH slots are wine-only (beer's pH/SO₂ system deferred, D-18),
+    # so the SO2_STATE_KEY-absent guard makes this a hard no-op on beer even if it were wired there.
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    yb[beer.slice("o2")] = 0.03  # o2 exists in both media, but so2_total does not
+    assert np.array_equal(SulfiteOxidation().derivatives(0.0, yb, beer, so2_params), beer.zeros())
+
+
+def test_sulfite_oxidation_protects_until_exhausted(so2_params, so2_store):
+    # THE HEADLINE (D-72): run the two oxidative Processes together over a ~1-year aging segment
+    # with a fixed O₂ charge. With no SO₂ the O₂ makes ~full oxidative acetaldehyde; SO₂ competes
+    # for that O₂ and SUPPRESSES acetaldehyde in proportion to the dose, and enough SO₂ (> ~4× O₂)
+    # nearly fully protects — the celebrated "SO₂ protects until exhausted" threshold, emergent from
+    # the two Processes summing over the shared o2 pool. Off-ledger o2/so2, so carbon still closes.
+    schema = wine_schema()
+    o2_0 = 0.04  # ~40 mg/L O₂ charge
+
+    def run(so2_0: float) -> Trajectory:
+        ps = ProcessSet(schema, [OxidativeAcetaldehyde(), SulfiteOxidation()], strict=True)
+        y0 = _sulfited_wine(schema, so2=so2_0, o2=o2_0, t=298.15)
+        traj = simulate(ps, params=so2_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+        assert traj.success, traj.message
+        return traj
+
+    none = run(0.0)
+    modest = run(0.05)  # ~50 mg/L: partial protection, SO₂ largely consumed
+    ample = run(0.30)  # ~300 mg/L (> 4·40): near-full protection, SO₂ left over
+
+    acet_none = float(none.series("acetaldehyde")[-1])
+    acet_modest = float(modest.series("acetaldehyde")[-1])
+    acet_ample = float(ample.series("acetaldehyde")[-1])
+
+    # Monotone protection: more SO₂ ⇒ less oxidative acetaldehyde.
+    assert acet_none > acet_modest > acet_ample
+    # Ample SO₂ nearly abolishes the oxidative note (well under a tenth of the unprotected level).
+    assert acet_ample < 0.1 * acet_none
+    # SO₂ is genuinely consumed where it is the limiting reactant (modest dose ~spent), and remains
+    # where it is in excess (ample dose retains a protective reserve) — the depletion threshold.
+    assert float(modest.series("so2_total")[-1]) < 0.5 * 0.05
+    assert float(ample.series("so2_total")[-1]) > 0.30 - 4.1 * o2_0  # ≥ dose − stoichiometric burn
+    # Non-negative pools; carbon closes (E → acetaldehyde is the only on-ledger move; o2/so2 off).
+    assert_nonnegative(ample, ("o2", "so2_total", "acetaldehyde"), atol=1e-9)
+    f_c = so2_store.value("biomass_C_fraction")
+    assert_conserved(ample, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+def test_sulfite_oxidation_tier_floored_at_speculative(so2_store):
+    # Speculative in FORM (Tier-3 frontier): the pools it writes are speculative even before the
+    # (speculative) aging parameter tiers cap them. Non-vacuous: o2/so2_total both speculative.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [SulfiteOxidation()])
+    for pool in ("o2", "so2_total"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, so2_store.tier_map()) is Tier.SPECULATIVE

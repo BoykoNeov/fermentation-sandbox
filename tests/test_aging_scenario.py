@@ -27,7 +27,12 @@ verb-params) at the vocabulary boundary.
 import numpy as np
 import pytest
 
-from fermentation.core.kinetics.aging import EsterHydrolysis, OxidativeAcetaldehyde
+from fermentation.core.kinetics.aging import (
+    EsterHydrolysis,
+    OxidativeAcetaldehyde,
+    SulfiteOxidation,
+)
+from fermentation.core.media import get_medium
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
@@ -86,6 +91,10 @@ def _begin_aging(day: float) -> Intervention:
 
 def _add_oxygen(day: float, o2_mgl: float) -> Intervention:
     return Intervention(day=day, action="add_oxygen", params={"o2_mgl": o2_mgl})
+
+
+def _add_so2(day: float, so2_mgl: float) -> Intervention:
+    return Intervention(day=day, action="add_so2", params={"so2_mgl": so2_mgl})
 
 
 # -- the compile-seam enable/disable gate -------------------------------------
@@ -357,3 +366,62 @@ def test_add_oxygen_rejects_unknown_params():
     )
     with pytest.raises(ValueError, match="unknown param"):
         compile_scenario(scenario)
+
+
+# -- oxidative aging: SO₂ scavenging on the shared O₂ budget (decision D-72) ---
+
+
+def test_sulfite_oxidation_gated_by_begin_aging_wine_only():
+    # SulfiteOxidation is WINE-ONLY (reads wine-only so2_total/pH slots) — present in the wine set,
+    # absent from beer — and rides the SAME aging gate: disabled at compile, enabled by begin_aging.
+    assert SulfiteOxidation.name in get_medium("wine").build_process_set()
+    assert SulfiteOxidation.name not in get_medium("beer").build_process_set()
+
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    assert SulfiteOxidation.name in cs.process_set
+    assert not cs.process_set.is_enabled(SulfiteOxidation.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(SulfiteOxidation.name)  # begin_aging turns it on too
+
+
+def test_so2_suppresses_oxidative_acetaldehyde_end_to_end():
+    # THE HEADLINE end-to-end (D-72): dose the SAME O₂ charge on two aged wines, one also dosed with
+    # SO₂ at the aging breakpoint. The SO₂ scavenges O₂ (bisulfite out-competes ethanol for it), so
+    # the sulfited wine finishes with LOWER oxidative acetaldehyde and CONSUMES its SO₂ — the "SO₂
+    # protects until exhausted" threshold, driven through the whole compile→schedule→run pipeline.
+    o2_dose = 60.0
+    day = _FERMENT_DAYS
+    unprotected = compile_scenario(_wine([_begin_aging(day), _add_oxygen(day, o2_dose)])).run()
+    protected = compile_scenario(
+        _wine([_begin_aging(day), _add_oxygen(day, o2_dose), _add_so2(day, 200.0)])
+    ).run()
+    assert unprotected.success and protected.success
+
+    # SO₂ present ⇒ less oxidative acetaldehyde than the identical wine without it.
+    assert float(protected.series("acetaldehyde")[-1]) < float(
+        unprotected.series("acetaldehyde")[-1]
+    )
+    # The protective SO₂ is genuinely consumed defending the wine (some of the 200 mg/L is burned).
+    so2_end_gpl = float(protected.series("so2_total")[-1])
+    assert so2_end_gpl < 0.200  # below the dosed 200 mg/L — SO₂ was spent oxidising
+    # And it did its job: the dosed O₂ is still largely consumed (diverted to SO₂, not left over).
+    assert float(protected.series("o2")[-1]) < 0.5 * (o2_dose / 1000.0)
+
+
+def test_so2_dosed_oxidative_run_closes_carbon_end_to_end():
+    # add_so2 + add_oxygen both mutate off-ledger slots (so2_total, o2), so the runtime books two
+    # external flows — both CARBON-FREE. The SO₂-oxidation transfer moves nothing on the carbon
+    # ledger (o2→? and so2→sulfate are both off it); only OxidativeAcetaldehyde's E→acetaldehyde is
+    # on it, and it closes exactly. So total_carbon stays flat across the whole trajectory.
+    day = _FERMENT_DAYS
+    cs = compile_scenario(_wine([_begin_aging(day), _add_oxygen(day, 60.0), _add_so2(day, 150.0)]))
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    # Every dose flow (O₂ and SO₂) injects zero carbon.
+    assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert_conserved(traj.as_trajectory(), c_of, label="carbon")
+    assert_nonnegative(traj.as_trajectory(), ("o2", "so2_total", "acetaldehyde"), atol=1e-9)
