@@ -44,6 +44,7 @@ from fermentation.core.kinetics import (
     BrettEthanolToxicity,
     BrettGrowth,
     BrettVinylphenolReduction,
+    EsterHydrolysis,
     FuselAminoAcidReroute,
     IsoAlphaAcidLoss,
     MalolacticCitrateMetabolism,
@@ -135,8 +136,8 @@ class CompiledScenario:
     #: Timed interventions compiled from the scenario, in canonical hours, ready to hand to
     #: :func:`fermentation.runtime.simulate_scheduled`: the temperature-schedule slope-change
     #: events (decision D-35) merged with the discrete winemaking verbs — ``add_dap`` / ``add_so2``
-    #: / ``rack`` / ``pitch_mlf`` (decision D-36). Empty ⇒ an un-scheduled run (plain
-    #: :func:`simulate` suffices).
+    #: / ``rack`` / ``pitch_mlf`` (decision D-36) and the ``begin_aging`` aging-phase switch
+    #: (decision D-70). Empty ⇒ an un-scheduled run (plain :func:`simulate` suffices).
     events: tuple[ScheduledEvent, ...] = field(default_factory=tuple)
 
     @property
@@ -499,6 +500,13 @@ def _load_parameters(
         # iso_alpha slot and the hop Process/boil calc), but loaded universally like the other
         # shared files — collision-free names, inert for wine.
         base / "hops.yaml",
+        # Aging chemistry (decision D-70): the ester-hydrolysis constants (k_ester_hydrolysis,
+        # E_a_ester_hydrolysis, esters_eq) the post-fermentation EsterHydrolysis Process reads.
+        # Medium-agnostic (acid-catalysed hydrolysis is a molecule/pH property, the
+        # vicinal_diketones.yaml pattern) and collision-free, so loaded universally like the other
+        # shared files; INERT until a begin_aging intervention enables the Process (which is
+        # disabled at compile), so an un-aged scenario carries the params but never reads them.
+        base / "aging.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 
@@ -742,9 +750,7 @@ def _iv_str(iv: Intervention, key: str, verb: str) -> str:
         )
     value = iv.params[key]
     if not isinstance(value, str):
-        raise ValueError(
-            f"intervention {verb!r} param {key!r} must be a string, got {value!r}"
-        )
+        raise ValueError(f"intervention {verb!r} param {key!r} must be a string, got {value!r}")
     return value
 
 
@@ -1157,6 +1163,63 @@ def _verb_add_sugar(
     )
 
 
+def _verb_begin_aging(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``begin_aging`` — start the post-fermentation aging phase (decision D-70, §4.1).
+
+    The aging-axis wiring: it **reconfigures** the Process set to enable
+    :class:`~fermentation.core.kinetics.aging.EsterHydrolysis` from its ``day`` onward — the
+    ``pitch_mlf`` reconfigure pattern MINUS the state mutation (aging inoculates nothing; it just
+    switches on a spontaneous chemistry the compile seam left off). ``EsterHydrolysis`` is wired
+    into both media but DISABLED at compile (aging is inherently post-ferment — there is no aging
+    at t0), so this verb is the *only* way to turn it on; before the breakpoint the run is
+    byte-for-byte the pre-aging model and after it the young fruity acetate esters hydrolyse back
+    toward equilibrium (fading the ester OAV, raising the fusel OAV, drifting VA/pH up).
+
+    **The aging span is expressed by ``duration_days``** (this is a pure reconfigure with no
+    "how long" of its own): put ``begin_aging`` at the ferment/aging boundary day and set
+    ``duration_days`` to cover the aging tail. The §7 slow-phase concern (do not integrate years
+    at ferment resolution) is answered for free by ``simulate_scheduled``'s segment restart — the
+    BDF solver re-initialises its order at the breakpoint and, with the fermentative flux gone
+    (``S ≈ 0``), takes large steps across the quiescent aging segment (default ``max_step=∞``); no
+    new integration machinery. Every other producer of ``esters``/``fusels``/``Byp`` is
+    flux-gated and silent at dryness, so the aging signal is unconfounded (Stance A, D-70).
+
+    Because the Process is enabled only from the breakpoint, ``simulate_scheduled`` min-combines
+    the per-segment tier maps (D-35): the speculative ``EsterHydrolysis`` drags ``esters`` /
+    ``fusels`` / ``Byp`` to speculative for the WHOLE run, not just the aging back half — a run is
+    only as trustworthy as its least-trustworthy segment.
+
+    Takes no params (a pure phase switch). Guards that the aging parameters are loaded (the
+    ``add_dap`` discipline) so a caller-supplied ``parameter_paths`` without ``aging.yaml`` fails
+    loudly HERE at compile, not as a bare ``KeyError`` mid-integration when the Process reads
+    ``k_ester_hydrolysis``.
+    """
+    _iv_check_keys(iv, frozenset(), "begin_aging")
+    # No schema-slot requirement — the Process is medium-agnostic (esters/fusels/Byp exist in both
+    # media). Guard the aging params are present (the add_dap/additions.yaml pattern): the
+    # reconfigure takes effect at runtime, so an absent aging.yaml would otherwise surface as a
+    # KeyError deep in EsterHydrolysis.derivatives rather than a clear compile-time scenario error.
+    for name in ("k_ester_hydrolysis", "E_a_ester_hydrolysis", "esters_eq"):
+        if name not in parameters:
+            raise ValueError(
+                f"intervention 'begin_aging' at day {iv.day:g} needs {name!r} but it is missing; "
+                "include aging.yaml in parameter_paths (the default lookup merges it "
+                "automatically, decision D-70)."
+            )
+
+    def reconfigure(ps: ProcessSet) -> None:
+        if EsterHydrolysis.name in ps:
+            ps.enable(EsterHydrolysis.name)
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"begin_aging@{iv.day:g}d",
+        reconfigure=reconfigure,
+    )
+
+
 #: action verb → compiler turning one :class:`Intervention` into a :class:`ScheduledEvent`.
 _INTERVENTION_VERBS: dict[
     str, Callable[[Intervention, StateSchema, ParameterSet], ScheduledEvent]
@@ -1169,6 +1232,7 @@ _INTERVENTION_VERBS: dict[
     "rack": _verb_rack,
     "pitch_mlf": _verb_pitch_mlf,
     "pitch_brett": _verb_pitch_brett,
+    "begin_aging": _verb_begin_aging,
 }
 
 
@@ -1388,6 +1452,17 @@ def compile_scenario(
                     process_set.disable(autolysis_process.name)
         else:
             parameters = _override_autolysis_rate(parameters, rate_per_h)
+
+    # Aging isolability (decision D-70): EsterHydrolysis is wired into both media but aging is
+    # INHERENTLY post-ferment — there is no aging at t0 — so unlike the pitch-gated MLF/Brett
+    # tuples (which can co-inoculate at t0) it is DISABLED unconditionally here. The ONLY way to
+    # turn it on is a ``begin_aging`` intervention, which re-enables it at its breakpoint (the
+    # pitch_mlf reconfigure pattern). Disabled ⇒ skipped by ``active``/``tier_of``/strict, so an
+    # un-aged scenario is byte-for-byte the pre-aging core and the esters/fusels/Byp pools keep
+    # their pre-aging tier (prime directive #3). aging.yaml's params ride in every ParameterSet
+    # (shared_files) but are read by nothing until a begin_aging event fires.
+    if EsterHydrolysis.name in process_set:
+        process_set.disable(EsterHydrolysis.name)
 
     t_span_h = (0.0, days_to_hours(scenario.duration_days))
 

@@ -84,6 +84,7 @@ from fermentation.core.kinetics import (
     BrettVinylphenolReduction,
     ColemanQuadraticDeathTemperature,
     DiacetylReduction,
+    EsterHydrolysis,
     EsterSynthesis,
     EsterVolatilization,
     EthanolInactivation,
@@ -588,6 +589,27 @@ _ACETALDEHYDE_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: paid (the MLF/Brett isolability pattern). Params live in the shared ``hops.yaml``.
 _HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 
+#: Aging chemistry — the slow post-fermentation "years" axis (Milestone 3 / Tier-3, decisions
+#: D-68/D-69/D-70): :class:`EsterHydrolysis`, the first §4.1 aging Process (young fruity acetate
+#: esters hydrolyse back toward equilibrium with age, releasing carbon 5:2 into ``fusels`` +
+#: ``Byp``). MEDIUM-AGNOSTIC — acid-catalysed ester hydrolysis is a property of the molecule and
+#: the wine/beer pH, not the biology (the ``vicinal_diketones.yaml`` / shared-file pattern), and
+#: ``esters``/``fusels``/``Byp`` exist in both schemas — so it is wired into BOTH media. Kept in
+#: its OWN isolable tuple (prime directive #3): a ProcessSet built without it is the pre-aging
+#: model. Unlike the always-on intrinsic aroma pools, aging is INHERENTLY post-ferment (there is
+#: no aging at t0), so the compile seam DISABLES it unconditionally and a ``begin_aging``
+#: intervention (decision D-70, the ``pitch_mlf`` reconfigure pattern MINUS the state mutation)
+#: re-enables it over a post-fermentation aging segment — off during the ferment, on during aging.
+#: An un-aged run is thus byte-for-byte the pre-aging core (disabled ⇒ skipped by ``active`` /
+#: ``tier_of`` / the strict ``touches`` check). During a post-dryness aging segment every OTHER
+#: producer of ``esters``/``fusels``/``Byp`` (``ester_synthesis``, ``ester_volatilization``,
+#: ``fusel_alcohols_ehrlich``, and the ``Byp`` uptake routing) is fermentative-flux-gated and
+#: quiescent at ``S ≈ 0`` (``fermentative_flux_shape`` is 0 when sugar OR biomass is 0), so the
+#: aging ester/fusel signal is UNCONFOUNDED — only :class:`EsterHydrolysis` moves those pools
+#: (Stance A, D-70: leave the ferment set on, the aging effect emerges). Params live in the
+#: shared, medium-agnostic ``aging.yaml``.
+_AGING_PROCESSES: tuple[Callable[[], Process], ...] = (EsterHydrolysis,)
+
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
 #: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
@@ -885,6 +907,7 @@ MEDIA: dict[str, Medium] = {
             + _POF_PROCESSES
             + _AMINO_ACID_PROCESSES
             + _AUTOLYSIS_PROCESSES
+            + _AGING_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),
@@ -899,6 +922,7 @@ MEDIA: dict[str, Medium] = {
             + _ACETALDEHYDE_PROCESSES
             + _H2S_PROCESSES
             + _HOPS_PROCESSES
+            + _AGING_PROCESSES
         ),
         modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
     ),

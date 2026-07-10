@@ -5439,3 +5439,76 @@ stand-in for acetic acid (C2 monoprotic), the same D-16 pool stand-in.
 **Next: D-70** — the aging-phase scenario wiring: an `age N months` verb, the `begin_aging` reconfigure
 that enables `EsterHydrolysis` over a long segment, `aging.yaml` into `compile.py`'s `shared_files`, and
 the §7 slow-phase (large-`max_step`) integration end-to-end.
+
+## D-70 — Aging-phase scenario wiring: the `begin_aging` verb + `EsterHydrolysis` into the compile seam (§4.1)
+
+**Date:** 2026-07-10. **Milestone 3 / Tier-3, aging beat wired end-to-end** (D-69 built the RHS; this
+wires it into the *scenario* pipeline). Ships the `begin_aging` intervention verb, `EsterHydrolysis`
+into both media (disabled at compile), `aging.yaml` into `compile.py`'s `shared_files`, and a
+scenario-level test file `tests/test_aging_scenario.py`. **753 tests green** (742 → +11 aging-scenario
+tests, incl. a beer-path smoke test; the five bare-wine-RHS isolability fixtures gained `aging.yaml`),
+`ruff`/`mypy` clean. One
+`advisor()` pass before writing reframed the work around the deferred D-68 sub-question below.
+
+**The advisor reframe — the load-bearing fork was NOT verb naming, but *what runs during aging*.**
+D-68 deferred "yeast state during aging"; `begin_aging` *enables* `EsterHydrolysis` but *disables*
+nothing, so the aging segment runs the **full** wine/beer set, not the clean `X=0, S=0, only-
+EsterHydrolysis` envelope D-69 was tested against. The advisor named the one Process that could
+confound the aging ester signal: **`EsterVolatilization`** (also moves `esters`, Arrhenius-driven). I
+verified its RHS: it is **fermentative-flux-gated** (`_fermentative_flux_shape(y, …); if flux <= 0: return`),
+and `fermentative_flux_shape` returns 0 when sugar OR biomass is 0. So at dryness (`S ≈ 0`) it — and
+`EsterSynthesis`, `FuselAlcoholsEhrlich`, and the `Byp` uptake routing, **every** producer of the three
+aging pools — is quiescent. **The aging ester/fusel/Byp signal is therefore unconfounded: only
+`EsterHydrolysis` moves those pools during a post-dryness aging segment.** This settles the deferred
+call as **Stance A** (leave the ferment set on; the aging effect emerges) over Stance B (reconfigure
+disables the ferment set) — no need to disable anything, because the flux gate already does it, and the
+one non-flux-gated draw across aging (`EthanolInactivation`, X→X_dead, carbon-neutral) drives the state
+*toward* the D-69 `X≈0` envelope. Recorded as a first-class invariant in the code + a test, not left implicit.
+
+**What landed.**
+- **`EsterHydrolysis` wired into both media** (`_AGING_PROCESSES = (EsterHydrolysis,)` in `media.py`),
+  medium-agnostic like the shared VDK/H₂S kinetics (ester hydrolysis is a molecule/pH property, and
+  `esters`/`fusels`/`Byp` exist in both schemas) — but **disabled unconditionally at the compile seam**.
+  Unlike the pitch-gated MLF/Brett tuples (which can co-inoculate at t0), aging is **inherently
+  post-ferment** — there is no aging at t0 — so there is no t0-enable path; the *only* way to turn it on
+  is a `begin_aging` event. Disabled ⇒ skipped by `active`/`tier_of`/strict, so an un-aged scenario is
+  byte-for-byte the pre-aging core and `esters`/`fusels`/`Byp` keep their pre-aging tier (prime directive #3).
+- **`begin_aging` verb** (`_verb_begin_aging`): the `pitch_mlf` reconfigure pattern **minus the state
+  mutation** — a pure phase switch that `ps.enable("ester_hydrolysis")` at its `day` and injects/removes
+  no mass (aging inoculates nothing). Takes **no params**; guards that the aging params are loaded (the
+  `add_dap`/`additions.yaml` discipline) so a caller-supplied `parameter_paths` without `aging.yaml`
+  fails loudly at compile, not as a bare `KeyError` mid-integration.
+- **`aging.yaml` into `shared_files`**: every compiled scenario now carries `k_ester_hydrolysis`/
+  `E_a_ester_hydrolysis`/`esters_eq` — inert (read by nothing) until `begin_aging` fires.
+
+**Verb design — bare `begin_aging`, aging span via `duration_days` (advisor-endorsed over `age {months}`).**
+The aging span is expressed by `duration_days` (put `begin_aging` at the ferment/aging boundary day and
+extend the duration to cover the tail) — the `duration_days`-is-the-single-span-source invariant stays
+clean, zero schema change. The `age {months}`-as-*intervention* alternative was **rejected**: an
+intervention at `day == duration_days` is rejected by `_compile_interventions`' at/beyond-duration check,
+so that framing fights an existing invariant. If "N months" ergonomics are wanted later, the clean shape
+is a *top-level* `age_months` field the compiler uses to extend `t_span` and auto-insert the `begin_aging`
+event — deferred as reversible, low-stakes sugar.
+
+**§7 slow-phase integration — no new machinery, exactly as D-68 predicted.** `simulate_scheduled`
+already segments the timeline; the BDF solver re-initialises its order at the `begin_aging` breakpoint,
+and with the fermentative flux gone at dryness it takes large steps across the quiescent aging segment
+(default `max_step=∞`). The end-to-end wine ferment→age run (30 d ferment + 150 d warm aging, the **full**
+wine set active) integrates to `success=True` and `total_carbon` closes end-to-end (`begin_aging`
+mutates no state ⇒ **no external flow** ⇒ the plain `final == initial` invariant, verified). The one real
+wrinkle is **output resolution, not accuracy**: a whole-span default `t_eval=linspace(0, span, 200)`
+under-samples the ferment; integration stays accurate (dense output), and callers wanting a fine ferment
+curve pass `t_eval` — flagged so a coarse ferment plot never reads as a bug.
+
+**Tier travels across the reconfigure (D-35 min-combine).** `EsterHydrolysis` is enabled only for the
+aging back half, but `simulate_scheduled` min-combines the per-segment tier maps, so the speculative
+aging Process drags `esters`/`fusels`/`Byp` to **speculative for the whole run** — a run is only as
+trustworthy as its least-trustworthy segment. No `KeyError` risk: the aging params ride in every
+`tier_map` now, and a disabled Process's `reads` are never consulted.
+
+**Regression surface (both changes perturb defaults, neither perturbs trajectories).** Adding
+`EsterHydrolysis` to the medium factories bumps the process-set *membership* (`test_media.py`'s
+`EXPECTED_PROCESSES` gained `AGING_PROCESSES`); adding `aging.yaml` bumps every `ParameterSet`'s keys.
+Both are count/contents changes only — disabled ⇒ skipped, so every un-aged *trajectory* stays
+byte-for-byte. **Next:** beat 1b (descriptor projection) or the next §4.1 aging Process (oxidation / oak
+extraction), each on the same `begin_aging` segment, validated by the D-67 OAV lens.

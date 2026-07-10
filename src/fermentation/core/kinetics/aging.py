@@ -7,14 +7,20 @@ sugar is gone, the yeast racked or crashed, and the chemistry that remains is sp
 (hydrolysis, oxidation, condensation), not metabolic. This module holds the aging
 Processes; :class:`EsterHydrolysis` is the first.
 
-**Off during the ferment, on during an aging segment (D-68).** These Processes are *not*
-wired into the primary-fermentation ProcessSet — a ``begin_aging`` scheduled event enables
-them for a long post-fermentation segment (the ``simulate_scheduled`` reconfigure mechanism,
-D-70). So the validated core and the Milestone-2 aroma beat stay byte-for-byte isolable
-(prime directive #3): building a ProcessSet without this module *is* the pre-aging model.
-In D-69 the Process is exercised directly via a hand-built ``ProcessSet`` (the D-64
-loss-Process test pattern); the scenario wiring (an ``age N months`` verb + the slow-phase
-integration) is D-70.
+**Off during the ferment, on during an aging segment (D-68/D-70).** These Processes ARE wired
+into both media's ProcessSet (D-70) but **disabled at the compile seam** — a ``begin_aging``
+scheduled event enables them for a long post-fermentation segment (the ``simulate_scheduled``
+reconfigure mechanism, the ``pitch_mlf`` pattern minus the state mutation). So the validated
+core and the Milestone-2 aroma beat stay byte-for-byte isolable (prime directive #3): a
+compiled scenario with no ``begin_aging`` never activates this module (disabled ⇒ skipped by
+``active``/``tier_of``/strict), and building a bare ProcessSet without this tuple *is* the
+pre-aging model. During a post-dryness aging segment every OTHER producer of
+``esters``/``fusels``/``Byp`` is fermentative-flux-gated and quiescent at ``S ≈ 0``, so the
+aging ester/fusel signal is unconfounded — only :class:`EsterHydrolysis` moves those pools
+(Stance A, D-70). The scenario-level ``begin_aging`` verb + span-via-``duration_days`` + the
+§7 slow-phase integration (the segment restart lets the solver take large steps across the
+quiescent aging segment) landed in D-70; in D-69 the Process was exercised directly via a
+hand-built ``ProcessSet`` (the D-64 loss-Process test pattern).
 
 ----------------------------------------------------------------------------------------
 

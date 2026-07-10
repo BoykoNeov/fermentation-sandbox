@@ -4,10 +4,10 @@
 # these names are collision-free with the per-medium kinetic parameters, and — like the
 # non-enzymatic VDK decarboxylation — acid-catalysed ester hydrolysis is a property of the
 # MOLECULE and the wine/beer pH, not of the beverage's biology, so its rate constant and
-# activation energy live in ONE shared file rather than per medium. (D-69 does NOT yet merge
-# this file into the compile seam: EsterHydrolysis is off during the ferment and is enabled
-# only in a post-fermentation aging segment — that wiring, and this file's addition to
-# compile.py's shared_files, is D-70. For D-69 the params are loaded directly by the tests.)
+# activation energy live in ONE shared file rather than per medium. Merged into compile.py's
+# shared_files at D-70, so every compiled scenario carries these params — but INERT until a
+# begin_aging intervention enables EsterHydrolysis (disabled at compile, since aging is inherently
+# post-ferment): an un-aged scenario loads the params and never reads them.
 #
 # THE PROCESS (fermentation.core.kinetics.aging.EsterHydrolysis):
 #

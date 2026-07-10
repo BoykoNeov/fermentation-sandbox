@@ -54,6 +54,7 @@ def full_params():
         base / "acetaldehyde.yaml",
         base / "keto_acids.yaml",
         base / "hydrogen_sulfide.yaml",
+        base / "aging.yaml",  # the bare wine set now carries the (default-off) aging Process (D-70)
     ).resolve()
 
 

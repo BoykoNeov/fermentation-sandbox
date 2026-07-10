@@ -213,6 +213,7 @@ def test_isolable_at_derivative_level():
         base / "acetaldehyde.yaml",
         base / "keto_acids.yaml",
         base / "hydrogen_sulfide.yaml",
+        base / "aging.yaml",  # the bare wine set now carries the (default-off) aging Process (D-70)
     ).resolve()
     m = get_medium("wine")
     schema = m.schema

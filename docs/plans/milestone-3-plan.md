@@ -1,14 +1,20 @@
 # Milestone 3 — Tier-3 (speculative frontier): sensory/OAV + aging chemistry
 
-> Status: **beat 1a built (D-67); aging axis opened (D-68); first aging Process built (D-69).**
+> Status: **beat 1a built (D-67); aging axis opened (D-68); first aging Process built (D-69);
+> aging-phase scenario wiring landed (D-70).**
 > The OAV sensory readout ships (`fermentation.sensory` + `sensory.yaml` + `tests/test_sensory_oav.py`).
-> **D-69 built `EsterHydrolysis` (`core/kinetics/aging.py` + shared `aging.yaml` + `tests/test_aging.py`,
-> 742 tests green): net decay of the `esters` pool toward a lower equilibrium floor, Arrhenius
-> warmer-ages-faster, released carbon split 5:2 → `fusels` + `Byp` (the advisor settled the
-> ethyl-acetate-ledger vs isoamyl-acetate crux at 5:2 — the sensory-coherent choice; carbon closes to
-> machine precision). Still OFF the ferment ProcessSet (isolable).** Next: D-70 wires the aging-phase
-> scenario verb (`age N months` + `begin_aging` reconfigure + `aging.yaml` into the compile seam + the
-> §7 slow-phase integration). Beat 1b (descriptor projection) remains deferred.
+> **D-69 built `EsterHydrolysis` (`core/kinetics/aging.py` + shared `aging.yaml` + `tests/test_aging.py`):
+> net decay of the `esters` pool toward a lower equilibrium floor, Arrhenius warmer-ages-faster, released
+> carbon split 5:2 → `fusels` + `Byp` (advisor-settled crux; carbon closes to machine precision).
+> **D-70 wired it into the scenario pipeline (753 tests green): `EsterHydrolysis` into both media
+> (disabled at compile — aging is inherently post-ferment), a `begin_aging` intervention verb (the
+> `pitch_mlf` reconfigure pattern MINUS the state mutation) that enables it over a post-fermentation
+> segment whose span is set by `duration_days`, and `aging.yaml` into `compile.py`'s `shared_files`. The
+> advisor reframe: the load-bearing call was the deferred "what runs during aging" — settled Stance A
+> (leave the ferment set on) because every producer of `esters`/`fusels`/`Byp` is fermentative-flux-gated
+> and quiescent at dryness, so the aging signal is unconfounded. §7 slow-phase = the segment restart (no
+> new machinery). An un-aged run is byte-for-byte the pre-aging core (isolable).** Next: beat 1b
+> (descriptor projection) or the next §4.1 aging Process (oxidation / oak extraction). Beat 1b deferred.
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
