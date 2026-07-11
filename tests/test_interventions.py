@@ -995,9 +995,7 @@ def test_add_sugar_raises_finished_ethanol():
     # strictly more ethanol (the extra hexose fermented) — emergent, no explicit ABV term.
     grid = np.linspace(0.0, 20.0 * 24.0, 401)
     undosed = compile_scenario(_wine([], yan_mgl=200.0, days=20.0)).run(t_eval=grid)
-    dosed = compile_scenario(
-        _wine([_sugar(1.0, 30.0)], yan_mgl=200.0, days=20.0)
-    ).run(t_eval=grid)
+    dosed = compile_scenario(_wine([_sugar(1.0, 30.0)], yan_mgl=200.0, days=20.0)).run(t_eval=grid)
 
     # both finished dry (added sugar fermented out, not stranded), and the dosed run made more EtOH
     assert dosed.series("S")[-1] < 5.0  # g/L residual — dry
