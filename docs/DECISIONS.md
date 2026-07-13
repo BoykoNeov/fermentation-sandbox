@@ -6414,11 +6414,25 @@ barrel fill-number depletion, or barrel-beer oak.
 `OakExtraction` and `TanninAnthocyaninCondensation`), and the **split-ledger** beat D-79 explicitly deferred. As a
 finished red wine takes up O₂ (**micro-oxygenation**), the dissolved-O₂ acetaldehyde that `OxidativeAcetaldehyde`
 (D-71) regenerates forms an **ethylidene bridge** —CH(CH₃)— linking a grape `tannin` unit to an `anthocyanin` unit
-(tannin–ethyl–anthocyanin) — an *acetaldehyde-accelerated* condensation that **stabilizes colour and softens
-astringency**. It is the **first link from the oxidative sub-axis to red-wine colour** (the "controlled micro-ox
-stabilizes red colour" payoff D-79 named), and the **first aging colour Process on the carbon ledger**. **One
-`advisor()` pass** (before writing) that confirmed the design and added five catches (all taken). **886 tests** (+16
-= 11 Process + 5 scenario, minus the schema/process enumeration edits), `ruff`/`mypy`/`pytest` green.
+(tannin–ethyl–anthocyanin) — an *acetaldehyde-accelerated* condensation forming stable ethyl-bridged pigment. It
+**wires the first link from the oxidative sub-axis to red-wine colour** and is the **first aging colour Process on
+the carbon ledger**. **One `advisor()` pass** before writing (confirmed the design + five catches, all taken) and
+**one done-call pass** (the honest-framing scope below). **887 tests** (+17 = 11 Process + 6 scenario, minus the
+schema/process enumeration edits), `ruff`/`mypy`/`pytest` green.
+
+**HONEST FRAMING — v1 delivers the MECHANISM + carbon, NOT a colour *behaviour* change (the done-call advisor's
+catch, scope corrected before finalizing).** D-79 named "controlled micro-oxygenation stabilizes red colour" as this
+beat's payoff, and D-80 *wires* that mechanism (O₂ → acetaldehyde → ethyl bridge → pigment) with the emergent
+SO₂-delay. But **`color_series` is O₂-invariant in v1** — anaerobic, oxygenated and oxygenated+SO₂ reds all end at
+the *same* total colour (verified ≈ 300 mg/L each). It cannot change, for three v1 reasons: (1) the D-79 direct route
+exhausts `anthocyanin` to ~0 regardless of O₂; (2) direct and bridged pigment are counted at **equal absorptivity**;
+(3) there is **no bleaching sink**, so total colour is conserved. So O₂ moves only `ethyl_bridge` (which no colour /
+sensory lens reads). The colour-**stability** payoff — bridged pigment *outlasting* free/direct pigment — becomes
+observable only once the deferred **SO₂/pH bleaching** beat lands (a second anthocyanin fate → colourless, which also
+promotes the pigment to an integrated slot and makes `color_series` genuinely decline). **What v1 verifiably
+delivers:** the split-ledger carbon accounting + the mechanism wiring + the SO₂-delay emergent + `ethyl_bridge`
+accumulation as the O₂ signal — pinned by `test_micro_oxygenation_leaves_colour_invariant_in_v1` (the D-79
+`color_series`-identity honesty-test discipline, applied here).
 
 **THE SPLIT LEDGER — why D-79 deferred it, and the fix.** One reaction straddles **two** conservation ledgers. The
 grape-phenolic bulk (`anthocyanin` + `tannin`) is **off** every ledger (grape-derived, untracked — the
@@ -6465,10 +6479,13 @@ Es-Safi et al. 1999).
 white / no-tannin / no-acetaldehyde wine (and all beer) is byte-for-byte the case without this Process. Wine-only (all
 four slots wine-only — `acetaldehyde` is medium-agnostic but the grape/bridge slots are appended to `wine_schema`),
 own isolable `_ACETALDEHYDE_BRIDGE_PROCESSES` tuple, disabled at compile / `begin_aging`-enabled (`_AGING_GATED_
-PROCESSES`). **Emergent end-to-end (verified):** `ethyl_bridge` is a *pure micro-ox signal* — after fermentation the
-viable yeast clears acetaldehyde to ~0, so an anaerobic aged red bridges nothing (`ethyl_bridge ≡ 0`); dosing O₂ makes
-it accumulate; SO₂ suppresses it. Anthocyanin (the limiting reagent) fully condenses via the direct route regardless,
-so the colour *endpoint* saturates — `ethyl_bridge` is the discriminator.
+PROCESSES`). **Emergent end-to-end (verified):** `ethyl_bridge` is a *near-pure micro-ox signal in these runs* — after
+a full fermentation the viable yeast clears acetaldehyde to ~0, so the anaerobic aged red here bridges nothing
+(`ethyl_bridge ≡ 0`); dosing O₂ makes it accumulate; SO₂ suppresses it. (That `≡ 0` is *model-contingent*, not a
+universal law: a genuinely reductive or SO₂-stranded red retains some residual acetaldehyde into aging, which would
+bridge slowly without any O₂ dose — fine for a Tier-3 directional signal, worth the hedge.) Anthocyanin (the limiting
+reagent) fully condenses via the direct route regardless, so the colour *endpoint* saturates — `ethyl_bridge` is the
+discriminator, not `color_series` (see the honest-framing note above).
 
 **Scope (v1):** tannin–ethyl–tannin (bridging two flavanols, no anthocyanin) deferred alongside D-79's grape-tannin
 self-polymerization — anchoring on anthocyanin keeps its sole fate = pigment and the reconstruction identity honest.

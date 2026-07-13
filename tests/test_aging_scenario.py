@@ -1188,6 +1188,31 @@ def test_micro_oxygenation_drives_bridged_condensation_end_to_end():
     assert float(ox.series("acetaldehyde")[-1]) > float(noox.series("acetaldehyde")[-1])
 
 
+def test_micro_oxygenation_leaves_colour_invariant_in_v1():
+    # HONEST-FRAMING PIN (the D-79 color_series-identity discipline, applied to D-80): what the
+    # bridged route delivers in v1 is the split-ledger CARBON accounting + the O₂→pigment MECHANISM
+    # wiring (verified by test_micro_oxygenation_drives_bridged_condensation_end_to_end: the
+    # ethyl_bridge slot accumulates only with O₂), NOT a colour *behaviour* change. `color_series`
+    # is O₂-INVARIANT here — anaerobic, oxygenated and oxygenated+SO₂ reds all end at ONE colour —
+    # three v1 reasons: (1) the D-79 direct route exhausts anthocyanin to ~0 regardless of O₂;
+    # (2) direct and bridged pigment are counted at EQUAL absorptivity; (3) there is no bleaching
+    # sink, so total colour is conserved. The micro-ox → colour-STABILITY payoff (bridged pigment
+    # outlasting free /
+    # direct pigment) becomes observable only once the deferred SO₂/pH BLEACHING beat lands — until
+    # then the verified micro-ox signal is `ethyl_bridge` accumulation, not `color_series`.
+    red_args = {"anthocyanin_gpl": 0.3, "tannin_gpl": 2.0}
+    noox = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], **red_args)).run()
+    ox = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 40.0)], **red_args)
+    ).run()
+    assert noox.success and ox.success
+    col_noox = color_series(noox.as_trajectory())
+    col_ox = color_series(ox.as_trajectory())
+    # Same total colour with and without O₂ (both ≈ anthocyanin₀ × 1000), to solver tolerance.
+    assert np.allclose(col_ox[-1], col_noox[-1], rtol=1e-3)
+    assert col_ox[-1] == pytest.approx(0.3 * 1000.0, rel=1e-3)
+
+
 def test_bridged_run_closes_carbon_end_to_end():
     # THE SPLIT-LEDGER CONSERVATION PROOF at scenario scale. The bridged route consumes ON-ledger
     # acetaldehyde (borrowed from E at D-71) and books its carbon into the on-ledger ethyl_bridge
