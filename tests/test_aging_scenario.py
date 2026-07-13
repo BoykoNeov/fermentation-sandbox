@@ -1188,18 +1188,14 @@ def test_micro_oxygenation_drives_bridged_condensation_end_to_end():
     assert float(ox.series("acetaldehyde")[-1]) > float(noox.series("acetaldehyde")[-1])
 
 
-def test_micro_oxygenation_leaves_colour_invariant_in_v1():
-    # HONEST-FRAMING PIN (the D-79 color_series-identity discipline, applied to D-80): what the
-    # bridged route delivers in v1 is the split-ledger CARBON accounting + the O₂→pigment MECHANISM
-    # wiring (verified by test_micro_oxygenation_drives_bridged_condensation_end_to_end: the
-    # ethyl_bridge slot accumulates only with O₂), NOT a colour *behaviour* change. `color_series`
-    # is O₂-INVARIANT here — anaerobic, oxygenated and oxygenated+SO₂ reds all end at ONE colour —
-    # three v1 reasons: (1) the D-79 direct route exhausts anthocyanin to ~0 regardless of O₂;
-    # (2) direct and bridged pigment are counted at EQUAL absorptivity; (3) there is no bleaching
-    # sink, so total colour is conserved. The micro-ox → colour-STABILITY payoff (bridged pigment
-    # outlasting free /
-    # direct pigment) becomes observable only once the deferred SO₂/pH BLEACHING beat lands — until
-    # then the verified micro-ox signal is `ethyl_bridge` accumulation, not `color_series`.
+def test_micro_oxygenation_now_fades_colour_end_to_end():
+    # THE D-81 PAYOFF at scenario scale, and the beat that RETIRED the D-80 "colour O₂-invariant in
+    # v1" pin: with :class:`AnthocyaninFading` wired, `color_series` is no longer O₂-invariant. An
+    # ANAEROBIC aged red HOLDS its colour (fading is O₂-coupled, so with no O₂ there is no bleaching
+    # — the condensation-only case ends at ≈ anthocyanin₀ × 1000, the D-79/D-80 flat line), while an
+    # OXYGENATED red FADES: dissolved O₂ bleaches free anthocyanin to the colourless
+    # faded_anthocyanin sink, so total colour genuinely DECLINES. This is the honest colour
+    # behaviour the D-80 framing said would land only once the bleaching beat did.
     red_args = {"anthocyanin_gpl": 0.3, "tannin_gpl": 2.0}
     noox = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], **red_args)).run()
     ox = compile_scenario(
@@ -1208,9 +1204,14 @@ def test_micro_oxygenation_leaves_colour_invariant_in_v1():
     assert noox.success and ox.success
     col_noox = color_series(noox.as_trajectory())
     col_ox = color_series(ox.as_trajectory())
-    # Same total colour with and without O₂ (both ≈ anthocyanin₀ × 1000), to solver tolerance.
-    assert np.allclose(col_ox[-1], col_noox[-1], rtol=1e-3)
-    assert col_ox[-1] == pytest.approx(0.3 * 1000.0, rel=1e-3)
+    # Anaerobic red HOLDS its colour (no O₂ ⇒ no fading; condensation conserves it) ≈ antho₀ × 1000.
+    assert col_noox[-1] == pytest.approx(0.3 * 1000.0, rel=1e-3)
+    # Oxygenated red FADES: O₂ bleaches free anthocyanin to colourless, so colour declines.
+    assert col_ox[-1] < col_noox[-1] - 5.0
+    # The lost colour is exactly the faded (colourless) fraction (the three-slot identity, D-81).
+    faded_ox = float(np.asarray(ox.series("faded_anthocyanin"), dtype=float)[-1])
+    assert faded_ox > 0.0
+    assert col_ox[-1] == pytest.approx((0.3 - faded_ox) * 1000.0, rel=1e-3)
 
 
 def test_bridged_run_closes_carbon_end_to_end():

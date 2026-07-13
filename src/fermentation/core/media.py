@@ -74,6 +74,7 @@ from fermentation.core.kinetics import (
     AlphaKetoglutarateExcretion,
     AlphaKetoglutarateReassimilation,
     AminoAcidAssimilation,
+    AnthocyaninFading,
     ArrheniusTemperature,
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
@@ -1010,6 +1011,25 @@ _ACETALDEHYDE_BRIDGE_PROCESSES: tuple[Callable[[], Process], ...] = (
     AcetaldehydeBridgedCondensation,
 )
 
+#: WINE-ONLY oxidative anthocyanin-fading aging Process (decision D-81) — the O₂-coupled bleaching
+#: loss that finally makes :func:`~fermentation.analysis.color_series` genuinely DECLINE.
+#: :class:`AnthocyaninFading` is the sixth **oxidative** aging sink on the shared ``o2`` pool (after
+#: :class:`OxidativeAcetaldehyde`/:class:`SulfiteOxidation`/:class:`PhenolicBrowning`/\
+#: :class:`StreckerDegradation`/:class:`EllagitanninOxidation`): dissolved O₂ degrades free
+#: ``anthocyanin`` to the colourless ``faded_anthocyanin`` slot (bilinear ``[o2]·[anthocyanin]``,
+#: the :class:`EllagitanninOxidation` form), a pure off-ledger transfer. Because it draws the SHARED
+#: o2 budget, **SO₂ protection is emergent** (SO₂ scavenges o2 via D-72, leaving less to fade the
+#: colour) — nothing scripted. It is the second ``anthocyanin`` fate that forced promoting the
+#: pigment to a slot (the A420 discriminator). Doubly substrate-gated on ``o2`` AND ``anthocyanin``
+#: ⇒
+#: zero unless a red is dosed AND oxygenated (a white / reductive / all-beer run is byte-for-byte
+#: inert) ⇒ adds ON TOP of the oxidative sub-axis. Wine-only (the grape slots are wine-only), like
+#: ``_POLYMERIZATION_PROCESSES``. Kept in its OWN isolable tuple (directive #3): DISABLED at compile
+#: and re-enabled by ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
+#: ``polymerization.yaml`` (with the condensation data — all colour-axis data together).
+_ANTHOCYANIN_FADING_PROCESSES: tuple[Callable[[], Process], ...] = (AnthocyaninFading,)
+
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
 #: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
@@ -1314,6 +1334,7 @@ MEDIA: dict[str, Medium] = {
             + _ELLAGITANNIN_PROCESSES
             + _POLYMERIZATION_PROCESSES
             + _ACETALDEHYDE_BRIDGE_PROCESSES
+            + _ANTHOCYANIN_FADING_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

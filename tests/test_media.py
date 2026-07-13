@@ -374,6 +374,12 @@ WINE_POLYMERIZATION_PROCESSES = {"tannin_anthocyanin_condensation"}
 # on-ledger acetaldehyde carbon in the ethyl_bridge slot. Wine-only, same compile-seam disable /
 # begin_aging re-enable.
 WINE_BRIDGE_PROCESSES = {"acetaldehyde_bridged_condensation"}
+# WINE-ONLY, OXIDATIVE aging (D-81): anthocyanin_fading — the O₂-coupled bleaching loss that makes
+# color_series genuinely decline. Dissolved O₂ fades free grape anthocyanin to the colourless
+# faded_anthocyanin slot (bilinear [o2]·[anthocyanin], the ellagitannin_oxidation form), drawing the
+# shared o2 pool so SO₂ protection is emergent. Wine-only, same compile-seam disable / begin_aging
+# re-enable.
+WINE_FADING_PROCESSES = {"anthocyanin_fading"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -395,6 +401,7 @@ EXPECTED_PROCESSES = {
         | WINE_OAK_PROCESSES
         | WINE_POLYMERIZATION_PROCESSES
         | WINE_BRIDGE_PROCESSES
+        | WINE_FADING_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

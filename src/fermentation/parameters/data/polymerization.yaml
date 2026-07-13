@@ -250,3 +250,99 @@ y_acetaldehyde_per_anthocyanin:
     source: "author estimate from the ethylidene-bridge stoichiometry: one acetaldehyde forms one -CH(CH3)- bridge per tannin–anthocyanin adduct (Timberlake & Bridle 1976; Es-Safi et al. 1999), expressed as a MASS ratio because the lumped anthocyanin pool has no clean molar mass (the y_tannin_per_anthocyanin / y_ellag_per_o2 idiom)."
     conditions: "g acetaldehyde consumed per g anthocyanin bridged, generic red wine at T_ref = 293.15 K."
     notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped anthocyanin pool). UNLIKE the direct route's off-ledger yields, this drives an ON-LEDGER acetaldehyde -> ethyl_bridge transfer (the split-ledger carbon capture, D-80); carbon closes for any value, so this only sets the MAGNITUDE of the acetaldehyde drawdown, not whether carbon balances."
+
+# ============================================================================================
+# D-81: OXIDATIVE ANTHOCYANIN FADING — the O2-coupled bleaching loss that makes colour DECLINE
+# ============================================================================================
+# The fermentation.core.kinetics.aging.AnthocyaninFading Process (WINE-ONLY). The SECOND fate of
+# free monomeric anthocyanin (besides condensation into stable pigment, D-79/D-80): dissolved O2
+# degrades it to COLOURLESS products (oxidative fading; quinone/peroxide-mediated). This is the beat
+# that makes analysis.color_series GENUINELY decline and unmasks the colour-stability payoff — the
+# condensed polymeric pigment SURVIVES while the free anthocyanin bleaches.
+#
+#   r_o2                    = k_anthocyanin_fade * f(T) * [o2] * [anthocyanin]   # g O2/L/h, this route's share
+#   d(o2)/dt                = -r_o2
+#   d(anthocyanin)/dt       = -y_anthocyanin_per_o2 * r_o2
+#   d(faded_anthocyanin)/dt = +y_anthocyanin_per_o2 * r_o2
+#
+# a BILINEAR O2 sink (the SulfiteOxidation/EllagitanninOxidation form), transferring anthocyanin to
+# the colourless faded_anthocyanin slot at a MASS-based yield. f(T) = arrhenius_factor(T,
+# E_a_anthocyanin_fade, T_ref) (own reaction-scale E_a). A pure g/L transfer between two OFF-LEDGER
+# slots, so the D-81 colour identity anthocyanin + polymeric_pigment + faded_anthocyanin ≡
+# anthocyanin0 closes by construction.
+#
+# O2-COUPLED, so SO2 PROTECTION is EMERGENT (the D-81 crux). Fading draws the SHARED o2 budget, NOT a
+# scripted g(SO2,pH) decay. "SO2 protects the colour" is true because SO2 is an ANTIOXIDANT: it
+# scavenges o2 (bisulfite oxidation, SulfiteOxidation D-72), leaving less o2 to fade the anthocyanin.
+# ProcessSet sums the o2 sinks and splits o2 by ki/Sum(k), so the protection FALLS OUT of the shared
+# pool with nothing scripted (the D-72/D-80 "SO2 effect, emergent" signature). This is DELIBERATELY
+# NOT a non-oxidative decay with an SO2 factor bolted on: SO2 does not meaningfully protect against
+# thermal/hydrolytic decay, so scripting an SO2 factor onto an O2-independent rate would attribute the
+# protection to the wrong pathway. The O2 coupling is the physically-honest mechanism.
+#
+# SUBSTRATE-GATED => adds on top, NO re-baseline. Bilinear in [anthocyanin], zero unless a red must is
+# dosed, so a white / no-anthocyanin (and all-beer) run is byte-for-byte the case without this
+# Process (the k_ethanol_oxidation + k_browning = 5.0e-4 anchor untouched). A red wine dosed with BOTH
+# anthocyanin and o2 DOES now split its o2 one more way — the physically-correct cost of a new
+# oxidative sink competing with the D-71..D-78 siblings (documented, not silent). Wine-only + disabled
+# at compile, enabled by begin_aging (aging is post-ferment).
+#
+# SCOPE (v1): the OXIDATIVE fade only. Deferred and NAMED, not smuggled in: (1) the REVERSIBLE SO2/pH
+# MASKING of monomeric anthocyanin (flavylium <=> colourless bisulfite adduct / carbinol equilibrium —
+# the literal Somers "bleaching" assay) is a fast equilibrium READOUT, not a fate — the next beat
+# (D-82); (2) the O2-INDEPENDENT (thermal/hydrolytic) bottle-aging fade is a separate pathway, so an
+# anaerobic sealed red holds its colour here (fades only via O2) — defensible short-term reality.
+#
+# TIER: ALL speculative. SOURCED FORM (dissolved O2 oxidatively degrades anthocyanins to colourless
+# products; SO2 protects as an antioxidant; warmer fades faster — Somers & Evans; Ribéreau-Gayon
+# Handbook of Enology; accelerated-ageing colour studies) + SPECULATIVE magnitudes (order-of-magnitude
+# author estimates, banded). Load-bearing sourced claims: (1) O2 fades free anthocyanin to colourless,
+# (2) SO2 (an antioxidant) protects, (3) warmer fades faster (E_a > 0).
+
+# -- BILINEAR OXIDATIVE-FADE RATE: o2 + anthocyanin -> colourless products ------------------------
+# r_o2 = k_anthocyanin_fade * f(T) * [o2] * [anthocyanin] (both g/L). This route's SHARE of the o2
+# draw. Set ~k_ellagitannin_oxidation (5.0e-3, the sibling bilinear o2*tannin sink): at a micro-ox o2
+# charge and a ~0.3 g/L anthocyanin the fade is a meaningful-but-partial anthocyanin loss competing
+# with condensation, so colour declines over the months-to-years span WITHOUT exhausting anthocyanin
+# instantly. The LOAD-BEARING claim is the FORM (O2-limited, anthocyanin-driven) and that O2 fades
+# colour, not this magnitude; banded an order of magnitude.
+k_anthocyanin_fade:
+  value: 5.0e-3
+  unit: "L/(g*h)"   # r_o2 = k_anthocyanin_fade * f(T) * [o2] * [anthocyanin]  (bilinear, both g/L)
+  tier: speculative
+  uncertainty: { low: 1.0e-3, high: 2.0e-2, note: "bilinear rate constant at T_ref = 20 C, mirroring the sibling k_ellagitannin_oxidation (5.0e-3) o2-sink form. With a micro-ox o2 charge (~30 mg/L) shared across the oxidative sinks, this route fades a meaningful-but-partial fraction of a ~0.3 g/L anthocyanin dose over the months-to-years ageing span, competing with condensation into stable pigment. The LOAD-BEARING claim is the FORM (O2-limited, first-order in both o2 and anthocyanin) and that O2 fades free anthocyanin to colourless, not this absolute rate. Banded an order of magnitude." }
+  provenance:
+    source: "author estimate anchored to the well-established oxidative fading of free monomeric anthocyanins in red wine: dissolved O2 (via quinones/peroxide from phenolic oxidation) degrades anthocyanins to colourless products, and SO2 protects as an antioxidant (Somers & Evans 1986; Ribéreau-Gayon et al., Handbook of Enology, on anthocyanin oxidation and SO2 protection of colour; accelerated-ageing colour studies). The bilinear constant folds the multi-step O2 -> quinone -> anthocyanin oxidation cascade into one lumped mass-action k on the shared o2 pool."
+    conditions: "generic red wine at cellar pH (~3.4-3.8) and temperature; bilinear in the dissolved-o2 and free-anthocyanin pools (both g/L) at T_ref = 293.15 K. Represents the aggregate O2-driven anthocyanin degradation to colourless products (NOT the reversible SO2/pH masking, a deferred readout, and NOT O2-independent thermal fade, a deferred pathway)."
+    notes: "SOURCED FORM (O2-limited, anthocyanin-driven oxidative fade to colourless; SO2 protects EMERGENTLY by scavenging o2 via D-72) + SPECULATIVE magnitude (order-of-magnitude, banded). Same bilinear o2*driver form as k_ellagitannin_oxidation / k_so2_oxidation. Draws the SHARED o2 pool, so ProcessSet splits o2 by ki/Sum(k) and SO2 protection needs nothing scripted."
+
+# -- ACTIVATION ENERGY: warmer fades faster (sourced ordering, REACTION-scale) -------------------
+# Its OWN parameter (prime directive #2), REACTION-scale (~55 kJ/mol) like every other aging reaction
+# E_a and well above the weak diffusion E_a_oak_extraction. Distinct from the condensation E_a's even
+# though numerically similar — a DIFFERENT reaction (oxidative degradation, not condensation).
+E_a_anthocyanin_fade:
+  value: 55000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 35000.0, high: 75000.0, note: "Q10 ~1.6-2.9 at 20 C. Wine oxidation activation energies ~35-75 kJ/mol. The SOURCED, load-bearing claim is the SIGN (warmer => faster oxidative fading, so warm storage bleaches red colour faster — the 'warm cellars kill colour' fact); the magnitude is speculative and banded. Its OWN parameter (prime directive #2), REACTION-scale, distinct from the condensation E_a's and the weak diffusion E_a_oak_extraction." }
+  provenance:
+    source: "SOURCED ORDERING: oxidative anthocyanin degradation accelerates with temperature (textbook Arrhenius; accelerated-ageing studies of red-wine colour loss; Ribéreau-Gayon Handbook of Enology). Warm storage bleaches red colour faster — the established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate O2-driven anthocyanin fade at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster fade) is the sourced, load-bearing claim. REACTION-scale (~55 kJ/mol). Its OWN parameter (prime directive #2), distinct from the condensation E_a_polymerization / E_a_acetaldehyde_bridge even though numerically similar — a separate reaction (oxidative degradation)."
+
+# -- MASS-BASED FADE YIELD: g anthocyanin faded per g O2 consumed by this route ------------------
+# d(anthocyanin)/dt = -y_anthocyanin_per_o2 * r_o2 (both g/L/h). MASS-based (g/g): anthocyanin is a
+# lumped pool with no clean molar mass (the y_ellag_per_o2 / y_tannin_per_anthocyanin idiom). Sets
+# HOW MUCH anthocyanin a given amount of route-consumed O2 fades — a pure TRANSFER to the colourless
+# faded_anthocyanin slot (faded gains exactly what anthocyanin loses), so the colour identity closes
+# for ANY value. Central ~1.0 is a lumped-cascade estimate (the O2 -> quinone -> anthocyanin route is
+# not a clean 1:1 O2:anthocyanin stoichiometry), banded wide.
+y_anthocyanin_per_o2:
+  value: 1.0
+  unit: "g/g"   # g anthocyanin faded per g O2 consumed by the fade route; d(anthocyanin)/dt = -y * r_o2
+  tier: speculative
+  uncertainty: { low: 0.3, high: 3.0, note: "g lumped anthocyanin faded per g O2 consumed via this route. The oxidative cascade (O2 -> quinone -> anthocyanin degradation) has no clean molar O2:anthocyanin stoichiometry, so this is a lumped ROUTE yield, not a mechanism ratio; central ~1.0 banded an order of magnitude. Governs the colour-DECLINE magnitude per unit O2 exposure — but the anthocyanin->faded transfer is exact and the colour identity closes for ANY value; this only sets how fast colour falls, not whether it balances." }
+  provenance:
+    source: "author estimate: g free monomeric anthocyanin faded to colourless per g O2 consumed by this oxidative route, expressed as a MASS ratio because the lumped anthocyanin pool has no clean molar mass and the O2->anthocyanin cascade is multi-step (the y_ellag_per_o2 idiom). Anchored so a micro-ox O2 exposure fades a meaningful-but-partial fraction of a typical anthocyanin dose (Somers & Evans 1986; Ribéreau-Gayon Handbook of Enology)."
+    conditions: "g anthocyanin faded per g O2 consumed by the fade route, generic red wine at T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped anthocyanin pool). Drives a pure OFF-LEDGER transfer anthocyanin -> faded_anthocyanin (both off every ledger), so it moves nothing conserved and the D-81 colour identity closes for any value — this only sets the colour-decline MAGNITUDE, not whether it balances."

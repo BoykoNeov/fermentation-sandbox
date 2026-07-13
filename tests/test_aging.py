@@ -34,6 +34,7 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics import (
     AcetaldehydeBridgedCondensation,
+    AnthocyaninFading,
     EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
@@ -2075,3 +2076,216 @@ def test_bridge_tier_floored_at_speculative(bridge_store):
     for pool in ("anthocyanin", "tannin", "acetaldehyde", "ethyl_bridge"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, bridge_store.tier_map()) is Tier.SPECULATIVE
+
+
+# -- D-81: AnthocyaninFading — the O₂-coupled oxidative bleaching loss --------------------------
+#
+# The tenth aging Process and the beat that makes color_series genuinely DECLINE: dissolved O₂ fades
+# free monomeric anthocyanin to the COLOURLESS faded_anthocyanin slot (a second anthocyanin fate
+# besides condensation into stable pigment). Bilinear O₂ sink (the EllagitanninOxidation form), a
+# pure off-ledger transfer, drawing the SHARED o2 pool — so SO₂ protection is EMERGENT (SO₂
+# o2 via D-72, leaving less to fade). These tests pin the closed form, the bilinearity, the gates,
+# the wine-only no-op, off-every-ledger invariance, the genuine colour DECLINE + the identity,
+# the emergent SO₂ protection, and tiers.
+
+
+@pytest.fixture
+def fade_store():
+    # Wine + polymerization.yaml (k_anthocyanin_fade, E_a_anthocyanin_fade, y_anthocyanin_per_o2 +
+    # the condensation params) + aging.yaml (k_so2_oxidation, for the emergent-SO₂-protection test's
+    # SulfiteOxidation) + the acidbase/acetaldehyde/keto-acid pKa params SulfiteOxidation's
+    # pH/bisulfite readout reads — the full oxidative-axis + fade parameter set.
+    d = default_data_dir()
+    return load_parameters(
+        d / "wine_generic.yaml",
+        d / "acidbase.yaml",
+        d / "acetaldehyde.yaml",
+        d / "keto_acids.yaml",
+        d / "aging.yaml",
+        d / "polymerization.yaml",
+    )
+
+
+@pytest.fixture
+def fade_params(fade_store):
+    return fade_store.resolve()
+
+
+def test_fading_metadata():
+    p = AnthocyaninFading()
+    assert p.name == "anthocyanin_fading"
+    assert p.tier is Tier.SPECULATIVE
+    # Draws the SHARED o2 pool (so SO₂ protection is emergent) and TRANSFERS anthocyanin into the
+    # colourless faded_anthocyanin slot — all three off every ledger, so nothing conserved moves.
+    assert set(p.touches) == {"o2", "anthocyanin", "faded_anthocyanin"}
+    assert "o2" in p.touches  # O₂-COUPLED (the D-81 crux — SO₂ protection is emergent)
+    assert set(p.reads) == {
+        "k_anthocyanin_fade",
+        "E_a_anthocyanin_fade",
+        "y_anthocyanin_per_o2",
+        "T_ref",
+    }
+
+
+def test_fading_closed_form(poly_params):
+    # r_o2 = k·f(T)·[o2]·[anthocyanin] (bilinear); d(o2)/dt = −r_o2; anthocyanin → faded at a
+    # mass-based yield (a pure transfer). Verify all three derivatives exactly and that nothing else
+    # moves — in particular NO pigment (fading is colourless), NO tannin, NO carbon borrow.
+    schema = wine_schema()
+    t = 298.15  # off T_ref so the Arrhenius factor bites
+    o2, antho = 0.03, 0.3
+    y = _aged_wine(schema, esters=0.0, t=t, o2=o2, anthocyanin=antho)
+    d = AnthocyaninFading().derivatives(0.0, y, schema, poly_params)
+
+    f_t = arrhenius_factor(t, poly_params["E_a_anthocyanin_fade"], poly_params["T_ref"])
+    k = poly_params["k_anthocyanin_fade"]
+    y_fade = poly_params["y_anthocyanin_per_o2"]
+    r_o2 = k * f_t * o2 * antho
+    faded = y_fade * r_o2
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "anthocyanin") == pytest.approx(-faded)
+    assert schema.get(d, "faded_anthocyanin") == pytest.approx(faded)
+    # Pure transfer: anthocyanin lost == faded gained (the colour identity closes by construction).
+    assert schema.get(d, "anthocyanin") == pytest.approx(-schema.get(d, "faded_anthocyanin"))
+    # Colourless fade adds NO pigment, and nothing else moves (no tannin, no E/CO2, no A420).
+    for var in ("X", "S", "E", "N", "CO2", "A420", "tannin", "polymeric_pigment", "acetaldehyde"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_fading_is_bilinear(poly_params):
+    # Bilinear in BOTH drivers: doubling o2 OR doubling anthocyanin doubles the fade rate.
+    schema = wine_schema()
+    p = AnthocyaninFading()
+
+    def fade_rate(o2: float, antho: float) -> float:
+        y = _aged_wine(schema, esters=0.0, o2=o2, anthocyanin=antho)
+        return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "anthocyanin"))
+
+    base = fade_rate(0.02, 0.2)
+    assert fade_rate(0.04, 0.2) == pytest.approx(2.0 * base)  # 2× o2
+    assert fade_rate(0.02, 0.4) == pytest.approx(2.0 * base)  # 2× anthocyanin
+    assert base < 0.0  # actually fading
+
+
+def test_fading_inert_without_o2_or_anthocyanin(poly_params):
+    # Doubly substrate-gated: no O₂ (reductive) OR no anthocyanin (white) ⇒ byte-for-byte zero, so
+    # such a run is exactly the case without this Process (isolability #3). Undershoot absorbed too.
+    schema = wine_schema()
+    p = AnthocyaninFading()
+    no_o2 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3)
+    no_antho = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    assert np.array_equal(p.derivatives(0.0, no_o2, schema, poly_params), schema.zeros())
+    assert np.array_equal(p.derivatives(0.0, no_antho, schema, poly_params), schema.zeros())
+    undershoot = _aged_wine(schema, esters=0.0, o2=-1e-9, anthocyanin=0.3)
+    assert np.array_equal(p.derivatives(0.0, undershoot, schema, poly_params), schema.zeros())
+
+
+def test_fading_gate_before_params_is_keyerror_safe(params):
+    # An enabled-but-undosed Process must not KeyError when polymerization.yaml is absent: the
+    # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks the fade rate,
+    # yet a white wine (anthocyanin 0, even with O₂ dosed) returns zero — gate-before-params.
+    schema = wine_schema()
+    y = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    d = AnthocyaninFading().derivatives(0.0, y, schema, params)
+    assert np.array_equal(d, schema.zeros())
+
+
+def test_fading_rises_with_temperature(poly_params):
+    # Warmer fades faster (E_a > 0, reaction-scale): the |anthocyanin| draw grows with T.
+    schema = wine_schema()
+    p = AnthocyaninFading()
+    cold = p.derivatives(
+        0.0, _aged_wine(schema, esters=0.0, t=283.15, o2=0.03, anthocyanin=0.3), schema, poly_params
+    )
+    warm = p.derivatives(
+        0.0, _aged_wine(schema, esters=0.0, t=303.15, o2=0.03, anthocyanin=0.3), schema, poly_params
+    )
+    assert abs(float(schema.get(warm, "anthocyanin"))) > abs(float(schema.get(cold, "anthocyanin")))
+
+
+def test_fading_wine_only_noop_on_beer(poly_params):
+    # Wine-only (anthocyanin/faded_anthocyanin are appended to wine_schema): a hard no-op on beer
+    # (o2 exists in both media, but the grape colour slots do not).
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 100.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    yb[beer.slice("o2")] = 0.03
+    assert np.array_equal(AnthocyaninFading().derivatives(0.0, yb, beer, poly_params), beer.zeros())
+
+
+def test_fading_moves_nothing_conserved(poly_store, poly_params):
+    # o2 (carbon-free) and both anthocyanin/faded_anthocyanin (grape-derived) are off every ledger,
+    # so fading anthocyanin to colourless products moves NOTHING conserved — carbon, mass
+    # AND total_nitrogen all exactly flat (the EllagitanninOxidation off-every-ledger invariance).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AnthocyaninFading()], strict=True)
+    y0 = _aged_wine(schema, esters=0.0, o2=0.04, anthocyanin=0.3)
+    traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success
+    f_c = poly_store.value("biomass_C_fraction")
+    f_n = poly_store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+
+
+def test_fading_makes_colour_decline(poly_params):
+    # THE D-81 HEADLINE: with condensation AND fading acting together on an oxygenated red, colour
+    # GENUINELY declines (unlike the D-79/D-80 flat line). Free anthocyanin leaves partly to STABLE
+    # pigment (colour retained) and partly to COLOURLESS faded (colour lost), so color_series falls
+    # by exactly the faded amount while the polymeric pigment survives — the stability payoff.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [TanninAnthocyaninCondensation(), AnthocyaninFading()], strict=True)
+    antho0 = 0.3
+    y0 = _aged_wine(schema, esters=0.0, o2=0.05, anthocyanin=antho0, tannin=2.0)
+    traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
+    assert traj.success
+
+    antho = np.asarray(traj.series("anthocyanin"), dtype=float)
+    pigment = np.asarray(traj.series("polymeric_pigment"), dtype=float)
+    faded = np.asarray(traj.series("faded_anthocyanin"), dtype=float)
+    col = color_series(traj)
+
+    # (1) colour GENUINELY declines (the whole point of D-81) — the pigment slot makes this real.
+    assert col[-1] < col[0] - 10.0  # well beyond solver jitter; col[0] == antho0 × 1000 == 300
+    assert np.all(np.diff(col) <= 1e-6)  # monotone non-increasing
+    # (2) it falls by exactly the faded amount: color ≡ (antho0 − faded) × 1000.
+    assert np.allclose(col, (antho0 - faded) * 1000.0)
+    # (3) the stable pigment SURVIVED (condensation still ran) — the colour-stability payoff.
+    assert pigment[-1] > 0.0
+    assert faded[-1] > 0.0  # some anthocyanin genuinely bleached to colourless
+    # (4) the three-slot colour identity holds by construction, now with faded > 0 (non-trivially).
+    assert np.allclose(antho + pigment + faded, antho0, atol=1e-9)
+
+
+def test_fading_so2_protects_colour_emergently(fade_params):
+    # THE EMERGENT PAYOFF: SO₂ protects the colour with NOTHING scripted. Two oxygenated reds
+    # (SulfiteOxidation + AnthocyaninFading on the shared o2 pool), identical but for the SO₂ dose:
+    # the sulfited wine scavenges o2 via D-72, leaving LESS o2 to fade the anthocyanin, so it keeps
+    # MORE colour (less faded). This falls out of the shared o2 split — no SO₂ term in the rate.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [SulfiteOxidation(), AnthocyaninFading()], strict=True)
+
+    def run(so2_0: float) -> Trajectory:
+        y0 = _sulfited_wine(schema, so2=so2_0, o2=0.05, t=298.15, anthocyanin=0.3)
+        traj = simulate(ps, params=fade_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+        assert traj.success
+        return traj
+
+    protected = run(0.08)  # a real SO₂ dose (~80 mg/L)
+    unprotected = run(0.0)  # no SO₂ — o2 goes entirely to fading (and ethanol oxidation)
+    faded_protected = float(protected.series("faded_anthocyanin")[-1])
+    faded_unprotected = float(unprotected.series("faded_anthocyanin")[-1])
+    # Emergent: SO₂ diverts o2 to bisulfite oxidation, so LESS anthocyanin fades — more colour kept.
+    assert faded_protected < faded_unprotected
+    # And the surviving colour is correspondingly higher with SO₂ (the colour-stability payoff).
+    assert float(color_series(protected)[-1]) > float(color_series(unprotected)[-1])
+
+
+def test_fading_tier_floored_at_speculative(poly_store):
+    # Speculative in FORM (Tier-3 frontier) and capped by its speculative fade params (D-1), for
+    # every pool it writes — the shared o2 pool and the grape anthocyanin/faded pair.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AnthocyaninFading()])
+    for pool in ("o2", "anthocyanin", "faded_anthocyanin"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, poly_store.tier_map()) is Tier.SPECULATIVE

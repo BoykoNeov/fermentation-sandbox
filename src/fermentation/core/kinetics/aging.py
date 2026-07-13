@@ -1435,3 +1435,133 @@ class AcetaldehydeBridgedCondensation(Process):
             _ETHYL_BRIDGE_SPECIES
         )
         return d
+
+
+class AnthocyaninFading(Process):
+    """Aging oxidative fade: dissolved O₂ degrades free anthocyanin → colourless (decision D-81).
+
+    The tenth aging Process and the beat that finally makes :func:`~fermentation.analysis.\
+    color_series` **genuinely decline**. Free monomeric ``anthocyanin`` has a **second**,
+    irreversible fate besides condensation into stable pigment (D-79/D-80): dissolved O₂ drives it
+    to **colourless** degradation products (quinone/peroxide-mediated oxidative fading; Somers &
+    Evans; Ribéreau-Gayon). This is the *bleaching loss* the D-79/D-80 colour axis deferred — and
+    the reason the pigment had to be promoted to an integrated slot (the ``anthocyanin₀ −
+    anthocyanin`` reconstruction can no longer isolate the pigment once anthocyanin has two fates).
+
+    ``r_o2 = k_anthocyanin_fade · f(T) · [o2] · [anthocyanin]`` — **bilinear** in the shared O₂ pool
+    and the anthocyanin driver (the :class:`SulfiteOxidation`/:class:`EllagitanninOxidation` form),
+    ``f(T) = arrhenius_factor(T, E_a_anthocyanin_fade, T_ref)`` the sourced warmer-fades-faster
+    factor. It is this route's **share** of the O₂-depletion rate; anthocyanin is transferred to the
+    colourless ``faded_anthocyanin`` slot at a mass-based yield::
+
+        d(o2)/dt                = −r_o2
+        d(anthocyanin)/dt       = −y_anthocyanin_per_o2 · r_o2
+        d(faded_anthocyanin)/dt = +y_anthocyanin_per_o2 · r_o2
+
+    a pure g/L **transfer** between two off-ledger slots (the faded pool gains exactly what
+    anthocyanin loses), so the D-81 colour identity ``anthocyanin + polymeric_pigment +
+    faded_anthocyanin ≡ anthocyanin₀`` closes by construction. ``faded_anthocyanin`` is colourless,
+    so :func:`~fermentation.analysis.color_series` (free anthocyanin + pigment) falls by exactly the
+    faded amount while the condensed **polymeric pigment survives** — the young-bleachable →
+    aged-stable colour dynamic, the colour-stability payoff.
+
+    **O₂-COUPLED, so SO₂ protection is EMERGENT (the D-81 correctness crux).** Fading draws the
+    **shared** ``o2`` budget, exactly like the D-71..D-78 oxidative sinks — it is *not* a scripted
+    ``g(SO₂, pH)`` decay. That matters: "SO₂ protects the colour" is true because SO₂ is an
+    **antioxidant** — it scavenges O₂ (bisulfite oxidation, :class:`SulfiteOxidation`, D-72), so a
+    sulfited wine simply has **less O₂ left** to fade the anthocyanin. ``ProcessSet`` sums the O₂
+    sinks and splits ``o2`` by kᵢ/Σk, so this protection **falls out** of the shared pool with
+    nothing scripted (the D-72/D-80 "SO₂ effect, emergent" signature). It also creates the real
+    micro-ox tension: under O₂, some anthocyanin bridges to *stable* pigment
+    (:class:`AcetaldehydeBridgedCondensation`, D-80) while some **fades to colourless** here — and
+    SO₂ both *protects* against this fade (via the D-72 draw) and *delays* the bridging (bound
+    acetaldehyde can't bridge, D-80), all from one shared equilibrium.
+
+    **Substrate-gated ⇒ adds on top, NO re-baseline (the D-72/D-75/D-78 rule).** The O₂ draw is
+    bilinear in ``[anthocyanin]``, zero unless a red must (``anthocyanin_gpl``) is dosed, so — like
+    :class:`EllagitanninOxidation` — this sink is zero without its substrate and adds on top of the
+    shared O₂ budget with no re-baseline: the ``k_ethanol_oxidation + k_browning = 5.0e-4`` anchor
+    is untouched, and every white / no-anthocyanin (and all-beer) trajectory is byte-for-byte
+    preserved. A *red* wine dosed with both anthocyanin and O₂ does now split its O₂ one more way
+    (a new real sink competing with the D-71..D-78 siblings) — the physically-correct cost of a new
+    oxidative pathway, documented, not silent.
+
+    **Off every ledger, no conservation term (the :class:`EllagitanninOxidation` precedent).**
+    ``o2`` (D-71) is carbon-free and both ``anthocyanin`` and ``faded_anthocyanin`` are
+    grape-derived colour pools off ``total_carbon``/``total_mass``/``total_nitrogen`` (``iso_alpha``
+    precedent), so fading moves **nothing conserved** — it touches only those three slots and
+    asserts nothing. The mass-based yield is therefore legitimate (no ledger reads either lump's
+    mass), and
+    the anthocyanin→faded transfer is exact regardless of the yield's value.
+
+    **Wine-only + isolable + doubly substrate-gated (prime directive #3).** ``anthocyanin`` /
+    ``faded_anthocyanin`` are wine-only (appended to ``wine_schema``), so this is wired into the
+    *wine* medium only; the ``"anthocyanin" not in schema`` guard makes it a hard no-op besides.
+    Wired **disabled at the compile seam** (aging is post-ferment); ``begin_aging`` enables it with
+    the other aging Processes. With no O₂ *or* no anthocyanin the ``o2 ≤ 0`` / ``anthocyanin ≤ 0``
+    guards return byte-for-byte zero, so a reductive (no ``add_oxygen``) or a white aging is exactly
+    the case without this Process. Tier **speculative** (the aging axis is the Tier-3 frontier; the
+    *form* — O₂-limited, anthocyanin-driven, warmer-faster, SO₂-protected-emergently — is sourced,
+    the rate/yield magnitudes order-of-magnitude estimates).
+
+    **Scope (v1):** the **oxidative** fade only. Two related phenomena are deliberately deferred and
+    named, not smuggled in: (1) the **reversible SO₂/pH masking** of monomeric anthocyanin (the
+    flavylium ⇌ colourless bisulfite adduct / carbinol equilibrium — the literal Somers "bleaching"
+    assay) is a fast equilibrium *readout*, not a fate, and is the next beat (D-82); (2) the
+    **O₂-independent** (thermal/hydrolytic) bottle-aging fade is a real but separate pathway — an
+    anaerobic sealed red holds its colour here (fades only via O₂), which is defensible short-term
+    reality. See ``polymerization.yaml`` for the full scope + provenance.
+    """
+
+    name = "anthocyanin_fading"
+    tier = Tier.SPECULATIVE
+    #: Consumes its share of the dissolved-O₂ substrate and TRANSFERS free anthocyanin into the
+    #: colourless ``faded_anthocyanin`` slot — all three off every ledger, so nothing conserved
+    #: moves; it touches those three and nothing else. (``anthocyanin`` is also drawn by the two
+    #: condensation routes — three Processes on one pool, the ``o2`` precedent.)
+    touches = ("o2", "anthocyanin", "faded_anthocyanin")
+    #: ``k_anthocyanin_fade``/``E_a_anthocyanin_fade``/``y_anthocyanin_per_o2`` are this Process's
+    #: own (polymerization.yaml, D-81); ``T_ref`` is shared with every Arrhenius rate. Their tiers
+    #: cap the ``anthocyanin``/``faded_anthocyanin`` output tiers via parameter-tier propagation
+    #: (D-1).
+    reads: tuple[str, ...] = (
+        "k_anthocyanin_fade",
+        "E_a_anthocyanin_fade",
+        "y_anthocyanin_per_o2",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (anthocyanin/faded_anthocyanin are appended to wine_schema): a hard no-op
+        # on any schema without them, belt-and-suspenders to the wine-only wiring.
+        if "anthocyanin" not in schema or "o2" not in schema:
+            return d
+        o2 = float(y[schema.slice("o2")][0])
+        anthocyanin = float(y[schema.slice("anthocyanin")][0])
+        # No oxidant OR no anthocyanin ⇒ no fading: reductive/white aging is byte-for-byte the case
+        # without this Process. Gate on the anthocyanin STATE before reading any fade param (the
+        # OakExtraction/Strecker substrate-gate-before-params discipline — an enabled-but-undosed
+        # Process mustn't KeyError if polymerization.yaml is absent). ``<= 0`` also absorbs solver
+        # undershoot.
+        if o2 <= 0.0 or anthocyanin <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_anthocyanin_fade"], params["T_ref"])
+        # This route's SHARE of the O₂-depletion rate (bilinear in o2 and the anthocyanin driver,
+        # the SulfiteOxidation/EllagitanninOxidation form) — substrate-gated on anthocyanin, so it
+        # adds on top of the anchor with no re-baseline (D-72/D-78). ProcessSet sums the sinks, so
+        # o2 splits by kᵢ/Σk — this is why SO₂ protection is EMERGENT (SO₂'s D-72 draw leaves less).
+        r_o2 = params["k_anthocyanin_fade"] * f_t * o2 * anthocyanin  # g O2/L/h via the fade route
+        d[schema.slice("o2")] = -r_o2
+        # Anthocyanin faded per g O2 at a MASS-based yield (g anthocyanin / g O2), not a molar
+        # stoichiometry — anthocyanin is a lumped pool with no clean molar mass (the y_ellag_per_o2
+        # idiom). It is a pure TRANSFER to the colourless faded slot: faded gains exactly what
+        # anthocyanin loses, so the D-81 colour identity closes by construction. Both off every
+        # ledger, so this moves nothing conserved.
+        faded = params["y_anthocyanin_per_o2"] * r_o2  # g anthocyanin/L/h
+        d[schema.slice("anthocyanin")] = -faded
+        d[schema.slice("faded_anthocyanin")] = faded
+        return d

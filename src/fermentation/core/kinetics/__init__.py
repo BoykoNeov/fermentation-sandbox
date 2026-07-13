@@ -16,6 +16,7 @@ from fermentation.core.kinetics.acetaldehyde import (
 )
 from fermentation.core.kinetics.aging import (
     AcetaldehydeBridgedCondensation,
+    AnthocyaninFading,
     EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
@@ -98,6 +99,7 @@ __all__ = [
     "AlphaKetoglutarateExcretion",
     "AlphaKetoglutarateReassimilation",
     "AminoAcidAssimilation",
+    "AnthocyaninFading",
     "AutolyticHydrogenSulfide",
     "AutolyticMercaptan",
     "BiomassCarryingCapacity",
