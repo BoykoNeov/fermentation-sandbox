@@ -484,3 +484,78 @@ K_anthocyanin_bisulfite:
     source: "author estimate anchored to the flavylium-bisulfite equilibrium literature (Brouillard & El Hage Chahine 1980; Timberlake & Bridle 1967; Somers & Evans on SO2 bleaching of wine colour). Folds the flavylium+HSO3- <=> colourless sulphonic-acid adduct into one lumped association constant on the free monomeric anthocyanin pool."
     conditions: "generic red wine at cellar pH; the reactive nucleophile is FREE bisulfite HSO3- (acidbase.bisulfite_so2_at_ph, after carbonyl binding), so bound SO2 does not bleach and reversibility is emergent (D-28/D-51/D-72)."
     notes: "SOURCED FORM (reversible Langmuir bleaching of MONOMERIC anthocyanin by free bisulfite; polymeric pigment is SO2-RESISTANT and counted full) + SPECULATIVE lumped magnitude (order-of-magnitude, banded). This SO2-sign is the OPPOSITE of the D-81 fade (where SO2 PROTECTS color_series) -- a different series and a different (reversible) form, both real."
+
+# ================================================================================================
+# D-84: TANNIN SELF-POLYMERIZATION — grape tannin condenses WITH ITSELF into a soft polymer
+# ================================================================================================
+# The fermentation.core.kinetics.aging.TanninSelfPolymerization Process (WINE-ONLY). The first of the
+# TANNIN-TANNIN axis the D-79/D-80 condensation beats deferred (their "one-directional-per-pool"
+# honesty note). Beyond condensing with anthocyanin (D-79/D-80), condensed grape tannin also reacts
+# WITH ITSELF: flavan-3-ol units link into larger polymers that taste SOFTER — the well-known
+# "tannins polish/soften with age even with nothing else to react with" behaviour. This is why a
+# WHITE wine's tannin, or a red whose anthocyanin is exhausted, STILL softens on aging — softening
+# the anthocyanin-dependent routes alone cannot produce.
+#
+#   r            = k_tannin_self_polymerization * f(T) * [tannin]^2   # g tannin/L/h
+#   d(tannin)/dt = -r
+#
+# BIMOLECULAR ([tannin]^2, a true SELF-reaction — second-order in the single tannin pool, distinct
+# from the D-79 BILINEAR two-pool form), f(T) = arrhenius_factor(T, E_a_tannin_self_polymerization,
+# T_ref). A PURE OFF-LEDGER tannin sink: the soft polymer goes to NO destination slot, consistent
+# with the D-79/D-80 routes which already consume tannin as a pure sink (the polymeric_pigment they
+# fill is in ANTHOCYANIN-equivalents, never tannin mass; no ledger reads tannin mass). r folds the
+# lumped self-condensation stoichiometry into one sink rate. NO YIELD (a self-reaction: no second
+# pool to consume at a ratio).
+#
+# ASTRINGENCY PAYOFF + the honesty note it retires. tannin is read as astringency
+# (analysis.astringency_series, mg/L free harsh tannin); the soft polymer is excluded, so drawing
+# tannin down SOFTENS the wine — exactly as the D-79 route does but WITHOUT needing anthocyanin.
+# Through D-80 the astringency readout carried a standing caveat ("grape tannin self-polymerization …
+# a further-deferred beat, so anthocyanin is the limiting reagent and A-T condensation softens only
+# modestly"); this Process builds that beat, so a no-anthocyanin (white / tannin-only) wine now
+# genuinely softens and that note is RETIRED.
+#
+# OFF EVERY LEDGER (grape-derived tannin, the iso_alpha/ellagitannin precedent), so it moves NOTHING
+# conserved. OAK- AND O2-INDEPENDENT (grape condensed tannin, distinct from oak hydrolysable
+# ellagitannin D-78; not an oxidation, draws no o2), so a steel-tank red with no oak and no oxygen
+# still self-polymerizes. Consumes NO on-ledger acetaldehyde (the DIRECT route — the
+# acetaldehyde-bridged tannin-ethyl-tannin variant is the separate D-85 beat), so no split-ledger
+# carbon capture. SUBSTRATE-GATED on tannin => a no-tannin run is byte-for-byte the case without it.
+# Wine-only + disabled at compile, enabled by begin_aging (aging is post-ferment).
+#
+# TIER: ALL speculative. SOURCED FORM (grape tannin self-condenses into softer polymers with age,
+# warmer-faster — Ribéreau-Gayon Handbook of Enology; proanthocyanidin-polymerization literature) +
+# SPECULATIVE magnitudes (order-of-magnitude author estimates, banded). Load-bearing sourced claims:
+# (1) tannin self-polymerizes into a softer form WITHOUT anthocyanin, (2) warmer polymerizes faster.
+
+# -- BIMOLECULAR SELF-CONDENSATION RATE: tannin + tannin -> soft polymer --------------------------
+# r = k_tannin_self_polymerization * f(T) * [tannin]^2 (g/L). Second-order (self-reaction). Set so a
+# typical young-red tannin (~2 g/L) self-polymerizes a modest fraction over the months-to-years aging
+# span — a slow background softening SUBORDINATE to the anthocyanin-driven D-79 route when anthocyanin
+# is present, but the DOMINANT softener once anthocyanin is exhausted or absent (a white). The
+# LOAD-BEARING claim is the FORM (bimolecular, o2-free, anthocyanin-free softening) and that tannin
+# softens by self-polymerization, not this magnitude; banded an order of magnitude.
+k_tannin_self_polymerization:
+  value: 3.0e-4
+  unit: "L/(g*h)"   # r = k_tannin_self_polymerization * f(T) * [tannin]^2  (second-order, g/L)
+  tier: speculative
+  uncertainty: { low: 7.0e-5, high: 1.2e-3, note: "second-order self-condensation constant at T_ref = 20 C. Chosen an order of magnitude below k_polymerization (2.0e-3, the anthocyanin-driven route) PER UNIT tannin so that when anthocyanin is present the A-T condensation dominates the softening, while self-polymerization becomes the DOMINANT softener once anthocyanin is exhausted or absent (a white). At ~2 g/L tannin the pseudo-first-order rate k*[tannin] ~ 6e-4 /h softens a modest fraction over the aging span. The LOAD-BEARING claim is the FORM (bimolecular, o2/anthocyanin-free) and that tannin softens by self-polymerization, not this absolute rate. Banded an order of magnitude." }
+  provenance:
+    source: "author estimate anchored to the age-softening of red-wine tannin by direct proanthocyanidin self-polymerization: condensed flavan-3-ol tannins link into larger, softer-tasting polymers over time independent of anthocyanin and oxygen (Ribéreau-Gayon et al., Handbook of Enology Vol. 2, on tannin polymerization and astringency loss; proanthocyanidin-polymerization studies). Folds the multi-step self-condensation into one lumped second-order k on the grape tannin pool."
+    conditions: "generic red (or tannin-dosed white) wine at cellar temperature; second-order in the grape condensed-tannin pool (g/L) at T_ref = 293.15 K. Represents the DIRECT, acetaldehyde-free self-condensation (distinct from the D-85 acetaldehyde-bridged tannin-ethyl-tannin route)."
+    notes: "SOURCED FORM (bimolecular self-condensation softening tannin WITHOUT anthocyanin or oxygen; warmer-faster) + SPECULATIVE magnitude (order-of-magnitude, banded). A PURE OFF-LEDGER sink (the soft polymer goes to no slot — the D-79/D-80 tannin-is-a-pure-sink precedent), so it moves nothing conserved and softens astringency as the free-tannin pool declines."
+
+# -- ACTIVATION ENERGY: warmer polymerizes faster (sourced ordering, REACTION-scale) -------------
+# Its OWN parameter (prime directive #2), REACTION-scale (~55 kJ/mol) like every other aging reaction
+# E_a. Distinct from the condensation/fade E_a's even though numerically similar — a DIFFERENT
+# reaction (tannin self-condensation). The load-bearing claim is the SIGN: warm storage softens
+# (polymerizes) tannin faster.
+E_a_tannin_self_polymerization:
+  value: 55000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 35000.0, high: 75000.0, note: "Q10 ~1.6-2.9 at 20 C. Wine condensation/polymerization activation energies ~35-75 kJ/mol. The SOURCED, load-bearing claim is the SIGN (warmer => faster tannin self-polymerization => faster softening); the magnitude is speculative and banded. Its OWN parameter (prime directive #2), REACTION-scale, distinct from the D-79/D-80/D-83 E_a's even though numerically similar." }
+  provenance:
+    source: "SOURCED ORDERING: tannin self-condensation/polymerization accelerates with temperature (textbook Arrhenius; proanthocyanidin-polymerization kinetics; Ribéreau-Gayon Handbook of Enology). Warm storage softens (polymerizes) tannin faster — the established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate tannin self-condensation at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster polymerization/softening) is the sourced, load-bearing claim. REACTION-scale (~55 kJ/mol). Its OWN parameter (prime directive #2), distinct from E_a_polymerization / E_a_acetaldehyde_bridge / E_a_anthocyanin_fade / E_a_anthocyanin_thermal_fade even though numerically similar — a separate reaction (tannin self-condensation)."

@@ -1677,3 +1677,115 @@ class ThermalAnthocyaninFade(Process):
         d[schema.slice("anthocyanin")] = -r
         d[schema.slice("faded_anthocyanin")] = r
         return d
+
+
+class TanninSelfPolymerization(Process):
+    """Aging condensation: grape tannin self-polymerizes → soft polymer (decision D-84).
+
+    The twelfth aging Process, the **fourth non-oxidative** one, and the first of the
+    **tannin–tannin axis** that the D-79/D-80 condensation beats explicitly deferred (their
+    "one-directional-per-pool" honesty note). Beyond condensing with anthocyanin (D-79/D-80),
+    condensed grape **tannin** also reacts **with itself**: flavan-3-ol units link into larger
+    polymers that taste **softer** — a direct (non-oxidative) self-condensation, the well-known
+    "tannins polish/soften with age even with nothing else to react with" behaviour
+    (Ribéreau-Gayon, *Handbook of Enology*; the
+    proanthocyanidin-polymerization literature). This is why a **white** wine's tannin, or a red
+    whose anthocyanin has been exhausted, **still softens** on aging — softening that the
+    anthocyanin-dependent condensation routes alone could not produce.
+
+    ``r = k_tannin_self_polymerization · f(T) · [tannin]²`` — **bimolecular** in the single tannin
+    pool (a true *self*-reaction, so second-order in ``[tannin]`` — distinct from the *bilinear*
+    two-pool D-79 form), ``f(T) = arrhenius_factor(T, E_a_tannin_self_polymerization, T_ref)`` the
+    sourced warmer-polymerizes-faster factor. It is a **pure off-ledger tannin sink**::
+
+        d(tannin)/dt = −r
+
+    The polymerized tannin goes to **no destination slot** — deliberately, and consistently with the
+    D-79/D-80 condensation routes, which already consume ``tannin`` as a pure sink (the shared
+    ``polymeric_pigment`` slot they fill is deposited in **anthocyanin**-equivalents, *never* tannin
+    mass; no ledger reads tannin mass). Adding a ``polymerized_tannin`` slot here but not for the
+    condensation-consumed tannin would be asymmetric bookkeeping for a pool nothing conserved reads,
+    so ``r`` folds the lumped self-condensation stoichiometry into one first-class sink rate and the
+    tannin simply declines (the polymer is soft, so it drops out of astringency — see below). **No
+    yield** (a self-reaction: there is no *second* pool to consume at a ratio).
+
+    **The astringency payoff, and the honesty note it retires.** ``tannin`` is read as astringency
+    (:func:`~fermentation.analysis.astringency_series`, mg/L free harsh tannin); the soft polymer is
+    excluded, so drawing ``tannin`` down **softens** the wine — exactly as the D-79 route does, but
+    **without needing anthocyanin**. Through D-80 the astringency readout carried a standing caveat
+    ("grape tannin self-polymerization … a further-deferred beat, so anthocyanin is the limiting
+    reagent and A–T condensation softens only modestly"); this Process builds that beat, so a
+    no-anthocyanin (white / tannin-only) wine now genuinely softens and that note is **retired**.
+
+    **Off every ledger, no conservation term (the :class:`TanninAnthocyaninCondensation`
+    precedent).** ``tannin`` is grape-derived — off ``total_carbon``/``total_mass``/
+    ``total_nitrogen`` (the ``iso_alpha``/``ellagitannin`` precedent) — so self-polymerization moves
+    **nothing conserved**: it touches only that one slot and asserts nothing. Unlike the D-80
+    bridged route it consumes **no**
+    on-ledger acetaldehyde (this is the *direct*, acetaldehyde-free self-condensation — the
+    acetaldehyde-bridged tannin–ethyl–tannin variant is the separate D-85 beat), so there is no
+    split-ledger carbon capture: a wholly off-ledger sink.
+
+    **Oak-independent AND O₂-independent.** Like :class:`TanninAnthocyaninCondensation`, this is a
+    **grape**-tannin reaction: it draws **no** ``o2`` (not an oxidation) and reads **no** oak pool —
+    ``tannin`` is grape **condensed** tannin, distinct from oak **hydrolysable** ``ellagitannin``
+    (D-78), so a steel-tank red with no oak and no oxygen still self-polymerizes and softens.
+
+    **Wine-only + isolable + substrate-gated (prime directive #3).** ``tannin`` is wine-only
+    (appended to ``wine_schema``), so this is wired into the *wine* medium only; the ``"tannin" not
+    in schema`` guard makes it a hard no-op besides. Wired **disabled at the compile seam** (aging
+    is post-ferment); ``begin_aging`` enables it with the other aging Processes. With no tannin the
+    ``tannin ≤ 0`` guard returns byte-for-byte zero, so a no-tannin run is exactly the case without
+    this Process. Tier **speculative** (the aging axis is the Tier-3 frontier; the *form* —
+    bimolecular self-condensation, warmer-faster, softening — is sourced, the rate/E_a magnitudes
+    order-of-magnitude estimates). **Scope (v1):** the direct (acetaldehyde-free) self-condensation
+    only; the acetaldehyde-bridged tannin–ethyl–tannin route is the separate D-85 beat. See
+    ``polymerization.yaml`` for the full scope + provenance.
+    """
+
+    name = "tannin_self_polymerization"
+    tier = Tier.SPECULATIVE
+    #: Consumes the single grape ``tannin`` pool as a pure off-ledger sink (the soft polymer goes
+    #: to no slot — the D-79/D-80 tannin-is-a-pure-sink precedent, since no ledger reads tannin
+    #: mass), so nothing conserved moves; it touches that one slot and nothing else. No ``o2`` (not
+    #: an oxidation), no ``acetaldehyde`` (the DIRECT route — bridged tannin–ethyl–tannin is D-85).
+    #: (``tannin`` is now drawn by THREE Processes — the two condensation routes and this.)
+    touches = ("tannin",)
+    #: ``k_tannin_self_polymerization``/``E_a_tannin_self_polymerization`` are this Process's own
+    #: (polymerization.yaml, D-84); ``T_ref`` is shared with every Arrhenius rate. No yield (a
+    #: self-reaction — one pool, no second reactant to consume at a ratio). Their tiers cap the
+    #: ``tannin`` output tier via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_tannin_self_polymerization",
+        "E_a_tannin_self_polymerization",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slot (tannin is appended to wine_schema): a hard no-op on any schema without it,
+        # belt-and-suspenders to the wine-only wiring.
+        if "tannin" not in schema:
+            return d
+        tannin = float(y[schema.slice("tannin")][0])
+        # No tannin ⇒ no self-polymerization: a no-tannin run is byte-for-byte the case without this
+        # Process. Gate on the tannin STATE before reading any param (the OakExtraction/Strecker
+        # substrate-gate-before-params discipline — an enabled-but-undosed Process mustn't KeyError
+        # if polymerization.yaml is absent). ``<= 0`` also absorbs solver undershoot.
+        if tannin <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_tannin_self_polymerization"], params["T_ref"])
+        # Bimolecular self-condensation ([tannin]², NOT the D-79 bilinear two-pool form): a true
+        # self-reaction, so second-order in the single tannin pool. r is the tannin consumption rate
+        # (g tannin/L/h); the lumped self-condensation stoichiometry is folded into k. No o2 term
+        # (not an oxidation) and no acetaldehyde (the DIRECT route — bridged tannin–ethyl–tannin is
+        # D-85). A pure OFF-LEDGER sink: the soft polymer goes to no slot (the D-79/D-80 precedent —
+        # no ledger reads tannin mass), so this moves nothing conserved. Astringency (which reads
+        # the free tannin) softens as the pool declines — WITHOUT anthocyanin (the D-80 honesty
+        # note retired).
+        r = params["k_tannin_self_polymerization"] * f_t * tannin * tannin  # g tannin/L/h
+        d[schema.slice("tannin")] = -r
+        return d

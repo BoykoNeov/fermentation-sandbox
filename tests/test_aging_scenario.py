@@ -1108,6 +1108,31 @@ def test_red_wine_polymerization_off_ledger_end_to_end():
     assert_nonnegative(traj.as_trajectory(), ("anthocyanin", "tannin"), atol=1e-9)
 
 
+def test_white_wine_tannin_softens_by_self_polymerization_end_to_end():
+    # THE D-84 PAYOFF at scenario scale, retiring the D-80 "softening needs anthocyanin" note. A
+    # tannin-dosed WHITE wine (no anthocyanin ⇒ both condensation routes inert) still SOFTENS over
+    # the aging tail, purely by TanninSelfPolymerization drawing the free-tannin pool down. Warmer
+    # softens more (the E_a lever), and it is oak-free (a steel-tank white). Colour stays zero
+    # throughout (no anthocyanin), confirming the softener is decoupled from the colour axis.
+    white_args = {"tannin_gpl": 3.0}  # tannin but NO anthocyanin
+    cool = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS)], aging_celsius=12.0, **white_args)
+    ).run()
+    warm = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS)], aging_celsius=30.0, **white_args)
+    ).run()
+    assert cool.success and warm.success
+    astr_cool = astringency_series(cool.as_trajectory())
+    astr_warm = astringency_series(warm.as_trajectory())
+    # Softens over aging (no anthocyanin, so this is self-polymerization ONLY — the retirement).
+    assert astr_cool[-1] < astr_cool[0]
+    assert astr_warm[-1] < astr_warm[0]
+    # Warmer softens MORE (E_a > 0, the temperature lever).
+    assert astr_warm[-1] < astr_cool[-1]
+    # No anthocyanin ⇒ colour is identically zero throughout (softener decoupled from colour).
+    assert np.all(color_series(warm.as_trajectory()) == 0.0)
+
+
 # -- D-80: acetaldehyde-bridged condensation end-to-end (micro-oxygenation → colour, split ledger)
 # --
 
@@ -1188,9 +1213,12 @@ def test_micro_oxygenation_drives_bridged_condensation_end_to_end():
     # O₂-scavenging), but still some (partial protection).
     assert 0.0 < bridge_ox_so2 < bridge_ox
 
-    # The direct route still exhausts anthocyanin in every run (colour endpoint saturates) — so the
-    # bridged route is an ADDITIONAL pigment-formation pathway, not the only one.
-    assert float(ox.series("anthocyanin")[-1]) < 1e-6
+    # The direct route still (near-)exhausts anthocyanin in every run (colour endpoint saturates) —
+    # so the bridged route is an ADDITIONAL pigment-formation pathway, not the only one. NOTE (D-84
+    # coupling): TanninSelfPolymerization now competes for the tannin pool, drawing [tannin] down a
+    # touch, so the anthocyanin-condensation rate (∝ [tannin]) is slightly lower and a tiny
+    # anthocyanin residual survives (~1e-4 g/L, still >99.9 % consumed) — hence < 1e-3, not < 1e-6.
+    assert float(ox.series("anthocyanin")[-1]) < 1e-3
     # Micro-ox sustains a residual acetaldehyde the anaerobic run lacks (O₂ keeps regenerating it).
     assert float(ox.series("acetaldehyde")[-1]) > float(noox.series("acetaldehyde")[-1])
 

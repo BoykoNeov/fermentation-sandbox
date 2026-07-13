@@ -112,6 +112,7 @@ from fermentation.core.kinetics import (
     SugarUptakeToEthanolCO2,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
+    TanninSelfPolymerization,
     TemperatureRamp,
     ThermalAnthocyaninFade,
     YeastAutolysis,
@@ -1053,6 +1054,26 @@ _ANTHOCYANIN_FADING_PROCESSES: tuple[Callable[[], Process], ...] = (AnthocyaninF
 #: ``polymerization.yaml`` (with the condensation/fade data — all colour-axis data together).
 _THERMAL_FADE_PROCESSES: tuple[Callable[[], Process], ...] = (ThermalAnthocyaninFade,)
 
+#: WINE-ONLY tannin self-polymerization aging Process (decision D-84) — the first of the
+#: tannin–tannin axis the D-79/D-80 condensation beats deferred. :class:`TanninSelfPolymerization`
+#: condenses grape ``tannin`` WITH ITSELF (bimolecular ``[tannin]²``, a true self-reaction) into a
+#: softer polymer, drawing the free-tannin pool down as a **pure off-ledger sink** (the soft polymer
+#: goes to no slot — the D-79/D-80 tannin-is-a-pure-sink precedent, since no ledger reads tannin
+#: mass). So astringency (:func:`~fermentation.analysis.astringency_series`) softens **WITHOUT
+#: needing anthocyanin** — a white / tannin-only wine now softens, retiring the D-80
+#: "one-directional-per-pool" honesty note. OAK- AND O₂-INDEPENDENT (grape condensed tannin, not oak
+#: ``ellagitannin``; not an oxidation, draws no ``o2``) and acetaldehyde-free (the DIRECT route —
+#: the bridged tannin–ethyl–tannin is D-85), so a steel-tank red still self-polymerizes. OFF EVERY
+#: LEDGER (grape-derived), so it moves nothing
+#: conserved. Substrate-gated on ``tannin`` ⇒ a no-tannin run is byte-for-byte inert. Wine-only (the
+#: grape slot is wine-only), like ``_POLYMERIZATION_PROCESSES``. Kept in its OWN isolable tuple
+#: (directive #3): DISABLED at compile and re-enabled by ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
+#: ``polymerization.yaml`` (with the condensation/fade data — all colour/tannin-axis data together).
+_TANNIN_SELF_POLYMERIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (
+    TanninSelfPolymerization,
+)
+
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
 #: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
@@ -1359,6 +1380,7 @@ MEDIA: dict[str, Medium] = {
             + _ACETALDEHYDE_BRIDGE_PROCESSES
             + _ANTHOCYANIN_FADING_PROCESSES
             + _THERMAL_FADE_PROCESSES
+            + _TANNIN_SELF_POLYMERIZATION_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

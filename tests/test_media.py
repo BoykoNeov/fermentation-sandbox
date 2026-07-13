@@ -386,6 +386,12 @@ WINE_FADING_PROCESSES = {"anthocyanin_fading"}
 # protect it (the mirror of D-81), so a sealed/sulfited/anaerobic red still fades. Wine-only, same
 # compile-seam disable / begin_aging re-enable.
 WINE_THERMAL_FADE_PROCESSES = {"thermal_anthocyanin_fade"}
+# WINE-ONLY tannin self-polymerization Process (decision D-84) — the first of the tannin–tannin axis
+# the D-79/D-80 condensation beats deferred. Condenses grape tannin WITH ITSELF (bimolecular
+# [tannin]²) into a soft polymer, a pure off-ledger tannin sink, so astringency softens WITHOUT
+# needing anthocyanin (retiring the "one-directional-per-pool" note). Wine-only, same compile-seam
+# disable / begin_aging re-enable.
+WINE_TANNIN_SELF_POLY_PROCESSES = {"tannin_self_polymerization"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -409,6 +415,7 @@ EXPECTED_PROCESSES = {
         | WINE_BRIDGE_PROCESSES
         | WINE_FADING_PROCESSES
         | WINE_THERMAL_FADE_PROCESSES
+        | WINE_TANNIN_SELF_POLY_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

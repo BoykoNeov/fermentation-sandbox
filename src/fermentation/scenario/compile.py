@@ -62,6 +62,7 @@ from fermentation.core.kinetics import (
     StreckerDegradation,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
+    TanninSelfPolymerization,
     ThermalAnthocyaninFade,
     YeastAutolysis,
     YeastPOFDecarboxylation,
@@ -142,8 +143,9 @@ _BRETT_GATED_PROCESSES = (
 #: anthocyanin to the colourless ``faded_anthocyanin`` slot, so colour genuinely declines and SO₂
 #: protection is emergent via the shared o2 pool) and :class:`ThermalAnthocyaninFade` (the D-83
 #: O₂-INDEPENDENT thermal fade — heat degrades free anthocyanin to the same ``faded_anthocyanin``
-#: slot with NO oxygen, so a sealed/sulfited/anaerobic red still fades and SO₂ gives no protection),
-#: so
+#: slot with NO oxygen, so a sealed/sulfited/anaerobic red still fades and SO₂ gives no protection)
+#: and :class:`TanninSelfPolymerization` (the D-84 tannin–tannin axis — grape ``tannin`` condenses
+#: with itself, ``[tannin]²``, into a soft polymer, softening astringency WITHOUT anthocyanin), so
 #: on beer they are simply absent from the ProcessSet — both the compile-disable and the
 #: begin_aging-enable loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
@@ -163,6 +165,7 @@ _AGING_GATED_PROCESSES = (
     AcetaldehydeBridgedCondensation,
     AnthocyaninFading,
     ThermalAnthocyaninFade,
+    TanninSelfPolymerization,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.

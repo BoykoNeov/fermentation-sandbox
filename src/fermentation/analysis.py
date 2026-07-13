@@ -172,12 +172,15 @@ def astringency_series(traj: Trajectory) -> FloatArray:
     scavenge O₂ (oak protection). Oak ``ellagitannin`` also **rises** first as
     :class:`~fermentation.core.kinetics.aging.OakExtraction` diffuses it in toward its
     ``add_oak``-set
-    ceiling. Even with all three mechanisms this remains **one-directional-per-pool** honest: grape
-    tannin
-    self-polymerization and tannin–ethyl–tannin bridging (the *other* softeners) are
-    further-deferred
-    beats, so anthocyanin is the limiting reagent and A–T condensation softens only modestly (the
-    D-78/D-79/D-80 scope).
+    ceiling. (4) Grape tannin **self-polymerization** (D-84):
+    :class:`~fermentation.core.kinetics.aging.TanninSelfPolymerization` condenses ``tannin`` with
+    itself (``[tannin]²``) into a soft polymer, so the wine softens **with no anthocyanin** — a
+    **white** or anthocyanin-exhausted red still softens (this retires the old
+    "one-directional-per-pool" caveat: softening no longer requires anthocyanin as the limiting
+    reagent). (5) The acetaldehyde-bridged **tannin–ethyl–tannin** route (D-85):
+    :class:`~fermentation.core.kinetics.aging.TanninEthylTanninCondensation` draws ``tannin`` down
+    via a dissolved-O₂ acetaldehyde linker bridging two flavanols — so micro-oxygenation softens
+    even an anthocyanin-free tannin pool.
 
     TIER (derived not asserted — pass ``ParameterSet.tier_map()`` to ``ProcessSet.tier_of(...)`` for
     each pool's reported tier): the whole aging axis is speculative, so parameter-tier propagation
