@@ -138,36 +138,121 @@ def ibu_series(traj: Trajectory) -> FloatArray:
 
 
 def astringency_series(traj: Trajectory) -> FloatArray:
-    """Oak-tannin astringency at each stored time, as mg/L ellagitannin (decision D-78).
+    """Free-tannin astringency at each stored time, as mg/L (decisions D-78/D-79).
 
     Astringency is a **taste** (a tactile/mouthfeel percept), *not* an aroma — so, exactly like
     ``iso_alpha``/IBU (:func:`ibu_series`, D-64), it is deliberately **excluded from the D-67 OAV
     odor lens** and read out here instead. And exactly like ``ibu_series``, this reads **no
-    threshold**: IBU *is* mg/L iso-alpha by definition, and here we report the oak hydrolysable
-    tannin directly as **mg/L ellagitannin** (the ``ellagitannin`` state in g/L × 1000, gallic/
-    ellagic-acid-equivalent), astringency being monotone in it. A calibrated perception-intensity
-    mapping (an "astringency index" against a taste threshold) is the deferred refinement —
-    reporting the concentration is the honest Tier-3 v1 (the aging axis is directional, not
-    magnitudes).
+    threshold**: it reports the **free (harsh) tannin** directly as mg/L, astringency being monotone
+    in it. A calibrated perception-intensity mapping (an "astringency index" against a taste
+    threshold) is the deferred refinement — reporting the concentration is the honest Tier-3 v1 (the
+    aging axis is directional, not magnitudes).
 
-    The trajectory **rises** as :class:`~fermentation.core.kinetics.aging.OakExtraction` diffuses
-    the tannin in toward its ``add_oak``-set ceiling, and **declines** as
-    :class:`~fermentation.core.kinetics.aging.EllagitanninOxidation` consumes the sacrificial tannin
-    to scavenge dissolved O₂ (oak protection) — so an oaked wine's astringency both builds on oak
-    contact and **softens** as the wine takes up oxygen. That oxidative-consumption softening is
-    **one directional contributor** only: the dominant real softening mechanism, tannin–anthocyanin
-    condensation/polymerisation, is a separate deferred beat, so this does not claim to reproduce
-    astringency softening. Requires a wine trajectory (the ``ellagitannin`` slot is wine-only,
-    D-78); an un-oaked wine is identically zero.
+    **Two harsh tannins, summed (D-79 extends the D-78 oak-only readout).** Free tannin is the sum
+    of
+    the grape **condensed** tannin (``tannin``, the dominant red-wine astringency) and the oak
+    **hydrolysable** tannin (``ellagitannin``, D-78) — both taste astringent, so ``astringency =
+    (tannin + ellagitannin) × 1000`` (g/L → mg/L, gallic/ellagic/catechin-equivalent). The
+    **polymeric pigment** the D-79 condensation forms is *soft* and deliberately **excluded** — that
+    exclusion is exactly what makes softening emerge (see below). A red wine with no oak reads grape
+    ``tannin`` alone; an oaked white reads ``ellagitannin`` alone; both 0 ⇒ identically zero.
 
-    TIER (decision D-78, derived not asserted — pass ``ParameterSet.tier_map()`` to
-    ``ProcessSet.tier_of('ellagitannin', ...)`` for the reported tier): the whole oak axis is
-    speculative (extraction form sourced, magnitudes estimated), so parameter-tier propagation (D-1)
-    caps this readout at **speculative**. Like ``iso_alpha``, ``ellagitannin`` is off every
-    conservation ledger (wood-derived), so this readout adds no invariant and oaking a wine leaves
-    ``total_carbon`` byte-for-byte unchanged.
+    The trajectory **softens** two ways. (1) The DOMINANT mechanism (D-79):
+    :class:`~fermentation.core.kinetics.aging.TanninAnthocyaninCondensation` condenses grape
+    ``tannin`` (with ``anthocyanin``) into soft polymeric pigment, drawing the free-tannin pool —
+    and
+    the astringency — down. (2) The oak contributor (D-78):
+    :class:`~fermentation.core.kinetics.aging.EllagitanninOxidation` consumes ``ellagitannin`` to
+    scavenge O₂ (oak protection). Oak ``ellagitannin`` also **rises** first as
+    :class:`~fermentation.core.kinetics.aging.OakExtraction` diffuses it in toward its
+    ``add_oak``-set
+    ceiling. Even with both mechanisms this remains **one-directional-per-pool** honest: grape
+    tannin
+    self-polymerization (the *other* big softener) is a further-deferred beat, so anthocyanin is the
+    limiting reagent and A–T condensation alone softens only modestly (the D-78/D-79 scope).
+
+    TIER (derived not asserted — pass ``ParameterSet.tier_map()`` to ``ProcessSet.tier_of(...)`` for
+    each pool's reported tier): the whole aging axis is speculative, so parameter-tier propagation
+    (D-1) caps this readout at **speculative**. Like ``iso_alpha``, both ``tannin`` and
+    ``ellagitannin`` are off every conservation ledger (grape-/wood-derived), so this readout adds
+    no
+    invariant and dosing them leaves ``total_carbon`` byte-for-byte unchanged.
     """
-    return np.asarray(traj.series("ellagitannin"), dtype=np.float64) * 1000.0
+    tannin = np.asarray(traj.series("tannin"), dtype=np.float64)
+    ellagitannin = np.asarray(traj.series("ellagitannin"), dtype=np.float64)
+    return (tannin + ellagitannin) * 1000.0
+
+
+def polymeric_pigment_series(traj: Trajectory) -> FloatArray:
+    """Stable polymeric pigment formed by tannin–anthocyanin condensation, mg/L (decision D-79).
+
+    As a red wine ages, :class:`~fermentation.core.kinetics.aging.TanninAnthocyaninCondensation`
+    condenses free monomeric ``anthocyanin`` (with grape ``tannin``) into **polymeric pigment** — a
+    softer-tasting, SO₂/pH-**stable** colour form. This readout reports that stable pigment as
+    **mg/L
+    of the anthocyanin condensed into it**: since in v1 condensation is the *sole* fate of
+    anthocyanin, the pigment is exactly the anthocyanin the pool has lost, ``(anthocyanin₀ −
+    anthocyanin(t)) × 1000``. It **rises** monotonically from 0 as the monomeric → polymeric shift
+    proceeds — the young-purple → aged-brick-red evolution's stable fraction.
+
+    **A post-hoc readout, not a state slot (the A420 discriminator, D-74).** Unlike ``A420`` — whose
+    O₂ driver has *competing* sinks so its browning share cannot be reconstructed and had to be
+    integrated as a slot — anthocyanin here has a **single** fate (→ pigment), so the pigment is
+    reconstructible from the pool's own drawdown (the ``iso_alpha``/IBU readout pattern).
+    ``anthocyanin₀`` is taken as the trajectory's first stored anthocyanin value (the compiled
+    initial condition; no process moves ``anthocyanin`` but condensation, and it is a t0 grape must
+    input). This stays valid even through the deferred acetaldehyde-bridge beat (which only adds a
+    second *formation* pathway — anthocyanin still all → pigment); only a future **bleaching** beat
+    (a
+    second anthocyanin fate to a *colourless* form) would break the identity and promote the pigment
+    to a slot.
+
+    Requires a wine trajectory carrying the ``anthocyanin`` slot (wine-only, D-79); a white / no-red
+    wine (anthocyanin ≡ 0) reads identically zero. TIER: **speculative** (the condensation params
+    are
+    speculative; parameter-tier propagation, D-1). Off every ledger (grape-derived), so this readout
+    adds no conservation invariant.
+    """
+    anthocyanin = np.asarray(traj.series("anthocyanin"), dtype=np.float64)
+    anthocyanin_0 = anthocyanin[0] if anthocyanin.size else 0.0
+    return (anthocyanin_0 - anthocyanin) * 1000.0
+
+
+def color_series(traj: Trajectory) -> FloatArray:
+    """Total anthocyanin-derived red colour at each stored time, mg/L (decision D-79).
+
+    The point of the D-79 condensation beat is colour **stabilization**, so this index counts
+    **both** colour-bearing forms: free monomeric ``anthocyanin`` (bright but bleachable) **and**
+    the
+    :func:`polymeric_pigment_series` it condenses into (SO₂/pH-**stable**). As the wine ages the
+    free
+    anthocyanin declines but the stable pigment rises, so **total red colour is retained as its form
+    shifts labile → stable** — the correct young-purple → aged-brick-red picture (reporting only
+    free
+    anthocyanin would show colour wrongly *vanishing*). Reported as ``(anthocyanin +
+    polymeric_pigment) × 1000`` mg/L, counting each condensed anthocyanin unit as contributing the
+    same colour it did when free (just now stable — the equal-absorptivity v1 simplification).
+
+    **CAVEAT — in v1 this is an algebraic identity, ``≡ anthocyanin₀ × 1000`` (a flat line).**
+    Because
+    the pigment is a *reconstructed* readout (``anthocyanin₀ − anthocyanin``, not an independently
+    integrated slot) and condensation is anthocyanin's sole fate, the sum collapses to the constant
+    initial anthocyanin — so this series does **not** independently verify the condensation Process
+    (that is what :func:`~fermentation.core.kinetics.aging.TanninAnthocyaninCondensation`'s
+    closed-form derivative tests do) and it plots as a flat line, not a curve. It is shipped for two
+    honest reasons: it states the v1 *physics* claim (direct condensation loses no colour, only
+    stabilizes it — the observable *dynamic* is the monomeric → polymeric **shift**,
+    :func:`polymeric_pigment_series`), and it is **future-ready** — a later **SO₂/pH bleaching**
+    beat
+    (a second anthocyanin fate → colourless) makes the total genuinely *decline*, and promoting the
+    pigment to an integrated state slot then makes this a non-tautological sum of two independent
+    quantities (with a testable ``anthocyanin + polymeric ≡ anthocyanin₀`` conservation invariant).
+
+    Requires a wine trajectory carrying ``anthocyanin`` (wine-only, D-79); a white wine reads
+    identically zero. TIER **speculative**; off every ledger (grape-derived), adds no invariant.
+    """
+    anthocyanin = np.asarray(traj.series("anthocyanin"), dtype=np.float64)
+    return anthocyanin * 1000.0 + polymeric_pigment_series(traj)
 
 
 # -- ensemble spread attribution (sensitivity) --------------------------------

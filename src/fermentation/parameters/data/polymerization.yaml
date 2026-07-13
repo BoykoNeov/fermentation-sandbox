@@ -1,0 +1,138 @@
+# Tannin–anthocyanin condensation — red-wine colour stabilization + astringency softening
+# (decision D-79, §4.1 aging). The DOMINANT real astringency-softening + red-colour-evolution
+# mechanism the D-77/D-78 oak beats deferred and the milestone-3 plan names — now built, unblocked
+# by D-78's off-every-ledger tannin/taste-pool infrastructure (though it reuses NONE of the oak
+# pools — see "OAK-INDEPENDENT" below).
+#
+# SHARED, but WINE-ONLY in effect (the aging.yaml / oak.yaml pattern): the names below are
+# collision-free and merged into every compiled scenario's ParameterSet at compile.py's
+# shared_files, but only the WINE medium carries the anthocyanin/tannin state slots and wires
+# TanninAnthocyaninCondensation, so the params are inert for beer. INERT until an anthocyanin+tannin
+# dose (must inputs) AND a begin_aging enable (aging is post-ferment); an un-dosed / white-wine run
+# is byte-for-byte the case without this beat (prime directive #3).
+#
+# THE PROCESS (fermentation.core.kinetics.aging.TanninAnthocyaninCondensation, WINE-ONLY):
+#
+#   r                      = k_polymerization * f(T) * [anthocyanin] * [tannin]   # g anthocyanin/L/h
+#   d(anthocyanin)/dt      = -r
+#   d(tannin)/dt           = -y_tannin_per_anthocyanin * r
+#
+# a BILINEAR direct condensation (the SulfiteOxidation/EllagitanninOxidation bilinear form): free
+# monomeric anthocyanin and condensed grape tannin combine into a polymeric pigment, warmed by an
+# Arrhenius factor f(T) = arrhenius_factor(T, E_a_polymerization, T_ref) so warm aging condenses
+# faster. The polymeric-pigment PRODUCT is NOT a state slot: in v1 condensation is the SOLE fate of
+# anthocyanin, so the stable pigment is exactly (anthocyanin_0 - anthocyanin(t)) and is
+# reconstructed POST-HOC by analysis.polymeric_pigment_series (the iso_alpha/A420 discriminator:
+# A420 HAD to integrate because O2 has competing sinks; here anthocyanin's single fate makes the
+# pigment reconstructible, so it is a readout, not a slot). A future BLEACHING beat (SO2/pH
+# decolorization — a SECOND anthocyanin fate to a COLOURLESS form) is what would break that identity
+# and promote the pigment to a slot.
+#
+# THE TWO EMERGENT PAYOFFS (the D-79 spine):
+#   (1) ASTRINGENCY SOFTENS. analysis.astringency_series now reads FREE tannin (tannin + oak
+#       ellagitannin, both harsh); the polymeric pigment is soft and NOT counted. As tannin condenses
+#       into pigment the free-tannin pool — and the astringency — declines. This is the DOMINANT
+#       softening mechanism D-78's oxidative ellagitannin consumption could only contribute one
+#       directional term to.
+#   (2) COLOUR STABILIZES. analysis.color_series counts BOTH free anthocyanin (bright, bleachable)
+#       AND the polymeric pigment (SO2/pH-STABLE): free anthocyanin declines but the stable pigment
+#       rises, so total red colour is RETAINED as its form shifts from labile to stable — the young
+#       purple-red → aged brick-red evolution. In v1 (no bleaching sink) the total is conserved; the
+#       observable dynamic is the monomeric → polymeric SHIFT (polymeric_pigment_series).
+#
+# OAK-INDEPENDENT AND O2-INDEPENDENT (the D-79 correctness crux). Tannin–anthocyanin polymerization
+# is a GRAPE-tannin + GRAPE-anthocyanin reaction — a steel-tank red with NO oak and NO oxygen still
+# polymerizes, softens, and stabilizes its colour. So this Process gates on the grape-derived
+# `anthocyanin` and `tannin` pools ONLY: it draws NO share of the shared o2 budget (unlike every
+# D-71..D-78 oxidative sink) and reads NO oak pool (the oak `ellagitannin` is a DIFFERENT, oak-
+# derived hydrolysable tannin — reusing it would wrongly make polymerization impossible without an
+# add_oak dose). `tannin` is the grape CONDENSED (flavan-3-ol) tannin the D-78 note left the
+# namespace free for; astringency_series sums it WITH oak ellagitannin because both taste harsh.
+#
+# OFF EVERY LEDGER (the iso_alpha / ellagitannin precedent). anthocyanin and tannin are grape-derived
+# — their carbon comes from an UNTRACKED grape-solids source, so booking them as mass would demand a
+# grape-phenolic carbon pool that does not exist. Both slots are off
+# total_carbon/total_mass/total_nitrogen, so this Process moves NOTHING conserved (like OakExtraction
+# / EllagitanninOxidation) and — a pure g/L transfer — needs NO chemistry.py species registration.
+# This is also why the tannin-consumption yield is MASS-based (y_tannin_per_anthocyanin, g/g), NOT a
+# molar stoichiometry: both anthocyanin and the condensed-tannin macromolecule are lumped pools with
+# no clean molar mass (an M_tannin would be fake precision — the y_ellag_per_o2 precedent).
+#
+# SUBSTRATE-GATED ⇒ ADDS ON TOP, NO RE-BASELINE (and trivially so — it touches no o2). Doubly gated
+# on anthocyanin AND tannin (zero unless BOTH are dosed), so a white wine (no anthocyanin) or a
+# no-tannin run is byte-for-byte the case without this Process. Because it draws no o2 it does not
+# even interact with the k_ethanol_oxidation + k_browning = 5.0e-4 always-on anchor — a wholly
+# separate, non-oxidative axis (the OakExtraction diffusion-axis precedent, but on grape pools).
+#
+# SCOPE (v1), flagged loudly:
+#   * DIRECT condensation ONLY. The ACETALDEHYDE-BRIDGED (ethylidene) condensation route — dissolved
+#     O2 -> acetaldehyde (D-71) -> ethyl-bridge linking tannin and anthocyanin — is the EXPLICIT
+#     named next beat, DEFERRED here because acetaldehyde is ON the carbon ledger (its carbon is
+#     borrowed exactly from E by OxidativeAcetaldehyde): an off-ledger pigment consuming the
+#     on-ledger acetaldehyde pool would make carbon vanish and fail assert_conserved. Building it
+#     cleanly needs a split-ledger accounting that is its own beat. So v1 links the oxidative
+#     sub-axis to colour NOT at all; the bridge beat is where "controlled micro-oxygenation stabilizes
+#     red colour" enters.
+#   * TANNIN SELF-POLYMERIZATION (tannin–tannin condensation, the OTHER big softener) is NOT
+#     modelled — anthocyanin is the limiting reagent here (tannin >> anthocyanin in real wine, ~1-4
+#     g/L vs ~0.3 g/L), so A–T condensation alone draws tannin down only MODESTLY. This is the same
+#     "one directional contributor, does not claim full softening" honesty D-78 established.
+#   * PIGMENT COLOUR EQUIVALENCE. Each condensed anthocyanin unit is counted as contributing the SAME
+#     colour as when it was free (just now STABLE) — polymeric pigments' genuinely different (pH/SO2-
+#     resistant, somewhat lower molar-absorptivity) colour is a Tier-3-beyond refinement. So total
+#     colour is conserved in v1; the SHIFT monomeric→polymeric is the honest directional signal.
+#   * NO A520/A420 HUE RATIO, NO SO2/pH BLEACHING of monomeric anthocyanin — later beats.
+#
+# TIER. ALL speculative — the condensation FORM (bilinear anthocyanin×tannin, warmer-faster,
+# saturating on the limiting anthocyanin) is textbook red-wine chemistry and the warmer-faster
+# ORDERING is a sourced claim, but every magnitude is an order-of-magnitude author estimate and the
+# aging axis is the Tier-3 frontier. The Process floors its outputs at speculative (parameter-tier
+# propagation, D-1). Load-bearing sourced claims: (1) anthocyanins and tannins condense into
+# polymeric pigments that are SOFTER and colour-STABLE (Somers 1971; Ribéreau-Gayon; the young
+# purple → aged brick-red / softening evolution), (2) the reaction is bimolecular (rate rises with
+# both reactant concentrations), (3) warmer aging condenses faster (E_a > 0, reaction-scale).
+
+# -- BILINEAR CONDENSATION RATE: anthocyanin + tannin -> polymeric pigment ----------------------
+k_polymerization:
+  value: 2.0e-3
+  unit: "L/(g*h)"   # r = k_polymerization * f(T) * [anthocyanin] * [tannin]  (bilinear, both g/L)
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 8.0e-3, note: "bimolecular rate constant at T_ref = 20 C. At a ~2 g/L grape-tannin charge the pseudo-first-order anthocyanin rate k*[tannin] ~ 4.0e-3 /h => half-life ln2/(k*[tannin]) ~ 170 h ~ 1 week at high tannin, lengthening to months as anthocyanin (the limiting reagent) and tannin are drawn down — the observed months-to-years timescale over which young red wine softens and its colour stabilizes. The LOAD-BEARING claim is the FORM (bimolecular, saturating on anthocyanin) and the warmer-faster ordering, not this magnitude." }
+  provenance:
+    source: "author estimate anchored to the timescale over which young red wine loses harsh astringency and shifts from purple-red to stable brick-red as monomeric anthocyanins and condensed tannins polymerize into polymeric pigments (Somers 1971, 'The polymeric nature of wine pigments', Phytochemistry 10:2175; Ribéreau-Gayon et al., Handbook of Enology, on tannin–anthocyanin condensation and ageing; months-to-a-few-years at cellar temperature). The bimolecular constant folds the (acid-catalysed, C4-C8 flavylium–flavanol addition) chemistry into one lumped k."
+    conditions: "generic red wine at cellar pH (~3.4-3.8) and temperature; bilinear in the free-anthocyanin and condensed-grape-tannin pools (both g/L) at T_ref = 293.15 K. Represents the aggregate direct (non-acetaldehyde-bridged) condensation, not a single adduct."
+    notes: "SOURCED FORM (bimolecular direct condensation, saturating on the limiting anthocyanin, softening + colour-stabilizing) + SPECULATIVE magnitude (order-of-magnitude, banded to the months-to-years red-wine ageing timescale). The load-bearing sourced claim is the warmer-faster ordering (E_a_polymerization) and that condensation SOFTENS and STABILIZES, not this absolute rate. Acetaldehyde-bridged condensation is the deferred next beat (acetaldehyde is on the carbon ledger)."
+
+# -- ACTIVATION ENERGY: warmer aging condenses faster (sourced ordering, REACTION-scale) --------
+# REACTION-scale (~55 kJ/mol, like the oxidative-sink E_a's and E_a_ester_hydrolysis), NOT the weak
+# DIFFUSION E_a_oak_extraction (20 kJ/mol): tannin–anthocyanin condensation is an acid-catalysed
+# chemical reaction (flavylium–flavanol addition), so it carries the reaction-scale temperature
+# sensitivity, not a diffusion one. Its OWN parameter (prime directive #2).
+E_a_polymerization:
+  value: 55000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 35000.0, high: 75000.0, note: "Q10 ~1.6-2.9 at 20 C. Wine polyphenol condensation activation energies ~35-75 kJ/mol. The SOURCED, load-bearing claim is the SIGN (warmer => faster condensation, so warm storage ages red wine's structure/colour faster — the well-known 'warm cellars age reds faster'); the magnitude is speculative and banded. Its OWN parameter (prime directive #2) and REACTION-scale, distinct from the weak diffusion E_a_oak_extraction." }
+  provenance:
+    source: "SOURCED ORDERING: tannin–anthocyanin condensation and polymeric-pigment formation accelerate with temperature (textbook Arrhenius; accelerated-ageing studies of red-wine colour/polymeric pigment; Ribéreau-Gayon Handbook of Enology). Warm storage advances the purple→brick-red colour shift and the astringency softening faster — the established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate tannin–anthocyanin condensation at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster condensation) is the sourced, load-bearing claim. REACTION-scale (~55 kJ/mol), matching the oxidative siblings and the ester-hydrolysis E_a and DELIBERATELY well above the weak diffusion E_a_oak_extraction (20 kJ/mol) — condensation is a chemical reaction, oak extraction is diffusion, so separate E_a's (prime directive #2)."
+
+# -- MASS-BASED TANNIN-CONSUMPTION YIELD: g condensed tannin spent per g anthocyanin condensed ---
+# d(tannin)/dt = -y_tannin_per_anthocyanin * r  (both g/L/h). MASS-based (g/g), NOT a molar
+# stoichiometry: both the anthocyanin pool and the condensed-tannin macromolecule are LUMPED pools
+# with no clean molar mass, so an M_tannin/M_anthocyanin ratio would be fake precision (the
+# y_ellag_per_o2 precedent). Sets HOW MUCH free tannin (and thus astringency) a given amount of
+# condensed anthocyanin removes. Both slots off every ledger => this consumption moves nothing
+# conserved. Central ~3 reflects that the condensed-tannin oligomer is heavier than the anthocyanin
+# it binds (a ~1:1 molar adduct of a ~1000 g/mol tannin oligomer with a ~500 g/mol anthocyanin), so
+# roughly a few grams of tannin condense per gram of anthocyanin — but banded wide.
+y_tannin_per_anthocyanin:
+  value: 3.0
+  unit: "g/g"   # g condensed tannin consumed per g anthocyanin condensed; d(tannin)/dt = -y * r
+  tier: speculative
+  uncertainty: { low: 1.0, high: 8.0, note: "g lumped condensed grape tannin spent per g anthocyanin condensed. A ~1:1 molar tannin–anthocyanin adduct of a heavier tannin oligomer (~1000 g/mol) with anthocyanin (~500 g/mol) gives a mass ratio of order ~2; higher-oligomer tannins push it up. Central 3.0 is a mid-band estimate, banded an order of magnitude. Governs the astringency-softening MAGNITUDE (with anthocyanin the limiting reagent, total tannin removed ~ y * anthocyanin_0, a MODEST fraction of the ~1-4 g/L tannin — the 'one directional contributor' scope)." }
+  provenance:
+    source: "author estimate from the tannin–anthocyanin condensation stoichiometry: a roughly 1:1 molar flavanol(-oligomer)–anthocyanin adduct (Somers 1971; Ribéreau-Gayon on condensed-pigment structure), expressed as a MASS ratio because the lumped condensed-tannin macromolecule has no clean molar mass (contrast the real-molecule 2:1 SO2:O2 _SO2_PER_O2)."
+    conditions: "g lumped condensed grape tannin consumed per g anthocyanin condensed, generic red wine at T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped tannin/anthocyanin pools — the y_ellag_per_o2 idiom). Both tannin and anthocyanin are off every ledger, so this consumption moves nothing conserved. Sets the astringency-softening rate; tannin self-polymerization (the other softener) is deferred, so this is one directional contributor."

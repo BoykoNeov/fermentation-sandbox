@@ -84,6 +84,24 @@
 > with toast (thermolabile). 1 advisor pass (endorsed all 4 forks). Next: beat 1b (descriptor projection), non-oxidative
 > Maillard Strecker, tannin–anthocyanin polymerization (now unblocked), barrel fill-number, or barrel-beer oak — all
 > deferred.**
+>
+> **PROGRESS (D-79, 2026-07-13): `TanninAnthocyaninCondensation` built — the DOMINANT red-wine astringency-softening +
+> colour-stabilization mechanism, the EIGHTH aging Process, the SECOND non-oxidative one, and a THIRD separate axis on
+> GRAPE pools (868 tests, +14). Free monomeric `anthocyanin` + condensed grape `tannin` (two GRAPE must inputs,
+> `anthocyanin_gpl`/`tannin_gpl`, default 0 ⇒ white wine) condense (bilinear `k·f(T)·[anthocyanin]·[tannin]`,
+> reaction-scale E_a) into a soft, SO₂/pH-STABLE polymeric pigment — the young-purple → aged-brick-red evolution.
+> OAK- AND O₂-INDEPENDENT (the correctness crux): grape condensed `tannin` ≠ oak hydrolysable `ellagitannin`, and the
+> Process draws NO o2 — a steel-tank red still polymerizes (reusing ellagitannin would wrongly require `add_oak`); it's
+> the grape `tannin` the D-78 note left the namespace free for. DOUBLY substrate-gated ⇒ white/no-tannin wine
+> byte-for-byte inert; off every ledger (grape-derived, no `chemistry.py` change). The polymeric pigment is a POST-HOC
+> readout (`polymeric_pigment_series` = anthocyanin₀ − anthocyanin), NOT a slot — the A420 discriminator applied
+> (anthocyanin's single fate ⇒ reconstructible), keeping v1 to 2 slots. Readouts: `astringency_series` now =
+> (tannin + ellagitannin)×1000 (softens as tannin condenses; polymeric excluded = soft); new `color_series` counts
+> free anthocyanin + polymeric pigment (colour RETAINED — the monomeric→polymeric shift, not vanishing; bleaching
+> deferred). ACETALDEHYDE BRIDGE DEFERRED — the advisor caught it as a conservation trap (acetaldehyde is ON the carbon
+> ledger; an off-ledger pigment consuming it fails `assert_conserved`) — it's the explicit named next beat. 1 advisor
+> pass (before writing; adjusted 2 leanings, 1 conservation-breaking). Next: the acetaldehyde-bridged route, tannin
+> self-polymerization, SO₂/pH bleaching (promotes pigment to a slot), beat 1b, Maillard Strecker, or barrel fill-number.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
@@ -109,7 +127,7 @@
         ├── ester formation/hydrolysis equilibria over time
         ├── oxidation (acetaldehyde/phenolic browning, Strecker)
         ├── oak extraction (vanillin, whiskey lactones — D-77; ellagitannins — D-78)
-        ├── tannin–anthocyanin polymerization (red colour / astringency)   ← unblocked by the D-78 ellagitannin pool
+        ├── tannin–anthocyanin polymerization (red colour / astringency)   ← D-79 (grape pools, oak-/O₂-independent)
         └── micro-oxygenation / reductive–oxidative sulfide evolution; Maillard/sotolon
 ```
 

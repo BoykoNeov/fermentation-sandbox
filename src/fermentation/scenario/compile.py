@@ -59,6 +59,7 @@ from fermentation.core.kinetics import (
     PhenolicBrowning,
     StreckerDegradation,
     SulfiteOxidation,
+    TanninAnthocyaninCondensation,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -118,7 +119,7 @@ _BRETT_GATED_PROCESSES = (
     BrettEthanolToxicity,
 )
 
-#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72/D-74/D-75/D-77/D-78):
+#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72/D-74/D-75/D-77/D-78/D-79):
 #: :class:`EsterHydrolysis` (the ester-fade), :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol
 #: oxidation), :class:`PhenolicBrowning` (the O₂-driven browning, D-74, accumulating ``A420``) and
 #: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72) and :class:`StreckerDegradation`
@@ -128,14 +129,16 @@ _BRETT_GATED_PROCESSES = (
 #: drawing no O2) and :class:`EllagitanninOxidation` (the D-78 oak-tannin O₂ scavenging — oak
 #: PROTECTION, the bridge from the oak axis to the O₂ sub-axis) are wine-only (they read wine-only
 #: ``so2_total``/pH, ``amino_acids``/``N``, the oak ceiling/extractive slots and the
-#: ``ellagitannin`` pool respectively), so on beer
-#: they are simply absent from the ProcessSet — both the compile-disable and the begin_aging-enable
-#: loops guard with ``name in process_set``, so listing them here is beer-safe.
+#: ``ellagitannin`` pool respectively), as is :class:`TanninAnthocyaninCondensation` (the D-79
+#: red-wine colour-stabilization + astringency softening — grape ``anthocyanin`` + grape ``tannin``
+#: condense to stable polymeric pigment; a NON-oxidative grape axis drawing neither O₂ nor oak), so
+#: on beer they are simply absent from the ProcessSet — both the compile-disable and the
+#: begin_aging-enable loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
 #: ``begin_aging`` verb re-enables exactly this tuple at its breakpoint and the compile seam
 #: disables exactly this tuple — one list,
-#: so the enable/disable stay symmetric as the aging axis grows. Their shared aging.yaml/oak.yaml
-#: parameters are guarded together at the verb boundary.
+#: so the enable/disable stay symmetric as the aging axis grows. Their shared
+#: aging.yaml/oak.yaml/polymerization.yaml parameters are guarded together at the verb boundary.
 _AGING_GATED_PROCESSES = (
     EsterHydrolysis,
     OxidativeAcetaldehyde,
@@ -144,6 +147,7 @@ _AGING_GATED_PROCESSES = (
     StreckerDegradation,
     OakExtraction,
     EllagitanninOxidation,
+    TanninAnthocyaninCondensation,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -273,6 +277,15 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             # hydroxycinnamic_gpl's own isolability.
             "ferulic_acid_gpl",
             "brett_pitch_gpl",
+            # anthocyanin_gpl / tannin_gpl are the optional GRAPE must inputs driving red-wine
+            # tannin–anthocyanin condensation (decision D-79): free monomeric anthocyanin
+            # (bleachable
+            # red pigment) and condensed grape tannin (harsh young astringency), which
+            # TanninAnthocyaninCondensation combines into stable polymeric pigment during aging.
+            # Both absent/0 ⇒ a white / no-tannin wine — the Process is byte-for-byte inert (doubly
+            # substrate-gated), so an undosed run is unchanged. Off every ledger (grape-derived).
+            "anthocyanin_gpl",
+            "tannin_gpl",
             # pof_positive is a binary POF+ strain opt-in (decision D-40 pt4): present/>0 enables
             # YeastPOFDecarboxylation (the yeast cinnamate decarboxylase filling vinylphenols during
             # AF), WHOLLY INDEPENDENT of brett_pitch_gpl. Absent/0 ⇒ a POF-negative wine — the
@@ -389,6 +402,15 @@ def _wine_initial(
         # entirely when this is 0 (tier + perf isolability, the mlf_pitch_gpl pattern).
         "X_brett": _optional(values, "brett_pitch_gpl", 0.0),
         "X_brett_dead": 0.0,  # non-viable Brett lees, empty until BrettDeath (D-40 pt3)
+        # Grape anthocyanin + condensed tannin must inputs (decision D-79); g/L, default 0 (a white
+        # /
+        # no-tannin wine). TanninAnthocyaninCondensation combines them into stable polymeric pigment
+        # during aging (colour stabilization + astringency softening). Off every ledger (grape-
+        # derived, the iso_alpha/ellagitannin precedent), so an undosed run is byte-for-byte the
+        # validated core; the Process is doubly substrate-gated AND disabled at compile until
+        # begin_aging (aging is post-ferment), so present-but-un-aged wine carries them inertly too.
+        "anthocyanin": _optional(values, "anthocyanin_gpl", 0.0),
+        "tannin": _optional(values, "tannin_gpl", 0.0),
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
@@ -547,6 +569,12 @@ def _load_parameters(
         # the oak slots + wires OakExtraction), but loaded universally like the other shared files —
         # collision-free names, inert for beer; INERT until an add_oak dose + begin_aging enable.
         base / "oak.yaml",
+        # Tannin–anthocyanin condensation (decision D-79): the red-wine colour-stabilization +
+        # astringency-softening rate/E_a/yield the TanninAnthocyaninCondensation Process reads.
+        # Wine-only in effect (only wine carries the anthocyanin/tannin slots + wires the Process),
+        # but loaded universally like the other shared files — collision-free names, inert for beer;
+        # INERT until an anthocyanin+tannin must dose + begin_aging enable.
+        base / "polymerization.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 

@@ -7,9 +7,14 @@ sugar is gone, the yeast racked or crashed, and the chemistry that remains is sp
 (hydrolysis, oxidation, condensation), not metabolic. This module holds the aging
 Processes; :class:`EsterHydrolysis` is the first, :class:`OxidativeAcetaldehyde` the second,
 :class:`SulfiteOxidation` the third, :class:`PhenolicBrowning` the fourth,
-:class:`StreckerDegradation` the fifth, and :class:`OakExtraction` (D-77) the sixth — the first
+:class:`StreckerDegradation` the fifth, :class:`OakExtraction` (D-77) the sixth — the first
 **non-oxidative** aging Process and a **separate axis** (barrel/chip aroma extraction, drawing no
-O₂, orthogonal to the whole oxidative sub-axis below).
+O₂, orthogonal to the whole oxidative sub-axis below) — :class:`EllagitanninOxidation` (D-78) the
+seventh (the oak-tannin O₂ sink that bridges the oak axis to the O₂ sub-axis), and
+:class:`TanninAnthocyaninCondensation` (D-79) the eighth — the second **non-oxidative** Process and
+a third **separate axis**: grape anthocyanin + grape tannin condense into stable polymeric pigment
+(red-wine colour stabilization + astringency softening), drawing **neither O₂ nor oak** (see its
+docstring for why it is oak- *and* O₂-independent).
 
 **The oxidative sub-axis (D-71).** :class:`OxidativeAcetaldehyde` opens the *oxidative* half of
 the aging axis on a **dissolved-O₂ pool** (``o2``, a new carbon-free state slot, off every
@@ -1034,4 +1039,144 @@ class EllagitanninOxidation(Process):
         # slots off every ledger, so this consumption moves nothing conserved (the SulfiteOxidation
         # idiom).
         d[schema.slice("ellagitannin")] = -params["y_ellag_per_o2"] * r_o2
+        return d
+
+
+class TanninAnthocyaninCondensation(Process):
+    """Aging condensation: grape anthocyanin + grape tannin → stable polymeric pigment (D-79).
+
+    The eighth aging Process, the **second non-oxidative** one (after :class:`OakExtraction`), and a
+    **third separate axis**: the DOMINANT real red-wine astringency-softening and colour-stabilizing
+    mechanism the D-77/D-78 oak beats deferred and the milestone-3 plan names. As a finished red
+    wine
+    ages, free monomeric **anthocyanin** (the bright, bleachable purple-red pigment) and condensed
+    grape **tannin** (the harsh young flavan-3-ol astringency) combine into **polymeric pigment** —
+    a
+    softer-tasting, SO₂/pH-**stable** colour form (Somers 1971; Ribéreau-Gayon). Two emergent
+    payoffs
+    the D-79 readouts expose: **astringency softens**
+    (:func:`~fermentation.analysis.astringency_series`
+    now reads free tannin — ``tannin + ellagitannin``, both harsh; the polymeric pigment is soft and
+    excluded — so it declines as tannin condenses) and **colour stabilizes**
+    (:func:`~fermentation.analysis.color_series` counts free anthocyanin *and* the polymeric
+    pigment,
+    so total red colour is retained as its form shifts labile → stable — the young purple → aged
+    brick-red evolution).
+
+    ``r = k_polymerization · f(T) · [anthocyanin] · [tannin]`` — **bilinear** in the two grape pools
+    (the :class:`SulfiteOxidation`/:class:`EllagitanninOxidation` form), ``f(T) =
+    arrhenius_factor(T, E_a_polymerization, T_ref)`` the sourced warmer-condenses-faster factor at
+    reaction scale. It consumes both reactants::
+
+        d(anthocyanin)/dt = −r
+        d(tannin)/dt      = −y_tannin_per_anthocyanin · r
+
+    at a **mass-based** yield (``g tannin per g anthocyanin``), *not* a molar stoichiometry — both
+    the anthocyanin pool and the condensed-tannin macromolecule are lumped pools with no clean molar
+    mass, so an ``M_tannin`` would be fake precision (the ``y_ellag_per_o2`` / D-78 precedent).
+
+    **The polymeric pigment is a POST-HOC readout, not a state slot (the A420 discriminator,
+    D-74).**
+    In v1 condensation is the **sole** fate of anthocyanin, so the stable pigment is exactly
+    ``anthocyanin₀ − anthocyanin(t)`` and is reconstructed after the run by
+    :func:`~fermentation.analysis.polymeric_pigment_series` (the ``iso_alpha``/IBU readout pattern).
+    Contrast ``A420``, which **had** to be an integrated slot because its O₂ driver has *competing*
+    sinks so the browning share is not reconstructible; here anthocyanin's **single** fate makes the
+    pigment reconstructible even after the deferred acetaldehyde-bridge beat (that beat only adds a
+    second *formation* pathway — anthocyanin still all → pigment). Only a future **bleaching** beat
+    (a second anthocyanin fate → a *colourless* form) would break the identity and promote the
+    pigment to a slot.
+
+    **Oak-independent AND O₂-independent (the D-79 correctness crux).** Tannin–anthocyanin
+    polymerization is a **grape**-tannin + **grape**-anthocyanin reaction: a steel-tank red with no
+    oak and no oxygen still polymerizes, softens, and stabilizes its colour. So this Process gates
+    on
+    the grape-derived ``anthocyanin`` and ``tannin`` pools **only** — it draws **no** share of the
+    shared ``o2`` budget (unlike every D-71..D-78 oxidative sink) and reads **no** oak pool. In
+    particular ``tannin`` is the grape **condensed** (flavan-3-ol) tannin — a *different* molecule
+    from oak's hydrolysable ``ellagitannin`` (D-78); reusing ellagitannin would wrongly make
+    polymerization impossible without an ``add_oak`` dose. This is the grape ``tannin`` pool the
+    D-78
+    note deliberately left the namespace free for. Because it touches no ``o2`` it does not even
+    interact with the ``k_ethanol_oxidation + k_browning`` always-on anchor — a wholly separate,
+    non-oxidative axis (the :class:`OakExtraction` diffusion-axis precedent, on grape pools).
+
+    **Off every ledger, no conservation term (the ``iso_alpha``/``ellagitannin`` precedent).** Both
+    ``anthocyanin`` and ``tannin`` are grape-derived — their carbon comes from an *untracked*
+    grape-solids source — so they are off ``total_carbon``/``total_mass``/``total_nitrogen`` (like
+    ``iso_alpha``/``A420``/``ellagitannin``), and this Process moves **nothing conserved**: it
+    touches only those two slots and asserts nothing (a pure g/L transfer, so — like
+    :class:`OakExtraction` — no ``chemistry.py`` species registration). This is also why the yield
+    is
+    mass-based: no ledger reads either lump's mass, so it carries no fabricated carbon.
+
+    **Doubly substrate-gated ⇒ adds on top, NO re-baseline (the D-72/D-75 rule).** The rate is
+    bilinear in both pools, each zero unless dosed as a grape must input (``anthocyanin_gpl`` /
+    ``tannin_gpl``), so a **white** wine (no anthocyanin) or a no-tannin run is byte-for-byte the
+    case
+    without this Process. Wine-only (both slots are appended to ``wine_schema``), like
+    :class:`OakExtraction` / :class:`EllagitanninOxidation`; the ``"anthocyanin" not in schema``
+    guard
+    makes it a hard no-op besides. Wired **disabled at the compile seam** (aging is post-ferment);
+    ``begin_aging`` enables it with the other aging Processes. Tier **speculative** (the aging axis
+    is
+    the Tier-3 frontier; the condensation *form* — bimolecular, saturating on the limiting
+    anthocyanin, warmer-faster, softening + colour-stabilizing — is sourced, the magnitudes
+    order-of-magnitude estimates). **Scope (v1):** direct condensation only — the
+    acetaldehyde-bridged
+    (ethylidene) route is the explicit deferred next beat (acetaldehyde is on the carbon ledger, so
+    an
+    off-ledger pigment cannot consume it without breaking closure); tannin self-polymerization and
+    SO₂/pH anthocyanin bleaching are further deferred (so this is *one directional* softening
+    contributor, the D-78 honesty). See ``polymerization.yaml`` for the full scope + provenance.
+    """
+
+    name = "tannin_anthocyanin_condensation"
+    tier = Tier.SPECULATIVE
+    #: Consumes the two grape pools it condenses — both off every ledger (grape-derived, the
+    #: ``ellagitannin`` precedent), so nothing conserved moves; it touches those two and nothing
+    #: else. The polymeric-pigment product is a post-hoc readout (``anthocyanin₀ − anthocyanin``),
+    #: not a slot (the A420 discriminator; see the class docstring), so it is not touched here.
+    touches = ("anthocyanin", "tannin")
+    #: ``k_polymerization``/``E_a_polymerization``/``y_tannin_per_anthocyanin`` are this Process's
+    #: own (polymerization.yaml, D-79); ``T_ref`` is shared with every Arrhenius rate. Their tiers
+    #: cap the ``anthocyanin``/``tannin`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_polymerization",
+        "E_a_polymerization",
+        "y_tannin_per_anthocyanin",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (anthocyanin/tannin are appended to wine_schema): a hard no-op on any
+        # schema without them, belt-and-suspenders to the wine-only wiring.
+        if "anthocyanin" not in schema or "tannin" not in schema:
+            return d
+        anthocyanin = float(y[schema.slice("anthocyanin")][0])
+        tannin = float(y[schema.slice("tannin")][0])
+        # No anthocyanin OR no tannin ⇒ no condensation: a white wine (no anthocyanin) or a
+        # no-tannin
+        # run is byte-for-byte the case without this Process. Gate on the grape STATE before reading
+        # any polymerization param (the OakExtraction/Strecker substrate-gate-before-params
+        # discipline — an enabled-but-undosed Process mustn't KeyError if polymerization.yaml is
+        # absent). ``<= 0`` also absorbs solver undershoot.
+        if anthocyanin <= 0.0 or tannin <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_polymerization"], params["T_ref"])
+        # Bilinear direct condensation (the SulfiteOxidation/EllagitanninOxidation form): the rate
+        # is
+        # the anthocyanin consumption (g anthocyanin/L/h). No o2 term — a wholly separate, non-
+        # oxidative grape axis (oak- AND O₂-independent), so it never touches the O₂ anchor.
+        r = params["k_polymerization"] * f_t * anthocyanin * tannin  # g anthocyanin/L/h condensed
+        d[schema.slice("anthocyanin")] = -r
+        # Tannin consumed per anthocyanin condensed at a MASS-based yield (g tannin / g
+        # anthocyanin),
+        # NOT a molar stoichiometry — both are lumped pools with no clean molar mass (the
+        # y_ellag_per_o2 idiom). Both slots off every ledger, so this moves nothing conserved.
+        d[schema.slice("tannin")] = -params["y_tannin_per_anthocyanin"] * r
         return d

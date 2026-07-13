@@ -27,7 +27,7 @@ verb-params) at the vocabulary boundary.
 import numpy as np
 import pytest
 
-from fermentation.analysis import astringency_series
+from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
 from fermentation.core.kinetics.aging import (
     EllagitanninOxidation,
     EsterHydrolysis,
@@ -36,6 +36,7 @@ from fermentation.core.kinetics.aging import (
     PhenolicBrowning,
     StreckerDegradation,
     SulfiteOxidation,
+    TanninAnthocyaninCondensation,
 )
 from fermentation.core.media import get_medium
 from fermentation.core.tiers import Tier
@@ -63,6 +64,8 @@ def _wine(
     aging_celsius: float = 25.0,
     amino_acids_gpl: float = 0.0,
     autolysis_rate_per_h: float = 0.0,
+    anthocyanin_gpl: float = 0.0,
+    tannin_gpl: float = 0.0,
 ) -> Scenario:
     # amino_acids_gpl (default 0, byte-for-byte the pre-D-75 helper) doses the assimilable amino
     # must input the StreckerDegradation Process (D-75) draws its aldehyde carbon from; a residual
@@ -70,11 +73,19 @@ def _wine(
     # autolysis_rate_per_h (default 0, byte-for-byte the pre-D-76 helper) instead opts into lees
     # autolysis (D-34): dead biomass self-digests post-dryness, REFILLING amino_acids from the
     # physically-real nitrogen source — the emergent sur-lie → Strecker pathway (D-76), no dose.
+    # anthocyanin_gpl/tannin_gpl (default 0, byte-for-byte the pre-D-79 helper) dose the grape must
+    # inputs the TanninAnthocyaninCondensation Process (D-79) condenses into stable polymeric
+    # pigment
+    # during aging — a red wine (both > 0) softens + stabilizes colour; a white (both 0) is inert.
     initial: dict[str, float] = {"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25}
     if amino_acids_gpl > 0.0:
         initial["amino_acids_gpl"] = amino_acids_gpl
     if autolysis_rate_per_h > 0.0:
         initial["autolysis_rate_per_h"] = autolysis_rate_per_h
+    if anthocyanin_gpl > 0.0:
+        initial["anthocyanin_gpl"] = anthocyanin_gpl
+    if tannin_gpl > 0.0:
+        initial["tannin_gpl"] = tannin_gpl
     return Scenario(
         name="aging-test",
         medium="wine",
@@ -958,7 +969,7 @@ def test_oak_protects_against_oxidation_end_to_end():
     # PARTIAL, not total — the oaked wine still browns and still makes some acetaldehyde.
     assert float(oaked.series("A420")[-1]) > 0.0
     # Astringency readout (mg/L ellagitannin, IBU-exact): positive on the oaked wine, zero un-oaked.
-    astr_oaked = astringency_series(oaked)
+    astr_oaked = astringency_series(oaked.as_trajectory())
     assert np.allclose(astr_oaked, np.asarray(oaked.series("ellagitannin"), dtype=float) * 1000.0)
     assert astr_oaked[-1] > 0.0
     assert float(unoaked.series("ellagitannin")[-1]) == 0.0  # un-oaked wine has no tannin
@@ -985,3 +996,105 @@ def test_add_oak_rejects_unknown_toast_and_wrong_medium():
         compile_scenario(_wine([_add_oak(_FERMENT_DAYS, 4.0, "charred")]))
     with pytest.raises(ValueError, match="wine-only"):
         compile_scenario(_beer([_add_oak(14.0, 4.0, "medium")]))
+
+
+# -- D-79: tannin–anthocyanin condensation end-to-end (red-wine softening + colour stabilization) --
+
+
+def test_polymerization_disabled_without_begin_aging():
+    # Wired into the wine medium (present in the set) but DISABLED at compile — aging is inherently
+    # post-ferment. Even a red wine (grape pools dosed) never activates it until begin_aging.
+    cs = compile_scenario(_wine([], anthocyanin_gpl=0.3, tannin_gpl=2.0))
+    assert TanninAnthocyaninCondensation.name in cs.process_set
+    assert not cs.process_set.is_enabled(TanninAnthocyaninCondensation.name)
+
+
+def test_begin_aging_enables_polymerization_at_the_breakpoint():
+    # The reconfigure enables it alongside the other aging Processes (its name rides in
+    # _AGING_GATED_PROCESSES) — a pure phase switch, mutating no state.
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], anthocyanin_gpl=0.3, tannin_gpl=2.0))
+    assert not cs.process_set.is_enabled(TanninAnthocyaninCondensation.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.mutate is None and event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(TanninAnthocyaninCondensation.name)
+
+
+def test_polymerization_params_ride_in_every_compiled_scenario():
+    # polymerization.yaml is in shared_files, so every compiled scenario carries the condensation
+    # params — inert (read by nothing until begin_aging enables the Process on a grape-dosed wine).
+    cs = compile_scenario(_wine([]))
+    for name in ("k_polymerization", "E_a_polymerization", "y_tannin_per_anthocyanin"):
+        assert name in cs.param_values
+
+
+def test_white_wine_polymerization_is_byte_for_byte_inert():
+    # Doubly substrate-gated: a white wine (no anthocyanin/tannin dose) aged with begin_aging is
+    # byte-for-byte the case without this Process — the grape pools stay 0 and all three readouts
+    # are identically zero (isolability #3).
+    white = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()
+    assert white.success
+    assert float(white.series("anthocyanin")[-1]) == 0.0
+    assert float(white.series("tannin")[-1]) == 0.0
+    white_traj = white.as_trajectory()
+    assert np.all(astringency_series(white_traj) == 0.0)
+    assert np.all(polymeric_pigment_series(white_traj) == 0.0)
+    assert np.all(color_series(white_traj) == 0.0)
+
+
+def test_red_wine_softens_and_stabilizes_colour_end_to_end():
+    # The D-79 spine through the compiled run() path (a red wine: both grape must inputs dosed,
+    # begin_aging enabling the Process over the warm aging tail):
+    #   (1) astringency SOFTENS — free tannin is drawn down from its young (post-ferment) value;
+    #   (2) polymeric pigment RISES from 0 (the stable pigment = anthocyanin condensed);
+    # (3) total colour is RETAINED (free anthocyanin declines, stable pigment rises, sum constant);
+    #   (4) OAK-INDEPENDENT — no add_oak anywhere, yet it softens and stabilizes (a steel-tank red).
+    red = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)], anthocyanin_gpl=0.3, tannin_gpl=2.0, aging_celsius=25.0
+        )
+    ).run()
+    assert red.success
+    red_traj = red.as_trajectory()
+
+    astr = astringency_series(red_traj)
+    # No oak, so astringency is exactly grape tannin × 1000; it softens over the aging tail.
+    assert np.allclose(astr, np.asarray(red.series("tannin"), dtype=float) * 1000.0)
+    assert astr[-1] < astr[0]
+
+    pig = polymeric_pigment_series(red_traj)
+    assert pig[0] == pytest.approx(0.0)
+    assert pig[-1] > 0.0  # stable pigment formed
+
+    # Total colour retained: free anthocyanin genuinely declined (the REAL Process signal), but the
+    # colour sum holds at the initial anthocyanin. NOTE: in v1 color_series ≡ antho0 × 1000 is an
+    # algebraic identity (pigment is the reconstructed drawdown), so it documents the v1
+    # stabilization
+    # physics, not an independent Process check — hence the anthocyanin drawdown is the load-bearing
+    # assertion here.
+    col = color_series(red_traj)
+    assert float(red.series("anthocyanin")[-1]) < 0.3  # the genuine dynamic
+    assert np.allclose(col, 0.3 * 1000.0)  # conserved-by-construction (documents, does not verify)
+
+
+def test_red_wine_polymerization_off_ledger_end_to_end():
+    # Both grape pools are off every ledger (grape-derived), so condensation moves nothing
+    # conserved:
+    # total_carbon and total_nitrogen close across the whole ferment+aging run (a pure reconfigure,
+    # no external flow), exactly as the un-dosed aged run does (the OakExtraction precedent).
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], anthocyanin_gpl=0.3, tannin_gpl=2.0))
+    traj = cs.run()
+    assert traj.success
+    assert traj.external_flows == ()  # grape must inputs are t0 initial conditions, not flows
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    schema = cs.schema
+    assert_conserved(
+        traj.as_trajectory(), total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon"
+    )
+    assert_conserved(
+        traj.as_trajectory(),
+        total_nitrogen(schema, biomass_nitrogen_fraction=f_n),
+        label="nitrogen",
+    )
+    assert_nonnegative(traj.as_trajectory(), ("anthocyanin", "tannin"), atol=1e-9)

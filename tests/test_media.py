@@ -54,6 +54,12 @@ WINE_OAK_SLOTS = (
     "whiskey_lactone_ceiling", "vanillin_ceiling", "guaiacol_ceiling", "eugenol_ceiling",
     "ellagitannin", "ellagitannin_ceiling",
 )  # fmt: skip
+# The tannin–anthocyanin condensation axis (decision D-79), appended last: the two GRAPE must-input
+# pools TanninAnthocyaninCondensation condenses into stable polymeric pigment — anthocyanin (the
+# bleachable red pigment) + condensed grape tannin (the harsh young astringency). Both off every
+# ledger (grape-derived, the iso_alpha/ellagitannin precedent); grape `tannin` is distinct from oak
+# `ellagitannin`. Wine-only. The polymeric-pigment product is a post-hoc readout, not a slot.
+WINE_POLYMERIZATION_SLOTS = ("anthocyanin", "tannin")
 
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
@@ -75,6 +81,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_KETO_ACID_SLOTS
         + WINE_STRECKER_SLOTS
         + WINE_OAK_SLOTS
+        + WINE_POLYMERIZATION_SLOTS
     )
     assert schema.spec("S").size == 1
     # 20 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
@@ -91,7 +98,10 @@ def test_wine_schema_has_single_sugar_slot():
     # + 10 oak slots (4 aroma extractives whiskey_lactone/vanillin/guaiacol/eugenol + 4 set-and-hold
     # ceilings — the non-oxidative barrel/chip axis, D-77 — plus the ellagitannin
     # TASTE/O₂-scavenging pool + its ceiling, the bridge to the O₂ sub-axis, D-78)
-    assert schema.size == 53
+    # + 2 grape polymerization slots (anthocyanin + condensed tannin — the red-wine colour-
+    # stabilization + astringency-softening axis, D-79; the polymeric-pigment product is a post-hoc
+    # readout, not a slot)
+    assert schema.size == 55
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -331,6 +341,12 @@ WINE_AGING_PROCESSES = {"sulfite_oxidation", "strecker_degradation"}
 # wine-only ellagitannin pool. Both wired into the wine medium only, same compile-seam disable /
 # begin_aging re-enable.
 WINE_OAK_PROCESSES = {"oak_extraction", "ellagitannin_oxidation"}
+# WINE-ONLY, NON-oxidative aging (D-79): tannin_anthocyanin_condensation condenses the two GRAPE
+# pools (anthocyanin + condensed tannin) into stable polymeric pigment — the red-wine colour-
+# stabilization + astringency-softening axis. A THIRD separate axis: it draws no O₂ (unlike every
+# oxidative sink) and reads no oak pool (grape tannin ≠ oak ellagitannin), so a steel-tank red still
+# polymerizes. Wired into the wine medium only, same compile-seam disable / begin_aging re-enable.
+WINE_POLYMERIZATION_PROCESSES = {"tannin_anthocyanin_condensation"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -350,6 +366,7 @@ EXPECTED_PROCESSES = {
         | AGING_PROCESSES
         | WINE_AGING_PROCESSES
         | WINE_OAK_PROCESSES
+        | WINE_POLYMERIZATION_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

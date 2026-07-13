@@ -19,7 +19,7 @@ D-64 loss-Process pattern), off the fermentation ProcessSet so isolability is pr
 import numpy as np
 import pytest
 
-from fermentation.analysis import astringency_series
+from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
 from fermentation.core.acidbase import bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
@@ -40,6 +40,7 @@ from fermentation.core.kinetics import (
     PhenolicBrowning,
     StreckerDegradation,
     SulfiteOxidation,
+    TanninAnthocyaninCondensation,
     arrhenius_factor,
 )
 from fermentation.core.kinetics.aging import _SO2_PER_O2
@@ -1572,3 +1573,213 @@ def test_ellagitannin_oxidation_tier_floored_at_speculative(ellag_store):
     ps = ProcessSet(schema, [EllagitanninOxidation()])
     assert ps.tier_of("ellagitannin") is Tier.SPECULATIVE
     assert ps.tier_of("ellagitannin", ellag_store.tier_map()) is Tier.SPECULATIVE
+
+
+# -- D-79: TanninAnthocyaninCondensation — red-wine colour stabilization + astringency softening --
+#
+# The eighth aging Process, the SECOND non-oxidative one (after OakExtraction) and a THIRD separate
+# axis: grape anthocyanin + grape tannin condense (bilinear) into stable polymeric pigment — the
+# DOMINANT softening + colour-evolution mechanism D-77/D-78 deferred. These tests pin the
+# closed-form
+# derivative, the bilinearity, the OFF-EVERY-LEDGER invariance, the doubly-substrate-gated
+# isolability
+# (a white / no-tannin wine is byte-for-byte inert; no o2 term ⇒ oak- AND O₂-independent), the
+# warmer-faster ordering, the wine-only no-op on beer, the speculative tier floor, and the three
+# readouts (astringency softens, polymeric pigment rises, colour is retained).
+
+
+@pytest.fixture
+def poly_store():
+    # Wine params + polymerization.yaml (k_polymerization, E_a_polymerization,
+    # y_tannin_per_anthocyanin,
+    # T_ref) — the shared_files the D-79 compile seam wires. TanninAnthocyaninCondensation reads its
+    # own rate/E_a/yield from here. (The plain ``store`` fixture omits polymerization.yaml.)
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml", default_data_dir() / "polymerization.yaml"
+    )
+
+
+@pytest.fixture
+def poly_params(poly_store):
+    return poly_store.resolve()
+
+
+def test_polymerization_metadata():
+    p = TanninAnthocyaninCondensation()
+    assert p.name == "tannin_anthocyanin_condensation"
+    # Speculative: the aging axis is the Tier-3 frontier.
+    assert p.tier is Tier.SPECULATIVE
+    # Touches ONLY the two grape pools it condenses — both off every ledger, so nothing conserved
+    # moves (the OakExtraction/EllagitanninOxidation precedent). NO o2 (a non-oxidative grape axis).
+    assert set(p.touches) == {"anthocyanin", "tannin"}
+    assert "o2" not in p.touches  # oak- AND O₂-independent (the D-79 crux)
+    assert set(p.reads) == {
+        "k_polymerization",
+        "E_a_polymerization",
+        "y_tannin_per_anthocyanin",
+        "T_ref",
+    }
+
+
+def test_polymerization_closed_form(poly_params):
+    # r = k·f(T)·[anthocyanin]·[tannin] (bilinear); d(antho)/dt = −r; d(tannin)/dt = −y·r
+    # (mass-based
+    # consumption). Verify both exactly, and that nothing else moves (no o2, no carbon borrow).
+    schema = wine_schema()
+    t = 298.15  # off T_ref so the Arrhenius factor bites
+    antho, tannin = 0.3, 2.0
+    y = _aged_wine(schema, esters=0.0, t=t, anthocyanin=antho, tannin=tannin)
+    d = TanninAnthocyaninCondensation().derivatives(0.0, y, schema, poly_params)
+
+    f_t = arrhenius_factor(t, poly_params["E_a_polymerization"], poly_params["T_ref"])
+    k = poly_params["k_polymerization"]
+    y_tannin = poly_params["y_tannin_per_anthocyanin"]
+    r = k * f_t * antho * tannin
+    assert schema.get(d, "anthocyanin") == pytest.approx(-r)
+    assert schema.get(d, "tannin") == pytest.approx(-y_tannin * r)
+    # A separate, non-oxidative grape axis: it touches NO o2 and borrows no carbon — nothing else.
+    for var in ("X", "S", "E", "N", "CO2", "o2", "A420", "acetaldehyde", "ellagitannin"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_polymerization_is_bilinear(poly_params):
+    # Bilinear in BOTH grape drivers: doubling anthocyanin OR doubling tannin doubles the rate.
+    schema = wine_schema()
+    base = TanninAnthocyaninCondensation().derivatives(
+        0.0, _aged_wine(schema, esters=0.0, anthocyanin=0.2, tannin=1.5), schema, poly_params
+    )
+    twice_antho = TanninAnthocyaninCondensation().derivatives(
+        0.0, _aged_wine(schema, esters=0.0, anthocyanin=0.4, tannin=1.5), schema, poly_params
+    )
+    twice_tannin = TanninAnthocyaninCondensation().derivatives(
+        0.0, _aged_wine(schema, esters=0.0, anthocyanin=0.2, tannin=3.0), schema, poly_params
+    )
+    assert schema.get(twice_antho, "anthocyanin") == pytest.approx(
+        2.0 * schema.get(base, "anthocyanin")
+    )
+    assert schema.get(twice_tannin, "anthocyanin") == pytest.approx(
+        2.0 * schema.get(base, "anthocyanin")
+    )
+    assert schema.get(base, "anthocyanin") < 0.0  # actually condensing
+
+
+def test_polymerization_inert_without_anthocyanin_or_tannin(poly_params):
+    # Doubly substrate-gated: no anthocyanin OR no tannin ⇒ byte-for-byte zero. A white wine (no
+    # anthocyanin) or a no-tannin wine is exactly the case without this Process (isolability #3).
+    schema = wine_schema()
+    p = TanninAnthocyaninCondensation()
+    no_antho = _aged_wine(schema, esters=0.0, anthocyanin=0.0, tannin=2.0)
+    no_tannin = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=0.0)
+    assert np.array_equal(p.derivatives(0.0, no_antho, schema, poly_params), schema.zeros())
+    assert np.array_equal(p.derivatives(0.0, no_tannin, schema, poly_params), schema.zeros())
+    # Solver undershoot (negative) is likewise absorbed.
+    undershoot = _aged_wine(schema, esters=0.0, anthocyanin=-1e-9, tannin=2.0)
+    assert np.array_equal(p.derivatives(0.0, undershoot, schema, poly_params), schema.zeros())
+
+
+def test_polymerization_gate_before_params_is_keyerror_safe(params):
+    # An enabled-but-undosed Process must not KeyError when polymerization.yaml is absent: the
+    # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks k_polymerization,
+    # yet a white wine (anthocyanin 0) returns zero — the gate-on-STATE-before-params discipline.
+    schema = wine_schema()
+    y = _aged_wine(schema, esters=0.0, anthocyanin=0.0, tannin=0.0)
+    d = TanninAnthocyaninCondensation().derivatives(0.0, y, schema, params)
+    assert np.array_equal(d, schema.zeros())
+
+
+def test_polymerization_rises_with_temperature(poly_params):
+    # Warmer condenses faster (E_a > 0, reaction-scale): the |anthocyanin| draw grows with T.
+    schema = wine_schema()
+    cold = TanninAnthocyaninCondensation().derivatives(
+        0.0,
+        _aged_wine(schema, esters=0.0, t=283.15, anthocyanin=0.3, tannin=2.0),
+        schema,
+        poly_params,
+    )
+    warm = TanninAnthocyaninCondensation().derivatives(
+        0.0,
+        _aged_wine(schema, esters=0.0, t=303.15, anthocyanin=0.3, tannin=2.0),
+        schema,
+        poly_params,
+    )
+    assert abs(float(schema.get(warm, "anthocyanin"))) > abs(float(schema.get(cold, "anthocyanin")))
+
+
+def test_polymerization_wine_only_noop_on_beer(poly_params):
+    # Wine-only (anthocyanin/tannin are appended to wine_schema): a hard no-op on beer (no slots).
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 100.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    assert np.array_equal(
+        TanninAnthocyaninCondensation().derivatives(0.0, yb, beer, poly_params), beer.zeros()
+    )
+
+
+def test_polymerization_moves_nothing_conserved(poly_store, poly_params):
+    # Both anthocyanin and tannin are off every ledger (grape-derived / carbon-free), so condensing
+    # them moves NOTHING conserved — total_carbon, total_mass AND total_nitrogen all exactly flat
+    # (the OakExtraction/EllagitanninOxidation off-every-ledger invariance). X=0 throughout.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [TanninAnthocyaninCondensation()], strict=True)
+    y0 = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=2.0)
+    traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success
+    f_c = poly_store.value("biomass_C_fraction")
+    f_n = poly_store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+
+
+def test_polymerization_softens_and_stabilizes_colour(poly_params):
+    # The D-79 spine, exercised over a long aging span (a red wine: both grape pools dosed):
+    #   (1) astringency_series (free tannin) SOFTENS — tannin is drawn down monotonically as it
+    #       condenses (here ellagitannin ≡ 0, so astringency == tannin × 1000);
+    #   (2) polymeric_pigment_series RISES from 0 (the stable pigment = anthocyanin condensed);
+    # (3) color_series is RETAINED (== initial anthocyanin × 1000, conserved in v1) — the observable
+    #       dynamic is the monomeric → polymeric shift, not colour loss (bleaching deferred).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [TanninAnthocyaninCondensation()], strict=True)
+    antho0, tannin0 = 0.3, 2.0
+    y0 = _aged_wine(schema, esters=0.0, anthocyanin=antho0, tannin=tannin0)
+    traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
+    assert traj.success
+
+    # (1) astringency softens — monotone non-increasing, ends well below the start (tol >> the ~1e-7
+    # mg/L adaptive-solver jitter at the tail plateau, << the ~900 mg/L signal). Tannin asymptotes
+    # to tannin0 − y·antho0 as the limiting anthocyanin depletes (~1100 mg/L here — a MODEST draw,
+    #     the "one directional contributor" scope: self-polymerization deferred).
+    astr = astringency_series(traj)
+    assert np.all(np.diff(astr) <= 1e-4)
+    assert astr[-1] < astr[0] - 100.0
+    # With no oak, astringency is exactly grape tannin × 1000.
+    assert np.allclose(astr, np.asarray(traj.series("tannin"), dtype=float) * 1000.0)
+
+    # (2) polymeric pigment rises from 0 = the anthocyanin condensed (antho0 − antho) × 1000.
+    pig = polymeric_pigment_series(traj)
+    assert pig[0] == pytest.approx(0.0)
+    assert pig[-1] > 0.0
+    assert np.all(np.diff(pig) >= -1e-4)  # monotone non-decreasing (bar solver jitter)
+    expected_pig = (antho0 - np.asarray(traj.series("anthocyanin"), dtype=float)) * 1000.0
+    assert np.allclose(pig, expected_pig)
+
+    # (3) total colour is RETAINED — free anthocyanin declines but polymeric pigment rises, so the
+    # sum holds at the initial anthocyanin (condensation loses no colour, it stabilizes it). NOTE:
+    # in v1 this equality is an ALGEBRAIC IDENTITY (color_series = anthocyanin + (antho0 −
+    # anthocyanin)
+    # ≡ antho0), so it documents the v1 stabilization physics but does NOT independently verify the
+    # Process — that is test_polymerization_closed_form's job. The genuine Process signal is the
+    # anthocyanin drawdown asserted next.
+    col = color_series(traj)
+    assert np.allclose(col, antho0 * 1000.0)
+    assert float(traj.series("anthocyanin")[-1]) < antho0  # free anthocyanin genuinely declined
+
+
+def test_polymerization_tier_floored_at_speculative(poly_store):
+    # Speculative in FORM (Tier-3 frontier) and capped by its speculative polymerization params
+    # (D-1).
+    # Both grape pools it writes are speculative pre- and post-parameter-tier propagation.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [TanninAnthocyaninCondensation()])
+    for pool in ("anthocyanin", "tannin"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, poly_store.tier_map()) is Tier.SPECULATIVE

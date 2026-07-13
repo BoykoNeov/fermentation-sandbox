@@ -6307,3 +6307,103 @@ decline, and the protection spine driven through the compiled `run()` path — t
 projection), the non-oxidative Maillard Strecker route, the deferred **tannin–anthocyanin polymerization** beat (the
 dominant astringency-softening + red-colour mechanism, now unblocked by the `ellagitannin` pool), barrel-age /
 fill-number depletion (a ceiling multiplier < 1), or barrel-beer oak.
+
+## D-79 — `TanninAnthocyaninCondensation` built: red-wine colour stabilization + astringency softening — the DOMINANT mechanism, a THIRD non-oxidative axis on GRAPE pools (§4.1)
+
+**Date:** 2026-07-13. **Milestone 3 / Tier-3, the eighth aging Process**, the **second non-oxidative** one (after
+`OakExtraction`), and the **dominant** red-wine astringency-softening + colour-evolution mechanism the D-77/D-78 oak
+beats deferred and the milestone plan named. As a finished red wine ages, free monomeric **anthocyanin** (the bright,
+bleachable purple-red grape pigment) and condensed grape **tannin** (the harsh young astringency) condense into a
+softer, SO₂/pH-**stable** polymeric pigment — the young-purple → aged-brick-red evolution. **One `advisor()` pass**
+(before writing) that adjusted two of my leanings — one of which would have broken conservation. **868 tests** (+14 =
+10 Process + 4 scenario, minus the schema/process enumeration edits), `ruff`/`mypy`/`pytest` green.
+
+**The acetaldehyde bridge is DEFERRED — it was a conservation trap (the advisor's load-bearing catch).** I was about
+to include the acetaldehyde-mediated (ethylidene) condensation route as a second additive rate term, reusing the
+existing `acetaldehyde` pool. The advisor caught that `acetaldehyde` is **on the carbon ledger** (its carbon is
+borrowed exactly from `E` by `OxidativeAcetaldehyde`, D-71) — so an **off-ledger** pigment consuming the on-ledger
+acetaldehyde pool would make carbon **vanish** and fail `assert_conserved` (a prime-directive violation, hidden
+behind "it reuses the existing pool"). So **v1 = direct condensation only**, fully off-ledger, and the
+acetaldehyde-bridge route is the **explicit named next beat** (it needs a split-ledger accounting of its own). This
+is the same "one contributor, defer the rest" scoping D-78 used.
+
+**Substrate is GRAPE `tannin`, NOT oak `ellagitannin` — correctness, not preference (the advisor's second
+adjustment).** Tannin–anthocyanin polymerization is a **grape**-tannin + **grape**-anthocyanin reaction and is
+**oak-independent AND O₂-independent**: a steel-tank red with no oak and no oxygen still polymerizes, softens, and
+stabilizes its colour. Reusing oak `ellagitannin` (D-78's hydrolysable tannin, a *different* molecule) would wrongly
+make polymerization impossible without an `add_oak` dose. So the beat adds the grape **condensed** `tannin` pool the
+D-78 note deliberately **left the namespace free for**, plus a free-monomeric `anthocyanin` pool — both **grape must
+inputs** (`anthocyanin_gpl` / `tannin_gpl`, default 0 ⇒ a white wine, the `hydroxycinnamic_gpl` precedent). The
+Process draws **no** share of the `o2` budget and reads **no** oak pool — a **third separate axis** (after the
+oxidative sub-axis and the oak diffusion axis), so it doesn't even touch the `k_ethanol_oxidation + k_browning`
+anchor.
+
+**The Process.** `r = k_polymerization · f(T) · [anthocyanin] · [tannin]` (**bilinear**, the `SulfiteOxidation` /
+`EllagitanninOxidation` form; reaction-scale `E_a_polymerization` ≈ 55 kJ/mol, warmer-condenses-faster);
+`d(anthocyanin)/dt = −r`, `d(tannin)/dt = −y_tannin_per_anthocyanin · r`. The tannin-consumption yield is
+**mass-based** (g/g), **not** molar — both are lumped pools with no clean molar mass, so an `M_tannin` would be fake
+precision (the `y_ellag_per_o2` / D-78 idiom). **Doubly substrate-gated** on `anthocyanin` AND `tannin` ⇒ a white /
+no-tannin wine is byte-for-byte inert. **Off every ledger** (both grape pools are grape-derived / unweighted, the
+`iso_alpha`/`ellagitannin` precedent), so it moves **nothing conserved** — no `chemistry.py` change (carbon, mass,
+nitrogen machine-flat, tested). Wine-only; wired into `_POLYMERIZATION_PROCESSES` and `_AGING_GATED_PROCESSES`
+(disabled at compile, enabled by `begin_aging`).
+
+**The polymeric pigment is a POST-HOC readout, NOT a state slot (the A420 discriminator, applied — the advisor's open
+call, decided by the codebase's own criterion).** In v1 condensation is the **sole** fate of anthocyanin, so the
+stable pigment is exactly `anthocyanin₀ − anthocyanin(t)` and is **reconstructible** post-hoc — the `iso_alpha`/IBU
+readout pattern. Contrast `A420`, which **had** to be an integrated slot because its O₂ driver has *competing* sinks
+so its browning share is *not* reconstructible (D-74). Anthocyanin's **single** fate makes the pigment reconstructible
+even through the deferred acetaldehyde-bridge beat (that only adds a second *formation* pathway — anthocyanin still
+all → pigment); only a future **bleaching** beat (a second anthocyanin fate → a *colourless* form) would break the
+identity and promote it to a slot. This keeps v1 to **two** new slots (`anthocyanin`, `tannin`), not three.
+
+**Eyes-open cost of the readout choice (advisor done-call note, accepted).** The advisor flagged, correctly, that
+reconstructibility *permits* a readout but doesn't *prefer* one, and that the readout has two costs a
+`polymeric_pigment` **slot** would avoid: (a) `color_series` (below) becomes an **algebraic identity** (`≡
+anthocyanin₀ × 1000`, a flat line) rather than an independent sum, so it can't verify the Process and can't vary in a
+plot; and (b) there is no testable `anthocyanin + polymeric ≡ anthocyanin₀` conservation invariant. **Accepted, not
+reworked:** the Process is fully verified by `test_polymerization_closed_form` (exact `d(anthocyanin)/dt = −r`,
+`d(tannin)/dt = −y·r`) plus the anthocyanin-drawdown / pigment-rise assertions, so the tautological `color_series`
+equality is **relabelled** in both the docstring and the tests as *documenting the v1 stabilization physics, not
+verifying the Process*. The slot is the natural upgrade **when** the bleaching beat lands (it makes colour genuinely
+non-conserved and the invariant real) — deferred with that beat, kept a readout here for consistency with the
+codebase's reconstructibility discriminator and to hold v1 at two slots.
+
+**Two emergent readouts (`analysis.py`).** (1) **Astringency softens:** `astringency_series` now reads free
+**tannin** — `(tannin + ellagitannin) × 1000`, both harsh; the soft polymeric pigment is **excluded**, and *that
+exclusion* is what makes softening emerge as tannin condenses. This **extends** the D-78 oak-only readout; every
+existing D-78 test (which doses no grape tannin) stays green since `tannin ≡ 0` there. Anthocyanin is the **limiting
+reagent** (tannin ≫ anthocyanin, ~1–4 g/L vs ~0.3 g/L), so A–T condensation alone draws tannin down only *modestly*
+(tannin asymptotes to `tannin₀ − y·anthocyanin₀`) — the "one directional contributor" honesty (tannin
+self-polymerization, the *other* softener, is deferred). (2) **Colour stabilizes:** new `color_series` counts free
+anthocyanin **and** `polymeric_pigment_series`, so total red colour is **retained** as its form shifts labile →
+stable. In v1 the total is conserved (= initial anthocyanin) — condensation loses no colour, it stabilizes it; the
+observable *dynamic* is the monomeric → polymeric shift. Reporting only free anthocyanin would show colour wrongly
+*vanishing* — the advisor's flag. A future SO₂/pH bleaching beat is what makes the total *decline* (the readout is
+already the right shape). Both are **taste/colour**, excluded from the D-67 OAV *odor* lens (the `iso_alpha`/IBU
+precedent), so **no `sensory.yaml` change**.
+
+**Fork confirmations (all per the advisor):** **(A) acetaldehyde bridge deferred** (conservation trap). **(B) grape
+`tannin`, not oak `ellagitannin`** (oak-independent correctness). **(C) colour readout counts polymeric pigment**
+(stabilization, not vanishing). **(D) pigment is a post-hoc readout, not a slot** (my call, by the codebase's own
+A420 reconstructibility discriminator).
+
+**Regression surface.** New: `TanninAnthocyaninCondensation` in `aging.py`; `polymerization.yaml`
+(`k_polymerization` + reaction-scale `E_a_polymerization` + mass-based `y_tannin_per_anthocyanin`, all speculative)
+added to `compile.py` `shared_files`; `anthocyanin` + `tannin` wine slots (grape must inputs); `anthocyanin_gpl` /
+`tannin_gpl` initial conditions + `_ALLOWED_KEYS`; `_POLYMERIZATION_PROCESSES` (wine-only) + into
+`_AGING_GATED_PROCESSES` (disable/`begin_aging` symmetry); `analysis.astringency_series` reworked + new
+`polymeric_pigment_series` / `color_series`. **No `chemistry.py` change** (off every ledger, no molar mass). **No
+OAV / `sensory.yaml` change** (taste/colour, not aroma). Two enumeration tests updated (wine schema 53→55,
+`WINE_POLYMERIZATION_SLOTS` / `WINE_POLYMERIZATION_PROCESSES`); a pre-existing latent mypy arg-type on the D-78
+`astringency_series(oaked)` call (a `ScheduledTrajectory` where a `Trajectory` is expected) surfaced by the
+re-analysis and fixed to `.as_trajectory()`. Every default / un-aged / white-wine / no-tannin trajectory
+byte-for-byte unchanged. +10 Process tests (closed form, bilinearity, doubly-gated isolability, gate-before-params
+KeyError-safety, warmer-faster, wine-only-on-beer, the off-every-ledger conservation triple, the soften+stabilize
+spine, the speculative tier floor) + 4 scenario tests (compile disable / `begin_aging` enable, params ride
+everywhere, white-wine byte-for-byte inert, and the red-wine soften+stabilize+off-ledger spine through the compiled
+`run()` path — oak-independently). **Next:** the acetaldehyde-bridged (ethylidene) condensation route (now the named
+next beat — controlled micro-oxygenation stabilizing red colour, needs split-ledger accounting for the on-ledger
+acetaldehyde), tannin self-polymerization (the other softener), SO₂/pH anthocyanin bleaching (promotes the pigment to
+a slot + makes `color_series` decline), beat 1b (descriptor projection), the non-oxidative Maillard Strecker route,
+barrel fill-number depletion, or barrel-beer oak.

@@ -109,6 +109,7 @@ from fermentation.core.kinetics import (
     StreckerDegradation,
     SugarUptakeToEthanolCO2,
     SulfiteOxidation,
+    TanninAnthocyaninCondensation,
     TemperatureRamp,
     YeastAutolysis,
     YeastPOFDecarboxylation,
@@ -563,6 +564,47 @@ def wine_schema() -> StateSchema:
             "cation_charge idiom). OakExtraction reads it (never written by a Process). Off every "
             "ledger. Default 0 ⇒ no oak ⇒ inert",
         ),
+        # Tannin–anthocyanin condensation — the red-wine colour-stabilization +
+        # astringency-softening
+        # aging axis (decision D-79). Two GRAPE-derived must-input pools (the hydroxycinnamic_gpl
+        # precedent): free monomeric anthocyanin (bleachable red pigment) + condensed grape tannin
+        # (harsh young astringency). TanninAnthocyaninCondensation (bilinear) consumes BOTH into a
+        # stable polymeric pigment — a SEPARATE, non-oxidative GRAPE axis: it draws NO o2 (unlike
+        # every oxidative sink) and reads NO oak pool (grape condensed tannin ≠ oak hydrolysable
+        # ellagitannin). The polymeric pigment is a POST-HOC readout (anthocyanin₀ − anthocyanin),
+        # NOT
+        # a slot (the A420 discriminator — anthocyanin's single fate makes it reconstructible). Both
+        # slots are OFF EVERY LEDGER (grape-derived, the iso_alpha/ellagitannin precedent), so the
+        # Process perturbs nothing conserved. default=0 ⇒ a white / no-tannin wine carries neither
+        # and
+        # the Process is byte-for-byte inert (doubly substrate-gated). Wine. Read as TASTE/COLOUR by
+        # analysis.astringency_series / polymeric_pigment_series / color_series, NOT the OAV odor
+        # lens.
+        VarSpec(
+            "anthocyanin",
+            "g/L",
+            default=0.0,
+            description="free monomeric anthocyanin — the bright, bleachable purple-red grape "
+            "pigment (decision D-79). GRAPE must input (default 0 ⇒ white wine). Consumed by "
+            "TanninAnthocyaninCondensation into stable polymeric pigment as the wine ages (the "
+            "young purple → aged brick-red colour evolution). Off every ledger (grape-derived, the "
+            "iso_alpha/ellagitannin precedent). Read as COLOUR by analysis.color_series / "
+            "polymeric_pigment_series (the stable pigment = anthocyanin₀ − anthocyanin), NOT the "
+            "OAV odor lens (colour is not an aroma)",
+        ),
+        VarSpec(
+            "tannin",
+            "g/L",
+            default=0.0,
+            description="condensed grape (flavan-3-ol, skin/seed) tannin — the harsh young-red "
+            "astringency (decision D-79). GRAPE must input (default 0). A DIFFERENT molecule from "
+            "oak's hydrolysable ellagitannin (D-78): this is the grape `tannin` the D-78 namespace "
+            "note left free. Consumed by TanninAnthocyaninCondensation (with anthocyanin) into "
+            "soft polymeric pigment, so astringency SOFTENS. Off every ledger (grape-derived). "
+            "Read "
+            "as TASTE by analysis.astringency_series (mg/L, summed WITH oak ellagitannin — both "
+            "harsh), NOT the OAV odor lens (astringency is a taste, the iso_alpha/IBU exclusion)",
+        ),
     ]
     return StateSchema(specs)
 
@@ -845,6 +887,30 @@ _OAK_PROCESSES: tuple[Callable[[], Process], ...] = (OakExtraction,)
 #: ``ellagitannin`` pool is 0 ⇒ byte-for-byte inert. Params live in ``oak.yaml`` (with the tannin's
 #: extraction yields — all ellagitannin data together).
 _ELLAGITANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (EllagitanninOxidation,)
+
+#: WINE-ONLY tannin–anthocyanin condensation aging Process (decision D-79) — the red-wine
+#: colour-stabilization + astringency-softening axis, the DOMINANT softening mechanism D-77/D-78
+#: deferred. :class:`TanninAnthocyaninCondensation` is the second **non-oxidative** aging Process
+#: (after :class:`OakExtraction`) and a **third separate axis**: as a finished red wine ages, free
+#: grape ``anthocyanin`` and condensed ``tannin`` combine (bilinear ``[anthocyanin]·[tannin]``,
+#: the :class:`SulfiteOxidation` form) into a stable polymeric pigment — softening the astringency
+#: and stabilizing the colour. **OAK- AND O₂-INDEPENDENT** (the D-79 crux): it draws NO share of the
+#: shared ``o2`` budget (unlike every D-71..D-78 oxidative sink) and reads NO oak pool — grape
+#: condensed ``tannin`` differs from oak hydrolysable ``ellagitannin`` (D-78), so a
+#: steel-tank red with no oak and no oxygen still polymerizes (a reused-ellagitannin design would
+#: wrongly require ``add_oak``). Wired into the *wine* medium only (both grape slots are wine-only),
+#: like ``_OAK_PROCESSES``/``_ELLAGITANNIN_PROCESSES``. OFF EVERY LEDGER (both grape pools are
+#: unweighted, the ``iso_alpha``/``ellagitannin`` precedent), so — like :class:`OakExtraction` — it
+#: moves nothing conserved. DOUBLY substrate-gated on ``anthocyanin`` AND ``tannin`` ⇒ zero unless
+#: BOTH are dosed (a white / no-tannin wine is byte-for-byte inert) ⇒ adds ON TOP, NO re-baseline
+#: (and trivially so — no ``o2`` term, so it never touches the ``k_ethanol_oxidation + k_browning``
+#: anchor). The polymeric-pigment product is a POST-HOC readout
+#: (:func:`~fermentation.analysis.polymeric_pigment_series` = ``anthocyanin₀ − anthocyanin``), NOT a
+#: state slot (the A420 discriminator — anthocyanin's single fate makes it reconstructible). Kept in
+#: its OWN isolable tuple (directive #3): DISABLED at compile and re-enabled by ``begin_aging`` (its
+#: name rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
+#: ``polymerization.yaml``.
+_POLYMERIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (TanninAnthocyaninCondensation,)
 
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
@@ -1148,6 +1214,7 @@ MEDIA: dict[str, Medium] = {
             + _STRECKER_PROCESSES
             + _OAK_PROCESSES
             + _ELLAGITANNIN_PROCESSES
+            + _POLYMERIZATION_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),
