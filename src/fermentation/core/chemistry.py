@@ -268,6 +268,22 @@ M_METHIONAL = 4 * _M_C + 8 * _M_H + 1 * _M_O + 1 * _M_S
 #: (phenylalanine's 9 carbons → an 8-carbon aldehyde + CO₂). Nitrogen-free (the amino-acid nitrogen
 #: is deaminated to ``N``), so it sits on ``total_carbon`` but not ``total_nitrogen``.
 M_PHENYLACETALDEHYDE = 8 * _M_C + 8 * _M_H + 1 * _M_O
+#: Ethylidene bridge (—CH(CH₃)—), C2H4 — the representative species for the ``ethyl_bridge`` pool,
+#: the acetaldehyde-derived linker of the **acetaldehyde-bridged (ethylidene) condensation** route
+#: (decision D-80, the split-ledger colour beat deferred at D-79). When dissolved-O₂ acetaldehyde
+#: (D-71) bridges a grape tannin to an anthocyanin — tannin—CH(CH₃)—anthocyanin — the acetaldehyde
+#: **loses its carbonyl oxygen as water** (CH₃CHO + 2 Ar–H → Ar–CH(CH₃)–Ar + H₂O), so the retained
+#: fragment is the two-carbon ethylidene C2H4. Registered (below) so ``carbon_mass_fraction``
+#: weights
+#: the ``ethyl_bridge`` slot: acetaldehyde's carbon (borrowed from ethanol at D-71, so **on** the
+#: carbon ledger) does NOT vanish into the off-ledger grape-phenolic pigment — it is captured here,
+#: on-ledger, and ``total_carbon`` closes to machine precision (the EsterHydrolysis carbon-exact
+#: split: release at ``cf(acetaldehyde)``, redeposit at ``cf(ethylidene)`` — this is the "split
+#: ledger", the grape bulk off-ledger, the acetaldehyde-derived bridge on it). Same 2 carbons as
+#: acetaldehyde; the lost water O is the standing aging-axis mass gap (``total_mass`` weights only
+#: ``{S, E, CO2}``, never asserted on an aging run — the D-71 E→acetaldehyde scope-out). Carbon
+#: fraction 24.022/28.054 ≈ 0.8563. Nitrogen-free.
+M_ETHYLIDENE = 2 * _M_C + 4 * _M_H
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -305,6 +321,7 @@ MOLAR_MASS: dict[str, float] = {
     "ethylguaiacol": M_ETHYLGUAIACOL,
     "methional": M_METHIONAL,
     "phenylacetaldehyde": M_PHENYLACETALDEHYDE,
+    "ethylidene": M_ETHYLIDENE,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -361,6 +378,12 @@ CARBON_ATOMS: dict[str, int] = {
     #: Phenylacetaldehyde (C8H8O) carries EIGHT carbons — phenylalanine (9 C) → an 8-carbon Strecker
     #: aldehyde + CO₂ (decision D-75), the honey-note counterpart to methional.
     "phenylacetaldehyde": 8,
+    #: Ethylidene bridge (C2H4) carries TWO carbons — the same two as its acetaldehyde precursor
+    #: (only the carbonyl O leaves, as water), so the acetaldehyde → ethyl_bridge transfer is a
+    #: carbon-exact C2 → C2 step and the ``ethyl_bridge`` pool sits on ``total_carbon`` (decision
+    #: D-80). This is what keeps the on-ledger acetaldehyde carbon from vanishing into the
+    #: off-ledger grape-phenolic pigment — the split-ledger accounting.
+    "ethylidene": 2,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -418,6 +441,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: themselves carry none — absent from ``total_nitrogen`` (decision D-75).
     "methional": 0,
     "phenylacetaldehyde": 0,
+    #: The ethylidene bridge (C2H4) is nitrogen-free — the acetaldehyde-derived C2 linker carries no
+    #: nitrogen, so the ``ethyl_bridge`` pool is absent from ``total_nitrogen`` (decision D-80).
+    "ethylidene": 0,
 }
 
 

@@ -54,12 +54,16 @@ WINE_OAK_SLOTS = (
     "whiskey_lactone_ceiling", "vanillin_ceiling", "guaiacol_ceiling", "eugenol_ceiling",
     "ellagitannin", "ellagitannin_ceiling",
 )  # fmt: skip
-# The tannin–anthocyanin condensation axis (decision D-79), appended last: the two GRAPE must-input
+# The tannin–anthocyanin condensation axis (decision D-79), appended: the two GRAPE must-input
 # pools TanninAnthocyaninCondensation condenses into stable polymeric pigment — anthocyanin (the
 # bleachable red pigment) + condensed grape tannin (the harsh young astringency). Both off every
 # ledger (grape-derived, the iso_alpha/ellagitannin precedent); grape `tannin` is distinct from oak
-# `ellagitannin`. Wine-only. The polymeric-pigment product is a post-hoc readout, not a slot.
-WINE_POLYMERIZATION_SLOTS = ("anthocyanin", "tannin")
+# `ellagitannin`. Wine-only. The polymeric-pigment product is a post-hoc readout, not a slot. Then
+# the ethyl_bridge slot (decision D-80, appended last): the acetaldehyde-derived ethylidene-bridge
+# carbon AcetaldehydeBridgedCondensation captures ON the carbon ledger (the split-ledger accounting)
+# so the on-ledger acetaldehyde carbon does not vanish into the off-ledger grape pigment. The FIRST
+# aging colour slot on the carbon ledger; filled by the Process (no must input). Wine-only.
+WINE_POLYMERIZATION_SLOTS = ("anthocyanin", "tannin", "ethyl_bridge")
 
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
@@ -101,7 +105,10 @@ def test_wine_schema_has_single_sugar_slot():
     # + 2 grape polymerization slots (anthocyanin + condensed tannin — the red-wine colour-
     # stabilization + astringency-softening axis, D-79; the polymeric-pigment product is a post-hoc
     # readout, not a slot)
-    assert schema.size == 55
+    # + 1 ethyl_bridge slot (the acetaldehyde-bridged / split-ledger colour beat, D-80: the first
+    # aging colour slot ON the carbon ledger, capturing the acetaldehyde carbon the bridged route
+    # consumes so it does not vanish into the off-ledger grape pigment)
+    assert schema.size == 56
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -347,6 +354,12 @@ WINE_OAK_PROCESSES = {"oak_extraction", "ellagitannin_oxidation"}
 # oxidative sink) and reads no oak pool (grape tannin ≠ oak ellagitannin), so a steel-tank red still
 # polymerizes. Wired into the wine medium only, same compile-seam disable / begin_aging re-enable.
 WINE_POLYMERIZATION_PROCESSES = {"tannin_anthocyanin_condensation"}
+# WINE-ONLY, NON-oxidative aging (D-80): acetaldehyde_bridged_condensation — the SPLIT-LEDGER beat,
+# the second pigment-formation pathway and the first link from the oxidative sub-axis to red-wine
+# colour. Dissolved-O₂ acetaldehyde bridges grape tannin to anthocyanin (trilinear), capturing the
+# on-ledger acetaldehyde carbon in the ethyl_bridge slot. Wine-only, same compile-seam disable /
+# begin_aging re-enable.
+WINE_BRIDGE_PROCESSES = {"acetaldehyde_bridged_condensation"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -367,6 +380,7 @@ EXPECTED_PROCESSES = {
         | WINE_AGING_PROCESSES
         | WINE_OAK_PROCESSES
         | WINE_POLYMERIZATION_PROCESSES
+        | WINE_BRIDGE_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

@@ -35,6 +35,7 @@ from pathlib import Path
 from fermentation.core import acidbase
 from fermentation.core.chemistry import sugar_species
 from fermentation.core.kinetics import (
+    AcetaldehydeBridgedCondensation,
     AminoAcidAssimilation,
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
@@ -129,9 +130,12 @@ _BRETT_GATED_PROCESSES = (
 #: drawing no O2) and :class:`EllagitanninOxidation` (the D-78 oak-tannin O₂ scavenging — oak
 #: PROTECTION, the bridge from the oak axis to the O₂ sub-axis) are wine-only (they read wine-only
 #: ``so2_total``/pH, ``amino_acids``/``N``, the oak ceiling/extractive slots and the
-#: ``ellagitannin`` pool respectively), as is :class:`TanninAnthocyaninCondensation` (the D-79
+#: ``ellagitannin`` pool respectively), as are :class:`TanninAnthocyaninCondensation` (the D-79
 #: red-wine colour-stabilization + astringency softening — grape ``anthocyanin`` + grape ``tannin``
-#: condense to stable polymeric pigment; a NON-oxidative grape axis drawing neither O₂ nor oak), so
+#: condense to stable polymeric pigment; a NON-oxidative grape axis drawing neither O₂ nor oak) and
+#: :class:`AcetaldehydeBridgedCondensation` (the D-80 SPLIT-LEDGER beat — dissolved-O₂ acetaldehyde
+#: bridges grape tannin to anthocyanin, the first link from the oxidative sub-axis to red-wine
+#: colour; its ``ethyl_bridge`` slot captures the acetaldehyde carbon on the ledger), so
 #: on beer they are simply absent from the ProcessSet — both the compile-disable and the
 #: begin_aging-enable loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
@@ -148,6 +152,7 @@ _AGING_GATED_PROCESSES = (
     OakExtraction,
     EllagitanninOxidation,
     TanninAnthocyaninCondensation,
+    AcetaldehydeBridgedCondensation,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.

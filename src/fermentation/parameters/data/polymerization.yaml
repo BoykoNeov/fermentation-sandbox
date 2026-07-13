@@ -64,19 +64,28 @@
 # even interact with the k_ethanol_oxidation + k_browning = 5.0e-4 always-on anchor — a wholly
 # separate, non-oxidative axis (the OakExtraction diffusion-axis precedent, but on grape pools).
 #
-# SCOPE (v1), flagged loudly:
-#   * DIRECT condensation ONLY. The ACETALDEHYDE-BRIDGED (ethylidene) condensation route — dissolved
-#     O2 -> acetaldehyde (D-71) -> ethyl-bridge linking tannin and anthocyanin — is the EXPLICIT
-#     named next beat, DEFERRED here because acetaldehyde is ON the carbon ledger (its carbon is
-#     borrowed exactly from E by OxidativeAcetaldehyde): an off-ledger pigment consuming the
-#     on-ledger acetaldehyde pool would make carbon vanish and fail assert_conserved. Building it
-#     cleanly needs a split-ledger accounting that is its own beat. So v1 links the oxidative
-#     sub-axis to colour NOT at all; the bridge beat is where "controlled micro-oxygenation stabilizes
-#     red colour" enters.
+# SCOPE:
+#   * DIRECT condensation (D-79) + the ACETALDEHYDE-BRIDGED (ethylidene) route (D-80, built below).
+#     The bridged route — dissolved O2 -> acetaldehyde (D-71) -> ethyl-bridge linking tannin and
+#     anthocyanin — is the SPLIT-LEDGER beat D-79 deferred. It was deferred because acetaldehyde is
+#     ON the carbon ledger (its carbon is borrowed exactly from E by OxidativeAcetaldehyde): an
+#     off-ledger pigment consuming the on-ledger acetaldehyde pool would make carbon vanish and fail
+#     assert_conserved. The D-80 fix is SPLIT-LEDGER accounting — a NEW on-ledger `ethyl_bridge` state
+#     slot (weighted at cf(ethylidene) in total_carbon) captures the acetaldehyde carbon, so the
+#     grape bulk (anthocyanin/tannin) stays OFF the ledger while the acetaldehyde-derived C2 bridge
+#     stays ON it, and total_carbon closes to machine precision (acetaldehyde C -> bridge C). This is
+#     where "controlled micro-oxygenation stabilizes red colour" enters: add_oxygen -> acetaldehyde
+#     -> bridging -> more pigment + softening + a LOWER oxidised-acetaldehyde note. See the
+#     AcetaldehydeBridgedCondensation Process (fermentation.core.kinetics.aging) and the params below.
 #   * TANNIN SELF-POLYMERIZATION (tannin–tannin condensation, the OTHER big softener) is NOT
 #     modelled — anthocyanin is the limiting reagent here (tannin >> anthocyanin in real wine, ~1-4
 #     g/L vs ~0.3 g/L), so A–T condensation alone draws tannin down only MODESTLY. This is the same
 #     "one directional contributor, does not claim full softening" honesty D-78 established.
+#   * TANNIN-ETHYL-TANNIN (acetaldehyde bridging TWO flavanols, no anthocyanin) is NOT modelled: the
+#     D-80 bridged route anchors on ANTHOCYANIN (tannin-ethyl-anthocyanin only), which is exactly
+#     what keeps anthocyanin's SOLE fate = pigment and so preserves the polymeric_pigment_series =
+#     anthocyanin0 - anthocyanin identity. The tannin-ethyl-tannin branch is deferred alongside the
+#     grape tannin self-polymerization above (both draw tannin without touching anthocyanin/colour).
 #   * PIGMENT COLOUR EQUIVALENCE. Each condensed anthocyanin unit is counted as contributing the SAME
 #     colour as when it was free (just now STABLE) — polymeric pigments' genuinely different (pH/SO2-
 #     resistant, somewhat lower molar-absorptivity) colour is a Tier-3-beyond refinement. So total
@@ -135,4 +144,109 @@ y_tannin_per_anthocyanin:
   provenance:
     source: "author estimate from the tannin–anthocyanin condensation stoichiometry: a roughly 1:1 molar flavanol(-oligomer)–anthocyanin adduct (Somers 1971; Ribéreau-Gayon on condensed-pigment structure), expressed as a MASS ratio because the lumped condensed-tannin macromolecule has no clean molar mass (contrast the real-molecule 2:1 SO2:O2 _SO2_PER_O2)."
     conditions: "g lumped condensed grape tannin consumed per g anthocyanin condensed, generic red wine at T_ref = 293.15 K."
-    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped tannin/anthocyanin pools — the y_ellag_per_o2 idiom). Both tannin and anthocyanin are off every ledger, so this consumption moves nothing conserved. Sets the astringency-softening rate; tannin self-polymerization (the other softener) is deferred, so this is one directional contributor."
+    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped tannin/anthocyanin pools — the y_ellag_per_o2 idiom). Both tannin and anthocyanin are off every ledger, so this consumption moves nothing conserved. Sets the astringency-softening rate; tannin self-polymerization (the other softener) is deferred, so this is one directional contributor. REUSED by the D-80 acetaldehyde-bridged route: the bridged adduct consumes tannin + anthocyanin in the SAME lumped mass ratio as the direct route (one shared stoichiometry, one param)."
+
+# ============================================================================================
+# D-80: THE ACETALDEHYDE-BRIDGED (ETHYLIDENE) CONDENSATION ROUTE — the split-ledger colour beat
+# ============================================================================================
+# The fermentation.core.kinetics.aging.AcetaldehydeBridgedCondensation Process (WINE-ONLY). The
+# SECOND formation pathway to polymeric pigment (after the D-79 direct route above), and the FIRST
+# link from the OXIDATIVE sub-axis (o2 -> acetaldehyde, D-71) to red-wine COLOUR:
+#
+#   r                     = k_acetaldehyde_bridge * f(T) * [free acetaldehyde] * [anthocyanin] * [tannin]
+#   d(anthocyanin)/dt     = -r                                          # OFF-ledger (grape-derived)
+#   d(tannin)/dt          = -y_tannin_per_anthocyanin * r               # OFF-ledger (reuse D-79 yield)
+#   d(acetaldehyde)/dt    = -y_acetaldehyde_per_anthocyanin * r         # ON the carbon ledger (D-27/D-71)
+#   d(ethyl_bridge)/dt    = +(acetaldehyde carbon consumed) / cf(ethylidene)   # ON-ledger, carbon-exact
+#
+# a TRILINEAR lumped termolecular step: the ethyl bridge -CH(CH3)- (from acetaldehyde) links ONE
+# grape tannin unit to ONE anthocyanin unit (tannin-ethyl-anthocyanin), so the rate needs all three
+# present. f(T) = arrhenius_factor(T, E_a_acetaldehyde_bridge, T_ref) (own reaction-scale E_a).
+#
+# THE SPLIT LEDGER (the D-80 crux, and why D-79 deferred it). One reaction straddles two ledgers:
+# the grape-phenolic bulk (anthocyanin + tannin) is OFF every ledger (grape-derived, untracked — the
+# iso_alpha/ellagitannin precedent), but acetaldehyde's carbon is ON the carbon ledger (borrowed
+# exactly from ethanol E by OxidativeAcetaldehyde, D-71). Consuming on-ledger acetaldehyde into an
+# off-ledger pigment would make carbon VANISH and fail assert_conserved (the trap D-79 named). The
+# fix: a NEW on-ledger `ethyl_bridge` state slot (media.wine_schema; weighted at cf(ethylidene) in
+# conservation.total_carbon) captures exactly the acetaldehyde carbon. Carbon closes to machine
+# precision via the EsterHydrolysis carbon-exact split (release at cf(acetaldehyde), redeposit at
+# cf(ethylidene)); the lost carbonyl O (-> water) is the standing aging-axis mass gap (total_mass
+# weights only {S,E,CO2}, never asserted on an aging run — the D-71 E->acetaldehyde scope-out).
+# The bridge MUST be an integrated slot, not a post-hoc readout: acetaldehyde has COMPETING fates
+# (D-27 production, D-71 oxidative production, D-27 reduction to E, D-47 SO2 binding, and now
+# bridging), so the bridged amount is not reconstructible from its drawdown (the A420 discriminator);
+# and total_carbon = weights @ y reads state slots, so the carbon must physically live in a slot.
+#
+# READS FREE ACETALDEHYDE (the D-47 precedent). SO2-bound acetaldehyde is the bisulfite adduct — its
+# carbonyl is blocked, so it CANNOT form the ethylidene bridge (no carbonyl for the flavanol to
+# attack), exactly as AcetaldehydeReduction reduces only free acetaldehyde under SO2 (D-47). So the
+# rate reads free_acetaldehyde when so2_total > 0, else total (the so2_total > 0 guard is exact — an
+# unsulfited run pays no per-RHS pH solve and is byte-for-byte total). EMERGENT payoff: SO2 DELAYS
+# acetaldehyde-mediated colour stabilization (bound acetaldehyde is unavailable to bridge) — a real
+# winemaking fact, emergent from the shared binding equilibrium, nothing scripted.
+#
+# TRIPLY SUBSTRATE-GATED => adds on top, NO re-baseline. Zero unless acetaldehyde AND anthocyanin AND
+# tannin are all present, so a white / no-tannin / no-acetaldehyde wine (and all beer) is
+# byte-for-byte the case without this Process. Wine-only (all three grape/bridge slots are wine-only)
+# + disabled at compile, enabled by begin_aging (aging is post-ferment).
+#
+# SCOPE: tannin-ethyl-tannin (bridging two flavanols, no anthocyanin) is deferred — anchoring on
+# anthocyanin keeps its sole fate = pigment and preserves polymeric_pigment_series = antho0 - antho.
+#
+# TIER: ALL speculative. SOURCED FORM (acetaldehyde bridges anthocyanins and tannins into ethyl-
+# linked polymeric pigments; the reaction is acid-catalysed and warmer-faster; SO2 blocks it via
+# carbonyl binding — Timberlake & Bridle 1976; Es-Safi et al. 1999; Ribéreau-Gayon Handbook of
+# Enology) + SPECULATIVE magnitudes (order-of-magnitude author estimates, banded).
+
+# -- TRILINEAR BRIDGED-CONDENSATION RATE: acetaldehyde + anthocyanin + tannin -> ethyl-bridged pigment
+# r = k_acetaldehyde_bridge * f(T) * [free acetaldehyde] * [anthocyanin] * [tannin]  (all g/L). Units
+# L^2/(g^2*h). Set ~20x k_polymerization PER UNIT so that at a typical micro-ox acetaldehyde level
+# (~0.05 g/L = 50 mg/L) the bridged pseudo-rate k_bridge*[acet] ~ 1e-3 /(g/L)/h is COMPARABLE to the
+# direct k_polymerization (2e-3) — i.e. once acetaldehyde is present the bridged route contributes on
+# the same order as the direct one, the sourced "acetaldehyde ACCELERATES polymerization" fact. Below
+# ~mg/L acetaldehyde it is negligible (no micro-ox => direct route dominates), which is correct.
+k_acetaldehyde_bridge:
+  value: 4.0e-2
+  unit: "L^2/(g^2*h)"   # r = k * f(T) * [free acetaldehyde] * [anthocyanin] * [tannin]  (all g/L)
+  tier: speculative
+  uncertainty: { low: 1.0e-2, high: 1.6e-1, note: "trilinear rate constant at T_ref = 20 C. At ~50 mg/L acetaldehyde the pseudo-bilinear constant k_bridge*[acet] ~ 2.0e-3 L/(g*h) is of order k_polymerization (2.0e-3) — so with micro-ox acetaldehyde present the bridged route condenses anthocyanin on a comparable timescale to the direct route, and jointly they shorten the months-to-years softening/colour-stabilization span. The LOAD-BEARING claim is the FORM (trilinear, needs acetaldehyde) and that acetaldehyde ACCELERATES condensation, not this magnitude. Banded an order of magnitude around ~20x k_polymerization per unit." }
+  provenance:
+    source: "author estimate anchored to the well-established acceleration of tannin–anthocyanin condensation by acetaldehyde: controlled micro-oxygenation / acetaldehyde addition speeds polymeric-pigment formation and colour stabilization in red wine (Timberlake & Bridle 1976, 'Interactions between anthocyanins, phenolic compounds, and acetaldehyde'; Es-Safi et al. 1999, J. Agric. Food Chem., on acetaldehyde-mediated flavanol–anthocyanin condensation; Ribéreau-Gayon et al., Handbook of Enology). The trilinear constant folds the (acetaldehyde-protonation, ethylidene carbocation, two-step flavanol/anthocyanin addition) chemistry into one lumped k."
+    conditions: "generic red wine at cellar pH (~3.4-3.8) and temperature; trilinear in the free-acetaldehyde, free-anthocyanin and condensed-grape-tannin pools (all g/L) at T_ref = 293.15 K. Represents the aggregate acetaldehyde-bridged (ethylidene) condensation forming tannin-ethyl-anthocyanin pigments."
+    notes: "SOURCED FORM (trilinear, acetaldehyde-accelerated, forming stable ethyl-bridged pigment) + SPECULATIVE magnitude. The load-bearing sourced claim is that acetaldehyde ACCELERATES condensation and that the product is a stable polymeric pigment (colour stabilization), not this absolute rate. LUMPED termolecular caveat: real bridging is a multi-step sequence (protonation -> carbinol -> ethylidene carbocation -> addition), collapsed to one mass-action step."
+
+# -- ACTIVATION ENERGY: warmer aging bridges faster (sourced ordering, REACTION-scale) --------------
+# Its OWN parameter (prime directive #2), distinct from E_a_polymerization (the direct route) — same
+# reason E_a_ellagitannin_oxidation is distinct from E_a_oak_extraction (same molecule, separate E_a
+# per mechanism): the direct and bridged condensations are DIFFERENT reactions, so a shared E_a would
+# make this Process read a param whose provenance is about the other route. REACTION-scale (~55
+# kJ/mol), like every other aging reaction E_a and well above the weak diffusion E_a_oak_extraction.
+E_a_acetaldehyde_bridge:
+  value: 55000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 35000.0, high: 75000.0, note: "Q10 ~1.6-2.9 at 20 C. Wine polyphenol condensation activation energies ~35-75 kJ/mol. The SOURCED, load-bearing claim is the SIGN (warmer => faster acetaldehyde-bridged condensation, so warm storage advances colour stabilization faster); the magnitude is speculative and banded. Its OWN parameter (prime directive #2), REACTION-scale, distinct from the direct-route E_a_polymerization and the weak diffusion E_a_oak_extraction." }
+  provenance:
+    source: "SOURCED ORDERING: acetaldehyde-bridged flavanol–anthocyanin condensation and ethyl-bridged pigment formation accelerate with temperature (textbook Arrhenius; accelerated-ageing / micro-oxygenation studies of red-wine colour and polymeric pigment; Ribéreau-Gayon Handbook of Enology). Warm storage advances the ethyl-bridged colour stabilization faster — the established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate acetaldehyde-bridged condensation at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster) is the sourced, load-bearing claim. REACTION-scale (~55 kJ/mol). Its OWN parameter (prime directive #2), distinct from the direct-route E_a_polymerization even though numerically similar — the two are separate reactions."
+
+# -- MASS-BASED ACETALDEHYDE-CONSUMPTION YIELD: g acetaldehyde incorporated per g anthocyanin bridged
+# d(acetaldehyde)/dt = -y_acetaldehyde_per_anthocyanin * r  (both g/L/h). MASS-based (g/g): anthocyanin
+# is a lumped pool with no clean molar mass (an M_anthocyanin would be fake precision — the
+# y_tannin_per_anthocyanin / y_ellag_per_o2 idiom). Sets HOW MUCH acetaldehyde a given amount of
+# bridged anthocyanin consumes (and thus how much ethyl-bridge carbon is booked on-ledger). Central
+# ~0.09 reflects ONE acetaldehyde (44 g/mol) per anthocyanin unit (~500 g/mol) bridged: 44/500 ~ 0.088.
+# UNLIKE the off-ledger tannin/anthocyanin yields, THIS yield drives an ON-LEDGER transfer (acetaldehyde
+# -> ethyl_bridge), so it participates in the carbon balance — but that balance closes for ANY value of
+# this yield (whatever acetaldehyde is consumed is exactly what the bridge pool gains, carbon-exact).
+y_acetaldehyde_per_anthocyanin:
+  value: 0.09
+  unit: "g/g"   # g acetaldehyde consumed per g anthocyanin bridged; d(acetaldehyde)/dt = -y * r
+  tier: speculative
+  uncertainty: { low: 0.03, high: 0.2, note: "g acetaldehyde incorporated per g anthocyanin condensed via the ethyl bridge. One acetaldehyde (44 g/mol) bridges one anthocyanin unit (~500 g/mol lumped), a mass ratio ~0.09; banded to reflect the lumped-pool molar-mass uncertainty. Governs how much acetaldehyde the bridged route draws down (the emergent 'micro-ox lowers the oxidised-acetaldehyde note') and how much ethyl-bridge carbon is booked on-ledger — but total_carbon closes for ANY value (acetaldehyde carbon consumed == ethyl_bridge carbon gained)." }
+  provenance:
+    source: "author estimate from the ethylidene-bridge stoichiometry: one acetaldehyde forms one -CH(CH3)- bridge per tannin–anthocyanin adduct (Timberlake & Bridle 1976; Es-Safi et al. 1999), expressed as a MASS ratio because the lumped anthocyanin pool has no clean molar mass (the y_tannin_per_anthocyanin / y_ellag_per_o2 idiom)."
+    conditions: "g acetaldehyde consumed per g anthocyanin bridged, generic red wine at T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped anthocyanin pool). UNLIKE the direct route's off-ledger yields, this drives an ON-LEDGER acetaldehyde -> ethyl_bridge transfer (the split-ledger carbon capture, D-80); carbon closes for any value, so this only sets the MAGNITUDE of the acetaldehyde drawdown, not whether carbon balances."

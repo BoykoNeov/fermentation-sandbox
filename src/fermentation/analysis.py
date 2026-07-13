@@ -157,19 +157,26 @@ def astringency_series(traj: Trajectory) -> FloatArray:
     exclusion is exactly what makes softening emerge (see below). A red wine with no oak reads grape
     ``tannin`` alone; an oaked white reads ``ellagitannin`` alone; both 0 ⇒ identically zero.
 
-    The trajectory **softens** two ways. (1) The DOMINANT mechanism (D-79):
+    The trajectory **softens** three ways. (1) The DOMINANT mechanism (D-79):
     :class:`~fermentation.core.kinetics.aging.TanninAnthocyaninCondensation` condenses grape
     ``tannin`` (with ``anthocyanin``) into soft polymeric pigment, drawing the free-tannin pool —
     and
-    the astringency — down. (2) The oak contributor (D-78):
+    the astringency — down. (2) The acetaldehyde-bridged route (D-80):
+    :class:`~fermentation.core.kinetics.aging.AcetaldehydeBridgedCondensation` *also* draws
+    ``tannin``
+    down, bridging it to ``anthocyanin`` via a dissolved-O₂ acetaldehyde linker — so
+    **micro-oxygenation
+    softens astringency** (the emergent O₂ → colour/mouthfeel link). (3) The oak contributor (D-78):
     :class:`~fermentation.core.kinetics.aging.EllagitanninOxidation` consumes ``ellagitannin`` to
     scavenge O₂ (oak protection). Oak ``ellagitannin`` also **rises** first as
     :class:`~fermentation.core.kinetics.aging.OakExtraction` diffuses it in toward its
     ``add_oak``-set
-    ceiling. Even with both mechanisms this remains **one-directional-per-pool** honest: grape
+    ceiling. Even with all three mechanisms this remains **one-directional-per-pool** honest: grape
     tannin
-    self-polymerization (the *other* big softener) is a further-deferred beat, so anthocyanin is the
-    limiting reagent and A–T condensation alone softens only modestly (the D-78/D-79 scope).
+    self-polymerization and tannin–ethyl–tannin bridging (the *other* softeners) are
+    further-deferred
+    beats, so anthocyanin is the limiting reagent and A–T condensation softens only modestly (the
+    D-78/D-79/D-80 scope).
 
     TIER (derived not asserted — pass ``ParameterSet.tier_map()`` to ``ProcessSet.tier_of(...)`` for
     each pool's reported tier): the whole aging axis is speculative, so parameter-tier propagation
@@ -200,12 +207,14 @@ def polymeric_pigment_series(traj: Trajectory) -> FloatArray:
     integrated as a slot — anthocyanin here has a **single** fate (→ pigment), so the pigment is
     reconstructible from the pool's own drawdown (the ``iso_alpha``/IBU readout pattern).
     ``anthocyanin₀`` is taken as the trajectory's first stored anthocyanin value (the compiled
-    initial condition; no process moves ``anthocyanin`` but condensation, and it is a t0 grape must
-    input). This stays valid even through the deferred acetaldehyde-bridge beat (which only adds a
-    second *formation* pathway — anthocyanin still all → pigment); only a future **bleaching** beat
-    (a
-    second anthocyanin fate to a *colourless* form) would break the identity and promote the pigment
-    to a slot.
+    initial condition; the only processes that move ``anthocyanin`` are the two condensation routes,
+    and it is a t0 grape must input). This stays valid through the D-80 acetaldehyde-bridge beat:
+    that
+    route adds a second *formation* pathway (:class:`~fermentation.core.kinetics.aging.\
+    AcetaldehydeBridgedCondensation`, tannin–ethyl–anthocyanin) but anthocyanin's sole fate is still
+    → pigment, so ``anthocyanin₀ − anthocyanin`` still equals the total pigment (direct + bridged).
+    Only a future **bleaching** beat (a second anthocyanin fate to a *colourless* form) would break
+    the identity and promote the pigment to a slot.
 
     Requires a wine trajectory carrying the ``anthocyanin`` slot (wine-only, D-79); a white / no-red
     wine (anthocyanin ≡ 0) reads identically zero. TIER: **speculative** (the condensation params

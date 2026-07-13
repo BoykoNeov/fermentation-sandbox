@@ -66,6 +66,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from fermentation.core.kinetics import (
+    AcetaldehydeBridgedCondensation,
     AcetaldehydeProduction,
     AcetaldehydeReduction,
     AcetolactateDecarboxylation,
@@ -605,6 +606,31 @@ def wine_schema() -> StateSchema:
             "as TASTE by analysis.astringency_series (mg/L, summed WITH oak ellagitannin — both "
             "harsh), NOT the OAV odor lens (astringency is a taste, the iso_alpha/IBU exclusion)",
         ),
+        # Acetaldehyde-bridged (ethylidene) condensation — the SPLIT-LEDGER colour beat (decision
+        # D-80), the D-79-deferred second pigment-formation pathway. AcetaldehydeBridgedCondensation
+        # (trilinear in acetaldehyde × anthocyanin × tannin) bridges grape tannin to anthocyanin
+        # with an acetaldehyde-derived ethylidene linker (tannin–ethyl–anthocyanin). Unlike the D-79
+        # direct route (moves nothing conserved), the bridged route consumes ON-LEDGER acetaldehyde
+        # (its carbon borrowed from E at D-71), so this `ethyl_bridge` slot CAPTURES that carbon
+        # on-ledger — weighted at cf(ethylidene) in total_carbon — instead of letting it vanish into
+        # the off-ledger grape pigment (the "split ledger": grape bulk off-ledger, acetaldehyde-
+        # derived bridge on it). The FIRST aging colour slot ON the carbon ledger. Filled BY the
+        # Process (starts at 0, no must input — it accumulates the bridged acetaldehyde carbon);
+        # default=0 ⇒ inert until the Process fires (needs anthocyanin + tannin + acetaldehyde all
+        # present + begin_aging). Wine.
+        VarSpec(
+            "ethyl_bridge",
+            "g/L",
+            default=0.0,
+            description="acetaldehyde-derived ethylidene bridge carbon (—CH(CH₃)—) locked into "
+            "polymeric pigment by AcetaldehydeBridgedCondensation (decision D-80). ON the carbon "
+            "ledger (weighted at cf(ethylidene) in total_carbon): it captures the acetaldehyde "
+            "carbon the bridged route consumes — borrowed from ethanol at D-71 — so it does NOT "
+            "vanish into the off-ledger grape pigment (the SPLIT-LEDGER accounting). Filled by the "
+            "Process (no must input, starts 0); an integrated slot, not a readout, because "
+            "acetaldehyde has competing fates (the A420 discriminator). NOT read by any sensory "
+            "lens (colour is captured via anthocyanin drawdown; this is carbon bookkeeping)",
+        ),
     ]
     return StateSchema(specs)
 
@@ -912,6 +938,32 @@ _ELLAGITANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (EllagitanninOxidat
 #: ``polymerization.yaml``.
 _POLYMERIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (TanninAnthocyaninCondensation,)
 
+#: WINE-ONLY acetaldehyde-bridged condensation aging Process (decision D-80) — the SPLIT-LEDGER
+#: colour beat D-79 deferred, and the second pigment-formation pathway (after
+#: :class:`TanninAnthocyaninCondensation`). :class:`AcetaldehydeBridgedCondensation` is the third
+#: **non-oxidative** aging Process and the FIRST aging colour Process on the **carbon ledger**: as a
+#: finished red wine takes up O₂ (micro-oxygenation), the dissolved-O₂ acetaldehyde
+#: (:class:`OxidativeAcetaldehyde`, D-71) forms an ethylidene bridge ``—CH(CH₃)—`` linking grape
+#: ``tannin`` to ``anthocyanin`` (trilinear ``[acetaldehyde]·[anthocyanin]·[tannin]``), stabilizing
+#: colour and softening astringency — **the first link from the oxidative sub-axis to red-wine
+#: colour** (the "controlled micro-ox stabilizes colour" payoff D-79 named). The grape bulk stays
+#: OFF
+#: every ledger (the D-79 precedent), but acetaldehyde's carbon is ON the ledger (borrowed from
+#: ``E``
+#: at D-71), so a new on-ledger ``ethyl_bridge`` slot captures it (weighted at ``cf(ethylidene)`` in
+#: ``total_carbon``) — the SPLIT LEDGER that keeps carbon from vanishing (the trap D-79 named).
+#: **Reads FREE acetaldehyde** under SO₂ (bound acetaldehyde can't bridge — the D-47 precedent), so
+#: SO₂ *delays* colour stabilization (emergent). TRIPLY substrate-gated on ``acetaldehyde`` AND
+#: ``anthocyanin`` AND ``tannin`` ⇒ zero unless all present (a white / no-tannin / no-acetaldehyde
+#: wine is byte-for-byte inert). Wine-only (the grape/bridge slots are wine-only), like
+#: ``_POLYMERIZATION_PROCESSES``. Kept in its OWN isolable tuple (directive #3): DISABLED at compile
+#: and re-enabled by ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
+#: ``polymerization.yaml`` (with the direct route's — all condensation data together).
+_ACETALDEHYDE_BRIDGE_PROCESSES: tuple[Callable[[], Process], ...] = (
+    AcetaldehydeBridgedCondensation,
+)
+
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
 #: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
@@ -1215,6 +1267,7 @@ MEDIA: dict[str, Medium] = {
             + _OAK_PROCESSES
             + _ELLAGITANNIN_PROCESSES
             + _POLYMERIZATION_PROCESSES
+            + _ACETALDEHYDE_BRIDGE_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

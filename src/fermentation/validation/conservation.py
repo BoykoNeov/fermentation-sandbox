@@ -247,6 +247,23 @@ def total_carbon(
         w[schema.slice("methional")] = carbon_mass_fraction("methional")
     if "phenylacetaldehyde" in schema:
         w[schema.slice("phenylacetaldehyde")] = carbon_mass_fraction("phenylacetaldehyde")
+    # Acetaldehyde-bridged condensation ethyl-bridge pool (decision D-80): the SPLIT-LEDGER capture.
+    # AcetaldehydeBridgedCondensation consumes ON-ledger acetaldehyde (whose carbon is borrowed from
+    # E at D-71) to form an ethylidene bridge —CH(CH₃)— in an OFF-ledger grape-phenolic pigment. If
+    # that acetaldehyde carbon were not re-captured on the ledger it would vanish and fail the
+    # carbon
+    # balance (the trap D-79 named). So this ``ethyl_bridge`` slot is weighted here at ethylidene's
+    # carbon fraction — the acetaldehyde-derived C2 bridge is ON the ledger while the grape bulk
+    # (anthocyanin/tannin) stays OFF it (the "split ledger"). The Process re-deposits the consumed
+    # acetaldehyde carbon here via the EsterHydrolysis carbon-exact split (release at
+    # cf(acetaldehyde), redeposit at cf(ethylidene)), so total_carbon closes to machine precision:
+    # acetaldehyde↓ exactly cancels ethyl_bridge↑ (a NON-trivial closure, unlike the direct D-79
+    # route which moves nothing conserved). On a run without the bridged route the pool is 0
+    # (constant
+    # 0 term). Nitrogen-free (absent from total_nitrogen); the lost carbonyl O (→ water) is the
+    # standing aging-axis mass gap (total_mass weights only {S,E,CO2}, never asserted on aging).
+    if "ethyl_bridge" in schema:
+        w[schema.slice("ethyl_bridge")] = carbon_mass_fraction("ethylidene")
     if "X" in schema:
         if biomass_carbon_fraction is None:
             raise ValueError(

@@ -29,6 +29,7 @@ import pytest
 
 from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
 from fermentation.core.kinetics.aging import (
+    AcetaldehydeBridgedCondensation,
     EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
@@ -1098,3 +1099,124 @@ def test_red_wine_polymerization_off_ledger_end_to_end():
         label="nitrogen",
     )
     assert_nonnegative(traj.as_trajectory(), ("anthocyanin", "tannin"), atol=1e-9)
+
+
+# -- D-80: acetaldehyde-bridged condensation end-to-end (micro-oxygenation → colour, split ledger)
+# --
+
+
+def test_bridged_condensation_disabled_without_begin_aging():
+    # Wired into the wine medium (present in the set) but DISABLED at compile — aging is
+    # post-ferment.
+    # Even a red wine (grape pools dosed) never activates the bridged route until begin_aging.
+    cs = compile_scenario(_wine([], anthocyanin_gpl=0.3, tannin_gpl=2.0))
+    assert AcetaldehydeBridgedCondensation.name in cs.process_set
+    assert not cs.process_set.is_enabled(AcetaldehydeBridgedCondensation.name)
+
+
+def test_begin_aging_enables_bridged_condensation_at_the_breakpoint():
+    # The reconfigure enables it alongside the other aging Processes (its name rides in
+    # _AGING_GATED_PROCESSES) — a pure phase switch, mutating no state.
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], anthocyanin_gpl=0.3, tannin_gpl=2.0))
+    assert not cs.process_set.is_enabled(AcetaldehydeBridgedCondensation.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.mutate is None and event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(AcetaldehydeBridgedCondensation.name)
+
+
+def test_bridged_params_ride_in_every_compiled_scenario():
+    # polymerization.yaml (D-80's params live with the D-79 ones) is in shared_files, so every
+    # compiled scenario carries the bridged-route params — inert until begin_aging on a grape-dosed,
+    # oxygenated wine.
+    cs = compile_scenario(_wine([]))
+    for name in (
+        "k_acetaldehyde_bridge",
+        "E_a_acetaldehyde_bridge",
+        "y_acetaldehyde_per_anthocyanin",
+    ):
+        assert name in cs.param_values
+
+
+def test_micro_oxygenation_drives_bridged_condensation_end_to_end():
+    # THE D-80 SPINE — the first link from the oxidative sub-axis to red-wine colour, through the
+    # compiled run(). ``ethyl_bridge`` (the acetaldehyde carbon captured on-ledger) is a PURE
+    # micro-ox
+    # signal: after fermentation the viable yeast has cleared acetaldehyde to ~0, so an anaerobic
+    # aged
+    # red bridges nothing (ethyl_bridge ≡ 0); dosing O₂ (add_oxygen) makes OxidativeAcetaldehyde
+    # (D-71)
+    # regenerate acetaldehyde, which the bridged route then consumes → ethyl_bridge accumulates. And
+    # SO₂ DELAYS it (bound acetaldehyde can't bridge, D-47/D-80; plus SulfiteOxidation scavenges the
+    # O₂, D-72) — so a sulfited oxygenated red bridges LESS than an unsulfited one. (Anthocyanin,
+    # the
+    # limiting reagent, fully condenses via the direct route in all runs, so the pigment ENDPOINT
+    # saturates and is not the discriminator here — ``ethyl_bridge`` is.)
+    red_args = {"anthocyanin_gpl": 0.3, "tannin_gpl": 2.0}
+    noox = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], **red_args)).run()
+    ox = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 40.0)], **red_args)
+    ).run()
+    ox_so2 = compile_scenario(
+        _wine(
+            [
+                _begin_aging(_FERMENT_DAYS),
+                _add_oxygen(_FERMENT_DAYS, 40.0),
+                _add_so2(_FERMENT_DAYS, 100.0),
+            ],
+            **red_args,
+        )
+    ).run()
+    assert noox.success and ox.success and ox_so2.success
+
+    bridge_noox = float(np.asarray(noox.series("ethyl_bridge"), dtype=float)[-1])
+    bridge_ox = float(np.asarray(ox.series("ethyl_bridge"), dtype=float)[-1])
+    bridge_ox_so2 = float(np.asarray(ox_so2.series("ethyl_bridge"), dtype=float)[-1])
+    # Anaerobic aged red: no acetaldehyde survives to aging ⇒ NO bridging (exactly zero).
+    assert bridge_noox == 0.0
+    # Micro-ox regenerates acetaldehyde ⇒ the bridge accumulates (the O₂ → colour link).
+    assert bridge_ox > 1e-4
+    # SO₂ delays it: the sulfited oxygenated red bridges strictly less (emergent, free-acetaldehyde
+    # +
+    # O₂-scavenging), but still some (partial protection).
+    assert 0.0 < bridge_ox_so2 < bridge_ox
+
+    # The direct route still exhausts anthocyanin in every run (colour endpoint saturates) — so the
+    # bridged route is an ADDITIONAL pigment-formation pathway, not the only one.
+    assert float(ox.series("anthocyanin")[-1]) < 1e-6
+    # Micro-ox sustains a residual acetaldehyde the anaerobic run lacks (O₂ keeps regenerating it).
+    assert float(ox.series("acetaldehyde")[-1]) > float(noox.series("acetaldehyde")[-1])
+
+
+def test_bridged_run_closes_carbon_end_to_end():
+    # THE SPLIT-LEDGER CONSERVATION PROOF at scenario scale. The bridged route consumes ON-ledger
+    # acetaldehyde (borrowed from E at D-71) and books its carbon into the on-ledger ethyl_bridge
+    # slot, so total_carbon closes across the WHOLE E → acetaldehyde → ethyl_bridge chain (the D-71
+    # borrow + the D-80 capture, both carbon-exact). Nitrogen closes too. total_mass is NOT
+    # asserted:
+    # the D-71 E → acetaldehyde transfer moves mass into an unweighted pool (the standing aging-axis
+    # scope-out), and add_oxygen books an external o2 flow besides — carbon (o2 off-ledger) is the
+    # invariant.
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 40.0)],
+            anthocyanin_gpl=0.3,
+            tannin_gpl=2.0,
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    schema = cs.schema
+    assert_conserved(
+        traj.as_trajectory(), total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon"
+    )
+    assert_conserved(
+        traj.as_trajectory(),
+        total_nitrogen(schema, biomass_nitrogen_fraction=f_n),
+        label="nitrogen",
+    )
+    # The ethyl_bridge slot genuinely accumulated (the closure is non-trivial, not vacuous).
+    assert float(np.asarray(traj.series("ethyl_bridge"), dtype=float)[-1]) > 1e-4
+    assert_nonnegative(traj.as_trajectory(), ("anthocyanin", "tannin", "ethyl_bridge"), atol=1e-9)

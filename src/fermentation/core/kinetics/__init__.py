@@ -15,6 +15,7 @@ from fermentation.core.kinetics.acetaldehyde import (
     AcetaldehydeReduction,
 )
 from fermentation.core.kinetics.aging import (
+    AcetaldehydeBridgedCondensation,
     EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
@@ -89,6 +90,7 @@ from fermentation.core.kinetics.vicinal_diketones import (
 )
 
 __all__ = [
+    "AcetaldehydeBridgedCondensation",
     "AcetaldehydeProduction",
     "AcetaldehydeReduction",
     "AcetolactateDecarboxylation",

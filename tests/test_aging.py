@@ -33,6 +33,7 @@ from fermentation.core.chemistry import (
     nitrogen_mass_fraction,
 )
 from fermentation.core.kinetics import (
+    AcetaldehydeBridgedCondensation,
     EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
@@ -69,6 +70,9 @@ _BYP_SHARE = 2.0 / 7.0
 #: Carbon fractions of the two pools the oxidation transfer moves carbon between (E → acetaldehyde).
 _ETHANOL_C = carbon_mass_fraction("ethanol")
 _ACET_C = carbon_mass_fraction("acetaldehyde")
+#: Carbon fraction of the ethylidene bridge (C2H4) — the D-80 split-ledger on-ledger capture
+#: species.
+_ETHYLIDENE_C = carbon_mass_fraction("ethylidene")
 #: Carbon fractions of the Strecker pools + the amino-acid source (D-75), for the closure checks.
 _METHIONAL_C = carbon_mass_fraction("methional")
 _PHENYLACET_C = carbon_mass_fraction("phenylacetaldehyde")
@@ -1783,3 +1787,251 @@ def test_polymerization_tier_floored_at_speculative(poly_store):
     for pool in ("anthocyanin", "tannin"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, poly_store.tier_map()) is Tier.SPECULATIVE
+
+
+# -- D-80: AcetaldehydeBridgedCondensation — the acetaldehyde-bridged (ethylidene) / split-ledger --
+#
+# The ninth aging Process, the THIRD non-oxidative one and the D-79-deferred split-ledger colour
+# beat:
+# dissolved-O₂ acetaldehyde (D-71) bridges grape tannin to anthocyanin (tannin–ethyl–anthocyanin),
+# the
+# FIRST link from the oxidative sub-axis to red-wine colour. Unlike the D-79 direct route (moves
+# nothing conserved), the bridged route consumes ON-ledger acetaldehyde (carbon borrowed from E at
+# D-71), so a new on-ledger ``ethyl_bridge`` slot captures that carbon — the SPLIT LEDGER (grape
+# bulk
+# off-ledger, acetaldehyde-derived bridge on it). These tests pin: the trilinear closed form + the
+# carbon-exact acetaldehyde→ethyl_bridge deposit, the trilinearity, the NON-TRIVIAL carbon closure
+# (acetaldehyde↓ exactly cancels ethyl_bridge↑ — the split-ledger proof), the FREE-acetaldehyde read
+# under SO₂ (bound acetaldehyde can't bridge — SO₂ delays colour stabilization, D-47), the exact
+# unsulfited/undosed isolability, the warmer-faster ordering, the wine-only no-op on beer, and
+# tiers.
+
+
+@pytest.fixture
+def bridge_store():
+    # Wine params + acidbase.yaml (the pKa params free_acetaldehyde/ph_of_state read under SO₂) +
+    # polymerization.yaml (k_acetaldehyde_bridge, E_a_acetaldehyde_bridge, y_acetaldehyde_per_
+    # anthocyanin, y_tannin_per_anthocyanin, T_ref). acidbase is needed for the SO₂ path AND for any
+    # simulate: the BDF numerical Jacobian perturbs so2_total off exact-zero, tripping the pH branch
+    # (the SulfiteOxidation precedent — real compiled wine always loads acidbase.yaml).
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "acidbase.yaml",
+        default_data_dir() / "polymerization.yaml",
+    )
+
+
+@pytest.fixture
+def bridge_params(bridge_store):
+    return bridge_store.resolve()
+
+
+def test_bridge_metadata():
+    p = AcetaldehydeBridgedCondensation()
+    assert p.name == "acetaldehyde_bridged_condensation"
+    assert p.tier is Tier.SPECULATIVE
+    # Touches the two grape pools (off every ledger) PLUS the on-ledger acetaldehyde/ethyl_bridge
+    # pair — the split ledger. The FIRST aging colour Process to touch the carbon ledger.
+    assert set(p.touches) == {"acetaldehyde", "ethyl_bridge", "anthocyanin", "tannin"}
+    assert set(p.reads) == {
+        "k_acetaldehyde_bridge",
+        "E_a_acetaldehyde_bridge",
+        "y_acetaldehyde_per_anthocyanin",
+        "y_tannin_per_anthocyanin",
+        "T_ref",
+    }
+
+
+def test_bridge_closed_form(poly_params):
+    # r = k·f(T)·[acetaldehyde]·[anthocyanin]·[tannin] (trilinear); anchored on anthocyanin. Verify
+    # all four derivatives exactly, INCLUDING the carbon-exact acetaldehyde→ethyl_bridge split
+    # (release at cf(acetaldehyde), redeposit at cf(ethylidene)). No SO₂ ⇒ reads total acetaldehyde.
+    schema = wine_schema()
+    t = 298.15  # off T_ref so the Arrhenius factor bites
+    acet, antho, tannin = 0.05, 0.3, 2.0
+    y = _aged_wine(schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=antho, tannin=tannin)
+    d = AcetaldehydeBridgedCondensation().derivatives(0.0, y, schema, poly_params)
+
+    f_t = arrhenius_factor(t, poly_params["E_a_acetaldehyde_bridge"], poly_params["T_ref"])
+    k = poly_params["k_acetaldehyde_bridge"]
+    y_tannin = poly_params["y_tannin_per_anthocyanin"]
+    y_acet = poly_params["y_acetaldehyde_per_anthocyanin"]
+    r = k * f_t * acet * antho * tannin
+    acet_consumed = y_acet * r
+    assert schema.get(d, "anthocyanin") == pytest.approx(-r)
+    assert schema.get(d, "tannin") == pytest.approx(-y_tannin * r)
+    assert schema.get(d, "acetaldehyde") == pytest.approx(-acet_consumed)
+    # The split-ledger capture: the acetaldehyde carbon released is re-deposited into ethyl_bridge
+    # at
+    # the ethylidene fraction, so carbon released == carbon deposited (machine precision).
+    expected_bridge = acet_consumed * _ACET_C / _ETHYLIDENE_C
+    assert schema.get(d, "ethyl_bridge") == pytest.approx(expected_bridge)
+    assert acet_consumed * _ACET_C == pytest.approx(schema.get(d, "ethyl_bridge") * _ETHYLIDENE_C)
+    # Nothing else moves (no o2, no E borrow, no A420, no oak pools).
+    for var in ("X", "S", "E", "N", "CO2", "o2", "A420", "ellagitannin"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_bridge_is_trilinear(poly_params):
+    # Trilinear: doubling acetaldehyde OR anthocyanin OR tannin each doubles the rate.
+    schema = wine_schema()
+    p = AcetaldehydeBridgedCondensation()
+
+    def rate(acet: float, antho: float, tannin: float) -> float:
+        y = _aged_wine(schema, esters=0.0, acetaldehyde=acet, anthocyanin=antho, tannin=tannin)
+        return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "anthocyanin"))
+
+    base = rate(0.04, 0.2, 1.5)
+    assert rate(0.08, 0.2, 1.5) == pytest.approx(2.0 * base)  # 2× acetaldehyde
+    assert rate(0.04, 0.4, 1.5) == pytest.approx(2.0 * base)  # 2× anthocyanin
+    assert rate(0.04, 0.2, 3.0) == pytest.approx(2.0 * base)  # 2× tannin
+    assert base < 0.0  # actually bridging
+
+
+def test_bridge_inert_without_any_substrate(poly_params):
+    # Triply substrate-gated: no acetaldehyde OR no anthocyanin OR no tannin ⇒ byte-for-byte zero,
+    # so
+    # a white / no-tannin / no-acetaldehyde (reductive, un-oxygenated) wine is exactly the case
+    # without this Process (isolability #3). Solver undershoot (negative) is likewise absorbed.
+    schema = wine_schema()
+    p = AcetaldehydeBridgedCondensation()
+    for kw in (
+        {"acetaldehyde": 0.0, "anthocyanin": 0.3, "tannin": 2.0},
+        {"acetaldehyde": 0.05, "anthocyanin": 0.0, "tannin": 2.0},
+        {"acetaldehyde": 0.05, "anthocyanin": 0.3, "tannin": 0.0},
+        {"acetaldehyde": -1e-9, "anthocyanin": 0.3, "tannin": 2.0},
+    ):
+        y = _aged_wine(schema, esters=0.0, **kw)
+        assert np.array_equal(p.derivatives(0.0, y, schema, poly_params), schema.zeros())
+
+
+def test_bridge_gate_before_params_is_keyerror_safe(params):
+    # An enabled-but-undosed Process must not KeyError when polymerization.yaml is absent: the
+    # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks
+    # k_acetaldehyde_bridge, yet a white wine (anthocyanin 0) returns zero — the
+    # gate-on-STATE-before-params discipline.
+    schema = wine_schema()
+    y = _aged_wine(schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.0, tannin=0.0)
+    d = AcetaldehydeBridgedCondensation().derivatives(0.0, y, schema, params)
+    assert np.array_equal(d, schema.zeros())
+
+
+def test_bridge_reads_free_acetaldehyde_under_so2(bridge_params):
+    # SO₂-bound acetaldehyde is the bisulfite adduct — its carbonyl is blocked, so it CANNOT bridge
+    # (the D-47 precedent). At the SAME total acetaldehyde, a sulfited wine bridges SLOWER than an
+    # unsulfited one (some acetaldehyde is bound and unavailable) — SO₂ DELAYS colour stabilization.
+    schema = wine_schema()
+    p = AcetaldehydeBridgedCondensation()
+    acids = {"tartaric": 4.0, "cation_charge": 0.012}  # a real acid state so pH solves
+    unsulfited = _aged_wine(
+        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.0, **acids
+    )
+    sulfited = _aged_wine(
+        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.05, **acids
+    )
+    r_unsulfited = float(
+        schema.get(p.derivatives(0.0, unsulfited, schema, bridge_params), "anthocyanin")
+    )
+    r_sulfited = float(
+        schema.get(p.derivatives(0.0, sulfited, schema, bridge_params), "anthocyanin")
+    )
+    # Both bridge (negative), but the sulfited rate is throttled toward zero (less free
+    # acetaldehyde).
+    assert r_sulfited < 0.0
+    assert r_unsulfited < 0.0
+    assert abs(r_sulfited) < abs(r_unsulfited)
+
+
+def test_bridge_unsulfited_is_exactly_total_acetaldehyde(bridge_params):
+    # The so2_total > 0 guard is EXACT: at so2_total = 0 the rate uses TOTAL acetaldehyde (no pH
+    # solve), so it equals the trilinear closed form on total acetaldehyde — byte-for-byte the
+    # no-SO₂-branch case. (This is why an unsulfited aging run pays no per-RHS brentq.)
+    schema = wine_schema()
+    acet, antho, tannin, t = 0.05, 0.3, 2.0, 298.15
+    y = _aged_wine(
+        schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=antho, tannin=tannin, so2_total=0.0
+    )
+    d = AcetaldehydeBridgedCondensation().derivatives(0.0, y, schema, bridge_params)
+    f_t = arrhenius_factor(t, bridge_params["E_a_acetaldehyde_bridge"], bridge_params["T_ref"])
+    r = bridge_params["k_acetaldehyde_bridge"] * f_t * acet * antho * tannin
+    assert schema.get(d, "anthocyanin") == pytest.approx(-r)
+
+
+def test_bridge_rises_with_temperature(poly_params):
+    # Warmer bridges faster (E_a > 0, reaction-scale): the |anthocyanin| draw grows with T.
+    schema = wine_schema()
+    p = AcetaldehydeBridgedCondensation()
+    cold = p.derivatives(
+        0.0,
+        _aged_wine(schema, esters=0.0, t=283.15, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0),
+        schema,
+        poly_params,
+    )
+    warm = p.derivatives(
+        0.0,
+        _aged_wine(schema, esters=0.0, t=303.15, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0),
+        schema,
+        poly_params,
+    )
+    assert abs(float(schema.get(warm, "anthocyanin"))) > abs(float(schema.get(cold, "anthocyanin")))
+
+
+def test_bridge_wine_only_noop_on_beer(poly_params):
+    # Wine-only (anthocyanin/tannin/ethyl_bridge are appended to wine_schema): a hard no-op on beer.
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 100.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    yb[beer.slice("acetaldehyde")] = 0.05  # acetaldehyde is medium-agnostic, but no grape pools
+    assert np.array_equal(
+        AcetaldehydeBridgedCondensation().derivatives(0.0, yb, beer, poly_params), beer.zeros()
+    )
+
+
+def test_bridge_carbon_closes_nontrivially(bridge_store, bridge_params):
+    # THE SPLIT-LEDGER PROOF. Unlike the D-79 direct route (moves nothing conserved), the bridged
+    # route genuinely MOVES carbon: it consumes on-ledger acetaldehyde and books its carbon into the
+    # on-ledger ethyl_bridge slot. total_carbon is flat NON-TRIVIALLY — acetaldehyde↓ exactly
+    # cancels
+    # ethyl_bridge↑ (that cancellation IS the split-ledger accounting). total_mass/total_nitrogen
+    # are
+    # flat too, but trivially (the Process touches no {S,E,CO2} or N species). X=0 throughout.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AcetaldehydeBridgedCondensation()], strict=True)
+    # A real acid state so the BDF Jacobian's so2_total perturbation solves pH cleanly (so2_total=0,
+    # so the exact RHS reads total acetaldehyde — the acids are inert here, just pH-well-posed).
+    y0 = _aged_wine(
+        schema,
+        esters=0.0,
+        acetaldehyde=0.05,
+        anthocyanin=0.3,
+        tannin=2.0,
+        tartaric=4.0,
+        cation_charge=0.012,
+    )
+    traj = simulate(ps, params=bridge_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success
+    f_c = bridge_store.value("biomass_C_fraction")
+    f_n = bridge_store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+    # The closure is NON-trivial: acetaldehyde genuinely fell and ethyl_bridge genuinely rose, and
+    # the
+    # carbon lost from one equals the carbon gained by the other (machine precision).
+    acet = np.asarray(traj.series("acetaldehyde"), dtype=float)
+    bridge = np.asarray(traj.series("ethyl_bridge"), dtype=float)
+    assert acet[-1] < acet[0] - 1e-3  # acetaldehyde consumed
+    assert bridge[-1] > bridge[0] + 1e-4  # ethyl_bridge accumulated
+    dC_acet = (acet[-1] - acet[0]) * _ACET_C
+    dC_bridge = (bridge[-1] - bridge[0]) * _ETHYLIDENE_C
+    assert dC_acet + dC_bridge == pytest.approx(0.0, abs=1e-12)
+
+
+def test_bridge_tier_floored_at_speculative(bridge_store):
+    # Speculative in FORM (Tier-3 frontier) and capped by its speculative polymerization params
+    # (D-1),
+    # for every pool it writes — including the on-ledger acetaldehyde/ethyl_bridge pair.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AcetaldehydeBridgedCondensation()])
+    for pool in ("anthocyanin", "tannin", "acetaldehyde", "ethyl_bridge"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, bridge_store.tier_map()) is Tier.SPECULATIVE
