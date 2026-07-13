@@ -248,7 +248,7 @@ def sensory_profile(
 ) -> SensoryProfile:
     """Build the aroma :class:`SensoryProfile` at ``time_index`` (default: the finished state).
 
-    Covers exactly the medium's aroma set (5 pools for beer, 14 for wine) — so the reported
+    Covers exactly the medium's aroma set (9 pools for beer, 14 for wine — D-86) — so the reported
     compounds *are* the medium's, never a wine-only pool on beer. Each reading's tier is the
     :func:`oav_tier` floor over the pool's chemistry tier (read from ``traj.tier_map``) and
     the threshold's tier; both fold under the mandatory speculative floor.

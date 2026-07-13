@@ -1058,9 +1058,10 @@ def test_barrel_beer_oak_protects_against_oxidation():
     # acetaldehyde. Beer already runs the always-on O₂ sinks (OxidativeAcetaldehyde/PhenolicBrowning
     # in the medium-agnostic _AGING_PROCESSES), so the substrate-gated ellag sink adds on top.
     o2_dose = 40.0
-    oaked = compile_scenario(
+    oaked_cs = compile_scenario(
         _beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "light"), _add_oxygen(14.0, o2_dose)])
-    ).run()  # light toast ⇒ most ellagitannin (strongest protection)
+    )  # light toast ⇒ most ellagitannin (strongest protection)
+    oaked = oaked_cs.run()
     unoaked = compile_scenario(
         _beer([_begin_aging(14.0), _add_oxygen(14.0, o2_dose)])
     ).run()
@@ -1068,6 +1069,19 @@ def test_barrel_beer_oak_protects_against_oxidation():
     assert float(oaked.series("A420")[-1]) < float(unoaked.series("A420")[-1])
     assert float(oaked.series("acetaldehyde")[-1]) < float(unoaked.series("acetaldehyde")[-1])
     assert float(oaked.series("A420")[-1]) > 0.0  # PARTIAL, not total — still some browning
+    # The oak axis + EllagitanninOxidation are all off every ledger (wood-derived), so even a
+    # fully-active oaked+oxygenated beer closes carbon + nitrogen (mirrors the wine oaked-ledger
+    # test; the un-oaked beer C+N check adds the off-ledger-slots-are-inert half).
+    f_c = oaked_cs.parameters.value("biomass_C_fraction")
+    f_n = oaked_cs.parameters.value("biomass_N_fraction")
+    assert_conserved(
+        oaked.as_trajectory(), total_carbon(oaked_cs.schema, biomass_carbon_fraction=f_c),
+        label="carbon",
+    )
+    assert_conserved(
+        oaked.as_trajectory(), total_nitrogen(oaked_cs.schema, biomass_nitrogen_fraction=f_n),
+        label="nitrogen",
+    )
 
 
 # -- D-79: tannin–anthocyanin condensation end-to-end (red-wine softening + colour stabilization) --
