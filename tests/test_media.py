@@ -63,7 +63,19 @@ WINE_OAK_SLOTS = (
 # carbon AcetaldehydeBridgedCondensation captures ON the carbon ledger (the split-ledger accounting)
 # so the on-ledger acetaldehyde carbon does not vanish into the off-ledger grape pigment. The FIRST
 # aging colour slot on the carbon ledger; filled by the Process (no must input). Wine-only.
-WINE_POLYMERIZATION_SLOTS = ("anthocyanin", "tannin", "ethyl_bridge")
+# Then the D-81 colour-form pair (appended last): polymeric_pigment — the stable pigment PROMOTED
+# from the D-79 post-hoc readout to an integrated slot (filled by both condensation routes) — and
+# faded_anthocyanin — the colourless, irreversible oxidative-fade sink (filled by AnthocyaninFading,
+# O₂-coupled). Both off every ledger (grape-derived colour-equivalents), both wine-only, both filled
+# by their Processes (no must input). Together they let color_series genuinely decline and close the
+# identity anthocyanin + polymeric_pigment + faded_anthocyanin ≡ anthocyanin₀.
+WINE_POLYMERIZATION_SLOTS = (
+    "anthocyanin",
+    "tannin",
+    "ethyl_bridge",
+    "polymeric_pigment",
+    "faded_anthocyanin",
+)
 
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
@@ -103,12 +115,14 @@ def test_wine_schema_has_single_sugar_slot():
     # ceilings — the non-oxidative barrel/chip axis, D-77 — plus the ellagitannin
     # TASTE/O₂-scavenging pool + its ceiling, the bridge to the O₂ sub-axis, D-78)
     # + 2 grape polymerization slots (anthocyanin + condensed tannin — the red-wine colour-
-    # stabilization + astringency-softening axis, D-79; the polymeric-pigment product is a post-hoc
-    # readout, not a slot)
+    # stabilization + astringency-softening axis, D-79)
     # + 1 ethyl_bridge slot (the acetaldehyde-bridged / split-ledger colour beat, D-80: the first
     # aging colour slot ON the carbon ledger, capturing the acetaldehyde carbon the bridged route
     # consumes so it does not vanish into the off-ledger grape pigment)
-    assert schema.size == 56
+    # + 2 D-81 colour-form slots (polymeric_pigment — the stable pigment PROMOTED from readout to an
+    # integrated slot — and faded_anthocyanin — the colourless oxidative-fade sink; both off-ledger,
+    # letting color_series genuinely decline)
+    assert schema.size == 58
 
 
 def test_beer_schema_has_three_sequential_sugars():

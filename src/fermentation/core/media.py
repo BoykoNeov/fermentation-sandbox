@@ -586,12 +586,14 @@ def wine_schema() -> StateSchema:
             "g/L",
             default=0.0,
             description="free monomeric anthocyanin — the bright, bleachable purple-red grape "
-            "pigment (decision D-79). GRAPE must input (default 0 ⇒ white wine). Consumed by "
-            "TanninAnthocyaninCondensation into stable polymeric pigment as the wine ages (the "
-            "young purple → aged brick-red colour evolution). Off every ledger (grape-derived, the "
-            "iso_alpha/ellagitannin precedent). Read as COLOUR by analysis.color_series / "
-            "polymeric_pigment_series (the stable pigment = anthocyanin₀ − anthocyanin), NOT the "
-            "OAV odor lens (colour is not an aroma)",
+            "pigment (decision D-79). GRAPE must input (default 0 ⇒ white wine). Has TWO fates as "
+            "the wine ages: condensed into stable polymeric_pigment (TanninAnthocyaninCondensation "
+            "D-79 / AcetaldehydeBridgedCondensation D-80 — the young purple → aged brick-red "
+            "evolution) AND oxidatively faded to colourless faded_anthocyanin (AnthocyaninFading "
+            "D-81 — the irreversible bleaching loss). Off every ledger (grape-derived, the "
+            "iso_alpha/ellagitannin precedent). Read as COLOUR by analysis.color_series (free "
+            "anthocyanin + polymeric_pigment; faded is colourless), NOT the OAV odor lens (colour "
+            "is not an aroma)",
         ),
         VarSpec(
             "tannin",
@@ -630,6 +632,50 @@ def wine_schema() -> StateSchema:
             "Process (no must input, starts 0); an integrated slot, not a readout, because "
             "acetaldehyde has competing fates (the A420 discriminator). NOT read by any sensory "
             "lens (colour is captured via anthocyanin drawdown; this is carbon bookkeeping)",
+        ),
+        # Polymeric pigment PROMOTED to an integrated slot + the colourless fade sink — the SO₂/pH
+        # anthocyanin-bleaching beat (decision D-81). D-79/D-80 kept the stable pigment a POST-HOC
+        # readout (anthocyanin₀ − anthocyanin) because condensation was anthocyanin's SOLE fate.
+        # D-81's AnthocyaninFading gives anthocyanin a SECOND, irreversible fate (oxidative
+        # degradation → colourless), so that reconstruction identity breaks (it would wrongly count
+        # faded anthocyanin as pigment) and the pigment MUST become a real slot (the A420
+        # discriminator, D-74). `polymeric_pigment` is now filled by BOTH condensation routes
+        # (direct D-79 + bridged D-80, d/dt = +r each); `faded_anthocyanin` is filled by
+        # AnthocyaninFading. Both OFF EVERY LEDGER (grape-derived colour-equivalents, the
+        # anthocyanin/tannin precedent), both filled BY their Processes (no must input, start 0),
+        # both wine-only. Together they close the three-slot colour identity anthocyanin +
+        # polymeric_pigment + faded_anthocyanin ≡ anthocyanin₀ (holds by construction — the d/dt
+        # terms sum to zero — NOT via assert_conserved, whose weights are 0 for these off-ledger
+        # slots).
+        VarSpec(
+            "polymeric_pigment",
+            "g/L",
+            default=0.0,
+            description="stable polymeric pigment (tannin–anthocyanin condensate) — the "
+            "SO₂/pH-STABLE aged red colour form (decision D-81, promoted from the D-79 post-hoc "
+            "readout). Filled by BOTH TanninAnthocyaninCondensation (direct, D-79) and "
+            "AcetaldehydeBridgedCondensation (bridged, D-80), each writing +r in "
+            "anthocyanin-equivalents. An integrated SLOT, not a readout, because D-81's "
+            "AnthocyaninFading gives anthocyanin a second fate → the anthocyanin₀ − anthocyanin "
+            "reconstruction no longer isolates the pigment (the A420 discriminator, D-74). Off "
+            "every ledger (grape-derived colour-equivalent, the anthocyanin/tannin precedent); "
+            "starts 0, no must input. Read as COLOUR by analysis.color_series / "
+            "polymeric_pigment_series (the bleach-RESISTANT fraction — the colour-stability "
+            "payoff), NOT the OAV odor lens (colour is not an aroma)",
+        ),
+        VarSpec(
+            "faded_anthocyanin",
+            "g/L",
+            default=0.0,
+            description="colourless anthocyanin-degradation products — the IRREVERSIBLE oxidative "
+            "fade sink (decision D-81). Filled by AnthocyaninFading (O₂-coupled: r_fade = "
+            "k_fade·f(T)·o2·[anthocyanin], drawing the shared o2 pool), capturing the free "
+            "monomeric anthocyanin lost to bleaching so it is NOT double-counted as pigment. This "
+            "is the second anthocyanin fate that makes analysis.color_series GENUINELY decline "
+            "(young bleachable colour is lost; the stable polymeric_pigment survives — the "
+            "colour-stability payoff). Off every ledger (grape-derived, the anthocyanin "
+            "precedent); starts 0, no must input, wine-only. NOT read by any sensory lens — it is "
+            "colourless (the whole point), so it carries no colour and no odor",
         ),
     ]
     return StateSchema(specs)

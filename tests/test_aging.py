@@ -1613,9 +1613,10 @@ def test_polymerization_metadata():
     assert p.name == "tannin_anthocyanin_condensation"
     # Speculative: the aging axis is the Tier-3 frontier.
     assert p.tier is Tier.SPECULATIVE
-    # Touches ONLY the two grape pools it condenses — both off every ledger, so nothing conserved
-    # moves (the OakExtraction/EllagitanninOxidation precedent). NO o2 (a non-oxidative grape axis).
-    assert set(p.touches) == {"anthocyanin", "tannin"}
+    # Touches the two grape pools it condenses PLUS the polymeric_pigment slot it fills (D-81
+    # promotion) — all three off every ledger, so nothing conserved moves (the OakExtraction/
+    # EllagitanninOxidation precedent). NO o2 (a non-oxidative grape axis).
+    assert set(p.touches) == {"anthocyanin", "tannin", "polymeric_pigment"}
     assert "o2" not in p.touches  # oak- AND O₂-independent (the D-79 crux)
     assert set(p.reads) == {
         "k_polymerization",
@@ -1641,6 +1642,9 @@ def test_polymerization_closed_form(poly_params):
     r = k * f_t * antho * tannin
     assert schema.get(d, "anthocyanin") == pytest.approx(-r)
     assert schema.get(d, "tannin") == pytest.approx(-y_tannin * r)
+    # The condensed anthocyanin is deposited into the polymeric_pigment slot (D-81), +r exactly
+    # balancing the anthocyanin drawdown (anthocyanin-equivalents).
+    assert schema.get(d, "polymeric_pigment") == pytest.approx(r)
     # A separate, non-oxidative grape axis: it touches NO o2 and borrows no carbon — nothing else.
     for var in ("X", "S", "E", "N", "CO2", "o2", "A420", "acetaldehyde", "ellagitannin"):
         assert schema.get(d, var) == 0.0
@@ -1758,7 +1762,10 @@ def test_polymerization_softens_and_stabilizes_colour(poly_params):
     # With no oak, astringency is exactly grape tannin × 1000.
     assert np.allclose(astr, np.asarray(traj.series("tannin"), dtype=float) * 1000.0)
 
-    # (2) polymeric pigment rises from 0 = the anthocyanin condensed (antho0 − antho) × 1000.
+    # (2) polymeric pigment rises from 0, read from the integrated polymeric_pigment slot (D-81).
+    # With condensation as anthocyanin's ONLY fate here (no AnthocyaninFading in this ProcessSet),
+    # the slot equals the anthocyanin condensed (antho0 − antho) × 1000 — a cross-check that the
+    # promoted slot reproduces the old reconstruction exactly (the promotion preserves behaviour).
     pig = polymeric_pigment_series(traj)
     assert pig[0] == pytest.approx(0.0)
     assert pig[-1] > 0.0
@@ -1768,14 +1775,36 @@ def test_polymerization_softens_and_stabilizes_colour(poly_params):
 
     # (3) total colour is RETAINED — free anthocyanin declines but polymeric pigment rises, so the
     # sum holds at the initial anthocyanin (condensation loses no colour, it stabilizes it). NOTE:
-    # in v1 this equality is an ALGEBRAIC IDENTITY (color_series = anthocyanin + (antho0 −
-    # anthocyanin)
-    # ≡ antho0), so it documents the v1 stabilization physics but does NOT independently verify the
-    # Process — that is test_polymerization_closed_form's job. The genuine Process signal is the
-    # anthocyanin drawdown asserted next.
+    # colour genuinely DECLINES only under AnthocyaninFading (D-81, the second anthocyanin fate → a
+    # colourless sink) — see test_fading_makes_colour_decline. With ONLY condensation here,
+    # color_series is flat at antho0 × 1000 (pigment gained == free anthocyanin lost), documenting
+    # the stabilization physics; the genuine Process signal is the anthocyanin drawdown next.
     col = color_series(traj)
     assert np.allclose(col, antho0 * 1000.0)
     assert float(traj.series("anthocyanin")[-1]) < antho0  # free anthocyanin genuinely declined
+
+
+def test_colour_form_identity_holds_by_construction(poly_params):
+    # The D-81 three-slot colour identity: anthocyanin + polymeric_pigment + faded_anthocyanin ≡
+    # anthocyanin₀ at ALL times. It holds BY CONSTRUCTION — condensation moves anthocyanin →
+    # polymeric_pigment (−r, +r) and fading moves anthocyanin → faded_anthocyanin, so the three
+    # d/dt terms sum to zero for any rate law. This CANNOT go through assert_conserved: all three
+    # slots are off every ledger (weight 0), so it is a direct three-slot sum check (advisor note).
+    # With only condensation in this ProcessSet, faded_anthocyanin stays ≡ 0 and the identity
+    # reduces to anthocyanin + polymeric_pigment ≡ antho0 — the promotion's colour-conservation
+    # proof.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [TanninAnthocyaninCondensation()], strict=True)
+    antho0 = 0.3
+    y0 = _aged_wine(schema, esters=0.0, anthocyanin=antho0, tannin=2.0)
+    traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
+    assert traj.success
+    antho = np.asarray(traj.series("anthocyanin"), dtype=float)
+    pigment = np.asarray(traj.series("polymeric_pigment"), dtype=float)
+    faded = np.asarray(traj.series("faded_anthocyanin"), dtype=float)
+    assert np.allclose(antho + pigment + faded, antho0, atol=1e-9)
+    assert np.allclose(faded, 0.0)  # no fade Process here ⇒ the colourless sink stays empty
+    assert pigment[-1] > 0.0  # pigment genuinely accumulated in its own slot
 
 
 def test_polymerization_tier_floored_at_speculative(poly_store):
@@ -1831,8 +1860,15 @@ def test_bridge_metadata():
     assert p.name == "acetaldehyde_bridged_condensation"
     assert p.tier is Tier.SPECULATIVE
     # Touches the two grape pools (off every ledger) PLUS the on-ledger acetaldehyde/ethyl_bridge
-    # pair — the split ledger. The FIRST aging colour Process to touch the carbon ledger.
-    assert set(p.touches) == {"acetaldehyde", "ethyl_bridge", "anthocyanin", "tannin"}
+    # pair — the split ledger — PLUS the polymeric_pigment slot it fills (D-81, shared with the
+    # direct route). The FIRST aging colour Process to touch the carbon ledger.
+    assert set(p.touches) == {
+        "acetaldehyde",
+        "ethyl_bridge",
+        "anthocyanin",
+        "tannin",
+        "polymeric_pigment",
+    }
     assert set(p.reads) == {
         "k_acetaldehyde_bridge",
         "E_a_acetaldehyde_bridge",
@@ -1867,6 +1903,10 @@ def test_bridge_closed_form(poly_params):
     expected_bridge = acet_consumed * _ACET_C / _ETHYLIDENE_C
     assert schema.get(d, "ethyl_bridge") == pytest.approx(expected_bridge)
     assert acet_consumed * _ACET_C == pytest.approx(schema.get(d, "ethyl_bridge") * _ETHYLIDENE_C)
+    # Deposits the bridged anthocyanin into the SHARED polymeric_pigment slot (D-81), +r — same pool
+    # the direct route fills (off-ledger colour-equivalent, distinct from the on-ledger ethyl_bridge
+    # carbon; no double-count).
+    assert schema.get(d, "polymeric_pigment") == pytest.approx(r)
     # Nothing else moves (no o2, no E borrow, no A420, no oak pools).
     for var in ("X", "S", "E", "N", "CO2", "o2", "A420", "ellagitannin"):
         assert schema.get(d, var) == 0.0

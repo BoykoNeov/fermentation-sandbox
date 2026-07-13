@@ -1100,17 +1100,20 @@ class TanninAnthocyaninCondensation(Process):
     the anthocyanin pool and the condensed-tannin macromolecule are lumped pools with no clean molar
     mass, so an ``M_tannin`` would be fake precision (the ``y_ellag_per_o2`` / D-78 precedent).
 
-    **The polymeric pigment is a POST-HOC readout, not a state slot (the A420 discriminator,
-    D-74).**
-    In v1 condensation is the **sole** fate of anthocyanin, so the stable pigment is exactly
-    ``anthocyanin₀ − anthocyanin(t)`` and is reconstructed after the run by
-    :func:`~fermentation.analysis.polymeric_pigment_series` (the ``iso_alpha``/IBU readout pattern).
-    Contrast ``A420``, which **had** to be an integrated slot because its O₂ driver has *competing*
-    sinks so the browning share is not reconstructible; here anthocyanin's **single** fate makes the
-    pigment reconstructible even after the deferred acetaldehyde-bridge beat (that beat only adds a
-    second *formation* pathway — anthocyanin still all → pigment). Only a future **bleaching** beat
-    (a second anthocyanin fate → a *colourless* form) would break the identity and promote the
-    pigment to a slot.
+    **The polymeric pigment is now an integrated ``polymeric_pigment`` slot (D-81 promotion).**
+    Through D-79/D-80 condensation was anthocyanin's **sole** fate, so the stable pigment was
+    exactly ``anthocyanin₀ − anthocyanin(t)`` and was reconstructed post-hoc (the ``iso_alpha``/IBU
+    readout pattern). D-81's :class:`AnthocyaninFading` adds a **second** anthocyanin fate
+    (oxidative → a colourless ``faded_anthocyanin`` slot), so that reconstruction no longer isolates
+    the
+    pigment — it would wrongly count the faded fraction — and the pigment had to become a real slot
+    (the A420 discriminator, D-74: a driver with competing sinks is not reconstructible). So this
+    Process now also writes ``d(polymeric_pigment)/dt = +r`` (anthocyanin-equivalents); the
+    bridged route (D-80) writes the same. Both routes feed one shared pigment pool, so
+    :func:`~fermentation.analysis.polymeric_pigment_series` reads the slot directly and
+    :func:`~fermentation.analysis.color_series` (free anthocyanin + pigment) now **genuinely
+    declines** as fading removes free anthocyanin without adding pigment (the colour-stability
+    payoff D-79 predicted this promotion would unmask).
 
     **Oak-independent AND O₂-independent (the D-79 correctness crux).** Tannin–anthocyanin
     polymerization is a **grape**-tannin + **grape**-anthocyanin reaction: a steel-tank red with no
@@ -1151,18 +1154,21 @@ class TanninAnthocyaninCondensation(Process):
     acetaldehyde-bridged
     (ethylidene) route is the explicit deferred next beat (acetaldehyde is on the carbon ledger, so
     an
-    off-ledger pigment cannot consume it without breaking closure); tannin self-polymerization and
-    SO₂/pH anthocyanin bleaching are further deferred (so this is *one directional* softening
-    contributor, the D-78 honesty). See ``polymerization.yaml`` for the full scope + provenance.
+    off-ledger pigment cannot consume it without breaking closure). SO₂/pH anthocyanin bleaching is
+    now built (:class:`AnthocyaninFading`, D-81 — the second, oxidative anthocyanin fate); tannin
+    self-polymerization remains deferred (so this is *one directional* softening contributor, the
+    D-78 honesty). See ``polymerization.yaml`` for the full scope + provenance.
     """
 
     name = "tannin_anthocyanin_condensation"
     tier = Tier.SPECULATIVE
-    #: Consumes the two grape pools it condenses — both off every ledger (grape-derived, the
-    #: ``ellagitannin`` precedent), so nothing conserved moves; it touches those two and nothing
-    #: else. The polymeric-pigment product is a post-hoc readout (``anthocyanin₀ − anthocyanin``),
-    #: not a slot (the A420 discriminator; see the class docstring), so it is not touched here.
-    touches = ("anthocyanin", "tannin")
+    #: Consumes the two grape pools it condenses and DEPOSITS the stable ``polymeric_pigment`` (D-81
+    #: promotion) — all three off every ledger (grape-derived colour-equivalents, the
+    #: ``ellagitannin`` precedent), so nothing conserved moves. The pigment is now an integrated
+    #: slot, not the old
+    #: post-hoc readout: D-81's :class:`AnthocyaninFading` gives anthocyanin a second fate, so
+    #: ``anthocyanin₀ − anthocyanin`` no longer isolates the pigment (the A420 discriminator, D-74).
+    touches = ("anthocyanin", "tannin", "polymeric_pigment")
     #: ``k_polymerization``/``E_a_polymerization``/``y_tannin_per_anthocyanin`` are this Process's
     #: own (polymerization.yaml, D-79); ``T_ref`` is shared with every Arrhenius rate. Their tiers
     #: cap the ``anthocyanin``/``tannin`` output tiers via parameter-tier propagation (D-1).
@@ -1204,6 +1210,12 @@ class TanninAnthocyaninCondensation(Process):
         # NOT a molar stoichiometry — both are lumped pools with no clean molar mass (the
         # y_ellag_per_o2 idiom). Both slots off every ledger, so this moves nothing conserved.
         d[schema.slice("tannin")] = -params["y_tannin_per_anthocyanin"] * r
+        # The condensed anthocyanin is DEPOSITED into the stable polymeric_pigment slot in
+        # anthocyanin-equivalents (D-81 promotion): every unit anthocyanin loses to condensation
+        # enters the pigment, so d(polymeric_pigment)/dt = +r exactly balances d(anthocyanin)/dt.
+        # Off every ledger (grape-derived colour-equivalent), so this deposit moves nothing
+        # conserved.
+        d[schema.slice("polymeric_pigment")] = r
         return d
 
 
@@ -1272,12 +1284,13 @@ class AcetaldehydeBridgedCondensation(Process):
     **Why the bridge is an integrated slot, not a post-hoc readout (the A420 discriminator, D-74).**
     Acetaldehyde has **competing** fates — production (fermentative D-27, oxidative D-71), reduction
     back to ``E`` (D-27), SO₂ binding (D-47), and now bridging — so the bridged amount is **not**
-    reconstructible from the acetaldehyde pool's drawdown (contrast ``anthocyanin``, whose single
-    fate
-    keeps :func:`~fermentation.analysis.polymeric_pigment_series` reconstructible). And structurally
-    ``total_carbon`` = ``weights @ y`` reads *state*, so the captured carbon must physically live in
-    a
-    slot for closure. Both reasons force the integrated slot.
+    reconstructible from the acetaldehyde pool's drawdown. (As of D-81 the **pigment** is a slot for
+    the same reason: :class:`AnthocyaninFading` gives anthocyanin a competing colourless fate,
+    so ``anthocyanin₀ − anthocyanin`` no longer isolates the pigment either — both drivers
+    acquired competing sinks, so both became slots.) And structurally ``total_carbon`` =
+    ``weights @ y`` reads
+    *state*, so the captured carbon must physically live in a slot for closure. Both reasons force
+    the integrated ``ethyl_bridge`` slot.
 
     **Reads FREE acetaldehyde, not total (the D-47 precedent).** SO₂-bound acetaldehyde is the
     bisulfite adduct — its carbonyl is blocked, so it **cannot** form the ethylidene bridge (there
@@ -1294,14 +1307,17 @@ class AcetaldehydeBridgedCondensation(Process):
     equilibrium
     with nothing scripted — the flip side of D-72's "SO₂ protects against oxidation".
 
-    **Readouts stay valid — anthocyanin's sole fate is still pigment (two formation pathways).** By
-    anchoring on anthocyanin (tannin–ethyl–anthocyanin, *not* tannin–ethyl–tannin), anthocyanin is
-    consumed only *into* pigment, via the direct route **or** this bridged route — so
-    :func:`~fermentation.analysis.polymeric_pigment_series` (``anthocyanin₀ − anthocyanin``) still
-    equals the total pigment (D-79 anticipated exactly this), :func:`~fermentation.analysis.\
-    astringency_series` softens *more* (this route also draws ``tannin`` down), and
-    :func:`~fermentation.analysis.color_series` is unchanged. The tannin–ethyl–tannin branch
-    (bridging
+    **Both formation routes feed one shared ``polymeric_pigment`` slot (D-81).** By anchoring on
+    anthocyanin (tannin–ethyl–anthocyanin, *not* tannin–ethyl–tannin) this route deposits pigment in
+    anthocyanin-equivalents (``+r``) into the same slot the direct route fills, so
+    :func:`~fermentation.analysis.polymeric_pigment_series` reads the total pigment straight from
+    the slot and :func:`~fermentation.analysis.astringency_series` softens *more* (this route draws
+    ``tannin`` down). :func:`~fermentation.analysis.color_series` (free anthocyanin + pigment) now
+    **genuinely declines** once :class:`AnthocyaninFading` (D-81) removes free anthocyanin to the
+    colourless ``faded_anthocyanin`` sink without adding pigment — the emergent micro-ox tension the
+    O₂-coupled fade creates (some anthocyanin bridges to *stable* pigment here, some fades to
+    *colourless*; SO₂ both protects against the fade, via the D-72 o2 draw, and delays this
+    bridging). The tannin–ethyl–tannin branch (bridging
     two flavanols, no anthocyanin) is deferred alongside D-79's grape-tannin self-polymerization —
     both draw tannin without touching anthocyanin, so deferring them keeps the sole-fate identity
     honest (documented, not silent).
@@ -1329,11 +1345,11 @@ class AcetaldehydeBridgedCondensation(Process):
     tier = Tier.SPECULATIVE
     #: Consumes the two grape pools it bridges (``anthocyanin``/``tannin`` — off every ledger, the
     #: D-79 precedent) plus the on-ledger ``acetaldehyde``, whose carbon it captures in the
-    #: on-ledger
-    #: ``ethyl_bridge`` slot (the split-ledger transfer). Touches those four and nothing else — the
-    #: ``acetaldehyde → ethyl_bridge`` carbon closes exactly; the grape pair moves nothing
-    #: conserved.
-    touches = ("acetaldehyde", "ethyl_bridge", "anthocyanin", "tannin")
+    #: on-ledger ``ethyl_bridge`` slot (the split-ledger transfer), and DEPOSITS the stable
+    #: ``polymeric_pigment`` (D-81 promotion — the second formation route into the shared pigment
+    #: pool). Touches those five and nothing else — the ``acetaldehyde → ethyl_bridge`` carbon
+    #: closes exactly; the grape pair + pigment (all off-ledger) move nothing conserved.
+    touches = ("acetaldehyde", "ethyl_bridge", "anthocyanin", "tannin", "polymeric_pigment")
     #: ``k_acetaldehyde_bridge``/``E_a_acetaldehyde_bridge``/``y_acetaldehyde_per_anthocyanin`` are
     #: this Process's own (polymerization.yaml, D-80); ``y_tannin_per_anthocyanin`` is shared with
     #: the
@@ -1396,6 +1412,12 @@ class AcetaldehydeBridgedCondensation(Process):
         # Tannin consumed per anthocyanin bridged at the SAME mass-based yield as the direct route
         # (same lumped adduct stoichiometry, D-79); off every ledger, moves nothing conserved.
         d[schema.slice("tannin")] = -params["y_tannin_per_anthocyanin"] * r
+        # Deposit the bridged anthocyanin into the SHARED polymeric_pigment slot in
+        # anthocyanin-equivalents (D-81 promotion), exactly as the direct route: both formation
+        # pathways feed one pigment pool, so d(polymeric_pigment)/dt = +r. Off-ledger colour-
+        # equivalent (distinct from the on-ledger ethyl_bridge carbon booked below — no
+        # double-count: pigment tracks colour, ethyl_bridge the acetaldehyde carbon locked into it).
+        d[schema.slice("polymeric_pigment")] = r
         # The ON-ledger half — the split-ledger carbon capture. Acetaldehyde consumed by the bridge
         # (g/L/h); its carbon must NOT vanish into the off-ledger pigment, so re-deposit it into the
         # on-ledger ethyl_bridge pool via the EsterHydrolysis carbon-exact split (release at

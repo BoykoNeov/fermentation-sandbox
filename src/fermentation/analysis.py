@@ -191,74 +191,60 @@ def astringency_series(traj: Trajectory) -> FloatArray:
 
 
 def polymeric_pigment_series(traj: Trajectory) -> FloatArray:
-    """Stable polymeric pigment formed by tannin–anthocyanin condensation, mg/L (decision D-79).
+    """Stable polymeric pigment from tannin–anthocyanin condensation, mg/L (decision D-79/D-81).
 
     As a red wine ages, :class:`~fermentation.core.kinetics.aging.TanninAnthocyaninCondensation`
-    condenses free monomeric ``anthocyanin`` (with grape ``tannin``) into **polymeric pigment** — a
-    softer-tasting, SO₂/pH-**stable** colour form. This readout reports that stable pigment as
-    **mg/L
-    of the anthocyanin condensed into it**: since in v1 condensation is the *sole* fate of
-    anthocyanin, the pigment is exactly the anthocyanin the pool has lost, ``(anthocyanin₀ −
-    anthocyanin(t)) × 1000``. It **rises** monotonically from 0 as the monomeric → polymeric shift
-    proceeds — the young-purple → aged-brick-red evolution's stable fraction.
+    (direct, D-79) and :class:`~fermentation.core.kinetics.aging.AcetaldehydeBridgedCondensation`
+    (bridged, D-80) condense free monomeric ``anthocyanin`` (with grape ``tannin``) into
+    **polymeric pigment** — a softer-tasting, SO₂/pH-**stable** colour form. This readout reports
+    that stable pigment as **mg/L**, read straight from the ``polymeric_pigment`` state slot both
+    routes fill. It **rises** from 0 as the monomeric → polymeric shift proceeds — the young-purple
+    → aged-brick-red evolution's stable fraction.
 
-    **A post-hoc readout, not a state slot (the A420 discriminator, D-74).** Unlike ``A420`` — whose
-    O₂ driver has *competing* sinks so its browning share cannot be reconstructed and had to be
-    integrated as a slot — anthocyanin here has a **single** fate (→ pigment), so the pigment is
-    reconstructible from the pool's own drawdown (the ``iso_alpha``/IBU readout pattern).
-    ``anthocyanin₀`` is taken as the trajectory's first stored anthocyanin value (the compiled
-    initial condition; the only processes that move ``anthocyanin`` are the two condensation routes,
-    and it is a t0 grape must input). This stays valid through the D-80 acetaldehyde-bridge beat:
-    that
-    route adds a second *formation* pathway (:class:`~fermentation.core.kinetics.aging.\
-    AcetaldehydeBridgedCondensation`, tannin–ethyl–anthocyanin) but anthocyanin's sole fate is still
-    → pigment, so ``anthocyanin₀ − anthocyanin`` still equals the total pigment (direct + bridged).
-    Only a future **bleaching** beat (a second anthocyanin fate to a *colourless* form) would break
-    the identity and promote the pigment to a slot.
+    **An integrated state slot as of D-81 (the A420 discriminator, D-74).** Through D-79/D-80 this
+    was a post-hoc readout ``(anthocyanin₀ − anthocyanin) × 1000`` because condensation was
+    anthocyanin's *sole* fate, so the pigment was reconstructible from the pool's own drawdown (the
+    ``iso_alpha``/IBU pattern). D-81's :class:`~fermentation.core.kinetics.aging.AnthocyaninFading`
+    gives anthocyanin a **second**, colourless fate, so ``anthocyanin₀ − anthocyanin`` would now
+    overcount the pigment by the faded fraction — exactly the ``A420`` situation (a driver with
+    *competing* sinks is not reconstructible), which forced promoting the pigment to the integrated
+    ``polymeric_pigment`` slot this reads.
 
-    Requires a wine trajectory carrying the ``anthocyanin`` slot (wine-only, D-79); a white / no-red
-    wine (anthocyanin ≡ 0) reads identically zero. TIER: **speculative** (the condensation params
-    are
-    speculative; parameter-tier propagation, D-1). Off every ledger (grape-derived), so this readout
-    adds no conservation invariant.
+    Requires a wine trajectory carrying the ``polymeric_pigment`` slot (wine-only, D-79/D-81); a
+    white / no-red wine (the pigment stays ≡ 0) reads identically zero. TIER: **speculative** (the
+    condensation params are speculative; parameter-tier propagation, D-1). Off every ledger
+    (grape-derived colour-equivalent), so this readout adds no conservation invariant.
     """
-    anthocyanin = np.asarray(traj.series("anthocyanin"), dtype=np.float64)
-    anthocyanin_0 = anthocyanin[0] if anthocyanin.size else 0.0
-    return (anthocyanin_0 - anthocyanin) * 1000.0
+    return np.asarray(traj.series("polymeric_pigment"), dtype=np.float64) * 1000.0
 
 
 def color_series(traj: Trajectory) -> FloatArray:
-    """Total anthocyanin-derived red colour at each stored time, mg/L (decision D-79).
+    """Total anthocyanin-derived red colour at each stored time, mg/L (decision D-79/D-81).
 
-    The point of the D-79 condensation beat is colour **stabilization**, so this index counts
-    **both** colour-bearing forms: free monomeric ``anthocyanin`` (bright but bleachable) **and**
-    the
-    :func:`polymeric_pigment_series` it condenses into (SO₂/pH-**stable**). As the wine ages the
-    free
-    anthocyanin declines but the stable pigment rises, so **total red colour is retained as its form
-    shifts labile → stable** — the correct young-purple → aged-brick-red picture (reporting only
-    free
-    anthocyanin would show colour wrongly *vanishing*). Reported as ``(anthocyanin +
-    polymeric_pigment) × 1000`` mg/L, counting each condensed anthocyanin unit as contributing the
-    same colour it did when free (just now stable — the equal-absorptivity v1 simplification).
+    Counts **both** colour-bearing forms: free monomeric ``anthocyanin`` (bright but bleachable)
+    **and** the :func:`polymeric_pigment_series` it condenses into (SO₂/pH-**stable**). The
+    colourless ``faded_anthocyanin`` sink is *not* counted — it carries no colour (the point of
+    fading). Reported as ``(anthocyanin + polymeric_pigment) × 1000`` mg/L, counting each condensed
+    anthocyanin unit as contributing the same colour it did when free (just now stable — the
+    equal-absorptivity v1 simplification).
 
-    **CAVEAT — in v1 this is an algebraic identity, ``≡ anthocyanin₀ × 1000`` (a flat line).**
-    Because
-    the pigment is a *reconstructed* readout (``anthocyanin₀ − anthocyanin``, not an independently
-    integrated slot) and condensation is anthocyanin's sole fate, the sum collapses to the constant
-    initial anthocyanin — so this series does **not** independently verify the condensation Process
-    (that is what :func:`~fermentation.core.kinetics.aging.TanninAnthocyaninCondensation`'s
-    closed-form derivative tests do) and it plots as a flat line, not a curve. It is shipped for two
-    honest reasons: it states the v1 *physics* claim (direct condensation loses no colour, only
-    stabilizes it — the observable *dynamic* is the monomeric → polymeric **shift**,
-    :func:`polymeric_pigment_series`), and it is **future-ready** — a later **SO₂/pH bleaching**
-    beat
-    (a second anthocyanin fate → colourless) makes the total genuinely *decline*, and promoting the
-    pigment to an integrated state slot then makes this a non-tautological sum of two independent
-    quantities (with a testable ``anthocyanin + polymeric ≡ anthocyanin₀`` conservation invariant).
+    **This now genuinely declines (D-81).** Through D-79/D-80 the pigment was a *reconstructed*
+    readout (``anthocyanin₀ − anthocyanin``) and condensation was anthocyanin's sole fate, so this
+    sum collapsed to the constant ``anthocyanin₀ × 1000`` — a flat line that stated the
+    stabilization physics but could not fall. D-81 makes the pigment an integrated slot *and* adds
+    :class:`~fermentation.core.kinetics.aging.AnthocyaninFading`, an irreversible anthocyanin →
+    colourless fate: free anthocyanin now leaves partly to *stable pigment* (colour retained) and
+    partly to *faded* (colour lost), so ``color = (anthocyanin₀ − faded_anthocyanin) × 1000`` and
+    the index **falls by exactly the faded amount**. The stable pigment that survives is the
+    colour-stability payoff; because fading is **O₂-coupled** (it draws the shared ``o2`` pool), an
+    anaerobic sealed red holds its colour while an oxygen-exposed one fades — and SO₂ *protects* by
+    scavenging that same O₂ (D-72), all emergent, nothing scripted. The three colour-form slots
+    close ``anthocyanin + polymeric_pigment + faded_anthocyanin ≡ anthocyanin₀`` by construction.
 
-    Requires a wine trajectory carrying ``anthocyanin`` (wine-only, D-79); a white wine reads
-    identically zero. TIER **speculative**; off every ledger (grape-derived), adds no invariant.
+    Requires a wine trajectory carrying ``anthocyanin`` + ``polymeric_pigment`` (wine-only,
+    D-79/D-81); a white wine reads identically zero. TIER **speculative**; off every ledger
+    (grape-derived), adds no assert_conserved invariant (the three-slot identity is checked
+    directly, weights being 0 here).
     """
     anthocyanin = np.asarray(traj.series("anthocyanin"), dtype=np.float64)
     return anthocyanin * 1000.0 + polymeric_pigment_series(traj)
