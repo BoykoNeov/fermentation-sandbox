@@ -1061,7 +1061,7 @@ _OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagit
 def _verb_add_oak(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet
 ) -> ScheduledEvent:
-    """``add_oak`` — put the wine in oak, setting each extractive's saturation ceiling (D-77/D-78).
+    """``add_oak`` — put the beverage in oak, setting each extractive's ceiling (D-77/D-78/D-86).
 
     The oak-extraction substrate lever, the aging-axis sibling of ``add_oxygen``: ``params`` names
     the oak-contact dose ``oak_gpl`` (the generalized chips-g/L / barrel surface-to-volume dose) and
@@ -1075,7 +1075,7 @@ def _verb_add_oak(
     (light → coconut-dominant, medium → vanilla, heavy → smoky/clove) and ``oak_gpl`` scales the
     ceilings linearly. The ellagitannin ceiling is set the same way; the D-78
     :class:`~fermentation.core.kinetics.aging.EllagitanninOxidation` sink then draws that tannin
-    down as it scavenges O₂ (oak protection), so oaking a wine both flavours it and buffers its
+    down as it scavenges O₂ (oak protection), so oaking a beverage both flavours it and buffers its
     redox.
 
     **The add_oxygen pattern (a dosed off-ledger substrate), NOT begin_aging.** Like ``add_oxygen``,
@@ -1088,10 +1088,11 @@ def _verb_add_oak(
     correction term (like ``add_oxygen``; unlike carbon-bearing ``add_acid``/``add_sugar``).
     Concentration model: no volume change on the addition (the shared verb caveat).
 
-    **Wine-only** (the oak slots are appended to ``wine_schema``): a beer scenario has no
-    ``whiskey_lactone`` slot and raises. Guards that ``oak.yaml`` is loaded (the ``add_dap``
-    discipline) so a caller-supplied ``parameter_paths`` without it fails loudly HERE at compile,
-    not as a bare ``KeyError`` when the verb reads a yield.
+    **Wine + barrel-beer** (decision D-86): the oak slots are carried by both ``wine_schema`` and
+    ``beer_schema`` (via ``core.media._oak_specs``), so ``add_oak`` works on either medium. Only a
+    bare/other medium with no ``whiskey_lactone`` slot raises. Guards that ``oak.yaml`` is loaded
+    (the ``add_dap`` discipline) so a caller-supplied ``parameter_paths`` without it fails loudly
+    HERE at compile, not as a bare ``KeyError`` when the verb reads a yield.
     """
     _iv_check_keys(iv, frozenset({"oak_gpl", "toast"}), "add_oak")
     oak_gpl = _iv_float(iv, "oak_gpl", "add_oak")
@@ -1101,10 +1102,11 @@ def _verb_add_oak(
             f"intervention 'add_oak' at day {iv.day:g}: unknown toast {toast!r}; the oak toast "
             f"levels are {sorted(_OAK_TOASTS)} (decision D-77)"
         )
-    if "whiskey_lactone" not in schema:  # the oak slots are wine-only (appended to wine_schema)
+    if "whiskey_lactone" not in schema:  # wine + beer carry the oak slots (D-86); a bare one won't
         raise ValueError(
-            f"intervention 'add_oak' at day {iv.day:g} needs a 'whiskey_lactone' slot, but medium "
-            f"{schema!r} has none (oak extraction is wine-only in v1, decision D-77)"
+            f"intervention 'add_oak' at day {iv.day:g} needs a 'whiskey_lactone' slot, but "
+            f"medium {schema!r} has none (oak needs the oak-axis slots; wine and beer carry "
+            f"them, decisions D-77/D-86)"
         )
     ceiling_deltas: dict[str, float] = {}
     for compound in _OAK_COMPOUNDS:

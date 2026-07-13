@@ -1,12 +1,15 @@
 # Oak extraction — the barrel/chip aroma-extractive aging axis (decision D-77, §4.1).
 #
-# SHARED, but WINE-ONLY in effect: like aging.yaml this file is medium-agnostic in its names
-# (collision-free) and merged into every compiled scenario's ParameterSet at compile.py's
-# shared_files, but only the WINE medium carries the oak state slots and wires OakExtraction, so
-# the params are inert for beer (the hops.yaml / wine-only-wiring precedent). Barrel-beer oak is a
-# trivial later extension (wire OakExtraction + the 8 slots into beer_schema).
+# SHARED across BOTH media (decision D-86, barrel-beer oak): like aging.yaml this file is medium-
+# agnostic in its names (collision-free) and merged into every compiled scenario's ParameterSet at
+# compile.py's shared_files. As of D-86 BOTH wine and beer carry the oak state slots (via
+# core.media._oak_specs) and wire OakExtraction + EllagitanninOxidation, so these params drive oak
+# extraction on either medium. Oak extraction is a WOOD property (these yields are g-extractive-per-
+# g-oak, matrix-independent); only the OAV PERCEPTION thresholds are matrix-specific (sensory.yaml's
+# threshold_<compound>_beer vs _wine). Barrel-aged beer (bourbon-barrel stouts, oak-aged sours,
+# foeder-aged beer) extracts the same aroma four + ellagitannin the wine axis does.
 #
-# THE PROCESS (fermentation.core.kinetics.aging.OakExtraction, WINE-ONLY):
+# THE PROCESS (fermentation.core.kinetics.aging.OakExtraction, WINE + BARREL-BEER — D-86):
 #
 #   d(C_i)/dt = k_oak_extraction * f(T) * max(0, ceiling_i - C_i)   # per extractive i
 #

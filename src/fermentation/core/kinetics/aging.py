@@ -834,11 +834,12 @@ class StreckerDegradation(Process):
 
 
 class OakExtraction(Process):
-    """Non-oxidative aging: oak extractives diffuse into the wine toward a ceiling (decision D-77).
+    """Non-oxidative aging: oak extractives diffuse into the beverage toward a ceiling (D-77/D-86).
 
     The sixth aging Process (D-77), the **first non-oxidative** one. **OakExtraction itself draws no
     O₂** and takes no share of the shared ``o2`` budget — a pure diffusion process. As a finished
-    wine sits in oak (barrel or chips/staves), four **aroma** extractives diffuse in and rise toward
+    wine **or beer** (barrel-beer oak, D-86) sits in oak (barrel or chips/staves), four **aroma**
+    extractives diffuse in and rise toward
     a saturation ceiling: **whiskey lactone** (β-methyl-γ-octalactone, "coconut", the signature
     oak-lactone note, LIGHT-toast dominant), **vanillin** ("vanilla", MEDIUM-toast peak),
     **guaiacol** (a lignin-pyrolysis "smoky/toasty" phenol, HEAVY-toast dominant — the oak/toast
@@ -865,7 +866,7 @@ class OakExtraction(Process):
     (the ceilings carry the toast *profile*; per-compound rates are a documented refinement).
 
     **The ceiling is set at the dose, in a set-and-hold state slot (the ``cation_charge`` idiom).**
-    Each ``ceiling_i`` lives in its own wine-only state slot that **no Process touches** — it is
+    Each ``ceiling_i`` lives in its own state slot that **no Process touches** — it is
     written *only* by the :func:`~fermentation.scenario.compile._verb_add_oak` verb, which computes
     ``ceiling_i = oak_gpl · oak_yield_<compound>_<toast>`` (the provenance-backed toast-specific
     yields in ``oak.yaml``) and holds it constant. So the *dose* (oak_gpl, toast) is a scenario
@@ -882,16 +883,18 @@ class OakExtraction(Process):
     in the RHS — unlike the O₂ Processes, which at least convert via ``M_O2``). ``d(C_i)/dt ≥ 0``
     always (monotone rise; ``C_i`` approaches but never exceeds its ceiling).
 
-    **Isolable + gated on the ceiling (prime directive #3).** Wine-only (the oak slots are
-    wine-only, appended to ``wine_schema``), so — like :class:`SulfiteOxidation` /
-    :class:`StreckerDegradation` — it is wired into the *wine* medium only; the ``"whiskey_lactone"
-    not in schema`` guard makes it a hard no-op besides. Wired **disabled at the compile seam**
-    (aging is post-ferment); ``begin_aging`` enables it with the other aging Processes. With **no**
-    oak dosed every ``ceiling_i`` is 0, so — via the explicit ``ceiling_i ≤ 0`` guard — the
-    contribution is byte-for-byte zero (the ``max(0, …)`` alone would not suffice: the floor here is
-    **0**, so a solver undershoot ``C_i = −ε`` would give ``max(0, ε) > 0`` and fabricate extract;
-    the guard blocks it, the o2≤0 idiom for a zero floor). So a ``begin_aging`` run with no
-    ``add_oak`` is byte-for-byte the case without oak — an aged wine that never saw wood. Tier
+    **Isolable + gated on the ceiling (prime directive #3).** Medium-agnostic — wired into BOTH
+    wine and beer (barrel-beer oak, D-86: the oak slots are carried by both schemas via
+    ``core.media._oak_specs``, since oak extraction is a wood property, not a grape/pH one — unlike
+    the wine-only :class:`SulfiteOxidation` / :class:`StreckerDegradation`); the ``"whiskey_lactone"
+    not in schema`` guard makes it a hard no-op on any bare medium besides. Wired **disabled at the
+    compile seam** (aging is post-ferment); ``begin_aging`` enables it with the other aging
+    Processes. With **no** oak dosed every ``ceiling_i`` is 0, so — via the explicit ``ceiling_i ≤
+    0`` guard — the contribution is byte-for-byte zero (the ``max(0, …)`` alone would not suffice:
+    the floor here is **0**, so a solver undershoot ``C_i = −ε`` would give ``max(0, ε) > 0`` and
+    fabricate extract; the guard blocks it, the o2≤0 idiom for a zero floor). So a ``begin_aging``
+    run with no ``add_oak`` is byte-for-byte the case without oak — an aged beverage that never saw
+    wood. Tier
     **speculative** (the extraction *form* — diffusion-limited approach to a ceiling, warmer-faster
     — is sourced; every magnitude, the yields especially, is an order-of-magnitude estimate).
     **Scope (v1):** ellagitannins are now modelled (D-78 — extracted here, O₂-scavenged by
@@ -919,11 +922,11 @@ class OakExtraction(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Wine-only slots (the oak extractives are appended to wine_schema): a hard no-op on any
-        # schema without them, belt-and-suspenders to the wine-only wiring.
+        # The oak extractives are appended to BOTH media (D-86, barrel-beer oak): a hard no-op on a
+        # bare schema without them, belt-and-suspenders to the wiring.
         if "whiskey_lactone" not in schema:
             return d
-        # Gate on STATE (the ceilings) BEFORE reading any oak param — so an un-oaked wine (every
+        # Gate on STATE (the ceilings) BEFORE reading any oak param — so an un-oaked run (every
         # ceiling 0) is byte-for-byte inert even when oak.yaml is not loaded (the Strecker/Sulfite
         # substrate-gate-before-params discipline; an enabled-but-undosed Process mustn't KeyError).
         # The EXPLICIT ceiling ≤ 0 guard is load-bearing — the floor is 0 (unlike esters_eq > 0), so
@@ -949,7 +952,7 @@ class OakExtraction(Process):
 
 
 class EllagitanninOxidation(Process):
-    """Oxidative aging: dissolved O₂ oxidises oak ellagitannin → oak protects the wine (D-78).
+    """Oxidative aging: dissolved O₂ oxidises oak ellagitannin → oak protects the beverage (D-78).
 
     The fourth **oxidative** sibling to claim a share of the shared ``o2`` budget (after
     :class:`OxidativeAcetaldehyde` D-71, :class:`PhenolicBrowning` D-74 and
@@ -991,12 +994,12 @@ class EllagitanninOxidation(Process):
     :class:`SulfiteOxidation` (gated on SO₂) and :class:`StreckerDegradation` (gated on amino acids)
     — this sink is **zero without its substrate** and therefore **adds on top** of the shared O₂
     budget with **no re-baseline**: ``k_ethanol_oxidation + k_browning = 5.0e-4`` (the always-on
-    anchor) is **untouched**, and the no-oak / all-beer trajectory is byte-for-byte preserved. A
+    anchor) is **untouched**, and the no-oak trajectory (either medium) is byte-for-byte kept. A
     nice illustration that the substrate-gated / always-on distinction — not the magnitude — is
     what's load-bearing: ``k_ellagitannin_oxidation`` is banded so that, when oak *is* present, this
     is a **major** sink (it takes roughly a third-to-half of the O₂), yet it still needs no
     re-baseline (unlike the always-on :class:`PhenolicBrowning`, which forced the D-74 re-baseline).
-    It is banded so the protection is **partial** — an oaked wine still shows *some* oxidative
+    It is banded so the protection is **partial** — an oaked beverage still shows *some* oxidative
     character.
 
     **Off every ledger, no conservation term (the :class:`SulfiteOxidation` precedent).** Both
@@ -1006,15 +1009,16 @@ class EllagitanninOxidation(Process):
     Process touches only those two slots and asserts nothing. This is why the mass-based yield is
     legitimate: no ledger reads the ``ellagitannin`` mass, so the lump carries no fabricated carbon.
 
-    **Wine-only + isolable + doubly substrate-gated (prime directive #3).** The ``ellagitannin``
-    slot is wine-only (appended to ``wine_schema``, D-78), so — like :class:`SulfiteOxidation` /
-    :class:`StreckerDegradation` / :class:`OakExtraction` — this is wired into the *wine* medium
-    only; the ``"ellagitannin" not in schema`` guard makes it a hard no-op besides. Wired **disabled
-    at the compile seam** (aging is post-ferment); ``begin_aging`` enables it with the other aging
-    Processes. With no O₂ *or* no oak dosed the ``o2 ≤ 0`` / ``ellagitannin ≤ 0`` guards return
-    byte-for-byte zero, so a reductive (no ``add_oxygen``) or an un-oaked aging is exactly the case
-    without this Process. Tier **speculative** (the aging axis is the Tier-3 frontier; the *form* —
-    O₂-limited, tannin-driven, warmer-faster — is sourced, the rate/yield magnitudes
+    **Medium-agnostic + isolable + doubly substrate-gated (prime directive #3).** The
+    ``ellagitannin`` slot and the ``o2`` pool are both carried by BOTH media (barrel-beer oak, D-86:
+    the oak axis is a wood property, so — like :class:`OakExtraction`, and unlike the wine-only
+    :class:`SulfiteOxidation` / :class:`StreckerDegradation` — it is wired into wine *and* beer).
+    The ``"ellagitannin" not in schema`` guard makes it a hard no-op on a bare medium. Wired
+    **disabled at the compile seam** (aging is post-ferment); ``begin_aging`` enables it with the
+    other aging Processes. With no O₂ *or* no oak dosed the ``o2 ≤ 0`` / ``ellagitannin ≤ 0`` guards
+    return byte-for-byte zero, so a reductive (no ``add_oxygen``) or an un-oaked aging is exactly
+    the case without this Process. Tier **speculative** (the aging axis is the Tier-3 frontier; the
+    *form* — O₂-limited, tannin-driven, warmer-faster — is sourced, the rate/yield magnitudes
     order-of-magnitude estimates).
     """
 
@@ -1039,8 +1043,8 @@ class EllagitanninOxidation(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Wine-only slot (ellagitannin is appended to wine_schema): a hard no-op on any schema
-        # without it, belt-and-suspenders to the wine-only wiring.
+        # ellagitannin is appended to BOTH media (D-86, barrel-beer oak): a hard no-op on any bare
+        # schema without it, belt-and-suspenders to the wiring.
         if "ellagitannin" not in schema or "o2" not in schema:
             return d
         o2 = float(y[schema.slice("o2")][0])

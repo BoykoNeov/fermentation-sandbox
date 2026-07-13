@@ -149,6 +149,21 @@
 > non-trivially; deposits NO pigment (colourless tannin–tannin polymer — the D-80 colour difference). The tannin–tannin axis
 > is now built. Next: beat 1b (descriptor projection), non-oxidative Maillard Strecker, barrel fill-number, barrel-beer
 > oak.**
+>
+> **PROGRESS (D-86, 2026-07-14): barrel-beer oak (945 tests). The oak axis (D-77 aroma four + D-78 ellagitannin), wine-only
+> since D-77, is now wired into BEER too — bourbon-barrel stouts, oak-aged/foeder sours, whiskey-barrel ales. ONE advisor
+> pass + ONE owner scope fork (FULL axis incl. ellagitannin, not aroma-only). Principle: extraction is a WOOD property
+> (the `oak.yaml` yields are matrix-independent, transfer unchanged), only PERCEPTION is matrix-specific (4 new
+> `threshold_<compound>_beer`, set below the wine values for beer's lower-ethanol/less-masking matrix). Wine stays
+> BYTE-FOR-BYTE: the 10 oak `VarSpec`s factored into `core.media._oak_specs()`, called at the SAME position in `wine_schema`
+> + appended in `beer_schema` (the `iso_alpha` precedent — NOT `_common_specs`, which would shift wine indices). Both oak
+> Processes (`OakExtraction` + `EllagitanninOxidation`) wired into both media (always medium-agnostic in logic; `o2` already
+> shared). `add_oak` needed NO logic change (the `whiskey_lactone`-slot guard auto-relaxed once beer carries the slot);
+> `oav.py` moved the 4 oak compounds to a shared `_OAK` tuple; `astringency_series` guarded the wine-only grape `tannin`
+> slot (beer astringency = oak ellagitannin alone). The GRAPE colour axis (D-79..D-85) stays wine-only (grape chemistry).
+> Three wine-only enumeration/rejection tests FLIPPED to both-media (expectation changes, not weakenings); +beer end-to-end
+> coverage incl. the D-78 protection spine on beer (oaked+oxygenated beer browns less). Next: beat 1b, non-oxidative
+> Maillard Strecker, barrel fill-number depletion.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

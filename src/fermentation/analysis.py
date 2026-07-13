@@ -157,6 +157,9 @@ def astringency_series(traj: Trajectory) -> FloatArray:
     **polymeric pigment** the D-79 condensation forms is *soft* and deliberately **excluded** — that
     exclusion is exactly what makes softening emerge (see below). A red wine with no oak reads grape
     ``tannin`` alone; an oaked white reads ``ellagitannin`` alone; both 0 ⇒ identically zero.
+    **Barrel-beer (D-86):** beer carries the oak axis (``ellagitannin``) but **no grape ``tannin``
+    slot** (that stays wine-only — it is grape chemistry), so on a beer trajectory the grape term is
+    absent and astringency = oak ``ellagitannin`` alone (an oak-aged beer's wood tannin).
 
     The trajectory **softens** three ways. (1) The DOMINANT mechanism (D-79):
     :class:`~fermentation.core.kinetics.aging.TanninAnthocyaninCondensation` condenses grape
@@ -189,8 +192,14 @@ def astringency_series(traj: Trajectory) -> FloatArray:
     no
     invariant and dosing them leaves ``total_carbon`` byte-for-byte unchanged.
     """
-    tannin = np.asarray(traj.series("tannin"), dtype=np.float64)
     ellagitannin = np.asarray(traj.series("ellagitannin"), dtype=np.float64)
+    # Grape condensed tannin is WINE-ONLY (grape chemistry); beer carries the oak axis but no
+    # `tannin` slot (D-86), so on a beer trajectory the grape term is absent → oak ellag only.
+    tannin = (
+        np.asarray(traj.series("tannin"), dtype=np.float64)
+        if "tannin" in traj.schema.names
+        else np.zeros_like(ellagitannin)
+    )
     return (tannin + ellagitannin) * 1000.0
 
 

@@ -44,12 +44,13 @@ WINE_KETO_ACID_SLOTS = ("pyruvate", "alpha_ketoglutarate")
 # phenylacetaldehyde (honey), the oxidative-aging markers StreckerDegradation produces from amino
 # acids. Wine-only (the Process reads wine-only amino_acids and deaminates to N).
 WINE_STRECKER_SLOTS = ("methional", "phenylacetaldehyde")
-# The oak-extraction axis (decisions D-77/D-78), appended last: 4 extracted aroma pools
+# The oak-extraction axis (decisions D-77/D-78): 4 extracted aroma pools
 # (whiskey_lactone/coconut, vanillin/vanilla, guaiacol/smoky, eugenol/clove) + their 4 SET-AND-HOLD
 # ceiling slots, then the ellagitannin TASTE/O₂-scavenging pool + its ceiling (D-78, the bridge to
 # the O₂ sub-axis). The add_oak verb writes all 5 ceilings (oak_gpl × toast-specific yield); all off
-# every ledger (exogenous wood-derived mass, the iso_alpha precedent). Wine-only.
-WINE_OAK_SLOTS = (
+# every ledger (exogenous wood-derived mass, the iso_alpha precedent). SHARED by wine and barrel-
+# beer (decision D-86 — the oak axis is a wood property; both media carry it via _oak_specs).
+OAK_SLOTS = (
     "whiskey_lactone", "vanillin", "guaiacol", "eugenol",
     "whiskey_lactone_ceiling", "vanillin_ceiling", "guaiacol_ceiling", "eugenol_ceiling",
     "ellagitannin", "ellagitannin_ceiling",
@@ -96,7 +97,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_MERCAPTAN_SLOTS
         + WINE_KETO_ACID_SLOTS
         + WINE_STRECKER_SLOTS
-        + WINE_OAK_SLOTS
+        + OAK_SLOTS
         + WINE_POLYMERIZATION_SLOTS
     )
     assert schema.spec("S").size == 1
@@ -127,7 +128,7 @@ def test_wine_schema_has_single_sugar_slot():
 
 def test_beer_schema_has_three_sequential_sugars():
     schema = beer_schema()
-    assert schema.names == SHARED + BEER_HOP_SLOTS
+    assert schema.names == SHARED + BEER_HOP_SLOTS + OAK_SLOTS
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
@@ -136,7 +137,10 @@ def test_beer_schema_has_three_sequential_sugars():
     # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink), o2 (D-71 aging substrate), A420 (D-74
     # oxidative-browning index)) + 1 beer-only iso_alpha bitterness slot (D-64) — S occupies 3
     # slots, so 20 shared names span 22 slots, + iso_alpha = 23
-    assert schema.size == 23
+    # + 10 oak-axis slots (4 aroma extractives + 4 ceilings — the barrel/chip axis, D-77 — plus the
+    # ellagitannin TASTE/O₂-scavenging pool + its ceiling, D-78) SHARED with wine by barrel-beer oak
+    # (decision D-86): the oak axis is a wood property, so both media carry it (via _oak_specs) = 33
+    assert schema.size == 33
 
 
 def test_shared_variable_units_are_canonical():
@@ -167,6 +171,17 @@ def test_shared_variable_units_are_canonical():
         "o2": "g/L",  # dissolved-oxygen aging substrate (D-71)
         "A420": "AU",  # oxidative-browning index — absorbance at 420 nm, dimensionless (D-74)
         "iso_alpha": "g/L",  # beer-only bitterness slot (D-64)
+        # Oak-extraction axis — SHARED with wine by barrel-beer oak (D-86); all off-ledger g/L.
+        "whiskey_lactone": "g/L",  # coconut oak-lactone (D-77)
+        "vanillin": "g/L",  # vanilla (D-77)
+        "guaiacol": "g/L",  # oak smoky/toasty (D-77)
+        "eugenol": "g/L",  # clove/spice (D-77)
+        "whiskey_lactone_ceiling": "g/L",  # set-and-hold ceiling (D-77)
+        "vanillin_ceiling": "g/L",
+        "guaiacol_ceiling": "g/L",
+        "eugenol_ceiling": "g/L",
+        "ellagitannin": "g/L",  # oak hydrolysable tannin — taste + O₂ scavenger (D-78)
+        "ellagitannin_ceiling": "g/L",
     }
 
 
@@ -355,13 +370,14 @@ AGING_PROCESSES = {"ester_hydrolysis", "oxidative_acetaldehyde", "phenolic_brown
 # deaminates to N — so — like the MLF/Brett Processes — both are wired into the wine medium only.
 # Same compile-seam disable / begin_aging re-enable as the rest.
 WINE_AGING_PROCESSES = {"sulfite_oxidation", "strecker_degradation"}
-# WINE-ONLY, NON-oxidative aging: oak_extraction (D-77, the barrel/chip aroma-extractive axis) reads
-# the wine-only oak ceiling/extractive slots and draws no O₂ — a SEPARATE axis from the oxidative
-# siblings. ellagitannin_oxidation (D-78) is the BRIDGE: it draws the O₂-scavenging share of the
-# shared o2 budget as the tannin OakExtraction fills is oxidised (oak protection), so it reads the
-# wine-only ellagitannin pool. Both wired into the wine medium only, same compile-seam disable /
-# begin_aging re-enable.
-WINE_OAK_PROCESSES = {"oak_extraction", "ellagitannin_oxidation"}
+# NON-oxidative oak aging, SHARED by wine and barrel-beer (decision D-86): oak_extraction (D-77, the
+# barrel/chip aroma-extractive axis) reads the oak ceiling/extractive slots and draws no O₂ — a
+# SEPARATE axis from the oxidative siblings. ellagitannin_oxidation (D-78) is the BRIDGE: it draws
+# the O₂-scavenging share of the shared o2 budget as the tannin OakExtraction fills is oxidised (oak
+# protection), reading the ellagitannin pool. Both wired into BOTH media (the oak axis is a wood
+# property; both schemas carry the slots via _oak_specs), same compile-seam disable / begin_aging
+# re-enable.
+OAK_PROCESSES = {"oak_extraction", "ellagitannin_oxidation"}
 # WINE-ONLY, NON-oxidative aging (D-79): tannin_anthocyanin_condensation condenses the two GRAPE
 # pools (anthocyanin + condensed tannin) into stable polymeric pigment — the red-wine colour-
 # stabilization + astringency-softening axis. A THIRD separate axis: it draws no O₂ (unlike every
@@ -417,7 +433,7 @@ EXPECTED_PROCESSES = {
         | KETO_ACID_PROCESSES
         | AGING_PROCESSES
         | WINE_AGING_PROCESSES
-        | WINE_OAK_PROCESSES
+        | OAK_PROCESSES
         | WINE_POLYMERIZATION_PROCESSES
         | WINE_BRIDGE_PROCESSES
         | WINE_FADING_PROCESSES
@@ -434,6 +450,7 @@ EXPECTED_PROCESSES = {
         | H2S_PROCESSES
         | HOP_PROCESSES
         | AGING_PROCESSES
+        | OAK_PROCESSES
     ),
 }
 # Per-rate Arrhenius modifiers wire into both media. Wine additionally carries the opt-in

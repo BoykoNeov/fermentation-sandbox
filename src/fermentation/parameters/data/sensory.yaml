@@ -236,3 +236,51 @@ threshold_eugenol_wine:
     source: "wine oak-volatile literature: eugenol ('clove/spice') perception threshold ~6-15 µg/L in wine (oak-volatile studies; the clove note of toasted oak)"
     conditions: "measured in/near wine matrix; eugenol, a single molecule"
     notes: "Single-molecule pool — clean OAV, matrix-matched. Wine-only pool. HEAVY-toast (co-varies with guaiacol, D-77)."
+
+# -- Oak extractives in BEER (decision D-86, barrel-beer oak): the SAME four wood aroma markers, in
+# the beer matrix. The extraction is medium-agnostic (a wood property; the oak.yaml yields are
+# shared), but the PERCEPTION threshold is matrix-specific: beer's LOWER ethanol (~4-6% vs wine's
+# ~12-14%) masks aroma LESS, so a given compound is somewhat MORE perceptible — the beer thresholds
+# sit modestly BELOW their wine counterparts. All values are speculative author estimates anchored
+# to the wine thresholds and adjusted down for the lower-ethanol matrix (beer-specific oak-volatile
+# threshold data is sparse); the load-bearing claim is only the rough magnitude + the direction
+# (beer threshold <= wine threshold), banded wide. All single-molecule pools (clean OAV).
+threshold_whiskey_lactone_beer:
+  value: 35.0
+  unit: "ug/L"   # whiskey lactone (cis oak lactone), 'coconut / oak'
+  tier: speculative
+  uncertainty: { low: 12.0, high: 90.0, note: "cis-whiskey-lactone threshold in beer, set modestly below the ~54 µg/L wine value for beer's lower-ethanol (less-masking) matrix; cis+trans lump, so the effective value tracks the cis:trans ratio — directional only. Banded wide." }
+  provenance:
+    source: "author estimate: cis-β-methyl-γ-octalactone ('oak/whiskey lactone', coconut) perception threshold in beer, transposed DOWN from the ~54-67 µg/L wine value (Spillman et al. 2004) for beer's lower ethanol content (less aroma masking). Barrel-aged beer oak-lactone thresholds are not well characterised; this is an order-of-magnitude estimate."
+    conditions: "beer matrix (~4-6% ABV); whiskey lactone — the pool LUMPS cis+trans, threshold taken at the potent cis value"
+    notes: "SPECULATIVE, author estimate transposed from the wine threshold for the beer matrix (D-86). Effectively single-marker (cis dominates), pool carries both isomers. The signature coconut oak-lactone note, LIGHT-toast dominant (D-77). Barrel-beer pool (D-86)."
+
+threshold_vanillin_beer:
+  value: 130.0
+  unit: "ug/L"   # vanillin, 'vanilla'
+  tier: speculative
+  uncertainty: { low: 40.0, high: 300.0, note: "vanillin threshold in beer, set below the ~200 µg/L wine value for the lower-ethanol matrix. Banded across the plausible range." }
+  provenance:
+    source: "author estimate: vanillin perception threshold in beer, transposed DOWN from the ~200-320 µg/L wine value (Boidron/Chatonnet oak-volatile studies) for beer's lower ethanol (less masking). Vanilla is a prominent note of bourbon-barrel-aged beer."
+    conditions: "beer matrix (~4-6% ABV); vanillin, a single molecule"
+    notes: "SPECULATIVE, author estimate transposed from the wine threshold for the beer matrix (D-86). Single-molecule pool — clean OAV. MEDIUM-toast peak (D-77). Barrel-beer pool (D-86)."
+
+threshold_guaiacol_beer:
+  value: 10.0
+  unit: "ug/L"   # guaiacol, 'smoky / toasty' (oak/toast — NOT the Brett ethylguaiacol)
+  tier: speculative
+  uncertainty: { low: 3.0, high: 40.0, note: "guaiacol threshold in beer, set below the ~20 µg/L wine value; guaiacol is a potent smoky phenol well below wine levels in the lighter beer matrix (smoked/rauchbier context). Banded wide." }
+  provenance:
+    source: "author estimate: guaiacol ('smoky/toasty') perception threshold in beer, transposed DOWN from the ~20-75 µg/L wine value for beer's lower-ethanol matrix (smoked-beer/rauchbier guaiacol is detectable at low µg/L). The OAK/toast smoky note, DISTINCT from the Brett 4-ethylguaiacol."
+    conditions: "beer matrix (~4-6% ABV); guaiacol, a single molecule — distinct from the Brett 4-ethylguaiacol (threshold_ethylguaiacols_*, a different molecule)"
+    notes: "SPECULATIVE, author estimate transposed from the wine threshold for the beer matrix (D-86). Single-molecule pool — clean OAV. HEAVY-toast dominant (D-77). NOT the Brett 4-ethylguaiacol. Barrel-beer pool (D-86)."
+
+threshold_eugenol_beer:
+  value: 8.0
+  unit: "ug/L"   # eugenol, 'clove / spice'
+  tier: speculative
+  uncertainty: { low: 3.0, high: 25.0, note: "eugenol threshold in beer, set below the ~15 µg/L wine value for the lower-ethanol matrix; eugenol is a potent clove phenol. Banded wide." }
+  provenance:
+    source: "author estimate: eugenol ('clove/spice') perception threshold in beer, transposed DOWN from the ~6-15 µg/L wine value for beer's lower ethanol (less masking); the clove note of toasted oak in barrel-aged beer."
+    conditions: "beer matrix (~4-6% ABV); eugenol, a single molecule"
+    notes: "SPECULATIVE, author estimate transposed from the wine threshold for the beer matrix (D-86). Single-molecule pool — clean OAV. HEAVY-toast (co-varies with guaiacol, D-77). Barrel-beer pool (D-86)."

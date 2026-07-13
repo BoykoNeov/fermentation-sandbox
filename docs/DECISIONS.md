@@ -6761,3 +6761,62 @@ enabled by `begin_aging`.
 
 **The tannin–tannin axis is now built** (D-84 direct + D-85 bridged). Still deferred: beat 1b (descriptor projection), the
 non-oxidative Maillard Strecker route, barrel fill-number depletion, barrel-beer oak.
+
+## D-86 — barrel-beer oak: the oak axis (D-77 aroma + D-78 ellagitannin) extended to **beer** — bourbon-barrel stouts, oak-aged sours, foeders (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3.** The trivial-extension beat D-77 named and deferred: wire the wine-only oak
+axis into **beer** so barrel/foeder-aged beer (bourbon-barrel imperial stout, oak-aged/foeder sours, whiskey-barrel ale)
+extracts the same wood character. **One `advisor()` pass** (confirmed orientation + the enumerated touch-list) and **one owner
+fork** (scope, via `AskUserQuestion`). 948 → 954 tests (+6 net new; several wine-only enumeration/rejection tests flipped to
+both-media), `ruff`/`mypy`/`pytest` green.
+
+**Owner fork — scope: FULL axis (aroma + ellagitannin), not aroma-only.** D-77 literally deferred "wire OakExtraction + the 8
+slots" (the 4 aroma extractives + 4 ceilings). But D-78 since added `ellagitannin` (the O₂-scavenging TASTE tannin), so
+"barrel-beer oak" was ambiguous. The owner took the **full axis**: real barrel-aged beer (sours in foeders, long barrel
+programs) genuinely extracts oak hydrolysable tannin — astringency + micro-ox O₂ scavenging — and the machinery is nearly
+free because `o2` is already medium-agnostic (beer runs the O₂ sub-axis: `OxidativeAcetaldehyde` + `PhenolicBrowning`). So
+beer gets **10 oak slots** (4 aroma + 4 ceilings + `ellagitannin` + its ceiling) and **both** oak Processes (`OakExtraction`
++ `EllagitanninOxidation`).
+
+**The design principle that shrank the diff — extraction is a WOOD property, only PERCEPTION is matrix-specific.** The
+`oak.yaml` physics (rate, activation energy, the 15 toast-specific per-gram yields → ceilings) is g-extractive-per-g-oak, a
+property of the wood and the toast, **matrix-independent** — it transfers to beer *unchanged* (only stale "wine-only" header
+comments changed). The one genuinely matrix-specific piece is the OAV **perception** threshold: beer's lower ethanol
+(~4–6 % vs wine's ~12–14 %) masks aroma less, so a compound is somewhat *more* perceptible. So `sensory.yaml` gained **4
+`threshold_<compound>_beer`** (whiskey lactone 35, vanillin 130, guaiacol 10, eugenol 8 µg/L — each set modestly BELOW its
+wine counterpart, all speculative author estimates transposed for the lower-ethanol matrix; the load-bearing claim is only
+the direction beer ≤ wine + rough magnitude, banded wide). The **grape colour axis** (anthocyanin/tannin condensation +
+fade, D-79..D-85) stays **wine-only** — that is grape chemistry, not oak.
+
+**Wine stays byte-for-byte — the `_oak_specs()` helper (the advisor's tightest constraint).** The 10 oak `VarSpec`s were
+factored out of `wine_schema`'s inline block into a `core.media._oak_specs()` helper, called at the **same position** in
+`wine_schema` (so wine's flat-array layout is *identical* — the schema-order contract + isolability both preserved) and
+**appended** in `beer_schema` (the `iso_alpha` beer-only-append precedent). Putting them into `_common_specs` instead would
+have inserted mid-layout and shifted every wine-only index — rejected. Both oak Processes moved from wine-only wiring into
+**both** media's `process_factories` (`_OAK_PROCESSES` + `_ELLAGITANNIN_PROCESSES`); they were always medium-agnostic in
+logic (`OakExtraction` reads only oak slots; `EllagitanninOxidation` reads `o2` + `ellagitannin`, both now in beer). The
+`_AGING_GATED_PROCESSES` disable/`begin_aging`-enable name set is medium-agnostic, so gating came for free.
+
+**`add_oak` needed NO logic change — the guard auto-relaxed.** The verb's medium guard is `"whiskey_lactone" not in schema →
+error`; once beer carries the slot the guard passes for beer automatically, now catching only a bare/other medium. Only the
+docstring + error wording changed (was "wine-only in v1"). **`oav.py`:** the 4 oak aroma compounds moved from `_WINE_ONLY`
+into a shared `_OAK` tuple appended to *both* media in `AROMA_COMPOUNDS` (`beer` = 5 common + 4 oak = 9; `wine` = 5 common +
+5 wine-only + 4 oak = 14, unchanged order since the oak four were already last). **`analysis.astringency_series`:** guarded
+the wine-only grape `tannin` slot (`"tannin" in traj.schema.names`) — beer has no grape tannin, so on a beer trajectory
+astringency = oak `ellagitannin` alone (an oak-aged beer's wood tannin).
+
+**Test flips (expectation changes, NOT weakenings — flagged loudly):** `test_add_oak_rejects_..._wrong_medium` (asserted beer
+*rejects* `add_oak`) → `..._accepts_beer` (beer now sets the 5 ceilings); `test_oak_extraction_gated_..._wine_only` and
+`test_ellagitannin_oxidation_gated_..._wine_only` → `..._both_media` (present, disabled-then-enabled, in each). New
+end-to-end beer coverage: un-oaked beer aging leaves the oak pools identically 0 AND closes carbon+nitrogen (off every
+ledger); oaked beer lifts the 4 oak OAVs (against the beer thresholds) + positive ellagitannin astringency; and the **D-78
+protection spine on beer** — an oaked+oxygenated beer browns LESS (lower A420) and makes LESS oxidative acetaldehyde than an
+un-oaked one at the same O₂ dose, the anchor `k_ethanol_oxidation + k_browning = 5.0e-4` untouched (substrate-gated, adds on
+top).
+
+**Regression surface.** `core.media._oak_specs()` (10 slots, shared); beer schema 23 → 33, beer process set +2; `oav.py`
+`_OAK` tuple (both media); `sensory.yaml` +4 beer thresholds; `oak.yaml`/`analysis.py`/`aging.py`/`compile.py` docstring +
+guard-wording updates. Enumeration goldens updated (`test_media` beer size/units/processes; `test_sensory_oav` beer compound
+set). **Every wine trajectory is byte-for-byte unchanged** (the `_oak_specs()` same-position insertion); un-oaked beer is
+byte-for-byte unchanged (ceiling ≤ 0 guard). **Next:** beat 1b (descriptor projection), the non-oxidative Maillard Strecker
+route, barrel fill-number depletion.

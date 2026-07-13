@@ -762,20 +762,19 @@ _OAK_EXTRACTIVES = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
 _OAK_CEILINGS = tuple(f"{c}_ceiling" for c in _OAK_EXTRACTIVES)
 
 
-def test_oak_extraction_gated_by_begin_aging_wine_only():
-    # OakExtraction rides the same aging tuple: wired into the WINE medium, DISABLED at compile,
-    # enabled by the SAME begin_aging reconfigure as the rest of the aging axis. Beer has no oak
-    # slots, so it is simply absent from the beer set (the SulfiteOxidation/StreckerDegradation
-    # wine-only pattern).
-    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
-    assert OakExtraction.name in cs.process_set
-    assert not cs.process_set.is_enabled(OakExtraction.name)  # off at compile (post-ferment)
-    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
-    assert event.reconfigure is not None
-    event.reconfigure(cs.process_set)
-    assert cs.process_set.is_enabled(OakExtraction.name)  # begin_aging turns it on too
-    # Wine-only: absent from the beer set entirely.
-    assert OakExtraction.name not in compile_scenario(_beer([_begin_aging(14.0)])).process_set
+def test_oak_extraction_gated_by_begin_aging_both_media():
+    # OakExtraction rides the same aging tuple: DISABLED at compile, enabled by the SAME begin_aging
+    # reconfigure as the rest of the aging axis. Barrel-beer oak (D-86): the oak axis is a wood
+    # property, so — unlike the wine-only SulfiteOxidation/StreckerDegradation — it is wired into
+    # BOTH media and present (disabled-then-enabled) in each.
+    for scenario in (_wine([_begin_aging(_FERMENT_DAYS)]), _beer([_begin_aging(14.0)])):
+        cs = compile_scenario(scenario)
+        assert OakExtraction.name in cs.process_set
+        assert not cs.process_set.is_enabled(OakExtraction.name)  # off at compile (post-ferment)
+        event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+        assert event.reconfigure is not None
+        event.reconfigure(cs.process_set)
+        assert cs.process_set.is_enabled(OakExtraction.name)  # begin_aging turns it on
 
 
 def test_oak_params_ride_in_every_compiled_scenario():
@@ -886,25 +885,21 @@ def test_oaked_run_closes_every_ledger_end_to_end():
 # acetaldehyde than an un-oaked wine at the same O₂ dose.
 
 
-def test_ellagitannin_oxidation_gated_by_begin_aging_wine_only():
-    # EllagitanninOxidation rides the same aging tuple: wired into the WINE medium, DISABLED at
-    # compile, enabled by the SAME begin_aging reconfigure as the rest of the aging axis. Beer has
-    # no
-    # ellagitannin slot, so it is simply absent from the beer set (the OakExtraction/Strecker
-    # pattern).
-    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
-    assert EllagitanninOxidation.name in cs.process_set
-    assert not cs.process_set.is_enabled(
-        EllagitanninOxidation.name
-    )  # off at compile (post-ferment)
-    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
-    assert event.reconfigure is not None
-    event.reconfigure(cs.process_set)
-    assert cs.process_set.is_enabled(EllagitanninOxidation.name)  # begin_aging turns it on too
-    # Wine-only: absent from the beer set entirely.
-    assert (
-        EllagitanninOxidation.name not in compile_scenario(_beer([_begin_aging(14.0)])).process_set
-    )
+def test_ellagitannin_oxidation_gated_by_begin_aging_both_media():
+    # EllagitanninOxidation rides the same aging tuple: DISABLED at compile, enabled by the SAME
+    # begin_aging reconfigure. Barrel-beer oak (D-86): the ellagitannin slot and o2 pool are both
+    # medium-agnostic, so — unlike the wine-only Strecker/SulfiteOxidation — it is wired into BOTH
+    # media and present (disabled-then-enabled) in each.
+    for scenario in (_wine([_begin_aging(_FERMENT_DAYS)]), _beer([_begin_aging(14.0)])):
+        cs = compile_scenario(scenario)
+        assert EllagitanninOxidation.name in cs.process_set
+        assert not cs.process_set.is_enabled(
+            EllagitanninOxidation.name
+        )  # off at compile (post-ferment)
+        event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+        assert event.reconfigure is not None
+        event.reconfigure(cs.process_set)
+        assert cs.process_set.is_enabled(EllagitanninOxidation.name)  # begin_aging turns it on
 
 
 def test_add_oak_sets_the_ellagitannin_ceiling_and_rate_params_ride_along():
@@ -995,13 +990,84 @@ def test_oak_extraction_raises_the_oak_oavs():
         assert float(oav_series(plain.as_trajectory(), thresholds, compound)[-1]) == 0.0
 
 
-def test_add_oak_rejects_unknown_toast_and_wrong_medium():
-    # The vocabulary boundary (loud errors): an unknown toast is a typo, rejected loudly; oak is
-    # wine-only, so a beer scenario with add_oak names the wine-only constraint (not a bare error).
+def test_add_oak_rejects_unknown_toast_and_accepts_beer():
+    # The vocabulary boundary (loud errors): an unknown toast is a typo, rejected loudly.
     with pytest.raises(ValueError, match="unknown toast"):
         compile_scenario(_wine([_add_oak(_FERMENT_DAYS, 4.0, "charred")]))
-    with pytest.raises(ValueError, match="wine-only"):
-        compile_scenario(_beer([_add_oak(14.0, 4.0, "medium")]))
+    # Barrel-beer oak (D-86): oak is no longer wine-only — a beer scenario now ACCEPTS add_oak
+    # (bourbon-barrel stouts / oak-aged sours), setting the same 5 ceilings from oak_gpl × toast
+    # yield. (Was a "wine-only" rejection before D-86 — a legitimate expectation flip, not a
+    # weakened test.) The unknown-toast rejection above still holds for beer too.
+    cs = compile_scenario(_beer([_add_oak(14.0, 4.0, "medium")]))
+    event = next(e for e in cs.events if e.label.startswith("add_oak"))
+    assert event.mutate is not None  # dose only (a pure ceiling mutate, like the wine add_oak)
+    after = event.mutate(cs.schema, cs.y0.copy())
+    # The medium-toast dose sets each ceiling to oak_gpl × oak_yield_<compound>_medium (> 0).
+    for compound in ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin"):
+        assert float(cs.schema.get(after, f"{compound}_ceiling")) > 0.0
+
+
+# -- D-86: barrel-beer oak end-to-end (the same wood axis, on beer) ------------------------------
+
+
+def test_un_oaked_beer_aging_leaves_the_oak_pools_zero_and_closes_ledgers():
+    # Isolability on beer (D-86, the D-77 three-case pattern): a begin_aging beer with NO add_oak
+    # leaves every oak extractive + ceiling identically 0 — byte-for-byte the case without the oak
+    # axis — and the whole ferment+aging trajectory still closes carbon AND nitrogen (the oak slots
+    # are off every ledger, so wiring them into beer perturbs no elemental balance).
+    cs = compile_scenario(_beer([_begin_aging(14.0)]))
+    traj = cs.run()
+    assert traj.success
+    for name in _OAK_EXTRACTIVES + _OAK_CEILINGS + ("ellagitannin", "ellagitannin_ceiling"):
+        assert np.max(np.abs(traj.series(name))) == 0.0  # identically zero — no oak dosed
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    assert_conserved(
+        traj.as_trajectory(), total_carbon(cs.schema, biomass_carbon_fraction=f_c), label="carbon"
+    )
+    assert_conserved(
+        traj.as_trajectory(), total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n),
+        label="nitrogen",
+    )
+
+
+def test_barrel_beer_oak_raises_the_oak_oavs_and_astringency():
+    # The sensory payoff on beer (bourbon-barrel stout / oak-aged sour): oak aging lifts the four
+    # oak-extractive OAVs from 0 (read through the D-67 lens against the beer-matrix thresholds,
+    # D-86) and the ellagitannin astringency readout goes positive. An un-oaked beer reads 0.
+    thresholds = load_thresholds()
+    oaked = compile_scenario(
+        _beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "medium")])
+    ).run()
+    plain = compile_scenario(_beer([_begin_aging(14.0)])).run()
+    assert oaked.success and plain.success
+    for compound in _OAK_EXTRACTIVES:
+        assert float(oav_series(oaked.as_trajectory(), thresholds, compound)[-1]) > 0.0
+        assert float(oav_series(plain.as_trajectory(), thresholds, compound)[-1]) == 0.0
+    # Astringency = oak ellagitannin alone (beer has no grape tannin slot — D-86): positive oaked.
+    astr = astringency_series(oaked.as_trajectory())
+    assert np.allclose(astr, np.asarray(oaked.series("ellagitannin"), dtype=float) * 1000.0)
+    assert astr[-1] > 0.0
+    assert float(plain.series("ellagitannin")[-1]) == 0.0
+
+
+def test_barrel_beer_oak_protects_against_oxidation():
+    # The D-78 protection spine, on beer (D-86): two identical oxygenated aged beers — same O₂ dose,
+    # same ferment+aging — differing ONLY in the add_oak charge. The oaked beer's ellagitannin
+    # scavenges its share of the O₂, so it browns LESS (lower A420) and makes LESS oxidative
+    # acetaldehyde. Beer already runs the always-on O₂ sinks (OxidativeAcetaldehyde/PhenolicBrowning
+    # in the medium-agnostic _AGING_PROCESSES), so the substrate-gated ellag sink adds on top.
+    o2_dose = 40.0
+    oaked = compile_scenario(
+        _beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "light"), _add_oxygen(14.0, o2_dose)])
+    ).run()  # light toast ⇒ most ellagitannin (strongest protection)
+    unoaked = compile_scenario(
+        _beer([_begin_aging(14.0), _add_oxygen(14.0, o2_dose)])
+    ).run()
+    assert oaked.success and unoaked.success
+    assert float(oaked.series("A420")[-1]) < float(unoaked.series("A420")[-1])
+    assert float(oaked.series("acetaldehyde")[-1]) < float(unoaked.series("acetaldehyde")[-1])
+    assert float(oaked.series("A420")[-1]) > 0.0  # PARTIAL, not total — still some browning
 
 
 # -- D-79: tannin–anthocyanin condensation end-to-end (red-wine softening + colour stabilization) --

@@ -36,9 +36,10 @@ honesty cost flagged in that threshold's provenance ``notes``. The single-molecu
 (diacetyl, acetaldehyde, H₂S, 4-EP, 4-EG) carry no such assumption.
 
 **Medium-specificity.** The aroma set is medium-specific (mirroring the beer-only
-``iso_alpha``): beer carries the 5 common pools; wine adds 4-EP, 4-EG, mercaptans, the two Strecker
-aldehydes (D-75) and the four oak extractives (D-77). Every
-threshold is matrix-specific too (``threshold_<pool>_beer`` vs ``_wine``) because ethanol and
+``iso_alpha``): beer carries the 5 common pools + the 4 oak extractives (barrel-beer, D-86); wine
+adds 4-EP, 4-EG, mercaptans and the two Strecker aldehydes (D-75) on top of the common + oak sets.
+The four oak extractives (D-77) are shared by both media (D-86 — the oak axis is a wood property).
+Every threshold is matrix-specific too (``threshold_<pool>_beer`` vs ``_wine``) because ethanol and
 the wine/beer matrix shift odor thresholds substantially. ``iso_alpha``/IBU is deliberately
 excluded — it is a *taste* (bitterness), already read out by :func:`fermentation.analysis.
 ibu_series` (D-64); an odor-threshold OAV does not apply to it.
@@ -85,30 +86,40 @@ _COMMON: tuple[AromaCompound, ...] = (
     AromaCompound("fusels", "isoamyl alcohol", "solventy / fusel", lumped=True),
 )
 
-#: The nine wine-only pools appended in ``wine_schema`` (Brett phenols + volatile thiols + the two
-#: Strecker aldehydes + the four oak extractives). ``methional`` and ``phenylacetaldehyde`` (D-75)
+#: The five wine-only pools appended in ``wine_schema`` (Brett phenols + volatile thiols + the two
+#: Strecker aldehydes). ``methional`` and ``phenylacetaldehyde`` (D-75)
 #: are single-molecule pools with OPPOSITE valence — methional the cooked-potato oxidative
-#: off-note, phenylacetaldehyde the honey note. The four oak extractives (decision D-77) are
-#: single-molecule pools of the non-oxidative barrel/chip axis — ``guaiacol`` here is the OAK smoky
-#: note, DISTINCT from the Brett ``ethylguaiacols`` above (a different molecule). All read against
-#: their own matrix-specific thresholds. The oak *ceiling* slots (set-and-hold, D-77) are NOT aroma
-#: pools — they hold saturation ceilings, not concentrations, so they are deliberately excluded.
+#: off-note, phenylacetaldehyde the honey note. All read against their own matrix-specific
+#: thresholds. (The four oak aroma extractives moved to the medium-agnostic ``_OAK`` tuple at D-86 —
+#: barrel-beer oak — since both media now carry the oak axis.)
 _WINE_ONLY: tuple[AromaCompound, ...] = (
     AromaCompound("ethylphenols", "4-ethylphenol", "horse-sweat / barnyard", lumped=False),
     AromaCompound("ethylguaiacols", "4-ethylguaiacol", "clove / smoky", lumped=False),
     AromaCompound("mercaptans", "methanethiol", "reductive / drains", lumped=True),
     AromaCompound("methional", "methional", "cooked potato / oxidative", lumped=False),
     AromaCompound("phenylacetaldehyde", "phenylacetaldehyde", "honey / floral", lumped=False),
+)
+
+#: The four oak aroma extractives — the non-oxidative barrel/chip diffusion axis (decision D-77),
+#: SHARED by wine and barrel-beer (decision D-86: both media carry the oak slots via
+#: ``core.media._oak_specs``). Single-molecule pools; ``guaiacol`` here is the OAK smoky note,
+#: DISTINCT from the Brett ``ethylguaiacols`` above (a different molecule). Each read against its
+#: matrix-specific threshold (``threshold_<compound>_beer`` vs ``_wine``, ``sensory.yaml``). The oak
+#: *ceiling* slots (set-and-hold, D-77) and the ``ellagitannin`` TASTE pool (D-78, read by
+#: :func:`~fermentation.analysis.astringency_series`, not the odor lens) are NOT aroma pools — all
+#: deliberately excluded here.
+_OAK: tuple[AromaCompound, ...] = (
     AromaCompound("whiskey_lactone", "whiskey lactone", "coconut / oak", lumped=False),
     AromaCompound("vanillin", "vanillin", "vanilla", lumped=False),
     AromaCompound("guaiacol", "guaiacol", "smoky / toasty", lumped=False),
     AromaCompound("eugenol", "eugenol", "clove / spice", lumped=False),
 )
 
-#: Medium -> its ordered aroma set. Beer = 5 common pools; wine = those + 9 wine-only (14 total).
+#: Medium -> its ordered aroma set. Beer = 5 common + 4 oak (9); wine = 5 common + 5 wine-only + 4
+#: oak (14). Wine's order is unchanged from before D-86 (the oak four were already last).
 AROMA_COMPOUNDS: Mapping[str, tuple[AromaCompound, ...]] = {
-    "beer": _COMMON,
-    "wine": _COMMON + _WINE_ONLY,
+    "beer": _COMMON + _OAK,
+    "wine": _COMMON + _WINE_ONLY + _OAK,
 }
 
 
