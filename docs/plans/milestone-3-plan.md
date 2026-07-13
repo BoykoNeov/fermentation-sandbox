@@ -102,6 +102,24 @@
 > ledger; an off-ledger pigment consuming it fails `assert_conserved`) — it's the explicit named next beat. 1 advisor
 > pass (before writing; adjusted 2 leanings, 1 conservation-breaking). Next: the acetaldehyde-bridged route, tannin
 > self-polymerization, SO₂/pH bleaching (promotes pigment to a slot), beat 1b, Maillard Strecker, or barrel fill-number.**
+>
+> **PROGRESS (D-80, 2026-07-13): `AcetaldehydeBridgedCondensation` built — the acetaldehyde-bridged (ethylidene) route,
+> the NINTH aging Process, the THIRD non-oxidative one, the SPLIT-LEDGER beat, and the first link from the oxidative
+> sub-axis to red-wine colour (887 tests). Trilinear `k·f(T)·[free acetaldehyde]·[anthocyanin]·[tannin]`; a new ON-ledger
+> `ethyl_bridge` slot captures the acetaldehyde carbon (weighted at cf(ethylidene)) so carbon closes non-trivially.
+> HONEST-FRAMING: v1 delivered the carbon + O₂→pigment MECHANISM, NOT a colour behaviour change — `color_series` was
+> O₂-invariant (superseded at D-81). 1 pre-work + 1 done-call advisor pass.**
+>
+> **PROGRESS (D-81, 2026-07-13): the SO₂/pH anthocyanin-BLEACHING beat — `AnthocyaninFading` built + polymeric pigment
+> PROMOTED to a slot, so `color_series` now GENUINELY DECLINES (899 tests, two commits). User chose "Both (C)" at the
+> design fork = reversible masking readout (A) + irreversible fade sink (B), a two-beat split; D-81 delivers B, D-82 (the
+> masking readout) is the COMMITTED second half, still owed. The fade is O₂-COUPLED (bilinear `k·f(T)·[o2]·[anthocyanin]`
+> on the shared o2 pool, anthocyanin → colourless `faded_anthocyanin`), so SO₂ colour-protection is EMERGENT (SO₂
+> scavenges o2 via D-72, leaving less to fade) — advisor caught that the reversible-masking alternative would make colour
+> RISE, not decline. HONEST O₂-GATING: colour declines UNDER O₂ exposure; an anaerobic red still holds flat via
+> condensation. Three-slot identity anthocyanin + polymeric_pigment + faded_anthocyanin ≡ anthocyanin₀ (by construction).
+> SUPERSEDES D-80's O₂-invariance framing. 1 pre-work fork-resolution + 1 done-call advisor pass. Next: D-82 (masking
+> readout, owed), O₂-independent thermal fade, tannin self-polymerization, beat 1b, Maillard Strecker, barrel fill-number.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

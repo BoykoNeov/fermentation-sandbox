@@ -6498,3 +6498,84 @@ deferred to keep the sole-fate honest; (5) weight `ethyl_bridge` in `total_carbo
 SO₂/pH anthocyanin bleaching (a second anthocyanin fate → colourless, promotes the pigment to an integrated slot +
 makes `color_series` genuinely decline), beat 1b (descriptor projection), the non-oxidative Maillard Strecker route,
 barrel fill-number depletion, or barrel-beer oak.
+
+## D-81 — `AnthocyaninFading` built + polymeric pigment PROMOTED to a slot: the SO₂/pH anthocyanin-bleaching beat — `color_series` now genuinely DECLINES, and SO₂ colour-protection is emergent (§4.1)
+
+**Date:** 2026-07-13. **Milestone 3 / Tier-3, the tenth aging Process** and the beat D-79/D-80 named as "the SO₂/pH
+bleaching that promotes the pigment to a slot and makes `color_series` genuinely decline." The user chose **"Both
+(C)"** when the design fork was surfaced (see below): the reversible SO₂/pH **masking** readout **and** the irreversible
+**fade** sink, "a two-beat split." **D-81 delivers beat B (the fade sink); D-82 (the masking readout) is the committed
+second half of the same request, still owed.** Shipped as **two commits** (advisor-recommended de-risking sequence):
+(1/2) the behaviour-preserving pigment-slot promotion, (2/2) the `AnthocyaninFading` mechanism. **Two `advisor()`
+passes** (a pre-work fork-resolution pass + a done-call pass, both taken in full). **899 tests** (+12 net: +1 identity,
++11 fading; the D-80 O₂-invariance scenario pin *retired*, not added), `ruff`/`mypy`/`pytest` green.
+
+**THE DESIGN FORK (surfaced to the user; the advisor overturned my first lean).** "SO₂/pH anthocyanin bleaching" is
+ambiguous between two *opposite-signed* phenomena: **(A)** reversible SO₂/pH **masking** — the flavylium ⇌ colourless
+bisulfite-adduct / carbinol equilibrium, the literal Somers assay — where colour loss *increases* with SO₂, a fast
+equilibrium **readout**, no slot; and **(B)** an **irreversible oxidative fade** to colourless products, where SO₂ is
+**protective** and colour genuinely declines. My first lean was A (reversible, "more honest"). **The advisor caught
+that A delivers the OPPOSITE of the headline ask:** under A, as condensation converts monomeric → resistant polymeric
+pigment, `color = χ(SO₂,pH)·monomeric + polymeric` *rises* (and rises further as SO₂ depletes and the mask lifts) — it
+never triggers the pigment-slot promotion and gives *deepening*, not declining, colour. B is the beat that delivers all
+three of the user's stated outcomes (decline / promote pigment to a slot / unmask the stability payoff). The only genuine
+misnomer is *labelling* an irreversible sink "bleaching" (it conflates two opposite SO₂-signs); the sink itself —
+oxidative anthocyanin fading — is real chemistry. Surfaced as a neutral three-option question (B / A / both); the user
+picked **both**, split B (D-81) then A (D-82).
+
+**PIGMENT PROMOTED TO AN INTEGRATED SLOT (commit 1/2, behaviour-preserving).** Through D-79/D-80 the stable pigment was
+a post-hoc readout `anthocyanin₀ − anthocyanin` because condensation was anthocyanin's **sole** fate. B gives anthocyanin
+a **second** fate (→ colourless), so that reconstruction would wrongly count the faded fraction as pigment — exactly the
+**A420 discriminator** (D-74: a driver with *competing* sinks is not reconstructible), which forces a real
+`polymeric_pigment` state slot. Both condensation routes (`TanninAnthocyaninCondensation` D-79 direct +
+`AcetaldehydeBridgedCondensation` D-80 bridged) now write `d(polymeric_pigment)/dt = +r` into one shared pool;
+`polymeric_pigment_series` reads the slot directly and `color_series = (anthocyanin + polymeric_pigment)·1000`. **With no
+fade Process the slot equals the old reconstruction exactly**, so this step is byte-for-byte behaviour-preserving (only
+`touches`/metadata/schema-size assertions changed) — verified before layering the mechanism on, isolating "did I break
+the scaffolding" from "is the fade right."
+
+**THE FADE MECHANISM — O₂-COUPLED, so SO₂ protection is EMERGENT (commit 2/2, the D-81 crux).**
+`r_o2 = k_anthocyanin_fade · f(T) · [o2] · [anthocyanin]` — a **bilinear** sink on the **shared** `o2` pool (the
+`SulfiteOxidation`/`EllagitanninOxidation` form), transferring anthocyanin → the colourless `faded_anthocyanin` slot at a
+mass-based `y_anthocyanin_per_o2` yield. It is **not** a scripted `g(SO₂,pH)` decay — the advisor's load-bearing catch:
+"SO₂ protects the colour" is true because SO₂ is an **antioxidant** that scavenges O₂ (bisulfite oxidation,
+`SulfiteOxidation` D-72), leaving *less O₂* to fade the anthocyanin. `ProcessSet` sums the O₂ sinks and splits `o2` by
+kᵢ/Σk, so **SO₂ protection falls out of the shared pool with nothing scripted** (the D-72/D-80 "SO₂ effect, emergent"
+signature), verified end-to-end by `test_fading_so2_protects_colour_emergently` (a sulfited red keeps strictly more
+colour). A scripted SO₂ factor on an O₂-*independent* decay would attribute the protection to the wrong pathway (SO₂ does
+not meaningfully protect against thermal/hydrolytic decay). O₂-coupling also creates the real micro-ox tension: under O₂,
+some anthocyanin bridges to *stable* pigment (D-80) while some **fades to colourless** here — SO₂ both protects the fade
+(via D-72) and delays the bridging (D-80), from one shared equilibrium.
+
+**THREE-SLOT COLOUR IDENTITY (by construction).** `anthocyanin + polymeric_pigment + faded_anthocyanin ≡ anthocyanin₀`
+at all times — the three `d/dt` terms sum to zero for any rate law (each anthocyanin unit lost to condensation *or*
+fading lands in the pigment *or* faded slot). All three slots are **off every ledger** (grape-derived colour-equivalents),
+so this is *conservation-trivial* and **cannot** go through `assert_conserved` (weights are 0); it is checked as a direct
+three-slot sum (the advisor's note). Verified both with condensation-only (`faded ≡ 0`, the promotion proof) and with
+fading active (`faded > 0`, non-trivially).
+
+**SUPERSEDES D-80's "colour O₂-invariant in v1" framing — the honest O₂-gating qualifier.** D-80 pinned
+`test_micro_oxygenation_leaves_colour_invariant_in_v1` (three v1 reasons: direct route exhausts anthocyanin; equal
+absorptivity; no bleaching sink). **D-81 removes reason 3, so that pin is retired** and replaced by
+`test_micro_oxygenation_now_fades_colour_end_to_end`. Because the fade is O₂-coupled, the honest behaviour is: an
+**oxygenated** red now genuinely **fades** (`color_series` declines, verified ≈ 287 vs 300 mg/L over the run), while an
+**anaerobic / no-`add_oxygen`** red still **holds flat** at ≈ `anthocyanin₀·1000` (condensation conserves colour; no O₂
+⇒ no fade). This is a real qualifier on the user's literal "genuinely decline": it declines **under O₂ exposure** — which
+is precisely the micro-ox colour-stability story the beat was meant to unmask (the surviving pigment is the stable
+fraction). The O₂-independent (thermal/hydrolytic) bottle-aging fade is a separate, deferred pathway (an anaerobic sealed
+red bleaches slowly in reality; out of v1 scope, named not smuggled).
+
+**Params (all speculative, `polymerization.yaml`, full provenance).** `k_anthocyanin_fade` (5.0e-3 L/(g·h), mirroring
+the sibling bilinear O₂-sink `k_ellagitannin_oxidation`), own reaction-scale `E_a_anthocyanin_fade` (55 kJ/mol, prime
+directive #2), `y_anthocyanin_per_o2` (1.0 g/g, mass-based lumped-cascade yield). Load-bearing sourced claims: O₂ fades
+free anthocyanin to colourless; SO₂ (an antioxidant) protects; warmer fades faster (Somers & Evans 1986; Ribéreau-Gayon
+Handbook of Enology). Wired into `kinetics.__init__`, the wine medium (own isolable `_ANTHOCYANIN_FADING_PROCESSES`
+tuple), and `compile._AGING_GATED_PROCESSES` (disabled at compile / `begin_aging`-enabled). Doubly substrate-gated on
+`o2` AND `anthocyanin`, wine-only ⇒ a white / reductive / all-beer run is byte-for-byte inert (a red dosed with both O₂
+and anthocyanin does split its O₂ one more way — the physically-correct cost of a new oxidative sink, documented).
+
+**Scope + next.** v1 is the **oxidative fade only**. **D-82 — the reversible SO₂/pH masking readout (beat A) — is the
+committed second half of the user's "Both (C)" choice, still owed** (a fast χ(SO₂,pH) coloured-fraction readout on free
+anthocyanin, polymeric pigment counted bleach-resistant; the Somers assay; a *readout*, no new slot). Also still deferred:
+the O₂-independent thermal/hydrolytic fade, tannin self-polymerization / tannin-ethyl-tannin (the other softeners), beat
+1b (descriptor projection), the non-oxidative Maillard Strecker route, barrel fill-number, barrel-beer oak.
