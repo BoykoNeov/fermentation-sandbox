@@ -6648,3 +6648,116 @@ above ~pH 4, out of the wine band); the readout does **not** deplete the SO₂ p
 COMPLETE** (B = D-81 fade + A = D-82 mask). Still deferred: the O₂-independent thermal/hydrolytic fade, tannin
 self-polymerization / tannin-ethyl-tannin (the other softeners), beat 1b (descriptor projection), the non-oxidative
 Maillard Strecker route, barrel fill-number depletion, barrel-beer oak.
+
+## D-83 — `ThermalAnthocyaninFade` built: the O₂-**independent** thermal fade — SO₂ gives NO protection, and a sealed anaerobic red now fades (§4.1)
+
+**Date:** 2026-07-13. **Milestone 3 / Tier-3.** The **eleventh** aging Process and the **second, O₂-independent**
+anthocyanin fate that D-81's `AnthocyaninFading` explicitly deferred. Beyond the O₂-driven oxidative bleaching (D-81), free
+monomeric anthocyanin also degrades by a **thermal/hydrolytic** route needing **no oxygen** — the flavylium ring opens and
+the pigment breaks down purely as a function of temperature and time (Somers & Evans; Ribéreau-Gayon on anthocyanin thermal
+stability). This is why a **sealed, anaerobic** red still loses its bright monomeric colour on the shelf and why **warm
+storage kills red colour** even in a fully reductive bottle. **918 tests** (+12: 11 unit + 1 scenario), `ruff`/`mypy`/
+`pytest` green. One `advisor()` pre-work pass (3-beat batch design: thermal fade + tannin self-poly + tannin-ethyl-tannin),
+taken in full.
+
+**THE PROCESS.** `r = k_anthocyanin_thermal_fade · f(T) · [anthocyanin]` — **first-order** in anthocyanin alone (the
+`EsterHydrolysis` form, *not* the D-81 bilinear `[o2]·[anthocyanin]`); it transfers anthocyanin into the **same** colourless
+`faded_anthocyanin` slot the D-81 fade fills (one sink, two contributing routes), `d(anthocyanin)/dt = −r`,
+`d(faded_anthocyanin)/dt = +r`. A pure off-ledger transfer, so the D-81 three-slot colour identity `anthocyanin +
+polymeric_pigment + faded_anthocyanin ≡ anthocyanin₀` still closes by construction. **No yield** (contrast D-81): the rate
+is already g anthocyanin/L/h — there is no O₂ pool to convert *through* — so the transfer is directly `−r`/`+r`. Two params
+only, `k`/`E_a`.
+
+**THE CRUX — O₂-INDEPENDENT, so SO₂ does NOT protect (the mirror of D-81).** This is the deliberate opposite of
+`AnthocyaninFading`. That route draws the **shared** `o2` budget, so SO₂ protects it *emergently* (SO₂ scavenges O₂ via
+`SulfiteOxidation`, D-72, leaving less to fade). Thermal fade touches **no** `o2` at all — it is not an oxidation — so **SO₂
+gives no protection**: a heavily-sulfited red *still* fades thermally, and only **cold storage** (`E_a > 0`) slows it.
+Keeping this a *separate* Process (not an SO₂-insensitive term bolted onto D-81) is exactly the discipline D-81's param note
+called for — it **rejected** scripting an SO₂ factor onto an O₂-independent rate; here we honour that by making the
+O₂-independent route truly SO₂-blind. Pinned both ways: `test_thermal_fade_unprotected_by_so2` (unit: identical rate
+sulfited vs not) and `test_thermal_fade_adds_to_oxidative_fade_end_to_end` (scenario: warm-anaerobic fades more than
+cool-anaerobic, and a 150 mg/L SO₂ dose does *not* rescue the warm red).
+
+**THE RETIREMENT.** D-81's Scope (v1) note said "an anaerobic sealed red **holds** its colour here (fades only via O₂)" —
+defensible short-term reality then, now **retired**: a reductive (no `add_oxygen`) red, byte-for-byte flat under D-81 alone,
+now genuinely declines. Three existing D-81/D-82 scenario tests that asserted anaerobic colour holds *exactly* flat at
+antho₀·1000 were updated to account for the small thermal loss (≈ 0.7 % over 150 d at 25 °C) while keeping their
+load-bearing contrasts (O₂ fades *more*; observed colour *rises* as content stays near-flat). Colour loss only, to the
+**colourless** sink — *not* browning (that is `PhenolicBrowning`/`A420`, D-73; this adds no `A420`, no second browning
+pathway). Params `k_anthocyanin_thermal_fade` (2.0e-5 /h — an order of magnitude below D-81's pseudo-first-order rate at a
+micro-ox O₂ charge, so under O₂ the oxidative route dominates while an anaerobic red fades slowly) and
+`E_a_anthocyanin_thermal_fade` (55 kJ/mol, own reaction-scale E_a), both **speculative**, banded. Wine-only, isolable,
+substrate-gated on anthocyanin; disabled at compile, enabled by `begin_aging`.
+
+## D-84 — `TanninSelfPolymerization` built: the direct tannin–tannin softener — astringency softens with **no anthocyanin** (§4.1)
+
+**Date:** 2026-07-13. **Milestone 3 / Tier-3.** The **twelfth** aging Process, the fourth non-oxidative one, and the
+**first of the tannin–tannin axis** the D-79/D-80 condensation beats deferred (their "one-directional-per-pool" honesty
+note). Beyond condensing with anthocyanin (D-79/D-80), condensed grape **tannin** also reacts **with itself** — flavan-3-ol
+units link into larger, softer polymers over time, independent of anthocyanin and oxygen (Ribéreau-Gayon; the
+proanthocyanidin-polymerization literature). So a **white** wine's tannin, or an anthocyanin-exhausted red, **still softens**
+on aging — softening the anthocyanin-dependent routes alone could not produce. **930 tests** (+12: 11 unit + 1 scenario),
+`ruff`/`mypy`/`pytest` green (same batch advisor pass as D-83).
+
+**THE PROCESS.** `r = k_tannin_self_polymerization · f(T) · [tannin]²` — **bimolecular** in the single tannin pool (a true
+*self*-reaction, second-order — distinct from the D-79 *bilinear* two-pool form), `d(tannin)/dt = −r`. A **pure off-ledger
+tannin sink**: the soft polymer goes to **no** destination slot, consistent with D-79/D-80, which already consume tannin as
+a pure sink (the `polymeric_pigment` they fill is in **anthocyanin**-equivalents, never tannin mass; no ledger reads tannin
+mass). Adding a `polymerized_tannin` slot here but not for the condensation-consumed tannin would be asymmetric bookkeeping
+for a pool nothing conserved reads — the advisor and I agreed **not** to open that refactor. `r` folds the lumped
+self-condensation stoichiometry into one sink rate; **no yield** (a self-reaction has no second pool). Off every ledger,
+moves nothing conserved (carbon/mass/nitrogen flat, pinned).
+
+**THE PAYOFF + the honesty note it retires.** `astringency_series` reads free tannin (mg/L) and excludes the soft polymer,
+so drawing tannin down **softens** the wine — exactly as the D-79 route does but **without needing anthocyanin**. Through
+D-80, `astringency_series` carried a standing caveat ("grape tannin self-polymerization … a further-deferred beat, so
+anthocyanin is the limiting reagent and A–T condensation softens only modestly"); this Process builds that beat, so the note
+is **retired** and the softening list gains mechanisms (4) self-polymerization and (5) tannin-ethyl-tannin. Pinned:
+`test_tannin_self_poly_softens_without_anthocyanin` (unit: a no-anthocyanin wine where the D-79 route is inert now softens)
+and `test_white_wine_tannin_softens_by_self_polymerization_end_to_end` (scenario: a tannin-dosed *white* softens, warmer
+more, colour identically zero throughout). Oak- and O₂-independent (grape condensed tannin ≠ oak `ellagitannin`; not an
+oxidation); acetaldehyde-free (the *direct* route — the bridged variant is D-85). Params `k_tannin_self_polymerization`
+(3.0e-4 L/(g·h) — an order of magnitude below the D-79 anthocyanin route per unit, so A–T dominates when anthocyanin is
+present and self-poly dominates once it is not) and `E_a_tannin_self_polymerization` (55 kJ/mol), both **speculative**,
+banded. One existing D-80 bridged-route test was relaxed (`< 1e-6` → `< 1e-3`): self-poly now competes for the tannin pool,
+so anthocyanin condenses slightly less completely (still > 99.9 % consumed) — a real physical coupling, documented.
+
+## D-85 — `TanninEthylTanninCondensation` built: the acetaldehyde-bridged tannin–ethyl–tannin softener — the second tannin–tannin route, ledger-touching (§4.1)
+
+**Date:** 2026-07-13. **Milestone 3 / Tier-3.** The **thirteenth** aging Process, the fifth non-oxidative one, the **second
+of the tannin–tannin axis**, and the **only ledger-touching beat** of this 3-Process batch. It is the acetaldehyde-bridged
+sibling of `TanninSelfPolymerization` (D-84), exactly as `AcetaldehydeBridgedCondensation` (D-80) is of
+`TanninAnthocyaninCondensation` (D-79): dissolved-O₂ acetaldehyde (D-71) forms an **ethylidene bridge** `—CH(CH₃)—` linking
+**two grape tannin** flavanols (tannin–ethyl–tannin), softening astringency. So **micro-oxygenation softens even an
+anthocyanin-free tannin pool** — a white / tannin-only wine's tannin polymerizes *faster* under O₂ — with **no colour**
+involved. **942 tests** (+12: 11 unit + 1 scenario, incl. non-trivial carbon closure), `ruff`/`mypy`/`pytest` green (same
+batch advisor pass; the advisor flagged this as the sole conservation-risk beat, so it was built **last**, after the two
+off-ledger routes were proven).
+
+**THE PROCESS.** `r = k_tannin_ethyl_tannin · f(T) · [free acetaldehyde] · [tannin]²` — the D-84 **bimolecular** `[tannin]²`
+form **plus** the D-80 free-acetaldehyde factor, anchored on **tannin** consumption (no anthocyanin — both bridge ends are
+flavanols): `d(tannin)/dt = −r`, `d(acetaldehyde)/dt = −y_acetaldehyde_per_tannin · r`, `d(ethyl_bridge)/dt = +(acetaldehyde
+carbon consumed)/c(ethylidene)`. The tannin bulk is a **pure off-ledger sink** (the D-84 precedent, no destination slot).
+
+**THE SPLIT LEDGER (reused verbatim from D-80).** Acetaldehyde's carbon is **on** the carbon ledger (borrowed from ethanol
+`E` at D-71), so consuming it into the off-ledger polymer would make carbon vanish. The **same** on-ledger `ethyl_bridge`
+slot D-80 introduced captures it via the **same** carbon-exact split (release at `c(acetaldehyde)`, re-deposit at
+`c(ethylidene)`), so `total_carbon` closes to **machine precision non-trivially** (acetaldehyde↓ exactly equals
+`ethyl_bridge`↑ in carbon) — pinned end-to-end on a *no-anthocyanin* run, `test_tannin_ethyl_carbon_closes_nontrivially` /
+`test_micro_oxygenation_softens_white_tannin_via_ethyl_bridge_end_to_end`. Both bridged routes (D-80 anthocyanin, D-85
+tannin) feed **one shared** `ethyl_bridge` pool — its meaning is the ethylidene bridge carbon, whether the bridge terminates
+in pigment or a tannin–tannin polymer.
+
+**ITS OWN acetaldehyde yield (prime directive #2), and NO pigment (the D-80 colour difference).** One acetaldehyde bridges
+**two flavanols** here — a different lumped stoichiometry from D-80's flavanol↔anthocyanin bridge — so it reads its **own**
+`y_acetaldehyde_per_tannin` (0.06 g/g, lower than D-80's per-anthocyanin 0.09 because a bridge is shared across two tannin
+units), *not* D-80's yield. And because both ends are **colourless** flavanols, it deposits **no** `polymeric_pigment` and
+touches **no** `anthocyanin` — a pure O₂-driven astringency softener, the colour difference from D-80. **Reads FREE
+acetaldehyde** under SO₂ (bound can't bridge — the D-47/D-80 precedent), so SO₂ *delays* the softening (emergent, pinned).
+Params `k_tannin_ethyl_tannin` (6.0e-3 L²/(g²·h) — ~20× `k_tannin_self_polymerization` per unit, the D-80/D-84 acceleration
+ratio, so at micro-ox acetaldehyde levels the bridged route matches the direct one), `E_a_tannin_ethyl_tannin` (55 kJ/mol),
+and `y_acetaldehyde_per_tannin`, all **speculative**, banded. Wine-only, triply substrate-gated, disabled at compile,
+enabled by `begin_aging`.
+
+**The tannin–tannin axis is now built** (D-84 direct + D-85 bridged). Still deferred: beat 1b (descriptor projection), the
+non-oxidative Maillard Strecker route, barrel fill-number depletion, barrel-beer oak.

@@ -133,6 +133,22 @@
 > speculative). 1 pre-work + 1 done-call advisor pass. THE COLOUR AXIS'S "Both (C)" REQUEST IS NOW COMPLETE (B=D-81 fade +
 > A=D-82 mask). Next: O₂-independent thermal fade, tannin self-polymerization / tannin-ethyl-tannin, beat 1b, Maillard
 > Strecker, barrel fill-number, barrel-beer oak.**
+>
+> **PROGRESS (D-83/D-84/D-85, 2026-07-13): a 3-Process batch closing two deferred aging axes (942 tests). ONE pre-work
+> advisor pass designed the batch and flagged the sole conservation risk; the off-ledger beats landed first, the
+> ledger-touching one last. (1) `ThermalAnthocyaninFade` (D-83, 11th aging Process) — the O₂-INDEPENDENT thermal fade:
+> `r = k·f(T)·[anthocyanin]` (first-order, no o2, no yield) → the same colourless `faded_anthocyanin` slot. The MIRROR of
+> D-81: touching no o2, SO₂ gives NO protection, so a sealed/sulfited/anaerobic red now fades (only cold storage slows it) —
+> RETIRES D-81's "anaerobic sealed red holds its colour" note (3 existing tests updated). (2) `TanninSelfPolymerization`
+> (D-84, 12th) — the DIRECT tannin–tannin softener: `r = k·f(T)·[tannin]²` (bimolecular self-reaction, pure off-ledger sink,
+> no destination slot per the D-79/D-80 tannin-is-a-pure-sink precedent). Softens astringency WITHOUT anthocyanin (a white
+> now softens) → RETIRES the `astringency_series` "one-directional-per-pool" note. (3) `TanninEthylTanninCondensation`
+> (D-85, 13th) — the acetaldehyde-BRIDGED tannin–ethyl–tannin route: `r = k·f(T)·[free acet]·[tannin]²`, the D-84 form + the
+> D-80 acetaldehyde factor. Reuses D-80's split-ledger carbon capture (acetaldehyde → shared `ethyl_bridge`, own
+> `y_acetaldehyde_per_tannin` — one acetaldehyde per TWO flavanols), so `total_carbon` closes to machine precision
+> non-trivially; deposits NO pigment (colourless tannin–tannin polymer — the D-80 colour difference). The tannin–tannin axis
+> is now built. Next: beat 1b (descriptor projection), non-oxidative Maillard Strecker, barrel fill-number, barrel-beer
+> oak.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
@@ -158,7 +174,9 @@
         ├── ester formation/hydrolysis equilibria over time
         ├── oxidation (acetaldehyde/phenolic browning, Strecker)
         ├── oak extraction (vanillin, whiskey lactones — D-77; ellagitannins — D-78)
-        ├── tannin–anthocyanin polymerization (red colour / astringency)   ← D-79 (grape pools, oak-/O₂-independent)
+        ├── tannin–anthocyanin polymerization (red colour / astringency)   ← D-79 direct + D-80 bridged; D-81 fade + D-82 mask
+        ├── anthocyanin fading: O₂-coupled (D-81) + O₂-independent thermal (D-83)   ← colour genuinely declines both ways
+        ├── tannin–tannin softening: self-polymerization (D-84 direct) + tannin-ethyl-tannin (D-85 bridged)   ← softens with no anthocyanin
         └── micro-oxygenation / reductive–oxidative sulfide evolution; Maillard/sotolon
 ```
 
