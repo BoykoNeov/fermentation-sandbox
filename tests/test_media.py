@@ -392,6 +392,13 @@ WINE_THERMAL_FADE_PROCESSES = {"thermal_anthocyanin_fade"}
 # needing anthocyanin (retiring the "one-directional-per-pool" note). Wine-only, same compile-seam
 # disable / begin_aging re-enable.
 WINE_TANNIN_SELF_POLY_PROCESSES = {"tannin_self_polymerization"}
+# WINE-ONLY acetaldehyde-bridged tannin–ethyl–tannin Process (decision D-85) — the second of the
+# tannin–tannin axis. Bridges TWO grape tannin flavanols with a dissolved-O₂ acetaldehyde ethylidene
+# linker (trilinear [acetaldehyde]·[tannin]²), an O₂-driven softener that reuses the D-80
+# split-ledger carbon capture (acetaldehyde → shared ethyl_bridge) but deposits NO pigment
+# (colourless). Wine-only,
+# same compile-seam disable / begin_aging re-enable.
+WINE_TANNIN_ETHYL_TANNIN_PROCESSES = {"tannin_ethyl_tannin_condensation"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -416,6 +423,7 @@ EXPECTED_PROCESSES = {
         | WINE_FADING_PROCESSES
         | WINE_THERMAL_FADE_PROCESSES
         | WINE_TANNIN_SELF_POLY_PROCESSES
+        | WINE_TANNIN_ETHYL_TANNIN_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

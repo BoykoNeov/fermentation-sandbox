@@ -43,6 +43,7 @@ from fermentation.core.kinetics import (
     StreckerDegradation,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
+    TanninEthylTanninCondensation,
     TanninSelfPolymerization,
     ThermalAnthocyaninFade,
     arrhenius_factor,
@@ -2616,6 +2617,204 @@ def test_tannin_self_poly_tier_is_speculative(poly_store):
     schema = wine_schema()
     ps = ProcessSet(schema, [TanninSelfPolymerization()], strict=True)
     assert ps.tier_of("tannin", poly_store.tier_map()) is Tier.SPECULATIVE
+
+
+# -- D-85: TanninEthylTanninCondensation — the acetaldehyde-bridged tannin–ethyl–tannin softener ---
+# TanninEthylTanninCondensation bridges TWO grape tannin flavanols with a dissolved-O₂ acetaldehyde
+# ethylidene linker (trilinear [acetaldehyde]·[tannin]², the D-84 self form + the D-80 acetaldehyde
+# factor), softening astringency WITHOUT anthocyanin. It reuses the D-80 split-ledger carbon capture
+# (acetaldehyde → shared ethyl_bridge slot, own y_acetaldehyde_per_tannin) but deposits NO pigment
+# (colourless tannin–tannin polymer). These tests pin the closed form + carbon-exact split, the
+# [tannin]² shape, the free-acetaldehyde SO₂ read, the gates, the wine-only no-op, NON-TRIVIAL
+# carbon closure end-to-end, the anthocyanin-free (colourless) softening, and tiers.
+
+
+def test_tannin_ethyl_metadata():
+    p = TanninEthylTanninCondensation()
+    assert p.name == "tannin_ethyl_tannin_condensation"
+    assert p.tier is Tier.SPECULATIVE
+    # Consumes off-ledger tannin (pure sink, no destination slot) + on-ledger acetaldehyde, whose
+    # carbon it books into the shared on-ledger ethyl_bridge slot. Touches NO anthocyanin and NO
+    # polymeric_pigment (a colourless tannin–tannin polymer — the colour difference from D-80).
+    assert set(p.touches) == {"acetaldehyde", "ethyl_bridge", "tannin"}
+    assert "anthocyanin" not in p.touches and "polymeric_pigment" not in p.touches
+    # Its OWN acetaldehyde yield (distinct from D-80's y_acetaldehyde_per_anthocyanin).
+    assert set(p.reads) == {
+        "k_tannin_ethyl_tannin",
+        "E_a_tannin_ethyl_tannin",
+        "y_acetaldehyde_per_tannin",
+        "T_ref",
+    }
+
+
+def test_tannin_ethyl_closed_form(poly_params):
+    # r = k·f(T)·[acetaldehyde]·[tannin]² (trilinear, second-order in tannin); anchored on tannin.
+    # Verify the tannin draw, the acetaldehyde drawdown at the OWN yield, and the carbon-exact
+    # acetaldehyde→ethyl_bridge split (release at cf(acetaldehyde), redeposit at cf(ethylidene)).
+    # No SO₂ ⇒ reads total acetaldehyde.
+    schema = wine_schema()
+    t = 298.15  # off T_ref so the Arrhenius factor bites
+    acet, tannin = 0.05, 2.0
+    y = _aged_wine(schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin)
+    d = TanninEthylTanninCondensation().derivatives(0.0, y, schema, poly_params)
+
+    f_t = arrhenius_factor(t, poly_params["E_a_tannin_ethyl_tannin"], poly_params["T_ref"])
+    k = poly_params["k_tannin_ethyl_tannin"]
+    y_acet = poly_params["y_acetaldehyde_per_tannin"]
+    r = k * f_t * acet * tannin * tannin
+    acet_consumed = y_acet * r
+    assert schema.get(d, "tannin") == pytest.approx(-r)
+    assert schema.get(d, "acetaldehyde") == pytest.approx(-acet_consumed)
+    # The split-ledger capture: acetaldehyde carbon released == carbon deposited into ethyl_bridge.
+    expected_bridge = acet_consumed * _ACET_C / _ETHYLIDENE_C
+    assert schema.get(d, "ethyl_bridge") == pytest.approx(expected_bridge)
+    assert acet_consumed * _ACET_C == pytest.approx(schema.get(d, "ethyl_bridge") * _ETHYLIDENE_C)
+    # NO pigment, NO anthocyanin, NO colour (the D-80 colour difference), and nothing else moves.
+    for var in ("anthocyanin", "polymeric_pigment", "faded_anthocyanin", "o2", "X", "S", "E", "N",
+                "CO2", "A420", "ellagitannin"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_tannin_ethyl_is_second_order_in_tannin_and_needs_acetaldehyde(poly_params):
+    # BIMOLECULAR in tannin (doubling tannin QUADRUPLES the rate) and FIRST-order in acetaldehyde
+    # (doubling acetaldehyde doubles it) — the D-84 self form accelerated by the D-80 factor.
+    schema = wine_schema()
+    p = TanninEthylTanninCondensation()
+
+    def rate(acet: float, tannin: float) -> float:
+        y = _aged_wine(schema, esters=0.0, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin)
+        return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "tannin"))
+
+    base = rate(0.04, 1.0)
+    assert rate(0.04, 2.0) == pytest.approx(4.0 * base)  # 2× tannin ⇒ 4× rate (second-order)
+    assert rate(0.08, 1.0) == pytest.approx(2.0 * base)  # 2× acetaldehyde ⇒ 2× rate (first-order)
+    assert base < 0.0  # actually bridging
+
+
+def test_tannin_ethyl_inert_without_tannin_or_acetaldehyde(poly_params):
+    # Doubly substrate-gated: no tannin OR no acetaldehyde ⇒ byte-for-byte zero (a no-tannin /
+    # reductive un-oxygenated wine is exactly the case without this Process). Undershoot absorbed.
+    schema = wine_schema()
+    p = TanninEthylTanninCondensation()
+    for kw in (
+        {"acetaldehyde": 0.0, "tannin": 2.0},
+        {"acetaldehyde": 0.05, "tannin": 0.0},
+        {"acetaldehyde": 0.05, "tannin": -1e-9},
+    ):
+        y = _aged_wine(schema, esters=0.0, anthocyanin=0.3, **kw)
+        assert np.array_equal(p.derivatives(0.0, y, schema, poly_params), schema.zeros())
+
+
+def test_tannin_ethyl_gate_before_params_is_keyerror_safe(params):
+    # An enabled-but-undosed Process must not KeyError when polymerization.yaml is absent: the
+    # ``params`` fixture lacks k_tannin_ethyl_tannin, yet a no-tannin wine returns zero.
+    schema = wine_schema()
+    y = _aged_wine(schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=0.0)
+    d = TanninEthylTanninCondensation().derivatives(0.0, y, schema, params)
+    assert np.array_equal(d, schema.zeros())
+
+
+def test_tannin_ethyl_reads_free_acetaldehyde_under_so2(bridge_params):
+    # SO₂-bound acetaldehyde can't bridge (the D-47/D-80 precedent): at the SAME total acetaldehyde
+    # a sulfited wine bridges SLOWER than an unsulfited one — SO₂ DELAYS the tannin softening.
+    schema = wine_schema()
+    p = TanninEthylTanninCondensation()
+    acids = {"tartaric": 4.0, "cation_charge": 0.012}  # a real acid state so pH solves
+    unsulfited = _aged_wine(
+        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.0, **acids
+    )
+    sulfited = _aged_wine(
+        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.05, **acids
+    )
+    r_unsulf = float(schema.get(p.derivatives(0.0, unsulfited, schema, bridge_params), "tannin"))
+    r_sulf = float(schema.get(p.derivatives(0.0, sulfited, schema, bridge_params), "tannin"))
+    assert r_sulf < 0.0 and r_unsulf < 0.0
+    assert abs(r_sulf) < abs(r_unsulf)  # SO₂ throttles the free-acetaldehyde-driven rate
+
+
+def test_tannin_ethyl_unsulfited_is_exactly_total_acetaldehyde(bridge_params):
+    # The so2_total > 0 guard is EXACT: at so2_total = 0 the rate uses TOTAL acetaldehyde (no pH
+    # solve), byte-for-byte the trilinear closed form — an unsulfited run pays no per-RHS brentq.
+    schema = wine_schema()
+    acet, tannin, t = 0.05, 2.0, 298.15
+    y = _aged_wine(
+        schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin, so2_total=0.0
+    )
+    d = TanninEthylTanninCondensation().derivatives(0.0, y, schema, bridge_params)
+    f_t = arrhenius_factor(t, bridge_params["E_a_tannin_ethyl_tannin"], bridge_params["T_ref"])
+    r = bridge_params["k_tannin_ethyl_tannin"] * f_t * acet * tannin * tannin
+    assert schema.get(d, "tannin") == pytest.approx(-r)
+
+
+def test_tannin_ethyl_rises_with_temperature(poly_params):
+    # Warmer bridges faster (E_a > 0, reaction-scale): the |tannin| draw grows with T.
+    schema = wine_schema()
+    p = TanninEthylTanninCondensation()
+    cold = p.derivatives(
+        0.0, _aged_wine(schema, esters=0.0, t=283.15, acetaldehyde=0.05, tannin=2.0), schema,
+        poly_params,
+    )
+    warm = p.derivatives(
+        0.0, _aged_wine(schema, esters=0.0, t=303.15, acetaldehyde=0.05, tannin=2.0), schema,
+        poly_params,
+    )
+    assert abs(float(schema.get(warm, "tannin"))) > abs(float(schema.get(cold, "tannin")))
+
+
+def test_tannin_ethyl_wine_only_noop_on_beer(poly_params):
+    # Wine-only (tannin/ethyl_bridge are appended to wine_schema): a hard no-op on beer (aldehyde
+    # exists in both media, but the grape/bridge slots do not).
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 100.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    yb[beer.slice("acetaldehyde")] = 0.05
+    assert np.array_equal(
+        TanninEthylTanninCondensation().derivatives(0.0, yb, beer, poly_params), beer.zeros()
+    )
+
+
+def test_tannin_ethyl_carbon_closes_nontrivially(bridge_store, bridge_params):
+    # THE D-85 SPLIT-LEDGER PROOF (the ledger-touching beat). It consumes on-ledger acetaldehyde and
+    # books its carbon into the on-ledger ethyl_bridge slot, so total_carbon is flat NON-TRIVIALLY —
+    # acetaldehyde↓ exactly cancels ethyl_bridge↑. mass/nitrogen flat too (touches no {S,E,CO2}/N).
+    # No anthocyanin here — the softening is purely tannin–ethyl–tannin (colourless).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [TanninEthylTanninCondensation()], strict=True)
+    y0 = _aged_wine(
+        schema,
+        esters=0.0,
+        acetaldehyde=0.05,
+        anthocyanin=0.0,  # NO anthocyanin — a pure tannin–ethyl–tannin run
+        tannin=3.0,
+        tartaric=4.0,
+        cation_charge=0.012,
+    )
+    traj = simulate(ps, params=bridge_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success
+    f_c = bridge_store.value("biomass_C_fraction")
+    f_n = bridge_store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+    # NON-trivial: acetaldehyde genuinely fell, ethyl_bridge genuinely rose, carbon lost == gained.
+    acet = np.asarray(traj.series("acetaldehyde"), dtype=float)
+    bridge = np.asarray(traj.series("ethyl_bridge"), dtype=float)
+    tannin = np.asarray(traj.series("tannin"), dtype=float)
+    assert acet[-1] < acet[0] - 1e-3  # acetaldehyde consumed
+    assert bridge[-1] > bridge[0] + 1e-4  # ethyl_bridge accumulated
+    assert tannin[-1] < tannin[0]  # tannin softened (the astringency payoff)
+    dC_acet = (acet[-1] - acet[0]) * _ACET_C
+    dC_bridge = (bridge[-1] - bridge[0]) * _ETHYLIDENE_C
+    assert dC_acet + dC_bridge == pytest.approx(0.0, abs=1e-12)
+
+
+def test_tannin_ethyl_tier_floored_at_speculative(bridge_store):
+    # Speculative in FORM + capped by its speculative params (D-1), for every pool it writes —
+    # including the on-ledger acetaldehyde/ethyl_bridge pair.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [TanninEthylTanninCondensation()])
+    for pool in ("tannin", "acetaldehyde", "ethyl_bridge"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, bridge_store.tier_map()) is Tier.SPECULATIVE
 
 
 def test_fading_so2_protects_colour_emergently(fade_params):

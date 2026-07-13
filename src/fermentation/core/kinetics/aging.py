@@ -1789,3 +1789,159 @@ class TanninSelfPolymerization(Process):
         r = params["k_tannin_self_polymerization"] * f_t * tannin * tannin  # g tannin/L/h
         d[schema.slice("tannin")] = -r
         return d
+
+
+class TanninEthylTanninCondensation(Process):
+    """Aging condensation: acetaldehyde bridges tannin + tannin → soft polymer (decision D-85).
+
+    The thirteenth aging Process, the **fifth non-oxidative** one, and the second of the
+    **tannin–tannin axis** — the acetaldehyde-bridged **tannin–ethyl–tannin** route that both the
+    D-80 bridged beat and the D-84 direct self-polymerization explicitly deferred. It is the
+    acetaldehyde-accelerated sibling of :class:`TanninSelfPolymerization` (D-84), exactly as
+    :class:`AcetaldehydeBridgedCondensation` (D-80) is of :class:`TanninAnthocyaninCondensation`
+    (D-79): dissolved-O₂ acetaldehyde (:class:`OxidativeAcetaldehyde`, D-71) forms an **ethylidene
+    bridge** ``—CH(CH₃)—`` linking **two grape tannin** flavanols (tannin–ethyl–tannin), an
+    acetaldehyde-accelerated self-condensation that **softens astringency**. So micro-oxygenation
+    (``add_oxygen``) now softens even an **anthocyanin-free** tannin pool — a white / tannin-only
+    wine's tannin polymerizes *faster* under O₂ — while simultaneously drawing acetaldehyde down
+    (the real micro-ox benefit, mouthfeel *and* reduced harshness), with no colour involved.
+
+    ``r = k_tannin_ethyl_tannin · f(T) · [acetaldehyde_free] · [tannin]²`` — the D-84
+    **bimolecular** self-condensation form (second-order in ``[tannin]``, a true tannin–tannin
+    reaction) **plus** the D-80 free-acetaldehyde factor,
+    ``f(T) = arrhenius_factor(T, E_a_tannin_ethyl_tannin, T_ref)`` its **own** E_a (a distinct
+    reaction — prime directive #2, the :class:`AcetaldehydeBridgedCondensation` vs
+    :class:`OakExtraction` precedent). Anchored on **tannin** consumption (there is no anthocyanin
+    here — both bridge ends are flavanols), so ``r`` is the tannin drawdown rate::
+
+        d(tannin)/dt       = −r                                       # off-ledger (grape-derived)
+        d(acetaldehyde)/dt = −y_acetaldehyde_per_tannin · r           # ON the carbon ledger
+        d(ethyl_bridge)/dt = +(acetaldehyde carbon consumed) / c(ethylidene)   # ON-ledger, exact
+
+    **The split ledger (reused verbatim from D-80).** The grape ``tannin`` bulk is **off** every
+    ledger (grape-derived, untracked — the ``iso_alpha``/``ellagitannin`` precedent), so consuming
+    it moves nothing conserved, exactly as the D-84 direct route. But acetaldehyde's carbon is
+    **on** the carbon ledger (borrowed from ethanol ``E`` at D-71), so consuming it into an
+    *off*-ledger polymer would make carbon vanish and fail
+    :func:`~fermentation.validation.conservation.assert_conserved`. The fix is the **same on-ledger
+    ``ethyl_bridge`` slot** D-80 introduced (weighted at ``carbon_mass_fraction("ethylidene")`` in
+    :func:`~fermentation.validation.conservation.total_carbon`), filled by the **same**
+    carbon-exact split — release at ``c(acetaldehyde)``, re-deposit at ``c(ethylidene)``
+    (acetaldehyde loses only its carbonyl O as water). So ``total_carbon`` closes to **machine
+    precision** non-trivially (acetaldehyde↓ exactly equals ``ethyl_bridge``↑ in carbon), and both
+    bridged routes (D-80 anthocyanin, D-85 tannin) deposit into **one shared** ``ethyl_bridge``
+    pool — its meaning is the ethylidene bridge carbon, whether the bridge terminates in pigment
+    (D-80) or a tannin–tannin polymer (here).
+
+    **A DIFFERENT acetaldehyde yield from D-80 (prime directive #2).** One acetaldehyde bridges
+    **two flavanols** here — a different lumped stoichiometry from D-80's flavanol↔anthocyanin
+    bridge — so this reads its **own** ``y_acetaldehyde_per_tannin`` (g acetaldehyde per g tannin
+    consumed), *not* D-80's ``y_acetaldehyde_per_anthocyanin``. Reusing D-80's yield would fake a
+    shared stoichiometry the two reactions do not have. The yield only sets the **magnitude** of
+    the acetaldehyde drawdown; carbon balances for any value (the D-80 property).
+
+    **Deposits NO pigment — the colour difference from D-80.** Both bridge ends are colourless
+    flavanols (tannin–ethyl–tannin), so — unlike D-80 (tannin–ethyl–anthocyanin, which deposits
+    ``polymeric_pigment`` in anthocyanin-equivalents) — this adds **nothing** to colour: it touches
+    no ``anthocyanin`` and no ``polymeric_pigment``. It is a pure astringency softener (draws
+    ``tannin``, like D-84), an O₂-driven one. The soft tannin–ethyl–tannin polymer goes to **no**
+    destination slot (the D-84/D-79/D-80 tannin-is-a-pure-sink precedent — no ledger reads tannin
+    mass), so besides the on-ledger acetaldehyde carbon it captures, it books nothing.
+
+    **Reads FREE acetaldehyde, not total (the D-47/D-80 precedent).** SO₂-bound acetaldehyde is the
+    bisulfite adduct — its carbonyl is blocked, so it **cannot** form the ethylidene bridge — so
+    when SO₂ is dosed (``so2_total > 0``) the rate reads
+    :func:`~fermentation.core.acidbase.free_acetaldehyde`; the guard is exact (an unsulfited run
+    pays no per-RHS pH ``brentq`` and is byte-for-byte the total-acetaldehyde case). **Emergent:**
+    SO₂ delays acetaldehyde-mediated tannin softening exactly as it delays the D-80 colour
+    stabilization — the same shared binding equilibrium, nothing scripted.
+
+    **Triply substrate-gated + wine-only + isolable (prime directive #3).** The rate is
+    ``[acetaldehyde] · [tannin]²``, so a no-tannin / no-acetaldehyde wine is byte-for-byte the case
+    without this Process (and all of beer — the slots are wine-only). Gated on the tannin STATE
+    before reading any polymerization param (the substrate-gate-before-params discipline). Wired
+    **disabled at the compile seam** (aging is post-ferment); ``begin_aging`` enables it with the
+    other aging Processes. Tier **speculative** (the aging axis is the Tier-3 frontier; the *form* —
+    acetaldehyde-bridged tannin–tannin, warmer-faster, SO₂-blocked, softening, colourless — is
+    sourced, the magnitudes order-of-magnitude estimates). See ``polymerization.yaml`` for the full
+    scope + provenance.
+    """
+
+    name = "tannin_ethyl_tannin_condensation"
+    tier = Tier.SPECULATIVE
+    #: Consumes the grape ``tannin`` pool (off every ledger — the D-84 pure-sink precedent, the
+    #: soft tannin–ethyl–tannin polymer goes to no slot) plus the on-ledger ``acetaldehyde``, whose
+    #: carbon it captures in the on-ledger ``ethyl_bridge`` slot (the D-80 split-ledger transfer,
+    #: one shared bridge pool). Touches those three and nothing else — the ``acetaldehyde →
+    #: ethyl_bridge`` carbon closes exactly; the tannin (off-ledger) moves nothing conserved.
+    #: Notably it touches NO ``anthocyanin`` and NO ``polymeric_pigment`` (a colourless
+    #: tannin–tannin polymer — the colour difference from D-80, which bridges to anthocyanin).
+    touches = ("acetaldehyde", "ethyl_bridge", "tannin")
+    #: ``k_tannin_ethyl_tannin``/``E_a_tannin_ethyl_tannin``/``y_acetaldehyde_per_tannin`` are this
+    #: Process's own (polymerization.yaml, D-85 — its own acetaldehyde yield, distinct from D-80's
+    #: ``y_acetaldehyde_per_anthocyanin`` since one acetaldehyde bridges TWO flavanols here);
+    #: ``T_ref`` is shared with every Arrhenius rate. The SO₂/pH params read inside
+    #: :func:`free_acetaldehyde`/:func:`ph_of_state` are omitted (all plausible, the Process is
+    #: already speculative — the D-47/D-80 precedent). Tiers cap the outputs via D-1.
+    reads: tuple[str, ...] = (
+        "k_tannin_ethyl_tannin",
+        "E_a_tannin_ethyl_tannin",
+        "y_acetaldehyde_per_tannin",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (tannin/ethyl_bridge are appended to wine_schema): a hard no-op on any
+        # schema without them, belt-and-suspenders to the wine-only wiring.
+        if "tannin" not in schema:
+            return d
+        tannin = float(y[schema.slice("tannin")][0])
+        acetaldehyde = float(y[schema.slice("acetaldehyde")][0])
+        # Doubly substrate-gated: no tannin OR no acetaldehyde ⇒ no bridging, so a no-tannin /
+        # no-acetaldehyde wine is byte-for-byte the case without this Process. Gate on the STATE
+        # before reading any polymerization param (the substrate-gate-before-params discipline — an
+        # enabled-but-undosed Process mustn't KeyError if polymerization.yaml is absent). ``<= 0``
+        # also absorbs solver undershoot.
+        if tannin <= 0.0 or acetaldehyde <= 0.0:
+            return d
+        # SO₂-bound acetaldehyde is the bisulfite adduct — its carbonyl is blocked, so it CANNOT
+        # form the ethylidene bridge; read only the FREE share under SO₂ (the D-47/D-80 precedent).
+        # The ``so2_total > 0`` guard is EXACT — an unsulfited run pays no per-RHS pH ``brentq`` and
+        # its rate is byte-for-byte the total-acetaldehyde case. Emergent: SO₂ delays acetaldehyde-
+        # mediated tannin softening (bound acetaldehyde is unavailable to bridge).
+        bridging_acetaldehyde = acetaldehyde
+        if SO2_STATE_KEY in schema and float(y[schema.slice(SO2_STATE_KEY)][0]) > 0.0:
+            bridging_acetaldehyde = free_acetaldehyde(
+                y, schema, params, ph_of_state(y, schema, params)
+            )
+            if bridging_acetaldehyde <= 0.0:  # all acetaldehyde bound ⇒ none available to bridge
+                return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_tannin_ethyl_tannin"], params["T_ref"])
+        # Bimolecular self-condensation ([tannin]², the D-84 form) ACCELERATED by free acetaldehyde
+        # (the D-80 factor): r is the tannin drawdown rate (g tannin/L/h), anchored on tannin (no
+        # anthocyanin here — both ends are flavanols). Consumes NO colour: touches neither
+        # anthocyanin nor polymeric_pigment (a colourless tannin–tannin polymer — the D-80 colour
+        # difference). The soft polymer goes to no slot (the D-84 pure-sink precedent).
+        r = params["k_tannin_ethyl_tannin"] * f_t * bridging_acetaldehyde * tannin * tannin
+        d[schema.slice("tannin")] = -r
+        # The ON-ledger half — the D-80 split-ledger carbon capture, reused verbatim. Acetaldehyde
+        # consumed by the bridge (g/L/h) at this route's OWN yield (one acetaldehyde per two
+        # flavanols — distinct from D-80's per-anthocyanin yield); its carbon must NOT vanish into
+        # the off-ledger tannin polymer, so re-deposit it into the on-ledger ethyl_bridge pool via
+        # the carbon-exact split (release at acetaldehyde's C fraction, re-deposit at ethylidene's —
+        # acetaldehyde loses only its carbonyl O as water). total_carbon closes to machine prec.:
+        # acetaldehyde C leaving == bridge C arriving. The yield only sets the MAGNITUDE; carbon
+        # balances for any value.
+        acet_consumed = params["y_acetaldehyde_per_tannin"] * r  # g acetaldehyde/L/h
+        d[schema.slice("acetaldehyde")] = -acet_consumed
+        carbon_released = acet_consumed * carbon_mass_fraction(
+            _BRIDGE_ACETALDEHYDE_SPECIES
+        )  # g C/L/h
+        d[schema.slice("ethyl_bridge")] = carbon_released / carbon_mass_fraction(
+            _ETHYL_BRIDGE_SPECIES
+        )
+        return d

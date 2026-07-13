@@ -112,6 +112,7 @@ from fermentation.core.kinetics import (
     SugarUptakeToEthanolCO2,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
+    TanninEthylTanninCondensation,
     TanninSelfPolymerization,
     TemperatureRamp,
     ThermalAnthocyaninFade,
@@ -1074,6 +1075,29 @@ _TANNIN_SELF_POLYMERIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (
     TanninSelfPolymerization,
 )
 
+#: WINE-ONLY acetaldehyde-bridged tannin–ethyl–tannin aging Process (decision D-85) — the second of
+#: the tannin–tannin axis, the acetaldehyde-bridged sibling of :class:`TanninSelfPolymerization`
+#: (exactly as :class:`AcetaldehydeBridgedCondensation` D-80 is of
+#: :class:`TanninAnthocyaninCondensation` D-79). :class:`TanninEthylTanninCondensation` bridges
+#: **two** grape ``tannin`` flavanols with a
+#: dissolved-O₂ acetaldehyde ethylidene linker (trilinear ``[acetaldehyde]·[tannin]²``), softening
+#: astringency — so micro-oxygenation softens even an **anthocyanin-free** tannin pool. Like D-80 it
+#: consumes ON-ledger ``acetaldehyde`` and captures its carbon in the **shared** on-ledger
+#: ``ethyl_bridge`` slot (the split-ledger carbon-exact transfer), but with its **own**
+#: ``y_acetaldehyde_per_tannin`` (one acetaldehyde per two flavanols) and — unlike D-80 — deposits
+#: **no** ``polymeric_pigment`` (a colourless tannin–tannin polymer; the tannin sink goes to no
+#: slot,
+#: the D-84 precedent). **Reads FREE acetaldehyde** under SO₂ (bound can't bridge — the D-47/D-80
+#: precedent), so SO₂ *delays* the softening (emergent). TRIPLY substrate-gated on ``acetaldehyde``
+#: AND ``tannin`` ⇒ a no-tannin / no-acetaldehyde wine is byte-for-byte inert. Wine-only (the
+#: grape/bridge slots are wine-only), like ``_ACETALDEHYDE_BRIDGE_PROCESSES``. Kept in its OWN
+#: isolable tuple (directive #3): DISABLED at compile and re-enabled by ``begin_aging`` (its name
+#: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
+#: ``polymerization.yaml`` (with the condensation/fade data — all colour/tannin-axis data together).
+_TANNIN_ETHYL_TANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (
+    TanninEthylTanninCondensation,
+)
+
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
 #: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
@@ -1381,6 +1405,7 @@ MEDIA: dict[str, Medium] = {
             + _ANTHOCYANIN_FADING_PROCESSES
             + _THERMAL_FADE_PROCESSES
             + _TANNIN_SELF_POLYMERIZATION_PROCESSES
+            + _TANNIN_ETHYL_TANNIN_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

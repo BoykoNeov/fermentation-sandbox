@@ -1397,3 +1397,40 @@ def test_bridged_run_closes_carbon_end_to_end():
     # The ethyl_bridge slot genuinely accumulated (the closure is non-trivial, not vacuous).
     assert float(np.asarray(traj.series("ethyl_bridge"), dtype=float)[-1]) > 1e-4
     assert_nonnegative(traj.as_trajectory(), ("anthocyanin", "tannin", "ethyl_bridge"), atol=1e-9)
+
+
+def test_micro_oxygenation_softens_white_tannin_via_ethyl_bridge_end_to_end():
+    # THE D-85 PAYOFF at scenario scale, and the split-ledger proof for the tannin–tannin route. A
+    # tannin-dosed WHITE wine (NO anthocyanin ⇒ both D-79/D-80 colour routes AND the anthocyanin
+    # fade are inert) is micro-oxygenated: dissolved-O₂ acetaldehyde bridges two flavanols
+    # (tannin–ethyl–tannin), so astringency softens MORE than the anaerobic control (where only the
+    # D-84 direct self-polymerization acts). The bridge carbon is booked on-ledger (ethyl_bridge
+    # accumulates), total_carbon closes across the E → acetaldehyde → ethyl_bridge chain, and colour
+    # stays identically zero throughout (a colourless tannin–tannin polymer — the D-80 colour
+    # difference).
+    white_args = {"tannin_gpl": 3.0}  # tannin but NO anthocyanin
+    noox = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], **white_args)).run()
+    ox = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 40.0)], **white_args)
+    ).run()
+    assert noox.success and ox.success
+    astr_noox = astringency_series(noox.as_trajectory())
+    astr_ox = astringency_series(ox.as_trajectory())
+    # Micro-ox softens MORE than the anaerobic control (the bridged route adds to the D-84 direct).
+    assert astr_ox[-1] < astr_noox[-1] - 1.0
+    # The bridge carbon accumulated on-ledger (the tannin–ethyl–tannin split-ledger capture).
+    bridge_ox = float(np.asarray(ox.series("ethyl_bridge"), dtype=float)[-1])
+    bridge_noox = float(np.asarray(noox.series("ethyl_bridge"), dtype=float)[-1])
+    assert bridge_ox > 1e-4  # micro-ox regenerates acetaldehyde that bridges
+    assert bridge_noox == pytest.approx(0.0, abs=1e-9)  # anaerobic: no acetaldehyde to bridge
+    # Colour stays identically zero (no anthocyanin — the tannin–ethyl–tannin polymer is colourless)
+    assert np.all(color_series(ox.as_trajectory()) == 0.0)
+    # total_carbon closes across the whole E → acetaldehyde → ethyl_bridge chain (o2 off-ledger).
+    cs = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 40.0)], **white_args)
+    )
+    traj = cs.run()
+    f_c = cs.parameters.value("biomass_C_fraction")
+    assert_conserved(
+        traj.as_trajectory(), total_carbon(cs.schema, biomass_carbon_fraction=f_c), label="carbon"
+    )

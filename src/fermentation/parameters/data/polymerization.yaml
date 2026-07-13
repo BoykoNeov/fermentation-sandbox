@@ -559,3 +559,96 @@ E_a_tannin_self_polymerization:
     source: "SOURCED ORDERING: tannin self-condensation/polymerization accelerates with temperature (textbook Arrhenius; proanthocyanidin-polymerization kinetics; Ribéreau-Gayon Handbook of Enology). Warm storage softens (polymerizes) tannin faster — the established direction."
     conditions: "equivalent Arrhenius activation energy of the aggregate tannin self-condensation at T_ref = 293.15 K"
     notes: "Only the DIRECTION (E_a > 0, warmer => faster polymerization/softening) is the sourced, load-bearing claim. REACTION-scale (~55 kJ/mol). Its OWN parameter (prime directive #2), distinct from E_a_polymerization / E_a_acetaldehyde_bridge / E_a_anthocyanin_fade / E_a_anthocyanin_thermal_fade even though numerically similar — a separate reaction (tannin self-condensation)."
+
+# ================================================================================================
+# D-85: TANNIN-ETHYL-TANNIN — acetaldehyde bridges TWO grape flavanols (the O2-driven softener)
+# ================================================================================================
+# The fermentation.core.kinetics.aging.TanninEthylTanninCondensation Process (WINE-ONLY). The
+# acetaldehyde-bridged sibling of the D-84 direct self-polymerization, exactly as the D-80 bridged
+# route is of the D-79 direct condensation: dissolved-O2 acetaldehyde (OxidativeAcetaldehyde, D-71)
+# forms an ethylidene bridge -CH(CH3)- linking TWO grape tannin flavanols (tannin-ethyl-tannin), an
+# acetaldehyde-accelerated self-condensation that SOFTENS astringency. So micro-oxygenation softens
+# even an ANTHOCYANIN-FREE tannin pool (a white / tannin-only wine polymerizes faster under O2) while
+# drawing acetaldehyde down -- with NO colour involved (both bridge ends are colourless flavanols).
+#
+#   r                  = k_tannin_ethyl_tannin * f(T) * [free acetaldehyde] * [tannin]^2   # g tannin/L/h
+#   d(tannin)/dt       = -r                                       # OFF-ledger (grape-derived)
+#   d(acetaldehyde)/dt = -y_acetaldehyde_per_tannin * r           # ON the carbon ledger
+#   d(ethyl_bridge)/dt = +(acetaldehyde carbon consumed)/c(ethylidene)   # ON-ledger, exact
+#
+# The D-84 BIMOLECULAR self-condensation form ([tannin]^2) PLUS the D-80 free-acetaldehyde factor,
+# f(T) = arrhenius_factor(T, E_a_tannin_ethyl_tannin, T_ref) (own reaction-scale E_a). Anchored on
+# TANNIN consumption (no anthocyanin -- both ends are flavanols). A PURE OFF-LEDGER tannin sink (the
+# soft tannin-ethyl-tannin polymer goes to NO slot, the D-84 precedent), so the tannin bulk moves
+# nothing conserved.
+#
+# SPLIT LEDGER (reused verbatim from D-80). Acetaldehyde's carbon is ON the carbon ledger (borrowed
+# from E at D-71), so consuming it into the off-ledger polymer would make carbon VANISH. The same
+# on-ledger ethyl_bridge slot D-80 introduced captures it via the SAME carbon-exact split (release at
+# c(acetaldehyde), re-deposit at c(ethylidene) -- acetaldehyde loses only its carbonyl O as water), so
+# total_carbon closes to MACHINE PRECISION non-trivially (acetaldehyde down == ethyl_bridge up in
+# carbon). BOTH bridged routes (D-80 anthocyanin, D-85 tannin) feed one shared ethyl_bridge pool.
+#
+# READS FREE acetaldehyde under SO2 (bound acetaldehyde can't bridge -- the D-47/D-80 precedent), so
+# SO2 DELAYS acetaldehyde-mediated tannin softening exactly as it delays the D-80 colour
+# stabilization (same shared binding equilibrium, nothing scripted). DEPOSITS NO pigment (touches no
+# anthocyanin / polymeric_pigment -- the colour difference from D-80): a pure O2-driven astringency
+# softener. Triply substrate-gated on acetaldehyde x tannin^2 => a no-tannin / no-acetaldehyde wine
+# (and all beer) is byte-for-byte inert. Wine-only + disabled at compile, enabled by begin_aging.
+#
+# TIER: ALL speculative. SOURCED FORM (acetaldehyde bridges two flavanols into a softer polymer,
+# O2-driven, SO2-blocked, warmer-faster -- Timberlake & Bridle 1976; Es-Safi et al. 1999;
+# Ribéreau-Gayon Handbook of Enology on acetaldehyde-induced tannin polymerization) + SPECULATIVE
+# magnitudes (order-of-magnitude author estimates, banded). Load-bearing sourced claims: (1)
+# acetaldehyde bridges two tannin flavanols (needs acetaldehyde), (2) it softens astringency WITHOUT
+# anthocyanin, (3) SO2 blocks it (free-carbonyl only), (4) warmer bridges faster.
+
+# -- TRILINEAR BRIDGED-SELF-CONDENSATION RATE: acetaldehyde + tannin + tannin -> soft polymer ------
+# r = k_tannin_ethyl_tannin * f(T) * [free acetaldehyde] * [tannin]^2 (all g/L). Units L^2/(g^2*h).
+# Set ~20x k_tannin_self_polymerization PER UNIT (the D-80/D-84 ratio) so that at a typical micro-ox
+# acetaldehyde level (~50 mg/L) the pseudo-bilinear constant k*[acet] is of order
+# k_tannin_self_polymerization (3.0e-4) -- i.e. once acetaldehyde is present the bridged route softens
+# tannin on a comparable timescale to the direct self-polymerization, and jointly they shorten the
+# months-to-years softening span. The LOAD-BEARING claim is the FORM (needs acetaldehyde, bimolecular
+# in tannin) and that acetaldehyde ACCELERATES tannin softening, not this magnitude.
+k_tannin_ethyl_tannin:
+  value: 6.0e-3
+  unit: "L^2/(g^2*h)"   # r = k_tannin_ethyl_tannin * f(T) * [free acet] * [tannin]^2  (all g/L)
+  tier: speculative
+  uncertainty: { low: 1.5e-3, high: 2.4e-2, note: "trilinear rate constant at T_ref = 20 C. Banded an order of magnitude around ~20x k_tannin_self_polymerization (3.0e-4) PER UNIT -- the same acetaldehyde-acceleration ratio as D-80's k_acetaldehyde_bridge/k_polymerization. At ~50 mg/L acetaldehyde the pseudo-bilinear k*[acet] ~ 3.0e-4 L/(g*h) matches k_tannin_self_polymerization, so with micro-ox acetaldehyde present the bridged route softens tannin on a comparable timescale to the direct route. The LOAD-BEARING claim is the FORM (needs acetaldehyde; bimolecular in tannin) and that acetaldehyde accelerates tannin softening, not this absolute rate." }
+  provenance:
+    source: "author estimate anchored to acetaldehyde-induced tannin (proanthocyanidin) polymerization: acetaldehyde forms ethylidene bridges between flavan-3-ol units, accelerating tannin condensation and softening astringency (Timberlake & Bridle 1976; Es-Safi et al. 1999; Fulcrand et al.; Ribéreau-Gayon et al., Handbook of Enology Vol. 2). Folds the lumped termolecular acetaldehyde+tannin+tannin step into one mass-action k."
+    conditions: "generic red (or tannin-dosed white) wine at cellar temperature; trilinear in free acetaldehyde and the grape tannin pool squared (all g/L) at T_ref = 293.15 K. Represents the acetaldehyde-BRIDGED tannin-tannin condensation (distinct from the D-84 direct, acetaldehyde-free self-condensation)."
+    notes: "SOURCED FORM (acetaldehyde-bridged tannin-tannin softening, O2-driven, SO2-blocked, warmer-faster, colourless) + SPECULATIVE magnitude (order-of-magnitude, banded). Same acetaldehyde-acceleration idiom as D-80's k_acetaldehyde_bridge but on the tannin-tannin (self) reaction, so it deposits NO pigment (both ends are flavanols)."
+
+# -- ACTIVATION ENERGY: warmer bridges faster (sourced ordering, REACTION-scale) -----------------
+# Its OWN parameter (prime directive #2), REACTION-scale (~55 kJ/mol). Distinct from the D-80 bridged
+# E_a and the D-84 direct E_a even though numerically similar -- a separate reaction
+# (acetaldehyde-bridged tannin-tannin condensation). The load-bearing claim is the SIGN.
+E_a_tannin_ethyl_tannin:
+  value: 55000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 35000.0, high: 75000.0, note: "Q10 ~1.6-2.9 at 20 C. Wine condensation activation energies ~35-75 kJ/mol. The SOURCED, load-bearing claim is the SIGN (warmer => faster acetaldehyde-bridged tannin polymerization/softening); the magnitude is speculative and banded. Its OWN parameter (prime directive #2), REACTION-scale, distinct from the D-80/D-84 E_a's even though numerically similar." }
+  provenance:
+    source: "SOURCED ORDERING: acetaldehyde-bridged tannin condensation accelerates with temperature (textbook Arrhenius; acetaldehyde-tannin polymerization kinetics; Ribéreau-Gayon Handbook of Enology). Warm storage bridges (softens) tannin faster -- the established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate acetaldehyde-bridged tannin-tannin condensation at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster) is the sourced, load-bearing claim. REACTION-scale (~55 kJ/mol). Its OWN parameter (prime directive #2), distinct from E_a_acetaldehyde_bridge / E_a_tannin_self_polymerization even though numerically similar -- a separate reaction (bridged tannin-tannin condensation)."
+
+# -- ACETALDEHYDE YIELD: g acetaldehyde consumed per g tannin bridged (ITS OWN, not D-80's) -------
+# d(acetaldehyde)/dt = -y_acetaldehyde_per_tannin * r (both g/L/h). MASS-based (g/g): the lumped tannin
+# pool has no clean molar mass (the y_tannin_per_anthocyanin / y_ellag_per_o2 idiom). ITS OWN yield,
+# NOT D-80's y_acetaldehyde_per_anthocyanin: one acetaldehyde bridges TWO flavanols here (a different
+# lumped stoichiometry than D-80's flavanol-anthocyanin bridge), so reusing D-80's value would fake a
+# shared stoichiometry the two reactions do not have (prime directive #2). Central ~0.06 g acetaldehyde
+# per g tannin (a lumped ethylidene-per-tannin-pair estimate). The yield only sets the acetaldehyde
+# drawdown MAGNITUDE; carbon balances for ANY value (the D-80 split-ledger property).
+y_acetaldehyde_per_tannin:
+  value: 0.06
+  unit: "g/g"   # g acetaldehyde consumed per g tannin bridged; d(acetaldehyde)/dt = -y * r
+  tier: speculative
+  uncertainty: { low: 0.02, high: 0.18, note: "g acetaldehyde consumed per g tannin bridged via this route. One acetaldehyde (44 g/mol) forms one -CH(CH3)- bridge per TANNIN PAIR; expressed as a MASS ratio because the lumped tannin pool has no clean molar mass. Lower than D-80's y_acetaldehyde_per_anthocyanin (0.09) because a bridge here is shared across two tannin units (per g tannin, less acetaldehyde). Central ~0.06 banded ~an order of magnitude. Governs the acetaldehyde-drawdown magnitude -- but carbon closes for ANY value (the split-ledger transfer is exact)." }
+  provenance:
+    source: "author estimate from the ethylidene-bridge stoichiometry: one acetaldehyde forms one -CH(CH3)- bridge per tannin-tannin (flavanol-flavanol) adduct (Timberlake & Bridle 1976; Es-Safi et al. 1999), expressed as a MASS ratio because the lumped tannin pool has no clean molar mass (the y_tannin_per_anthocyanin / y_acetaldehyde_per_anthocyanin idiom). Its OWN value, distinct from D-80's per-anthocyanin yield -- a bridge is shared across two flavanols here."
+    conditions: "g acetaldehyde consumed per g grape tannin bridged by this route, generic wine at T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped tannin pool). Drives the split-ledger transfer acetaldehyde (on-ledger) -> ethyl_bridge (on-ledger), so total_carbon closes for ANY value -- this only sets how fast acetaldehyde is drawn down, not whether carbon balances. ITS OWN yield (prime directive #2), distinct from D-80's y_acetaldehyde_per_anthocyanin (one acetaldehyde per two flavanols here, vs per flavanol-anthocyanin pair there)."
