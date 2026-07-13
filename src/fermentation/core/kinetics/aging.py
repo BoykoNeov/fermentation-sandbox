@@ -980,9 +980,11 @@ class EllagitanninOxidation(Process):
     ellagitannin is a lumped hydrolysable-tannin macromolecule with no clean molar mass, so an
     ``M_ellagitannin`` would be fake precision (contrast :data:`_SO2_PER_O2`, a real-molecule molar
     ratio). So this consumption **softens the astringency** the ``ellagitannin`` pool carries — but
-    *one directional contributor only* (the D-78 scope): the dominant real softening mechanism,
-    tannin–anthocyanin condensation/polymerisation, is the separate deferred beat, so this does
-    **not** claim to reproduce astringency softening.
+    one contributor among several now built: the grape-tannin softeners
+    :class:`TanninAnthocyaninCondensation` (D-79), :class:`TanninSelfPolymerization` (D-84) and
+    :class:`TanninEthylTanninCondensation` (D-85) draw the *grape* ``tannin`` pool while this D-78
+    sink draws the *oak* ``ellagitannin`` pool — both feed
+    :func:`~fermentation.analysis.astringency_series` (which sums the two harsh tannins).
 
     **Substrate-gated ⇒ adds on top, NO re-baseline (the D-72/D-75 rule).** The O₂ draw is bilinear
     in ``[ellagitannin]``, which is zero unless oak is dosed (``add_oak``), so — exactly like
@@ -1150,14 +1152,13 @@ class TanninAnthocyaninCondensation(Process):
     is
     the Tier-3 frontier; the condensation *form* — bimolecular, saturating on the limiting
     anthocyanin, warmer-faster, softening + colour-stabilizing — is sourced, the magnitudes
-    order-of-magnitude estimates). **Scope (v1):** direct condensation only — the
-    acetaldehyde-bridged
-    (ethylidene) route is the explicit deferred next beat (acetaldehyde is on the carbon ledger, so
-    an
-    off-ledger pigment cannot consume it without breaking closure). SO₂/pH anthocyanin bleaching is
-    now built (:class:`AnthocyaninFading`, D-81 — the second, oxidative anthocyanin fate); tannin
-    self-polymerization remains deferred (so this is *one directional* softening contributor, the
-    D-78 honesty). See ``polymerization.yaml`` for the full scope + provenance.
+    order-of-magnitude estimates). This is the **direct** condensation route; the sibling softeners
+    are all now built: the acetaldehyde-bridged (ethylidene) anthocyanin route
+    (:class:`AcetaldehydeBridgedCondensation`, D-80), SO₂/pH anthocyanin bleaching
+    (:class:`AnthocyaninFading`, D-81 + :class:`ThermalAnthocyaninFade`, D-83), and grape-tannin
+    self-polymerization (:class:`TanninSelfPolymerization`, D-84 direct +
+    :class:`TanninEthylTanninCondensation`, D-85 bridged) — so astringency softening is **no longer
+    one-directional**. See ``polymerization.yaml`` for the full scope + provenance.
     """
 
     name = "tannin_anthocyanin_condensation"
@@ -1317,10 +1318,11 @@ class AcetaldehydeBridgedCondensation(Process):
     colourless ``faded_anthocyanin`` sink without adding pigment — the emergent micro-ox tension the
     O₂-coupled fade creates (some anthocyanin bridges to *stable* pigment here, some fades to
     *colourless*; SO₂ both protects against the fade, via the D-72 o2 draw, and delays this
-    bridging). The tannin–ethyl–tannin branch (bridging
-    two flavanols, no anthocyanin) is deferred alongside D-79's grape-tannin self-polymerization —
-    both draw tannin without touching anthocyanin, so deferring them keeps the sole-fate identity
-    honest (documented, not silent).
+    bridging). The tannin–ethyl–tannin branch — this route's *self*-reaction analogue, bridging two
+    flavanols with no anthocyanin — is now built (:class:`TanninEthylTanninCondensation`, D-85,
+    alongside the D-84 direct self-polymerization); it draws ``tannin`` without touching
+    ``anthocyanin`` and deposits *no* pigment (colourless), so it softens astringency without
+    perturbing this route's anchor-on-anthocyanin colour accounting.
 
     **Triply substrate-gated + wine-only + isolable (prime directive #3).** The rate is trilinear in
     ``acetaldehyde`` × ``anthocyanin`` × ``tannin``, so a white / no-tannin / no-acetaldehyde wine
@@ -1335,8 +1337,8 @@ class AcetaldehydeBridgedCondensation(Process):
     aging Processes. Tier **speculative** (the aging axis is the Tier-3 frontier; the *form* —
     acetaldehyde-bridged, trilinear, warmer-faster, SO₂-blocked, colour-stabilizing — is sourced,
     the
-    magnitudes order-of-magnitude estimates). **Scope (v1):** tannin–ethyl–tannin deferred (see
-    above);
+    magnitudes order-of-magnitude estimates). **Scope (v1):** the tannin–ethyl–tannin analogue is
+    built separately (D-85, see above);
     the bridged pigment's colour is counted equal to free anthocyanin (the D-79 equal-absorptivity
     simplification). See ``polymerization.yaml`` for the full scope + provenance.
     """
@@ -1504,13 +1506,15 @@ class AnthocyaninFading(Process):
     *form* — O₂-limited, anthocyanin-driven, warmer-faster, SO₂-protected-emergently — is sourced,
     the rate/yield magnitudes order-of-magnitude estimates).
 
-    **Scope (v1):** the **oxidative** fade only. Two related phenomena are deliberately deferred and
-    named, not smuggled in: (1) the **reversible SO₂/pH masking** of monomeric anthocyanin (the
-    flavylium ⇌ colourless bisulfite adduct / carbinol equilibrium — the literal Somers "bleaching"
-    assay) is a fast equilibrium *readout*, not a fate, and is the next beat (D-82); (2) the
-    **O₂-independent** (thermal/hydrolytic) bottle-aging fade is a real but separate pathway — an
-    anaerobic sealed red holds its colour here (fades only via O₂), which is defensible short-term
-    reality. See ``polymerization.yaml`` for the full scope + provenance.
+    **Scope:** the **oxidative** fade only — this route fades free anthocyanin *via O₂*. Two related
+    phenomena, once deferred, are now built as their own beats (named, not smuggled in): (1) the
+    **reversible SO₂/pH masking** of monomeric anthocyanin (the flavylium ⇌ colourless bisulfite
+    adduct / carbinol equilibrium — the literal Somers "bleaching" assay) is a fast equilibrium
+    *readout*, not a fate — :func:`~fermentation.analysis.observed_color_series` (D-82); (2) the
+    **O₂-independent** (thermal/hydrolytic) bottle-aging fade — :class:`ThermalAnthocyaninFade`
+    (D-83), a *separate* Process that fills the same ``faded_anthocyanin`` sink with **no** O₂ — so
+    an anaerobic sealed red now fades thermally too (retiring the earlier "anaerobic red holds its
+    colour" scope note). See ``polymerization.yaml`` for the full scope + provenance.
     """
 
     name = "anthocyanin_fading"
@@ -1518,7 +1522,8 @@ class AnthocyaninFading(Process):
     #: Consumes its share of the dissolved-O₂ substrate and TRANSFERS free anthocyanin into the
     #: colourless ``faded_anthocyanin`` slot — all three off every ledger, so nothing conserved
     #: moves; it touches those three and nothing else. (``anthocyanin`` is also drawn by the two
-    #: condensation routes — three Processes on one pool, the ``o2`` precedent.)
+    #: condensation routes and the D-83 thermal fade — four Processes on one pool, the ``o2``
+    #: precedent.)
     touches = ("o2", "anthocyanin", "faded_anthocyanin")
     #: ``k_anthocyanin_fade``/``E_a_anthocyanin_fade``/``y_anthocyanin_per_o2`` are this Process's
     #: own (polymerization.yaml, D-81); ``T_ref`` is shared with every Arrhenius rate. Their tiers
@@ -1749,7 +1754,8 @@ class TanninSelfPolymerization(Process):
     #: to no slot — the D-79/D-80 tannin-is-a-pure-sink precedent, since no ledger reads tannin
     #: mass), so nothing conserved moves; it touches that one slot and nothing else. No ``o2`` (not
     #: an oxidation), no ``acetaldehyde`` (the DIRECT route — bridged tannin–ethyl–tannin is D-85).
-    #: (``tannin`` is now drawn by THREE Processes — the two condensation routes and this.)
+    #: (``tannin`` is now drawn by FOUR Processes — the two condensation routes, this, and the
+    #: D-85 tannin–ethyl–tannin bridge.)
     touches = ("tannin",)
     #: ``k_tannin_self_polymerization``/``E_a_tannin_self_polymerization`` are this Process's own
     #: (polymerization.yaml, D-84); ``T_ref`` is shared with every Arrhenius rate. No yield (a

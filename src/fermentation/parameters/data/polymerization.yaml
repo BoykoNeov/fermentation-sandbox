@@ -77,15 +77,16 @@
 #     where "controlled micro-oxygenation stabilizes red colour" enters: add_oxygen -> acetaldehyde
 #     -> bridging -> more pigment + softening + a LOWER oxidised-acetaldehyde note. See the
 #     AcetaldehydeBridgedCondensation Process (fermentation.core.kinetics.aging) and the params below.
-#   * TANNIN SELF-POLYMERIZATION (tannin–tannin condensation, the OTHER big softener) is NOT
-#     modelled — anthocyanin is the limiting reagent here (tannin >> anthocyanin in real wine, ~1-4
-#     g/L vs ~0.3 g/L), so A–T condensation alone draws tannin down only MODESTLY. This is the same
-#     "one directional contributor, does not claim full softening" honesty D-78 established.
-#   * TANNIN-ETHYL-TANNIN (acetaldehyde bridging TWO flavanols, no anthocyanin) is NOT modelled: the
-#     D-80 bridged route anchors on ANTHOCYANIN (tannin-ethyl-anthocyanin only), which is exactly
-#     what keeps anthocyanin's SOLE fate = pigment and so preserves the polymeric_pigment_series =
-#     anthocyanin0 - anthocyanin identity. The tannin-ethyl-tannin branch is deferred alongside the
-#     grape tannin self-polymerization above (both draw tannin without touching anthocyanin/colour).
+#   * TANNIN SELF-POLYMERIZATION (tannin–tannin condensation, the OTHER big softener) is now BUILT
+#     (D-84, TanninSelfPolymerization, params below): grape tannin condenses WITH ITSELF (bimolecular
+#     [tannin]^2) into a soft polymer, a pure off-ledger tannin sink. So a WHITE / anthocyanin-
+#     exhausted wine now softens too — astringency softening is no longer "one directional" (retiring
+#     the D-78 honesty note here). Together with the anthocyanin-limited A-T condensation it makes the
+#     softening multi-mechanism.
+#   * TANNIN-ETHYL-TANNIN (acetaldehyde bridging TWO flavanols, no anthocyanin) is now BUILT too
+#     (D-85, TanninEthylTanninCondensation, params below): the acetaldehyde-bridged analogue of D-84,
+#     anchored on tannin (not anthocyanin), depositing NO pigment (colourless) — so it draws tannin
+#     without touching anthocyanin/colour and preserves the D-80 anchor-on-anthocyanin accounting.
 #   * PIGMENT COLOUR EQUIVALENCE. Each condensed anthocyanin unit is counted as contributing the SAME
 #     colour as when it was free (just now STABLE) — polymeric pigments' genuinely different (pH/SO2-
 #     resistant, somewhat lower molar-absorptivity) colour is a Tier-3-beyond refinement. So total
@@ -110,7 +111,7 @@ k_polymerization:
   provenance:
     source: "author estimate anchored to the timescale over which young red wine loses harsh astringency and shifts from purple-red to stable brick-red as monomeric anthocyanins and condensed tannins polymerize into polymeric pigments (Somers 1971, 'The polymeric nature of wine pigments', Phytochemistry 10:2175; Ribéreau-Gayon et al., Handbook of Enology, on tannin–anthocyanin condensation and ageing; months-to-a-few-years at cellar temperature). The bimolecular constant folds the (acid-catalysed, C4-C8 flavylium–flavanol addition) chemistry into one lumped k."
     conditions: "generic red wine at cellar pH (~3.4-3.8) and temperature; bilinear in the free-anthocyanin and condensed-grape-tannin pools (both g/L) at T_ref = 293.15 K. Represents the aggregate direct (non-acetaldehyde-bridged) condensation, not a single adduct."
-    notes: "SOURCED FORM (bimolecular direct condensation, saturating on the limiting anthocyanin, softening + colour-stabilizing) + SPECULATIVE magnitude (order-of-magnitude, banded to the months-to-years red-wine ageing timescale). The load-bearing sourced claim is the warmer-faster ordering (E_a_polymerization) and that condensation SOFTENS and STABILIZES, not this absolute rate. Acetaldehyde-bridged condensation is the deferred next beat (acetaldehyde is on the carbon ledger)."
+    notes: "SOURCED FORM (bimolecular direct condensation, saturating on the limiting anthocyanin, softening + colour-stabilizing) + SPECULATIVE magnitude (order-of-magnitude, banded to the months-to-years red-wine ageing timescale). The load-bearing sourced claim is the warmer-faster ordering (E_a_polymerization) and that condensation SOFTENS and STABILIZES, not this absolute rate. The acetaldehyde-bridged condensation (D-80) and tannin self-polymerization (D-84) / tannin-ethyl-tannin (D-85) sibling softeners are built below."
 
 # -- ACTIVATION ENERGY: warmer aging condenses faster (sourced ordering, REACTION-scale) --------
 # REACTION-scale (~55 kJ/mol, like the oxidative-sink E_a's and E_a_ester_hydrolysis), NOT the weak
@@ -140,11 +141,11 @@ y_tannin_per_anthocyanin:
   value: 3.0
   unit: "g/g"   # g condensed tannin consumed per g anthocyanin condensed; d(tannin)/dt = -y * r
   tier: speculative
-  uncertainty: { low: 1.0, high: 8.0, note: "g lumped condensed grape tannin spent per g anthocyanin condensed. A ~1:1 molar tannin–anthocyanin adduct of a heavier tannin oligomer (~1000 g/mol) with anthocyanin (~500 g/mol) gives a mass ratio of order ~2; higher-oligomer tannins push it up. Central 3.0 is a mid-band estimate, banded an order of magnitude. Governs the astringency-softening MAGNITUDE (with anthocyanin the limiting reagent, total tannin removed ~ y * anthocyanin_0, a MODEST fraction of the ~1-4 g/L tannin — the 'one directional contributor' scope)." }
+  uncertainty: { low: 1.0, high: 8.0, note: "g lumped condensed grape tannin spent per g anthocyanin condensed. A ~1:1 molar tannin–anthocyanin adduct of a heavier tannin oligomer (~1000 g/mol) with anthocyanin (~500 g/mol) gives a mass ratio of order ~2; higher-oligomer tannins push it up. Central 3.0 is a mid-band estimate, banded an order of magnitude. Governs the astringency-softening MAGNITUDE (with anthocyanin the limiting reagent, total tannin removed ~ y * anthocyanin_0, a MODEST fraction of the ~1-4 g/L tannin via THIS route — the tannin self-polymerization (D-84) and tannin-ethyl-tannin (D-85) routes draw the rest)." }
   provenance:
     source: "author estimate from the tannin–anthocyanin condensation stoichiometry: a roughly 1:1 molar flavanol(-oligomer)–anthocyanin adduct (Somers 1971; Ribéreau-Gayon on condensed-pigment structure), expressed as a MASS ratio because the lumped condensed-tannin macromolecule has no clean molar mass (contrast the real-molecule 2:1 SO2:O2 _SO2_PER_O2)."
     conditions: "g lumped condensed grape tannin consumed per g anthocyanin condensed, generic red wine at T_ref = 293.15 K."
-    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped tannin/anthocyanin pools — the y_ellag_per_o2 idiom). Both tannin and anthocyanin are off every ledger, so this consumption moves nothing conserved. Sets the astringency-softening rate; tannin self-polymerization (the other softener) is deferred, so this is one directional contributor. REUSED by the D-80 acetaldehyde-bridged route: the bridged adduct consumes tannin + anthocyanin in the SAME lumped mass ratio as the direct route (one shared stoichiometry, one param)."
+    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped tannin/anthocyanin pools — the y_ellag_per_o2 idiom). Both tannin and anthocyanin are off every ledger, so this consumption moves nothing conserved. Sets the astringency-softening rate for this route; tannin self-polymerization (D-84) and tannin-ethyl-tannin (D-85) are the other softeners, so softening is multi-mechanism (no longer one-directional). REUSED by the D-80 acetaldehyde-bridged route: the bridged adduct consumes tannin + anthocyanin in the SAME lumped mass ratio as the direct route (one shared stoichiometry, one param)."
 
 # ============================================================================================
 # D-80: THE ACETALDEHYDE-BRIDGED (ETHYLIDENE) CONDENSATION ROUTE — the split-ledger colour beat
@@ -191,8 +192,8 @@ y_tannin_per_anthocyanin:
 # byte-for-byte the case without this Process. Wine-only (all three grape/bridge slots are wine-only)
 # + disabled at compile, enabled by begin_aging (aging is post-ferment).
 #
-# SCOPE: tannin-ethyl-tannin (bridging two flavanols, no anthocyanin) is deferred — anchoring on
-# anthocyanin keeps its sole fate = pigment and preserves polymeric_pigment_series = antho0 - antho.
+# SCOPE: this route anchors on ANTHOCYANIN (tannin-ethyl-anthocyanin), keeping its fate = pigment. The
+# tannin-ethyl-tannin analogue (bridging two flavanols, no anthocyanin) is built separately (D-85).
 #
 # TIER: ALL speculative. SOURCED FORM (acetaldehyde bridges anthocyanins and tannins into ethyl-
 # linked polymeric pigments; the reaction is acid-catalysed and warmer-faster; SO2 blocks it via
