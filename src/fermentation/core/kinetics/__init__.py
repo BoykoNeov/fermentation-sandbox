@@ -25,6 +25,7 @@ from fermentation.core.kinetics.aging import (
     StreckerDegradation,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
+    ThermalAnthocyaninFade,
 )
 from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
 from fermentation.core.kinetics.arrhenius import (
@@ -119,6 +120,7 @@ __all__ = [
     "StreckerDegradation",
     "SulfiteOxidation",
     "TanninAnthocyaninCondensation",
+    "ThermalAnthocyaninFade",
     "EsterSynthesis",
     "EsterVolatilization",
     "EthanolInactivation",

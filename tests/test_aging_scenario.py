@@ -1072,15 +1072,17 @@ def test_red_wine_softens_and_stabilizes_colour_end_to_end():
     assert pig[0] == pytest.approx(0.0)
     assert pig[-1] > 0.0  # stable pigment formed
 
-    # Total colour retained: free anthocyanin genuinely declined (the REAL Process signal), but the
-    # colour sum holds at the initial anthocyanin. NOTE: in v1 color_series ≡ antho0 × 1000 is an
-    # algebraic identity (pigment is the reconstructed drawdown), so it documents the v1
-    # stabilization
-    # physics, not an independent Process check — hence the anthocyanin drawdown is the load-bearing
-    # assertion here.
+    # Colour largely RETAINED as it shifts form (free anthocyanin → stable pigment), MINUS a small
+    # O₂-independent THERMAL fade (D-83: even this anaerobic red loses a few mg/L to the colourless
+    # sink over the warm tail). The three-slot identity anthocyanin + pigment + faded ≡ antho0 holds
+    # by construction, so color_series = (antho0 − faded) × 1000 — the stabilization physics
+    # (pigment holds the colour condensation shifts) modulo the thermal loss; anthocyanin drawdown +
+    # pigment rise are the load-bearing Process signals.
     col = color_series(red_traj)
+    faded = np.asarray(red.series("faded_anthocyanin"), dtype=float)
     assert float(red.series("anthocyanin")[-1]) < 0.3  # the genuine dynamic
-    assert np.allclose(col, 0.3 * 1000.0)  # conserved-by-construction (documents, does not verify)
+    assert 0.0 < faded[-1] < 0.01  # a SMALL thermal-only fade (anaerobic ⇒ no oxidative bleaching)
+    assert np.allclose(col, (0.3 - faded) * 1000.0)  # retained modulo thermal fade (three-slot id.)
 
 
 def test_red_wine_polymerization_off_ledger_end_to_end():
@@ -1194,13 +1196,13 @@ def test_micro_oxygenation_drives_bridged_condensation_end_to_end():
 
 
 def test_micro_oxygenation_now_fades_colour_end_to_end():
-    # THE D-81 PAYOFF at scenario scale, and the beat that RETIRED the D-80 "colour O₂-invariant in
-    # v1" pin: with :class:`AnthocyaninFading` wired, `color_series` is no longer O₂-invariant. An
-    # ANAEROBIC aged red HOLDS its colour (fading is O₂-coupled, so with no O₂ there is no bleaching
-    # — the condensation-only case ends at ≈ anthocyanin₀ × 1000, the D-79/D-80 flat line), while an
-    # OXYGENATED red FADES: dissolved O₂ bleaches free anthocyanin to the colourless
-    # faded_anthocyanin sink, so total colour genuinely DECLINES. This is the honest colour
-    # behaviour the D-80 framing said would land only once the bleaching beat did.
+    # THE D-81 PAYOFF at scenario scale (that RETIRED the D-80 "colour O₂-invariant" pin): an
+    # OXYGENATED red FADES more than an anaerobic one — dissolved O₂ adds an oxidative bleaching
+    # on top. NOTE (D-83 retirement): the anaerobic red no longer holds PERFECTLY flat — it now
+    # fades a SMALL THERMAL amount (ThermalAnthocyaninFade, O₂-independent), so this test pins the
+    # O₂ CONTRAST (ox fades strictly MORE than no-ox) rather than "no-ox holds at antho₀ × 1000"
+    # (that D-81 assertion is retired by D-83; see test_thermal_fade_adds_to_oxidative_fade for the
+    # thermal decomposition). Both runs still satisfy the three-slot colour identity.
     red_args = {"anthocyanin_gpl": 0.3, "tannin_gpl": 2.0}
     noox = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], **red_args)).run()
     ox = compile_scenario(
@@ -1209,14 +1211,49 @@ def test_micro_oxygenation_now_fades_colour_end_to_end():
     assert noox.success and ox.success
     col_noox = color_series(noox.as_trajectory())
     col_ox = color_series(ox.as_trajectory())
-    # Anaerobic red HOLDS its colour (no O₂ ⇒ no fading; condensation conserves it) ≈ antho₀ × 1000.
-    assert col_noox[-1] == pytest.approx(0.3 * 1000.0, rel=1e-3)
-    # Oxygenated red FADES: O₂ bleaches free anthocyanin to colourless, so colour declines.
+    # Anaerobic red fades only THERMALLY (D-83) — a small background loss, well under the O₂ fade.
+    faded_noox = float(np.asarray(noox.series("faded_anthocyanin"), dtype=float)[-1])
+    assert 0.0 < faded_noox < 0.01  # small thermal-only fade (≈ a few mg/L over 150 d at 25 °C)
+    # Oxygenated red FADES MORE: O₂ adds an oxidative bleaching sink on top of the thermal one.
     assert col_ox[-1] < col_noox[-1] - 5.0
-    # The lost colour is exactly the faded (colourless) fraction (the three-slot identity, D-81).
+    # Each run's lost colour is exactly its faded (colourless) fraction (the three-slot identity).
     faded_ox = float(np.asarray(ox.series("faded_anthocyanin"), dtype=float)[-1])
-    assert faded_ox > 0.0
+    assert faded_ox > faded_noox  # O₂ fade strictly exceeds thermal-only
     assert col_ox[-1] == pytest.approx((0.3 - faded_ox) * 1000.0, rel=1e-3)
+    assert col_noox[-1] == pytest.approx((0.3 - faded_noox) * 1000.0, rel=1e-3)
+
+
+def test_thermal_fade_adds_to_oxidative_fade_end_to_end():
+    # THE D-83 PAYOFF at scenario scale: ThermalAnthocyaninFade fades a red even with NO O₂, and its
+    # thermal loss is TEMPERATURE-driven (warm storage bleaches faster) and SO₂-UNPROTECTED — the
+    # mirror of D-81's O₂-coupled, SO₂-protected fade. Two anaerobic reds, cellar-cool vs warm: the
+    # warm one fades MORE, purely thermally (no O₂ in either), and a heavy SO₂ dose does NOT rescue
+    # the warm red's colour (SO₂ protects only the O₂ route, D-81 — it can't touch a thermal one).
+    red_args = {"anthocyanin_gpl": 0.3, "tannin_gpl": 2.0}
+    cool = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS)], aging_celsius=12.0, **red_args)
+    ).run()
+    warm = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS)], aging_celsius=30.0, **red_args)
+    ).run()
+    warm_so2 = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_so2(_FERMENT_DAYS, 150.0)],
+            aging_celsius=30.0,
+            **red_args,
+        )
+    ).run()
+    assert cool.success and warm.success and warm_so2.success
+    faded_cool = float(np.asarray(cool.series("faded_anthocyanin"), dtype=float)[-1])
+    faded_warm = float(np.asarray(warm.series("faded_anthocyanin"), dtype=float)[-1])
+    faded_warm_so2 = float(np.asarray(warm_so2.series("faded_anthocyanin"), dtype=float)[-1])
+    # Anaerobic reds still fade (thermally): both lose SOME colour with zero O₂ (the D-83 headline).
+    assert faded_cool > 0.0 and faded_warm > 0.0
+    # Warmer fades MORE (E_a > 0, the temperature lever) — 'warm cellars kill colour' even sealed.
+    assert faded_warm > faded_cool
+    # SO₂ does NOT protect the thermal route (the D-83 mirror of D-81): the sulfited warm red fades
+    # essentially the SAME as the unsulfited warm red (no O₂ to scavenge ⇒ no emergent protection).
+    assert faded_warm_so2 == pytest.approx(faded_warm, rel=1e-3)
 
 
 # == D-82: the reversible SO₂/pH masking readout (observed_color_series), end to end ============
@@ -1279,9 +1316,10 @@ def test_so2_masks_observed_colour_opposite_sign_to_fade():
 def test_condensation_unmasks_observed_colour_while_content_flat():
     # The Somers "ageing shifts colour onto the SO₂/pH-resistant pigment" evolution: as monomeric
     # anthocyanin condenses to bleach-/pH-resistant polymeric pigment (counted FULL), observed
-    # colour RISES over the aging tail — even though color_series (content) is FLAT (no fade;
-    # condensation conserves content). observed_color_series and color_series thus trend OPPOSITELY
-    # here: the reason beat A was worth building alongside beat B (D-81).
+    # colour RISES over the aging tail — even though color_series (content) is NEARLY flat (this red
+    # is anaerobic, so no oxidative fade; condensation conserves content and only a SMALL D-83
+    # thermal fade nibbles it). observed_color_series RISES while color_series is flat-to-slightly-
+    # declining — they trend OPPOSITELY here: the reason beat A was worth building alongside beat B.
     cs = compile_scenario(
         _wine(
             [_begin_aging(_FERMENT_DAYS)], anthocyanin_gpl=0.3, tannin_gpl=2.0, aging_celsius=25.0
@@ -1292,9 +1330,11 @@ def test_condensation_unmasks_observed_colour_while_content_flat():
     traj = red.as_trajectory()
     col = color_series(traj)
     obs = observed_color_series(traj, cs.param_values)
-    assert np.allclose(col, 0.3 * 1000.0)  # content FLAT (anaerobic; condensation conserves it)
+    # Content NEARLY flat: only a small thermal fade (anaerobic ⇒ no oxidative fade), well under
+    # the strong observed rise below — the load-bearing contrast is the OPPOSITE trends.
+    assert col[-1] > 0.3 * 1000.0 - 5.0  # ≈ flat (small thermal loss only)
     assert polymeric_pigment_series(traj)[-1] > 0.0  # pigment genuinely formed
-    assert obs[-1] > obs[0]  # observed RISES: masked monomeric → unmasked resistant pigment
+    assert obs[-1] > obs[0] + 5.0  # observed RISES strongly: masked monomeric → unmasked pigment
 
 
 def test_bridged_run_closes_carbon_end_to_end():

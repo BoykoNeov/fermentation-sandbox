@@ -380,6 +380,12 @@ WINE_BRIDGE_PROCESSES = {"acetaldehyde_bridged_condensation"}
 # shared o2 pool so SO₂ protection is emergent. Wine-only, same compile-seam disable / begin_aging
 # re-enable.
 WINE_FADING_PROCESSES = {"anthocyanin_fading"}
+# WINE-ONLY O₂-INDEPENDENT thermal anthocyanin-fade Process (decision D-83) — the second, non-
+# oxidative fate that fades free anthocyanin to the SAME colourless faded_anthocyanin slot, but by a
+# thermal/hydrolytic route needing NO oxygen (first-order [anthocyanin]). Touching no o2, SO₂ does
+# protect it (the mirror of D-81), so a sealed/sulfited/anaerobic red still fades. Wine-only, same
+# compile-seam disable / begin_aging re-enable.
+WINE_THERMAL_FADE_PROCESSES = {"thermal_anthocyanin_fade"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -402,6 +408,7 @@ EXPECTED_PROCESSES = {
         | WINE_POLYMERIZATION_PROCESSES
         | WINE_BRIDGE_PROCESSES
         | WINE_FADING_PROCESSES
+        | WINE_THERMAL_FADE_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

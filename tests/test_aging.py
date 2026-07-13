@@ -43,6 +43,7 @@ from fermentation.core.kinetics import (
     StreckerDegradation,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
+    ThermalAnthocyaninFade,
     arrhenius_factor,
 )
 from fermentation.core.kinetics.aging import _SO2_PER_O2
@@ -2255,6 +2256,190 @@ def test_fading_makes_colour_decline(poly_params):
     assert faded[-1] > 0.0  # some anthocyanin genuinely bleached to colourless
     # (4) the three-slot colour identity holds by construction, now with faded > 0 (non-trivially).
     assert np.allclose(antho + pigment + faded, antho0, atol=1e-9)
+
+
+# -- D-83: ThermalAnthocyaninFade — the O₂-INDEPENDENT thermal/hydrolytic bleaching loss --------
+# ThermalAnthocyaninFade is the second, O₂-independent fate that fades free monomeric anthocyanin to
+# the SAME colourless faded_anthocyanin slot the D-81 oxidative fade fills — but by a thermal route
+# needing NO oxygen (first-order [anthocyanin], the EsterHydrolysis form, NOT the D-81 bilinear
+# o2·anthocyanin). Its crux is the MIRROR of D-81: touching no o2, SO₂ does NOT protect it, so a
+# sealed/sulfited/anaerobic red still fades and only cold storage slows it. These tests pin the
+# closed form, the first-order (o2-free) shape, the single gate, the wine-only no-op, off-every-
+# ledger invariance, that it fades a REDUCTIVE red (retiring the D-81 anaerobic-holds note), that
+# SO₂ does NOT protect it (vs the D-81 contrast), the shared faded sink + identity, and tiers.
+
+
+def test_thermal_fade_metadata():
+    p = ThermalAnthocyaninFade()
+    assert p.name == "thermal_anthocyanin_fade"
+    assert p.tier is Tier.SPECULATIVE
+    # TRANSFERS anthocyanin into the colourless faded_anthocyanin slot — both off every ledger, so
+    # nothing conserved moves. It touches NO o2 (the D-83 crux — O₂-INDEPENDENT, so SO₂ can't
+    # protect it), unlike its D-81 oxidative sibling.
+    assert set(p.touches) == {"anthocyanin", "faded_anthocyanin"}
+    assert "o2" not in p.touches  # O₂-INDEPENDENT (the D-83 crux, the mirror of D-81)
+    # No yield (contrast D-81): the rate is already g anthocyanin/L/h — a direct −r/+r transfer.
+    assert set(p.reads) == {
+        "k_anthocyanin_thermal_fade",
+        "E_a_anthocyanin_thermal_fade",
+        "T_ref",
+    }
+
+
+def test_thermal_fade_closed_form(poly_params):
+    # r = k·f(T)·[anthocyanin] (FIRST-ORDER, no o2 term); anthocyanin → faded 1:1 (a pure transfer,
+    # no yield). Verify both derivatives exactly and that nothing else moves — in particular NO o2
+    # draw (this is the O₂-free route), NO pigment (fading is colourless), NO tannin, NO carbon.
+    schema = wine_schema()
+    t = 298.15  # off T_ref so the Arrhenius factor bites
+    antho = 0.3
+    y = _aged_wine(schema, esters=0.0, t=t, o2=0.03, anthocyanin=antho)
+    d = ThermalAnthocyaninFade().derivatives(0.0, y, schema, poly_params)
+
+    f_t = arrhenius_factor(t, poly_params["E_a_anthocyanin_thermal_fade"], poly_params["T_ref"])
+    r = poly_params["k_anthocyanin_thermal_fade"] * f_t * antho
+    assert schema.get(d, "anthocyanin") == pytest.approx(-r)
+    assert schema.get(d, "faded_anthocyanin") == pytest.approx(r)
+    # Pure transfer: anthocyanin lost == faded gained (the colour identity closes by construction).
+    assert schema.get(d, "anthocyanin") == pytest.approx(-schema.get(d, "faded_anthocyanin"))
+    # O₂-FREE (the whole point): despite o2 present in state, this route draws NONE. And nothing
+    # else moves — no pigment, no tannin, no E/CO2, no A420.
+    for var in ("o2", "X", "S", "E", "N", "CO2", "A420", "tannin", "polymeric_pigment"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_thermal_fade_is_first_order_and_o2_independent(poly_params):
+    # FIRST-ORDER in anthocyanin (doubling it doubles the rate) and INDEPENDENT of o2 (doubling —
+    # or zeroing — o2 leaves the rate unchanged, the D-83 crux vs the D-81 bilinear o2 sink).
+    schema = wine_schema()
+    p = ThermalAnthocyaninFade()
+
+    def fade_rate(o2: float, antho: float) -> float:
+        y = _aged_wine(schema, esters=0.0, o2=o2, anthocyanin=antho)
+        return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "anthocyanin"))
+
+    base = fade_rate(0.02, 0.2)
+    assert fade_rate(0.02, 0.4) == pytest.approx(2.0 * base)  # 2× anthocyanin ⇒ 2× rate
+    assert fade_rate(0.04, 0.2) == pytest.approx(base)  # 2× o2 ⇒ SAME rate (o2-independent)
+    assert fade_rate(0.0, 0.2) == pytest.approx(base)  # ZERO o2 ⇒ SAME rate (fades anaerobically!)
+    assert base < 0.0  # actually fading
+
+
+def test_thermal_fade_inert_without_anthocyanin(poly_params):
+    # Singly substrate-gated on anthocyanin only (NO o2 gate — it fades even with zero o2). A white
+    # wine (no anthocyanin) ⇒ byte-for-byte zero, so it is exactly the case without this Process.
+    schema = wine_schema()
+    p = ThermalAnthocyaninFade()
+    no_antho = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    assert np.array_equal(p.derivatives(0.0, no_antho, schema, poly_params), schema.zeros())
+    # Undershoot absorbed too.
+    undershoot = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=-1e-9)
+    assert np.array_equal(p.derivatives(0.0, undershoot, schema, poly_params), schema.zeros())
+
+
+def test_thermal_fade_gate_before_params_is_keyerror_safe(params):
+    # An enabled-but-undosed Process must not KeyError when polymerization.yaml is absent: the
+    # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks the thermal-fade
+    # rate, yet a white wine (anthocyanin 0) returns zero — gate-before-params.
+    schema = wine_schema()
+    y = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    d = ThermalAnthocyaninFade().derivatives(0.0, y, schema, params)
+    assert np.array_equal(d, schema.zeros())
+
+
+def test_thermal_fade_rises_with_temperature(poly_params):
+    # Warmer fades faster (E_a > 0, reaction-scale): the |anthocyanin| draw grows with T — the
+    # 'warm storage kills colour even anaerobically' temperature lever, the only lever this route
+    # has (no o2/SO₂ coupling).
+    schema = wine_schema()
+    p = ThermalAnthocyaninFade()
+    cold = p.derivatives(
+        0.0, _aged_wine(schema, esters=0.0, t=283.15, o2=0.0, anthocyanin=0.3), schema, poly_params
+    )
+    warm = p.derivatives(
+        0.0, _aged_wine(schema, esters=0.0, t=303.15, o2=0.0, anthocyanin=0.3), schema, poly_params
+    )
+    assert abs(float(schema.get(warm, "anthocyanin"))) > abs(float(schema.get(cold, "anthocyanin")))
+
+
+def test_thermal_fade_wine_only_noop_on_beer(poly_params):
+    # Wine-only (anthocyanin/faded_anthocyanin are appended to wine_schema): a hard no-op on beer.
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 100.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    d = ThermalAnthocyaninFade().derivatives(0.0, yb, beer, poly_params)
+    assert np.array_equal(d, beer.zeros())
+
+
+def test_thermal_fade_moves_nothing_conserved(poly_store, poly_params):
+    # Both anthocyanin/faded_anthocyanin (grape-derived) are off every ledger, so thermal fading
+    # anthocyanin to colourless products moves NOTHING conserved — carbon, mass AND nitrogen all
+    # exactly flat (the AnthocyaninFading off-every-ledger invariance, now with no o2 involved).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [ThermalAnthocyaninFade()], strict=True)
+    y0 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3)  # o2=0: fades anyway
+    traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success
+    f_c = poly_store.value("biomass_C_fraction")
+    f_n = poly_store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+
+
+def test_thermal_fade_bleaches_a_reductive_red(poly_params):
+    # THE D-83 HEADLINE, retiring the D-81 "anaerobic sealed red holds its colour" note. With ONLY
+    # ThermalAnthocyaninFade on a fully REDUCTIVE (o2 = 0) red — which is byte-for-byte FLAT under
+    # AnthocyaninFading alone (D-81 fades only via o2) — colour now GENUINELY declines, purely
+    # thermally, into the colourless faded slot. Contrast pinned: the D-81 oxidative fade does
+    # nothing here (no o2).
+    schema = wine_schema()
+    antho0 = 0.3
+    y0 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=antho0)  # anaerobic, sealed red
+
+    # D-81 alone on a reductive red: byte-for-byte flat (fades only via o2).
+    ps_oxid = ProcessSet(schema, [AnthocyaninFading()], strict=True)
+    traj_oxid = simulate(ps_oxid, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
+    assert traj_oxid.success
+    assert color_series(traj_oxid)[-1] == pytest.approx(antho0 * 1000.0)  # unchanged, D-81 inert
+
+    # D-83 alone on the SAME reductive red: colour genuinely declines (the retirement).
+    ps_therm = ProcessSet(schema, [ThermalAnthocyaninFade()], strict=True)
+    traj = simulate(ps_therm, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
+    assert traj.success
+    antho = np.asarray(traj.series("anthocyanin"), dtype=float)
+    faded = np.asarray(traj.series("faded_anthocyanin"), dtype=float)
+    col = color_series(traj)
+    assert col[-1] < col[0] - 10.0  # genuinely declines (col[0] == antho0 × 1000 == 300)
+    assert np.all(np.diff(col) <= 1e-6)  # monotone non-increasing
+    assert col[-1] == pytest.approx((antho0 - faded[-1]) * 1000.0)  # falls by exactly the faded amt
+    # Two-slot identity (no pigment/o2 route here): anthocyanin + faded ≡ anthocyanin₀.
+    assert np.allclose(antho + faded, antho0, atol=1e-9)
+
+
+def test_thermal_fade_unprotected_by_so2(fade_params):
+    # THE D-83 MIRROR OF D-81: SO₂ does NOT protect the thermal route. Because it draws no o2, a
+    # heavily-sulfited red fades thermally EXACTLY as an unsulfited one — the physically-honest
+    # split vs D-81, where SO₂ protects the o2-coupled fade emergently. Two identical reds, one
+    # dosed with SO₂: the thermal anthocyanin draw is byte-for-byte the same.
+    schema = wine_schema()
+    p = ThermalAnthocyaninFade()
+    no_so2 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3)
+    with_so2 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3, so2_total=0.05)
+    d_no = p.derivatives(0.0, no_so2, schema, fade_params)
+    d_so2 = p.derivatives(0.0, with_so2, schema, fade_params)
+    # SO₂ present or not, the thermal fade rate is identical (no o2 to scavenge ⇒ no protection).
+    assert schema.get(d_so2, "anthocyanin") == pytest.approx(schema.get(d_no, "anthocyanin"))
+    assert schema.get(d_so2, "anthocyanin") < 0.0  # and it IS fading despite the SO₂ dose
+
+
+def test_thermal_fade_tier_is_speculative(poly_store):
+    # Parameter-tier propagation (D-1): both fade params are speculative, so the anthocyanin /
+    # faded_anthocyanin outputs report speculative (the aging-axis frontier).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [ThermalAnthocyaninFade()], strict=True)
+    tier_map = poly_store.tier_map()
+    assert ps.tier_of("anthocyanin", tier_map) is Tier.SPECULATIVE
+    assert ps.tier_of("faded_anthocyanin", tier_map) is Tier.SPECULATIVE
 
 
 def test_fading_so2_protects_colour_emergently(fade_params):

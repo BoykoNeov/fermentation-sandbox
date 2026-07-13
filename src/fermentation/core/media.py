@@ -113,6 +113,7 @@ from fermentation.core.kinetics import (
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
     TemperatureRamp,
+    ThermalAnthocyaninFade,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -670,15 +671,18 @@ def wine_schema() -> StateSchema:
             "faded_anthocyanin",
             "g/L",
             default=0.0,
-            description="colourless anthocyanin-degradation products — the IRREVERSIBLE oxidative "
-            "fade sink (decision D-81). Filled by AnthocyaninFading (O₂-coupled: r_fade = "
-            "k_fade·f(T)·o2·[anthocyanin], drawing the shared o2 pool), capturing the free "
-            "monomeric anthocyanin lost to bleaching so it is NOT double-counted as pigment. This "
-            "is the second anthocyanin fate that makes analysis.color_series GENUINELY decline "
-            "(young bleachable colour is lost; the stable polymeric_pigment survives — the "
-            "colour-stability payoff). Off every ledger (grape-derived, the anthocyanin "
-            "precedent); starts 0, no must input, wine-only. NOT read by any sensory lens — it is "
-            "colourless (the whole point), so it carries no colour and no odor",
+            description="colourless anthocyanin-degradation products — the IRREVERSIBLE fade sink "
+            "(decisions D-81/D-83). Filled by TWO routes into one pool: AnthocyaninFading "
+            "(O₂-coupled oxidative bleaching, D-81: r = k_fade·f(T)·o2·[anthocyanin], drawing the "
+            "shared o2 pool) AND ThermalAnthocyaninFade (O₂-INDEPENDENT thermal/hydrolytic fade, "
+            "D-83: r = k_thermal·f(T)·[anthocyanin], no o2 — so a sealed/sulfited/anaerobic red "
+            "still fades, SO₂ giving no protection). Both capture the free monomeric anthocyanin "
+            "lost to fading so it is NOT double-counted as pigment. Together they are the second "
+            "anthocyanin fate that makes analysis.color_series GENUINELY decline (young bleachable "
+            "colour is lost; the stable polymeric_pigment survives — the colour-stability payoff). "
+            "Off every ledger (grape-derived, the anthocyanin precedent); starts 0, no must input, "
+            "wine-only. NOT read by any sensory lens — it is colourless (the whole point), so it "
+            "carries no colour and no odor",
         ),
     ]
     return StateSchema(specs)
@@ -1032,6 +1036,23 @@ _ACETALDEHYDE_BRIDGE_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: ``polymerization.yaml`` (with the condensation data — all colour-axis data together).
 _ANTHOCYANIN_FADING_PROCESSES: tuple[Callable[[], Process], ...] = (AnthocyaninFading,)
 
+#: WINE-ONLY O₂-INDEPENDENT thermal anthocyanin-fade aging Process (decision D-83) — the second,
+#: non-oxidative fate that fades free ``anthocyanin`` to colourless, the pathway D-81 deferred.
+#: :class:`ThermalAnthocyaninFade` degrades free monomeric ``anthocyanin`` to the SAME colourless
+#: ``faded_anthocyanin`` slot the D-81 oxidative fade fills, but by a **thermal/hydrolytic** route
+#: needing **no oxygen** (first-order ``[anthocyanin]``, the :class:`EsterHydrolysis` form, NOT the
+#: D-81 bilinear ``[o2]·[anthocyanin]``). Because it touches **no ``o2``**, **SO₂ does NOT protect**
+#: it (the mirror of D-81's emergent SO₂ protection): a sealed, sulfited, anaerobic red still fades
+#: thermally, and only cold storage (``E_a > 0``) slows it — so a **reductive** red, flat under D-81
+#: alone, now genuinely declines (retiring the D-81 "anaerobic sealed red holds its colour" note). A
+#: pure OFF-LEDGER transfer (the D-81 colour identity still closes by construction), **no yield**
+#: (the rate is already g anthocyanin/L/h). Wine-only (the grape slots are wine-only), like
+#: ``_ANTHOCYANIN_FADING_PROCESSES``. Kept in its OWN isolable tuple (directive #3): DISABLED at
+#: compile and re-enabled by ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
+#: ``polymerization.yaml`` (with the condensation/fade data — all colour-axis data together).
+_THERMAL_FADE_PROCESSES: tuple[Callable[[], Process], ...] = (ThermalAnthocyaninFade,)
+
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
 #: draws carbon *out of ``S``* into the ``pyruvate`` pool on the fermentative flux (so it
@@ -1337,6 +1358,7 @@ MEDIA: dict[str, Medium] = {
             + _POLYMERIZATION_PROCESSES
             + _ACETALDEHYDE_BRIDGE_PROCESSES
             + _ANTHOCYANIN_FADING_PROCESSES
+            + _THERMAL_FADE_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),
