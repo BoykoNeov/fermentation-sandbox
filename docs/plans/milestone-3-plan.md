@@ -66,8 +66,24 @@
 > wood-derived, the `iso_alpha` precedent — cleanest aging Process, no `chemistry.py` change). Owner forks: 4
 > compounds (+eugenol) and WINE-ONLY wired (like Strecker — medium-agnostic physics ≠ agnostic wiring). Explicit
 > `ceiling ≤ 0` undershoot guard (the floor is 0, so `max()` alone fabricates extract). 8 wine-only slots, 838
-> tests. Next: beat 1b (descriptor projection), non-oxidative Maillard Strecker, ellagitannin astringency (couples
-> to O₂), or barrel-beer oak — all deferred.**
+> tests.**
+> **D-78 (latest) built `EllagitanninOxidation` — the oak-tannin O₂-scavenging sink, the BRIDGE from the oak
+> extractive axis to the O₂ sub-axis D-77 kept separate (850 tests, +12). Ellagitannin is oak's hydrolysable tannin:
+> `OakExtraction` extracts a 5th pool (identical diffusion), and a new `EllagitanninOxidation` draws its share of the
+> shared `o2` budget (bilinear `[o2]·[ellagitannin]`, the `SulfiteOxidation` form) and CONSUMES it. THE SPINE is oak
+> PROTECTION: an oaked+oxygenated wine browns LESS (lower A420) and makes LESS oxidative acetaldehyde than an un-oaked
+> wine at the same O₂ dose (the D-72 SO₂-protection threshold with a RENEWABLE buffer — the wood re-supplies tannin
+> below the ceiling, so protection is sustained for months-to-years, unlike SO₂'s finite pool). SUBSTRATE-GATED on
+> `[ellagitannin]` ⇒ adds ON TOP with NO re-baseline (the `k_ethanol+k_browning=5e-4` anchor untouched) even though
+> it's a DOMINANT sink when present — proving the substrate-gated/always-on distinction, not the magnitude, is
+> load-bearing. MASS-based consumption yield `y_ellag_per_o2` (g/g, no fake molar mass for the lumped macromolecule);
+> off every ledger (both slots), so nothing conserved moves. ASTRINGENCY is a TASTE readout `analysis.astringency_series`
+> (mg/L ellagitannin, IBU-exact, reads no threshold — the iso_alpha exclusion), NOT the OAV odor lens and NOT an
+> A420-style slot (it tracks the current pool). Softening = ONE contributor (oxidative consumption); tannin–anthocyanin
+> polymerization is the separate deferred beat (the `tannin` namespace left free). Toast ordering: ellagitannin DECLINES
+> with toast (thermolabile). 1 advisor pass (endorsed all 4 forks). Next: beat 1b (descriptor projection), non-oxidative
+> Maillard Strecker, tannin–anthocyanin polymerization (now unblocked), barrel fill-number, or barrel-beer oak — all
+> deferred.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
@@ -92,8 +108,8 @@
   aging chemistry (the "years" axis) ← subsequent beats, one Process at a time
         ├── ester formation/hydrolysis equilibria over time
         ├── oxidation (acetaldehyde/phenolic browning, Strecker)
-        ├── oak extraction (vanillin, whiskey lactones, ellagitannins)
-        ├── tannin–anthocyanin polymerization (red colour / astringency)
+        ├── oak extraction (vanillin, whiskey lactones — D-77; ellagitannins — D-78)
+        ├── tannin–anthocyanin polymerization (red colour / astringency)   ← unblocked by the D-78 ellagitannin pool
         └── micro-oxygenation / reductive–oxidative sulfide evolution; Maillard/sotolon
 ```
 

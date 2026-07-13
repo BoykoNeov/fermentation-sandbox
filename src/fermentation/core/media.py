@@ -84,6 +84,7 @@ from fermentation.core.kinetics import (
     BrettVinylphenolReduction,
     ColemanQuadraticDeathTemperature,
     DiacetylReduction,
+    EllagitanninOxidation,
     EsterHydrolysis,
     EsterSynthesis,
     EsterVolatilization,
@@ -456,13 +457,16 @@ def wine_schema() -> StateSchema:
             "SAME quinone-driven Strecker route. Produced-only, carbon from amino_acids + CO₂, "
             "nitrogen deaminated to N. Read by the OAV lens (threshold_phenylacetaldehyde_wine)",
         ),
-        # Oak extraction — the barrel/chip aroma-extractive aging axis (decision D-77). Four
-        # extracted aroma pools (rising toward their ceilings) + four SET-AND-HOLD ceiling slots
-        # (the cation_charge idiom — state written ONLY by the add_oak verb, never by a Process).
-        # OakExtraction is a SEPARATE, non-oxidative aging axis (draws no O₂). All eight slots are
-        # OFF EVERY LEDGER (exogenous WOOD-derived mass, like the hop-derived iso_alpha, D-64), so
-        # they never perturb total_carbon/total_mass/total_nitrogen. default=0 ⇒ an un-oaked wine
-        # carries no ceiling and OakExtraction is byte-for-byte inert (the ceiling ≤ 0 guard). Wine.
+        # Oak extraction — the barrel/chip aroma-extractive aging axis (decision D-77), plus the
+        # ellagitannin BRIDGE (decision D-78). Four extracted AROMA pools + the ellagitannin TASTE
+        # pool (five rising toward their ceilings) + five SET-AND-HOLD ceiling slots (the
+        # cation_charge idiom — state written ONLY by the add_oak verb, never by a Process). The
+        # aroma four are a SEPARATE, non-oxidative axis (draw no O₂); ellagitannin bridges to the
+        # o2 sub-axis — EllagitanninOxidation (D-78) consumes it to scavenge O₂ (protecting the
+        # wine). All ten slots are OFF EVERY LEDGER (exogenous WOOD-derived mass, like the
+        # hop-derived iso_alpha, D-64), so they never perturb
+        # total_carbon/total_mass/total_nitrogen. default=0 ⇒ an un-oaked wine carries no ceiling
+        # and both oak Processes are byte-for-byte inert (the ceiling ≤ 0 guard). Wine.
         VarSpec(
             "whiskey_lactone",
             "g/L",
@@ -529,6 +533,35 @@ def wine_schema() -> StateSchema:
             description="SET-AND-HOLD saturation ceiling for eugenol (decision D-77): "
             "oak_gpl × oak_yield_eugenol_<toast>, written ONLY by add_oak. Off every ledger. "
             "Default 0 ⇒ inert",
+        ),
+        # Ellagitannin — the BRIDGE extractive (decision D-78). Unlike the four aroma extractives
+        # above (pure diffusion axis, O₂-orthogonal), ellagitannin is DYNAMIC: OakExtraction rises
+        # it toward its ceiling (diffusion in), AND EllagitanninOxidation draws its share of the
+        # shared o2 budget and CONSUMES it (the oak O₂-scavenging PROTECTION, the D-78 spine). It is
+        # a TASTE extractive — astringency, read out by analysis.astringency_series (the
+        # iso_alpha/IBU precedent), NOT the D-67 OAV aroma lens. Both slots are OFF EVERY LEDGER
+        # (wood-derived, the iso_alpha precedent), so neither Process perturbs
+        # total_carbon/total_mass/total_nitrogen. default=0 ⇒ an un-oaked wine carries no ceiling
+        # and both Processes are byte-for-byte inert.
+        VarSpec(
+            "ellagitannin",
+            "g/L",
+            default=0.0,
+            description="ellagitannin — oak's hydrolysable TANNIN (decision D-78), the ASTRINGENCY "
+            "extractive AND an O₂ scavenger, LIGHT-toast dominant (thermolabile — degraded by "
+            "toasting). Dynamic: OakExtraction rises it toward ellagitannin_ceiling (diffusion), "
+            "EllagitanninOxidation consumes it as it scavenges dissolved O₂ (protecting the wine). "
+            "Off every ledger (wood-derived). A TASTE — read by analysis.astringency_series (mg/L "
+            "tannin), NOT the OAV odor lens (the iso_alpha/IBU exclusion)",
+        ),
+        VarSpec(
+            "ellagitannin_ceiling",
+            "g/L",
+            default=0.0,
+            description="SET-AND-HOLD saturation ceiling for ellagitannin (decision D-78): "
+            "oak_gpl × oak_yield_ellagitannin_<toast>, written ONLY by the add_oak verb (the "
+            "cation_charge idiom). OakExtraction reads it (never written by a Process). Off every "
+            "ledger. Default 0 ⇒ no oak ⇒ inert",
         ),
     ]
     return StateSchema(specs)
@@ -773,22 +806,45 @@ _OXIDATIVE_SO2_PROCESSES: tuple[Callable[[], Process], ...] = (SulfiteOxidation,
 #: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in ``aging.yaml``.
 _STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (StreckerDegradation,)
 
-#: WINE-ONLY oak-extraction aging Process (decision D-77) — the barrel/chip aroma-extractive axis.
-#: :class:`OakExtraction` is the first **non-oxidative** aging Process and a **separate axis**: it
-#: draws NO O₂ (unlike every D-71→D-75 oxidative sibling), so it takes no share of the shared ``o2``
-#: budget. As a finished wine sits in oak, four wood extractives — ``whiskey_lactone`` (coconut),
-#: ``vanillin`` (vanilla), ``guaiacol`` (smoky) and ``eugenol`` (clove) — diffuse in and rise toward
-#: a per-compound saturation ceiling (first-order approach from below, the inverse of
-#: :class:`EsterHydrolysis`). The ceilings are SET-AND-HOLD wine-only state slots the ``add_oak``
-#: verb writes (``oak_gpl`` × toast-specific yield); this Process reads them and rises the extracted
-#: pools toward them. Wired into the *wine* medium only (the oak slots are wine-only, appended to
-#: ``wine_schema``), like ``_OXIDATIVE_SO2_PROCESSES``/``_STRECKER_PROCESSES``. OFF EVERY LEDGER
-#: (exogenous wood-derived mass, the ``iso_alpha`` precedent), so it moves nothing conserved and — a
-#: pure g/L transfer — needs no ``chemistry.py`` species registration. Kept in its OWN tuple
-#: (isolable, directive #3): DISABLED at the compile seam and re-enabled by ``begin_aging`` (its
-#: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no oak dosed every
-#: ceiling is 0 ⇒ byte-for-byte inert (the ceiling ≤ 0 guard). Params live in ``oak.yaml``.
+#: WINE-ONLY oak-extraction aging Process (decision D-77) — the barrel/chip extractive axis.
+#: :class:`OakExtraction` is the first **non-oxidative** aging Process: it draws NO O₂, so it takes
+#: no share of the shared ``o2`` budget. As a finished wine sits in oak, four AROMA extractives —
+#: ``whiskey_lactone`` (coconut), ``vanillin`` (vanilla), ``guaiacol`` (smoky) and ``eugenol``
+#: (clove) — PLUS the ``ellagitannin`` TASTE extractive (D-78) diffuse in and rise toward a
+#: per-compound saturation ceiling (first-order approach from below, the inverse of
+#: :class:`EsterHydrolysis`). The aroma four are a **separate axis**, O₂-orthogonal;
+#: ``ellagitannin`` bridges to the O₂ sub-axis (see :data:`_ELLAGITANNIN_PROCESSES`) but its
+#: *extraction* is the same pure diffusion this Process performs. The ceilings are SET-AND-HOLD
+#: wine-only state slots the ``add_oak`` verb writes (``oak_gpl`` × toast-specific yield); this
+#: Process reads them and rises the extracted pools toward them. Wired into the *wine* medium only
+#: (the oak slots are wine-only, appended to ``wine_schema``), like
+#: ``_OXIDATIVE_SO2_PROCESSES``/``_STRECKER_PROCESSES``. OFF EVERY LEDGER (exogenous wood-derived
+#: mass, the ``iso_alpha`` precedent), so it moves nothing conserved and — a pure g/L transfer —
+#: needs no ``chemistry.py`` species registration. Kept in its OWN tuple (isolable, directive #3):
+#: DISABLED at the compile seam and re-enabled by ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no oak dosed every ceiling
+#: is 0 ⇒ byte-for-byte inert (the ceiling ≤ 0 guard). Params live in ``oak.yaml``.
 _OAK_PROCESSES: tuple[Callable[[], Process], ...] = (OakExtraction,)
+
+#: WINE-ONLY ellagitannin O₂-scavenging aging Process (decision D-78) — the BRIDGE from the oak
+#: extractive axis to the O₂ sub-axis. :class:`EllagitanninOxidation` is the fourth oxidative
+#: sibling to claim a share of the shared ``o2`` budget (after
+#: ``OxidativeAcetaldehyde``/``PhenolicBrowning``/ ``SulfiteOxidation``): oak's hydrolysable tannin
+#: (the ``ellagitannin`` pool that ``OakExtraction`` fills) is a sacrificial antioxidant — dissolved
+#: O₂ oxidises it (bilinear ``[o2]·[ellagitannin]``, the :class:`SulfiteOxidation` form), CONSUMING
+#: the tannin as it scavenges. So an oaked + oxygenated wine browns LESS and accumulates LESS
+#: oxidative acetaldehyde than an un-oaked wine at the same O₂ dose — the oak-PROTECTION emergent
+#: (the D-78 spine, the D-72 "SO₂ protects" threshold with a *renewable* buffer: the wood
+#: re-supplies tannin below the ceiling). SUBSTRATE-GATED on the ``ellagitannin`` pool ⇒ zero unless
+#: oak is dosed ⇒ adds on top of the anchor with NO re-baseline (the D-72/D-75 rule;
+#: ``k_ethanol_oxidation + k_browning = 5.0e-4`` untouched). Wine-only (the ``ellagitannin`` slots
+#: are wine-only), like ``_STRECKER_PROCESSES``. OFF EVERY LEDGER (both ``o2`` and ``ellagitannin``
+#: are unweighted), so — like ``SulfiteOxidation`` — it moves nothing conserved. Kept in its OWN
+#: tuple (isolable, directive #3): DISABLED at compile and re-enabled by ``begin_aging`` (its name
+#: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no oak dosed the
+#: ``ellagitannin`` pool is 0 ⇒ byte-for-byte inert. Params live in ``oak.yaml`` (with the tannin's
+#: extraction yields — all ellagitannin data together).
+_ELLAGITANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (EllagitanninOxidation,)
 
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
@@ -1091,6 +1147,7 @@ MEDIA: dict[str, Medium] = {
             + _OXIDATIVE_SO2_PROCESSES
             + _STRECKER_PROCESSES
             + _OAK_PROCESSES
+            + _ELLAGITANNIN_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

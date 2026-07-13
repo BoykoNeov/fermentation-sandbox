@@ -44,6 +44,7 @@ from fermentation.core.kinetics import (
     BrettEthanolToxicity,
     BrettGrowth,
     BrettVinylphenolReduction,
+    EllagitanninOxidation,
     EsterHydrolysis,
     FuselAminoAcidReroute,
     IsoAlphaAcidLoss,
@@ -117,22 +118,24 @@ _BRETT_GATED_PROCESSES = (
     BrettEthanolToxicity,
 )
 
-#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72/D-74):
+#: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72/D-74/D-75/D-77/D-78):
 #: :class:`EsterHydrolysis` (the ester-fade), :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol
 #: oxidation), :class:`PhenolicBrowning` (the O₂-driven browning, D-74, accumulating ``A420``) and
 #: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72) and :class:`StreckerDegradation`
 #: (the O₂/amino-acid-driven Strecker aldehydes, D-75). The first three are medium-agnostic
-#: (wired into both media); :class:`SulfiteOxidation`, :class:`StreckerDegradation` and
+#: (wired into both media); :class:`SulfiteOxidation`, :class:`StreckerDegradation`,
 #: :class:`OakExtraction` (the NON-oxidative barrel/chip aroma extraction, D-77 — a separate axis
-#: drawing no O2) are wine-only (they read wine-only ``so2_total``/pH, ``amino_acids``/``N`` and the
-#: oak ceiling/extractive slots respectively), so on beer
+#: drawing no O2) and :class:`EllagitanninOxidation` (the D-78 oak-tannin O₂ scavenging — oak
+#: PROTECTION, the bridge from the oak axis to the O₂ sub-axis) are wine-only (they read wine-only
+#: ``so2_total``/pH, ``amino_acids``/``N``, the oak ceiling/extractive slots and the
+#: ``ellagitannin`` pool respectively), so on beer
 #: they are simply absent from the ProcessSet — both the compile-disable and the begin_aging-enable
 #: loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
 #: ``begin_aging`` verb re-enables exactly this tuple at its breakpoint and the compile seam
 #: disables exactly this tuple — one list,
-#: so the enable/disable stay symmetric as the aging axis grows. Their shared aging.yaml parameters
-#: are guarded together at the verb boundary.
+#: so the enable/disable stay symmetric as the aging axis grows. Their shared aging.yaml/oak.yaml
+#: parameters are guarded together at the verb boundary.
 _AGING_GATED_PROCESSES = (
     EsterHydrolysis,
     OxidativeAcetaldehyde,
@@ -140,6 +143,7 @@ _AGING_GATED_PROCESSES = (
     SulfiteOxidation,
     StreckerDegradation,
     OakExtraction,
+    EllagitanninOxidation,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -993,28 +997,35 @@ def _verb_add_oxygen(
     )
 
 
-#: The oak toast levels :func:`_verb_add_oak` accepts (decision D-77) and the four extractives it
-#: doses. The categorical ``toast`` selects the per-gram yield set (``oak_yield_<compound>_<toast>``
-#: in oak.yaml); the compound → ceiling-slot pairing mirrors ``aging._OAK_COMPOUND_CEILINGS``.
+#: The oak toast levels :func:`_verb_add_oak` accepts (decision D-77) and the extractives it doses:
+#: the four aroma extractives (D-77) plus ``ellagitannin`` (the D-78 taste/O₂-scavenging bridge).
+#: The categorical ``toast`` selects the per-gram yield set (``oak_yield_<compound>_<toast>`` in
+#: oak.yaml); the compound → ceiling-slot pairing mirrors ``aging._OAK_COMPOUND_CEILINGS``. So one
+#: ``add_oak`` dose sets all five saturation ceilings (aroma + tannin) from a single ``oak_gpl``/
+#: ``toast`` choice.
 _OAK_TOASTS = ("light", "medium", "heavy")
-_OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+_OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin")
 
 
 def _verb_add_oak(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet
 ) -> ScheduledEvent:
-    """``add_oak`` — put the wine in oak, setting each extractive's saturation ceiling (D-77).
+    """``add_oak`` — put the wine in oak, setting each extractive's saturation ceiling (D-77/D-78).
 
     The oak-extraction substrate lever, the aging-axis sibling of ``add_oxygen``: ``params`` names
     the oak-contact dose ``oak_gpl`` (the generalized chips-g/L / barrel surface-to-volume dose) and
     the categorical ``toast`` (``light``/``medium``/``heavy`` — the ``add_acid`` string-param move).
-    For each of the four extractives it computes the **saturation ceiling** ``oak_gpl ·
+    For each of the five extractives — the four aroma compounds (D-77) plus ``ellagitannin`` (the
+    D-78 taste/O₂-scavenging tannin) — it computes the **saturation ceiling** ``oak_gpl ·
     oak_yield_<compound>_<toast>`` (the provenance-backed toast-specific per-gram yields in
     ``oak.yaml``) and writes it to that compound's **set-and-hold** ceiling state slot. The
     :class:`~fermentation.core.kinetics.aging.OakExtraction` Process (enabled by ``begin_aging``)
     then rises the extracted pools toward those ceilings — so the toast selects the aroma *profile*
     (light → coconut-dominant, medium → vanilla, heavy → smoky/clove) and ``oak_gpl`` scales the
-    ceilings linearly.
+    ceilings linearly. The ellagitannin ceiling is set the same way; the D-78
+    :class:`~fermentation.core.kinetics.aging.EllagitanninOxidation` sink then draws that tannin
+    down as it scavenges O₂ (oak protection), so oaking a wine both flavours it and buffers its
+    redox.
 
     **The add_oxygen pattern (a dosed off-ledger substrate), NOT begin_aging.** Like ``add_oxygen``,
     this verb only doses — it does **not** enable the Process (``begin_aging`` does, alongside the
@@ -1399,11 +1410,19 @@ def _verb_begin_aging(
         "E_a_browning",
         "y_a420_per_o2",
         # Oak extraction (D-77): the non-oxidative barrel/chip axis begin_aging also enables. Only
-        # the shared rate + activation energy are guarded here (the 12 toast-specific yields are
-        # guarded at the add_oak verb, which is the only reader that needs them); k_oak_extraction/
-        # E_a_oak_extraction are read by OakExtraction on every enabled aging segment.
+        # the shared rate + activation energy are guarded here (the 15 toast-specific yields — 4
+        # aroma + ellagitannin — are guarded at the add_oak verb, which is the only reader that
+        # needs them); k_oak_extraction/E_a_oak_extraction are read by OakExtraction on every
+        # enabled aging segment.
         "k_oak_extraction",
         "E_a_oak_extraction",
+        # Ellagitannin O₂ scavenging (D-78): the oak-tannin protection sink. Substrate-gated on the
+        # ellagitannin pool (guarded before reading params in-Process, like Strecker), so these can
+        # never be missing-when-needed (add_oak, the only way to get ellagitannin, already requires
+        # oak.yaml); guarded here for parity with the oak-extraction params it ships alongside.
+        "k_ellagitannin_oxidation",
+        "E_a_ellagitannin_oxidation",
+        "y_ellag_per_o2",
     ):
         if name not in parameters:
             raise ValueError(

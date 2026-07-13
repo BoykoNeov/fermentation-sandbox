@@ -6211,3 +6211,96 @@ slots/process/compounds; every default / un-aged / un-oaked / oxidative-aging tr
 unchanged. +9 Process tests + 9 scenario tests. **Next:** the deferred beat 1b (descriptor projection), the
 non-oxidative Maillard Strecker route, ellagitannin astringency (couples to O₂), or barrel-beer oak (trivial
 extension).
+
+## D-78 — `EllagitanninOxidation` built: the oak-tannin O₂-scavenging sink — oak **PROTECTS** the wine, the BRIDGE from the oak axis to the O₂ sub-axis (§4.1)
+
+**Date:** 2026-07-13. **Milestone 3 / Tier-3, the seventh aging Process** and the one D-77 **explicitly deferred**:
+ellagitannins are the oak extractive that couples the two axes D-77 kept separate. Oak's hydrolysable tannin is
+both **extracted** by the D-77 diffusion axis (a fifth extractive) **and** a potent **O₂ scavenger** — a sacrificial
+antioxidant that intercepts dissolved O₂, so an oaked + oxygenated wine browns **less** and makes **less** oxidative
+acetaldehyde than an un-oaked wine at the same O₂ dose (**oak protection** — the spine). Plus it carries
+**astringency**, a *taste*. **One `advisor()` pass** (strong endorse of all four forks + refinements). 850 tests
+(+12), `ruff`/`mypy`/`pytest` green.
+
+**The spine is PROTECTION, not astringency (the advisor's reprioritization).** The beat is named "astringency," but
+the load-bearing, novel physics — and the exact reason D-77 deferred it — is ellagitannin **as an O₂ scavenger that
+protects the wine**. The crown-jewel emergent result is the direct analogue of D-72's "SO₂ protects until exhausted"
+threshold: an oaked wine's tannin intercepts the O₂, so **A420 and oxidative acetaldehyde both drop**. This is
+built + tested rigorously (a two-run oaked-vs-un-oaked comparison, same O₂ dose); the astringency readout is a thin
+secondary observable riding on the same pool (no calibrated astringency scale — false precision at Tier-3).
+
+**Two Processes, one pool — extraction (diffusion) + oxidation (reaction) are different physics (fork B).**
+`OakExtraction` gains a fifth extractive, `ellagitannin`, by the **identical** `max(0, ceiling − C)` diffusion form
+(so `touches` → 5; the aroma four stay O₂-orthogonal). A **new** `EllagitanninOxidation` is the O₂ sink:
+`d(o2)/dt = −k_ellagitannin_oxidation · f(T) · [o2] · [ellagitannin]` (**bilinear**, the `SulfiteOxidation` form),
+and it **consumes** the tannin as it scavenges. Two Processes touching one pool is the `o2` precedent. Kept as a
+separate isolable tuple `_ELLAGITANNIN_PROCESSES` (wine-only).
+
+**Substrate-gated ⇒ adds ON TOP, NO re-baseline (fork D — the D-72/D-75 rule, now a clean illustration).** The O₂
+draw is bilinear in `[ellagitannin]`, which is **zero unless oak is dosed** (`add_oak`), so — exactly like
+`SulfiteOxidation` (gated on SO₂) and `StreckerDegradation` (gated on amino acids) — this sink adds on top of the
+shared budget with the anchor `k_ethanol_oxidation + k_browning = 5.0e-4` **untouched**, and the no-oak / all-beer
+trajectory byte-for-byte preserved. The sharp point: this is a **dominant** sink when present (banded to take
+roughly a third-to-half of the O₂), yet it needs **no** re-baseline — proving the **substrate-gated / always-on
+distinction, not the magnitude**, is what's load-bearing (contrast the always-on `PhenolicBrowning`, which *forced*
+the D-74 re-baseline). Banded so protection is **PARTIAL** — an oaked wine still shows *some* oxidative character.
+
+**The renewable-buffer emergent — anticipated, not "fixed" (the advisor's subtlest catch).** Because `OakExtraction`
+keeps topping the tannin up toward its ceiling while `EllagitanninOxidation` burns it, **the wood re-supplies tannin
+as fast as O₂ consumes it** (below the ceiling). So oak buffers redox for **months-to-years** — an oaked+oxygenated
+wine's acetaldehyde may *never* climb — a **renewable** buffer, unlike SO₂'s finite, exhaustible pool. This is
+physically correct (a barrel is a large tannin reservoir); the eventual wood exhaustion is D-77's already-deferred
+**fill-number** refinement. Documented as the SO₂-vs-oak contrast, not read as a bug or over-calibrated away.
+
+**Mass-based consumption yield, not a molar stoichiometry (the advisor's honesty refinement).**
+`d(ellagitannin)/dt = −y_ellag_per_o2 · r_o2` where `y_ellag_per_o2` is **g ellagitannin per g O₂** — *not* a molar
+ratio. Ellagitannin is a lumped hydrolysable-tannin macromolecule with no clean molar mass, so an `M_ellagitannin`
+would be fake precision (contrast `_SO2_PER_O2`, a real-molecule 2:1). Legitimate because both `o2` and
+`ellagitannin` are **off every ledger** (wood-derived, the `iso_alpha`/`A420` precedent), so — like
+`SulfiteOxidation` — this consumption moves **nothing conserved** (no ledger reads the tannin mass, so the lump
+carries no fabricated carbon; carbon/mass/nitrogen all machine-precision flat, tested). `E_a_ellagitannin_oxidation`
+is its **own** param at **reaction** scale (~50 kJ/mol, matching the oxidative siblings), deliberately distinct from
+the *weak* diffusion `E_a_oak_extraction` (20 kJ/mol) that governs the same tannin's **extraction** — two physics,
+two activation energies (directive #2).
+
+**Astringency is a TASTE readout, not OAV, not a state slot (fork C, both discriminators).** Astringency is a
+tactile/mouthfeel percept, so — exactly like `iso_alpha`/IBU, which D-67 excludes from the OAV *odor* lens — it is
+read out by a new `analysis.astringency_series(traj) = traj.series("ellagitannin") · 1000` (mg/L tannin), **IBU-exact:
+reads no threshold** (IBU *is* mg/L iso-alpha; here we report the tannin directly, astringency monotone in it; a
+calibrated intensity index is deferred). And it is a **readout**, not an A420-style integrated state slot: astringency
+tracks the *current* `ellagitannin` pool (reconstructible pointwise), whereas A420 *had* to be a slot because browning
+pigment is cumulative/irreversible. NB the distinction: `ellagitannin` **itself** is a genuine state slot (dynamically
+extracted + consumed, not closed-form reconstructible); *astringency* is the thin readout over it. So no threshold was
+added to `sensory.yaml` (the OAV odor table).
+
+**Softening is ONE contributor, honestly scoped.** The astringency decline that emerges is from the **oxidative
+consumption** of the sacrificial tannin (tested: without re-supply the pool draws down monotonically, so
+`astringency_series` softens). The *dominant* real softening mechanism — tannin–anthocyanin condensation /
+polymerisation (red-wine colour + astringency evolution) — is the **separate deferred beat** the milestone plan
+names; the `tannin` namespace is left free for it (the pool is named `ellagitannin`, not generic `tannin`). This beat
+does **not** claim to reproduce astringency softening, only one directional contributor.
+
+**Toast ordering: ellagitannin DECLINES with toast (light > medium > heavy).** Hydrolysable tannins are
+**thermolabile** — degraded by the heat of toasting — so heavily-toasted barrels release *less* tannin and taste
+rounder / less astringent (Chatonnet barrel-toast studies; Cadahia on oak-toasting ellagitannin loss). Same
+declining direction as whiskey lactone, opposite to the guaiacol/eugenol pyrolysis phenols. Anchored to the **mg/L**
+scale (not the µg/L aroma scale): a ~4 g/L oak dose lands ~24–100 mg/L across toast. Magnitudes speculative; the
+ordering + mg/L scale are the sourced claims.
+
+**Fork confirmations (all four correct, per the advisor):** **(A) consumed/sacrificial** — the O₂-protection role
+*requires* the pool to deplete (a scavenger that isn't consumed isn't scavenging; ellagitannin content genuinely
+declines during oxidative aging). **(B) two Processes.** **(C) taste readout.** **(D) substrate-gated, no
+re-baseline.**
+
+**Regression surface.** New: `EllagitanninOxidation` in `aging.py`; `oak.yaml` gains `k_ellagitannin_oxidation` +
+reaction-scale `E_a_ellagitannin_oxidation` + mass-based `y_ellag_per_o2` + 3 toast yields (all speculative);
+`ellagitannin` + `ellagitannin_ceiling` wine slots; `ellagitannin` added to `OakExtraction`'s extraction tuple +
+`add_oak`'s `_OAK_COMPOUNDS`; `EllagitanninOxidation` into `_AGING_GATED_PROCESSES` (disable/`begin_aging` symmetry)
++ the `begin_aging` param guard; `analysis.astringency_series`. **No `chemistry.py` change** (off every ledger, no
+molar mass — the mass-based-yield payoff). **No OAV / sensory.yaml change** (astringency is a taste, not aroma).
+Three enumeration tests updated (schema size 51→53, `WINE_OAK_SLOTS`, `WINE_OAK_PROCESSES`); every default / un-aged
+/ un-oaked / reductive-aging trajectory byte-for-byte unchanged. +12 Process tests (incl. the protection spine, the
+sacrificial-softening, and the off-every-ledger conservation triple). **Next:** the deferred beat 1b (descriptor
+projection), the non-oxidative Maillard Strecker route, the deferred **tannin–anthocyanin polymerization** beat (the
+dominant astringency-softening + red-colour mechanism, now unblocked by the `ellagitannin` pool), barrel-age /
+fill-number depletion (a ceiling multiplier < 1), or barrel-beer oak.

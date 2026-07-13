@@ -15,6 +15,7 @@ from fermentation.core.kinetics.acetaldehyde import (
     AcetaldehydeReduction,
 )
 from fermentation.core.kinetics.aging import (
+    EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
     OxidativeAcetaldehyde,
@@ -105,6 +106,7 @@ __all__ = [
     "DiacetylReduction",
     "ArrheniusTemperature",
     "ColemanQuadraticDeathTemperature",
+    "EllagitanninOxidation",
     "EsterHydrolysis",
     "OakExtraction",
     "OxidativeAcetaldehyde",

@@ -19,6 +19,7 @@ D-64 loss-Process pattern), off the fermentation ProcessSet so isolability is pr
 import numpy as np
 import pytest
 
+from fermentation.analysis import astringency_series
 from fermentation.core.acidbase import bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
@@ -32,6 +33,7 @@ from fermentation.core.chemistry import (
     nitrogen_mass_fraction,
 )
 from fermentation.core.kinetics import (
+    EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
     OxidativeAcetaldehyde,
@@ -1170,9 +1172,10 @@ def test_oak_metadata():
     p = OakExtraction()
     assert p.name == "oak_extraction"
     assert p.tier is Tier.SPECULATIVE
-    # Writes ONLY the four extracted-compound slots (the ceilings are read, never written — a
-    # set-and-hold constant the add_oak verb owns). Off every ledger, so nothing conserved moves.
-    assert set(p.touches) == {"whiskey_lactone", "vanillin", "guaiacol", "eugenol"}
+    # Writes ONLY the five extracted-compound slots — the four aroma extractives (D-77) plus the
+    # ellagitannin taste extractive (D-78). The ceilings are read, never written (a set-and-hold
+    # constant the add_oak verb owns). Off every ledger, so nothing conserved moves.
+    assert set(p.touches) == {"whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin"}
     # Only its own shared rate/E_a + T_ref; the per-compound ceilings ride in STATE, not params.
     assert set(p.reads) == {"k_oak_extraction", "E_a_oak_extraction", "T_ref"}
 
@@ -1313,3 +1316,256 @@ def test_oak_tier_floored_at_speculative(oak_store):
     for pool in _OAK_COMPOUNDS:
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, oak_store.tier_map()) is Tier.SPECULATIVE
+
+
+def test_oak_also_extracts_ellagitannin(oak_params):
+    # D-78: OakExtraction now extracts a FIFTH pool, ellagitannin (the taste/O₂-scavenging tannin),
+    # by the IDENTICAL diffusion-to-a-ceiling form — d(ellag)/dt = k·f(T)·max(0, ceiling − ellag).
+    schema = wine_schema()
+    t = 298.15
+    y = _oak_wine(schema, ceilings={"ellagitannin": 0.1}, t=t)
+    y[schema.slice("ellagitannin")] = 0.04  # partly extracted ⇒ gap = 0.1 − 0.04
+    d = OakExtraction().derivatives(0.0, y, schema, oak_params)
+    f_t = arrhenius_factor(t, oak_params["E_a_oak_extraction"], oak_params["T_ref"])
+    k = oak_params["k_oak_extraction"]
+    assert schema.get(d, "ellagitannin") == pytest.approx(k * f_t * (0.1 - 0.04))
+    # Extraction draws NO O₂ (a diffusion process) and never moves the ceiling.
+    assert schema.get(d, "o2") == 0.0
+    assert schema.get(d, "ellagitannin_ceiling") == 0.0
+
+
+# =====================================================================================
+# EllagitanninOxidation (decision D-78) — the WINE-ONLY oak-tannin O₂-scavenging sink, the BRIDGE
+# from the D-77 oak extractive axis to the O₂ sub-axis. Oak's hydrolysable tannin (the ellagitannin
+# pool OakExtraction fills) is a sacrificial antioxidant: dissolved O₂ oxidises it (bilinear
+# [o2]·[ellagitannin], the SulfiteOxidation form), CONSUMING it at a mass-based yield y_ellag_per_o2
+# (g ellag / g O₂ — no fake molar mass for the lumped macromolecule). The EMERGENT SPINE is oak
+# PROTECTION: an oaked + oxygenated wine browns LESS (lower A420) and makes LESS oxidative
+# acetaldehyde than an un-oaked wine at the same O₂ dose (the D-72 "SO₂ protects" threshold with a
+# RENEWABLE buffer). Substrate-gated on ellagitannin ⇒ adds on top with NO re-baseline of the
+# k_ethanol_oxidation + k_browning = 5.0e-4 anchor. Off every ledger (both slots unweighted), so it
+# moves nothing conserved. These tests pin the closed form, the bilinearity, the reaction-scale
+# temperature ordering, the doubly-substrate-gated inertness (KeyError-safe without oak.yaml), the
+# wine-only no-op on beer, THE PROTECTION SPINE (partial, not total), the sacrificial-consumption
+# softening (astringency_series), the off-every-ledger invariance, and the speculative tier floor.
+
+
+@pytest.fixture
+def ellag_store():
+    # Wine params + aging.yaml (the O₂ sinks browning/ethanol oxidation) + oak.yaml (the
+    # ellagitannin extraction yields AND the D-78 scavenging rate/E_a/yield) — the shared_files the
+    # compile seam wires. EllagitanninOxidation + OakExtraction + PhenolicBrowning +
+    # OxidativeAcetaldehyde all resolve from this combined store.
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "aging.yaml",
+        default_data_dir() / "oak.yaml",
+    )
+
+
+@pytest.fixture
+def ellag_params(ellag_store):
+    return ellag_store.resolve()
+
+
+def test_ellagitannin_oxidation_metadata():
+    p = EllagitanninOxidation()
+    assert p.name == "ellagitannin_oxidation"
+    # Speculative: the aging axis is the Tier-3 frontier.
+    assert p.tier is Tier.SPECULATIVE
+    # Touches ONLY o2 (consumed) and ellagitannin (oxidised) — both off every ledger, so nothing
+    # conserved moves (the SulfiteOxidation precedent). No carbon borrow.
+    assert set(p.touches) == {"o2", "ellagitannin"}
+    assert set(p.reads) == {
+        "k_ellagitannin_oxidation",
+        "E_a_ellagitannin_oxidation",
+        "y_ellag_per_o2",
+        "T_ref",
+    }
+
+
+def test_ellagitannin_oxidation_closed_form(ellag_params):
+    # d(o2)/dt = −k·f(T)·[o2]·[ellag] (bilinear, the SulfiteOxidation form); d(ellag)/dt = −y·r_o2
+    # (mass-based consumption). Verify both exactly, and that nothing else moves.
+    schema = wine_schema()
+    t = 298.15  # off T_ref so the Arrhenius factor bites
+    o2, ellag = 0.03, 0.08
+    y = _aged_wine(schema, esters=0.0, t=t, o2=o2, ellagitannin=ellag)
+    d = EllagitanninOxidation().derivatives(0.0, y, schema, ellag_params)
+
+    f_t = arrhenius_factor(t, ellag_params["E_a_ellagitannin_oxidation"], ellag_params["T_ref"])
+    k = ellag_params["k_ellagitannin_oxidation"]
+    y_ellag = ellag_params["y_ellag_per_o2"]
+    r_o2 = k * f_t * o2 * ellag
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "ellagitannin") == pytest.approx(-y_ellag * r_o2)
+    # Off every ledger — no carbon borrow (unlike OxidativeAcetaldehyde's E→acetaldehyde), no A420,
+    # no other pool touched.
+    for var in ("X", "S", "E", "N", "CO2", "A420", "acetaldehyde", "so2_total"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_ellagitannin_oxidation_is_bilinear(ellag_params):
+    # Bilinear in BOTH drivers: doubling o2 OR doubling ellagitannin doubles the O₂-scavenging rate.
+    schema = wine_schema()
+    base = EllagitanninOxidation().derivatives(
+        0.0, _aged_wine(schema, esters=0.0, o2=0.02, ellagitannin=0.05), schema, ellag_params
+    )
+    twice_o2 = EllagitanninOxidation().derivatives(
+        0.0, _aged_wine(schema, esters=0.0, o2=0.04, ellagitannin=0.05), schema, ellag_params
+    )
+    twice_ellag = EllagitanninOxidation().derivatives(
+        0.0, _aged_wine(schema, esters=0.0, o2=0.02, ellagitannin=0.10), schema, ellag_params
+    )
+    assert schema.get(twice_o2, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
+    assert schema.get(twice_ellag, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
+    assert schema.get(base, "o2") < 0.0  # actually scavenging
+
+
+def test_ellagitannin_oxidation_inert_without_o2_or_tannin(ellag_params):
+    # Doubly substrate-gated: no O₂ OR no ellagitannin ⇒ byte-for-byte zero. A reductive (no
+    # add_oxygen) or an un-oaked aging is exactly the case without this Process (isolability #3).
+    schema = wine_schema()
+    p = EllagitanninOxidation()
+    no_o2 = _aged_wine(schema, esters=0.0, o2=0.0, ellagitannin=0.08)
+    no_tannin = _aged_wine(schema, esters=0.0, o2=0.03, ellagitannin=0.0)
+    assert np.array_equal(p.derivatives(0.0, no_o2, schema, ellag_params), schema.zeros())
+    assert np.array_equal(p.derivatives(0.0, no_tannin, schema, ellag_params), schema.zeros())
+    # <= 0 also absorbs solver undershoot (a spurious −ε in either driver ⇒ no draw).
+    undershoot = _aged_wine(schema, esters=0.0, o2=-1e-9, ellagitannin=0.08)
+    assert np.array_equal(p.derivatives(0.0, undershoot, schema, ellag_params), schema.zeros())
+
+
+def test_ellagitannin_oxidation_gate_before_params_is_keyerror_safe(params):
+    # Gate on the ellagitannin STATE before reading any oak param, so an enabled-but-undosed Process
+    # never KeyErrors when oak.yaml is ABSENT (the ``params`` fixture is wine+aging only, no
+    # k_ellagitannin_oxidation). An un-oaked wine (ellag=0) returns zero without touching oak
+    # params.
+    schema = wine_schema()
+    y = _aged_wine(schema, esters=0.0, o2=0.03, ellagitannin=0.0)
+    assert np.array_equal(
+        EllagitanninOxidation().derivatives(0.0, y, schema, params), schema.zeros()
+    )
+
+
+def test_ellagitannin_oxidation_rises_with_temperature(ellag_params):
+    # REACTION-scale E_a_ellagitannin_oxidation > 0 (its OWN param, ~50 kJ/mol — distinct from the
+    # WEAK diffusion E_a_oak_extraction that governs the tannin's extraction): warmer scavenges
+    # faster.
+    schema = wine_schema()
+    p = EllagitanninOxidation()
+    cold = p.derivatives(
+        0.0,
+        _aged_wine(schema, esters=0.0, t=283.15, o2=0.03, ellagitannin=0.08),
+        schema,
+        ellag_params,
+    )
+    warm = p.derivatives(
+        0.0,
+        _aged_wine(schema, esters=0.0, t=303.15, o2=0.03, ellagitannin=0.08),
+        schema,
+        ellag_params,
+    )
+    # More negative (faster scavenging) when warmer.
+    assert schema.get(warm, "o2") < schema.get(cold, "o2") < 0.0
+
+
+def test_ellagitannin_oxidation_wine_only_noop_on_beer(ellag_params):
+    # WINE-ONLY: the ellagitannin slot is appended to wine_schema (beer has none), so the
+    # "ellagitannin" not in schema guard makes this a hard no-op on beer even if wired there.
+    beer = beer_schema()
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    yb[beer.slice("o2")] = 0.03  # o2 present, but no ellagitannin slot exists
+    assert np.array_equal(
+        EllagitanninOxidation().derivatives(0.0, yb, beer, ellag_params), beer.zeros()
+    )
+
+
+def test_oak_protects_against_oxidation(ellag_params):
+    # THE D-78 SPINE. Two identical oxygenated aging runs — same O₂ dose, full oxidative process set
+    # — differing ONLY in whether the wine is oaked (ellagitannin present). The oaked wine browns
+    # LESS (lower A420) and makes LESS oxidative acetaldehyde, because the tannin scavenges its
+    # share of the O₂ (oak protection, the SO₂-protection analogue with a renewable buffer).
+    # Suppression is PARTIAL (the oaked wine still shows SOME browning/acetaldehyde — banded so
+    # ellagitannin never monopolizes the O₂). And the tannin is CONSUMED (its pool declines) — the
+    # sacrificial softening.
+    schema = wine_schema()
+    processes = [
+        OakExtraction(),
+        EllagitanninOxidation(),
+        PhenolicBrowning(),
+        OxidativeAcetaldehyde(),
+    ]
+    ps = ProcessSet(schema, processes, strict=True)
+    o2_dose = 0.04  # ~40 mg/L cumulative O₂ exposure
+    span = (0.0, 24.0 * 365.0)  # ~1 year
+
+    # Oaked: an ellagitannin charge at its ceiling (renewable — OakExtraction re-supplies below it).
+    oaked0 = _aged_wine(schema, esters=0.0, o2=o2_dose, ellagitannin=0.1, ellagitannin_ceiling=0.1)
+    oaked = simulate(ps, params=ellag_params, y0=oaked0, t_span=span)
+    # Un-oaked: identical but no tannin (and no ceiling), same O₂ dose.
+    unoaked0 = _aged_wine(
+        schema, esters=0.0, o2=o2_dose, ellagitannin=0.0, ellagitannin_ceiling=0.0
+    )
+    unoaked = simulate(ps, params=ellag_params, y0=unoaked0, t_span=span)
+    assert oaked.success and unoaked.success
+
+    a420_oaked = float(oaked.series("A420")[-1])
+    a420_unoaked = float(unoaked.series("A420")[-1])
+    acet_oaked = float(oaked.series("acetaldehyde")[-1])
+    acet_unoaked = float(unoaked.series("acetaldehyde")[-1])
+
+    # PROTECTION: oak lowers BOTH the browning index and the oxidative acetaldehyde.
+    assert a420_oaked < a420_unoaked
+    assert acet_oaked < acet_unoaked
+    # PARTIAL, not total (ellagitannin does not monopolize the O₂ — banded so oaked wines still
+    # oxidise SOME): the oaked wine still browns and still makes acetaldehyde.
+    assert a420_oaked > 0.0 and acet_oaked > 0.0
+    # SACRIFICIAL: the tannin is consumed scavenging O₂ — its pool ends BELOW the ceiling
+    # (softening).
+    assert float(oaked.series("ellagitannin")[-1]) < 0.1
+
+
+def test_ellagitannin_consumed_softens_astringency(ellag_params):
+    # WITHOUT the renewable re-supply (EllagitanninOxidation alone, no OakExtraction), the
+    # sacrificial tannin is drawn down MONOTONICALLY under O₂ — so astringency_series (mg/L
+    # ellagitannin) SOFTENS over the run. One directional contributor (oxidative consumption);
+    # polymerization deferred.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [EllagitanninOxidation()], strict=True)
+    y0 = _aged_wine(schema, esters=0.0, o2=0.05, ellagitannin=0.1)
+    traj = simulate(ps, params=ellag_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success
+    astr = astringency_series(traj)
+    # astringency_series is exactly ellagitannin (g/L) × 1000 (mg/L), IBU-exact (reads no
+    # threshold).
+    assert np.allclose(astr, np.asarray(traj.series("ellagitannin"), dtype=float) * 1000.0)
+    # Softens: monotone non-increasing, and ends below the start (some tannin spent on the O₂).
+    assert np.all(np.diff(astr) <= 1e-15)
+    assert astr[-1] < astr[0]
+    assert astr[-1] >= 0.0  # never negative (the o2 charge is finite, tannin only partly spent)
+
+
+def test_ellagitannin_oxidation_moves_nothing_conserved(ellag_store, ellag_params):
+    # Both o2 and ellagitannin are off every ledger (wood-derived / carbon-free), so oxidising the
+    # tannin moves NOTHING conserved — total_carbon, total_mass AND total_nitrogen all exactly flat
+    # (the SulfiteOxidation off-every-ledger invariance). X=0 throughout.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [EllagitanninOxidation()], strict=True)
+    y0 = _aged_wine(schema, esters=0.0, o2=0.05, ellagitannin=0.1)
+    traj = simulate(ps, params=ellag_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success
+    f_c = ellag_store.value("biomass_C_fraction")
+    f_n = ellag_store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+
+
+def test_ellagitannin_oxidation_tier_floored_at_speculative(ellag_store):
+    # Speculative in FORM (Tier-3 frontier) and capped by its speculative oak params (D-1). The
+    # ellagitannin pool it writes is speculative both pre- and post-parameter-tier propagation.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [EllagitanninOxidation()])
+    assert ps.tier_of("ellagitannin") is Tier.SPECULATIVE
+    assert ps.tier_of("ellagitannin", ellag_store.tier_map()) is Tier.SPECULATIVE

@@ -241,17 +241,22 @@ _PHENYLACETALDEHYDE_SPECIES = "phenylacetaldehyde"
 #: bookkeeping must route, not an off-ledger emission (D-75).
 _CO2_PER_STRECKER_ALDEHYDE = 1.0
 
-#: The four oak extractives and their set-and-hold ceiling slots (decision D-77). Each extracted
-#: aroma pool (the first element) rises toward its own saturation ceiling (the second element); the
+#: The oak extractives and their set-and-hold ceiling slots (decisions D-77/D-78). Each extracted
+#: pool (the first element) rises toward its own saturation ceiling (the second element); the
 #: ceiling slots are **constant state** written *only* by the ``add_oak`` verb (``oak_gpl`` ×
 #: toast-specific yield) and read — never written — here, the ``cation_charge`` set-and-hold idiom.
-#: Whiskey lactone (coconut, light-toast dominant), vanillin (vanilla, medium-toast peak), guaiacol
-#: (smoky, heavy-toast) and eugenol (clove, heavy-toast) — the toast ordering the ceilings encode.
+#: Four AROMA extractives (D-77) — whiskey lactone (coconut, light-toast dominant), vanillin
+#: (vanilla, medium-toast peak), guaiacol (smoky, heavy-toast) and eugenol (clove, heavy-toast) —
+#: plus the ``ellagitannin`` TASTE extractive (D-78, light-toast dominant / declining with toast —
+#: thermolabile). Their *extraction* is identical diffusion-to-a-ceiling; ellagitannin additionally
+#: feeds the O₂ sub-axis via the separate :class:`EllagitanninOxidation` sink (the aroma four draw
+#: no O₂).
 _OAK_COMPOUND_CEILINGS: tuple[tuple[str, str], ...] = (
     ("whiskey_lactone", "whiskey_lactone_ceiling"),
     ("vanillin", "vanillin_ceiling"),
     ("guaiacol", "guaiacol_ceiling"),
     ("eugenol", "eugenol_ceiling"),
+    ("ellagitannin", "ellagitannin_ceiling"),
 )
 
 
@@ -801,16 +806,25 @@ class StreckerDegradation(Process):
 class OakExtraction(Process):
     """Non-oxidative aging: oak extractives diffuse into the wine toward a ceiling (decision D-77).
 
-    The sixth aging Process, the **first non-oxidative** one, and a **separate axis** from the
-    O₂ sub-axis (D-71–D-75): it draws **no O₂**, takes no share of the shared ``o2`` budget, and is
-    orthogonal to the browning/acetaldehyde/SO₂/Strecker competition. As a finished wine sits in oak
-    (barrel or chips/staves), four wood extractives diffuse in and rise toward a saturation ceiling:
-    **whiskey lactone** (β-methyl-γ-octalactone, "coconut", the signature oak-lactone note,
-    LIGHT-toast dominant), **vanillin** ("vanilla", MEDIUM-toast peak), **guaiacol** (a lignin-
-    pyrolysis "smoky/toasty" phenol, HEAVY-toast dominant — the oak/toast note, *distinct* from the
-    Brett 4-ethylguaiacol of D-55) and **eugenol** ("clove/spice", HEAVY-toast). Unlike the other
-    five aging Processes these products move **no** pool the D-67 OAV lens already reads, so this
-    beat adds **four new aroma pools** (the D-77 four-compound fork; eugenol co-varies w/ guaiacol).
+    The sixth aging Process (D-77), the **first non-oxidative** one. **OakExtraction itself draws no
+    O₂** and takes no share of the shared ``o2`` budget — a pure diffusion process. As a finished
+    wine sits in oak (barrel or chips/staves), four **aroma** extractives diffuse in and rise toward
+    a saturation ceiling: **whiskey lactone** (β-methyl-γ-octalactone, "coconut", the signature
+    oak-lactone note, LIGHT-toast dominant), **vanillin** ("vanilla", MEDIUM-toast peak),
+    **guaiacol** (a lignin-pyrolysis "smoky/toasty" phenol, HEAVY-toast dominant — the oak/toast
+    note, *distinct* from the Brett 4-ethylguaiacol of D-55) and **eugenol** ("clove/spice",
+    HEAVY-toast). These four move **no** pool the D-67 OAV lens already read, so D-77 added four new
+    aroma pools; those four are a **separate axis**, orthogonal to the
+    browning/acetaldehyde/SO₂/Strecker competition.
+
+    **The ellagitannin bridge (D-78).** This Process *also* extracts a fifth pool, **ellagitannin**
+    (oak's hydrolysable TASTE tannin, LIGHT-toast dominant / declining with toast — thermolabile),
+    by the *identical* diffusion-to-a-ceiling form. But ellagitannin is **not** O₂-orthogonal: a
+    *separate* Process, :class:`EllagitanninOxidation`, consumes it to scavenge dissolved O₂ (oak
+    PROTECTION). So the ``ellagitannin`` pool has two Processes on it (extraction here, oxidation
+    there — the ``o2`` two-Processes-one-pool precedent); *this* Process only pushes it up toward
+    its ceiling. Ellagitannin is a taste (astringency), read out by ``analysis.astringency_series``,
+    not the OAV odor lens.
 
     ``d(C_i)/dt = k_oak_extraction · f(T) · max(0, ceiling_i − C_i)`` per extractive ``i`` — a
     **first-order approach FROM BELOW** to a per-compound ceiling, the exact inverse of
@@ -850,17 +864,21 @@ class OakExtraction(Process):
     ``add_oak`` is byte-for-byte the case without oak — an aged wine that never saw wood. Tier
     **speculative** (the extraction *form* — diffusion-limited approach to a ceiling, warmer-faster
     — is sourced; every magnitude, the yields especially, is an order-of-magnitude estimate).
-    **Scope (v1):** ellagitannins are deferred (they are O₂ scavengers, would violate "no O₂");
-    ``oak_gpl`` is the generalized oak-contact dose subsuming chips-g/L and barrel surface-to-volume
-    ratio (barrel fill-number depletion deferred); whiskey lactone is a lumped cis+trans pool.
+    **Scope (v1):** ellagitannins are now modelled (D-78 — extracted here, O₂-scavenged by
+    :class:`EllagitanninOxidation`); ``oak_gpl`` is the generalized oak-contact dose subsuming
+    chips-g/L and barrel surface-to-volume ratio (barrel fill-number depletion deferred); whiskey
+    lactone is a lumped cis+trans pool.
     """
 
     name = "oak_extraction"
     tier = Tier.SPECULATIVE
-    #: Writes only the four extracted-compound slots (the ceiling slots are read, never written — a
+    #: Writes only the five extracted-compound slots — the four aroma extractives (D-77) plus the
+    #: ``ellagitannin`` taste extractive (D-78). The ceiling slots are read, never written (a
     #: set-and-hold constant the ``add_oak`` verb owns). Off every ledger (exogenous wood-derived
-    #: mass, the iso_alpha precedent), so nothing conserved moves.
-    touches = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+    #: mass, the iso_alpha precedent), so nothing conserved moves. (``ellagitannin`` is *also*
+    #: consumed by the separate :class:`EllagitanninOxidation` O₂ sink — two Processes on one pool,
+    #: the ``o2`` precedent — but this Process only *extracts* it.)
+    touches = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin")
     #: ``k_oak_extraction``/``E_a_oak_extraction`` are this Process's own (oak.yaml, D-77); and
     #: ``T_ref`` is shared with every Arrhenius rate. The per-compound ceilings ride in *state* (by
     #: ``add_oak``), not params, so they are not in ``reads``. Tiers cap the four extracted pools'
@@ -897,4 +915,123 @@ class OakExtraction(Process):
         k = params["k_oak_extraction"]
         for compound, gap in active:
             d[schema.slice(compound)] = k * f_t * gap  # first-order approach from below, off-ledger
+        return d
+
+
+class EllagitanninOxidation(Process):
+    """Oxidative aging: dissolved O₂ oxidises oak ellagitannin → oak protects the wine (D-78).
+
+    The fourth **oxidative** sibling to claim a share of the shared ``o2`` budget (after
+    :class:`OxidativeAcetaldehyde` D-71, :class:`PhenolicBrowning` D-74 and
+    :class:`SulfiteOxidation` D-72), and the **bridge** from the D-77 oak extractive axis to the O₂
+    sub-axis. Oak's hydrolysable tannin — the ``ellagitannin`` pool :class:`OakExtraction` fills by
+    diffusion — is a potent **sacrificial antioxidant**: dissolved O₂ oxidises its galloyl/gallate
+    groups, so the tannin **scavenges O₂**, diverting it from phenolic browning and ethanol
+    oxidation. The emergent payoff — **the D-78 spine** — is oak **PROTECTION**: an oaked +
+    oxygenated wine browns **less** (lower ``A420``) and accumulates **less** oxidative acetaldehyde
+    than an un-oaked wine at the same O₂ dose. This is the :class:`SulfiteOxidation` "SO₂ protects
+    until exhausted" threshold (D-72) with one difference: the buffer is **renewable**. While the
+    wine is below the ceiling :class:`OakExtraction` re-supplies tannin as fast as this Process
+    burns it, so oak buffers redox for **months-to-years** (an oaked+oxygenated wine's acetaldehyde
+    may never climb) — contrast SO₂, whose finite pool is spent once. That renewability is
+    physically correct (a barrel is a large tannin reservoir); the eventual wood exhaustion is
+    D-77's already-deferred barrel **fill-number** refinement, not modelled here.
+
+    ``d(o2)/dt = −r`` with ``r = k_ellagitannin_oxidation · f(T) · [o2] · [ellagitannin]`` —
+    **bilinear** in the dissolved-O₂ pool and the ellagitannin driver (the :class:`SulfiteOxidation`
+    form), ``f(T) = arrhenius_factor(T, E_a_ellagitannin_oxidation, T_ref)`` the sourced
+    warmer-scavenges-faster factor at **reaction** scale (its own param, ~50 kJ/mol — distinct from
+    the *weak* diffusion ``E_a_oak_extraction`` that governs the tannin's extraction: scavenging is
+    a chemical oxidation, extraction is diffusion). The tannin is **consumed** as it scavenges::
+
+        d(ellagitannin)/dt = −y_ellag_per_o2 · r
+
+    at a **mass-based** yield (``g ellagitannin per g O₂``), *not* a molar stoichiometry:
+    ellagitannin is a lumped hydrolysable-tannin macromolecule with no clean molar mass, so an
+    ``M_ellagitannin`` would be fake precision (contrast :data:`_SO2_PER_O2`, a real-molecule molar
+    ratio). So this consumption **softens the astringency** the ``ellagitannin`` pool carries — but
+    *one directional contributor only* (the D-78 scope): the dominant real softening mechanism,
+    tannin–anthocyanin condensation/polymerisation, is the separate deferred beat, so this does
+    **not** claim to reproduce astringency softening.
+
+    **Substrate-gated ⇒ adds on top, NO re-baseline (the D-72/D-75 rule).** The O₂ draw is bilinear
+    in ``[ellagitannin]``, which is zero unless oak is dosed (``add_oak``), so — exactly like
+    :class:`SulfiteOxidation` (gated on SO₂) and :class:`StreckerDegradation` (gated on amino acids)
+    — this sink is **zero without its substrate** and therefore **adds on top** of the shared O₂
+    budget with **no re-baseline**: ``k_ethanol_oxidation + k_browning = 5.0e-4`` (the always-on
+    anchor) is **untouched**, and the no-oak / all-beer trajectory is byte-for-byte preserved. A
+    nice illustration that the substrate-gated / always-on distinction — not the magnitude — is
+    what's load-bearing: ``k_ellagitannin_oxidation`` is banded so that, when oak *is* present, this
+    is a **major** sink (it takes roughly a third-to-half of the O₂), yet it still needs no
+    re-baseline (unlike the always-on :class:`PhenolicBrowning`, which forced the D-74 re-baseline).
+    It is banded so the protection is **partial** — an oaked wine still shows *some* oxidative
+    character.
+
+    **Off every ledger, no conservation term (the :class:`SulfiteOxidation` precedent).** Both
+    ``o2`` (D-71) and ``ellagitannin`` (wood-derived, off
+    ``total_carbon``/``total_mass``/``total_nitrogen`` like ``iso_alpha``/``A420``, D-77) are
+    unweighted, so oxidising the tannin to untracked products moves **nothing conserved** — this
+    Process touches only those two slots and asserts nothing. This is why the mass-based yield is
+    legitimate: no ledger reads the ``ellagitannin`` mass, so the lump carries no fabricated carbon.
+
+    **Wine-only + isolable + doubly substrate-gated (prime directive #3).** The ``ellagitannin``
+    slot is wine-only (appended to ``wine_schema``, D-78), so — like :class:`SulfiteOxidation` /
+    :class:`StreckerDegradation` / :class:`OakExtraction` — this is wired into the *wine* medium
+    only; the ``"ellagitannin" not in schema`` guard makes it a hard no-op besides. Wired **disabled
+    at the compile seam** (aging is post-ferment); ``begin_aging`` enables it with the other aging
+    Processes. With no O₂ *or* no oak dosed the ``o2 ≤ 0`` / ``ellagitannin ≤ 0`` guards return
+    byte-for-byte zero, so a reductive (no ``add_oxygen``) or an un-oaked aging is exactly the case
+    without this Process. Tier **speculative** (the aging axis is the Tier-3 frontier; the *form* —
+    O₂-limited, tannin-driven, warmer-faster — is sourced, the rate/yield magnitudes
+    order-of-magnitude estimates).
+    """
+
+    name = "ellagitannin_oxidation"
+    tier = Tier.SPECULATIVE
+    #: Consumes its share of the dissolved-O₂ substrate and the ``ellagitannin`` tannin it oxidises
+    #: — both slots off every ledger, so nothing conserved moves; it touches those two and nothing
+    #: else. (``ellagitannin`` is also *extracted* by :class:`OakExtraction` — two Processes on one
+    #: pool, the ``o2`` precedent.)
+    touches = ("o2", "ellagitannin")
+    #: ``k_ellagitannin_oxidation``/``E_a_ellagitannin_oxidation``/``y_ellag_per_o2`` are this
+    #: Process's own (oak.yaml, D-78); ``T_ref`` is shared with every Arrhenius rate. Their tiers
+    #: cap the ``o2``/``ellagitannin`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_ellagitannin_oxidation",
+        "E_a_ellagitannin_oxidation",
+        "y_ellag_per_o2",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slot (ellagitannin is appended to wine_schema): a hard no-op on any schema
+        # without it, belt-and-suspenders to the wine-only wiring.
+        if "ellagitannin" not in schema or "o2" not in schema:
+            return d
+        o2 = float(y[schema.slice("o2")][0])
+        ellag = float(y[schema.slice("ellagitannin")][0])
+        # No oxidant OR no tannin ⇒ no scavenging: reductive/un-oaked aging is byte-for-byte the
+        # case without this Process. Gate on the ellagitannin STATE before reading any oak param
+        # (the OakExtraction/Strecker substrate-gate-before-params discipline — an
+        # enabled-but-undosed Process mustn't KeyError if oak.yaml is absent). ``<= 0`` also absorbs
+        # solver undershoot.
+        if o2 <= 0.0 or ellag <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_ellagitannin_oxidation"], params["T_ref"])
+        # This route's SHARE of the O₂-depletion rate (bilinear in o2 and the tannin driver, the
+        # SulfiteOxidation form) — substrate-gated on ellagitannin, so it adds on top of the anchor
+        # with no re-baseline (D-72/D-75). ProcessSet sums the sinks, so o2 splits by kᵢ/Σk.
+        r_o2 = (
+            params["k_ellagitannin_oxidation"] * f_t * o2 * ellag
+        )  # g O2/L/h via the tannin route
+        d[schema.slice("o2")] = -r_o2
+        # The sacrificial tannin is consumed at a MASS-based yield (g ellag / g O2), not a molar
+        # stoichiometry — ellagitannin is a lumped macromolecule with no clean molar mass. Both
+        # slots off every ledger, so this consumption moves nothing conserved (the SulfiteOxidation
+        # idiom).
+        d[schema.slice("ellagitannin")] = -params["y_ellag_per_o2"] * r_o2
         return d

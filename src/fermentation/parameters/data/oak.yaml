@@ -27,20 +27,48 @@
 # byte-for-byte inert (the ceiling<=0 guard), so a begin_aging run with no add_oak is byte-for-byte
 # the case without oak (prime directive #3), exactly like an un-oxygenated aging is the reductive case.
 #
-# A SEPARATE AXIS, NO O2 (the D-77 scope). Unlike the four oxidative aging Processes (D-71..D-75),
-# oak extraction is DIFFUSION-driven, not oxidation-driven: it consumes NO o2, draws no share of the
-# shared O2 budget, and is orthogonal to the browning/acetaldehyde/SO2/Strecker competition. It
-# touches ONLY the four extracted-compound slots — OFF EVERY LEDGER (exogenous WOOD-derived mass,
-# like the hop-derived iso_alpha, D-64; the extractives' carbon comes from an UNTRACKED oak source,
-# so booking it as a mass would demand a wood carbon pool that does not exist). So OakExtraction
-# moves NOTHING conserved — total_carbon/total_mass/total_nitrogen all stay flat (cleaner even than
-# PhenolicBrowning, which at least reads o2). Pure g/L transfer, so — like iso_alpha — it needs no
-# chemistry.py species registration (no molar-mass conversion in the RHS).
+# THE FOUR AROMA EXTRACTIVES ARE A SEPARATE AXIS, NO O2 (the D-77 scope). OakExtraction itself is
+# DIFFUSION-driven, not oxidation-driven: it consumes NO o2, draws no share of the shared O2 budget,
+# and is orthogonal to the browning/acetaldehyde/SO2/Strecker competition. It touches ONLY the
+# extracted-compound slots — OFF EVERY LEDGER (exogenous WOOD-derived mass, like the hop-derived
+# iso_alpha, D-64; the extractives' carbon comes from an UNTRACKED oak source, so booking it as a
+# mass would demand a wood carbon pool that does not exist). So OakExtraction moves NOTHING conserved
+# — total_carbon/total_mass/total_nitrogen all stay flat (cleaner even than PhenolicBrowning, which
+# at least reads o2). Pure g/L transfer, so — like iso_alpha — it needs no chemistry.py species
+# registration (no molar-mass conversion in the RHS).
+#
+# ELLAGITANNIN — THE BRIDGE TO THE O2 SUB-AXIS (decision D-78). D-77 deferred ellagitannins precisely
+# because they are NOT purely diffusion-axis: oak's hydrolysable tannins are DIFFUSION-extracted like
+# the aroma four (OakExtraction rises a fifth extractive toward its ceiling), but they are ALSO potent
+# O2 SCAVENGERS — a sacrificial antioxidant reservoir that intercepts dissolved O2, PROTECTING the
+# wine (the barrel-aging / micro-oxygenation reality). So a SECOND, oxidative Process
+# (EllagitanninOxidation) draws the ellagitannin's share of the shared o2 budget (bilinear in o2 and
+# the ellagitannin pool, the SulfiteOxidation form) and CONSUMES the tannin as it scavenges. The
+# emergent payoff — the D-78 spine — is oak PROTECTION: an oaked + oxygenated wine browns LESS (lower
+# A420) and accumulates LESS oxidative acetaldehyde than an un-oaked wine at the same O2 dose, exactly
+# the D-72 "SO2 protects" threshold with a renewable buffer. Ellagitannin is thus the ONE oak
+# extractive that bridges the diffusion axis to the O2 sub-axis; the aroma four remain O2-orthogonal.
+# It also carries ASTRINGENCY — a TASTE, read out by analysis.astringency_series (the iso_alpha/IBU
+# precedent), NOT the D-67 OAV odor lens. Both ellagitannin slots are OFF EVERY LEDGER (wood-derived),
+# so EllagitanninOxidation — like SulfiteOxidation — moves nothing conserved (mass-based consumption
+# yield y_ellag_per_o2, no fake molar mass for the lumped macromolecule). Its O2 draw is
+# SUBSTRATE-GATED on the ellagitannin pool (zero unless oak is dosed), so — the D-72/D-75 rule — it
+# adds on top of the anchor with NO re-baseline of k_ethanol_oxidation + k_browning = 5.0e-4.
 #
 # SCOPE (v1), flagged loudly:
-#   * ELLAGITANNINS (the milestone plan names them) are DEFERRED: they are astringent tannins AND
-#     O2 scavengers, so they would couple into the o2 sub-axis (violating "no O2") — a different
-#     beat. Only the four volatile aroma extractives are modelled here.
+#   * ELLAGITANNIN astringency SOFTENING here is the OXIDATIVE-CONSUMPTION contributor ONLY (the
+#     sacrificial tannin is spent scavenging O2, so the pool — and the astringency — declines). The
+#     DOMINANT real softening mechanism, tannin–anthocyanin CONDENSATION/POLYMERIZATION (red-wine
+#     colour + astringency evolution), is the SEPARATE deferred beat the milestone plan names — the
+#     `tannin` namespace is left free for it. This beat does NOT claim to reproduce astringency
+#     softening, only one directional contributor to it.
+#   * ELLAGITANNIN as an O2 buffer is RENEWABLE, not finite like SO2: while the wine is below the
+#     ceiling the wood keeps re-supplying tannin as fast as O2 burns it (OakExtraction's approach
+#     term), so oak buffers redox for months-to-years — an oaked+oxygenated wine's acetaldehyde may
+#     never climb (contrast SO2, whose protection ENDS at exhaustion). This is physically correct (a
+#     barrel is a large tannin reservoir); the eventual wood exhaustion is D-77's already-deferred
+#     BARREL FILL-NUMBER refinement. k_ellagitannin_oxidation is banded so suppression is PARTIAL
+#     (ellagitannin does not monopolize the O2 — oaked wines still show SOME oxidative character).
 #   * oak_gpl is the GENERALIZED oak-contact dose, subsuming chips-g/L and barrel surface-to-volume
 #     ratio (higher S:V or more chips => more contact => proportionally higher ceilings — the
 #     ceilings scale LINEARLY with oak_gpl). BARREL AGE / FILL NUMBER (a used barrel extracts less)
@@ -55,10 +83,13 @@
 # saturation ceiling, warmer-faster) is sourced, but every magnitude (rate, activation energy, and
 # especially the toast-specific yields) is an order-of-magnitude author estimate, and the aging axis
 # is the Tier-3 frontier. The Process floors its outputs at speculative regardless of input tiers
-# (parameter-tier propagation, D-1). Load-bearing sourced claims: (1) oak yields these four
-# extractives with the stated TOAST ORDERING (lactone light -> vanillin medium -> guaiacol/eugenol
-# heavy), (2) extraction approaches a ceiling (diffusion-limited, saturating), (3) warmer extracts
-# faster (E_a > 0, but WEAKLY — diffusion, see below).
+# (parameter-tier propagation, D-1). Load-bearing sourced claims: (1) oak yields these extractives
+# with the stated TOAST ORDERING (lactone light -> vanillin medium -> guaiacol/eugenol heavy;
+# ellagitannin DECLINES with toast, light > medium > heavy — thermolabile, degraded by toasting, so
+# heavy-toast barrels are rounder/less astringent, D-78), (2) extraction approaches a ceiling
+# (diffusion-limited, saturating), (3) warmer extracts faster (E_a > 0, but WEAKLY — diffusion, see
+# below), and — for the ellagitannin O2-scavenging Process (D-78) — (4) ellagitannin is a faster O2
+# scavenger than ethanol (=> it PROTECTS the wine), consumed sacrificially as it does so.
 
 # -- FIRST-ORDER EXTRACTION RATE: extractives diffuse into the wine toward the ceiling ----------
 k_oak_extraction:
@@ -218,3 +249,108 @@ oak_yield_eugenol_heavy:
     source: "author estimate; see oak_yield_eugenol_light — eugenol is HIGHEST at heavy toast (co-varying with guaiacol)."
     conditions: "g eugenol / g oak at HEAVY toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
     notes: "SPECULATIVE magnitude, SOURCED toast ordering (eugenol peaks heavy)."
+
+# =============================================================================================
+# ELLAGITANNIN — THE BRIDGE EXTRACTIVE (decision D-78): diffusion-extracted like the aroma four,
+# but ALSO an O2 scavenger (a sacrificial antioxidant that PROTECTS the wine) and an ASTRINGENCY
+# contributor. Two Processes touch its pool: OakExtraction rises it toward the ceiling below (the
+# same diffusion form as the aroma four), and EllagitanninOxidation (the D-78 oxidative Process)
+# draws its share of the shared o2 budget and CONSUMES it. See the header for the full bridge story.
+#
+# TOAST ORDERING: ellagitannin DECLINES with toast (light > medium > heavy) — hydrolysable tannins
+# are THERMOLABILE, degraded by the heat of toasting, so heavily-toasted barrels release LESS tannin
+# and taste rounder/less astringent (Chatonnet et al. barrel-toast studies; Cadahia et al. on
+# oak-toasting ellagitannin loss). SAME direction as whiskey lactone, OPPOSITE to guaiacol/eugenol.
+#
+# UNITS & SCALE: ellagitannin extracts at the mg/L scale (NOT the µg/L aroma scale) — oak-aged wine
+# carries tens-to-~100+ mg/L ellagitannins (gallic/ellagic-acid-equivalent). Anchored so a ~4 g/L
+# oak-chip-equivalent dose lands ~24–100 mg/L across toast levels. ALL speculative; the SOURCED,
+# load-bearing claim is the toast ORDERING (declining) + the mg/L scale, not the exact magnitudes.
+
+# -- WHISKEY-LACTONE-LIKE TOAST ORDERING (declining): light > medium > heavy -------------------
+oak_yield_ellagitannin_light:
+  value: 2.5e-2
+  unit: "g/g"   # g ellagitannin / g oak; * oak_gpl => ceiling (g/L). ~100 mg/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 8.0e-3, high: 7.0e-2, note: "hydrolysable-tannin yield at LIGHT/untoasted toast (its PEAK — untoasted oak retains the most intact ellagitannin); ~100 mg/L ceiling at a 4 g/L oak dose, upper end of the oak-aged range (new untoasted oak is the most astringent). Gallic/ellagic-acid-equivalent lumped tannin." }
+  provenance:
+    source: "author estimate anchored to ellagitannin (vescalagin/castalagin and related hydrolysable tannins, ~tens-to-hundreds mg/L) levels in oak-aged wine and to the TOAST ORDERING (Chatonnet et al. barrel-toast studies; Cadahia et al. on ellagitannin degradation with oak toasting): ellagitannin is HIGHEST in light/untoasted oak and DEGRADES with heavier toast (thermolysis of the hydrolysable tannin), the SAME declining direction as whiskey lactone and the INVERSE of the guaiacol/eugenol pyrolysis phenols."
+    conditions: "g ellagitannin (gallic/ellagic-acid-equivalent, lumped) extractable per g oak at LIGHT toast; * oak_gpl => the saturation ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (ellagitannin peaks light, falls with toast — thermolabile). Lumped hydrolysable-tannin pool (no speciation). Doubly caveated: order-of-magnitude yield AND a fixed dose->ceiling linearity."
+oak_yield_ellagitannin_medium:
+  value: 1.5e-2
+  unit: "g/g"   # ~60 mg/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 5.0e-3, high: 5.0e-2, note: "ellagitannin at MEDIUM toast — falling from the light peak as toasting thermolyses the tannin; ~60 mg/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_ellagitannin_light — ellagitannin declines from light to heavy toast (thermolysis; Chatonnet/Cadahia toast ordering)."
+    conditions: "g ellagitannin / g oak at MEDIUM toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering. Lumped hydrolysable tannin."
+oak_yield_ellagitannin_heavy:
+  value: 6.0e-3
+  unit: "g/g"   # ~24 mg/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 2.0e-3, high: 2.5e-2, note: "ellagitannin at HEAVY toast — its LOWEST level (largely thermolysed by heavy toasting, so heavy-toast barrels are rounder/less astringent); ~24 mg/L ceiling at 4 g/L oak." }
+  provenance:
+    source: "author estimate; see oak_yield_ellagitannin_light — ellagitannin is lowest at heavy toast (thermal breakdown of the hydrolysable tannin)."
+    conditions: "g ellagitannin / g oak at HEAVY toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (ellagitannin lowest heavy). Lumped hydrolysable tannin."
+
+# -- BILINEAR O2xELLAGITANNIN SCAVENGING RATE: oak tannin protects the wine (the D-78 SPINE) ----
+# d(o2)/dt = -k_ellagitannin_oxidation * f(T) * [o2] * [ellagitannin]  (bilinear, both g/L — the
+# SulfiteOxidation form). Ellagitannin scavenges O2, diverting it from browning + ethanol oxidation,
+# so an oaked+oxygenated wine browns less and accumulates less oxidative acetaldehyde — oak PROTECTION.
+# SUBSTRATE-GATED on the ellagitannin pool => zero unless oak is dosed => adds ON TOP of the anchor
+# with NO re-baseline (the D-72/D-75 rule; k_ethanol_oxidation + k_browning = 5.0e-4 untouched). BANDED
+# so suppression is PARTIAL — a MAJOR but not total O2 sink: at a ~50–100 mg/L ellagitannin charge
+# (0.05–0.1 g/L) the pseudo-first-order O2 rate k*[ellag] ~ 2.5e-4–5e-4 /h is ~0.5–1x the 5.0e-4
+# always-on total, so ellagitannin takes roughly a third-to-half of the O2 (a clear, VISIBLE protection
+# that still leaves oaked wines SOME oxidative character). Deliberately ~40x SMALLER per unit mass than
+# k_so2_oxidation (0.2): a bulky tannin macromolecule is a slower O2 scavenger per gram than the
+# bisulfite anion — but it is present at ~1000x the concentration and is RENEWABLE (wood re-supplies
+# it below the ceiling), so it buffers redox for months-to-years (contrast SO2's finite, exhaustible
+# pool). The load-bearing SOURCED claim is the ORDERING (tannin out-competes ethanol for O2 => oak
+# protects), not this magnitude.
+k_ellagitannin_oxidation:
+  value: 5.0e-3
+  unit: "L/(g*h)"   # d(o2)/dt = -k_ellagitannin_oxidation * f(T) * [o2] * [ellagitannin]  (bilinear)
+  tier: speculative
+  uncertainty: { low: 1.0e-3, high: 2.0e-2, note: "bimolecular O2xellagitannin rate constant at T_ref = 20 C. The LOAD-BEARING claim is the ORDERING (ellagitannin scavenges O2 faster than ethanol => oak protects), not the magnitude: at a 50–100 mg/L ellagitannin charge the pseudo-first-order O2 rate k*[ellag] ~ 2.5e-4–5e-4 /h is ~0.5–1x the always-on total (k_ethanol_oxidation + k_browning = 5e-4; D-74), so ellagitannin takes roughly a third-to-half of the O2 — a MAJOR, VISIBLE, but PARTIAL protection (banded so it never monopolizes the O2). Renewable (wood re-supplies below the ceiling), so buffering is SUSTAINED, unlike SO2's finite pool." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that oak hydrolysable tannins (ellagitannins) are potent O2 scavengers that PROTECT wine from oxidation during barrel aging / micro-oxygenation (Vivas & Glories 1996 on ellagitannin oxygen consumption; Danilewicz on wine antioxidant phenolics; the galloyl/gallate groups reduce O2/H2O2 in the coupled-oxidation cascade). The bimolecular constant folds the catalysis into k (no explicit catalyst pool, as with k_so2_oxidation/k_browning)."
+    conditions: "generic wine at cellar pH/temperature; bilinear in the dissolved-o2 pool and the ellagitannin pool (both g/L) at T_ref = 293.15 K."
+    notes: "SOURCED FORM (bilinear O2xellagitannin, tannin out-competing ethanol for O2 => oak protects the wine, browning + acetaldehyde SUPPRESSED — the D-78 spine, the D-72 SO2-protection analogue with a RENEWABLE buffer) + SPECULATIVE magnitude. Banded so protection is PARTIAL (a third-to-half of the O2), never total. The mass-based consumption yield (y_ellag_per_o2) — not this rate — sets HOW MUCH tannin a given O2 flux spends."
+
+# -- ACTIVATION ENERGY: warmer scavenges O2 faster (sourced ordering, REACTION-scale) ----------
+# Its OWN parameter (prime directive #2) and REACTION-scale (~50 kJ/mol, like the other O2-sink E_a's
+# — SO2/browning/ethanol/Strecker), NOT the weak DIFFUSION E_a_oak_extraction (20 kJ/mol): the
+# EXTRACTION of ellagitannin is diffusion-limited (E_a_oak_extraction), but its O2 SCAVENGING is a
+# chemical oxidation reaction, so it carries the reaction-scale temperature sensitivity of its oxidative
+# siblings. Two distinct physics on one pool => two distinct activation energies.
+E_a_ellagitannin_oxidation:
+  value: 50000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 70000.0, note: "Q10 ~1.5-2.6 at 20 C. Wine oxidation / tannin-autoxidation activation energies ~30-70 kJ/mol. The SOURCED, load-bearing claim is the SIGN (warmer => faster tannin O2 scavenging, so warm storage spends the protective tannin faster); the magnitude is speculative and banded. Its OWN parameter (prime directive #2) and REACTION-scale — distinct from the weak DIFFUSION E_a_oak_extraction (20 kJ/mol) that governs the tannin's EXTRACTION: scavenging is a chemical oxidation, extraction is diffusion." }
+  provenance:
+    source: "SOURCED ORDERING: tannin autoxidation and the coupled wine-oxidation cascade accelerate with temperature (textbook Arrhenius; wine oxidation activation energies ~30-70 kJ/mol, Danilewicz; Vivas & Glories 1996). Warm storage consumes the protective oak tannin faster is the well-established direction."
+    conditions: "equivalent Arrhenius activation energy of the aggregate O2xellagitannin scavenging at T_ref = 293.15 K"
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster tannin O2 scavenging) is the sourced, load-bearing claim. REACTION-scale (~50 kJ/mol), matching the oxidative siblings (E_a_so2_oxidation / E_a_browning / E_a_ethanol_oxidation / E_a_strecker) and DELIBERATELY well above the weak diffusion E_a_oak_extraction — the tannin's O2 scavenging is a chemical reaction, its wood extraction is diffusion, so the two get separate E_a's (prime directive #2)."
+
+# -- MASS-BASED CONSUMPTION YIELD: g ellagitannin spent per g O2 scavenged -----------------------
+# d(ellagitannin)/dt = -y_ellag_per_o2 * r_o2  (both g/L/h). MASS-based (g/g), NOT a molar stoichiometry:
+# ellagitannin is a LUMPED hydrolysable-tannin macromolecule with no clean molar mass, so an
+# M_ellagitannin would be fake precision (contrast _SO2_PER_O2, a real-molecule molar stoichiometry).
+# The sacrificial tannin is CONSUMED as it scavenges (its astringency softens — one directional
+# contributor, D-78 scope), but the wood RE-SUPPLIES it below the ceiling (OakExtraction), so the pool
+# reaches a dynamic balance rather than exhausting like SO2. Both slots off every ledger => this
+# consumption moves nothing conserved.
+y_ellag_per_o2:
+  value: 2.0
+  unit: "g/g"   # g ellagitannin consumed per g O2 scavenged; d(ellag)/dt = -y_ellag_per_o2 * r_o2
+  tier: speculative
+  uncertainty: { low: 0.5, high: 6.0, note: "g lumped ellagitannin spent per g O2 the tannin route scavenges. Ellagitannins (MW ~900-1900) carry several O2-reactive galloyl/gallate sites, so one macromolecule scavenges multiple O2 — a mass ratio of order ~1 g tannin per g O2 (rough: ~1000 g/mol tannin, a few O2 at 32 g/mol each). Central 2.0 is a mid-band estimate; banded an order of magnitude. Not load-bearing precisely — it sets how fast the tannin (and its astringency) is drawn down; the wood re-supply and the ceiling govern the steady level." }
+  provenance:
+    source: "author estimate from the ellagitannin O2-scavenging stoichiometry: hydrolysable tannins reduce O2 (and the H2O2/quinones of the coupled cascade) at their galloyl/gallate sites, consuming the tannin (Vivas & Glories 1996 measured ellagitannin O2 consumption in wine). A MASS ratio (g tannin per g O2), not a molar one — the lumped macromolecule has no clean molar mass (contrast the real-molecule 2:1 SO2:O2)."
+    conditions: "g lumped ellagitannin consumed per g O2 scavenged by the tannin route, generic wine at T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped tannin macromolecule — the advisor-flagged D-78 refinement over a molar stoichiometry). Both ellagitannin and o2 are off every ledger, so this consumption moves nothing conserved (the SulfiteOxidation precedent). Sets the astringency-softening RATE (one oxidative contributor; polymerization deferred), capped by the wood re-supply."

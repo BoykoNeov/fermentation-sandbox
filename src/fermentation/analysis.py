@@ -137,6 +137,39 @@ def ibu_series(traj: Trajectory) -> FloatArray:
     return np.asarray(traj.series("iso_alpha"), dtype=np.float64) * 1000.0
 
 
+def astringency_series(traj: Trajectory) -> FloatArray:
+    """Oak-tannin astringency at each stored time, as mg/L ellagitannin (decision D-78).
+
+    Astringency is a **taste** (a tactile/mouthfeel percept), *not* an aroma — so, exactly like
+    ``iso_alpha``/IBU (:func:`ibu_series`, D-64), it is deliberately **excluded from the D-67 OAV
+    odor lens** and read out here instead. And exactly like ``ibu_series``, this reads **no
+    threshold**: IBU *is* mg/L iso-alpha by definition, and here we report the oak hydrolysable
+    tannin directly as **mg/L ellagitannin** (the ``ellagitannin`` state in g/L × 1000, gallic/
+    ellagic-acid-equivalent), astringency being monotone in it. A calibrated perception-intensity
+    mapping (an "astringency index" against a taste threshold) is the deferred refinement —
+    reporting the concentration is the honest Tier-3 v1 (the aging axis is directional, not
+    magnitudes).
+
+    The trajectory **rises** as :class:`~fermentation.core.kinetics.aging.OakExtraction` diffuses
+    the tannin in toward its ``add_oak``-set ceiling, and **declines** as
+    :class:`~fermentation.core.kinetics.aging.EllagitanninOxidation` consumes the sacrificial tannin
+    to scavenge dissolved O₂ (oak protection) — so an oaked wine's astringency both builds on oak
+    contact and **softens** as the wine takes up oxygen. That oxidative-consumption softening is
+    **one directional contributor** only: the dominant real softening mechanism, tannin–anthocyanin
+    condensation/polymerisation, is a separate deferred beat, so this does not claim to reproduce
+    astringency softening. Requires a wine trajectory (the ``ellagitannin`` slot is wine-only,
+    D-78); an un-oaked wine is identically zero.
+
+    TIER (decision D-78, derived not asserted — pass ``ParameterSet.tier_map()`` to
+    ``ProcessSet.tier_of('ellagitannin', ...)`` for the reported tier): the whole oak axis is
+    speculative (extraction form sourced, magnitudes estimated), so parameter-tier propagation (D-1)
+    caps this readout at **speculative**. Like ``iso_alpha``, ``ellagitannin`` is off every
+    conservation ledger (wood-derived), so this readout adds no invariant and oaking a wine leaves
+    ``total_carbon`` byte-for-byte unchanged.
+    """
+    return np.asarray(traj.series("ellagitannin"), dtype=np.float64) * 1000.0
+
+
 # -- ensemble spread attribution (sensitivity) --------------------------------
 #
 # Which sampled parameters *drive* an ensemble's output spread, and how does that
