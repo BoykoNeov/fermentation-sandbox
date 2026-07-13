@@ -521,3 +521,58 @@ def test_speciation_tier_drops_with_binding_constant(pset, params):
     tiers = dict(pset.tier_map())
     tiers[acidbase.SO2_BINDING_PARAM] = Tier.SPECULATIVE
     assert acidbase.molecular_so2_tier(tiers) is Tier.SPECULATIVE
+
+
+# == 11. D-82: the reversible SO₂/pH masking readout (anthocyanin coloured fraction) ============
+# The pure competitive-denominator scalar behind analysis.observed_color_series — carbinol
+# (hydration) and bisulfite adduct as PARALLEL drains of the flavylium pool, one denominator.
+
+
+def test_coloured_fraction_competitive_denominator_form():
+    # coloured = 1 / (1 + K_h/h + K·[HSO₃⁻]) — verified against the explicit expression, and shown
+    # NOT to equal the product form [h/(h+K_h)]·[1/(1+K·B)] (which carries a spurious cross-term
+    # physically implying bisulfite bleaches the colourless carbinol — it cannot).
+    pk_h, k_bleach = 2.6, 2.5e4
+    k_h = 10.0 ** (-pk_h)
+    for ph, b in ((3.0, 0.0), (3.4, 3.0e-4), (3.8, 1.0e-4)):
+        h = 10.0 ** (-ph)
+        got = acidbase.anthocyanin_coloured_fraction(h, b, pk_h, k_bleach)
+        assert got == pytest.approx(1.0 / (1.0 + k_h / h + k_bleach * b))
+        product = (h / (h + k_h)) * (1.0 / (1.0 + k_bleach * b))
+        if b > 0.0:  # the forms diverge only when BOTH drains are active
+            assert got > product  # the competitive form retains more colour (no double-masking)
+
+
+def test_coloured_fraction_pure_ph_limit_matches_neutral_fraction():
+    # With no bisulfite (B=0) the bleaching term drops and the coloured fraction collapses to the
+    # monoprotic flavylium⇌carbinol share h/(h+K_h) — i.e. neutral_fraction at the hydration pK,
+    # the same textbook shape the molecular-SO₂ readout uses (a cross-check on the pH limb).
+    pk_h = 2.6
+    for ph in (3.0, 3.4, 3.8, 4.2):
+        h = 10.0 ** (-ph)
+        assert acidbase.anthocyanin_coloured_fraction(h, 0.0, pk_h, 2.5e4) == pytest.approx(
+            acidbase.neutral_fraction(h, (pk_h,))
+        )
+
+
+def test_coloured_fraction_low_ph_is_redder_and_so2_bleaches():
+    # The two sourced directions: LOWER pH ⇒ more red flavylium (acidify to brighten), and MORE free
+    # bisulfite ⇒ less apparent colour (SO₂ bleaching). Both strictly monotone; bounded (0, 1].
+    pk_h, k_bleach = 2.6, 2.5e4
+    ph_grid = [3.0, 3.2, 3.4, 3.6, 3.8, 4.0]
+    fr = [
+        acidbase.anthocyanin_coloured_fraction(10.0 ** (-p), 0.0, pk_h, k_bleach) for p in ph_grid
+    ]
+    assert all(a > b for a, b in zip(fr, fr[1:], strict=False))  # strictly falls as pH rises
+    b_grid = [0.0, 1.0e-4, 3.0e-4, 1.0e-3]
+    h = 10.0 ** (-3.4)
+    fb = [acidbase.anthocyanin_coloured_fraction(h, b, pk_h, k_bleach) for b in b_grid]
+    assert all(a > b for a, b in zip(fb, fb[1:], strict=False))  # strictly falls as bisulfite rises
+    assert fb[0] == pytest.approx(acidbase.anthocyanin_coloured_fraction(h, 0.0, pk_h, k_bleach))
+    for f in (*fr, *fb):
+        assert 0.0 < f <= 1.0
+    # At wine pH 3.4 only a minority of monomeric anthocyanin is red even with NO SO₂ (~0.14) — the
+    # flavylium-minority textbook result the pH mask encodes.
+    assert acidbase.anthocyanin_coloured_fraction(h, 0.0, pk_h, k_bleach) == pytest.approx(
+        0.14, abs=0.02
+    )

@@ -451,6 +451,47 @@ def molecular_so2_fraction(ph: float, pkas: tuple[float, ...]) -> float:
     return neutral_fraction(10.0 ** (-ph), pkas)
 
 
+def anthocyanin_coloured_fraction(
+    h: float, bisulfite_molar: float, pk_hydration: float, k_bisulfite: float
+) -> float:
+    """Coloured (red flavylium) fraction of free monomeric anthocyanin — the Somers mask (D-82).
+
+    A fast, **reversible** speciation READOUT (no state, no fate — the D-82 masking beat, the
+    committed second half of D-81's "Both"): free monomeric anthocyanin sits in equilibrium between
+    the red **flavylium** cation (AH⁺) and two *colourless* forms that both drain the SAME AH⁺ pool
+    — the **carbinol** hemiketal (pH/hydration) and the **bisulfite adduct** (SO₂ "bleaching").
+    Because carbinol and adduct are *parallel* drains **through** flavylium (not sequential), the
+    coloured share is ONE competitive denominator, NOT a product of two fractions:
+
+        ``coloured = 1 / (1 + K_h/h + K_bleach·[HSO₃⁻])``
+
+    with ``K_h = 10^(−pk_hydration)`` the flavylium⇌carbinol hydration constant and ``K_bleach``
+    [L/mol] the flavylium+bisulfite association constant. The product form
+    ``[h/(h+K_h)]·[1/(1+K_bleach·B)]`` would carry a spurious cross-term ``(K_h/h)(K_bleach·B)`` —
+    physically "bisulfite also bleaches the *colourless* carbinol", which it cannot (bisulfite adds
+    only to flavylium); the single denominator is the equilibrium-honest form (and simpler). ``h``
+    is ``10^(−pH)``; ``bisulfite_molar`` is **free** bisulfite HSO₃⁻ [mol/L] (bound SO₂ cannot
+    bleach — pass :func:`bisulfite_so2_at_ph` ÷ ``M_SO2``, the same reactive nucleophile the D-72
+    oxidation scavenges with).
+
+    Returns a value in ``(0, 1]``: rises toward 1 as ``h`` rises (**LOW pH ⇒ redder** — acidity
+    favours flavylium) and as bisulfite falls (**less SO₂ ⇒ less bleaching**). At wine pH 3.4 with
+    no SO₂ it is only ~0.14 — a minority of monomeric anthocyanin is red at wine pH (the textbook
+    result); a typical free-SO₂ charge roughly halves it again. **Reversible + emergent:** as SO₂ is
+    bound by acetaldehyde/keto-acids (D-28/D-51) or oxidatively consumed (D-72), free bisulfite
+    falls and the mask *lifts* — the "unmask the colour-stability payoff" story, nothing scripted.
+    NB the SO₂-sign here is the **opposite** of D-81's ``AnthocyaninFading`` ("SO₂ *protects*
+    colour"): this is the reversible *masking* of a different (monomeric) form, not the irreversible
+    fade — both real, no contradiction (D-82).
+
+    v1 simplification: the weakly-coloured **quinoidal base** (AH⁺ ⇌ A above the flavylium pKa) is
+    ignored — red = flavylium only — so this slightly *under*-counts coloured forms above ~pH 4 (out
+    of the wine band). Pure floats, no state, so trivially unit-testable in isolation.
+    """
+    k_h = 10.0 ** (-pk_hydration)
+    return float(1.0 / (1.0 + k_h / h + k_bisulfite * bisulfite_molar))
+
+
 def _so2_total(y: FloatArray, schema: StateSchema) -> float:
     """The total-SO₂ pool (g/L), or 0 if the schema has no :data:`SO2_STATE_KEY` slot."""
     if SO2_STATE_KEY not in schema:

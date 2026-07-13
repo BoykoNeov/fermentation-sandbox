@@ -6579,3 +6579,72 @@ committed second half of the user's "Both (C)" choice, still owed** (a fast χ(S
 anthocyanin, polymeric pigment counted bleach-resistant; the Somers assay; a *readout*, no new slot). Also still deferred:
 the O₂-independent thermal/hydrolytic fade, tannin self-polymerization / tannin-ethyl-tannin (the other softeners), beat
 1b (descriptor projection), the non-oxidative Maillard Strecker route, barrel fill-number, barrel-beer oak.
+
+## D-82 — `observed_color_series` built: the reversible SO₂/pH **masking** readout — beat A, so the colour axis's "Both" request is now COMPLETE (§4.1)
+
+**Date:** 2026-07-13. **Milestone 3 / Tier-3.** The **committed second half** of D-81's "Both (C)" fork: the reversible
+SO₂/pH **masking** readout (beat A), delivered alongside D-81's irreversible oxidative **fade** (beat B). With this the
+grape-colour axis's original two-beat request is **complete**. A pure **READOUT** — no state slot, no `d/dt`, nothing
+consumed — the literal **Somers "bleaching" assay**: free monomeric anthocyanin is masked by a fast, reversible
+equilibrium while the polymeric pigment is counted **unmasked** (SO₂/pH-resistant). **906 tests** (+7: 3 unit for the pure
+scalar, 4 scenario for the series), `ruff`/`mypy`/`pytest` green. **Two `advisor()` passes** (pre-work design + done-call),
+both taken in full.
+
+**THE READOUT.** `analysis.observed_color_series(traj, params)`:
+
+    observed = χ(SO₂, pH) · anthocyanin·1000 + polymeric_pigment·1000        (mg/L)
+
+with χ the coloured (red flavylium) fraction from the new pure scalar
+`acidbase.anthocyanin_coloured_fraction(h, bisulfite_molar, pk_hydration, k_bisulfite)`. This is **distinct** from
+`color_series` (D-79/81), which reports intrinsic pigment **content** (potential colour — what the wine *holds*);
+`observed_color_series` reports what the wine actually **expresses** at its current pH and free SO₂. Both valid, different
+questions; `observed ≤ color_series` always (χ ≤ 1; the pigment term is identical in both).
+
+**THE ADVISOR'S LOAD-BEARING PHYSICS CATCH — the COMPETITIVE single denominator, not a product.** My first formula was
+`χ = [h/(h+K_h)] · [1/(1+K·B)]` (pH mask × SO₂ mask, multiplied). The advisor caught that flavylium, carbinol, and the
+bisulfite adduct are all in fast equilibrium **through** flavylium — carbinol (hydration) and adduct (bleaching) are
+**parallel drains from the same [AH⁺] pool**, so the coloured share is ONE competitive denominator:
+
+    coloured = 1 / (1 + K_h/h + K·[HSO₃⁻])          K_h = 10^(−pk_hydration)
+
+The product form expands to `1/((1+K_h/h)(1+K·B))`, carrying a **spurious cross-term** `(K_h/h)(K·B)` — physically
+"bisulfite also bleaches the *colourless* carbinol", which it cannot (bisulfite adds only to flavylium). Not academic: at
+pH 3.4, `K_h/h ≈ 6.3` and ~20 mg/L free SO₂ gives `K·B ≈ 7.5`, so competitive → ~0.068 coloured vs multiplicative →
+~0.016, a **~4× gap**. The single denominator is the equilibrium-honest form *and* simpler (one expression). Verified: at
+wine pH 3.4 with no SO₂ the fraction is ~0.14 (a minority of monomeric anthocyanin is red — the textbook flavylium
+minority), matching the `neutral_fraction`-at-pk_h pH-only limit (a cross-check assertion).
+
+**FREE bisulfite, never total — reversibility is EMERGENT.** χ reads FREE bisulfite via `acidbase.bisulfite_so2_at_ph`
+(÷ `M_SO2` → mol/L) — the reactive HSO₃⁻ *after* acetaldehyde/keto-acid binding (D-28/D-51), because **bound SO₂ cannot
+bleach** (the same nucleophile D-72 scavenges O₂ with). So the mask **lifts emergently** as SO₂ is bound (D-28/D-51) or
+oxidatively consumed (D-72) — the "unmask the colour-stability payoff" story, nothing scripted. pH is solved per column
+from the acids (`ph_of_state`), so both maskings track the mildly-drifting charge balance for free.
+
+**OPPOSITE SO₂-SIGN TO D-81 — intentional, guarded by cross-ref comments.** Here MORE SO₂ ⇒ **less** observed colour
+(reversible bleaching of the monomeric form); in `color_series` under `AnthocyaninFading` (D-81) more SO₂ ⇒ **more**
+retained colour (SO₂ scavenges the O₂ that would irreversibly fade it). Different series, different mechanism (reversible
+masking of a monomeric form vs an irreversible oxidative fate) — both real, **no contradiction**. Docstrings and a param
+note explicitly flag the opposite sign so nobody later "reconciles" them. Pinned end-to-end
+(`test_so2_masks_observed_colour_opposite_sign_to_fade`): two anaerobic reds identical but for an SO₂ dose have
+**identical** `color_series` (content held fixed, no O₂ ⇒ no fade, SulfiteOxidation inert) yet the sulfited one shows
+**lower** `observed_color_series`.
+
+**THE OPPOSITE-TREND FEATURE — why A was worth building alongside B.** As monomeric anthocyanin condenses to
+bleach-/pH-resistant polymeric pigment (counted FULL), `observed_color_series` **rises** over the aging tail even while
+`color_series` (content) is flat/declining — the Somers "ageing shifts colour onto the SO₂-resistant pigment" evolution.
+The two series trend **oppositely** here; pinned by `test_condensation_unmasks_observed_colour_while_content_flat`.
+
+**Params (both new, `polymerization.yaml`, full provenance).** `pKa_flavylium_hydration` (2.6, **plausible** — the
+sourced flavylium⇌carbinol hydration pK of malvidin-3-glucoside, applied as an apparent constant to the lumped pool, the
+`pKa_sulfurous` precedent) and `K_anthocyanin_bisulfite` (2.5e4 L/mol, **speculative** — the flavylium+bisulfite
+association constant spans 10⁴–10⁵ across anthocyanins; only the FORM and directions are sourced). The readout tier is
+**speculative** (the lumped `K` dominates the combine); no explicit tier function (follows the `color_series` sibling,
+per advisor). The pure scalar takes raw floats (not the params dict) — trivially unit-testable and it sidesteps the
+"colour params living in acidbase" module-boundary smell.
+
+**Scope (v1) + next.** Ignores the weakly-coloured **quinoidal base** (red = flavylium only, so χ slightly under-counts
+above ~pH 4, out of the wine band); the readout does **not** deplete the SO₂ pool by anthocyanin binding (a minor sink at
+~0.3 g/L). Wine-only (a white / no-red wine reads identically zero). **The colour axis's "Both (C)" request is now
+COMPLETE** (B = D-81 fade + A = D-82 mask). Still deferred: the O₂-independent thermal/hydrolytic fade, tannin
+self-polymerization / tannin-ethyl-tannin (the other softeners), beat 1b (descriptor projection), the non-oxidative
+Maillard Strecker route, barrel fill-number depletion, barrel-beer oak.

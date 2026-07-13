@@ -346,3 +346,61 @@ y_anthocyanin_per_o2:
     source: "author estimate: g free monomeric anthocyanin faded to colourless per g O2 consumed by this oxidative route, expressed as a MASS ratio because the lumped anthocyanin pool has no clean molar mass and the O2->anthocyanin cascade is multi-step (the y_ellag_per_o2 idiom). Anchored so a micro-ox O2 exposure fades a meaningful-but-partial fraction of a typical anthocyanin dose (Somers & Evans 1986; Ribéreau-Gayon Handbook of Enology)."
     conditions: "g anthocyanin faded per g O2 consumed by the fade route, generic red wine at T_ref = 293.15 K."
     notes: "SPECULATIVE magnitude, MASS-based (no fake molar mass for the lumped anthocyanin pool). Drives a pure OFF-LEDGER transfer anthocyanin -> faded_anthocyanin (both off every ledger), so it moves nothing conserved and the D-81 colour identity closes for any value — this only sets the colour-decline MAGNITUDE, not whether it balances."
+
+# ================================================================================================
+# D-82 -- REVERSIBLE SO2/pH MASKING of monomeric anthocyanin: the Somers "bleaching" READOUT.
+# ================================================================================================
+# The committed SECOND HALF of D-81's "Both" fork (beat A: the reversible masking readout, alongside
+# beat B, the D-81 irreversible oxidative fade). A fast-equilibrium READOUT, NOT a fate: no state
+# slot, no d/dt, nothing consumed. Free monomeric anthocyanin sits in equilibrium between the red
+# FLAVYLIUM cation (AH+) and two COLOURLESS forms that both drain the same AH+ pool -- the CARBINOL
+# hemiketal (pH/hydration) and the BISULFITE ADDUCT (SO2 "bleaching"). analysis.observed_color_series
+# reports the coloured fraction chi(SO2,pH) of monomeric anthocyanin PLUS the (bleach-/pH-resistant)
+# polymeric_pigment counted full -- the Somers SO2-resistant-colour assay, distinct from
+# analysis.color_series (which is intrinsic pigment CONTENT / potential colour, D-79/81).
+#
+#   chi = 1 / (1 + K_h/h + K_anthocyanin_bisulfite*[HSO3-])      # h = 10^(-pH), K_h = 10^(-pKa_flavylium_hydration)
+#   observed = chi * anthocyanin*1000 + polymeric_pigment*1000   # mg/L; pigment is SO2/pH-stable
+#
+# COMPETITIVE single denominator (NOT a product of two fractions): carbinol and bisulfite adduct are
+# PARALLEL drains THROUGH flavylium, so a product form would carry a spurious cross-term implying
+# bisulfite bleaches the colourless carbinol (it cannot -- bisulfite adds only to flavylium). Reads
+# FREE bisulfite (acidbase.bisulfite_so2_at_ph, AFTER acetaldehyde/keto-acid binding), never total
+# SO2 -- bound SO2 cannot bleach -- so REVERSIBILITY is emergent: as SO2 is bound (D-28/D-51) or
+# oxidatively consumed (D-72), free bisulfite falls and the mask LIFTS (observed colour rises),
+# nothing scripted. The SO2-sign is the OPPOSITE of D-81 ("SO2 protects color_series"): different
+# series, different form (reversible masking of monomeric vs irreversible fade) -- both real, no
+# contradiction. SHARED but WINE-ONLY in effect (only wine carries anthocyanin/polymeric_pigment).
+
+# -- FLAVYLIUM<=>CARBINOL HYDRATION: the pH masking (LOW pH => redder) ----------------------------
+# Apparent pK of the flavylium/carbinol hydration equilibrium AH+ + H2O <=> B(carbinol) + H+: the
+# coloured (flavylium) share is h/(h+K_h) in the pH-only limit (~0.14 at pH 3.4 -- only a minority of
+# monomeric anthocyanin is red at wine pH, the textbook result). ~2.6 for malvidin-3-glucoside (the
+# dominant red-wine anthocyanin). Applied as an APPARENT constant to the LUMPED anthocyanin pool (the
+# pKa_sulfurous precedent) -- SOURCED value + wine-extrapolation caveat => plausible.
+pKa_flavylium_hydration:
+  value: 2.6
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 2.3, high: 2.9, note: "apparent hydration pK (pK_h) of the flavylium<=>carbinol equilibrium; literature ~2.4-2.8 for malvidin-3-glucoside and related red-wine anthocyanins. Sets the pH-only coloured fraction h/(h+10^(-pK_h)): ~0.14 at pH 3.4, ~0.24 at pH 3.0, ~0.06 at pH 4.0 -- the LOW-pH-is-redder direction is the load-bearing sourced claim; the magnitude applied to the lumped pool is the extrapolation." }
+  provenance:
+    source: "Brouillard & Delaporte (1977) and Brouillard & Dubois (1977) on the flavylium/carbinol/chalcone equilibria of malvidin-3-glucoside; Somers (1971) and Somers & Evans on red-wine colour vs pH; Ribereau-Gayon et al., Handbook of Enology Vol. 2 (anthocyanin equilibria)."
+    conditions: "apparent hydration pK applied to the lumped monomeric-anthocyanin pool at cellar pH (~3.0-4.0); an apparent constant (the pKa_sulfurous / D-22 idiom), so it affects the coloured-fraction SLOPE and magnitude, with only the LOW-pH-is-redder DIRECTION claimed fidelity-grade."
+    notes: "The SOURCED, load-bearing claim is the SIGN/direction (lower pH => more red flavylium => deeper apparent colour -- the 'acidify to brighten red' fact) and the ~0.1-0.2 coloured fraction at wine pH; the exact pK on the lumped pool is the extrapolation. Only the FLAVYLIUM form is counted red (v1): the weakly-coloured quinoidal base above the flavylium pKa is ignored, so this under-counts colour above ~pH 4 (out of the wine band)."
+
+# -- FLAVYLIUM+BISULFITE BLEACHING: the SO2 masking (more SO2 => less apparent colour) ------------
+# Association constant of the flavylium+bisulfite -> colourless adduct: the unbleached share is
+# 1/(1 + K*[HSO3-]) in the SO2-only limit. Literature spans ~1e4-1e5 L/mol across anthocyanins; the
+# lumped-pool magnitude is speculative (only the FORM and the more-SO2-is-less-colour direction are
+# sourced). Central ~2.5e4 L/mol so a ~20 mg/L free-SO2 charge (~3e-4 mol/L HSO3-) roughly halves
+# the coloured monomeric fraction again on top of the pH masking -- the Somers "SO2 bleaches the
+# free anthocyanin, not the polymeric pigment" observation.
+K_anthocyanin_bisulfite:
+  value: 2.5e4
+  unit: "L/mol"
+  tier: speculative
+  uncertainty: { low: 5.0e3, high: 1.0e5, note: "flavylium+HSO3- association constant; literature ~1e4-1e5 L/mol across anthocyanins (Brouillard & El Hage Chahine; Timberlake & Bridle). Sets the SO2-only unbleached fraction 1/(1+K*[HSO3-]): at ~3e-4 mol/L free bisulfite (~20 mg/L free SO2) K*B ~ 7.5, so ~0.12 unbleached. The SOURCED claim is the FORM (Langmuir bleaching, more SO2 => less apparent colour, monomeric only); the lumped-pool magnitude is speculative, banded ~an order of magnitude." }
+  provenance:
+    source: "author estimate anchored to the flavylium-bisulfite equilibrium literature (Brouillard & El Hage Chahine 1980; Timberlake & Bridle 1967; Somers & Evans on SO2 bleaching of wine colour). Folds the flavylium+HSO3- <=> colourless sulphonic-acid adduct into one lumped association constant on the free monomeric anthocyanin pool."
+    conditions: "generic red wine at cellar pH; the reactive nucleophile is FREE bisulfite HSO3- (acidbase.bisulfite_so2_at_ph, after carbonyl binding), so bound SO2 does not bleach and reversibility is emergent (D-28/D-51/D-72)."
+    notes: "SOURCED FORM (reversible Langmuir bleaching of MONOMERIC anthocyanin by free bisulfite; polymeric pigment is SO2-RESISTANT and counted full) + SPECULATIVE lumped magnitude (order-of-magnitude, banded). This SO2-sign is the OPPOSITE of the D-81 fade (where SO2 PROTECTS color_series) -- a different series and a different (reversible) form, both real."

@@ -120,6 +120,19 @@
 > condensation. Three-slot identity anthocyanin + polymeric_pigment + faded_anthocyanin ≡ anthocyanin₀ (by construction).
 > SUPERSEDES D-80's O₂-invariance framing. 1 pre-work fork-resolution + 1 done-call advisor pass. Next: D-82 (masking
 > readout, owed), O₂-independent thermal fade, tannin self-polymerization, beat 1b, Maillard Strecker, barrel fill-number.**
+>
+> **PROGRESS (D-82, 2026-07-13): the masking readout — `observed_color_series` built, DELIVERING D-81's COMMITTED beat A
+> (906 tests). A pure READOUT (no state slot, no fate): the Somers reversible SO₂/pH bleaching. Free monomeric anthocyanin
+> is masked by a coloured fraction `χ = 1/(1 + K_h/h + K·[HSO₃⁻])` (`acidbase.anthocyanin_coloured_fraction`), polymeric
+> pigment counted FULL (SO₂/pH-resistant); `observed = χ·anthocyanin·1000 + pigment·1000`. Advisor's load-bearing catch:
+> the COMPETITIVE single denominator, NOT a product of two fractions — carbinol + bisulfite adduct are parallel drains of
+> the flavylium pool, so a product form carries a spurious cross-term (bisulfite bleaching the colourless carbinol, ~4×
+> error at pH 3.4/20 mg/L). Reads FREE bisulfite (`bisulfite_so2_at_ph`, after carbonyl binding), so reversibility is
+> emergent (SO₂ bound/oxidised → mask lifts). OPPOSITE SO₂-sign to D-81 (here SO₂ MASKS; D-81 SO₂ PROTECTS) — different
+> series, both real, comment cross-refs guard it. Two params (`pKa_flavylium_hydration` plausible, `K_anthocyanin_bisulfite`
+> speculative). 1 pre-work + 1 done-call advisor pass. THE COLOUR AXIS'S "Both (C)" REQUEST IS NOW COMPLETE (B=D-81 fade +
+> A=D-82 mask). Next: O₂-independent thermal fade, tannin self-polymerization / tannin-ethyl-tannin, beat 1b, Maillard
+> Strecker, barrel fill-number, barrel-beer oak.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

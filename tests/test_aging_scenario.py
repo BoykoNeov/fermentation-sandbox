@@ -27,7 +27,12 @@ verb-params) at the vocabulary boundary.
 import numpy as np
 import pytest
 
-from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
+from fermentation.analysis import (
+    astringency_series,
+    color_series,
+    observed_color_series,
+    polymeric_pigment_series,
+)
 from fermentation.core.kinetics.aging import (
     AcetaldehydeBridgedCondensation,
     EllagitanninOxidation,
@@ -1212,6 +1217,84 @@ def test_micro_oxygenation_now_fades_colour_end_to_end():
     faded_ox = float(np.asarray(ox.series("faded_anthocyanin"), dtype=float)[-1])
     assert faded_ox > 0.0
     assert col_ox[-1] == pytest.approx((0.3 - faded_ox) * 1000.0, rel=1e-3)
+
+
+# == D-82: the reversible SO₂/pH masking readout (observed_color_series), end to end ============
+# The committed second half of D-81's "Both" fork: observed_color_series masks the free monomeric
+# anthocyanin by χ(SO₂, pH) while counting the SO₂/pH-resistant polymeric pigment full — the Somers
+# assay, distinct from color_series (intrinsic pigment CONTENT). A pure readout: no state slot.
+
+
+def test_observed_colour_white_wine_is_zero():
+    # Wine-only, doubly gated: a white wine (no anthocyanin/tannin dose) reads identically zero —
+    # no monomeric to mask, no pigment to count (the color_series/astringency isolability contract).
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    white = cs.run()
+    assert white.success
+    assert np.all(observed_color_series(white.as_trajectory(), cs.param_values) == 0.0)
+
+
+def test_observed_colour_is_masked_below_content_colour():
+    # observed ≤ color_series ALWAYS (χ ≤ 1; the pigment term is identical in both). And it is
+    # strictly BELOW at wine pH even with no SO₂, because only a minority of monomeric anthocyanin
+    # is red (the flavylium fraction ~0.14 at pH 3.4) — the pH mask alone.
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)], anthocyanin_gpl=0.3, tannin_gpl=2.0, aging_celsius=25.0
+        )
+    )
+    red = cs.run()
+    assert red.success
+    traj = red.as_trajectory()
+    obs = observed_color_series(traj, cs.param_values)
+    col = color_series(traj)
+    assert np.all(obs <= col + 1e-9)  # masked ≤ content, at every column
+    assert obs[0] < col[0]  # strictly masked while colour is still monomeric (pH mask, no SO₂)
+
+
+def test_so2_masks_observed_colour_opposite_sign_to_fade():
+    # THE D-82 HEADLINE and the OPPOSITE-SIGN point vs D-81. Two reds identical but for an SO₂ dose,
+    # aged ANAEROBICALLY (no O₂ ⇒ no fade ⇒ SO₂ is inert to color_series; SulfiteOxidation needs
+    # O₂): color_series is IDENTICAL between them (content held fixed), yet observed_color_series is
+    # LOWER for the sulfited wine — SO₂ reversibly BLEACHES the monomeric colour. This is the
+    # opposite sign to D-81 (where SO₂ PROTECTS color_series by scavenging fade-driving O₂): a
+    # different series and a different (reversible) mechanism, both real — do not "reconcile" them.
+    red_args = {"anthocyanin_gpl": 0.3, "tannin_gpl": 2.0}
+    plain_cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], **red_args))
+    so2_cs = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_so2(_FERMENT_DAYS, 150.0)], **red_args)
+    )
+    plain, sulfited = plain_cs.run(), so2_cs.run()
+    assert plain.success and sulfited.success
+    plain_traj, sulf_traj = plain.as_trajectory(), sulfited.as_trajectory()
+    # Content colour is identical (no O₂ ⇒ no fade; SO₂ does not touch anthocyanin/pigment content).
+    assert np.allclose(color_series(plain_traj), color_series(sulf_traj))
+    # …yet the sulfited wine shows LESS observed colour throughout — the bleaching mask.
+    obs_plain = observed_color_series(plain_traj, plain_cs.param_values)
+    obs_sulf = observed_color_series(sulf_traj, so2_cs.param_values)
+    assert obs_sulf[-1] < obs_plain[-1]
+    assert np.all(obs_sulf <= obs_plain + 1e-9)
+
+
+def test_condensation_unmasks_observed_colour_while_content_flat():
+    # The Somers "ageing shifts colour onto the SO₂/pH-resistant pigment" evolution: as monomeric
+    # anthocyanin condenses to bleach-/pH-resistant polymeric pigment (counted FULL), observed
+    # colour RISES over the aging tail — even though color_series (content) is FLAT (no fade;
+    # condensation conserves content). observed_color_series and color_series thus trend OPPOSITELY
+    # here: the reason beat A was worth building alongside beat B (D-81).
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)], anthocyanin_gpl=0.3, tannin_gpl=2.0, aging_celsius=25.0
+        )
+    )
+    red = cs.run()
+    assert red.success
+    traj = red.as_trajectory()
+    col = color_series(traj)
+    obs = observed_color_series(traj, cs.param_values)
+    assert np.allclose(col, 0.3 * 1000.0)  # content FLAT (anaerobic; condensation conserves it)
+    assert polymeric_pigment_series(traj)[-1] > 0.0  # pigment genuinely formed
+    assert obs[-1] > obs[0]  # observed RISES: masked monomeric → unmasked resistant pigment
 
 
 def test_bridged_run_closes_carbon_end_to_end():

@@ -36,6 +36,7 @@ import numpy as np
 from scipy.stats import rankdata
 
 from fermentation.core import acidbase
+from fermentation.core.chemistry import M_SO2
 from fermentation.core.state import FloatArray
 from fermentation.core.tiers import Tier
 from fermentation.runtime.ensemble import Ensemble
@@ -248,6 +249,74 @@ def color_series(traj: Trajectory) -> FloatArray:
     """
     anthocyanin = np.asarray(traj.series("anthocyanin"), dtype=np.float64)
     return anthocyanin * 1000.0 + polymeric_pigment_series(traj)
+
+
+#: The two colour-equilibrium parameter names :func:`observed_color_series` reads (decision D-82) —
+#: the flavylium⇌carbinol hydration pK and the flavylium+bisulfite bleaching constant.
+_FLAVYLIUM_PK_PARAM = "pKa_flavylium_hydration"
+_BISULFITE_BLEACH_PARAM = "K_anthocyanin_bisulfite"
+
+
+def observed_color_series(traj: Trajectory, params: Mapping[str, float]) -> FloatArray:
+    """Observed (SO₂/pH-masked) red colour at each stored time, mg/L — the Somers assay (D-82).
+
+    The committed **second half** of D-81's "Both" fork (beat A, the reversible SO₂/pH **masking**
+    readout, alongside the D-81 irreversible fade, beat B). Where :func:`color_series` reports the
+    intrinsic pigment **content** (potential colour — what the wine *holds*), this reports what the
+    wine actually **expresses** at its current pH and free SO₂: a fast, reversible equilibrium
+    masks the free monomeric anthocyanin, while the polymeric pigment is counted **unmasked**
+    (SO₂/pH-stable — the Somers "SO₂-resistant pigment"):
+
+        ``observed = χ(SO₂, pH) · anthocyanin·1000 + polymeric_pigment·1000``    (mg/L)
+
+    with χ the coloured (red flavylium) fraction from
+    :func:`fermentation.core.acidbase.anthocyanin_coloured_fraction` — the competitive
+    ``1/(1 + K_h/h + K·[HSO₃⁻])`` (carbinol hydration **and** bisulfite bleaching as parallel drains
+    of the same flavylium pool, one denominator, no spurious cross-term). Free bisulfite is
+    :func:`fermentation.core.acidbase.bisulfite_so2_at_ph` (÷ ``M_SO2`` → mol/L) — **free**, *after*
+    acetaldehyde/keto-acid binding (D-28/D-51), because bound SO₂ cannot bleach; pH is solved per
+    column from the acids (:func:`fermentation.core.acidbase.ph_of_state`), so both maskings track
+    the (mildly drifting) charge balance with nothing scripted.
+
+    **Emergent + reversible — the reason A was built alongside B.** (1) As SO₂ is bound (D-28/D-51)
+    or oxidatively consumed (D-72), free bisulfite falls and the mask **lifts** — observed colour
+    *rises* with no scripting (the "unmask the stability payoff" story). (2) As monomeric
+    anthocyanin condenses to bleach-resistant polymeric pigment (D-79/D-80), observed colour
+    **rises** even while :func:`color_series` is flat or declining — the Somers "ageing shifts to
+    the SO₂-resistant pigment" evolution. So the two series answer complementary, sometimes
+    opposite-trending, questions.
+
+    **Opposite SO₂-sign to D-81 — intentional, not a bug.** Here MORE SO₂ ⇒ *less* observed colour
+    (reversible bleaching of the monomeric form); in :func:`color_series` under
+    :class:`~fermentation.core.kinetics.aging.AnthocyaninFading` more SO₂ ⇒ *more* retained colour
+    (SO₂ scavenges the O₂ that would irreversibly fade it, D-72/D-81). Different series, different
+    mechanism (reversible masking of a monomeric form vs an irreversible oxidative fate) — both
+    real, no contradiction. Do not "reconcile" them.
+
+    Always ``observed ≤`` :func:`color_series` (χ ≤ 1, and the pigment term is identical in both).
+    Requires a wine trajectory carrying ``anthocyanin`` + ``polymeric_pigment`` (wine-only,
+    D-79/D-81); a white / no-red wine reads identically zero. With no SO₂ dosed the bleaching term
+    vanishes and only the **pH** mask remains (a red still shows only ~14 % of its monomeric colour
+    at pH 3.4 — the flavylium minority). TIER **speculative** (the ``K_anthocyanin_bisulfite``
+    lumped magnitude dominates the combine; the whole colour axis is speculative — parameter-tier
+    propagation, D-1); off every ledger, so this readout adds no conservation invariant. v1 caveats:
+    the weakly-coloured quinoidal base is ignored (red = flavylium only), and the readout does not
+    deplete the SO₂ pool by anthocyanin binding (a minor sink at ~0.3 g/L anthocyanin).
+    """
+    schema = traj.schema
+    anthocyanin = np.asarray(traj.series("anthocyanin"), dtype=np.float64)
+    pigment = np.asarray(traj.series("polymeric_pigment"), dtype=np.float64)
+    pk_h = params[_FLAVYLIUM_PK_PARAM]
+    k_bleach = params[_BISULFITE_BLEACH_PARAM]
+    chi = np.empty(traj.y.shape[1], dtype=np.float64)
+    for i in range(traj.y.shape[1]):
+        col = traj.y[:, i]
+        ph = acidbase.ph_of_state(col, schema, params)
+        bisulfite_molar = acidbase.bisulfite_so2_at_ph(col, schema, params, ph) / M_SO2
+        chi[i] = acidbase.anthocyanin_coloured_fraction(
+            10.0 ** (-ph), bisulfite_molar, pk_h, k_bleach
+        )
+    return chi * anthocyanin * 1000.0 + pigment * 1000.0
 
 
 # -- ensemble spread attribution (sensitivity) --------------------------------

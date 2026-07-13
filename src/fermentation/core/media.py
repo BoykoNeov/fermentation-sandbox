@@ -593,8 +593,9 @@ def wine_schema() -> StateSchema:
             "evolution) AND oxidatively faded to colourless faded_anthocyanin (AnthocyaninFading "
             "D-81 — the irreversible bleaching loss). Off every ledger (grape-derived, the "
             "iso_alpha/ellagitannin precedent). Read as COLOUR by analysis.color_series (free "
-            "anthocyanin + polymeric_pigment; faded is colourless), NOT the OAV odor lens (colour "
-            "is not an aroma)",
+            "anthocyanin + polymeric_pigment; faded is colourless) and, SO₂/pH-masked, by "
+            "analysis.observed_color_series (the reversible Somers bleaching readout, D-82), NOT "
+            "the OAV odor lens (colour is not an aroma)",
         ),
         VarSpec(
             "tannin",
@@ -661,8 +662,9 @@ def wine_schema() -> StateSchema:
             "reconstruction no longer isolates the pigment (the A420 discriminator, D-74). Off "
             "every ledger (grape-derived colour-equivalent, the anthocyanin/tannin precedent); "
             "starts 0, no must input. Read as COLOUR by analysis.color_series / "
-            "polymeric_pigment_series (the bleach-RESISTANT fraction — the colour-stability "
-            "payoff), NOT the OAV odor lens (colour is not an aroma)",
+            "polymeric_pigment_series and counted FULL (SO₂/pH-resistant) by "
+            "analysis.observed_color_series (the bleach-RESISTANT fraction — the colour-stability "
+            "payoff, D-82), NOT the OAV odor lens (colour is not an aroma)",
         ),
         VarSpec(
             "faded_anthocyanin",
