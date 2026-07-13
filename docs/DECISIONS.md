@@ -6219,8 +6219,9 @@ ellagitannins are the oak extractive that couples the two axes D-77 kept separat
 both **extracted** by the D-77 diffusion axis (a fifth extractive) **and** a potent **O₂ scavenger** — a sacrificial
 antioxidant that intercepts dissolved O₂, so an oaked + oxygenated wine browns **less** and makes **less** oxidative
 acetaldehyde than an un-oaked wine at the same O₂ dose (**oak protection** — the spine). Plus it carries
-**astringency**, a *taste*. **One `advisor()` pass** (strong endorse of all four forks + refinements). 850 tests
-(+12), `ruff`/`mypy`/`pytest` green.
+**astringency**, a *taste*. **Two `advisor()` passes** (a design pass that strong-endorsed all four forks +
+refinements, then a done-call pass that caught a missing end-to-end scenario test — added as a follow-up). 854 tests
+(+16), `ruff`/`mypy`/`pytest` green.
 
 **The spine is PROTECTION, not astringency (the advisor's reprioritization).** The beat is named "astringency," but
 the load-bearing, novel physics — and the exact reason D-77 deferred it — is ellagitannin **as an O₂ scavenger that
@@ -6300,7 +6301,9 @@ reaction-scale `E_a_ellagitannin_oxidation` + mass-based `y_ellag_per_o2` + 3 to
 molar mass — the mass-based-yield payoff). **No OAV / sensory.yaml change** (astringency is a taste, not aroma).
 Three enumeration tests updated (schema size 51→53, `WINE_OAK_SLOTS`, `WINE_OAK_PROCESSES`); every default / un-aged
 / un-oaked / reductive-aging trajectory byte-for-byte unchanged. +12 Process tests (incl. the protection spine, the
-sacrificial-softening, and the off-every-ledger conservation triple). **Next:** the deferred beat 1b (descriptor
+sacrificial-softening, and the off-every-ledger conservation triple) **+ 4 scenario tests** (the advisor's done-call
+gap: `add_oak` sets the ellagitannin ceiling, `begin_aging` enables `EllagitanninOxidation` wine-only, the toast
+decline, and the protection spine driven through the compiled `run()` path — the user-facing surface). **Next:** the deferred beat 1b (descriptor
 projection), the non-oxidative Maillard Strecker route, the deferred **tannin–anthocyanin polymerization** beat (the
 dominant astringency-softening + red-colour mechanism, now unblocked by the `ellagitannin` pool), barrel-age /
 fill-number depletion (a ceiling multiplier < 1), or barrel-beer oak.

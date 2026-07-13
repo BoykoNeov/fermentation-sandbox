@@ -27,7 +27,9 @@ verb-params) at the vocabulary boundary.
 import numpy as np
 import pytest
 
+from fermentation.analysis import astringency_series
 from fermentation.core.kinetics.aging import (
+    EllagitanninOxidation,
     EsterHydrolysis,
     OakExtraction,
     OxidativeAcetaldehyde,
@@ -856,6 +858,110 @@ def test_oaked_run_closes_every_ledger_end_to_end():
     assert_conserved(traj.as_trajectory(), c_of, label="carbon")
     assert_conserved(traj.as_trajectory(), n_of, label="nitrogen")
     assert_nonnegative(traj.as_trajectory(), _OAK_EXTRACTIVES, atol=1e-15)
+
+
+# -- EllagitanninOxidation (decision D-78) — oak PROTECTS the wine, end to end ------------------
+# The user-facing path the unit tests in test_aging.py never drive: add_oak → compile →
+# begin_aging + add_oxygen → run(). These pin the verb/compile wiring (add_oak sets the ellagitannin
+# ceiling; begin_aging enables EllagitanninOxidation, wine-only) and — the SPINE — the
+# oak-protection
+# emergent through the compiled run(): an oaked+oxygenated wine browns less and makes less oxidative
+# acetaldehyde than an un-oaked wine at the same O₂ dose.
+
+
+def test_ellagitannin_oxidation_gated_by_begin_aging_wine_only():
+    # EllagitanninOxidation rides the same aging tuple: wired into the WINE medium, DISABLED at
+    # compile, enabled by the SAME begin_aging reconfigure as the rest of the aging axis. Beer has
+    # no
+    # ellagitannin slot, so it is simply absent from the beer set (the OakExtraction/Strecker
+    # pattern).
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    assert EllagitanninOxidation.name in cs.process_set
+    assert not cs.process_set.is_enabled(
+        EllagitanninOxidation.name
+    )  # off at compile (post-ferment)
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(EllagitanninOxidation.name)  # begin_aging turns it on too
+    # Wine-only: absent from the beer set entirely.
+    assert (
+        EllagitanninOxidation.name not in compile_scenario(_beer([_begin_aging(14.0)])).process_set
+    )
+
+
+def test_add_oak_sets_the_ellagitannin_ceiling_and_rate_params_ride_along():
+    # D-78: the SAME add_oak dose that sets the four aroma ceilings now ALSO sets the ellagitannin
+    # ceiling to oak_gpl × oak_yield_ellagitannin_<toast>, and the scavenging rate/E_a/yield params
+    # ride in every compiled scenario (oak.yaml is in shared_files) — inert until oak is dosed.
+    cs = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium")])
+    )
+    for name in ("k_ellagitannin_oxidation", "E_a_ellagitannin_oxidation", "y_ellag_per_o2"):
+        assert name in cs.parameters
+    event = next(e for e in cs.events if e.label.startswith("add_oak"))
+    assert event.mutate is not None
+    after = event.mutate(cs.schema, cs.y0.copy())
+    expected = 4.0 * cs.param_values["oak_yield_ellagitannin_medium"]
+    assert cs.schema.get(after, "ellagitannin_ceiling") == pytest.approx(expected)
+    assert (
+        cs.schema.get(after, "ellagitannin") == 0.0
+    )  # the tannin itself starts empty (extracts in)
+
+
+def test_ellagitannin_declines_with_toast():
+    # The D-78 toast ORDERING: ellagitannin is THERMOLABILE — degraded by toasting — so it DECLINES
+    # light > medium > heavy (heavy-toast barrels are rounder/less astringent), the same direction
+    # as
+    # whiskey lactone and opposite the guaiacol/eugenol pyrolysis phenols. A discriminating check
+    # through the real add_oak verb at a fixed oak dose.
+    def ceiling(toast: str) -> float:
+        cs = compile_scenario(
+            _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, toast)])
+        )
+        event = next(e for e in cs.events if e.label.startswith("add_oak"))
+        assert event.mutate is not None
+        after = event.mutate(cs.schema, cs.y0.copy())
+        return float(cs.schema.get(after, "ellagitannin_ceiling"))
+
+    assert ceiling("light") > ceiling("medium") > ceiling("heavy") > 0.0
+
+
+def test_oak_protects_against_oxidation_end_to_end():
+    # THE D-78 SPINE, through the compiled run() (not a hand-built ProcessSet): two identical
+    # oxygenated aged wines — same 40 mg/L O₂ dose, same ferment + aging — differing ONLY in the
+    # add_oak charge. The oaked wine's ellagitannin scavenges its share of the O₂, so it browns LESS
+    # (lower A420) and accumulates LESS oxidative acetaldehyde. Suppression is PARTIAL (the oaked
+    # wine
+    # still shows SOME browning/acetaldehyde). And its astringency readout is positive (tannin
+    # present).
+    o2_dose = 40.0
+    oaked = compile_scenario(
+        _wine(
+            [
+                _begin_aging(_FERMENT_DAYS),
+                _add_oak(
+                    _FERMENT_DAYS, 6.0, "light"
+                ),  # light toast ⇒ most ellagitannin (protection)
+                _add_oxygen(_FERMENT_DAYS, o2_dose),
+            ]
+        )
+    ).run()
+    unoaked = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, o2_dose)])
+    ).run()
+    assert oaked.success and unoaked.success
+
+    # PROTECTION: oak lowers BOTH the browning index and the oxidative acetaldehyde.
+    assert float(oaked.series("A420")[-1]) < float(unoaked.series("A420")[-1])
+    assert float(oaked.series("acetaldehyde")[-1]) < float(unoaked.series("acetaldehyde")[-1])
+    # PARTIAL, not total — the oaked wine still browns and still makes some acetaldehyde.
+    assert float(oaked.series("A420")[-1]) > 0.0
+    # Astringency readout (mg/L ellagitannin, IBU-exact): positive on the oaked wine, zero un-oaked.
+    astr_oaked = astringency_series(oaked)
+    assert np.allclose(astr_oaked, np.asarray(oaked.series("ellagitannin"), dtype=float) * 1000.0)
+    assert astr_oaked[-1] > 0.0
+    assert float(unoaked.series("ellagitannin")[-1]) == 0.0  # un-oaked wine has no tannin
 
 
 def test_oak_extraction_raises_the_oak_oavs():

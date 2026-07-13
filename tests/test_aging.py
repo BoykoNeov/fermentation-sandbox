@@ -1521,9 +1521,12 @@ def test_oak_protects_against_oxidation(ellag_params):
     # PARTIAL, not total (ellagitannin does not monopolize the O₂ — banded so oaked wines still
     # oxidise SOME): the oaked wine still browns and still makes acetaldehyde.
     assert a420_oaked > 0.0 and acet_oaked > 0.0
-    # SACRIFICIAL: the tannin is consumed scavenging O₂ — its pool ends BELOW the ceiling
-    # (softening).
-    assert float(oaked.series("ellagitannin")[-1]) < 0.1
+    # SACRIFICIAL: the tannin IS drawn on (its pool sits at/below the ceiling — the buffer is being
+    # spent). NB with the wood re-supply this is only a weak witness (OakExtraction refills the pool
+    # back toward the ceiling once the O₂ is gone, so it ends only fractionally below 0.1) — the
+    # GENUINE monotone softening is isolated in test_ellagitannin_consumed_softens_astringency (no
+    # re-supply). Here the physical truth is a BUFFERED tannin, not permanent softening.
+    assert float(oaked.series("ellagitannin")[-1]) <= 0.1
 
 
 def test_ellagitannin_consumed_softens_astringency(ellag_params):

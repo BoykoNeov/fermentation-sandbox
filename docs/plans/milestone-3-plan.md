@@ -68,7 +68,7 @@
 > `ceiling ≤ 0` undershoot guard (the floor is 0, so `max()` alone fabricates extract). 8 wine-only slots, 838
 > tests.**
 > **D-78 (latest) built `EllagitanninOxidation` — the oak-tannin O₂-scavenging sink, the BRIDGE from the oak
-> extractive axis to the O₂ sub-axis D-77 kept separate (850 tests, +12). Ellagitannin is oak's hydrolysable tannin:
+> extractive axis to the O₂ sub-axis D-77 kept separate (854 tests, +16). Ellagitannin is oak's hydrolysable tannin:
 > `OakExtraction` extracts a 5th pool (identical diffusion), and a new `EllagitanninOxidation` draws its share of the
 > shared `o2` budget (bilinear `[o2]·[ellagitannin]`, the `SulfiteOxidation` form) and CONSUMES it. THE SPINE is oak
 > PROTECTION: an oaked+oxygenated wine browns LESS (lower A420) and makes LESS oxidative acetaldehyde than an un-oaked
