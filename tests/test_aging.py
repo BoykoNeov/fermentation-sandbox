@@ -2022,7 +2022,7 @@ def test_maillard_browning_tier_floored_at_speculative(caramel_store):
 # segment, the warmer-faster ordering, the wine-only no-op on beer, the off-every-ledger invariance
 # (carbon AND mass AND nitrogen flat), and the speculative tier floor.
 
-_OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+_OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "furaneol")
 
 
 @pytest.fixture
@@ -2062,10 +2062,17 @@ def test_oak_metadata():
     p = OakExtraction()
     assert p.name == "oak_extraction"
     assert p.tier is Tier.SPECULATIVE
-    # Writes ONLY the five extracted-compound slots — the four aroma extractives (D-77) plus the
-    # ellagitannin taste extractive (D-78). The ceilings are read, never written (a set-and-hold
-    # constant the add_oak verb owns). Off every ledger, so nothing conserved moves.
-    assert set(p.touches) == {"whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin"}
+    # Writes ONLY the six extracted-compound slots — the five aroma extractives (four D-77 +
+    # furaneol/caramel D-94) plus the ellagitannin taste extractive (D-78). The ceilings are read,
+    # never written (a set-and-hold constant the add_oak verb owns). Off every ledger, none moves.
+    assert set(p.touches) == {
+        "whiskey_lactone",
+        "vanillin",
+        "guaiacol",
+        "eugenol",
+        "furaneol",
+        "ellagitannin",
+    }
     # Only its own shared rate/E_a + T_ref; the per-compound ceilings ride in STATE, not params.
     assert set(p.reads) == {"k_oak_extraction", "E_a_oak_extraction", "T_ref"}
 
@@ -2172,6 +2179,7 @@ def test_integrated_oak_saturates_and_moves_nothing_conserved(oak_params, oak_st
         "vanillin": 2.0e-4,
         "guaiacol": 6.0e-5,
         "eugenol": 2.5e-5,
+        "furaneol": 4.8e-5,  # D-94: the caramel furanone extracts + is off every ledger too
     }
     y0 = _oak_wine(schema, ceilings=ceilings, t=298.15)
     traj = simulate(ps, params=oak_params, y0=y0, t_span=(0.0, 24.0 * 365.0))  # ~1 year
@@ -2222,6 +2230,64 @@ def test_oak_also_extracts_ellagitannin(oak_params):
     # Extraction draws NO O₂ (a diffusion process) and never moves the ceiling.
     assert schema.get(d, "o2") == 0.0
     assert schema.get(d, "ellagitannin_ceiling") == 0.0
+
+
+def test_oak_extracts_furaneol_the_caramel_furanone(oak_params):
+    # D-94: OakExtraction extracts a SIXTH pool, furaneol (the caramel/toffee furanone — the caramel
+    # note D-93 deferred), by the IDENTICAL diffusion-to-a-ceiling form as the other aroma four.
+    schema = wine_schema()
+    t = 298.15
+    y = _oak_wine(schema, ceilings={"furaneol": 1.0e-4}, t=t)
+    y[schema.slice("furaneol")] = 3.0e-5  # partly extracted ⇒ gap = 1.0e-4 − 3.0e-5
+    d = OakExtraction().derivatives(0.0, y, schema, oak_params)
+    f_t = arrhenius_factor(t, oak_params["E_a_oak_extraction"], oak_params["T_ref"])
+    k = oak_params["k_oak_extraction"]
+    assert schema.get(d, "furaneol") == pytest.approx(k * f_t * (1.0e-4 - 3.0e-5))
+    # Off every ledger like the other aroma pools: draws no O₂ and never moves the ceiling.
+    assert schema.get(d, "o2") == 0.0
+    assert schema.get(d, "furaneol_ceiling") == 0.0
+
+
+@pytest.fixture
+def caramel_oak_store():
+    # Wine + thermal.yaml (Caramelization: k/E_a/y_a420) + oak.yaml (OakExtraction rate/E_a/yields):
+    # the two Processes D-94's collision thesis is about run from one combined store.
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "thermal.yaml",
+        default_data_dir() / "oak.yaml",
+    )
+
+
+def test_furaneol_and_caramelization_coexist_without_collision(caramel_oak_store):
+    # D-94's load-bearing thesis: the caramel AROMA (furaneol, on the oak axis — off every ledger)
+    # and the caramel COLOUR (D-88 melanoidin, ON total_carbon) are the SAME browning chemistry read
+    # two ways, and they DO NOT collide. Run a SWEET wine (residual sugar) aging in oak with BOTH
+    # Caramelization and OakExtraction active: melanoidin forms (on-ledger, from core S) AND the
+    # furaneol pool extracts toward its ceiling (off-ledger, from the oak/spirit ceiling). Carbon
+    # EXACTLY — the sugar→melanoidin transfer is carbon-exact and furaneol adds NOTHING to it,
+    # because the two never share a conserved pool (the collision the D-93 deferral feared is
+    # dissolved by putting caramel AROMA on the off-ledger oak axis, not an on-ledger co-product).
+    params = caramel_oak_store.resolve()
+    schema = wine_schema()
+    y0 = _caramel_wine(schema, s=100.0, t=308.15)  # warm sweet wine ⇒ caramelization runs (Madeira)
+    y0[schema.slice("furaneol_ceiling")] = 1.0e-4  # ~100 µg/L ceiling (as add_oak wood + bourbon)
+    ps = ProcessSet(schema, [Caramelization(), OakExtraction()], strict=True)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))  # ~1 year
+    assert traj.success, traj.message
+
+    # BOTH ran: melanoidin (on-ledger caramelization COLOUR) AND furaneol (off-ledger AROMA) rose.
+    assert float(traj.series("melanoidin")[-1]) > 0.0  # caramelization browned the sugar
+    furaneol_end = float(traj.series("furaneol")[-1])
+    assert 0.0 < furaneol_end <= 1.0e-4 + 1e-15  # extracted from 0 toward (not past) its ceiling
+    assert float(traj.series("S")[-1]) < 100.0  # residual sugar was consumed into melanoidin
+
+    # NO COLLISION: total_carbon closes to machine precision though both Processes ran. Furaneol's
+    # extraction moves nothing conserved (off every ledger, the iso_alpha precedent), so it cannot
+    # perturb the D-88 sugar→melanoidin carbon closure — the whole reason caramel AROMA lives on the
+    # off-ledger oak axis rather than as an on-ledger caramelization co-product (D-94).
+    f_c = caramel_oak_store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
 
 
 # =====================================================================================

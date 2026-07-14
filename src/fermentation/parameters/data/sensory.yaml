@@ -330,3 +330,29 @@ threshold_eugenol_beer:
     source: "author estimate: eugenol ('clove/spice') perception threshold in beer, transposed DOWN from the ~6-15 µg/L wine value for beer's lower ethanol (less masking); the clove note of toasted oak in barrel-aged beer."
     conditions: "beer matrix (~4-6% ABV); eugenol, a single molecule"
     notes: "SPECULATIVE, author estimate transposed from the wine threshold for the beer matrix (D-86). Single-molecule pool — clean OAV. HEAVY-toast (co-varies with guaiacol, D-77). Barrel-beer pool (D-86)."
+
+# -- Furaneol (decision D-94): the caramel/toffee oak+bourbon furanone. The fifth oak aroma marker,
+# SHARED by wine and barrel-beer like the D-77 four (the oak axis is a wood property). Furaneol
+# (HDMF) is a POTENT caramel odorant (low threshold), so a modest µg/L level reads strongly caramel-
+# forward — the point of choosing it over the higher-threshold oak-toast markers (maltol/furfural),
+# which would rarely clear OAV>1. Descriptor kept DISTINCT from sotolon's curry/maple. Beer <= wine
+# per the D-86 lower-ethanol (less-masking) direction. Both speculative, banded wide.
+threshold_furaneol_wine:
+  value: 5.0
+  unit: "ug/L"   # furaneol (HDMF, 4-hydroxy-2,5-dimethyl-3(2H)-furanone), 'caramel / toffee'
+  tier: speculative
+  uncertainty: { low: 1.0, high: 37.0, note: "furaneol (HDMF) wine odour threshold ~5 µg/L (some panels/matrices up to ~37 µg/L); a potent caramel/burnt-sugar furanone. Band spans the reported wine range." }
+  provenance:
+    source: "wine aroma literature: furaneol (HDMF, 4-hydroxy-2,5-dimethyl-3(2H)-furanone, 'caramel/strawberry/burnt sugar') perception threshold ~5 µg/L in wine (Ferreira et al. 2000 and related wine-aroma quantitative studies; also reported up to ~37 µg/L depending on matrix)."
+    conditions: "measured in/near wine matrix; furaneol, a single molecule (the caramel furanone)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. The 'caramel/toffee' oak+bourbon note (D-94); descriptor kept DISTINCT from sotolon's curry/maple (D-87). RISES with toast (D-94), a thermal sugar-degradation furanone of toasted/charred oak. Off every ledger (oak axis) — no collision with the on-ledger D-88 caramelization melanoidin."
+
+threshold_furaneol_beer:
+  value: 4.0
+  unit: "ug/L"   # furaneol (HDMF), 'caramel / toffee'
+  tier: speculative
+  uncertainty: { low: 1.0, high: 35.0, note: "furaneol threshold in beer, set modestly below the ~5 µg/L wine value for beer's lower-ethanol (less-masking) matrix; furaneol is a potent caramel furanone (a known malt/staling sweet note in beer). Banded wide." }
+  provenance:
+    source: "author estimate: furaneol (HDMF, 'caramel/toffee/burnt sugar') perception threshold in beer, transposed DOWN from the ~5 µg/L wine value (Ferreira et al. 2000) for beer's lower ethanol (less masking). Furaneol is a recognised caramel/sweet flavour compound of malt and aged beer; bourbon-barrel beer reads strongly caramel-forward."
+    conditions: "beer matrix (~4-6% ABV); furaneol, a single molecule"
+    notes: "SPECULATIVE, author estimate transposed from the wine threshold for the beer matrix (D-94, the D-86 direction). Single-molecule pool — clean OAV. The caramel/toffee note of toasted/charred oak + ex-bourbon barrels. Barrel-beer pool. Off every ledger (oak axis)."

@@ -7352,3 +7352,75 @@ docstring); `aging.py` (`OakExtraction` scope note — soak-back now modelled as
 deferred). **No Process, state, or schema change** — purely the dose. **Every wine + beer trajectory without `spirit` is
 byte-for-byte unchanged.** **Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield, the bourbon
 **aroma** soak-back + the gradual-reservoir / per-compound-retention refinements.
+
+## D-94 — bourbon-barrel CARAMEL soak-back: `furaneol`, a fifth oak AROMA extractive — the caramel/toffee note D-93 deferred; NO Process (§4.1)
+
+**What.** The caramel/toffee half of the bourbon note that **D-93 deferred**. Bourbon reads strongly **caramel** — from its
+charred-new-oak maturation (thermal degradation of wood sugars during charring yields caramel furanones) and the distillate. D-93
+modelled vanilla/coconut/char but left caramel out for two reasons: it had **no aroma pool**, and a new furanone pool was feared to
+**collide with the D-88 caramelization / `A420` axis**. D-94 builds it as **`furaneol`** (HDMF, 4-hydroxy-2,5-dimethyl-3(2H)-furanone
+— the canonical potent "caramel/burnt-sugar/toffee" odorant), a **fifth oak AROMA extractive** on the D-77 oak axis, exactly
+parallel to the four: a toast-specific wood yield **RISING with toast** (`oak_yield_furaneol_<toast>`, a thermal
+sugar-degradation product co-varying with guaiacol/eugenol — a charred barrel gives more caramel) **and** a bourbon spirit-soak
+**ceiling bump** (`spirit_soak_furaneol_bourbon`, the D-93 mechanism — `furaneol` is now in `_OAK_SPIRIT_AROMAS`, so an ex-bourbon
+`add_oak` bumps its ceiling and `OakExtraction` leaches it in gradually on top of the wood). One advisor pass (confirmed the shape +
+sharpened three points, below); no owner fork.
+
+**The collision is DISSOLVED, not relocated (the scope thesis, advisor-confirmed).** `furaneol` lives on the **oak axis**:
+**off every ledger** (wood/spirit-derived, the `iso_alpha` treatment), so it NEVER touches core `S` or the on-ledger D-88
+`melanoidin` — it therefore **cannot** perturb D-88's sugar→melanoidin carbon closure. The clean framing: `melanoidin` is
+caramelization's **colour body** (on-ledger, raises `A420`); `furaneol` is the **volatile aroma** of the same browning chemistry
+(off-ledger, read by OAV) — two different measured quantities, only one of which D-88 modelled. The **genuinely deferred** beat is
+caramel aroma from the *beverage's own* thermal caramelization — that *would* be on-ledger (diverting a sliver of sugar carbon out
+of the melanoidin park), a separate build; this D-94 pool is **oak/spirit-derived only**.
+
+**Wood yields are FORCED, not optional (the advisor's load-bearing code constraint).** In `_verb_add_oak` the spirit bump is applied
+via `spirit_aroma_bumps.get(compound, 0.0)` **inside** the `_OAK_COMPOUNDS` loop, so a compound in `_OAK_SPIRIT_AROMAS` but **not**
+`_OAK_COMPOUNDS` would have its bump silently dropped. So `furaneol` **must** be a full oak extractive (`_OAK_COMPOUNDS` ⇒ needs
+`oak_yield_furaneol_<toast>`). This is also **more faithful** (furfural/maltol/furanones from toasted/charred oak are real,
+Chatonnet/Cadahia) and **symmetric** with the three D-93 aromas (all already carry D-77 wood yields) — the tell that this is the
+minimal *coherent* build, not scope creep.
+
+**Compound choice — potency, not "most caramel" (the advisor's discriminator).** The deliverable is caramel-**forward** =
+`OAV>1` at realistic levels. Furanones split hard: the best oak-toast markers (**furfural, maltol**) have **high** thresholds and
+may never clear `OAV>1` at plausible barrel concentrations; the **potent** caramel odorant **furaneol/HDMF** (wine threshold ~5 µg/L,
+Ferreira et al. 2000) clears easily, so a *moderate* µg/L level reads strongly caramel — potency does the work. Single-molecule pool
+(clean OAV, the `vanillin`/`guaiacol` discipline). Descriptor **"caramel / toffee"**, kept **distinct** from `sotolon`'s
+"curry/maple" (D-87).
+
+**Params (`oak.yaml` +4, `sensory.yaml` +2; all speculative), SIZED BY OAV BAND not by mass (the done-call advisor catch).**
+`spirit_soak_furaneol_bourbon = 2.0e-5 g/L` (~20 µg/L first-fill bump); `oak_yield_furaneol_{light,medium,heavy} = 5.0e-7 /
+2.0e-6 / 5.0e-6 g/g` (~2 / 8 / 20 µg/L at 4 g/L oak — RISING with toast, light sub-threshold, heavy prominent, the sourced
+ordering); thresholds `threshold_furaneol_wine = 5.0`, `_beer = 4.0 µg/L` (beer ≤ wine, the D-86 lower-ethanol direction). The bump
+reuses `spirit_soak_retention` (one residual spirit, one depletion — the D-92/D-93 pattern), and is toast- and `oak_gpl`-independent
+(a barrel property, the D-93 discipline). **Why NOT a vanillin-sized bump (the calibration crux):** furaneol's potency (beer
+threshold ~4 µg/L, ~30× below vanillin's 130) means *lower mass and lower threshold push OAV the same way* — a first-draft
+mass-matched ~80 µg/L bump read caramel OAV ~27 vs vanilla ~3.8, i.e. **~7× more forward than vanilla**, contradicting its own
+"prominent bourbon note" provenance and invisible to a bare `OAV>1` forward test. Recalibrated so the caramel OAV increment (~5)
+lands in the **same band as the D-93 congener bumps** (vanillin +1.5, whiskey_lactone +2.9, guaiacol +4.0 OAV) — a coherent
+prominent note, not a caramel bomb. Same logic set the heavy wood yield to ~20 µg/L (OAV ~5, matching guaiacol's heavy prominence)
+rather than the first-draft ~48.
+
+**Schema +2 slots per medium** (`furaneol` pool + `furaneol_ceiling`), both media (D-86): **wine 64→66, beer 34→36**. The
+"un-oaked run is byte-for-byte inert" guarantee holds on **trajectory values** (`default=0` ⇒ ceiling 0 ⇒ `OakExtraction` skips it),
+not array shape — layout-size tests bumped, off-ledger invariance confirmed by test.
+
+**Tests (+2 unit, `test_aging.py`; the D-93/D-77 scenario suites auto-extend via the shared tuples).** `test_oak_extracts_furaneol
+_the_caramel_furanone` (identical diffusion-to-a-ceiling form, off-ledger); `test_furaneol_and_caramelization_coexist_without
+_collision` (**the D-94 thesis made executable** — a warm sweet wine ages in oak with BOTH `Caramelization` and `OakExtraction`
+active; melanoidin forms on-ledger AND furaneol extracts off-ledger, and `total_carbon` closes to machine precision — no collision).
+Adding `furaneol` to the shared test tuples (`_OAK_EXTRACTIVES`, `_OAK_SPIRIT_AROMAS`, `_OAK_COMPOUNDS`) auto-extends the D-77 oak
+suite (toast-yield ceiling, end-to-end extraction, off-ledger invariance) and the **D-93** bourbon suite (ceiling bumped by exactly
+`spirit_soak_furaneol_bourbon`, geometric fill depletion, and the **end-to-end forward read** — furaneol clears `OAV>1` and reads
+more forward with bourbon) to the caramel pool for free. **`test_toast_selects_the_aroma_profile` gained an explicit
+`heavy > medium > light` line for furaneol** (the done-call advisor's gap catch — the RISING toast ordering in the provenance must
+be *guarded*, not just auto-built into the ceiling dict).
+
+**Regression surface.** `media.py` (`_oak_specs` — `furaneol` + `furaneol_ceiling`); `aging.py` (`_OAK_COMPOUND_CEILINGS` +
+`OakExtraction.touches` + docstrings); `compile.py` (`_OAK_COMPOUNDS` + `_OAK_SPIRIT_AROMAS` + `_verb_add_oak` docstring);
+`oav.py` (`_OAK` + counts, beer 9→10 / wine 18→19); `oak.yaml` (+4 params + D-94 header); `sensory.yaml` (+2 thresholds).
+**No new Process** — `furaneol` rides the existing `OakExtraction` and the D-93 spirit-bump path. **Every wine + beer trajectory
+without `add_oak` (and every oaked-but-non-bourbon caramel level, driven purely by the new wood yields) is unchanged where it should
+be; the un-oaked run is byte-for-byte inert.** **Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield,
+the on-ledger thermal-caramelization aroma co-product (the genuinely deferred caramel beat), the gradual-reservoir / per-compound-
+retention refinements.

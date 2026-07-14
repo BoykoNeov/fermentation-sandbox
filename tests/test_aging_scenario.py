@@ -1075,11 +1075,12 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
 
 # -- OakExtraction (decision D-77) — the NON-oxidative barrel/chip aroma axis, end to end -------
 
-_OAK_EXTRACTIVES = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
+_OAK_EXTRACTIVES = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "furaneol")
 _OAK_CEILINGS = tuple(f"{c}_ceiling" for c in _OAK_EXTRACTIVES)
-#: The bourbon aroma-soak-back subset (D-93) — mirrors compile._OAK_SPIRIT_AROMAS. An ex-bourbon
-#: barrel BUMPS these three (vanilla/coconut/char); eugenol (clove) + ellagitannin are untouched.
-_OAK_SPIRIT_AROMAS = ("vanillin", "whiskey_lactone", "guaiacol")
+#: The bourbon aroma-soak-back subset (D-93/D-94) — mirrors compile._OAK_SPIRIT_AROMAS. An ex-
+#: bourbon barrel BUMPS these four (vanilla/coconut/char — D-93 — + caramel furaneol — D-94);
+#: eugenol (clove) + ellagitannin are untouched.
+_OAK_SPIRIT_AROMAS = ("vanillin", "whiskey_lactone", "guaiacol", "furaneol")
 
 
 def test_oak_extraction_gated_by_begin_aging_both_media():
@@ -1140,6 +1141,9 @@ def test_toast_selects_the_aroma_profile():
     assert light["whiskey_lactone"] > medium["whiskey_lactone"] > heavy["whiskey_lactone"]
     assert heavy["guaiacol"] > medium["guaiacol"] > light["guaiacol"]
     assert heavy["eugenol"] > medium["eugenol"] > light["eugenol"]
+    # Furaneol (caramel/toffee) RISES with toast (a thermal sugar-degradation furanone, co-varying
+    # with guaiacol/eugenol — heavy/charred oak gives the most caramel; the D-94 sourced ordering).
+    assert heavy["furaneol"] > medium["furaneol"] > light["furaneol"]
     # Vanillin (vanilla) peaks at medium toast (lignin thermal release), not at the extremes.
     assert medium["vanillin"] > light["vanillin"] and medium["vanillin"] > heavy["vanillin"]
 
@@ -1315,7 +1319,7 @@ def test_add_oak_rejects_unknown_toast_and_accepts_beer():
     with pytest.raises(ValueError, match="unknown toast"):
         compile_scenario(_wine([_add_oak(_FERMENT_DAYS, 4.0, "charred")]))
     # Barrel-beer oak (D-86): oak is no longer wine-only — a beer scenario now ACCEPTS add_oak
-    # (bourbon-barrel stouts / oak-aged sours), setting the same 5 ceilings from oak_gpl × toast
+    # (bourbon-barrel stouts / oak-aged sours), setting the same 6 ceilings from oak_gpl × toast
     # yield. (Was a "wine-only" rejection before D-86 — a legitimate expectation flip, not a
     # weakened test.) The unknown-toast rejection above still holds for beer too.
     cs = compile_scenario(_beer([_add_oak(14.0, 4.0, "medium")]))
@@ -1323,7 +1327,7 @@ def test_add_oak_rejects_unknown_toast_and_accepts_beer():
     assert event.mutate is not None  # dose only (a pure ceiling mutate, like the wine add_oak)
     after = event.mutate(cs.schema, cs.y0.copy())
     # The medium-toast dose sets each ceiling to oak_gpl × oak_yield_<compound>_medium (> 0).
-    for compound in ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin"):
+    for compound in (*_OAK_EXTRACTIVES, "ellagitannin"):
         assert float(cs.schema.get(after, f"{compound}_ceiling")) > 0.0
 
 
@@ -1692,9 +1696,7 @@ def test_bourbon_aroma_bump_depletes_geometrically_with_fill_number():
                 _wine(
                     [
                         _begin_aging(_FERMENT_DAYS),
-                        _add_oak(
-                            _FERMENT_DAYS, 4.0, "medium", fill_number=fill, spirit=spirit
-                        ),
+                        _add_oak(_FERMENT_DAYS, 4.0, "medium", fill_number=fill, spirit=spirit),
                     ]
                 )
             )

@@ -1075,27 +1075,36 @@ def _verb_add_oxygen(
 
 
 #: The oak toast levels :func:`_verb_add_oak` accepts (decision D-77) and the extractives it doses:
-#: the four aroma extractives (D-77) plus ``ellagitannin`` (the D-78 taste/O₂-scavenging bridge).
+#: the FIVE aroma extractives (four D-77 + ``furaneol`` caramel D-94) plus ``ellagitannin`` (the
+#: D-78 taste/O₂-scavenging bridge).
 #: The categorical ``toast`` selects the per-gram yield set (``oak_yield_<compound>_<toast>`` in
 #: oak.yaml); the compound → ceiling-slot pairing mirrors ``aging._OAK_COMPOUND_CEILINGS``. So one
-#: ``add_oak`` dose sets all five saturation ceilings (aroma + tannin) from a single ``oak_gpl``/
+#: ``add_oak`` dose sets all six saturation ceilings (aroma + tannin) from a single ``oak_gpl``/
 #: ``toast`` choice.
 _OAK_TOASTS = ("light", "medium", "heavy")
-_OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin")
+_OAK_COMPOUNDS = (
+    "whiskey_lactone",
+    "vanillin",
+    "guaiacol",
+    "eugenol",
+    "furaneol",  # caramel/toffee — the caramel furanone (decision D-94)
+    "ellagitannin",
+)
 #: The ex-spirit barrel types :func:`_verb_add_oak` accepts for the D-92 residual-spirit soak-back:
 #: a first-fill ex-``spirit`` barrel donates residual ethanol (``spirit_soak_ethanol_<spirit>`` in
 #: oak.yaml) into the beverage, raising ABV. ``bourbon`` this beat (whiskey/rum extensible); the
 #: categorical is how the caller asserts a soaked barrel (soak-back is a barrel, not chips).
 _OAK_SPIRITS = ("bourbon",)
-#: The oak-aroma extractives an ex-spirit barrel's residual spirit BUMPS the ceiling of (D-93): the
-#: bourbon-barrel aroma soak-back. A DELIBERATE subset of :data:`_OAK_COMPOUNDS` — vanilla +
-#: coconut + char are bourbon's signature (``vanillin``/``whiskey_lactone``/``guaiacol``);
+#: The oak-aroma extractives an ex-spirit barrel's residual spirit BUMPS the ceiling of (D-93/D-94):
+#: the bourbon-barrel aroma soak-back. A DELIBERATE subset of :data:`_OAK_COMPOUNDS` — vanilla +
+#: coconut + char are bourbon's signature (``vanillin``/``whiskey_lactone``/``guaiacol``, D-93) and
+#: ``furaneol`` its prominent CARAMEL/toffee note (D-94, bourbon matures in charred new oak);
 #: ``eugenol`` (clove) is not a bourbon note and ``ellagitannin`` is a wood taste tannin, so both
 #: are excluded.
 #: Each is bumped by ``spirit_soak_<compound>_<spirit>`` (toast- and ``oak_gpl``-independent, ×
 #: ``spirit_scale``); ``OakExtraction`` then leaches it in gradually — a CEILING bump is the only
 #: form additive with the wood pool (a bolus into the pool is erased by the extraction gate, D-93).
-_OAK_SPIRIT_AROMAS = ("vanillin", "whiskey_lactone", "guaiacol")
+_OAK_SPIRIT_AROMAS = ("vanillin", "whiskey_lactone", "guaiacol", "furaneol")
 
 
 def _verb_add_oak(
@@ -1182,10 +1191,22 @@ def _verb_add_oak(
     toast, and residual spirit is a barrel not a chips/S:V property), depleting with reuse by the
     SAME ``spirit_scale`` as the ethanol. NOT double-counting: one shared pool bumped, not a
     parallel pool (the D-77 yields stay generic new-oak wood; the ex-bourbon barrel's *depleted
-    wood* is the orthogonal ``fill_number`` effect, D-91). Caramel — a real bourbon note with no
-    aroma pool — is deferred (a new furanone pool would risk colliding with the D-88
-    caramelization/A420 axis). ``spirit`` absent ⇒ no bump ⇒ byte-for-byte the pre-D-92 charge on
-    the aroma ceilings too.
+    wood* is the orthogonal ``fill_number`` effect, D-91). ``spirit`` absent ⇒ no bump ⇒
+    byte-for-byte the pre-D-92 charge on the aroma ceilings too.
+
+    **Bourbon-barrel CARAMEL soak-back (decision D-94).** The caramel/toffee note D-93 deferred is
+    now modelled as ``furaneol`` (HDMF), a fifth oak aroma extractive (:data:`_OAK_COMPOUNDS`) with
+    its own toast yields (``oak_yield_furaneol_<toast>``, RISING with toast — a thermal
+    sugar-degradation furanone of toasted/charred oak) and, being in :data:`_OAK_SPIRIT_AROMAS`, a
+    ``spirit_soak_furaneol_<spirit>`` ceiling bump exactly like the three D-93 congeners. The D-93
+    collision worry with the D-88 caramelization/``A420`` axis is DISSOLVED, not relocated:
+    ``furaneol`` is on the OAK axis — off every ledger (wood/spirit-derived, ``iso_alpha``), never
+    touching core ``S`` or the on-ledger ``melanoidin`` — so it cannot perturb D-88's sugar→
+    melanoidin carbon closure. ``melanoidin`` is caramelization's *colour body* (on-ledger,
+    ``A420``); ``furaneol`` the *volatile aroma* of the same browning chemistry (off-ledger, OAV).
+    The genuinely deferred beat is caramel aroma from the *beverage's own* thermal caramelization
+    (on-ledger — it would divert a sliver of sugar carbon out of the melanoidin park); this D-94
+    pool is oak/spirit-derived only.
     """
     _iv_check_keys(iv, frozenset({"oak_gpl", "toast", "fill_number", "spirit"}), "add_oak")
     oak_gpl = _iv_float(iv, "oak_gpl", "add_oak")

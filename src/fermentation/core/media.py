@@ -244,11 +244,12 @@ def _oak_specs() -> list[VarSpec]:
     """The oak-extraction axis slots — SHARED by wine and barrel-beer (decisions D-77/D-78/D-86).
 
     The barrel/chip aroma-extractive aging axis (decision D-77), plus the ellagitannin BRIDGE
-    (decision D-78). Four extracted AROMA pools + the ellagitannin TASTE pool (five rising toward
-    their ceilings) + five SET-AND-HOLD ceiling slots (the ``cation_charge`` idiom — state written
-    ONLY by the ``add_oak`` verb, never by a Process). The aroma four are a SEPARATE, non-oxidative
-    axis (draw no O₂); ellagitannin bridges to the ``o2`` sub-axis — :class:`EllagitanninOxidation`
-    (D-78) consumes it to scavenge O₂ (protecting the beverage). All ten slots are OFF EVERY LEDGER
+    (decision D-78) and the ``furaneol`` caramel furanone (decision D-94). FIVE extracted AROMA
+    pools + the ellagitannin TASTE pool (six rising toward their ceilings) + six SET-AND-HOLD
+    ceiling slots (the ``cation_charge`` idiom — state written ONLY by the ``add_oak`` verb, never
+    by a Process). The aroma five are a SEPARATE, non-oxidative axis (draw no O₂); ellagitannin
+    bridges to the ``o2`` sub-axis — :class:`EllagitanninOxidation` (D-78) consumes it to scavenge
+    O₂ (protecting the beverage). All twelve slots are OFF EVERY LEDGER
     (exogenous WOOD-derived mass, like the hop-derived ``iso_alpha``, D-64), so they never perturb
     ``total_carbon``/``total_mass``/``total_nitrogen``. ``default=0`` ⇒ an un-oaked beverage carries
     no ceiling and both oak Processes are byte-for-byte inert (the ceiling ≤ 0 guard).
@@ -299,6 +300,17 @@ def _oak_specs() -> list[VarSpec]:
             "(threshold_eugenol_<medium>)",
         ),
         VarSpec(
+            "furaneol",
+            "g/L",
+            default=0.0,
+            description="furaneol (HDMF, 4-hydroxy-2,5-dimethyl-3(2H)-furanone) — the "
+            "'caramel/toffee' oak/bourbon furanone (decision D-94), a thermal sugar-degradation "
+            "product RISING with toast (co-varies with guaiacol). Produced-only: OakExtraction "
+            "rises it toward furaneol_ceiling (wood diffusion + the D-93 bourbon spirit soak-back "
+            "bump). Off every ledger (wood/spirit-derived, so no collision with the on-ledger "
+            "D-88 caramelization melanoidin). Read by the OAV lens (threshold_furaneol_<medium>)",
+        ),
+        VarSpec(
             "whiskey_lactone_ceiling",
             "g/L",
             default=0.0,
@@ -329,6 +341,15 @@ def _oak_specs() -> list[VarSpec]:
             default=0.0,
             description="SET-AND-HOLD saturation ceiling for eugenol (decision D-77): "
             "oak_gpl × oak_yield_eugenol_<toast>, written ONLY by add_oak. Off every ledger. "
+            "Default 0 ⇒ inert",
+        ),
+        VarSpec(
+            "furaneol_ceiling",
+            "g/L",
+            default=0.0,
+            description="SET-AND-HOLD saturation ceiling for furaneol (decision D-94): "
+            "oak_gpl × oak_yield_furaneol_<toast> (+ the D-93 spirit_soak_furaneol_<spirit> bump "
+            "for an ex-bourbon barrel), written ONLY by add_oak. Off every ledger. "
             "Default 0 ⇒ inert",
         ),
         # Ellagitannin — the BRIDGE extractive (decision D-78). Unlike the four aroma extractives

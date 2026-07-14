@@ -332,17 +332,20 @@ _MAILLARD_MELANOIDIN_SPECIES = "maillard_melanoidin"
 #: pool (the first element) rises toward its own saturation ceiling (the second element); the
 #: ceiling slots are **constant state** written *only* by the ``add_oak`` verb (``oak_gpl`` ×
 #: toast-specific yield) and read — never written — here, the ``cation_charge`` set-and-hold idiom.
-#: Four AROMA extractives (D-77) — whiskey lactone (coconut, light-toast dominant), vanillin
-#: (vanilla, medium-toast peak), guaiacol (smoky, heavy-toast) and eugenol (clove, heavy-toast) —
-#: plus the ``ellagitannin`` TASTE extractive (D-78, light-toast dominant / declining with toast —
+#: FIVE AROMA extractives — whiskey lactone (coconut, light-toast dominant), vanillin
+#: (vanilla, medium-toast peak), guaiacol (smoky, heavy-toast), eugenol (clove, heavy-toast) (D-77)
+#: and ``furaneol`` (caramel/toffee, rising with toast — the caramel furanone, D-94) — plus the
+#: ``ellagitannin`` TASTE extractive (D-78, light-toast dominant / declining with toast —
 #: thermolabile). Their *extraction* is identical diffusion-to-a-ceiling; ellagitannin additionally
-#: feeds the O₂ sub-axis via the separate :class:`EllagitanninOxidation` sink (the aroma four draw
-#: no O₂).
+#: feeds the O₂ sub-axis via the separate :class:`EllagitanninOxidation` sink (the aroma five draw
+#: no O₂). ``furaneol`` is an ordinary aroma extractive here (off every ledger, wood/spirit-derived)
+#: — it does NOT touch the on-ledger D-88 caramelization ``melanoidin``, so no collision (D-94).
 _OAK_COMPOUND_CEILINGS: tuple[tuple[str, str], ...] = (
     ("whiskey_lactone", "whiskey_lactone_ceiling"),
     ("vanillin", "vanillin_ceiling"),
     ("guaiacol", "guaiacol_ceiling"),
     ("eugenol", "eugenol_ceiling"),
+    ("furaneol", "furaneol_ceiling"),
     ("ellagitannin", "ellagitannin_ceiling"),
 )
 
@@ -1424,15 +1427,23 @@ class OakExtraction(Process):
 
     The sixth aging Process (D-77), the **first non-oxidative** one. **OakExtraction itself draws no
     O₂** and takes no share of the shared ``o2`` budget — a pure diffusion process. As a finished
-    wine **or beer** (barrel-beer oak, D-86) sits in oak (barrel or chips/staves), four **aroma**
+    wine **or beer** (barrel-beer oak, D-86) sits in oak (barrel or chips/staves), five **aroma**
     extractives diffuse in and rise toward
     a saturation ceiling: **whiskey lactone** (β-methyl-γ-octalactone, "coconut", the signature
     oak-lactone note, LIGHT-toast dominant), **vanillin** ("vanilla", MEDIUM-toast peak),
     **guaiacol** (a lignin-pyrolysis "smoky/toasty" phenol, HEAVY-toast dominant — the oak/toast
-    note, *distinct* from the Brett 4-ethylguaiacol of D-55) and **eugenol** ("clove/spice",
-    HEAVY-toast). These four move **no** pool the D-67 OAV lens already read, so D-77 added four new
-    aroma pools; those four are a **separate axis**, orthogonal to the
-    browning/acetaldehyde/SO₂/Strecker competition.
+    note, *distinct* from the Brett 4-ethylguaiacol of D-55), **eugenol** ("clove/spice",
+    HEAVY-toast) and **furaneol** (HDMF, "caramel/toffee", a thermal sugar-degradation furanone
+    RISING with toast — the caramel note of toasted/charred oak and, via the D-93 spirit soak-back,
+    of ex-bourbon barrels; decision D-94). These five move **no** pool the D-67 OAV lens already
+    read, so D-77 added four new aroma pools and D-94 the fifth; those five are a **separate axis**,
+    orthogonal to the browning/acetaldehyde/SO₂/Strecker competition. **``furaneol`` is off every
+    ledger** (wood/spirit-derived, the ``iso_alpha`` treatment) — so it does *not* touch core ``S``
+    or the on-ledger D-88 caramelization ``melanoidin``, and the two do not collide: ``melanoidin``
+    is the caramelization *colour body* (on-ledger, ``A420``), ``furaneol`` the *volatile aroma* of
+    the same browning chemistry (off-ledger, OAV). The genuinely deferred beat is caramel aroma from
+    the *beverage's own* thermal caramelization (on-ledger — it would divert a sliver of sugar
+    carbon out of the melanoidin park); this D-94 pool is oak/spirit-derived only (see D-94).
 
     **The ellagitannin bridge (D-78).** This Process *also* extracts a fifth pool, **ellagitannin**
     (oak's hydrolysable TASTE tannin, LIGHT-toast dominant / declining with toast — thermolabile),
@@ -1493,7 +1504,8 @@ class OakExtraction(Process):
     ``add_oak`` ethanol *dose* (D-92), NOT by this Process: soak-back ethanol comes from the spirit,
     not the wood, and lands on the core ``E`` slot, so it is a discrete on-ledger dose, orthogonal
     to this off-ledger diffusion axis. The bourbon *aroma* soak-back (D-93) IS drawn by THIS
-    Process: an ex-spirit ``add_oak`` dose BUMPS the vanillin/whiskey_lactone/guaiacol ceilings by
+    Process: an ex-spirit ``add_oak`` dose BUMPS the vanillin/whiskey_lactone/guaiacol (D-93) and
+    ``furaneol`` (caramel, D-94) ceilings by
     the residual spirit's congeners, and this Process leaches them in gradually on top of the wood
     diffusion — a
     ceiling bump being the only wood + spirit *additive* form (a bolus into the pool would be erased
@@ -1508,8 +1520,10 @@ class OakExtraction(Process):
     #: set-and-hold constant the ``add_oak`` verb owns). Off every ledger (exogenous wood-derived
     #: mass, the iso_alpha precedent), so nothing conserved moves. (``ellagitannin`` is *also*
     #: consumed by the separate :class:`EllagitanninOxidation` O₂ sink — two Processes on one pool,
-    #: the ``o2`` precedent — but this Process only *extracts* it.)
-    touches = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin")
+    #: the ``o2`` precedent — but this Process only *extracts* it.) ``furaneol`` (caramel/toffee,
+    #: the caramel furanone, D-94) is the fifth aroma extractive, extracted identically (off every
+    #: ledger, so no collision with the on-ledger D-88 caramelization ``melanoidin``).
+    touches = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "furaneol", "ellagitannin")
     #: ``k_oak_extraction``/``E_a_oak_extraction`` are this Process's own (oak.yaml, D-77); and
     #: ``T_ref`` is shared with every Arrhenius rate. The per-compound ceilings ride in *state* (by
     #: ``add_oak``), not params, so they are not in ``reads``. Tiers cap the four extracted pools'

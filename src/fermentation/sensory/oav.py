@@ -36,10 +36,11 @@ honesty cost flagged in that threshold's provenance ``notes``. The single-molecu
 (diacetyl, acetaldehyde, H₂S, 4-EP, 4-EG) carry no such assumption.
 
 **Medium-specificity.** The aroma set is medium-specific (mirroring the beer-only
-``iso_alpha``): beer carries the 5 common pools + the 4 oak extractives (barrel-beer, D-86); wine
-adds 4-EP, 4-EG, mercaptans, the two Strecker aldehydes (D-75) and the four non-oxidative THERMAL
-Strecker aldehydes/sotolon (D-87) on top of the common + oak sets.
-The four oak extractives (D-77) are shared by both media (D-86 — the oak axis is a wood property).
+``iso_alpha``): beer carries the 5 common pools + the 5 oak extractives (barrel-beer, D-86 + the
+D-94 furaneol caramel); wine adds 4-EP, 4-EG, mercaptans, the two Strecker aldehydes (D-75) and the
+four non-oxidative THERMAL Strecker aldehydes/sotolon (D-87) on top of the common + oak sets.
+The five oak extractives (D-77 four + furaneol D-94) are shared by both media (D-86 — the oak axis
+is a wood property).
 Every threshold is matrix-specific too (``threshold_<pool>_beer`` vs ``_wine``) because ethanol and
 the wine/beer matrix shift odor thresholds substantially. ``iso_alpha``/IBU is deliberately
 excluded — it is a *taste* (bitterness), already read out by :func:`fermentation.analysis.
@@ -108,10 +109,12 @@ _WINE_ONLY: tuple[AromaCompound, ...] = (
     AromaCompound("sotolon", "sotolon", "curry / maple / nutty", lumped=False),
 )
 
-#: The four oak aroma extractives — the non-oxidative barrel/chip diffusion axis (decision D-77),
-#: SHARED by wine and barrel-beer (decision D-86: both media carry the oak slots via
-#: ``core.media._oak_specs``). Single-molecule pools; ``guaiacol`` here is the OAK smoky note,
-#: DISTINCT from the Brett ``ethylguaiacols`` above (a different molecule). Each read against its
+#: The FIVE oak aroma extractives — the non-oxidative barrel/chip diffusion axis (decision D-77 for
+#: the first four, D-94 for ``furaneol``), SHARED by wine and barrel-beer (decision D-86: both media
+#: carry the oak slots via ``core.media._oak_specs``). Single-molecule pools; ``guaiacol`` here is
+#: the OAK smoky note, DISTINCT from the Brett ``ethylguaiacols`` above (a different molecule);
+#: ``furaneol`` (HDMF) is the caramel/toffee note of toasted/charred oak + ex-bourbon barrels, its
+#: descriptor kept DISTINCT from ``sotolon``'s "maple". Each read against its
 #: matrix-specific threshold (``threshold_<compound>_beer`` vs ``_wine``, ``sensory.yaml``). The oak
 #: *ceiling* slots (set-and-hold, D-77) and the ``ellagitannin`` TASTE pool (D-78, read by
 #: :func:`~fermentation.analysis.astringency_series`, not the odor lens) are NOT aroma pools — all
@@ -121,11 +124,13 @@ _OAK: tuple[AromaCompound, ...] = (
     AromaCompound("vanillin", "vanillin", "vanilla", lumped=False),
     AromaCompound("guaiacol", "guaiacol", "smoky / toasty", lumped=False),
     AromaCompound("eugenol", "eugenol", "clove / spice", lumped=False),
+    AromaCompound("furaneol", "furaneol", "caramel / toffee", lumped=False),
 )
 
-#: Medium -> its ordered aroma set. Beer = 5 common + 4 oak (9); wine = 5 common + 9 wine-only + 4
-#: oak (18 — D-87 added the four thermal Strecker/sotolon pools to the wine-only set). Wine's order
-#: keeps the oak four last, so the D-87 pools slot in after the two D-75 aldehydes, before oak.
+#: Medium -> its ordered aroma set. Beer = 5 common + 5 oak (10); wine = 5 common + 9 wine-only + 5
+#: oak (19 — D-87 added the four thermal Strecker/sotolon pools to the wine-only set, D-94 added
+#: furaneol to the oak set). Wine's order keeps the oak five last, so the D-87 pools slot in after
+#: the two D-75 aldehydes, before oak.
 AROMA_COMPOUNDS: Mapping[str, tuple[AromaCompound, ...]] = {
     "beer": _COMMON + _OAK,
     "wine": _COMMON + _WINE_ONLY + _OAK,
@@ -257,7 +262,7 @@ def sensory_profile(
 ) -> SensoryProfile:
     """Build the aroma :class:`SensoryProfile` at ``time_index`` (default: the finished state).
 
-    Covers exactly the medium's aroma set (9 pools for beer, 18 for wine — D-87) — so the reported
+    Covers exactly the medium's aroma set (10 pools for beer, 19 for wine — D-94) — so the reported
     compounds *are* the medium's, never a wine-only pool on beer. Each reading's tier is the
     :func:`oav_tier` floor over the pool's chemistry tier (read from ``traj.tier_map``) and
     the threshold's tier; both fold under the mandatory speculative floor.

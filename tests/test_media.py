@@ -44,15 +44,17 @@ WINE_KETO_ACID_SLOTS = ("pyruvate", "alpha_ketoglutarate")
 # phenylacetaldehyde (honey), the oxidative-aging markers StreckerDegradation produces from amino
 # acids. Wine-only (the Process reads wine-only amino_acids and deaminates to N).
 WINE_STRECKER_SLOTS = ("methional", "phenylacetaldehyde")
-# The oak-extraction axis (decisions D-77/D-78): 4 extracted aroma pools
-# (whiskey_lactone/coconut, vanillin/vanilla, guaiacol/smoky, eugenol/clove) + their 4 SET-AND-HOLD
-# ceiling slots, then the ellagitannin TASTE/O₂-scavenging pool + its ceiling (D-78, the bridge to
-# the O₂ sub-axis). The add_oak verb writes all 5 ceilings (oak_gpl × toast-specific yield); all off
-# every ledger (exogenous wood-derived mass, the iso_alpha precedent). SHARED by wine and barrel-
-# beer (decision D-86 — the oak axis is a wood property; both media carry it via _oak_specs).
+# The oak-extraction axis (decisions D-77/D-78/D-94): 5 extracted aroma pools
+# (whiskey_lactone/coconut, vanillin/vanilla, guaiacol/smoky, eugenol/clove — D-77 — and
+# furaneol/caramel — D-94) + their 5 SET-AND-HOLD ceiling slots, then the ellagitannin
+# TASTE/O₂-scavenging pool + its ceiling (D-78, the bridge to the O₂ sub-axis). The add_oak verb
+# writes all 6 ceilings (oak_gpl × toast-specific yield); all off every ledger (exogenous wood/
+# spirit-derived mass, the iso_alpha precedent). SHARED by wine and barrel-beer (decision D-86 — the
+# oak axis is a wood property; both media carry it via _oak_specs).
 OAK_SLOTS = (
-    "whiskey_lactone", "vanillin", "guaiacol", "eugenol",
+    "whiskey_lactone", "vanillin", "guaiacol", "eugenol", "furaneol",
     "whiskey_lactone_ceiling", "vanillin_ceiling", "guaiacol_ceiling", "eugenol_ceiling",
+    "furaneol_ceiling",
     "ellagitannin", "ellagitannin_ceiling",
 )  # fmt: skip
 # The tannin–anthocyanin condensation axis (decision D-79), appended: the two GRAPE must-input
@@ -140,9 +142,10 @@ def test_wine_schema_has_single_sugar_slot():
     # branch, D-40; ferulic_acid, vinylguaiacols, ethylguaiacols — the ferulic branch, D-55;
     # X_brett, X_brett_dead) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate D-49,
     # alpha_ketoglutarate D-50) + 2 Strecker-aldehyde slots (methional, phenylacetaldehyde — D-75)
-    # + 10 oak slots (4 aroma extractives whiskey_lactone/vanillin/guaiacol/eugenol + 4 set-and-hold
-    # ceilings — the non-oxidative barrel/chip axis, D-77 — plus the ellagitannin
-    # TASTE/O₂-scavenging pool + its ceiling, the bridge to the O₂ sub-axis, D-78)
+    # + 12 oak slots (5 aroma extractives whiskey_lactone/vanillin/guaiacol/eugenol — D-77 — +
+    # furaneol/caramel — D-94 — + 5 set-and-hold ceilings — the non-oxidative barrel/chip axis —
+    # plus the ellagitannin TASTE/O₂-scavenging pool + its ceiling, the bridge to the O₂ sub-axis,
+    # D-78)
     # + 2 grape polymerization slots (anthocyanin + condensed tannin — the red-wine colour-
     # stabilization + astringency-softening axis, D-79)
     # + 1 ethyl_bridge slot (the acetaldehyde-bridged / split-ledger colour beat, D-80: the first
@@ -162,7 +165,10 @@ def test_wine_schema_has_single_sugar_slot():
     # + 1 D-89 N-bearing Maillard melanoidin carbon+nitrogen-park slot (the amino-acid-incorporating
     # thermal browning of residual sugar + amino acids → maillard_melanoidin, raising the same A420;
     # the FIRST non-biomass, non-arginine species on total_nitrogen — it retains the amino-acid N)
-    assert schema.size == 64
+    # + 2 D-94 furaneol slots (the caramel/toffee oak+bourbon furanone pool + its ceiling — the
+    # fifth oak aroma extractive; off every ledger like the D-77 four, so no collision with the
+    # on-ledger D-88 caramelization melanoidin)
+    assert schema.size == 66
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -176,13 +182,14 @@ def test_beer_schema_has_three_sequential_sugars():
     # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink), o2 (D-71 aging substrate), A420 (D-74
     # oxidative-browning index)) + 1 beer-only iso_alpha bitterness slot (D-64) — S occupies 3
     # slots, so 20 shared names span 22 slots, + iso_alpha = 23
-    # + 10 oak-axis slots (4 aroma extractives + 4 ceilings — the barrel/chip axis, D-77 — plus the
-    # ellagitannin TASTE/O₂-scavenging pool + its ceiling, D-78) SHARED with wine by barrel-beer oak
-    # (decision D-86): the oak axis is a wood property, so both media carry it (via _oak_specs) = 33
+    # + 12 oak-axis slots (5 aroma extractives — D-77 four + furaneol/caramel D-94 — + 5 ceilings —
+    # the barrel/chip axis — plus the ellagitannin TASTE/O₂-scavenging pool + its ceiling, D-78)
+    # SHARED with wine by barrel-beer oak (decision D-86): the oak axis is a wood property, so both
+    # media carry it (via _oak_specs) = 35
     # + 1 caramelization melanoidin carbon-park slot (D-90: sugar-only thermal browning is medium-
     # agnostic — beer's residual dextrins caramelize too, so melanoidin is appended to beer_schema
-    # too, ON total_carbon; the N-incorporating maillard_melanoidin stays wine-only, D-32) = 34
-    assert schema.size == 34
+    # too, ON total_carbon; the N-incorporating maillard_melanoidin stays wine-only, D-32) = 36
+    assert schema.size == 36
 
 
 def test_shared_variable_units_are_canonical():
@@ -218,10 +225,12 @@ def test_shared_variable_units_are_canonical():
         "vanillin": "g/L",  # vanilla (D-77)
         "guaiacol": "g/L",  # oak smoky/toasty (D-77)
         "eugenol": "g/L",  # clove/spice (D-77)
+        "furaneol": "g/L",  # caramel/toffee oak+bourbon furanone (D-94)
         "whiskey_lactone_ceiling": "g/L",  # set-and-hold ceiling (D-77)
         "vanillin_ceiling": "g/L",
         "guaiacol_ceiling": "g/L",
         "eugenol_ceiling": "g/L",
+        "furaneol_ceiling": "g/L",  # set-and-hold ceiling (D-94)
         "ellagitannin": "g/L",  # oak hydrolysable tannin — taste + O₂ scavenger (D-78)
         "ellagitannin_ceiling": "g/L",
         "melanoidin": "g/L",  # caramelization carbon-park (D-88; medium-agnostic D-90)

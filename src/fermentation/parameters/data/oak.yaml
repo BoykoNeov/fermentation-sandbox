@@ -229,8 +229,10 @@ spirit_soak_retention:
 # COMPOUND SUBSET (DELIBERATE, not all five): vanilla + coconut + char are bourbon's signature, so
 # vanillin + whiskey_lactone + guaiacol are bumped; eugenol (CLOVE) is NOT a bourbon note and is left
 # untouched; ellagitannin is a wood TASTE tannin, not a spirit aroma congener, also untouched.
-# CARAMEL — a real bourbon note — has NO aroma pool and would need a new furanone pool that may
-# collide with the D-88 caramelization / A420 axis; DEFERRED (scope creep), flagged not built.
+# CARAMEL — a real bourbon note — had NO aroma pool at D-93 and a new furanone pool was feared to
+# collide with the D-88 caramelization / A420 axis, so it was DEFERRED. It is now built as FURANEOL
+# (D-94, below): a fifth oak aroma extractive on the OFF-LEDGER oak axis (so no collision with the
+# on-ledger D-88 melanoidin), bumped by spirit_soak_furaneol_bourbon exactly like these three.
 #
 # PROVENANCE is SOFTER than the ethanol's: no clean measurable observable (the ethanol had the ~1%
 # ABV gain). We have a sourced ORDERING (ex-bourbon beer reads vanilla/coconut/char-forward vs
@@ -263,6 +265,85 @@ spirit_soak_guaiacol_bourbon:
     source: "author estimate anchored to the ORDERING that bourbon barrels are CHARRED (a real char layer, unlike a toasted wine barrel), so bourbon-barrel beer carries a genuine char/smoke note (guaiacol); magnitude sized above the ~10 ug/L beer guaiacol threshold (sensory.yaml) but the smallest of the three (subordinate to vanilla/coconut)."
     conditions: "g/L bump to the guaiacol_ceiling by a FIRST-FILL ex-bourbon barrel, toast- and oak_gpl-INDEPENDENT; * spirit_soak_retention ** (fill_number - 1); drawn in gradually by OakExtraction (D-77)."
     notes: "SOURCED ORDERING (char present, subordinate) + SPECULATIVE magnitude. OFF the ledger (aroma ceiling). Bumps the SAME D-77 guaiacol pool (additive, not parallel). Toast-INDEPENDENT. This is the oak/toast guaiacol, NOT the Brett 4-ethylguaiacol (a separate pool)."
+
+# =============================================================================================
+# BOURBON-BARREL CARAMEL SOAK-BACK + the caramel oak furanone FURANEOL (decision D-94).
+#
+# The caramel/toffee note D-93 DEFERRED. Bourbon reads strongly CARAMEL/toffee — from its charred-
+# new-oak maturation (thermal degradation of wood sugars during charring makes caramel furanones)
+# AND from the corn/rye distillate. D-93 modelled vanilla/coconut/char but left caramel out: it had
+# no aroma pool, and a new furanone pool was feared to COLLIDE with the D-88 caramelization / A420
+# axis. D-94 resolves it by adding FURANEOL (HDMF, 4-hydroxy-2,5-dimethyl-3(2H)-furanone — the
+# canonical "caramel/burnt-sugar/toffee" odorant, potent, low threshold) as a FIFTH oak AROMA
+# EXTRACTIVE on the OAK axis, exactly parallel to the D-77 four:
+#   * a toast-specific WOOD yield (oak_yield_furaneol_<toast>, below), RISING with toast (furaneol
+#     is a thermal sugar-degradation product of oak toasting/charring — same pyrolysis direction as
+#     guaiacol/eugenol), so a heavily-toasted/charred barrel gives more caramel; and
+#   * a bourbon SPIRIT soak-back ceiling BUMP (spirit_soak_furaneol_bourbon, below), the D-93
+#     mechanism — furaneol is in _OAK_SPIRIT_AROMAS, so an ex-bourbon add_oak bumps its ceiling by
+#     spirit_soak_furaneol_bourbon * spirit_scale, drawn in GRADUALLY by OakExtraction on top of the
+#     wood. (eugenol/clove and the ellagitannin taste tannin stay unbumped, the D-93 subset.)
+#
+# THE COLLISION IS DISSOLVED, NOT RELOCATED. furaneol lives on the oak axis: OFF EVERY LEDGER
+# (wood/spirit-derived, the iso_alpha precedent), so it NEVER touches core S or the on-ledger D-88
+# `melanoidin` — it CANNOT perturb D-88's sugar->melanoidin carbon closure. `melanoidin` is
+# caramelization's COLOUR body (on-ledger, raises A420); furaneol is the VOLATILE AROMA of the same
+# browning chemistry (off-ledger, read by OAV). Two different measured quantities, only one of which
+# D-88 modelled. The GENUINELY deferred beat is caramel aroma from the BEVERAGE'S OWN thermal
+# caramelization (that WOULD be on-ledger — diverting a sliver of sugar carbon out of the melanoidin
+# park — a separate beat); this D-94 pool is oak/spirit-derived only. Descriptor "caramel/toffee",
+# kept DISTINCT from sotolon's "curry/maple" (D-87).
+#
+# TIER: all speculative. The load-bearing SOURCED claims are the FORM (furaneol is a real caramel
+# furanone of toasted/charred oak and aged bourbon; RISING with toast) and the ORDERING (bourbon-
+# barrel beverages read caramel-forward). Every magnitude is an author estimate, banded wide.
+
+# -- FURANEOL BOURBON SPIRIT SOAK-BACK BUMP: the ex-bourbon barrel's residual caramel congener ----
+spirit_soak_furaneol_bourbon:
+  value: 2.0e-5
+  unit: "g/L"   # furaneol ceiling BUMP from a FIRST-FILL ex-bourbon barrel; * retention**(fill-1)
+  tier: speculative
+  uncertainty: { low: 5.0e-6, high: 8.0e-5, note: "furaneol (~20 ug/L) the ex-bourbon barrel's residual spirit adds to the aroma ceiling at first fill. Bourbon's caramel/toffee is a PROMINENT note, and furaneol is POTENT (beer threshold ~4 ug/L), so ~20 ug/L already reads clearly caramel-FORWARD — the OAV increment (~5) is DELIBERATELY sized into the same band as the D-93 congener bumps (vanillin +1.5, whiskey_lactone +2.9, guaiacol +4.0 OAV), NOT larger: potency means a SMALL g/L reads forward, so a vanillin-sized ~200 ug/L bump would make caramel ~7x more forward than vanilla — a distortion of relative prominence the low mass avoids. No clean observable; sized to a prominent-but-coherent caramel. Banded 5-80 ug/L." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that bourbon-barrel-aged beverages read CARAMEL/toffee-forward (furaneol/HDMF is a caramel-type furanone of bourbon's charred-new-oak maturation and the distillate, carried back in the residual spirit); magnitude sized so the caramel OAV lands in the SAME band as the D-93 bourbon congeners (a coherent prominent note, not a caramel bomb — furaneol's low ~4 ug/L beer threshold means a small g/L already reads forward)."
+    conditions: "g/L bump to the furaneol_ceiling by a FIRST-FILL (fill_number = 1) ex-bourbon barrel, toast- and oak_gpl-INDEPENDENT; * spirit_soak_retention ** (fill_number - 1) for reused barrels; drawn in gradually by OakExtraction (D-77)."
+    notes: "SOURCED ORDERING (caramel-forward) + SPECULATIVE magnitude, sized by OAV band not by mass (furaneol's potency makes a mass-matched vanillin bump over-forward — D-94 advisor catch). OFF the carbon/mass ledger (aroma ceiling, iso_alpha precedent) — moves nothing conserved, so NO collision with the on-ledger D-88 caramelization melanoidin (D-94). Bumps the SAME D-94 furaneol wood pool (additive with wood, NOT a parallel pool). Toast-INDEPENDENT (set by bourbon's char, not the cooper's toast). Reuses spirit_soak_retention (one residual spirit, one depletion — the D-92/D-93 pattern)."
+
+# -- FURANEOL TOAST-SPECIFIC WOOD YIELDS: ceiling = oak_gpl * oak_yield_furaneol_<toast> (g/L) ----
+# RISING with toast (light < medium < heavy), co-varying with guaiacol/eugenol: furaneol is a
+# thermal sugar-degradation (caramelization/pyrolysis) product formed when the cooper toasts/chars
+# the oak, so more heat => more caramel furanone (the inverse of the light-dominant lactone). Sized
+# by OAV (furaneol is POTENT — ~4-5 ug/L threshold), so the g/L are SMALL: at a ~4 g/L oak dose
+# light is sub-threshold (little caramel in lightly-toasted oak), medium reads clearly (OAV ~2 beer)
+# and heavy is prominent (OAV ~5 beer — the charred-barrel caramel, matching guaiacol's heavy-toast
+# prominence). ALL speculative; the SOURCED claim is the RISING toast ordering, not the magnitudes.
+oak_yield_furaneol_light:
+  value: 5.0e-7
+  unit: "g/g"   # g furaneol / g oak; * oak_gpl => ceiling (g/L). ~2 ug/L at 4 g/L oak
+  tier: speculative
+  uncertainty: { low: 1.5e-7, high: 2.0e-6, note: "furaneol at LIGHT toast — minimal (little thermal sugar degradation yet); ~2 ug/L ceiling at 4 g/L oak, below the ~4-5 ug/L threshold (light oak reads little caramel — sub-threshold, correct). RISES with toast (co-varies with guaiacol)." }
+  provenance:
+    source: "author estimate anchored to furaneol (HDMF, 'caramel/toffee/burnt sugar') as a thermal sugar-degradation (caramelization/pyrolysis) volatile of toasted/charred oak, RISING with toast level (the pyrolysis-product direction of guaiacol/eugenol; lowest light, highest heavy) — the inverse of the light-dominant whiskey lactone. Caramel/furanone notes strengthen with barrel toast/char (Chatonnet/Cadahia barrel-toast studies on oak volatiles)."
+    conditions: "g furaneol / g oak at LIGHT toast; * oak_gpl => the saturation ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (furaneol RISES with toast — a thermal degradation product). Single-molecule pool. Off every ledger (wood-derived). Doubly caveated: order-of-magnitude yield AND a fixed dose->ceiling linearity."
+oak_yield_furaneol_medium:
+  value: 2.0e-6
+  unit: "g/g"   # ~8 ug/L at 4 g/L oak (OAV ~2 beer)
+  tier: speculative
+  uncertainty: { low: 6.0e-7, high: 8.0e-6, note: "furaneol at MEDIUM toast — rising as toasting caramelizes/degrades the wood sugars; ~8 ug/L ceiling at 4 g/L oak, clearly over the ~4-5 ug/L threshold (a real medium-toast caramel note, OAV ~2 beer — in the oak-sibling band)." }
+  provenance:
+    source: "author estimate; see oak_yield_furaneol_light — furaneol rises from light to heavy toast (thermal sugar degradation; caramel strengthens with barrel toast/char)."
+    conditions: "g furaneol / g oak at MEDIUM toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (furaneol rises with toast). Single-molecule pool."
+oak_yield_furaneol_heavy:
+  value: 5.0e-6
+  unit: "g/g"   # ~20 ug/L at 4 g/L oak (prominent caramel of a charred/heavy barrel, OAV ~5 beer)
+  tier: speculative
+  uncertainty: { low: 1.5e-6, high: 2.0e-5, note: "furaneol at HEAVY toast — ITS PEAK (strong caramel/toffee of a heavily-toasted/charred barrel — the bourbon-char regime); ~20 ug/L ceiling at 4 g/L oak, OAV ~5 beer — prominent, matching guaiacol's heavy-toast prominence (both charred-barrel-dominant), not a caramel bomb." }
+  provenance:
+    source: "author estimate; see oak_yield_furaneol_light — furaneol is HIGHEST at heavy toast/char (maximal thermal sugar degradation; the caramel of a charred bourbon-style barrel)."
+    conditions: "g furaneol / g oak at HEAVY toast; * oak_gpl => ceiling (g/L) at T_ref = 293.15 K"
+    notes: "SPECULATIVE magnitude, SOURCED toast ordering (furaneol peaks heavy). Single-molecule pool."
 
 # -- ACTIVATION ENERGY: warmer extracts faster, but WEAKLY (diffusion-limited) -----------------
 # DELIBERATELY LOW and its OWN parameter (prime directive #2): oak extraction is DIFFUSION-limited,
