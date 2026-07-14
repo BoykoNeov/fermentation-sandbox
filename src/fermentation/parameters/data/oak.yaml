@@ -160,12 +160,13 @@ oak_fill_retention:
 # chips/S:V contact one, so scaling it by the generalized oak_gpl dose would be wrong (oak chips
 # carry no soaked spirit). The caller asserts an ex-spirit barrel via the categorical `spirit`.
 #
-# SCOPE (v1), flagged loudly:
-#   * ETHANOL (ABV) ONLY this beat. The bourbon AROMA soak-back (residual vanilla/caramel/coconut
-#     spirit congeners) is a SEPARATE deferred contribution — it OVERLAPS the oak aroma pools
-#     already modelled (vanillin/whiskey_lactone/etc., D-77), so booking it now would double-count;
-#     the honest v1 is the measurable ABV gain, aroma congeners deferred. So "spirit soak-back" is
-#     NOT fully done — only its ethanol (ABV) half.
+# SCOPE (D-92): ETHANOL (ABV) ONLY. The bourbon AROMA soak-back (residual vanilla/coconut/char
+# spirit congeners) is the SEPARATE second half — now modelled in D-93 below, as a bump to the
+# SAME D-77 aroma ceilings (NOT a parallel pool: bumping one ceiling can't double-count; a parallel
+# pool would). D-92 deferred it out of the double-count fear that a bolus DIRECTLY into the extracted
+# pool would need; D-93 resolves that by bumping the CEILING (the only additive-with-wood option —
+# see aging.py OakExtraction gate) and letting OakExtraction leach it gradually. So the ethanol and
+# aroma halves are now BOTH done — D-92 ethanol + D-93 aroma.
 #   * INSTANTANEOUS at charge, not the gradual weeks-months leach reality shows — the add_oxygen
 #     dose simplification (front-loads the ABV vs a ramp). A gradual leach from a finite on-ledger
 #     spirit RESERVOIR slot (drawn down into E, conserving WITHIN-segment with no external-flow
@@ -191,7 +192,77 @@ spirit_soak_retention:
   provenance:
     source: "author estimate anchored to the ORDERING that residual barrel SPIRIT depletes FASTER than the wood extractables — an ex-bourbon barrel's soaked spirit is largely leached out by its first fill (first-fill vs neutral-barrel practice in barrel-aged beer), so the ABV pickup drops steeply after the first use, faster than the oak-character decline governed by oak_fill_retention (D-91)."
     conditions: "dimensionless; multiplies the spirit_soak_ethanol_<spirit> ethanol bolus by spirit_soak_retention ** (fill_number - 1) at charge time, generic ex-spirit barrel."
-    notes: "SOURCED ORDERING (residual spirit depletes faster than wood extractables; steeper than oak_fill_retention) + SPECULATIVE magnitude (banded 0.05-0.4). Its OWN parameter, NOT reused oak_fill_retention (prime directive #2, and the value genuinely differs — spirit rinses faster than wood extracts). Geometric ACROSS-FILL discount; a gradual within-fill reservoir leach is the deferred refinement."
+    notes: "SOURCED ORDERING (residual spirit depletes faster than wood extractables; steeper than oak_fill_retention) + SPECULATIVE magnitude (banded 0.05-0.4). Its OWN parameter, NOT reused oak_fill_retention (prime directive #2, and the value genuinely differs — spirit rinses faster than wood extracts). Geometric ACROSS-FILL discount; a gradual within-fill reservoir leach is the deferred refinement. Multiplies BOTH the ethanol soak (D-92) AND the aroma soak (D-93): same residual spirit, one depletion."
+
+# =============================================================================================
+# BOURBON-BARREL AROMA SOAK-BACK: an ex-spirit barrel donates residual CONGENERS (decision D-93).
+#
+# The SECOND half of the bourbon soak-back D-92 deferred. Bourbon is matured for years in CHARRED
+# NEW OAK, so the residual spirit soaked into an ex-bourbon barrel's staves ("the devil's cut")
+# carries the spirit's own aroma congeners — vanilla (vanillin), coconut/oak (oak lactone), and
+# char/smoke (guaiacol) — which leach BACK into the beer/wine ON TOP of what the wood diffusion
+# gives (D-77). This is why a bourbon-barrel imperial stout reads vanilla-/coconut-/char-FORWARD.
+#
+# THE MODEL — a CEILING BUMP, drawn in GRADUALLY by the existing OakExtraction Process (D-77), NOT a
+# bolus. The ONLY way to make wood + spirit ADDITIVE: OakExtraction rises each pool toward its
+# ceiling with gap = ceiling - conc, so a bolus straight into the extracted pool (the ethanol->E
+# move) would be ERASED — extraction fills up to the wood ceiling regardless, giving max(bump, wood)
+# not the sum (aging.py OakExtraction gate). Bumping the CEILING (ceiling = wood + spirit) is the
+# only additive form, and it is BOTH more faithful (gradual weeks-months leach, not an instant
+# jump) AND legal: the aroma ceilings are OFF the carbon/mass ledger (wood-derived, iso_alpha
+# precedent), so — UNLIKE D-92's on-ledger ethanol, which was FORCED to a discrete dose to avoid
+# creating carbon within-segment — a gradual off-ledger leach is available here for free. The ledger
+# is what splits the two halves (ethanol=bolus, aroma=gradual), not caprice.
+#
+# NOT double-counting: one shared pool bumped, NOT a parallel pool. The D-77 oak_yield_* values are
+# generic NEW-oak wood diffusion; this adds the ex-bourbon barrel's residual-SPIRIT congeners on top
+# into the SAME measured pool. (The ex-bourbon barrel's DEPLETED WOOD — it extracted into the spirit
+# for years — is the ORTHOGONAL third effect, represented by fill_number, D-91; not baked in here.)
+#
+# TOAST-INDEPENDENT and oak_gpl-INDEPENDENT (both DELIBERATE): the spirit's congener profile is set
+# by the BOURBON's char, not the toast the cooper gave the new-oak dose, and the residual-spirit
+# amount is a BARREL property, not a chips/S:V one — so these are flat per-first-fill g/L bumps,
+# indexed by SPIRIT (spirit_soak_<compound>_bourbon), NOT by toast, and NOT scaled by oak_gpl. They
+# deplete with reuse by the SAME spirit_soak_retention as the ethanol (one residual spirit, one
+# depletion): ceiling_bump = spirit_soak_<compound>_bourbon * spirit_soak_retention ** (fill - 1).
+#
+# COMPOUND SUBSET (DELIBERATE, not all five): vanilla + coconut + char are bourbon's signature, so
+# vanillin + whiskey_lactone + guaiacol are bumped; eugenol (CLOVE) is NOT a bourbon note and is left
+# untouched; ellagitannin is a wood TASTE tannin, not a spirit aroma congener, also untouched.
+# CARAMEL — a real bourbon note — has NO aroma pool and would need a new furanone pool that may
+# collide with the D-88 caramelization / A420 axis; DEFERRED (scope creep), flagged not built.
+#
+# PROVENANCE is SOFTER than the ethanol's: no clean measurable observable (the ethanol had the ~1%
+# ABV gain). We have a sourced ORDERING (ex-bourbon beer reads vanilla/coconut/char-forward vs
+# neutral oak) and SPECULATIVE magnitudes, sized clearly suprathreshold at first fill (beer
+# thresholds: vanillin 130, whiskey_lactone 35, guaiacol 10 ug/L, sensory.yaml). Banded wide.
+spirit_soak_vanillin_bourbon:
+  value: 2.0e-4
+  unit: "g/L"   # vanillin ceiling BUMP from a FIRST-FILL ex-bourbon barrel; * retention**(fill-1)
+  tier: speculative
+  uncertainty: { low: 5.0e-5, high: 4.0e-4, note: "vanillin (200 ug/L) the ex-bourbon barrel's residual spirit adds to the aroma ceiling at first fill — comparable to a medium-toast wood ceiling (~200 ug/L at 4 g/L), well over the ~130 ug/L beer threshold, so vanilla reads FORWARD. No clean observable; sized to the vanilla-forward character of bourbon-barrel beer. Banded 50-400 ug/L." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that bourbon-barrel-aged beer reads VANILLA-forward (vanillin is the signature note of bourbon's charred-new-oak maturation, carried back in the residual spirit); magnitude sized clearly above the ~130 ug/L beer vanillin threshold (sensory.yaml)."
+    conditions: "g/L bump to the vanillin_ceiling by a FIRST-FILL (fill_number = 1) ex-bourbon barrel, toast- and oak_gpl-INDEPENDENT; * spirit_soak_retention ** (fill_number - 1) for reused barrels; drawn in gradually by OakExtraction (D-77)."
+    notes: "SOURCED ORDERING (vanilla-forward) + SPECULATIVE magnitude. OFF the carbon/mass ledger (aroma ceiling, iso_alpha precedent) — moves nothing conserved. Bumps the SAME D-77 vanillin pool (additive with wood, NOT a parallel pool ⇒ cannot double-count). Toast-INDEPENDENT (set by bourbon's char, not the cooper's toast)."
+spirit_soak_whiskey_lactone_bourbon:
+  value: 1.0e-4
+  unit: "g/L"   # whiskey-lactone (coconut) ceiling BUMP from a FIRST-FILL ex-bourbon barrel
+  tier: speculative
+  uncertainty: { low: 2.0e-5, high: 2.5e-4, note: "whiskey/oak lactone (100 ug/L) — the COCONUT note — the residual spirit adds at first fill. Bourbon's coconut/oak character is prominent; sized well over the ~35 ug/L beer threshold (OAV ~3). Exceeds the medium-toast wood ceiling (~80 ug/L). Banded 20-250 ug/L." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that bourbon-barrel beer reads COCONUT/oak-forward (whiskey (oak) lactone is the classic coconut note of bourbon's charred oak, carried in the residual spirit); magnitude sized clearly above the ~35 ug/L beer whiskey_lactone threshold (sensory.yaml)."
+    conditions: "g/L bump to the whiskey_lactone_ceiling by a FIRST-FILL ex-bourbon barrel, toast- and oak_gpl-INDEPENDENT; * spirit_soak_retention ** (fill_number - 1); drawn in gradually by OakExtraction (D-77)."
+    notes: "SOURCED ORDERING (coconut-forward) + SPECULATIVE magnitude. OFF the ledger (aroma ceiling). Bumps the SAME D-77 whiskey_lactone pool (additive, not parallel). Toast-INDEPENDENT. Lumped cis+trans oak lactone, the D-77 convention."
+spirit_soak_guaiacol_bourbon:
+  value: 4.0e-5
+  unit: "g/L"   # guaiacol (smoky/char) ceiling BUMP from a FIRST-FILL ex-bourbon barrel
+  tier: speculative
+  uncertainty: { low: 1.0e-5, high: 1.0e-4, note: "guaiacol (40 ug/L) — the SMOKY/CHAR note — the residual spirit adds at first fill. Bourbon barrels are CHARRED (not just toasted), so char/smoke is a genuine bourbon-barrel note; sized over the ~10 ug/L beer threshold (OAV ~4). Banded 10-100 ug/L. The SMALLEST of the three bumps (char is present but subordinate to vanilla/coconut)." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that bourbon barrels are CHARRED (a real char layer, unlike a toasted wine barrel), so bourbon-barrel beer carries a genuine char/smoke note (guaiacol); magnitude sized above the ~10 ug/L beer guaiacol threshold (sensory.yaml) but the smallest of the three (subordinate to vanilla/coconut)."
+    conditions: "g/L bump to the guaiacol_ceiling by a FIRST-FILL ex-bourbon barrel, toast- and oak_gpl-INDEPENDENT; * spirit_soak_retention ** (fill_number - 1); drawn in gradually by OakExtraction (D-77)."
+    notes: "SOURCED ORDERING (char present, subordinate) + SPECULATIVE magnitude. OFF the ledger (aroma ceiling). Bumps the SAME D-77 guaiacol pool (additive, not parallel). Toast-INDEPENDENT. This is the oak/toast guaiacol, NOT the Brett 4-ethylguaiacol (a separate pool)."
 
 # -- ACTIVATION ENERGY: warmer extracts faster, but WEAKLY (diffusion-limited) -----------------
 # DELIBERATELY LOW and its OWN parameter (prime directive #2): oak extraction is DIFFUSION-limited,

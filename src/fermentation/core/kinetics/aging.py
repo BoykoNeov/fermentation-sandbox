@@ -1492,8 +1492,13 @@ class OakExtraction(Process):
     **ethanol** soak-back (the ~1% ABV a bourbon barrel donates) is also modelled — but as an
     ``add_oak`` ethanol *dose* (D-92), NOT by this Process: soak-back ethanol comes from the spirit,
     not the wood, and lands on the core ``E`` slot, so it is a discrete on-ledger dose, orthogonal
-    to this off-ledger diffusion axis. The bourbon *aroma* soak-back and a gradual reservoir leach
-    remain deferred (D-92).
+    to this off-ledger diffusion axis. The bourbon *aroma* soak-back (D-93) IS drawn by THIS
+    Process: an ex-spirit ``add_oak`` dose BUMPS the vanillin/whiskey_lactone/guaiacol ceilings by
+    the residual spirit's congeners, and this Process leaches them in gradually on top of the wood
+    diffusion — a
+    ceiling bump being the only wood + spirit *additive* form (a bolus into the pool would be erased
+    by the ``gap = ceiling − conc`` gate below). A gradual within-fill reservoir leach remains
+    deferred (D-92).
     """
 
     name = "oak_extraction"

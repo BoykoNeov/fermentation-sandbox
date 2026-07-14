@@ -1087,6 +1087,15 @@ _OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagit
 #: oak.yaml) into the beverage, raising ABV. ``bourbon`` this beat (whiskey/rum extensible); the
 #: categorical is how the caller asserts a soaked barrel (soak-back is a barrel, not chips).
 _OAK_SPIRITS = ("bourbon",)
+#: The oak-aroma extractives an ex-spirit barrel's residual spirit BUMPS the ceiling of (D-93): the
+#: bourbon-barrel aroma soak-back. A DELIBERATE subset of :data:`_OAK_COMPOUNDS` — vanilla +
+#: coconut + char are bourbon's signature (``vanillin``/``whiskey_lactone``/``guaiacol``);
+#: ``eugenol`` (clove) is not a bourbon note and ``ellagitannin`` is a wood taste tannin, so both
+#: are excluded.
+#: Each is bumped by ``spirit_soak_<compound>_<spirit>`` (toast- and ``oak_gpl``-independent, ×
+#: ``spirit_scale``); ``OakExtraction`` then leaches it in gradually — a CEILING bump is the only
+#: form additive with the wood pool (a bolus into the pool is erased by the extraction gate, D-93).
+_OAK_SPIRIT_AROMAS = ("vanillin", "whiskey_lactone", "guaiacol")
 
 
 def _verb_add_oak(
@@ -1154,9 +1163,29 @@ def _verb_add_oak(
     straight to the observed ABV gain. Residual spirit depletes with reuse via its OWN steep
     ``spirit_soak_retention`` (spirit ~gone by fill 2–3, far faster than the wood's
     ``oak_fill_retention``), read only when it bites. ``spirit`` DEFAULTS ABSENT ⇒ no ethanol dose
-    ⇒ **byte-for-byte** the pre-D-92 charge. v1 models ETHANOL (ABV) ONLY; the bourbon AROMA
-    congener soak-back (overlaps the D-77 oak aroma pools) and a gradual within-fill reservoir
-    leach (both more faithful, the latter conservation-natural) are documented refinements deferred.
+    ⇒ **byte-for-byte** the pre-D-92 charge.
+
+    **Bourbon-barrel aroma soak-back (decision D-93).** The same ``spirit`` also carries the
+    residual spirit's own aroma **congeners** — bourbon matures in **charred new oak**, so its
+    residual spirit reads vanilla/coconut/char-forward. So a ``spirit`` dose ALSO **bumps the
+    ceilings** of the bourbon-signature aroma extractives (:data:`_OAK_SPIRIT_AROMAS`:
+    ``vanillin``/``whiskey_lactone``/``guaiacol`` — not clove ``eugenol`` or the taste tannin
+    ``ellagitannin``) by ``spirit_soak_<compound>_<spirit> × spirit_scale`` g/L, and
+    :class:`~fermentation.core.kinetics.aging.OakExtraction` then leaches them in **gradually** on
+    top of the wood diffusion. A CEILING bump — NOT a bolus into the extracted pool, which the
+    extraction gate (``gap = ceiling − conc``) would ERASE, giving ``max(wood, spirit)`` not the
+    sum; bumping the ceiling is the **only** wood + spirit **additive** form. Legal because the
+    aroma ceilings are **off the carbon/mass ledger** (wood-derived, ``iso_alpha`` precedent) — so
+    unlike the on-ledger ethanol (FORCED to a discrete dose lest a gradual leach create carbon
+    within-segment), the aroma leach is gradual for free, the **more faithful** form. Toast- and
+    ``oak_gpl``-INDEPENDENT (the congener profile is set by the bourbon's char, not the cooper's
+    toast, and residual spirit is a barrel not a chips/S:V property), depleting with reuse by the
+    SAME ``spirit_scale`` as the ethanol. NOT double-counting: one shared pool bumped, not a
+    parallel pool (the D-77 yields stay generic new-oak wood; the ex-bourbon barrel's *depleted
+    wood* is the orthogonal ``fill_number`` effect, D-91). Caramel — a real bourbon note with no
+    aroma pool — is deferred (a new furanone pool would risk colliding with the D-88
+    caramelization/A420 axis). ``spirit`` absent ⇒ no bump ⇒ byte-for-byte the pre-D-92 charge on
+    the aroma ceilings too.
     """
     _iv_check_keys(iv, frozenset({"oak_gpl", "toast", "fill_number", "spirit"}), "add_oak")
     oak_gpl = _iv_float(iv, "oak_gpl", "add_oak")
@@ -1217,6 +1246,7 @@ def _verb_add_oak(
     # BITES (fill_number != 1). ETHANOL (ABV) only — bourbon AROMA congeners (overlapping the D-77
     # oak aroma pools) and a gradual reservoir leach are deferred refinements.
     ethanol_soak_delta = 0.0
+    spirit_aroma_bumps: dict[str, float] = {}  # D-93: compound -> ceiling bump from residual spirit
     if "spirit" in iv.params:
         spirit = _iv_str(iv, "spirit", "add_oak")
         if spirit not in _OAK_SPIRITS:
@@ -1248,6 +1278,21 @@ def _verb_add_oak(
                 ) from None
             spirit_scale = spirit_retention ** (fill_number - 1)
         ethanol_soak_delta = soak_gpl * spirit_scale
+        # Bourbon AROMA soak-back (D-93): the residual spirit also BUMPS the ceilings of the
+        # bourbon-signature aroma extractives (vanilla/coconut/char), which OakExtraction then
+        # leaches in gradually — a CEILING bump, NOT a bolus into the pool (the extraction gate
+        # would erase it). Toast- and oak_gpl-INDEPENDENT flat g/L bumps, × the SAME spirit_scale as
+        # ethanol (one residual spirit, one depletion). Off-ledger like the ceilings they raise.
+        for compound in _OAK_SPIRIT_AROMAS:
+            bump_name = f"spirit_soak_{compound}_{spirit}"
+            try:
+                bump_val = parameters[bump_name].value
+            except KeyError:
+                raise ValueError(
+                    f"intervention 'add_oak' with spirit={spirit!r} needs {bump_name!r} but it is "
+                    "missing; include oak.yaml in parameter_paths (decision D-93)."
+                ) from None
+            spirit_aroma_bumps[compound] = bump_val * spirit_scale
     ceiling_deltas: dict[str, float] = {}
     for compound in _OAK_COMPOUNDS:
         yield_name = f"oak_yield_{compound}_{toast}"
@@ -1258,8 +1303,13 @@ def _verb_add_oak(
                 f"intervention 'add_oak' needs {yield_name!r} but it is missing; include oak.yaml "
                 "in parameter_paths (the default lookup merges it automatically, decision D-77)."
             ) from None
-        # fill_scale discounts the fresh-barrel ceiling by the barrel's use history (D-91).
-        ceiling_deltas[f"{compound}_ceiling"] = oak_gpl * yield_val * fill_scale
+        # fill_scale discounts the fresh-barrel ceiling by the barrel's use history (D-91); the D-93
+        # spirit-aroma bump (0.0 for compounds not in _OAK_SPIRIT_AROMAS, or when no spirit) adds
+        # the ex-bourbon barrel's residual-spirit congeners on top of the wood diffusion into the
+        # SAME ceiling — additive, so OakExtraction rises the pool to wood + spirit, not the max.
+        ceiling_deltas[f"{compound}_ceiling"] = (
+            oak_gpl * yield_val * fill_scale + spirit_aroma_bumps.get(compound, 0.0)
+        )
     slices = {name: schema.slice(name) for name in ceiling_deltas}
     ethanol_slice = schema.slice("E") if ethanol_soak_delta else None
 

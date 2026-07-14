@@ -1077,6 +1077,9 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
 
 _OAK_EXTRACTIVES = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
 _OAK_CEILINGS = tuple(f"{c}_ceiling" for c in _OAK_EXTRACTIVES)
+#: The bourbon aroma-soak-back subset (D-93) — mirrors compile._OAK_SPIRIT_AROMAS. An ex-bourbon
+#: barrel BUMPS these three (vanilla/coconut/char); eugenol (clove) + ellagitannin are untouched.
+_OAK_SPIRIT_AROMAS = ("vanillin", "whiskey_lactone", "guaiacol")
 
 
 def test_oak_extraction_gated_by_begin_aging_both_media():
@@ -1530,8 +1533,11 @@ def test_spirit_soak_back_absent_leaves_ethanol_untouched_byte_for_byte():
     after_b = ev_b.mutate(bourbon.schema, bourbon.y0.copy())
     # No spirit ⇒ E untouched by the dose (mutate only writes off-ledger ceilings).
     assert plain.schema.get(after_p, "E") == plain.schema.get(plain.y0, "E")
-    # spirit does NOT touch the ceilings — identical to the plain charge at the same oak_gpl/toast.
-    for compound in (*_OAK_EXTRACTIVES, "ellagitannin"):
+    # spirit does NOT touch the NON-soak ceilings (eugenol/clove + the ellagitannin taste tannin are
+    # not bourbon congeners, D-93) — identical to the plain charge at the same oak_gpl/toast. The
+    # three aroma-soak ceilings (vanillin/whiskey_lactone/guaiacol) ARE bumped — see the D-93 tests.
+    untouched = set(_OAK_EXTRACTIVES + ("ellagitannin",)) - set(_OAK_SPIRIT_AROMAS)
+    for compound in untouched:
         name = f"{compound}_ceiling"
         assert bourbon.schema.get(after_b, name) == plain.schema.get(after_p, name)
 
@@ -1631,6 +1637,134 @@ def test_bourbon_barrel_stout_gains_abv_end_to_end():
     # First-fill bourbon barrel adds the most ABV; a near-neutral reused barrel adds little; a
     # spirit-free oak barrel adds none — the ordering a barrel-aged-beer program manages.
     assert first_fill > fourth_fill > no_spirit
+
+
+# -- D-93: bourbon-barrel AROMA soak-back — an ex-spirit barrel donates residual CONGENERS -------
+#
+# The second half of the D-92 soak-back. Bourbon matures in CHARRED NEW OAK, so its residual spirit
+# reads vanilla/coconut/char-forward: add_oak {spirit: bourbon} BUMPS the vanillin/whiskey_lactone/
+# guaiacol ceilings (a DELIBERATE subset; not eugenol/clove or the ellagitannin tannin) by
+# spirit_soak_<c>_bourbon × spirit_scale, and OakExtraction (D-77) leaches them in GRADUALLY on top
+# of the wood diffusion. A CEILING bump — the ONLY wood + spirit ADDITIVE form (a bolus into the
+# pool is erased by the extraction gate). Off the carbon/mass ledger (aroma ceilings, iso_alpha).
+# spirit ABSENT ⇒ no bump ⇒ byte-for-byte the pre-D-92 charge on the aroma ceilings too.
+
+
+def test_bourbon_aroma_bumps_the_signature_ceilings_by_exactly_the_spirit_soak():
+    # A first-fill ex-bourbon barrel raises EACH of the three signature aroma ceilings
+    # (vanillin/whiskey_lactone/guaiacol) by exactly its spirit_soak_<c>_bourbon g/L (retention**0
+    # == 1.0), ON TOP of the wood ceiling — while eugenol (clove) and ellagitannin stay wood-only.
+    plain = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium")])
+    )
+    bourbon = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium", spirit="bourbon")]
+        )
+    )
+    ev_p = next(e for e in plain.events if e.label.startswith("add_oak"))
+    ev_b = next(e for e in bourbon.events if e.label.startswith("add_oak"))
+    assert ev_p.mutate is not None and ev_b.mutate is not None
+    after_p = ev_p.mutate(plain.schema, plain.y0.copy())
+    after_b = ev_b.mutate(bourbon.schema, bourbon.y0.copy())
+    for compound in _OAK_SPIRIT_AROMAS:
+        name = f"{compound}_ceiling"
+        bump = bourbon.param_values[f"spirit_soak_{compound}_bourbon"]
+        assert bump > 0.0
+        # The bourbon ceiling is the wood ceiling PLUS the spirit bump — additive, not max/replace.
+        assert bourbon.schema.get(after_b, name) == pytest.approx(
+            plain.schema.get(after_p, name) + bump, rel=1e-12
+        )
+    # Non-signature extractives (clove + tannin) are NOT bumped — the deliberate subset.
+    for compound in ("eugenol", "ellagitannin"):
+        name = f"{compound}_ceiling"
+        assert bourbon.schema.get(after_b, name) == plain.schema.get(after_p, name)
+
+
+def test_bourbon_aroma_bump_depletes_geometrically_with_fill_number():
+    # The residual-spirit congeners deplete with reuse by the SAME spirit_soak_retention as the
+    # ethanol (one residual spirit, one depletion): the vanillin ceiling BUMP at fills 1/2/3 is in
+    # the ratio 1 : r_s : r_s² — steeper than the wood's oak_fill_retention (discounts wood).
+    def vanillin_bump(fill: int) -> float:
+        # Isolate the spirit contribution: bourbon ceiling minus the same-fill plain (wood) ceiling.
+        def ceil(spirit: str | None) -> float:
+            cs = compile_scenario(
+                _wine(
+                    [
+                        _begin_aging(_FERMENT_DAYS),
+                        _add_oak(
+                            _FERMENT_DAYS, 4.0, "medium", fill_number=fill, spirit=spirit
+                        ),
+                    ]
+                )
+            )
+            ev = next(e for e in cs.events if e.label.startswith("add_oak"))
+            assert ev.mutate is not None
+            after = ev.mutate(cs.schema, cs.y0.copy())
+            return float(cs.schema.get(after, "vanillin_ceiling"))
+
+        return ceil("bourbon") - ceil(None)
+
+    r_s = compile_scenario(_wine([])).param_values["spirit_soak_retention"]
+    first, second, third = vanillin_bump(1), vanillin_bump(2), vanillin_bump(3)
+    assert first > second > third > 0.0
+    assert second == pytest.approx(first * r_s)
+    assert third == pytest.approx(first * r_s**2)
+
+
+def test_bourbon_aroma_leaches_in_gradually_and_reads_forward_end_to_end():
+    # The end-to-end payoff AND the additive proof at runtime: a bourbon-barrel beer finishes with
+    # HIGHER extracted vanillin/whiskey_lactone/guaiacol than the SAME beer in an identical
+    # spirit-free oak barrel — OakExtraction actually reaches the raised (wood + spirit) ceiling, so
+    # the spirit congeners are NOT erased by the gate (the whole reason for the ceiling-bump
+    # design). Their OAVs rise too (vanilla/coconut/char read FORWARD); eugenol (not bumped) is not.
+    thresholds = load_thresholds()
+
+    def finals(iv: Intervention) -> tuple[dict[str, float], dict[str, float]]:
+        traj = compile_scenario(_beer([_begin_aging(14.0), iv])).run()
+        assert traj.success
+        pools = {c: float(traj.series(c)[-1]) for c in (*_OAK_SPIRIT_AROMAS, "eugenol")}
+        # Exercise the OAV readout (Beat 1a) too, not just the raw pools — the test claims the aroma
+        # "reads forward", so it must go through the sensory pathway, not merely the concentrations.
+        tj = traj.as_trajectory()
+        oav = {c: float(oav_series(tj, thresholds, c)[-1]) for c in _OAK_SPIRIT_AROMAS}
+        return pools, oav
+
+    (no_spirit, no_oav) = finals(_add_oak(14.0, 6.0, "medium"))
+    (bourbon, bourbon_oav) = finals(_add_oak(14.0, 6.0, "medium", spirit="bourbon"))
+    for compound in _OAK_SPIRIT_AROMAS:
+        assert bourbon[compound] > no_spirit[compound]  # spirit congeners actually leach in
+        # The sensory readout lifts too: each signature aroma reads MORE FORWARD (higher OAV) with
+        # the bourbon soak-back, and clears its perception threshold (OAV > 1) on its own.
+        assert bourbon_oav[compound] > no_oav[compound]
+        assert bourbon_oav[compound] > 1.0
+    # eugenol is not a bourbon congener ⇒ its extracted pool is identical either way.
+    assert bourbon["eugenol"] == pytest.approx(no_spirit["eugenol"], rel=1e-9)
+
+
+def test_bourbon_aroma_soak_back_is_off_ledger():
+    # The aroma bump moves NO conserved quantity (aroma ceilings + extracted pools are off the
+    # carbon/mass ledger, the iso_alpha precedent) — so a bourbon run's ONLY carbon injection is the
+    # D-92 ethanol dose. Total injected carbon equals the ethanol-only amount; carbon still closes.
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium", spirit="bourbon")]
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.param_values["biomass_C_fraction"]
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    injected = sum(c_of(flow.delta) for flow in traj.external_flows)
+    # Ethanol carbon: the soak-back ethanol bolus is the ONLY carbon the whole add_oak dose injects
+    # (the aroma bumps are carbon-free). Its magnitude is spirit_soak_ethanol_bourbon g/L ethanol.
+    ethanol_gpl = cs.param_values["spirit_soak_ethanol_bourbon"]
+    e_only = cs.schema.zeros()
+    e_only[cs.schema.slice("E")] = ethanol_gpl
+    ethanol_carbon = c_of(e_only)
+    assert injected == pytest.approx(ethanol_carbon, rel=1e-9)
+    c_initial, c_final = c_of(cs.y0), c_of(traj.y[:, -1])
+    assert c_final == pytest.approx(c_initial + injected, abs=1e-9)
 
 
 # -- D-79: tannin–anthocyanin condensation end-to-end (red-wine softening + colour stabilization) --

@@ -7214,6 +7214,77 @@ purely the dose. **Every wine + beer trajectory without `fill_number` (or with `
 **Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield, the deferred finite-reservoir /
 per-compound-retention refinements, bourbon-barrel spirit soak-back.
 
+## D-93 — bourbon-barrel AROMA soak-back: an ex-spirit barrel donates residual CONGENERS — an `add_oak` `spirit` **ceiling bump**, no new Process/state (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3.** The **second half** of the bourbon soak-back D-92 deferred. Bourbon matures
+for years in **charred new oak**, so the residual spirit soaked into an ex-bourbon barrel's staves ("the devil's cut") carries
+the spirit's own aroma **congeners** — vanilla (vanillin), coconut/oak (whiskey lactone), char/smoke (guaiacol) — which leach
+**back into** the beer/wine **on top of** what the wood diffusion gives (D-77). This is why a bourbon-barrel imperial stout reads
+vanilla-/coconut-/char-**forward**. **One `advisor()` pass** (confirmed the design and sharpened it; no owner fork). 1003 → 1007
+tests (+4, one D-92 test amended), `ruff`/`mypy`/`pytest` green.
+
+**The design — a CEILING BUMP, drawn in GRADUALLY by the existing `OakExtraction` (D-77), NOT a bolus.** `add_oak {spirit}` also
+adds `spirit_soak_<compound>_<spirit> × spirit_scale` g/L to each of the three bourbon-signature aroma **ceilings**
+(`vanillin`/`whiskey_lactone`/`guaiacol`), and `OakExtraction` then rises those pools toward the raised ceilings on top of the
+wood diffusion. **No new Process, state slot, or schema change** — the bump lands on the existing ceiling slots the D-77 machinery
+already reads. `spirit` **absent** ⇒ no bump ⇒ **byte-for-byte** the pre-D-92 charge on the aroma ceilings too.
+
+**Why a ceiling bump is the ONLY additive form — the advisor's load-bearing proof.** A bolus straight **into** the extracted pool
+(mirroring D-92's ethanol→`E` move) would be **erased** by the `OakExtraction` gate: at a typical first charge `conc ≈ 0`, so
+`gap = C_wood − X` stays positive and extraction fills the pool up to `C_wood` **regardless of X** — yielding `max(X, C_wood)`,
+never the **sum** (`aging.py` OakExtraction gate, `gap = ceiling − conc`). Bumping the **ceiling** (`ceiling = C_wood + X`) is the
+**only** way to make wood + spirit **additive**. Verified against the gate before writing.
+
+**The D-92 asymmetry (ethanol = instantaneous bolus, aroma = gradual leach) is a STRENGTH, not an oversight — the ledger splits
+them.** Ethanol is **on** the carbon+mass ledger, so a gradual within-Process leach would **create carbon within-segment** (D-92's
+whole blocker) ⇒ **forced** to a discrete dose. The aroma ceilings are **off** the ledger (wood-derived, the `iso_alpha`
+precedent) ⇒ a gradual-via-ceiling leach is **both available AND strictly more faithful** — exactly the "instantaneous is a
+simplification" refinement D-92 flagged. Not caprice: the ledger is what splits the two halves.
+
+**Double-count — genuinely resolved (the reason D-92 deferred this).** One shared pool is **bumped**, NOT a parallel pool added,
+so the *state* cannot double-count (provided the D-77 yields stay wood-only — they are: generic new-oak diffusion). The ex-bourbon
+barrel's *depleted wood* (it extracted into the spirit for years) is the **orthogonal** third effect, represented by `fill_number`
+(D-91, which already discounts both ceilings) — **not** baked into the spirit feature.
+
+**Advisor sharpenings, all taken (they set the param shape):** (1) **Toast-INDEPENDENT** — the congener profile is set by the
+bourbon's char, not the toast the cooper gave the new-oak dose, so params are `spirit_soak_<compound>_bourbon` (indexed by
+**spirit**, like the ethanol param), **not** `..._<toast>`. Also `oak_gpl`-independent (residual spirit is a **barrel**, not a
+chips/S:V, property) — flat per-first-fill g/L bumps. (2) **Deliberate compound subset** — vanilla + coconut + char are bourbon's
+signature (`vanillin` + `whiskey_lactone` clear, `guaiacol` for the **char** layer — bourbon barrels are charred, not merely
+toasted); **`eugenol` (clove) is NOT a bourbon note** and the `ellagitannin` **taste** tannin is not an aroma congener — both left
+untouched. (3) **Reuse `spirit_scale`** — same residual spirit ⇒ same depletion; the aroma bump multiplies by the same
+`spirit_soak_retention ** (fill − 1)` as the ethanol (one residual spirit, one depletion — no second retention). (4) **Softer
+provenance** — no clean measurable observable here (the ethanol had the ~1% ABV anchor); we have a sourced **ordering**
+(ex-bourbon beer reads vanilla/coconut/char-forward vs neutral oak) and **speculative** magnitudes, sized clearly suprathreshold
+at first fill and banded wide.
+
+**Parameters (`oak.yaml`, all speculative, decoupled from `oak_gpl`/`toast`).** `spirit_soak_vanillin_bourbon = 2.0e-4 g/L`
+(~200 µg/L, over the ~130 beer threshold ⇒ vanilla forward; banded 50–400); `spirit_soak_whiskey_lactone_bourbon = 1.0e-4 g/L`
+(~100 µg/L coconut, OAV ~3 over the ~35 threshold; banded 20–250); `spirit_soak_guaiacol_bourbon = 4.0e-5 g/L` (~40 µg/L char,
+OAV ~4 over the ~10 threshold — the smallest, char subordinate to vanilla/coconut; banded 10–100). **Caramel** — a real bourbon
+note — has **no aroma pool** and would need a new furanone pool that may collide with the D-88 caramelization/A420 axis; **deferred**
+(scope creep), flagged not built.
+
+**Tests (+4, `test_aging_scenario.py`; 1 D-92 test amended).** `test_bourbon_aroma_bumps_the_signature_ceilings_by_exactly_the
+_spirit_soak` (each of the three ceilings rises by exactly `spirit_soak_<c>_bourbon` **on top of** the wood ceiling — additive,
+not max; eugenol + ellagitannin unchanged); `test_bourbon_aroma_bump_depletes_geometrically_with_fill_number` (the isolated
+vanillin bump at fills 1/2/3 in ratio 1 : r_s : r_s² — same `spirit_soak_retention` as the ethanol); `test_bourbon_aroma_leaches
+_in_gradually_and_reads_forward_end_to_end` (the **runtime additive proof** — a bourbon-barrel beer finishes with **higher**
+extracted vanillin/whiskey_lactone/guaiacol than a spirit-free barrel, so OakExtraction actually reaches the raised ceiling and
+the congeners are **not** erased by the gate; and — through the **OAV readout** (Beat 1a, not just raw pools) — each aroma reads
+**more forward** (higher OAV) and clears its perception threshold (OAV > 1); eugenol unchanged); `test_bourbon_aroma_soak_back_is
+_off_ledger` (the aroma bump
+injects **no** carbon — total injected carbon equals the D-92 ethanol-only amount; carbon still closes). The amended D-92 test
+`test_spirit_soak_back_absent_leaves_ethanol_untouched_byte_for_byte` now asserts bourbon == plain only on the **non-soak**
+ceilings (eugenol + ellagitannin); the three signature ceilings ARE bumped (the D-93 tests own that).
+
+**Regression surface.** `oak.yaml` (+3 `spirit_soak_<compound>_bourbon` params + section header; D-92 scope comment updated —
+aroma half now done); `compile.py` (`_verb_add_oak` — `_OAK_SPIRIT_AROMAS`, `spirit_aroma_bumps` collected in the spirit block and
+**added** into `ceiling_deltas`; docstring); `aging.py` (`OakExtraction` scope note — aroma soak-back now drawn by **this**
+Process). **No Process, state, or schema change** — purely the ceiling bump. **Every wine + beer trajectory without `spirit` is
+byte-for-byte unchanged.** **Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield, a caramel/furanone
+pool for the bourbon caramel note, and the gradual-reservoir / per-compound-retention refinements.
+
 ## D-92 — bourbon-barrel spirit soak-back: an ex-spirit barrel donates ETHANOL (raises ABV) — an `add_oak` `spirit` **dose**, no new Process/state (§4.1)
 
 **Date:** 2026-07-14. **Milestone 3 / Tier-3.** The long-deferred "bourbon-barrel spirit soak-back" beat, flagged out of scope
