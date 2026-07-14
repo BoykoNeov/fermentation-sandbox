@@ -95,6 +95,12 @@ WINE_MAILLARD_SLOTS = (
 # Sugar-only
 # (nitrogen-free — caramelization, not Maillard). Wine-only. Raises the shared A420 index (D-74).
 WINE_CARAMELIZATION_SLOTS = ("melanoidin",)
+# The N-bearing Maillard melanoidin carbon+nitrogen-park (decision D-89), appended last: the brown
+# amino-acid-incorporating thermal-browning polymer MaillardBrowning forms by consuming residual
+# sugar AND amino acids (the N-incorporating branch D-88's sugar-only Caramelization deferred). ON
+# total_carbon AND total_nitrogen — the FIRST non-biomass, non-arginine species on the nitrogen
+# ledger (it RETAINS the amino-acid nitrogen). Wine-only. Raises the shared A420 index (D-74/D-88).
+WINE_MAILLARD_BROWNING_SLOTS = ("maillard_melanoidin",)
 
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
@@ -119,6 +125,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_POLYMERIZATION_SLOTS
         + WINE_MAILLARD_SLOTS
         + WINE_CARAMELIZATION_SLOTS
+        + WINE_MAILLARD_BROWNING_SLOTS
     )
     assert schema.spec("S").size == 1
     # 20 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
@@ -151,7 +158,10 @@ def test_wine_schema_has_single_sugar_slot():
     # residual sugar → melanoidin, raising the shared A420; the first aging pool on total_carbon
     # that
     # holds consumed core-S carbon)
-    assert schema.size == 63
+    # + 1 D-89 N-bearing Maillard melanoidin carbon+nitrogen-park slot (the amino-acid-incorporating
+    # thermal browning of residual sugar + amino acids → maillard_melanoidin, raising the same A420;
+    # the FIRST non-biomass, non-arginine species on total_nitrogen — it retains the amino-acid N)
+    assert schema.size == 64
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -454,6 +464,14 @@ WINE_MAILLARD_PROCESSES = {"maillard_strecker"}
 # carbon-park by heat with no O₂, raising the shared A420 index; the first aging Process to consume
 # core S. Wine-only v1. Same compile-seam disable / begin_aging re-enable.
 WINE_CARAMELIZATION_PROCESSES = {"caramelization"}
+# WINE-ONLY, NON-oxidative amino-acid-incorporating THERMAL browning (decision D-89):
+# maillard_browning — the N-bearing browning branch D-88's sugar-only caramelization deferred.
+# Residual sugar + amino acids brown to the on-ledger N-bearing maillard_melanoidin park by heat
+# with
+# no O₂, raising the same A420; the first aging Process on the nitrogen ledger. Draws the shared
+# amino_acids (with D-87) and shared S (with D-88). Wine-only v1. Same disable / begin_aging
+# re-enable.
+WINE_MAILLARD_BROWNING_PROCESSES = {"maillard_browning"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -474,6 +492,7 @@ EXPECTED_PROCESSES = {
         | WINE_AGING_PROCESSES
         | WINE_MAILLARD_PROCESSES
         | WINE_CARAMELIZATION_PROCESSES
+        | WINE_MAILLARD_BROWNING_PROCESSES
         | OAK_PROCESSES
         | WINE_POLYMERIZATION_PROCESSES
         | WINE_BRIDGE_PROCESSES

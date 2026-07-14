@@ -194,6 +194,21 @@
 > D-86 pattern). E_a = 100 kJ/mol (matches D-87 — the thermal axis). The non-oxidative thermal axis (D-87 aroma + D-88
 > browning) is now complete. Next: beat 1b (descriptor projection), barrel fill-number, N-incorporating Maillard melanoidin
 > / beer thermal browning.**
+>
+> **PROGRESS (D-89, 2026-07-14): amino-acid-incorporating THERMAL browning — `MaillardBrowning`, the twelfth aging Process,
+> the N-incorporating browning branch D-88 `Caramelization` explicitly deferred (992 tests). Where D-88 browns SUGAR ALONE to
+> nitrogen-free caramelan, TRUE Maillard condenses residual SUGAR + AMINO ACID → a brown polymer that RETAINS the amino-acid
+> nitrogen (what makes a melanoidin *nitrogenous*), raising the SAME A420. Consumes both core `S` and `amino_acids` with no
+> O₂ into a new on-ledger N-bearing `maillard_melanoidin` pool (glucose–glycine stand-in C8H12O5N, molar C:N ≈ 8:1) — the
+> FIRST aging Process on the nitrogen ledger (first non-biomass, non-arginine species on `total_nitrogen`). ONE advisor pass,
+> owner scope fork (FULL build, N-fate = "closest to reality" = ALL-N-retained, because D-87 already owns the deaminating
+> branch). Dual carbon+nitrogen closure by SIZING both draws to the melanoidin formed (`r_m = r_sugar·c(sugar)/(c_m −
+> n_m·c(arg)/n(arg))`); the denominator sign is the silent trap (>0 or it creates sugar with no test catching it — a metadata
+> test pins it). The 3 thermal branches now split cleanly (sugar-only D-88 / N-retaining D-89 / N-releasing volatile D-87),
+> summed over shared `S`/`amino_acids` by ProcessSet. `k_maillard_browning` calibrated (5e-8, nitrogen-limited/minor) so the
+> shared-`amino_acids` competition doesn't erase the diagnostic sotolon — the D-74-suppresses-acetaldehyde precedent on
+> amino_acids. Wine-only v1. The four-way interaction test became FIVE-WAY. Next: beat 1b (descriptor projection), barrel
+> fill-number, beer thermal browning (the D-86 oak-to-beer pattern for the whole thermal axis).**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

@@ -51,6 +51,7 @@ from fermentation.core.kinetics import (
     EsterHydrolysis,
     FuselAminoAcidReroute,
     IsoAlphaAcidLoss,
+    MaillardBrowning,
     MaillardStrecker,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
@@ -157,7 +158,10 @@ _BRETT_GATED_PROCESSES = (
 #: and
 #: :class:`Caramelization` (the D-88 sugar-only THERMAL browning — residual sugar browns to the
 #: on-ledger ``melanoidin`` carbon-park by heat with no O₂, raising the shared ``A420``; wine-only,
-#: the first aging Process to consume core ``S``), so
+#: the first aging Process to consume core ``S``) and :class:`MaillardBrowning` (the D-89
+#: amino-acid-incorporating THERMAL browning — residual sugar + amino acids brown to the on-ledger
+#: N-bearing ``maillard_melanoidin`` carbon+nitrogen-park by heat with no O₂, raising the same
+#: ``A420``; wine-only, the first aging Process on the nitrogen ledger), so
 #: on beer they are simply absent from the ProcessSet — both the compile-disable and the
 #: begin_aging-enable loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
@@ -181,6 +185,7 @@ _AGING_GATED_PROCESSES = (
     TanninEthylTanninCondensation,
     MaillardStrecker,
     Caramelization,
+    MaillardBrowning,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -608,11 +613,12 @@ def _load_parameters(
         # but loaded universally like the other shared files — collision-free names, inert for beer;
         # INERT until an anthocyanin+tannin must dose + begin_aging enable.
         base / "polymerization.yaml",
-        # Non-oxidative THERMAL aging axis (decisions D-87/D-88): the sugar+heat-driven,
-        # O2-independent Strecker aldehydes (MaillardStrecker) and sugar-only caramelization
-        # browning (Caramelization). Wine-only in effect (only wine wires the Processes + carries
-        # amino_acids / the thermal aroma slots), but loaded universally like the other shared
-        # files — collision-free names, inert for beer; INERT until a begin_aging enable.
+        # Non-oxidative THERMAL aging axis (decisions D-87/D-88/D-89): the sugar+heat-driven,
+        # O2-independent Strecker aldehydes (MaillardStrecker), sugar-only caramelization browning
+        # (Caramelization), and amino-acid-incorporating Maillard browning (MaillardBrowning — the
+        # N-bearing melanoidin branch). Wine-only in effect (only wine wires the Processes + carries
+        # amino_acids / the thermal aroma + melanoidin slots), but loaded universally like the other
+        # shared files — collision-free names, inert for beer; INERT until a begin_aging enable.
         base / "thermal.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))

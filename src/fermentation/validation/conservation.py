@@ -273,6 +273,16 @@ def total_carbon(
     # aging.
     if "melanoidin" in schema:
         w[schema.slice("melanoidin")] = carbon_mass_fraction("melanoidin")
+    # N-bearing Maillard melanoidin (decision D-89): the amino-acid-incorporating thermal-browning
+    # carbon-park. Like caramelan (D-88) it holds core-S carbon, but MaillardBrowning ALSO draws
+    # amino_acids, so this pool carries BOTH the sugar carbon and the amino-acid carbon. Booked at
+    # its own (glucose–glycine stand-in) carbon fraction — the species the Process deposits against
+    # — so total_carbon closes to machine precision: the carbon out of S + amino_acids equals the
+    # carbon into maillard_melanoidin (the draws are sized to it; see the class docstring). It is
+    # ALSO on total_nitrogen (the nitrogen it retains), the first non-biomass, non-arginine species
+    # there. Empty (constant 0) on any run where S ≈ 0 or amino_acids == 0 at aging.
+    if "maillard_melanoidin" in schema:
+        w[schema.slice("maillard_melanoidin")] = carbon_mass_fraction("maillard_melanoidin")
     # Acetaldehyde-bridged condensation ethyl-bridge pool (decision D-80): the SPLIT-LEDGER capture.
     # AcetaldehydeBridgedCondensation consumes ON-ledger acetaldehyde (whose carbon is borrowed from
     # E at D-71) to form an ethylidene bridge —CH(CH₃)— in an OFF-ledger grape-phenolic pigment. If
@@ -357,6 +367,16 @@ def total_nitrogen(
     # species besides biomass; on an undosed run the pool is empty (constant 0 term).
     if "amino_acids" in schema:
         w[schema.slice("amino_acids")] = nitrogen_mass_fraction("arginine")
+    # N-bearing Maillard melanoidin (decision D-89): the FIRST non-biomass, non-arginine species on
+    # the nitrogen ledger. MaillardBrowning RETAINS the amino-acid nitrogen it draws in the
+    # melanoidin polymer (the deaminating branch is D-87's job — this is the D-45/D-75 deamination
+    # idiom INVERTED: the nitrogen is parked in the product, not refunded to N). Sizing the
+    # amino_acids draw so all its nitrogen lands here means the pool loses exactly the nitrogen
+    # maillard_melanoidin gains, so total_nitrogen closes to machine precision through the transfer.
+    # Weighted at this species' own nitrogen fraction — the species the Process deposits against.
+    # Empty (constant 0) on any run where S ≈ 0 or amino_acids == 0 at aging.
+    if "maillard_melanoidin" in schema:
+        w[schema.slice("maillard_melanoidin")] = nitrogen_mass_fraction("maillard_melanoidin")
     if "X" in schema:
         if biomass_nitrogen_fraction is None:
             raise ValueError(

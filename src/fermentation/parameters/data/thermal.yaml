@@ -226,3 +226,100 @@ y_a420_per_melanoidin:
     source: "author estimate: caramelization melanoidins are the brown chromophore of caramel/aged sweet wine, absorbing broadly through the visible incl. 420 nm. The per-mass absorbance is a lumped optical yield (no single extinction coefficient for a heterogeneous polymer)."
     conditions: "generic sweet wine; A420 (dimensionless, 1 cm path) contributed per g/L melanoidin formed, at T_ref = 293.15 K. Adds to the SAME A420 slot the O2-driven PhenolicBrowning (D-74) accumulates."
     notes: "SPECULATIVE magnitude. Ties the melanoidin MASS (on total_carbon) to the A420 optical index (off every ledger) -- so thermal browning is READ by analysis.a420 alongside the oxidative browning. A lumped optical yield, not a molar extinction coefficient (melanoidin has no clean molar mass -- the caramelan stand-in, D-88)."
+
+# ============================================================================================
+# D-89 -- MaillardBrowning (non-oxidative amino-acid-incorporating THERMAL browning)
+# ============================================================================================
+# THE PROCESS (fermentation.core.kinetics.aging.MaillardBrowning, WINE-ONLY):
+#
+#   S_total  = sum of the residual-sugar vector (g/L)                     # reducing-sugar substrate
+#   gate     = amino_acids / (K_amino_acids + amino_acids)                # smooth availability [0,1)
+#   r_sugar  = k_maillard_browning * f(T) * S_total * gate                # g sugar/L/h into browning
+#   f(T)     = arrhenius_factor(T, E_a_maillard_browning, T_ref)          # STRONGLY warmer-faster
+#   r_m      = r_sugar * c(sugar) / (c_m - n_m*c(arg)/n(arg))             # g melanoidin/L/h (sized)
+#   r_aa     = r_m * n_m / n(arg)                                          # g arginine/L/h drawn
+#   d(S)/dt                  = -r_sugar
+#   d(amino_acids)/dt        = -r_aa
+#   d(maillard_melanoidin)/dt = +r_m
+#   d(A420)/dt               = +y_a420_per_maillard_melanoidin * r_m       # the SHARED browning index
+#
+# The amino-acid-incorporating browning branch D-88 (Caramelization, sugar-only) deferred. TRUE
+# Maillard browning condenses a reducing SUGAR with an AMINO ACID (Amadori -> Maillard cascade) into
+# a brown polymer that RETAINS the amino-acid nitrogen -- what makes a Maillard melanoidin
+# nitrogenous. So this route consumes core S AND amino_acids by heat with NO O2, and books BOTH the
+# sugar carbon and the amino-acid carbon+nitrogen into the new on-ledger `maillard_melanoidin` pool
+# (the FIRST non-biomass, non-arginine species on total_nitrogen). It raises the SAME A420 index
+# D-74/D-88 accumulate (all browning is one observable). The draws are SIZED to the melanoidin formed
+# (its fixed C:N stand-in), so total_carbon AND total_nitrogen close to machine precision; ALL drawn
+# nitrogen is RETAINED here (the deaminating/volatile branch is D-87's job -- putting a partial-
+# deamination split here would double-count D-87 and add an un-pinnable parameter). The three thermal
+# branches split the amino-acid/browning fate cleanly and sum over the shared S/amino_acids reagents
+# via ProcessSet (the o2-sharing pattern, no double-count): sugar-only caramelization (D-88), the
+# N-retaining melanoidin branch (D-89), and the N-releasing volatile Strecker branch (D-87).
+#
+# WINE-ONLY (reads amino_acids + the wine melanoidin park; beer thermal browning deferred, the D-86
+# oak-to-beer pattern). ISOLABILITY on the amino_acids HARD gate (undosed => exactly zero); residual
+# sugar is a SOFT driver. TIER: all speculative -- the Tier-3 frontier. The load-bearing SOURCED
+# claim is the FORM (sugar + amino acid + heat => N-bearing browning, O2-independent, strongly
+# warmer-faster; intrinsically amino-acid-catalysed but NITROGEN-LIMITED in wine, so a real but MINOR
+# browning contributor vs the sugar-only caramelization on the abundant residual sugar). Every
+# magnitude is an order-of-magnitude estimate. The `maillard_melanoidin` C8H12O5N stand-in formula
+# (molar C:N ~= 8:1) is code-with-citation in chemistry.py, NOT here (only the uncertain magnitudes
+# below are YAML) -- and its C-rich C:N is load-bearing: it keeps (c_m - n_m*c(arg)/n(arg)) > 0 so
+# the sized sugar draw stays positive (a negative denominator would silently create sugar).
+
+# -- MAILLARD BROWNING RATE CONSTANT (first-order in residual sugar, aa-gated, O2-FREE) -------
+# First-order in residual sugar (like k_caramelization) but ADDITIONALLY gated by amino-acid
+# availability -- so it is amino-acid-LIMITED: as amino acids exhaust the Maillard browning stops
+# while D-88 caramelization keeps browning the sugar. Set COMPARABLE to (a bit below) k_caramelization
+# (8.0e-8): though amino acids intrinsically catalyse browning, in wine the route is NITROGEN-LIMITED
+# -- most YAN is assimilated during fermentation, so only a scarce residual amino-acid pool feeds
+# aging-time Maillard browning. So this is a real but MINOR browning
+# contributor next to the sugar-only caramelization that runs on the abundant residual sugar.
+# CALIBRATED so a warm multi-year sweet + amino-acid-dosed sealed aging (i) forms a real N-melanoidin
+# A420 bump (~0.05 AU) atop caramelization's larger share, WITHOUT (ii) so depleting the shared
+# amino-acid pool that the diagnostic sotolon Strecker marker (D-87) drops below perceptibility --
+# aged Sauternes shows BOTH deep amber-brown colour AND perceptible sotolon, so the model must keep
+# both. The two constraints together pin k to the low-1e-7..1e-8 band.
+k_maillard_browning:
+  value: 5.0e-8
+  unit: "1/h"   # r_sugar = k_maillard_browning * f(T) * S_total * gate(aa)  (first-order in sugar)
+  tier: speculative
+  uncertainty: { low: 2.0e-8, high: 2.0e-7, note: "Pseudo-first-order Maillard-browning rate at T_ref = 20 C, per g/L residual sugar, at the amino-acid-saturated gate. Set COMPARABLE to (a bit below) k_caramelization (8.0e-8): amino acids intrinsically catalyse browning, but in wine the route is NITROGEN-LIMITED (scarce residual YAN after fermentation), so its cumulative browning is MINOR vs the sugar-only caramelization on abundant sugar. CALIBRATED (advisor-flagged shared-reagent competition) so the N-melanoidin forms a real A420 bump WITHOUT depleting the shared amino-acid pool enough to erase the diagnostic sotolon marker (D-87). CAUTION: the UPPER band (>~1.5e-7) draws the shared amino_acids hard enough to push sotolon BELOW perceptibility (OAV<1) in the sweet-aging scenario -- the set value stays deliberately LOW for this reason; a future value bump must re-check test_maillard_raises_the_thermal_oavs. Only the FORM (sugar+aa+heat=>N-browning, O2-free) and the strong thermal sensitivity are sourced." }
+  provenance:
+    source: "author estimate anchored to the FORM that amino-acid-incorporating Maillard browning is the nitrogen-bearing thermal-browning route of aged SWEET/thermal wines (Sauternes amber-to-brown, Madeira/baked-wine deep colour), distinct from the sugar-only caramelization of D-88 and the O2-driven phenolic browning of D-74. Intrinsically the Maillard reaction is more facile than pure caramelization (amino acids catalyse sugar dehydration/fragmentation; Hodge 1953; van Boekel 2006), but in wine it is NITROGEN-LIMITED by the scarce residual amino-acid pool, so its EFFECTIVE cumulative contribution is comparable-to-minor vs caramelization. Folds the Amadori/dicarbonyl precursors into k (no intermediate pool tracked in v1, as with k_caramelization / k_maillard_strecker)."
+    conditions: "generic sweet wine at cellar-to-warm temperature; pseudo-first-order in the residual-sugar vector S, additionally gated by the amino-acid availability fraction aa/(K_amino_acids+aa), at T_ref = 293.15 K. WINE-ONLY (reads amino_acids); O2-INDEPENDENT (no o2 term)."
+    notes: "SOURCED FORM (sugar-driven, amino-acid-catalysed but nitrogen-LIMITED in wine, heat-accelerated, O2-INDEPENDENT, N-retaining) + SPECULATIVE magnitude. The N-incorporating sibling of the sugar-only k_caramelization (D-88): both browning routes draw S and SUM via ProcessSet (additive over sugar, split by rate -- the o2-sharing pattern), and this one additionally draws amino_acids (shared with k_maillard_strecker, D-87), so all three thermal branches split the shared reagents with no double-count. The shared-amino_acids competition is REAL PHYSICS: N-Maillard browning modestly suppresses the D-87 Strecker aldehydes by drawing the same pool -- calibrated so sotolon stays perceptible (the o2-sub-axis D-74-suppresses-acetaldehyde precedent, applied to amino_acids)."
+
+# -- ACTIVATION ENERGY: Maillard browning is STRONGLY warmer-faster (the sourced ORDERING) ------
+# Same high thermal band as E_a_caramelization / E_a_maillard_strecker (~100 kJ/mol): Maillard
+# browning is far more temperature-sensitive than the oxidative aging reactions (Q10 ~3-4), which is
+# why Madeira estufagem (45-50 C) and baked/rancio wines develop deep nitrogenous-melanoidin colour
+# orders faster than a cellar-cool sweet wine. Its OWN parameter (prime directive #2), matching the
+# non-oxidative thermal axis's band.
+E_a_maillard_browning:
+  value: 100000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 80000.0, high: 130000.0, note: "Q10 ~3-4.5 at 20 C. Maillard-browning activation energies ~100-150 kJ/mol -- markedly ABOVE the ~30-70 kJ/mol oxidative-browning band (E_a_browning). The SOURCED, load-bearing claim is the ORDERING (thermal Maillard browning >> oxidative browning in temperature sensitivity, so warm/baked sweet wines darken far faster); the magnitude is speculative and banded." }
+  provenance:
+    source: "SOURCED ORDERING: Maillard browning is strongly thermally activated (E_a ~100-150 kJ/mol; classic Maillard kinetics -- Labuza & Baisier, van Boekel, Hodge), well above the oxidative wine-browning reactions. Madeira estufagem and baked/rancio styles develop deep colour orders faster than cellar aging -- the temperature acceleration IS the sourced signature."
+    conditions: "equivalent Arrhenius activation energy of the aggregate non-oxidative amino-acid Maillard browning at T_ref = 293.15 K"
+    notes: "Only the DIRECTION and ORDERING (E_a_maillard_browning > the oxidative E_a's; warmer => much faster N-browning) are sourced. Exact magnitude speculative, banded around Q10 ~3.5. Its OWN parameter, matching E_a_caramelization / E_a_maillard_strecker's band (all the non-oxidative thermal axis)."
+
+# -- A420 YIELD: browning-index absorbance per gram of N-bearing Maillard melanoidin formed -----
+# A420 is the dimensionless 420 nm absorbance (1 cm path) -- the standard browning index (D-74).
+# Set ABOVE the sugar-only y_a420_per_melanoidin (D-88, 0.4): nitrogenous Maillard melanoidins are
+# the DOMINANT brown chromophores of thermally-aged sugar+protein systems, browner per unit mass
+# than pure caramelization polymers (the sourced ordering that Maillard browning out-colours
+# caramelization). Thermal Maillard browning thus raises the SAME A420 index the oxidative
+# PhenolicBrowning (D-74) and the sugar-only Caramelization (D-88) accumulate.
+y_a420_per_maillard_melanoidin:
+  value: 0.8
+  unit: "1"   # A420 absorbance units per g/L Maillard melanoidin formed (dimensionless index per g/L)
+  tier: speculative
+  uncertainty: { low: 0.2, high: 3.0, note: "A420 (420 nm absorbance, 1 cm) per g/L N-bearing Maillard melanoidin. An order-of-magnitude estimate set ~2x the sugar-only caramelan yield (D-88, 0.4): nitrogenous melanoidins are more strongly coloured per mass than caramelization polymers. CALIBRATED with k_maillard_browning so a warm multi-year sweet + amino-acid aging adds a comparable-to-caramelization A420 share." }
+  provenance:
+    source: "author estimate: nitrogenous Maillard melanoidins are the dominant brown chromophores of thermally-aged sugar+amino-acid systems (Hodge 1953; the deep colour of Madeira/baked wine, roasted/aged foods), browner per mass than sugar-only caramelization polymers. The per-mass absorbance is a lumped optical yield (no single extinction coefficient for a heterogeneous polymer)."
+    conditions: "generic sweet wine; A420 (dimensionless, 1 cm path) contributed per g/L Maillard melanoidin formed, at T_ref = 293.15 K. Adds to the SAME A420 slot the O2-driven PhenolicBrowning (D-74) and the sugar-only Caramelization (D-88) accumulate."
+    notes: "SPECULATIVE magnitude, set above y_a420_per_melanoidin (D-88) per the sourced browner-per-mass ordering. Ties the maillard_melanoidin MASS (on total_carbon + total_nitrogen) to the A420 optical index (off every ledger) -- so N-browning is READ by analysis.a420 alongside the oxidative + caramelization browning. A lumped optical yield, not a molar extinction coefficient."

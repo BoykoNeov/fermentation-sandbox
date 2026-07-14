@@ -322,8 +322,27 @@ M_SOTOLON = 6 * _M_C + 8 * _M_H + 3 * _M_O
 #: gap (``total_mass`` weights only ``{S, E, CO2}``, never asserted on an aging run). CO₂/volatile
 #: evolution of real caramelization is lumped into this polymer (a documented v1 simplification).
 #: Nitrogen-free — this is CARAMELIZATION (sugar-only), not amino-acid-incorporating Maillard
-#: melanoidin (that route is deferred, D-88).
+#: melanoidin (:data:`M_MAILLARD_MELANOIDIN` — the N-bearing route, D-89).
 M_MELANOIDIN = 12 * _M_C + 18 * _M_H + 9 * _M_O
+#: N-bearing Maillard melanoidin — the brown polymer of
+#: :class:`~fermentation.core.kinetics.aging.MaillardBrowning` (decision D-89), the
+#: **amino-acid-incorporating** thermal-browning route that D-88's sugar-only
+#: :class:`~fermentation.core.kinetics.aging.Caramelization` deferred. Where caramelan
+#: (:data:`M_MELANOIDIN`) is nitrogen-free, a true Maillard melanoidin **retains the amino-acid
+#: nitrogen in the polymer** (that is what makes it *nitrogenous*), so this species is the FIRST
+#: non-biomass, non-arginine pool on ``total_nitrogen``. Booked at a **glucose–glycine
+#: model-melanoidin stand-in** ``C8H12O5N`` (a hexose + amino acid condensed and dehydrated — the
+#: canonical glucose/glycine Maillard model system; Cämmerer & Kroh), a heterogeneous polymer with
+#: no clean molar mass, giving molar C:N ≈ 8:1 and elemental ~47.5 % C / 6.9 % N / 39.6 % O —
+#: squarely in the reported melanoidin range. Like caramelan it is an on-ledger **carbon-park** (the
+#: ``debris``/``glucan`` precedent) — :class:`MaillardBrowning` consumes core ``S`` **and**
+#: ``amino_acids`` to form it, so both the sugar carbon and the amino-acid carbon+nitrogen must
+#: land in a weighted pool or the transfer would read as carbon/nitrogen destroyed. The draws are
+#: sized to the melanoidin formed (its fixed C:N), so ``total_carbon`` AND ``total_nitrogen`` close
+#: to machine precision (§ its class docstring); ALL drawn amino-acid nitrogen is retained here (the
+#: deaminating branch is D-87's job). Water lost on dehydration is the standing aging-axis mass gap
+#: (``total_mass`` = {S,E,CO2}, never asserted on an aging run). Tag speculative.
+M_MAILLARD_MELANOIDIN = 8 * _M_C + 12 * _M_H + 5 * _M_O + 1 * _M_N
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -367,6 +386,7 @@ MOLAR_MASS: dict[str, float] = {
     "2_methylpropanal": M_2_METHYLPROPANAL,
     "sotolon": M_SOTOLON,
     "melanoidin": M_MELANOIDIN,
+    "maillard_melanoidin": M_MAILLARD_MELANOIDIN,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -444,6 +464,11 @@ CARBON_ATOMS: dict[str, int] = {
     #: core-S carbon), so the sugar → melanoidin transfer closes to machine precision (decision
     #: D-88).
     "melanoidin": 12,
+    #: N-bearing Maillard melanoidin (glucose–glycine stand-in C8H12O5N) carries EIGHT carbons —
+    #: the carbon-park pool MaillardBrowning (D-89) forms from consumed sugar + amino acid; ON
+    #: total_carbon (it holds core-S carbon AND amino-acid carbon), so the transfer closes to
+    #: machine precision when the draws are sized to it (decision D-89).
+    "maillard_melanoidin": 8,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -515,6 +540,13 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: Melanoidin is nitrogen-free here: this is CARAMELIZATION (sugar-only, D-88), not amino-acid-
     #: incorporating Maillard melanoidin — so it carries no nitrogen (absent from total_nitrogen).
     "melanoidin": 0,
+    #: N-bearing Maillard melanoidin (glucose–glycine stand-in C8H12O5N) carries ONE nitrogen — the
+    #: amino-acid nitrogen RETAINED in the polymer (this is what makes a Maillard melanoidin
+    #: nitrogenous, unlike sugar-only caramelan). The FIRST non-biomass, non-arginine species on
+    #: total_nitrogen: MaillardBrowning (D-89) draws amino_acids sized so all its nitrogen lands
+    #: here, so total_nitrogen closes to machine precision (the D-45/D-75 deamination idiom
+    #: INVERTED — the nitrogen is parked in the product, not deaminated back to N).
+    "maillard_melanoidin": 1,
 }
 
 

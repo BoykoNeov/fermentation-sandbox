@@ -981,18 +981,24 @@ def test_caramelization_closes_carbon_end_to_end():
 
 
 def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
-    # THE four-way interaction (the shared-pool stress test): a SWEET + OXYGENATED +
+    # THE five-way interaction (the shared-pool stress test): a SWEET + OXYGENATED +
     # amino-acid-dosed
-    # aged wine runs ALL FOUR aging axes at once — BOTH Strecker routes (oxidative D-75 + thermal
-    # D-87) drawing the shared amino_acids, BOTH browning routes (oxidative D-74 + thermal D-88)
-    # writing the shared A420, AND Caramelization consuming core S. Each route sizes its OWN draw
-    # and
+    # aged wine runs ALL FIVE amino-acid/browning aging routes at once — BOTH Strecker routes
+    # (oxidative D-75 + thermal D-87) drawing the shared amino_acids, all THREE browning routes
+    # writing the shared A420 (oxidative D-74 + sugar-only thermal Caramelization D-88 +
+    # amino-acid-incorporating thermal MaillardBrowning D-89), with Caramelization AND
+    # MaillardBrowning
+    # BOTH consuming core S and MaillardBrowning ALSO drawing the shared amino_acids into the
+    # N-bearing
+    # maillard_melanoidin park. This is the stress case for the nitrogen ledger: MaillardBrowning is
+    # the FIRST aging Process to PARK nitrogen in a product pool (D-87 deaminates its N back to N;
+    # D-89 retains it), so with it live, three sinks pull amino_acids at once and total_nitrogen
+    # must
+    # still close through the maillard_melanoidin weighting. Each route sizes its OWN draw and
     # ProcessSet SUMS them, so by additivity carbon + nitrogen must still close and no shared pool
-    # goes negative — the one combination where a shared-pool interaction bug could hide, and
-    # exactly
-    # where conservation would catch it. (The aa gate throttles both Strecker draws to 0 as
-    # amino_acids
-    # empties, so it never goes negative.)
+    # goes negative — the combination where a shared-pool interaction bug could hide, and exactly
+    # where conservation would catch it. (The aa gate throttles all amino_acids draws to 0 as the
+    # pool empties, so it never goes negative.)
     cs = compile_scenario(
         _wine(
             [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],  # OXYGENATED
@@ -1015,19 +1021,30 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
     assert all(n_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
     assert_conserved(tj, c_of, label="carbon")
     assert_conserved(tj, n_of, label="nitrogen")
-    # No shared pool goes negative — the aa gate keeps the doubly-drawn amino_acids ≥ 0.
+    # No shared pool goes negative — the aa gate keeps the triply-drawn amino_acids ≥ 0, and both
+    # carbon-parks (melanoidin + the N-bearing maillard_melanoidin) stay nonnegative.
     assert_nonnegative(
         tj,
-        ("amino_acids", "S", "melanoidin", "A420", "o2", *_MAILLARD_ALDEHYDES, "N"),
+        (
+            "amino_acids",
+            "S",
+            "melanoidin",
+            "maillard_melanoidin",
+            "A420",
+            "o2",
+            *_MAILLARD_ALDEHYDES,
+            "N",
+        ),
         atol=1e-9,
     )
-    # All four axes actually fired: the thermal browning (melanoidin) + thermal aldehydes (sotolon,
-    # a thermal-route-only marker) are live ALONGSIDE the oxidative browning (A420 also gets the O₂
-    # route) and the oxidative Strecker (methional/phenylacetaldehyde, shared with the thermal
-    # route).
-    assert float(traj.series("melanoidin")[-1]) > 0.0  # thermal browning
+    # All five routes actually fired: the two thermal browning polymers (sugar-only melanoidin +
+    # N-bearing maillard_melanoidin) + thermal aldehydes (sotolon, a thermal-route-only marker) are
+    # live ALONGSIDE the oxidative browning (A420 gets all three browning routes) and the oxidative
+    # Strecker (methional/phenylacetaldehyde, shared with the thermal route).
+    assert float(traj.series("melanoidin")[-1]) > 0.0  # sugar-only thermal browning (D-88)
+    assert float(traj.series("maillard_melanoidin")[-1]) > 0.0  # N-bearing thermal browning (D-89)
     assert float(traj.series("sotolon")[-1]) > 0.0  # thermal Strecker (O₂-independent marker)
-    assert float(traj.series("A420")[-1]) > 0.0  # browning index (both routes)
+    assert float(traj.series("A420")[-1]) > 0.0  # browning index (all three routes)
     assert float(traj.series("methional")[-1]) > 0.0  # Strecker (both routes)
 
 

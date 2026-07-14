@@ -7003,3 +7003,86 @@ at all, first-order-in-sugar, monotone A420 rise, warmer-faster, wine-only no-op
 closure, the speculative tier floor) + scenario (compile-seam gate wine-only, sealed-sweet browning through the full
 pipeline vs a dry control, carbon closes end to end with core S consumed). **Next:** beat 1b (descriptor projection), barrel
 fill-number depletion, the deferred N-incorporating Maillard melanoidin / beer thermal browning.
+
+## D-89 — `MaillardBrowning` built: the amino-acid-incorporating THERMAL browning (N-bearing melanoidin + A420), D-88's deferred N-route; first aging Process on the nitrogen ledger (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3, the twelfth aging Process and the FIFTH non-oxidative one** — the
+**N-incorporating Maillard melanoidin** branch that D-88 `Caramelization` explicitly deferred ("modelling that
+N-incorporating browning is deferred … `melanoidin` here is a caramelization polymer, nitrogen-free"). Owner-directed
+(picked from the D-88 "Next" list), one advisor pass (green-lit the design, verified both ledgers close by construction,
+flagged the one silent trap — see below), owner scope fork: FULL build, N-fate = "closest to reality". `MaillardBrowning`
+(WINE-ONLY) is the **amino-acid-incorporating thermal mirror** completing the browning axis: where D-88 browns **sugar
+alone** to nitrogen-free caramelan, *true* Maillard browning condenses a reducing **sugar with an amino acid** (Amadori →
+Maillard cascade → brown polymer) and **retains the amino-acid nitrogen in the melanoidin** — that retained nitrogen is what
+makes a Maillard melanoidin *nitrogenous*. So it consumes **both** core `S` and `amino_acids` by heat with **no O₂**, books
+both into a new on-ledger N-bearing `maillard_melanoidin` pool, and raises the **same** `A420` D-74/D-88 accumulate (all
+browning is one observable). All new tests pass (14 unit + the five-way interaction extension), `ruff`/`mypy` clean, full
+suite green (979 → 992).
+
+**The three thermal amino-acid/browning branches — a clean division, no double-count.** D-89 completes the split of the
+thermal amino-acid/browning fate into complementary branches that `ProcessSet` sums over the shared `S`/`amino_acids`
+reagents (the o2-sharing pattern D-73 established, now applied to two limiting reagents): (1) `Caramelization` (D-88) —
+**sugar-only** → nitrogen-free `melanoidin`, runs even at zero amino acids; (2) `MaillardBrowning` (D-89) — the
+**N-retaining** browning branch → nitrogen-bearing `maillard_melanoidin`, *all* drawn amino-acid nitrogen kept in the
+polymer; (3) `MaillardStrecker` (D-87) — the **N-releasing/volatile** branch → deaminates to `N` + Strecker aldehydes + CO₂.
+Real Maillard chemistry partitions amino-acid nitrogen between polymer-retention and Strecker-release; the *system* (D-87 +
+D-89) reproduces that partition while each branch stays internally pure. **"Closest to reality" (the owner's N-fate answer)
+is all-N-retained**, precisely because D-87 already owns the release branch: putting a partial-deamination split inside D-89
+would double-count D-87's release and add an un-pinnable free parameter (the D-75/D-87 silent-mis-key hazard).
+
+**The FIRST aging Process on the nitrogen ledger — dual-ledger closure by sizing the draws (advisor-verified).**
+`maillard_melanoidin` is an on-ledger carbon+nitrogen-park (the `melanoidin` carbon-park extended to nitrogen — the FIRST
+non-biomass, non-arginine species on `total_nitrogen`; a genuine ledger novelty). Its stand-in `C8H12O5N` fixes its carbon
+fraction `c_m` and nitrogen fraction `n_m`; requiring **all** the amino-acid nitrogen and **all** the drawn carbon (sugar +
+amino acid) to land in the polymer gives two equations — nitrogen `r_aa·n(arg) = r_m·n_m`, carbon `r_sugar·c(sugar) +
+r_aa·c(arg) = r_m·c_m` — solved (given `r_sugar` from the rate law) as `r_m = r_sugar·c(sugar) / (c_m − n_m·c(arg)/n(arg))`,
+`r_aa = r_m·n_m/n(arg)`. So `total_carbon` **and** `total_nitrogen` close to machine precision for *any* formula (verified
+per-RHS < 1e-18 for both, and end-to-end over a full sweet + amino-acid ferment + aging, both ledgers flat; and in the
+five-way interaction test with all five amino-acid/browning routes live). No deamination term (the N-retaining branch by
+construction).
+
+**The one silent trap — the denominator sign (advisor's must-check).** `(c_m − n_m·c(arg)/n(arg))` must be comfortably
+positive or `r_m` flips sign and the Process would *create* sugar with **no conservation test catching it** (closure holds
+for either sign). The threshold is mass-ratio `c_m/n_m > c(arg)/n(arg) = 72/56 ≈ 1.29` (atomic C:N > ~1.5); the C-rich
+melanoidin (C:N ≈ 8:1, `c_m/n_m ≈ 6.9`) clears it by ~5×, leaving the denominator ≈ 0.81·c_m (healthy, no blow-up). A
+dedicated metadata test pins `denom > 0` and the ratio, so a future formula edit that flipped the sign fails loudly.
+
+**The stand-in formula `C8H12O5N` (code-with-citation, not YAML).** A **glucose–glycine model-melanoidin repeat unit** (a
+hexose + amino acid condensed and dehydrated — the canonical glucose/glycine Maillard model system; Cämmerer & Kroh), molar
+C:N ≈ 8:1, elemental ~47.5 % C / 6.9 % N / 39.6 % O — squarely in reported melanoidin ranges. Like caramelan it is
+code-with-citation in `chemistry.py` (a heterogeneous polymer with no clean molar mass), NOT a YAML parameter; only the
+uncertain magnitudes go in `thermal.yaml`. The water lost on dehydration is the standing aging-axis mass gap.
+
+**The shared-`amino_acids` competition is real physics — calibrated so the diagnostic sotolon survives (the D-74-precedent
+applied to nitrogen).** With D-89 live, three sinks pull the *shared* `amino_acids` at once (D-75 + D-87 Strecker + D-89
+browning). The aging-time amino-acid pool is scarce (yeast assimilates most YAN during fermentation), so an over-aggressive
+`k_maillard_browning` depletes it and suppresses the D-87 Strecker aldehydes — at the first-cut rate it pushed **sotolon**
+(the Sauternes/Madeira marker) *below* its perceptibility threshold. But aged Sauternes shows BOTH deep amber-brown colour
+AND perceptible sotolon, so the model must keep both: `k_maillard_browning` was calibrated to **5.0e-8 1/h** (comparable to,
+a bit below, `k_caramelization`), reflecting that N-Maillard browning is **nitrogen-limited** in wine — a real but MINOR
+browning contributor (N-melanoidin ~0.06 g/L, A420 bump ~0.05) next to sugar-only caramelization on the abundant sugar,
+while sotolon recovers to OAV ≈ 1.18. This is the exact analogue of D-74's `PhenolicBrowning` suppressing
+`OxidativeAcetaldehyde` by diverting the shared O₂ — the shared-reagent competition lives in the rate constants, the
+provenance narrative corrected from "more facile / above caramelization" to "intrinsically catalysed but nitrogen-limited."
+
+**Isolable + wine-only + the tier consequence.** Isolability rests on the `amino_acids` **HARD gate** (undosed ⇒ exactly 0 ⇒
+byte-for-byte the case without this Process); residual sugar is a **soft** driver (dry wine `S ≈ 0` ⇒ inert). Wine-only v1
+(the `amino_acids` + `maillard_melanoidin` slots are wine slots; beer thermal browning stays deferred, the D-86 oak-to-beer
+pattern). Speculative in FORM (sugar + amino acid + heat → N-browning, O₂-independent, strongly warmer-faster is sourced;
+magnitudes estimated). Because it **touches core `S` and `amino_acids`**, a `begin_aging` run reports structural
+`tier_of("S")`/`tier_of("amino_acids")` = SPECULATIVE — correct and exactly precedented (D-88's S-write, D-75/D-87's
+amino_acids draw).
+
+**Regression surface.** 1 new wine-only state slot (`maillard_melanoidin`, wine 63 → 64, beer untouched), 1 new chemistry
+species + carbon/nitrogen weight (the glucose–glycine stand-in `C8H12O5N`, first nonzero-N product entry), 1 new Process, 3
+new `thermal.yaml` params (`k_maillard_browning`, `E_a_maillard_browning`, `y_a420_per_maillard_melanoidin`),
+`conservation.total_nitrogen` +1 term (the novelty), `compile._AGING_GATED_PROCESSES` +1. Enumeration goldens updated
+(`test_media` wine size 63 → 64 / `WINE_MAILLARD_BROWNING_SLOTS` / `WINE_MAILLARD_BROWNING_PROCESSES`). **Every dry / un-aged
+trajectory stays byte-for-byte** (undosed amino_acids HARD gate; S ≈ 0 soft gate); beer byte-for-byte unchanged (wine-only).
+The D-87 sweet-wine scenario now co-runs `MaillardBrowning` (the sotolon OAV recalibration above); the four-way interaction
+test became **five-way** (all five amino-acid/browning routes live — the N-bearing fifth process stresses the nitrogen
+ledger, both ledgers still close, no shared pool negative). New tests: `MaillardBrowning` unit (closed form, carbon AND
+nitrogen closure per-RHS, the denominator-sign trap, amino-acid HARD-gate isolability, sugar soft-gate, O₂-independence,
+availability-gate saturation, warmer-faster, wine-only no-op on beer, integrated sweet browning + dual-ledger closure, the
+speculative tier floor). **Next:** beat 1b (descriptor projection), barrel fill-number depletion, beer thermal browning
+(the D-86 oak-to-beer pattern for the whole thermal axis).

@@ -98,6 +98,7 @@ from fermentation.core.kinetics import (
     HydrogenSulfideProduction,
     HydrogenSulfideVolatilization,
     IsoAlphaAcidLoss,
+    MaillardBrowning,
     MaillardStrecker,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
@@ -788,6 +789,29 @@ def wine_schema() -> StateSchema:
             "pool. Wine-only",
         )
     )
+    # N-bearing Maillard melanoidin carbon+nitrogen-park (decision D-89), appended last: the brown
+    # amino-acid-incorporating thermal-browning polymer MaillardBrowning forms by consuming residual
+    # sugar AND amino acids (the N-incorporating browning branch D-88 deferred). It holds consumed
+    # core-S carbon AND amino-acid carbon+nitrogen, so — unlike the off-ledger oak/colour lumps and
+    # unlike the nitrogen-free caramelan — it is ON total_carbon AND total_nitrogen (the FIRST
+    # non-biomass, non-arginine species on the nitrogen ledger; sugar + amino_acids → this pool
+    # closes both exactly). It raises the SAME A420 index D-74/D-88 accumulate. Wine-only v1.
+    specs.append(
+        VarSpec(
+            "maillard_melanoidin",
+            "g/L",
+            default=0.0,
+            description="maillard_melanoidin — the brown N-bearing Maillard melanoidin polymer "
+            "(glucose–glycine stand-in C8H12O5N, molar C:N ≈ 8:1) MaillardBrowning forms from "
+            "residual sugar + amino acids by HEAT with NO O₂ (decision D-89, the "
+            "amino-acid-incorporating browning branch D-88's sugar-only Caramelization deferred). "
+            "A carbon+nitrogen-park pool: ON total_carbon AND total_nitrogen (the FIRST "
+            "non-biomass, non-arginine species on the nitrogen ledger — it RETAINS the amino-acid "
+            "nitrogen, what makes a Maillard melanoidin nitrogenous; sugar + amino_acids → this "
+            "pool closes both ledgers exactly). Raises the shared A420 browning index (read by "
+            "analysis.a420); the MASS itself is not a sensory pool. Wine-only",
+        )
+    )
     return StateSchema(specs)
 
 
@@ -1070,6 +1094,22 @@ _MAILLARD_STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (MaillardStrec
 #: segment (every standard dry aging run) it is byte-for-byte inert (the ``S ≤ 0`` guard). Params
 #: live in ``thermal.yaml``.
 _CARAMELIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (Caramelization,)
+
+#: WINE-ONLY non-oxidative amino-acid-incorporating THERMAL browning Process (decision D-89) — the
+#: N-bearing browning branch D-88's sugar-only :class:`Caramelization` deferred. :class:`\
+#: MaillardBrowning` browns **residual sugar + amino acids** to a nitrogen-bearing
+#: ``maillard_melanoidin`` polymer by heat alone (no ``o2``), raising the SAME ``A420`` index
+#: D-74/D-88 accumulate. It consumes core ``S`` **and** ``amino_acids`` and RETAINS the amino-acid
+#: nitrogen in the polymer, so ``maillard_melanoidin`` is the FIRST non-biomass, non-arginine
+#: species on ``total_nitrogen`` (the draws are sized to it, so both carbon and nitrogen close
+#: exactly). Draws the shared ``amino_acids`` reagent with :class:`MaillardStrecker` (D-87) and the
+#: shared ``S`` with :class:`Caramelization` (D-88) — ``ProcessSet`` sums the three thermal branches
+#: over those reagents (the o2-sharing pattern, no double-count). Wine-only for v1 (beer thermal
+#: browning deferred, the D-86 oak-to-beer pattern). Kept in its OWN tuple (isolable, directive #3):
+#: DISABLED at the compile seam and re-enabled by ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Isolability on the
+#: ``amino_acids`` HARD gate (undosed ⇒ byte-for-byte inert). Params live in ``thermal.yaml``.
+_MAILLARD_BROWNING_PROCESSES: tuple[Callable[[], Process], ...] = (MaillardBrowning,)
 
 #: Oak-extraction aging Process (decision D-77) — the barrel/chip extractive axis. WINE + BARREL-
 #: BEER (D-86: wired into BOTH media — the oak axis is a wood property, not a grape one).
@@ -1544,6 +1584,7 @@ MEDIA: dict[str, Medium] = {
             + _STRECKER_PROCESSES
             + _MAILLARD_STRECKER_PROCESSES
             + _CARAMELIZATION_PROCESSES
+            + _MAILLARD_BROWNING_PROCESSES
             + _OAK_PROCESSES
             + _ELLAGITANNIN_PROCESSES
             + _POLYMERIZATION_PROCESSES

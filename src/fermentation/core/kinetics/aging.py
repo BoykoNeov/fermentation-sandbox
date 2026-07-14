@@ -24,16 +24,22 @@ slot captures the acetaldehyde carbon so it does not vanish into the off-ledger 
 grape bulk off-ledger, the acetaldehyde-derived bridge on it — the "split ledger"; see its
 docstring).
 
-**The non-oxidative THERMAL axis (D-87/D-88).** :class:`MaillardStrecker` (D-87) is the
+**The non-oxidative THERMAL axis (D-87/D-88/D-89).** :class:`MaillardStrecker` (D-87) is the
 **O₂-independent thermal mirror** of :class:`StreckerDegradation` (D-75) — the beat D-75 deferred:
 residual **sugar + heat** (α-dicarbonyls, no O₂) degrade amino acids to the sweet-wine / Madeira
 Strecker suite (the two D-75 aldehydes + three branched-chain malty aldehydes + sotolon), sharing
 the ``amino_acids`` limiting reagent with the oxidative route. :class:`Caramelization` (D-88) is the
-matching **O₂-independent thermal mirror** of :class:`PhenolicBrowning` (D-74): sugar-only browning
-to a new on-ledger ``melanoidin`` carbon-park pool, raising the shared ``A420`` with no O₂. Both are
-wine-only, both driven by residual sugar (D-88 is the first aging Process to *consume* core ``S``),
-both the same thermal-mirror relationship :class:`ThermalAnthocyaninFade` (D-83) has to
-:class:`AnthocyaninFading` (D-81).
+matching **O₂-independent thermal mirror** of :class:`PhenolicBrowning` (D-74): **sugar-only**
+browning to a new on-ledger ``melanoidin`` carbon-park pool, raising the shared ``A420`` with no O₂.
+:class:`MaillardBrowning` (D-89) is the **amino-acid-incorporating** browning branch D-88 deferred:
+**sugar + amino acid + heat** → a nitrogen-bearing ``maillard_melanoidin`` pool (the FIRST
+non-biomass, non-arginine species on ``total_nitrogen``), retaining the amino-acid nitrogen in the
+polymer and raising the same ``A420``. Together the three split the thermal amino-acid/browning fate
+cleanly: **sugar-only** caramelization (D-88), the **N-retaining** melanoidin branch (D-89), and the
+**N-releasing** volatile Strecker branch (D-87) — summed over the shared ``S``/``amino_acids``
+reagents by ``ProcessSet``, no double-count (see :class:`MaillardBrowning`). All wine-only, all
+driven by residual sugar (D-88/D-89 *consume* core ``S``), all the same thermal-mirror relationship
+:class:`ThermalAnthocyaninFade` (D-83) has to :class:`AnthocyaninFading` (D-81).
 
 **The oxidative sub-axis (D-71).** :class:`OxidativeAcetaldehyde` opens the *oxidative* half of
 the aging axis on a **dissolved-O₂ pool** (``o2``, a new carbon-free state slot, off every
@@ -309,6 +315,14 @@ _MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool], ...] = (
 #: the sugar → melanoidin transfer closes exactly. Named here so the carbon draw + ``total_carbon``
 #: weighting ride on one species (D-19), the ``_ESTER_SPECIES`` discipline.
 _MELANOIDIN_SPECIES = "melanoidin"
+
+#: The N-bearing Maillard melanoidin carbon+nitrogen-park species (decision D-89): the sugar carbon
+#: AND the amino-acid carbon+nitrogen :class:`MaillardBrowning` consumes land here (on
+#: ``total_carbon`` *and* ``total_nitrogen``, booked at the glucose–glycine stand-in fraction), so
+#: the sugar + amino_acids → maillard_melanoidin transfer closes both ledgers exactly. Named here so
+#: the carbon/nitrogen draws + the ``total_carbon``/``total_nitrogen`` weighting ride on one species
+#: (D-19), the ``_MELANOIDIN_SPECIES`` discipline.
+_MAILLARD_MELANOIDIN_SPECIES = "maillard_melanoidin"
 
 #: The oak extractives and their set-and-hold ceiling slots (decisions D-77/D-78). Each extracted
 #: pool (the first element) rises toward its own saturation ceiling (the second element); the
@@ -1197,6 +1211,190 @@ class Caramelization(Process):
         # D-74
         # optical-index slot). Monotone (mel_rate ≥ 0), like the D-74 oxidative browning it joins.
         d[schema.slice("A420")] = params["y_a420_per_melanoidin"] * mel_rate
+        return d
+
+
+class MaillardBrowning(Process):
+    """Non-oxidative THERMAL browning: sugar + amino acid → N-bearing melanoidin, NO O₂ (D-89).
+
+    The **amino-acid-incorporating** thermal-browning route that the sugar-only
+    :class:`Caramelization` (D-88) explicitly deferred ("modelling that N-incorporating browning is
+    deferred … ``melanoidin`` here is a caramelization polymer, nitrogen-free"). Where D-88 browns
+    **sugar alone** to a nitrogen-free caramelan, *true* Maillard browning condenses a **reducing
+    sugar with an amino acid** (Amadori rearrangement → Strecker/Maillard cascade → brown polymer)
+    and **retains the amino-acid nitrogen in the melanoidin** — that nitrogen is what makes a
+    Maillard melanoidin *nitrogenous*. So this route consumes **both** core ``S`` and
+    ``amino_acids``
+    by heat with **no O₂**, and a sealed sweet wine on residual sugar + amino acids browns thermally
+    this way too. It raises the **same** ``A420`` browning index D-74/D-88 accumulate (all browning
+    is one observable), needing **no** new observable — only the new carbon+nitrogen-park pool.
+
+    **The three thermal amino-acid/browning branches, and why they don't double-count.** With D-89
+    the non-oxidative thermal axis splits the amino-acid fate cleanly into complementary branches
+    that ``ProcessSet`` sums over the shared ``amino_acids`` (and ``S``) reagents — the O₂-sharing
+    pattern (D-73) applied to two limiting reagents, so each pool depletes *once* and splits by the
+    branches' rates:
+
+    * :class:`Caramelization` (D-88) — **sugar-only** browning → nitrogen-free ``melanoidin``; runs
+      even at zero amino acids.
+    * :class:`MaillardBrowning` (**this**, D-89) — the **N-retaining** browning branch: sugar +
+      amino acid → nitrogen-bearing ``maillard_melanoidin``, **all** drawn amino-acid nitrogen kept
+      in the polymer.
+    * :class:`MaillardStrecker` (D-87) — the **N-releasing / volatile** branch: the same sugar
+      dicarbonyls deaminate + decarboxylate amino acids to volatile Strecker aldehydes + sotolon,
+      refunding nitrogen to ``N`` and evolving CO₂.
+
+    Real Maillard chemistry partitions amino-acid nitrogen between polymer-retention and
+    Strecker-release; the **system** (D-87 + D-89) reproduces that partition while each branch stays
+    internally pure — the N-retaining polymer branch keeps *its* nitrogen (D-89), the deaminating
+    volatile branch releases *its* nitrogen (D-87). Putting a partial-deamination split inside D-89
+    would double-count D-87's release (and add an un-pinnable free parameter — the D-75/D-87
+    silent-mis-key hazard), so **all drawn nitrogen is retained here** (the owner's D-89
+    closest-to-reality choice, given D-87 already owns the release branch).
+
+    ``r_sugar = k_maillard_browning · f(T) · [S_total] · gate(aa)`` — first-order in the **residual
+    sugar** (summed over the vector, the reducing-sugar substrate) and gated by amino-acid
+    availability ``gate = aa/(K_amino_acids + aa)`` (the D-33/D-75 smooth-Monod shape), with ``f(T)
+    =
+    arrhenius_factor(T, E_a_maillard_browning, T_ref)`` the **strongly** warmer-faster factor
+    (``E_a ≈ 100 kJ/mol``, above the oxidative aging E_a's — the same sourced
+    Maillard/caramelization-≫-oxidation ordering :class:`MaillardStrecker`/:class:`Caramelization`
+    carry). So it is amino-acid-limited: as amino acids exhaust the browning stops, while D-88
+    caramelization keeps browning the residual sugar. The consumed sugar + amino acid are booked
+    as::
+
+        d(S)/dt                  = −r_sugar
+        d(amino_acids)/dt        = −r_aa
+        d(maillard_melanoidin)/dt = +r_m
+        d(A420)/dt               = +y_a420_per_maillard_melanoidin · r_m
+
+    **Carbon AND nitrogen close by construction — the draws are sized to the melanoidin formed (the
+    first two-ledger aging transfer).** ``maillard_melanoidin`` is an on-ledger carbon+nitrogen-park
+    (the ``melanoidin`` carbon-park extended to nitrogen — the FIRST non-biomass, non-arginine
+    species on ``total_nitrogen``): its stand-in ``C8H12O5N`` fixes its carbon fraction ``c_m`` and
+    nitrogen fraction ``n_m``. Requiring **all** the amino-acid nitrogen to land in the polymer and
+    **all** the drawn carbon (sugar + amino acid) to land in the polymer gives two equations::
+
+        nitrogen:  r_aa · n(arg)                 = r_m · n_m
+        carbon:    r_sugar · c(sugar) + r_aa · c(arg) = r_m · c_m
+
+    solved (given ``r_sugar`` from the rate law) as::
+
+        r_m  = r_sugar · c(sugar) / (c_m − n_m · c(arg)/n(arg))
+        r_aa = r_m · n_m / n(arg)
+
+    so ``total_carbon`` **and** ``total_nitrogen`` close to machine precision for *any* stand-in
+    formula. **The denominator is the one silent trap** (advisor's must-check): ``c_m − n_m·c(arg)/
+    n(arg)`` must be comfortably positive or ``r_m`` flips sign and the Process would *create* sugar
+    with no conservation test catching it (closure holds for either sign). The threshold is
+    mass-ratio
+    ``c_m/n_m > c(arg)/n(arg) = 72/56 ≈ 1.29`` (atomic C:N > ~1.5); the C-rich melanoidin (C:N ≈
+    8:1,
+    ``c_m/n_m ≈ 6.9``) clears it by ~5×, leaving the denominator ≈ 0.81·c_m (healthy, no blow-up).
+    The amino-acid draw is the arginine lump (D-45), exact on the ledger, approximate on provenance;
+    the whole amino acid (carbon skeleton + nitrogen) is built into the polymer here — unlike D-87,
+    where the carbon leaves as aldehyde+CO₂ and only the nitrogen returns. ``total_mass``
+    ({S,E,CO2})
+    sees the ``S`` debit with no matching credit (the melanoidin and the dehydration water are
+    off it), the standing aging-axis mass gap, never asserted on an aging run.
+
+    **Wine-only + isolable + doubly substrate-gated (prime directive #3).** ``amino_acids`` and the
+    ``maillard_melanoidin`` park are wine-only (beer's amino-acid pool is not tracked, D-32; beer
+    thermal browning is deferred, the D-86 oak-to-beer pattern), so — like :class:`MaillardStrecker`
+    / :class:`Caramelization` — this is wired into the *wine* medium only; the guard on either slot
+    is
+    a hard no-op besides. Wired **disabled at the compile seam**; ``begin_aging`` enables it with
+    the
+    other aging Processes. **Isolability rests on the ``amino_acids`` HARD gate** (undosed ⇒ exactly
+    0
+    ⇒ byte-for-byte the case without this Process — the default wine is unchanged); residual sugar
+    is
+    a **soft** driver (a dry wine holds ~0 at the aging segment ⇒ inert via the ``S ≤ 0`` guard, but
+    a
+    "dry" wine's residual ~1–2 g/L would brown a negligible trace, not byte-for-byte zero — the
+    physically-correct trace). Tier **speculative** (the *form* — sugar + amino acid + heat →
+    N-bearing browning, O₂-independent, strongly warmer-faster — is sourced; every magnitude is an
+    order-of-magnitude estimate).
+    """
+
+    name = "maillard_browning"
+    tier = Tier.SPECULATIVE
+    #: Consumes core ``S`` AND ``amino_acids`` and books both into the on-ledger
+    #: ``maillard_melanoidin`` carbon+nitrogen-park (so ``total_carbon`` and ``total_nitrogen`` both
+    #: close), raising the shared off-ledger ``A420`` browning index. Touches those four and nothing
+    #: else — NO ``o2`` (the whole point), NO ``CO2``/``N`` (all carbon+nitrogen retained in the
+    #: polymer; the deaminating/decarboxylating branch is :class:`MaillardStrecker`, D-87).
+    touches = ("S", "amino_acids", "maillard_melanoidin", "A420")
+    #: ``k_maillard_browning``/``E_a_maillard_browning``/``y_a420_per_maillard_melanoidin`` are this
+    #: Process's own (thermal.yaml, D-89); ``K_amino_acids`` is the *shared* availability
+    #: half-saturation (the same constant the mercaptan/reroute/D-75/D-87 gates read); ``T_ref`` is
+    #: shared with every Arrhenius rate. Their tiers cap the output tiers via parameter-tier
+    #: propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_maillard_browning",
+        "E_a_maillard_browning",
+        "y_a420_per_maillard_melanoidin",
+        "K_amino_acids",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (beer's amino-acid pool is not tracked, D-32; the melanoidin park is a
+        # wine slot): a hard no-op on any schema without them, belt-and-suspenders to the wine-only
+        # wiring.
+        if "maillard_melanoidin" not in schema or "amino_acids" not in schema:
+            return d
+        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
+        # HARD amino-acid gate — the isolability guarantee: an undosed wine (aa == 0) is
+        # byte-for-byte the case without this Process. ``<= 0`` also absorbs solver undershoot.
+        if aa <= 0.0:
+            return d
+        s_slice = schema.slice("S")
+        # Residual sugar is the reducing-sugar substrate (summed over the vector), a SOFT gate: a
+        # dry wine (S ≈ 0 at the aging segment) makes ~none, but the trace is physically real, so
+        # this is not an isolability claim. ``<= 0`` also absorbs a solver undershoot (S < 0).
+        s_total = max(float(y[s_slice].sum()), 0.0)
+        if s_total <= 0.0:
+            return d
+        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_maillard_browning"], params["T_ref"])
+        r_sugar = params["k_maillard_browning"] * f_t * s_total * gate  # g sugar/L/h into browning
+        if r_sugar <= 0.0:
+            return d
+
+        # Size the melanoidin formed + the amino-acid draw so BOTH ledgers close (all nitrogen and
+        # all carbon retained in the polymer — the N-retaining branch; the deaminating branch is
+        # D-87):
+        #   nitrogen:  r_aa·n(arg)               = r_m·n_m
+        #   carbon:    r_sugar·c(sugar) + r_aa·c(arg) = r_m·c_m
+        # =>  r_m  = r_sugar·c(sugar) / (c_m − n_m·c(arg)/n(arg)),   r_aa = r_m·n_m/n(arg).
+        c_sugar = carbon_mass_fraction(sugar_species(schema)[0])  # wine's single hexose
+        c_m = carbon_mass_fraction(_MAILLARD_MELANOIDIN_SPECIES)
+        n_m = nitrogen_mass_fraction(_MAILLARD_MELANOIDIN_SPECIES)
+        c_arg = carbon_mass_fraction(AMINO_ACID_SPECIES)
+        n_arg = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+        # denom > 0 by construction: the C-rich melanoidin (C:N ≈ 8:1) far exceeds arginine's C:N
+        # (≈ 1.29), so ≈ 0.81·c_m — never near zero. (A negative denom would silently create sugar,
+        # so this ordering is load-bearing; a metadata test pins it, the class docstring's trap.)
+        denom = c_m - n_m * c_arg / n_arg
+        mel_rate = r_sugar * c_sugar / denom  # g maillard_melanoidin/L/h
+        aa_mass = mel_rate * n_m / n_arg  # g arginine/L/h drawn, sized to the retained nitrogen
+
+        # FORWARD-NOTE (if D-89 ever goes medium-agnostic for beer thermal browning, the D-88 note):
+        # ``d[s_slice] = -r_sugar`` is correct for WINE's single-slot S but would broadcast −r into
+        # ALL THREE beer sugar slots — a beer version must apportion the draw across the vector (and
+        # use each component's own carbon fraction for the melanoidin transfer, not just hexose).
+        d[s_slice] = -r_sugar
+        d[schema.slice("amino_acids")] = -aa_mass
+        d[schema.slice(_MAILLARD_MELANOIDIN_SPECIES)] = mel_rate
+        # The shared A420 browning index rises with the melanoidin formed (off every ledger, the
+        # D-74 optical-index slot). Maillard melanoidins brown more per mass than caramelan, so this
+        # yield is its own (larger) parameter. Monotone (mel_rate ≥ 0), joining the D-74/D-88 route.
+        d[schema.slice("A420")] = params["y_a420_per_maillard_melanoidin"] * mel_rate
         return d
 
 
