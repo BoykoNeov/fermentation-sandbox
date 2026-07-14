@@ -1485,8 +1485,10 @@ class OakExtraction(Process):
     — is sourced; every magnitude, the yields especially, is an order-of-magnitude estimate).
     **Scope (v1):** ellagitannins are now modelled (D-78 — extracted here, O₂-scavenged by
     :class:`EllagitanninOxidation`); ``oak_gpl`` is the generalized oak-contact dose subsuming
-    chips-g/L and barrel surface-to-volume ratio (barrel fill-number depletion deferred); whiskey
-    lactone is a lumped cis+trans pool.
+    chips-g/L and barrel surface-to-volume ratio; barrel fill-number depletion is now modelled
+    (D-91 — a reused barrel sets lower ceilings via ``oak_fill_retention``, at the ``add_oak`` dose;
+    the *within-fill* finite-reservoir draw-down and per-compound retention remain deferred);
+    whiskey lactone is a lumped cis+trans pool.
     """
 
     name = "oak_extraction"
@@ -1553,8 +1555,10 @@ class EllagitanninOxidation(Process):
     wine is below the ceiling :class:`OakExtraction` re-supplies tannin as fast as this Process
     burns it, so oak buffers redox for **months-to-years** (an oaked+oxygenated wine's acetaldehyde
     may never climb) — contrast SO₂, whose finite pool is spent once. That renewability is
-    physically correct (a barrel is a large tannin reservoir); the eventual wood exhaustion is
-    D-77's already-deferred barrel **fill-number** refinement, not modelled here.
+    physically correct (a barrel is a large tannin reservoir); the eventual **within-fill** wood
+    exhaustion (the reservoir depleting as a single fill ages) is the deferred finite-reservoir
+    refinement — distinct from D-91's *across-fill* ``fill_number``, which lowers a reused barrel's
+    starting ceilings at dose time but does not draw them down dynamically here.
 
     ``d(o2)/dt = −r`` with ``r = k_ellagitannin_oxidation · f(T) · [o2] · [ellagitannin]`` —
     **bilinear** in the dissolved-O₂ pool and the ellagitannin driver (the :class:`SulfiteOxidation`

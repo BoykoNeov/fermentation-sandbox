@@ -1108,7 +1108,10 @@ def _verb_add_oak(
     this verb only doses — it does **not** enable the Process (``begin_aging`` does, alongside the
     other aging Processes). So the natural usage is ``begin_aging`` at the ferment/aging boundary,
     plus ``add_oak`` for the oak charge; a second ``add_oak`` **raises** the ceilings (a fresh
-    charge / more chips — the ``+=`` dose idiom, the deferred fill-number's coarse form). The
+    charge / more chips — the ``+=`` dose idiom). Note ``+=`` and ``fill_number`` (D-91, below) are
+    **orthogonal** levers, not coarse-vs-fine versions of one: ``+=`` adds *more oak contact* and
+    **raises** the ceiling, whereas ``fill_number`` models the *same oak, more depleted* by prior
+    fills and **lowers** it. The
     ceiling slots are **off every ledger** (wood-derived, the ``iso_alpha`` precedent), so the
     jump perturbs no elemental balance — the run-wide carbon/nitrogen ledgers close with **no**
     correction term (like ``add_oxygen``; unlike carbon-bearing ``add_acid``/``add_sugar``).
@@ -1119,8 +1122,22 @@ def _verb_add_oak(
     bare/other medium with no ``whiskey_lactone`` slot raises. Guards that ``oak.yaml`` is loaded
     (the ``add_dap`` discipline) so a caller-supplied ``parameter_paths`` without it fails loudly
     HERE at compile, not as a bare ``KeyError`` when the verb reads a yield.
+
+    **Barrel fill-number depletion (decision D-91).** An OPTIONAL ``fill_number`` (int ≥ 1, default
+    1) counts the barrel's use: a reused barrel has a depleted accessible extractable pool, so it
+    sets LOWER ceilings than a fresh first-fill one at the same ``oak_gpl``/``toast``. Every ceiling
+    is scaled by ``oak_fill_retention ** (fill_number − 1)``, so ``fill_number = 1`` is UNSCALED
+    (``r**0 == 1.0`` exactly ⇒ byte-for-byte the pre-D-91 dose) and each prior fill geometrically
+    discounts the extractables — the signature lever of barrel-aged BEER programs (a first-fill
+    bourbon barrel for the imperial stout, then the neutralised barrel for a sour). This is an
+    ACROSS-FILL dose input (barrel history known at charge time), NOT a within-fill dynamic
+    reservoir; the mechanistic finite-reservoir model, per-compound retention, and a first-fill
+    ex-bourbon barrel's residual-SPIRIT soak-back (leached from the spirit, not the wood) are all
+    documented refinements deferred here. ``fill_number`` is validated int-valued ≥ 1 (a "zeroth
+    fill" is meaningless), and ``oak_fill_retention`` is read only when it bites (``fill_number ≠
+    1``), so a fresh fill stays inert even against a partial ``oak.yaml``.
     """
-    _iv_check_keys(iv, frozenset({"oak_gpl", "toast"}), "add_oak")
+    _iv_check_keys(iv, frozenset({"oak_gpl", "toast", "fill_number"}), "add_oak")
     oak_gpl = _iv_float(iv, "oak_gpl", "add_oak")
     toast = _iv_str(iv, "toast", "add_oak")
     if toast not in _OAK_TOASTS:
@@ -1134,6 +1151,37 @@ def _verb_add_oak(
             f"medium {schema!r} has none (oak needs the oak-axis slots; wine and beer carry "
             f"them, decisions D-77/D-86)"
         )
+    # Barrel fill-number depletion (D-91): a reused barrel extracts LESS. fill_number is an OPTIONAL
+    # int >= 1 counting the barrel's use (1 = a fresh first-fill barrel, the default). Each prior
+    # fill geometrically discounts every ceiling by oak_fill_retention; fill_number = 1 is UNSCALED
+    # (retention ** 0 == 1.0 exactly ⇒ byte-for-byte the pre-D-91 behaviour). Validate int-valued
+    # >= 1 (a "zeroth fill" is meaningless — brewers count first/second/third), the toast-string
+    # rejection pattern. Read oak_fill_retention only when it BITES (fill_number != 1), so a fresh
+    # fill stays inert even against a partial oak.yaml.
+    fill_scale = 1.0
+    if "fill_number" in iv.params:
+        raw = iv.params["fill_number"]
+        try:
+            fill_f = float(raw)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"intervention 'add_oak' param 'fill_number' must be a number, got {raw!r}"
+            ) from None
+        if fill_f < 1.0 or fill_f != int(fill_f):
+            raise ValueError(
+                f"intervention 'add_oak' at day {iv.day:g}: fill_number must be an integer >= 1 "
+                f"(1 = a fresh first-fill barrel), got {raw!r} (decision D-91)"
+            )
+        fill_number = int(fill_f)
+        if fill_number != 1:
+            try:
+                retention = parameters["oak_fill_retention"].value
+            except KeyError:  # oak.yaml not loaded (caller-supplied parameter_paths)
+                raise ValueError(
+                    "intervention 'add_oak' with fill_number > 1 needs 'oak_fill_retention' but it "
+                    "is missing; include oak.yaml in parameter_paths (decision D-91)."
+                ) from None
+            fill_scale = retention ** (fill_number - 1)
     ceiling_deltas: dict[str, float] = {}
     for compound in _OAK_COMPOUNDS:
         yield_name = f"oak_yield_{compound}_{toast}"
@@ -1144,7 +1192,8 @@ def _verb_add_oak(
                 f"intervention 'add_oak' needs {yield_name!r} but it is missing; include oak.yaml "
                 "in parameter_paths (the default lookup merges it automatically, decision D-77)."
             ) from None
-        ceiling_deltas[f"{compound}_ceiling"] = oak_gpl * yield_val
+        # fill_scale discounts the fresh-barrel ceiling by the barrel's use history (D-91).
+        ceiling_deltas[f"{compound}_ceiling"] = oak_gpl * yield_val * fill_scale
     slices = {name: schema.slice(name) for name in ceiling_deltas}
 
     def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:

@@ -7151,3 +7151,65 @@ forward-notes resolved in both `Caramelization` and `MaillardBrowning`); `media.
 `_CARAMELIZATION_PROCESSES` in beer, comment); `compile.py` + `conservation.py` docstring updates. **Every wine trajectory is
 byte-for-byte unchanged** (single-slot reduction); a dry-finished beer browns only a numerically-negligible trace. **Next:**
 beat 1b (descriptor projection), barrel fill-number depletion, a beer-specific per-melanoidin A420 yield (refinement).
+
+## D-91 — barrel fill-number depletion: a reused barrel extracts LESS — an `add_oak` **dose** input (`fill_number`), no new Process or slot (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3.** The long-deferred "barrel fill-number depletion" beat (forward-noted since
+D-77/D-86): a barrel is a **depleting** oak source, so a second-/third-/fourth-fill barrel imparts progressively **less** wood
+character than a fresh first-fill one at the same dose. The signature lever of barrel-aged **beer** programs — a first-fill
+bourbon barrel for the imperial stout, then the neutralised barrel for a sour where fresh oak would overwhelm. **One
+`advisor()` pass** (confirmed the design shape + sharpened six points; no owner fork — the dose-input scope is the documented
+one). 993 → 997 tests (+4), `ruff`/`mypy`/`pytest` green.
+
+**The design fork — an ACROSS-FILL dose input, NOT a within-fill dynamic reservoir (the advisor's #1).** Two models could
+express depletion: (a) `fill_number` scales the saturation ceiling *at dose time* (barrel history is known when the oak is
+charged), or (b) a finite extractable **reservoir** state slot that `OakExtraction` draws down as it extracts, so depletion is
+*emergent* from cumulative extraction. (b) is the more mechanistic model but a much bigger change — new state, a Process edit,
+conservation-adjacent. Every forward-note says "fill-**number** depletion" — an across-fill *input*, not a within-fill
+reservoir — so **(a) is the documented scope and is correct**. This matches D-77's "the ceiling is set at the dose" exactly:
+fill-number is a barrel-history property known at charge time, so it belongs in the `add_oak` **verb** as a ceiling scale,
+**not** in state and **not** in `OakExtraction`. The finite-reservoir model is the noted deferred refinement.
+
+**The implementation — purely dose-level, the cleanest possible.** `add_oak` gains an **optional** `fill_number` (int ≥ 1,
+default 1). Each of the five ceilings (four aroma + `ellagitannin`) is scaled by `oak_fill_retention ** (fill_number − 1)`
+before the `+=` write. **No new Process, no new state slot, no schema change** — fill-number is a dose property exactly like
+`oak_gpl` and `toast`, and `OakExtraction` is untouched. `fill_number = 1` (a fresh first-fill barrel, the default) gives
+`r**0 = 1.0` **exactly** in IEEE, and `delta * 1.0 == delta` exactly, so **every pre-D-91 wine + beer trajectory is
+byte-for-byte unchanged** — the whole existing oak suite already pins the first-fill case. `oak_fill_retention` is read **only
+when it bites** (`fill_number ≠ 1`), so a fresh fill stays inert even against a caller's partial `oak.yaml` (belt-and-braces;
+the byte-for-byte guarantee holds regardless since `**0`/`*1.0` are exact).
+
+**The parameter — `oak_fill_retention = 0.5` (speculative), sourced ORDERING + speculative magnitude.** New param in `oak.yaml`
+(dimensionless, banded 0.3–0.7). The load-bearing sourced claim is the **observable it reproduces**: barrels go effectively
+**neutral by ~4th–5th fill** (standard cooperage/winemaking/barrel-aged-beer practice — first-fill barrels impart the most
+oak, a barrel is managed as neutral after ~3–4 uses). `r = 0.5` lands that (fill 3 → 0.25, fill 4 → 0.125, fill 5 → 0.06 of a
+fresh barrel); the geometric per-fill discount is the simplest form consistent with monotone-decreasing reuse. **One shared
+retention across all five extractives** — per-compound retention (the lipophilic whiskey lactone persists across *more* fills
+than the readily-leached ellagitannin) is a documented refinement, matching the single-shared-`k_oak_extraction` discipline.
+**Off every ledger** like the ceilings it scales (wood-derived, the `iso_alpha` precedent) — moves nothing conserved.
+
+**Validation — int-valued ≥ 1 (the advisor's #3).** `_iv_check_keys` treats `allowed` as the full *permitted* set (optionality
+is enforced by the reader), so `fill_number` was simply added to `add_oak`'s allowed keys. A "zeroth fill" (< 1) and a
+fractional fill are meaningless — brewers count first/second/third — so both are rejected **loudly at compile** (the
+`toast`-string rejection pattern), never silently coerced. Accepts an int-valued float (`fill_f == int(fill_f)`).
+
+**Scope boundary — oak-EXTRACTABLE depletion only (the advisor's #4).** `fill_number` depletes the **wood** extractables. A
+first-fill ex-bourbon barrel's residual-**SPIRIT** soak-back (vanilla/oak/ethanol leached from the *spirit* itself, not the
+wood) is a **separate** contribution, out of scope / deferred — "first oak fill" (full wood extractables) is **not** the same
+as "first-fill ex-bourbon barrel" (wood + spirit soak-back). Documented in both `oak.yaml` and the verb docstring so a reader
+cannot conflate them.
+
+**Tests (+4, `test_aging_scenario.py`).** `test_fill_number_defaults_to_first_fill_byte_for_byte` (implicit == explicit
+`fill_number=1` == raw `oak_gpl × yield`, to the bit — the backward-compat anchor); `test_higher_fill_number_geometrically_
+discounts_the_ceilings` (fills 1/2/4 in the ratio 1 : r : r³, strictly decreasing across all five extractives); the motivating
+**beer** end-to-end `test_reused_barrel_beer_reads_lower_oak_oavs_and_astringency_end_to_end` (a first-fill vs fourth-fill
+bourbon-barrel stout, identical but for `fill_number` — the reused barrel reads lower on every oak OAV and lower ellagitannin
+astringency, both still positive); `test_add_oak_rejects_a_zeroth_or_fractional_fill_number` (0, −1, 2.5 all raise). The
+`_add_oak` test helper gained an optional `fill_number` kwarg (omitted ⇒ fresh fill).
+
+**Regression surface.** `oak.yaml` (+`oak_fill_retention` param + section header); `compile.py` (`_verb_add_oak` — `fill_number`
+in allowed keys, validation, `fill_scale` applied to every ceiling delta; docstring); `aging.py` (`OakExtraction` scope note —
+fill-number now modelled, within-fill reservoir + per-compound retention deferred). **No Process, state, or schema change** —
+purely the dose. **Every wine + beer trajectory without `fill_number` (or with `fill_number=1`) is byte-for-byte unchanged.**
+**Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield, the deferred finite-reservoir /
+per-compound-retention refinements, bourbon-barrel spirit soak-back.

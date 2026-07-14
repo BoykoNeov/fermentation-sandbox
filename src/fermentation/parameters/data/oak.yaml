@@ -69,13 +69,16 @@
 #     ceiling the wood keeps re-supplying tannin as fast as O2 burns it (OakExtraction's approach
 #     term), so oak buffers redox for months-to-years — an oaked+oxygenated wine's acetaldehyde may
 #     never climb (contrast SO2, whose protection ENDS at exhaustion). This is physically correct (a
-#     barrel is a large tannin reservoir); the eventual wood exhaustion is D-77's already-deferred
-#     BARREL FILL-NUMBER refinement. k_ellagitannin_oxidation is banded so suppression is PARTIAL
+#     barrel is a large tannin reservoir); the eventual WITHIN-FILL wood exhaustion (the reservoir
+#     depleting as one fill ages) is the deferred finite-reservoir refinement — distinct from D-91's
+#     ACROSS-FILL fill_number, which lowers the STARTING ceilings of a reused barrel at dose time but
+#     does not draw them down dynamically. k_ellagitannin_oxidation is banded so suppression is PARTIAL
 #     (ellagitannin does not monopolize the O2 — oaked wines still show SOME oxidative character).
 #   * oak_gpl is the GENERALIZED oak-contact dose, subsuming chips-g/L and barrel surface-to-volume
 #     ratio (higher S:V or more chips => more contact => proportionally higher ceilings — the
 #     ceilings scale LINEARLY with oak_gpl). BARREL AGE / FILL NUMBER (a used barrel extracts less)
-#     is DEFERRED: it would be a ceiling multiplier < 1, a later refinement.
+#     is now MODELLED (D-91): add_oak's fill_number applies the ceiling multiplier < 1 this note
+#     anticipated (oak_fill_retention ** (fill_number - 1)), an across-fill DOSE input (see below).
 #   * SHARED k_oak_extraction across all four compounds this beat — the ceilings carry the toast
 #     PROFILE (which compound dominates), the rate is common. Per-compound extraction rates (lactone
 #     is slower than vanillin in reality) are a documented refinement, not this beat.
@@ -104,6 +107,35 @@ k_oak_extraction:
     source: "author estimate anchored to the timescale over which oak aroma compounds are extracted into wine in barrel/chip aging (barrel-aging and oak-chip contact studies — e.g. Spillman, Sefton & Gawel 2004; whiskey-lactone/vanillin extraction rises over weeks-to-months then plateaus as the accessible wood is exhausted)."
     conditions: "generic wine at cellar temperature; first-order in the gap (ceiling - concentration), shared across all four extractives, at T_ref = 293.15 K. The wood-diffusion physics is lumped into this single constant."
     notes: "SOURCED FORM (first-order diffusion-limited approach to a saturation ceiling => SATURATING extractive, not unbounded) + SPECULATIVE magnitude (order-of-magnitude, banded to the weeks-to-months barrel-extraction timescale). The load-bearing sourced claim is that extraction SATURATES (approaches a ceiling), not this absolute rate."
+
+# -- BARREL FILL-NUMBER DEPLETION: a reused barrel extracts LESS (decision D-91) ----------------
+# A barrel is a DEPLETING oak source: each successive fill draws down the wood's accessible
+# extractable pool, so a second-/third-/fourth-fill barrel sets LOWER saturation ceilings than a
+# fresh first-fill one from the same oak_gpl/toast. The add_oak verb multiplies every ceiling by
+#   oak_fill_retention ** (fill_number - 1)
+# so fill_number = 1 (a fresh, first-fill barrel) is UNSCALED (r**0 = 1, byte-for-byte the pre-D-91
+# behaviour) and each prior fill geometrically discounts the extractables. This is an ACROSS-FILL
+# DOSE INPUT (barrel history known when the oak is charged), NOT a within-fill dynamic reservoir
+# OakExtraction draws down — the documented fill-number scope; the mechanistic finite-reservoir
+# model (depletion emergent from cumulative extraction) is the deferred refinement. SHARED across
+# both media (D-86): fill-number depletion is a WOOD property, and it is the signature lever of
+# barrel-aged BEER programs (a first-fill bourbon barrel for the imperial stout, then the neutralised
+# barrel for a sour where fresh oak would overwhelm). Per-compound retention (the lipophilic whiskey
+# lactone persists across MORE fills than the readily-leached ellagitannin) is a documented
+# refinement — one shared retention this beat, matching the single-shared-k_oak_extraction discipline.
+# SCOPE: this is oak-EXTRACTABLE depletion only. A first-fill bourbon/whiskey barrel's residual-
+# SPIRIT soak-back (vanilla/oak/ethanol leached from the spirit itself, not the wood) is a SEPARATE
+# contribution, out of scope here (deferred) — "first oak fill" (full wood extractables) is not the
+# same as "first-fill ex-bourbon barrel" (wood + spirit soak-back).
+oak_fill_retention:
+  value: 0.5
+  unit: "1"   # dimensionless fraction of extractables retained per PRIOR fill; ceiling *= r**(fill-1)
+  tier: speculative
+  uncertainty: { low: 0.3, high: 0.7, note: "fraction of the accessible oak extractable pool a barrel retains for the NEXT fill. The SOURCED, load-bearing claim is the ORDERING and the observable it reproduces: barrels go effectively NEUTRAL by roughly the 4th-5th fill (winemaker/brewer barrel-management practice — first-fill barrels impart the most oak, and a barrel is treated as neutral after ~3-4 uses). r = 0.5 lands that (fill 3 -> 0.5**2 = 0.25, fill 4 -> 0.125, fill 5 -> 0.06 of a fresh barrel); r = 0.3 neutralises faster, r = 0.7 slower. Geometric per-fill discount is the simplest form consistent with monotone-decreasing reuse; the magnitude is a banded author estimate." }
+  provenance:
+    source: "author estimate anchored to the well-established ORDERING that oak barrels deplete with reuse — first-fill barrels impart the most oak character and a barrel is managed as effectively neutral after ~3-5 fills (standard cooperage/winemaking/barrel-aged-beer practice; e.g. first-use vs neutral-barrel programs in barrel-aged sour and stout production). The geometric per-fill retention lumps the wood's diminishing accessible extractable pool into one fraction."
+    conditions: "dimensionless; multiplies every add_oak saturation ceiling by oak_fill_retention ** (fill_number - 1) at dose time, generic oak barrel, shared across both media (wood property)."
+    notes: "SOURCED ORDERING (barrels deplete with reuse; neutral by ~4th-5th fill) + SPECULATIVE magnitude (banded 0.3-0.7). Geometric ACROSS-FILL discount at the dose (a barrel-history input), NOT a within-fill dynamic reservoir (the deferred mechanistic refinement). One shared retention across all five extractives (per-compound retention deferred). Off every ledger like the ceilings it scales (wood-derived, iso_alpha precedent) — moves nothing conserved."
 
 # -- ACTIVATION ENERGY: warmer extracts faster, but WEAKLY (diffusion-limited) -----------------
 # DELIBERATELY LOW and its OWN parameter (prime directive #2): oak extraction is DIFFUSION-limited,

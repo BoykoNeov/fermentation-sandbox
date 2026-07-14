@@ -148,8 +148,13 @@ def _add_oxygen(day: float, o2_mgl: float) -> Intervention:
     return Intervention(day=day, action="add_oxygen", params={"o2_mgl": o2_mgl})
 
 
-def _add_oak(day: float, oak_gpl: float, toast: str) -> Intervention:
-    return Intervention(day=day, action="add_oak", params={"oak_gpl": oak_gpl, "toast": toast})
+def _add_oak(
+    day: float, oak_gpl: float, toast: str, fill_number: float | None = None
+) -> Intervention:
+    params: dict[str, object] = {"oak_gpl": oak_gpl, "toast": toast}
+    if fill_number is not None:  # D-91 barrel fill-number depletion (default omitted ⇒ fresh fill)
+        params["fill_number"] = fill_number
+    return Intervention(day=day, action="add_oak", params=params)
 
 
 def _add_so2(day: float, so2_mgl: float) -> Intervention:
@@ -1387,6 +1392,107 @@ def test_barrel_beer_oak_protects_against_oxidation():
         total_nitrogen(oaked_cs.schema, biomass_nitrogen_fraction=f_n),
         label="nitrogen",
     )
+
+
+# -- D-91: barrel fill-number depletion (a reused barrel extracts LESS — the add_oak dose lever) --
+# fill_number is an ACROSS-FILL dose input, not new physics: it scales every add_oak ceiling by
+# oak_fill_retention ** (fill_number - 1) at charge time. fill_number = 1 (a fresh first-fill
+# barrel, the default) is UNSCALED — byte-for-byte the pre-D-91 dose — so the whole existing oak
+# suite pins the first-fill case; these tests pin the DEPLETION. The signature lever is barrel-aged
+# BEER, so a beer scenario carries the end-to-end weight.
+
+
+def test_fill_number_defaults_to_first_fill_byte_for_byte():
+    # The backward-compat anchor: omitting fill_number is identical to fill_number = 1 (r ** 0 ==
+    # 1.0 exactly), so the ceilings match to the last bit — the guarantee that every pre-D-91 wine +
+    # beer trajectory is untouched. Explicit and implicit first-fill produce identical ceilings.
+    implicit = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium")])
+    )
+    explicit = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium", fill_number=1)])
+    )
+    ev_i = next(e for e in implicit.events if e.label.startswith("add_oak"))
+    ev_e = next(e for e in explicit.events if e.label.startswith("add_oak"))
+    assert ev_i.mutate is not None and ev_e.mutate is not None
+    after_i = ev_i.mutate(implicit.schema, implicit.y0.copy())
+    after_e = ev_e.mutate(explicit.schema, explicit.y0.copy())
+    for compound in (*_OAK_EXTRACTIVES, "ellagitannin"):
+        name = f"{compound}_ceiling"
+        # byte-for-byte: explicit first-fill == implicit == the raw oak_gpl × yield (unscaled)
+        assert implicit.schema.get(after_i, name) == explicit.schema.get(after_e, name)
+        assert (
+            implicit.schema.get(after_i, name)
+            == 4.0 * implicit.param_values[f"oak_yield_{compound}_medium"]
+        )
+
+
+def test_higher_fill_number_geometrically_discounts_the_ceilings():
+    # The D-91 core: each prior fill multiplies every ceiling by oak_fill_retention. A fresh
+    # (fill 1), second-fill (fill 2) and fourth-fill (fill 4) barrel at the SAME oak_gpl/toast set
+    # ceilings in the ratio 1 : r : r³ — a decreasing geometric sequence, all 5 extractives.
+    def ceilings(fill: int) -> dict[str, float]:
+        cs = compile_scenario(
+            _wine(
+                [
+                    _begin_aging(_FERMENT_DAYS),
+                    _add_oak(_FERMENT_DAYS, 4.0, "medium", fill_number=fill),
+                ]
+            )
+        )
+        ev = next(e for e in cs.events if e.label.startswith("add_oak"))
+        assert ev.mutate is not None
+        after = ev.mutate(cs.schema, cs.y0.copy())
+        return {
+            c: float(cs.schema.get(after, f"{c}_ceiling"))
+            for c in (*_OAK_EXTRACTIVES, "ellagitannin")
+        }
+
+    r = compile_scenario(_wine([])).param_values["oak_fill_retention"]
+    fresh, second, fourth = ceilings(1), ceilings(2), ceilings(4)
+    for compound in (*_OAK_EXTRACTIVES, "ellagitannin"):
+        assert fresh[compound] > second[compound] > fourth[compound] > 0.0  # monotone depletion
+        assert second[compound] == pytest.approx(fresh[compound] * r)  # one prior fill ⇒ × r
+        assert fourth[compound] == pytest.approx(fresh[compound] * r**3)  # three prior fills ⇒ × r³
+
+
+def test_reused_barrel_beer_reads_lower_oak_oavs_and_astringency_end_to_end():
+    # The motivating BEER payoff (D-91): a first-fill bourbon-barrel stout vs the SAME beer in a
+    # fourth-fill (near-neutral) barrel — identical ferment + aging + oak_gpl/toast, differing ONLY
+    # in fill_number. The reused barrel reads LOWER on every oak OAV and lower ellagitannin
+    # astringency: a depleted barrel imparts less wood character (barrel-aged-beer practice).
+    thresholds = load_thresholds()
+    fresh = compile_scenario(
+        _beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "medium", fill_number=1)])
+    ).run()
+    reused = compile_scenario(
+        _beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "medium", fill_number=4)])
+    ).run()
+    assert fresh.success and reused.success
+    for compound in _OAK_EXTRACTIVES:
+        oav_fresh = float(oav_series(fresh.as_trajectory(), thresholds, compound)[-1])
+        oav_reused = float(oav_series(reused.as_trajectory(), thresholds, compound)[-1])
+        assert oav_fresh > oav_reused > 0.0  # both oaked, but the reused barrel imparts less
+    # Astringency (oak ellagitannin alone on beer, D-86): reused barrel lower, still positive.
+    astr_fresh = float(astringency_series(fresh.as_trajectory())[-1])
+    astr_reused = float(astringency_series(reused.as_trajectory())[-1])
+    assert astr_fresh > astr_reused > 0.0
+
+
+def test_add_oak_rejects_a_zeroth_or_fractional_fill_number():
+    # fill_number counts a physical barrel use — first/second/third — so it must be an integer ≥ 1.
+    # A "zeroth fill" (< 1) and a fractional fill are both meaningless and rejected loudly at
+    # compile (the toast-string rejection pattern), not silently coerced.
+    for bad in (0, -1, 2.5):
+        with pytest.raises(ValueError, match="fill_number must be an integer"):
+            compile_scenario(
+                _wine(
+                    [
+                        _begin_aging(_FERMENT_DAYS),
+                        _add_oak(_FERMENT_DAYS, 4.0, "medium", fill_number=bad),
+                    ]
+                )
+            )
 
 
 # -- D-79: tannin–anthocyanin condensation end-to-end (red-wine softening + colour stabilization) --

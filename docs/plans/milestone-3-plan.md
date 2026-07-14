@@ -229,6 +229,27 @@
 > appended to `beer_schema`, `_CARAMELIZATION_PROCESSES` in beer, gating free (name-guarded `_AGING_GATED_PROCESSES`). The
 > thermal axis is now media-split: sugar-only browning BOTH media (D-88/D-90), N-routes wine-only (D-87/D-89). Next: beat 1b
 > (descriptor projection), barrel fill-number, a beer-specific per-melanoidin A420 yield (refinement).**
+>
+> **PROGRESS (D-91, 2026-07-14): barrel fill-number depletion — a reused barrel extracts LESS, an `add_oak` DOSE input
+> (997 tests). The long-deferred fill-number beat (forward-noted since D-77/D-86): a barrel is a DEPLETING oak source, so a
+> 2nd-/3rd-/4th-fill barrel imparts progressively less wood character than a fresh first-fill one — the signature lever of
+> barrel-aged BEER programs (first-fill bourbon barrel → imperial stout, then the neutralised barrel → a sour). Design fork
+> (advisor): an ACROSS-FILL DOSE INPUT (`fill_number` scales the saturation ceiling AT DOSE TIME, barrel history known when
+> the oak is charged), NOT a within-fill dynamic RESERVOIR `OakExtraction` draws down (the mechanistic model — new state /
+> Process / conservation-adjacent — deferred); matches D-77's "the ceiling is set at the dose". PURELY DOSE-LEVEL: NO new
+> Process, state slot, or schema change. `add_oak` gains an OPTIONAL `fill_number` (int ≥ 1, default 1); each of the 5
+> ceilings scaled by `oak_fill_retention ** (fill_number − 1)` before the `+=` write; `OakExtraction` untouched.
+> `fill_number = 1` (fresh, default) → `r**0 = 1.0` EXACTLY ⇒ every pre-D-91 wine + beer trajectory BYTE-FOR-BYTE unchanged
+> (the whole existing oak suite already pins the first-fill case). New `oak_fill_retention = 0.5` (speculative, banded
+> 0.3–0.7): sourced ORDERING = barrels go effectively NEUTRAL by ~4th–5th fill; one shared retention across all 5 extractives
+> (per-compound retention deferred). Off every ledger (wood-derived, iso_alpha precedent). Validated int-valued ≥ 1 (zeroth /
+> fractional fill rejected loudly at compile — brewers count first/second/third). SCOPE: oak-EXTRACTABLE depletion only — a
+> first-fill ex-bourbon barrel's residual-SPIRIT soak-back (leached from the spirit, not the wood) is SEPARATE / deferred.
+> +4 tests (byte-for-byte first fill, geometric 1:r:r³ discount across all 5 extractives, the motivating BEER end-to-end
+> first-vs-fourth-fill stout reads lower oak OAVs + astringency, validation). ONE advisor pass (green-lit + sharpened six
+> points; a second done-call caught stale "deferred fill-number" docstrings, fixed). Next: beat 1b (descriptor projection),
+> a beer-specific per-melanoidin A420 yield, the deferred finite-reservoir / per-compound-retention refinements,
+> bourbon-barrel spirit soak-back.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
