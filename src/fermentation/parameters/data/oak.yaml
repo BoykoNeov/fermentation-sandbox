@@ -137,6 +137,62 @@ oak_fill_retention:
     conditions: "dimensionless; multiplies every add_oak saturation ceiling by oak_fill_retention ** (fill_number - 1) at dose time, generic oak barrel, shared across both media (wood property)."
     notes: "SOURCED ORDERING (barrels deplete with reuse; neutral by ~4th-5th fill) + SPECULATIVE magnitude (banded 0.3-0.7). Geometric ACROSS-FILL discount at the dose (a barrel-history input), NOT a within-fill dynamic reservoir (the deferred mechanistic refinement). One shared retention across all five extractives (per-compound retention deferred). Off every ledger like the ceilings it scales (wood-derived, iso_alpha precedent) — moves nothing conserved."
 
+# =============================================================================================
+# BOURBON-BARREL SPIRIT SOAK-BACK: an ex-spirit barrel donates residual ETHANOL (decision D-92).
+#
+# A first-fill ex-bourbon (or whiskey/rum) barrel's staves are soaked with several litres of
+# residual high-ABV spirit ("the devil's cut" — spirit absorbed into the wood plus wet-barrel
+# residue). When the barrel is filled with beer/wine, that residual spirit leaches BACK OUT into
+# the beverage, RAISING its ABV — the signature "a bourbon-barrel imperial stout gains ~1% ABV
+# from the barrel" effect. This is a SEPARATE contribution from the wood EXTRACTIVES above
+# (D-77/78) and from fill-number depletion (D-91): the ethanol comes from the SPIRIT that soaked
+# the wood, NOT from the wood itself. D-91 flagged it out of scope; this beat models it.
+#
+# THE MODEL — a DISCRETE ETHANOL DOSE at charge time (the add_oxygen precedent), NOT a Process.
+# add_oak {spirit: bourbon} adds a bolus of ethanol (the core E slot) to the beverage:
+#   delta_E = spirit_soak_ethanol_<spirit> * spirit_soak_retention ** (fill_number - 1)  [g/L]
+# UNLIKE the off-ledger wood extractives, ethanol is ON the carbon + mass ledger, so this dose
+# INJECTS tracked carbon/mass — booked automatically as a POSITIVE external flow by the scheduler
+# (post-minus-pre state delta), exactly like add_sugar, so the run-wide identity final == initial
+# + Sigma flows still closes (the ledger is NOT violated; a within-Process leach WOULD violate it,
+# which is why this is a dose). Anchored STRAIGHT to the observed ABV gain in g/L and DELIBERATELY
+# DECOUPLED from oak_gpl: soak-back is a BARREL phenomenon (residual spirit in staves), not a
+# chips/S:V contact one, so scaling it by the generalized oak_gpl dose would be wrong (oak chips
+# carry no soaked spirit). The caller asserts an ex-spirit barrel via the categorical `spirit`.
+#
+# SCOPE (v1), flagged loudly:
+#   * ETHANOL (ABV) ONLY this beat. The bourbon AROMA soak-back (residual vanilla/caramel/coconut
+#     spirit congeners) is a SEPARATE deferred contribution — it OVERLAPS the oak aroma pools
+#     already modelled (vanillin/whiskey_lactone/etc., D-77), so booking it now would double-count;
+#     the honest v1 is the measurable ABV gain, aroma congeners deferred. So "spirit soak-back" is
+#     NOT fully done — only its ethanol (ABV) half.
+#   * INSTANTANEOUS at charge, not the gradual weeks-months leach reality shows — the add_oxygen
+#     dose simplification (front-loads the ABV vs a ramp). A gradual leach from a finite on-ledger
+#     spirit RESERVOIR slot (drawn down into E, conserving WITHIN-segment with no external-flow
+#     booking) is BOTH the more faithful AND the conservation-natural refinement, deferred — the
+#     same reservoir machinery D-91 deferred for the wood extractables.
+#   * fill-number depletes it with its OWN steep spirit_soak_retention (spirit ~gone by fill 2-3),
+#     FAR faster than the wood's oak_fill_retention — "first-fill" is the term of art precisely
+#     because a refill barrel has been rinsed of most residual spirit by its first fill.
+spirit_soak_ethanol_bourbon:
+  value: 8.0
+  unit: "g/L"   # ethanol donated to the beverage by a FIRST-FILL ex-bourbon barrel; * retention**(fill-1)
+  tier: speculative
+  uncertainty: { low: 4.0, high: 12.0, note: "residual-spirit ethanol a first-fill ex-bourbon barrel leaches into the beverage. The SOURCED, load-bearing anchor is the observed ABV GAIN: a bourbon-barrel-aged imperial stout typically gains ~0.5-1.5% ABV from the barrel. At ethanol density 0.789 g/mL, 1% ABV = 10 mL/L * 0.789 = 7.89 g/L, so ~8 g/L is a ~1% ABV central estimate; 4 g/L ~ 0.5% ABV, 12 g/L ~ 1.5% ABV. Decoupled from oak_gpl (a barrel, not a chips/S:V, phenomenon). FIRST-FILL magnitude; refills deplete via spirit_soak_retention." }
+  provenance:
+    source: "author estimate anchored to the well-documented ABV gain of bourbon-/whiskey-barrel-aged beer (barrel-aged imperial stout / barleywine programs typically report ~0.5-1.5% ABV picked up from residual spirit in the staves — 'the angel's/devil's cut'). Converted to g/L at ethanol density 0.789 g/mL (1% ABV ~ 7.9 g/L)."
+    conditions: "g/L ethanol donated by a FIRST-FILL (fill_number = 1) ex-bourbon barrel, decoupled from oak_gpl; * spirit_soak_retention ** (fill_number - 1) for reused barrels. Generic beverage at charge time."
+    notes: "SOURCED ORDERING + MAGNITUDE-BY-CONVERSION (the ~1% ABV gain is a real, measurable observable; the g/L follows by the ethanol density) but SPECULATIVE in that the exact residual-spirit load varies widely by barrel/wetness. Ethanol is ON the carbon+mass ledger, so this dose books a POSITIVE external flow (add_sugar precedent) and the run-wide ledger closes. ETHANOL (ABV) ONLY — the bourbon AROMA congener soak-back is deferred (overlaps the D-77 oak aroma pools)."
+spirit_soak_retention:
+  value: 0.2
+  unit: "1"   # dimensionless fraction of residual spirit retained per PRIOR fill; delta_E *= r**(fill-1)
+  tier: speculative
+  uncertainty: { low: 0.05, high: 0.4, note: "fraction of the residual spirit an ex-bourbon barrel retains for the NEXT fill. DELIBERATELY STEEPER than the wood's oak_fill_retention (0.5): a barrel's residual SPIRIT is largely rinsed out by its FIRST fill (that is why 'first-fill bourbon barrel' is the term of art), so r ~ 0.2 leaves fill 2 with ~20% and fill 3 with ~4% of the fresh soak — spirit effectively gone by the 2nd-3rd fill, far faster than the wood extractables (neutral by ~4th-5th). r = 0.05 near-total first-fill rinse-out, r = 0.4 slower. Geometric per-fill discount, the oak_fill_retention form." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that residual barrel SPIRIT depletes FASTER than the wood extractables — an ex-bourbon barrel's soaked spirit is largely leached out by its first fill (first-fill vs neutral-barrel practice in barrel-aged beer), so the ABV pickup drops steeply after the first use, faster than the oak-character decline governed by oak_fill_retention (D-91)."
+    conditions: "dimensionless; multiplies the spirit_soak_ethanol_<spirit> ethanol bolus by spirit_soak_retention ** (fill_number - 1) at charge time, generic ex-spirit barrel."
+    notes: "SOURCED ORDERING (residual spirit depletes faster than wood extractables; steeper than oak_fill_retention) + SPECULATIVE magnitude (banded 0.05-0.4). Its OWN parameter, NOT reused oak_fill_retention (prime directive #2, and the value genuinely differs — spirit rinses faster than wood extracts). Geometric ACROSS-FILL discount; a gradual within-fill reservoir leach is the deferred refinement."
+
 # -- ACTIVATION ENERGY: warmer extracts faster, but WEAKLY (diffusion-limited) -----------------
 # DELIBERATELY LOW and its OWN parameter (prime directive #2): oak extraction is DIFFUSION-limited,
 # not a chemical reaction, so its temperature sensitivity is WEAK — well below the 50-60 kJ/mol of

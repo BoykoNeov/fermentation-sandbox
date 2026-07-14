@@ -1082,6 +1082,11 @@ def _verb_add_oxygen(
 #: ``toast`` choice.
 _OAK_TOASTS = ("light", "medium", "heavy")
 _OAK_COMPOUNDS = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol", "ellagitannin")
+#: The ex-spirit barrel types :func:`_verb_add_oak` accepts for the D-92 residual-spirit soak-back:
+#: a first-fill ex-``spirit`` barrel donates residual ethanol (``spirit_soak_ethanol_<spirit>`` in
+#: oak.yaml) into the beverage, raising ABV. ``bourbon`` this beat (whiskey/rum extensible); the
+#: categorical is how the caller asserts a soaked barrel (soak-back is a barrel, not chips).
+_OAK_SPIRITS = ("bourbon",)
 
 
 def _verb_add_oak(
@@ -1131,13 +1136,29 @@ def _verb_add_oak(
     discounts the extractables — the signature lever of barrel-aged BEER programs (a first-fill
     bourbon barrel for the imperial stout, then the neutralised barrel for a sour). This is an
     ACROSS-FILL dose input (barrel history known at charge time), NOT a within-fill dynamic
-    reservoir; the mechanistic finite-reservoir model, per-compound retention, and a first-fill
-    ex-bourbon barrel's residual-SPIRIT soak-back (leached from the spirit, not the wood) are all
-    documented refinements deferred here. ``fill_number`` is validated int-valued ≥ 1 (a "zeroth
+    reservoir; the mechanistic finite-reservoir model and per-compound retention are documented
+    refinements deferred here. ``fill_number`` is validated int-valued ≥ 1 (a "zeroth
     fill" is meaningless), and ``oak_fill_retention`` is read only when it bites (``fill_number ≠
     1``), so a fresh fill stays inert even against a partial ``oak.yaml``.
+
+    **Bourbon-barrel spirit soak-back (decision D-92).** An OPTIONAL categorical ``spirit`` (v1:
+    ``"bourbon"``) marks the barrel as an ex-spirit cask: its staves are soaked with residual
+    high-ABV spirit that leaches back into the beverage, DONATING ethanol and RAISING ABV (the
+    "a bourbon-barrel imperial stout gains ~1% ABV from the barrel" effect). A DISCRETE ethanol
+    dose to the core ``E`` slot (the ``add_oxygen`` precedent), ``spirit_soak_ethanol_<spirit> ×
+    spirit_soak_retention ** (fill_number − 1)`` g/L — a SEPARATE contribution from the wood
+    extractives (the ethanol is from the SPIRIT, not the wood), so it does NOT touch the ceilings.
+    Ethanol is ON the carbon+mass ledger, but the scheduler books this dose as a POSITIVE external
+    flow (the ``add_sugar`` precedent), so the run-wide ``final == initial + Σ flows`` still closes.
+    DECOUPLED from ``oak_gpl`` (soak-back is a barrel, not a chips/S:V, phenomenon) and anchored
+    straight to the observed ABV gain. Residual spirit depletes with reuse via its OWN steep
+    ``spirit_soak_retention`` (spirit ~gone by fill 2–3, far faster than the wood's
+    ``oak_fill_retention``), read only when it bites. ``spirit`` DEFAULTS ABSENT ⇒ no ethanol dose
+    ⇒ **byte-for-byte** the pre-D-92 charge. v1 models ETHANOL (ABV) ONLY; the bourbon AROMA
+    congener soak-back (overlaps the D-77 oak aroma pools) and a gradual within-fill reservoir
+    leach (both more faithful, the latter conservation-natural) are documented refinements deferred.
     """
-    _iv_check_keys(iv, frozenset({"oak_gpl", "toast", "fill_number"}), "add_oak")
+    _iv_check_keys(iv, frozenset({"oak_gpl", "toast", "fill_number", "spirit"}), "add_oak")
     oak_gpl = _iv_float(iv, "oak_gpl", "add_oak")
     toast = _iv_str(iv, "toast", "add_oak")
     if toast not in _OAK_TOASTS:
@@ -1158,7 +1179,7 @@ def _verb_add_oak(
     # >= 1 (a "zeroth fill" is meaningless — brewers count first/second/third), the toast-string
     # rejection pattern. Read oak_fill_retention only when it BITES (fill_number != 1), so a fresh
     # fill stays inert even against a partial oak.yaml.
-    fill_scale = 1.0
+    fill_number = 1
     if "fill_number" in iv.params:
         raw = iv.params["fill_number"]
         try:
@@ -1173,15 +1194,60 @@ def _verb_add_oak(
                 f"(1 = a fresh first-fill barrel), got {raw!r} (decision D-91)"
             )
         fill_number = int(fill_f)
-        if fill_number != 1:
+    fill_scale = 1.0
+    if fill_number != 1:
+        try:
+            retention = parameters["oak_fill_retention"].value
+        except KeyError:  # oak.yaml not loaded (caller-supplied parameter_paths)
+            raise ValueError(
+                "intervention 'add_oak' with fill_number > 1 needs 'oak_fill_retention' but it "
+                "is missing; include oak.yaml in parameter_paths (decision D-91)."
+            ) from None
+        fill_scale = retention ** (fill_number - 1)
+    # Bourbon-barrel spirit soak-back (D-92): an ex-spirit barrel donates residual ETHANOL, raising
+    # ABV — the "barrel-aged stout gains ~1% ABV" effect. An OPTIONAL categorical `spirit` (default
+    # absent ⇒ no soak-back ⇒ byte-for-byte the pre-D-92 dose): when given, add a DISCRETE ethanol
+    # bolus (the add_oxygen dose precedent) to the core E slot. UNLIKE the off-ledger wood ceilings,
+    # ethanol is ON the carbon+mass ledger, but the scheduler books this dose's delta as a POSITIVE
+    # external flow (add_sugar precedent), so the run-wide identity final == initial + Σ flows still
+    # closes. Anchored straight to the g/L ABV gain and DECOUPLED from oak_gpl (soak-back is a
+    # barrel, not a chips/S:V, effect). Depletes with fill_number via its OWN steep
+    # spirit_soak_retention (spirit ~gone by fill 2-3, far faster than the wood's
+    # oak_fill_retention), read only when it
+    # BITES (fill_number != 1). ETHANOL (ABV) only — bourbon AROMA congeners (overlapping the D-77
+    # oak aroma pools) and a gradual reservoir leach are deferred refinements.
+    ethanol_soak_delta = 0.0
+    if "spirit" in iv.params:
+        spirit = _iv_str(iv, "spirit", "add_oak")
+        if spirit not in _OAK_SPIRITS:
+            raise ValueError(
+                f"intervention 'add_oak' at day {iv.day:g}: unknown spirit {spirit!r} "
+                f"(known ex-spirit barrels: {', '.join(_OAK_SPIRITS)}, decision D-92)"
+            )
+        if "E" not in schema:
+            raise ValueError(
+                f"intervention 'add_oak' at day {iv.day:g} with spirit={spirit!r} needs an 'E' "
+                f"(ethanol) slot for the soak-back, but medium {schema!r} has none (decision D-92)"
+            )
+        soak_name = f"spirit_soak_ethanol_{spirit}"
+        try:
+            soak_gpl = parameters[soak_name].value
+        except KeyError:
+            raise ValueError(
+                f"intervention 'add_oak' with spirit={spirit!r} needs {soak_name!r} but it is "
+                "missing; include oak.yaml in parameter_paths (decision D-92)."
+            ) from None
+        spirit_scale = 1.0
+        if fill_number != 1:  # residual spirit depletes with reuse, its OWN steep retention (D-92)
             try:
-                retention = parameters["oak_fill_retention"].value
-            except KeyError:  # oak.yaml not loaded (caller-supplied parameter_paths)
+                spirit_retention = parameters["spirit_soak_retention"].value
+            except KeyError:
                 raise ValueError(
-                    "intervention 'add_oak' with fill_number > 1 needs 'oak_fill_retention' but it "
-                    "is missing; include oak.yaml in parameter_paths (decision D-91)."
+                    "intervention 'add_oak' with spirit and fill_number > 1 needs "
+                    "'spirit_soak_retention' but it is missing; include oak.yaml (decision D-92)."
                 ) from None
-            fill_scale = retention ** (fill_number - 1)
+            spirit_scale = spirit_retention ** (fill_number - 1)
+        ethanol_soak_delta = soak_gpl * spirit_scale
     ceiling_deltas: dict[str, float] = {}
     for compound in _OAK_COMPOUNDS:
         yield_name = f"oak_yield_{compound}_{toast}"
@@ -1195,11 +1261,14 @@ def _verb_add_oak(
         # fill_scale discounts the fresh-barrel ceiling by the barrel's use history (D-91).
         ceiling_deltas[f"{compound}_ceiling"] = oak_gpl * yield_val * fill_scale
     slices = {name: schema.slice(name) for name in ceiling_deltas}
+    ethanol_slice = schema.slice("E") if ethanol_soak_delta else None
 
     def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
         out = y.copy()
         for name, delta in ceiling_deltas.items():
             out[slices[name]] += delta  # += so a second oak charge raises the ceiling (refill)
+        if ethanol_slice is not None:  # D-92 spirit soak-back: residual ethanol raises ABV
+            out[ethanol_slice] += ethanol_soak_delta
         return out
 
     return ScheduledEvent(

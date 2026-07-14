@@ -1488,7 +1488,12 @@ class OakExtraction(Process):
     chips-g/L and barrel surface-to-volume ratio; barrel fill-number depletion is now modelled
     (D-91 — a reused barrel sets lower ceilings via ``oak_fill_retention``, at the ``add_oak`` dose;
     the *within-fill* finite-reservoir draw-down and per-compound retention remain deferred);
-    whiskey lactone is a lumped cis+trans pool.
+    whiskey lactone is a lumped cis+trans pool. A first-fill ex-**spirit** barrel's residual-spirit
+    **ethanol** soak-back (the ~1% ABV a bourbon barrel donates) is also modelled — but as an
+    ``add_oak`` ethanol *dose* (D-92), NOT by this Process: soak-back ethanol comes from the spirit,
+    not the wood, and lands on the core ``E`` slot, so it is a discrete on-ledger dose, orthogonal
+    to this off-ledger diffusion axis. The bourbon *aroma* soak-back and a gradual reservoir leach
+    remain deferred (D-92).
     """
 
     name = "oak_extraction"

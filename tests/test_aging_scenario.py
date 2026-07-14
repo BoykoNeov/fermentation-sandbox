@@ -149,11 +149,17 @@ def _add_oxygen(day: float, o2_mgl: float) -> Intervention:
 
 
 def _add_oak(
-    day: float, oak_gpl: float, toast: str, fill_number: float | None = None
+    day: float,
+    oak_gpl: float,
+    toast: str,
+    fill_number: float | None = None,
+    spirit: str | None = None,
 ) -> Intervention:
     params: dict[str, object] = {"oak_gpl": oak_gpl, "toast": toast}
     if fill_number is not None:  # D-91 barrel fill-number depletion (default omitted ⇒ fresh fill)
         params["fill_number"] = fill_number
+    if spirit is not None:  # D-92 ex-spirit barrel soak-back (default omitted ⇒ no soak-back)
+        params["spirit"] = spirit
     return Intervention(day=day, action="add_oak", params=params)
 
 
@@ -1493,6 +1499,138 @@ def test_add_oak_rejects_a_zeroth_or_fractional_fill_number():
                     ]
                 )
             )
+
+
+# -- D-92: bourbon-barrel spirit soak-back — an ex-spirit barrel donates ETHANOL (raises ABV) ------
+#
+# A SEPARATE contribution from the wood extractives (D-77/78) and fill-number depletion (D-91): the
+# ethanol comes from residual SPIRIT soaked into the staves, not the wood. add_oak {spirit: bourbon}
+# adds a DISCRETE ethanol dose to the core E slot (the add_oxygen precedent), decoupled from oak_gpl
+# and depleting with fill_number via its OWN steep spirit_soak_retention. spirit ABSENT ⇒ no ethanol
+# ⇒ byte-for-byte the pre-D-92 charge (the existing oak suite pins no-spirit). ETHANOL (ABV) only
+# this beat — the bourbon AROMA congeners are deferred.
+
+
+def test_spirit_soak_back_absent_leaves_ethanol_untouched_byte_for_byte():
+    # The backward-compat anchor: an add_oak with NO spirit does not touch E, and its ceilings are
+    # exactly the raw oak_gpl × yield — so every pre-D-92 wine + beer trajectory is untouched. A
+    # bourbon charge at the SAME dose sets IDENTICAL ceilings (soak-back is orthogonal to the wood).
+    plain = compile_scenario(
+        _wine([_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium")])
+    )
+    bourbon = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium", spirit="bourbon")]
+        )
+    )
+    ev_p = next(e for e in plain.events if e.label.startswith("add_oak"))
+    ev_b = next(e for e in bourbon.events if e.label.startswith("add_oak"))
+    assert ev_p.mutate is not None and ev_b.mutate is not None
+    after_p = ev_p.mutate(plain.schema, plain.y0.copy())
+    after_b = ev_b.mutate(bourbon.schema, bourbon.y0.copy())
+    # No spirit ⇒ E untouched by the dose (mutate only writes off-ledger ceilings).
+    assert plain.schema.get(after_p, "E") == plain.schema.get(plain.y0, "E")
+    # spirit does NOT touch the ceilings — identical to the plain charge at the same oak_gpl/toast.
+    for compound in (*_OAK_EXTRACTIVES, "ellagitannin"):
+        name = f"{compound}_ceiling"
+        assert bourbon.schema.get(after_b, name) == plain.schema.get(after_p, name)
+
+
+def test_bourbon_spirit_adds_the_full_first_fill_ethanol_bolus():
+    # A first-fill (default fill_number = 1) ex-bourbon barrel donates the FULL soak-back ethanol
+    # (spirit_soak_retention ** 0 == 1.0 exactly): the E slot rises by exactly spirit_soak_ethanol_
+    # bourbon g/L (~8 g/L ≈ 1% ABV), the signature barrel-aged-stout ABV gain.
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium", spirit="bourbon")]
+        )
+    )
+    ev = next(e for e in cs.events if e.label.startswith("add_oak"))
+    assert ev.mutate is not None
+    after = ev.mutate(cs.schema, cs.y0.copy())
+    delta_e = float(cs.schema.get(after, "E") - cs.schema.get(cs.y0, "E"))
+    assert delta_e == pytest.approx(cs.param_values["spirit_soak_ethanol_bourbon"], rel=1e-12)
+    assert delta_e > 0.0
+
+
+def test_spirit_soak_back_depletes_geometrically_and_steeper_than_the_wood():
+    # A reused ex-bourbon barrel donates LESS residual spirit: the E bolus at fills 1/2/3 is in the
+    # ratio 1 : r_s : r_s² (r_s = spirit_soak_retention). And the spirit depletes STEEPER than the
+    # wood extractables (r_s < oak_fill_retention) — "first-fill bourbon barrel" is the term of art
+    # because a refill barrel is largely rinsed of spirit by its first use.
+    def bolus(fill: int) -> float:
+        cs = compile_scenario(
+            _wine(
+                [
+                    _begin_aging(_FERMENT_DAYS),
+                    _add_oak(_FERMENT_DAYS, 4.0, "medium", fill_number=fill, spirit="bourbon"),
+                ]
+            )
+        )
+        ev = next(e for e in cs.events if e.label.startswith("add_oak"))
+        assert ev.mutate is not None
+        after = ev.mutate(cs.schema, cs.y0.copy())
+        return float(cs.schema.get(after, "E") - cs.schema.get(cs.y0, "E"))
+
+    params = compile_scenario(_wine([])).param_values
+    r_s, r_wood = params["spirit_soak_retention"], params["oak_fill_retention"]
+    first, second, third = bolus(1), bolus(2), bolus(3)
+    assert first > second > third > 0.0  # monotone depletion of the residual spirit
+    assert second == pytest.approx(first * r_s)  # one prior fill ⇒ × r_s
+    assert third == pytest.approx(first * r_s**2)  # two prior fills ⇒ × r_s²
+    assert r_s < r_wood  # spirit rinses out faster than the wood extractables deplete
+
+
+def test_spirit_soak_back_conserves_carbon_across_the_jump():
+    # The crown-jewel ledger (D-92): ethanol is ON the carbon+mass ledger, so the soak-back dose
+    # INJECTS carbon — but the scheduler books it as a POSITIVE external flow (the add_sugar
+    # precedent), so the run-wide identity final == initial + Σ flows still closes to machine
+    # precision. (Contrast the off-ledger o2/ceiling doses, whose flows are carbon-free.)
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oak(_FERMENT_DAYS, 4.0, "medium", spirit="bourbon")]
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.param_values["biomass_C_fraction"]
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    injected = sum(c_of(flow.delta) for flow in traj.external_flows)
+    # The soak-back flow carries POSITIVE carbon (ethanol's), unlike carbon-free o2/ceiling doses.
+    assert injected > 0.0
+    c_initial, c_final = c_of(cs.y0), c_of(traj.y[:, -1])
+    assert c_final == pytest.approx(c_initial + injected, abs=1e-9)
+
+
+def test_add_oak_rejects_an_unknown_spirit():
+    # spirit is a categorical asserting an ex-spirit barrel; an unknown one is rejected loudly at
+    # compile (the toast-string rejection pattern), never silently ignored.
+    with pytest.raises(ValueError, match="unknown spirit"):
+        compile_scenario(
+            _wine(
+                [
+                    _begin_aging(_FERMENT_DAYS),
+                    _add_oak(_FERMENT_DAYS, 4.0, "medium", spirit="tequila"),
+                ]
+            )
+        )
+
+
+def test_bourbon_barrel_stout_gains_abv_end_to_end():
+    # The motivating BEER payoff (D-92): a bourbon-barrel imperial stout finishes at HIGHER ABV than
+    # the SAME beer aged in an identical but spirit-free oak barrel — the residual-spirit soak-back.
+    # A fourth-fill (near-rinsed) bourbon barrel donates LESS than a first-fill (steep depletion).
+    def final_ethanol(iv: Intervention) -> float:
+        traj = compile_scenario(_beer([_begin_aging(14.0), iv])).run()
+        assert traj.success
+        return float(traj.series("E")[-1])
+
+    no_spirit = final_ethanol(_add_oak(14.0, 6.0, "medium"))
+    first_fill = final_ethanol(_add_oak(14.0, 6.0, "medium", spirit="bourbon"))
+    fourth_fill = final_ethanol(_add_oak(14.0, 6.0, "medium", fill_number=4, spirit="bourbon"))
+    # First-fill bourbon barrel adds the most ABV; a near-neutral reused barrel adds little; a
+    # spirit-free oak barrel adds none — the ordering a barrel-aged-beer program manages.
+    assert first_fill > fourth_fill > no_spirit
 
 
 # -- D-79: tannin–anthocyanin condensation end-to-end (red-wine softening + colour stabilization) --

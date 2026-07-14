@@ -7213,3 +7213,71 @@ fill-number now modelled, within-fill reservoir + per-compound retention deferre
 purely the dose. **Every wine + beer trajectory without `fill_number` (or with `fill_number=1`) is byte-for-byte unchanged.**
 **Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield, the deferred finite-reservoir /
 per-compound-retention refinements, bourbon-barrel spirit soak-back.
+
+## D-92 — bourbon-barrel spirit soak-back: an ex-spirit barrel donates ETHANOL (raises ABV) — an `add_oak` `spirit` **dose**, no new Process/state (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3.** The long-deferred "bourbon-barrel spirit soak-back" beat, flagged out of scope
+by D-91: a first-fill ex-bourbon (whiskey/rum) barrel's staves are soaked with several litres of residual **high-ABV spirit**
+("the devil's cut") that leaches **back into** the beverage when it is filled, **raising ABV** — the signature "a bourbon-barrel
+imperial stout gains ~1% ABV from the barrel" effect. This is a **separate** contribution from the wood **extractives** (D-77/78)
+and from **fill-number depletion** (D-91): the ethanol comes from the **spirit**, not the wood. **One `advisor()` pass** (one
+blocker + three design calls; resolved with primary evidence — no owner fork). 997 → 1003 tests (+6), `ruff`/`mypy`/`pytest` green.
+
+**The BLOCKER the advisor flagged, resolved with primary evidence — is a carbon-bearing dose "free"?** Ethanol is **on** the
+carbon+mass ledger (unlike the off-ledger wood extractives/o2), so a soak-back that injects ethanol injects **tracked carbon**.
+The conservation discipline has TWO layers: (1) `assert_conserved` checks within-segment drift-from-initial; (2) the **run-wide**
+crown-jewel identity `final == initial + Σ external_flows`. The advisor rightly said "confirm, don't infer." Traced it:
+`runtime/schedule.py:231` books **every** dose's `new_y − current_y` as an `ExternalFlow` **automatically, verb-agnostically**,
+and `total_carbon`/`total_mass` weight that delta. So a discrete ethanol dose books a **positive-carbon external flow** and the
+run-wide ledger closes with **no** bespoke correction — exactly like `add_sugar`. (A *within-Process continuous* leach would
+instead show as within-segment carbon **creation** and break layer (1) — which is precisely why soak-back is a **dose**, not a
+Process.) Blocker resolved in favour of "free dose."
+
+**The design — a DISCRETE ethanol dose at charge, NOT a gradual reservoir.** `add_oak` gains an **optional categorical `spirit`**
+(v1: `"bourbon"`; whiskey/rum extensible — the `toast` idiom). When given, `mutate` adds a bolus to the core **`E`** slot:
+`delta_E = spirit_soak_ethanol_<spirit> × spirit_soak_retention ** (fill_number − 1)` g/L. **No new Process, no new state slot, no
+schema change** — the ethanol lands on the existing `E` slot; the dose is the whole beat (the `add_oxygen`/D-91 discipline). The
+soak-back does **not** touch the oak ceilings (orthogonal to the wood axis). `spirit` **defaults absent** ⇒ no ethanol dose ⇒
+**every pre-D-92 wine + beer trajectory is byte-for-byte unchanged** (the whole existing oak suite pins the no-spirit case).
+
+**Advisor call #2 — DECOUPLED from `oak_gpl`, anchored straight to the ABV gain.** The defensible real number is the **ABV gain**
+(~0.5–1.5% ABV for a first-fill bourbon barrel), not a per-g-oak yield. `spirit_soak_ethanol_bourbon = 8.0 g/L` (speculative,
+banded 4–12): at ethanol density 0.789 g/mL, 1% ABV = 7.89 g/L, so ~8 g/L ≈ 1% ABV. **Deliberately NOT scaled by `oak_gpl`** —
+soak-back is a **barrel** phenomenon (spirit in staves), not a chips/S:V contact one, and scaling it by the generalized `oak_gpl`
+would make chips-with-spirit nonsensical. The caller asserts an ex-spirit barrel via the `spirit` categorical.
+
+**Advisor call #3 — spirit depletes STEEPER than the wood; its OWN retention.** New `spirit_soak_retention = 0.2` (speculative,
+banded 0.05–0.4), **not** reused `oak_fill_retention = 0.5`: "first-fill" is the term of art precisely because a refill barrel is
+largely **rinsed of residual spirit** by its first fill. `r_s = 0.2` leaves fill 2 with ~20% and fill 3 with ~4% (spirit ~gone by
+fill 2–3, far faster than the wood's neutral-by-4th–5th). Its own parameter per prime directive #2 (and the value genuinely
+differs — spirit rinses faster than wood extracts). Read **only when it bites** (`fill_number ≠ 1`), so a first-fill stays inert
+against a partial `oak.yaml`.
+
+**Advisor call #4 — scope honesty: ETHANOL (ABV) ONLY, aroma deferred.** v1 models the **measurable** effect (the ABV gain). The
+bourbon **aroma** soak-back (residual vanilla/caramel/coconut spirit **congeners**) is a **separate deferred** contribution — it
+**overlaps** the oak aroma pools already modelled (vanillin/whiskey_lactone, D-77), so booking it now would **double-count**. So
+"spirit soak-back" is **not** fully done — only its ethanol half. Framed loudly in `oak.yaml`, the docstring, and here so it does
+not read as "soak-back complete." Also honest: the dose is **instantaneous** at charge (front-loads ABV vs reality's weeks-months
+ramp); a gradual leach from a finite **on-ledger spirit reservoir** slot (drawn down into `E`, conserving **within-segment** with
+no external-flow booking) is **both** the more faithful **and** the conservation-natural refinement — deferred, the same reservoir
+machinery D-91 deferred for the wood.
+
+**Validation.** `spirit` added to `add_oak`'s allowed keys; an unknown spirit is rejected loudly at compile (the `toast`-string
+rejection pattern). A `spirit` charge on a medium without an `E` slot raises (defensive; both media carry `E`). `fill_number` was
+refactored to compute once (default 1) and drive **both** the ceiling `fill_scale` (D-91) and the spirit `spirit_scale` (D-92) —
+the D-91 byte-for-byte guarantee is preserved (`oak_fill_retention` still read only when `fill_number ≠ 1`).
+
+**Tests (+6, `test_aging_scenario.py`).** `test_spirit_soak_back_absent_leaves_ethanol_untouched_byte_for_byte` (no spirit ⇒ `E`
+untouched, ceilings == plain — the backward-compat anchor); `test_bourbon_spirit_adds_the_full_first_fill_ethanol_bolus`
+(first-fill ⇒ `E` rises by exactly `spirit_soak_ethanol_bourbon`); `test_spirit_soak_back_depletes_geometrically_and_steeper_than
+_the_wood` (fills 1/2/3 in ratio 1 : r_s : r_s², and `r_s < oak_fill_retention`); `test_spirit_soak_back_conserves_carbon_across
+_the_jump` (the crown jewel — soak-back flow injects **positive** carbon, `final == initial + Σ flows`); `test_add_oak_rejects_an
+_unknown_spirit`; the motivating **beer** end-to-end `test_bourbon_barrel_stout_gains_abv_end_to_end` (first-fill > fourth-fill >
+spirit-free final ABV). The `_add_oak` helper gained an optional `spirit` kwarg (omitted ⇒ no soak-back).
+
+**Regression surface.** `oak.yaml` (+`spirit_soak_ethanol_bourbon`, `+spirit_soak_retention` + section header); `compile.py`
+(`_verb_add_oak` — `spirit`/`_OAK_SPIRITS`, validation, `ethanol_soak_delta` on the `E` slot in `mutate`, `fill_number` refactor;
+docstring); `aging.py` (`OakExtraction` scope note — soak-back now modelled as an ethanol dose, aroma + gradual reservoir
+deferred). **No Process, state, or schema change** — purely the dose. **Every wine + beer trajectory without `spirit` is
+byte-for-byte unchanged.** **Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield, the bourbon
+**aroma** soak-back + the gradual-reservoir / per-compound-retention refinements.
