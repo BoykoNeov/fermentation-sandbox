@@ -1185,7 +1185,13 @@ class Caramelization(Process):
         # to machine precision (the EsterHydrolysis split). Wine sugar is the single hexose species.
         carbon_released = r_sugar * carbon_mass_fraction(sugar_species(schema)[0])  # g C/L/h
         mel_rate = carbon_released / carbon_mass_fraction(_MELANOIDIN_SPECIES)  # g melanoidin/L/h
-        d[s_slice] = -r_sugar  # debit the residual sugar (wine: a single slot)
+        # Debit the residual sugar. Correct for WINE's single-slot S. FORWARD-NOTE (if D-88 ever
+        # goes
+        # medium-agnostic for beer thermal browning): ``d[s_slice] = -r_sugar`` would broadcast −r
+        # into
+        # ALL THREE beer sugar slots — it must instead apportion the draw across the vector (and use
+        # each component's own carbon fraction for the melanoidin transfer, not just component [0]).
+        d[s_slice] = -r_sugar
         d[schema.slice("melanoidin")] = mel_rate
         # The shared A420 browning index rises with the melanoidin formed (off every ledger, the
         # D-74

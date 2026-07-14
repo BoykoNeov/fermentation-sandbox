@@ -980,6 +980,57 @@ def test_caramelization_closes_carbon_end_to_end():
     assert_nonnegative(traj.as_trajectory(), ("S", "melanoidin", "A420"), atol=1e-9)
 
 
+def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
+    # THE four-way interaction (the shared-pool stress test): a SWEET + OXYGENATED +
+    # amino-acid-dosed
+    # aged wine runs ALL FOUR aging axes at once — BOTH Strecker routes (oxidative D-75 + thermal
+    # D-87) drawing the shared amino_acids, BOTH browning routes (oxidative D-74 + thermal D-88)
+    # writing the shared A420, AND Caramelization consuming core S. Each route sizes its OWN draw
+    # and
+    # ProcessSet SUMS them, so by additivity carbon + nitrogen must still close and no shared pool
+    # goes negative — the one combination where a shared-pool interaction bug could hide, and
+    # exactly
+    # where conservation would catch it. (The aa gate throttles both Strecker draws to 0 as
+    # amino_acids
+    # empties, so it never goes negative.)
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],  # OXYGENATED
+            amino_acids_gpl=0.8,  # both Strecker routes have substrate
+            brix=_SWEET_BRIX,  # SWEET — both browning routes + Caramelization's S driver
+            aging_celsius=30.0,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    tj = traj.as_trajectory()
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    c_of = total_carbon(cs.schema, biomass_carbon_fraction=f_c)
+    n_of = total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n)
+    # The O₂ dose is the only external flow and carries neither carbon nor nitrogen (o2 off every
+    # ledger), so BOTH ledgers stay flat (final == initial) with all four axes live.
+    assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert all(n_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
+    assert_conserved(tj, c_of, label="carbon")
+    assert_conserved(tj, n_of, label="nitrogen")
+    # No shared pool goes negative — the aa gate keeps the doubly-drawn amino_acids ≥ 0.
+    assert_nonnegative(
+        tj,
+        ("amino_acids", "S", "melanoidin", "A420", "o2", *_MAILLARD_ALDEHYDES, "N"),
+        atol=1e-9,
+    )
+    # All four axes actually fired: the thermal browning (melanoidin) + thermal aldehydes (sotolon,
+    # a thermal-route-only marker) are live ALONGSIDE the oxidative browning (A420 also gets the O₂
+    # route) and the oxidative Strecker (methional/phenylacetaldehyde, shared with the thermal
+    # route).
+    assert float(traj.series("melanoidin")[-1]) > 0.0  # thermal browning
+    assert float(traj.series("sotolon")[-1]) > 0.0  # thermal Strecker (O₂-independent marker)
+    assert float(traj.series("A420")[-1]) > 0.0  # browning index (both routes)
+    assert float(traj.series("methional")[-1]) > 0.0  # Strecker (both routes)
+
+
 # -- OakExtraction (decision D-77) — the NON-oxidative barrel/chip aroma axis, end to end -------
 
 _OAK_EXTRACTIVES = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")

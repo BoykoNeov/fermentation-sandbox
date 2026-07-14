@@ -6982,9 +6982,14 @@ agnostic *in principle* (beer/wort melanoidins are real), but this is wired into
 carbon-park is a wine slot; the `"melanoidin" not in schema` guard makes it a hard no-op on beer), bundled with the
 sweet-wine thermal axis. Beer thermal browning is deferred — the D-86 oak-to-beer extension pattern.
 
-**§4.3 firewall.** Speculative in FORM (the *form* — sugar-driven, heat-accelerated, O₂-independent browning — is sourced;
-the rate + per-melanoidin absorbance yield are order-of-magnitude estimates). Isolable (disable the Process and the browning
-vanishes; a dry wine is unchanged regardless).
+**§4.3 firewall + the tier consequence (the S-write, parallel to D-87's N-write).** Speculative in FORM (the *form* —
+sugar-driven, heat-accelerated, O₂-independent browning — is sourced; the rate + per-melanoidin absorbance yield are
+order-of-magnitude estimates). Isolable (disable the Process and the browning vanishes; a dry wine is unchanged regardless).
+Because it **touches core `S`**, a `begin_aging` run now reports structural `tier_of("S")` = SPECULATIVE (even a *dry* wine —
+this is a structural effect of the Process being in the enabled set, not runtime-gated). This is correct and exactly
+precedented by `tier_of("E")` since D-71 (`OxidativeAcetaldehyde` touches `E`) and the D-45/D-75 `tier_of("N")` drop: a
+speculative aging Process writing a validated-core pool caps that pool's structural tier. Nothing regressed (no benchmark
+asserts a validated sugar tier on an aged run).
 
 **Regression surface.** 1 new wine-only state slot (`melanoidin`, wine 62 → 63, beer untouched), 1 new chemistry species +
 carbon/nitrogen weight (the caramelan stand-in), 1 new Process, 3 new `thermal.yaml` params (`k_caramelization`,
