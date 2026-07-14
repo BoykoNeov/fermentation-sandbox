@@ -97,6 +97,7 @@ from fermentation.core.kinetics import (
     HydrogenSulfideProduction,
     HydrogenSulfideVolatilization,
     IsoAlphaAcidLoss,
+    MaillardStrecker,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
     MalolacticDeath,
@@ -712,6 +713,57 @@ def wine_schema() -> StateSchema:
             "carries no colour and no odor",
         ),
     ]
+    # Non-oxidative THERMAL Strecker aldehydes + sotolon (decision D-87), appended last: the four
+    # NEW aroma pools MaillardStrecker produces from residual sugar + amino acids + heat with NO O₂
+    # (the sweet-wine / Madeira / baked-wine suite). methional + phenylacetaldehyde (D-75, above)
+    # are SHARED with this route — same molecules — so only these four are new. Carbon-bearing
+    # (booked from amino_acids as arginine, deaminated to N), so on total_carbon like the D-75 pair.
+    # Wine-only. Read by the D-67 OAV lens against their own thresholds (threshold_<pool>_wine).
+    specs += [
+        VarSpec(
+            "2_methylbutanal",
+            "g/L",
+            default=0.0,
+            description="2-methylbutanal — the 'malty/almond' branched-chain Strecker aldehyde of "
+            "isoleucine (decision D-87). Produced-only by MaillardStrecker: residual sugar forms "
+            "α-dicarbonyls that deaminate + decarboxylate isoleucine WITH NO O₂ (the thermal "
+            "mirror of the D-75 oxidative route); carbon from amino_acids (arginine stand-in), "
+            "nitrogen deaminated to N, one CO₂ released. Read by the OAV lens "
+            "(threshold_2_methylbutanal_wine)",
+        ),
+        VarSpec(
+            "3_methylbutanal",
+            "g/L",
+            default=0.0,
+            description="3-methylbutanal — the 'malty/dark-chocolate' branched-chain Strecker "
+            "aldehyde of leucine (decision D-87), typically the most prominent thermal/staling "
+            "branched-chain aldehyde. Produced-only by MaillardStrecker (sugar+heat, no O₂); "
+            "carbon from amino_acids + CO₂, nitrogen deaminated to N. Read by the OAV lens "
+            "(threshold_3_methylbutanal_wine)",
+        ),
+        VarSpec(
+            "2_methylpropanal",
+            "g/L",
+            default=0.0,
+            description="2-methylpropanal (isobutyraldehyde) — the 'malty/grainy' Strecker "
+            "aldehyde of valine (decision D-87). Produced-only by MaillardStrecker (sugar+heat, "
+            "no O₂); "
+            "carbon from amino_acids + CO₂, nitrogen deaminated to N. Read by the OAV lens "
+            "(threshold_2_methylpropanal_wine)",
+        ),
+        VarSpec(
+            "sotolon",
+            "g/L",
+            default=0.0,
+            description="sotolon (4,5-dimethyl-3-hydroxy-2(5H)-furanone) — the 'curry/maple/nutty' "
+            "furanone marker of botrytized sweet wine (Sauternes), vin jaune, aged Port and "
+            "Madeira (decision D-87). Produced-only by MaillardStrecker but NOT a decarboxylation "
+            "Strecker aldehyde (a threonine/acetaldehyde aldol furanone), so it carries NO CO₂ "
+            "term; carbon booked from amino_acids (arginine lump; its 2 acetaldehyde-derived "
+            "carbons lumped in). Trace by mass but potent. Read by the OAV lens "
+            "(threshold_sotolon_wine)",
+        ),
+    ]
     return StateSchema(specs)
 
 
@@ -961,6 +1013,24 @@ _OXIDATIVE_SO2_PROCESSES: tuple[Callable[[], Process], ...] = (SulfiteOxidation,
 #: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in ``aging.yaml``.
 _STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (StreckerDegradation,)
 
+#: WINE-ONLY non-oxidative THERMAL Strecker aging Process (decision D-87) — the O₂-INDEPENDENT
+#: thermal mirror of ``_STRECKER_PROCESSES``. :class:`MaillardStrecker` reads wine-only state
+#: (``amino_acids`` + the ``N``-deamination) and the residual-sugar driver, so it is wired into the
+#: *wine* medium only. Unlike the D-75 oxidative route it draws NO ``o2``: residual sugar forms
+#: α-dicarbonyls (Maillard) that deaminate + decarboxylate amino acids to the sweet-wine / Madeira
+#: aldehyde suite — methional + phenylacetaldehyde (shared with D-75), the three branched-chain
+#: malty aldehydes (``2_methylbutanal`` / ``3_methylbutanal`` / ``2_methylpropanal``) and
+#: ``sotolon`` (the curry/maple furanone) — with NO oxygen, so a sealed sweet wine ages thermally.
+#: DOUBLY substrate-gated (on residual sugar AND ``amino_acids``): like ``_STRECKER_PROCESSES`` it
+#: adds on top of the aging trajectory WITHOUT re-baselining, and — sharing the ``amino_acids``
+#: limiting reagent with the D-75 route via ``ProcessSet`` summing — the two Strecker routes are
+#: additive over that pool (the o2-sharing pattern applied to amino_acids). Kept in its OWN tuple
+#: (isolable, directive #3): DISABLED at the compile seam and re-enabled by ``begin_aging`` (its
+#: name
+#: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
+#: ``thermal.yaml``.
+_MAILLARD_STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (MaillardStrecker,)
+
 #: Oak-extraction aging Process (decision D-77) — the barrel/chip extractive axis. WINE + BARREL-
 #: BEER (D-86: wired into BOTH media — the oak axis is a wood property, not a grape one).
 #: :class:`OakExtraction` is the first **non-oxidative** aging Process: it draws NO O₂, so it takes
@@ -1130,9 +1200,7 @@ _TANNIN_SELF_POLYMERIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: isolable tuple (directive #3): DISABLED at compile and re-enabled by ``begin_aging`` (its name
 #: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
 #: ``polymerization.yaml`` (with the condensation/fade data — all colour/tannin-axis data together).
-_TANNIN_ETHYL_TANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (
-    TanninEthylTanninCondensation,
-)
+_TANNIN_ETHYL_TANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (TanninEthylTanninCondensation,)
 
 #: Excreted keto-acid overflow pool (wine-only, decision D-49): pyruvate as the
 #: second-strongest SO₂-binding carbonyl after acetaldehyde. :class:`PyruvateExcretion`
@@ -1434,6 +1502,7 @@ MEDIA: dict[str, Medium] = {
             + _AGING_PROCESSES
             + _OXIDATIVE_SO2_PROCESSES
             + _STRECKER_PROCESSES
+            + _MAILLARD_STRECKER_PROCESSES
             + _OAK_PROCESSES
             + _ELLAGITANNIN_PROCESSES
             + _POLYMERIZATION_PROCESSES

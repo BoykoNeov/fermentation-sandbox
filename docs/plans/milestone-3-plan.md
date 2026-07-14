@@ -164,6 +164,22 @@
 > Three wine-only enumeration/rejection tests FLIPPED to both-media (expectation changes, not weakenings); +beer end-to-end
 > coverage incl. the D-78 protection spine on beer (oaked+oxygenated beer browns less). Next: beat 1b, non-oxidative
 > Maillard Strecker, barrel fill-number depletion.**
+>
+> **PROGRESS (D-87, 2026-07-14): non-oxidative THERMAL Strecker route — `MaillardStrecker`, the tenth aging Process, the
+> O₂-INDEPENDENT thermal mirror of `StreckerDegradation` (D-75) — the beat D-75 deferred (964 tests). Residual SUGAR + HEAT
+> (α-dicarbonyls, NO O₂) degrade amino acids to the sweet-wine/Madeira aldehyde suite, so a SEALED sweet wine ages
+> thermally where the O₂-only D-75 route is silent. TWO advisor passes + TWO owner scope forks (FULL scope both): (1) the
+> aldehyde suite — added FOUR new wine-only pools (2-/3-methylbutanal, 2-methylpropanal, sotolon) beyond the two shared with
+> D-75, not the lean 2-pool v1; (2) build the sugar→melanoidin thermal browning too — split into its own D-88
+> (`Caramelization`) per one-Process-per-decision. Crux: `S` is a read-only DRIVER (not consumed here — the aldehyde carbon
+> is the AMINO ACID's, drawn from `amino_acids`; booking a sugar draw would break `total_carbon` AND undercount real sugar
+> loss, so it is FORCED not convenient). Sotolon is NOT a Strecker aldehyde (a furanone) → NO CO₂ term (the flag is
+> load-bearing: closure holds for any CO₂ attribution, so a mis-key passes silently — the D-75 fidelity lesson; levels
+> anchored to literature: sotolon ~5–20 µg/L Sauternes). Additive with D-75 over the shared `amino_acids` limiting reagent
+> (the o2-sharing pattern on amino acids). Isolability on the `amino_acids` HARD gate (S is a soft driver). E_a = 100 kJ/mol
+> (> the oxidative ~50: the sourced ORDERING — Maillard out-accelerates oxidation with temperature). New `thermal.yaml`.
+> Next: D-88 (`Caramelization`, the first aging Process to consume core `S` — carries the `begin_aging` golden re-baseline),
+> beat 1b, barrel fill-number.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

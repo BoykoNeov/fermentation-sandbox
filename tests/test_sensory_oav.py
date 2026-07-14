@@ -130,7 +130,7 @@ def test_profile_reading_tier_is_speculative_even_when_pool_is_validated(thresho
 
 
 def test_profile_compound_set_matches_the_medium(thresholds):
-    """Beer profiles the 5 common + 4 oak pools (9); wine adds the 5 wine-only pools (14)."""
+    """Beer profiles the 5 common + 4 oak pools (9); wine adds the 9 wine-only pools (18, D-87)."""
     beer = sensory_profile(_traj(beer_schema(), {}), thresholds)
     wine = sensory_profile(_traj(wine_schema(), {}), thresholds)
     # The 4 oak extractives (D-77) are SHARED by both media (barrel-beer oak, D-86 — the oak axis is
@@ -143,6 +143,11 @@ def test_profile_compound_set_matches_the_medium(thresholds):
         "mercaptans",
         "methional",
         "phenylacetaldehyde",
+        # The four non-oxidative THERMAL Strecker aldehyde/sotolon pools (decision D-87).
+        "2_methylbutanal",
+        "3_methylbutanal",
+        "2_methylpropanal",
+        "sotolon",
     }
     # The set-and-hold ceiling slots are read by OakExtraction but are not aroma compounds.
     assert "vanillin_ceiling" not in wine.readings

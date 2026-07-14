@@ -284,6 +284,31 @@ M_PHENYLACETALDEHYDE = 8 * _M_C + 8 * _M_H + 1 * _M_O
 #: ``{S, E, CO2}``, never asserted on an aging run — the D-71 E→acetaldehyde scope-out). Carbon
 #: fraction 24.022/28.054 ≈ 0.8563. Nitrogen-free.
 M_ETHYLIDENE = 2 * _M_C + 4 * _M_H
+#: The non-oxidative THERMAL Strecker aldehydes (decision D-87) — the sweet-wine / Madeira /
+#: baked-wine aroma suite the sugar-dicarbonyl (Maillard) route degrades amino acids into WITHOUT
+#: O₂, the thermal mirror of the D-75 oxidative (quinone-driven) set. Three are branched-chain
+#: Strecker aldehydes of the branched-chain amino acids, each one carbon short of its amino acid
+#: (the
+#: carboxyl lost as CO₂, exactly as methional/phenylacetaldehyde): **2-methylbutanal** (C5H10O, from
+#: isoleucine, "malty/almond"), **3-methylbutanal** (C5H10O, from leucine, "malty/dark-chocolate")
+#: and **2-methylpropanal** (isobutyraldehyde, C4H8O, from valine, "malty/grainy"). Nitrogen-free —
+#: the amino-acid nitrogen is deaminated back to ``N`` (the D-45/D-75 idiom) — but carbon-bearing,
+#: so
+#: (like methional/phenylacetaldehyde) they sit on ``total_carbon`` and must be weighted below.
+M_2_METHYLBUTANAL = 5 * _M_C + 10 * _M_H + 1 * _M_O
+M_3_METHYLBUTANAL = 5 * _M_C + 10 * _M_H + 1 * _M_O
+M_2_METHYLPROPANAL = 4 * _M_C + 8 * _M_H + 1 * _M_O
+#: Sotolon (4,5-dimethyl-3-hydroxy-2(5H)-furanone), C6H8O3 — the "curry/fenugreek/maple/nutty"
+#: marker of botrytized sweet wines (Sauternes), vin jaune, aged Port and Madeira (decision D-87).
+#: Unlike the four Strecker aldehydes it is **NOT** a decarboxylation product: its true formation is
+#: an aldol condensation of α-ketobutyrate (from threonine deamination) with acetaldehyde (and an
+#: ascorbate/sugar-degradation branch), so it carries **no** CO₂ term. Booked — like every product
+#: of
+#: the non-oxidative route — with its carbon drawn from the ``amino_acids`` (arginine) lump: exact
+#: on
+#: the ledger, approximate on provenance (2 of its 6 carbons are really acetaldehyde-derived; the
+#: acetaldehyde-coupled sotolon route is deferred). Nitrogen-free (deaminated), carbon-tracked.
+M_SOTOLON = 6 * _M_C + 8 * _M_H + 3 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -322,6 +347,10 @@ MOLAR_MASS: dict[str, float] = {
     "methional": M_METHIONAL,
     "phenylacetaldehyde": M_PHENYLACETALDEHYDE,
     "ethylidene": M_ETHYLIDENE,
+    "2_methylbutanal": M_2_METHYLBUTANAL,
+    "3_methylbutanal": M_3_METHYLBUTANAL,
+    "2_methylpropanal": M_2_METHYLPROPANAL,
+    "sotolon": M_SOTOLON,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -384,6 +413,16 @@ CARBON_ATOMS: dict[str, int] = {
     #: D-80). This is what keeps the on-ledger acetaldehyde carbon from vanishing into the
     #: off-ledger grape-phenolic pigment — the split-ledger accounting.
     "ethylidene": 2,
+    #: The non-oxidative THERMAL Strecker aldehydes (decision D-87). The three branched-chain
+    #: aldehydes carry ONE fewer carbon than their branched-chain amino acid (the carboxyl lost as
+    #: CO₂, the D-75 decarboxylation): 2-methylbutanal (C5, from isoleucine C6), 3-methylbutanal
+    #: (C5, from leucine C6), 2-methylpropanal (C4, from valine C5). Sotolon (C6) is a furanone, NOT
+    #: a decarboxylation product (no CO₂ term) — its carbon is booked from the arginine lump. All
+    #: carbon-tracked (they sit on ``total_carbon``, the methional/phenylacetaldehyde idiom).
+    "2_methylbutanal": 5,
+    "3_methylbutanal": 5,
+    "2_methylpropanal": 4,
+    "sotolon": 6,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -444,6 +483,14 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: The ethylidene bridge (C2H4) is nitrogen-free — the acetaldehyde-derived C2 linker carries no
     #: nitrogen, so the ``ethyl_bridge`` pool is absent from ``total_nitrogen`` (decision D-80).
     "ethylidene": 0,
+    #: The non-oxidative thermal Strecker aldehydes / sotolon are nitrogen-free: the Process
+    #: deaminates the drawn amino-acid nitrogen back to ``N`` (the D-45/D-75 idiom), so the
+    #: aldehydes
+    #: themselves carry none — absent from ``total_nitrogen`` (decision D-87).
+    "2_methylbutanal": 0,
+    "3_methylbutanal": 0,
+    "2_methylpropanal": 0,
+    "sotolon": 0,
 }
 
 

@@ -1,0 +1,161 @@
+# ============================================================================================
+# THE NON-OXIDATIVE THERMAL AGING AXIS (decisions D-87, D-88)
+# ============================================================================================
+# The O2-INDEPENDENT thermal mirror of the oxidative aging sub-axis. Where the D-71..D-78 O2
+# sub-axis needs dissolved oxygen (bottle ingress / micro-ox / barrel) to drive its chemistry,
+# THIS axis is driven by RESIDUAL SUGAR and HEAT alone -- a sealed, sulfited, oxygen-free sweet
+# wine still ages thermally. Two Processes:
+#
+#   * MaillardStrecker (D-87) -- the non-oxidative Strecker route: residual sugar forms
+#     alpha-dicarbonyls (methylglyoxal, glyoxal, deoxyosones) via Maillard/caramelization, and
+#     those dicarbonyls deaminate + decarboxylate amino acids to STRECKER ALDEHYDES with NO O2.
+#     The thermal mirror of the oxidative (quinone-driven) StreckerDegradation (D-75): same
+#     limiting reagent (amino_acids), same carbon/nitrogen ledger closure, but driven by sugar +
+#     heat instead of dissolved O2. Produces the sweet-wine / Madeira aroma suite: methional +
+#     phenylacetaldehyde (shared with D-75), the three branched-chain aldehydes 2-methylbutanal
+#     (isoleucine), 3-methylbutanal (leucine), 2-methylpropanal (valine), and sotolon (the
+#     curry/fenugreek/maple furanone of botrytized sweet wine / vin jaune / Madeira). See
+#     fermentation.core.kinetics.aging.MaillardStrecker and decision D-87.
+#
+#   * Caramelization (D-88) -- the non-oxidative sugar-only browning route (params appended by
+#     D-88): residual sugar thermally browns to melanoidin, raising A420 with no O2. The thermal
+#     mirror of the O2-driven PhenolicBrowning (D-74). SUGAR-ONLY (no amino-acid nitrogen
+#     incorporated), so it is caramelization, not true Maillard melanoidin -- a documented v1
+#     scope (see D-88).
+#
+# BOTH Processes are WINE-ONLY (they read the wine-only amino_acids / the sweet-wine residual-sugar
+# regime) and DISABLED at the compile seam, re-enabled by begin_aging alongside the rest of the
+# aging axis. Both are SUBSTRATE-GATED (on residual sugar; MaillardStrecker additionally on
+# amino_acids), so like the D-72/D-75 substrate-gated O2 sinks they add on top of the existing
+# aging trajectory WITHOUT re-baselining anything: an amino-acid-free (MaillardStrecker) or
+# sugar-free / dry (both) wine is left as it was. ISOLABILITY rests on the amino_acids HARD gate
+# for MaillardStrecker (undosed => exactly zero); residual sugar is a SOFT driver (a "dry" wine
+# still holds ~1-2 g/L, so the thermal route is negligible there, not byte-for-byte zero -- the
+# physically-correct trace).
+#
+# TIER: all speculative -- the Tier-3 frontier. The load-bearing SOURCED claims are the FORMS
+# (sugar + amino acid + heat => Strecker aldehydes / sugar + heat => browning, both O2-independent
+# and strongly warmer-faster) and the ORDERING that the thermal route is far MORE temperature-
+# sensitive than the oxidative one (Maillard/caramelization E_a ~100 kJ/mol, well above the
+# oxidative sub-axis's ~50). Every magnitude is an order-of-magnitude estimate.
+
+# ============================================================================================
+# D-87 -- MaillardStrecker (non-oxidative thermal Strecker aldehydes + sotolon)
+# ============================================================================================
+# THE PROCESS (fermentation.core.kinetics.aging.MaillardStrecker, WINE-ONLY):
+#
+#   S_total    = sum of the residual-sugar vector (g/L)                    # the dicarbonyl driver
+#   gate       = amino_acids / (K_amino_acids + amino_acids)               # smooth availability [0,1)
+#   n_ald      = k_maillard_strecker * f(T) * S_total * gate               # mol total product /L/h
+#   f(T)       = arrhenius_factor(T, E_a_maillard_strecker, T_ref)         # STRONGLY warmer-faster
+#   n_i        = (w_maillard_i / sum_j w_maillard_j) * n_ald               # per-product mol rate
+#   d(product_i)/dt = +n_i * M_i                                           # each aroma pool, g/L/h
+#   d(CO2)/dt  = +(n_ald - n_sotolon) * M_CO2   # 1 CO2 per DECARBOXYLATING aldehyde, NOT sotolon
+#   d(amino_acids)/dt = -(total product carbon rate) / c_arginine          # arginine sized to C
+#   d(N)/dt    = +(that arginine draw) * n_arginine                        # deamination -> N
+#
+# NO O2 term (the whole point -- this is the O2-independent route). S is a READ-ONLY driver, NOT
+# consumed here (its consumption is booked by the Caramelization route, D-88; the aldehyde carbon
+# is the AMINO ACID's, not the sugar's -- the sugar dicarbonyl is only the electron-accepting
+# oxidant, and its own carbon goes to melanoidin, D-88). CARBON + NITROGEN close to machine
+# precision exactly as D-75: the arginine draw is sized to the total product carbon (all aldehydes
+# + sotolon + CO2), and all arginine nitrogen is deaminated to N (products N-free). The arginine-
+# for-amino_acids stand-in is exact on the ledger, approximate on provenance (the D-45 lump);
+# sotolon additionally lumps its 2 acetaldehyde-derived carbons into that draw (its true aldol
+# route is deferred). total_mass ({S,E,CO2}) sees the CO2 term with no matching S/E debit here, but
+# is never asserted on an aging run (the standing OxidativeAcetaldehyde scope-out).
+
+# -- THERMAL STRECKER RATE CONSTANT (first-order in residual sugar, aa-gated, O2-FREE) -------
+# A lumped constant: n_ald = k_maillard_strecker * f(T) * S[g/L] * gate, so it directly yields mol
+# total aldehyde /L/h (the per-sugar dicarbonyl yield is folded in -- no fake per-sugar molar
+# conversion, since the wine sugar pool is a glucose/fructose vector stand-in). The amino_acids pool
+# is the true limiting reagent (finite aa => finite aldehyde); this k sets the RATE of approach.
+k_maillard_strecker:
+  value: 6.0e-13
+  unit: "mol/(g*h)"   # n_ald[mol/L/h] = k * f(T) * S[g/L] * gate  (mol aldehyde per g-sugar per h)
+  tier: speculative
+  uncertainty: { low: 5.0e-14, high: 2.0e-12, note: "Lumped non-oxidative Strecker rate at T_ref = 20 C. CALIBRATED (D-87, advisor-flagged must-anchor) to land the produced aldehydes in the observed aged-sweet-wine range at a sweet (residual S ~100 g/L) + amino-acid-dosed + WARM (25-30 C) sealed aging: sotolon ~5-20 µg/L (Sauternes/Madeira), methional low-single-digit µg/L, the branched-chain malty aldehydes ~single-digit-to-tens µg/L. Band ~1 order each way -- the magnitude is a Tier-3 estimate; only the FORM (sugar+aa+heat=>aldehyde, O2-free) and the strong thermal sensitivity are sourced." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that non-oxidative (sugar-dicarbonyl) Strecker degradation is the dominant aldehyde route in aged SWEET/thermal wines (Sauternes, Madeira, fortified) where residual sugar is high and O2 is limited (Pripis-Nicolau et al. 2000 on dicarbonyl-mediated Strecker in wine model systems; Escudero et al. 2000, 2002 on Strecker aldehydes as aged-wine markers; the Maillard/caramelization dicarbonyl precursors form from residual sugar). Folds the dicarbonyl precursor into k (no dicarbonyl pool tracked in v1, as with the oxidative k_strecker)."
+    conditions: "generic sweet wine at cellar-to-warm temperature; pseudo-first-order in the residual-sugar vector S (the dicarbonyl driver), additionally gated by the amino-acid availability fraction aa/(K_amino_acids+aa), at T_ref = 293.15 K. WINE-ONLY (reads amino_acids); O2-INDEPENDENT (no o2 term)."
+    notes: "SOURCED FORM (sugar-driven, amino-acid-gated, heat-accelerated, O2-INDEPENDENT) + SPECULATIVE magnitude. This is the thermal MIRROR of the oxidative k_strecker (D-75): same limiting reagent (amino_acids), same ledger closure, different driver (residual sugar + heat, not dissolved O2). Both routes draw the shared amino_acids pool and SUM via ProcessSet -- additive over the limiting reagent, the o2-sharing pattern applied to amino_acids, no double-count."
+
+# -- ACTIVATION ENERGY: the thermal route is STRONGLY warmer-faster (the sourced ORDERING) -----
+# The load-bearing sourced claim is the ORDERING: Maillard/caramelization chemistry is far more
+# temperature-sensitive than the oxidative aging reactions (Q10 ~3-4 vs the oxidative sub-axis's
+# ~2), so E_a_maillard_strecker is set ABOVE the oxidative E_a's (~50 kJ/mol). This is why a
+# WARM sweet wine (Madeira estufagem, baked wine) develops the thermal aldehyde suite so much
+# faster than a cellar-cool one -- the classic thermal-aging acceleration.
+E_a_maillard_strecker:
+  value: 100000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 80000.0, high: 130000.0, note: "Q10 ~3-4.5 at 20 C. Maillard/caramelization activation energies are characteristically ~100-150 kJ/mol -- markedly ABOVE the ~30-70 kJ/mol oxidative-staling band (E_a_strecker, E_a_browning). The SOURCED, load-bearing claim is the ORDERING (thermal route >> oxidative route in temperature sensitivity, so warm/baked sweet wines age far faster); the exact magnitude is speculative and banded." }
+  provenance:
+    source: "SOURCED ORDERING: Maillard browning and caramelization are strongly thermally activated (E_a ~100-150 kJ/mol; classic food-chemistry Maillard kinetics -- Labuza, van Boekel), well above the ~30-70 kJ/mol of the oxidative wine-aging reactions. Thermal sweet-wine processes (Madeira estufagem at 45-50 C, baked/rancio styles) develop Strecker/furanone character on a timescale orders faster than cellar aging -- the temperature acceleration IS the sourced signature."
+    conditions: "equivalent Arrhenius activation energy of the aggregate non-oxidative (sugar-dicarbonyl) Strecker degradation at T_ref = 293.15 K"
+    notes: "Only the DIRECTION and the ORDERING (E_a_maillard_strecker > the oxidative E_a's; warmer => much faster thermal aldehydes) are the sourced, load-bearing claims. Exact magnitude speculative and banded around a Q10 ~3.5. Its OWN parameter (prime directive #2) -- a distinct reaction from the oxidative E_a_strecker, and the higher band is the whole point (the thermal route out-accelerates the oxidative one with temperature)."
+
+# -- ALDEHYDE / FURANONE COMPOSITION: relative-abundance x reactivity weights (normalized) -----
+# The six non-oxidative-route products are booked by RELATIVE weights, NORMALIZED in the Process
+# (f_i = w_i / sum_j w_j), so they need not sum to 1 here (avoids the six-fractions-must-sum-to-1
+# fragility; a test asserts the normalized split sums to 1). Each weight is a PRODUCTION flux
+# quantity -- relative amino-acid abundance x Strecker/thermal reactivity -- NOT a perceptibility
+# quantity (potency lives in the per-compound OAV thresholds, so folding it in here would DOUBLE-
+# count it, the D-75 follow-up lesson). Phenylalanine, leucine and the other branched-chain amino
+# acids are among the more abundant must amino acids; methionine is a minor sulfur amino acid; the
+# threonine-derived sotolon route is a minor but characteristic flux.
+w_maillard_phenylacetaldehyde:
+  value: 0.30
+  unit: "1"   # relative production weight (normalized against the other five in-code)
+  tier: speculative
+  uncertainty: { low: 0.15, high: 0.45, note: "Phenylalanine is among the most abundant must amino acids => phenylacetaldehyde (honey) a major thermal-Strecker product. Relative weight, normalized in-code." }
+  provenance:
+    source: "author estimate of relative phenylalanine-derived thermal-Strecker flux (abundance x reactivity). Phenylalanine consistently among the most abundant must amino acids (Escudero et al. 2000, 2002)."
+    conditions: "generic sweet wine; relative production weight of phenylacetaldehyde (C8H8O) among the six non-oxidative-route products, at T_ref = 293.15 K. amino_acids booked as arginine (the D-45 lump), so this is a composition stand-in."
+    notes: "SPECULATIVE. PRODUCTION flux only; perceptibility lives in threshold_phenylacetaldehyde_wine. Normalized against the other five weights in-code."
+w_maillard_3_methylbutanal:
+  value: 0.22
+  unit: "1"   # relative production weight (normalized in-code)
+  tier: speculative
+  uncertainty: { low: 0.10, high: 0.35, note: "3-methylbutanal (leucine, malty/dark-chocolate) is typically the most prominent branched-chain thermal/staling aldehyde. Relative weight, normalized in-code." }
+  provenance:
+    source: "author estimate of relative leucine-derived thermal-Strecker flux. 3-methylbutanal is a canonical malty aldehyde of thermally-aged and stale beverages (leucine abundant, high Strecker reactivity)."
+    conditions: "generic sweet wine; relative production weight of 3-methylbutanal (C5H10O) among the six products, at T_ref = 293.15 K. arginine lump."
+    notes: "SPECULATIVE. Production flux only; potency in threshold_3_methylbutanal_wine. Normalized in-code."
+w_maillard_2_methylbutanal:
+  value: 0.15
+  unit: "1"   # relative production weight (normalized in-code)
+  tier: speculative
+  uncertainty: { low: 0.07, high: 0.28, note: "2-methylbutanal (isoleucine, malty/almond). Relative weight, normalized in-code." }
+  provenance:
+    source: "author estimate of relative isoleucine-derived thermal-Strecker flux (a canonical malty aldehyde, isoleucine moderately abundant)."
+    conditions: "generic sweet wine; relative production weight of 2-methylbutanal (C5H10O) among the six products, at T_ref = 293.15 K. arginine lump."
+    notes: "SPECULATIVE. Production flux only; potency in threshold_2_methylbutanal_wine. Normalized in-code."
+w_maillard_2_methylpropanal:
+  value: 0.15
+  unit: "1"   # relative production weight (normalized in-code)
+  tier: speculative
+  uncertainty: { low: 0.07, high: 0.28, note: "2-methylpropanal / isobutyraldehyde (valine, malty/grainy). Relative weight, normalized in-code." }
+  provenance:
+    source: "author estimate of relative valine-derived thermal-Strecker flux (isobutyraldehyde, valine moderately abundant)."
+    conditions: "generic sweet wine; relative production weight of 2-methylpropanal (C4H8O) among the six products, at T_ref = 293.15 K. arginine lump."
+    notes: "SPECULATIVE. Production flux only; potency in threshold_2_methylpropanal_wine. Normalized in-code."
+w_maillard_sotolon:
+  value: 0.10
+  unit: "1"   # relative production weight (normalized in-code)
+  tier: speculative
+  uncertainty: { low: 0.03, high: 0.20, note: "Sotolon (the curry/maple furanone) is a TRACE product by mass but the diagnostic marker of botrytized sweet wine / vin jaune / Madeira. Relative weight, normalized in-code; small mass share but potent (very low threshold)." }
+  provenance:
+    source: "author estimate of relative sotolon flux. Sotolon forms via aldol condensation of alpha-ketobutyrate (threonine deamination) with acetaldehyde (Pham et al. 1995; Cutzach et al. on aged sweet wine), a MINOR but characteristic route -- so a small production weight, its impact carried by a very low perception threshold."
+    conditions: "generic sweet wine; relative production weight of sotolon (C6H8O3) among the six products, at T_ref = 293.15 K. Carbon booked from the arginine lump; its 2 acetaldehyde-derived carbons lumped in (exact on ledger, approximate on provenance; the acetaldehyde-coupled sotolon route deferred)."
+    notes: "SPECULATIVE. Production flux only; potency in threshold_sotolon_wine (very low -- sotolon is a potent odorant). NOT a decarboxylation product => it contributes NO CO2 term (unlike the five Strecker aldehydes). Normalized in-code."
+w_maillard_methional:
+  value: 0.08
+  unit: "1"   # relative production weight (normalized in-code)
+  tier: speculative
+  uncertainty: { low: 0.03, high: 0.18, note: "Methional (methionine, cooked-potato) is a MINOR production share (methionine a minor sulfur amino acid) but potent. Relative weight, normalized in-code." }
+  provenance:
+    source: "author estimate of relative methionine-derived thermal-Strecker flux. Methionine is a minor must amino acid, so methional is a small production share -- but a potent low-µg/L marker (the same flux-not-potency logic as the oxidative f_methional, D-75)."
+    conditions: "generic sweet wine; relative production weight of methional (C4H8OS) among the six products, at T_ref = 293.15 K. arginine lump."
+    notes: "SPECULATIVE. Production flux only; potency in threshold_methional_wine (shared with the D-75 oxidative route -- same molecule, same threshold). Normalized in-code."

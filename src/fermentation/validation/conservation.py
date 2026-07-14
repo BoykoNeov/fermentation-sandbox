@@ -247,6 +247,20 @@ def total_carbon(
         w[schema.slice("methional")] = carbon_mass_fraction("methional")
     if "phenylacetaldehyde" in schema:
         w[schema.slice("phenylacetaldehyde")] = carbon_mass_fraction("phenylacetaldehyde")
+    # Non-oxidative THERMAL Strecker aldehydes + sotolon (decision D-87): MaillardStrecker draws
+    # carbon from the amino-acid pool into the four new aroma pools (three branched-chain aldehydes
+    # +
+    # sotolon) and — for the five decarboxylating aldehydes only, NOT sotolon — releases the acid's
+    # carboxyl carbon as CO2, deaminating the nitrogen to N. Like the D-75 pair they carry carbon
+    # and
+    # must be weighted or the transfer would read as carbon destroyed; booked at each product's own
+    # carbon fraction (the same species the Process deposits against), so total_carbon closes to
+    # machine precision: carbon into the aldehydes + sotolon + CO2 equals carbon out of amino_acids.
+    # Nitrogen-free (arginine N deaminated to N), so absent from total_nitrogen. Empty (constant 0)
+    # on any run where the Process is inert (no amino acids or no residual sugar).
+    for _thermal_ald in ("2_methylbutanal", "3_methylbutanal", "2_methylpropanal", "sotolon"):
+        if _thermal_ald in schema:
+            w[schema.slice(_thermal_ald)] = carbon_mass_fraction(_thermal_ald)
     # Acetaldehyde-bridged condensation ethyl-bridge pool (decision D-80): the SPLIT-LEDGER capture.
     # AcetaldehydeBridgedCondensation consumes ON-ledger acetaldehyde (whose carbon is borrowed from
     # E at D-71) to form an ethylidene bridge —CH(CH₃)— in an OFF-ledger grape-phenolic pigment. If

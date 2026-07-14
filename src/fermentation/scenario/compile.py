@@ -50,6 +50,7 @@ from fermentation.core.kinetics import (
     EsterHydrolysis,
     FuselAminoAcidReroute,
     IsoAlphaAcidLoss,
+    MaillardStrecker,
     MalolacticCitrateMetabolism,
     MalolacticConversion,
     MalolacticDeath,
@@ -149,7 +150,10 @@ _BRETT_GATED_PROCESSES = (
 #: with itself, ``[tannin]²``, into a soft polymer, softening astringency WITHOUT anthocyanin) and
 #: :class:`TanninEthylTanninCondensation` (the D-85 acetaldehyde-bridged tannin–ethyl–tannin route —
 #: dissolved-O₂ acetaldehyde bridges two flavanols, an O₂-driven softener that captures its carbon
-#: in the shared ``ethyl_bridge`` slot and deposits no pigment), so
+#: in the shared ``ethyl_bridge`` slot and deposits no pigment) and :class:`MaillardStrecker` (the
+#: D-87 NON-oxidative THERMAL Strecker route — residual sugar + heat, no O₂, degrade amino acids to
+#: the sweet-wine/Madeira aldehyde suite; wine-only, reads ``amino_acids`` + deaminates to ``N``),
+#: so
 #: on beer they are simply absent from the ProcessSet — both the compile-disable and the
 #: begin_aging-enable loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
@@ -171,6 +175,7 @@ _AGING_GATED_PROCESSES = (
     ThermalAnthocyaninFade,
     TanninSelfPolymerization,
     TanninEthylTanninCondensation,
+    MaillardStrecker,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -598,6 +603,12 @@ def _load_parameters(
         # but loaded universally like the other shared files — collision-free names, inert for beer;
         # INERT until an anthocyanin+tannin must dose + begin_aging enable.
         base / "polymerization.yaml",
+        # Non-oxidative THERMAL aging axis (decisions D-87/D-88): the sugar+heat-driven,
+        # O2-independent Strecker aldehydes (MaillardStrecker) and sugar-only caramelization
+        # browning (Caramelization). Wine-only in effect (only wine wires the Processes + carries
+        # amino_acids / the thermal aroma slots), but loaded universally like the other shared
+        # files — collision-free names, inert for beer; INERT until a begin_aging enable.
+        base / "thermal.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 

@@ -24,6 +24,17 @@ slot captures the acetaldehyde carbon so it does not vanish into the off-ledger 
 grape bulk off-ledger, the acetaldehyde-derived bridge on it — the "split ledger"; see its
 docstring).
 
+**The non-oxidative THERMAL axis (D-87/D-88).** :class:`MaillardStrecker` (D-87) is the
+**O₂-independent thermal mirror** of :class:`StreckerDegradation` (D-75) — the beat D-75 deferred:
+residual **sugar + heat** (α-dicarbonyls, no O₂) degrade amino acids to the sweet-wine / Madeira
+Strecker suite (the two D-75 aldehydes + three branched-chain malty aldehydes + sotolon), sharing
+the ``amino_acids`` limiting reagent with the oxidative route. :class:`Caramelization` (D-88) is the
+matching **O₂-independent thermal mirror** of :class:`PhenolicBrowning` (D-74): sugar-only browning
+to a new on-ledger ``melanoidin`` carbon-park pool, raising the shared ``A420`` with no O₂. Both are
+wine-only, both driven by residual sugar (D-88 is the first aging Process to *consume* core ``S``),
+both the same thermal-mirror relationship :class:`ThermalAnthocyaninFade` (D-83) has to
+:class:`AnthocyaninFading` (D-81).
+
 **The oxidative sub-axis (D-71).** :class:`OxidativeAcetaldehyde` opens the *oxidative* half of
 the aging axis on a **dissolved-O₂ pool** (``o2``, a new carbon-free state slot, off every
 conservation ledger like ``h2s``/``iso_alpha``). O₂ — not ethanol — is the rate-limiting
@@ -193,6 +204,9 @@ from fermentation.core.acidbase import (
     ph_of_state,
 )
 from fermentation.core.chemistry import (
+    M_2_METHYLBUTANAL,
+    M_2_METHYLPROPANAL,
+    M_3_METHYLBUTANAL,
     M_ACETALDEHYDE,
     M_CO2,
     M_ETHANOL,
@@ -200,6 +214,7 @@ from fermentation.core.chemistry import (
     M_O2,
     M_PHENYLACETALDEHYDE,
     M_SO2,
+    M_SOTOLON,
     carbon_mass_fraction,
     nitrogen_mass_fraction,
 )
@@ -258,6 +273,31 @@ _PHENYLACETALDEHYDE_SPECIES = "phenylacetaldehyde"
 #: carboxyl carbon. On the carbon ledger (unlike ``o2``), so it is a genuine product term the carbon
 #: bookkeeping must route, not an off-ledger emission (D-75).
 _CO2_PER_STRECKER_ALDEHYDE = 1.0
+
+#: The six products of the **non-oxidative THERMAL** Strecker route (decision D-87, the sweet-wine /
+#: Madeira suite :class:`MaillardStrecker` produces) and their per-product config: ``(pool name,
+#: molar mass, composition-weight parameter, decarboxylates?)``. The pool name is also the
+#: :mod:`chemistry` species key (so ``carbon_mass_fraction`` weights the carbon draw +
+#: ``total_carbon``
+#: on one species, D-19). **The ``decarboxylates`` flag is load-bearing** (advisor's must-catch):
+#: the
+#: five true Strecker aldehydes each release **1 mol CO₂** (the amino acid's carboxyl carbon), but
+#: **sotolon does not** (a threonine/acetaldehyde aldol furanone, not a decarboxylation product).
+#: The
+#: arginine draw is sized to *total product carbon* (§ derivatives), so ``total_carbon`` closes for
+#: **any** CO₂ attribution — a mis-keyed CO₂ term would pass every conservation test silently — so
+#: the
+#: CO₂ is keyed to these flags explicitly, and the produced µg/L levels are anchored to literature
+#: (the D-75 follow-up fidelity lesson). Two are **shared** with the D-75 oxidative route (same
+#: molecules, same pools/thresholds); four are D-87-only.
+_MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool], ...] = (
+    ("methional", M_METHIONAL, "w_maillard_methional", True),
+    ("phenylacetaldehyde", M_PHENYLACETALDEHYDE, "w_maillard_phenylacetaldehyde", True),
+    ("2_methylbutanal", M_2_METHYLBUTANAL, "w_maillard_2_methylbutanal", True),
+    ("3_methylbutanal", M_3_METHYLBUTANAL, "w_maillard_3_methylbutanal", True),
+    ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", True),
+    ("sotolon", M_SOTOLON, "w_maillard_sotolon", False),
+)
 
 #: The oak extractives and their set-and-hold ceiling slots (decisions D-77/D-78). Each extracted
 #: pool (the first element) rises toward its own saturation ceiling (the second element); the
@@ -827,6 +867,200 @@ class StreckerDegradation(Process):
         d[schema.slice("o2")] = -r_o2  # this route's aa-gated O₂ share (off every ledger)
         d[schema.slice("methional")] = meth_rate
         d[schema.slice("phenylacetaldehyde")] = phenyl_rate
+        d[schema.slice("CO2")] = co2_rate
+        d[schema.slice("amino_acids")] = -aa_mass
+        d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine N → ammonium (D-45)
+        return d
+
+
+class MaillardStrecker(Process):
+    """Non-oxidative THERMAL Strecker aging: sugar dicarbonyls degrade amino acids, NO O₂ (D-87).
+
+    The **O₂-independent thermal mirror** of :class:`StreckerDegradation` (D-75) — the beat that
+    decision deferred ("the non-oxidative Maillard/sugar-dicarbonyl route (sweet wines, thermal) is
+    deferred, keeping Strecker honestly on the ``o2`` sub-axis"). Where the D-75 oxidative route
+    needs dissolved O₂ (its o-quinones are the amino-acid oxidant), THIS route is driven by
+    **residual sugar + heat alone**: the sugar forms **α-dicarbonyls** (methylglyoxal, glyoxal,
+    deoxyosones via Maillard/caramelization), and those dicarbonyls deaminate + decarboxylate amino
+    acids to Strecker aldehydes with **no oxygen** — so a *sealed, sulfited, oxygen-free sweet wine*
+    still ages, developing the Sauternes / Madeira / baked-wine aroma suite. This is the same
+    O₂-independent-thermal-mirror relationship :class:`ThermalAnthocyaninFade` (D-83) has to
+    :class:`AnthocyaninFading` (D-81).
+
+    **The aroma suite — four new pools + two shared (the owner's full-scope D-87 choice).** The
+    products are :data:`_MAILLARD_PRODUCTS`: **methional** (cooked-potato) and
+    **phenylacetaldehyde** (honey) — the *same* two molecules the D-75 route makes, so the same two
+    pools/thresholds are reused — plus four D-87-only pools: the three branched-chain **malty**
+    Strecker aldehydes **2-methylbutanal** (isoleucine), **3-methylbutanal** (leucine),
+    **2-methylpropanal** (valine), and **sotolon**, the curry/fenugreek/maple **furanone** that is
+    *the* diagnostic marker of botrytized sweet wine / vin jaune / Madeira. (Scope, documented: the
+    thermal-wine aldehyde signature is broader still — the branched-chain aldehydes + sotolon are
+    the
+    v1 set; other markers are lumped out. And sotolon is **not** a Strecker aldehyde — a
+    threonine/acetaldehyde aldol furanone — so it carries no CO₂ term; its 2 acetaldehyde-derived
+    carbons are lumped into the arginine draw, the acetaldehyde-coupled route deferred.)
+
+    ``n_ald = k_maillard_strecker · f(T) · [S_total] · gate(aa)`` — first-order in the **residual
+    sugar** (summed over the sugar vector, the dicarbonyl driver) and gated by the amino-acid
+    availability ``gate = aa/(K_amino_acids + aa)`` (the D-33/D-75 smooth-Monod availability shape).
+    ``f(T) = arrhenius_factor(T, E_a_maillard_strecker, T_ref)`` is the **strongly** warmer-faster
+    factor: ``E_a_maillard_strecker ≈ 100 kJ/mol`` sits *above* the oxidative aging E_a's (~50), the
+    sourced ordering that Maillard/caramelization out-accelerates oxidation with temperature — why a
+    warm Madeira estufagem develops thermal character orders faster than cellar aging. ``n_ald`` is
+    **mol total product/L/h directly** (the per-sugar dicarbonyl yield is folded into
+    ``k_maillard_strecker``, avoiding a fake per-sugar molar conversion — the wine sugar is a
+    glucose/fructose vector stand-in). It is split among the six products by their **normalized**
+    composition weights ``w_maillard_*`` (relative amino-acid abundance × reactivity — a production
+    flux, *not* potency, which the OAV thresholds already carry; the D-75 follow-up lesson), and the
+    five decarboxylating aldehydes each contribute **1 mol CO₂** (sotolon none).
+
+    **S is a read-only DRIVER, not consumed here (the forced carbon-closure choice).** The Strecker
+    aldehyde's carbon skeleton **is** the amino acid (methional = methionine − COOH); the sugar
+    dicarbonyl is only the electron-accepting oxidant, and its own carbon goes to melanoidin (booked
+    by the separate :class:`Caramelization`, D-88). So the aldehyde carbon is drawn from
+    ``amino_acids`` (the D-75 algebra), and ``S`` is **not** debited by this Process — which is not
+    merely convenient but *forced*: booking a sugar draw here would break ``total_carbon``
+    (melanoidin
+    is off-ledger) *and* undercount real sugar loss (bulk thermal browning dominates depletion,
+    D-88).
+    The unbooked per-Strecker sugar consumption is µM-scale (µg/L aldehydes ⇒ trace dicarbonyl),
+    negligible vs the g/L residual pool. So ``S`` is read but **not** in ``touches``.
+
+    **Carbon + nitrogen close by construction (the D-75 idiom exactly).** The arginine draw is sized
+    to the **total product carbon** (all six products + the CO₂ from the five decarboxylating ones),
+    and all arginine nitrogen is **deaminated** to ``N`` (products N-free), so ``total_carbon`` and
+    ``total_nitrogen`` close to machine precision. Because closure holds for *any* CO₂ attribution,
+    the CO₂ is keyed to the :data:`_MAILLARD_PRODUCTS` ``decarboxylates`` flags explicitly and the
+    produced µg/L levels are anchored to literature (no conservation test would catch a mis-key).
+    The
+    arginine-for-``amino_acids`` stand-in is exact on the ledger, approximate on provenance (the
+    D-45
+    lump). ``total_mass`` ({S,E,CO2}) sees the CO₂ with no matching S/E debit, but is never asserted
+    on an aging run (the standing :class:`OxidativeAcetaldehyde` scope-out).
+
+    **Additive with the oxidative route over the shared ``amino_acids`` limiting reagent.** Both
+    Strecker routes draw ``amino_acids`` and ``ProcessSet`` sums them, so the pool depletes *once*
+    and
+    splits by their rates — the o2-sharing pattern (D-73) applied to the amino-acid limiting
+    reagent,
+    no double-count. An O₂-**and**-sugar-rich aged sweet wine runs both; a sealed sweet wine runs
+    only
+    this one (the discriminating case, D-87); a dry oxidised wine runs only D-75.
+
+    **Wine-only + isolable + doubly substrate-gated (prime directive #3).** ``amino_acids`` and the
+    ``N``-deamination are wine-only (beer's amino-acid pool is not tracked, D-32), so — like
+    :class:`StreckerDegradation` — this is wired into the *wine* medium only; the ``"amino_acids"
+    not
+    in schema`` guard is a hard no-op besides. Wired **disabled at the compile seam**;
+    ``begin_aging``
+    enables it with the other aging Processes. **Isolability rests on the ``amino_acids`` HARD
+    gate**
+    (undosed ⇒ exactly 0 ⇒ byte-for-byte the case without this Process — the default wine is
+    unchanged); residual sugar is a **soft** driver (a "dry" wine still holds ~1–2 g/L, so the route
+    is *negligible* there, not byte-for-byte zero — the physically-correct trace, not a claim of
+    exact isolation on ``S``). **Writes ``N``** (deamination), so an enabled run drops structural
+    ``tier_of("N")`` PLAUSIBLE→SPECULATIVE (the D-45/D-75 note). Tier **speculative** (the *form* —
+    sugar-driven, amino-acid-gated, heat-accelerated, O₂-independent — is sourced; every magnitude
+    is
+    an order-of-magnitude estimate).
+    """
+
+    name = "maillard_strecker"
+    tier = Tier.SPECULATIVE
+    #: Writes the six thermal-route product pools + the decarboxylation ``CO2``, drawing the carbon
+    #: from ``amino_acids`` (arginine) and deaminating its nitrogen to ``N``. Touches those nine and
+    #: nothing else — ``S`` is a read-only driver (not consumed here; its draw is booked by D-88),
+    #: and
+    #: there is NO ``o2`` term (the whole point). The C/N transfer closes exactly.
+    touches = (
+        "methional",
+        "phenylacetaldehyde",
+        "2_methylbutanal",
+        "3_methylbutanal",
+        "2_methylpropanal",
+        "sotolon",
+        "CO2",
+        "amino_acids",
+        "N",
+    )
+    #: ``k_maillard_strecker``/``E_a_maillard_strecker`` and the six ``w_maillard_*`` composition
+    #: weights are this Process's own (thermal.yaml, D-87); ``K_amino_acids`` is the *shared*
+    #: availability half-saturation (the same constant the mercaptan/reroute/D-75 gates read);
+    #: ``T_ref`` is shared with every Arrhenius rate. Their tiers cap the output tiers via
+    #: parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_maillard_strecker",
+        "E_a_maillard_strecker",
+        "w_maillard_methional",
+        "w_maillard_phenylacetaldehyde",
+        "w_maillard_2_methylbutanal",
+        "w_maillard_3_methylbutanal",
+        "w_maillard_2_methylpropanal",
+        "w_maillard_sotolon",
+        "K_amino_acids",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots (beer's amino-acid pool is not tracked, D-32; sotolon is a wine-only
+        # pool):
+        # a hard no-op on any schema without them, belt-and-suspenders to the wine-only wiring.
+        if "amino_acids" not in schema or "sotolon" not in schema:
+            return d
+        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
+        # HARD amino-acid gate — the isolability guarantee: an undosed wine (aa == 0) is
+        # byte-for-byte
+        # the case without this Process. ``<= 0`` also absorbs solver undershoot (no spurious draw).
+        if aa <= 0.0:
+            return d
+        # Residual sugar is the dicarbonyl DRIVER (summed over the vector), a SOFT gate: a dry wine
+        # (S ≈ 0) makes ~none, but the trace is physically real, so this is not an isolability
+        # claim.
+        s_total = max(float(y[schema.slice("S")].sum()), 0.0)
+        if s_total <= 0.0:
+            return d
+        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_maillard_strecker"], params["T_ref"])
+        # mol total product /L/h — driven by residual sugar + heat, NO o2 (the yield folded into k).
+        n_ald_total = params["k_maillard_strecker"] * f_t * s_total * gate
+        if n_ald_total <= 0.0:
+            return d
+
+        # Split among the six products by their NORMALIZED composition weights (relative production
+        # flux). Accumulate the total product carbon (aldehydes + sotolon + CO2) and the CO2 from
+        # the
+        # DECARBOXYLATING products only (sotolon contributes none — its flag is load-bearing).
+        weights = [params[wname] for (_, _, wname, _) in _MAILLARD_PRODUCTS]
+        w_sum = sum(weights)  # > 0 (all speculative positive weights)
+        product_carbon = 0.0  # g C/L/h into the products
+        co2_mol = 0.0  # mol CO2/L/h, from the decarboxylating aldehydes only
+        product_rates: list[tuple[str, float]] = []
+        for (pool, m_i, _wname, decarboxylates), w_i in zip(
+            _MAILLARD_PRODUCTS, weights, strict=True
+        ):
+            n_i = (w_i / w_sum) * n_ald_total  # mol/L/h of product i
+            rate_i = n_i * m_i  # g/L/h
+            product_rates.append((pool, rate_i))
+            product_carbon += rate_i * carbon_mass_fraction(pool)
+            if decarboxylates:
+                co2_mol += _CO2_PER_STRECKER_ALDEHYDE * n_i  # 1 CO2 per Strecker decarboxylation
+        co2_rate = co2_mol * M_CO2  # g CO2/L/h
+        product_carbon += co2_rate * carbon_mass_fraction("CO2")
+
+        # Draw the product carbon from amino_acids (arginine) sized to match, and deaminate the
+        # arginine nitrogen to N (the D-45/D-75 idiom): carbon out of amino_acids == carbon into the
+        # products + CO2, and all arginine N lands in N (products N-free), so total_carbon and
+        # total_nitrogen both close to machine precision.
+        c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
+        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+        aa_mass = product_carbon / c_aa  # arginine mass consumed to supply that carbon
+
+        for pool, rate_i in product_rates:
+            d[schema.slice(pool)] = rate_i
         d[schema.slice("CO2")] = co2_rate
         d[schema.slice("amino_acids")] = -aa_mass
         d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine N → ammonium (D-45)

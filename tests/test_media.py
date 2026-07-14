@@ -77,6 +77,17 @@ WINE_POLYMERIZATION_SLOTS = (
     "polymeric_pigment",
     "faded_anthocyanin",
 )
+# The four non-oxidative THERMAL Strecker aldehyde/sotolon aroma pools (decision D-87), appended
+# last: the sweet-wine / Madeira suite MaillardStrecker produces from residual sugar + amino acids +
+# heat with NO O₂. methional + phenylacetaldehyde (WINE_STRECKER_SLOTS, above) are SHARED with this
+# route (same molecules), so only these four are new. Carbon-bearing (booked from amino_acids as
+# arginine, deaminated to N), on total_carbon like the D-75 pair. Wine-only.
+WINE_MAILLARD_SLOTS = (
+    "2_methylbutanal",
+    "3_methylbutanal",
+    "2_methylpropanal",
+    "sotolon",
+)
 
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
@@ -99,6 +110,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_STRECKER_SLOTS
         + OAK_SLOTS
         + WINE_POLYMERIZATION_SLOTS
+        + WINE_MAILLARD_SLOTS
     )
     assert schema.spec("S").size == 1
     # 20 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas,
@@ -123,7 +135,11 @@ def test_wine_schema_has_single_sugar_slot():
     # + 2 D-81 colour-form slots (polymeric_pigment — the stable pigment PROMOTED from readout to an
     # integrated slot — and faded_anthocyanin — the colourless oxidative-fade sink; both off-ledger,
     # letting color_series genuinely decline)
-    assert schema.size == 58
+    # + 4 D-87 non-oxidative THERMAL Strecker aldehyde/sotolon slots (2-/3-methylbutanal,
+    # 2-methylpropanal, sotolon — the sweet-wine/Madeira suite MaillardStrecker produces from
+    # residual sugar + amino acids + heat with NO O₂; methional + phenylacetaldehyde are shared with
+    # the D-75 oxidative route, so only these four are new)
+    assert schema.size == 62
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -415,6 +431,12 @@ WINE_TANNIN_SELF_POLY_PROCESSES = {"tannin_self_polymerization"}
 # (colourless). Wine-only,
 # same compile-seam disable / begin_aging re-enable.
 WINE_TANNIN_ETHYL_TANNIN_PROCESSES = {"tannin_ethyl_tannin_condensation"}
+# WINE-ONLY, NON-oxidative THERMAL aging (decision D-87): maillard_strecker — the O₂-independent
+# thermal mirror of strecker_degradation. Residual sugar + heat (α-dicarbonyls, no O₂) degrade amino
+# acids to the sweet-wine/Madeira aldehyde suite; wine-only (reads amino_acids, deaminates to N),
+# additive with the D-75 route over the shared amino_acids limiting reagent. Same compile-seam
+# disable / begin_aging re-enable.
+WINE_MAILLARD_PROCESSES = {"maillard_strecker"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -433,6 +455,7 @@ EXPECTED_PROCESSES = {
         | KETO_ACID_PROCESSES
         | AGING_PROCESSES
         | WINE_AGING_PROCESSES
+        | WINE_MAILLARD_PROCESSES
         | OAK_PROCESSES
         | WINE_POLYMERIZATION_PROCESSES
         | WINE_BRIDGE_PROCESSES

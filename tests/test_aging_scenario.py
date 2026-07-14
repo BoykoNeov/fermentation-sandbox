@@ -37,6 +37,7 @@ from fermentation.core.kinetics.aging import (
     AcetaldehydeBridgedCondensation,
     EllagitanninOxidation,
     EsterHydrolysis,
+    MaillardStrecker,
     OakExtraction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
@@ -72,7 +73,16 @@ def _wine(
     autolysis_rate_per_h: float = 0.0,
     anthocyanin_gpl: float = 0.0,
     tannin_gpl: float = 0.0,
+    brix: float = 24.0,
+    duration_days: float | None = None,
 ) -> Scenario:
+    # brix (default 24.0, byte-for-byte the pre-D-87 dry-fermenting helper) sets the must sugar; a
+    # botrytis-level brix (~70) ferments to the ethanol-inactivation ceiling and ARRESTS with a
+    # large
+    # RESIDUAL sugar — a SWEET wine — the driver the non-oxidative thermal MaillardStrecker (D-87)
+    # needs. (The modelled ABV at that brix runs high — a pre-existing EthanolInactivation
+    # calibration limit, orthogonal to D-87: what matters here is the residual sugar it leaves.)
+    # duration_days overrides the default ferment+aging span (a longer sweet-wine aging tail).
     # amino_acids_gpl (default 0, byte-for-byte the pre-D-75 helper) doses the assimilable amino
     # must input the StreckerDegradation Process (D-75) draws its aldehyde carbon from; a residual
     # survives to the aging segment (AminoAcidAssimilation only draws it during active ferment).
@@ -83,7 +93,7 @@ def _wine(
     # inputs the TanninAnthocyaninCondensation Process (D-79) condenses into stable polymeric
     # pigment
     # during aging — a red wine (both > 0) softens + stabilizes colour; a white (both 0) is inert.
-    initial: dict[str, float] = {"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25}
+    initial: dict[str, float] = {"brix": brix, "yan_mgl": 250.0, "pitch_gpl": 0.25}
     if amino_acids_gpl > 0.0:
         initial["amino_acids_gpl"] = amino_acids_gpl
     if autolysis_rate_per_h > 0.0:
@@ -105,7 +115,7 @@ def _wine(
             TemperaturePoint(day=_FERMENT_DAYS, celsius=aging_celsius),
         ],
         interventions=interventions,
-        duration_days=_FERMENT_DAYS + _AGING_DAYS,
+        duration_days=(_FERMENT_DAYS + _AGING_DAYS if duration_days is None else duration_days),
     )
 
 
@@ -756,6 +766,139 @@ def test_sur_lie_strecker_closes_carbon_and_nitrogen_end_to_end():
     )
 
 
+# -- MaillardStrecker (decision D-87) — the NON-oxidative THERMAL Strecker axis, end to end -----
+#
+# The O₂-INDEPENDENT thermal mirror of StreckerDegradation (D-75): a SEALED (no add_oxygen) SWEET
+# (residual sugar) amino-acid-dosed wine develops the sweet-wine/Madeira aldehyde suite from sugar +
+# heat alone — where the O₂-only D-75 route, with no oxygen, makes NOTHING. A botrytis-level brix
+# (~70) ferments to the ethanol-inactivation ceiling and arrests with a large residual sugar (the
+# driver). These pin: the compile-seam gate (wine-only, disabled→begin_aging); the sealed-sweet
+# aldehyde production through the FULL pipeline vs a dry-wine control (the soft sugar driver); and
+# end-to-end carbon + nitrogen closure.
+
+_MAILLARD_ALDEHYDES = (
+    "methional",
+    "phenylacetaldehyde",
+    "2_methylbutanal",
+    "3_methylbutanal",
+    "2_methylpropanal",
+    "sotolon",
+)
+_SWEET_BRIX = 70.0  # botrytis-level must → arrests with ~130 g/L residual sugar (a SWEET wine)
+_SWEET_AGING_DAYS = 730.0  # a multi-year sweet-wine aging tail (thermal aging is slow)
+
+
+def test_maillard_gated_by_begin_aging_wine_only():
+    # MaillardStrecker is WINE-ONLY (reads wine-only amino_acids + deaminates to N) — present in the
+    # wine set, absent from beer — and rides the aging gate: disabled at compile, then on by
+    # begin_aging (the StreckerDegradation pattern).
+    assert MaillardStrecker.name in get_medium("wine").build_process_set()
+    assert MaillardStrecker.name not in get_medium("beer").build_process_set()
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], amino_acids_gpl=0.5))
+    assert MaillardStrecker.name in cs.process_set
+    assert not cs.process_set.is_enabled(MaillardStrecker.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(MaillardStrecker.name)  # begin_aging turns it on
+
+
+def test_maillard_thermal_aldehydes_in_sealed_sweet_wine():
+    # THE discriminating end-to-end through the FULL pipeline: a SEALED (NO add_oxygen) SWEET wine,
+    # amino-acid-dosed, aged warm — develops ALL SIX thermal products from residual sugar + heat
+    # with
+    # no O₂ whatsoever. Compared against a DRY wine (brix 24 → ~0 residual sugar) under the
+    # identical
+    # sealed aging, which makes ~none (the soft sugar driver). This is the sugar-driven, O₂-free
+    # route the D-75 oxidative one could never produce (no O₂ ⇒ D-75 is silent, per
+    # test_strecker_silent_reductive above). Levels land aroma-relevant (sotolon ~µg/L, the
+    # Sauternes/Madeira range) — anchored in thermal.yaml provenance, asserted directionally here.
+    sweet = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],  # SEALED — no add_oxygen
+            amino_acids_gpl=0.8,
+            brix=_SWEET_BRIX,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    ).run()
+    dry = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],
+            amino_acids_gpl=0.8,
+            brix=24.0,  # dry-fermenting control → residual sugar ≈ 0 ⇒ thermal route ~silent
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    ).run()
+    assert sweet.success and dry.success
+    # The sweet wine really is sweet: a large residual sugar drives the route (no O₂ dosed
+    # anywhere).
+    assert float(sweet.series("S")[-1]) > 50.0
+    assert float(dry.series("S")[-1]) < 1.0
+    for pool in _MAILLARD_ALDEHYDES:
+        sweet_end = float(sweet.series(pool)[-1])
+        dry_end = float(dry.series(pool)[-1])
+        assert sweet_end > 0.0  # the sealed sweet wine forms every thermal product
+        assert sweet_end > 100.0 * dry_end  # orders more than the ~silent dry control
+
+
+def test_maillard_raises_the_thermal_oavs():
+    # Through the STATED acceptance lens (the D-67 OAV lens): the whole point of D-87 is the four
+    # new
+    # thermal aromas the lens now reads (+ the two shared with D-75). A sealed sweet wine raises
+    # them
+    # positive; a dry wine leaves them ~0. Sotolon (the curry/maple furanone) is the diagnostic one.
+    thresholds = load_thresholds()
+    sweet = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],
+            amino_acids_gpl=0.8,
+            brix=_SWEET_BRIX,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    ).run()
+    assert sweet.success
+    for pool in _MAILLARD_ALDEHYDES:
+        assert float(oav_series(sweet.as_trajectory(), thresholds, pool)[-1]) > 0.0
+    # Sotolon and the honey phenylacetaldehyde clear their perception thresholds (OAV > 1) at these
+    # aged-Sauternes-range levels — the sweet-wine thermal signature is genuinely perceptible.
+    assert float(oav_series(sweet.as_trajectory(), thresholds, "sotolon")[-1]) > 1.0
+    assert float(oav_series(sweet.as_trajectory(), thresholds, "phenylacetaldehyde")[-1]) > 1.0
+
+
+def test_maillard_closes_carbon_and_nitrogen_end_to_end():
+    # MaillardStrecker draws carbon from amino_acids into the six thermal products + CO₂, deaminates
+    # the nitrogen to N — so BOTH ledgers must close end to end through the full ferment + sealed
+    # sweet aging. No external flow at all (no O₂ dose; the amino-acid + sugar are t0 initials), so
+    # total_carbon and total_nitrogen are both flat (final == initial).
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],
+            amino_acids_gpl=0.8,
+            brix=_SWEET_BRIX,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    f_n = cs.parameters.value("biomass_N_fraction")
+    assert_conserved(
+        traj.as_trajectory(),
+        total_carbon(cs.schema, biomass_carbon_fraction=f_c),
+        label="carbon",
+    )
+    assert_conserved(
+        traj.as_trajectory(),
+        total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n),
+        label="nitrogen",
+    )
+    assert_nonnegative(
+        traj.as_trajectory(),
+        ("amino_acids", *_MAILLARD_ALDEHYDES, "N"),
+        atol=1e-9,
+    )
+
+
 # -- OakExtraction (decision D-77) — the NON-oxidative barrel/chip aroma axis, end to end -------
 
 _OAK_EXTRACTIVES = ("whiskey_lactone", "vanillin", "guaiacol", "eugenol")
@@ -1026,7 +1169,8 @@ def test_un_oaked_beer_aging_leaves_the_oak_pools_zero_and_closes_ledgers():
         traj.as_trajectory(), total_carbon(cs.schema, biomass_carbon_fraction=f_c), label="carbon"
     )
     assert_conserved(
-        traj.as_trajectory(), total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n),
+        traj.as_trajectory(),
+        total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n),
         label="nitrogen",
     )
 
@@ -1036,9 +1180,7 @@ def test_barrel_beer_oak_raises_the_oak_oavs_and_astringency():
     # oak-extractive OAVs from 0 (read through the D-67 lens against the beer-matrix thresholds,
     # D-86) and the ellagitannin astringency readout goes positive. An un-oaked beer reads 0.
     thresholds = load_thresholds()
-    oaked = compile_scenario(
-        _beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "medium")])
-    ).run()
+    oaked = compile_scenario(_beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "medium")])).run()
     plain = compile_scenario(_beer([_begin_aging(14.0)])).run()
     assert oaked.success and plain.success
     for compound in _OAK_EXTRACTIVES:
@@ -1062,9 +1204,7 @@ def test_barrel_beer_oak_protects_against_oxidation():
         _beer([_begin_aging(14.0), _add_oak(14.0, 6.0, "light"), _add_oxygen(14.0, o2_dose)])
     )  # light toast ⇒ most ellagitannin (strongest protection)
     oaked = oaked_cs.run()
-    unoaked = compile_scenario(
-        _beer([_begin_aging(14.0), _add_oxygen(14.0, o2_dose)])
-    ).run()
+    unoaked = compile_scenario(_beer([_begin_aging(14.0), _add_oxygen(14.0, o2_dose)])).run()
     assert oaked.success and unoaked.success
     assert float(oaked.series("A420")[-1]) < float(unoaked.series("A420")[-1])
     assert float(oaked.series("acetaldehyde")[-1]) < float(unoaked.series("acetaldehyde")[-1])
@@ -1075,11 +1215,13 @@ def test_barrel_beer_oak_protects_against_oxidation():
     f_c = oaked_cs.parameters.value("biomass_C_fraction")
     f_n = oaked_cs.parameters.value("biomass_N_fraction")
     assert_conserved(
-        oaked.as_trajectory(), total_carbon(oaked_cs.schema, biomass_carbon_fraction=f_c),
+        oaked.as_trajectory(),
+        total_carbon(oaked_cs.schema, biomass_carbon_fraction=f_c),
         label="carbon",
     )
     assert_conserved(
-        oaked.as_trajectory(), total_nitrogen(oaked_cs.schema, biomass_nitrogen_fraction=f_n),
+        oaked.as_trajectory(),
+        total_nitrogen(oaked_cs.schema, biomass_nitrogen_fraction=f_n),
         label="nitrogen",
     )
 

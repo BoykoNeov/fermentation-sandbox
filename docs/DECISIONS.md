@@ -6820,3 +6820,110 @@ guard-wording updates. Enumeration goldens updated (`test_media` beer size/units
 set). **Every wine trajectory is byte-for-byte unchanged** (the `_oak_specs()` same-position insertion); un-oaked beer is
 byte-for-byte unchanged (ceiling ≤ 0 guard). **Next:** beat 1b (descriptor projection), the non-oxidative Maillard Strecker
 route, barrel fill-number depletion.
+
+## D-87 — `MaillardStrecker` built: the non-oxidative THERMAL Strecker route (sweet-wine/Madeira aldehydes + sotolon), the O₂-independent mirror of D-75 (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3, the tenth aging Process and the THIRD non-oxidative one** (after
+`OakExtraction` D-77 and the grape-colour axis D-79). `MaillardStrecker` (WINE-ONLY) builds the beat D-75 explicitly
+deferred: the **non-oxidative Maillard/sugar-dicarbonyl** Strecker route. It is the **O₂-independent thermal mirror** of
+`StreckerDegradation` (D-75) — exactly the relationship `ThermalAnthocyaninFade` (D-83) has to `AnthocyaninFading` (D-81).
+Where the D-75 oxidative route needs dissolved O₂ (its o-quinones are the amino-acid oxidant), this route is driven by
+**residual sugar + heat**: the sugar forms α-dicarbonyls (methylglyoxal, glyoxal, deoxyosones via Maillard/caramelization)
+that deaminate + decarboxylate amino acids to Strecker aldehydes with **NO oxygen** — so a sealed, sulfited, oxygen-free
+sweet wine still ages, developing the Sauternes / Madeira / baked-wine aroma suite. All new tests pass (15 unit + 4
+scenario), `ruff`/`mypy` clean, the full suite green (945 → 964). **Two `advisor()` passes before writing** (the design pass
+confirmed the mirror + the forced sugar-closure; the expanded-scope pass sharpened sotolon, melanoidin, and the golden
+audit) and **two scope forks were put to the owner**, who chose the FULL scope on both.
+
+**Owner fork 1 — the aldehyde suite: FULL, not the lean 2-pool v1.** The advisor's initial steer was to reuse just the two
+D-75 pools; the owner chose to **add** the branched-chain aldehydes + sotolon (aged sweet/thermal wines are characterized by
+2-/3-methylbutanal, 2-methylpropanal and sotolon as much as by methional/phenylacetaldehyde). So D-87 adds **four** new
+wine-only aroma pools: **2-methylbutanal** (isoleucine, malty/almond), **3-methylbutanal** (leucine, malty/dark-chocolate),
+**2-methylpropanal** (isobutyraldehyde, valine, malty/grainy) and **sotolon** (the curry/fenugreek/maple furanone) — plus
+the two SHARED with D-75 (`methional`, `phenylacetaldehyde` — same molecules, one pool + threshold each; the two routes are
+additive over them). Scope, documented: the thermal-wine aldehyde signature is broader still (other markers lumped out, v1).
+
+**Owner fork 2 — build the thermal-browning counterpart too (→ D-88).** The owner also chose to build the bulk
+sugar→melanoidin thermal browning (the O₂-independent mirror of `PhenolicBrowning` D-74). Per the codebase's one-Process-
+per-decision norm and to localize the golden churn, that is split into its **own decision D-88** (`Caramelization`) — the
+first aging Process to consume core `S`, so it carries the `begin_aging` golden re-baseline. D-87 is the aroma-production
+half; D-88 the browning half. Both are the same non-oxidative thermal axis, sharing a new `thermal.yaml`.
+
+**Sotolon is NOT a Strecker aldehyde — the CO₂-keying is load-bearing (advisor's catch).** The five true Strecker
+aldehydes each lose their amino acid's carboxyl as **1 mol CO₂** (the decarboxylation); **sotolon does not** (a
+threonine-α-ketobutyrate + acetaldehyde aldol furanone, not a decarboxylation product), so it carries NO CO₂ term. Because
+the arginine draw is sized to *total product carbon*, `total_carbon` closes for **any** CO₂ attribution — a mis-keyed CO₂
+would pass every conservation test silently (the exact trap the D-75 follow-up hit: split backwards, level 5× high, no test
+caught it). So the CO₂ is keyed to a per-product `decarboxylates` flag explicitly (`aging._MAILLARD_PRODUCTS`), and the
+produced µg/L levels are **anchored to literature** rather than trusted to the closure tests. Sotolon's two acetaldehyde-
+derived carbons (of its six) are lumped into the arginine draw — exact on the ledger, approximate on provenance (the
+acetaldehyde-coupled sotolon route is deferred), the same honest arginine-lump caveat D-45/D-75 carry.
+
+**S is a read-only DRIVER, not consumed here — FORCED, not merely convenient (the design crux).** The Strecker aldehyde's
+carbon skeleton **is** the amino acid (methional = methionine − COOH); the sugar dicarbonyl is only the electron-accepting
+oxidant, and its own carbon goes to melanoidin (booked by D-88). So the aldehyde carbon is drawn from `amino_acids` (the
+D-75 algebra) and `S` is **not** debited by this Process. This is not a convenience: booking a sugar draw here would break
+`total_carbon` (melanoidin is off-ledger) *and* undercount real sugar loss (bulk thermal browning, D-88, dominates
+depletion). The unbooked per-Strecker sugar consumption is µM-scale (µg/L aldehydes ⇒ trace dicarbonyl), negligible vs the
+g/L residual pool. So `S` is read but NOT in `touches`; there is NO `o2` term (the whole point).
+
+**Carbon + nitrogen close by construction (the D-75 idiom exactly).** The arginine draw is sized to the total product
+carbon (all six products + the CO₂ from the five decarboxylating ones), and all arginine nitrogen is deaminated to `N`
+(products N-free), so `total_carbon` and `total_nitrogen` close to machine precision (verified per-RHS < 1e-18 and
+end-to-end over the full ferment + sealed-sweet aging, both ledgers flat — no external flow, no O₂ dose). Writing `N`
+(deamination) drops structural `tier_of("N")` PLAUSIBLE→SPECULATIVE (the D-45/D-75 note). `total_mass` ({S,E,CO2}) sees the
+CO₂ with no matching S/E debit but is never asserted on an aging run (the standing `OxidativeAcetaldehyde` scope-out).
+
+**Additive with D-75 over the shared `amino_acids` limiting reagent.** Both Strecker routes draw `amino_acids` and
+`ProcessSet` sums them, so the pool depletes *once* and splits by their rates — the o2-sharing pattern (D-73) applied to the
+amino-acid limiting reagent, no double-count. A sealed sweet wine runs only this route (the discriminating case); a dry
+oxidised wine runs only D-75; an O₂-**and**-sugar-rich aged sweet wine runs both (the oxidative route's amino-acid draw then
+slightly suppresses the thermal aldehydes — the correct competition, seen as a small sealed-vs-oxygenated sotolon gap).
+
+**Isolability rests on the `amino_acids` HARD gate, NOT sugar (advisor's correction).** Undosed amino acids ⇒ the gate is
+exactly 0 ⇒ byte-for-byte the case without this Process (the default wine is unchanged — the D-75 substrate-gate isolability).
+Residual sugar is a **SOFT** driver: a "dry" wine still holds ~1–2 g/L, so the thermal route is *negligible* there, **not**
+byte-for-byte zero — the physically-correct trace, framed honestly (the isolability guarantee is on amino acids, not S).
+
+**The composition split — normalized relative-abundance weights (split hygiene).** The six products are booked by relative
+**production-flux** weights `w_maillard_*` (amino-acid abundance × Strecker/thermal reactivity, NOT potency — potency lives
+in the OAV thresholds; folding it in would double-count, the D-75 lesson), **normalized in-code** to fractions summing to 1
+(a test asserts the sum). Phenylalanine/leucine dominant, methionine minor, sotolon a small-but-characteristic route.
+
+**The rate + the sourced thermal ORDERING.** `n_ald = k_maillard_strecker · f(T) · [S_total] · gate(aa)` — first-order in
+residual sugar (the dicarbonyl driver, summed over the vector), aa-availability-gated (`aa/(K_amino_acids+aa)`, the shared
+half-saturation), yield folded into `k` (mol total aldehyde /L/h directly — no fake per-sugar molar conversion, since the
+wine sugar is a glucose/fructose vector stand-in). `E_a_maillard_strecker = 100 kJ/mol` sits **above** the oxidative aging
+E_a's (~50): the load-bearing SOURCED claim is the **ORDERING** — Maillard/caramelization is far more temperature-sensitive
+(Q10 ~3.5 vs ~2), why a warm Madeira estufagem / baked wine develops thermal character orders faster than cellar aging.
+
+**Magnitudes (all speculative, Tier-3 frontier).** `k_maillard_strecker = 6.0e-13 mol/(g·h)` (calibrated, advisor's
+must-anchor: a realistically-aged sweet wine — botrytis-level residual sugar ~130 g/L, warm multi-year aging — lands
+**sotolon ~5–20 µg/L** (Sauternes/Madeira), **phenylacetaldehyde ~tens µg/L** (honey), **methional low-µg/L** (potent), the
+branched-chain malty aldehydes ~single-digit-to-tens µg/L, all OAV-relevant); `E_a_maillard_strecker = 100 kJ/mol`; six
+`w_maillard_*` weights (phenylacetaldehyde 0.30, 3-methylbutanal 0.22, 2-methylbutanal/propanal 0.15, sotolon 0.10,
+methional 0.08, normalized). Four new `sensory.yaml` thresholds (2-methylbutanal 16, 3-methylbutanal 15, 2-methylpropanal 6,
+sotolon 8 µg/L). New `thermal.yaml` (shared_files, wine-only in effect, inert until `begin_aging`).
+
+**Sealed-sweet ferment reality (a pre-existing model limit, flagged not fixed).** A genuinely sweet wine (residual sugar at
+the aging segment) arises in the model only from a botrytis-level brix (~70) whose ferment arrests on ethanol inactivation —
+which overshoots ABV (E ~350 g/L, a pre-existing `EthanolInactivation` calibration limit, orthogonal to D-87). The residual
+sugar it leaves (~130 g/L) is realistic and is all the thermal route needs; the discriminating physics is additionally
+pinned at the controlled ProcessSet-integration level (a hand-set residual-sugar state), where a sealed sweet wine
+accumulates the thermal suite while the O₂-only D-75 route on the same state produces **exactly zero** — the acceptance
+anchor. Recorded so the high modelled ABV is not mistaken for a D-87 artifact.
+
+**Regression surface.** 4 new wine-only state slots (wine 58 → 62, beer untouched), 4 new chemistry species + carbon/
+nitrogen weights, 4 new `sensory.yaml` thresholds, 4 new `AromaCompound`s (wine aroma set 14 → 18), 1 new Process, a new
+`thermal.yaml` (2 params + 6 weights), `compile._AGING_GATED_PROCESSES` +1 + `thermal.yaml` in shared_files. Enumeration
+goldens updated (`test_media` wine size/`WINE_MAILLARD_SLOTS`/`WINE_MAILLARD_PROCESSES`; `test_sensory_oav` wine compound
+set). **Every non-sweet / amino-acid-free / dry trajectory stays byte-for-byte** (the amino_acids hard gate + the sugar
+driver ≈ 0 at dryness); beer is byte-for-byte unchanged (wine-only). New tests: `MaillardStrecker` unit (closed form, carbon
++ nitrogen closure per-RHS, aa hard-gate + sugar soft-gate isolability, O₂-INDEPENDENCE — identical with/without O₂ — the
+first-order-in-sugar linearity + aa-saturation, the split normalization + the sotolon-no-CO₂ flag, warmer-faster +
+more-thermally-sensitive-than-oxidative, wine-only no-op on beer, integrated sealed-sweet accumulation + closure, the
+discriminating contrast vs the O₂-only route, the speculative tier floor incl. the N-write) + scenario (compile-seam gate
+wine-only, sealed-sweet aldehydes through the full pipeline vs a dry control, the thermal OAVs climb, carbon + nitrogen close
+end to end). **Next (D-88):** `Caramelization` — the sugar-only thermal browning (melanoidin + A420), the first aging
+Process to consume core `S` (carries the `begin_aging` golden re-baseline + retires the "reductive aging = byte-for-byte
+ester-only" claim for sweet wines). Then beat 1b (descriptor projection), barrel fill-number.

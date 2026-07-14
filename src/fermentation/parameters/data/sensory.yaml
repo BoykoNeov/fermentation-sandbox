@@ -196,6 +196,52 @@ threshold_phenylacetaldehyde_wine:
     conditions: "measured in/near wine matrix; phenylacetaldehyde, a single molecule (the phenylalanine-derived Strecker aldehyde)"
     notes: "Single-molecule pool — clean OAV, matrix-matched. The pleasant-valence Strecker aldehyde (contrast methional's off-note); the two share the D-75 Strecker Process. Wine-only pool. Same arginine-lump provenance caveat as methional."
 
+# -- Non-oxidative THERMAL Strecker aldehydes + sotolon (decision D-87): the sweet-wine / Madeira ---
+# aroma markers the MaillardStrecker route produces from residual sugar + amino acids + heat, with
+# NO O2. Single-molecule pools, each read against its own wine threshold. The three branched-chain
+# aldehydes are the "malty/oxidised" notes; sotolon is the curry/maple furanone. Same arginine-lump
+# provenance caveat as the D-75 pair (modelled carbon booked from arginine, not the literal amino
+# acid). methional / phenylacetaldehyde thresholds (above) are SHARED with this route (same molecule).
+threshold_2_methylbutanal_wine:
+  value: 16.0
+  unit: "ug/L"   # 2-methylbutanal, 'malty / almond' (branched-chain Strecker aldehyde of isoleucine)
+  tier: speculative
+  uncertainty: { low: 5.0, high: 50.0, note: "2-methylbutanal perception threshold in wine ~10-25 µg/L (reported ~16 µg/L in wine-like matrix); band widened for matrix dependence." }
+  provenance:
+    source: "wine/beverage aroma literature: 2-methylbutanal (malty/almond, the isoleucine Strecker aldehyde) perception threshold ~10-25 µg/L in wine-like matrices (Ferreira et al.; beer-staling aldehyde literature — 2-/3-methylbutanal canonical malty staling markers)."
+    conditions: "measured in/near wine matrix; 2-methylbutanal, a single molecule (the isoleucine-derived Strecker aldehyde)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. A malty/oxidised marker of thermally-aged sweet wine. Wine-only pool. arginine-lump provenance caveat (decision D-87)."
+
+threshold_3_methylbutanal_wine:
+  value: 15.0
+  unit: "ug/L"   # 3-methylbutanal, 'malty / dark chocolate' (branched-chain Strecker aldehyde of leucine)
+  tier: speculative
+  uncertainty: { low: 4.0, high: 50.0, note: "3-methylbutanal perception threshold in wine ~10-20 µg/L; band widened for matrix dependence." }
+  provenance:
+    source: "wine/beverage aroma literature: 3-methylbutanal (malty/chocolate, the leucine Strecker aldehyde) perception threshold ~10-20 µg/L in wine-like matrices (Ferreira et al.; the dominant malty staling aldehyde in beverage aging literature)."
+    conditions: "measured in/near wine matrix; 3-methylbutanal, a single molecule (the leucine-derived Strecker aldehyde)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. Typically the most prominent branched-chain thermal/staling aldehyde. Wine-only pool. arginine-lump caveat (decision D-87)."
+
+threshold_2_methylpropanal_wine:
+  value: 6.0
+  unit: "ug/L"   # 2-methylpropanal (isobutyraldehyde), 'malty / grainy' (Strecker aldehyde of valine)
+  tier: speculative
+  uncertainty: { low: 2.0, high: 20.0, note: "2-methylpropanal / isobutyraldehyde perception threshold in wine ~5-10 µg/L; band widened for matrix dependence." }
+  provenance:
+    source: "wine/beverage aroma literature: 2-methylpropanal (isobutyraldehyde, malty/grainy, the valine Strecker aldehyde) perception threshold ~5-10 µg/L in wine-like matrices (Ferreira et al.; beer-staling aldehyde literature)."
+    conditions: "measured in/near wine matrix; 2-methylpropanal, a single molecule (the valine-derived Strecker aldehyde)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. A malty/grainy thermal-aging marker. Wine-only pool. arginine-lump caveat (decision D-87)."
+
+threshold_sotolon_wine:
+  value: 8.0
+  unit: "ug/L"   # sotolon, 'curry / maple / nutty' (the botrytized-sweet-wine / Madeira furanone)
+  tier: speculative
+  uncertainty: { low: 2.0, high: 20.0, note: "sotolon perception threshold in wine ~5-19 µg/L (reported ~8 µg/L in white wine; potent); band ~2-20 µg/L across matrices." }
+  provenance:
+    source: "wine aroma literature: sotolon (4,5-dimethyl-3-hydroxy-2(5H)-furanone) perception threshold ~5-19 µg/L in wine (Cutzach et al.; Pham et al. 1995; the curry/fenugreek/maple marker of botrytized sweet wine, vin jaune, aged Port and Madeira)."
+    conditions: "measured in/near wine matrix; sotolon, a single molecule (the threonine/acetaldehyde-derived furanone)"
+    notes: "Single-molecule pool — clean OAV, matrix-matched. THE diagnostic marker of aged sweet/oxidative wine (curry/maple). Trace by mass but potent (low threshold). Wine-only pool. arginine-lump caveat, and its 2 acetaldehyde-derived carbons are lumped into the arginine draw (decision D-87)."
+
 # -- Oak extractives (decision D-77): the barrel/chip aroma markers (non-oxidative aging axis) -----
 threshold_whiskey_lactone_wine:
   value: 54.0
