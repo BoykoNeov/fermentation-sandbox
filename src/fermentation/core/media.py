@@ -766,13 +766,13 @@ def wine_schema() -> StateSchema:
             "(threshold_sotolon_wine)",
         ),
     ]
-    # Caramelization melanoidin carbon-park (decision D-88), appended last: the brown thermal-
-    # browning polymer Caramelization forms by consuming residual sugar (the O₂-independent mirror
-    # of PhenolicBrowning D-74). The FIRST aging pool that holds consumed core-S carbon, so — unlike
-    # the off-ledger oak/colour lumps — it is ON total_carbon (sugar → melanoidin closes exactly).
-    # It raises the SAME A420 index D-74 accumulates (not a new observable). Sugar-only
-    # (nitrogen-free
-    # — caramelization, not Maillard). Wine-only v1 (beer thermal browning deferred).
+    # Caramelization melanoidin carbon-park (decision D-88; medium-agnostic D-90), appended: the
+    # brown thermal-browning polymer Caramelization forms by consuming residual sugar (the
+    # O₂-independent mirror of PhenolicBrowning D-74). The FIRST aging pool that holds consumed
+    # core-S carbon, so — unlike the off-ledger oak/colour lumps — it is ON total_carbon
+    # (sugar → melanoidin closes exactly). It raises the SAME A420 index D-74 accumulates (not a
+    # new observable). Sugar-only (nitrogen-free — caramelization, not Maillard). Now in BOTH media
+    # (D-90: beer thermal browning — the beer_schema counterpart is appended in beer_schema()).
     specs.append(
         VarSpec(
             "melanoidin",
@@ -786,7 +786,7 @@ def wine_schema() -> StateSchema:
             "Sugar-only (nitrogen-free — caramelization, not amino-acid Maillard). Raises the "
             "shared A420 "
             "browning index (read by analysis.a420); the melanoidin MASS itself is not a sensory "
-            "pool. Wine-only",
+            "pool. In BOTH media (D-90: beer thermal browning)",
         )
     )
     # N-bearing Maillard melanoidin carbon+nitrogen-park (decision D-89), appended last: the brown
@@ -847,6 +847,32 @@ def beer_schema() -> StateSchema:
     # Extraction is a WOOD property (medium-agnostic oak.yaml yields); only the OAV perception
     # thresholds are matrix-specific (threshold_<compound>_beer, sensory.yaml).
     specs += _oak_specs()
+    # Caramelization melanoidin carbon-park (decision D-88; medium-agnostic D-90). The SAME brown
+    # thermal-browning polymer Caramelization forms in wine — beer's residual dextrins (unfermented
+    # maltose/maltotriose) caramelize by HEAT with NO O₂, browning an aged/warm-stored beer and
+    # raising the SAME A420 index D-74/D-86 accumulate. Appended here (not in _common_specs, so
+    # wine_schema keeps its single append) — a carbon-park ON total_carbon: the consumed core-S
+    # carbon (all three beer sugars, apportioned at each component's own carbon fraction) redeposits
+    # here, so sugar → melanoidin closes exactly. Sugar-only (nitrogen-free — caramelization, not
+    # Maillard; the N-incorporating MaillardBrowning D-89 stays wine-only, since beer's amino-acid
+    # pool is untracked, D-32). Default 0 ⇒ a dry-finished beer (S ≈ 0 at begin_aging) browns
+    # negligibly; a high-residual/under-attenuated beer browns meaningfully.
+    specs.append(
+        VarSpec(
+            "melanoidin",
+            "g/L",
+            default=0.0,
+            description="melanoidin — the brown caramelization polymer (caramelan stand-in "
+            "C12H18O9) Caramelization forms from residual sugar by HEAT with NO O₂ (decision D-88, "
+            "the O₂-independent thermal mirror of PhenolicBrowning D-74; medium-agnostic D-90 — "
+            "beer's residual dextrins caramelize too). A carbon-park pool (the debris/glucan "
+            "precedent): ON total_carbon (it holds the consumed core-S carbon — all three beer "
+            "sugars at their own carbon fractions — so sugar → melanoidin closes exactly), unlike "
+            "the off-ledger oak lumps. Sugar-only (nitrogen-free — caramelization, not amino-acid "
+            "Maillard). Raises the shared A420 browning index (read by analysis.a420); the "
+            "melanoidin MASS itself is not a sensory pool. In BOTH media (D-90)",
+        )
+    )
     return StateSchema(specs)
 
 
@@ -1079,20 +1105,26 @@ _STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (StreckerDegradation,)
 #: ``thermal.yaml``.
 _MAILLARD_STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (MaillardStrecker,)
 
-#: WINE-ONLY non-oxidative THERMAL browning Process (decision D-88) — the O₂-INDEPENDENT thermal
-#: mirror of :class:`PhenolicBrowning` (D-74) and the browning half of the thermal axis
-#: :class:`MaillardStrecker` (D-87) opened. :class:`Caramelization` browns **residual sugar** to
-#: ``melanoidin`` by heat alone (no ``o2``), raising the SAME ``A420`` index D-74 accumulates — so a
-#: sealed sweet wine still darkens with age. It is the **first aging Process to consume core**
-#: ``S``, so its carbon lands in the on-ledger ``melanoidin`` carbon-park (``total_carbon`` closes).
-#: SUGAR-
-#: ONLY (nitrogen-free — caramelization, not Maillard). Wine-only for v1 (a bundling choice with the
-#: sweet-wine axis, not a physics constraint — sugar browning is medium-agnostic in principle; beer
-#: thermal browning deferred, the D-86 oak-to-beer pattern). Kept in its OWN tuple (isolable,
-#: directive #3): DISABLED at the compile seam and re-enabled by ``begin_aging`` (its name rides in
+#: MEDIUM-AGNOSTIC (WINE + BEER, decision D-88; extended to beer D-90) non-oxidative THERMAL
+#: browning Process — the O₂-INDEPENDENT thermal mirror of :class:`PhenolicBrowning` (D-74) and the
+#: browning half of the thermal axis :class:`MaillardStrecker` (D-87) opened.
+#: :class:`Caramelization`
+#: browns **residual sugar** to ``melanoidin`` by heat alone (no ``o2``), raising the SAME ``A420``
+#: index D-74/D-86 accumulate — so a sealed sweet wine *or* high-residual beer still darkens with
+#: age. It is the **first aging Process to consume core** ``S``, so its carbon lands in the
+#: on-ledger
+#: ``melanoidin`` carbon-park (``total_carbon`` closes); the D-90 vectorized draw apportions the
+#: debit across beer's 3-slot ``S`` at each component's own carbon fraction, so both media close.
+#: SUGAR-ONLY (nitrogen-free — caramelization, not Maillard; the N-incorporating
+#: :class:`MaillardBrowning` D-89 stays wine-only since beer's ``amino_acids`` are untracked, D-32).
+#: Wired into BOTH media (D-90: the ``melanoidin`` slot is appended to both ``wine_schema`` and
+#: ``beer_schema``, the D-86 oak-to-beer pattern), unlike the wine-only
+#: ``_MAILLARD_STRECKER_PROCESSES`` /
+#: ``_MAILLARD_BROWNING_PROCESSES``. Kept in its OWN tuple (isolable, directive #3): DISABLED at the
+#: compile seam and re-enabled by ``begin_aging`` (its name rides in
 #: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With ``S ≈ 0`` at the aging
-#: segment (every standard dry aging run) it is byte-for-byte inert (the ``S ≤ 0`` guard). Params
-#: live in ``thermal.yaml``.
+#: segment (a standard dry aging run) it is byte-for-byte (wine) / numerically (beer) inert (the
+#: per-component clamp + ``S ≤ 0`` guard). Params live in ``thermal.yaml``.
 _CARAMELIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (Caramelization,)
 
 #: WINE-ONLY non-oxidative amino-acid-incorporating THERMAL browning Process (decision D-89) — the
@@ -1608,6 +1640,7 @@ MEDIA: dict[str, Medium] = {
             + _H2S_PROCESSES
             + _HOPS_PROCESSES
             + _AGING_PROCESSES
+            + _CARAMELIZATION_PROCESSES
             + _OAK_PROCESSES
             + _ELLAGITANNIN_PROCESSES
         ),

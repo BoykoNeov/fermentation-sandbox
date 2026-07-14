@@ -37,9 +37,12 @@ non-biomass, non-arginine species on ``total_nitrogen``), retaining the amino-ac
 polymer and raising the same ``A420``. Together the three split the thermal amino-acid/browning fate
 cleanly: **sugar-only** caramelization (D-88), the **N-retaining** melanoidin branch (D-89), and the
 **N-releasing** volatile Strecker branch (D-87) — summed over the shared ``S``/``amino_acids``
-reagents by ``ProcessSet``, no double-count (see :class:`MaillardBrowning`). All wine-only, all
-driven by residual sugar (D-88/D-89 *consume* core ``S``), all the same thermal-mirror relationship
-:class:`ThermalAnthocyaninFade` (D-83) has to :class:`AnthocyaninFading` (D-81).
+reagents by ``ProcessSet``, no double-count (see :class:`MaillardBrowning`). All driven by residual
+sugar (D-88/D-89 *consume* core ``S``), all the same thermal-mirror relationship
+:class:`ThermalAnthocyaninFade` (D-83) has to :class:`AnthocyaninFading` (D-81). D-87/D-89 are
+**wine-only** (they read the wine-only ``amino_acids`` pool, untracked in beer, D-32); D-88
+:class:`Caramelization` is **medium-agnostic** (D-90) — sugar-only browning is physics, so beer's
+residual dextrins caramelize too (the vectorized draw apportions across beer's 3-slot ``S``).
 
 **The oxidative sub-axis (D-71).** :class:`OxidativeAcetaldehyde` opens the *oxidative* half of
 the aging axis on a **dissolved-O₂ pool** (``o2``, a new carbon-free state slot, off every
@@ -50,10 +53,11 @@ bottle-aging reality a first-order-in-ethanol rate could never reproduce (it wou
 unbounded). O₂ enters via a dedicated ``add_oxygen`` dosing verb (one dose = a bottle's
 ingress; repeated = micro-oxygenation / barrel), and a ``begin_aging`` run with **no** O₂ dosed
 is purely *reductive* aging (screwcap/inert) — byte-for-byte the :class:`EsterHydrolysis`-only
-aging, since the Process contributes exactly zero at ``o2 = 0``. **(D-88 supersedes this for sweet
-wines:** the "un-oxygenated aging is byte-for-byte the ester-only case" claim now holds only for
-*dry* wines — a sealed **sweet** wine browns thermally (:class:`Caramelization`) and develops the
-thermal Strecker suite (:class:`MaillardStrecker`) with no O₂ at all; the D-83-style mirror.)
+aging, since the Process contributes exactly zero at ``o2 = 0``. **(D-88/D-90 supersede this for
+residual-sugar beverages:** the "un-oxygenated aging is byte-for-byte the ester-only case" claim now
+holds only for *dry* ones — a sealed **sweet** wine or **high-residual** beer browns thermally
+(:class:`Caramelization`, medium-agnostic per D-90) with no O₂ at all, and a sweet wine additionally
+develops the thermal Strecker suite (:class:`MaillardStrecker`, wine-only); the D-83-style mirror.)
 Oxidative aging is
 fundamentally a competition for a finite O₂ budget: the ``o2`` pool is the shared substrate the
 whole oxidative sub-axis draws down, and **each O₂ consumer owns its own rate constant and draws
@@ -1138,24 +1142,30 @@ class Caramelization(Process):
     simplification). ``A420`` is the optical browning index (off every ledger, the D-74 slot), so it
     carries no carbon — only ``melanoidin`` parks it.
 
-    **Isolable + a SOFT sugar gate (prime directive #3).** Wine-only for v1 (the sweet-wine thermal
-    axis; sugar-only browning is medium-agnostic *in principle* — beer/wort melanoidins are real —
-    so
-    this is a bundling choice, not a physics constraint: beer thermal browning is deferred, the D-86
-    oak-to-beer extension pattern). The ``"melanoidin" not in schema`` guard makes it a hard no-op
-    on
-    beer. Wired **disabled at the compile seam**; ``begin_aging`` enables it with the other aging
-    Processes. Residual sugar is a **SOFT** driver: a dry wine (``S ≈ 0`` at the aging segment —
-    every
-    standard aging scenario ferments to dryness before ``begin_aging``) is byte-for-byte inert via
-    the ``S ≤ 0`` guard (which also absorbs a solver undershoot), so an ordinary *dry* aged wine is
-    unchanged. But a **sweet** wine now browns thermally even sealed and sulfited — so the D-71/D-74
-    "reductive aging is byte-for-byte the ester-only case" claim now holds only for **dry** wines
-    (the
-    D-83-style supersession: a sealed sweet wine is *not* inert). Tier **speculative** (the *form* —
-    sugar-driven, heat-accelerated, O₂-independent browning — is sourced; the rate and
-    per-melanoidin
-    absorbance yield are order-of-magnitude estimates).
+    **Medium-agnostic (D-90 supersedes D-88's provisional "wine-only v1").** Sugar-only browning is
+    physics, not a grape property — beer/wort residual dextrins (unfermented maltose/maltotriose)
+    caramelize and brown an aged/warm-stored beer exactly as sweet-wine sugar does — so D-90 wires
+    this into **both** media (the ``melanoidin`` carbon-park is appended to both ``wine_schema`` and
+    ``beer_schema``, the D-86 oak-to-beer pattern). The ``"melanoidin" not in schema`` guard is now
+    only belt-and-suspenders. The **vectorized** draw (the D-90 rework) apportions the sugar debit
+    across beer's 3-slot ``S`` by each component's share and releases carbon at each component's
+    **own** fraction (glucose / maltose / maltotriose differ), so ``total_carbon`` closes for both
+    media; wine's single slot reduces to the D-88 form byte-for-byte. The N-incorporating
+    :class:`MaillardBrowning` (D-89) does **not** follow — beer's ``amino_acids`` pool is untracked
+    (D-32), so beer thermal browning is caramelization only.
+
+    **Isolable + a SOFT sugar gate (prime directive #3).** Wired **disabled at the compile seam**;
+    ``begin_aging`` enables it with the other aging Processes. Residual sugar is a **SOFT** driver:
+    a dry beverage (``S ≈ 0`` at the aging segment — a standard wine ferments to dryness, ``S ≤ 0``
+    exactly, before ``begin_aging``; a standard beer to ``S ≈ 5e-11``, browning a negligible trace)
+    is byte-for-byte (wine) or numerically inert (beer) via the per-component clamp + ``S ≤ 0``
+    guard, so an ordinary *dry* aged beverage is unchanged. But a **sweet** wine / **high-residual**
+    (under-attenuated, big-stout) beer now browns thermally even sealed and sulfited — so the
+    D-71/D-74 "reductive aging is byte-for-byte the ester-only case" claim now holds only for *dry*
+    beverages (the D-83-style supersession: a sealed sweet wine / residual-sugar beer is *not*
+    inert). Tier **speculative** (the *form* — sugar-driven, heat-accelerated, O₂-independent
+    browning — is sourced; the rate and per-melanoidin absorbance yield are order-of-magnitude
+    estimates).
     """
 
     name = "caramelization"
@@ -1181,31 +1191,41 @@ class Caramelization(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Wine-only for v1 (the melanoidin carbon-park is a wine slot): a hard no-op on beer
-        # besides.
+        # Medium-agnostic (D-90): a hard no-op on any schema without the melanoidin carbon-park.
         if "melanoidin" not in schema:
             return d
         s_slice = schema.slice("S")
-        s_total = max(float(y[s_slice].sum()), 0.0)  # residual sugar, summed over the vector
-        # Dry wine (S ≈ 0 at the aging segment) ⇒ byte-for-byte inert (the SOFT sugar gate; also
-        # absorbs a solver undershoot S < 0). A sweet wine browns; a dry one is unchanged.
+        # PER-COMPONENT clamp (the D-90 correctness pin), NOT ``max(sum, 0)``: on beer's 3-slot S a
+        # solver undershoot can leave ONE component slightly negative while the sum stays positive —
+        # then ``frac_i = y_i / s_total`` would be negative and the apportioned debit
+        # ``-r_sugar·frac_i`` would flip POSITIVE, silently *creating* that sugar (carbon still
+        # closes for either sign — the D-89-denominator trap family). Clamping each component first
+        # makes a negative slot contribute a zero draw. For WINE's single slot this is identical to
+        # ``max(sum, 0)``, so wine is byte-for-byte unchanged.
+        s_clamped = y[s_slice].clip(min=0.0)  # per-component ≥ 0
+        s_total = float(s_clamped.sum())  # residual sugar, summed over the (clamped) vector
+        # Dry beverage (S ≈ 0 at the aging segment) ⇒ byte-for-byte inert (the SOFT sugar gate; the
+        # clamp above already absorbed any solver undershoot). A sweet wine / high-residual beer
+        # browns; a dry one is unchanged.
         if s_total <= 0.0:
             return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_caramelization"], params["T_ref"])
-        r_sugar = params["k_caramelization"] * f_t * s_total  # g sugar/L/h caramelized
-        # Carbon-exact transfer sugar → melanoidin: release the sugar carbon at the sugar's fraction
-        # and redeposit into melanoidin at its (caramelan-stand-in) fraction, so total_carbon closes
-        # to machine precision (the EsterHydrolysis split). Wine sugar is the single hexose species.
-        carbon_released = r_sugar * carbon_mass_fraction(sugar_species(schema)[0])  # g C/L/h
+        r_sugar = params["k_caramelization"] * f_t * s_total  # g sugar/L/h caramelized (total)
+        # Carbon-exact transfer sugar → melanoidin: apportion the total draw across the S vector by
+        # each component's share and release its carbon at that component's OWN fraction (glucose /
+        # maltose / maltotriose differ), then redeposit into melanoidin at its caramelan-stand-in
+        # fraction — so total_carbon closes to machine precision (the EsterHydrolysis split) in both
+        # media. Wine's single hexose slot ⇒ the sum is one term at c(glucose), the D-88 form.
+        species = sugar_species(schema)
+        carbon_released = r_sugar * sum(
+            float(s_clamped[i]) / s_total * carbon_mass_fraction(sp) for i, sp in enumerate(species)
+        )  # g C/L/h
         mel_rate = carbon_released / carbon_mass_fraction(_MELANOIDIN_SPECIES)  # g melanoidin/L/h
-        # Debit the residual sugar. Correct for WINE's single-slot S. FORWARD-NOTE (if D-88 ever
-        # goes
-        # medium-agnostic for beer thermal browning): ``d[s_slice] = -r_sugar`` would broadcast −r
-        # into
-        # ALL THREE beer sugar slots — it must instead apportion the draw across the vector (and use
-        # each component's own carbon fraction for the melanoidin transfer, not just component [0]).
-        d[s_slice] = -r_sugar
+        # Debit the residual sugar, APPORTIONED across the vector (each slot loses its share of the
+        # total draw). ``s_clamped / s_total`` sums to 1, so the total debit is exactly ``r_sugar``;
+        # for wine's single slot it is ``-r_sugar`` as before.
+        d[s_slice] = -r_sugar * (s_clamped / s_total)
         d[schema.slice("melanoidin")] = mel_rate
         # The shared A420 browning index rises with the melanoidin formed (off every ledger, the
         # D-74
@@ -1384,10 +1404,11 @@ class MaillardBrowning(Process):
         mel_rate = r_sugar * c_sugar / denom  # g maillard_melanoidin/L/h
         aa_mass = mel_rate * n_m / n_arg  # g arginine/L/h drawn, sized to the retained nitrogen
 
-        # FORWARD-NOTE (if D-89 ever goes medium-agnostic for beer thermal browning, the D-88 note):
-        # ``d[s_slice] = -r_sugar`` is correct for WINE's single-slot S but would broadcast −r into
-        # ALL THREE beer sugar slots — a beer version must apportion the draw across the vector (and
-        # use each component's own carbon fraction for the melanoidin transfer, not just hexose).
+        # WINE-ONLY (unlike sugar-only :class:`Caramelization`, which D-90 made medium-agnostic):
+        # this route reads ``amino_acids``, untracked in beer (D-32), so it never runs on 3-slot S.
+        # ``d[s_slice] = -r_sugar`` is therefore correct as written (wine's single slot). Were beer
+        # amino acids ever tracked, this would need the D-90 vectorized apportionment Caramelization
+        # now carries (apportion the draw across the S vector; per-component carbon fractions).
         d[s_slice] = -r_sugar
         d[schema.slice("amino_acids")] = -aa_mass
         d[schema.slice(_MAILLARD_MELANOIDIN_SPECIES)] = mel_rate

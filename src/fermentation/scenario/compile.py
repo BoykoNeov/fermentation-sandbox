@@ -157,8 +157,10 @@ _BRETT_GATED_PROCESSES = (
 #: the sweet-wine/Madeira aldehyde suite; wine-only, reads ``amino_acids`` + deaminates to ``N``)
 #: and
 #: :class:`Caramelization` (the D-88 sugar-only THERMAL browning — residual sugar browns to the
-#: on-ledger ``melanoidin`` carbon-park by heat with no O₂, raising the shared ``A420``; wine-only,
-#: the first aging Process to consume core ``S``) and :class:`MaillardBrowning` (the D-89
+#: on-ledger ``melanoidin`` carbon-park by heat with no O₂, raising the shared ``A420``;
+#: MEDIUM-AGNOSTIC per D-90 — beer's residual dextrins caramelize too, the vectorized draw
+#: apportions across beer's 3-slot ``S``; the first aging Process to consume core ``S``) and
+#: :class:`MaillardBrowning` (the D-89
 #: amino-acid-incorporating THERMAL browning — residual sugar + amino acids brown to the on-ledger
 #: N-bearing ``maillard_melanoidin`` carbon+nitrogen-park by heat with no O₂, raising the same
 #: ``A420``; wine-only, the first aging Process on the nitrogen ledger), so
@@ -616,9 +618,11 @@ def _load_parameters(
         # Non-oxidative THERMAL aging axis (decisions D-87/D-88/D-89): the sugar+heat-driven,
         # O2-independent Strecker aldehydes (MaillardStrecker), sugar-only caramelization browning
         # (Caramelization), and amino-acid-incorporating Maillard browning (MaillardBrowning — the
-        # N-bearing melanoidin branch). Wine-only in effect (only wine wires the Processes + carries
-        # amino_acids / the thermal aroma + melanoidin slots), but loaded universally like the other
-        # shared files — collision-free names, inert for beer; INERT until a begin_aging enable.
+        # N-bearing melanoidin branch). Caramelization is MEDIUM-AGNOSTIC (D-90: both media wire it
+        # + carry the melanoidin slot — beer's residual dextrins caramelize); MaillardStrecker /
+        # MaillardBrowning stay wine-only in effect (only wine wires them + carries amino_acids /
+        # the thermal aroma slots). Loaded universally like the other shared files — collision-free
+        # names; every rate is INERT until a begin_aging enable.
         base / "thermal.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))

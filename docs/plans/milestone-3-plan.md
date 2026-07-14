@@ -209,6 +209,26 @@
 > shared-`amino_acids` competition doesn't erase the diagnostic sotolon — the D-74-suppresses-acetaldehyde precedent on
 > amino_acids. Wine-only v1. The four-way interaction test became FIVE-WAY. Next: beat 1b (descriptor projection), barrel
 > fill-number, beer thermal browning (the D-86 oak-to-beer pattern for the whole thermal axis).**
+>
+> **PROGRESS (D-90, 2026-07-14): beer thermal browning — `Caramelization` (D-88) extended to BEER, the D-86 oak-to-beer
+> pattern (993 tests). A warm-stored / long-aged beer's residual dextrins (unfermented maltose/maltotriose) caramelize to
+> `melanoidin` by HEAT with no O₂, raising the SAME shared `A420` browning index — the sealed-sweet-wine mechanism, now on
+> beer. Scope is FORCED, not chosen: of the 3 thermal branches only D-88 is sugar-only; D-87/D-89 read `amino_acids`, untracked
+> in beer (D-32), so they genuinely can't follow — beer thermal browning is caramelization ALONE (the inverse of D-86: physics
+> is medium-agnostic, but reagent TRACKING is the wine-only wall). ONE advisor pass, no owner fork. The one real correctness
+> pin (advisor's must-fix): PER-COMPONENT clamp (`s_clamped = y[S].clip(min=0)`), NOT `max(sum,0)` — on beer's 3-slot `S` a
+> solver undershoot leaving one component negative would flip the apportioned debit POSITIVE and silently CREATE sugar (carbon
+> closes either sign — the D-89-denominator trap family). Vectorized carbon-exact transfer: each sugar caramelizes at its OWN
+> carbon fraction (glucose C6 / maltose C12 / maltotriose C18 differ), `carbon_released = r·Σ(sᵢ/s_total)·c(sugarᵢ)`. Wine
+> reduces to the single-slot D-88 form BYTE-FOR-BYTE (every wine trajectory unchanged); `thermal.yaml` params transfer
+> unchanged (`A420` is an absorbance, not a matrix-specific threshold). Isolability asymmetry (honest, documented): a beer
+> finishes at S ≈ 5e-11 (positive, guard doesn't fire) not wine's exact ≤ 0, so a reductive beer browns a NEGLIGIBLE trace
+> (A420 ≈ 4e-8 vs 0.27 O₂-dosed) — NOT byte-for-byte inert; the "reductive aging = ester-only" claim now holds only for truly
+> DRY beverages. Load-bearing new test: a residual wort browns with per-component carbon closure to 1e-18; integrated
+> high-residual big-stout beer closes `total_carbon` across the multi-slot vector over an aging year. Wiring: `melanoidin`
+> appended to `beer_schema`, `_CARAMELIZATION_PROCESSES` in beer, gating free (name-guarded `_AGING_GATED_PROCESSES`). The
+> thermal axis is now media-split: sugar-only browning BOTH media (D-88/D-90), N-routes wine-only (D-87/D-89). Next: beat 1b
+> (descriptor projection), barrel fill-number, a beer-specific per-melanoidin A420 yield (refinement).**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

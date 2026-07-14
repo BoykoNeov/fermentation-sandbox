@@ -550,12 +550,23 @@ def test_begin_aging_browns_the_beer_scenario():
     # MEDIUM-AGNOSTIC end to end (D-74, superseding D-73's provisional wine-only): beer carries
     # autoxidising polyphenols and browns too, and A420 exists in the beer schema — so an
     # oxygen-dosed aged beer browns (A420 climbs), the beer-side smoke coverage for browning.
+    #
+    # D-90 supersession: the reductive (no-O₂) beer is no longer byte-for-byte A420 = 0. Caramel
+    # ization is now medium-agnostic, so the beer's residual sugar (this scenario finishes at
+    # S ≈ 5e-11 g/L — near-dry but NOT the exact ≤ 0 the wine scenarios hit, so the soft-sugar guard
+    # does not fire) browns a NEGLIGIBLE thermal trace (~4e-8) over the warm aging tail. The
+    # discriminating physics still holds: the O₂-driven PhenolicBrowning dominates by ~7 orders of
+    # magnitude. (A meaningfully-brown reductive beer needs real residual sugar — see the
+    # high-residual carbon-closure test in test_aging.py.)
     day = 14.0
     oxidative = compile_scenario(_beer([_begin_aging(day), _add_oxygen(day, 40.0)])).run()
     reductive = compile_scenario(_beer([_begin_aging(day)])).run()
     assert oxidative.success and reductive.success
-    assert float(oxidative.series("A420")[-1]) > 0.0
-    assert float(reductive.series("A420")[-1]) == 0.0
+    ox_a420 = float(oxidative.series("A420")[-1])
+    red_a420 = float(reductive.series("A420")[-1])
+    assert ox_a420 > 1e-2  # O₂-driven browning is substantial
+    assert red_a420 < 1e-6  # reductive near-dry beer browns only a negligible thermal trace
+    assert ox_a420 > 1e4 * red_a420  # oxidative browning dominates the caramelization trace
 
 
 def test_browned_run_closes_carbon_end_to_end():
@@ -902,19 +913,22 @@ def test_maillard_closes_carbon_and_nitrogen_end_to_end():
 
 # -- Caramelization (decision D-88) — the NON-oxidative THERMAL browning axis, end to end -------
 #
-# The O₂-INDEPENDENT thermal mirror of PhenolicBrowning (D-74): a SEALED SWEET wine browns
-# thermally (residual sugar → melanoidin, raising the shared A420) with no oxygen — where a DRY
-# wine (S ≈ 0 at the aging segment) is byte-for-byte inert. The FIRST aging Process to consume core
-# S, so it carries the sugar carbon into the on-ledger melanoidin carbon-park (total_carbon closes).
-# These pin: the compile-seam gate (wine-only, disabled→begin_aging); the sealed-sweet browning vs a
-# dry control through the FULL pipeline; and end-to-end carbon closure with core S consumed.
+# The O₂-INDEPENDENT thermal mirror of PhenolicBrowning (D-74): a SEALED SWEET wine (or, D-90,
+# high-residual beer) browns thermally (residual sugar → melanoidin, raising shared A420) with no
+# oxygen — where a DRY beverage (S ≈ 0 at the aging segment) is byte-for-byte inert. The FIRST aging
+# Process to consume core S, so it carries the sugar carbon into the on-ledger melanoidin park
+# (total_carbon closes). These pin: the compile-seam gate (medium-agnostic D-90, disabled→begin_
+# aging); the sealed-sweet browning vs a dry control through the FULL pipeline; end-to-end carbon
+# closure with core S consumed.
 
 
-def test_caramelization_gated_by_begin_aging_wine_only():
-    # Caramelization is WINE-ONLY (the melanoidin carbon-park is a wine slot) — present in the wine
-    # set, absent from beer — and rides the aging gate: disabled at compile, then on by begin_aging.
+def test_caramelization_gated_by_begin_aging_medium_agnostic():
+    # Caramelization is MEDIUM-AGNOSTIC (D-90: both media carry the melanoidin park + wire the
+    # Process — beer's residual dextrins caramelize too) — present in BOTH sets, unlike wine-only
+    # MaillardStrecker/MaillardBrowning — and rides the aging gate: disabled at compile, on by
+    # begin_aging.
     assert Caramelization.name in get_medium("wine").build_process_set()
-    assert Caramelization.name not in get_medium("beer").build_process_set()
+    assert Caramelization.name in get_medium("beer").build_process_set()
     cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], brix=_SWEET_BRIX))
     assert Caramelization.name in cs.process_set
     assert not cs.process_set.is_enabled(Caramelization.name)  # off at compile

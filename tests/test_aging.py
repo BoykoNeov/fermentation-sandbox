@@ -98,6 +98,11 @@ _SOTOLON_C = carbon_mass_fraction("sotolon")
 # Caramelization (decision D-88): the sugar (glucose) and melanoidin-carbon-park carbon fractions.
 _GLUCOSE_C = carbon_mass_fraction("glucose")
 _MELANOIDIN_C = carbon_mass_fraction("melanoidin")
+# Beer's other two sugars (decision D-90, medium-agnostic caramelization): each caramelizes at its
+# OWN carbon fraction (glucose/maltose/maltotriose differ), so the vectorized draw must weight the
+# melanoidin transfer per component — these pin the beer carbon-closure test.
+_MALTOSE_C = carbon_mass_fraction("maltose")
+_MALTOTRIOSE_C = carbon_mass_fraction("maltotriose")
 # MaillardBrowning (decision D-89): the N-bearing melanoidin park's carbon + nitrogen fractions, and
 # arginine's nitrogen fraction — for the sized-draw closed form + carbon/nitrogen closure checks.
 _MAILLARD_MELANOIDIN_C = carbon_mass_fraction("maillard_melanoidin")
@@ -1488,16 +1493,19 @@ def test_maillard_tier_floored_at_speculative(maillard_store):
 
 
 # =====================================================================================
-# Caramelization (decision D-88) — the WINE-ONLY, NON-oxidative THERMAL browning: the O₂-INDEPENDENT
-# thermal mirror of PhenolicBrowning (D-74). Residual SUGAR browns to melanoidin by HEAT (no O₂),
-# raising the SAME A420 index D-74 accumulates — so a sealed sweet wine still darkens. The FIRST
-# aging Process to consume core S: the sugar carbon lands in the on-ledger melanoidin carbon-park
-# (the debris/glucan precedent), so total_carbon closes exactly (release at the sugar fraction,
-# redeposit at melanoidin's). SUGAR-ONLY (nitrogen-free — caramelization, not Maillard). These tests
-# pin the closed form, carbon closure per-RHS, the sugar SOFT gate (inert at S ≈ 0 / undershoot),
-# the O₂-independence (no o2 term at all), the first-order-in-sugar linearity, the monotone A420
-# rise, the warmer-faster ordering, the wine-only no-op on beer, the integrated sweet browning +
-# closure, and the speculative tier floor.
+# Caramelization (decision D-88; MEDIUM-AGNOSTIC D-90) — the NON-oxidative THERMAL browning: the
+# O₂-INDEPENDENT thermal mirror of PhenolicBrowning (D-74). Residual SUGAR browns to melanoidin by
+# HEAT (no O₂), raising the SAME A420 index D-74 accumulates — so a sealed sweet wine *or*
+# high-residual beer still darkens. The FIRST aging Process to consume core S: the sugar carbon
+# lands in the on-ledger melanoidin carbon-park (the debris/glucan precedent), so carbon closes
+# exactly (release at each sugar's own fraction, redeposit at melanoidin's — the D-90 vectorized
+# draw apportions across beer's 3-slot S). SUGAR-ONLY (nitrogen-free — caramelization, not Maillard;
+# N-incorporating MaillardBrowning D-89 stays wine-only, beer's amino_acids untracked, D-32). These
+# tests pin the closed form, carbon closure per-RHS, the sugar SOFT gate (inert at S ≈ 0 /
+# undershoot), the O₂-independence (no o2 term at all), the first-order-in-sugar linearity, the
+# monotone A420 rise, the warmer-faster ordering, the medium-agnostic beer + per-component carbon
+# closure (D-90), the integrated sweet-wine + residual-beer browning + closure, and the speculative
+# tier floor.
 
 _CARAMEL_TOUCHES = {"S", "melanoidin", "A420"}
 
@@ -1643,14 +1651,63 @@ def test_caramelization_rises_with_temperature(caramel_params):
     assert schema.get(warm, "melanoidin") > schema.get(cold, "melanoidin") > 0.0
 
 
-def test_caramelization_is_wine_only_noop_on_beer(caramel_params):
-    # Wine-only v1 (the melanoidin carbon-park is a wine slot): a hard no-op on beer even with
-    # residual wort sugar (the "melanoidin" not in schema guard).
+def test_caramelization_runs_on_beer_and_closes_carbon_per_component(caramel_params):
+    # MEDIUM-AGNOSTIC (D-90 supersedes D-88's wine-only v1): beer's residual dextrins caramelize.
+    # The vectorized draw apportions the sugar debit across the 3-slot S vector and releases each
+    # component's carbon at its OWN fraction (glucose/maltose/maltotriose differ), so total_carbon
+    # closes per-RHS on beer. A warm beer with ALL THREE sugars present — so every per-component
+    # carbon fraction (glucose slot 0 included) is load-bearing in the closure — browns, and the
+    # per-component carbon balance is exact.
     beer = beer_schema()
     yb = beer.zeros()
-    yb[beer.slice("S")] = 60.0
+    s_vec = [10.0, 40.0, 20.0]  # glucose + maltose + maltotriose all residual
+    yb[beer.slice("S")] = s_vec
     yb[beer.slice("T")] = 303.15
-    assert np.array_equal(Caramelization().derivatives(0.0, yb, beer, caramel_params), beer.zeros())
+    d = Caramelization().derivatives(0.0, yb, beer, caramel_params)
+    # It RUNS (not the old no-op): melanoidin + A420 climb, sugar is consumed.
+    mel_rate = float(d[beer.slice("melanoidin")][0])
+    assert mel_rate > 0.0
+    assert float(d[beer.slice("A420")][0]) > 0.0
+    dS = d[beer.slice("S")]
+    # Every slot is debited (per-component apportionment, not a broadcast onto one slot).
+    assert dS[0] < 0.0 and dS[1] < 0.0 and dS[2] < 0.0
+    # The draw is apportioned by share: maltose (40) loses twice maltotriose (20), 4× glucose (10).
+    assert float(dS[1]) == pytest.approx(2.0 * float(dS[2]))
+    assert float(dS[1]) == pytest.approx(4.0 * float(dS[0]))
+    # CARBON closes per-RHS: carbon leaving each S slot (at its own fraction) == carbon into
+    # melanoidin.
+    carbon_residual = (
+        float(dS[0]) * _GLUCOSE_C
+        + float(dS[1]) * _MALTOSE_C
+        + float(dS[2]) * _MALTOTRIOSE_C
+        + mel_rate * _MELANOIDIN_C
+    )
+    assert carbon_residual == pytest.approx(0.0, abs=1e-18)
+
+
+def test_caramelization_browns_a_residual_beer_and_closes_carbon(caramel_store):
+    # Integrated beer counterpart of the sweet-wine browning test (D-90): a warm HIGH-RESIDUAL beer
+    # (under-attenuated big stout — maltose + maltotriose left) browns over an aging year through
+    # STRICT ProcessSet, with total_carbon closing to machine precision across the multi-slot S
+    # vector (the per-component fractions redeposit correctly). The load-bearing beer-closure test.
+    beer = load_parameters(
+        default_data_dir() / "beer_generic.yaml", default_data_dir() / "thermal.yaml"
+    )
+    params = beer.resolve()
+    schema = beer_schema()
+    y0 = schema.zeros()
+    y0[schema.slice("S")] = [0.0, 45.0, 25.0]  # residual maltose + maltotriose
+    y0[schema.slice("E")] = 40.0
+    y0[schema.slice("T")] = 303.15  # 30 °C warm store
+    ps = ProcessSet(schema, [Caramelization()], strict=True)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success, traj.message
+    assert float(traj.series("melanoidin")[-1]) > 0.0  # browns from 0
+    assert float(traj.series("A420")[-1]) > 0.0  # A420 climbs from 0
+    assert float(traj.series("S")[:, -1].sum()) < 70.0  # residual sugar declined
+    assert_nonnegative(traj, ("melanoidin", "A420"), atol=1e-9)
+    f_c = beer.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
 
 
 def test_caramelization_browns_a_sweet_wine_and_closes_carbon(caramel_store, caramel_params):

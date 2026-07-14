@@ -88,13 +88,14 @@ WINE_MAILLARD_SLOTS = (
     "2_methylpropanal",
     "sotolon",
 )
-# The caramelization melanoidin carbon-park (decision D-88), appended last: the brown thermal-
+# The caramelization melanoidin carbon-park (decision D-88; D-90 medium-agnostic): brown thermal-
 # browning polymer Caramelization forms by consuming residual sugar (the O₂-independent mirror of
 # PhenolicBrowning D-74). The FIRST aging pool holding consumed core-S carbon, so — unlike the
 # off-ledger oak/colour lumps — it is ON total_carbon (sugar → melanoidin closes exactly).
 # Sugar-only
-# (nitrogen-free — caramelization, not Maillard). Wine-only. Raises the shared A420 index (D-74).
-WINE_CARAMELIZATION_SLOTS = ("melanoidin",)
+# (nitrogen-free — caramelization, not Maillard). In BOTH media (D-90: beer's residual dextrins
+# caramelize too, appended to both schemas). Raises the shared A420 index (D-74).
+CARAMELIZATION_SLOTS = ("melanoidin",)
 # The N-bearing Maillard melanoidin carbon+nitrogen-park (decision D-89), appended last: the brown
 # amino-acid-incorporating thermal-browning polymer MaillardBrowning forms by consuming residual
 # sugar AND amino acids (the N-incorporating branch D-88's sugar-only Caramelization deferred). ON
@@ -124,7 +125,7 @@ def test_wine_schema_has_single_sugar_slot():
         + OAK_SLOTS
         + WINE_POLYMERIZATION_SLOTS
         + WINE_MAILLARD_SLOTS
-        + WINE_CARAMELIZATION_SLOTS
+        + CARAMELIZATION_SLOTS
         + WINE_MAILLARD_BROWNING_SLOTS
     )
     assert schema.spec("S").size == 1
@@ -166,7 +167,7 @@ def test_wine_schema_has_single_sugar_slot():
 
 def test_beer_schema_has_three_sequential_sugars():
     schema = beer_schema()
-    assert schema.names == SHARED + BEER_HOP_SLOTS + OAK_SLOTS
+    assert schema.names == SHARED + BEER_HOP_SLOTS + OAK_SLOTS + CARAMELIZATION_SLOTS
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
@@ -178,7 +179,10 @@ def test_beer_schema_has_three_sequential_sugars():
     # + 10 oak-axis slots (4 aroma extractives + 4 ceilings — the barrel/chip axis, D-77 — plus the
     # ellagitannin TASTE/O₂-scavenging pool + its ceiling, D-78) SHARED with wine by barrel-beer oak
     # (decision D-86): the oak axis is a wood property, so both media carry it (via _oak_specs) = 33
-    assert schema.size == 33
+    # + 1 caramelization melanoidin carbon-park slot (D-90: sugar-only thermal browning is medium-
+    # agnostic — beer's residual dextrins caramelize too, so melanoidin is appended to beer_schema
+    # too, ON total_carbon; the N-incorporating maillard_melanoidin stays wine-only, D-32) = 34
+    assert schema.size == 34
 
 
 def test_shared_variable_units_are_canonical():
@@ -220,6 +224,7 @@ def test_shared_variable_units_are_canonical():
         "eugenol_ceiling": "g/L",
         "ellagitannin": "g/L",  # oak hydrolysable tannin — taste + O₂ scavenger (D-78)
         "ellagitannin_ceiling": "g/L",
+        "melanoidin": "g/L",  # caramelization carbon-park (D-88; medium-agnostic D-90)
     }
 
 
@@ -459,11 +464,13 @@ WINE_TANNIN_ETHYL_TANNIN_PROCESSES = {"tannin_ethyl_tannin_condensation"}
 # additive with the D-75 route over the shared amino_acids limiting reagent. Same compile-seam
 # disable / begin_aging re-enable.
 WINE_MAILLARD_PROCESSES = {"maillard_strecker"}
-# WINE-ONLY, NON-oxidative THERMAL browning (decision D-88): caramelization — the O₂-independent
-# thermal mirror of phenolic_browning (D-74). Residual sugar browns to the on-ledger melanoidin
-# carbon-park by heat with no O₂, raising the shared A420 index; the first aging Process to consume
-# core S. Wine-only v1. Same compile-seam disable / begin_aging re-enable.
-WINE_CARAMELIZATION_PROCESSES = {"caramelization"}
+# MEDIUM-AGNOSTIC (WINE + BEER), NON-oxidative THERMAL browning (decision D-88; extended to beer
+# D-90): caramelization — the O₂-independent thermal mirror of phenolic_browning (D-74). Residual
+# sugar browns to the on-ledger melanoidin carbon-park by heat with no O₂, raising the shared A420
+# index; the first aging Process to consume core S. In BOTH media (D-90: beer's residual dextrins
+# caramelize too, the vectorized draw apportions across beer 3-slot S). Same compile-seam disable/
+# begin_aging re-enable.
+CARAMELIZATION_PROCESSES = {"caramelization"}
 # WINE-ONLY, NON-oxidative amino-acid-incorporating THERMAL browning (decision D-89):
 # maillard_browning — the N-bearing browning branch D-88's sugar-only caramelization deferred.
 # Residual sugar + amino acids brown to the on-ledger N-bearing maillard_melanoidin park by heat
@@ -491,7 +498,7 @@ EXPECTED_PROCESSES = {
         | AGING_PROCESSES
         | WINE_AGING_PROCESSES
         | WINE_MAILLARD_PROCESSES
-        | WINE_CARAMELIZATION_PROCESSES
+        | CARAMELIZATION_PROCESSES
         | WINE_MAILLARD_BROWNING_PROCESSES
         | OAK_PROCESSES
         | WINE_POLYMERIZATION_PROCESSES
@@ -510,6 +517,7 @@ EXPECTED_PROCESSES = {
         | H2S_PROCESSES
         | HOP_PROCESSES
         | AGING_PROCESSES
+        | CARAMELIZATION_PROCESSES
         | OAK_PROCESSES
     ),
 }

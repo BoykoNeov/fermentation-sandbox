@@ -7086,3 +7086,68 @@ nitrogen closure per-RHS, the denominator-sign trap, amino-acid HARD-gate isolab
 availability-gate saturation, warmer-faster, wine-only no-op on beer, integrated sweet browning + dual-ledger closure, the
 speculative tier floor). **Next:** beat 1b (descriptor projection), barrel fill-number depletion, beer thermal browning
 (the D-86 oak-to-beer pattern for the whole thermal axis).
+
+## D-90 — beer thermal browning: `Caramelization` (D-88) extended to **beer** — an aged/warm-stored beer's residual dextrins caramelize (melanoidin + A420), the D-86 oak-to-beer pattern (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3.** The beer half of the thermal-browning axis: wire the wine-only sugar-only
+`Caramelization` (D-88) into **beer**, so a warm-stored / long-aged beer with residual dextrins (unfermented
+maltose/maltotriose) browns thermally — melanoidin accumulates and the shared `A420` browning index climbs — with **no O₂**,
+exactly as a sealed sweet wine does. **One `advisor()` pass** (confirmed orientation + sharpened five points); no owner fork
+(the scope is forced: only the sugar-only route can follow — see below). 992 → 993 tests (+1 net; several wine-only
+enumeration/no-op tests flipped to medium-agnostic), `ruff`/`mypy`/`pytest` green.
+
+**Scope is forced, not chosen — caramelization ONLY, the N-routes stay wine-only.** Of the three thermal amino-acid/browning
+branches (D-87 `MaillardStrecker`, D-88 `Caramelization`, D-89 `MaillardBrowning`), only **D-88 is sugar-only**. D-87 and
+D-89 both read `amino_acids`, which beer does **not** track (D-32) — so they genuinely cannot follow to beer, and "beer
+thermal browning" is caramelization alone. This is the exact inverse of the D-86 principle: there the *physics* (oak
+extraction) was medium-agnostic and only *perception* was matrix-specific; here the physics (sugar browning) is likewise
+medium-agnostic, but the *reagent tracking* (amino acids) is the wine-only wall the N-routes hit.
+
+**The one real correctness pin — per-component clamp, not `max(sum, 0)` (the advisor's must-fix).** D-88's wine draw was
+`s_total = max(y[S].sum(), 0)` then `d[S] = -r_sugar` — correct for wine's **single** sugar slot. Broadcast naively onto
+beer's **3-slot** `S` that would (a) debit −r into all three slots (3× the intended draw) and (b) hit a **silent
+sugar-creation trap**: a solver undershoot can leave one component slightly negative while the *sum* stays positive, so
+`frac_i = y_i/s_total` goes negative and the apportioned debit `−r·frac_i` flips **positive** — the Process *creates* that
+sugar, and no conservation test catches it (carbon closes for either sign, the D-89-denominator trap family). Fix: clamp
+**per component** first (`s_clamped = y[S].clip(min=0)`), then `s_total = s_clamped.sum()`, `frac = s_clamped/s_total`. A
+negative slot contributes a zero draw; carbon still closes (debit + melanoidin credit use the same clamped draw). For wine's
+single slot this is *identical* to `max(sum, 0)`, so **every wine trajectory is byte-for-byte unchanged**.
+
+**The vectorized carbon-exact transfer — per-component fractions.** The three beer sugars have **different** carbon fractions
+(glucose C6, maltose C12, maltotriose C18 — different anhydro-water content per gram), so the melanoidin carbon credit must
+weight each component's draw by *its own* fraction: `carbon_released = r_sugar · Σᵢ (s_cᵢ/s_total)·c(sugarᵢ)`, then
+`mel_rate = carbon_released / c(melanoidin)` and the debit `d[S] = −r_sugar·(s_clamped/s_total)` apportioned across the
+vector. `total_carbon` already guarded `if "melanoidin" in schema` (medium-agnostic), so the ledger picked up the beer slot
+for free. Wine (single hexose slot) reduces the Σ to one term at `c(glucose)` — the D-88 form exactly.
+
+**Wiring — the D-86 pattern.** `melanoidin` appended to `beer_schema` (after `_oak_specs`, the `iso_alpha` beer-only-append
+precedent; wine keeps its single append, so wine layout is identical); `_CARAMELIZATION_PROCESSES` added to beer's
+`process_factories`; `_AGING_GATED_PROCESSES` is medium-agnostic (name-guarded), so the compile-disable / `begin_aging`-enable
+gating came for free. `thermal.yaml` params (`k_caramelization`, `E_a_caramelization`, `y_a420_per_melanoidin`) transfer
+**unchanged**: `A420` is an *absorbance*, not a matrix-specific perception threshold, so no beer-specific yield is warranted
+for v1 (a beer-specific per-melanoidin yield is a documented future refinement, not built).
+
+**The isolability asymmetry — beer is NOT byte-for-byte inert (the honest D-83-style supersession).** D-88 claimed dry aged
+wine is *byte-for-byte* inert (S ≤ 0 exactly at `begin_aging`, so the `S ≤ 0` guard fires). A standard beer scenario instead
+finishes at **S ≈ 5e-11 g/L** — near-dry but *positive*, so the guard does **not** fire and the reductive beer browns a
+**negligible thermal trace** (A420 ≈ 4e-8 over a warm 120-day tail, vs 0.27 for the same beer O₂-dosed). This is
+scenario-specific numerics (beer's finish vs wine's exact ≤ 0), not a model asymmetry — documented as such. So
+`test_begin_aging_browns_the_beer_scenario` no longer asserts `reductive A420 == 0`; it now asserts the **discriminating**
+physics survives (O₂-driven browning ≫ 1e4× the caramelization trace), the D-71/D-74 "reductive aging = ester-only" claim
+now holding only for genuinely *dry* beverages.
+
+**Test flips (expectation changes, NOT weakenings — flagged loudly):** `test_caramelization_is_wine_only_noop_on_beer` →
+`..._runs_on_beer_and_closes_carbon_per_component` (the load-bearing new test: a residual wort — glucose spent,
+maltose+maltotriose left — browns, the draw apportions by share, and per-component carbon closes to 1e-18);
+`test_caramelization_gated_..._wine_only` → `..._medium_agnostic` (present in **both** sets); `test_begin_aging_browns_the_
+beer_scenario` reframed (above). New integrated `test_caramelization_browns_a_residual_beer_and_closes_carbon` (a
+high-residual big-stout beer through the **strict** ProcessSet, `total_carbon` closing across the multi-slot vector over an
+aging year — the beer counterpart of the sweet-wine browning test). Enumeration goldens updated (`test_media` beer size
+33 → 34, units + process set gain `melanoidin`/`caramelization`; `CARAMELIZATION_SLOTS`/`CARAMELIZATION_PROCESSES` renamed
+from `WINE_*`).
+
+**Regression surface.** `aging.py` (`Caramelization.derivatives` vectorized + per-component clamp; docstrings +
+forward-notes resolved in both `Caramelization` and `MaillardBrowning`); `media.py` (beer `melanoidin` slot +
+`_CARAMELIZATION_PROCESSES` in beer, comment); `compile.py` + `conservation.py` docstring updates. **Every wine trajectory is
+byte-for-byte unchanged** (single-slot reduction); a dry-finished beer browns only a numerically-negligible trace. **Next:**
+beat 1b (descriptor projection), barrel fill-number depletion, a beer-specific per-melanoidin A420 yield (refinement).

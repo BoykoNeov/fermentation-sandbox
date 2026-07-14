@@ -261,16 +261,15 @@ def total_carbon(
     for _thermal_ald in ("2_methylbutanal", "3_methylbutanal", "2_methylpropanal", "sotolon"):
         if _thermal_ald in schema:
             w[schema.slice(_thermal_ald)] = carbon_mass_fraction(_thermal_ald)
-    # Caramelization melanoidin (decision D-88): the sugar-only thermal-browning carbon-park. Unlike
-    # every other aging-browning pool (o2/A420 off-ledger), Caramelization CONSUMES core S to form
-    # melanoidin, so the sugar carbon it draws must land in a weighted pool or the transfer would
-    # read
-    # as carbon destroyed. Booked at melanoidin's own (caramelan stand-in) carbon fraction — the
-    # same
-    # species the Process deposits against — so total_carbon closes to machine precision: the carbon
-    # out of S equals the carbon into melanoidin (the EsterHydrolysis carbon-exact split). Nitrogen-
-    # free (sugar-only, not amino-acid Maillard). Empty (constant 0) on any run where S ≈ 0 at
-    # aging.
+    # Caramelization melanoidin (decision D-88; medium-agnostic D-90 — the guard fires for BOTH
+    # schemas): the sugar-only thermal-browning carbon-park. Unlike every other aging-browning pool
+    # (o2/A420 off-ledger), Caramelization CONSUMES core S to form melanoidin, so the sugar carbon
+    # it draws must land in a weighted pool or the transfer would read as carbon destroyed. Booked
+    # at melanoidin's own (caramelan stand-in) carbon fraction — the species the Process deposits
+    # against — so total_carbon closes to machine precision: the carbon out of S (on beer, summed
+    # over the vector at each sugar's own fraction — the D-90 vectorized draw) equals the
+    # carbon into melanoidin (the EsterHydrolysis carbon-exact split). Nitrogen-free (sugar-only,
+    # not amino-acid Maillard). Empty (constant 0) on any run where S ≈ 0 at aging.
     if "melanoidin" in schema:
         w[schema.slice("melanoidin")] = carbon_mass_fraction("melanoidin")
     # N-bearing Maillard melanoidin (decision D-89): the amino-acid-incorporating thermal-browning
