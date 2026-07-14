@@ -6927,3 +6927,74 @@ wine-only, sealed-sweet aldehydes through the full pipeline vs a dry control, th
 end to end). **Next (D-88):** `Caramelization` — the sugar-only thermal browning (melanoidin + A420), the first aging
 Process to consume core `S` (carries the `begin_aging` golden re-baseline + retires the "reductive aging = byte-for-byte
 ester-only" claim for sweet wines). Then beat 1b (descriptor projection), barrel fill-number.
+
+## D-88 — `Caramelization` built: the non-oxidative sugar-only THERMAL browning (melanoidin + A420), the O₂-independent mirror of D-74; first aging Process to consume core `S` (§4.1)
+
+**Date:** 2026-07-14. **Milestone 3 / Tier-3, the eleventh aging Process and the FOURTH non-oxidative one** — the browning
+half of the non-oxidative thermal axis :class:`MaillardStrecker` (D-87) opened, and the owner's second D-87 scope fork built
+out. `Caramelization` (WINE-ONLY) is the **O₂-independent thermal mirror** of `PhenolicBrowning` (D-74): where D-74 needs
+dissolved O₂ to oxidise phenolics brown, this route browns **residual sugar** by heat alone (thermal
+dehydration/caramelization to melanoidin), so a *sealed, oxygen-free sweet wine still darkens with age* — the
+amber-to-brown of an aged Sauternes, the deep colour of Madeira and baked/rancio wines. It raises the **same** `A420`
+browning index D-74 accumulates (oxidative and thermal browning are one observable), so it needs no new observable — only a
+carbon-park pool for the sugar it consumes. All new tests pass (11 unit + 3 scenario), `ruff`/`mypy` clean, the full suite
+green (964 → 978). Built directly from the D-87 expanded-scope advisor pass (no separate advisor pass — the design was
+settled there: melanoidin carbon-park, caramelization-not-Maillard, the golden audit, wine-only bundling).
+
+**The FIRST aging Process to consume core `S` — the on-ledger melanoidin carbon-park (the forced closure, advisor's
+must).** Every prior aging Process touches aroma pools / `o2` / `amino_acids` / `N` / `E` — none the core sugar. Because
+`S` is **on** `total_carbon`, the sugar carbon this Process draws **must** land in a weighted pool or the transfer would
+read as carbon destroyed (unlike D-74's `A420`, whose pigment carbon comes from an *untracked* phenol pool, so it is
+off-ledger). So `melanoidin` is an **on-ledger carbon-park** (the `debris`/`glucan` precedent, D-34), a new wine slot booked
+at a **caramelan stand-in** (`C12H18O9`, two glucose − 3 water, the canonical thermal-dehydration unit, carbon fraction
+~0.47). The transfer is carbon-exact (release the sugar carbon at the sugar's fraction, redeposit at melanoidin's — the
+`EsterHydrolysis` split idiom), so `total_carbon` closes to machine precision (verified per-RHS < 1e-18 and end-to-end over
+the full sweet-wine ferment + aging, ledger flat). The water lost on dehydration is the standing aging-axis mass gap
+(`total_mass` weights only `{S, E, CO2}`, never asserted on an aging run); CO₂/volatile evolution of real caramelization is
+lumped into the polymer (a documented v1 simplification). `A420` (the D-74 optical index, off every ledger) carries no
+carbon — only `melanoidin` parks it.
+
+**CARAMELIZATION, not Maillard (the advisor's scope correction).** This is the **sugar-only** route — it touches `{S,
+melanoidin, A420}` and incorporates **no amino-acid nitrogen**. True Maillard melanoidins are nitrogen-bearing (sugar +
+amino acid); modelling that N-incorporating browning is deferred. So `melanoidin` here is a nitrogen-free caramelization
+polymer, and the Process is honestly *caramelization*. This is why it is booked cleanly on `total_carbon` but absent from
+`total_nitrogen`.
+
+**The rate + the shared A420.** `r = k_caramelization · f(T) · [S_total]` — first-order in the residual sugar (summed over
+the vector), `E_a_caramelization = 100 kJ/mol` the same high band as `E_a_maillard_strecker` (D-87), above the oxidative
+aging E_a's (~50): the sourced ordering that caramelization out-accelerates oxidation with temperature (why Madeira
+estufagem / baked wines brown orders faster than cellar aging). The sugar → melanoidin transfer feeds `A420` at
+`y_a420_per_melanoidin = 0.4` (AU per g/L melanoidin), so thermal browning is read by `analysis.a420` alongside the
+oxidative browning. Calibrated: a warm (30 °C) multi-year sweet-wine aging lands `A420` ~0.13 at cellar 25 °C and ~1.9 at
+Madeira-estufagem 45 °C, while most residual sugar survives (browning is slow — only a few g/L caramelizes at cellar
+temperature); a dry wine (S ≈ 0) makes exactly none.
+
+**Isolable + a SOFT sugar gate (the golden audit — minimal churn).** The advisor flagged this as the first aging Process to
+consume `S`, so it *could* shift existing `begin_aging` goldens. **Audit result:** every standard aging scenario ferments to
+dryness (`S ≈ 0`) before `begin_aging`, so `Caramelization` is byte-for-byte inert on all of them (the `S ≤ 0` guard, which
+also absorbs a solver undershoot). So the golden churn is confined to *sweet*-wine runs (the new D-87/D-88 tests, brix ~70).
+**The D-83-style supersession:** the D-71/D-74 "un-oxygenated aging is byte-for-byte the ester-only case" claim now holds
+only for **dry** wines — a sealed sweet wine is *not* inert (it browns thermally + develops the D-87 thermal Strecker
+suite). Retired in-tree in the module docstring (exactly as D-83 retired D-81's "anaerobic red holds colour").
+
+**Wine-only v1 — a bundling choice, not a physics constraint (advisor's note).** Sugar-only caramelization is medium-
+agnostic *in principle* (beer/wort melanoidins are real), but this is wired into the *wine* medium only (the `melanoidin`
+carbon-park is a wine slot; the `"melanoidin" not in schema` guard makes it a hard no-op on beer), bundled with the
+sweet-wine thermal axis. Beer thermal browning is deferred — the D-86 oak-to-beer extension pattern.
+
+**§4.3 firewall.** Speculative in FORM (the *form* — sugar-driven, heat-accelerated, O₂-independent browning — is sourced;
+the rate + per-melanoidin absorbance yield are order-of-magnitude estimates). Isolable (disable the Process and the browning
+vanishes; a dry wine is unchanged regardless).
+
+**Regression surface.** 1 new wine-only state slot (`melanoidin`, wine 62 → 63, beer untouched), 1 new chemistry species +
+carbon/nitrogen weight (the caramelan stand-in), 1 new Process, 3 new `thermal.yaml` params (`k_caramelization`,
+`E_a_caramelization`, `y_a420_per_melanoidin`), `compile._AGING_GATED_PROCESSES` +1. Enumeration goldens updated (`test_media`
+wine size 62 → 63 / `WINE_CARAMELIZATION_SLOTS` / `WINE_CARAMELIZATION_PROCESSES`). **Every dry / un-aged trajectory stays
+byte-for-byte** (S ≈ 0 at the aging segment ⇒ the `S ≤ 0` guard); beer is byte-for-byte unchanged (wine-only). The D-87
+sweet-wine scenario tests now co-run `Caramelization` (both `begin_aging`-enabled) and still pass — residual sugar declines
+but stays > 50 g/L, the thermal aldehydes stay positive, and `total_carbon` still closes (melanoidin now in the ledger). New
+tests: `Caramelization` unit (closed form, carbon closure per-RHS, sugar soft-gate isolability, O₂-independence — no o2 term
+at all, first-order-in-sugar, monotone A420 rise, warmer-faster, wine-only no-op on beer, integrated sweet browning +
+closure, the speculative tier floor) + scenario (compile-seam gate wine-only, sealed-sweet browning through the full
+pipeline vs a dry control, carbon closes end to end with core S consumed). **Next:** beat 1b (descriptor projection), barrel
+fill-number depletion, the deferred N-incorporating Maillard melanoidin / beer thermal browning.

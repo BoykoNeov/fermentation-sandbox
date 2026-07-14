@@ -35,6 +35,7 @@ from fermentation.analysis import (
 )
 from fermentation.core.kinetics.aging import (
     AcetaldehydeBridgedCondensation,
+    Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
     MaillardStrecker,
@@ -897,6 +898,86 @@ def test_maillard_closes_carbon_and_nitrogen_end_to_end():
         ("amino_acids", *_MAILLARD_ALDEHYDES, "N"),
         atol=1e-9,
     )
+
+
+# -- Caramelization (decision D-88) — the NON-oxidative THERMAL browning axis, end to end -------
+#
+# The O₂-INDEPENDENT thermal mirror of PhenolicBrowning (D-74): a SEALED SWEET wine browns
+# thermally (residual sugar → melanoidin, raising the shared A420) with no oxygen — where a DRY
+# wine (S ≈ 0 at the aging segment) is byte-for-byte inert. The FIRST aging Process to consume core
+# S, so it carries the sugar carbon into the on-ledger melanoidin carbon-park (total_carbon closes).
+# These pin: the compile-seam gate (wine-only, disabled→begin_aging); the sealed-sweet browning vs a
+# dry control through the FULL pipeline; and end-to-end carbon closure with core S consumed.
+
+
+def test_caramelization_gated_by_begin_aging_wine_only():
+    # Caramelization is WINE-ONLY (the melanoidin carbon-park is a wine slot) — present in the wine
+    # set, absent from beer — and rides the aging gate: disabled at compile, then on by begin_aging.
+    assert Caramelization.name in get_medium("wine").build_process_set()
+    assert Caramelization.name not in get_medium("beer").build_process_set()
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], brix=_SWEET_BRIX))
+    assert Caramelization.name in cs.process_set
+    assert not cs.process_set.is_enabled(Caramelization.name)  # off at compile
+    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+    assert event.reconfigure is not None
+    event.reconfigure(cs.process_set)
+    assert cs.process_set.is_enabled(Caramelization.name)  # begin_aging turns it on
+
+
+def test_caramelization_browns_sealed_sweet_wine_not_dry():
+    # THE discriminating end-to-end: a SEALED (no add_oxygen) SWEET wine browns thermally —
+    # melanoidin
+    # + the A420 browning index climb from 0 with no oxygen — where a DRY wine (S ≈ 0 at the aging
+    # segment) leaves both at ~0 (byte-for-byte inert, the soft sugar gate). No O₂ anywhere, so this
+    # is browning the O₂-driven PhenolicBrowning (D-74) could never produce.
+    sweet = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],  # SEALED — no add_oxygen
+            brix=_SWEET_BRIX,
+            aging_celsius=30.0,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    ).run()
+    dry = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],
+            brix=24.0,  # dry-fermenting control → residual sugar ≈ 0 ⇒ caramelization ~inert
+            aging_celsius=30.0,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    ).run()
+    assert sweet.success and dry.success
+    # The sweet wine browns: melanoidin forms and A420 rises, all from residual sugar + heat, no O₂.
+    assert float(sweet.series("melanoidin")[-1]) > 0.0
+    assert float(sweet.series("A420")[-1]) > 0.01  # a visible browning index
+    # The dry wine (no residual sugar) makes essentially none.
+    assert float(dry.series("melanoidin")[-1]) < 1e-6
+    assert float(sweet.series("A420")[-1]) > 100.0 * float(dry.series("A420")[-1])
+    # Residual sugar declines (consumed into melanoidin) but is not exhausted (browning is slow).
+    assert float(sweet.series("S")[-1]) > 50.0
+
+
+def test_caramelization_closes_carbon_end_to_end():
+    # Caramelization CONSUMES core S into the melanoidin carbon-park — the first aging Process to
+    # touch S — so total_carbon must still close end to end (the sugar carbon parks in the on-ledger
+    # melanoidin pool, not destroyed). No external flow (no O₂ dose), so the ledger is flat.
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],
+            brix=_SWEET_BRIX,
+            aging_celsius=30.0,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    )
+    traj = cs.run()
+    assert traj.success
+    f_c = cs.parameters.value("biomass_C_fraction")
+    assert_conserved(
+        traj.as_trajectory(),
+        total_carbon(cs.schema, biomass_carbon_fraction=f_c),
+        label="carbon",
+    )
+    assert_nonnegative(traj.as_trajectory(), ("S", "melanoidin", "A420"), atol=1e-9)
 
 
 # -- OakExtraction (decision D-77) — the NON-oxidative barrel/chip aroma axis, end to end -------

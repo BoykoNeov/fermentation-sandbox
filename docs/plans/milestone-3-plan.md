@@ -180,6 +180,20 @@
 > (> the oxidative ~50: the sourced ORDERING — Maillard out-accelerates oxidation with temperature). New `thermal.yaml`.
 > Next: D-88 (`Caramelization`, the first aging Process to consume core `S` — carries the `begin_aging` golden re-baseline),
 > beat 1b, barrel fill-number.**
+>
+> **PROGRESS (D-88, 2026-07-14): non-oxidative sugar-only THERMAL browning — `Caramelization`, the eleventh aging Process,
+> the O₂-INDEPENDENT thermal mirror of `PhenolicBrowning` (D-74) and the browning half of the D-87 thermal axis (978 tests).
+> Residual SUGAR browns to melanoidin by HEAT (no O₂), raising the SAME A420 index D-74 accumulates — so a sealed sweet wine
+> still darkens (Sauternes amber, Madeira/baked deep colour). The FIRST aging Process to consume core `S`: its carbon lands
+> in a new on-ledger `melanoidin` carbon-park (caramelan stand-in C12H18O9, the debris/glucan precedent), so `total_carbon`
+> closes exactly (release at the sugar fraction, redeposit at melanoidin's — the EsterHydrolysis split). CARAMELIZATION not
+> Maillard (sugar-only, nitrogen-free — N-incorporating melanoidin deferred). GOLDEN AUDIT: every standard aging run
+> ferments to dryness (S ≈ 0) before `begin_aging`, so it is byte-for-byte inert on them (the S ≤ 0 guard) — churn confined
+> to sweet-wine runs. D-83-style supersession: "un-oxygenated aging = byte-for-byte ester-only" now holds only for DRY wines
+> (a sealed sweet wine browns thermally). Wine-only v1 (a bundling choice, not physics — beer thermal browning deferred, the
+> D-86 pattern). E_a = 100 kJ/mol (matches D-87 — the thermal axis). The non-oxidative thermal axis (D-87 aroma + D-88
+> browning) is now complete. Next: beat 1b (descriptor projection), barrel fill-number, N-incorporating Maillard melanoidin
+> / beer thermal browning.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

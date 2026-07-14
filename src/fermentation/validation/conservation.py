@@ -261,6 +261,18 @@ def total_carbon(
     for _thermal_ald in ("2_methylbutanal", "3_methylbutanal", "2_methylpropanal", "sotolon"):
         if _thermal_ald in schema:
             w[schema.slice(_thermal_ald)] = carbon_mass_fraction(_thermal_ald)
+    # Caramelization melanoidin (decision D-88): the sugar-only thermal-browning carbon-park. Unlike
+    # every other aging-browning pool (o2/A420 off-ledger), Caramelization CONSUMES core S to form
+    # melanoidin, so the sugar carbon it draws must land in a weighted pool or the transfer would
+    # read
+    # as carbon destroyed. Booked at melanoidin's own (caramelan stand-in) carbon fraction — the
+    # same
+    # species the Process deposits against — so total_carbon closes to machine precision: the carbon
+    # out of S equals the carbon into melanoidin (the EsterHydrolysis carbon-exact split). Nitrogen-
+    # free (sugar-only, not amino-acid Maillard). Empty (constant 0) on any run where S ≈ 0 at
+    # aging.
+    if "melanoidin" in schema:
+        w[schema.slice("melanoidin")] = carbon_mass_fraction("melanoidin")
     # Acetaldehyde-bridged condensation ethyl-bridge pool (decision D-80): the SPLIT-LEDGER capture.
     # AcetaldehydeBridgedCondensation consumes ON-ledger acetaldehyde (whose carbon is borrowed from
     # E at D-71) to form an ethylidene bridge —CH(CH₃)— in an OFF-ledger grape-phenolic pigment. If

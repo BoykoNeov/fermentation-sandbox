@@ -46,6 +46,7 @@ from fermentation.core.kinetics import (
     BrettEthanolToxicity,
     BrettGrowth,
     BrettVinylphenolReduction,
+    Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
     FuselAminoAcidReroute,
@@ -152,8 +153,11 @@ _BRETT_GATED_PROCESSES = (
 #: dissolved-O₂ acetaldehyde bridges two flavanols, an O₂-driven softener that captures its carbon
 #: in the shared ``ethyl_bridge`` slot and deposits no pigment) and :class:`MaillardStrecker` (the
 #: D-87 NON-oxidative THERMAL Strecker route — residual sugar + heat, no O₂, degrade amino acids to
-#: the sweet-wine/Madeira aldehyde suite; wine-only, reads ``amino_acids`` + deaminates to ``N``),
-#: so
+#: the sweet-wine/Madeira aldehyde suite; wine-only, reads ``amino_acids`` + deaminates to ``N``)
+#: and
+#: :class:`Caramelization` (the D-88 sugar-only THERMAL browning — residual sugar browns to the
+#: on-ledger ``melanoidin`` carbon-park by heat with no O₂, raising the shared ``A420``; wine-only,
+#: the first aging Process to consume core ``S``), so
 #: on beer they are simply absent from the ProcessSet — both the compile-disable and the
 #: begin_aging-enable loops guard with ``name in process_set``, so listing them here is beer-safe.
 #: All are DISABLED unconditionally at compile (aging is inherently post-ferment); the
@@ -176,6 +180,7 @@ _AGING_GATED_PROCESSES = (
     TanninSelfPolymerization,
     TanninEthylTanninCondensation,
     MaillardStrecker,
+    Caramelization,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.

@@ -309,6 +309,21 @@ M_2_METHYLPROPANAL = 4 * _M_C + 8 * _M_H + 1 * _M_O
 #: the ledger, approximate on provenance (2 of its 6 carbons are really acetaldehyde-derived; the
 #: acetaldehyde-coupled sotolon route is deferred). Nitrogen-free (deaminated), carbon-tracked.
 M_SOTOLON = 6 * _M_C + 8 * _M_H + 3 * _M_O
+#: Melanoidin — the brown thermal-browning polymer of :class:`~fermentation.core.kinetics.aging.\
+#: Caramelization` (decision D-88), the non-oxidative sugar-only browning route (the O₂-independent
+#: thermal mirror of ``PhenolicBrowning``, D-74). A heterogeneous caramelization polymer with no
+#: clean molar mass; booked at a **caramelan stand-in** ``C12H18O9`` (two glucose − 3 water, the
+#: canonical thermal-dehydration unit) so it carries a plausible carbon fraction (~0.47). It is a
+#: **carbon-park** pool (the ``debris``/``glucan`` precedent): unlike the off-ledger oak/hop lumps,
+#: it is ON ``total_carbon``, because :class:`Caramelization` *consumes core ``S``* to form it — so
+#: the sugar carbon must land in a weighted pool or the transfer would read as carbon destroyed. The
+#: transfer is carbon-exact (release at the sugar's fraction, redeposit at this one, the
+#: ``EsterHydrolysis`` split idiom); the water lost on dehydration is the standing aging-axis mass
+#: gap (``total_mass`` weights only ``{S, E, CO2}``, never asserted on an aging run). CO₂/volatile
+#: evolution of real caramelization is lumped into this polymer (a documented v1 simplification).
+#: Nitrogen-free — this is CARAMELIZATION (sugar-only), not amino-acid-incorporating Maillard
+#: melanoidin (that route is deferred, D-88).
+M_MELANOIDIN = 12 * _M_C + 18 * _M_H + 9 * _M_O
 
 #: Molar mass [g/mol] keyed by species name. ``fermentation.core.media`` sugar
 #: component names ("glucose", "maltose", "maltotriose") are keys here.
@@ -351,6 +366,7 @@ MOLAR_MASS: dict[str, float] = {
     "3_methylbutanal": M_3_METHYLBUTANAL,
     "2_methylpropanal": M_2_METHYLPROPANAL,
     "sotolon": M_SOTOLON,
+    "melanoidin": M_MELANOIDIN,
 }
 
 #: Carbon atoms per molecule, keyed by species name. The two sulfur species
@@ -423,6 +439,11 @@ CARBON_ATOMS: dict[str, int] = {
     "3_methylbutanal": 5,
     "2_methylpropanal": 4,
     "sotolon": 6,
+    #: Melanoidin (caramelan stand-in C12H18O9) carries TWELVE carbons — the caramelization
+    #: carbon-park pool Caramelization (D-88) forms from consumed sugar; ON total_carbon (it holds
+    #: core-S carbon), so the sugar → melanoidin transfer closes to machine precision (decision
+    #: D-88).
+    "melanoidin": 12,
 }
 
 #: Nitrogen atoms per molecule, keyed by species name. Nitrogen was historically tracked
@@ -491,6 +512,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     "3_methylbutanal": 0,
     "2_methylpropanal": 0,
     "sotolon": 0,
+    #: Melanoidin is nitrogen-free here: this is CARAMELIZATION (sugar-only, D-88), not amino-acid-
+    #: incorporating Maillard melanoidin — so it carries no nitrogen (absent from total_nitrogen).
+    "melanoidin": 0,
 }
 
 

@@ -159,3 +159,70 @@ w_maillard_methional:
     source: "author estimate of relative methionine-derived thermal-Strecker flux. Methionine is a minor must amino acid, so methional is a small production share -- but a potent low-µg/L marker (the same flux-not-potency logic as the oxidative f_methional, D-75)."
     conditions: "generic sweet wine; relative production weight of methional (C4H8OS) among the six products, at T_ref = 293.15 K. arginine lump."
     notes: "SPECULATIVE. Production flux only; potency in threshold_methional_wine (shared with the D-75 oxidative route -- same molecule, same threshold). Normalized in-code."
+
+# ============================================================================================
+# D-88 -- Caramelization (non-oxidative sugar-only thermal browning)
+# ============================================================================================
+# THE PROCESS (fermentation.core.kinetics.aging.Caramelization, WINE-ONLY):
+#
+#   S_total  = sum of the residual-sugar vector (g/L)
+#   r        = k_caramelization * f(T) * S_total                    # g sugar/L/h caramelized
+#   f(T)     = arrhenius_factor(T, E_a_caramelization, T_ref)       # STRONGLY warmer-faster
+#   d(S)/dt         = -r
+#   d(melanoidin)/dt = +r * c(sugar) / c(melanoidin)               # carbon-exact carbon-park
+#   d(A420)/dt       = +y_a420_per_melanoidin * d(melanoidin)/dt   # the SHARED browning index (D-74)
+#
+# The O2-INDEPENDENT thermal mirror of PhenolicBrowning (D-74): residual sugar browns to melanoidin
+# by HEAT alone (thermal dehydration/caramelization), no O2 -- so a sealed sweet wine still darkens.
+# The FIRST aging Process to consume core S, so the sugar carbon must land in a weighted pool: the
+# melanoidin carbon-park (ON total_carbon, the debris/glucan precedent) closes the transfer exactly
+# (release at the sugar fraction, redeposit at melanoidin's caramelan-stand-in fraction). Raises the
+# SAME A420 index D-74 accumulates (oxidative + thermal browning are one observable). SUGAR-ONLY
+# (no amino-acid N incorporated) => it is CARAMELIZATION, not Maillard melanoidin (that route
+# deferred). WINE-ONLY v1 (a bundling choice with the sweet-wine axis, not a physics constraint --
+# beer/wort melanoidins are real; beer thermal browning deferred, the D-86 oak-to-beer pattern).
+# ALL speculative -- the FORM (sugar + heat => browning, O2-independent, strongly warmer-faster) is
+# sourced; every magnitude an order-of-magnitude estimate.
+
+# -- CARAMELIZATION RATE CONSTANT (first-order in residual sugar, O2-FREE) --------------------
+# Small: only a few g/L of a sweet wine's residual sugar browns over years of cellar aging (thermal
+# caramelization is slow at cellar temperature; it is the WARM styles -- Madeira estufagem, baked
+# wines -- where it runs fast, via the high E_a below). CALIBRATED (D-88) so a warm multi-year sweet-
+# wine aging raises A420 to a visible amber-brown (~0.3-1 AU) while leaving most residual sugar.
+k_caramelization:
+  value: 8.0e-8
+  unit: "1/h"   # d(S)/dt = -k_caramelization * f(T) * S_total  (first-order in residual sugar)
+  tier: speculative
+  uncertainty: { low: 2.0e-8, high: 3.0e-7, note: "Pseudo-first-order caramelization rate at T_ref = 20 C. Deliberately SMALL: at cellar temperature only a few g/L of residual sugar browns over years (most sweet-wine sugar survives); the WARM styles (Madeira estufagem ~45-50 C, baked/rancio) brown fast via the high E_a. CALIBRATED so a warm multi-year sweet aging lands A420 in the visible amber-brown range without materially depleting the residual sugar. Only the FORM (sugar+heat=>browning, O2-free) and the strong thermal sensitivity are sourced." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that thermal caramelization of residual sugar is the non-oxidative browning route of aged SWEET/thermal wines (Sauternes amber-to-brown, Madeira/baked-wine deep colour), distinct from the O2-driven phenolic browning of D-74. Caramelization/thermal-dehydration kinetics (classic food chemistry -- Kroh; caramel formation is a canonical thermal, O2-independent browning)."
+    conditions: "generic sweet wine; pseudo-first-order in the residual-sugar vector S, at T_ref = 293.15 K. WINE-ONLY (v1 bundling); O2-INDEPENDENT (no o2 term). Consumes core S into the melanoidin carbon-park."
+    notes: "SOURCED FORM (sugar-driven, heat-accelerated, O2-INDEPENDENT browning) + SPECULATIVE magnitude. The thermal MIRROR of the O2-driven k_browning (D-74). The FIRST aging Process to consume core S -- its carbon parks in the on-ledger melanoidin pool so total_carbon closes."
+
+# -- ACTIVATION ENERGY: caramelization is STRONGLY warmer-faster (the sourced ORDERING) --------
+# Same high band as E_a_maillard_strecker (D-87): caramelization/Maillard chemistry is far more
+# temperature-sensitive than the oxidative aging reactions (Q10 ~3-4). This is why Madeira estufagem
+# (45-50 C) and baked/rancio wines brown on a timescale orders faster than a cellar-cool sweet wine.
+E_a_caramelization:
+  value: 100000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 80000.0, high: 130000.0, note: "Q10 ~3-4.5 at 20 C. Caramelization/thermal-browning activation energies ~100-150 kJ/mol -- markedly ABOVE the ~30-70 kJ/mol oxidative-browning band (E_a_browning). The SOURCED, load-bearing claim is the ORDERING (thermal browning >> oxidative browning in temperature sensitivity, so warm/baked sweet wines darken far faster); the magnitude is speculative and banded." }
+  provenance:
+    source: "SOURCED ORDERING: caramelization is strongly thermally activated (E_a ~100-150 kJ/mol; classic caramel/Maillard kinetics -- Kroh, Labuza), well above the oxidative wine-browning reactions. Madeira estufagem and baked/rancio styles develop deep colour orders faster than cellar aging -- the temperature acceleration IS the sourced signature."
+    conditions: "equivalent Arrhenius activation energy of the aggregate non-oxidative sugar caramelization at T_ref = 293.15 K"
+    notes: "Only the DIRECTION and ORDERING (E_a_caramelization > the oxidative E_a's; warmer => much faster thermal browning) are sourced. Exact magnitude speculative, banded around Q10 ~3.5. Its OWN parameter (prime directive #2), matching E_a_maillard_strecker's band (both are the non-oxidative thermal axis)."
+
+# -- A420 YIELD: browning-index absorbance per gram of melanoidin formed ----------------------
+# A420 is the dimensionless 420 nm absorbance (1 cm path) -- the standard browning index (D-74).
+# This yield converts the melanoidin MASS formed into the absorbance it contributes, so thermal
+# browning raises the SAME A420 index the oxidative PhenolicBrowning (D-74) accumulates.
+y_a420_per_melanoidin:
+  value: 0.4
+  unit: "1"   # A420 absorbance units per g/L melanoidin formed (dimensionless index per g/L)
+  tier: speculative
+  uncertainty: { low: 0.1, high: 1.5, note: "A420 (420 nm absorbance, 1 cm) per g/L caramelization melanoidin. An order-of-magnitude estimate: caramel/melanoidin has a broad brown chromophore absorbing at 420 nm, so ~a few tenths of an AU per g/L is plausible. CALIBRATED with k_caramelization so a warm multi-year sweet aging lands A420 in the visible amber-brown range (~0.3-1 AU)." }
+  provenance:
+    source: "author estimate: caramelization melanoidins are the brown chromophore of caramel/aged sweet wine, absorbing broadly through the visible incl. 420 nm. The per-mass absorbance is a lumped optical yield (no single extinction coefficient for a heterogeneous polymer)."
+    conditions: "generic sweet wine; A420 (dimensionless, 1 cm path) contributed per g/L melanoidin formed, at T_ref = 293.15 K. Adds to the SAME A420 slot the O2-driven PhenolicBrowning (D-74) accumulates."
+    notes: "SPECULATIVE magnitude. Ties the melanoidin MASS (on total_carbon) to the A420 optical index (off every ledger) -- so thermal browning is READ by analysis.a420 alongside the oxidative browning. A lumped optical yield, not a molar extinction coefficient (melanoidin has no clean molar mass -- the caramelan stand-in, D-88)."

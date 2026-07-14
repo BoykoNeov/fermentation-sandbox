@@ -44,7 +44,11 @@ bottle-aging reality a first-order-in-ethanol rate could never reproduce (it wou
 unbounded). O₂ enters via a dedicated ``add_oxygen`` dosing verb (one dose = a bottle's
 ingress; repeated = micro-oxygenation / barrel), and a ``begin_aging`` run with **no** O₂ dosed
 is purely *reductive* aging (screwcap/inert) — byte-for-byte the :class:`EsterHydrolysis`-only
-aging, since the Process contributes exactly zero at ``o2 = 0``. Oxidative aging is
+aging, since the Process contributes exactly zero at ``o2 = 0``. **(D-88 supersedes this for sweet
+wines:** the "un-oxygenated aging is byte-for-byte the ester-only case" claim now holds only for
+*dry* wines — a sealed **sweet** wine browns thermally (:class:`Caramelization`) and develops the
+thermal Strecker suite (:class:`MaillardStrecker`) with no O₂ at all; the D-83-style mirror.)
+Oxidative aging is
 fundamentally a competition for a finite O₂ budget: the ``o2`` pool is the shared substrate the
 whole oxidative sub-axis draws down, and **each O₂ consumer owns its own rate constant and draws
 its own share** — ``ProcessSet`` sums them, so the pool depletes *once* and the O₂ splits among
@@ -217,6 +221,7 @@ from fermentation.core.chemistry import (
     M_SOTOLON,
     carbon_mass_fraction,
     nitrogen_mass_fraction,
+    sugar_species,
 )
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
@@ -298,6 +303,12 @@ _MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool], ...] = (
     ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", True),
     ("sotolon", M_SOTOLON, "w_maillard_sotolon", False),
 )
+
+#: The caramelization carbon-park species (decision D-88): the sugar carbon :class:`Caramelization`
+#: consumes lands here (on ``total_carbon``, booked at melanoidin's caramelan-stand-in fraction), so
+#: the sugar → melanoidin transfer closes exactly. Named here so the carbon draw + ``total_carbon``
+#: weighting ride on one species (D-19), the ``_ESTER_SPECIES`` discipline.
+_MELANOIDIN_SPECIES = "melanoidin"
 
 #: The oak extractives and their set-and-hold ceiling slots (decisions D-77/D-78). Each extracted
 #: pool (the first element) rises toward its own saturation ceiling (the second element); the
@@ -1064,6 +1075,122 @@ class MaillardStrecker(Process):
         d[schema.slice("CO2")] = co2_rate
         d[schema.slice("amino_acids")] = -aa_mass
         d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine N → ammonium (D-45)
+        return d
+
+
+class Caramelization(Process):
+    """Non-oxidative THERMAL browning: residual sugar caramelizes → melanoidin, NO O₂ (D-88).
+
+    The **O₂-independent thermal mirror** of :class:`PhenolicBrowning` (D-74) — the browning half of
+    the non-oxidative thermal axis :class:`MaillardStrecker` (D-87) opened. Where D-74 needs
+    dissolved O₂ to oxidise phenolics brown, this route browns **residual sugar** by heat alone
+    (thermal dehydration/caramelization to melanoidin), so a *sealed, oxygen-free sweet wine* still
+    darkens with age — the amber-to-brown of an aged Sauternes / the deep colour of Madeira and
+    baked/rancio wines. It raises the **same** ``A420`` browning index D-74 accumulates (both routes
+    darken the wine — oxidative *and* thermal browning are one observable), so it needs **no** new
+    observable, only a carbon-park pool for the sugar it consumes.
+
+    **CARAMELIZATION, not Maillard (the D-88 scope honesty).** This is the **sugar-only** route: it
+    touches ``{S, melanoidin, A420}`` and incorporates **no amino-acid nitrogen**. True Maillard
+    melanoidins are nitrogen-bearing (sugar + amino acid); modelling that N-incorporating browning
+    is
+    deferred. So ``melanoidin`` here is a caramelization polymer (nitrogen-free), and this Process
+    is
+    honestly *caramelization*.
+
+    ``d(S)/dt = −r`` with ``r = k_caramelization · f(T) · [S_total]`` — first-order in the residual
+    sugar (summed over the vector), ``f(T) = arrhenius_factor(T, E_a_caramelization, T_ref)`` the
+    **strongly** warmer-faster factor (``E_a_caramelization ≈ 100 kJ/mol``, above the oxidative
+    aging
+    E_a's — the same sourced Maillard/caramelization-≫-oxidation ordering :class:`MaillardStrecker`
+    carries). The consumed sugar is booked as::
+
+        d(melanoidin)/dt = +r · c(sugar) / c(melanoidin)          # carbon-exact transfer
+        d(A420)/dt       = +y_a420_per_melanoidin · d(melanoidin)/dt   # the shared browning index
+
+    **The FIRST aging Process to consume core ``S`` — an on-ledger carbon-park (the forced
+    closure).**
+    Every prior aging Process touches aroma pools / ``o2`` / ``amino_acids`` / ``N`` / ``E`` — none
+    the core sugar. Because ``S`` is **on** ``total_carbon``, the sugar carbon this Process draws
+    **must** land in a weighted pool or the transfer would read as carbon destroyed (unlike D-74's
+    ``A420``, whose pigment carbon comes from an *untracked* phenol pool, so it is off-ledger). So
+    ``melanoidin`` is an **on-ledger carbon-park** (the ``debris``/``glucan`` precedent, D-34): the
+    carbon released from ``S`` (at the sugar's fraction) is redeposited into ``melanoidin`` (at its
+    caramelan-stand-in fraction), so ``total_carbon`` closes to machine precision (the
+    :class:`EsterHydrolysis` carbon-exact split). The water lost on dehydration is the standing
+    aging-axis mass gap (``total_mass`` weights only ``{S, E, CO2}``, never asserted on an aging
+    run);
+    CO₂/volatile evolution of real caramelization is lumped into the polymer (a documented v1
+    simplification). ``A420`` is the optical browning index (off every ledger, the D-74 slot), so it
+    carries no carbon — only ``melanoidin`` parks it.
+
+    **Isolable + a SOFT sugar gate (prime directive #3).** Wine-only for v1 (the sweet-wine thermal
+    axis; sugar-only browning is medium-agnostic *in principle* — beer/wort melanoidins are real —
+    so
+    this is a bundling choice, not a physics constraint: beer thermal browning is deferred, the D-86
+    oak-to-beer extension pattern). The ``"melanoidin" not in schema`` guard makes it a hard no-op
+    on
+    beer. Wired **disabled at the compile seam**; ``begin_aging`` enables it with the other aging
+    Processes. Residual sugar is a **SOFT** driver: a dry wine (``S ≈ 0`` at the aging segment —
+    every
+    standard aging scenario ferments to dryness before ``begin_aging``) is byte-for-byte inert via
+    the ``S ≤ 0`` guard (which also absorbs a solver undershoot), so an ordinary *dry* aged wine is
+    unchanged. But a **sweet** wine now browns thermally even sealed and sulfited — so the D-71/D-74
+    "reductive aging is byte-for-byte the ester-only case" claim now holds only for **dry** wines
+    (the
+    D-83-style supersession: a sealed sweet wine is *not* inert). Tier **speculative** (the *form* —
+    sugar-driven, heat-accelerated, O₂-independent browning — is sourced; the rate and
+    per-melanoidin
+    absorbance yield are order-of-magnitude estimates).
+    """
+
+    name = "caramelization"
+    tier = Tier.SPECULATIVE
+    #: Consumes core ``S`` and books the carbon into the on-ledger ``melanoidin`` carbon-park (so
+    #: ``total_carbon`` closes), raising the shared off-ledger ``A420`` browning index. Touches
+    #: those
+    #: three and nothing else — NO ``o2`` (the whole point), no amino acids (sugar-only
+    #: caramelization,
+    #: not Maillard).
+    touches = ("S", "melanoidin", "A420")
+    #: ``k_caramelization``/``E_a_caramelization``/``y_a420_per_melanoidin`` are this Process's own
+    #: (thermal.yaml, D-88); ``T_ref`` is shared with every Arrhenius rate. Their tiers cap the
+    #: ``S``/``melanoidin``/``A420`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_caramelization",
+        "E_a_caramelization",
+        "y_a420_per_melanoidin",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only for v1 (the melanoidin carbon-park is a wine slot): a hard no-op on beer
+        # besides.
+        if "melanoidin" not in schema:
+            return d
+        s_slice = schema.slice("S")
+        s_total = max(float(y[s_slice].sum()), 0.0)  # residual sugar, summed over the vector
+        # Dry wine (S ≈ 0 at the aging segment) ⇒ byte-for-byte inert (the SOFT sugar gate; also
+        # absorbs a solver undershoot S < 0). A sweet wine browns; a dry one is unchanged.
+        if s_total <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_caramelization"], params["T_ref"])
+        r_sugar = params["k_caramelization"] * f_t * s_total  # g sugar/L/h caramelized
+        # Carbon-exact transfer sugar → melanoidin: release the sugar carbon at the sugar's fraction
+        # and redeposit into melanoidin at its (caramelan-stand-in) fraction, so total_carbon closes
+        # to machine precision (the EsterHydrolysis split). Wine sugar is the single hexose species.
+        carbon_released = r_sugar * carbon_mass_fraction(sugar_species(schema)[0])  # g C/L/h
+        mel_rate = carbon_released / carbon_mass_fraction(_MELANOIDIN_SPECIES)  # g melanoidin/L/h
+        d[s_slice] = -r_sugar  # debit the residual sugar (wine: a single slot)
+        d[schema.slice("melanoidin")] = mel_rate
+        # The shared A420 browning index rises with the melanoidin formed (off every ledger, the
+        # D-74
+        # optical-index slot). Monotone (mel_rate ≥ 0), like the D-74 oxidative browning it joins.
+        d[schema.slice("A420")] = params["y_a420_per_melanoidin"] * mel_rate
         return d
 
 

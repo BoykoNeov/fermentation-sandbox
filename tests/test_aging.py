@@ -39,6 +39,7 @@ from fermentation.core.chemistry import (
 from fermentation.core.kinetics import (
     AcetaldehydeBridgedCondensation,
     AnthocyaninFading,
+    Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
     MaillardStrecker,
@@ -93,6 +94,9 @@ _2MB_C = carbon_mass_fraction("2_methylbutanal")
 _3MB_C = carbon_mass_fraction("3_methylbutanal")
 _2MP_C = carbon_mass_fraction("2_methylpropanal")
 _SOTOLON_C = carbon_mass_fraction("sotolon")
+# Caramelization (decision D-88): the sugar (glucose) and melanoidin-carbon-park carbon fractions.
+_GLUCOSE_C = carbon_mass_fraction("glucose")
+_MELANOIDIN_C = carbon_mass_fraction("melanoidin")
 
 
 @pytest.fixture
@@ -1476,6 +1480,201 @@ def test_maillard_tier_floored_at_speculative(maillard_store):
     for pool in _MAILLARD_TOUCHES:
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, maillard_store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# Caramelization (decision D-88) — the WINE-ONLY, NON-oxidative THERMAL browning: the O₂-INDEPENDENT
+# thermal mirror of PhenolicBrowning (D-74). Residual SUGAR browns to melanoidin by HEAT (no O₂),
+# raising the SAME A420 index D-74 accumulates — so a sealed sweet wine still darkens. The FIRST
+# aging Process to consume core S: the sugar carbon lands in the on-ledger melanoidin carbon-park
+# (the debris/glucan precedent), so total_carbon closes exactly (release at the sugar fraction,
+# redeposit at melanoidin's). SUGAR-ONLY (nitrogen-free — caramelization, not Maillard). These tests
+# pin the closed form, carbon closure per-RHS, the sugar SOFT gate (inert at S ≈ 0 / undershoot),
+# the O₂-independence (no o2 term at all), the first-order-in-sugar linearity, the monotone A420
+# rise, the warmer-faster ordering, the wine-only no-op on beer, the integrated sweet browning +
+# closure, and the speculative tier floor.
+
+_CARAMEL_TOUCHES = {"S", "melanoidin", "A420"}
+
+
+@pytest.fixture
+def caramel_store():
+    # Wine params + the thermal.yaml constants (k_caramelization, E_a_caramelization,
+    # y_a420_per_melanoidin, T_ref) — the shared_files the D-88 compile seam wires.
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml", default_data_dir() / "thermal.yaml"
+    )
+
+
+@pytest.fixture
+def caramel_params(caramel_store):
+    return caramel_store.resolve()
+
+
+def _caramel_wine(schema: StateSchema, *, s: float = 100.0, t: float = 298.15, **kw) -> FloatArray:
+    """A finished SWEET wine at the start of aging: residual sugar ``s``, warm, sealed (o2 = 0)."""
+    y = _aged_wine(schema, esters=0.0, t=t)
+    y[schema.slice("S")] = s
+    for name, val in kw.items():
+        y[schema.slice(name)] = val
+    return y
+
+
+def _caramel_closed_form(
+    schema: StateSchema, params: dict[str, float], y: FloatArray, t: float
+) -> dict[str, float]:
+    """The Process's own algebra, recomputed independently."""
+    s_total = float(y[schema.slice("S")].sum())
+    f_t = arrhenius_factor(t, params["E_a_caramelization"], params["T_ref"])
+    r = params["k_caramelization"] * f_t * s_total
+    mel_rate = r * _GLUCOSE_C / _MELANOIDIN_C
+    return {
+        "S": -r,
+        "melanoidin": mel_rate,
+        "A420": params["y_a420_per_melanoidin"] * mel_rate,
+    }
+
+
+def test_caramelization_metadata():
+    p = Caramelization()
+    assert p.name == "caramelization"
+    assert p.tier is Tier.SPECULATIVE
+    # Consumes core S into the on-ledger melanoidin carbon-park + raises the shared A420. Touches
+    # those three and nothing else — NO o2 (the whole point), no amino acids (sugar-only).
+    assert set(p.touches) == _CARAMEL_TOUCHES
+    assert "o2" not in p.touches
+    assert set(p.reads) == {
+        "k_caramelization",
+        "E_a_caramelization",
+        "y_a420_per_melanoidin",
+        "T_ref",
+    }
+
+
+def test_caramelization_matches_closed_form(caramel_params):
+    schema = wine_schema()
+    y = _caramel_wine(schema, s=100.0, t=298.15)  # off T_ref so the Arrhenius factor bites
+    d = Caramelization().derivatives(0.0, y, schema, caramel_params)
+    cf = _caramel_closed_form(schema, caramel_params, y, 298.15)
+    assert cf["melanoidin"] > 0.0  # live (guards against a vacuous pass)
+    assert schema.get(d, "S") == pytest.approx(cf["S"])
+    assert schema.get(d, "melanoidin") == pytest.approx(cf["melanoidin"])
+    assert schema.get(d, "A420") == pytest.approx(cf["A420"])
+    # Touches nothing else — no o2, no aroma pools, no amino acids, no E.
+    for var in ("o2", "amino_acids", "E", "esters", "acetaldehyde", "sotolon", "N"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_caramelization_carbon_closes_per_rhs(caramel_params):
+    # CARBON closes to machine precision: the sugar carbon leaving S equals the carbon entering the
+    # melanoidin carbon-park (release at the sugar fraction, redeposit at melanoidin's). A420 is an
+    # optical index (off every ledger), so it carries none.
+    schema = wine_schema()
+    d = Caramelization().derivatives(0.0, _caramel_wine(schema), schema, caramel_params)
+    carbon_residual = schema.get(d, "S") * _GLUCOSE_C + schema.get(d, "melanoidin") * _MELANOIDIN_C
+    assert carbon_residual == pytest.approx(0.0, abs=1e-18)
+
+
+def test_caramelization_inert_without_sugar(caramel_params):
+    # No residual sugar ⇒ no browning: a dry wine (S = 0) is byte-for-byte inert (the SOFT sugar
+    # gate — every standard dry aging run ferments to S ≈ 0 before begin_aging, so caramelization
+    # leaves it unchanged). Also absorbs the S < 0 solver undershoot.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [Caramelization()], strict=True)
+    assert np.array_equal(
+        ps.total_derivatives(0.0, _caramel_wine(schema, s=0.0), caramel_params), schema.zeros()
+    )
+    assert np.array_equal(
+        Caramelization().derivatives(0.0, _caramel_wine(schema, s=-1e-6), schema, caramel_params),
+        schema.zeros(),
+    )
+
+
+def test_caramelization_is_oxygen_independent(caramel_params):
+    # NO o2 term at all: a sealed wine (o2 = 0) browns exactly as an oxygenated one — the whole
+    # point
+    # (the O₂-independent thermal mirror of the O₂-driven PhenolicBrowning). o2 is untouched.
+    schema = wine_schema()
+    sealed = Caramelization().derivatives(
+        0.0, _caramel_wine(schema, o2=0.0), schema, caramel_params
+    )
+    oxygenated = Caramelization().derivatives(
+        0.0, _caramel_wine(schema, o2=0.05), schema, caramel_params
+    )
+    assert np.array_equal(sealed, oxygenated)
+    assert schema.get(sealed, "o2") == 0.0  # never draws o2
+    assert schema.get(sealed, "melanoidin") > 0.0  # non-vacuous: browning while sealed
+
+
+def test_caramelization_first_order_in_sugar(caramel_params):
+    # First-order in residual sugar: doubling S doubles the browning rate (and the A420 rise).
+    schema = wine_schema()
+    base = Caramelization().derivatives(0.0, _caramel_wine(schema, s=50.0), schema, caramel_params)
+    dbl = Caramelization().derivatives(0.0, _caramel_wine(schema, s=100.0), schema, caramel_params)
+    assert schema.get(dbl, "melanoidin") == pytest.approx(2.0 * schema.get(base, "melanoidin"))
+    assert schema.get(dbl, "A420") == pytest.approx(2.0 * schema.get(base, "A420"))
+
+
+def test_caramelization_a420_rises_monotone(caramel_params):
+    # A420 accumulates (produced-only, the D-74 optical-index idiom): d(A420)/dt ≥ 0 whenever sugar
+    # is present, so the browning index is monotone (never reversed). Melanoidin likewise.
+    schema = wine_schema()
+    d = Caramelization().derivatives(0.0, _caramel_wine(schema), schema, caramel_params)
+    assert schema.get(d, "A420") > 0.0
+    assert schema.get(d, "melanoidin") > 0.0
+    assert schema.get(d, "S") < 0.0  # sugar is consumed
+
+
+def test_caramelization_rises_with_temperature(caramel_params):
+    # Warmer browns faster — the sourced direction (caramelization is strongly thermal, why Madeira
+    # estufagem browns so much faster than cellar aging).
+    schema = wine_schema()
+    cold = Caramelization().derivatives(
+        0.0, _caramel_wine(schema, t=283.15), schema, caramel_params
+    )
+    warm = Caramelization().derivatives(
+        0.0, _caramel_wine(schema, t=303.15), schema, caramel_params
+    )
+    assert schema.get(warm, "melanoidin") > schema.get(cold, "melanoidin") > 0.0
+
+
+def test_caramelization_is_wine_only_noop_on_beer(caramel_params):
+    # Wine-only v1 (the melanoidin carbon-park is a wine slot): a hard no-op on beer even with
+    # residual wort sugar (the "melanoidin" not in schema guard).
+    beer = beer_schema()
+    yb = beer.zeros()
+    yb[beer.slice("S")] = 60.0
+    yb[beer.slice("T")] = 303.15
+    assert np.array_equal(Caramelization().derivatives(0.0, yb, beer, caramel_params), beer.zeros())
+
+
+def test_caramelization_browns_a_sweet_wine_and_closes_carbon(caramel_store, caramel_params):
+    # Integrated: a warm SWEET wine (residual sugar) browns over an aging year — melanoidin + A420
+    # climb from 0, S declines — with carbon closing to machine precision through the segment (the
+    # sugar carbon parks in melanoidin). Sealed (o2 defaults to 0) — the browning needs no oxygen.
+    schema = wine_schema()
+    y0 = _caramel_wine(schema, s=120.0, t=303.15)  # 30 °C sweet wine
+    ps = ProcessSet(schema, [Caramelization()], strict=True)
+    traj = simulate(ps, params=caramel_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success, traj.message
+    mel = traj.series("melanoidin")
+    a420 = traj.series("A420")
+    s = traj.series("S")
+    assert mel[-1] > mel[0] == 0.0  # melanoidin accumulates from 0
+    assert a420[-1] > a420[0] == 0.0  # A420 browning index climbs from 0
+    assert s[-1] < s[0]  # residual sugar declines (consumed into melanoidin)
+    assert_nonnegative(traj, ("S", "melanoidin", "A420"), atol=1e-9)
+    f_c = caramel_store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+def test_caramelization_tier_floored_at_speculative(caramel_store):
+    # Speculative in FORM (Tier-3 frontier): every pool it writes is speculative.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [Caramelization()])
+    for pool in _CARAMEL_TOUCHES:
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, caramel_store.tier_map()) is Tier.SPECULATIVE
 
 
 # =====================================================================================

@@ -17,6 +17,7 @@ from fermentation.core.kinetics.acetaldehyde import (
 from fermentation.core.kinetics.aging import (
     AcetaldehydeBridgedCondensation,
     AnthocyaninFading,
+    Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
     MaillardStrecker,
@@ -115,6 +116,7 @@ __all__ = [
     "DiacetylReduction",
     "ArrheniusTemperature",
     "ColemanQuadraticDeathTemperature",
+    "Caramelization",
     "EllagitanninOxidation",
     "EsterHydrolysis",
     "MaillardStrecker",

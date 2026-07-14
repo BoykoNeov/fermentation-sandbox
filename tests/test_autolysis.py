@@ -45,6 +45,8 @@ def full_params():
         base / "keto_acids.yaml",
         base / "hydrogen_sulfide.yaml",
         base / "aging.yaml",  # the bare wine set now carries the (default-off) aging Process (D-70)
+        base / "thermal.yaml",  # D-87/D-88: Caramelization fires at S>0 (must), so the bare
+        # wine set needs its params (the first aging Process not inert at a fermentation state)
     ).resolve()
 
 
