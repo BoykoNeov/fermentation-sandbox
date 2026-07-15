@@ -45,6 +45,12 @@ class EsterSpec:
     the lump into single-molecule pools, each weighted **and** perceived as itself, removes
     that seam rather than papering over it: no ester pool carries a ``lumped`` composition
     assumption any more.
+
+    ``precursor_pool`` (decision D-97) names the liquid state variable holding the ester's
+    **precursor alcohol**, when — and only when — that alcohol is scarce enough for its
+    supply to limit the rate. It is ``None`` for an ester whose precursor is a bulk pool that
+    saturates the enzyme (see :data:`ESTER_SPECS` for the concentration argument that decides
+    this per ester; it is *derived*, never asserted).
     """
 
     pool: str
@@ -54,6 +60,10 @@ class EsterSpec:
     #: Human-readable note for the liquid pool's :class:`~fermentation.core.state.VarSpec`
     #: description — kept here so the schema text cannot drift from the registry.
     note: str
+    #: Liquid pool of the precursor alcohol this ester's synthesis is **first-order in**
+    #: (decision D-97), or ``None`` when the precursor saturates the enzyme and the rate is
+    #: zeroth-order in it. Read only — never debited (the carbon still comes from ``S``).
+    precursor_pool: str | None = None
 
 
 #: The THREE aroma-active esters the sim tracks (decision D-96) — each a **single-molecule**
@@ -74,6 +84,29 @@ class EsterSpec:
 #: (D-96, the load-bearing call): the lump's composition is *derived* from three
 #: independently-anchored rates, never a single fitted ratio splitting one ``k_ester``. Adding
 #: a fourth ester (ethyl octanoate, phenylethyl acetate) is one entry here plus its params.
+#:
+#: **The ATF1 precursor coupling — ONE enzyme, ONE rate law, TWO limits (decision D-97).**
+#: The two acetate esters are made by the same enzyme from the same acetyl-CoA donor,
+#: differing only in the alcohol it acetylates. Whether that alcohol *limits* the rate is
+#: therefore not a modelling preference — it is decided by comparing each alcohol's
+#: concentration to ATF1's measured ``Km`` for it (~29.8 mM for isoamyl alcohol; Fujii 1998,
+#: Appl. Environ. Microbiol. 64:4076-4078, citing Yoshioka & Hashimoto 1981):
+#:
+#: * ``isoamyl_acetate`` — its precursor is *isoamyl alcohol*, the ``fusels`` pool, which runs
+#:   ~0.5-1 mM: **~30-60x BELOW Km** ⇒ the enzyme sits far down its linear stretch ⇒ the rate
+#:   is **first-order in the pool** (``precursor_pool="fusels"``). Fujii states the conclusion
+#:   outright: *"a major rate-limiting factor for isoamyl acetate production is the amount of
+#:   isoamyl alcohol in the sake mash"*. This is what makes the banana note **YAN-responsive**
+#:   — it inherits the nitrogen dependence of the Ehrlich pathway that builds its precursor.
+#: * ``ethyl_acetate`` — its precursor is *ethanol*, the bulk ``E`` pool, which runs ~2 M:
+#:   **orders of magnitude ABOVE any mM-scale Km** ⇒ the enzyme is saturated in it ⇒ the rate
+#:   is **zeroth-order** in the precursor ⇒ no term at all (``precursor_pool=None``). Ethanol
+#:   is never scarce, so it can never limit.
+#:
+#: So the asymmetry between two esters of the *same* enzyme is **derived from their precursor
+#: concentrations**, not an exemption granted to one of them. ``ethyl_hexanoate`` is ungated
+#: for a different reason: a different enzyme (EEB1/EHT1) acylating from hexanoyl-CoA, a
+#: precursor the sim does not model at all — so there is no pool to be first-order in.
 ESTER_SPECS: tuple[EsterSpec, ...] = (
     EsterSpec(
         "ethyl_acetate",
@@ -81,6 +114,8 @@ ESTER_SPECS: tuple[EsterSpec, ...] = (
         "ethyl_acetate",
         "k_ethyl_acetate",
         note="ethyl acetate (C4H8O2) — the bulk solventy/nail-polish acetate ester (ATF1)",
+        # No precursor term: ethanol (~2 M) saturates ATF1 ⇒ zeroth-order in it (D-97).
+        precursor_pool=None,
     ),
     EsterSpec(
         "isoamyl_acetate",
@@ -89,6 +124,9 @@ ESTER_SPECS: tuple[EsterSpec, ...] = (
         "k_isoamyl_acetate",
         note="isoamyl acetate (C7H14O2) — the trace, potent BANANA acetate ester (ATF1); "
         "the only ester the D-69 aging hydrolysis fades",
+        # First-order in isoamyl alcohol: the `fusels` pool runs ~30-60x below ATF1's
+        # Km ~29.8 mM (Fujii 1998) ⇒ the [S] << Km limit. This is the D-97 coupling.
+        precursor_pool="fusels",
     ),
     EsterSpec(
         "ethyl_hexanoate",

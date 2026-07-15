@@ -291,6 +291,37 @@
 > flag was being DROPPED at the layer boundary — it now propagates from the dominant contributor (`sulfidic` = clean h2s +
 > lumped mercaptans is the live case). Next: beat 1b SLICE 2 (the perceptual speculation), a beer-specific per-melanoidin
 > A420 yield, the on-ledger thermal-caramelization aroma co-product.**
+>
+> **PROGRESS (D-97, 2026-07-15): the ATF1 PRECURSOR COUPLING — the banana ester becomes YAN-responsive (1039 tests, +8). The
+> first of D-96's four named deferred refinements, and the only one with a NEW OBSERVABLE. `isoamyl_acetate` synthesis is now
+> FIRST-ORDER in its precursor alcohol, the `fusels` pool. Before D-97 the banana was YAN-BLIND — flat at 0.759/0.758/0.756
+> mg/L across YAN 40/80/250 while the `fusels` pool that IS its precursor swung 2.9x. Not a coarse reading: a MISSING
+> DEPENDENCY. THE ADVISOR REVERSED ITS OWN STEER AND A PROBE IS WHY: its first crux was "gate on the N-gated DRIVER, not the
+> accumulating pool" (structurally airtight — a monotone pool's gate is flat or back-loading), but `N` empties at DAY 2 with
+> ~75% of the sugar unfermented, so a driver-coupled banana STOPS DEAD at day 2 while 51 mg/L of substrate sits there and the
+> flux still supplies acetyl-CoA. Coupling to the RATE conflates "the precursor is being made" with "the ester is being made";
+> the alcohol PERSISTS. Its no-op objection also dissolved: it reasoned about flatness IN TIME, but the discriminating signal
+> is ACROSS-YAN. Lesson: a five-line probe settled in seconds what neither of us could settle by reasoning. THE FORM WAS A
+> LOOKUP, NOT A JUDGEMENT: Fujii 1998 (AEM 64:4076-4078) gives ATF1's Km for isoamyl alcohol ~29.8 mM AND states the mechanism
+> outright ("a major rate-limiting factor ... is the amount of isoamyl alcohol") — one paper sources BOTH that the coupling
+> exists and what form it takes. The pool runs ~51x (wine) / ~63x (beer) BELOW Km ⇒ the [S]<<Km limit ⇒ linear is the MEASURED
+> regime, not the convenient choice. WHY THE MEASURED Km IS NOT A PARAMETER (the advisor's dual trap — "omitting a Km that
+> matters is the same sin as fitting one; the discipline is SOURCE THE FACT, not fewer params"): in this limit only the RATIO
+> Vmax/Km is IDENTIFIABLE — scale Km 10x, refit Vmax, byte-identical trajectory ⇒ it would be a sourced-looking constant no
+> output could validate. `k_isoamyl_acetate` IS that ratio; the Km's honest home is the PROVENANCE, justifying the FORM. THE
+> ASYMMETRY IS DERIVED: ethyl acetate is ATF1 too, but its ethanol precursor (~2 M) SATURATES the enzyme ⇒ zeroth-order ⇒ no
+> term. One enzyme, one rate law, two limits, decided by concentrations. READ NEVER DEBITED: carbon still from `S`, so
+> `touches`/`total_carbon` untouched; the C5+C2=C7 inverse of D-69's 5:2 is the tempting elegance, DEFERRED and pinned
+> meanwhile. OUTCOME PINNED AS A RATIO (D-96's lesson applied FIRST, not caught at the end): `k` is re-anchored so the finished
+> value is unchanged ⇒ any absolute-band test would pass on the OLD model; the teeth assert the ester swing TRACKS the fusel
+> swing on a real run. Verified: unwiring `precursor_pool` fails it + 3 others. NO NEW PARAMETER; `k` 5.0e-6→1.0e-4 (wine,
+> x20) / 1.2e-5→3.05e-4 (beer, x25.4) — the factors DIFFER because each medium's fusel level does. EMERGENT, untuned: the
+> sensory payoff lands in BEER, not wine — under D-95's MAX rule wine's `fruity` is apple-dominated (no YAN dependence) so it
+> barely moves (79.0→78.6) while the banana's own OAV swings 14.7→42.1 (real but MASKED, honestly so); in beer the fruity
+> DOMINANT LABEL FLIPS with nitrogen (YAN 100 ⇒ ethyl_hexanoate, 200+ ⇒ isoamyl_acetate) — a low-nitrogen wort's fruity stops
+> being banana-led. Next: the isoamyl-acetate carbon re-route (the D-69 5:2 inverse); per-ester dH/E_a (BLOCKED on sourcing —
+> an author estimate would LOWER fidelity, so it may stay deferred rather than be built for completeness); speciating the
+> `fusels` lump (the D-96 pattern one pool over, which would retire this beat's inherited lump caveat); beat 1b slice 2.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens

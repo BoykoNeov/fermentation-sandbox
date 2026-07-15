@@ -211,11 +211,55 @@ class EsterSynthesis(Process):
     per-medium ``E_a_esters``. For the two acetates this is principled: same enzyme (ATF1), so
     no basis to differ. For ``ethyl_hexanoate`` (EEB1/EHT1 — a different enzyme, tied to
     fatty-acid synthesis) it is a genuine approximation, kept because no separate activation
-    energy is sourced; a per-ester ``E_a`` is the named deferred refinement. Likewise the
-    acetate esters' real dependence on their precursor alcohol (ATF1 acetylates *isoamyl
-    alcohol*, so isoamyl acetate should track the ``fusels`` pool) is **deferred**: v1 gives
-    every ester the same flux shape, so isoamyl acetate's time profile mirrors ethyl acetate's
-    rather than being nitrogen-front-loaded like ``fusels``.
+    energy is sourced; a per-ester ``E_a`` is the named deferred refinement.
+
+    **The ATF1 precursor coupling (decision D-97) — why isoamyl acetate alone carries an extra
+    term.** ATF1 acetylates an *alcohol*, and Fujii 1998 (Appl. Environ. Microbiol.
+    64:4076-4078) measures its ``Km`` for isoamyl alcohol at ~29.8 mM while stating outright
+    that *"a major rate-limiting factor for isoamyl acetate production is the amount of isoamyl
+    alcohol"*. The ``fusels`` pool runs ~0.5-1 mM — **~30-60x below that Km** — so the enzyme
+    sits far down its linear stretch and the rate is **first-order in the pool**:
+    ``d(isoamyl_acetate)/dt = k · fusels · X · S/(K_su+S) · f(T)``. Ethyl acetate gets no such
+    term because *its* precursor is ethanol (~2 M, orders of magnitude above any mM-scale Km)
+    ⇒ ATF1 is saturated in it ⇒ zeroth-order. Same enzyme, same rate law, opposite limits: the
+    asymmetry is **derived from the two precursors' concentrations**, not an exemption.
+
+    **Why first-order and not an explicit ``fusels/(Km+fusels)`` gate — identifiability, not
+    parsimony (D-97).** In the ``[S] << Km`` limit the saturable form is numerically the linear
+    one to within ~2 %, and only the *ratio* ``Vmax/Km`` is identifiable from any model output:
+    scaling ``Km`` tenfold and refitting ``Vmax`` would give a byte-identical trajectory. Adding
+    the measured ``Km`` as a parameter would therefore mint a sourced-looking constant that no
+    model output could ever validate. ``k_isoamyl_acetate`` **is** that identifiable ratio, and
+    the ``Km`` lives where it does its real work: in the parameter's provenance, as the sourced
+    justification for this rate law's *form*.
+
+    **What this buys — the banana note becomes YAN-responsive.** Reading the ``fusels`` pool
+    makes isoamyl acetate inherit the nitrogen dependence of the Ehrlich pathway that builds its
+    precursor: a low-YAN ferment makes less isoamyl alcohol, hence less banana. Before D-97 the
+    ester was **YAN-blind** (flat ~0.758 mg/L across YAN 40-250 mg/L, where ``fusels`` swung
+    2.9x) because every ester shared one plain flux shape. Note this couples to the *pool*, not
+    to the fusel *production rate*: the alcohol **persists** after nitrogen is exhausted (in a
+    wine run ``N`` empties around day 2 with ~75 % of the sugar still unfermented), and ATF1 goes
+    on acetylating it for as long as the flux supplies acetyl-CoA. Coupling to the rate would
+    have stopped the banana dead at day 2 with 51 mg/L of its substrate sitting in the vessel.
+
+    **Read, never debited — a deliberate v1 scope call (D-97).** The rate reads ``fusels``; the
+    ester's carbon is still drawn from ``S``, so ``touches`` is unchanged and ``total_carbon``
+    is untouched. Physically the acetylation takes the C5 skeleton *from* the alcohol (and C2
+    from acetyl-CoA) — the exact inverse of the 5:2 split D-69's hydrolysis returns to
+    ``fusels`` — so a carbon re-route off ``fusels`` is the honest end state and is the named
+    deferred refinement. It is mass-negligible here (~0.5 mg/L of ester against an ~86 mg/L
+    fusel pool), and the sugar draw is the same documented stand-in
+    :class:`FuselAlcoholsEhrlich` already uses for the amino-acid skeleton.
+
+    **Two inherited caveats, named not buried (D-97).** (i) ``fusels`` is a **lumped** pool
+    (isoamyl alcohol representative, but really all the higher alcohols), so reading it whole as
+    the ATF1 substrate over-states the true isoamyl-alcohol supply. The over-statement is
+    absorbed into the re-anchored ``k``; what it costs is that the *YAN-response* assumes the
+    lump's composition is fixed — the D-66 caveat, honest here because ``fusels`` is genuinely
+    flagged lumped. (ii) Isoamyl acetate now inherits :class:`FuselAlcoholsEhrlich`'s
+    **speculative monotone-in-N** shape, including its admitted omission of the low-YAN
+    biosynthetic rise. Both sit inside this Process's existing plausible/speculative framing.
     """
 
     name = "ester_synthesis"
@@ -244,6 +288,12 @@ class EsterSynthesis(Process):
         f_t = arrhenius_factor(temp, params["E_a_esters"], params["T_ref"])
         for spec in ESTER_SPECS:
             rate = params[spec.k_param] * flux * f_t
+            if spec.precursor_pool is not None:
+                # ATF1 is FAR from saturated in this alcohol ([S] ~ 0.5-1 mM vs Km ~29.8 mM),
+                # so its supply limits the rate first-order (D-97). READ ONLY — the pool is
+                # never debited; the ester's carbon still comes from S (see the class doc).
+                # Clamped >= 0 so a solver undershoot cannot flip synthesis negative.
+                rate *= max(float(y[schema.slice(spec.precursor_pool)][0]), 0.0)
             d[schema.slice(spec.pool)] = rate
             # Each ester draws at ITS OWN carbon fraction (C4/C7/C8) — the D-96 split's
             # ledger payoff: no ester's carbon is booked through a stand-in molecule.

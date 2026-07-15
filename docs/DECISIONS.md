@@ -7646,3 +7646,117 @@ in a sound beer. All six pools land inside their own molecule's literature band.
 **Next:** **beat 1b slice 2** (weighting / compression / masking — the perceptual speculation, where the params live), the ATF1
 precursor coupling, per-ester `dH`/`E_a`, a beer-specific per-melanoidin A420 yield, the on-ledger thermal-caramelization aroma
 co-product, the gradual-reservoir / per-compound-retention refinements.
+
+## D-97 — the ATF1 precursor coupling: the banana ester becomes YAN-responsive, and a Km decides the rate law's form (§3.2)
+
+**What.** `isoamyl_acetate` synthesis is now **first-order in its precursor alcohol**, the `fusels` pool:
+`d(isoamyl_acetate)/dt = k · [fusels] · X · S/(K_su+S) · f(T)`. The other two esters are unchanged. This is the first of D-96's
+four named deferred refinements, and the only one of them with a **new observable**. Before D-97 the banana note was **YAN-blind** —
+flat at 0.759 / 0.758 / 0.756 mg/L across YAN 40 / 80 / 250 mg/L, while the `fusels` pool that *is* its precursor swung **2.9×**
+(29.5 → 86.4 mg/L) over the same range. That is not a coarse reading; it is a **missing dependency**: ATF1 acetylates isoamyl
+alcohol, the Ehrlich pathway that builds isoamyl alcohol is nitrogen-gated, so a nitrogen-starved must *must* make less banana and
+the model said it made exactly as much. One new registry field, no new parameter, two re-anchored constants. 1031 → 1039 tests.
+
+**THE ADVISOR REVERSED ITS OWN STEER, AND THE DATA IS WHY (the entry's spine).** The first advisor pass gave a crisp crux: gate on
+the **driver**, not the pool — couple to the N-gated Ehrlich rate (or share `fusel_production_rate`, the D-33 pattern), because
+`fusels` is a *produced-only, monotonically-accumulating* pool whose availability gate is either ≈1 throughout (a no-op with a
+parameter bolted on) or, if it varies, *back*-loads the ester — the opposite of the intended nitrogen front-loading. Structurally
+airtight. **A probe killed it.** `N` empties at **day 2 with ~75 % of the sugar still unfermented** (S = 185 of 245 g/L), so a
+driver-coupled banana **stops dead at day 2** while 51 mg/L of its substrate sits in the vessel and the flux goes on supplying
+acetyl-CoA for six more days. Coupling to the *rate* conflates **"the precursor is being made"** with **"the ester is being made."**
+The alcohol **persists**; ATF1 keeps acetylating it. The pool is the right thing to read, and the existing `flux` term already
+supplies the "production stops at dryness" envelope the driver-coupling was reaching for. The advisor's own no-op objection also
+dissolved on inspection: it was reasoning about **flatness in time within one run**, but the discriminating signal here is
+**across-YAN, between runs** — a gate sitting at 0.667 responds to nitrogen perfectly well. **The lesson is not "the advisor was
+wrong"** — the structural argument was correct and worth having — **it is that a five-line probe settled in seconds what neither of
+us could settle by reasoning.** The model was right there to be asked.
+
+**THE FORM WAS DECIDED BY A LOOKUP, NOT A JUDGEMENT — and the fact was findable.** Linear (`k·[fusels]`, no new constant) versus
+saturable (`[fusels]/(Km+[fusels])`, one new constant) turns **entirely** on one number: ATF1's Km for isoamyl alcohol against the
+~0.58 mM the pool actually carries. **Fujii et al. 1998** (Appl. Environ. Microbiol. 64:4076-4078, citing Yoshioka & Hashimoto 1981,
+Agric. Biol. Chem. 45:2183-2190) reports **Km ≈ 29.8 mM** for isoamyl alcohol against **0.19 mM** for acetyl-CoA — and states the
+mechanism outright: *"a major rate-limiting factor for isoamyl acetate production is the amount of isoamyl alcohol in the sake
+mash."* **Both halves of this beat are sourced by one paper**: that the coupling exists at all, and what form it takes. The pool sits
+**~51× below Km** (wine) and **~63×** (beer) — deep in the `[S] ≪ Km` limit, robust across the whole reported 25–30 mM range, so the
+conclusion does not hinge on the exact value. **Linear is the MEASURED regime, not the convenient choice.**
+
+**WHY THE MEASURED Km IS *NOT* A PARAMETER — identifiability, and it is the subtler half of the argument.** The advisor named a
+**dual trap** worth recording: *"Don't pick linear because it avoids a parameter. Omitting a Km that physically matters is the same
+sin as fitting one — 'fewer params' is not the discipline, 'source the fact' is."* Exactly right, and it forced the real reason.
+Implementing `[fusels]/(Km+[fusels])` with the sourced 29.8 mM would give **`Vmax` (fitted) + `Km` (sourced)** — but in the `[S] ≪ Km`
+limit **only the ratio `Vmax/Km` is identifiable**: scale Km tenfold, refit Vmax, and the trajectory is **byte-identical**. The
+sourced-looking constant would do **no work** and **no model output could ever validate it** — mechanistic detail as decoration,
+which is its own species of the D-96 disease (a number that *looks* anchored while nothing anchors it). `k_isoamyl_acetate` **IS**
+that identifiable ratio. So the Km lives where it does real work — in the **provenance**, as the sourced justification for the rate
+law's **form** — and the code carries the limit it implies. **The discipline is "source the fact," and the fact's honest home is
+sometimes the provenance, not the store.** Prime directive #2 is about not inventing numbers, not about maximising their count.
+
+**THE ASYMMETRY IS DERIVED, NOT AN EXEMPTION — one enzyme, one rate law, two limits.** The obvious objection is *"ethyl acetate is
+ATF1 too — why is it not coupled?"* The answer needs no special pleading: its precursor is **ethanol**, the bulk `E` pool at ~2 M,
+**orders of magnitude ABOVE** any mM-scale Km ⇒ ATF1 is **saturated** in it ⇒ **zeroth-order** ⇒ no term. Same enzyme, same
+Michaelis-Menten law, **opposite limits, decided by the two precursors' concentrations**. `ethyl_hexanoate` is ungated for a
+different and equally stated reason: a different enzyme (EEB1/EHT1) acylating from **hexanoyl-CoA**, a precursor the sim does not
+model — there is no pool to be first-order in. Pinned by `test_ethyl_acetate_stays_yan_blind_while_the_banana_responds`, which is
+precisely what fails if someone "helpfully" gates both acetates.
+
+**READ, NEVER DEBITED — a scope call, and the D-69 symmetry deliberately NOT taken.** The rate **reads** `fusels`; the ester's carbon
+still comes from `S`. Reading ≠ debiting, so `touches` is unchanged, `total_carbon` is untouched, and no conservation test moves.
+The temptation was strong and named: ATF1 takes the **C5 skeleton from the alcohol + C2 from acetyl-CoA = C7**, the **exact inverse
+of D-69's 5:2 hydrolysis split** that returns C5 to `fusels` — the same 5:2 that D-96 made *exact*. Building the re-route now would
+have been chasing an elegance: the deferred item is the **flux shape**, the re-route is **mass-negligible** (~0.5 mg/L of ester
+against an ~86 mg/L pool), and the sugar draw is the *same documented stand-in* `FuselAlcoholsEhrlich` already uses for the
+amino-acid skeleton. Deferred with its motivation recorded, and **pinned meanwhile**: `test_ester_synthesis_reads_the_fusel_pool_but_
+never_debits_it` fails the moment reading quietly becomes debiting (which would double-count against the fusel producer).
+
+**THE OUTCOME IS PINNED, AS A RATIO — D-96's own done-call lesson, applied first this time rather than caught at the end.** Because
+`k` is re-anchored to hold the finished value, **the calibration target is unchanged and the OAV at reference YAN does not move** —
+so any test of the finished number would pass just as well on the pre-D-97 model. The teeth are the observable the old model got
+**wrong**: `test_low_yan_makes_less_banana_than_high_yan_end_to_end` asserts, on a **real solver run**, that the ester swing **tracks
+the fusel swing** (ratio-to-ratio, ±25 %) rather than merely exceeding 1 — an absolute band would also pass for a `k` that had simply
+been retuned. **Verified to have teeth**: unwiring `precursor_pool` fails it (and three others) while the rest of the suite stays
+green. The regime test and the read-not-debit test correctly **survive** that unwiring — they guard the form's precondition and the
+scope boundary, not the coupling.
+
+**A TEST FOR THE FORM'S PRECONDITION, not just its mechanism.** `test_fusel_pool_stays_far_below_atf1_km_so_the_first_order_form_
+holds` checks on a real run that the pool stays under **10 % of Km**. First-order is only correct in the `[S] ≪ Km` limit, and that
+is a claim about **concentrations the sim actually reaches** — so it is checkable rather than merely asserted in provenance. If a
+future change ever drove `fusels` toward Km, the linear form would silently over-predict the banana without saturating, and this
+test — not a reviewer — is what says so. **The sourced justification for a form should be executable when the form's validity is a
+model output.**
+
+**Numbers, and an EMERGENT result nothing was tuned for.** Wine `isoamyl_acetate` across YAN 40 → 250: **0.442 → 1.264 mg/L
+(2.86×)**, against the fusel pool's 2.9× — the ester tracks its precursor **because both are derived**, not because either was fitted;
+YAN 80 still lands **0.758 mg/L**, the D-96 target, to three digits. `k` re-anchored **5.0e-6 → 1.0e-4** (wine, ×20) and
+**1.2e-5 → 3.05e-4** (beer, ×25.4) — and **the two factors DIFFER precisely because each medium's fusel level differs** (51.1 vs
+41.5 mg/L), the same per-medium independence D-96 established; units `1/h → L/(g*h)`, the `k_mlf_diacetyl_reduction` precedent.
+Uncertainty bands rescaled by the same factors, so they pin the identical **concentration** span (the rate stays linear in `k`).
+**The sensory payoff lands in BEER, not wine, and the reason is D-95's MAX rule**: wine's `fruity` is dominated by
+`ethyl_hexanoate` (apple), which has no YAN dependence, so wine's descriptor barely moves (79.0 → 78.6) even as the banana's own OAV
+swings **14.7 → 42.1** — the effect is real but **masked**, and honestly so. In beer, where D-96 established the banana *is* the
+fruity dominant, **the dominant LABEL FLIPS with nitrogen**: at YAN 100 `ethyl_hexanoate` takes over (fruity 1.04), at YAN 200+ it is
+`isoamyl_acetate` (1.84 → 2.69). **A low-nitrogen wort's fruity character stops being banana-led** — a qualitative, emergent
+consequence of two independently-anchored molecules meeting under a max rule, which is exactly the attribution D-95 built `dominant`
+to express.
+
+**Inherited caveats, named not buried.** (i) `fusels` is a **LUMPED** pool (isoamyl alcohol representative, really all the higher
+alcohols), so reading it whole over-states the true isoamyl-alcohol supply. The over-statement is absorbed into the re-anchored `k`;
+the residual cost is that the **YAN-response assumes the lump's composition is fixed** — the D-66 caveat, honest here because
+`fusels` is genuinely flagged `lumped` (D-96 left the marker meaning something precisely so this could be said plainly). The clean
+fix is the same one D-96 prescribes: **another pool, never another disclaimer** — speciating `fusels` as the esters were speciated.
+(ii) Isoamyl acetate now **inherits `FuselAlcoholsEhrlich`'s speculative monotone-in-N shape**, including its admitted omission of
+the low-YAN biosynthetic rise; the observed non-monotonicity at YAN 400 (fusels 86.4 → 80.4, ester 1.264 → 1.181) is that inherited
+shape showing through, which is why the outcome test compares 40 vs 250 and not the extreme.
+
+**Regression surface.** `carbon_routing.py` (`EsterSpec.precursor_pool`, registry), `byproducts.py` (`EsterSynthesis.derivatives` +
+docs), `wine_generic.yaml` / `beer_generic.yaml` (`k_isoamyl_acetate` value/unit/band/provenance). No state slot, no `touches`, no
+ledger entry, no new parameter. The §2.2 inversion benchmarks and every conservation test pass **unweakened**. One existing test
+changed and it changed **correctly**: `test_ester_derivative_matches_closed_form` had `fusels = 0` and so asserted a now-legitimately-
+zero banana rate — it now reconstructs the rate **from the registry** (`spec.precursor_pool`) rather than special-casing a name, and
+`_wine_y0` defaults `fusels` to a realistic 50 mg/L so no ester assertion is **vacuously** true.
+
+**Next:** per-ester `dH`/`E_a` (blocked on sourcing — an author-estimate would *lower* fidelity, so this may stay deferred until a
+source exists rather than be built for completeness); the **isoamyl-acetate carbon re-route** off `fusels` (the D-69 5:2 inverse,
+now the natural next beat); ethyl acetate + ethyl hexanoate hydrolysis (sensorially mute); further fruity esters (one registry entry
+each); beat 1b slice 2 (weighting / compression / masking); speciating the `fusels` lump — which would retire caveat (i) above and is
+the D-96 pattern applied one pool over; a beer-specific per-melanoidin A420 yield; the on-ledger thermal-caramelization aroma
+co-product.

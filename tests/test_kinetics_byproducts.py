@@ -70,8 +70,12 @@ def _wine_y0(
     e: float = 0.0,
     n: float = 0.1,
     t: float = 293.15,
+    fusels: float = 0.05,
 ) -> FloatArray:
-    return schema.pack({"X": x, "S": [s], "E": e, "N": n, "T": t, "CO2": 0.0})
+    # `fusels` defaults to a realistic mid-ferment ~50 mg/L rather than 0 because since D-97
+    # it is isoamyl acetate's PRECURSOR: at fusels=0 the banana rate is identically 0 and any
+    # assertion about it would be vacuously true.
+    return schema.pack({"X": x, "S": [s], "E": e, "N": n, "T": t, "CO2": 0.0, "fusels": fusels})
 
 
 # -- metadata -----------------------------------------------------------------
@@ -117,10 +121,16 @@ def test_ester_derivative_matches_closed_form(params):
     ethyl-acetate carbon fraction. The molecules differ (C4/C7/C8), so a single shared fraction
     would now mis-debit sugar for two of the three; this pins that each ester is weighted as
     itself.
+
+    Since **D-97** the closed form is no longer uniform across the three: isoamyl acetate
+    carries a first-order ``[fusels]`` precursor factor (ATF1 is far from saturated in isoamyl
+    alcohol), while the other two do not. That per-ester branch is driven by
+    ``EsterSpec.precursor_pool``, so this reconstructs the rate from the registry rather than
+    special-casing a name.
     """
     schema = wine_schema()
-    x, s, t = 2.0, 200.0, 293.15
-    y = _wine_y0(schema, x=x, s=s, t=t)
+    x, s, t, fusels = 2.0, 200.0, 293.15, 0.05
+    y = _wine_y0(schema, x=x, s=s, t=t, fusels=fusels)
     d = EsterSynthesis().derivatives(0.0, y, schema, params)
 
     flux = x * (s / (params["K_sugar_uptake"] + s))
@@ -129,6 +139,8 @@ def test_ester_derivative_matches_closed_form(params):
     total_ester_carbon = 0.0
     for spec in ESTER_SPECS:
         rate = params[spec.k_param] * flux * f_t
+        if spec.precursor_pool is not None:
+            rate *= schema.get(y, spec.precursor_pool)  # D-97: first-order in the precursor
         assert schema.get(d, spec.pool) == pytest.approx(rate), spec.pool
         assert rate > 0.0, spec.pool  # a real contribution, not a vacuous 0 == 0
         total_ester_carbon += rate * carbon_mass_fraction(spec.species)
@@ -661,3 +673,194 @@ def test_volatilization_tier_capped_by_placeholder_params(store):
     ps = ProcessSet(schema, [EsterVolatilization()])
     assert ps.tier_of("ethyl_acetate_gas") is Tier.PLAUSIBLE
     assert ps.tier_of("ethyl_acetate_gas", store.tier_map()) is Tier.SPECULATIVE
+
+
+# -- D-97: the ATF1 precursor coupling ----------------------------------------
+#
+# The banana ester's rate is FIRST-ORDER in its precursor alcohol (the `fusels` pool),
+# because ATF1's measured Km for isoamyl alcohol (~29.8 mM; Fujii 1998, AEM 64:4076-4078)
+# sits ~30-60x ABOVE the pool the sim actually carries (~0.5-1 mM) — the [S] << Km limit.
+# Ethyl acetate gets no such term: its precursor is ethanol (~2 M), which saturates the
+# same enzyme. Same enzyme, same rate law, opposite limits.
+
+
+def _wine_isoamyl_run(yan_mgl: float):
+    """A real solver run to dryness at a given YAN; returns the finished pools."""
+    sc = Scenario(
+        name=f"d97-yan-{yan_mgl}",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": yan_mgl, "pitch_gpl": 0.25},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=21.0,
+    )
+    compiled = compile_scenario(sc, strict=True)
+    traj = simulate(compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h)
+    assert traj.success, traj.message
+    assert float(traj.series("S")[-1]) <= 2.0, "run must reach dryness to compare finished pools"
+    return {
+        "isoamyl_acetate": float(traj.series("isoamyl_acetate")[-1]),
+        "ethyl_acetate": float(traj.series("ethyl_acetate")[-1]),
+        "fusels": float(traj.series("fusels")[-1]),
+    }
+
+
+def test_low_yan_makes_less_banana_than_high_yan_end_to_end():
+    """THE D-97 OUTCOME — the observable the pre-D-97 model got WRONG.
+
+    This is the test the beat exists for, and the one that pins the *result* rather than the
+    mechanism (the D-96 done-call lesson: every other test here pins how it works, so a
+    regression that silently unwired the coupling would slip past them all). Before D-97 the
+    banana ester was **YAN-blind** — flat at 0.759/0.758/0.756 mg/L across YAN 40/80/250,
+    because every ester shared one plain flux shape and nothing downstream of nitrogen
+    reached it. That is physically wrong: ATF1 acetylates isoamyl alcohol, the Ehrlich
+    pathway that builds isoamyl alcohol is nitrogen-gated, so a nitrogen-starved must has
+    less precursor to acetylate and MUST make less banana.
+
+    Deliberately asserted as a RATIO against the fusel swing, not as absolute values: the
+    point is that the ester *tracks its precursor*, which is the derived consequence, whereas
+    an absolute band would also pass for a k that had simply been retuned.
+    """
+    low = _wine_isoamyl_run(40.0)
+    high = _wine_isoamyl_run(250.0)
+
+    # The precursor pool must genuinely differ, or the test proves nothing about coupling.
+    fusel_ratio = high["fusels"] / low["fusels"]
+    assert fusel_ratio > 2.0, (
+        f"precondition: YAN 40 -> 250 must move the fusel pool substantially for this test "
+        f"to have teeth (got {fusel_ratio:.2f}x: {low['fusels']:.4f} -> {high['fusels']:.4f} g/L)"
+    )
+
+    # THE CLAIM: the banana tracks its precursor. Pre-D-97 this ratio was 1.00 (0.756/0.759).
+    ester_ratio = high["isoamyl_acetate"] / low["isoamyl_acetate"]
+    assert ester_ratio > 2.0, (
+        f"low-YAN must make substantially LESS isoamyl acetate than high-YAN (D-97): "
+        f"{low['isoamyl_acetate'] * 1000:.3f} vs {high['isoamyl_acetate'] * 1000:.3f} mg/L "
+        f"= {ester_ratio:.2f}x. Pre-D-97 this was 1.00x - the ester was YAN-blind."
+    )
+    # And it tracks it CLOSELY - first-order in the pool, so the ester ratio should land near
+    # the fusel ratio rather than merely somewhere above 1. This is what distinguishes the
+    # first-order coupling from any weaker or saturating dependence.
+    assert ester_ratio == pytest.approx(fusel_ratio, rel=0.25), (
+        f"first-order in the precursor => the ester swing ({ester_ratio:.2f}x) should track "
+        f"the fusel swing ({fusel_ratio:.2f}x) closely"
+    )
+
+
+def test_ethyl_acetate_stays_yan_blind_while_the_banana_responds():
+    """The ASYMMETRY, pinned: ethyl acetate must NOT inherit the precursor coupling.
+
+    Both acetates are ATF1 products, so the naive "couple the acetate esters to their
+    precursor" would gate BOTH - and this test is what fails if someone does. Ethanol runs
+    ~2 M against the same mM-scale Km => ATF1 is saturated in it => zeroth-order => ethyl
+    acetate cannot respond to its precursor's supply, and (having no nitrogen dependence
+    anywhere upstream) stays YAN-blind. The asymmetry between two esters of the SAME enzyme
+    is derived from the precursors' concentrations, not an exemption granted by hand.
+    """
+    low = _wine_isoamyl_run(40.0)
+    high = _wine_isoamyl_run(250.0)
+
+    # Ethyl acetate moves only via the small flux/biomass differences YAN causes - nowhere
+    # near the banana's response.
+    ea_ratio = high["ethyl_acetate"] / low["ethyl_acetate"]
+    ia_ratio = high["isoamyl_acetate"] / low["isoamyl_acetate"]
+    assert ea_ratio == pytest.approx(1.0, abs=0.15), (
+        f"ethyl acetate should stay ~YAN-blind (its ethanol precursor saturates ATF1): "
+        f"{ea_ratio:.3f}x"
+    )
+    assert ia_ratio > 2.0 * ea_ratio, (
+        f"the banana must respond far more strongly to YAN than ethyl acetate does "
+        f"({ia_ratio:.2f}x vs {ea_ratio:.2f}x) - that asymmetry IS the D-97 claim"
+    )
+
+
+def test_fusel_pool_stays_far_below_atf1_km_so_the_first_order_form_holds():
+    """The FORM's precondition, checked on a real run - not left as an unchecked assumption.
+
+    First-order-in-precursor is only correct in the ``[S] << Km`` limit. That is a claim about
+    the concentrations the sim actually reaches, so it is checkable *here* rather than merely
+    asserted in provenance: if the fusel pool ever climbed toward ATF1's Km, the linear form
+    would silently become wrong (over-predicting the banana without saturating) and the
+    saturable form with the measured Km would be required instead. Guarding at 10% of Km
+    keeps the linear approximation within ~10%; the model in fact runs an order of magnitude
+    below that.
+    """
+    # Fujii 1998, AEM 64:4076-4078 (citing Yoshioka & Hashimoto 1981): Km ~29.8 mM.
+    km_mm = 29.8
+    isoamyl_alcohol_molar_mass = 88.15  # g/mol, C5H12O - the molecule `fusels` is booked as
+
+    worst = max(_wine_isoamyl_run(yan)["fusels"] for yan in (40.0, 250.0))
+    pool_mm = worst / isoamyl_alcohol_molar_mass * 1000.0
+    assert pool_mm < 0.1 * km_mm, (
+        f"the fusel pool ({pool_mm:.3f} mM) must stay well below ATF1's Km ({km_mm} mM) for "
+        f"the first-order form to hold; it currently runs at {pool_mm / km_mm:.1%} of Km"
+    )
+
+
+def test_only_the_banana_declares_a_precursor_and_it_is_a_real_pool():
+    """The registry contract: exactly one ester is precursor-coupled, and it names a real slot.
+
+    Pins the D-96 promise that ``ESTER_SPECS`` drives every layer - a phantom precursor pool
+    would otherwise fail only at runtime, deep inside the solver.
+    """
+    coupled = [spec for spec in ESTER_SPECS if spec.precursor_pool is not None]
+    assert [spec.pool for spec in coupled] == ["isoamyl_acetate"], (
+        "only isoamyl acetate is precursor-limited (D-97): ethyl acetate's ethanol precursor "
+        "saturates ATF1, and ethyl hexanoate's hexanoyl-CoA precursor is not modelled at all"
+    )
+    assert coupled[0].precursor_pool == "fusels"
+    # No phantom: the named precursor must be a real state slot in BOTH media.
+    for schema in (wine_schema(), beer_schema()):
+        assert coupled[0].precursor_pool in schema.names
+
+
+def test_ester_synthesis_reads_the_fusel_pool_but_never_debits_it(params):
+    """READ, NEVER DEBITED - the D-97 scope call, pinned.
+
+    The rate reads ``fusels``; the ester's carbon still comes from ``S``. Physically the
+    acetylation takes the C5 skeleton *from* the alcohol (the exact inverse of the 5:2 split
+    D-69's hydrolysis returns to ``fusels``), so the carbon re-route is the honest end state
+    and the named deferred refinement. Until then this test pins the boundary: reading a pool
+    must not silently become debiting it, which would double-count against
+    :class:`FuselAlcoholsEhrlich` and break the ``touches`` contract.
+    """
+    schema = wine_schema()
+    proc = EsterSynthesis()
+    assert "fusels" not in proc.touches, "D-97 reads the fusel pool; it must not debit it"
+
+    y = _wine_y0(schema)
+    y[schema.slice("fusels")] = 0.05
+    d = proc.derivatives(0.0, y, schema, params)
+    assert float(d[schema.slice("fusels")][0]) == 0.0, (
+        "EsterSynthesis must leave the fusel pool untouched (it is a substrate it reads, "
+        "not a pool it consumes - the carbon comes from S)"
+    )
+    assert float(d[schema.slice("isoamyl_acetate")][0]) > 0.0, "...while still making the ester"
+
+
+def test_banana_rate_is_first_order_in_the_fusel_pool(params):
+    """The MECHANISM at the derivative level: double the precursor, double the banana rate -
+    and leave the other two esters exactly where they were.
+
+    The pure-function counterpart to the end-to-end outcome test: it isolates the coupling
+    from every confound a full run carries (biomass, stripping, dryness).
+    """
+    schema = wine_schema()
+    proc = EsterSynthesis()
+
+    def rates(fusels: float):
+        y = _wine_y0(schema, fusels=fusels)
+        d = proc.derivatives(0.0, y, schema, params)
+        return {spec.pool: float(d[schema.slice(spec.pool)][0]) for spec in ESTER_SPECS}
+
+    single = rates(0.05)
+    double = rates(0.10)
+    assert double["isoamyl_acetate"] == pytest.approx(2.0 * single["isoamyl_acetate"]), (
+        "the banana rate is FIRST-ORDER in the fusel pool (D-97)"
+    )
+    # The ungated esters must be untouched by the precursor pool.
+    assert double["ethyl_acetate"] == pytest.approx(single["ethyl_acetate"])
+    assert double["ethyl_hexanoate"] == pytest.approx(single["ethyl_hexanoate"])
+    # And with no precursor at all there is no banana - but the others still form.
+    empty = rates(0.0)
+    assert empty["isoamyl_acetate"] == 0.0, "no precursor alcohol => no acetylation => no banana"
+    assert empty["ethyl_acetate"] > 0.0, "ethyl acetate does not depend on the fusel pool"
