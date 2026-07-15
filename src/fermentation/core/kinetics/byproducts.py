@@ -1,9 +1,13 @@
 """Temperature-/metabolism-driven aroma byproducts — esters and fusel alcohols.
 
 The first Milestone-2 (Tier-2) beat (decision D-18 build order). Two *additive*
-Processes that fill the produced-only ``esters`` and ``fusels`` pools the schema
-gained in the byproducts beat. Both are trace (mg/L–low-hundreds-mg/L) beside the
-g/L ethanol flux, and both **rise with temperature** — the physics behind the
+Processes that fill the produced-only ester and ``fusels`` pools the schema gained in the
+byproducts beat. Since **decision D-96** "the ester pool" is three single-molecule pools —
+``ethyl_acetate`` / ``isoamyl_acetate`` / ``ethyl_hexanoate``, registered in
+:data:`~fermentation.core.kinetics.carbon_routing.ESTER_SPECS` — not one lump; see that
+registry for why the lump could not survive contact with its own OAV readout. Both are
+trace (mg/L–low-hundreds-mg/L) beside the g/L ethanol flux, and both **rise with
+temperature** — the physics behind the
 "warm ferments are estery/fusel-heavy" rule and the directional benchmark
 ``test_lower_temperature_is_slower_but_cleaner``.
 
@@ -44,9 +48,10 @@ brake, and the stripping dynamics all perturb the clean cancellation.
 
 **Carbon accounting — option (a)/a1 (decision D-19): carbon routed from sugar.**
 Each Process draws its species' carbon *out of ``S``* and the pools are weighted in
-``total_carbon`` (by ethyl-acetate / isoamyl-alcohol carbon fractions), so esters and
-fusels are **real carbon-accounted state** under one consistent rule with ``Gly`` and
-``Byp`` (D-16) — not diagnostic re-expressions. This is the user's call (2026-06-29),
+``total_carbon`` (each ester by its OWN molecule's carbon fraction since D-96 — C4/C7/C8 —
+and fusels by isoamyl alcohol's), so esters and fusels are **real carbon-accounted state**
+under one consistent rule with ``Gly`` and ``Byp`` (D-16) — not diagnostic re-expressions.
+This is the user's call (2026-06-29),
 chosen over the interim option (b) (pools outside ``total_carbon``) and the
 closure-neutral a2 variant (transfer from ``E``/``Byp`` without a sugar draw).
 
@@ -90,14 +95,15 @@ deamination branch is the prerequisite the re-route was long deferred on (D-19/D
 **The gas-stripping sink (decisions D-20 → D-21).** The observed fall of wine *liquid*
 ester with temperature is largely **evaporation** (Rollero 2014), not reduced synthesis.
 That sink — logged as future work in D-19 — is built as :class:`EsterVolatilization`,
-which strips liquid ``esters`` into the bookkeeping ``esters_gas`` headspace pool on the
+which strips each liquid ester into its own bookkeeping headspace pool on the
 evolving-CO2 stream, with a **physical** Henry's-law partition (``dH_ester_volatil`` ≈
 45 kJ/mol, sourced ethyl-acetate gas/liquid partition enthalpy; D-21 replaced D-20's
 fudged per-medium ``E_a_ester_volatil``). Because a sourced stripping is medium-
 independent, the wine/beer direction is carried by **per-medium sourced synthesis
-``E_a_esters``** (beer steep / wine flat), not by the sink. The transfer is carbon-neutral
-(``esters`` → ``esters_gas``, both ethyl acetate), so ``total_carbon`` still closes to
-machine precision. See that class for the full rationale.
+``E_a_esters``** (beer steep / wine flat), not by the sink. Each transfer is carbon-neutral
+(a pool and its twin share one molecule's weight), so ``total_carbon`` still closes to
+machine precision. See that class for the full rationale, and for why v1 shares one sourced
+ethyl-acetate partition enthalpy across all three esters (a documented approximation, D-96).
 
 Tiers: :class:`EsterSynthesis` is **plausible** in form (warmth-favoured,
 flux-coupled ester synthesis is the standard direction in the canonical *beer* model,
@@ -121,6 +127,7 @@ from collections.abc import Mapping
 from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar as _draw_carbon_from_sugar,
 )
@@ -134,12 +141,14 @@ from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
-#: Representative species whose formula carbon-accounts each aroma pool (D-19). Ester
-#: ⇒ ethyl acetate (C4H8O2); fusel ⇒ isoamyl alcohol (C5H12O). The carbon mass
-#: fraction of each weights both the sugar draw here and the pool in ``total_carbon``,
+#: Representative species whose formula carbon-accounts each aroma pool (D-19). The carbon
+#: mass fraction of each weights both the sugar draw here and the pool in ``total_carbon``,
 #: from the one chemistry source of truth — so the draw and the conservation check
 #: can never disagree (cf. the ``Gly``/``Byp`` routing in the uptake Process).
-_ESTER_SPECIES = "ethyl_acetate"
+#:
+#: The fusel pool is still a genuinely LUMPED pool standing in for the higher alcohols;
+#: the ester pools no longer are — each is its own molecule, registered in ``ESTER_SPECS``
+#: and weighted by itself (decision D-96), so there is no single ``_ESTER_SPECIES`` any more.
 _FUSEL_SPECIES = "isoamyl_alcohol"
 
 
@@ -174,30 +183,55 @@ def fusel_production_rate(y: FloatArray, schema: StateSchema, params: Mapping[st
 class EsterSynthesis(Process):
     """Ester production, coupled to the fermentative flux and favoured by warmth.
 
-    ``d(esters)/dt = k_ester · X · S_total/(K_sugar_uptake + S_total) · f(T)`` with
-    ``f(T) = arrhenius_factor(T, E_a_esters, T_ref)``. Esters (isoamyl acetate,
-    ethyl esters, ethyl acetate) form alongside fermentation; tying synthesis to the
-    biomass-catalysed sugar flux (sharing ``K_sugar_uptake``) couples them to that
-    flux directly. ``E_a_esters`` is **sourced per medium** (decision D-21): **steep**
-    for beer (de Andrés-Toro 1998, ester ride growth — synthesis outruns the stripping
-    sink, so beer liquid esters *rise* with T) and **weak/~flat** for wine (Mouret 2015 /
-    Rollero 2014, wine ester synthesis is weak and non-monotonic — so the gas-stripping
-    sink :class:`EsterVolatilization` wins and wine liquid esters *fall* with T). This is
-    only the *synthesis* term; net liquid ester is synthesis minus stripping (see that
-    class and the module docstring). The ester carbon (booked as ethyl acetate) is routed
-    *out of ``S``* via :func:`_draw_carbon_from_sugar` (option a1, D-19), so it touches
-    ``esters`` and ``S`` — never ``E``/``CO2`` — and ``total_carbon`` (which now weights
-    ``esters``) closes exactly. See the module docstring for the ester carbon-source caveat.
+    For each ester in :data:`~fermentation.core.kinetics.carbon_routing.ESTER_SPECS`,
+    ``d(ester)/dt = k_<ester> · X · S_total/(K_sugar_uptake + S_total) · f(T)`` with
+    ``f(T) = arrhenius_factor(T, E_a_esters, T_ref)``. Esters form alongside fermentation;
+    tying synthesis to the biomass-catalysed sugar flux (sharing ``K_sugar_uptake``) couples
+    them to that flux directly. ``E_a_esters`` is **sourced per medium** (decision D-21):
+    **steep** for beer (de Andrés-Toro 1998, ester ride growth — synthesis outruns the
+    stripping sink, so beer liquid esters *rise* with T) and **weak/~flat** for wine (Mouret
+    2015 / Rollero 2014, wine ester synthesis is weak and non-monotonic — so the gas-stripping
+    sink :class:`EsterVolatilization` wins and wine liquid esters *fall* with T). This is only
+    the *synthesis* term; net liquid ester is synthesis minus stripping (see that class and
+    the module docstring). Each ester's carbon is routed *out of ``S``* via
+    :func:`_draw_carbon_from_sugar` **at its own molecule's carbon fraction** (option a1,
+    D-19), so this touches the three ester pools and ``S`` — never ``E``/``CO2`` — and
+    ``total_carbon`` closes exactly. See the module docstring for the ester carbon-source
+    caveat.
+
+    **Three esters, three independently-sourced rates (decision D-96).** Before D-96 a single
+    ``k_ester`` filled one lumped pool. The pool is now split into three single-molecule pools
+    and — the load-bearing call — each ``k`` is anchored to **its own molecule's** measured
+    concentration range rather than to a share of the old total. Splitting one ``k_ester`` by a
+    fitted ratio would have reproduced the same numbers while smuggling back the very
+    fabricated-composition constant the split exists to remove; here the lump's composition and
+    the total ester mass are *derived*, not targeted.
+
+    **Shared temperature shape — a documented simplification (D-96).** All three read the one
+    per-medium ``E_a_esters``. For the two acetates this is principled: same enzyme (ATF1), so
+    no basis to differ. For ``ethyl_hexanoate`` (EEB1/EHT1 — a different enzyme, tied to
+    fatty-acid synthesis) it is a genuine approximation, kept because no separate activation
+    energy is sourced; a per-ester ``E_a`` is the named deferred refinement. Likewise the
+    acetate esters' real dependence on their precursor alcohol (ATF1 acetylates *isoamyl
+    alcohol*, so isoamyl acetate should track the ``fusels`` pool) is **deferred**: v1 gives
+    every ester the same flux shape, so isoamyl acetate's time profile mirrors ethyl acetate's
+    rather than being nitrogen-front-loaded like ``fusels``.
     """
 
     name = "ester_synthesis"
     tier = Tier.PLAUSIBLE
-    touches = ("esters", "S")
+    touches = (*(spec.pool for spec in ESTER_SPECS), "S")
     #: ``K_sugar_uptake`` is shared with the fermentative-uptake flux this tracks;
     #: ``E_a_esters`` (sourced per medium — steep beer / flat wine, D-21) and ``T_ref``
-    #: set the temperature shape.
-    #: Their tiers cap ``esters``'s output tier via parameter-tier propagation (D-1).
-    reads: tuple[str, ...] = ("k_ester", "K_sugar_uptake", "E_a_esters", "T_ref")
+    #: set the temperature shape, shared by all three esters (D-96). Each ester has its own
+    #: independently-sourced rate constant. Their tiers cap the ester pools' output tier via
+    #: parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        *(spec.k_param for spec in ESTER_SPECS),
+        "K_sugar_uptake",
+        "E_a_esters",
+        "T_ref",
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -208,9 +242,12 @@ class EsterSynthesis(Process):
             return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_esters"], params["T_ref"])
-        rate = params["k_ester"] * flux * f_t
-        d[schema.slice("esters")] = rate
-        _draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(_ESTER_SPECIES))
+        for spec in ESTER_SPECS:
+            rate = params[spec.k_param] * flux * f_t
+            d[schema.slice(spec.pool)] = rate
+            # Each ester draws at ITS OWN carbon fraction (C4/C7/C8) — the D-96 split's
+            # ledger payoff: no ester's carbon is booked through a stand-in molecule.
+            _draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(spec.species))
         return d
 
 
@@ -362,7 +399,8 @@ class EsterVolatilization(Process):
     """CO2-stripping loss of liquid esters to the headspace — a physical Henry's-law sink.
 
     ``d(esters)/dt = -k · X·S_total/(K_sugar_uptake+S_total) · f_gas(T) · f_part(T) ·
-    esters`` and the equal-and-opposite ``+`` into ``esters_gas``, where
+    <ester>`` and the equal-and-opposite ``+`` into that ester's own ``<ester>_gas`` twin,
+    for each ester in ``ESTER_SPECS`` (decision D-96), where
 
     * ``f_gas(T) = arrhenius_factor(T, E_a_uptake, T_ref)`` is the **gas-flow** factor: the
       stripping rides the evolving-CO2 stream, whose rate is the fermentative uptake flux
@@ -398,16 +436,29 @@ class EsterVolatilization(Process):
     Rollero evaporation inversion). Both directions now emerge from *physical + sourced*
     parameters, not a compensating constant. Verified empirically at 14/20/25 °C.
 
-    **Carbon — a neutral liquid→gas transfer (no sugar draw).** Unlike
+    **Carbon — three neutral liquid→gas transfers (no sugar draw).** Unlike
     :class:`EsterSynthesis`/:class:`FuselAlcoholsEhrlich`, this Process draws **no fresh
-    sugar**: it only moves carbon already in the liquid ``esters`` pool into the
-    ``esters_gas`` headspace pool, both booked as ethyl acetate. So it touches
-    ``esters`` and ``esters_gas`` only — never ``S``/``E``/``CO2`` — and since
-    ``total_carbon`` weights both pools at the *same* ethyl-acetate fraction, the transfer
-    is carbon-neutral and closure stays at machine precision (the headspace pool is the
-    ester analogue of evolved ``CO2``: carbon leaves the liquid but not the ledger).
-    ``esters`` is clamped ≥ 0 so a solver undershoot cannot strip a negative pool into
-    spurious gas.
+    sugar**: it only moves carbon already in each liquid ester pool into *that ester's own*
+    headspace pool. So it touches the three ester pools and their three gas twins only —
+    never ``S``/``E``/``CO2`` — and since ``total_carbon`` weights each pool and its twin at
+    the *same* molecule's fraction, **every** transfer is carbon-neutral independently and
+    closure stays at machine precision (a headspace pool is the ester analogue of evolved
+    ``CO2``: carbon leaves the liquid but not the ledger). Each liquid pool is clamped ≥ 0 so
+    a solver undershoot cannot strip a negative pool into spurious gas.
+
+    Note the pairing is *why* each ester needs its own gas pool (decision D-96): a single
+    shared headspace pool could carry only one carbon weight, so stripping a C7 ester into a
+    C4-weighted pool would create or destroy carbon. Before D-96 one lumped pool and one gas
+    twin were both booked as ethyl acetate, and the question could not arise.
+
+    **Documented simplification — one partition enthalpy for three molecules (D-96).**
+    ``dH_ester_volatil`` is sourced for **ethyl acetate** (~45 kJ/mol, NIST/Sander) and v1
+    applies it to all three esters. That is a measured constant borrowed for two molecules it
+    was not measured for — an approximation the ester van't Hoff enthalpies' natural clustering
+    (~40–55 kJ/mol across this range) makes tolerable, but an approximation, and it is recorded
+    here rather than left implicit. Its direction is known: isoamyl acetate and ethyl hexanoate
+    are *less* volatile than ethyl acetate, so v1 slightly over-strips them. Per-ester sourced
+    partition enthalpies are the named deferred refinement.
 
     **Documented simplification.** The full Morakul (2011) partition coefficient is also
     *ethanol-dependent* (``ln k_i = F1 + F2·E − (F3 + F4·E)·R·(1000/T − 1000/T_ref)``); we
@@ -421,7 +472,7 @@ class EsterVolatilization(Process):
 
     name = "ester_volatilization"
     tier = Tier.PLAUSIBLE
-    touches = ("esters", "esters_gas")
+    touches = (*(spec.pool for spec in ESTER_SPECS), *(spec.gas_pool for spec in ESTER_SPECS))
     #: ``K_sugar_uptake``/``E_a_uptake`` are shared with the fermentative uptake whose CO2
     #: stream does the stripping (gas-flow factor); ``dH_ester_volatil`` is the sourced
     #: ethyl-acetate Henry's-law partition enthalpy (gas/liquid factor); ``T_ref`` anchors
@@ -443,13 +494,16 @@ class EsterVolatilization(Process):
         flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
         if flux <= 0.0:
             return d
-        esters_liquid = max(float(y[schema.slice("esters")][0]), 0.0)
-        if esters_liquid <= 0.0:  # nothing in the liquid pool to strip
-            return d
         temp = float(y[schema.slice("T")][0])
         f_gas = arrhenius_factor(temp, params["E_a_uptake"], params["T_ref"])  # CO2 gas flow
         f_part = arrhenius_factor(temp, params["dH_ester_volatil"], params["T_ref"])  # partition
-        rate = params["k_ester_volatil"] * flux * f_gas * f_part * esters_liquid
-        d[schema.slice("esters")] = -rate
-        d[schema.slice("esters_gas")] = rate
+        for spec in ESTER_SPECS:
+            liquid = max(float(y[schema.slice(spec.pool)][0]), 0.0)
+            if liquid <= 0.0:  # nothing in this liquid pool to strip
+                continue
+            rate = params["k_ester_volatil"] * flux * f_gas * f_part * liquid
+            # Liquid → its OWN headspace twin: the pair shares one molecule's carbon weight,
+            # so each transfer is carbon-neutral independently (D-96).
+            d[schema.slice(spec.pool)] = -rate
+            d[schema.slice(spec.gas_pool)] = rate
         return d

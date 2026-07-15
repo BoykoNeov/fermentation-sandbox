@@ -29,11 +29,25 @@ threshold's own tier: the sensory *mapping itself* is the canonical speculative 
 :class:`~fermentation.core.tiers.Tier` docstring names "sensory mapping"), so the floor must
 hold even if a threshold were later mislabelled plausible. See :func:`oav_tier`.
 
-**The lumped-pool call (D-66).** ``esters``/``fusels``/``mercaptans`` are single g/L pools
-mixing several molecules; each is read against the threshold of one **named representative**
-(the stand-in its ``VarSpec`` already names), with the "assumes fixed lump composition"
-honesty cost flagged in that threshold's provenance ``notes``. The single-molecule pools
-(diacetyl, acetaldehyde, H₂S, 4-EP, 4-EG) carry no such assumption.
+**The lumped-pool call (D-66, narrowed at D-96).** ``fusels``/``mercaptans`` are single g/L
+pools mixing several molecules; each is read against the threshold of one **named
+representative** (the stand-in its ``VarSpec`` already names), with the "assumes fixed lump
+composition" honesty cost flagged in that threshold's provenance ``notes``. The
+single-molecule pools (diacetyl, acetaldehyde, H₂S, 4-EP, 4-EG, and since D-96 the three
+esters) carry no such assumption.
+
+**Why the esters left that list (decision D-96).** ``esters`` was the *worst* case of the
+lumped call, and not merely because the lump was coarse: the pool was carbon-weighted as
+**ethyl acetate** on the ledger (D-19) but read here against **isoamyl acetate**'s threshold
+(D-67) — one pool with two molecular identities, in two different layers. Since ethyl acetate
+dominates the pool's mass while isoamyl acetate's threshold is ~300× lower, the OAV was
+inflated by about that factor: a Brett wine read **761**, implying ~23 mg/L isoamyl acetate
+when real wine tops out near 1–3. That is a category error in the numerator, not an uncertain
+ratio, and no ``lumped`` flag could honestly caveat it. D-96 split the pool into three
+single-molecule pools — ``ethyl_acetate``, ``isoamyl_acetate``, ``ethyl_hexanoate`` — each
+weighted *and* perceived as itself. Two consequences worth stating plainly: the D-69 aging
+hydrolysis' 5:2 carbon split became **exact** (it finally debits the molecule it was always
+splitting as), and ``lumped`` now marks only pools where it is true.
 
 **Medium-specificity.** The aroma set is medium-specific (mirroring the beer-only
 ``iso_alpha``): beer carries the 5 common pools + the 5 oak extractives (barrel-beer, D-86 + the
@@ -79,12 +93,28 @@ class AromaCompound:
     lumped: bool
 
 
-#: The five aroma-active pools shared by both media (``_common_specs`` in ``core.media``).
+#: The seven aroma-active pools shared by both media (``_common_specs`` in ``core.media``).
+#:
+#: **The three esters are single-molecule pools (decision D-96).** Until D-96 one lumped
+#: ``esters`` pool stood here, carbon-weighted as *ethyl acetate* but read against *isoamyl
+#: acetate*'s threshold — a split identity that inflated the fruity OAV by roughly the ratio of
+#: the two molecules' thresholds (~300×), reporting ~761 for a Brett wine: not merely uncertain
+#: but **non-physical**, since it implied ~23 mg/L isoamyl acetate against a real ceiling of
+#: ~1–3 mg/L. Each pool is now weighted *and* perceived as one molecule, so the ratio means what
+#: it says. ``ethyl_acetate`` is the bulk solventy ester (tens of mg/L against a ~7.5 mg/L wine
+#: threshold ⇒ OAV of order 1); ``isoamyl_acetate`` the trace potent banana one; ``ethyl_hexanoate``
+#: the apple/pineapple ethyl ester of a medium-chain fatty acid — added at D-96 so splitting the
+#: lump did not narrow the fruity axis to banana alone.
+#:
+#: ``lumped`` now survives only on ``fusels`` (and wine's ``mercaptans``), where it is **true**:
+#: those pools really are several molecules read against one representative's threshold.
 _COMMON: tuple[AromaCompound, ...] = (
     AromaCompound("diacetyl", "2,3-butanedione", "buttery", lumped=False),
     AromaCompound("acetaldehyde", "acetaldehyde", "green apple / bruised", lumped=False),
     AromaCompound("h2s", "hydrogen sulfide", "rotten egg", lumped=False),
-    AromaCompound("esters", "isoamyl acetate", "banana / fruity", lumped=True),
+    AromaCompound("ethyl_acetate", "ethyl acetate", "solventy / nail-polish", lumped=False),
+    AromaCompound("isoamyl_acetate", "isoamyl acetate", "banana", lumped=False),
+    AromaCompound("ethyl_hexanoate", "ethyl hexanoate", "apple / pineapple", lumped=False),
     AromaCompound("fusels", "isoamyl alcohol", "solventy / fusel", lumped=True),
 )
 
@@ -127,10 +157,11 @@ _OAK: tuple[AromaCompound, ...] = (
     AromaCompound("furaneol", "furaneol", "caramel / toffee", lumped=False),
 )
 
-#: Medium -> its ordered aroma set. Beer = 5 common + 5 oak (10); wine = 5 common + 9 wine-only + 5
-#: oak (19 — D-87 added the four thermal Strecker/sotolon pools to the wine-only set, D-94 added
-#: furaneol to the oak set). Wine's order keeps the oak five last, so the D-87 pools slot in after
-#: the two D-75 aldehydes, before oak.
+#: Medium -> its ordered aroma set. Beer = 7 common + 5 oak (12); wine = 7 common + 9 wine-only + 5
+#: oak (21 — D-87 added the four thermal Strecker/sotolon pools to the wine-only set, D-94 added
+#: furaneol to the oak set, D-96 took the common set from 5 to 7 by splitting the lumped ``esters``
+#: pool into three single-molecule esters). Wine's order keeps the oak five last, so the D-87 pools
+#: slot in after the two D-75 aldehydes, before oak.
 AROMA_COMPOUNDS: Mapping[str, tuple[AromaCompound, ...]] = {
     "beer": _COMMON + _OAK,
     "wine": _COMMON + _WINE_ONLY + _OAK,

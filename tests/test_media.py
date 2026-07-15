@@ -5,10 +5,14 @@ import dataclasses
 import numpy as np
 import pytest
 
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine_schema
 
+# The three single-molecule ester pools and their headspace twins replaced the lumped
+# `esters`/`esters_gas` pair at D-96; spread from the registry so this list cannot drift.
 SHARED = (
-    "X", "S", "E", "N", "T", "CO2", "X_dead", "Gly", "Byp", "esters", "fusels", "esters_gas",
+    "X", "S", "E", "N", "T", "CO2", "X_dead", "Gly", "Byp",
+    *(spec.pool for spec in ESTER_SPECS), "fusels", *(spec.gas_pool for spec in ESTER_SPECS),
     "acetolactate", "diacetyl", "butanediol", "acetaldehyde", "h2s", "h2s_gas", "o2", "A420",
 )  # fmt: skip
 
@@ -168,7 +172,11 @@ def test_wine_schema_has_single_sugar_slot():
     # + 2 D-94 furaneol slots (the caramel/toffee oak+bourbon furanone pool + its ceiling — the
     # fifth oak aroma extractive; off every ledger like the D-77 four, so no collision with the
     # on-ledger D-88 caramelization melanoidin)
-    assert schema.size == 66
+    # + 4 D-96 ester-split slots (the lumped esters/esters_gas pair became the three
+    # single-molecule pools ethyl_acetate/isoamyl_acetate/ethyl_hexanoate, each with its own
+    # headspace twin — a twin per ester is FORCED, since a pool and its twin must share one
+    # molecule's carbon weight for the strip to stay carbon-neutral: 2 slots became 6)
+    assert schema.size == 70
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -177,19 +185,21 @@ def test_beer_schema_has_three_sequential_sugars():
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
-    # 20 shared (X, S(3), E, N, T, CO2, X_dead, Gly, Byp, esters, fusels, esters_gas (D-20),
+    # 24 shared (X, S(3), E, N, T, CO2, X_dead, Gly, Byp, the THREE ester pools + fusels +
+    # their THREE gas twins (D-20 generalised per-ester at D-96: the lumped esters/esters_gas
+    # pair became ethyl_acetate/isoamyl_acetate/ethyl_hexanoate + one twin each, +4 slots),
     # acetolactate, diacetyl, butanediol (VDK pathway, D-26), acetaldehyde (D-27),
     # h2s (D-29) + h2s_gas (D-42 CO2-stripping sink), o2 (D-71 aging substrate), A420 (D-74
     # oxidative-browning index)) + 1 beer-only iso_alpha bitterness slot (D-64) — S occupies 3
-    # slots, so 20 shared names span 22 slots, + iso_alpha = 23
+    # slots, so 24 shared names span 26 slots, + iso_alpha = 27
     # + 12 oak-axis slots (5 aroma extractives — D-77 four + furaneol/caramel D-94 — + 5 ceilings —
     # the barrel/chip axis — plus the ellagitannin TASTE/O₂-scavenging pool + its ceiling, D-78)
     # SHARED with wine by barrel-beer oak (decision D-86): the oak axis is a wood property, so both
     # media carry it (via _oak_specs) = 35
     # + 1 caramelization melanoidin carbon-park slot (D-90: sugar-only thermal browning is medium-
     # agnostic — beer's residual dextrins caramelize too, so melanoidin is appended to beer_schema
-    # too, ON total_carbon; the N-incorporating maillard_melanoidin stays wine-only, D-32) = 36
-    assert schema.size == 36
+    # too, ON total_carbon; the N-incorporating maillard_melanoidin stays wine-only, D-32) = 40
+    assert schema.size == 40
 
 
 def test_shared_variable_units_are_canonical():
@@ -208,9 +218,9 @@ def test_shared_variable_units_are_canonical():
         "X_dead": "g/L",
         "Gly": "g/L",
         "Byp": "g/L",
-        "esters": "g/L",
+        **{spec.pool: "g/L" for spec in ESTER_SPECS},
         "fusels": "g/L",
-        "esters_gas": "g/L",
+        **{spec.gas_pool: "g/L" for spec in ESTER_SPECS},
         "acetolactate": "g/L",
         "diacetyl": "g/L",
         "butanediol": "g/L",
@@ -253,16 +263,18 @@ def test_wine_acid_slot_units_are_canonical():
 
 
 def test_produced_only_pools_default_to_zero_when_omitted():
-    # X_dead/Gly/Byp/esters/fusels/esters_gas are produced-only pools (VarSpec.default=0),
+    # X_dead/Gly/Byp/the three esters/fusels/the ester gas twins are produced-only pools
+    # (VarSpec.default=0),
     # so an initial state may omit them; substrate/condition vars stay required (test_state).
     schema = wine_schema()
     arr = schema.pack({"X": 0.25, "S": [245.0], "E": 0.0, "N": 0.08, "T": 293.15, "CO2": 0.0})
     assert schema.get(arr, "X_dead") == 0.0
     assert schema.get(arr, "Gly") == 0.0
     assert schema.get(arr, "Byp") == 0.0
-    assert schema.get(arr, "esters") == 0.0
+    for spec in ESTER_SPECS:
+        assert schema.get(arr, spec.pool) == 0.0
+        assert schema.get(arr, spec.gas_pool) == 0.0
     assert schema.get(arr, "fusels") == 0.0
-    assert schema.get(arr, "esters_gas") == 0.0
     assert schema.get(arr, "acetolactate") == 0.0
     assert schema.get(arr, "diacetyl") == 0.0
     assert schema.get(arr, "butanediol") == 0.0

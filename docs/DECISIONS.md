@@ -7519,3 +7519,110 @@ repo has none (beat 1a enforced the §4.2 firewall architecturally, not by test)
 the layer below deliberately skipped. **Next:** **beat 1b slice 2** (weighting / compression / masking — the perceptual speculation,
 where the params live), a beer-specific per-melanoidin A420 yield, the on-ledger thermal-caramelization aroma co-product, the
 gradual-reservoir / per-compound-retention refinements.
+
+## D-96 — the lumped `esters` pool SPLIT into three single-molecule esters — retiring the ledger/lens split identity that made `fruity` non-physical (§4.2/§3.2)
+
+**What.** The owner read D-95's fresh projection output and stopped on one number: a bourbon-barrel stout's `fruity` read OAV **53**,
+a Brett wine's read **761**, each now labelled `(lumped)` right next to the value. Their call — *"that's beat 1a's lumped-esters
+assumption showing through, not this layer's doing, but it might be worth a look on its own merits."* It was. The diagnosis: `esters`
+was **the only pool in the sim with two molecular identities**. `chemistry.py` carbon-weighted it as **ethyl acetate** (C4, D-19);
+`oav.py` read it against **isoamyl acetate**'s threshold (D-67). `fusels` (isoamyl alcohol both layers) and `mercaptans`
+(methanethiol both layers) were self-consistent; only `esters` was not. The lump is now **three single-molecule pools** —
+`ethyl_acetate` / `isoamyl_acetate` / `ethyl_hexanoate` — each weighted **and** perceived as itself. Wine 66→70 slots, beer 36→40.
+Three advisor passes (one diagnostic, one design, one on a design change the owner's fork forced) + two owner forks.
+
+**NOT A LOUD CAVEAT — A DEFECT (the advisor's reframe, which set the whole build's stakes).** My first instinct was to treat 761 as
+"directional only, honestly flagged". The advisor refused that framing and it is the entry's spine: 761 implies **~23 mg/L of isoamyl
+acetate**, against a real-wine ceiling of ~1–3. The number is **non-physical under the very molecule it is being read against** —
+a category error in the *numerator*, not an uncertain ratio. `lumped` can honestly caveat a *coarse* reading; it cannot caveat reading
+a pool against a molecule the pool is not made of. The advisor also drew the layer line that saved the build from going wrong:
+**D-95 was the messenger, not the culprit** — the projection merely put `(lumped)` beside a number precise enough to look calibrated.
+Fixing a beat-1a number by touching the projection would have been the tempting mistake.
+
+**THE LINCHPIN — three INDEPENDENTLY-SOURCED k's, never a ratio-split of one (the advisor's blocker, and the integrity of the fork).**
+The cheap implementation was to take `k_ester = 4e-4` and divide it ~97/3. The advisor blocked it in the sharpest terms available:
+that would be *"option 3 wearing option 2's clothes"* — the owner explicitly chose **split the pool** over **the composition fraction
+knob**, and a fitted ratio is the fraction knob, merely relabelled across three slots. The trap is that it **works**: a 3% ratio also
+lands a plausible OAV, so *the number landing is not evidence the build is right*. The discriminating question is never "does the
+output look right" but **"is the composition sourced or fitted?"** So each `k` is anchored to **its own molecule's** measured range
+(ethyl acetate ~30–80 mg/L wine / ~10–30 ale; isoamyl acetate ~0.1–3 / ~0.5–3; ethyl hexanoate ~0.1–1 / ~0.1–0.5), calibrated
+post-stripping, six independent provenance entries. **Composition and total ester mass are now DERIVED, not targeted** — and the
+receipt is that the derived isoamyl/ethyl-acetate ratio **differs by medium**: ~1.5 % in wine vs ~10.9 % in ale (the banana note is
+an ale signature). A single ratio-split k could only ever have scaled the media *together*; it could not have produced a disagreement.
+
+**THE PAYOFF — D-69's 5:2 split became EXACT, and a seam invisible to conservation for 27 decisions closed.** D-69 (the
+advisor-settled crux of its own beat) split hydrolysis carbon **5:2** into `fusels` + `Byp` from the stand-in reaction *isoamyl
+acetate → isoamyl alcohol (C5) + acetic acid (C2)* — while **debiting ethyl acetate (C4)**, because that was the lump's immovable
+D-19 mass weighting. Debited molecule ≠ split molecule; D-69 documented the mismatch and moved on. **It had to**: closure holds for
+*any* split summing to 1, so `total_carbon` could not see it — the draw and the check agreed, they just agreed on the wrong molecule.
+That is precisely how the seam survived from D-69 to D-95. Post-D-96 the Process debits `isoamyl_acetate` itself and **5 + 2 = 7 =
+its real carbon count**: the split now *exactly partitions the debited molecule*. Asserted at import in `aging.py` and pinned by
+`test_five_to_two_split_exactly_partitions_the_debited_molecule` — a test that **could not have been written at D-69** (4 ≠ 7) and
+that fails under the old arrangement. The ratio never changed. It stopped being a stand-in.
+
+**THE SPLIT IDENTITY HAD A SECOND HOST — `esters_eq` → `isoamyl_acetate_eq` (caught by a test, not by review).** The full suite
+surfaced what per-file runs had missed: D-69's equilibrium floor `esters_eq = 5 mg/L` was **the lump's floor, "booked as
+ethyl-acetate-equivalent g/L (the D-19 esters mass weighting)"** — its own provenance called it *"the aging analogue of the D-67
+fixed-lump-composition assumption"*. It carried the **same disease as the pool**, one layer over. Once `EsterHydrolysis` debits
+`isoamyl_acetate` (~0.76 mg/L young), a 5 mg/L floor sits **above the entire pool** ⇒ `max(0, ester − eq)` is identically 0 ⇒ **the
+Process never fires**, silently disabling D-69's entire fruity→fusel fade. And it would have been **invisible to conservation**: a
+Process that does nothing conserves everything perfectly — the same blind spot that hid the 5:2 seam. Re-anchored to isoamyl
+acetate's own scale (`2.0e-4 g/L` ≈ 26 % of the young level ⇒ aging strips ~74 % of the banana, leaving a residuum) and **renamed**,
+because the name was half the error. `k_ester_hydrolysis` needed no change (first-order in the excess ⇒ scale-free). **The lesson
+generalises: splitting a lumped pool is not done when the pool is split — every parameter anchored to the lump's scale inherits the
+lump's identity.** A grep for the pool name would not have found this one; the floor was named for the pool, not for a molecule.
+
+**AN HONEST DEMOTION THE SPLIT EXPOSED — D-69's "raises fusels" is now correctly NEGLIGIBLE.** End-to-end on a real 400-day aged
+wine: `isoamyl_acetate` **0.756 → 0.426 mg/L (−43.6 %)**, relaxing toward the floor — the banana fades, D-69's headline intact. But
+`fusels` rises only **+0.3 %** (86.38 → 86.60 mg/L), because hydrolysing ~0.33 mg/L of a trace ester cannot meaningfully move an
+86 mg/L pool. Pre-D-96 that rise looked substantial *only because the lump was ~50 mg/L of mostly ethyl acetate and the Process
+deposited all of it as isoamyl alcohol* — the artifact D-69's own docstring half-anticipated when it rejected the 1:1 alternative for
+"fabricating the fusel-aroma rise out of the wrong molecule". The split shows the rise was largely an artifact of the lump either
+way. The claim is not lost, it is **right-sized**: the fade is real and large, the fusel rise is real and tiny.
+`test_aging_fades_esters_and_raises_fusels_end_to_end` still passes on the direction — it always asserted the sign, never a magnitude.
+
+**OWNER FORK 1 — split the pool** (over: the ethyl-acetate reading / the fraction knob / band-the-number). **OWNER FORK 2 — add a
+THIRD pool.** The advisor insisted the coverage cost reach the owner before building: splitting into exactly the two acetates makes
+the **fatty-acid ethyl esters explicitly unmodeled**, so `fruity` — the axis that started this — would have narrowed to **banana
+alone**. The owner chose breadth, and `ethyl_hexanoate` (apple/pineapple, Guth's highest-OAV wine ester) is why `fruity` never
+regressed. It is **single-molecule** too: a *lumped* medium-chain pool would have reintroduced exactly what this decision exists to
+kill. Consequence the advisor predicted and the runs confirm: under D-95's MAX rule wine's `fruity` dominant is **`ethyl_hexanoate`
+(apple), not banana** — its threshold is ~6× lower than isoamyl acetate's. The *dominant label* changed, not only the number.
+
+**THE `lumped` FLAG NOW MEANS SOMETHING.** It survives only on `fusels`/`mercaptans`, where it is **true**. Two paired tests pin the
+marker in both directions (a lumped pool must declare `LUMPED POOL`; a single-molecule pool must not), so the flag and the provenance
+cannot drift apart: re-point a pool at another molecule's threshold and reach for the lump caveat to excuse it, and you must flip
+`lumped` — which trips the other test. **The honest fix is another pool, never another disclaimer.** D-95's `dominant` attribution
+also stopped being vacuous on `fruity`: it read one lumped pool (the only candidate); it now picks between two real molecules.
+
+**Design (mostly forced, not chosen).** ONE canonical registry `ESTER_SPECS` in `carbon_routing.py` (the `AMINO_ACID_SPECIES`
+precedent) drives *every* layer — schema slots, synthesis, stripping, the ledger, the aroma set, the scenario pitch — so a fourth
+ester is **one entry**, not a new code path, and the schema cannot drift from the ledger. **A gas twin per ester is FORCED, not a
+preference:** a pool and its twin must share one molecule's carbon weight for stripping to be carbon-neutral, so a single shared
+headspace pool becomes impossible the moment the esters differ (C7 stripped into a C4-weighted pool *creates carbon*). Before D-96 one
+lump and one twin were both ethyl acetate and the question could not arise. Stripping all three (rather than the advisor's initial
+"defer isoamyl stripping, +1 slot") superseded that advice once the owner added the third pool and the loop made uniform stripping
+nearly free — and it is *lower* benchmark risk: shared `E_a_esters` + shared stripping ⇒ each pool inverts, so the aggregate inverts
+by construction. The §2.2 wine/beer inversion benchmark passes **unweakened**, re-pointed to the summed liquid mass (what the lump
+always held). Scenario DSL, `pack()`, and the D-95 no-orphan test all failed **loudly** at the rename — the edges held.
+
+**Honest costs, named not buried (the advisor's standing rule — and note the pattern: I walked into the same trap one level down).**
+After refusing the fitted ratio on the `k`s I proposed sharing `dH_ester_volatil` across all three esters — *the identical move*: a
+constant measured for ethyl acetate, borrowed for molecules it was not measured for. Milder (ester van't Hoff enthalpies cluster
+~40–55 kJ/mol) but the same shape, and the advisor caught it. Kept for v1 with its **direction stated** (isoamyl acetate and ethyl
+hexanoate are *less* volatile ⇒ v1 slightly over-strips them), documented in the class rather than left implicit. Likewise
+`E_a_esters` is shared: principled for the two ATF1 acetates (same enzyme, no basis to differ), a **genuine approximation** for
+EEB1/EHT1-derived `ethyl_hexanoate`. **Deferred beats, all named:** per-ester `dH` and `E_a`; the ATF1 **precursor coupling** (isoamyl
+acetate should track the `fusels` pool, not mirror ethyl acetate's flux shape); **ethyl acetate + ethyl hexanoate hydrolysis** (ethyl
+acetate's is sensorially mute — its products are already bulk-present; if added, ethanol's honest destination is the core `E` slot,
+which is *safe* because `total_mass` is scoped to `{S,E,CO2}` and asserted only byproduct-free, where the ester pools are identically
+zero — verified, not assumed); and the further fruity esters (ethyl octanoate, phenylethyl acetate) — now **one registry entry each**.
+
+**Numbers.** Wine `fruity` **761 → 78.6** (dominant `ethyl_hexanoate`; real wine ethyl hexanoate genuinely runs OAV in the tens —
+Guth ranks it among wine's highest, so this is the *physical* reading, not a suppressed one). Beer `fruity` **53 → 1.80** (dominant
+`isoamyl_acetate`, just above Meilgaard's threshold — textbook for an ale), with `ethyl_acetate` at 0.66, correctly *below* threshold
+in a sound beer. All six pools land inside their own molecule's literature band. 1027 → 1031 tests; ruff + mypy clean.
+
+**Next:** **beat 1b slice 2** (weighting / compression / masking — the perceptual speculation, where the params live), the ATF1
+precursor coupling, per-ester `dH`/`E_a`, a beer-specific per-melanoidin A420 yield, the on-ledger thermal-caramelization aroma
+co-product, the gradual-reservoir / per-compound-retention refinements.

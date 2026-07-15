@@ -24,6 +24,7 @@ import pytest
 
 from fermentation.core import acidbase
 from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate
 from fermentation.runtime.schedule import ScheduledTrajectory
@@ -271,7 +272,11 @@ def test_rack_removes_settled_lees_and_leaves_the_wine_untouched():
         assert flow.delta[sl][0] < 0.0
     # Everything that stays with the racked-off liquid is untouched (zero delta): viable biomass,
     # sugar, ethanol, YAN, glycerol, byproducts, acids, SO₂.
-    for name in ("X", "S", "E", "N", "Gly", "Byp", "esters", "fusels", "tartaric", "so2_total"):
+    for name in (
+        "X", "S", "E", "N", "Gly", "Byp",
+        *(spec.pool for spec in ESTER_SPECS),  # the three D-96 ester pools
+        "fusels", "tartaric", "so2_total",
+    ):  # fmt: skip
         assert np.all(flow.delta[schema.slice(name)] == 0.0)
 
 

@@ -553,15 +553,46 @@ biomass_N_yield_log_slope:
 # de Andres-Toro ester/growth coupling above and the brewing consensus, NOT a
 # first-principles claim about elementary-step activation energies.
 
-k_ester:
-  value: 4.0e-4
-  unit: "1/h"   # d(esters)/dt = k_ester * X * S/(K_su+S) * f(T); per-biomass ester rate
+# --- The three ester synthesis rates (decision D-96) -------------------------------------
+# Each k is anchored INDEPENDENTLY to its own molecule's measured range in wine. This is the
+# load-bearing discipline of D-96: the pre-D-96 single `k_ester` filled one lumped pool whose
+# mass was booked as ethyl acetate but whose OAV was read against isoamyl acetate's threshold,
+# making the fruity OAV non-physical (~761, implying ~23 mg/L isoamyl acetate against a real
+# ceiling of ~1-3). Splitting that one k by a fitted 97/3-style ratio would have reproduced
+# plausible numbers while smuggling back exactly the fabricated composition constant the split
+# exists to remove. So the lump's composition and the total ester mass are DERIVED from three
+# independently-sourced rates, never targeted. Each k inverts the run-integrated identity
+# ~ (k/q_sugar_max)*S0 at that molecule's own target, then is trimmed for the stripping sink.
+
+k_ethyl_acetate:
+  value: 3.3e-4
+  unit: "1/h"   # d(ethyl_acetate)/dt = k_ethyl_acetate * X * S/(K_su+S) * f(T)
   tier: speculative
-  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "order-of-magnitude target for total esters ~50-200 mg/L at 20 C" }
+  uncertainty: { low: 2.0e-4, high: 5.5e-4, note: "band spans ethyl acetate ~30-80 mg/L in the finished wine, its own typical range in sound wine" }
   provenance:
-    source: "author estimate bounded by typical wine ester levels; structurally after de Andres-Toro et al. 1998 (ethyl acetate ~ growth flux), read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400)"
-    conditions: "S. cerevisiae wine; ester synthesis coupled to the biomass-catalysed sugar flux"
-    notes: "Read by EsterSynthesis as the specific ester-formation rate on the fermentative-flux Monod shape (shares K_sugar_uptake). At T_ref the run-integrated total is ~ (k_ester/q_sugar_max)*S0 ~ (4e-4/0.85)*245 ~ 0.12 g/L (~120 mg/L), within the typical 50-200 mg/L range for total wine esters (ethyl acetate dominant). SPECULATIVE on magnitude: de Andres-Toro forms ethyl acetate as Y_EA*mu_x*X_A (a different coupling and unit system from our flux-coupled k_ester), so it gives no directly-transferable rate constant - we keep an order-of-magnitude target landing the trace in the right band, not a sourced fit. The wine aroma model Mouret 2015 BEJ (doi:10.1016/j.bej.2015.07.017) is now read, but it parameterises aroma as two-phase production YIELDS from sugar, linear in T and N0 (not a per-flux Arrhenius rate), so it too yields no constant transferable to our k_ester form."
+    source: "author estimate bounded by ETHYL ACETATE's own measured range in wine (~30-80 mg/L in sound wine; >150-200 mg/L reads as a volatile-acidity/spoilage fault) - Jackson, Wine Science (3rd ed.); structurally after de Andres-Toro et al. 1998 (ethyl acetate ~ growth flux), read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400)"
+    conditions: "S. cerevisiae wine; ATF1/alcohol-acetyltransferase acetate ester, coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `ethyl_acetate` pool. Anchored to ETHYL ACETATE ALONE, not to a share of a lumped ester total (D-96). Calibrated against the FINISHED wine with the EsterVolatilization sink active (which strips ~45% of the synthesised ester to the headspace at 20 C): a 21-day 24-Brix run at 20 C lands ~50 mg/L liquid, mid-band for this molecule's own 30-80 mg/L range. SPECULATIVE on magnitude: de Andres-Toro form ethyl acetate as Y_EA*mu_x*X_A (a different coupling and unit system from our flux-coupled k), so no directly-transferable rate constant exists; the anchor is this molecule's measured concentration band, not a fitted rate."
+
+k_isoamyl_acetate:
+  value: 5.0e-6
+  unit: "1/h"   # d(isoamyl_acetate)/dt = k_isoamyl_acetate * X * S/(K_su+S) * f(T)
+  tier: speculative
+  uncertainty: { low: 1.0e-6, high: 1.5e-5, note: "band spans isoamyl acetate ~0.3-4 mg/L, its own typical range in wine" }
+  provenance:
+    source: "author estimate bounded by ISOAMYL ACETATE's own measured range in wine (~0.1-3 mg/L; Guth 1997, J. Agric. Food Chem. 45:3027-3032 reports ~0.1-1 mg/L in Gewurztraminer/Scheurebe)"
+    conditions: "S. cerevisiae wine; ATF1 acetate ester of isoamyl alcohol, coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `isoamyl_acetate` pool - the BANANA note, and the pool whose OAV D-96 exists to make physical. Anchored to ISOAMYL ACETATE ALONE (D-96), calibrated post-stripping: a 21-day 24-Brix run at 20 C lands ~0.76 mg/L liquid, inside Guth's own 0.1-1 mg/L assay range for this molecule and ~30x below the ~23 mg/L the pre-D-96 lumped reading implied. That this works out to ~1.5% of ethyl acetate is a DERIVED consequence of two independent anchors, not an assumed composition - which is the whole point: the pre-D-96 alternative was to FIT that percentage. KNOWN SIMPLIFICATION (D-96): ATF1 acetylates isoamyl alcohol, so this ester should track the `fusels` pool (nitrogen-front-loaded); v1 gives it the same plain flux shape as ethyl acetate, so its time profile mirrors ethyl acetate's. The precursor coupling is the named deferred refinement."
+
+k_ethyl_hexanoate:
+  value: 2.6e-6
+  unit: "1/h"   # d(ethyl_hexanoate)/dt = k_ethyl_hexanoate * X * S/(K_su+S) * f(T)
+  tier: speculative
+  uncertainty: { low: 6.0e-7, high: 6.5e-6, note: "band spans ethyl hexanoate ~0.1-1 mg/L in the finished wine, its own typical range" }
+  provenance:
+    source: "author estimate bounded by ETHYL HEXANOATE's own measured range in wine (~0.1-1 mg/L; Guth 1997, J. Agric. Food Chem. 45:3027-3032 reports ~0.4 mg/L, one of the highest-OAV odorants in the wines assayed)"
+    conditions: "S. cerevisiae wine; EEB1/EHT1 ethyl ester of a medium-chain fatty acid, coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `ethyl_hexanoate` pool - the APPLE/PINEAPPLE half of the fruity bouquet, added at D-96 so the descriptor axis did not narrow to banana alone when the lump was split. Anchored to ETHYL HEXANOATE ALONE, calibrated post-stripping: a 21-day 24-Brix run at 20 C lands ~0.4 mg/L liquid, matching the Guth 1997 assay value for this molecule. KNOWN SIMPLIFICATION (D-96): this is an EEB1/EHT1 product, a DIFFERENT enzyme from the two ATF1 acetates, yet v1 shares their `E_a_esters` temperature shape because no separate activation energy is sourced. A per-ester E_a is the named deferred refinement; the shared shape is why this pool inherits the wine stripping-dominated temperature inversion."
 
 E_a_esters:
   value: 55100.0

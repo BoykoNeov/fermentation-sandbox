@@ -92,10 +92,10 @@ def test_oav_is_zero_when_pool_is_zero(thresholds):
 
 def test_oav_is_monotone_increasing_in_its_pool(thresholds):
     """More of a compound ⇒ strictly higher OAV (a positive scaling of the pool)."""
-    lo = _traj(beer_schema(), {"esters": 1.0e-3})
-    hi = _traj(beer_schema(), {"esters": 2.0e-3})
-    o_lo = float(oav_series(lo, thresholds, "esters")[-1])
-    o_hi = float(oav_series(hi, thresholds, "esters")[-1])
+    lo = _traj(beer_schema(), {"isoamyl_acetate": 1.0e-3})
+    hi = _traj(beer_schema(), {"isoamyl_acetate": 2.0e-3})
+    o_lo = float(oav_series(lo, thresholds, "isoamyl_acetate")[-1])
+    o_hi = float(oav_series(hi, thresholds, "isoamyl_acetate")[-1])
     assert 0.0 < o_lo < o_hi
     assert o_hi == pytest.approx(2.0 * o_lo, rel=1e-12)
 
@@ -137,7 +137,12 @@ def test_profile_compound_set_matches_the_medium(thresholds):
     # beer oak, D-86 — the oak axis is a wood property). The oak *ceiling* slots are NOT aroma
     # pools, so they must NOT appear.
     oak = {"whiskey_lactone", "vanillin", "guaiacol", "eugenol", "furaneol"}
-    assert set(beer.readings) == {"diacetyl", "acetaldehyde", "h2s", "esters", "fusels"} | oak
+    # The lumped `esters` pool became three single-molecule ester pools at D-96, taking the
+    # common set from 5 to 7.
+    assert set(beer.readings) == {
+        "diacetyl", "acetaldehyde", "h2s",
+        "ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate", "fusels",
+    } | oak  # fmt: skip
     assert set(wine.readings) == set(beer.readings) | {
         "ethylphenols",
         "ethylguaiacols",
@@ -211,7 +216,50 @@ def test_every_threshold_is_speculative_with_a_recorded_matrix(thresholds):
 
 
 def test_lumped_thresholds_flag_the_fixed_composition_assumption(thresholds):
-    """The three lumped reps carry the 'lump composition' honesty cost in their notes (D-66)."""
-    for key in ("threshold_esters_beer", "threshold_fusels_beer", "threshold_mercaptans_wine"):
-        notes = thresholds[key].provenance.notes.lower()
-        assert "lump" in notes and "composition" in notes, key
+    """Every lumped rep carries the 'lump composition' honesty cost in its notes (D-66).
+
+    Derived from the ``lumped`` flag rather than a hardcoded list, so the caveat cannot go
+    missing when a pool is added — and, since D-96, cannot linger when one stops being lumped.
+    """
+    lumped = {
+        (c.pool, medium)
+        for medium, compounds in AROMA_COMPOUNDS.items()
+        for c in compounds
+        if c.lumped
+    }
+    assert lumped, "the lumped set should not be empty — fusels/mercaptans are still lumps"
+    for pool, medium in lumped:
+        notes = thresholds[f"threshold_{pool}_{medium}"].provenance.notes.strip().lower()
+        # The convention is a LEADING declaration, checked with startswith rather than a bare
+        # substring: prose elsewhere in a note may legitimately discuss lumping (a
+        # single-molecule note may explain what it was split *from*), and only the opening
+        # marker is the claim.
+        assert notes.startswith("lumped pool"), (pool, medium)
+        assert "composition" in notes, (pool, medium)
+
+
+def test_single_molecule_thresholds_do_not_declare_a_lump_caveat(thresholds):
+    """The converse of the D-66 flag, and the D-96 guard: the caveat only where it is TRUE.
+
+    Before D-96 the ``esters`` pool was carbon-weighted as *ethyl acetate* but read against
+    *isoamyl acetate*'s threshold, and the ``lumped`` flag was made to carry that split
+    identity — which it could not honestly do: the resulting OAV was non-physical (~761 for a
+    wine, implying ~23 mg/L isoamyl acetate against a real ceiling of ~1–3), not merely
+    uncertain. A ``lumped`` flag can excuse a *coarse* reading; it cannot excuse reading a pool
+    against a molecule the pool is not made of.
+
+    Paired with the D-66 test above this pins the marker in **both** directions, so the two
+    tests together make the flag and the provenance impossible to drift apart. If someone
+    re-points a single-molecule pool at a different molecule's threshold and reaches for the
+    lump caveat to excuse it, they must flip ``lumped`` — which trips the D-66 test unless the
+    pool really is a lump. The honest fix is another pool, never another disclaimer.
+    """
+    for medium, compounds in AROMA_COMPOUNDS.items():
+        for c in compounds:
+            if c.lumped:
+                continue
+            notes = thresholds[f"threshold_{c.pool}_{medium}"].provenance.notes.strip().lower()
+            assert not notes.startswith("lumped pool"), (
+                f"{c.pool} ({medium}) is flagged lumped=False but its threshold declares a "
+                "fixed-lump-composition assumption"
+            )

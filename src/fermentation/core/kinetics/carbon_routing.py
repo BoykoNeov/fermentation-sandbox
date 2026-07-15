@@ -14,12 +14,98 @@ Extracted from :mod:`fermentation.core.kinetics.byproducts` (decision D-26) so t
 fusel aroma Processes and the vicinal-diketone (diacetyl) Processes share one definition —
 the same single-source-of-truth discipline the chemistry constants follow. The behaviour
 is unchanged from the byproducts beat (D-19); only the home moved.
+
+It also hosts :data:`ESTER_SPECS`, the **canonical ester registry** (decision D-96) — the
+single source of truth every layer derives from (state slots, synthesis, stripping, the
+carbon ledger, the OAV aroma set), so a fourth ester is *one entry*, not a new code path.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
 from fermentation.core.state import FloatArray, StateSchema
+
+
+@dataclass(frozen=True)
+class EsterSpec:
+    """One aroma-active ester: its liquid pool, headspace twin, molecule and rate constant.
+
+    ``pool`` is the liquid state variable, ``gas_pool`` its CO₂-stripped headspace
+    bookkeeping twin (decision D-20), ``species`` the molecule **both** are carbon-weighted
+    by in :func:`~fermentation.validation.conservation.total_carbon` — weighting a
+    liquid/gas pair at the *same* fraction is what makes stripping carbon-neutral — and
+    ``k_param`` the per-medium synthesis rate constant.
+
+    **Each pool IS its molecule (decision D-96).** Before D-96 a single lumped ``esters``
+    pool was carbon-weighted as *ethyl acetate* but read on the OAV lens against *isoamyl
+    acetate*'s threshold — a split identity that made the fruity OAV non-physical (~761 for a
+    wine, implying ~23 mg/L isoamyl acetate against a real ceiling of ~1–3 mg/L). Splitting
+    the lump into single-molecule pools, each weighted **and** perceived as itself, removes
+    that seam rather than papering over it: no ester pool carries a ``lumped`` composition
+    assumption any more.
+    """
+
+    pool: str
+    gas_pool: str
+    species: str
+    k_param: str
+    #: Human-readable note for the liquid pool's :class:`~fermentation.core.state.VarSpec`
+    #: description — kept here so the schema text cannot drift from the registry.
+    note: str
+
+
+#: The THREE aroma-active esters the sim tracks (decision D-96) — each a **single-molecule**
+#: pool, so none carries the fixed-lump-composition caveat (that now survives only on
+#: ``fusels``/``mercaptans``, where it is true). Two families:
+#:
+#: * the **acetate esters** (ATF1/alcohol acetyltransferase) — ``ethyl_acetate``, the bulk
+#:   solventy one (tens of mg/L), and ``isoamyl_acetate``, the trace potent banana one
+#:   (~1–3 mg/L). Same enzyme ⇒ they share ``E_a_esters``, the per-medium sourced
+#:   temperature shape (decision D-21).
+#: * the **ethyl ester of a medium-chain fatty acid** — ``ethyl_hexanoate`` (apple/pineapple),
+#:   the highest-OAV ester in wine. **Documented v1 simplification (D-96):** it is
+#:   EEB1/EHT1-derived, a *different* enzyme from the acetates, but v1 shares
+#:   ``E_a_esters`` because no separate activation energy is sourced. A per-ester ``E_a`` is
+#:   the named deferred refinement.
+#:
+#: Each ``k`` is sourced **independently** to its own molecule's measured concentration range
+#: (D-96, the load-bearing call): the lump's composition is *derived* from three
+#: independently-anchored rates, never a single fitted ratio splitting one ``k_ester``. Adding
+#: a fourth ester (ethyl octanoate, phenylethyl acetate) is one entry here plus its params.
+ESTER_SPECS: tuple[EsterSpec, ...] = (
+    EsterSpec(
+        "ethyl_acetate",
+        "ethyl_acetate_gas",
+        "ethyl_acetate",
+        "k_ethyl_acetate",
+        note="ethyl acetate (C4H8O2) — the bulk solventy/nail-polish acetate ester (ATF1)",
+    ),
+    EsterSpec(
+        "isoamyl_acetate",
+        "isoamyl_acetate_gas",
+        "isoamyl_acetate",
+        "k_isoamyl_acetate",
+        note="isoamyl acetate (C7H14O2) — the trace, potent BANANA acetate ester (ATF1); "
+        "the only ester the D-69 aging hydrolysis fades",
+    ),
+    EsterSpec(
+        "ethyl_hexanoate",
+        "ethyl_hexanoate_gas",
+        "ethyl_hexanoate",
+        "k_ethyl_hexanoate",
+        note="ethyl hexanoate (C8H16O2) — the APPLE/PINEAPPLE ethyl ester of a "
+        "medium-chain fatty acid (EEB1/EHT1)",
+    ),
+)
+
+#: The ester the D-69 aging hydrolysis acts on — the **banana** acetate. Its fade to
+#: ``fusels`` + ``Byp`` is the whole point of that Process, and at D-96 the 5:2 carbon split
+#: became **exact**: the debited molecule finally *is* isoamyl acetate (C7 → isoamyl alcohol
+#: C5 + acetic acid C2), where D-69 had to debit ethyl acetate and split as if it were
+#: isoamyl acetate. See :class:`~fermentation.core.kinetics.aging.EsterHydrolysis`.
+HYDROLYSING_ESTER: EsterSpec = ESTER_SPECS[1]
 
 
 def draw_carbon_from_sugar(

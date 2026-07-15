@@ -27,12 +27,26 @@
 # `notes`. (The sensory layer selects the key set by medium; it does not claim the measurement
 # matrix equals the medium.)
 #
-# LUMPED POOLS (the D-66 owner call). `esters`, `fusels` and `mercaptans` are single g/L pools
-# that really mix several molecules whose thresholds span orders of magnitude. Each is assigned
-# the threshold of ONE named representative compound — the stand-in its VarSpec description
-# already names — and the "assumes fixed lump composition" honesty cost is flagged loudly in
-# that threshold's `notes`. Single-molecule pools (diacetyl, acetaldehyde, h2s, 4-EP, 4-EG)
-# carry no such assumption and are the cleaner OAVs.
+# LUMPED POOLS (the D-66 owner call, NARROWED at D-96). `fusels` and `mercaptans` are single g/L
+# pools that really mix several molecules whose thresholds span orders of magnitude. Each is
+# assigned the threshold of ONE named representative compound — the stand-in its VarSpec
+# description already names — and the "assumes fixed lump composition" honesty cost is flagged
+# loudly in that threshold's `notes`, which MUST open with the marker `LUMPED POOL` (tested both
+# ways: a lumped pool declares it, a single-molecule pool must not). Single-molecule pools
+# (diacetyl, acetaldehyde, h2s, 4-EP, 4-EG, and since D-96 the three esters) carry no such
+# assumption and are the cleaner OAVs.
+#
+# `esters` LEFT THIS LIST AT D-96, and why is worth stating. It was the worst lumped case — not
+# because the lump was coarse, but because the pool was carbon-weighted as ETHYL ACETATE on the
+# ledger (D-19) while being read here against ISOAMYL ACETATE's threshold (D-67): one pool, two
+# molecular identities, in two different layers. Ethyl acetate dominates the mass; isoamyl
+# acetate's threshold is ~300x lower; so the OAV was inflated by roughly that factor and a Brett
+# wine read 761 — implying ~23 mg/L isoamyl acetate against a real ceiling of ~1-3. That is a
+# category error in the NUMERATOR, not an uncertain ratio, and no lump caveat could honestly
+# cover it. The pool is now three single-molecule pools, each weighted AND perceived as itself.
+# The rule the episode leaves behind: a `lumped` flag can excuse a COARSE reading; it can never
+# excuse reading a pool against a molecule the pool is not made of. The honest fix is another
+# pool, never another disclaimer.
 #
 # iso_alpha / IBU is DELIBERATELY ABSENT — it is a TASTE (bitterness), not an odor, already read
 # out directly as IBU (analysis.ibu_series, D-64). An odor-threshold OAV does not apply to it.
@@ -71,15 +85,41 @@ threshold_h2s_beer:
     conditions: "measured in beer (matrix-matched); hydrogen sulfide (H2S), the single molecule of the residual dissolved pool"
     notes: "Single-molecule pool — clean OAV. Matrix-matched. The most potent (lowest-threshold) aroma pool tracked."
 
-threshold_esters_beer:
+# --- The three ester thresholds, beer (decision D-96) -------------------------------------
+# Each ester pool is now read against ITS OWN molecule's threshold. The pre-D-96 single
+# `threshold_esters_beer` read a pool whose mass was booked as ethyl acetate against isoamyl
+# acetate's threshold - a split identity between the ledger and this lens that made the OAV
+# non-physical rather than merely uncertain. None of the three carries a lump caveat now.
+
+threshold_ethyl_acetate_beer:
+  value: 30000.0
+  unit: "ug/L"   # ethyl acetate, 'solventy/nail-polish'
+  tier: speculative
+  uncertainty: { low: 20000.0, high: 40000.0, note: "Meilgaard reports ~30 mg/L; band reflects panel spread only - no lump-composition term is needed any more (D-96)" }
+  provenance:
+    source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), ethyl acetate beer flavour threshold ~30 mg/L"
+    conditions: "measured in beer (matrix-matched); ethyl acetate read against the `ethyl_acetate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
+    notes: "SINGLE-MOLECULE POOL (D-96): the pool is ethyl acetate, weighted as ethyl acetate, read against ethyl acetate's own threshold. Sound ale sits at or below this threshold (~10-30 mg/L), so a healthy beer reads OAV around or under 1 and ethyl acetate is correctly NOT a dominant note - the solventy/nail-polish character is a fault-level reading, which is what this molecule's threshold is for."
+
+threshold_isoamyl_acetate_beer:
   value: 1200.0
   unit: "ug/L"   # isoamyl acetate, 'banana'
   tier: speculative
-  uncertainty: { low: 500.0, high: 2500.0, note: "isoamyl acetate ~1.0-1.6 mg/L in beer; band widened further for the fixed-lump-composition assumption below" }
+  uncertainty: { low: 1000.0, high: 1600.0, note: "isoamyl acetate ~1.0-1.6 mg/L in beer; band is now the reported range ALONE - the D-66 lump-composition widening is retired (D-96)" }
   provenance:
     source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), isoamyl acetate (3-methylbutyl acetate) beer flavour threshold ~1.0-1.6 mg/L"
-    conditions: "measured in beer (matrix-matched); isoamyl acetate, the representative of the LUMPED esters pool (the pool's named stand-in)"
-    notes: "LUMPED POOL — assumes the esters pool is compositionally dominated by isoamyl acetate. Real ester mixes (ethyl acetate, ethyl hexanoate, ...) have thresholds spanning orders of magnitude, so this OAV is only as meaningful as that fixed-composition assumption (D-66). Band widened accordingly."
+    conditions: "measured in beer (matrix-matched); isoamyl acetate read against the `isoamyl_acetate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
+    notes: "SINGLE-MOLECULE POOL (D-96). Value unchanged from the pre-D-96 `threshold_esters_beer`, but it now reads a pool that IS isoamyl acetate (~2.2 mg/L in a finished ale) rather than the whole ester mass (~64 mg/L) - which is the entire fix: same threshold, physical numerator, OAV ~1.8 instead of ~53. The uncertainty band NARROWED because the D-66 'assumes fixed lump composition' term no longer applies; what remains is the panel spread Meilgaard reports."
+
+threshold_ethyl_hexanoate_beer:
+  value: 210.0
+  unit: "ug/L"   # ethyl hexanoate, 'apple/pineapple'
+  tier: speculative
+  uncertainty: { low: 150.0, high: 300.0, note: "Meilgaard reports ~0.21 mg/L; band reflects panel spread only" }
+  provenance:
+    source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), ethyl hexanoate (ethyl caproate) beer flavour threshold ~0.21 mg/L"
+    conditions: "measured in beer (matrix-matched); ethyl hexanoate read against the `ethyl_hexanoate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
+    notes: "SINGLE-MOLECULE POOL (D-96). Added at D-96 alongside the pool itself, so the fruity descriptor axis keeps the apple/pineapple ethyl-ester note instead of narrowing to banana alone when the lumped pool was split."
 
 threshold_fusels_beer:
   value: 50000.0
@@ -125,15 +165,42 @@ threshold_h2s_wine:
     conditions: "measured in wine (matrix-matched); hydrogen sulfide (H2S), single molecule"
     notes: "Single-molecule pool — clean OAV. Matrix-matched. The most potent aroma pool tracked in wine."
 
-threshold_esters_wine:
-  value: 30.0
-  unit: "ug/L"   # isoamyl acetate, 'banana/fruity'; model wine (10% ethanol)
+# --- The three ester thresholds, wine (decision D-96) -------------------------------------
+# Each ester pool is read against ITS OWN molecule's threshold. The pre-D-96
+# `threshold_esters_wine` was the sim's most misleading number: 30 ug/L (isoamyl acetate's
+# threshold) divided into the WHOLE ester mass (~23 mg/L, mostly ethyl acetate) gave a Brett
+# wine a 'fruity' OAV of 761 - implying ~23 mg/L of isoamyl acetate when real wine tops out
+# near 1-3. The MATRIX GAP caveat below survives the split; the LUMPED caveat does not.
+
+threshold_ethyl_acetate_wine:
+  value: 7500.0
+  unit: "ug/L"   # ethyl acetate, 'solventy/nail-polish'; model wine
   tier: speculative
-  uncertainty: { low: 10.0, high: 150.0, note: "Guth ~30 µg/L in model wine; band widened for both matrix (model vs real wine) and the fixed-lump-composition assumption" }
+  uncertainty: { low: 5000.0, high: 12000.0, note: "commonly cited ~7.5-12 mg/L in wine; band reflects the reported spread and the model-vs-real matrix gap - no lump-composition term is needed any more (D-96)" }
+  provenance:
+    source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032) and the standard wine-chemistry range for ethyl acetate odor threshold, ~7.5-12 mg/L in model wine"
+    conditions: "MATRIX GAP - measured in ~10% ethanol MODEL wine, not real wine; ethyl acetate read against the `ethyl_acetate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
+    notes: "SINGLE-MOLECULE POOL + MATRIX GAP (D-96): the lump caveat is retired, the model-solution caveat is not. Sound wine carries ~30-80 mg/L ethyl acetate against this ~7.5 mg/L threshold, so it reads a modest OAV of order 2-10 - present but not dominant, which is correct: ethyl acetate is the ester you notice only when it goes wrong (>150-200 mg/L reads as a volatile-acidity fault)."
+
+threshold_isoamyl_acetate_wine:
+  value: 30.0
+  unit: "ug/L"   # isoamyl acetate, 'banana'; model wine (10% ethanol)
+  tier: speculative
+  uncertainty: { low: 15.0, high: 60.0, note: "Guth ~30 µg/L in model wine; band widened for the matrix gap ONLY - the D-66 fixed-lump-composition widening is retired (D-96)" }
   provenance:
     source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032), isoamyl acetate odor threshold ~30 µg/L in model wine (10% ethanol)"
-    conditions: "MATRIX GAP — measured in 10% ethanol MODEL wine, not real wine; isoamyl acetate as the representative of the LUMPED esters pool"
-    notes: "LUMPED POOL + MATRIX GAP: assumes the esters pool is dominated by isoamyl acetate AND uses a model-solution (not real-wine) threshold. Doubly caveated; directional only."
+    conditions: "MATRIX GAP - measured in 10% ethanol MODEL wine, not real wine; isoamyl acetate read against the `isoamyl_acetate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
+    notes: "SINGLE-MOLECULE POOL + MATRIX GAP (D-96). The value is UNCHANGED from the pre-D-96 `threshold_esters_wine` - the 761 was never this threshold's fault. What changed is the numerator: this reads a pool that IS isoamyl acetate (~0.76 mg/L in a finished wine) instead of the entire ester mass (~23 mg/L), so the OAV lands ~25 instead of 761. Real wine isoamyl acetate at 0.1-3 mg/L against a 30 ug/L threshold genuinely does run OAV ~3-100, so a value in the tens is the physical reading, not a suppressed one."
+
+threshold_ethyl_hexanoate_wine:
+  value: 5.0
+  unit: "ug/L"   # ethyl hexanoate, 'apple/pineapple'; model wine (10% ethanol)
+  tier: speculative
+  uncertainty: { low: 3.0, high: 14.0, note: "Guth ~5 µg/L in model wine; band widened for the matrix gap" }
+  provenance:
+    source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032), ethyl hexanoate odor threshold ~5 µg/L in model wine (10% ethanol)"
+    conditions: "MATRIX GAP - measured in 10% ethanol MODEL wine, not real wine; ethyl hexanoate read against the `ethyl_hexanoate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
+    notes: "SINGLE-MOLECULE POOL + MATRIX GAP (D-96). Added at D-96 with the pool. Very low threshold against a ~0.4 mg/L concentration puts this among wine's HIGHEST-OAV odorants (Guth ranks it so), running OAV in the tens-to-low-hundreds. Consequence worth stating: under the D-95 MAX rule this molecule - not banana - is normally the DOMINANT contributor to wine's `fruity` axis. That is the sourced reading, and it is why splitting the lump without adding this pool would have narrowed fruity to a note that is not actually wine's loudest fruity ester."
 
 threshold_fusels_wine:
   value: 30000.0

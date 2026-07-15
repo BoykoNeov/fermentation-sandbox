@@ -197,7 +197,7 @@ def test_aging_params_ride_in_every_compiled_scenario():
     # aging.yaml is in shared_files, so the params are present even on an un-aged scenario —
     # inert (read by nothing until begin_aging enables the Process), but loaded.
     cs = compile_scenario(_wine([]))
-    for name in ("k_ester_hydrolysis", "E_a_ester_hydrolysis", "esters_eq"):
+    for name in ("k_ester_hydrolysis", "E_a_ester_hydrolysis", "isoamyl_acetate_eq"):
         assert name in cs.parameters
 
 
@@ -213,28 +213,28 @@ def test_aging_fades_esters_and_raises_fusels_end_to_end():
     plain = compile_scenario(_wine([])).run()
     assert aged.success and plain.success
 
-    esters_aged = float(aged.series("esters")[-1])
-    esters_plain = float(plain.series("esters")[-1])
+    ester_aged = float(aged.series("isoamyl_acetate")[-1])
+    ester_plain = float(plain.series("isoamyl_acetate")[-1])
     fusels_aged = float(aged.series("fusels")[-1])
     fusels_plain = float(plain.series("fusels")[-1])
     byp_aged = float(aged.series("Byp")[-1])
     byp_plain = float(plain.series("Byp")[-1])
 
     # The wine actually made ester during the ferment, so there is something to hydrolyse.
-    assert esters_plain > 0.0
+    assert ester_plain > 0.0
     # Aging hydrolyses the fruity acetate esters: fewer esters, more fusels + Byp at the end.
-    assert esters_aged < esters_plain
+    assert ester_aged < ester_plain
     assert fusels_aged > fusels_plain
     assert byp_aged > byp_plain
 
 
 def test_aging_does_not_strip_esters_below_the_equilibrium_floor():
     # Net decay toward a LOWER floor, not decay-to-zero (D-68): even over a long warm aging tail
-    # the esters pool relaxes toward, not past, esters_eq.
+    # the esters pool relaxes toward, not past, isoamyl_acetate_eq.
     cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
     traj = cs.run()
     assert traj.success
-    assert float(traj.series("esters")[-1]) >= cs.param_values["esters_eq"]
+    assert float(traj.series("isoamyl_acetate")[-1]) >= cs.param_values["isoamyl_acetate_eq"]
 
 
 # -- conservation + non-negativity end-to-end --------------------------------
@@ -255,7 +255,7 @@ def test_aged_run_closes_carbon_end_to_end():
     assert_conserved(
         traj.as_trajectory(), total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon"
     )
-    assert_nonnegative(traj.as_trajectory(), ("esters", "fusels", "Byp"), atol=1e-9)
+    assert_nonnegative(traj.as_trajectory(), ("isoamyl_acetate", "fusels", "Byp"), atol=1e-9)
 
 
 def test_slow_phase_integration_succeeds_over_the_long_span():
@@ -282,7 +282,7 @@ def test_aging_floors_touched_pools_at_speculative_for_the_whole_run():
     # WHOLE run — not just the aging segment.
     cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
     traj = cs.run()
-    for pool in ("esters", "fusels", "Byp"):
+    for pool in ("isoamyl_acetate", "fusels", "Byp"):
         assert traj.tier_map[pool] is Tier.SPECULATIVE
 
 
@@ -322,9 +322,9 @@ def test_begin_aging_drives_the_beer_scenario_path():
     aged = cs.run()
     plain = compile_scenario(_beer([])).run()
     assert aged.success and plain.success
-    esters_plain = float(plain.series("esters")[-1])
-    assert esters_plain > 0.0  # the beer ferment made ester to hydrolyse
-    assert float(aged.series("esters")[-1]) < esters_plain  # aging fades it
+    ester_plain = float(plain.series("isoamyl_acetate")[-1])
+    assert ester_plain > 0.0  # the beer ferment made ester to hydrolyse
+    assert float(aged.series("isoamyl_acetate")[-1]) < ester_plain  # aging fades it
     assert float(aged.series("fusels")[-1]) > float(plain.series("fusels")[-1])
 
 

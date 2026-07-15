@@ -14,7 +14,7 @@
 #   d(C_i)/dt = k_oak_extraction * f(T) * max(0, ceiling_i - C_i)   # per extractive i
 #
 # a FIRST-ORDER APPROACH FROM BELOW to a per-compound saturation ceiling — the exact inverse of
-# EsterHydrolysis's `max(0, esters - esters_eq)` net decay toward a floor. As a finished wine sits
+# EsterHydrolysis's `max(0, esters - isoamyl_acetate_eq)` net decay toward a floor. As a finished wine sits
 # in oak (barrel or chips/staves), four wood extractives diffuse into the wine and rise toward a
 # ceiling set by the oak-contact dose and toast level: WHISKEY LACTONE (cis/trans β-methyl-γ-
 # octalactone, "coconut", the signature oak-lactone note, LIGHT-toast dominant), VANILLIN

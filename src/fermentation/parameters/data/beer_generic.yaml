@@ -306,15 +306,44 @@ biomass_N_fraction:
 # constraint is relative to the value in THIS file; the de Andres-Toro ester ordering
 # holds against any plausible fermentative-flux E_a.
 
-k_ester:
-  value: 4.0e-4
-  unit: "1/h"   # d(esters)/dt = k_ester * X * S/(K_su+S) * f(T)
+# --- The three ester synthesis rates (decision D-96) -------------------------------------
+# Each k is anchored INDEPENDENTLY to its own molecule's measured range in ALE - see the wine
+# file for the full rationale (splitting one lumped `k_ester` by a fitted ratio would have
+# smuggled back the fabricated composition constant the D-96 split exists to remove). Note the
+# ordering genuinely DIFFERS from wine and is not a rescaling of it: ale carries LESS ethyl
+# acetate than wine (~20 vs ~50 mg/L) but MORE isoamyl acetate (~2 vs ~1.4 mg/L) - the banana
+# note is an ale signature, and independent per-molecule anchoring is what lets the two media
+# disagree in that direction at all. A single ratio-split k could only have scaled them together.
+
+k_ethyl_acetate:
+  value: 1.1e-4
+  unit: "1/h"   # d(ethyl_acetate)/dt = k_ethyl_acetate * X * S/(K_su+S) * f(T)
   tier: speculative
-  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "order-of-magnitude target for ale ester total ~50-150 mg/L at 20 C" }
+  uncertainty: { low: 5.5e-5, high: 1.7e-4, note: "band spans ethyl acetate ~10-30 mg/L in the finished beer, its own typical range in ale" }
   provenance:
-    source: "author estimate bounded by typical ale ester levels; structurally after de Andres-Toro et al. 1998 (ethyl acetate ~ growth flux, beer-specific), read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400)"
-    conditions: "ale yeast; ester synthesis coupled to the biomass-catalysed sugar flux"
-    notes: "Read by EsterSynthesis. Mirrors the wine file - ester kinetics treated yeast-generic. Beer's lower fermentable sugar (~88 g/L vs wine's ~245) gives a smaller integrated ester total ~ (4e-4/0.5)*88 ~ 0.07 g/L (~70 mg/L), the right trace order for ale esters. SPECULATIVE on magnitude: de Andres-Toro form ethyl acetate as Y_EA*mu_x*X_A (a growth coupling and unit system unlike our flux-coupled k_ester), so it gives no directly-transferable rate constant - an order-of-magnitude target, not a sourced fit."
+    source: "author estimate bounded by ETHYL ACETATE's own measured range in beer (~10-30 mg/L in ale; Meilgaard 1975, MBAA Tech. Q. 12:151-168 gives a beer flavour threshold ~30 mg/L, so sound ale sits at or below it); structurally after de Andres-Toro et al. 1998 (ethyl acetate ~ growth flux, beer-specific), read via Pilarski & Gerogiorgis 2022 (doi:10.3390/pr10112400)"
+    conditions: "ale yeast; ATF1/alcohol-acetyltransferase acetate ester, coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `ethyl_acetate` pool. Anchored to ETHYL ACETATE ALONE in ale, not to a share of a lumped total (D-96). Calibrated against the FINISHED beer with the EsterVolatilization sink active: a 21-day run at 20 C lands ~20 mg/L liquid, mid-band for this molecule's own 10-30 mg/L ale range and below Meilgaard's ~30 mg/L threshold, so a sound ale correctly reads OAV < 1 on the solventy note. Note beer strips FAR less than wine (~19% vs ~45% of the ester synthesised) - less sugar means less CO2 evolved to carry ester into the headspace. SPECULATIVE on magnitude: de Andres-Toro form ethyl acetate as Y_EA*mu_x*X_A (a growth coupling and unit system unlike our flux-coupled k), so no transferable rate constant exists; the anchor is this molecule's measured band."
+
+k_isoamyl_acetate:
+  value: 1.2e-5
+  unit: "1/h"   # d(isoamyl_acetate)/dt = k_isoamyl_acetate * X * S/(K_su+S) * f(T)
+  tier: speculative
+  uncertainty: { low: 4.0e-6, high: 2.5e-5, note: "band spans isoamyl acetate ~0.7-4 mg/L, its own typical range in ale" }
+  provenance:
+    source: "author estimate bounded by ISOAMYL ACETATE's own measured range in beer (~0.5-3 mg/L in ale; Meilgaard 1975, MBAA Tech. Q. 12:151-168 gives a threshold ~1.0-1.6 mg/L and ales characteristically sit at or above it - the banana note is a recognised ale signature)"
+    conditions: "ale yeast; ATF1 acetate ester of isoamyl alcohol, coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `isoamyl_acetate` pool - the BANANA note. Anchored to ISOAMYL ACETATE ALONE (D-96): calibrated post-stripping to ~2.2 mg/L in the finished beer, inside its own 0.5-3 mg/L band and just above the Meilgaard threshold, which is the correct reading for an ale. This works out to ~11% of ale's ethyl acetate versus ~1.5% in wine - a DERIVED difference between the media that follows from anchoring each molecule in each medium separately, and one a ratio-split of a single k could not have produced. Same deferred ATF1 precursor coupling as the wine file."
+
+k_ethyl_hexanoate:
+  value: 1.2e-6
+  unit: "1/h"   # d(ethyl_hexanoate)/dt = k_ethyl_hexanoate * X * S/(K_su+S) * f(T)
+  tier: speculative
+  uncertainty: { low: 3.0e-7, high: 3.5e-6, note: "band spans ethyl hexanoate ~0.05-0.6 mg/L, its own typical range in ale" }
+  provenance:
+    source: "author estimate bounded by ETHYL HEXANOATE's own measured range in beer (~0.1-0.5 mg/L in ale; Meilgaard 1975, MBAA Tech. Q. 12:151-168 gives a beer flavour threshold ~0.21 mg/L)"
+    conditions: "ale yeast; EEB1/EHT1 ethyl ester of a medium-chain fatty acid, coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `ethyl_hexanoate` pool - the APPLE/PINEAPPLE note. Anchored to ETHYL HEXANOATE ALONE: calibrated post-stripping to ~0.22 mg/L in the finished beer, inside its own 0.1-0.5 mg/L band and right at Meilgaard's ~0.21 mg/L threshold. Same KNOWN SIMPLIFICATION as the wine file (D-96): an EEB1/EHT1 product sharing the ATF1 acetates' `E_a_esters`, because no separate activation energy is sourced; a per-ester E_a is the named deferred refinement."
 
 E_a_esters:
   value: 200000.0

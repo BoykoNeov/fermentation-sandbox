@@ -27,7 +27,9 @@ The shared variables (decisions D-B / D-4):
     Gly    glycerol              g/L (realised-yield byproduct sink — decision D-16)
     Byp    minor byproducts      g/L (lumped organic acids / higher alcohols,
                                  carbon-accounted as succinic acid — decision D-16)
-    esters esters                g/L (aroma byproducts; lumped produced-only pool)
+    ethyl_acetate    ethyl acetate    g/L (solventy/nail-polish acetate ester — D-96)
+    isoamyl_acetate  isoamyl acetate  g/L (banana acetate ester — D-96)
+    ethyl_hexanoate  ethyl hexanoate  g/L (apple/pineapple fatty-acid ethyl ester — D-96)
     fusels fusel/higher alcohols g/L (Ehrlich pathway; lumped produced-only pool)
     acetolactate α-acetolactate  g/L (vicinal-diketone precursor reservoir — decision D-26)
     diacetyl diacetyl (VDK)      g/L (buttery off-note; produced then reabsorbed — D-26)
@@ -44,15 +46,15 @@ The shared variables (decisions D-B / D-4):
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
-``X_dead``, ``Gly``, ``Byp``, ``esters``, ``fusels`` and the VDK pools
+``X_dead``, ``Gly``, ``Byp``, the three ester pools, ``fusels`` and the VDK pools
 (``acetolactate``/``diacetyl``/``butanediol``) start at zero at pitch and are only
 accumulated by the kinetics, so they declare a default initial of 0
 (`VarSpec.default`) and need not be named at every initial-condition call site. The
-``esters``/``fusels`` pools are filled by the Tier-2 byproduct Processes wired below;
+ester/``fusels`` pools are filled by the Tier-2 byproduct Processes wired below;
 the three VDK pools by the diacetyl-pathway Processes (decision D-26).
 Under **decision D-19 (option a1)** those Processes route the aroma carbon *out of
-``S``* and ``total_carbon`` weights the pools (as ethyl acetate / isoamyl alcohol), so
-``esters``/``fusels`` are real carbon-accounted state alongside ``Gly``/``Byp`` — not
+``S``* and ``total_carbon`` weights the pools (each ester as ITSELF since D-96, fusels as
+isoamyl alcohol), so they are real carbon-accounted state alongside ``Gly``/``Byp`` — not
 diagnostic re-expressions. The former ``Byp`` double-count (it once lumped higher
 alcohols) is resolved by carving them out of ``Y_byproduct_sugar``; the draw touches
 only ``S`` (never ``E``/``CO2``), so turning the byproducts on perturbs the core only
@@ -122,6 +124,7 @@ from fermentation.core.kinetics import (
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import StateSchema, VarSpec
 
@@ -150,11 +153,14 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             default=0.0,
             description="minor byproducts (organic acids/higher alcohols; succinic-equivalent)",
         ),
-        VarSpec(
-            "esters",
-            "g/L",
-            default=0.0,
-            description="esters (fermentation aroma; lumped produced-only pool)",
+        #: The THREE single-molecule ester pools (decision D-96), derived from the canonical
+        #: ``ESTER_SPECS`` registry so a fourth ester is one entry there — never a hand-edit
+        #: here that could drift from the carbon ledger or the OAV aroma set. Each replaced a
+        #: share of the pre-D-96 lumped ``esters`` pool, which was weighted as ethyl acetate
+        #: but *perceived* as isoamyl acetate.
+        *(
+            VarSpec(spec.pool, "g/L", default=0.0, description=spec.note)
+            for spec in ESTER_SPECS
         ),
         VarSpec(
             "fusels",
@@ -162,12 +168,19 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             default=0.0,
             description="fusel / higher alcohols (Ehrlich pathway; lumped produced-only pool)",
         ),
-        VarSpec(
-            "esters_gas",
-            "g/L",
-            default=0.0,
-            description="esters lost to the headspace by CO2 stripping (volatilized; "
-            "carbon-bookkeeping pool, decision D-20)",
+        #: Each ester's headspace twin (decision D-20, generalised per-ester at D-96): the
+        #: CO2-stripping sink moves liquid ester carbon here. A pool and its twin share ONE
+        #: molecule's carbon weight, which is what makes the strip carbon-neutral — so a
+        #: SINGLE shared gas pool is impossible once the esters differ (C4/C7/C8).
+        *(
+            VarSpec(
+                spec.gas_pool,
+                "g/L",
+                default=0.0,
+                description=f"{spec.pool} lost to the headspace by CO2 stripping "
+                "(volatilized; carbon-bookkeeping pool, decisions D-20/D-96)",
+            )
+            for spec in ESTER_SPECS
         ),
         VarSpec(
             "acetolactate",
@@ -962,20 +975,21 @@ _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: *separate* tuple from the validated-core primary set so the speculative beat stays
 #: **isolable** (prime directive #3): building a ProcessSet without this tuple is the
 #: pure validated core. Under D-19 (option a1) they route aroma carbon out of ``S``
-#: and ``total_carbon`` weights the ``esters``/``fusels`` pools, so they no longer
+#: and ``total_carbon`` weights the ester/``fusels`` pools, so they no longer
 #: leave the core byte-for-byte when enabled — turning them on draws a *trace* of
 #: sugar (~0.2 % of ``S0``), perturbing only ``dS`` (never ``dE``/``dCO2``). Carbon
 #: still closes to machine precision with them on, and the §2.2 trio stays in band.
 #: See D-19 / milestone-2-tasks.md.
 #:
 #: :class:`EsterVolatilization` (decision D-20) is the gas-stripping sink that moves
-#: liquid ``esters`` into the bookkeeping ``esters_gas`` headspace pool as CO2 sparges
+#: each liquid ester into its own bookkeeping headspace twin as CO2 sparges
 #: the must — the physics behind wine's "warmer ⇒ *less* liquid ester" (Rollero 2014):
 #: with ``E_a_ester_volatil`` set *per medium* it is held **above** ``E_a_esters`` for
 #: wine (stripping outruns synthesis, liquid esters fall with T) and **below** it for
 #: beer (synthesis dominates, esters rise with T — de Andrés-Toro). The transfer is
-#: carbon-neutral (``esters`` → ``esters_gas``, both booked as ethyl acetate), so it is
-#: in this isolable tuple too and ``total_carbon`` still closes to machine precision.
+#: carbon-neutral (each pool and its twin book as the SAME one of the three D-96 ester
+#: molecules), so it is in this isolable tuple too and ``total_carbon`` still closes to
+#: machine precision.
 _BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterSynthesis,
     FuselAlcoholsEhrlich,
@@ -1057,7 +1071,7 @@ _HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 #: O₂ consumer, so it diverts O₂ from — and suppresses — oxidative acetaldehyde). ALL
 #: MEDIUM-AGNOSTIC
 #: — hydrolysis and oxidation are properties of the molecules and the wine/beer pH, not the biology
-#: (the ``vicinal_diketones.yaml`` / shared-file pattern); ``esters``/``fusels``/``Byp``/
+#: (the ``vicinal_diketones.yaml`` / shared-file pattern); the ester/``fusels``/``Byp``/
 #: ``acetaldehyde``/``o2``/``A420`` exist in both schemas, and both wine and beer carry autoxidising
 #: polyphenols that consume O₂ and brown (D-74) — so all three are wired into BOTH media. Kept in
 #: their OWN isolable tuple (prime directive #3): a
@@ -1067,7 +1081,7 @@ _HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 #: reconfigure pattern MINUS the state mutation) re-enables it over a post-fermentation aging
 #: segment — off during the ferment, on during aging. An un-aged run is thus byte-for-byte the
 #: pre-aging core (disabled ⇒ skipped by ``active`` / ``tier_of`` / the strict ``touches`` check).
-#: During a post-dryness aging segment every OTHER producer of ``esters``/``fusels``/``Byp`` /
+#: During a post-dryness aging segment every OTHER producer of the ester/``fusels``/``Byp`` /
 #: ``acetaldehyde`` (``ester_synthesis``, ``ester_volatilization``, ``fusel_alcohols_ehrlich``, the
 #: ``Byp`` uptake routing, and ``acetaldehyde_production``/``_reduction``) is fermentative-flux- or
 #: viable-``X``-gated and quiescent at ``S ≈ 0`` / ``X = 0``, so the aging signal is UNCONFOUNDED —

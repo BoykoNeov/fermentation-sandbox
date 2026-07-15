@@ -91,12 +91,25 @@ M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O
 #: alcohols it formerly lumped now have their own carbon-routed ``fusels`` pool, so
 #: there is no double-count between ``Byp`` (succinic) and ``fusels`` (isoamyl).
 M_SUCCINIC = 4 * _M_C + 6 * _M_H + 4 * _M_O
-#: Ethyl acetate, C4H8O2 — the representative species for the lumped ``esters`` aroma
-#: pool, carbon-routed from sugar under decision D-19. BOOKKEEPING CAVEAT: a real
-#: ester's ethanol moiety is carbon already counted in ``E``, so "route ester carbon
-#: from sugar" over-attributes fresh hexose carbon — it closes the ledger exactly but
-#: is an accounting stand-in, not a claim about the metabolic carbon origin (D-19).
+#: Ethyl acetate, C4H8O2 — the ``ethyl_acetate`` pool's own species (decision D-96: the
+#: pool *is* this molecule; before D-96 it stood in for a lumped ``esters`` pool whose OAV
+#: was read as a *different* molecule — see the module note below). Carbon-routed from
+#: sugar under decision D-19. BOOKKEEPING CAVEAT: a real ester's ethanol moiety is carbon
+#: already counted in ``E``, so "route ester carbon from sugar" over-attributes fresh
+#: hexose carbon — it closes the ledger exactly but is an accounting stand-in, not a claim
+#: about the metabolic carbon origin (D-19).
 M_ETHYL_ACETATE = 4 * _M_C + 8 * _M_H + 2 * _M_O
+#: Isoamyl acetate (3-methylbutyl acetate), C7H14O2 — the ``isoamyl_acetate`` pool's own
+#: species (decision D-96). The potent *banana* acetate ester: trace by mass but low-threshold,
+#: so it dominates the fruity note that ethyl acetate's bulk mass cannot explain. Same D-19
+#: sugar-carbon stand-in caveat as ``ethyl_acetate``.
+M_ISOAMYL_ACETATE = 7 * _M_C + 14 * _M_H + 2 * _M_O
+#: Ethyl hexanoate (ethyl caproate), C8H16O2 — the ``ethyl_hexanoate`` pool's own species
+#: (decision D-96). The representative *ethyl ester of a medium-chain fatty acid* — the
+#: apple/pineapple half of the fruity bouquet, and the highest-OAV ester in wine. Unlike the
+#: two acetates (ATF1) it is EEB1/EHT1-derived; v1 shares the acetates' ``E_a_esters``
+#: temperature shape, a documented simplification (D-96). Same D-19 carbon stand-in caveat.
+M_ETHYL_HEXANOATE = 8 * _M_C + 16 * _M_H + 2 * _M_O
 #: Isoamyl alcohol (3-methylbutan-1-ol), C5H12O — the representative species for the
 #: lumped ``fusels`` higher-alcohol pool, carbon-routed from sugar under decision
 #: D-19. BOOKKEEPING CAVEAT: the Ehrlich pathway builds fusels from amino-acid
@@ -359,6 +372,8 @@ MOLAR_MASS: dict[str, float] = {
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
     "ethyl_acetate": M_ETHYL_ACETATE,
+    "isoamyl_acetate": M_ISOAMYL_ACETATE,
+    "ethyl_hexanoate": M_ETHYL_HEXANOATE,
     "isoamyl_alcohol": M_ISOAMYL_OH,
     "tartaric_acid": M_TARTARIC,
     "malic_acid": M_MALIC,
@@ -412,6 +427,11 @@ CARBON_ATOMS: dict[str, int] = {
     "glycerol": 3,
     "succinic_acid": 4,
     "ethyl_acetate": 4,
+    #: Isoamyl acetate (C7H14O2) carries SEVEN carbons and ethyl hexanoate (C8H16O2) EIGHT —
+    #: each ester pool is weighted by its OWN molecule (decision D-96), so a liquid→gas strip
+    #: or the D-69 hydrolysis moves that ester's real carbon, not a stand-in's.
+    "isoamyl_acetate": 7,
+    "ethyl_hexanoate": 8,
     "isoamyl_alcohol": 5,
     "tartaric_acid": 4,
     "malic_acid": 4,
@@ -495,6 +515,8 @@ NITROGEN_ATOMS: dict[str, int] = {
     "glycerol": 0,
     "succinic_acid": 0,
     "ethyl_acetate": 0,
+    "isoamyl_acetate": 0,
+    "ethyl_hexanoate": 0,
     "isoamyl_alcohol": 0,
     "tartaric_acid": 0,
     "malic_acid": 0,

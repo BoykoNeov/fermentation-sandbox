@@ -71,6 +71,7 @@ from fermentation.core.kinetics import (
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.core.kinetics.hops import iso_alpha_fraction
 from fermentation.core.kinetics.temperature import RAMP_RATE
 from fermentation.core.media import get_medium
@@ -389,9 +390,13 @@ def _wine_initial(
         "X_dead": 0.0,  # no inactivated biomass at pitch
         "Gly": 0.0,  # no byproducts at pitch (decision D-16)
         "Byp": 0.0,
-        "esters": 0.0,  # produced-only aroma pools, empty at pitch (decision D-19)
+        # Produced-only aroma pools, empty at pitch (decision D-19). The three ester pools and
+        # their headspace twins (D-96) are spread from the canonical registry, so a fourth ester
+        # needs no edit here — and cannot be silently omitted from a pitch (pack() would raise).
+        **{spec.pool: 0.0 for spec in ESTER_SPECS},
+        # Volatilized-ester bookkeeping pools, empty at pitch (decisions D-20/D-96)
+        **{spec.gas_pool: 0.0 for spec in ESTER_SPECS},
         "fusels": 0.0,
-        "esters_gas": 0.0,  # volatilized-ester bookkeeping pool, empty at pitch (D-20)
         "tartaric": tartaric,
         "malic": malic,
         "lactic": 0.0,
@@ -492,9 +497,13 @@ def _beer_initial(
         "X_dead": 0.0,  # no inactivated biomass at pitch
         "Gly": 0.0,  # beer carries zero byproduct diversion in M1 (decision D-16)
         "Byp": 0.0,
-        "esters": 0.0,  # produced-only aroma pools, empty at pitch (decision D-19)
+        # Produced-only aroma pools, empty at pitch (decision D-19). The three ester pools and
+        # their headspace twins (D-96) are spread from the canonical registry, so a fourth ester
+        # needs no edit here — and cannot be silently omitted from a pitch (pack() would raise).
+        **{spec.pool: 0.0 for spec in ESTER_SPECS},
+        # Volatilized-ester bookkeeping pools, empty at pitch (decisions D-20/D-96)
+        **{spec.gas_pool: 0.0 for spec in ESTER_SPECS},
         "fusels": 0.0,
-        "esters_gas": 0.0,  # volatilized-ester bookkeeping pool, empty at pitch (D-20)
     }
 
 
@@ -597,7 +606,8 @@ def _load_parameters(
         # shared files — collision-free names, inert for wine.
         base / "hops.yaml",
         # Aging chemistry (decision D-70): the ester-hydrolysis constants (k_ester_hydrolysis,
-        # E_a_ester_hydrolysis, esters_eq) the post-fermentation EsterHydrolysis Process reads.
+        # E_a_ester_hydrolysis, isoamyl_acetate_eq) the post-fermentation EsterHydrolysis
+        # Process reads.
         # Medium-agnostic (acid-catalysed hydrolysis is a molecule/pH property, the
         # vicinal_diketones.yaml pattern) and collision-free, so loaded universally like the other
         # shared files; INERT until a begin_aging intervention enables the Process (which is
@@ -1668,7 +1678,7 @@ def _verb_begin_aging(
     for name in (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
-        "esters_eq",
+        "isoamyl_acetate_eq",
         "k_ethanol_oxidation",
         "E_a_ethanol_oxidation",
         "y_acetaldehyde_per_o2",

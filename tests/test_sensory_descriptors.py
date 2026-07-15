@@ -252,8 +252,8 @@ def test_clean_run_raises_no_false_descriptor(thresholds):
 def test_descriptor_is_monotone_in_its_pools(thresholds):
     """Raising any pool never lowers its descriptor (max is monotone non-decreasing)."""
     schema = wine_schema()
-    lo = _project(thresholds, schema, {"esters": 1.0e-3})
-    hi = _project(thresholds, schema, {"esters": 2.0e-3})
+    lo = _project(thresholds, schema, {"isoamyl_acetate": 1.0e-3})
+    hi = _project(thresholds, schema, {"isoamyl_acetate": 2.0e-3})
     assert 0.0 < lo.readings["fruity"].oav < hi.readings["fruity"].oav
 
     # Raising a NON-dominant contributor leaves the descriptor unmoved (it is still not loudest)
@@ -306,7 +306,44 @@ def test_lumped_flag_propagates_from_the_dominant_contributor(thresholds):
     assert h2s_loud.readings["sulfidic"].lumped is False
     # A clean single-molecule axis never claims a lump assumption.
     assert h2s_loud.readings["buttery"].lumped is False
-    assert h2s_loud.readings["fruity"].lumped is True  # esters — lumped (D-66)
+    # `fruity` read True here until D-96, when the lumped `esters` pool became two
+    # single-molecule pools (isoamyl_acetate + ethyl_hexanoate). Both contributors are now real
+    # molecules, so the axis carries no fixed-composition assumption at all — the caveat did not
+    # move, it stopped existing.
+    assert h2s_loud.readings["fruity"].lumped is False
+
+
+def test_lumped_flag_propagates_across_the_split_ester_solventy_axis(thresholds):
+    """`solventy` is the D-96 analogue of `sulfidic`: one single-molecule pool + one real lump.
+
+    The split gave `solventy` a genuinely mixed axis — `ethyl_acetate` (single-molecule, exact)
+    alongside `fusels` (a real lump read against isoamyl alcohol). So the same honesty rule the
+    `sulfidic` test pins must hold here, on a pairing that did not exist before D-96: the axis
+    inherits the lump assumption exactly when the lump is the loudest contributor, and drops it
+    when the exact molecule is.
+    """
+    schema = wine_schema()
+    ea_loud = _project(
+        thresholds,
+        schema,
+        {
+            "ethyl_acetate": _at_oav(thresholds, "ethyl_acetate", "wine", 4.0),
+            "fusels": _at_oav(thresholds, "fusels", "wine", 0.5),
+        },
+    )
+    assert ea_loud.readings["solventy"].dominant == "ethyl_acetate"
+    assert ea_loud.readings["solventy"].lumped is False
+
+    fusels_loud = _project(
+        thresholds,
+        schema,
+        {
+            "ethyl_acetate": _at_oav(thresholds, "ethyl_acetate", "wine", 0.5),
+            "fusels": _at_oav(thresholds, "fusels", "wine", 4.0),
+        },
+    )
+    assert fusels_loud.readings["solventy"].dominant == "fusels"
+    assert fusels_loud.readings["solventy"].lumped is True
 
 
 def test_descriptor_tier_is_the_speculative_floor_even_for_a_validated_input():
@@ -350,9 +387,11 @@ def test_projection_inherits_the_taste_exclusions(thresholds):
 
 def test_dominant_pools_view(thresholds):
     profile = _project(
-        thresholds, wine_schema(), {"esters": _at_oav(thresholds, "esters", "wine", 2.0)}
+        thresholds,
+        wine_schema(),
+        {"isoamyl_acetate": _at_oav(thresholds, "isoamyl_acetate", "wine", 2.0)},
     )
-    assert profile.dominant_pools()["fruity"] == "esters"
+    assert profile.dominant_pools()["fruity"] == "isoamyl_acetate"
 
 
 # -- the swappable seam (handoff §4.2) ----------------------------------------

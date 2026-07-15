@@ -19,6 +19,7 @@ from fermentation.core.chemistry import (
     nitrogen_mass_fraction,
     sugar_species,
 )
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.core.state import FloatArray, StateSchema
 
 QuantityFn = Callable[[FloatArray], float]
@@ -94,23 +95,33 @@ def total_carbon(
         w[schema.slice("Byp")] = carbon_mass_fraction("succinic_acid")
     # Aroma byproduct pools (decision D-19): the ester/fusel Processes route their
     # carbon out of sugar, so these pools must be weighted or carbon would read as
-    # destroyed when they accumulate. Esters book as ethyl acetate, fusels as isoamyl
-    # alcohol — the same representative species the Processes draw against, from the
-    # one chemistry source of truth, so the check matches the kinetics. No overlap
+    # destroyed when they accumulate. Each ester books as its own molecule (D-96), fusels
+    # as isoamyl alcohol — the same representative species the Processes draw against, from
+    # the one chemistry source of truth, so the check matches the kinetics. No overlap
     # with Byp: under D-19 Byp is organic-acids/polyols only (higher alcohols moved
     # to the fusels pool), so the former Byp double-count is gone.
-    if "esters" in schema:
-        w[schema.slice("esters")] = carbon_mass_fraction("ethyl_acetate")
-    if "fusels" in schema:
-        w[schema.slice("fusels")] = carbon_mass_fraction("isoamyl_alcohol")
-    # Volatilized esters (decision D-20): the EsterVolatilization sink moves carbon
-    # from the liquid ``esters`` pool into this headspace pool as CO2 strips it, so it
-    # must be weighted at the *same* ethyl-acetate fraction or that liquid→gas transfer
-    # would read as carbon destroyed. This mirrors how evolved ``CO2`` stays counted —
+    # Each ester books as ITSELF (decision D-96): the three single-molecule pools that
+    # replaced the lumped ``esters`` pool are weighted at their own molecule's carbon
+    # fraction (ethyl acetate C4, isoamyl acetate C7, ethyl hexanoate C8), from the same
+    # ``ESTER_SPECS`` registry the Processes draw against — so the draw and the check can
+    # never disagree, and a fourth ester is weighted here automatically.
+    #
+    # Volatilized esters (decisions D-20/D-96): the EsterVolatilization sink moves carbon
+    # from each liquid pool into THAT ester's headspace twin as CO2 strips it, so the twin
+    # must be weighted at the *same* molecule's fraction or the liquid→gas transfer would
+    # read as carbon destroyed. Pairing each pool with its own twin is exactly why one
+    # shared gas pool is impossible now the esters differ — a C7 stripped into a
+    # C4-weighted pool would create carbon. This mirrors how evolved ``CO2`` stays counted:
     # the carbon leaves the liquid but not the ledger, so closure holds to machine
     # precision while wine's liquid esters honestly fall with temperature.
-    if "esters_gas" in schema:
-        w[schema.slice("esters_gas")] = carbon_mass_fraction("ethyl_acetate")
+    for spec in ESTER_SPECS:
+        fraction = carbon_mass_fraction(spec.species)
+        if spec.pool in schema:
+            w[schema.slice(spec.pool)] = fraction
+        if spec.gas_pool in schema:
+            w[schema.slice(spec.gas_pool)] = fraction
+    if "fusels" in schema:
+        w[schema.slice("fusels")] = carbon_mass_fraction("isoamyl_alcohol")
     # Vicinal-diketone (VDK) pools (decision D-26): the diacetyl pathway routes carbon
     # sugar → α-acetolactate → diacetyl + CO2 → 2,3-butanediol, every step balanced on
     # this ledger. α-acetolactate is drawn from sugar (excretion) and booked at its own

@@ -1,12 +1,12 @@
 """Tests for the Tier-3 aging Process :class:`EsterHydrolysis` (decision D-69).
 
 The first §4.1 aging Process: a first-order **net decay** of the lumped ``esters`` pool
-toward a lower equilibrium floor ``esters_eq`` (young fruity acetate esters hydrolyse and
+toward a lower equilibrium floor ``isoamyl_acetate_eq`` (young fruity acetate esters hydrolyse and
 fade with age), warmed by an Arrhenius factor (warmer ages faster), routing the released
 ester carbon **5:2** into ``fusels`` (isoamyl alcohol, the alcohol product) and ``Byp``
 (succinic-stand-in acetic acid, the acid product). These tests pin the closed-form
 derivative and the exact 5:2 split; prove the properties the aging axis requires — **net
-decay toward equilibrium** (zero at/below ``esters_eq``, not decay-to-zero), **warmer ⇒
+decay toward equilibrium** (zero at/below ``isoamyl_acetate_eq``, not decay-to-zero), **warmer ⇒
 faster**, and an **on-ledger carbon transfer that closes ``total_carbon`` to machine
 precision** (the D-68 "conservation is back in force" requirement, unlike the D-67 readout);
 check the solver-undershoot guards; and confirm the tier floors at speculative and the
@@ -22,6 +22,7 @@ import pytest
 from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
 from fermentation.core.acidbase import bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import (
+    CARBON_ATOMS,
     M_2_METHYLBUTANAL,
     M_2_METHYLPROPANAL,
     M_3_METHYLBUTANAL,
@@ -55,7 +56,14 @@ from fermentation.core.kinetics import (
     ThermalAnthocyaninFade,
     arrhenius_factor,
 )
-from fermentation.core.kinetics.aging import _MAILLARD_PRODUCTS, _SO2_PER_O2
+from fermentation.core.kinetics.aging import (
+    _ACETIC_ACID_CARBONS,
+    _BYP_CARBON_SHARE,
+    _FUSEL_CARBON_SHARE,
+    _ISOAMYL_ALCOHOL_CARBONS,
+    _MAILLARD_PRODUCTS,
+    _SO2_PER_O2,
+)
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import Process, ProcessSet
@@ -72,7 +80,8 @@ from fermentation.validation import (
 )
 
 #: Carbon fractions of the three pools the transfer touches (mirror the Process constants).
-_ESTER_C = carbon_mass_fraction("ethyl_acetate")
+#: D-96: the hydrolysis debits isoamyl acetate ITSELF, not an ethyl-acetate stand-in.
+_ESTER_C = carbon_mass_fraction("isoamyl_acetate")
 _FUSEL_C = carbon_mass_fraction("isoamyl_alcohol")
 _BYP_C = carbon_mass_fraction("succinic_acid")
 #: The 5:2 split, from the isoamyl-acetate stand-in reaction (isoamyl alcohol 5 C : acetic 2 C).
@@ -124,12 +133,12 @@ def params(store):
     return store.resolve()
 
 
-def _aged_wine(schema: StateSchema, *, esters: float = 0.1, t: float = 293.15, **kw) -> FloatArray:
+def _aged_wine(schema: StateSchema, *, ester: float = 0.1, t: float = 293.15, **kw) -> FloatArray:
     """A finished, racked wine at the start of aging: yeast gone (X=0), dry (S=0), with the
     liquid ``esters`` pool pre-loaded (nothing produces it during aging — the Process only
     decays it). ``fusels``/``Byp`` default to 0 so their aging gains are unambiguous."""
     y = schema.pack({"X": 0.0, "S": [0.0], "E": 100.0, "N": 0.0, "T": t, "CO2": 0.0})
-    y[schema.slice("esters")] = esters
+    y[schema.slice("isoamyl_acetate")] = ester
     for name, val in kw.items():
         y[schema.slice(name)] = val
     return y
@@ -145,11 +154,11 @@ def test_metadata():
     assert p.tier is Tier.SPECULATIVE
     # An on-ledger inter-pool transfer: decays esters, routes carbon to the alcohol (fusels)
     # and acid (Byp) products — never S/E/CO2 (aging draws no sugar, unlike the M2 producers).
-    assert set(p.touches) == {"esters", "fusels", "Byp"}
+    assert set(p.touches) == {"isoamyl_acetate", "fusels", "Byp"}
     assert set(p.reads) == {
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
-        "esters_eq",
+        "isoamyl_acetate_eq",
         "T_ref",
     }
 
@@ -159,15 +168,15 @@ def test_metadata():
 
 def test_derivative_matches_closed_form(params):
     schema = wine_schema()
-    esters, t = 0.1, 298.15  # off T_ref so the Arrhenius factor bites
-    y = _aged_wine(schema, esters=esters, t=t)
+    ester, t = 0.1, 298.15  # off T_ref so the Arrhenius factor bites
+    y = _aged_wine(schema, ester=ester, t=t)
     d = EsterHydrolysis().derivatives(0.0, y, schema, params)
 
     f_t = arrhenius_factor(t, params["E_a_ester_hydrolysis"], params["T_ref"])
-    rate = params["k_ester_hydrolysis"] * f_t * (esters - params["esters_eq"])
+    rate = params["k_ester_hydrolysis"] * f_t * (ester - params["isoamyl_acetate_eq"])
     carbon_released = rate * _ESTER_C
 
-    assert schema.get(d, "esters") == pytest.approx(-rate)
+    assert schema.get(d, "isoamyl_acetate") == pytest.approx(-rate)
     # 5:2 split of the released carbon, re-deposited via each product's own carbon fraction.
     assert schema.get(d, "fusels") == pytest.approx(_FUSEL_SHARE * carbon_released / _FUSEL_C)
     assert schema.get(d, "Byp") == pytest.approx(_BYP_SHARE * carbon_released / _BYP_C)
@@ -181,21 +190,43 @@ def test_carbon_closes_per_rhs(params):
     # fusel + Byp carbon gained, to machine precision — a pure on-ledger inter-pool transfer
     # (no S involvement), so total_carbon closes for ANY split summing to 1 (here 5:2).
     schema = wine_schema()
-    d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, esters=0.1, t=298.15), schema, params)
+    d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=0.1, t=298.15), schema, params)
     carbon_residual = (
-        schema.get(d, "esters") * _ESTER_C
+        schema.get(d, "isoamyl_acetate") * _ESTER_C
         + schema.get(d, "fusels") * _FUSEL_C
         + schema.get(d, "Byp") * _BYP_C
     )
     assert carbon_residual == pytest.approx(0.0, abs=1e-15)
 
 
+def test_five_to_two_split_exactly_partitions_the_debited_molecule():
+    """The 5:2 split accounts for EVERY carbon of the ester it debits — impossible before D-96.
+
+    This is the test that could not have been written at D-69. Back then the Process debited
+    the lumped ``esters`` pool at its ledger-fixed **ethyl acetate** (C4) weighting, while
+    splitting the released carbon 5:2 as though the molecule were **isoamyl acetate** — the
+    stand-in reaction the split ratio actually comes from. Debited molecule ≠ split molecule, so
+    ``5 + 2 = 7`` could not equal the debited molecule's 4 carbons, and D-69 could only
+    *document* the mismatch. Crucially, every conservation test still passed: closure holds for
+    ANY split summing to 1, so the ledger could not see the seam.
+
+    D-96 split the lump, so the Process now debits isoamyl acetate itself and 5 + 2 = 7 = its
+    real carbon count. The stand-in became the thing. (``aging.py`` also asserts this at import;
+    pinned here too, since the seam it closes was invisible to conservation for 27 decisions.)
+    """
+    assert _ISOAMYL_ALCOHOL_CARBONS + _ACETIC_ACID_CARBONS == CARBON_ATOMS["isoamyl_acetate"] == 7
+    # And the ratio really is read off those carbon counts, not a free parameter.
+    assert pytest.approx(1.0) == _FUSEL_CARBON_SHARE + _BYP_CARBON_SHARE
+    assert pytest.approx(5.0 / 2.0) == _FUSEL_CARBON_SHARE / _BYP_CARBON_SHARE
+
+
 def test_split_is_five_to_two_by_carbon(params):
-    # The carbon (not mass) partition is exactly 5:2 — the isoamyl-acetate stand-in ratio
-    # (isoamyl alcohol 5 C : acetic acid 2 C), the advisor-settled crux (D-69). Verified as
-    # carbon so it is independent of the pools' differing mass weightings.
+    # The carbon (not mass) partition is exactly 5:2 — isoamyl acetate's real hydrolysis
+    # stoichiometry (isoamyl alcohol 5 C : acetic acid 2 C), the advisor-settled crux (D-69),
+    # exact rather than a stand-in since D-96. Verified as carbon so it is independent of the
+    # pools' differing mass weightings.
     schema = wine_schema()
-    d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, esters=0.1), schema, params)
+    d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=0.1), schema, params)
     fusel_carbon = schema.get(d, "fusels") * _FUSEL_C
     byp_carbon = schema.get(d, "Byp") * _BYP_C
     assert fusel_carbon / byp_carbon == pytest.approx(5.0 / 2.0)
@@ -208,32 +239,36 @@ def test_split_is_five_to_two_by_carbon(params):
 
 
 def test_zero_at_and_below_equilibrium(params):
-    # Net decay toward a LOWER floor, not decay-to-zero (D-68): at or below esters_eq the
+    # Net decay toward a LOWER floor, not decay-to-zero (D-68): at or below isoamyl_acetate_eq the
     # rate is zero (the reverse ester-formation half is the deferred bidirectional term).
     schema = wine_schema()
-    eq = params["esters_eq"]
-    at_eq = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, esters=eq), schema, params)
-    below = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, esters=eq * 0.5), schema, params)
+    eq = params["isoamyl_acetate_eq"]
+    at_eq = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=eq), schema, params)
+    below = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=eq * 0.5), schema, params)
     assert np.array_equal(at_eq, schema.zeros())
     assert np.array_equal(below, schema.zeros())
 
 
 def test_decays_only_the_excess_above_equilibrium(params):
-    # The rate is proportional to (esters - esters_eq), so a pool twice as far above the floor
+    # The rate is proportional to (ester - isoamyl_acetate_eq), so a pool twice as far above it
     # decays twice as fast — the linear approach to equilibrium (Ramey & Ough first-order form).
     schema = wine_schema()
-    eq = params["esters_eq"]
-    near = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, esters=eq + 0.02), schema, params)
-    far = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, esters=eq + 0.04), schema, params)
-    assert schema.get(far, "esters") == pytest.approx(2.0 * schema.get(near, "esters"))
-    assert schema.get(far, "esters") < schema.get(near, "esters") < 0.0  # both decaying
+    eq = params["isoamyl_acetate_eq"]
+    near = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=eq + 0.02), schema, params)
+    far = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=eq + 0.04), schema, params)
+    assert schema.get(far, "isoamyl_acetate") == pytest.approx(
+        2.0 * schema.get(near, "isoamyl_acetate")
+    )
+    assert (
+        schema.get(far, "isoamyl_acetate") < schema.get(near, "isoamyl_acetate") < 0.0
+    )  # both decaying
 
 
 def test_solver_undershoot_does_not_create_pools(params):
     # A solver undershoot (esters < 0) must not flip max(0, ...) into spurious production of
-    # fusels/Byp (or negative decay). esters_eq > 0 makes the excess negative ⇒ clamped to 0.
+    # fusels/Byp (or negative decay). A floor > 0 makes the excess negative ⇒ clamped to 0.
     schema = wine_schema()
-    d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, esters=-1e-6), schema, params)
+    d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=-1e-6), schema, params)
     assert np.array_equal(d, schema.zeros())
 
 
@@ -245,25 +280,25 @@ def test_rises_with_temperature(params):
     # faster — why warm cellars age wine faster and cold storage preserves fruity esters.
     schema = wine_schema()
     cold = EsterHydrolysis().derivatives(
-        0.0, _aged_wine(schema, esters=0.1, t=283.15), schema, params
+        0.0, _aged_wine(schema, ester=0.1, t=283.15), schema, params
     )
     warm = EsterHydrolysis().derivatives(
-        0.0, _aged_wine(schema, esters=0.1, t=303.15), schema, params
+        0.0, _aged_wine(schema, ester=0.1, t=303.15), schema, params
     )
     # Faster decay (more negative) and a correspondingly larger fusel/Byp gain when warm.
-    assert schema.get(warm, "esters") < schema.get(cold, "esters") < 0.0
+    assert schema.get(warm, "isoamyl_acetate") < schema.get(cold, "isoamyl_acetate") < 0.0
     assert schema.get(warm, "fusels") > schema.get(cold, "fusels") > 0.0
 
 
 def test_factor_is_one_at_reference_temperature(params):
     # At T_ref the Arrhenius factor is exactly 1, so the rate is the bare first-order term.
     schema = wine_schema()
-    esters = 0.1
+    ester = 0.1
     d = EsterHydrolysis().derivatives(
-        0.0, _aged_wine(schema, esters=esters, t=params["T_ref"]), schema, params
+        0.0, _aged_wine(schema, ester=ester, t=params["T_ref"]), schema, params
     )
-    expected = params["k_ester_hydrolysis"] * (esters - params["esters_eq"])
-    assert schema.get(d, "esters") == pytest.approx(-expected)
+    expected = params["k_ester_hydrolysis"] * (ester - params["isoamyl_acetate_eq"])
+    assert schema.get(d, "isoamyl_acetate") == pytest.approx(-expected)
 
 
 # -- integrated aging segment (conservation + direction) ----------------------
@@ -277,19 +312,19 @@ def test_integrated_aging_closes_carbon_and_fades_esters(params, store):
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterHydrolysis()], strict=True)
     esters0 = 0.1
-    y0 = _aged_wine(schema, esters=esters0, t=293.15)
+    y0 = _aged_wine(schema, ester=esters0, t=293.15)
     # ~1 year of aging (large steps are fine — no ferment stiffness; the §7 slow-phase point).
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success, traj.message
 
     # The fruity esters fade (toward, not past, the equilibrium floor) and the products rise.
-    esters_end = float(traj.series("esters")[-1])
-    assert params["esters_eq"] <= esters_end < esters0
+    ester_end = float(traj.series("isoamyl_acetate")[-1])
+    assert params["isoamyl_acetate_eq"] <= ester_end < esters0
     assert float(traj.series("fusels")[-1]) > 0.0
     assert float(traj.series("Byp")[-1]) > 0.0
     # Non-negative pools and machine-precision carbon closure (X=0 throughout, so the biomass
     # term is inert; the invariant is the esters → fusels + Byp inter-pool transfer).
-    assert_nonnegative(traj, ("esters", "fusels", "Byp"), atol=1e-12)
+    assert_nonnegative(traj, ("isoamyl_acetate", "fusels", "Byp"), atol=1e-12)
     f_c = store.value("biomass_C_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
     # Carbon is the invariant; mass carries a small (~4.5%) documented stand-in gap (aging.yaml):
@@ -301,12 +336,12 @@ def test_integrated_aging_closes_carbon_and_fades_esters(params, store):
 
 
 def test_isolable_from_the_core_when_below_equilibrium(params):
-    # Isolability corner (prime directive #3): with the esters pool below esters_eq the Process
+    # Isolability corner (prime directive #3): with the ester pool below its floor the Process
     # contributes exactly nothing, so an aging segment on an ester-poor wine is byte-for-byte
     # the no-aging state — the Process cannot create aroma out of an empty pool.
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterHydrolysis()], strict=True)
-    y = _aged_wine(schema, esters=params["esters_eq"] * 0.5)
+    y = _aged_wine(schema, ester=params["isoamyl_acetate_eq"] * 0.5)
     assert np.array_equal(ps.total_derivatives(0.0, y, params), schema.zeros())
 
 
@@ -321,10 +356,10 @@ def test_integrated_aging_closes_carbon_beer_multislot(store):
     schema = beer_schema()
     ps = ProcessSet(schema, [EsterHydrolysis()], strict=True)
     y0 = schema.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
-    y0[schema.slice("esters")] = 0.08
+    y0[schema.slice("isoamyl_acetate")] = 0.08
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 180.0))
     assert traj.success, traj.message
-    assert float(traj.series("esters")[-1]) < 0.08
+    assert float(traj.series("isoamyl_acetate")[-1]) < 0.08
     f_c = beer.value("biomass_C_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
 
@@ -338,7 +373,7 @@ def test_tier_floored_at_speculative(store):
     # parameter tiers keeps it there. Non-vacuous: esters/fusels/Byp are all speculative.
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterHydrolysis()])
-    for pool in ("esters", "fusels", "Byp"):
+    for pool in ("isoamyl_acetate", "fusels", "Byp"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
 
@@ -371,7 +406,7 @@ def test_oxidation_metadata():
 def test_oxidation_matches_closed_form(params):
     schema = wine_schema()
     o2, t = 0.03, 298.15  # off T_ref so the Arrhenius factor bites
-    y = _aged_wine(schema, esters=0.0, t=t, o2=o2)  # esters=0 so only oxidation moves anything
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2)  # esters=0 so only oxidation moves anything
     d = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
 
     f_t = arrhenius_factor(t, params["E_a_ethanol_oxidation"], params["T_ref"])
@@ -383,7 +418,7 @@ def test_oxidation_matches_closed_form(params):
     # Carbon-exact C2 borrow from ethanol (the reduction reversed).
     assert schema.get(d, "E") == pytest.approx(-acet_rate * M_ETHANOL / M_ACETALDEHYDE)
     # Oxidation touches nothing else — no sugar, no CO2, no esters/fusels/Byp, no biomass.
-    for var in ("X", "S", "N", "CO2", "esters", "fusels", "Byp"):
+    for var in ("X", "S", "N", "CO2", "isoamyl_acetate", "fusels", "Byp"):
         assert schema.get(d, var) == 0.0
 
 
@@ -392,7 +427,7 @@ def test_oxidation_carbon_closes_per_rhs(params):
     # carbon lost from ethanol equals the carbon gained as acetaldehyde, to machine precision.
     schema = wine_schema()
     d = OxidativeAcetaldehyde().derivatives(
-        0.0, _aged_wine(schema, esters=0.0, t=298.15, o2=0.03), schema, params
+        0.0, _aged_wine(schema, ester=0.0, t=298.15, o2=0.03), schema, params
     )
     carbon_residual = schema.get(d, "E") * _ETHANOL_C + schema.get(d, "acetaldehyde") * _ACET_C
     assert carbon_residual == pytest.approx(0.0, abs=1e-15)
@@ -404,7 +439,7 @@ def test_oxidation_inert_without_oxygen(params):
     # ester-hydrolysis-only case. Cannot oxidise ethanol out of an empty O₂ pool.
     schema = wine_schema()
     ps = ProcessSet(schema, [OxidativeAcetaldehyde()], strict=True)
-    y = _aged_wine(schema, esters=0.0, o2=0.0)
+    y = _aged_wine(schema, ester=0.0, o2=0.0)
     assert np.array_equal(ps.total_derivatives(0.0, y, params), schema.zeros())
 
 
@@ -449,7 +484,7 @@ def test_integrated_oxidation_saturates_and_closes_carbon(params, store):
     schema = wine_schema()
     ps = ProcessSet(schema, [OxidativeAcetaldehyde()], strict=True)
     o2_0 = 0.04  # ~40 mg/L cumulative O₂ exposure
-    y0 = _aged_wine(schema, esters=0.0, t=298.15, o2=o2_0)
+    y0 = _aged_wine(schema, ester=0.0, t=298.15, o2=o2_0)
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))  # ~1 year
     assert traj.success, traj.message
 
@@ -520,7 +555,7 @@ def _sulfited_wine(
     wine range), dosed SO₂ and O₂. ``tartaric`` + a ``cation_charge`` set an acidic ~pH 3.3; the
     dosed ``so2_total``/``o2`` are the substrates. ``acetaldehyde`` defaults to 0 so free SO₂ ==
     total (no binding) and the bisulfite driver is unambiguous unless a test sets otherwise."""
-    y = _aged_wine(schema, esters=0.0, t=t, so2_total=so2, o2=o2, tartaric=4.0, cation_charge=0.012)
+    y = _aged_wine(schema, ester=0.0, t=t, so2_total=so2, o2=o2, tartaric=4.0, cation_charge=0.012)
     for name, val in kw.items():
         y[schema.slice(name)] = val
     return y
@@ -553,7 +588,7 @@ def test_sulfite_oxidation_matches_closed_form(so2_params):
     assert schema.get(d, "o2") == pytest.approx(-r_o2)
     assert schema.get(d, "so2_total") == pytest.approx(-_SO2_PER_O2 * (r_o2 / M_O2) * M_SO2)
     # Touches nothing else — not ethanol/acetaldehyde/esters, no sugar, no CO2, no biomass.
-    for var in ("X", "S", "E", "N", "CO2", "acetaldehyde", "esters", "fusels", "Byp"):
+    for var in ("X", "S", "E", "N", "CO2", "acetaldehyde", "isoamyl_acetate", "fusels", "Byp"):
         assert schema.get(d, var) == 0.0
 
 
@@ -717,7 +752,7 @@ def test_browning_metadata():
 def test_browning_matches_closed_form(params):
     schema = wine_schema()
     o2, t = 0.03, 298.15  # off T_ref so the Arrhenius factor bites
-    y = _aged_wine(schema, esters=0.0, t=t, o2=o2)
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2)
     d = PhenolicBrowning().derivatives(0.0, y, schema, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
     r_o2 = params["k_browning"] * f_t * o2
@@ -739,7 +774,7 @@ def test_browning_is_dominant_share_over_ethanol_oxidation(params):
     assert params["k_browning"] > params["k_ethanol_oxidation"]
     assert params["k_browning"] + params["k_ethanol_oxidation"] == pytest.approx(5.0e-4)
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, o2=0.03)
+    y = _aged_wine(schema, ester=0.0, o2=0.03)
     brown = PhenolicBrowning().derivatives(0.0, y, schema, params)
     ethanol = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
     assert -schema.get(brown, "o2") > -schema.get(ethanol, "o2") > 0.0
@@ -815,7 +850,7 @@ def test_integrated_browning_accumulates_a420_and_saturates(params, store):
     schema = wine_schema()
     ps = ProcessSet(schema, [PhenolicBrowning()], strict=True)
     o2_0 = 0.04  # ~40 mg/L cumulative O₂ exposure
-    y0 = _aged_wine(schema, esters=0.0, t=298.15, o2=o2_0)
+    y0 = _aged_wine(schema, ester=0.0, t=298.15, o2=o2_0)
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))  # ~1 year
     assert traj.success, traj.message
 
@@ -856,7 +891,7 @@ def test_browning_diverts_o2_and_suppresses_acetaldehyde(params, store):
 
     def run(processes: list[Process]) -> Trajectory:
         ps = ProcessSet(schema, processes, strict=True)
-        y0 = _aged_wine(schema, esters=0.0, t=298.15, o2=o2_0)
+        y0 = _aged_wine(schema, ester=0.0, t=298.15, o2=o2_0)
         traj = simulate(ps, params=params, y0=y0, t_span=span)
         assert traj.success, traj.message
         return traj
@@ -917,7 +952,7 @@ def _strecker_wine(
 ) -> FloatArray:
     """A finished, racked wine at the start of aging with dosed amino acids + O2 — the two Strecker
     substrates. ``esters`` defaults to 0 (irrelevant here); any extra pool via kwargs."""
-    y = _aged_wine(schema, esters=0.0, t=t, o2=o2, amino_acids=aa)
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2, amino_acids=aa)
     for name, val in kw.items():
         y[schema.slice(name)] = val
     return y
@@ -982,7 +1017,7 @@ def test_strecker_matches_closed_form(params):
     assert schema.get(d, "amino_acids") == pytest.approx(-aa_mass)
     assert schema.get(d, "N") == pytest.approx(aa_mass * _AA_N)
     # Touches nothing else — no ethanol/esters/fusels/acetaldehyde, no sugar, no biomass.
-    for var in ("X", "S", "E", "esters", "fusels", "Byp", "acetaldehyde"):
+    for var in ("X", "S", "E", "isoamyl_acetate", "fusels", "Byp", "acetaldehyde"):
         assert schema.get(d, var) == 0.0
 
 
@@ -1210,7 +1245,7 @@ def _maillard_wine(
 ) -> FloatArray:
     """A finished, SEALED (o2 = 0 — the whole point) SWEET wine at the start of aging: residual
     sugar ``s`` (the dicarbonyl driver) + dosed ``amino_acids``, warm. Any extra pool via kwargs."""
-    y = _aged_wine(schema, esters=0.0, t=t, amino_acids=aa)
+    y = _aged_wine(schema, ester=0.0, t=t, amino_acids=aa)
     y[schema.slice("S")] = s
     for name, val in kw.items():
         y[schema.slice(name)] = val
@@ -1282,7 +1317,7 @@ def test_maillard_matches_closed_form(maillard_params):
     # S is a read-only driver — NOT consumed here (its draw is booked by D-88). And NO o2 term.
     assert schema.get(d, "S") == 0.0
     assert schema.get(d, "o2") == 0.0
-    for var in ("X", "E", "esters", "fusels", "Byp", "acetaldehyde"):
+    for var in ("X", "E", "isoamyl_acetate", "fusels", "Byp", "acetaldehyde"):
         assert schema.get(d, var) == 0.0
 
 
@@ -1526,7 +1561,7 @@ def caramel_params(caramel_store):
 
 def _caramel_wine(schema: StateSchema, *, s: float = 100.0, t: float = 298.15, **kw) -> FloatArray:
     """A finished SWEET wine at the start of aging: residual sugar ``s``, warm, sealed (o2 = 0)."""
-    y = _aged_wine(schema, esters=0.0, t=t)
+    y = _aged_wine(schema, ester=0.0, t=t)
     y[schema.slice("S")] = s
     for name, val in kw.items():
         y[schema.slice(name)] = val
@@ -1574,7 +1609,7 @@ def test_caramelization_matches_closed_form(caramel_params):
     assert schema.get(d, "melanoidin") == pytest.approx(cf["melanoidin"])
     assert schema.get(d, "A420") == pytest.approx(cf["A420"])
     # Touches nothing else — no o2, no aroma pools, no amino acids, no E.
-    for var in ("o2", "amino_acids", "E", "esters", "acetaldehyde", "sotolon", "N"):
+    for var in ("o2", "amino_acids", "E", "isoamyl_acetate", "acetaldehyde", "sotolon", "N"):
         assert schema.get(d, var) == 0.0
 
 
@@ -1769,7 +1804,7 @@ def _maillard_browning_wine(
     """A finished, SEALED (o2 = 0) SWEET wine at the start of aging: residual sugar ``s`` + dosed
     ``amino_acids``, warm — the regime where amino-acid Maillard browning runs. Extra pools via
     kw."""
-    y = _aged_wine(schema, esters=0.0, t=t, amino_acids=aa)
+    y = _aged_wine(schema, ester=0.0, t=t, amino_acids=aa)
     y[schema.slice("S")] = s
     for name, val in kw.items():
         y[schema.slice(name)] = val
@@ -1838,7 +1873,7 @@ def test_maillard_browning_matches_closed_form(caramel_params):
     assert schema.get(d, "maillard_melanoidin") == pytest.approx(cf["maillard_melanoidin"])
     assert schema.get(d, "A420") == pytest.approx(cf["A420"])
     # Touches nothing else — no o2, no CO2, no N, no aroma pools, no E.
-    for var in ("o2", "CO2", "N", "E", "esters", "acetaldehyde", "sotolon", "melanoidin"):
+    for var in ("o2", "CO2", "N", "E", "isoamyl_acetate", "acetaldehyde", "sotolon", "melanoidin"):
         assert schema.get(d, var) == 0.0
 
 
@@ -2050,7 +2085,7 @@ def _oak_wine(
     """A finished, racked wine at the start of oak aging: the four ceiling slots pre-set (as the
     add_oak verb would, oak_gpl × toast yield), the extracted pools starting at 0. ``ceilings`` maps
     a compound name to its ceiling g/L; any extra pool via kwargs."""
-    y = _aged_wine(schema, esters=0.0, t=t)
+    y = _aged_wine(schema, ester=0.0, t=t)
     for compound, ceiling in (ceilings or {}).items():
         y[schema.slice(f"{compound}_ceiling")] = ceiling
     for name, val in kw.items():
@@ -2123,7 +2158,8 @@ def test_oak_is_first_order_in_the_gap(oak_params):
 def test_oak_inert_without_dose_and_on_undershoot(oak_params):
     # No oak dosed (every ceiling 0) ⇒ byte-for-byte inert: a begin_aging run with no add_oak is the
     # case without oak. And the EXPLICIT ceiling ≤ 0 guard is load-bearing — the floor is 0 (unlike
-    # esters_eq > 0), so a solver undershoot conc = −ε must NOT flip max(0, ceiling − conc) into
+    # the ester floor is > 0), so a solver undershoot conc = −ε must NOT flip
+    # max(0, ceiling − conc) into
     # spurious extraction. Both the undosed and the undershoot case return byte-for-byte zero.
     schema = wine_schema()
     ps = ProcessSet(schema, [OakExtraction()], strict=True)
@@ -2346,7 +2382,7 @@ def test_ellagitannin_oxidation_closed_form(ellag_params):
     schema = wine_schema()
     t = 298.15  # off T_ref so the Arrhenius factor bites
     o2, ellag = 0.03, 0.08
-    y = _aged_wine(schema, esters=0.0, t=t, o2=o2, ellagitannin=ellag)
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2, ellagitannin=ellag)
     d = EllagitanninOxidation().derivatives(0.0, y, schema, ellag_params)
 
     f_t = arrhenius_factor(t, ellag_params["E_a_ellagitannin_oxidation"], ellag_params["T_ref"])
@@ -2365,13 +2401,13 @@ def test_ellagitannin_oxidation_is_bilinear(ellag_params):
     # Bilinear in BOTH drivers: doubling o2 OR doubling ellagitannin doubles the O₂-scavenging rate.
     schema = wine_schema()
     base = EllagitanninOxidation().derivatives(
-        0.0, _aged_wine(schema, esters=0.0, o2=0.02, ellagitannin=0.05), schema, ellag_params
+        0.0, _aged_wine(schema, ester=0.0, o2=0.02, ellagitannin=0.05), schema, ellag_params
     )
     twice_o2 = EllagitanninOxidation().derivatives(
-        0.0, _aged_wine(schema, esters=0.0, o2=0.04, ellagitannin=0.05), schema, ellag_params
+        0.0, _aged_wine(schema, ester=0.0, o2=0.04, ellagitannin=0.05), schema, ellag_params
     )
     twice_ellag = EllagitanninOxidation().derivatives(
-        0.0, _aged_wine(schema, esters=0.0, o2=0.02, ellagitannin=0.10), schema, ellag_params
+        0.0, _aged_wine(schema, ester=0.0, o2=0.02, ellagitannin=0.10), schema, ellag_params
     )
     assert schema.get(twice_o2, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
     assert schema.get(twice_ellag, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
@@ -2383,12 +2419,12 @@ def test_ellagitannin_oxidation_inert_without_o2_or_tannin(ellag_params):
     # add_oxygen) or an un-oaked aging is exactly the case without this Process (isolability #3).
     schema = wine_schema()
     p = EllagitanninOxidation()
-    no_o2 = _aged_wine(schema, esters=0.0, o2=0.0, ellagitannin=0.08)
-    no_tannin = _aged_wine(schema, esters=0.0, o2=0.03, ellagitannin=0.0)
+    no_o2 = _aged_wine(schema, ester=0.0, o2=0.0, ellagitannin=0.08)
+    no_tannin = _aged_wine(schema, ester=0.0, o2=0.03, ellagitannin=0.0)
     assert np.array_equal(p.derivatives(0.0, no_o2, schema, ellag_params), schema.zeros())
     assert np.array_equal(p.derivatives(0.0, no_tannin, schema, ellag_params), schema.zeros())
     # <= 0 also absorbs solver undershoot (a spurious −ε in either driver ⇒ no draw).
-    undershoot = _aged_wine(schema, esters=0.0, o2=-1e-9, ellagitannin=0.08)
+    undershoot = _aged_wine(schema, ester=0.0, o2=-1e-9, ellagitannin=0.08)
     assert np.array_equal(p.derivatives(0.0, undershoot, schema, ellag_params), schema.zeros())
 
 
@@ -2398,7 +2434,7 @@ def test_ellagitannin_oxidation_gate_before_params_is_keyerror_safe(params):
     # k_ellagitannin_oxidation). An un-oaked wine (ellag=0) returns zero without touching oak
     # params.
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, o2=0.03, ellagitannin=0.0)
+    y = _aged_wine(schema, ester=0.0, o2=0.03, ellagitannin=0.0)
     assert np.array_equal(
         EllagitanninOxidation().derivatives(0.0, y, schema, params), schema.zeros()
     )
@@ -2412,13 +2448,13 @@ def test_ellagitannin_oxidation_rises_with_temperature(ellag_params):
     p = EllagitanninOxidation()
     cold = p.derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=283.15, o2=0.03, ellagitannin=0.08),
+        _aged_wine(schema, ester=0.0, t=283.15, o2=0.03, ellagitannin=0.08),
         schema,
         ellag_params,
     )
     warm = p.derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=303.15, o2=0.03, ellagitannin=0.08),
+        _aged_wine(schema, ester=0.0, t=303.15, o2=0.03, ellagitannin=0.08),
         schema,
         ellag_params,
     )
@@ -2457,12 +2493,10 @@ def test_oak_protects_against_oxidation(ellag_params):
     span = (0.0, 24.0 * 365.0)  # ~1 year
 
     # Oaked: an ellagitannin charge at its ceiling (renewable — OakExtraction re-supplies below it).
-    oaked0 = _aged_wine(schema, esters=0.0, o2=o2_dose, ellagitannin=0.1, ellagitannin_ceiling=0.1)
+    oaked0 = _aged_wine(schema, ester=0.0, o2=o2_dose, ellagitannin=0.1, ellagitannin_ceiling=0.1)
     oaked = simulate(ps, params=ellag_params, y0=oaked0, t_span=span)
     # Un-oaked: identical but no tannin (and no ceiling), same O₂ dose.
-    unoaked0 = _aged_wine(
-        schema, esters=0.0, o2=o2_dose, ellagitannin=0.0, ellagitannin_ceiling=0.0
-    )
+    unoaked0 = _aged_wine(schema, ester=0.0, o2=o2_dose, ellagitannin=0.0, ellagitannin_ceiling=0.0)
     unoaked = simulate(ps, params=ellag_params, y0=unoaked0, t_span=span)
     assert oaked.success and unoaked.success
 
@@ -2492,7 +2526,7 @@ def test_ellagitannin_consumed_softens_astringency(ellag_params):
     # polymerization deferred.
     schema = wine_schema()
     ps = ProcessSet(schema, [EllagitanninOxidation()], strict=True)
-    y0 = _aged_wine(schema, esters=0.0, o2=0.05, ellagitannin=0.1)
+    y0 = _aged_wine(schema, ester=0.0, o2=0.05, ellagitannin=0.1)
     traj = simulate(ps, params=ellag_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success
     astr = astringency_series(traj)
@@ -2511,7 +2545,7 @@ def test_ellagitannin_oxidation_moves_nothing_conserved(ellag_store, ellag_param
     # (the SulfiteOxidation off-every-ledger invariance). X=0 throughout.
     schema = wine_schema()
     ps = ProcessSet(schema, [EllagitanninOxidation()], strict=True)
-    y0 = _aged_wine(schema, esters=0.0, o2=0.05, ellagitannin=0.1)
+    y0 = _aged_wine(schema, ester=0.0, o2=0.05, ellagitannin=0.1)
     traj = simulate(ps, params=ellag_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success
     f_c = ellag_store.value("biomass_C_fraction")
@@ -2584,7 +2618,7 @@ def test_polymerization_closed_form(poly_params):
     schema = wine_schema()
     t = 298.15  # off T_ref so the Arrhenius factor bites
     antho, tannin = 0.3, 2.0
-    y = _aged_wine(schema, esters=0.0, t=t, anthocyanin=antho, tannin=tannin)
+    y = _aged_wine(schema, ester=0.0, t=t, anthocyanin=antho, tannin=tannin)
     d = TanninAnthocyaninCondensation().derivatives(0.0, y, schema, poly_params)
 
     f_t = arrhenius_factor(t, poly_params["E_a_polymerization"], poly_params["T_ref"])
@@ -2605,13 +2639,13 @@ def test_polymerization_is_bilinear(poly_params):
     # Bilinear in BOTH grape drivers: doubling anthocyanin OR doubling tannin doubles the rate.
     schema = wine_schema()
     base = TanninAnthocyaninCondensation().derivatives(
-        0.0, _aged_wine(schema, esters=0.0, anthocyanin=0.2, tannin=1.5), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, anthocyanin=0.2, tannin=1.5), schema, poly_params
     )
     twice_antho = TanninAnthocyaninCondensation().derivatives(
-        0.0, _aged_wine(schema, esters=0.0, anthocyanin=0.4, tannin=1.5), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, anthocyanin=0.4, tannin=1.5), schema, poly_params
     )
     twice_tannin = TanninAnthocyaninCondensation().derivatives(
-        0.0, _aged_wine(schema, esters=0.0, anthocyanin=0.2, tannin=3.0), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, anthocyanin=0.2, tannin=3.0), schema, poly_params
     )
     assert schema.get(twice_antho, "anthocyanin") == pytest.approx(
         2.0 * schema.get(base, "anthocyanin")
@@ -2627,12 +2661,12 @@ def test_polymerization_inert_without_anthocyanin_or_tannin(poly_params):
     # anthocyanin) or a no-tannin wine is exactly the case without this Process (isolability #3).
     schema = wine_schema()
     p = TanninAnthocyaninCondensation()
-    no_antho = _aged_wine(schema, esters=0.0, anthocyanin=0.0, tannin=2.0)
-    no_tannin = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=0.0)
+    no_antho = _aged_wine(schema, ester=0.0, anthocyanin=0.0, tannin=2.0)
+    no_tannin = _aged_wine(schema, ester=0.0, anthocyanin=0.3, tannin=0.0)
     assert np.array_equal(p.derivatives(0.0, no_antho, schema, poly_params), schema.zeros())
     assert np.array_equal(p.derivatives(0.0, no_tannin, schema, poly_params), schema.zeros())
     # Solver undershoot (negative) is likewise absorbed.
-    undershoot = _aged_wine(schema, esters=0.0, anthocyanin=-1e-9, tannin=2.0)
+    undershoot = _aged_wine(schema, ester=0.0, anthocyanin=-1e-9, tannin=2.0)
     assert np.array_equal(p.derivatives(0.0, undershoot, schema, poly_params), schema.zeros())
 
 
@@ -2641,7 +2675,7 @@ def test_polymerization_gate_before_params_is_keyerror_safe(params):
     # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks k_polymerization,
     # yet a white wine (anthocyanin 0) returns zero — the gate-on-STATE-before-params discipline.
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, anthocyanin=0.0, tannin=0.0)
+    y = _aged_wine(schema, ester=0.0, anthocyanin=0.0, tannin=0.0)
     d = TanninAnthocyaninCondensation().derivatives(0.0, y, schema, params)
     assert np.array_equal(d, schema.zeros())
 
@@ -2651,13 +2685,13 @@ def test_polymerization_rises_with_temperature(poly_params):
     schema = wine_schema()
     cold = TanninAnthocyaninCondensation().derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=283.15, anthocyanin=0.3, tannin=2.0),
+        _aged_wine(schema, ester=0.0, t=283.15, anthocyanin=0.3, tannin=2.0),
         schema,
         poly_params,
     )
     warm = TanninAnthocyaninCondensation().derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=303.15, anthocyanin=0.3, tannin=2.0),
+        _aged_wine(schema, ester=0.0, t=303.15, anthocyanin=0.3, tannin=2.0),
         schema,
         poly_params,
     )
@@ -2679,7 +2713,7 @@ def test_polymerization_moves_nothing_conserved(poly_store, poly_params):
     # (the OakExtraction/EllagitanninOxidation off-every-ledger invariance). X=0 throughout.
     schema = wine_schema()
     ps = ProcessSet(schema, [TanninAnthocyaninCondensation()], strict=True)
-    y0 = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=2.0)
+    y0 = _aged_wine(schema, ester=0.0, anthocyanin=0.3, tannin=2.0)
     traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success
     f_c = poly_store.value("biomass_C_fraction")
@@ -2699,7 +2733,7 @@ def test_polymerization_softens_and_stabilizes_colour(poly_params):
     schema = wine_schema()
     ps = ProcessSet(schema, [TanninAnthocyaninCondensation()], strict=True)
     antho0, tannin0 = 0.3, 2.0
-    y0 = _aged_wine(schema, esters=0.0, anthocyanin=antho0, tannin=tannin0)
+    y0 = _aged_wine(schema, ester=0.0, anthocyanin=antho0, tannin=tannin0)
     traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
     assert traj.success
 
@@ -2747,7 +2781,7 @@ def test_colour_form_identity_holds_by_construction(poly_params):
     schema = wine_schema()
     ps = ProcessSet(schema, [TanninAnthocyaninCondensation()], strict=True)
     antho0 = 0.3
-    y0 = _aged_wine(schema, esters=0.0, anthocyanin=antho0, tannin=2.0)
+    y0 = _aged_wine(schema, ester=0.0, anthocyanin=antho0, tannin=2.0)
     traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
     assert traj.success
     antho = np.asarray(traj.series("anthocyanin"), dtype=float)
@@ -2836,7 +2870,7 @@ def test_bridge_closed_form(poly_params):
     schema = wine_schema()
     t = 298.15  # off T_ref so the Arrhenius factor bites
     acet, antho, tannin = 0.05, 0.3, 2.0
-    y = _aged_wine(schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=antho, tannin=tannin)
+    y = _aged_wine(schema, ester=0.0, t=t, acetaldehyde=acet, anthocyanin=antho, tannin=tannin)
     d = AcetaldehydeBridgedCondensation().derivatives(0.0, y, schema, poly_params)
 
     f_t = arrhenius_factor(t, poly_params["E_a_acetaldehyde_bridge"], poly_params["T_ref"])
@@ -2869,7 +2903,7 @@ def test_bridge_is_trilinear(poly_params):
     p = AcetaldehydeBridgedCondensation()
 
     def rate(acet: float, antho: float, tannin: float) -> float:
-        y = _aged_wine(schema, esters=0.0, acetaldehyde=acet, anthocyanin=antho, tannin=tannin)
+        y = _aged_wine(schema, ester=0.0, acetaldehyde=acet, anthocyanin=antho, tannin=tannin)
         return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "anthocyanin"))
 
     base = rate(0.04, 0.2, 1.5)
@@ -2892,7 +2926,7 @@ def test_bridge_inert_without_any_substrate(poly_params):
         {"acetaldehyde": 0.05, "anthocyanin": 0.3, "tannin": 0.0},
         {"acetaldehyde": -1e-9, "anthocyanin": 0.3, "tannin": 2.0},
     ):
-        y = _aged_wine(schema, esters=0.0, **kw)
+        y = _aged_wine(schema, ester=0.0, **kw)
         assert np.array_equal(p.derivatives(0.0, y, schema, poly_params), schema.zeros())
 
 
@@ -2902,7 +2936,7 @@ def test_bridge_gate_before_params_is_keyerror_safe(params):
     # k_acetaldehyde_bridge, yet a white wine (anthocyanin 0) returns zero — the
     # gate-on-STATE-before-params discipline.
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.0, tannin=0.0)
+    y = _aged_wine(schema, ester=0.0, acetaldehyde=0.05, anthocyanin=0.0, tannin=0.0)
     d = AcetaldehydeBridgedCondensation().derivatives(0.0, y, schema, params)
     assert np.array_equal(d, schema.zeros())
 
@@ -2915,10 +2949,10 @@ def test_bridge_reads_free_acetaldehyde_under_so2(bridge_params):
     p = AcetaldehydeBridgedCondensation()
     acids = {"tartaric": 4.0, "cation_charge": 0.012}  # a real acid state so pH solves
     unsulfited = _aged_wine(
-        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.0, **acids
+        schema, ester=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.0, **acids
     )
     sulfited = _aged_wine(
-        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.05, **acids
+        schema, ester=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.05, **acids
     )
     r_unsulfited = float(
         schema.get(p.derivatives(0.0, unsulfited, schema, bridge_params), "anthocyanin")
@@ -2940,7 +2974,7 @@ def test_bridge_unsulfited_is_exactly_total_acetaldehyde(bridge_params):
     schema = wine_schema()
     acet, antho, tannin, t = 0.05, 0.3, 2.0, 298.15
     y = _aged_wine(
-        schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=antho, tannin=tannin, so2_total=0.0
+        schema, ester=0.0, t=t, acetaldehyde=acet, anthocyanin=antho, tannin=tannin, so2_total=0.0
     )
     d = AcetaldehydeBridgedCondensation().derivatives(0.0, y, schema, bridge_params)
     f_t = arrhenius_factor(t, bridge_params["E_a_acetaldehyde_bridge"], bridge_params["T_ref"])
@@ -2954,13 +2988,13 @@ def test_bridge_rises_with_temperature(poly_params):
     p = AcetaldehydeBridgedCondensation()
     cold = p.derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=283.15, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0),
+        _aged_wine(schema, ester=0.0, t=283.15, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0),
         schema,
         poly_params,
     )
     warm = p.derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=303.15, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0),
+        _aged_wine(schema, ester=0.0, t=303.15, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0),
         schema,
         poly_params,
     )
@@ -2991,7 +3025,7 @@ def test_bridge_carbon_closes_nontrivially(bridge_store, bridge_params):
     # so the exact RHS reads total acetaldehyde — the acids are inert here, just pH-well-posed).
     y0 = _aged_wine(
         schema,
-        esters=0.0,
+        ester=0.0,
         acetaldehyde=0.05,
         anthocyanin=0.3,
         tannin=2.0,
@@ -3084,7 +3118,7 @@ def test_fading_closed_form(poly_params):
     schema = wine_schema()
     t = 298.15  # off T_ref so the Arrhenius factor bites
     o2, antho = 0.03, 0.3
-    y = _aged_wine(schema, esters=0.0, t=t, o2=o2, anthocyanin=antho)
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2, anthocyanin=antho)
     d = AnthocyaninFading().derivatives(0.0, y, schema, poly_params)
 
     f_t = arrhenius_factor(t, poly_params["E_a_anthocyanin_fade"], poly_params["T_ref"])
@@ -3108,7 +3142,7 @@ def test_fading_is_bilinear(poly_params):
     p = AnthocyaninFading()
 
     def fade_rate(o2: float, antho: float) -> float:
-        y = _aged_wine(schema, esters=0.0, o2=o2, anthocyanin=antho)
+        y = _aged_wine(schema, ester=0.0, o2=o2, anthocyanin=antho)
         return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "anthocyanin"))
 
     base = fade_rate(0.02, 0.2)
@@ -3122,11 +3156,11 @@ def test_fading_inert_without_o2_or_anthocyanin(poly_params):
     # such a run is exactly the case without this Process (isolability #3). Undershoot absorbed too.
     schema = wine_schema()
     p = AnthocyaninFading()
-    no_o2 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3)
-    no_antho = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    no_o2 = _aged_wine(schema, ester=0.0, o2=0.0, anthocyanin=0.3)
+    no_antho = _aged_wine(schema, ester=0.0, o2=0.03, anthocyanin=0.0)
     assert np.array_equal(p.derivatives(0.0, no_o2, schema, poly_params), schema.zeros())
     assert np.array_equal(p.derivatives(0.0, no_antho, schema, poly_params), schema.zeros())
-    undershoot = _aged_wine(schema, esters=0.0, o2=-1e-9, anthocyanin=0.3)
+    undershoot = _aged_wine(schema, ester=0.0, o2=-1e-9, anthocyanin=0.3)
     assert np.array_equal(p.derivatives(0.0, undershoot, schema, poly_params), schema.zeros())
 
 
@@ -3135,7 +3169,7 @@ def test_fading_gate_before_params_is_keyerror_safe(params):
     # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks the fade rate,
     # yet a white wine (anthocyanin 0, even with O₂ dosed) returns zero — gate-before-params.
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    y = _aged_wine(schema, ester=0.0, o2=0.03, anthocyanin=0.0)
     d = AnthocyaninFading().derivatives(0.0, y, schema, params)
     assert np.array_equal(d, schema.zeros())
 
@@ -3145,10 +3179,10 @@ def test_fading_rises_with_temperature(poly_params):
     schema = wine_schema()
     p = AnthocyaninFading()
     cold = p.derivatives(
-        0.0, _aged_wine(schema, esters=0.0, t=283.15, o2=0.03, anthocyanin=0.3), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, t=283.15, o2=0.03, anthocyanin=0.3), schema, poly_params
     )
     warm = p.derivatives(
-        0.0, _aged_wine(schema, esters=0.0, t=303.15, o2=0.03, anthocyanin=0.3), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, t=303.15, o2=0.03, anthocyanin=0.3), schema, poly_params
     )
     assert abs(float(schema.get(warm, "anthocyanin"))) > abs(float(schema.get(cold, "anthocyanin")))
 
@@ -3168,7 +3202,7 @@ def test_fading_moves_nothing_conserved(poly_store, poly_params):
     # AND total_nitrogen all exactly flat (the EllagitanninOxidation off-every-ledger invariance).
     schema = wine_schema()
     ps = ProcessSet(schema, [AnthocyaninFading()], strict=True)
-    y0 = _aged_wine(schema, esters=0.0, o2=0.04, anthocyanin=0.3)
+    y0 = _aged_wine(schema, ester=0.0, o2=0.04, anthocyanin=0.3)
     traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success
     f_c = poly_store.value("biomass_C_fraction")
@@ -3186,7 +3220,7 @@ def test_fading_makes_colour_decline(poly_params):
     schema = wine_schema()
     ps = ProcessSet(schema, [TanninAnthocyaninCondensation(), AnthocyaninFading()], strict=True)
     antho0 = 0.3
-    y0 = _aged_wine(schema, esters=0.0, o2=0.05, anthocyanin=antho0, tannin=2.0)
+    y0 = _aged_wine(schema, ester=0.0, o2=0.05, anthocyanin=antho0, tannin=2.0)
     traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0 * 2.0))
     assert traj.success
 
@@ -3242,7 +3276,7 @@ def test_thermal_fade_closed_form(poly_params):
     schema = wine_schema()
     t = 298.15  # off T_ref so the Arrhenius factor bites
     antho = 0.3
-    y = _aged_wine(schema, esters=0.0, t=t, o2=0.03, anthocyanin=antho)
+    y = _aged_wine(schema, ester=0.0, t=t, o2=0.03, anthocyanin=antho)
     d = ThermalAnthocyaninFade().derivatives(0.0, y, schema, poly_params)
 
     f_t = arrhenius_factor(t, poly_params["E_a_anthocyanin_thermal_fade"], poly_params["T_ref"])
@@ -3264,7 +3298,7 @@ def test_thermal_fade_is_first_order_and_o2_independent(poly_params):
     p = ThermalAnthocyaninFade()
 
     def fade_rate(o2: float, antho: float) -> float:
-        y = _aged_wine(schema, esters=0.0, o2=o2, anthocyanin=antho)
+        y = _aged_wine(schema, ester=0.0, o2=o2, anthocyanin=antho)
         return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "anthocyanin"))
 
     base = fade_rate(0.02, 0.2)
@@ -3279,10 +3313,10 @@ def test_thermal_fade_inert_without_anthocyanin(poly_params):
     # wine (no anthocyanin) ⇒ byte-for-byte zero, so it is exactly the case without this Process.
     schema = wine_schema()
     p = ThermalAnthocyaninFade()
-    no_antho = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    no_antho = _aged_wine(schema, ester=0.0, o2=0.03, anthocyanin=0.0)
     assert np.array_equal(p.derivatives(0.0, no_antho, schema, poly_params), schema.zeros())
     # Undershoot absorbed too.
-    undershoot = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=-1e-9)
+    undershoot = _aged_wine(schema, ester=0.0, o2=0.03, anthocyanin=-1e-9)
     assert np.array_equal(p.derivatives(0.0, undershoot, schema, poly_params), schema.zeros())
 
 
@@ -3291,7 +3325,7 @@ def test_thermal_fade_gate_before_params_is_keyerror_safe(params):
     # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks the thermal-fade
     # rate, yet a white wine (anthocyanin 0) returns zero — gate-before-params.
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, o2=0.03, anthocyanin=0.0)
+    y = _aged_wine(schema, ester=0.0, o2=0.03, anthocyanin=0.0)
     d = ThermalAnthocyaninFade().derivatives(0.0, y, schema, params)
     assert np.array_equal(d, schema.zeros())
 
@@ -3303,10 +3337,10 @@ def test_thermal_fade_rises_with_temperature(poly_params):
     schema = wine_schema()
     p = ThermalAnthocyaninFade()
     cold = p.derivatives(
-        0.0, _aged_wine(schema, esters=0.0, t=283.15, o2=0.0, anthocyanin=0.3), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, t=283.15, o2=0.0, anthocyanin=0.3), schema, poly_params
     )
     warm = p.derivatives(
-        0.0, _aged_wine(schema, esters=0.0, t=303.15, o2=0.0, anthocyanin=0.3), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, t=303.15, o2=0.0, anthocyanin=0.3), schema, poly_params
     )
     assert abs(float(schema.get(warm, "anthocyanin"))) > abs(float(schema.get(cold, "anthocyanin")))
 
@@ -3325,7 +3359,7 @@ def test_thermal_fade_moves_nothing_conserved(poly_store, poly_params):
     # exactly flat (the AnthocyaninFading off-every-ledger invariance, now with no o2 involved).
     schema = wine_schema()
     ps = ProcessSet(schema, [ThermalAnthocyaninFade()], strict=True)
-    y0 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3)  # o2=0: fades anyway
+    y0 = _aged_wine(schema, ester=0.0, o2=0.0, anthocyanin=0.3)  # o2=0: fades anyway
     traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success
     f_c = poly_store.value("biomass_C_fraction")
@@ -3343,7 +3377,7 @@ def test_thermal_fade_bleaches_a_reductive_red(poly_params):
     # nothing here (no o2).
     schema = wine_schema()
     antho0 = 0.3
-    y0 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=antho0)  # anaerobic, sealed red
+    y0 = _aged_wine(schema, ester=0.0, o2=0.0, anthocyanin=antho0)  # anaerobic, sealed red
 
     # D-81 alone on a reductive red: byte-for-byte flat (fades only via o2).
     ps_oxid = ProcessSet(schema, [AnthocyaninFading()], strict=True)
@@ -3372,8 +3406,8 @@ def test_thermal_fade_unprotected_by_so2(fade_params):
     # dosed with SO₂: the thermal anthocyanin draw is byte-for-byte the same.
     schema = wine_schema()
     p = ThermalAnthocyaninFade()
-    no_so2 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3)
-    with_so2 = _aged_wine(schema, esters=0.0, o2=0.0, anthocyanin=0.3, so2_total=0.05)
+    no_so2 = _aged_wine(schema, ester=0.0, o2=0.0, anthocyanin=0.3)
+    with_so2 = _aged_wine(schema, ester=0.0, o2=0.0, anthocyanin=0.3, so2_total=0.05)
     d_no = p.derivatives(0.0, no_so2, schema, fade_params)
     d_so2 = p.derivatives(0.0, with_so2, schema, fade_params)
     # SO₂ present or not, the thermal fade rate is identical (no o2 to scavenge ⇒ no protection).
@@ -3424,7 +3458,7 @@ def test_tannin_self_poly_closed_form(poly_params):
     schema = wine_schema()
     t = 298.15  # off T_ref so the Arrhenius factor bites
     tannin = 2.0
-    y = _aged_wine(schema, esters=0.0, t=t, anthocyanin=0.3, tannin=tannin)
+    y = _aged_wine(schema, ester=0.0, t=t, anthocyanin=0.3, tannin=tannin)
     d = TanninSelfPolymerization().derivatives(0.0, y, schema, poly_params)
 
     f_t = arrhenius_factor(t, poly_params["E_a_tannin_self_polymerization"], poly_params["T_ref"])
@@ -3453,7 +3487,7 @@ def test_tannin_self_poly_is_second_order(poly_params):
     p = TanninSelfPolymerization()
 
     def rate(tannin: float) -> float:
-        y = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=tannin)
+        y = _aged_wine(schema, ester=0.0, anthocyanin=0.3, tannin=tannin)
         return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "tannin"))
 
     base = rate(1.0)
@@ -3468,7 +3502,7 @@ def test_tannin_self_poly_independent_of_anthocyanin_and_o2(poly_params):
     p = TanninSelfPolymerization()
 
     def rate(anthocyanin: float, o2: float) -> float:
-        y = _aged_wine(schema, esters=0.0, anthocyanin=anthocyanin, o2=o2, tannin=2.0)
+        y = _aged_wine(schema, ester=0.0, anthocyanin=anthocyanin, o2=o2, tannin=2.0)
         return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "tannin"))
 
     base = rate(0.3, 0.03)
@@ -3482,9 +3516,9 @@ def test_tannin_self_poly_inert_without_tannin(poly_params):
     # case without this Process. Undershoot absorbed too.
     schema = wine_schema()
     p = TanninSelfPolymerization()
-    no_tannin = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=0.0)
+    no_tannin = _aged_wine(schema, ester=0.0, anthocyanin=0.3, tannin=0.0)
     assert np.array_equal(p.derivatives(0.0, no_tannin, schema, poly_params), schema.zeros())
-    undershoot = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=-1e-9)
+    undershoot = _aged_wine(schema, ester=0.0, anthocyanin=0.3, tannin=-1e-9)
     assert np.array_equal(p.derivatives(0.0, undershoot, schema, poly_params), schema.zeros())
 
 
@@ -3493,7 +3527,7 @@ def test_tannin_self_poly_gate_before_params_is_keyerror_safe(params):
     # ``params`` fixture (wine_generic + aging.yaml, NO polymerization.yaml) lacks the rate, yet a
     # no-tannin wine returns zero — gate-before-params.
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, anthocyanin=0.3, tannin=0.0)
+    y = _aged_wine(schema, ester=0.0, anthocyanin=0.3, tannin=0.0)
     d = TanninSelfPolymerization().derivatives(0.0, y, schema, params)
     assert np.array_equal(d, schema.zeros())
 
@@ -3503,10 +3537,10 @@ def test_tannin_self_poly_rises_with_temperature(poly_params):
     schema = wine_schema()
     p = TanninSelfPolymerization()
     cold = p.derivatives(
-        0.0, _aged_wine(schema, esters=0.0, t=283.15, tannin=2.0), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, t=283.15, tannin=2.0), schema, poly_params
     )
     warm = p.derivatives(
-        0.0, _aged_wine(schema, esters=0.0, t=303.15, tannin=2.0), schema, poly_params
+        0.0, _aged_wine(schema, ester=0.0, t=303.15, tannin=2.0), schema, poly_params
     )
     assert abs(float(schema.get(warm, "tannin"))) > abs(float(schema.get(cold, "tannin")))
 
@@ -3524,7 +3558,7 @@ def test_tannin_self_poly_moves_nothing_conserved(poly_store, poly_params):
     # NOTHING conserved — carbon, mass AND nitrogen all exactly flat (the pure off-ledger sink).
     schema = wine_schema()
     ps = ProcessSet(schema, [TanninSelfPolymerization()], strict=True)
-    y0 = _aged_wine(schema, esters=0.0, tannin=3.0)  # no anthocyanin — softens anyway
+    y0 = _aged_wine(schema, ester=0.0, tannin=3.0)  # no anthocyanin — softens anyway
     traj = simulate(ps, params=poly_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success
     f_c = poly_store.value("biomass_C_fraction")
@@ -3541,7 +3575,7 @@ def test_tannin_self_poly_softens_without_anthocyanin(poly_params):
     # self-polymerization. Contrast pinned: the D-79 direct condensation does nothing here.
     schema = wine_schema()
     tannin0 = 3.0
-    y0 = _aged_wine(schema, esters=0.0, anthocyanin=0.0, tannin=tannin0)  # white / no anthocyanin
+    y0 = _aged_wine(schema, ester=0.0, anthocyanin=0.0, tannin=tannin0)  # white / no anthocyanin
 
     # D-79 alone with no anthocyanin: byte-for-byte flat (condensation needs anthocyanin).
     ps_cond = ProcessSet(schema, [TanninAnthocyaninCondensation()], strict=True)
@@ -3602,7 +3636,7 @@ def test_tannin_ethyl_closed_form(poly_params):
     schema = wine_schema()
     t = 298.15  # off T_ref so the Arrhenius factor bites
     acet, tannin = 0.05, 2.0
-    y = _aged_wine(schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin)
+    y = _aged_wine(schema, ester=0.0, t=t, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin)
     d = TanninEthylTanninCondensation().derivatives(0.0, y, schema, poly_params)
 
     f_t = arrhenius_factor(t, poly_params["E_a_tannin_ethyl_tannin"], poly_params["T_ref"])
@@ -3640,7 +3674,7 @@ def test_tannin_ethyl_is_second_order_in_tannin_and_needs_acetaldehyde(poly_para
     p = TanninEthylTanninCondensation()
 
     def rate(acet: float, tannin: float) -> float:
-        y = _aged_wine(schema, esters=0.0, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin)
+        y = _aged_wine(schema, ester=0.0, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin)
         return float(schema.get(p.derivatives(0.0, y, schema, poly_params), "tannin"))
 
     base = rate(0.04, 1.0)
@@ -3659,7 +3693,7 @@ def test_tannin_ethyl_inert_without_tannin_or_acetaldehyde(poly_params):
         {"acetaldehyde": 0.05, "tannin": 0.0},
         {"acetaldehyde": 0.05, "tannin": -1e-9},
     ):
-        y = _aged_wine(schema, esters=0.0, anthocyanin=0.3, **kw)
+        y = _aged_wine(schema, ester=0.0, anthocyanin=0.3, **kw)
         assert np.array_equal(p.derivatives(0.0, y, schema, poly_params), schema.zeros())
 
 
@@ -3667,7 +3701,7 @@ def test_tannin_ethyl_gate_before_params_is_keyerror_safe(params):
     # An enabled-but-undosed Process must not KeyError when polymerization.yaml is absent: the
     # ``params`` fixture lacks k_tannin_ethyl_tannin, yet a no-tannin wine returns zero.
     schema = wine_schema()
-    y = _aged_wine(schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=0.0)
+    y = _aged_wine(schema, ester=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=0.0)
     d = TanninEthylTanninCondensation().derivatives(0.0, y, schema, params)
     assert np.array_equal(d, schema.zeros())
 
@@ -3679,10 +3713,10 @@ def test_tannin_ethyl_reads_free_acetaldehyde_under_so2(bridge_params):
     p = TanninEthylTanninCondensation()
     acids = {"tartaric": 4.0, "cation_charge": 0.012}  # a real acid state so pH solves
     unsulfited = _aged_wine(
-        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.0, **acids
+        schema, ester=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.0, **acids
     )
     sulfited = _aged_wine(
-        schema, esters=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.05, **acids
+        schema, ester=0.0, acetaldehyde=0.05, anthocyanin=0.3, tannin=2.0, so2_total=0.05, **acids
     )
     r_unsulf = float(schema.get(p.derivatives(0.0, unsulfited, schema, bridge_params), "tannin"))
     r_sulf = float(schema.get(p.derivatives(0.0, sulfited, schema, bridge_params), "tannin"))
@@ -3696,7 +3730,7 @@ def test_tannin_ethyl_unsulfited_is_exactly_total_acetaldehyde(bridge_params):
     schema = wine_schema()
     acet, tannin, t = 0.05, 2.0, 298.15
     y = _aged_wine(
-        schema, esters=0.0, t=t, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin, so2_total=0.0
+        schema, ester=0.0, t=t, acetaldehyde=acet, anthocyanin=0.3, tannin=tannin, so2_total=0.0
     )
     d = TanninEthylTanninCondensation().derivatives(0.0, y, schema, bridge_params)
     f_t = arrhenius_factor(t, bridge_params["E_a_tannin_ethyl_tannin"], bridge_params["T_ref"])
@@ -3710,13 +3744,13 @@ def test_tannin_ethyl_rises_with_temperature(poly_params):
     p = TanninEthylTanninCondensation()
     cold = p.derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=283.15, acetaldehyde=0.05, tannin=2.0),
+        _aged_wine(schema, ester=0.0, t=283.15, acetaldehyde=0.05, tannin=2.0),
         schema,
         poly_params,
     )
     warm = p.derivatives(
         0.0,
-        _aged_wine(schema, esters=0.0, t=303.15, acetaldehyde=0.05, tannin=2.0),
+        _aged_wine(schema, ester=0.0, t=303.15, acetaldehyde=0.05, tannin=2.0),
         schema,
         poly_params,
     )
@@ -3743,7 +3777,7 @@ def test_tannin_ethyl_carbon_closes_nontrivially(bridge_store, bridge_params):
     ps = ProcessSet(schema, [TanninEthylTanninCondensation()], strict=True)
     y0 = _aged_wine(
         schema,
-        esters=0.0,
+        ester=0.0,
         acetaldehyde=0.05,
         anthocyanin=0.0,  # NO anthocyanin — a pure tannin–ethyl–tannin run
         tannin=3.0,

@@ -141,10 +141,11 @@ real, coherent aging phenomena, and the D-68 reason this was chosen as the first
 Process (it moves OAVs the D-67 lens already reads, needing no new extraction driver and no
 new state pool). The rate::
 
-    d(esters)/dt = -k_ester_hydrolysis · f(T) · max(0, esters - esters_eq)
+    d(esters)/dt = -k_ester_hydrolysis · f(T) · max(0, esters - isoamyl_acetate_eq)
 
-is **net decay toward a lower equilibrium floor** ``esters_eq``, *not* decay-to-zero (D-68):
-below ``esters_eq`` the rate is zero. The bidirectional reality — ethyl esters of fatty
+is **net decay toward a lower equilibrium floor** ``isoamyl_acetate_eq``, *not* decay-to-zero
+(D-68):
+below ``isoamyl_acetate_eq`` the rate is zero. The bidirectional reality — ethyl esters of fatty
 acids sit *below* equilibrium young and slowly *form* on aging — is the deferred half;
 framing the acetate-dominated lump as "net decay toward a lower floor" is the same
 fixed-composition honesty the D-67 sensory lump carries. ``f(T) = arrhenius_factor(T,
@@ -218,6 +219,7 @@ from fermentation.core.acidbase import (
     ph_of_state,
 )
 from fermentation.core.chemistry import (
+    CARBON_ATOMS,
     M_2_METHYLBUTANAL,
     M_2_METHYLPROPANAL,
     M_3_METHYLBUTANAL,
@@ -235,29 +237,43 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
+from fermentation.core.kinetics.carbon_routing import HYDROLYSING_ESTER
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
-#: Representative species that carbon-account each pool the hydrolysis touches, from the one
-#: chemistry source of truth (mirrors the ``_ESTER_SPECIES``/``_FUSEL_SPECIES`` discipline in
-#: :mod:`~fermentation.core.kinetics.byproducts`). Esters book as ethyl acetate (D-19, the
-#: immovable pool weighting), the fusel product as isoamyl alcohol, the acid product (``Byp``)
-#: as succinic acid (D-16). Using these fractions both to release and to re-deposit the carbon
-#: is what makes the transfer close in ``total_carbon`` exactly.
-_ESTER_SPECIES = "ethyl_acetate"
+#: Representative species that carbon-account the two *product* pools the hydrolysis fills,
+#: from the one chemistry source of truth. The fusel product books as isoamyl alcohol, the acid
+#: product (``Byp``) as succinic acid (D-16). The *debited* ester is no longer named here: it
+#: comes from the canonical registry (``HYDROLYSING_ESTER``), which since D-96 is the real
+#: molecule — isoamyl acetate — rather than a stand-in. Using these fractions both to release
+#: and to re-deposit the carbon is what makes the transfer close in ``total_carbon`` exactly.
 _FUSEL_SPECIES = "isoamyl_alcohol"
 _BYP_SPECIES = "succinic_acid"
 
-#: The 5:2 carbon split of the released ester carbon between ``fusels`` and ``Byp`` (D-69),
-#: set by the **isoamyl-acetate** stand-in reaction (see the class docstring for why isoamyl
-#: acetate, not the ethyl-acetate mass species, sets the split): isoamyl alcohol carries 5
-#: carbons, acetic acid 2. Stoichiometry of the named stand-in reaction — a code-with-citation
-#: constant like the chemistry carbon counts, not an empirical/uncertain YAML parameter.
+#: The 5:2 carbon split of the released ester carbon between ``fusels`` and ``Byp``
+#: (decisions D-69/D-96), set by the hydrolysis reaction **isoamyl acetate → isoamyl alcohol +
+#: acetic acid**: isoamyl alcohol carries 5 carbons, acetic acid 2. Stoichiometry of a named
+#: reaction — a code-with-citation constant like the chemistry carbon counts, not an
+#: empirical/uncertain YAML parameter.
+#:
+#: At D-69 this was a *stand-in* ratio: the pool it debited was ledger-weighted as ethyl acetate
+#: (C4), so 5 + 2 = 7 could not equal the debited molecule's carbon and the mismatch had to be
+#: documented instead of checked. Since D-96 the Process debits isoamyl acetate itself, so the
+#: split **exactly partitions the debited molecule's seven carbons** — an invariant the module
+#: now asserts at import rather than asserting in prose, and one that would fire if a future
+#: edit re-pointed the hydrolysis at an ester whose stoichiometry these shares do not describe.
 _ISOAMYL_ALCOHOL_CARBONS = 5  # the alcohol product → fusels
 _ACETIC_ACID_CARBONS = 2  # the acid product → Byp
 _FUSEL_CARBON_SHARE = _ISOAMYL_ALCOHOL_CARBONS / (_ISOAMYL_ALCOHOL_CARBONS + _ACETIC_ACID_CARBONS)
 _BYP_CARBON_SHARE = _ACETIC_ACID_CARBONS / (_ISOAMYL_ALCOHOL_CARBONS + _ACETIC_ACID_CARBONS)
+
+if CARBON_ATOMS[HYDROLYSING_ESTER.species] != _ISOAMYL_ALCOHOL_CARBONS + _ACETIC_ACID_CARBONS:
+    raise AssertionError(  # pragma: no cover - structural invariant, D-96
+        f"The {_ISOAMYL_ALCOHOL_CARBONS}:{_ACETIC_ACID_CARBONS} hydrolysis split must "
+        f"partition every carbon of {HYDROLYSING_ESTER.species} "
+        f"({CARBON_ATOMS[HYDROLYSING_ESTER.species]} C)."
+    )
 
 #: Ethanol and acetaldehyde are both C2, so the oxidative ``ethanol → acetaldehyde`` transfer is
 #: mole-for-mole — exactly the (inverse of the) D-27 acetaldehyde reduction. Weighting the ethanol
@@ -363,17 +379,38 @@ _ETHYL_BRIDGE_SPECIES = "ethylidene"
 
 
 class EsterHydrolysis(Process):
-    """Aging hydrolysis of fruity acetate esters toward equilibrium (decision D-69).
+    """Aging hydrolysis of the fruity banana ester toward equilibrium (decisions D-69/D-96).
 
-    ``d(esters)/dt = -k_ester_hydrolysis · f(T) · max(0, esters - esters_eq)`` — first-order
-    net decay of the lumped ``esters`` pool toward the lower equilibrium floor ``esters_eq``
-    (not to zero), with ``f(T) = arrhenius_factor(T, E_a_ester_hydrolysis, T_ref)`` the
-    sourced warmer-ages-faster factor. The released ester carbon
-    (``rate·c(ethyl_acetate)``, ledger-fixed by the D-19 esters weighting) is split **5:2**
-    into ``fusels`` (isoamyl alcohol, the alcohol product) and ``Byp`` (succinic-stand-in
-    acetic acid, the acid product) — so aging fades the ester OAV, raises the fusel OAV, and
-    drifts VA/pH up. See the module docstring for the full carbon algebra, the 5:2 split
-    rationale (the advisor-settled crux), and the §4.3 firewall / stand-in seams it inherits.
+    ``d(isoamyl_acetate)/dt = -k_ester_hydrolysis · f(T) · max(0, isoamyl_acetate -
+    isoamyl_acetate_eq)`` — first-order net decay of the ``isoamyl_acetate`` pool toward the lower
+    equilibrium floor ``isoamyl_acetate_eq`` (not to zero), with ``f(T) = arrhenius_factor(T,
+    E_a_ester_hydrolysis, T_ref)`` the sourced warmer-ages-faster factor. The released ester
+    carbon (``rate·c(isoamyl_acetate)``) is split **5:2** into ``fusels`` (isoamyl alcohol,
+    the alcohol product) and ``Byp`` (succinic-stand-in acetic acid, the acid product) — so
+    aging fades the banana OAV, raises the fusel OAV, and drifts VA/pH up. See the module
+    docstring for the full carbon algebra and the §4.3 firewall it inherits.
+
+    **The 5:2 split is now EXACT — D-96 retired D-69's documented stand-in seam.** D-69 had
+    to debit the *lumped* pool at its ledger-fixed **ethyl acetate** (C4) weighting while
+    splitting the released carbon 5:2 as though the molecule were **isoamyl acetate** — the
+    coherent stand-in reaction (isoamyl acetate → isoamyl alcohol C5 + acetic acid C2), chosen
+    because this is a *sensory* Process and D-67 had committed the pool's OAV to isoamyl
+    acetate. Debited molecule ≠ split molecule: a mismatch D-69 inherited from D-19/D-67,
+    documented and invisible to every conservation test (closure holds for any split summing
+    to 1). D-96 split the lump into single-molecule pools, so this Process now debits
+    ``isoamyl_acetate`` **itself**: the molecule being hydrolysed, the molecule the 5:2 came
+    from, and the molecule the OAV reads are finally all the same one. The ratio is unchanged
+    — it was always isoamyl acetate's — but it is no longer a stand-in.
+
+    **Scope — the banana ester only (D-96).** Of the three esters in ``ESTER_SPECS`` only
+    ``isoamyl_acetate`` hydrolyses here, because the fruity→fusel fade *is* this Process's
+    reason to exist (D-68) and that fade lives entirely in this pathway. Ethyl acetate
+    hydrolysis is **deferred**: it is sensorially mute (its products, ethanol and acetic acid,
+    are already bulk-present), so leaving that pool stable through aging is a documented v1
+    simplification, not an oversight. Were it added, ethanol's honest destination is the core
+    ``E`` slot — safe, because ``total_mass`` is scoped to ``{S, E, CO2}`` and asserted only on
+    a byproduct-free configuration, where the ester pools are identically zero and this Process
+    is inert. Ethyl hexanoate hydrolysis is likewise deferred.
 
     Off during the ferment (no fermentative-flux gate; it is temperature- and pool-driven);
     enabled only in a post-fermentation aging segment (D-68/D-70). Tier **speculative**.
@@ -381,35 +418,43 @@ class EsterHydrolysis(Process):
 
     name = "ester_hydrolysis"
     tier = Tier.SPECULATIVE
-    #: Decays its own ``esters`` pool and routes the released carbon to the alcohol product
+    #: Decays the ``isoamyl_acetate`` pool and routes the released carbon to the alcohol product
     #: (``fusels``) and the acid product (``Byp``) — an on-ledger inter-pool transfer, so it
     #: touches those three and nothing else (no ``S``/``E``/``CO2``; aging draws no sugar).
-    touches = ("esters", "fusels", "Byp")
-    #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``esters_eq`` are this Process's own
+    touches = (HYDROLYSING_ESTER.pool, "fusels", "Byp")
+    #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``isoamyl_acetate_eq`` are this Process's own
     #: (aging.yaml, D-69); ``T_ref`` is shared with every other Arrhenius rate. Their tiers cap
-    #: the ``esters``/``fusels``/``Byp`` output tiers via parameter-tier propagation (D-1).
-    reads: tuple[str, ...] = ("k_ester_hydrolysis", "E_a_ester_hydrolysis", "esters_eq", "T_ref")
+    #: the ``isoamyl_acetate``/``fusels``/``Byp`` output tiers via parameter-tier propagation
+    #: (D-1).
+    reads: tuple[str, ...] = (
+        "k_ester_hydrolysis",
+        "E_a_ester_hydrolysis",
+        "isoamyl_acetate_eq",
+        "T_ref",
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        esters = float(y[schema.slice("esters")][0])
-        # Net decay toward the equilibrium floor: the excess above esters_eq, never below zero
+        ester = float(y[schema.slice(HYDROLYSING_ESTER.pool)][0])
+        # Net decay toward the equilibrium floor: the excess above the floor, never below zero
         # (below the floor there is no net hydrolysis — the reverse formation is deferred, D-68).
-        # max(0, ...) with esters_eq > 0 also absorbs a solver undershoot (esters < 0 ⇒ 0).
-        excess = max(0.0, esters - params["esters_eq"])
+        # max(0, ...) with isoamyl_acetate_eq > 0 also absorbs a solver undershoot (ester < 0 ⇒ 0).
+        excess = max(0.0, ester - params["isoamyl_acetate_eq"])
         if excess <= 0.0:
             return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_ester_hydrolysis"], params["T_ref"])
-        rate = params["k_ester_hydrolysis"] * f_t * excess  # g esters/L/h decayed
+        rate = params["k_ester_hydrolysis"] * f_t * excess  # g isoamyl acetate/L/h decayed
 
-        # The released ester carbon is ledger-fixed by the pool's (immovable) ethyl-acetate
-        # weighting; split it 5:2 and re-deposit through each product pool's own carbon
-        # fraction, so total_carbon closes to machine precision for any split summing to 1.
-        carbon_released = rate * carbon_mass_fraction(_ESTER_SPECIES)  # g C/L/h
-        d[schema.slice("esters")] = -rate
+        # The released carbon is now the REAL molecule's (isoamyl acetate, C7) — D-96 retired
+        # D-69's debit-as-ethyl-acetate / split-as-isoamyl-acetate stand-in. Split it 5:2 and
+        # re-deposit through each product pool's own carbon fraction, so total_carbon closes to
+        # machine precision for any split summing to 1 — and 5:2 is now the true stoichiometry
+        # of the molecule actually being debited (C7 → isoamyl alcohol C5 + acetic acid C2).
+        carbon_released = rate * carbon_mass_fraction(HYDROLYSING_ESTER.species)  # g C/L/h
+        d[schema.slice(HYDROLYSING_ESTER.pool)] = -rate
         d[schema.slice("fusels")] = (
             _FUSEL_CARBON_SHARE * carbon_released / carbon_mass_fraction(_FUSEL_SPECIES)
         )
@@ -1456,7 +1501,8 @@ class OakExtraction(Process):
 
     ``d(C_i)/dt = k_oak_extraction · f(T) · max(0, ceiling_i − C_i)`` per extractive ``i`` — a
     **first-order approach FROM BELOW** to a per-compound ceiling, the exact inverse of
-    :class:`EsterHydrolysis`'s ``max(0, esters − esters_eq)`` net decay toward a floor. ``f(T) =
+    :class:`EsterHydrolysis`'s ``max(0, ester − isoamyl_acetate_eq)`` net decay toward a floor.
+    ``f(T) =
     arrhenius_factor(T, E_a_oak_extraction, T_ref)`` is the *weak* warmer-extracts-faster factor
     (diffusion-limited, so ``E_a_oak_extraction`` is deliberately low — well below the reaction
     E_a's of the oxidative Processes). One **shared** ``k_oak_extraction`` across all four this beat
@@ -1541,7 +1587,8 @@ class OakExtraction(Process):
         # Gate on STATE (the ceilings) BEFORE reading any oak param — so an un-oaked run (every
         # ceiling 0) is byte-for-byte inert even when oak.yaml is not loaded (the Strecker/Sulfite
         # substrate-gate-before-params discipline; an enabled-but-undosed Process mustn't KeyError).
-        # The EXPLICIT ceiling ≤ 0 guard is load-bearing — the floor is 0 (unlike esters_eq > 0), so
+        # The EXPLICIT ceiling ≤ 0 guard is load-bearing — the floor is 0 (unlike the ester
+        # hydrolysis floor, which is > 0), so
         # ``max(0, ceiling − C)`` alone would let a solver undershoot C = −ε fabricate extract.
         active: list[tuple[str, float]] = []
         for compound, ceiling_name in _OAK_COMPOUND_CEILINGS:

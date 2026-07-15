@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from fermentation.core.chemistry import co2_yield, sugar_species
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units import abv_from_ethanol, apparent_gravity, sg_to_plato
@@ -229,8 +230,15 @@ def test_co2_integral_tracks_sugar_consumed():
 def _aroma_run(medium: str, initial: dict[str, float], celsius: float, duration_days: float):
     """Run a medium isothermally; return (days_to_dryness, liquid-pool dict).
 
-    Reads the **liquid** ``esters``/``fusels`` pools only — ``esters_gas`` is the
-    bookkeeping headspace pool (volatilized away), not aroma in the glass (D-20)."""
+    Reads the **liquid** ester/``fusels`` pools only — the ``*_gas`` pools are the
+    bookkeeping headspace pools (volatilized away), not aroma in the glass (D-20).
+
+    ``esters`` is the **summed liquid ester mass** across the three single-molecule pools
+    (decision D-96), which is what the pre-D-96 lumped ``esters`` pool held. The benchmark's
+    claim is about total liquid ester mass responding to temperature, and that claim is
+    unchanged by the split — so this sums rather than picking a representative pool, and the
+    assertions below are untouched. All three esters share ``E_a_esters`` and the same
+    stripping physics, so each inverts and the sum inverts with them."""
     sc = Scenario(
         name=f"{medium}-{celsius}C",
         medium=medium,
@@ -247,7 +255,7 @@ def _aroma_run(medium: str, initial: dict[str, float], celsius: float, duration_
     )
     assert traj.success, traj.message
     pools = {
-        "esters": float(traj.series("esters")[-1]),
+        "esters": sum(float(traj.series(spec.pool)[-1]) for spec in ESTER_SPECS),
         "fusels": float(traj.series("fusels")[-1]),
     }
     return days, pools

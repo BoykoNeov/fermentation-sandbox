@@ -26,7 +26,7 @@ per-Process mechanics it rests on, plus the honest per-pool temperature directio
 import numpy as np
 import pytest
 
-from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.chemistry import CARBON_ATOMS, carbon_mass_fraction
 from fermentation.core.kinetics import (
     EsterSynthesis,
     EsterVolatilization,
@@ -35,6 +35,7 @@ from fermentation.core.kinetics import (
     SugarUptakeToEthanolCO2,
     arrhenius_factor,
 )
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -80,10 +81,21 @@ def test_ester_metadata():
     p = EsterSynthesis()
     assert p.name == "ester_synthesis"
     assert p.tier is Tier.PLAUSIBLE  # warmth-favoured, flux-coupled: standard form
-    # Touches its own pool AND S — the ester carbon is routed from sugar (a1, D-19);
-    # never E/CO2 (uptake's ethanol/CO2 production is left untouched).
-    assert set(p.touches) == {"esters", "S"}
-    assert set(p.reads) == {"k_ester", "K_sugar_uptake", "E_a_esters", "T_ref"}
+    # Touches ALL THREE ester pools AND S — each ester's carbon is routed from sugar (a1,
+    # D-19); never E/CO2 (uptake's ethanol/CO2 production is left untouched). Since D-96 one
+    # Process fills three single-molecule pools instead of one lump.
+    assert set(p.touches) == {"ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate", "S"}
+    # One INDEPENDENTLY-SOURCED rate per ester (D-96), plus the shared flux/temperature terms.
+    # A single k split by a fitted ratio would have been exactly the fabricated-composition
+    # constant the split exists to remove, so the plurality here is the point.
+    assert set(p.reads) == {
+        "k_ethyl_acetate",
+        "k_isoamyl_acetate",
+        "k_ethyl_hexanoate",
+        "K_sugar_uptake",
+        "E_a_esters",  # shared: one ATF1 enzyme for the acetates (D-96 documents the hexanoate)
+        "T_ref",
+    }
 
 
 def test_fusel_metadata():
@@ -99,22 +111,50 @@ def test_fusel_metadata():
 
 
 def test_ester_derivative_matches_closed_form(params):
+    """Each ester forms at its OWN rate and draws its OWN carbon — the D-96 ledger payoff.
+
+    The pre-D-96 version of this test checked one lumped pool against one ``k_ester`` and one
+    ethyl-acetate carbon fraction. The molecules differ (C4/C7/C8), so a single shared fraction
+    would now mis-debit sugar for two of the three; this pins that each ester is weighted as
+    itself.
+    """
     schema = wine_schema()
     x, s, t = 2.0, 200.0, 293.15
     y = _wine_y0(schema, x=x, s=s, t=t)
     d = EsterSynthesis().derivatives(0.0, y, schema, params)
 
     flux = x * (s / (params["K_sugar_uptake"] + s))
-    f_t = arrhenius_factor(t, params["E_a_esters"], params["T_ref"])
-    rate = params["k_ester"] * flux * f_t
-    assert schema.get(d, "esters") == pytest.approx(rate)
-    # The ester carbon is routed from sugar (a1, D-19): one slot, so dS removes exactly
-    # the ester carbon converted back to grams of glucose. Carbon balances per-RHS.
-    assert schema.get(d, "S") == pytest.approx(-rate * _ESTER_C / _GLUCOSE_C)
-    assert schema.get(d, "S") * _GLUCOSE_C == pytest.approx(-schema.get(d, "esters") * _ESTER_C)
+    f_t = arrhenius_factor(t, params["E_a_esters"], params["T_ref"])  # shared shape (D-96)
+
+    total_ester_carbon = 0.0
+    for spec in ESTER_SPECS:
+        rate = params[spec.k_param] * flux * f_t
+        assert schema.get(d, spec.pool) == pytest.approx(rate), spec.pool
+        assert rate > 0.0, spec.pool  # a real contribution, not a vacuous 0 == 0
+        total_ester_carbon += rate * carbon_mass_fraction(spec.species)
+
+    # Every ester's carbon is routed from sugar (a1, D-19): one wine slot, so dS removes the
+    # SUM of the three esters' carbon converted back to grams of glucose. Carbon balances
+    # per-RHS — and it only balances because each ester is debited at its own fraction.
+    assert schema.get(d, "S") == pytest.approx(-total_ester_carbon / _GLUCOSE_C)
+    assert -schema.get(d, "S") * _GLUCOSE_C == pytest.approx(total_ester_carbon)
     # Nothing else moves — ethanol/CO2 production is left to the uptake Process.
     for var in ("X", "E", "N", "CO2", "fusels"):
         assert schema.get(d, var) == 0.0
+
+
+def test_each_ester_is_carbon_weighted_as_its_own_molecule():
+    """The three esters have genuinely different carbon fractions — C4 vs C7 vs C8 (D-96).
+
+    Guards the split's premise. If a future edit collapsed these onto one representative
+    species the ledger would silently mis-book two of the three, and every conservation test
+    would still pass (the draw and the check would agree — they would just agree on the wrong
+    molecule). That symmetry is exactly how the pre-D-96 seam survived so long, so the
+    distinctness is asserted directly rather than inferred from closure.
+    """
+    fractions = {spec.species: carbon_mass_fraction(spec.species) for spec in ESTER_SPECS}
+    assert len(set(fractions.values())) == 3, fractions
+    assert {CARBON_ATOMS[spec.species] for spec in ESTER_SPECS} == {4, 7, 8}
 
 
 def test_ester_factor_is_one_at_reference_temperature(params):
@@ -125,7 +165,7 @@ def test_ester_factor_is_one_at_reference_temperature(params):
     y = _wine_y0(schema, x=x, s=s, t=params["T_ref"])
     d = EsterSynthesis().derivatives(0.0, y, schema, params)
     flux = x * (s / (params["K_sugar_uptake"] + s))
-    assert schema.get(d, "esters") == pytest.approx(params["k_ester"] * flux)
+    assert schema.get(d, "ethyl_acetate") == pytest.approx(params["k_ethyl_acetate"] * flux)
 
 
 def test_ester_rises_with_temperature(params):
@@ -133,7 +173,7 @@ def test_ester_rises_with_temperature(params):
     schema = wine_schema()
     cold = EsterSynthesis().derivatives(0.0, _wine_y0(schema, t=283.15), schema, params)
     warm = EsterSynthesis().derivatives(0.0, _wine_y0(schema, t=303.15), schema, params)
-    assert schema.get(warm, "esters") > schema.get(cold, "esters") > 0.0
+    assert schema.get(warm, "ethyl_acetate") > schema.get(cold, "ethyl_acetate") > 0.0
 
 
 def test_ester_scales_with_fermentative_flux(params):
@@ -142,16 +182,16 @@ def test_ester_scales_with_fermentative_flux(params):
     schema = wine_schema()
     r1 = EsterSynthesis().derivatives(0.0, _wine_y0(schema, x=1.0), schema, params)
     r2 = EsterSynthesis().derivatives(0.0, _wine_y0(schema, x=2.0), schema, params)
-    assert schema.get(r2, "esters") == pytest.approx(2.0 * schema.get(r1, "esters"))
+    assert schema.get(r2, "ethyl_acetate") == pytest.approx(2.0 * schema.get(r1, "ethyl_acetate"))
 
 
 def test_ester_zero_without_biomass_or_sugar(params):
     schema = wine_schema()
     assert EsterSynthesis().derivatives(0.0, _wine_y0(schema, x=0.0), schema, params)[
-        schema.slice("esters")
+        schema.slice("ethyl_acetate")
     ] == pytest.approx(0.0)
     assert EsterSynthesis().derivatives(0.0, _wine_y0(schema, s=0.0), schema, params)[
-        schema.slice("esters")
+        schema.slice("ethyl_acetate")
     ] == pytest.approx(0.0)
 
 
@@ -186,7 +226,7 @@ def test_fusel_derivative_matches_closed_form(params):
     # converted back to grams of glucose.
     assert schema.get(d, "S") == pytest.approx(-rate * _FUSEL_C / _GLUCOSE_C)
     assert schema.get(d, "S") * _GLUCOSE_C == pytest.approx(-schema.get(d, "fusels") * _FUSEL_C)
-    for var in ("X", "E", "N", "CO2", "esters"):
+    for var in ("X", "E", "N", "CO2", "ethyl_acetate"):
         assert schema.get(d, var) == 0.0
 
 
@@ -228,11 +268,11 @@ def test_fusel_zero_without_biomass_or_sugar(params):
 # -- ester volatilization (gas-stripping sink, decision D-20) -----------------
 
 
-def _wine_y0_with_esters(schema: StateSchema, *, esters: float, **kw) -> FloatArray:
+def _wine_y0_with_ester(schema: StateSchema, *, ester: float, **kw) -> FloatArray:
     """A wine state with the liquid ``esters`` pool pre-loaded (the sink needs ester to
     strip; the produced-only pool is 0 at pitch so it must be set explicitly here)."""
     y = _wine_y0(schema, **kw)
-    y[schema.slice("esters")] = esters
+    y[schema.slice("ethyl_acetate")] = ester
     return y
 
 
@@ -241,9 +281,14 @@ def test_volatilization_metadata():
     assert p.name == "ester_volatilization"
     # Plausible *form* (CO2 stripping is well-understood physics); speculative params cap it.
     assert p.tier is Tier.PLAUSIBLE
-    # A pure liquid->gas transfer: touches the liquid pool and the headspace pool only —
-    # never S/E/CO2 (it draws no fresh sugar, unlike synthesis).
-    assert set(p.touches) == {"esters", "esters_gas"}
+    # Pure liquid->gas transfers: touches each liquid ester pool and its OWN headspace twin,
+    # never S/E/CO2 (it draws no fresh sugar, unlike synthesis). Since D-96 all three esters
+    # are stripped, each into its own twin — a twin per ester is forced, since a pool and its
+    # twin must share one molecule's carbon weight for the transfer to stay carbon-neutral.
+    assert set(p.touches) == {
+        *(spec.pool for spec in ESTER_SPECS),
+        *(spec.gas_pool for spec in ESTER_SPECS),
+    }
     # Physical Henry model (D-21): gas-flow rides E_a_uptake, partition rides the sourced
     # ethyl-acetate enthalpy dH_ester_volatil — NOT a fudged per-medium E_a_ester_volatil.
     assert set(p.reads) == {
@@ -258,7 +303,7 @@ def test_volatilization_metadata():
 def test_volatilization_derivative_matches_closed_form(params):
     schema = wine_schema()
     x, s, t, est = 2.0, 200.0, 298.15, 0.1  # off T_ref so both Arrhenius factors bite
-    y = _wine_y0_with_esters(schema, esters=est, x=x, s=s, t=t)
+    y = _wine_y0_with_ester(schema, ester=est, x=x, s=s, t=t)
     d = EsterVolatilization().derivatives(0.0, y, schema, params)
 
     flux = x * (s / (params["K_sugar_uptake"] + s))
@@ -266,10 +311,12 @@ def test_volatilization_derivative_matches_closed_form(params):
     f_part = arrhenius_factor(t, params["dH_ester_volatil"], params["T_ref"])  # partition
     rate = params["k_ester_volatil"] * flux * f_gas * f_part * est
     # Liquid loses exactly what the headspace gains — a carbon-neutral transfer.
-    assert schema.get(d, "esters") == pytest.approx(-rate)
-    assert schema.get(d, "esters_gas") == pytest.approx(rate)
+    assert schema.get(d, "ethyl_acetate") == pytest.approx(-rate)
+    assert schema.get(d, "ethyl_acetate_gas") == pytest.approx(rate)
     # Both pools book as ethyl acetate, so the per-RHS carbon residual is exactly zero.
-    carbon_residual = schema.get(d, "esters") * _ESTER_C + schema.get(d, "esters_gas") * _ESTER_C
+    carbon_residual = (
+        schema.get(d, "ethyl_acetate") * _ESTER_C + schema.get(d, "ethyl_acetate_gas") * _ESTER_C
+    )
     assert carbon_residual == pytest.approx(0.0, abs=0.0)
     # No fresh sugar drawn, no ethanol/CO2 touched — unlike synthesis (which routes from S).
     for var in ("X", "S", "E", "N", "CO2", "fusels"):
@@ -279,7 +326,7 @@ def test_volatilization_derivative_matches_closed_form(params):
 def test_volatilization_zero_without_liquid_ester(params):
     # Nothing in the liquid pool to strip ⇒ no flux into the headspace.
     schema = wine_schema()
-    d = EsterVolatilization().derivatives(0.0, _wine_y0(schema), schema, params)  # esters=0
+    d = EsterVolatilization().derivatives(0.0, _wine_y0(schema), schema, params)  # ester=0
     assert np.array_equal(d, schema.zeros())
 
 
@@ -290,13 +337,13 @@ def test_volatilization_zero_without_fermentative_flux(params):
     schema = wine_schema()
     assert np.array_equal(
         EsterVolatilization().derivatives(
-            0.0, _wine_y0_with_esters(schema, esters=0.1, x=0.0), schema, params
+            0.0, _wine_y0_with_ester(schema, ester=0.1, x=0.0), schema, params
         ),
         schema.zeros(),
     )
     assert np.array_equal(
         EsterVolatilization().derivatives(
-            0.0, _wine_y0_with_esters(schema, esters=0.1, s=0.0), schema, params
+            0.0, _wine_y0_with_ester(schema, ester=0.1, s=0.0), schema, params
         ),
         schema.zeros(),
     )
@@ -307,19 +354,19 @@ def test_volatilization_rises_with_temperature(params):
     # the snapshot property behind the wine inversion (warmer strips more).
     schema = wine_schema()
     cold = EsterVolatilization().derivatives(
-        0.0, _wine_y0_with_esters(schema, esters=0.1, t=283.15), schema, params
+        0.0, _wine_y0_with_ester(schema, ester=0.1, t=283.15), schema, params
     )
     warm = EsterVolatilization().derivatives(
-        0.0, _wine_y0_with_esters(schema, esters=0.1, t=303.15), schema, params
+        0.0, _wine_y0_with_ester(schema, ester=0.1, t=303.15), schema, params
     )
-    assert schema.get(warm, "esters_gas") > schema.get(cold, "esters_gas") > 0.0
+    assert schema.get(warm, "ethyl_acetate_gas") > schema.get(cold, "ethyl_acetate_gas") > 0.0
 
 
 def test_volatilization_negative_ester_does_not_strip(params):
     # A solver undershoot (esters < 0) must not flip the clamp into spurious gas creation.
     schema = wine_schema()
     d = EsterVolatilization().derivatives(
-        0.0, _wine_y0_with_esters(schema, esters=-1e-6), schema, params
+        0.0, _wine_y0_with_ester(schema, ester=-1e-6), schema, params
     )
     assert np.array_equal(d, schema.zeros())
 
@@ -348,16 +395,16 @@ def test_both_run_strict_and_stay_nonnegative(params):
     # S is now also drawn by the byproduct Processes (a1) — it must stay non-negative
     # too: the proportional draw vanishes as a slot empties, so it cannot overshoot. The
     # liquid esters pool, drawn down by the volatilization sink, must also stay >= 0.
-    assert_nonnegative(traj, ("esters", "fusels", "esters_gas", "S"), atol=1e-12)
+    assert_nonnegative(traj, ("ethyl_acetate", "fusels", "ethyl_acetate_gas", "S"), atol=1e-12)
     # The aroma pools actually accumulate (the mechanisms are live), and the sink fills
     # the headspace pool from the liquid esters it strips (D-20).
-    assert float(traj.series("esters")[-1]) > 0.0
+    assert float(traj.series("ethyl_acetate")[-1]) > 0.0
     assert float(traj.series("fusels")[-1]) > 0.0
-    assert float(traj.series("esters_gas")[-1]) > 0.0
+    assert float(traj.series("ethyl_acetate_gas")[-1]) > 0.0
     # Trace, as expected — orders of magnitude below the g/L ethanol flux.
-    assert float(traj.series("esters")[-1]) < 1.0
+    assert float(traj.series("ethyl_acetate")[-1]) < 1.0
     assert float(traj.series("fusels")[-1]) < 1.0
-    assert float(traj.series("esters_gas")[-1]) < 1.0
+    assert float(traj.series("ethyl_acetate_gas")[-1]) < 1.0
 
 
 def test_byproducts_perturb_only_sugar_and_close_carbon_per_rhs(params):
@@ -387,12 +434,17 @@ def test_byproducts_perturb_only_sugar_and_close_carbon_per_rhs(params):
         for var in ("X", "E", "N", "CO2"):
             assert d_core[schema.slice(var)] == pytest.approx(d_byp[schema.slice(var)], abs=0.0)
         # dS gains only the byproduct draw, and the carbon balances exactly:
-        #   Δ(dS)·c(glucose) + d[esters]·c(ester) + d[fusels]·c(fusel) == 0.
+        #   Δ(dS)·c(glucose) + Σ_esters d[ester]·c(that ester) + d[fusels]·c(fusel) == 0.
+        # Since D-96 the sum runs over three esters, EACH at its own molecule's fraction
+        # (C4/C7/C8) — a single shared fraction would leave a residual here.
         delta_s = float(d_byp[schema.slice("S")][0] - d_core[schema.slice("S")][0])
-        ester_rate = float(d_byp[schema.slice("esters")][0])
         fusel_rate = float(d_byp[schema.slice("fusels")][0])
         assert delta_s <= 0.0  # sugar is drawn down, never created
-        carbon_residual = delta_s * _GLUCOSE_C + ester_rate * _ESTER_C + fusel_rate * _FUSEL_C
+        ester_carbon = sum(
+            float(d_byp[schema.slice(spec.pool)][0]) * carbon_mass_fraction(spec.species)
+            for spec in ESTER_SPECS
+        )
+        carbon_residual = delta_s * _GLUCOSE_C + ester_carbon + fusel_rate * _FUSEL_C
         assert carbon_residual == pytest.approx(0.0, abs=1e-12)
 
 
@@ -456,9 +508,9 @@ def test_total_carbon_closes_with_byproducts_on(params, store):
     # Closure is non-trivial only because the pools actually accumulated — including the
     # volatilized-ester headspace pool, whose carbon must stay counted (D-20) or the
     # liquid→gas transfer would read as destroyed.
-    assert float(traj.series("esters")[-1]) > 0.0
+    assert float(traj.series("ethyl_acetate")[-1]) > 0.0
     assert float(traj.series("fusels")[-1]) > 0.0
-    assert float(traj.series("esters_gas")[-1]) > 0.0
+    assert float(traj.series("ethyl_acetate_gas")[-1]) > 0.0
 
 
 def test_total_carbon_closes_with_byproducts_on_beer_multislot():
@@ -493,10 +545,10 @@ def test_total_carbon_closes_with_byproducts_on_beer_multislot():
     # The proportional draw must vanish as each slot empties (glucose first under
     # sequential uptake), so no sugar slot is driven negative; the volatilization sink
     # keeps the liquid esters pool non-negative as it strips into the headspace pool.
-    assert_nonnegative(traj, ("S", "esters", "fusels", "esters_gas"), atol=1e-9)
-    assert float(traj.series("esters")[-1]) > 0.0
+    assert_nonnegative(traj, ("S", "ethyl_acetate", "fusels", "ethyl_acetate_gas"), atol=1e-9)
+    assert float(traj.series("ethyl_acetate")[-1]) > 0.0
     assert float(traj.series("fusels")[-1]) > 0.0
-    assert float(traj.series("esters_gas")[-1]) > 0.0
+    assert float(traj.series("ethyl_acetate_gas")[-1]) > 0.0
 
 
 # -- integrated temperature directions (the load-bearing E_a-ordering guards) --
@@ -518,9 +570,9 @@ def _wine_run_to_dryness(celsius: float, duration_days: float):
     assert traj.success, traj.message
     reached_dryness = float(traj.series("S")[-1]) <= 2.0
     pools = {
-        "esters": float(traj.series("esters")[-1]),
+        "ethyl_acetate": float(traj.series("ethyl_acetate")[-1]),
         "fusels": float(traj.series("fusels")[-1]),
-        "esters_gas": float(traj.series("esters_gas")[-1]),
+        "ethyl_acetate_gas": float(traj.series("ethyl_acetate_gas")[-1]),
     }
     return reached_dryness, pools
 
@@ -547,21 +599,22 @@ def test_integrated_wine_aroma_temperature_directions():
         f"fusels should rise with T (cleaner cold): cold {cold['fusels']:.4f} vs "
         f"warm {warm['fusels']:.4f} g/L"
     )
-    assert 0.0 < warm["esters"] < cold["esters"], (
+    assert 0.0 < warm["ethyl_acetate"] < cold["ethyl_acetate"], (
         f"wine LIQUID esters should fall with T (volatilization inversion, D-20): "
-        f"cold {cold['esters']:.4f} vs warm {warm['esters']:.4f} g/L"
+        f"cold {cold['ethyl_acetate']:.4f} vs warm {warm['ethyl_acetate']:.4f} g/L"
     )
-    assert 0.0 < cold["esters_gas"] < warm["esters_gas"], (
+    assert 0.0 < cold["ethyl_acetate_gas"] < warm["ethyl_acetate_gas"], (
         f"volatilized esters_gas should rise with T (more stripping when warm): "
-        f"cold {cold['esters_gas']:.4f} vs warm {warm['esters_gas']:.4f} g/L"
+        f"cold {cold['ethyl_acetate_gas']:.4f} vs "
+        f"warm {warm['ethyl_acetate_gas']:.4f} g/L"
     )
     # THE headline D-21 fidelity claim, locked (prime directive #2: enforced, not just
     # honoured): wine TOTAL ester production (liquid + volatilized) is ~FLAT in T. It is
     # the *consequence* of E_a_esters = E_a_uptake (the liquid-falls/gas-rises asserts
     # above can survive a drift that breaks flatness; this cannot). The 2% band is far
     # tighter than the tilt even a ~1 kJ/mol drift of either E_a would cause.
-    cold_total = cold["esters"] + cold["esters_gas"]
-    warm_total = warm["esters"] + warm["esters_gas"]
+    cold_total = cold["ethyl_acetate"] + cold["ethyl_acetate_gas"]
+    warm_total = warm["ethyl_acetate"] + warm["ethyl_acetate_gas"]
     assert cold_total == pytest.approx(warm_total, rel=0.02), (
         f"wine TOTAL ester production should be ~flat in T (D-21 mapping E_a_esters = "
         f"E_a_uptake): cold {cold_total:.4f} vs warm {warm_total:.4f} g/L"
@@ -588,9 +641,9 @@ def test_ester_tier_capped_by_placeholder_params(store):
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterSynthesis()])
     # Structural (form-only) tier is plausible…
-    assert ps.tier_of("esters") is Tier.PLAUSIBLE
+    assert ps.tier_of("ethyl_acetate") is Tier.PLAUSIBLE
     # …but folding in the real parameter tiers drops it to speculative.
-    assert ps.tier_of("esters", store.tier_map()) is Tier.SPECULATIVE
+    assert ps.tier_of("ethyl_acetate", store.tier_map()) is Tier.SPECULATIVE
 
 
 def test_fusel_form_is_speculative_regardless_of_params():
@@ -606,5 +659,5 @@ def test_volatilization_tier_capped_by_placeholder_params(store):
     # rate params cap the esters_gas output at speculative (parameter-tier propagation).
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterVolatilization()])
-    assert ps.tier_of("esters_gas") is Tier.PLAUSIBLE
-    assert ps.tier_of("esters_gas", store.tier_map()) is Tier.SPECULATIVE
+    assert ps.tier_of("ethyl_acetate_gas") is Tier.PLAUSIBLE
+    assert ps.tier_of("ethyl_acetate_gas", store.tier_map()) is Tier.SPECULATIVE

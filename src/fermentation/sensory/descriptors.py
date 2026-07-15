@@ -84,12 +84,29 @@ class DescriptorAxis:
     gloss: str
 
 
-#: The descriptor vocabulary — 14 axes over wine's 19 aroma pools, 9 over beer's 10 (D-95).
+#: The descriptor vocabulary — 14 axes over wine's 21 aroma pools, 9 over beer's 12 (D-95,
+#: pool counts updated at D-96).
 #:
 #: Granularity is the owner's call (~12 many-to-many axes): coarse enough that the projection
 #: does real work (``malty`` collapses three pools), fine enough to keep distinctions the
-#: chemistry worked to earn. Two calls worth recording:
+#: chemistry worked to earn. Three calls worth recording:
 #:
+#: * ``fruity`` and ``solventy`` split the three esters **by smell, not by chemical family**
+#:   (D-96). When D-96 broke the lumped ``esters`` pool into ``ethyl_acetate`` /
+#:   ``isoamyl_acetate`` / ``ethyl_hexanoate``, the two ATF1 acetates did *not* stay together:
+#:   isoamyl acetate is banana and joins ``fruity``, while ethyl acetate is nail-polish and
+#:   joins ``fusels`` under ``solventy``. Ethyl hexanoate, a different enzyme's product
+#:   (EEB1/EHT1), lands with the banana ester. That is the projection layer doing precisely
+#:   its job — the axis a molecule belongs to is a *perceptual* fact, and it cuts across the
+#:   biosynthetic families the chemistry layer is organised by.
+#:
+#:   This is also where D-96 pays off for the MAX rule. Before the split ``fruity`` read one
+#:   lumped pool, so its ``dominant`` attribution was vacuous — the lump was the only
+#:   candidate, and the number it reported (OAV ~761 for a Brett wine) was non-physical
+#:   anyway. Now the axis reads two real molecules and MAX picks between them, so ``dominant``
+#:   names something. Expect **``ethyl_hexanoate`` to win in wine**: its threshold is ~6×
+#:   lower than isoamyl acetate's, so apple/pineapple — not banana — is normally wine's
+#:   loudest fruity ester (Guth 1997 ranks it among the highest-OAV wine odorants).
 #: * ``green_apple`` stays its own axis rather than joining ``cooked_potato`` under a shared
 #:   "oxidative" — ``acetaldehyde`` is a fermentation intermediate (D-27) long before it is an
 #:   oxidation product (D-71), so a young beer's green-apple note would be mislabelled.
@@ -101,8 +118,16 @@ class DescriptorAxis:
 #:   compounds is what a projection *is*; merging these two back into one ``nutty_caramel``
 #:   axis would be equally defensible and costs exactly this one entry.
 DESCRIPTOR_AXES: tuple[DescriptorAxis, ...] = (
-    DescriptorAxis("fruity", ("esters",), "banana / pear-drop / general fruit esters"),
-    DescriptorAxis("solventy", ("fusels",), "hot, solventy higher alcohols"),
+    DescriptorAxis(
+        "fruity",
+        ("isoamyl_acetate", "ethyl_hexanoate"),
+        "banana / pear-drop / apple / pineapple — the fruity esters",
+    ),
+    DescriptorAxis(
+        "solventy",
+        ("ethyl_acetate", "fusels"),
+        "hot, solventy higher alcohols and nail-polish ethyl acetate",
+    ),
     DescriptorAxis("buttery", ("diacetyl",), "butter / butterscotch"),
     DescriptorAxis("green_apple", ("acetaldehyde",), "green apple / bruised fruit"),
     DescriptorAxis("sulfidic", ("h2s", "mercaptans"), "rotten egg / drains / reductive"),
