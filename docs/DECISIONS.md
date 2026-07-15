@@ -7747,9 +7747,24 @@ fix is the same one D-96 prescribes: **another pool, never another disclaimer** 
 the low-YAN biosynthetic rise; the observed non-monotonicity at YAN 400 (fusels 86.4 → 80.4, ester 1.264 → 1.181) is that inherited
 shape showing through, which is why the outcome test compares 40 vs 250 and not the extreme.
 
+**A STATED DEPENDENCY AND A BENIGN TIER CONSEQUENCE — confirmed and documented, deliberately NOT engineered (done-call advisor
+catch).** Reading `fusels` means `isoamyl_acetate` synthesis now **requires** `FuselAlcoholsEhrlich` to be active, and a
+**plausible**-form Process now reads a pool a **speculative** one fills. Both are benign, and the advisor's call was to *resolve by
+documenting, not building*: (i) the two are **co-wired** in `media._BYPRODUCT_PROCESSES` — the only tuple either appears in —
+verified, so no supported ProcessSet runs one without the other; a set with `EsterSynthesis` alone is not broken but merely
+*precursor-free* (banana rate ≡ 0, no crash, the other two esters unaffected). (ii) The tier **understates nothing**:
+`k_isoamyl_acetate` is speculative regardless, so the pool's output tier already sits at the speculative floor. Tier propagation runs
+through parameters and `touches`, **not** through state dependencies — a **pre-existing** property of the tier system that D-97 makes
+newly visible but did not introduce, and building a state-dependency propagator for a number that is *already correct* would be scope
+creep. Recorded here so the gap is a **known limitation** rather than an unnoticed one. **Ensemble consequence:** because the rate
+multiplies `[fusels]`, `isoamyl_acetate` now inherits the fusel pool's variance (via `k_fusel`/`K_n`/`E_a_fusels`) under a D-24
+sweep — *more* correct, but it means the band widens beyond what `k_isoamyl_acetate`'s own uncertainty implies. The parameter's
+"pins the same concentration span" note is about the **point estimate holding `fusels` fixed**, and is not a claim about the
+ensemble band.
+
 **Regression surface.** `carbon_routing.py` (`EsterSpec.precursor_pool`, registry), `byproducts.py` (`EsterSynthesis.derivatives` +
 docs), `wine_generic.yaml` / `beer_generic.yaml` (`k_isoamyl_acetate` value/unit/band/provenance). No state slot, no `touches`, no
-ledger entry, no new parameter. The §2.2 inversion benchmarks and every conservation test pass **unweakened**. One existing test
+ledger entry, no new parameter. The §2.2 inversion benchmarks and every conservation test pass **unweakened** (`pytest -m benchmark`: 16 passed, 1023 deselected — run explicitly rather than inferred from the full suite, on the done-call advisor's prompt; the count also confirms the benchmarks are *not* marker-deselected from the default run, so CLAUDE.md's "skipped until kinetics" note is historical). One existing test
 changed and it changed **correctly**: `test_ester_derivative_matches_closed_form` had `fusels = 0` and so asserted a now-legitimately-
 zero banana rate — it now reconstructs the rate **from the registry** (`spec.precursor_pool`) rather than special-casing a name, and
 `_wine_y0` defaults `fusels` to a realistic 50 mg/L so no ester assertion is **vacuously** true.

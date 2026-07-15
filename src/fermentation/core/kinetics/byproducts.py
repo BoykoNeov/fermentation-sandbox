@@ -252,6 +252,26 @@ class EsterSynthesis(Process):
     fusel pool), and the sugar draw is the same documented stand-in
     :class:`FuselAlcoholsEhrlich` already uses for the amino-acid skeleton.
 
+    **A stated dependency, not a latent surprise (D-97).** Reading ``fusels`` means
+    ``isoamyl_acetate`` synthesis **requires** :class:`FuselAlcoholsEhrlich` to be active — the
+    two are co-wired in ``media._BYPRODUCT_PROCESSES`` (the only tuple either appears in), so
+    every supported ProcessSet has both. A ProcessSet built with this Process alone is not
+    broken, it is merely *precursor-free*: the banana rate is identically 0 (no alcohol to
+    acetylate) while the other two esters form normally. Note the tier consequence is benign
+    and needs no machinery: a **plausible**-form Process now reads a pool a **speculative**
+    one fills, but ``k_isoamyl_acetate`` is speculative anyway, so the pool's *output* tier is
+    already at the speculative floor and understates nothing. (Tier propagation runs through
+    parameters and ``touches``, not through state dependencies — a pre-existing property of the
+    tier system, not something this coupling introduces.)
+
+    **Ensemble consequence (D-97).** Because the rate multiplies ``[fusels]``,
+    ``isoamyl_acetate`` now **inherits the fusel pool's variance** (via ``k_fusel`` / ``K_n`` /
+    ``E_a_fusels``) under a D-24 ensemble sweep. That is *more* correct — the precursor's
+    uncertainty genuinely is the ester's — but it means the band widens beyond what
+    ``k_isoamyl_acetate``'s own uncertainty implies. The parameter's "pins the same
+    concentration span" note is a statement about the **point estimate** holding ``fusels``
+    fixed; it is not a claim about the ensemble band.
+
     **Two inherited caveats, named not buried (D-97).** (i) ``fusels`` is a **lumped** pool
     (isoamyl alcohol representative, but really all the higher alcohols), so reading it whole as
     the ATF1 substrate over-states the true isoamyl-alcohol supply. The over-statement is
