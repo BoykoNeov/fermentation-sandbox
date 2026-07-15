@@ -188,6 +188,20 @@ class DescriptorReading:
     fixed-lump-composition honesty cost from the *dominant* contributor — a descriptor driven
     by a lumped pool inherits that pool's assumption, and the caveat must not vanish just
     because it crossed a layer.
+
+    ``rule`` names the projector that produced this reading, and it exists because ``oav`` is
+    **not the same quantity under every projector** (D-98). :class:`MaxRuleProjector` puts a
+    raw OAV there; :class:`~fermentation.sensory.compression.StevensProjector` puts a
+    compressed *perceived intensity* (``OAV ** n``) there; the seam's own docstring anticipates
+    a future panel-trained model emitting genuine intensities. Those are different quantities
+    sharing one field — exactly the split identity D-96 called a category error (one pool,
+    two molecular identities, in two layers), and D-96's rule was that the honest fix is
+    another *pool*, never another disclaimer. So the reading **self-identifies** rather than
+    relying on a caller to remember which projector it called. The quantities do agree on the
+    one semantic that matters most: both equal 1 **at** the perception threshold, so
+    ``above_threshold`` means the same thing under either rule. Renaming ``oav`` to a
+    projector-neutral ``magnitude`` is the deeper fix, deferred at D-98 as churn across slice
+    1's callers and tests for no new observable.
     """
 
     descriptor: str
@@ -197,6 +211,7 @@ class DescriptorReading:
     above_threshold: bool
     lumped: bool
     tier: Tier
+    rule: str = "max"
 
 
 @dataclass(frozen=True)

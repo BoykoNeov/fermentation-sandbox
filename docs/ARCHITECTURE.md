@@ -37,7 +37,7 @@ Package map:
 | scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` (`.run` / `.run_ensemble`); intervention verbs `add_dap` / `add_so2` / `rack` / `pitch_mlf` |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
 | analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series`, `molecular_so2_series`, `ibu_series` (top-layer observables over a `Trajectory`) |
-| sensory | `fermentation.sensory` | `oav_series`, `sensory_profile`, `oav_tier`, `load_thresholds`, `AROMA_COMPOUNDS` — the speculative Tier-3 OAV aroma readout over a `Trajectory` (D-67) |
+| sensory | `fermentation.sensory` | `oav_series`, `sensory_profile`, `oav_tier`, `load_thresholds`, `AROMA_COMPOUNDS` — the speculative Tier-3 OAV aroma readout over a `Trajectory` (D-67); `MaxRuleProjector` + `DescriptorProjector` — descriptor projection (D-95); `StevensProjector`, `dominant_flip_sensitivity` — compression, isolable and non-default (D-98) |
 
 ## The core
 
@@ -291,8 +291,7 @@ construction). Opened as the first beat of Milestone 3 (`docs/plans/milestone-3-
     silent rather than faking a 1.2 smell no compound justifies.
   - **Honest framing.** Under max, a descriptor clears iff one of its pools does, so
     `above_threshold()` is a pure **regrouping** of beat 1a's flags — the layer adds vocabulary
-    + attribution, **not new above-threshold information**. Weighting/compression/masking (and
-    the params those need) is the explicitly deferred **slice 2**.
+    + attribution, **not new above-threshold information**.
   - **Membership is structure, not parameters** — binary (a pool feeds an axis or not), so it
     lives in code like `AromaCompound.descriptor` (D-67) and mints no constants. The axis set
     is **derived** per medium from `AROMA_COMPOUNDS` (`axes_for_medium`), so beer can never
@@ -303,6 +302,28 @@ construction). Opened as the first beat of Milestone 3 (`docs/plans/milestone-3-
     one layer up (the projection is itself a further leap), tested non-vacuously. The odor/taste
     split is inherited free: consuming a `SensoryProfile` makes it structurally impossible for
     `iso_alpha`/`ellagitannin` to leak into an aroma descriptor.
+
+- **Stevens compression — beat 1b slice 2 (D-98), `sensory/compression.py`.** `StevensProjector`
+  compresses each contributor's OAV to a perceived intensity (`I = OAV ** n`, per-compound `n`
+  from the standalone `parameters/data/psychophysics.yaml`) **before** the max rule. Arrives
+  through D-95's seam untouched; **isolable and NOT the default** (delete the YAML and slice 1
+  is byte-for-byte unaffected — PD#3).
+  - **Additivity survives.** Compression is **per-compound, below the combination rule**, which
+    is **still max** — it says nothing about how two compounds combine. Max is a deliberate
+    **under-claim**: mixture perception is hypoadditive (truth sits between max and sum), and
+    reaching that middle needs per-pair `cosα` coefficients that exist for no pair of our pools.
+  - **Its only new observable is `dominant`.** `I > 1` iff `OAV > 1` for any `n > 0`, so
+    compression can neither invent nor silence a detectable smell. A **global** exponent is a
+    provable no-op (monotone ⇒ argmax preserved), which is why the exponents are per-compound —
+    and per-compound exponents are unmeasured for these compounds, so all 21 are **author
+    estimates** (ordered by solubility per Cain 1969, which justifies the *ordering* and the
+    *spread's scale* — never a value; `source:` says `author estimate`, tested).
+  - **THE RESULT: no trustworthy flip exists, by theorem.** A robust flip needs two pools on one
+    axis with **disjoint** exponent bands; none do, because the bands are wide *because* the
+    values are guesses. **An honest band and a trustworthy flip from an estimate are mutually
+    exclusive** — so the layer is informative only where it is redundant. Read it via
+    `dominant_flip_sensitivity` (a *manual* Monte Carlo: like the thresholds, these load
+    standalone and sit outside the D-24 ensemble sweep), never as a bare `dominant`.
 
 ## Testing & quality gates
 

@@ -489,15 +489,32 @@ uncertainty bands.
 
 ## Deferred / later beats (in order)
 
-- ~~**1b. Descriptor-space projection**~~ — **slice 1 BUILT at D-95** (`sensory/descriptors.py`):
-  the OAV vector maps onto a 14-axis (wine) / 9-axis (beer) descriptor vocabulary behind the
-  `DescriptorProjector` seam (handoff §4.2: so an ML model trained on sensory-panel data could
-  later replace it). **Slice 2 remains deferred** — weighting, compression (Stevens), masking/
-  suppression, matrix effects: the perceptual math that genuinely needs parameters, and the
-  point at which the layer would start claiming an intensity a regrouping cannot justify. The
-  **additivity seam is the slice line**: slice 1's max rule assumes no perceptual additivity
-  (consistent with D-67's refusal to sum OAVs one layer down), and any weighted/compressed
-  combination rule must answer that objection head-on before it ships.
+- ~~**1b. Descriptor-space projection**~~ — **slice 1 BUILT at D-95**, **slice 2 BUILT AND CLOSED
+  at D-98**. Slice 1 (`sensory/descriptors.py`) maps the OAV vector onto a 14-axis (wine) /
+  9-axis (beer) descriptor vocabulary behind the `DescriptorProjector` seam (handoff §4.2: so an
+  ML model trained on sensory-panel data could later replace it), max rule, zero params.
+
+  **Slice 2 (`sensory/compression.py`, D-98) is DONE — and its result is that it may claim
+  nothing.** Of D-95's four scoped items, three were never real: **matrix effects** were already
+  discharged at beat 1a (thresholds are matrix-specific); **weights** are subsumed into the
+  Stevens `k`, which a threshold pins (D-95 mis-cited `thermal.yaml`, whose weights are
+  *production* fluxes); **masking/suppression** is BLOCKED on per-pair `cosα` coefficients that
+  exist for no pair of our pools — **the one genuinely deferred item, with its unblock condition
+  named**. Only **per-compound compression** was real, and it ships behind the seam, isolable,
+  **not the default**.
+
+  **The additivity objection is answered, not dodged**: compression is applied *per compound,
+  before* the combination rule, and the rule is **still max**, so no additivity is assumed at any
+  layer. Max is a deliberate **under-claim** — mixture perception is hypoadditive, so the truth
+  lies between max and sum, in exactly the region the missing `cosα` would be needed to reach.
+
+  **The result is a theorem: no dominance flip this layer produces can be trusted, ever.** A
+  robust flip requires two pools on one axis with *disjoint* exponent bands; none exist, because
+  the bands are wide *because* the exponents are author estimates. An honest band and a
+  trustworthy flip from a guess are mutually exclusive — so slice 2 is informative only where it
+  is redundant. **Do not re-propose this beat**; `test_a_robust_dominance_flip_is_impossible_at_
+  these_bands` fails the day measured in-matrix exponents with narrow bands exist, and that
+  failure is the only signal that would reopen it.
 - **Aging chemistry (§4.1), one Process at a time on a slow/years phase** — ester
   formation/hydrolysis equilibria; oxidation (acetaldehyde generation, phenolic browning,
   Strecker degradation); **oak extraction** (diffusion-limited vanillin / whiskey lactones /

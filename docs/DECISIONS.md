@@ -7775,3 +7775,175 @@ now the natural next beat); ethyl acetate + ethyl hexanoate hydrolysis (sensoria
 each); beat 1b slice 2 (weighting / compression / masking); speciating the `fusels` lump — which would retire caveat (i) above and is
 the D-96 pattern applied one pool over; a beer-specific per-melanoidin A420 yield; the on-ledger thermal-caramelization aroma
 co-product.
+
+## D-98 — beat 1b slice 2: per-compound Stevens compression, and the proof that its own honesty forbids its payload (§4.2)
+
+**What.** The last unbuilt piece of Milestone 3's descriptor beat, deferred at D-95 and carried as a standing "Next:" ever since.
+Slice 2 applies a **per-compound** odor-intensity compression curve — `I = OAV ** n` — *before* slice 1's max rule, via a new
+`StevensProjector` at D-95's existing seam, reading 21 exponents from a new `psychophysics.yaml`. It ships **built, isolable, and
+NOT the default**, because the honest answer to "what may we claim from it?" turns out to be **almost nothing** — and *that*, not
+the projector, is the deliverable. 1039 → 1069 tests; benchmarks 16/16; no core/runtime/scenario file touched.
+
+**THE OWNER OVERRODE THE RECOMMENDATION, AND WAS RIGHT TO.** The probe below concluded slice 2 should not ship at all. The owner's
+call — build it on author estimates, explicitly labelled, with the sensitivity statement as the deliverable — is what turned a
+"blocked" note into a **theorem**. The blocked verdict would have recorded *we could not find the numbers*; the build proves
+something stronger and permanent: **at author-estimate precision the payload is unreachable in principle**. A refusal to build
+could not have discovered that. Recorded because the disagreement was load-bearing and the owner's branch was the better one.
+
+**THE IN-SESSION FRAMING WAS WRONG AND IS CORRECTED HERE.** I argued author estimates "violate prime directive #2". They do not.
+PD#2 reads: *"A guess is tagged `speculative` with `source: 'author estimate'`."* It forbids **undocumented** guesses, not guesses
+— and `thermal.yaml`'s sotolon weight has shipped as an author estimate since D-87. The rule is *source the fact or label the
+guess*, never *have fewer numbers*. (D-97 established the complementary half: **omitting** a dependency that matters is the same
+sin as fitting one.)
+
+**FOUR ITEMS IN, ONE OUT — D-95's "slice 2" was a bundle, and three of its four were already resolved.**
+* **Matrix effects — ALREADY DONE at beat 1a**, one layer down: thresholds are matrix-specific (`_wine`/`_beer`) and always were.
+  The literature's reported water→wine threshold shifts span **factors of ~2 to ~23000**, which is *why* they live there. Nothing
+  to build; D-95 simply listed a discharged item.
+* **Weights — NOT A THING.** D-95 cited `thermal.yaml`'s relative weights as the precedent. Reading that file dissolves the
+  analogy: those are **production-flux** weights, and the file says outright *"perceptibility lives in
+  threshold_phenylacetaldehyde_wine"*. The codebase already separates production weight from perceptibility. A perceptual weight
+  is just `k` in `I = k·C**n`, which the threshold pins (below). There was never a third quantity to source.
+* **Masking / suppression — BLOCKED, deliberately unbuilt.** The vector model needs a per-pair interaction coefficient
+  `cosα = (OI²mix − OI²a − OI²b)/(2·OIa·OIb)`, obtained by putting panels in front of pairs. The one published shortcut (constant
+  `cosα ≈ −0.129`) is explicitly scoped to compounds *"with similar functional groups"*; our 21 pools span esters, aldehydes,
+  ketones, thiols, phenols, furanones and lactones. 210 pairs, none measured. **This half stays deferred** — the per-ester
+  `dH`/`E_a` situation exactly.
+* **Compression — the only real item**, and the whole of this entry.
+
+**THE ADVISOR'S CORRECTION THAT SAVED THE MAX RULE.** I brought a finding that mixture perception is **hypoadditive** — the true
+combined intensity sits *between* max and sum — and drew from it that slice 1's "max asserts nothing" defense was weaker than D-95
+claimed, since max is really a *lower-bound* assertion. **The sign was backwards.** A lower bound is honest **under-claiming**,
+which is precisely what a speculative layer owes; the truthful middle is exactly the region needing the `cosα` coefficients that
+do not exist. So the combination rule **honestly stays non-additive**, and that is D-98's head-on answer to the plan's standing
+requirement that any compressed rule "answer the additivity objection before it ships": **compression is applied per-compound,
+below the line slice 1 drew, and never crosses into cross-compound summation.** *We never assume additivity, at any layer* —
+still true after slice 2. "Max isn't zero-assertion, it's a lower-bound assertion" must never be allowed to slide into "so replace
+max."
+
+**THE OWNER'S PROPOSED CALIBRATION WAS INVALIDATED BY ALGEBRA — the single most reusable thing here.** The instruction was: search
+each compound's minimal detection level, calibrate the curve on it. Two independent facts break it, and both are worth pinning so
+it is never re-attempted:
+1. **The detection levels are already in the model** — all 33, sourced and matrix-specific, in `sensory.yaml`. That *is* beat 1a.
+   Nothing to search.
+2. **A threshold cannot calibrate a curve.** `I = k·C**n` has TWO unknowns; a threshold `T` is ONE point, and by *definition* the
+   point where every compound is equally just-detectable (`I(T) == I_thr`). So `k = I_thr/T**n` ⇒ `I(C) = I_thr·(C/T)**n =
+   I_thr·OAV**n`. **The threshold pins `k` GIVEN `n` and never pins `n`.** Calibrating on it reproduces OAV — which beat 1a
+   already computes — and leaves the curve's *shape* wholly undetermined. A threshold says **where** a smell becomes detectable;
+   it is silent on **how fast** it grows after. Independent facts; only the second is slice 2.
+
+**THE DILEMMA THAT DECIDES THE DESIGN — sourceable XOR consequential.** Two probes, seconds each, settled what no amount of
+reasoning would:
+* A **GLOBAL** exponent is sourceable — the wine-aroma literature (Ferreira school) states the exponent *"is unknown for most
+  compounds"* and that *"a common approach is to assign to it a global value of one"*, i.e. **OAV, what beat 1a already does** —
+  and is a **provable NO-OP**: a monotone transform preserves argmax, so `dominant` never moves; `I > 1` iff `OAV > 1`, so
+  `above_threshold` never moves. It would mint a parameter and change nothing. (The modified-vector-model literature's own
+  `OI = 1.07·lnOAV` is global too, hence equally inert here.)
+* **PER-COMPOUND** exponents are the only version with an observable — a probe flipped `dominant` by varying them — and are the
+  version the literature says does not exist.
+
+**The version that would change something cannot be sourced; the version that can be sourced changes nothing.** This is **D-97's
+identifiability argument landing in reverse**: there the Km was *not* a parameter because only `Vmax/Km` was identifiable; here a
+global exponent is not a parameter because it is unidentifiable against **every output the layer produces**. Per-compound it is,
+therefore, or nothing.
+
+**CAIN 1969 IS IN `notes:`, NEVER IN `source:` — and the owner was right to keep it.** The advisor's steer was to drop Cain
+entirely as *"a guess wearing a citation"*, on a sharp argument: under the max rule only the **spread** of exponents can flip an
+answer, and Cain gives **rank order**, so the citation would constrain the sensorially-inert part while the part that actually
+moves the answer stayed invented. The owner overrode: include it, with a note. **Both are satisfied, and the advisor's own words
+permitted it** (*"keep Cain as a one-line directional note at most"*): Cain 1969 (Percept. Psychophys. 6:349-354) reports exponent
+size in near-perfect rank-order correlation with **aqueous solubility** (soluble ~**2.5×** insoluble; exponent falling with
+n-alcohol chain length), so the 21 values are **ordered by solubility** and the file's extreme-to-extreme spread **is Cain's 2.5×**
+(0.65/0.26), not an invented figure. What Cain may **not** do is vouch for a value: **not one of the 21 compounds is in his set**;
+his exponents are **air-delivery** measurements and his own result is that absolute exponents *shift* with presentation method while
+only rank survives — with no evidence rank survives transfer into an **ethanolic matrix** documented to reorder perception outright;
+and the solubility correlation may be partly **partitioning**, the very axis a wine matrix alters. Hence `source: "author estimate"`
+on all 21, tested. Citing Cain in `source:` would be §4.3's "speculation borrowing the validated core's credibility" in miniature.
+
+**THE RESULT — A ROBUST DOMINANCE FLIP IS IMPOSSIBLE, ON ANY AXIS, IN EITHER MEDIUM, FOR ANY DRINK, EVER.** Not an observation
+across the runs tried: **a theorem**, and the entry's centre. A "flip" is compound *j* winning although `OAV_j < OAV_i` (both above
+threshold ⇒ `ln(OAV_i) > ln(OAV_j) > 0`). Exponents are sampled independently, so *j* survives **every** draw only if it wins at its
+own band minimum against *i*'s band maximum:
+
+    min(n_j)·ln(OAV_j) > max(n_i)·ln(OAV_i)
+    ⇒ min(n_j)/max(n_i) > ln(OAV_i)/ln(OAV_j) > 1
+    ⇒ min(n_j) > max(n_i)        i.e. THE TWO BANDS MUST BE DISJOINT.
+
+**No two pools on any axis have disjoint bands, in either medium** (verified, and asserted by
+`test_a_robust_dominance_flip_is_impossible_at_these_bands`). Therefore no flip this layer produces can be trusted. **And the reason
+is self-inflicted in the most honest possible way: the bands are wide BECAUSE the values are guesses.** Bands narrow enough to be
+disjoint would claim a precision an author estimate does not have. **An honest uncertainty band and a trustworthy flip from an
+estimate are mutually exclusive.** The corollary is the sharpest statement of the beat: *slice 2 is informative only where it is
+redundant* — every axis it leaves alone is robust (the OAV gap is unclosable), every axis it moves is a coin toss.
+
+**MEASURED, ON REAL INTEGRATED RUNS.** The payload is real and it is untrustworthy, both demonstrably. On a Brett wine at YAN 250
+compression **flips `fruity` from apple to banana**: `ethyl_hexanoate` carries **1.9× the OAV** (78.6 vs 42.1) and **loses**,
+because its flatter exponent (0.28 — the least soluble ester) compresses it harder than isoamyl acetate's 0.36. That is the
+documented OAV critique made executable, and it is a genuine new observable. **The sensitivity pass then kills it: 55%/45%.** A coin
+toss. Contested at every nitrogen level tried (YAN 40 → **80/20**; YAN 80 → **62/38**; YAN 250 → **55/45**; an oaked Brett wine →
+**64/36**), so the honest reading is **"cannot say which ester dominates wine's fruity note"** — a *result*, and the reason
+`MaxRuleProjector` **remains the default**. An oaked wine's `vanilla_oak` likewise flips (vanillin → whiskey lactone) at **53/47**,
+and sub-threshold besides. Robust verdicts appear only where compression changed nothing (`smoky`, `clove_spice`, `sulfidic`).
+
+**A BUG THE SENSITIVITY PASS FOUND IN ITSELF — `silent` is not a detail.** The first run reported `vanilla_oak: vanillin (robust —
+wins every draw)` **on a wine with no oak at all**. Since `0 ** n == 0`, every draw ties, the tie breaks to the first-listed pool,
+and the verdict reads as *maximal confidence in an aroma that does not exist* — slice 1's "a clean run raises no false descriptor"
+sin arriving one layer up **wearing a statistic**. `FlipVerdict.silent` catches it and `robust` is False whenever it fires. Worth
+recording because the failure mode is generic: **a statistic computed over a degenerate case reports certainty, not absence.**
+
+**Design.** (i) **A separate `psychophysics.yaml`, not `sensory.yaml`** — a threshold is a *measured* quantity with a real citation
+and these are 21 guesses that must not borrow Meilgaard's/Guth's credibility **by adjacency** (§4.3); and slice 2 must stay
+togglable off (**PD#3**), which it is: loaded only by `load_exponents()`, consumed only by `StevensProjector`, and slice 1 neither
+imports nor knows of it. (ii) **Standalone load, never the compile seam** — no RHS reads an exponent; the chemistry cannot see a
+perceptual guess even by accident (tested). (iii) **Matrix-agnostic exponents** — minting `_wine`/`_beer` variants would **double
+the guesses for zero information**; the matrix-dependence is unmodelled and flagged in every `conditions`. (iv) **A new `rule` field
+on `DescriptorReading`** — `oav` holds a raw OAV under the max rule and a compressed *intensity* under Stevens, which is **D-96's
+category error exactly** (one field, two quantities, in two layers), and D-96's rule was *the honest fix is another pool, never
+another disclaimer*; hence structure, not a comment. Renaming `oav` → `magnitude` is the deeper fix, **deferred** as churn across
+slice 1 for no new observable. (v) **`StevensProjector` arrived through D-95's seam untouched** — the best evidence that Protocol
+was the right shape.
+
+**Tests (+30, new `tests/test_sensory_compression.py`).** All 21 exponents are `author estimate`/`speculative` with the value inside
+its band; **coverage is exact** (every pool has an exponent, every exponent a pool — a missing one **raises rather than silently
+defaulting to n=1**, which would leave one compound uncompressed among twenty and manufacture a flip out of a YAML omission); the
+file's **solubility ordering is executable** (acetaldehyde/whiskey-lactone ratio == Cain's 2.5×; the three esters ordered); **no
+exponent reaches a compiled scenario**; compression is **threshold-preserving** (`I(1)==1` for every n, and `above_threshold`
+identical under both rules across the boundary); **a global exponent cannot change `dominant`** (the argument for per-compound, as
+a test); **per-compound exponents can** (the payload exists); **THE HEADLINE** — no disjoint bands, hence no robust flip, in either
+medium; the fruity flip is a **coin toss** under its own uncertainty; a wide OAV gap is robust **precisely because compression
+changed nothing**; an absent axis reads **silent, not robust**; determinism in seed; the seam; the `rule` tag; **slice 1 unaffected**.
+**Teeth verified by unwiring** (not inferred — D-96's lesson): forcing the two fruity esters' bands **disjoint** fails the
+impossibility theorem in *both* media and swings the coin toss to 98/2; making compression the identity fails the flip, the coin
+toss and the compressive property. The impossibility test correctly does **not** move under unwiring — it is a statement about the
+**bands**, not the code — and it is written to **fail loudly if exponents ever become sourceable with narrow bands**, which is
+exactly the signal that slice 2 has become real.
+
+**Regression surface.** New: `sensory/compression.py`, `parameters/data/psychophysics.yaml`, `tests/test_sensory_compression.py`.
+Touched: `sensory/descriptors.py` (the additive, defaulted `rule` field only), `sensory/__init__.py` (re-exports). **Nothing in
+`core`/`runtime`/`scenario`/`parameters` schema is touched** — no state slot, no RHS, no ledger entry, no compile-seam file, so the
+Tier-1 suite, the §2.2 benchmarks (**re-run: 16/16**, not inferred) and every conservation test are byte-for-byte untouched. Full
+suite **1069 passed**, ruff + mypy clean.
+
+**Caveats, stated rather than engineered around.** (i) The exponents sit **outside the D-24 ensemble sweep** (standalone load, like
+the thresholds), so `simulate_ensemble` will not propagate these bands — which is *why* `dominant_flip_sensitivity` is a **manual**
+Monte Carlo and not a free consequence of existing machinery. (ii) The impossibility theorem's derivation assumes both compounds
+**above threshold**; below threshold the logs flip sign and flips do occur (`vanilla_oak` here), but sub-threshold dominance is
+sensorially void — nothing is detectable — so no usable flip exists in either regime. (iii) Sampling is **independent and uniform**
+per compound: independent because the estimates *are* independent guesses with no covariance to model, uniform because the bands are
+honest ignorance, not panel spreads, and a uniform draw declines to claim the centre is likelier than the edge. (iv) The `fusels`
+and `mercaptans` exponents are **doubly speculative** — an estimate about a **lumped** pool's stand-in molecule. (v) `stevens_n_h2s`
+is flagged in-file as the **worst-founded entry**: Cain's correlation is over *organic* odorants and H₂S is a small inorganic gas
+entirely outside it, so "order it by solubility" has no clear meaning; any flip turning on it is an artefact. (vi) The 0.01 gap
+between the two `malty` C5 aldehyde isomers is a **deterministic tie-break, not a claim** — flagged in both entries.
+
+**What this beat is worth.** Slice 2 delivers **no new sensory claim** — by proof, not by omission. What it delivers is the proof
+itself, executable and permanent: the standing "Next: beat 1b slice 2" item is **retired**, and any future session proposing it will
+find a test asserting *why it cannot pay* and a file stating *what would have to change first*. **The unblock condition is precise
+and singular: measured per-compound exponents, in an ethanolic matrix, with bands narrow enough to be disjoint on some axis.** Then
+`test_a_robust_dominance_flip_is_impossible_at_these_bands` starts failing, and that failure is the good news.
+
+**Next:** the **isoamyl-acetate carbon re-route** off `fusels` (the D-69 5:2 inverse); **speciating the `fusels` lump** (the D-96
+pattern one pool over — which would also retire caveat (iv) above and give the ATF1 Km comparison a real molecule); per-ester
+`dH`/`E_a` (blocked on sourcing); **masking/suppression** (blocked on `cosα`, re-deferred here with its unblock condition named);
+further fruity esters; a beer-specific per-melanoidin A420 yield; the on-ledger thermal-caramelization aroma co-product; the
+`oav` → `magnitude` rename.

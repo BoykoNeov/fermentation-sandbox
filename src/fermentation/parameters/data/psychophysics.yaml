@@ -1,0 +1,313 @@
+# Per-compound Stevens exponents — the odor-intensity compression curves (decision D-98).
+#
+# READ THIS HEADER BEFORE READING A SINGLE VALUE BELOW. Every number in this file is an
+# AUTHOR ESTIMATE. Not one of them is a measured exponent for the compound it is filed under.
+# `source:` says "author estimate" on all 21 entries, and that is the literal truth, not a
+# formality. This file is the most speculative in the repository and it is important that it
+# reads that way.
+#
+# WHAT A STEVENS EXPONENT IS. Perceived odor intensity grows as a POWER of concentration,
+# not linearly: I = k * C**n, with n < 1 for essentially all odorants (a nose compresses —
+# doubling a compound less than doubles its smell). n is the compound-specific compression:
+# n near 0.7 ramps up steeply, n near 0.25 plateaus almost at once. Reported odor exponents
+# span roughly 0.2-0.8.
+#
+# WHY THIS FILE IS NOT `sensory.yaml`. Two reasons, both structural:
+#   (1) `sensory.yaml` loads via `sensory.oav.load_thresholds()`; a threshold is a MEASURED
+#       quantity with a real citation. Mixing 21 guesses into that file would let them borrow
+#       Meilgaard's and Guth's credibility by adjacency — the §4.3 firewall in miniature.
+#   (2) ISOLABILITY (prime directive #3). Slice 2 must be togglable OFF. It is: this file is
+#       loaded only by `sensory.compression.load_exponents()`, consumed only by
+#       `StevensProjector`, and the slice-1 `MaxRuleProjector` neither imports nor knows about
+#       any of it. Delete this file and beat 1a + slice 1 are byte-for-byte unaffected.
+#
+# ===================================================================================
+# WHAT THE THRESHOLD CANNOT DO — the reason these are guesses and not calibrations
+# ===================================================================================
+# The obvious idea is to calibrate each curve on the compound's detection threshold, which
+# `sensory.yaml` already holds for all 33 keys, sourced and matrix-specific. IT DOES NOT WORK,
+# and the algebra is worth stating once so it is never re-attempted:
+#
+#   I = k * C**n has TWO unknowns. A threshold T is ONE point, and by DEFINITION it is the
+#   point where every compound is equally just-detectable: I(T) == I_thr for all compounds.
+#   So  k * T**n == I_thr  =>  k = I_thr / T**n  =>  I(C) = I_thr * (C/T)**n = I_thr * OAV**n.
+#
+# The threshold therefore pins k GIVEN n, and NEVER pins n. Calibrating on it reproduces OAV
+# exactly — a quantity beat 1a already computes — and leaves the curve's SHAPE completely
+# undetermined. A threshold says WHERE a smell becomes detectable; it is silent on HOW FAST it
+# grows thereafter. Those are independent facts and only the second one is this file.
+# Consequence: with I_thr normalized to 1, this layer's intensity is exactly `OAV ** n`.
+#
+# ===================================================================================
+# THE BASIS FOR THE ORDERING — Cain 1969, and precisely how far it is load-bearing
+# ===================================================================================
+# The estimates are NOT free-hand. Cain 1969 (Percept. Psychophys. 6:349-354, "Odor intensity:
+# differences in the exponent of the psychophysical function") reports that exponent size is
+# in near-perfect RANK-ORDER correlation with an odorant's WATER SOLUBILITY: completely
+# water-soluble odorants (n-propanol, acetone) ran ~2.5x the exponents of insoluble ones
+# (n-octanol, geraniol), and along the n-aliphatic alcohols both exponent and solubility fall
+# with chain length. So the values below are ORDERED BY AQUEOUS SOLUBILITY, and the ~2.5x
+# extreme-to-extreme ratio is Cain's stated figure, not one invented here (0.65 / 0.26 = 2.5).
+#
+# NOW THE HONEST LIMITS OF THAT, which matter more than the citation:
+#   * Cain's compounds are NOT our compounds. Not one of the 21 below appears in his set. The
+#     ORDERING is transferred by analogy; the ASSIGNMENT of any individual compound to a point
+#     on the scale is an author estimate and nothing more.
+#   * Cain's exponents are AIR-DELIVERY measurements. His own result is that absolute exponents
+#     SHIFT with presentation method (olfactometer vs. sniffed swab) and only the RANK survives
+#     the change. There is no evidence the rank survives transfer into an ETHANOLIC WINE/BEER
+#     MATRIX, which is the matrix these are applied in and which is documented to reorder
+#     perception outright.
+#   * The solubility correlation may be partly PARTITIONING, not receptor psychophysics — which
+#     is precisely the axis a wine matrix alters.
+#   * THE SPREAD IS THE LOAD-BEARING QUANTITY, AND IT IS THE WEAKEST PART. Under the max rule
+#     the only thing an exponent can change is WHICH compound is named dominant, and a flip
+#     depends on the RATIO of two exponents, not their rank. Cain's 2.5x is a between-EXTREMES
+#     figure for HIS compounds under AIR delivery; every intermediate spacing below is invented.
+#
+# So: Cain justifies the DIRECTION and the rough SCALE of the spread. Cain does not justify any
+# single value. `source:` stays "author estimate" on every entry for that reason — the citation
+# lives in `notes:`, where it belongs, and may never be read as vouching for these numbers.
+#
+# WHAT THIS BUYS, AND WHAT IT DOES NOT. `above_threshold` is UNCHANGED by compression: with
+# I = OAV**n and n > 0, I > 1 iff OAV > 1. A GLOBAL exponent is a provable NO-OP on every
+# observable (a monotone transform preserves argmax, so `dominant` is untouched too) — which is
+# why one is not offered. PER-COMPOUND exponents can flip `dominant`, and that flip is this
+# file's ENTIRE payload. See D-98's sensitivity pass for whether any flip actually survives the
+# uncertainty bands below — the answer decides what, if anything, may be claimed from it.
+#
+# UNCERTAINTY. Bands are deliberately WIDE (roughly -40%/+50%, clipped into the reported
+# 0.2-0.8 odor range) because a guess must state that it is one. They are NOT panel spreads;
+# there is no panel. They are the author's honest ignorance. NB (D-24): like `sensory.yaml`,
+# this file loads standalone and therefore sits OUTSIDE the ensemble parameter sweep —
+# `simulate_ensemble` will not propagate these bands. The D-98 sensitivity pass is a MANUAL
+# Monte Carlo over them, not automatic propagation.
+#
+# TIER. All `speculative`, necessarily. The consuming layer floors its outputs at speculative
+# regardless (`descriptor_tier`), so nothing here can lift any output's tier.
+
+# =====================================================================================
+# TIER A — miscible / very soluble (>100 g/L in water). The steepest exponents.
+# =====================================================================================
+
+stevens_n_acetaldehyde:
+  value: 0.65
+  unit: "1"   # dimensionless Stevens exponent
+  tier: speculative
+  uncertainty: { low: 0.39, high: 0.80, note: "author's ignorance, not a panel spread. Top of the assumed range: acetaldehyde is fully miscible, the most water-soluble odorant in the set." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — a matrix-agnostic estimate. Applied to both wine and beer; the matrix-dependence of exponents is UNMODELLED (see notes)."
+    notes: "ORDERED per Cain 1969 (Percept. Psychophys. 6:349-354): exponent rank-order tracks aqueous solubility, soluble ~2.5x insoluble. Acetaldehyde is MISCIBLE => placed at the top of the assumed 0.2-0.8 odor range. Cain measured neither this compound nor any wine matrix; the ordering is transferred by analogy and the value itself is a guess."
+
+stevens_n_diacetyl:
+  value: 0.62
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.37, high: 0.80, note: "author's ignorance. Very soluble (~200 g/L) => near the top of the range." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; applied to wine and beer alike."
+    notes: "ORDERED per Cain 1969's solubility-exponent rank correlation. Diacetyl is very water-soluble (~200 g/L) => a steep exponent. Not one of Cain's compounds; value is an author estimate."
+
+stevens_n_furaneol:
+  value: 0.60
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.36, high: 0.80, note: "author's ignorance. Furaneol (HDMF) is a very soluble sugar-like furanone." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; applied to wine and beer alike."
+    notes: "ORDERED per Cain 1969. Furaneol is highly water-soluble => steep. Not a Cain compound; author estimate."
+
+stevens_n_sotolon:
+  value: 0.60
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.36, high: 0.80, note: "author's ignorance. Highly soluble furanone, as furaneol." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool in practice (D-87)."
+    notes: "ORDERED per Cain 1969. Highly water-soluble => steep; tied with furaneol, which is itself an admission that this estimate cannot resolve two similar furanones. Author estimate."
+
+# =====================================================================================
+# TIER B — soluble (10-100 g/L). Mid exponents.
+# =====================================================================================
+
+stevens_n_methional:
+  value: 0.55
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.33, high: 0.80, note: "author's ignorance. Very soluble thioether aldehyde." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool in practice (D-75/D-87)."
+    notes: "ORDERED per Cain 1969. Highly water-soluble => upper-mid. Author estimate."
+
+stevens_n_2_methylpropanal:
+  value: 0.52
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.31, high: 0.78, note: "author's ignorance. ~89 g/L — the most soluble of the three branched-chain aldehydes." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool in practice (D-87)."
+    notes: "ORDERED per Cain 1969, and INTERNALLY by chain length among the malty aldehydes: Cain reports exponent falling with n-alcohol chain length, so the C4 isobutyraldehyde is placed above the two C5 aldehydes. That intra-family ordering is the one place Cain's finding maps at all closely onto our set — but Cain's series was ALCOHOLS, not aldehydes. Author estimate."
+
+stevens_n_h2s:
+  value: 0.50
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.30, high: 0.75, note: "author's ignorance, and WIDER in spirit than the number suggests — see notes: H2S is the worst-founded entry in the file." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; applied to wine and beer alike."
+    notes: "THE WEAKEST ESTIMATE HERE, flagged deliberately. Cain's correlation is over ORGANIC odorants; H2S is a small INORGANIC gas (~4 g/L) entirely outside the set the correlation was drawn on, so 'order it by solubility' has no clear meaning for it. Placed mid-range as a non-committal default rather than pretending the correlation extends. If any D-98 dominant-flip ever turns on h2s, it should be treated as an artefact of this line."
+
+stevens_n_ethyl_acetate:
+  value: 0.50
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.30, high: 0.75, note: "author's ignorance. ~80 g/L — much the most soluble of the three esters." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; applied to wine and beer alike."
+    notes: "ORDERED per Cain 1969. Ethyl acetate (~80 g/L) is far more water-soluble than the other two esters => the steepest ester exponent. Author estimate."
+
+stevens_n_mercaptans:
+  value: 0.48
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.29, high: 0.72, note: "author's ignorance, compounded: this is a LUMPED pool (D-66), so the exponent is a guess about a stand-in molecule for a mixture." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool. Read against methanethiol, the pool's D-66 representative."
+    notes: "LUMPED POOL. Doubly speculative: an author-estimate exponent applied to a pool that already assumes a fixed lump composition. Methanethiol (~15 g/L) ordered per Cain 1969 => upper-mid. Author estimate."
+
+stevens_n_fusels:
+  value: 0.45
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.27, high: 0.68, note: "author's ignorance, compounded: LUMPED pool (D-66), exponent guessed about a stand-in." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Read against isoamyl alcohol, the pool's D-66 representative."
+    notes: "LUMPED POOL. Isoamyl alcohol (~25 g/L) ordered per Cain 1969 — and this is the one compound CLASS Cain actually measured (n-aliphatic alcohols, exponent falling with chain length), though he used the straight-chain series and this is branched. The closest analogy in the file, which is not the same as a measurement. Author estimate."
+
+stevens_n_2_methylbutanal:
+  value: 0.45
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.27, high: 0.68, note: "author's ignorance. C5 branched aldehyde." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool in practice (D-87)."
+    notes: "ORDERED per Cain 1969 + the chain-length argument: a C5 aldehyde, so below the C4 2-methylpropanal. Separated from 3-methylbutanal by 0.01 — an ordering the author cannot actually defend; the two are near-identical in solubility, and the gap is a tie-break, not a claim."
+
+stevens_n_3_methylbutanal:
+  value: 0.44
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.26, high: 0.66, note: "author's ignorance. C5 branched aldehyde, isomer of the above." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool in practice (D-87)."
+    notes: "ORDERED per Cain 1969 + chain length. An ISOMER of 2-methylbutanal: their solubilities are near-identical and no honest basis separates their exponents. The 0.01 gap is a deterministic tie-break ONLY. If a D-98 dominant-flip within `malty` ever turns on this 0.01, the finding is an artefact of this line and must be reported as one."
+
+stevens_n_guaiacol:
+  value: 0.43
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.26, high: 0.65, note: "author's ignorance. ~17 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; shared wine/beer oak pool (D-86)."
+    notes: "ORDERED per Cain 1969. Guaiacol (~17 g/L) => mid. The OAK smoky compound, distinct from the Brett `ethylguaiacols`. Author estimate."
+
+# =====================================================================================
+# TIER C — sparingly soluble (1-10 g/L). Flatter exponents.
+# =====================================================================================
+
+stevens_n_phenylacetaldehyde:
+  value: 0.38
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.23, high: 0.57, note: "author's ignorance. ~5 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool in practice (D-75/D-87)."
+    notes: "ORDERED per Cain 1969. ~5 g/L => flatter. Author estimate."
+
+stevens_n_isoamyl_acetate:
+  value: 0.36
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.22, high: 0.54, note: "author's ignorance. ~2 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; applied to wine and beer alike."
+    notes: "ORDERED per Cain 1969: ~2 g/L, well below ethyl acetate (~80 g/L) but above ethyl hexanoate (~0.5 g/L) => the middle ester exponent. NB this entry and `stevens_n_ethyl_hexanoate` together decide the `fruity` axis' dominant compound (banana vs apple), which is the single most consequential pair in this file — see D-98's sensitivity pass."
+
+stevens_n_eugenol:
+  value: 0.35
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.21, high: 0.53, note: "author's ignorance. ~2.4 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; shared wine/beer oak pool (D-86)."
+    notes: "ORDERED per Cain 1969. ~2.4 g/L => flat. Author estimate."
+
+stevens_n_ethylguaiacols:
+  value: 0.34
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.20, high: 0.51, note: "author's ignorance. ~1-2 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only (Brett) pool."
+    notes: "ORDERED per Cain 1969. 4-ethylguaiacol ~1-2 g/L => flat. This pool feeds TWO descriptor axes (`smoky` + `clove_spice`, D-95), so one estimate moves both. Author estimate."
+
+stevens_n_vanillin:
+  value: 0.33
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.20, high: 0.50, note: "author's ignorance. ~1 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; shared wine/beer oak pool (D-86)."
+    notes: "ORDERED per Cain 1969: ~1 g/L => flat. Independently suggestive (NOT a source for this value): the odor-intensity literature uses vanillin as its standing example that a LOW threshold does not imply a HIGH suprathreshold intensity — vanillin is detected below cis-3-hexen-1-ol yet is the weaker smell at most usable concentrations, which is qualitatively what a flat exponent encodes. That is a directional sanity check on the SIGN, not a measurement of the value."
+
+# =====================================================================================
+# TIER D — poorly soluble (<1 g/L). The flattest exponents.
+# =====================================================================================
+
+stevens_n_ethylphenols:
+  value: 0.29
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.20, high: 0.44, note: "author's ignorance. ~0.6 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only (Brett) pool."
+    notes: "ORDERED per Cain 1969. 4-ethylphenol ~0.6 g/L => near the bottom of the range. Author estimate."
+
+stevens_n_ethyl_hexanoate:
+  value: 0.28
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.20, high: 0.42, note: "author's ignorance. ~0.5 g/L." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; applied to wine and beer alike."
+    notes: "ORDERED per Cain 1969: ~0.5 g/L, the least soluble ester => the flattest ester exponent, and by the chain-length argument (C8 vs isoamyl acetate's C7) the same direction. NB this entry and `stevens_n_isoamyl_acetate` together decide the `fruity` axis' dominant compound — the most consequential pair in the file. Under slice 1's max rule ethyl hexanoate dominates wine's fruity on raw OAV; whether compression flips that to banana is exactly what D-98's sensitivity pass tests, and the flip turns on THIS guess against THAT one."
+
+stevens_n_whiskey_lactone:
+  value: 0.26
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.20, high: 0.39, note: "author's ignorance. The least soluble compound in the set — the bottom anchor." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic; shared wine/beer oak pool (D-86)."
+    notes: "ORDERED per Cain 1969 and placed as the BOTTOM ANCHOR of the file's spread: a lipophilic oak lactone, the least water-soluble pool here. 0.65 (acetaldehyde) / 0.26 = 2.5, which is Cain's reported soluble-to-insoluble exponent ratio — so the file's OVERALL SPREAD is Cain's figure rather than an invented one. Every INTERMEDIATE spacing remains an author estimate, and Cain's 2.5x was measured on his compounds under air delivery, not on these in an ethanolic matrix."
