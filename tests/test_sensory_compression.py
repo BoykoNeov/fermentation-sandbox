@@ -32,6 +32,7 @@ from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.sensory.compression import (
     FlipVerdict,
     StevensProjector,
+    _axis_draws,
     _exponent_key,
     compressed_intensity,
     dominant_flip_sensitivity,
@@ -255,20 +256,29 @@ def test_per_compound_exponents_can_flip_dominant(thresholds, exponents):
 def test_a_robust_dominance_flip_is_impossible_at_these_bands(exponents, medium):
     """D-98'S CENTRAL RESULT — and it is a THEOREM, not a measurement.
 
-    A "flip" is compound j winning although OAV_j < OAV_i. Both above threshold =>
-    ln(OAV_i) > ln(OAV_j) > 0. Sampling is independent per compound, so j survives EVERY draw
-    only if it wins at its own band minimum against i's band maximum:
+    A "flip" is compound j winning although OAV_j < OAV_i (both above threshold). Claim: if
+    j and i's exponent bands OVERLAP, j cannot win every draw — so no flip is ever robust.
 
-        min(n_j) * ln(OAV_j) > max(n_i) * ln(OAV_i)
-        => min(n_j) / max(n_i) > ln(OAV_i) / ln(OAV_j) > 1
-        => min(n_j) > max(n_i)          i.e. THE TWO BANDS MUST BE DISJOINT.
+    Proof. Let v be any value in both bands. The draw n_i == n_j == v is admissible, and it is
+    admissible under EITHER sampling scheme — including the order-preserving one, since equal
+    exponents violate no strict rank. At that draw compression is a GLOBAL exponent, which is a
+    provable no-op (a monotone transform preserves argmax — see
+    `test_a_global_exponent_cannot_change_dominant`), so the higher-OAV compound i wins it. A
+    neighbourhood of that draw has positive measure, so i wins with positive probability and j
+    cannot be unanimous. Hence robustness requires DISJOINT bands. []
 
-    So a trustworthy flip requires two pools on one axis whose exponent bands do not overlap.
-    This test asserts none do — in either medium, on any axis. Therefore **no dominance flip
-    this layer can produce is robust, on any trajectory, for any drink, ever**: not because
-    these particular guesses are bad, but because the bands are wide *because* they are
-    guesses. Narrow enough bands to be disjoint would claim a precision an author estimate does
-    not have. An honest band and a trustworthy flip from an estimate are mutually exclusive.
+    This test asserts none are disjoint — in either medium, on any axis. Therefore **no
+    dominance flip this layer can produce is robust, on any trajectory, for any drink, ever**:
+    not because these particular guesses are bad, but because the bands are wide *because* they
+    are guesses. Narrow enough bands to be disjoint would claim a precision an author estimate
+    does not have. An honest band and a trustworthy flip from an estimate are mutually
+    exclusive.
+
+    NB this proof deliberately does NOT route through "j wins at min(n_j) against max(n_i)",
+    which silently assumes the two are sampled INDEPENDENTLY. That was D-98's original argument
+    and it was fragile: the default sampling is order-preserving (Cain's rank is a correlation),
+    under which min(n_j) and max(n_i) are not jointly reachable. The equal-exponents argument
+    above needs no independence and is why the conclusion survived the correction intact.
 
     The result is CONDITIONAL on the bands: a real measured exponent with a genuinely narrow
     band could produce a robust flip, and this test is what would then start failing — which is
@@ -291,25 +301,66 @@ def test_a_robust_dominance_flip_is_impossible_at_these_bands(exponents, medium)
                 )
 
 
-def test_the_fruity_flip_is_a_coin_toss_under_its_own_uncertainty(thresholds, exponents):
+def test_the_fruity_flip_is_never_trustworthy_under_its_own_uncertainty(thresholds, exponents):
     """The theorem above, instantiated on the pair that matters most.
 
-    `fruity` is the one axis where compression changes wine's answer (apple -> banana). The
-    sensitivity pass reports it CONTESTED and near 50/50, so the flip is a statement about
-    `psychophysics.yaml`, not about wine. The honest reading of slice 2 on this axis is
-    "cannot say which ester dominates" — which is a result, and is why `MaxRuleProjector`
-    remains the default.
+    `fruity` is the one axis where compression changes wine's answer (apple -> banana). Under
+    the honest order-preserving sampling banana wins a clear MAJORITY at high YAN (~78%) — but
+    a majority is not robustness, and the verdict stays CONTESTED. The flip is therefore still a
+    statement about `psychophysics.yaml`, not about wine: "cannot say which ester dominates".
+    That is why `MaxRuleProjector` remains the default.
     """
     pools = {
         "isoamyl_acetate": _at_oav(thresholds, "isoamyl_acetate", "wine", 42.0),
         "ethyl_hexanoate": _at_oav(thresholds, "ethyl_hexanoate", "wine", 79.0),
     }
     profile = sensory_profile(_traj(wine_schema(), pools), thresholds)
-    verdict = dominant_flip_sensitivity(profile, exponents, draws=2000, seed=0)["fruity"]
+    verdict = dominant_flip_sensitivity(profile, exponents, draws=4000, seed=0)["fruity"]
     assert verdict.contested
     assert not verdict.robust
-    assert 0.25 < verdict.share["isoamyl_acetate"] < 0.75
+    # A strong majority, and NOT unanimity — the whole distinction the beat turns on.
+    assert 0.6 < verdict.share["isoamyl_acetate"] < 0.95
     assert "CONTESTED" in verdict.summary()
+
+
+def test_sampling_respects_the_solubility_ordering_it_claims(exponents):
+    """THE DONE-CALL CATCH, PINNED: the Monte Carlo may not contradict the file it samples.
+
+    D-98 originally sampled every exponent INDEPENDENTLY while `psychophysics.yaml` asserts —
+    and `test_exponents_are_ordered_by_the_documented_solubility_argument` pins — that the
+    values are rank-ordered by solubility per Cain. ~28% of draws inverted the two fruity
+    esters, i.e. the pass spent a quarter of its evidence on draws the file calls impossible.
+    Since Cain's finding IS a rank correlation, the ordering is the best-supported structure the
+    citation offers and the absolute values the least: independent sampling kept the weak part
+    and discarded the strong one. It was not cosmetic — it moved wine's fruity contest from
+    55/45 to 78/22 at YAN 250.
+    """
+    rng = np.random.default_rng(0)
+    pools = ("isoamyl_acetate", "ethyl_hexanoate")  # nominal 0.36 > 0.28
+    ordered = _axis_draws(pools, exponents, rng, 3000, preserve_order=True)
+    assert np.all(ordered[:, 0] >= ordered[:, 1])
+    # ...and the naive mode really does violate it, so the guard is not vacuous.
+    naive = _axis_draws(pools, exponents, rng, 3000, preserve_order=False)
+    assert np.any(naive[:, 0] < naive[:, 1])
+
+
+def test_equal_exponents_hand_the_axis_to_the_higher_oav_compound(thresholds, exponents):
+    """The theorem's engine, isolated: at n_i == n_j compression is global, hence a no-op.
+
+    This draw is admissible under BOTH sampling schemes (equal values violate no strict rank),
+    and it is why overlapping bands forbid a robust flip without any appeal to independence.
+    """
+    pools = {
+        "isoamyl_acetate": _at_oav(thresholds, "isoamyl_acetate", "wine", 42.0),
+        "ethyl_hexanoate": _at_oav(thresholds, "ethyl_hexanoate", "wine", 79.0),
+    }
+    profile = sensory_profile(_traj(wine_schema(), pools), thresholds)
+    # 0.30 lies inside BOTH bands ([0.22, 0.54] and [0.20, 0.42]) — an admissible tie.
+    for pool in pools:
+        band = exponents[_exponent_key(pool)].uncertainty
+        assert band.low <= 0.30 <= band.high
+    intensities = {p: compressed_intensity(profile.readings[p].oav, 0.30) for p in pools}
+    assert max(intensities, key=lambda p: intensities[p]) == "ethyl_hexanoate"
 
 
 def test_a_wide_oav_gap_is_robust_precisely_because_compression_changed_nothing(

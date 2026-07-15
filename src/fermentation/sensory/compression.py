@@ -63,8 +63,19 @@ citation justifies the *direction* and rough *scale* of the spread and **not** a
 changes the answer is worth nothing on its own; a guess whose *consequences you have mapped* is
 worth something. :func:`dominant_flip_sensitivity` samples the exponents across their honest
 uncertainty bands and reports, per descriptor axis, whether ``dominant`` is stable or whether
-the answer is an artefact of the guess. A knife-edge flip is not a finding about wine — it is a
+the answer is an artefact of the guess. An unresolved flip is not a finding about wine — it is a
 finding about ``psychophysics.yaml``, and it is reported as one. See D-98.
+
+**And the result is that nothing it produces may be claimed — by theorem.** If two pools on an
+axis have **overlapping** exponent bands, the draw ``n_i == n_j == v`` is admissible; there
+compression is a *global* exponent, hence the no-op above, hence the higher-OAV compound wins
+that draw. So the lower-OAV compound can never be unanimous: **a robust flip requires disjoint
+bands**, and none are (`test_a_robust_dominance_flip_is_impossible_at_these_bands`). The bands
+are wide *because* the values are guesses — narrow enough to be disjoint would claim a precision
+an author estimate does not have. **An honest band and a trustworthy flip from an estimate are
+mutually exclusive**, so this layer is informative only where it is redundant. That is why
+:class:`~fermentation.sensory.descriptors.MaxRuleProjector` stays the default and why a bare
+``dominant`` from this projector must never be quoted without its verdict.
 
 **Isolation.** ``psychophysics.yaml`` loads standalone here (never through the compile seam —
 no RHS reads an exponent), and slice 1 neither imports nor knows about this module. Delete
@@ -78,6 +89,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from fermentation.core.state import FloatArray
 from fermentation.parameters.store import ParameterSet, default_data_dir, load_parameters
 from fermentation.sensory.descriptors import (
     DescriptorProfile,
@@ -249,28 +261,78 @@ class FlipVerdict:
         return f"{self.descriptor}: CONTESTED — {parts}"
 
 
+def _axis_draws(
+    axis_pools: tuple[str, ...],
+    exponents: ParameterSet,
+    rng: np.random.Generator,
+    draws: int,
+    preserve_order: bool,
+) -> FloatArray:
+    """``(draws, len(axis_pools))`` exponent draws, optionally respecting Cain's rank.
+
+    Uniform over each pool's band — the bands are honest ignorance, not panel spreads, and a
+    uniform draw declines to claim the centre is likelier than the edge.
+
+    With ``preserve_order`` (the default), draws that contradict the file's own solubility
+    ordering are **rejected**. This is the correction of an inconsistency D-98 shipped with and
+    caught at its done-call: `psychophysics.yaml` asserts — and a test pins — that the exponents
+    are rank-ordered by solubility per Cain 1969, yet sampling independently let ~28% of draws
+    invert an axis' order. Cain's finding *is* a rank correlation: the ordering is the
+    best-supported structure the citation provides, and the absolute values are what it supports
+    least, so independent sampling discarded the good part and kept the weak one. The joint
+    distribution is therefore the independent product **conditioned on the rank holding**.
+
+    Conditioning is applied **per axis**, which is not an approximation: exponents are a priori
+    independent and an axis' dominant depends only on its own contributors, so conditioning on
+    the global 21-compound order would give this axis the identical conditional law — at a far
+    worse acceptance rate.
+    """
+    bands = [exponents[_exponent_key(p)].uncertainty for p in axis_pools]
+    nominal = [exponents.value(_exponent_key(p)) for p in axis_pools]
+    width = len(axis_pools)
+    out = np.empty((draws, width), dtype=np.float64)
+    filled = 0
+    while filled < draws:
+        batch = max(2 * (draws - filled), 1024)
+        cand = np.column_stack([rng.uniform(b.low, b.high, size=batch) for b in bands])
+        if preserve_order and width > 1:
+            ok = np.ones(batch, dtype=bool)
+            for i in range(width):
+                for j in range(width):
+                    # strict nominal order only: equal nominals assert no ordering to keep
+                    if nominal[i] > nominal[j]:
+                        ok &= cand[:, i] >= cand[:, j]
+            cand = cand[ok]
+        take = min(draws - filled, len(cand))
+        out[filled : filled + take] = cand[:take]
+        filled += take
+    return out
+
+
 def dominant_flip_sensitivity(
     profile: SensoryProfile,
     exponents: ParameterSet,
     *,
     draws: int = 4000,
     seed: int = 0,
+    preserve_order: bool = True,
 ) -> dict[str, FlipVerdict]:
     """Does each axis' ``dominant`` survive the exponents' uncertainty bands? (D-98)
 
     **The actual deliverable of slice 2.** The projector reports a ``dominant`` computed from 21
     author estimates; on its own that number is worth nothing, because a guess that changes the
     answer is indistinguishable from a guess that fabricates it. This maps the consequence:
-    sample every exponent independently and uniformly across its ``psychophysics.yaml``
-    uncertainty band, re-project, and count how often each compound wins its axis.
+    sample every exponent across its ``psychophysics.yaml`` uncertainty band, re-project, and
+    count how often each compound wins its axis.
 
-    Sampling is **independent** per compound because the estimates *are* independent guesses —
-    there is no covariance to model, and pretending otherwise would invent structure. Uniform
-    rather than normal for the same reason: the bands are honest ignorance, not panel spreads,
-    and a uniform draw declines to claim the centre is likelier than the edge.
+    ``preserve_order`` (default True) keeps only draws consistent with the file's solubility
+    rank — see :func:`_axis_draws` for why independence was the wrong default and materially so
+    (wine's fruity contest moves from 55/45 to 78/22 at YAN 250 when the rank is respected).
+    Pass False to reproduce the naive independent sampling; it is retained only so the
+    comparison stays runnable, and it contradicts a tested claim of the parameter file.
 
     Read the verdicts as follows. ``robust`` means the attribution holds across the whole band,
-    so it is real conditional knowledge — the OAV gap is wide enough that no plausible exponent
+    so it is real conditional knowledge — the OAV gap is wide enough that no admissible exponent
     ratio closes it. ``contested`` means the answer is an artefact of the guess and must be
     reported as "cannot say", never as a sensory claim. ``silent`` means the axis has no
     contributor present at all, so there is nothing to attribute and *neither* verdict applies
@@ -282,21 +344,16 @@ def dominant_flip_sensitivity(
     """
     rng = np.random.default_rng(seed)
     axes = axes_for_medium(profile.medium)
-    pools = sorted({p for a in axes for p in a.pools})
-
-    bands = {p: exponents[_exponent_key(p)].uncertainty for p in pools}
-    samples = {p: rng.uniform(bands[p].low, bands[p].high, size=draws) for p in pools}
 
     nominal = StevensProjector(exponents).project(profile)
     wins: dict[str, dict[str, int]] = {a.name: dict.fromkeys(a.pools, 0) for a in axes}
-    for d in range(draws):
-        for axis in axes:
-            best, best_i = axis.pools[0], -np.inf
-            for pool in axis.pools:
-                i = compressed_intensity(profile.readings[pool].oav, float(samples[pool][d]))
-                if i > best_i:
-                    best, best_i = pool, i
-            wins[axis.name][best] += 1
+    for axis in axes:
+        sample = _axis_draws(axis.pools, exponents, rng, draws, preserve_order)
+        oavs = np.array([profile.readings[p].oav for p in axis.pools], dtype=np.float64)
+        # intensity_{d,i} = OAV_i ** n_{d,i}; argmax along the pool axis, ties to the first pool
+        intensity = oavs[None, :] ** sample
+        for idx in np.asarray(np.argmax(intensity, axis=1)):
+            wins[axis.name][axis.pools[int(idx)]] += 1
 
     verdicts: dict[str, FlipVerdict] = {}
     for axis in axes:

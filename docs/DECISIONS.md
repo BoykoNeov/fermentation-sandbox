@@ -7782,7 +7782,7 @@ co-product.
 Slice 2 applies a **per-compound** odor-intensity compression curve — `I = OAV ** n` — *before* slice 1's max rule, via a new
 `StevensProjector` at D-95's existing seam, reading 21 exponents from a new `psychophysics.yaml`. It ships **built, isolable, and
 NOT the default**, because the honest answer to "what may we claim from it?" turns out to be **almost nothing** — and *that*, not
-the projector, is the deliverable. 1039 → 1069 tests; benchmarks 16/16; no core/runtime/scenario file touched.
+the projector, is the deliverable. 1039 → 1071 tests; benchmarks 16/16; no core/runtime/scenario file touched.
 
 **THE OWNER OVERRODE THE RECOMMENDATION, AND WAS RIGHT TO.** The probe below concluded slice 2 should not ship at all. The owner's
 call — build it on author estimates, explicitly labelled, with the sensitivity statement as the deliverable — is what turned a
@@ -7862,34 +7862,61 @@ on all 21, tested. Citing Cain in `source:` would be §4.3's "speculation borrow
 
 **THE RESULT — A ROBUST DOMINANCE FLIP IS IMPOSSIBLE, ON ANY AXIS, IN EITHER MEDIUM, FOR ANY DRINK, EVER.** Not an observation
 across the runs tried: **a theorem**, and the entry's centre. A "flip" is compound *j* winning although `OAV_j < OAV_i` (both above
-threshold ⇒ `ln(OAV_i) > ln(OAV_j) > 0`). Exponents are sampled independently, so *j* survives **every** draw only if it wins at its
-own band minimum against *i*'s band maximum:
-
-    min(n_j)·ln(OAV_j) > max(n_i)·ln(OAV_i)
-    ⇒ min(n_j)/max(n_i) > ln(OAV_i)/ln(OAV_j) > 1
-    ⇒ min(n_j) > max(n_i)        i.e. THE TWO BANDS MUST BE DISJOINT.
+threshold). **Claim:** if *i* and *j*'s exponent bands **overlap**, *j* cannot win every draw. **Proof:** let `v` lie in both bands.
+The draw `n_i = n_j = v` is admissible — and admissible under **either** sampling scheme, since equal exponents violate no strict
+rank. At that draw compression is a **global** exponent, which is a **provable no-op** (a monotone transform preserves argmax), so
+the higher-OAV compound *i* wins it; a neighbourhood of that draw has positive measure, so *i* wins with positive probability and
+*j* cannot be unanimous. **Hence robustness requires DISJOINT bands.** ∎
 
 **No two pools on any axis have disjoint bands, in either medium** (verified, and asserted by
 `test_a_robust_dominance_flip_is_impossible_at_these_bands`). Therefore no flip this layer produces can be trusted. **And the reason
 is self-inflicted in the most honest possible way: the bands are wide BECAUSE the values are guesses.** Bands narrow enough to be
 disjoint would claim a precision an author estimate does not have. **An honest uncertainty band and a trustworthy flip from an
 estimate are mutually exclusive.** The corollary is the sharpest statement of the beat: *slice 2 is informative only where it is
-redundant* — every axis it leaves alone is robust (the OAV gap is unclosable), every axis it moves is a coin toss.
+redundant* — every axis it leaves alone is robust (the OAV gap is unclosable), every axis it moves is unresolved.
+
+**THE PROOF ABOVE IS THE SECOND ONE. The first was fragile, and the done-call caught it** — see the sampling correction below. D-98
+originally argued *j* survives every draw only if `min(n_j)·ln(OAV_j) > max(n_i)·ln(OAV_i)`, hence `min(n_j) > max(n_i)`, hence
+disjoint bands. That reaches the right conclusion **through an independence assumption**: it takes *j* at its band minimum while *i*
+sits at its maximum, a pair that is **not jointly reachable** once sampling respects Cain's rank. The equal-exponents argument needs
+no independence, and is why the conclusion survived the correction **unchanged** while the numbers under it moved. The disjointness
+condition is identical under both proofs, so the headline test never needed editing — only its reasoning did.
 
 **MEASURED, ON REAL INTEGRATED RUNS.** The payload is real and it is untrustworthy, both demonstrably. On a Brett wine at YAN 250
 compression **flips `fruity` from apple to banana**: `ethyl_hexanoate` carries **1.9× the OAV** (78.6 vs 42.1) and **loses**,
 because its flatter exponent (0.28 — the least soluble ester) compresses it harder than isoamyl acetate's 0.36. That is the
-documented OAV critique made executable, and it is a genuine new observable. **The sensitivity pass then kills it: 55%/45%.** A coin
-toss. Contested at every nitrogen level tried (YAN 40 → **80/20**; YAN 80 → **62/38**; YAN 250 → **55/45**; an oaked Brett wine →
-**64/36**), so the honest reading is **"cannot say which ester dominates wine's fruity note"** — a *result*, and the reason
-`MaxRuleProjector` **remains the default**. An oaked wine's `vanilla_oak` likewise flips (vanillin → whiskey lactone) at **53/47**,
-and sub-threshold besides. Robust verdicts appear only where compression changed nothing (`smoky`, `clove_spice`, `sulfidic`).
+documented OAV critique made executable, and it is a genuine new observable. **More: the nominal answer SWITCHES WITH NITROGEN** —
+apple-led at YAN 40, banana-led at YAN 250 — which is D-97's YAN-responsive banana propagating up two layers into a descriptor
+label. **And the sensitivity pass refuses to let any of it be claimed.** Under the honest order-preserving sampling the fruity
+contest runs **71/29 to apple at YAN 40** and **78/22 to banana at YAN 250**: a ~3:1 majority at each end — **suggestive, and not
+robust**. (It is not a coin toss and must not be described as one; that framing was an artefact of the superseded independent
+sampling, which reported 80/20 → 62/38 → 55/45.) So the honest reading is **"cannot say which ester dominates wine's fruity
+note"** — a *result*, and the reason `MaxRuleProjector` **remains the default**. An oaked wine's `vanilla_oak` likewise flips
+(vanillin → whiskey lactone) at **80/20**, and sub-threshold besides. Robust verdicts appear only where compression changed nothing
+(`solventy`, `smoky`, `clove_spice`, `sulfidic`).
 
 **A BUG THE SENSITIVITY PASS FOUND IN ITSELF — `silent` is not a detail.** The first run reported `vanilla_oak: vanillin (robust —
 wins every draw)` **on a wine with no oak at all**. Since `0 ** n == 0`, every draw ties, the tie breaks to the first-listed pool,
 and the verdict reads as *maximal confidence in an aroma that does not exist* — slice 1's "a clean run raises no false descriptor"
 sin arriving one layer up **wearing a statistic**. `FlipVerdict.silent` catches it and `robust` is False whenever it fires. Worth
 recording because the failure mode is generic: **a statistic computed over a degenerate case reports certainty, not absence.**
+
+**THE DONE-CALL CATCH — THE MONTE CARLO CONTRADICTED THE FILE IT WAS SAMPLING.** The first implementation sampled all 21 exponents
+**independently**, justified in-entry as *"independent because the estimates are independent guesses — there is no covariance to
+model."* **That was wrong, and wrong about the one thing the citation actually supports.** `psychophysics.yaml` asserts — and
+`test_exponents_are_ordered_by_the_documented_solubility_argument` **pins as fact** — that the values are rank-ordered by solubility
+per Cain. Independent sampling let ~**28%** of draws invert the two fruity esters: **a quarter of the evidence was spent on draws the
+parameter file calls impossible.** The covariance "there was none of" is exactly **Cain's rank correlation** — which D-98 *did* model,
+in the nominal values and in a test, and then **discarded at the sampling step**. Cain's finding *is* a rank correlation, so the
+ordering is the **best**-supported structure the citation provides and the absolute values the **least**: the naive pass kept the weak
+half and threw away the strong one. **Fixed:** draws are now the independent product **conditioned on the rank holding**
+(per-axis rejection — not an approximation, since exponents are a priori independent and an axis' dominant depends only on its own
+contributors, so conditioning on the global 21-compound order yields the identical conditional law at a far worse acceptance rate).
+**It was material, not cosmetic:** wine's fruity contest moved **55/45 → 78/22** at YAN 250, `vanilla_oak` **53/47 → 80/20**, and
+`solventy` from contested to **robust**. The *conclusion* survived — nothing became robust that should not have — but only because the
+theorem had a second proof that never needed independence. **The lesson generalises past this entry: a sensitivity analysis is a
+model too, and it must obey the same provenance discipline as the parameters it perturbs.** Sampling that contradicts a tested claim
+of its own parameter file is not conservative — it is a *different, undocumented* model wearing the file's name.
 
 **Design.** (i) **A separate `psychophysics.yaml`, not `sensory.yaml`** — a threshold is a *measured* quantity with a real citation
 and these are 21 guesses that must not borrow Meilgaard's/Guth's credibility **by adjacency** (§4.3); and slice 2 must stay
@@ -7903,18 +7930,21 @@ another disclaimer*; hence structure, not a comment. Renaming `oav` → `magnitu
 slice 1 for no new observable. (v) **`StevensProjector` arrived through D-95's seam untouched** — the best evidence that Protocol
 was the right shape.
 
-**Tests (+30, new `tests/test_sensory_compression.py`).** All 21 exponents are `author estimate`/`speculative` with the value inside
+**Tests (+32, new `tests/test_sensory_compression.py`).** All 21 exponents are `author estimate`/`speculative` with the value inside
 its band; **coverage is exact** (every pool has an exponent, every exponent a pool — a missing one **raises rather than silently
 defaulting to n=1**, which would leave one compound uncompressed among twenty and manufacture a flip out of a YAML omission); the
 file's **solubility ordering is executable** (acetaldehyde/whiskey-lactone ratio == Cain's 2.5×; the three esters ordered); **no
 exponent reaches a compiled scenario**; compression is **threshold-preserving** (`I(1)==1` for every n, and `above_threshold`
 identical under both rules across the boundary); **a global exponent cannot change `dominant`** (the argument for per-compound, as
 a test); **per-compound exponents can** (the payload exists); **THE HEADLINE** — no disjoint bands, hence no robust flip, in either
-medium; the fruity flip is a **coin toss** under its own uncertainty; a wide OAV gap is robust **precisely because compression
-changed nothing**; an absent axis reads **silent, not robust**; determinism in seed; the seam; the `rule` tag; **slice 1 unaffected**.
+medium; **the theorem's engine isolated** (at equal exponents the higher-OAV compound takes the axis — the no-op, which is what
+forbids the flip without any appeal to independence); the fruity flip is a **strong majority but never unanimous** under its own
+uncertainty; **the sampler respects the ordering it claims** (the done-call catch, pinned — and non-vacuously: the naive mode is
+asserted to violate it); a wide OAV gap is robust **precisely because compression changed nothing**; an absent axis reads **silent,
+not robust**; determinism in seed; the seam; the `rule` tag; **slice 1 unaffected**.
 **Teeth verified by unwiring** (not inferred — D-96's lesson): forcing the two fruity esters' bands **disjoint** fails the
-impossibility theorem in *both* media and swings the coin toss to 98/2; making compression the identity fails the flip, the coin
-toss and the compressive property. The impossibility test correctly does **not** move under unwiring — it is a statement about the
+impossibility theorem in *both* media and swings the contest to 98/2; making compression the identity fails the flip, the contest
+and the compressive property. The impossibility test correctly does **not** move under unwiring — it is a statement about the
 **bands**, not the code — and it is written to **fail loudly if exponents ever become sourceable with narrow bands**, which is
 exactly the signal that slice 2 has become real.
 
@@ -7922,15 +7952,18 @@ exactly the signal that slice 2 has become real.
 Touched: `sensory/descriptors.py` (the additive, defaulted `rule` field only), `sensory/__init__.py` (re-exports). **Nothing in
 `core`/`runtime`/`scenario`/`parameters` schema is touched** — no state slot, no RHS, no ledger entry, no compile-seam file, so the
 Tier-1 suite, the §2.2 benchmarks (**re-run: 16/16**, not inferred) and every conservation test are byte-for-byte untouched. Full
-suite **1069 passed**, ruff + mypy clean.
+suite **1071 passed**, ruff + mypy clean.
 
 **Caveats, stated rather than engineered around.** (i) The exponents sit **outside the D-24 ensemble sweep** (standalone load, like
 the thresholds), so `simulate_ensemble` will not propagate these bands — which is *why* `dominant_flip_sensitivity` is a **manual**
-Monte Carlo and not a free consequence of existing machinery. (ii) The impossibility theorem's derivation assumes both compounds
-**above threshold**; below threshold the logs flip sign and flips do occur (`vanilla_oak` here), but sub-threshold dominance is
-sensorially void — nothing is detectable — so no usable flip exists in either regime. (iii) Sampling is **independent and uniform**
-per compound: independent because the estimates *are* independent guesses with no covariance to model, uniform because the bands are
-honest ignorance, not panel spreads, and a uniform draw declines to claim the centre is likelier than the edge. (iv) The `fusels`
+Monte Carlo and not a free consequence of existing machinery. (ii) The impossibility theorem assumes both compounds **above
+threshold**; below threshold flips do occur (`vanilla_oak` here), but sub-threshold dominance is sensorially void — nothing is
+detectable — so no usable flip exists in either regime. (iii) Sampling is **uniform** within each band and **order-preserving**
+across compounds: uniform because the bands are honest ignorance, not panel spreads, so a uniform draw declines to claim the centre
+is likelier than the edge; order-preserving because Cain's rank is the one structure the citation supports and a pass that violated
+it would contradict a tested claim of the file it samples (see the done-call catch above — this caveat originally read "independent…
+no covariance to model" and was **wrong**). `preserve_order=False` reproduces the naive mode, retained only so the comparison stays
+runnable. (iv) The `fusels`
 and `mercaptans` exponents are **doubly speculative** — an estimate about a **lumped** pool's stand-in molecule. (v) `stevens_n_h2s`
 is flagged in-file as the **worst-founded entry**: Cain's correlation is over *organic* odorants and H₂S is a small inorganic gas
 entirely outside it, so "order it by solubility" has no clear meaning; any flip turning on it is an artefact. (vi) The 0.01 gap

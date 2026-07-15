@@ -83,6 +83,25 @@
 # `simulate_ensemble` will not propagate these bands. The D-98 sensitivity pass is a MANUAL
 # Monte Carlo over them, not automatic propagation.
 #
+# THE BANDS OVERLAP, AND THAT IS THE WHOLE RESULT. Because every pair of pools sharing a
+# descriptor axis has OVERLAPPING bands, the draw n_i == n_j is always admissible — and there
+# compression is a GLOBAL exponent, i.e. the no-op above, so the higher-OAV compound wins that
+# draw. The lower-OAV compound therefore can never win unanimously: A ROBUST DOMINANCE FLIP
+# REQUIRES DISJOINT BANDS, AND NONE ARE DISJOINT. The bands are wide *because* these are
+# guesses; bands narrow enough to be disjoint would claim a precision an author estimate does
+# not have. An honest band and a trustworthy flip from an estimate are mutually exclusive.
+# `test_a_robust_dominance_flip_is_impossible_at_these_bands` asserts it and will FAIL the day
+# a real measured exponent arrives with a genuinely narrow band — which is the good news, and
+# the only thing that reopens this beat.
+#
+# THE ORDERING IS SAMPLED, NOT JUST STORED. Cain's claim is a RANK correlation, so the
+# sensitivity pass draws these bands CONDITIONED ON THE RANK HOLDING (`preserve_order`, the
+# default). D-98 originally sampled independently, which let ~28% of draws invert the two
+# fruity esters — spending a quarter of the evidence on draws THIS FILE CALLS IMPOSSIBLE, and
+# discarding the one structure the citation supports while keeping the values it supports
+# least. It was material: wine's fruity contest moved 55/45 -> 78/22. If you add or re-order
+# an entry here, that ordering IS the sampled constraint, not decoration.
+#
 # TIER. All `speculative`, necessarily. The consuming layer floors its outputs at speculative
 # regardless (`descriptor_tier`), so nothing here can lift any output's tier.
 
