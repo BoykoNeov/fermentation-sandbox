@@ -26,6 +26,7 @@ from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.runtime.integrate import Trajectory
+from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.sensory.descriptors import (
     DESCRIPTOR_AXES,
     DescriptorProfile,
@@ -447,3 +448,73 @@ def test_an_alternative_projector_swaps_in(thresholds):
     # Same input, different rule: the stub's additive malty clears threshold where v1's does not.
     assert MaxRuleProjector().project(oav_profile).readings["malty"].oav == pytest.approx(0.4)
     assert stub.project(oav_profile).readings["malty"].oav == pytest.approx(1.2)
+
+
+# -- D-96 regression: the fruity OAV is PHYSICAL on a real run ----------------
+
+
+def _finished_wine_profile(
+    thresholds, **initial_extra: float
+) -> tuple[SensoryProfile, DescriptorProfile]:
+    """Compile + run a real wine to dryness and return its (SensoryProfile, DescriptorProfile).
+
+    A REAL solver run, not a synthetic trajectory: the D-96 defect lived in the interaction
+    between the carbon ledger, the parameter files and the OAV lens, so only an end-to-end run
+    exercises the wiring that produced 761 in the first place.
+    """
+    sc = Scenario(
+        name="d96-regression",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25, **initial_extra},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=40.0,
+    )
+    cs = compile_scenario(sc, strict=True)
+    scheduled = cs.run(t_eval=np.linspace(0.0, 40.0 * 24.0, 200))
+    assert scheduled.success, scheduled.message
+    profile = sensory_profile(scheduled.as_trajectory(), thresholds)
+    return profile, MaxRuleProjector().project(profile)
+
+
+@pytest.mark.parametrize("brett", [False, True], ids=["clean-wine", "brett-wine"])
+def test_fruity_oav_is_physical_on_a_real_wine_run(thresholds, brett):
+    """THE D-96 regression: `fruity` reads tens, not 761 — pinned on a real finished wine.
+
+    This is the test the whole decision exists to make possible, and the one thing every other
+    D-96 test could not catch. The structural tests (5:2 exactness, per-ester carbon weighting,
+    the lumped-marker pair) all pin MECHANISM; none of them pins the OUTCOME. Reintroduce a
+    ledger/lens mismatch — carbon-weight a pool as one molecule while reading it against
+    another's threshold — or fat-finger a threshold by two orders of magnitude, and every one of
+    them still passes while `fruity` climbs back to a non-physical 761.
+
+    The bound is the physical claim, not a golden number: a wine's fruity esters genuinely run
+    OAV in the tens-to-low-hundreds (Guth 1997), so anything in [1, 200] is defensible and 761 —
+    which implied ~23 mg/L of isoamyl acetate against a real ceiling of ~1-3 — is not. Run on
+    BOTH a clean wine and the **Brett** wine whose 761 started this: Brett touches the phenol
+    pools, not the esters, so its fruity reading must be equally physical. That the pre-D-96
+    number came from the Brett scenario specifically is why it is parametrized here rather than
+    checked on a generic wine alone.
+    """
+    extra = {"hydroxycinnamic_gpl": 0.15, "brett_pitch_gpl": 0.4} if brett else {}
+    profile, descriptors = _finished_wine_profile(thresholds, **extra)
+
+    fruity = descriptors.readings["fruity"]
+    assert 1.0 < fruity.oav < 200.0, (
+        f"fruity OAV {fruity.oav:.1f} is outside the physical band — the pre-D-96 lumped "
+        f"reading was 761 (dominant {fruity.dominant})"
+    )
+    # The number must come from a REAL molecule, and MAX must be choosing between real
+    # candidates — before D-96 `fruity` read one lumped pool, so `dominant` was vacuous.
+    assert fruity.dominant in ("isoamyl_acetate", "ethyl_hexanoate")
+    assert set(fruity.contributors) == {"isoamyl_acetate", "ethyl_hexanoate"}
+    # No ester carries a fixed-lump-composition assumption any more (D-96), so the axis cannot
+    # inherit one: the honesty flag must be off *because it is false*, not by omission.
+    assert fruity.lumped is False
+
+    # Each ester's own OAV is physical too — the axis max could hide one absurd contributor.
+    for pool in ("isoamyl_acetate", "ethyl_hexanoate"):
+        assert 0.0 < profile.readings[pool].oav < 200.0, pool
+    # Ethyl acetate is the bulk ester by mass yet must read a MODEST OAV: it is the pool whose
+    # mass the pre-D-96 lump borrowed while wearing isoamyl acetate's ~300x lower threshold —
+    # the exact swap that manufactured 761. Reading single digits here is that seam staying shut.
+    assert 0.0 < profile.readings["ethyl_acetate"].oav < 20.0

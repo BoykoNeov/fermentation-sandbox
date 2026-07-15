@@ -7618,6 +7618,26 @@ acetate's is sensorially mute — its products are already bulk-present; if adde
 which is *safe* because `total_mass` is scoped to `{S,E,CO2}` and asserted only byproduct-free, where the ester pools are identically
 zero — verified, not assumed); and the further fruity esters (ethyl octanoate, phenylethyl acetate) — now **one registry entry each**.
 
+**THE APPLE-DOMINANCE HEADLINE IS THRESHOLD-SENSITIVE — flagged, not buried (done-call advisor catch).** "Wine's fruity dominant is
+ethyl_hexanoate, not banana" rests entirely on `threshold_ethyl_hexanoate_wine = 5 µg/L`, and the margin is thinner than it looks.
+Apple wins only while that threshold stays below **~15.6 µg/L** (where its OAV would fall to isoamyl acetate's ~25). It survives this
+entry's own uncertainty band — at the 14 µg/L ceiling, 28.1 vs 25.2, a ~12 % margin — but reported wine/model thresholds for the
+compound span ~5–60 µg/L across sources, and anywhere above ~15.6 **the dominant label flips to banana**. So the split's *value* claim
+is robust (fruity reads tens either way — that is the D-96 fix) while its *attribution* claim is not. Recorded in the threshold's
+provenance and deliberately **NOT pinned by a test**: asserting apple-dominance would harden a result this uncertain, so the D-96
+regression test accepts either dominant and bounds only the physical band. Worth confirming against Guth 1997's primary table before
+anything leans on apple specifically.
+
+**THE OUTCOME IS PINNED, NOT JUST THE MECHANISM (done-call advisor catch — my own lesson, unapplied).** Every other D-96 test pins
+*mechanism* (5:2 exactness, per-ester carbon weighting, the lumped-marker pair, the floor). None pinned the *observable that started
+this*: reintroduce a ledger/lens mismatch or fat-finger a threshold and they all still pass while `fruity` climbs back to 761 — the
+exact "invisible to the checks we have" failure this whole decision is about. `test_fruity_oav_is_physical_on_a_real_wine_run` now
+bounds fruity to `[1, 200]` on a **real solver run**, parametrized over a clean wine **and the Brett wine whose 761 started this**
+(Brett touches the phenol pools, not the esters, so its fruity must be equally physical). Verified to have teeth: re-pointing ethyl
+acetate at isoamyl acetate's threshold — the original defect — fails it at **OAV 1662**. A second line of defence surfaced while
+proving that: the `Parameter` uncertainty band *rejected the bad value outright* before the test could even run, so the provenance
+schema is itself a guard against exactly this class of edit.
+
 **Numbers.** Wine `fruity` **761 → 78.6** (dominant `ethyl_hexanoate`; real wine ethyl hexanoate genuinely runs OAV in the tens —
 Guth ranks it among wine's highest, so this is the *physical* reading, not a suppressed one). Beer `fruity` **53 → 1.80** (dominant
 `isoamyl_acetate`, just above Meilgaard's threshold — textbook for an ale), with `ethyl_acetate` at 0.66, correctly *below* threshold
