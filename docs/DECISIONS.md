@@ -7424,3 +7424,98 @@ without `add_oak` (and every oaked-but-non-bourbon caramel level, driven purely 
 be; the un-oaked run is byte-for-byte inert.** **Next:** beat 1b (descriptor projection), a beer-specific per-melanoidin A420 yield,
 the on-ledger thermal-caramelization aroma co-product (the genuinely deferred caramel beat), the gradual-reservoir / per-compound-
 retention refinements.
+
+## D-95 — beat 1b slice 1: descriptor-space projection — the OAV vector grouped into vocabulary; the MAX rule, NO parameters (§4.2)
+
+**What.** The **last unbuilt piece of Milestone 3's opening beat**, deferred at D-66 and carried as a standing "Next:" candidate in
+every entry from D-67 through D-94 (~28 mentions) while the aging axis grew 13 Processes underneath it. Where beat 1a (D-67) answers
+*"how many times over its perception threshold is compound i?"*, beat 1b answers *"which descriptor words does that OAV vector light
+up, and what is driving each?"* — projecting wine's 19 / beer's 10 aroma pools onto **14 / 9 descriptor axes**. New
+`sensory/descriptors.py`; **no state, no Process, no ledger entry, no YAML, no parameters** (1027 tests, +18). Two advisor passes
+(one pre-work designing the slice line, one done-call catching a hole in my own justification — below) + two owner forks.
+
+**THE SLICE LINE IS THE ADDITIVITY SEAM (the pre-work advisor's crux, and the whole design).** Descriptor projection is inherently
+many-to-many: `malty` collects three branched-chain aldehyde pools, `smoky` collects both oak `guaiacol` and Brett `ethylguaiacols`.
+But **the layer directly below already refused to aggregate** — `SensoryProfile` reports per-compound OAVs and *never* a summed
+scalar, because summing assumes **perceptual additivity**, which is contested and would over-claim (D-67). So the aggregation rule
+here is **NOT a free choice**: a projector that summed OAVs per descriptor would silently reintroduce the exact assumption the layer
+beneath it rejected, and the codebase would be internally inconsistent. Hence the **MAX rule** (`MaxRuleProjector`): a descriptor
+reads its **loudest contributor** and names it (`dominant`). Max asserts nothing beyond "this compound is 4.2× over threshold";
+sum/compression/Stevens all assert additivity. **The through-line — *we never assume additivity, at any layer* — is the beat's whole
+defense**, and it cuts the work in two: **slice 1 (this entry)** = the seam, vocabulary, binary membership, the max rule, tests, ZERO
+params; **slice 2 (deferred, → D-96)** = weights, compression exponent, masking/suppression, matrix effects, and the provenance file
+those entail (the `thermal.yaml` relative-weight precedent, D-87, applies *there* — not here).
+
+**Owner fork #1 — vocabulary granularity: ~12 many-to-many axes** (over ~7 coarse families, which would erase the oak-guaiacol /
+Brett-4-EG distinction the chemistry worked to earn, and over ~18 near-1:1 axes, which would barely be a projection at all — a rename
+of beat 1a's strings). Landed at **14** (wine) / **9** (beer). `ethylguaiacols` feeds **two** axes (`smoky` + `clove_spice`) — the
+many-to-many, and real: 4-EG genuinely smells of both. **Owner fork #2 — max-rule-v1 with weights deferred** (over weighted intensity
+in the first slice).
+
+**THE DONE-CALL ADVISOR CATCH — my "forced by D-94" justification was internally inconsistent.** I argued `caramel` (furaneol) and
+`curry_maple` (sotolon) *must* stay split because D-94 kept those two compounds' descriptors deliberately distinct. **That argument
+does not hold**: D-94 governed the **compound** layer, whereas collapsing distinct compounds is **this layer's entire job** — and
+this same vocabulary merges `guaiacol` + `ethylguaiacols` into `smoky`, two molecules whose distinctness the codebase flags *just as
+loudly* (guaiacol's VarSpec says "DISTINCT from the Brett 4-ethylguaiacol"). Distinctness below cannot forbid one merge while
+permitting the other. The split **stands as a judgement** (toffee and curry are different smells), **not a constraint** — recorded
+here and in the module docstring precisely so it never later reads as forced; merging them back into one `nutty_caramel` axis costs
+exactly one entry and would be equally defensible. The parallel change — **`methional` out of `malty` into its own `cooked_potato`
+axis** — stands on plain descriptor accuracy (methional is the cooked-potato Strecker off-note; it is not malty) and needs no such
+appeal. `green_apple` likewise stays separate rather than joining `cooked_potato` under a shared "oxidative": `acetaldehyde` is a
+fermentation intermediate (D-27) long before it is an oxidation product (D-71), so a young beer's green-apple note would be
+mislabelled.
+
+**THE DONE-CALL ADVISOR CATCH #2 — the `lumped` honesty flag was being dropped at the layer boundary.** Beat 1a treats D-66's
+fixed-lump-composition caveat as load-bearing (`OAVReading.lumped`, flagged in provenance, tested), but the first-draft
+`DescriptorReading` had no `lumped` field — so a descriptor driven by a lumped pool would inherit the assumption **silently**.
+`sulfidic` is the live case (clean `h2s` + lumped `mercaptans`): `lumped` now propagates **from the dominant contributor**, True
+exactly when methanethiol is the louder. The caveat must not evaporate on crossing a layer.
+
+**HONEST FRAMING — what this layer does and does NOT add (the D-80 "mechanism, not a behaviour change" precedent).** Under the max
+rule a descriptor clears threshold **iff** one of its pools does, so `DescriptorProfile.above_threshold()` is a **pure regrouping**
+of beat 1a's pool-level flags — it carries **no new above-threshold information**. Slice 1 delivers **vocabulary grouping + dominant
+attribution**, not a new sensory claim. Making the per-descriptor number say something a regrouping cannot is exactly what slice 2's
+weighting buys — which is *why* slice 2 is where the speculation lives. Stated here so it can never later read as over-claiming.
+
+**No magic numbers — membership is STRUCTURE, not parameters.** The pool→descriptor map is **binary** (a pool feeds an axis or does
+not), which pairs naturally with max and needs no weights ⇒ slice 1 mints **no constants and adds no YAML**. It lives in code exactly
+as `AromaCompound.descriptor` already does (accepted at D-67); `Parameter` forbids extra fields (`test_extra_fields_forbidden`) so a
+`descriptor:` key could not join `sensory.yaml` anyway. **Weights are precisely what will make slice 2 need a provenance file** —
+the cleanest possible statement of where the two slices differ.
+
+**The axis set is DERIVED, never declared** (`axes_for_medium`): each axis is intersected with the medium's pool set from
+`AROMA_COMPOUNDS`, so an axis with no pools in a medium **does not exist** there (beer can never report `barnyard`, by construction
+rather than a second hand-maintained list) and a shared axis is **narrowed** (beer's `sulfidic` is `h2s` alone; beer's `smoky` is oak
+`guaiacol` alone). Beer's vocabulary is a **strict subset** of wine's. A future aroma pool wires itself in with one membership entry —
+and **fails the no-orphan test loudly** until it does.
+
+**The seam (the handoff's own words, made executable).** §4.2 asks for "a separate, swappable sensory model ... with a clean seam so
+it can later be replaced by an ML model trained on real sensory-panel data". `DescriptorProjector` is that Protocol —
+`project(SensoryProfile) -> DescriptorProfile`, the narrowest thing that can be. A test swaps in a stand-in projector emitting a
+per-descriptor *intensity* (the thing a panel-trained model would, and a max cannot) without touching beat 1a, the chemistry, or any
+caller — so "replaceable" is **proven, not aspirational**. **The tier floor repeats D-67's argument one layer up**: `descriptor_tier`
+folds in an explicit `Tier.SPECULATIVE` because the *projection itself* is a further heuristic leap beyond the sourced ratio —
+grouping compounds under a word and naming one dominant is a perceptual claim no threshold measurement backs. Tested **non-vacuously**
+on the pure function with VALIDATED inputs (D-67's advisor caught the vacuous form of exactly this test).
+
+**Inherited for free: the odor/taste split.** Because the projection consumes a `SensoryProfile`, `iso_alpha`/IBU (a taste, D-64) and
+`ellagitannin`/astringency (D-78) are **already absent** — it is structurally impossible for a bitterness to leak into an aroma
+descriptor. Pinned by test anyway.
+
+**Tests (+18, new `tests/test_sensory_descriptors.py`).** Vocabulary integrity (no orphan pool — the coverage guard for future beats;
+no phantom pool; the derived axis set; the 4-EG two-axis case); **the max rule** (`malty` with three contributors reads 4.2 not their
+sum 5.6 — *the beat's thesis, executable*; and the consequence that matters most: three pools each at OAV 0.4 leave `malty`
+**silent**, where a sum would fake a 1.2 smell no compound justifies); `dominant` tracks the argmax; monotone **non-decreasing**
+(raising a *non*-dominant contributor leaves the descriptor unmoved — the max rule working); clean run raises no false descriptor;
+`lumped` propagates; the non-vacuous tier floor; the seam. **End-to-end sanity on REAL integrated runs** (directional only, §4.3): a
+first-fill heavy-toast **bourbon-barrel stout** reads `caramel` (furaneol, OAV 8.9) + `vanilla_oak` (3.3) + `smoky` (oak guaiacol,
+8.9) above threshold with no `barnyard` axis existing at all; an **un-oaked Brett wine** reads `barnyard` (1.8) with all five oak
+words at exactly 0.
+
+**Regression surface.** `sensory/descriptors.py` (new); `sensory/__init__.py` (re-exports). **Nothing in `core`/`runtime`/`scenario`/
+`parameters` is touched** — no state slot, no RHS, no ledger entry, no YAML, so the Tier-1 suite, the §2.2 benchmarks and every
+conservation test are byte-for-byte untouched (prime directive #3, trivially). **No import-direction/layering test was added**: the
+repo has none (beat 1a enforced the §4.2 firewall architecturally, not by test), and inventing one here would over-build a guardrail
+the layer below deliberately skipped. **Next:** **beat 1b slice 2** (weighting / compression / masking — the perceptual speculation,
+where the params live), a beer-specific per-melanoidin A420 yield, the on-ledger thermal-caramelization aroma co-product, the
+gradual-reservoir / per-compound-retention refinements.

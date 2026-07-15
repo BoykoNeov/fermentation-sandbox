@@ -278,8 +278,31 @@ construction). Opened as the first beat of Milestone 3 (`docs/plans/milestone-3-
 - **Lumped pools (D-66).** `esters`/`fusels`/`mercaptans` are read against one named
   representative's threshold (isoamyl acetate / isoamyl alcohol / methanethiol), with the
   "assumes fixed lump composition" honesty cost flagged in provenance. `iso_alpha`/IBU is
-  excluded — a *taste*, already read out by `ibu_series` (D-64). Descriptor-space projection
-  ("smells like leather and banana") is the deferred, even-more-speculative beat 1b.
+  excluded — a *taste*, already read out by `ibu_series` (D-64).
+- **Descriptor projection — beat 1b slice 1 (D-95), `sensory/descriptors.py`.** Projects the
+  OAV vector onto a descriptor vocabulary: wine's 19 / beer's 10 aroma pools → **14 / 9 axes**
+  (`malty` collects three aldehydes; `ethylguaiacols` feeds both `smoky` and `clove_spice`).
+  Consumes a `SensoryProfile`; adds **no state, no Process, no ledger entry, no parameters**.
+  - **The max rule, not a sum — the load-bearing call.** `SensoryProfile` refuses to sum OAVs
+    (contested additivity, D-67), so a projector that summed per descriptor would silently
+    reintroduce what the layer beneath rejected. `MaxRuleProjector` reports each descriptor's
+    **loudest contributor** and names it (`dominant`) — asserting no additivity. *We never
+    assume additivity, at any layer.* Consequence: three pools at OAV 0.4 leave the descriptor
+    silent rather than faking a 1.2 smell no compound justifies.
+  - **Honest framing.** Under max, a descriptor clears iff one of its pools does, so
+    `above_threshold()` is a pure **regrouping** of beat 1a's flags — the layer adds vocabulary
+    + attribution, **not new above-threshold information**. Weighting/compression/masking (and
+    the params those need) is the explicitly deferred **slice 2**.
+  - **Membership is structure, not parameters** — binary (a pool feeds an axis or not), so it
+    lives in code like `AromaCompound.descriptor` (D-67) and mints no constants. The axis set
+    is **derived** per medium from `AROMA_COMPOUNDS` (`axes_for_medium`), so beer can never
+    report `barnyard` by construction, and beer's vocabulary is a strict subset of wine's.
+  - **The seam (§4.2).** `DescriptorProjector` is a Protocol — `project(SensoryProfile) ->
+    DescriptorProfile` — so a future panel-trained ML model swaps in without touching beat 1a
+    or the chemistry (proven by a test, not asserted). `descriptor_tier` repeats the D-67 floor
+    one layer up (the projection is itself a further leap), tested non-vacuously. The odor/taste
+    split is inherited free: consuming a `SensoryProfile` makes it structurally impossible for
+    `iso_alpha`/`ellagitannin` to leak into an aroma descriptor.
 
 ## Testing & quality gates
 

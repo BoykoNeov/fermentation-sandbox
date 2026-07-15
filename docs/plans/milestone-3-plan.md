@@ -250,6 +250,47 @@
 > points; a second done-call caught stale "deferred fill-number" docstrings, fixed). Next: beat 1b (descriptor projection),
 > a beer-specific per-melanoidin A420 yield, the deferred finite-reservoir / per-compound-retention refinements,
 > bourbon-barrel spirit soak-back.**
+>
+> **PROGRESS (D-92/D-93/D-94, 2026-07-14): the BOURBON-BARREL SOAK-BACK trio — an ex-spirit barrel donates more than wood
+> (1009 tests). D-91 scoped itself to oak-*extractable* depletion and flagged the residual-SPIRIT soak-back as separate; these
+> three build it. All are `add_oak` DOSE-level (an optional categorical `spirit`, v1 `bourbon`) — NO new Process, state slot,
+> or schema change until D-94's pool. `spirit` absent ⇒ byte-for-byte unchanged. (1) **D-92 — ETHANOL** (~1% ABV gain, the
+> "barrel-aged stout gains ABV" effect): the advisor's BLOCKER was "is a carbon-bearing dose free?" — traced to
+> `schedule.py:231`, the scheduler books every dose's `new_y − current_y` as an `ExternalFlow` automatically, so a DISCRETE
+> dose closes the run-wide ledger where a within-Process CONTINUOUS leach would CREATE carbon within-segment. That is *why*
+> it is a dose, not a Process. Own steeper `spirit_soak_retention=0.2` (first-fill is the term of art), decoupled from
+> `oak_gpl`. (2) **D-93 — AROMA CONGENERS** (vanillin/whiskey_lactone/guaiacol): a CEILING BUMP drawn in GRADUALLY by
+> `OakExtraction`, NOT a bolus — the load-bearing proof is that a bolus into the pool is ERASED by the extraction gate
+> (`gap = ceiling − conc` ⇒ `max(X, C_wood)`, not the sum), so bumping the ceiling is the ONLY additive-with-wood form. The
+> D-92 asymmetry (ethanol=bolus, aroma=gradual) is a STRENGTH: the LEDGER splits them — ethanol is ON it (forced to a dose),
+> aroma ceilings are OFF it (gradual is both available AND more faithful). (3) **D-94 — CARAMEL**: `furaneol` (HDMF), a FIFTH
+> oak extractive, both a toast-RISING wood yield and a bourbon ceiling bump. The feared collision with D-88's
+> caramelization/`A420` axis is DISSOLVED, not relocated: `melanoidin` is caramelization's on-ledger COLOUR body, `furaneol`
+> the off-ledger volatile AROMA of the same chemistry — so it cannot perturb D-88's carbon closure (an executable test pins
+> it). Done-call catch: SIZE BY OAV BAND, not mass — furaneol's potency (threshold ~30× below vanillin's) meant a
+> mass-matched bump read caramel ~7× more forward than vanilla, invisible to a bare `OAV>1` test. The genuinely deferred beat
+> is caramel aroma from the beverage's OWN thermal caramelization (that WOULD be on-ledger).**
+>
+> **PROGRESS (D-95, 2026-07-15): beat 1b slice 1 — DESCRIPTOR-SPACE PROJECTION, the last unbuilt piece of this milestone's
+> OPENING beat, deferred at D-66 and carried as a standing "Next:" in every entry from D-67 through D-94 while the aging axis
+> grew 13 Processes underneath it (1027 tests, +18). New `sensory/descriptors.py`: wine's 19 / beer's 10 aroma pools project
+> onto 14 / 9 descriptor axes. NO state, Process, ledger entry, YAML, or parameters. THE SLICE LINE IS THE ADDITIVITY SEAM
+> (the advisor's crux): projection is inherently many-to-many (`malty` ← three aldehydes; `smoky` ← oak guaiacol + Brett 4-EG),
+> but the layer BELOW already refused to aggregate — `SensoryProfile` never sums OAVs because additivity is contested (D-67).
+> So the rule is NOT a free choice: summing would silently reintroduce what the layer beneath rejected. Hence the MAX rule —
+> each descriptor reads its LOUDEST contributor and names it (`dominant`). *We never assume additivity, at any layer.* Slice 2
+> (deferred, D-96) = weights/compression/masking + the params those need. HONEST FRAMING (the D-80 precedent): under max a
+> descriptor clears iff one of its pools does, so `above_threshold()` is a pure REGROUPING of beat 1a's flags — slice 1 adds
+> vocabulary + attribution, NOT new above-threshold information. Membership is STRUCTURE not parameters (binary ⇒ no weights
+> ⇒ no YAML — weights are precisely what makes slice 2 need a provenance file); the axis set is DERIVED per medium, so beer
+> can never report `barnyard` by construction. `DescriptorProjector` Protocol = the §4.2 swappable seam, PROVEN by a test that
+> swaps in an alternative rule. Owner forks: ~12 many-to-many axes (over ~7 coarse / ~18 near-1:1); max-rule-v1. Done-call
+> advisor catches: (1) my "D-94 FORCES the caramel/curry split" justification was internally inconsistent — D-94 governed the
+> COMPOUND layer, while collapsing distinct compounds is this layer's JOB, and the same vocabulary merges guaiacol + 4-EG
+> whose distinctness is flagged just as loudly; the split stands as a JUDGEMENT, recorded as such. (2) The `lumped` honesty
+> flag was being DROPPED at the layer boundary — it now propagates from the dominant contributor (`sulfidic` = clean h2s +
+> lumped mercaptans is the live case). Next: beat 1b SLICE 2 (the perceptual speculation), a beer-specific per-melanoidin
+> A420 yield, the on-ledger thermal-caramelization aroma co-product.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
@@ -267,10 +308,12 @@
 ## Build order (dependency-ordered; handoff §6 step 5, re-sequenced per D-66)
 
 ```
-  sensory / OAV readout layer      ← FIRST beat (this milestone's active work)
+  sensory / OAV readout layer      ← FIRST beat — COMPLETE at D-95 (slice 2 deferred)
         │  (pure readout over compounds already tracked; zero core risk)
-        │  1a. OAV ratio (sourced thresholds)      ← the honest, sourced part
-        └─ 1b. descriptor-space projection         ← deferred: a further heuristic leap
+        │  1a. OAV ratio (sourced thresholds)      ← D-67: the honest, sourced part
+        └─ 1b. descriptor-space projection         ← D-95 slice 1: vocabulary + the MAX rule
+              (slice 2 — weighting/compression/masking, the perceptual math that needs
+               parameters — deferred; the additivity seam is the slice line)
   aging chemistry (the "years" axis) ← subsequent beats, one Process at a time
         ├── ester formation/hydrolysis equilibria over time
         ├── oxidation (acetaldehyde/phenolic browning, Strecker)
@@ -415,12 +458,15 @@ uncertainty bands.
 
 ## Deferred / later beats (in order)
 
-- **1b. Descriptor-space projection** — map the OAV vector onto a descriptor vocabulary
-  ("fruity/buttery/barnyard/reductive/…"). This is a *further* heuristic leap beyond the
-  sourced OAV ratio ("OAVs → this smells like leather and banana"), so it is fenced as a
-  **separate, even-more-speculative swappable sub-model** (handoff §4.2: a clean seam so an
-  ML model trained on sensory-panel data could later replace it). Keeping it out of beat 1a
-  keeps the sourced-ratio layer honest.
+- ~~**1b. Descriptor-space projection**~~ — **slice 1 BUILT at D-95** (`sensory/descriptors.py`):
+  the OAV vector maps onto a 14-axis (wine) / 9-axis (beer) descriptor vocabulary behind the
+  `DescriptorProjector` seam (handoff §4.2: so an ML model trained on sensory-panel data could
+  later replace it). **Slice 2 remains deferred** — weighting, compression (Stevens), masking/
+  suppression, matrix effects: the perceptual math that genuinely needs parameters, and the
+  point at which the layer would start claiming an intensity a regrouping cannot justify. The
+  **additivity seam is the slice line**: slice 1's max rule assumes no perceptual additivity
+  (consistent with D-67's refusal to sum OAVs one layer down), and any weighted/compressed
+  combination rule must answer that objection head-on before it ships.
 - **Aging chemistry (§4.1), one Process at a time on a slow/years phase** — ester
   formation/hydrolysis equilibria; oxidation (acetaldehyde generation, phenolic browning,
   Strecker degradation); **oak extraction** (diffusion-limited vanillin / whiskey lactones /
