@@ -86,8 +86,13 @@ isoamyl carbon", the model gives **7.15%** at D-100's dose, and D-103 found the 
 had — Rollero *et al.* 2017 measures **2-8%** by U-13C leucine labelling. The two independent
 isotope methods agree *qualitatively* (de novo dominates) and **disagree quantitatively**: Rollero's
 ">90% ... from the carbon central metabolism" implies <10% catabolic, while the [U-13C]-glucose
-tracer's ">75% hexose derived" implies <25%. **Recorded as two bands, never averaged into one** —
-this model sits over the first and inside the second.
+tracer's ">75% hexose derived" implies <25%. **Recorded as two bands, never averaged into one.**
+
+**Only ISOAMYL is "over the first, inside the second"** (8.0-13.4%) — do not read the two bands as
+straddling this model generally. **Isobutanol (47-79%) and 2-PE (43-73%) breach BOTH**, exceeding
+even the looser <25%; and compared aggregate-to-aggregate — which is what Rollero's collective
+">90% of the acids and higher alcohols" invites — the five together give **67-79% CCM vs >90%**,
+~2-3x over. The mild-looking 14-23.5% is the isoamyl+isobutanol subset only.
 
 **A SINK THIS MODULE DOES NOT HAVE (a real gap, deliberately not patched here).** The re-route is
 each precursor's *only* consumer, so **100% of consumed leucine is attributed to Ehrlich**. Real

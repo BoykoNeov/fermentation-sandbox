@@ -8689,13 +8689,33 @@ refutation that the paper does not contain.* **Fetching a primary source is not 
 **Two isotope methods, converging QUALITATIVELY and diverging QUANTITATIVELY — recorded as two
 bands, never averaged.** Rollero's ">90% CCM" implies **<10%** catabolic; the independent
 [U-¹³C]-glucose tracer (PMC4922003: isoamyl, isobutyl, β-phenylethanol *">75% hexose derived"*)
-implies **<25%**. The model sits **over the first and inside the second**. Both agree on the only
-thing this beat needs: **de novo dominates; catabolism is minor.**
+implies **<25%**. Both agree on the only thing this beat needs: **de novo dominates; catabolism is
+minor.**
+
+**"The model sits over the first and inside the second" — WRITTEN HERE FIRST, AND IT IS TRUE OF
+EXACTLY ONE COMPOUND.** Only **isoamyl** (8.0–13.4%) is over Rollero yet inside the tracer.
+**Isobutanol (47–79%) and 2-PE (43–73%) BREACH BOTH BOUNDS** — they exceed the tracer's <25% as
+well as Rollero's <10–15%. The bracket phrasing reads as though the two sources *straddle* the
+model, i.e. borderline; in fact three of five compounds violate **both**. **It understated my own
+conclusion** — the shape defect is *more* decisive than "over one, inside the other" implies. The
+D-96/D-102 failure mode (**the sentence and the evidence are not the same claim**) in its
+**conservative** direction this time, which is exactly why it nearly stood: an error that makes you
+look *less* right attracts no scrutiny. Corrected in both places it was written.
 
 **The aggregate looks mild because the compound the model gets RIGHT carries most of the carbon.**
 Isoamyl is ~53% of fusel carbon at ~8%, so it drags the weighted mean down and **masks** the
-per-species defect. An aggregate over all five would additionally mix measured with unmeasured
-compounds. ⇒ **The aggregate magnitude is secondary and source-dependent; the SHAPE is the finding.**
+per-species defect. ⇒ **The aggregate magnitude is secondary and source-dependent; the SHAPE is the
+finding.**
+
+**But "mild" is carried by MY SUBSET CHOICE, and must not stand unqualified.** The 14–23.5% figure
+is the isoamyl+isobutanol pair — chosen because those are the compounds Rollero *labelled* — scored
+against a **per-compound** reading of his result. Yet Rollero's abstract figure is itself a
+**collective** one: *">90% of **the acids and higher alcohols** … derived from … the CCM"*. Compared
+**aggregate-to-aggregate**, as that sentence invites, the model's full five-alcohol figure is
+**67–79% CCM (21–33% catabolic) against >90% — ~2–3× over, NOT mild**, and its 33% top end is not
+inside the glucose tracer's <25% either. Both numbers are recorded above, so nothing is hidden — but
+**the cleanest like-for-like comparison is the sharper one**, and a reader checking the abstract
+will find it. *The subset that made the aggregate look mild was the subset with the best excuse.*
 
 ### THE REAL DEFECT IS THE GATE'S SHAPE — which no scalar can fix
 
