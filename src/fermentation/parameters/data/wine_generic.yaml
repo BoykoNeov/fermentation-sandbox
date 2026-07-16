@@ -366,10 +366,13 @@ y_h2s_autolysis:
 # shared autolysis flux (d(mercaptans) = y_mercaptan * k_autolysis * f_T * X_dead * gate) — but
 # because methanethiol carries CARBON (unlike H2S) the Process draws that carbon from the
 # `amino_acids` pool and DEAMINATES its nitrogen to N (Option A, the D-33 fusel-reroute idiom).
-# Real methanethiol is from METHIONINE degradation on the lees; the model draws from the arginine
-# `amino_acids` lump (exact on the ledger, approximate on provenance — the arginine-for-amino_acids
-# stand-in). An availability gate aa/(K_amino_acids+aa) ramps it to 0 as the pool empties (solver-
-# safe, can't drive amino_acids negative). Not flux-linked ⇒ accumulates un-stripped post-dryness
+# Methanethiol's carbon comes from METHIONINE — the sulfur-bearing amino acid whose demethiolation
+# genuinely releases the thiol. Until D-100 the model had to draw it from the lumped `amino_acids`
+# pool (booked as arginine, a molecule containing NO sulfur) and carry the mismatch as a provenance
+# caveat; the pool is now speciated, so the draw IS methionine and that caveat is RETIRED, not
+# restated. A relative-depletion gate met/(K_i+met), K_i = K_amino_acids·must_aa_fraction_methionine
+# (the D-100 rule), ramps it to 0 as the pool empties (solver-safe, can't drive methionine
+# negative). Not flux-linked ⇒ accumulates un-stripped post-dryness
 # (the reductive fault); copper-fined out by add_copper. OPT-IN with the D-34 autolysis Processes.
 #
 # MAGNITUDE — anchored on biomass METHIONINE content, and set BELOW the H2S yield (reduction is
@@ -386,7 +389,7 @@ y_mercaptan:
   provenance:
     source: "author estimate anchored on yeast biomass methionine content (~0.4-1% dry weight; general microbiology) and the reductive-fault magnitude of sur-lie mercaptans (methanethiol threshold ~2-3 ug/L; Swiegers et al. 2005; Rauhut)"
     conditions: "generic S. cerevisiae wine lees; g methanethiol per g dead biomass autolysed, released on the same first-order autolysis flux as the D-34 amino-acid refill and the D-44 H2S yield"
-    notes: "Read by AutolyticMercaptan as the yield on the autolysis flux, gated by amino-acid availability. Carbon for the thiol is drawn from the arginine `amino_acids` lump (NOT literal methionine — the ledger sees arginine; ~0.66 mol N deaminated per mol MeSH vs methionine's ~1, same order) and the nitrogen deaminated to N. Ceiling ~1.6e-3 g MeSH/g biomass = ALL biomass methionine leaving as MeSH; the model's 1e-5 is ~0.6% of that. Set BELOW y_h2s_autolysis (2e-5) since reduction skews to H2S. OPT-IN ONLY (disabled with YeastAutolysis unless autolysis_rate_per_h is set). Directional, hence speculative."
+    notes: "Read by AutolyticMercaptan as the yield on the autolysis flux, gated by METHIONINE availability (D-100: the draw is the real sulfur-bearing precursor, and its nitrogen is deaminated to N — the pre-D-100 arginine stand-in, and the ~0.66-vs-1 mol-N-per-mol-MeSH mismatch it carried, are RETIRED). Ceiling ~1.6e-3 g MeSH/g biomass = ALL biomass methionine leaving as MeSH; the model's 1e-5 is ~0.6% of that. Set BELOW y_h2s_autolysis (2e-5) since reduction skews to H2S. OPT-IN ONLY (disabled with YeastAutolysis unless autolysis_rate_per_h is set). Directional, hence speculative. SCOPE, not magnitude: this yield sizes the AUTOLYTIC route ONLY. Wine MeSH has at least two further routes the model does not carry — yeast demethiolation of methionine during ACTIVE fermentation, and post-bottling anoxic formation from thioacetates/disulfides — so an autolysis-off wine reads mercaptans = 0. See the AutolyticMercaptan module docstring for why that zero is defensible young and NOT defensible for a bottle-aged wine."
 
 # -- Ethanol-driven cell inactivation (the timescale brake, decision D-13) -----
 # Coleman split biomass into active cells X_A and modelled an ethanol-proportional

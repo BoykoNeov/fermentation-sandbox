@@ -8235,3 +8235,108 @@ sourced **yeast-autolysate** amino-acid spectrum (vs the must stand-in); **per-s
 `E_a`/gates to make the fusel spectrum dynamic (all blocked on sourcing — the D-98 trap); re-anchor **`f_methional`** now that
 abundance is modelled explicitly; the isoamyl-acetate **carbon re-route** (D-69's 5:2 inverse); speciate **`mercaptans`** — the last
 lump; per-ester `dH`/`E_a` (blocked); masking (blocked on `cosα`); further fruity esters; the `oav` → `magnitude` rename.
+
+## D-101 — the `mercaptans` "lump" cannot be speciated because it is already ONE molecule; the stale provenance D-100 left behind; and D-45's "chiefly" retired to an honest SCOPE
+
+**Status:** built (2026-07-16). Documentation/provenance only — **no Process, state, parameter value, or output changed**
+(1094 passed, benchmarks 16/16, ruff + mypy clean; test count unmoved, which is the point).
+
+**What triggered it.** The standing roadmap item, carried since D-99: *"speciate `mercaptans` — the last lump."* It cannot be done,
+and finding out why is the entry.
+
+**THE FINDING — `mercaptans` IS METHANETHIOL UNDER A PLURAL NAME.** The decisive fact is `y_mercaptan`'s own anchor: *"g
+**methanethiol** released per g dead biomass,"* sized as ~0.6% of the biomass-methionine MeSH ceiling. Not a total-thiol yield. And
+every other layer agrees: the `total_carbon` weight is methanethiol (1 C), the OAV threshold is methanethiol's, the D-98 Stevens
+exponent is ordered as methanethiol, and since D-100 the precursor draw is methionine. **One producer** (`AutolyticMercaptan`), **one
+remover** (`add_copper`), **one molecule at every layer.** Nothing in the model produces ethanethiol or any other thiol, so the
+fixed-lump-composition caveat this pool carries **describes a mixture the mass balance does not contain**.
+
+**WHY THIS IS THE EXACT INVERSE OF D-96, AND WHY THE D-99/D-100 PATTERN IS A CATEGORY ERROR HERE.** D-96's `esters` was a pool whose
+ledger and lens named **different** molecules — a defect hiding *behind* a `lumped` flag. `mercaptans` is a pool whose every layer
+names the **same** molecule but which **wears a `lumped` flag it does not earn** — a false caveat, not a false number. And the
+contrast with D-99 is what forbids the obvious move: the fusel lump's `k` was anchored to the **TOTAL** (86 mg/L = the sum of five
+species), so splitting it was arithmetic on a real mixture. `y_mercaptan` is anchored to **MeSH alone**. **You cannot split a pool
+that only ever had one molecule in it.** Any "speciation" would have to ratio-split one MeSH-anchored autolytic yield into invented
+EtSH/DMS sub-yields — precisely the **"option 3 wearing option 2's clothes"** fitted-ratio knob **D-96 forbids**. The roadmap item was
+malformed; retiring the false flag (rename `mercaptans`→`methanethiol`, `lumped=False`) is the real beat, and is **deferred to its own
+entry** — it trips the D-66 `assert lumped, "the lumped set should not be empty"` tripwire, which must be **replaced with a positive
+assertion** (the D-99 rule: do not lose the coverage with the pathology), not weakened.
+
+**ETHANETHIOL DECLINED — the D-98 shape, named.** Its threshold is sourceable (1.1 µg/L; the reductive-faults review's Table 1, which
+also corroborates **MeSH 1.8–3.1 vs the model's `threshold_mercaptans_wine` = 3.0** — banked, no change). But its route is **H₂S +
+ethanol/acetaldehyde, or ethyl thioacetate hydrolysis** — *not* autolysis — and **no rate constant was found**; practitioner figures
+(20–50 ppb) conflict with the review's 1.1 by ~27×. **Sourceable threshold, unsourceable rate** ⇒ declined.
+
+**DMS SCOUTED AND BANKED — it is the breadth move, and it is REACHABLE (evidence recorded here so it is not re-derived).** Route is
+**distinct**: DMS accumulates by hydrolysis of **S-methylmethionine (SMM)** during bottle aging, *not* autolysis ⇒ it needs **no
+ratio-split** and can carry its own anchor ⇒ **the D-96 linchpin is satisfiable**. Threshold **25 µg/L** in wine (review Table 1;
+band ~3.67–60 across matrices — model-solution work gives 1.74 dilute-alcohol / 2.80 +12 esters / 3.67 dearomatised red wine, the
+Amarone paper cites 25–60 red / 10 in 10% ethanol). Concentration **2.9–64.3 µg/L, mean 27.9** in commercial Amarone ⇒ **OAV ≈ 1**;
+>100 µg/L under accelerated aging ⇒ a real, near-threshold, **aged-wine-specific** odorant.
+
+**THE RATE FORM, AND THE RESULT THAT MATTERS — NEITHER SOURCE SUFFICES ALONE.** Scheuren 2014 (*J. Inst. Brew.* 120:474–476) gives
+first-order SMM→DMS with **E_a = 128 ± 37 kJ/mol** — but in **wort at boiling**. Extrapolated down ~55 °C it predicts **48.6%** SMM
+conversion in one month at 45 °C; the Amarone study **independently measured 49–54%** in the **wine** matrix. Different field,
+different matrix. **But the band is the finding**: E_a's own ±37 kJ/mol spans a 15 °C half-life of **0.39 to 445 years** — useless. The
+Amarone datum **refutes both ends** (91 kJ/mol ⇒ 99.5% conversion; 165 ⇒ 8.1%; measured 49–54%) and **pins E_a near 128**. *The wine
+measurement is what makes the brewing extrapolation usable at all.* **Design that follows:** anchor `k` **in-matrix** on Amarone
+(45 °C, wine) and take **only** E_a from Scheuren — his absolute `k` is then never used, which **removes an unverified assumption that
+his constant is quoted at 100 °C** (at 105 °C the agreement decays to 32%). The 15 °C half-life band shrinks **0.39–445 → 2.8–52 yr,
+central ~12 yr** — the right order for bottle aging. **Honest tension, recorded:** the Amarone datum can be the **check** on Scheuren
+or the **anchor** for `k`, **not both**; anchoring is safer and forfeits the check to a corroborating note.
+**THE UNCLOSED LINK, and why DMS is not built here:** the **natural SMM/DMSp level in must/young wine is NOT established** (Amarone
+*spiked* 6.4 mg/L — not a natural level), and DMS needs a dosable precursor slot. Also **Scheuren is paywalled and UNREAD** — its
+E_a is from a search summary, and **must be read before it ships**. Also: DMS's most-studied property is that it **ENHANCES fruity
+ester perception** (lowers the fruity pool's threshold) — a perceptual interaction the model **structurally cannot express** (masking,
+blocked on `cosα` since D-95/D-98) ⇒ we would model its concentration honestly and stay **silent on its most-studied effect**.
+
+**THE PD#2 VIOLATION D-100 LEFT BEHIND — the shovel-ready half, and the reason this entry exists at all.** D-100 rewired the **code**
+to draw real precursors but left **nine provenance strings across three YAML files and one module** still claiming the **arginine**
+lump — statements now **flatly false against the code they document**: `wine_generic.yaml` (the D-45 block comment + `y_mercaptan`'s
+`notes`), `sensory.yaml` (`threshold_methional_wine` and `threshold_phenylacetaldehyde_wine` — *"booked from arginine carbon, not
+literal methionine"*), `aging.yaml` (the Strecker ledger comment, its rate equations `c_arginine`/`y_N_arginine`, and `f_methional`'s
+`conditions`), and `mercaptans.py`'s own docstring — which still carried a **"PROVENANCE CAVEAT — the arginine lump, not literal
+methionine"** section describing a draw the code had already replaced. **This is exactly the D-99 done-call catch repeating** (*"I
+nearly shipped a provenance note CLAIMING a re-anchor while the code did not do it"*) — an **untrue provenance string is the one thing
+PD#2 forbids outright**, and a grep for the *pool* name would not have found most of these. **LESSON, generalising D-96's:** splitting
+a lumped pool is not done when the pool is split, and not done when the parameters anchored to its scale are re-anchored — **every
+sentence that JUSTIFIES a number by the lump's identity inherits the lump too.** Provenance is code's documentation and rots exactly
+like it, except **nothing compiles it**.
+
+**D-45's "CHIEFLY" RETIRED TO A SCOPE — and the investigation that shrank, correctly, from "defect" to "overclaim".** The route survey
+challenged D-45's premise (*"Real methanethiol comes **chiefly** from methionine degradation on the lees"*): the reviews attribute wine
+MeSH to **demethiolation of methionine (via KMBA) during ACTIVE fermentation** and to **post-bottling anoxic formation** from
+thioacetates/disulfides, and **none names autolysis as chief**. **But the Process is NOT misattributed, and the first framing was
+wrong.** The lees route is real (practitioner literature: undisturbed lees generate H₂S/VSCs; enzymatic degradation of S compounds on
+gross lees), and **D-45's physics is sounder than the challenge**: MeSH boils at **~35 °C**, so fermentation-route thiol is largely
+**stripped by the CO₂ stream** — which is *precisely why* D-45 chose a **non-flux-linked** route, so the fault accumulates un-stripped
+post-dryness. **The defect was one word and one behaviour, not a route.** Resolution, sized to the evidence: the docstring **no longer
+claims "chiefly"**, and the omission is recorded as a **SCOPE** with its two halves separated — *young non-sur-lie wine: the
+`mercaptans = 0` is **roughly defensible** (fermentation MeSH strips); **bottle-aged wine: the zero is NOT defensible*** (post-bottling
+formation makes MeSH regardless of lees — screwcap reduction is the classic case), which needs a **new Process over unmodelled
+precursors** — a beat, **not** a patch and **not** a re-anchoring of `y_mercaptan`.
+**THE EVIDENCE FLOOR IS ITSELF THE RESULT.** This rests on **secondary reviews read through summarising fetches**; the primaries that
+would settle route dominance — **Smith 2015** (*Aust. J. Grape Wine Res.*) and **Franco-Luesma & Ferreira 2016** (*JAFC*, anoxic-storage
+formation) — are **paywalled and UNREAD** (one targeted attempt each: 402, and reCAPTCHA). At this project's bar that grade licenses
+**softening a claim and recording a gap**; it does **not** license reshaping a route or re-anchoring a yield on working, deliberately
+designed code. **"Cannot source it to primary yet" IS the answer, not a prelude to building on summaries.** An **absence-of-evidence
+trap was caught in the act**: *"the fetch did not surface autolysis"* is a fact about a summarising model's output, **not about the
+review** — and it contradicted the practitioner evidence already in hand. A **2025 JAFC MeSH/H₂S kinetics paper** is named as the
+candidate to one day re-anchor `y_mercaptan` (today an author estimate).
+
+**`f_methional` — the redundancy is REAL but SOFTER than it first looked, and deliberately NOT acted on.** With abundance now explicit
+(D-100), `f_methional`'s abundance half is in principle **derivable** rather than estimated. The first reading — that 0.15 matches the
+spectrum's met/(met+phe) = **0.1515** almost exactly — **was an artifact of the YAML's rounded display**: the *sourced* value is 0.44%,
+giving **0.136**, not 0.15. And equating them would **silently assert methionine:phenylalanine Strecker reactivity = 1**, which is not
+sourced. So the claim is **flagged in provenance, not folded in**: the two abundance stories remain **free to drift**, and an ensemble
+sampling both bands **asserts both** — the D-98 lesson (*a sensitivity analysis is a model too*) one file over. Deriving it stays its
+own queued beat.
+
+**Verification:** 1094 passed (unchanged — documentation-only, and a test count that did not move is the receipt); benchmarks 16/16;
+ruff + mypy clean. **No Process, state slot, parameter value, or model output changed.**
+
+**Next:** **retire the false lump** (`mercaptans`→`methanethiol`, `lumped=False`, replace the D-66 tripwire with a positive assertion —
+now fully scoped and unblocked by this entry); **DMS via SMM hydrolysis** (blocked on the natural SMM must-level + reading Scheuren);
+the **bottle-aged MeSH route** (blocked on primary sources + unmodelled thioacetate/disulfide precursors); **derive `f_methional`**
+(blocked on Strecker relative reactivity); bound the D-33 re-route's catabolic fraction; sourced yeast-autolysate spectrum; the
+isoamyl-acetate carbon re-route; per-ester `dH`/`E_a` (blocked); masking (blocked on `cosα`); the `oav` → `magnitude` rename.
