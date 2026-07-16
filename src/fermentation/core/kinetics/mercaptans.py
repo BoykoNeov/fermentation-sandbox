@@ -121,7 +121,27 @@ _MERCAPTAN_SPECIES = "methanethiol"
 #: lumped ``amino_acids`` pool (arginine) and document the mismatch as a provenance caveat —
 #: arginine contains no sulfur, so the molecule it books could not possibly make a mercaptan. With
 #: the pool speciated, the draw finally *is* methionine: the sulfur-bearing amino acid whose
-#: demethiolation genuinely releases methanethiol. **The D-45 caveat is retired, not restated.**
+#: demethiolation genuinely releases methanethiol.
+#:
+#: **HALF the D-45 caveat is retired — D-100 said "retired, not restated" and that overclaimed
+#: (decision D-105).** The *identity* is now right; the *stoichiometry* is still a stand-in. The
+#: reaction this comment names — demethiolation — is ``1 mol methionine → 1 mol methanethiol +
+#: 1 mol 2-oxobutyrate + NH₃``, but the draw below is sized to the **thiol's single carbon**, so it
+#: consumes **0.2 mol methionine per mol thiol**: a **5× under-draw**, with methionine's other four
+#: carbons (the 2-oxobutyrate) never charged and its nitrogen released at 1/5 the real rate. Carbon
+#: closes — the draw is *defined* to close it — which is exactly why no conservation test sees this;
+#: ``test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the_co2`` is the one
+#: that does. **The code's own named mechanism is what convicts it**: no literature is needed to see
+#: that a 1:1 reaction is being run at 0.2:1.
+#:
+#: **Not fixed here, and the reason is structural**: drawing the honest 1 mol would strand four
+#: carbons with nowhere to go, because the model has no **2-oxobutyrate** pool. That is the same
+#: missing node sotolon needs (D-104 fabricates it from sugar via ``de_novo``) — so this route and
+#: sotolon are **producer and consumer of one untracked molecule**, and the keto-acid node closes
+#: both or neither. **Currently inert** (measured, D-105): this route only fires *sur lie*, where
+#: autolysis refills methionine faster than any consumer draws it (pool 2.74 → 5.88 mg/L over a
+#: 150-day aging), so the corrected draw would still take only ~3.6% of the pool and the gate never
+#: bites. A real defect with no present consequence — recorded, not patched.
 _PRECURSOR_SPECIES = "methionine"
 
 

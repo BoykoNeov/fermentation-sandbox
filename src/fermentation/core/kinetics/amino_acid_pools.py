@@ -243,8 +243,30 @@ def draw_precursor_carbon(
     the pool **equals** the carbon entering the caller's products, and the nitrogen that mass
     carried is returned for the caller to deaminate into ``N``. Carbon and nitrogen therefore
     close to machine precision at every call site, exactly as the D-45/D-75 lumped idiom did — but
-    now at the *right molecule's* carbon fraction, so the draw is a chemical claim rather than a
-    stand-in.
+    now at the *right molecule's* carbon fraction.
+
+    **"So the draw is a chemical claim rather than a stand-in" — that was D-100's wording and it
+    binds only the routes it describes (decision D-105).** Sizing by carbon coincides with the real
+    molar stoichiometry **iff the caller charges every one of the precursor's carbons**, i.e.
+    ``C(precursor) == C(product) + C(CO₂ charged)``. Where that holds the draw lands on exactly
+    1 mol precursor per mol product and *is* a chemical claim; where it does not, this helper will
+    still close the ledger against the wrong number of moles, silently. It cannot check: the caller
+    passes carbon, not a reaction. **Measured across the tree at D-105** — the **seven** routes that
+    charge their decarboxylation CO₂ (D-75's two oxidative + D-87's five thermal Strecker aldehydes)
+    draw at exactly 1.0000; the **seven** that charge none do not (the five Ehrlich re-routes at
+    ``(n-1)/n``, the mercaptan at ``0.2``, sotolon at ``1.5``). **This is the D-104 error class and
+    it is mechanical**, so it is pinned rather than trusted — in ``tests/test_amino_acid_pools.py``,
+    in **two layers**, because the first alone is not enough:
+
+    * ``test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the_co2`` pins the
+      **declaration** layer (the route tables + an explicit, reasoned exception list);
+    * ``test_every_true_strecker_route_draws_1_to_1_when_the_process_is_actually_driven`` pins the
+      **code**, by driving each Process and reading the debit off ``dy/dt``.
+
+    **Only the second catches implementation drift, and conservation catches neither** — measured at
+    D-105: deleting the CO₂ term from :class:`~fermentation.core.kinetics.aging.StreckerDegradation`
+    drops methional to a 0.8:1 draw (the D-104 error, reintroduced) while **all 135 conservation /
+    carbon tests still pass**, because a draw defined to close the ledger can never violate it.
 
     Accumulates into ``d`` with ``+=``: several products can share one precursor (methional and
     3-methylbutanal both come off :class:`MaillardStrecker`'s single pass; threonine feeds both

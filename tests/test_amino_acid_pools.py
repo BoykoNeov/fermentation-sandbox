@@ -14,9 +14,22 @@ properties that make the split safe rather than merely plausible:
   guarantees depend on — now for BLENDS, not one species.
 """
 
+from collections.abc import Mapping
+
 import pytest
 
-from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
+from fermentation.core.chemistry import (
+    MOLAR_MASS,
+    carbon_mass_fraction,
+    nitrogen_mass_fraction,
+)
+from fermentation.core.kinetics.aging import (
+    _CO2_PER_STRECKER_ALDEHYDE,
+    _MAILLARD_PRODUCTS,
+    _STRECKER_ROUTES,
+    MaillardStrecker,
+    StreckerDegradation,
+)
 from fermentation.core.kinetics.amino_acid_pools import (
     AMINO_ACID_SPECS,
     ASSIMILABLE_SPECS,
@@ -29,7 +42,9 @@ from fermentation.core.kinetics.amino_acid_pools import (
     release_spectrum_nitrogen,
     spectrum_carbon_per_nitrogen,
 )
+from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
 from fermentation.core.media import wine_schema
+from fermentation.core.state import FloatArray, StateSchema
 from fermentation.parameters.store import default_data_dir, load_parameters
 from tests.conftest import seed_amino_acids
 
@@ -160,6 +175,196 @@ def test_every_pool_is_weighted_on_both_conservation_ledgers():
     for spec in AMINO_ACID_SPECS:
         assert carbon_mass_fraction(spec.species) > 0.0
         assert nitrogen_mass_fraction(spec.species) > 0.0
+
+
+# -- the stoichiometric signature: a closed ledger is NOT a correct draw ------
+
+
+#: Every precursor→product route in the tree, with the CO₂ each one **charges to its precursor's
+#: draw** — the flag that decides whether a carbon-sized draw is also the real stoichiometry
+#: (decision D-105). Read off the route tables: :data:`_STRECKER_ROUTES` always charges 1 (the
+#: constant ``_CO2_PER_STRECKER_ALDEHYDE``), :data:`_MAILLARD_PRODUCTS` charges 1 iff its
+#: ``decarboxylates`` flag is set, and the Ehrlich re-route / mercaptan draws carry no CO₂ term at
+#: all — which is precisely why they are the exceptions below.
+_ROUTES: tuple[tuple[str, str, float, str], ...] = (
+    *((pool, prec, 1.0, "D-75 oxidative Strecker") for pool, _f, prec in _STRECKER_ROUTES),
+    *(
+        (pool, prec, 1.0 if decarb else 0.0, "D-87 thermal Strecker")
+        for pool, _m, _w, decarb, prec, _dn in _MAILLARD_PRODUCTS
+    ),
+    *(
+        (spec.species, spec.precursor_amino_acid, 0.0, "D-33 Ehrlich re-route")
+        for spec in FUSEL_SPECS
+    ),
+    ("methanethiol", "methionine", 0.0, "D-45 demethiolation"),
+)
+
+#: The routes whose carbon-sized draw is **knowingly not** their molar stoichiometry, each with the
+#: carbon that makes it so (decision D-105). This is an allow-list, not a waiver: a route may only
+#: sit here with a reason, and anything NEW that drifts fails the test below rather than joining
+#: them silently. Every entry is blocked on the same missing thing — a **2-ketobutyrate pool** for
+#: the first two, an accounting call on D-104's split for the third — so the list is the keto-acid
+#: node's work-list, written down.
+_KNOWN_NON_STOICHIOMETRIC: dict[tuple[str, str], str] = {
+    ("sotolon", "threonine"): (
+        "OVER-draws 1.5x: sotolon is an aldol of 2-ketobutyrate + ACETALDEHYDE, and the two "
+        "acetaldehyde carbons are lumped into the threonine draw (D-87 scope note). D-104's "
+        "de_novo=True splits the RATE off the must pool but not this ratio."
+    ),
+    ("methanethiol", "methionine"): (
+        "UNDER-draws 5x: demethiolation is 1 mol methionine -> 1 mol methanethiol + 1 mol "
+        "2-oxobutyrate + NH3, but the draw is sized to the THIOL's 1 carbon, so methionine's "
+        "other 4 (the 2-oxobutyrate) are never charged. Carbon closes; the stoichiometry does "
+        "not. Found by this signature at D-105."
+    ),
+    **{
+        (spec.species, spec.precursor_amino_acid): (
+            "UNDER-draws (n-1)/n: the Ehrlich re-route charges the precursor for the ALCOHOL's "
+            "carbon but not for the CO2 the same decarboxylation releases, so it consumes "
+            "(n-1)/n mol precursor per mol alcohol instead of 1. Unlike the two above this needs "
+            "no new pool -- CO2 is tracked -- but charging it moves D-104's freshly-landed split, "
+            "so it is that beat's call, not a drive-by."
+        )
+        for spec in FUSEL_SPECS
+    },
+}
+
+
+def test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the_co2():
+    """The signature that separates a true degradation from a carbon-sized stand-in (D-105).
+
+    Every draw in this tree closes the carbon ledger **by construction** — the mass is sized so C
+    out of the pool equals C into the products. That makes conservation blind here: a draw can
+    conserve carbon perfectly while consuming the wrong number of moles of precursor, and no
+    conservation test can tell. This is the test that can.
+
+    A product that is a genuine degradation of its precursor satisfies ``C(precursor) ==
+    C(product) + C(CO2 charged)`` — every precursor carbon is accounted for, so sizing the draw by
+    carbon lands on **exactly 1 mol precursor per mol product**, the real stoichiometry, with no
+    freedom left over. Where that identity fails the draw is a stand-in: the route is either
+    sourcing carbon it does not name (sotolon's acetaldehyde) or discarding carbon it should charge
+    for (the mercaptan's 2-oxobutyrate, the Ehrlich CO2).
+
+    **This is the D-104 error class, made mechanical.** D-104 found sotolon rooted in a must amino
+    acid where reality uses a mostly-de-novo keto acid, and the audit of the D-75 oxidative route
+    it prescribed (D-105) found the same signature already sitting on the carbon ledger — visible
+    with no literature at all. D-75 and D-87's five true Strecker aldehydes pass **exactly**; they
+    are the only routes in the tree that charge their decarboxylation CO2, and that term is why.
+    """
+    m_c = MOLAR_MASS["CO2"] * carbon_mass_fraction("CO2")  # g C per mol carbon
+
+    def carbons(species: str) -> float:
+        return MOLAR_MASS[species] * carbon_mass_fraction(species) / m_c
+
+    for product, precursor, n_co2, route in _ROUTES:
+        implied = (carbons(product) + n_co2) / carbons(precursor)  # mol precursor / mol product
+        known = _KNOWN_NON_STOICHIOMETRIC.get((product, precursor))
+        if known is None:
+            assert implied == pytest.approx(1.0, abs=1e-12), (
+                f"{route}: {precursor} -> {product} charges {n_co2:g} CO2, implying "
+                f"{implied:.4f} mol {precursor} per mol {product} where a true degradation "
+                f"demands 1.0. Either this route is not a degradation of {precursor} (the D-104 "
+                f"error -- it needs a de-novo/keto-acid source, not a hard gate on the pool), or "
+                f"it is failing to charge its own CO2. Fix it, or add it to "
+                f"_KNOWN_NON_STOICHIOMETRIC with the carbon that explains it."
+            )
+        else:
+            assert implied != pytest.approx(1.0, abs=1e-12), (
+                f"{route}: {precursor} -> {product} is listed in _KNOWN_NON_STOICHIOMETRIC but "
+                f"now draws stoichiometrically ({implied:.4f}). If it was fixed, delete the "
+                f"entry -- a stale waiver hides the next regression.\nRecorded reason: {known}"
+            )
+
+
+@pytest.fixture
+def aging_params():
+    # The Strecker routes read their rate constants from three files; the pool spectrum lives in
+    # wine_generic. Driving a Process needs all of them resolved together.
+    return {
+        **load_parameters(default_data_dir() / "wine_generic.yaml").resolve(),
+        **load_parameters(default_data_dir() / "aging.yaml").resolve(),
+        **load_parameters(default_data_dir() / "thermal.yaml").resolve(),
+    }
+
+
+def _driveable_state(schema: StateSchema, params: Mapping[str, float]) -> FloatArray:
+    # A warm, oxygenated, mid-ferment-composition state: enough for BOTH the oxidative (needs o2)
+    # and the thermal (needs sugar) routes to fire on one seeded pool.
+    y = schema.zeros()
+    y[schema.slice("T")] = 298.15
+    y[schema.slice("S")] = 100.0
+    y[schema.slice("X")] = 2.0
+    y[schema.slice("E")] = 50.0
+    y[schema.slice("o2")] = 8.0e-3
+    y[schema.slice("N")] = 0.1
+    seed_amino_acids(y, schema, params, 1.0)
+    return y
+
+
+#: The seven routes whose draw ratio is **gate-independent** — the Process gates its product and its
+#: precursor draw together, so the gate cancels and the measured ratio is a structural constant that
+#: one seeded state pins exactly (decision D-105). The partial re-sourcings (Ehrlich re-route,
+#: de-novo sotolon) are deliberately NOT here: their ratio is `gate × structural` by design, so no
+#: single state pins them — they are covered by the arithmetic partition above.
+_EXACT_DRIVEN_ROUTES: tuple[tuple[str, str, str], ...] = (
+    ("strecker", "methional", "methionine"),
+    ("strecker", "phenylacetaldehyde", "phenylalanine"),
+    ("maillard", "methional", "methionine"),
+    ("maillard", "phenylacetaldehyde", "phenylalanine"),
+    ("maillard", "2_methylbutanal", "isoleucine"),
+    ("maillard", "3_methylbutanal", "leucine"),
+    ("maillard", "2_methylpropanal", "valine"),
+)
+
+
+@pytest.mark.parametrize(("which", "product", "precursor"), _EXACT_DRIVEN_ROUTES)
+def test_every_true_strecker_route_draws_1_to_1_when_the_process_is_actually_driven(
+    schema, aging_params, which, product, precursor
+):
+    """The same claim, but **against the code** rather than the route table (decision D-105).
+
+    The arithmetic test above reads ``n_co2`` out of ``_ROUTES`` — a literal *this file* declares.
+    That pins the **declaration** layer and nothing else: delete the CO₂ term from
+    :meth:`StreckerDegradation.derivatives` and methional starts drawing 0.8 mol methionine per mol
+    methional — **the D-104 error, reintroduced** — while carbon still closes (4 C out, 4 C in) and
+    the table still *says* ``n_co2=1.0``. Conservation would stay green and so would that test.
+    **Both blind to it.** This test drives the Process and reads the debit off ``dy/dt``, so the
+    deletion fails here — which is the only place it fails.
+
+    The distinction is the beat's own lesson turned on its own tripwire: **a calculation that can
+    only produce the answer you expect is not a check**, and `4 + 1 == 5` is that calculation.
+    """
+    proc = StreckerDegradation() if which == "strecker" else MaillardStrecker()
+    y = _driveable_state(schema, aging_params)
+    d = proc.derivatives(0.0, y, schema, aging_params)
+    product_rate = float(d[schema.slice(product)][0])
+    precursor_rate = -float(d[schema.slice(precursor)][0])
+    assert product_rate > 0.0, "the route must actually fire, or this asserts nothing"
+    assert precursor_rate > 0.0
+    mol_product = product_rate / MOLAR_MASS[product]
+    mol_precursor = precursor_rate / MOLAR_MASS[precursor]
+    # A true Strecker degradation consumes exactly one precursor per aldehyde: the aldehyde IS the
+    # amino acid minus its carboxyl (charged as CO2) and its amino group (deaminated to N).
+    assert mol_precursor / mol_product == pytest.approx(1.0, abs=1e-9)
+
+
+def test_the_d75_oxidative_strecker_routes_draw_at_exact_stoichiometry():
+    """The D-104-prescribed audit of D-75, pinned as the acquittal it produced (D-105).
+
+    D-104 left the oxidative Strecker route un-audited for its own error while noting that D-75
+    shares methional and phenylacetaldehyde with the thermal route. It does not have it: methional
+    IS methionine minus its carboxyl and amino groups (C5 -> C4 + CO2), phenylacetaldehyde IS
+    phenylalanine's (C9 -> C8 + CO2). Both charge that CO2, so both land on 1.0000 mol precursor
+    per mol aldehyde and no de-novo share is even expressible -- the mass balance forbids it. The
+    hard gate on the amino-acid pool is therefore the CORRECT topology here, not the sotolon
+    mistake, and this pins that rather than leaving it to be re-litigated.
+    """
+    m_c = MOLAR_MASS["CO2"] * carbon_mass_fraction("CO2")
+    for pool, _fparam, precursor in _STRECKER_ROUTES:
+        c_product = MOLAR_MASS[pool] * carbon_mass_fraction(pool) / m_c
+        c_precursor = MOLAR_MASS[precursor] * carbon_mass_fraction(precursor) / m_c
+        # the whole claim in one line: aldehyde + its carboxyl CO2 == the amino acid, exactly
+        assert c_product + _CO2_PER_STRECKER_ALDEHYDE == pytest.approx(c_precursor, abs=1e-9)
 
 
 # -- the draw idioms close their own ledgers ---------------------------------

@@ -9086,3 +9086,236 @@ this beat asked "is my new code wrong, or was the old expectation?", the answer 
 closure-permeation; variety-specific DMSp; audit the D-75 oxidative route for the D-104 error;
 retire the false `mercaptans` lump; sourced yeast-autolysate spectrum; re-anchor `f_methional`;
 masking (blocked on `cos-alpha`); the `oav` -> `magnitude` rename.
+
+## D-105 — the D-75 audit D-104 prescribed: acquitted on the charge, and the error class turned out to have a signature on the carbon ledger the whole time
+
+**Date:** 2026-07-16. **Milestone 3 / Tier-3, an AUDIT beat — no new Process, parameter, or state slot.** D-104
+closed by naming its own un-run check: "the oxidative (D-75) Strecker route was not re-examined. It shares
+methional and phenylacetaldehyde with D-87 but was not audited for the same amino-acid-vs-keto-acid error." This
+is that audit. **D-75 does not have the error.** But running the check required stating it mechanically, and the
+mechanical form found a real defect **one pool over**, in a route nobody was auditing. Docs + one test + two
+docstring corrections; **no physics changed**.
+
+### The verdict on the charge: acquitted, on topology, not on a band
+
+The D-104 error is a product reality builds from a **mostly-de-novo keto acid** while the model roots it on a
+**must amino acid** — sotolon, an aldol furanone of 2-ketobutyrate, not a Strecker product at all. D-75 makes
+exactly two things and both are *genuine* Strecker degradations: **methional IS methionine** minus its carboxyl
+(CO₂) and amino (NH₃) groups, **phenylacetaldehyde IS phenylalanine's**. So the hard gate on the amino-acid pool
+is the **correct topology here**, not the sotolon mistake — which is what D-104's own `_MAILLARD_PRODUCTS`
+comment already says about these same two molecules ("the five true Strecker aldehydes ... are degradations *of
+the amino acid itself*"). The audit confirms D-75 is **consistent with the classification D-104 already made**.
+
+**This acquittal is deliberately not the D-103 trap.** D-103's lesson was that an uncited band nearly *acquitted*
+a model that should have been convicted — "an uncited number cannot acquit any more than it can convict." So
+this acquittal rests on **no number that could be uncited**: a topology charge answered on topology, from the
+atom counts `chemistry.py` already carries. Verified two ways — by the C-balance, and by **driving each Process**
+and reading the actual debit off `dy/dt` (not by re-deriving its arithmetic, which is how the assumption below
+nearly got me).
+
+### The audit's real product: the error class is MECHANICAL, and conservation is blind to it
+
+To check D-75 the charge had to be made testable. It reduces to one identity:
+
+> A product that is a **true degradation of its precursor** satisfies `C(precursor) == C(product) + C(CO₂ charged)`
+> — every precursor carbon accounted for. Then sizing the draw **by carbon** lands on **exactly 1 mol precursor
+> per mol product**: the real stoichiometry, with **no freedom left over**. Where the identity fails, the draw is
+> a stand-in — the route either sources carbon it does not name, or discards carbon it should charge for.
+
+**Every draw in this tree closes the carbon ledger by construction** — the mass is *defined* as `carbon /
+carbon_mass_fraction(precursor)`. So a draw can conserve carbon to machine precision while consuming **the wrong
+number of moles**, and **no conservation test can ever see it**. "Conservation laws are tests" is a prime
+directive and this is precisely the class of error it is **structurally incapable** of catching. That is why the
+defect below survived D-45 → D-100 → D-104 untouched.
+
+**This is demonstrated, not argued.** Delete the CO₂ term from `StreckerDegradation` — neither emit it nor charge
+it — and methional starts drawing **0.8 mol methionine per mol methional**: the D-104 error, reintroduced in the
+very route this beat acquitted. Carbon closes *perfectly* (4 C out of methionine, 4 C into methional, no CO₂
+anywhere). Run against that mutation:
+
+| guard | verdict on the reintroduced D-104 error |
+|---|---|
+| **all 135 conservation / carbon tests** | **pass** — blind, exactly as the argument predicts |
+| the declaration-layer tripwire (below) | **passes** — blind |
+| **the driven test** (below) | **FAILS** (`assert 0.8 == 1.0`) — the only guard that sees it |
+
+**135 conservation tests cannot see a route stop being the reaction it claims to be.** That is the corollary the
+prime directive needs.
+
+### Applied tree-wide, the signature partitions the tree exactly — and the CO₂ term is the whole difference
+
+Measured by **driving each Process** on a controlled state and reading the precursor debit and product credit off
+`dy/dt` (mol precursor consumed per mol product formed). The routes split into two kinds, and the distinction
+decides what may be claimed:
+
+**(a) Ratio gate-INDEPENDENT** — the route gates its product and its draw *together*, so the gate cancels and the
+measured ratio is a structural constant, not a state artifact:
+
+| route | driven | real | |
+|---|---|---|---|
+| **D-75** methional ← methionine | **1.0000** | 1.0 | exact |
+| **D-75** phenylacetaldehyde ← phenylalanine | **1.0000** | 1.0 | exact |
+| **D-87** methional, phenylacetaldehyde, 2-methylbutanal, 3-methylbutanal, 2-methylpropanal (all five driven) | **1.0000** | 1.0 | exact |
+| **D-45 methanethiol ← methionine** | **0.2000** | 1.0 | **under 5×** |
+
+**(b) Ratio gate-DEPENDENT by design** — a *partial re-sourcing*: the ungated share stays on sugar, so the ratio
+slides with the pool and equals `gate × (structural ratio)`. Driven at saturation (`gate` → 0.9998), with
+`ratio/gate` recovering the structural value **exactly**:
+
+| route | driven | /gate | real | |
+|---|---|---|---|---|
+| D-33 propanol ← threonine | 0.7499 | **0.7500** (3/4) | 1.0 | under |
+| D-33 isobutanol ← valine | 0.7998 | **0.8000** (4/5) | 1.0 | under |
+| D-33 isoamyl alcohol ← leucine | 0.8332 | **0.8333** (5/6) | 1.0 | under |
+| D-33 active amyl ← isoleucine | 0.8332 | **0.8333** (5/6) | 1.0 | under |
+| D-33 2-phenylethanol ← phenylalanine | 0.8887 | **0.8889** (8/9) | 1.0 | under |
+| D-87 sotolon ← threonine | 1.3636 | **1.5000** (6/4) | 1.0 | over |
+
+**The seven exact routes are precisely the seven that charge their decarboxylation CO₂ to the precursor's draw.
+That term is the entire difference.** D-75's advisor called the CO₂ a "must-fix" when the route was built; it is
+why **D-75 is the reference implementation of the idiom it shares**, and the audit's answer to "does D-75 have
+the error" is that D-75 is the route that gets this right. The Ehrlich re-route's shortfall is exactly `(n-1)/n`
+for an n-carbon precursor — **one carbon per precursor, the CO₂ it never charges**.
+
+**Two caught assumptions, logged because both nearly landed — the same trap, twice, in one beat.** (1) The first
+pass of this table fed `n_CO2=1` to the Ehrlich routes and printed a clean `1.0000` for all five. That was **my
+assumption, not the code** — the re-route draws the alcohol's carbon only. (2) The second pass "drove" the
+re-route but inferred `mol alcohol` **from the carbon it drew**, which is the identity `C(alcohol)/C(precursor)` —
+it *cannot* return anything but 5/6, so it confirmed the number while measuring nothing. Only driving the
+**producer and the re-route together** — the producer books the alcohol, the re-route draws the precursor —
+measures it. **A calculation that can only produce the answer you expect is not a check**, and it printed the
+right number both times. This is D-102's "claimed a bracket, checked an overlap" in its third costume; the
+sotolon row is what exposed it (1.3636 driven vs the 1.5000 the C-balance predicts — the gap *is* the gate).
+
+### The finding: D-45 under-draws methionine 5×, and the file's own docstring convicts it
+
+`mercaptans.py` names its mechanism in prose: methionine, "the sulfur-bearing amino acid whose **demethiolation**
+genuinely releases methanethiol". Demethiolation is `1 mol methionine → 1 mol methanethiol + 1 mol 2-oxobutyrate
++ NH₃`. The draw is sized to **the thiol's single carbon**, so it consumes **0.2 mol methionine per mol thiol** —
+methionine's other four carbons never charged, its nitrogen released at 1/5 the real rate.
+
+**No literature is needed to convict**: this is an **internal contradiction** between the mechanism the file names
+and the arithmetic it performs. A source is needed only to *fix* it. And D-100's line here — "**The D-45 caveat is
+retired, not restated**" — **overclaimed**: the *identity* was retired (arginine → methionine, a real fix; arginine
+has no sulfur and could not make a mercaptan), the *stoichiometry* was not. Half a caveat was retired and the
+sentence claimed all of it.
+
+### It is currently inert — measured across every regime, not asserted
+
+A defect that changes no output is worth stating as exactly that:
+
+| regime | mercaptan route | methionine pool | does the 5× bite? |
+|---|---|---|---|
+| **sur lie** (autolysis) | fires | **2.74 → 5.88 mg/L** (refills) | **no** — corrected draw is 3.6% of the pool; never limiting |
+| no lees, dosed 0.5 g/L | **silent** (rides the autolysis flux) | 2.50 → 2.46 mg/L | no — the draw is exactly zero |
+| no lees, undosed | silent | 0 | no — everything silent |
+
+The route **only fires sur lie**, and sur lie autolysis refills methionine **faster than every consumer draws
+it**. So there is **no regime in which the 5× changes an output**. Real, recorded, not patched — and the gate
+feedback that *would* make it bite (a corrected draw closing the depletion gate sooner) needs a limiting pool
+that never occurs.
+
+### Why it is not fixed here: the two anomalies are ONE missing molecule, from opposite sides
+
+Drawing the honest 1 mol would **strand four carbons with nowhere to go** — the model has no **2-oxobutyrate**
+pool. That is the *same* molecule sotolon needs, which D-104 fabricates from sugar via `de_novo=True`. So:
+
+> **Methionine demethiolation PRODUCES 2-oxobutyrate and the model throws it away. Sotolon CONSUMES
+> 2-ketobutyrate and the model invents it from sugar. They are the same molecule, in the same wine, on the same
+> aging phase.**
+
+The keto-acid node — already the next milestone, argued there from the *fusel* side (valine → KIC → isoamyl,
+propanol's growth-only production) — turns out to have a **producer and a consumer already sitting in the tree**.
+That is an argument for the node **from inside the model**, independent of the tracer sourcing, and it was
+invisible until the signature named both routes.
+
+### A second gap, surfaced not patched: methionine has NO fermentation-phase consumer at all
+
+Measured on a 0.5 g/L dose through a full ferment — **methionine is consumed 0.00%**, the only speciated pool
+untouched (leucine/isoleucine/valine/threonine/phenylalanine 100%, arginine/glutamine 98%). It leaves
+fermentation at **100% of its dose**. Three deliberate decisions compose into it: the six precursors are excluded
+from the yeast's nitrogen draw (`ASSIMILABLE_SPECS` = {arginine, generic} — the D-100 decoupling, load-bearing and
+correct); the other five precursors are drained by the Ehrlich re-route + D-104's sink; and **methionine alone has
+no Ehrlich route** — the model has no `methionol` pool (methionine's actual fusel), a molecule that appears
+**nowhere in the tree**.
+
+**D-100 saw the mechanism and read it the other way — which is why nobody chased it.** Its entry records
+"**NO FUSEL EATS IT**", framed as the *reassuring* half: methionine was flagged as the highest-risk precursor
+(scarcest at 0.005, three consumers) and turned out **safest**, because nothing competes for it. That is the same
+fact as this one. The reading that was missing is the flip side — nothing competing for it means **nothing
+consumes it**, which is over-retention, not safety. D-100 was answering "can methionine be starved?" (no), and
+the question that mattered was "should it survive fermentation intact?" (also no).
+
+**D-104's anabolic sink cannot reach methionine BY CONSTRUCTION.** The sink is parameterised as
+`f_non_ehrlich_*` = 1 − (this alcohol's share) — a definition that **only exists where there IS an alcohol**. So a
+precursor with no Ehrlich route gets no protein sink, and D-104's sourced 77–86%-to-protein is **inexpressible for
+methionine** in the architecture D-104 chose. D-75's methional therefore feeds on a pool reality would have
+largely eaten. **This is D-104's own finding, one pool over — and it was invisible from the fusel side because
+methionine has no fusel to be wrong about.** Named, not built: it needs a source, and it needs the sink's
+parameterisation reconsidered, not extended.
+
+### The lessons
+
+(i) **A closed ledger is not a correct draw.** Conservation is this project's sharpest instrument and it is
+*structurally blind* to stoichiometry whenever the draw is carbon-sized — a draw defined to close the ledger can
+never violate it. The prime directive needs the corollary. (ii) **The D-104 error class had a signature on the
+carbon ledger the whole time.** D-100→D-104 spent four beats on tracer papers to reach conclusions that
+atom-counting shows in one line; the sourcing was still necessary for the *magnitudes*, but **sourcing is not the
+only instrument, and it was reached for first**. (iii) **A docstring claim binds only the set it describes** —
+D-104's lesson was about a citation; here it is our own prose. "The draw is a chemical claim rather than a
+stand-in" is true of **seven** routes and false of **seven** (five Ehrlich + mercaptan + sotolon), *in the same
+helper* — an even split, which is worth stating precisely because "three" was the first number written here and
+it counted route *families*, not routes. (iv) **An audit that acquits its
+target can still find the bug** — one pool over, in a route nobody charged. (v) **Measuring the code beats reading
+the code**: the assumption caught above printed a clean, wrong table that agreed with my reading perfectly.
+
+### The receipt
+
+**1131 → 1140 passed** (both counts *measured* by `--collect-only` against `HEAD`, not computed — D-103's lesson
+was that the one number which had to be real was the one it did not check; the first draft of this line said
+"1131 → 1133" and was **already stale**, because the advisor's catch added the seven driven routes after it was
+written). **+9 is the whole change and nothing was displaced**: no existing assertion moved, because no physics
+did. `ruff` + `mypy` clean, benchmarks untouched. The two docstring corrections and this entry are the rest.
+
+The signature is now a **tripwire, not a finding** — in **two layers, and the second one is the load-bearing
+one**:
+
+1. **Declaration layer.** `test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the_co2`
+   walks every route in `_STRECKER_ROUTES` + `_MAILLARD_PRODUCTS` + `FUSEL_SPECS` + the mercaptan and fails any
+   whose carbon-sized draw is not its molar stoichiometry, unless it is in `_KNOWN_NON_STOICHIOMETRIC` **with the
+   carbon that explains it**. An allow-list, not a waiver; its stale-waiver arm fails if a listed route is
+   silently fixed. The list **is the keto-acid node's work-list, written down**.
+2. **Code layer.** `test_every_true_strecker_route_draws_1_to_1_when_the_process_is_actually_driven` **drives**
+   the seven gate-independent exact routes and reads the debit off `dy/dt`.
+
+**Layer 1 alone was not enough, and finding that out is part of the beat.** It reads `n_co2` out of a table *this
+file declares* — for the D-75 rows it asserts `4 + 1 == 5`, which is true no matter what the Process does. My
+first two mutation tests both edited **the table**, so they verified the guard at the only layer it covers and I
+read that as code-level protection. **The advisor caught it**: the entry claimed "fails any new route that
+drifts, and conservation cannot" and that was **false for implementation drift**. The measured table above is the
+proof — and it is this beat's own lesson (v) turned on its own tripwire: **`4 + 1 == 5` is a calculation that can
+only produce the answer you expect.** The driven test is what makes the claim true; the mutation that deletes the
+CO₂ term now fails **there and nowhere else in 1140 tests**.
+
+`test_the_d75_oxidative_strecker_routes_draw_at_exact_stoichiometry` pins the acquittal so it is not
+re-litigated.
+
+### Not done, deliberately
+
+- **The mercaptan 5×** — blocked on the 2-oxobutyrate pool; it is the keto-acid node's, and the node now has a
+  second, independent reason to exist.
+- **The Ehrlich re-route's `(n-1)/n`** — **the cheapest real fix on the list and NOT blocked**: CO₂ is already a
+  tracked pool, so the re-route could charge it exactly as D-75/D-87 do. But it makes every precursor deplete
+  ~20% faster and release ~20% more nitrogen, landing directly on **D-104's freshly-landed split** — that beat's
+  call, with measurement, not a drive-by from an audit. **Whether it shifts D-104's numbers is NOT claimed here;
+  it was not measured.**
+- **Methionine's missing assimilation + anabolic sink**, and the absent **`methionol`** pool — its own beat, needs
+  a source.
+- **`f_methional` re-anchoring** stays separate: a magnitude question, not the topology charge.
+- **The D-75 quinone double-count** (the inherited D-73 additive-share lump) was not re-opened — out of scope.
+
+**Next:** the **keto-acid node** / de-novo precursor synthesis as one coupled milestone (now with an in-tree
+producer + consumer argument); the Ehrlich CO₂ charge as D-104's follow-up; methionine's assimilation/sink +
+`methionol`; DMS closure-permeation; variety-specific DMSp; retire the false `mercaptans` lump; sourced
+yeast-autolysate spectrum; re-anchor `f_methional`; masking (blocked on `cos-alpha`); the `oav` → `magnitude`
+rename.
