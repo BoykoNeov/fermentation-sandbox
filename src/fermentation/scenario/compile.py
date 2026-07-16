@@ -401,8 +401,9 @@ def _wine_amino_acids(values: Mapping[str, float], parameters: ParameterSet) -> 
     uncertainty bands would otherwise break a sum-to-one assertion on nearly every draw. So
     ``amino_acids_gpl`` is exactly conserved into the pools whatever the fractions are, and the
     dose means "this much assimilable amino acid" — never "this much times whatever the spectrum
-    happens to add up to". Overrides are applied **after** the split and do NOT re-normalize: an
-    override is an addition to the must, so it raises the total assimilable dose.
+    happens to add up to". An override **replaces** that pool's share outright (absolute, not
+    additive) and does not re-normalize the others, so it raises or lowers the total assimilable
+    dose accordingly — which is what "hold the must, spike the leucine" requires.
 
     An absent/zero dose leaves every pool at 0 — the isolability guarantee (D-32): every gate
     reads exactly 0 and the run is byte-for-byte the validated core.

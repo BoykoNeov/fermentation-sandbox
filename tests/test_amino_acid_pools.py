@@ -55,22 +55,40 @@ def test_every_per_species_gate_reduces_to_the_lumped_gate_at_spectrum_compositi
 
     THE property that makes the D-100 gate rule honest rather than a guess. ``K_i = K·f_i`` is
     derived from constants already sourced (``K_amino_acids`` + the must spectrum), and it means
-    ``aa_i/(K·f_i + aa_i) = f_i·aa/(f_i·K + f_i·aa) = aa/(K + aa)`` exactly. So speciation is a
-    provable no-op on the rate at the composition a dose creates, and only the pool DRIFTING away
-    from that composition — the actual D-100 pathology — changes anything.
+    ``aa_i/(K·f_i + aa_i) = f_i·aa/(f_i·K + f_i·aa) = aa/(K + aa)``. So speciation is a no-op on the
+    rate at the composition a dose creates, and only the pool DRIFTING away from that composition —
+    the actual D-100 pathology — changes anything. Without it, every closed-form assertion the
+    eight consumer suites carry would have been silently re-baselined by the split.
 
-    Without this, every closed-form assertion the eight consumer suites carry would have been
-    silently re-baselined by the split rather than preserved.
+    TWO CLAIMS OF DIFFERENT STANDING, asserted separately below. That all species and subsets agree
+    is STRUCTURAL (any fractions). That the shared value equals the PRE-SPLIT LUMPED gate is
+    CONTINGENT on the spectrum summing to 1: a dose is apportioned `f_i·D/Σf`, so a spectrum summing
+    to F seeds `D/F` and gives `(D/F)/(K + D/F)`. The sourced fractions sum to exactly 1.000 today,
+    so it holds — but an ENSEMBLE sampling their uncertainty bands has F != 1 on nearly every draw
+    and shifts the baseline slightly (acceptable: the fractions are speculative). This test pins the
+    CURRENT values and will fail if a re-source breaks the sum — which is the point.
     """
     y = schema.zeros()
     seed_amino_acids(y, schema, params, total)
+
+    # (a) STRUCTURAL: every species and every subset agree, because the rule scales K by the
+    # substrate's summed share. This is what lets the identity-agnostic consumers gate on
+    # {arginine, generic} without silently shrinking to 0.81x.
+    gates = [depletion_gate(y, schema, params, (spec,)) for spec in AMINO_ACID_SPECS]
+    for gate in gates:
+        assert gate == pytest.approx(gates[0], rel=1e-12)
+    assert depletion_gate(y, schema, params, ASSIMILABLE_SPECS) == pytest.approx(
+        gates[0], rel=1e-12
+    )
+    assert depletion_gate(y, schema, params, AMINO_ACID_SPECS) == pytest.approx(gates[0], rel=1e-12)
+
+    # (b) CONTINGENT on the sourced fractions summing to 1 (they do, exactly): the shared value is
+    # the PRE-SPLIT lumped gate, so the split does not move the dosed baseline.
+    assert sum(params[spec.fraction_param] for spec in AMINO_ACID_SPECS) == pytest.approx(
+        1.0, abs=1e-12
+    )
     lumped = total / (params["K_amino_acids"] + total)
-    for spec in AMINO_ACID_SPECS:
-        assert depletion_gate(y, schema, params, (spec,)) == pytest.approx(lumped, rel=1e-12)
-    # ...and for any SUBSET, since the rule scales K by the substrate's summed share. This is what
-    # lets the identity-agnostic consumers gate on {arginine, generic} without shrinking to 0.81x.
-    assert depletion_gate(y, schema, params, ASSIMILABLE_SPECS) == pytest.approx(lumped, rel=1e-12)
-    assert depletion_gate(y, schema, params, AMINO_ACID_SPECS) == pytest.approx(lumped, rel=1e-12)
+    assert gates[0] == pytest.approx(lumped, rel=1e-12)
 
 
 def test_the_gate_bites_per_species_once_the_pool_leaves_spectrum_composition(schema, params):

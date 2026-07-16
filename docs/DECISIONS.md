@@ -8092,3 +8092,146 @@ the **isoamyl-acetate carbon re-route** off `isoamyl_alcohol` (the D-69 5:2 inve
 beer propanol** concentration (the one author estimate here) and **in-matrix beer thresholds** for the four chemistry-only alcohols
 (Meilgaard 1975/Engan 1972 paywalled); per-ester `dH`/`E_a` (blocked); masking/suppression (blocked on `cosα`); further fruity esters;
 a beer-specific per-melanoidin A420 yield; the on-ledger thermal-caramelization aroma co-product; the `oav` → `magnitude` rename.
+
+---
+
+## D-100 — the lumped `amino_acids` pool split into EIGHT single-molecule pools: the last shared substrate
+
+**Status:** built (2026-07-16). Third and last of the pool splits (D-96 esters → D-99 fusels → D-100 amino acids). `mercaptans` is
+now the only lump left in the project.
+
+**What forced it — D-99's own finding, not a preference.** The fusel split raised the higher alcohols ~3.8× (an honest, *forced*
+rise) and broke three tests in unrelated subsystems: Maillard, Brett growth, MLF growth. All three through one channel. The D-33
+`FuselAminoAcidReroute` re-sourced Ehrlich fusel carbon from the lumped `amino_acids` pool — that is, **from ARGININE, which makes no
+higher alcohol** — and drained it to ~0. A pre-D-99 emulation proved D-99 did not *create* the pathology: the re-route already ate
+~96.5% of the pool, and sotolon passed only on the old lump's under-production. The finding was structural and general: **two
+speciated-scale consumers cannot share one lumped substrate.** D-99 pinned it as a fails-if-fixed tripwire and deferred the fix here.
+
+**The eight pools.** Six **precursors** — each the amino acid whose skeleton actually becomes a specific product, so drawing it is a
+chemical claim rather than a bookkeeping stand-in — and two **identity-agnostic** pools:
+
+| pool | fusel (D-99) | thermal / oxidative product |
+| --- | --- | --- |
+| `leucine` | isoamyl_alcohol | 3-methylbutanal (D-87) |
+| `isoleucine` | active_amyl_alcohol | 2-methylbutanal |
+| `valine` | isobutanol | 2-methylpropanal |
+| `threonine` | propanol | **sotolon** (via α-ketobutyrate) |
+| `phenylalanine` | 2_phenylethanol | phenylacetaldehyde (D-75/D-87) |
+| `methionine` | — | methional (D-75/D-87) + methanethiol (D-45) |
+| `amino_acids` (arginine) + `amino_acids_generic` (glutamine) | — | identity-agnostic: yeast swap (D-32), MLF growth (D-38), Brett growth (D-40), Maillard browning (D-89) |
+
+`proline` is deliberately **excluded**: not assimilated anaerobically (excluded from YAN by definition), so `amino_acids_gpl` is
+honestly an *assimilable* dose and must's ~48% proline never enters the model. **The `amino_acids` slot keeps its name** and stays the
+arginine pool — renaming would touch every consumer a second time for no fidelity gain (advisor-confirmed).
+
+**THE DECOUPLING — the structural claim the beat rests on.** `FuselAminoAcidReroute.touches` no longer names `amino_acids` at all.
+Precursor consumers and identity-agnostic consumers address **disjoint** pools, so fusel production **cannot** starve bacterial
+growth — impossible by construction, not tuned away. Measured: arginine ends at 0.0101 g/L with the re-route ON vs 0.0132 OFF (it was
+~1e-5 vs ~0.2 under the lump — five orders). `test_no_precursor_is_also_an_identity_agnostic_pool` fails if a future beat blurs the
+sets, forcing the argument to be re-made rather than silently lost.
+
+**THE GATE RULE — one uniform rule, zero new parameters.** Every consumer gates on its own substrate with its existing
+half-saturation scaled by that substrate's must-spectrum share: `gate_i = aa_i / (K·f_i + aa_i)`, `f` summed over multi-pool draws
+(so the generic gate uses `f_arg + f_generic` ≈ 0.81; the two bacterial Processes pass their own `K_aa_mlf`/`K_aa_brett` rather than
+having D-100 quietly re-point them at the shared constant). Derived from `K_amino_acids` (already sourced, already shared) plus the
+D-100 spectrum — **prime directive #2 respected without inventing a number.**
+
+**It is NOT a Michaelis constant and does not pretend to be.** `K_amino_acids` never was one — it is an availability proxy calibrated
+at pool scale; scaling it by the spectrum keeps it an availability proxy at *species* scale, a **relative-depletion** measure, honest
+because it is labelled as one. Per-species Michaelis constants would be eight unsourced numbers wearing the costume of fidelity — the
+**D-98 trap**, declined here exactly as D-99 declined per-species activation energies.
+
+**The reduction property — and the two claims inside it, which have DIFFERENT standing.** At must-spectrum composition
+`gate_i = f_i·aa/(f_i·K + f_i·aa) = aa/(K + aa)`.
+
+* **Structural (any fractions):** every species and every subset agree. This is what lets the identity-agnostic consumers gate on
+  {arginine, generic} without silently shrinking to 0.81×.
+* **Contingent on `Σf = 1`:** that the shared value equals the *pre-split lumped* gate. A dose is apportioned `f_i·D/Σf`, so a
+  spectrum summing to `F` seeds `D/F` and yields `(D/F)/(K + D/F)` ≠ `D/(K+D)`. The sourced fractions sum to **exactly 1.000**, so it
+  holds today — verified by hand at a hypothetical `F = 1.05`, where subsets still agree (0.8840) but the lumped match breaks (vs
+  0.8889). **An ensemble sampling the fractions' bands therefore shifts the baseline slightly on nearly every draw** (acceptable at
+  this tier — they are speculative). The advisor caught this conflation in my own docstrings; the test now asserts the two claims
+  separately and will fail if a re-source breaks the sum.
+
+This property is *why the split is auditable*: every closed-form suite (D-45/D-75/D-87/D-89, the re-route) keeps asserting **the same
+numbers**, because the tests seed at spectrum composition where speciation is provably a no-op on the rate. Nothing was re-baselined
+to accommodate the split; anything a test still caught was a real change.
+
+**TWO LUMPS RETIRED — not restated.** The D-96 rule ("the honest fix is another pool, never another disclaimer") paid twice:
+
+1. **D-33's nitrogen over-release.** Sourcing fusel carbon through 4-nitrogen arginine deaminated ~0.78 g N per g fusel carbon —
+   **~4×** the real leucine→isoamyl N:C. Each precursor now releases the nitrogen it actually carries.
+2. **D-45's sulfur-free mercaptan.** The thiol draw booked **arginine — a molecule containing no sulfur** — as methanethiol's source.
+   It is now methionine, whose demethiolation genuinely releases it.
+
+**THREE EMERGENT FINDINGS the lump could not express.**
+
+1. **The anabolic/catabolic split is now EMERGENT.** Real must carries ~30–60 mg/L leucine but wine makes ~150–250 mg/L isoamyl
+   alcohol: **most higher alcohol is synthesised de novo from sugar**, not catabolised. The lump let the re-route draw a fixed
+   gate-fraction from a big arginine pool forever, which is nonsense. Now leucine's own gate throttles its re-route as leucine
+   depletes (measured: leucine supplies only ~7% of the isoamyl carbon) and the rest stays on the sugar stand-in — so the ratio
+   *falls out of* the must spectrum and the fusel demand instead of being fitted. **The sugar stand-in D-19 apologised for is no
+   longer an embarrassment: it is the correct book for de-novo synthesis.**
+2. **Aging precursors are dominantly AUTOLYSIS-SOURCED; thermal/oxidative Strecker aroma is strongly lees-dependent.** Fermentation
+   strips the Ehrlich precursors; autolysis (D-34) is the model's only amino-acid *source*, and since D-100 it releases the full
+   spectrum rather than pure arginine. Measured with lees on: phenylalanine 1.6e-5 → 44.8 mg/L, phenylacetaldehyde 0.016 → 1631 µg/L,
+   restoring the literature phenyl-dominant ordering. The published sur-lie mechanism, arriving as a *consequence of speciation*
+   rather than a modelled rule.
+3. **`f_methional` (D-75) was a lump for precursor ABUNDANCE** — its own code comment said so ("phenylalanine is the more abundant
+   must precursor") — which D-100 now models explicitly. **Deliberately NOT re-anchored here**: out of scope, and re-anchoring a
+   parameter to make a test pass is precisely the D-99 anti-tuning violation.
+
+**THE MAGNITUDE OF (2) IS NOT VALIDATED — the honesty that matters most here.** The model currently says a no-lees aged wine makes
+*essentially zero* branched-chain Strecker aldehyde. That extreme is **amplified by an unconstrained speculative parameter, not
+derived**: the re-route's catabolic fraction is a lumped estimate (~0.5 via the shared gate) against a literature contribution nearer
+20–50%, so this model drains the precursors **harder than reality** — corroborated by the 1631 µg/L phenylacetaldehyde landing above
+the literature 10–100 µg/L band. **The DIRECTION is sourced; the MAGNITUDE is artifact-tinged.** Bounding the catabolic fraction is
+deferred (unsourced today — the D-98 trap again). The `< 1e-9` assertion is recorded as a **tripwire on current behaviour**: if the
+fraction is ever bounded, that test should move, and moving it is the signal the magnitude got honest — not a regression.
+
+**THE TRIPWIRE FLIPPED.** sotolon OAV **0 → 3.22** with the re-route ON. The D-99 known-limitation test is deleted per its own
+instructions, and — the advisor's call — **replaced with a positive assertion** so its coverage does not vanish with the pathology,
+plus a second test pinning the autolysis dependency. **Methionine, flagged as the highest-risk precursor (scarcest at 0.005, three
+consumers), turned out to be the SAFEST for a structural reason: no fusel eats it**, so methional held at OAV 60. The casualty was
+**phenylalanine** instead — drained by 2-phenylethanol. *Fourth time a risk/sourcing call landed on the wrong molecule and only
+looking settled it* (cf. D-99's active-amyl and propanol calls).
+
+**WHAT D-100 DOES NOT FIX, pinned not hidden.** Speciation does not end precursor competition — it **localises** it. Threonine still
+feeds both propanol and sotolon; leucine both isoamyl alcohol and 3-methylbutanal. Those are **the same molecule in reality**, so the
+competition is real chemistry and the model *should* show it (sotolon stays below its no-re-route value — just no longer silenced).
+What is removed is the **false** competition: fusels vs arginine, which share no chemistry at all. Also unfixed: the release uses the
+**must** spectrum, but autolysate is protein hydrolysate — richer in branched-chain/sulfur AAs, far poorer in arginine — so it
+*understates* exactly the precursors the aroma routes want. The error is conservative (under-produces rather than invents) and
+re-sourcing it is a parameter-file change, not a structural one. Non-preferential uptake is likewise a modelling choice, not a claim:
+real yeast prefer via nitrogen catabolite repression; per-species uptake constants are unsourced.
+
+**Dose API (owner's choice):** fixed must-spectrum split + per-species `<species>_gpl` **absolute** overrides (spike the leucine, hold
+the must). Fractions are **normalized, not asserted to sum to 1** — they are eight independent provenance entries, each re-sourceable
+alone, and an ensemble sampling their bands would break a sum-to-one assertion on nearly every draw. Spectrum recorded from two
+published *Vitis vinifera* profiles (PMC6222330 Cabernet, PMC12191762 Asprinio) **before any wiring** — the D-99 anti-tuning
+discipline. The large varietal variable is the arginine-vs-generic split (Cabernet 47%, Asprinio 25%), and it lands entirely on the
+identity-agnostic pools — so it cannot move the tripwire, which turns on the precursors.
+
+**Guarantees widened from one species to a BLEND, and re-proved rather than assumed.** D-32's no-sugar-creation, D-38/D-40's positive
+carbon shortfall and D-89's positive denominator all rested on arginine's C:N (1.29) sitting below biomass's (4.3) and melanoidin's
+(8). The drawn blend is now state-dependent, so each is re-established by **bounding** it: any {arginine, glutamine} blend lies
+between 1.29 and 2.14, so all three orderings hold for *any* pool composition — structural still, no clamp, no C⁰ kink for the BDF
+solver. The D-89 margin narrows honestly from 0.81·c_m to 0.69·c_m at worst and is asserted at both ends. D-34's debris remainder is
+re-proved against the *spectrum's* C:N (~1.9, up from 1.29) versus biomass's 4–11 floor. **`assimilable_carbon_per_nitrogen` and
+`draw_assimilable_nitrogen` share one split rule** precisely because MaillardBrowning sizes its melanoidin from the ratio *before*
+drawing — a drift between them would break carbon closure invisibly.
+
+**Solver-noise note (a finding in itself).** Two `assert_nonnegative` guards began failing at ~-1e-9 — **exactly the solver's own
+`atol` (1e-9)**. Verified as noise, not drift: the excursion tracks `atol` ~1:1 (1e-9 → -1.1e-9, 1e-11 → -1.3e-12, 1e-13 → -1.1e-14)
+with the trajectory unchanged. Asserting tighter than the integrator's own promise tests scipy, not the model, so those two sites now
+pass `atol=1e-8` with the reasoning recorded. **That this only began mattering at D-100 is the fix working:** D-33's retired
+over-release was propping up YAN ~4×; each precursor now releases its real nitrogen, so `N` reaches zero as it should.
+
+**Verification:** 1094 tests pass; §2.2 benchmarks **16/16** (undosed runs byte-for-byte — every gate is exactly 0 with no dose, so
+the validated core is untouched); ruff + mypy clean. Carbon and nitrogen close to machine precision at every rewired call site.
+
+**Next:** **bound the re-route's catabolic fraction** (the magnitude limit above — the highest-value follow-up this beat creates); a
+sourced **yeast-autolysate** amino-acid spectrum (vs the must stand-in); **per-species uptake preference** (NCR) and per-species
+`E_a`/gates to make the fusel spectrum dynamic (all blocked on sourcing — the D-98 trap); re-anchor **`f_methional`** now that
+abundance is modelled explicitly; the isoamyl-acetate **carbon re-route** (D-69's 5:2 inverse); speciate **`mercaptans`** — the last
+lump; per-ester `dH`/`E_a` (blocked); masking (blocked on `cosα`); further fruity esters; the `oav` → `magnitude` rename.

@@ -47,11 +47,20 @@ with ``f`` summed over the substrate for a multi-pool draw (so the generic gate 
 and the D-100 must spectrum (recorded from literature before any wiring). Two properties make it
 the honest choice:
 
-  * **It reduces exactly.** At must-spectrum composition ``aa_i = f_i·aa_total``, so
-    ``gate_i = f_i·aa_total/(f_i·K + f_i·aa_total) = aa_total/(K + aa_total)`` — *byte-for-byte the
-    old lumped gate*, for every species. The split therefore does not silently move the dosed
-    baseline; only the pool drifting away from spectrum composition changes anything. Pinned by
-    ``test_every_per_species_gate_reduces_to_the_lumped_gate_at_spectrum_composition``.
+  * **It reduces.** At must-spectrum composition ``aa_i = f_i·aa_total``, so
+    ``gate_i = f_i·aa_total/(f_i·K + f_i·aa_total) = aa_total/(K + aa_total)`` — the same gate for
+    **every species and every subset**, so the split does not silently move the dosed baseline.
+    Pinned by ``test_every_per_species_gate_reduces_to_the_lumped_gate_at_spectrum_composition``.
+
+    **Two claims, with different standing — do not conflate them.** That all subsets agree is
+    *structural*: it falls out of the algebra for any fractions. That the common value equals the
+    **pre-split lumped gate** is *contingent on ``Σf = 1``*, which the sourced spectrum happens to
+    satisfy exactly today. Since a dose is apportioned as ``f_i·D/Σf`` (:func:`normalized
+    <fermentation.scenario.compile._wine_amino_acids>`), a spectrum summing to ``F ≠ 1`` seeds
+    ``D/F`` and gives ``(D/F)/(K + D/F)`` — not ``D/(K+D)``. So an **ensemble sampling the
+    fractions' uncertainty bands shifts the baseline slightly** on nearly every draw (acceptable at
+    this tier; the fractions are speculative), and a future re-source that breaks the sum would move
+    it permanently. The reduction test pins *current* values and will catch that.
   * **It bites where the physics is.** When one species is preferentially drained — exactly the
     D-100 pathology — *its own* gate falls while the others' do not. The lumped gate could not
     express that: it read a pool 38% arginine and concluded leucine was abundant.
@@ -262,8 +271,19 @@ def release_spectrum_nitrogen(
     arginine — a molecule that feeds no Ehrlich alcohol and no Strecker aldehyde — so the pool it
     refilled could not restore the aroma routes that had drained. Releasing the spectrum puts
     leucine, methionine and threonine back, which is how a real *sur lie* wine regenerates the
-    precursors fermentation consumed. Thermal Strecker aroma in an aged wine therefore now
-    *depends on autolysis*, which is the published mechanism, not a modelling artifact.
+    precursors fermentation consumed. Aging precursors are therefore now **dominantly
+    autolysis-sourced**, and thermal/oxidative Strecker aroma is **strongly lees-dependent** — the
+    published sur-lie mechanism, arriving as a consequence of speciation rather than a modelled
+    rule.
+
+    **The DIRECTION is sourced; the MAGNITUDE is not — do not read the extreme as a prediction.**
+    The model currently says a no-lees aged wine makes *essentially zero* branched-chain Strecker
+    aldehyde. That extreme is amplified by an unconstrained speculative parameter, not derived: the
+    re-route's catabolic fraction is a lumped estimate (~0.5 via the shared ``K_amino_acids`` gate)
+    while the literature catabolic contribution is nearer 20-50%, so this model drains the
+    precursors **harder than reality does**. Bounding that fraction is deferred (unsourced today —
+    the D-98 trap), and until it lands, "silent without lees" is *what the current re-route
+    fraction gives*, not a validated claim. The lees-enrichment direction stands on its own.
 
     **DOCUMENTED LIMITATION (decision D-100):** the release uses the **must** spectrum, because a
     sourced yeast-**autolysate** amino-acid spectrum is not in hand. Autolysate is protein

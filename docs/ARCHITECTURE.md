@@ -32,7 +32,7 @@ Package map:
 |-------|---------|-----------|
 | parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` |
 | units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, … |
-| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon/nitrogen fractions, Gay-Lussac split, `sugar_species`); `acidbase` (`solve_ph`, `ph_of_state`, `titratable_acidity`, `ph_tier`, `speciate_so2`, charge balance); `kinetics` (growth, uptake, ethanol inhibition, Arrhenius, esters/fusels, acetaldehyde, vicinal diketones, H₂S, malolactic, amino-acid ledger, autolysis, temperature ramp, carrying-capacity cap) |
+| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon/nitrogen fractions, Gay-Lussac split, `sugar_species`); `acidbase` (`solve_ph`, `ph_of_state`, `titratable_acidity`, `ph_tier`, `speciate_so2`, charge balance); `kinetics` (growth, uptake, ethanol inhibition, Arrhenius, esters/fusels, acetaldehyde, vicinal diketones, H₂S, malolactic, the speciated amino-acid pool registry (`amino_acid_pools`, D-100) + ledger, autolysis, temperature ramp, carrying-capacity cap) |
 | runtime | `fermentation.runtime` | `simulate`, `Trajectory`; `simulate_scheduled`, `ScheduledEvent`, `ScheduledTrajectory` (event loop); `simulate_ensemble`, `Ensemble` (stochastic wrapper) |
 | scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` (`.run` / `.run_ensemble`); intervention verbs `add_dap` / `add_so2` / `rack` / `pitch_mlf` |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
@@ -60,8 +60,8 @@ Milestone 2 grows the vector further with additive, isolable pools introduced by
 their respective Processes — aroma byproducts (`esters`/`fusels` and their gas
 sinks, `acetaldehyde`, diacetyl's α-acetolactate/`diacetyl`/butanediol pools,
 `h2s`), the wine acid/SO₂ system (`tartaric`/`malic`/`lactic`/`cation_charge`,
-`so2_total`), and the MLF/nitrogen machinery (`X_mlf`, `citrate`, `amino_acids`,
-`debris`). Each defaults to 0 (or is dosed at the compile seam) so a scenario that
+`so2_total`), and the MLF/nitrogen machinery (`X_mlf`, `citrate`, the eight speciated
+amino-acid pools, `debris`). Each defaults to 0 (or is dosed at the compile seam) so a scenario that
 doesn't use it stays byte-for-byte the validated core (prime directive #3); most
 are detailed in the pH/aroma sections below and in `DECISIONS.md`.
 
@@ -275,9 +275,12 @@ construction). Opened as the first beat of Milestone 3 (`docs/plans/milestone-3-
   matrix gap in `notes`). Stored in µg/L (the literature unit), crossed to canonical g/L at
   the boundary via `units.convert.ugl_to_gpl`. `sensory_profile` reports **per-compound** OAVs
   + above-threshold flags (never a summed scalar — summing assumes contested additivity).
-- **Lumped pools (D-66).** `esters`/`fusels`/`mercaptans` are read against one named
-  representative's threshold (isoamyl acetate / isoamyl alcohol / methanethiol), with the
-  "assumes fixed lump composition" honesty cost flagged in provenance. `iso_alpha`/IBU is
+- **Lumped pools (D-66) — only `mercaptans` remains.** The lump read one named
+  representative's threshold and paid an "assumes fixed lump composition" honesty cost in
+  provenance. D-96 split the esters, D-99 the fusels, and D-100 the `amino_acids` substrate
+  they draw on; `mercaptans` (methanethiol) is **the last lumped pool in the project**. The
+  guard derives from the `AromaCompound.lumped` flag rather than a hardcoded list, so the
+  caveat cannot linger on a pool that stopped being lumped. `iso_alpha`/IBU is
   excluded — a *taste*, already read out by `ibu_series` (D-64).
 - **Descriptor projection — beat 1b slice 1 (D-95), `sensory/descriptors.py`.** Projects the
   OAV vector onto a descriptor vocabulary: wine's 19 / beer's 10 aroma pools → **14 / 9 axes**

@@ -372,6 +372,47 @@
 > with a **representative-compound threshold per lump** (owner call, over the
 > single-compound-only alternative).
 
+> **PROGRESS (D-100, 2026-07-16): the lumped `amino_acids` pool SPLIT into EIGHT single-molecule pools — the LAST shared
+> substrate (1094 tests, +24; benchmarks 16/16; ruff+mypy clean). The lump D-99 exposed, resolved: six PRECURSORS
+> (leucine/isoleucine/valine/threonine/phenylalanine/methionine — each the molecule whose skeleton actually becomes a product)
+> plus two IDENTITY-AGNOSTIC pools (`amino_acids`, kept as the arginine slot, + `amino_acids_generic` as glutamine). Ten
+> consumers rewired. THE DECOUPLING: the D-33 reroute no longer touches `amino_acids` AT ALL — precursor and identity-agnostic
+> consumers address DISJOINT pools, so fusel production CANNOT starve MLF/Brett/yeast-growth (structurally impossible, not
+> tuned away; arginine ends 0.0101 with the reroute ON vs 0.0132 OFF, was ~1e-5 vs ~0.2). THE GATE RULE, one uniform rule with
+> ZERO new parameters: each consumer gates on its own substrate with its existing K scaled by that substrate's must-spectrum
+> share (`K_i = K·f_i`) — derived from `K_amino_acids` + the sourced spectrum, NOT a Michaelis constant and labelled as not
+> being one (per-species Michaelis constants = eight unsourced numbers = the D-98 trap, declined). It REDUCES: at spectrum
+> composition every gate equals the pre-split lumped gate, which is WHY every closed-form suite still asserts its OLD numbers
+> — nothing was re-baselined. **The advisor caught me conflating two claims inside that property**: subset-agreement is
+> STRUCTURAL, but the match to the old VALUE is contingent on Σf = 1 (verified by hand at F=1.05: subsets still agree, lumped
+> match breaks) ⇒ ensembles sampling the bands shift the baseline slightly. TWO LUMPS RETIRED, not restated: D-33's ~4×
+> nitrogen over-release (4-N arginine deaminated for a 1-N job) and D-45's mercaptan drawn from ARGININE — a molecule with NO
+> SULFUR. THREE EMERGENT FINDINGS: (i) the anabolic/catabolic split is now EMERGENT — leucine supplies only ~7% of the isoamyl
+> carbon and its own gate throttles the rest onto sugar, so **D-19's apologised-for sugar stand-in is now the CORRECT book for
+> de-novo synthesis**; (ii) aging precursors are dominantly AUTOLYSIS-sourced (phenylalanine 1.6e-5 → 44.8 mg/L with lees,
+> phenylacetaldehyde 0.016 → 1631 µg/L, restoring the literature phenyl-dominant ordering) — the published sur-lie mechanism
+> as a CONSEQUENCE, not a rule; (iii) `f_methional` was a lump for precursor ABUNDANCE (its own comment says so) — NOT
+> re-anchored here, that would be the D-99 anti-tuning violation. **THE MAGNITUDE OF (ii) IS NOT VALIDATED and is recorded as
+> such** (advisor's call, the one that matters at this project's bar): the reroute's catabolic fraction is a ~0.5 lumped guess
+> vs a literature 20-50%, so the model drains precursors HARDER than reality and "silent without lees" is what that fraction
+> gives, not a prediction — the `<1e-9` bound is a TRIPWIRE on current behaviour, and moving it when the fraction is bounded
+> is the SIGNAL, not a regression. THE TRIPWIRE FLIPPED: sotolon OAV 0 → 3.22 with the reroute ON; the D-99 limitation test
+> deleted per its own instructions and REPLACED with a positive assertion (coverage preserved) + one pinning the autolysis
+> dependency. **Methionine — flagged as highest-risk (scarcest, 3 consumers) — was the SAFEST, structurally: no fusel eats
+> it** (methional held at OAV 60); the casualty was PHENYLALANINE. *Fourth time a risk call landed on the wrong molecule and
+> only looking settled it.* WHAT IT DOESN'T FIX, pinned: threonine still feeds propanol AND sotolon — that competition is REAL
+> chemistry over one molecule and the model SHOULD show it; what's removed is the FALSE one (fusels vs arginine, no shared
+> chemistry). Guarantees widened from one species to a BLEND and re-proved by BOUNDING it (any {arginine, glutamine} blend
+> lies in 1.29–2.14, below biomass's 4.3 and melanoidin's 8 ⇒ D-32/D-38/D-40/D-89 all still structural, no clamp). Autolysis
+> releases the MUST spectrum (autolysate is protein hydrolysate — richer in branched-chain/sulfur, poorer in arginine — so the
+> error is CONSERVATIVE: under-produces rather than invents). Two `assert_nonnegative` guards moved to atol=1e-8 — they were
+> asserting tighter than the solver's OWN atol (1e-9); verified noise not drift (tracks atol ~1:1 across 1e-9/1e-11/1e-13),
+> and that it only began mattering now is the fix working (the retired over-release was propping up YAN). **`mercaptans` is
+> now the LAST lump in the project.** Next: BOUND the reroute's catabolic fraction (the highest-value follow-up this beat
+> creates); a sourced yeast-autolysate spectrum; per-species uptake preference (NCR) + per-species E_a/gates (blocked — D-98
+> trap); re-anchor `f_methional` now abundance is explicit; the isoamyl-acetate carbon re-route (D-69's 5:2 inverse);
+> speciate `mercaptans`.**
+
 ## Build order (dependency-ordered; handoff §6 step 5, re-sequenced per D-66)
 
 ```

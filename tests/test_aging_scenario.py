@@ -1003,21 +1003,28 @@ def test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciate
 
 
 def test_thermal_aroma_from_drained_precursors_requires_autolysis():
-    """The D-100 EMERGENT prediction: fermentation eats the precursors; autolysis puts them back.
+    """The D-100 EMERGENT consequence: aging precursors are dominantly autolysis-sourced.
 
     Not a wiring choice — a consequence. The branched-chain and aromatic amino acids are Ehrlich
-    substrates, so a ferment consumes them almost completely (real must carries ~30-60 mg/L
-    leucine while wine makes ~150-250 mg/L isoamyl alcohol — most higher alcohol is synthesised de
-    novo from sugar, and the catabolic part exhausts the pool). A sealed sweet wine aged with NO
-    lees contact therefore has nothing left for the thermal Strecker route to degrade.
+    substrates, so a ferment consumes them (real must carries ~30-60 mg/L leucine while wine makes
+    ~150-250 mg/L isoamyl alcohol — most higher alcohol is synthesised de novo from sugar, and the
+    catabolic part exhausts the pool). Autolysis (D-34) is the only amino-acid SOURCE in the model,
+    and since D-100 it releases the full must spectrum rather than pure arginine — so it restores
+    the precursors, and with them the aroma. That lees contact enriches Maillard/Strecker character
+    is the published sur-lie mechanism, arriving as an emergent consequence of speciation rather
+    than as a modelled rule. The lumped model could not express it: arginine stood in for
+    precursors that were long gone, so it made thermal aldehydes from a pool whose real precursor
+    content was zero.
 
-    Autolysis (D-34) is the only amino-acid SOURCE in the model, and since D-100 it releases the
-    full must spectrum rather than pure arginine — so it restores the precursors, and with them the
-    aroma. This is the published sur-lie mechanism (lees contact enriches Maillard/Strecker
-    character) arriving as an emergent consequence of speciation rather than as a modelled rule.
-
-    The lumped model could not express this: arginine stood in for precursors that were long gone,
-    so it made thermal aldehydes from a pool whose real precursor content was zero.
+    THE DIRECTION IS SOURCED; THE MAGNITUDE ASSERTED HERE IS NOT. The `< 1e-9` bound below is
+    **what the current speculative re-route fraction gives**, NOT a validated prediction. The
+    re-route's catabolic fraction is a lumped estimate (~0.5, via the shared `K_amino_acids` gate)
+    against a literature catabolic contribution nearer 20-50%, so this model drains the precursors
+    HARDER than reality — corroborated by the companion oxidative scenario landing
+    phenylacetaldehyde above the literature 10-100 ug/L band when lees are on. Bounding that
+    fraction is deferred (unsourced today — the D-98 trap). Read these bounds as a TRIPWIRE on
+    current behaviour: if the re-route fraction is ever bounded, this test should move, and moving
+    it is the signal that the magnitude got more honest — not a regression.
     """
 
     def sweet(autolysis: float | None):
