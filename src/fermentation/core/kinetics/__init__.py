@@ -91,6 +91,11 @@ from fermentation.core.kinetics.malolactic import (
     malolactic_toxicity_gate,
 )
 from fermentation.core.kinetics.mercaptans import AutolyticMercaptan
+from fermentation.core.kinetics.precursor_fates import (
+    NON_EHRLICH_FRACTION_PARAMS,
+    PrecursorNonEhrlichFates,
+    non_ehrlich_fraction_param,
+)
 from fermentation.core.kinetics.temperature import TemperatureRamp
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.kinetics.vicinal_diketones import (
@@ -141,6 +146,9 @@ __all__ = [
     "EthanolInhibition",
     "FuselAlcoholsEhrlich",
     "FuselAminoAcidReroute",
+    "NON_EHRLICH_FRACTION_PARAMS",
+    "PrecursorNonEhrlichFates",
+    "non_ehrlich_fraction_param",
     "GrowthNitrogenLimited",
     "HydrogenSulfideProduction",
     "HydrogenSulfideVolatilization",

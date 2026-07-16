@@ -111,6 +111,7 @@ from fermentation.core.kinetics import (
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
+    PrecursorNonEhrlichFates,
     PyruvateExcretion,
     PyruvateReassimilation,
     SMMHydrolysis,
@@ -1691,9 +1692,18 @@ _CARRYING_CAPACITY_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (BiomassC
 #: what :class:`FuselAlcoholsEhrlich` drew it must stay unscaled too — the producer and re-route
 #: share :func:`~fermentation.core.kinetics.byproducts.fusel_production_rate` and neither is a
 #: modifier target. Disabled with the swap at the compile seam when amino acids are un-dosed.
+#:
+#: :class:`PrecursorNonEhrlichFates` (decision D-104) rides here too, and for the same reason the
+#: re-route does — it is **not** a modifier target. It scales the re-route's own per-species draw
+#: by ``f/(1−f)``, so it inherits that draw's temperature shape exactly; scaling it by the growth
+#: modifiers (as the swap is) would break the ratio it exists to impose. It closes the sink D-100
+#: documented and left out: before it, the re-route was each precursor's ONLY consumer, so 100% of
+#: consumed leucine was attributed to isoamyl alcohol where real yeast send 77–86% of it to
+#: protein. Disabled with the swap and the re-route when amino acids are un-dosed.
 _AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     AminoAcidAssimilation,
     FuselAminoAcidReroute,
+    PrecursorNonEhrlichFates,
 )
 
 #: Yeast autolysis (wine-only, decisions D-34, D-44): the autolytic-peptide source that refills the

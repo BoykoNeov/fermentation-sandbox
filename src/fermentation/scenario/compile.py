@@ -62,6 +62,7 @@ from fermentation.core.kinetics import (
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
+    PrecursorNonEhrlichFates,
     SMMHydrolysis,
     StreckerDegradation,
     SulfiteOxidation,
@@ -2010,7 +2011,11 @@ def compile_scenario(
     # producer drew), which is always enabled in the wine set, so it is safe to enable here.
     amino_acids_gpl = float(scenario.initial.get("amino_acids_gpl", 0.0) or 0.0)
     if amino_acids_gpl <= 0.0:
-        for aa_process in (AminoAcidAssimilation, FuselAminoAcidReroute):
+        for aa_process in (
+            AminoAcidAssimilation,
+            FuselAminoAcidReroute,
+            PrecursorNonEhrlichFates,
+        ):
             if aa_process.name in process_set:
                 process_set.disable(aa_process.name)
 

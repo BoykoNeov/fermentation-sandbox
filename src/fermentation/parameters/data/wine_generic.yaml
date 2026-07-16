@@ -298,6 +298,102 @@ must_aa_fraction_methionine:
     conditions: "Vitis vinifera grape must; methionine as a fraction of assimilable free amino acids"
     notes: "The scarcest tracked amino acid in must; sulfur-bearing precursor of methional (oxidative Strecker, D-75) and the autolytic mercaptan (D-45). Its scarcity is itself a fidelity gain: the arginine lump over-supplied methionine-derived aromas."
 
+# -- Precursor non-Ehrlich fates (decision D-104) ------------------------------
+# THE FRACTION OF EACH CONSUMED PRECURSOR THAT GOES ANYWHERE EXCEPT ITS OWN HIGHER ALCOHOL.
+# Before D-104 the Ehrlich re-route was each precursor's ONLY consumer, so the model attributed
+# 100% of consumed leucine to isoamyl alcohol. Real yeast send most of it to PROTEIN. These
+# fractions close that gap; PrecursorNonEhrlichFates draws f/(1-f) times the re-route's own
+# per-species draw, so consumed precursor splits exactly f : (1-f) between "everything else"
+# and the Ehrlich alcohol.
+#
+# READ THE DEFINITION CAREFULLY — it is NOT the protein share, and the difference is the whole
+# beat. These are a LUMP of every non-Ehrlich fate: protein incorporation + downstream amino-acid
+# biosynthesis + unrecovered losses. Crepin's threonine has FOUR fates (38% protein, ~18%
+# propanol, ~17% proteinogenic isoleucine, 20% unrecovered); this model has TWO, so using the
+# PROTEIN share (0.38) would dump the other 44% onto propanol. Measured: the protein share gives
+# propanol 55.7% catabolic against a sourced 19%, WORSE than no sink at all is bad; the lump
+# gives 16.4%. The parameter answers "how much does NOT become this alcohol", nothing else.
+#
+# SOURCE: Crepin et al. 2017, Appl. Environ. Microbiol. 83:e02617-16 (PMC5311416) — the only
+# study found that labels leu/ile/val/thr SEPARATELY in a WINE fermentation (synthetic must
+# mimicking grape juice, EC1118, 240 g/L glucose, 180 mg N/L, pH 3.5, 28 C) and reports both the
+# protein route and the alcohol. Rollero 2017 (the D-103 source) labels only leucine and valine
+# and never measures propanol — see DECISIONS D-104.
+#
+# Tier: PLAUSIBLE for the four Crepin measured directly (a real per-species measurement in the
+# right organism and matrix, but a single study at one must composition and one time point);
+# SPECULATIVE for phenylalanine/methionine, which Crepin does not measure at all.
+#
+# STAND-IN CAVEAT (the D-19/D-31 discipline): the sink books the whole lump as if it became
+# biomass — carbon refunded to sugar, nitrogen to ammonium. Crepin's "20% unrecovered" did NOT
+# become biomass, so that share is booked to the wrong home. Carbon and nitrogen still close
+# exactly (atoms only move between weighted pools); what is approximate is the DESTINATION.
+#
+# STATIC, and that is a real limit (decision D-104): these are measured FATES from one must, not
+# rate constants, so the split does NOT respond to must composition. This retires D-100's "the
+# anabolic/catabolic ratio is emergent, not a fitted fraction" FOR THIS SPLIT. The reason is
+# measured, not preferred: the emergent (demand-driven) split is MONOTONICALLY INVERTED against
+# Crepin — model leucine 20.9% to protein vs a measured 77-86%, model order leu<ile<val<thr vs
+# Crepin's thr<val<ile<leu, exactly reversed. An emergent WRONG answer is worse than a sourced
+# static one. See DECISIONS D-104 for why no biomass composition can fix the inversion.
+
+f_non_ehrlich_leucine:
+  value: 0.815
+  unit: "dimensionless"
+  tier: plausible
+  uncertainty: { low: 0.77, high: 0.86, note: "Crepin's stated range for leucine -> protein, taken as the whole non-Ehrlich lump" }
+  provenance:
+    source: "Crepin et al. 2017, Appl. Environ. Microbiol. 83:e02617-16 (PMC5311416)"
+    conditions: "S. cerevisiae EC1118, synthetic must mimicking grape juice, 240 g/L glucose, 180 mg N/L, pH 3.5, 28 C; [13C6]leucine tracer; end of growth phase"
+    notes: "VERBATIM: 'between 77% and 86% of assimilated leucine was directed toward protein synthesis'. Midpoint 0.815. For leucine the protein share IS effectively the whole non-Ehrlich lump: no other large sink is documented for it (unlike threonine, whose catabolism also feeds proteinogenic isoleucine). Leucine is the compound this beat most changes: it is the precursor of isoamyl alcohol, ~52% of the model's fusel carbon, and the model previously sent 100% of it to Ehrlich."
+
+f_non_ehrlich_valine:
+  value: 0.85
+  unit: "dimensionless"
+  tier: plausible
+  uncertainty: { low: 0.77, high: 0.90, note: "1 - (valine -> isobutanol); Crepin's 15% via KIV, widened for the single-study/one-timepoint read" }
+  provenance:
+    source: "Crepin et al. 2017, Appl. Environ. Microbiol. 83:e02617-16 (PMC5311416)"
+    conditions: "S. cerevisiae EC1118, synthetic must mimicking grape juice, 180 mg N/L, 28 C; [13C5]valine tracer; end of growth phase"
+    notes: "VERBATIM: 'the substantial fractions of KIV and KIC derived from labeled valine, accounting for 15% and 23% of the consumed valine at the end of the growth phase (N_T), respectively, were reduced in higher alcohols'. Only the KIV share (15%) becomes ISOBUTANOL, so the non-isobutanol lump is 0.85 — this is NOT valine's protein share (41%), because valine's other fates include the KIC route. THE KIC 23% IS A ROUTE THIS MODEL DOES NOT HAVE: it carries valine carbon into ISOAMYL alcohol. That absence is why the model under-counts isoamyl's catabolic fraction (1.35% vs Rollero's 2-8%) — a documented missing route, NOT a value to tune (decision D-104)."
+
+f_non_ehrlich_threonine:
+  value: 0.82
+  unit: "dimensionless"
+  tier: plausible
+  uncertainty: { low: 0.75, high: 0.88, note: "1 - (threonine -> propanol); propanol/isoleucine split within Crepin's combined 35% is not resolved" }
+  provenance:
+    source: "Crepin et al. 2017, Appl. Environ. Microbiol. 83:e02617-16 (PMC5311416)"
+    conditions: "S. cerevisiae EC1118, synthetic must mimicking grape juice, 180 mg N/L, 28 C; [13C4]threonine tracer; end of growth phase"
+    notes: "Threonine's measured fates: 38% directly to protein ('the portions of exogenous isoleucine, valine, and threonine directly recovered in proteins accounted for only 51, 41, and 38% of their consumption'), a combined 35% to 'propanol and in proteinogenic isoleucine', and 'Overall, 20% of the consumed threonine was not recovered in related proteinogenic amino acids or propanol'. The propanol/isoleucine split inside that 35% is NOT resolved by the paper; taking it as roughly even puts propanol near 18%, so the non-propanol lump is ~0.82. The uncertainty band spans the unresolved split. VALIDATION (not a fit): the paper independently reports propanol as '19% consumed threonine (labeled fraction) and 81% newly synthesized threonine' — the model at this value measures 16.4% on a Crepin-commensurate must."
+
+f_non_ehrlich_isoleucine:
+  value: 0.51
+  unit: "dimensionless"
+  tier: plausible
+  uncertainty: { low: 0.45, high: 0.75, note: "isoleucine -> protein; the active-amyl share is unresolved, so the true lump is >= this and the band is skewed up" }
+  provenance:
+    source: "Crepin et al. 2017, Appl. Environ. Microbiol. 83:e02617-16 (PMC5311416)"
+    conditions: "S. cerevisiae EC1118, synthetic must mimicking grape juice, 180 mg N/L, 28 C; [13C6]isoleucine tracer; end of growth phase"
+    notes: "VERBATIM: 'the portions of exogenous isoleucine, valine, and threonine directly recovered in proteins accounted for only 51, 41, and 38% of their consumption'. Unlike valine and threonine, Crepin does not resolve how much of isoleucine's remaining 49% reaches ACTIVE AMYL ALCOHOL specifically rather than other fates, so this falls back to the PROTEIN share — a LOWER BOUND on the true non-Ehrlich lump (hence the up-skewed band). The model therefore over-attributes active amyl alcohol by an unknown margin; it carries no sourced odour threshold and no per-compound tracer study, so the error is unconstrained in both directions. Recorded, not estimated away."
+
+f_non_ehrlich_phenylalanine:
+  value: 0.53
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.38, high: 0.86, note: "author estimate; band spans the full range of Crepin's four measured values" }
+  provenance:
+    source: "author estimate"
+    conditions: "generic S. cerevisiae wine ferment; phenylalanine -> 2-phenylethanol (Ehrlich, D-99)"
+    notes: "NOT MEASURED BY CREPIN — the paper labels leu/ile/val/thr only, and no per-compound tracer study for 2-phenylethanol was found. Taken as the mean of Crepin's four measured splits (0.815/0.85/0.82/0.51), with the band spanning their full range. There is no mechanistic argument available to place phenylalanine within that range: leucine (0.815) and isoleucine (0.51) are both end-product amino acids yet differ by 1.6x, so the 'is it a biosynthetic hub' reasoning that might have ranked it demonstrably does not predict the measured values. Hence speculative and a wide band, not a confident interpolation."
+
+# NO f_non_ehrlich_methionine ENTRY, deliberately (decision D-104). Methionine is the one tracked
+# precursor with no Ehrlich higher alcohol (FUSEL_SPECS has no methionine entry), and this sink
+# anchors to the re-route's per-species draw — so the parameter would never be read. An unread
+# constant is not provenance, it is clutter that invites a future reader to wire it somewhere it
+# does not belong. Methionine's own non-Ehrlich fate is a real gap, but it belongs to whatever beat
+# gives methionine a catabolic route, not to this one.
+
 # -- Yeast autolysis (opt-in, decision D-34) ----------------------------------
 # The autolytic-peptide source that REFILLS the amino-acid pool from dead biomass (X_dead)
 # post-AF — the second prerequisite (after the D-33 fusel re-route) the deferred MLF-with-

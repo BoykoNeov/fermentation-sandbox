@@ -420,7 +420,13 @@ MLF_PROCESSES = {
 # The fusel Ehrlich re-route (D-33) rides in the same dosed, wine-only tuple as the swap: it
 # sources a fraction of fusel carbon from amino acids and deaminates, disabled at the compile
 # seam when amino acids are undosed.
-AMINO_ACID_PROCESSES = {"amino_acid_assimilation", "fusel_amino_acid_reroute"}
+AMINO_ACID_PROCESSES = {
+    "amino_acid_assimilation",
+    "fusel_amino_acid_reroute",
+    # The precursors' non-Ehrlich fates (D-104): the sink that stopped the re-route being each
+    # precursor's ONLY consumer. Wired wine-only and disabled with the other two when un-dosed.
+    "precursor_non_ehrlich_fates",
+}
 # Malolactic growth (decision D-23, the deferred growth beat) is wired into the WINE medium only;
 # enabled in a bare build_process_set and disabled at the compile seam unless a scenario BOTH
 # co-inoculates O. oeni AND doses amino acids (mlf_pitch_gpl>0 AND amino_acids_gpl>0) — a stricter

@@ -400,7 +400,17 @@
 > 0.192 at this dose (never ~0.5); the "20-50%" was UNCITED and the sourced band is LOWER (Rollero 2017: isoamyl 2-8%,
 > isobutanol 5-15%) ⇒ 20-50% would have ACQUITTED the model. The conclusion "drains harder than reality" is TRUE but every
 > number under it was wrong, and the defect is the gate's per-species SHAPE, not a fraction to bound ⇒ NO knob, and the
-> `<1e-9` tripwire correctly does NOT move. See D-103.]** THE TRIPWIRE FLIPPED: sotolon OAV 0 → 3.22 with the reroute ON; the D-99 limitation test
+> `<1e-9` tripwire correctly does NOT move. See D-103.]**
+> **[D-104 CORRECTS TWO MORE OF THESE CLAIMS. (a) Finding (i) — "the anabolic/catabolic split is now EMERGENT" — is RETIRED
+> for the protein split: measured against Crépin 2017 the emergent (demand-driven) split is MONOTONICALLY INVERTED (model
+> leucine 20.9% → protein vs a measured 77–86%; model order leu<ile<val<thr vs Crépin's thr<val<ile<leu, exactly reversed),
+> and no biomass composition repairs it — the model's Ehrlich demand pulls the AMINO ACID where reality pulls a mostly-de-novo
+> KETO ACID. An emergent WRONG answer is worse than a sourced static one, so the split is now sourced and STATIC. What
+> survives of (i): each alcohol's catabolic FRACTION is still emergent, being (1−f) × a supply/demand ratio. (b) "THE TRIPWIRE
+> FLIPPED: sotolon OAV 0 → 3.22" was NEVER A FIX — sotolon rode on ~6.6 mg/L of leftover threonine that survived only because
+> propanol's demand was too small to consume it. D-104's anabolic sink consumes it properly and sotolon died AGAIN (its third
+> death, always through threonine) ⇒ re-based on 2-ketobutyrate (`de_novo=True`), which is the actual fix. See D-104.]**
+> THE TRIPWIRE FLIPPED: sotolon OAV 0 → 3.22 with the reroute ON; the D-99 limitation test
 > deleted per its own instructions and REPLACED with a positive assertion (coverage preserved) + one pinning the autolysis
 > dependency. **Methionine — flagged as highest-risk (scarcest, 3 consumers) — was the SAFEST, structurally: no fusel eats
 > it** (methional held at OAV 60); the casualty was PHENYLALANINE. *Fourth time a risk call landed on the wrong molecule and

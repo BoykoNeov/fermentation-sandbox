@@ -47,9 +47,23 @@ sourced from the pool::
 
 with ``ψ = amino_acid_assimilation_fraction ∈ [0, 1]`` the max aa-funded share of
 biomass nitrogen. The nitrogen refund is then ``ρ·y_N = ψ·gate·f_N·base_dx ≤
-f_N·base_dx`` (growth's nitrogen draw) for all ``ψ·gate ≤ 1`` — never over-refunds,
-so no deamination branch is needed in v1 (excess-aa deamination is deferred with the
-fusel Ehrlich re-route, D-23/D-32). The carbon refund is
+f_N·base_dx`` (growth's nitrogen draw) for all ``ψ·gate ≤ 1`` — **this Process** never
+over-refunds, so it needs no deamination branch of its own.
+
+.. warning::
+
+   **That bound is this swap's alone, and it is NOT the system's (decision D-104).** It was
+   written when the swap was the only Process refunding biomass nitrogen. Since D-104
+   :class:`~fermentation.core.kinetics.precursor_fates.PrecursorNonEhrlichFates` refunds the
+   *precursors'* nitrogen too, and nothing bounds the pair against ``f_N·base_dx``: measured at
+   the shipped ``ψ = 0.5`` with a 1 g/L dose, the **joint** refund reaches **1.04× growth's draw
+   at pitch**. The excess is *net deamination* — physical, and needing no branch, because the
+   refund is always the drawn molecule's own nitrogen and the sign of the net falls out of the
+   arithmetic. Nitrogen still closes exactly (it is transferred from the precursor pools, never
+   created). The guarantee that *does* still bind the pair is the **carbon** one below — no
+   sugar creation — and it is pinned jointly in ``tests/test_precursor_fates.py``.
+
+The carbon refund is
 ``ρ·y_C = ψ·gate·base_dx·f_N·(y_C/y_N)``; dividing by growth's carbon draw
 ``f_C·base_dx`` gives ``ψ·gate·(f_N/f_C)·(y_C/y_N) = ψ·gate·(aa C:N)/(biomass C:N)``.
 With arginine (mass C:N ≈ 1.29) and biomass (``f_C/f_N`` ≈ 4.3) this is

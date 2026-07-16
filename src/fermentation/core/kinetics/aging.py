@@ -244,7 +244,11 @@ from fermentation.core.kinetics.amino_acid_pools import (
     draw_precursor_carbon,
 )
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
-from fermentation.core.kinetics.carbon_routing import HYDROLYSING_ESTER, ISOAMYL_ALCOHOL
+from fermentation.core.kinetics.carbon_routing import (
+    HYDROLYSING_ESTER,
+    ISOAMYL_ALCOHOL,
+    draw_carbon_from_sugar,
+)
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -350,19 +354,44 @@ _CO2_PER_STRECKER_ALDEHYDE = 1.0
 #: propanol-vs-sotolon competition is genuine chemistry over one molecule. (Scope, unchanged from
 #: D-87: sotolon's 2 acetaldehyde-derived carbons are lumped into the threonine draw; the
 #: acetaldehyde-coupled route stays deferred.)
-_MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool, str], ...] = (
-    ("methional", M_METHIONAL, "w_maillard_methional", True, "methionine"),
+#:
+#: **The ``de_novo`` flag is the second load-bearing one (decision D-104), and it is sotolon's
+#: alone.** The five true Strecker aldehydes are degradations *of the amino acid itself* — no
+#: leucine, no 3-methylbutanal — so their rate is rightly gated on their precursor and all their
+#: carbon comes from it. **Sotolon is not.** It is an aldol furanone of **2-ketobutyrate** +
+#: acetaldehyde, and Crépin *et al.* 2017 measures 2-ketobutyrate's source as intracellular
+#: threonine that is **"19% consumed threonine (labeled fraction) and 81% newly synthesized"** —
+#: i.e. de-novo-dominated. So gating sotolon on the *must* threonine pool made a wine with no
+#: residual threonine produce **no sotolon at all**, which is false: aged Sauternes and Tokaji are
+#: defined by it.
+#:
+#: **Sotolon has now been the canary three times, always through threonine** — D-99's honest fusel
+#: rise killed it, D-100 revived it by speciating the pool, and D-104's anabolic sink killed it
+#: again by (correctly) finishing threonine off. D-100's revival was never a fix: it rested on
+#: ~6.6 mg/L of threonine that survived only because propanol's demand was too small to consume it.
+#: Each time, the real fault was the same — sotolon rooted in a must AMINO ACID where reality uses
+#: a mostly-de-novo KETO ACID. ``de_novo=True`` fixes the root: the rate is ungated by the pool and
+#: the carbon splits ``gate : (1-gate)`` between must threonine and the sugar de-novo stand-in, so
+#: the exogenous share lands at the SAME ~18% the Ehrlich re-route gives propanol. That agreement
+#: is Crépin's own signature ("the isotopic enrichment detected in propanol … was the same as that
+#: measured in proteinogenic threonine") reproduced rather than asserted.
+_MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool, str, bool], ...] = (
+    ("methional", M_METHIONAL, "w_maillard_methional", True, "methionine", False),
     (
         "phenylacetaldehyde",
         M_PHENYLACETALDEHYDE,
         "w_maillard_phenylacetaldehyde",
         True,
         "phenylalanine",
+        False,
     ),
-    ("2_methylbutanal", M_2_METHYLBUTANAL, "w_maillard_2_methylbutanal", True, "isoleucine"),
-    ("3_methylbutanal", M_3_METHYLBUTANAL, "w_maillard_3_methylbutanal", True, "leucine"),
-    ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", True, "valine"),
-    ("sotolon", M_SOTOLON, "w_maillard_sotolon", False, "threonine"),
+    ("2_methylbutanal", M_2_METHYLBUTANAL, "w_maillard_2_methylbutanal", True, "isoleucine", False),
+    ("3_methylbutanal", M_3_METHYLBUTANAL, "w_maillard_3_methylbutanal", True, "leucine", False),
+    ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", True, "valine", False),
+    # The only de-novo-capable product: an aldol furanone of 2-ketobutyrate, not a Strecker
+    # degradation of threonine (hence decarboxylates=False AND de_novo=True — the two flags travel
+    # together for the same underlying reason: sotolon is not made the way the other five are).
+    ("sotolon", M_SOTOLON, "w_maillard_sotolon", False, "threonine", True),
 )
 
 #: The caramelization carbon-park species (decision D-88): the sugar carbon :class:`Caramelization`
@@ -1113,11 +1142,15 @@ class MaillardStrecker(Process):
     name = "maillard_strecker"
     tier = Tier.SPECULATIVE
     #: Writes the six thermal-route product pools + the decarboxylation ``CO2``, drawing the carbon
-    #: from each product's OWN precursor (D-100) and deaminating its nitrogen to ``N``. Touches
-    #: those nine and
-    #: nothing else — ``S`` is a read-only driver (not consumed here; its draw is booked by D-88),
-    #: and
-    #: there is NO ``o2`` term (the whole point). The C/N transfer closes exactly.
+    #: from each product's OWN precursor (D-100) and deaminating its nitrogen to ``N``. There is NO
+    #: ``o2`` term (the whole point). The C/N transfer closes exactly.
+    #:
+    #: **``S`` became a WRITE at D-104**, having been a read-only driver through D-87/D-100: sotolon
+    #: is ``de_novo``-capable, so the share of its carbon that the must threonine pool cannot
+    #: supply is drawn off sugar (the de-novo 2-ketobutyrate stand-in, D-19 option a1). The other
+    #: five products still take every gram from their own amino acid and never touch ``S``. The
+    #: caramelization draw (D-88) remains a separate Process; these two are the only sugar-carbon
+    #: consumers on the thermal axis and they book independently.
     touches = (
         "methional",
         "phenylacetaldehyde",
@@ -1127,10 +1160,11 @@ class MaillardStrecker(Process):
         "sotolon",
         "CO2",
         "N",
+        "S",
         # Each product's OWN precursor (decision D-100) — no longer the lumped ``amino_acids``
         # pool. Six products over five distinct amino acids (methional and the three
         # branched-chain aldehydes each have their own; sotolon takes threonine).
-        *dict.fromkeys(precursor for (_, _, _, _, precursor) in _MAILLARD_PRODUCTS),
+        *dict.fromkeys(precursor for (_, _, _, _, precursor, _) in _MAILLARD_PRODUCTS),
     )
     #: ``k_maillard_strecker``/``E_a_maillard_strecker`` and the six ``w_maillard_*`` composition
     #: weights are this Process's own (thermal.yaml, D-87); ``K_amino_acids`` is the *shared*
@@ -1151,7 +1185,7 @@ class MaillardStrecker(Process):
         # Each precursor's must-spectrum share, which scales its relative-depletion gate (D-100).
         *dict.fromkeys(
             SPEC_BY_SPECIES[precursor].fraction_param
-            for (_, _, _, _, precursor) in _MAILLARD_PRODUCTS
+            for (_, _, _, _, precursor, _) in _MAILLARD_PRODUCTS
         ),
     )
 
@@ -1181,7 +1215,7 @@ class MaillardStrecker(Process):
         # byte-for-byte to the D-87 rate; away from it, a product stops when the amino acid it is
         # made from runs out — which is the whole point (the D-100 pathology was sotolon dying
         # because a pool 38% ARGININE had been drained by fusels that eat leucine).
-        weights = [params[wname] for (_, _, wname, _, _) in _MAILLARD_PRODUCTS]
+        weights = [params[wname] for (_, _, wname, _, _, _) in _MAILLARD_PRODUCTS]
         w_sum = sum(weights)  # > 0 (all speculative positive weights)
         co2_mol = 0.0  # mol CO2/L/h, from the decarboxylating aldehydes only
         product_rates: list[tuple[str, float]] = []
@@ -1189,13 +1223,17 @@ class MaillardStrecker(Process):
         # from five different amino acids, and the shared CO2 must be attributed to the precursor
         # that actually released it (its own carboxyl carbon), not to a lump.
         precursor_carbon: dict[str, float] = {}
-        for (pool, m_i, _wname, decarboxylates, precursor), w_i in zip(
+        de_novo_carbon = 0.0  # sotolon's share sourced off SUGAR (the de-novo 2-ketobutyrate)
+        for (pool, m_i, _wname, decarboxylates, precursor, de_novo), w_i in zip(
             _MAILLARD_PRODUCTS, weights, strict=True
         ):
             gate_i = depletion_gate(y, schema, params, (SPEC_BY_SPECIES[precursor],))
-            if gate_i <= 0.0:
+            if gate_i <= 0.0 and not de_novo:
                 continue  # this precursor is exhausted ⇒ its product stops (and cannot go negative)
-            n_i = (w_i / w_sum) * driver * gate_i  # mol/L/h of product i
+            # A de-novo-capable product is NOT rate-gated by the must pool: its carbon comes from a
+            # keto acid the cell makes from sugar, so an exhausted precursor changes where the
+            # carbon comes from, never whether the product forms (D-104).
+            n_i = (w_i / w_sum) * driver * (1.0 if de_novo else gate_i)  # mol/L/h of product i
             if n_i <= 0.0:
                 continue
             rate_i = n_i * m_i  # g/L/h
@@ -1208,7 +1246,18 @@ class MaillardStrecker(Process):
                 co2_i = _CO2_PER_STRECKER_ALDEHYDE * n_i * M_CO2  # g CO2/L/h
                 co2_mol += _CO2_PER_STRECKER_ALDEHYDE * n_i
                 carbon_i += co2_i * carbon_mass_fraction("CO2")
-            precursor_carbon[precursor] = precursor_carbon.get(precursor, 0.0) + carbon_i
+            if de_novo:
+                # Split this product's carbon gate : (1-gate) between the MUST pool and the sugar
+                # de-novo stand-in — the D-33 producer/re-route shape, inline. The exogenous share
+                # is therefore gate_i, the same quantity the Ehrlich re-route gives propanol off
+                # the same pool, which is exactly Crépin's "propanol's enrichment == proteinogenic
+                # threonine's" (one intracellular pool, every consumer sees one enrichment).
+                precursor_carbon[precursor] = (
+                    precursor_carbon.get(precursor, 0.0) + gate_i * carbon_i
+                )
+                de_novo_carbon += (1.0 - gate_i) * carbon_i
+            else:
+                precursor_carbon[precursor] = precursor_carbon.get(precursor, 0.0) + carbon_i
         if not product_rates:
             return d
 
@@ -1220,7 +1269,14 @@ class MaillardStrecker(Process):
         nitrogen = sum(
             draw_precursor_carbon(d, schema, precursor, carbon)
             for precursor, carbon in precursor_carbon.items()
+            if carbon > 0.0
         )
+        # The de-novo share comes off SUGAR — carbon-accounted exactly as the Ehrlich producer's
+        # stand-in is (D-19 option a1), so total_carbon still closes to machine precision. It
+        # carries NO nitrogen (sugar has none), which is itself the physical point: de-novo
+        # 2-ketobutyrate needs no amino acid, so this route releases no ammonium.
+        if de_novo_carbon > 0.0:
+            draw_carbon_from_sugar(d, y, schema, de_novo_carbon)
 
         for pool, rate_i in product_rates:
             d[schema.slice(pool)] = rate_i

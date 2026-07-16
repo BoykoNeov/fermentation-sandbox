@@ -8835,3 +8835,254 @@ with the authors; the **bottle-aged MeSH route** (blocked on primary sources); *
 `mercaptans` lump** (`→methanethiol`, `lumped=False`); **derive `f_methional`** (blocked); sourced
 yeast-autolysate spectrum; the isoamyl-acetate carbon re-route; per-ester `dH`/`E_a` (blocked);
 masking (blocked on `cosα`); the `oav` → `magnitude` rename.
+
+---
+
+## D-104 — the anabolic sink D-100 prophesied, built the way D-100 forbade: the catabolic fraction was never a gate output but a SUPPLY CEILING, the emergent split is MONOTONICALLY INVERTED, and getting the split right made every output worse
+
+**Status:** built. `PrecursorNonEhrlichFates` + five sourced fractions + sotolon re-based on
+2-ketobutyrate. Wine-only, opt-in with the amino-acid dose. At fermentation the outputs move
+**<1%** — this is an **attribution** fix, not an aroma fix, and saying otherwise would oversell it.
+
+### What was wrong
+
+D-100 wrote its own gap down and left it: the D-33/D-99 Ehrlich re-route was each precursor's
+**only** consumer, so the model attributed **100% of consumed leucine to isoamyl alcohol**. Real
+yeast build protein with most of it. D-103 called this "likely the shape defect itself" and made it
+the top item. **The premise was right and is now sourced. The prescription D-100 wrote — "needs a
+sourced biomass amino-acid composition" — is refuted.**
+
+### Finding 1 — the catabolic fraction is a SUPPLY CEILING, not a gate output
+
+Four of five per-species fractions equal `supply_C / demand_C` **to three significant figures**
+(isobutanol 49.4% vs 49.4%; active amyl 13.4% vs 13.4%; isoamyl 8.4% vs 8.4%; 2-PE 45.2% vs 45.2%;
+propanol capped, supply 104.5% of demand). The model drains ~100% of every precursor into its
+alcohol and the "fraction" is just how far that precursor's carbon stretches.
+
+**Stronger than D-103's "there was never a lever"**: the gate is not shaping the spread *at all*.
+The 11x spread **is** the must spectrum divided by the fusel rate constants — two things sourced
+independently, whose ratio nobody ever chose.
+
+### Finding 2 — I made D-103's own error twice more, in both directions
+
+- **"propanol is ~3x over the sourced band."** *No such band exists.* Rollero 2017 labels **U-13C
+  leucine and valine only**; its ">90% from CCM" covers **{isovaleric acid, isobutyric acid,
+  isoamyl, isobutanol}** — verified in the full text. I refused an uncited band the power to
+  convict at D-103, then let a **mismatched** one convict anyway.
+- **"aggregate CCM 90.2% => in band."** The same error inverted, one message later: a **five**-
+  compound aggregate tested against a sentence describing a **four**-compound set. Correctly scoped
+  (isoamyl+isobutanol): 85.31% -> **92.82%**. Both readings happened to clear; only one was a
+  comparison.
+
+**The rule needs a third clause.** D-101: a summary is a source of leads, not constants. D-103: an
+uncited number cannot acquit any more than convict. **D-104: a cited number binds only the SET it
+describes** — citation is necessary, not sufficient; scope is the other half.
+
+### Finding 3 — the source that answers this: Crepin et al. 2017
+
+*Appl. Environ. Microbiol.* 83:e02617-16 (PMC5311416). The only study found that labels
+**leu/ile/val/thr separately in a WINE fermentation** and reports **both** the protein route and the
+alcohol. Synthetic must mimicking grape juice, EC1118, 240 g/L glucose, **180 mg N/L**, pH 3.5, 28 C.
+
+> "between **77% and 86% of assimilated leucine** was directed toward protein synthesis"
+> "the portions of exogenous **isoleucine, valine, and threonine** directly recovered in proteins
+> accounted for only **51, 41, and 38%** of their consumption"
+> "propanol originates entirely from the catabolism of intracellular threonine, consisting of **19%
+> consumed threonine** (labeled fraction) and **81% newly synthesized threonine**"
+> "the isotopic enrichment detected in propanol ... was **the same as that measured in
+> proteinogenic threonine**"
+
+**Commensurability was load-bearing, and the mismatch FLATTERED the model.** The first probe ran YAN
+250 + 1 g/L aa ~= **470 mg N/L** against Crepin's **180**; D-103 logged that the fraction rises with
+nitrogen. Rebuilt at Crepin's own must, propanol reads **45.7%**, not the 33.4% the convenient run
+showed. The D-102 not-commensurate trap, caught before it shipped.
+
+### Finding 4 — the prescription is refuted: the emergent split is MONOTONICALLY INVERTED
+
+A sink built from biomass composition (D-100's prescription) splits each precursor by **demand**.
+Measured against Crepin, per species, consumed -> protein:
+
+| | leucine | isoleucine | valine | threonine |
+|---|---|---|---|---|
+| **model** | **20.9%** | 28.8% | 45.8% | **49.7%** |
+| **Crepin** | **77-86%** | 51% | 41% | **38%** |
+
+Model order leu<ile<val<thr; Crepin's thr<val<ile<leu. **Exactly reversed** — and identical at
+end-of-growth and end-of-fermentation (the precursors exhaust during growth), so not a time-point
+artifact.
+
+**No biomass composition repairs it.** The model's Ehrlich demand pulls the **amino acid**, so the
+largest alcohol drains its own precursor hardest — leucine loses to Ehrlich *because* isoamyl is 52%
+of the fusel carbon. For leucine to reach 77-86% by demand its protein demand would need ~4x the
+isoamyl demand: roughly half the biomass being leucine. Reality escapes the inversion by building
+isoamyl from **KIC**, a keto acid that is mostly *de novo*, so the leucine pool never faces that
+demand. **Protein-priority fails too** (it sends threonine ~0% to catabolism where reality sends
+62%), and so does a keto-acid node with near-equilibrium transamination (the label equilibrates and
+leucine's protein share returns to ~22%).
+
+**"Emergent" is unreachable here.** Crepin's 77-86% is a *kinetic* fact — leucine's deamination is
+slow relative to tRNA charging — not a demand ratio. This **retires D-100's "the anabolic/catabolic
+ratio is emergent, not a fitted fraction" for this split**, on measurement rather than preference:
+*an emergent wrong answer is worse than a sourced static one*. What survives of D-100's claim is
+what it was really about — each alcohol's **catabolic fraction** is still emergent, being `(1-f)`
+times a supply/demand ratio the model computes.
+
+### Finding 5 — THE HEADLINE: getting the split right made every output worse
+
+Implementing Crepin's **protein shares** as the split — the obvious reading — was measured before it
+was built, and it is a disaster:
+
+| alcohol | no sink | ballpark | **protein-share f** | **non-Ehrlich-lump f** | sourced |
+|---|---|---|---|---|---|
+| propanol | 72.93% | 45.70% | **55.71%** | **16.41%** | 19% |
+| isobutanol | 43.58% | 23.31% | **25.45%** | **6.46%** | 5-15% |
+| isoamyl | 7.38% | 5.75% | **1.35%** | **1.35%** | 2-8% |
+
+The protein share makes propanol and isobutanol **worse than the crude estimate it replaced**. The
+cause is **topological, not parametric**: Crepin's `f_i` are fates in a **four**-fate network
+(threonine: 38% protein / ~18% propanol / ~17% proteinogenic isoleucine / 20% unrecovered); this
+model has **two**, so `1-f` lands entirely on the alcohol. `f_thr = 0.38` gives propanol 55.7%;
+`f_thr ~= 0.82` would fix propanol but contradicts Crepin's own 38%. **No value of a protein-share
+`f_i` satisfies both.**
+
+**The fix is the definition, not the number.** `f_non_ehrlich_*` is **1 - (this alcohol's share of
+the consumed precursor)** — a lump of *every* non-Ehrlich fate. Propanol **72.9% -> 16.4%** against
+a measured 19%; isobutanol **into band**. Two of three testable compounds right, from sourced
+numbers, untuned. **Reading the parameter as "the protein share" will silently re-break the model**,
+which is why the module says so three times.
+
+### Finding 6 — isoamyl's remaining miss is SOURCED, not a loose end
+
+Model 1.35% vs Rollero's 2-8%. Crepin measures **23% of consumed valine reaching KIC -> isoamyl**.
+Reality feeds isoamyl exogenous carbon from **both leucine and valine**; this model routes only
+leucine, so it **must** under-count. A missing route, not a number to nudge. `active_amyl_alcohol`
+is over-attributed by an unknown margin for the mirror reason: Crepin does not resolve isoleucine's
+active-amyl share, so `f_non_ehrlich_isoleucine` falls back to the protein share — a **lower bound**
+on the true lump, hence its up-skewed band.
+
+### Finding 7 — sotolon was the canary THREE TIMES, and D-100's revival of it was never a fix
+
+Landing the sink drove no-lees sotolon from **OAV 3.221 to 0.000**. Cause: sotolon rode on **6.6
+mg/L of leftover threonine** that survived only because propanol's demand was too small to consume
+it. **D-100's celebrated "sotolon is perceptible again" rested on the supply ceiling leaving a
+crumb**, not on any sotolon physics.
+
+Sotolon has now been the canary three times, always through threonine: D-99's honest fusel rise
+killed it; D-100 revived it by speciating; D-104's honest sink finished threonine off and killed it
+again. Each time the root was identical — **sotolon rooted in a must AMINO ACID where reality uses a
+mostly-de-novo KETO ACID** (2-ketobutyrate + acetaldehyde; Crepin measures the same node feeding
+propanol as "19% consumed / 81% newly synthesized" threonine).
+
+**Fixed at the root rather than re-pinned** (the owner's call): `de_novo=True`, sotolon alone. Its
+rate is ungated by the must pool and its carbon splits `gate : (1-gate)` between must threonine and
+the sugar de-novo stand-in — the D-33 producer/re-route shape, inline. The five true Strecker
+aldehydes keep their hard gate because they ARE degradations of the amino acid (no leucine, no
+3-methylbutanal).
+
+| lees | sink | sotolon OAV before | after |
+|---|---|---|---|
+| no | OFF | 3.221 | **6.489** |
+| no | ON | **0.000** | **6.465** |
+| yes | ON | 6.137 | 6.460 |
+
+Sotolon now ~6.46-6.49 **regardless of lees or sink**. **The sur-lie anchoring is preserved**
+(6.175 -> 6.485, +5%): where `w_maillard_sotolon` was anchored, threonine was abundant so the gate
+was already ~1. Only the no-lees case moved — the case that was wrong. And its exogenous share now
+equals the Ehrlich re-route's for propanol off the same pool: **Crepin's "propanol's enrichment ==
+proteinogenic threonine's" reproduced, not asserted.**
+
+**The cost, recorded:** `MaillardStrecker` is no longer inert at `aa = 0` — sotolon fires on sugar
+alone. Prime directive #3 therefore rests **entirely on the compile seam** disabling it undosed,
+where it used to have unit-level belt-and-braces too. That is now asserted end-to-end
+(`test_scenario_isolability_survives_the_de_novo_sotolon_route`), and `S` moved from a read-only
+driver to a **write** in `touches` for the first time since D-87.
+
+### Finding 8 — the branched-chain aldehydes went to EXACTLY zero, and the sourced answer was that the model is right
+
+The sink also silenced the **branched-chain** Strecker aldehydes in no-lees wines (3-methylbutanal
+et al. → exactly 0, where D-100 had already documented "essentially zero"). Unlike sotolon these are
+**correctly** gated: they *are* degradations of the amino acid, so no leucine must mean no
+3-methylbutanal. That raised an obvious suspicion — **the model leaves no residual free amino acid,
+but surely real ferments do?** If true, the tests were right and the sink was over-eating.
+
+**The suspicion was wrong, and the source says so.** Crépin measures the nitrogen sources as
+**"sequentially exhausted in the medium"**, with the amino acids "substantially lower than the
+anabolic demand" for everything but glutamine and arginine. The one compound that *does* persist —
+**"no significant changes were observed in residual proline concentrations"** — is **proline**,
+which D-100 already excludes from the spectrum because it is not assimilated anaerobically. So the
+model driving the precursors to ~0 is **correct and sourced**, and it is the *pre-D-104* behaviour
+that was the artifact: the re-route being each precursor's only consumer left leucine at levels real
+yeast never leave, and the aldehydes fed on the leftovers. **The same crumb that propped up sotolon
+was propping these up too.**
+
+The three thermal/oxidative scenarios therefore moved **sur lie** — the regime the model claims
+(D-100's "aging precursors are dominantly autolysis-sourced", which D-104 turns from nearly-true
+into exactly-true) — and the no-lees claim is asserted head-on by its own test rather than dropped.
+
+**The gap this exposes, named not built:** real bottle-aged wine *does* develop branched-chain
+aldehydes without lees, over years, as **peptides and proteins hydrolyse** and release amino acids.
+This model has no peptide pool — its dose is free amino acids only, and Crépin's own medium is
+deliberately "without oligopeptide addition", so the source cannot constrain it either. **The zero
+is right about the mechanism the model has and wrong about the wine.**
+
+### The guard fired, and it falsified a claim D-32 makes about itself
+
+The owner's architecture call (separate Process + guard) earned its keep immediately: the joint
+(swap + sink) **nitrogen** refund reaches **1.04x growth's draw at pitch** — at `base_dx` ~2.2e-2
+g/L/h, a vigorously growing state, **not** a degenerate 0/0 tail (checked). D-32's docstring claims
+its refund "never over-refunds, so no deamination branch is needed in v1". **That bound is the
+swap's alone and is no longer the system's**, and the docstring now says so.
+
+Not a bug: the refund is always the drawn molecule's own nitrogen, and whether the net is negative
+(sparing ammonium) or positive (**deamination**) falls out of the arithmetic — no branch required.
+Nitrogen closes to 1e-14 because it is *transferred*, never created. The guarantee that still binds
+the pair is **carbon**: measured **0.546x** growth's draw, and net `dS/dt` never positive — no
+gluconeogenesis. Both pinned, and the deamination pinned to a band so a `psi`/dose change that makes
+"slight deamination at pitch" untrue fails loudly.
+
+### Bookkeeping caveat (the D-19/D-31 stand-in discipline)
+
+The sink books the whole lump as if it became **biomass** — carbon refunded to sugar, nitrogen to
+ammonium. Crepin's "20% unrecovered" did not become biomass, so that share is booked to the wrong
+home. Carbon and nitrogen still close exactly; what is approximate is the **destination**.
+
+### The lessons
+
+(i) **A cited number binds only the set it describes** — I convicted propanol and acquitted the
+model on the same mismatched band, one message apart. (ii) **Getting an input right can make the
+outputs worse, and that is information**: it localised the defect to the *topology*. A model that
+cannot be simultaneously right about the split and the alcohol is telling you its routes are
+missing, not its constants. (iii) **The premise can be right and the prescription wrong** — D-100
+named this sink and prescribed the one construction that inverts it. (iv) **Measure the design
+before building it**: four designs were measured and three discarded before any committed code.
+(v) **An emergent wrong answer is worse than a sourced static one** — "emergent, not fitted" is a
+virtue only while the emergent answer is right. (vi) **When the same compound breaks three times,
+the compound is not the problem** — sotolon died at D-99, D-100 and D-104, always through threonine,
+and each beat fixed the beat rather than the root. (vii) **A failing test is a question, not a
+verdict** — the branched-chain aldehydes going to zero looked like the sink over-eating; the source
+said the model had finally got it right and the *old* passing tests were the artifact. Both times
+this beat asked "is my new code wrong, or was the old expectation?", the answer was the second.
+
+### Not done, deliberately
+
+- **The keto-acid node.** Sotolon is now the first route re-based on one, but it is a *stand-in*
+  (the carbon comes off sugar, not a tracked 2-ketobutyrate pool). The real node — sourced-justified
+  by valine -> KIC -> isoamyl, and by propanol being produced *exclusively during growth*, which the
+  shared N-gate cannot express (D-99's "fixed spectrum" limit, holding a sourced counterexample at
+  last) — touches the fusel rate law and risks D-99's independently-anchored `k_*` provenance. The
+  sink, the node, and de-novo precursor synthesis are **one coupled problem**, not three beats.
+- Per-compound sources for **2-PE / active amyl** do not exist; `f_non_ehrlich_phenylalanine` is an
+  author estimate with a band spanning Crepin's full measured range, because the "is it a
+  biosynthetic hub" reasoning that might have placed it **demonstrably does not predict** the
+  measured values (leucine 0.815 and isoleucine 0.51 are both end products, 1.6x apart).
+- **The oxidative (D-75) Strecker route was not re-examined.** It shares methional and
+  phenylacetaldehyde with D-87 but was not audited for the same amino-acid-vs-keto-acid error.
+- **No peptide pool.** The model doses free amino acids only, so it cannot express the slow
+  peptide/protein hydrolysis that gives a bottle-aged, never-on-lees wine its branched-chain
+  aldehydes. Crépin cannot constrain it either (its medium is "without oligopeptide addition"), so
+  this needs its own source before it can be built.
+
+**Next:** the **keto-acid node** / de-novo precursor synthesis as one coupled milestone; DMS
+closure-permeation; variety-specific DMSp; audit the D-75 oxidative route for the D-104 error;
+retire the false `mercaptans` lump; sourced yeast-autolysate spectrum; re-anchor `f_methional`;
+masking (blocked on `cos-alpha`); the `oav` -> `magnitude` rename.

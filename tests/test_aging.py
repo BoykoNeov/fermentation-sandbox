@@ -1321,6 +1321,9 @@ _MAILLARD_TOUCHES = {
     "sotolon",
     "CO2",
     "N",
+    # S became a WRITE at D-104: sotolon is de_novo-capable, so the share of its carbon the must
+    # threonine pool cannot supply is drawn off sugar (the de-novo 2-ketobutyrate stand-in).
+    "S",
     *_MAILLARD_PRECURSORS.values(),
 }
 # Per-product carbon fraction, keyed by pool (for the closed-form carbon accounting).
@@ -1379,17 +1382,24 @@ def _maillard_closed_form(
     s_total = float(y[schema.slice("S")].sum())
     gate = aa / (params["K_amino_acids"] + aa)
     f_t = arrhenius_factor(t, params["E_a_maillard_strecker"], params["T_ref"])
-    n_ald = params["k_maillard_strecker"] * f_t * s_total * gate
-    weights = [params[wname] for (_, _, wname, _, _) in _MAILLARD_PRODUCTS]
+    driver = params["k_maillard_strecker"] * f_t * s_total  # PRE-gate since D-104
+    weights = [params[wname] for (_, _, wname, _, _, _) in _MAILLARD_PRODUCTS]
     w_sum = sum(weights)
     out: dict[str, float] = {}
     co2_mol = 0.0
-    for (pool, m_i, _wn, decarb, _prec), w_i in zip(_MAILLARD_PRODUCTS, weights, strict=True):
-        n_i = (w_i / w_sum) * n_ald
+    for (pool, m_i, _wn, decarb, _prec, de_novo), w_i in zip(
+        _MAILLARD_PRODUCTS, weights, strict=True
+    ):
+        # A de-novo-capable product (sotolon alone) is NOT rate-gated by the must pool — its carbon
+        # comes from a keto acid the cell makes from sugar, so an empty pool moves the carbon's
+        # SOURCE, never the rate (D-104). The five true Strecker aldehydes stay gated: no leucine,
+        # no 3-methylbutanal.
+        n_i = (w_i / w_sum) * driver * (1.0 if de_novo else gate)
         out[pool] = n_i * m_i
         if decarb:
             co2_mol += n_i
     out["CO2"] = co2_mol * M_CO2
+    out["_gate"] = gate  # the exogenous share of sotolon's carbon; the rest comes off sugar
     return out
 
 
@@ -1398,12 +1408,13 @@ def test_maillard_metadata():
     assert p.name == "maillard_strecker"
     # Speculative: the aging axis is the Tier-3 frontier (form sourced, magnitudes estimated).
     assert p.tier is Tier.SPECULATIVE
-    # Books the six thermal products + the decarboxylation CO2, drawing carbon from amino_acids and
-    # deaminating the nitrogen to N. Touches those nine and nothing else — NO o2, and S is a
-    # read-only driver (not in touches).
+    # Books the six thermal products + the decarboxylation CO2, drawing carbon from each product's
+    # own precursor and deaminating the nitrogen to N — plus S since D-104 (sotolon's de-novo
+    # 2-ketobutyrate share). Still NO o2: the thermal axis is the oxygen-free one, which is the
+    # whole point of the D-87 split from D-75.
     assert set(p.touches) == _MAILLARD_TOUCHES
     assert "o2" not in p.touches
-    assert "S" not in p.touches
+    assert "S" in p.touches  # D-104: was a read-only driver through D-87/D-100
     assert "amino_acids" not in p.touches  # the lumped draw is RETIRED (D-100)
     assert set(p.reads) == {
         "k_maillard_strecker",
@@ -1435,11 +1446,16 @@ def test_maillard_matches_closed_form(maillard_params):
     # EACH precursor drawn sized to the carbon of the product IT made, plus the CO2 that product's
     # own carboxyl released (D-100; sotolon contributes none — it is an aldol furanone, not a
     # Strecker aldehyde). The CO2 attribution is invisible to conservation, so it is pinned here.
+    # Since D-104 sotolon draws only its GATED share from threonine; the rest comes off sugar.
     per_precursor: dict[str, float] = {}
-    for pool, m_i, _wname, decarb, precursor in _MAILLARD_PRODUCTS:
+    expected_de_novo = 0.0
+    for pool, m_i, _wname, decarb, precursor, de_novo in _MAILLARD_PRODUCTS:
         carbon = cf[pool] * _MAILLARD_C[pool]
         if decarb:
             carbon += (cf[pool] / m_i) * M_CO2 * _CO2_C  # 1 CO2 per aldehyde
+        if de_novo:
+            expected_de_novo += (1.0 - cf["_gate"]) * carbon
+            carbon *= cf["_gate"]
         per_precursor[precursor] = per_precursor.get(precursor, 0.0) + carbon
     expected_n = 0.0
     for precursor, carbon in per_precursor.items():
@@ -1448,8 +1464,12 @@ def test_maillard_matches_closed_form(maillard_params):
         expected_n += mass * nitrogen_mass_fraction(precursor)
     assert schema.get(d, "N") == pytest.approx(expected_n)
     assert schema.get(d, "amino_acids") == 0.0  # the lumped pool is untouched (D-100)
-    # S is a read-only driver — NOT consumed here (its draw is booked by D-88). And NO o2 term.
-    assert schema.get(d, "S") == 0.0
+    # S IS consumed since D-104 — sotolon's de-novo (2-ketobutyrate) share is booked off sugar,
+    # exactly as the Ehrlich producer's stand-in is. Sized to the un-gated remainder, and carrying
+    # NO nitrogen (sugar has none — de-novo 2-ketobutyrate needs no amino acid).
+    assert expected_de_novo > 0.0  # guards against a vacuous pass
+    s_drawn = -float(d[schema.slice("S")].sum()) * carbon_mass_fraction("glucose")
+    assert s_drawn == pytest.approx(expected_de_novo)
     assert schema.get(d, "o2") == 0.0
     for var in ("X", "E", "isoamyl_acetate", "isoamyl_alcohol", "Byp", "acetaldehyde"):
         assert schema.get(d, var) == 0.0
@@ -1470,6 +1490,10 @@ def test_maillard_carbon_closes_per_rhs(maillard_params):
             schema.get(d, aa) * carbon_mass_fraction(aa)
             for aa in set(_MAILLARD_PRECURSORS.values())
         )
+        # The sugar leg (D-104): sotolon's de-novo share leaves S rather than threonine. Omitting
+        # it here would make this test PASS ONLY IF that leg were zero — i.e. it would silently
+        # stop testing the thing D-104 added.
+        + float(d[schema.slice("S")].sum()) * carbon_mass_fraction("glucose")
     )
     assert carbon_residual == pytest.approx(0.0, abs=1e-18)
 
@@ -1492,21 +1516,57 @@ def test_maillard_nitrogen_closes_per_rhs(maillard_params):
     assert nitrogen_residual == pytest.approx(0.0, abs=1e-18)
 
 
-def test_maillard_inert_without_amino_acids(maillard_params):
-    # No amino acids ⇒ no thermal Strecker: the HARD gate that IS the isolability guarantee — an
-    # undosed wine is byte-for-byte the case without this Process. Also the aa<0 undershoot guard.
+def test_the_five_strecker_aldehydes_are_inert_without_amino_acids_but_sotolon_is_not(
+    maillard_params,
+):
+    # NARROWED AT D-104, deliberately — read the reason before "restoring" this.
+    #
+    # Through D-100 this asserted the WHOLE Process was inert at aa=0. That is no longer true and
+    # must not be: sotolon is an aldol furanone of 2-ketobutyrate, which Crépin measures as
+    # de-novo-dominated ("19% consumed threonine ... 81% newly synthesized"), so gating it on the
+    # must pool made a wine with no residual threonine produce NO sotolon — false for every aged
+    # Sauternes. `de_novo=True` un-gates it and sources the shortfall off sugar.
+    #
+    # The FIVE true Strecker aldehydes keep the hard gate, and that distinction is the whole point:
+    # they are degradations OF the amino acid (no leucine, no 3-methylbutanal), so aa=0 must silence
+    # them exactly. Pinned per-product rather than on the summed RHS so a future change cannot
+    # silently un-gate one of the five.
     schema = wine_schema()
-    ps = ProcessSet(schema, [MaillardStrecker()], strict=True)
-    assert np.array_equal(
-        ps.total_derivatives(0.0, _maillard_wine(schema, maillard_params, aa=0.0), maillard_params),
-        schema.zeros(),
-    )
-    assert np.array_equal(
-        MaillardStrecker().derivatives(
-            0.0, _maillard_wine(schema, maillard_params, aa=-1e-6), schema, maillard_params
+    for aa in (0.0, -1e-6):  # 0 and the solver-undershoot guard
+        d = MaillardStrecker().derivatives(
+            0.0, _maillard_wine(schema, maillard_params, aa=aa), schema, maillard_params
+        )
+        for pool, _m, _w, _decarb, _prec, de_novo in _MAILLARD_PRODUCTS:
+            if de_novo:
+                continue
+            assert schema.get(d, pool) == 0.0, f"{pool} fired at aa={aa}"
+        # …and no precursor is drawn, and no CO2 released, by the gated five.
+        for precursor in set(_MAILLARD_PRECURSORS.values()):
+            assert schema.get(d, precursor) == 0.0
+        assert schema.get(d, "N") == 0.0  # nothing deaminated: the five are silent
+        # Sotolon DOES fire, on sugar alone — the D-104 fix, asserted positively so the coverage
+        # this test used to carry does not just vanish.
+        assert schema.get(d, "sotolon") > 0.0
+        assert float(d[schema.slice("S")].sum()) < 0.0  # its carbon comes off sugar
+
+
+def test_scenario_isolability_survives_the_de_novo_sotolon_route():
+    # WHERE the isolability guarantee actually lives now (D-104). The Process is no longer inert at
+    # aa=0, so prime directive #3 rests entirely on the compile seam disabling it — verified here
+    # end-to-end rather than assumed, because the unit-level belt-and-braces is gone.
+    from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+
+    compiled = compile_scenario(
+        Scenario(
+            name="undosed",
+            medium="wine",
+            initial={"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25},  # NO amino_acids_gpl
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+            duration_days=1.0,
         ),
-        schema.zeros(),
+        strict=True,
     )
+    assert not compiled.process_set.is_enabled(MaillardStrecker.name)
 
 
 def test_maillard_inert_without_sugar(maillard_params):
@@ -1573,8 +1633,14 @@ def test_maillard_availability_gate_saturates(maillard_params):
     high = MaillardStrecker().derivatives(
         0.0, _maillard_wine(schema, maillard_params, aa=100.0 * k), schema, maillard_params
     )
-    lo, md, hi = (schema.get(x, "sotolon") for x in (low, mid, high))
+    # Read on a GATED product since D-104 — sotolon is `de_novo` and therefore deliberately flat in
+    # aa (its rate no longer depends on the must pool; only its carbon's SOURCE does). Using it here
+    # would test the opposite of what this Process now claims.
+    lo, md, hi = (schema.get(x, "3_methylbutanal") for x in (low, mid, high))
     assert lo < md < hi  # monotone increasing in aa
+    # …and sotolon is flat in aa, which is the D-104 fix stated as an assertion.
+    s_lo, s_hi = (schema.get(x, "sotolon") for x in (low, high))
+    assert s_lo == pytest.approx(s_hi)
     assert (md - lo) > (hi - md)  # but saturating (diminishing returns) — the gate flattens
 
 

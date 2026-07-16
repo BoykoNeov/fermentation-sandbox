@@ -746,9 +746,16 @@ def test_strecker_raises_the_strecker_oavs():
         _wine(
             [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],
             amino_acids_gpl=0.5,
+            autolysis_rate_per_h=_SUR_LIE_RATE,  # D-104: see _SUR_LIE_RATE
         )
     ).run()
-    reductive = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], amino_acids_gpl=0.5)).run()
+    reductive = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],
+            amino_acids_gpl=0.5,
+            autolysis_rate_per_h=_SUR_LIE_RATE,
+        )
+    ).run()
     assert aged.success and reductive.success
 
     for pool in ("methional", "phenylacetaldehyde"):
@@ -857,6 +864,30 @@ _MAILLARD_ALDEHYDES = (
 _SWEET_BRIX = 70.0  # botrytis-level must → arrests with ~130 g/L residual sugar (a SWEET wine)
 _SWEET_AGING_DAYS = 730.0  # a multi-year sweet-wine aging tail (thermal aging is slow)
 
+#: **Why the Strecker scenarios below age SUR LIE (decision D-104).** They used to age with no
+#: lees, and passed only because the model left a few mg/L of unconsumed precursor behind. It does
+#: not any more, and **that is the fix, not the regression**: before D-104 the Ehrlich re-route was
+#: each precursor's only consumer, so leucine survived in quantities real yeast never leave. Crépin
+#: *et al.* 2017 (PMC5311416) measures the assimilable amino acids as **"sequentially exhausted in
+#: the medium"**, supplied "substantially lower than the anabolic demand" for everything but
+#: glutamine and arginine — and the one that *does* persist ("no significant changes were observed
+#: in residual proline concentrations") is **proline**, which D-100 already excludes from the
+#: spectrum because it is not assimilated anaerobically. So a no-lees wine genuinely has no
+#: branched-chain Strecker substrate, and asserting perceptible aldehydes there was asserting an
+#: artifact.
+#:
+#: Aging these on lees tests the same physics in **the regime the model claims to model** — D-100's
+#: "aging precursors are dominantly autolysis-sourced … thermal/oxidative Strecker aroma is
+#: strongly lees-dependent", which D-104 turns from nearly-true into exactly-true. The no-lees claim
+#: is not dropped: :func:`test_no_lees_leaves_no_branched_chain_strecker_substrate` asserts it
+#: head-on, so the coverage moves rather than vanishing.
+#:
+#: **The honest gap this exposes**: real bottle-aged wine does develop branched-chain aldehydes
+#: without lees, via slow **peptide/protein hydrolysis** releasing amino acids over years. This
+#: model has no peptide pool at all (its dose is free amino acids only), so it cannot express that
+#: route — named in D-104, not built.
+_SUR_LIE_RATE = 1.0e-3  # 1/h; the D-34 opt-in autolysis rate that refills the precursor pools
+
 
 def test_maillard_gated_by_begin_aging_wine_only():
     # MaillardStrecker is WINE-ONLY (reads wine-only amino_acids + deaminates to N) — present in the
@@ -889,6 +920,7 @@ def test_maillard_thermal_aldehydes_in_sealed_sweet_wine():
         _wine(
             [_begin_aging(_FERMENT_DAYS)],  # SEALED — no add_oxygen
             amino_acids_gpl=0.8,
+            autolysis_rate_per_h=_SUR_LIE_RATE,  # D-104: see _SUR_LIE_RATE
             brix=_SWEET_BRIX,
             duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
         )
@@ -897,6 +929,7 @@ def test_maillard_thermal_aldehydes_in_sealed_sweet_wine():
         _wine(
             [_begin_aging(_FERMENT_DAYS)],
             amino_acids_gpl=0.8,
+            autolysis_rate_per_h=_SUR_LIE_RATE,  # matched to the sweet arm — sugar is the variable
             brix=24.0,  # dry-fermenting control → residual sugar ≈ 0 ⇒ thermal route ~silent
             duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
         )
@@ -933,6 +966,7 @@ def test_maillard_raises_the_thermal_oavs():
         _wine(
             [_begin_aging(_FERMENT_DAYS)],
             amino_acids_gpl=0.8,
+            autolysis_rate_per_h=_SUR_LIE_RATE,  # D-104: see _SUR_LIE_RATE
             brix=_SWEET_BRIX,
             duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
         )
@@ -2426,3 +2460,48 @@ def test_micro_oxygenation_softens_white_tannin_via_ethyl_bridge_end_to_end():
     assert_conserved(
         traj.as_trajectory(), total_carbon(cs.schema, biomass_carbon_fraction=f_c), label="carbon"
     )
+
+
+def test_no_lees_leaves_no_branched_chain_strecker_substrate():
+    """The no-lees claim, asserted head-on rather than lost when the thermal tests moved sur lie.
+
+    **This is a POSITIVE assertion of a KNOWN-INCOMPLETE prediction, and both halves matter.**
+
+    What is sourced: the assimilable amino acids really are consumed. Crépin *et al.* 2017
+    (PMC5311416) measures the nitrogen sources as "sequentially exhausted in the medium", with the
+    amino acids "substantially lower than the anabolic demand" for everything but glutamine and
+    arginine. Before D-104 the model could not reproduce that — the Ehrlich re-route was each
+    precursor's only consumer, so leucine survived at levels real yeast never leave, and the
+    branched-chain aldehydes fed on the leftovers. The anabolic sink (D-104) consumes them properly,
+    so a no-lees wine has **no substrate** and the route is silent.
+
+    What is NOT sourced, and is why this pins zero without celebrating it: real bottle-aged wine
+    *does* develop branched-chain aldehydes without lees, over years, as **peptides and proteins
+    hydrolyse** and release amino acids. This model has no peptide pool — its dose is free amino
+    acids only (Crépin's own medium is deliberately "without oligopeptide addition") — so it cannot
+    express that route at all. **The zero below is therefore right about the mechanism it has and
+    wrong about the wine.** Named in D-104; not built here.
+
+    Sotolon is excluded on purpose: since D-104 it is ``de_novo``-capable (an aldol furanone of
+    mostly-de-novo 2-ketobutyrate, not a Strecker degradation), so it correctly survives with no
+    lees and no precursor — which is the D-104 fix and is pinned separately.
+    """
+    aged = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS)],  # NO autolysis_rate_per_h ⇒ no lees
+            amino_acids_gpl=0.8,
+            brix=_SWEET_BRIX,
+            duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+        )
+    ).run()
+    assert aged.success
+
+    # The precursors really are gone — the premise, not an assumption.
+    for precursor in ("leucine", "isoleucine", "valine"):
+        assert float(aged.series(precursor)[-1]) < 1.0e-6, precursor
+    # ⇒ their Strecker aldehydes are silent. These ARE degradations of the amino acid, so no
+    # substrate must mean no product; that is the D-87 gate working, not a defect in it.
+    for pool in ("3_methylbutanal", "2_methylbutanal", "2_methylpropanal"):
+        assert float(aged.series(pool)[-1]) == 0.0, pool
+    # …while sotolon survives on the de-novo route (D-104) — the whole point of that flag.
+    assert float(aged.series("sotolon")[-1]) > 0.0

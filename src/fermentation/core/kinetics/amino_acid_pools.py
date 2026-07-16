@@ -94,11 +94,20 @@ even the looser <25%; and compared aggregate-to-aggregate — which is what Roll
 ">90% of the acids and higher alcohols" invites — the five together give **67-79% CCM vs >90%**,
 ~2-3x over. The mild-looking 14-23.5% is the isoamyl+isobutanol subset only.
 
-**A SINK THIS MODULE DOES NOT HAVE (a real gap, deliberately not patched here).** The re-route is
-each precursor's *only* consumer, so **100% of consumed leucine is attributed to Ehrlich**. Real
-yeast incorporate much of it into **protein** — the anabolic sink. Every precursor here therefore
-disappears by the one route the model owns, whatever reality's split. Building it needs a sourced
-biomass amino-acid composition and touches the conservation ledger ⇒ its own beat, not a footnote.
+**THE SINK THIS MODULE LACKED — CLOSED AT D-104, and the fix was not the one this note predicted.**
+D-100 wrote here that the re-route being each precursor's only consumer meant "100% of consumed
+leucine is attributed to Ehrlich", that real yeast send much of it to **protein**, and that
+building the sink "needs a sourced biomass amino-acid composition". The premise was right and
+**sourced**: Crépin *et al.* 2017 (Appl. Environ. Microbiol. 83:e02617-16) measures **77–86% of
+assimilated leucine directed toward protein synthesis**. The prescription was wrong. A sink built
+from biomass composition splits each precursor by *demand*, and the model's Ehrlich demand pulls
+the **amino acid**, so the largest alcohol drains its own precursor hardest — measured against
+Crépin the split comes out **monotonically inverted** (model leucine 20.9% to protein; model order
+leu<ile<val<thr against Crépin's thr<val<ile<leu). No composition repairs it. Reality escapes the
+inversion by building isoamyl from **KIC**, a keto acid that is mostly de novo, so the leucine pool
+never faces that demand. :mod:`~fermentation.core.kinetics.precursor_fates` therefore imposes the
+measured *outcome* — see it for why ``f_non_ehrlich_*`` is a **lump of all non-Ehrlich fates** and
+emphatically not the protein share, and for what that costs (the split is static).
 
 **Isolability (prime directive #3).** Every speciated slot defaults to 0, so an undosed run has
 every gate at exactly 0 and is byte-for-byte the validated core — the D-32 guarantee, unchanged.
@@ -295,17 +304,35 @@ def release_spectrum_nitrogen(
     published sur-lie mechanism, arriving as a consequence of speciation rather than a modelled
     rule.
 
-    **The DIRECTION is sourced; the MAGNITUDE is not — do not read the extreme as a prediction.**
-    The model currently says a no-lees aged wine makes *essentially zero* branched-chain Strecker
-    aldehyde. **D-103 corrects what D-100 wrote here.** D-100 claimed the re-route's catabolic
-    fraction was "a lumped estimate (~0.5 via the shared ``K_amino_acids`` gate)" against "a
-    literature contribution nearer 20-50%". Both numbers were wrong. Measured exactly (the
-    re-route is each precursor's only consumer, so the fraction is a state difference, not a
-    quadrature): it is **0.192** at D-100's own dose, and **0.21-0.33** at a realistic must
-    (leucine 30-60 mg/L) — never ~0.5, which needs ~5 g/L amino acids. And the "20-50%" was
-    **uncited**; the sourced contribution is **lower**, so that band would have *acquitted* a
-    model that should be convicted (see D-103 for why an uncited number can no more acquit than
-    convict).
+    **The DIRECTION is sourced, and at D-104 the EXTREME became exact — for a sourced reason.**
+    The model says a no-lees aged wine makes **zero** branched-chain Strecker aldehyde (D-103 read
+    "essentially zero"; the D-104 sink finished the precursors off). That is no longer an artifact:
+    Crépin *et al.* 2017 measures the assimilable amino acids as "sequentially exhausted in the
+    medium", supplied "substantially lower than the anabolic demand" for all but glutamine and
+    arginine — and the one that *does* persist ("no significant changes were observed in residual
+    proline concentrations") is **proline, which this module already excludes**. So the exhaustion
+    is right. What the model still cannot express is the slow **peptide/protein hydrolysis** that
+    gives a never-on-lees bottle-aged wine its branched-chain aldehydes: there is no peptide pool
+    (D-104, named not built). **The zero is right about the mechanism it has and wrong about the
+    wine.**
+
+    **D-103 corrects what D-100 wrote here.** D-100 claimed the re-route's catabolic fraction was
+    "a lumped estimate (~0.5 via the shared ``K_amino_acids`` gate)" against "a literature
+    contribution nearer 20-50%". Both numbers were wrong. Measured exactly it is **0.192** at
+    D-100's own dose, and **0.21-0.33** at a realistic must (leucine 30-60 mg/L) — never ~0.5,
+    which needs ~5 g/L amino acids. And the "20-50%" was **uncited**; the sourced contribution is
+    **lower**, so that band would have *acquitted* a model that should be convicted (see D-103 for
+    why an uncited number can no more acquit than convict).
+
+    .. warning::
+
+       **The METHOD note that stood here is now false (decision D-104).** D-103 measured that
+       0.192 as a **pool state difference**, justified because "the re-route is each precursor's
+       only consumer". :class:`~fermentation.core.kinetics.precursor_fates.PrecursorNonEhrlichFates`
+       is a second consumer, so a state difference now **double-counts the anabolic draw as
+       catabolic**. Measure the re-route's own draw instead — or reconstruct it as
+       ``consumed x (1 - f_non_ehrlich_i)``, which is exact by construction. D-103's numbers were
+       correct *when taken*; the recipe is what expired.
 
     **There is no single fraction to bound — the defect is this gate's SHAPE (decision D-103).**
     Rollero *et al.* 2017 (Microb. Biotechnol. 10:1649-1662, U-13C leucine/valine in synthetic
@@ -326,11 +353,15 @@ def release_spectrum_nitrogen(
     the per-species defect. **The aggregate is the misleading statistic here; the shape is the
     finding.**
 
-    "Silent without lees" is **still not validated, and D-103 does not settle it either way**: it
-    is an output of this same gate (phenylalanine exhausts *because* the overstated 2-PE draw
-    takes all its carbon), so a correct lower draw might leave residual precursor. In reality
-    phenylalanine does exhaust — but via protein synthesis, a sink this model does not have
-    (below). Right outcome, wrong route, unresolved. The lees-enrichment direction stands alone.
+    **"Silent without lees" — SETTLED AT D-104, and D-103's hope about it was wrong.** D-103 wrote
+    that the precursors exhaust as "an output of this same gate ... so a correct lower draw **might
+    leave residual precursor**", and that in reality phenylalanine exhausts "via protein synthesis,
+    a sink this model does not have. Right outcome, wrong route, unresolved." D-104 built that sink,
+    and both halves resolved *against* the hope: the correct draw leaves **less** residue, not more
+    (the sink is a second consumer, so exhaustion is more complete), and the sourced answer is that
+    **real ferments exhaust them too** (above). So the route is now right as well as the outcome —
+    the precursors go via protein, as they should. What "silent without lees" still lacks is the
+    **peptide pool**, not a better fraction.
 
     **DOCUMENTED LIMITATION (decision D-100):** the release uses the **must** spectrum, because a
     sourced yeast-**autolysate** amino-acid spectrum is not in hand. Autolysate is protein
