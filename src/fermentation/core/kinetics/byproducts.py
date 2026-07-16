@@ -78,9 +78,18 @@ the higher-alcohol share); the higher alcohols now live solely in the carbon-rou
 carries no carbon in :func:`total_carbon`, so fusel carbon is sourced from sugar.
 (ii) An ester's ethanol moiety is carbon *already counted in ``E``*, so routing ester
 carbon from sugar over-attributes fresh hexose. Both close the ledger exactly; neither
-asserts where the carbon physically came from. Fusels carry **no CO2 co-product**
-(the Ehrlich decarboxylation is omitted) — a documented simplification that keeps the
-draw a clean 1:1 sugar→pool carbon transfer.
+asserts where the carbon physically came from. The **sugar stand-in** carries **no CO2
+co-product** (the Ehrlich decarboxylation is omitted) — a documented simplification that keeps
+that draw a clean 1:1 sugar→pool carbon transfer.
+
+**Since D-106 that omission is scoped to the stand-in, and the asymmetry is deliberate.**
+:class:`FuselAminoAcidReroute` *does* emit the decarboxylation CO2, for the fraction it
+re-sources onto real amino acids. The two are not inconsistent: a draw off an *amino acid* is a
+chemical claim about a named reaction (leucine → isoamyl alcohol + CO2 + NH3), and it is wrong
+unless it charges every one of leucine's six carbons — that was the D-105 finding. A draw off
+*sugar* claims no reaction at all; it is a placeholder for de-novo synthesis whose real carbon
+path (hexose → pyruvate → keto acid, decarboxylating on the way) the model does not trace. So
+the CO2 appears exactly where a mechanism is asserted, and stays absent where one is not.
 
 **The fusel sugar stand-in is now re-routable (decision D-33).** When the toggleable
 ``amino_acids`` pool (arginine; D-32) is dosed, :class:`FuselAminoAcidReroute` re-sources a
@@ -124,7 +133,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.chemistry import CARBON_ATOMS, carbon_mass_fraction
 from fermentation.core.kinetics.amino_acid_pools import (
     SPEC_BY_SPECIES,
     depletion_gate,
@@ -154,6 +163,14 @@ from fermentation.core.tiers import Tier
 #: registered in ``ESTER_SPECS`` (decision D-96) / ``FUSEL_SPECS`` (decision D-99) and weighted
 #: by itself, so there is no single ``_ESTER_SPECIES`` or ``_FUSEL_SPECIES`` to name here.
 #: ``mercaptans`` is now the last lumped pool in the project.
+
+#: The Ehrlich decarboxylation releases exactly **1 mol CO₂ per mol higher alcohol** — the keto
+#: acid's carboxyl carbon, the step that turns the transaminated amino acid into its aldehyde
+#: (decision D-106). The twin of ``aging._CO2_PER_STRECKER_ALDEHYDE``, and for the same reason:
+#: it is a real product on the carbon ledger, so charging it to the precursor's draw is what makes
+#: that draw the molecule's actual stoichiometry. All five routes are ``C(precursor) ==
+#: C(alcohol) + 1`` (measured, D-106), so one constant covers the set.
+_CO2_PER_EHRLICH_ALCOHOL = 1.0
 
 
 def fusel_rate_shape(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
@@ -238,6 +255,29 @@ def fusel_carbon_draw_by_species(
         (spec, params[spec.k_param] * shape * carbon_mass_fraction(spec.species))
         for spec in FUSEL_SPECS
     ]
+
+
+def ehrlich_co2_carbon(spec: FuselSpec, alcohol_carbon: float) -> float:
+    """The decarboxylation carbon [g C/L/h] charged to ``spec``'s precursor (decision D-106).
+
+    ``alcohol_carbon`` is the **gated** carbon of the alcohol being re-sourced onto its amino acid.
+    The Ehrlich pathway decarboxylates exactly once per alcohol, so the precursor must also give up
+    one carbon beyond the alcohol's — and since ``alcohol_carbon`` is spread over
+    ``CARBON_ATOMS[spec.species]`` carbons, that one carbon is simply the quotient. Charging it is
+    what makes the draw 1 mol precursor per mol alcohol; without it the route consumes ``(n-1)/n``
+    (the D-105 finding).
+
+    **This exists as a shared helper because its absence is what let the two callers drift.**
+    :class:`FuselAminoAcidReroute` draws it and
+    :class:`~fermentation.core.kinetics.precursor_fates.PrecursorNonEhrlichFates` must scale its
+    D-104 split against the *same* number — the sink's whole contract is that the realised split is
+    exactly ``f : (1-f)`` of the precursor the re-route actually consumes. Before D-106 both
+    recomputed ``gate x fusel_carbon`` independently and agreed by luck, because the two arithmetics
+    were identical; adding the CO₂ to one silently moved the realised split in the other. One
+    helper, two callers: they can no longer disagree (the D-33/D-99 shared-helper discipline, which
+    this route had in name only).
+    """
+    return _CO2_PER_EHRLICH_ALCOHOL * alcohol_carbon / CARBON_ATOMS[spec.species]
 
 
 class EsterSynthesis(Process):
@@ -519,12 +559,14 @@ class FuselAminoAcidReroute(Process):
     name = "fusel_amino_acid_reroute"
     tier = Tier.SPECULATIVE
     #: Refunds carbon to ``S``, debits **each alcohol's own precursor**, releases nitrogen to
-    #: ``N``. Never touches ``fusels`` — production stays entirely in :class:`FuselAlcoholsEhrlich`
+    #: ``N``, and emits the decarboxylation ``CO2`` (D-106 — the term whose absence made the draw
+    #: ``(n-1)/n``). Never touches ``fusels`` — production stays entirely in
+    #: :class:`FuselAlcoholsEhrlich`
     #: — and, since D-100, **never touches ``amino_acids``/``amino_acids_generic``**: arginine does
     #: not make higher alcohols, so the re-route can no longer starve the consumers that live on
     #: those pools (yeast swap, MLF growth, Brett growth, Maillard browning). That absence is the
     #: whole D-100 decoupling and is pinned by a test.
-    touches = ("S", "N", *(spec.precursor_amino_acid for spec in FUSEL_SPECS))
+    touches = ("S", "N", "CO2", *(spec.precursor_amino_acid for spec in FUSEL_SPECS))
     #: Recomputes the fusel rate (so it reads the producer's parameters) plus ``K_amino_acids``
     #: and each precursor's ``must_aa_fraction_*`` for the relative-depletion gates (D-100).
     #: Their tiers cap the ``S``/precursor/``N`` output tiers via parameter-tier propagation (D-1).
@@ -549,6 +591,7 @@ class FuselAminoAcidReroute(Process):
             return d
         refund = 0.0  # total carbon re-sourced off sugar, across the five precursors
         nitrogen = 0.0  # total nitrogen deaminated out of them
+        co2_carbon = 0.0  # total decarboxylation carbon, precursor → CO2 (D-106)
         for spec, fusel_carbon in draws:
             if fusel_carbon <= 0.0:
                 continue
@@ -560,12 +603,22 @@ class FuselAminoAcidReroute(Process):
             gate = depletion_gate(y, schema, params, (precursor,))
             if gate <= 0.0:
                 continue  # this precursor is exhausted ⇒ its alcohol stays on the sugar stand-in
-            aa_carbon = gate * fusel_carbon  # the fraction re-sourced from THIS precursor
-            nitrogen += draw_precursor_carbon(d, schema, spec.precursor_amino_acid, aa_carbon)
+            aa_carbon = gate * fusel_carbon  # the ALCOHOL carbon re-sourced from THIS precursor
+            # The Ehrlich decarboxylation's own CO₂ (D-106) — charged to the precursor, which is
+            # what makes the draw 1 mol per mol instead of (n-1)/n, and NOT refunded to sugar,
+            # because the producer only ever drew sugar for the alcohol itself. Shared with the
+            # D-104 sink, which must scale its split against this same number.
+            co2_i = ehrlich_co2_carbon(spec, aa_carbon)
+            nitrogen += draw_precursor_carbon(
+                d, schema, spec.precursor_amino_acid, aa_carbon + co2_i
+            )
             refund += aa_carbon
+            co2_carbon += co2_i
         if refund <= 0.0:
             return d
         d[schema.slice("N")] = nitrogen  # DEAMINATION: precursor N → ammonium (the D-33 branch)
+        # Precursor carbon that became CO₂, not alcohol: drawn above, emitted here, never refunded.
+        d[schema.slice("CO2")] = co2_carbon / carbon_mass_fraction("CO2")
         # Refund the producer's sugar draw for the re-sourced fraction (the inverse of its draw),
         # so net sugar loss is only the un-rerouted remainder. rate > 0 ⇒ flux > 0 ⇒ sugar present,
         # so the refund always lands (no carbon leak).

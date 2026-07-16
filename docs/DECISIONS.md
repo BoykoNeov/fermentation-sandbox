@@ -9319,3 +9319,125 @@ producer + consumer argument); the Ehrlich CO₂ charge as D-104's follow-up; me
 `methionol`; DMS closure-permeation; variety-specific DMSp; retire the false `mercaptans` lump; sourced
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (blocked on `cos-alpha`); the `oav` → `magnitude`
 rename.
+
+## D-106 — the Ehrlich CO₂ charge D-105 deferred: the split survived exactly, and the fix exposed an artifact one pool over
+
+**Date:** 2026-07-17. **Milestone 3 / Tier-3.** D-105 measured the Ehrlich re-route at `(n-1)/n` and deferred the
+fix with a named reason: it is "the cheapest real fix on the list and NOT blocked" — CO₂ is already tracked — but
+"it makes every precursor deplete ~20% faster and release ~20% more nitrogen, landing directly on D-104's
+freshly-landed split — that beat's call, **with measurement**, not a drive-by from an audit." This is that beat.
+The code change is three lines. **The measurement is the work**, and it is what this entry is mostly about.
+
+### The change
+
+The Ehrlich pathway is `amino acid → (transaminate) → keto acid → (decarboxylate, releasing CO₂) → aldehyde →
+(reduce) → alcohol`. All five routes are `C(precursor) == C(alcohol) + 1` — **measured**, not assumed: threonine
+C4→propanol C3, valine C5→isobutanol C4, isoleucine C6→2-methylbutanol C5, leucine C6→isoamyl C5, phenylalanine
+C9→2-phenylethanol C8. `FuselAminoAcidReroute` charged its precursor for the *alcohol's* carbon and not for that
+CO₂, so it consumed `(n-1)/n` mol precursor per mol alcohol. It now charges it (`_CO2_PER_EHRLICH_ALCOHOL`, the
+twin of `aging._CO2_PER_STRECKER_ALDEHYDE`) and emits the CO₂ to the ledger. **All twelve decarboxylating routes
+in the tree now draw at exactly 1.0000; the two that remain are the mercaptan (0.2) and sotolon (1.5), both
+blocked on the 2-ketobutyrate pool.** `_KNOWN_NON_STOICHIOMETRIC` is now *exactly* the keto-acid node's work-list.
+
+**The refund is deliberately NOT scaled** (the trap, and the advisor's must-catch): the producer only ever drew
+sugar for the alcohol, so refunding the CO₂'s carbon too would create sugar out of the precursor. Per mol
+alcohol: precursor −n C, sugar +(n−1) C **unchanged**, CO₂ +1 C. The nitrogen rises on its own, because the
+drawn *mass* rose — a full mole of precursor carries a full mole of N to deaminate.
+
+### The asymmetry the fix exposed — the real finding, and it is not about the Ehrlich route at all
+
+Measured at an **8 g/L stress dose, no lees** (the discriminating regime: at the realistic 1 g/L the precursors
+are exhausted before aging *either way*, so a faster depletion changes the trajectory and not the endpoint, and
+nothing moves at all):
+
+| output | before | after | |
+|---|---|---|---|
+| **phenylacetaldehyde** | 43.8 µg/L | ~0 | **−99.998%** |
+| **methional** | 94.7 µg/L | 94.8 µg/L | **+0.083%** |
+
+**Both are products of the SAME D-75 oxidative Strecker route.** D-106 collapses one and leaves the other dead
+flat. The only reason for the difference is the D-105 finding: **methionine has no fermentation-phase consumer**,
+so the Ehrlich re-route cannot touch it and neither can this fix. D-106 does not *create* that artifact — it
+**exposes** it, by stripping away the phenylalanine residual that was masking it. Before, both aldehydes were
+present and the model looked self-consistent; after, the model says *a no-lees heavily-dosed wine makes methional
+but not phenylacetaldehyde*, and **that is not chemistry — it is the missing methionine sink showing through.**
+This hands the methionine-sink beat (D-105's "named, not built") its sharpest motivation yet, and it is
+**recorded, not built**: D-106 is the CO₂ charge.
+
+**The phenylalanine collapse is toward a number this project already sourced, and that is why it is not a
+regression.** D-103/D-104 established from Crépin *et al.* 2017 that the assimilable amino acids are
+"sequentially exhausted in the medium" and that a no-lees aged wine makes **~zero** branched-chain Strecker
+aldehyde. The 43.8 µg/L was a knife-edge residual (phenylalanine ended fermentation at 0.18 mg/L of an 8 g/L
+dose — 99.998% consumed); a 12.5% change in the draw was enough to flip it. **No benchmark asserted it.** The
+scope of the claim, stated D-105-style: D-106 makes the **phenylalanine side** consistent with sourced
+exhaustion and **reveals that the methionine side is not**. It does **not** make aging aldehyde correct.
+
+### D-104's split needed no recalibration — and the reason is structural, not lucky
+
+D-105 feared this beat would move D-104's freshly-landed split. **It does not, exactly**: `f_i` is a **ratio**,
+and D-106 scales the Ehrlich branch and the D-104 sink **equally** (the sink is *defined* off the Ehrlich draw),
+so the sourced 77–86% is still realised to 1e-12. What moves is the **absolute** consumption, **+12.6%**.
+
+That is a **modelling choice and it is stated rather than left implicit**: the Ehrlich branch is anchored to
+*alcohol production* and the sink to the *split ratio*, so correcting the stoichiometry necessarily scales both,
+rather than holding total consumption fixed and shifting the split. The alternative would have silently
+overridden a **sourced** number with a stoichiometric correction.
+
+**But it only survived because the sink was fixed too, and the crux test caught that.** `PrecursorNonEhrlichFates`
+recomputed `gate × fusel_carbon` independently, with the comment "exactly what the re-route books" — **true until
+D-106 made it false**. Left alone, the realised split silently fell (threonine **0.82 → 0.774**) while every
+conservation test stayed green. The fix is `ehrlich_co2_carbon`, a **shared helper**: the two Processes had the
+shared-helper discipline *in name only* — they agreed by luck because their arithmetics were identical, and
+adding a term to one broke the other. One helper, two callers, and they can no longer drift.
+
+### Two bands re-authored, and why this is not the D-103 trap
+
+D-103's lesson is that an **uncited band nearly acquitted a model**. The discriminator: that warns against moving
+a band to *acquit code whose correctness is not independently established*. **The CO₂ charge does not rest on
+either band** — it rests on atom counts, and it is **mutation-tested**: deleting the term fails the driven test,
+and a 2× count fails it *while all conservation tests stay green*. When upstream gets **more** correct,
+re-authoring a downstream tripwire is the right response. Both moved *because the model improved*:
+
+1. **The joint N refund, 1.040× → 1.171×** (ceiling was 1.15). The tripwire did its job — it forces a
+   *qualitative* question, not "what number now." **The call: "slight deamination at pitch" is still fair.** It
+   is the same story in degree, not kind — 17% of growth's draw rather than 4%; direction, mechanism and
+   conservation unchanged; inverting the nitrogen story would need the precursors to become a dominant N *source*
+   (multiples of growth's draw). Ceiling → 1.20, **authored, not sourced** — its width is tripwire margin, not
+   physics. D-32's docstring cited the stale `1.04×` and is corrected.
+2. **The precursor-negativity bound**, now **scale-relative** (`> -1e-6 × initial`, plus an absolute ceiling),
+   which is what it always meant; the old `-1e-9` was one run's noise floor, not a physical statement. **The
+   undershoot is solver noise, not the bigger draw, and the ORDERING proves it**: phenylalanine has the
+   **smallest** draw increase (+12.5%) yet grew its undershoot **most** (4.3×), while valine and isoleucine —
+   drawing 25%/20% more — *improved* to ~1e-15. If the draw drove it, that ordering would reverse.
+
+### The lessons
+
+(i) **"~20%" was one molecule's number generalised to a set.** D-105 predicted "~20% faster / ~20% more N"; that
+is leucine's `n/(n-1)` (C6→C5). The measured per-species spread is **+12.5% to +33.3%** and the realised
+aggregate is **+12.6%**. This is D-104's "a cited number binds only the SET it describes" and D-105's own lesson
+(iii) — **committed by D-105, about D-106, in the sentence deferring it.** The error class keeps finding new
+hosts. (ii) **A fix can be inert on outputs and still be worth shipping** — at realistic doses D-106 moves
+nothing; its value is that the stoichiometry is now right and the *next* beat inherits a correct draw. (iii)
+**The discriminating regime has to be looked for.** The first measurement ran at a realistic dose and reported
+"nothing moved" — with the aldehyde pools at **0.0**, because the scenario never dosed O₂ and the route never
+fired. A vacuous measurement that agrees with you is D-105's lesson (v) wearing a different hat.
+
+### The receipt
+
+**1140 → 1141 passed** (measured). +1 is the new driven test; the three re-authored assertions and the crux test
+are edits, not additions. `ruff` + `mypy` clean; **16/16 benchmarks pass, both media**. Carbon and nitrogen close
+to 1e-14 through the change. Integrated aroma at realistic dose: **unmoved to <0.001%**; `CO2` +0.010% and
+ethanol −0.004% are the decarboxylation appearing on the ledger — precursor carbon that becomes CO₂ no longer
+refunds to sugar.
+
+### Not done, deliberately
+
+- **Methionine's missing assimilation + anabolic sink** and the absent `methionol` — **now the best-motivated
+  item on the list**: D-106 turned it from a measured absence into a visible model artifact.
+- **The mercaptan 5×** and **sotolon's 1.5×** — the last two on `_KNOWN_NON_STOICHIOMETRIC`, both blocked on the
+  2-ketobutyrate pool, which now has a producer, a consumer, and two beats of motivation.
+
+**Next:** the **keto-acid node** as one coupled milestone; **methionine's assimilation/sink + `methionol`** (see
+above); DMS closure-permeation; variety-specific DMSp; retire the false `mercaptans` lump; sourced
+yeast-autolysate spectrum; re-anchor `f_methional`; masking (blocked on `cos-alpha`); the `oav` → `magnitude`
+rename.

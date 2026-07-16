@@ -251,17 +251,22 @@ def draw_precursor_carbon(
     ``C(precursor) == C(product) + C(CO₂ charged)``. Where that holds the draw lands on exactly
     1 mol precursor per mol product and *is* a chemical claim; where it does not, this helper will
     still close the ledger against the wrong number of moles, silently. It cannot check: the caller
-    passes carbon, not a reaction. **Measured across the tree at D-105** — the **seven** routes that
-    charge their decarboxylation CO₂ (D-75's two oxidative + D-87's five thermal Strecker aldehydes)
-    draw at exactly 1.0000; the **seven** that charge none do not (the five Ehrlich re-routes at
-    ``(n-1)/n``, the mercaptan at ``0.2``, sotolon at ``1.5``). **This is the D-104 error class and
-    it is mechanical**, so it is pinned rather than trusted — in ``tests/test_amino_acid_pools.py``,
-    in **two layers**, because the first alone is not enough:
+    passes carbon, not a reaction. **Measured across the tree at D-106** — the **twelve** routes
+    that charge their decarboxylation CO₂ (D-75's two oxidative, D-87's five thermal Strecker
+    aldehydes, D-106's five Ehrlich re-routes) draw at exactly 1.0000; the **two** that do not
+    (the mercaptan at ``0.2``, sotolon at ``1.5``). D-105 measured this **7 / 7** and named the
+    Ehrlich ``(n-1)/n`` as the one entry needing no new pool; D-106 charged it, which is the whole
+    of the move. **This is the D-104 error class and it is mechanical**, so it is pinned rather than
+    trusted — in ``tests/test_amino_acid_pools.py``, in **two layers**, because the first alone is
+    not enough:
 
     * ``test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the_co2`` pins the
       **declaration** layer (the route tables + an explicit, reasoned exception list);
     * ``test_every_true_strecker_route_draws_1_to_1_when_the_process_is_actually_driven`` pins the
-      **code**, by driving each Process and reading the debit off ``dy/dt``.
+      **code**, by driving each Process and reading the debit off ``dy/dt``;
+    * ``test_the_ehrlich_reroute_charges_one_co2_per_precursor_mole_when_driven`` does the same for
+      the re-route (D-106), which needs its own test because it never touches ``fusels`` — its CO₂
+      is the only product rate on its ``dy/dt`` to divide by.
 
     **Only the second catches implementation drift, and conservation catches neither** — measured at
     D-105: deleting the CO₂ term from :class:`~fermentation.core.kinetics.aging.StreckerDegradation`

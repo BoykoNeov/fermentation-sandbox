@@ -95,7 +95,8 @@ def test_metadata():
     assert p.name == "fusel_amino_acid_reroute"
     assert p.tier is Tier.SPECULATIVE
     # A swap: it moves the carbon SOURCE and releases nitrogen — it never produces fusels.
-    assert set(p.touches) == {"S", "N", *_PRECURSORS}
+    # ``CO2`` joined at D-106: the Ehrlich decarboxylation the re-sourced fraction really performs.
+    assert set(p.touches) == {"S", "N", "CO2", *_PRECURSORS}
     for pool in _FUSEL_POOLS:
         assert pool not in p.touches
     # THE D-100 DECOUPLING, pinned: the re-route no longer touches the identity-agnostic pools.
@@ -143,8 +144,10 @@ def test_reroute_contribution_is_carbon_and_nitrogen_neutral(full_params):
 
 def test_reroute_never_touches_any_fusel_pool_or_other_columns(full_params):
     # Derivative-level guard (the warm=more-fusel benchmark is protected): enabling the re-route
-    # changes ONLY S/amino_acids/N — never the five fusel pools/E/CO2/X (D-99). Production
-    # stays in the producer.
+    # changes ONLY S/precursors/N/CO2 — never the five fusel pools/E/X (D-99). Production
+    # stays in the producer. ``CO2`` left this exclusion list at D-106 and is asserted POSITIVE
+    # below instead: the re-sourced fraction is a real decarboxylation, so a zero there is now the
+    # bug rather than the contract.
     ps = _isolate_fusel(full_params)
     schema = ps.schema
     y = _wine_y0(schema, full_params, x=1.0, s=200.0, n=0.15, aa=5.0)
@@ -154,12 +157,13 @@ def test_reroute_never_touches_any_fusel_pool_or_other_columns(full_params):
     d_prod = ps.total_derivatives(0.0, y, full_params)
     ps.enable(REROUTE)
     d_reroute = d_both - d_prod
-    for col in (*_FUSEL_POOLS, "E", "CO2", "X"):
+    for col in (*_FUSEL_POOLS, "E", "X"):
         assert d_reroute[schema.slice(col)][0] == 0.0
-    # It DOES debit every precursor, and deaminate:
+    # It DOES debit every precursor, deaminate, and decarboxylate:
     for precursor in _PRECURSORS:
         assert d_reroute[schema.slice(precursor)][0] < 0.0  # debited
     assert d_reroute[schema.slice("N")][0] > 0.0  # deaminated (ammonium released)
+    assert d_reroute[schema.slice("CO2")][0] > 0.0  # decarboxylated (D-106)
     # ...and it leaves the identity-agnostic pools ALONE (the D-100 decoupling, at the
     # derivative level rather than the metadata level).
     assert d_reroute[schema.slice("amino_acids")][0] == 0.0
@@ -168,8 +172,18 @@ def test_reroute_never_touches_any_fusel_pool_or_other_columns(full_params):
 
 def test_reroute_matches_the_producer_draw_exactly(full_params):
     # The single-helper guarantee, made concrete: the re-route refunds sugar carbon equal to
-    # ``g`` × the carbon the producer drew, so the amino-acid debit (as carbon) equals the sugar
-    # refund (as carbon) — i.e. exactly the fraction of the producer's draw is re-sourced.
+    # ``g`` × the carbon the producer drew — i.e. exactly the fraction of the producer's draw is
+    # re-sourced, and the REFUND is the invariant the two Processes share.
+    #
+    # **The debit is no longer that same number (decision D-106).** Until D-106 the precursor debit
+    # equalled the sugar refund exactly, because the draw was sized to the alcohol's carbon alone —
+    # which is precisely what made it (n-1)/n of a mole instead of 1. The draw now also carries the
+    # decarboxylation CO2, so the identity that holds is the three-way one:
+    #
+    #     precursor carbon OUT == sugar carbon REFUNDED + CO2 carbon EMITTED
+    #
+    # The refund assertion below is deliberately UNCHANGED: the producer only ever drew sugar for
+    # the alcohol, so refunding the CO2's carbon too would create sugar out of the precursor.
     ps = _isolate_fusel(full_params)
     schema = ps.schema
     aa_val = 0.3
@@ -191,14 +205,19 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
     # sugar carbon refunded by the re-route (single wine slot):
     sugar_refund_c = d_reroute[schema.slice("S")][0] * carbon_mass_fraction("glucose")
     assert sugar_refund_c == pytest.approx(g * fusel_carbon, rel=1e-12)
-    # The carbon debited ACROSS THE FIVE PRECURSORS — each at its OWN carbon fraction — equals
-    # that same carbon. Before D-100 this was one debit at arginine's fraction; the sum is what
-    # must now match, because each alcohol eats a different molecule.
+    # The carbon debited ACROSS THE FIVE PRECURSORS — each at its OWN carbon fraction. Before
+    # D-100 this was one debit at arginine's fraction; the sum is what must now match, because each
+    # alcohol eats a different molecule. Since D-106 it matches refund + CO2, not refund alone.
     aa_debit_c = sum(
         -d_reroute[schema.slice(precursor)][0] * carbon_mass_fraction(precursor)
         for precursor in _PRECURSORS
     )
-    assert aa_debit_c == pytest.approx(g * fusel_carbon, rel=1e-12)
+    co2_c = d_reroute[schema.slice("CO2")][0] * carbon_mass_fraction("CO2")
+    assert aa_debit_c == pytest.approx(g * fusel_carbon + co2_c, rel=1e-12)
+    # The CO2 is a real share of the draw, not a rounding term: one carbon per alcohol means the
+    # precursors give up ~1/n MORE carbon than they did before D-106. Pin that it is neither zero
+    # nor the whole draw, so a silently-dropped term cannot pass as "approximately equal".
+    assert 0.1 * aa_debit_c < co2_c < 0.35 * aa_debit_c
     # ...and the deamination releases exactly the nitrogen THOSE molecules carried. This is the
     # D-33 over-release lump being retired, not restated: arginine (4 N over 6 C) would have
     # released ~4x the real leucine->isoamyl N:C, and now each precursor releases its own.

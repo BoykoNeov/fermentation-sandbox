@@ -98,7 +98,10 @@ from collections.abc import Mapping
 
 from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
 from fermentation.core.kinetics.amino_acid_pools import SPEC_BY_SPECIES, depletion_gate
-from fermentation.core.kinetics.byproducts import fusel_carbon_draw_by_species
+from fermentation.core.kinetics.byproducts import (
+    ehrlich_co2_carbon,
+    fusel_carbon_draw_by_species,
+)
 from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS, refund_carbon_to_sugar
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -134,6 +137,22 @@ class PrecursorNonEhrlichFates(Process):
     Debits the precursor, refunds its carbon to ``S`` and its nitrogen to ``N`` (the D-32 swap
     shape, per molecule). See the module docstring for why ``f_i`` is **not** the protein share
     and why the draw rides the re-route rather than growth.
+
+    **D-106 changed what "the re-route's own draw" means, and the split survived it exactly.**
+    Charging the Ehrlich decarboxylation CO₂ made that draw a full mole of precursor per alcohol
+    instead of ``(n-1)/n``, so this Process now scales against alcohol carbon **+ CO₂ carbon**
+    (via the shared :func:`~fermentation.core.kinetics.byproducts.ehrlich_co2_carbon`). Scaling
+    against the alcohol alone would have realised a *lower* ``f`` than the file's sourced one —
+    measured, threonine 0.82 → 0.774 — which is what the crux test caught.
+
+    **The sourced fraction needed no recalibration, and the reason is structural**: ``f_i`` is a
+    *ratio*, and D-106 scales the Ehrlich branch and this lump **equally** (the lump is defined off
+    the Ehrlich draw), so the realised split is still exactly the sourced 77–86%. What D-106 does
+    move is the **absolute** consumption, up ~12.6% — because the Ehrlich branch is anchored to
+    *alcohol production* and this sink to the *split ratio*, so correcting the stoichiometry
+    necessarily scales both rather than holding total consumption fixed and shifting the split.
+    That is a modelling choice, not an accident: the alternative — hold consumption, move the split
+    — would have silently overridden a sourced number with a stoichiometric correction.
     """
 
     name = "precursor_non_ehrlich_fates"
@@ -193,7 +212,13 @@ class PrecursorNonEhrlichFates(Process):
                     f"{non_ehrlich_fraction_param(spec.precursor_amino_acid)}={f} outside [0, 1): "
                     "it is the fraction of consumed precursor NOT becoming its alcohol"
                 )
-            ehrlich_carbon = gate * fusel_carbon  # exactly what the re-route books
+            alcohol_carbon = gate * fusel_carbon
+            # EXACTLY what the re-route books — the alcohol's carbon **plus the decarboxylation
+            # CO₂ charged to the same precursor** (D-106). The CO₂ term is not optional here: the
+            # split is over *consumed precursor*, and since D-106 the Ehrlich branch consumes a
+            # full mole per alcohol rather than (n-1)/n. Scaling against the alcohol carbon alone
+            # would silently realise a LOWER f than the file's sourced one (threonine: 0.82 → 0.77).
+            ehrlich_carbon = alcohol_carbon + ehrlich_co2_carbon(spec, alcohol_carbon)
             lump_carbon = ehrlich_carbon * f / (1.0 - f)  # ⇒ realised split is exactly f : (1−f)
             mass = lump_carbon / carbon_mass_fraction(precursor.species)
             d[schema.slice(precursor.pool)] -= mass

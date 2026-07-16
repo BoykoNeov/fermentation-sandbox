@@ -42,6 +42,7 @@ from fermentation.core.kinetics.amino_acid_pools import (
     release_spectrum_nitrogen,
     spectrum_carbon_per_nitrogen,
 )
+from fermentation.core.kinetics.byproducts import FuselAminoAcidReroute
 from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
 from fermentation.core.media import wine_schema
 from fermentation.core.state import FloatArray, StateSchema
@@ -193,7 +194,7 @@ _ROUTES: tuple[tuple[str, str, float, str], ...] = (
         for pool, _m, _w, decarb, prec, _dn in _MAILLARD_PRODUCTS
     ),
     *(
-        (spec.species, spec.precursor_amino_acid, 0.0, "D-33 Ehrlich re-route")
+        (spec.species, spec.precursor_amino_acid, 1.0, "D-33 Ehrlich re-route")
         for spec in FUSEL_SPECS
     ),
     ("methanethiol", "methionine", 0.0, "D-45 demethiolation"),
@@ -202,9 +203,13 @@ _ROUTES: tuple[tuple[str, str, float, str], ...] = (
 #: The routes whose carbon-sized draw is **knowingly not** their molar stoichiometry, each with the
 #: carbon that makes it so (decision D-105). This is an allow-list, not a waiver: a route may only
 #: sit here with a reason, and anything NEW that drifts fails the test below rather than joining
-#: them silently. Every entry is blocked on the same missing thing — a **2-ketobutyrate pool** for
-#: the first two, an accounting call on D-104's split for the third — so the list is the keto-acid
-#: node's work-list, written down.
+#: them silently.
+#:
+#: **The five Ehrlich re-routes left this list at D-106** — they were the one entry that needed no
+#: new pool (CO₂ was already tracked), so charging the decarboxylation moved them to an exact 1:1
+#: and the stale-waiver arm below required their removal. What remains is blocked on the same
+#: missing thing: a **2-ketobutyrate pool**. The list is now exactly the keto-acid node's
+#: work-list, and nothing else.
 _KNOWN_NON_STOICHIOMETRIC: dict[tuple[str, str], str] = {
     ("sotolon", "threonine"): (
         "OVER-draws 1.5x: sotolon is an aldol of 2-ketobutyrate + ACETALDEHYDE, and the two "
@@ -217,16 +222,6 @@ _KNOWN_NON_STOICHIOMETRIC: dict[tuple[str, str], str] = {
         "other 4 (the 2-oxobutyrate) are never charged. Carbon closes; the stoichiometry does "
         "not. Found by this signature at D-105."
     ),
-    **{
-        (spec.species, spec.precursor_amino_acid): (
-            "UNDER-draws (n-1)/n: the Ehrlich re-route charges the precursor for the ALCOHOL's "
-            "carbon but not for the CO2 the same decarboxylation releases, so it consumes "
-            "(n-1)/n mol precursor per mol alcohol instead of 1. Unlike the two above this needs "
-            "no new pool -- CO2 is tracked -- but charging it moves D-104's freshly-landed split, "
-            "so it is that beat's call, not a drive-by."
-        )
-        for spec in FUSEL_SPECS
-    },
 }
 
 
@@ -303,9 +298,11 @@ def _driveable_state(schema: StateSchema, params: Mapping[str, float]) -> FloatA
 
 #: The seven routes whose draw ratio is **gate-independent** — the Process gates its product and its
 #: precursor draw together, so the gate cancels and the measured ratio is a structural constant that
-#: one seeded state pins exactly (decision D-105). The partial re-sourcings (Ehrlich re-route,
-#: de-novo sotolon) are deliberately NOT here: their ratio is `gate × structural` by design, so no
-#: single state pins them — they are covered by the arithmetic partition above.
+#: one seeded state pins exactly (decision D-105). The Ehrlich re-route is not here for a different
+#: reason than de-novo sotolon: it never touches ``fusels`` (production stays in the producer), so
+#: there is no product rate on its own ``dy/dt`` to divide by. **D-106 gives it one anyway** — its
+#: CO₂, one mole per alcohol re-sourced, which is what
+#: :func:`test_the_ehrlich_reroute_charges_one_co2_per_precursor_mole_when_driven` reads.
 _EXACT_DRIVEN_ROUTES: tuple[tuple[str, str, str], ...] = (
     ("strecker", "methional", "methionine"),
     ("strecker", "phenylacetaldehyde", "phenylalanine"),
@@ -346,6 +343,38 @@ def test_every_true_strecker_route_draws_1_to_1_when_the_process_is_actually_dri
     # A true Strecker degradation consumes exactly one precursor per aldehyde: the aldehyde IS the
     # amino acid minus its carboxyl (charged as CO2) and its amino group (deaminated to N).
     assert mol_precursor / mol_product == pytest.approx(1.0, abs=1e-9)
+
+
+def test_the_ehrlich_reroute_charges_one_co2_per_precursor_mole_when_driven(schema, aging_params):
+    """The re-route's draw is 1:1 **against the code**, not the table (decision D-106).
+
+    D-105 measured this route at ``(n-1)/n``: it charged the precursor for the alcohol's carbon but
+    not for the CO2 the same decarboxylation releases, so leucine went out at 5/6 mol per mol
+    isoamyl alcohol. D-106 charges it. The claim is now that **every mole of precursor drawn emits
+    exactly one mole of CO2** — the Ehrlich decarboxylation, one per alcohol.
+
+    This route cannot be checked the way the seven Strecker routes are: it never touches ``fusels``
+    (production stays in :class:`FuselAlcoholsEhrlich`, which is the whole D-33 swap design), so
+    there is no product rate on its ``dy/dt``. Its CO2 **is** the product rate — one mole per mole
+    of alcohol re-sourced — and it is gate-independent for the same reason the others are: the
+    draw and the CO2 both scale with ``gate x fusel_carbon``, so the gate cancels and any seeded
+    state pins the ratio exactly.
+
+    Deleting the CO2 term fails **here**: the precursor debit drops by 1/n, the moles stop matching,
+    and — exactly as at D-105 — carbon still closes and no conservation test notices.
+    """
+    y = _driveable_state(schema, aging_params)
+    d = FuselAminoAcidReroute().derivatives(0.0, y, schema, aging_params)
+    co2_mol = float(d[schema.slice("CO2")][0]) / MOLAR_MASS["CO2"]
+    precursor_mol = sum(
+        -float(d[schema.slice(spec.precursor_amino_acid)][0])
+        / MOLAR_MASS[spec.precursor_amino_acid]
+        for spec in FUSEL_SPECS
+    )
+    assert precursor_mol > 0.0, "the re-route must actually fire, or this asserts nothing"
+    assert co2_mol > 0.0, "no CO2 emitted -- the D-106 decarboxylation term is gone"
+    # One CO2 per precursor consumed: the Ehrlich pathway decarboxylates exactly once per alcohol.
+    assert co2_mol / precursor_mol == pytest.approx(1.0, abs=1e-9)
 
 
 def test_the_d75_oxidative_strecker_routes_draw_at_exact_stoichiometry():

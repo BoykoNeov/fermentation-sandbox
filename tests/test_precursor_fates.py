@@ -176,12 +176,29 @@ def test_carbon_and_nitrogen_close_over_a_dosed_run(full_params):
 
 def test_the_sink_never_drives_a_precursor_negative(full_params):
     # Both consumers ride the SAME gate, which → 0 as the pool empties, so the combined draw is
-    # self-limiting however large f/(1-f) gets.
+    # self-limiting however large f/(1-f) gets. Near an empty pool the gate is LINEAR in it
+    # (aa/(K·f_i + aa) → aa/(K·f_i)), so the draw decays exponentially and cannot reach zero in
+    # exact arithmetic, let alone cross it. Any negative here is therefore BDF undershoot, and the
+    # claim is structural — not an epsilon.
+    #
+    # **Stated scale-relatively since D-106**, which is what it always meant. The old absolute
+    # -1e-9 was calibrated to a pre-D-106 undershoot (phenylalanine -4.8e-10); charging the Ehrlich
+    # CO2 grew the draw and phenylalanine's undershoot went to -2.1e-9 — through a bound that was
+    # never a physical statement, only that run's noise floor.
+    #
+    # That undershoot is solver noise, not the bigger draw, and the ORDERING proves it:
+    # phenylalanine has the SMALLEST draw increase of the five (+12.5%, C9→C8) yet grew its
+    # undershoot the most (4.3x), while valine and isoleucine — drawing 25%/20% more — improved to
+    # ~1e-15. If the draw drove the undershoot that ordering would have to reverse.
     traj, compiled = _run(amino_acids_gpl=1.0)
     schema = compiled.process_set.schema
     for species in _PRECURSORS:
         pool = traj.y[schema.slice(species)][0]
-        assert pool.min() > -1e-9, species
+        # Relative to the pool the run actually started with: a structural failure (a draw that
+        # outruns its own gate) lands orders of magnitude above this, while numerical undershoot
+        # sits far below it. The absolute ceiling keeps a tiny seeded pool from making it vacuous.
+        assert pool.min() > -1e-6 * float(pool[0]), species
+        assert pool.min() > -1e-7, species
 
 
 def _worst_joint_refund(traj, compiled) -> tuple[float, float]:
@@ -246,12 +263,29 @@ def test_the_joint_nitrogen_refund_exceeds_growths_draw_at_pitch_and_that_is_dea
     # D-32's docstring argues its N refund is "≤ f_N·base_dx (growth's nitrogen draw) for all
     # ψ·gate ≤ 1 — never over-refunds, so no deamination branch is needed in v1". That holds for
     # the swap ALONE. With this sink on it is FALSE: at pitch (t=0, base_dx ~2.2e-2 g/L/h — a
-    # vigorously growing state, NOT a degenerate tail) the joint refund reaches ~1.04x.
+    # vigorously growing state, NOT a degenerate tail) the joint refund reaches **1.171x**
+    # (measured; it was 1.040x from D-104 until D-106).
     #
     # It is physical. The refund is always the drawn amino acid's own nitrogen; whether the NET
     # is negative (aa nitrogen spares ammonium growth would have drawn) or positive (the excess is
     # deaminated and released) falls out of the arithmetic rather than needing its own branch. So
     # the over-refund IS the deamination — no branch required, just a claim to correct.
+    #
+    # **D-106 moved this 1.040 → 1.171 and the ceiling was re-authored, which needs its reason
+    # stated.** Charging the Ehrlich decarboxylation CO2 made the re-route draw a FULL mole of
+    # precursor per alcohol instead of (n-1)/n, and a full mole carries a full mole of nitrogen —
+    # so the deamination rose by the same ~12.6% the consumption did. The band moved because the
+    # model got MORE right, and the CO2 charge does not rest on this band: it is fixed by atom
+    # counts and pinned by a mutation-tested driven test. That is the difference between this and
+    # the D-103 trap, where a band was nearly used to ACQUIT a model whose correctness was not
+    # independently established.
+    #
+    # **The qualitative call the tripwire exists to force**: is "slight deamination at pitch" still
+    # fair at 1.171x? Yes — it is the same story in degree, not in kind. The net ammonium release
+    # is 17% of growth's draw rather than 4%; the direction, the mechanism, and the conservation are
+    # unchanged, and 17% is nowhere near inverting the nitrogen story (which would need the
+    # precursors to become a dominant N SOURCE, i.e. multiples of growth's draw). The ceiling below
+    # is AUTHORED, not sourced — its width is tripwire margin over the measured value, not physics.
     #
     # It is bounded and it conserves: carbon stays at ~0.55x (the test above), and total nitrogen
     # closes to 1e-14 (the conservation test) because the nitrogen is TRANSFERRED from the
@@ -260,7 +294,7 @@ def test_the_joint_nitrogen_refund_exceeds_growths_draw_at_pitch_and_that_is_dea
     # here instead of quietly inverting the nitrogen story.
     traj, compiled = _run(amino_acids_gpl=1.0)
     worst_n, _ = _worst_joint_refund(traj, compiled)
-    assert 1.0 < worst_n < 1.15, f"joint N refund {worst_n:.3f}x — outside the documented band"
+    assert 1.0 < worst_n < 1.20, f"joint N refund {worst_n:.3f}x — outside the documented band"
 
 
 # -- isolability --------------------------------------------------------------

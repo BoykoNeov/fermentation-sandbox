@@ -56,8 +56,11 @@ over-refunds, so it needs no deamination branch of its own.
    written when the swap was the only Process refunding biomass nitrogen. Since D-104
    :class:`~fermentation.core.kinetics.precursor_fates.PrecursorNonEhrlichFates` refunds the
    *precursors'* nitrogen too, and nothing bounds the pair against ``f_N·base_dx``: measured at
-   the shipped ``ψ = 0.5`` with a 1 g/L dose, the **joint** refund reaches **1.04× growth's draw
-   at pitch**. The excess is *net deamination* — physical, and needing no branch, because the
+   the shipped ``ψ = 0.5`` with a 1 g/L dose, the **joint** refund reaches **1.171× growth's draw
+   at pitch** (D-104 measured 1.04×; **D-106 raised it to 1.171×** by charging the Ehrlich
+   decarboxylation CO₂, which makes the re-route consume a full mole of precursor per alcohol
+   instead of ``(n-1)/n`` — and a full mole carries a full mole of nitrogen to deaminate). The
+   excess is *net deamination* — physical, and needing no branch, because the
    refund is always the drawn molecule's own nitrogen and the sign of the net falls out of the
    arithmetic. Nitrogen still closes exactly (it is transferred from the precursor pools, never
    created). The guarantee that *does* still bind the pair is the **carbon** one below — no
