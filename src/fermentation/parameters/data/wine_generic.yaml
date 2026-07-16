@@ -203,6 +203,101 @@ K_amino_acids:
     conditions: "generic S. cerevisiae wine ferment; smooth availability gate aa/(K+aa)"
     notes: "Half-saturation in the smooth availability gate gate(aa) = aa/(K_amino_acids + aa) that ramps assimilation up from an empty pool and down to zero as amino acids are exhausted (the same smooth-Monod shape the fermentative flux uses, keeping the RHS C1 for the BDF solver). Scaled to the g/L range of assimilable nitrogen in must; an estimate, hence speculative."
 
+# -- Must assimilable amino-acid spectrum (decision D-100) ---------------------
+# The fixed fraction vector that splits a single amino_acids_gpl dose across the eight speciated
+# amino-acid slots (arginine + leucine/isoleucine/valine/threonine/phenylalanine/methionine +
+# amino_acids_generic), the beer wort-sugar-spectrum precedent. Proline is EXCLUDED — not assimilated
+# anaerobically (excluded from YAN by definition), so the dose is an *assimilable* amino-acid dose
+# and the ~48%-of-must proline fraction never enters the model. Fractions are of ASSIMILABLE amino
+# acids and sum to 1.0. RECORDED FROM LITERATURE BEFORE ANY WIRING (the D-99 anti-tuning discipline:
+# the spectrum is fixed by measured must profiles, never nudged toward a descriptor/OAV outcome).
+# Anchored to two published Vitis vinifera profiles: Cabernet Sauvignon control (PMC6222330,
+# Molecules 2018, Table 2) and 'Asprinio' must (PMC12191762, Foods 2025, Table 1). The PRECURSOR
+# fractions (leu/ile/val/thr/phe/met) are stable across cultivars (~3/2/3-5/6-8/3/<1%); the large
+# varietal variable is the arginine-vs-generic split (Cabernet arg 47%, Asprinio 25%), but both feed
+# only the identity-agnostic consumers so that split does not bear on the D-100 tripwire. Tagged
+# speculative: a representative "typical must", not a single measurement (wide varietal range).
+
+must_aa_fraction_arginine:
+  value: 0.380
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.25, high: 0.48, note: "arginine as a fraction of assimilable must AAs; Asprinio 25.5% .. Cabernet 47.4%" }
+  provenance:
+    source: "Cabernet Sauvignon control (PMC6222330, Molecules 2018, Tab.2) + Asprinio must (PMC12191762, Foods 2025, Tab.1), midpoint"
+    conditions: "Vitis vinifera grape must; fraction of assimilable free amino acids (proline excluded, not assimilated anaerobically)"
+    notes: "Arginine is the dominant yeast-assimilable amino acid in grape must; the D-32 representative species. Large varietal range (25-47%); midpoint taken. Feeds only the identity-agnostic yeast/MLF/Brett swaps (with amino_acids_generic), so its value does not affect the D-100 tripwire (which turns on the precursor pools)."
+
+must_aa_fraction_generic:
+  value: 0.430
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.34, high: 0.55, note: "the assimilable remainder (glu/ala/ser/asp/his/lys/gly/trp/tyr/cys/GABA) as a fraction of assimilable AAs" }
+  provenance:
+    source: "remainder after the seven named species; PMC6222330 (34.2%) + PMC12191762 (~54%)"
+    conditions: "Vitis vinifera grape must; the amino_acids_generic bucket (glutamine stand-in) as a fraction of assimilable free amino acids"
+    notes: "Every assimilable amino acid without its own slot, lumped as glutamine (the N-rich canonical assimilable-N proxy). Drawn by the identity-agnostic yeast/MLF/Brett swaps ALONGSIDE arginine so arginine is not the sole generic source (D-100). Does not bear on the tripwire."
+
+must_aa_fraction_threonine:
+  value: 0.067
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.05, high: 0.08, note: "threonine fraction; Asprinio 5.49% .. Cabernet 7.83%" }
+  provenance:
+    source: "PMC6222330 (7.83%) + PMC12191762 (5.49%), midpoint"
+    conditions: "Vitis vinifera grape must; threonine as a fraction of assimilable free amino acids"
+    notes: "Precursor of propanol (Ehrlich, D-99) AND sotolon (via alpha-ketobutyrate, D-87) — the load-bearing SHARED precursor whose fraction sizes the residual (real, not artifact) propanol-vs-sotolon competition that survives the D-100 split. Stable across cultivars."
+
+must_aa_fraction_valine:
+  value: 0.037
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.027, high: 0.047, note: "valine fraction; Cabernet 2.75% .. Asprinio 4.67%" }
+  provenance:
+    source: "PMC6222330 (2.75%) + PMC12191762 (4.67%), midpoint"
+    conditions: "Vitis vinifera grape must; valine as a fraction of assimilable free amino acids"
+    notes: "Precursor of isobutanol (Ehrlich, D-99) and 2-methylpropanal (thermal Strecker, D-87)."
+
+must_aa_fraction_leucine:
+  value: 0.032
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.03, high: 0.035, note: "leucine fraction; Cabernet 3.00% .. Asprinio 3.46%" }
+  provenance:
+    source: "PMC6222330 (3.00%) + PMC12191762 (3.46%), midpoint"
+    conditions: "Vitis vinifera grape must; leucine as a fraction of assimilable free amino acids"
+    notes: "Precursor of isoamyl_alcohol (Ehrlich, D-99 — the largest fusel by mass) and 3-methylbutanal (thermal Strecker, D-87)."
+
+must_aa_fraction_phenylalanine:
+  value: 0.028
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.027, high: 0.029, note: "phenylalanine fraction; Cabernet 2.73% .. Asprinio 2.88%" }
+  provenance:
+    source: "PMC6222330 (2.73%) + PMC12191762 (2.88%), midpoint"
+    conditions: "Vitis vinifera grape must; phenylalanine as a fraction of assimilable free amino acids"
+    notes: "Precursor of 2_phenylethanol (Ehrlich, D-99) AND phenylacetaldehyde (oxidative Strecker, D-75) — a shared fusel/aging precursor, though phenylacetaldehyde needs oxidative (quinone) conditions, so the two rarely draw simultaneously."
+
+must_aa_fraction_isoleucine:
+  value: 0.021
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.017, high: 0.026, note: "isoleucine fraction; Cabernet 1.69% .. Asprinio 2.53%" }
+  provenance:
+    source: "PMC6222330 (1.69%) + PMC12191762 (2.53%), midpoint"
+    conditions: "Vitis vinifera grape must; isoleucine as a fraction of assimilable free amino acids"
+    notes: "Precursor of active_amyl_alcohol (Ehrlich, D-99) and 2-methylbutanal (thermal Strecker, D-87)."
+
+must_aa_fraction_methionine:
+  value: 0.005
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 0.002, high: 0.008, note: "methionine fraction; Cabernet 0.44%, Asprinio below detection (trace)" }
+  provenance:
+    source: "PMC6222330 (0.44%); PMC12191762 below detection (methionine is always trace in must)"
+    conditions: "Vitis vinifera grape must; methionine as a fraction of assimilable free amino acids"
+    notes: "The scarcest tracked amino acid in must; sulfur-bearing precursor of methional (oxidative Strecker, D-75) and the autolytic mercaptan (D-45). Its scarcity is itself a fidelity gain: the arginine lump over-supplied methionine-derived aromas."
+
 # -- Yeast autolysis (opt-in, decision D-34) ----------------------------------
 # The autolytic-peptide source that REFILLS the amino-acid pool from dead biomass (X_dead)
 # post-AF — the second prerequisite (after the D-33 fusel re-route) the deferred MLF-with-

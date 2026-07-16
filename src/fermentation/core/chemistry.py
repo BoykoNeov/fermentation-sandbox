@@ -241,6 +241,40 @@ M_METHANETHIOL = 1 * _M_C + 4 * _M_H + 1 * _M_S
 #: strictly below growth's sugar-carbon demand for any assimilation fraction ψ ≤ 1, so the
 #: swap never creates hexose (gluconeogenesis) and needs no clamp — decision D-32.
 M_ARGININE = 6 * _M_C + 14 * _M_H + 4 * _M_N + 2 * _M_O
+#: The D-100 speciation of the lumped ``amino_acids`` pool into single-molecule amino acids.
+#: The lump (arginine stand-in, D-32) could not serve the now-speciated-scale consumers drawing on
+#: it (D-96/D-99 fusels + esters at honest levels): two speciated consumers cannot share one lumped
+#: substrate (the D-99 done-call finding). Each amino acid below is a real molecule, carbon- AND
+#: nitrogen-weighted by its own formula, so a per-precursor consumer (Ehrlich fusel, thermal/
+#: oxidative Strecker, mercaptan) draws exactly the amino acid its chemistry names — the whole point
+#: of the split. The five Ehrlich precursors map 1:1 onto the D-99 fusels (leucine→isoamyl,
+#: isoleucine→active-amyl, valine→isobutanol, threonine→propanol, phenylalanine→2-phenylethanol) and
+#: onto the D-87 thermal Strecker aldehydes (isoleucine→2-methylbutanal, leucine→3-methylbutanal,
+#: valine→2-methylpropanal, threonine→sotolon via α-ketobutyrate); phenylalanine + methionine feed
+#: the D-75 oxidative Strecker aldehydes (phenylacetaldehyde / methional) and methionine the D-45
+#: mercaptan. All are N-rich (mass C:N well below biomass ≈ 4.3), so — like arginine — the D-32
+#: yeast-swap carbon refund stays below growth's demand and never creates hexose (no clamp needed).
+M_LEUCINE = 6 * _M_C + 13 * _M_H + 1 * _M_N + 2 * _M_O
+#: L-isoleucine, C6H13NO2 — an isomer of leucine (identical formula, identical C/N weights); the two
+#: differ only in odour-precursor identity (active-amyl vs isoamyl alcohol; 2- vs 3-methylbutanal).
+M_ISOLEUCINE = 6 * _M_C + 13 * _M_H + 1 * _M_N + 2 * _M_O
+M_VALINE = 5 * _M_C + 11 * _M_H + 1 * _M_N + 2 * _M_O
+M_THREONINE = 4 * _M_C + 9 * _M_H + 1 * _M_N + 3 * _M_O
+M_PHENYLALANINE = 9 * _M_C + 11 * _M_H + 1 * _M_N + 2 * _M_O
+#: L-methionine, C5H11NO2S — sulfur-bearing (its thioether is the sulfur source of both methional,
+#: D-75, and the autolytic mercaptan, D-45); the S is not tracked on any ledger (the D-45 idiom),
+#: only its carbon and nitrogen are.
+M_METHIONINE = 5 * _M_C + 11 * _M_H + 1 * _M_N + 2 * _M_O + 1 * _M_S
+#: L-glutamine, C5H10N2O3 — the representative species for the ``amino_acids_generic`` bucket: every
+#: assimilable amino acid without its own slot (glutamic acid / alanine / serine / aspartate /
+#: histidine / lysine / glycine / tryptophan / tyrosine / cysteine / GABA), which the identity-
+#: agnostic consumers (the D-32 yeast swap, D-38 MLF growth, D-40 Brett growth) draw alongside
+#: arginine so arginine is not the sole generic source (D-100). Glutamine is the canonical
+#: assimilable-N proxy and N-rich (mass C:N ≈ 2.14 < biomass ≈ 4.3), keeping the D-32 no-hexose
+#: guarantee. **Proline is deliberately NOT tracked**: it is not assimilated anaerobically (excluded
+#: from YAN by definition), so it is inert and absent from the pool — the ~48 %-of-must-AA proline
+#: fraction simply never enters the model (the dose is an *assimilable* amino-acid dose).
+M_GLUTAMINE = 5 * _M_C + 10 * _M_H + 2 * _M_N + 3 * _M_O
 #: β-glucan / mannoprotein repeat unit, anhydroglucose C6H10O5 (glucose minus one water, the
 #: polysaccharide monomer) — the representative species for the non-assimilable cell-wall
 #: **debris** pool yeast autolysis leaves behind (decision D-34). Dead-cell biomass is C-rich
@@ -423,6 +457,13 @@ MOLAR_MASS: dict[str, float] = {
     "diacetyl": M_DIACETYL,
     "butanediol": M_BUTANEDIOL,
     "arginine": M_ARGININE,
+    "leucine": M_LEUCINE,
+    "isoleucine": M_ISOLEUCINE,
+    "valine": M_VALINE,
+    "threonine": M_THREONINE,
+    "phenylalanine": M_PHENYLALANINE,
+    "methionine": M_METHIONINE,
+    "glutamine": M_GLUTAMINE,
     "glucan": M_GLUCAN,
     "p_coumaric_acid": M_P_COUMARIC,
     "vinylphenol": M_VINYLPHENOL,
@@ -495,6 +536,17 @@ CARBON_ATOMS: dict[str, int] = {
     "diacetyl": 4,
     "butanediol": 4,
     "arginine": 6,
+    #: The D-100 speciated amino acids, each carrying its own carbon count (decision D-100):
+    #: leucine/isoleucine C6 (isomers), valine C5, threonine C4, phenylalanine C9, methionine C5,
+    #: glutamine C5 (the ``amino_acids_generic`` bucket representative). Each per-precursor consumer
+    #: draws its own molecule, so the carbon it books is that amino acid's, not the arginine lump's.
+    "leucine": 6,
+    "isoleucine": 6,
+    "valine": 5,
+    "threonine": 4,
+    "phenylalanine": 9,
+    "methionine": 5,
+    "glutamine": 5,
     "glucan": 6,
     "p_coumaric_acid": 9,
     "vinylphenol": 8,
@@ -588,6 +640,18 @@ NITROGEN_ATOMS: dict[str, int] = {
     "diacetyl": 0,
     "butanediol": 0,
     "arginine": 4,
+    #: The D-100 speciated amino acids each carry nitrogen (decision D-100): the seven monoamino
+    #: acids one N, glutamine (the generic-bucket stand-in) two. This is what keeps the pool on
+    #: total_nitrogen after the split — each per-precursor draw deaminates its own amino acid's
+    #: nitrogen back to ``N`` (the D-33/D-45/D-75 idiom), and the generic yeast/MLF/Brett swaps
+    #: refund/consume each species' own nitrogen so total_nitrogen closes per species.
+    "leucine": 1,
+    "isoleucine": 1,
+    "valine": 1,
+    "threonine": 1,
+    "phenylalanine": 1,
+    "methionine": 1,
+    "glutamine": 2,
     #: Cell-wall debris (glucan) is carbon-only: all dead-cell nitrogen is released as
     #: assimilable amino acids, so the remainder carries none (decision D-34).
     "glucan": 0,

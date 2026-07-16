@@ -844,6 +844,84 @@ def wine_schema() -> StateSchema:
             "analysis.a420); the MASS itself is not a sensory pool. Wine-only",
         )
     )
+    # The D-100 speciation of the lumped `amino_acids` pool (arginine stand-in, D-32) into
+    # single-molecule amino acids, appended last so existing wine slot indices are unchanged. The
+    # existing `amino_acids` slot ABOVE is retained as the ARGININE pool (its representative species
+    # was always arginine); these seven siblings give every other consumed amino acid its own slot,
+    # each carbon- AND nitrogen-weighted by its own molecule (chemistry.py). The five Ehrlich
+    # precursors (leucine/isoleucine/valine/threonine/phenylalanine) map onto the D-99 fusels and
+    # the D-87 thermal Strecker aldehydes; phe + met feed the D-75 oxidative Strecker aldehydes and
+    # methionine the D-45 mercaptan; `amino_acids_generic` (glutamine stand-in) is the bucket of
+    # every other assimilable amino acid the identity-agnostic yeast/MLF/Brett swaps draw alongside
+    # arginine (D-100). Proline is NOT tracked — not assimilated anaerobically (excluded from YAN).
+    # All default=0: an undosed / arginine-only run leaves them inert (0 on every ledger), byte-for-
+    # byte the pre-D-100 core. The consumers are rewired to draw them at the atomic flip (D-100
+    # commit 2); until then this is pure inert scaffolding.
+    specs += [
+        VarSpec(
+            "leucine",
+            "g/L",
+            default=0.0,
+            description="assimilable L-leucine (dosed must input, split from amino_acids_gpl by "
+            "the must spectrum; autolysis-refilled). Ehrlich precursor of isoamyl_alcohol (D-99) "
+            "and the thermal Strecker precursor of 3-methylbutanal (D-87). Carbon- AND "
+            "nitrogen-bearing (deaminated to N when catabolised). Decision D-100",
+        ),
+        VarSpec(
+            "isoleucine",
+            "g/L",
+            default=0.0,
+            description="assimilable L-isoleucine (dosed must input + autolysis-refilled). The "
+            "Ehrlich precursor of active_amyl_alcohol (D-99) and the thermal Strecker precursor of "
+            "2-methylbutanal (D-87). An isomer of leucine (same C/N weights). Decision D-100",
+        ),
+        VarSpec(
+            "valine",
+            "g/L",
+            default=0.0,
+            description="assimilable L-valine (dosed must input + autolysis-refilled). The Ehrlich "
+            "precursor of isobutanol (D-99) and the thermal Strecker precursor of 2-methylpropanal "
+            "(D-87). Carbon- AND nitrogen-bearing. Decision D-100",
+        ),
+        VarSpec(
+            "threonine",
+            "g/L",
+            default=0.0,
+            description="assimilable L-threonine (dosed must input + autolysis-refilled). The "
+            "Ehrlich precursor of propanol (D-99) AND of sotolon (via α-ketobutyrate, D-87) — "
+            "the ONE amino acid shared between a fusel and a thermal-aging product, so a real "
+            "(not artifact) propanol-vs-sotolon competition survives the split. Decision D-100",
+        ),
+        VarSpec(
+            "phenylalanine",
+            "g/L",
+            default=0.0,
+            description="assimilable L-phenylalanine (dosed must input + autolysis-refilled). The "
+            "Ehrlich precursor of 2_phenylethanol (D-99) AND the oxidative Strecker precursor of "
+            "phenylacetaldehyde (D-75) — shared between a fusel and an oxidative-aging aldehyde. "
+            "Carbon- AND nitrogen-bearing. Decision D-100",
+        ),
+        VarSpec(
+            "methionine",
+            "g/L",
+            default=0.0,
+            description="assimilable L-methionine (dosed must input + autolysis-refilled). The "
+            "sulfur-bearing precursor of the oxidative Strecker aldehyde methional (D-75) and the "
+            "autolytic mercaptan methanethiol (D-45). Its sulfur is untracked (the D-45 idiom); "
+            "carbon- AND nitrogen-bearing. Trace in must. Decision D-100",
+        ),
+        VarSpec(
+            "amino_acids_generic",
+            "g/L",
+            default=0.0,
+            description="the generic assimilable amino-acid bucket (glutamine stand-in) — every "
+            "assimilable amino acid without its own slot (glutamic acid/alanine/serine/aspartate/"
+            "histidine/lysine/glycine/tryptophan/tyrosine/cysteine/GABA). Drawn by the identity-"
+            "agnostic yeast swap (D-32), MLF growth (D-38) and Brett growth (D-40) ALONGSIDE "
+            "arginine so it is not the sole generic source (D-100). Carbon- AND nitrogen-bearing "
+            "(glutamine, N-rich). Dosed must input + autolysis-refilled. Decision D-100",
+        ),
+    ]
     return StateSchema(specs)
 
 

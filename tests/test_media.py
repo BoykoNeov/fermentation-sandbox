@@ -114,6 +114,20 @@ CARAMELIZATION_SLOTS = ("melanoidin",)
 # ledger (it RETAINS the amino-acid nitrogen). Wine-only. Raises the shared A420 index (D-74/D-88).
 WINE_MAILLARD_BROWNING_SLOTS = ("maillard_melanoidin",)
 
+# The D-100 speciation of the lumped amino_acids pool: seven named amino acids + a generic bucket,
+# appended last so existing wine slot indices are unchanged. The existing amino_acids slot is kept
+# as the arginine pool; these give every other consumed amino acid (and the generic assimilable
+# remainder) its own carbon/nitrogen-weighted slot. All default 0 ⇒ inert until dosed.
+WINE_SPECIATED_AA_SLOTS = (
+    "leucine",
+    "isoleucine",
+    "valine",
+    "threonine",
+    "phenylalanine",
+    "methionine",
+    "amino_acids_generic",
+)
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -138,6 +152,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_MAILLARD_SLOTS
         + CARAMELIZATION_SLOTS
         + WINE_MAILLARD_BROWNING_SLOTS
+        + WINE_SPECIATED_AA_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -182,7 +197,11 @@ def test_wine_schema_has_single_sugar_slot():
     # single-molecule pools ethyl_acetate/isoamyl_acetate/ethyl_hexanoate, each with its own
     # headspace twin — a twin per ester is FORCED, since a pool and its twin must share one
     # molecule's carbon weight for the strip to stay carbon-neutral: 2 slots became 6)
-    assert schema.size == 74
+    # + 7 D-100 speciated amino-acid slots (the lumped amino_acids pool, arginine stand-in, gains
+    # seven siblings: leucine/isoleucine/valine/threonine/phenylalanine/methionine + the generic
+    # bucket amino_acids_generic — every consumed amino acid its own carbon/nitrogen-weighted slot;
+    # the existing amino_acids slot is retained as the arginine pool, so 1 slot became 8: +7)
+    assert schema.size == 81
 
 
 def test_beer_schema_has_three_sequential_sugars():

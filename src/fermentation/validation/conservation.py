@@ -215,6 +215,18 @@ def total_carbon(
     # is weighted in total_nitrogen below.
     if "amino_acids" in schema:
         w[schema.slice("amino_acids")] = carbon_mass_fraction("arginine")
+    # The D-100 speciated amino-acid pools: the lumped `amino_acids` (arginine) split into seven
+    # named amino acids + a generic bucket, each carbon-weighted at its OWN molecule's fraction —
+    # the same per-species discipline as the D-96 esters / D-99 fusels. A per-precursor consumer
+    # (Ehrlich reroute, thermal/oxidative Strecker, mercaptan) debits its species and deposits the
+    # carbon in its aroma product, so weighting each at its own fraction keeps total_carbon closed
+    # through that draw. The generic bucket is booked at glutamine (its stand-in). All empty on
+    # an undosed / arginine-only run (constant 0 terms) — byte-for-byte the pre-D-100 core.
+    for _aa in ("leucine", "isoleucine", "valine", "threonine", "phenylalanine", "methionine"):
+        if _aa in schema:
+            w[schema.slice(_aa)] = carbon_mass_fraction(_aa)
+    if "amino_acids_generic" in schema:
+        w[schema.slice("amino_acids_generic")] = carbon_mass_fraction("glutamine")
     # Cell-wall debris pool (decision D-34): yeast autolysis (YeastAutolysis) turns dead biomass
     # X_dead into amino acids + this non-assimilable carbon-rich remainder (booked as glucan). The
     # dead-cell carbon r·f_C splits into the amino acids' carbon and this debris carbon, weighted
@@ -393,6 +405,16 @@ def total_nitrogen(
     # species besides biomass; on an undosed run the pool is empty (constant 0 term).
     if "amino_acids" in schema:
         w[schema.slice("amino_acids")] = nitrogen_mass_fraction("arginine")
+    # The D-100 speciated amino-acid pools carry nitrogen too (each monoamino acid one N, glutamine
+    # two), weighted at their own fractions so total_nitrogen closes through every per-species draw:
+    # a catabolic consumer deaminates the drawn amino acid's nitrogen back to `N` (the D-33/D-45
+    # /D-75 idiom), and the generic yeast/MLF/Brett swaps refund/consume each species' own N. All
+    # empty on an undosed / arginine-only run (constant 0 terms) — the pre-D-100 core is unchanged.
+    for _aa in ("leucine", "isoleucine", "valine", "threonine", "phenylalanine", "methionine"):
+        if _aa in schema:
+            w[schema.slice(_aa)] = nitrogen_mass_fraction(_aa)
+    if "amino_acids_generic" in schema:
+        w[schema.slice("amino_acids_generic")] = nitrogen_mass_fraction("glutamine")
     # N-bearing Maillard melanoidin (decision D-89): the FIRST non-biomass, non-arginine species on
     # the nitrogen ledger. MaillardBrowning RETAINS the amino-acid nitrogen it draws in the
     # melanoidin polymer (the deaminating branch is D-87's job — this is the D-45/D-75 deamination
