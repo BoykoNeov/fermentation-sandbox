@@ -9444,3 +9444,193 @@ refunds to sugar.
 above); DMS closure-permeation; variety-specific DMSp; retire the false `mercaptans` lump; sourced
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (blocked on `cos-alpha`); the `oav` → `magnitude`
 rename.
+
+---
+
+## D-107 — the keto-acid node: one missing molecule, two anomalies, and the driver sotolon never needed
+
+**The brief was the work-list D-105 wrote down.** `_KNOWN_NON_STOICHIOMETRIC` held exactly two routes, both blocked
+on the same thing: the D-45 mercaptan **produced** 2-ketobutyrate and discarded it (under-drawing methionine **5×**),
+while sotolon **consumed** it and invented it from sugar (over-drawing threonine **1.5×**). *Producer and consumer of
+one untracked molecule, in the same wine, on the same aging phase.* Build the pool and both close from opposite
+sides. That much went as scripted. What did not was sotolon.
+
+### The pool: the third excreted overflow keto-acid, and the D-49 question answered the other way
+
+`alpha_ketobutyrate` (C4H6O3) joins pyruvate (D-49) and α-ketoglutarate (D-50) with the same structure — flux-linked
+excretion, co-metabolic reassimilation that stops at dryness and **freezes** a persistent residual (**measured: 2.08
+mg/L**). D-49 *rejected* routing acetaldehyde through pyruvate because the intracellular flux intermediate and the
+excreted residual are physically distinct pools. **The same test selects the pool here**, because the reaction that
+consumes it happens where no intracellular pool can reach: sotolon forms in a **sealed bottle with no living yeast**,
+by a purely chemical aldol (Pham *et al.* 1995). Pons *et al.* 2010 confirms it directly — wine yeast "released large
+quantities of 2-ketobutyric acid" during fermentation, "similar to those found in oxidized dry white wines".
+
+Two reuse notes. D-50 had already written the Gay-Lussac split generically in `carbon_atoms`, so the third pool needed
+**no new arithmetic** — it needed the split **extracted** (`_gay_lussac_reassimilation`) rather than copied a third
+time, which is D-104's lesson applied before it could bite (a duplicated draw agrees by luck until it does not).
+And the reassimilation *freeze* is now load-bearing for a **second** reason: for the two terminal keto-acids it
+preserves a residual for SO₂ to bind; here it preserves the **substrate the in-bottle aldol eats over years**.
+
+### The move the work-list did not predict: sotolon was never a Strecker product
+
+Sotolon rode `MaillardStrecker` from D-87 to D-106 carrying **two exception flags**, and D-104 wrote that "the two
+flags travel together for the same underlying reason: sotolon is not made the way the other five are." That reason was
+right and the conclusion it licensed was **too small**. Sotolon is an aldol of α-ketobutyrate + acetaldehyde: not a
+degradation of an amino acid, no carboxyl to lose (hence no CO₂), and its carbon was never its "precursor's". **The
+flags were the model reporting, in the only vocabulary it had, that the compound was in the wrong Process.**
+
+So the fix was not to re-route sotolon's carbon and leave it where it sat. It moved to
+`SotolonAldolCondensation`, bimolecular in its two real substrates. **Both flags then had exactly one value across all
+five remaining rows and were deleted** — `_MAILLARD_PRODUCTS` is now five true Strecker aldehydes that all
+decarboxylate and all take every gram from their own amino acid: a table with **no exceptions in it**, which is the
+shape the physics always had. Three further things fell out, none of them planned:
+
+* **`MaillardStrecker` is wholly inert at aa=0 again.** D-104 had to give that up (`de_novo` un-gated sotolon's rate),
+  leaving prime directive #3 resting entirely on the compile seam. It is back, *without* re-breaking sotolon.
+* **`S` is a read-only driver again.** The only row that drew sugar carbon was the row that was not a Strecker
+  degradation.
+* **The canary is retired, not fed.** Sotolon died three times through threonine (D-99, D-104) and was rescued twice
+  (D-100, D-104). Every one of those was a fight over a dependence **it never had**: threonine is sotolon's
+  *grand*parent (threonine → α-ketobutyrate → sotolon), and the model kept re-deriving the symptom because the
+  intermediate was missing.
+
+**The sugar driver was empirically wrong, not merely inelegant.** `k · f(T) · S` is pseudo-first-order in the
+*dicarbonyl* driver — which a Strecker degradation needs and an aldol does not. It made sotolon a **sweetness**
+marker. Pons *et al.* 2010 identifies this same aldol as the sotolon pathway in prematurely aged **DRY white wines**,
+where it is the *prémox* marker. Sugar is absent from the rate law because it is absent from the reaction.
+
+### Mass-action is CHEAPER than the gated alternative — the trade ran backwards
+
+The conservative option (keep the sugar driver, re-route only the carbon) needed **soft availability gates** on the two
+new source pools to stop them going negative — i.e. a **fabricated half-saturation constant per substrate**, the D-98
+trap. The faithful option needs none: a rate proportional to both substrates is C¹, **cannot** drive either negative,
+and is **exactly** 0 when the keto-acid Processes are off — byte-for-byte isolability with no clamp and no epsilon.
+**The more faithful form is the one with fewer invented numbers.** That is worth recording because the usual
+expectation is the opposite, and it is why "re-route the carbon, defer the rate law" was declined.
+
+The one number **not** invented is the activation energy: `E_a_maillard_strecker` is carried over and **labelled** a
+carry-over. Pham sources the *direction* ("formation of sotolon increases by increasing temperature") and nothing
+more; sotolon already rode that constant D-87→D-106, so carrying it is the status quo. Inventing a sotolon-specific
+E_a to look precise is exactly the one **D-101 fabricated and D-102 had to retract**.
+
+### Measured, not asserted
+
+| claim | measurement | verdict |
+|---|---|---|
+| **prémox falls out** (O₂ → acetaldehyde → sotolon) | dry + O₂ **0 / 5 / 20** mg/L → AcH **0 / 3.9 / 15.7** mg/L → sotolon **0.03 / 1.54 / 6.06** µg/L | **holds**, nothing scripted |
+| sotolon lands in the sourced band | sweet sur lie 730 d: **14.0 µg/L** (band 5–20, Sauternes/Madeira) | **holds** |
+| the 2-KB residual | **2.08 mg/L** (designed plateau 2.0) | holds |
+| **the third threonine consumer** vs D-106 | propanol and all five fusels **≤0.0003%**; E +0.0003%, CO₂ +0.0002% | **no recalibration needed** |
+| the mercaptan's 5× fix moves outputs | fires sur lie only; autolysis refills methionine faster than any draw | **inert, as D-105 predicted** |
+
+The prémox row is the one that mattered most, and it was **run, not reasoned**: the advisor's standing instruction was
+that "O₂→acetaldehyde→sotolon falls out for free" is an unmeasured claim until an `add_oxygen` run says so. It does.
+
+### The miss: Crépin's 19/81 is NOT reproduced — 1.7%, and the diagnosis is the excretion SHAPE
+
+Excretion draws its carbon `gate : (1−gate)` between must threonine (a real ILV1 deamination, all its nitrogen to `N`)
+and the sugar de-novo stand-in. The **realised, flux-weighted exogenous share is 1.7%** against Crépin's **19%** — a
+~10× under-shoot. **It is recorded, not fixed, and not papered over.**
+
+**The structure earns its place; the number does not.** Moving the enrichment from D-104's *consumption*-time gate to
+*synthesis* time is right on the mechanism — reality fixes enrichment when the keto-acid is made, and one pool is then
+seen at one enrichment by every future consumer. **The magnitude is a measured miss, and this entry does not justify
+the split by a Crépin match, because there isn't one.**
+
+**The diagnosis is a shape I inherited, and D-49 named it and deferred it in writing.** The excretion rides
+pyruvate/α-KG's `X · S/(K+S)` fermentative shape, which **peaks late** — long after threonine has exhausted (the
+amino acids go in the first hours; the sugar flux peaks days later). So a metabolite whose real overflow tracks
+**early amino-acid/nitrogen metabolism** gets sourced almost entirely de novo. D-49's own docstring says:
+*"Nothing reads the peak; D-51 reads only the residual, so the growth-coupled excretion that would restore the
+transient (option B) is deferred."* **D-107 is the beat that makes something read the timing** — the enrichment is a
+timing quantity — so option B's deferral is no longer free. Whether a growth-linked excretion shape recovers Crépin's
+19% is the **untested** next step, filed as such.
+
+Held as a **hypothesis, not a verdict**: that D-104's celebrated ~18% ("Crépin's own signature reproduced rather than
+asserted") was an artifact of *where* its gate was evaluated — aging, sur lie, after autolysis refilled threonine.
+Three numbers exist (≈0.7 with threonine present, D-104's 0.18, this 0.017) and they do not fit one clean theory.
+D-104's number was also a different *quantity* (sotolon's carbon share, not the pool's source). That is suggestive and
+it is not measured, so it is not claimed. **The tidy story is the confirmation-bias trap in this beat** — recording
+the temptation is the point.
+
+**Why ship it anyway: the 1.7% is INERT on every output.** Threonine exhausts to 0 regardless; sotolon's magnitude is
+split-independent; the measured perturbation is ≤0.0003%. Imposing a sourced 19% constant would add an **invented
+number for zero observable gain** — strictly worse than an honest emergent value. A real defect with no present
+consequence: the D-105 disposition, applied to a number instead of a route.
+
+### THE LOAD-BEARING DEPENDENCY ON A KNOWN DEFECT: dry-wine acetaldehyde is 0
+
+**This is the finding most likely to bite a future beat, and it is not the one the brief was about.** Measured: a
+**dry** wine ends aging with **acetaldehyde ≈ 0.0 mg/L**, a **sweet** one with **32.9**. The D-27 ADH reduction is
+no-flux and viable-`X`-gated, so a dry ferment that finishes with living yeast reduces its acetaldehyde away entirely,
+while a sweet one arrests by ethanol inactivation and freezes it. **Real dry whites hold ~30 mg/L.** The zero is a
+pre-existing artifact, and D-107 has just made it **load-bearing**:
+
+* Sotolon's sweet-vs-dry separation **no longer comes from sugar — it comes from acetaldehyde.** The dry arm makes
+  0.025 µg/L not because sotolon needs sugar but because the model's dry wine has no acetaldehyde.
+* The three defensible outputs — dry-sealed ≈ 0, dry + O₂ rises, sweet = 14 µg/L — are **partly right for the wrong
+  reason**. They read as good correspondence (an ordinary dry white under good closure really has no sotolon; prémox
+  really is oxidative), and one leg of that rests on an artifact.
+* **If the acetaldehyde baseline is ever corrected, dry sealed wine produces ~sweet-level sotolon** (both carry ~2
+  mg/L 2-KB × ~30 mg/L AcH) and the separation collapses. That beat must re-examine this route, not just D-27.
+
+Stated here rather than in a docstring footnote because it is a **cross-decision coupling**: a fix to D-27 is now
+silently a change to the aging aroma headline.
+
+### The lessons
+
+(i) **An exception flag is a Process boundary asking to be moved.** `decarboxylates=False` and `de_novo=True` were two
+descriptions of one fact — sotolon was in the wrong Process — and D-104 wrote that fact down *verbatim* while reading
+it as a property to be handled rather than a misfiling to be undone. The tell is that **both flags had exactly one
+dissenting row, and it was the same row.**
+(ii) **The faithful form can be the cheap one.** Fidelity usually costs parameters; here the sourced rate law removed
+two fabricated constants the "conservative" option required. The conservative option was not the cheap option — it
+was the one that looked cheap because it changed less.
+(iii) **A source can refute the premise of a compromise, not just supply a number.** The plan was "keep the sugar
+driver, defer the rate law", resting on the belief that a sotolon-positive dry wine would be a regression. Pons 2010
+killed that premise outright — dry whites make sotolon, and it is their prémox marker. The reading that mattered was
+not a magnitude but **a fact that made the safe option wrong**.
+(iv) **A closed-form test written from the code cannot find a stoichiometry error in the code.** `test_matches_closed_
+form` re-derived the mercaptan's carbon-sized draw and passed for sixty decisions, because it was the same arithmetic
+written twice. It is now written from the **reaction**. D-105's "measuring the code beats reading the code" has a
+sharper edge: measure against the *chemistry*, not against the implementation.
+(v) **The number you did not have to invent is worth more than the one you match.** The Crépin miss is recorded at 1.7%
+because inventing a 19% would buy nothing observable — and the temptation was strongest exactly where the citation was
+best.
+
+### The receipt
+
+**1143 → 1152 passed** (both measured by `--collect-only`, not computed), **16/16 benchmarks both media**, `ruff` +
+`mypy` clean. Carbon and nitrogen close through the node; the pool carries **three** flows across the ledger and all
+three close on **atom counts** (`4 == 4` threonine deamination, `5 == 1 + 4` demethiolation, `4 + 2 == 6` the aldol) —
+not on a sized draw, which is why the aldol has **no D-105 blind spot to check at all**.
+
+`_KNOWN_NON_STOICHIOMETRIC` **is empty**, and `test_the_known_non_stoichiometric_allow_list_is_empty` keeps it so.
+The two entries closed differently and the distinction is recorded: the mercaptan was **fixed** (1:1, C4 charged);
+sotolon's was **dissolved** — it is not a carbon-sized draw off an amino acid any more, so the ratio it failed was an
+artifact of asking a Strecker question about a molecule that was never a Strecker product.
+
+**Not the D-103 trap** — every re-authored assertion is mutation-tested, **5/5 caught by the intended test**: drop the
+acetaldehyde draw → the driven 1:1 test fails; halve the 2-KB debit → same; make the aldol first-order → the
+bimolecular test fails; re-introduce a sugar driver → the sugar-independence test fails; revert the mercaptan to its
+carbon-sized draw → the closed form fails. The D-105 two-layer discipline holds: the declaration layer generalised
+(routes now declare **charged co-products**, not just CO₂ — the column D-105 predicted and could not express, because
+charging is only possible into a pool that exists), and the code layer drives each route and reads the debit.
+
+### Not done, deliberately
+
+- **The fusel side of the node** — propanol is still `threonine → propanol` directly, so the genuine
+  propanol-vs-sotolon competition, which is over **α-ketobutyrate** (propanol *is* 2-KB decarboxylated), is still not
+  expressible. The D-100 competition-over-threonine is now **gone** rather than wrong: excretion's rate is flux-only,
+  so the re-route cannot move sotolon. Re-basing the Ehrlich fusels on their keto acids (valine→KIV, leucine→KIC) is
+  the milestone this beat only opened.
+- **Pham's pH and ethanol terms** — sotolon rises with *decreasing* pH and *decreasing* ethanol. The model **has** both
+  quantities, so these are real omissions rather than inexpressible ones.
+- **The sotolon enantiomers** — (S) threshold ~0.8 µg/L vs (R) ~89 µg/L (Pons); one racemic pool against one threshold
+  is a lump, and the ~100× spread means the OAV is soft by that much.
+- **The growth-linked excretion shape** (D-49 option B) — now motivated by the Crépin miss above, where D-49 had
+  deferred it for want of a reader.
+- **Dry-wine acetaldehyde** (D-27) — see the load-bearing dependency above.
+- Methionine's assimilation/sink + `methionol`; DMS closure-permeation; variety-specific DMSp; retire the false
+  `mercaptans` lump; sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking; the `oav` → `magnitude`
+  rename.

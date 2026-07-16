@@ -1322,6 +1322,25 @@ class SotolonAldolCondensation(Process):
     energy to look precise is exactly the E_a D-101 fabricated and D-102 had to retract. Re-sourcing
     it is a parameter-file change, not a structural one.
 
+    **A LOAD-BEARING DEPENDENCY ON A KNOWN DEFECT — read this before changing D-27 (decision
+    D-107).** Measured: a **dry** wine ends aging with ``acetaldehyde ≈ 0.0`` mg/L, a **sweet** one
+    with **32.9**. :class:`~fermentation.core.kinetics.acetaldehyde.AcetaldehydeReduction` (D-27) is
+    no-flux and viable-``X``-gated, so a dry ferment that finishes with living yeast reduces its
+    acetaldehyde away entirely, while a sweet one arrests by ethanol inactivation and freezes it.
+    **Real dry whites hold ~30 mg/L**, so that zero is a pre-existing artifact — and this Process
+    has
+    just made it load-bearing. Sotolon's sweet-vs-dry separation no longer comes from sugar; it
+    comes
+    from *acetaldehyde*. The dry arm makes 0.025 µg/L not because sotolon needs sugar but because
+    the
+    model's dry wine has no acetaldehyde. The outputs read as good correspondence (an ordinary dry
+    white under good closure really has no sotolon; prémox really is oxidative), but one leg of that
+    is **right for the wrong reason**: correct the acetaldehyde baseline and a dry sealed wine will
+    make ~sweet-level sotolon (both carry ~2 mg/L α-ketobutyrate × ~30 mg/L acetaldehyde),
+    collapsing
+    the separation. A fix to D-27 is therefore silently a change to the aging aroma headline, and
+    must re-examine this route rather than only that one.
+
     **Scope — named, not hidden.** (1) Pham also measures sotolon rising with **decreasing pH** and
     **decreasing ethanol**; neither term is here, and the model has both quantities, so this is a
     real omission rather than an inexpressible one. (2) Botrytised sweet wines may carry an

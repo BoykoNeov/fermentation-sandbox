@@ -410,6 +410,18 @@
 > FLIPPED: sotolon OAV 0 → 3.22" was NEVER A FIX — sotolon rode on ~6.6 mg/L of leftover threonine that survived only because
 > propanol's demand was too small to consume it. D-104's anabolic sink consumes it properly and sotolon died AGAIN (its third
 > death, always through threonine) ⇒ re-based on 2-ketobutyrate (`de_novo=True`), which is the actual fix. See D-104.]**
+>
+> **[D-107 SUPERSEDES THAT LAST CLAIM — `de_novo=True` was not "the actual fix", it was the right diagnosis wearing the
+> only vocabulary available. Sotolon is not a Strecker product AT ALL: it is a purely chemical aldol of
+> α-ketobutyrate + acetaldehyde (Pham 1995), so it did not belong in `MaillardStrecker`, and its TWO exception flags
+> (`decarboxylates=False`, `de_novo=True`) were the model saying so. D-107 built the **2-ketobutyrate pool** — the
+> keto-acid NODE, whose producer (the D-45 mercaptan, discarding its C4 and under-drawing methionine 5×) and consumer
+> (sotolon, inventing it from sugar and over-drawing threonine 1.5×) had BOTH been sitting in the tree since D-105 —
+> moved sotolon to `SotolonAldolCondensation`, and **both flags then had one value across five rows and were deleted**.
+> `_KNOWN_NON_STOICHIOMETRIC` is EMPTY. The threonine-vs-sotolon "REAL chemistry over one molecule" competition asserted
+> below is now **GONE rather than wrong**: threonine is sotolon's *grand*parent, and the genuine competition is over
+> α-ketobutyrate (propanol IS 2-KB decarboxylated) — inexpressible until the fusels are re-based on their keto acids,
+> which is the rest of this milestone. See D-107.]**
 > THE TRIPWIRE FLIPPED: sotolon OAV 0 → 3.22 with the reroute ON; the D-99 limitation test
 > deleted per its own instructions and REPLACED with a positive assertion (coverage preserved) + one pinning the autolysis
 > dependency. **Methionine — flagged as highest-risk (scarcest, 3 consumers) — was the SAFEST, structurally: no fusel eats

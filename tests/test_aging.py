@@ -1838,9 +1838,9 @@ def test_sotolon_aldol_is_bimolecular_in_both_substrates(maillard_params):
     schema = wine_schema()
     p = SotolonAldolCondensation()
 
-    def rate(**kw):
-        return schema.get(p.derivatives(0.0, _aldol_wine(schema, **kw), schema, maillard_params),
-        "sotolon")
+    def rate(**kw: float) -> float:
+        d = p.derivatives(0.0, _aldol_wine(schema, **kw), schema, maillard_params)
+        return float(schema.get(d, "sotolon"))
 
     base = rate()
     assert base > 0.0

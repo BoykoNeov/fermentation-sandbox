@@ -423,9 +423,36 @@ class AlphaKetobutyrateExcretion(Process):
     exogenous threonine / 81% newly synthesised**, so a pure-threonine draw would be wrong by ~5×
     *and* would make a threonine-free wine produce no sotolon — the D-104 canary. A pure-sugar draw
     would be simpler and would zero the enrichment, throwing away the one thing D-104 got right. The
-    split reproduces the 19/81 rather than asserting it: it is ``gate``, the same quantity the
-    Ehrlich re-route gives propanol off the same pool, which is Crépin's own signature (one
-    intracellular pool ⇒ one enrichment, seen identically by every consumer).
+    split puts the enrichment where reality fixes it — at **synthesis**, so one pool is seen at one
+    enrichment by every consumer, which is Crépin's own signature ("the isotopic enrichment detected
+    in propanol … was the same as that measured in proteinogenic threonine").
+
+    **THE MAGNITUDE IS A MEASURED MISS, AND THIS DOCSTRING DOES NOT CLAIM OTHERWISE (D-107).** The
+    realised, flux-weighted exogenous share is **1.7%**, against Crépin's **19%** — a ~10×
+    under-shoot. The *structure* earns its place (the mechanism above); the *number* does not, and
+    it is recorded rather than fixed because it is **inert on every output**: threonine exhausts to
+    0
+    regardless, sotolon's magnitude is split-independent, and the measured perturbation on D-106's
+    propanol/fusel balance is ≤0.0003%. Imposing a sourced 19% constant would add an invented number
+    for **zero observable gain** — strictly worse than an honest emergent value.
+
+    **The diagnosis is the excretion SHAPE, inherited from this module's two older pools.** The rate
+    rides pyruvate/α-KG's ``X · S/(K+S)`` fermentative shape, which **peaks late** — long after
+    threonine has exhausted (the assimilable amino acids go in the first hours; the sugar flux peaks
+    days later). So a metabolite whose real overflow tracks **early amino-acid/nitrogen metabolism**
+    is sourced almost entirely de novo. **The module docstring already named this and deferred it**:
+    "Nothing reads the peak; D-51 reads only the residual, so the growth-coupled excretion that
+    would restore the transient (option B) is deferred." Enrichment **is** a timing quantity, so
+    D-107 is the beat that makes something read the peak — and option B's deferral is no longer
+    free.
+    Whether a growth-linked shape recovers the 19% is **untested**, and is the next step here.
+
+    Held as a **hypothesis, not a verdict**: that D-104's ~18% (which it read as Crépin reproduced)
+    was an artifact of evaluating the same gate at *aging* time, sur lie, after autolysis had
+    refilled threonine. Three numbers exist — ≈0.7 with threonine present, D-104's 0.18, this 0.017
+    — and they do not fit one clean theory; D-104's was also a different *quantity* (sotolon's
+    carbon
+    share, not the pool's source). Suggestive, unmeasured, therefore not claimed.
 
     **The nitrogen is not decoration.** ``L-threonine → 2-oxobutanoate + NH₃`` (ILV1) is a genuine
     deamination and α-ketobutyrate is nitrogen-free, so *all* the drawn threonine's nitrogen lands
