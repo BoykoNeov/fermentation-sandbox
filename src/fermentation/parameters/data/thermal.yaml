@@ -45,25 +45,29 @@
 # THE PROCESS (fermentation.core.kinetics.aging.MaillardStrecker, WINE-ONLY):
 #
 #   S_total    = sum of the residual-sugar vector (g/L)                    # the dicarbonyl driver
-#   gate       = amino_acids / (K_amino_acids + amino_acids)               # smooth availability [0,1)
+#   gate_i     = aa_i / (K_i + aa_i),  K_i = K_amino_acids * f_i           # PER-PRECURSOR (D-100)
 #   n_ald      = k_maillard_strecker * f(T) * S_total * gate               # mol total product /L/h
 #   f(T)       = arrhenius_factor(T, E_a_maillard_strecker, T_ref)         # STRONGLY warmer-faster
 #   n_i        = (w_maillard_i / sum_j w_maillard_j) * n_ald               # per-product mol rate
 #   d(product_i)/dt = +n_i * M_i                                           # each aroma pool, g/L/h
 #   d(CO2)/dt  = +(n_ald - n_sotolon) * M_CO2   # 1 CO2 per DECARBOXYLATING aldehyde, NOT sotolon
-#   d(amino_acids)/dt = -(total product carbon rate) / c_arginine          # arginine sized to C
-#   d(N)/dt    = +(that arginine draw) * n_arginine                        # deamination -> N
+#   d(<precursor_i>)/dt = -(product_i carbon rate) / c_<precursor_i>       # each sized to ITS C
+#   d(N)/dt    = +(sum of those draws) * n_<precursor_i>                   # deamination -> N
 #
 # NO O2 term (the whole point -- this is the O2-independent route). S is a READ-ONLY driver, NOT
 # consumed here (its consumption is booked by the Caramelization route, D-88; the aldehyde carbon
 # is the AMINO ACID's, not the sugar's -- the sugar dicarbonyl is only the electron-accepting
 # oxidant, and its own carbon goes to melanoidin, D-88). CARBON + NITROGEN close to machine
-# precision exactly as D-75: the arginine draw is sized to the total product carbon (all aldehydes
-# + sotolon + CO2), and all arginine nitrogen is deaminated to N (products N-free). The arginine-
-# for-amino_acids stand-in is exact on the ledger, approximate on provenance (the D-45 lump);
-# sotolon additionally lumps its 2 acetaldehyde-derived carbons into that draw (its true aldol
-# route is deferred). total_mass ({S,E,CO2}) sees the CO2 term with no matching S/E debit here, but
-# is never asserted on an aging run (the standing OxidativeAcetaldehyde scope-out).
+# precision exactly as D-75: EACH product's draw is sized to ITS OWN carbon (its aldehyde + its
+# carboxyl CO2) and taken from ITS OWN precursor -- leucine -> 3-methylbutanal, isoleucine ->
+# 2-methylbutanal, valine -> 2-methylpropanal, methionine -> methional, phenylalanine ->
+# phenylacetaldehyde, threonine -> sotolon (decision D-100) -- and all that precursor nitrogen is
+# deaminated to N (products N-free). Before D-100 every product drew the amino_acids arginine lump:
+# exact on the ledger, approximate on provenance -- that stand-in is RETIRED. Sotolon remains
+# approximate in one respect the split did not fix: it lumps its 2 acetaldehyde-derived carbons
+# into its threonine draw (its true aldol route is deferred). total_mass ({S,E,CO2}) sees the CO2
+# term with no matching S/E debit here, but is never asserted on an aging run (the standing
+# OxidativeAcetaldehyde scope-out).
 
 # -- THERMAL STRECKER RATE CONSTANT (first-order in residual sugar, aa-gated, O2-FREE) -------
 # A lumped constant: n_ald = k_maillard_strecker * f(T) * S[g/L] * gate, so it directly yields mol
@@ -112,7 +116,7 @@ w_maillard_phenylacetaldehyde:
   uncertainty: { low: 0.15, high: 0.45, note: "Phenylalanine is among the most abundant must amino acids => phenylacetaldehyde (honey) a major thermal-Strecker product. Relative weight, normalized in-code." }
   provenance:
     source: "author estimate of relative phenylalanine-derived thermal-Strecker flux (abundance x reactivity). Phenylalanine consistently among the most abundant must amino acids (Escudero et al. 2000, 2002)."
-    conditions: "generic sweet wine; relative production weight of phenylacetaldehyde (C8H8O) among the six non-oxidative-route products, at T_ref = 293.15 K. amino_acids booked as arginine (the D-45 lump), so this is a composition stand-in."
+    conditions: "generic sweet wine; relative production weight of phenylacetaldehyde (C8H8O) among the six non-oxidative-route products, at T_ref = 293.15 K. Since D-100 MaillardStrecker draws each product's REAL precursor (phenylalanine here), each gated on its own pool — the pre-D-100 arginine-lump stand-in is retired; this weight remains an estimate of relative production flux."
     notes: "SPECULATIVE. PRODUCTION flux only; perceptibility lives in threshold_phenylacetaldehyde_wine. Normalized against the other five weights in-code."
 w_maillard_3_methylbutanal:
   value: 0.22
@@ -121,7 +125,7 @@ w_maillard_3_methylbutanal:
   uncertainty: { low: 0.10, high: 0.35, note: "3-methylbutanal (leucine, malty/dark-chocolate) is typically the most prominent branched-chain thermal/staling aldehyde. Relative weight, normalized in-code." }
   provenance:
     source: "author estimate of relative leucine-derived thermal-Strecker flux. 3-methylbutanal is a canonical malty aldehyde of thermally-aged and stale beverages (leucine abundant, high Strecker reactivity)."
-    conditions: "generic sweet wine; relative production weight of 3-methylbutanal (C5H10O) among the six products, at T_ref = 293.15 K. arginine lump."
+    conditions: "generic sweet wine; relative production weight of 3-methylbutanal (C5H10O) among the six products, at T_ref = 293.15 K. Drawn from LEUCINE, its real precursor, since D-100 (the arginine lump is retired)."
     notes: "SPECULATIVE. Production flux only; potency in threshold_3_methylbutanal_wine. Normalized in-code."
 w_maillard_2_methylbutanal:
   value: 0.15
@@ -130,7 +134,7 @@ w_maillard_2_methylbutanal:
   uncertainty: { low: 0.07, high: 0.28, note: "2-methylbutanal (isoleucine, malty/almond). Relative weight, normalized in-code." }
   provenance:
     source: "author estimate of relative isoleucine-derived thermal-Strecker flux (a canonical malty aldehyde, isoleucine moderately abundant)."
-    conditions: "generic sweet wine; relative production weight of 2-methylbutanal (C5H10O) among the six products, at T_ref = 293.15 K. arginine lump."
+    conditions: "generic sweet wine; relative production weight of 2-methylbutanal (C5H10O) among the six products, at T_ref = 293.15 K. Drawn from ISOLEUCINE, its real precursor, since D-100 (the arginine lump is retired)."
     notes: "SPECULATIVE. Production flux only; potency in threshold_2_methylbutanal_wine. Normalized in-code."
 w_maillard_2_methylpropanal:
   value: 0.15
@@ -139,7 +143,7 @@ w_maillard_2_methylpropanal:
   uncertainty: { low: 0.07, high: 0.28, note: "2-methylpropanal / isobutyraldehyde (valine, malty/grainy). Relative weight, normalized in-code." }
   provenance:
     source: "author estimate of relative valine-derived thermal-Strecker flux (isobutyraldehyde, valine moderately abundant)."
-    conditions: "generic sweet wine; relative production weight of 2-methylpropanal (C4H8O) among the six products, at T_ref = 293.15 K. arginine lump."
+    conditions: "generic sweet wine; relative production weight of 2-methylpropanal (C4H8O) among the six products, at T_ref = 293.15 K. Drawn from VALINE, its real precursor, since D-100 (the arginine lump is retired)."
     notes: "SPECULATIVE. Production flux only; potency in threshold_2_methylpropanal_wine. Normalized in-code."
 w_maillard_sotolon:
   value: 0.10
@@ -148,7 +152,7 @@ w_maillard_sotolon:
   uncertainty: { low: 0.03, high: 0.20, note: "Sotolon (the curry/maple furanone) is a TRACE product by mass but the diagnostic marker of botrytized sweet wine / vin jaune / Madeira. Relative weight, normalized in-code; small mass share but potent (very low threshold)." }
   provenance:
     source: "author estimate of relative sotolon flux. Sotolon forms via aldol condensation of alpha-ketobutyrate (threonine deamination) with acetaldehyde (Pham et al. 1995; Cutzach et al. on aged sweet wine), a MINOR but characteristic route -- so a small production weight, its impact carried by a very low perception threshold."
-    conditions: "generic sweet wine; relative production weight of sotolon (C6H8O3) among the six products, at T_ref = 293.15 K. Carbon booked from the arginine lump; its 2 acetaldehyde-derived carbons lumped in (exact on ledger, approximate on provenance; the acetaldehyde-coupled sotolon route deferred)."
+    conditions: "generic sweet wine; relative production weight of sotolon (C6H8O3) among the six products, at T_ref = 293.15 K. Carbon booked from THREONINE, its real precursor, since D-100 (the arginine lump is retired); its 2 acetaldehyde-derived carbons are still lumped into that draw -- approximate on provenance, and the acetaldehyde-coupled sotolon route stays deferred."
     notes: "SPECULATIVE. Production flux only; potency in threshold_sotolon_wine (very low -- sotolon is a potent odorant). NOT a decarboxylation product => it contributes NO CO2 term (unlike the five Strecker aldehydes). Normalized in-code."
 w_maillard_methional:
   value: 0.08
@@ -157,7 +161,7 @@ w_maillard_methional:
   uncertainty: { low: 0.03, high: 0.18, note: "Methional (methionine, cooked-potato) is a MINOR production share (methionine a minor sulfur amino acid) but potent. Relative weight, normalized in-code." }
   provenance:
     source: "author estimate of relative methionine-derived thermal-Strecker flux. Methionine is a minor must amino acid, so methional is a small production share -- but a potent low-µg/L marker (the same flux-not-potency logic as the oxidative f_methional, D-75)."
-    conditions: "generic sweet wine; relative production weight of methional (C4H8OS) among the six products, at T_ref = 293.15 K. arginine lump."
+    conditions: "generic sweet wine; relative production weight of methional (C4H8OS) among the six products, at T_ref = 293.15 K. Drawn from METHIONINE, its real precursor, since D-100 (the arginine lump is retired)."
     notes: "SPECULATIVE. Production flux only; potency in threshold_methional_wine (shared with the D-75 oxidative route -- same molecule, same threshold). Normalized in-code."
 
 # ============================================================================================
@@ -236,8 +240,12 @@ y_a420_per_melanoidin:
 #   gate     = amino_acids / (K_amino_acids + amino_acids)                # smooth availability [0,1)
 #   r_sugar  = k_maillard_browning * f(T) * S_total * gate                # g sugar/L/h into browning
 #   f(T)     = arrhenius_factor(T, E_a_maillard_browning, T_ref)          # STRONGLY warmer-faster
-#   r_m      = r_sugar * c(sugar) / (c_m - n_m*c(arg)/n(arg))             # g melanoidin/L/h (sized)
-#   r_aa     = r_m * n_m / n(arg)                                          # g arginine/L/h drawn
+#   r_m      = r_sugar * c(sugar) / (c_m - n_m*R)                         # g melanoidin/L/h (sized)
+#   r_aa     = r_m * n_m / n(blend)                                       # g/L/h of the IDENTITY-
+#              # AGNOSTIC {arginine, generic} blend (D-100) -- melanoidin retains amino-acid N
+#              # regardless of which molecule carried it, so this route draws the blend, never a
+#              # precursor. R = the blend's mass C:N. Contrast MaillardStrecker, which draws each
+#              # aldehyde's OWN precursor.
 #   d(S)/dt                  = -r_sugar
 #   d(amino_acids)/dt        = -r_aa
 #   d(maillard_melanoidin)/dt = +r_m

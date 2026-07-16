@@ -51,10 +51,12 @@ this model does not carry: (1) yeast **demethiolation** of methionine (via trans
 during **active fermentation**, and (2) **post-bottling** formation under anoxic storage from
 thioacetates and disulfides. So:
 
-* **Young, non-sur-lie wine — the zero is roughly defensible.** MeSH boils at ~35 °C, so the
-  fermentation-route thiol is largely **stripped by the CO₂ stream** as it forms. That is exactly
-  why this Process is deliberately *not* flux-linked (see above): a flux-linked thiol would be
-  swept out, and the reductive fault is a post-dryness, un-stripped residual.
+* **Young, non-sur-lie wine — the zero is roughly defensible.** Methanethiol boils at **~6 °C**
+  (CH₃SH; contrast ethanethiol's 35 °C), i.e. it is a **gas well below any fermentation
+  temperature**, so the fermentation-route thiol is largely **stripped by the CO₂ stream** as it
+  forms. That is exactly why this Process is deliberately *not* flux-linked (see above): a
+  flux-linked thiol would be swept out, and the reductive fault is a post-dryness, un-stripped
+  residual.
 * **Bottle-aged wine — the zero is NOT defensible.** Route (2) makes MeSH regardless of lees
   (screwcap reduction is the classic case), and this model cannot show it at all. Closing that gap
   needs a new Process over precursors (thioacetates/disulfides) that are not modelled — a beat of

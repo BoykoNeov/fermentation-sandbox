@@ -333,8 +333,9 @@ _CO2_PER_STRECKER_ALDEHYDE = 1.0
 #: the
 #: five true Strecker aldehydes each release **1 mol CO₂** (the amino acid's carboxyl carbon), but
 #: **sotolon does not** (a threonine/acetaldehyde aldol furanone, not a decarboxylation product).
-#: The
-#: arginine draw is sized to *total product carbon* (§ derivatives), so ``total_carbon`` closes for
+#: Each
+#: precursor's draw is sized to ITS OWN product carbon (§ derivatives, D-100), so ``total_carbon``
+#: closes for
 #: **any** CO₂ attribution — a mis-keyed CO₂ term would pass every conservation test silently — so
 #: the
 #: CO₂ is keyed to these flags explicitly, and the produced µg/L levels are anchored to literature
@@ -879,17 +880,18 @@ class StreckerDegradation(Process):
     speculative parameter band while the O₂ draw stays a minor, in-band perturbation.
 
     **Carbon + nitrogen close by construction — the D-45 mercaptans idiom + a CO₂ term.** The
-    aldehyde carbon is drawn from ``amino_acids`` (booked as arginine) and the amino-acid nitrogen
-    is **deaminated** back to the ``N`` pool, exactly as
+    aldehyde carbon is drawn from **its own precursor** — methionine for methional, phenylalanine
+    for phenylacetaldehyde (decision D-100) — and that precursor's nitrogen is **deaminated** back
+    to the ``N`` pool, exactly as
     :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan` does; the Strecker
     **decarboxylation** adds one product this idiom did not have — **1 mol CO₂ per mol aldehyde**
-    (:data:`_CO2_PER_STRECKER_ALDEHYDE`, the acid's carboxyl carbon), on the carbon ledger. The
-    arginine draw is *sized to the product carbon* (methional + phenylacetaldehyde + CO₂), so
+    (:data:`_CO2_PER_STRECKER_ALDEHYDE`, the acid's carboxyl carbon), on the carbon ledger. Each
+    draw is *sized to that route's product carbon* (its aldehyde + its own carboxyl CO₂), so
     ``total_carbon`` closes to machine precision (the :class:`EsterHydrolysis` multi-product split
-    idiom); all the arginine nitrogen lands in ``N`` and the products are nitrogen-free, so
-    ``total_nitrogen`` closes. The arginine-for-``amino_acids`` stand-in is **exact on the ledger,
-    approximate on provenance** (the drawn C/N is arginine's, not methionine/phenylalanine) — the
-    same honest stand-in mercaptans carries. ``o2`` is off every ledger (D-71), so spending it moves
+    idiom); all the precursor nitrogen lands in ``N`` and the products are nitrogen-free, so
+    ``total_nitrogen`` closes. Before D-100 both routes drew the ``amino_acids`` arginine lump —
+    **exact on the ledger, approximate on provenance**; that stand-in is **retired** here and in
+    mercaptans alike. ``o2`` is off every ledger (D-71), so spending it moves
     nothing conserved. ``total_mass`` ({S,E,CO2}) sees the CO₂ term with no matching S/E debit, but
     it is never asserted on an aging run (the aroma pools are active) — the standing
     :class:`OxidativeAcetaldehyde` scope-out.
@@ -1041,7 +1043,7 @@ class MaillardStrecker(Process):
     the
     v1 set; other markers are lumped out. And sotolon is **not** a Strecker aldehyde — a
     threonine/acetaldehyde aldol furanone — so it carries no CO₂ term; its 2 acetaldehyde-derived
-    carbons are lumped into the arginine draw, the acetaldehyde-coupled route deferred.)
+    carbons are lumped into its THREONINE draw, the acetaldehyde-coupled route deferred.)
 
     ``n_ald = k_maillard_strecker · f(T) · [S_total] · gate(aa)`` — first-order in the **residual
     sugar** (summed over the sugar vector, the dicarbonyl driver) and gated by the amino-acid
@@ -1069,16 +1071,16 @@ class MaillardStrecker(Process):
     The unbooked per-Strecker sugar consumption is µM-scale (µg/L aldehydes ⇒ trace dicarbonyl),
     negligible vs the g/L residual pool. So ``S`` is read but **not** in ``touches``.
 
-    **Carbon + nitrogen close by construction (the D-75 idiom exactly).** The arginine draw is sized
-    to the **total product carbon** (all six products + the CO₂ from the five decarboxylating ones),
-    and all arginine nitrogen is **deaminated** to ``N`` (products N-free), so ``total_carbon`` and
-    ``total_nitrogen`` close to machine precision. Because closure holds for *any* CO₂ attribution,
+    **Carbon + nitrogen close by construction (the D-75 idiom exactly).** Each precursor's draw
+    is sized to **its own product's carbon** (its aldehyde, plus its own carboxyl CO₂ if it
+    decarboxylates — sotolon does not), and all that precursor nitrogen is **deaminated** to ``N``
+    (products N-free), so ``total_carbon`` and ``total_nitrogen`` close to machine precision.
+    Because closure holds for *any* CO₂ attribution,
     the CO₂ is keyed to the :data:`_MAILLARD_PRODUCTS` ``decarboxylates`` flags explicitly and the
     produced µg/L levels are anchored to literature (no conservation test would catch a mis-key).
-    The
-    arginine-for-``amino_acids`` stand-in is exact on the ledger, approximate on provenance (the
-    D-45
-    lump). ``total_mass`` ({S,E,CO2}) sees the CO₂ with no matching S/E debit, but is never asserted
+    Since D-100 each product draws its OWN precursor, so the pre-D-100 arginine-lump stand-in —
+    exact on the ledger, approximate on provenance — is retired. ``total_mass`` ({S,E,CO2}) sees
+    the CO₂ with no matching S/E debit, but is never asserted
     on an aging run (the standing :class:`OxidativeAcetaldehyde` scope-out).
 
     **Additive with the oxidative route over the shared ``amino_acids`` limiting reagent.** Both
@@ -1111,7 +1113,8 @@ class MaillardStrecker(Process):
     name = "maillard_strecker"
     tier = Tier.SPECULATIVE
     #: Writes the six thermal-route product pools + the decarboxylation ``CO2``, drawing the carbon
-    #: from ``amino_acids`` (arginine) and deaminating its nitrogen to ``N``. Touches those nine and
+    #: from each product's OWN precursor (D-100) and deaminating its nitrogen to ``N``. Touches
+    #: those nine and
     #: nothing else — ``S`` is a read-only driver (not consumed here; its draw is booked by D-88),
     #: and
     #: there is NO ``o2`` term (the whole point). The C/N transfer closes exactly.
@@ -1441,7 +1444,9 @@ class MaillardBrowning(Process):
     ``c_m/n_m > c(arg)/n(arg) = 72/56 ≈ 1.29`` (atomic C:N > ~1.5); the C-rich melanoidin (C:N ≈
     8:1,
     ``c_m/n_m ≈ 6.9``) clears it by ~5×, leaving the denominator ≈ 0.81·c_m (healthy, no blow-up).
-    The amino-acid draw is the arginine lump (D-45), exact on the ledger, approximate on provenance;
+    The amino-acid draw is the identity-agnostic ``{arginine, generic}`` blend (D-100) — melanoidin
+    retains amino-acid nitrogen regardless of which molecule carried it, so this route never touches
+    a precursor;
     the whole amino acid (carbon skeleton + nitrogen) is built into the polymer here — unlike D-87,
     where the carbon leaves as aldehyde+CO₂ and only the nitrogen returns. ``total_mass``
     ({S,E,CO2})

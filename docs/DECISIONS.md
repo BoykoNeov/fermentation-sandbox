@@ -8291,12 +8291,29 @@ ester perception** (lowers the fruity pool's threshold) — a perceptual interac
 blocked on `cosα` since D-95/D-98) ⇒ we would model its concentration honestly and stay **silent on its most-studied effect**.
 
 **THE PD#2 VIOLATION D-100 LEFT BEHIND — the shovel-ready half, and the reason this entry exists at all.** D-100 rewired the **code**
-to draw real precursors but left **nine provenance strings across three YAML files and one module** still claiming the **arginine**
-lump — statements now **flatly false against the code they document**: `wine_generic.yaml` (the D-45 block comment + `y_mercaptan`'s
+to draw real precursors but left **~30 provenance strings across four YAML files and five modules** still claiming the **arginine**
+lump — statements now **flatly false against the code they document**. ***I DECLARED THIS PURGE COMPLETE TWICE AND WAS WRONG BOTH
+TIMES — that is the most useful thing in this entry.*** First I said "nine, across three YAMLs and one module": an **undercount from a
+grep scoped to the four files I had already edited**. Corrected to ~20 — then the *unfiltered* sweep found ~10 more, because my second
+grep was **filtered on `mercaptan|methional|phenylacet`** and `thermal.yaml`'s `butanal`/`propanal`/`sotolon` weights **do not contain
+those words**. I had fixed **two of that file's six** product weights and moved on. **The filter WAS the scope limit, invisibly** —
+the D-96 lesson (*"my per-file test runs missed 6 failures a `head -20` grep truncated — completeness sweeps must not be
+head-limited"*) repeating in a **new disguise**, and the lesson generalises past `head`: *any* narrowing of a completeness sweep —
+path, filter, keyword — is a scope limit, and **the narrower it is the more it looks like diligence**. Only `grep <term>` with **no
+filter at all**, read in full, terminated it. The full set: `wine_generic.yaml` (the D-45 block comment + `y_mercaptan`'s
 `notes`), `sensory.yaml` (`threshold_methional_wine` and `threshold_phenylacetaldehyde_wine` — *"booked from arginine carbon, not
 literal methionine"*), `aging.yaml` (the Strecker ledger comment, its rate equations `c_arginine`/`y_N_arginine`, and `f_methional`'s
-`conditions`), and `mercaptans.py`'s own docstring — which still carried a **"PROVENANCE CAVEAT — the arginine lump, not literal
-methionine"** section describing a draw the code had already replaced. **This is exactly the D-99 done-call catch repeating** (*"I
+`conditions`), `mercaptans.py`'s own docstring — which still carried a **"PROVENANCE CAVEAT — the arginine lump, not literal
+methionine"** section describing a draw the code had already replaced — and, found only by the *unscoped* sweep: `chemistry.py`
+(`M_METHANETHIOL`'s and the nitrogen-map's *"deaminates the arginine nitrogen"*, and `M_SOTOLON`'s *"carbon drawn from the
+`amino_acids` (arginine) lump"* — sotolon draws **threonine** now), `aging.py`'s `StreckerDegradation` docstring, `media.py`'s two
+state-slot descriptions, `conservation.py`'s mercaptan ledger comment, and `thermal.yaml`'s two D-87 product weights. **A true
+distinction the sweep forced, and the reason a blind find-and-replace would have been WRONG:** `MaillardBrowning` legitimately draws
+the **identity-agnostic `{arginine, generic}` blend** (melanoidin retains amino-acid nitrogen *regardless of which molecule carried
+it*) — its arginine mentions are **correct**, and D-100 made that draw a **blend**, so `thermal.yaml`'s melanoidin equations were
+stale in the *opposite* direction (naming pure arginine for what is now a blend) and are corrected to say so. `MaillardStrecker`, one
+Process over in the same file, draws each aldehyde's **own** precursor. **Which arginine mentions are stale is not greppable — it
+depends on whether the consumer is identity-agnostic.** **This is exactly the D-99 done-call catch repeating** (*"I
 nearly shipped a provenance note CLAIMING a re-anchor while the code did not do it"*) — an **untrue provenance string is the one thing
 PD#2 forbids outright**, and a grep for the *pool* name would not have found most of these. **LESSON, generalising D-96's:** splitting
 a lumped pool is not done when the pool is split, and not done when the parameters anchored to its scale are re-anchored — **every
@@ -8308,9 +8325,17 @@ challenged D-45's premise (*"Real methanethiol comes **chiefly** from methionine
 MeSH to **demethiolation of methionine (via KMBA) during ACTIVE fermentation** and to **post-bottling anoxic formation** from
 thioacetates/disulfides, and **none names autolysis as chief**. **But the Process is NOT misattributed, and the first framing was
 wrong.** The lees route is real (practitioner literature: undisturbed lees generate H₂S/VSCs; enzymatic degradation of S compounds on
-gross lees), and **D-45's physics is sounder than the challenge**: MeSH boils at **~35 °C**, so fermentation-route thiol is largely
-**stripped by the CO₂ stream** — which is *precisely why* D-45 chose a **non-flux-linked** route, so the fault accumulates un-stripped
-post-dryness. **The defect was one word and one behaviour, not a route.** Resolution, sized to the evidence: the docstring **no longer
+gross lees), and **D-45's physics is sounder than the challenge**: methanethiol boils at **~6 °C** (CH₃SH — NIST), i.e. it is a **gas
+well below any fermentation temperature**, so fermentation-route thiol is largely **stripped by the CO₂ stream** — which is *precisely
+why* D-45 chose a **non-flux-linked** route, so the fault accumulates un-stripped post-dryness.
+**A DONE-CALL CATCH ON THIS ENTRY'S OWN EVIDENCE, AND THE SHARPEST IRONY IN IT.** This first shipped as *"MeSH boils at ~35 °C"* —
+**wrong: 35 °C is ETHANETHIOL's**, the sibling molecule named in the same sentence; methanethiol is 6.2 °C. The number came from a
+**summarising fetch** of PMC8310686 and was taken **at face value for a load-bearing claim** — in the very entry whose thesis is *"the
+evidence floor is the result."* **Tests, ruff and mypy cannot catch a wrong fact in prose**, and none did; only re-checking the
+constant against a chemistry reference did. **The argument SURVIVES AND STRENGTHENS** (at 6 °C the stripping case is *stronger*, and
+D-45's non-flux-linked choice *more* defensible) ⇒ a **precision fix, not a rethink** — but a wrong physical constant in shipped
+provenance is exactly the defect this project rejects, and it is recorded rather than quietly corrected. **The rule it earns: a
+summarising fetch is a SOURCE OF LEADS, never of CONSTANTS.** **The defect was one word and one behaviour, not a route.** Resolution, sized to the evidence: the docstring **no longer
 claims "chiefly"**, and the omission is recorded as a **SCOPE** with its two halves separated — *young non-sur-lie wine: the
 `mercaptans = 0` is **roughly defensible** (fermentation MeSH strips); **bottle-aged wine: the zero is NOT defensible*** (post-bottling
 formation makes MeSH regardless of lees — screwcap reduction is the classic case), which needs a **new Process over unmodelled

@@ -241,7 +241,7 @@ def total_carbon(
     # carries carbon and must be weighted or that draw would read as carbon destroyed. Booked at
     # methanethiol's carbon fraction (its representative species, the same one the Process draws
     # against), so total_carbon closes to machine precision through the transfer: the carbon into
-    # mercaptans equals the carbon out of amino_acids. Nitrogen-free (the arginine N is deaminated
+    # mercaptans equals the carbon out of methionine. Nitrogen-free (the methionine N is deaminated
     # to the N pool), so it is absent from total_nitrogen. On an undosed / autolysis-off run the
     # pool is empty and the Process disabled (constant 0 term). NOTE: the add_copper verb (D-45)
     # removes mercaptans as precipitated copper mercaptide — carbon that legitimately LEAVES the
@@ -279,7 +279,8 @@ def total_carbon(
     # must be weighted or the transfer would read as carbon destroyed. Booked at each aldehyde's own
     # carbon fraction (its representative species, the same one the Process deposits against), so
     # total_carbon closes to machine precision: the carbon into methional + phenylacetaldehyde + CO2
-    # equals the carbon out of amino_acids. Nitrogen-free (arginine N deaminated to N), so both are
+    # equals the carbon out of each aldehyde's own precursor. Nitrogen-free (that N is deaminated
+    # to the N pool), so both are
     # absent from total_nitrogen. On a reductive / amino-acid-free run the pools are empty and the
     # Process contributes zero (constant 0 terms).
     if "methional" in schema:
@@ -294,8 +295,9 @@ def total_carbon(
     # and
     # must be weighted or the transfer would read as carbon destroyed; booked at each product's own
     # carbon fraction (the same species the Process deposits against), so total_carbon closes to
-    # machine precision: carbon into the aldehydes + sotolon + CO2 equals carbon out of amino_acids.
-    # Nitrogen-free (arginine N deaminated to N), so absent from total_nitrogen. Empty (constant 0)
+    # machine precision: carbon into the aldehydes + sotolon + CO2 equals carbon out of each one's
+    # own precursor. Nitrogen-free (that N deaminated to the N pool), so absent from total_nitrogen.
+    # Empty (constant 0)
     # on any run where the Process is inert (no amino acids or no residual sugar).
     for _thermal_ald in ("2_methylbutanal", "3_methylbutanal", "2_methylpropanal", "sotolon"):
         if _thermal_ald in schema:

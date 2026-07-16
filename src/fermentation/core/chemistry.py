@@ -218,13 +218,13 @@ M_H2S = 2 * _M_H + 1 * _M_S
 #: Methanethiol (methyl mercaptan), CH3SH ≡ CH4S — the representative species for the lumped
 #: **mercaptans** (volatile thiol) pool (decision D-45). Methanethiol is the dominant "reduction"
 #: thiol (cooked-cabbage / rotten, sensory threshold ~2–3 µg/L; its onion/rubber sibling is
-#: ethanethiol), the honest single-species stand-in for the lumped pool — the arginine-for-
-#: ``amino_acids`` / p-coumaric-for-``hydroxycinnamics`` idiom (D-32/D-40). **Unlike H₂S it carries
+#: ethanethiol), the honest single-species stand-in for the pool — the
+#: p-coumaric-for-``hydroxycinnamics`` idiom (D-40). **Unlike H₂S it carries
 #: carbon** (one C), so — registered with 1 carbon below — the ``mercaptans`` pool sits on
 #: ``total_carbon`` (contrast the carbon-free ``h2s``/SO₂). Nitrogen-free: methanethiol has no N,
 #: so the autolytic-thiol Process (:class:`~fermentation.core.kinetics.mercaptans.\
-#: AutolyticMercaptan`) **deaminates** the arginine nitrogen it draws back to the ``N`` pool (D-33
-#: idiom). Carbon fraction 12.011/48.107 ≈ 0.2497.
+#: AutolyticMercaptan`) **deaminates** the **methionine** nitrogen it draws back to the ``N`` pool
+#: (the D-33 idiom; methionine since D-100). Carbon fraction 12.011/48.107 ≈ 0.2497.
 M_METHANETHIOL = 1 * _M_C + 4 * _M_H + 1 * _M_S
 #: L-arginine, C6H14N4O2 — the representative species for the assimilable **amino-acid**
 #: pool (decision D-32). Arginine is the *dominant* yeast-assimilable amino acid in grape
@@ -293,7 +293,7 @@ M_GLUCAN = 6 * _M_C + 10 * _M_H + 5 * _M_O
 #: (and POF+ *S. cerevisiae*) decarboxylate them to 4-vinylphenol/4-vinylguaiacol, which Brett
 #: then reduces to the 4-ethylphenol/4-ethylguaiacol "barnyard"/"clove" off-aromas. The two
 #: precursors and their two product chains are **lumped** (fork-2 choice, D-40): p-coumaric is the
-#: honest single-species stand-in (the dominant 4-EP branch), the arginine-for-``amino_acids`` /
+#: honest single-species stand-in (the dominant 4-EP branch), the
 #: succinic-for-``Byp`` idiom (D-16/D-32). Decarboxylation p-coumaric (9 C) → 4-vinylphenol (8 C)
 #: + CO2 (1 C) is carbon-closing mole-for-mole on the existing ledger (9 = 8 + 1), exactly like
 #: malic → lactic + CO2 (D-23). BOOKKEEPING CAVEAT: lumping p-coumaric for the (larger) ferulic
@@ -382,12 +382,12 @@ M_2_METHYLPROPANAL = 4 * _M_C + 8 * _M_H + 1 * _M_O
 #: marker of botrytized sweet wines (Sauternes), vin jaune, aged Port and Madeira (decision D-87).
 #: Unlike the four Strecker aldehydes it is **NOT** a decarboxylation product: its true formation is
 #: an aldol condensation of α-ketobutyrate (from threonine deamination) with acetaldehyde (and an
-#: ascorbate/sugar-degradation branch), so it carries **no** CO₂ term. Booked — like every product
-#: of
-#: the non-oxidative route — with its carbon drawn from the ``amino_acids`` (arginine) lump: exact
-#: on
-#: the ledger, approximate on provenance (2 of its 6 carbons are really acetaldehyde-derived; the
-#: acetaldehyde-coupled sotolon route is deferred). Nitrogen-free (deaminated), carbon-tracked.
+#: ascorbate/sugar-degradation branch), so it carries **no** CO₂ term. Its carbon is drawn from
+#: **threonine** — the amino acid its α-ketobutyrate really comes from (decision D-100; before that
+#: it was the ``amino_acids`` arginine lump, exact on the ledger but approximate on provenance).
+#: Still approximate in one respect the split did not fix: 2 of its 6 carbons are really
+#: acetaldehyde-derived, and the acetaldehyde-coupled sotolon route is deferred.
+#: Nitrogen-free (deaminated), carbon-tracked.
 M_SOTOLON = 6 * _M_C + 8 * _M_H + 3 * _M_O
 #: Melanoidin — the brown thermal-browning polymer of :class:`~fermentation.core.kinetics.aging.\
 #: Caramelization` (decision D-88), the non-oxidative sugar-only browning route (the O₂-independent
@@ -574,7 +574,7 @@ CARBON_ATOMS: dict[str, int] = {
     #: aldehydes carry ONE fewer carbon than their branched-chain amino acid (the carboxyl lost as
     #: CO₂, the D-75 decarboxylation): 2-methylbutanal (C5, from isoleucine C6), 3-methylbutanal
     #: (C5, from leucine C6), 2-methylpropanal (C4, from valine C5). Sotolon (C6) is a furanone, NOT
-    #: a decarboxylation product (no CO₂ term) — its carbon is booked from the arginine lump. All
+    #: a decarboxylation product (no CO₂ term) — its carbon is booked from THREONINE (D-100). All
     #: carbon-tracked (they sit on ``total_carbon``, the methional/phenylacetaldehyde idiom).
     "2_methylbutanal": 5,
     "3_methylbutanal": 5,
@@ -633,8 +633,8 @@ NITROGEN_ATOMS: dict[str, int] = {
     "citric_acid": 0,
     "sulfur_dioxide": 0,
     "hydrogen_sulfide": 0,
-    #: Methanethiol is nitrogen-free: the autolytic-thiol Process deaminates the arginine nitrogen
-    #: it draws back to the ``N`` pool, so the mercaptan itself carries none (decision D-45).
+    #: Methanethiol is nitrogen-free: the autolytic-thiol Process deaminates the methionine
+    #: nitrogen it draws back to the ``N`` pool, so the mercaptan itself carries none (D-45/D-100).
     "methanethiol": 0,
     "alpha_acetolactate": 0,
     "diacetyl": 0,

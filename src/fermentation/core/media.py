@@ -610,7 +610,8 @@ def wine_schema() -> StateSchema:
             "of methionine, the principal OXIDATIVE off-note of aged wine/stale beer (decision "
             "D-75). Produced-only: StreckerDegradation forms it as dissolved O₂ (via the phenol "
             "autoxidation quinones) oxidatively deaminates + decarboxylates amino acids; carbon "
-            "drawn from amino_acids (arginine stand-in), the nitrogen deaminated to N, one CO₂ "
+            "drawn from METHIONINE, its real precursor (D-100), the nitrogen deaminated to N, "
+            "one CO₂ "
             "released per aldehyde. Read by the D-67 OAV lens (threshold_methional_wine)",
         ),
         VarSpec(
@@ -751,7 +752,8 @@ def wine_schema() -> StateSchema:
     # NEW aroma pools MaillardStrecker produces from residual sugar + amino acids + heat with NO O₂
     # (the sweet-wine / Madeira / baked-wine suite). methional + phenylacetaldehyde (D-75, above)
     # are SHARED with this route — same molecules — so only these four are new. Carbon-bearing
-    # (booked from amino_acids as arginine, deaminated to N), so on total_carbon like the D-75 pair.
+    # (booked from each aldehyde's OWN precursor, D-100, deaminated to N), so on total_carbon like
+    # the D-75 pair.
     # Wine-only. Read by the D-67 OAV lens against their own thresholds (threshold_<pool>_wine).
     specs += [
         VarSpec(
@@ -761,7 +763,8 @@ def wine_schema() -> StateSchema:
             description="2-methylbutanal — the 'malty/almond' branched-chain Strecker aldehyde of "
             "isoleucine (decision D-87). Produced-only by MaillardStrecker: residual sugar forms "
             "α-dicarbonyls that deaminate + decarboxylate isoleucine WITH NO O₂ (the thermal "
-            "mirror of the D-75 oxidative route); carbon from amino_acids (arginine stand-in), "
+            "mirror of the D-75 oxidative route); carbon from ISOLEUCINE, its real precursor "
+            "(D-100), "
             "nitrogen deaminated to N, one CO₂ released. Read by the OAV lens "
             "(threshold_2_methylbutanal_wine)",
         ),
@@ -793,7 +796,8 @@ def wine_schema() -> StateSchema:
             "furanone marker of botrytized sweet wine (Sauternes), vin jaune, aged Port and "
             "Madeira (decision D-87). Produced-only by MaillardStrecker but NOT a decarboxylation "
             "Strecker aldehyde (a threonine/acetaldehyde aldol furanone), so it carries NO CO₂ "
-            "term; carbon booked from amino_acids (arginine lump; its 2 acetaldehyde-derived "
+            "term; carbon booked from THREONINE, its real precursor (D-100; its 2 "
+            "acetaldehyde-derived "
             "carbons lumped in). Trace by mass but potent. Read by the OAV lens "
             "(threshold_sotolon_wine)",
         ),
