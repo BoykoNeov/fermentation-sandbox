@@ -71,15 +71,29 @@ species scale — a *relative-depletion* measure, honest because it is labelled 
 Michaelis constants would be eight unsourced numbers wearing the costume of fidelity — the D-98
 trap, declined here for the same reason D-99 declined per-species activation energies.
 
-**The emergent anabolic/catabolic split (the D-100 finding).** Real must carries ~30-60 mg/L
-leucine, but wine makes ~150-250 mg/L isoamyl alcohol: **most higher alcohol is NOT from amino-acid
-catabolism** — it is synthesised de novo from sugar via the valine/leucine biosynthetic pathway.
-The lumped model could not know this; it let the re-route draw a fixed fraction of fusel carbon
-from a big arginine pool forever, which is nonsense (arginine does not make isoamyl alcohol). With
-the split, leucine's own gate throttles the re-route as leucine depletes, and the remaining fusel
-carbon stays on the sugar stand-in. **The anabolic/catabolic ratio is therefore emergent** — a
+**The emergent anabolic/catabolic split (the D-100 finding, SOURCED at D-103).** Real must carries
+~30-60 mg/L leucine, but wine makes ~150-250 mg/L isoamyl alcohol: **most higher alcohol is NOT from
+amino-acid catabolism** — it is synthesised de novo from sugar via the valine/leucine biosynthetic
+pathway. The lumped model could not know this; it let the re-route draw a fixed fraction of fusel
+carbon from a big arginine pool forever, which is nonsense (arginine does not make isoamyl alcohol).
+With the split, leucine's own gate throttles the re-route as leucine depletes, and the remaining
+fusel carbon stays on the sugar stand-in. **The anabolic/catabolic ratio is therefore emergent** — a
 consequence of the must spectrum and the fusel demand, not a fitted fraction. That is a fidelity
 gain the split delivers for free, and the mechanism by which the D-100 tripwire flips.
+
+D-100 made that argument by hand and **it holds**: it reasoned "leucine supplies only ~7% of the
+isoamyl carbon", the model gives **7.15%** at D-100's dose, and D-103 found the source D-100 never
+had — Rollero *et al.* 2017 measures **2-8%** by U-13C leucine labelling. The two independent
+isotope methods agree *qualitatively* (de novo dominates) and **disagree quantitatively**: Rollero's
+">90% ... from the carbon central metabolism" implies <10% catabolic, while the [U-13C]-glucose
+tracer's ">75% hexose derived" implies <25%. **Recorded as two bands, never averaged into one** —
+this model sits over the first and inside the second.
+
+**A SINK THIS MODULE DOES NOT HAVE (a real gap, deliberately not patched here).** The re-route is
+each precursor's *only* consumer, so **100% of consumed leucine is attributed to Ehrlich**. Real
+yeast incorporate much of it into **protein** — the anabolic sink. Every precursor here therefore
+disappears by the one route the model owns, whatever reality's split. Building it needs a sourced
+biomass amino-acid composition and touches the conservation ledger ⇒ its own beat, not a footnote.
 
 **Isolability (prime directive #3).** Every speciated slot defaults to 0, so an undosed run has
 every gate at exactly 0 and is byte-for-byte the validated core — the D-32 guarantee, unchanged.
@@ -278,12 +292,40 @@ def release_spectrum_nitrogen(
 
     **The DIRECTION is sourced; the MAGNITUDE is not — do not read the extreme as a prediction.**
     The model currently says a no-lees aged wine makes *essentially zero* branched-chain Strecker
-    aldehyde. That extreme is amplified by an unconstrained speculative parameter, not derived: the
-    re-route's catabolic fraction is a lumped estimate (~0.5 via the shared ``K_amino_acids`` gate)
-    while the literature catabolic contribution is nearer 20-50%, so this model drains the
-    precursors **harder than reality does**. Bounding that fraction is deferred (unsourced today —
-    the D-98 trap), and until it lands, "silent without lees" is *what the current re-route
-    fraction gives*, not a validated claim. The lees-enrichment direction stands on its own.
+    aldehyde. **D-103 corrects what D-100 wrote here.** D-100 claimed the re-route's catabolic
+    fraction was "a lumped estimate (~0.5 via the shared ``K_amino_acids`` gate)" against "a
+    literature contribution nearer 20-50%". Both numbers were wrong. Measured exactly (the
+    re-route is each precursor's only consumer, so the fraction is a state difference, not a
+    quadrature): it is **0.192** at D-100's own dose, and **0.21-0.33** at a realistic must
+    (leucine 30-60 mg/L) — never ~0.5, which needs ~5 g/L amino acids. And the "20-50%" was
+    **uncited**; the sourced contribution is **lower**, so that band would have *acquitted* a
+    model that should be convicted (see D-103 for why an uncited number can no more acquit than
+    convict).
+
+    **There is no single fraction to bound — the defect is this gate's SHAPE (decision D-103).**
+    Rollero *et al.* 2017 (Microb. Biotechnol. 10:1649-1662, U-13C leucine/valine in synthetic
+    must) measures the catabolic contribution as **uniformly low across species** — isoamyl
+    alcohol **2-8%**, isobutanol **5-15%**, ">90% of the acids and higher alcohols ... derived
+    from intermediates produced by the carbon central metabolism". This gate instead spans
+    **~8% (isoamyl) to ~82-93% (propanol)** — an 11x spread set by each alcohol's *demand/supply*
+    ratio, so it over-attributes precisely the MINOR alcohols whose precursor is abundant relative
+    to their small carbon draw. ``K_amino_acids`` is one shared scalar (assimilation/MLF/Brett
+    read it too) and **cannot** reshape a per-species spread ⇒ there was never a knob here.
+
+    **What the gate DOES earn, and it is not nothing:** both Rollero trends are reproduced — the
+    fraction *rises with nitrogen* ("increased with the initial nitrogen content") and *falls as
+    precursors deplete* ("enrichments decreased throughout the fermentation process ... as the
+    exogenous amino acids were depleted"). And on the compound carrying ~53% of the fusel carbon
+    the model is close: isoamyl **8.0-13.4%** vs a measured **2-8%**. That is why the *aggregate*
+    over-attribution looks mild (14-23.5% over Rollero's measured pair) — isoamyl's weight masks
+    the per-species defect. **The aggregate is the misleading statistic here; the shape is the
+    finding.**
+
+    "Silent without lees" is **still not validated, and D-103 does not settle it either way**: it
+    is an output of this same gate (phenylalanine exhausts *because* the overstated 2-PE draw
+    takes all its carbon), so a correct lower draw might leave residual precursor. In reality
+    phenylalanine does exhaust — but via protein synthesis, a sink this model does not have
+    (below). Right outcome, wrong route, unresolved. The lees-enrichment direction stands alone.
 
     **DOCUMENTED LIMITATION (decision D-100):** the release uses the **must** spectrum, because a
     sourced yeast-**autolysate** amino-acid spectrum is not in hand. Autolysate is protein

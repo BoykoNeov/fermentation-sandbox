@@ -8189,6 +8189,19 @@ the literature 10–100 µg/L band. **The DIRECTION is sourced; the MAGNITUDE is
 deferred (unsourced today — the D-98 trap again). The `< 1e-9` assertion is recorded as a **tripwire on current behaviour**: if the
 fraction is ever bounded, that test should move, and moving it is the signal the magnitude got honest — not a regression.
 
+**[NUMBERS CORRECTED in D-103 — the paragraph above is wrong twice, and its evidence cannot test its claim.** (1) "~0.5 via the
+shared gate" was **never measured**: measured exactly (the re-route is each precursor's only consumer ⇒ the fraction is a state
+difference) it is **0.192** at this entry's own dose and **0.21–0.33** at a realistic must; ~0.5 needs ~5 g/L amino acids, ~3× a real
+must. (2) "a literature contribution nearer 20–50%" is **uncited** — it traces only to four restatements of this sentence — and the
+sourced contribution is **LOWER** (Rollero 2017, U-¹³C leu/val: isoamyl **2–8%**, isobutanol **5–15%**, ">90% … from the carbon
+central metabolism") ⇒ **20–50% would have ACQUITTED this model, not convicted it.** (3) The 1631 µg/L corroboration is an **ON-LEES**
+value, and on lees autolysis refills phenylalanine to ~54 mg/L ⇒ **the pool ends FULL and nothing throttled**: it measures the one run
+where the alleged over-drain is absent. The **CONCLUSION survives** — the model does over-attribute to catabolism — but reached
+through a wrong model value and a band pointing the other way. There is **no single fraction to bound** (per-species spread ~8%
+isoamyl → ~82–93% propanol; reality is uniformly low) ⇒ **D-103 turns no knob and the `< 1e-9` tripwire correctly does NOT move.**
+Finding (i)'s hand mass-balance — "leucine supplies only ~7% of the isoamyl carbon" — is **CONFIRMED and now SOURCED** (model 7.15%
+vs Rollero 2–8%). See **D-103**.]**
+
 **THE TRIPWIRE FLIPPED.** sotolon OAV **0 → 3.22** with the re-route ON. The D-99 known-limitation test is deleted per its own
 instructions, and — the advisor's call — **replaced with a positive assertion** so its coverage does not vanish with the pathology,
 plus a second test pinning the autolysis dependency. **Methionine, flagged as the highest-risk precursor (scarcest at 0.005, three
@@ -8586,3 +8599,219 @@ ambiguity by correspondence with the authors (the only route left to halving E_a
 primary sources); **retire the false `mercaptans` lump** (`→methanethiol`, `lumped=False`); **derive `f_methional`** (blocked);
 sourced yeast-autolysate spectrum; the isoamyl-acetate carbon re-route; per-ester `dH`/`E_a` (blocked); masking (blocked on `cosα`);
 the `oav` → `magnitude` rename.
+
+---
+
+## D-103 — the catabolic fraction could not be bounded because it is not a number: the item was malformed, D-100's two figures were both wrong, and an uncited band nearly ACQUITTED the model
+
+**Status:** documentation + provenance ONLY. No Process, state slot, parameter or output changed.
+**1116 passed, UNCHANGED — and the unchanged tests are the receipt** (see "the tripwire that
+correctly did not move"). Benchmarks **16/16** (`pytest -m benchmark`: 16 passed, 1100 deselected —
+the 16 are *inside* the 1116, not additional to it). Ruff + mypy clean.
+
+**[A self-inflicted instance of this entry's own lesson, recorded rather than quietly fixed.** I
+first wrote *"1099 + 21 passed"* here — **carried over from a status note, never measured.** The
+suite is **1116**; 1099 + 21 = 1120, and no run ever produced either number. **In the entry whose
+thesis is "an unsourced number cannot support a claim", I sourced my own receipt to memory.** The
+receipt for a documentation-only beat is the *one* number that must be real, and it was the number
+I did not check. **Only running it settled it** — the sixth time in this project a figure survived
+reasoning and died to a five-second command.]**
+
+The standing "highest-value follow-up" since D-100 — *bound the D-33 re-route's catabolic fraction*
+— is **malformed**, in the D-101 shape. There is no fraction to bound: the quantity is an **11×
+per-species spread** (~8% isoamyl → ~82–93% propanol) that also **moves with dose** (0.12 → 0.53
+across 0.4–5.0 g/L). "The catabolic fraction" does not name one thing. And `K_amino_acids` — the
+only knob — is **one shared scalar** (assimilation / MLF / Brett read it too) that cannot reshape a
+per-species spread even in principle. **There was never a lever here.**
+
+### THE MEASUREMENT — and the quadrature error conservation caught
+
+D-100 asserted "~0.5 **via the shared gate**". That is a *static read of a gate*, not a measurement.
+The gate at t0 is ~0.89, not 0.5; the quantity that matters is the integrated `Σ g·F / Σ F`.
+
+**Exactly measurable, as it turns out — no quadrature needed.** The re-route is the **sole**
+consumer of every precursor and the producer the **sole** source of every alcohol over a
+ferment-only run (verified, not assumed) ⇒ the fraction is a **state difference**:
+`(aa₀ − aa_end)·c_aa / ((alc_end − alc₀)·c_alc)`. **My first probe did use quadrature** — trapezoid
+over linearly-interpolated states — and **overstated the draw 1.3–3.5×**, booking more carbon out of
+valine than valine ever held. **The mass-balance cross-check caught it**; a nonlinear rate evaluated
+on interpolated states does not survive contact with conservation. *The cheap check that would have
+been skipped is the one that worked.*
+
+| | model @ D-100's dose (0.8) | model @ realistic must (leucine 30–60 mg/L) |
+|---|---|---|
+| propanol | 0.775 | 0.82–0.93 |
+| isobutanol | 0.423 | 0.47–0.79 |
+| 2-phenylethanol | 0.387 | 0.43–0.73 |
+| active amyl | 0.115 | 0.13–0.22 |
+| **isoamyl** | **0.072** | **0.080–0.134** |
+| **TOTAL** | **0.192** | **0.21–0.33** |
+
+**~0.5 needs ≈5 g/L amino acids — roughly 3× a real must.** It was never the model's value.
+
+### THE SOURCE — Rollero et al. 2017 (Microb. Biotechnol. 10:1649–1662, PMC5658611, open)
+
+U-¹³C₅ L-valine and U-¹³C₆ L-leucine, synthetic must (Bely 1990), N = 70 / 250 / 425 mg/L.
+**Abstract, verbatim:** *"However, more than 90% of the acids and higher alcohols (and their acetate
+ester derivatives) were derived from intermediates produced by the carbon central metabolism (CCM)."*
+**Results, verbatim:** *"Low isotopic enrichments of isobutanol (between 5% and 15%) and isoamyl
+alcohol (between 2% and 8%) were found in the presence of labelled valine and leucine irrespective
+of the initial nitrogen and phytosterol content… These enrichments decreased throughout the
+fermentation process… indicating a strong contribution of the CCM to the formation of the ketoacid
+precursors of higher alcohols, which increased as the exogenous amino acids were depleted."*
+
+**Two sentences that look contradictory and are not** — the second says enrichment *"increased with
+the initial nitrogen content"*. Reconciled: the enrichments stay in a **low band** irrespective of
+conditions; **within** that band they rise with N. Recorded because the apparent contradiction is
+exactly what a summarising fetch mangles.
+
+### THE FETCH HAZARD, LIVE — and why it did not bite
+
+D-101's rule (*"a summarising fetch is a source of LEADS, never of CONSTANTS"*) has a corollary this
+entry discovered the hard way: **`WebFetch` is itself a summarising layer.** Two fetches of the same
+paper returned **contradictory** claims, and one attached the "irrespective of nitrogen" clause to
+isobutanol/isoamyl — which, taken at face value, would have been a **structural refutation of the
+gate's shape** (the model's fraction rises steeply with dose). Only pulling the **full-text XML** and
+reading both sentences in place showed both are real, in the same section, and reconcilable — and
+that the model's direction is **corroborated, not refuted**. *I was one step from headlining a
+refutation that the paper does not contain.* **Fetching a primary source is not reading it.**
+
+### THE COMPARISON — and why the AGGREGATE is the misleading statistic
+
+| alcohol | model @ realistic must | measured | verdict |
+|---|---|---|---|
+| **isoamyl** (≈53% of fusel carbon) | 8.0–13.4% | **2–8%** (Rollero) | at/just above band — **close** |
+| isobutanol | 47–79% | **5–15%** (Rollero) | **clearly over** (~4–5× at matched valine) |
+| 2-phenylethanol | 43–73% | ≤25% (glucose tracer only) | over |
+| propanol | 82–93% | **no data** | unsourceable |
+| aggregate, Rollero-measured pair | **14.0–23.5%** | <10% implied | mildly over |
+
+**Two isotope methods, converging QUALITATIVELY and diverging QUANTITATIVELY — recorded as two
+bands, never averaged.** Rollero's ">90% CCM" implies **<10%** catabolic; the independent
+[U-¹³C]-glucose tracer (PMC4922003: isoamyl, isobutyl, β-phenylethanol *">75% hexose derived"*)
+implies **<25%**. The model sits **over the first and inside the second**. Both agree on the only
+thing this beat needs: **de novo dominates; catabolism is minor.**
+
+**The aggregate looks mild because the compound the model gets RIGHT carries most of the carbon.**
+Isoamyl is ~53% of fusel carbon at ~8%, so it drags the weighted mean down and **masks** the
+per-species defect. An aggregate over all five would additionally mix measured with unmeasured
+compounds. ⇒ **The aggregate magnitude is secondary and source-dependent; the SHAPE is the finding.**
+
+### THE REAL DEFECT IS THE GATE'S SHAPE — which no scalar can fix
+
+**Reality:** the catabolic contribution is **uniformly low (2–15%) across species** — CCM dominates
+the α-ketoacid pool for *every* higher alcohol.
+**This model:** **~8% → ~82–93%**, a spread set by each alcohol's **demand/supply ratio**. The
+availability gate makes a **minor** alcohol overwhelmingly catabolic *merely because its precursor is
+abundant relative to its small carbon draw*. Isobutanol's draw is ~⅕ of isoamyl's against a
+comparable valine pool ⇒ its gate never throttles ⇒ 47–79% where reality says 5–15%.
+
+**A form problem, not a magnitude** — the D-99 tell repeating (*"dosing more amino acids makes it
+worse"*). No value of `K_amino_acids` yields *uniformly low across species*, because the spread is
+generated by the demand/supply ratio the gate is a function of, not by the gate's scale.
+
+### WHAT THE GATE DOES EARN — both Rollero trends, unprompted
+
+Not nothing, and stated because a correction beat that only convicts is as incomplete as D-100 was:
+* the fraction **rises with nitrogen** — Rollero: *"increased with the initial nitrogen content"*; ✓
+* the fraction **falls as precursors deplete** — Rollero: *"enrichments decreased throughout the
+  fermentation process … as the exogenous amino acids were depleted"*; ✓
+* **D-100's finding (i) is CONFIRMED and now SOURCED.** Its hand mass-balance — *"leucine supplies
+  only ~7% of the isoamyl carbon"* — gives **7.15%** in the model against Rollero's measured
+  **2–8%**. **D-100 got the physics argument right and then convicted the model on a number it never
+  measured.** (Not a self-contradiction: (i) is isoamyl-specific, "~0.5" is the overall fraction —
+  different quantities. For the overall to reach 0.5 the other four alcohols would all need
+  **~97.3%** catabolic, impossible for pools that also synthesise de novo.)
+
+### THE LESSON — an uncited number cannot ACQUIT any more than it can CONVICT
+
+**The centre of this entry, and it is a correction of my own correction.** Having established that
+D-100's "20–50%" was **uncited** (it traces to exactly four restatements of D-100's own prose and no
+source), I then concluded: *the model sits at 0.21–0.33, inside 20–50%, therefore "drains harder than
+reality" is unsupported.* **That acquittal is invalid** — I refused the band the power to convict and
+in the same breath let it acquit. **The advisor endorsed this framing explicitly** (*"the premise is
+unsupported regardless of whether 20–50% is real"*) and later **retracted it**.
+
+**The band was not merely uncited — it was wrong in the PERMISSIVE direction.** The sourced
+contribution is **<10–25%**, so **20–50% would have acquitted a model that should be convicted.** The
+owner's call to **source before landing** is the only reason the false acquittal did not ship.
+
+**And D-100's CONCLUSION was right all along** — the model *does* over-attribute to catabolism —
+reached through a **wrong model value** (~0.5 vs 0.192) and a **band pointing the other way**.
+**A right conclusion is not evidence of a sound process** — the D-102 lesson, second occurrence,
+now in *both* directions in one beat: D-100 was **right for wrong reasons**, and I was **wrong for
+plausible ones**.
+
+### THE TRIPWIRE THAT CORRECTLY DID NOT MOVE
+
+D-100 prophesied: *"if the fraction is ever bounded, that test should move, and moving it is the
+signal."* **It is not bounded, no knob turned, and `< 1e-9` stands unchanged.** Recorded loudly in
+the test's own docstring so a future reader cannot read the unmoved test as contradicting D-103:
+**for a documentation-only correction, the UNCHANGED test IS the receipt** (the D-101 pattern).
+What *would* move it is the missing anabolic sink or a re-formed gate — both their own beats.
+
+### THE CITED CORROBORATION COULD NOT TEST THE CLAIM
+
+D-100 offered phenylacetaldehyde **1631 µg/L** (above the literature 10–100 band) as corroborating
+over-draining. It is an **ON-LEES** value — and **on lees, autolysis refills phenylalanine to
+~54 mg/L**: the pool ends **FULL**, nothing throttled. **It measures the one run where the alleged
+fault is absent.** (The direction is backwards too: over-draining would make that aldehyde **LOW**;
+the evidence offered was that it is **HIGH**. Two opposite-signed anomalies bundled as one — D-102's
+*"the tidy story was tidy because it was incomplete"*, in a new costume.)
+
+### THE SWEEP — and the trap that did not bite this time
+
+The false claim lives at **four** sites (this archive, `milestone-3-plan.md`,
+`amino_acid_pools.py`, `test_aging_scenario.py`), all corrected **in place**. Per D-101, the
+`20-50` grep was **filtered by construction** ⇒ re-run **unfiltered** on `catabolic` / `drain` /
+`harder than reality`, which surfaced two files the filtered sweep never touched
+(`conservation.py`, `test_kinetics_byproducts.py`). **Both use "catabolic" correctly and
+unrelatedly** ⇒ four is the complete set. **The D-101 trap did not bite — but only the unfiltered
+sweep could prove that**, which is the whole point of the rule.
+
+### A SINK THIS MODEL DOES NOT HAVE (surfaced here, deliberately NOT patched)
+
+The re-route is each precursor's **only** consumer ⇒ **100% of consumed leucine is attributed to
+Ehrlich**. Real yeast incorporate much of it into **protein**. Every precursor therefore disappears
+by the one route the model owns, whatever reality's split — and this, not the carbon fraction, is
+the likeliest reason the per-species shape is wrong. Needs a sourced biomass amino-acid composition
+and touches the conservation ledger ⇒ **its own beat.**
+
+### WHAT THIS DOES *NOT* SETTLE
+
+**"Silent without lees" is untouched, and D-103 does not resolve it either way.** It is tempting to
+say it is driven by *exhaustion*, not the fraction — **too clean**: both are outputs of the same
+gate (phenylalanine exhausts *because* the overstated 2-PE draw takes all its carbon), so a correct
+lower draw might leave residual precursor feeding aging Strecker without lees. In reality
+phenylalanine **does** exhaust — but via **protein synthesis**, the sink above. **Right outcome,
+wrong route; unresolved and deferred.**
+
+**Commensurability, flagged and NOT leaned on.** Rollero's medium is **synthetic** must (leu/val at
+~1.3% of assimilable N vs this model's spectrum at ~3.2% of mass) ⇒ band-vs-band, not
+apples-to-apples. The paper's own framing is that the two routes **converge at the shared
+α-ketoacid** and are not cleanly separable *mechanistically*; for pure **carbon bookkeeping** (what
+this model does) a U-¹³C-leucine enrichment in isoamyl *is* "fraction of isoamyl carbon from
+leucine" — but the verbatim enrichment **definition for volatiles** was not extracted. ⇒ **No
+multiplier is hung on the precise enrichment value.** The conviction rests only on the qualitative
+floor both methods and D-100's own finding (i) agree on: **de novo dominates, catabolism is minor.**
+
+### LESSONS
+
+(i) **An uncited number cannot acquit any more than it can convict** — the symmetric half of D-101,
+and I broke it in the act of enforcing it. (ii) **A right conclusion is not evidence of a sound
+process** (D-102), demonstrated in both directions at once. (iii) **Fetching a primary source is not
+reading it** — the fetch layer summarises, and it contradicted itself on the sentence that mattered.
+(iv) **Check the cheap conservation law before trusting your own integral** — it caught a 3.5×
+quadrature error in one line. (v) **An aggregate can hide the defect it averages over** — here the
+one compound the model gets right carries the most carbon. (vi) **"Bound the fraction" presumed a
+number; measuring first dissolved the item** — the D-97 probe lesson: the model was right there to
+be asked.
+
+**Next:** the **anabolic/protein sink** for the speciated precursors (this beat's own discovery, and
+now the highest-value item it creates — it likely *is* the per-species shape defect); the **DMS
+closure-permeation** axis (well-formed: sourced at 12%, needs an OTR-coupled sink); a
+**variety-specific DMSp** (the 8× band); resolve D-102's 3-vs-4-month ambiguity by correspondence
+with the authors; the **bottle-aged MeSH route** (blocked on primary sources); **retire the false
+`mercaptans` lump** (`→methanethiol`, `lumped=False`); **derive `f_methional`** (blocked); sourced
+yeast-autolysate spectrum; the isoamyl-acetate carbon re-route; per-ester `dH`/`E_a` (blocked);
+masking (blocked on `cosα`); the `oav` → `magnitude` rename.

@@ -1017,14 +1017,28 @@ def test_thermal_aroma_from_drained_precursors_requires_autolysis():
     content was zero.
 
     THE DIRECTION IS SOURCED; THE MAGNITUDE ASSERTED HERE IS NOT. The `< 1e-9` bound below is
-    **what the current speculative re-route fraction gives**, NOT a validated prediction. The
-    re-route's catabolic fraction is a lumped estimate (~0.5, via the shared `K_amino_acids` gate)
-    against a literature catabolic contribution nearer 20-50%, so this model drains the precursors
-    HARDER than reality — corroborated by the companion oxidative scenario landing
-    phenylacetaldehyde above the literature 10-100 ug/L band when lees are on. Bounding that
-    fraction is deferred (unsourced today — the D-98 trap). Read these bounds as a TRIPWIRE on
-    current behaviour: if the re-route fraction is ever bounded, this test should move, and moving
-    it is the signal that the magnitude got more honest — not a regression.
+    **what the current speculative re-route fraction gives**, NOT a validated prediction.
+
+    D-103 CORRECTS THE NUMBERS D-100 PUT IN THIS DOCSTRING, AND THIS TEST CORRECTLY DOES NOT MOVE.
+    D-100 wrote that the catabolic fraction was "~0.5 via the shared `K_amino_acids` gate" against
+    "a literature catabolic contribution nearer 20-50%". Measured exactly, it is **0.192** at this
+    test's own dose and 0.21-0.33 at a realistic must; the 20-50% was **uncited**, and the sourced
+    contribution is LOWER still (Rollero 2017: isoamyl 2-8%, isobutanol 5-15% by U-13C labelling)
+    — so that band would have *acquitted* this model rather than convicting it.
+
+    THE CITED CORROBORATION COULD NOT TEST THE CLAIM. The phenylacetaldehyde figure was taken from
+    an ON-LEES run — and on lees autolysis refills phenylalanine to ~54 mg/L, so the pool ends
+    FULL and nothing throttled. It measured the one run where the alleged over-drain is absent.
+    (The direction is backwards too: over-draining would make that aldehyde LOW, and the evidence
+    offered was that it is HIGH.)
+
+    D-100 prophesied "if the re-route fraction is ever bounded, this test should move". **It is
+    not bounded and this test has not moved** — D-103 turns no knob, because there is no single
+    fraction to bound (the real defect is the gate's per-species SHAPE: ~8% for isoamyl vs ~82-93%
+    for propanol, where reality is uniformly low) and `K_amino_acids` is one shared scalar that
+    cannot reshape it. Do NOT read this test's unchanged bound as contradicting D-103 — an
+    unchanged test IS the receipt for a documentation-only correction. What would move it is the
+    missing anabolic/protein sink, or a re-formed gate; both are their own beats.
     """
 
     def sweet(autolysis: float | None):

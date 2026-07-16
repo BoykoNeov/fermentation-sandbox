@@ -396,7 +396,11 @@
 > such** (advisor's call, the one that matters at this project's bar): the reroute's catabolic fraction is a ~0.5 lumped guess
 > vs a literature 20-50%, so the model drains precursors HARDER than reality and "silent without lees" is what that fraction
 > gives, not a prediction — the `<1e-9` bound is a TRIPWIRE on current behaviour, and moving it when the fraction is bounded
-> is the SIGNAL, not a regression. THE TRIPWIRE FLIPPED: sotolon OAV 0 → 3.22 with the reroute ON; the D-99 limitation test
+> is the SIGNAL, not a regression. **[D-103 CORRECTS THIS SENTENCE: both numbers were wrong. Measured exactly the fraction is
+> 0.192 at this dose (never ~0.5); the "20-50%" was UNCITED and the sourced band is LOWER (Rollero 2017: isoamyl 2-8%,
+> isobutanol 5-15%) ⇒ 20-50% would have ACQUITTED the model. The conclusion "drains harder than reality" is TRUE but every
+> number under it was wrong, and the defect is the gate's per-species SHAPE, not a fraction to bound ⇒ NO knob, and the
+> `<1e-9` tripwire correctly does NOT move. See D-103.]** THE TRIPWIRE FLIPPED: sotolon OAV 0 → 3.22 with the reroute ON; the D-99 limitation test
 > deleted per its own instructions and REPLACED with a positive assertion (coverage preserved) + one pinning the autolysis
 > dependency. **Methionine — flagged as highest-risk (scarcest, 3 consumers) — was the SAFEST, structurally: no fusel eats
 > it** (methional held at OAV 60); the casualty was PHENYLALANINE. *Fourth time a risk call landed on the wrong molecule and
