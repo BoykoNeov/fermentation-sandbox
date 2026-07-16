@@ -9356,7 +9356,10 @@ nothing moves at all):
 | **methional** | 94.7 µg/L | 94.8 µg/L | **+0.083%** |
 
 **Both are products of the SAME D-75 oxidative Strecker route.** D-106 collapses one and leaves the other dead
-flat. The only reason for the difference is the D-105 finding: **methionine has no fermentation-phase consumer**,
+flat. (Methional's `+0.083%` is not a residual draw — **methionine's pool is measured unchanged**, 0.0398643 →
+0.0398642. It is a second-order *trajectory* shift: the sink's altered sugar/nitrogen refund perturbs the whole
+ferment by a hair. That it is trajectory and not pool is what makes the asymmetry below **sharper**, not weaker.)
+The only reason for the difference is the D-105 finding: **methionine has no fermentation-phase consumer**,
 so the Ehrlich re-route cannot touch it and neither can this fix. D-106 does not *create* that artifact — it
 **exposes** it, by stripping away the phenylalanine residual that was masking it. Before, both aldehydes were
 present and the model looked self-consistent; after, the model says *a no-lees heavily-dosed wine makes methional
