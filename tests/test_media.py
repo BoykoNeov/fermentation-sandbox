@@ -48,7 +48,9 @@ WINE_BRETT_SLOTS = (
 WINE_MERCAPTAN_SLOTS = ("mercaptans",)
 # The excreted keto-acid overflow pools (decisions D-49, D-50), appended last: pyruvate then
 # alpha-ketoglutarate, the second- and third-strongest SO₂-binding carbonyls after acetaldehyde.
-WINE_KETO_ACID_SLOTS = ("pyruvate", "alpha_ketoglutarate")
+# alpha_ketobutyrate (D-107) is the THIRD, and the only one with a consumer: it is the C4 half of
+# sotolon's aldol, and the C4 co-product the D-45 mercaptan had been discarding.
+WINE_KETO_ACID_SLOTS = ("pyruvate", "alpha_ketoglutarate", "alpha_ketobutyrate")
 # The two Strecker-aldehyde aroma pools (decision D-75), appended last: methional (potato) and
 # phenylacetaldehyde (honey), the oxidative-aging markers StreckerDegradation produces from amino
 # acids. Wine-only (the Process reads wine-only amino_acids and deaminates to N).
@@ -219,7 +221,7 @@ def test_wine_schema_has_single_sugar_slot():
     # sulfur pool that is NOT autolysis-gated — DMS accumulates by spontaneous hydrolysis during
     # bottle aging, lees or no lees, which is why it carries its own anchor and needed no
     # ratio-split, i.e. the D-96 linchpin `mercaptans` could not satisfy at D-101)
-    assert schema.size == 83
+    assert schema.size == 84
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -464,6 +466,12 @@ AUTOLYSIS_PROCESSES = {"yeast_autolysis", "autolytic_hydrogen_sulfide", "autolyt
 KETO_ACID_PROCESSES = {
     "pyruvate_excretion", "pyruvate_reassimilation",
     "alpha_kg_excretion", "alpha_kg_reassimilation",
+    # The keto-acid NODE (D-107): alpha-ketobutyrate. Same excreted-pool structure as its two
+    # siblings, but the only one with a CONSUMER (sotolon_aldol_condensation eats its frozen
+    # residual in the bottle) and a second PRODUCER (the D-45 mercaptan books its C4 co-product
+    # here). Its excretion is also the only one whose carbon is not pure sugar: it splits
+    # threonine:sugar by threonine's depletion gate (Crepin's 19/81).
+    "alpha_kb_excretion", "alpha_kb_reassimilation",
 }  # fmt: skip
 # Hop bittering (decision D-64) is wired into the BEER medium only (wine has no iso_alpha slot).
 # The boil isomerization is a compile-seam calc, not a Process; the only dynamic member is the
@@ -536,7 +544,12 @@ WINE_TANNIN_ETHYL_TANNIN_PROCESSES = {"tannin_ethyl_tannin_condensation"}
 # acids to the sweet-wine/Madeira aldehyde suite; wine-only (reads amino_acids, deaminates to N),
 # additive with the D-75 route over the shared amino_acids limiting reagent. Same compile-seam
 # disable / begin_aging re-enable.
-WINE_MAILLARD_PROCESSES = {"maillard_strecker"}
+# sotolon_aldol_condensation (D-107) rides the same tuple and gate but is NOT a Strecker route: it
+# is the purely chemical aldol of alpha-ketobutyrate + acetaldehyde (Pham et al. 1995) that used to
+# ride inside maillard_strecker carrying two exception flags. It is sugar-INDEPENDENT (an aldol
+# needs its two substrates, not a dicarbonyl), which is why dry white wines make sotolon too --
+# Pons et al. 2010's premox marker.
+WINE_MAILLARD_PROCESSES = {"maillard_strecker", "sotolon_aldol_condensation"}
 # MEDIUM-AGNOSTIC (WINE + BEER), NON-oxidative THERMAL browning (decision D-88; extended to beer
 # D-90): caramelization — the O₂-independent thermal mirror of phenolic_browning (D-74). Residual
 # sugar browns to the on-ledger melanoidin carbon-park by heat with no O₂, raising the shared A420

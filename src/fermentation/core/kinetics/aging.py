@@ -224,6 +224,7 @@ from fermentation.core.chemistry import (
     M_2_METHYLPROPANAL,
     M_3_METHYLBUTANAL,
     M_ACETALDEHYDE,
+    M_ALPHA_KETOBUTYRATE,
     M_CO2,
     M_ETHANOL,
     M_METHIONAL,
@@ -247,7 +248,6 @@ from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import (
     HYDROLYSING_ESTER,
     ISOAMYL_ALCOHOL,
-    draw_carbon_from_sugar,
 )
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -328,70 +328,55 @@ _STRECKER_ROUTES: tuple[tuple[str, str | None, str], ...] = (
 #: bookkeeping must route, not an off-ledger emission (D-75).
 _CO2_PER_STRECKER_ALDEHYDE = 1.0
 
-#: The six products of the **non-oxidative THERMAL** Strecker route (decision D-87, the sweet-wine /
-#: Madeira suite :class:`MaillardStrecker` produces) and their per-product config: ``(pool name,
-#: molar mass, composition-weight parameter, decarboxylates?)``. The pool name is also the
+#: The **five** products of the **non-oxidative THERMAL** Strecker route (decision D-87, the
+#: sweet-wine / Madeira suite :class:`MaillardStrecker` produces) and their per-product config:
+#: ``(pool name, molar mass, composition-weight parameter, precursor)``. The pool name is also the
 #: :mod:`chemistry` species key (so ``carbon_mass_fraction`` weights the carbon draw +
-#: ``total_carbon``
-#: on one species, D-19). **The ``decarboxylates`` flag is load-bearing** (advisor's must-catch):
-#: the
-#: five true Strecker aldehydes each release **1 mol CO₂** (the amino acid's carboxyl carbon), but
-#: **sotolon does not** (a threonine/acetaldehyde aldol furanone, not a decarboxylation product).
-#: Each
-#: precursor's draw is sized to ITS OWN product carbon (§ derivatives, D-100), so ``total_carbon``
-#: closes for
-#: **any** CO₂ attribution — a mis-keyed CO₂ term would pass every conservation test silently — so
-#: the
-#: CO₂ is keyed to these flags explicitly, and the produced µg/L levels are anchored to literature
-#: (the D-75 follow-up fidelity lesson). Two are **shared** with the D-75 oxidative route (same
-#: molecules, same pools/thresholds); four are D-87-only.
+#: ``total_carbon`` on one species, D-19). Each precursor's draw is sized to ITS OWN product carbon
+#: (§ derivatives, D-100), and each releases **1 mol CO₂** (the amino acid's own carboxyl carbon).
+#: ``total_carbon`` closes for **any** CO₂ attribution — a mis-keyed CO₂ term would pass every
+#: conservation test silently — so the produced µg/L levels are anchored to literature (the D-75
+#: follow-up fidelity lesson) and the 1:1 stoichiometry is pinned by a *driven* test (D-105/D-106).
+#: Two are **shared** with the D-75 oxidative route (same molecules, same pools/thresholds); three
+#: are D-87-only.
+#:
 #: **``precursor`` became load-bearing at D-100**: each product's carbon is drawn from the amino
 #: acid it is actually made from, not from the lumped arginine pool. The Strecker map is the same
 #: one the Ehrlich fusels read (leucine→3-methylbutanal as leucine→isoamyl alcohol), which is
-#: exactly why the two routes compete for real. **sotolon's threonine is the load-bearing entry**:
-#: it is not a Strecker aldehyde at all but a threonine/acetaldehyde aldol furanone (hence
-#: ``decarboxylates=False``), and threonine is also propanol's Ehrlich precursor — so the
-#: propanol-vs-sotolon competition is genuine chemistry over one molecule. (Scope, unchanged from
-#: D-87: sotolon's 2 acetaldehyde-derived carbons are lumped into the threonine draw; the
-#: acetaldehyde-coupled route stays deferred.)
+#: exactly why the two routes compete for real.
 #:
-#: **The ``de_novo`` flag is the second load-bearing one (decision D-104), and it is sotolon's
-#: alone.** The five true Strecker aldehydes are degradations *of the amino acid itself* — no
-#: leucine, no 3-methylbutanal — so their rate is rightly gated on their precursor and all their
-#: carbon comes from it. **Sotolon is not.** It is an aldol furanone of **2-ketobutyrate** +
-#: acetaldehyde, and Crépin *et al.* 2017 measures 2-ketobutyrate's source as intracellular
-#: threonine that is **"19% consumed threonine (labeled fraction) and 81% newly synthesized"** —
-#: i.e. de-novo-dominated. So gating sotolon on the *must* threonine pool made a wine with no
-#: residual threonine produce **no sotolon at all**, which is false: aged Sauternes and Tokaji are
-#: defined by it.
+#: **THIS TABLE HAD SIX ROWS AND TWO FLAGS UNTIL D-107, AND SOTOLON WAS BOTH OF THEM.** ``sotolon``
+#: carried ``decarboxylates=False`` (it is not a decarboxylation product) *and* ``de_novo=True``
+#: (its
+#: carbon is not its precursor's), and D-104 wrote that "the two flags travel together for the same
+#: underlying reason: sotolon is not made the way the other five are". That reason was right and the
+#: conclusion it licensed was too small: sotolon is not a Strecker degradation **at all** — it is an
+#: aldol of α-ketobutyrate + acetaldehyde (Pham *et al.* 1995), so it did not belong in this
+#: Process,
+#: and the flags were the model reporting that fact in the only vocabulary it had. D-107 moved it to
+#: :class:`SotolonAldolCondensation`; **both flags then had exactly one value across all five
+#: remaining rows and were deleted**. What is left is five true Strecker aldehydes that all
+#: decarboxylate and all take every gram from their own amino acid — a table with no exceptions in
+#: it, which is the shape the physics always had.
 #:
-#: **Sotolon has now been the canary three times, always through threonine** — D-99's honest fusel
-#: rise killed it, D-100 revived it by speciating the pool, and D-104's anabolic sink killed it
-#: again by (correctly) finishing threonine off. D-100's revival was never a fix: it rested on
-#: ~6.6 mg/L of threonine that survived only because propanol's demand was too small to consume it.
-#: Each time, the real fault was the same — sotolon rooted in a must AMINO ACID where reality uses
-#: a mostly-de-novo KETO ACID. ``de_novo=True`` fixes the root: the rate is ungated by the pool and
-#: the carbon splits ``gate : (1-gate)`` between must threonine and the sugar de-novo stand-in, so
-#: the exogenous share lands at the SAME ~18% the Ehrlich re-route gives propanol. That agreement
-#: is Crépin's own signature ("the isotopic enrichment detected in propanol … was the same as that
-#: measured in proteinogenic threonine") reproduced rather than asserted.
-_MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool, str, bool], ...] = (
-    ("methional", M_METHIONAL, "w_maillard_methional", True, "methionine", False),
+#: **Sotolon was the canary three times, always through threonine** — D-99's honest fusel rise
+#: killed
+#: it, D-100 revived it by speciating the pool, D-104's anabolic sink killed it again by (correctly)
+#: finishing threonine off, and D-104's ``de_novo`` rescued it by ungating the rate. Every one of
+#: those was a fight over a threonine dependence **sotolon never had**: threonine is its
+#: *grand*parent (threonine → α-ketobutyrate → sotolon), and the model kept re-deriving the symptom
+#: because the intermediate was missing. It is not missing now.
+_MAILLARD_PRODUCTS: tuple[tuple[str, float, str, str], ...] = (
+    ("methional", M_METHIONAL, "w_maillard_methional", "methionine"),
     (
         "phenylacetaldehyde",
         M_PHENYLACETALDEHYDE,
         "w_maillard_phenylacetaldehyde",
-        True,
         "phenylalanine",
-        False,
     ),
-    ("2_methylbutanal", M_2_METHYLBUTANAL, "w_maillard_2_methylbutanal", True, "isoleucine", False),
-    ("3_methylbutanal", M_3_METHYLBUTANAL, "w_maillard_3_methylbutanal", True, "leucine", False),
-    ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", True, "valine", False),
-    # The only de-novo-capable product: an aldol furanone of 2-ketobutyrate, not a Strecker
-    # degradation of threonine (hence decarboxylates=False AND de_novo=True — the two flags travel
-    # together for the same underlying reason: sotolon is not made the way the other five are).
-    ("sotolon", M_SOTOLON, "w_maillard_sotolon", False, "threonine", True),
+    ("2_methylbutanal", M_2_METHYLBUTANAL, "w_maillard_2_methylbutanal", "isoleucine"),
+    ("3_methylbutanal", M_3_METHYLBUTANAL, "w_maillard_3_methylbutanal", "leucine"),
+    ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", "valine"),
 )
 
 #: The caramelization carbon-park species (decision D-88): the sugar carbon :class:`Caramelization`
@@ -1141,30 +1126,30 @@ class MaillardStrecker(Process):
 
     name = "maillard_strecker"
     tier = Tier.SPECULATIVE
-    #: Writes the six thermal-route product pools + the decarboxylation ``CO2``, drawing the carbon
+    #: Writes the five thermal-route product pools + the decarboxylation ``CO2``, drawing the carbon
     #: from each product's OWN precursor (D-100) and deaminating its nitrogen to ``N``. There is NO
     #: ``o2`` term (the whole point). The C/N transfer closes exactly.
     #:
-    #: **``S`` became a WRITE at D-104**, having been a read-only driver through D-87/D-100: sotolon
-    #: is ``de_novo``-capable, so the share of its carbon that the must threonine pool cannot
-    #: supply is drawn off sugar (the de-novo 2-ketobutyrate stand-in, D-19 option a1). The other
-    #: five products still take every gram from their own amino acid and never touch ``S``. The
-    #: caramelization draw (D-88) remains a separate Process; these two are the only sugar-carbon
-    #: consumers on the thermal axis and they book independently.
+    #: **``S`` became a WRITE at D-104 and is READ-ONLY again at D-107.** D-104 gave sotolon a
+    #: de-novo sugar draw because its carbon is not its precursor's; sotolon now lives in
+    #: :class:`SotolonAldolCondensation` and takes its carbon from the tracked
+    #: ``alpha_ketobutyrate``
+    #: pool instead, so the sugar stand-in it needed is gone and every one of the five products left
+    #: here takes every gram from its own amino acid. ``S`` is back to what it was through
+    #: D-87/D-100: the **dicarbonyl driver**, read and never written. That is a fidelity statement,
+    #: not a tidy-up — a Strecker degradation has no business drawing sugar carbon, and the only row
+    #: that did was the row that was not a Strecker degradation.
     touches = (
         "methional",
         "phenylacetaldehyde",
         "2_methylbutanal",
         "3_methylbutanal",
         "2_methylpropanal",
-        "sotolon",
         "CO2",
         "N",
-        "S",
         # Each product's OWN precursor (decision D-100) — no longer the lumped ``amino_acids``
-        # pool. Six products over five distinct amino acids (methional and the three
-        # branched-chain aldehydes each have their own; sotolon takes threonine).
-        *dict.fromkeys(precursor for (_, _, _, _, precursor, _) in _MAILLARD_PRODUCTS),
+        # pool. Five products over five distinct amino acids, one each.
+        *dict.fromkeys(precursor for (_, _, _, precursor) in _MAILLARD_PRODUCTS),
     )
     #: ``k_maillard_strecker``/``E_a_maillard_strecker`` and the six ``w_maillard_*`` composition
     #: weights are this Process's own (thermal.yaml, D-87); ``K_amino_acids`` is the *shared*
@@ -1179,13 +1164,11 @@ class MaillardStrecker(Process):
         "w_maillard_2_methylbutanal",
         "w_maillard_3_methylbutanal",
         "w_maillard_2_methylpropanal",
-        "w_maillard_sotolon",
         "K_amino_acids",
         "T_ref",
         # Each precursor's must-spectrum share, which scales its relative-depletion gate (D-100).
         *dict.fromkeys(
-            SPEC_BY_SPECIES[precursor].fraction_param
-            for (_, _, _, _, precursor, _) in _MAILLARD_PRODUCTS
+            SPEC_BY_SPECIES[precursor].fraction_param for (_, _, _, precursor) in _MAILLARD_PRODUCTS
         ),
     )
 
@@ -1215,49 +1198,35 @@ class MaillardStrecker(Process):
         # byte-for-byte to the D-87 rate; away from it, a product stops when the amino acid it is
         # made from runs out — which is the whole point (the D-100 pathology was sotolon dying
         # because a pool 38% ARGININE had been drained by fusels that eat leucine).
-        weights = [params[wname] for (_, _, wname, _, _, _) in _MAILLARD_PRODUCTS]
+        weights = [params[wname] for (_, _, wname, _) in _MAILLARD_PRODUCTS]
         w_sum = sum(weights)  # > 0 (all speculative positive weights)
-        co2_mol = 0.0  # mol CO2/L/h, from the decarboxylating aldehydes only
+        co2_mol = 0.0  # mol CO2/L/h — every product here decarboxylates (D-107)
         product_rates: list[tuple[str, float]] = []
-        # Carbon each precursor must supply — accumulated per species because five products draw
-        # from five different amino acids, and the shared CO2 must be attributed to the precursor
+        # Carbon each precursor must supply — accumulated per species because the five products draw
+        # from five different amino acids, and each product's CO2 must be attributed to the
+        # precursor
         # that actually released it (its own carboxyl carbon), not to a lump.
         precursor_carbon: dict[str, float] = {}
-        de_novo_carbon = 0.0  # sotolon's share sourced off SUGAR (the de-novo 2-ketobutyrate)
-        for (pool, m_i, _wname, decarboxylates, precursor, de_novo), w_i in zip(
-            _MAILLARD_PRODUCTS, weights, strict=True
-        ):
+        for (pool, m_i, _wname, precursor), w_i in zip(_MAILLARD_PRODUCTS, weights, strict=True):
             gate_i = depletion_gate(y, schema, params, (SPEC_BY_SPECIES[precursor],))
-            if gate_i <= 0.0 and not de_novo:
+            if gate_i <= 0.0:
                 continue  # this precursor is exhausted ⇒ its product stops (and cannot go negative)
-            # A de-novo-capable product is NOT rate-gated by the must pool: its carbon comes from a
-            # keto acid the cell makes from sugar, so an exhausted precursor changes where the
-            # carbon comes from, never whether the product forms (D-104).
-            n_i = (w_i / w_sum) * driver * (1.0 if de_novo else gate_i)  # mol/L/h of product i
+            n_i = (w_i / w_sum) * driver * gate_i  # mol/L/h of product i
             if n_i <= 0.0:
                 continue
             rate_i = n_i * m_i  # g/L/h
             product_rates.append((pool, rate_i))
-            carbon_i = rate_i * carbon_mass_fraction(pool)
-            if decarboxylates:
-                # 1 CO2 per Strecker decarboxylation — the amino acid's own carboxyl carbon, so it
-                # is charged to THIS product's precursor (sotolon contributes none; its flag is
-                # load-bearing, and no conservation test would catch a mis-key — D-87's trap).
-                co2_i = _CO2_PER_STRECKER_ALDEHYDE * n_i * M_CO2  # g CO2/L/h
-                co2_mol += _CO2_PER_STRECKER_ALDEHYDE * n_i
-                carbon_i += co2_i * carbon_mass_fraction("CO2")
-            if de_novo:
-                # Split this product's carbon gate : (1-gate) between the MUST pool and the sugar
-                # de-novo stand-in — the D-33 producer/re-route shape, inline. The exogenous share
-                # is therefore gate_i, the same quantity the Ehrlich re-route gives propanol off
-                # the same pool, which is exactly Crépin's "propanol's enrichment == proteinogenic
-                # threonine's" (one intracellular pool, every consumer sees one enrichment).
-                precursor_carbon[precursor] = (
-                    precursor_carbon.get(precursor, 0.0) + gate_i * carbon_i
-                )
-                de_novo_carbon += (1.0 - gate_i) * carbon_i
-            else:
-                precursor_carbon[precursor] = precursor_carbon.get(precursor, 0.0) + carbon_i
+            # 1 CO2 per Strecker decarboxylation — the amino acid's own carboxyl carbon, charged to
+            # THIS product's precursor. Since D-107 this is unconditional: the one row that did not
+            # decarboxylate was sotolon, which was never a Strecker aldehyde and now has its own
+            # Process. Charging it is what makes the carbon-sized draw land on the true 1:1 molar
+            # stoichiometry (D-105's signature) — and no conservation test would catch its absence,
+            # so it is pinned by a driven test instead (D-87's trap, D-105's fix).
+            co2_mol += _CO2_PER_STRECKER_ALDEHYDE * n_i
+            carbon_i = rate_i * carbon_mass_fraction(pool) + (
+                _CO2_PER_STRECKER_ALDEHYDE * n_i * M_CO2 * carbon_mass_fraction("CO2")
+            )
+            precursor_carbon[precursor] = precursor_carbon.get(precursor, 0.0) + carbon_i
         if not product_rates:
             return d
 
@@ -1271,17 +1240,148 @@ class MaillardStrecker(Process):
             for precursor, carbon in precursor_carbon.items()
             if carbon > 0.0
         )
-        # The de-novo share comes off SUGAR — carbon-accounted exactly as the Ehrlich producer's
-        # stand-in is (D-19 option a1), so total_carbon still closes to machine precision. It
-        # carries NO nitrogen (sugar has none), which is itself the physical point: de-novo
-        # 2-ketobutyrate needs no amino acid, so this route releases no ammonium.
-        if de_novo_carbon > 0.0:
-            draw_carbon_from_sugar(d, y, schema, de_novo_carbon)
-
         for pool, rate_i in product_rates:
             d[schema.slice(pool)] = rate_i
         d[schema.slice("CO2")] = co2_mol * M_CO2
         d[schema.slice("N")] = nitrogen  # DEAMINATION: precursor N → ammonium (D-45)
+        return d
+
+
+class SotolonAldolCondensation(Process):
+    """Sotolon by aldol condensation of α-ketobutyrate + acetaldehyde — the node's consumer (D-107).
+
+    ``n_sot = k_sotolon_aldol · f(T) · [alpha_ketobutyrate] · [acetaldehyde]``  [mol sotolon/L/h],
+    **bimolecular (mass-action) in its two real substrates**, with::
+
+        d(sotolon)/dt             = +n_sot · M_SOTOLON
+        d(alpha_ketobutyrate)/dt  = −n_sot · M_ALPHA_KETOBUTYRATE     (the C4 half)
+        d(acetaldehyde)/dt        = −n_sot · M_ACETALDEHYDE           (the C2 half)
+
+    **This is a purely chemical reaction and that is the whole argument.** Pham *et al.* 1995 formed
+    sotolon from α-ketobutyric acid + acetaldehyde in a synthetic medium "under the conditions of
+    temperature, pH, and alcoholic content similar to the ageing of wine in barrels … by a purely
+    chemical mechanism". No enzyme, no yeast, no sugar. Sotolon accumulates in a **sealed bottle
+    over
+    years**, which is why its α-ketobutyrate must be the *excreted, extracellular* residual
+    (:mod:`~fermentation.core.kinetics.keto_acids`, D-107) and not an intracellular flux
+    intermediate — the same test D-49 applied to pyruvate, answered the other way because the
+    reaction that consumes this pool happens where no intracellular pool can reach.
+
+    **WHY THIS IS NOT IN :class:`MaillardStrecker` ANY MORE (the D-107 move).** Sotolon rode the
+    thermal Strecker Process from D-87 to D-106 carrying two exception flags — ``decarboxylates=
+    False`` and ``de_novo=True`` — and D-104 noted that "the two flags travel together for the same
+    underlying reason: sotolon is not made the way the other five are". They were the model
+    reporting,
+    in the only vocabulary it had, that this compound was in the wrong Process. It is not a Strecker
+    degradation: it is not a degradation *of an amino acid* at all, it releases no CO₂ because there
+    is no carboxyl to lose, and its carbon was never its "precursor's". Moving it here deleted both
+    flags and left :data:`_MAILLARD_PRODUCTS` five true Strecker aldehydes with no exceptions in it.
+
+    **The sugar driver is gone, and Pons *et al.* 2010 is why.** Inside ``MaillardStrecker``
+    sotolon's
+    rate was ``k · f(T) · S`` — pseudo-first-order in residual sugar, the *dicarbonyl* driver. A
+    dicarbonyl is what a Strecker degradation needs; an aldol needs its two substrates. The sugar
+    driver made sotolon a **sweetness** marker, and that is empirically wrong: Pons *et al.* 2010
+    identified this exact aldol as the source of sotolon in prematurely aged **DRY white wines**,
+    where it is the *prémox* marker. Sugar does not appear in this rate law because it does not
+    appear in the reaction.
+
+    **THE EMERGENT PAYOFF — oxidation raises sotolon, with nothing scripted.** ``acetaldehyde`` is
+    raised by :class:`OxidativeAcetaldehyde` (D-71) when O₂ is dosed, so an oxidised wine makes more
+    sotolon *because* it made more acetaldehyde. That is Pons' prémox mechanism falling out of a
+    rate law written from Pham's chemistry, and it is measured (D-107), not asserted. The same term
+    covers vin jaune, where the flor's very high acetaldehyde is why 6 years under veil reaches
+    120–268 µg/L (Pham). SO₂ also enters correctly for free: it binds acetaldehyde (D-47), and this
+    Process reads the pool the binding depletes.
+
+    **Isolability is EXACT and it is why this is mass-action rather than gated.** The rate is the
+    product of its two substrates, so a ProcessSet without ``_KETO_ACID_PROCESSES`` leaves
+    ``alpha_ketobutyrate`` at 0 and this rate at **exactly** 0 — byte-for-byte, with no clamp, no
+    availability constant, and no epsilon. Neither pool can be driven negative for the same reason
+    (each draw is proportional to the pool it debits). A Michaelis-style availability gate would
+    have
+    needed a fabricated half-saturation constant per substrate; the honest rate law needs none — the
+    **more faithful form is also the one with fewer invented numbers** (contrast the D-98 trap).
+
+    **Carbon closes on ATOM COUNTS, not on a sized draw** — the strongest closure in the tree.
+    Sotolon's 6 carbons are α-ketobutyrate's 4 + acetaldehyde's 2, so ``total_carbon`` closes
+    because
+    the *chemistry* balances, not because a mass was sized to make it. This route therefore has no
+    D-105 signature to check: there is no carbon-sized draw here to be silently wrong about the mole
+    count. It draws **1 mol of each substrate per mol of sotolon** because that is what is written.
+    Nitrogen: untouched — both substrates are N-free, so this is the one aging aroma route that
+    releases **no ammonium** (its nitrogen left earlier, at the threonine deamination that made the
+    keto-acid). Mass carries a small gap: the aldol condenses out 1 mol H₂O
+    (``C4H6O3 + C2H4O → C6H8O3 + H2O``), which is untracked — carbon is the invariant, as
+    everywhere.
+
+    **The temperature term is a CARRY-OVER, and is labelled one (the D-101/D-102 line).** It reads
+    ``E_a_maillard_strecker`` — the constant sotolon already rode from D-87 through D-106 — so this
+    is the status quo, not a new number. Pham sources the **direction** ("the formation of sotolon
+    increases by increasing temperature") and nothing more; inventing a sotolon-specific activation
+    energy to look precise is exactly the E_a D-101 fabricated and D-102 had to retract. Re-sourcing
+    it is a parameter-file change, not a structural one.
+
+    **Scope — named, not hidden.** (1) Pham also measures sotolon rising with **decreasing pH** and
+    **decreasing ethanol**; neither term is here, and the model has both quantities, so this is a
+    real omission rather than an inexpressible one. (2) Botrytised sweet wines may carry an
+    additional sugar/furanone contribution this Process does not model — what is modelled is the
+    sourced aldol. (3) The **enantiomers are not split**: (S)-sotolon's threshold (~0.8 µg/L) is
+    ~100× below (R)'s (~89 µg/L) (Pons *et al.*), so one racemic pool against one threshold is a
+    lump. (4) Propanol is still made from threonine directly rather than from this pool, so the
+    genuine propanol-vs-sotolon competition — which is over **α-ketobutyrate**, not threonine — is
+    not yet expressible; that is the fusel side of the node (see D-107).
+
+    Wine-only (both product and substrate slots are wine-only); wired **disabled at the compile
+    seam** and enabled by ``begin_aging`` with the other aging Processes. Tier **speculative** (the
+    *form* — bimolecular in α-ketobutyrate × acetaldehyde, purely chemical, warmer-faster — is
+    sourced; the rate magnitude is an order-of-magnitude estimate).
+    """
+
+    name = "sotolon_aldol_condensation"
+    tier = Tier.SPECULATIVE
+    #: Fills ``sotolon`` from its two real substrates. No ``S`` (not sugar-driven), no ``CO2`` (no
+    #: decarboxylation), no ``N`` (both substrates are nitrogen-free) — the three absences are the
+    #: content of D-107.
+    touches = ("sotolon", "alpha_ketobutyrate", "acetaldehyde")
+    #: ``k_sotolon_aldol`` is this Process's own second-order rate constant (thermal.yaml, D-107);
+    #: ``E_a_maillard_strecker`` is a **carry-over**, not a claim that this reaction shares the
+    #: Strecker activation energy (see the class docstring); ``T_ref`` is shared with every
+    #: Arrhenius rate. Their tiers cap the output tier via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = ("k_sotolon_aldol", "E_a_maillard_strecker", "T_ref")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slots: a hard no-op on any schema without them (belt-and-suspenders to the
+        # wine-only wiring, the MaillardStrecker idiom).
+        if "sotolon" not in schema or "alpha_ketobutyrate" not in schema:
+            return d
+        keto = max(float(y[schema.slice("alpha_ketobutyrate")][0]), 0.0)
+        acetaldehyde = max(float(y[schema.slice("acetaldehyde")][0]), 0.0)
+        # Mass-action in BOTH substrates ⇒ either at zero means no reaction. This is the exact
+        # isolability guarantee (keto-acid Processes off ⇒ pool 0 ⇒ byte-for-byte no-op), not a
+        # defensive guard: the clamps only absorb solver undershoot.
+        if keto <= 0.0 or acetaldehyde <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_maillard_strecker"], params["T_ref"])
+        # Second-order rate law (Pham et al. 1995): mol/L/h from the two molar concentrations.
+        n_sot = (
+            params["k_sotolon_aldol"]
+            * f_t
+            * (keto / M_ALPHA_KETOBUTYRATE)
+            * (acetaldehyde / M_ACETALDEHYDE)
+        )
+        if n_sot <= 0.0:
+            return d
+        # 1 mol of each substrate per mol of sotolon. Carbon closes because 4 + 2 == 6 on the atom
+        # counts in `chemistry`, so no draw is being *sized* to close it (D-105's blind spot cannot
+        # exist here).
+        d[schema.slice("sotolon")] = n_sot * M_SOTOLON
+        d[schema.slice("alpha_ketobutyrate")] = -n_sot * M_ALPHA_KETOBUTYRATE
+        d[schema.slice("acetaldehyde")] = -n_sot * M_ACETALDEHYDE
         return d
 
 

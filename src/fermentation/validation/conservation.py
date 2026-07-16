@@ -181,6 +181,20 @@ def total_carbon(
     # precision. Nitrogen-free, so absent from total_nitrogen.
     if "alpha_ketoglutarate" in schema:
         w[schema.slice("alpha_ketoglutarate")] = carbon_mass_fraction("alpha_ketoglutarate")
+    # Excreted overflow alpha-ketobutyrate — THE KETO-ACID NODE (decision D-107): the same
+    # excreted-side-pool structure again, weighted at its own C4 fraction. This pool carries
+    # THREE flows across this ledger, not one, and all three close on ATOM COUNTS:
+    #   in:  threonine (C4) -> alpha_ketobutyrate (C4)          [deamination, 4 == 4]
+    #   in:  methionine (C5) -> methanethiol (C1) + this (C4)   [demethiolation, 5 == 1 + 4]
+    #   out: this (C4) + acetaldehyde (C2) -> sotolon (C6)      [the aldol, 4 + 2 == 6]
+    # plus the excretion's sugar de-novo share and the Gay-Lussac reassimilation it shares with
+    # its two siblings. Weighting it here is what lets all of them close to machine precision —
+    # and note that closure is NOT evidence any of them draws the right number of moles (D-105's
+    # lesson: a draw sized to close the ledger can never violate it). Nitrogen-free, so absent
+    # from total_nitrogen — which is itself load-bearing: both producing routes are deaminations,
+    # so every gram of precursor nitrogen must land in N rather than ride along here.
+    if "alpha_ketobutyrate" in schema:
+        w[schema.slice("alpha_ketobutyrate")] = carbon_mass_fraction("alpha_ketobutyrate")
     # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
     # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
     # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that

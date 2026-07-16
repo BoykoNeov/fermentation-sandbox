@@ -181,23 +181,33 @@ def test_every_pool_is_weighted_on_both_conservation_ledgers():
 # -- the stoichiometric signature: a closed ledger is NOT a correct draw ------
 
 
-#: Every precursor→product route in the tree, with the CO₂ each one **charges to its precursor's
-#: draw** — the flag that decides whether a carbon-sized draw is also the real stoichiometry
-#: (decision D-105). Read off the route tables: :data:`_STRECKER_ROUTES` always charges 1 (the
-#: constant ``_CO2_PER_STRECKER_ALDEHYDE``), :data:`_MAILLARD_PRODUCTS` charges 1 iff its
-#: ``decarboxylates`` flag is set, and the Ehrlich re-route / mercaptan draws carry no CO₂ term at
-#: all — which is precisely why they are the exceptions below.
-_ROUTES: tuple[tuple[str, str, float, str], ...] = (
-    *((pool, prec, 1.0, "D-75 oxidative Strecker") for pool, _f, prec in _STRECKER_ROUTES),
+#: Every precursor→product route in the tree, with the **carbon each one charges to its precursor's
+#: draw beyond the named product**: the ``CO₂`` it books, plus any **tracked co-product** it books
+#: (decision D-105, generalised at D-107). Together those decide whether a carbon-sized draw is also
+#: the real stoichiometry. Read off the route tables: :data:`_STRECKER_ROUTES` and
+#: :data:`_MAILLARD_PRODUCTS` each charge 1 CO₂ and no co-product; the Ehrlich re-route charges its
+#: decarboxylation CO₂ since D-106; and the mercaptan charges **no CO₂ but a C4 co-product** —
+#: α-ketobutyrate — since D-107.
+#:
+#: **The co-product column is what D-105 predicted and could not yet express.** Its wording was that
+#: a failing route "is either sourcing carbon it does not name (sotolon's acetaldehyde) or
+#: **discarding carbon it should charge for** (the mercaptan's 2-oxobutyrate, the Ehrlich CO₂)".
+#: Charging is only possible into a pool that exists — CO₂ already did (so D-106 could fix the
+#: Ehrlich routes immediately), and α-ketobutyrate did not (so the mercaptan waited for D-107 to
+#: build it). The signature did not change; the model finally has the slots to satisfy it.
+_ROUTES: tuple[tuple[str, str, float, tuple[str, ...], str], ...] = (
+    *((pool, prec, 1.0, (), "D-75 oxidative Strecker") for pool, _f, prec in _STRECKER_ROUTES),
     *(
-        (pool, prec, 1.0 if decarb else 0.0, "D-87 thermal Strecker")
-        for pool, _m, _w, decarb, prec, _dn in _MAILLARD_PRODUCTS
+        (pool, prec, 1.0, (), "D-87 thermal Strecker")
+        for pool, _m, _w, prec in _MAILLARD_PRODUCTS
     ),
     *(
-        (spec.species, spec.precursor_amino_acid, 1.0, "D-33 Ehrlich re-route")
+        (spec.species, spec.precursor_amino_acid, 1.0, (), "D-33 Ehrlich re-route")
         for spec in FUSEL_SPECS
     ),
-    ("methanethiol", "methionine", 0.0, "D-45 demethiolation"),
+    # Demethiolation: 1 methionine -> 1 methanethiol + 1 alpha-ketobutyrate + NH3. No CO2 (nothing
+    # decarboxylates), but the C4 keto-acid is now charged — which is the whole of the D-107 fix.
+    ("methanethiol", "methionine", 0.0, ("alpha_ketobutyrate",), "D-45 demethiolation"),
 )
 
 #: The routes whose carbon-sized draw is **knowingly not** their molar stoichiometry, each with the
@@ -205,24 +215,32 @@ _ROUTES: tuple[tuple[str, str, float, str], ...] = (
 #: sit here with a reason, and anything NEW that drifts fails the test below rather than joining
 #: them silently.
 #:
-#: **The five Ehrlich re-routes left this list at D-106** — they were the one entry that needed no
-#: new pool (CO₂ was already tracked), so charging the decarboxylation moved them to an exact 1:1
-#: and the stale-waiver arm below required their removal. What remains is blocked on the same
-#: missing thing: a **2-ketobutyrate pool**. The list is now exactly the keto-acid node's
-#: work-list, and nothing else.
-_KNOWN_NON_STOICHIOMETRIC: dict[tuple[str, str], str] = {
-    ("sotolon", "threonine"): (
-        "OVER-draws 1.5x: sotolon is an aldol of 2-ketobutyrate + ACETALDEHYDE, and the two "
-        "acetaldehyde carbons are lumped into the threonine draw (D-87 scope note). D-104's "
-        "de_novo=True splits the RATE off the must pool but not this ratio."
-    ),
-    ("methanethiol", "methionine"): (
-        "UNDER-draws 5x: demethiolation is 1 mol methionine -> 1 mol methanethiol + 1 mol "
-        "2-oxobutyrate + NH3, but the draw is sized to the THIOL's 1 carbon, so methionine's "
-        "other 4 (the 2-oxobutyrate) are never charged. Carbon closes; the stoichiometry does "
-        "not. Found by this signature at D-105."
-    ),
-}
+#: **IT IS EMPTY (decision D-107), and that is the beat's win condition.** D-105 wrote that this
+#: list
+#: "is exactly the keto-acid node's work-list, and nothing else" — both remaining entries were
+#: blocked on one missing molecule, 2-ketobutyrate, which the mercaptan **produced and discarded**
+#: while sotolon **consumed it and invented it from sugar**. Building that pool
+#: (:mod:`~fermentation.core.kinetics.keto_acids`) closed both from opposite sides:
+#:
+#: * ``("methanethiol", "methionine")`` — the 5× under-draw: fixed. The draw is 1 mol methionine per
+#:   mol thiol and the C4 goes to ``alpha_ketobutyrate``, so ``5 == 1 + 4`` and the route charges
+#:   every carbon it consumes.
+#: * ``("sotolon", "threonine")`` — the 1.5× over-draw: **dissolved rather than fixed**, and the
+#:   distinction matters. Sotolon does not appear in :data:`_ROUTES` any more because it is not a
+#:   carbon-sized draw off an amino acid at all: it is an aldol of two tracked pools
+#:   (:class:`~fermentation.core.kinetics.aging.SotolonAldolCondensation`), drawing 1 mol of each
+#:   substrate because that is what is written. **A route with no carbon-sized draw has no D-105
+#:   blind spot to check** — the ratio it was failing was an artifact of asking a Strecker question
+#:   about a molecule that was never a Strecker product. Its replacement is pinned by
+#:   ``test_the_sotolon_aldol_draws_one_mole_of_each_substrate_when_driven``, which is a *stronger*
+#:   test: it reads the real stoichiometry off ``dy/dt`` rather than off a declared table.
+#:
+#: **Keep it empty.** The stale-waiver arm below has nothing to guard now, so the *only* thing
+#: standing between a new carbon-sized draw and a silent wrong mole count is the empty dict and the
+#: driven tests. An entry added here must carry the carbon that explains it and a reason to believe
+#: it cannot be charged — which, as D-107 demonstrates, usually means "the pool does not exist yet",
+#: i.e. a work-list item rather than a permanent exemption.
+_KNOWN_NON_STOICHIOMETRIC: dict[tuple[str, str], str] = {}
 
 
 def test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the_co2():
@@ -251,17 +269,19 @@ def test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the
     def carbons(species: str) -> float:
         return MOLAR_MASS[species] * carbon_mass_fraction(species) / m_c
 
-    for product, precursor, n_co2, route in _ROUTES:
-        implied = (carbons(product) + n_co2) / carbons(precursor)  # mol precursor / mol product
+    for product, precursor, n_co2, co_products, route in _ROUTES:
+        charged = carbons(product) + n_co2 + sum(carbons(c) for c in co_products)
+        implied = charged / carbons(precursor)  # mol precursor / mol product
         known = _KNOWN_NON_STOICHIOMETRIC.get((product, precursor))
         if known is None:
             assert implied == pytest.approx(1.0, abs=1e-12), (
-                f"{route}: {precursor} -> {product} charges {n_co2:g} CO2, implying "
-                f"{implied:.4f} mol {precursor} per mol {product} where a true degradation "
-                f"demands 1.0. Either this route is not a degradation of {precursor} (the D-104 "
-                f"error -- it needs a de-novo/keto-acid source, not a hard gate on the pool), or "
-                f"it is failing to charge its own CO2. Fix it, or add it to "
-                f"_KNOWN_NON_STOICHIOMETRIC with the carbon that explains it."
+                f"{route}: {precursor} -> {product} charges {n_co2:g} CO2 and co-products "
+                f"{co_products or '()'}, implying {implied:.4f} mol {precursor} per mol {product} "
+                f"where a true degradation demands 1.0. Either this route is not a degradation of "
+                f"{precursor} (the D-104 error -- it needs a de-novo/keto-acid source, not a hard "
+                f"gate on the pool), or it is failing to charge carbon it really releases: its "
+                f"CO2, or a co-product pool. Fix it, or add it to _KNOWN_NON_STOICHIOMETRIC with "
+                f"the carbon that explains it."
             )
         else:
             assert implied != pytest.approx(1.0, abs=1e-12), (
@@ -269,6 +289,28 @@ def test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the
                 f"now draws stoichiometrically ({implied:.4f}). If it was fixed, delete the "
                 f"entry -- a stale waiver hides the next regression.\nRecorded reason: {known}"
             )
+
+
+def test_the_known_non_stoichiometric_allow_list_is_empty():
+    """The keto-acid node's work-list, closed (decision D-107).
+
+    D-105 found the signature above and left two routes on the allow-list, writing that it "is now
+    exactly the keto-acid node's work-list, and nothing else". Both were blocked on **one missing
+    molecule**: the mercaptan *produced* 2-ketobutyrate and discarded it (under-drawing methionine
+    5×), while sotolon *consumed* it and invented it from sugar (over-drawing threonine 1.5×) —
+    producer and consumer of the same untracked pool, in the same wine, on the same aging phase.
+    D-107 built the pool and both closed, from opposite sides.
+
+    This test exists so the list cannot quietly refill. It is not the same claim as the loop above:
+    that one permits an entry *with a reason*, and this one says the current correct number of
+    reasons is zero. If a future beat needs to add one, delete this test **deliberately** and say
+    why in DECISIONS — do not let it happen as a side effect.
+    """
+    assert _KNOWN_NON_STOICHIOMETRIC == {}, (
+        "The keto-acid node's work-list was emptied at D-107. A new entry means a route is "
+        "knowingly drawing the wrong number of moles while conservation stays green -- which is "
+        "exactly the D-104/D-105 error class. Justify it in DECISIONS, or fix the route."
+    )
 
 
 @pytest.fixture

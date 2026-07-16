@@ -141,3 +141,62 @@ k_pyruvate_reassimilation:
     source: "author estimate; yeast co-metabolically re-assimilates excreted overflow pyruvate during active fermentation, oxidising it back into central metabolism (Boulton et al.; Ribereau-Gayon et al.). Tracks the fermentative flux, so it stops at dryness and freezes the finished-wine residual (Jackowetz & Mira de Orduna 2013)."
     conditions: "generic yeast; overflow-pyruvate re-assimilation, first-order in pyruvate and FLUX-LINKED (co-metabolic — shares the X*S/(K_sugar_uptake+S) fermentative shape with excretion), so it dies at dryness"
     notes: "Returns carbon to ETHANOL + CO2, not sugar (C3 -> C2 + C1, one mole each — carbon-closing): that is pyruvate's real forward metabolic fate, and a refund-to-sugar would be a no-op at post-dryness S=0 anyway. FLUX-LINKING is load-bearing and DELIBERATELY the OPPOSITE of the no-flux ADH acetaldehyde reduction (D-27): a normal ferment finishes with the yeast still viable, so a no-flux viable-X gate would drain overflow pyruvate to ~0 over the long tail (a crash-dependent residual a clean ferment never strands). Co-metabolic flux-linking pegs the residual to END-OF-FERMENTATION (the dryness freeze), not yeast death — crash- and duration-independent (decision D-49, option A). Magnitude speculative."
+
+# =====================================================================================
+# ALPHA-KETOBUTYRATE (2-oxobutyrate) -- THE KETO-ACID NODE (decision D-107)
+# =====================================================================================
+#
+#   threonine --deamination(gate)--\
+#                                   >-- [alpha_ketobutyrate] --aldol+acetaldehyde--> sotolon
+#   sugar ------de novo (1-gate)---/          ^
+#                                             |
+#   methionine --demethiolation (D-45)--------+  (+ methanethiol + NH3)
+#
+# The third excreted overflow keto-acid, and THE ONLY ONE WITH A CONSUMER. Pyruvate (D-49) and
+# alpha-KG (D-50) are terminal residuals that exist to bind SO2; this pool is a SUBSTRATE -- its
+# frozen dryness residual is what the bottle-aging sotolon aldol eats over the following years
+# (SotolonAldolCondensation, D-107). It also has a second PRODUCER: the D-45 mercaptan route is
+# methionine -> methanethiol + 2-oxobutyrate + NH3, and until this pool existed that 2-oxobutyrate
+# had nowhere to go -- which is exactly why that route drew methionine at 0.2 mol per mol thiol
+# (a 5x under-draw, found at D-105 and unblocked here).
+#
+# STRUCTURE = pyruvate/alpha-KG (flux-linked excretion; co-metabolic flux-linked reassimilation
+# that stops at dryness and FREEZES a persistent finished-wine residual), with ONE difference:
+# the CARBON SOURCE SPLITS. Crepin et al. 2017 measures 2-ketobutyrate's source as intracellular
+# threonine that is "19% consumed threonine (labeled fraction) and 81% newly synthesized", so the
+# draw is gate:(1-gate) between the must `threonine` pool and the sugar de-novo stand-in, where
+# `gate` is threonine's own D-100 relative-depletion gate. The RATE is flux-only (NOT gated on
+# threonine): gating it would empty the pool in a threonine-free wine and kill sotolon -- the D-104
+# canary, one pool upstream. This is D-104's structure with the gate finally on the molecule it was
+# always about, and moved to where reality fixes enrichment: SYNTHESIS time, not consumption time.
+#
+# EVIDENCE GRADE -- stated because it bounds the residual below. Pons et al. 2010 (J. Agric. Food
+# Chem. 58:7273, "Identification of a Sotolon Pathway in Dry White Wines") establishes the two
+# claims this pool rests on: wine yeast "released large quantities of 2-ketobutyric acid" during
+# alcoholic fermentation (so it IS an excreted pool, not only a flux intermediate), and the
+# sotolon aldol is what consumes it. What that paper is NOT read for is a NUMBER: no measured
+# finished-wine 2-oxobutyrate concentration is in hand (unlike pyruvate/alpha-KG, which Jackowetz &
+# Mira de Orduna 2013 quantifies). So the residual below is anchored on an ORDERING, and it is
+# labelled as one.
+#
+# -- EXCRETION: threonine + sugar -> alpha_ketobutyrate (flux-linked draw, temperature-flat) -----
+k_alpha_kb_excretion:
+  value: 2.0e-4
+  unit: "1/h"   # d(alpha_ketobutyrate)/dt = k_alpha_kb_excretion * X * S/(K_sugar_uptake + S); carbon drawn threonine:S by threonine's depletion gate
+  tier: speculative
+  uncertainty: { low: 5.0e-5, high: 1.0e-3, note: "with k_alpha_kb_reassimilation 1e-1 the quasi-steady frozen residual ~ k_alpha_kb_excretion/k_alpha_kb_reassimilation ~ 0.5-10 mg/L; nominal 2e-4/1e-1 = 2 mg/L. It is the RATIO to k_alpha_kb_reassimilation, not either magnitude alone, that sets the residual" }
+  provenance:
+    source: "author estimate anchored on an ORDERING, not on a measurement: alpha-ketobutyrate is a MINOR keto acid relative to pyruvate (~30 mg/L) and alpha-ketoglutarate (~20 mg/L), the two that Jackowetz & Mira de Orduna 2013 quantifies -- so ~2 mg/L, an order below both. That yeast excrete it at all is sourced (Pons et al. 2010: strains 'released large quantities of 2-ketobutyric acid' in model wine, 'similar to those found in oxidized dry white wines'); the LEVEL is not. Corroborating the order of magnitude: 2-ketobutyrate's dominant fate is decarboxylation to propanal -> propanol (10s of mg/L in wine), so the excreted residual is a small leak off a much larger flux."
+    conditions: "generic yeast; overflow-alpha-ketobutyrate excretion coupled to the biomass-catalysed sugar (fermentative) flux, shared K_sugar_uptake, at any temperature (held flat, v1)"
+    notes: "SPECULATIVE MAGNITUDE, SOURCED STRUCTURE. The CARBON SOURCE is the load-bearing part and it is sourced (Crepin et al. 2017, 19% exogenous threonine / 81% de novo): the draw splits gate:(1-gate) between `threonine` (a real deamination, L-threonine -> 2-oxobutanoate + NH3 via ILV1, so ALL its nitrogen is released to N) and sugar (de-novo, nitrogen-free). The RATE is flux-only and deliberately NOT gated on threonine -- see the AlphaKetobutyrateExcretion docstring for why gating it would resurrect the D-104 sotolon canary. Held TEMPERATURE-FLAT (v1, the D-49/D-50 call)."
+
+# -- REASSIMILATION: alpha_ketobutyrate -> ethanol + CO2 (flux-linked, Gay-Lussac split) ---------
+k_alpha_kb_reassimilation:
+  value: 1.0e-1
+  unit: "L/(g*h)"   # d(alpha_ketobutyrate)/dt = -k_alpha_kb_reassimilation * X * S/(K_sugar_uptake+S) * [alpha_ketobutyrate]; returned to E + CO2 at the 2:1 Gay-Lussac carbon split
+  tier: speculative
+  uncertainty: { low: 3.0e-2, high: 3.0e-1, note: "sets the approach speed to (and, with k_alpha_kb_excretion, the level of) the frozen plateau; fast enough that the pool reaches the plateau within a day and holds it to dryness, so the residual robustly ~= k_alpha_kb_excretion/k_alpha_kb_reassimilation. It is the RATIO, not this magnitude alone, that sets the residual" }
+  provenance:
+    source: "author estimate, set EQUAL to the pyruvate and alpha-KG reassimilation constants (both 1e-1): there is no evidence that overflow alpha-ketobutyrate is re-assimilated at a different rate from its two siblings, and inventing a distinct number to look precise would be the D-98 trap. Yeast co-metabolically re-assimilate excreted overflow keto-acids during active fermentation (Boulton et al.; Ribereau-Gayon et al.)."
+    conditions: "generic yeast; overflow-alpha-ketobutyrate re-assimilation, first-order in alpha_ketobutyrate and FLUX-LINKED (co-metabolic — shares the X*S/(K_sugar_uptake+S) fermentative shape with excretion), so it dies at dryness"
+    notes: "Returns carbon to ETHANOL + CO2 at the Gay-Lussac 2:1 carbon ratio (4/3 mol ethanol + 4/3 mol CO2 per mole) -- alpha-ketobutyrate's C4 is NOT a whole Gay-Lussac unit, so this is alpha-KG's case, not pyruvate's mole-for-mole coincidence. D-50 already wrote that split generically in carbon_atoms, so the third pool needed no new arithmetic; D-107 EXTRACTED it into a shared helper (_gay_lussac_reassimilation) rather than making a third copy -- the D-104 lesson that a duplicated draw agrees by luck until it does not. THE FREEZE IS LOAD-BEARING FOR A SECOND REASON HERE: unlike pyruvate/alpha-KG (whose residual exists to bind SO2), this residual is the SUBSTRATE the in-bottle sotolon aldol consumes over years, which only makes sense because flux-linking pegs it to end-of-fermentation rather than draining it to ~0 over the long tail. Magnitude speculative."

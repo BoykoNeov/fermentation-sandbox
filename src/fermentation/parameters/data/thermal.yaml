@@ -145,15 +145,37 @@ w_maillard_2_methylpropanal:
     source: "author estimate of relative valine-derived thermal-Strecker flux (isobutyraldehyde, valine moderately abundant)."
     conditions: "generic sweet wine; relative production weight of 2-methylpropanal (C4H8O) among the six products, at T_ref = 293.15 K. Drawn from VALINE, its real precursor, since D-100 (the arginine lump is retired)."
     notes: "SPECULATIVE. Production flux only; potency in threshold_2_methylpropanal_wine. Normalized in-code."
-w_maillard_sotolon:
-  value: 0.10
-  unit: "1"   # relative production weight (normalized in-code)
+# -- SOTOLON: NOT a Strecker weight any more -- its own second-order aldol rate (decision D-107) --
+#
+# `w_maillard_sotolon` IS RETIRED. It was sotolon's relative production weight among SIX thermal
+# Strecker products, and sotolon is not a Strecker product: it is an aldol condensation of
+# alpha-ketobutyrate + acetaldehyde (Pham et al. 1995 -- "under the conditions of temperature, pH,
+# and alcoholic content similar to the ageing of wine in barrels ... by a purely chemical
+# mechanism"). It carried TWO exception flags in the D-87 product table (decarboxylates=False,
+# de_novo=True) for two decisions; both were the model reporting that this compound was in the
+# wrong Process. D-107 moved it to SotolonAldolCondensation and both flags were deleted.
+#
+# THE SUGAR DRIVER WENT WITH IT, and that is an empirical correction, not a tidy-up. Riding
+# k_maillard_strecker made sotolon pseudo-first-order in RESIDUAL SUGAR (the dicarbonyl driver a
+# Strecker degradation needs and an aldol does not), i.e. a SWEETNESS marker. Pons et al. 2010
+# identified this same aldol as the source of sotolon in prematurely aged DRY WHITE wines, where it
+# is the premature-oxidation ('premox') marker. Sugar is absent from the rate law below because it
+# is absent from the reaction.
+k_sotolon_aldol:
+  value: 2.0e-4
+  unit: "L/(mol*h)"   # n_sotolon[mol/L/h] = k_sotolon_aldol * f(T) * [alpha_ketobutyrate][mol/L] * [acetaldehyde][mol/L]
   tier: speculative
-  uncertainty: { low: 0.03, high: 0.20, note: "Sotolon (the curry/maple furanone) is a TRACE product by mass but the diagnostic marker of botrytized sweet wine / vin jaune / Madeira. Relative weight, normalized in-code; small mass share but potent (very low threshold)." }
+  uncertainty: { low: 5.0e-5, high: 8.0e-4, note: "CALIBRATED (the D-87 anchor, inherited) to land sotolon at ~5-20 ug/L over a multi-year warm sealed sweet-wine aging -- the Sauternes/Madeira range -- against the ~2 mg/L alpha-ketobutyrate residual and the ~33 mg/L acetaldehyde this model produces. Band ~1 order each way: it is a Tier-3 magnitude. NOTE the band is not independent of k_alpha_kb_excretion -- the two multiply, so the residual's uncertainty rides into sotolon on top of this." }
   provenance:
-    source: "author estimate of relative sotolon flux. Sotolon forms via aldol condensation of alpha-ketobutyrate (threonine deamination) with acetaldehyde (Pham et al. 1995; Cutzach et al. on aged sweet wine), a MINOR but characteristic route -- so a small production weight, its impact carried by a very low perception threshold."
-    conditions: "generic sweet wine; relative production weight of sotolon (C6H8O3) among the six products, at T_ref = 293.15 K. Carbon booked from THREONINE, its real precursor, since D-100 (the arginine lump is retired); its 2 acetaldehyde-derived carbons are still lumped into that draw -- approximate on provenance, and the acetaldehyde-coupled sotolon route stays deferred."
-    notes: "SPECULATIVE. Production flux only; potency in threshold_sotolon_wine (very low -- sotolon is a potent odorant). NOT a decarboxylation product => it contributes NO CO2 term (unlike the five Strecker aldehydes). Normalized in-code."
+    source: "SOURCED FORM (Pham et al. 1995, J. Agric. Food Chem. 43:2616 -- sotolon formed from alpha-ketobutyric acid + acetaldehyde in synthetic wine medium by a purely chemical mechanism, no enzyme and no yeast; Pons et al. 2010, J. Agric. Food Chem. 58:7273 -- the same aldol identified as the sotolon pathway in prematurely aged dry white wines) + SPECULATIVE magnitude (author estimate; Pham's actual rate data is paywalled and UNREAD -- what is taken from it is the mechanism and the direction of the temperature/pH/ethanol dependences, not a rate constant)."
+    conditions: "generic wine; SECOND-ORDER (bimolecular, mass-action) in alpha_ketobutyrate x acetaldehyde, at T_ref = 293.15 K. Wine-only; O2-INDEPENDENT as a rate law (but see notes -- the O2 coupling arrives through acetaldehyde)."
+    notes: |
+      SPECULATIVE magnitude, SOURCED form. Three things follow from the rate law being mass-action in the two real substrates rather than gated:
+      (1) ISOLABILITY IS EXACT AND FREE. A ProcessSet without the keto-acid Processes leaves alpha_ketobutyrate at 0 and this rate at EXACTLY 0 -- no clamp, no epsilon. Neither substrate can be driven negative (each draw is proportional to the pool it debits). A Michaelis-style availability gate would have needed a FABRICATED half-saturation per substrate; the faithful form needs none. The more-faithful rate law is the one with FEWER invented numbers -- the opposite of the usual trade, and the reason D-107 did not settle for re-routing sotolon's carbon while leaving it sugar-driven.
+      (2) THE OXIDATION COUPLING IS EMERGENT. OxidativeAcetaldehyde (D-71) raises acetaldehyde when O2 is dosed, so an oxidised wine makes more sotolon BECAUSE it made more acetaldehyde -- Pons' premox mechanism, with nothing scripted. Same term explains vin jaune (flor acetaldehyde is very high => 120-268 ug/L over 6 years, Pham). SO2 enters for free too: it binds acetaldehyde (D-47), and this rate reads the pool that binding depletes.
+      (3) CARBON CLOSES ON ATOM COUNTS. Sotolon C6 = alpha-ketobutyrate C4 + acetaldehyde C2, so total_carbon closes because the chemistry balances, not because a mass was SIZED to close it -- this route has no D-105 carbon-sized-draw blind spot to check. Mass carries a small gap: the aldol condenses out 1 mol H2O (C4H6O3 + C2H4O -> C6H8O3 + H2O), untracked.
+      TEMPERATURE: reads E_a_maillard_strecker as a DELIBERATE CARRY-OVER, not a claim that this reaction shares the Strecker activation energy. Sotolon already rode that constant from D-87 to D-106, so carrying it is the status quo; Pham sources the DIRECTION ("formation of sotolon increases by increasing temperature") and nothing more. Inventing a sotolon-specific E_a to look precise is exactly the fabrication D-101 committed and D-102 had to retract. Re-sourcing it is a parameter-file change, not a structural one.
+      SCOPE, named not hidden: Pham also measures sotolon rising with DECREASING pH and DECREASING ethanol -- neither term is modelled, and the model HAS both quantities, so these are real omissions rather than inexpressible ones. Botrytised sweet wines may carry an additional sugar/furanone contribution not modelled here. The ENANTIOMERS are not split: (S)-sotolon's threshold ~0.8 ug/L is ~100x below (R)'s ~89 ug/L (Pons et al.), so one racemic pool against one threshold is a lump -- see threshold_sotolon_wine.
 w_maillard_methional:
   value: 0.08
   unit: "1"   # relative production weight (normalized in-code)

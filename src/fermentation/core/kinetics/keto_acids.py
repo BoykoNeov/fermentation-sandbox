@@ -96,6 +96,49 @@ stand-ins (the fusel/ester idiom, D-19), and the ethanol/CO2 route is chosen her
 preserves isolability, matching pyruvate exactly.
 Residual sized *lower* than pyruvate's ~30 mg/L (nominal ~20 mg/L): α-ketoglutarate is typically
 somewhat less abundant in finished wine than pyruvate (Jackowetz & Mira de Orduña 2013).
+
+**α-Ketobutyrate (decision D-107) — THE NODE: the first excreted keto-acid with a CONSUMER.**
+:class:`AlphaKetobutyrateExcretion` / :class:`AlphaKetobutyrateReassimilation` are the third pair,
+and the reassimilation is *literally* α-KG's code at ``carbon_atoms = 4`` (the Gay-Lussac split was
+already written generically — D-50 paid that cost once). The **excretion is the new shape**, and two
+things make this pool different in kind from its two siblings:
+
+1. **It is consumed.** Pyruvate and α-KG are terminal residuals that exist to bind SO₂ (D-51).
+   α-Ketobutyrate is the **C4 half of sotolon's aldol** (Pham *et al.* 1995;
+   :class:`~fermentation.core.kinetics.aging.SotolonAldolCondensation`) — so this pool is not a
+   parking space, it is a *substrate*, and its frozen dryness residual is what the bottle-aging
+   aldol eats over the following years.
+2. **It has a second producer.** The D-45 mercaptan route
+   (:class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan`) is
+   ``methionine → methanethiol + 2-oxobutyrate + NH₃``, and until this slot existed the
+   2-oxobutyrate had nowhere to go — which is precisely why that route drew methionine at **0.2 mol
+   per mol thiol** (a 5× under-draw, D-105) rather than the honest 1. The producer and the consumer
+   were **both already in the tree, on opposite sides of one untracked molecule**, for two decisions
+   before anything connected them.
+
+**Why the carbon source SPLITS, and why the rate does not (the load-bearing shape).** Crépin *et
+al.*
+2017 measures 2-ketobutyrate's source as intracellular threonine that is **19% consumed (exogenous)
+threonine and 81% newly synthesised** — i.e. de-novo-dominated. So excretion draws its carbon
+``gate : (1−gate)`` between the must ``threonine`` pool and the sugar de-novo stand-in (D-19 option
+a1), with ``gate`` threonine's own D-100 relative-depletion gate; the threonine share is a genuine
+**deamination** (``L-threonine → 2-oxobutanoate + NH₃``, ILV1), so its nitrogen goes to ``N``, while
+the de-novo share carries none (sugar has no nitrogen — the physical point). The **rate** is
+flux-only ``k · X · S/(K+S)``, exactly its two siblings': gating the rate on threonine would empty
+the pool in a threonine-free wine and kill sotolon — the D-104 canary, one pool further upstream.
+This is D-104's structure with the gate finally on **the molecule it was always about**: D-104 split
+sotolon's carbon on threonine's gate at *consumption* time, standing in for a keto-acid pool it did
+not have. The enrichment is now fixed where reality fixes it — at **synthesis** — and every consumer
+of the pool inherits one enrichment, which is Crépin's own signature ("the isotopic enrichment
+detected in propanol … was the same as that measured in proteinogenic threonine").
+
+**Isolability, and the reason it is exact.** The pool joins the same wine-only
+``_KETO_ACID_PROCESSES``
+tuple. Its consumer's rate is **bilinear in this pool and acetaldehyde**, so a ProcessSet built
+without these Processes leaves ``alpha_ketobutyrate`` at 0 and sotolon's rate at *exactly* 0 — no
+clamp, no gate, no epsilon. That is not a happy accident: it is why
+:class:`~fermentation.core.kinetics.aging.SotolonAldolCondensation` is written mass-action rather
+than gated (D-107).
 """
 
 from __future__ import annotations
@@ -104,11 +147,17 @@ from collections.abc import Mapping
 
 from fermentation.core.chemistry import (
     CARBON_ATOMS,
+    M_ALPHA_KETOBUTYRATE,
     M_ALPHA_KETOGLUTARATE,
     M_CO2,
     M_ETHANOL,
     M_PYRUVATE,
     carbon_mass_fraction,
+)
+from fermentation.core.kinetics.amino_acid_pools import (
+    SPEC_BY_SPECIES,
+    depletion_gate,
+    draw_precursor_carbon,
 )
 from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar,
@@ -129,6 +178,56 @@ _ALPHA_KG_SPECIES = "alpha_ketoglutarate"
 #: :class:`AlphaKetoglutarateReassimilation`): one chemistry source of truth, so a formula change
 #: there automatically keeps the split carbon-exact here.
 _ALPHA_KG_CARBON_ATOMS = CARBON_ATOMS[_ALPHA_KG_SPECIES]
+
+#: The species carbon-accounting the ``alpha_ketobutyrate`` pool — the keto-acid node (D-107).
+_ALPHA_KB_SPECIES = "alpha_ketobutyrate"
+#: Carbon atoms per mole of α-ketobutyrate (4), for the shared Gay-Lussac reassimilation split.
+_ALPHA_KB_CARBON_ATOMS = CARBON_ATOMS[_ALPHA_KB_SPECIES]
+
+#: α-Ketobutyrate's exogenous precursor: ``L-threonine → 2-oxobutanoate + NH₃`` (threonine
+#: dehydratase / ILV1). This is the **19%** half of Crépin *et al.* 2017's 19/81 exogenous/de-novo
+#: split; the other 81% is de-novo threonine, which the model does not track separately because it
+#: would deaminate to this pool immediately — so it is booked straight off sugar (D-19 option a1).
+#: Naming the species here rather than inlining it keeps the draw and the gate on one molecule.
+_ALPHA_KB_PRECURSOR = "threonine"
+
+
+def _gay_lussac_reassimilation(
+    d: FloatArray,
+    y: FloatArray,
+    schema: StateSchema,
+    params: Mapping[str, float],
+    species: str,
+    molar_mass: float,
+    carbon_atoms: int,
+    k_param: str,
+) -> None:
+    """The shared excreted-keto-acid reassimilation step (decisions D-49/D-50, extracted at D-107).
+
+    ``d(pool)/dt = −L`` with ``L = k · X · S/(K_sugar_uptake+S) · [pool]``, returned to metabolism
+    at
+    the **Gay-Lussac 2:1 carbon ratio**: ``units = (L/M) · (carbon_atoms/3)`` moles each of ethanol
+    and CO₂. Carbon-exact for any ``carbon_atoms``, and reduces to pyruvate's mole-for-mole
+    ``C3 → C2 + C1`` at 3 (see :class:`AlphaKetoglutarateReassimilation` for why the naive
+    "1 mol ethanol + 1 mol CO2 per mole" copy would threaten the §2.2 ABV/CO₂ benchmarks).
+
+    Extracted when α-ketobutyrate became the **third** caller (D-107): D-50 already wrote the split
+    generically in ``carbon_atoms``, so the third pool needed no new arithmetic — only a third copy
+    of it, which is what this function exists to prevent. The D-104 lesson applies directly (a
+    duplicated draw that "recomputes exactly what the other books" agrees by luck until it does
+    not): three keto-acids sharing one ratio must share **one implementation** of it.
+    """
+    pool = max(float(y[schema.slice(species)][0]), 0.0)
+    if pool <= 0.0:  # nothing to re-assimilate
+        return
+    flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
+    if flux <= 0.0:  # dryness / no viable yeast ⇒ re-assimilation stops, pool is frozen
+        return
+    loss = params[k_param] * flux * pool  # mass loss of the keto-acid
+    units = (loss / molar_mass) * (carbon_atoms / 3.0)
+    d[schema.slice(species)] = -loss
+    d[schema.slice("E")] = units * M_ETHANOL
+    d[schema.slice("CO2")] = units * M_CO2
 
 
 class PyruvateExcretion(Process):
@@ -219,17 +318,18 @@ class PyruvateReassimilation(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        pyruvate = max(float(y[schema.slice("pyruvate")][0]), 0.0)
-        if pyruvate <= 0.0:  # nothing to re-assimilate
-            return d
-        flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
-        if flux <= 0.0:  # dryness / no viable yeast ⇒ re-assimilation stops, pool is frozen
-            return d
-        loss = params["k_pyruvate_reassimilation"] * flux * pyruvate  # mass loss of pyruvate
-        r = loss / M_PYRUVATE  # molar turnover: 1 pyruvate → 1 ethanol + 1 CO₂ (C3 → C2 + C1)
-        d[schema.slice("pyruvate")] = -loss
-        d[schema.slice("E")] = r * M_ETHANOL
-        d[schema.slice("CO2")] = r * M_CO2
+        # Pyruvate's C3 is exactly one Gay-Lussac unit, so the shared split (D-107) reduces here to
+        # the mole-for-mole 1 pyruvate → 1 ethanol + 1 CO₂ (C3 → C2 + C1) this class always ran.
+        _gay_lussac_reassimilation(
+            d,
+            y,
+            schema,
+            params,
+            _PYRUVATE_SPECIES,
+            M_PYRUVATE,
+            CARBON_ATOMS[_PYRUVATE_SPECIES],
+            "k_pyruvate_reassimilation",
+        )
         return d
 
 
@@ -291,18 +391,133 @@ class AlphaKetoglutarateReassimilation(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        alpha_kg = max(float(y[schema.slice("alpha_ketoglutarate")][0]), 0.0)
-        if alpha_kg <= 0.0:  # nothing to re-assimilate
-            return d
+        # The Gay-Lussac carbon split (NOT mole-for-mole — see the class docstring), shared with
+        # pyruvate and α-ketobutyrate since D-107: 2 mol ethanol-carbon : 1 mol CO2-carbon per 3
+        # carbons fermented.
+        _gay_lussac_reassimilation(
+            d,
+            y,
+            schema,
+            params,
+            _ALPHA_KG_SPECIES,
+            M_ALPHA_KETOGLUTARATE,
+            _ALPHA_KG_CARBON_ATOMS,
+            "k_alpha_kg_reassimilation",
+        )
+        return d
+
+
+class AlphaKetobutyrateExcretion(Process):
+    """Overflow-α-ketobutyrate excretion — fills the keto-acid NODE (decision D-107).
+
+    ``d(alpha_ketobutyrate)/dt = k_alpha_kb_excretion · X · S_total/(K_sugar_uptake + S_total)``.
+    The **rate** is flux-only, exactly like its two siblings; the **carbon source** is the one new
+    shape in this module, and it splits::
+
+        gate      = threonine's D-100 relative-depletion gate
+        carbon    = rate · c(alpha_ketobutyrate)
+        threonine share: gate · carbon      → drawn from `threonine`, its N deaminated to `N`
+        de-novo share:   (1−gate) · carbon  → drawn from `S` (the sugar stand-in), N-free
+
+    **Why split, and why not gate the rate.** Crépin *et al.* 2017 measures 2-ketobutyrate as **19%
+    exogenous threonine / 81% newly synthesised**, so a pure-threonine draw would be wrong by ~5×
+    *and* would make a threonine-free wine produce no sotolon — the D-104 canary. A pure-sugar draw
+    would be simpler and would zero the enrichment, throwing away the one thing D-104 got right. The
+    split reproduces the 19/81 rather than asserting it: it is ``gate``, the same quantity the
+    Ehrlich re-route gives propanol off the same pool, which is Crépin's own signature (one
+    intracellular pool ⇒ one enrichment, seen identically by every consumer).
+
+    **The nitrogen is not decoration.** ``L-threonine → 2-oxobutanoate + NH₃`` (ILV1) is a genuine
+    deamination and α-ketobutyrate is nitrogen-free, so *all* the drawn threonine's nitrogen lands
+    in
+    ``N`` — which is what closes ``total_nitrogen``. The de-novo share releases none, because sugar
+    has none; that asymmetry is the physical content of the split, not a bookkeeping artifact.
+
+    Held temperature-flat (v1, the D-49/D-50 call). Touches ``alpha_ketobutyrate``/``threonine``/
+    ``S``/``N``. **Writes ``N``**, so an enabled run drops structural ``tier_of("N")``
+    PLAUSIBLE→SPECULATIVE (the D-45 precedent). Tier **speculative** (rate magnitude estimate).
+    """
+
+    name = "alpha_kb_excretion"
+    tier = Tier.SPECULATIVE
+    touches = ("alpha_ketobutyrate", _ALPHA_KB_PRECURSOR, "S", "N")
+    reads: tuple[str, ...] = (
+        "k_alpha_kb_excretion",
+        "K_sugar_uptake",
+        "K_amino_acids",
+        SPEC_BY_SPECIES[_ALPHA_KB_PRECURSOR].fraction_param,
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
         flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
-        if flux <= 0.0:  # dryness / no viable yeast ⇒ re-assimilation stops, pool is frozen
+        if flux <= 0.0:
             return d
-        loss = params["k_alpha_kg_reassimilation"] * flux * alpha_kg  # mass loss of alpha-KG
-        molar_turnover = loss / M_ALPHA_KETOGLUTARATE
-        # Gay-Lussac carbon split (NOT mole-for-mole — see the class docstring): 2 mol
-        # ethanol-carbon-equivalent : 1 mol CO2-carbon-equivalent per 3 carbons fermented.
-        units = molar_turnover * (_ALPHA_KG_CARBON_ATOMS / 3.0)
-        d[schema.slice("alpha_ketoglutarate")] = -loss
-        d[schema.slice("E")] = units * M_ETHANOL
-        d[schema.slice("CO2")] = units * M_CO2
+        rate = params["k_alpha_kb_excretion"] * flux  # [g alpha-ketobutyrate/L/h]
+        carbon = rate * carbon_mass_fraction(_ALPHA_KB_SPECIES)  # [g C/L/h] to account for
+        # The exogenous share is threonine's own relative-depletion gate (D-100) — NOT a fitted
+        # fraction. Crépin's 19/81 is reproduced by it, so it moves correctly with the must's
+        # threonine rather than being pinned to one measurement's number (the D-104 lesson: a cited
+        # number binds only the set it describes).
+        gate = depletion_gate(y, schema, params, (SPEC_BY_SPECIES[_ALPHA_KB_PRECURSOR],))
+        d[schema.slice(_ALPHA_KB_SPECIES)] = rate
+        if gate > 0.0:
+            # THREONINE DEAMINATION (ILV1): its nitrogen is released to ammonium in full, since the
+            # keto-acid keeps none of it — this is what closes total_nitrogen.
+            nitrogen = draw_precursor_carbon(d, schema, _ALPHA_KB_PRECURSOR, gate * carbon)
+            d[schema.slice("N")] = nitrogen
+        if gate < 1.0:
+            # The de-novo share: 2-ketobutyrate the cell builds from sugar (via de-novo threonine,
+            # which would deaminate to this pool immediately — so it is not tracked separately).
+            # Carries NO nitrogen, which is the physical point.
+            draw_carbon_from_sugar(d, y, schema, (1.0 - gate) * carbon)
+        return d
+
+
+class AlphaKetobutyrateReassimilation(Process):
+    """Co-metabolic re-assimilation of overflow α-ketobutyrate — freezes the node's residual
+    (D-107).
+
+    ``d(alpha_ketobutyrate)/dt = −L`` with ``L = k_alpha_kb_reassimilation ·
+    X · S/(K_sugar_uptake+S) · [alpha_ketobutyrate]``, carbon returned to ``E``/``CO2`` at the
+    shared
+    Gay-Lussac 2:1 split (:func:`_gay_lussac_reassimilation`) — α-ketobutyrate's C4 is not a whole
+    Gay-Lussac unit, so this is α-KG's case, not pyruvate's, and D-50's generic ``carbon_atoms/3``
+    covers it with no new arithmetic.
+
+    **The freeze is what the consumer needs.** As with pyruvate/α-KG this is flux-linked, so it
+    stops
+    at dryness and the pool holds its quasi-steady plateau
+    ``k_alpha_kb_excretion / k_alpha_kb_reassimilation`` as a persistent finished-wine residual. For
+    the two terminal keto-acids that residual exists to bind SO₂; here it is the **substrate the
+    bottle-aging sotolon aldol draws down over the following years**
+    (:class:`~fermentation.core.kinetics.aging.SotolonAldolCondensation`) — a real, slow, in-bottle
+    consumption that only makes sense *because* the residual is frozen rather than drained to 0 by a
+    viable-``X`` no-flux gate (the D-49 option-A argument, now load-bearing for a second reason).
+
+    Tier **speculative**; mass carries the usual small gap (the oxidation moves untracked NAD(P)H) —
+    carbon is the invariant.
+    """
+
+    name = "alpha_kb_reassimilation"
+    tier = Tier.SPECULATIVE
+    touches = ("alpha_ketobutyrate", "E", "CO2")
+    reads: tuple[str, ...] = ("k_alpha_kb_reassimilation", "K_sugar_uptake")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        _gay_lussac_reassimilation(
+            d,
+            y,
+            schema,
+            params,
+            _ALPHA_KB_SPECIES,
+            M_ALPHA_KETOBUTYRATE,
+            _ALPHA_KB_CARBON_ATOMS,
+            "k_alpha_kb_reassimilation",
+        )
         return d

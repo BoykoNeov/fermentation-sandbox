@@ -101,7 +101,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.chemistry import MOLAR_MASS, carbon_mass_fraction
 from fermentation.core.kinetics.amino_acid_pools import (
     SPEC_BY_SPECIES,
     depletion_gate,
@@ -123,26 +123,40 @@ _MERCAPTAN_SPECIES = "methanethiol"
 #: the pool speciated, the draw finally *is* methionine: the sulfur-bearing amino acid whose
 #: demethiolation genuinely releases methanethiol.
 #:
-#: **HALF the D-45 caveat is retired — D-100 said "retired, not restated" and that overclaimed
-#: (decision D-105).** The *identity* is now right; the *stoichiometry* is still a stand-in. The
-#: reaction this comment names — demethiolation — is ``1 mol methionine → 1 mol methanethiol +
-#: 1 mol 2-oxobutyrate + NH₃``, but the draw below is sized to the **thiol's single carbon**, so it
-#: consumes **0.2 mol methionine per mol thiol**: a **5× under-draw**, with methionine's other four
-#: carbons (the 2-oxobutyrate) never charged and its nitrogen released at 1/5 the real rate. Carbon
-#: closes — the draw is *defined* to close it — which is exactly why no conservation test sees this;
-#: ``test_a_carbon_sized_draw_equals_real_stoichiometry_only_where_it_charges_the_co2`` is the one
-#: that does. **The code's own named mechanism is what convicts it**: no literature is needed to see
-#: that a 1:1 reaction is being run at 0.2:1.
+#: **THE 5× UNDER-DRAW IS FIXED (decision D-107); the rest of this note is its history.** D-45 sized
+#: the draw to the **thiol's single carbon**, so it consumed **0.2 mol methionine per mol thiol** —
+#: methionine's other four carbons never charged, its nitrogen released at 1/5 the real rate. Carbon
+#: closed — the draw was *defined* to close it — which is exactly why no conservation test ever saw
+#: it, and why it survived D-45 → D-100 → D-104. **The code's own named mechanism convicted it**
+#: (D-105): demethiolation is ``1 mol methionine → 1 mol methanethiol + 1 mol 2-oxobutyrate + NH₃``,
+#: an internal contradiction with a 0.2:1 draw that needed no literature to see. D-100's line here —
+#: "the D-45 caveat is retired, not restated" — **overclaimed**: the *identity* was retired
+#: (arginine
+#: → methionine, a real fix), the *stoichiometry* was not. Half a caveat was retired and the
+#: sentence
+#: claimed all of it.
 #:
-#: **Not fixed here, and the reason is structural**: drawing the honest 1 mol would strand four
-#: carbons with nowhere to go, because the model has no **2-oxobutyrate** pool. That is the same
-#: missing node sotolon needs (D-104 fabricates it from sugar via ``de_novo``) — so this route and
-#: sotolon are **producer and consumer of one untracked molecule**, and the keto-acid node closes
-#: both or neither. **Currently inert** (measured, D-105): this route only fires *sur lie*, where
-#: autolysis refills methionine faster than any consumer draws it (pool 2.74 → 5.88 mg/L over a
-#: 150-day aging), so the corrected draw would still take only ~3.6% of the pool and the gate never
-#: bites. A real defect with no present consequence — recorded, not patched.
+#: **What unblocked it was not a source but a pool.** D-105 could not patch this: drawing the honest
+#: 1 mol would strand four carbons with nowhere to go, because the model had no **2-oxobutyrate**.
+#: That is the same molecule sotolon consumes (which D-104 fabricated from sugar via ``de_novo``) —
+#: so this route and sotolon were **producer and consumer of one untracked molecule, in the same
+#: wine, on the same aging phase**, for two decisions. D-107 builds the pool
+#: (:mod:`~fermentation.core.kinetics.keto_acids`), and the draw below is now the honest **1:1**:
+#: the C4 goes to ``alpha_ketobutyrate`` and the full nitrogen to ``N``.
+#:
+#: **It was measured INERT before the fix and it stays nearly so — that is expected, not a
+#: disappointment** (D-105): this route only fires *sur lie*, where autolysis refills methionine
+#: faster than any consumer draws it (pool 2.74 → 5.88 mg/L over a 150-day aging), so even the
+#: corrected 5× draw takes only ~3.6% of the pool and the gate never bites. The value here is that
+#: the stoichiometry is right and the four carbons are on the ledger where a consumer can reach them
+#: — not a moved output.
 _PRECURSOR_SPECIES = "methionine"
+
+#: The C4 co-product of demethiolation (decision D-107): ``methionine → methanethiol +
+#: 2-oxobutyrate + NH₃``. Booking it into the keto-acid node's pool is what lets the draw above be
+#: 1:1 — the carbon split ``5 = 1 + 4`` is exact *because* it is read off the atom counts in
+#: :mod:`~fermentation.core.chemistry`, not off a fitted fraction.
+_CO_PRODUCT_SPECIES = "alpha_ketobutyrate"
 
 
 class AutolyticMercaptan(Process):
@@ -161,8 +175,10 @@ class AutolyticMercaptan(Process):
     name = "autolytic_mercaptan"
     tier = Tier.SPECULATIVE
     #: Fills ``mercaptans``, debits ``methionine`` for its carbon (decision D-100 — the *actual*
-    #: precursor, no longer the arginine lump), releases the nitrogen to ``N``.
-    touches = ("mercaptans", _PRECURSOR_SPECIES, "N")
+    #: precursor, no longer the arginine lump), releases the nitrogen to ``N``, and — since D-107 —
+    #: books the C4 co-product into ``alpha_ketobutyrate`` (the keto-acid node), which is what makes
+    #: the methionine draw the honest 1:1 instead of D-45's 0.2:1.
+    touches = ("mercaptans", _PRECURSOR_SPECIES, _CO_PRODUCT_SPECIES, "N")
     #: ``y_mercaptan`` sets the g-MeSH-per-g-biomass-autolysed yield; ``k_autolysis``/
     #: ``E_a_autolysis``/``T_ref`` are the *same* autolysis constants
     #: :func:`~fermentation.core.kinetics.autolysis.autolysis_flux` reads (so all autolysis branches
@@ -192,13 +208,24 @@ class AutolyticMercaptan(Process):
             return d  # no methionine ⇒ no thiol source ⇒ no mercaptan (the D-33 no-op)
 
         r_merc = params["y_mercaptan"] * r_autolysis * gate  # [g methanethiol/L/h]
-        # Draw the mercaptan carbon from METHIONINE and deaminate its nitrogen (Option A, D-33;
-        # speciated at D-100): the carbon into mercaptans is sized to equal the carbon out of
-        # methionine, so carbon closes; the released methionine nitrogen all goes to the N pool
-        # since methanethiol is nitrogen-free, so nitrogen closes — both by construction.
-        merc_carbon = r_merc * carbon_mass_fraction(_MERCAPTAN_SPECIES)  # [g C/L/h] in the thiol
-        nitrogen = draw_precursor_carbon(d, schema, _PRECURSOR_SPECIES, merc_carbon)
+        # DEMETHIOLATION AT ITS REAL STOICHIOMETRY (decision D-107):
+        #     1 mol methionine → 1 mol methanethiol + 1 mol 2-oxobutyrate + NH₃
+        # so the draw is sized to ONE MOLE of methionine per mole of thiol, not (as through D-106)
+        # to the thiol's single carbon — which consumed 0.2 mol and discarded the other four
+        # carbons. Passing methionine's FULL molar carbon to the shared helper is what makes the
+        # debit exactly 1:1; the helper sizes mass from carbon, so handing it the whole molecule's
+        # carbon hands it the whole molecule.
+        n_merc = r_merc / MOLAR_MASS[_MERCAPTAN_SPECIES]  # [mol/L/h] of thiol == of methionine
+        met_carbon = (
+            n_merc * MOLAR_MASS[_PRECURSOR_SPECIES] * carbon_mass_fraction(_PRECURSOR_SPECIES)
+        )
+        nitrogen = draw_precursor_carbon(d, schema, _PRECURSOR_SPECIES, met_carbon)
 
         d[schema.slice("mercaptans")] = r_merc
+        # The C4 co-product, on the ledger at last. Carbon closes on ATOM COUNTS, not on a sized
+        # draw: methionine's 5 carbons leave as the thiol's 1 + this pool's 4, so the identity
+        # C(methionine) == C(methanethiol) + C(2-oxobutyrate) is what balances the books here —
+        # which is exactly the D-105 signature that convicted the old draw, now satisfied.
+        d[schema.slice(_CO_PRODUCT_SPECIES)] = n_merc * MOLAR_MASS[_CO_PRODUCT_SPECIES]
         d[schema.slice("N")] = nitrogen  # DEAMINATION: methionine nitrogen → ammonium (D-33)
         return d

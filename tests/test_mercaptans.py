@@ -16,7 +16,11 @@ from collections.abc import Mapping
 import numpy as np
 import pytest
 
-from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
+from fermentation.core.chemistry import (
+    MOLAR_MASS,
+    carbon_mass_fraction,
+    nitrogen_mass_fraction,
+)
 from fermentation.core.kinetics import AutolyticMercaptan, GrowthNitrogenLimited
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.media import wine_schema
@@ -37,6 +41,9 @@ from tests.conftest import seed_amino_acids
 _MERCAPTAN_SPECIES = "methanethiol"
 #: The thiol's real precursor since D-100 (was the lumped arginine stand-in).
 _AA_SPECIES = "methionine"
+#: Demethiolation's C4 co-product (D-107) — the keto-acid node. Its existence is what let the
+#: methionine draw become the honest 1:1: the other four carbons finally have somewhere to go.
+_CO_PRODUCT_SPECIES = "alpha_ketobutyrate"
 
 
 @pytest.fixture
@@ -83,7 +90,22 @@ def _mercaptan_y0(
 
 
 def _expected(params: Mapping[str, float], *, x_dead: float, amino_acids: float, t: float):
-    """The closed form: (r_merc, aa_mass, n_release)."""
+    """The closed form: (r_merc, met_mass, keto_rate, n_release).
+
+    **This helper used to encode the bug (decision D-107).** Through D-106 it read
+    ``aa_mass = merc_carbon / c_methionine`` — sizing the methionine draw to the *thiol's single
+    carbon*, i.e. 0.2 mol methionine per mol thiol. It matched the Process exactly and passed for
+    sixty-odd decisions, because it was the same arithmetic written twice. That is the D-105 lesson
+    in test form: **a closed-form check written from the code cannot find a stoichiometry error in
+    the code** — only the reaction can, and the reaction is
+    ``1 mol methionine → 1 mol methanethiol + 1 mol 2-oxobutyrate + NH₃``.
+
+    So this is now written from the **reaction**, not the implementation: one mole of methionine per
+    mole of thiol, its C4 to α-ketobutyrate, its nitrogen to N — and the carbon identity ``5 ==
+    1+4``
+    is asserted independently in :func:`test_carbon_closes_at_the_derivative_level` rather than
+    assumed here.
+    """
     f_t = arrhenius_factor(t, params["E_a_autolysis"], params["T_ref"])
     r_autolysis = params["k_autolysis"] * f_t * x_dead
     # At must-spectrum composition methionine's relative-depletion gate aa_i/(K·f_i + aa_i) is
@@ -91,10 +113,12 @@ def _expected(params: Mapping[str, float], *, x_dead: float, amino_acids: float,
     # unchanged by the split — which is exactly the property being asserted.
     gate = amino_acids / (params["K_amino_acids"] + amino_acids)
     r_merc = params["y_mercaptan"] * r_autolysis * gate
-    merc_carbon = r_merc * carbon_mass_fraction(_MERCAPTAN_SPECIES)
-    aa_mass = merc_carbon / carbon_mass_fraction(_AA_SPECIES)
-    n_release = aa_mass * nitrogen_mass_fraction(_AA_SPECIES)
-    return r_merc, aa_mass, n_release
+    # STOICHIOMETRY, not carbon-sizing: 1 mol methionine per mol thiol (D-107).
+    n_merc = r_merc / MOLAR_MASS[_MERCAPTAN_SPECIES]  # mol/L/h
+    met_mass = n_merc * MOLAR_MASS[_AA_SPECIES]
+    keto_rate = n_merc * MOLAR_MASS[_CO_PRODUCT_SPECIES]  # the C4 that used to be discarded
+    n_release = met_mass * nitrogen_mass_fraction(_AA_SPECIES)
+    return r_merc, met_mass, keto_rate, n_release
 
 
 # -- metadata + closed form ---------------------------------------------------
@@ -104,8 +128,9 @@ def test_metadata():
     p = AutolyticMercaptan()
     assert p.name == "autolytic_mercaptan"
     assert p.tier is Tier.SPECULATIVE
-    # Draws METHIONINE (D-100), not the retired lumped arginine pool.
-    assert set(p.touches) == {"mercaptans", "methionine", "N"}
+    # Draws METHIONINE (D-100), not the retired lumped arginine pool — and since D-107 books the
+    # C4 co-product demethiolation really releases, which is what makes that draw 1:1.
+    assert set(p.touches) == {"mercaptans", "methionine", "alpha_ketobutyrate", "N"}
     assert "amino_acids" not in p.touches
     assert set(p.reads) == {
         "y_mercaptan",
@@ -128,26 +153,66 @@ def test_matches_closed_form(params):
     schema = wine_schema()
     y = _mercaptan_y0(schema, params, x_dead=1.5, amino_acids=1.0)
     d = AutolyticMercaptan().derivatives(0.0, y, schema, params)
-    r_merc, aa_mass, n_release = _expected(params, x_dead=1.5, amino_acids=1.0, t=293.15)
+    r_merc, met_mass, keto_rate, n_release = _expected(
+        params, x_dead=1.5, amino_acids=1.0, t=293.15
+    )
     assert schema.get(d, "mercaptans") == pytest.approx(r_merc)
     assert schema.get(d, "mercaptans") > 0.0
-    assert schema.get(d, "methionine") == pytest.approx(-aa_mass)
+    assert schema.get(d, "methionine") == pytest.approx(-met_mass)
+    assert schema.get(d, "alpha_ketobutyrate") == pytest.approx(keto_rate)
     assert schema.get(d, "N") == pytest.approx(n_release)
-    # touches ONLY those three — nothing else on the state moves (not X_dead, S, E, h2s, …)
+    # touches ONLY those four — nothing else on the state moves (not X_dead, S, E, h2s, …)
     for name in schema.names:
-        if name in ("mercaptans", "methionine", "N"):
+        if name in ("mercaptans", "methionine", "alpha_ketobutyrate", "N"):
             continue
         assert schema.get(d, name) == pytest.approx(0.0, abs=1e-18), name
 
 
 def test_carbon_closes_at_the_derivative_level(params):
-    # The carbon into mercaptans EQUALS the carbon out of amino_acids (the draw is sized to match),
-    # so the transfer is carbon-neutral on total_carbon — closure by construction (D-45).
+    """Carbon out of methionine == carbon into methanethiol + alpha-ketobutyrate (D-107).
+
+    **The meaning of this test changed even though its form did not.** Through D-106 it compared two
+    numbers that were *defined* to be equal: the draw was sized from the thiol's carbon, so closure
+    was a tautology and the test could never fail — which is precisely why it never caught the 5×
+    under-draw sitting next to it (D-105: "a draw defined to close the ledger can never violate
+    it"). Now the draw is sized by MOLES, and closure is a real constraint that holds only because
+    methionine's 5 carbons genuinely equal the thiol's 1 + the keto-acid's 4. Break the split — book
+    the C4 at the wrong molar mass, or drop the pool — and this fails.
+    """
     schema = wine_schema()
     d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, params), schema, params)
     c_merc = schema.get(d, "mercaptans") * carbon_mass_fraction(_MERCAPTAN_SPECIES)
+    c_keto = schema.get(d, "alpha_ketobutyrate") * carbon_mass_fraction(_CO_PRODUCT_SPECIES)
     c_aa = schema.get(d, "methionine") * carbon_mass_fraction(_AA_SPECIES)
-    assert c_merc + c_aa == pytest.approx(0.0, abs=1e-18)  # gain == loss
+    assert c_merc + c_keto + c_aa == pytest.approx(0.0, abs=1e-18)  # gain == loss
+
+
+def test_demethiolation_draws_one_mole_of_methionine_per_mole_of_thiol(params):
+    """The D-105 conviction, now the D-107 fix — measured off ``dy/dt``, not declared (D-107).
+
+    D-45 drew **0.2 mol methionine per mol methanethiol**: the draw was sized to the thiol's single
+    carbon, so methionine's other four (the 2-oxobutyrate) were never charged and its nitrogen was
+    released at 1/5 the real rate. Carbon closed the whole time — the draw was defined to close it —
+    which is why 1140 tests and every conservation check missed it for sixty decisions.
+
+    The mechanism the module names in prose is what convicted it, with no literature needed:
+    demethiolation is ``1 mol methionine → 1 mol methanethiol + 1 mol 2-oxobutyrate + NH₃``, and a
+    1:1 reaction was being run at 0.2:1 — an internal contradiction. This test pins the ratio by
+    DRIVING the Process and reading the debit, so it fails on implementation drift and not merely on
+    a table edit (the D-105 two-layer lesson, where layer 1 alone proved insufficient).
+    """
+    schema = wine_schema()
+    d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, params), schema, params)
+    n_thiol = schema.get(d, "mercaptans") / MOLAR_MASS[_MERCAPTAN_SPECIES]
+    n_met = -schema.get(d, "methionine") / MOLAR_MASS[_AA_SPECIES]
+    n_keto = schema.get(d, "alpha_ketobutyrate") / MOLAR_MASS[_CO_PRODUCT_SPECIES]
+    assert n_thiol > 0.0
+    assert n_met / n_thiol == pytest.approx(1.0, abs=1e-12), (
+        "demethiolation must consume 1 mol methionine per mol thiol; D-45 consumed 0.2 by sizing "
+        "the draw to the thiol's single carbon"
+    )
+    # The co-product is 1:1 too — it IS the other four carbons, so it cannot be anything else.
+    assert n_keto / n_thiol == pytest.approx(1.0, abs=1e-12)
 
 
 def test_nitrogen_closes_at_the_derivative_level(params):
@@ -195,7 +260,7 @@ def test_is_not_flux_linked(params):
     dry = AutolyticMercaptan().derivatives(
         0.0, _mercaptan_y0(schema, params, s=0.0, x=0.0), schema, params
     )
-    r_merc, _, _ = _expected(params, x_dead=1.5, amino_acids=1.0, t=293.15)
+    r_merc, _, _, _ = _expected(params, x_dead=1.5, amino_acids=1.0, t=293.15)
     assert schema.get(dry, "mercaptans") == pytest.approx(r_merc)
     assert schema.get(dry, "mercaptans") > 0.0
 

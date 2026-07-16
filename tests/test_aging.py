@@ -29,6 +29,7 @@ from fermentation.core.chemistry import (
     M_2_METHYLPROPANAL,
     M_3_METHYLBUTANAL,
     M_ACETALDEHYDE,
+    M_ALPHA_KETOBUTYRATE,
     M_CO2,
     M_ETHANOL,
     M_METHIONAL,
@@ -50,6 +51,7 @@ from fermentation.core.kinetics import (
     OakExtraction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
+    SotolonAldolCondensation,
     StreckerDegradation,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
@@ -1310,20 +1312,21 @@ _MAILLARD_PRECURSORS = {
     "2_methylbutanal": "isoleucine",
     "3_methylbutanal": "leucine",
     "2_methylpropanal": "valine",
-    "sotolon": "threonine",
 }
+# SOTOLON LEFT THIS MAP AT D-107. It was never a Strecker degradation of threonine: it is an aldol
+# of alpha-ketobutyrate + acetaldehyde (Pham et al. 1995), and threonine is only its GRANDparent
+# (threonine -> alpha-ketobutyrate -> sotolon). See SotolonAldolCondensation and its tests below.
 _MAILLARD_TOUCHES = {
     "methional",
     "phenylacetaldehyde",
     "2_methylbutanal",
     "3_methylbutanal",
     "2_methylpropanal",
-    "sotolon",
     "CO2",
     "N",
-    # S became a WRITE at D-104: sotolon is de_novo-capable, so the share of its carbon the must
-    # threonine pool cannot supply is drawn off sugar (the de-novo 2-ketobutyrate stand-in).
-    "S",
+    # S is READ-ONLY again since D-107 (it was a WRITE at D-104, for sotolon's de-novo sugar
+    # stand-in). A Strecker degradation has no business drawing sugar carbon, and the only row that
+    # did was the row that was not a Strecker degradation.
     *_MAILLARD_PRECURSORS.values(),
 }
 # Per-product carbon fraction, keyed by pool (for the closed-form carbon accounting).
@@ -1333,7 +1336,6 @@ _MAILLARD_C = {
     "2_methylbutanal": _2MB_C,
     "3_methylbutanal": _3MB_C,
     "2_methylpropanal": _2MP_C,
-    "sotolon": _SOTOLON_C,
 }
 
 
@@ -1383,23 +1385,19 @@ def _maillard_closed_form(
     gate = aa / (params["K_amino_acids"] + aa)
     f_t = arrhenius_factor(t, params["E_a_maillard_strecker"], params["T_ref"])
     driver = params["k_maillard_strecker"] * f_t * s_total  # PRE-gate since D-104
-    weights = [params[wname] for (_, _, wname, _, _, _) in _MAILLARD_PRODUCTS]
+    weights = [params[wname] for (_, _, wname, _) in _MAILLARD_PRODUCTS]
     w_sum = sum(weights)
     out: dict[str, float] = {}
     co2_mol = 0.0
-    for (pool, m_i, _wn, decarb, _prec, de_novo), w_i in zip(
-        _MAILLARD_PRODUCTS, weights, strict=True
-    ):
-        # A de-novo-capable product (sotolon alone) is NOT rate-gated by the must pool — its carbon
-        # comes from a keto acid the cell makes from sugar, so an empty pool moves the carbon's
-        # SOURCE, never the rate (D-104). The five true Strecker aldehydes stay gated: no leucine,
-        # no 3-methylbutanal.
-        n_i = (w_i / w_sum) * driver * (1.0 if de_novo else gate)
+    for (pool, m_i, _wn, _prec), w_i in zip(_MAILLARD_PRODUCTS, weights, strict=True):
+        # Every product here is a true Strecker degradation of its own amino acid, so every one is
+        # gated on its precursor (no leucine, no 3-methylbutanal) and every one decarboxylates.
+        # The two exception branches this loop used to carry — `de_novo` (rate ungated, carbon off
+        # sugar) and `decarboxylates=False` — were sotolon's alone, and sotolon left at D-107.
+        n_i = (w_i / w_sum) * driver * gate
         out[pool] = n_i * m_i
-        if decarb:
-            co2_mol += n_i
+        co2_mol += n_i
     out["CO2"] = co2_mol * M_CO2
-    out["_gate"] = gate  # the exogenous share of sotolon's carbon; the rest comes off sugar
     return out
 
 
@@ -1408,13 +1406,16 @@ def test_maillard_metadata():
     assert p.name == "maillard_strecker"
     # Speculative: the aging axis is the Tier-3 frontier (form sourced, magnitudes estimated).
     assert p.tier is Tier.SPECULATIVE
-    # Books the six thermal products + the decarboxylation CO2, drawing carbon from each product's
-    # own precursor and deaminating the nitrogen to N — plus S since D-104 (sotolon's de-novo
-    # 2-ketobutyrate share). Still NO o2: the thermal axis is the oxygen-free one, which is the
-    # whole point of the D-87 split from D-75.
+    # Books the FIVE thermal Strecker aldehydes + the decarboxylation CO2, drawing carbon from each
+    # product's own precursor and deaminating the nitrogen to N. Still NO o2: the thermal axis is
+    # the
+    # oxygen-free one, which is the whole point of the D-87 split from D-75.
     assert set(p.touches) == _MAILLARD_TOUCHES
     assert "o2" not in p.touches
-    assert "S" in p.touches  # D-104: was a read-only driver through D-87/D-100
+    # D-107: S is a READ-ONLY driver again (it was a WRITE at D-104 for sotolon's de-novo sugar
+    # share), and sotolon is not this Process's product at all any more.
+    assert "S" not in p.touches
+    assert "sotolon" not in p.touches
     assert "amino_acids" not in p.touches  # the lumped draw is RETIRED (D-100)
     assert set(p.reads) == {
         "k_maillard_strecker",
@@ -1424,11 +1425,14 @@ def test_maillard_metadata():
         "w_maillard_2_methylbutanal",
         "w_maillard_3_methylbutanal",
         "w_maillard_2_methylpropanal",
-        "w_maillard_sotolon",
         "K_amino_acids",
         "T_ref",
         *(f"must_aa_fraction_{aa}" for aa in set(_MAILLARD_PRECURSORS.values())),
     }
+    # w_maillard_sotolon is RETIRED (D-107): sotolon is not one of six co-produced Strecker
+    # products competing for a shared flux, so it has no relative composition weight. It has its
+    # own second-order rate constant instead (k_sotolon_aldol).
+    assert not any(r.startswith("w_maillard_sotolon") for r in p.reads)
 
 
 def test_maillard_matches_closed_form(maillard_params):
@@ -1439,23 +1443,17 @@ def test_maillard_matches_closed_form(maillard_params):
     d = MaillardStrecker().derivatives(0.0, y, schema, maillard_params)
     cf = _maillard_closed_form(schema, maillard_params, y, 298.15)
 
-    assert cf["sotolon"] > 0.0  # products are live (guards against a vacuous pass)
+    assert cf["methional"] > 0.0  # products are live (guards against a vacuous pass)
     for pool in _MAILLARD_C:
         assert schema.get(d, pool) == pytest.approx(cf[pool])
     assert schema.get(d, "CO2") == pytest.approx(cf["CO2"])
     # EACH precursor drawn sized to the carbon of the product IT made, plus the CO2 that product's
-    # own carboxyl released (D-100; sotolon contributes none — it is an aldol furanone, not a
-    # Strecker aldehyde). The CO2 attribution is invisible to conservation, so it is pinned here.
-    # Since D-104 sotolon draws only its GATED share from threonine; the rest comes off sugar.
+    # own carboxyl released (D-100). The CO2 attribution is invisible to conservation, so it is
+    # pinned here — and charging it is exactly what makes each carbon-sized draw land on the true
+    # 1 mol precursor per mol product (D-105's signature).
     per_precursor: dict[str, float] = {}
-    expected_de_novo = 0.0
-    for pool, m_i, _wname, decarb, precursor, de_novo in _MAILLARD_PRODUCTS:
-        carbon = cf[pool] * _MAILLARD_C[pool]
-        if decarb:
-            carbon += (cf[pool] / m_i) * M_CO2 * _CO2_C  # 1 CO2 per aldehyde
-        if de_novo:
-            expected_de_novo += (1.0 - cf["_gate"]) * carbon
-            carbon *= cf["_gate"]
+    for pool, m_i, _wname, precursor in _MAILLARD_PRODUCTS:
+        carbon = cf[pool] * _MAILLARD_C[pool] + (cf[pool] / m_i) * M_CO2 * _CO2_C
         per_precursor[precursor] = per_precursor.get(precursor, 0.0) + carbon
     expected_n = 0.0
     for precursor, carbon in per_precursor.items():
@@ -1464,12 +1462,10 @@ def test_maillard_matches_closed_form(maillard_params):
         expected_n += mass * nitrogen_mass_fraction(precursor)
     assert schema.get(d, "N") == pytest.approx(expected_n)
     assert schema.get(d, "amino_acids") == 0.0  # the lumped pool is untouched (D-100)
-    # S IS consumed since D-104 — sotolon's de-novo (2-ketobutyrate) share is booked off sugar,
-    # exactly as the Ehrlich producer's stand-in is. Sized to the un-gated remainder, and carrying
-    # NO nitrogen (sugar has none — de-novo 2-ketobutyrate needs no amino acid).
-    assert expected_de_novo > 0.0  # guards against a vacuous pass
-    s_drawn = -float(d[schema.slice("S")].sum()) * carbon_mass_fraction("glucose")
-    assert s_drawn == pytest.approx(expected_de_novo)
+    # S IS NOT CONSUMED since D-107: it is the dicarbonyl DRIVER, read and never written. The only
+    # row that drew sugar carbon was sotolon's de-novo share (D-104), and sotolon now takes its
+    # carbon from the tracked alpha_ketobutyrate pool in its own Process.
+    assert float(d[schema.slice("S")].sum()) == 0.0
     assert schema.get(d, "o2") == 0.0
     for var in ("X", "E", "isoamyl_acetate", "isoamyl_alcohol", "Byp", "acetaldehyde"):
         assert schema.get(d, var) == 0.0
@@ -1490,10 +1486,9 @@ def test_maillard_carbon_closes_per_rhs(maillard_params):
             schema.get(d, aa) * carbon_mass_fraction(aa)
             for aa in set(_MAILLARD_PRECURSORS.values())
         )
-        # The sugar leg (D-104): sotolon's de-novo share leaves S rather than threonine. Omitting
-        # it here would make this test PASS ONLY IF that leg were zero — i.e. it would silently
-        # stop testing the thing D-104 added.
-        + float(d[schema.slice("S")].sum()) * carbon_mass_fraction("glucose")
+        # The D-104 sugar leg is gone (D-107): sotolon's de-novo share left with sotolon, so this
+        # Process is a pure amino-acid -> aldehyde + CO2 transfer again. `test_maillard_matches_
+        # closed_form` asserts dS == 0 head-on, so dropping the term here is not hiding a leg.
     )
     assert carbon_residual == pytest.approx(0.0, abs=1e-18)
 
@@ -1516,44 +1511,45 @@ def test_maillard_nitrogen_closes_per_rhs(maillard_params):
     assert nitrogen_residual == pytest.approx(0.0, abs=1e-18)
 
 
-def test_the_five_strecker_aldehydes_are_inert_without_amino_acids_but_sotolon_is_not(
-    maillard_params,
-):
-    # NARROWED AT D-104, deliberately — read the reason before "restoring" this.
-    #
-    # Through D-100 this asserted the WHOLE Process was inert at aa=0. That is no longer true and
-    # must not be: sotolon is an aldol furanone of 2-ketobutyrate, which Crépin measures as
-    # de-novo-dominated ("19% consumed threonine ... 81% newly synthesized"), so gating it on the
-    # must pool made a wine with no residual threonine produce NO sotolon — false for every aged
-    # Sauternes. `de_novo=True` un-gates it and sources the shortfall off sugar.
-    #
-    # The FIVE true Strecker aldehydes keep the hard gate, and that distinction is the whole point:
-    # they are degradations OF the amino acid (no leucine, no 3-methylbutanal), so aa=0 must silence
-    # them exactly. Pinned per-product rather than on the summed RHS so a future change cannot
-    # silently un-gate one of the five.
+def test_maillard_is_wholly_inert_without_amino_acids(maillard_params):
+    """The unit-level isolability D-104 had to give up, RESTORED at D-107.
+
+    D-87/D-100 asserted the whole Process was inert at aa=0. D-104 broke that -- correctly, given
+    where sotolon then lived: sotolon is de-novo-dominated (Crepin: "19% consumed threonine ... 81%
+    newly synthesized"), so gating it on the must pool made a threonine-free wine produce no sotolon
+    at all, false for every aged Sauternes. ``de_novo=True`` un-gated its rate and sourced the
+    shortfall off sugar, which meant this Process fired at aa=0 and prime directive #3 fell back
+    entirely onto the compile seam.
+
+    D-107 gets the property back **without** re-breaking sotolon, because the exception was never
+    about this Process: sotolon is an aldol, not a Strecker degradation, and it now lives in
+    :class:`SotolonAldolCondensation` with its carbon coming from a tracked keto-acid pool. What is
+    left here is five true degradations OF an amino acid -- no leucine, no 3-methylbutanal -- so
+    aa=0 silences every one of them exactly, as it always should have. Pinned per-product so a
+    future change cannot silently un-gate one.
+    """
     schema = wine_schema()
     for aa in (0.0, -1e-6):  # 0 and the solver-undershoot guard
         d = MaillardStrecker().derivatives(
             0.0, _maillard_wine(schema, maillard_params, aa=aa), schema, maillard_params
         )
-        for pool, _m, _w, _decarb, _prec, de_novo in _MAILLARD_PRODUCTS:
-            if de_novo:
-                continue
+        for pool, _m, _w, _prec in _MAILLARD_PRODUCTS:
             assert schema.get(d, pool) == 0.0, f"{pool} fired at aa={aa}"
-        # …and no precursor is drawn, and no CO2 released, by the gated five.
         for precursor in set(_MAILLARD_PRECURSORS.values()):
             assert schema.get(d, precursor) == 0.0
-        assert schema.get(d, "N") == 0.0  # nothing deaminated: the five are silent
-        # Sotolon DOES fire, on sugar alone — the D-104 fix, asserted positively so the coverage
-        # this test used to carry does not just vanish.
-        assert schema.get(d, "sotolon") > 0.0
-        assert float(d[schema.slice("S")].sum()) < 0.0  # its carbon comes off sugar
+        assert schema.get(d, "N") == 0.0  # nothing deaminated
+        # …and no sugar drawn: the D-104 de-novo leg left with sotolon.
+        assert float(d[schema.slice("S")].sum()) == 0.0
+        assert np.array_equal(d, schema.zeros())  # byte-for-byte the no-op
 
 
-def test_scenario_isolability_survives_the_de_novo_sotolon_route():
-    # WHERE the isolability guarantee actually lives now (D-104). The Process is no longer inert at
-    # aa=0, so prime directive #3 rests entirely on the compile seam disabling it — verified here
-    # end-to-end rather than assumed, because the unit-level belt-and-braces is gone.
+def test_scenario_isolability_disables_the_thermal_route_when_undosed():
+    # The compile seam is the OUTER isolability guarantee (prime directive #3). D-104 made it the
+    # ONLY one -- the Process fired at aa=0 via sotolon's de-novo sugar draw, so the unit-level
+    # belt-and-braces was gone. D-107 restored the inner one (see
+    # test_maillard_is_wholly_inert_without_amino_acids), so this is belt-and-braces again rather
+    # than the sole line of defence. Kept either way: the two guarantees are independent, and a
+    # seam regression is not a unit-level one.
     from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 
     compiled = compile_scenario(
@@ -1601,7 +1597,7 @@ def test_maillard_is_oxygen_independent(maillard_params):
         0.0, _maillard_wine(schema, maillard_params, o2=0.05), schema, maillard_params
     )
     assert np.array_equal(sealed, oxygenated)
-    assert schema.get(sealed, "sotolon") > 0.0  # non-vacuous: it IS producing while sealed
+    assert schema.get(sealed, "methional") > 0.0  # non-vacuous: it IS producing while sealed
 
 
 def test_maillard_first_order_in_sugar(maillard_params):
@@ -1615,7 +1611,7 @@ def test_maillard_first_order_in_sugar(maillard_params):
     dbl = MaillardStrecker().derivatives(
         0.0, _maillard_wine(schema, maillard_params, s=80.0), schema, maillard_params
     )
-    assert schema.get(dbl, "sotolon") == pytest.approx(2.0 * schema.get(base, "sotolon"))
+    assert schema.get(dbl, "methional") == pytest.approx(2.0 * schema.get(base, "methional"))
 
 
 def test_maillard_availability_gate_saturates(maillard_params):
@@ -1633,21 +1629,23 @@ def test_maillard_availability_gate_saturates(maillard_params):
     high = MaillardStrecker().derivatives(
         0.0, _maillard_wine(schema, maillard_params, aa=100.0 * k), schema, maillard_params
     )
-    # Read on a GATED product since D-104 — sotolon is `de_novo` and therefore deliberately flat in
-    # aa (its rate no longer depends on the must pool; only its carbon's SOURCE does). Using it here
-    # would test the opposite of what this Process now claims.
+    # D-104 had to read this on a specifically-chosen GATED product, because sotolon was `de_novo`
+    # and therefore deliberately flat in aa. Since D-107 every product here is gated, so the choice
+    # no longer carries that caveat -- any of the five would do.
     lo, md, hi = (schema.get(x, "3_methylbutanal") for x in (low, mid, high))
     assert lo < md < hi  # monotone increasing in aa
-    # …and sotolon is flat in aa, which is the D-104 fix stated as an assertion.
-    s_lo, s_hi = (schema.get(x, "sotolon") for x in (low, high))
-    assert s_lo == pytest.approx(s_hi)
     assert (md - lo) > (hi - md)  # but saturating (diminishing returns) — the gate flattens
 
 
-def test_maillard_split_normalizes_and_sotolon_has_no_co2(maillard_params):
-    # The six composition weights NORMALIZE to fractions summing to 1 (the split-hygiene the advisor
-    # flagged), and — the load-bearing flag — sotolon (a furanone, NOT a decarboxylation product)
-    # contributes NO CO2, while the CO2 exactly matches the FIVE Strecker aldehydes' mole sum.
+def test_maillard_split_normalizes_and_every_product_charges_one_co2(maillard_params):
+    # The five composition weights NORMALIZE to fractions summing to 1 (the split-hygiene the
+    # advisor flagged), and EVERY product charges exactly 1 CO2 -- so the CO2 mole rate equals the
+    # TOTAL product mole rate. Through D-106 this test asserted the opposite: that sotolon (a
+    # furanone, NOT a decarboxylation product) was EXCLUDED from the CO2 sum. D-107 moved sotolon
+    # out of this Process, so the exception it guarded no longer exists and the assertion inverts
+    # from a strict subset to an equality. It stays load-bearing for the reason it always was:
+    # conservation closes for ANY CO2 attribution, so only an explicit check pins the keying -- and
+    # charging that CO2 is exactly what makes each carbon-sized draw land on the true 1:1 (D-105).
     schema = wine_schema()
     y = _maillard_wine(schema, maillard_params)
     d = MaillardStrecker().derivatives(0.0, y, schema, maillard_params)
@@ -1658,18 +1656,17 @@ def test_maillard_split_normalizes_and_sotolon_has_no_co2(maillard_params):
         "2_methylbutanal": M_2_METHYLBUTANAL,
         "3_methylbutanal": M_3_METHYLBUTANAL,
         "2_methylpropanal": M_2_METHYLPROPANAL,
-        "sotolon": M_SOTOLON,
     }
     n = {pool: schema.get(d, pool) / masses[pool] for pool in masses}
     n_total = sum(n.values())
+    assert n_total > 0.0  # non-vacuous
     # The normalized split sums to 1 (fractions = n_i / n_total).
     assert sum(n[pool] / n_total for pool in n) == pytest.approx(1.0)
-    # CO2 == the FIVE decarboxylating aldehydes' mole sum (sotolon EXCLUDED) — the flag is load-
-    # bearing (conservation closes for ANY CO2 attribution, so only this asserts it is keyed right).
-    decarb_mol = sum(n[pool] for pool in n if pool != "sotolon")
-    assert schema.get(d, "CO2") / M_CO2 == pytest.approx(decarb_mol)
-    # Concretely: NOT the total (sotolon really is excluded — a non-vacuous check).
-    assert decarb_mol < n_total
+    # CO2 == EVERY product's mole sum: all five decarboxylate (D-107), so D-87's strict subset is
+    # now an equality.
+    assert schema.get(d, "CO2") / M_CO2 == pytest.approx(n_total)
+    # And sotolon is not this Process's business at all any more.
+    assert schema.get(d, "sotolon") == 0.0
 
 
 def test_maillard_rises_with_temperature(maillard_params):
@@ -1681,7 +1678,7 @@ def test_maillard_rises_with_temperature(maillard_params):
     warm = MaillardStrecker().derivatives(
         0.0, _maillard_wine(schema, maillard_params, t=303.15), schema, maillard_params
     )
-    assert schema.get(warm, "sotolon") > schema.get(cold, "sotolon") > 0.0
+    assert schema.get(warm, "methional") > schema.get(cold, "methional") > 0.0
 
 
 def test_maillard_is_more_thermally_sensitive_than_oxidative(maillard_params, params):
@@ -1729,10 +1726,10 @@ def test_maillard_sealed_sweet_accumulates_where_oxidative_gives_zero(
     ps = ProcessSet(schema, [MaillardStrecker()], strict=True)
     traj = simulate(ps, params=maillard_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success, traj.message
-    for pool in ("methional", "phenylacetaldehyde", "sotolon", "3_methylbutanal"):
+    for pool in ("methional", "phenylacetaldehyde", "2_methylpropanal", "3_methylbutanal"):
         series = traj.series(pool)
         assert series[-1] > series[0] == 0.0  # produced-only, monotone accumulation from 0
-    assert_nonnegative(traj, ("amino_acids", "sotolon", "methional", "N"), atol=1e-9)
+    assert_nonnegative(traj, ("amino_acids", "methional", "N"), atol=1e-9)
     f_c = maillard_store.value("biomass_C_fraction")
     f_n = maillard_store.value("biomass_N_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
@@ -1745,6 +1742,175 @@ def test_maillard_tier_floored_at_speculative(maillard_store):
     schema = wine_schema()
     ps = ProcessSet(schema, [MaillardStrecker()])
     for pool in _MAILLARD_TOUCHES:
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, maillard_store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# SotolonAldolCondensation (decision D-107) — the keto-acid NODE's consumer: the purely chemical
+# aldol of alpha-ketobutyrate + acetaldehyde. NOT a Strecker route: no sugar driver, no CO2, no N.
+# =====================================================================================
+
+
+def _aldol_wine(
+    schema: StateSchema,
+    *,
+    keto: float = 2.0e-3,  # ~2 mg/L — the D-107 excreted residual
+    acetaldehyde: float = 33.0e-3,  # ~33 mg/L — what a stuck/sweet ferment leaves
+    s: float = 80.0,
+    t: float = 298.15,
+) -> FloatArray:
+    y = schema.zeros()
+    y[schema.slice("T")] = t
+    y[schema.slice("S")] = s
+    y[schema.slice("alpha_ketobutyrate")] = keto
+    y[schema.slice("acetaldehyde")] = acetaldehyde
+    return y
+
+
+def test_sotolon_aldol_metadata():
+    p = SotolonAldolCondensation()
+    assert p.name == "sotolon_aldol_condensation"
+    assert p.tier is Tier.SPECULATIVE
+    # Its two real substrates and its one product. The three ABSENCES are the content of D-107:
+    # no S (an aldol needs substrates, not a dicarbonyl driver), no CO2 (nothing decarboxylates —
+    # there is no carboxyl to lose), no N (both substrates are nitrogen-free).
+    assert set(p.touches) == {"sotolon", "alpha_ketobutyrate", "acetaldehyde"}
+    assert "S" not in p.touches
+    assert "CO2" not in p.touches
+    assert "N" not in p.touches
+    assert "threonine" not in p.touches  # threonine is sotolon's GRANDparent, not its precursor
+    assert set(p.reads) == {"k_sotolon_aldol", "E_a_maillard_strecker", "T_ref"}
+
+
+def test_the_sotolon_aldol_draws_one_mole_of_each_substrate_when_driven(maillard_params):
+    """The D-105 signature, satisfied by construction rather than by sizing (decision D-107).
+
+    Sotolon's entry on ``_KNOWN_NON_STOICHIOMETRIC`` said it OVER-drew threonine 1.5×: all six of
+    its carbons were taken from a C4 amino acid, because its two acetaldehyde-derived carbons were
+    lumped into that draw (the D-87 scope note). That ratio was never fixable by re-sizing — it was
+    the wrong question. Sotolon is an aldol of two molecules, so it consumes **1 mol of each**, and
+    the carbon closes because ``4 + 2 == 6`` on the atom counts, not because a mass was chosen to
+    make it close.
+
+    That distinction is the point: a route with no carbon-sized draw **has no D-105 blind spot**.
+    This test reads the stoichiometry off ``dy/dt``, so it is the code layer, not a declaration.
+    """
+    schema = wine_schema()
+    d = SotolonAldolCondensation().derivatives(
+        0.0, _aldol_wine(schema), schema, maillard_params
+    )
+    n_sot = schema.get(d, "sotolon") / M_SOTOLON
+    n_keto = -schema.get(d, "alpha_ketobutyrate") / M_ALPHA_KETOBUTYRATE
+    n_acet = -schema.get(d, "acetaldehyde") / M_ACETALDEHYDE
+    assert n_sot > 0.0  # non-vacuous
+    assert n_keto / n_sot == pytest.approx(1.0, abs=1e-12)
+    assert n_acet / n_sot == pytest.approx(1.0, abs=1e-12)
+
+
+def test_sotolon_aldol_carbon_closes_on_atom_counts(maillard_params):
+    # C6 out == C4 + C2 in. This is the strongest closure in the tree: it holds because the
+    # chemistry balances, not because the draw was sized to make it hold.
+    schema = wine_schema()
+    d = SotolonAldolCondensation().derivatives(
+        0.0, _aldol_wine(schema), schema, maillard_params
+    )
+    residual = (
+        schema.get(d, "sotolon") * carbon_mass_fraction("sotolon")
+        + schema.get(d, "alpha_ketobutyrate") * carbon_mass_fraction("alpha_ketobutyrate")
+        + schema.get(d, "acetaldehyde") * carbon_mass_fraction("acetaldehyde")
+    )
+    assert residual == pytest.approx(0.0, abs=1e-18)
+    # And the atom counts really are what balances it (the identity this route rests on).
+    assert CARBON_ATOMS["sotolon"] == (
+        CARBON_ATOMS["alpha_ketobutyrate"] + CARBON_ATOMS["acetaldehyde"]
+    )
+
+
+def test_sotolon_aldol_is_bimolecular_in_both_substrates(maillard_params):
+    """Mass-action in BOTH substrates — the rate law Pham et al. 1995 measured (D-107).
+
+    Doubling either substrate doubles the rate; doubling both quadruples it. This is what makes the
+    route sugar-independent (an aldol needs its two substrates, not a dicarbonyl), and it is the
+    MUTATION-SENSITIVE property: a rate that was first-order in one substrate, or that kept the
+    D-87 sugar driver, fails here.
+    """
+    schema = wine_schema()
+    p = SotolonAldolCondensation()
+
+    def rate(**kw):
+        return schema.get(p.derivatives(0.0, _aldol_wine(schema, **kw), schema, maillard_params),
+        "sotolon")
+
+    base = rate()
+    assert base > 0.0
+    assert rate(keto=4.0e-3) == pytest.approx(2.0 * base)
+    assert rate(acetaldehyde=66.0e-3) == pytest.approx(2.0 * base)
+    assert rate(keto=4.0e-3, acetaldehyde=66.0e-3) == pytest.approx(4.0 * base)
+
+
+def test_sotolon_aldol_is_sugar_independent(maillard_params):
+    """The empirical correction D-107 makes, stated as an assertion (Pons et al. 2010).
+
+    Inside MaillardStrecker sotolon's rate was ``k · f(T) · S`` — pseudo-first-order in residual
+    sugar, which made it a SWEETNESS marker. Pons *et al.* 2010 identified this same aldol as the
+    sotolon pathway in prematurely aged DRY white wines, where it is the premature-oxidation
+    marker. Sugar is absent from the rate law because it is absent from the reaction, so a bone-dry
+    state and a botrytis-sweet one give byte-for-byte the same derivative.
+    """
+    schema = wine_schema()
+    p = SotolonAldolCondensation()
+    dry = p.derivatives(0.0, _aldol_wine(schema, s=0.0), schema, maillard_params)
+    sweet = p.derivatives(0.0, _aldol_wine(schema, s=150.0), schema, maillard_params)
+    assert np.array_equal(dry, sweet)
+    assert schema.get(dry, "sotolon") > 0.0  # non-vacuous: it fires with NO sugar at all
+
+
+def test_sotolon_aldol_is_exactly_isolable_without_the_keto_acid_pool(maillard_params):
+    """Isolability is EXACT and free, which is WHY the rate is mass-action (decision D-107).
+
+    A ProcessSet built without ``_KETO_ACID_PROCESSES`` leaves ``alpha_ketobutyrate`` at 0, and a
+    rate that is the product of its substrates is then **exactly** 0 — no clamp, no epsilon, no
+    availability constant. The alternative (keep the sugar driver, gate the draws on the pools)
+    would have needed a FABRICATED half-saturation per substrate: the faithful rate law is the one
+    with FEWER invented numbers. Both substrates are checked, plus the solver-undershoot guard.
+    """
+    schema = wine_schema()
+    p = SotolonAldolCondensation()
+    for kw in ({"keto": 0.0}, {"acetaldehyde": 0.0}, {"keto": -1e-9}, {"acetaldehyde": -1e-9}):
+        d = p.derivatives(0.0, _aldol_wine(schema, **kw), schema, maillard_params)
+        assert np.array_equal(d, schema.zeros()), kw
+
+
+def test_sotolon_aldol_rises_with_temperature(maillard_params):
+    # Pham et al. 1995: "the formation of sotolon increases by increasing temperature". Only the
+    # DIRECTION is sourced — the magnitude rides E_a_maillard_strecker as a labelled carry-over
+    # (sotolon already rode that constant from D-87 to D-106), because inventing a sotolon-specific
+    # activation energy to look precise is the E_a D-101 fabricated and D-102 had to retract.
+    schema = wine_schema()
+    p = SotolonAldolCondensation()
+    cold = p.derivatives(0.0, _aldol_wine(schema, t=283.15), schema, maillard_params)
+    warm = p.derivatives(0.0, _aldol_wine(schema, t=303.15), schema, maillard_params)
+    assert schema.get(warm, "sotolon") > schema.get(cold, "sotolon") > 0.0
+
+
+def test_sotolon_aldol_is_wine_only_noop_on_beer(maillard_params):
+    # sotolon/alpha_ketobutyrate are wine-only slots, so this is a hard no-op on beer even with
+    # residual wort sugar and acetaldehyde present.
+    beer = beer_schema()
+    yb = beer.zeros()
+    yb[beer.slice("S")] = 50.0
+    yb[beer.slice("T")] = 298.15
+    yb[beer.slice("acetaldehyde")] = 30.0e-3
+    assert np.array_equal(
+        SotolonAldolCondensation().derivatives(0.0, yb, beer, maillard_params), beer.zeros()
+    )
+
+
+def test_sotolon_aldol_tier_floored_at_speculative(maillard_store):
+    schema = wine_schema()
+    ps = ProcessSet(schema, [SotolonAldolCondensation()])
+    for pool in ("sotolon", "alpha_ketobutyrate", "acetaldehyde"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, maillard_store.tier_map()) is Tier.SPECULATIVE
 

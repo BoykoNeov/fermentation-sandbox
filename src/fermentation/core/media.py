@@ -73,6 +73,8 @@ from fermentation.core.kinetics import (
     AcetaldehydeReduction,
     AcetolactateDecarboxylation,
     AcetolactateExcretion,
+    AlphaKetobutyrateExcretion,
+    AlphaKetobutyrateReassimilation,
     AlphaKetoglutarateExcretion,
     AlphaKetoglutarateReassimilation,
     AminoAcidAssimilation,
@@ -115,6 +117,7 @@ from fermentation.core.kinetics import (
     PyruvateExcretion,
     PyruvateReassimilation,
     SMMHydrolysis,
+    SotolonAldolCondensation,
     StreckerDegradation,
     SugarUptakeToEthanolCO2,
     SulfiteOxidation,
@@ -603,6 +606,20 @@ def wine_schema() -> StateSchema:
             "AlphaKetoglutarateReassimilation returns it to ethanol+CO2 at the Gay-Lussac 2:1 "
             "carbon split and stops at dryness, freezing a persistent finished-wine residual — "
             "the third SO2-binding carbonyl, after acetaldehyde and pyruvate (D-50)",
+        ),
+        VarSpec(
+            "alpha_ketobutyrate",
+            "g/L",
+            default=0.0,
+            description="excreted overflow alpha-ketobutyrate (2-oxobutyrate; C4 keto-acid; "
+            "excreted-then-reassimilated, the pyruvate/alpha-KG structure). THE KETO-ACID NODE "
+            "(D-107): unlike its two siblings this pool has a CONSUMER — it is the C4 half of "
+            "sotolon's aldol (SotolonAldolCondensation) — and a second PRODUCER, the D-45 "
+            "mercaptan, whose 2-oxobutyrate by-product had nowhere to go until this slot existed. "
+            "AlphaKetobutyrateExcretion draws it threonine:sugar by threonine's depletion gate "
+            "(Crepin's 19% exogenous / 81% de novo, reproduced not asserted); the flux-linked "
+            "reassimilation freezes a persistent finished-wine residual at dryness, which is what "
+            "the bottle-aging aldol then eats",
         ),
         VarSpec(
             "methional",
@@ -1249,7 +1266,10 @@ _STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (StreckerDegradation,)
 #: name
 #: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Params live in
 #: ``thermal.yaml``.
-_MAILLARD_STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (MaillardStrecker,)
+_MAILLARD_STRECKER_PROCESSES: tuple[Callable[[], Process], ...] = (
+    MaillardStrecker,
+    SotolonAldolCondensation,
+)
 
 #: MEDIUM-AGNOSTIC (WINE + BEER, decision D-88; extended to beer D-90) non-oxidative THERMAL
 #: browning Process — the O₂-INDEPENDENT thermal mirror of :class:`PhenolicBrowning` (D-74) and the
@@ -1521,6 +1541,8 @@ _KETO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     PyruvateReassimilation,
     AlphaKetoglutarateExcretion,
     AlphaKetoglutarateReassimilation,
+    AlphaKetobutyrateExcretion,
+    AlphaKetobutyrateReassimilation,
 )
 
 #: Hydrogen-sulfide production + CO₂-stripping (Milestone 2, decisions D-29 / D-42): the

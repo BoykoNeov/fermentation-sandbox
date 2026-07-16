@@ -69,6 +69,25 @@ M_PYRUVATE = 3 * _M_C + 4 * _M_H + 3 * _M_O
 #: destination is a carbon-closing lumped stand-in, not a metabolic claim (see the ``keto_acids``
 #: module docstring). Modelled with the SAME excreted-side-pool structure as pyruvate.
 M_ALPHA_KETOGLUTARATE = 5 * _M_C + 6 * _M_H + 5 * _M_O
+#: α-Ketobutyric acid (2-oxobutanoic acid / 2-ketobutyrate — all three names are one molecule),
+#: C4H6O3 — the **third** excreted overflow keto-acid (decision D-107), and the only one in the
+#: model with a *consumer*: it is the C4 half of sotolon's aldol.
+#:
+#: **Why an excreted pool and not an intracellular flux intermediate** (the D-49 question, which
+#: this molecule answers the other way): sotolon forms in a **sealed bottle with no living yeast**,
+#: by a purely chemical aldol (Pham *et al.* 1995) — so the α-ketobutyrate it condenses **must** be
+#: an extracellular residual present at bottling. Pons *et al.* 2010 measures exactly that: wine
+#: yeast strains "released large quantities of 2-ketobutyric acid" during alcoholic fermentation,
+#: "similar to those found in oxidized dry white wines". D-49 rejected routing acetaldehyde through
+#: pyruvate because the persistent pool and the flux intermediate are physically distinct; that same
+#: test here **selects** the excreted pool, because the reaction that consumes it happens where no
+#: intracellular pool can reach.
+#:
+#: Its **sources** are threonine deamination (``L-threonine → 2-oxobutanoate + NH₃``, ILV1) and
+#: methionine demethiolation (``methionine → methanethiol + 2-oxobutyrate + NH₃``, D-45) — the
+#: second is why this pool unblocks the mercaptan's 5× under-draw: the four carbons D-45 had to
+#: discard finally have somewhere to go.
+M_ALPHA_KETOBUTYRATE = 4 * _M_C + 6 * _M_H + 3 * _M_O
 #: Carbon dioxide, CO2.
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
@@ -435,6 +454,7 @@ MOLAR_MASS: dict[str, float] = {
     "acetaldehyde": M_ACETALDEHYDE,
     "pyruvate": M_PYRUVATE,
     "alpha_ketoglutarate": M_ALPHA_KETOGLUTARATE,
+    "alpha_ketobutyrate": M_ALPHA_KETOBUTYRATE,
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
@@ -501,6 +521,11 @@ CARBON_ATOMS: dict[str, int] = {
     #: (decision D-50); its reassimilation is carbon-closing at the Gay-Lussac 2:1 split
     #: (5/3 mol ethanol + 5/3 mol CO2 per mole, C5 → C(10/3) ethanol-carbon + C(5/3) CO2-carbon).
     "alpha_ketoglutarate": 5,
+    #: α-Ketobutyrate (C4H6O3) carries four carbons — the third excreted keto-acid (decision
+    #: D-107). Two consumers read this count and **must** agree with it or their ledgers break:
+    #: the mercaptan's ``5 = 1 + 4`` split (methionine → methanethiol + this) and sotolon's
+    #: ``6 = 4 + 2`` aldol (this + acetaldehyde). Both are exact *because* the atom counts are.
+    "alpha_ketobutyrate": 4,
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,
@@ -612,6 +637,13 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: α-Ketoglutarate is nitrogen-free as tracked here (a keto-acid); its real reassimilation
     #: fate is N-coupled (glutamate synthesis), but that coupling is not modelled in v1 (D-50).
     "alpha_ketoglutarate": 0,
+    #: α-Ketobutyrate is nitrogen-free (a keto-acid) — and here that is **load-bearing rather than
+    #: incidental** (decision D-107). Both routes that make it are *deaminations* (threonine →
+    #: 2-oxobutyrate + NH₃; methionine → methanethiol + 2-oxobutyrate + NH₃), so every gram of
+    #: precursor nitrogen must land in ``N``: the keto-acid keeps none of it. That is exactly what
+    #: makes ``total_nitrogen`` close through both, and why sotolon — built from this pool — is
+    #: the one aging product that releases **no** ammonium.
+    "alpha_ketobutyrate": 0,
     "CO2": 0,
     "glycerol": 0,
     "succinic_acid": 0,

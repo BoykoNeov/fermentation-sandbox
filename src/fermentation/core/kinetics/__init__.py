@@ -26,6 +26,7 @@ from fermentation.core.kinetics.aging import (
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     SMMHydrolysis,
+    SotolonAldolCondensation,
     StreckerDegradation,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
@@ -74,6 +75,8 @@ from fermentation.core.kinetics.hydrogen_sulfide import (
 from fermentation.core.kinetics.inactivation import EthanolInactivation
 from fermentation.core.kinetics.inhibition import EthanolInhibition
 from fermentation.core.kinetics.keto_acids import (
+    AlphaKetobutyrateExcretion,
+    AlphaKetobutyrateReassimilation,
     AlphaKetoglutarateExcretion,
     AlphaKetoglutarateReassimilation,
     PyruvateExcretion,
@@ -110,6 +113,8 @@ __all__ = [
     "AcetaldehydeReduction",
     "AcetolactateDecarboxylation",
     "AcetolactateExcretion",
+    "AlphaKetobutyrateExcretion",
+    "AlphaKetobutyrateReassimilation",
     "AlphaKetoglutarateExcretion",
     "AlphaKetoglutarateReassimilation",
     "AminoAcidAssimilation",
@@ -130,6 +135,7 @@ __all__ = [
     "EsterHydrolysis",
     "MaillardBrowning",
     "MaillardStrecker",
+    "SotolonAldolCondensation",
     "OakExtraction",
     "OxidativeAcetaldehyde",
     "PhenolicBrowning",
