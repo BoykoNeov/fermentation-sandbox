@@ -106,8 +106,21 @@ class AromaCompound:
 #: the apple/pineapple ethyl ester of a medium-chain fatty acid — added at D-96 so splitting the
 #: lump did not narrow the fruity axis to banana alone.
 #:
-#: ``lumped`` now survives only on ``fusels`` (and wine's ``mercaptans``), where it is **true**:
-#: those pools really are several molecules read against one representative's threshold.
+#: ``lumped`` since D-99 survives only on wine's ``mercaptans``, where it is **true**: that pool
+#: really is several molecules read against one representative's threshold. It is the last one.
+#:
+#: **The fusel lump left at D-99** and the shape of its error is worth contrasting with the
+#: esters' above. It had no split identity — weighted as isoamyl alcohol *and* read against
+#: isoamyl alcohol — so it was self-consistent, and its OAV was never non-physical. It simply
+#: asserted that every higher alcohol smells like isoamyl alcohol, when only ~52% of the wine
+#: pool's mass is isoamyl alcohol and one of the other four (2-phenylethanol) is not solventy
+#: at all but ROSE. Self-consistency is not correctness.
+#:
+#: Only ``isoamyl_alcohol`` of the five is aroma-active in BOTH media, so only it is common
+#: here: it is the one higher alcohol with a sourced in-matrix beer threshold (Meilgaard 1975,
+#: ~50 mg/L). See :data:`_FUSELS_WINE_THRESHOLD_ONLY` for the two whose threshold exists only
+#: for wine, and :data:`~fermentation.core.kinetics.carbon_routing.FUSEL_SPECS` for the two
+#: that are chemistry-only in both.
 _COMMON: tuple[AromaCompound, ...] = (
     AromaCompound("diacetyl", "2,3-butanedione", "buttery", lumped=False),
     AromaCompound("acetaldehyde", "acetaldehyde", "green apple / bruised", lumped=False),
@@ -115,7 +128,31 @@ _COMMON: tuple[AromaCompound, ...] = (
     AromaCompound("ethyl_acetate", "ethyl acetate", "solventy / nail-polish", lumped=False),
     AromaCompound("isoamyl_acetate", "isoamyl acetate", "banana", lumped=False),
     AromaCompound("ethyl_hexanoate", "ethyl hexanoate", "apple / pineapple", lumped=False),
-    AromaCompound("fusels", "isoamyl alcohol", "solventy / fusel", lumped=True),
+    AromaCompound("isoamyl_alcohol", "isoamyl alcohol", "solventy / fusel", lumped=False),
+)
+
+#: Pools whose MOLECULE exists in both media but whose THRESHOLD is sourced only for wine
+#: (decision D-99) — a category this file had no need of until the fusels split, and one worth
+#: keeping distinct from ``_WINE_ONLY`` rather than folding into it.
+#:
+#: The distinction is not pedantry: ``_WINE_ONLY`` holds pools beer's schema does not *have*
+#: (Brett phenols, volatile thiols), where saying "wine-only" is a fact about the chemistry.
+#: These two are different — beer's wort ferments isobutanol and 2-phenylethanol just as wine's
+#: must does, at 9.6 and 25.7 mg/L respectively (Wang/Frank/Steinhaus 2024, n=78/n=92). The sim
+#: models both pools in both media. What beer lacks is a **measurement**: no in-matrix beer
+#: odour threshold is sourced for either (Meilgaard 1975 / Engan 1972 are paywalled, and the
+#: water-only OTCs are unusable — the water/ethanol gap runs to ~136x, inconsistently across
+#: compounds; see sensory.yaml). So beer models the molecules and claims nothing about their
+#: smell, which is the honest position and not the same statement as "beer has no
+#: 2-phenylethanol".
+#:
+#: :func:`~fermentation.sensory.descriptors.axes_for_medium` needs no special case for this —
+#: it narrows every axis to the pools present in the medium's aroma set, so beer's ``solventy``
+#: quietly drops ``isobutanol`` and its ``floral_honey`` (whose only other member,
+#: ``phenylacetaldehyde``, is genuinely wine-only) disappears entirely. Beer stays at 9 axes.
+_FUSELS_WINE_THRESHOLD_ONLY: tuple[AromaCompound, ...] = (
+    AromaCompound("isobutanol", "isobutanol", "fusel / alcoholic", lumped=False),
+    AromaCompound("2_phenylethanol", "2-phenylethanol", "rose / honey / floral", lumped=False),
 )
 
 #: The nine wine-only pools appended in ``wine_schema`` (Brett phenols + volatile thiols + the two
@@ -157,14 +194,19 @@ _OAK: tuple[AromaCompound, ...] = (
     AromaCompound("furaneol", "furaneol", "caramel / toffee", lumped=False),
 )
 
-#: Medium -> its ordered aroma set. Beer = 7 common + 5 oak (12); wine = 7 common + 9 wine-only + 5
-#: oak (21 — D-87 added the four thermal Strecker/sotolon pools to the wine-only set, D-94 added
-#: furaneol to the oak set, D-96 took the common set from 5 to 7 by splitting the lumped ``esters``
-#: pool into three single-molecule esters). Wine's order keeps the oak five last, so the D-87 pools
-#: slot in after the two D-75 aldehydes, before oak.
+#: Medium -> its ordered aroma set. Beer = 7 common + 5 oak (12); wine = 7 common + 2
+#: wine-threshold-only fusels + 9 wine-only + 5 oak (23 — D-87 added the four thermal
+#: Strecker/sotolon pools to the wine-only set, D-94 added furaneol to the oak set, D-96 took the
+#: common set from 5 to 7 by splitting the lumped ``esters`` pool into three single-molecule
+#: esters, D-99 added the two wine-thresholded higher alcohols). Wine's order keeps the oak five
+#: last, so the D-87 pools slot in after the two D-75 aldehydes, before oak.
+#:
+#: **D-99 left beer's count unchanged at 12** — the fusel split was one-for-one here
+#: (``fusels`` → ``isoamyl_alcohol``), because only that one molecule has a sourced beer
+#: threshold. Beer's other four higher alcohols are real modelled pools with no aroma claim.
 AROMA_COMPOUNDS: Mapping[str, tuple[AromaCompound, ...]] = {
     "beer": _COMMON + _OAK,
-    "wine": _COMMON + _WINE_ONLY + _OAK,
+    "wine": _COMMON + _FUSELS_WINE_THRESHOLD_ONLY + _WINE_ONLY + _OAK,
 }
 
 

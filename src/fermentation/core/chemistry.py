@@ -110,13 +110,46 @@ M_ISOAMYL_ACETATE = 7 * _M_C + 14 * _M_H + 2 * _M_O
 #: two acetates (ATF1) it is EEB1/EHT1-derived; v1 shares the acetates' ``E_a_esters``
 #: temperature shape, a documented simplification (D-96). Same D-19 carbon stand-in caveat.
 M_ETHYL_HEXANOATE = 8 * _M_C + 16 * _M_H + 2 * _M_O
-#: Isoamyl alcohol (3-methylbutan-1-ol), C5H12O — the representative species for the
-#: lumped ``fusels`` higher-alcohol pool, carbon-routed from sugar under decision
-#: D-19. BOOKKEEPING CAVEAT: the Ehrlich pathway builds fusels from amino-acid
-#: skeletons, but ``N`` (YAN) carries no carbon in :func:`total_carbon`, so the
-#: carbon is sourced from sugar as a stand-in — exact on the ledger, approximate on
-#: the metabolism (D-19).
+#: THE FIVE EHRLICH HIGHER ALCOHOLS (decision D-99) — each its own pool, each carbon-weighted
+#: by its OWN molecule. Until D-99 a single lumped ``fusels`` pool stood for all five and was
+#: weighted (and perceived) as isoamyl alcohol alone; the split is the D-96 ester pattern one
+#: pool over. Each ``k`` is anchored **independently** to its own molecule's measured
+#: concentration (Wang, Frank & Steinhaus 2024) — never a ratio-split off a lumped total.
+#:
+#: ⚠ **NOMENCLATURE — anchor on CAS, not on the trivial names.** ``isoamyl_alcohol`` and
+#: ``active_amyl_alcohol`` are STRUCTURAL ISOMERS: same formula C5H12O, same molar mass,
+#: ~5.5× apart in odour potency. Vendor literature is not reliable here — Restek's 2025
+#: "Alcoholic Beverage Analysis by GC" note has the two synonyms **inverted**. The bindings
+#: below are correct and are the ones to trust:
+#:   * isoamyl alcohol      = 3-methylbutan-1-ol = **CAS 123-51-3**
+#:   * active amyl alcohol  = 2-methylbutan-1-ol = **CAS 137-32-6**
+#: (The physical cause of the confusion is real: the two coelute on common GC phases such as
+#: Rtx-VMS "regardless of column dimensions", so routine OIV/BIPEA methods report one combined
+#: "amyl alcohols" figure. That is a column artifact, not a fact about the molecules — aroma
+#: research resolves them, and quantifies them separately.)
+#:
+#: BOOKKEEPING CAVEAT, shared by all five: the Ehrlich pathway builds higher alcohols from
+#: amino-acid skeletons, but ``N`` (YAN) carries no carbon in :func:`total_carbon`, so the
+#: carbon is sourced from sugar as a stand-in — exact on the ledger, approximate on the
+#: metabolism (D-19).
+#:
+#: Propan-1-ol (CAS 71-23-8), C3H8O — the threonine-derived alcohol, shortest of the five.
+M_PROPANOL = 3 * _M_C + 8 * _M_H + 1 * _M_O
+#: Isobutanol (2-methylpropan-1-ol, CAS 78-83-1), C4H10O — the valine-derived alcohol.
+M_ISOBUTANOL = 4 * _M_C + 10 * _M_H + 1 * _M_O
+#: Active amyl alcohol (2-methylbutan-1-ol, **CAS 137-32-6**), C5H12O — the ISOLEUCINE-derived
+#: alcohol. An isomer of isoamyl alcohol, NOT a synonym for it (see the CAS warning above).
+M_ACTIVE_AMYL_OH = 5 * _M_C + 12 * _M_H + 1 * _M_O
+#: Isoamyl alcohol (3-methylbutan-1-ol, **CAS 123-51-3**), C5H12O — the LEUCINE-derived
+#: alcohol and the dominant higher alcohol of both media (wine mean ~172 mg/L, n=555 studies).
+#: The precursor the D-97 ATF1 coupling makes isoamyl acetate first-order in, and the C5 half
+#: of the D-69 hydrolysis split.
 M_ISOAMYL_OH = 5 * _M_C + 12 * _M_H + 1 * _M_O
+#: 2-Phenylethanol (CAS 60-12-8), C8H10O — the PHENYLALANINE-derived alcohol and the only
+#: aromatic one of the five: the rose/honey note, not a solventy one. Its wine threshold
+#: (~10 mg/L, Guth 1997) sits ~3× BELOW its typical wine concentration (~28.7 mg/L, n=684),
+#: which is what gives wine a floral axis from fermentation alone (D-99).
+M_2_PHENYLETHANOL = 8 * _M_C + 10 * _M_H + 1 * _M_O
 #: Tartaric acid, C4H6O6 — the dominant grape acid and the TA reference species
 #: (equivalent weight M_TARTARIC/2 ≈ 75.04 g/eq). Diprotic; charge-active in the
 #: wine pH solver (decision D-18).
@@ -374,7 +407,11 @@ MOLAR_MASS: dict[str, float] = {
     "ethyl_acetate": M_ETHYL_ACETATE,
     "isoamyl_acetate": M_ISOAMYL_ACETATE,
     "ethyl_hexanoate": M_ETHYL_HEXANOATE,
+    "propanol": M_PROPANOL,
+    "isobutanol": M_ISOBUTANOL,
+    "active_amyl_alcohol": M_ACTIVE_AMYL_OH,
     "isoamyl_alcohol": M_ISOAMYL_OH,
+    "2_phenylethanol": M_2_PHENYLETHANOL,
     "tartaric_acid": M_TARTARIC,
     "malic_acid": M_MALIC,
     "lactic_acid": M_LACTIC,
@@ -432,7 +469,19 @@ CARBON_ATOMS: dict[str, int] = {
     #: or the D-69 hydrolysis moves that ester's real carbon, not a stand-in's.
     "isoamyl_acetate": 7,
     "ethyl_hexanoate": 8,
+    #: The five Ehrlich alcohols each carry their OWN carbon count (decision D-99), which is
+    #: the whole point of the split: the lumped pool weighted all of them as isoamyl's five.
+    #: Per MOLE that is a 5-vs-3 error on propan-1-ol, but the ledger weights per GRAM, and
+    #: the carbon *mass* fractions are far closer (0.5996 / 0.6482 / 0.6813 / 0.6813 / 0.7865)
+    #: because the heavier molecules carry proportionally more hydrogen too — so the lump
+    #: over-booked propan-1-ol's carbon by ~14% and under-booked 2-phenylethanol's by ~13%,
+    #: not by the 67%/38% the atom counts alone suggest. The two C5 isomers agree exactly here:
+    #: they differ in odour, not in carbon.
+    "propanol": 3,
+    "isobutanol": 4,
+    "active_amyl_alcohol": 5,
     "isoamyl_alcohol": 5,
+    "2_phenylethanol": 8,
     "tartaric_acid": 4,
     "malic_acid": 4,
     "lactic_acid": 3,
@@ -517,7 +566,15 @@ NITROGEN_ATOMS: dict[str, int] = {
     "ethyl_acetate": 0,
     "isoamyl_acetate": 0,
     "ethyl_hexanoate": 0,
+    #: All five Ehrlich alcohols are nitrogen-free: the pathway TRANSAMINATES the amino acid
+    #: away before decarboxylating it, so the nitrogen leaves with the amino group and the
+    #: alcohol that survives carries none. This is exactly why the D-33 reroute books the
+    #: amino-acid skeleton's carbon while `N` accounting stays untouched (D-99).
+    "propanol": 0,
+    "isobutanol": 0,
+    "active_amyl_alcohol": 0,
     "isoamyl_alcohol": 0,
+    "2_phenylethanol": 0,
     "tartaric_acid": 0,
     "malic_acid": 0,
     "lactic_acid": 0,

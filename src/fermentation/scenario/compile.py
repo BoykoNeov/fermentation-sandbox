@@ -71,7 +71,7 @@ from fermentation.core.kinetics import (
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.kinetics.hops import iso_alpha_fraction
 from fermentation.core.kinetics.temperature import RAMP_RATE
 from fermentation.core.media import get_medium
@@ -396,7 +396,10 @@ def _wine_initial(
         **{spec.pool: 0.0 for spec in ESTER_SPECS},
         # Volatilized-ester bookkeeping pools, empty at pitch (decisions D-20/D-96)
         **{spec.gas_pool: 0.0 for spec in ESTER_SPECS},
-        "fusels": 0.0,
+        # The five Ehrlich higher-alcohol pools, empty at pitch (decision D-99) — spread from
+        # the canonical registry for the same reason as the esters. No gas twins: higher
+        # alcohols are not stripped.
+        **{spec.pool: 0.0 for spec in FUSEL_SPECS},
         "tartaric": tartaric,
         "malic": malic,
         "lactic": 0.0,
@@ -503,7 +506,10 @@ def _beer_initial(
         **{spec.pool: 0.0 for spec in ESTER_SPECS},
         # Volatilized-ester bookkeeping pools, empty at pitch (decisions D-20/D-96)
         **{spec.gas_pool: 0.0 for spec in ESTER_SPECS},
-        "fusels": 0.0,
+        # The five Ehrlich higher-alcohol pools, empty at pitch (decision D-99) — spread from
+        # the canonical registry for the same reason as the esters. No gas twins: higher
+        # alcohols are not stripped.
+        **{spec.pool: 0.0 for spec in FUSEL_SPECS},
     }
 
 

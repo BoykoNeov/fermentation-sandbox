@@ -127,7 +127,7 @@ from collections.abc import Mapping
 from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS, FuselSpec
 from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar as _draw_carbon_from_sugar,
 )
@@ -146,27 +146,29 @@ from fermentation.core.tiers import Tier
 #: from the one chemistry source of truth — so the draw and the conservation check
 #: can never disagree (cf. the ``Gly``/``Byp`` routing in the uptake Process).
 #:
-#: The fusel pool is still a genuinely LUMPED pool standing in for the higher alcohols;
-#: the ester pools no longer are — each is its own molecule, registered in ``ESTER_SPECS``
-#: and weighted by itself (decision D-96), so there is no single ``_ESTER_SPECIES`` any more.
-_FUSEL_SPECIES = "isoamyl_alcohol"
+#: Neither the ester nor the fusel pools are lumped any more — each is its own molecule,
+#: registered in ``ESTER_SPECS`` (decision D-96) / ``FUSEL_SPECS`` (decision D-99) and weighted
+#: by itself, so there is no single ``_ESTER_SPECIES`` or ``_FUSEL_SPECIES`` to name here.
+#: ``mercaptans`` is now the last lumped pool in the project.
 
 
-def fusel_production_rate(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
-    """Ehrlich fusel-alcohol production rate ``d(fusels)/dt`` [g/L/h] — the shared rate.
+def fusel_rate_shape(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """The Ehrlich rate shape SHARED by all five higher alcohols — everything but ``k`` [1/h].
 
-    ``k_fusel · X·S_total/(K_sugar_uptake+S_total) · N/(K_n+N) · arrhenius(T, E_a_fusels,
-    T_ref)`` (the fermentative-flux Monod shape, gated on assimilable nitrogen, warmed by a
-    steeper-than-uptake Arrhenius factor). Returns 0 under the same guards
+    ``X·S_total/(K_sugar_uptake+S_total) · N/(K_n+N) · arrhenius(T, E_a_fusels, T_ref)``: the
+    fermentative-flux Monod shape, gated on assimilable nitrogen, warmed by a
+    steeper-than-uptake Arrhenius factor. Returns 0 under the guards
     :class:`FuselAlcoholsEhrlich` applies (no flux, no nitrogen).
 
-    Factored out (decision D-33) as the single source of the fusel rate so the *producer*
-    (:class:`FuselAlcoholsEhrlich`, which deposits it in the ``fusels`` pool and draws the
-    carbon from sugar) and the *re-route* (:class:`FuselAminoAcidReroute`, which re-sources a
-    fraction of that carbon from the amino-acid pool) compute the **identical** rate. Any
-    divergence between the two would break carbon closure, since the re-route refunds exactly
-    the sugar carbon the producer drew — this helper makes that impossible (the shared
-    ``biomass_growth_rate`` discipline of the D-32 swap, applied to fusels).
+    **That all five share this one shape is the honest limit of the D-99 split**, and is worth
+    stating where it is implemented rather than only in the registry doc. The five *molecules*
+    are now real — own carbon weight, own threshold, own independently-anchored ``k`` — but
+    one N-gate and one ``E_a_fusels`` between them means the **spectrum is fixed**: warm the
+    ferment or starve it of nitrogen and all five scale together, so no ratio among them can
+    ever move. D-99 retires the wrong-molecule error, not the fixed-composition one; it
+    downgrades it to a fixed *spectrum*. Per-species activation energies and per-amino-acid
+    gates would make the composition dynamic and are deliberately NOT here: neither is sourced,
+    and five author-estimated ``E_a``s would look like fidelity while adding only invention.
     """
     flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
     if flux <= 0.0:
@@ -177,7 +179,48 @@ def fusel_production_rate(y: FloatArray, schema: StateSchema, params: Mapping[st
     nitrogen_gate = n / (params["K_n"] + n)
     temp = float(y[schema.slice("T")][0])
     f_t = arrhenius_factor(temp, params["E_a_fusels"], params["T_ref"])
-    return float(params["k_fusel"] * flux * nitrogen_gate * f_t)
+    return float(flux * nitrogen_gate * f_t)
+
+
+def fusel_production_rate(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], spec: FuselSpec
+) -> float:
+    """One higher alcohol's production rate ``d(<spec.pool>)/dt`` [g/L/h].
+
+    ``k_<spec> · fusel_rate_shape(...)``. The per-species ``k`` is the ONLY thing that
+    distinguishes the five (decision D-99), and each is anchored independently to its own
+    molecule's measured concentration — never a share of a lumped ``k_fusel``.
+    """
+    shape = fusel_rate_shape(y, schema, params)
+    if shape <= 0.0:
+        return 0.0
+    return float(params[spec.k_param] * shape)
+
+
+def fusel_carbon_draw(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """Total carbon [g C/L/h] the Ehrlich producer books out of sugar, across all five species.
+
+    Each alcohol contributes ``rate_i · carbon_mass_fraction(species_i)`` — its own molecule's
+    fraction, from the one chemistry source of truth (decision D-99). Before the split this was
+    one rate at isoamyl alcohol's fraction standing in for all five.
+
+    Factored out (decision D-33, generalised at D-99) as the single source of the fusel carbon
+    draw so the *producer* (:class:`FuselAlcoholsEhrlich`, which draws it from sugar) and the
+    *re-route* (:class:`FuselAminoAcidReroute`, which re-sources a fraction of it from the
+    amino-acid pool and refunds the sugar) compute the **identical** number. Any divergence
+    would break carbon closure, since the re-route refunds exactly what the producer drew —
+    this helper makes that impossible (the shared ``biomass_growth_rate`` discipline of the
+    D-32 swap, applied to fusels).
+    """
+    shape = fusel_rate_shape(y, schema, params)
+    if shape <= 0.0:
+        return 0.0
+    return float(
+        sum(
+            params[spec.k_param] * shape * carbon_mass_fraction(spec.species)
+            for spec in FUSEL_SPECS
+        )
+    )
 
 
 class EsterSynthesis(Process):
@@ -350,20 +393,33 @@ class FuselAlcoholsEhrlich(Process):
 
     name = "fusel_alcohols_ehrlich"
     tier = Tier.SPECULATIVE
-    touches = ("fusels", "S")
+    #: The five single-molecule pools of ``FUSEL_SPECS`` plus ``S`` (decision D-99), derived
+    #: from the registry so a sixth alcohol cannot silently violate the `touches` contract.
+    touches: tuple[str, ...] = (*(spec.pool for spec in FUSEL_SPECS), "S")
     #: ``K_sugar_uptake``/``K_n`` are shared with the uptake/growth Processes;
-    #: ``E_a_fusels`` (> ``E_a_uptake``) and ``T_ref`` set the temperature shape.
-    reads: tuple[str, ...] = ("k_fusel", "K_sugar_uptake", "K_n", "E_a_fusels", "T_ref")
+    #: ``E_a_fusels`` (> ``E_a_uptake``) and ``T_ref`` set the temperature shape — one shared
+    #: shape for all five (see :func:`fusel_rate_shape` for why that is the honest limit).
+    #: The five ``k``s are per-species and independently anchored (D-99).
+    reads: tuple[str, ...] = (
+        *(spec.k_param for spec in FUSEL_SPECS),
+        "K_sugar_uptake",
+        "K_n",
+        "E_a_fusels",
+        "T_ref",
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        rate = fusel_production_rate(y, schema, params)  # shared with the re-route (D-33)
-        if rate <= 0.0:
+        shape = fusel_rate_shape(y, schema, params)
+        if shape <= 0.0:
             return d
-        d[schema.slice("fusels")] = rate
-        _draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(_FUSEL_SPECIES))
+        for spec in FUSEL_SPECS:
+            d[schema.slice(spec.pool)] = params[spec.k_param] * shape
+        # ONE draw for all five, each at its own molecule's carbon fraction — shared verbatim
+        # with the re-route (D-33/D-99) so the draw and its refund can never disagree.
+        _draw_carbon_from_sugar(d, y, schema, fusel_carbon_draw(y, schema, params))
         return d
 
 
@@ -428,7 +484,7 @@ class FuselAminoAcidReroute(Process):
     #: for the availability gate. Their tiers cap the ``S``/``amino_acids``/``N`` output tier via
     #: parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
-        "k_fusel",
+        *(spec.k_param for spec in FUSEL_SPECS),
         "K_sugar_uptake",
         "K_n",
         "E_a_fusels",
@@ -440,15 +496,16 @@ class FuselAminoAcidReroute(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        rate = fusel_production_rate(y, schema, params)  # identical to the producer's (D-33)
-        if rate <= 0.0:
+        # The producer's TOTAL sugar draw, across all five species at their own carbon
+        # fractions — computed by the identical helper it uses (D-33/D-99).
+        fusel_carbon = fusel_carbon_draw(y, schema, params)
+        if fusel_carbon <= 0.0:
             return d
         aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
         if aa <= 0.0:
             return d  # empty pool ⇒ producer sources all fusel carbon from sugar (undosed no-op)
 
         gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
-        fusel_carbon = rate * carbon_mass_fraction(_FUSEL_SPECIES)  # what the producer drew from S
         aa_carbon = gate * fusel_carbon  # the fraction re-sourced from amino acids
         c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
         y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)

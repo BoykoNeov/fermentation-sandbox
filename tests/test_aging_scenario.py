@@ -14,11 +14,13 @@ pipeline end-to-end:
   ``shared_files``) but is read by nothing until ``begin_aging`` fires;
 * the §7 slow-phase integration comes for free from ``simulate_scheduled``'s segment restart:
   with the fermentative flux gone at dryness the solver takes large steps across the quiescent
-  aging segment, and every other producer of ``esters``/``fusels``/``Byp`` is flux-gated and
+  aging segment, and every other producer of ``esters``/``isoamyl_alcohol``/``Byp`` is
+  flux-gated and
   silent there — so the aging signal is unconfounded (Stance A).
 
 These tests pin: the compile-seam enable/disable gate; the emergent aging headline (esters fade,
-fusels + Byp rise) end-to-end vs an otherwise-identical un-aged run; end-to-end carbon closure
+isoamyl alcohol + Byp rise) end-to-end vs an otherwise-identical un-aged run; end-to-end
+carbon closure
 (a pure inter-pool transfer — no external flow, since ``begin_aging`` mutates no state); the
 speculative tier floor min-combined across the whole run; and the loud errors (params, unknown
 verb-params) at the vocabulary boundary.
@@ -33,6 +35,7 @@ from fermentation.analysis import (
     observed_color_series,
     polymeric_pigment_series,
 )
+from fermentation.core.kinetics import FuselAminoAcidReroute
 from fermentation.core.kinetics.aging import (
     AcetaldehydeBridgedCondensation,
     Caramelization,
@@ -49,6 +52,7 @@ from fermentation.core.kinetics.aging import (
 from fermentation.core.media import get_medium
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir
+from fermentation.runtime import ScheduledTrajectory
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 from fermentation.sensory import load_thresholds, oav_series
 from fermentation.validation.conservation import (
@@ -60,7 +64,7 @@ from fermentation.validation.conservation import (
 
 # A short, dry-by-then ferment (14 d at 20 C takes a 24-Brix must to dryness), then a warm aging
 # tail. begin_aging sits well past dryness so the flux-gated ester producers are quiescent and the
-# aging effect is the ONLY thing moving esters/fusels/Byp (Stance A). Warm (25 C) aging + a
+# aging effect is the ONLY thing moving esters/isoamyl_alcohol/Byp (Stance A). Warm (25 C) aging + a
 # multi-month tail makes the hydrolysis measurable within a fast test.
 _FERMENT_DAYS = 30.0
 _AGING_DAYS = 150.0
@@ -122,7 +126,8 @@ def _wine(
 
 def _beer(interventions: list[Intervention]) -> Scenario:
     # A minimal ~1.048-OG wort (glucose+maltose+maltotriose), fermented ~14 d then aged. Aging is
-    # medium-agnostic (esters/fusels/Byp exist in the beer schema too), so begin_aging must drive
+    # medium-agnostic (esters/isoamyl_alcohol/Byp exist in the beer schema too), so
+    # begin_aging must drive
     # the beer scenario path just as it does wine — this is the beer-side smoke coverage.
     return Scenario(
         name="beer-aging-test",
@@ -142,6 +147,25 @@ def _beer(interventions: list[Intervention]) -> Scenario:
 
 def _begin_aging(day: float) -> Intervention:
     return Intervention(day=day, action="begin_aging")
+
+
+def _run_thermal_isolating_reroute(scenario: Scenario) -> ScheduledTrajectory:
+    """Compile + run with the D-33 Ehrlich amino-acid reroute disabled (decision D-99).
+
+    Any end-to-end thermal test that asserts a MAGNITUDE — thermal aldehydes at aroma-relevant
+    levels, or "the route fired" — must isolate the reroute, or the assertion goes vacuous. The
+    reroute and MaillardStrecker both draw the lumped `amino_acids` pool; since D-99 raised fusel
+    production ~3.8x the reroute empties it during FERMENTATION (it needs flux, so it is inactive
+    by the time begin_aging fires), leaving the aging-phase thermal routes ~nothing to work on.
+    Isolating it restores the substrate WITHOUT weakening aging-phase conservation — the reroute
+    is not active during aging anyway. The starvation itself is a real known limitation (D-100),
+    pinned in test_the_ehrlich_reroute_starves_maillard_of_the_lumped_amino_acid_pool. A PURE
+    conservation test (no magnitude claim) deliberately does NOT use this helper — closure must
+    hold with every Process on, and the reroute makes that stress stronger, not weaker.
+    """
+    cs = compile_scenario(scenario)
+    cs.process_set.disable(FuselAminoAcidReroute.name)
+    return cs.run()
 
 
 def _add_oxygen(day: float, o2_mgl: float) -> Intervention:
@@ -201,11 +225,12 @@ def test_aging_params_ride_in_every_compiled_scenario():
         assert name in cs.parameters
 
 
-# -- the emergent aging headline (esters fade, fusels + Byp rise) -------------
+# -- the emergent aging headline (esters fade, isoamyl alcohol + Byp rise) ----
 
 
-def test_aging_fades_esters_and_raises_fusels_end_to_end():
-    # The end-to-end payoff: an aged wine finishes with LOWER esters and HIGHER fusels/Byp than
+def test_aging_fades_esters_and_raises_isoamyl_alcohol_end_to_end():
+    # The end-to-end payoff: an aged wine finishes with LOWER esters and HIGHER
+    # isoamyl_alcohol/Byp than
     # the otherwise-identical un-aged wine. Both runs share the identical ferment (aging is off
     # until the breakpoint), so any difference at the end is exactly the aging Process's doing —
     # a clean A/B that also proves isolability (the un-aged run never activates the Process).
@@ -215,16 +240,19 @@ def test_aging_fades_esters_and_raises_fusels_end_to_end():
 
     ester_aged = float(aged.series("isoamyl_acetate")[-1])
     ester_plain = float(plain.series("isoamyl_acetate")[-1])
-    fusels_aged = float(aged.series("fusels")[-1])
-    fusels_plain = float(plain.series("fusels")[-1])
+    isoamyl_aged = float(aged.series("isoamyl_alcohol")[-1])
+    isoamyl_plain = float(plain.series("isoamyl_alcohol")[-1])
     byp_aged = float(aged.series("Byp")[-1])
     byp_plain = float(plain.series("Byp")[-1])
 
     # The wine actually made ester during the ferment, so there is something to hydrolyse.
     assert ester_plain > 0.0
-    # Aging hydrolyses the fruity acetate esters: fewer esters, more fusels + Byp at the end.
+    # Aging hydrolyses the banana acetate ester: less ester, more isoamyl alcohol + Byp at the
+    # end. Since D-99 the alcohol lands in the isoamyl pool SPECIFICALLY — hydrolysing isoamyl
+    # acetate yields 3-methylbutan-1-ol and nothing else, so the old lump silently credited a
+    # share of it to four other molecules.
     assert ester_aged < ester_plain
-    assert fusels_aged > fusels_plain
+    assert isoamyl_aged > isoamyl_plain
     assert byp_aged > byp_plain
 
 
@@ -243,7 +271,8 @@ def test_aging_does_not_strip_esters_below_the_equilibrium_floor():
 def test_aged_run_closes_carbon_end_to_end():
     # begin_aging mutates no state (a pure reconfigure), so there is NO external flow: the
     # run-wide invariant is the plain final == initial carbon. The ferment routes carbon into the
-    # aroma pools and the aging segment transfers esters -> fusels + Byp — both close to machine
+    # aroma pools and the aging segment transfers esters -> isoamyl_alcohol + Byp — both
+    # close to machine
     # precision, so total_carbon is flat across the whole ferment+aging trajectory.
     cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
     traj = cs.run()
@@ -255,7 +284,9 @@ def test_aged_run_closes_carbon_end_to_end():
     assert_conserved(
         traj.as_trajectory(), total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon"
     )
-    assert_nonnegative(traj.as_trajectory(), ("isoamyl_acetate", "fusels", "Byp"), atol=1e-9)
+    assert_nonnegative(
+        traj.as_trajectory(), ("isoamyl_acetate", "isoamyl_alcohol", "Byp"), atol=1e-9
+    )
 
 
 def test_slow_phase_integration_succeeds_over_the_long_span():
@@ -278,11 +309,12 @@ def test_slow_phase_integration_succeeds_over_the_long_span():
 def test_aging_floors_touched_pools_at_speculative_for_the_whole_run():
     # EsterHydrolysis is enabled only for the aging back half, but simulate_scheduled min-combines
     # the per-segment tier maps (D-35): a run is only as trustworthy as its least-trustworthy
-    # segment, so the speculative aging Process drags esters/fusels/Byp to speculative for the
+    # segment, so the speculative aging Process drags esters/isoamyl_alcohol/Byp to
+    # speculative for the
     # WHOLE run — not just the aging segment.
     cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
     traj = cs.run()
-    for pool in ("isoamyl_acetate", "fusels", "Byp"):
+    for pool in ("isoamyl_acetate", "isoamyl_alcohol", "Byp"):
         assert traj.tier_map[pool] is Tier.SPECULATIVE
 
 
@@ -313,7 +345,8 @@ def test_begin_aging_without_aging_params_fails_loudly_at_compile():
 
 
 def test_begin_aging_drives_the_beer_scenario_path():
-    # Aging is medium-agnostic (D-70): esters/fusels/Byp exist in the beer schema, so begin_aging
+    # Aging is medium-agnostic (D-70): esters/isoamyl_alcohol/Byp exist in the beer schema,
+    # so begin_aging
     # must compile, enable EsterHydrolysis, and fade the beer esters exactly as it does for wine.
     # Beer-side smoke coverage — the D-69 Process math is beer-tested, but the beer scenario
     # compile -> begin_aging -> run path was otherwise unexercised.
@@ -325,7 +358,7 @@ def test_begin_aging_drives_the_beer_scenario_path():
     ester_plain = float(plain.series("isoamyl_acetate")[-1])
     assert ester_plain > 0.0  # the beer ferment made ester to hydrolyse
     assert float(aged.series("isoamyl_acetate")[-1]) < ester_plain  # aging fades it
-    assert float(aged.series("fusels")[-1]) > float(plain.series("fusels")[-1])
+    assert float(aged.series("isoamyl_alcohol")[-1]) > float(plain.series("isoamyl_alcohol")[-1])
 
 
 # -- oxidative aging: the O₂ substrate + add_oxygen (decision D-71) ------------
@@ -836,22 +869,24 @@ def test_maillard_thermal_aldehydes_in_sealed_sweet_wine():
     # route the D-75 oxidative one could never produce (no O₂ ⇒ D-75 is silent, per
     # test_strecker_silent_reductive above). Levels land aroma-relevant (sotolon ~µg/L, the
     # Sauternes/Madeira range) — anchored in thermal.yaml provenance, asserted directionally here.
-    sweet = compile_scenario(
+    # The D-33 reroute is ISOLATED (D-99): it would drain the shared amino_acids pool to ~0 and
+    # collapse these levels to noise, making the assertions below vacuous — see the helper.
+    sweet = _run_thermal_isolating_reroute(
         _wine(
             [_begin_aging(_FERMENT_DAYS)],  # SEALED — no add_oxygen
             amino_acids_gpl=0.8,
             brix=_SWEET_BRIX,
             duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
         )
-    ).run()
-    dry = compile_scenario(
+    )
+    dry = _run_thermal_isolating_reroute(
         _wine(
             [_begin_aging(_FERMENT_DAYS)],
             amino_acids_gpl=0.8,
             brix=24.0,  # dry-fermenting control → residual sugar ≈ 0 ⇒ thermal route ~silent
             duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
         )
-    ).run()
+    )
     assert sweet.success and dry.success
     # The sweet wine really is sweet: a large residual sugar drives the route (no O₂ dosed
     # anywhere).
@@ -870,15 +905,26 @@ def test_maillard_raises_the_thermal_oavs():
     # thermal aromas the lens now reads (+ the two shared with D-75). A sealed sweet wine raises
     # them
     # positive; a dry wine leaves them ~0. Sotolon (the curry/maple furanone) is the diagnostic one.
+    #
+    # THE D-33 REROUTE IS ISOLATED OUT (decision D-99), and the assertions below are UNCHANGED in
+    # strength — this tests D-87 without an unrelated, known-limited D-33 interaction. Both
+    # Processes draw on the ONE lumped `amino_acids` pool (arginine standing in for every amino
+    # acid), and with honest D-99 fusel levels the Ehrlich reroute consumes all of it before
+    # MaillardStrecker can, driving sotolon to zero. That interaction is a REAL known limitation
+    # and is pinned by its own test below — see test_the_ehrlich_reroute_starves_maillard_of_the
+    # _lumped_amino_acid_pool and D-100. Isolating it here is the `_isolate_*` pattern this suite
+    # already uses; the pathology is captured in CI, not hidden from it.
     thresholds = load_thresholds()
-    sweet = compile_scenario(
+    cs = compile_scenario(
         _wine(
             [_begin_aging(_FERMENT_DAYS)],
             amino_acids_gpl=0.8,
             brix=_SWEET_BRIX,
             duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
         )
-    ).run()
+    )
+    cs.process_set.disable(FuselAminoAcidReroute.name)
+    sweet = cs.run()
     assert sweet.success
     for pool in _MAILLARD_ALDEHYDES:
         assert float(oav_series(sweet.as_trajectory(), thresholds, pool)[-1]) > 0.0
@@ -888,11 +934,99 @@ def test_maillard_raises_the_thermal_oavs():
     assert float(oav_series(sweet.as_trajectory(), thresholds, "phenylacetaldehyde")[-1]) > 1.0
 
 
+def test_the_ehrlich_reroute_starves_maillard_of_the_lumped_amino_acid_pool():
+    """KNOWN LIMITATION, pinned not hidden (decision D-99; the fix is deferred to D-100).
+
+    Two Processes at speciated scale draw on ONE lumped substrate and the sim has no model of
+    the competition. `FuselAminoAcidReroute` (D-33) re-sources Ehrlich fusel carbon from
+    `amino_acids`; `MaillardStrecker` (D-87) degrades the same pool to the thermal aldehydes.
+    That pool is a LUMP — arginine standing in for every amino acid — so the reroute's debit is
+    booked against the very molecules Maillard needs. It should not be: Ehrlich consumes
+    leucine / isoleucine / valine / threonine / phenylalanine, while sotolon's precursors are
+    elsewhere in the pool. The competition modelled here is an artifact of the lump, not
+    biochemistry.
+
+    D-99 DID NOT CREATE THIS — it finished it, and the numbers say so. Emulating the pre-D-99
+    lumped model (every k scaled so the total carbon draw matches the old single
+    `k_fusel=2.5e-3`) on this exact scenario leaves `amino_acids` at 0.0277 g/L of an initial
+    0.8 — the reroute was ALREADY eating ~96.5% of the pool — and sotolon passed its OAV>1
+    assertion at 1.18, an 18% margin. Honest per-species anchoring (D-99) raises fusel
+    production ~3.8x, spends the last 3.5%, and the margin is gone. The old lump's
+    UNDER-PRODUCTION was the only thing holding that test up.
+
+    The proof that the reroute is the sole channel: disable it and D-99's 3.8x fusel rise moves
+    sotolon by 0.4% (4.379 -> 4.362 on the same scenario). Nothing else about the split touches
+    the thermal route — which is why isolating the reroute in the test above is a scope
+    boundary rather than a dodge.
+
+    DO NOT "FIX" THIS BY DOSING MORE AMINO ACIDS. The reroute REFUNDS sugar carbon as it
+    re-sources, which extends the fermentative flux, which produces MORE fusels: at
+    amino_acids_gpl=2.0 the pool still empties and total fusels rise to ~1203 mg/L. Dosing feeds
+    the consumer. The real fix is structural — speciate `amino_acids` (the D-96 -> D-99 pattern
+    one pool over), or bound the catabolic fraction, or model consumer priority — and all three
+    are unsourced today.
+
+    MAILLARD IS NOT THE ONLY VICTIM. The lumped `amino_acids` pool feeds FOUR consumers, and
+    D-99's fusel rise starves the other three through the reroute exactly as it starves this one:
+      * MalolacticGrowth (D-23) — its co-pitch growth advantage collapses to solver noise; the
+        reroute is isolated in tests/test_mlf_growth.py::
+        test_mid_run_pitch_growth_is_emergently_gated_by_ethanol.
+      * BrettGrowth (D-40) — a dosed Brett population barely grows (ratio ~1.1 vs ~10 without the
+        reroute); isolated in tests/test_brett.py::test_growth_accelerates_phenols.
+      * MaillardStrecker (D-87) — this test.
+    All three isolate the reroute for the same reason and point back here. That the same lump
+    limits fusels, thermal aroma, MLF and Brett is the argument that speciating `amino_acids` is
+    a real next step (D-100), not a corner case — it is load-bearing across the aging/spoilage
+    layer, which is why it earns its own decision rather than a patch.
+    """
+    thresholds = load_thresholds()
+
+    def sweet(disable_reroute: bool):
+        cs = compile_scenario(
+            _wine(
+                [_begin_aging(_FERMENT_DAYS)],
+                amino_acids_gpl=0.8,
+                brix=_SWEET_BRIX,
+                duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+            )
+        )
+        if disable_reroute:
+            cs.process_set.disable(FuselAminoAcidReroute.name)
+        res = cs.run()
+        assert res.success
+        return res
+
+    with_reroute = sweet(disable_reroute=False)
+    without = sweet(disable_reroute=True)
+
+    # THE PATHOLOGY: the reroute empties the pool — ~1e-5 g/L of an initial 0.8, i.e. five
+    # orders down and still falling under the smooth aa/(K+aa) gate, which approaches zero
+    # asymptotically rather than reaching it. Without the reroute a fifth of the pool survives
+    # the ferment and is there for the thermal route to work on.
+    assert float(with_reroute.series("amino_acids")[-1]) < 1.0e-4
+    assert float(without.series("amino_acids")[-1]) > 0.15
+
+    # ITS CONSEQUENCE: sotolon is driven from clearly-perceptible to silent — not by any thermal
+    # parameter, but by an unrelated fermentation Process eating its substrate first.
+    assert float(oav_series(with_reroute.as_trajectory(), thresholds, "sotolon")[-1]) < 0.01
+    assert float(oav_series(without.as_trajectory(), thresholds, "sotolon")[-1]) > 1.0
+
+    # This test is the D-100 tripwire. When the amino-acid lump is split (or the competition
+    # otherwise modelled), the reroute will stop consuming Maillard's precursors and the first
+    # assertion will FAIL — which is the signal that this limitation is gone, not a regression.
+    # Delete this test then; do not weaken it to keep it green.
+
+
 def test_maillard_closes_carbon_and_nitrogen_end_to_end():
     # MaillardStrecker draws carbon from amino_acids into the six thermal products + CO₂, deaminates
     # the nitrogen to N — so BOTH ledgers must close end to end through the full ferment + sealed
     # sweet aging. No external flow at all (no O₂ dose; the amino-acid + sugar are t0 initials), so
     # total_carbon and total_nitrogen are both flat (final == initial).
+    #
+    # DELIBERATELY KEEPS THE D-33 REROUTE ON (unlike the magnitude tests above, D-99): this asserts
+    # only CLOSURE and nonnegativity — invariants that must hold with EVERY Process active, and the
+    # reroute (another amino_acids consumer) makes the ledger stress stronger, not weaker. It makes
+    # no aroma-magnitude claim, so the reroute draining the pool cannot render it vacuous.
     cs = compile_scenario(
         _wine(
             [_begin_aging(_FERMENT_DAYS)],
@@ -1024,6 +1158,12 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
     # goes negative — the combination where a shared-pool interaction bug could hide, and exactly
     # where conservation would catch it. (The aa gate throttles all amino_acids draws to 0 as the
     # pool empties, so it never goes negative.)
+    # The D-33 reroute is ISOLATED (D-99): the five AGING routes stressed here each need the
+    # shared amino_acids pool, and the reroute would empty it during fermentation, so the
+    # "all five fired" assertions below (sotolon > 0 etc.) would pass on ~noise. The reroute is
+    # a SIXTH, fermentation-phase process — not one of the five aging routes — so isolating it
+    # neither removes a stressed route nor weakens the aging-phase carbon/nitrogen closure (it
+    # is inactive during aging regardless). See _run_thermal_isolating_reroute + D-100.
     cs = compile_scenario(
         _wine(
             [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],  # OXYGENATED
@@ -1033,6 +1173,7 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
             duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
         )
     )
+    cs.process_set.disable(FuselAminoAcidReroute.name)
     traj = cs.run()
     assert traj.success
     tj = traj.as_trajectory()

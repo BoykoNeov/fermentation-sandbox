@@ -575,14 +575,14 @@ k_ethyl_acetate:
     notes: "Read by EsterSynthesis for the `ethyl_acetate` pool. Anchored to ETHYL ACETATE ALONE, not to a share of a lumped ester total (D-96). Calibrated against the FINISHED wine with the EsterVolatilization sink active (which strips ~45% of the synthesised ester to the headspace at 20 C): a 21-day 24-Brix run at 20 C lands ~50 mg/L liquid, mid-band for this molecule's own 30-80 mg/L range. SPECULATIVE on magnitude: de Andres-Toro form ethyl acetate as Y_EA*mu_x*X_A (a different coupling and unit system from our flux-coupled k), so no directly-transferable rate constant exists; the anchor is this molecule's measured concentration band, not a fitted rate."
 
 k_isoamyl_acetate:
-  value: 1.0e-4
-  unit: "L/(g*h)"   # d(isoamyl_acetate)/dt = k_isoamyl_acetate * [fusels] * X * S/(K_su+S) * f(T)
+  value: 5.02e-5
+  unit: "L/(g*h)"   # d(isoamyl_acetate)/dt = k_isoamyl_acetate * [isoamyl_alcohol] * X * S/(K_su+S) * f(T)
   tier: speculative
-  uncertainty: { low: 2.0e-5, high: 3.0e-4, note: "band spans isoamyl acetate ~0.3-4 mg/L, its own typical range in wine (the D-96 band, rescaled x20 with the value at D-97 so it pins the same CONCENTRATION span: the rate stays linear in k)" }
+  uncertainty: { low: 1.0e-5, high: 1.5e-4, note: "band spans isoamyl acetate ~0.3-4 mg/L, its own typical range in wine (the D-96 band, rescaled x20 at D-97 and x0.502 at D-99 so it pins the same CONCENTRATION span throughout: the rate stays linear in k)" }
   provenance:
     source: "author estimate bounded by ISOAMYL ACETATE's own measured range in wine (~0.1-3 mg/L; Guth 1997, J. Agric. Food Chem. 45:3027-3032 reports ~0.1-1 mg/L in Gewurztraminer/Scheurebe). The rate law's FORM is sourced separately: Fujii et al. 1998, Appl. Environ. Microbiol. 64:4076-4078 (citing Yoshioka & Hashimoto 1981, Agric. Biol. Chem. 45:2183-2190) measures ATF1's Km for isoamyl alcohol at ~29.8 mM vs 0.19 mM for acetyl-CoA, and states that 'a major rate-limiting factor for isoamyl acetate production is the amount of isoamyl alcohol'."
-    conditions: "S. cerevisiae wine; ATF1 acetate ester of isoamyl alcohol, FIRST-ORDER in the `fusels` precursor pool and coupled to the biomass-catalysed sugar flux"
-    notes: "Read by EsterSynthesis for the `isoamyl_acetate` pool - the BANANA note, and the pool whose OAV D-96 exists to make physical. Anchored to ISOAMYL ACETATE ALONE (D-96), calibrated post-stripping: a 21-day 24-Brix run at 20 C lands ~0.76 mg/L liquid, inside Guth's own 0.1-1 mg/L assay range for this molecule and ~30x below the ~23 mg/L the pre-D-96 lumped reading implied. That this works out to ~1.5% of ethyl acetate is a DERIVED consequence of two independent anchors, not an assumed composition - which is the whole point: the pre-D-96 alternative was to FIT that percentage. D-97 RE-ANCHORED the value 5.0e-6 -> 1.0e-4 (x20, absorbing the ~0.05 g/L `fusels` factor the new precursor term introduces) so the finished wine lands on the SAME 0.758 mg/L: the coupling changes the ester's YAN-response and time shape, NOT its calibration target. WHY FIRST-ORDER, NOT A SATURABLE Km GATE: the `fusels` pool runs ~0.58 mM against ATF1's measured Km ~29.8 mM (~51x below), i.e. deep in the [S] << Km limit where the saturable form IS the linear one to ~2%. In that limit only the RATIO Vmax/Km is identifiable - scaling Km 10x and refitting Vmax gives a byte-identical trajectory - so adding the measured Km as a parameter would mint a sourced-looking constant no model output could validate. THIS k IS that identifiable ratio; the Km's real work is justifying the FORM, which is why it lives here in provenance rather than in the store. CAVEAT: `fusels` is a LUMPED pool, so reading it whole over-states the true isoamyl-alcohol supply; the over-statement is absorbed into this k, and the residual cost is that the YAN-response assumes the lump's composition is fixed (the D-66 caveat). Deferred: the carbon re-route (this reads `fusels` but still draws carbon from S)."
+    conditions: "S. cerevisiae wine; ATF1 acetate ester of isoamyl alcohol, FIRST-ORDER in the `isoamyl_alcohol` precursor pool (the molecule itself since D-99, not a lump) and coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `isoamyl_acetate` pool - the BANANA note, and the pool whose OAV D-96 exists to make physical. Anchored to ISOAMYL ACETATE ALONE (D-96), calibrated post-stripping: a 21-day 24-Brix run at 20 C lands ~0.76 mg/L liquid, inside Guth's own 0.1-1 mg/L assay range for this molecule and ~30x below the ~23 mg/L the pre-D-96 lumped reading implied. That this works out to ~1.5% of ethyl acetate is a DERIVED consequence of two independent anchors, not an assumed composition - which is the whole point: the pre-D-96 alternative was to FIT that percentage. D-97 RE-ANCHORED the value 5.0e-6 -> 1.0e-4 (x20, absorbing the ~0.05 g/L `fusels` factor the new precursor term introduces) so the finished wine lands on the SAME 0.758 mg/L: the coupling changes the ester's YAN-response and time shape, NOT its calibration target. D-99 RE-ANCHORED IT AGAIN, 1.0e-4 -> 5.02e-5 (x0.502), for the same reason one decision on: speciating the fusels lump replaced an 86 mg/L stand-in pool with 172 mg/L of ACTUAL isoamyl alcohol, so the precursor factor doubled and the ester would have doubled with it. The factor is EXACT, not fitted: both rates share one shape, so it is just k_fusel_old / k_isoamyl_alcohol_new = 2.5e-3 / 4.98e-3. Same discipline both times - a precursor re-definition must not smuggle in a recalibration. WHY FIRST-ORDER, NOT A SATURABLE Km GATE: the `isoamyl_alcohol` pool runs ~1.95 mM against ATF1's measured Km ~29.8 mM (~15x below; the margin TIGHTENED from ~51x at D-97 because honest anchoring doubled the pool), i.e. still in the [S] << Km limit where the saturable form IS the linear one to ~7%. In that limit only the RATIO Vmax/Km is identifiable - scaling Km 10x and refitting Vmax gives a byte-identical trajectory - so adding the measured Km as a parameter would mint a sourced-looking constant no model output could validate. THIS k IS that identifiable ratio; the Km's real work is justifying the FORM, which is why it lives here in provenance rather than in the store. D-99 RETIRED THIS ENTRY'S LUMP CAVEAT: until then the precursor was a LUMPED pool, so reading it whole over-stated the true isoamyl-alcohol supply (~52% of the lump is actually isoamyl alcohol), the over-statement was absorbed into this k, and the YAN-response rode on the lump's composition being fixed (the D-66 caveat). The term now reads the molecule Fujii actually measured ATF1's Km for - 3-methylbutan-1-ol, CAS 123-51-3, NOT its C5 isomer 2-methylbutan-1-ol, which is a different substrate. What survives is weaker and stated in FUSEL_SPECS: all five alcohols share one N-gate, so the SPECTRUM is still fixed even though this pool is now a real molecule. Deferred: the carbon re-route (this reads `isoamyl_alcohol` but still draws carbon from S)."
 
 k_ethyl_hexanoate:
   value: 2.6e-6
@@ -604,15 +604,88 @@ E_a_esters:
     conditions: "S. cerevisiae wine; equivalent Arrhenius activation energy at T_ref = 293.15 K"
     notes: "D-21 REVISION (was a generic beer-grounded 80,000 under D-19): the wine/beer ester direction lives HERE, in synthesis, not in the gas-stripping sink (medium-independent once sourced - see dH_ester_volatil). MAPPING (principled, not a coincidence): run-integrated synthesis scales as arrh(E_a_esters)/arrh(E_a_uptake) (the bare-flux integral to dryness is fixed by total sugar), so it is ~T-INDEPENDENT exactly when E_a_esters ~ E_a_uptake. Mouret 2015 reports wine ester synthesis (TOTAL production) is WEAK / non-monotonic in T (isoamyl acetate quadratic, lowest ~24 C; ethyl hexanoate ~T-independent) - so we set E_a_esters ~ E_a_uptake (55,100). The physical gas-stripping sink (sensitivity E_a_uptake + dH_ester_volatil ~ 100 kJ/mol) is then STEEPER than synthesis, so it OUTRUNS synthesis on the LIQUID and wine liquid esters FALL with T (Rollero 2014 evaporation inversion), while total production stays ~flat and the stripped fraction (esters_gas) RISES with T - WITHOUT any fudged stripping E_a (the D-20 approach, retired). The warmer=>more-aroma direction for wine is carried by the FUSELS. SPECULATIVE magnitude (the flat-production direction is sourced; the exact value is not). Verified empirically (14/20/25 C): wine liquid esters fall ~73/61/50 mg/L, total ~flat 114 mg/L, gas rises 41->64."
 
-k_fusel:
-  value: 2.5e-3
-  unit: "1/h"   # d(fusels)/dt = k_fusel * X * S/(K_su+S) * N/(K_n+N) * f(T)
+# =====================================================================================
+# THE FIVE EHRLICH HIGHER-ALCOHOL RATE CONSTANTS (decision D-99)
+# =====================================================================================
+# These five replace the single lumped `k_fusel`. Each is anchored INDEPENDENTLY to its own
+# molecule's measured wine concentration -- never a share of one fitted k_fusel, which would
+# have smuggled back the fabricated composition constant the split exists to remove (the D-96
+# rule, applied one pool over).
+#
+# THE ANCHOR: Wang X., Frank S. & Steinhaus M. 2024, J. Agric. Food Chem. 72(40):22250-22257
+# (doi:10.1021/acs.jafc.4c06838), Table 2 -- a META-ANALYSIS reporting, per compound, a MEAN
+# over N independently published wine studies. Those n's are the evidence and are recorded per
+# entry below; they are also why five separately-anchored k's are sourceable at all.
+#
+# ! THE VALUES ARE MEANS, NOT RANGES. The meta-analysis reports mean+n, not a band. The
+#   `uncertainty` bands below are therefore AUTHOR ESTIMATES around a measured mean, not
+#   reported bands, and each says so. Do not read them as literature intervals.
+#
+# THE TOTAL RISES ~3.8x AND THAT IS THE POINT (D-99): the five means sum to ~328 mg/L against
+# the old lump's ~86. The old value sat below even the SUM OF THE FIVE SPECIES' LOW ENDS, and
+# k_fusel's own note already conceded it ran at "the low end of the 150-400 mg/L wine
+# higher-alcohol range". Honest per-molecule anchoring CANNOT land where the lump did. The rise
+# is forced by the sourcing, not chosen for an outcome -- it would be identical had no one
+# looked at the OAV consequences.
+#
+# WHAT ALL FIVE STILL SHARE (the honest limit): one N-gate and one E_a_fusels, so the SPECTRUM
+# is fixed even though the molecules are now real -- warm or starve the ferment and all five
+# scale together. Per-species E_a / per-amino-acid gates would make composition dynamic and are
+# DEFERRED as unsourced (see FUSEL_SPECS / fusel_rate_shape).
+#
+# The Mouret 2015 / Rollero 2014 non-monotonic-N corroboration below applies to ALL FIVE
+# equally: it is a property of the Ehrlich pathway this file models with one monotone branch,
+# which is why every one of these stays speculative.
+
+k_propanol:
+  value: 6.95e-4
+  unit: "1/h"   # d(propanol)/dt = k_propanol * X * S/(K_su+S) * N/(K_n+N) * f(T)
   tier: speculative
-  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "order-of-magnitude target; trace total fusels (our run ~0.05-0.15 g/L), low end of the 150-400 mg/L wine higher-alcohol range" }
+  uncertainty: { low: 1.4e-4, high: 2.8e-3, note: "AUTHOR-ESTIMATED band (x0.2/x4) -- deliberately the widest of the five. Target ~24 mg/L is a single-variety midpoint, not a general mean" }
   provenance:
-    source: "author estimate bounded by typical wine higher-alcohol levels; N-gate structure corroborated by Mouret 2015 (doi:10.1016/j.bej.2015.07.017) + Rollero/Mouret 2014 (doi:10.1007/s00253-014-6210-9)"
-    conditions: "S. cerevisiae wine; Ehrlich fusel formation, nitrogen-gated on the fermentative flux"
-    notes: "Read by FuselAlcoholsEhrlich. Higher than k_ester because the N-gate (N/(K_n+N)) front-loads fusel formation into the nitrogen-replete early ferment and so cuts the production window short - the larger rate compensates. Total wine higher alcohols are ~150-400 mg/L; our N-gated trace lands ~0.05-0.15 g/L (low end), front-loaded as Mouret/Sablayrolles observe (higher alcohols are maximal once N is exhausted at the end of growth, ~30% sugar consumption). SPECULATIVE order-of-magnitude target - the WEAKEST-sourced k of the four: no kinetic model of OUR per-flux form exists (de Andres-Toro has no fusel term; Mouret's is a yield-from-sugar form). CORROBORATION (D-19 sourcing step): Mouret 2015 + Rollero 2014 confirm higher-alcohol synthesis is OPTIMAL at ~200-300 mg N/L and NON-MONOTONIC in nitrogen - exactly the non-monotonic-N behaviour our FuselAlcoholsEhrlich knowingly simplifies to a single monotone branch (the documented reason that Process stays speculative)."
+    source: "Jiang & Zhang 2018 (Molecules 23(5):1096, doi:10.3390/molecules23051096), Table 2: propan-1-ol 16.7-30.9 mg/L in Cabernet Franc wines; N-gate structure corroborated by Mouret 2015 (doi:10.1016/j.bej.2015.07.017) + Rollero/Mouret 2014 (doi:10.1007/s00253-014-6210-9)"
+    conditions: "S. cerevisiae wine; Ehrlich fusel formation from THREONINE, nitrogen-gated on the fermentative flux. k set to land finished propan-1-ol at ~24 mg/L (the midpoint of the cited range)"
+    notes: "Read by FuselAlcoholsEhrlich. THE WEAKEST-SOURCED OF THE FIVE, and the reason is worth stating: Wang/Frank/Steinhaus 2024 -- the meta-analysis anchoring the other four -- OMITS propan-1-ol entirely, in BOTH matrices. The only measurement located is ONE study, ONE variety (Cabernet Franc), THREE terrains: real, but not a general wine range like the n=128-684 means behind the others. Kept anyway because propan-1-ol is unquestionably present and omitting it would misattribute its carbon to the other four; it is CHEMISTRY-ONLY (no sourced odour threshold in any matrix => no OAV entry => it cannot reach a descriptor axis). At ~24 mg/L against the ~306 mg/L threshold floated for it, its OAV would be ~0.08 -- so under the D-95 MAX rule it could never be a descriptor's loudest contributor even if a threshold were added. Its accuracy is a LEDGER question, not a sensory one."
+
+k_isobutanol:
+  value: 9.55e-4
+  unit: "1/h"   # d(isobutanol)/dt = k_isobutanol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 2.9e-4, high: 2.9e-3, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 2: isobutanol (2-methylpropan-1-ol) wine MEAN 33.0 mg/L over n=486 published studies; N-gate structure corroborated by Mouret 2015 + Rollero/Mouret 2014"
+    conditions: "S. cerevisiae wine; Ehrlich fusel formation from VALINE, nitrogen-gated on the fermentative flux. k set to land finished isobutanol at the 33.0 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. n=486 independent studies behind the mean -- among the best-attested numbers in this file. Corroborated independently at 10.1-19.9 mg/L in Cabernet Franc (Jiang & Zhang 2018), i.e. the same order, lower for that variety. AROMA-ACTIVE IN WINE (Guth threshold ~40 mg/L => OAV ~0.8, just under threshold and so a genuine MAX contender on the solventy axis rather than a foregone conclusion), CHEMISTRY-ONLY IN BEER (no beer threshold sourced)."
+
+k_active_amyl_alcohol:
+  value: 2.03e-3
+  unit: "1/h"   # d(active_amyl_alcohol)/dt = k_active_amyl_alcohol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 6.1e-4, high: 6.1e-3, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 2: 2-methylbutan-1-ol wine MEAN 70.1 mg/L over n=128 published studies; N-gate structure corroborated by Mouret 2015 + Rollero/Mouret 2014"
+    conditions: "S. cerevisiae wine; Ehrlich fusel formation from ISOLEUCINE, nitrogen-gated on the fermentative flux. k set to land finished 2-methylbutan-1-ol at the 70.1 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. ACTIVE AMYL ALCOHOL = 2-methylbutan-1-ol = CAS 137-32-6 -- an ISOMER of isoamyl alcohol (3-methylbutan-1-ol, CAS 123-51-3), NOT a synonym. Vendor literature has been seen to invert the two names (Restek 2025); the ~5.5x potency gap between them makes that swap consequential. THAT THIS ENTRY EXISTS AT ALL IS THE FINDING: routine OIV/BIPEA reference methods report one combined 'amyl alcohols' figure because the two isomers COELUTE on common GC phases (Rtx-VMS, 'regardless of column dimensions') -- a column artifact, not a law of nature. Aroma research resolves them, and n=128 independent wine studies quantified this one separately, which is what makes an INDEPENDENT anchor possible here instead of a D-96-forbidden ratio-split off isoamyl. CHEMISTRY-ONLY: no odour threshold is published for it in wine OR beer (water-only 1.2 mg/L, an unusable matrix -- see sensory.yaml on the ~136x water/ethanol gap), so it carries no OAV. Its 70 mg/L was previously read at ISOAMYL's threshold by the lump, overstating its potency ~5.5x; removing that false claim is a fidelity gain even though this pool now makes no sensory claim at all."
+
+k_isoamyl_alcohol:
+  value: 4.98e-3
+  unit: "1/h"   # d(isoamyl_alcohol)/dt = k_isoamyl_alcohol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 1.5e-3, high: 1.5e-2, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 2: 3-methylbutan-1-ol wine MEAN 172 mg/L over n=555 published studies; N-gate structure corroborated by Mouret 2015 + Rollero/Mouret 2014"
+    conditions: "S. cerevisiae wine; Ehrlich fusel formation from LEUCINE, nitrogen-gated on the fermentative flux. k set to land finished 3-methylbutan-1-ol at the 172 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. ISOAMYL ALCOHOL = 3-methylbutan-1-ol = CAS 123-51-3 (see k_active_amyl_alcohol on the isomer hazard). THE DOMINANT higher alcohol -- 172 mg/L is ~52% of the five-species total, which is why the pre-D-99 lump reading everything at ITS threshold was a defensible-looking error rather than an obvious one. Corroborated independently at 51.1-67.5 mg/L in Cabernet Franc (Jiang & Zhang 2018), i.e. lower for that variety but the same dominant rank. This pool is load-bearing beyond its own OAV: it is the D-97 ATF1 precursor that makes the banana ester YAN-responsive (isoamyl acetate synthesis is first-order in it), and the C5 half of the D-69 hydrolysis split -- so this k now also sets the banana ester's supply. k_isoamyl_acetate is RE-ANCHORED against the new pool level so the finished ester is unchanged (D-97's ratio lesson: an absolute-band test would otherwise pass on the old model)."
+
+k_2_phenylethanol:
+  value: 8.31e-4
+  unit: "1/h"   # d(2_phenylethanol)/dt = k_2_phenylethanol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 2.5e-4, high: 2.5e-3, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 2: 2-phenylethanol wine MEAN 28.7 mg/L over n=684 published studies; N-gate structure corroborated by Mouret 2015 + Rollero/Mouret 2014"
+    conditions: "S. cerevisiae wine; Ehrlich fusel formation from PHENYLALANINE, nitrogen-gated on the fermentative flux. k set to land finished 2-phenylethanol at the 28.7 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. n=684 studies -- THE BEST-ATTESTED concentration in this file. The only AROMATIC one of the five, and the only one whose descriptor is not solventy: rose/honey. THE PAYLOAD OF D-99, and it is fully sourced independently of every gap in the beat: 28.7 mg/L against Guth 1997's ~10 mg/L wine threshold => OAV ~2.9, so wine gains a FERMENTATION-DERIVED floral axis. Before D-99 wine's floral_honey axis read phenylacetaldehyde alone -- a D-75 Strecker aldehyde requiring OXIDATIVE aging -- so a young un-oxidised wine read floral_honey = 0, which is simply wrong about wine. NOT TUNED: k lands the meta-analytic mean and nothing else; the OAV is whatever that mean divided by Guth's threshold happens to be. Corroborated independently at 11.4-31.4 mg/L in Cabernet Franc (Jiang & Zhang 2018). CHEMISTRY-ONLY IN BEER despite a similar concentration (25.7 mg/L, n=92) -- no beer threshold is sourced, and Meilgaard via Holt et al. 2019 states 2-phenylethanol is 'typically found below its sensory threshold in beer', so beer correctly gains no floral axis."
 
 E_a_fusels:
   value: 70000.0

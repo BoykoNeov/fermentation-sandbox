@@ -124,9 +124,14 @@ ESTER_SPECS: tuple[EsterSpec, ...] = (
         "k_isoamyl_acetate",
         note="isoamyl acetate (C7H14O2) — the trace, potent BANANA acetate ester (ATF1); "
         "the only ester the D-69 aging hydrolysis fades",
-        # First-order in isoamyl alcohol: the `fusels` pool runs ~30-60x below ATF1's
-        # Km ~29.8 mM (Fujii 1998) ⇒ the [S] << Km limit. This is the D-97 coupling.
-        precursor_pool="fusels",
+        # First-order in isoamyl alcohol: the pool runs far below ATF1's Km ~29.8 mM
+        # (Fujii 1998) ⇒ the [S] << Km limit. This is the D-97 coupling. Since D-99 it names
+        # the isoamyl pool SPECIFICALLY rather than the old lump — which is what the Km was
+        # always measured for. Fujii's Km is for 3-methylbutan-1-ol; pointing this at the
+        # lump meant a mixture stood in for the molecule the enzyme actually sees, and
+        # pointing it at `active_amyl_alcohol` (the C5 ISOMER) would be a different enzyme
+        # substrate entirely. Hence the registry constant, not a literal.
+        precursor_pool="isoamyl_alcohol",
     ),
     EsterSpec(
         "ethyl_hexanoate",
@@ -144,6 +149,124 @@ ESTER_SPECS: tuple[EsterSpec, ...] = (
 #: C5 + acetic acid C2), where D-69 had to debit ethyl acetate and split as if it were
 #: isoamyl acetate. See :class:`~fermentation.core.kinetics.aging.EsterHydrolysis`.
 HYDROLYSING_ESTER: EsterSpec = ESTER_SPECS[1]
+
+
+@dataclass(frozen=True)
+class FuselSpec:
+    """One Ehrlich higher alcohol: its pool, molecule, rate constant and amino-acid precursor.
+
+    The fusel twin of :class:`EsterSpec`, and deliberately simpler in one way: there is **no
+    ``gas_pool``**. The esters carry a CO₂-stripped headspace twin (D-20) because they are
+    volatile enough to be swept out during a vigorous ferment; the higher alcohols are not
+    stripped in this model, so each is a liquid pool only.
+
+    ``species`` is the molecule the pool is carbon-weighted by in
+    :func:`~fermentation.validation.conservation.total_carbon`, and — since D-99 — **it is the
+    pool's own molecule, not a stand-in**. ``precursor_amino_acid`` is documentation of the
+    Ehrlich route, not a modelled pool: `N` (YAN) is a single lumped nitrogen number here, so
+    the sim cannot know which amino acid was consumed. It is recorded because it is *why*
+    these five and not others, and because it names exactly what a future speciated-YAN model
+    would have to supply to make the composition dynamic (see :data:`FUSEL_SPECS`).
+    """
+
+    pool: str
+    species: str
+    k_param: str
+    #: Human-readable note for the pool's :class:`~fermentation.core.state.VarSpec`
+    #: description — kept here so the schema text cannot drift from the registry.
+    note: str
+    #: The Ehrlich-pathway amino acid whose skeleton becomes this alcohol. Documentation of
+    #: provenance only — never read by any rate law (see the class doc).
+    precursor_amino_acid: str
+
+
+#: The FIVE Ehrlich higher alcohols the sim tracks (decision D-99) — each a **single-molecule**
+#: pool, so none carries the fixed-lump-composition caveat. This is the D-96 ester split
+#: applied one pool over, and for the same reason: until D-99 one lumped ``fusels`` pool was
+#: carbon-weighted as isoamyl alcohol AND read on the OAV lens against isoamyl alcohol's
+#: threshold — so unlike the pre-D-96 ester pool it had no *split identity*, but it made a
+#: quieter and broader error: it asserted that **every** higher alcohol smells like isoamyl
+#: alcohol and weighs like it. Four of the five are neither.
+#:
+#: **Each ``k`` is anchored INDEPENDENTLY to its own molecule's measured concentration** — the
+#: load-bearing D-96 rule, and the reason this beat is worth anything. The lump's composition
+#: is now *derived* from five independently-anchored rates; a ratio-split off one ``k_fusel``
+#: would have smuggled back the fabricated composition constant the split exists to remove.
+#: Concentrations come from Wang, Frank & Steinhaus 2024 (J. Agric. Food Chem. 72:22250-22257),
+#: a meta-analysis reporting a per-compound MEAN over N independently published studies —
+#: n=486 (isobutanol) / 128 (active amyl) / 555 (isoamyl) / 684 (2-phenylethanol) for wine.
+#: The honest consequence is that the total RISES ~3.8× (wine ~86 → ~328 mg/L): the old lump
+#: sat below even the *sum of the five species' low ends*, and ``k_fusel``'s own provenance
+#: already admitted it ran at "the low end of the 150-400 mg/L wine higher-alcohol range".
+#: The rise is **forced by honest per-molecule anchoring**, not chosen for an outcome.
+#:
+#: **The two C5 isomers are the trap.** ``isoamyl_alcohol`` (3-methylbutan-1-ol, CAS 123-51-3)
+#: and ``active_amyl_alcohol`` (2-methylbutan-1-ol, CAS 137-32-6) share a formula, a molar mass
+#: and a carbon count, and differ ~5.5× in odour potency. They coelute on common GC phases, so
+#: routine OIV/BIPEA methods report a single combined "amyl alcohols" figure — but aroma
+#: research resolves and quantifies them separately (n=128 wine / n=64 beer studies for active
+#: amyl alone), which is what makes five independently-anchored pools sourceable rather than a
+#: ratio-split. See :mod:`fermentation.core.chemistry` for the CAS warning; vendor literature
+#: has been seen to invert these two names.
+#:
+#: **What this split does NOT buy — the honest limit (D-99).** All five share one N-gate and
+#: one ``E_a_fusels``, so the *spectrum* is fixed even though the *molecules* are now real:
+#: raise the temperature or starve the nitrogen and all five move together. Speciation retires
+#: the wrong-molecule-threshold error; it replaces "fixed composition" with the weaker but
+#: still-real "fixed spectrum". Making the spectrum dynamic needs per-species activation
+#: energies and per-amino-acid gates — **deferred, because neither is sourced**, and an author
+#: estimate per species would lower fidelity while looking like it raised it.
+FUSEL_SPECS: tuple[FuselSpec, ...] = (
+    FuselSpec(
+        "propanol",
+        "propanol",
+        "k_propanol",
+        note="propan-1-ol (C3H8O) — the shortest Ehrlich higher alcohol; no sourced odour "
+        "threshold in either matrix, so it is chemistry-only (carries no OAV)",
+        precursor_amino_acid="threonine",
+    ),
+    FuselSpec(
+        "isobutanol",
+        "isobutanol",
+        "k_isobutanol",
+        note="isobutanol / 2-methylpropan-1-ol (C4H10O) — fusel/alcoholic; aroma-active in "
+        "wine (Guth threshold ~40 mg/L), chemistry-only in beer (no beer threshold sourced)",
+        precursor_amino_acid="valine",
+    ),
+    FuselSpec(
+        "active_amyl_alcohol",
+        "active_amyl_alcohol",
+        "k_active_amyl_alcohol",
+        note="active amyl alcohol / 2-methylbutan-1-ol (C5H12O, CAS 137-32-6) — an ISOMER of "
+        "isoamyl alcohol, not a synonym; no sourced odour threshold in either matrix, so it "
+        "is chemistry-only (carries no OAV)",
+        precursor_amino_acid="isoleucine",
+    ),
+    FuselSpec(
+        "isoamyl_alcohol",
+        "isoamyl_alcohol",
+        "k_isoamyl_alcohol",
+        note="isoamyl alcohol / 3-methylbutan-1-ol (C5H12O, CAS 123-51-3) — the DOMINANT "
+        "higher alcohol of both media and the solventy/fusel note; the D-97 precursor of "
+        "isoamyl acetate and the C5 half of the D-69 hydrolysis split",
+        precursor_amino_acid="leucine",
+    ),
+    FuselSpec(
+        "2_phenylethanol",
+        "2_phenylethanol",
+        "k_2_phenylethanol",
+        note="2-phenylethanol (C8H10O) — the only AROMATIC higher alcohol: rose/honey, not "
+        "solventy. Aroma-active in wine (Guth threshold ~10 mg/L vs ~28.7 mg/L typical), "
+        "chemistry-only in beer (no beer threshold sourced)",
+        precursor_amino_acid="phenylalanine",
+    ),
+)
+
+#: The higher alcohol the D-97 ATF1 coupling and the D-69 aging hydrolysis both act on — the
+#: **isoamyl** one, in both cases because the ester in question is isoamyl acetate. Named here
+#: so neither Process has to spell the string, and so the D-99 split cannot silently re-point
+#: either at the wrong C5 isomer (``active_amyl_alcohol`` is a different molecule).
+ISOAMYL_ALCOHOL: FuselSpec = FUSEL_SPECS[3]
 
 
 def draw_carbon_from_sugar(

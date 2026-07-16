@@ -326,14 +326,14 @@ k_ethyl_acetate:
     notes: "Read by EsterSynthesis for the `ethyl_acetate` pool. Anchored to ETHYL ACETATE ALONE in ale, not to a share of a lumped total (D-96). Calibrated against the FINISHED beer with the EsterVolatilization sink active: a 21-day run at 20 C lands ~20 mg/L liquid, mid-band for this molecule's own 10-30 mg/L ale range and below Meilgaard's ~30 mg/L threshold, so a sound ale correctly reads OAV < 1 on the solventy note. Note beer strips FAR less than wine (~19% vs ~45% of the ester synthesised) - less sugar means less CO2 evolved to carry ester into the headspace. SPECULATIVE on magnitude: de Andres-Toro form ethyl acetate as Y_EA*mu_x*X_A (a growth coupling and unit system unlike our flux-coupled k), so no transferable rate constant exists; the anchor is this molecule's measured band."
 
 k_isoamyl_acetate:
-  value: 3.05e-4
-  unit: "L/(g*h)"   # d(isoamyl_acetate)/dt = k_isoamyl_acetate * [fusels] * X * S/(K_su+S) * f(T)
+  value: 4.26e-4
+  unit: "L/(g*h)"   # d(isoamyl_acetate)/dt = k_isoamyl_acetate * [isoamyl_alcohol] * X * S/(K_su+S) * f(T)
   tier: speculative
-  uncertainty: { low: 1.0e-4, high: 6.4e-4, note: "band spans isoamyl acetate ~0.7-4 mg/L, its own typical range in ale (the D-96 band, rescaled x25.4 with the value at D-97 so it pins the same CONCENTRATION span: the rate stays linear in k)" }
+  uncertainty: { low: 1.4e-4, high: 8.94e-4, note: "band spans isoamyl acetate ~0.7-4 mg/L, its own typical range in ale (the D-96 band, rescaled x25.4 at D-97 and x1.397 at D-99 so it pins the same CONCENTRATION span throughout: the rate stays linear in k)" }
   provenance:
     source: "author estimate bounded by ISOAMYL ACETATE's own measured range in beer (~0.5-3 mg/L in ale; Meilgaard 1975, MBAA Tech. Q. 12:151-168 gives a threshold ~1.0-1.6 mg/L and ales characteristically sit at or above it - the banana note is a recognised ale signature). The rate law's FORM is sourced separately: Fujii et al. 1998, Appl. Environ. Microbiol. 64:4076-4078 (citing Yoshioka & Hashimoto 1981, Agric. Biol. Chem. 45:2183-2190) measures ATF1's Km for isoamyl alcohol at ~29.8 mM and states that 'a major rate-limiting factor for isoamyl acetate production is the amount of isoamyl alcohol'."
-    conditions: "ale yeast; ATF1 acetate ester of isoamyl alcohol, FIRST-ORDER in the `fusels` precursor pool and coupled to the biomass-catalysed sugar flux"
-    notes: "Read by EsterSynthesis for the `isoamyl_acetate` pool - the BANANA note. Anchored to ISOAMYL ACETATE ALONE (D-96): calibrated post-stripping to ~2.2 mg/L in the finished beer, inside its own 0.5-3 mg/L band and just above the Meilgaard threshold, which is the correct reading for an ale. This works out to ~11% of ale's ethyl acetate versus ~1.5% in wine - a DERIVED difference between the media that follows from anchoring each molecule in each medium separately, and one a ratio-split of a single k could not have produced. D-97 RE-ANCHORED the value 1.2e-5 -> 3.05e-4 (x25.4, absorbing the ~0.0415 g/L `fusels` factor the new precursor term introduces) so the finished ale still lands ~2.2 mg/L - the coupling changes the YAN-response and time shape, NOT the calibration target. NOTE the media's rescale factors DIFFER (x20 wine / x25.4 beer) precisely because each medium's `fusels` level differs (51.1 vs 41.5 mg/L): the same per-medium independence D-96 established. Beer's pool is ~0.47 mM against ATF1's Km ~29.8 mM (~63x below), so beer sits in the same [S] << Km linear regime as wine - see the wine file's note for why the Km is NOT a parameter (unidentifiable in this limit; this k IS the identifiable Vmax/Km ratio)."
+    conditions: "ale yeast; ATF1 acetate ester of isoamyl alcohol, FIRST-ORDER in the `isoamyl_alcohol` precursor pool (the molecule itself since D-99, not a lump) and coupled to the biomass-catalysed sugar flux"
+    notes: "Read by EsterSynthesis for the `isoamyl_acetate` pool - the BANANA note. Anchored to ISOAMYL ACETATE ALONE (D-96): calibrated post-stripping to ~2.2 mg/L in the finished beer, inside its own 0.5-3 mg/L band and just above the Meilgaard threshold, which is the correct reading for an ale. This works out to ~11% of ale's ethyl acetate versus ~1.5% in wine - a DERIVED difference between the media that follows from anchoring each molecule in each medium separately, and one a ratio-split of a single k could not have produced. D-97 RE-ANCHORED the value 1.2e-5 -> 3.05e-4 (x25.4, absorbing the ~0.0415 g/L `fusels` factor the new precursor term introduces) so the finished ale still lands ~2.2 mg/L - the coupling changes the YAN-response and time shape, NOT the calibration target. NOTE the media's rescale factors DIFFER (x20 wine / x25.4 beer) precisely because each medium's `fusels` level differs (51.1 vs 41.5 mg/L): the same per-medium independence D-96 established. D-99 RE-ANCHORED IT AGAIN, 3.05e-4 -> 4.26e-4 (x1.397), when speciation replaced the lump with the actual isoamyl-alcohol pool; the finished ale still lands ~2.2 mg/L. THE FACTOR MOVES THE OPPOSITE WAY FROM WINE'S (x1.397 here vs x0.502 there) AND THAT IS THE POINT: wine's precursor DOUBLED under honest anchoring (86 -> 172 mg/L) while beer's FELL (41.5 -> 30.05 mg/L), because ale's higher alcohols are far less isoamyl-dominated than wine's (~35% vs ~52% of the total). A cross-medium ratio-split could not have produced two factors in opposite directions - only anchoring each molecule in each medium separately does. The factor is EXACT, not fitted: both rates share one shape, so it is k_fusel_old / k_isoamyl_alcohol_new = 2.5e-3 / 1.79e-3. Beer's pool is now ~0.34 mM against ATF1's Km ~29.8 mM (~87x below; the margin WIDENED from ~63x as the pool fell, the mirror of wine's tightening), so beer sits even more securely in the [S] << Km linear regime - see the wine file's note for why the Km is NOT a parameter (unidentifiable in this limit; this k IS the identifiable Vmax/Km ratio) and for the lump caveat D-99 retired from both files."
 
 k_ethyl_hexanoate:
   value: 1.2e-6
@@ -355,15 +355,82 @@ E_a_esters:
     conditions: "ale yeast; equivalent Arrhenius activation energy at T_ref = 293.15 K"
     notes: "D-21 REVISION (was a generic 80,000 under D-19, shared with wine): the wine/beer ester direction lives HERE, in synthesis, not in the gas-stripping sink (medium-independent once sourced - see dH_ester_volatil). Beer ester synthesis is STRONGLY T-sensitive (de Andres-Toro tie ethyl acetate to growth; apparent E_a ~221-265 kJ/mol). Held at ~200k, WELL ABOVE the physical stripping sensitivity (E_a_uptake + dH_ester_volatil ~ 100 kJ/mol), so SYNTHESIS OUTRUNS STRIPPING and beer LIQUID esters RISE with temperature - the warm-ale ester character - WITHOUT any fudged stripping E_a (the D-20 approach, retired). This applies de Andres-Toro's GROWTH-coupled E_a to our FLUX-coupled synthesis term (a transfer of the sourced ORDERING; D-19 established the ordering is sourced, the exact magnitude is not). SPECULATIVE magnitude (the ~200k is steep-but-sourced-in-direction; the exact value within 120-265k is not pinned). Verified empirically (14/20/25 C): beer liquid esters rise ~22/72/181 mg/L."
 
-k_fusel:
-  value: 2.5e-3
-  unit: "1/h"   # d(fusels)/dt = k_fusel * X * S/(K_su+S) * N/(K_n+N) * f(T)
+# =====================================================================================
+# THE FIVE EHRLICH HIGHER-ALCOHOL RATE CONSTANTS (decision D-99)
+# =====================================================================================
+# The beer half of the D-99 split; see wine_generic.yaml for the full rationale. Each k is
+# anchored INDEPENDENTLY to its own molecule's measured BEER concentration -- never a share of
+# one k_fusel, and never a share of the wine file's values either (a cross-medium ratio-split
+# would be the same sin one axis over).
+#
+# THE ANCHOR: Wang X., Frank S. & Steinhaus M. 2024, J. Agric. Food Chem. 72(40):22250-22257
+# (doi:10.1021/acs.jafc.4c06838), Table 1 -- the BEER table of the same meta-analysis, again
+# per-compound MEANS over N independently published studies (n recorded per entry).
+#
+# ! THE VALUES ARE MEANS, NOT RANGES; the `uncertainty` bands are AUTHOR ESTIMATES around them.
+#
+# ! DO NOT IMPORT THAT PAPER'S OAV COLUMN. Its Table 1 divides these beer concentrations by
+#   WATER odour thresholds and reports e.g. 2-phenylethanol OAV ~180. That directly
+#   contradicts Meilgaard (via Holt et al. 2019), which states 2-phenylethanol is "typically
+#   found below its sensory threshold in beer". Both cannot hold, and the water denominator is
+#   the error: water thresholds under-read ethanolic-matrix ones by up to ~136x, inconsistently
+#   across compounds (see sensory.yaml). The paper's CONCENTRATIONS are sound; its OAVs are not.
+#
+# BEER IS THE MEDIUM WITHOUT THRESHOLDS. Only isoamyl alcohol has a sourced in-matrix beer
+# threshold (Meilgaard 1975, ~50 mg/L -- already in sensory.yaml since D-66). The other four
+# are CHEMISTRY-ONLY here: real pools, real carbon, no OAV, no descriptor axis. That is the
+# honest state of the literature, not a modelling shortcut -- Meilgaard 1975 and Engan 1972
+# are paywalled and no open secondary reproduces their per-compound numerics with attribution.
+
+k_propanol:
+  value: 5.96e-4
+  unit: "1/h"   # d(propanol)/dt = k_propanol * X * S/(K_su+S) * N/(K_n+N) * f(T)
   tier: speculative
-  uncertainty: { low: 5.0e-4, high: 1.0e-2, note: "order-of-magnitude target; ale fusel total ~50-200 mg/L at 20 C" }
+  uncertainty: { low: 5.8e-5, high: 1.5e-3, note: "AUTHOR-ESTIMATED band (x0.2/x5) around an AUTHOR-ESTIMATED value -- deliberately the widest in the file, because nothing measured underlies it" }
   provenance:
-    source: "author estimate bounded by typical ale higher-alcohol levels; N-gate structure after Mouret/Sablayrolles (wine); no fusel kinetic model of our form sourced (de Andres-Toro has no fusel term)"
-    conditions: "ale yeast; Ehrlich fusel formation, nitrogen-gated on the fermentative flux"
-    notes: "Read by FuselAlcoholsEhrlich. Mirrors the wine file. The N-gate front-loads fusels into the nitrogen-replete early ferment; beer's higher wort YAN (~200 mg/L) keeps the gate open a touch longer than a low-N wine must. SPECULATIVE order-of-magnitude target - the WEAKEST-sourced of the four (de Andres-Toro models no higher alcohols). CORROBORATION (D-19): the wine aroma studies Mouret 2015 / Rollero 2014 confirm higher-alcohol synthesis is optimal at ~200-300 mg N/L and NON-MONOTONIC in nitrogen - the very behaviour FuselAlcoholsEhrlich knowingly simplifies to one monotone branch (why it stays speculative)."
+    source: "author estimate"
+    conditions: "ale yeast; Ehrlich fusel formation from THREONINE, nitrogen-gated on the fermentative flux. k set to land finished propan-1-ol at ~10 mg/L"
+    notes: "Read by FuselAlcoholsEhrlich. *** THE ONLY UNSOURCED NUMBER IN D-99 -- the single weakest value in this beat, and it is flagged here rather than buried. *** No measured beer propan-1-ol concentration was located: Wang/Frank/Steinhaus 2024 OMITS propan-1-ol from its beer table (as it does from its wine table), and the J. Inst. Brew. reviews that would carry it (Olaniran 2017, doi:10.1002/jib.389; Engan 1972) are paywalled -- verified 402, not merely unsearched. Search snippets floating '10-30 ppm' and '~500/600 ppm' were DISCARDED: no source containing them was ever opened, so they are not data (the same discipline applied throughout D-99). Kept despite this because propan-1-ol is unquestionably present in beer and omitting the pool would misattribute its carbon to the other four -- an author estimate for a real molecule beats a silent zero. Tagged `source: author estimate` per prime directive #2, which forbids UNDOCUMENTED guesses, not guesses. IT CANNOT AFFECT ANY OUTPUT BUT THE LEDGER: chemistry-only (no sourced threshold in any matrix => no OAV => unreachable from any descriptor axis). Note this is NOT a regression -- the k_fusel it replaces was itself an author estimate, and it silently weighted this molecule's carbon at isoamyl's mass fraction (0.6813 vs propan-1-ol's true 0.5996 -- a ~14% over-book). Sourcing this is the named follow-up."
+
+k_isobutanol:
+  value: 5.72e-4
+  unit: "1/h"   # d(isobutanol)/dt = k_isobutanol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 8.4e-5, high: 8.4e-4, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 1: isobutanol beer MEAN 9.6 mg/L over n=78 published studies; N-gate structure after Mouret 2015 / Rollero 2014 (wine)"
+    conditions: "ale yeast; Ehrlich fusel formation from VALINE, nitrogen-gated on the fermentative flux. k set to land finished isobutanol at the 9.6 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. ~3.4x LOWER than wine's 33.0 mg/L mean -- the media genuinely differ, and each file anchors to its OWN medium's measurement rather than sharing a value. CHEMISTRY-ONLY in beer: no in-matrix beer threshold sourced (the water-only 19 mg/L is an unusable matrix), so this pool carries no OAV here while its wine twin is aroma-active."
+
+k_active_amyl_alcohol:
+  value: 6.14e-4
+  unit: "1/h"   # d(active_amyl_alcohol)/dt = k_active_amyl_alcohol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 9.0e-5, high: 9.0e-4, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 1: 2-methylbutan-1-ol beer MEAN 10.3 mg/L over n=64 published studies; corroborated structurally by Holt et al. 2019 (FEMS Microbiol. Rev. 43(3):193-222, doi:10.1093/femsre/fuy041), which treats isoamyl and active amyl alcohol as separate compounds"
+    conditions: "ale yeast; Ehrlich fusel formation from ISOLEUCINE, nitrogen-gated on the fermentative flux. k set to land finished 2-methylbutan-1-ol at the 10.3 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. ACTIVE AMYL = 2-methylbutan-1-ol = CAS 137-32-6, an ISOMER of isoamyl alcohol (CAS 123-51-3) and not a synonym -- see the wine file; Restek 2025 inverts these two names. n=64 independent BEER studies quantified it separately from 3-methylbutan-1-ol (n=73), which is what makes an independent anchor possible rather than a ratio-split. CHEMISTRY-ONLY: no in-matrix threshold in beer or wine."
+
+k_isoamyl_alcohol:
+  value: 1.79e-3
+  unit: "1/h"   # d(isoamyl_alcohol)/dt = k_isoamyl_alcohol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 2.6e-4, high: 2.6e-3, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 1: 3-methylbutan-1-ol beer MEAN 30.0 mg/L over n=73 published studies; descriptor 'alcoholic/vinous/sweet' per Holt et al. 2019 (doi:10.1093/femsre/fuy041); N-gate structure after Mouret 2015 / Rollero 2014 (wine)"
+    conditions: "ale yeast; Ehrlich fusel formation from LEUCINE, nitrogen-gated on the fermentative flux. k set to land finished 3-methylbutan-1-ol at the 30.0 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. ISOAMYL ALCOHOL = 3-methylbutan-1-ol = CAS 123-51-3. THE ONLY BEER POOL OF THE FIVE WITH A SOURCED IN-MATRIX THRESHOLD (Meilgaard 1975, ~50 mg/L, measured in beer -- sensory.yaml), so beer's solventy axis rides on this pool alone plus ethyl acetate. 30.0 mg/L against that 50 mg/L threshold => OAV ~0.6, i.e. BELOW threshold -- which is literature-correct, not a model failure: fusel character is a DEFECT in beer at elevated levels, not a normal descriptor of it. Also the D-97 ATF1 precursor of the banana ester and the C5 half of the D-69 hydrolysis split, so this k sets the banana ester's supply; k_isoamyl_acetate is RE-ANCHORED so the finished ester is unchanged."
+
+k_2_phenylethanol:
+  value: 1.53e-3
+  unit: "1/h"   # d(2_phenylethanol)/dt = k_2_phenylethanol * X * S/(K_su+S) * N/(K_n+N) * f(T)
+  tier: speculative
+  uncertainty: { low: 2.2e-4, high: 2.2e-3, note: "AUTHOR-ESTIMATED band (x0.3/x3) around a MEASURED MEAN; the meta-analysis reports mean+n, not a range" }
+  provenance:
+    source: "Wang X., Frank S. & Steinhaus M. 2024 (J. Agric. Food Chem. 72(40):22250-22257, doi:10.1021/acs.jafc.4c06838), Table 1: 2-phenylethanol beer MEAN 25.7 mg/L over n=92 published studies; descriptor 'roses/honey' per Holt et al. 2019 (doi:10.1093/femsre/fuy041)"
+    conditions: "ale yeast; Ehrlich fusel formation from PHENYLALANINE, nitrogen-gated on the fermentative flux. k set to land finished 2-phenylethanol at the 25.7 mg/L meta-analytic mean"
+    notes: "Read by FuselAlcoholsEhrlich. Nearly the same concentration as wine's 28.7 mg/L -- and yet BEER GAINS NO FLORAL AXIS while wine does. That asymmetry is sourced, not arbitrary: Guth 1997 gives a ~10 mg/L threshold in 10% aq. ethanol (wine's matrix) but no beer threshold exists, and Meilgaard via Holt et al. 2019 states 2-phenylethanol is 'typically found below its sensory threshold in beer' -- so beer's threshold, whatever its value, is high enough that this concentration does not clear it. Modelling the molecule while making no sensory claim about it is exactly right here. The water-only 0.14 mg/L OTC would give OAV ~180 and contradict Meilgaard outright; see the header on why that denominator is wrong."
 
 E_a_fusels:
   value: 70000.0

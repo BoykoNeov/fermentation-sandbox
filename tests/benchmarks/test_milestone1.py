@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from fermentation.core.chemistry import co2_yield, sugar_species
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units import abv_from_ethanol, apparent_gravity, sg_to_plato
@@ -230,8 +230,9 @@ def test_co2_integral_tracks_sugar_consumed():
 def _aroma_run(medium: str, initial: dict[str, float], celsius: float, duration_days: float):
     """Run a medium isothermally; return (days_to_dryness, liquid-pool dict).
 
-    Reads the **liquid** ester/``fusels`` pools only — the ``*_gas`` pools are the
-    bookkeeping headspace pools (volatilized away), not aroma in the glass (D-20).
+    Reads the **liquid** ester / higher-alcohol pools only — the ``*_gas`` pools are the
+    bookkeeping headspace pools (volatilized away), not aroma in the glass (D-20). The higher
+    alcohols have no gas twins at all (they are not stripped), so all five are liquid.
 
     ``esters`` is the **summed liquid ester mass** across the three single-molecule pools
     (decision D-96), which is what the pre-D-96 lumped ``esters`` pool held. The benchmark's
@@ -256,7 +257,11 @@ def _aroma_run(medium: str, initial: dict[str, float], celsius: float, duration_
     assert traj.success, traj.message
     pools = {
         "esters": sum(float(traj.series(spec.pool)[-1]) for spec in ESTER_SPECS),
-        "fusels": float(traj.series("fusels")[-1]),
+        # The summed liquid mass across the five single-molecule higher-alcohol pools
+        # (decision D-99) — exactly what the pre-D-99 lumped ``fusels`` pool held, so the
+        # benchmark's directional "colder ⇒ cleaner" claim is tested on the same quantity it
+        # always was. Summed from the registry, so a sixth alcohol needs no edit here.
+        "fusels": sum(float(traj.series(spec.pool)[-1]) for spec in FUSEL_SPECS),
     }
     return days, pools
 

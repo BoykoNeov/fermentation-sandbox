@@ -130,7 +130,7 @@ def test_profile_reading_tier_is_speculative_even_when_pool_is_validated(thresho
 
 
 def test_profile_compound_set_matches_the_medium(thresholds):
-    """Beer profiles the 5 common + 5 oak pools (10); wine adds the 9 wine-only pools (19, D-94)."""
+    """Beer profiles the 7 common + 5 oak pools (12); wine adds 2 fusel + 9 wine-only (23, D-99)."""
     beer = sensory_profile(_traj(beer_schema(), {}), thresholds)
     wine = sensory_profile(_traj(wine_schema(), {}), thresholds)
     # The 5 oak extractives (D-77 four + furaneol/caramel D-94) are SHARED by both media (barrel-
@@ -138,12 +138,28 @@ def test_profile_compound_set_matches_the_medium(thresholds):
     # pools, so they must NOT appear.
     oak = {"whiskey_lactone", "vanillin", "guaiacol", "eugenol", "furaneol"}
     # The lumped `esters` pool became three single-molecule ester pools at D-96, taking the
-    # common set from 5 to 7.
+    # common set from 5 to 7. D-99 split the lumped `fusels` pool into five single-molecule
+    # higher alcohols but left this set at 7 and beer's total at 12: only `isoamyl_alcohol`
+    # has a sourced in-matrix BEER threshold (Meilgaard 1975), so it alone replaces `fusels`
+    # one-for-one here. Beer's other four higher alcohols are real modelled pools that carry
+    # no OAV — present in `beer_schema()` and deliberately absent from this set.
     assert set(beer.readings) == {
         "diacetyl", "acetaldehyde", "h2s",
-        "ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate", "fusels",
+        "ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate", "isoamyl_alcohol",
     } | oak  # fmt: skip
+    # The chemistry/sensory asymmetry D-99 introduced, asserted rather than described: beer
+    # FERMENTS these four and the sim MODELS them, but no beer threshold is sourced for any of
+    # them, so none may reach the OAV lens. This is the guard against a future edit "tidying"
+    # the aroma set to match the schema — the mismatch is the honest position, not an oversight.
+    for chemistry_only in ("propanol", "isobutanol", "active_amyl_alcohol", "2_phenylethanol"):
+        assert chemistry_only in beer_schema(), chemistry_only
+        assert chemistry_only not in beer.readings, chemistry_only
     assert set(wine.readings) == set(beer.readings) | {
+        # The two higher alcohols whose MOLECULE is in both media but whose THRESHOLD is
+        # sourced only for wine (Guth 1997, 10% aq. ethanol — the same paper and matrix as
+        # isoamyl alcohol's). Beer ferments both; no beer threshold exists for either (D-99).
+        "isobutanol",
+        "2_phenylethanol",
         "ethylphenols",
         "ethylguaiacols",
         "mercaptans",
@@ -227,7 +243,10 @@ def test_lumped_thresholds_flag_the_fixed_composition_assumption(thresholds):
         for c in compounds
         if c.lumped
     }
-    assert lumped, "the lumped set should not be empty — fusels/mercaptans are still lumps"
+    # Since D-99, wine's `mercaptans` is the LAST lumped pool in the project (D-96 split the
+    # esters, D-99 the fusels). If a future decision splits it too, this assert fires — and the
+    # honest response is to DELETE this test, not to invent a lump to keep it green.
+    assert lumped, "the lumped set should not be empty — mercaptans is still a lump"
     for pool, medium in lumped:
         notes = thresholds[f"threshold_{pool}_{medium}"].provenance.notes.strip().lower()
         # The convention is a LEADING declaration, checked with startswith rather than a bare

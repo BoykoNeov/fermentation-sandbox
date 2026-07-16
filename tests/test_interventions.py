@@ -24,7 +24,7 @@ import pytest
 
 from fermentation.core import acidbase
 from fermentation.core.chemistry import carbon_mass_fraction
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate
 from fermentation.runtime.schedule import ScheduledTrajectory
@@ -275,7 +275,8 @@ def test_rack_removes_settled_lees_and_leaves_the_wine_untouched():
     for name in (
         "X", "S", "E", "N", "Gly", "Byp",
         *(spec.pool for spec in ESTER_SPECS),  # the three D-96 ester pools
-        "fusels", "tartaric", "so2_total",
+        *(spec.pool for spec in FUSEL_SPECS),  # the five D-99 higher-alcohol pools
+        "tartaric", "so2_total",
     ):  # fmt: skip
         assert np.all(flow.delta[schema.slice(name)] == 0.0)
 

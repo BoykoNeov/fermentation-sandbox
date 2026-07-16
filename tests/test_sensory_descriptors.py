@@ -314,14 +314,21 @@ def test_lumped_flag_propagates_from_the_dominant_contributor(thresholds):
     assert h2s_loud.readings["fruity"].lumped is False
 
 
-def test_lumped_flag_propagates_across_the_split_ester_solventy_axis(thresholds):
-    """`solventy` is the D-96 analogue of `sulfidic`: one single-molecule pool + one real lump.
+def test_no_contributor_to_solventy_is_lumped_whoever_dominates(thresholds):
+    """`solventy` carries NO lump caveat from any contributor — the D-99 converse (was D-96).
 
-    The split gave `solventy` a genuinely mixed axis — `ethyl_acetate` (single-molecule, exact)
-    alongside `fusels` (a real lump read against isoamyl alcohol). So the same honesty rule the
-    `sulfidic` test pins must hold here, on a pairing that did not exist before D-96: the axis
-    inherits the lump assumption exactly when the lump is the loudest contributor, and drops it
-    when the exact molecule is.
+    THIS TEST ASSERTED THE OPPOSITE UNTIL D-99, and the flip is the decision's whole point.
+    Between D-96 and D-99 `solventy` was the mixed case — `ethyl_acetate` (single-molecule,
+    exact) beside `fusels` (a real lump read against isoamyl alcohol) — so it pinned that the
+    axis inherits the lump assumption exactly when the lump is loudest. D-99 split `fusels`
+    into five single-molecule pools, so every contributor to this axis is now its own molecule
+    and there is no lump left to inherit. The assertion could not be repaired to say what it
+    said; it is rewritten to pin what replaced it.
+
+    The lumped-propagation MACHINERY is still tested — `sulfidic` (h2s + mercaptans) remains a
+    genuinely mixed axis, because wine's `mercaptans` is now the last lump in the project. This
+    test is that one's converse guard: it fires if anyone re-points a solventy pool at a
+    molecule it is not made of and reaches for the `lumped` flag to excuse it.
     """
     schema = wine_schema()
     ea_loud = _project(
@@ -329,22 +336,25 @@ def test_lumped_flag_propagates_across_the_split_ester_solventy_axis(thresholds)
         schema,
         {
             "ethyl_acetate": _at_oav(thresholds, "ethyl_acetate", "wine", 4.0),
-            "fusels": _at_oav(thresholds, "fusels", "wine", 0.5),
+            "isoamyl_alcohol": _at_oav(thresholds, "isoamyl_alcohol", "wine", 0.5),
+            "isobutanol": _at_oav(thresholds, "isobutanol", "wine", 0.5),
         },
     )
     assert ea_loud.readings["solventy"].dominant == "ethyl_acetate"
     assert ea_loud.readings["solventy"].lumped is False
 
-    fusels_loud = _project(
-        thresholds,
-        schema,
-        {
-            "ethyl_acetate": _at_oav(thresholds, "ethyl_acetate", "wine", 0.5),
-            "fusels": _at_oav(thresholds, "fusels", "wine", 4.0),
-        },
-    )
-    assert fusels_loud.readings["solventy"].dominant == "fusels"
-    assert fusels_loud.readings["solventy"].lumped is True
+    # MAX still swaps the dominant — the axis is not merely un-lumped, it is still discriminating.
+    for loud in ("isoamyl_alcohol", "isobutanol"):
+        quiet = {
+            p: _at_oav(thresholds, p, "wine", 0.5)
+            for p in ("ethyl_acetate", "isoamyl_alcohol", "isobutanol")
+        }
+        profile = _project(
+            thresholds, schema, {**quiet, loud: _at_oav(thresholds, loud, "wine", 4.0)}
+        )
+        assert profile.readings["solventy"].dominant == loud
+        # The point: a higher-alcohol-dominated solventy no longer drags a lump caveat with it.
+        assert profile.readings["solventy"].lumped is False
 
 
 def test_descriptor_tier_is_the_speculative_floor_even_for_a_validated_input():

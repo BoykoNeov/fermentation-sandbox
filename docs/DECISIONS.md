@@ -7980,3 +7980,115 @@ pattern one pool over — which would also retire caveat (iv) above and give the
 `dH`/`E_a` (blocked on sourcing); **masking/suppression** (blocked on `cosα`, re-deferred here with its unblock condition named);
 further fruity esters; a beer-specific per-melanoidin A420 yield; the on-ledger thermal-caramelization aroma co-product; the
 `oav` → `magnitude` rename.
+
+## D-99 — the lumped `fusels` pool SPLIT into five single-molecule higher alcohols — and its 3.8× honest rise exposed the `amino_acids` pool as the next lump (§3.2/§4.2)
+
+**What.** The single lumped `fusels` g/L pool is now **five single-molecule pools** — `propanol`, `isobutanol`,
+`active_amyl_alcohol`, `isoamyl_alcohol`, `2_phenylethanol` — each carbon-weighted by its own molecule, each produced by one shared
+Ehrlich rate shape times its **own independently-anchored `k`**. This is the D-96 ester split applied one pool over, and the second
+of D-96's four named deferred refinements (D-97 took the first). The producer, the D-33 amino-acid reroute, the D-97 ATF1 precursor
+coupling, the D-69 aging hydrolysis, `total_carbon`, the schema, the OAV lens, three descriptor axes and the D-98 Stevens exponents
+were all rewired. Wine schema 70 → 74 slots, beer 40 → 44; D-98's exponent count 21 → 23; **1070 tests (up from 1039), benchmarks
+16/16, ruff + mypy clean.** Built, isolable, and — unlike D-95/D-98 — **on by default**, because it is chemistry, not a sensory
+projection: the five pools are real state whether or not anything reads their smell.
+
+**THE OWNER OVERRODE MY SPECIES COUNT AND WAS RIGHT — AGAIN.** Offered four species (folding `active_amyl_alcohol` into
+`isoamyl_alcohol`, since I feared active amyl was only ever reported *bundled* with isoamyl as "amyl alcohols"), the owner chose
+**five**, accepting the sourcing risk I flagged. The risk was real but the fear was wrong: Wang, Frank & Steinhaus 2024
+(*J. Agric. Food Chem.* 72:22250-22257), a meta-analysis, gives 2-methylbutan-1-ol its **own row, own mean, over n=128 wine studies
+and n=64 beer studies**. The bundling I feared is a **GC column artifact, not a law of nature** (Restek 2025: the amyl isomers
+coelute on the common Rtx-VMS phase "regardless of column dimensions"; Rtx-1301 resolves them), so it is bundled in routine OIV/BIPEA
+QC and *split* in aroma research. This is the **third** time a "can't/shouldn't source it" call of mine (D-97's Km, D-98's payload,
+this) was overruled or dissolved by going and looking. The standing lesson hardens: **look before pleading absence.**
+
+**MY RECOMMENDED CUT WAS AIMED AT THE WRONG MOLECULE — the sourcing inverted the risk.** Active amyl turned out *decisively*
+sourceable; **propanol** is the weak one, omitted from the meta-analysis in *both* media. So the species I proposed to drop is the
+best-attested of the two doubtful ones, and the one I kept without question is the lone author estimate (beer propanol — the single
+unsourced number in the whole beat, flagged as such in-file rather than buried). Recording this because it is cheap to reverse and
+the owner should see that the intuition ran backwards.
+
+**THE ~3.8× RISE IS FORCED BY HONESTY, NOT CHOSEN FOR AN OUTCOME — and that is the load-bearing defense.** The five wine means sum to
+~328 mg/L against the old lump's ~86; beer ~86 against ~42. The old value sat **below even the sum of the five species' low ends**,
+and `k_fusel`'s own provenance already conceded it ran at "the low end of the 150-400 mg/L wine higher-alcohol range." Honest
+per-molecule anchoring *cannot* land where the lump did — the rise would be identical had no one looked at any OAV. Each `k` was set
+by **solving for its species' literature mean**, recorded in a sourcing table *before any k was chosen* (the advisor's anti-tuning
+tripwire); wine landed at 327.9 mg/L against a 327.8 target on the first try, beer needed one uniform ×2.05 correction (the old beer
+lump under-produced even more than wine's). No `k` was ever nudged toward a descriptor threshold.
+
+**THE PAYOFF LANDS IN WINE, AND IT IS SUBTRACTIVE BEFORE IT IS ADDITIVE.** Two effects, in order of importance:
+(1) **The lump asserted every higher alcohol smells like isoamyl alcohol.** Four of five do not, and the pool is only ~52% isoamyl by
+mass in wine (~35% in beer) — so ~half the pool was read at the wrong molecule's potency, most starkly `2_phenylethanol`, which is not
+solventy at all but **rose/honey**. The split removes a false claim *even where it adds no new one* (`propanol`/`active_amyl_alcohol`
+are chemistry-only — no threshold sourced in any usable matrix, so they carry no OAV and reach no descriptor axis; that silence is
+honest, not an omission). (2) **Wine gains a fermentation-derived floral axis.** `2_phenylethanol` runs ~28.7 mg/L against Guth 1997's
+~10 mg/L wine threshold ⇒ **OAV ~2.9**, dominant on `floral_honey` — an axis that read **exactly 0** for a young un-oxidised wine
+before, because its only member was `phenylacetaldehyde`, a D-75 Strecker aldehyde needing *oxidative* aging. A young wine smelling of
+rose is correct; the old model was simply wrong about it. **Beer correctly gains no floral axis** — no beer threshold is sourced for
+2-phenylethanol and Meilgaard (via Holt et al. 2019) states it sits *below* threshold in beer — the mirror of D-97's wine/beer
+asymmetry.
+
+**THE D-96 RULE AND THE ONLY PAYOFF ARE THE SAME ACT — the exact inverse of D-98.** A probe settled it before the build: ratio-splitting
+the *current* 86 mg/L lump (the D-96-forbidden move) leaves 2-PE at OAV ~0.93 and the beat delivers nothing; honest per-species
+anchoring (the D-96-*required* move) raises the total to the real range and lights the floral axis. At D-98 "sourceable" and
+"consequential" were mutually exclusive; here they **coincide** — the honest construction is the only one with an observable.
+
+**D-98 PREDICTED THIS BEAT AND ITS TWO SIDE-EFFECTS, VERBATIM.** Its "Next" named "speciating the `fusels` lump … which would also
+retire caveat (iv) above and give the ATF1 Km comparison a real molecule." Both landed. D-98's caveat (iv) — the doubly-speculative
+lumped exponent — is retired (`stevens_n_fusels` → `stevens_n_isoamyl_alcohol`, single-molecule; two new aliphatic-alcohol exponents
+join, ordered by Cain 1969's *measured* chain-length trend but kept author-estimated with overlapping bands, so **D-98's tripwire
+`test_a_robust_dominance_flip_is_impossible_at_these_bands` stays green** — the beat did not sneak disjoint bands in). And the D-97 Km
+comparison now reads **3-methylbutan-1-ol specifically** (CAS 123-51-3, the molecule Fujii measured), not a lump — with the margin to
+Km *tightening* from ~51× to ~15× because honest anchoring doubled that pool, still safely in the `[S] << Km` linear regime.
+
+**THE D-97 RATIO LESSON, APPLIED PROSPECTIVELY AND ALMOST MISSED.** `isoamyl_acetate` is first-order in its precursor (D-97), and
+speciation doubled that precursor (86 → 172 mg/L actual isoamyl alcohol), so the banana ester silently doubled and wine's `fruity`
+dominant flipped isoamyl_acetate ← ethyl_hexanoate — a change with no evidence behind it. `k_isoamyl_acetate` was **re-anchored** by an
+*exact* factor (both rates share one shape ⇒ `k_fusel_old / k_isoamyl_alcohol_new`, ×0.502 wine / ×1.397 beer — opposite directions,
+because wine's precursor doubled while beer's *fell*, ale being less isoamyl-dominated), restoring the finished ester and reverting
+`fruity` to 78.5/ethyl_hexanoate. **I nearly shipped a provenance note *claiming* this re-anchor while the code did not do it** — an
+untrue provenance string, exactly what prime directive #2 forbids; caught by reading the descriptor outcome against D-97's recorded
+value rather than trusting my own comment.
+
+**THE DONE-CALL CATCH THAT BECAME THE BEAT'S SECOND FINDING: the `amino_acids` pool is the next lump.** The 3.8× fusel rise broke
+three tests in *unrelated* subsystems — Maillard thermal aroma, Brett growth, MLF growth — all via the D-33 reroute, which sources
+Ehrlich fusel carbon from the single lumped `amino_acids` pool (arginine standing in for leucine/isoleucine/valine/threonine/
+phenylalanine). At honest fusel levels the reroute **drains that lump to ~0**, starving every other consumer of it. A pre-D-99
+emulation (every `k` scaled so the total draw matches the old single `k_fusel`) proved **D-99 did not create this — it finished it**:
+the reroute was *already* eating ~96.5% of the pool, and sotolon passed its OAV>1 assertion at 1.18, an 18% margin the old lump's
+under-production was the only thing propping up. Two speciated-scale consumers cannot share one lumped substrate. The fix is
+structural (speciate `amino_acids`, or bound the catabolic fraction, or model consumer priority) and **unsourced today** ⇒ deferred to
+**D-100**. Resolution here (the isolable-speculative-Process contract, prime directive #3): the reroute is isolated out of the three
+affected tests — each of which tests a *different* Process, not the reroute, which stays fully covered in `test_fusel_reroute.py` — and
+the pathology is **pinned** in `test_the_ehrlich_reroute_starves_maillard_of_the_lumped_amino_acid_pool`, a D-100 tripwire written to
+FAIL when the lump is finally split (delete it then; do not weaken it). Dosing more amino acids makes it *worse*, not better — the
+reroute refunds sugar carbon, extending the flux, making more fusels — which is the tell that it is a form problem, not a magnitude to
+tune.
+
+**Smaller done-call catches.** (a) The over-book of the lump's carbon weight is ~14%/13% per GRAM (0.5996 vs 0.6813 for propan-1-ol),
+NOT the ~67% the per-MOLE 5-vs-3 atom count suggests — the heavier alcohols carry proportionally more hydrogen; I wrote the mole
+figure into three files' comments before the model corrected me. (b) The ledger **closed** under the old stand-in weight because the
+producer drew from `S` at the *same* fraction the pool was weighted by, so the error cancelled exactly — a self-consistent wrong
+weight is invisible to a conservation test, which is why closure alone never caught it and splitting the pool is what made each number
+mean something. (c) The matrix gap between water and ethanolic thresholds is **~136×** for isoamyl alcohol (0.22 vs 30 mg/L), ~71× for
+2-PE, ~2× for isobutanol — inconsistent across compounds, so water OTCs cannot substitute for the missing beer thresholds, and Wang
+et al. 2024's own OAV column (which divides by water thresholds and reports 2-PE beer OAV ~180, contradicting Meilgaard) is
+deliberately **not** imported; its concentrations are sound, its OAVs are not. (d) Nomenclature: isoamyl = 3-methylbutan-1-ol =
+CAS 123-51-3; active amyl = 2-methylbutan-1-ol = CAS 137-32-6; Restek's vendor note **inverts** these, and they differ ~5.5× in
+potency, so every name is CAS-anchored in the chemistry and YAML.
+
+**What survives — the honest limit, stated where it is implemented.** All five share one N-gate and one `E_a_fusels`, so the
+composition is a **fixed spectrum** even though the molecules are now real: warm or starve the ferment and all five move together, no
+ratio among them can change. D-99 retires the *wrong-molecule-threshold* error and downgrades *fixed composition* to *fixed spectrum*;
+it does not retire it. Making the spectrum dynamic needs per-species activation energies and per-amino-acid gates — both unsourced,
+both the real D-98 trap (an author estimate per species would look like fidelity while adding only invention), both deferred.
+
+**`mercaptans` is now the last lumped pool in the project** (D-96 split the esters, D-99 the fusels). The `test_sensory_oav.py`
+lumped-set guard and its converse both derive from the `AromaCompound.lumped` flag, not a hardcoded list, so the D-66 caveat retired
+under test pressure exactly as designed — it *cannot linger* on a pool that stopped being lumped.
+
+**Next:** speciate the **`amino_acids` pool** (**D-100** — the lump this beat exposed, load-bearing across fusels/Maillard/MLF/Brett);
+the **isoamyl-acetate carbon re-route** off `isoamyl_alcohol` (the D-69 5:2 inverse, now with a real single-molecule target);
+**per-species `E_a`/N-gates** to make the fusel spectrum dynamic (blocked on sourcing — the fixed-spectrum limit above); a **sourced
+beer propanol** concentration (the one author estimate here) and **in-matrix beer thresholds** for the four chemistry-only alcohols
+(Meilgaard 1975/Engan 1972 paywalled); per-ester `dH`/`E_a` (blocked); masking/suppression (blocked on `cosα`); further fruity esters;
+a beer-specific per-melanoidin A420 yield; the on-ledger thermal-caramelization aroma co-product; the `oav` → `magnitude` rename.

@@ -27,14 +27,38 @@
 # `notes`. (The sensory layer selects the key set by medium; it does not claim the measurement
 # matrix equals the medium.)
 #
-# LUMPED POOLS (the D-66 owner call, NARROWED at D-96). `fusels` and `mercaptans` are single g/L
-# pools that really mix several molecules whose thresholds span orders of magnitude. Each is
-# assigned the threshold of ONE named representative compound — the stand-in its VarSpec
-# description already names — and the "assumes fixed lump composition" honesty cost is flagged
-# loudly in that threshold's `notes`, which MUST open with the marker `LUMPED POOL` (tested both
-# ways: a lumped pool declares it, a single-molecule pool must not). Single-molecule pools
-# (diacetyl, acetaldehyde, h2s, 4-EP, 4-EG, and since D-96 the three esters) carry no such
-# assumption and are the cleaner OAVs.
+# LUMPED POOLS (the D-66 owner call, NARROWED at D-96, and now down to ONE at D-99).
+# `mercaptans` is the LAST lumped pool in the project: a single g/L pool that really mixes
+# several molecules whose thresholds span orders of magnitude. It is assigned the threshold of
+# ONE named representative compound — the stand-in its VarSpec description already names — and
+# the "assumes fixed lump composition" honesty cost is flagged loudly in that threshold's
+# `notes`, which MUST open with the marker `LUMPED POOL` (tested both ways: a lumped pool
+# declares it, a single-molecule pool must not — and both tests derive from the `lumped` flag
+# rather than a hardcoded list, so the caveat cannot go missing when a pool is added, nor
+# linger once a pool stops being lumped). Every other pool is single-molecule and carries no
+# such assumption: diacetyl, acetaldehyde, h2s, 4-EP, 4-EG, the three esters (D-96) and the
+# five Ehrlich higher alcohols (D-99).
+#
+# `fusels` LEFT THIS LIST AT D-99, and the reason differs instructively from the esters' below.
+# The fusel lump had NO split identity — it was weighted as isoamyl alcohol on the ledger AND
+# read here against isoamyl alcohol's threshold, so it was self-consistent, and its OAV was
+# never non-physical the way the ester lump's 761 was. Its error was quieter and broader: it
+# asserted that EVERY higher alcohol smells like isoamyl alcohol. Four of the five are not, and
+# the pool is only ~52% isoamyl by mass in wine (~35% in beer) — so ~half the pool was read at
+# the wrong molecule's potency, most starkly 2-phenylethanol, which is not solventy at all but
+# ROSE. The lesson: self-consistency is not correctness. A lump that weighs and perceives as
+# the same molecule will pass every conservation check and still be wrong about what it is.
+#
+# THE MATRIX GAP IS ~136x AND IS WHY FOUR BEER FUSELS HAVE NO THRESHOLD (D-99). Water and
+# ethanolic-matrix thresholds are not interchangeable, and not by a fixable offset: isoamyl
+# alcohol reads 0.22 mg/L in water vs 30 mg/L in 10% aq. ethanol (~136x), 2-phenylethanol
+# 0.14 vs 10 (~71x), isobutanol 19 vs 40 (~2x). Water OTCs therefore CANNOT stand in for
+# missing beer thresholds — the substitution would not be conservative, it would be wrong by an
+# unknown factor per compound. Concretely: Wang/Frank/Steinhaus 2024's own Table 1 divides beer
+# concentrations by water OTCs and reports 2-phenylethanol OAV ~180, contradicting Meilgaard
+# (via Holt et al. 2019), which states that compound sits BELOW threshold in beer. Both cannot
+# hold. That paper's CONCENTRATIONS anchor every k in wine/beer_generic.yaml; its OAVs are not
+# imported here, deliberately.
 #
 # `esters` LEFT THIS LIST AT D-96, and why is worth stating. It was the worst lumped case — not
 # because the lump was coarse, but because the pool was carbon-weighted as ETHYL ACETATE on the
@@ -121,15 +145,15 @@ threshold_ethyl_hexanoate_beer:
     conditions: "measured in beer (matrix-matched); ethyl hexanoate read against the `ethyl_hexanoate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
     notes: "SINGLE-MOLECULE POOL (D-96). Added at D-96 alongside the pool itself, so the fruity descriptor axis keeps the apple/pineapple ethyl-ester note instead of narrowing to banana alone when the lumped pool was split."
 
-threshold_fusels_beer:
+threshold_isoamyl_alcohol_beer:
   value: 50000.0
-  unit: "ug/L"   # isoamyl alcohol (3-methylbutan-1-ol), 'solventy/fusel'
+  unit: "ug/L"   # isoamyl alcohol (3-methylbutan-1-ol, CAS 123-51-3), 'solventy/fusel'
   tier: speculative
-  uncertainty: { low: 30000.0, high: 70000.0, note: "isoamyl alcohol ~50-70 mg/L in beer; band also carries the fixed-lump-composition assumption" }
+  uncertainty: { low: 30000.0, high: 70000.0, note: "isoamyl alcohol ~50-70 mg/L in beer. Band NARROWED at D-99: it no longer has to carry a fixed-lump-composition assumption, only the threshold's own spread" }
   provenance:
     source: "Meilgaard 1975 (MBAA Tech. Q. 12:151-168), isoamyl alcohol (3-methylbutan-1-ol) beer flavour threshold ~50 mg/L"
-    conditions: "measured in beer (matrix-matched); isoamyl alcohol, the representative of the LUMPED fusels pool (the Ehrlich higher-alcohol stand-in)"
-    notes: "LUMPED POOL — assumes the fusels pool is dominated by isoamyl alcohol. Propanol/isobutanol/2-phenylethanol have different thresholds, so the OAV rides on the fixed-composition assumption (D-66)."
+    conditions: "measured in beer (MATRIX-MATCHED); isoamyl alcohol, CAS 123-51-3 — since D-99 the pool IS this molecule, not a stand-in for four others"
+    notes: "Single-molecule pool since D-99 — this value did not change, its SUBJECT did. It was always an isoamyl-alcohol number; before D-99 it was applied to a lump in which isoamyl alcohol is only ~35% of the mass (beer mean 30.0 of ~85.6 mg/L), so the other ~65% — propanol, isobutanol, active amyl, 2-phenylethanol — was read at this molecule's potency. Splitting the pool is what let the number mean what it says. THE ONLY IN-MATRIX BEER THRESHOLD OF THE FIVE: Meilgaard 1975 and Engan 1972 (J. Inst. Brew. 78:33-36) are paywalled and no open secondary reproduces their other per-compound numerics with attribution, so beer's other four higher alcohols are chemistry-only (no OAV). Their WATER thresholds exist but are unusable — see the matrix-gap note in this file's header."
 
 # =====================================================================================
 # WINE matrix — the 5 common pools + 3 wine-only (ethylphenols, ethylguaiacols, mercaptans).
@@ -202,15 +226,35 @@ threshold_ethyl_hexanoate_wine:
     conditions: "MATRIX GAP - measured in 10% ethanol MODEL wine, not real wine; ethyl hexanoate read against the `ethyl_hexanoate` pool - the SAME molecule the carbon ledger weights that pool by (D-96)"
     notes: "SINGLE-MOLECULE POOL + MATRIX GAP (D-96). Added at D-96 with the pool. Very low threshold against a ~0.39 mg/L concentration puts this among wine's HIGHEST-OAV odorants (Guth ranks it so), running OAV ~79 at this value. Consequence worth stating: under the D-95 MAX rule this molecule - not banana - is the DOMINANT contributor to wine's `fruity` axis. THIS VALUE IS THE LEVER FOR THAT HEADLINE, AND THE MARGIN IS THIN - flagged rather than buried (advisor's done-call catch). Apple-dominance needs ethyl hexanoate's OAV to beat isoamyl acetate's ~25, i.e. it holds only while this threshold is below ~15.6 ug/L. It survives this entry's own band (at the 14 ug/L ceiling: OAV 28.1 vs banana 25.2 - a ~12% margin), but reported wine/model thresholds for this compound span roughly 5-60 ug/L across sources, and ANYWHERE ABOVE ~15.6 THE DOMINANT LABEL FLIPS TO BANANA. So: the fruity axis VALUE is robust (tens either way - the D-96 fix) but its ATTRIBUTION is threshold-sensitive. Deliberately NOT pinned by a test asserting apple-dominance - that would harden a result this uncertain; the D-96 regression test accepts either dominant and bounds only the physical OAV band. Worth confirming against Guth 1997's primary table before any claim leans on apple specifically."
 
-threshold_fusels_wine:
+threshold_isoamyl_alcohol_wine:
   value: 30000.0
-  unit: "ug/L"   # isoamyl alcohol (3-methylbutan-1-ol), 'fusel/solventy'; model wine
+  unit: "ug/L"   # isoamyl alcohol (3-methylbutan-1-ol, CAS 123-51-3), 'fusel/solventy'; model wine
   tier: speculative
-  uncertainty: { low: 10000.0, high: 60000.0, note: "Guth ~30 mg/L in model wine; band carries matrix + fixed-lump-composition uncertainty" }
+  uncertainty: { low: 10000.0, high: 60000.0, note: "Guth ~30 mg/L in model wine; band carries the MATRIX gap. NARROWED at D-99: no longer also carries a fixed-lump-composition assumption" }
   provenance:
     source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032), 3-methylbutanol (isoamyl alcohol) odor threshold ~30 mg/L in model wine (10% ethanol)"
-    conditions: "MATRIX GAP — measured in 10% ethanol MODEL wine; isoamyl alcohol as the representative of the LUMPED fusels pool"
-    notes: "LUMPED POOL + MATRIX GAP: fixed-composition assumption plus a model-solution threshold. Directional only."
+    conditions: "MATRIX GAP — measured in 10% w/w aq. ethanol MODEL wine, not real wine; isoamyl alcohol, CAS 123-51-3 — since D-99 the pool IS this molecule"
+    notes: "Single-molecule pool since D-99 + MATRIX GAP (a model-solution threshold; directional only). The value did not change, its SUBJECT did: it was always an isoamyl-alcohol number applied to a lump in which this molecule is only ~52% of the mass. Independently corroborated at D-99 by a second, unrelated secondary read (Jiang & Zhang 2018, Molecules 23(5):1096, reproducing the same Guth 30 mg/L). NB Guth 1997 itself is paywalled and has never been opened directly — every wine threshold here is a SECONDARY read, and the 10% w/w matrix is Guth's stated method as reported by the citing works."
+
+threshold_isobutanol_wine:
+  value: 40000.0
+  unit: "ug/L"   # isobutanol (2-methylpropan-1-ol, CAS 78-83-1), 'fusel/alcoholic'; model wine
+  tier: speculative
+  uncertainty: { low: 13000.0, high: 80000.0, note: "AUTHOR-ESTIMATED band (x0.33/x2) around Guth's ~40 mg/L; the source reports a point value, not a range. Band carries the matrix gap" }
+  provenance:
+    source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032), isobutanol odor threshold ~40 mg/L in model wine (10% ethanol) — as cited in Jiang & Zhang 2018 (Molecules 23(5):1096, doi:10.3390/molecules23051096)"
+    conditions: "MATRIX GAP — measured in 10% w/w aq. ethanol MODEL wine, not real wine; isobutanol, CAS 78-83-1, single molecule"
+    notes: "Added at D-99 with the pool itself. SAME PAPER AND SAME MATRIX as threshold_isoamyl_alcohol_wine, which is what makes the two mixable on one descriptor axis — the fusel thresholds wine reads are three rows of one 10%-ethanol study, not a stitched-together set. A GENUINE MAX CONTENDER, not a foregone conclusion: 33.0 mg/L typical against 40 => OAV ~0.8, close enough to isoamyl's ~5.7 to matter only if the bands move, which is exactly the honest situation. SECONDARY READ — Guth 1997 never opened directly."
+
+threshold_2_phenylethanol_wine:
+  value: 10000.0
+  unit: "ug/L"   # 2-phenylethanol (CAS 60-12-8), 'rose / honey / floral'; model wine
+  tier: speculative
+  uncertainty: { low: 3000.0, high: 20000.0, note: "AUTHOR-ESTIMATED band (x0.3/x2) around Guth's ~10 mg/L; the source reports a point value, not a range. Band carries the matrix gap" }
+  provenance:
+    source: "Guth 1997 (J. Agric. Food Chem. 45:3027-3032), 2-phenylethanol odor threshold ~10 mg/L in model wine (10% ethanol) — as cited in Jiang & Zhang 2018 (Molecules 23(5):1096, doi:10.3390/molecules23051096)"
+    conditions: "MATRIX GAP — measured in 10% w/w aq. ethanol MODEL wine, not real wine; 2-phenylethanol, CAS 60-12-8, single molecule"
+    notes: "Added at D-99 with the pool itself, and THE PAYLOAD OF THAT DECISION: 2-phenylethanol runs ~28.7 mg/L in wine (Wang/Frank/Steinhaus 2024 meta-analytic mean, n=684 studies) against this ~10 mg/L threshold => OAV ~2.9, so wine gains a FERMENTATION-DERIVED floral axis. Before D-99, floral_honey read phenylacetaldehyde alone — a D-75 Strecker aldehyde needing OXIDATIVE aging — so a young un-oxidised wine reported floral_honey = 0, which is simply wrong about wine: rose/honey is a normal note of young wine and 2-phenylethanol is why. The two now share the axis and MAX picks between them (D-95). THE VALUE IS DOUBLY CORROBORATED: recovered independently at D-99 from Jiang & Zhang 2018, matching the 10 mg/L this project had already recorded from a separate read. SECONDARY READ — Guth 1997 never opened directly. BEER HAS NO TWIN: no beer threshold is sourced for this molecule, and Meilgaard (via Holt et al. 2019, doi:10.1093/femsre/fuy041) states it is 'typically found below its sensory threshold in beer' — so beer models the molecule and correctly claims nothing about its smell."
 
 threshold_ethylphenols_wine:
   value: 425.0

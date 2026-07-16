@@ -35,7 +35,7 @@ from fermentation.core.kinetics import (
     SugarUptakeToEthanolCO2,
     arrhenius_factor,
 )
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -47,8 +47,21 @@ from fermentation.validation import assert_conserved, assert_nonnegative, total_
 
 #: Representative species the pools book against (mirrors the Process constants).
 _ESTER_C = carbon_mass_fraction("ethyl_acetate")
-_FUSEL_C = carbon_mass_fraction("isoamyl_alcohol")
 _GLUCOSE_C = carbon_mass_fraction("glucose")
+
+#: The five single-molecule higher-alcohol pools the lumped `fusels` pool became at D-99.
+_FUSEL_POOLS = tuple(spec.pool for spec in FUSEL_SPECS)
+
+
+def _total_fusels(traj) -> float:
+    """End-of-run total higher alcohols [g/L] — what the pre-D-99 lumped pool held.
+
+    Summed from the registry so a sixth alcohol needs no edit here. Tests asserting a
+    DIRECTION on total fusels (warmer ⇒ more) use this; tests about the D-97 banana coupling
+    or the D-69 hydrolysis must read `isoamyl_alcohol` SPECIFICALLY instead — those are facts
+    about one molecule, not about the class.
+    """
+    return sum(float(traj.series(pool)[-1]) for pool in _FUSEL_POOLS)
 
 
 @pytest.fixture
@@ -70,12 +83,16 @@ def _wine_y0(
     e: float = 0.0,
     n: float = 0.1,
     t: float = 293.15,
-    fusels: float = 0.05,
+    isoamyl_alcohol: float = 0.05,
 ) -> FloatArray:
-    # `fusels` defaults to a realistic mid-ferment ~50 mg/L rather than 0 because since D-97
-    # it is isoamyl acetate's PRECURSOR: at fusels=0 the banana rate is identically 0 and any
-    # assertion about it would be vacuously true.
-    return schema.pack({"X": x, "S": [s], "E": e, "N": n, "T": t, "CO2": 0.0, "fusels": fusels})
+    # `isoamyl_alcohol` defaults to a realistic mid-ferment ~50 mg/L rather than 0 because since
+    # D-97 it is isoamyl acetate's PRECURSOR: at 0 the banana rate is identically 0 and any
+    # assertion about it would be vacuously true. It names the MOLECULE since D-99 — the D-97
+    # coupling is first-order in 3-methylbutan-1-ol specifically (Fujii 1998 measured ATF1's Km
+    # for that alcohol), not in a lump, and not in its C5 isomer `active_amyl_alcohol`.
+    return schema.pack(
+        {"X": x, "S": [s], "E": e, "N": n, "T": t, "CO2": 0.0, "isoamyl_alcohol": isoamyl_alcohol}
+    )
 
 
 # -- metadata -----------------------------------------------------------------
@@ -107,8 +124,16 @@ def test_fusel_metadata():
     assert p.name == "fusel_alcohols_ehrlich"
     # Speculative *form*: the nitrogen dependence is a knowingly-monotone simplification.
     assert p.tier is Tier.SPECULATIVE
-    assert set(p.touches) == {"fusels", "S"}  # fusel carbon routed from sugar (a1, D-19)
-    assert set(p.reads) == {"k_fusel", "K_sugar_uptake", "K_n", "E_a_fusels", "T_ref"}
+    # The five single-molecule higher-alcohol pools (D-99) + S: fusel carbon is still routed
+    # from sugar (a1, D-19), now at each species' OWN carbon fraction.
+    assert set(p.touches) == {*_FUSEL_POOLS, "S"}
+    # One k PER SPECIES, independently anchored (D-99) — but still ONE shared E_a and ONE
+    # shared N-gate, which is the split's honest limit: the molecules are speciated, the
+    # temperature/nitrogen response is not, so the composition is a fixed SPECTRUM.
+    assert set(p.reads) == {
+        *(spec.k_param for spec in FUSEL_SPECS),
+        "K_sugar_uptake", "K_n", "E_a_fusels", "T_ref",
+    }  # fmt: skip
 
 
 # -- ester closed form & guards -----------------------------------------------
@@ -129,8 +154,8 @@ def test_ester_derivative_matches_closed_form(params):
     special-casing a name.
     """
     schema = wine_schema()
-    x, s, t, fusels = 2.0, 200.0, 293.15, 0.05
-    y = _wine_y0(schema, x=x, s=s, t=t, fusels=fusels)
+    x, s, t, isoamyl_alcohol = 2.0, 200.0, 293.15, 0.05
+    y = _wine_y0(schema, x=x, s=s, t=t, isoamyl_alcohol=isoamyl_alcohol)
     d = EsterSynthesis().derivatives(0.0, y, schema, params)
 
     flux = x * (s / (params["K_sugar_uptake"] + s))
@@ -151,7 +176,7 @@ def test_ester_derivative_matches_closed_form(params):
     assert schema.get(d, "S") == pytest.approx(-total_ester_carbon / _GLUCOSE_C)
     assert -schema.get(d, "S") * _GLUCOSE_C == pytest.approx(total_ester_carbon)
     # Nothing else moves — ethanol/CO2 production is left to the uptake Process.
-    for var in ("X", "E", "N", "CO2", "fusels"):
+    for var in ("X", "E", "N", "CO2", *_FUSEL_POOLS):
         assert schema.get(d, var) == 0.0
 
 
@@ -232,12 +257,23 @@ def test_fusel_derivative_matches_closed_form(params):
     flux = x * (s / (params["K_sugar_uptake"] + s))
     gate = n / (params["K_n"] + n)
     f_t = arrhenius_factor(t, params["E_a_fusels"], params["T_ref"])
-    rate = params["k_fusel"] * flux * gate * f_t
-    assert schema.get(d, "fusels") == pytest.approx(rate)
-    # Fusel carbon routed from sugar (a1, D-19): dS removes exactly the fusel carbon
-    # converted back to grams of glucose.
-    assert schema.get(d, "S") == pytest.approx(-rate * _FUSEL_C / _GLUCOSE_C)
-    assert schema.get(d, "S") * _GLUCOSE_C == pytest.approx(-schema.get(d, "fusels") * _FUSEL_C)
+    shape = flux * gate * f_t  # shared by all five (D-99)
+
+    # Each species gets its OWN k against the one shared shape — so the five rates stand in a
+    # fixed ratio set by the k's, which are anchored to five INDEPENDENT measured concentrations
+    # (never a ratio-split off one k_fusel; that is the D-96 rule this split obeys).
+    for spec in FUSEL_SPECS:
+        assert schema.get(d, spec.pool) == pytest.approx(params[spec.k_param] * shape), spec.pool
+
+    # Fusel carbon routed from sugar (a1, D-19): dS removes exactly the summed fusel carbon,
+    # each species weighted at ITS OWN molecule's fraction (D-99), converted back to grams of
+    # glucose. Before the split this was one rate at isoamyl alcohol's fraction standing in for
+    # all five — self-consistent, and therefore invisible to the carbon check.
+    fusel_carbon = sum(
+        schema.get(d, spec.pool) * carbon_mass_fraction(spec.species) for spec in FUSEL_SPECS
+    )
+    assert schema.get(d, "S") == pytest.approx(-fusel_carbon / _GLUCOSE_C)
+    assert schema.get(d, "S") * _GLUCOSE_C == pytest.approx(-fusel_carbon)
     for var in ("X", "E", "N", "CO2", "ethyl_acetate"):
         assert schema.get(d, var) == 0.0
 
@@ -247,7 +283,8 @@ def test_fusel_zero_without_nitrogen(params):
     # mechanism that front-loads fusel formation into the early, N-replete ferment.
     schema = wine_schema()
     d = FuselAlcoholsEhrlich().derivatives(0.0, _wine_y0(schema, n=0.0), schema, params)
-    assert schema.get(d, "fusels") == 0.0
+    for pool in _FUSEL_POOLS:
+        assert schema.get(d, pool) == 0.0, pool
 
 
 def test_fusel_rises_with_nitrogen_monotone_branch(params):
@@ -257,24 +294,28 @@ def test_fusel_rises_with_nitrogen_monotone_branch(params):
     schema = wine_schema()
     low = FuselAlcoholsEhrlich().derivatives(0.0, _wine_y0(schema, n=0.02), schema, params)
     high = FuselAlcoholsEhrlich().derivatives(0.0, _wine_y0(schema, n=0.2), schema, params)
-    assert schema.get(high, "fusels") > schema.get(low, "fusels") > 0.0
+    # All five rise together — they share the one N-gate (D-99). No ratio among them can move
+    # with nitrogen, which is precisely the fixed-spectrum limitation the split does NOT retire.
+    for pool in _FUSEL_POOLS:
+        assert schema.get(high, pool) > schema.get(low, pool) > 0.0, pool
 
 
 def test_fusel_rises_with_temperature(params):
     schema = wine_schema()
     cold = FuselAlcoholsEhrlich().derivatives(0.0, _wine_y0(schema, t=283.15), schema, params)
     warm = FuselAlcoholsEhrlich().derivatives(0.0, _wine_y0(schema, t=303.15), schema, params)
-    assert schema.get(warm, "fusels") > schema.get(cold, "fusels") > 0.0
+    # Again all five together: one shared E_a_fusels (D-99). A per-species E_a is the deferred
+    # refinement that would make the SPECTRUM temperature-dependent — unsourced, so not built.
+    for pool in _FUSEL_POOLS:
+        assert schema.get(warm, pool) > schema.get(cold, pool) > 0.0, pool
 
 
 def test_fusel_zero_without_biomass_or_sugar(params):
     schema = wine_schema()
-    assert FuselAlcoholsEhrlich().derivatives(0.0, _wine_y0(schema, x=0.0), schema, params)[
-        schema.slice("fusels")
-    ] == pytest.approx(0.0)
-    assert FuselAlcoholsEhrlich().derivatives(0.0, _wine_y0(schema, s=0.0), schema, params)[
-        schema.slice("fusels")
-    ] == pytest.approx(0.0)
+    for starved in (_wine_y0(schema, x=0.0), _wine_y0(schema, s=0.0)):
+        d = FuselAlcoholsEhrlich().derivatives(0.0, starved, schema, params)
+        for pool in _FUSEL_POOLS:
+            assert d[schema.slice(pool)] == pytest.approx(0.0), pool
 
 
 # -- ester volatilization (gas-stripping sink, decision D-20) -----------------
@@ -331,7 +372,7 @@ def test_volatilization_derivative_matches_closed_form(params):
     )
     assert carbon_residual == pytest.approx(0.0, abs=0.0)
     # No fresh sugar drawn, no ethanol/CO2 touched — unlike synthesis (which routes from S).
-    for var in ("X", "S", "E", "N", "CO2", "fusels"):
+    for var in ("X", "S", "E", "N", "CO2", *_FUSEL_POOLS):
         assert schema.get(d, var) == 0.0
 
 
@@ -407,15 +448,15 @@ def test_both_run_strict_and_stay_nonnegative(params):
     # S is now also drawn by the byproduct Processes (a1) — it must stay non-negative
     # too: the proportional draw vanishes as a slot empties, so it cannot overshoot. The
     # liquid esters pool, drawn down by the volatilization sink, must also stay >= 0.
-    assert_nonnegative(traj, ("ethyl_acetate", "fusels", "ethyl_acetate_gas", "S"), atol=1e-12)
+    assert_nonnegative(traj, ("ethyl_acetate", *_FUSEL_POOLS, "ethyl_acetate_gas", "S"), atol=1e-12)
     # The aroma pools actually accumulate (the mechanisms are live), and the sink fills
     # the headspace pool from the liquid esters it strips (D-20).
     assert float(traj.series("ethyl_acetate")[-1]) > 0.0
-    assert float(traj.series("fusels")[-1]) > 0.0
+    assert _total_fusels(traj) > 0.0
     assert float(traj.series("ethyl_acetate_gas")[-1]) > 0.0
     # Trace, as expected — orders of magnitude below the g/L ethanol flux.
     assert float(traj.series("ethyl_acetate")[-1]) < 1.0
-    assert float(traj.series("fusels")[-1]) < 1.0
+    assert _total_fusels(traj) < 1.0
     assert float(traj.series("ethyl_acetate_gas")[-1]) < 1.0
 
 
@@ -446,17 +487,23 @@ def test_byproducts_perturb_only_sugar_and_close_carbon_per_rhs(params):
         for var in ("X", "E", "N", "CO2"):
             assert d_core[schema.slice(var)] == pytest.approx(d_byp[schema.slice(var)], abs=0.0)
         # dS gains only the byproduct draw, and the carbon balances exactly:
-        #   Δ(dS)·c(glucose) + Σ_esters d[ester]·c(that ester) + d[fusels]·c(fusel) == 0.
-        # Since D-96 the sum runs over three esters, EACH at its own molecule's fraction
-        # (C4/C7/C8) — a single shared fraction would leave a residual here.
+        #   Δ(dS)·c(glucose) + Σ_esters d[ester]·c(it) + Σ_fusels d[alcohol]·c(it) == 0.
+        # Since D-96 the ester sum runs over three molecules and since D-99 the fusel sum runs
+        # over five, EACH at its own fraction — a single shared fraction would leave a residual
+        # here. NB it would NOT have before D-99: the lumped pool was drawn from S at the very
+        # same stand-in fraction it was weighted by, so the error cancelled exactly and this
+        # assertion passed on a wrong weight. Splitting the pool is what made it mean something.
         delta_s = float(d_byp[schema.slice("S")][0] - d_core[schema.slice("S")][0])
-        fusel_rate = float(d_byp[schema.slice("fusels")][0])
         assert delta_s <= 0.0  # sugar is drawn down, never created
         ester_carbon = sum(
             float(d_byp[schema.slice(spec.pool)][0]) * carbon_mass_fraction(spec.species)
             for spec in ESTER_SPECS
         )
-        carbon_residual = delta_s * _GLUCOSE_C + ester_carbon + fusel_rate * _FUSEL_C
+        fusel_carbon = sum(
+            float(d_byp[schema.slice(spec.pool)][0]) * carbon_mass_fraction(spec.species)
+            for spec in FUSEL_SPECS
+        )
+        carbon_residual = delta_s * _GLUCOSE_C + ester_carbon + fusel_carbon
         assert carbon_residual == pytest.approx(0.0, abs=1e-12)
 
 
@@ -521,7 +568,7 @@ def test_total_carbon_closes_with_byproducts_on(params, store):
     # volatilized-ester headspace pool, whose carbon must stay counted (D-20) or the
     # liquid→gas transfer would read as destroyed.
     assert float(traj.series("ethyl_acetate")[-1]) > 0.0
-    assert float(traj.series("fusels")[-1]) > 0.0
+    assert _total_fusels(traj) > 0.0
     assert float(traj.series("ethyl_acetate_gas")[-1]) > 0.0
 
 
@@ -557,9 +604,9 @@ def test_total_carbon_closes_with_byproducts_on_beer_multislot():
     # The proportional draw must vanish as each slot empties (glucose first under
     # sequential uptake), so no sugar slot is driven negative; the volatilization sink
     # keeps the liquid esters pool non-negative as it strips into the headspace pool.
-    assert_nonnegative(traj, ("S", "ethyl_acetate", "fusels", "ethyl_acetate_gas"), atol=1e-9)
+    assert_nonnegative(traj, ("S", "ethyl_acetate", *_FUSEL_POOLS, "ethyl_acetate_gas"), atol=1e-9)
     assert float(traj.series("ethyl_acetate")[-1]) > 0.0
-    assert float(traj.series("fusels")[-1]) > 0.0
+    assert _total_fusels(traj) > 0.0
     assert float(traj.series("ethyl_acetate_gas")[-1]) > 0.0
 
 
@@ -583,7 +630,10 @@ def _wine_run_to_dryness(celsius: float, duration_days: float):
     reached_dryness = float(traj.series("S")[-1]) <= 2.0
     pools = {
         "ethyl_acetate": float(traj.series("ethyl_acetate")[-1]),
-        "fusels": float(traj.series("fusels")[-1]),
+        # Summed across the five single-molecule pools (D-99) — the same total quantity the
+        # pre-D-99 lump held, so the "fusels rise with T" direction is tested on what it always
+        # was. They share one E_a_fusels, so all five rise together and the sum is faithful.
+        "fusels": _total_fusels(traj),
         "ethyl_acetate_gas": float(traj.series("ethyl_acetate_gas")[-1]),
     }
     return reached_dryness, pools
@@ -663,7 +713,8 @@ def test_fusel_form_is_speculative_regardless_of_params():
     # output is speculative even before any parameter caps it.
     schema = wine_schema()
     ps = ProcessSet(schema, [FuselAlcoholsEhrlich()])
-    assert ps.tier_of("fusels") is Tier.SPECULATIVE
+    for pool in _FUSEL_POOLS:
+        assert ps.tier_of(pool) is Tier.SPECULATIVE, pool
 
 
 def test_volatilization_tier_capped_by_placeholder_params(store):
@@ -700,7 +751,11 @@ def _wine_isoamyl_run(yan_mgl: float):
     return {
         "isoamyl_acetate": float(traj.series("isoamyl_acetate")[-1]),
         "ethyl_acetate": float(traj.series("ethyl_acetate")[-1]),
-        "fusels": float(traj.series("fusels")[-1]),
+        # The D-97 PRECURSOR — isoamyl alcohol specifically since D-99, not the class. The
+        # coupling is first-order in 3-methylbutan-1-ol because that is the alcohol Fujii 1998
+        # measured ATF1's Km for; summing the five here (or reading the C5 isomer) would be a
+        # different, unmeasured quantity.
+        "isoamyl_alcohol": float(traj.series("isoamyl_alcohol")[-1]),
     }
 
 
@@ -724,10 +779,11 @@ def test_low_yan_makes_less_banana_than_high_yan_end_to_end():
     high = _wine_isoamyl_run(250.0)
 
     # The precursor pool must genuinely differ, or the test proves nothing about coupling.
-    fusel_ratio = high["fusels"] / low["fusels"]
+    fusel_ratio = high["isoamyl_alcohol"] / low["isoamyl_alcohol"]
     assert fusel_ratio > 2.0, (
         f"precondition: YAN 40 -> 250 must move the fusel pool substantially for this test "
-        f"to have teeth (got {fusel_ratio:.2f}x: {low['fusels']:.4f} -> {high['fusels']:.4f} g/L)"
+        f"to have teeth (got {fusel_ratio:.2f}x: {low['isoamyl_alcohol']:.4f} -> "
+        f"{high['isoamyl_alcohol']:.4f} g/L)"
     )
 
     # THE CLAIM: the banana tracks its precursor. Pre-D-97 this ratio was 1.00 (0.756/0.759).
@@ -786,9 +842,14 @@ def test_fusel_pool_stays_far_below_atf1_km_so_the_first_order_form_holds():
     """
     # Fujii 1998, AEM 64:4076-4078 (citing Yoshioka & Hashimoto 1981): Km ~29.8 mM.
     km_mm = 29.8
-    isoamyl_alcohol_molar_mass = 88.15  # g/mol, C5H12O - the molecule `fusels` is booked as
+    isoamyl_alcohol_molar_mass = 88.15  # g/mol, C5H12O (3-methylbutan-1-ol, CAS 123-51-3)
 
-    worst = max(_wine_isoamyl_run(yan)["fusels"] for yan in (40.0, 250.0))
+    # Reads the isoamyl_alcohol POOL since D-99, which is what makes this check exact rather
+    # than indicative: Fujii's Km is for 3-methylbutan-1-ol, and before the split this compared
+    # it against a LUMP of five molecules (~52% of which was actually isoamyl alcohol). The
+    # comparison is now like-for-like — and the margin TIGHTENED, because honest anchoring
+    # raised this pool ~2x. It still clears 10% of Km, so the [S] << Km limit still holds.
+    worst = max(_wine_isoamyl_run(yan)["isoamyl_alcohol"] for yan in (40.0, 250.0))
     pool_mm = worst / isoamyl_alcohol_molar_mass * 1000.0
     assert pool_mm < 0.1 * km_mm, (
         f"the fusel pool ({pool_mm:.3f} mM) must stay well below ATF1's Km ({km_mm} mM) for "
@@ -807,7 +868,9 @@ def test_only_the_banana_declares_a_precursor_and_it_is_a_real_pool():
         "only isoamyl acetate is precursor-limited (D-97): ethyl acetate's ethanol precursor "
         "saturates ATF1, and ethyl hexanoate's hexanoyl-CoA precursor is not modelled at all"
     )
-    assert coupled[0].precursor_pool == "fusels"
+    # Names the MOLECULE since D-99, not the lump: Fujii 1998 measured ATF1's Km for
+    # 3-methylbutan-1-ol specifically, and `active_amyl_alcohol` is a different substrate.
+    assert coupled[0].precursor_pool == "isoamyl_alcohol"
     # No phantom: the named precursor must be a real state slot in BOTH media.
     for schema in (wine_schema(), beer_schema()):
         assert coupled[0].precursor_pool in schema.names
@@ -825,12 +888,13 @@ def test_ester_synthesis_reads_the_fusel_pool_but_never_debits_it(params):
     """
     schema = wine_schema()
     proc = EsterSynthesis()
-    assert "fusels" not in proc.touches, "D-97 reads the fusel pool; it must not debit it"
+    for pool in _FUSEL_POOLS:
+        assert pool not in proc.touches, "D-97 reads the fusel pool; it must not debit it"
 
     y = _wine_y0(schema)
-    y[schema.slice("fusels")] = 0.05
+    y[schema.slice("isoamyl_alcohol")] = 0.05
     d = proc.derivatives(0.0, y, schema, params)
-    assert float(d[schema.slice("fusels")][0]) == 0.0, (
+    assert float(d[schema.slice("isoamyl_alcohol")][0]) == 0.0, (
         "EsterSynthesis must leave the fusel pool untouched (it is a substrate it reads, "
         "not a pool it consumes - the carbon comes from S)"
     )
@@ -848,7 +912,7 @@ def test_banana_rate_is_first_order_in_the_fusel_pool(params):
     proc = EsterSynthesis()
 
     def rates(fusels: float):
-        y = _wine_y0(schema, fusels=fusels)
+        y = _wine_y0(schema, isoamyl_alcohol=fusels)
         d = proc.derivatives(0.0, y, schema, params)
         return {spec.pool: float(d[schema.slice(spec.pool)][0]) for spec in ESTER_SPECS}
 

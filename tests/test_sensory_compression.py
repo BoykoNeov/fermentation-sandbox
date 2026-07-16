@@ -82,12 +82,25 @@ def _at_oav(thresholds, pool: str, medium: str, oav: float) -> float:
 def test_every_exponent_is_an_author_estimate_and_speculative(exponents):
     """No entry may claim a source it does not have — the §4.3 firewall at the file level.
 
-    D-98's whole defensibility rests on these 21 numbers never being mistaken for measurements.
+    D-98's whole defensibility rests on these 23 numbers never being mistaken for measurements.
     Cain 1969 is cited in `notes` (it orders them and sets the spread's scale) and MUST NOT
     appear in `source`, which would let the values borrow a citation that measured none of
     these compounds, in a matrix Cain never used.
+
+    The count tracks wine's aroma-pool set exactly (one exponent per pool the OAV lens can
+    read), which is why D-99's fusel split moved it 21 → 23: `fusels` became `isoamyl_alcohol`
+    one-for-one, and `isobutanol` / `2_phenylethanol` joined as wine-thresholded pools. The
+    other two higher alcohols (`propanol`, `active_amyl_alcohol`) get NO entry here — they have
+    no threshold, so they never reach this lens, and inventing exponents for them would be
+    exactly the unforced speculation D-98 exists to forbid.
+
+    D-99 is also where this file came closest to a real source and deliberately did not take
+    it: Cain's measured class is n-aliphatic alcohols with the exponent falling by chain
+    length, and four of the five new pools are aliphatic alcohols of differing length. That
+    supplies an ORDERING, not values — so these stay author estimates with overlapping bands,
+    and `test_a_robust_dominance_flip_is_impossible_at_these_bands` still holds.
     """
-    assert len(exponents) == 21
+    assert len(exponents) == 23
     for p in exponents:
         assert p.provenance.source == "author estimate", p.name
         assert p.tier is Tier.SPECULATIVE, p.name

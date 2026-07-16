@@ -112,11 +112,20 @@ def _run(
     days: float = 40.0,
     n_eval: int = 300,
     interventions: list[Intervention] | None = None,
+    disable: tuple[str, ...] = (),
     **initial_extra: float,
 ):
     compiled = compile_scenario(
         _wine_scenario(days=days, interventions=interventions, **initial_extra), strict=True
     )
+    # `disable` lets a test isolate Brett dynamics from an unrelated speculative Process (the
+    # D-33 Ehrlich amino-acid reroute), which competes for the SAME lumped `amino_acids` pool
+    # Brett growth feeds on. Since D-99 raised fusel production ~3.8x that reroute drains the
+    # lump to ~0, starving Brett — a known limitation of the shared amino-acid lump, deferred
+    # to D-100 and pinned in tests/test_aging_scenario.py. Isolating it here (the isolable-
+    # speculative-Process contract, prime directive #3) tests Brett without that interaction.
+    for name in disable:
+        compiled.process_set.disable(name)
     t_eval = np.linspace(0.0, days * 24.0, n_eval)
     traj = compiled.run(t_eval=t_eval)
     return compiled, traj
@@ -470,11 +479,22 @@ def test_growth_accelerates_phenols():
     ``X_brett`` than the constant-catalyst control — the "it gets worse the longer the barrel sits"
     dynamic a fixed catalyst (pt1) cannot produce.
     """
+    # The Ehrlich amino-acid reroute is isolated out: it and BrettGrowth draw on the one lumped
+    # `amino_acids` pool, and since D-99's honest (~3.8x higher) fusel levels the reroute empties
+    # it before Brett can grow. That competition is a real known limitation (D-100), pinned in
+    # tests/test_aging_scenario.py; this test is about Brett's autocatalysis, so it isolates it.
     _, dynamic = _run(
-        days=120.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0
+        days=120.0,
+        hydroxycinnamic_gpl=0.1,
+        brett_pitch_gpl=0.05,
+        amino_acids_gpl=1.0,
+        disable=("fusel_amino_acid_reroute",),
     )
     _, constant = _run(
-        days=120.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05
+        days=120.0,
+        hydroxycinnamic_gpl=0.1,
+        brett_pitch_gpl=0.05,
+        disable=("fusel_amino_acid_reroute",),
     )  # no aa ⇒ no growth
 
     assert dynamic.series("X_brett")[-1] > 2.0 * constant.series("X_brett")[-1]  # population grew

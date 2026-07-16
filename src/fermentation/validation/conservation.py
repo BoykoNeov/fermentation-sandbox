@@ -19,7 +19,7 @@ from fermentation.core.chemistry import (
     nitrogen_mass_fraction,
     sugar_species,
 )
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.state import FloatArray, StateSchema
 
 QuantityFn = Callable[[FloatArray], float]
@@ -95,11 +95,11 @@ def total_carbon(
         w[schema.slice("Byp")] = carbon_mass_fraction("succinic_acid")
     # Aroma byproduct pools (decision D-19): the ester/fusel Processes route their
     # carbon out of sugar, so these pools must be weighted or carbon would read as
-    # destroyed when they accumulate. Each ester books as its own molecule (D-96), fusels
-    # as isoamyl alcohol — the same representative species the Processes draw against, from
-    # the one chemistry source of truth, so the check matches the kinetics. No overlap
-    # with Byp: under D-19 Byp is organic-acids/polyols only (higher alcohols moved
-    # to the fusels pool), so the former Byp double-count is gone.
+    # destroyed when they accumulate. Since D-96 (esters) and D-99 (higher alcohols) EVERY
+    # one of these pools books as its own molecule — the same species the Processes draw
+    # against, from the one chemistry source of truth, so the check matches the kinetics.
+    # No overlap with Byp: under D-19 Byp is organic-acids/polyols only (higher alcohols
+    # moved to their own pools), so the former Byp double-count is gone.
     # Each ester books as ITSELF (decision D-96): the three single-molecule pools that
     # replaced the lumped ``esters`` pool are weighted at their own molecule's carbon
     # fraction (ethyl acetate C4, isoamyl acetate C7, ethyl hexanoate C8), from the same
@@ -120,8 +120,24 @@ def total_carbon(
             w[schema.slice(spec.pool)] = fraction
         if spec.gas_pool in schema:
             w[schema.slice(spec.gas_pool)] = fraction
-    if "fusels" in schema:
-        w[schema.slice("fusels")] = carbon_mass_fraction("isoamyl_alcohol")
+    # Each higher alcohol books as ITSELF (decision D-99), from the same ``FUSEL_SPECS``
+    # registry the producer draws against — the fusel twin of the ester rule above, and the
+    # ledger half of the D-99 split. The lumped ``fusels`` pool that stood here weighted all
+    # five at isoamyl alcohol's carbon mass fraction (0.6813), which over-booked propan-1-ol's
+    # carbon by ~14% (its own is 0.5996) and under-booked 2-phenylethanol's by ~13% (0.7865).
+    # Those are per-GRAM errors and are much milder than the per-MOLE 5-vs-3 carbon-atom gap
+    # implies — the heavier alcohols carry proportionally more hydrogen.
+    #
+    # THE LEDGER STILL CLOSED UNDER THAT STAND-IN, and that is the instructive part: the
+    # producer drew from S at the very same fraction the pool was weighted by, so the error
+    # cancelled exactly. Closure alone could never have caught it — a self-consistent wrong
+    # weight is invisible to a conservation test. It took splitting the pool to make each
+    # number mean what it says.
+    #
+    # No gas twins here: higher alcohols are not stripped (contrast D-20's ester volatilization).
+    for fusel in FUSEL_SPECS:
+        if fusel.pool in schema:
+            w[schema.slice(fusel.pool)] = carbon_mass_fraction(fusel.species)
     # Vicinal-diketone (VDK) pools (decision D-26): the diacetyl pathway routes carbon
     # sugar → α-acetolactate → diacetyl + CO2 → 2,3-butanediol, every step balanced on
     # this ledger. α-acetolactate is drawn from sugar (excretion) and booked at its own

@@ -124,7 +124,7 @@ from fermentation.core.kinetics import (
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS
+from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import StateSchema, VarSpec
 
@@ -158,16 +158,14 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
         #: here that could drift from the carbon ledger or the OAV aroma set. Each replaced a
         #: share of the pre-D-96 lumped ``esters`` pool, which was weighted as ethyl acetate
         #: but *perceived* as isoamyl acetate.
-        *(
-            VarSpec(spec.pool, "g/L", default=0.0, description=spec.note)
-            for spec in ESTER_SPECS
-        ),
-        VarSpec(
-            "fusels",
-            "g/L",
-            default=0.0,
-            description="fusel / higher alcohols (Ehrlich pathway; lumped produced-only pool)",
-        ),
+        *(VarSpec(spec.pool, "g/L", default=0.0, description=spec.note) for spec in ESTER_SPECS),
+        #: The FIVE single-molecule Ehrlich higher-alcohol pools (decision D-99), derived from
+        #: the canonical ``FUSEL_SPECS`` registry for the same reason the esters are: a sixth
+        #: alcohol is one entry there, never a hand-edit here that could drift from the carbon
+        #: ledger or the OAV aroma set. Together they replace the pre-D-99 lumped ``fusels``
+        #: pool, which weighted AND perceived all five as isoamyl alcohol. Unlike the esters
+        #: these have no headspace twin — they are not stripped in this model.
+        *(VarSpec(spec.pool, "g/L", default=0.0, description=spec.note) for spec in FUSEL_SPECS),
         #: Each ester's headspace twin (decision D-20, generalised per-ester at D-96): the
         #: CO2-stripping sink moves liquid ester carbon here. A pool and its twin share ONE
         #: molecule's carbon weight, which is what makes the strip carbon-neutral — so a

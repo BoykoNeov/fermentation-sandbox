@@ -186,6 +186,13 @@ def test_mid_run_pitch_growth_is_emergently_gated_by_ethanol():
         )  # fmt: skip
         cs = compile_scenario(sc, strict=True)
         assert cs.process_set.is_enabled("malolactic_growth")  # enabled by aa, regardless of pitch
+        # Isolate the Ehrlich amino-acid reroute (D-33): it and MalolacticGrowth draw on the SAME
+        # lumped `amino_acids` pool, and since D-99 raised fusel production ~3.8x the reroute
+        # drains it to ~0 before the co-pitched MLF culture can grow on it — the early-pitch
+        # growth advantage this test measures collapses to solver noise. A known limitation of
+        # the shared amino-acid lump (D-100), pinned in tests/test_aging_scenario.py; this test
+        # is about MLF's ethanol-gated growth window, so it isolates the competing consumer.
+        cs.process_set.disable("fusel_amino_acid_reroute")
         if not growth:
             cs.process_set.disable("malolactic_growth")  # survives pitch_mlf (aa-gated, not pitch)
         tr = cs.run(t_eval=np.linspace(0.0, 21.0 * 24.0, 500))

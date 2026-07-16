@@ -18,8 +18,9 @@ from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_frac
 from fermentation.core.kinetics import (
     FuselAlcoholsEhrlich,
     FuselAminoAcidReroute,
-    fusel_production_rate,
+    fusel_carbon_draw,
 )
+from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
 from fermentation.core.media import get_medium, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -31,7 +32,8 @@ from fermentation.validation import assert_conserved, total_carbon, total_nitrog
 
 REROUTE = FuselAminoAcidReroute.name
 PRODUCER = FuselAlcoholsEhrlich.name
-_FUSEL_SPECIES = "isoamyl_alcohol"
+# The five single-molecule higher-alcohol pools the lumped `fusels` pool became at D-99.
+_FUSEL_POOLS = tuple(spec.pool for spec in FUSEL_SPECS)
 _AA_SPECIES = "arginine"
 
 
@@ -83,8 +85,11 @@ def test_metadata():
     assert p.tier is Tier.SPECULATIVE
     # A swap: it moves the carbon SOURCE and releases nitrogen — it never produces fusels.
     assert set(p.touches) == {"S", "amino_acids", "N"}
-    assert "fusels" not in p.touches
-    for r in ("k_fusel", "E_a_fusels", "K_amino_acids"):
+    for pool in _FUSEL_POOLS:
+        assert pool not in p.touches
+    # Reads all FIVE per-species k's since D-99 — it must reproduce the producer's TOTAL
+    # draw, which is the sum over five rates at five different carbon fractions.
+    for r in (*(spec.k_param for spec in FUSEL_SPECS), "E_a_fusels", "K_amino_acids"):
         assert r in p.reads
 
 
@@ -116,9 +121,10 @@ def test_reroute_contribution_is_carbon_and_nitrogen_neutral(full_params):
 # -- production is untouched; only the carbon source moves --------------------
 
 
-def test_reroute_never_touches_fusels_or_other_columns(full_params):
+def test_reroute_never_touches_any_fusel_pool_or_other_columns(full_params):
     # Derivative-level guard (the warm=more-fusel benchmark is protected): enabling the re-route
-    # changes ONLY S/amino_acids/N — never fusels/E/CO2/X. Production stays in the producer.
+    # changes ONLY S/amino_acids/N — never the five fusel pools/E/CO2/X (D-99). Production
+    # stays in the producer.
     ps = _isolate_fusel(full_params)
     schema = ps.schema
     y = _wine_y0(schema, x=1.0, s=200.0, n=0.15, aa=5.0)
@@ -128,7 +134,7 @@ def test_reroute_never_touches_fusels_or_other_columns(full_params):
     d_prod = ps.total_derivatives(0.0, y, full_params)
     ps.enable(REROUTE)
     d_reroute = d_both - d_prod
-    for col in ("fusels", "E", "CO2", "X"):
+    for col in (*_FUSEL_POOLS, "E", "CO2", "X"):
         assert d_reroute[schema.slice(col)][0] == 0.0
     # It DOES move exactly these three:
     assert d_reroute[schema.slice("amino_acids")][0] < 0.0  # debited
@@ -143,9 +149,10 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
     schema = ps.schema
     aa_val = 0.3
     y = _wine_y0(schema, x=1.5, s=180.0, n=0.12, aa=aa_val)
-    rate = fusel_production_rate(y, schema, full_params)
     g = aa_val / (full_params["K_amino_acids"] + aa_val)
-    fusel_carbon = rate * carbon_mass_fraction(_FUSEL_SPECIES)
+    # The producer's TOTAL draw across all five species, each at its OWN carbon fraction
+    # (D-99). Before the split this was one rate times one stand-in fraction.
+    fusel_carbon = fusel_carbon_draw(y, schema, full_params)
 
     ps.enable(REROUTE)
     d_both = ps.total_derivatives(0.0, y, full_params)

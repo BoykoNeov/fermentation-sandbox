@@ -3,14 +3,14 @@
 The first §4.1 aging Process: a first-order **net decay** of the lumped ``esters`` pool
 toward a lower equilibrium floor ``isoamyl_acetate_eq`` (young fruity acetate esters hydrolyse and
 fade with age), warmed by an Arrhenius factor (warmer ages faster), routing the released
-ester carbon **5:2** into ``fusels`` (isoamyl alcohol, the alcohol product) and ``Byp``
+ester carbon **5:2** into ``isoamyl_alcohol`` (isoamyl alcohol, the alcohol product) and ``Byp``
 (succinic-stand-in acetic acid, the acid product). These tests pin the closed-form
 derivative and the exact 5:2 split; prove the properties the aging axis requires — **net
 decay toward equilibrium** (zero at/below ``isoamyl_acetate_eq``, not decay-to-zero), **warmer ⇒
 faster**, and an **on-ledger carbon transfer that closes ``total_carbon`` to machine
 precision** (the D-68 "conservation is back in force" requirement, unlike the D-67 readout);
 check the solver-undershoot guards; and confirm the tier floors at speculative and the
-Process touches only ``esters``/``fusels``/``Byp`` (no ``S``/``E``/``CO2`` — aging draws no
+Process touches only ``esters``/``isoamyl_alcohol``/``Byp`` (no ``S``/``E``/``CO2`` — aging draws no
 sugar). The scenario-level aging-phase wiring (the ``age N months`` verb + the reconfigure
 enable) is D-70; here the Process is exercised directly via a hand-built ``ProcessSet`` (the
 D-64 loss-Process pattern), off the fermentation ProcessSet so isolability is preserved.
@@ -136,7 +136,7 @@ def params(store):
 def _aged_wine(schema: StateSchema, *, ester: float = 0.1, t: float = 293.15, **kw) -> FloatArray:
     """A finished, racked wine at the start of aging: yeast gone (X=0), dry (S=0), with the
     liquid ``esters`` pool pre-loaded (nothing produces it during aging — the Process only
-    decays it). ``fusels``/``Byp`` default to 0 so their aging gains are unambiguous."""
+    decays it). ``isoamyl_alcohol``/``Byp`` default to 0 so their aging gains are unambiguous."""
     y = schema.pack({"X": 0.0, "S": [0.0], "E": 100.0, "N": 0.0, "T": t, "CO2": 0.0})
     y[schema.slice("isoamyl_acetate")] = ester
     for name, val in kw.items():
@@ -152,9 +152,10 @@ def test_metadata():
     assert p.name == "ester_hydrolysis"
     # Speculative: the aging axis is the Tier-3 frontier (form sourced, magnitudes estimated).
     assert p.tier is Tier.SPECULATIVE
-    # An on-ledger inter-pool transfer: decays esters, routes carbon to the alcohol (fusels)
+    # An on-ledger inter-pool transfer: decays esters, routes carbon to the alcohol
+    # (isoamyl_alcohol)
     # and acid (Byp) products — never S/E/CO2 (aging draws no sugar, unlike the M2 producers).
-    assert set(p.touches) == {"isoamyl_acetate", "fusels", "Byp"}
+    assert set(p.touches) == {"isoamyl_acetate", "isoamyl_alcohol", "Byp"}
     assert set(p.reads) == {
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
@@ -178,7 +179,9 @@ def test_derivative_matches_closed_form(params):
 
     assert schema.get(d, "isoamyl_acetate") == pytest.approx(-rate)
     # 5:2 split of the released carbon, re-deposited via each product's own carbon fraction.
-    assert schema.get(d, "fusels") == pytest.approx(_FUSEL_SHARE * carbon_released / _FUSEL_C)
+    assert schema.get(d, "isoamyl_alcohol") == pytest.approx(
+        _FUSEL_SHARE * carbon_released / _FUSEL_C
+    )
     assert schema.get(d, "Byp") == pytest.approx(_BYP_SHARE * carbon_released / _BYP_C)
     # Aging touches nothing else — no sugar draw, no ethanol/CO2, no biomass.
     for var in ("X", "S", "E", "N", "CO2"):
@@ -193,7 +196,7 @@ def test_carbon_closes_per_rhs(params):
     d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=0.1, t=298.15), schema, params)
     carbon_residual = (
         schema.get(d, "isoamyl_acetate") * _ESTER_C
-        + schema.get(d, "fusels") * _FUSEL_C
+        + schema.get(d, "isoamyl_alcohol") * _FUSEL_C
         + schema.get(d, "Byp") * _BYP_C
     )
     assert carbon_residual == pytest.approx(0.0, abs=1e-15)
@@ -227,7 +230,7 @@ def test_split_is_five_to_two_by_carbon(params):
     # pools' differing mass weightings.
     schema = wine_schema()
     d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=0.1), schema, params)
-    fusel_carbon = schema.get(d, "fusels") * _FUSEL_C
+    fusel_carbon = schema.get(d, "isoamyl_alcohol") * _FUSEL_C
     byp_carbon = schema.get(d, "Byp") * _BYP_C
     assert fusel_carbon / byp_carbon == pytest.approx(5.0 / 2.0)
     # Both products gain, and the fusel share is the larger (5/7) — the stronger fusel-OAV
@@ -266,7 +269,7 @@ def test_decays_only_the_excess_above_equilibrium(params):
 
 def test_solver_undershoot_does_not_create_pools(params):
     # A solver undershoot (esters < 0) must not flip max(0, ...) into spurious production of
-    # fusels/Byp (or negative decay). A floor > 0 makes the excess negative ⇒ clamped to 0.
+    # isoamyl_alcohol/Byp (or negative decay). A floor > 0 makes the excess negative ⇒ clamped to 0.
     schema = wine_schema()
     d = EsterHydrolysis().derivatives(0.0, _aged_wine(schema, ester=-1e-6), schema, params)
     assert np.array_equal(d, schema.zeros())
@@ -287,7 +290,7 @@ def test_rises_with_temperature(params):
     )
     # Faster decay (more negative) and a correspondingly larger fusel/Byp gain when warm.
     assert schema.get(warm, "isoamyl_acetate") < schema.get(cold, "isoamyl_acetate") < 0.0
-    assert schema.get(warm, "fusels") > schema.get(cold, "fusels") > 0.0
+    assert schema.get(warm, "isoamyl_alcohol") > schema.get(cold, "isoamyl_alcohol") > 0.0
 
 
 def test_factor_is_one_at_reference_temperature(params):
@@ -307,7 +310,8 @@ def test_factor_is_one_at_reference_temperature(params):
 def test_integrated_aging_closes_carbon_and_fades_esters(params, store):
     # Run a long aging segment (a racked, dry wine — X=0, S=0) with ONLY EsterHydrolysis
     # active, under the strict touches contract. Over the aging span the esters pool fades,
-    # the fusels and Byp pools rise, and total_carbon closes to machine precision — the pure
+    # the isoamyl_alcohol and Byp pools rise, and total_carbon closes to machine precision —
+    # the pure
     # on-ledger transfer of the D-68 aging axis (no sugar drawn, no ethanol touched).
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterHydrolysis()], strict=True)
@@ -320,11 +324,11 @@ def test_integrated_aging_closes_carbon_and_fades_esters(params, store):
     # The fruity esters fade (toward, not past, the equilibrium floor) and the products rise.
     ester_end = float(traj.series("isoamyl_acetate")[-1])
     assert params["isoamyl_acetate_eq"] <= ester_end < esters0
-    assert float(traj.series("fusels")[-1]) > 0.0
+    assert float(traj.series("isoamyl_alcohol")[-1]) > 0.0
     assert float(traj.series("Byp")[-1]) > 0.0
     # Non-negative pools and machine-precision carbon closure (X=0 throughout, so the biomass
-    # term is inert; the invariant is the esters → fusels + Byp inter-pool transfer).
-    assert_nonnegative(traj, ("isoamyl_acetate", "fusels", "Byp"), atol=1e-12)
+    # term is inert; the invariant is the esters → isoamyl_alcohol + Byp inter-pool transfer).
+    assert_nonnegative(traj, ("isoamyl_acetate", "isoamyl_alcohol", "Byp"), atol=1e-12)
     f_c = store.value("biomass_C_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
     # Carbon is the invariant; mass carries a small (~4.5%) documented stand-in gap (aging.yaml):
@@ -348,7 +352,8 @@ def test_isolable_from_the_core_when_below_equilibrium(params):
 def test_integrated_aging_closes_carbon_beer_multislot(store):
     # The multi-slot (beer) counterpart: the aging transfer is sugar-free so the 3-slot S
     # vector is irrelevant to it, but running the strict ProcessSet on beer_schema proves the
-    # Process is medium-agnostic (esters/fusels/Byp exist in both) and closes carbon there too.
+    # Process is medium-agnostic (esters/isoamyl_alcohol/Byp exist in both) and closes carbon
+    # there too.
     beer = load_parameters(
         default_data_dir() / "beer_generic.yaml", default_data_dir() / "aging.yaml"
     )
@@ -370,10 +375,10 @@ def test_integrated_aging_closes_carbon_beer_multislot(store):
 def test_tier_floored_at_speculative(store):
     # The aging Process is speculative in FORM (Tier-3 frontier), so every pool it writes is
     # speculative even before parameters cap it — and folding in the (speculative) aging
-    # parameter tiers keeps it there. Non-vacuous: esters/fusels/Byp are all speculative.
+    # parameter tiers keeps it there. Non-vacuous: esters/isoamyl_alcohol/Byp are all speculative.
     schema = wine_schema()
     ps = ProcessSet(schema, [EsterHydrolysis()])
-    for pool in ("isoamyl_acetate", "fusels", "Byp"):
+    for pool in ("isoamyl_acetate", "isoamyl_alcohol", "Byp"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
 
@@ -417,8 +422,8 @@ def test_oxidation_matches_closed_form(params):
     assert schema.get(d, "acetaldehyde") == pytest.approx(acet_rate)
     # Carbon-exact C2 borrow from ethanol (the reduction reversed).
     assert schema.get(d, "E") == pytest.approx(-acet_rate * M_ETHANOL / M_ACETALDEHYDE)
-    # Oxidation touches nothing else — no sugar, no CO2, no esters/fusels/Byp, no biomass.
-    for var in ("X", "S", "N", "CO2", "isoamyl_acetate", "fusels", "Byp"):
+    # Oxidation touches nothing else — no sugar, no CO2, no esters/isoamyl_alcohol/Byp, no biomass.
+    for var in ("X", "S", "N", "CO2", "isoamyl_acetate", "isoamyl_alcohol", "Byp"):
         assert schema.get(d, var) == 0.0
 
 
@@ -588,7 +593,17 @@ def test_sulfite_oxidation_matches_closed_form(so2_params):
     assert schema.get(d, "o2") == pytest.approx(-r_o2)
     assert schema.get(d, "so2_total") == pytest.approx(-_SO2_PER_O2 * (r_o2 / M_O2) * M_SO2)
     # Touches nothing else — not ethanol/acetaldehyde/esters, no sugar, no CO2, no biomass.
-    for var in ("X", "S", "E", "N", "CO2", "acetaldehyde", "isoamyl_acetate", "fusels", "Byp"):
+    for var in (
+        "X",
+        "S",
+        "E",
+        "N",
+        "CO2",
+        "acetaldehyde",
+        "isoamyl_acetate",
+        "isoamyl_alcohol",
+        "Byp",
+    ):
         assert schema.get(d, var) == 0.0
 
 
@@ -1016,8 +1031,8 @@ def test_strecker_matches_closed_form(params):
     aa_mass = product_carbon / _AA_C
     assert schema.get(d, "amino_acids") == pytest.approx(-aa_mass)
     assert schema.get(d, "N") == pytest.approx(aa_mass * _AA_N)
-    # Touches nothing else — no ethanol/esters/fusels/acetaldehyde, no sugar, no biomass.
-    for var in ("X", "S", "E", "isoamyl_acetate", "fusels", "Byp", "acetaldehyde"):
+    # Touches nothing else — no ethanol/esters/higher alcohols/acetaldehyde, no sugar, no biomass.
+    for var in ("X", "S", "E", "isoamyl_acetate", "isoamyl_alcohol", "Byp", "acetaldehyde"):
         assert schema.get(d, var) == 0.0
 
 
@@ -1317,7 +1332,7 @@ def test_maillard_matches_closed_form(maillard_params):
     # S is a read-only driver — NOT consumed here (its draw is booked by D-88). And NO o2 term.
     assert schema.get(d, "S") == 0.0
     assert schema.get(d, "o2") == 0.0
-    for var in ("X", "E", "isoamyl_acetate", "fusels", "Byp", "acetaldehyde"):
+    for var in ("X", "E", "isoamyl_acetate", "isoamyl_alcohol", "Byp", "acetaldehyde"):
         assert schema.get(d, var) == 0.0
 
 

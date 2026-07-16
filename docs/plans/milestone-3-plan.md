@@ -322,6 +322,42 @@
 > being banana-led. Next: the isoamyl-acetate carbon re-route (the D-69 5:2 inverse); per-ester dH/E_a (BLOCKED on sourcing —
 > an author estimate would LOWER fidelity, so it may stay deferred rather than be built for completeness); speciating the
 > `fusels` lump (the D-96 pattern one pool over, which would retire this beat's inherited lump caveat); beat 1b slice 2.**
+>
+> **PROGRESS (D-99, 2026-07-16): the lumped `fusels` pool SPLIT into FIVE single-molecule higher alcohols (1070 tests, +31;
+> benchmarks 16/16; ruff+mypy clean). The second of D-96's four deferred refinements, and the D-96 ester split one pool over:
+> `propanol`/`isobutanol`/`active_amyl_alcohol`/`isoamyl_alcohol`/`2_phenylethanol`, each carbon-weighted by its own molecule,
+> each produced by one shared Ehrlich shape times its OWN independently-anchored `k` (Wang/Frank/Steinhaus 2024 meta-analytic
+> means; n=486-684 wine studies per compound). Unlike D-95/D-98 it is ON BY DEFAULT — chemistry, not a sensory projection.
+> THE OWNER OVERRODE MY "four species" AND WAS RIGHT (3rd time a "can't source it" call was overruled by looking): active amyl
+> has its OWN row over n=128 wine / n=64 beer studies — the "amyl alcohols" bundling is a GC COLUMN ARTIFACT (coelution), split
+> in aroma research. MY RECOMMENDED CUT WAS AIMED AT THE WRONG MOLECULE: propanol, not active amyl, is the weak one (omitted
+> from the meta-analysis in both media; beer propanol is the beat's one author estimate, flagged in-file). THE ~3.8x RISE
+> (wine 86→328 mg/L) IS FORCED, NOT CHOSEN: the old lump sat below even the sum of the five species' LOW ends; each `k` was set
+> by solving for a literature mean recorded BEFORE any k was picked (wine hit 327.9 vs 327.8 target first try). PAYOFF IS
+> SUBTRACTIVE FIRST: the lump asserted EVERY higher alcohol smells like isoamyl (only ~52% is, by mass), reading 2-phenylethanol
+> — which is ROSE, not solvent — at the wrong potency; the split removes that false claim even for the two chemistry-only pools
+> (propanol/active amyl: no usable-matrix threshold ⇒ no OAV ⇒ honest silence). THEN ADDITIVE: 2-phenylethanol ~28.7 mg/L vs
+> Guth's ~10 ⇒ OAV ~2.9 ⇒ WINE GAINS A FLORAL AXIS that read exactly 0 before (its only member was the oxidation-only D-75
+> phenylacetaldehyde). Beer correctly gains none (no beer threshold; Meilgaard says 2-PE is sub-threshold in beer) — the mirror
+> of D-97. THE D-96 RULE AND THE ONLY PAYOFF ARE THE SAME ACT — the INVERSE of D-98's "sourceable XOR consequential": a probe
+> showed ratio-splitting the current lump (D-96-forbidden) leaves 2-PE at OAV 0.93 and delivers nothing, while honest anchoring
+> (D-96-required) lights the axis. D-98 PREDICTED BOTH SIDE-EFFECTS VERBATIM: its caveat (iv) lumped exponent is retired
+> (single-molecule now; 2 new aliphatic-alcohol exponents ordered by Cain's MEASURED chain-length trend but kept author-estimated
+> with OVERLAPPING bands, so D-98's tripwire stays green), and the ATF1 Km comparison now reads 3-methylbutan-1-ol specifically.
+> D-97's RATIO LESSON APPLIED PROSPECTIVELY: speciation doubled the banana's precursor, so `k_isoamyl_acetate` was re-anchored by
+> an EXACT factor (x0.502 wine / x1.397 beer — opposite directions, because wine's isoamyl pool doubled while beer's FELL) to
+> hold the finished ester and stop `fruity` flipping on no evidence. I NEARLY SHIPPED A PROVENANCE NOTE CLAIMING the re-anchor
+> while the code didn't do it — caught by checking the descriptor outcome against D-97's recorded value. THE DONE-CALL CATCH
+> BECAME THE SECOND FINDING: the 3.8x rise broke THREE tests in unrelated subsystems (Maillard, Brett growth, MLF growth) — all
+> via the D-33 reroute draining the lumped `amino_acids` pool to ~0. A pre-D-99 emulation proved D-99 didn't CREATE this — the
+> reroute already ate ~96.5% of the pool and sotolon passed at an 18% margin the old lump's under-production propped up. TWO
+> SPECIATED-SCALE CONSUMERS CAN'T SHARE ONE LUMPED SUBSTRATE ⇒ `amino_acids` is THE NEXT LUMP ⇒ D-100. Resolved in-scope: the
+> speculative reroute is ISOLATED out of the three affected tests (each tests a different Process; the reroute stays fully
+> covered in test_fusel_reroute.py) and the pathology is PINNED as a D-100 tripwire. `mercaptans` is now the LAST lump in the
+> project. HONEST LIMIT STATED: all five share one N-gate + one E_a ⇒ fixed SPECTRUM (not fixed composition); dynamic spectrum
+> needs per-species E_a/gates = unsourced = the real D-98 trap = deferred. Next: D-100 (speciate `amino_acids`); the isoamyl-
+> acetate carbon re-route (D-69 5:2 inverse); per-species E_a/gates (blocked); sourced beer propanol + in-matrix beer thresholds
+> (paywalled); per-ester dH/E_a (blocked); masking (blocked on cosα); further fruity esters; the oav→magnitude rename.**
 > Milestone 1 (Tier-1 validated core) and Milestone 2 (Tier-2
 > plausible mechanisms) are closed — the §2.2 benchmark trio is green and §3.3
 > "additives with clear mechanisms" completed at D-65 (717 tests). This plan opens
@@ -432,20 +468,25 @@ slots (they do not exist in the beer schema).
 | `diacetyl` | wine + beer | 2,3-butanedione | buttery | single molecule — clean OAV |
 | `acetaldehyde` | wine + beer | acetaldehyde | green apple / bruised | single molecule — clean OAV |
 | `h2s` | wine + beer | hydrogen sulfide | rotten egg | single molecule — clean OAV |
-| `esters` | wine + beer | **isoamyl acetate** (stand-in) | banana / fruity | **lumped** → representative threshold |
-| `fusels` | wine + beer | **isoamyl alcohol** (3-methylbutan-1-ol, stand-in) | solventy / fusel | **lumped** → representative threshold |
+| `ethyl_acetate` / `isoamyl_acetate` / `ethyl_hexanoate` | wine + beer | each ITSELF (D-96 split the lumped `esters`) | solventy / banana / apple | single molecule — clean OAV |
+| `isoamyl_alcohol` | wine + beer | isoamyl alcohol (3-methylbutan-1-ol) | solventy / fusel | single molecule since D-99 |
+| `isobutanol` / `2_phenylethanol` | wine (threshold), both (chemistry) | each ITSELF (D-99 split the lumped `fusels`) | solventy / rose | single molecule; wine-thresholded, chemistry-only in beer |
+| `propanol` / `active_amyl_alcohol` | wine + beer | — (no sourced threshold in any matrix) | — | single molecule; CHEMISTRY-ONLY, no OAV (D-99) |
 | `ethylphenols` | **wine only** | 4-ethylphenol | horse-sweat / barnyard | single molecule — clean OAV |
 | `ethylguaiacols` | **wine only** | 4-ethylguaiacol | clove / smoky | single molecule — clean OAV |
-| `mercaptans` | **wine only** | **methanethiol** (stand-in, already the pool's named stand-in) | reductive / drains | **lumped** → representative threshold |
+| `mercaptans` | **wine only** | **methanethiol** (stand-in) | reductive / drains | **lumped** → representative threshold — the LAST lump (D-99) |
 
-- **The lumped-pool call (D-66, owner-chosen).** `esters`/`fusels`/`mercaptans` are single
-  g/L pools that really mix several molecules whose thresholds span ~3 orders of magnitude.
-  We assign each lump the threshold of one **named representative compound** — the stand-in
-  its `VarSpec` description *already* names (fusels = Ehrlich higher alcohols → isoamyl
-  alcohol; mercaptans = "methanethiol stand-in") — compute OAV uniformly, and carry
-  **"assumes fixed lump composition"** loudly in that threshold's provenance `notes`. This
-  keeps the dominant young-product aromas (esters, fusels) in the numeric readout; the
-  honesty cost is the fixed-composition assumption, flagged at the source.
+- **The lumped-pool call (D-66, owner-chosen) — NOW DOWN TO ONE POOL.** A lumped pool is a
+  single g/L pool that really mixes several molecules whose thresholds span ~3 orders of
+  magnitude; it is assigned the threshold of one **named representative compound** and carries
+  **"assumes fixed lump composition"** loudly in that threshold's provenance `notes`. D-96
+  split the `esters` lump into three single-molecule pools and D-99 split the `fusels` lump
+  into five, so **`mercaptans` is the last lumped pool in the project**. The lumped-flag tests
+  derive from `AromaCompound.lumped`, not a hardcoded list, so the caveat cannot linger on a
+  pool that stopped being lumped — the D-66 honesty cost retires under test pressure as each
+  pool is speciated. D-99 also showed *why* a self-consistent lump is dangerous even when its
+  ledger closes: reading every higher alcohol at isoamyl alcohol's threshold mislabelled
+  2-phenylethanol (rose) as solventy — self-consistency is not correctness.
 - **`iso_alpha` / IBU is excluded** — it is a **taste** (bitterness), not an odor, and is
   already a direct mg/L→IBU readout (`analysis.ibu_series`, D-64). Do not shoehorn a
   bitterness into an odor-threshold OAV. (A future taste-intensity readout is separate.)
@@ -538,9 +579,13 @@ uncertainty bands.
   **must surface its speculative tier** in any plot, export, or report — the tier-floor rule
   above enforces this at the API.
 - **Lump-composition assumption** (the accepted D-66 (a) call): a lump's OAV is only as
-  meaningful as its assumed fixed composition. Flagged in every lumped threshold's provenance;
-  revisit if/when the esters/fusels pools are ever speciated (a *chemistry*-layer change, which
-  would be motivated on its own merits, never to serve the sensory layer — §4.2).
+  meaningful as its assumed fixed composition. The risk was flagged in every lumped threshold's
+  provenance and *retired as predicted* — the `esters` lump was speciated at D-96 and the
+  `fusels` lump at D-99, both chemistry-layer changes motivated on their own merits (each `k`
+  independently anchored, never to serve the sensory layer — §4.2). `mercaptans` is the last
+  pool still carrying the assumption. D-99 also surfaced a **new lump risk one layer down**: the
+  `amino_acids` pool (arginine standing in for five amino acids) cannot serve the now-speciated-
+  scale consumers that draw on it (fusels, Maillard, MLF, Brett) — deferred as D-100 and pinned.
 - **Aging multi-scale stiffness** (handoff §7): the years phase must use phase-based Process
   activation and an appropriate step regime; do not integrate aging at ferment resolution.
 - **Thresholds sit outside the D-24 ensemble sweep** — a deliberate consequence of loading

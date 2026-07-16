@@ -84,21 +84,33 @@ class DescriptorAxis:
     gloss: str
 
 
-#: The descriptor vocabulary — 14 axes over wine's 21 aroma pools, 9 over beer's 12 (D-95,
-#: pool counts updated at D-96).
+#: The descriptor vocabulary — 14 axes over wine's 23 aroma pools, 9 over beer's 12 (D-95,
+#: pool counts updated at D-96 and D-99).
 #:
 #: Granularity is the owner's call (~12 many-to-many axes): coarse enough that the projection
 #: does real work (``malty`` collapses three pools), fine enough to keep distinctions the
-#: chemistry worked to earn. Three calls worth recording:
+#: chemistry worked to earn. Four calls worth recording:
 #:
 #: * ``fruity`` and ``solventy`` split the three esters **by smell, not by chemical family**
 #:   (D-96). When D-96 broke the lumped ``esters`` pool into ``ethyl_acetate`` /
 #:   ``isoamyl_acetate`` / ``ethyl_hexanoate``, the two ATF1 acetates did *not* stay together:
 #:   isoamyl acetate is banana and joins ``fruity``, while ethyl acetate is nail-polish and
-#:   joins ``fusels`` under ``solventy``. Ethyl hexanoate, a different enzyme's product
+#:   joins the higher alcohols under ``solventy``. Ethyl hexanoate, a different enzyme's product
 #:   (EEB1/EHT1), lands with the banana ester. That is the projection layer doing precisely
 #:   its job — the axis a molecule belongs to is a *perceptual* fact, and it cuts across the
 #:   biosynthetic families the chemistry layer is organised by.
+#:
+#: * **The Ehrlich alcohols split across two axes too, and one of them is not solventy (D-99).**
+#:   The same principle, and a sharper case for it. All five higher alcohols are one enzyme
+#:   family's products off one pathway, and the lumped ``fusels`` pool they replaced sat on
+#:   ``solventy`` alone — but ``2_phenylethanol`` is ROSE, and belongs on ``floral_honey`` with
+#:   an oxidative Strecker aldehyde it shares no chemistry whatsoever with. That is the clearest
+#:   demonstration in this file that perception does not respect biosynthesis: a lump built
+#:   along pathway lines put a floral molecule on the solvent axis, and only splitting the pool
+#:   could move it. Of the other four, ``isoamyl_alcohol`` and ``isobutanol`` join ``solventy``
+#:   as expected; ``propanol`` and ``active_amyl_alcohol`` reach NO axis at all — not by
+#:   judgement but because no odour threshold is sourced for them in any usable matrix, so they
+#:   carry no OAV to project. An honest silence, not an omission.
 #:
 #:   This is also where D-96 pays off for the MAX rule. Before the split ``fruity`` read one
 #:   lumped pool, so its ``dominant`` attribution was vacuous — the lump was the only
@@ -125,7 +137,7 @@ DESCRIPTOR_AXES: tuple[DescriptorAxis, ...] = (
     ),
     DescriptorAxis(
         "solventy",
-        ("ethyl_acetate", "fusels"),
+        ("ethyl_acetate", "isoamyl_alcohol", "isobutanol"),
         "hot, solventy higher alcohols and nail-polish ethyl acetate",
     ),
     DescriptorAxis("buttery", ("diacetyl",), "butter / butterscotch"),
@@ -136,7 +148,9 @@ DESCRIPTOR_AXES: tuple[DescriptorAxis, ...] = (
     DescriptorAxis("clove_spice", ("eugenol", "ethylguaiacols"), "clove / warm spice"),
     DescriptorAxis("caramel", ("furaneol",), "caramel / toffee / burnt sugar"),
     DescriptorAxis("barnyard", ("ethylphenols",), "horse-sweat / barnyard / band-aid"),
-    DescriptorAxis("floral_honey", ("phenylacetaldehyde",), "honey / rose / floral"),
+    DescriptorAxis(
+        "floral_honey", ("phenylacetaldehyde", "2_phenylethanol"), "honey / rose / floral"
+    ),
     DescriptorAxis("cooked_potato", ("methional",), "cooked potato / oxidised savoury"),
     DescriptorAxis(
         "malty",

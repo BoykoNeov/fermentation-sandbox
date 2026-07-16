@@ -237,18 +237,18 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
-from fermentation.core.kinetics.carbon_routing import HYDROLYSING_ESTER
+from fermentation.core.kinetics.carbon_routing import HYDROLYSING_ESTER, ISOAMYL_ALCOHOL
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
-#: Representative species that carbon-account the two *product* pools the hydrolysis fills,
-#: from the one chemistry source of truth. The fusel product books as isoamyl alcohol, the acid
-#: product (``Byp``) as succinic acid (D-16). The *debited* ester is no longer named here: it
-#: comes from the canonical registry (``HYDROLYSING_ESTER``), which since D-96 is the real
-#: molecule — isoamyl acetate — rather than a stand-in. Using these fractions both to release
-#: and to re-deposit the carbon is what makes the transfer close in ``total_carbon`` exactly.
-_FUSEL_SPECIES = "isoamyl_alcohol"
+#: Representative species that carbon-accounts the acid *product* pool (``Byp``) the hydrolysis
+#: fills — succinic acid (D-16), from the one chemistry source of truth. Neither of the other
+#: two molecules is named here any more: the *debited* ester comes from ``HYDROLYSING_ESTER``
+#: (since D-96 the real molecule, isoamyl acetate, rather than a stand-in), and the *alcohol
+#: product* from ``ISOAMYL_ALCOHOL`` (since D-99 its own pool rather than a share of a lump).
+#: Using these fractions both to release and to re-deposit the carbon is what makes the
+#: transfer close in ``total_carbon`` exactly.
 _BYP_SPECIES = "succinic_acid"
 
 #: The 5:2 carbon split of the released ester carbon between ``fusels`` and ``Byp``
@@ -419,13 +419,17 @@ class EsterHydrolysis(Process):
     name = "ester_hydrolysis"
     tier = Tier.SPECULATIVE
     #: Decays the ``isoamyl_acetate`` pool and routes the released carbon to the alcohol product
-    #: (``fusels``) and the acid product (``Byp``) — an on-ledger inter-pool transfer, so it
-    #: touches those three and nothing else (no ``S``/``E``/``CO2``; aging draws no sugar).
-    touches = (HYDROLYSING_ESTER.pool, "fusels", "Byp")
+    #: (``isoamyl_alcohol``) and the acid product (``Byp``) — an on-ledger inter-pool transfer,
+    #: so it touches those three and nothing else (no ``S``/``E``/``CO2``; aging draws no sugar).
+    #: Since D-99 the alcohol lands in the isoamyl pool SPECIFICALLY: hydrolysing isoamyl
+    #: acetate yields 3-methylbutan-1-ol and nothing else, so depositing into the old lump
+    #: silently credited a share of it to four other molecules — and crediting the C5 ISOMER
+    #: ``active_amyl_alcohol`` would be a different compound with a ~5.5× different potency.
+    touches = (HYDROLYSING_ESTER.pool, ISOAMYL_ALCOHOL.pool, "Byp")
     #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``isoamyl_acetate_eq`` are this Process's own
     #: (aging.yaml, D-69); ``T_ref`` is shared with every other Arrhenius rate. Their tiers cap
-    #: the ``isoamyl_acetate``/``fusels``/``Byp`` output tiers via parameter-tier propagation
-    #: (D-1).
+    #: the ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output tiers via parameter-tier
+    #: propagation (D-1).
     reads: tuple[str, ...] = (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
@@ -455,8 +459,8 @@ class EsterHydrolysis(Process):
         # of the molecule actually being debited (C7 → isoamyl alcohol C5 + acetic acid C2).
         carbon_released = rate * carbon_mass_fraction(HYDROLYSING_ESTER.species)  # g C/L/h
         d[schema.slice(HYDROLYSING_ESTER.pool)] = -rate
-        d[schema.slice("fusels")] = (
-            _FUSEL_CARBON_SHARE * carbon_released / carbon_mass_fraction(_FUSEL_SPECIES)
+        d[schema.slice(ISOAMYL_ALCOHOL.pool)] = (
+            _FUSEL_CARBON_SHARE * carbon_released / carbon_mass_fraction(ISOAMYL_ALCOHOL.species)
         )
         d[schema.slice("Byp")] = (
             _BYP_CARBON_SHARE * carbon_released / carbon_mass_fraction(_BYP_SPECIES)

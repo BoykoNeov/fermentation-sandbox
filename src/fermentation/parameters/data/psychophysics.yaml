@@ -203,15 +203,35 @@ stevens_n_mercaptans:
     conditions: "no matrix — matrix-agnostic. Wine-only pool. Read against methanethiol, the pool's D-66 representative."
     notes: "LUMPED POOL. Doubly speculative: an author-estimate exponent applied to a pool that already assumes a fixed lump composition. Methanethiol (~15 g/L) ordered per Cain 1969 => upper-mid. Author estimate."
 
-stevens_n_fusels:
+stevens_n_isoamyl_alcohol:
   value: 0.45
   unit: "1"
   tier: speculative
-  uncertainty: { low: 0.27, high: 0.68, note: "author's ignorance, compounded: LUMPED pool (D-66), exponent guessed about a stand-in." }
+  uncertainty: { low: 0.27, high: 0.68, note: "author's ignorance. ~25 g/L. Band NARROWED in MEANING at D-99 — no longer compounded by a lump stand-in — but the numbers are unchanged, because the ignorance about the exponent itself did not improve." }
   provenance:
     source: "author estimate"
-    conditions: "no matrix — matrix-agnostic. Read against isoamyl alcohol, the pool's D-66 representative."
-    notes: "LUMPED POOL. Isoamyl alcohol (~25 g/L) ordered per Cain 1969 — and this is the one compound CLASS Cain actually measured (n-aliphatic alcohols, exponent falling with chain length), though he used the straight-chain series and this is branched. The closest analogy in the file, which is not the same as a measurement. Author estimate."
+    conditions: "no matrix — matrix-agnostic. Isoamyl alcohol (3-methylbutan-1-ol, CAS 123-51-3), single molecule since D-99."
+    notes: "ORDERED per Cain 1969. Isoamyl alcohol (~25 g/L) — and this is the one compound CLASS Cain actually measured (n-aliphatic alcohols, exponent falling with chain length), though he used the straight-chain series and this is branched. The closest analogy in the file, which is not the same as a measurement. Author estimate. D-99 retired this entry's LUMPED marker: the pool it describes is now one molecule, so the exponent is a guess about a real compound rather than a guess about a stand-in for five. THAT IS A NARROWER CLAIM, NOT A BETTER-SOURCED ONE — the value did not move, and no D-98 conclusion changes."
+
+stevens_n_isobutanol:
+  value: 0.50
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.30, high: 0.75, note: "author's ignorance. ~85 g/L — the most soluble of the aroma-active higher alcohols." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Isobutanol (2-methylpropan-1-ol, CAS 78-83-1). Wine-only in practice (no beer threshold sourced, D-99)."
+    notes: "ORDERED per Cain 1969, added at D-99 with the pool. Isobutanol (~85 g/L) is far more water-soluble than isoamyl alcohol (~25 g/L) => the steeper exponent of the two, which is the SAME ordering Cain measured directly (his n-aliphatic alcohol series has the exponent FALLING with chain length, and C4 < C5). This is the closest any entry in this file comes to sourced ordering — Cain's measured class is exactly aliphatic alcohols — but it remains an author estimate: he used straight chains, these are branched, and an ORDERING IS NOT A VALUE. Deliberately left overlapping isoamyl's band (D-98): disjoint bands here would be a claim no source supports, and would trip test_a_robust_dominance_flip_is_impossible_at_these_bands, which exists precisely to fire when someone asserts a precision the literature has not supplied."
+
+stevens_n_2_phenylethanol:
+  value: 0.46
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.28, high: 0.69, note: "author's ignorance, and the widest-justified of the alcohols: Cain's series does not cover aromatics at all." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. 2-phenylethanol (CAS 60-12-8). Wine-only in practice (no beer threshold sourced, D-99)."
+    notes: "Added at D-99 with the pool. Placed by the file's solubility proxy (~20 g/L => just below isoamyl's ~25 g/L => a hair steeper), but WITH A CAVEAT THE OTHER ALCOHOLS DO NOT CARRY: 2-phenylethanol is AROMATIC, and Cain 1969's measured class is n-ALIPHATIC alcohols. So the one place this file could lean on a real measured ordering is exactly the place it cannot — the chain-length trend has no meaning for a benzene ring. This entry is an author estimate ordered by analogy to an analogy. Its band overlaps phenylacetaldehyde's (0.23–0.57) — the compound it now shares the floral_honey axis with — which is not a coincidence to be tidied away: overlapping bands are what D-98 PROVED must hold while these numbers are guesses, and the overlap is why that axis's dominant reads as the higher OAV rather than as a compression artifact."
 
 stevens_n_2_methylbutanal:
   value: 0.45

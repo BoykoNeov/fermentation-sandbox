@@ -54,7 +54,9 @@ from fermentation.core.kinetics.byproducts import (
     EsterVolatilization,
     FuselAlcoholsEhrlich,
     FuselAminoAcidReroute,
+    fusel_carbon_draw,
     fusel_production_rate,
+    fusel_rate_shape,
 )
 from fermentation.core.kinetics.carrying_capacity import BiomassCarryingCapacity
 from fermentation.core.kinetics.growth import GrowthNitrogenLimited, biomass_growth_rate
@@ -160,7 +162,9 @@ __all__ = [
     "brett_environmental_gate",
     "brett_ethanol_survival_factor",
     "cardinal_temperature_factor",
+    "fusel_carbon_draw",
     "fusel_production_rate",
+    "fusel_rate_shape",
     "iso_alpha_fraction",
     "malolactic_environmental_gate",
     "malolactic_toxicity_gate",

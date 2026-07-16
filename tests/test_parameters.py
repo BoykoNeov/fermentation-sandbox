@@ -172,7 +172,16 @@ def test_load_shipped_beer_parameters():
         "k_isoamyl_acetate",
         "k_ethyl_hexanoate",
         "E_a_esters",
-        "k_fusel",
+        # The five per-species Ehrlich higher-alcohol rate constants that replaced the
+        # single lumped `k_fusel` at D-99 — each anchored independently to its own
+        # molecule's measured beer concentration, never a share of one k.
+        "k_propanol",
+        "k_isobutanol",
+        "k_active_amyl_alcohol",
+        "k_isoamyl_alcohol",
+        "k_2_phenylethanol",
+        # Still ONE activation energy across all five: the molecules are speciated, the
+        # temperature response is not (the composition stays a fixed spectrum, D-99).
         "E_a_fusels",
         "k_ester_volatil",
         "dH_ester_volatil",
