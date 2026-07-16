@@ -15,6 +15,10 @@ import pytest
 
 from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
 from fermentation.core.kinetics import YeastAutolysis
+from fermentation.core.kinetics.amino_acid_pools import (
+    AMINO_ACID_SPECS,
+    spectrum_carbon_per_nitrogen,
+)
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -79,7 +83,10 @@ def test_metadata():
     p = YeastAutolysis()
     assert p.name == "yeast_autolysis"
     assert p.tier is Tier.SPECULATIVE
-    assert set(p.touches) == {"X_dead", "amino_acids", "debris"}
+    # Releases across ALL EIGHT speciated pools at must-spectrum composition (D-100). Under the
+    # lump this deposited pure arginine — a molecule that feeds no Ehrlich alcohol and no Strecker
+    # aldehyde — so the refill could not restore a single aroma precursor the ferment consumed.
+    assert set(p.touches) == {"X_dead", "debris", *(spec.pool for spec in AMINO_ACID_SPECS)}
     for r in ("k_autolysis", "E_a_autolysis", "biomass_N_fraction", "biomass_C_fraction"):
         assert r in p.reads
 
@@ -104,31 +111,42 @@ def test_autolysis_contribution_is_carbon_and_nitrogen_neutral(full_params):
 
 
 def test_debris_carries_the_excess_carbon_and_is_positive(full_params):
-    # Nitrogen-anchored: amino acids gain exactly the dead-cell nitrogen; the C-rich remainder goes
-    # to debris. Verify the algebra and that the excess is strictly positive (biomass is always more
-    # carbon-rich than arginine, so the split never flips — no clamp needed).
+    # Nitrogen-anchored: the amino acids RELEASED ACROSS ALL EIGHT POOLS carry exactly the
+    # dead-cell nitrogen; the C-rich remainder goes to debris. Verify the algebra and that the
+    # excess is strictly positive (biomass C:N 4-11 always exceeds the must spectrum's ~1.9, so the
+    # split never flips — no clamp needed; D-100 narrowed that margin from arginine's 1.29 but did
+    # not threaten it).
     ps = _isolate_autolysis(full_params)
     schema = ps.schema
     y = _wine_y0(schema, x_dead=1.5)
     d = ps.total_derivatives(0.0, y, full_params)
     f_c = full_params["biomass_C_fraction"]
     f_n = full_params["biomass_N_fraction"]
-    y_n = nitrogen_mass_fraction(_AA_SPECIES)
-    y_c = carbon_mass_fraction(_AA_SPECIES)
+    ratio = spectrum_carbon_per_nitrogen(full_params)  # the released blend's mass C:N
     r = -d[schema.slice("X_dead")][0]  # X_dead consumed
     assert r > 0.0
-    # amino acids carry exactly the dead-cell nitrogen:
-    assert d[schema.slice("amino_acids")][0] == pytest.approx(r * f_n / y_n, rel=1e-12)
-    assert d[schema.slice("amino_acids")][0] * y_n == pytest.approx(
-        r * f_n, rel=1e-12
-    )  # N released
+    # Every pool gains mass (D-100: the refill restores the PRECURSORS, not just arginine — the
+    # mechanism by which a real sur-lie wine regenerates what fermentation consumed).
+    for spec in AMINO_ACID_SPECS:
+        assert d[schema.slice(spec.pool)][0] > 0.0
+    # Summed over the eight, the released amino acids carry exactly the dead-cell nitrogen:
+    released_n = sum(
+        d[schema.slice(spec.pool)][0] * nitrogen_mass_fraction(spec.species)
+        for spec in AMINO_ACID_SPECS
+    )
+    assert released_n == pytest.approx(r * f_n, rel=1e-12)
+    # ...and they are released AT MUST-SPECTRUM COMPOSITION (mass ratios track the spectrum):
+    total_mass = sum(d[schema.slice(spec.pool)][0] for spec in AMINO_ACID_SPECS)
+    denom = sum(full_params[spec.fraction_param] for spec in AMINO_ACID_SPECS)
+    for spec in AMINO_ACID_SPECS:
+        share = d[schema.slice(spec.pool)][0] / total_mass
+        assert share == pytest.approx(full_params[spec.fraction_param] / denom, rel=1e-12)
     # debris carbon = dead-cell carbon − amino-acid carbon, and it is positive:
     debris_carbon = d[schema.slice("debris")][0] * carbon_mass_fraction(_DEBRIS_SPECIES)
     assert debris_carbon > 0.0
-    assert debris_carbon == pytest.approx(r * (f_c - f_n * y_c / y_n), rel=1e-12)
+    assert debris_carbon == pytest.approx(r * f_c - released_n * ratio, rel=1e-12)
     # the dominant fate really is debris (most dead-cell carbon is non-assimilable cell wall):
-    aa_carbon = d[schema.slice("amino_acids")][0] * y_c
-    assert debris_carbon > aa_carbon
+    assert debris_carbon > released_n * ratio
 
 
 def test_no_dead_cells_is_a_noop(full_params):

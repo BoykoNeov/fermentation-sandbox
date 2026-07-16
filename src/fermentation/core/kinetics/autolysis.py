@@ -68,8 +68,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
-from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.kinetics.amino_acid_pools import (
+    AMINO_ACID_SPECS,
+    release_spectrum_nitrogen,
+)
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -118,18 +121,23 @@ class YeastAutolysis(Process):
 
     name = "yeast_autolysis"
     tier = Tier.SPECULATIVE
-    #: Consumes dead biomass ``X_dead``; deposits amino acids and the carbon-only ``debris`` pool.
-    touches = ("X_dead", "amino_acids", "debris")
+    #: Consumes dead biomass ``X_dead``; deposits amino acids across **all eight speciated pools**
+    #: at must-spectrum composition (decision D-100 — the refill is the model's only amino-acid
+    #: source, so it is the only thing that can restore the Ehrlich/Strecker precursors a ferment
+    #: consumed) and the carbon-only ``debris`` pool.
+    touches = ("X_dead", *(spec.pool for spec in AMINO_ACID_SPECS), "debris")
     #: ``k_autolysis`` sets the rate, ``E_a_autolysis``/``T_ref`` its temperature shape;
     #: ``biomass_N_fraction``/``biomass_C_fraction`` (the same fractions the conservation checks
-    #: read, D-8) partition the released mass between amino acids and debris. Their tiers cap the
-    #: ``X_dead``/``amino_acids``/``debris`` output tiers via parameter-tier propagation (D-1).
+    #: read, D-8) partition the released mass between amino acids and debris; the eight
+    #: ``must_aa_fraction_*`` shares set the composition released (D-100). Their tiers cap the
+    #: ``X_dead``/amino-acid/``debris`` output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         "k_autolysis",
         "E_a_autolysis",
         "T_ref",
         "biomass_N_fraction",
         "biomass_C_fraction",
+        *(spec.fraction_param for spec in AMINO_ACID_SPECS),
     )
 
     def derivatives(
@@ -142,17 +150,17 @@ class YeastAutolysis(Process):
 
         f_n = params["biomass_N_fraction"]
         f_c = params["biomass_C_fraction"]
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        y_c = carbon_mass_fraction(AMINO_ACID_SPECIES)
         c_debris = carbon_mass_fraction(_DEBRIS_SPECIES)
 
-        # Nitrogen-anchored: the dead-cell nitrogen r·f_N leaves as amino acids (arginine carrying
-        # exactly that nitrogen). The amino acids' carbon is r·f_N·(y_C/y_N); the rest of the
-        # dead-cell carbon (r·f_C) is the non-assimilable cell-wall remainder → debris. Structurally
-        # f_C > f_N·y_C/y_N (biomass C:N ≈ 4–11 ≫ arginine's ≈ 1.29), so the excess is always
-        # positive — no clamp, no derivative kink (advisor; decision D-34).
+        # Nitrogen-anchored: the dead-cell nitrogen r·f_N leaves as amino acids, released across
+        # all eight pools at must-spectrum composition (D-100 — no longer as pure arginine, which
+        # could refill the pool without restoring a single aroma precursor). The amino acids'
+        # carbon is r·f_N·R with R the spectrum's C:N; the rest of the dead-cell carbon (r·f_C) is
+        # the non-assimilable cell-wall remainder → debris. Structurally f_C > f_N·R (biomass C:N
+        # ≈ 4–11 ≫ the spectrum's ≈ 1.9), so the excess is always positive — no clamp, no
+        # derivative kink (advisor; decision D-34, its margin narrowed but not threatened at D-100).
         d[schema.slice("X_dead")] = -r
-        d[schema.slice("amino_acids")] = r * f_n / y_n
-        debris_carbon = r * (f_c - f_n * y_c / y_n)  # [g C/L/h] cell-wall carbon left behind
+        aa_carbon = release_spectrum_nitrogen(d, schema, params, r * f_n)  # [g C/L/h] released
+        debris_carbon = r * f_c - aa_carbon  # [g C/L/h] cell-wall carbon left behind
         d[schema.slice("debris")] = debris_carbon / c_debris
         return d

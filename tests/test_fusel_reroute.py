@@ -2,14 +2,17 @@
 
 :class:`FuselAlcoholsEhrlich` books fusel carbon out of *sugar* (a stand-in — the real Ehrlich
 pathway builds higher alcohols from amino-acid skeletons and releases the amino nitrogen). Once
-the toggleable ``amino_acids`` pool (arginine; D-32) exists, :class:`FuselAminoAcidReroute`
-re-sources a fraction ``g = aa/(K_amino_acids+aa)`` of that carbon off sugar and onto amino acids
-and **deaminates** — releasing the consumed amino acids' nitrogen to the ammonium ``N`` pool. It
+the amino-acid pools exist (D-32, SPECIATED at D-100), :class:`FuselAminoAcidReroute` re-sources
+a fraction ``g_i = aa_i/(K_amino_acids·f_i + aa_i)`` of **each alcohol's** carbon off sugar and onto
+**that alcohol's own precursor** — leucine for isoamyl alcohol, valine for isobutanol, and so on —
+and **deaminates**, releasing the consumed amino acids' nitrogen to the ammonium ``N`` pool. It
 is a separate wine-only *swap* (never touches ``fusels``; production stays in the producer), and
 the two share one :func:`fusel_production_rate` so the re-route's sugar refund matches the
 producer's draw exactly. This suite pins the closure algebra, the deamination direction, that
 production is untouched at the derivative level, and undosed isolability.
 """
+
+from collections.abc import Mapping
 
 import numpy as np
 import pytest
@@ -29,12 +32,15 @@ from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.validation import assert_conserved, total_carbon, total_nitrogen
+from tests.conftest import seed_amino_acids
 
 REROUTE = FuselAminoAcidReroute.name
 PRODUCER = FuselAlcoholsEhrlich.name
 # The five single-molecule higher-alcohol pools the lumped `fusels` pool became at D-99.
 _FUSEL_POOLS = tuple(spec.pool for spec in FUSEL_SPECS)
-_AA_SPECIES = "arginine"
+#: Each alcohol's precursor amino acid — the pools the re-route actually debits since D-100.
+#: `amino_acids` (arginine) is NOT among them, which is the whole decoupling.
+_PRECURSORS = tuple(spec.precursor_amino_acid for spec in FUSEL_SPECS)
 
 
 @pytest.fixture
@@ -55,6 +61,7 @@ def full_params():
 
 def _wine_y0(
     schema: StateSchema,
+    params: Mapping[str, float],
     *,
     x: float = 1.0,
     s: float = 200.0,
@@ -63,7 +70,11 @@ def _wine_y0(
     e: float = 40.0,
     t_k: float = 293.15,
 ) -> FloatArray:
-    return schema.pack({"X": x, "S": [s], "E": e, "N": n, "T": t_k, "CO2": 5.0, "amino_acids": aa})
+    # Amino acids seeded at MUST-SPECTRUM composition (D-100) — the state in which every
+    # per-precursor gate aa_i/(K·f_i + aa_i) provably equals the pre-split lumped gate aa/(K + aa),
+    # so the closed forms below assert the same numbers the lumped suite did.
+    y = schema.pack({"X": x, "S": [s], "E": e, "N": n, "T": t_k, "CO2": 5.0})
+    return seed_amino_acids(y, schema, params, aa)
 
 
 def _isolate_fusel(full_params: dict[str, float]) -> ProcessSet:
@@ -84,13 +95,22 @@ def test_metadata():
     assert p.name == "fusel_amino_acid_reroute"
     assert p.tier is Tier.SPECULATIVE
     # A swap: it moves the carbon SOURCE and releases nitrogen — it never produces fusels.
-    assert set(p.touches) == {"S", "amino_acids", "N"}
+    assert set(p.touches) == {"S", "N", *_PRECURSORS}
     for pool in _FUSEL_POOLS:
         assert pool not in p.touches
+    # THE D-100 DECOUPLING, pinned: the re-route no longer touches the identity-agnostic pools.
+    # Arginine does not make higher alcohols, so fusel production can no longer drain the substrate
+    # the yeast swap / MLF growth / Brett growth / Maillard browning live on. This single assertion
+    # is what makes D-99's ~3.8x fusel rise unable to starve three unrelated subsystems again.
+    assert "amino_acids" not in p.touches
+    assert "amino_acids_generic" not in p.touches
     # Reads all FIVE per-species k's since D-99 — it must reproduce the producer's TOTAL
-    # draw, which is the sum over five rates at five different carbon fractions.
+    # draw, which is the sum over five rates at five different carbon fractions — plus each
+    # precursor's must-spectrum share, which scales its own gate (D-100).
     for r in (*(spec.k_param for spec in FUSEL_SPECS), "E_a_fusels", "K_amino_acids"):
         assert r in p.reads
+    for precursor in _PRECURSORS:
+        assert f"must_aa_fraction_{precursor}" in p.reads
 
 
 # -- the re-route's own contribution is carbon- and nitrogen-neutral ----------
@@ -107,7 +127,7 @@ def test_reroute_contribution_is_carbon_and_nitrogen_neutral(full_params):
     carbon = total_carbon(schema, biomass_carbon_fraction=f_c)
     nitrogen = total_nitrogen(schema, biomass_nitrogen_fraction=f_n)
     for x, s, n, aa in [(1.0, 200.0, 0.15, 5.0), (0.5, 240.0, 0.1, 1.0), (2.0, 80.0, 0.05, 0.3)]:
-        y = _wine_y0(schema, x=x, s=s, n=n, aa=aa)
+        y = _wine_y0(schema, full_params, x=x, s=s, n=n, aa=aa)
         ps.enable(REROUTE)
         d_both = ps.total_derivatives(0.0, y, full_params)
         ps.disable(REROUTE)
@@ -127,7 +147,7 @@ def test_reroute_never_touches_any_fusel_pool_or_other_columns(full_params):
     # stays in the producer.
     ps = _isolate_fusel(full_params)
     schema = ps.schema
-    y = _wine_y0(schema, x=1.0, s=200.0, n=0.15, aa=5.0)
+    y = _wine_y0(schema, full_params, x=1.0, s=200.0, n=0.15, aa=5.0)
     ps.enable(REROUTE)
     d_both = ps.total_derivatives(0.0, y, full_params)
     ps.disable(REROUTE)
@@ -136,9 +156,14 @@ def test_reroute_never_touches_any_fusel_pool_or_other_columns(full_params):
     d_reroute = d_both - d_prod
     for col in (*_FUSEL_POOLS, "E", "CO2", "X"):
         assert d_reroute[schema.slice(col)][0] == 0.0
-    # It DOES move exactly these three:
-    assert d_reroute[schema.slice("amino_acids")][0] < 0.0  # debited
+    # It DOES debit every precursor, and deaminate:
+    for precursor in _PRECURSORS:
+        assert d_reroute[schema.slice(precursor)][0] < 0.0  # debited
     assert d_reroute[schema.slice("N")][0] > 0.0  # deaminated (ammonium released)
+    # ...and it leaves the identity-agnostic pools ALONE (the D-100 decoupling, at the
+    # derivative level rather than the metadata level).
+    assert d_reroute[schema.slice("amino_acids")][0] == 0.0
+    assert d_reroute[schema.slice("amino_acids_generic")][0] == 0.0
 
 
 def test_reroute_matches_the_producer_draw_exactly(full_params):
@@ -148,7 +173,9 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
     ps = _isolate_fusel(full_params)
     schema = ps.schema
     aa_val = 0.3
-    y = _wine_y0(schema, x=1.5, s=180.0, n=0.12, aa=aa_val)
+    y = _wine_y0(schema, full_params, x=1.5, s=180.0, n=0.12, aa=aa_val)
+    # AT MUST-SPECTRUM COMPOSITION every per-precursor gate collapses to this one lumped value
+    # (the D-100 reduction property), so the aggregate below is exact, not approximate.
     g = aa_val / (full_params["K_amino_acids"] + aa_val)
     # The producer's TOTAL draw across all five species, each at its OWN carbon fraction
     # (D-99). Before the split this was one rate times one stand-in fraction.
@@ -164,14 +191,22 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
     # sugar carbon refunded by the re-route (single wine slot):
     sugar_refund_c = d_reroute[schema.slice("S")][0] * carbon_mass_fraction("glucose")
     assert sugar_refund_c == pytest.approx(g * fusel_carbon, rel=1e-12)
-    # amino-acid carbon debited equals that same carbon:
-    aa_debit_c = -d_reroute[schema.slice("amino_acids")][0] * carbon_mass_fraction(_AA_SPECIES)
-    assert aa_debit_c == pytest.approx(g * fusel_carbon, rel=1e-12)
-    # and the deamination releases exactly that amino-acid mass's nitrogen:
-    aa_mass = g * fusel_carbon / carbon_mass_fraction(_AA_SPECIES)
-    assert d_reroute[schema.slice("N")][0] == pytest.approx(
-        aa_mass * nitrogen_mass_fraction(_AA_SPECIES), rel=1e-12
+    # The carbon debited ACROSS THE FIVE PRECURSORS — each at its OWN carbon fraction — equals
+    # that same carbon. Before D-100 this was one debit at arginine's fraction; the sum is what
+    # must now match, because each alcohol eats a different molecule.
+    aa_debit_c = sum(
+        -d_reroute[schema.slice(precursor)][0] * carbon_mass_fraction(precursor)
+        for precursor in _PRECURSORS
     )
+    assert aa_debit_c == pytest.approx(g * fusel_carbon, rel=1e-12)
+    # ...and the deamination releases exactly the nitrogen THOSE molecules carried. This is the
+    # D-33 over-release lump being retired, not restated: arginine (4 N over 6 C) would have
+    # released ~4x the real leucine->isoamyl N:C, and now each precursor releases its own.
+    expected_n = sum(
+        -d_reroute[schema.slice(precursor)][0] * nitrogen_mass_fraction(precursor)
+        for precursor in _PRECURSORS
+    )
+    assert d_reroute[schema.slice("N")][0] == pytest.approx(expected_n, rel=1e-12)
 
 
 def test_reroute_never_creates_sugar(full_params):
@@ -181,7 +216,7 @@ def test_reroute_never_creates_sugar(full_params):
     ps = _isolate_fusel(full_params)
     schema = ps.schema
     for aa in (0.1, 1.0, 10.0):
-        y = _wine_y0(schema, x=1.5, s=180.0, n=0.12, aa=aa)
+        y = _wine_y0(schema, full_params, x=1.5, s=180.0, n=0.12, aa=aa)
         ps.enable(REROUTE)
         d_both = ps.total_derivatives(0.0, y, full_params)
         ps.disable(REROUTE)
@@ -204,7 +239,7 @@ def test_empty_pool_reroute_is_a_noop(full_params):
     off.disable(REROUTE)
     schema = on.schema
     for x, s, n in [(0.5, 240.0, 0.15), (2.0, 120.0, 0.05), (1.0, 200.0, 0.12)]:
-        y = _wine_y0(schema, x=x, s=s, n=n, aa=0.0)
+        y = _wine_y0(schema, full_params, x=x, s=s, n=n, aa=0.0)
         diff = on.total_derivatives(0.0, y, full_params) - off.total_derivatives(
             0.0, y, full_params
         )

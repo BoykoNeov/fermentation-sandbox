@@ -69,8 +69,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
-from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.kinetics.amino_acid_pools import (
+    SPEC_BY_SPECIES,
+    depletion_gate,
+    draw_precursor_carbon,
+)
 from fermentation.core.kinetics.autolysis import autolysis_flux
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -80,6 +84,13 @@ from fermentation.core.tiers import Tier
 #: (methyl mercaptan), the dominant reduction thiol. Named as a module constant so the carbon draw
 #: here and the ``total_carbon`` weighting name one species (the D-19 idiom).
 _MERCAPTAN_SPECIES = "methanethiol"
+
+#: Methanethiol's actual precursor (decision D-100). D-45 had to draw the thiol's carbon from the
+#: lumped ``amino_acids`` pool (arginine) and document the mismatch as a provenance caveat —
+#: arginine contains no sulfur, so the molecule it books could not possibly make a mercaptan. With
+#: the pool speciated, the draw finally *is* methionine: the sulfur-bearing amino acid whose
+#: demethiolation genuinely releases methanethiol. **The D-45 caveat is retired, not restated.**
+_PRECURSOR_SPECIES = "methionine"
 
 
 class AutolyticMercaptan(Process):
@@ -97,19 +108,22 @@ class AutolyticMercaptan(Process):
 
     name = "autolytic_mercaptan"
     tier = Tier.SPECULATIVE
-    #: Fills ``mercaptans``, debits ``amino_acids`` for its carbon, releases the nitrogen to ``N``.
-    touches = ("mercaptans", "amino_acids", "N")
+    #: Fills ``mercaptans``, debits ``methionine`` for its carbon (decision D-100 — the *actual*
+    #: precursor, no longer the arginine lump), releases the nitrogen to ``N``.
+    touches = ("mercaptans", _PRECURSOR_SPECIES, "N")
     #: ``y_mercaptan`` sets the g-MeSH-per-g-biomass-autolysed yield; ``k_autolysis``/
     #: ``E_a_autolysis``/``T_ref`` are the *same* autolysis constants
     #: :func:`~fermentation.core.kinetics.autolysis.autolysis_flux` reads (so all autolysis branches
-    #: share one clock and one ``autolysis_rate_per_h`` override); ``K_amino_acids`` sets the smooth
-    #: availability gate. Their tiers cap the output tiers via parameter-tier propagation (D-1).
+    #: share one clock and one ``autolysis_rate_per_h`` override); ``K_amino_acids`` scaled by
+    #: ``must_aa_fraction_methionine`` sets the relative-depletion gate (D-100). Their tiers cap the
+    #: output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         "y_mercaptan",
         "k_autolysis",
         "E_a_autolysis",
         "T_ref",
         "K_amino_acids",
+        SPEC_BY_SPECIES[_PRECURSOR_SPECIES].fraction_param,
     )
 
     def derivatives(
@@ -119,22 +133,20 @@ class AutolyticMercaptan(Process):
         r_autolysis = autolysis_flux(y, schema, params)  # [g X_dead/L/h] — the shared D-34 flux
         if r_autolysis <= 0.0:
             return d  # no dead cells ⇒ nothing to autolyse (clamped, so no negative overshoot)
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
-        if aa <= 0.0:
-            return d  # empty amino-acid pool ⇒ no methionine source ⇒ no mercaptan (the D-33 no-op)
+        # Methionine's own relative-depletion gate (decision D-100): → 0 as the pool empties, so
+        # the draw can never drive it negative and an undosed wine is the byte-for-byte no-op.
+        gate = depletion_gate(y, schema, params, (SPEC_BY_SPECIES[_PRECURSOR_SPECIES],))
+        if gate <= 0.0:
+            return d  # no methionine ⇒ no thiol source ⇒ no mercaptan (the D-33 no-op)
 
-        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
         r_merc = params["y_mercaptan"] * r_autolysis * gate  # [g methanethiol/L/h]
-        # Draw the mercaptan carbon from amino acids and deaminate their nitrogen (Option A, D-33):
-        # the carbon into mercaptans (r_merc·c_merc) is sized to equal the carbon out of amino_acids
-        # (aa_mass·c_aa), so carbon closes; the released arginine nitrogen (aa_mass·y_N) all goes to
-        # the N pool since methanethiol is nitrogen-free, so nitrogen closes — both by construction.
+        # Draw the mercaptan carbon from METHIONINE and deaminate its nitrogen (Option A, D-33;
+        # speciated at D-100): the carbon into mercaptans is sized to equal the carbon out of
+        # methionine, so carbon closes; the released methionine nitrogen all goes to the N pool
+        # since methanethiol is nitrogen-free, so nitrogen closes — both by construction.
         merc_carbon = r_merc * carbon_mass_fraction(_MERCAPTAN_SPECIES)  # [g C/L/h] in the thiol
-        c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        aa_mass = merc_carbon / c_aa  # arginine mass consumed to supply that carbon
+        nitrogen = draw_precursor_carbon(d, schema, _PRECURSOR_SPECIES, merc_carbon)
 
         d[schema.slice("mercaptans")] = r_merc
-        d[schema.slice("amino_acids")] = -aa_mass
-        d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine nitrogen → ammonium (D-33)
+        d[schema.slice("N")] = nitrogen  # DEAMINATION: methionine nitrogen → ammonium (D-33)
         return d

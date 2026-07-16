@@ -32,6 +32,7 @@ from fermentation.validation import (
     total_carbon,
     total_nitrogen,
 )
+from tests.conftest import seed_amino_acids
 
 
 @pytest.fixture
@@ -129,17 +130,30 @@ def test_carbon_and_nitrogen_conserved_over_a_growing_run():
 
 def test_touches_only_x_mlf_amino_acids_sugar(params):
     proc = MalolacticGrowth()
-    assert set(proc.touches) == {"X_mlf", "amino_acids", "S"}
+    # Bacteria eat the IDENTITY-AGNOSTIC pools (D-100) — any assimilable amino acid supplies
+    # biomass nitrogen. They never touch a precursor, which is precisely why fusel production can
+    # no longer starve MLF growth (the D-100 decoupling; D-99's 3.8x fusel rise collapsed it).
+    assert set(proc.touches) == {"X_mlf", "amino_acids", "amino_acids_generic", "S"}
     assert "N" not in proc.touches  # nitrogen comes from amino acids, not the ammonium pool
+    for precursor in (
+        "leucine",
+        "isoleucine",
+        "valine",
+        "threonine",
+        "phenylalanine",
+        "methionine",
+    ):
+        assert precursor not in proc.touches
 
     schema = wine_schema()
     y = schema.pack(
         {"X": 1.0, "S": [120.0], "E": 20.0, "N": 0.05, "T": 293.15, "CO2": 0.0,
-         "X_mlf": 0.1, "amino_acids": 2.0, "malic": 3.0, "tartaric": 3.0}
+         "X_mlf": 0.1, "malic": 3.0, "tartaric": 3.0}
     )  # fmt: skip
+    seed_amino_acids(y, schema, params, 2.0)
     d = proc.derivatives(0.0, y, schema, params)
     moved = {name for name in schema.names if float(d[schema.slice(name)][0]) != 0.0}
-    assert moved == {"X_mlf", "amino_acids", "S"}
+    assert moved == {"X_mlf", "amino_acids", "amino_acids_generic", "S"}
 
 
 # -- 4. compile-seam gate: keyed on the amino-acid feature, NOT the pitch ----------

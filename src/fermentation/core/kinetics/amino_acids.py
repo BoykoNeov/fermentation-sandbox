@@ -99,9 +99,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import (
-    carbon_mass_fraction,
-    nitrogen_mass_fraction,
+from fermentation.core.kinetics.amino_acid_pools import (
+    AMINO_ACID_SPECIES,
+    ASSIMILABLE_SPECS,
+    depletion_gate,
+    draw_assimilable_nitrogen,
 )
 from fermentation.core.kinetics.carbon_routing import refund_carbon_to_sugar
 from fermentation.core.kinetics.growth import biomass_growth_rate
@@ -109,13 +111,10 @@ from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
-#: The representative species for the lumped assimilable amino-acid pool (decision D-32).
-#: Arginine is the dominant yeast-assimilable amino acid in grape must and is N-rich (mass
-#: C:N ≈ 1.29 ≪ biomass ≈ 4.3), the property that keeps the carbon refund below growth's
-#: demand for any ψ ≤ 1 (see the module docstring). Kept as a module constant so the swap
-#: and the conservation weighting name one species. Public so the D-33 fusel Ehrlich
-#: re-route (which sources fusel carbon from this same pool) references the identical species.
-AMINO_ACID_SPECIES = "arginine"
+#: Re-exported for the consumers that named this module as the home of the representative
+#: species before D-100 moved the pool registry to
+#: :mod:`~fermentation.core.kinetics.amino_acid_pools`. The species itself is unchanged.
+__all__ = ["AMINO_ACID_SPECIES", "AminoAcidAssimilation"]
 
 
 class AminoAcidAssimilation(Process):
@@ -130,13 +129,17 @@ class AminoAcidAssimilation(Process):
 
     name = "amino_acid_assimilation"
     tier = Tier.SPECULATIVE
-    #: Refunds carbon to ``S`` and nitrogen to ``N``; debits the ``amino_acids`` pool.
-    #: Does NOT touch ``X`` (growth builds biomass; this only re-sources its atoms).
-    touches = ("amino_acids", "N", "S")
+    #: Refunds carbon to ``S`` and nitrogen to ``N``; debits the two identity-agnostic pools
+    #: ``amino_acids`` (arginine) + ``amino_acids_generic`` (D-100). Does NOT touch ``X``
+    #: (growth builds biomass; this only re-sources its atoms), and does not touch the six
+    #: precursor pools — yeast build biomass from any assimilable amino acid, but leucine's
+    #: fate in this model is the Ehrlich pathway (D-33/D-99), not protein.
+    touches = (*(spec.pool for spec in ASSIMILABLE_SPECS), "N", "S")
     #: ``mu_max``/``K_s``/``K_n``/``biomass_N_fraction`` reach it through the shared
-    #: growth-rate helper (the swap anchors to the same base rate); ``ψ`` and
-    #: ``K_amino_acids`` are its own. ``ProcessSet.tier_of`` folds these into the
-    #: swap's output tier for ``S``/``N``/``amino_acids`` when it is enabled (D-1).
+    #: growth-rate helper (the swap anchors to the same base rate); ``ψ``, ``K_amino_acids``
+    #: and the two assimilable ``must_aa_fraction_*`` shares (which scale the D-100
+    #: relative-depletion gate) are its own. ``ProcessSet.tier_of`` folds these into the
+    #: swap's output tier for ``S``/``N``/the assimilable pools when it is enabled (D-1).
     reads: tuple[str, ...] = (
         "mu_max",
         "K_s",
@@ -144,6 +147,7 @@ class AminoAcidAssimilation(Process):
         "biomass_N_fraction",
         "amino_acid_assimilation_fraction",
         "K_amino_acids",
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
     )
 
     def derivatives(
@@ -153,31 +157,35 @@ class AminoAcidAssimilation(Process):
         base_dx = biomass_growth_rate(y, schema, params)
         if base_dx <= 0.0:
             return d  # no growth ⇒ no biomass to re-source ⇒ nothing to swap
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
-        if aa <= 0.0:
+        # The identity-agnostic substrate's relative-depletion gate (D-100): {arginine, generic}
+        # with K scaled by their combined must-spectrum share. → 0 on an empty pool, so this is
+        # still the undosed no-op, and the draw can never drive either pool negative.
+        gate = depletion_gate(y, schema, params, ASSIMILABLE_SPECS)
+        if gate <= 0.0:
             return d  # empty pool ⇒ nothing to assimilate (also the undosed no-op)
 
-        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        y_c = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        # ρ [g aa/L/h]: aa consumption anchored to the fraction ψ·gate of biomass
-        # nitrogen sourced from the pool. ρ·y_N ≤ f_N·base_dx and ρ·y_C < f_C·base_dx
-        # for all ψ·gate ≤ 1 (module docstring), so neither refund exceeds growth's draw.
-        rho = (
+        # The nitrogen demand [g N/L/h]: the fraction ψ·gate of the biomass nitrogen growth is
+        # drawing. ≤ f_N·base_dx for all ψ·gate ≤ 1 (module docstring), so the N refund never
+        # exceeds growth's draw and no deamination branch is needed.
+        nitrogen = (
             params["amino_acid_assimilation_fraction"]
             * gate
             * params["biomass_N_fraction"]
             * base_dx
-            / y_n
         )
-        d[schema.slice("amino_acids")] = -rho
-        d[schema.slice("N")] = rho * y_n  # refund displaced biomass nitrogen to ammonium
+        # Split that demand across {arginine, generic} in proportion to the nitrogen each holds,
+        # debiting both (D-100). Returns the carbon those amino acids carry — a blend of
+        # arginine's C:N ≈ 1.29 and glutamine's ≈ 2.14, both far below biomass's ≈ 4.3, so the
+        # carbon refund stays strictly below growth's demand and the swap still cannot create
+        # hexose for any ψ ≤ 1 (the guarantee is structural for the blend, not just for arginine).
+        carbon = draw_assimilable_nitrogen(d, y, schema, nitrogen)
+        d[schema.slice("N")] = nitrogen  # refund displaced biomass nitrogen to ammonium
 
         # Refund the displaced biomass carbon to sugar — the inverse of growth's draw,
         # distributed across sugar slots by their current carbon content so that
-        # Σ_i (d[S_i]·c_i) = ρ·y_C exactly. base_dx > 0 guarantees s_total > 0, so the
+        # Σ_i (d[S_i]·c_i) equals it exactly. base_dx > 0 guarantees s_total > 0, so the
         # refund always has somewhere to go (no silent carbon leak). Shares the single
         # carbon-routing helper with the fusel re-route (D-33) so the draw and its inverse
         # can never drift apart (single source of truth, decision D-8).
-        refund_carbon_to_sugar(d, y, schema, rho * y_c)  # ρ·y_C [g C/L/h]
+        refund_carbon_to_sugar(d, y, schema, carbon)  # [g C/L/h]
         return d

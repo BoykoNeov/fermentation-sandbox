@@ -71,6 +71,11 @@ from fermentation.core.kinetics import (
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
+from fermentation.core.kinetics.amino_acid_pools import (
+    AMINO_ACID_SPECS,
+    GENERIC_POOL,
+    AminoAcidSpec,
+)
 from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.kinetics.hops import iso_alpha_fraction
 from fermentation.core.kinetics.temperature import RAMP_RATE
@@ -279,6 +284,24 @@ class CompiledScenario:
 
 # -- initial-composition vocabulary (the industry-unit boundary) --------------
 
+
+def _amino_acid_override_key(spec: AminoAcidSpec) -> str:
+    """The scenario key overriding one speciated amino-acid pool's dose (decision D-100).
+
+    ``<species>_gpl`` — named for the **molecule**, not the slot, so a scenario says
+    ``arginine_gpl`` rather than leaking the historical ``amino_acids``-slot-is-arginine detail
+    (D-100 kept that slot name to avoid touching every consumer twice; the dose API need not
+    inherit the compromise). The generic bucket is the one pool with no single molecule, so it
+    keeps its slot name: ``amino_acids_generic_gpl``.
+    """
+    return f"{spec.pool if spec.pool == GENERIC_POOL else spec.species}_gpl"
+
+
+#: Every per-species amino-acid override key the wine seam accepts (decision D-100).
+_AMINO_ACID_OVERRIDE_KEYS: tuple[str, ...] = tuple(
+    _amino_acid_override_key(spec) for spec in AMINO_ACID_SPECS
+)
+
 #: Keys accepted in ``Scenario.initial`` per medium. Validated at compile time so
 #: a typo ("brixx") fails loudly instead of being silently ignored.
 _ALLOWED_KEYS: dict[str, frozenset[str]] = {
@@ -310,6 +333,11 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "carrying_capacity_gpl",
             "citrate_gpl",
             "amino_acids_gpl",
+            # Per-species amino-acid overrides (decision D-100): each speciated pool's dose can be
+            # set directly, overriding its must-spectrum share of amino_acids_gpl. Spread from the
+            # canonical registry so a ninth amino acid needs no edit here and cannot be silently
+            # unreachable from a scenario.
+            *_AMINO_ACID_OVERRIDE_KEYS,
             "autolysis_rate_per_h",
             "hydroxycinnamic_gpl",
             # Ferulic-acid must precursor (decision D-55) — the second, genuinely distinct
@@ -355,6 +383,39 @@ def _require(values: Mapping[str, float], key: str, medium: str) -> float:
 
 def _optional(values: Mapping[str, float], key: str, default: float) -> float:
     return _nonneg(float(values[key]), key) if key in values else default
+
+
+def _wine_amino_acids(values: Mapping[str, float], parameters: ParameterSet) -> dict[str, float]:
+    """Split the assimilable amino-acid dose across the eight speciated pools (decision D-100).
+
+    **Fixed spectrum + per-species overrides (the owner's D-100 dose API).** ``amino_acids_gpl``
+    stays the one knob a scenario normally turns: it is apportioned by the sourced
+    ``must_aa_fraction_*`` spectrum (recorded from published *Vitis vinifera* must profiles before
+    any wiring — the D-99 anti-tuning discipline), so the default composition is a real must's,
+    not a modelling convenience. Any pool can then be overridden individually with
+    ``<species>_gpl`` — which is what a study of a *specific* precursor needs (spike the leucine,
+    hold the rest) and what keeps the fixed spectrum from becoming a straitjacket.
+
+    The fractions are **normalized** rather than asserted to sum to 1: they are eight independent
+    provenance entries, each free to be re-sourced on its own, and an ensemble sampling their
+    uncertainty bands would otherwise break a sum-to-one assertion on nearly every draw. So
+    ``amino_acids_gpl`` is exactly conserved into the pools whatever the fractions are, and the
+    dose means "this much assimilable amino acid" — never "this much times whatever the spectrum
+    happens to add up to". Overrides are applied **after** the split and do NOT re-normalize: an
+    override is an addition to the must, so it raises the total assimilable dose.
+
+    An absent/zero dose leaves every pool at 0 — the isolability guarantee (D-32): every gate
+    reads exactly 0 and the run is byte-for-byte the validated core.
+    """
+    dose = _optional(values, "amino_acids_gpl", 0.0)
+    fractions = {spec.pool: parameters[spec.fraction_param].value for spec in AMINO_ACID_SPECS}
+    total = sum(fractions.values())
+    pools = {pool: dose * fraction / total for pool, fraction in fractions.items()}
+    for spec in AMINO_ACID_SPECS:
+        key = _amino_acid_override_key(spec)
+        if key in values:
+            pools[spec.pool] = _nonneg(float(values[key]), key)
+    return pools
 
 
 def _wine_initial(
@@ -420,12 +481,14 @@ def _wine_initial(
         # reservoir. Carbon-active (weighted in total_carbon) but not charge-active (kept out
         # of the D-18 pH balance in v1); inert at 0, so an un-dosed run is unchanged.
         "citrate": _optional(values, "citrate_gpl", 0.0),
-        # Assimilable amino-acid dose (decision D-32); g/L, default 0 (no amino-acid ledger).
-        # Carbon- AND nitrogen-bearing (arginine); the AminoAcidAssimilation swap funds a
-        # fraction of biomass from it, refunding sugar + ammonium N. Inert at 0 and the compile
-        # step below disables the swap Process entirely when this is 0, so an undosed run is
-        # byte-for-byte the validated core (tier + perf isolability, the MLF/carrying pattern).
-        "amino_acids": _optional(values, "amino_acids_gpl", 0.0),
+        # Assimilable amino-acid dose (decisions D-32, SPECIATED at D-100); g/L, default 0 (no
+        # amino-acid ledger). One ``amino_acids_gpl`` dose is split across the eight speciated
+        # pools by the sourced must spectrum, with optional per-species override keys — see
+        # :func:`_wine_amino_acids`. Carbon- AND nitrogen-bearing (every pool is weighted in both
+        # ledgers); inert at 0 and the compile step below disables the amino-acid Processes
+        # entirely when the dose is 0, so an undosed run is byte-for-byte the validated core
+        # (tier + perf isolability, the MLF/carrying pattern).
+        **_wine_amino_acids(values, parameters),
         # Non-assimilable cell-wall debris pool (decision D-34); produced-only, empty at pitch.
         # YeastAutolysis routes the carbon-rich remainder of autolysed dead biomass here after
         # releasing the nitrogen-rich amino acids; inert (weight 0) until autolysis is opted in.

@@ -29,6 +29,7 @@ from fermentation.core.kinetics import (
     GrowthNitrogenLimited,
     arrhenius_factor,
 )
+from fermentation.core.kinetics.amino_acid_pools import AMINO_ACID_SPECS
 from fermentation.core.media import get_medium, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -37,6 +38,15 @@ from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.validation import assert_conserved, total_carbon, total_nitrogen
+
+#: The must-spectrum share each pool receives of an ``amino_acids_gpl`` dose (D-100),
+#: normalized exactly as the compile seam normalizes it.
+_STORE = load_parameters(default_data_dir() / "wine_generic.yaml").resolve()
+_FRACTIONS = {
+    spec.pool: _STORE[spec.fraction_param]
+    / sum(_STORE[s2.fraction_param] for s2 in AMINO_ACID_SPECS)
+    for spec in AMINO_ACID_SPECS
+}
 
 SWAP = AminoAcidAssimilation.name
 GROWTH = GrowthNitrogenLimited.name
@@ -95,7 +105,19 @@ def test_metadata():
     assert p.tier is Tier.SPECULATIVE
     # Refunds carbon to S and nitrogen to N; debits the aa pool. Does NOT touch X (growth
     # builds biomass; the swap only re-sources its atoms).
-    assert set(p.touches) == {"amino_acids", "N", "S"}
+    # The swap draws the IDENTITY-AGNOSTIC pools (D-100): biomass needs amino-acid nitrogen and
+    # does not care which molecule carried it. It never touches a precursor — leucine's fate in
+    # this model is the Ehrlich pathway, not protein.
+    assert set(p.touches) == {"amino_acids", "amino_acids_generic", "N", "S"}
+    for precursor in (
+        "leucine",
+        "isoleucine",
+        "valine",
+        "threonine",
+        "phenylalanine",
+        "methionine",
+    ):
+        assert precursor not in p.touches
     assert "X" not in p.touches
     assert "amino_acid_assimilation_fraction" in p.reads
     assert "K_amino_acids" in p.reads
@@ -204,7 +226,31 @@ def test_default_compile_disables_the_swap():
 def test_dose_enables_the_swap():
     _, compiled = _run(80.0, amino_acids_gpl=2.0)
     assert compiled.process_set.is_enabled(SWAP)
-    assert compiled.y0[compiled.schema.slice("amino_acids").start] == pytest.approx(2.0)
+    # The dose is SPLIT across the eight speciated pools by the sourced must spectrum (D-100),
+    # so `amino_acids` (the arginine slot) receives its share, not the whole dose...
+    schema = compiled.schema
+    arginine = compiled.y0[schema.slice("amino_acids").start]
+    assert arginine == pytest.approx(2.0 * _FRACTIONS["amino_acids"])
+    # ...and the dose is CONSERVED into the pools: nothing is lost to, or invented by, the split.
+    total = sum(compiled.y0[schema.slice(spec.pool).start] for spec in AMINO_ACID_SPECS)
+    assert total == pytest.approx(2.0)
+
+
+def test_per_species_override_raises_that_pool_without_disturbing_the_others():
+    # The other half of the D-100 dose API (the owner's choice): a study of ONE precursor needs to
+    # spike it and hold the rest, which the fixed spectrum alone cannot express. The override is an
+    # ADDITION to the must, so it raises the total assimilable dose rather than re-normalizing.
+    _, base = _run(80.0, amino_acids_gpl=2.0)
+    _, spiked = _run(80.0, amino_acids_gpl=2.0, leucine_gpl=0.5)
+    schema = spiked.schema
+    assert spiked.y0[schema.slice("leucine").start] == pytest.approx(0.5)
+    assert base.y0[schema.slice("leucine").start] == pytest.approx(2.0 * _FRACTIONS["leucine"])
+    for spec in AMINO_ACID_SPECS:
+        if spec.pool == "leucine":
+            continue
+        assert spiked.y0[schema.slice(spec.pool).start] == pytest.approx(
+            base.y0[schema.slice(spec.pool).start]
+        )
 
 
 # -- tier: structural drop only when enabled ---------------------------------
@@ -235,15 +281,18 @@ def _run(
     amino_acids_gpl: float | None = None,
     carrying_capacity_gpl: float | None = None,
     days: float = 14.0,
+    **overrides: float,
 ):
     """Compile + integrate a wine ferment at the given YAN; dose the amino-acid ledger when
     ``amino_acids_gpl`` is set and opt into the carrying cap when ``carrying_capacity_gpl`` is.
+    Extra kwargs pass through as per-species amino-acid overrides (``leucine_gpl=...``, D-100).
     Returns (trajectory, compiled)."""
     initial: dict[str, float] = {"brix": 24.0, "yan_mgl": yan_mgl, "pitch_gpl": 0.25}
     if amino_acids_gpl is not None:
         initial["amino_acids_gpl"] = amino_acids_gpl
     if carrying_capacity_gpl is not None:
         initial["carrying_capacity_gpl"] = carrying_capacity_gpl
+    initial.update(overrides)
     scenario = Scenario(
         name=f"wine-aa-{yan_mgl:.0f}-{amino_acids_gpl or 0:.1f}",
         medium="wine",
@@ -280,10 +329,14 @@ def test_amino_acid_pool_depletes_and_stays_nonnegative():
     from fermentation.validation import assert_nonnegative
 
     traj, _ = _run(150.0, amino_acids_gpl=2.0)
-    aa = np.asarray(traj.series("amino_acids"))
-    assert aa[0] == pytest.approx(2.0)
-    assert aa[-1] < aa[0]  # consumed
-    assert_nonnegative(traj, ("amino_acids",))
+    # The swap eats the IDENTITY-AGNOSTIC pools only (D-100) — yeast build biomass from any
+    # assimilable amino acid, so {arginine, generic} is the honest substrate. Both must deplete
+    # and neither may go negative (the relative-depletion gate's guarantee).
+    for pool in ("amino_acids", "amino_acids_generic"):
+        aa = np.asarray(traj.series(pool))
+        assert aa[0] == pytest.approx(2.0 * _FRACTIONS[pool])
+        assert aa[-1] < aa[0]  # consumed
+    assert_nonnegative(traj, ("amino_acids", "amino_acids_generic"))
 
 
 def test_both_opt_ins_compose_through_the_compile_seam():

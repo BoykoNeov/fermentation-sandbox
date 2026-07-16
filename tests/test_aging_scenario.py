@@ -49,6 +49,7 @@ from fermentation.core.kinetics.aging import (
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
 )
+from fermentation.core.kinetics.amino_acid_pools import AMINO_ACID_SPECS
 from fermentation.core.media import get_medium
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir
@@ -654,11 +655,24 @@ def test_strecker_produces_aldehydes_with_oxygen_and_amino_acids():
     # aldehydes accumulated (methional the cooked-potato off-note, phenylacetaldehyde the honey),
     # phenylacetaldehyde-dominant (f_methional = 0.15 — phenylalanine is the more abundant must
     # precursor), and the dosed O₂ largely consumed over the aging tail.
+    #
+    # NOW ON LEES (decision D-100). The phenyl-dominant ordering this test anchors is a property of
+    # a REAL aged wine, and a real aged wine has had lees contact. Speciation revealed that the
+    # ordering cannot hold without it: phenylalanine is 2-phenylethanol's Ehrlich precursor, so
+    # fermentation strips it, while methionine (which no fusel eats) survives — leaving methional
+    # dominant and phenylacetaldehyde silent, the inverse of the literature. Autolysis restores
+    # phenylalanine and with it the ordering. See
+    # test_thermal_aroma_from_drained_precursors_requires_autolysis for the mechanism, pinned.
+    #
+    # The lumped pool hid this: `f_methional` was standing in for precursor ABUNDANCE (its own
+    # comment says so), which D-100 now models explicitly — so the old scenario only produced
+    # phenylacetaldehyde by drawing on arginine, a molecule that makes none.
     o2_dose = 60.0
     aged = compile_scenario(
         _wine(
             [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, o2_dose)],
             amino_acids_gpl=0.5,
+            autolysis_rate_per_h=1.0e-3,
         )
     ).run()
     assert aged.success
@@ -934,50 +948,17 @@ def test_maillard_raises_the_thermal_oavs():
     assert float(oav_series(sweet.as_trajectory(), thresholds, "phenylacetaldehyde")[-1]) > 1.0
 
 
-def test_the_ehrlich_reroute_starves_maillard_of_the_lumped_amino_acid_pool():
-    """KNOWN LIMITATION, pinned not hidden (decision D-99; the fix is deferred to D-100).
+def test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciated():
+    """THE D-100 TRIPWIRE, FLIPPED (decision D-100; supersedes the D-99 known-limitation pin).
 
-    Two Processes at speciated scale draw on ONE lumped substrate and the sim has no model of
-    the competition. `FuselAminoAcidReroute` (D-33) re-sources Ehrlich fusel carbon from
-    `amino_acids`; `MaillardStrecker` (D-87) degrades the same pool to the thermal aldehydes.
-    That pool is a LUMP — arginine standing in for every amino acid — so the reroute's debit is
-    booked against the very molecules Maillard needs. It should not be: Ehrlich consumes
-    leucine / isoleucine / valine / threonine / phenylalanine, while sotolon's precursors are
-    elsewhere in the pool. The competition modelled here is an artifact of the lump, not
-    biochemistry.
+    The deleted test pinned a pathology: `FuselAminoAcidReroute` (D-33) re-sourced Ehrlich fusel
+    carbon from the LUMPED `amino_acids` pool — i.e. from ARGININE, which makes no higher alcohol —
+    and at D-99's honest ~3.8x fusel rise it drained that pool to ~0 and drove sotolon from OAV
+    ~1.2 to silence. Two speciated-scale consumers were sharing one lumped substrate.
 
-    D-99 DID NOT CREATE THIS — it finished it, and the numbers say so. Emulating the pre-D-99
-    lumped model (every k scaled so the total carbon draw matches the old single
-    `k_fusel=2.5e-3`) on this exact scenario leaves `amino_acids` at 0.0277 g/L of an initial
-    0.8 — the reroute was ALREADY eating ~96.5% of the pool — and sotolon passed its OAV>1
-    assertion at 1.18, an 18% margin. Honest per-species anchoring (D-99) raises fusel
-    production ~3.8x, spends the last 3.5%, and the margin is gone. The old lump's
-    UNDER-PRODUCTION was the only thing holding that test up.
-
-    The proof that the reroute is the sole channel: disable it and D-99's 3.8x fusel rise moves
-    sotolon by 0.4% (4.379 -> 4.362 on the same scenario). Nothing else about the split touches
-    the thermal route — which is why isolating the reroute in the test above is a scope
-    boundary rather than a dodge.
-
-    DO NOT "FIX" THIS BY DOSING MORE AMINO ACIDS. The reroute REFUNDS sugar carbon as it
-    re-sources, which extends the fermentative flux, which produces MORE fusels: at
-    amino_acids_gpl=2.0 the pool still empties and total fusels rise to ~1203 mg/L. Dosing feeds
-    the consumer. The real fix is structural — speciate `amino_acids` (the D-96 -> D-99 pattern
-    one pool over), or bound the catabolic fraction, or model consumer priority — and all three
-    are unsourced today.
-
-    MAILLARD IS NOT THE ONLY VICTIM. The lumped `amino_acids` pool feeds FOUR consumers, and
-    D-99's fusel rise starves the other three through the reroute exactly as it starves this one:
-      * MalolacticGrowth (D-23) — its co-pitch growth advantage collapses to solver noise; the
-        reroute is isolated in tests/test_mlf_growth.py::
-        test_mid_run_pitch_growth_is_emergently_gated_by_ethanol.
-      * BrettGrowth (D-40) — a dosed Brett population barely grows (ratio ~1.1 vs ~10 without the
-        reroute); isolated in tests/test_brett.py::test_growth_accelerates_phenols.
-      * MaillardStrecker (D-87) — this test.
-    All three isolate the reroute for the same reason and point back here. That the same lump
-    limits fusels, thermal aroma, MLF and Brett is the argument that speciating `amino_acids` is
-    a real next step (D-100), not a corner case — it is load-bearing across the aging/spoilage
-    layer, which is why it earns its own decision rather than a patch.
+    D-100 speciates the pool, and this test asserts the inverse of what its predecessor asserted:
+    with the reroute ON, sotolon is now clearly perceptible. Kept as a POSITIVE assertion rather
+    than deleted outright so the coverage the old test carried does not vanish with the pathology.
     """
     thresholds = load_thresholds()
 
@@ -999,22 +980,83 @@ def test_the_ehrlich_reroute_starves_maillard_of_the_lumped_amino_acid_pool():
     with_reroute = sweet(disable_reroute=False)
     without = sweet(disable_reroute=True)
 
-    # THE PATHOLOGY: the reroute empties the pool — ~1e-5 g/L of an initial 0.8, i.e. five
-    # orders down and still falling under the smooth aa/(K+aa) gate, which approaches zero
-    # asymptotically rather than reaching it. Without the reroute a fifth of the pool survives
-    # the ferment and is there for the thermal route to work on.
-    assert float(with_reroute.series("amino_acids")[-1]) < 1.0e-4
-    assert float(without.series("amino_acids")[-1]) > 0.15
+    # THE FIX, at the pool the pathology ran through: arginine now ends at essentially the same
+    # level whether fusels are re-routed or not. The reroute cannot touch it — arginine makes no
+    # higher alcohol, so `FuselAminoAcidReroute.touches` does not name it. What little difference
+    # remains is second-order (the reroute spares sugar, which shifts the ferment slightly).
+    arg_on = float(with_reroute.series("amino_acids")[-1])
+    arg_off = float(without.series("amino_acids")[-1])
+    assert arg_on > 0.5 * arg_off  # was ~1e-5 vs ~0.2 under the lump: five orders down
+    assert arg_on > 1.0e-3
 
-    # ITS CONSEQUENCE: sotolon is driven from clearly-perceptible to silent — not by any thermal
-    # parameter, but by an unrelated fermentation Process eating its substrate first.
-    assert float(oav_series(with_reroute.as_trajectory(), thresholds, "sotolon")[-1]) < 0.01
+    # THE CONSEQUENCE, inverted: sotolon is perceptible WITH the reroute running. The old test
+    # asserted OAV < 0.01 here and > 1.0 without; both routes now clear the threshold.
+    sotolon_on = float(oav_series(with_reroute.as_trajectory(), thresholds, "sotolon")[-1])
+    assert sotolon_on > 1.0
     assert float(oav_series(without.as_trajectory(), thresholds, "sotolon")[-1]) > 1.0
 
-    # This test is the D-100 tripwire. When the amino-acid lump is split (or the competition
-    # otherwise modelled), the reroute will stop consuming Maillard's precursors and the first
-    # assertion will FAIL — which is the signal that this limitation is gone, not a regression.
-    # Delete this test then; do not weaken it to keep it green.
+    # WHAT D-100 DOES NOT CLAIM TO FIX — the honest boundary. Threonine feeds BOTH propanol
+    # (Ehrlich) and sotolon (D-87), so the reroute still costs sotolon something. That competition
+    # is REAL CHEMISTRY over one molecule, unlike the retired fusels-vs-arginine competition, so
+    # the model SHOULD show it: sotolon stays below its no-reroute value, just no longer silenced.
+    assert sotolon_on < float(oav_series(without.as_trajectory(), thresholds, "sotolon")[-1])
+
+
+def test_thermal_aroma_from_drained_precursors_requires_autolysis():
+    """The D-100 EMERGENT prediction: fermentation eats the precursors; autolysis puts them back.
+
+    Not a wiring choice — a consequence. The branched-chain and aromatic amino acids are Ehrlich
+    substrates, so a ferment consumes them almost completely (real must carries ~30-60 mg/L
+    leucine while wine makes ~150-250 mg/L isoamyl alcohol — most higher alcohol is synthesised de
+    novo from sugar, and the catabolic part exhausts the pool). A sealed sweet wine aged with NO
+    lees contact therefore has nothing left for the thermal Strecker route to degrade.
+
+    Autolysis (D-34) is the only amino-acid SOURCE in the model, and since D-100 it releases the
+    full must spectrum rather than pure arginine — so it restores the precursors, and with them the
+    aroma. This is the published sur-lie mechanism (lees contact enriches Maillard/Strecker
+    character) arriving as an emergent consequence of speciation rather than as a modelled rule.
+
+    The lumped model could not express this: arginine stood in for precursors that were long gone,
+    so it made thermal aldehydes from a pool whose real precursor content was zero.
+    """
+
+    def sweet(autolysis: float | None):
+        kw = {}
+        if autolysis is not None:
+            kw["autolysis_rate_per_h"] = autolysis
+        cs = compile_scenario(
+            _wine(
+                [_begin_aging(_FERMENT_DAYS)],
+                amino_acids_gpl=0.8,
+                brix=_SWEET_BRIX,
+                duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+                **kw,
+            )
+        )
+        res = cs.run()
+        assert res.success
+        return res
+
+    no_lees = sweet(None)
+    on_lees = sweet(1.0e-3)
+
+    # Fermentation strips the Ehrlich precursors to ~nothing without lees...
+    for precursor in ("leucine", "isoleucine", "phenylalanine"):
+        assert float(no_lees.series(precursor)[-1]) < 1.0e-4
+        # ...and autolysis restores them by orders of magnitude.
+        assert float(on_lees.series(precursor)[-1]) > 100.0 * max(
+            float(no_lees.series(precursor)[-1]), 1e-12
+        )
+
+    # METHIONINE IS THE CONTROL: no fusel consumes it, so it survives the ferment on its own and
+    # does NOT depend on lees for its presence. That the model distinguishes these two cases —
+    # rather than treating "amino acids" as one thing — is the whole point of D-100.
+    assert float(no_lees.series("methionine")[-1]) > 1.0e-3
+
+    # The aroma follows the precursor: the leucine-derived malty aldehyde is silent without lees
+    # and real with them.
+    assert float(no_lees.series("3_methylbutanal")[-1]) < 1.0e-9
+    assert float(on_lees.series("3_methylbutanal")[-1]) > 1.0e-6
 
 
 def test_maillard_closes_carbon_and_nitrogen_end_to_end():
@@ -1049,10 +1091,22 @@ def test_maillard_closes_carbon_and_nitrogen_end_to_end():
         total_nitrogen(cs.schema, biomass_nitrogen_fraction=f_n),
         label="nitrogen",
     )
+    # atol at 10x the solver's own atol (1e-9, runtime.integrate): N reaches a TRUE zero on this
+    # scenario, and a state legitimately at zero undershoots by ~the integrator's absolute
+    # tolerance — asserting tighter than the solver's own promise tests scipy, not the model. That
+    # this only began mattering at D-100 is the fix working: the reroute's arginine draw
+    # over-released nitrogen ~4x (D-33's documented lump), propping up the YAN that growth ate;
+    # each precursor now releases the nitrogen it actually carries, so N reaches zero as it should.
+    # Verified as noise, not drift: the excursion tracks the solver's atol ~1:1 (1e-9 -> -1.1e-9,
+    # 1e-11 -> -1.3e-12, 1e-13 -> -1.1e-14) with the trajectory itself unchanged.
     assert_nonnegative(
         traj.as_trajectory(),
-        ("amino_acids", *_MAILLARD_ALDEHYDES, "N"),
-        atol=1e-9,
+        (
+            *(spec.pool for spec in AMINO_ACID_SPECS),  # every speciated pool (D-100)
+            *_MAILLARD_ALDEHYDES,
+            "N",
+        ),
+        atol=1e-8,
     )
 
 
@@ -1187,12 +1241,23 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
     assert all(n_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
     assert_conserved(tj, c_of, label="carbon")
     assert_conserved(tj, n_of, label="nitrogen")
-    # No shared pool goes negative — the aa gate keeps the triply-drawn amino_acids ≥ 0, and both
-    # carbon-parks (melanoidin + the N-bearing maillard_melanoidin) stay nonnegative.
+    # No shared pool goes negative — each relative-depletion gate keeps its own amino acid ≥ 0
+    # (D-100), and both carbon-parks (melanoidin + the N-bearing maillard_melanoidin) stay
+    # nonnegative.
+    #
+    # atol at 10x the solver's own atol (1e-9, runtime.integrate): N reaches a TRUE zero here, and
+    # a state legitimately at zero undershoots by ~the integrator's absolute tolerance — asserting
+    # tighter than the solver's own promise tests scipy, not the model. That this only began
+    # mattering at D-100 is the fix working: the reroute's arginine draw over-released nitrogen ~4x
+    # (D-33's documented lump), propping up the YAN; each precursor now releases its REAL nitrogen.
+    # Verified as noise, not drift: the excursion tracks the solver's atol ~1:1 (1e-9 -> -1.1e-9,
+    # 1e-11 -> -1.3e-12, 1e-13 -> -1.1e-14) with the trajectory unchanged.
     assert_nonnegative(
         tj,
         (
             "amino_acids",
+            "amino_acids_generic",
+            *(spec.pool for spec in AMINO_ACID_SPECS),
             "S",
             "melanoidin",
             "maillard_melanoidin",
@@ -1201,7 +1266,7 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
             *_MAILLARD_ALDEHYDES,
             "N",
         ),
-        atol=1e-9,
+        atol=1e-8,
     )
     # All five routes actually fired: the two thermal browning polymers (sugar-only melanoidin +
     # N-bearing maillard_melanoidin) + thermal aldehydes (sotolon, a thermal-route-only marker) are

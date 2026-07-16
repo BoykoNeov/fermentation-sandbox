@@ -3,8 +3,10 @@
 Beyond H₂S (D-44), the other "reduction" off-aromas are the mercaptans (thiols), lumped here as
 **methanethiol**. :class:`AutolyticMercaptan` fills the ``mercaptans`` pool as a yield on the shared
 autolysis flux — but because methanethiol carries **carbon** (unlike H₂S), it draws that carbon from
-the ``amino_acids`` pool and **deaminates** the nitrogen to ``N`` (Option A, the D-33 fusel-reroute
-idiom). This suite pins the closed form, the carbon+nitrogen closure (both by construction), the
+the **methionine** pool (decision D-100 — the *actual* precursor; D-45 had to draw from the lumped
+arginine pool and document that arginine contains no sulfur) and **deaminates** the nitrogen to
+``N`` (Option A, the D-33 fusel-reroute idiom). This suite pins the closed form, the
+carbon+nitrogen closure (both by construction), the
 availability gate + guards, the new ``tier_of("N")`` drop (the first autolysis-gated N-writer), the
 opt-in isolability, and the emergent post-dryness accumulation.
 """
@@ -30,9 +32,11 @@ from fermentation.validation import (
     total_carbon,
     total_nitrogen,
 )
+from tests.conftest import seed_amino_acids
 
 _MERCAPTAN_SPECIES = "methanethiol"
-_AA_SPECIES = "arginine"
+#: The thiol's real precursor since D-100 (was the lumped arginine stand-in).
+_AA_SPECIES = "methionine"
 
 
 @pytest.fixture
@@ -52,6 +56,7 @@ def params(store):
 
 def _mercaptan_y0(
     schema: StateSchema,
+    params: Mapping[str, float],
     *,
     x_dead: float = 1.5,
     amino_acids: float = 1.0,
@@ -60,8 +65,10 @@ def _mercaptan_y0(
     t: float = 293.15,
 ) -> FloatArray:
     # A post-AF-ish state: dead biomass to autolyse, an amino-acid pool (autolysis-refilled) to
-    # source the mercaptan carbon, ethanol high, nitrogen exhausted.
-    return schema.pack(
+    # source the mercaptan carbon, ethanol high, nitrogen exhausted. The amino acids are seeded at
+    # MUST-SPECTRUM composition (D-100), the state in which every per-species gate provably equals
+    # the pre-split lumped gate — so the closed form below asserts the same numbers it always did.
+    y = schema.pack(
         {
             "X": x,
             "S": [s],
@@ -70,15 +77,18 @@ def _mercaptan_y0(
             "T": t,
             "CO2": 0.0,
             "X_dead": x_dead,
-            "amino_acids": amino_acids,
         }
     )
+    return seed_amino_acids(y, schema, params, amino_acids)
 
 
 def _expected(params: Mapping[str, float], *, x_dead: float, amino_acids: float, t: float):
     """The closed form: (r_merc, aa_mass, n_release)."""
     f_t = arrhenius_factor(t, params["E_a_autolysis"], params["T_ref"])
     r_autolysis = params["k_autolysis"] * f_t * x_dead
+    # At must-spectrum composition methionine's relative-depletion gate aa_i/(K·f_i + aa_i) is
+    # ALGEBRAICALLY the pre-split lumped gate aa/(K + aa) (decision D-100), so this closed form is
+    # unchanged by the split — which is exactly the property being asserted.
     gate = amino_acids / (params["K_amino_acids"] + amino_acids)
     r_merc = params["y_mercaptan"] * r_autolysis * gate
     merc_carbon = r_merc * carbon_mass_fraction(_MERCAPTAN_SPECIES)
@@ -94,8 +104,17 @@ def test_metadata():
     p = AutolyticMercaptan()
     assert p.name == "autolytic_mercaptan"
     assert p.tier is Tier.SPECULATIVE
-    assert set(p.touches) == {"mercaptans", "amino_acids", "N"}
-    assert set(p.reads) == {"y_mercaptan", "k_autolysis", "E_a_autolysis", "T_ref", "K_amino_acids"}
+    # Draws METHIONINE (D-100), not the retired lumped arginine pool.
+    assert set(p.touches) == {"mercaptans", "methionine", "N"}
+    assert "amino_acids" not in p.touches
+    assert set(p.reads) == {
+        "y_mercaptan",
+        "k_autolysis",
+        "E_a_autolysis",
+        "T_ref",
+        "K_amino_acids",
+        "must_aa_fraction_methionine",
+    }
 
 
 def test_mercaptan_is_carbon_bearing():
@@ -107,16 +126,16 @@ def test_mercaptan_is_carbon_bearing():
 
 def test_matches_closed_form(params):
     schema = wine_schema()
-    y = _mercaptan_y0(schema, x_dead=1.5, amino_acids=1.0)
+    y = _mercaptan_y0(schema, params, x_dead=1.5, amino_acids=1.0)
     d = AutolyticMercaptan().derivatives(0.0, y, schema, params)
     r_merc, aa_mass, n_release = _expected(params, x_dead=1.5, amino_acids=1.0, t=293.15)
     assert schema.get(d, "mercaptans") == pytest.approx(r_merc)
     assert schema.get(d, "mercaptans") > 0.0
-    assert schema.get(d, "amino_acids") == pytest.approx(-aa_mass)
+    assert schema.get(d, "methionine") == pytest.approx(-aa_mass)
     assert schema.get(d, "N") == pytest.approx(n_release)
     # touches ONLY those three — nothing else on the state moves (not X_dead, S, E, h2s, …)
     for name in schema.names:
-        if name in ("mercaptans", "amino_acids", "N"):
+        if name in ("mercaptans", "methionine", "N"):
             continue
         assert schema.get(d, name) == pytest.approx(0.0, abs=1e-18), name
 
@@ -125,9 +144,9 @@ def test_carbon_closes_at_the_derivative_level(params):
     # The carbon into mercaptans EQUALS the carbon out of amino_acids (the draw is sized to match),
     # so the transfer is carbon-neutral on total_carbon — closure by construction (D-45).
     schema = wine_schema()
-    d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema), schema, params)
+    d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, params), schema, params)
     c_merc = schema.get(d, "mercaptans") * carbon_mass_fraction(_MERCAPTAN_SPECIES)
-    c_aa = schema.get(d, "amino_acids") * carbon_mass_fraction(_AA_SPECIES)
+    c_aa = schema.get(d, "methionine") * carbon_mass_fraction(_AA_SPECIES)
     assert c_merc + c_aa == pytest.approx(0.0, abs=1e-18)  # gain == loss
 
 
@@ -135,8 +154,8 @@ def test_nitrogen_closes_at_the_derivative_level(params):
     # The nitrogen leaving amino_acids (arginine) all lands in the N pool (methanethiol is N-free):
     # the DEAMINATION branch, so total_nitrogen is unchanged by the transfer.
     schema = wine_schema()
-    d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema), schema, params)
-    n_out_of_aa = schema.get(d, "amino_acids") * nitrogen_mass_fraction(_AA_SPECIES)
+    d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, params), schema, params)
+    n_out_of_aa = schema.get(d, "methionine") * nitrogen_mass_fraction(_AA_SPECIES)
     n_into_pool = schema.get(d, "N")  # the N pool weight is 1.0
     assert n_out_of_aa + n_into_pool == pytest.approx(0.0, abs=1e-18)
 
@@ -147,8 +166,12 @@ def test_nitrogen_closes_at_the_derivative_level(params):
 def test_scales_with_dead_biomass(params):
     # First-order in X_dead (via the shared autolysis flux): 2× the dead biomass ⇒ 2× the rate.
     schema = wine_schema()
-    r1 = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, x_dead=1.0), schema, params)
-    r2 = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, x_dead=2.0), schema, params)
+    r1 = AutolyticMercaptan().derivatives(
+        0.0, _mercaptan_y0(schema, params, x_dead=1.0), schema, params
+    )
+    r2 = AutolyticMercaptan().derivatives(
+        0.0, _mercaptan_y0(schema, params, x_dead=2.0), schema, params
+    )
     assert schema.get(r2, "mercaptans") == pytest.approx(2.0 * schema.get(r1, "mercaptans"))
 
 
@@ -156,10 +179,10 @@ def test_availability_gate_ramps_with_amino_acids(params):
     # The smooth gate aa/(K+aa): more amino acids ⇒ closer to the full yield; near-empty ⇒ near 0.
     schema = wine_schema()
     lo = AutolyticMercaptan().derivatives(
-        0.0, _mercaptan_y0(schema, amino_acids=0.01), schema, params
+        0.0, _mercaptan_y0(schema, params, amino_acids=0.01), schema, params
     )
     hi = AutolyticMercaptan().derivatives(
-        0.0, _mercaptan_y0(schema, amino_acids=2.0), schema, params
+        0.0, _mercaptan_y0(schema, params, amino_acids=2.0), schema, params
     )
     assert 0.0 < schema.get(lo, "mercaptans") < schema.get(hi, "mercaptans")
 
@@ -169,7 +192,9 @@ def test_is_not_flux_linked(params):
     # it fires at S=0 and X=0 (post-fermentation) — which is why the flux-linked stripping sink
     # cannot sweep the thiols and they accumulate as residual.
     schema = wine_schema()
-    dry = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, s=0.0, x=0.0), schema, params)
+    dry = AutolyticMercaptan().derivatives(
+        0.0, _mercaptan_y0(schema, params, s=0.0, x=0.0), schema, params
+    )
     r_merc, _, _ = _expected(params, x_dead=1.5, amino_acids=1.0, t=293.15)
     assert schema.get(dry, "mercaptans") == pytest.approx(r_merc)
     assert schema.get(dry, "mercaptans") > 0.0
@@ -178,8 +203,12 @@ def test_is_not_flux_linked(params):
 def test_rises_with_temperature(params):
     # Autolysis is enzymatic (shares E_a_autolysis via the flux), so warmer lees release faster.
     schema = wine_schema()
-    cold = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, t=283.15), schema, params)
-    warm = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, t=303.15), schema, params)
+    cold = AutolyticMercaptan().derivatives(
+        0.0, _mercaptan_y0(schema, params, t=283.15), schema, params
+    )
+    warm = AutolyticMercaptan().derivatives(
+        0.0, _mercaptan_y0(schema, params, t=303.15), schema, params
+    )
     assert schema.get(warm, "mercaptans") > schema.get(cold, "mercaptans") > 0.0
 
 
@@ -188,12 +217,12 @@ def test_zero_without_dead_biomass_or_amino_acids(params):
     # source, the D-33 no-op). Solver undershoots (negative) are clamped.
     schema = wine_schema()
     p = AutolyticMercaptan()
-    no_dead = p.derivatives(0.0, _mercaptan_y0(schema, x_dead=0.0), schema, params)
-    no_aa = p.derivatives(0.0, _mercaptan_y0(schema, amino_acids=0.0), schema, params)
-    neg_dead = p.derivatives(0.0, _mercaptan_y0(schema, x_dead=-1e-6), schema, params)
+    no_dead = p.derivatives(0.0, _mercaptan_y0(schema, params, x_dead=0.0), schema, params)
+    no_aa = p.derivatives(0.0, _mercaptan_y0(schema, params, amino_acids=0.0), schema, params)
+    neg_dead = p.derivatives(0.0, _mercaptan_y0(schema, params, x_dead=-1e-6), schema, params)
     for d in (no_dead, no_aa, neg_dead):
         assert schema.get(d, "mercaptans") == 0.0
-        assert schema.get(d, "amino_acids") == 0.0
+        assert schema.get(d, "methionine") == 0.0
         assert schema.get(d, "N") == 0.0
 
 
@@ -264,7 +293,7 @@ def test_mercaptans_accumulate_post_dryness():
     # CO2 sweeps it). Reaches the sensory scale (methanethiol threshold ~2-3 µg/L).
     traj, _ = _run_autolysis(rate_per_h=2.0e-3, days=40.0)
     merc = np.asarray(traj.series("mercaptans"))
-    assert_nonnegative(traj, ("mercaptans", "amino_acids"), atol=1e-12)
+    assert_nonnegative(traj, ("mercaptans", "methionine"), atol=1e-12)
     assert merc[-1] > 5.0e-6  # > 5 µg/L — a clear reductive signal above threshold
     i15 = int(np.argmin(np.abs(traj.t / 24.0 - 15.0)))
     assert merc[-1] > 1.5 * float(merc[i15]) > 0.0  # still rising well after dryness

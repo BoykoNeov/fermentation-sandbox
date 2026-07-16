@@ -92,9 +92,12 @@ from fermentation.core.chemistry import (
     M_VINYLGUAIACOL,
     M_VINYLPHENOL,
     carbon_mass_fraction,
-    nitrogen_mass_fraction,
 )
-from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.kinetics.amino_acid_pools import (
+    ASSIMILABLE_SPECS,
+    depletion_gate,
+    draw_assimilable_nitrogen,
+)
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import fermentative_flux_shape
 from fermentation.core.kinetics.malolactic import cardinal_temperature_factor
@@ -515,9 +518,11 @@ class BrettGrowth(Process):
 
     name = "brett_growth"
     tier = Tier.SPECULATIVE
-    #: Builds ``X_brett`` from the ``amino_acids`` pool, drawing the carbon shortfall from ``E``.
+    #: Builds ``X_brett`` from the identity-agnostic amino-acid pools ({arginine, generic},
+    #: decision D-100 — never the Ehrlich precursors, which is what stops fusel production from
+    #: starving Brett), drawing the carbon shortfall from ``E``.
     #: Does NOT touch ``S`` (Brett grows in dry wine) or ``N`` (nitrogen from amino acids).
-    touches = ("X_brett", "amino_acids", "E")
+    touches = ("X_brett", *(spec.pool for spec in ASSIMILABLE_SPECS), "E")
     #: ``mu_max_brett``/``K_aa_brett`` are the Brett growth rate + amino-acid half-saturation;
     #: ``biomass_N_fraction``/``biomass_C_fraction`` are the composition biomass is built (and
     #: weighted) at, so carbon/nitrogen close. The shared Brett gate params throttle growth by
@@ -525,6 +530,9 @@ class BrettGrowth(Process):
     reads: tuple[str, ...] = (
         "mu_max_brett",
         "K_aa_brett",
+        # The assimilable pools' must-spectrum shares, which scale K_aa_brett into the D-100
+        # relative-depletion gate.
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
         "K_E_brett",
         "brett_carrying_capacity",
         "biomass_N_fraction",
@@ -542,9 +550,6 @@ class BrettGrowth(Process):
         x_brett = max(float(y[schema.slice("X_brett")][0]), 0.0) if "X_brett" in schema else 0.0
         if x_brett <= 0.0:
             return d
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0) if "amino_acids" in schema else 0.0
-        if aa <= 0.0:
-            return d
         e = max(float(y[schema.slice("E")][0]), 0.0)
         if e <= 0.0:
             return d
@@ -560,7 +565,13 @@ class BrettGrowth(Process):
         if brake <= 0.0:  # at/above the carrying capacity, growth is fully shut down
             return d
 
-        aa_monod = aa / (params["K_aa_brett"] + aa)
+        # The identity-agnostic substrate's relative-depletion gate (decision D-100): {arginine,
+        # generic} with K_aa_brett scaled by their combined must-spectrum share. → 0 on an empty
+        # pool, which is the smooth shadow the old hard `aa <= 0` guard provided (and the guarantee
+        # the draw cannot push either pool negative).
+        aa_monod = depletion_gate(y, schema, params, ASSIMILABLE_SPECS, k_param="K_aa_brett")
+        if aa_monod <= 0.0:
+            return d
         # Ethanol-availability Monod (decision D-40 pt2). Brett grows ON ethanol, so growth scales
         # with how much ethanol is present: ~0 during early AF (E small) and ~1 in a finished wine
         # (E >> K_E_brett). This is ALSO the smooth "shadow" the hard `if e <= 0` guard needs: like
@@ -586,18 +597,17 @@ class BrettGrowth(Process):
 
         f_n = params["biomass_N_fraction"]
         f_c = params["biomass_C_fraction"]
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        y_c = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        # Nitrogen-anchored: consume the arginine that carries the new biomass's nitrogen. Its
-        # carbon (rho*y_C) falls short of the biomass carbon demand (f_C*dx_brett) because arginine
-        # is N-rich, so the positive shortfall is drawn from ETHANOL (not sugar — Brett's niche is
-        # the dry wine). Both ledgers close exactly: X_brett gains f_N*dx_brett N (= rho*y_N) and
-        # f_C*dx_brett C (= rho*y_C amino acid + ethanol shortfall). Shortfall coeff > 0
-        # structurally (biomass C:N >> arginine's), so no clamp needed (decision D-40).
-        rho = f_n * dx_brett / y_n  # [g arginine/L/h] consumed to supply the biomass nitrogen
-        shortfall = f_c * dx_brett - rho * y_c  # [g C/L/h] biomass carbon not covered by arginine
+        # Nitrogen-anchored: consume the amino acids carrying the new biomass's nitrogen, split
+        # across {arginine, generic} by the nitrogen each holds (D-100). Their carbon falls short
+        # of the biomass carbon demand (f_C*dx_brett) because both are N-rich, so the positive
+        # shortfall is drawn from ETHANOL (not sugar — Brett's niche is the dry wine). Both ledgers
+        # close exactly: X_brett gains f_N*dx_brett N (= the amino-acid N) and f_C*dx_brett C
+        # (= amino-acid carbon + ethanol shortfall). The shortfall stays positive structurally —
+        # the blend's C:N is bounded by arginine's ≈ 1.29 and glutamine's ≈ 2.14, both far below
+        # biomass's ≈ 4.3 — so no clamp is needed (D-40, its guarantee widened to the blend).
+        carbon = draw_assimilable_nitrogen(d, y, schema, f_n * dx_brett)  # [g C/L/h] it carries
+        shortfall = f_c * dx_brett - carbon  # [g C/L/h] biomass carbon not covered by amino acids
         d[schema.slice("X_brett")] = dx_brett
-        d[schema.slice("amino_acids")] = -rho
         # Remove `shortfall` grams of carbon from ethanol: g ethanol = g C / (g C/g ethanol).
         d[schema.slice("E")] = -shortfall / carbon_mass_fraction("ethanol")
         return d

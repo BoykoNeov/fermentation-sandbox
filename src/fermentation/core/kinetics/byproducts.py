@@ -124,8 +124,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
-from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.chemistry import carbon_mass_fraction
+from fermentation.core.kinetics.amino_acid_pools import (
+    SPEC_BY_SPECIES,
+    depletion_gate,
+    draw_precursor_carbon,
+)
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS, FuselSpec
 from fermentation.core.kinetics.carbon_routing import (
@@ -212,15 +216,28 @@ def fusel_carbon_draw(y: FloatArray, schema: StateSchema, params: Mapping[str, f
     this helper makes that impossible (the shared ``biomass_growth_rate`` discipline of the
     D-32 swap, applied to fusels).
     """
+    return float(sum(carbon for _, carbon in fusel_carbon_draw_by_species(y, schema, params)))
+
+
+def fusel_carbon_draw_by_species(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+) -> list[tuple[FuselSpec, float]]:
+    """Each higher alcohol's own carbon draw [g C/L/h], paired with its spec (decision D-100).
+
+    The per-species decomposition of :func:`fusel_carbon_draw` (which now sums this, so the two
+    can never disagree). D-33's re-route only ever needed the *total*, because it sourced every
+    fusel's carbon from one lumped ``amino_acids`` pool. D-100 speciates that pool, so the
+    re-route must know **which alcohol wants how much carbon** in order to debit that alcohol's
+    own precursor — leucine for isoamyl alcohol, valine for isobutanol, and so on
+    (``spec.precursor_amino_acid``, documentation-only since D-99, becomes load-bearing here).
+    """
     shape = fusel_rate_shape(y, schema, params)
     if shape <= 0.0:
-        return 0.0
-    return float(
-        sum(
-            params[spec.k_param] * shape * carbon_mass_fraction(spec.species)
-            for spec in FUSEL_SPECS
-        )
-    )
+        return []
+    return [
+        (spec, params[spec.k_param] * shape * carbon_mass_fraction(spec.species))
+        for spec in FUSEL_SPECS
+    ]
 
 
 class EsterSynthesis(Process):
@@ -442,47 +459,75 @@ class FuselAminoAcidReroute(Process):
     **A swap, not a producer — it never touches ``fusels``.** Like the D-32
     :class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation` swap, this leaves the
     *production* entirely to :class:`FuselAlcoholsEhrlich` (both call the one
-    :func:`fusel_production_rate`); it only moves the carbon *source*. For the amino-acid-sourced
-    fraction ``g = aa/(K_amino_acids + aa)`` (the same smooth availability gate the swap uses,
-    → 0 as the pool empties) of the fusel carbon ``F_c = rate·c_fusel``:
+    :func:`fusel_production_rate`); it only moves the carbon *source*. **Per alcohol** ``i``
+    (decision D-100), for its own carbon draw ``F_i = rate_i·c_i`` and its own precursor's
+    relative-depletion gate ``g_i = aa_i/(K_amino_acids·f_i + aa_i)``:
 
-      * **refund sugar** by ``g·F_c`` (undoing the producer's draw for that fraction),
-      * **debit amino acids** by ``g·F_c / c_aa`` (the arginine mass carrying that carbon), and
-      * **release ammonium** ``N`` by ``(g·F_c/c_aa)·y_N`` (deamination).
+      * **refund sugar** by ``g_i·F_i`` (undoing the producer's draw for that fraction),
+      * **debit that alcohol's precursor** by ``g_i·F_i / c_precursor``, and
+      * **release ammonium** ``N`` by the nitrogen that mass carried (deamination).
 
-    Carbon closes: the fusel gains ``F_c`` (from the producer), sourced now as ``(1−g)·F_c`` from
-    sugar + ``g·F_c`` from amino acids. Nitrogen closes: the amino acids lose exactly the nitrogen
-    the ``N`` pool gains. Net sugar is ``−(1−g)·F_c ≤ 0`` for all ``g ≤ 1`` — the re-route never
-    creates sugar (it only *spares* it), so the ABV bookkeeping caveat is the D-32 one (spared
-    sugar ferments to ethanol). **Wine-only** and **forced to be a separate Process**: declaring
-    ``amino_acids``/``N`` in the both-media producer's ``touches`` would break beer's ProcessSet
-    construction (beer has no ``amino_acids`` slot).
+    Carbon closes: the fusel gains ``F_i`` (from the producer), sourced now as ``(1−g_i)·F_i``
+    from sugar + ``g_i·F_i`` from its precursor. Nitrogen closes: the precursors lose exactly the
+    nitrogen the ``N`` pool gains. Net sugar is ``−Σ(1−g_i)·F_i ≤ 0`` for all ``g_i ≤ 1`` — the
+    re-route never creates sugar (it only *spares* it), so the ABV bookkeeping caveat is the D-32
+    one (spared sugar ferments to ethanol). **Wine-only** and **forced to be a separate Process**:
+    declaring the precursor pools/``N`` in the both-media producer's ``touches`` would break
+    beer's ProcessSet construction (beer tracks no amino acids).
 
-    **Isolability (undosed-only, paired with the producer).** The availability gate → 0 at
-    ``aa = 0``, so an undosed wine run is byte-for-byte the sugar-stand-in producer; the compile
+    **The D-100 decoupling — this Process no longer touches ``amino_acids``.** Until D-100 it drew
+    every alcohol's carbon from the lumped pool, i.e. **from arginine**, which does not make higher
+    alcohols. That was not merely imprecise: at D-99's honest ~3.8× fusel rise the re-route drained
+    the shared lump to ~0 and starved Maillard, MLF growth and Brett growth — three unrelated
+    subsystems broken through one lumped substrate. Now each alcohol eats *its own* precursor and
+    the identity-agnostic pools ({arginine, generic} — 81% of the must spectrum) are untouchable by
+    fusel production, so that cross-subsystem starvation is structurally impossible rather than
+    tuned away.
+
+    **The anabolic/catabolic split became EMERGENT (the D-100 fidelity gain).** Real must carries
+    ~30-60 mg/L leucine but wine makes ~150-250 mg/L isoamyl alcohol — most higher alcohol is
+    synthesised **de novo from sugar**, not catabolised from amino acids. The lumped model could
+    not represent that: it re-sourced a fixed gate-fraction of fusel carbon from a large arginine
+    pool indefinitely. Now leucine's own gate throttles its re-route as leucine depletes and the
+    remainder stays on the sugar stand-in — so the anabolic/catabolic ratio *falls out of* the must
+    spectrum and the fusel demand instead of being a fitted fraction. The sugar stand-in it leaves
+    behind is no longer an embarrassment but the **correct** book for de-novo synthesis.
+
+    **The D-33 nitrogen over-release lump is RETIRED (decision D-100).** D-33 had to document that
+    sourcing fusel carbon through N-rich arginine deaminated ``c_fusel/c_aa·y_N`` ≈ 0.78 g N per g
+    fusel carbon — roughly **4× the real leucine→isoamyl-alcohol N:C** (leucine carries one amino
+    group over six carbons). Drawing each alcohol's actual precursor releases exactly the nitrogen
+    that molecule carries, so the ratio is now right by construction and the caveat is gone. Tier
+    **speculative** (it inherits the fusel rate's speculative parameters and the spectrum/gate
+    estimates).
+
+    **Isolability (undosed-only, paired with the producer).** Every precursor gate → 0 at
+    ``aa_i = 0``, so an undosed wine run is byte-for-byte the sugar-stand-in producer; the compile
     seam additionally *disables* this Process when ``amino_acids_gpl ≤ 0`` (tier isolability, the
     D-32 pattern). It is only valid while :class:`FuselAlcoholsEhrlich` is active — it refunds
     sugar that producer drew — so the two are kept paired (disabling the producer alone would let
     the re-route create sugar; the same acceptable swap↔producer coupling as D-32's swap↔growth).
 
-    **Documented lump — arginine over-releases nitrogen.** Sourcing fusel carbon through the
-    N-rich representative amino acid deaminates ``c_fusel/c_aa · y_N`` ≈ 0.78 g N per g fusel
-    carbon — roughly **4× the real leucine→isoamyl-alcohol N:C** (leucine carries one amino group
-    over six carbons). This is conservation-exact but a forced consequence of the single-species
-    ``amino_acids`` lump (arginine, chosen N-rich for the D-32 swap), the same class of stand-in
-    as the sugar-carbon fiction it replaces. The released nitrogen feeds back as supplementary YAN,
-    but fusels are trace so the effect is second-order and tiny. Tier **speculative** (it inherits
-    the fusel rate's speculative parameters and the ``amino_acids`` gate estimate).
+    **The honest limit D-100 does NOT fix.** Speciation does not end the precursor competition — it
+    *localises* it. Threonine still feeds both propanol (here) and sotolon (D-87); leucine feeds
+    both isoamyl alcohol and 3-methylbutanal. Those are the same molecule in reality, so the
+    competition is **real chemistry, not an artifact**, and the model should show it. What D-100
+    removes is the *false* competition — fusels vs bacterial growth over arginine, which shares no
+    chemistry at all.
     """
 
     name = "fusel_amino_acid_reroute"
     tier = Tier.SPECULATIVE
-    #: Refunds carbon to ``S``, debits ``amino_acids``, releases nitrogen to ``N``. Never
-    #: touches ``fusels`` — production stays entirely in :class:`FuselAlcoholsEhrlich`.
-    touches = ("S", "amino_acids", "N")
+    #: Refunds carbon to ``S``, debits **each alcohol's own precursor**, releases nitrogen to
+    #: ``N``. Never touches ``fusels`` — production stays entirely in :class:`FuselAlcoholsEhrlich`
+    #: — and, since D-100, **never touches ``amino_acids``/``amino_acids_generic``**: arginine does
+    #: not make higher alcohols, so the re-route can no longer starve the consumers that live on
+    #: those pools (yeast swap, MLF growth, Brett growth, Maillard browning). That absence is the
+    #: whole D-100 decoupling and is pinned by a test.
+    touches = ("S", "N", *(spec.precursor_amino_acid for spec in FUSEL_SPECS))
     #: Recomputes the fusel rate (so it reads the producer's parameters) plus ``K_amino_acids``
-    #: for the availability gate. Their tiers cap the ``S``/``amino_acids``/``N`` output tier via
-    #: parameter-tier propagation (D-1).
+    #: and each precursor's ``must_aa_fraction_*`` for the relative-depletion gates (D-100).
+    #: Their tiers cap the ``S``/precursor/``N`` output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         *(spec.k_param for spec in FUSEL_SPECS),
         "K_sugar_uptake",
@@ -490,35 +535,41 @@ class FuselAminoAcidReroute(Process):
         "E_a_fusels",
         "T_ref",
         "K_amino_acids",
+        *(SPEC_BY_SPECIES[spec.precursor_amino_acid].fraction_param for spec in FUSEL_SPECS),
     )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # The producer's TOTAL sugar draw, across all five species at their own carbon
-        # fractions — computed by the identical helper it uses (D-33/D-99).
-        fusel_carbon = fusel_carbon_draw(y, schema, params)
-        if fusel_carbon <= 0.0:
+        # Each alcohol's OWN carbon draw, at its own molecule's fraction — from the identical
+        # helper the producer's total comes from (D-33/D-99, speciated at D-100).
+        draws = fusel_carbon_draw_by_species(y, schema, params)
+        if not draws:
             return d
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
-        if aa <= 0.0:
-            return d  # empty pool ⇒ producer sources all fusel carbon from sugar (undosed no-op)
-
-        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
-        aa_carbon = gate * fusel_carbon  # the fraction re-sourced from amino acids
-        c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        aa_mass = aa_carbon / c_aa  # arginine mass consumed to supply that carbon
-
-        d[schema.slice("amino_acids")] = -aa_mass
-        d[schema.slice("N")] = (
-            aa_mass * y_n
-        )  # DEAMINATION: aa nitrogen → ammonium (the D-33 branch)
+        refund = 0.0  # total carbon re-sourced off sugar, across the five precursors
+        nitrogen = 0.0  # total nitrogen deaminated out of them
+        for spec, fusel_carbon in draws:
+            if fusel_carbon <= 0.0:
+                continue
+            precursor = SPEC_BY_SPECIES[spec.precursor_amino_acid]
+            # This alcohol's OWN precursor gate — the D-100 relative-depletion rule. Draining
+            # leucine throttles isoamyl alcohol's re-route and NOTHING else; the lumped gate read
+            # a pool 38% arginine and wrongly concluded leucine was abundant. → 0 as the precursor
+            # empties, so the draw can never drive it negative (and an undosed run is a no-op).
+            gate = depletion_gate(y, schema, params, (precursor,))
+            if gate <= 0.0:
+                continue  # this precursor is exhausted ⇒ its alcohol stays on the sugar stand-in
+            aa_carbon = gate * fusel_carbon  # the fraction re-sourced from THIS precursor
+            nitrogen += draw_precursor_carbon(d, schema, spec.precursor_amino_acid, aa_carbon)
+            refund += aa_carbon
+        if refund <= 0.0:
+            return d
+        d[schema.slice("N")] = nitrogen  # DEAMINATION: precursor N → ammonium (the D-33 branch)
         # Refund the producer's sugar draw for the re-sourced fraction (the inverse of its draw),
-        # so net sugar loss is only the (1−g) fraction still taken from sugar. rate > 0 ⇒ flux > 0
-        # ⇒ sugar present, so the refund always lands (no carbon leak).
-        _refund_carbon_to_sugar(d, y, schema, aa_carbon)
+        # so net sugar loss is only the un-rerouted remainder. rate > 0 ⇒ flux > 0 ⇒ sugar present,
+        # so the refund always lands (no carbon leak).
+        _refund_carbon_to_sugar(d, y, schema, refund)
         return d
 
 

@@ -567,7 +567,20 @@ def test_growth_draws_ethanol_not_sugar_or_ammonium(schema, params):
     assert d[schema.slice("E")][0] < 0.0  # carbon shortfall drawn from ethanol
     assert float(d[schema.slice("S")].sum()) == 0.0  # NOT sugar (Brett's dry-wine niche)
     assert d[schema.slice("N")][0] == 0.0  # NOT ammonium (nitrogen-anchored on amino acids)
-    assert set(BrettGrowth.touches) == {"X_brett", "amino_acids", "E"}
+    # Brett eats the IDENTITY-AGNOSTIC pools (D-100) — any assimilable amino acid supplies
+    # biomass nitrogen — and never a precursor. That is the decoupling: D-99's 3.8x fusel rise
+    # drained the shared lump via the Ehrlich re-route and left a dosed Brett population barely
+    # growing (ratio ~1.1 vs ~10); the re-route cannot reach these pools at all.
+    assert set(BrettGrowth.touches) == {"X_brett", "amino_acids", "amino_acids_generic", "E"}
+    for precursor in (
+        "leucine",
+        "isoleucine",
+        "valine",
+        "threonine",
+        "phenylalanine",
+        "methionine",
+    ):
+        assert precursor not in BrettGrowth.touches
 
 
 def test_growth_needs_ethanol_the_carbon_source(schema, params):
@@ -814,7 +827,15 @@ def test_death_run_conserves_carbon_and_nitrogen():
     )
     assert_conserved(traj, carbon, label="carbon (Brett death on)")
     assert_conserved(traj, nitrogen, label="nitrogen (Brett death on)")
-    assert_nonnegative(traj, ("X_brett", "X_brett_dead"))
+    # atol at 10x the solver's own atol (1e-9, runtime.integrate): X_brett is driven to a TRUE zero
+    # by the SO2 kill, and a state legitimately at zero undershoots by ~the integrator's absolute
+    # tolerance — asserting tighter than the solver's own promise tests scipy, not the model. That
+    # this only began mattering at D-100 is itself the fix working: the re-route's arginine draw
+    # used to over-release nitrogen ~4x (D-33's documented lump), propping up the YAN that fed
+    # growth; releasing each precursor's REAL nitrogen lets these pools reach zero as they should.
+    # Verified as noise, not drift: the excursion tracks the solver's atol ~1:1 (1e-9 -> -1.1e-9,
+    # 1e-11 -> -1.3e-12, 1e-13 -> -1.1e-14) while the trajectory is unchanged.
+    assert_nonnegative(traj, ("X_brett", "X_brett_dead"), atol=1e-8)
 
 
 def test_death_is_speculative():

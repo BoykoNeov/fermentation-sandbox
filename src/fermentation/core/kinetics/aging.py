@@ -235,7 +235,14 @@ from fermentation.core.chemistry import (
     nitrogen_mass_fraction,
     sugar_species,
 )
-from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.kinetics.amino_acid_pools import (
+    ASSIMILABLE_SPECS,
+    SPEC_BY_SPECIES,
+    assimilable_carbon_per_nitrogen,
+    depletion_gate,
+    draw_assimilable_nitrogen,
+    draw_precursor_carbon,
+)
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import HYDROLYSING_ESTER, ISOAMYL_ALCOHOL
 from fermentation.core.process import Process
@@ -300,6 +307,18 @@ _SO2_PER_O2 = 2.0  # mol SO₂ oxidised per mol O₂ consumed via the sulfite-sc
 _METHIONAL_SPECIES = "methional"
 _PHENYLACETALDEHYDE_SPECIES = "phenylacetaldehyde"
 
+#: The **oxidative** (quinone-driven) Strecker route's two products (decision D-75), speciated at
+#: D-100: ``(pool, mol-fraction parameter or None for the remainder, precursor amino acid)``.
+#: ``f_methional`` splits the aldehyde flux between them, and each half now draws **its own**
+#: amino acid rather than the lumped arginine pool — methional really is methionine minus its
+#: carboxyl, phenylacetaldehyde really is phenylalanine minus its. The thermal D-87 route makes
+#: the same two molecules from the same two precursors (:data:`_MAILLARD_PRODUCTS`), so the two
+#: routes correctly compete for methionine and phenylalanine while ``ProcessSet`` sums them.
+_STRECKER_ROUTES: tuple[tuple[str, str | None, str], ...] = (
+    (_METHIONAL_SPECIES, "f_methional", "methionine"),
+    (_PHENYLACETALDEHYDE_SPECIES, None, "phenylalanine"),
+)
+
 #: The Strecker decarboxylation releases exactly **1 mol CO₂ per mol aldehyde** — the amino acid's
 #: carboxyl carbon. On the carbon ledger (unlike ``o2``), so it is a genuine product term the carbon
 #: bookkeeping must route, not an off-ledger emission (D-75).
@@ -321,13 +340,28 @@ _CO2_PER_STRECKER_ALDEHYDE = 1.0
 #: CO₂ is keyed to these flags explicitly, and the produced µg/L levels are anchored to literature
 #: (the D-75 follow-up fidelity lesson). Two are **shared** with the D-75 oxidative route (same
 #: molecules, same pools/thresholds); four are D-87-only.
-_MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool], ...] = (
-    ("methional", M_METHIONAL, "w_maillard_methional", True),
-    ("phenylacetaldehyde", M_PHENYLACETALDEHYDE, "w_maillard_phenylacetaldehyde", True),
-    ("2_methylbutanal", M_2_METHYLBUTANAL, "w_maillard_2_methylbutanal", True),
-    ("3_methylbutanal", M_3_METHYLBUTANAL, "w_maillard_3_methylbutanal", True),
-    ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", True),
-    ("sotolon", M_SOTOLON, "w_maillard_sotolon", False),
+#: **``precursor`` became load-bearing at D-100**: each product's carbon is drawn from the amino
+#: acid it is actually made from, not from the lumped arginine pool. The Strecker map is the same
+#: one the Ehrlich fusels read (leucine→3-methylbutanal as leucine→isoamyl alcohol), which is
+#: exactly why the two routes compete for real. **sotolon's threonine is the load-bearing entry**:
+#: it is not a Strecker aldehyde at all but a threonine/acetaldehyde aldol furanone (hence
+#: ``decarboxylates=False``), and threonine is also propanol's Ehrlich precursor — so the
+#: propanol-vs-sotolon competition is genuine chemistry over one molecule. (Scope, unchanged from
+#: D-87: sotolon's 2 acetaldehyde-derived carbons are lumped into the threonine draw; the
+#: acetaldehyde-coupled route stays deferred.)
+_MAILLARD_PRODUCTS: tuple[tuple[str, float, str, bool, str], ...] = (
+    ("methional", M_METHIONAL, "w_maillard_methional", True, "methionine"),
+    (
+        "phenylacetaldehyde",
+        M_PHENYLACETALDEHYDE,
+        "w_maillard_phenylacetaldehyde",
+        True,
+        "phenylalanine",
+    ),
+    ("2_methylbutanal", M_2_METHYLBUTANAL, "w_maillard_2_methylbutanal", True, "isoleucine"),
+    ("3_methylbutanal", M_3_METHYLBUTANAL, "w_maillard_3_methylbutanal", True, "leucine"),
+    ("2_methylpropanal", M_2_METHYLPROPANAL, "w_maillard_2_methylpropanal", True, "valine"),
+    ("sotolon", M_SOTOLON, "w_maillard_sotolon", False, "threonine"),
 )
 
 #: The caramelization carbon-park species (decision D-88): the sugar carbon :class:`Caramelization`
@@ -887,14 +921,23 @@ class StreckerDegradation(Process):
     name = "strecker_degradation"
     tier = Tier.SPECULATIVE
     #: Consumes its aa-gated share of the dissolved-O₂ substrate; books the two Strecker aldehydes
-    #: (``methional``/``phenylacetaldehyde``) + the decarboxylation ``CO2``, drawing the carbon from
-    #: ``amino_acids`` (arginine), deaminating its nitrogen to ``N``. Touches those six and nothing
-    #: else — ``o2`` is off every ledger; the C/N transfer closes exactly.
-    touches = ("o2", "methional", "phenylacetaldehyde", "CO2", "amino_acids", "N")
+    #: (``methional``/``phenylacetaldehyde``) + the decarboxylation ``CO2``, drawing each one's
+    #: carbon from **its own precursor** (methionine/phenylalanine, decision D-100 — the lumped
+    #: arginine draw is retired) and deaminating that precursor's nitrogen to ``N``. ``o2`` is off
+    #: every ledger; the C/N transfer closes exactly.
+    touches = (
+        "o2",
+        "methional",
+        "phenylacetaldehyde",
+        "CO2",
+        "N",
+        *(precursor for _, _, precursor in _STRECKER_ROUTES),
+    )
     #: ``k_strecker``/``E_a_strecker``/``y_strecker_per_o2``/``f_methional`` are this Process's own
     #: (aging.yaml, D-75); ``K_amino_acids`` is the *shared* availability half-saturation (the same
-    #: constant the mercaptan/reroute gates read); ``T_ref`` is shared with every Arrhenius rate.
-    #: Their tiers cap the output tiers via parameter-tier propagation (D-1).
+    #: constant the mercaptan/reroute gates read), scaled per-precursor by its
+    #: ``must_aa_fraction_*`` share (D-100); ``T_ref`` is shared with every Arrhenius rate. Their
+    #: tiers cap the output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         "k_strecker",
         "E_a_strecker",
@@ -902,55 +945,74 @@ class StreckerDegradation(Process):
         "f_methional",
         "K_amino_acids",
         "T_ref",
+        *(SPEC_BY_SPECIES[precursor].fraction_param for _, _, precursor in _STRECKER_ROUTES),
     )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Wine-only slots (beer's amino-acid pool is not tracked, D-32): a hard no-op on any schema
-        # without them, belt-and-suspenders to the wine-only wiring.
-        if "amino_acids" not in schema or "o2" not in schema:
+        # Wine-only slots (beer tracks no amino acids, D-32): a hard no-op on any schema without
+        # them, belt-and-suspenders to the wine-only wiring.
+        if "methionine" not in schema or "o2" not in schema:
             return d
         o2 = float(y[schema.slice("o2")][0])
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
-        # No O₂ or amino acids ⇒ no Strecker: reductive/amino-acid-free aging is byte-for-byte
-        # the case without this Process. ``<= 0`` also absorbs solver undershoot (o2 < 0 ⇒ no draw).
-        if o2 <= 0.0 or aa <= 0.0:
+        # No O₂ ⇒ no Strecker: reductive aging is byte-for-byte the case without this Process.
+        # ``<= 0`` also absorbs solver undershoot (o2 < 0 ⇒ no draw).
+        if o2 <= 0.0:
             return d
-        # Smooth availability gate (the D-33 swap/reroute idiom): throttles the O₂ draw down to
-        # 0 as the pool empties, so O₂/carbon/N vanish together; amino_acids never goes negative.
-        gate = aa / (params["K_amino_acids"] + aa)  # in [0, 1)
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_strecker"], params["T_ref"])
-        # This route's aa-gated SHARE of the O₂-depletion rate — a SMALL wine-only add-on (NOT in
-        # the 5.0e-4 always-on anchor; substrate-gated, adds on top like SulfiteOxidation, D-72).
-        r_o2 = params["k_strecker"] * f_t * o2 * gate  # g O2/L/h consumed by the Strecker route
-        n_ald = params["y_strecker_per_o2"] * (r_o2 / M_O2)  # mol total Strecker aldehyde/L/h
+        # The un-gated O₂-depletion driver — a SMALL wine-only add-on (NOT in the 5.0e-4 always-on
+        # anchor; substrate-gated, adds on top like SulfiteOxidation, D-72).
+        driver = params["k_strecker"] * f_t * o2  # g O2/L/h before the availability gates
         f_meth = params["f_methional"]  # mol fraction methional; the rest is phenylacetaldehyde
-        meth_rate = f_meth * n_ald * M_METHIONAL  # g methional/L/h
-        phenyl_rate = (1.0 - f_meth) * n_ald * M_PHENYLACETALDEHYDE  # g phenylacetaldehyde/L/h
-        co2_rate = _CO2_PER_STRECKER_ALDEHYDE * n_ald * M_CO2  # 1 CO₂ per aldehyde (decarb)
+        shares = {_METHIONAL_SPECIES: f_meth, _PHENYLACETALDEHYDE_SPECIES: 1.0 - f_meth}
 
-        # Draw the product carbon (aldehydes + CO₂, all on-ledger) from amino_acids sized to
-        # match, and deaminate the arginine nitrogen to N (the D-45 idiom + CO₂ decarb): carbon
-        # out of amino_acids == carbon into products, and all arginine N lands in N (products are
-        # N-free), so total_carbon and total_nitrogen both close to machine precision.
-        product_carbon = (
-            meth_rate * carbon_mass_fraction(_METHIONAL_SPECIES)
-            + phenyl_rate * carbon_mass_fraction(_PHENYLACETALDEHYDE_SPECIES)
-            + co2_rate * carbon_mass_fraction("CO2")
-        )  # g C/L/h into the products
-        c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        aa_mass = product_carbon / c_aa  # arginine mass consumed to supply that carbon
+        # Each aldehyde is throttled by ITS OWN precursor's relative-depletion gate (decision
+        # D-100): methional stops when methionine runs out, phenylacetaldehyde when phenylalanine
+        # does — independently, as the chemistry demands. At must-spectrum composition both gates
+        # equal the old lumped gate, so this reduces byte-for-byte to the D-75 rate. The gates also
+        # throttle the O₂ draw (each route takes only the share its substrate can support), so O₂,
+        # carbon and nitrogen still vanish together and no precursor is driven negative.
+        r_o2 = 0.0  # g O2/L/h actually consumed, summed over the two gated routes
+        co2_mol = 0.0  # mol CO2/L/h — 1 per aldehyde (both routes decarboxylate)
+        product_rates: list[tuple[str, float]] = []
+        precursor_carbon: dict[str, float] = {}
+        for pool, _fparam, precursor in _STRECKER_ROUTES:
+            gate_i = depletion_gate(y, schema, params, (SPEC_BY_SPECIES[precursor],))
+            if gate_i <= 0.0:
+                continue  # this precursor is exhausted ⇒ its aldehyde (and its O₂ share) stop
+            r_o2_i = shares[pool] * driver * gate_i  # this route's gated O₂ share
+            n_i = params["y_strecker_per_o2"] * (r_o2_i / M_O2)  # mol aldehyde/L/h
+            if n_i <= 0.0:
+                continue
+            rate_i = n_i * (M_METHIONAL if pool == _METHIONAL_SPECIES else M_PHENYLACETALDEHYDE)
+            co2_i = _CO2_PER_STRECKER_ALDEHYDE * n_i * M_CO2  # the amino acid's carboxyl carbon
+            r_o2 += r_o2_i
+            co2_mol += _CO2_PER_STRECKER_ALDEHYDE * n_i
+            product_rates.append((pool, rate_i))
+            # Carbon THIS precursor must supply: its aldehyde + the CO₂ its own carboxyl released.
+            precursor_carbon[precursor] = rate_i * carbon_mass_fraction(pool) + co2_i * (
+                carbon_mass_fraction("CO2")
+            )
+        if not product_rates:
+            return d
+
+        # Draw each aldehyde's carbon from ITS OWN precursor, sized to match, and deaminate that
+        # precursor's nitrogen to N (the D-45 idiom + CO₂ decarb, speciated at D-100): carbon out
+        # of each amino acid == carbon into the product it made, and all their N lands in N
+        # (products are N-free), so total_carbon and total_nitrogen close to machine precision.
+        nitrogen = sum(
+            draw_precursor_carbon(d, schema, precursor, carbon)
+            for precursor, carbon in precursor_carbon.items()
+        )
 
         d[schema.slice("o2")] = -r_o2  # this route's aa-gated O₂ share (off every ledger)
-        d[schema.slice("methional")] = meth_rate
-        d[schema.slice("phenylacetaldehyde")] = phenyl_rate
-        d[schema.slice("CO2")] = co2_rate
-        d[schema.slice("amino_acids")] = -aa_mass
-        d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine N → ammonium (D-45)
+        for pool, rate_i in product_rates:
+            d[schema.slice(pool)] = rate_i
+        d[schema.slice("CO2")] = co2_mol * M_CO2
+        d[schema.slice("N")] = nitrogen  # DEAMINATION: precursor N → ammonium (D-45)
         return d
 
 
@@ -1061,8 +1123,11 @@ class MaillardStrecker(Process):
         "2_methylpropanal",
         "sotolon",
         "CO2",
-        "amino_acids",
         "N",
+        # Each product's OWN precursor (decision D-100) — no longer the lumped ``amino_acids``
+        # pool. Six products over five distinct amino acids (methional and the three
+        # branched-chain aldehydes each have their own; sotolon takes threonine).
+        *dict.fromkeys(precursor for (_, _, _, _, precursor) in _MAILLARD_PRODUCTS),
     )
     #: ``k_maillard_strecker``/``E_a_maillard_strecker`` and the six ``w_maillard_*`` composition
     #: weights are this Process's own (thermal.yaml, D-87); ``K_amino_acids`` is the *shared*
@@ -1080,22 +1145,20 @@ class MaillardStrecker(Process):
         "w_maillard_sotolon",
         "K_amino_acids",
         "T_ref",
+        # Each precursor's must-spectrum share, which scales its relative-depletion gate (D-100).
+        *dict.fromkeys(
+            SPEC_BY_SPECIES[precursor].fraction_param
+            for (_, _, _, _, precursor) in _MAILLARD_PRODUCTS
+        ),
     )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Wine-only slots (beer's amino-acid pool is not tracked, D-32; sotolon is a wine-only
-        # pool):
-        # a hard no-op on any schema without them, belt-and-suspenders to the wine-only wiring.
-        if "amino_acids" not in schema or "sotolon" not in schema:
-            return d
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
-        # HARD amino-acid gate — the isolability guarantee: an undosed wine (aa == 0) is
-        # byte-for-byte
-        # the case without this Process. ``<= 0`` also absorbs solver undershoot (no spurious draw).
-        if aa <= 0.0:
+        # Wine-only slots (beer tracks no amino acids, D-32; sotolon is a wine-only pool): a hard
+        # no-op on any schema without them, belt-and-suspenders to the wine-only wiring.
+        if "sotolon" not in schema or "leucine" not in schema:
             return d
         # Residual sugar is the dicarbonyl DRIVER (summed over the vector), a SOFT gate: a dry wine
         # (S ≈ 0) makes ~none, but the trace is physically real, so this is not an isolability
@@ -1103,48 +1166,63 @@ class MaillardStrecker(Process):
         s_total = max(float(y[schema.slice("S")].sum()), 0.0)
         if s_total <= 0.0:
             return d
-        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_maillard_strecker"], params["T_ref"])
-        # mol total product /L/h — driven by residual sugar + heat, NO o2 (the yield folded into k).
-        n_ald_total = params["k_maillard_strecker"] * f_t * s_total * gate
-        if n_ald_total <= 0.0:
+        driver = params["k_maillard_strecker"] * f_t * s_total  # mol product/L/h before gating
+        if driver <= 0.0:
             return d
 
         # Split among the six products by their NORMALIZED composition weights (relative production
-        # flux). Accumulate the total product carbon (aldehydes + sotolon + CO2) and the CO2 from
-        # the
-        # DECARBOXYLATING products only (sotolon contributes none — its flag is load-bearing).
-        weights = [params[wname] for (_, _, wname, _) in _MAILLARD_PRODUCTS]
+        # flux), each throttled by ITS OWN precursor's relative-depletion gate (decision D-100).
+        # At must-spectrum composition every gate equals the old lumped gate, so this reduces
+        # byte-for-byte to the D-87 rate; away from it, a product stops when the amino acid it is
+        # made from runs out — which is the whole point (the D-100 pathology was sotolon dying
+        # because a pool 38% ARGININE had been drained by fusels that eat leucine).
+        weights = [params[wname] for (_, _, wname, _, _) in _MAILLARD_PRODUCTS]
         w_sum = sum(weights)  # > 0 (all speculative positive weights)
-        product_carbon = 0.0  # g C/L/h into the products
         co2_mol = 0.0  # mol CO2/L/h, from the decarboxylating aldehydes only
         product_rates: list[tuple[str, float]] = []
-        for (pool, m_i, _wname, decarboxylates), w_i in zip(
+        # Carbon each precursor must supply — accumulated per species because five products draw
+        # from five different amino acids, and the shared CO2 must be attributed to the precursor
+        # that actually released it (its own carboxyl carbon), not to a lump.
+        precursor_carbon: dict[str, float] = {}
+        for (pool, m_i, _wname, decarboxylates, precursor), w_i in zip(
             _MAILLARD_PRODUCTS, weights, strict=True
         ):
-            n_i = (w_i / w_sum) * n_ald_total  # mol/L/h of product i
+            gate_i = depletion_gate(y, schema, params, (SPEC_BY_SPECIES[precursor],))
+            if gate_i <= 0.0:
+                continue  # this precursor is exhausted ⇒ its product stops (and cannot go negative)
+            n_i = (w_i / w_sum) * driver * gate_i  # mol/L/h of product i
+            if n_i <= 0.0:
+                continue
             rate_i = n_i * m_i  # g/L/h
             product_rates.append((pool, rate_i))
-            product_carbon += rate_i * carbon_mass_fraction(pool)
+            carbon_i = rate_i * carbon_mass_fraction(pool)
             if decarboxylates:
-                co2_mol += _CO2_PER_STRECKER_ALDEHYDE * n_i  # 1 CO2 per Strecker decarboxylation
-        co2_rate = co2_mol * M_CO2  # g CO2/L/h
-        product_carbon += co2_rate * carbon_mass_fraction("CO2")
+                # 1 CO2 per Strecker decarboxylation — the amino acid's own carboxyl carbon, so it
+                # is charged to THIS product's precursor (sotolon contributes none; its flag is
+                # load-bearing, and no conservation test would catch a mis-key — D-87's trap).
+                co2_i = _CO2_PER_STRECKER_ALDEHYDE * n_i * M_CO2  # g CO2/L/h
+                co2_mol += _CO2_PER_STRECKER_ALDEHYDE * n_i
+                carbon_i += co2_i * carbon_mass_fraction("CO2")
+            precursor_carbon[precursor] = precursor_carbon.get(precursor, 0.0) + carbon_i
+        if not product_rates:
+            return d
 
-        # Draw the product carbon from amino_acids (arginine) sized to match, and deaminate the
-        # arginine nitrogen to N (the D-45/D-75 idiom): carbon out of amino_acids == carbon into the
-        # products + CO2, and all arginine N lands in N (products N-free), so total_carbon and
-        # total_nitrogen both close to machine precision.
-        c_aa = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        aa_mass = product_carbon / c_aa  # arginine mass consumed to supply that carbon
+        # Draw each product's carbon from ITS OWN precursor, sized to match, and deaminate that
+        # precursor's nitrogen to N (the D-45/D-75 idiom, speciated): carbon out of each amino acid
+        # == carbon into the products + CO2 it supplied, and all their N lands in N (products are
+        # N-free), so total_carbon and total_nitrogen both close to machine precision — now with
+        # each molecule weighted at its own fractions rather than arginine's.
+        nitrogen = sum(
+            draw_precursor_carbon(d, schema, precursor, carbon)
+            for precursor, carbon in precursor_carbon.items()
+        )
 
         for pool, rate_i in product_rates:
             d[schema.slice(pool)] = rate_i
-        d[schema.slice("CO2")] = co2_rate
-        d[schema.slice("amino_acids")] = -aa_mass
-        d[schema.slice("N")] = aa_mass * y_n  # DEAMINATION: arginine N → ammonium (D-45)
+        d[schema.slice("CO2")] = co2_mol * M_CO2
+        d[schema.slice("N")] = nitrogen  # DEAMINATION: precursor N → ammonium (D-45)
         return d
 
 
@@ -1396,33 +1474,44 @@ class MaillardBrowning(Process):
     #: close), raising the shared off-ledger ``A420`` browning index. Touches those four and nothing
     #: else — NO ``o2`` (the whole point), NO ``CO2``/``N`` (all carbon+nitrogen retained in the
     #: polymer; the deaminating/decarboxylating branch is :class:`MaillardStrecker`, D-87).
-    touches = ("S", "amino_acids", "maillard_melanoidin", "A420")
+    touches = (
+        "S",
+        "maillard_melanoidin",
+        "A420",
+        # The identity-agnostic pools (decision D-100): melanoidin retains amino-acid NITROGEN
+        # without regard to which molecule carried it, so this route draws {arginine, generic} —
+        # the same substrate as the yeast/MLF/Brett swaps — and never touches a precursor. That
+        # is what makes it immune to the Ehrlich re-route, resolving the D-100 starvation.
+        *(spec.pool for spec in ASSIMILABLE_SPECS),
+    )
     #: ``k_maillard_browning``/``E_a_maillard_browning``/``y_a420_per_maillard_melanoidin`` are this
     #: Process's own (thermal.yaml, D-89); ``K_amino_acids`` is the *shared* availability
-    #: half-saturation (the same constant the mercaptan/reroute/D-75/D-87 gates read); ``T_ref`` is
-    #: shared with every Arrhenius rate. Their tiers cap the output tiers via parameter-tier
-    #: propagation (D-1).
+    #: half-saturation (the same constant the mercaptan/reroute/D-75/D-87 gates read), scaled by the
+    #: assimilable pools' combined must-spectrum share (D-100); ``T_ref`` is shared with every
+    #: Arrhenius rate. Their tiers cap the output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         "k_maillard_browning",
         "E_a_maillard_browning",
         "y_a420_per_maillard_melanoidin",
         "K_amino_acids",
         "T_ref",
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
     )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Wine-only slots (beer's amino-acid pool is not tracked, D-32; the melanoidin park is a
-        # wine slot): a hard no-op on any schema without them, belt-and-suspenders to the wine-only
-        # wiring.
+        # Wine-only slots (beer tracks no amino acids, D-32; the melanoidin park is a wine slot):
+        # a hard no-op on any schema without them, belt-and-suspenders to the wine-only wiring.
         if "maillard_melanoidin" not in schema or "amino_acids" not in schema:
             return d
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0)
-        # HARD amino-acid gate — the isolability guarantee: an undosed wine (aa == 0) is
-        # byte-for-byte the case without this Process. ``<= 0`` also absorbs solver undershoot.
-        if aa <= 0.0:
+        # HARD amino-acid gate on the identity-agnostic substrate (decision D-100) — the
+        # isolability guarantee: an undosed wine is byte-for-byte the case without this Process.
+        # → 0 as the pools empty, so the draw can never drive either negative, and the ``<= 0``
+        # short-circuit also absorbs solver undershoot.
+        gate = depletion_gate(y, schema, params, ASSIMILABLE_SPECS)
+        if gate <= 0.0:
             return d
         s_slice = schema.slice("S")
         # Residual sugar is the reducing-sugar substrate (summed over the vector), a SOFT gate: a
@@ -1431,7 +1520,6 @@ class MaillardBrowning(Process):
         s_total = max(float(y[s_slice].sum()), 0.0)
         if s_total <= 0.0:
             return d
-        gate = aa / (params["K_amino_acids"] + aa)  # smooth availability, in [0, 1)
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_maillard_browning"], params["T_ref"])
         r_sugar = params["k_maillard_browning"] * f_t * s_total * gate  # g sugar/L/h into browning
@@ -1440,29 +1528,35 @@ class MaillardBrowning(Process):
 
         # Size the melanoidin formed + the amino-acid draw so BOTH ledgers close (all nitrogen and
         # all carbon retained in the polymer — the N-retaining branch; the deaminating branch is
-        # D-87):
-        #   nitrogen:  r_aa·n(arg)               = r_m·n_m
-        #   carbon:    r_sugar·c(sugar) + r_aa·c(arg) = r_m·c_m
-        # =>  r_m  = r_sugar·c(sugar) / (c_m − n_m·c(arg)/n(arg)),   r_aa = r_m·n_m/n(arg).
+        # D-87). With ``R`` the drawn blend's mass C:N (decision D-100 — {arginine, generic}, split
+        # by the nitrogen each holds, so ``R`` is what the draw will actually realise):
+        #   nitrogen:  r_aa·n_aa                    = r_m·n_m
+        #   carbon:    r_sugar·c(sugar) + r_m·n_m·R = r_m·c_m
+        # =>  r_m = r_sugar·c(sugar) / (c_m − n_m·R).
         c_sugar = carbon_mass_fraction(sugar_species(schema)[0])  # wine's single hexose
         c_m = carbon_mass_fraction(_MAILLARD_MELANOIDIN_SPECIES)
         n_m = nitrogen_mass_fraction(_MAILLARD_MELANOIDIN_SPECIES)
-        c_arg = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        n_arg = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        # denom > 0 by construction: the C-rich melanoidin (C:N ≈ 8:1) far exceeds arginine's C:N
-        # (≈ 1.29), so ≈ 0.81·c_m — never near zero. (A negative denom would silently create sugar,
-        # so this ordering is load-bearing; a metadata test pins it, the class docstring's trap.)
-        denom = c_m - n_m * c_arg / n_arg
+        ratio = assimilable_carbon_per_nitrogen(y, schema)  # R [g C per g N drawn]
+        # denom > 0 by construction: the C-rich melanoidin (C:N ≈ 8:1) far exceeds the assimilable
+        # blend's C:N, which is bounded by its two members (arginine ≈ 1.29 .. glutamine ≈ 2.14)
+        # whatever the pool composition — so ≈ 0.73..0.84·c_m, never near zero. (A negative denom
+        # would silently create sugar, so this ordering is load-bearing; a metadata test pins it,
+        # the class docstring's trap. D-100 widened the margin's worst case from 1.29 to 2.14 and
+        # it still clears 8 by ~3.7×.)
+        denom = c_m - n_m * ratio
         mel_rate = r_sugar * c_sugar / denom  # g maillard_melanoidin/L/h
-        aa_mass = mel_rate * n_m / n_arg  # g arginine/L/h drawn, sized to the retained nitrogen
 
         # WINE-ONLY (unlike sugar-only :class:`Caramelization`, which D-90 made medium-agnostic):
-        # this route reads ``amino_acids``, untracked in beer (D-32), so it never runs on 3-slot S.
-        # ``d[s_slice] = -r_sugar`` is therefore correct as written (wine's single slot). Were beer
-        # amino acids ever tracked, this would need the D-90 vectorized apportionment Caramelization
-        # now carries (apportion the draw across the S vector; per-component carbon fractions).
+        # this route reads the amino-acid pools, untracked in beer (D-32), so it never runs on
+        # 3-slot S. ``d[s_slice] = -r_sugar`` is therefore correct as written (wine's single slot).
+        # Were beer amino acids ever tracked, this would need the D-90 vectorized apportionment
+        # Caramelization now carries (apportion the draw across the S vector; per-component
+        # carbon fractions).
         d[s_slice] = -r_sugar
-        d[schema.slice("amino_acids")] = -aa_mass
+        # Draw the retained nitrogen from {arginine, generic} (decision D-100). The carbon returned
+        # is exactly ``mel_rate·n_m·R`` — the same ``R`` the melanoidin was sized with — so the
+        # carbon ledger closes to machine precision by construction, not by coincidence.
+        draw_assimilable_nitrogen(d, y, schema, mel_rate * n_m)
         d[schema.slice(_MAILLARD_MELANOIDIN_SPECIES)] = mel_rate
         # The shared A420 browning index rises with the melanoidin formed (off every ledger, the
         # D-74 optical-index slot). Maillard melanoidins brown more per mass than caramelan, so this

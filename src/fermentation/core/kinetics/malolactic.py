@@ -122,10 +122,12 @@ from fermentation.core.chemistry import (
     M_DIACETYL,
     M_LACTIC,
     M_MALIC,
-    carbon_mass_fraction,
-    nitrogen_mass_fraction,
 )
-from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.kinetics.amino_acid_pools import (
+    ASSIMILABLE_SPECS,
+    depletion_gate,
+    draw_assimilable_nitrogen,
+)
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import draw_carbon_from_sugar
 from fermentation.core.process import Process
@@ -485,10 +487,13 @@ class MalolacticGrowth(Process):
 
     name = "malolactic_growth"
     tier = Tier.SPECULATIVE
-    #: Builds bacterial biomass ``X_mlf`` from the ``amino_acids`` pool, drawing the carbon
-    #: shortfall from ``S``. Does NOT touch ``N`` (nitrogen is sourced from amino acids, not the
-    #: ammonium pool — the D-38 anchoring choice).
-    touches = ("X_mlf", "amino_acids", "S")
+    #: Builds bacterial biomass ``X_mlf`` from the identity-agnostic amino-acid pools ({arginine,
+    #: generic}, decision D-100), drawing the carbon shortfall from ``S``. Does NOT touch ``N``
+    #: (nitrogen is sourced from amino acids, not the ammonium pool — the D-38 anchoring choice),
+    #: and does NOT touch the six precursor pools: those are the Ehrlich/Strecker substrates, and
+    #: keeping bacterial growth off them is exactly what stops fusel production from starving MLF
+    #: (the D-100 decoupling).
+    touches = ("X_mlf", *(spec.pool for spec in ASSIMILABLE_SPECS), "S")
     #: ``mu_max_mlf``/``K_aa_mlf`` are the bacterial growth rate + amino-acid half-saturation;
     #: ``K_s`` (reused from yeast growth) sets the sugar Monod; ``biomass_N_fraction``/
     #: ``biomass_C_fraction`` are the composition the biomass is built at (and weighted at in the
@@ -501,6 +506,9 @@ class MalolacticGrowth(Process):
         "K_s",
         "biomass_N_fraction",
         "biomass_C_fraction",
+        # The assimilable pools' must-spectrum shares, which scale K_aa_mlf into the D-100
+        # relative-depletion gate.
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
         *_MLF_GATE_READS,
     )
 
@@ -514,8 +522,13 @@ class MalolacticGrowth(Process):
         x_mlf = max(float(y[schema.slice("X_mlf")][0]), 0.0) if "X_mlf" in schema else 0.0
         if x_mlf <= 0.0:
             return d
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0) if "amino_acids" in schema else 0.0
-        if aa <= 0.0:
+        # The identity-agnostic substrate's relative-depletion gate (decision D-100): {arginine,
+        # generic} with K_aa_mlf scaled by their combined must-spectrum share. Bacteria build
+        # biomass from any assimilable amino acid, so this is the honest substrate — and, being
+        # untouched by the Ehrlich re-route, it is why D-99's fusel rise can no longer collapse
+        # bacterial growth (the D-100 finding).
+        aa_monod = depletion_gate(y, schema, params, ASSIMILABLE_SPECS, k_param="K_aa_mlf")
+        if aa_monod <= 0.0:
             return d
         s_total = max(float(y[schema.slice("S")].sum()), 0.0)
         if s_total <= 0.0:
@@ -524,7 +537,6 @@ class MalolacticGrowth(Process):
         ph = ph_of_state(y, schema, params)
         gate = malolactic_environmental_gate(y, schema, params, ph)
 
-        aa_monod = aa / (params["K_aa_mlf"] + aa)
         s_monod = s_total / (params["K_s"] + s_total)
         dx_mlf = params["mu_max_mlf"] * x_mlf * aa_monod * s_monod * gate  # [g X_mlf/L/h]
         if dx_mlf <= 0.0:
@@ -532,18 +544,17 @@ class MalolacticGrowth(Process):
 
         f_n = params["biomass_N_fraction"]
         f_c = params["biomass_C_fraction"]
-        y_n = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
-        y_c = carbon_mass_fraction(AMINO_ACID_SPECIES)
-        # Nitrogen-anchored: consume the arginine that carries the new biomass's nitrogen. Its
-        # carbon (rho*y_C) falls short of the biomass carbon demand (f_C*dx_mlf) because arginine
-        # is N-rich, so the positive shortfall is drawn from sugar. Both ledgers close exactly:
-        # X_mlf gains f_N*dx_mlf N (= rho*y_N, the amino-acid N) and f_C*dx_mlf C (= rho*y_C amino
-        # acid + shortfall sugar). The shortfall coefficient (f_C - f_N*y_C/y_N) > 0 structurally
-        # (biomass C:N >> arginine's), so no clamp is needed (decision D-38).
-        rho = f_n * dx_mlf / y_n  # [g arginine/L/h] consumed to supply the biomass nitrogen
+        # Nitrogen-anchored: consume the amino acids carrying the new biomass's nitrogen, split
+        # across {arginine, generic} by the nitrogen each holds (D-100). Their carbon falls short
+        # of the biomass carbon demand (f_C*dx_mlf) because both are N-rich, so the positive
+        # shortfall is drawn from sugar. Both ledgers close exactly: X_mlf gains f_N*dx_mlf N
+        # (= the amino-acid N) and f_C*dx_mlf C (= amino-acid carbon + shortfall sugar). The
+        # shortfall stays positive structurally — the blend's C:N is bounded by arginine's ≈ 1.29
+        # and glutamine's ≈ 2.14, both far below biomass's ≈ 4.3 — so no clamp is needed (D-38,
+        # whose guarantee D-100 widens from one species to the blend without weakening it).
+        carbon = draw_assimilable_nitrogen(d, y, schema, f_n * dx_mlf)  # [g C/L/h] it carries
         d[schema.slice("X_mlf")] = dx_mlf
-        d[schema.slice("amino_acids")] = -rho
-        shortfall = f_c * dx_mlf - rho * y_c  # [g C/L/h] biomass carbon not covered by arginine
+        shortfall = f_c * dx_mlf - carbon  # [g C/L/h] biomass carbon not covered by amino acids
         draw_carbon_from_sugar(d, y, schema, shortfall)
         return d
 
@@ -777,8 +788,13 @@ autolysis.YeastAutolysis` reads only the yeast ``X_dead`` pool, so senescing bac
         # regardless of how far E or nutrient depletion runs (no clamp needed — the wipeout guard).
         e = max(float(y[schema.slice("E")][0]), 0.0)
         ethanol_stress = e / (e + params["ethanol_tolerance_mlf"])
-        aa = max(float(y[schema.slice("amino_acids")][0]), 0.0) if "amino_acids" in schema else 0.0
-        starvation_stress = params["K_aa_mlf"] / (params["K_aa_mlf"] + aa)
+        # Starvation reads the SAME substrate MalolacticGrowth eats — {arginine, generic}, on the
+        # same D-100 relative-depletion scale — so the two stay each other's exact complement:
+        # `starvation_stress = 1 − growth's aa_monod`. Reading a different pool (or the same pool
+        # on a different scale) would let bacteria starve while growing, or vice versa.
+        starvation_stress = 1.0 - depletion_gate(
+            y, schema, params, ASSIMILABLE_SPECS, k_param="K_aa_mlf"
+        )
         stress = (
             1.0
             + params["k_senescence_ethanol_scale"] * ethanol_stress

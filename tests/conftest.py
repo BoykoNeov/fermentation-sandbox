@@ -1,5 +1,8 @@
 """Shared fixtures: a mass-conserving toy fermentation used to exercise the
 runtime and the validation harness without committing to real kinetics.
+
+Also home to :func:`seed_amino_acids`, the one place the D-100 must-spectrum seeding lives, so
+that every amino-acid consumer's tests state the same thing by the same means.
 """
 
 from collections.abc import Mapping
@@ -7,9 +10,33 @@ from collections.abc import Mapping
 import pytest
 
 from fermentation.core.chemistry import CO2_PER_HEXOSE, ETHANOL_PER_HEXOSE
+from fermentation.core.kinetics.amino_acid_pools import AMINO_ACID_SPECS
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema, VarSpec
 from fermentation.core.tiers import Tier
+
+
+def seed_amino_acids(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], total: float
+) -> FloatArray:
+    """Load ``total`` g/L of assimilable amino acids at **must-spectrum composition** (D-100).
+
+    The test-side twin of the compile seam's ``_wine_amino_acids`` split, and the state the
+    D-100 gate algebra is designed around: at spectrum composition every per-species
+    relative-depletion gate ``aa_i/(K·f_i + aa_i)`` collapses to the pre-split lumped gate
+    ``aa/(K + aa)`` exactly. That is what lets the D-45/D-75/D-87/D-89 closed-form assertions
+    keep asserting the *same numbers* across the split — they are not being loosened to
+    accommodate speciation, they are being seeded in the state where speciation is provably a
+    no-op on the rate. Anything a test still catches after this seeding is a real change.
+
+    Mutates and returns ``y`` (the ``_wine``-builder idiom).
+    """
+    fractions = {spec.pool: params[spec.fraction_param] for spec in AMINO_ACID_SPECS}
+    denominator = sum(fractions.values())
+    for pool, fraction in fractions.items():
+        y[schema.slice(pool)] = total * fraction / denominator
+    return y
+
 
 # Gay-Lussac mass split: glucose -> 2 ethanol + 2 CO2. Derived from the shared
 # stoichiometry in fermentation.core.chemistry (single source of truth) so the

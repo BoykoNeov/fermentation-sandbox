@@ -16,6 +16,8 @@ enable) is D-70; here the Process is exercised directly via a hand-built ``Proce
 D-64 loss-Process pattern), off the fermentation ProcessSet so isolability is preserved.
 """
 
+from collections.abc import Mapping
+
 import numpy as np
 import pytest
 
@@ -64,6 +66,12 @@ from fermentation.core.kinetics.aging import (
     _MAILLARD_PRODUCTS,
     _SO2_PER_O2,
 )
+from fermentation.core.kinetics.amino_acid_pools import (
+    AMINO_ACID_SPECS,
+    ASSIMILABLE_SPECS,
+    GENERIC_SPECIES,
+    assimilable_carbon_per_nitrogen,
+)
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import Process, ProcessSet
@@ -78,6 +86,7 @@ from fermentation.validation import (
     total_mass,
     total_nitrogen,
 )
+from tests.conftest import seed_amino_acids
 
 #: Carbon fractions of the three pools the transfer touches (mirror the Process constants).
 #: D-96: the hydrolysis debits isoamyl acetate ITSELF, not an ethyl-acetate stand-in.
@@ -99,6 +108,10 @@ _PHENYLACET_C = carbon_mass_fraction("phenylacetaldehyde")
 _CO2_C = carbon_mass_fraction("CO2")
 _AA_C = carbon_mass_fraction(AMINO_ACID_SPECIES)
 _AA_N = nitrogen_mass_fraction(AMINO_ACID_SPECIES)
+#: The generic bucket's stand-in (glutamine, D-100) — the other half of every identity-agnostic
+#: draw, and the C-richer end of the blend the D-89 denominator must clear.
+_GENERIC_C = carbon_mass_fraction(GENERIC_SPECIES)
+_GENERIC_N = nitrogen_mass_fraction(GENERIC_SPECIES)
 # The four non-oxidative THERMAL Strecker aldehyde/sotolon carbon fractions (decision D-87).
 _2MB_C = carbon_mass_fraction("2_methylbutanal")
 _3MB_C = carbon_mass_fraction("3_methylbutanal")
@@ -959,15 +972,37 @@ def test_browning_tier_floored_at_speculative(store):
 # wine-only no-op on beer, the warmer-faster ordering, the integrated saturation + closure, and the
 # speculative tier floor (incl. the structural N-write).
 
-_STRECKER_TOUCHES = {"o2", "methional", "phenylacetaldehyde", "CO2", "amino_acids", "N"}
+#: Each aldehyde now draws ITS OWN precursor (D-100): methional really is methionine minus its
+#: carboxyl, phenylacetaldehyde really is phenylalanine minus its. The lumped arginine draw —
+#: which booked a molecule containing no sulfur as methional's source — is retired.
+_STRECKER_TOUCHES = {
+    "o2",
+    "methional",
+    "phenylacetaldehyde",
+    "CO2",
+    "N",
+    "methionine",
+    "phenylalanine",
+}
+#: (precursor, product) — the D-100 map the two Strecker routes and the thermal route share.
+_STRECKER_PRECURSORS = {"methional": "methionine", "phenylacetaldehyde": "phenylalanine"}
 
 
 def _strecker_wine(
-    schema: StateSchema, *, aa: float = 0.05, o2: float = 0.03, t: float = 293.15, **kw
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    aa: float = 0.05,
+    o2: float = 0.03,
+    t: float = 293.15,
+    **kw,
 ) -> FloatArray:
     """A finished, racked wine at the start of aging with dosed amino acids + O2 — the two Strecker
-    substrates. ``esters`` defaults to 0 (irrelevant here); any extra pool via kwargs."""
-    y = _aged_wine(schema, ester=0.0, t=t, o2=o2, amino_acids=aa)
+    substrates. Amino acids are seeded at MUST-SPECTRUM composition (D-100), the state in which
+    every per-precursor gate provably equals the pre-split lumped gate, so the closed form below
+    asserts the same numbers the lumped suite did. ``esters`` defaults to 0 (irrelevant here)."""
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2)
+    seed_amino_acids(y, schema, params, aa)
     for name, val in kw.items():
         y[schema.slice(name)] = val
     return y
@@ -978,7 +1013,10 @@ def _strecker_closed_form(
 ) -> dict[str, float]:
     """The Process's own algebra, recomputed independently for the closed-form assertions."""
     o2 = float(y[schema.slice("o2")][0])
-    aa = float(y[schema.slice("amino_acids")][0])
+    # At must-spectrum composition every per-precursor gate aa_i/(K·f_i + aa_i) collapses to this
+    # one lumped value (the D-100 reduction property), so the pre-split algebra is EXACT here —
+    # which is the property this closed form now doubles as a proof of.
+    aa = sum(float(y[schema.slice(spec.pool)][0]) for spec in AMINO_ACID_SPECS)
     gate = aa / (params["K_amino_acids"] + aa)
     f_t = arrhenius_factor(t, params["E_a_strecker"], params["T_ref"])
     r_o2 = params["k_strecker"] * f_t * o2 * gate
@@ -1000,6 +1038,7 @@ def test_strecker_metadata():
     # Consumes its aa-gated O2 share; books the two aldehydes + the decarboxylation CO2, drawing
     # carbon from amino_acids and deaminating the nitrogen to N. Touches those six and nothing else.
     assert set(p.touches) == _STRECKER_TOUCHES
+    assert "amino_acids" not in p.touches  # the lumped draw is RETIRED (D-100)
     assert set(p.reads) == {
         "k_strecker",
         "E_a_strecker",
@@ -1007,13 +1046,15 @@ def test_strecker_metadata():
         "f_methional",
         "K_amino_acids",
         "T_ref",
+        "must_aa_fraction_methionine",
+        "must_aa_fraction_phenylalanine",
     }
 
 
 def test_strecker_matches_closed_form(params):
     schema = wine_schema()
     aa, o2, t = 0.05, 0.03, 298.15  # off T_ref so the Arrhenius factor bites
-    y = _strecker_wine(schema, aa=aa, o2=o2, t=t)
+    y = _strecker_wine(schema, params, aa=aa, o2=o2, t=t)
     d = StreckerDegradation().derivatives(0.0, y, schema, params)
     cf = _strecker_closed_form(schema, params, y, t)
 
@@ -1022,41 +1063,58 @@ def test_strecker_matches_closed_form(params):
     assert schema.get(d, "methional") == pytest.approx(cf["methional"])
     assert schema.get(d, "phenylacetaldehyde") == pytest.approx(cf["phenylacetaldehyde"])
     assert schema.get(d, "CO2") == pytest.approx(cf["CO2"])
-    # amino_acids drawn sized to the product carbon; nitrogen deaminated to N.
-    product_carbon = (
-        cf["methional"] * _METHIONAL_C
-        + cf["phenylacetaldehyde"] * _PHENYLACET_C
-        + cf["CO2"] * _CO2_C
-    )
-    aa_mass = product_carbon / _AA_C
-    assert schema.get(d, "amino_acids") == pytest.approx(-aa_mass)
-    assert schema.get(d, "N") == pytest.approx(aa_mass * _AA_N)
+    # EACH precursor is drawn sized to the carbon of the product IT made, plus the CO2 that
+    # product's own carboxyl released (D-100). The CO2 attribution is load-bearing and invisible to
+    # conservation — closure holds for any split — so it is asserted per-precursor here.
+    n_ald = cf["CO2"] / M_CO2  # total mol aldehyde; 1 CO2 each (both routes decarboxylate)
+    f_meth = params["f_methional"]
+    per_precursor = {
+        "methionine": cf["methional"] * _METHIONAL_C + f_meth * n_ald * M_CO2 * _CO2_C,
+        "phenylalanine": (
+            cf["phenylacetaldehyde"] * _PHENYLACET_C + (1.0 - f_meth) * n_ald * M_CO2 * _CO2_C
+        ),
+    }
+    expected_n = 0.0
+    for precursor, carbon in per_precursor.items():
+        mass = carbon / carbon_mass_fraction(precursor)
+        assert schema.get(d, precursor) == pytest.approx(-mass)
+        expected_n += mass * nitrogen_mass_fraction(precursor)
+    # ...and the deamination releases the nitrogen THOSE molecules carried, not arginine's.
+    assert schema.get(d, "N") == pytest.approx(expected_n)
+    assert schema.get(d, "amino_acids") == 0.0  # the lumped pool is untouched (D-100)
     # Touches nothing else — no ethanol/esters/higher alcohols/acetaldehyde, no sugar, no biomass.
     for var in ("X", "S", "E", "isoamyl_acetate", "isoamyl_alcohol", "Byp", "acetaldehyde"):
         assert schema.get(d, var) == 0.0
 
 
 def test_strecker_carbon_closes_per_rhs(params):
-    # CARBON closes to machine precision: the arginine carbon leaving amino_acids equals the carbon
-    # entering methional + phenylacetaldehyde + CO2 (the draw is sized to match) — a pure on-ledger
-    # transfer, off-ledger o2 aside.
+    # CARBON closes to machine precision: the carbon leaving EACH precursor, at ITS OWN carbon
+    # fraction (D-100), equals the carbon entering methional + phenylacetaldehyde + CO2 — a pure
+    # on-ledger transfer, off-ledger o2 aside.
     schema = wine_schema()
-    d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=298.15), schema, params)
+    d = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, t=298.15), schema, params
+    )
     carbon_residual = (
         schema.get(d, "methional") * _METHIONAL_C
         + schema.get(d, "phenylacetaldehyde") * _PHENYLACET_C
         + schema.get(d, "CO2") * _CO2_C
-        + schema.get(d, "amino_acids") * _AA_C
+        + sum(schema.get(d, aa) * carbon_mass_fraction(aa) for aa in _STRECKER_PRECURSORS.values())
     )
     assert carbon_residual == pytest.approx(0.0, abs=1e-18)
 
 
 def test_strecker_nitrogen_closes_per_rhs(params):
-    # NITROGEN closes: all the arginine nitrogen leaving amino_acids lands in the N pool (the
-    # aldehydes are nitrogen-free — the deamination, the D-45 mercaptan idiom).
+    # NITROGEN closes: all the nitrogen leaving the precursors, at THEIR OWN fractions (D-100),
+    # lands in the N pool (the aldehydes are nitrogen-free — the deamination, the D-45 idiom).
     schema = wine_schema()
-    d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=298.15), schema, params)
-    nitrogen_residual = schema.get(d, "amino_acids") * _AA_N + schema.get(d, "N") * 1.0
+    d = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, t=298.15), schema, params
+    )
+    nitrogen_residual = (
+        sum(schema.get(d, aa) * nitrogen_mass_fraction(aa) for aa in _STRECKER_PRECURSORS.values())
+        + schema.get(d, "N") * 1.0
+    )
     assert nitrogen_residual == pytest.approx(0.0, abs=1e-18)
 
 
@@ -1066,10 +1124,12 @@ def test_strecker_inert_without_oxygen(params):
     schema = wine_schema()
     ps = ProcessSet(schema, [StreckerDegradation()], strict=True)
     assert np.array_equal(
-        ps.total_derivatives(0.0, _strecker_wine(schema, o2=0.0), params), schema.zeros()
+        ps.total_derivatives(0.0, _strecker_wine(schema, params, o2=0.0), params), schema.zeros()
     )
     assert np.array_equal(
-        StreckerDegradation().derivatives(0.0, _strecker_wine(schema, o2=-1e-6), schema, params),
+        StreckerDegradation().derivatives(
+            0.0, _strecker_wine(schema, params, o2=-1e-6), schema, params
+        ),
         schema.zeros(),
     )
 
@@ -1080,10 +1140,12 @@ def test_strecker_inert_without_amino_acids(params):
     schema = wine_schema()
     ps = ProcessSet(schema, [StreckerDegradation()], strict=True)
     assert np.array_equal(
-        ps.total_derivatives(0.0, _strecker_wine(schema, aa=0.0), params), schema.zeros()
+        ps.total_derivatives(0.0, _strecker_wine(schema, params, aa=0.0), params), schema.zeros()
     )
     assert np.array_equal(
-        StreckerDegradation().derivatives(0.0, _strecker_wine(schema, aa=-1e-6), schema, params),
+        StreckerDegradation().derivatives(
+            0.0, _strecker_wine(schema, params, aa=-1e-6), schema, params
+        ),
         schema.zeros(),
     )
 
@@ -1092,9 +1154,21 @@ def test_strecker_first_order_in_oxygen(params):
     # First-order in the O2 pool (at fixed amino acids, so the availability gate is held constant):
     # doubling [o2] doubles the instantaneous O2 draw and every product rate.
     schema = wine_schema()
-    base = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, o2=0.02), schema, params)
-    dbl = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, o2=0.04), schema, params)
-    for pool in ("o2", "methional", "phenylacetaldehyde", "CO2", "amino_acids", "N"):
+    base = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, o2=0.02), schema, params
+    )
+    dbl = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, o2=0.04), schema, params
+    )
+    for pool in (
+        "o2",
+        "methional",
+        "phenylacetaldehyde",
+        "CO2",
+        "methionine",
+        "phenylalanine",
+        "N",
+    ):
         assert schema.get(dbl, pool) == pytest.approx(2.0 * schema.get(base, pool))
 
 
@@ -1104,10 +1178,14 @@ def test_strecker_availability_gate_saturates(params):
     # ungated k*f*[o2]; at aa == K it is ~half that — a monotone, saturating aa dependence.
     schema = wine_schema()
     k = params["K_amino_acids"]
-    low = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, aa=0.1 * k), schema, params)
-    mid = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, aa=k), schema, params)
+    low = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, aa=0.1 * k), schema, params
+    )
+    mid = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, aa=k), schema, params
+    )
     high = StreckerDegradation().derivatives(
-        0.0, _strecker_wine(schema, aa=100.0 * k), schema, params
+        0.0, _strecker_wine(schema, params, aa=100.0 * k), schema, params
     )
     # Monotone increasing O2 draw magnitude with amino acids, but saturating (not linear).
     assert 0.0 < -schema.get(low, "o2") < -schema.get(mid, "o2") < -schema.get(high, "o2")
@@ -1120,7 +1198,7 @@ def test_strecker_split_phenylacetaldehyde_dominant(params):
     # f_methional = 0.15 PHENYLACETALDEHYDE dominates (the split is production flux — phenylalanine
     # is far more abundant in must than methionine; potency lives in the OAV threshold, not here).
     schema = wine_schema()
-    d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema), schema, params)
+    d = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, params), schema, params)
     meth_mol = schema.get(d, "methional") / M_METHIONAL
     phenyl_mol = schema.get(d, "phenylacetaldehyde") / M_PHENYLACETALDEHYDE
     f_meth = params["f_methional"]
@@ -1134,8 +1212,12 @@ def test_strecker_rises_with_temperature(params):
     # The sourced ordering (E_a_strecker > 0): warmer storage forms Strecker aldehydes faster — the
     # canonical warm-storage staling/oxidation direction.
     schema = wine_schema()
-    cold = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=283.15), schema, params)
-    warm = StreckerDegradation().derivatives(0.0, _strecker_wine(schema, t=303.15), schema, params)
+    cold = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, t=283.15), schema, params
+    )
+    warm = StreckerDegradation().derivatives(
+        0.0, _strecker_wine(schema, params, t=303.15), schema, params
+    )
     assert schema.get(warm, "methional") > schema.get(cold, "methional") > 0.0
     assert schema.get(warm, "o2") < schema.get(cold, "o2") < 0.0  # more O2 drawn when warm
 
@@ -1164,7 +1246,7 @@ def test_integrated_strecker_saturates_and_closes(params, store):
         [OxidativeAcetaldehyde(), PhenolicBrowning(), StreckerDegradation()],
         strict=True,
     )
-    y0 = _strecker_wine(schema, aa=0.05, o2=0.04, t=298.15)
+    y0 = _strecker_wine(schema, params, aa=0.05, o2=0.04, t=298.15)
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success, traj.message
 
@@ -1218,6 +1300,18 @@ def test_strecker_tier_floored_at_speculative(store):
 # the
 # speculative tier floor (incl. the structural N-write).
 
+#: Each product draws ITS OWN precursor (D-100) — five distinct amino acids over six products.
+#: sotolon<-threonine is the load-bearing entry: threonine is ALSO propanol's Ehrlich precursor, so
+#: the propanol-vs-sotolon competition is real chemistry over one molecule (unlike the retired
+#: fusels-vs-arginine competition, which was an artifact of the lump).
+_MAILLARD_PRECURSORS = {
+    "methional": "methionine",
+    "phenylacetaldehyde": "phenylalanine",
+    "2_methylbutanal": "isoleucine",
+    "3_methylbutanal": "leucine",
+    "2_methylpropanal": "valine",
+    "sotolon": "threonine",
+}
 _MAILLARD_TOUCHES = {
     "methional",
     "phenylacetaldehyde",
@@ -1226,8 +1320,8 @@ _MAILLARD_TOUCHES = {
     "2_methylpropanal",
     "sotolon",
     "CO2",
-    "amino_acids",
     "N",
+    *_MAILLARD_PRECURSORS.values(),
 }
 # Per-product carbon fraction, keyed by pool (for the closed-form carbon accounting).
 _MAILLARD_C = {
@@ -1256,11 +1350,19 @@ def maillard_params(maillard_store):
 
 
 def _maillard_wine(
-    schema: StateSchema, *, aa: float = 0.3, s: float = 80.0, t: float = 298.15, **kw
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    aa: float = 0.3,
+    s: float = 80.0,
+    t: float = 298.15,
+    **kw,
 ) -> FloatArray:
     """A finished, SEALED (o2 = 0 — the whole point) SWEET wine at the start of aging: residual
-    sugar ``s`` (the dicarbonyl driver) + dosed ``amino_acids``, warm. Any extra pool via kwargs."""
-    y = _aged_wine(schema, ester=0.0, t=t, amino_acids=aa)
+    sugar ``s`` (the dicarbonyl driver) + dosed amino acids at MUST-SPECTRUM composition (D-100 —
+    the state where every per-precursor gate provably equals the pre-split lumped gate), warm."""
+    y = _aged_wine(schema, ester=0.0, t=t)
+    seed_amino_acids(y, schema, params, aa)
     y[schema.slice("S")] = s
     for name, val in kw.items():
         y[schema.slice(name)] = val
@@ -1271,16 +1373,18 @@ def _maillard_closed_form(
     schema: StateSchema, params: dict[str, float], y: FloatArray, t: float
 ) -> dict[str, float]:
     """The Process's own algebra, recomputed independently for the closed-form assertions."""
-    aa = float(y[schema.slice("amino_acids")][0])
+    # At must-spectrum composition every per-precursor gate collapses to this one lumped value
+    # (the D-100 reduction property), so the pre-split algebra is EXACT here.
+    aa = sum(float(y[schema.slice(spec.pool)][0]) for spec in AMINO_ACID_SPECS)
     s_total = float(y[schema.slice("S")].sum())
     gate = aa / (params["K_amino_acids"] + aa)
     f_t = arrhenius_factor(t, params["E_a_maillard_strecker"], params["T_ref"])
     n_ald = params["k_maillard_strecker"] * f_t * s_total * gate
-    weights = [params[wname] for (_, _, wname, _) in _MAILLARD_PRODUCTS]
+    weights = [params[wname] for (_, _, wname, _, _) in _MAILLARD_PRODUCTS]
     w_sum = sum(weights)
     out: dict[str, float] = {}
     co2_mol = 0.0
-    for (pool, m_i, _wn, decarb), w_i in zip(_MAILLARD_PRODUCTS, weights, strict=True):
+    for (pool, m_i, _wn, decarb, _prec), w_i in zip(_MAILLARD_PRODUCTS, weights, strict=True):
         n_i = (w_i / w_sum) * n_ald
         out[pool] = n_i * m_i
         if decarb:
@@ -1300,6 +1404,7 @@ def test_maillard_metadata():
     assert set(p.touches) == _MAILLARD_TOUCHES
     assert "o2" not in p.touches
     assert "S" not in p.touches
+    assert "amino_acids" not in p.touches  # the lumped draw is RETIRED (D-100)
     assert set(p.reads) == {
         "k_maillard_strecker",
         "E_a_maillard_strecker",
@@ -1311,12 +1416,15 @@ def test_maillard_metadata():
         "w_maillard_sotolon",
         "K_amino_acids",
         "T_ref",
+        *(f"must_aa_fraction_{aa}" for aa in set(_MAILLARD_PRECURSORS.values())),
     }
 
 
 def test_maillard_matches_closed_form(maillard_params):
     schema = wine_schema()
-    y = _maillard_wine(schema, aa=0.3, s=80.0, t=298.15)  # off T_ref so the Arrhenius factor bites
+    y = _maillard_wine(
+        schema, maillard_params, aa=0.3, s=80.0, t=298.15
+    )  # off T_ref so the Arrhenius factor bites
     d = MaillardStrecker().derivatives(0.0, y, schema, maillard_params)
     cf = _maillard_closed_form(schema, maillard_params, y, 298.15)
 
@@ -1324,11 +1432,22 @@ def test_maillard_matches_closed_form(maillard_params):
     for pool in _MAILLARD_C:
         assert schema.get(d, pool) == pytest.approx(cf[pool])
     assert schema.get(d, "CO2") == pytest.approx(cf["CO2"])
-    # amino_acids drawn sized to the TOTAL product carbon (all six products + CO2); N deaminated.
-    product_carbon = sum(cf[pool] * _MAILLARD_C[pool] for pool in _MAILLARD_C) + cf["CO2"] * _CO2_C
-    aa_mass = product_carbon / _AA_C
-    assert schema.get(d, "amino_acids") == pytest.approx(-aa_mass)
-    assert schema.get(d, "N") == pytest.approx(aa_mass * _AA_N)
+    # EACH precursor drawn sized to the carbon of the product IT made, plus the CO2 that product's
+    # own carboxyl released (D-100; sotolon contributes none — it is an aldol furanone, not a
+    # Strecker aldehyde). The CO2 attribution is invisible to conservation, so it is pinned here.
+    per_precursor: dict[str, float] = {}
+    for pool, m_i, _wname, decarb, precursor in _MAILLARD_PRODUCTS:
+        carbon = cf[pool] * _MAILLARD_C[pool]
+        if decarb:
+            carbon += (cf[pool] / m_i) * M_CO2 * _CO2_C  # 1 CO2 per aldehyde
+        per_precursor[precursor] = per_precursor.get(precursor, 0.0) + carbon
+    expected_n = 0.0
+    for precursor, carbon in per_precursor.items():
+        mass = carbon / carbon_mass_fraction(precursor)
+        assert schema.get(d, precursor) == pytest.approx(-mass)
+        expected_n += mass * nitrogen_mass_fraction(precursor)
+    assert schema.get(d, "N") == pytest.approx(expected_n)
+    assert schema.get(d, "amino_acids") == 0.0  # the lumped pool is untouched (D-100)
     # S is a read-only driver — NOT consumed here (its draw is booked by D-88). And NO o2 term.
     assert schema.get(d, "S") == 0.0
     assert schema.get(d, "o2") == 0.0
@@ -1337,24 +1456,39 @@ def test_maillard_matches_closed_form(maillard_params):
 
 
 def test_maillard_carbon_closes_per_rhs(maillard_params):
-    # CARBON closes to machine precision: the arginine carbon leaving amino_acids equals the carbon
-    # entering all six products + CO2 (the draw is sized to match) — a pure on-ledger transfer.
+    # CARBON closes to machine precision: the carbon leaving EACH precursor, at ITS OWN carbon
+    # fraction (D-100), equals the carbon entering all six products + CO2 — a pure on-ledger
+    # transfer. Five distinct molecules now, each weighted as itself rather than as arginine.
     schema = wine_schema()
-    d = MaillardStrecker().derivatives(0.0, _maillard_wine(schema), schema, maillard_params)
+    d = MaillardStrecker().derivatives(
+        0.0, _maillard_wine(schema, maillard_params), schema, maillard_params
+    )
     carbon_residual = (
         sum(schema.get(d, pool) * _MAILLARD_C[pool] for pool in _MAILLARD_C)
         + schema.get(d, "CO2") * _CO2_C
-        + schema.get(d, "amino_acids") * _AA_C
+        + sum(
+            schema.get(d, aa) * carbon_mass_fraction(aa)
+            for aa in set(_MAILLARD_PRECURSORS.values())
+        )
     )
     assert carbon_residual == pytest.approx(0.0, abs=1e-18)
 
 
 def test_maillard_nitrogen_closes_per_rhs(maillard_params):
-    # NITROGEN closes: all the arginine nitrogen leaving amino_acids lands in the N pool (every
-    # product is nitrogen-free — the deamination, the D-45/D-75 idiom).
+    # NITROGEN closes: all the nitrogen leaving the five precursors, at THEIR OWN fractions
+    # (D-100), lands in the N pool (every product is nitrogen-free — the deamination, the
+    # D-45/D-75 idiom).
     schema = wine_schema()
-    d = MaillardStrecker().derivatives(0.0, _maillard_wine(schema), schema, maillard_params)
-    nitrogen_residual = schema.get(d, "amino_acids") * _AA_N + schema.get(d, "N") * 1.0
+    d = MaillardStrecker().derivatives(
+        0.0, _maillard_wine(schema, maillard_params), schema, maillard_params
+    )
+    nitrogen_residual = (
+        sum(
+            schema.get(d, aa) * nitrogen_mass_fraction(aa)
+            for aa in set(_MAILLARD_PRECURSORS.values())
+        )
+        + schema.get(d, "N") * 1.0
+    )
     assert nitrogen_residual == pytest.approx(0.0, abs=1e-18)
 
 
@@ -1364,11 +1498,12 @@ def test_maillard_inert_without_amino_acids(maillard_params):
     schema = wine_schema()
     ps = ProcessSet(schema, [MaillardStrecker()], strict=True)
     assert np.array_equal(
-        ps.total_derivatives(0.0, _maillard_wine(schema, aa=0.0), maillard_params), schema.zeros()
+        ps.total_derivatives(0.0, _maillard_wine(schema, maillard_params, aa=0.0), maillard_params),
+        schema.zeros(),
     )
     assert np.array_equal(
         MaillardStrecker().derivatives(
-            0.0, _maillard_wine(schema, aa=-1e-6), schema, maillard_params
+            0.0, _maillard_wine(schema, maillard_params, aa=-1e-6), schema, maillard_params
         ),
         schema.zeros(),
     )
@@ -1380,12 +1515,14 @@ def test_maillard_inert_without_sugar(maillard_params):
     # clean no-op here (and absorbs the S<0 solver undershoot).
     schema = wine_schema()
     assert np.array_equal(
-        MaillardStrecker().derivatives(0.0, _maillard_wine(schema, s=0.0), schema, maillard_params),
+        MaillardStrecker().derivatives(
+            0.0, _maillard_wine(schema, maillard_params, s=0.0), schema, maillard_params
+        ),
         schema.zeros(),
     )
     assert np.array_equal(
         MaillardStrecker().derivatives(
-            0.0, _maillard_wine(schema, s=-1e-6), schema, maillard_params
+            0.0, _maillard_wine(schema, maillard_params, s=-1e-6), schema, maillard_params
         ),
         schema.zeros(),
     )
@@ -1398,10 +1535,10 @@ def test_maillard_is_oxygen_independent(maillard_params):
     # zero at o2 = 0. Same sweet state, o2 swept 0 → high: byte-for-byte identical derivative.
     schema = wine_schema()
     sealed = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, o2=0.0), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, o2=0.0), schema, maillard_params
     )
     oxygenated = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, o2=0.05), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, o2=0.05), schema, maillard_params
     )
     assert np.array_equal(sealed, oxygenated)
     assert schema.get(sealed, "sotolon") > 0.0  # non-vacuous: it IS producing while sealed
@@ -1413,10 +1550,10 @@ def test_maillard_first_order_in_sugar(maillard_params):
     # reagent), not sugar — sugar drives the RATE.
     schema = wine_schema()
     base = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, s=40.0), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, s=40.0), schema, maillard_params
     )
     dbl = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, s=80.0), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, s=80.0), schema, maillard_params
     )
     assert schema.get(dbl, "sotolon") == pytest.approx(2.0 * schema.get(base, "sotolon"))
 
@@ -1427,12 +1564,14 @@ def test_maillard_availability_gate_saturates(maillard_params):
     schema = wine_schema()
     k = maillard_params["K_amino_acids"]
     # Equal-RATIO aa steps (k → 10k → 100k), so a saturating gate shows strictly diminishing gains.
-    low = MaillardStrecker().derivatives(0.0, _maillard_wine(schema, aa=k), schema, maillard_params)
+    low = MaillardStrecker().derivatives(
+        0.0, _maillard_wine(schema, maillard_params, aa=k), schema, maillard_params
+    )
     mid = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, aa=10.0 * k), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, aa=10.0 * k), schema, maillard_params
     )
     high = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, aa=100.0 * k), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, aa=100.0 * k), schema, maillard_params
     )
     lo, md, hi = (schema.get(x, "sotolon") for x in (low, mid, high))
     assert lo < md < hi  # monotone increasing in aa
@@ -1444,7 +1583,7 @@ def test_maillard_split_normalizes_and_sotolon_has_no_co2(maillard_params):
     # flagged), and — the load-bearing flag — sotolon (a furanone, NOT a decarboxylation product)
     # contributes NO CO2, while the CO2 exactly matches the FIVE Strecker aldehydes' mole sum.
     schema = wine_schema()
-    y = _maillard_wine(schema)
+    y = _maillard_wine(schema, maillard_params)
     d = MaillardStrecker().derivatives(0.0, y, schema, maillard_params)
     # mole rate of each product = mass rate / molar mass
     masses = {
@@ -1471,10 +1610,10 @@ def test_maillard_rises_with_temperature(maillard_params):
     # Warmer ages faster — the sourced direction (thermal Strecker is strongly temperature-driven).
     schema = wine_schema()
     cold = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, t=283.15), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, t=283.15), schema, maillard_params
     )
     warm = MaillardStrecker().derivatives(
-        0.0, _maillard_wine(schema, t=303.15), schema, maillard_params
+        0.0, _maillard_wine(schema, maillard_params, t=303.15), schema, maillard_params
     )
     assert schema.get(warm, "sotolon") > schema.get(cold, "sotolon") > 0.0
 
@@ -1513,7 +1652,9 @@ def test_maillard_sealed_sweet_accumulates_where_oxidative_gives_zero(
     # single contrast that proves the route does something the oxidative sink cannot. Carbon AND
     # nitrogen close to machine precision through the integrated segment.
     schema = wine_schema()
-    y0 = _maillard_wine(schema, aa=0.4, s=80.0, t=301.15)  # 28 °C, sealed (o2 defaults to 0)
+    y0 = _maillard_wine(
+        schema, maillard_params, aa=0.4, s=80.0, t=301.15
+    )  # 28 °C, sealed (o2 defaults to 0)
     # The oxidative route on the SAME sealed state: identically zero (its o2 <= 0 guard short-
     # circuits before it even reads a param, so maillard_params suffices — nothing is computed).
     d_oxid = StreckerDegradation().derivatives(0.0, y0, schema, maillard_params)
@@ -1807,19 +1948,46 @@ def test_caramelization_tier_floored_at_speculative(caramel_store):
 # no-op on beer, the integrated sweet browning + dual-ledger closure, and the speculative tier
 # floor.
 
-_MAILLARD_BROWNING_TOUCHES = {"S", "amino_acids", "maillard_melanoidin", "A420"}
-#: The sized-draw denominator (c_m − n_m·c(arg)/n(arg)) — must be > 0 or r_m flips sign and the
-#: Process would silently create sugar (closure holds either sign — the advisor's must-check trap).
-_MB_DENOM = _MAILLARD_MELANOIDIN_C - _MAILLARD_MELANOIDIN_N * _AA_C / _AA_N
+#: Browning retains amino-acid NITROGEN without caring which molecule carried it, so it draws the
+#: IDENTITY-AGNOSTIC pools (D-100) — never a precursor. That is what makes it immune to the Ehrlich
+#: re-route, which is the starvation channel D-100 exists to close.
+_MAILLARD_BROWNING_TOUCHES = {
+    "S",
+    "amino_acids",
+    "amino_acids_generic",
+    "maillard_melanoidin",
+    "A420",
+}
+#: The two extremes of the drawn blend's mass C:N (D-100). The realised ratio is a
+#: nitrogen-weighted average of these, so ANY pool composition lands between them.
+_BLEND_CN_BOUNDS = (_AA_C / _AA_N, _GENERIC_C / _GENERIC_N)
+
+
+def _mb_denom(ratio: float) -> float:
+    """The sized-draw denominator ``c_m − n_m·R`` at a given blend C:N ``R``.
+
+    Must be > 0 or ``r_m`` flips sign and the Process silently CREATES sugar — and no conservation
+    test would catch it, because closure holds for either sign (the advisor's must-check trap,
+    D-89). D-100 makes ``R`` state-dependent (it was arginine's fixed 1.29), so the check below
+    asserts the sign across the whole reachable range rather than at one species.
+    """
+    return _MAILLARD_MELANOIDIN_C - _MAILLARD_MELANOIDIN_N * ratio
 
 
 def _maillard_browning_wine(
-    schema: StateSchema, *, aa: float = 0.3, s: float = 80.0, t: float = 298.15, **kw
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    aa: float = 0.3,
+    s: float = 80.0,
+    t: float = 298.15,
+    **kw,
 ) -> FloatArray:
     """A finished, SEALED (o2 = 0) SWEET wine at the start of aging: residual sugar ``s`` + dosed
-    ``amino_acids``, warm — the regime where amino-acid Maillard browning runs. Extra pools via
-    kw."""
-    y = _aged_wine(schema, ester=0.0, t=t, amino_acids=aa)
+    amino acids at MUST-SPECTRUM composition (D-100), warm — the regime where amino-acid Maillard
+    browning runs. Extra pools via kw."""
+    y = _aged_wine(schema, ester=0.0, t=t)
+    seed_amino_acids(y, schema, params, aa)
     y[schema.slice("S")] = s
     for name, val in kw.items():
         y[schema.slice(name)] = val
@@ -1830,19 +1998,34 @@ def _maillard_browning_closed_form(
     schema: StateSchema, params: dict[str, float], y: FloatArray, t: float
 ) -> dict[str, float]:
     """The Process's own sized-draw algebra, recomputed independently for the assertions."""
-    aa = float(y[schema.slice("amino_acids")][0])
+    # The identity-agnostic substrate, gated on ITS combined must-spectrum share (D-100). At
+    # must-spectrum composition this equals the pre-split lumped gate exactly — the reduction
+    # property — so the D-89 algebra is reproduced here rather than reinvented.
+    assimilable = sum(float(y[schema.slice(spec.pool)][0]) for spec in ASSIMILABLE_SPECS)
+    share = sum(params[spec.fraction_param] for spec in ASSIMILABLE_SPECS)
     s_total = float(y[schema.slice("S")].sum())
-    gate = aa / (params["K_amino_acids"] + aa)
+    gate = assimilable / (params["K_amino_acids"] * share + assimilable)
     f_t = arrhenius_factor(t, params["E_a_maillard_browning"], params["T_ref"])
     r_sugar = params["k_maillard_browning"] * f_t * s_total * gate
-    mel_rate = r_sugar * _GLUCOSE_C / _MB_DENOM
-    aa_mass = mel_rate * _MAILLARD_MELANOIDIN_N / _AA_N
-    return {
+    ratio = assimilable_carbon_per_nitrogen(y, schema)  # the drawn blend's mass C:N
+    mel_rate = r_sugar * _GLUCOSE_C / _mb_denom(ratio)
+    nitrogen = mel_rate * _MAILLARD_MELANOIDIN_N
+    # The nitrogen demand splits across {arginine, generic} by the nitrogen each pool holds.
+    held = {
+        spec.pool: float(y[schema.slice(spec.pool)][0]) * nitrogen_mass_fraction(spec.species)
+        for spec in ASSIMILABLE_SPECS
+    }
+    total_n = sum(held.values())
+    out = {
         "S": -r_sugar,
-        "amino_acids": -aa_mass,
         "maillard_melanoidin": mel_rate,
         "A420": params["y_a420_per_maillard_melanoidin"] * mel_rate,
     }
+    for spec in ASSIMILABLE_SPECS:
+        out[spec.pool] = (
+            -(held[spec.pool] / total_n) * nitrogen / nitrogen_mass_fraction(spec.species)
+        )
+    return out
 
 
 def test_maillard_browning_metadata():
@@ -1863,23 +2046,31 @@ def test_maillard_browning_metadata():
         "y_a420_per_maillard_melanoidin",
         "K_amino_acids",
         "T_ref",
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
     }
 
 
 def test_maillard_browning_denominator_is_positive_with_margin():
     # THE load-bearing sign check (advisor's must-verify): the sized-draw denominator must be
     # comfortably positive, else r_m flips sign and the Process CREATES sugar with no conservation
-    # test catching it (closure holds either sign). The threshold is c_m/n_m > c(arg)/n(arg) ≈ 1.29
-    # (arginine is N-rich); the C-rich melanoidin (C:N ≈ 8:1) clears it by ~5×, leaving denom ≈
-    # 0.81·c_m.
-    assert _MB_DENOM > 0.0
-    assert _MAILLARD_MELANOIDIN_C / _MAILLARD_MELANOIDIN_N > _AA_C / _AA_N
-    assert 0.77 < _MB_DENOM / _MAILLARD_MELANOIDIN_C < 0.85  # ≈ 0.81·c_m — a healthy margin
+    # test catching it (closure holds either sign). D-100 makes the drawn blend's C:N
+    # state-dependent, so the check is now over the WHOLE reachable range — arginine-only (1.29) to
+    # generic-only (2.14) — which is strictly stronger than the old single-species assertion. The
+    # C-rich melanoidin (C:N ≈ 8:1) clears even the worst case by ~3.7×.
+    for ratio in _BLEND_CN_BOUNDS:
+        assert _mb_denom(ratio) > 0.0
+        assert ratio < _MAILLARD_MELANOIDIN_C / _MAILLARD_MELANOIDIN_N
+    # The margin narrows with D-100 (glutamine is less N-rich than arginine) but stays healthy:
+    # 0.81·c_m at arginine's ratio, 0.69·c_m at glutamine's — the worst case the blend can reach.
+    assert 0.65 < _mb_denom(max(_BLEND_CN_BOUNDS)) / _MAILLARD_MELANOIDIN_C < 0.72
+    assert 0.77 < _mb_denom(min(_BLEND_CN_BOUNDS)) / _MAILLARD_MELANOIDIN_C < 0.85
 
 
 def test_maillard_browning_matches_closed_form(caramel_params):
     schema = wine_schema()
-    y = _maillard_browning_wine(schema, aa=0.3, s=80.0, t=298.15)  # off T_ref so Arrhenius bites
+    y = _maillard_browning_wine(
+        schema, caramel_params, aa=0.3, s=80.0, t=298.15
+    )  # off T_ref so Arrhenius bites
     d = MaillardBrowning().derivatives(0.0, y, schema, caramel_params)
     cf = _maillard_browning_closed_form(schema, caramel_params, y, 298.15)
     assert cf["maillard_melanoidin"] > 0.0  # live (guards against a vacuous pass)
@@ -1893,30 +2084,41 @@ def test_maillard_browning_matches_closed_form(caramel_params):
 
 
 def test_maillard_browning_carbon_closes_per_rhs(caramel_params):
-    # CARBON closes to machine precision: the carbon leaving S (sugar) + amino_acids (arginine)
-    # equals the carbon entering the maillard_melanoidin park. A420 is an optical index (off every
-    # ledger), so it carries none.
+    # CARBON closes to machine precision: the carbon leaving S (sugar) + BOTH identity-agnostic
+    # pools, each at its own carbon fraction (D-100), equals the carbon entering the
+    # maillard_melanoidin park. A420 is an optical index (off every ledger), so it carries none.
+    # This closes only because the melanoidin was sized with the SAME blend C:N the draw realises
+    # — the reason `assimilable_carbon_per_nitrogen` and `draw_assimilable_nitrogen` share a
+    # split rule rather than each computing their own.
     schema = wine_schema()
-    d = MaillardBrowning().derivatives(0.0, _maillard_browning_wine(schema), schema, caramel_params)
+    d = MaillardBrowning().derivatives(
+        0.0, _maillard_browning_wine(schema, caramel_params), schema, caramel_params
+    )
     carbon_residual = (
         schema.get(d, "S") * _GLUCOSE_C
-        + schema.get(d, "amino_acids") * _AA_C
+        + sum(
+            schema.get(d, spec.pool) * carbon_mass_fraction(spec.species)
+            for spec in ASSIMILABLE_SPECS
+        )
         + schema.get(d, "maillard_melanoidin") * _MAILLARD_MELANOIDIN_C
     )
     assert carbon_residual == pytest.approx(0.0, abs=1e-18)
 
 
 def test_maillard_browning_nitrogen_closes_per_rhs(caramel_params):
-    # NITROGEN closes to machine precision — the D-89 novelty: the nitrogen leaving amino_acids
-    # (arginine) is RETAINED in the maillard_melanoidin polymer (NOT deaminated to N — that is
-    # D-87's
-    # branch), so amino_acids↓·n(arg) exactly cancels maillard_melanoidin↑·n(mm).
-    # maillard_melanoidin
-    # is the FIRST non-biomass, non-arginine species on total_nitrogen.
+    # NITROGEN closes to machine precision — the D-89 novelty: the nitrogen leaving the
+    # identity-agnostic pools is RETAINED in the maillard_melanoidin polymer (NOT deaminated to N —
+    # that is D-87's branch), so the drawn nitrogen exactly cancels maillard_melanoidin↑·n(mm).
+    # maillard_melanoidin is the FIRST non-biomass, non-amino-acid species on total_nitrogen.
     schema = wine_schema()
-    d = MaillardBrowning().derivatives(0.0, _maillard_browning_wine(schema), schema, caramel_params)
+    d = MaillardBrowning().derivatives(
+        0.0, _maillard_browning_wine(schema, caramel_params), schema, caramel_params
+    )
     nitrogen_residual = (
-        schema.get(d, "amino_acids") * _AA_N
+        sum(
+            schema.get(d, spec.pool) * nitrogen_mass_fraction(spec.species)
+            for spec in ASSIMILABLE_SPECS
+        )
         + schema.get(d, "maillard_melanoidin") * _MAILLARD_MELANOIDIN_N
     )
     assert nitrogen_residual == pytest.approx(0.0, abs=1e-18)
@@ -1932,12 +2134,17 @@ def test_maillard_browning_inert_without_amino_acids(caramel_params):
     schema = wine_schema()
     ps = ProcessSet(schema, [MaillardBrowning()], strict=True)
     assert np.array_equal(
-        ps.total_derivatives(0.0, _maillard_browning_wine(schema, aa=0.0, s=120.0), caramel_params),
+        ps.total_derivatives(
+            0.0, _maillard_browning_wine(schema, caramel_params, aa=0.0, s=120.0), caramel_params
+        ),
         schema.zeros(),
     )
     assert np.array_equal(
         MaillardBrowning().derivatives(
-            0.0, _maillard_browning_wine(schema, aa=-1e-6, s=120.0), schema, caramel_params
+            0.0,
+            _maillard_browning_wine(schema, caramel_params, aa=-1e-6, s=120.0),
+            schema,
+            caramel_params,
         ),
         schema.zeros(),
     )
@@ -1950,13 +2157,13 @@ def test_maillard_browning_soft_sugar_gate(caramel_params):
     schema = wine_schema()
     assert np.array_equal(
         MaillardBrowning().derivatives(
-            0.0, _maillard_browning_wine(schema, s=0.0), schema, caramel_params
+            0.0, _maillard_browning_wine(schema, caramel_params, s=0.0), schema, caramel_params
         ),
         schema.zeros(),
     )
     assert np.array_equal(
         MaillardBrowning().derivatives(
-            0.0, _maillard_browning_wine(schema, s=-1e-6), schema, caramel_params
+            0.0, _maillard_browning_wine(schema, caramel_params, s=-1e-6), schema, caramel_params
         ),
         schema.zeros(),
     )
@@ -1968,10 +2175,10 @@ def test_maillard_browning_is_oxygen_independent(caramel_params):
     # (the O₂-independent thermal mirror). o2 is untouched.
     schema = wine_schema()
     sealed = MaillardBrowning().derivatives(
-        0.0, _maillard_browning_wine(schema, o2=0.0), schema, caramel_params
+        0.0, _maillard_browning_wine(schema, caramel_params, o2=0.0), schema, caramel_params
     )
     oxygenated = MaillardBrowning().derivatives(
-        0.0, _maillard_browning_wine(schema, o2=0.05), schema, caramel_params
+        0.0, _maillard_browning_wine(schema, caramel_params, o2=0.05), schema, caramel_params
     )
     assert np.array_equal(sealed, oxygenated)
     assert schema.get(sealed, "o2") == 0.0  # never draws o2
@@ -1984,10 +2191,10 @@ def test_maillard_browning_availability_gate_saturates(caramel_params):
     schema = wine_schema()
     k = caramel_params["K_amino_acids"]
     half = MaillardBrowning().derivatives(
-        0.0, _maillard_browning_wine(schema, aa=k), schema, caramel_params
+        0.0, _maillard_browning_wine(schema, caramel_params, aa=k), schema, caramel_params
     )
     saturated = MaillardBrowning().derivatives(
-        0.0, _maillard_browning_wine(schema, aa=1.0e6 * k), schema, caramel_params
+        0.0, _maillard_browning_wine(schema, caramel_params, aa=1.0e6 * k), schema, caramel_params
     )
     # At aa = K the melanoidin rate is half its saturated value (gate = 0.5 vs ≈ 1.0).
     assert schema.get(half, "maillard_melanoidin") == pytest.approx(
@@ -2000,10 +2207,10 @@ def test_maillard_browning_rises_with_temperature(caramel_params):
     # Madeira estufagem develops nitrogenous-melanoidin colour so much faster than cellar aging).
     schema = wine_schema()
     cold = MaillardBrowning().derivatives(
-        0.0, _maillard_browning_wine(schema, t=283.15), schema, caramel_params
+        0.0, _maillard_browning_wine(schema, caramel_params, t=283.15), schema, caramel_params
     )
     warm = MaillardBrowning().derivatives(
-        0.0, _maillard_browning_wine(schema, t=303.15), schema, caramel_params
+        0.0, _maillard_browning_wine(schema, caramel_params, t=303.15), schema, caramel_params
     )
     assert schema.get(warm, "maillard_melanoidin") > schema.get(cold, "maillard_melanoidin") > 0.0
 
@@ -2031,7 +2238,9 @@ def test_maillard_browning_browns_sweet_wine_closes_carbon_and_nitrogen(
     # in
     # maillard_melanoidin). Sealed (o2 defaults to 0) — the browning needs no oxygen.
     schema = wine_schema()
-    y0 = _maillard_browning_wine(schema, aa=0.6, s=120.0, t=303.15)  # 30 °C sweet + amino acids
+    y0 = _maillard_browning_wine(
+        schema, caramel_params, aa=0.6, s=120.0, t=303.15
+    )  # 30 °C sweet + amino acids
     ps = ProcessSet(schema, [MaillardBrowning()], strict=True)
     traj = simulate(ps, params=caramel_params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success, traj.message
