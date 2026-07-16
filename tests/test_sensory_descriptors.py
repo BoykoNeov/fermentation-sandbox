@@ -111,12 +111,12 @@ def test_no_phantom_pool_every_axis_pool_is_a_real_aroma_pool():
 def test_axis_set_is_derived_from_the_medium():
     """Beer's vocabulary is a strict subset of wine's, narrowed pool-wise — never declared.
 
-    Wine → 14 axes over 19 pools; beer → 9 over 10. Beer cannot report the grape/Brett-only
+    Wine → 15 axes over 20 pools; beer → 9 over 10. Beer cannot report the grape/Brett-only
     words by construction, and its shared axes are narrowed to the pools beer actually has.
     """
     beer = {a.name: a.pools for a in axes_for_medium("beer")}
     wine = {a.name: a.pools for a in axes_for_medium("wine")}
-    assert len(wine) == 14
+    assert len(wine) == 15
     assert len(beer) == 9
     assert set(beer) < set(wine)  # strict subset
     assert set(wine) - set(beer) == {
@@ -125,6 +125,12 @@ def test_axis_set_is_derived_from_the_medium():
         "cooked_potato",  # methional — D-75
         "malty",  # the three D-87 thermal Strecker aldehydes
         "curry_maple",  # sotolon — D-87
+        # dms — D-102. Its OWN axis rather than a member of `sulfidic`: DMS is a volatile sulfur
+        # compound, but `sulfidic` means "rotten egg / drains / reductive" and DMS is the
+        # truffle/black-olive note, POSITIVE near its threshold. Folding it in would repeat D-99's
+        # finding exactly (2-phenylethanol booked `solventy` when it is ROSE) — a grouping that is
+        # self-consistent and still wrong. Chemical family is not a perceptual axis.
+        "truffle_olive",
     }
     # Shared axes are narrowed to the medium's pools: mercaptans + ethylguaiacols are wine-only.
     assert beer["sulfidic"] == ("h2s",)

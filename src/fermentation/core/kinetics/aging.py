@@ -2719,3 +2719,119 @@ class TanninEthylTanninCondensation(Process):
             _ETHYL_BRIDGE_SPECIES
         )
         return d
+
+
+class SMMHydrolysis(Process):
+    """DMS accumulation by hydrolysis of the grape-borne precursor pool (decision D-102).
+
+    ``d(dms_potential)/dt = -k_smm_hydrolysis · f(T) · dms_potential`` and ``d(dms)/dt = +`` the
+    same rate — a first-order Arrhenius decay of the precursor **straight into the product**, with
+    ``f(T) = arrhenius_factor(T, E_a_smm_hydrolysis, T_ref)``. Fills the ``dms`` pool with the
+    aged-wine "truffle / black olive / cooked corn" odorant, whose OAV the D-67 lens already reads.
+
+    **A DISTINCT route — this is why the beat exists, and why it needed no ratio-split.** Every
+    other sulfur pool in the model is autolysis-gated
+    (:class:`~fermentation.core.kinetics.hydrogen_sulfide.AutolyticHydrogenSulfide` D-44,
+    :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan` D-45). DMS is not: it
+    accumulates by **spontaneous hydrolysis of S-methylmethionine (SMM) during bottle aging**, on
+    the lees or off them, and so it carries its **own anchor** rather than dividing a shared
+    autolytic yield into invented sub-yields. That is exactly the D-96 linchpin the ``mercaptans``
+    speciation could not satisfy (D-101: you cannot split a pool that only ever had one molecule
+    in it), and it is satisfiable here.
+
+    **In DMS-EQUIVALENTS, so the conversion is 1:1 by construction.** ``dms_potential`` is g of
+    *releasable DMS*, not g of SMM — the unit the wine literature reports DMSp in, because DMSp is
+    an assay (cleave every precursor with hot alkali, measure the DMS that comes off). So there is
+    **no stoichiometric yield parameter to guess** and SMM's molar-mass / iodide-salt-form
+    ambiguity never enters the model. ``dms_potential + dms`` is invariant to machine precision —
+    a real conservation law on two off-ledger pools, and a test.
+
+    **No pH term — a SOURCED NULL, not an omission.** SMM hydrolysis in wine is a nucleophilic
+    substitution of the sulfur by water, and below pH 5 that mechanism's rate is pH-insensitive:
+    De La Burgade et al. 2025 measured SMM degradation at pH 2.8 vs 3.8 and found no significant
+    difference. Wine's whole range sits inside the insensitive regime, so a pH term would be a
+    knob with a measured value of zero. (This is also, exactly, why Scheuren's brewing activation
+    energy is not used — see ``dms.yaml``'s header: his wort at pH 5.2 is in the *other*
+    mechanism's regime, and E_a is a property of a mechanism. Transferred here it would predict a
+    ~53-year cellar half-life, i.e. that aged wine never develops DMS at all.)
+
+    **Not flux-linked, and cumulative — the D-42 contrast is the point.** Like the D-44/D-45
+    reductive faults it fires post-dryness, so there is no CO₂ stream to strip it: unlike ``h2s``
+    (whose D-42 stripping sink makes it a *residual*), ``dms`` only rises. ``d(dms)/dt >= 0``
+    always (monotonic, no clamp) — a decay of a non-negative pool by a positive rate, so the
+    precursor approaches 0 from above and needs no floor and no C¹ shadow gate.
+
+    **Conservation — moves NOTHING conserved, by construction (the D-74 A420 argument).** Both
+    slots are off every ledger, so the precursor's carbon comes from untracked SMM and lands in
+    untracked DMS without ever touching ``total_carbon``/``total_nitrogen``. This is *cleaner*
+    than :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan`, which must debit real
+    methionine for its thiol's carbon. At µg/L the amounts are ~1e-6 of the carbon ledger anyway,
+    so the off-ledger call costs nothing measurable and buys exactness.
+
+    **SCOPE — three overstatements, ALL pushing the same way, and that way is conservative.**
+    Stated here because together they bound every number this Process emits:
+
+    * **DMSp ⊃ SMM.** The pool is a DMSp *assay* value (all precursors, incl. DMSPA and unknowns);
+      the rate is SMM's. SMM is only 21–74% of DMS formed, so the substrate is over-stated by up
+      to ~4×.
+    * **Variety.** ``dms_potential_initial`` defaults generic wine to the only at-bottling dataset
+      — six **Syrah** wines, a high-DMSp variety. A low-DMSp wine is over-predicted, measurably:
+      see D-102 on the Amarone miss, which is **recorded, not tuned**.
+    * **No closure permeation.** Real DMS escapes through cork (De La Burgade's headline result:
+      up to 12% of initial). Modelling the bottle as sealed keeps DMS in. That is a closure-
+      specific, orthogonal axis and a beat of its own — not a re-anchoring of ``k``.
+
+    All three make the model cry fault **earlier** than reality. For an off-aroma that is the safe
+    direction; a model that under-predicted a fault would be the dangerous one.
+
+    **What it cannot express, and it is DMS's most-studied property.** DMS *enhances* fruity-ester
+    perception (it lowers the fruity pool's effective threshold) rather than adding to it. The OAV
+    lens is structurally unable to carry a perceptual interaction (masking, blocked on ``cosα``
+    since D-95/D-98), so the model tracks DMS's concentration honestly and stays **silent** on its
+    best-documented effect. See ``threshold_dms_wine``'s notes.
+
+    **Isolability — wine-only and aging-gated (prime directive #3).** Touches only
+    ``{dms_potential, dms}`` — both new, both wine-only, both off every ledger — so no existing
+    pool, ledger, tier or test can move whether it fires or not. Wired into wine's aging tuple and
+    disabled at compile with the rest of the aging axis; an un-aged wine is byte-for-byte the
+    pre-D-102 model. Tier **speculative** (the anchors are accelerated-aging extrapolations down
+    to a cellar; see ``dms.yaml``).
+    """
+
+    name = "smm_hydrolysis"
+    tier = Tier.SPECULATIVE
+    #: Decays ``dms_potential`` into ``dms`` 1:1 in DMS-equivalents — an inter-pool transfer
+    #: between two OFF-ledger slots, so it touches these two and nothing else. No carbon pool, no
+    #: nitrogen pool, no ``o2`` (this is a hydrolysis, not an oxidation — a sealed, un-oxygenated,
+    #: sulfited bottle makes DMS exactly as fast; the D-83 O₂-independent relationship).
+    touches = ("dms_potential", "dms")
+    #: ``k_smm_hydrolysis``/``E_a_smm_hydrolysis`` are this Process's own (dms.yaml, D-102);
+    #: ``T_ref`` is shared with every other Arrhenius rate. Their tiers cap the ``dms`` output tier
+    #: via parameter-tier propagation (D-1). Note ``dms_potential_initial`` is NOT read here — it
+    #: seeds the slot at the compile seam (a must property); it does not drive the rate.
+    reads: tuple[str, ...] = (
+        "k_smm_hydrolysis",
+        "E_a_smm_hydrolysis",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        potential = float(y[schema.slice("dms_potential")][0])
+        if potential <= 0.0:
+            # No precursor ⇒ no DMS (the un-seeded no-op). Also absorbs a solver undershoot: a
+            # first-order decay cannot drive the pool negative, so this is a guard, not a clamp
+            # on real physics.
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_smm_hydrolysis"], params["T_ref"])
+        rate = params["k_smm_hydrolysis"] * f_t * potential  # g eq. DMS/L/h
+
+        # 1:1 in DMS-equivalents (see the docstring): the precursor pool IS denominated in the DMS
+        # it can release, so what leaves one slot enters the other with no yield and no molar-mass
+        # conversion. dms_potential + dms is invariant to machine precision.
+        d[schema.slice("dms_potential")] = -rate
+        d[schema.slice("dms")] = rate
+        return d

@@ -113,6 +113,7 @@ from fermentation.core.kinetics import (
     PhenolicBrowning,
     PyruvateExcretion,
     PyruvateReassimilation,
+    SMMHydrolysis,
     StreckerDegradation,
     SugarUptakeToEthanolCO2,
     SulfiteOxidation,
@@ -925,6 +926,35 @@ def wine_schema() -> StateSchema:
             "arginine so it is not the sole generic source (D-100). Carbon- AND nitrogen-bearing "
             "(glutamine, N-rich). Dosed must input + autolysis-refilled. Decision D-100",
         ),
+        # The DMS axis (decision D-102), appended LAST so existing wine slot indices are unchanged
+        # (the D-100 convention). Both slots are OFF every ledger — the pair's carbon comes from
+        # untracked SMM and lands in untracked DMS, so SMMHydrolysis moves nothing conserved (the
+        # D-74 A420 argument), and at µg/L it is ~1e-6 of the carbon ledger regardless.
+        VarSpec(
+            "dms_potential",
+            "g/L",
+            default=0.0,
+            description="DMS potential (DMSp) — the grape-borne precursor pool that hydrolyses to "
+            "dimethyl sulfide during bottle aging (decision D-102), chiefly S-methylmethionine "
+            "(SMM). Booked in DMS-EQUIVALENTS (g of the DMS it can release, NOT g of SMM) — the "
+            "unit the wine literature reports DMSp in, which makes the SMMHydrolysis conversion "
+            "1:1 by construction and sidesteps SMM's molar-mass/iodide-salt-form ambiguity. A "
+            "GRAPE property, not a winemaking dose, so _wine_initial seeds it from the sourced "
+            "dms_potential_initial rather than 0 (a 0 default would assert aged wine makes no DMS "
+            "— the D-45 hard-zero defect). Carbon-negligible at µg/L and on NO ledger (the "
+            "h2s/o2/A420 pattern). Decision D-102",
+        ),
+        VarSpec(
+            "dms",
+            "g/L",
+            default=0.0,
+            description="dimethyl sulfide (DMS) — the aged-wine 'truffle / black olive / cooked "
+            "corn' odorant (decision D-102), accumulated by SMMHydrolysis as a first-order "
+            "Arrhenius decay of dms_potential. Cumulative and monotonic (d(dms)/dt >= 0): unlike "
+            "the D-42 h2s residual there is no CO2 stream to strip it (aging is post-dryness), so "
+            "it accumulates rather than settling to a residual. Off every ledger (with "
+            "dms_potential — see that slot). Default 0 ⇒ no DMS at pitch. Decision D-102",
+        ),
     ]
     return StateSchema(specs)
 
@@ -1257,6 +1287,24 @@ _CARAMELIZATION_PROCESSES: tuple[Callable[[], Process], ...] = (Caramelization,)
 #: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). Isolability on the
 #: ``amino_acids`` HARD gate (undosed ⇒ byte-for-byte inert). Params live in ``thermal.yaml``.
 _MAILLARD_BROWNING_PROCESSES: tuple[Callable[[], Process], ...] = (MaillardBrowning,)
+
+#: DMS-via-SMM-hydrolysis aging Process (decision D-102) — the aged-wine truffle/black-olive
+#: odorant. WINE-ONLY. :class:`SMMHydrolysis` is a **distinct route**, and that is the point: every
+#: other sulfur pool here is autolysis-gated (D-44 ``h2s``, D-45 ``mercaptans``), whereas DMS
+#: accumulates by spontaneous hydrolysis of the grape-borne precursor during bottle aging — lees or
+#: no lees — so it carries its **own anchor** instead of ratio-splitting a shared autolytic yield
+#: (the D-96 linchpin ``mercaptans`` could not satisfy, D-101). Booked in **DMS-equivalents**, so
+#: ``dms_potential`` → ``dms`` is 1:1 with no yield parameter and no molar-mass conversion. OFF
+#: EVERY LEDGER (both slots — the D-74 ``A420`` argument: untracked precursor → untracked product,
+#: so it moves nothing conserved; at µg/L it is ~1e-6 of the carbon ledger regardless), so it needs
+#: no ``chemistry.py`` species registration. Wine-only because the CONSTANTS are wine-anchored:
+#: beer's DMS is real and better-studied, but arrives by other routes entirely (wort-boil SMM
+#: cleavage *before* pitch; yeast DMSO reduction during ferment), and transferring these constants
+#: to it would be the exact wort→wine mechanism error D-102 rejects Scheuren for. Kept in its OWN
+#: tuple (isolable, directive #3): DISABLED at the compile seam and re-enabled by ``begin_aging``
+#: (its name rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no
+#: precursor seeded ⇒ byte-for-byte inert (the ``dms_potential <= 0`` guard). Params: ``dms.yaml``.
+_DMS_PROCESSES: tuple[Callable[[], Process], ...] = (SMMHydrolysis,)
 
 #: Oak-extraction aging Process (decision D-77) — the barrel/chip extractive axis. WINE + BARREL-
 #: BEER (D-86: wired into BOTH media — the oak axis is a wood property, not a grape one).
@@ -1740,6 +1788,7 @@ MEDIA: dict[str, Medium] = {
             + _THERMAL_FADE_PROCESSES
             + _TANNIN_SELF_POLYMERIZATION_PROCESSES
             + _TANNIN_ETHYL_TANNIN_PROCESSES
+            + _DMS_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

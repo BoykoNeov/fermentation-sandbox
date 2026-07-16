@@ -286,6 +286,17 @@ threshold_mercaptans_wine:
     conditions: "measured in/near wine matrix; methanethiol, the representative of the LUMPED mercaptans pool (the pool's named stand-in)"
     notes: "LUMPED POOL — assumes the volatile-thiol pool is dominated by methanethiol. Ethanethiol/H2S-adjacent thiols differ, so the OAV rides on the fixed-composition assumption (D-66). Wine-only pool."
 
+# -- DMS (decision D-102): the aged-wine truffle/black-olive odorant -----------------------
+threshold_dms_wine:
+  value: 25.0
+  unit: "ug/L"   # dimethyl sulfide, 'truffle / black olive / cooked corn'
+  tier: speculative
+  uncertainty: { low: 25.0, high: 60.0, note: "the RED-WINE band (25-60 µg/L). The value takes the LOW end deliberately — the conservative choice for an off-aroma, since a low threshold cries fault earlier. The band is matrix spread, not measurement error: DMS's threshold moves ~16x with the matrix (see notes), and this pool is wine-only so only the wine end is banded" }
+  provenance:
+    source: "Ugliano et al. 2023 (J. Agric. Food Chem. 71, 'Dimethyl Sulfide (DMS) in Amarone Wines'), which cites 25-60 µg/L in red wine and 10 µg/L in 10% (v/v) ethanol. Independently corroborated in-matrix: De La Burgade et al. 2025 use 60 µg/L (South Australian Cabernet Sauvignon), and the Amarone paper additionally cites 27 µg/L for Bordeaux red."
+    conditions: "measured in RED WINE (matrix-matched); dimethyl sulfide, a single molecule — no lump assumption"
+    notes: "SINGLE-MOLECULE POOL — clean OAV, matrix-matched, and NOT lumped (unlike mercaptans, the last lump). The 16x matrix spread is why only the red-wine band is used: reported thresholds run 1.74 µg/L (dilute alcohol) / 2.80 (+12 esters) / 3.67 (dearomatised red wine) in MODEL solutions, but 25-60 in real red wine — the model-solution values are NOT interchangeable with the wine ones and are excluded, the same water/ethanol-gap reasoning that excluded the beer fusel OTCs (D-99). WHAT THIS THRESHOLD CANNOT EXPRESS, and it is DMS's most-studied property: DMS ENHANCES the perception of fruity esters (it LOWERS the fruity pool's effective threshold) rather than acting additively. That is a perceptual INTERACTION the OAV lens is structurally unable to carry (masking/enhancement is blocked on cosα since D-95/D-98), so the model reports DMS's concentration honestly and stays silent on its best-documented effect. Wine-only pool."
+
 # -- Strecker aldehydes (decision D-75): the oxidative-aging aroma markers ------------------
 threshold_methional_wine:
   value: 0.5

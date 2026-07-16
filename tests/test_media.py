@@ -128,6 +128,16 @@ WINE_SPECIATED_AA_SLOTS = (
     "amino_acids_generic",
 )
 
+# The DMS axis (decision D-102), appended last (the D-100 convention — existing wine slot indices
+# are unchanged). `dms_potential` is the GRAPE-borne precursor (chiefly S-methylmethionine) booked
+# in DMS-EQUIVALENTS, so SMMHydrolysis converts it 1:1 into `dms` with no yield parameter; `dms` is
+# the aged-wine truffle/black-olive odorant. BOTH are off every ledger (untracked precursor →
+# untracked product, so the Process moves nothing conserved — the D-74 A420 argument). Unlike every
+# other optional wine slot, `dms_potential` does NOT default to 0 at compile: it is seeded from the
+# sourced `dms_potential_initial`, because DMSp is a property of the grape rather than a winemaking
+# dose (a 0 default is the D-45 hard-zero defect).
+WINE_DMS_SLOTS = ("dms_potential", "dms")
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -153,6 +163,7 @@ def test_wine_schema_has_single_sugar_slot():
         + CARAMELIZATION_SLOTS
         + WINE_MAILLARD_BROWNING_SLOTS
         + WINE_SPECIATED_AA_SLOTS
+        + WINE_DMS_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -201,7 +212,14 @@ def test_wine_schema_has_single_sugar_slot():
     # seven siblings: leucine/isoleucine/valine/threonine/phenylalanine/methionine + the generic
     # bucket amino_acids_generic — every consumed amino acid its own carbon/nitrogen-weighted slot;
     # the existing amino_acids slot is retained as the arginine pool, so 1 slot became 8: +7)
-    assert schema.size == 81
+    # + 2 D-102 DMS slots (dms_potential — the GRAPE-borne precursor, chiefly S-methylmethionine,
+    # booked in DMS-EQUIVALENTS so SMMHydrolysis converts it 1:1 with no yield parameter — and dms,
+    # the aged-wine truffle/black-olive odorant. Both OFF every ledger: untracked precursor →
+    # untracked product, so the Process moves nothing conserved, the D-74 A420 argument. The FIRST
+    # sulfur pool that is NOT autolysis-gated — DMS accumulates by spontaneous hydrolysis during
+    # bottle aging, lees or no lees, which is why it carries its own anchor and needed no
+    # ratio-split, i.e. the D-96 linchpin `mercaptans` could not satisfy at D-101)
+    assert schema.size == 83
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -528,6 +546,15 @@ CARAMELIZATION_PROCESSES = {"caramelization"}
 # amino_acids (with D-87) and shared S (with D-88). Wine-only v1. Same disable / begin_aging
 # re-enable.
 WINE_MAILLARD_BROWNING_PROCESSES = {"maillard_browning"}
+# WINE-ONLY DMS accumulation (decision D-102): smm_hydrolysis — the grape-borne precursor pool
+# hydrolysing to the aged-wine truffle/black-olive odorant. A DISTINCT route, and that is the beat:
+# unlike every other sulfur Process here (D-44 h2s, D-45 mercaptans) it is NOT autolysis-gated, so
+# it carries its own anchor instead of ratio-splitting a shared autolytic yield. Touches only the
+# two off-ledger DMS slots, so it moves nothing conserved. Wine-only because the CONSTANTS are
+# wine-anchored — beer's DMS is real but arrives by other routes (wort-boil cleavage pre-pitch;
+# yeast DMSO reduction), and transferring these would be the same wort→wine mechanism error D-102
+# rejects Scheuren's activation energy for. Same disable / begin_aging re-enable.
+WINE_DMS_PROCESSES = {"smm_hydrolysis"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -556,6 +583,7 @@ EXPECTED_PROCESSES = {
         | WINE_THERMAL_FADE_PROCESSES
         | WINE_TANNIN_SELF_POLY_PROCESSES
         | WINE_TANNIN_ETHYL_TANNIN_PROCESSES
+        | WINE_DMS_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

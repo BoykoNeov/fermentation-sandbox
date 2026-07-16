@@ -8365,3 +8365,199 @@ now fully scoped and unblocked by this entry); **DMS via SMM hydrolysis** (block
 the **bottle-aged MeSH route** (blocked on primary sources + unmodelled thioacetate/disulfide precursors); **derive `f_methional`**
 (blocked on Strecker relative reactivity); bound the D-33 re-route's catabolic fraction; sourced yeast-autolysate spectrum; the
 isoamyl-acetate carbon re-route; per-ester `dH`/`E_a` (blocked); masking (blocked on `cosα`); the `oav` → `magnitude` rename.
+
+
+## D-102 — DMS via SMM hydrolysis: a DISTINCT route that carries its own anchor — and the correction of D-101's activation energy, which was a search-summary fabrication of a paper that forbids the transfer anyway
+
+**Status:** built (2026-07-16). New wine-only Process `SMMHydrolysis`, two off-ledger slots (`dms_potential`, `dms`), a new
+`dms.yaml`, a new `threshold_dms_wine`, a new `stevens_n_dms`, a new `truffle_olive` descriptor axis, 21 new tests. Wine schema 81 → 83 slots; D-98 exponents 23 → 24.
+
+**What triggered it.** The roadmap item D-101 banked and blocked: *"DMS via SMM hydrolysis (blocked on the natural SMM must-level +
+reading Scheuren)."* Both blockers are now closed. **Closing them inverted the design.**
+
+### THE HEADLINE — I shipped a fabricated constant, and the lesson meant to prevent it is the one it broke
+
+D-101 banked **`E_a = 128 ± 37 kJ/mol`** for SMM→DMS from Scheuren et al. 2014, and recorded — *in the same entry* — that the number
+came from a **search summary** and *"must be read before it ships."* I read it. Its equation (6) says, verbatim:
+
+> `EA = (186 ± 12) · kJ/mol`
+
+**Not 128 ± 37.** The value is higher and the band is **three times tighter**. Verified against the paper's own data rather than
+taken on faith a second time: a least-squares Arrhenius fit of its **Table 1** (six measured constants, 80–98.5 °C) gives **192
+kJ/mol**, and its stated *"half-life of SMM at 98.5 °C is 30.5 min"* is exactly `ln2 / 0.0227 min⁻¹`. The number is real; D-101's was
+not. **D-101's own fix-commit lesson — *"a summarising fetch is a source of LEADS, never of CONSTANTS"* — was written about a wrong
+boiling point in that very entry, while a second fabricated constant sat undetected three paragraphs away.** Recording the lesson is
+not applying it. The only thing that applies it is opening the PDF.
+
+**The fabrication was load-bearing, and it propagated into a "finding".** D-101 concluded the design *"shrinks the 15 °C half-life
+band 0.39–445 → 2.8–52 yr, **central ~12 yr** — the right order for bottle aging."* That ~12 yr **is literally the E_a=128 row**.
+The satisfying "it lands on the right timescale" result was an artifact of the wrong number. So was the reasoning that produced it
+(*"the Amarone datum refutes both ends and **pins E_a near 128**"*) — a chain of inference over a band that never existed.
+
+### THE DEEPER KILL — the paper forbids the transfer its number was wanted for
+
+D-101's design was *"anchor `k` in-matrix on Amarone and take **only** E_a from Scheuren."* Reading the discussion killed it
+independently of the value being wrong:
+
+> *"the pH value is considered to strongly influence the **mechanism** of decomposition. On the one hand, a high pH value affects the
+> intramolecular substitution of the SMM-carboxyl unit, while on the other hand a low pH value promotes the nucleophile substitution
+> of the sulphur unit by water"* — and *"It will be of interest to investigate the impact of pH value ... in future studies."*
+
+Scheuren measures **wort at pH 5.2**. Wine is **pH 2.8–4.0**. Those are **two different reaction mechanisms**, and an activation
+energy is a property of a *mechanism*. The transfer is not merely *uncertain* — **the source explicitly declines to support it**.
+**Confirmed independently from the wine side:** De La Burgade et al. 2025 measured SMM degradation at pH 2.8 vs 3.8 and found **no
+significant difference**, reasoning *"since the degradation reaction is a nucleophilic substitution, a **pH < 5 has no influence** on
+either the reaction kinetics or yield."* Wine sits wholly inside the low-pH regime. **Two consequences:** the Process carries **no pH
+term** (a *sourced null*, not an omission), and Scheuren is unusable for wine at any precision.
+
+**A discussion-section caveat is exactly what a summary cannot carry.** The summary gave a number with no matrix, no pH, and no
+mechanism warning. Every one of those was in the paper, and every one mattered more than the number did.
+
+**The size of the error, on the only question the model asks.** All rivals share the Amarone 45 °C anchor and differ *only* in E_a:
+
+| E_a (kJ/mol) | source | 18 °C cellar half-life |
+|---|---|---|
+| **186 ± 12** | Scheuren, **real** — wort pH 5.2, wrong mechanism | **53 yr** — aged wine never develops DMS. False. |
+| 128 ± 37 | D-101's **fabrication** of the above | 7.0 yr |
+| **101–125** | **in-wine, this entry** | **2.7–6.3 yr** |
+| *(observed)* | *six Syrah wines, 18 °C, 24 mo* | *DMSp 1.47 yr* |
+
+The fabricated value lands **nearer the truth than the number it misquoted** — the right order for the wrong reason. Had D-101's
+design shipped, plausible output would have concealed two independent errors. **A right-looking answer is not evidence of a sound
+process**, and this is the cleanest demonstration of it in the project.
+
+### BLOCKER 1 CLOSED — and "not established" was a narrow-search artifact, again
+
+D-101 recorded *"the natural SMM/DMSp level in must/young wine is NOT established."* It is established. I had searched **SMM**; the
+wine literature reports the quantity as **DMS potential (DMSp)** — a whole vein, and an *assay* (cleave every precursor with hot
+alkali, measure the DMS released). One search term away. **The D-96/D-101 scope-limit trap in a fifth disguise: the narrowing was in
+the vocabulary.** "Not established" meant "not established *by the words I tried*", and nothing in the entry marked the difference.
+
+De La Burgade et al. 2025 (PMC12152913, open access) — the only primary **at-bottling** measurement of natural, unspiked DMSp:
+
+> *"At bottling DMSP concentrations varied from **119.0 to 958.4 μg eq. DMS/L**"* — six real Syrah wines, six wineries, bottled 2021.
+
+**The apparent 10× conflict with Segurel 2004 is what corroborates it.** The paper flags its own levels as *"considerably higher"*
+than Segurel's **8.6–97.1 µg eq. DMS/L** and does not explain the gap. It is **the decay curve**: Segurel measured *aged* wines
+(vintages 1992–2002), De La Burgade measured *at bottling*. Decaying 119–958 forward 5 years at this entry's own 18 °C rate predicts
+**11.3–90.9** against Segurel's observed **8.6–97.1**. Near-exact. **Two independent French studies agree once age is accounted for**
+— a corroboration only visible after building the rate.
+
+### THE RATE — and why three in-wine points do NOT lie on one line
+
+| T | source | measured | k (1/h) | half-life |
+|---|---|---|---|---|
+| 18 °C | Syrah cellar, natural, 24 mo | **DMSp** −61% | 5.37e-5 | 1.47 yr |
+| 35 °C | model wine, spiked, crown cap | **SMM** −45–49% | 2.18e-4 / 2.90e-4 | 0.36 / 0.27 yr |
+| 45 °C | Amarone, spiked, 1 mo | **SMM** −49–54% | 1.005e-3 | 0.08 yr |
+
+The apparent E_a **doubles** across the interval (61 kJ/mol over 18→35; 125 over 35→45) — which Arrhenius forbids. **The resolution
+is that it is an observable mismatch, not a physics failure:** the 35/45 points measure **SMM specifically** (spiked SMM, SMM
+assayed); the 18 °C point measures **DMSp** — the *total* precursor pool, of which SMM is only **21–74%**, and whose own paper reports
+that its **chemical mass balance does not close** (DMS **permeates out through closures**, up to 12% of initial; an unknown DMSPA
+precursor is suspected). **Three points measuring two different quantities are not required to be collinear.** So E_a is fitted on
+the **clean SMM pair only** (→ **101–125 kJ/mol**), and the 18 °C point is a **check, not a fit point**. Forcing it onto the line
+would manufacture a spurious ~61 kJ/mol by averaging two different observables — the tidier-looking and wronger move.
+
+**The check passes, in the direction it must:** the model's SMM half-life at 18 °C is **4.1 yr** against the observed **DMSp**
+half-life of **1.47 yr**. DMSp is broader and more labile, so it *must* decay faster. Slower-SMM-than-DMSp is the prediction; the
+data agrees.
+
+**The band's origin is an unresolvable self-contradiction in the source, and is recorded rather than hidden.** De La Burgade et al.
+state their accelerated-ageing duration **twice as 3 months** (methods §2.3) and **twice as 4 months** (§4.2 and Table 1's caption).
+2 vs 2, no tiebreaker in text, table or supplement. 3 months ⇒ E_a = 101; 4 months ⇒ 125. Rather than pick, **the band covers both**.
+**Validation:** the central pair reproduces **both** anchors it was fitted through — 45 °C: 52.0% predicted in 1 month vs 49–54%
+observed; 35 °C: 42.3% at 3 mo / 52.0% at 4 mo vs 45–49% observed.
+
+### THE DESIGN
+
+* **A DISTINCT route — the whole reason this beat exists.** Every other sulfur pool is autolysis-gated (D-44 `h2s`, D-45
+  `mercaptans`). DMS is **not**: it accumulates by spontaneous hydrolysis of a **grape-borne** precursor during bottle aging, lees or
+  no lees. So it **carries its own anchor** instead of ratio-splitting a shared autolytic yield into invented sub-yields — **exactly
+  the D-96 linchpin `mercaptans` could not satisfy** (D-101: you cannot split a pool that only ever had one molecule in it). The
+  roadmap item that was malformed at D-101 is well-formed here, for a structural reason.
+* **Booked in DMS-EQUIVALENTS.** `dms_potential` is g of *releasable DMS*, not g of SMM — the unit the literature reports, because
+  DMSp is an assay. The conversion is **1:1 by construction**: no stoichiometric yield to guess, and SMM's molar-mass /
+  **iodide-salt-form** ambiguity (both papers spike the iodide) never enters. `dms_potential + dms` is invariant to machine precision
+  — a real conservation law, and a test.
+* **Off every ledger, both slots** (the D-74 `A420` argument): untracked precursor → untracked product, so the Process **moves
+  nothing conserved**. *Cleaner* than D-45's `AutolyticMercaptan`, which must debit real methionine for its thiol's carbon. At µg/L
+  it is ~1e-6 of the carbon ledger regardless.
+* **Seeded, not dosed — the anti-hard-zero call.** `dms_potential` is the **only** optional wine slot that does not default to 0: it
+  is seeded from the sourced `dms_potential_initial`. The distinction is real — `so2_total`/oak/anthocyanin are winemaking **doses**,
+  where 0 is a *true statement* about a scenario that made no addition; **DMSp is a property of the grape** that every must carries,
+  so a 0 default would assert that aged wine develops no DMS — **the D-45 hard-zero defect**, which that entry had to confess rather
+  than fix.
+* **Its own descriptor axis, not `sulfidic`.** DMS is a volatile sulfur compound, so `sulfidic` is the tempting home — but that axis
+  means *"rotten egg / drains / reductive"* and DMS is the truffle/black-olive note, **positive near threshold**. Folding it in would
+  repeat **exactly** D-99's finding (2-phenylethanol booked as `solventy` when it is ROSE) — a grouping that is self-consistent and
+  still wrong. **Chemical family is not a perceptual axis.** The D-99 lesson applied *before* it could bite, for once.
+* **Wine-only, and the reason is the one that killed Scheuren.** Beer's DMS is real and *better* studied — but it arrives by other
+  routes (wort-boil SMM cleavage **before** pitch; yeast DMSO reduction during ferment), and these constants are wine-anchored.
+  Wiring them into beer would be the **wort→wine transfer this entry rejects Scheuren for**, committed in the other direction.
+
+### TWO THINGS THE PROJECT'S OWN CONTRACTS CAUGHT — one in code, one in the test suite
+
+**(1) A green-tests-dead-feature bug, found only by DRIVING the model.** `dms_potential_ugl` is documented as the per-scenario
+override in **three** places (`dms.yaml`, the `VarSpec`, the compile seam's own comment) — and it was never added to the medium's
+allowed-initial-keys set, so **every scenario that used it raised**. All 16 unit tests passed throughout, because they build state by
+hand and **never cross the compile seam**. Running a real ferment→cellar scenario end-to-end found it in one call. **A unit test that
+constructs its own state cannot test the seam that constructs state for real users.** Now pinned by a parametrized regression (0 /
+119 / 958.4, since an explicit 0 must still be honoured).
+
+**(2) D-98's exponent contract caught an omission the beat did not know it had.** Adding `dms` to the OAV registry silently required a
+`stevens_n_dms`: D-98 mandates that *every* aroma pool of *every* medium carry a Stevens exponent, and the loader raises by name if
+one is missing. Eleven tests failed until it was added — **the parameter file enforcing its own completeness**, which is what PD#2 is
+for. **And the lesson from this entry's own headline was applied prospectively, for once:** the exponent's *rank* claim rests on
+aqueous solubility (Cain 1969), so the solubility was **checked against a primary-citing source rather than recalled** — PubChem CID
+1068: **22 g/L at 25 °C** (Suzuki 1991; HMDB agrees; Merck's *"soluble below 300 mM"* = 18.6 g/L agrees). **One source, ILO-WHO ICSC,
+says *"Solubility in water: none"*** — an outlier contradicted by every quantitative measurement, and rejected *because* three sources
+were checked rather than one. That places DMS between guaiacol (~17 g/L, 0.43) and isoamyl alcohol (~25 g/L, 0.45) ⇒ **0.44**, with a
+band overlapping every neighbour so D-98's no-robust-flip theorem stays intact (`dms` is its axis' sole member and can contest no
+dominance regardless).
+
+### THE HEADLINE THE OWNER ASKED FOR DID NOT SURVIVE, AND THAT IS THE RESULT
+
+The brief specified *"threshold 25 µg/L, **OAV ≈ 1** in aged wine."* The threshold is confirmed (25–60 µg/L red wine; the low end is
+taken deliberately — the conservative choice for an off-aroma). **OAV ≈ 1 is not a property of aged wine. It is Amarone's mean
+(27.9 µg/L) specifically.** The same six Syrah wines reach **68–400 µg/L** (OAV ~1–7), and DMSp at bottling varies **8× within that
+one variety and vintage**. Across the literature OAV spans **~0.05 to ~7**. **The model cannot emit OAV ≈ 1 as a tight prediction
+because reality does not have one** — DMS output is set by DMSp-at-bottling, a grape property with an 8× spread. Surfaced to the
+owner before building; the instruction was to **let OAV fall where the sourced inputs put it**.
+
+Where it falls, with **nothing tuned** — seeded at the sourced 119–958 band, 5 years at 18 °C:
+
+* **DMS 68–544 µg/L**, which **brackets the Syrah observation** (68.2–399.5). Not circular: the precursor level and the rate come
+  from independent measurements and are compared against a third.
+* **It OVER-PREDICTS Amarone** (2.9–64.3, mean 27.9) — the entire predicted band sits above Amarone's *maximum*. Corvina evidently
+  carries far less precursor than Syrah. **THE MISS IS RECORDED, NOT TUNED.** Backing `dms_potential_initial` out of Amarone's
+  observed DMS would make OAV ≈ 1 land **by construction rather than by evidence** — and OAV ≈ 1 *is* the low-precursor corner, so
+  the temptation was specific and real. A miss is a finding.
+
+### WHAT IT OVER-STATES, AND WHY THAT IS THE SAFE DIRECTION
+
+Three scoped overstatements, **all pushing the same way**: (1) **DMSp ⊃ SMM** — the pool is an assay of *all* precursors while the
+rate is SMM's (over-states substrate up to ~4×); (2) **variety** — generic wine defaults to Syrah's high DMSp; (3) **no closure
+permeation** — real DMS escapes through cork (up to 12%), and modelling a sealed bottle keeps it in. All three make the model **cry
+fault earlier than reality**. For an off-aroma that is conservative; **a model that under-predicted a fault would be the dangerous
+one.** Permeation is closure-specific and orthogonal — its own beat, not a re-anchoring of `k`.
+
+**What it cannot express, and it is DMS's most-studied property.** DMS **enhances fruity-ester perception** (it *lowers* the fruity
+pool's effective threshold) rather than adding to it. The OAV lens is structurally unable to carry a perceptual interaction (masking,
+blocked on `cosα` since D-95/D-98). So the model tracks DMS's concentration honestly and stays **silent** on its best-documented
+effect — stated in `threshold_dms_wine`'s notes so the silence reads as a scope, not an oversight.
+
+**Lessons.** (i) **Recording a lesson is not applying it** — D-101 wrote *"a summarising fetch is a source of LEADS, never of
+CONSTANTS"* and shipped a second fabricated constant in the same entry. (ii) **A discussion-section caveat is what a summary cannot
+carry**, and here it mattered more than the number. (iii) **"Not established" is a claim about your search terms** — the fifth
+scope-limit disguise, this time vocabulary (`SMM` vs `DMSp`). (iv) **A right-looking answer is not a sound process**: the fabrication
+landed nearer the truth than the value it misquoted. (v) **Non-collinear data may be measuring two different things** — check the
+observable before fitting *or* discarding. (vi) **When the brief's target does not exist in reality, the target is the thing to
+correct**, not the model.
+
+**Next:** bound the D-33 re-route's catabolic fraction; the **DMS closure-permeation** axis (now well-formed: sourced at 12%, needs
+an OTR-coupled sink); a **variety-specific DMSp** (the 8× band is this beat's dominant uncertainty); resolve the 3-vs-4-month
+ambiguity by correspondence with the authors (the only route left to halving E_a's band); the **bottle-aged MeSH route** (blocked on
+primary sources); **retire the false `mercaptans` lump** (`→methanethiol`, `lumped=False`); **derive `f_methional`** (blocked);
+sourced yeast-autolysate spectrum; the isoamyl-acetate carbon re-route; per-ester `dH`/`E_a` (blocked); masking (blocked on `cosα`);
+the `oav` → `magnitude` rename.

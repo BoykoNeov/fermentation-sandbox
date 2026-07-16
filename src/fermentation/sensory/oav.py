@@ -174,6 +174,7 @@ _WINE_ONLY: tuple[AromaCompound, ...] = (
     AromaCompound("3_methylbutanal", "3-methylbutanal", "malty / dark chocolate", lumped=False),
     AromaCompound("2_methylpropanal", "2-methylpropanal", "malty / grainy", lumped=False),
     AromaCompound("sotolon", "sotolon", "curry / maple / nutty", lumped=False),
+    AromaCompound("dms", "dimethyl sulfide", "truffle / black olive / cooked corn", lumped=False),
 )
 
 #: The FIVE oak aroma extractives — the non-oxidative barrel/chip diffusion axis (decision D-77 for

@@ -203,6 +203,16 @@ stevens_n_mercaptans:
     conditions: "no matrix — matrix-agnostic. Wine-only pool. Read against methanethiol, the pool's D-66 representative."
     notes: "LUMPED POOL. Doubly speculative: an author-estimate exponent applied to a pool that already assumes a fixed lump composition. Methanethiol (~15 g/L) ordered per Cain 1969 => upper-mid. Author estimate."
 
+stevens_n_dms:
+  value: 0.44
+  unit: "1"
+  tier: speculative
+  uncertainty: { low: 0.26, high: 0.66, note: "author's ignorance, at this file's standard width. The band OVERLAPS every neighbour, which is deliberate and is what keeps D-98's no-robust-dominance-flip theorem intact — dms is the sole member of its axis, so it cannot contest a dominance anyway." }
+  provenance:
+    source: "author estimate"
+    conditions: "no matrix — matrix-agnostic. Wine-only pool (decision D-102)."
+    notes: "Ordered per Cain 1969's solubility rank, like every other entry here: DMS's water solubility is 22 g/L at 25 C (PubChem CID 1068, citing Suzuki 1991 J. Comput.-Aided Mol. Design 5:149-66 at 2.2e4 mg/L, and HMDB at 22 mg/mL; the Merck Index's 'soluble below 300 mM' = 18.6 g/L agrees. NB one source, ILO-WHO ICSC, states 'Solubility in water: none' — an outlier, contradicted by every quantitative measurement, and rejected). That places it between guaiacol (~17 g/L, 0.43) and isoamyl alcohol (~25 g/L, 0.45), hence 0.44. THE SOLUBILITY WAS CHECKED AGAINST A PRIMARY-CITING SOURCE RATHER THAN RECALLED — D-101 shipped ethanethiol's boiling point as methanethiol's by taking a number at face value, and D-102 corrected a fabricated activation energy from the same habit. The exponent itself remains an author estimate: only the ORDER is claimed, and only rank is what Cain supports."
+
 stevens_n_isoamyl_alcohol:
   value: 0.45
   unit: "1"

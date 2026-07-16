@@ -1,0 +1,94 @@
+# DMS via SMM hydrolysis — the aged-wine "truffle / black olive" odorant (decision D-102).
+#
+# WINE-ONLY parameter file. Merged into compile.py's wine files, so a compiled wine scenario
+# carries these params — but INERT until a begin_aging intervention enables SMMHydrolysis
+# (aging is inherently post-ferment). An un-aged scenario loads them and never reads them.
+#
+# THE PROCESS (fermentation.core.kinetics.aging.SMMHydrolysis):
+#
+#   d(dms_potential)/dt = -k_smm_hydrolysis * f(T) * dms_potential
+#   d(dms)/dt           = +k_smm_hydrolysis * f(T) * dms_potential
+#
+# a first-order decay of the precursor pool straight into the product, with
+# f(T) = arrhenius_factor(T, E_a_smm_hydrolysis, T_ref). Warm storage makes DMS faster.
+#
+# BOOKED IN DMS-EQUIVALENTS. `dms_potential` is g of the DMS it can release, NOT g of SMM. This
+# is how the wine literature reports DMSp (it is an ASSAY: cleave every precursor with hot
+# alkali, measure the DMS that comes off), so the conversion is 1:1 by construction, there is no
+# stoichiometric yield parameter to guess, and SMM's molar-mass / iodide-salt-form ambiguity
+# never enters. The cost is stated under dms_potential_initial: DMSp is broader than SMM.
+#
+# CARBON. Both slots are OFF every ledger, so this Process moves nothing conserved (the D-74
+# A420 argument: the carbon would come from an untracked precursor and land in an untracked
+# product, so it is sidestepped by construction rather than approximated). At µg/L the amounts
+# are ~1e-6 of the carbon ledger regardless.
+#
+# ============================================================================================
+# WHY SCHEUREN'S ACTIVATION ENERGY IS **NOT** USED — the load-bearing negative result (D-102).
+# ============================================================================================
+# The obvious source for this rate is Scheuren et al. 2014 (J. Inst. Brew. 120:474-476,
+# "Decomposition kinetics of dimethyl sulphide"), the one paper that measures SMM->DMS across a
+# temperature range and reports an Arrhenius activation energy. It is NOT used here, for a
+# reason found only by READING it (decision D-101 banked it from a search summary, which had the
+# value wrong AND could not carry the caveat):
+#
+#   * Its actual value is E_A = (186 +/- 12) kJ/mol -- not the 128 +/- 37 D-101 banked.
+#     (Verified against the paper's OWN Table 1: a least-squares Arrhenius fit of its six
+#     measured constants gives 192 kJ/mol, and its stated 30.5 min half-life at 98.5 C is
+#     exactly ln2/0.0227 min^-1. The number is real; D-101's was a fabrication.)
+#   * It is measured in **wort at pH 5.2**, 80-98.5 C. Its own discussion says the pH does not
+#     merely shift the rate, it **changes the mechanism**: "a high pH value affects the
+#     intramolecular substitution of the SMM-carboxyl unit, while on the other hand a low pH
+#     value promotes the nucleophile substitution of the sulphur unit by water", and it defers
+#     pH to "future studies".
+#   * Wine (pH 2.8-4.0) is in the LOW-pH regime; wort pH 5.2 is in the HIGH-pH one. An
+#     activation energy is a property of a MECHANISM, so it does not cross that boundary. The
+#     source declines to support the transfer the D-101 design was built on.
+#   * Confirmed from the wine side, independently: De La Burgade et al. 2025 measured SMM
+#     degradation at pH 2.8 vs 3.8 and found NO significant difference, reasoning "since the
+#     degradation reaction is a nucleophilic substitution, a pH < 5 has no influence on either
+#     the reaction kinetics or yield". Wine sits inside the pH-insensitive low-pH regime --
+#     which is why this file has NO pH term (a sourced null, not an omission).
+#   * The size of the error, on the only question that matters: transferred to a 18 C cellar,
+#     E_a = 186 gives an SMM half-life of ~53 YEARS (DMS would never appear in aged wine, which
+#     is false). The in-matrix value below gives ~4 yr. See D-102.
+#
+# So every constant here is anchored IN WINE. Scheuren is recorded as the road not taken.
+
+# -- FIRST-ORDER HYDROLYSIS RATE: DMS potential -> DMS ------------------------------------
+k_smm_hydrolysis:
+  value: 2.63e-5
+  unit: "1/h"   # d(dms_potential)/dt = -k_smm_hydrolysis * f(T) * dms_potential
+  tier: speculative
+  uncertainty: { low: 1.80e-5, high: 3.84e-5, note: "the band is NOT a guess — it is the propagation of the E_a band below (the two readings of the 35 C paper's own duration), each re-anchored to T_ref, quoted to three significant figures. (It propagates the UNROUNDED fit, E_a = 101242 / 124690, giving 1.804e-5 / 3.842e-5; re-deriving from E_a's own rounded 101000 / 125000 gives 1.793e-5 / 3.861e-5 instead — a ~0.5% difference, immaterial against a band that spans 2.1x, but stated so 'propagation' is not read as an exactness this cannot have.) => SMM half-life at T_ref = 293.15 K of 2.1-4.4 years, and 2.7-6.3 years at an 18 C cellar. The right order for bottle aging, and the reason the Scheuren transfer (53 yr) is rejected" }
+  provenance:
+    source: "ANCHORED IN-MATRIX on two independent wine-matrix measurements of SMM->DMS conversion, and extrapolated to T_ref along E_a_smm_hydrolysis. (1) Ugliano et al. 2023 (J. Agric. Food Chem. 71; 'Dimethyl Sulfide (DMS) in Amarone Wines'): real Amarone spiked with 6.4 mg/L SMM converted 49-54% in ONE MONTH at 45 C (12-14% at 1 week -- consistent with first order: k from the 1-week point is 8.3e-4/h, from the 1-month point 1.0e-3/h). (2) De La Burgade et al. 2025 (PMC12152913, open access; 'Dimethyl sulfide transfers through closure during accelerated model wine ageing'): model wine spiked with 53.6 umol/L SMM degraded 45-49% (crown-capped) at 35 C. Both at wine pH (3/4 and 2.8/3.8 respectively)."
+    conditions: "generic wine at cellar pH (2.8-4.0, where the rate is pH-INSENSITIVE -- see the header); first-order in dms_potential, at T_ref = 293.15 K. The value at T_ref is itself an extrapolation ~15 C below the nearer anchor (35 C), so its uncertainty is dominated by E_a's, which is why the two bands are propagated together rather than banded independently."
+    notes: "SOURCED FORM (first-order, both papers) + SOURCED IN-MATRIX MAGNITUDE (two labs, two wine matrices, bracketing a real 10 C interval) -- better provenance than k_ester_hydrolysis, which is an order-of-magnitude author estimate. Tier is speculative anyway: the anchors are ACCELERATED (35/45 C) and the model's use case is a ~18 C cellar, so every cellar prediction rides on the extrapolation. CHECK, and it passes: extrapolating to 18 C gives an SMM half-life of 4.1 yr against a MEASURED DMSp half-life of 1.47 yr in six real Syrah wines cellared at 18 C for 24 months (De La Burgade). DMSp decaying FASTER than SMM is the expected direction, not a discrepancy -- DMSp is the broader, more labile pool (SMM is only 21-74% of it; see dms_potential_initial). The two are different observables and are NOT required to agree; this is why the 18 C point is used as a CHECK and not as a third fit point (doing so would force a spurious E_a of ~61 kJ/mol -- see D-102)."
+
+# -- ACTIVATION ENERGY: warmer storage makes DMS faster (sourced in-matrix) ---------------
+E_a_smm_hydrolysis:
+  value: 113000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 101000.0, high: 125000.0, note: "Q10 ~4.4-5.9 at 20 C -- a STEEP temperature dependence, which is why warm storage is the dominant lever on aged-wine DMS. The band is not statistical: it is the two readings of a SELF-CONTRADICTORY duration in the 35 C source (see notes). Both ends are equally supported by the paper, so the band is the honest width" }
+  provenance:
+    source: "IN-MATRIX two-point Arrhenius fit across the only two wine-matrix SMM-degradation rates in the literature: 35 C (De La Burgade et al. 2025, model wine, 45-49% degraded) and 45 C (Ugliano et al. 2023, Amarone, 49-54% in 1 month). Both measure SMM SPECIFICALLY (spiked SMM, SMM assayed directly), both at wine pH, both first-order. Scheuren et al. 2014's 186 +/- 12 kJ/mol is DELIBERATELY NOT USED -- it is wort at pH 5.2, a different reaction mechanism (see the file header)."
+    conditions: "equivalent Arrhenius activation energy of SMM hydrolysis in wine at pH 2.8-4.0, anchored at T_ref = 293.15 K"
+    notes: "THE BAND'S ORIGIN IS AN UNRESOLVABLE CONTRADICTION IN THE SOURCE, and is recorded rather than hidden. De La Burgade et al. state their accelerated-ageing duration TWICE AS 3 MONTHS (methods 2.3: 'placed vertically at 35 C for 3 months to perform an accelerated ageing. After 3 months, all the wines were chemically characterized') and TWICE AS 4 MONTHS (section 4.2: 'placed in an oven (35 C) for 4 months of accelerated ageing'; and Table 1's caption: 'after 4 months of accelerated ageing at 35 C'). 2 vs 2, with no tiebreaker in the text, figures or supplement. The 3-month reading gives E_a = 101 kJ/mol, the 4-month 125. Rather than pick, the band covers both and the central value is their mean. WHAT IS LOAD-BEARING is the DIRECTION and the ORDER (E_a > 0, and ~100-125 rather than Scheuren's 186): the sign is why warm cellars make DMS and cold ones do not, and the order is what puts the cellar half-life in YEARS (4.1) instead of DECADES (53 at E_a=186). A two-point cross-study fit cannot carry an uncertainty of its own -- this band is the source ambiguity only, and the true uncertainty is wider. VALIDATION: the central pair reproduces BOTH anchors it was fitted through (45 C: 52.0% predicted in 1 month vs 49-54% observed; 35 C: 42.3% at 3 mo / 52.0% at 4 mo vs 45-49% observed)."
+
+# -- THE PRECURSOR LEVEL: a GRAPE property, seeded at must, not a winemaking dose ---------
+dms_potential_initial:
+  value: 338.0
+  unit: "ug/L"   # DMS-EQUIVALENTS (ug of releasable DMS per L), NOT ug of SMM. Seeds dms_potential.
+  tier: speculative
+  uncertainty: { low: 119.0, high: 958.4, note: "the FULL measured spread of the six Syrah wines, not a confidence interval — an 8x range WITHIN one variety and one vintage. This band is the dominant uncertainty in the whole beat: predicted aged-wine DMS is linear in it, so the model's OAV inherits the 8x directly. That is a fact about grapes, not a modelling weakness" }
+  provenance:
+    source: "De La Burgade et al. 2025 (PMC12152913, open access), the only primary AT-BOTTLING measurement of natural (unspiked) DMSp in real wine found: 'At bottling DMSP concentrations varied from 119.0 to 958.4 ug eq. DMS/L' across six Syrah wines from six wineries (Languedoc-Roussillon and Cotes-du-Rhone, bottled March 2021, conventional practice). Value = the geometric mean of that range (337.7). CORROBORATED INDEPENDENTLY, and the apparent conflict is what corroborates it: Segurel et al. 2004 report only 8.6-97.1 ug eq. DMS/L in Syrah/Grenache wines of vintages 1992-2002 -- ~10x lower, which the 2025 paper flags without explaining. It is the DECAY CURVE, not a disagreement: Segurel measured AGED wines (~2-12 yr old at analysis), and decaying 119-958 forward at this file's own 18 C rate for 5 years predicts 11.3-90.9 ug eq/L against Segurel's observed 8.6-97.1. Near-exact. Two independent French studies agree once age is accounted for."
+    conditions: "DMS-equivalents in must / at bottling, before any bottle aging. STRONGLY VARIETY-DEPENDENT (see notes)."
+    notes: "TWO OVERSTATEMENTS, both in the SAME direction (this parameter reads HIGH), both stated rather than corrected -- correcting either would need a number nobody has published. (1) VARIETY. The only at-bottling dataset is SYRAH, a variety with notably high DMS potential; this value defaults GENERIC wine to it. The model demonstrably over-predicts a low-DMSp wine: Amarone (Corvina/Rondinella, withered) measures 2.9-64.3 ug/L DMS (mean 27.9) where this parameter predicts 68-544 after 5 years. That MISS IS RECORDED, NOT TUNED (D-102): backing this value out of Amarone's observed DMS would make the OAV land where wanted by construction rather than by evidence. (2) DMSp > SMM. DMSp is an ASSAY (hot alkali cleaves EVERY precursor, known and unknown -- incl. DMSPA), while the rate above is SMM's. SMM accounts for only 21-74% of DMS formed (Bekker et al., cited in De La Burgade). So treating the whole DMSp pool as SMM over-states the substrate by up to ~4x. A third overstatement is scoped out in the Process docstring (no closure permeation -- real DMS escapes through cork, up to 12% of initial). ALL THREE PUSH THE SAME WAY, which is the CONSERVATIVE direction for an off-aroma: the model cries fault earlier than reality. A model that under-predicted a fault would be the dangerous one."
+
+# -- SANITY BOUND: not a rate, a tripwire on the precursor pool ---------------------------
+# (none needed: the Process is a decay of a non-negative pool by a positive rate, so
+#  dms_potential -> 0 monotonically and dms rises monotonically to it. No clamp, no floor,
+#  no discontinuity. The conservation of (dms_potential + dms) is exact and IS a test.)

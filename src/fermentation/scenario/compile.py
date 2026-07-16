@@ -62,6 +62,7 @@ from fermentation.core.kinetics import (
     OenococcusDiacetylReduction,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
+    SMMHydrolysis,
     StreckerDegradation,
     SulfiteOxidation,
     TanninAnthocyaninCondensation,
@@ -93,6 +94,7 @@ from fermentation.units.convert import (
     celsius_to_kelvin,
     days_to_hours,
     mgl_to_gpl,
+    ugl_to_gpl,
 )
 
 #: Coleman Y_X/N regression coefficients (decision D-14). Present iff a medium
@@ -194,6 +196,7 @@ _AGING_GATED_PROCESSES = (
     MaillardStrecker,
     Caramelization,
     MaillardBrowning,
+    SMMHydrolysis,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -361,6 +364,15 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             # Process stays disabled and the run is byte-for-byte the validated core. Not a state
             # slot: it is a compile-time gate only, never packed into y0.
             "pof_positive",
+            # The grape's DMS potential in DMS-EQUIVALENT µg/L (decision D-102) — the precursor
+            # SMMHydrolysis converts to aged-wine DMS. UNLIKE every other optional key here, absent
+            # does NOT mean 0: it falls back to the sourced must level `dms_potential_initial`,
+            # because DMSp is a property of the GRAPE that every must carries rather than a
+            # winemaking dose (a 0 default would assert aged wine makes no DMS — the D-45 hard-zero
+            # defect). Scenarios SHOULD set it: DMSp is strongly variety-dependent and the sourced
+            # default is Syrah's, which over-predicts a low-DMSp variety (see dms.yaml). Explicit 0
+            # is still honoured, and makes the Process byte-for-byte inert.
+            "dms_potential_ugl",
         }
     ),
     "beer": frozenset(
@@ -472,6 +484,28 @@ def _wine_initial(
         # charge is a scoped omission the inverse anchoring would absorb at t=0 anyway (D-22).
         # Free/bound are derived from this total + acetaldehyde at the solved pH (D-28).
         "so2_total": mgl_to_gpl(_optional(values, "so2_total_mgl", 0.0)),
+        # DMS potential — the grape-borne precursor of aged-wine DMS (decision D-102), in
+        # DMS-EQUIVALENT µg/L. Unlike every other optional above, this does NOT default to 0: it
+        # defaults to the SOURCED must level (dms_potential_initial). The distinction is real —
+        # so2_total/oak/anthocyanin are winemaking DOSES, and 0 is a true statement about a
+        # scenario that made no addition, whereas DMSp is a property of the GRAPE that every must
+        # carries. Defaulting it to 0 would assert that aged wine develops no DMS, which is the
+        # D-45 hard-zero defect (a Process that silently never fires). Scenarios override via
+        # `dms_potential_ugl` — and should, since DMSp is strongly variety-dependent and the
+        # sourced default is Syrah's (see dms.yaml's notes on the Amarone over-prediction).
+        # Absent from the ParameterSet ⇒ 0.0, so older parameter sets still compile inertly.
+        "dms_potential": ugl_to_gpl(
+            _optional(
+                values,
+                "dms_potential_ugl",
+                (
+                    parameters["dms_potential_initial"].value
+                    if "dms_potential_initial" in parameters
+                    else 0.0
+                ),
+            )
+        ),
+        "dms": 0.0,  # produced-only: no DMS at pitch, it accumulates over bottle aging
         # Oenococcus oeni dose driving malolactic conversion (D-23); g/L, default 0 (no
         # MLF). Inert catalyst in v1 (no Process grows/kills it) and carbon-free, so an
         # undosed run is byte-for-byte the validated core; the compile step below disables
@@ -704,6 +738,14 @@ def _load_parameters(
         # the thermal aroma slots). Loaded universally like the other shared files — collision-free
         # names; every rate is INERT until a begin_aging enable.
         base / "thermal.yaml",
+        # DMS via SMM hydrolysis (decision D-102): the k/E_a of the grape-borne precursor's
+        # bottle-aging hydrolysis + the sourced must DMS-potential level that seeds the pool.
+        # Wine-only in effect (only wine carries the dms_potential/dms slots + wires
+        # SMMHydrolysis), but loaded universally like the other shared files — collision-free
+        # names, inert for beer. Beer's DMS is real but arrives by OTHER routes this file's
+        # wine-anchored constants must not be used for (see dms.yaml / the Process docstring);
+        # INERT until a begin_aging enable.
+        base / "dms.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 

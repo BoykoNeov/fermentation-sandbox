@@ -99,8 +99,14 @@ def test_every_exponent_is_an_author_estimate_and_speculative(exponents):
     length, and four of the five new pools are aliphatic alcohols of differing length. That
     supplies an ORDERING, not values — so these stay author estimates with overlapping bands,
     and `test_a_robust_dominance_flip_is_impossible_at_these_bands` still holds.
+
+    D-102 added the 24th, `stevens_n_dms`, when the DMS aroma pool joined the wine lens — the
+    contract this count enforces (every aroma pool of every medium needs an exponent) is what
+    caught its absence. Its solubility rank was CHECKED against a primary-citing source (PubChem:
+    22 g/L at 25 C) rather than recalled, since D-101 shipped a wrong boiling point and D-102
+    corrected a fabricated activation energy from exactly that habit.
     """
-    assert len(exponents) == 23
+    assert len(exponents) == 24
     for p in exponents:
         assert p.provenance.source == "author estimate", p.name
         assert p.tier is Tier.SPECULATIVE, p.name

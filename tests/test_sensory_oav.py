@@ -170,6 +170,11 @@ def test_profile_compound_set_matches_the_medium(thresholds):
         "3_methylbutanal",
         "2_methylpropanal",
         "sotolon",
+        # The aged-wine truffle/black-olive odorant (decision D-102) — a single-molecule pool
+        # (NOT lumped) whose precursor is grape-borne, so it accumulates on bottle aging with no
+        # lees. Wine-only: beer's DMS is real but arrives by other routes (wort-boil cleavage
+        # before pitch; yeast DMSO reduction), so no beer threshold is claimed here.
+        "dms",
     }
     # The set-and-hold ceiling slots are read by OakExtraction but are not aroma compounds.
     assert "vanillin_ceiling" not in wine.readings

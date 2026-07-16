@@ -152,6 +152,14 @@ DESCRIPTOR_AXES: tuple[DescriptorAxis, ...] = (
         "floral_honey", ("phenylacetaldehyde", "2_phenylethanol"), "honey / rose / floral"
     ),
     DescriptorAxis("cooked_potato", ("methional",), "cooked potato / oxidised savoury"),
+    # DMS gets its OWN axis rather than joining `sulfidic` (decision D-102) — the D-99 lesson
+    # applied before it could bite. It IS a volatile sulfur compound, so `sulfidic` is the
+    # tempting home; but that axis means "rotten egg / drains / reductive", and DMS smells of
+    # none of those. It is the aged-wine truffle/black-olive note, POSITIVE near its threshold
+    # and only faulty far above it. Folding it in would repeat exactly the error D-99 found in
+    # the fusel lump — 2-phenylethanol booked as `solventy` when it is ROSE — where the grouping
+    # was self-consistent and still wrong. Chemical family is not a perceptual axis.
+    DescriptorAxis("truffle_olive", ("dms",), "truffle / black olive / cooked corn"),
     DescriptorAxis(
         "malty",
         ("2_methylbutanal", "3_methylbutanal", "2_methylpropanal"),
