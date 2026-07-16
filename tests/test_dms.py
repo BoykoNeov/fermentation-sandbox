@@ -17,9 +17,20 @@ un-seeded no-op, the off-ledger isolability, and the speculative tier.
 measurements they were fitted through; ``test_cellar_halflife_lands_in_years`` checks the
 extrapolation the model actually uses against the third, independent observation (six real Syrah
 wines cellared at 18 °C for 24 months) — the check that would have caught the D-101 activation
-energy, and does catch Scheuren's. ``test_predicted_aged_wine_dms_brackets_the_syrah_observation``
-records what the model predicts against reality **without tuning**, including the Amarone
-over-prediction, which is a *recorded finding* and not a defect (see D-102 and dms.yaml).
+energy, and does catch Scheuren's.
+
+**What the aged-wine comparison may and may not claim (an overclaim, corrected).**
+``test_predicted_aging_dms_is_the_right_order_against_syrah_at_the_MATCHING_age`` first read
+*"brackets the Syrah observation"* — and did not: it compared the model at **5 years** against data
+at **t24 = 2 years**, and asserted only that two ranges **overlap**, which nearly any positive
+conversion satisfies. **The assertion was weaker than the sentence around it** — the D-96 failure
+mode (prove the mechanism, never pin the observable) wearing a new costume. Two confounds make a
+quantitative bracket unavailable at *any* age: the model reports DMS **formed by aging** (it seeds
+``dms = 0``) while those wines already held **29.9–314.9 µg/L at bottling**, and their totals
+**fall** t12→t24 as DMS permeates out through the closure — a shape a monotonic-from-zero model
+cannot produce. So the comparison claims **order of magnitude and direction**, nothing sharper.
+``test_the_amarone_miss_is_recorded_not_tuned`` carries the same caveat and the same honest
+strength: a *recorded finding*, not a defect (see D-102 and ``dms.yaml``).
 """
 
 import math
@@ -337,27 +348,54 @@ def test_dmsp_decay_direction_matches_the_syrah_cellar_observation(params):
     assert smm_half_life_yr < 10.0  # but not so slow that bottle aging could not show it
 
 
-def test_predicted_aged_wine_dms_brackets_the_syrah_observation_and_over_predicts_amarone(params):
-    # WHAT THE MODEL SAYS, WITH NOTHING TUNED (the D-102 headline). Seeded with the sourced
-    # at-bottling DMSp band (119.0-958.4 ug eq/L, six Syrah wines) and run 5 years at 18 C:
-    conv = _converted_fraction(params, 291.15, 5 * 8766.0)
+def test_predicted_aging_dms_is_the_right_order_against_syrah_at_the_MATCHING_age(params):
+    # WHAT THE MODEL SAYS, WITH NOTHING TUNED — and what that CANNOT be compared to.
+    #
+    # THIS TEST IS THE CORRECTED VERSION OF AN OVERCLAIM (D-102). It first read "brackets the Syrah
+    # observation", comparing the model at 5 YEARS against Syrah data at t24 = 2 YEARS, and its
+    # assertion (`lo < 399.5 and hi > 68.2`) merely checked that two ranges OVERLAP — which almost
+    # any positive conversion satisfies. The assertion was weaker than the sentence around it: the
+    # D-96 failure mode (prove the mechanism, never pin the observable) in a new costume.
+    #
+    # TWO CONFOUNDS make a quantitative bracket unavailable at ANY age, and they are the point:
+    #  1. The model reports DMS *FORMED BY AGING* (it seeds dms = 0). The Syrah wines already held
+    #     29.9-314.9 ug/L DMS *AT BOTTLING* ("DMS was already present in all wines at bottling"),
+    #     so the observed t24 totals are dominated by DMS the model structurally starts without.
+    #  2. The observed totals FALL from t12 to t24 (LR1: 539.8 -> 399.5) because DMS PERMEATES OUT
+    #     through the closure — a shape a monotonic-from-zero model cannot produce at all.
+    # Formed-DMS and total-DMS are not commensurate. Only the ORDER OF MAGNITUDE is checkable, and
+    # that is therefore all this test asserts.
+    conv = _converted_fraction(params, 291.15, 2 * 8766.0)  # t24 — the MATCHING age
     lo, hi = 119.0 * conv, 958.4 * conv
+    assert 0.25 < conv < 0.35  # ~28.5% of the precursor converts in the Syrah study's 2 years
 
-    # ...it brackets the Syrah wines it is anchored on (68.2-399.5 ug/L observed at t24). This is
-    # NOT circular: the DMSp level and the rate come from independent measurements, and the DMS
-    # they predict is compared to a third.
-    assert lo < 399.5 and hi > 68.2
+    # Right order of magnitude against the observed t24 totals (68.2-399.5): tens-to-hundreds of
+    # ug/L, not single digits and not thousands. A real check (a 10x-wrong rate fails it) but a
+    # WEAKER one than "brackets" — which is the honest strength given the confounds above.
+    assert 10.0 < lo < 100.0
+    assert 100.0 < hi < 1000.0
 
-    # ...and it OVER-PREDICTS Amarone (2.9-64.3 ug/L, mean 27.9), whose Corvina fruit evidently
-    # carries far less precursor than Syrah. THIS MISS IS RECORDED, NOT TUNED (D-102): backing
-    # dms_potential_initial out of Amarone's observed DMS would make OAV ~= 1 land by construction
-    # instead of by evidence. The user's "OAV ~= 1 in aged wine" is Amarone's MEAN specifically —
-    # reality has no single value, and this assertion pins that the model does not pretend to.
-    assert lo > 64.3  # the whole predicted band sits above Amarone's observed maximum
+    # The one comparison the paper makes PAIRABLE by naming its wines, recorded but not asserted as
+    # validation: LR1 has the max DMSp (958.4) and went 314.9 -> 539.8 (t12) -> 399.5 (t24), i.e. it
+    # GROSSLY formed >= 224.9 before permeation removed ~140. The model forms ~273 from that
+    # precursor in 2 years — the right size against gross formation, and ~3x the NET increase of
+    # 84.6. Both readings are consistent with a model that omits permeation; neither is a bracket.
+    assert 200.0 < hi < 350.0
 
-    # The direction of every scoped overstatement (DMSp > SMM; Syrah's variety; no closure
-    # permeation) is the same, and it is the conservative one for an off-aroma: cry fault early.
-    assert conv > 0.5  # a 5-year-old wine has converted most of its precursor
+
+def test_the_amarone_miss_is_recorded_not_tuned(params):
+    # The model OVER-PREDICTS Amarone (2.9-64.3 ug/L, mean 27.9), whose Corvina fruit evidently
+    # carries far less precursor than Syrah — the sourced default. THE MISS IS RECORDED, NOT TUNED
+    # (D-102): backing dms_potential_initial out of Amarone's observed DMS would make OAV ~= 1 land
+    # by construction rather than by evidence, and OAV ~= 1 *is* the low-precursor corner, so the
+    # temptation is specific and real. The brief's "OAV ~= 1 in aged wine" is Amarone's MEAN
+    # specifically; reality has no single value, and this pins that the model does not pretend to.
+    #
+    # CAVEATED THE SAME WAY as the Syrah comparison above: Amarone's at-bottling DMS is UNSTATED, so
+    # "over-predicts" also compares formed-DMS to a total. The DIRECTION is the honest read (Corvina
+    # carries less precursor than Syrah); the factor is softer than it looks.
+    conv = _converted_fraction(params, 291.15, 5 * 8766.0)
+    assert 119.0 * conv > 64.3  # even the lowest-precursor wine exceeds Amarone's observed maximum
 
 
 def test_dms_oav_is_reported_and_crosses_threshold_in_aged_wine(params):
@@ -368,7 +406,13 @@ def test_dms_oav_is_reported_and_crosses_threshold_in_aged_wine(params):
     threshold_ugl = load_thresholds()["threshold_dms_wine"].value
     assert threshold_ugl == pytest.approx(25.0)
 
+    # NB this is the model's own OAV — DMS FORMED BY AGING over its threshold. It is not offered as
+    # a reproduction of any measured aged-wine OAV: real wines also carry at-bottling DMS (which
+    # would raise it) and lose DMS through the closure (which would lower it), and this Process
+    # models neither. What is claimed is the SHAPE: crosses threshold, and does so across a band
+    # ~8x wide because the grape's precursor level is ~8x wide.
     conv = _converted_fraction(params, 291.15, 5 * 8766.0)
     oav_lo, oav_hi = 119.0 * conv / threshold_ugl, 958.4 * conv / threshold_ugl
     assert oav_lo > 1.0  # even the lowest-precursor wine crosses threshold by 5 years
     assert oav_hi > 10.0  # and the band is WIDE — an 8x spread within one variety
+    assert oav_hi / oav_lo == pytest.approx(958.4 / 119.0)  # the spread IS the precursor's, exactly

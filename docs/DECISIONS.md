@@ -8525,14 +8525,39 @@ one variety and vintage**. Across the literature OAV spans **~0.05 to ~7**. **Th
 because reality does not have one** — DMS output is set by DMSp-at-bottling, a grape property with an 8× spread. Surfaced to the
 owner before building; the instruction was to **let OAV fall where the sourced inputs put it**.
 
-Where it falls, with **nothing tuned** — seeded at the sourced 119–958 band, 5 years at 18 °C:
+Where it falls, with **nothing tuned** — seeded at the sourced 119–958 band, at the Syrah study's own **t24 = 2 years**, 18 °C:
+**DMS 34–273 µg/L formed** (28.5% conversion), against observed t24 totals of 68.2–399.5. **Right order of magnitude; that is all it
+may claim** — see the correction below. And it **OVER-PREDICTS Amarone** (2.9–64.3, mean 27.9): Corvina evidently carries far less
+precursor than Syrah. **THE MISS IS RECORDED, NOT TUNED.** Backing `dms_potential_initial` out of Amarone's observed DMS would make
+OAV ≈ 1 land **by construction rather than by evidence** — and OAV ≈ 1 *is* the low-precursor corner, so the temptation was specific
+and real. A miss is a finding.
 
-* **DMS 68–544 µg/L**, which **brackets the Syrah observation** (68.2–399.5). Not circular: the precursor level and the rate come
-  from independent measurements and are compared against a third.
-* **It OVER-PREDICTS Amarone** (2.9–64.3, mean 27.9) — the entire predicted band sits above Amarone's *maximum*. Corvina evidently
-  carries far less precursor than Syrah. **THE MISS IS RECORDED, NOT TUNED.** Backing `dms_potential_initial` out of Amarone's
-  observed DMS would make OAV ≈ 1 land **by construction rather than by evidence** — and OAV ≈ 1 *is* the low-precursor corner, so
-  the temptation was specific and real. A miss is a finding.
+**THE DONE-CALL CATCH — I CLAIMED A BRACKET AND HAD CHECKED AN OVERLAP.** This entry first read *"DMS 68–544 µg/L, which **brackets
+the Syrah observation** (68.2–399.5)"*, and its test asserted `lo < 399.5 and hi > 68.2`. Both were wrong, in the entry whose headline
+is a fabricated constant:
+
+* **Age mismatch.** 68–544 is the model at **5 years**; the Syrah data is **t24 = 2 years**. At the matching age the model gives
+  **34–273** — the low end *below* observed 68, the high end *below* observed 400. **It does not bracket; choosing 5 years is what
+  made it appear to.**
+* **The assertion was weaker than the sentence.** `lo < 399.5 and hi > 68.2` merely tests that two ranges **overlap**, which nearly
+  any positive conversion satisfies. **The D-96 failure mode — prove the mechanism, never pin the observable — in a new costume**,
+  and D-96's own lesson was that a claim no test constrains is a claim the suite cannot defend.
+* **And the comparison is not commensurate at ANY age — the fact was in my own notes.** I read and recorded *"DMS was already present
+  in all wines at bottling, with amounts varying from **29.9 to 314.9 µg/L**"* — then compared the model, which seeds `dms = 0` and
+  reports only **DMS FORMED BY AGING**, against **totals** dominated by DMS it structurally starts without. Worse, those totals
+  **FALL** t12→t24 (LR1: 539.8 → 399.5) as DMS **permeates out** — a shape a monotonic-from-zero model cannot produce.
+
+**What the data actually supports, recorded because it is more interesting than the bracket was.** The paper names LR1 (max DMSp
+958.4): 314.9 → 539.8 (t12) → 399.5 (t24), i.e. **gross formation ≥ 224.9 before permeation removed ~140**. The model forms **~273**
+from that precursor in 2 years — **the right size against GROSS formation, ~3× the NET increase of 84.6**. Both readings are exactly
+what a model omitting permeation should give. **So: order of magnitude and direction are established; a quantitative bracket is
+not**, and the entry now says so.
+
+**IT ALSO BREAKS THIS ENTRY'S OWN "ALL CONSERVATIVE, SAME DIRECTION" FRAMING, which is the more useful half.** The three logged
+overstatements (DMSp ⊃ SMM; Syrah's variety; no permeation) all push *cry-fault-early*. This confound pushes the **opposite** way:
+omitting at-bottling DMS makes the model **under-count** an aged wine's total. The tidy "everything errs safe" story was tidy because
+it was incomplete. *(The advisor's catch. It does not touch the rate: E_a was fitted only on the clean spiked-SMM degradation points,
+which are independent of both the at-bottling DMS and the permeation — so the D-101 correction stands entirely.)*
 
 ### WHAT IT OVER-STATES, AND WHY THAT IS THE SAFE DIRECTION
 

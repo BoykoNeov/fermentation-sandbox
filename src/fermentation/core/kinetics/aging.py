@@ -2784,6 +2784,16 @@ class SMMHydrolysis(Process):
     All three make the model cry fault **earlier** than reality. For an off-aroma that is the safe
     direction; a model that under-predicted a fault would be the dangerous one.
 
+    **A FOURTH SCOPE, and it cuts the OTHER WAY — so "all conservative" is NOT the whole story.**
+    This Process reports **DMS formed by aging** and seeds ``dms = 0``: it models no *at-bottling*
+    DMS. Real wines have it, and substantially — the six Syrah wines carried **29.9–314.9 µg/L
+    before any aging** (fermentative and yeast-mediated routes, D-102's scope). So the model
+    **under-counts** an aged wine's *total* DMS, partly offsetting the three overstatements above.
+    **The consequence that matters is a comparison rule, not a magnitude:** this pool is *not*
+    commensurate with a measured aged-wine DMS total, and must not be validated against one (D-102
+    made exactly that error and corrected it). Modelling the pre-aging DMS needs the fermentative
+    and DMSO-reduction routes — a beat of its own.
+
     **What it cannot express, and it is DMS's most-studied property.** DMS *enhances* fruity-ester
     perception (it lowers the fruity pool's effective threshold) rather than adding to it. The OAV
     lens is structurally unable to carry a perceptual interaction (masking, blocked on ``cosα``
