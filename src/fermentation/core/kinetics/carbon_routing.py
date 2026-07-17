@@ -162,11 +162,26 @@ class FuselSpec:
 
     ``species`` is the molecule the pool is carbon-weighted by in
     :func:`~fermentation.validation.conservation.total_carbon`, and — since D-99 — **it is the
-    pool's own molecule, not a stand-in**. ``precursor_amino_acid`` is documentation of the
-    Ehrlich route, not a modelled pool: `N` (YAN) is a single lumped nitrogen number here, so
-    the sim cannot know which amino acid was consumed. It is recorded because it is *why*
-    these five and not others, and because it names exactly what a future speciated-YAN model
-    would have to supply to make the composition dynamic (see :data:`FUSEL_SPECS`).
+    pool's own molecule, not a stand-in**.
+
+    **``precursor_amino_acid`` is LOAD-BEARING, and this docstring said the opposite for ten
+    decisions (fixed at D-111).** It read *"documentation of the Ehrlich route, not a modelled
+    pool: `N` (YAN) is a single lumped nitrogen number here, so the sim cannot know which amino
+    acid was consumed"*, and the field carried *"never read by any rate law"*. **D-100 speciated
+    the amino-acid lump** — the very "future speciated-YAN model" the note anticipated — so the
+    sim *does* know which amino acid was consumed, and this field is how it knows:
+    :class:`~fermentation.core.kinetics.byproducts.FuselAminoAcidReroute` and
+    :class:`~fermentation.core.kinetics.precursor_fates.PrecursorNonEhrlichFates` both resolve it
+    through ``SPEC_BY_SPECIES`` and gate on the pool it names, inside ``derivatives``, and both
+    derive their ``touches`` from it. The D-109/D-110 stale-prose class, one module over: **the
+    file furthest from the mechanism drifts, because nothing it does fails when its prose goes
+    stale.**
+
+    **One alcohol, one precursor — no longer true either (D-111).** This field names each
+    alcohol's *primary* precursor. Isoamyl alcohol has a **second** one (valine, via
+    α-ketoisocaproate), which lives in :data:`SECONDARY_FUSEL_ROUTES` rather than here because
+    a frozen one-to-one field cannot express it. See that registry for why the many-to-one map
+    is a *sourcing*-layer fact and never reaches the producer.
     """
 
     pool: str
@@ -175,8 +190,10 @@ class FuselSpec:
     #: Human-readable note for the pool's :class:`~fermentation.core.state.VarSpec`
     #: description — kept here so the schema text cannot drift from the registry.
     note: str
-    #: The Ehrlich-pathway amino acid whose skeleton becomes this alcohol. Documentation of
-    #: provenance only — never read by any rate law (see the class doc).
+    #: The Ehrlich-pathway amino acid whose skeleton becomes this alcohol — the **primary**
+    #: precursor, and a pool the re-route and the D-104 sink both gate on (see the class doc;
+    #: the "documentation only, never read by any rate law" claim here was false from D-100 to
+    #: D-111). Additional precursors for the same alcohol live in :data:`SECONDARY_FUSEL_ROUTES`.
     precursor_amino_acid: str
 
 
@@ -267,6 +284,111 @@ FUSEL_SPECS: tuple[FuselSpec, ...] = (
 #: so neither Process has to spell the string, and so the D-99 split cannot silently re-point
 #: either at the wrong C5 isomer (``active_amyl_alcohol`` is a different molecule).
 ISOAMYL_ALCOHOL: FuselSpec = FUSEL_SPECS[3]
+
+
+@dataclass(frozen=True)
+class SecondaryFuselRoute:
+    """A SECOND amino-acid precursor for an alcohol that already has one (decision D-111).
+
+    :class:`FuselSpec` pins one alcohol to one ``precursor_amino_acid``. Reality does not:
+    isoamyl alcohol is built from **leucine** (via α-ketoisocaproate, KIC) *and* from **valine**
+    (via α-ketoisovalerate → KIC, the leucine-biosynthesis chain-elongation step). This registry
+    carries the extra routes, so the one-to-one field above stays honest instead of quietly
+    meaning two things.
+
+    **It is a SOURCING fact and never reaches the producer (D-109's constraint).**
+    :class:`~fermentation.core.kinetics.byproducts.FuselAlcoholsEhrlich` makes exactly as much
+    isoamyl alcohol as before; a secondary route only changes *where that carbon came from*. That
+    is what keeps the producer byte-for-byte when the precursor pools are undosed, and it is why
+    this is a partition rather than a sixth state slot: D-109 measured that the intracellular keto
+    acid is a vanishing pool carrying an enormous flux ⇒ quasi-steady ⇒ a partition.
+
+    **The stoichiometry is the whole reason this needs its own type.** The primary Ehrlich route
+    is 1 precursor → 1 alcohol + 1 CO₂ with the precursor carrying exactly one carbon more than
+    the alcohol (leucine C6 → isoamyl C5 + CO₂), which is the assumption
+    :func:`~fermentation.core.kinetics.byproducts.ehrlich_co2_carbon` is built on. The valine
+    route breaks it in both places: **valine C5 + 2 C from acetyl-CoA → isoamyl C5 + 2 CO₂**, so
+    the precursor is the *same* size as the alcohol and **two** carbons leave.
+
+    **The sugar refund is provenance-independent, which is the D-109 trap dissolving.** Per mole,
+    the truth is ``valine 5C + sugar 2C → isoamyl 5C + 2 CO₂``, and the producer has already
+    drawn 5 C of sugar for that isoamyl. So the sourcing layer applies the *difference*: debit
+    the precursor 5 C, refund sugar **3 C**, emit 2 C as CO₂ — and that 3 is fixed by the net
+    sugar balance, **not** by which carbons the two decarboxylations remove. D-109 flagged the
+    atom assignment ({3,4,5}/5) as a trap conservation cannot catch; it does not reach the draw
+    at all, and it does not reach the validation either, because Rollero defines enrichment as
+    *"the fraction of labelled molecule with respect to its total production"* — a **molecule**
+    fraction, so the atom assignment never enters. (It is 4/5 mechanistically — valine loses C1
+    at the LEU2 decarboxylation, acetyl-CoA its carbonyl at the KIC decarboxylation — but that
+    number is now *unnecessary* rather than unsourced.)
+    """
+
+    #: The alcohol this route feeds — must already exist in :data:`FUSEL_SPECS`.
+    alcohol_pool: str
+    #: The amino acid it is sourced from. Must NOT be that alcohol's own
+    #: ``precursor_amino_acid`` (that is the primary route) but must be *some* alcohol's, since
+    #: the share is anchored against that alcohol's draw (see the share param's note).
+    precursor: str
+    #: ``f_<precursor>_to_<alcohol>``: the fraction of **consumed precursor** that becomes this
+    #: alcohol. Anchored against the precursor's *primary* alcohol branch, whose share is the
+    #: residue ``1 − f_non_ehrlich − this`` — so the three-way split of consumed valine
+    #: (isobutanol / isoamyl / everything-else) sums to 1 by construction.
+    share_param: str
+    #: CO₂ released per alcohol on this route. **Two** for valine → KIC → isoamyl (one at the
+    #: LEU2 oxidative decarboxylation of 3-isopropylmalate, one at the KIC decarboxylation),
+    #: against the primary Ehrlich route's one. Read as an integer count, never inferred.
+    co2_per_alcohol: int
+
+
+#: The many-to-one routes (decision D-111). One entry: **valine → KIC → isoamyl alcohol**, the
+#: route D-104 named as missing and declined to build ("the gap is a missing route ... NOT a value
+#: to tune") and D-109 scoped as the milestone's real content.
+#:
+#: **SOURCED TWICE, AND THE TWO SOURCES ARE NOT RIVALS.** Crépin et al. 2017 measures 23% of
+#: consumed valine reduced into isoamyl alcohol via KIC. Rollero et al. 2017 reports "42–45% of
+#: consumed valine was converted into α-ketoisocaproate" — the **parent** flux, not a competing
+#: value for the same quantity: its Fig. 3 partitions KIC further into isoamyl alcohol, isovaleric
+#: acid and proteinogenic leucine, and its own raw µM (labelled isoamyl / consumed valine =
+#: 23/62, 53/221, 42/376 = 37% / 24% / 11%) reproduces the figure's stated 35/23/11%. So Crépin's
+#: 23% is the **isoamyl branch inside** Rollero's 42–45%, and Crépin's value at 180 mg N/L lands
+#: on Rollero's 23–24% at 250 mg N/L — two independent studies agreeing on the parameter.
+#:
+#: **The parameter and its validation have DIFFERENT denominators, which is what makes this
+#: non-circular** (D-109 worried the 23% was "circular as an input ... a validation target, not a
+#: parameter"). The input's denominator is *consumed valine*; the validation's is *total isoamyl*
+#: (Rollero's ¹³C-valine enrichment of isoamyl alcohol, 2.1–7.5%). Both are anchored independently
+#: in the model — consumed valine by the isobutanol branch, isoamyl by ``k_isoamyl_alcohol`` — so
+#: imposing one does not manufacture the other.
+SECONDARY_FUSEL_ROUTES: tuple[SecondaryFuselRoute, ...] = (
+    SecondaryFuselRoute(
+        alcohol_pool="isoamyl_alcohol",
+        precursor="valine",
+        share_param="f_valine_to_isoamyl",
+        co2_per_alcohol=2,
+    ),
+)
+
+#: CO₂ released per alcohol on the **primary** Ehrlich route: the pathway decarboxylates exactly
+#: once (transamination → decarboxylation → reduction). Named here beside
+#: :attr:`SecondaryFuselRoute.co2_per_alcohol`, which is 2 for the valine → KIC route, so the
+#: contrast is visible in one place rather than being an unexplained ``1.0`` in the rate law.
+CO2_PER_PRIMARY_EHRLICH_ALCOHOL = 1
+
+
+def non_ehrlich_fraction_param(species: str) -> str:
+    """The ``f_non_ehrlich_<species>`` parameter naming rule — the one place it is spelled.
+
+    Derived from the species rather than hand-listed so a sixth Ehrlich alcohol added to
+    :data:`FUSEL_SPECS` cannot silently acquire a fraction that no parameter file defines (it
+    fails at load, loudly).
+
+    **Lives here rather than in** :mod:`~fermentation.core.kinetics.precursor_fates` **(its home
+    until D-111)** because the fusel sourcing layer now needs it too: a secondary route's share is
+    anchored against its precursor's *primary* branch, whose share is the residue
+    ``1 − f_non_ehrlich − f_secondary``. That module re-exports it, so existing importers are
+    unaffected.
+    """
+    return f"f_non_ehrlich_{species}"
 
 
 def draw_carbon_from_sugar(

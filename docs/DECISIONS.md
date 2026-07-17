@@ -10231,3 +10231,233 @@ claim in its most direct form) and the DMS note; and the milestone plan's compou
   sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking (blocked on `cos-alpha`); the `oav` →
   `magnitude` rename.
 - **New:** the D-55 Brett-phenol prose above.
+
+## D-111 — the fusel-side keto-acid node: the route is real, the reason it was missing was not, and four "confirmations" passed on the wrong rows
+
+**Owner picked D-109's scoped milestone — the fusel keto-acid node — and the "findings + build, one beat" scope. Both
+landed: valine now reaches isoamyl alcohol via KIC as an algebraic partition in the sourcing layer, never in the
+producer (D-109's constraint), and `FUSEL_SPECS`' one-alcohol-one-precursor assumption is broken without a sixth state
+slot.** The route D-104 named is real and was absent (model **0%**, Rollero **2.1–7.5%**); it is now **1.74%**,
+untuned. But **the reason D-104 gave for building it does not survive**, and the beat's sharpest finding is about my
+own method rather than the model: I reported four independent confirmations of a decisive result, and **all four
+passed on the wrong rows of the table**.
+
+**1168 → 1171 passed (+3), both MEASURED** — 1171 from the completed run's own `PYTEST_EXIT=0`, 1168 from `--collect-only`
+in a throwaway detached worktree at HEAD (D-110's technique). **16/16 benchmarks among them, not beside them**, and
+**nothing skipped, deselected, or xfailed** (0 occurrences in the run). ruff + mypy clean, **4/4 mutations caught**.
+
+### The data, and how it was actually read
+
+Rollero 2015 (*Appl. Microbiol. Biotechnol.*, U-¹³C tracers on valine/leucine/isoleucine/threonine) and Crépin 2017
+(*Microb. Cell Fact.*) are the two sources. **Crépin's full text was never obtained** — PMC returns metadata only
+(ASM restricts it), Europe PMC's `fullTextXML` 404s — so every Crépin number here is resolved *through Rollero's*
+Fig. 3 and raw µM, and is labelled as such rather than cited as if read. Rollero's supplementary tables came from
+Europe PMC's `supplementaryFiles` endpoint after the PMC `/bin/` path and the OA ftp link both 404'd; Tables S1/S2 are
+**EMF vector images**, not text, and were parsed out of `EMR_EXTTEXTOUTW` records.
+
+### ⭐ Finding 0 — the row-mapping error, and why four checks did not catch it
+
+The first EMF extraction keyed rows on **draw order**. It was shifted by two. I reported to the owner as *decisive*:
+isobutanol 5.5–14.7%, isoamyl 0.7–3.1%. Those rows are **isobutyric acid** and **isovaleric acid** — different
+molecules. The result was wrong, and the reason it was *persuasive* is the part worth keeping:
+
+I had **four independent confirmations**, and every one of them shared the mapping assumption:
+
+- the numbers *"match the paper's stated 5–15%"* — a **coincidence** off adjacent rows;
+- three further consistency checks, each re-reading the same mis-keyed table.
+
+**A check that shares an assumption with the error is not a check, and counting four of them is exactly what made them
+persuasive.** Independence is a property of the *assumptions*, not of the arithmetic. Four checks reading one bad index
+are one check, run four times.
+
+The one true tell was there and I **rationalised it away**: isobutyl acetate came out enriched in the *leucine* culture
+while isobutanol did not — chemically impossible, since the ester is the alcohol's acetate. I filed it as
+low-concentration noise. **The anomaly that does not fit is worth more than the four checks that do**, and it is the
+one I explained away. The fix was to stop keying on order and parse the glyph **coordinates**, which is the only thing
+that made the rows self-identifying rather than inferred.
+
+This is D-103's fetch-hazard rule (*"fetching a primary source is not reading it"*) one layer deeper: **extracting a
+source is not reading it either.** A parser interposes exactly the summarising layer D-103 warned about, and it does
+it silently.
+
+### Finding 1 — D-104's diagnosis conflates two carbon sources; its conclusion survives, its reason does not
+
+D-104 wrote isoamyl's miss up as *sourced, not a loose end — do not tune it*, and explained it thus: *"Crépin measures
+23% of consumed valine reaching KIC → isoamyl alcohol. Reality feeds isoamyl exogenous carbon from both leucine and
+valine; this model routes only leucine, so it must under-count."* The conclusion (build the route) is right. **The
+reason is not**, and it is a commensurability error of the same family D-108 was acquitted on:
+
+- The model's isoamyl catabolic share is **1.12%** (re-measured; D-104's tabled 1.35% is stale post-D-106/107/108),
+  and it is **leucine**-derived.
+- Its like-for-like sourced counterpart is Rollero's **leucine** tracer: **3.4–17.3%**. The model is under by ~3–15×.
+- A **valine** route adds *valine*-derived carbon. **It cannot close a leucine shortfall.** The two numbers are
+  different quantities, and adding the second does not repair the first.
+
+The leucine gap is **D-103's gate *shape*** defect, not a missing route. D-104's table therefore reads as though
+building this route would fix the isoamyl miss; it does not, and could not.
+
+### Finding 2 — D-109's {3,4,5}/5 stoichiometry trap dissolves rather than being solved
+
+D-109 flagged the atom assignment (which of isoamyl's five carbons come from valine vs acetyl-CoA) as *"a trap
+conservation cannot catch."* It never enters:
+
+- **It does not reach the draw.** Per mole the truth is `valine 5C + sugar 2C → isoamyl 5C + 2 CO₂`, and the producer
+  has already drawn 5C of sugar for that isoamyl. The sourcing layer applies the **difference**: debit the precursor
+  5C, refund sugar **3C**, emit 2C as CO₂. The 3 is fixed by the **net sugar balance**, not by which carbons the two
+  decarboxylations remove.
+- **It does not reach the validation.** Rollero defines enrichment as *"the fraction of labelled molecule with respect
+  to its total production"* — a **molecule** fraction, not an atom fraction. The atom assignment is invisible to it.
+
+Mechanistically the answer is 4/5; the finding is that it is **unnecessary** rather than unsourced. A trap that cannot
+be reached is not a trap, and the useful move was checking *whether the number is load-bearing* before sourcing it.
+
+### Finding 3 — Crépin's 23% and Rollero's 42–45% are node and branch, not rivals
+
+They look contradictory and are not: **Rollero's 42–45% is the parent KIV→KIC flux; Crépin's 23% is the isoamyl-alcohol
+branch inside it.** Proven from Fig. 3's node balance and the raw µM (23/62 = 37%, 53/221 = 24%, 42/376 = 11%, against
+the stated 35/23/11), and Crépin @180 mgN/L ≈ Rollero @250 mgN/L. So Crépin's 23% **is** isoamyl-specific and is the
+right number for this parameter.
+
+**Non-circular, by different denominators** — D-109 called the 23% *"circular as an input... a validation target, not a
+parameter"*, and that is the one D-109 claim this beat overturns: the **parameter's** denominator is *consumed valine*;
+the **validation's** denominator is *total isoamyl*. They are different ratios, so using one does not assume the other.
+
+### The build
+
+- **`SecondaryFuselRoute` + `SECONDARY_FUSEL_ROUTES`** (`carbon_routing`) carry the extra routes, so `FuselSpec`'s
+  one-to-one `precursor_amino_acid` stays honest instead of quietly meaning two things. A route is a **sourcing** fact
+  and never reaches the producer: `FuselAlcoholsEhrlich` makes exactly as much isoamyl as before, so an undosed run
+  stays byte-for-byte the validated core (prime directive #3).
+- **`EhrlichDraw` + `ehrlich_draws()`** (`byproducts`) — one shared helper, two callers. Before D-111 there was one
+  branch per alcohol, so the re-route and the D-104 sink could each recompute `gate × fusel_carbon` and agree by
+  construction. With valine holding **two** branches they cannot, and recomputing in two places is the exact drift
+  D-106 caught. Each branch is carbon-neutral by construction: `refund_carbon + co2_carbon − precursor_carbon == 0`.
+- **`f_non_ehrlich_valine` 0.85 → 0.62** (band 0.50–0.74, plausible). This is a **re-parametrization, not a tune**: the
+  23% previously sat *inside* the lump and was refunded to sugar; it is now an explicit branch, so the lump must shed
+  it. Isobutanol's residue share is unchanged at 0.15.
+- **`f_valine_to_isoamyl` 0.23** (band 0.11–0.37 = Rollero's N-range, plausible), full provenance.
+- **The D-104 sink sums *every* branch of a precursor before applying the split.** `f` is the fraction going anywhere
+  except **this model's Ehrlich alcohols**, plural since D-111. Drop one branch and valine's realised non-Ehrlich share
+  lands at **0.497 against the file's sourced 0.62** — a sourced number overridden by an arithmetic slip **both ledgers
+  still close through**. D-106's catch one route further on: there the omission was the CO₂, here the second branch.
+  (The *stated reason* for this pin was wrong when first written — see Finding 4.)
+
+### ⭐ Finding 4 — I wrote the beat's own error into the beat's own "correctness pin", and only the mutation caught it
+
+`precursor_fates.py` carried a seven-line comment calling the branch sum **the D-111 correctness pin**, and justifying
+it thus: *"Applying f/(1−f) per branch would realise 0.62/0.38 against each of the 0.15 and 0.23 shares separately — a
+lump of 0.245·C instead of 0.62·C — silently overriding a sourced number with an arithmetic slip that conservation
+cannot see."* **That hazard cannot occur.** `f` is per-**species**; both valine branches share the species; so
+`f/(1−f)` is one constant and `Σ(cᵢ)·k == Σ(cᵢ·k)` is **linearity**. Measured: identical, **0.000e+00** relative
+difference. The 0.245 is simply the isobutanol branch's *share of the lump* (0.15/0.38 × 0.62 = 0.2447) — the comment
+had conflated *"apply per branch"* with *"apply to one branch and discard the other."*
+
+**The code was right and its stated reason was false** — the fifth-and-then-some instance of *"the sentence and the
+assertion are not the same claim"* (D-96/D-102/D-108/D-109), and the first to land on prose written **in the same beat
+that cites the lesson**. The real hazard is one branch never reaching the sum (`=` instead of `+=`), which realises
+**0.497 against a sourced 0.62** and is caught by `test_the_realised_split_is_exactly_the_sourced_fraction`.
+
+**What found it was the mutation test, and only after the mutation harness's first attempt was itself wrong** — it
+aimed the branch-drop at `test_reroute_matches_the_producer_draw_exactly`, which exercises `FuselAminoAcidReroute`, a
+**different Process** from the `PrecursorNonEhrlichFates` sink being mutated. It reported *"SURVIVED — the guard is
+vacuous"*, which was false; retargeted, the guard catches it. **A mutation that survives is a claim about the tests,
+and it needs the same scepticism as a test that passes** — the first read was "the guard is vacuous", and the truth was
+"the guard is elsewhere, and separately the comment is wrong."
+
+### ⭐ The clamp, and D-103's gate-shape defect becoming arithmetically impossible
+
+The headroom clamp (`headroom = total_alcohol − already_sourced`) was added as routine defence. It exposed something:
+
+**At a realistic must (aa = 1.0 g/L), leucine's D-100 gate claims 90.9% of isoamyl and the KIC branch wants 31.8% —
+two sourced claims summing to 122.7% of a pool that only has 100%.**
+
+Neither claim is individually absurd, and before D-111 nothing could have caught it: **one claim can be wrong silently;
+two cannot.** The over-claim is not the clamp's bug — it is **D-103's gate shape**, measured for the first time, because
+adding a second claimant on the same pool turned a soft calibration miss into an arithmetic contradiction. The
+integrated cost is small and measured: realised 0.2233 against a sourced 0.23, isobutanol 0.1567 against 0.15, and the
+lump exact at 0.6200.
+
+### The payoff, and it was predicted before the code existed
+
+Valine-derived isoamyl alcohol: **0% → 1.74%**, against Rollero's **2.1–7.5%**. Same order, marginally under,
+**untuned**. It was **predicted at 1.80% from the sourced shares alone before the code existed**, and the clamp
+accounts for the 1.80 → 1.74 — so the number is a *derivation that the implementation reproduced*, not an output that
+was read and then explained.
+
+### The tests that had to change, and what that says
+
+**Two suites failed on the full run, and neither is a model bug — both are the pre-D-111 assumption written down.**
+
+- **`test_the_ehrlich_reroute_charges_one_co2_per_precursor_mole_when_driven` → `..._per_decarboxylation_...`.** It
+  pinned CO₂/precursor at exactly **1.0**; D-111 reads **1.0485**. The KIC route decarboxylates **twice** per alcohol
+  (`valine 5C + 2C acetyl-CoA → isoamyl 5C + 2 CO₂`) while still consuming one mole of precursor, so the identity
+  generalises from a constant to a count: `co2_mol == precursor_mol + kic_mol`. **This was verified as the route
+  table's prediction before the test was touched** — counts taken from the *declared* constants
+  (`CO2_PER_PRIMARY_EHRLICH_ALCOHOL`, `route.co2_per_alcohol`), only the flux magnitudes from the model — and it
+  reproduces the measurement to **2.1e-16**, with `co2_mol − precursor_mol` equal to the KIC mole exactly. Deriving the
+  expectation from the draw's own `co2_carbon` would only have asserted that the code equals itself. **The guard is
+  again the only thing that noticed the stoichiometry moved** — carbon closes either way.
+- **`test_thermal_and_oxidative_axes_coexist_and_close_end_to_end`: a stale *justification*, not a stale number.** Its
+  `atol=1e-8` rode on a measured claim — *"the excursion tracks the solver's atol ~1:1 (1e-9 → -1.1e-9, 1e-11 →
+  -1.3e-12)"* — so 10× the solver's 1e-9 read as ample headroom. D-111's `f_valine` drop cuts the sink's nitrogen
+  refund, N's approach to its true zero sharpens, and the undershoot grew to **16×** the solver atol, through an
+  unchanged bound. Re-running **the comment's own diagnostic** settles it as noise rather than a D-111 over-draw: the
+  excursion **collapses** as the solver tightens (1e-9 → -1.600e-8, 1e-11 → -4.010e-12, 1e-13 → -1.084e-14) with the
+  trajectory unchanged (final N 4.3633e-05 → 4.3649e-05). **A real over-draw would converge to a nonzero negative;
+  this converges to zero.** Bound moved to 5e-8 with the measured table replacing the superseded claim. The
+  stale-docstring class of D-109/D-110, now found in a *test comment*, where it was load-bearing on a tolerance.
+
+**⭐ And the exit code was wrong in my own notes.** The full run was recorded as *"completed with exit code 0"* and was
+**exit 1, 2 failed / 1169 passed**. D-110 made exactly this ruling about a *pass count* — *"a decision log's own numbers
+are subject to the standard it enforces on the model; 'I could have derived it' is not 'I measured it'"* — and the same
+error recurred one field over, on the **exit code**, which is the one number the whole ritual exists to protect. The
+notification said the task **completed**; *completed* is not *passed*, and I read the former as the latter. The
+mechanism is worth naming because it is structural, not careless: the harness reports the exit status of the **whole
+shell command**, and the command ends `; echo "PYTEST_EXIT=$?" >> file` — so the reported code is the **`echo`'s**, and
+it is 0 whatever pytest did. That is D-110's `pytest | tail` false-green **wearing a different disguise**: the rule
+"redirect to a file and echo `$?`" was followed exactly, and the *notification* still lied. Only reading `PYTEST_EXIT`
+out of the file is the measurement. (This run: `PYTEST_EXIT=0`, genuinely — read, not assumed.)
+
+**The same class, caught once more in this beat**: a `--collect-only` at HEAD returned **1101**, which is a plausible
+number and would have made D-111 read as *+70 tests*. The `git worktree add` had been **killed by a 3-minute timeout
+mid-checkout**, leaving 47 of 49 test files and 163 phantom deletions. Rebuilt clean, HEAD collects **1168**. **A
+number produced by a broken extraction looks exactly like a number** — which is Finding 0 again, in the tooling rather
+than the source.
+
+### Noted, not fixed — the sink fires without its paired re-route
+
+`PrecursorNonEhrlichFates` documents itself as *"only valid while the re-route is active (it scales that Process's
+draw), so the two are kept paired"*, and the compile seam does pair them (both disabled at `amino_acids_gpl ≤ 0`). But
+five sites in `test_aging_scenario.py` call `process_set.disable(FuselAminoAcidReroute.name)` **without** the sink, and
+the sink's `ehrlich_draws()` does not consult Process enablement — so it keeps drawing against a re-route that is off.
+**Deliberately not fixed here**, for reasons that were checked rather than assumed: the sink touches the **speciated**
+pools (`leucine`, `valine`, …) plus `S`/`N` and explicitly *never* `amino_acids`/`amino_acids_generic` (the D-100
+decoupling), which is the shared pool those tests stress — so no assertion is corrupted. It is pre-existing, and
+disabling the sink would push N the **wrong** way (it *refunds* N). Code-level pairing enforcement is a separate beat
+if it is wanted.
+
+### Prose corrected
+
+- `FuselSpec`'s docstring claimed the registry is *"documentation of the Ehrlich route, not a modelled pool"* whose
+  precursor is *"never read by any rate law"* — **false since D-100** speciated the pools. Retired.
+- `_CO2_PER_EHRLICH_ALCOHOL`'s *"All five routes are C(precursor) == C(alcohol) + 1, so one constant covers the set"* —
+  no longer true; the KIC route is C(precursor) == C(alcohol) with two CO₂. Retired.
+- D-104's isoamyl paragraph is superseded by Finding 1 above (the route it prescribes is right; the shortfall it cites
+  is a leucine number a valine route cannot close).
+
+### Next
+
+- **The leucine-derived shortfall is now the sharpest open item** (1.12% against Rollero's 3.4–17.3%), and it is
+  **D-103's gate *shape*** — a scalar cannot fix it. The **122.7% over-claim is the lever**: it is the first
+  arithmetically impossible statement the gate has produced, so it localises the defect instead of merely bounding it.
+- **The prize is still open: D-104's inverted split** (model leu<ile<val<thr against Crépin's thr<val<ile<leu). D-111
+  builds the *mechanism* D-104 said the model could not represent — *"reality escapes the inversion by building isoamyl
+  from KIC... this model has no keto-acid node, so it cannot reproduce that mechanism"*. It now has one, on the valine
+  side only. Whether that touches the inversion is untested.
+- **D-109's parsimony question** (per-species vs shared BAT1/BAT2 transaminase) is untouched, and must be prototyped
+  **kinetically-limited, not near-equilibrium**.
+- The remaining node routes: **KMV → isoleucine**, **phenylpyruvate**.
+- **An unused independent check**: Rollero's isoamyl *acetate* enrichment (0–19.7% valine-labelled) tests the D-97 ATF1
+  coupling against a source it has never been held to.
+- Unchanged: closure O₂ ingress; acetaldehyde generation during maturation + the 0-vs-2.7 unsulfited floor; the
+  deferred tail (D-110's list) plus D-55's Brett-phenol prose.

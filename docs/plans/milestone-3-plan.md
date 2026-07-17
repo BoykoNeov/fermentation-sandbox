@@ -455,6 +455,33 @@
 > visible (isoamyl's valine-derived carbon is {3,4,5}/5 depending which carbons the two decarboxylations remove — **both
 > close the ledger**, so the atom assignment must be sourced, not assumed). See D-109.]**
 >
+> **[D-111 BUILDS THAT NODE (fusel side, valine branch) — and the reason D-104 gave for needing it does not survive.
+> `SecondaryFuselRoute` breaks `FUSEL_SPECS`' one-alcohol-one-precursor assumption: isoamyl ← leucine **and** valine
+> (Crépin's 23% via KIC), as an algebraic partition in the **sourcing layer, never the producer** — exactly D-109's
+> constraint, so an undosed run stays byte-for-byte the core. PAYOFF: valine-derived isoamyl **0% → 1.74%** vs Rollero's
+> **2.1–7.5%** — untuned, and **predicted at 1.80% from the sourced shares before the code existed** (the clamp accounts
+> for 1.80→1.74). (1) **D-109's {3,4,5}/5 tracer trap DISSOLVES rather than being solved** — it reaches neither the draw
+> (the 3C sugar refund falls out of the *net* balance, not atom identity) nor the validation (Rollero defines enrichment
+> as *"the fraction of labelled **molecule** with respect to its total production"* — a molecule fraction). Checking
+> whether a number was load-bearing beat sourcing it. (2) **D-109's "the 23% is circular as an input" is OVERTURNED, by
+> different denominators**: the parameter's is *consumed valine*, the validation's is *total isoamyl*. (3) **D-104's
+> DIAGNOSIS is a commensurability error** — its "must under-count" cites a **valine** route against isoamyl's shortfall,
+> which is **leucine**-derived (model 1.12% vs Rollero's *leucine* tracer 3.4–17.3%). A valine route cannot close a
+> leucine gap; the conclusion (build it) survives, the reason doesn't. That gap is **D-103's gate SHAPE**. (4) **⭐ THE
+> CLAMP EXPOSED THE GATE**: at a realistic must (aa=1.0 g/L) leucine's D-100 gate claims **90.9%** of isoamyl while the
+> KIC branch wants **31.8%** — two sourced claims summing to **122.7%**. *One claim can be wrong silently; two cannot* —
+> adding a second claimant turned a soft calibration miss into an arithmetic contradiction. (5) **⭐ FOUR "INDEPENDENT
+> CONFIRMATIONS" PASSED ON THE WRONG ROWS**: Tables S1/S2 are EMF vector images, my first parser keyed rows on draw
+> order and was shifted by two, and I reported isobutyric/isovaleric acid as isobutanol/isoamyl — *decisively*. All four
+> checks shared the mapping assumption, so they were **one check run four times**; the one true tell (isobutyl acetate
+> enriched where isobutanol wasn't — chemically impossible) I rationalised as noise. D-103's *"fetching a source is not
+> reading it"*, one layer deeper: **extracting a source is not reading it either.** Fixed by parsing glyph
+> **coordinates**. **[CORRECTS THE D-100 BLOCK BELOW: its "verified noise not drift (tracks atol ~1:1)" went STALE and an
+> `atol=1e-8` rode on it — D-111's `f_valine` drop cuts the sink's N refund, sharpening N's approach to its true zero,
+> and the undershoot grew to **16×** the solver atol. Re-measured, still noise: it COLLAPSES as the solver tightens
+> (1e-9→-1.600e-8, 1e-11→-4.010e-12, 1e-13→-1.084e-14), trajectory unchanged — a real over-draw would converge to a
+> NONZERO negative. Bound → 5e-8 with the measured table replacing the claim.]** See D-111.]**
+>
 > **[D-108 — D-107's ⚠ "fix D-27's zero acetaldehyde" is RETIRED, and the bug was in D-107's own aldol. The ⚠ rested on
 > "real dry whites hold ~30 mg/L" — a **SULFITED** figure compared against **UNSULFITED** runs; the like-for-like target
 > is **2.7 mg/L** (Herzan 2020, PMC7684598 variant (0/0/0)) vs the model's 0.000 ⇒ **D-27 acquitted on the gate**, and

@@ -97,27 +97,23 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
-from fermentation.core.kinetics.amino_acid_pools import SPEC_BY_SPECIES, depletion_gate
-from fermentation.core.kinetics.byproducts import (
-    ehrlich_co2_carbon,
-    fusel_carbon_draw_by_species,
+from fermentation.core.kinetics.amino_acid_pools import SPEC_BY_SPECIES
+from fermentation.core.kinetics.byproducts import ehrlich_draws
+from fermentation.core.kinetics.carbon_routing import (
+    FUSEL_SPECS,
+    SECONDARY_FUSEL_ROUTES,
+    non_ehrlich_fraction_param,
+    refund_carbon_to_sugar,
 )
-from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS, refund_carbon_to_sugar
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
+#: Re-exported: ``non_ehrlich_fraction_param`` moved to
+#: :mod:`~fermentation.core.kinetics.carbon_routing` at D-111 (the fusel sourcing layer needs it
+#: to derive a secondary route's primary-branch share, and cannot import this module — that would
+#: be a cycle). Kept in ``__all__`` so every existing importer, including the tests, is unaffected.
 __all__ = ["NON_EHRLICH_FRACTION_PARAMS", "PrecursorNonEhrlichFates", "non_ehrlich_fraction_param"]
-
-
-def non_ehrlich_fraction_param(species: str) -> str:
-    """The ``f_non_ehrlich_<species>`` parameter naming rule — the one place it is spelled.
-
-    Derived from the species rather than hand-listed so a sixth Ehrlich alcohol added to
-    :data:`~fermentation.core.kinetics.carbon_routing.FUSEL_SPECS` cannot silently acquire a
-    fraction that no parameter file defines (it fails at load, loudly).
-    """
-    return f"f_non_ehrlich_{species}"
 
 
 #: The fraction parameter for every precursor the re-route actually draws — derived from the
@@ -176,32 +172,48 @@ class PrecursorNonEhrlichFates(Process):
         "K_amino_acids",
         *(SPEC_BY_SPECIES[spec.precursor_amino_acid].fraction_param for spec in FUSEL_SPECS),
         *NON_EHRLICH_FRACTION_PARAMS,
+        # D-111: the shared draw helper resolves every secondary route's share, so this Process
+        # reads it too — the lump it books is scaled against those branches as well.
+        *(route.share_param for route in SECONDARY_FUSEL_ROUTES),
     )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # The re-route's own per-species carbon draw, from the identical helper it uses — so the
-        # ratio this Process imposes is against the exact flux the re-route will book, and the two
-        # can never drift apart (the D-33/D-99 shared-helper discipline).
-        draws = fusel_carbon_draw_by_species(y, schema, params)
+        # EXACTLY the branches the re-route will book, from the identical helper it uses — so the
+        # ratio this Process imposes is against the precursor carbon actually consumed, and the two
+        # can never drift apart (the D-33/D-99 shared-helper discipline, generalised at D-111).
+        draws = ehrlich_draws(y, schema, params)
         if not draws:
             return d
+        # EVERY branch of a precursor must reach this sum — the D-111 correctness pin. `f` is the
+        # fraction of consumed precursor going anywhere except **this model's Ehrlich alcohols**,
+        # plural since D-111: valine feeds isobutanol AND isoamyl alcohol. Drop one branch
+        # (accumulate with `=` rather than `+=`, so the second silently wins) and valine's realised
+        # non-Ehrlich share lands at **0.497 against the file's sourced 0.62** — a sourced number
+        # overridden by an arithmetic slip that conservation cannot see, since both books still
+        # close. D-106's catch one route further on: there the omission was the CO₂, here the second
+        # branch. `test_the_realised_split_is_exactly_the_sourced_fraction` fails on it; measured.
+        #
+        # What is NOT a hazard, recorded because this comment first claimed it was: applying f/(1−f)
+        # per branch instead of to the sum is a **no-op**. `f` is per-SPECIES and both valine
+        # branches share the species, so f/(1−f) is one constant and `Σ(cᵢ)·k == Σ(cᵢ·k)` is
+        # linearity — measured identical at 0.000e+00 relative difference. The mutation test caught
+        # the false claim; the *code* was right and its stated reason was not, which is this
+        # project's oldest lesson (D-96/D-102/D-108/D-109) landing on prose in the beat citing it.
+        ehrlich_by_precursor: dict[str, float] = {}
+        for draw in draws:
+            ehrlich_by_precursor[draw.precursor.species] = (
+                ehrlich_by_precursor.get(draw.precursor.species, 0.0) + draw.precursor_carbon
+            )
         carbon = 0.0  # total precursor carbon re-sourced off sugar into the non-Ehrlich lump
         nitrogen = 0.0  # total nitrogen it carries, refunded to ammonium
-        for spec, fusel_carbon in draws:
-            if fusel_carbon <= 0.0:
+        for species, ehrlich_carbon in ehrlich_by_precursor.items():
+            if ehrlich_carbon <= 0.0:
                 continue
-            precursor = SPEC_BY_SPECIES[spec.precursor_amino_acid]
-            # This precursor's OWN relative-depletion gate — the SAME gate the re-route applies
-            # (D-100), so both consumers are throttled together and the imposed split holds at
-            # every instant, not just in the integral. → 0 as the pool empties, so the combined
-            # draw can never drive it negative, and an undosed run is a no-op.
-            gate = depletion_gate(y, schema, params, (precursor,))
-            if gate <= 0.0:
-                continue
-            f = params[non_ehrlich_fraction_param(spec.precursor_amino_acid)]
+            precursor = SPEC_BY_SPECIES[species]
+            f = params[non_ehrlich_fraction_param(species)]
             # f is a fraction of the consumed precursor, so f ∈ [0, 1); f → 1 would demand an
             # infinite draw against a finite alcohol. The parameter file bounds every entry well
             # below this; the guard is here because a bad ENSEMBLE draw off the uncertainty band
@@ -209,16 +221,16 @@ class PrecursorNonEhrlichFates(Process):
             # solver rather than fail.
             if not 0.0 <= f < 1.0:
                 raise ValueError(
-                    f"{non_ehrlich_fraction_param(spec.precursor_amino_acid)}={f} outside [0, 1): "
-                    "it is the fraction of consumed precursor NOT becoming its alcohol"
+                    f"{non_ehrlich_fraction_param(species)}={f} outside [0, 1): "
+                    "it is the fraction of consumed precursor NOT becoming an Ehrlich alcohol"
                 )
-            alcohol_carbon = gate * fusel_carbon
-            # EXACTLY what the re-route books — the alcohol's carbon **plus the decarboxylation
-            # CO₂ charged to the same precursor** (D-106). The CO₂ term is not optional here: the
-            # split is over *consumed precursor*, and since D-106 the Ehrlich branch consumes a
-            # full mole per alcohol rather than (n-1)/n. Scaling against the alcohol carbon alone
-            # would silently realise a LOWER f than the file's sourced one (threonine: 0.82 → 0.77).
-            ehrlich_carbon = alcohol_carbon + ehrlich_co2_carbon(spec, alcohol_carbon)
+            # `ehrlich_carbon` is the SUM over this precursor's branches of the whole-molecule
+            # draw the re-route books — the alcohol's carbon **plus the decarboxylation CO₂
+            # charged to the same precursor** (D-106; two CO₂ on the D-111 KIC route). The CO₂
+            # term is not optional: the split is over *consumed precursor*, and since D-106 an
+            # Ehrlich branch consumes a full mole per alcohol rather than (n-1)/n. Scaling against
+            # alcohol carbon alone would silently realise a LOWER f than the file's sourced one
+            # (threonine: 0.82 → 0.77).
             lump_carbon = ehrlich_carbon * f / (1.0 - f)  # ⇒ realised split is exactly f : (1−f)
             mass = lump_carbon / carbon_mass_fraction(precursor.species)
             d[schema.slice(precursor.pool)] -= mass

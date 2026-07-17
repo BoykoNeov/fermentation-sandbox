@@ -132,15 +132,28 @@ check (handoff §3.5).
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 
-from fermentation.core.chemistry import CARBON_ATOMS, carbon_mass_fraction
+from fermentation.core.chemistry import (
+    CARBON_ATOMS,
+    carbon_mass_fraction,
+    nitrogen_mass_fraction,
+)
 from fermentation.core.kinetics.amino_acid_pools import (
     SPEC_BY_SPECIES,
+    AminoAcidSpec,
     depletion_gate,
     draw_precursor_carbon,
 )
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS, FuselSpec
+from fermentation.core.kinetics.carbon_routing import (
+    CO2_PER_PRIMARY_EHRLICH_ALCOHOL,
+    ESTER_SPECS,
+    FUSEL_SPECS,
+    SECONDARY_FUSEL_ROUTES,
+    FuselSpec,
+    non_ehrlich_fraction_param,
+)
 from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar as _draw_carbon_from_sugar,
 )
@@ -170,9 +183,16 @@ from fermentation.core.tiers import Tier
 #: acid's carboxyl carbon, the step that turns the transaminated amino acid into its aldehyde
 #: (decision D-106). The twin of ``aging._CO2_PER_STRECKER_ALDEHYDE``, and for the same reason:
 #: it is a real product on the carbon ledger, so charging it to the precursor's draw is what makes
-#: that draw the molecule's actual stoichiometry. All five routes are ``C(precursor) ==
-#: C(alcohol) + 1`` (measured, D-106), so one constant covers the set.
-_CO2_PER_EHRLICH_ALCOHOL = 1.0
+#: that draw the molecule's actual stoichiometry.
+#:
+#: **"All five routes are C(precursor) == C(alcohol) + 1, so one constant covers the set" — that
+#: note was retired at D-111**, which is exactly the ``+1`` it asserted. It was true of every
+#: *primary* route and still is; it is false of the **secondary** valine → KIC → isoamyl route,
+#: where the precursor is the *same* size as the alcohol (both C5), two carbons leave as CO₂, and
+#: acetyl-CoA supplies the difference. Hence the alias: this is the PRIMARY route's count, and
+#: :attr:`~fermentation.core.kinetics.carbon_routing.SecondaryFuselRoute.co2_per_alcohol` carries
+#: the other. :func:`_branch` costs both from ``(n_p, n_a, k)`` alone, so neither is hand-written.
+_CO2_PER_EHRLICH_ALCOHOL = float(CO2_PER_PRIMARY_EHRLICH_ALCOHOL)
 
 
 def fusel_rate_shape(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
@@ -280,6 +300,157 @@ def ehrlich_co2_carbon(spec: FuselSpec, alcohol_carbon: float) -> float:
     this route had in name only).
     """
     return _CO2_PER_EHRLICH_ALCOHOL * alcohol_carbon / CARBON_ATOMS[spec.species]
+
+
+@dataclass(frozen=True)
+class EhrlichDraw:
+    """One fully-costed Ehrlich sourcing branch: ``precursor → alcohol`` (decision D-111).
+
+    **The shared helper the many-to-one map made necessary, and the D-106 discipline it enforces.**
+    Before D-111 there was exactly one branch per alcohol, so the re-route and the D-104 sink could
+    each recompute ``gate × fusel_carbon`` and agree. D-111 gives valine **two** branches
+    (isobutanol via KIV, isoamyl alcohol via KIC), and the sink's contract is that consumed
+    precursor splits exactly ``f : (1−f)`` between the non-Ehrlich lump and **everything Ehrlich** —
+    so the sink must scale against the *sum* of a precursor's branches. Recomputing that in two
+    places is the exact drift D-106 caught (two callers "computing the same thing" agreed by luck
+    until one changed). One helper, two callers.
+
+    Every field is carbon [g C/L/h], and **each branch is carbon-neutral by construction**:
+    ``refund_carbon + co2_carbon − precursor_carbon == 0``. The alcohol itself is *not* credited
+    here — the producer already made it and already drew sugar for it (D-109's constraint: the
+    partition lives in the sourcing layer, never in the producer). A branch only moves *where that
+    carbon came from*, which is what keeps
+    :class:`FuselAlcoholsEhrlich` byte-for-byte when the precursor pools are undosed.
+    """
+
+    #: The amino-acid pool this branch debits.
+    precursor: AminoAcidSpec
+    #: The alcohol whose carbon is being re-sourced onto that precursor.
+    alcohol: FuselSpec
+    #: The alcohol carbon sourced on this branch — gated, so ≤ the alcohol's total draw.
+    alcohol_carbon: float
+    #: Carbon drawn out of the precursor pool: one whole molecule per alcohol.
+    precursor_carbon: float
+    #: Carbon leaving as CO₂ (one decarboxylation on the primary route, two via KIC).
+    co2_carbon: float
+    #: Carbon refunded to ``S``, undoing the producer's draw for the part not actually from sugar.
+    refund_carbon: float
+
+    @property
+    def nitrogen(self) -> float:
+        """Nitrogen [g N/L/h] deaminated out of the precursor — what the ``N`` pool gains."""
+        return (
+            self.precursor_carbon
+            / carbon_mass_fraction(self.precursor.species)
+            * nitrogen_mass_fraction(self.precursor.species)
+        )
+
+
+def _branch(
+    precursor: AminoAcidSpec, alcohol: FuselSpec, alcohol_carbon: float, co2_per_alcohol: int
+) -> EhrlichDraw:
+    """Cost one branch from its stoichiometry alone — the general form of the D-106 charge.
+
+    For a precursor of ``n_p`` carbons becoming an alcohol of ``n_a`` carbons while releasing
+    ``k`` CO₂, per mole of alcohol: the precursor gives up ``n_p``, ``k`` carbons leave as CO₂,
+    and the sugar refund is ``n_p − k`` — the producer drew ``n_a`` for the alcohol, the truth
+    needs ``n_a + k − n_p`` from sugar (as acetyl-CoA), and the difference is what is handed back.
+
+    **The refund is provenance-independent** (see :class:`SecondaryFuselRoute`): it falls out of
+    the net sugar balance, not out of which carbons the decarboxylations remove — so D-109's
+    ``{3,4,5}/5`` atom-assignment trap never reaches the ledger.
+
+    **This reduces to the primary route exactly**, which is the check that D-111 moved nothing it
+    did not mean to: there ``n_p = n_a + 1`` and ``k = 1``, giving ``precursor = alcohol·(n_a+1)/n_a
+    = alcohol + ehrlich_co2_carbon``, ``co2 = alcohol/n_a`` and ``refund = alcohol·n_a/n_a =
+    alcohol`` — the three numbers the pre-D-111 code wrote by hand.
+    """
+    n_a = CARBON_ATOMS[alcohol.species]
+    n_p = CARBON_ATOMS[precursor.species]
+    per_alcohol_carbon = alcohol_carbon / n_a
+    return EhrlichDraw(
+        precursor=precursor,
+        alcohol=alcohol,
+        alcohol_carbon=alcohol_carbon,
+        precursor_carbon=per_alcohol_carbon * n_p,
+        co2_carbon=per_alcohol_carbon * co2_per_alcohol,
+        refund_carbon=per_alcohol_carbon * (n_p - co2_per_alcohol),
+    )
+
+
+def ehrlich_draws(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+) -> list[EhrlichDraw]:
+    """Every Ehrlich sourcing branch, primary and secondary, fully costed (decision D-111).
+
+    The single source of truth for *where each higher alcohol's carbon came from*, shared by
+    :class:`FuselAminoAcidReroute` (which applies it) and
+    :class:`~fermentation.core.kinetics.precursor_fates.PrecursorNonEhrlichFates` (which scales
+    the non-Ehrlich lump against it). See :class:`EhrlichDraw` for why one helper is mandatory.
+
+    **Primary branches** are each alcohol's own ``precursor_amino_acid``, gated on that pool's
+    relative depletion (D-100) — unchanged from D-100/D-106.
+
+    **Secondary branches**
+    (:data:`~fermentation.core.kinetics.carbon_routing.SECONDARY_FUSEL_ROUTES`)
+    are anchored *algebraically* against their precursor's primary branch rather than gated
+    independently, because the sourced quantity is a **share of consumed precursor**: valine's
+    consumption splits ``0.15 : 0.23 : 0.62`` between isobutanol, isoamyl alcohol and everything
+    else, and the isobutanol branch is the one the model anchors (via ``k_isobutanol``). So
+    ``consumed = primary_carbon / share_primary`` and the secondary branch takes
+    ``share_secondary × consumed``. That is D-109's "algebraic partition in the sourcing layer":
+    no new state, no second gate, and the primary gate already throttles the whole node as the
+    precursor empties (so an undosed run is still a no-op, and the pool cannot go negative).
+    """
+    draws: list[EhrlichDraw] = []
+    by_alcohol: dict[str, float] = {}
+    primary_by_precursor: dict[str, EhrlichDraw] = {}
+    for spec, fusel_carbon in fusel_carbon_draw_by_species(y, schema, params):
+        if fusel_carbon <= 0.0:
+            continue
+        precursor = SPEC_BY_SPECIES[spec.precursor_amino_acid]
+        gate = depletion_gate(y, schema, params, (precursor,))
+        if gate <= 0.0:
+            continue  # exhausted ⇒ this alcohol stays wholly on the sugar stand-in
+        branch = _branch(precursor, spec, gate * fusel_carbon, CO2_PER_PRIMARY_EHRLICH_ALCOHOL)
+        draws.append(branch)
+        primary_by_precursor[spec.precursor_amino_acid] = branch
+        by_alcohol[spec.pool] = branch.alcohol_carbon
+
+    totals = dict(fusel_carbon_draw_by_species(y, schema, params))
+    for route in SECONDARY_FUSEL_ROUTES:
+        primary = primary_by_precursor.get(route.precursor)
+        if primary is None:
+            continue  # the precursor is exhausted (or makes no alcohol) ⇒ no anchor, no route
+        f = params[non_ehrlich_fraction_param(route.precursor)]
+        share = params[route.share_param]
+        share_primary = 1.0 - f - share
+        if share_primary <= 0.0:
+            raise ValueError(
+                f"{non_ehrlich_fraction_param(route.precursor)}={f} + {route.share_param}={share} "
+                f"leaves no share for {primary.alcohol.pool}: the three fates of consumed "
+                f"{route.precursor} must sum to 1 with a POSITIVE primary branch"
+            )
+        alcohol = next(s for s in FUSEL_SPECS if s.pool == route.alcohol_pool)
+        precursor = SPEC_BY_SPECIES[route.precursor]
+        consumed = primary.precursor_carbon / share_primary
+        n_a, n_p = CARBON_ATOMS[alcohol.species], CARBON_ATOMS[precursor.species]
+        alcohol_carbon = share * consumed * n_a / n_p
+        # This alcohol cannot be sourced from more precursor than it is being made from. The
+        # secondary branch is anchored off a DIFFERENT alcohol's draw, so nothing about its
+        # arithmetic bounds it by this alcohol's own production — unlike a gated primary branch,
+        # which is a fraction of exactly that. Measured headroom is large (valine ~1.8% + leucine
+        # ~1.1% of isoamyl), so this never binds in practice; it is here because if it ever DID
+        # bind, the refund would hand back more sugar than the producer drew for this alcohol and
+        # the ledger would still close — the D-89/D-90 denominator-trap family, where conservation
+        # is blind and only an explicit guard is not.
+        headroom = totals.get(alcohol, 0.0) - by_alcohol.get(alcohol.pool, 0.0)
+        if alcohol_carbon > headroom:
+            alcohol_carbon = max(0.0, headroom)
+        if alcohol_carbon <= 0.0:
+            continue
+        draws.append(_branch(precursor, alcohol, alcohol_carbon, route.co2_per_alcohol))
+    return draws
 
 
 class EsterSynthesis(Process):
@@ -582,7 +753,11 @@ class FuselAminoAcidReroute(Process):
     #: whole D-100 decoupling and is pinned by a test.
     touches = ("S", "N", "CO2", *(spec.precursor_amino_acid for spec in FUSEL_SPECS))
     #: Recomputes the fusel rate (so it reads the producer's parameters) plus ``K_amino_acids``
-    #: and each precursor's ``must_aa_fraction_*`` for the relative-depletion gates (D-100).
+    #: and each precursor's ``must_aa_fraction_*`` for the relative-depletion gates (D-100). Since
+    #: D-111 it also reads each secondary route's share **and its precursor's non-Ehrlich
+    #: fraction** — not because this Process books the lump (it does not; that is the D-104 sink's
+    #: job) but because the two together fix the *primary* branch's share as the residue
+    #: ``1 − f_non_ehrlich − f_secondary``, which is what the secondary draw is anchored against.
     #: Their tiers cap the ``S``/precursor/``N`` output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         *(spec.k_param for spec in FUSEL_SPECS),
@@ -592,42 +767,32 @@ class FuselAminoAcidReroute(Process):
         "T_ref",
         "K_amino_acids",
         *(SPEC_BY_SPECIES[spec.precursor_amino_acid].fraction_param for spec in FUSEL_SPECS),
+        *(route.share_param for route in SECONDARY_FUSEL_ROUTES),
+        *(non_ehrlich_fraction_param(route.precursor) for route in SECONDARY_FUSEL_ROUTES),
     )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        # Each alcohol's OWN carbon draw, at its own molecule's fraction — from the identical
-        # helper the producer's total comes from (D-33/D-99, speciated at D-100).
-        draws = fusel_carbon_draw_by_species(y, schema, params)
+        # EVERY sourcing branch, primary and secondary, costed from its own stoichiometry — the
+        # one helper the D-104 sink also reads, so the split it imposes is against exactly the
+        # precursor this Process consumes (D-106's shared-helper discipline, D-111's many-to-one).
+        draws = ehrlich_draws(y, schema, params)
         if not draws:
             return d
-        refund = 0.0  # total carbon re-sourced off sugar, across the five precursors
-        nitrogen = 0.0  # total nitrogen deaminated out of them
-        co2_carbon = 0.0  # total decarboxylation carbon, precursor → CO2 (D-106)
-        for spec, fusel_carbon in draws:
-            if fusel_carbon <= 0.0:
-                continue
-            precursor = SPEC_BY_SPECIES[spec.precursor_amino_acid]
-            # This alcohol's OWN precursor gate — the D-100 relative-depletion rule. Draining
-            # leucine throttles isoamyl alcohol's re-route and NOTHING else; the lumped gate read
-            # a pool 38% arginine and wrongly concluded leucine was abundant. → 0 as the precursor
-            # empties, so the draw can never drive it negative (and an undosed run is a no-op).
-            gate = depletion_gate(y, schema, params, (precursor,))
-            if gate <= 0.0:
-                continue  # this precursor is exhausted ⇒ its alcohol stays on the sugar stand-in
-            aa_carbon = gate * fusel_carbon  # the ALCOHOL carbon re-sourced from THIS precursor
-            # The Ehrlich decarboxylation's own CO₂ (D-106) — charged to the precursor, which is
-            # what makes the draw 1 mol per mol instead of (n-1)/n, and NOT refunded to sugar,
-            # because the producer only ever drew sugar for the alcohol itself. Shared with the
-            # D-104 sink, which must scale its split against this same number.
-            co2_i = ehrlich_co2_carbon(spec, aa_carbon)
+        refund = 0.0  # total carbon re-sourced off sugar, across every branch
+        nitrogen = 0.0  # total nitrogen deaminated out of the precursors
+        co2_carbon = 0.0  # total decarboxylation carbon, precursor → CO2 (D-106; ×2 via KIC)
+        for draw in draws:
+            # Debit the precursor a whole molecule per alcohol. The gate that produced this
+            # branch → 0 as the pool empties (D-100's relative-depletion rule), so the draw can
+            # never drive it negative and an undosed run is a no-op.
             nitrogen += draw_precursor_carbon(
-                d, schema, spec.precursor_amino_acid, aa_carbon + co2_i
+                d, schema, draw.precursor.species, draw.precursor_carbon
             )
-            refund += aa_carbon
-            co2_carbon += co2_i
+            refund += draw.refund_carbon
+            co2_carbon += draw.co2_carbon
         if refund <= 0.0:
             return d
         d[schema.slice("N")] = nitrogen  # DEAMINATION: precursor N → ammonium (the D-33 branch)

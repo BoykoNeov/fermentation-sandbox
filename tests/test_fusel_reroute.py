@@ -17,12 +17,13 @@ from collections.abc import Mapping
 import numpy as np
 import pytest
 
-from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_fraction
+from fermentation.core.chemistry import CARBON_ATOMS, carbon_mass_fraction, nitrogen_mass_fraction
 from fermentation.core.kinetics import (
     FuselAlcoholsEhrlich,
     FuselAminoAcidReroute,
     fusel_carbon_draw,
 )
+from fermentation.core.kinetics.byproducts import ehrlich_draws, fusel_carbon_draw_by_species
 from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
 from fermentation.core.media import get_medium, wine_schema
 from fermentation.core.process import ProcessSet
@@ -182,11 +183,24 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
     #
     #     precursor carbon OUT == sugar carbon REFUNDED + CO2 carbon EMITTED
     #
-    # The refund assertion below is deliberately UNCHANGED: the producer only ever drew sugar for
-    # the alcohol, so refunding the CO2's carbon too would create sugar out of the precursor.
+    # **And the refund is no longer ``g × the producer's draw`` either (decision D-111).** That
+    # identity WAS the one-alcohol-one-precursor world: every branch refunded the whole alcohol
+    # carbon it re-sourced, so the total was just the gated fraction of what the producer drew.
+    # Isoamyl alcohol now has a SECOND precursor — valine via alpha-ketoisocaproate — which
+    # re-sources FURTHER isoamyl carbon off sugar, so the refund is strictly larger. The extra
+    # term is derived below from the SOURCED shares and the route's stoichiometry, never from the
+    # code's own output: fitting the expectation to the implementation would assert nothing (the
+    # D-96/D-102/D-109 "the sentence and the assertion are not the same claim" trap).
     ps = _isolate_fusel(full_params)
     schema = ps.schema
-    aa_val = 0.3
+    # 0.05 rather than the 0.3 this test used pre-D-111, and the reason is the finding rather than
+    # convenience: at 0.3 the KIC branch's headroom clamp BINDS (leucine's gate already claims 75%
+    # of isoamyl's carbon and valine wants another 26%), so the closed form below — which is the
+    # UNCLAMPED algebra — is not what the code should compute there. This test asserts the sourcing
+    # algebra, so it is run in the regime where the algebra applies; the clamp is pinned on its own
+    # in `test_the_kic_branch_cannot_source_more_isoamyl_than_is_being_made`, at a dose where it
+    # really does bind. Splitting them keeps each assertion able to fail for exactly one reason.
+    aa_val = 0.05
     y = _wine_y0(schema, full_params, x=1.5, s=180.0, n=0.12, aa=aa_val)
     # AT MUST-SPECTRUM COMPOSITION every per-precursor gate collapses to this one lumped value
     # (the D-100 reduction property), so the aggregate below is exact, not approximate.
@@ -204,7 +218,27 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
 
     # sugar carbon refunded by the re-route (single wine slot):
     sugar_refund_c = d_reroute[schema.slice("S")][0] * carbon_mass_fraction("glucose")
-    assert sugar_refund_c == pytest.approx(g * fusel_carbon, rel=1e-12)
+    # The D-111 valine -> KIC -> isoamyl branch's extra refund, from the parameter file's shares
+    # and the route's stoichiometry ALONE:
+    #   consumed valine splits share_but : share_iso : f  (isobutanol : isoamyl : everything else),
+    #   the isobutanol branch is the anchor and draws (n+1)/n of its alcohol carbon (D-106),
+    #   and the KIC branch refunds (n_p - k)/n_a = (5-2)/5 of the isoamyl carbon it re-sources
+    #   -- valine C5 + 2 C acetyl-CoA -> isoamyl C5 + 2 CO2, of which the producer already drew
+    #   all 5 C from sugar while the truth needs only 2, so 3 come back.
+    f_val = full_params["f_non_ehrlich_valine"]
+    share_iso = full_params["f_valine_to_isoamyl"]
+    share_but = 1.0 - f_val - share_iso
+    but_carbon = next(
+        c
+        for spec, c in fusel_carbon_draw_by_species(y, schema, full_params)
+        if spec.pool == "isobutanol"
+    )
+    n_but = CARBON_ATOMS["isobutanol"]
+    consumed_valine_c = (g * but_carbon * (n_but + 1) / n_but) / share_but
+    kic_isoamyl_c = share_iso * consumed_valine_c  # valine C5 -> isoamyl C5, so 1:1 in carbon
+    extra_refund = kic_isoamyl_c * 3.0 / 5.0
+    assert extra_refund > 0.0, "vacuous: the D-111 KIC branch contributed nothing"
+    assert sugar_refund_c == pytest.approx(g * fusel_carbon + extra_refund, rel=1e-12)
     # The carbon debited ACROSS THE FIVE PRECURSORS — each at its OWN carbon fraction. Before
     # D-100 this was one debit at arginine's fraction; the sum is what must now match, because each
     # alcohol eats a different molecule. Since D-106 it matches refund + CO2, not refund alone.
@@ -213,7 +247,12 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
         for precursor in _PRECURSORS
     )
     co2_c = d_reroute[schema.slice("CO2")][0] * carbon_mass_fraction("CO2")
-    assert aa_debit_c == pytest.approx(g * fusel_carbon + co2_c, rel=1e-12)
+    # The same D-111 term appears here too, and it MUST: the three-way identity is over whatever
+    # the precursors actually gave up, and valine now gives up a second molecule for the KIC route.
+    # Its sugar refund is 3/5 of that branch (not the whole of it, as on the primary routes), which
+    # is why the extra term is `extra_refund` and not `kic_isoamyl_c` — the missing 2/5 is the two
+    # CO2, already inside `co2_c`.
+    assert aa_debit_c == pytest.approx(g * fusel_carbon + extra_refund + co2_c, rel=1e-12)
     # The CO2 is a real share of the draw, not a rounding term: one carbon per alcohol means the
     # precursors give up ~1/n MORE carbon than they did before D-106. Pin that it is neither zero
     # nor the whole draw, so a silently-dropped term cannot pass as "approximately equal".
@@ -327,3 +366,100 @@ def test_carbon_and_nitrogen_close_with_the_reroute_on():
     assert_conserved(
         traj, total_nitrogen(compiled.schema, biomass_nitrogen_fraction=f_n), label="nitrogen"
     )
+
+
+# -- D-111: the many-to-one map (valine -> KIC -> isoamyl alcohol) ------------
+
+
+def test_valine_feeds_isoamyl_alcohol_as_well_as_isobutanol(full_params):
+    """The D-111 route exists at all: valine sources TWO alcohols, not one.
+
+    D-104 named this route as the model's missing one ("the gap is a missing route (valine -> KIC
+    -> isoamyl)") and declined to build it; D-109 scoped it as the milestone's real content.
+    Before D-111 ``FuselSpec`` pinned one alcohol to one precursor, so this could not be expressed.
+    """
+    ps = _isolate_fusel(full_params)
+    schema = ps.schema
+    y = _wine_y0(schema, full_params, x=1.5, s=180.0, n=0.12, aa=0.05)
+    by_alcohol = {
+        d.alcohol.pool: d
+        for d in ehrlich_draws(y, schema, full_params)
+        if d.precursor.species == "valine"
+    }
+    assert set(by_alcohol) == {"isobutanol", "isoamyl_alcohol"}
+    # The KIC route's stoichiometry is what makes it a different KIND of branch, not just another
+    # one: valine C5 + 2 C acetyl-CoA -> isoamyl C5 + 2 CO2, against the primary route's
+    # C(precursor) == C(alcohol) + 1 and ONE CO2. Both are asserted, because the D-106 helper's
+    # "one constant covers the set" is exactly what this route retires.
+    kic = by_alcohol["isoamyl_alcohol"]
+    assert kic.co2_carbon == pytest.approx(kic.alcohol_carbon * 2.0 / 5.0, rel=1e-12)
+    assert kic.precursor_carbon == pytest.approx(kic.alcohol_carbon, rel=1e-12)  # C5 -> C5
+    assert kic.refund_carbon == pytest.approx(kic.alcohol_carbon * 3.0 / 5.0, rel=1e-12)
+    primary = by_alcohol["isobutanol"]
+    assert primary.co2_carbon == pytest.approx(primary.alcohol_carbon / 4.0, rel=1e-12)
+
+
+def test_every_ehrlich_branch_is_carbon_neutral_in_the_sourcing_layer(full_params):
+    """Each branch only moves carbon's SOURCE: refund + CO2 == precursor drawn, exactly.
+
+    The invariant that lets D-111 add a route with two CO2 and an acetyl-CoA co-substrate without
+    touching ``total_carbon``: the producer already made the alcohol and already drew sugar for it,
+    so a branch that credited the alcohol would double-count. Holds per branch, so no branch can
+    be wrong in a way another branch's error hides.
+    """
+    ps = _isolate_fusel(full_params)
+    schema = ps.schema
+    for aa in (0.01, 0.05, 0.3, 1.0):
+        y = _wine_y0(schema, full_params, x=1.5, s=180.0, n=0.12, aa=aa)
+        draws = ehrlich_draws(y, schema, full_params)
+        assert draws, "vacuous: no branches at all"
+        for d in draws:
+            assert d.refund_carbon + d.co2_carbon == pytest.approx(d.precursor_carbon, rel=1e-12)
+
+
+def test_the_kic_branch_cannot_source_more_isoamyl_than_is_being_made(full_params):
+    """The headroom clamp, and the D-103 gate-shape defect it makes VISIBLE.
+
+    The KIC branch is anchored off ISOBUTANOL's draw (the share is a fraction of consumed valine),
+    so nothing in its arithmetic bounds it by isoamyl's own production — unlike a gated primary
+    branch, which is a fraction of exactly that. At a realistic must (aa = 1.0 g/L => leucine
+    ~32 mg/L, valine ~37 mg/L) leucine's gate already claims **90.9%** of isoamyl's instantaneous
+    carbon and the KIC branch wants a further **31.8%**: two independently *sourced* claims summing
+    to **122.7%** of one alcohol.
+
+    **That sum is D-103's finding becoming visible rather than a new defect.** D-103 measured the
+    gate's shape as the real problem ("which no scalar can fix") — the model sources far too much
+    of each alcohol from its precursor early, and only survives integrated because the precursor
+    pools are tiny and empty fast. One sourcing claim can be that wrong silently; TWO cannot, and
+    the many-to-one map is what turns the error into an arithmetic impossibility.
+
+    Without the clamp the refund would hand back more sugar than the producer ever drew for this
+    alcohol, and **conservation would not notice** — the ledger closes either way (the D-89/D-90
+    denominator-trap family, where only an explicit guard is not blind).
+    """
+    ps = _isolate_fusel(full_params)
+    schema = ps.schema
+    y = _wine_y0(schema, full_params, x=1.5, s=180.0, n=0.12, aa=1.0)
+    totals = dict(fusel_carbon_draw_by_species(y, schema, full_params))
+    f_iso = next(c for spec, c in totals.items() if spec.pool == "isoamyl_alcohol")
+    by_precursor = {
+        d.precursor.species: d
+        for d in ehrlich_draws(y, schema, full_params)
+        if d.alcohol.pool == "isoamyl_alcohol"
+    }
+    sourced = sum(d.alcohol_carbon for d in by_precursor.values())
+    # The clamp is real at this dose: it must actually be binding, or this test is vacuous and
+    # would pass on a model that never needed a guard.
+    unclamped = full_params["f_valine_to_isoamyl"] * (
+        next(
+            d.precursor_carbon
+            for d in ehrlich_draws(y, schema, full_params)
+            if d.alcohol.pool == "isobutanol"
+        )
+        / (1.0 - full_params["f_non_ehrlich_valine"] - full_params["f_valine_to_isoamyl"])
+    )
+    assert unclamped + by_precursor["leucine"].alcohol_carbon > f_iso, (
+        "vacuous: the clamp is not binding here, so this asserts nothing"
+    )
+    # ...and it holds: isoamyl is never sourced from more precursor than it is made from.
+    assert sourced <= f_iso * (1.0 + 1e-12)

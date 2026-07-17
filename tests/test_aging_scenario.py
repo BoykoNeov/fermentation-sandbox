@@ -1382,13 +1382,24 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
     # (D-100), and both carbon-parks (melanoidin + the N-bearing maillard_melanoidin) stay
     # nonnegative.
     #
-    # atol at 10x the solver's own atol (1e-9, runtime.integrate): N reaches a TRUE zero here, and
-    # a state legitimately at zero undershoots by ~the integrator's absolute tolerance — asserting
-    # tighter than the solver's own promise tests scipy, not the model. That this only began
-    # mattering at D-100 is the fix working: the reroute's arginine draw over-released nitrogen ~4x
-    # (D-33's documented lump), propping up the YAN; each precursor now releases its REAL nitrogen.
-    # Verified as noise, not drift: the excursion tracks the solver's atol ~1:1 (1e-9 -> -1.1e-9,
-    # 1e-11 -> -1.3e-12, 1e-13 -> -1.1e-14) with the trajectory unchanged.
+    # N reaches a TRUE zero here (YAN exhaustion), and a state legitimately at zero undershoots by
+    # ~the integrator's local error — asserting tighter than the solver's own promise tests scipy,
+    # not the model. That this only began mattering at D-100 is the fix working: the reroute's
+    # arginine draw over-released nitrogen ~4x (D-33's documented lump), propping up the YAN; each
+    # precursor now releases its REAL nitrogen.
+    #
+    # RE-MEASURED at D-111, because the old comment's justification went stale and this atol rode
+    # on it. It read "the excursion tracks the solver's atol ~1:1 (1e-9 -> -1.1e-9, 1e-11 ->
+    # -1.3e-12)", so 10x the solver's 1e-9 looked like ample headroom. D-111 dropped
+    # f_non_ehrlich_valine 0.85 -> 0.62, which cuts the D-104 sink's nitrogen refund (it refunds
+    # deaminated precursor N to ammonium), so N's approach to zero is sharper and BDF's undershoot
+    # at the production atol grew to 16x it — through an unchanged 1e-8. Re-running the comment's
+    # own diagnostic proves it is still NOISE and not a D-111 over-draw: the excursion COLLAPSES as
+    # the solver tightens (1e-9 -> -1.600e-8, 1e-11 -> -4.010e-12, 1e-13 -> -1.084e-14) and the
+    # trajectory is unchanged (final N 4.3633e-05 -> 4.3649e-05 -> 4.3649e-05). A real over-draw
+    # would converge to a NONZERO negative; this converges to zero. So the bound moves to 5e-8 —
+    # ~3x the measured excursion at the atol production actually runs — and the tolerance now
+    # states the solver's real precision rather than a superseded claim about it.
     assert_nonnegative(
         tj,
         (
@@ -1403,7 +1414,7 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
             *_MAILLARD_ALDEHYDES,
             "N",
         ),
-        atol=1e-8,
+        atol=5e-8,
     )
     # All five routes actually fired: the two thermal browning polymers (sugar-only melanoidin +
     # N-bearing maillard_melanoidin) + thermal aldehydes (sotolon, a thermal-route-only marker) are

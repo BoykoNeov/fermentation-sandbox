@@ -348,14 +348,24 @@ f_non_ehrlich_leucine:
     notes: "VERBATIM: 'between 77% and 86% of assimilated leucine was directed toward protein synthesis'. Midpoint 0.815. For leucine the protein share IS effectively the whole non-Ehrlich lump: no other large sink is documented for it (unlike threonine, whose catabolism also feeds proteinogenic isoleucine). Leucine is the compound this beat most changes: it is the precursor of isoamyl alcohol, ~52% of the model's fusel carbon, and the model previously sent 100% of it to Ehrlich."
 
 f_non_ehrlich_valine:
-  value: 0.85
+  value: 0.62
   unit: "dimensionless"
   tier: plausible
-  uncertainty: { low: 0.77, high: 0.90, note: "1 - (valine -> isobutanol); Crepin's 15% via KIV, widened for the single-study/one-timepoint read" }
+  uncertainty: { low: 0.50, high: 0.74, note: "1 - 0.15 (KIV -> isobutanol) - 0.23 (KIC -> isoamyl); band carries the +-0.12 of the isoamyl share below, since the three shares must sum to 1" }
   provenance:
     source: "Crepin et al. 2017, Appl. Environ. Microbiol. 83:e02617-16 (PMC5311416)"
     conditions: "S. cerevisiae EC1118, synthetic must mimicking grape juice, 180 mg N/L, 28 C; [13C5]valine tracer; end of growth phase"
-    notes: "VERBATIM: 'the substantial fractions of KIV and KIC derived from labeled valine, accounting for 15% and 23% of the consumed valine at the end of the growth phase (N_T), respectively, were reduced in higher alcohols'. Only the KIV share (15%) becomes ISOBUTANOL, so the non-isobutanol lump is 0.85 — this is NOT valine's protein share (41%), because valine's other fates include the KIC route. THE KIC 23% IS A ROUTE THIS MODEL DOES NOT HAVE: it carries valine carbon into ISOAMYL alcohol. That absence is why the model under-counts isoamyl's catabolic fraction (1.35% vs Rollero's 2-8%) — a documented missing route, NOT a value to tune (decision D-104)."
+    notes: "VERBATIM: 'the substantial fractions of KIV and KIC derived from labeled valine, accounting for 15% and 23% of the consumed valine at the end of the growth phase (N_T), respectively, were reduced in higher alcohols'. Valine's consumption splits THREE ways: 15% -> isobutanol (via KIV), 23% -> isoamyl alcohol (via KIC, `f_valine_to_isoamyl`), and 0.62 to everything else. NOT valine's protein share (41%) — the lump definition is 'not an Ehrlich alcohol of this model', and valine now has TWO. D-111 CHANGED THIS FROM 0.85, AND IT IS A RE-PARAMETRIZATION, NOT A TUNE: until D-111 the model had no valine -> isoamyl route, so Crepin's 23% sat INSIDE this lump and was refunded to sugar as though it were protein. Building the route moves that 23% from the lump to the alcohol it actually becomes; the isobutanol share (the residue, 1 - 0.62 - 0.23 = 0.15) is UNCHANGED, which is why isobutanol's realised catabolic fraction does not move. See DECISIONS D-111."
+
+f_valine_to_isoamyl:
+  value: 0.23
+  unit: "dimensionless"
+  tier: plausible
+  uncertainty: { low: 0.11, high: 0.37, note: "Rollero's own per-condition range across SM70/SM250/SM425 (37% / 24% / 11% of consumed valine); Crepin's 23% sits inside it" }
+  provenance:
+    source: "Crepin et al. 2017, Appl. Environ. Microbiol. 83:e02617-16 (PMC5311416); corroborated by Rollero et al. 2017, Microb. Biotechnol. 10:1649-1662 (PMC5658611, CC BY), Fig. 3 + Table S1"
+    conditions: "S. cerevisiae, synthetic wine must; Crepin 180 mg N/L, 28 C, [13C5]valine tracer, end of growth phase; Rollero 70/250/425 mg N/L, [U-13C5]valine tracer"
+    notes: "THE FRACTION OF CONSUMED VALINE THAT BECOMES ISOAMYL ALCOHOL, via alpha-ketoisovalerate -> alpha-ketoisocaproate (the leucine-biosynthesis chain elongation) -> decarboxylation -> reduction. Crepin VERBATIM: the KIC fraction derived from labeled valine accounts for '23% of the consumed valine ... reduced in higher alcohols'. TWO SOURCES, NOT RIVALS (decision D-111): Rollero's prose figure '42-45% of consumed valine was converted into alpha-ketoisocaproate' is the PARENT flux — his Fig. 3 splits KIC further into isoamyl alcohol, isovaleric acid and proteinogenic leucine (the node balances: KIV 78% -> KIC 44% + isobutanol 31% + isobutyric acid 3%; KIC 44% -> isoamyl 35% + isovaleric 0.2% + proteinogenic leucine 9%). Rollero's raw uM gives the isoamyl branch directly as labelled isoamyl / consumed valine = 23/62, 53/221, 42/376 = 37% / 24% / 11% for SM70/SM250/SM425, reproducing his figure's stated 35/23/11%. Crepin's 23% at 180 mg N/L therefore lands on Rollero's 23-24% at 250 mg N/L: independent agreement, so the value is taken as-is and the BAND is Rollero's N-range. THE VALIDATION IS A DIFFERENT DENOMINATOR AND THAT IS THE POINT (decision D-109 flagged this number as 'circular as an input'): this parameter's denominator is CONSUMED VALINE; the independent check is Rollero's isotopic enrichment of isoamyl alcohol in the 13C-valine culture (2.1-7.5%, Table S1), whose denominator is TOTAL ISOAMYL — anchored separately by k_isoamyl_alcohol. The model realises 1.80%, just under that band, and it is NOT tuned to it. Tier PLAUSIBLE, matching the other Crepin fractions (real per-species tracer measurement in the right organism and matrix, two studies, but one time point each)."
 
 f_non_ehrlich_threonine:
   value: 0.82

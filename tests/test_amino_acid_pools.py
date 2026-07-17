@@ -42,8 +42,12 @@ from fermentation.core.kinetics.amino_acid_pools import (
     release_spectrum_nitrogen,
     spectrum_carbon_per_nitrogen,
 )
-from fermentation.core.kinetics.byproducts import FuselAminoAcidReroute
-from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
+from fermentation.core.kinetics.byproducts import FuselAminoAcidReroute, ehrlich_draws
+from fermentation.core.kinetics.carbon_routing import (
+    CO2_PER_PRIMARY_EHRLICH_ALCOHOL,
+    FUSEL_SPECS,
+    SECONDARY_FUSEL_ROUTES,
+)
 from fermentation.core.media import wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.parameters.store import default_data_dir, load_parameters
@@ -384,23 +388,37 @@ def test_every_true_strecker_route_draws_1_to_1_when_the_process_is_actually_dri
     assert mol_precursor / mol_product == pytest.approx(1.0, abs=1e-9)
 
 
-def test_the_ehrlich_reroute_charges_one_co2_per_precursor_mole_when_driven(schema, aging_params):
-    """The re-route's draw is 1:1 **against the code**, not the table (decision D-106).
+def test_the_ehrlich_reroute_charges_one_co2_per_decarboxylation_when_driven(schema, aging_params):
+    """The re-route's CO2 is one per **decarboxylation**, not per precursor (D-106, D-111).
 
     D-105 measured this route at ``(n-1)/n``: it charged the precursor for the alcohol's carbon but
     not for the CO2 the same decarboxylation releases, so leucine went out at 5/6 mol per mol
-    isoamyl alcohol. D-106 charges it. The claim is now that **every mole of precursor drawn emits
-    exactly one mole of CO2** — the Ehrlich decarboxylation, one per alcohol.
+    isoamyl alcohol. D-106 charges it, and pinned the ratio at exactly **1.0** — one Ehrlich
+    decarboxylation per alcohol, and (D-106) one whole mole of precursor per alcohol.
+
+    **D-111 broke the 1.0, and that is the route table landing rather than a regression.** Valine
+    reaches isoamyl alcohol by leucine-biosynthesis chain elongation — ``valine 5C + 2C acetyl-CoA
+    → isoamyl 5C + 2 CO2`` — which decarboxylates **twice** per alcohol while still consuming one
+    mole of precursor. So the identity generalises from a constant to a count::
+
+        co2_mol == precursor_mol + kic_mol
+
+    i.e. one CO2 per mole of precursor drawn (every branch) **plus one more** for each mole routed
+    through KIC. Measured at 1.0485 against the pre-D-111 1.0, and the route table predicts that
+    number to 2e-16 — so this asserts the declared stoichiometry, not the code's own arithmetic:
+    ``kic_mol`` is built from ``alcohol_carbon`` (a flux) and the *declared* ``co2_per_alcohol``,
+    never from the draw's ``co2_carbon``, which would only assert the code equals itself.
 
     This route cannot be checked the way the seven Strecker routes are: it never touches ``fusels``
     (production stays in :class:`FuselAlcoholsEhrlich`, which is the whole D-33 swap design), so
-    there is no product rate on its ``dy/dt``. Its CO2 **is** the product rate — one mole per mole
-    of alcohol re-sourced — and it is gate-independent for the same reason the others are: the
-    draw and the CO2 both scale with ``gate x fusel_carbon``, so the gate cancels and any seeded
-    state pins the ratio exactly.
+    there is no product rate on its ``dy/dt``. Its CO2 **is** the product rate, and it is
+    gate-independent for the same reason the others are: the draw and the CO2 both scale with
+    ``gate x fusel_carbon``, so the gate cancels and any seeded state pins the ratio exactly.
 
     Deleting the CO2 term fails **here**: the precursor debit drops by 1/n, the moles stop matching,
-    and — exactly as at D-105 — carbon still closes and no conservation test notices.
+    and — exactly as at D-105 — carbon still closes and no conservation test notices. Dropping only
+    the KIC route's *second* CO2 also fails here, and nowhere else: it lands back on the old 1.0,
+    and carbon still closes because the refund absorbs it (D-111).
     """
     y = _driveable_state(schema, aging_params)
     d = FuselAminoAcidReroute().derivatives(0.0, y, schema, aging_params)
@@ -410,10 +428,21 @@ def test_the_ehrlich_reroute_charges_one_co2_per_precursor_mole_when_driven(sche
         / MOLAR_MASS[spec.precursor_amino_acid]
         for spec in FUSEL_SPECS
     )
+    # The moles routed through a SECOND decarboxylation, from the declared route table.
+    secondary = {(r.alcohol_pool, r.precursor): r for r in SECONDARY_FUSEL_ROUTES}
+    kic_mol = 0.0
+    for draw in ehrlich_draws(y, schema, aging_params):
+        route = secondary.get((draw.alcohol.pool, draw.precursor.species))
+        if route is None:
+            continue
+        species = draw.alcohol.species
+        alcohol_mol = draw.alcohol_carbon / carbon_mass_fraction(species) / MOLAR_MASS[species]
+        kic_mol += alcohol_mol * (route.co2_per_alcohol - CO2_PER_PRIMARY_EHRLICH_ALCOHOL)
     assert precursor_mol > 0.0, "the re-route must actually fire, or this asserts nothing"
     assert co2_mol > 0.0, "no CO2 emitted -- the D-106 decarboxylation term is gone"
-    # One CO2 per precursor consumed: the Ehrlich pathway decarboxylates exactly once per alcohol.
-    assert co2_mol / precursor_mol == pytest.approx(1.0, abs=1e-9)
+    assert kic_mol > 0.0, "the D-111 KIC branch never fired -- this would assert the old identity"
+    # One CO2 per precursor consumed, PLUS one more for every mole that came the KIC way.
+    assert co2_mol == pytest.approx(precursor_mol + kic_mol, rel=1e-12)
 
 
 def test_the_d75_oxidative_strecker_routes_draw_at_exact_stoichiometry():
