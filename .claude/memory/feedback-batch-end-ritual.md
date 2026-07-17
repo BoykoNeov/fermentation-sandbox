@@ -24,11 +24,23 @@ append the batch write-up to [[project-fermentation-sandbox]] or to a `MEMORY.md
 index line; instead update the project file's short status block and bump the
 current D-number. `MEMORY.md` index entries stay one line (~200 chars). This is
 the guardrail that keeps memory from re-bloating — the decision log is the archive,
-memory is the boot context. (1b) **sync the repo's tracked copy** — the memory files are
+memory is the boot context. **This rule as prose is NOT sufficient — it has already
+failed once.** It was added by `acd3ce1` (2026-07-02) claiming to fix "the cause, not
+just the symptom"; the project file still regrew 2.4KB → 277KB (**114×**, a full
+D-38→D-111 changelog in two formats) by 2026-07-17. The mechanism that now backs it:
+`.claude/hooks/check_memory_size.py`, a PostToolUse hook (project `.claude/settings.json`)
+that warns when `project-fermentation-sandbox.md` exceeds **150 lines**. It *detects*;
+it cannot enforce distillation — that is still a judgement call at ritual time. If the
+warning fires, distil rather than raise the cap. (1b) **sync the repo's tracked copy** — the memory files are
 version-controlled under `.claude/memory/` (since commit `1c095ab`), so refresh
 them from the live dir before committing:
 `cp ~/.claude/projects/M--claud-projects-Fermentation/memory/*.md .claude/memory/`
-then `git add .claude/memory/`. This is the durable mechanism (the user asked on
+then `git add .claude/memory/`. **This step drifts silently — check it every time.**
+On 2026-07-17 the tracked copy was found **52 decisions stale** (last committed at
+D-59, `33cb5ab`, 2026-07-08) while the live file had grown 6× past it. Nothing catches
+this: the live memory lives *outside* the repo, so a clean `git status` is not evidence
+the tracked copy matches — it only means the stale copy is committed. Diff the two, don't
+trust the tree. This is the durable mechanism (the user asked on
 2026-06-23 that memory be tracked *always, with the rest*, not a one-off snapshot)
 — so memory is committed alongside docs/code every checkpoint, behaving like any
 other tracked file; (2) update affected docs (`docs/ARCHITECTURE.md`,

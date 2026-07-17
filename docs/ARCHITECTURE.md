@@ -1,12 +1,13 @@
 # Architecture
 
-This describes how the layers fit together. Milestones 0 and 1 are complete
-(the tested skeleton, then single-strain isothermal primary fermentation passing
-both §2.2 benchmarks); Milestone 2 (pH, aroma byproducts, SO₂, MLF, temperature
-scheduling, discrete interventions, stochastic ensembles) is in progress. The
+This describes how the layers fit together. Milestones 0, 1 and 2 are complete
+(the tested skeleton; then single-strain isothermal primary fermentation passing
+both §2.2 benchmarks; then pH, aroma byproducts, SO₂, MLF, temperature
+scheduling, discrete interventions and stochastic ensembles). Milestone 3 — the
+sensory/OAV + aging frontier, Tier-3 — is in progress. The
 original brief is [`FERMENTATION_SIM_HANDOFF.md`](FERMENTATION_SIM_HANDOFF.md);
 the per-decision record and where we deviated from it are in
-[`DECISIONS.md`](DECISIONS.md) (D-1 … D-37), which is the canonical archive.
+[`DECISIONS.md`](DECISIONS.md) (D-1 … D-111), which is the canonical archive.
 
 ## Layering
 
