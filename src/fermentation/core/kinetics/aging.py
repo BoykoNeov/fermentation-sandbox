@@ -1409,9 +1409,13 @@ class SotolonAldolCondensation(Process):
     The arithmetic agrees and is blunter: propanol's molar demand is **~2.8× the total α-KB this
     pool ever excretes**, so the re-base is infeasible, not merely mis-attributed — it would starve
     propanol *and* collapse this Process's substrate, while looking like the promised competition
-    at last. That same 2.8× is why the item is **relocated, not dissolved**: propanol is ~73% of the
-    2-ketobutyrate flux, so an *intracellular* node — a quasi-steady **flux partition**, not a pool
-    (D-49's own physics) — would couple propanol and sotolon materially. See D-109.
+    at last. That same 2.8× is why the item is **relocated, not dissolved**: propanol's 2-KB demand
+    is that much larger than *the excretion flux itself*, so an *intracellular* node — a
+    quasi-steady **flux partition**, not a pool (D-49's own physics) — would couple propanol and
+    sotolon materially. (Deliberately **not** "propanol is the node's dominant sink": 2-KB's
+    committed route is isoleucine biosynthesis via KMV, which this model does not carry, so the
+    share of *total* 2-KB synthesis is unmeasured. The ratio is what the measurement supports.)
+    See D-109.
 
     Wine-only (both product and substrate slots are wine-only); wired **disabled at the compile
     seam** and enabled by ``begin_aging`` with the other aging Processes. Tier **speculative** (the

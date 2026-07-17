@@ -9848,8 +9848,30 @@ difference the whole file is about.
 propanol-vs-sotolon competition becomes expressible. D-109 measured that item before building it. The prescribed fix
 is rejected on the node's own founding principle and is infeasible by arithmetic; the work-list claim I opened the
 beat intending to correct turned out to be *correct*; and the promised payoff is real but lives somewhere else.**
-Findings + tripwires only — **no physics changed**. 1158 → 1165 passed (both measured), 16/16 benchmarks,
-ruff + mypy clean, 4/4 mutations caught.
+Findings + tripwires only — **no physics changed**, and that claim is *verified* rather than asserted: the AST of every
+touched module, with docstrings stripped, is identical to HEAD. 1158 → 1165 passed (both measured), 16/16 benchmarks,
+ruff + mypy clean, 5/5 mutations caught.
+
+**Two of this entry's own claims were wrong on review and are corrected below rather than quietly dropped** — the
+"dominant sink" overclaim (finding 4) and a sourced-floor assertion applied to an unsourced precursor (the tripwires
+section). Both are the error class the beat is *about*, which is the point.
+
+**And the tooling nearly un-did one of the corrections silently.** The mutation harness restores each mutation with
+`git checkout -- src/`, which cannot tell *the mutation* from *uncommitted work* — it reverts both. It duly ate the
+`aging.py` half of the "dominant sink" fix, made after the previous commit. The loss was **invisible in the obvious
+place**: the correction survived in `DECISIONS.md`, the milestone plan and the tests, so every artifact a reviewer
+reads said the right thing while **the source docstring — the one a future reader actually hits — still carried the
+overclaim**. Caught by `git status` disagreeing with what the beat believed it had changed. The harness now refuses
+to run against a dirty `src/` rather than depending on remembering. **A cleanup step that "restores" state is a
+writer too, and it does not know which of your changes it is destroying.**
+
+The same harness produced the beat's other false alarm, and it is worth naming because the *reassuring* reading was
+the wrong one: a full-suite run reported **26 failed, 1136 passed** — because it was running in the background while
+the mutation harness was deliberately corrupting `src/` in the foreground. It measured a tree that existed only
+between two `git checkout`s. Every failure evaporated on the clean tree (the named one,
+`test_compiled_wine_scenario_ferments_and_conserves_carbon`, passes in 2.2 s), and the entry's `1165 passed` is from
+a run that predates any mutation. **Mutation testing and the suite cannot share a working tree**, and the failure
+mode is symmetric: the same race that invents 26 failures can hand back a green run against a mutated tree.
 
 ### Finding 1 — the pool D-107 chose FOR sotolon is the wrong pool for propanol: D-49's test, applied symmetrically
 
@@ -9909,10 +9931,18 @@ writing up deserves the same suspicion as one that agrees with you.*
 ### Finding 4 — the payoff is real, and the number that kills the shortcut is the number that says so
 
 The 2.79× reads two ways, and both are true. As *"can this pool supply propanol?"* it is fatal to design A. As
-*"how big is propanol inside the node?"* it says propanol is **~73% of the 2-ketobutyrate flux** (0.834 of 1.13
-mmol/L against excretion's 0.299) — the node's **dominant sink**. So an honestly partitioned node **would** couple
-propanol and sotolon materially. **The item is relocated, not dissolved.** (The 73% rests on `k_alpha_kb_excretion`,
-an author estimate ⇒ an order-of-magnitude claim, not a calibration.)
+*"how big is propanol next to the excretion flux?"* it says propanol's 2-KB demand (0.834 mmol/L) is **~2.8× the
+entire excretion flux** (0.299 mmol/L). So an honestly partitioned node **would** couple propanol and sotolon
+materially. **The item is relocated, not dissolved.** (Rests on `k_alpha_kb_excretion`, an author estimate ⇒ an
+order-of-magnitude claim, not a calibration.)
+
+**The claim is the RATIO, and NOT "propanol is the node's dominant sink" — that phrasing was a scope error, caught
+in review, in the beat about scope errors.** 2-ketobutyrate's *committed* route is **isoleucine biosynthesis**
+(ILV2 → KMV → isoleucine): it is why the cell makes 2-KB at all, and propanol and excretion are **both overflow**
+off it. This model carries no KMV, so propanol/(propanol + excretion) = 73% is a share of the two branches the
+model happens to have — **not** of total 2-KB synthesis, where isoleucine biosynthesis is plausibly comparable or
+larger. The propanol-vs-excretion ratio is what the measurement supports and is all the argument requires. It would
+also have contradicted this entry's own next-list, which names KMV.
 
 **This is where the beat's own bias was caught before it set:** reaching for a "the question was malformed" audit is
 the pull this project's D-101/D-103/D-105 pattern creates, and it was the wrong read. D-49's distinction does not
@@ -9943,9 +9973,31 @@ that competition, so the paragraph held up as a virtue exactly what the model ha
 
 - `test_the_excreted_pool_cannot_supply_propanol` — the supply arithmetic. **Caught** by `k_alpha_kb_excretion ×10`
   (a pool that *can* supply propanol re-opens the design question, and should).
-- `test_every_fusel_is_de_novo_dominated[×5]` — every alcohol ≥80% de novo (Crépin's 81%, Rollero's >90% CCM),
-  asserted against the **weaker** of the two bands so the test cannot be broken by their disagreement (never
-  averaged — D-103). **Caught** by `f_non_ehrlich_threonine → 0`.
+- `test_every_sourced_fusel_is_de_novo_dominated[×4]` — every *sourced* alcohol ≥80% de novo (Crépin's 81%,
+  Rollero's >90% CCM), asserted against the **weaker** of the two bands so the test cannot be broken by their
+  disagreement (never averaged — D-103). **Caught** by `f_non_ehrlich_threonine → 0`.
+- `test_2_phenylethanol_carries_no_sourced_de_novo_floor` — **the review catch, and it is D-104's rule broken by my
+  own tripwire.** The floor was first parametrized over **all five** alcohols under the banner "Crépin's 81%,
+  Rollero's >90%" — but **neither paper labels phenylalanine** (Crépin tracers: [13C] leu/ile/val/thr; Rollero's:
+  U-13C val/leu). `f_non_ehrlich_phenylalanine` is `tier: speculative`, `source: "author estimate"`, band
+  **0.38–0.86**, so 2-PE's de-novo share is a **model artifact asserted as a reproduction of measurement** — *a
+  cited number binds only the set it describes*, committed in the test where breaking it **looks more thorough,
+  not less**. **And it was not academic: the floor sits inside the parameter's own band** — at the default
+  `f_phe = 0.53` 2-PE is **83.8%** de novo; at the band's low end (0.38) it is **78.6%**, *under the floor* ⇒ **an
+  ensemble sampling that band would have failed it**, which is the realistic way it would ever have surfaced. The
+  floor now binds the four sourced alcohols (87.9 / 94.9 / 95.3 / 98.9% — comfortable), and 2-PE gets its own test
+  pinning the **provenance** (the `test_methionine_has_no_non_ehrlich_fraction` shape, D-104) so a future beat that
+  sources phenylalanine moves it deliberately. **Caught** by flipping `f_phe`'s tier to `plausible`.
+
+  **And the beat's own lesson recurred INSIDE the fix for it — a sixth time.** That test's first draft asserted
+  `uncertainty.low < value < uncertainty.high` under a comment reading *"the floor really does fall inside its
+  band, which is why this cannot be waved through"*. The assertion is **trivially true of every parameter in the
+  file** and says nothing whatever about the floor: *the sentence and the assertion are not the same claim*, written
+  while correcting an instance of exactly that. It now **runs** the model at `f_phe = 0.38` and asserts the breach
+  (78.6% < 80%) *and* that the default clears it (83.8% ≥ 80%) — both sides can fail, which is what makes the
+  exclusion load-bearing rather than decorative. The share is computed through **one shared helper** with the
+  sourced-floor test, so the exclusion cannot be argued from arithmetic the floor never used (D-106's shared-helper
+  discipline, where two callers "recomputing exactly the same thing" agreed **by luck** until one changed).
 - `test_alpha_kb_production_is_exactly_threonine_independent` — finding 3, at the derivative level where it is
   **exact** rather than nearly-true. **Caught** by gating the rate on threonine (D-107's rejected design), *and* by
   making the Process inert — because `rate_starved == rate_replete` is satisfied by `0 == 0`, so the guard needs

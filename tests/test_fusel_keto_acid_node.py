@@ -31,11 +31,19 @@ the mutation test is the only reason that write-up did not ship.
 **3. The promised payoff is REAL, and the number that kills the shortcut is the number that says
 so.** Propanol's molar demand is **~2.8× the total α-KB the pool ever excretes** — which is why it
 cannot be drawn from that pool (finding 1), and equally why a *correctly placed* node would matter:
-propanol is ~73% of the 2-ketobutyrate flux, so it is the node's dominant sink, and partitioning
-that flux honestly would couple propanol and sotolon **materially**. The item is not dissolved by
-this beat; it is **relocated** — off the excreted pool and onto the intracellular partition, where
-it needs the milestone rather than a shortcut. (The 73% rests on ``k_alpha_kb_excretion``, an
-author estimate — so it is an order-of-magnitude claim, not a calibration.)
+propanol's 2-KB demand is several times the **excretion flux itself**, so partitioning that flux
+honestly would couple propanol and sotolon **materially**. The item is not dissolved by this beat;
+it is **relocated** — off the excreted pool and onto the intracellular partition, where it needs
+the milestone rather than a shortcut. (Rests on ``k_alpha_kb_excretion``, an author estimate ⇒ an
+order-of-magnitude claim, not a calibration.)
+
+**The claim is deliberately the RATIO, not "propanol is the node's dominant sink".** 2-KB's
+committed anabolic route is **isoleucine biosynthesis** (ILV2 → KMV → isoleucine) — that is *why*
+the cell makes 2-KB at all; propanol and excretion are both overflow off it. This model carries no
+KMV, so propanol's share of *total* 2-KB synthesis is **unmeasured** and could well be the smaller
+one. Propanol-vs-excretion is what the measurement supports and is all the argument needs; the
+"dominant sink" phrasing was a scope error caught in review, in the beat whose subject is exactly
+that (and it would have jarred against this file's own milestone scoping, which names KMV).
 
 **Why the fusel-side node is a PARTITION and not a pool (the scoping result).** D-49's physics
 says the intracellular keto acid is a vanishing pool carrying an enormous flux — i.e.
@@ -59,6 +67,7 @@ from fermentation.core.chemistry import (
 )
 from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
 from fermentation.core.kinetics.precursor_fates import non_ehrlich_fraction_param
+from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 
@@ -75,6 +84,21 @@ _AGING_DAYS = 720.0
 #: is asserted against the WEAKER of the two, so the test cannot be broken by the disagreement
 #: between them — recorded as two bands, never averaged (D-103).
 _SOURCED_DE_NOVO_FLOOR = 0.80
+
+#: The precursor Crépin/Rollero do **not** label. ``f_non_ehrlich_phenylalanine`` is
+#: ``tier: speculative``, ``source: "author estimate"``, band 0.38–0.86 — so 2-phenylethanol's
+#: de-novo share is a **model artifact**, not a reproduction of anything measured, and the floor
+#: above does not bind it. See :func:`test_2_phenylethanol_carries_no_sourced_de_novo_floor`.
+_UNSOURCED_PRECURSOR = "phenylalanine"
+
+#: The four alcohols whose precursors Crépin actually labelled ([13C] leu/ile/val/thr) — the only
+#: ones the sourced floor may be asserted against. Derived from the registry rather than hand-listed
+#: so a sixth alcohol cannot silently inherit a floor no source covers (D-104: **a cited number
+#: binds only the SET it describes** — and this test is where that rule is easiest to break, because
+#: parametrizing over all of ``FUSEL_SPECS`` looks more thorough, not less).
+_SOURCED_FUSEL_SPECS = tuple(
+    s for s in FUSEL_SPECS if s.precursor_amino_acid != _UNSOURCED_PRECURSOR
+)
 
 #: The routes that ALSO eat the speciated precursors. Disabled where the ``f : (1−f)`` split
 #: invariant is used to size the Ehrlich draw from a state difference, so that invariant is
@@ -115,7 +139,13 @@ def _scenario(*, o2_mgl: float = 20.0, aging: bool = True) -> Scenario:
     )
 
 
-def _run(*, drop: tuple[str, ...] = (), scale: dict[str, float] | None = None, **kw):
+def _run(
+    *,
+    drop: tuple[str, ...] = (),
+    scale: dict[str, float] | None = None,
+    set_params: dict[str, float] | None = None,
+    **kw,
+):
     cs = compile_scenario(_scenario(**kw))
     for name in drop:
         cs.process_set.disable(name)  # KeyErrors on a renamed Process rather than silently no-op
@@ -128,6 +158,9 @@ def _run(*, drop: tuple[str, ...] = (), scale: dict[str, float] | None = None, *
     for key, factor in (scale or {}).items():
         assert key in pv, f"no such parameter {key!r}"
         pv[key] = pv[key] * factor
+    for key, value in (set_params or {}).items():
+        assert key in pv, f"no such parameter {key!r}"
+        pv[key] = value
     traj = simulate_scheduled(
         cs.process_set,
         pv,
@@ -162,10 +195,12 @@ def test_the_excreted_pool_cannot_supply_propanol():
     competition finally expressing itself.
 
     **THE SAME RATIO ARGUES BOTH WAYS, AND THAT IS THE BEAT'S RESULT.** Read as "can this pool
-    supply propanol?" it is fatal to the shortcut. Read as "how big is propanol inside the node?"
-    it says propanol is ~73% of the 2-ketobutyrate flux — the **dominant sink** — so an honestly
+    supply propanol?" it is fatal to the shortcut. Read as "how big is propanol next to the
+    excretion flux?" it says propanol's 2-KB demand is several times that flux — so an honestly
     partitioned intracellular node would couple propanol and sotolon materially. The promised
-    payoff is real; it is the *location* that was wrong.
+    payoff is real; it is the *location* that was wrong. (Not "the node's dominant sink" — 2-KB's
+    committed route is isoleucine biosynthesis, which this model does not carry; see the module
+    docstring.)
 
     TRIPWIRE, not a curiosity: if a future beat raises the excretion rate enough for the pool to
     supply propanol, this fails, and the design question genuinely re-opens.
@@ -194,12 +229,48 @@ def test_the_excreted_pool_cannot_supply_propanol():
     )
 
 
-# -- finding 2: the de-novo dominance that makes the competition small, and is SOURCED ---------
+# -- finding 2: the de-novo supply structure the node must preserve (SOURCED for four of five) --
 
 
-@pytest.mark.parametrize("spec", FUSEL_SPECS, ids=lambda s: s.pool)
-def test_every_fusel_is_de_novo_dominated(spec):
-    """Every Ehrlich alcohol draws ≥80% of its carbon de novo, not from its precursor (D-109).
+def _de_novo_share(spec, *, f_override: float | None = None) -> float:
+    """This alcohol's de-novo carbon share, from EXACT state differences (decision D-109).
+
+    The D-104 split invariant (consumed precursor splits exactly ``f : (1−f)`` between the
+    non-Ehrlich lump and the alcohol) sizes the Ehrlich draw with no quadrature — D-103, where a
+    nonlinear rate integrated over linearly-interpolated states overstated a draw 1.3–3.5×. The
+    other precursor consumers are disabled so that invariant is *exact* rather than nearly-true.
+    ``n_alc/(n_alc+1)`` removes the D-106 decarboxylation CO₂: the draw is a full mole of precursor
+    per mole of alcohol, of which one carbon leaves as CO₂ instead of reaching the alcohol.
+
+    **One helper, two callers** — the sourced-floor test and the 2-PE exclusion must compute this
+    the *same* way, or the exclusion could be argued from arithmetic the floor never used (the
+    D-33/D-99/D-106 shared-helper discipline; D-106 is the beat where two callers "recomputing
+    exactly the same thing" agreed **by luck** until one of them changed).
+    """
+    precursor = spec.precursor_amino_acid
+    param = non_ehrlich_fraction_param(precursor)
+    overrides = {} if f_override is None else {param: f_override}
+    traj, schema = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS, set_params=overrides)
+
+    consumed = float(traj.y[schema.slice(precursor), 0][0]) - _end(traj, schema, precursor)
+    made = _end(traj, schema, spec.pool)
+    assert consumed > 0.0 and made > 0.0, "vacuous: nothing consumed or nothing made"
+
+    f = (
+        compile_scenario(_scenario(aging=False)).param_values[param]
+        if f_override is None
+        else f_override
+    )
+    n_alc = CARBON_ATOMS[spec.species]
+    draw_carbon = (1.0 - f) * consumed * carbon_mass_fraction(precursor)
+    alcohol_carbon_from_precursor = draw_carbon * n_alc / (n_alc + 1.0)
+    total_alcohol_carbon = made * carbon_mass_fraction(spec.species)
+    return 1.0 - alcohol_carbon_from_precursor / total_alcohol_carbon
+
+
+@pytest.mark.parametrize("spec", _SOURCED_FUSEL_SPECS, ids=lambda s: s.pool)
+def test_every_sourced_fusel_is_de_novo_dominated(spec):
+    """Every *sourced* Ehrlich alcohol draws ≥80% of its carbon de novo (decision D-109).
 
     The **sourced supply structure the fusel-side node has to preserve**, pinned here because the
     milestone will rewrite the sourcing layer that produces it: Crépin measures 2-ketobutyrate as
@@ -215,36 +286,72 @@ def test_every_fusel_is_de_novo_dominated(spec):
     threonine is zero for a **structural** reason instead (see
     :func:`test_alpha_kb_production_is_exactly_threonine_independent`).
 
+    **2-phenylethanol is deliberately NOT in this parametrization** — see
+    :func:`test_2_phenylethanol_carries_no_sourced_de_novo_floor`.
+
     Measured from EXACT state differences via the D-104 split invariant (consumed precursor splits
     exactly ``f : (1−f)`` between the non-Ehrlich lump and the alcohol), with the other precursor
     consumers disabled so that invariant is exact. The ``n_alc/(n_alc+1)`` factor removes the D-106
     decarboxylation CO₂: the Ehrlich draw is a full mole of precursor per mole of alcohol, of which
     one carbon leaves as CO₂ rather than reaching the alcohol.
     """
-    traj, schema = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
-    cs = compile_scenario(_scenario(aging=False))
-    pv = cs.param_values
-
-    precursor = spec.precursor_amino_acid
-    consumed = float(traj.y[schema.slice(precursor), 0][0]) - _end(traj, schema, precursor)
-    made = _end(traj, schema, spec.pool)
-    assert consumed > 0.0 and made > 0.0, "vacuous: nothing consumed or nothing made"
-
-    f = pv[non_ehrlich_fraction_param(precursor)]
-    n_alc = CARBON_ATOMS[spec.species]
-    draw_carbon = (1.0 - f) * consumed * carbon_mass_fraction(precursor)
-    alcohol_carbon_from_precursor = draw_carbon * n_alc / (n_alc + 1.0)
-    total_alcohol_carbon = made * carbon_mass_fraction(spec.species)
-
-    de_novo_share = 1.0 - alcohol_carbon_from_precursor / total_alcohol_carbon
+    de_novo_share = _de_novo_share(spec)
     assert de_novo_share >= _SOURCED_DE_NOVO_FLOOR, (
-        f"{spec.pool} is only {de_novo_share:.1%} de novo; D-109's finding that the keto-acid "
-        "competition is negligible rests on the sourced de-novo dominance (Crépin 81%, "
-        "Rollero >90% CCM)"
+        f"{spec.pool} is only {de_novo_share:.1%} de novo, under the sourced floor "
+        f"{_SOURCED_DE_NOVO_FLOOR:.0%} (Crépin 81% newly-synthesised 2-KB; Rollero >90% CCM). "
+        "The fusel-side node is specified to PRESERVE this supply structure — if a beat moved it, "
+        "the milestone's premise (the intracellular keto acid is mostly de novo) moved with it"
     )
 
 
-# -- finding 3: the competition is present, correctly signed, and negligible -------------------
+def test_2_phenylethanol_carries_no_sourced_de_novo_floor():
+    """Why 2-PE is excluded from the floor above — and why that is not a convenience (D-109).
+
+    **Neither Crépin nor Rollero labels phenylalanine.** Crépin's tracers are [13C] leu/ile/val/thr;
+    Rollero's are U-13C valine/leucine. ``f_non_ehrlich_phenylalanine`` is accordingly
+    ``tier: speculative``, ``source: "author estimate"``, band **0.38–0.86** — taken as the mean of
+    Crépin's four measured splits because *"there is no mechanistic argument available to place
+    phenylalanine within that range"*. So 2-PE's de-novo share is a **model artifact**, and
+    asserting it against a floor justified as "Crépin's 81%, Rollero's >90%" would apply a number
+    to a set it does not describe — **D-104's rule, in the test that most invites breaking it**.
+
+    **And it is not academic: the floor is inside the parameter's own uncertainty band.** At the
+    default ``f_phe = 0.53`` 2-PE measures **83.8%** de novo, but at the band's low end
+    (``f_phe = 0.38``) it is **78.6%** — under the 80% floor. So parametrizing the sourced floor
+    over all five would assert something ``f_phe``'s own provenance entry contradicts, and **an
+    ensemble sampling that band would fail it** — the realistic way it would ever have been found.
+    (The four sourced alcohols clear the floor with room: 87.9 / 94.9 / 95.3 / 98.9%.)
+
+    This test exists so the exclusion reads as a **sourcing boundary** rather than an omission, and
+    so a future beat that sources phenylalanine moves it deliberately — the shape of
+    ``test_methionine_has_no_non_ehrlich_fraction`` (D-104).
+    """
+    cs = compile_scenario(_scenario(aging=False))
+    param = non_ehrlich_fraction_param(_UNSOURCED_PRECURSOR)
+    entry = cs.parameters[param]
+
+    # The exclusion is justified by the PROVENANCE, so the provenance is what is pinned. If a future
+    # beat sources phenylalanine, this fails and the exclusion must be revisited on purpose.
+    assert entry.tier is Tier.SPECULATIVE, f"{param} is no longer speculative — re-check the floor"
+    assert entry.provenance.source == "author estimate"
+    assert _UNSOURCED_PRECURSOR not in {s.precursor_amino_acid for s in _SOURCED_FUSEL_SPECS}
+
+    # ...AND THE FLOOR REALLY IS INSIDE THE BAND — MEASURED, because the first draft of this very
+    # test asserted `uncertainty.low < value < uncertainty.high` under a comment claiming exactly
+    # the sentence below. That is trivially true of every parameter in the file and says nothing
+    # about the floor: the beat's own "the sentence and the assertion are not the same claim",
+    # committed in the fix for committing it. The claim needs a RUN at the band's low end.
+    assert entry.uncertainty is not None
+    spec = next(s for s in FUSEL_SPECS if s.precursor_amino_acid == _UNSOURCED_PRECURSOR)
+    at_low_end = _de_novo_share(spec, f_override=entry.uncertainty.low)
+    at_default = _de_novo_share(spec)
+    assert at_default >= _SOURCED_DE_NOVO_FLOOR, "2-PE clears the floor at the default f_phe..."
+    assert at_low_end < _SOURCED_DE_NOVO_FLOOR, (
+        f"...but at f_phe={entry.uncertainty.low} (this parameter's OWN sourced band) 2-PE is "
+        f"{at_low_end:.1%} de novo, under the {_SOURCED_DE_NOVO_FLOOR:.0%} floor — which is why "
+        "it is excluded rather than merely comfortable. If this no longer holds, the exclusion "
+        "should be revisited on the evidence rather than kept by inertia"
+    )
 
 
 def test_alpha_kb_production_is_exactly_threonine_independent():

@@ -437,8 +437,11 @@
 > is **2.79× the total α-KB the pool ever excretes** (42.6× the residual) ⇒ it would starve propanol *and* collapse
 > sotolon's substrate — while looking exactly like the promised competition arriving. It would also zero a core both-media
 > fusel when the keto-acids toggle off (PD#3).
-> (3) **The payoff is REAL — the same 2.79× says so**: propanol is **~73% of the 2-KB flux**, the node's dominant sink, so
-> an honestly partitioned node *would* couple propanol and sotolon materially. **Relocated, not dissolved.**
+> (3) **The payoff is REAL — the same 2.79× says so**: propanol's 2-KB demand is **~2.8× the entire excretion flux**, so
+> an honestly partitioned node *would* couple propanol and sotolon materially. **Relocated, not dissolved.** (The RATIO,
+> deliberately not "propanol is the node's dominant sink": 2-KB's *committed* route is isoleucine biosynthesis via **KMV**
+> — named in this very scoping list — which the model does not carry, so propanol's share of TOTAL 2-KB synthesis is
+> unmeasured. Both propanol and excretion are overflow off that route.)
 > (4) **THE SCOPING RESULT: the fusel-side node is a FLUX PARTITION, not a pool — D-49's own physics.** The intracellular
 > keto acid is a vanishing pool carrying an enormous flux ⇒ quasi-steady ⇒ `synthesis == Σ consumption` ⇒ a **partition**,
 > not a state variable. **Two nodes, differing in kind**: the excreted keto-acids are pools (they persist, they bind SO₂);
