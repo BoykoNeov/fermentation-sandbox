@@ -588,14 +588,20 @@ slots (they do not exist in the beer schema).
 | `propanol` / `active_amyl_alcohol` | wine + beer | — (no sourced threshold in any matrix) | — | single molecule; CHEMISTRY-ONLY, no OAV (D-99) |
 | `ethylphenols` | **wine only** | 4-ethylphenol | horse-sweat / barnyard | single molecule — clean OAV |
 | `ethylguaiacols` | **wine only** | 4-ethylguaiacol | clove / smoky | single molecule — clean OAV |
-| `mercaptans` | **wine only** | **methanethiol** (stand-in) | reductive / drains | **lumped** → representative threshold — the LAST lump (D-99) |
+| `methanethiol` | **wine only** | methanethiol | reductive / drains | single molecule — clean OAV (was the false lump `mercaptans` until D-110) |
 
-- **The lumped-pool call (D-66, owner-chosen) — NOW DOWN TO ONE POOL.** A lumped pool is a
+- **The lumped-pool call (D-66, owner-chosen) — NOW DOWN TO ZERO POOLS (D-110).** A lumped pool is a
   single g/L pool that really mixes several molecules whose thresholds span ~3 orders of
   magnitude; it is assigned the threshold of one **named representative compound** and carries
   **"assumes fixed lump composition"** loudly in that threshold's provenance `notes`. D-96
   split the `esters` lump into three single-molecule pools and D-99 split the `fusels` lump
-  into five, so **`mercaptans` is the last lumped pool in the project**. The lumped-flag tests
+  into five, leaving `mercaptans` as the last — and **D-110 retired it too, but by a different
+  route: it was not a real lump at all.** No Process makes ethanethiol or any other thiol, so the
+  pool held exactly one molecule under a plural name; the flag asserted an uncertainty the mass
+  balance did not carry. Renamed to `methanethiol`, `lumped=False`, **provably zero output change**
+  (the raw 84-slot state array is byte-identical, copper fining included) — the pool already *was*
+  the molecule at every layer, which is why the relabel was free. **The D-66 lump-composition risk
+  class is CLOSED.** The lumped-flag tests
   derive from `AromaCompound.lumped`, not a hardcoded list, so the caveat cannot linger on a
   pool that stopped being lumped — the D-66 honesty cost retires under test pressure as each
   pool is speciated. D-99 also showed *why* a self-consistent lump is dangerous even when its

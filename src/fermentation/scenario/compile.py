@@ -1113,10 +1113,13 @@ def _verb_add_copper(
         ) from None
     copper_gpl = mgl_to_gpl(copper_mgl)  # g/L Cu dosed
     h2s_slice = schema.slice("h2s")
-    # Mercaptans are wine-only; bind them with leftover copper iff the slot exists (D-45).
-    has_mercaptans = "mercaptans" in schema
-    binding_merc = parameters["copper_mercaptan_binding"].value if has_mercaptans else 0.0
-    merc_slice = schema.slice("mercaptans") if has_mercaptans else None
+    # The thiol pool is wine-only; bind it with leftover copper iff the slot exists (D-45). The
+    # slot is `methanethiol` since D-110 (it was the false plural `mercaptans` through D-109);
+    # `copper_mercaptan_binding` keeps its name deliberately — copper mercaptide precipitation
+    # Cu2+ + 2 RSH -> Cu(SR)2 is real class chemistry, general over thiols, and asserts no lump.
+    has_methanethiol = "methanethiol" in schema
+    binding_merc = parameters["copper_mercaptan_binding"].value if has_methanethiol else 0.0
+    merc_slice = schema.slice("methanethiol") if has_methanethiol else None
 
     def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
         out = y.copy()

@@ -142,7 +142,7 @@ DESCRIPTOR_AXES: tuple[DescriptorAxis, ...] = (
     ),
     DescriptorAxis("buttery", ("diacetyl",), "butter / butterscotch"),
     DescriptorAxis("green_apple", ("acetaldehyde",), "green apple / bruised fruit"),
-    DescriptorAxis("sulfidic", ("h2s", "mercaptans"), "rotten egg / drains / reductive"),
+    DescriptorAxis("sulfidic", ("h2s", "methanethiol"), "rotten egg / drains / reductive"),
     DescriptorAxis("vanilla_oak", ("vanillin", "whiskey_lactone"), "vanilla / coconut / sweet oak"),
     DescriptorAxis("smoky", ("guaiacol", "ethylguaiacols"), "smoke / toast / campfire"),
     DescriptorAxis("clove_spice", ("eugenol", "ethylguaiacols"), "clove / warm spice"),

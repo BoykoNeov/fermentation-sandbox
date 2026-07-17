@@ -735,7 +735,7 @@ def test_add_copper_binds_h2s_first_then_mercaptans():
     cs = compile_scenario(_wine([_copper(5.0, 0.5)]))
     ev = _copper_event(cs, 5.0)
     schema = cs.schema
-    h2s, merc = schema.slice("h2s"), schema.slice("mercaptans")
+    h2s, merc = schema.slice("h2s"), schema.slice("methanethiol")
     copper_gpl = mgl_to_gpl(0.5)
     b_h2s = cs.param_values["copper_h2s_binding"]
     b_merc = cs.param_values["copper_mercaptan_binding"]
@@ -757,7 +757,7 @@ def test_add_copper_h2s_consumes_copper_before_mercaptans():
     cs = compile_scenario(_wine([_copper(5.0, 0.001)]))  # tiny dose: ~0.5 µg/L H₂S capacity
     ev = _copper_event(cs, 5.0)
     schema = cs.schema
-    h2s, merc = schema.slice("h2s"), schema.slice("mercaptans")
+    h2s, merc = schema.slice("h2s"), schema.slice("methanethiol")
     y = cs.y0.copy()
     y[h2s] = 1.0e-3  # 1 mg/L H₂S ≫ capacity ⇒ soaks all copper
     y[merc] = 1.0e-4
@@ -800,7 +800,7 @@ def test_add_copper_clears_both_h2s_and_mercaptans():
     grid = np.linspace(0.0, 40.0 * 24.0, 401)
     no_cu = compile_scenario(_autolysis_wine([])).run(t_eval=grid)
     fined = compile_scenario(_autolysis_wine([_copper(38.0, 0.5)])).run(t_eval=grid)
-    for pool in ("h2s", "mercaptans"):
+    for pool in ("h2s", "methanethiol"):
         built = np.asarray(no_cu.series(pool))
         cleared = np.asarray(fined.series(pool))
         assert built[-1] > 1.0e-6, pool  # the fault really built up

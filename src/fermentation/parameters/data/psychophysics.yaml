@@ -193,11 +193,11 @@ stevens_n_ethyl_acetate:
     conditions: "no matrix — matrix-agnostic; applied to wine and beer alike."
     notes: "ORDERED per Cain 1969. Ethyl acetate (~80 g/L) is far more water-soluble than the other two esters => the steepest ester exponent. Author estimate."
 
-stevens_n_mercaptans:
+stevens_n_methanethiol:
   value: 0.48
   unit: "1"
   tier: speculative
-  uncertainty: { low: 0.29, high: 0.72, note: "author's ignorance, compounded: this is a LUMPED pool (D-66), so the exponent is a guess about a stand-in molecule for a mixture." }
+  uncertainty: { low: 0.29, high: 0.72, note: "author's ignorance -- a guess about ONE KNOWN MOLECULE (methanethiol), no longer 'compounded' by a lump. D-110 RENAMED the key (stevens_n_mercaptans -> stevens_n_methanethiol) and retired that claim WITHOUT touching value or band, because the band never carried the extra width the old note advertised: it read 'author's ignorance, COMPOUNDED: this is a LUMPED pool (D-66), so the exponent is a guess about a stand-in molecule for a mixture', but 0.29-0.72 on 0.48 is 0.60x-1.50x -- the file's DEFAULT single-molecule width, identical to stevens_n_h2s (0.30-0.75 on 0.50 = 0.60x-1.50x) and stevens_n_methional (0.60x-1.45x), neither of which is lumped. The compounding was asserted in prose and never applied to the number, so retiring it costs nothing -- and that is a checked result, not a convenience: had the band actually been widened for the lump, honesty would have required NARROWING it here and moving the ensemble." }
   provenance:
     source: "author estimate"
     conditions: "no matrix — matrix-agnostic. Wine-only pool. Read against methanethiol, the pool's D-66 representative."

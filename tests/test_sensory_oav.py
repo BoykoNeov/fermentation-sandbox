@@ -162,7 +162,7 @@ def test_profile_compound_set_matches_the_medium(thresholds):
         "2_phenylethanol",
         "ethylphenols",
         "ethylguaiacols",
-        "mercaptans",
+        "methanethiol",
         "methional",
         "phenylacetaldehyde",
         # The four non-oxidative THERMAL Strecker aldehyde/sotolon pools (decision D-87).
@@ -236,11 +236,22 @@ def test_every_threshold_is_speculative_with_a_recorded_matrix(thresholds):
         assert p.provenance.conditions.strip(), key  # measurement matrix recorded
 
 
-def test_lumped_thresholds_flag_the_fixed_composition_assumption(thresholds):
-    """Every lumped rep carries the 'lump composition' honesty cost in its notes (D-66).
+def test_no_pool_is_lumped_and_any_future_lump_must_declare_itself(thresholds):
+    """The project carries NO lumped pool (D-110) — and the D-66 caveat still binds if one returns.
 
-    Derived from the ``lumped`` flag rather than a hardcoded list, so the caveat cannot go
-    missing when a pool is added — and, since D-96, cannot linger when one stops being lumped.
+    **This test used to assert the opposite, and both halves are deliberate.** Through D-109 it
+    opened ``assert lumped, "the lumped set should not be empty — mercaptans is still a lump"``,
+    with a comment instructing that if a future decision split the last lump the honest response
+    was to *delete this test*. D-110 retired that lump — so the instruction came due, and it is
+    **not** followed, because D-101 (later, and reasoning about this exact retirement) prescribed
+    replacing the tripwire with a *positive assertion* instead. Deleting would have thrown away a
+    live guard to satisfy a stale note: the D-66 rule (*a lump must declare its
+    fixed-composition assumption in its threshold provenance*) is **still true**, it simply has
+    no instances today. A rule with no instances is dormant, not wrong.
+
+    So the assertion inverts rather than vanishes: emptiness is now the **claim**, checked in
+    both directions. ``assert not lumped`` fails the day a pool re-lumps — and if that day comes,
+    the loop below is already waiting to demand its caveat.
     """
     lumped = {
         (c.pool, medium)
@@ -248,11 +259,21 @@ def test_lumped_thresholds_flag_the_fixed_composition_assumption(thresholds):
         for c in compounds
         if c.lumped
     }
-    # Since D-99, wine's `mercaptans` is the LAST lumped pool in the project (D-96 split the
-    # esters, D-99 the fusels). If a future decision splits it too, this assert fires — and the
-    # honest response is to DELETE this test, not to invent a lump to keep it green.
-    assert lumped, "the lumped set should not be empty — mercaptans is still a lump"
-    for pool, medium in lumped:
+    # The lump-composition risk class (D-66) is CLOSED: `esters` speciated at D-96, `fusels` at
+    # D-99, and wine's `mercaptans` — the last one — retired at D-110, where the flag turned out
+    # to be FALSE rather than merely retired: nothing in the model produces ethanethiol or any
+    # other thiol, so the pool was one molecule under a plural name. Renaming it `methanethiol`
+    # made the slot, the carbon weight, the threshold and the Stevens exponent name one compound.
+    assert not lumped, (
+        f"a pool re-lumped: {sorted(lumped)} — if that is deliberate, it must carry the D-66 "
+        "fixed-composition caveat in its threshold provenance (the loop below enforces it), and "
+        "this assertion should become the list of known lumps rather than be deleted"
+    )
+    # Dormant, not dead: the D-66 contract for any lump that ever returns. Vacuous today BY
+    # CONSTRUCTION, which the assertion above is what makes safe — without it, this loop would
+    # silently pass over an empty set and the caveat rule could rot unnoticed (the `0 == 0`
+    # trap D-105 named, and D-109 hit again in its own tripwire).
+    for pool, medium in lumped:  # pragma: no cover — no lumped pools exist since D-110
         notes = thresholds[f"threshold_{pool}_{medium}"].provenance.notes.strip().lower()
         # The convention is a LEADING declaration, checked with startswith rather than a bare
         # substring: prose elsewhere in a note may legitimately discuss lumping (a

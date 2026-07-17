@@ -838,7 +838,7 @@ def test_sur_lie_strecker_closes_carbon_and_nitrogen_end_to_end():
     assert_conserved(traj.as_trajectory(), n_of, label="nitrogen")
     assert_nonnegative(
         traj.as_trajectory(),
-        ("amino_acids", "debris", "methional", "phenylacetaldehyde", "mercaptans", "h2s"),
+        ("amino_acids", "debris", "methional", "phenylacetaldehyde", "methanethiol", "h2s"),
         atol=1e-9,
     )
 

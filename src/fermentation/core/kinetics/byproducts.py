@@ -162,7 +162,9 @@ from fermentation.core.tiers import Tier
 #: Neither the ester nor the fusel pools are lumped any more — each is its own molecule,
 #: registered in ``ESTER_SPECS`` (decision D-96) / ``FUSEL_SPECS`` (decision D-99) and weighted
 #: by itself, so there is no single ``_ESTER_SPECIES`` or ``_FUSEL_SPECIES`` to name here.
-#: ``mercaptans`` is now the last lumped pool in the project.
+#: **No pool in the project is lumped any more (decision D-110).** ``mercaptans`` was the last —
+#: and it turned out to be a FALSE lump rather than a real one, holding the single molecule it is
+#: now named for (``methanethiol``). D-96 and D-99 split real mixtures; D-110 deleted a claim.
 
 #: The Ehrlich decarboxylation releases exactly **1 mol CO₂ per mol higher alcohol** — the keto
 #: acid's carboxyl carbon, the step that turns the transaminated amino acid into its aldehyde

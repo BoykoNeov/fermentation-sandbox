@@ -6,12 +6,23 @@ sensory threshold ~2–3 µg/L) and its onion/rubber sibling ethanethiol. Booked
 (:data:`~fermentation.core.chemistry.M_METHANETHIOL`) — the p-coumaric-for-``hydroxycinnamics``
 single-species idiom (D-40).
 
-**The pool is flagged ``lumped``, but every layer of it now names methanethiol** — the yield
-(``y_mercaptan`` is g *methanethiol* per g biomass, anchored on the MeSH ceiling), the
-``total_carbon`` weight, the OAV threshold, the Stevens exponent, and the precursor draw. Nothing
-in the model produces ethanethiol or any other thiol, so the fixed-lump-composition caveat this
-pool carries describes a mixture the mass balance does not contain. Retiring that flag is its own
-beat; the honest reading meanwhile is that this is methanethiol under a plural name.
+**THE FALSE LUMP IS RETIRED (decision D-110).** Through D-109 the pool was named ``mercaptans``
+and flagged ``lumped``, while every layer of it named methanethiol — the yield (g *methanethiol*
+per g biomass, anchored on the MeSH ceiling), the ``total_carbon`` weight, the OAV threshold, the
+Stevens exponent, and the precursor draw. Nothing in the model produces ethanethiol or any other
+thiol, so the fixed-lump-composition caveat described **a mixture the mass balance did not
+contain**: a plural name and a ``lumped=True`` flag asserting an uncertainty the model did not
+actually carry. D-110 renamed the pool to ``methanethiol`` and flipped the flag — a **pure
+relabel**, verified to move no number (the pool already *was* this molecule at every layer, which
+is precisely why the rename could be free). It was the **last** lumped pool in the project: the
+``esters`` lump was speciated at D-96, the ``fusels`` lump at D-99, and the D-66
+lump-composition risk class closes here.
+
+**A lump flag is a CLAIM, and an over-cautious false one is still false.** The flag read as
+honest humility — it looked like the model conceding uncertainty. But it pointed at a mixture that
+did not exist, so it bought no safety and cost a real name; a caveat that describes something the
+mass balance does not contain is not conservatism, it is **a wrong claim wearing a hedge's
+clothes**.
 
 **Formation — autolysis-linked, carbon from methionine (Option A, owner-chosen).** Methanethiol is
 released by **methionine degradation** on the lees during self-digestion — one real route among
@@ -112,9 +123,15 @@ from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
-#: The representative species for the lumped **mercaptans** thiol pool (decision D-45): methanethiol
-#: (methyl mercaptan), the dominant reduction thiol. Named as a module constant so the carbon draw
-#: here and the ``total_carbon`` weighting name one species (the D-19 idiom).
+#: The thiol this Process makes (decisions D-45/D-110): methanethiol (methyl mercaptan), the
+#: dominant reduction thiol. Named as a module constant so the carbon draw here and the
+#: ``total_carbon`` weighting name one species (the D-19 idiom).
+#:
+#: **Since D-110 this is also the STATE SLOT's name**, not just the species'. It was the
+#: "representative species for the lumped ``mercaptans`` pool" through D-109 — a representative of
+#: a mixture that did not exist. Now that slot and species are one string, the D-19 idiom is not a
+#: convention this module has to keep: the weighting cannot drift from the pool it weights, because
+#: naming them differently would take an edit rather than an omission.
 _MERCAPTAN_SPECIES = "methanethiol"
 
 #: Methanethiol's actual precursor (decision D-100). D-45 had to draw the thiol's carbon from the
@@ -162,14 +179,23 @@ _CO_PRODUCT_SPECIES = "alpha_ketobutyrate"
 class AutolyticMercaptan(Process):
     """Autolytic mercaptan (thiol) release — a carbon-bearing yield on the autolysis flux (D-45).
 
-    ``r_merc = y_mercaptan · autolysis_flux(y) · [aa/(K_amino_acids+aa)]`` [g methanethiol/L/h];
-    fills the lumped ``mercaptans`` pool, drawing the mercaptan carbon from the ``amino_acids`` pool
+    ``r_merc = y_methanethiol · autolysis_flux(y) · [met/(K_met + met)]`` [g methanethiol/L/h];
+    fills the single-molecule ``methanethiol`` pool, drawing the carbon from the **methionine** pool
     and **deaminating** its nitrogen back to ammonium ``N`` (Option A, the D-33 fusel-reroute
-    idiom). Carbon closes (C into ``mercaptans`` = C out of ``amino_acids``); nitrogen closes (arg N
-    → ``N``, methanethiol is N-free). Not flux-linked, so it accumulates un-stripped post-dryness —
-    the reductive fault. Opt-in and wine-only (rides the D-34 autolysis gate). The **first
-    autolysis-gated ``N``-writer**, so it drops the structural ``tier_of("N")`` to speculative (the
-    D-27 ``E`` parallel); tier speculative.
+    idiom). Carbon closes on ATOM COUNTS (methionine's 5 C leave as the thiol's 1 + the C4 booked to
+    ``alpha_ketobutyrate``); nitrogen closes (methionine's N → ``N``, methanethiol is N-free). Not
+    flux-linked, so it accumulates un-stripped post-dryness — the reductive fault. Opt-in and
+    wine-only (rides the D-34 autolysis gate). The **first autolysis-gated ``N``-writer**, so it
+    drops the structural ``tier_of("N")`` to speculative (the D-27 ``E`` parallel); tier
+    speculative.
+
+    **This docstring was stale through D-109 and is corrected at D-110** — it described the
+    *pre-D-100* Process: carbon drawn from the ``amino_acids`` lump, the gate on
+    ``aa/(K_amino_acids+aa)``, and *"arg N → N"*, a nitrogen released by **arginine** — a molecule
+    with no sulfur, which could not make a thiol. It also predated D-107 entirely, omitting the C4
+    co-product and the 1:1 draw. The module docstring, the ``touches`` note and the code were all
+    correct throughout; only the class docstring — **the one a reader hits first** — still carried
+    the retired claim. D-109's lesson, recurring in a new place.
     """
 
     name = "autolytic_mercaptan"
@@ -178,15 +204,15 @@ class AutolyticMercaptan(Process):
     #: precursor, no longer the arginine lump), releases the nitrogen to ``N``, and — since D-107 —
     #: books the C4 co-product into ``alpha_ketobutyrate`` (the keto-acid node), which is what makes
     #: the methionine draw the honest 1:1 instead of D-45's 0.2:1.
-    touches = ("mercaptans", _PRECURSOR_SPECIES, _CO_PRODUCT_SPECIES, "N")
-    #: ``y_mercaptan`` sets the g-MeSH-per-g-biomass-autolysed yield; ``k_autolysis``/
+    touches = (_MERCAPTAN_SPECIES, _PRECURSOR_SPECIES, _CO_PRODUCT_SPECIES, "N")
+    #: ``y_methanethiol`` sets the g-MeSH-per-g-biomass-autolysed yield; ``k_autolysis``/
     #: ``E_a_autolysis``/``T_ref`` are the *same* autolysis constants
     #: :func:`~fermentation.core.kinetics.autolysis.autolysis_flux` reads (so all autolysis branches
     #: share one clock and one ``autolysis_rate_per_h`` override); ``K_amino_acids`` scaled by
     #: ``must_aa_fraction_methionine`` sets the relative-depletion gate (D-100). Their tiers cap the
     #: output tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
-        "y_mercaptan",
+        "y_methanethiol",
         "k_autolysis",
         "E_a_autolysis",
         "T_ref",
@@ -207,7 +233,7 @@ class AutolyticMercaptan(Process):
         if gate <= 0.0:
             return d  # no methionine ⇒ no thiol source ⇒ no mercaptan (the D-33 no-op)
 
-        r_merc = params["y_mercaptan"] * r_autolysis * gate  # [g methanethiol/L/h]
+        r_merc = params["y_methanethiol"] * r_autolysis * gate  # [g methanethiol/L/h]
         # DEMETHIOLATION AT ITS REAL STOICHIOMETRY (decision D-107):
         #     1 mol methionine → 1 mol methanethiol + 1 mol 2-oxobutyrate + NH₃
         # so the draw is sized to ONE MOLE of methionine per mole of thiol, not (as through D-106)
@@ -221,7 +247,7 @@ class AutolyticMercaptan(Process):
         )
         nitrogen = draw_precursor_carbon(d, schema, _PRECURSOR_SPECIES, met_carbon)
 
-        d[schema.slice("mercaptans")] = r_merc
+        d[schema.slice(_MERCAPTAN_SPECIES)] = r_merc
         # The C4 co-product, on the ledger at last. Carbon closes on ATOM COUNTS, not on a sized
         # draw: methionine's 5 carbons leave as the thiol's 1 + this pool's 4, so the identity
         # C(methionine) == C(methanethiol) + C(2-oxobutyrate) is what balances the books here —

@@ -19,6 +19,8 @@ the full suite staying green is the end-to-end proof).
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -134,7 +136,7 @@ def test_axis_set_is_derived_from_the_medium():
     }
     # Shared axes are narrowed to the medium's pools: mercaptans + ethylguaiacols are wine-only.
     assert beer["sulfidic"] == ("h2s",)
-    assert wine["sulfidic"] == ("h2s", "mercaptans")
+    assert wine["sulfidic"] == ("h2s", "methanethiol")
     assert beer["smoky"] == ("guaiacol",)
     assert wine["smoky"] == ("guaiacol", "ethylguaiacols")
 
@@ -201,7 +203,7 @@ def test_dominant_names_the_argmax_and_tracks_it(thresholds):
         schema,
         {
             "h2s": _at_oav(thresholds, "h2s", "wine", 3.0),
-            "mercaptans": _at_oav(thresholds, "mercaptans", "wine", 0.5),
+            "methanethiol": _at_oav(thresholds, "methanethiol", "wine", 0.5),
         },
     )
     assert h2s_loud.readings["sulfidic"].dominant == "h2s"
@@ -212,10 +214,10 @@ def test_dominant_names_the_argmax_and_tracks_it(thresholds):
         schema,
         {
             "h2s": _at_oav(thresholds, "h2s", "wine", 0.5),
-            "mercaptans": _at_oav(thresholds, "mercaptans", "wine", 3.0),
+            "methanethiol": _at_oav(thresholds, "methanethiol", "wine", 3.0),
         },
     )
-    assert merc_loud.readings["sulfidic"].dominant == "mercaptans"
+    assert merc_loud.readings["sulfidic"].dominant == "methanethiol"
 
 
 def test_above_threshold_regroups_the_pool_level_flags(thresholds):
@@ -270,7 +272,7 @@ def test_descriptor_is_monotone_in_its_pools(thresholds):
         schema,
         {
             "h2s": _at_oav(thresholds, "h2s", "wine", 3.0),
-            "mercaptans": _at_oav(thresholds, "mercaptans", "wine", 0.5),
+            "methanethiol": _at_oav(thresholds, "methanethiol", "wine", 0.5),
         },
     )
     bumped = _project(
@@ -278,46 +280,83 @@ def test_descriptor_is_monotone_in_its_pools(thresholds):
         schema,
         {
             "h2s": _at_oav(thresholds, "h2s", "wine", 3.0),
-            "mercaptans": _at_oav(thresholds, "mercaptans", "wine", 1.5),
+            "methanethiol": _at_oav(thresholds, "methanethiol", "wine", 1.5),
         },
     )
     assert bumped.readings["sulfidic"].oav == pytest.approx(base.readings["sulfidic"].oav)
 
 
-def test_lumped_flag_propagates_from_the_dominant_contributor(thresholds):
-    """D-66's fixed-lump-composition caveat survives the projection.
+def _with_lumped_thiol(thresholds, *, h2s_oav: float, thiol_oav: float) -> SensoryProfile:
+    """A REAL wine profile with methanethiol's reading forced ``lumped=True``.
 
-    `sulfidic` mixes h2s (clean, single-molecule) with mercaptans (a lumped pool read against
-    methanethiol). The descriptor inherits the assumption exactly when the lumped pool is the
-    one driving it — the honesty cost must not evaporate on crossing a layer.
+    Since D-110 no pool in the project is ``lumped``, so no real trajectory can drive the
+    ``lumped=True`` branch of :meth:`MaxRuleProjector.project`. The machinery is still live, so
+    the honest test injects the flag rather than deleting the test or inventing a lump in the
+    model to keep it green. Only the ONE flag under test is synthetic — every other pool, axis
+    and OAV is the real thing, so the projector is exercised exactly as it runs in production.
+    """
+    profile = sensory_profile(
+        _traj(
+            wine_schema(),
+            {
+                "h2s": _at_oav(thresholds, "h2s", "wine", h2s_oav),
+                "methanethiol": _at_oav(thresholds, "methanethiol", "wine", thiol_oav),
+            },
+        ),
+        thresholds,
+    )
+    readings = dict(profile.readings)
+    readings["methanethiol"] = replace(readings["methanethiol"], lumped=True)
+    return replace(profile, readings=readings)
+
+
+def test_lumped_flag_propagates_from_the_dominant_contributor(thresholds):
+    """D-66's fixed-lump-composition caveat survives the projection — on a SYNTHETIC lump.
+
+    `sulfidic` mixes two single-molecule pools: h2s and methanethiol. Until D-110 the latter was
+    the lumped `mercaptans` pool and this test drove the assertion from a real trajectory; the
+    retirement left the project with **no lumped pool at all**, so the `lumped=True` branch of
+    the max rule became unreachable from any real run.
+
+    **Unreachable is not dead.** The propagation is live code guarding a live rule — if a future
+    beat lumps a pool, the honesty cost must still cross the layer — so the flag is injected
+    here instead of dropped. Deleting would have removed a guard because its last *instance*
+    went away, not because its *rule* did; keeping it as `assert False is False` on a real
+    trajectory would have been worse, since it would pass no matter what the projector did (the
+    `0 == 0` trap, D-105). The synthetic profile is what makes both branches able to fail.
+    """
+    thiol_loud = _with_lumped_thiol(thresholds, h2s_oav=0.5, thiol_oav=3.0)
+    assert MaxRuleProjector().project(thiol_loud).readings["sulfidic"].lumped is True
+
+    # Same lumped pool, now NOT dominant: the flag must follow the DOMINANT contributor, not
+    # merely the presence of a lump on the axis. This is the direction that can actually catch a
+    # projector that ORs the flags together instead of reading the winner's.
+    h2s_loud = _with_lumped_thiol(thresholds, h2s_oav=3.0, thiol_oav=0.5)
+    assert MaxRuleProjector().project(h2s_loud).readings["sulfidic"].lumped is False
+
+
+def test_no_axis_on_a_real_trajectory_claims_a_lump(thresholds):
+    """The D-110 claim at the descriptor layer: NO axis inherits a lump, because none exists.
+
+    The companion to the synthetic test above, and the half that must run on a **real**
+    trajectory: the projector must not fabricate a flag no contributor carries. `buttery` was
+    always clean; `fruity` read True until D-96 split the lumped `esters` pool; `solventy` until
+    D-99 split `fusels`; `sulfidic` until D-110 retired `mercaptans` — the last one. The caveats
+    did not move to another axis, they **stopped existing**.
     """
     schema = wine_schema()
-    merc_loud = _project(
-        thresholds,
-        schema,
-        {
-            "h2s": _at_oav(thresholds, "h2s", "wine", 0.5),
-            "mercaptans": _at_oav(thresholds, "mercaptans", "wine", 3.0),
-        },
-    )
-    assert merc_loud.readings["sulfidic"].lumped is True
-
-    h2s_loud = _project(
+    profile = _project(
         thresholds,
         schema,
         {
             "h2s": _at_oav(thresholds, "h2s", "wine", 3.0),
-            "mercaptans": _at_oav(thresholds, "mercaptans", "wine", 0.5),
+            "methanethiol": _at_oav(thresholds, "methanethiol", "wine", 0.5),
+            "diacetyl": _at_oav(thresholds, "diacetyl", "wine", 2.0),
+            "isoamyl_acetate": _at_oav(thresholds, "isoamyl_acetate", "wine", 2.0),
         },
     )
-    assert h2s_loud.readings["sulfidic"].lumped is False
-    # A clean single-molecule axis never claims a lump assumption.
-    assert h2s_loud.readings["buttery"].lumped is False
-    # `fruity` read True here until D-96, when the lumped `esters` pool became two
-    # single-molecule pools (isoamyl_acetate + ethyl_hexanoate). Both contributors are now real
-    # molecules, so the axis carries no fixed-composition assumption at all — the caveat did not
-    # move, it stopped existing.
-    assert h2s_loud.readings["fruity"].lumped is False
+    claimed = {name for name, r in profile.readings.items() if r.lumped}
+    assert not claimed, f"axes claim a lump no pool carries: {sorted(claimed)}"
 
 
 def test_no_contributor_to_solventy_is_lumped_whoever_dominates(thresholds):
@@ -331,10 +370,13 @@ def test_no_contributor_to_solventy_is_lumped_whoever_dominates(thresholds):
     and there is no lump left to inherit. The assertion could not be repaired to say what it
     said; it is rewritten to pin what replaced it.
 
-    The lumped-propagation MACHINERY is still tested — `sulfidic` (h2s + mercaptans) remains a
-    genuinely mixed axis, because wine's `mercaptans` is now the last lump in the project. This
-    test is that one's converse guard: it fires if anyone re-points a solventy pool at a
-    molecule it is not made of and reaches for the `lumped` flag to excuse it.
+    The lumped-propagation MACHINERY is still tested, but no longer from any real axis: D-110
+    retired `mercaptans` — the last lump, and on inspection a FALSE one — so `sulfidic` is now
+    two single-molecule pools and the project has no mixed axis left to drive it. See
+    `test_lumped_flag_propagates_from_the_dominant_contributor`, which injects a synthetic lumped
+    reading rather than let the rule go unguarded. This test remains the converse guard: it fires
+    if anyone re-points a solventy pool at a molecule it is not made of and reaches for the
+    `lumped` flag to excuse it.
     """
     schema = wine_schema()
     ea_loud = _project(

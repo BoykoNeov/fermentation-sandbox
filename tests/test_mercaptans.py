@@ -1,14 +1,22 @@
 """Tests for the mercaptan (thiol) beat — the carbon-bearing autolytic reductive off-aroma (D-45).
 
-Beyond H₂S (D-44), the other "reduction" off-aromas are the mercaptans (thiols), lumped here as
-**methanethiol**. :class:`AutolyticMercaptan` fills the ``mercaptans`` pool as a yield on the shared
-autolysis flux — but because methanethiol carries **carbon** (unlike H₂S), it draws that carbon from
-the **methionine** pool (decision D-100 — the *actual* precursor; D-45 had to draw from the lumped
+Beyond H₂S (D-44), the other "reduction" off-aroma the model carries is **methanethiol**.
+:class:`AutolyticMercaptan` fills the ``methanethiol`` pool as a yield on the shared autolysis flux
+— but because methanethiol carries **carbon** (unlike H₂S), it draws that carbon from the
+**methionine** pool (decision D-100 — the *actual* precursor; D-45 had to draw from the lumped
 arginine pool and document that arginine contains no sulfur) and **deaminates** the nitrogen to
 ``N`` (Option A, the D-33 fusel-reroute idiom). This suite pins the closed form, the
 carbon+nitrogen closure (both by construction), the
 availability gate + guards, the new ``tier_of("N")`` drop (the first autolysis-gated N-writer), the
 opt-in isolability, and the emergent post-dryness accumulation.
+
+**The pool was ``mercaptans``, a lumped plural, through D-109 — and the lump was FALSE, not merely
+coarse** (decision D-110): nothing in the model produces ethanethiol or any other thiol, so the
+fixed-composition caveat described a mixture the mass balance never contained. The rename to the
+one molecule it holds moved no number, because the pool already *was* that molecule at every layer.
+See ``test_the_pool_is_one_molecule_and_names_it`` and
+``test_the_model_makes_no_thiol_but_this_one`` — the latter is the one that keeps the claim honest
+as the model grows.
 """
 
 from collections.abc import Mapping
@@ -30,6 +38,7 @@ from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.sensory.oav import AROMA_COMPOUNDS, load_thresholds
 from fermentation.validation import (
     assert_conserved,
     assert_nonnegative,
@@ -48,7 +57,7 @@ _CO_PRODUCT_SPECIES = "alpha_ketobutyrate"
 
 @pytest.fixture
 def store():
-    # wine_generic carries every mercaptan read (y_mercaptan, k_autolysis, E_a_autolysis, T_ref,
+    # wine_generic carries every mercaptan read (y_methanethiol, k_autolysis, E_a_autolysis, T_ref,
     # K_amino_acids); the shared H₂S file rounds out the resolved set for tier maps.
     return load_parameters(
         default_data_dir() / "wine_generic.yaml",
@@ -112,7 +121,7 @@ def _expected(params: Mapping[str, float], *, x_dead: float, amino_acids: float,
     # ALGEBRAICALLY the pre-split lumped gate aa/(K + aa) (decision D-100), so this closed form is
     # unchanged by the split — which is exactly the property being asserted.
     gate = amino_acids / (params["K_amino_acids"] + amino_acids)
-    r_merc = params["y_mercaptan"] * r_autolysis * gate
+    r_merc = params["y_methanethiol"] * r_autolysis * gate
     # STOICHIOMETRY, not carbon-sizing: 1 mol methionine per mol thiol (D-107).
     n_merc = r_merc / MOLAR_MASS[_MERCAPTAN_SPECIES]  # mol/L/h
     met_mass = n_merc * MOLAR_MASS[_AA_SPECIES]
@@ -130,10 +139,10 @@ def test_metadata():
     assert p.tier is Tier.SPECULATIVE
     # Draws METHIONINE (D-100), not the retired lumped arginine pool — and since D-107 books the
     # C4 co-product demethiolation really releases, which is what makes that draw 1:1.
-    assert set(p.touches) == {"mercaptans", "methionine", "alpha_ketobutyrate", "N"}
+    assert set(p.touches) == {"methanethiol", "methionine", "alpha_ketobutyrate", "N"}
     assert "amino_acids" not in p.touches
     assert set(p.reads) == {
-        "y_mercaptan",
+        "y_methanethiol",
         "k_autolysis",
         "E_a_autolysis",
         "T_ref",
@@ -156,14 +165,14 @@ def test_matches_closed_form(params):
     r_merc, met_mass, keto_rate, n_release = _expected(
         params, x_dead=1.5, amino_acids=1.0, t=293.15
     )
-    assert schema.get(d, "mercaptans") == pytest.approx(r_merc)
-    assert schema.get(d, "mercaptans") > 0.0
+    assert schema.get(d, "methanethiol") == pytest.approx(r_merc)
+    assert schema.get(d, "methanethiol") > 0.0
     assert schema.get(d, "methionine") == pytest.approx(-met_mass)
     assert schema.get(d, "alpha_ketobutyrate") == pytest.approx(keto_rate)
     assert schema.get(d, "N") == pytest.approx(n_release)
     # touches ONLY those four — nothing else on the state moves (not X_dead, S, E, h2s, …)
     for name in schema.names:
-        if name in ("mercaptans", "methionine", "alpha_ketobutyrate", "N"):
+        if name in ("methanethiol", "methionine", "alpha_ketobutyrate", "N"):
             continue
         assert schema.get(d, name) == pytest.approx(0.0, abs=1e-18), name
 
@@ -181,7 +190,7 @@ def test_carbon_closes_at_the_derivative_level(params):
     """
     schema = wine_schema()
     d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, params), schema, params)
-    c_merc = schema.get(d, "mercaptans") * carbon_mass_fraction(_MERCAPTAN_SPECIES)
+    c_merc = schema.get(d, "methanethiol") * carbon_mass_fraction(_MERCAPTAN_SPECIES)
     c_keto = schema.get(d, "alpha_ketobutyrate") * carbon_mass_fraction(_CO_PRODUCT_SPECIES)
     c_aa = schema.get(d, "methionine") * carbon_mass_fraction(_AA_SPECIES)
     assert c_merc + c_keto + c_aa == pytest.approx(0.0, abs=1e-18)  # gain == loss
@@ -203,7 +212,7 @@ def test_demethiolation_draws_one_mole_of_methionine_per_mole_of_thiol(params):
     """
     schema = wine_schema()
     d = AutolyticMercaptan().derivatives(0.0, _mercaptan_y0(schema, params), schema, params)
-    n_thiol = schema.get(d, "mercaptans") / MOLAR_MASS[_MERCAPTAN_SPECIES]
+    n_thiol = schema.get(d, "methanethiol") / MOLAR_MASS[_MERCAPTAN_SPECIES]
     n_met = -schema.get(d, "methionine") / MOLAR_MASS[_AA_SPECIES]
     n_keto = schema.get(d, "alpha_ketobutyrate") / MOLAR_MASS[_CO_PRODUCT_SPECIES]
     assert n_thiol > 0.0
@@ -237,7 +246,7 @@ def test_scales_with_dead_biomass(params):
     r2 = AutolyticMercaptan().derivatives(
         0.0, _mercaptan_y0(schema, params, x_dead=2.0), schema, params
     )
-    assert schema.get(r2, "mercaptans") == pytest.approx(2.0 * schema.get(r1, "mercaptans"))
+    assert schema.get(r2, "methanethiol") == pytest.approx(2.0 * schema.get(r1, "methanethiol"))
 
 
 def test_availability_gate_ramps_with_amino_acids(params):
@@ -249,7 +258,7 @@ def test_availability_gate_ramps_with_amino_acids(params):
     hi = AutolyticMercaptan().derivatives(
         0.0, _mercaptan_y0(schema, params, amino_acids=2.0), schema, params
     )
-    assert 0.0 < schema.get(lo, "mercaptans") < schema.get(hi, "mercaptans")
+    assert 0.0 < schema.get(lo, "methanethiol") < schema.get(hi, "methanethiol")
 
 
 def test_is_not_flux_linked(params):
@@ -261,8 +270,8 @@ def test_is_not_flux_linked(params):
         0.0, _mercaptan_y0(schema, params, s=0.0, x=0.0), schema, params
     )
     r_merc, _, _, _ = _expected(params, x_dead=1.5, amino_acids=1.0, t=293.15)
-    assert schema.get(dry, "mercaptans") == pytest.approx(r_merc)
-    assert schema.get(dry, "mercaptans") > 0.0
+    assert schema.get(dry, "methanethiol") == pytest.approx(r_merc)
+    assert schema.get(dry, "methanethiol") > 0.0
 
 
 def test_rises_with_temperature(params):
@@ -274,7 +283,7 @@ def test_rises_with_temperature(params):
     warm = AutolyticMercaptan().derivatives(
         0.0, _mercaptan_y0(schema, params, t=303.15), schema, params
     )
-    assert schema.get(warm, "mercaptans") > schema.get(cold, "mercaptans") > 0.0
+    assert schema.get(warm, "methanethiol") > schema.get(cold, "methanethiol") > 0.0
 
 
 def test_zero_without_dead_biomass_or_amino_acids(params):
@@ -286,9 +295,58 @@ def test_zero_without_dead_biomass_or_amino_acids(params):
     no_aa = p.derivatives(0.0, _mercaptan_y0(schema, params, amino_acids=0.0), schema, params)
     neg_dead = p.derivatives(0.0, _mercaptan_y0(schema, params, x_dead=-1e-6), schema, params)
     for d in (no_dead, no_aa, neg_dead):
-        assert schema.get(d, "mercaptans") == 0.0
+        assert schema.get(d, "methanethiol") == 0.0
         assert schema.get(d, "methionine") == 0.0
         assert schema.get(d, "N") == 0.0
+
+
+# -- D-110: the false lump, retired ---------------------------------------------
+
+
+def test_the_pool_is_one_molecule_and_names_it(store):
+    """The D-110 retire, pinned where it can fail: the slot, the weight and the threshold agree.
+
+    The `mercaptans` lump was FALSE, not merely coarse — the pool held exactly one molecule
+    under a plural name — and the rename is only legitimate because of that. So the tripwire is
+    not "the flag is False" (which a careless edit could restore) but the fact underneath it:
+    the pool's slot name IS its molecule, so the carbon weight, the OAV threshold and the
+    Stevens exponent cannot drift apart from the compound the Process actually makes. The
+    single-molecule identity `pool == representative` is what D-96 established after the
+    `esters` lump's split identity produced a non-physical OAV; this pins it here.
+    """
+    (compound,) = [c for c in AROMA_COMPOUNDS["wine"] if c.pool == _MERCAPTAN_SPECIES]
+    assert compound.lumped is False
+    # The identity that makes the lump-composition question un-askable for this pool.
+    assert compound.pool == compound.representative == _MERCAPTAN_SPECIES
+    # The chemistry module knows it as a real molecule, so the weight is read, never assumed.
+    assert MOLAR_MASS[_MERCAPTAN_SPECIES] > 0.0
+    assert carbon_mass_fraction(_MERCAPTAN_SPECIES) > 0.0
+    # And the sensory layer resolves it by that same name — the drift the rename forecloses.
+    assert f"threshold_{_MERCAPTAN_SPECIES}_wine" in load_thresholds()
+
+
+def test_the_model_makes_no_thiol_but_this_one(store):
+    """WHY the lump was false, asserted rather than recited — the load-bearing half of D-110.
+
+    The retire rests on a claim about the whole model, not about this Process: *nothing produces
+    ethanethiol or any other thiol*, so a fixed-lump-composition caveat described a mixture the
+    mass balance never contained. Recited in prose that claim is unfalsifiable, so it is checked
+    against the state schema itself — if a future beat adds a second thiol pool, the pool really
+    does become a mixture again, and this fires to say the `lumped=False` flag is now a lie.
+
+    Deliberately checked over the SCHEMA rather than a curated list: a hardcoded list would pass
+    by construction and guard nothing (D-105's `4 + 1 == 5`).
+    """
+    schema = wine_schema()
+    # Thiols the wine literature attributes to reduction, none of which the model carries. This
+    # is the set the retired `mercaptans` plural implicitly claimed to contain.
+    other_thiols = {"ethanethiol", "propanethiol", "butanethiol", "benzenethiol", "furfurylthiol"}
+    present = other_thiols & set(schema.names)
+    assert not present, (
+        f"the model now carries a second thiol {sorted(present)} — the `methanethiol` pool is a "
+        "mixture again and its lumped=False flag (D-110) no longer tells the truth"
+    )
+    assert _MERCAPTAN_SPECIES in schema
 
 
 # -- tier: the new structural drop on N (the D-27 E parallel) ------------------
@@ -297,7 +355,7 @@ def test_zero_without_dead_biomass_or_amino_acids(params):
 def test_output_tier_is_speculative(store):
     schema = wine_schema()
     ps = ProcessSet(schema, [AutolyticMercaptan()])
-    assert ps.tier_of("mercaptans", store.tier_map()) is Tier.SPECULATIVE
+    assert ps.tier_of("methanethiol", store.tier_map()) is Tier.SPECULATIVE
 
 
 def test_is_the_first_autolysis_gated_n_writer(store):
@@ -349,7 +407,7 @@ def test_disabled_without_opt_in():
     compiled = compile_scenario(scenario, strict=True)
     assert "autolytic_mercaptan" not in {p.name for p in compiled.process_set.active}
     traj = compiled.run()
-    assert float(np.max(np.abs(traj.series("mercaptans")))) == 0.0
+    assert float(np.max(np.abs(traj.series("methanethiol")))) == 0.0
 
 
 def test_mercaptans_accumulate_post_dryness():
@@ -357,8 +415,8 @@ def test_mercaptans_accumulate_post_dryness():
     # deep post-dryness (the autolysis-refilled amino_acids feed the thiol; not flux-linked, so no
     # CO2 sweeps it). Reaches the sensory scale (methanethiol threshold ~2-3 µg/L).
     traj, _ = _run_autolysis(rate_per_h=2.0e-3, days=40.0)
-    merc = np.asarray(traj.series("mercaptans"))
-    assert_nonnegative(traj, ("mercaptans", "methionine"), atol=1e-12)
+    merc = np.asarray(traj.series("methanethiol"))
+    assert_nonnegative(traj, ("methanethiol", "methionine"), atol=1e-12)
     assert merc[-1] > 5.0e-6  # > 5 µg/L — a clear reductive signal above threshold
     i15 = int(np.argmin(np.abs(traj.t / 24.0 - 15.0)))
     assert merc[-1] > 1.5 * float(merc[i15]) > 0.0  # still rising well after dryness
@@ -377,4 +435,4 @@ def test_conserves_carbon_and_nitrogen_on_a_compiled_run():
     assert_conserved(
         traj, total_nitrogen(compiled.schema, biomass_nitrogen_fraction=f_n), label="nitrogen"
     )
-    assert float(np.asarray(traj.series("mercaptans"))[-1]) > 0.0  # it really did accumulate
+    assert float(np.asarray(traj.series("methanethiol"))[-1]) > 0.0  # it really did accumulate

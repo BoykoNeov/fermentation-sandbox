@@ -578,12 +578,16 @@ def wine_schema() -> StateSchema:
             "fractions, no longer catalytic; racked off with the other lees, decisions D-40/D-58)",
         ),
         VarSpec(
-            "mercaptans",
+            "methanethiol",
             "g/L",
             default=0.0,
-            description="lumped volatile thiols (methanethiol stand-in) — the carbon-bearing "
-            "reductive off-aroma. AutolyticMercaptan fills it as a yield on the autolysis flux, "
-            "drawing carbon from amino_acids and deaminating the nitrogen to N (Option A, D-45); "
+            description="methanethiol (CH3SH) — the carbon-bearing reductive off-aroma. Named for "
+            "the one molecule it contains since D-110: it was `mercaptans` through D-109, a plural "
+            "asserting a thiol MIXTURE the mass balance never held (nothing in the model makes "
+            "ethanethiol or any other thiol). AutolyticMercaptan fills it as a yield on the "
+            "autolysis flux, drawing carbon from methionine (D-100 — the actual sulfur-bearing "
+            "precursor, not the arginine lump) at demethiolation's real 1:1 stoichiometry, booking "
+            "the C4 co-product to alpha_ketobutyrate and deaminating the nitrogen to N (D-107); "
             "carbon-accounted as methanethiol, nitrogen-free. Copper-fined out by add_copper",
         ),
         VarSpec(

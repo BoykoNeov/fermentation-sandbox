@@ -10042,3 +10042,192 @@ that competition, so the paragraph held up as a virtue exactly what the model ha
 - The growth-linked excretion shape (D-49 option B); Pham's pH + ethanol terms; sotolon enantiomers; methionine's
   assimilation/sink + `methionol`; a peptide pool; variety-specific DMSp; retire the false `mercaptans` lump;
   sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking; the `oav` → `magnitude` rename.
+
+## D-110 — the last lump, retired: it was FALSE rather than coarse, the hedge outlived two real lumps, and only the test I was told to delete caught the bug
+
+**Owner picked the deferred-tail bucket; I narrowed to D-101's fully-scoped item: retire the false `mercaptans` lump
+(`→methanethiol`, `lumped=False`, replace the D-66 tripwire with a positive assertion). It is done, and it closes the
+D-66 lump-composition risk class** — `esters` speciated at D-96, `fusels` at D-99, `mercaptans` here. **No pool in the
+project is lumped any more.**
+
+**The rename moved no number, and that is measured rather than asserted:** a probe captured the full 84-slot state
+array for two wine runs (autolysis opted in; autolysis + `add_copper` fining) before and after, and the **raw arrays
+are byte-identical** (`max|diff| = 0.000e+00`, `np.array_equal` True), pool matching by name at 8.471529e-06 (plain)
+and 1.166841e-06 (copper). The copper path is not decorative in that probe — it bites, taking the pool from 7.28e-6
+down to 1.17e-6 — which matters because `add_copper` is the one verb that reaches the pool **by name** and would have
+failed silently on a missed lookup. Byte-for-byte is claimable (rather than only by-name equivalence) because
+`StateSchema` preserves **insertion order** — `self._specs = tuple(specs)` with a cursor walking in sequence, never
+sorted — so `mercaptans` → `methanethiol` could not shift an index. That was checked before it was relied on; had the
+schema sorted its names, the new slot would have landed among the `met*` cluster and every raw-index claim in this
+entry would have been false. **1168 passed, exit 0, nothing skipped or deselected** — 16/16 benchmarks among them, not
+beside them; HEAD collects 1165, so the beat adds a net 3 tests. ruff + mypy clean, 3/3 mutations caught.
+
+### Finding 1 — the lump was FALSE, not coarse, and that is the whole difference
+
+D-96 and D-99 **split real mixtures**. This retire splits nothing: the pool held **exactly one molecule under a plural
+name**. Every layer already named methanethiol — the yield, the `total_carbon` weight, the OAV threshold, the Stevens
+exponent, the precursor draw — and **nothing in the model produces ethanethiol or any other thiol**, so the
+fixed-lump-composition caveat described *a mixture the mass balance did not contain*. That is why the relabel was free:
+a rename that moves no number is only possible because the pool already *was* the compound.
+
+**A lump flag is a claim, and an over-cautious false one is still false.** The flag read as honest humility — the model
+conceding uncertainty — which is precisely why it survived D-45 → D-66 → D-96 → D-99 → D-109 while two *real* lumps
+were found and split around it. It bought no safety and cost a real name. **A hedge that names a nonexistent
+uncertainty is not caution; it is an error wearing modesty's clothes, and it is harder to see than an overclaim
+because it looks like the thing we reward.**
+
+The claim is now asserted rather than recited (`test_the_model_makes_no_thiol_but_this_one`), and checked **over the
+state schema** rather than a curated list — a hardcoded list would pass by construction and guard nothing (D-105's
+`4 + 1 == 5`). If a future beat adds a second thiol the pool *really does* become a mixture again, and the test fires
+to say `lumped=False` has become a lie. **Caught** by adding an `ethanethiol` slot.
+
+### Finding 2 — two source files asserted opposite things about one flag, and the one further from the chemistry was wrong
+
+`sensory/oav.py` said the lump was **true**: *"`lumped` since D-99 survives only on wine's `mercaptans`, where it is
+**true**: that pool really is several molecules read against one representative's threshold."* `core/kinetics/
+mercaptans.py` said it was **false**: *"the fixed-lump-composition caveat this pool carries describes a mixture the
+mass balance does not contain."* Both shipped, in the same repo, for eleven decisions.
+
+This needed **no literature to resolve** — only a reader willing to hold both files open (the D-105
+internal-contradiction shape, recurring). The module that owns the chemistry was right; the module one layer up, which
+consumes the flag, was wrong. **The direction is worth keeping: the file further from the mechanism is the one that
+drifts, because nothing it does fails when its prose goes stale.**
+
+### Finding 3 — the two band-widenings were advertised in prose and never applied to the numbers
+
+Retiring a lump is *not* automatically free, and this is where it could have cost something. Both of the pool's
+perceptual parameters justified their uncertainty bands **by the lump**:
+
+* `threshold_mercaptans_wine` — *"band widened for the fixed-lump-composition assumption"*
+* `stevens_n_mercaptans` — *"author's ignorance, **compounded**: this is a LUMPED pool (D-66), so the exponent is a
+  guess about a stand-in molecule for a mixture."*
+
+If those widenings were real, honesty demanded **narrowing both bands** and moving the D-24 ensemble — a genuine model
+change, not a relabel. They are not real. Measured against the file's own unlumped siblings:
+
+| parameter | value | band | relative | lumped? |
+|---|---|---|---|---|
+| `stevens_n_mercaptans` | 0.48 | 0.29–0.72 | **0.60× – 1.50×** | claimed yes |
+| `stevens_n_h2s` | 0.50 | 0.30–0.75 | **0.60× – 1.50×** | no |
+| `stevens_n_methional` | 0.55 | 0.33–0.80 | 0.60× – 1.45× | no |
+
+The exponent's band is the file's **default single-molecule width, identical to `stevens_n_h2s` to two decimals**. The
+"compounding" was never in the number. The threshold's 0.5×–3.3× is likewise **mid-pack** among unlumped siblings
+(`methional` 0.6–2.0×, `sotolon` 0.25–2.5×, `h2s` 0.63–9.4×). So no re-band is owed, and both notes now carry the
+**surviving, true** justification (panel/matrix spread — what every other threshold in the file cites).
+
+**This is a result, not a convenience, and the difference is the counterfactual:** the check was run to find out
+whether the retire cost a re-band, with the answer able to come back "yes". It came back no. Recording *why* it came
+back no — rather than quietly keeping numbers that happened to be fine — is the point, because "the reason changed but
+the number didn't" is exactly the shape a motivated edit takes. The prose claimed a caution the arithmetic never
+carried: **the same error as the lump itself, one file over, twice.**
+
+### Finding 4 — D-109's lesson recurring, in three more places
+
+The `AutolyticMercaptan` **class docstring** — the one a reader hits first — still described the *pre-D-100* Process:
+carbon drawn from the `amino_acids` lump, the gate on `aa/(K_amino_acids+aa)`, and *"arg N → `N`"*, a nitrogen released
+by **arginine**, a molecule with no sulfur that could not make a thiol. It also predated D-107 entirely, omitting the
+C4 co-product and the 1:1 draw. The module docstring, the `touches` note and **the code** were correct throughout.
+D-109 lost an `aging.py` docstring fix to its own harness and recorded that *every artifact a reviewer reads said the
+right thing while the source docstring still carried the overclaim*. **Same shape, three more sites**, found by reading
+rather than by tooling: the class docstring, `media.py`'s `VarSpec` description (*"drawing carbon from amino_acids"*),
+and `wine_generic.yaml`'s header — which **contradicts itself within four lines**, saying the draw is from
+`amino_acids` and then, in the next sentence, that it is methionine. All corrected. Attributed separately from the
+rename: it is a distinct defect that merely lived in the same file.
+
+### Finding 5 — the tripwire with two conflicting instructions, and the deletion that would have shipped a bug
+
+The D-66 test opened `assert lumped, "the lumped set should not be empty — mercaptans is still a lump"`, with a comment
+instructing that if a future decision split the last lump, *"the honest response is to DELETE this test"*. D-101, later
+and reasoning about **this exact retirement**, said replace it with a **positive assertion**. The instructions
+conflict; D-101 wins, and the reasoning is not seniority but content: **the D-66 rule is still true, it simply has no
+instances.** A rule with no instances is *dormant, not wrong*. So the assertion inverted rather than vanished
+(`assert not lumped`, naming the re-lump condition), and the caveat loop below it is left waiting.
+
+**The same question arose one file over and answered itself empirically.**
+`test_lumped_flag_propagates_from_the_dominant_contributor` used `mercaptans` as its only lumped example, so the retire
+removed its subject. Deleting it was tempting and would have been wrong; asserting `False is False` on a real
+trajectory would have been worse, since it passes no matter what the projector does. It now injects a **synthetic**
+lumped reading into an otherwise-real profile — only the one flag under test is fake — and pins that the axis follows
+the **dominant** contributor rather than any lump on the axis.
+
+**That choice was vindicated by mutation, not by taste.** Changing the projector to
+`lumped=any(profile.readings[p].lumped for p in axis.pools)` — ORing the flags instead of reading the winner's — is
+**invisible to every real trajectory in the project**, because with no lumps left `any(...)` and `dominant.lumped` are
+both permanently `False`. Only the synthetic test catches it, and it does. **Had I followed the test's own instruction
+to delete it, this beat would have shipped a live defect in the projector and a green suite saying otherwise.** The
+generalisation: *when the last instance of a rule disappears, the guard becomes unfalsifiable-by-real-data and
+therefore more valuable, not less — deletion is the one response that cannot be recovered from.*
+
+### The tooling: `pytest | tail` reported a false GREEN, and I nearly took it
+
+The mid-rename check ran `uv run pytest -q -x 2>&1 | tail -20`. The harness reported **exit code 0** while pytest had
+actually reported `1 failed, 296 passed`: **piping discards pytest's exit status and hands back `tail`'s.** The
+reassuring reading was available and wrong — the run was against a half-renamed tree and *should* have been red. Caught
+only because a green suite on a knowingly-broken tree is not believable, i.e. by the D-109 rule that a measurement
+agreeing with you deserves the suspicion. Every subsequent run in this beat redirects to a file and echoes `$?`
+directly. **D-109 named the mutation-harness/suite race; this is the same family — a cleanup or transport step between
+the measurement and the reader is a writer too, and `| tail` writes the exit code.**
+
+Relatedly, and by deliberate contrast with D-109: the mutation checks here were **hand-applied and hand-reverted**, never
+`git checkout -- src/`. That is the harness that ate D-109's fix, and this tree was dirty throughout.
+
+**And this entry nearly shipped the same error in its own headline.** The paragraph above was drafted while the suite
+was still running, and it read *"1165 → 1168 passed"* — a number I had **inferred from the diff** (net +3 test
+functions) and written in the past tense as though measured. Both figures happened to be right, which is the point:
+*the prediction was indistinguishable from the measurement precisely because it was correct*, and it would have entered
+the archive unmarked. The fix was cheap — the after-count came from the completed run (1168, exit 0), and the baseline
+from a `--collect-only` in a **throwaway detached worktree at HEAD** (1165), which is seconds rather than another
+15-minute suite and never puts the dirty working tree at risk (D-109's race, avoided by construction rather than by
+care). **A decision log's own numbers are subject to the standard it enforces on the model; "I could have derived it"
+is not "I measured it", and the tense hides which one you did.**
+
+### Scope: what did NOT rename, and why
+
+`copper_mercaptan_binding` **keeps its name**. Copper mercaptide precipitation `Cu²⁺ + 2 RSH → Cu(SR)₂(s) + 2 H⁺` is
+real class chemistry, general over thiols, and the parameter asserts **no lump** — the falseness being retired is the
+claim that the *pool* is a mixture, not the existence of the word "mercaptan". The same line divides the rest of the
+sweep: the identifier surface renamed (slot, `y_mercaptan`→`y_methanethiol`, `threshold_*`, `stevens_n_*`, the
+`AROMA_COMPOUNDS` key, the `total_carbon` weighting, every by-name lookup), while "mercaptans" as a **chemical-class
+noun** stands in prose and in this archive. A blind find-replace would have rewritten the historical record, which is
+the one thing a decision log may not do.
+
+One consequence worth naming: slot name and species name are now **one string**, so
+`w[schema.slice("methanethiol")] = carbon_mass_fraction("methanethiol")` is the identity every single-molecule pool
+shows. The weighting can no longer drift from the pool it weights **by omission** — only by a deliberate edit.
+
+### The sweep was unfiltered, and it found six more sites
+
+Per D-101/D-108 (*any narrowing is a scope limit, and the narrower it is the more it looks like diligence*), the grep
+ran across `src/`, `tests/`, `docs/`. **A rename that leaves the false claim standing in six other files is not a
+retire.** Found and corrected: `chemistry.py` (methanethiol as *"the representative species for the lumped mercaptans
+pool ... the honest single-species stand-in"* — the wrong idiom, since a stand-in names a mixture it approximates and
+there was none); `byproducts.py` (*"`mercaptans` is now the last lumped pool in the project"*); `oav.py`'s module
+header (*"`fusels`/`mercaptans` are single g/L pools mixing several molecules"* — **also stale on `fusels`, split at
+D-99**); `sensory.yaml`'s LUMPED POOLS header (*"a single g/L pool that really mixes several molecules"* — the false
+claim in its most direct form) and the DMS note; and the milestone plan's compound table.
+
+### Also recorded, not fixed
+
+- **`chemistry.py` appears to carry the same stale-lump prose for the Brett phenols**: `M_ETHYLPHENOL` is documented as
+  *"the representative species for the lumped **ethylphenols** end-product pool (4-ethylphenol + 4-ethylguaiacol;
+  decision D-40)"*, and `M_VINYLPHENOL` likewise — but `ethylguaiacols`/`vinylguaiacols` are **their own slots with
+  their own carbon weights** (`carbon_mass_fraction("ethylguaiacol")`), read against their own thresholds and flagged
+  `lumped=False`, since the D-55 split. So the parentheticals name a molecule the pool no longer contains. **Flagged,
+  not fixed**: it is a different decision's prose, and asserting it stale rests on reading the pools, not on having
+  read D-55 in full — which is exactly the standard this entry spent five findings defending. It was **load-bearing
+  enough to check anyway**, because if those pools were still real lumps the headline claim "no pool is lumped" would
+  be an overclaim; they are not, and it is not.
+- The `lumped` flag and machinery are **kept**, dormant. Removing them would delete the D-66 contract along with its
+  last instance — the Finding-5 error, one layer up.
+
+### Next
+
+- Unchanged from D-109: **the fusel-side keto-acid node** (the scoped milestone — algebraic partitions in the sourcing
+  layer, never the producer); **closure O₂ ingress**, still load-bearing on the sotolon headline; **acetaldehyde
+  generation during maturation** + the 0-vs-2.7 unsulfited floor.
+- The deferred tail, now one item shorter: the growth-linked excretion shape (D-49 option B); Pham's pH + ethanol
+  terms; sotolon enantiomers; methionine's assimilation/sink + `methionol`; a peptide pool; variety-specific DMSp;
+  sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking (blocked on `cos-alpha`); the `oav` →
+  `magnitude` rename.
+- **New:** the D-55 Brett-phenol prose above.

@@ -45,7 +45,7 @@ WINE_BRETT_SLOTS = (
     "X_brett", "X_brett_dead",
 )  # fmt: skip
 # The carbon-bearing volatile-thiol pool AutolyticMercaptan fills (decision D-45), appended last.
-WINE_MERCAPTAN_SLOTS = ("mercaptans",)
+WINE_MERCAPTAN_SLOTS = ("methanethiol",)
 # The excreted keto-acid overflow pools (decisions D-49, D-50), appended last: pyruvate then
 # alpha-ketoglutarate, the second- and third-strongest SO₂-binding carbonyls after acetaldehyde.
 # alpha_ketobutyrate (D-107) is the THIRD, and the only one with a consumer: it is the C4 half of

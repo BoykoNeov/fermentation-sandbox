@@ -29,10 +29,13 @@ threshold's own tier: the sensory *mapping itself* is the canonical speculative 
 :class:`~fermentation.core.tiers.Tier` docstring names "sensory mapping"), so the floor must
 hold even if a threshold were later mislabelled plausible. See :func:`oav_tier`.
 
-**The lumped-pool call (D-66, narrowed at D-96).** ``fusels``/``mercaptans`` are single g/L
-pools mixing several molecules; each is read against the threshold of one **named
-representative** (the stand-in its ``VarSpec`` already names), with the "assumes fixed lump
-composition" honesty cost flagged in that threshold's provenance ``notes``. The
+**The lumped-pool call (D-66) is now MOOT: no pool is lumped (D-96 → D-99 → D-110).** This
+paragraph described ``fusels``/``mercaptans`` as single g/L pools mixing several molecules, each
+read against one **named representative**, with the "assumes fixed lump composition" honesty cost
+flagged in that threshold's provenance ``notes``. ``fusels`` was speciated at D-99 (so that half
+had been stale since), and ``mercaptans`` — the last — at D-110, where the flag proved **false**
+rather than merely coarse: the pool held one molecule and is now named for it. The machinery below
+survives for any future lump; it simply binds nothing today. The
 single-molecule pools (diacetyl, acetaldehyde, H₂S, 4-EP, 4-EG, and since D-96 the three
 esters) carry no such assumption.
 
@@ -106,8 +109,18 @@ class AromaCompound:
 #: the apple/pineapple ethyl ester of a medium-chain fatty acid — added at D-96 so splitting the
 #: lump did not narrow the fruity axis to banana alone.
 #:
-#: ``lumped`` since D-99 survives only on wine's ``mercaptans``, where it is **true**: that pool
-#: really is several molecules read against one representative's threshold. It is the last one.
+#: **``lumped`` is now FALSE for every pool in the project (decision D-110), and this comment used
+#: to say the opposite.** Through D-109 it read: *"lumped since D-99 survives only on wine's
+#: ``mercaptans``, where it is **true**: that pool really is several molecules read against one
+#: representative's threshold. It is the last one."* The first half was right — it *was* the last
+#: one — but **"where it is true" was false, and the module that owned the pool said so**:
+#: :mod:`~fermentation.core.kinetics.mercaptans` recorded that nothing in the model produces
+#: ethanethiol or any other thiol, so the lump described a mixture the mass balance did not
+#: contain. Two source files asserted opposite things about one flag, and the one further from the
+#: chemistry is the one that got it wrong (the D-105 internal-contradiction shape: the argument
+#: needed no literature, only a reader willing to hold both files open). The pool is
+#: ``methanethiol`` and ``lumped=False`` since D-110; ``esters`` was speciated at D-96, ``fusels``
+#: at D-99, and the D-66 lump-composition risk class **closes here**.
 #:
 #: **The fusel lump left at D-99** and the shape of its error is worth contrasting with the
 #: esters' above. It had no split identity — weighted as isoamyl alcohol *and* read against
@@ -167,7 +180,7 @@ _FUSELS_WINE_THRESHOLD_ONLY: tuple[AromaCompound, ...] = (
 _WINE_ONLY: tuple[AromaCompound, ...] = (
     AromaCompound("ethylphenols", "4-ethylphenol", "horse-sweat / barnyard", lumped=False),
     AromaCompound("ethylguaiacols", "4-ethylguaiacol", "clove / smoky", lumped=False),
-    AromaCompound("mercaptans", "methanethiol", "reductive / drains", lumped=True),
+    AromaCompound("methanethiol", "methanethiol", "reductive / drains", lumped=False),
     AromaCompound("methional", "methional", "cooked potato / oxidative", lumped=False),
     AromaCompound("phenylacetaldehyde", "phenylacetaldehyde", "honey / floral", lumped=False),
     AromaCompound("2_methylbutanal", "2-methylbutanal", "malty / almond", lumped=False),

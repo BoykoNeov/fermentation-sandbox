@@ -234,12 +234,16 @@ M_SO2 = 1 * _M_S + 2 * _M_O
 #: weight) and for the deferred CO₂-stripping volatilization sink; the v1 production kinetics
 #: work in g/L directly and need no molar conversion.
 M_H2S = 2 * _M_H + 1 * _M_S
-#: Methanethiol (methyl mercaptan), CH3SH ≡ CH4S — the representative species for the lumped
-#: **mercaptans** (volatile thiol) pool (decision D-45). Methanethiol is the dominant "reduction"
-#: thiol (cooked-cabbage / rotten, sensory threshold ~2–3 µg/L; its onion/rubber sibling is
-#: ethanethiol), the honest single-species stand-in for the pool — the
-#: p-coumaric-for-``hydroxycinnamics`` idiom (D-40). **Unlike H₂S it carries
-#: carbon** (one C), so — registered with 1 carbon below — the ``mercaptans`` pool sits on
+#: Methanethiol (methyl mercaptan), CH3SH ≡ CH4S — the molecule the **``methanethiol``** pool IS
+#: (decisions D-45/D-110). Methanethiol is the dominant "reduction" thiol (cooked-cabbage /
+#: rotten, sensory threshold ~2–3 µg/L; its onion/rubber sibling, ethanethiol, is real chemistry
+#: the model does NOT carry). Through D-109 the pool was the plural ``mercaptans`` and this note
+#: called methanethiol its "representative species ... the honest single-species stand-in" — the
+#: p-coumaric-for-``hydroxycinnamics`` idiom (D-40). **That was the wrong idiom**: a stand-in
+#: names a mixture it approximates, and there was no mixture — no Process makes any thiol but this
+#: one. D-110 renamed the pool to the compound, so this is not a representative of anything; it is
+#: the pool's own molecule. **Unlike H₂S it carries
+#: carbon** (one C), so — registered with 1 carbon below — the ``methanethiol`` pool sits on
 #: ``total_carbon`` (contrast the carbon-free ``h2s``/SO₂). Nitrogen-free: methanethiol has no N,
 #: so the autolytic-thiol Process (:class:`~fermentation.core.kinetics.mercaptans.\
 #: AutolyticMercaptan`) **deaminates** the **methionine** nitrogen it draws back to the ``N`` pool
