@@ -982,6 +982,75 @@ def test_maillard_raises_the_thermal_oavs():
     assert float(oav_series(sweet.as_trajectory(), thresholds, "phenylacetaldehyde")[-1]) > 1.0
 
 
+def _dry_sotolon_ugl(interventions: list[Intervention], *, aging_days: float = 730.0) -> float:
+    """End-of-aging sotolon (µg/L) for a DRY sur-lie wine under the given interventions."""
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), *interventions],
+            amino_acids_gpl=0.8,
+            autolysis_rate_per_h=_SUR_LIE_RATE,
+            brix=24.0,
+            aging_celsius=20.0,
+            duration_days=_FERMENT_DAYS + aging_days,
+        )
+    )
+    cs.process_set.disable(FuselAminoAcidReroute.name)
+    traj = cs.run()
+    assert traj.success
+    return float(traj.series("sotolon")[-1]) * 1e6
+
+
+def test_so2_protects_a_dry_wine_from_sotolon_instead_of_causing_it():  # noqa: E501
+    """THE D-108 FIX, END TO END — and the direction is the whole assertion.
+
+    Before D-108 :class:`SotolonAldolCondensation` read the TOTAL acetaldehyde slot, so dosing SO₂
+    — which *strands* acetaldehyde by protecting it from ADH (D-47) — made a dry wine produce MORE
+    sotolon: measured 0.025 → 5.02 µg/L at 60 mg/L must SO₂, a 200× rise clearing the perception
+    threshold. That is backwards: the bisulfite adduct's carbonyl is blocked, so it cannot undergo
+    the aldol at all, and Pons *et al.* have LOW free SO₂ as the *prémox risk factor*.
+
+    **This is the regime nothing tested.** The pre-D-108 code moved this observable by 85× and all
+    1152 tests stayed green — sotolon under SO₂ had no coverage anywhere (the D-105 tripwire
+    lesson: the guard existed at the layer nobody drove).
+    """
+    unsulfited = _dry_sotolon_ugl([])
+    sulfited = _dry_sotolon_ugl([_add_so2(0.0, 60.0)])
+    # Both are far sub-threshold in a SEALED dry wine, which is the point — neither smells of
+    # curry. The claim under test is that SO₂ does not manufacture sotolon out of the protection
+    # it provides: the pre-D-108 code put `sulfited` at 5.02 µg/L, at threshold.
+    assert sulfited < 1.0
+    assert unsulfited < 1.0
+
+
+def test_so2_protection_erodes_as_oxygen_consumes_it_which_is_pons_premox():  # noqa: E501
+    """THE EMERGENT PAYOFF (decision D-108): sotolon rises as free SO₂ fades. Nothing scripted.
+
+    D-108's free-read composed with :class:`SulfiteOxidation` (D-72) reproduces Pons' actual prémox
+    mechanism without a single new parameter: O₂ both *drives* the acetaldehyde (D-71) and *eats*
+    the SO₂ that was suppressing the aldol, so a sulfited wine is protected while its SO₂ lasts and
+    goes prémox as it goes.
+
+    This test also pins the correction of a claim D-108 first got wrong: the entry initially called
+    ``so2_total`` permanent, on a probe measuring 60.0000 mg/L at day 729 — which had dosed **no
+    O₂**, the substrate :class:`SulfiteOxidation` needs. It measured a sealed bottle and read it as
+    a property of the slot (D-106's vacuous-measurement lesson, one beat later).
+    """
+    # Protection is real at a moderate O₂ dose: the sulfited wine makes LESS sotolon than the
+    # unsulfited one exposed to the same oxygen.
+    assert _dry_sotolon_ugl(
+        [_add_so2(0.0, 60.0), _add_oxygen(_FERMENT_DAYS, 5.0)]
+    ) < _dry_sotolon_ugl([_add_oxygen(_FERMENT_DAYS, 5.0)])
+    # …and it ERODES: more O₂ ⇒ more SO₂ consumed ⇒ more free carbonyl ⇒ monotonically more
+    # sotolon, all with the SAME SO₂ dose. This is the prémox trajectory.
+    ladder = [
+        _dry_sotolon_ugl([_add_so2(0.0, 60.0), *([_add_oxygen(_FERMENT_DAYS, o2)] if o2 else [])])
+        for o2 in (0.0, 5.0, 20.0, 60.0)
+    ]
+    assert ladder == sorted(ladder)
+    assert ladder[0] < 1.0  # sealed + sulfited: protected, sub-threshold
+    assert ladder[-1] > 5.0  # heavily oxidised: protection spent, sotolon perceptible
+
+
 def test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciated():
     """THE D-100 TRIPWIRE, FLIPPED (decision D-100; supersedes the D-99 known-limitation pin).
 

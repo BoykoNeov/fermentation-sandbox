@@ -22,7 +22,13 @@ import numpy as np
 import pytest
 
 from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
-from fermentation.core.acidbase import bisulfite_so2_at_ph, ph_of_state
+from fermentation.core.acidbase import (
+    bisulfite_so2_at_ph,
+    build_pka_map,
+    free_acetaldehyde,
+    ph_of_state,
+    solve_cation_charge,
+)
 from fermentation.core.chemistry import (
     CARBON_ATOMS,
     M_2_METHYLBUTANAL,
@@ -32,11 +38,13 @@ from fermentation.core.chemistry import (
     M_ALPHA_KETOBUTYRATE,
     M_CO2,
     M_ETHANOL,
+    M_MALIC,
     M_METHIONAL,
     M_O2,
     M_PHENYLACETALDEHYDE,
     M_SO2,
     M_SOTOLON,
+    M_TARTARIC,
     carbon_mass_fraction,
     nitrogen_mass_fraction,
 )
@@ -81,6 +89,7 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import Trajectory, simulate
+from fermentation.units.convert import mgl_to_gpl
 from fermentation.validation import (
     assert_conserved,
     assert_nonnegative,
@@ -1909,6 +1918,163 @@ def test_sotolon_aldol_tier_floored_at_speculative(maillard_store):
     for pool in ("sotolon", "alpha_ketobutyrate", "acetaldehyde"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, maillard_store.tier_map()) is Tier.SPECULATIVE
+
+
+# -------------------------------------------------------------------------------------
+# D-108: the aldol reads FREE acetaldehyde, not total. SO₂-bound acetaldehyde is the
+# bisulfite adduct — its carbonyl is BLOCKED, and an aldol condensation IS a nucleophilic
+# attack on that carbonyl, so the adduct cannot condense. Identical to the argument
+# AcetaldehydeBridging (D-80) and the tannin polymerization already make for the ethylidene
+# bridge, and AcetaldehydeReduction (D-47) for ADH. D-107 read the TOTAL slot while its
+# docstring claimed it "reads the pool the binding depletes" — but `free = total − bound` is
+# a derived overlay and the binding depletes nothing, so SO₂ came out RAISING sotolon.
+# NOTE these are the FIRST tests of sotolon under SO₂ at all: the pre-D-108 code moved
+# sulfited sotolon by 85× and all 1152 tests stayed green (the D-105 tripwire lesson).
+# -------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def aldol_so2_store():
+    # thermal.yaml (k_sotolon_aldol / E_a) + acidbase.yaml (pKas + the D-51 binding constants
+    # free_acetaldehyde reads) + wine_generic.yaml. The plain maillard_store omits acidbase.
+    return load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "thermal.yaml",
+        default_data_dir() / "acidbase.yaml",
+    )
+
+
+@pytest.fixture
+def aldol_so2_params(aldol_so2_store):
+    return aldol_so2_store.resolve()
+
+
+def _aldol_sulfitable(
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    so2_mgl: float,
+    acetaldehyde_mgl: float = 50.0,
+) -> FloatArray:
+    """An aging wine at pH ~3.4 with α-ketobutyrate, acetaldehyde and (maybe) SO₂ dosed."""
+    tartaric, malic = 6.0, 3.0
+    totals = {"tartaric": tartaric / M_TARTARIC, "malic": malic / M_MALIC, "lactic": 0.0}
+    cation = solve_cation_charge(totals, 0.0, build_pka_map(params), 3.4)
+    y = schema.zeros()
+    y[schema.slice("T")] = 298.15
+    y[schema.slice("tartaric")] = tartaric
+    y[schema.slice("malic")] = malic
+    y[schema.slice("cation_charge")] = cation
+    y[schema.slice("alpha_ketobutyrate")] = 2.0e-3
+    y[schema.slice("acetaldehyde")] = mgl_to_gpl(acetaldehyde_mgl)
+    if so2_mgl > 0.0:
+        y[schema.slice("so2_total")] = mgl_to_gpl(so2_mgl)
+    return y
+
+
+def _sotolon_rate(schema: StateSchema, params: Mapping[str, float], y: FloatArray) -> float:
+    d = SotolonAldolCondensation().derivatives(0.0, y, schema, params)
+    return float(d[schema.slice("sotolon")][0])
+
+
+def test_unsulfited_aldol_is_byte_for_byte_the_total_acetaldehyde_form(aldol_so2_params):
+    # The `so2_total > 0` guard is EXACT: with no SO₂ the rate reads the TOTAL pool (free ==
+    # total), no per-RHS pH brentq is paid, and the Process is byte-for-byte the D-107 code.
+    # This is why every output D-107 measured — all of them unsulfited — is unmoved by D-108.
+    schema = wine_schema()
+    y = _aldol_sulfitable(schema, aldol_so2_params, so2_mgl=0.0)
+    ph = ph_of_state(y, schema, aldol_so2_params)
+    total = float(y[schema.slice("acetaldehyde")][0])
+    assert free_acetaldehyde(y, schema, aldol_so2_params, ph) == pytest.approx(total)
+    # Written from the CHEMISTRY (Pham's bimolecular aldol), not re-derived from the code —
+    # D-107 lesson (iv): the same arithmetic twice cannot find an error in itself.
+    f_t = arrhenius_factor(
+        298.15, aldol_so2_params["E_a_maillard_strecker"], aldol_so2_params["T_ref"]
+    )
+    n_expected = (
+        aldol_so2_params["k_sotolon_aldol"]
+        * f_t
+        * (2.0e-3 / M_ALPHA_KETOBUTYRATE)
+        * (total / M_ACETALDEHYDE)
+    )
+    assert _sotolon_rate(schema, aldol_so2_params, y) == pytest.approx(n_expected * M_SOTOLON)
+
+
+def test_so2_throttles_the_aldol_to_the_free_share(aldol_so2_params):
+    # THE D-108 FIX. Bound acetaldehyde has no free carbonyl ⇒ it cannot condense ⇒ dosing SO₂
+    # must LOWER the sotolon rate, in proportion to free/total. Before D-108 this ran backwards:
+    # SO₂ strands acetaldehyde (D-47 protects it from ADH), the rate read the swollen TOTAL, and
+    # a sulfited dry wine made MORE sotolon — against Pons, for whom low free SO₂ is the prémox
+    # RISK factor.
+    schema = wine_schema()
+    y_clean = _aldol_sulfitable(schema, aldol_so2_params, so2_mgl=0.0)
+    y_comparable = _aldol_sulfitable(schema, aldol_so2_params, so2_mgl=60.0)
+    y_excess = _aldol_sulfitable(schema, aldol_so2_params, so2_mgl=400.0)
+    r_clean = _sotolon_rate(schema, aldol_so2_params, y_clean)
+    r_comparable = _sotolon_rate(schema, aldol_so2_params, y_comparable)
+    r_excess = _sotolon_rate(schema, aldol_so2_params, y_excess)
+    assert r_clean > 0.0
+    assert r_comparable < r_clean  # the DIRECTION is the whole point: SO₂ protects
+    assert r_excess < r_comparable  # more SO₂ ⇒ less sotolon, monotone
+    assert r_excess < 0.02 * r_clean  # SO₂ ≫ acetaldehyde ⇒ ~no free carbonyl left to condense
+    # Pin the rate to the free-acetaldehyde readout exactly (the D-47 assertion shape).
+    ph = ph_of_state(y_comparable, schema, aldol_so2_params)
+    free = free_acetaldehyde(y_comparable, schema, aldol_so2_params, ph)
+    f_t = arrhenius_factor(
+        298.15, aldol_so2_params["E_a_maillard_strecker"], aldol_so2_params["T_ref"]
+    )
+    n_expected = (
+        aldol_so2_params["k_sotolon_aldol"]
+        * f_t
+        * (2.0e-3 / M_ALPHA_KETOBUTYRATE)
+        * (free / M_ACETALDEHYDE)
+    )
+    assert r_comparable == pytest.approx(n_expected * M_SOTOLON)
+
+
+def test_the_aldol_draw_debits_TOTAL_acetaldehyde_even_though_the_rate_reads_free(aldol_so2_params):
+    """The D-47 idiom, and the half that keeps carbon closing (decision D-108).
+
+    Only the RATE reads the free share. The DRAW still debits the ``acetaldehyde`` slot — which
+    holds the TOTAL — because consuming free acetaldehyde removes it from the total and the
+    binding equilibrium then re-splits what is left. Booking the draw against a derived "free
+    pool" instead would debit a quantity that is not a state slot, and carbon would stop closing
+    on the atom counts. So the 1:1:1 mole relation must survive SO₂ untouched.
+    """
+    schema = wine_schema()
+    y = _aldol_sulfitable(schema, aldol_so2_params, so2_mgl=60.0)
+    d = SotolonAldolCondensation().derivatives(0.0, y, schema, aldol_so2_params)
+    n_sot = float(d[schema.slice("sotolon")][0]) / M_SOTOLON
+    assert n_sot > 0.0
+    # 1 mol of each substrate per mol of sotolon — unchanged under SO₂ (4 + 2 == 6 still closes).
+    assert float(d[schema.slice("alpha_ketobutyrate")][0]) == pytest.approx(
+        -n_sot * M_ALPHA_KETOBUTYRATE
+    )
+    assert float(d[schema.slice("acetaldehyde")][0]) == pytest.approx(-n_sot * M_ACETALDEHYDE)
+
+
+def test_the_aldol_asymptotes_toward_zero_under_excess_so2_but_never_reaches_it(aldol_so2_params):
+    """The end of the ladder is an ASYMPTOTE, not a hard zero — and this test first claimed a zero.
+
+    The binding is an equilibrium (``free = total − bound`` off the D-51 split), so ``bound`` stays
+    below ``total`` and a vanishing free share survives however much SO₂ is dosed: at **5000 mg/L
+    SO₂ against
+    1 mg/L acetaldehyde**, ``free_acetaldehyde`` still returns ~2e-8 g/L. This test originally
+    asserted ``free <= 0`` and an exactly-zero derivative — a hard zero the chemistry cannot make.
+    So the ``acetaldehyde <= 0.0`` early-return in the Process is a **defensive mirror** of the D-47
+    idiom rather than a reachable branch, and is documented as such rather than claimed as coverage.
+
+    What IS true, and is what a sulfited wine actually does, is asserted instead: the rate is driven
+    arbitrarily close to zero, and stays strictly positive.
+    """
+    schema = wine_schema()
+    y = _aldol_sulfitable(schema, aldol_so2_params, so2_mgl=5000.0, acetaldehyde_mgl=1.0)
+    ph = ph_of_state(y, schema, aldol_so2_params)
+    free = free_acetaldehyde(y, schema, aldol_so2_params, ph)
+    assert 0.0 < free < 1.0e-6  # vanishing, but an equilibrium never gives it up entirely
+    y_clean = _aldol_sulfitable(schema, aldol_so2_params, so2_mgl=0.0, acetaldehyde_mgl=1.0)
+    r_excess = _sotolon_rate(schema, aldol_so2_params, y)
+    assert 0.0 < r_excess < 1.0e-4 * _sotolon_rate(schema, aldol_so2_params, y_clean)
 
 
 # =====================================================================================

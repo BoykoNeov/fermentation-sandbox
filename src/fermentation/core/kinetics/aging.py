@@ -1291,8 +1291,48 @@ class SotolonAldolCondensation(Process):
     sotolon *because* it made more acetaldehyde. That is Pons' prémox mechanism falling out of a
     rate law written from Pham's chemistry, and it is measured (D-107), not asserted. The same term
     covers vin jaune, where the flor's very high acetaldehyde is why 6 years under veil reaches
-    120–268 µg/L (Pham). SO₂ also enters correctly for free: it binds acetaldehyde (D-47), and this
-    Process reads the pool the binding depletes.
+    120–268 µg/L (Pham).
+
+    **SO₂ — READS FREE, NOT TOTAL (decision D-108, correcting D-107).** D-107 claimed here that "SO₂
+    also enters correctly for free: it binds acetaldehyde (D-47), and this Process reads the pool
+    the binding depletes". **That sentence was false and the code matched the sentence, not the
+    chemistry.** The binding depletes *nothing*: the ``acetaldehyde`` slot holds TOTAL acetaldehyde
+    and :func:`~fermentation.core.acidbase.free_acetaldehyde` derives the free share as
+    ``free = total − bound`` — a read-only overlay on the D-51 equilibrium. So the rate read the
+    total, *including the bound share*, and SO₂ — which strands acetaldehyde by protecting it from
+    ADH — came out **raising** sotolon: measured, a dry wine dosed 60 mg/L SO₂ in the must went
+    0.025 → 5.02 µg/L, a 200× rise to threshold. Reality runs the other way (Pons: low free SO₂ is
+    the *prémox risk factor*). The adduct's carbonyl is blocked and an aldol **is** a nucleophilic
+    attack on that carbonyl — the same argument :class:`AcetaldehydeBridging` (D-80) and the tannin
+    polymerization already make for the ethylidene bridge, and :class:`~fermentation.core.kinetics.
+    acetaldehyde.AcetaldehydeReduction` (D-47) makes for ADH. **This Process was the only reader of
+    that pool in the file getting it wrong, and the file already carried the argument three times.**
+    No literature was needed to convict — only the sibling Processes (the D-105 internal-
+    contradiction shape).
+
+    **THE SECOND EMERGENT PAYOFF — PONS' PRÉMOX MECHANISM ITSELF, AND IT ARRIVED BY CORRECTING A
+    CLAIM THIS ENTRY FIRST GOT WRONG (D-108).** The suppression above is *not* permanent, and the
+    first draft of this docstring said it was: ``so2_total`` looked like a conserved slot because a
+    60 mg/L must dose measured **60.0000 mg/L at day 729** — but that probe dosed **no O₂**, and
+    :class:`SulfiteOxidation` (which consumes ``so2_total``) needs O₂ as its substrate. It measured
+    a sealed bottle and read that as a property of the slot: **a vacuous measurement that agreed
+    with me** (D-106's lesson, one beat later). Dosed with O₂ the SO₂ *does* deplete, and sotolon
+    recovers as it goes — measured, dry + 60 mg/L must SO₂, O₂ 0/5/20/60 mg/L::
+
+        SO₂ end   60.000 → 44.597 → 30.369 → 24.508  mg/L
+        sotolon    0.059 →  0.121 →  2.113 →  7.639  µg/L   (unsulfited: 0.025 → … → 7.837)
+
+    So the model now says what Pons says: **a sulfited wine is protected while its SO₂ lasts, and
+    goes prémox as the free SO₂ fades** — the protection is real at 5 mg/L O₂ (0.121 vs the
+    unsulfited 0.677) and gone by 60 (7.639 vs 7.837), because the O₂ that drives the sotolon has
+    eaten the SO₂ that was suppressing it. Nothing scripted; it is D-108's free-read composed with
+    D-72's oxidation. **The real bound is one layer out and is NOT this Process's**: a *sealed* wine
+    here has strictly zero O₂ ingress (no closure permeation — the same gap D-102 named for DMS
+    leaving through the closure), so a sealed sulfited bottle never ages toward prémox at all. That
+    is the limitation to state, not "SO₂ is permanent", which was false. At O₂ = 0 the sulfited wine
+    sits marginally *above* the unsulfited one (0.059 vs 0.025) — both far sub-threshold — because
+    SO₂ stranded acetaldehyde that ADH would otherwise have cleared, and a small free share of it
+    condenses. That is the D-47 protection showing through, not a residue of the D-107 bug.
 
     **Isolability is EXACT and it is why this is mass-action rather than gated.** The rate is the
     product of its two substrates, so a ProcessSet without ``_KETO_ACID_PROCESSES`` leaves
@@ -1322,24 +1362,25 @@ class SotolonAldolCondensation(Process):
     energy to look precise is exactly the E_a D-101 fabricated and D-102 had to retract. Re-sourcing
     it is a parameter-file change, not a structural one.
 
-    **A LOAD-BEARING DEPENDENCY ON A KNOWN DEFECT — read this before changing D-27 (decision
-    D-107).** Measured: a **dry** wine ends aging with ``acetaldehyde ≈ 0.0`` mg/L, a **sweet** one
-    with **32.9**. :class:`~fermentation.core.kinetics.acetaldehyde.AcetaldehydeReduction` (D-27) is
-    no-flux and viable-``X``-gated, so a dry ferment that finishes with living yeast reduces its
-    acetaldehyde away entirely, while a sweet one arrests by ethanol inactivation and freezes it.
-    **Real dry whites hold ~30 mg/L**, so that zero is a pre-existing artifact — and this Process
-    has
-    just made it load-bearing. Sotolon's sweet-vs-dry separation no longer comes from sugar; it
-    comes
-    from *acetaldehyde*. The dry arm makes 0.025 µg/L not because sotolon needs sugar but because
-    the
-    model's dry wine has no acetaldehyde. The outputs read as good correspondence (an ordinary dry
-    white under good closure really has no sotolon; prémox really is oxidative), but one leg of that
-    is **right for the wrong reason**: correct the acetaldehyde baseline and a dry sealed wine will
-    make ~sweet-level sotolon (both carry ~2 mg/L α-ketobutyrate × ~30 mg/L acetaldehyde),
-    collapsing
-    the separation. A fix to D-27 is therefore silently a change to the aging aroma headline, and
-    must re-examine this route rather than only that one.
+    **D-107'S "LOAD-BEARING DEPENDENCY ON D-27" WAS A COMMENSURABILITY ERROR — RETIRED, MEASURED
+    (decision D-108).** D-107 warned here that the dry arm's ``acetaldehyde ≈ 0.0`` mg/L was a D-27
+    artifact because **"real dry whites hold ~30 mg/L"**, and that correcting D-27 would collapse
+    the sweet-vs-dry separation. **The ~30 mg/L is a SULFITED figure and every run behind that
+    warning was UNSULFITED.** Against the like-for-like target the model is nearly right: an
+    unsulfited white really ends at **2.7 mg/L** (Herzan *et al.* 2020, Food Sci. Nutr.
+    8:5850–5859, **PMC7684598**, Table 1, variant (0/0/0) — no SO₂ at any of must / maturation /
+    bottling), and finished-wine acetaldehyde is driven by the **SO₂ regime**, not by the ADH gate
+    — 2.7 → 6.5 → 17.2 → 25.9 → 51.6 mg/L as SO₂ is added, the paper concluding that to minimise
+    acetaldehyde "it is recommended to exclude the use of SO₂". The model
+    already carries that driver (D-47) and reproduces the ladder: dosed 60 mg/L in the must it
+    strands **22.9 mg/L** against that study's 17.2. **D-27 is acquitted on the gate.** Its residual
+    0.0-vs-2.7 floor is a real but small miss, named here and deliberately not patched — inventing a
+    constant to hit 2.7 buys nothing observable (sotolon is sub-threshold either way), which is
+    D-107's own lesson (v). The corrected sweet figure is **38.066**, not the 32.9 D-107 recorded.
+    ⚠ **The separation is fragile for a different reason, and it is not latent — it is LIVE**: the
+    collapse D-107 predicted for some future D-27 fix is reachable **today** by dosing SO₂, which
+    every real winemaker does. That is what D-108 fixed above, and it was this Process's bug, not
+    D-27's.
 
     **Scope — named, not hidden.** (1) Pham also measures sotolon rising with **decreasing pH** and
     **decreasing ethanol**; neither term is here, and the model has both quantities, so this is a
@@ -1384,6 +1425,20 @@ class SotolonAldolCondensation(Process):
         # defensive guard: the clamps only absorb solver undershoot.
         if keto <= 0.0 or acetaldehyde <= 0.0:
             return d
+        # SO₂-BOUND ACETALDEHYDE CANNOT CONDENSE (decision D-108, the D-47/D-80 precedent). The
+        # `acetaldehyde` slot holds TOTAL acetaldehyde — `free_acetaldehyde` derives the free share
+        # from the D-51 equilibrium (`free = total − bound`); the binding does NOT deplete the slot.
+        # The adduct's carbonyl is blocked, and an aldol condensation IS a nucleophilic attack on
+        # that carbonyl — the identical argument AcetaldehydeBridging (D-80) and the tannin
+        # polymerization already make for the ethylidene bridge, and AcetaldehydeReduction (D-47)
+        # for ADH. The RATE reads free; the DRAW below still debits the total slot (consuming free
+        # acetaldehyde removes it from the total and the equilibrium re-splits) — the D-47 idiom.
+        # The guard is EXACT: an unsulfited run pays no per-RHS pH `brentq` and is byte-for-byte the
+        # D-107 total-acetaldehyde case, so every output D-107 measured is unmoved.
+        if SO2_STATE_KEY in schema and float(y[schema.slice(SO2_STATE_KEY)][0]) > 0.0:
+            acetaldehyde = free_acetaldehyde(y, schema, params, ph_of_state(y, schema, params))
+            if acetaldehyde <= 0.0:  # all acetaldehyde bound ⇒ no free carbonyl to condense
+                return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_maillard_strecker"], params["T_ref"])
         # Second-order rate law (Pham et al. 1995): mol/L/h from the two molar concentrations.

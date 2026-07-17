@@ -422,6 +422,21 @@
 > below is now **GONE rather than wrong**: threonine is sotolon's *grand*parent, and the genuine competition is over
 > α-ketobutyrate (propanol IS 2-KB decarboxylated) — inexpressible until the fusels are re-based on their keto acids,
 > which is the rest of this milestone. See D-107.]**
+>
+> **[D-108 — D-107's ⚠ "fix D-27's zero acetaldehyde" is RETIRED, and the bug was in D-107's own aldol. The ⚠ rested on
+> "real dry whites hold ~30 mg/L" — a **SULFITED** figure compared against **UNSULFITED** runs; the like-for-like target
+> is **2.7 mg/L** (Herzan 2020, PMC7684598 variant (0/0/0)) vs the model's 0.000 ⇒ **D-27 acquitted on the gate**, and
+> the prescribed flux-link fix measured **39.999 = a 15× regression** that also compressed dry and sweet to one
+> temperature-only plateau. The real defect: `SotolonAldolCondensation` read **TOTAL** acetaldehyde while its docstring
+> claimed it "reads the pool the binding depletes" — but `free = total − bound` is a read-only overlay, so SO₂ came out
+> **raising** sotolon (dry + 60 mg/L must SO₂: 0.025 → **5.02 µg/L**, 200× to threshold), against Pons, for whom low
+> free SO₂ is the prémox RISK factor. The bisulfite adduct's carbonyl is blocked and an aldol IS an attack on that
+> carbonyl — the argument `AcetaldehydeReduction` (D-47), `AcetaldehydeBridging` (D-80) and the tannin polymerization
+> **already make three times in the same file**. Fixed by reading `free_acetaldehyde` behind the exact `so2_total > 0`
+> guard: **zero new constants**, unsulfited **byte-for-byte** (max|diff| = 0.0 ⇒ every D-107 output unmoved), sulfited
+> dry sotolon **5.020 → 0.059**. **Emergent payoff — Pons' prémox mechanism itself**: SO₂ *does* deplete via
+> `SulfiteOxidation` given O₂, so protection erodes as free SO₂ fades (O₂ 0/5/20/60 ⇒ sotolon 0.059/0.121/2.113/7.639).
+> **Newly load-bearing: closure O₂ ingress** — a sealed bottle admits no O₂ here, so it never goes prémox. See D-108.]**
 > THE TRIPWIRE FLIPPED: sotolon OAV 0 → 3.22 with the reroute ON; the D-99 limitation test
 > deleted per its own instructions and REPLACED with a positive assertion (coverage preserved) + one pinning the autolysis
 > dependency. **Methionine — flagged as highest-risk (scarcest, 3 consumers) — was the SAFEST, structurally: no fusel eats

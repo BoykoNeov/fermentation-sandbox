@@ -9560,10 +9560,23 @@ consequence: the D-105 disposition, applied to a number instead of a route.
 
 ### THE LOAD-BEARING DEPENDENCY ON A KNOWN DEFECT: dry-wine acetaldehyde is 0
 
+> **⚠ RETIRED AT D-108 — THIS SECTION IS WRONG, AND IS KEPT BECAUSE IT IS INSTRUCTIVE.** The premise
+> *"real dry whites hold ~30 mg/L"* is a **commensurability error**: ~30 mg/L is a **sulfited** figure and every run
+> behind this warning was **unsulfited**. An unsulfited white really ends at **2.7 mg/L** (Herzan *et al.* 2020,
+> PMC7684598, Table 1, variant (0/0/0)), so the model's 0.0 was nearly right and **D-27 is acquitted on the gate**.
+> The `32.9` below is also wrong — it is **38.066**, measured. The prescribed fix (flux-link the ADH reduction,
+> D-49's idiom) was **prototyped and measured at 39.999 mg/L unsulfited = a 15× regression**, and it compressed the
+> dry and sweet arms to the same value to four decimals (the plateau `k_a/(k_r·f(T))` — both `X` and `S/(K+S)` cancel).
+> **The conclusion was right for the wrong reason**: the separation *is* fragile, but the culprit was D-107's own
+> aldol reading TOTAL acetaldehyde, and the collapse was **already live via SO₂**, not latent behind a D-27 fix. See
+> D-108.
+
 **This is the finding most likely to bite a future beat, and it is not the one the brief was about.** Measured: a
-**dry** wine ends aging with **acetaldehyde ≈ 0.0 mg/L**, a **sweet** one with **32.9**. The D-27 ADH reduction is
+**dry** wine ends aging with **acetaldehyde ≈ 0.0 mg/L**, a **sweet** one with **32.9** *(→ 38.066, D-108)*. The D-27
+ADH reduction is
 no-flux and viable-`X`-gated, so a dry ferment that finishes with living yeast reduces its acetaldehyde away entirely,
-while a sweet one arrests by ethanol inactivation and freezes it. **Real dry whites hold ~30 mg/L.** The zero is a
+while a sweet one arrests by ethanol inactivation and freezes it. ~~**Real dry whites hold ~30 mg/L.**~~ *(sulfited;
+unsulfited is 2.7 — D-108)* The zero is a
 pre-existing artifact, and D-107 has just made it **load-bearing**:
 
 * Sotolon's sweet-vs-dry separation **no longer comes from sugar — it comes from acetaldehyde.** The dry arm makes
@@ -9634,3 +9647,170 @@ charging is only possible into a pool that exists), and the code layer drives ea
 - Methionine's assimilation/sink + `methionol`; DMS closure-permeation; variety-specific DMSp; retire the false
   `mercaptans` lump; sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking; the `oav` → `magnitude`
   rename.
+
+---
+
+## D-108 — the D-27 audit D-107 prescribed: acquitted on a commensurability error, and the bug was one Process over in D-107's own code
+
+**The brief was D-107's own ⚠: "dry-wine acetaldehyde is 0.0 mg/L, real dry whites hold ~30, and this is now
+load-bearing on the aging aroma headline." Both halves of that are wrong, and the beat is what replaced them.**
+1152 → 1158 passed (both **measured**), 16/16 benchmarks, ruff + mypy clean, 2/2 mutations caught.
+
+### The premise died first: ~30 mg/L is a SULFITED number and every run behind the warning was UNSULFITED
+
+D-107 convicted D-27 against *"real dry whites hold ~30 mg/L"*. That figure describes **sulfited** wine — which is
+essentially all commercial wine — and the model runs it indicted were **unsulfited**. The like-for-like target is
+Herzan *et al.* 2020 (Food Sci. Nutr. 8:5850–5859, **PMC7684598**), Table 1, variant **(0/0/0)** — no SO₂ at must,
+maturation, or bottling: **2.7 mg/L**. The model gives **0.000**. **D-27 is acquitted on the gate.**
+
+The same table says what the real driver is, and it is not the ADH gate:
+
+| variant (must/tank/bottling) | (0/0/0) | (0/0/35) | (60/0/35) | (0/30/35) | (60/30/35) |
+|---|---|---|---|---|---|
+| acetaldehyde mg/L | **2.7** | 6.5 | 17.2 | 25.9 | **51.6** |
+
+— the paper concluding that to minimise acetaldehyde *"it is recommended to exclude the use of SO₂ not only before
+fermentation but also during the first months of vinification"*. **Finished-wine acetaldehyde is set by the SO₂
+regime.** The model already carries that driver (D-47) and reproduces the ladder: dosed 60 mg/L in the must it
+strands **22.9 mg/L** against the study's 17.2. The 0-vs-2.7 floor is a **real but small miss, named and not
+patched** — inventing a constant to hit 2.7 buys nothing observable (sotolon is sub-threshold either way). D-107's
+own lesson (v). *D-27 is acquitted on the gate, not declared spotless.*
+
+### The prescribed fix was measured before building, and it was a 15× regression
+
+D-49's entry is the reason this looked easy: it hit **this exact symptom** (residual 0.0), diagnosed it
+(*"a clean ferment finishes with the yeast still viable … the residual had been wrongly pegged to yeast death"*),
+fixed it by flux-linking — and **explicitly exonerated acetaldehyde while doing so**: *"the opposite of ADH, which
+genuinely keeps reducing acetaldehyde through the post-ferment rest"*. The advisor's read was that the exoneration
+was the untested hinge and probably false, on a clean mechanism: ADH spends NADH, anaerobic yeast regenerate NADH
+only from glycolysis, so no sugar ⇒ no NADH ⇒ no reduction. Sourced, that mechanism is right (*"the reduction of
+acetaldehyde to ethanol regenerates NAD⁺ from NADH, allowing glycolysis to proceed"*).
+
+**And the fix built on it still fails, which is the point.** Prototyped: flux-linking gives **39.999 mg/L** —
+against the *real* unsulfited 2.7, a **15× regression**, worse than the 0.000 it replaced. It also compresses the
+arms: dry **39.999** vs sweet **39.999**, identical to four decimals, because the quasi-steady plateau is
+`k_a/(k_r·f(T))` — **both `X` and `S/(K+S)` cancel**, leaving a temperature-only constant. **A right mechanism can
+still be the wrong fix**: the NADH argument is sound and D-49's exoneration is over-stated, yet acting on either
+would have made the model worse, because the *observable* they were reasoned toward (~30) was the sulfited one.
+
+**The 39.999-vs-"~40 mg/L typical" agreement is the trap in miniature.** A search summary offered "white wines
+typically have around 40 mg/L"; the prototype hit 39.999. That is a **sulfited** figure meeting an **unsulfited**
+run — D-102's fabricated E_a landing near the truth, in a new costume. *The number that matched was the one that
+proved the comparison was wrong.*
+
+### The real defect: D-107's aldol reads TOTAL acetaldehyde, and its docstring claimed the opposite
+
+`SotolonAldolCondensation` (D-107) said of itself:
+
+> *"SO₂ also enters correctly for free: it binds acetaldehyde (D-47), and this Process reads the pool the binding
+> depletes."*
+
+**The binding depletes nothing.** `free_acetaldehyde` computes `free = total − bound` — a **read-only overlay** on
+the D-51 equilibrium; the `acetaldehyde` slot holds **total**. So the rate read the total *including the bound
+share*, and SO₂ — which strands acetaldehyde by protecting it from ADH — came out **raising** sotolon: measured, a
+dry wine dosed 60 mg/L must SO₂ went **0.025 → 5.02 µg/L**, a **200× rise to threshold**. Reality runs the other
+way: Pons has **low free SO₂ as the prémox risk factor**.
+
+**No literature was needed to convict — the file already carried the argument three times.** The bisulfite adduct's
+carbonyl is blocked, and an aldol **is** a nucleophilic attack on that carbonyl:
+
+* `AcetaldehydeReduction` (D-47): reduces only the free share.
+* `AcetaldehydeBridging` (D-80): *"its carbonyl is blocked, so it cannot form the ethylidene bridge (there is no
+  free carbonyl for the flavanol to attack)"*.
+* the tannin polymerization: *"Reads FREE acetaldehyde, not total (**the D-47/D-80 precedent**)"*.
+
+**The aldol was the one reader of that pool in the file getting it wrong, and it was the newest.** The D-105
+internal-contradiction shape: the mechanism the file names versus the arithmetic it performs. Fix: read
+`free_acetaldehyde` behind the same exact `so2_total > 0` guard. **Zero new constants.** The **rate** reads free;
+the **draw** still debits the total slot (consuming free acetaldehyde removes it from the total and the equilibrium
+re-splits) — the D-47 idiom, and the half that keeps carbon closing on `4 + 2 == 6`.
+
+### Measured, both halves, with the anti-vacuity check built in
+
+* **Unsulfited is byte-for-byte**: full-trajectory `np.array_equal` vs the pre-D-108 Process, **max|diff| = 0.0**,
+  dry and sweet. So **every output D-107 reported is unmoved** — all of them were unsulfited. This is *not* a rescue
+  of D-107's headline; it is a fix in the regime D-107 never ran.
+* **Sulfited genuinely differs** — asserted, or the line above would be vacuous (D-106's lesson).
+* **Sulfited dry sotolon: 5.020 → 0.059 µg/L**, sub-threshold; more SO₂ ⇒ less sotolon, monotone.
+
+### The emergent payoff — Pons' prémox mechanism — arrived by correcting a claim THIS entry first got wrong
+
+The first draft of the fix's docstring called `so2_total` **permanent**, on a probe measuring **60.0000 mg/L at day
+729**. That probe **dosed no O₂** — and `SulfiteOxidation` (which consumes `so2_total`) needs O₂ as its substrate.
+**It measured a sealed bottle and read the result as a property of the slot: a vacuous measurement that agreed with
+me** — D-106's lesson, one beat later, in the entry citing it. Dosed with O₂, SO₂ *does* deplete, and sotolon
+recovers as it goes (dry, 60 mg/L must SO₂, 730 d):
+
+| O₂ mg/L | 0 | 5 | 20 | 60 |
+|---|---|---|---|---|
+| SO₂ end mg/L | 60.000 | 44.597 | 30.369 | 24.508 |
+| sotolon µg/L | 0.059 | **0.121** | 2.113 | **7.639** |
+| unsulfited control | 0.025 | 0.677 | 2.632 | 7.837 |
+
+**The model now says what Pons says**: a sulfited wine is protected while its SO₂ lasts (0.121 vs the unsulfited
+0.677 at 5 mg/L O₂) and goes prémox as the free SO₂ fades — because the O₂ that drives the sotolon **eats the SO₂
+that was suppressing it**. Nothing scripted; D-108's free-read composed with D-72's oxidation. **The real bound is
+one layer out**: a sealed wine here has strictly zero O₂ ingress (no closure permeation — the gap D-102 already
+named for DMS leaving *through* the closure), so a sealed sulfited bottle never ages toward prémox at all. **That**
+is the limitation to state — not "SO₂ is permanent", which was false.
+
+### The regime nothing tested, and the filter that hid my own broken test
+
+**The pre-D-108 code moved sulfited sotolon by 85× and all 1152 tests stayed green.** Sotolon under SO₂ had no
+coverage anywhere — D-105's tripwire lesson, recurring: the guard existed at a layer nobody drove.
+
+And I reproduced the failure inside the fix. I ran the new tests with `-k "aldol"`, saw **"12 passed"**, and read it
+as my four new tests passing. `test_fully_bound_acetaldehyde_gives_exactly_no_sotolon` **does not contain the word
+"aldol"** — it never ran. When it did, it failed on its **own premise**: it asserted `free <= 0` under excess SO₂,
+but the binding is an **equilibrium**, so `bound` never reaches `total` and 5000 mg/L SO₂ against 1 mg/L
+acetaldehyde still leaves **1.97e-8 g/L free**. **I asserted a hard zero the chemistry cannot make.** Rewritten to
+assert the asymptote that is real; the Process's `acetaldehyde <= 0.0` early-return is documented as a **defensive
+mirror** of the D-47 idiom rather than claimed as covered. **D-101's lesson verbatim: any narrowing of a sweep —
+path, filter, keyword — is a scope limit, and the narrower it is the more it looks like diligence.**
+
+**And I invented a citation.** The first draft of this entry credited PMC7684598 to *"Čížková et al."* — a name I
+never verified and that does not appear on the paper (**Herzan, Prokes, Baron, Kumsta, Pavlousek, Sochor** 2020).
+Caught before landing, in the entry whose subject is a false claim about a source.
+
+### Mutation-tested (2/2)
+
+* **Read total** (revert to the D-107 bug) ⇒ **4 tests fail** across both layers (unit + end-to-end scenario).
+  Every other test — including all the conservation tests — stays green: **carbon closes perfectly against the
+  wrong carbonyl**, which is why this survived at all.
+* **Scale the draw** (rate reads free, draw double-counts the protection) ⇒ **3 tests fail**, including the
+  pre-existing atom-count closure.
+
+### The lessons
+
+(i) **A cited number binds only the set it describes — and "set" includes the PROCESS REGIME, not just the
+compound.** D-104 established scope for *which compounds* a figure covers. This is the same error one axis over:
+~30 mg/L is a true statement about dry white wine and a false comparison for *this* run, because the model's wine
+was unsulfited. **The citation was real, the compound was right, and the comparison was still wrong.**
+(ii) **A right mechanism can still be the wrong fix.** The NADH argument for co-metabolic ADH is sound, and D-49's
+exoneration *is* over-stated — yet flux-linking makes the model 15× worse, because the observable it reasoned
+toward was the sulfited one. **Mechanism and target must be commensurate too.**
+(iii) **An audit that acquits its target can still find the bug — one Process over, in the code that commissioned
+the audit.** D-105's lesson, recurring with a twist: D-107 wrote the ⚠ that sent this beat after D-27, and the bug
+was in D-107's own new Process, described by a sentence D-107 wrote about itself.
+(iv) **The strongest conviction needs no literature — only the siblings.** Three Processes in the same file already
+made the carbonyl-is-blocked argument. The fix was findable by reading the file against itself.
+(v) **The measurement that agrees with you is the one to distrust.** Twice this beat: 39.999 matching a "~40 mg/L"
+that was the wrong regime, and 60.0000 mg/L "proving" SO₂ permanent in a probe that dosed no O₂. Both agreed with
+the story I had; neither measured what I claimed.
+
+### Next
+
+- **The fusel side of the keto-acid node** — unchanged from D-107, and now the largest open item: propanol is still
+  `threonine → propanol` direct, so the real propanol-vs-sotolon competition over **α-ketobutyrate** is
+  inexpressible until the Ehrlich fusels are re-based on their keto acids.
+- **Closure O₂ ingress** — newly load-bearing (D-108): a sealed sulfited bottle cannot go prémox here, because it
+  admits no O₂ at all. The same gap D-102 named for DMS permeating *out*; it now blocks the aging-aroma direction
+  as well as the sulfur one. **A fix there is silently a change to the sotolon headline** — this beat's own
+  cross-decision coupling, stated in the shape D-107 taught.
+- **Acetaldehyde generation during maturation** — real and out of scope: SO₂ dosed at aging does **nothing** here
+  (0.000) against Herzan's (0/30/35) = **25.9 mg/L**. The model's dry wine has no acetaldehyde left for SO₂ to
+  protect by then, and no maturation-phase source to make more.
+- **The 0-vs-2.7 unsulfited floor** — a small real miss, deliberately unpatched (see above).
+- The growth-linked excretion shape (D-49 option B); Pham's pH + ethanol terms; sotolon enantiomers; methionine's
+  assimilation/sink + `methionol`; a peptide pool; variety-specific DMSp; retire the false `mercaptans` lump;
+  sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking; the `oav` → `magnitude` rename.
