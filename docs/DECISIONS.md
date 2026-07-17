@@ -10246,6 +10246,13 @@ passed on the wrong rows of the table**.
 in a throwaway detached worktree at HEAD (D-110's technique). **16/16 benchmarks among them, not beside them**, and
 **nothing skipped, deselected, or xfailed** (0 occurrences in the run). ruff + mypy clean, **4/4 mutations caught**.
 
+*Precise scope of that 1171, since this entry's own standard demands it*: the run predates the Finding-4 comment fix, so
+it was measured on a tree identical to this commit **except for inline `#` comment text in `precursor_fates.py`** — the
+`ehrlich_by_precursor` loop is byte-identical across the edit and every differing line begins with `#` (diffed, not
+assumed). Python gives comments no runtime meaning, so the number transfers; re-running to make it literally-HEAD-exact
+would be confirming what the language defines. Stated rather than smoothed over, because "the number was measured on
+*almost* this tree" is exactly the kind of gap D-110 ruled on.
+
 ### The data, and how it was actually read
 
 Rollero 2015 (*Appl. Microbiol. Biotechnol.*, U-¹³C tracers on valine/leucine/isoleucine/threonine) and Crépin 2017
@@ -10364,7 +10371,7 @@ vacuous"*, which was false; retargeted, the guard catches it. **A mutation that 
 and it needs the same scepticism as a test that passes** — the first read was "the guard is vacuous", and the truth was
 "the guard is elsewhere, and separately the comment is wrong."
 
-### ⭐ The clamp, and D-103's gate-shape defect becoming arithmetically impossible
+### ⭐ Finding 5 — the clamp, and D-103's gate-shape defect becoming arithmetically impossible
 
 The headroom clamp (`headroom = total_alcohol − already_sourced`) was added as routine defence. It exposed something:
 
