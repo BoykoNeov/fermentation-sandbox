@@ -197,10 +197,7 @@ def test_every_pool_is_weighted_on_both_conservation_ledgers():
 #: build it). The signature did not change; the model finally has the slots to satisfy it.
 _ROUTES: tuple[tuple[str, str, float, tuple[str, ...], str], ...] = (
     *((pool, prec, 1.0, (), "D-75 oxidative Strecker") for pool, _f, prec in _STRECKER_ROUTES),
-    *(
-        (pool, prec, 1.0, (), "D-87 thermal Strecker")
-        for pool, _m, _w, prec in _MAILLARD_PRODUCTS
-    ),
+    *((pool, prec, 1.0, (), "D-87 thermal Strecker") for pool, _m, _w, prec in _MAILLARD_PRODUCTS),
     *(
         (spec.species, spec.precursor_amino_acid, 1.0, (), "D-33 Ehrlich re-route")
         for spec in FUSEL_SPECS

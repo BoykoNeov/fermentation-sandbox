@@ -1797,9 +1797,7 @@ def test_the_sotolon_aldol_draws_one_mole_of_each_substrate_when_driven(maillard
     This test reads the stoichiometry off ``dy/dt``, so it is the code layer, not a declaration.
     """
     schema = wine_schema()
-    d = SotolonAldolCondensation().derivatives(
-        0.0, _aldol_wine(schema), schema, maillard_params
-    )
+    d = SotolonAldolCondensation().derivatives(0.0, _aldol_wine(schema), schema, maillard_params)
     n_sot = schema.get(d, "sotolon") / M_SOTOLON
     n_keto = -schema.get(d, "alpha_ketobutyrate") / M_ALPHA_KETOBUTYRATE
     n_acet = -schema.get(d, "acetaldehyde") / M_ACETALDEHYDE
@@ -1812,9 +1810,7 @@ def test_sotolon_aldol_carbon_closes_on_atom_counts(maillard_params):
     # C6 out == C4 + C2 in. This is the strongest closure in the tree: it holds because the
     # chemistry balances, not because the draw was sized to make it hold.
     schema = wine_schema()
-    d = SotolonAldolCondensation().derivatives(
-        0.0, _aldol_wine(schema), schema, maillard_params
-    )
+    d = SotolonAldolCondensation().derivatives(0.0, _aldol_wine(schema), schema, maillard_params)
     residual = (
         schema.get(d, "sotolon") * carbon_mass_fraction("sotolon")
         + schema.get(d, "alpha_ketobutyrate") * carbon_mass_fraction("alpha_ketobutyrate")
