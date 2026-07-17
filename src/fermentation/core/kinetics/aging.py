@@ -1397,6 +1397,22 @@ class SotolonAldolCondensation(Process):
     genuine propanol-vs-sotolon competition — which is over **α-ketobutyrate**, not threonine — is
     not yet expressible; that is the fusel side of the node (see D-107).
 
+    **D-109 AUDITED (4) AND UPHELD IT — then rejected the fix it was read as prescribing.** The
+    sentence above is *correct*: the competition really is absent, not merely mis-shaped, because
+    :class:`~fermentation.core.kinetics.keto_acids.AlphaKetobutyrateExcretion`'s rate is flux-only
+    (threonine's gate moves the carbon source, not the rate — measured bit-identical). But it was
+    read as prescribing "draw propanol from ``alpha_ketobutyrate``", and **that pool is the wrong
+    one, by this Process's own argument**. This aldol selects the *excreted, extracellular residual*
+    because it runs in a sealed bottle where no intracellular pool can reach — D-49's test.
+    Propanol is made *intracellularly, by living yeast, mid-ferment*: it IS D-49's flux
+    intermediate, so the same test that chose this pool for sotolon **rejects it for propanol**.
+    The arithmetic agrees and is blunter: propanol's molar demand is **~2.8× the total α-KB this
+    pool ever excretes**, so the re-base is infeasible, not merely mis-attributed — it would starve
+    propanol *and* collapse this Process's substrate, while looking like the promised competition
+    at last. That same 2.8× is why the item is **relocated, not dissolved**: propanol is ~73% of the
+    2-ketobutyrate flux, so an *intracellular* node — a quasi-steady **flux partition**, not a pool
+    (D-49's own physics) — would couple propanol and sotolon materially. See D-109.
+
     Wine-only (both product and substrate slots are wine-only); wired **disabled at the compile
     seam** and enabled by ``begin_aging`` with the other aging Processes. Tier **speculative** (the
     *form* — bimolecular in α-ketobutyrate × acetaldehyde, purely chemical, warmer-faster — is

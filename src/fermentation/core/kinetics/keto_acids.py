@@ -132,6 +132,16 @@ not have. The enrichment is now fixed where reality fixes it — at **synthesis*
 of the pool inherits one enrichment, which is Crépin's own signature ("the isotopic enrichment
 detected in propanol … was the same as that measured in proteinogenic threonine").
 
+**THE FLUX-ONLY RATE IS NOW LOAD-BEARING FOR A SECOND REASON (D-109).** Because the rate does not
+read threonine, draining threonine costs this pool **exactly nothing** — only the carbon *source*
+moves to sugar (measured at the derivative level: bit-identical at threonine 67 mg/L and at 0). So
+propanol, which drains threonine hard, cannot reduce sotolon's substrate through it: the
+propanol-vs-sotolon competition over threonine is **structurally zero, and deliberately so**. That
+vindicates the work-list's "the competition is GONE rather than wrong" — a claim D-109 set out to
+correct and instead confirmed, after a probe that measured a 0.42% sotolon response to
+``k_propanol`` and mistook the **sugar ledger** for the competition. See
+``tests/test_fusel_keto_acid_node.py``.
+
 **Isolability, and the reason it is exact.** The pool joins the same wine-only
 ``_KETO_ACID_PROCESSES``
 tuple. Its consumer's rate is **bilinear in this pool and acetaldehyde**, so a ProcessSet built
@@ -523,6 +533,20 @@ class AlphaKetobutyrateReassimilation(Process):
     (:class:`~fermentation.core.kinetics.aging.SotolonAldolCondensation`) — a real, slow, in-bottle
     consumption that only makes sense *because* the residual is frozen rather than drained to 0 by a
     viable-``X`` no-flux gate (the D-49 option-A argument, now load-bearing for a second reason).
+
+    **KNOWN IMPERFECTION — THE ``E``/``CO2`` DESTINATION IS A STAND-IN, AND FOR THIS POOL IT IS A
+    WEAKER ONE THAN FOR ITS SIBLINGS (recorded at D-109, not fixed).** The Gay-Lussac split is
+    inherited from pyruvate/α-KG, where "re-assimilated to ethanol + CO₂" is a fair lump. Real
+    re-assimilated 2-ketobutyrate is substantially **decarboxylated to propanal and reduced to
+    propanol** — i.e. its true fate is partly the Ehrlich route. Booking it to ``E``/``CO2`` is
+    therefore the D-19 idiom applied to a fate the model *does* elsewhere represent, which is a
+    sharper compromise than the siblings carry. **It is deliberately NOT re-routed to ``propanol``**
+    — :class:`~fermentation.core.kinetics.byproducts.FuselAlcoholsEhrlich` already produces all the
+    propanol the model reports, so sending this carbon there would **double-count** the same
+    chemistry — and this pool is by construction the overflow that was *not* decarboxylated. The
+    honest fix is the intracellular partition node (D-109's scoping), where excretion and propanol
+    are two branches of one flux and the question does not arise. Carbon closes either way; what is
+    approximate is the **destination**, as for the whole excreted-keto-acid family.
 
     Tier **speculative**; mass carries the usual small gap (the oxidation moves untracked NAD(P)H) —
     carbon is the invariant.

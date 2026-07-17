@@ -423,6 +423,35 @@
 > α-ketobutyrate (propanol IS 2-KB decarboxylated) — inexpressible until the fusels are re-based on their keto acids,
 > which is the rest of this milestone. See D-107.]**
 >
+> **[D-109 CONFIRMS THAT "GONE" AND REJECTS THE FIX IT WAS READ AS PRESCRIBING — the fusel side, measured before
+> building. (1) **"GONE" is CORRECT, and D-109 opened intending to correct it.** `AlphaKetobutyrateExcretion`'s rate is
+> flux-only; threonine's gate moves the **carbon source**, never the **rate** — `d(α-KB)/dt` is **bit-identical** at
+> threonine 67 mg/L and at 0. So propanol cannot starve sotolon through threonine, *structurally and on purpose* (gating
+> the rate on threonine would kill sotolon in a threonine-free wine — the D-104 canary). A probe measuring sotolon moving
+> 0.42% with `k_propanol` was read as "the competition is present but small"; it is the **sugar ledger**, and **only the
+> mutation test caught it** — deleting the threonine draw left the assertion passing. *"The sentence and the assertion are
+> not the same claim"*, fifth occurrence, first that would have shipped as a correction to something **true**.
+> (2) **"Re-based on their keto acids" must NOT be read as the excreted pool.** Sotolon's α-KB is the *extracellular
+> residual* (D-49's test, the reason D-107 chose it); propanol is made intracellularly by living yeast mid-ferment = D-49's
+> *flux intermediate* ⇒ **the same test rejects that pool for propanol**. It is also **infeasible**: propanol's molar demand
+> is **2.79× the total α-KB the pool ever excretes** (42.6× the residual) ⇒ it would starve propanol *and* collapse
+> sotolon's substrate — while looking exactly like the promised competition arriving. It would also zero a core both-media
+> fusel when the keto-acids toggle off (PD#3).
+> (3) **The payoff is REAL — the same 2.79× says so**: propanol is **~73% of the 2-KB flux**, the node's dominant sink, so
+> an honestly partitioned node *would* couple propanol and sotolon materially. **Relocated, not dissolved.**
+> (4) **THE SCOPING RESULT: the fusel-side node is a FLUX PARTITION, not a pool — D-49's own physics.** The intracellular
+> keto acid is a vanishing pool carrying an enormous flux ⇒ quasi-steady ⇒ `synthesis == Σ consumption` ⇒ a **partition**,
+> not a state variable. **Two nodes, differing in kind**: the excreted keto-acids are pools (they persist, they bind SO₂);
+> the fusel node is a partition of the **sourcing layer** (`FuselAminoAcidReroute`/`PrecursorNonEhrlichFates`) —
+> **never the producer**, which is what keeps `FuselAlcoholsEhrlich` byte-for-byte when the keto-acids toggle off.
+> **It is a MILESTONE, not a beat**: the real work is breaking `FUSEL_SPECS`' one-alcohol-one-precursor assumption
+> (isoamyl ← leucine **and** valine: Crépin's 23% via KIC = D-104's named missing route); the prize is D-104's inverted
+> split (**open** — D-104 measured that near-equilibrium transamination does *not* un-invert); the **parsimony question is
+> open both ways** (per-species rates ≈ the five `f_i`, but **BAT1/BAT2 are shared** across leu/ile/val ⇒ a shared-BAT
+> partition could be *cheaper* — prototype + source before deciding); and a **tracer stoichiometry trap** is already
+> visible (isoamyl's valine-derived carbon is {3,4,5}/5 depending which carbons the two decarboxylations remove — **both
+> close the ledger**, so the atom assignment must be sourced, not assumed). See D-109.]**
+>
 > **[D-108 — D-107's ⚠ "fix D-27's zero acetaldehyde" is RETIRED, and the bug was in D-107's own aldol. The ⚠ rested on
 > "real dry whites hold ~30 mg/L" — a **SULFITED** figure compared against **UNSULFITED** runs; the like-for-like target
 > is **2.7 mg/L** (Herzan 2020, PMC7684598 variant (0/0/0)) vs the model's 0.000 ⇒ **D-27 acquitted on the gate**, and

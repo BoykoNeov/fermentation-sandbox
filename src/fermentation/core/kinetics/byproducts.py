@@ -549,11 +549,23 @@ class FuselAminoAcidReroute(Process):
     the re-route create sugar; the same acceptable swap↔producer coupling as D-32's swap↔growth).
 
     **The honest limit D-100 does NOT fix.** Speciation does not end the precursor competition — it
-    *localises* it. Threonine still feeds both propanol (here) and sotolon (D-87); leucine feeds
-    both isoamyl alcohol and 3-methylbutanal. Those are the same molecule in reality, so the
-    competition is **real chemistry, not an artifact**, and the model should show it. What D-100
-    removes is the *false* competition — fusels vs bacterial growth over arginine, which shares no
-    chemistry at all.
+    *localises* it. Leucine feeds both isoamyl alcohol (here) and 3-methylbutanal (D-87); the same
+    holds for valine/isoleucine/phenylalanine and their thermal aldehydes. Those are the same
+    molecule in reality, so the competition is **real chemistry, not an artifact**, and the model
+    should show it. What D-100 removes is the *false* competition — fusels vs bacterial growth over
+    arginine, which shares no chemistry at all.
+
+    **The threonine/sotolon example this paragraph used to give is RETIRED (D-107, measured D-109)
+    — and it was wrong in BOTH halves.** It read "threonine still feeds both propanol (here) and
+    sotolon (D-87)". Sotolon left D-87 at D-107 (it is not a Strecker product at all, but an aldol
+    — :class:`~fermentation.core.kinetics.aging.SotolonAldolCondensation`), and its substrate is
+    **α-ketobutyrate**, threonine's *child*. Threonine reaches sotolon only by supplying the
+    **carbon source** of :class:`~fermentation.core.kinetics.keto_acids.AlphaKetobutyrateExcretion`,
+    whose *rate* is flux-only — so draining threonine here does not cost that pool one microgram,
+    and propanol and sotolon do **not** compete over threonine. D-109 measured it exactly (the two
+    derivatives are bit-identical at threonine 67 mg/L and at 0). The real propanol-vs-sotolon
+    competition is over α-ketobutyrate, is **not** expressible from this Process, and is the fusel
+    side of the keto-acid node (D-109's scoping).
     """
 
     name = "fusel_amino_acid_reroute"

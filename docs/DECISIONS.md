@@ -9841,3 +9841,152 @@ difference the whole file is about.
 - The growth-linked excretion shape (D-49 option B); Pham's pH + ethanol terms; sotolon enantiomers; methionine's
   assimilation/sink + `methionol`; a peptide pool; variety-specific DMSp; retire the false `mercaptans` lump;
   sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking; the `oav` → `magnitude` rename.
+
+## D-109 — the fusel side of the keto-acid node: the prescribed fix was the one D-49 forbids, and the claim I set out to correct was true
+
+**The brief was D-108's "largest open item": re-base the Ehrlich fusels on their keto acids so the genuine
+propanol-vs-sotolon competition becomes expressible. D-109 measured that item before building it. The prescribed fix
+is rejected on the node's own founding principle and is infeasible by arithmetic; the work-list claim I opened the
+beat intending to correct turned out to be *correct*; and the promised payoff is real but lives somewhere else.**
+Findings + tripwires only — **no physics changed**. 1158 → 1165 passed (both measured), 16/16 benchmarks,
+ruff + mypy clean, 4/4 mutations caught.
+
+### Finding 1 — the pool D-107 chose FOR sotolon is the wrong pool for propanol: D-49's test, applied symmetrically
+
+`SotolonAldolCondensation` selects the **excreted, extracellular residual** for a stated reason (`aging.py`): the
+aldol runs in a sealed bottle over years, *"which is why its α-ketobutyrate must be the excreted, extracellular
+residual and not an intracellular flux intermediate — the same test D-49 applied to pyruvate, answered the other
+way"*. Propanol is made **intracellularly, by living yeast, during active fermentation**. It *is* D-49's flux
+intermediate — the very thing `keto_acids.py` rejected as acetaldehyde's precursor, in the module docstring that
+built the pool. **The same test that selected this pool for sotolon rejects it for propanol.** One pool cannot be
+both, and the argument needs no literature: the module already carries it (the D-105 internal-contradiction shape).
+
+Design A would also **zero a core, both-media fusel** whenever `_KETO_ACID_PROCESSES` toggles off — a prime
+directive #3 violation, since propanol's magnitude is independently anchored (D-99) and must survive without the
+speculative pool.
+
+### Finding 2 — and it is infeasible, not merely mis-attributed: the pool is ~3× too small
+
+Propanol is 1 mol 2-KB decarboxylated, so drawing it from this pool needs 1 mol of pool per mol of alcohol.
+Measured on a Crépin-commensurate must (180 mg N/L, 28 °C), with reassimilation disabled so the pool accumulates
+every gram excreted and the total is an **exact state difference** (no quadrature — D-103):
+
+| quantity | value |
+|---|---|
+| α-KB frozen residual | 2.00 mg/L |
+| α-KB **total ever excreted** | 30.55 mg/L = **0.299 mmol/L** |
+| propanol produced | 50.14 mg/L = **0.834 mmol/L** |
+| propanol demand / total α-KB ever excreted | **2.79×** |
+| propanol demand / frozen residual | **42.6×** |
+
+So the re-base does not mis-attribute the competition — it **cannot be built**. It would starve propanol *and*
+collapse sotolon's substrate, producing a large, dramatic, wrong result that **would look exactly like the
+long-promised competition finally expressing itself**.
+
+### Finding 3 — THE BEAT: the claim I set out to correct was TRUE, and only the mutation test caught it
+
+The work-list says the competition is *"GONE rather than wrong"*. I opened the beat intending to correct that: a
+probe drove `k_propanol` across its whole physical range (0 → 10×; propanol ~0 → ~497 mg/L) and sotolon moved
+**0.42%, monotone, correctly signed** — read as *"the competition is present, correctly signed, and negligible;
+the work-list was wrong on the facts"*.
+
+**It is not the competition.** `AlphaKetobutyrateExcretion`'s rate is `k · X · S/(K+S)` — **flux-only**. Threonine's
+depletion gate re-routes the **carbon source**, never the **rate**. Measured at the derivative level, `d(α-KB)/dt` is
+**bit-identical** at threonine 67 mg/L and at 0 (3.6264732548e-04 both); only the sugar draw moves. So draining
+threonine costs the pool nothing, and propanol — which drains threonine hard — **cannot** reduce sotolon's substrate
+through it. **The competition over threonine is structurally zero, and D-107 chose that deliberately**: gating the
+rate on threonine would empty the pool in a threonine-free wine and kill sotolon (the D-104 canary). The 0.42% is
+the **sugar ledger** — propanol's de-novo carbon leaves `S`, which every flux-linked rate reads.
+
+**The work-list was right, and my probe was a sentence about threonine attached to an assertion about `k_propanol`.**
+D-96/D-102/D-108's *"the sentence and the assertion are not the same claim"* — a **fifth** occurrence, and the first
+in which it would have shipped as a *correction to something true*. **Only the mutation test convicted it**: deleting
+the threonine draw entirely left the assertion **passing**, which is the definition of a test that guards nothing.
+The lesson upgrade is exact: D-108 learned to distrust the measurement that **agrees** with you; this one **disagreed**
+with the work-list, flattered me with a finding, and was believed for it. *A measurement that hands you a result worth
+writing up deserves the same suspicion as one that agrees with you.*
+
+### Finding 4 — the payoff is real, and the number that kills the shortcut is the number that says so
+
+The 2.79× reads two ways, and both are true. As *"can this pool supply propanol?"* it is fatal to design A. As
+*"how big is propanol inside the node?"* it says propanol is **~73% of the 2-ketobutyrate flux** (0.834 of 1.13
+mmol/L against excretion's 0.299) — the node's **dominant sink**. So an honestly partitioned node **would** couple
+propanol and sotolon materially. **The item is relocated, not dissolved.** (The 73% rests on `k_alpha_kb_excretion`,
+an author estimate ⇒ an order-of-magnitude claim, not a calibration.)
+
+**This is where the beat's own bias was caught before it set:** reaching for a "the question was malformed" audit is
+the pull this project's D-101/D-103/D-105 pattern creates, and it was the wrong read. D-49's distinction does not
+dissolve the task — it says there are **two nodes, not one**.
+
+### Finding 5 — the scoping result: the fusel-side node is a PARTITION, not a pool, and D-49's physics says so
+
+D-49's own argument is that the intracellular keto acid is a **vanishing pool carrying an enormous flux** — i.e.
+quasi-steady, `synthesis == Σ consumption` at every instant. **A quasi-steady node is a flux partition, not a state
+variable.** So the two nodes differ *in kind*, and that is the shape of the milestone:
+
+* **The excreted keto-acids are pools** — they persist, they are measured, they bind SO₂ (D-49/D-50/D-107).
+* **The fusel-side node is a partition of the sourcing** — no sixth state slot, and it belongs in the
+  `FuselAminoAcidReroute` / `PrecursorNonEhrlichFates` sourcing layer, **never in the producer**. That constraint is
+  what keeps `FuselAlcoholsEhrlich` byte-for-byte when the keto-acids toggle off, so design A's PD#3 problem cannot
+  recur.
+
+### What was corrected, and one stale claim the unfiltered sweep found
+
+The `grep` for the competition claim was run **unfiltered** across `src/`, `docs/` and `tests/` (D-101/D-108: any
+narrowing is a scope limit, and the narrower it is the more it looks like diligence). The two work-list statements
+are **correct and stand**. One site was **stale and wrong in both halves** — `byproducts.py`'s *"Threonine still
+feeds both propanol (here) and sotolon (D-87)"*, offered as an example of real chemistry *"the model should show"*:
+sotolon left D-87 at D-107, and its substrate is α-ketobutyrate, not threonine. The model correctly does **not** show
+that competition, so the paragraph held up as a virtue exactly what the model had stopped doing. Corrected in place.
+
+### The tripwires (`tests/test_fusel_keto_acid_node.py`), and 4/4 mutations
+
+- `test_the_excreted_pool_cannot_supply_propanol` — the supply arithmetic. **Caught** by `k_alpha_kb_excretion ×10`
+  (a pool that *can* supply propanol re-opens the design question, and should).
+- `test_every_fusel_is_de_novo_dominated[×5]` — every alcohol ≥80% de novo (Crépin's 81%, Rollero's >90% CCM),
+  asserted against the **weaker** of the two bands so the test cannot be broken by their disagreement (never
+  averaged — D-103). **Caught** by `f_non_ehrlich_threonine → 0`.
+- `test_alpha_kb_production_is_exactly_threonine_independent` — finding 3, at the derivative level where it is
+  **exact** rather than nearly-true. **Caught** by gating the rate on threonine (D-107's rejected design), *and* by
+  making the Process inert — because `rate_starved == rate_replete` is satisfied by `0 == 0`, so the guard needs
+  guarding (D-105's `4 + 1 == 5`).
+
+### Also recorded, not built
+
+- **The `E`/`CO2` reassimilation destination is a weaker stand-in for α-KB than for its siblings.** Real
+  re-assimilated 2-KB is substantially decarboxylated to propanal → **propanol** — a fate the model *does* represent
+  elsewhere. It is deliberately **not** re-routed there: `FuselAlcoholsEhrlich` already makes all the propanol the
+  model reports, so it would **double-count**, and this pool is by construction the overflow that was *not*
+  decarboxylated. The honest fix is the partition node, where the question does not arise.
+
+### Next
+
+- **The fusel-side keto-acid node — now scoped, and it is a MILESTONE, not a beat.** Build it as algebraic
+  partitions (KIV/KIC/KMV/phenylpyruvate), in the sourcing layer, never in the producer. Its content:
+  * **The real work is the many-to-many map.** `FUSEL_SPECS` assumes **one alcohol ↔ one precursor**, and the
+    re-route and the D-104 sink are both built on that assumption. The node breaks it: isoamyl is fed by leucine
+    **and** valine (Crépin: 23% of consumed valine reaches KIC → isoamyl — D-104's explicitly named missing route,
+    and the reason isoamyl under-counts at 1.1% against Rollero's 2–8%).
+  * **The prize is D-104's inverted split** — model leucine 20.9% → protein against a measured 77–86%, order exactly
+    reversed. Reality escapes it by building isoamyl from KIC, a mostly-de-novo keto acid, so the leucine pool never
+    faces the isoamyl demand. **Open, not assumed**: D-104 measured that a node with *near-equilibrium*
+    transamination does **not** un-invert (label equilibrates; leucine returns to ~22%).
+  * **The parsimony question is open and must not be pre-judged in either direction.** Un-inversion needs
+    kinetically-limited transamination; that looks like one constant per species — i.e. no cheaper than the five
+    `f_i` it would replace. **But BAT1/BAT2 are shared** across leu/ile/val (threonine is separate — ILV1), so a
+    shared-transaminase partition could be a parsimony **win**: one BAT rate + the de-novo fluxes, emergent, fewer
+    constants than three `f_i`. Prototype and source it before deciding — the D-107 result (the faithful form had
+    *fewer* invented numbers) says the trade can run backwards.
+  * **A stoichiometry trap is already visible, and conservation is blind to it.** For val → KIV → KIC → isoamyl the
+    pool draw (1 mol valine + 2 C sugar → 1 mol isoamyl + 2 CO₂) is provenance-independent, but the *reported*
+    valine-derived carbon share — the number that would be scored against Rollero's 2–8% — is (labelled C in
+    isoamyl)/5 ∈ {3,4,5}/5 depending which carbons the two decarboxylations remove. **Both assignments close the
+    carbon ledger**, so D-105's *"a closed ledger is not a correct draw"* applies in a tracer costume: the atom
+    assignment must be **sourced**, not assumed.
+  * *"23% of consumed valine"* is **circular** as an input (consumed valine is set by the draws) — it is a
+    validation target, not a parameter.
+- **Closure O₂ ingress** — unchanged from D-108 and still load-bearing on the sotolon headline.
+- **Acetaldehyde generation during maturation**; the 0-vs-2.7 unsulfited floor (D-108).
+- The growth-linked excretion shape (D-49 option B); Pham's pH + ethanol terms; sotolon enantiomers; methionine's
+  assimilation/sink + `methionol`; a peptide pool; variety-specific DMSp; retire the false `mercaptans` lump;
+  sourced yeast-autolysate spectrum; re-anchor `f_methional`; masking; the `oav` → `magnitude` rename.
