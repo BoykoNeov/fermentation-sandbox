@@ -1034,21 +1034,34 @@ def test_so2_protection_erodes_as_oxygen_consumes_it_which_is_pons_premox():  # 
     ``so2_total`` permanent, on a probe measuring 60.0000 mg/L at day 729 — which had dosed **no
     O₂**, the substrate :class:`SulfiteOxidation` needs. It measured a sealed bottle and read it as
     a property of the slot (D-106's vacuous-measurement lesson, one beat later).
+
+    **THE ASSERTION IS A RATIO, AND THE REASON IS THE WHOLE CARE OF THIS TEST.** The obvious version
+    — "sotolon rises monotonically with O₂ under a fixed SO₂ dose" — is **confounded and proves
+    nothing about erosion**: the *unsulfited* control rises monotonically too (0.025 → 7.837),
+    because O₂ → acetaldehyde (D-71) → sotolon is the dominant driver whatever the SO₂ does. That
+    ladder would rise if erosion did nothing at all. What isolates protection is the **sulfited /
+    unsulfited ratio at matched O₂**, which divides the shared driver out: it climbs 0.179 → 0.803
+    → 0.975 toward 1.0 (= no protection left) as the O₂ eats the SO₂. *The sentence and the
+    assertion have to be the same claim* (D-96/D-102).
     """
     # Protection is real at a moderate O₂ dose: the sulfited wine makes LESS sotolon than the
-    # unsulfited one exposed to the same oxygen.
+    # unsulfited one exposed to the same oxygen. This single leg is the load-bearing evidence.
     assert _dry_sotolon_ugl(
         [_add_so2(0.0, 60.0), _add_oxygen(_FERMENT_DAYS, 5.0)]
     ) < _dry_sotolon_ugl([_add_oxygen(_FERMENT_DAYS, 5.0)])
-    # …and it ERODES: more O₂ ⇒ more SO₂ consumed ⇒ more free carbonyl ⇒ monotonically more
-    # sotolon, all with the SAME SO₂ dose. This is the prémox trajectory.
-    ladder = [
-        _dry_sotolon_ugl([_add_so2(0.0, 60.0), *([_add_oxygen(_FERMENT_DAYS, o2)] if o2 else [])])
-        for o2 in (0.0, 5.0, 20.0, 60.0)
+    # …and it ERODES: the protection RATIO rises toward 1 as O₂ consumes the SO₂ that was doing the
+    # protecting. Measured on the ratio, not the raw ladder, for the reason in the docstring.
+    ratios = [
+        _dry_sotolon_ugl([_add_so2(0.0, 60.0), _add_oxygen(_FERMENT_DAYS, o2)])
+        / _dry_sotolon_ugl([_add_oxygen(_FERMENT_DAYS, o2)])
+        for o2 in (5.0, 20.0, 60.0)
     ]
-    assert ladder == sorted(ladder)
-    assert ladder[0] < 1.0  # sealed + sulfited: protected, sub-threshold
-    assert ladder[-1] > 5.0  # heavily oxidised: protection spent, sotolon perceptible
+    assert ratios == sorted(ratios)  # protection monotonically spent
+    assert ratios[0] < 0.5  # 5 mg/L O₂: SO₂ largely intact ⇒ strong protection
+    assert ratios[-1] > 0.9  # 60 mg/L O₂: SO₂ largely consumed ⇒ protection ~gone
+    # The sealed sulfited wine stays sub-threshold; the heavily oxidised one is perceptible.
+    assert _dry_sotolon_ugl([_add_so2(0.0, 60.0)]) < 1.0
+    assert _dry_sotolon_ugl([_add_so2(0.0, 60.0), _add_oxygen(_FERMENT_DAYS, 60.0)]) > 5.0
 
 
 def test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciated():

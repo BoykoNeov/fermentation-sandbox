@@ -9719,8 +9719,18 @@ carbonyl is blocked, and an aldol **is** a nucleophilic attack on that carbonyl:
   free carbonyl for the flavanol to attack)"*.
 * the tannin polymerization: *"Reads FREE acetaldehyde, not total (**the D-47/D-80 precedent**)"*.
 
-**The aldol was the one reader of that pool in the file getting it wrong, and it was the newest.** The D-105
-internal-contradiction shape: the mechanism the file names versus the arithmetic it performs. Fix: read
+**The aldol was the one reader of that pool in the file getting it wrong, and it was the newest** — and **that is
+swept, not asserted**, because "the one" is exactly the claim that bit at D-101 and D-103. An **unfiltered**
+`grep -rn 'slice("acetaldehyde")' src/` gives 11 hits, classified by what each *does* rather than what it says:
+**four rate reads** (a value multiplying into a rate — these must route through `free_acetaldehyde` under SO₂),
+four **draw debits** (`d[…] = −n·M` — these correctly read the total slot), two **writes** (production, D-27/D-71),
+and one **carbon weight**. The four rate reads map 1:1 onto the four `free_acetaldehyde` call sites:
+`acetaldehyde.py:260→273` (D-47), `aging.py:1422→1439` (D-108, this fix), `aging.py:2381→2399` (D-80),
+`aging.py:2906→2921` (tannin). **Verified in the CODE, not the docstrings** — which is the only check worth
+running here, since a docstring claiming "free" over a rate reading total *is this entire decision*. The sweep is
+clean: no second D-108 site.
+
+The D-105 internal-contradiction shape: the mechanism the file names versus the arithmetic it performs. Fix: read
 `free_acetaldehyde` behind the same exact `so2_total > 0` guard. **Zero new constants.** The **rate** reads free;
 the **draw** still debits the total slot (consuming free acetaldehyde removes it from the total and the equilibrium
 re-splits) — the D-47 idiom, and the half that keeps carbon closing on `4 + 2 == 6`.
@@ -9746,13 +9756,23 @@ recovers as it goes (dry, 60 mg/L must SO₂, 730 d):
 | SO₂ end mg/L | 60.000 | 44.597 | 30.369 | 24.508 |
 | sotolon µg/L | 0.059 | **0.121** | 2.113 | **7.639** |
 | unsulfited control | 0.025 | 0.677 | 2.632 | 7.837 |
+| **protection ratio** | — | **0.179** | **0.803** | **0.975** |
 
 **The model now says what Pons says**: a sulfited wine is protected while its SO₂ lasts (0.121 vs the unsulfited
 0.677 at 5 mg/L O₂) and goes prémox as the free SO₂ fades — because the O₂ that drives the sotolon **eats the SO₂
-that was suppressing it**. Nothing scripted; D-108's free-read composed with D-72's oxidation. **The real bound is
-one layer out**: a sealed wine here has strictly zero O₂ ingress (no closure permeation — the gap D-102 already
-named for DMS leaving *through* the closure), so a sealed sulfited bottle never ages toward prémox at all. **That**
-is the limitation to state — not "SO₂ is permanent", which was false.
+that was suppressing it**. Nothing scripted; D-108's free-read composed with D-72's oxidation.
+
+**THE EVIDENCE IS THE RATIO ROW, NOT THE SOTOLON ROW — and the difference is a claim this entry nearly overstated.**
+The obvious reading, "sotolon rises monotonically with O₂ at fixed SO₂, therefore protection erodes", is
+**confounded**: the *unsulfited control rises monotonically too*, because O₂ → acetaldehyde (D-71) → sotolon is the
+dominant driver regardless of SO₂. **That ladder would rise if erosion did nothing.** What isolates protection is
+the **sulfited/unsulfited ratio at matched O₂**, which divides the shared driver out: **0.179 → 0.803 → 0.975**,
+climbing toward 1.0 = no protection left. The test asserts the ratio; the first draft asserted the raw ladder and
+would have been *"the sentence and the assertion are not the same claim"* (D-96/D-102) a fourth time.
+
+**The real bound is one layer out**: a sealed wine here has strictly zero O₂ ingress (no closure permeation — the
+gap D-102 already named for DMS leaving *through* the closure), so a sealed sulfited bottle never ages toward
+prémox at all. **That** is the limitation to state — not "SO₂ is permanent", which was false.
 
 ### The regime nothing tested, and the filter that hid my own broken test
 
@@ -9794,9 +9814,16 @@ the audit.** D-105's lesson, recurring with a twist: D-107 wrote the ⚠ that se
 was in D-107's own new Process, described by a sentence D-107 wrote about itself.
 (iv) **The strongest conviction needs no literature — only the siblings.** Three Processes in the same file already
 made the carbonyl-is-blocked argument. The fix was findable by reading the file against itself.
-(v) **The measurement that agrees with you is the one to distrust.** Twice this beat: 39.999 matching a "~40 mg/L"
-that was the wrong regime, and 60.0000 mg/L "proving" SO₂ permanent in a probe that dosed no O₂. Both agreed with
-the story I had; neither measured what I claimed.
+(v) **The measurement that agrees with you is the one to distrust.** Three times this beat: 39.999 matching a
+"~40 mg/L" that was the wrong regime; 60.0000 mg/L "proving" SO₂ permanent in a probe that dosed no O₂; and a
+monotone sotolon ladder "proving" the protection erodes when the unsulfited control is monotone too. All three
+agreed with the story I had; none measured what I claimed. **The third is the sharpest, because it would have
+shipped as the beat's showpiece result.**
+(vi) **I made D-107's exact error while correcting it.** D-107 asserted "real dry whites hold ~30 mg/L" without
+checking the regime; I asserted "the aldol was the ONE reader getting it wrong" without sweeping for the others,
+and invoked D-101's filter lesson *about my test selection* in the same beat I left the fix's own scope unswept.
+The sweep came back clean, so the claim survives — **but it was an assertion until it was a grep**, and that is the
+difference the whole file is about.
 
 ### Next
 

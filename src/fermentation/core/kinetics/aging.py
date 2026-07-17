@@ -1319,14 +1319,19 @@ class SotolonAldolCondensation(Process):
     with me** (D-106's lesson, one beat later). Dosed with O₂ the SO₂ *does* deplete, and sotolon
     recovers as it goes — measured, dry + 60 mg/L must SO₂, O₂ 0/5/20/60 mg/L::
 
-        SO₂ end   60.000 → 44.597 → 30.369 → 24.508  mg/L
-        sotolon    0.059 →  0.121 →  2.113 →  7.639  µg/L   (unsulfited: 0.025 → … → 7.837)
+        SO₂ end            60.000 → 44.597 → 30.369 → 24.508  mg/L
+        sotolon             0.059 →  0.121 →  2.113 →  7.639  µg/L
+        unsulfited control  0.025 →  0.677 →  2.632 →  7.837  µg/L
+        PROTECTION RATIO        —  →  0.179 →  0.803 →  0.975   ← the evidence
 
     So the model now says what Pons says: **a sulfited wine is protected while its SO₂ lasts, and
-    goes prémox as the free SO₂ fades** — the protection is real at 5 mg/L O₂ (0.121 vs the
-    unsulfited 0.677) and gone by 60 (7.639 vs 7.837), because the O₂ that drives the sotolon has
-    eaten the SO₂ that was suppressing it. Nothing scripted; it is D-108's free-read composed with
-    D-72's oxidation. **The real bound is one layer out and is NOT this Process's**: a *sealed* wine
+    goes prémox as the free SO₂ fades** — because the O₂ that drives the sotolon has eaten the SO₂
+    that was suppressing it. Nothing scripted; it is D-108's free-read composed with D-72's
+    oxidation. **Read the RATIO row, not the sotolon row**: the raw ladder rises monotonically in
+    the unsulfited control *too* (O₂ → acetaldehyde → sotolon is the dominant driver either way), so
+    it would rise even if the protection never eroded. Only the sulfited/unsulfited ratio at matched
+    O₂ divides that driver out, and it is what the test asserts (0.179 → 0.975 = protection spent).
+    **The real bound is one layer out and is NOT this Process's**: a *sealed* wine
     here has strictly zero O₂ ingress (no closure permeation — the same gap D-102 named for DMS
     leaving through the closure), so a sealed sulfited bottle never ages toward prémox at all. That
     is the limitation to state, not "SO₂ is permanent", which was false. At O₂ = 0 the sulfited wine
