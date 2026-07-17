@@ -18,6 +18,7 @@ import argparse
 import pathlib
 import re
 import sys
+import unicodedata
 
 DECISIONS = pathlib.Path(__file__).resolve().parent.parent / "docs" / "DECISIONS.md"
 
@@ -32,10 +33,23 @@ TITLE_MAX = 100
 
 
 def slug(heading_text: str) -> str:
-    """Approximate GitHub's heading-anchor algorithm."""
-    s = heading_text.strip().lower()
-    s = re.sub(r"[^\w\s-]", "", s, flags=re.UNICODE)
-    return s.replace(" ", "-")
+    """GitHub's heading-anchor algorithm: lowercase, drop punctuation, spaces to hyphens.
+
+    Keep Unicode *letters* (ℝ in D-46 survives) and *decimal* digits only. The category
+    test is doing real work here: `\\w`/`str.isalnum()` also admit category-No characters,
+    so the subscript in SO₂ / H₂S / CO₂ survived and silently broke 25 of 111 anchors --
+    GitHub strips it. Verified against GitHub's own renderer (`gh api -X POST markdown`),
+    not against this function; checking a slug with the slug that made it proves only
+    self-consistency.
+    """
+    out: list[str] = []
+    for char in heading_text.strip().lower():
+        category = unicodedata.category(char)
+        if category.startswith("L") or category == "Nd" or char in "-_":
+            out.append(char)
+        elif char.isspace():
+            out.append(" ")
+    return "".join(out).replace(" ", "-")
 
 
 def shorten(title: str) -> str:
