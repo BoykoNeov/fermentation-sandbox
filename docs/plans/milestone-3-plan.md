@@ -482,6 +482,30 @@
 > (1e-9→-1.600e-8, 1e-11→-4.010e-12, 1e-13→-1.084e-14), trajectory unchanged — a real over-draw would converge to a
 > NONZERO negative. Bound → 5e-8 with the measured table replacing the claim.]** See D-111.]**
 >
+> **[D-112 MEASURES D-111's "sharpest open item" (the leucine→isoamyl shortfall, 1.12% vs Rollero 3.4–17.3%) BEFORE
+> building and RETIRES it — documentation + tests only, no production change (1171 → 1175, +4). The keto-acid node fixes
+> **none** of the three things the gap turns out to be. (1) **D-103's gate-shape SPREAD is already absorbed by the D-104
+> sink**: sink OFF the catabolic shares span 6% (isoamyl) → 67% (propanol), D-103's 11× spread; sink ON the `(1−f)`
+> multiplier compresses ALL FIVE into 1.1–16.4%, roughly Rollero's uniform "2–15%" band. Four of five are reasonable;
+> isoamyl is the lone outlier and it is UNDER, not over — so "minor alcohols wildly over-attributed" is stale. (2)
+> **Isoamyl sits on a `(1−f)` MASS-CONSERVATION ceiling** = `(1−f)·leucine_C/isoamyl_C = 0.185×6.04% = 1.117%`; Crépin's
+> f prices in every non-isoamyl leucine fate, so the node reallocates *how* leucine reaches isoamyl but not *how much* —
+> the sharper statement is "no sourcing-layer change on this architecture can", not "a scalar can't". The gate cap (the
+> intuitive fix, and the ADVISOR's prediction) is **INERT** (1.12→1.13%, leucine still exhausts): leucine (32 mg/L) is
+> too scarce to persist under any draw rate — empirically refuting the hand-prediction, the probe as arbiter. Even f=0
+> tops out at 7.0%, below Rollero's 17.3%. (3) **Most of the residual gap is an incommensurate DENOMINATOR**: leucine
+> supply MATCHES Rollero (Table S3: 1.3% YAN → ~30 mg/L SM250 ≈ model's 32), but the probe must's `amino_acids_gpl=1.0`
+> dose inflates isoamyl to 307 mg/L (Rollero's is 10–120 mg/L, EMF-column-verified). Since leucine consumed is fixed, the
+> share ∝ 1/isoamyl, so at Rollero's isoamyl the share is ~2.9% ≈ Rollero's 3.4% floor — the 3–15× "shortfall" collapses
+> to ~1× once the denominator matches. Plus a raw-enrichment-vs-net-carbon mismatch (U-¹³C picks up leucine↔KIC exchange
+> a net model can't; flagged not over-parsed, per D-111's mis-mapping lesson). (4) **The isoamyl-MAGNITUDE dig
+> (owner-requested)**: `k_isoamyl_alcohol` is correctly calibrated — 171.8/172.1 mg/L at 250/300 mgN/L with no aa dose,
+> bang on the Wang-2024 172 anchor — so the ~2× over-production is the aa dose's deamination-N sustaining the fusel gate
+> (the documented monotone-in-N branch), not a mis-set k. Recorded, not tuned. The keto-acid node keeps its REAL
+> motivation — D-104's inverted anabolic split (leu<ile<val<thr vs Crépin's reverse), touched only on the valine side at
+> D-111 — and loses the false one (closing the leucine gap). New `tests/test_fusel_catabolic_shape.py` pins all three
+> facts; D-111/D-104/`precursor_fates.py` prose corrected. See D-112.]**
+>
 > **[D-108 — D-107's ⚠ "fix D-27's zero acetaldehyde" is RETIRED, and the bug was in D-107's own aldol. The ⚠ rested on
 > "real dry whites hold ~30 mg/L" — a **SULFITED** figure compared against **UNSULFITED** runs; the like-for-like target
 > is **2.7 mg/L** (Herzan 2020, PMC7684598 variant (0/0/0)) vs the model's 0.000 ⇒ **D-27 acquitted on the gate**, and

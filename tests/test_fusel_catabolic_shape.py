@@ -1,0 +1,155 @@
+"""The fusel catabolic SHAPE, measured — the receipts for D-112.
+
+D-111 left "the leucine-derived isoamyl shortfall (1.12% vs Rollero 3.4-17.3%)" as the sharpest
+open item, framed as D-103's gate *shape* that the keto-acid node would fix. **D-112 measured it
+and retired that framing.** This suite pins the three measurements so a future beat cannot quietly
+re-inherit the stale story:
+
+1. **D-103's gate-shape SPREAD is absorbed by the D-104 non-Ehrlich sink** — it is large with the
+   sink off (isoamyl ~6% vs propanol ~67%) and compresses to a uniform low band with it on. So the
+   "minor alcohols are wildly over-attributed" defect is gone, and only isoamyl (UNDER) survives.
+2. **Isoamyl sits on its ``(1-f)`` mass-conservation ceiling**, which no sourcing-layer change —
+   the keto-acid node included — can lift: a gate cap (the "obvious" fix) does not move it, because
+   leucine is too scarce to persist under any draw rate.
+3. **``k_isoamyl_alcohol`` is correctly calibrated** to the Wang 2024 172 mg/L anchor at typical
+   must nitrogen with no amino-acid dose — so the ~2x isoamyl over-production in the D-109
+   characterization must is the ``amino_acids_gpl=1.0`` dose (Finding 4), not a mis-set ``k``.
+
+All shares are measured from EXACT state differences (no quadrature — D-103's trapezoid error),
+reusing the vetted D-109 harness where possible.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from fermentation.core.chemistry import CARBON_ATOMS, carbon_mass_fraction
+from fermentation.core.kinetics.amino_acid_pools import depletion_gate as _orig_gate
+from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS, ISOAMYL_ALCOHOL
+from fermentation.runtime import simulate_scheduled
+from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from tests.test_fusel_keto_acid_node import (
+    _FERMENT_DAYS,
+    _OTHER_PRECURSOR_CONSUMERS,
+    _de_novo_share,
+    _end,
+    _run,
+)
+
+_SINK = "precursor_non_ehrlich_fates"
+_PROPANOL = next(s for s in FUSEL_SPECS if s.pool == "propanol")
+
+
+def _direct_catabolic_share_sink_off(spec) -> float:
+    """Precursor-derived carbon fraction of ``spec``'s alcohol with the D-104 sink DISABLED.
+
+    With the sink off the re-route is the precursor's ONLY consumer, so consumed precursor carbon
+    times ``n/(n+1)`` (removing the D-106 decarboxylation CO2) is exactly the alcohol carbon sourced
+    from it — an exact state difference, no quadrature. This is ~D-103's gate value; contrast with
+    :func:`_de_novo_share` (sink on), which yields the compressed ``(1-f)``-scaled share.
+    """
+    prec = spec.precursor_amino_acid
+    traj, schema = _run(aging=False, drop=(*_OTHER_PRECURSOR_CONSUMERS, _SINK))
+    consumed = float(traj.y[schema.slice(prec), 0][0]) - _end(traj, schema, prec)
+    made = _end(traj, schema, spec.pool)
+    n_alc = CARBON_ATOMS[spec.species]
+    alc_from_prec = consumed * carbon_mass_fraction(prec) * n_alc / (n_alc + 1.0)
+    return alc_from_prec / (made * carbon_mass_fraction(spec.species))
+
+
+def test_the_d104_sink_absorbs_the_d103_gate_shape_spread():
+    """D-103's 11x catabolic spread is absorbed by the D-104 sink (decision D-112, finding 1).
+
+    With the sink OFF the gate over-attributes minor alcohols exactly as D-103 diagnosed — propanol
+    (small carbon draw against an abundant precursor) reads many times isoamyl (large draw, which
+    throttles its own gate). With the sink ON the ``(1-f)`` multiplier compresses every alcohol into
+    Rollero's uniform low band. So "minor alcohols are wildly over-attributed" is no longer true,
+    and the only survivor is isoamyl — which is UNDER, the opposite direction. If a future beat
+    re-widens the sink-on spread, the D-112 premise (the gate-shape defect is retired) has moved.
+    """
+    iso_off = _direct_catabolic_share_sink_off(ISOAMYL_ALCOHOL)
+    prop_off = _direct_catabolic_share_sink_off(_PROPANOL)
+    # D-103's spread: sink OFF, propanol reads several times isoamyl (a minor alcohol over-read).
+    assert prop_off > 4.0 * iso_off, (
+        f"sink-OFF spread collapsed (propanol {prop_off:.1%} vs isoamyl {iso_off:.1%}) — D-103's "
+        "gate-shape spread is the thing D-112 says the sink absorbs; if it is gone with the sink "
+        "off too, finding 1's baseline has moved"
+    )
+    # Sink ON: every alcohol compresses to the low band (all five <= ~17%, Rollero's uniform range).
+    on = {s.pool: 1.0 - _de_novo_share(s) for s in FUSEL_SPECS}
+    assert max(on.values()) < 0.20, f"sink-on shares no longer compressed to the low band: {on}"
+    # And the compression is real: propanol specifically drops from tens-of-% to the low band.
+    assert on["propanol"] < 0.5 * prop_off
+
+
+def test_isoamyl_sits_on_the_one_minus_f_mass_conservation_ceiling(monkeypatch):
+    """Isoamyl's leucine share is a ``(1-f)`` ceiling a gate cap cannot move (D-112, finding 2).
+
+    Leucine's only two AF fates are the non-Ehrlich lump ``f`` and isoamyl ``(1-f)``, so its share
+    of isoamyl is ``(1-f) x leucine_C/isoamyl_C`` — a mass-conservation ceiling the model sits on.
+    The keto-acid node reallocates HOW leucine reaches isoamyl (via KIC) but not HOW MUCH, and
+    Crépin's ``f`` already prices in every non-isoamyl fate. The proof the ceiling binds:
+    a gate cap — the intuitive "stop the gate over-claiming" fix — does NOT move the realised share,
+    because leucine (~32 mg/L) is too scarce to persist under any draw rate (the advisor predicted
+    the opposite; the probe refuted it). If a cap ever DOES move it, leucine has stopped exhausting
+    and the ceiling argument must be re-derived.
+    """
+    base = 1.0 - _de_novo_share(ISOAMYL_ALCOHOL)
+    assert 0.005 < base < 0.03, f"isoamyl leucine share {base:.4f} left its measured ~1.1% regime"
+
+    # Cap the availability gate at 0.10 (the D-104 sink rides ehrlich_draws->depletion_gate, so both
+    # the re-route and the sink shrink together — a faithful "catabolic cap with the sink intact").
+    # String target so mypy does not need depletion_gate re-exported from byproducts.
+    monkeypatch.setattr(
+        "fermentation.core.kinetics.byproducts.depletion_gate",
+        lambda *a, **k: min(_orig_gate(*a, **k), 0.10),
+    )
+    capped = 1.0 - _de_novo_share(ISOAMYL_ALCOHOL)
+    assert abs(capped - base) < 0.005, (
+        f"the gate cap moved isoamyl leucine share {base:.4f} -> {capped:.4f}: it should be inert "
+        "(leucine exhausts under any draw rate), which is why no cap and no node lifts the ceiling"
+    )
+
+
+def _isoamyl_no_dose(yan_mgl: float, celsius: float = 20.0) -> float:
+    """Finished isoamyl (mg/L) with NO amino-acid dose, at ``yan_mgl`` and ``celsius`` (D-112)."""
+    scenario = Scenario(
+        name="d112-anchor",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": yan_mgl, "pitch_gpl": 0.25, "amino_acids_gpl": 0.0},
+        temperature_schedule=[
+            TemperaturePoint(day=0.0, celsius=celsius),
+            TemperaturePoint(day=_FERMENT_DAYS, celsius=celsius),
+        ],
+        duration_days=_FERMENT_DAYS,
+    )
+    cs = compile_scenario(scenario)
+    traj = simulate_scheduled(
+        cs.process_set,
+        cs.param_values,
+        cs.y0,
+        cs.t_span_h,
+        events=cs.events,
+        param_tiers=cs.parameters.tier_map(),
+    )
+    assert traj.success, traj.message
+    return _end(traj, cs.process_set.schema, ISOAMYL_ALCOHOL.pool) * 1e3
+
+
+@pytest.mark.parametrize("yan", [250.0, 300.0])
+def test_k_isoamyl_alcohol_lands_the_wang_2024_anchor_at_typical_must_n(yan):
+    """``k_isoamyl_alcohol`` lands finished isoamyl on its 172 mg/L anchor (D-112, finding 4).
+
+    The provenance sets ``k`` to land 3-methylbutan-1-ol at the Wang 2024 mean **172 mg/L**. With
+    NO amino-acid dose, at typical must nitrogen (250-300 mgN/L) and ``T_ref = 20 °C``, the model
+    reproduce that mean — so the ~2x isoamyl over-production in the D-109 characterization must
+    (307 mg/L) is the ``amino_acids_gpl=1.0`` dose's deamination-N sustaining the fusel gate, NOT a
+    mis-set ``k``. This is what makes the isoamyl catabolic DENOMINATOR a probe artifact, not a
+    calibration bug: the ceiling comparison in finding 3 rests on the ``k`` being right here.
+    """
+    isoamyl = _isoamyl_no_dose(yan)
+    assert 140.0 < isoamyl < 205.0, (
+        f"isoamyl {isoamyl:.1f} mg/L at YAN {yan:.0f} (no aa dose, 20 °C) left the 172 mg/L Wang "
+        "anchor band — if k moved, D-112 finding 4 (the over-production is the aa dose, not the k) "
+        "must be re-measured"
+    )

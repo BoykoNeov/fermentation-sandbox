@@ -62,11 +62,18 @@ isobutanol           43.6%       **6.5%**   5–15% (Rollero, U-13C valine)
 isoamyl alcohol      7.4%        **1.35%**  2–8% (Rollero, U-13C leucine) — UNDER
 ===================  ==========  =========  ====================================
 
-**Isoamyl's miss is sourced, not a loose end — do not tune it.** Crépin measures **23% of
-consumed valine reaching KIC → isoamyl alcohol**. Reality feeds isoamyl exogenous carbon from
-*both* leucine and valine; this model routes only leucine, so it **must** under-count. The gap is
-a missing route (valine → KIC → isoamyl), and closing it means a keto-acid node — named in D-104,
-not built here. ``active_amyl_alcohol`` is over-attributed by an unknown margin for the mirror
+**Isoamyl's miss is sourced, not a loose end — do not tune it. [D-111 built the valine route; D-112
+MEASURED that it does not close the leucine gap, and neither does the node.]** The valine → KIC →
+isoamyl route D-104 named as missing is real and was built at D-111 (0% → 1.74%, matching Rollero's
+valine tracer). But the *leucine*-derived shortfall (1.12% vs Rollero's *leucine* tracer 3.4–17.3%)
+is a **different quantity** a valine route cannot touch, and D-112 measured that no sourcing-layer
+change touches it either: leucine's only AF fates are this lump ``f`` and isoamyl ``(1−f)``, so
+``isoamyl_leucine = (1−f)·leucine_C/isoamyl_C`` is a **mass-conservation ceiling** the model already
+sits on, and Crépin's ``f`` already prices in every non-isoamyl fate. Most of the residual gap is an
+incommensurate isoamyl **denominator** (the probe must's ``aa`` dose inflates isoamyl ~2×; at
+Rollero's isoamyl the share is ~2.9%, ≈ Rollero's floor) plus a raw-enrichment-vs-net-carbon
+mismatch. So the keto-acid node's motivation is D-104's **inverted split**, never this gap.
+``active_amyl_alcohol`` is over-attributed by an unknown margin for the mirror
 reason: Crépin does not resolve isoleucine's active-amyl share, so ``f_non_ehrlich_isoleucine``
 falls back to the protein share, a *lower bound* on the true lump.
 
