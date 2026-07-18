@@ -506,6 +506,19 @@
 > D-111 — and loses the false one (closing the leucine gap). New `tests/test_fusel_catabolic_shape.py` pins all three
 > facts; D-111/D-104/`precursor_fates.py` prose corrected. See D-112.]**
 >
+> **[D-113 MEASURES D-112's one surviving motivation — "does D-111's valine route touch D-104's inverted split?" — and
+> the answer is NO, structurally. The inversion is a property of the EMERGENT demand sink (leucine 20.9% vs Crépin
+> 77–86%); the shipped model IMPOSES the split via static `f`, so reading it back is the D-108 vacuity trap. An
+> **invariance probe** (no demand-sink reconstruction → no invented biomass spectrum, the D-98 trap) settles it: (1)
+> **leucine's Ehrlich branch is BIT-INVARIANT** under the route toggle — `ehrlich_draws` clamps the valine branch to
+> *headroom above* leucine's full claim, so the route relieves leucine of **0%** of its isoamyl demand (D-111 Finding 5's
+> 122.7% clamp cut the *KIC* branch, not leucine's 90.9%). (2) **Total biomass invariant** → leucine's emergent share is
+> route-invariant for ANY `w_leu`. (3) The route moves NO concentration at all (both toggles: even the full D-111 route+`f`
+> change) — every precursor exhausts, so it is pure carbon-**attribution**; valine's protein-proxy 0.85→0.62 is imposed
+> bookkeeping on the *least*-inverted species (45.8 vs 41), never leucine. Advisor's "~1.74% relief" corrected to 0% by
+> the code, surfaced not switched. **Un-inverting leucine needs a de-novo-KIC *leucine relief* (not a valine drain) +
+> kinetically-limited transamination — an unsourced build, the owner's call.** Doc+test only, 1175→1176. See D-113.]**
+>
 > **[D-108 — D-107's ⚠ "fix D-27's zero acetaldehyde" is RETIRED, and the bug was in D-107's own aldol. The ⚠ rested on
 > "real dry whites hold ~30 mg/L" — a **SULFITED** figure compared against **UNSULFITED** runs; the like-for-like target
 > is **2.7 mg/L** (Herzan 2020, PMC7684598 variant (0/0/0)) vs the model's 0.000 ⇒ **D-27 acquitted on the gate**, and

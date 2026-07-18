@@ -73,6 +73,10 @@ sits on, and Crépin's ``f`` already prices in every non-isoamyl fate. Most of t
 incommensurate isoamyl **denominator** (the probe must's ``aa`` dose inflates isoamyl ~2×; at
 Rollero's isoamyl the share is ~2.9%, ≈ Rollero's floor) plus a raw-enrichment-vs-net-carbon
 mismatch. So the keto-acid node's motivation is D-104's **inverted split**, never this gap.
+**[D-113 measured whether D-111's valine route touches that inverted split: it does not. Leucine's
+Ehrlich branch is bit-invariant under the route — it is a headroom-fill that relieves leucine of 0%
+of its isoamyl demand (a valine *drain*, not the leucine *relief* the inversion needs). Un-inverting
+leucine remains an unsourced build (de-novo-KIC relief + kinetically-limited transamination).]**
 ``active_amyl_alcohol`` is over-attributed by an unknown margin for the mirror
 reason: Crépin does not resolve isoleucine's active-amyl share, so ``f_non_ehrlich_isoleucine``
 falls back to the protein share, a *lower bound* on the true lump.

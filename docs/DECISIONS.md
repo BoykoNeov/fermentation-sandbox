@@ -120,6 +120,8 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 - [**D-109**](#d-109--the-fusel-side-of-the-keto-acid-node-the-prescribed-fix-was-the-one-d-49-forbids-and-the-claim-i-set-out-to-correct-was-true) — the fusel side of the keto-acid node: the prescribed fix was the one D-49 forbids, and the claim I …
 - [**D-110**](#d-110--the-last-lump-retired-it-was-false-rather-than-coarse-the-hedge-outlived-two-real-lumps-and-only-the-test-i-was-told-to-delete-caught-the-bug) — the last lump, retired: it was FALSE rather than coarse, the hedge outlived two real lumps, and …
 - [**D-111**](#d-111--the-fusel-side-keto-acid-node-the-route-is-real-the-reason-it-was-missing-was-not-and-four-confirmations-passed-on-the-wrong-rows) — the fusel-side keto-acid node: the route is real, the reason it was missing was not, and four …
+- [**D-112**](#d-112--the-leucineisoamyl-shortfall-measured-before-building-d-103s-spread-is-already-retired-by-d-104-the-node-cannot-lift-the-1f-ceiling-and-most-of-the-gap-is-an-incommensurate-denominator) — the leucine→isoamyl "shortfall" measured before building: retired as a gate-shape defect, a `(1−f)` ceiling, and an incommensurate denominator …
+- [**D-113**](#d-113--the-node-measured-against-the-inversion-it-was-kept-for-d-111s-valine-route-leaves-leucine-bit-invariant-so-the-split-it-must-un-invert-is-untouched) — the node measured against the inversion it was kept for: D-111's valine route leaves leucine bit-invariant, so the split it must un-invert is untouched …
 <!-- END INDEX -->
 
 ## Process decisions (project setup)
@@ -10581,7 +10583,10 @@ if it is wanted.
 - **The prize is still open: D-104's inverted split** (model leu<ile<val<thr against Crépin's thr<val<ile<leu). D-111
   builds the *mechanism* D-104 said the model could not represent — *"reality escapes the inversion by building isoamyl
   from KIC... this model has no keto-acid node, so it cannot reproduce that mechanism"*. It now has one, on the valine
-  side only. Whether that touches the inversion is untested.
+  side only. Whether that touches the inversion is untested. **[D-113 MEASURED IT — it does not: leucine's Ehrlich
+  branch is bit-invariant under the route (a headroom-fill relieves leucine of 0% of its isoamyl demand), so leucine's
+  emergent split is untouched. The route feeds isoamyl from a valine *drain*, not the leucine *relief* the inversion
+  needs. See D-113.]**
 - **D-109's parsimony question** (per-species vs shared BAT1/BAT2 transaminase) is untouched, and must be prototyped
   **kinetically-limited, not near-equilibrium**.
 - The remaining node routes: **KMV → isoleucine**, **phenylpyruvate**.
@@ -10706,9 +10711,144 @@ no aa dose. Each fails if a future beat moves the fact it pins.
 ### Next
 
 * The node's live motivation is the **inverted split** (untested since D-111's valine-only touch), **not** the leucine gap.
+  **[D-113 MEASURED it: D-111's valine route does NOT touch the inversion — leucine is bit-invariant. Un-inverting it
+  needs a de-novo-KIC *leucine relief* (not a valine drain) + kinetically-limited transamination — an unsourced build,
+  the owner's call. See D-113.]**
 * The **isoamyl production magnitude / monotone-in-N branch** (Finding 4) is the concrete model-improvement lever this
   beat surfaced: at a realistic must the dominant higher alcohol reads ~2.5× the source, feeding the OAV / D-97 banana
   layer. It is a real calibration item orthogonal to routing — deferred here (the non-monotone Ehrlich shape is unsourced,
   the D-98 trap), not dismissed.
 * Unchanged from D-111: D-109's parsimony question (shared BAT1/BAT2); the KMV → isoleucine and phenylpyruvate routes;
   Rollero's isoamyl-*acetate* enrichment as an unused D-97 ATF1 check; the deferred tail.
+
+## D-113 — the node measured against the inversion it was kept for: D-111's valine route leaves leucine bit-invariant, so the split it must un-invert is untouched
+
+**D-112 stripped the keto-acid node down to its one surviving motivation — D-104's inverted anabolic split (model
+leucine 20.9% to protein against Crépin's 77–86%, order `leu<ile<val<thr` exactly reversed) — and left one thing
+explicitly untested: *"D-111 built the KIC mechanism on the valine side only. Whether that touches the inversion is
+untested."* This beat is that test. It does not, and the reason is structural — the route relieves leucine of **0%**
+of its isoamyl demand.** Documentation + one test, **no production change**: `git diff` touches only
+`tests/test_fusel_catabolic_shape.py`, `docs/`, and prose. **1175 → 1176 passed** (baseline from `--collect-only` at
+HEAD; after-count measured), 16/16 benchmarks, ruff + mypy clean.
+
+### The trap avoided first: measuring the SHIPPED split is vacuous
+
+The obvious probe — run the model, read each precursor's realised anabolic share — is the D-108 vacuity trap. The
+shipped model does not *exhibit* the inversion; it **imposes** the split via static sourced `f_non_ehrlich`
+(`precursor_fates.py`: leucine 0.815, valine 0.62, threonine 0.82, isoleucine 0.51). Reading those back out just
+recites Crépin. The inversion — leucine at 20.9% — is a property of the **emergent, demand-anchored** sink (D-100's
+rejected prescription, `w_i·dX/dt` at biomass composition), which D-104 measured on a throwaway prototype and never
+shipped. So the decision-relevant question is not *"what is leucine's share"* but *"does the valine route MOVE it"*,
+and that has a clean answer without ever reconstructing the demand sink.
+
+### The method: an invariance probe, because reconstructing the sink would spring the D-98 trap
+
+Leucine's emergent protein share is `D_bio,leu / (D_bio,leu + D_ehrlich,leu)`, with `D_bio,leu = w_leu · (total
+biomass built)` and `D_ehrlich,leu` its Ehrlich draw. Reproducing D-104's 20.9% would need an **invented yeast-protein
+amino-acid spectrum** (`w_leu`) — a speculative constant the model does not carry, minted to characterise a prototype
+that was never built: the D-98 trap in service of a number that is not decision-relevant. The invariance probe needs
+none of it: **if both `D_ehrlich,leu` and total biomass are invariant under the route toggle, the share is invariant
+for ANY `w_leu`.** Toggle cleanly via `f_valine_to_isoamyl ∈ {0.23, 0}` (leucine's branch is untouched by construction;
+this isolates the route). The prediction was written before the run (D-111 discipline): both deltas second-order, and
+the sign of leucine's — if any — *toward more inversion* via the valine-deamination N-feedback (more N → higher fusel
+gate → larger isoamyl claim). It held.
+
+### Finding 1 — leucine's Ehrlich branch is BIT-INVARIANT under the route (derivative level, exact)
+
+`ehrlich_draws` gates leucine's isoamyl branch at `gate_leu · fusel_carbon_isoamyl` in its primary loop and **clamps
+the valine branch to the headroom *above* it** (`headroom = totals[isoamyl] − by_alcohol[isoamyl]`). So the two
+branches do not compete: leucine claims first, valine fills the remainder. Measured on a dosed mid-ferment state, the
+route leaves **every** branch bit-identical and adds exactly one:
+
+| (precursor → alcohol) | route ON | route OFF |
+|---|---|---|
+| leucine → isoamyl | `0.005681878653847694` | `0.005681878653847694` |
+| valine → isobutanol | `0.00102698156` | `0.00102698156` |
+| isoleucine → active amyl | `0.0023650077` | `0.0023650077` |
+| threonine → propanol | `0.000654792943` | `0.000654792943` |
+| **valine → isoamyl** | **`0.000363640234`** | **`0` (absent)** |
+
+**The route relieves leucine of 0% of its isoamyl demand — it adds a valine drain, it does not lift a leucine one.**
+This is D-111 Finding 5 read the other way: the 122.7% over-claim clamp cut the *KIC* branch 31.8→9.1%, and leucine
+kept its 90.9%.
+
+### Finding 2 — end to end, both inputs to leucine's share are invariant, so the share is (for any `w_leu`)
+
+On the Crépin-commensurate must (180 mg N/L, 28 °C, aa = 1.0), toggling the route: **leucine consumed** (∝ `D_ehrlich,leu`
+via the sink's exact `f:(1−f)` split, `f_non_ehrlich_leucine` route-invariant) moves **+1.6e-8**, **total biomass**
+(∝ `D_bio,leu`) moves **+2.0e-7** — solver noise, and the sign is the predicted N-feedback direction. Every precursor
+consumed is invariant to ≤3.4e-8; biomass, isoamyl, isobutanol to ≤2e-6. **Leucine's emergent protein share is
+route-invariant for every biomass composition. The inversion is untouched.**
+
+### Finding 3 — the route moves NO concentration at all; even valine's shift is attribution-only, and imposed
+
+The contrast the advisor asked for, and it came out sharper than the framing: the route touches **valine** — but even
+*that* moves no physical quantity. Two toggles were run: the route alone (`f_valine_to_isoamyl 0.23→0`, lump pinned)
+and **the whole D-111 beat** (post = route + `f_non_ehrlich_valine` 0.62; pre = no-route + 0.85). Under *both*, every
+precursor still exhausts to its dose and biomass/isoamyl/isobutanol are invariant to ≤3e-5. **D-111 was a pure
+carbon-attribution change**: it relabels where isoamyl's/valine's carbon is *booked* (the tracer quantity D-111
+reported as 0% → 1.74% valine-derived isoamyl), with zero effect on any concentration, because valine — like leucine —
+**exhausts either way** (D-112's mass-conservation logic, one precursor over). Valine's realised protein-proxy lump did
+move 0.85 → 0.62 toward Crépin's non-Ehrlich share — but that is the *imposed* static `f`, a bookkeeping correction on
+the **least**-inverted species (model 45.8 vs Crépin 41), not the model emergently producing a split. So the honest
+verdict threads two errors: **not** "the route does nothing" (it corrected valine's attribution) and **not** "the route
+helps the inversion" (valine was not the inverted species; leucine is, and leucine is bit-invariant).
+
+### The reasoning was refined mid-beat, and the correction is the point
+
+The approach was checked with the stronger reviewer before any code. Its first read was that the valine route relieves
+leucine of *~1.74%* of its isoamyl demand (leucine still facing ~98%) — predicting the inversion *barely* moves.
+Reading `ehrlich_draws` refuted it: the valine branch is headroom-*fill*, so leucine's claim is untouched and the
+relief is **0%, not 1.74%** — which makes the conclusion *stronger*, not weaker. The reviewer, shown the code,
+concurred and redirected the method away from reconstructing the demand sink (the D-98 trap) to the invariance probe.
+**The primary source — the code — beat the a-priori estimate**, which is D-105's "measure the code" and this project's
+standing refrain that the reasoned call has been empirically wrong here more often than not (D-97, D-104, D-108, D-111,
+D-112). It was surfaced as a reconcile rather than a silent switch, and the run confirmed the code reading (the
+second-order N-feedback the code cannot show came out at the predicted sign and 1e-8 magnitude).
+
+### The receipt, and the anti-vacuity
+
+`test_the_valine_route_does_not_touch_leucines_anabolic_split` pins both halves: the derivative-level bit-equality of
+leucine's branch (a leucine-relieving route would break the exact `==`), and the end-to-end invariance of leucine
+consumed + biomass. **Anti-vacuity is explicit**: the same test asserts the valine → isoamyl branch *appears* with the
+route and *vanishes* without it, so the invariance is not a no-op on a disabled route — the route is live, and it is
+valine it touches, never leucine. If a future beat claims the node fixed the inversion, this fails, because the split
+it must move is leucine's.
+
+### What this leaves — and it is a build the owner has not authorised
+
+The node's motivation is now **measured, not merely asserted, to be unaddressed by what exists.** Un-inverting leucine
+requires the model to *emergently* produce leucine's 77–86% protein share, which needs two things the model does not
+have, **both unsourced**:
+
+- **A de-novo-KIC route that RELIEVES leucine's isoamyl demand** — isoamyl built from a mostly-de-novo keto acid so the
+  leucine pool never faces the isoamyl draw (D-104's stated escape mechanism). D-111 built a valine *drain* on isoamyl;
+  this is a leucine *relief*, the opposite direction, and it is what the inversion actually needs.
+- **Kinetically-limited transamination** (D-109's parsimony fork: per-species vs shared BAT1/BAT2). D-104 already
+  measured that *near-equilibrium* transamination does **not** un-invert (the label equilibrates and leucine returns to
+  ~22%), so the kinetic limit is load-bearing — and its rate is an author estimate, the D-98 trap.
+
+**This is a mechanism build resting on an invented transaminase rate, so it is the owner's call, not a drive-by.** The
+measurement is the deliverable; the build is surfaced, not started.
+
+### Lessons
+
+(i) **The vacuity trap has a third axis: the QUANTITY, not just the regime (D-108) or the compound (D-104).** Measuring
+the shipped split would have read the imposed `f` back out — a number that agrees with the source because it *is* the
+source. The inversion lives in a quantity the shipped model does not compute (the emergent share), and the probe had to
+target the *toggle's effect* on that quantity's inputs, not the quantity itself.
+(ii) **An invariance probe can beat a reconstruction — fewer invented numbers, and more general.** Reproducing 20.9%
+needed a fabricated biomass spectrum; showing both inputs invariant needs none and holds for *any* spectrum. D-107's
+"the faithful form had fewer invented numbers," applied to a measurement instead of a rate law.
+(iii) **A headroom-fill is not a relief, and conservation cannot tell them apart.** The valine branch and a
+leucine-relieving branch would both close the carbon ledger; only reading *which* branch the draw comes off
+distinguishes "adds a valine drain" from "lifts a leucine one" — the D-105/D-111 shape, where the ledger is blind to
+the attribution that is the entire finding.
+
+### Next
+
+- **The inverted split is now measured-untouched, and un-inverting it is a scoped but unsourced build** (de-novo-KIC
+  leucine-relief + kinetically-limited transamination) — the owner's call, per the D-98 trap and the parsimony fork.
+- Unchanged from D-111/D-112: D-109's parsimony question (shared BAT1/BAT2, prototyped kinetically-limited); the
+  **KMV → isoleucine** and **phenylpyruvate** node routes; the isoamyl-magnitude / monotone-in-N lever (D-112 Finding 4);
+  Rollero's isoamyl-*acetate* enrichment as an unused D-97 ATF1 check; closure O₂ ingress; the deferred tail.
