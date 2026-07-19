@@ -10862,7 +10862,7 @@ the attribution that is the entire finding.
 
 **What.** D-111 left *"an unused independent check: Rollero's isoamyl **acetate** enrichment (0–19.7 % valine-labelled)"*
 as an open item. It is now run. The model's valine-derived share of `isoamyl_acetate` is **0 %** — not small, but
-**structurally incapable of being anything else** — against Rollero's measured 0.0–19.7 % (4.0–4.4 % at the
+**structurally incapable of being anything else** — against Rollero's measured 0.0–19.7 % (**~4 %** at the
 well-measured columns). No code changed except one new test. The finding is *why* the zero is structural, and what it
 costs the build that was supposed to fix it.
 
@@ -10874,8 +10874,15 @@ than trusted. `image1.emf` (Table S1, U-¹³C valine) was re-parsed with the coo
 its own `Is. Enr.` row, and an independent labelled/total computation from the raw µM agrees to rounding.
 
 **The band is real but the note flattened its structure, and the structure is the point.** The four high values
-(17.6 / 19.7 / 14.9 / 16.6 %) all sit at SM70, where the acetate *total* is 0.45–1.59 µM — noise-dominated. At the
-well-measured SM250/SM425 columns the acetate reads **4.0–4.4 %** against its parent alcohol's **3.4–7.3 %**. So the
+(17.6 / 19.7 / 14.9 / 16.6 %) all sit in the low-nitrogen **SM70** blocks, and they are excluded on a **physical
+bound, not a noise argument**: in a valine tracer the acetyl group comes from unlabelled acetyl-CoA, so a labelled
+acetate requires a labelled alcohol and **the ester's enrichment cannot exceed its parent alcohol's**. Every one of
+those four does — by **3.1× / 3.5× / 5.3× / 3.2×** against alcohol readings of 5.6 / 5.6 / 2.8 / 5.2 %. **This is
+exactly the tell that caught D-111's row-mapping error** (isobutyl acetate enriched in the *leucine* culture while
+isobutanol was not — Finding 0), reappearing as a data-quality discriminator: at SM70 the acetate totals are small and
+7 of 8 columns breach the bound, so the block cannot be read as enrichment at all. At the well-measured SM250/SM425
+columns the acetate is **~4 % (median 4.1, spread 0.0–5.4)** against its parent alcohol's **3.4–7.5 %**, at or
+marginally below it throughout (three columns exceed by 1.0–1.3×, i.e. within measurement error). So the
 sourced fact is not a 20-point band to be scored against loosely; it is the tight statement **the ester carries label
 at essentially its parent alcohol's enrichment** — which is what the chemistry predicts, the C5 skeleton transferring
 as a unit, and Rollero's enrichment being a *molecule* fraction (D-111 Finding 3). **"0–19.7 %" would have made the
@@ -10949,7 +10956,8 @@ invalidated** rather than silently going green on a stale claim.
 
 (i) **The anti-vacuity check must cover the SOURCED BAND, not just the assertion.** 0 ∈ [0, 19.7 %], so a
 band-membership test would have passed vacuously and reported the model as *agreeing* with Rollero. The band's own
-noise structure — four high values at sub-2 µM totals — is what turned a pass into a miss. **A loose band can make a
+internal structure — a whole low-nitrogen block breaching the physical ester ≤ alcohol bound — is what turned a pass
+into a miss. **A loose band can make a
 structural zero look like a fit.**
 (ii) **"Mass-negligible" and "observable-negligible" are different quantities, and a deferral can be right on one and
 badly wrong on the other.** D-97's ~0.5 mg/L reasoning was correct and remains correct; it just does not bound what
