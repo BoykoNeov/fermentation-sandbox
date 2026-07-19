@@ -901,6 +901,67 @@ def test_ester_synthesis_reads_the_fusel_pool_but_never_debits_it(params):
     assert float(d[schema.slice("isoamyl_acetate")][0]) > 0.0, "...while still making the ester"
 
 
+def test_the_ester_carries_no_amino_acid_label_because_its_carbon_is_wholly_sugar_sourced(params):
+    """D-114 — the model's isoamyl-acetate enrichment is STRUCTURALLY zero, and why.
+
+    Rollero 2017 Table S1 (U-¹³C valine) measures isoamyl **acetate** at 0.0-19.7 % labelled
+    (4.0-4.4 % at the well-measured SM250/SM425 columns) against its parent **alcohol**'s
+    2.1-7.5 % — the ester tracks the alcohol, because the C5 skeleton transfers as a unit and
+    Rollero's enrichment is a *molecule* fraction (D-111 Finding 3). The model returns **0 %**,
+    and not as a small number: it cannot return anything else.
+
+    **The reason is stock-vs-flow, and it is what this test pins.** ``ehrlich_draws`` costs
+    *production* — it knows which precursor a gram of alcohol was made from at the moment it is
+    made. A pool is a bare ``float64`` slot carrying no provenance. The alcohol is sourced
+    directly by the Ehrlich producer, so its carbon is flow-attributable; the ester is drawn
+    from the alcohol *pool* (D-97 reads it, never debits it) and its own carbon comes wholly
+    from ``S``, so attributing it would need *stock* attribution the model does not have.
+
+    **Why this is asserted on the CARBON, not on the draw list.** "No ``EsterSpec`` appears in
+    ``ehrlich_draws``" would be a tautology about the data structure — a check sharing the
+    error's own assumption (D-111 Finding 0). The load-bearing assertion is that every gram of
+    ester carbon is removed from ``S``: if a future beat builds the deferred D-69 5:2-inverse
+    re-route, the C5 would come off ``isoamyl_alcohol`` and only 2/7 of the draw would land on
+    sugar — and this test FAILS, which is the finding's premise being correctly invalidated.
+
+    **The consequence recorded for the next beat:** that re-route is *necessary but not
+    sufficient*. Debiting a provenance-free pool moves mass without moving label, so reaching
+    Rollero's ~4 % additionally needs provenance to ride in state — the D-1 shape (tier and
+    uncertainty deliberately do not ride inside the state floats), an architectural layer
+    rather than D-97's "mass-negligible" (~0.5 mg/L) deferral.
+    """
+    schema = wine_schema()
+    proc = EsterSynthesis()
+
+    # A realistic mid-ferment state: sugar left to draw from, a real precursor alcohol pool.
+    y = _wine_y0(schema, x=1.5, s=180.0, e=40.0, n=0.05)
+    y[schema.slice("isoamyl_alcohol")] = 0.05
+    d = proc.derivatives(0.0, y, schema, params)
+
+    # Anti-vacuity: the ester must actually be forming, or "0 % of nothing" proves nothing.
+    banana = float(d[schema.slice("isoamyl_acetate")][0])
+    assert banana > 0.0, "vacuous: no ester is being synthesised at this state"
+
+    # THE PIN: the carbon deposited in the three ester pools is removed from S, in full.
+    # draw_carbon_from_sugar guarantees Sigma_i(d[S_i]*c_i) == -carbon exactly, so any carbon
+    # sourced from the alcohol pool (or an amino acid) instead would show up as a residual.
+    ester_carbon = sum(
+        float(d[schema.slice(spec.pool)][0]) * carbon_mass_fraction(spec.species)
+        for spec in ESTER_SPECS
+    )
+    sugar_carbon = -float(d[schema.slice("S")][0]) * _GLUCOSE_C
+    assert ester_carbon > 0.0
+    assert sugar_carbon == pytest.approx(ester_carbon, rel=1e-12), (
+        "every gram of ester carbon must come from S (D-97 'read, never debited'). A shortfall "
+        "here means some of it now comes off the precursor pool — the D-69 5:2-inverse re-route "
+        "— at which point the ester's enrichment is no longer structurally zero and D-114's "
+        "measurement must be redone"
+    )
+
+    # And the alcohol pool is genuinely untouched, so none of that carbon came from it.
+    assert float(d[schema.slice("isoamyl_alcohol")][0]) == 0.0
+
+
 def test_banana_rate_is_first_order_in_the_fusel_pool(params):
     """The MECHANISM at the derivative level: double the precursor, double the banana rate -
     and leave the other two esters exactly where they were.
