@@ -165,15 +165,24 @@ and it conflated two families that move in *opposite* directions:
   **forms**. The sim tracks **none** of them, so the deferred formation half as scoped had no
   pool to act on.
 
-Sources are three independent verbatim reads (Díaz-Maroto/Schneider/Baumes 2005 SIDA on 1–5 y
-Muscadet; Makhotkina & Kilmartin 2012 on Sauvignon blanc at 5/10/18 °C; Marais & Pool 1980),
-**not** Ramey & Ough 1980 — the canonical source is paywalled and every attempt to hang the
-split on it went unverified, so it is cited for the mechanism only, never as the evidence.
+Sources for the DIRECTION SPLIT are three independent verbatim reads (Díaz-Maroto/Schneider/
+Baumes 2005 SIDA on 1–5 y Muscadet; Makhotkina & Kilmartin 2012 on Sauvignon blanc at
+5/10/18 °C; Marais & Pool 1980) — Ramey & Ough 1980 does not speciate the forming family, so
+there it is cited for mechanism only. **The RATE is a different claim, and at D-123 Ramey & Ough
+1980 supplied it:** the paper (paywalled at ACS but readable as an open scanned PDF on the
+author's winery site) measures the isoamyl-acetate hydrolysis rate *in real wine* — Table IX/VIII
+``k_obsd`` and Table X ``E_a`` — which now anchor ``k_ester_hydrolysis`` /
+``E_a_ester_hydrolysis`` (previously author estimates). D-121's "canonical source is paywalled,
+never the evidence" is superseded for the rate; it stands for the direction split.
 
 ``ethyl_acetate`` is the **third** case and the one exception among the acetates: it
 **increases** on storage (ethanol at ~2 M plus accumulating acetic acid put it *below* its
-esterification equilibrium). It is deliberately left inert here — see D-121 for why neither it
-nor ``ethyl_hexanoate`` ships a term: the direction is known, the **rate is not**.
+esterification equilibrium). It is deliberately left inert here — see D-121/D-123 for why neither
+it nor ``ethyl_hexanoate`` ships a term: for ``ethyl_acetate`` the direction is known but the
+**rate is not** (it is absent from R&O's eight esters, and no canonical study covers a 51 mg/L
+pool), and ``ethyl_hexanoate`` has a R&O *model-solution* k (Table I) but their own real-wine
+data show it does not change appreciably — so a term would invent motion the source denies. Both
+stay **blocked on sourcing**, not refused.
 
 **Carbon — an on-ledger inter-pool transfer (conservation is back in force, D-68).** Unlike
 the D-67 sensory readout (a pure diagnostic off the ledger), this is the first aging RHS
@@ -522,9 +531,10 @@ class EsterHydrolysis(Process):
         *(tracer.tracer_pool for tracer in VALINE_LABEL_TRACERS),
     )
     #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``isoamyl_acetate_eq`` are this Process's own
-    #: (aging.yaml, D-69); ``T_ref`` is shared with every other Arrhenius rate. Their tiers cap
-    #: the ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output tiers via parameter-tier
-    #: propagation (D-1).
+    #: (aging.yaml, D-69; ``k``/``E_a`` re-anchored to Ramey & Ough 1980's real-wine measurement at
+    #: D-123, ``isoamyl_acetate_eq`` still author-estimate); ``T_ref`` is shared with every other
+    #: Arrhenius rate. Their tiers cap the ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output
+    #: tiers via parameter-tier propagation (D-1).
     reads: tuple[str, ...] = (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",

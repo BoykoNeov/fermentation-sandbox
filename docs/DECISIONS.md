@@ -12249,3 +12249,117 @@ the 1187-test suite is unaffected — run post-commit as the standing after-chec
 (per-species `E_a` + per-amino-acid gates, to break the D-99 fixed-spectrum limit) — stays **blocked
 on sourcing**: D-99 is explicit that author-estimated per-species activation energies would lower
 fidelity while looking like they raised it. It reopens when measured values land.
+
+## D-123 — the ester-aging blocker, partially lifted: Ramey & Ough 1980 was readable after all, and the rate that landed is for the ester we already model
+
+**D-121 recorded the ester-aging builds as "blocked on sourcing" and named the trigger to reopen:
+"the moment a rate constant lands."** It did — via a retrieval path the D-121 pass never tried. This
+entry re-anchors `k_ester_hydrolysis` and `E_a_ester_hydrolysis` from D-69's author estimates to
+Ramey & Ough 1980's **real-wine measurement**. It is a **provenance/tier upgrade to the one working
+ester-aging term** (isoamyl-acetate hydrolysis), with a single behavioural change (k), and it is
+**not** the build D-121 anticipated.
+
+### How the paper became readable (the methodological point, D-118/D-119 inverted)
+
+D-121's retrieval failure was against the **ACS primary PDF** (`CLOSED`, no open PDF on Semantic
+Scholar) and it recorded the verdict as "an institutional-access ask, not a search problem." A fresh
+secondary-literature search (reviews/dissertations that *quote* the numbers) instead surfaced the
+**primary paper itself hosted openly on the author's winery site** (`rameywine.com`) — a scanned
+image PDF, read here by rendering its pages. So the single-host lesson **inverts**: D-118/D-119
+warned *don't trust one host as if it were many*; the mirror is *don't record one host's paywall as
+the paper's only door* — an author-hosted or secondary copy can exist. "Blocked on sourcing" was
+true of the ACS door and false of the paper.
+
+### What landed, and the ester it landed for
+
+R&O 1980 studied **eight** esters (ethyl butanoate/hexanoate/octanoate/decanoate; isobutyl / isoamyl
+/ hexyl / 2-phenylethyl acetate). The consequence reorganises D-121's plan:
+
+- **`ethyl_acetate` — still fully blocked.** It is **not among the eight** at all. D-121 named it
+  "the better first build once numbers exist"; the numbers did not come for it. Its formation term
+  remains unsourced.
+- **`ethyl_hexanoate` — stays deferred.** R&O gives it a **model-solution** k (Table I) and E_a
+  (Table II, 12.7 kcal/mol), but their **own real-wine data** report it "did not change appreciably"
+  (Tables VIII/IX, followed visually not quantitatively) — corroborating Marais 1992. A term built
+  from the model-solution k would invent motion the source itself denies.
+- **`isoamyl_acetate` — the term we already model — is now sourceable.** This is what shipped.
+
+### The numbers (verbatim from the rendered tables)
+
+*Table X, activation energies in WINE:* isoamyl (+active amyl) acetate **14.1 kcal/mol Pinot noir
+(r = −1.00) / 15.3 Chardonnay (r = −0.997)** = **59.0 / 64.0 kJ/mol**; Table II model solution
+16.5 kcal/mol = 69.0. → `E_a_ester_hydrolysis` **60000 → 59000 J/mol** (Pinot). The old guess already
+sat inside the measured wine range, so the value barely moved; the substance is that the magnitude is
+now **measured (r ≈ −1.00)**, not estimated.
+
+*Tables IX/VIII/I, pseudo-first-order k_obsd at 21.1 °C, shifted to T_ref = 20 °C via E_a:* Pinot
+(pH 3.36) 54.72e-9 /s → **1.80e-4 /h**; Chardonnay (pH 2.94) 98.73e-9 /s → 3.22e-4 /h; model solution
+32.60e-9 /s → 1.06e-4 /h. → `k_ester_hydrolysis` **1.0e-4 → 2.2e-4 /h** (band 1.3e-4–4.0e-4). The old
+D-69 estimate coincided with R&O's **model-solution** value; this re-anchors to the real **wine**.
+
+### Two things the advisor caught that reshaped the anchor
+
+1. **pH, not variety, is R&O's headline** (~×9 per pH unit, Table V), and the sim's rate is
+   **pH-blind**. The Pinot/Chardonnay k spread is mostly the pH gap (3.36 vs 2.94), not grape. So k is
+   **pinned to Pinot (pH 3.36, a typical red)** and the reference pH is stated — averaging the two
+   wines would average two pH's. The larger prize is deferred: a **pH-explicit** hydrolysis rate is
+   now sourceable (R&O Tables VI/VII give the second-order [H⁺] constants and the sim already computes
+   pH in `acidbase.py`), so acetate fade could genuinely track wine pH. Bigger build, owner's call.
+2. **The rate-law graft is a real choice.** R&O saw **log-linear decay over 200 d (no floor)**, so
+   k_obsd is a pure first-order *disappearance* constant; `EsterHydrolysis` decays toward
+   `isoamyl_acetate_eq`. At the sim's ~1 mg/L young level the floor eats ~20 % of the driving force,
+   so k_sim = k_obsd would under-reproduce R&O's *observed* fade by ~15–25 %. The owner chose **match
+   R&O's observed fade** over match-R&O's-number, so k = k_obsd(Pinot, 20 °C) **× 1.25** ≈ 2.2e-4 /h,
+   pinned by `test_reanchored_rate_reproduces_ramey_ough_young_wine_fade` (sim fade ≈ k_obsd·[ester]
+   at 1 mg/L). The +active-amyl coelution in R&O's wine peak is a minor same-ester-bond C5 proxy.
+
+### Tier — kept speculative, deliberately
+
+Both params stay **speculative**, diverging from the advisor's "E_a → plausible." The output tier is
+speculative regardless (the Process is speculative in FORM and floors its outputs via D-1), so a
+param-tier bump is invisible to outputs; meanwhile the aging axis's **uniform speculative floor** is
+load-bearing (`test_tier_floored_at_speculative`, the milestone-3 framing). Under-claiming is the safe
+direction. Recorded honestly: **E_a alone would justify PLAUSIBLE** (r ≈ −1.00 across model + both
+wines) — a clean future promotion should the axis-wide floor be revisited; **k** carries a floor-graft
++ single-pH pin, so speculative is honest for it regardless.
+
+### What did NOT change
+
+- **`isoamyl_acetate_eq` (the floor) — value unchanged, a genuine author estimate.** Reading R&O
+  actually *weakened* its citation: their window is log-linear (no equilibrium reached), so they
+  measure **no floor**; "esters approach equilibrium, not zero" is R&O's stated *mechanism* (Berthelot
+  esterification), not a measured isoamyl-acetate value. The provenance note was corrected to stop
+  over-claiming R&O.
+- **The Process structure** — no pH term added (that is the deferred larger build). The 5:2 carbon
+  split, the label tracers, conservation — all untouched. The existing `test_aging.py` rate tests
+  read the params dynamically, so the value change breaks none of them.
+
+### Same-file doc-rot swept (on-topic, documented not silent)
+
+While editing `aging.yaml`/`aging.py` I corrected two stale items D-121/D-122 left on this exact
+topic, having now read R&O cover-to-cover: (i) the `aging.yaml` header still called `ethyl_hexanoate`
+the family that **forms** — D-121's corrected direction (it **hydrolyses**, R&O Table I) is now in the
+YAML too, not only in the `aging.py` docstring; (ii) a D-99 `fusels`-lump residue in the same header
+block (the carbon routes to `isoamyl_alcohol`, its own pool). `aging.py`'s module docstring line "the
+canonical source is paywalled … never the evidence" is superseded **for the rate** (it stands for the
+direction split, which R&O does not speciate).
+
+### Receipts
+
+`aging.yaml` (k/E_a re-anchored + provenance rewritten; eq note corrected; header direction/fusels
+fixes), `aging.py` (module docstring + `reads` attribution), `test_aging.py` (+2 tests:
+`test_reanchored_params_sit_in_the_ramey_ough_measured_ranges`,
+`test_reanchored_rate_reproduces_ramey_ough_young_wine_fade`). `ruff check`/`ruff format --check`/
+`mypy` clean; the aging.yaml validates through the `Parameter` schema; targeted ester/tier suite
+green; full suite is the standing after-check.
+
+### Next
+
+- **The pH-explicit hydrolysis rate** (R&O Tables VI/VII + `acidbase.py` pH): now sourceable, the
+  natural follow-on — acetate fade tracking wine pH. Deferred as the larger build (owner's call).
+- **`ethyl_acetate` formation** — still blocked: absent from R&O, needs a *formation* rate no
+  verified source supplies. **`ethyl_hexanoate` hydrolysis** — deferred: R&O's own wine data show no
+  appreciable change. Both reopen only on a rate for *those* pools.
+- **The equilibrium floor** stays unmeasured; **Makhotkina & Kilmartin 2012** (PMID 22868118) may
+  corroborate the isoamyl k/E_a and carry ethyl-ester rates — worth a fetch (the same author-hosted /
+  secondary-copy discipline that unblocked R&O here).

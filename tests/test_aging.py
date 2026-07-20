@@ -340,6 +340,39 @@ def test_factor_is_one_at_reference_temperature(params):
     assert schema.get(d, "isoamyl_acetate") == pytest.approx(-expected)
 
 
+# -- Ramey & Ough 1980 re-anchor (decision D-123) -----------------------------
+# R&O measured the isoamyl-acetate hydrolysis rate in REAL wine (open scanned PDF; the ACS copy is
+# paywalled, which is why D-121 recorded it as blocked). Table IX (Pinot noir, pH 3.36): pseudo-
+# first-order k_obsd = 54.72e-9 /s at 21.1 C, which shifts to ~1.80e-4 /h at T_ref = 20 C via E_a.
+# Table X: E_a = 14.1 kcal/mol (Pinot) = 59.0 kJ/mol. These now anchor k_ester_hydrolysis /
+# E_a_ester_hydrolysis, which were author estimates at D-69.
+_RAMEY_OUGH_PINOT_KOBS_PER_H_20C = 1.80e-4  # R&O Table IX, Pinot noir, shifted to T_ref (/h)
+
+
+def test_reanchored_params_sit_in_the_ramey_ough_measured_ranges(params):
+    # Provenance teeth: the loaded k / E_a fall in R&O's measured WINE ranges, so a revert to the
+    # D-69 author estimates would fail — notably k = 1.0e-4, which coincided with R&O's MODEL-
+    # solution value (~1.06e-4) and sits below the real-wine band this re-anchor adopts.
+    assert 55000.0 <= params["E_a_ester_hydrolysis"] <= 69000.0  # R&O wine 59-64, model 69 kJ/mol
+    assert 1.3e-4 <= params["k_ester_hydrolysis"] <= 4.0e-4  # R&O wine, floor-grafted (D-123)
+
+
+def test_reanchored_rate_reproduces_ramey_ough_young_wine_fade(params):
+    # THE floor-graft's design claim (D-123): EsterHydrolysis decays toward isoamyl_acetate_eq, but
+    # R&O saw pure log-linear decay (NO floor over 200 d), so k was inflated (~x1.25) so that at a
+    # representative young isoamyl_acetate level the sim's rate k_sim*(ester - eq) reproduces R&O's
+    # measured disappearance k_obsd*[ester]. Check at 1.0 mg/L, T_ref (the level it was calibrated
+    # at). With the old k = 1.0e-4 the sim rate would be ~44% of R&O's, so this pins the re-anchor.
+    schema = wine_schema()
+    ester = 1.0e-3  # g/L = 1.0 mg/L, a representative young-wine isoamyl acetate
+    d = EsterHydrolysis().derivatives(
+        0.0, _aged_wine(schema, ester=ester, t=params["T_ref"]), schema, params
+    )
+    sim_fade = -float(schema.get(d, "isoamyl_acetate"))  # g/L/h, the modelled disappearance rate
+    ramey_ough_fade = _RAMEY_OUGH_PINOT_KOBS_PER_H_20C * ester  # R&O's measured k_obsd*[ester]
+    assert sim_fade == pytest.approx(ramey_ough_fade, rel=0.05)
+
+
 # -- integrated aging segment (conservation + direction) ----------------------
 
 
