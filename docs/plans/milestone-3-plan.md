@@ -835,3 +835,22 @@ uncertainty bands.
   only compiled-scenario params, so it will *not* propagate threshold uncertainty into the OAV
   band. Defensible for a speculative readout (the OAV floor is already speculative), but state
   it explicitly in D-67 so it never later reads as an oversight, not a choice.
+
+> **[D-119 READS MINEBOIS FIG. 6A — the unlock D-118 named — AND NOTHING SHIPS. `f_de_novo_2_phenylethanol` stays
+> 0.9827, `f_non_ehrlich_phenylalanine` stays 0.975; only the caveat's standing changes. Read off the PMC deposit's
+> figure image (Wiley still 402). Sc 2-PE: ~4.2 uM labelled / 109 uM unlabelled / ~113 uM total, printed I.E 3.7%.
+> **The bar semantics needed deriving and the obvious reading is wrong** — the large number is the UNLABELLED segment
+> (as total it reproduces isobutanol's I.E as 9.63% vs a printed 8.8%; as unlabelled, 8.78%, and isoamyl agrees).
+> **The gain is the NUMERATOR, not the fraction:** 4.17/113 = 3.69% and 4.17/162 = 2.57% recover both printed numbers,
+> so the 2.5% D-117/D-118 rest on is corroborated in uM independently of the algebra. **TWO WRONG INSTINCTS, both
+> recorded because the errors are instructive:** (1) "the measured 0.963 breaches the 0.971 guard" — no, 0.963 has
+> Minebois's ~113 uM total as its denominator, and transplanting it demands 8.7 uM from a branch that supplies ~4.2;
+> **a de-novo fraction is not scale-invariant**; (2) "0.963 is a T4 snapshot that climbs to 0.9827" — refuted by Panel
+> B, where the fraction is **FLAT at ~3.7%** (labelled 4 -> 4.8 uM as total 109 -> 130 uM). What actually holds 0.9827
+> up is a single cross-must scaling assumption (a Wang-typical wine carries ~Minebois-like Phe while making ~2x her
+> 2-PE) that one fermentation at one Phe dose cannot settle — so **the blocker MOVED rather than lifted**, from "figure
+> unread" to "does the Phe flux scale with total 2-PE?". Residual risk is **guard-safe** (under-attribution => smaller
+> refund), hence no re-ship; 0.963 must never enter a sampled field. All three alcohols are de-novo dominated in-study
+> (2-PE 0.963, isoamyl 0.946, isobutanol 0.912), so **D-118's finding is a CLASS of error, not a phenylalanine
+> peculiarity** — but those numbers inherit the same cross-must caveat and are NOT drop-in `f_de_novo` values for the
+> isoamyl beat. Sharpened ask: Phe dose vs total 2-PE (Querol, aquerol@iata.csic.es). See D-119.]**

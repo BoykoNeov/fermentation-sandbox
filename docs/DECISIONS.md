@@ -11813,3 +11813,112 @@ demonstrating it is what works.
 - Unchanged from D-113→D-117: isoleucine's bound; the Minebois/Crépin leucine conflict (29.3% vs
   77–86%), which the un-inversion build must open by pricing; the un-inversion build itself; the
   KMV → isoleucine route; closure O₂ ingress; acetaldehyde in maturation; the deferred tail.
+
+---
+
+## D-119 — Fig. 6A read: the numerator is corroborated, and the blocker moves rather than lifts
+
+**Status: measured, nothing built.** No parameter value changes. `f_de_novo_2_phenylethanol` stays
+at **0.9827** and `f_non_ehrlich_phenylalanine` stays at **0.975**. What changes is the *standing* of
+the caveat D-118 shipped them with, and the shape of the external ask.
+
+### The obligation this discharges
+
+D-118 named one unlock, in the YAML and in its Next list: *"Minebois Fig. 6A's UNLABELLED bar
+fraction has total 2-phenylethanol as its denominator and is genuinely independent of
+`f_non_ehrlich_phenylalanine`; it is published only as a figure, and the underlying values sit in
+supplementary DataSets released 'upon reasonable request' (checked, not assumed)."*
+
+**The figure is now read.** Not from the paywalled Wiley PDF (still HTTP 402) but from the PMC
+open-access deposit's own figure image (`MBT2-18-e70087-g003.jpg`), which is the same Fig. 6A. The
+bars carry printed numbers, so this is a *number extraction*, not a pixel measurement.
+
+### What the bars say (Sc = T73, the model's strain, at T4)
+
+| alcohol | labelled (µM) | unlabelled (µM) | total (µM) | printed I.E | de-novo share |
+|---|---|---|---|---|---|
+| 2-phenylethanol | ~4.2 (printed `4`) | 109 | ~113 | 3.7 % | **0.963** |
+| isoamyl alcohol | 77 (leu) + 104 (val) | 3211 | 3392 | 2.3 % / 3.1 % | **0.946** |
+| isobutanol | 39 (val) | 405 | 444 | 8.8 % | **0.912** |
+
+**The bar semantics had to be derived, not assumed, and the obvious reading is wrong.** The large
+number is the **unlabelled segment**, not the total. Taking it as the total reproduces isobutanol's
+I.E as 9.63% against a printed 8.8%; taking it as the unlabelled segment gives 8.78%. Isoamyl agrees
+on the same reading (2.27%/3.07% vs printed 2.3%/3.1%). 2-PE then needs its labelled `4` to be a
+rounded ~4.17, which recovers **both** printed numbers at once — 4.17/113 = 3.69% (the I.E) and
+4.17/162 = 2.57% (the 2.5% D-117/D-118 are built on). Three independent cross-checks, plus the
+caption's own worked example (126/266 = 47.37% vs printed 47.4%).
+
+**That is the real gain and it is worth stating plainly: the 2.5% numerator is now corroborated
+independently of the algebra that consumed it.** D-118 could only reach 4.17 µM by multiplying a
+reported percentage by a reconstructed must composition. The bar states the µM directly, and the two
+agree. Whatever else is uncertain here, the numerator is not.
+
+### The claim this refutes — including the one this entry's author reached for first
+
+The in-study de-novo share is **0.963**, not the shipped 0.9827, and the first instinct was that the
+measured value therefore *breaches* the D-118 carbon guard (analytic breach point 0.971). **That is
+wrong, and the way it is wrong is the content of this entry.**
+
+0.963 has Minebois's *own* total 2-PE (~113 µM) as its denominator. The model's total is Wang's
+meta-analytic wine mean, ~235 µM. Applying 0.963 to the model demands 235 × 0.037 = **8.7 µM** from a
+phenylalanine branch that can supply at most ~4.2 µM. It "breaches" because it over-charges Phe by
+2×, not because reality does. **A de-novo fraction is not scale-invariant, and a denominator cannot
+be transplanted between fermentations.**
+
+The second instinct — that 0.963 is merely a T4 snapshot that climbs toward 0.9827 as the run
+finishes — is **also wrong, and the figure refutes it.** Panel B's Sc traces show labelled 2-PE
+growing 4 → ~4.8 µM while total grows ~109 → ~130 µM, so the in-study fraction is **flat at ~3.7%**
+across the observed window. It does not climb. That defense is retired.
+
+### So what actually holds up the shipped 0.9827
+
+Exactly one thing, and it is a cross-must scaling assumption: **a Wang-typical wine carries roughly
+Minebois-like phenylalanine (~162 µM) while making ~2× her 2-phenylethanol.** If that holds, the
+Phe-derived numerator stays ~4 µM against a 235 µM total and 0.9827 is right. One fermentation at
+one Phe dose cannot confirm or deny it — it is a question about how the numerator scales *across*
+production levels, and Fig. 6A is a single point in that space.
+
+**The blocker therefore MOVED rather than lifted.** It was "the figure is unread." It is now "does
+the Phe→2-PE flux scale with the must's total 2-PE?" That is a better-posed question and a different
+request to the same author.
+
+**And the residual risk is in the guard-safe direction, which is why nothing is re-shipped.** If the
+scaling assumption fails and truth is nearer 0.963, the model is *under*-attributing 2-PE to
+phenylalanine — a smaller sink refund, further from the conservation guard, not nearer it. An error
+that can only be conservative does not justify touching a committed value on one figure's evidence.
+**0.963 must not appear in any sampled field** (D-117's lesson, and it sits below the 0.971 breach
+point for the arithmetic reason above, not a physical one).
+
+### Carry-forward for the isoamyl beat
+
+D-118's Next list put isoamyl first, as "one entry plus a sourced number". **The number above is not
+that number.** 0.946 inherits the identical cross-must caveat — Minebois's total isoamyl (3392 µM)
+against whatever total the model's `k_isoamyl_alcohol` is anchored to (the Wang-2024 172 mg/L
+anchor, a different fermentation). The isoamyl entry is still worth building; it just does not get to
+skip the scaling question by borrowing a corroborated numerator. Same for isobutanol's 0.912.
+
+That said, the direction is informative and worth recording: **all three alcohols are de-novo
+dominated in-study, 91–96%**, so D-118's finding is not a phenylalanine peculiarity. The depletion
+gate's availability/provenance confusion is a *class* of error across the fusel layer.
+
+### Verification provenance, stated because it is not the usual one
+
+The D-118 commit (`1500fd7`) went out on ruff + `ruff format --check` + mypy run directly in-session,
+and on a **1185-passed suite run from a background task this session did not launch** whose preamble
+(`108 files already formatted`, ruff clean, mypy clean) matches the committed tree exactly. This
+session's own suite run was killed before completing. The tree was byte-identical between the two, so
+the result stands — but it was not watched start to finish, and that is worth one sentence rather
+than a silent "green".
+
+### Next
+
+- **Ask Querol (aquerol@iata.csic.es) for the raw supplementary DataSets** — specifically Phe dose
+  vs total 2-PE across conditions, which is what settles the scaling assumption. The earlier framing
+  ("the unlabelled bar fraction") is now satisfied and should not be re-sent.
+- **The single-host obligation is unchanged and still open.** PMC's figure image is the same deposit
+  as PMC's text, not a second host. Wiley remains HTTP 402.
+- **Isoamyl's de-novo entry**, with the scaling caveat above priced rather than inherited.
+- Unchanged from D-118: the phenylalanine-responsive share (feedback inhibition); the de-novo
+  decarboxylation CO₂; isoleucine's bound; the Minebois/Crépin leucine conflict; the un-inversion
+  build; the KMV → isoleucine route; closure O₂ ingress; acetaldehyde in maturation; the deferred tail.
