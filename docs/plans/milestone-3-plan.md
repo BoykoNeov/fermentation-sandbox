@@ -882,3 +882,22 @@ uncertainty bands.
 > static-f class). **The live lever on isoamyl is `f_non_ehrlich_leucine`, not a route** — Crepin's 0.815 vs the
 > ~0.29 implied by Minebois, the open D-103 conflict; her `f` and her de-novo share are ONE study, so their
 > consistency is internal, NOT corroboration. Receipts: two tripwires in `test_fusel_catabolic_shape.py`. See D-120.]**
+
+> **[D-121 CORRECTS THE ESTER BEAT AND EMPTIES ITS DEFERRED HALF — the docstring ships, no build does.**
+> "Ester formation/hydrolysis equilibria" in the build order above is **half built already** (D-68/D-69
+> `EsterHydrolysis`, scoped at D-96 to the banana ester alone), and the half that was named as deferred —
+> *"ethyl esters of fatty acids sit below equilibrium young and slowly form on aging"* — is **directionally
+> wrong**. Straight-chain MCFA ethyl esters (hexanoate/octanoate/decanoate) **hydrolyse**, the same way as
+> the acetates; the family that **forms** is the branched/polyprotic-acid ethyl esters (diethyl succinate,
+> ethyl lactate, ethyl isobutanoate), and **the sim tracks none of them** — so that deferred half had no
+> pool to act on. Confirmed by three independent verbatim sources (Díaz-Maroto 2005, Makhotkina & Kilmartin
+> 2012, Marais & Pool 1980); **Ramey & Ough 1980 is paywalled and is NOT the evidence** — every claim that
+> tried to attribute the split to it was voted down. Measured: `ethyl_acetate` (51.274 mg/L) and
+> `ethyl_hexanoate` (0.404 mg/L) are **frozen across 365 d** — no term exists for either.
+> **Nothing further ships because the RATE is unsourced and its magnitude is contested**: ethyl hexanoate's
+> decline is *not significant* at 15 °C over 3.8 y (Marais 1992) yet −46% over 24 mo cool (Treixadura), and
+> that dataset is *not first-order* (flat to month 18, then sharp) so the existing exponential instrument
+> would mis-fit it. **A guessed `k` would be more wrong than the current inertness.** This is **blocked on
+> sourcing, NOT refused** (contrast D-120, where direction was the kill) — it reopens the moment a rate
+> constant lands. `ethyl_acetate` is the better first build when one does: high-confidence rise, bulk pool,
+> but it needs a *formation* term `EsterHydrolysis` cannot provide. See D-121.]**

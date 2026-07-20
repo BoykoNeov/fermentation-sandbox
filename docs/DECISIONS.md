@@ -5494,6 +5494,16 @@ honesty the D-67 sensory lump carries — **not** decay-to-zero, which over-stri
 (warm aging degrades faster). Tier **speculative**; the ethyl-acetate-pool / isoamyl-acetate-reaction
 mismatch documented loudly (the D-19 "bookkeeping stand-in, not a metabolic claim" precedent).
 
+> **[THE PARENTHESIS ABOVE IS DIRECTIONALLY WRONG — SUPERSEDED BY D-121.** "Ethyl esters of fatty
+> acids slowly *form* on aging while acetates hydrolyse" conflates two families that move in
+> **opposite** directions. Straight-chain MCFA ethyl esters (ethyl hexanoate/octanoate/decanoate)
+> are secreted *above* equilibrium and **hydrolyse**, the *same* way as the acetates. The family
+> that **forms** is the ethyl esters of branched/polyprotic acids (ethyl isobutanoate, ethyl
+> 2-methylbutanoate, diethyl succinate, ethyl lactate) — **none of which the sim tracks**, so the
+> "deferred half" named here never had a pool to act on. The decay-only RHS is *unaffected* and
+> stays correct: the error is in the justifying prose, not the physics. `ethyl_acetate` is a third
+> case again — it **increases**. See D-121.]**
+
 **Decomposition:** **D-69 = the `EsterHydrolysis` physics** — the Process + a new `aging.yaml` params
 file + direct unit/conservation tests (tested via `ProcessSet`, the D-64 loss-Process pattern), split
 ratio resolved with the advisor. **D-70 = the aging-phase scenario wiring** — the `age N months` verb +
@@ -12069,3 +12079,111 @@ bites it is chasing a target that no longer describes the regime.
 - Unchanged from D-119: the single-host obligation; the phenylalanine-responsive share; the de-novo
   decarboxylation CO₂; isoleucine's bound; the un-inversion build; the KMV → isoleucine route;
   closure O₂ ingress; acetaldehyde in maturation; the deferred tail.
+
+## D-121 — the ester-aging "deferred half" was a direction error; the docstring ships, the build does not
+
+**What was asked for and what came back are different things.** The milestone-3 build order names
+"ester formation/hydrolysis equilibria" as the first aging beat, and `aging.py` named the remaining
+half concretely: *"ethyl esters of fatty acids sit below equilibrium young and slowly form on
+aging."* That sentence is **directionally wrong**, and it had been motivating a deferred build for
+three decisions. **What ships is the correction.** No parameter, no Process, no `ethyl_hexanoate`
+or `ethyl_acetate` term.
+
+### First, the measurement — two of three esters are inert
+
+Wine, dry ferment then 365 d reductive aging at 15 °C, exact state differences:
+
+| ester | ferment-end | aging-end | Δ |
+|---|---|---|---|
+| `ethyl_acetate` | 51.274 mg/L | 51.274 | **+0.000 — frozen, no term exists** |
+| `isoamyl_acetate` | 1.286 mg/L | 0.813 | −0.473 (hydrolyses toward the 0.200 floor) |
+| `ethyl_hexanoate` | 0.404 mg/L | 0.404 | **+0.000 — frozen, no term exists** |
+
+Concentrations are in realistic young-wine ranges, so this is a **missing term**, not a magnitude
+error. D-96 scoped `EsterHydrolysis` to the banana ester alone; nothing has covered the other two
+since.
+
+### The crux, resolved against the docstring
+
+Two ester families move in **opposite** directions on aging, and the old prose merged them:
+
+* **Straight-chain MCFA ethyl esters** — yeast *lipid* metabolism; ethyl hexanoate/octanoate/
+  decanoate. Secreted **above** equilibrium, **hydrolyse** down. **Same direction as the acetates.**
+* **Branched / polyprotic-acid ethyl esters** — yeast *nitrogen* metabolism plus chemical
+  esterification; ethyl isobutanoate, ethyl 2-methylbutanoate, ethyl isovalerate, diethyl succinate,
+  ethyl lactate. Sit **below** equilibrium young and **form**.
+
+**The sim tracks none of the forming family.** So the deferred half as scoped had no pool to act on
+— it was not deferred, it was void.
+
+**Provenance, stated precisely because the temptation was to overstate it.** The verdict rests on
+three *independent* verbatim reads: Díaz-Maroto/Schneider/Baumes 2005 (SIDA, 1–5 y Muscadet —
+branched increased, straight-chain decreased); Makhotkina & Kilmartin 2012 (Sauvignon blanc, 1 y at
+5/10/18 °C — names all three processes explicitly); Marais & Pool 1980 (acetates *and* C6/C8/C10
+ethyl esters in the same decreasing group). **Ramey & Ough 1980 is NOT the evidence** — it is
+paywalled (ACS `CLOSED`, abstract elided; Semantic Scholar has no open PDF), and the research pass
+**voted down** every claim that tried to attribute the split to it. Cited for mechanism, never as
+the source. This is the D-118/D-119 single-host lesson applied prospectively rather than after the
+fact.
+
+### The third ester, which neither family covers
+
+`ethyl_acetate` **increases** on storage — the one exception among the acetates. Ethanol at ~2 M
+(against trace fusel alcohols) plus accumulating acetic acid put it **below** its esterification
+equilibrium. It is also absent from **both** canonical hydrolysis panels (Ramey & Ough; Makhotkina &
+Kilmartin) because at 30–300 mg/L it is orders of magnitude above the trace esters — so no canonical
+study covers the pool the model would need to move.
+
+### Why the build does not follow from the finding
+
+The direction is settled. **The rate is not, and the rate is what decides whether a build improves
+fidelity at all.**
+
+- **No sourced numbers exist in the verified set** — no equilibrium concentration, no rate constant,
+  no activation energy, for any of the three. The one obtainable `ethyl_acetate` figure (+100–150
+  mg/L after bottling) is from **botrytised sweet wines with elevated volatile acidity** and is
+  explicitly non-transferable to sound dry wine.
+- **The magnitude is contested, in the regime that matters.** Marais/van Wyk/Rapp 1992: ethyl
+  hexanoate's decline is **not statistically significant at 15 °C over 199 weeks (~3.8 y)** in any of
+  three Rieslings — while highly significant at 30 °C over 47 weeks. Treixadura (24 mo, cool dark)
+  instead reports 0.65 → 0.35 mg/L, −46%. **At cellar temperature these disagree about whether the
+  effect is observable at all.**
+- **A guessed decline would be MORE wrong than frozen.** If the true cellar-temperature effect is
+  ~0 (Marais), a speculative `k` invents motion the literature could not detect. Inertness is the
+  honest state here, and it is *already* what the model does.
+- **The shape is wrong too, on the one longitudinal dataset.** Treixadura holds roughly flat to
+  month 18 and then falls sharply — **not first-order**. `EsterHydrolysis`'s exponential relaxation
+  toward a floor would mis-fit it, so even with a `k` the existing instrument is not obviously the
+  right one.
+
+**This is NOT a D-120-style refusal, and recording it as one would be an error.** D-120 refused
+because the instrument was on the **wrong side** — direction was the kill. Here the direction is
+**correct** and the instrument already exists and is conservation-tested. The verdict is **blocked on
+sourcing**, not *refused as unphysical*. Those are different states and they reopen on different
+evidence: D-120 reopens if an alcohol starts over-attributing; this reopens the moment a rate
+constant lands.
+
+### Receipts
+
+The correction is prose, so it is pinned as prose: `aging.py`'s module docstring now names both
+families and which way each moves, and D-68's originating parenthesis carries a superseded marker.
+No test is added — there is no new behaviour to pin, and pinning the *current* inertness of
+`ethyl_hexanoate` would freeze the very thing a future rate constant should change.
+
+### Next
+
+- **Obtain the rate.** Ramey & Ough 1980 (J Agric Food Chem 28(5):928-934, DOI
+  10.1021/jf60231a021) and Makhotkina & Kilmartin 2012 (Food Chem, PMID 22868118) reportedly carry
+  the constants and activation energies. Both are paywalled; in-session retrieval failed. **This is
+  an institutional-access or interlibrary ask, not a search problem** — the same shape as the Querol
+  request, and it should ride alongside it.
+- **`ethyl_acetate` is the better first build once numbers exist** — its rise is high-confidence and
+  its pool is bulk (51 mg/L, not trace), so the effect would be sensorily real rather than
+  borderline-undetectable. It needs a *formation* term, which `EsterHydrolysis` cannot provide.
+- **Do not add a fourth ester to chase the forming family** without deciding whether diethyl
+  succinate / ethyl lactate earn a pool; that is a D-96-registry question, not an aging one.
+- **Ethyl decanoate is a trap for later**: it decreases like its family but *not* slowly — a uniform
+  hydrolysis constant across C4–C10 ethyl esters would be a parameterisation error.
+- Unchanged from D-120: the class question stays closed; `f_non_ehrlich_leucine` / D-103 remains the
+  live isoamyl lever and the owner's call; the Querol ask; the single-host obligation; the deferred
+  tail.

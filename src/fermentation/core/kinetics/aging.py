@@ -145,13 +145,35 @@ new state pool). The rate::
 
 is **net decay toward a lower equilibrium floor** ``isoamyl_acetate_eq``, *not* decay-to-zero
 (D-68):
-below ``isoamyl_acetate_eq`` the rate is zero. The bidirectional reality — ethyl esters of fatty
-acids sit *below* equilibrium young and slowly *form* on aging — is the deferred half;
-framing the acetate-dominated lump as "net decay toward a lower floor" is the same
-fixed-composition honesty the D-67 sensory lump carries. ``f(T) = arrhenius_factor(T,
+below ``isoamyl_acetate_eq`` the rate is zero. Framing this as "net decay toward a lower floor"
+is the same fixed-composition honesty the D-67 sensory lump carries. ``f(T) = arrhenius_factor(T,
 E_a_ester_hydrolysis, T_ref)`` gives the sourced **warmer-ages-faster** direction (cold
 cellars preserve fruity esters). No fermentative-flux gate — aging runs when the flux is
 zero — so unlike the M2 producers this Process is driven by temperature and the pool alone.
+
+**The "deferred half" this docstring used to name DOES NOT EXIST TO BUILD (decision D-121).**
+Until D-121 the text above claimed the bidirectional reality was that *"ethyl esters of fatty
+acids sit below equilibrium young and slowly form on aging"*. **That is directionally wrong**,
+and it conflated two families that move in *opposite* directions:
+
+* **Straight-chain medium-chain fatty-acid ethyl esters** (yeast *lipid* metabolism — ethyl
+  hexanoate/octanoate/decanoate) are secreted **above** equilibrium and **hydrolyse** on aging:
+  the **same** direction as the acetates, not the opposite one.
+* **Ethyl esters of branched and polyprotic/organic acids** (yeast *nitrogen* metabolism and
+  chemical esterification — ethyl isobutanoate, ethyl 2-methylbutanoate, ethyl isovalerate,
+  diethyl succinate, ethyl lactate) are the family that sits **below** equilibrium young and
+  **forms**. The sim tracks **none** of them, so the deferred formation half as scoped had no
+  pool to act on.
+
+Sources are three independent verbatim reads (Díaz-Maroto/Schneider/Baumes 2005 SIDA on 1–5 y
+Muscadet; Makhotkina & Kilmartin 2012 on Sauvignon blanc at 5/10/18 °C; Marais & Pool 1980),
+**not** Ramey & Ough 1980 — the canonical source is paywalled and every attempt to hang the
+split on it went unverified, so it is cited for the mechanism only, never as the evidence.
+
+``ethyl_acetate`` is the **third** case and the one exception among the acetates: it
+**increases** on storage (ethanol at ~2 M plus accumulating acetic acid put it *below* its
+esterification equilibrium). It is deliberately left inert here — see D-121 for why neither it
+nor ``ethyl_hexanoate`` ships a term: the direction is known, the **rate is not**.
 
 **Carbon — an on-ledger inter-pool transfer (conservation is back in force, D-68).** Unlike
 the D-67 sensory readout (a pure diagnostic off the ledger), this is the first aging RHS
