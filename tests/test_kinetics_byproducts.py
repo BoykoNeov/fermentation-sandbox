@@ -26,7 +26,12 @@ per-Process mechanics it rests on, plus the honest per-pool temperature directio
 import numpy as np
 import pytest
 
-from fermentation.core.chemistry import CARBON_ATOMS, carbon_mass_fraction
+from fermentation.core.chemistry import (
+    CARBON_ATOMS,
+    M_ISOAMYL_ACETATE,
+    M_ISOAMYL_OH,
+    carbon_mass_fraction,
+)
 from fermentation.core.kinetics import (
     EsterSynthesis,
     EsterVolatilization,
@@ -105,7 +110,19 @@ def test_ester_metadata():
     # Touches ALL THREE ester pools AND S — each ester's carbon is routed from sugar (a1,
     # D-19); never E/CO2 (uptake's ethanol/CO2 production is left untouched). Since D-96 one
     # Process fills three single-molecule pools instead of one lump.
-    assert set(p.touches) == {"ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate", "S"}
+    # Since D-115 it ALSO debits the precursor alcohol (the 5:2-inverse re-route) and writes
+    # both label tracers. The D-97-era set excluded ``isoamyl_alcohol`` on the "read, never
+    # debited" scope call; D-115 retires that deliberately, so this widening is the beat's
+    # content rather than a leak — see the re-route and label tests below for the real pins.
+    assert set(p.touches) == {
+        "ethyl_acetate",
+        "isoamyl_acetate",
+        "ethyl_hexanoate",
+        "S",
+        "isoamyl_alcohol",
+        "isoamyl_alcohol_valine",
+        "isoamyl_acetate_valine",
+    }
     # One INDEPENDENTLY-SOURCED rate per ester (D-96), plus the shared flux/temperature terms.
     # A single k split by a fitted ratio would have been exactly the fabricated-composition
     # constant the split exists to remove, so the plurality here is the point.
@@ -161,23 +178,32 @@ def test_ester_derivative_matches_closed_form(params):
     flux = x * (s / (params["K_sugar_uptake"] + s))
     f_t = arrhenius_factor(t, params["E_a_esters"], params["T_ref"])  # shared shape (D-96)
 
-    total_ester_carbon = 0.0
+    sugar_carbon = 0.0
     for spec in ESTER_SPECS:
         rate = params[spec.k_param] * flux * f_t
         if spec.precursor_pool is not None:
             rate *= schema.get(y, spec.precursor_pool)  # D-97: first-order in the precursor
         assert schema.get(d, spec.pool) == pytest.approx(rate), spec.pool
         assert rate > 0.0, spec.pool  # a real contribution, not a vacuous 0 == 0
-        total_ester_carbon += rate * carbon_mass_fraction(spec.species)
+        ester_carbon = rate * carbon_mass_fraction(spec.species)
+        # Since D-115 the precursor-coupled ester funds only its C2 acetyl group from sugar —
+        # the C5 comes off the alcohol pool (the 5:2-inverse re-route). The other two still
+        # draw whole, so the closed form is now per-ester on the SOURCE as well as the rate.
+        sugar_carbon += ester_carbon * (2.0 / 7.0 if spec.precursor_pool is not None else 1.0)
 
-    # Every ester's carbon is routed from sugar (a1, D-19): one wine slot, so dS removes the
-    # SUM of the three esters' carbon converted back to grams of glucose. Carbon balances
-    # per-RHS — and it only balances because each ester is debited at its own fraction.
-    assert schema.get(d, "S") == pytest.approx(-total_ester_carbon / _GLUCOSE_C)
-    assert -schema.get(d, "S") * _GLUCOSE_C == pytest.approx(total_ester_carbon)
-    # Nothing else moves — ethanol/CO2 production is left to the uptake Process.
-    for var in ("X", "E", "N", "CO2", *_FUSEL_POOLS):
+    # Carbon balances per-RHS — and it only balances because each ester is debited at its own
+    # fraction, from its own source.
+    assert schema.get(d, "S") == pytest.approx(-sugar_carbon / _GLUCOSE_C)
+    assert -schema.get(d, "S") * _GLUCOSE_C == pytest.approx(sugar_carbon)
+    # Nothing else moves — ethanol/CO2 production is left to the uptake Process. The isoamyl
+    # pool is now excluded from this sweep because D-115 deliberately debits it; the other four
+    # higher alcohols must still be untouched, which is what catches a re-route that leaked
+    # onto the wrong C5 isomer (`active_amyl_alcohol` — the D-99 trap).
+    untouched = tuple(p for p in _FUSEL_POOLS if p != "isoamyl_alcohol")
+    assert len(untouched) == len(_FUSEL_POOLS) - 1, "the isoamyl pool must be in _FUSEL_POOLS"
+    for var in ("X", "E", "N", "CO2", *untouched):
         assert schema.get(d, var) == 0.0
+    assert schema.get(d, "isoamyl_alcohol") < 0.0, "D-115: the acetylation consumes its C5"
 
 
 def test_each_ester_is_carbon_weighted_as_its_own_molecule():
@@ -338,9 +364,12 @@ def test_volatilization_metadata():
     # never S/E/CO2 (it draws no fresh sugar, unlike synthesis). Since D-96 all three esters
     # are stripped, each into its own twin — a twin per ester is forced, since a pool and its
     # twin must share one molecule's carbon weight for the transfer to stay carbon-neutral.
+    # Since D-115 the banana ester's label tracer joins them: stripping is non-fractionating, so
+    # the tracer must fall with the pool or the enrichment would inflate for no physical reason.
     assert set(p.touches) == {
         *(spec.pool for spec in ESTER_SPECS),
         *(spec.gas_pool for spec in ESTER_SPECS),
+        "isoamyl_acetate_valine",
     }
     # Physical Henry model (D-21): gas-flow rides E_a_uptake, partition rides the sourced
     # ethyl-acetate enthalpy dH_ester_volatil — NOT a fudged per-medium E_a_ester_volatil.
@@ -876,90 +905,178 @@ def test_only_the_banana_declares_a_precursor_and_it_is_a_real_pool():
         assert coupled[0].precursor_pool in schema.names
 
 
-def test_ester_synthesis_reads_the_fusel_pool_but_never_debits_it(params):
-    """READ, NEVER DEBITED - the D-97 scope call, pinned.
+def test_the_acetylation_sources_its_c5_off_the_alcohol_and_only_its_c2_off_sugar(params):
+    """THE 5:2-INVERSE RE-ROUTE (decision D-115) - what D-97 deferred, built.
 
-    The rate reads ``fusels``; the ester's carbon still comes from ``S``. Physically the
-    acetylation takes the C5 skeleton *from* the alcohol (the exact inverse of the 5:2 split
-    D-69's hydrolysis returns to ``fusels``), so the carbon re-route is the honest end state
-    and the named deferred refinement. Until then this test pins the boundary: reading a pool
-    must not silently become debiting it, which would double-count against
-    :class:`FuselAlcoholsEhrlich` and break the ``touches`` contract.
+    D-97 read the alcohol pool without debiting it and drew the whole ester from ``S``, on the
+    correct reasoning that the re-route is **mass-negligible** (~0.5 mg/L of ester against an
+    ~86 mg/L alcohol pool). D-114 established that this bounds the wrong quantity: the deferral
+    was 100 % of the ester's valine enrichment, because an ester made wholly of sugar carbon is
+    structurally incapable of carrying an amino-acid label. So the acetylation now takes the C5
+    skeleton off ``isoamyl_alcohol`` and only the C2 acetyl group off ``S``.
+
+    The predecessor of this test asserted the exact opposite (``pool not in proc.touches``,
+    "reading a pool must not silently become debiting it"). That assertion is **retired by
+    design, not broken** - it pinned a boundary D-97 chose and D-115 deliberately moves.
+
+    **Asserted on the carbon split, not on ``touches``.** A ``touches`` assertion is a tautology
+    about the declaration; the load-bearing facts are that the alcohol debit is *mole-for-mole*
+    with the ester and that the sugar draw fell to exactly 2/7 of the ester's carbon.
     """
     schema = wine_schema()
     proc = EsterSynthesis()
-    for pool in _FUSEL_POOLS:
-        assert pool not in proc.touches, "D-97 reads the fusel pool; it must not debit it"
-
-    y = _wine_y0(schema)
-    y[schema.slice("isoamyl_alcohol")] = 0.05
-    d = proc.derivatives(0.0, y, schema, params)
-    assert float(d[schema.slice("isoamyl_alcohol")][0]) == 0.0, (
-        "EsterSynthesis must leave the fusel pool untouched (it is a substrate it reads, "
-        "not a pool it consumes - the carbon comes from S)"
-    )
-    assert float(d[schema.slice("isoamyl_acetate")][0]) > 0.0, "...while still making the ester"
-
-
-def test_the_ester_carries_no_amino_acid_label_because_its_carbon_is_wholly_sugar_sourced(params):
-    """D-114 — the model's isoamyl-acetate enrichment is STRUCTURALLY zero, and why.
-
-    Rollero 2017 Table S1 (U-¹³C valine) measures isoamyl **acetate** at 0.0-19.7 % labelled
-    (4.0-4.4 % at the well-measured SM250/SM425 columns) against its parent **alcohol**'s
-    2.1-7.5 % — the ester tracks the alcohol, because the C5 skeleton transfers as a unit and
-    Rollero's enrichment is a *molecule* fraction (D-111 Finding 3). The model returns **0 %**,
-    and not as a small number: it cannot return anything else.
-
-    **The reason is stock-vs-flow, and it is what this test pins.** ``ehrlich_draws`` costs
-    *production* — it knows which precursor a gram of alcohol was made from at the moment it is
-    made. A pool is a bare ``float64`` slot carrying no provenance. The alcohol is sourced
-    directly by the Ehrlich producer, so its carbon is flow-attributable; the ester is drawn
-    from the alcohol *pool* (D-97 reads it, never debits it) and its own carbon comes wholly
-    from ``S``, so attributing it would need *stock* attribution the model does not have.
-
-    **Why this is asserted on the CARBON, not on the draw list.** "No ``EsterSpec`` appears in
-    ``ehrlich_draws``" would be a tautology about the data structure — a check sharing the
-    error's own assumption (D-111 Finding 0). The load-bearing assertion is that every gram of
-    ester carbon is removed from ``S``: if a future beat builds the deferred D-69 5:2-inverse
-    re-route, the C5 would come off ``isoamyl_alcohol`` and only 2/7 of the draw would land on
-    sugar — and this test FAILS, which is the finding's premise being correctly invalidated.
-
-    **The consequence recorded for the next beat:** that re-route is *necessary but not
-    sufficient*. Debiting a provenance-free pool moves mass without moving label, so reaching
-    Rollero's ~4 % additionally needs provenance to ride in state — the D-1 shape (tier and
-    uncertainty deliberately do not ride inside the state floats), an architectural layer
-    rather than D-97's "mass-negligible" (~0.5 mg/L) deferral.
-    """
-    schema = wine_schema()
-    proc = EsterSynthesis()
-
-    # A realistic mid-ferment state: sugar left to draw from, a real precursor alcohol pool.
     y = _wine_y0(schema, x=1.5, s=180.0, e=40.0, n=0.05)
     y[schema.slice("isoamyl_alcohol")] = 0.05
     d = proc.derivatives(0.0, y, schema, params)
 
-    # Anti-vacuity: the ester must actually be forming, or "0 % of nothing" proves nothing.
     banana = float(d[schema.slice("isoamyl_acetate")][0])
     assert banana > 0.0, "vacuous: no ester is being synthesised at this state"
 
-    # THE PIN: the carbon deposited in the three ester pools is removed from S, in full.
-    # draw_carbon_from_sugar guarantees Sigma_i(d[S_i]*c_i) == -carbon exactly, so any carbon
-    # sourced from the alcohol pool (or an amino acid) instead would show up as a residual.
-    ester_carbon = sum(
-        float(d[schema.slice(spec.pool)][0]) * carbon_mass_fraction(spec.species)
-        for spec in ESTER_SPECS
-    )
-    sugar_carbon = -float(d[schema.slice("S")][0]) * _GLUCOSE_C
-    assert ester_carbon > 0.0
-    assert sugar_carbon == pytest.approx(ester_carbon, rel=1e-12), (
-        "every gram of ester carbon must come from S (D-97 'read, never debited'). A shortfall "
-        "here means some of it now comes off the precursor pool — the D-69 5:2-inverse re-route "
-        "— at which point the ester's enrichment is no longer structurally zero and D-114's "
-        "measurement must be redone"
+    # The alcohol is now DEBITED - and mole for mole, one alcohol molecule per ester molecule.
+    alcohol = -float(d[schema.slice("isoamyl_alcohol")][0])
+    assert alcohol > 0.0, "D-115: the acetylation must consume its precursor alcohol"
+    assert alcohol / M_ISOAMYL_OH == pytest.approx(banana / M_ISOAMYL_ACETATE, rel=1e-12), (
+        "one alcohol molecule per ester molecule - the C5 skeleton transfers as a unit"
     )
 
-    # And the alcohol pool is genuinely untouched, so none of that carbon came from it.
+    # ...and the split is exactly 5:2 by carbon, the inverse of the D-69 hydrolysis.
+    ester_carbon = banana * carbon_mass_fraction("isoamyl_acetate")
+    alcohol_carbon = alcohol * carbon_mass_fraction("isoamyl_alcohol")
+    assert alcohol_carbon == pytest.approx(ester_carbon * 5.0 / 7.0, rel=1e-12)
+
+    # The OTHER two esters are untouched by this: they have no precursor pool, so they still
+    # draw whole from S. Without this the test would pass on a build that re-routed everything.
+    ungated_carbon = sum(
+        float(d[schema.slice(spec.pool)][0]) * carbon_mass_fraction(spec.species)
+        for spec in ESTER_SPECS
+        if spec.precursor_pool is None
+    )
+    sugar_carbon = -float(d[schema.slice("S")][0]) * _GLUCOSE_C
+    assert sugar_carbon == pytest.approx(ungated_carbon + ester_carbon * 2.0 / 7.0, rel=1e-12), (
+        "sugar must now fund the ungated esters in full plus ONLY the C2 acetyl group of the "
+        "banana ester"
+    )
+
+
+def test_the_alcohol_debit_cannot_drive_its_pool_negative(params):
+    """The re-route is SELF-LIMITING, structurally - no clamp, and none needed (D-115).
+
+    The debit is proportional to a rate that is itself first-order in the same pool (D-97), so
+    it is first-order decay: it vanishes exactly as fast as the pool does. This matters because
+    a clamp here would be actively harmful - it would break the ester's own mass balance rather
+    than prevent anything that can happen - so the safety has to come from the algebra instead.
+
+    Asserted as a *ratio* rather than at one pool value, because "the derivative is small at a
+    small pool" is true of any decaying term; what makes it safe is that the ratio is CONSTANT.
+    """
+    schema = wine_schema()
+    proc = EsterSynthesis()
+
+    def debit_per_unit_pool(pool: float) -> float:
+        y = _wine_y0(schema, x=1.5, s=180.0, e=40.0, n=0.05)
+        y[schema.slice("isoamyl_alcohol")] = pool
+        d = proc.derivatives(0.0, y, schema, params)
+        return -float(d[schema.slice("isoamyl_alcohol")][0]) / pool
+
+    reference = debit_per_unit_pool(0.05)
+    assert reference > 0.0, "vacuous: nothing is being debited at all"
+    for pool in (1e-9, 1e-6, 1e-3, 0.05, 0.5):
+        assert debit_per_unit_pool(pool) == pytest.approx(reference, rel=1e-12), (
+            "the debit must stay strictly proportional to the pool at every scale - that "
+            "proportionality IS the guarantee the pool cannot go negative"
+        )
+
+    # And at exactly zero the whole branch is inert rather than dividing by zero.
+    y = _wine_y0(schema, x=1.5, s=180.0, e=40.0, n=0.05)
+    y[schema.slice("isoamyl_alcohol")] = 0.0
+    d = proc.derivatives(0.0, y, schema, params)
     assert float(d[schema.slice("isoamyl_alcohol")][0]) == 0.0
+    assert float(d[schema.slice("isoamyl_acetate")][0]) == 0.0
+
+
+def test_the_label_rides_across_the_acetylation_at_the_alcohol_pools_fraction(params):
+    """D-115 - the ester now carries VALINE label, at its parent alcohol's current fraction.
+
+    This replaces ``test_the_ester_carries_no_amino_acid_label_because_its_carbon_is_wholly_
+    sugar_sourced``, whose own docstring predicted this: *"if a future beat builds the deferred
+    D-69 5:2-inverse re-route ... this test FAILS, which is the finding's premise being
+    correctly invalidated rather than silently going green on a stale claim."* It was, and this
+    is the successor.
+
+    **The mechanism.** Rollero 2017 defines enrichment as a **molecule** fraction (D-111 Finding
+    3), and the C5 skeleton transfers through the acetylation as a unit - so an ester molecule
+    is labelled exactly when its parent alcohol molecule was, and the fraction passes across the
+    reaction unchanged. That identity is what this test pins, at three different pool fractions
+    so it cannot pass on a build that hard-codes one.
+    """
+    schema = wine_schema()
+    proc = EsterSynthesis()
+
+    for fraction in (0.0, 0.25, 1.0):
+        y = _wine_y0(schema, x=1.5, s=180.0, e=40.0, n=0.05)
+        y[schema.slice("isoamyl_alcohol")] = 0.05
+        y[schema.slice("isoamyl_alcohol_valine")] = 0.05 * fraction
+        d = proc.derivatives(0.0, y, schema, params)
+
+        banana = float(d[schema.slice("isoamyl_acetate")][0])
+        assert banana > 0.0, "vacuous: no ester is being synthesised at this state"
+
+        # The ester is credited with label at EXACTLY the alcohol pool's fraction.
+        labelled = float(d[schema.slice("isoamyl_acetate_valine")][0])
+        assert labelled == pytest.approx(banana * fraction, rel=1e-12), (
+            "an ester molecule is labelled iff its parent alcohol was - the fraction must "
+            "cross the acetylation unchanged"
+        )
+        # ...and the alcohol tracer is debited at the same fraction, so the ALCOHOL pool's own
+        # enrichment is left exactly where it was. A re-route that moved mass without moving
+        # label in step would silently enrich (or dilute) the source pool.
+        alcohol = -float(d[schema.slice("isoamyl_alcohol")][0])
+        alcohol_labelled = -float(d[schema.slice("isoamyl_alcohol_valine")][0])
+        assert alcohol_labelled == pytest.approx(alcohol * fraction, rel=1e-12), (
+            "the draw is NON-FRACTIONATING: it must remove labelled and unlabelled alcohol in "
+            "the proportion the pool holds them"
+        )
+
+
+def test_stripping_is_non_fractionating_so_it_cannot_inflate_the_enrichment(params):
+    """The classic tracer bug, pinned shut (D-115): mass leaves, label must leave with it.
+
+    :class:`EsterVolatilization` strips liquid ester to the headspace. If it debited the pool
+    but not the tracer, the enrichment ``tracer/bulk`` would climb toward 100 % purely because
+    the denominator shrank - a rising "measurement" produced entirely by a bookkeeping omission,
+    and one no conservation test could catch (a tracer slot carries no carbon weight, so the
+    ledger is blind to it by construction - the D-89/D-90 family).
+
+    Asserted as *the fraction is invariant*, which is the physical statement, rather than as
+    "the tracer derivative is negative", which would pass at any wrong magnitude.
+    """
+    schema = wine_schema()
+    proc = EsterVolatilization()
+    y = _wine_y0(schema, x=1.5, s=180.0, e=40.0, n=0.05)
+    y[schema.slice("isoamyl_acetate")] = 1.0e-3
+    y[schema.slice("isoamyl_acetate_valine")] = 0.25e-3
+    d = proc.derivatives(0.0, y, schema, params)
+
+    stripped = -float(d[schema.slice("isoamyl_acetate")][0])
+    assert stripped > 0.0, "vacuous: nothing is being stripped"
+    stripped_label = -float(d[schema.slice("isoamyl_acetate_valine")][0])
+    assert stripped_label == pytest.approx(stripped * 0.25, rel=1e-12), (
+        "stripping must remove labelled and unlabelled molecules in the pool's own proportion"
+    )
+
+
+def _retired_d114_test_the_ester_carries_no_label(params):  # pragma: no cover - see below
+    """RETIRED at D-115, kept as the record of what was measured and why it stopped being true.
+
+    D-114 measured the model's isoamyl-acetate enrichment as **structurally** zero: the ester's
+    carbon came wholly from ``S``, so no parameter could have moved it. The finding was correct
+    and its premise is now deliberately gone - the D-115 re-route sources the C5 off the alcohol
+    pool. Its live successors are
+    :func:`test_the_acetylation_sources_its_c5_off_the_alcohol_and_only_its_c2_off_sugar` (the
+    carbon) and :func:`test_the_label_rides_across_the_acetylation_at_the_alcohol_pools_fraction`
+    (the label). Kept un-collected rather than deleted because the *reason* a green test went red
+    is the beat's whole content, and a deleted test leaves no trace of that.
+    """
 
 
 def test_banana_rate_is_first_order_in_the_fusel_pool(params):

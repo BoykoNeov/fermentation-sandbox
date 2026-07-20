@@ -519,6 +519,32 @@
 > the code, surfaced not switched. **Un-inverting leucine needs a de-novo-KIC *leucine relief* (not a valine drain) +
 > kinetically-limited transamination — an unsourced build, the owner's call.** Doc+test only, 1175→1176. See D-113.]**
 >
+> **[D-115 BUILDS what D-114 parked and finds the blocker was a category error. D-114 read "provenance to ride in
+> state" as a **D-1**-level decision (tier/uncertainty are *derived*, never inside the state floats) and surfaced the
+> item as the owner's call. But a **13C isotopologue concentration is not metadata about a value — it is a conserved
+> extensive quantity in g/L** that flows and integrates like any other pool, so D-1's "don't wreck the hot loop with
+> per-element objects" argument never reached it. D-1 untouched; `state.py`'s extension of it to the word *provenance*
+> was over-broad in exactly one place and is corrected. TWO PARTS, one build (shipping the re-route alone would have
+> killed D-114's "structurally zero" framing without delivering the observable): (1) **the D-69 5:2-INVERSE RE-ROUTE**
+> — `EsterSynthesis` sources isoamyl acetate's C5 off `isoamyl_alcohol` and only C2 off `S`, reading the *same* ratio
+> constants as the hydrolysis (moved `aging.py` → `carbon_routing.py`: a second consumer of a private ratio is the
+> D-26/D-106 drift setup). The debit is self-limiting with NO clamp — the rate is first-order in the pool it debits,
+> so a clamp would break the ester's mass balance rather than prevent anything. (2) **TWO TRACER SLOTS** in g/L of the
+> labelled molecule (Rollero's enrichment is a *molecule* fraction, D-111 Finding 3), carbon-ledger weight **zero**
+> because each is a sub-quantity of a pool already weighted. **THE ONE-SLOT DESIGN COLLAPSED and the collapse is the
+> scoping lesson**: if the alcohol's fraction is flat the slot is REDUNDANT (it reproduces D-111's number); if not, the
+> ester still needs quadrature (the D-103 defect) or its own slot ⇒ INSUFFICIENT. No regime makes exactly one right,
+> and crediting the hydrolysis return at the *alcohol's* fraction would have baked the answer into the RHS (D-98/D-108
+> vacuity, relocated where no test could see it). **MEASURED, not assumed:** the alcohol fraction runs **26.3% → 1.84%**
+> across the ester-forming window, so one-slot inheritance errs **13.2%** — D-114's "93% forms late" was TRUE but
+> licensed a FALSE inference, because the early 7% draws from a pool 10–25× richer. **Mass shares are not label
+> shares.** RESULT: ester **1.93%** vs Rollero ~4%, alcohol **1.84%** vs 2.1–7.5%, **ratio 1.05** — the ratio is the
+> deliverable (Rollero's ester sits at its parent alcohol's enrichment; the model reproduces that), the ~2× absolute
+> shortfall is INHERITED from the alcohol's known D-111 gap, and `f_valine_to_isoamyl` is **untouched** (tuning it to
+> land 4% is D-104's "a missing route, NOT a value to tune" one compound downstream). Three tests retired, all
+> predicted — D-114's own docstring said it would FAIL here, and its choice to assert on the CARBON rather than the
+> draw list is what made that a clean red instead of a stale green. No conservation test moved. See D-115.]**
+>
 > **[D-108 — D-107's ⚠ "fix D-27's zero acetaldehyde" is RETIRED, and the bug was in D-107's own aldol. The ⚠ rested on
 > "real dry whites hold ~30 mg/L" — a **SULFITED** figure compared against **UNSULFITED** runs; the like-for-like target
 > is **2.7 mg/L** (Herzan 2020, PMC7684598 variant (0/0/0)) vs the model's 0.000 ⇒ **D-27 acquitted on the gate**, and

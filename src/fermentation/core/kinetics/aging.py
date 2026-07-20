@@ -246,8 +246,14 @@ from fermentation.core.kinetics.amino_acid_pools import (
 )
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import (
+    ACETYL_CARBON_SHARE,
+    ACETYLATION_ACETYL_CARBONS,
+    ACETYLATION_ALCOHOL_CARBONS,
+    ALCOHOL_CARBON_SHARE,
     HYDROLYSING_ESTER,
     ISOAMYL_ALCOHOL,
+    VALINE_LABEL_TRACERS,
+    labelled_fraction,
 )
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
@@ -274,10 +280,20 @@ _BYP_SPECIES = "succinic_acid"
 #: split **exactly partitions the debited molecule's seven carbons** — an invariant the module
 #: now asserts at import rather than asserting in prose, and one that would fire if a future
 #: edit re-pointed the hydrolysis at an ester whose stoichiometry these shares do not describe.
-_ISOAMYL_ALCOHOL_CARBONS = 5  # the alcohol product → fusels
-_ACETIC_ACID_CARBONS = 2  # the acid product → Byp
-_FUSEL_CARBON_SHARE = _ISOAMYL_ALCOHOL_CARBONS / (_ISOAMYL_ALCOHOL_CARBONS + _ACETIC_ACID_CARBONS)
-_BYP_CARBON_SHARE = _ACETIC_ACID_CARBONS / (_ISOAMYL_ALCOHOL_CARBONS + _ACETIC_ACID_CARBONS)
+#: **Since D-115 the ratio lives in the registry, not here.** The synthesis side now runs the
+#: same reaction in reverse (the 5:2-inverse re-route), so two modules read one stoichiometry —
+#: the D-26/D-106 setup where private copies agree by luck until one of them changes. These are
+#: aliases onto the shared constants, kept under their original names so the algebra below reads
+#: as it always has.
+_ISOAMYL_ALCOHOL_CARBONS = ACETYLATION_ALCOHOL_CARBONS  # the alcohol product → isoamyl_alcohol
+_ACETIC_ACID_CARBONS = ACETYLATION_ACETYL_CARBONS  # the acid product → Byp
+_FUSEL_CARBON_SHARE = ALCOHOL_CARBON_SHARE
+_BYP_CARBON_SHARE = ACETYL_CARBON_SHARE
+
+#: The two D-115 label tracers, resolved once. ``VALINE_LABEL_TRACERS`` is ordered
+#: alcohol-then-ester (the direction the label flows through the acetylation); this Process runs
+#: that flow backwards, crediting the alcohol from the ester.
+_ALCOHOL_TRACER, _ESTER_TRACER = VALINE_LABEL_TRACERS
 
 if CARBON_ATOMS[HYDROLYSING_ESTER.species] != _ISOAMYL_ALCOHOL_CARBONS + _ACETIC_ACID_CARBONS:
     raise AssertionError(  # pragma: no cover - structural invariant, D-96
@@ -474,7 +490,15 @@ class EsterHydrolysis(Process):
     #: acetate yields 3-methylbutan-1-ol and nothing else, so depositing into the old lump
     #: silently credited a share of it to four other molecules — and crediting the C5 ISOMER
     #: ``active_amyl_alcohol`` would be a different compound with a ~5.5× different potency.
-    touches = (HYDROLYSING_ESTER.pool, ISOAMYL_ALCOHOL.pool, "Byp")
+    #: Since D-115 the two label tracers join them — the transfer carries its label as well as
+    #: its carbon, or an aging segment would dilute the alcohol pool's enrichment with returned
+    #: molecules booked as unlabelled.
+    touches = (
+        HYDROLYSING_ESTER.pool,
+        ISOAMYL_ALCOHOL.pool,
+        "Byp",
+        *(tracer.tracer_pool for tracer in VALINE_LABEL_TRACERS),
+    )
     #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``isoamyl_acetate_eq`` are this Process's own
     #: (aging.yaml, D-69); ``T_ref`` is shared with every other Arrhenius rate. Their tiers cap
     #: the ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output tiers via parameter-tier
@@ -514,6 +538,22 @@ class EsterHydrolysis(Process):
         d[schema.slice("Byp")] = (
             _BYP_CARBON_SHARE * carbon_released / carbon_mass_fraction(_BYP_SPECIES)
         )
+
+        # D-115: the label comes back with the C5. Hydrolysis is the exact reverse of the
+        # acetylation, so an ester molecule that was valine-derived returns a valine-derived
+        # alcohol molecule — mole for mole, hence the same 5:2 carbon algebra applied to the
+        # tracer. Debited at the ESTER's own fraction (not the alcohol's): using the alcohol's
+        # would assume the answer this route exists to compute, which is the vacuity trap the
+        # second tracer slot was added to avoid.
+        f_ester = labelled_fraction(y, schema, _ESTER_TRACER)
+        if f_ester > 0.0:
+            d[schema.slice(_ESTER_TRACER.tracer_pool)] = -rate * f_ester
+            d[schema.slice(_ALCOHOL_TRACER.tracer_pool)] = (
+                _FUSEL_CARBON_SHARE
+                * carbon_released
+                * f_ester
+                / carbon_mass_fraction(ISOAMYL_ALCOHOL.species)
+            )
         return d
 
 

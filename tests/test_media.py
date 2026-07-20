@@ -5,7 +5,11 @@ import dataclasses
 import numpy as np
 import pytest
 
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
+from fermentation.core.kinetics.carbon_routing import (
+    ESTER_SPECS,
+    FUSEL_SPECS,
+    VALINE_LABEL_TRACERS,
+)
 from fermentation.core.media import MEDIA, Medium, beer_schema, get_medium, wine_schema
 
 # The three single-molecule ester pools and their headspace twins replaced the lumped
@@ -17,6 +21,10 @@ SHARED = (
     "X", "S", "E", "N", "T", "CO2", "X_dead", "Gly", "Byp",
     *(spec.pool for spec in ESTER_SPECS),
     *(spec.pool for spec in FUSEL_SPECS),
+    # The two D-115 valine-label tracers, spread from their own registry for the same
+    # no-drift reason. They are SUB-QUANTITIES of two pools above (g/L of the labelled
+    # molecule), not new mass — hence carbon weight zero in `total_carbon`.
+    *(tracer.tracer_pool for tracer in VALINE_LABEL_TRACERS),
     *(spec.gas_pool for spec in ESTER_SPECS),
     "acetolactate", "diacetyl", "butanediol", "acetaldehyde", "h2s", "h2s_gas", "o2", "A420",
 )  # fmt: skip
@@ -221,7 +229,11 @@ def test_wine_schema_has_single_sugar_slot():
     # sulfur pool that is NOT autolysis-gated — DMS accumulates by spontaneous hydrolysis during
     # bottle aging, lees or no lees, which is why it carries its own anchor and needed no
     # ratio-split, i.e. the D-96 linchpin `mercaptans` could not satisfy at D-101)
-    assert schema.size == 84
+    # + 2 D-115 valine-label tracer slots (isoamyl_alcohol_valine, isoamyl_acetate_valine —
+    # the valine-derived part of each pool, in g/L of the labelled molecule). OFF the carbon
+    # ledger, and necessarily so: each is a sub-quantity of a pool already weighted there, so
+    # giving them weight would double-count every labelled gram.
+    assert schema.size == 86
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -245,7 +257,8 @@ def test_beer_schema_has_three_sequential_sugars():
     # + 1 caramelization melanoidin carbon-park slot (D-90: sugar-only thermal browning is medium-
     # agnostic — beer's residual dextrins caramelize too, so melanoidin is appended to beer_schema
     # too, ON total_carbon; the N-incorporating maillard_melanoidin stays wine-only, D-32) = 40
-    assert schema.size == 44
+    # + 2 D-115 valine-label tracer slots (see the wine-schema note above) = 46
+    assert schema.size == 46
 
 
 def test_shared_variable_units_are_canonical():
@@ -266,6 +279,9 @@ def test_shared_variable_units_are_canonical():
         "Byp": "g/L",
         **{spec.pool: "g/L" for spec in ESTER_SPECS},
         **{spec.pool: "g/L" for spec in FUSEL_SPECS},
+        # g/L of the LABELLED MOLECULE, not g C/L (D-115) — Rollero's enrichment is a molecule
+        # fraction, so `tracer / bulk` must be a bare ratio with no carbon-fraction correction.
+        **{tracer.tracer_pool: "g/L" for tracer in VALINE_LABEL_TRACERS},
         **{spec.gas_pool: "g/L" for spec in ESTER_SPECS},
         "acetolactate": "g/L",
         "diacetyl": "g/L",

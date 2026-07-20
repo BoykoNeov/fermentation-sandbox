@@ -5,9 +5,19 @@ contiguous ``float64`` numpy array so that ``scipy.integrate.solve_ivp`` can dri
 it with no per-element Python objects in the hot loop. The mapping from physical
 variable names to array indices — including which variables are vectors (e.g. the
 multi-sugar ``S`` for beer) — lives here in :class:`StateSchema`. Tier and
-provenance metadata deliberately do **not** ride inside these floats; they are
+uncertainty metadata deliberately do **not** ride inside these floats; they are
 derived at the analysis boundary from the Processes and parameters that fed each
 variable.
+
+**"and provenance" used to appear in that sentence, and it was over-broad (D-115).**
+Read literally it excluded the isotope tracer slots
+(:class:`~fermentation.core.kinetics.carbon_routing.LabelTracer`), and D-114 did read it
+that way — parking a sourced observable behind what looked like a D-1-level architectural
+decision. A ¹³C isotopologue concentration is **not** metadata about a value; it is a
+conserved extensive quantity in g/L that flows, accumulates and integrates like any other
+pool, needing no per-element object and costing the hot loop nothing. D-1's argument does
+not reach it. What D-1 excludes is a *description of* a number (its tier, its uncertainty)
+riding alongside the number; a labelled sub-quantity is simply another number.
 """
 
 from __future__ import annotations

@@ -286,6 +286,111 @@ FUSEL_SPECS: tuple[FuselSpec, ...] = (
 ISOAMYL_ALCOHOL: FuselSpec = FUSEL_SPECS[3]
 
 
+#: Carbons the ACETYLATION reaction moves between isoamyl alcohol and isoamyl acetate
+#: (decisions D-69/D-96/D-115) — the alcohol's C5 skeleton plus C2 from acetyl-CoA.
+#: Stoichiometry of a named reaction, so a code-with-citation constant like the chemistry
+#: carbon counts, never a YAML parameter.
+#:
+#: **Both directions of the same reaction read these, which is why they live here.**
+#: :class:`~fermentation.core.kinetics.aging.EsterHydrolysis` splits the released carbon 5:2
+#: (ester → alcohol + acetic acid); since D-115
+#: :class:`~fermentation.core.kinetics.byproducts.EsterSynthesis` runs the **inverse**, sourcing
+#: the C5 off ``isoamyl_alcohol`` and only the remaining 2/7 from ``S``. Until D-115 only the
+#: hydrolysis existed and the constants lived in ``aging``; a second consumer of a ratio kept
+#: private to one module is exactly the D-26/D-106 drift setup (two callers computing "the same
+#: thing" until one changes), so the ratio moved to the registry both sides already import.
+ACETYLATION_ALCOHOL_CARBONS = 5  # the C5 skeleton: isoamyl alcohol
+ACETYLATION_ACETYL_CARBONS = 2  # the C2 acetyl group: acetyl-CoA / acetic acid
+_ACETYLATION_TOTAL_CARBONS = ACETYLATION_ALCOHOL_CARBONS + ACETYLATION_ACETYL_CARBONS
+#: Share of the ester's carbon carried by the alcohol half (5/7) and the acetyl half (2/7).
+ALCOHOL_CARBON_SHARE = ACETYLATION_ALCOHOL_CARBONS / _ACETYLATION_TOTAL_CARBONS
+ACETYL_CARBON_SHARE = ACETYLATION_ACETYL_CARBONS / _ACETYLATION_TOTAL_CARBONS
+
+
+@dataclass(frozen=True)
+class LabelTracer:
+    """A pool's **valine-derived** sub-quantity, carried as its own state slot (decision D-115).
+
+    **This is a physical quantity, NOT the metadata D-1 forbids — and the distinction is the
+    whole justification.** D-1 decided that tier and uncertainty are *derived* at the analysis
+    boundary rather than riding inside the state floats, and :mod:`fermentation.core.state`
+    extends that to "provenance". A ¹³C isotopologue concentration is a different kind of thing:
+    it is a **conserved extensive quantity in g/L** that flows, accumulates and integrates
+    exactly like every other pool. Tracking it in a float64 slot is not wrapping a scalar in a
+    metadata object — it is what state floats are *for*. D-1 is untouched.
+
+    ``tracer_pool`` holds the concentration of the ``bulk_pool``'s molecules whose carbon
+    skeleton came from **valine**, so the enrichment Rollero 2017 reports is simply
+    ``tracer / bulk`` (see :func:`labelled_fraction`). Valine specifically, because that is the
+    tracer Rollero fed (U-¹³C valine); a leucine-derived share would be a different experiment
+    and would need its own slot rather than a share of this one.
+
+    **Why the ESTER needs a slot of its own and cannot inherit the alcohol's fraction.** The
+    ester's enrichment is ``∫(synthesis · f_alcohol) / ∫synthesis`` — a flux-weighted average of
+    a *time-varying* fraction. Reconstructing that after the fact from trajectory samples is
+    quadrature over interpolated states, the D-103 defect that overstated a draw 1.3–3.5×; and
+    crediting the D-69 hydrolysis return at the alcohol's fraction instead would **assume** the
+    ester tracks the alcohol and then "measure" that it does — the D-98/D-108 vacuity trap
+    relocated into the core. Two slots make every flow carry a fraction that was actually
+    computed: the re-route debits at ``f_alcohol``, the hydrolysis return credits at
+    ``f_ester``, the stripping debits at ``f_ester``.
+
+    **Carbon-ledger inert by construction.**
+    :func:`~fermentation.validation.conservation.total_carbon` builds an explicit weight vector
+    and leaves unlisted variables at zero, so a tracer slot is **not** counted — which is
+    correct and load-bearing: it is a *sub-quantity of* its bulk pool, and weighting it would
+    double-count every labelled gram. The bulk pool's own weight already carries that carbon.
+    """
+
+    #: The pool whose valine-derived share is being tracked. Must be a real, carbon-weighted pool.
+    bulk_pool: str
+    #: The slot holding the valine-derived part of it [g/L]. Carbon-ledger weight zero.
+    tracer_pool: str
+
+
+#: The amino acid whose label the tracers follow — **valine**, because that is what Rollero 2017
+#: fed (U-¹³C valine) and therefore the only enrichment the model can be held to. Named here so
+#: the producer-side credit cannot silently widen to "any Ehrlich precursor": crediting the
+#: leucine → isoamyl primary branch as well would double the tracer against a source that
+#: measured only one of the two routes, and the ledger would not notice (a labelled sub-quantity
+#: carries no carbon weight — the D-89/D-90 family, where only an explicit guard is not blind).
+LABELLED_PRECURSOR = "valine"
+
+#: The two tracers the valine → KIC → isoamyl route needs to reach Rollero's ester observable
+#: (decision D-115): the **alcohol** the D-111 secondary route labels, and the **ester** the
+#: D-115 re-route carries that label into. Ordered alcohol-then-ester, the direction the label
+#: actually flows.
+VALINE_LABEL_TRACERS: tuple[LabelTracer, ...] = (
+    LabelTracer(bulk_pool=ISOAMYL_ALCOHOL.pool, tracer_pool="isoamyl_alcohol_valine"),
+    LabelTracer(bulk_pool=HYDROLYSING_ESTER.pool, tracer_pool="isoamyl_acetate_valine"),
+)
+
+#: ``bulk_pool -> LabelTracer``, so a Process can ask "is this pool traced?" without scanning.
+TRACER_BY_BULK: dict[str, LabelTracer] = {t.bulk_pool: t for t in VALINE_LABEL_TRACERS}
+
+
+def labelled_fraction(y: FloatArray, schema: StateSchema, tracer: LabelTracer) -> float:
+    """The valine-derived **molecule** fraction of ``tracer.bulk_pool``, in [0, 1].
+
+    Rollero 2017 defines enrichment as *"the fraction of labelled molecule with respect to its
+    total production"* — a **molecule** fraction (D-111 Finding 3), which is why both slots hold
+    g/L of the labelled molecule and this is a bare ratio rather than a carbon-weighted one.
+    The C5 skeleton transfers through the acetylation as a unit, so an ester molecule is
+    labelled exactly when the alcohol it was built from was: the fraction passes across the
+    reaction unchanged, and no carbon-fraction bookkeeping enters.
+
+    Clamped into [0, 1] and zero on an empty bulk pool. The clamp is not cosmetic: a solver
+    undershoot on either slot could otherwise produce a negative or >1 fraction that would
+    silently **create** label when a flow multiplies by it. Returning 0.0 for an empty pool is
+    the physically right answer (no molecules ⇒ no labelled molecules) and keeps every caller
+    free of a divide-by-zero guard.
+    """
+    bulk = float(y[schema.slice(tracer.bulk_pool)][0])
+    if bulk <= 0.0:
+        return 0.0
+    return min(1.0, max(0.0, float(y[schema.slice(tracer.tracer_pool)][0]) / bulk))
+
+
 @dataclass(frozen=True)
 class SecondaryFuselRoute:
     """A SECOND amino-acid precursor for an alcohol that already has one (decision D-111).

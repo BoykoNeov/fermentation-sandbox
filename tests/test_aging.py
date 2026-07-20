@@ -179,7 +179,17 @@ def test_metadata():
     # An on-ledger inter-pool transfer: decays esters, routes carbon to the alcohol
     # (isoamyl_alcohol)
     # and acid (Byp) products — never S/E/CO2 (aging draws no sugar, unlike the M2 producers).
-    assert set(p.touches) == {"isoamyl_acetate", "isoamyl_alcohol", "Byp"}
+    # Since D-115 the two label tracers ride along: the transfer carries its VALINE label as
+    # well as its carbon, or an aging segment would dilute the alcohol pool's enrichment with
+    # returned molecules silently booked as unlabelled. They carry no carbon weight, so the
+    # "never S/E/CO2" statement above is untouched — the ledger still sees three pools.
+    assert set(p.touches) == {
+        "isoamyl_acetate",
+        "isoamyl_alcohol",
+        "Byp",
+        "isoamyl_acetate_valine",
+        "isoamyl_alcohol_valine",
+    }
     assert set(p.reads) == {
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",

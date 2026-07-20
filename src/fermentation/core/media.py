@@ -129,7 +129,11 @@ from fermentation.core.kinetics import (
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
+from fermentation.core.kinetics.carbon_routing import (
+    ESTER_SPECS,
+    FUSEL_SPECS,
+    VALINE_LABEL_TRACERS,
+)
 from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import StateSchema, VarSpec
 
@@ -171,6 +175,26 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
         #: pool, which weighted AND perceived all five as isoamyl alcohol. Unlike the esters
         #: these have no headspace twin — they are not stripped in this model.
         *(VarSpec(spec.pool, "g/L", default=0.0, description=spec.note) for spec in FUSEL_SPECS),
+        #: The TWO valine-label tracer slots (decision D-115): the valine-derived part of the
+        #: isoamyl alcohol pool and of the isoamyl acetate pool, in g/L of the labelled molecule,
+        #: so Rollero's enrichment is ``tracer / bulk`` directly. **Not** the provenance metadata
+        #: D-1 excludes from the state floats — a ¹³C isotopologue concentration is a conserved
+        #: extensive quantity that flows and integrates like any other pool (see
+        #: :class:`~fermentation.core.kinetics.carbon_routing.LabelTracer`). They carry carbon
+        #: weight **zero** in ``total_carbon``, because each is a sub-quantity of a pool already
+        #: weighted there; weighting them would double-count every labelled gram.
+        *(
+            VarSpec(
+                tracer.tracer_pool,
+                "g/L",
+                default=0.0,
+                description=(
+                    f"valine-derived {tracer.bulk_pool} (D-115 label tracer) — a SUB-QUANTITY "
+                    f"of {tracer.bulk_pool}, not additional mass; carbon-ledger weight 0"
+                ),
+            )
+            for tracer in VALINE_LABEL_TRACERS
+        ),
         #: Each ester's headspace twin (decision D-20, generalised per-ester at D-96): the
         #: CO2-stripping sink moves liquid ester carbon here. A pool and its twin share ONE
         #: molecule's carbon weight, which is what makes the strip carbon-neutral — so a

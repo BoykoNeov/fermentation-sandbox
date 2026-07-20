@@ -123,6 +123,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 - [**D-112**](#d-112--the-leucineisoamyl-shortfall-measured-before-building-d-103s-spread-is-already-retired-by-d-104-the-node-cannot-lift-the-1f-ceiling-and-most-of-the-gap-is-an-incommensurate-denominator) — the leucine→isoamyl "shortfall" measured before building: D-103's spread is already retired by …
 - [**D-113**](#d-113--the-node-measured-against-the-inversion-it-was-kept-for-d-111s-valine-route-leaves-leucine-bit-invariant-so-the-split-it-must-un-invert-is-untouched) — the node measured against the inversion it was kept for: D-111's valine route leaves leucine …
 - [**D-114**](#d-114--the-acetate-check-the-esters-enrichment-is-structurally-zero-because-the-model-attributes-flows-and-the-ester-draws-from-a-stock) — the acetate check: the ester's enrichment is structurally zero because the model attributes flows …
+- [**D-115**](#d-115--the-acetate-enrichment-built-an-isotope-tracer-is-physics-not-metadata-so-d-1-was-never-the-obstacle) — the acetate enrichment, built: an isotope tracer is physics, not metadata, so D-1 was never …
 <!-- END INDEX -->
 
 ## Process decisions (project setup)
@@ -10930,6 +10931,14 @@ here for carbon provenance instead of rate.
 counter *"then attribute the 7 % made during the window."* Stock-vs-flow forecloses that on its own: even that 7 %
 draws from the pool, not the flow. The timing only says the cheap fix would not be worth its complexity.
 
+**[D-115 CORRECTION — this corroboration is measured and true, and it later licensed a FALSE inference.** The
+"93 % forms late" figure was read as implying the alcohol pool's valine fraction is *frozen* by the time the ester
+forms, and therefore that the ester could inherit a single number. It cannot: the fraction runs **26.3 % → 1.84 %**
+across that window, so the early 7 % of the ester draws from a pool 10–25× richer and carries far more than 7 % of the
+label. One-slot inheritance errs by **13.2 %**. **Mass shares are not label shares** — the same denominator switch this
+entry's own Lesson (ii) warns about, one level further in. The paragraph is correct as written about *timing*; it is
+only unsafe as a proxy for *attribution*. See D-115.]**
+
 ### Two corrections to the standing record
 
 1. D-111's Next says this check *"tests the **D-97 ATF1 coupling** against a source it has never been held to."* **It
@@ -10972,7 +10981,148 @@ cheap to *act on*, and finding that out cost one probe and one test.
 - **The isoamyl-acetate enrichment is now measured-structurally-zero, and closing it is a two-part unsourced build**
   (the D-69 5:2-inverse re-route **plus** provenance-carrying state, the D-1 shape) — the owner's call. The re-route
   alone is *insufficient*, which is new; it should no longer be listed as if it were the fix.
+  **[D-115 BUILT IT, and corrects this line once: the second half is NOT "the D-1 shape". A ¹³C tracer is a conserved
+  extensive quantity, not metadata about a value, so D-1 never reached it and no architectural decision was reopened.
+  The "necessary but not sufficient" reading of the re-route was right. Result: ester 1.93 % vs Rollero's ~4 %, ratio
+  ester/alcohol 1.05. See D-115.]**
 - Unchanged from D-113: the de-novo-KIC leucine-relief + kinetically-limited transamination build (D-104's inversion);
   D-109's parsimony question (shared BAT1/BAT2); the **KMV → isoleucine** and **phenylpyruvate** node routes; the
   isoamyl-magnitude / monotone-in-N lever (D-112 Finding 4); closure O₂ ingress; acetaldehyde in maturation + the
   0-vs-2.7 unsulfited floor; the deferred tail.
+
+
+## D-115 — the acetate enrichment, built: an isotope tracer is physics, not metadata, so D-1 was never the obstacle
+
+**What.** D-114 measured the model's isoamyl-**acetate** valine enrichment as **structurally zero** and concluded that
+closing it was a two-part unsourced build — the deferred D-69 5:2-inverse carbon re-route **plus** "provenance to ride
+in state", which it read as a **D-1**-level architectural decision and surfaced as the owner's call. Both halves are
+now built. The ester's enrichment is **1.93 %** against Rollero's **~4 %**, its parent alcohol's is **1.84 %** against
+a measured **3.4–7.5 %**, and the ratio ester/alcohol is **1.05**. Two new state slots, one re-routed carbon draw,
+three retired tests, two new ones. **D-1 is untouched, and the finding is that it never had to be.**
+
+### The reframe that dissolved the blocker — STOCK vs FLOW was right, "provenance in state" was not
+
+D-114's mechanism was correct: `ehrlich_draws` attributes **production** (it knows which precursor a gram of alcohol was
+made from as it is made), a pool is a bare `float64` carrying no origin, and the ester draws from the **pool**. What was
+wrong was the *cost* it assigned to fixing that. It read the fix as carrying **provenance** in the state floats and
+therefore as reopening D-1 — where tier and uncertainty are deliberately *derived* at the analysis boundary rather than
+wrapped around each scalar.
+
+**A ¹³C isotopologue concentration is not provenance metadata. It is a conserved extensive quantity in g/L.** It flows,
+it accumulates, it integrates under `solve_ivp` exactly like every other pool, and it needs no per-element Python
+object. D-1's actual argument — *"wrapping each scalar in a tier-carrying object would wreck the integration hot loop"*
+— has no purchase on it. So the slots this beat adds are not an exception carved out of D-1; they are ordinary state,
+and `state.py`'s docstring extension of D-1 to the word "provenance" was over-broad in exactly one place. **The
+architectural blocker was a category error, and it cost one reframe rather than a design.**
+
+### The build
+
+* **The re-route (mass).** `EsterSynthesis` now sources isoamyl acetate's **C5 skeleton off `isoamyl_alcohol`** and only
+  the **C2 acetyl group off `S`** — the exact inverse of D-69's hydrolysis split, reading the *same* ratio constants.
+  Those constants moved from `aging.py` into `carbon_routing.py`: a second consumer of a ratio kept private to one
+  module is the D-26/D-106 drift setup (two callers computing "the same thing" until one changes).
+* **The tracers (label).** Two slots — `isoamyl_alcohol_valine` and `isoamyl_acetate_valine`, in **g/L of the labelled
+  molecule**, so Rollero's enrichment is `tracer / bulk` with no carbon-fraction correction (his enrichment is a
+  *molecule* fraction — D-111 Finding 3 — and the C5 transfers as a unit). Label enters at
+  `FuselAminoAcidReroute` (the valine branch of `ehrlich_draws`), crosses at `EsterSynthesis` at the alcohol pool's
+  current fraction, returns at `EsterHydrolysis` at the **ester's** fraction, and leaves at `EsterVolatilization` at the
+  ester's fraction.
+* **Ledger-inert by construction.** `total_carbon` builds an explicit weight vector and leaves unlisted variables at
+  zero, so the tracers carry **no** carbon weight — which is correct and load-bearing: each is a *sub-quantity of* a
+  pool already weighted there, and weighting them would double-count every labelled gram. Carbon and nitrogen still
+  close to solver tolerance.
+* **The debit is self-limiting without a clamp.** The rate is first-order in the same pool it debits (D-97), so the draw
+  decays exactly as the pool does. A clamp would be actively harmful — it would break the ester's own mass balance
+  rather than prevent anything that can happen — so the safety comes from the algebra, and a test pins the
+  proportionality at five scales down to 1e-9 rather than checking one pool value.
+
+### The one-slot design collapsed under scrutiny, and the collapse is worth recording
+
+The scoping question was how many tracer slots. The cheap answer was **one**: track the alcohol's fraction and let the
+ester inherit it, justified by D-114's own corroboration that **~93 % of the ester forms after valine is exhausted**, so
+the alcohol's fraction should be *frozen* by then. That option does not exist:
+
+* if the alcohol's fraction really is flat over the ester-forming window, the ester's enrichment equals that constant,
+  which is the **already-known** D-111 number — the slot is **redundant**, and the analytic boundary calculation was
+  always enough;
+* if it is not flat, the ester still needs `∫(synth·f_alcohol)/∫synth` — **quadrature over interpolated states**, the
+  D-103 defect that overstated a draw 1.3–3.5×, or its own slot. The slot is **insufficient**.
+
+There is no regime in which exactly one slot is the right tool. The alternative — crediting the D-69 hydrolysis return
+at the *alcohol's* fraction — would have been worse: it bakes "ester fraction = alcohol fraction" into the **core** and
+then "measures" that the ester tracks the alcohol. That is the D-98/D-108 vacuity trap relocated out of the test and
+into the RHS, where no test could see it.
+
+**And the empirical answer is that the flat premise is false.** Measured at Rollero's SM250 condition, the alcohol's
+valine fraction across the ester-forming window runs **26.3 % → 1.84 %** — an order of magnitude, not a constant. The
+young pool is dominated by the valine route because it is tiny; de-novo synthesis then swamps it. So one-slot
+inheritance would have reported **2.18 %** against the tracer's **1.93 %**, a **13.2 %** relative error. **D-114's
+"93 % forms late" was a true statement that licensed a false inference**: the 7 % that forms early comes off a pool
+that is 10–25× richer, so it carries far more than 7 % of the label. Timing shares are not label shares.
+
+`test_the_ester_needed_its_own_tracer_slot_because_the_alcohol_fraction_is_not_flat` keeps this measured rather than
+argued, and is written as a **tripwire**: if a future beat flattens that fraction, the second slot stops earning its
+keep and the test fails, reopening the design question rather than silently carrying a slot that buys nothing.
+
+### What the result is, and what it deliberately is not
+
+| quantity | model | Rollero 2017 |
+|---|---|---|
+| isoamyl **alcohol** enrichment | 1.84 % | 2.1–7.5 % |
+| isoamyl **acetate** enrichment | 1.93 % | ~4 % (SM250/SM425); 0.0–19.7 % full spread |
+| ester / alcohol | **1.05** | ~1 (at or marginally below) |
+
+**The ratio is the deliverable.** Rollero's ester sits at essentially its parent alcohol's enrichment, which is what the
+chemistry predicts, and the model reproduces that structural relationship. The absolute shortfall (~2× on the ester) is
+**inherited, not new** — the alcohol already ran just under its band at D-111, and the ester is now pinned to it.
+
+**The model's ratio is marginally ABOVE 1 where Rollero's is at-or-below, and that is a real reportable difference**,
+not noise: the model's alcohol fraction *falls* over the run, so the ester integrates some of the earlier, richer pool.
+Recorded as a discrepancy rather than smoothed over.
+
+**The DoD was set before the code was written, and it was not "hit 4 %".** Closing the residual gap would mean raising
+`f_valine_to_isoamyl` — sourced **twice** (Crépin 2017's 23 %, sitting inside Rollero's own 42–45 % KIC flux), and whose
+denominator is *consumed valine* where the validation's is *total ester*. Tuning it to land 4 % is exactly the D-104
+error — *"the gap is a missing route ... NOT a value to tune"* — with the route now built and the temptation moved one
+compound downstream. **The parameter is untouched by this beat.** The test asserts order-of-magnitude plus the ratio,
+and its docstring says why tightening it would be a regression in fidelity dressed as an improvement.
+
+### Three tests retired, all of them predicted
+
+1. `test_ester_synthesis_reads_the_fusel_pool_but_never_debits_it` (D-97) — asserted `pool not in touches`. Retired by
+   design: it pinned a boundary D-97 *chose* and D-115 deliberately moves.
+2. `test_the_ester_carries_no_amino_acid_label_because_its_carbon_is_wholly_sugar_sourced` (D-114) — its own docstring
+   said *"if a future beat builds the deferred D-69 5:2-inverse re-route ... this test FAILS, which is the finding's
+   premise being correctly invalidated rather than silently going green on a stale claim."* It did. **D-114's decision
+   to assert on the CARBON rather than on the draw list is what made the invalidation land as a clean red rather than a
+   stale green** — the test was built to die correctly, and it did.
+3. `test_ester_derivative_matches_closed_form` — the closed form is now per-ester on the *source* as well as the rate.
+
+The seven remaining failures were `touches` declarations and schema-size listings. **No conservation test moved**, which
+is the signal that mattered: 1167 passed on the first full run with the build in.
+
+### Lessons
+
+(i) **An "architectural blocker" deserves one hard look at its category before it becomes a design.** D-114 correctly
+identified what the model could not compute and then mis-priced the fix by one classification — metadata vs physical
+quantity. The mechanism analysis was right; the cost estimate was wrong, and the cost estimate is what parked the item
+on four consecutive Next lists.
+(ii) **A true fact can license a false inference, and the tell is a switched denominator.** "93 % of the ester forms
+after valine is gone" is true and was measured. It does *not* imply the label is 93 % determined by that window,
+because the early 7 % draws from a far richer pool. **Mass shares and label shares are different quantities** — the
+same D-105/D-111/D-113/D-114 refrain (the ledger is blind to the attribution that is the whole finding), reappearing
+one level in, inside the *corroboration* rather than inside the claim.
+(iii) **When an option collapses under scrutiny, say so and re-ask rather than picking a neighbour.** The one-slot
+design was offered, chosen, and then proved to occupy no coherent niche. Silently expanding to two would have delivered
+a scope the owner never approved; silently retreating to zero would have overridden a decision they had just made.
+
+### Next
+
+- **The ester/alcohol ratio runs marginally above 1 where the source runs at-or-below.** Small, measured, and now
+  visible; the cause is the alcohol pool's falling fraction, which is the D-103 gate-shape defect showing up in a
+  *third* observable. Worth a beat only if the gate is being reworked anyway.
+- Unchanged from D-113/D-114: the de-novo-KIC leucine-relief + kinetically-limited transamination build (D-104's
+  inversion); D-109's parsimony question (shared BAT1/BAT2); the **KMV → isoleucine** and **phenylpyruvate** node
+  routes; the isoamyl-magnitude / monotone-in-N lever (D-112 Finding 4); closure O₂ ingress; acetaldehyde in maturation
+  + the 0-vs-2.7 unsulfited floor; the deferred tail.
+- **No longer on the list:** the isoamyl-acetate carbon re-route, which had stood on every "Next" since D-97.

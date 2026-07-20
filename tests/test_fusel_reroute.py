@@ -97,7 +97,11 @@ def test_metadata():
     assert p.tier is Tier.SPECULATIVE
     # A swap: it moves the carbon SOURCE and releases nitrogen — it never produces fusels.
     # ``CO2`` joined at D-106: the Ehrlich decarboxylation the re-sourced fraction really performs.
-    assert set(p.touches) == {"S", "N", "CO2", *_PRECURSORS}
+    # ``isoamyl_alcohol_valine`` joined at D-115: this is where a gram of isoamyl alcohol first
+    # becomes valine-derived, so it is where the label enters the model. It is a SUB-QUANTITY of
+    # the alcohol pool carrying zero carbon weight — so the "never produces fusels" claim below
+    # still holds exactly, and is still checked against the real pools.
+    assert set(p.touches) == {"S", "N", "CO2", *_PRECURSORS, "isoamyl_alcohol_valine"}
     for pool in _FUSEL_POOLS:
         assert pool not in p.touches
     # THE D-100 DECOUPLING, pinned: the re-route no longer touches the identity-agnostic pools.
@@ -463,3 +467,177 @@ def test_the_kic_branch_cannot_source_more_isoamyl_than_is_being_made(full_param
     )
     # ...and it holds: isoamyl is never sourced from more precursor than it is made from.
     assert sourced <= f_iso * (1.0 + 1e-12)
+
+
+# -- D-115: the label reaches the ESTER, and what it is measured against ------
+
+
+#: Rollero *et al.* 2017's own SM250 condition - 250 mg N/L, 24 C. The enrichments below are
+#: quoted against that paper, so the probe must run on a COMMENSURATE must (D-104's lesson,
+#: where a ~470 mg N/L probe flattered the model against a 180 mg N/L source).
+_ROLLERO_YAN = 250.0
+_ROLLERO_TEMP = 24.0
+
+#: What Rollero measures, and the ONLY thing this beat may be scored against.
+#:
+#: The **alcohol** band is the model's existing, already-validated D-111 target (2.1-7.5%). The
+#: **ester** figure is D-114's corrected reading: ~4% at the well-measured SM250/SM425 columns,
+#: **not** the bare 0.0-19.7% full spread. That correction is load-bearing in the sceptical
+#: direction - the four high values all sit in the low-nitrogen SM70 blocks and breach the
+#: physical bound that an acetate's enrichment cannot exceed its parent alcohol's (by 3.1-5.3x),
+#: so they are excluded on chemistry rather than on a noise argument. Quoted loosely as
+#: "0-19.7%" the band would swallow almost any model output, including D-114's structural zero.
+_ROLLERO_ALCOHOL_BAND = (0.021, 0.075)
+_ROLLERO_ESTER = 0.04
+
+
+def _rollero_run(amino_acids_gpl: float, *, days: float = 14.0):
+    scenario = Scenario(
+        name=f"d115-enrichment-{amino_acids_gpl}",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": _ROLLERO_YAN,
+            "pitch_gpl": 0.25,
+            "amino_acids_gpl": amino_acids_gpl,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=_ROLLERO_TEMP)],
+        duration_days=days,
+    )
+    compiled = compile_scenario(scenario, strict=True)
+    dur = compiled.t_span_h[1]
+    t_eval = np.linspace(0.0, dur, int(dur) + 1)
+    traj = simulate(
+        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h, t_eval=t_eval
+    )
+    assert traj.success, traj.message
+    return traj, compiled
+
+
+def _enrichment(traj, schema, bulk: str, tracer: str) -> float:
+    b = float(traj.y[schema.slice(bulk), -1][0])
+    assert b > 0.0, f"vacuous: {bulk} is empty, so its enrichment is a division of zeros"
+    return float(traj.y[schema.slice(tracer), -1][0]) / b
+
+
+def test_the_ester_carries_valine_label_at_its_parent_alcohols_enrichment():
+    """D-115's headline: the ester's enrichment is a model output, and it TRACKS THE ALCOHOL.
+
+    **What is being claimed, and what is deliberately NOT.** Rollero measures isoamyl acetate at
+    ~4% valine-labelled against its parent alcohol's 3.4-7.5% - the ester sits *at or marginally
+    below* its alcohol throughout, which is what the chemistry predicts (the C5 skeleton
+    transfers as a unit, and enrichment is a molecule fraction). **That RATIO is the structural
+    claim this beat delivers.** The model's absolute enrichment is ~1.9%, roughly half the
+    measured ~4%, and this test asserts *only the same order of magnitude* - because the
+    shortfall is **inherited**, not new: the alcohol itself runs at ~1.8% against a measured
+    2.1-7.5%, an already-documented D-111 gap.
+
+    **Why the DoD is not "hit 4%".** Closing the residual gap here would mean raising
+    ``f_valine_to_isoamyl``, which is independently sourced twice (Crepin 2017's 23%, sitting
+    inside Rollero's own 42-45% KIC flux) and whose denominator is *consumed valine* while this
+    test's is *total ester*. Tuning it to land this number is precisely the D-104 error - "the
+    gap is a missing route ... NOT a value to tune" - with the route now built and the
+    temptation moved one compound downstream. The parameter is untouched by this beat.
+    """
+    traj, compiled = _rollero_run(1.0)
+    schema = compiled.schema
+    alcohol = _enrichment(traj, schema, "isoamyl_alcohol", "isoamyl_alcohol_valine")
+    ester = _enrichment(traj, schema, "isoamyl_acetate", "isoamyl_acetate_valine")
+
+    # Anti-vacuity FIRST: a structural zero would satisfy "same order of magnitude as zero".
+    assert ester > 0.0, (
+        "the ester carries NO label - the D-115 re-route is not delivering, and this is exactly "
+        "the structural zero D-114 measured"
+    )
+    assert alcohol > 0.0
+
+    # THE STRUCTURAL CLAIM: the ester tracks its parent alcohol. Rollero's ester/alcohol ratio
+    # is ~1 (at or marginally below); the model's is marginally ABOVE 1, because the alcohol
+    # pool's fraction FALLS over the run and the ester integrates some of the earlier, richer
+    # pool. That direction is a real, reportable difference from the source, not a fit.
+    assert ester / alcohol == pytest.approx(1.0, abs=0.15), (
+        "the ester must carry label at essentially its parent alcohol's enrichment - the C5 "
+        "transfers as a unit, so the two fractions cannot diverge"
+    )
+
+    # ORDER OF MAGNITUDE ONLY against the source, and the band is deliberately generous in the
+    # direction of the known shortfall. Tightening this toward Rollero's ~4% would convert an
+    # honest inherited gap into pressure on a sourced parameter.
+    assert 0.25 * _ROLLERO_ESTER < ester < 2.0 * _ROLLERO_ESTER, (
+        f"model ester enrichment {ester:.4f} is not even the right order against Rollero's "
+        f"~{_ROLLERO_ESTER:.2f} - something structural, not a calibration drift"
+    )
+    # And the alcohol's own gap is UNCHANGED by this beat: still just under D-111's band.
+    lo, _hi = _ROLLERO_ALCOHOL_BAND
+    assert 0.5 * lo < alcohol < lo, (
+        f"alcohol enrichment {alcohol:.4f} moved out of its known just-under-band position - "
+        "the re-route was supposed to cost the alcohol pool almost nothing (mass-negligible)"
+    )
+
+
+def test_no_amino_acid_dose_means_no_label_anywhere():
+    """Isolability, and the anti-vacuity floor for every enrichment number above (D-115).
+
+    With no amino-acid dose there is no valine, so no branch of ``ehrlich_draws`` sources
+    isoamyl alcohol from it and **both** tracers must stay identically zero - while the pools
+    themselves fill normally. Without this, an implementation that credited the tracer from the
+    *leucine* branch (the same pool's primary precursor) would produce healthy-looking
+    enrichments that no source supports, and nothing else in the suite would notice: a tracer
+    slot carries no carbon weight, so conservation is blind to it by construction.
+    """
+    traj, compiled = _rollero_run(0.0)
+    schema = compiled.schema
+
+    # The pools are real - this is a working ferment, not an empty one.
+    assert float(traj.y[schema.slice("isoamyl_alcohol"), -1][0]) > 0.0
+    assert float(traj.y[schema.slice("isoamyl_acetate"), -1][0]) > 0.0
+    # ...and carry no label whatsoever.
+    assert float(traj.y[schema.slice("isoamyl_alcohol_valine"), -1][0]) == 0.0
+    assert float(traj.y[schema.slice("isoamyl_acetate_valine"), -1][0]) == 0.0
+
+
+def test_the_ester_needed_its_own_tracer_slot_because_the_alcohol_fraction_is_not_flat():
+    """THE RECEIPT for the two-slot design (D-115) - a measurement, not an argument.
+
+    The cheap design was one slot: track the alcohol's valine fraction and let the ester inherit
+    it, justified by D-114's observation that ~93% of the ester forms after valine is exhausted,
+    so the fraction should be *frozen* by then. **That premise is false, and this test is where
+    it is falsified.** The alcohol's fraction is strongly time-varying across the window in which
+    the ester forms - it starts high (a tiny young pool is dominated by the valine route) and
+    falls by more than an order of magnitude as de-novo synthesis takes over.
+
+    So the ester's enrichment is a flux-weighted average of a moving fraction, and inheriting a
+    single number gets it wrong in a measurable way. Reconstructing that average after the fact
+    is quadrature over interpolated states - the D-103 defect that overstated a draw 1.3-3.5x -
+    which is why the ester carries its own integrated slot instead.
+
+    **A tripwire, not a curiosity.** If a future beat flattens the alcohol's fraction (a
+    different gate shape, a de-novo ceiling), the second slot stops earning its keep and this
+    test fails - at which point the design question genuinely re-opens.
+    """
+    traj, compiled = _rollero_run(1.0)
+    schema = compiled.schema
+    alcohol = traj.y[schema.slice("isoamyl_alcohol")][0]
+    alcohol_label = traj.y[schema.slice("isoamyl_alcohol_valine")][0]
+    ester = traj.y[schema.slice("isoamyl_acetate")][0]
+
+    made = np.clip(np.diff(ester, prepend=ester[0]), 0.0, None)
+    assert made.sum() > 0.0, "vacuous: no ester formed over the run"
+    fraction = np.where(alcohol > 0.0, alcohol_label / np.where(alcohol > 0.0, alcohol, 1.0), 0.0)
+
+    forming = fraction[made > 0.0]
+    assert forming.max() > 5.0 * forming.min(), (
+        "the alcohol's valine fraction is nearly FLAT across the ester-forming window, so the "
+        "ester could inherit it and the second tracer slot is redundant - re-open the D-115 "
+        "design decision rather than carrying a slot that buys nothing"
+    )
+
+    # And the error the one-slot design would actually have made: the flux-weighted alcohol
+    # fraction is NOT the ester's own integrated enrichment.
+    inherited = float((fraction * made).sum() / made.sum())
+    actual = _enrichment(traj, schema, "isoamyl_acetate", "isoamyl_acetate_valine")
+    assert abs(inherited - actual) / actual > 0.05, (
+        f"one-slot inheritance would have reported {inherited:.5f} against the tracer's "
+        f"{actual:.5f} - if that error is now negligible the second slot is not paying for "
+        "itself"
+    )

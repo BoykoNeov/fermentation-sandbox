@@ -147,11 +147,18 @@ from fermentation.core.kinetics.amino_acid_pools import (
 )
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.carbon_routing import (
+    ACETYL_CARBON_SHARE,
+    ALCOHOL_CARBON_SHARE,
     CO2_PER_PRIMARY_EHRLICH_ALCOHOL,
     ESTER_SPECS,
     FUSEL_SPECS,
+    ISOAMYL_ALCOHOL,
+    LABELLED_PRECURSOR,
     SECONDARY_FUSEL_ROUTES,
+    TRACER_BY_BULK,
+    VALINE_LABEL_TRACERS,
     FuselSpec,
+    labelled_fraction,
     non_ehrlich_fraction_param,
 )
 from fermentation.core.kinetics.carbon_routing import (
@@ -166,6 +173,13 @@ from fermentation.core.kinetics.carbon_routing import (
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
+
+#: ``pool -> FuselSpec``, so the D-115 re-route can weight its debit at the precursor alcohol's
+#: **own molecule**. Resolved through the registry rather than by assuming ``pool == species``:
+#: that assumption happens to hold today, and a lookup that is right by coincidence is the
+#: D-99 two-C5-isomers trap waiting to happen (``isoamyl_alcohol`` and ``active_amyl_alcohol``
+#: share a formula and a carbon count, so a mis-resolution would be invisible to the ledger).
+_FUSEL_SPEC_BY_POOL: dict[str, FuselSpec] = {spec.pool: spec for spec in FUSEL_SPECS}
 
 #: Representative species whose formula carbon-accounts each aroma pool (D-19). The carbon
 #: mass fraction of each weights both the sugar draw here and the pool in ``total_carbon``,
@@ -516,14 +530,31 @@ class EsterSynthesis(Process):
     on acetylating it for as long as the flux supplies acetyl-CoA. Coupling to the rate would
     have stopped the banana dead at day 2 with 51 mg/L of its substrate sitting in the vessel.
 
-    **Read, never debited — a deliberate v1 scope call (D-97).** The rate reads ``fusels``; the
-    ester's carbon is still drawn from ``S``, so ``touches`` is unchanged and ``total_carbon``
-    is untouched. Physically the acetylation takes the C5 skeleton *from* the alcohol (and C2
-    from acetyl-CoA) — the exact inverse of the 5:2 split D-69's hydrolysis returns to
-    ``fusels`` — so a carbon re-route off ``fusels`` is the honest end state and is the named
-    deferred refinement. It is mass-negligible here (~0.5 mg/L of ester against an ~86 mg/L
-    fusel pool), and the sugar draw is the same documented stand-in
-    :class:`FuselAlcoholsEhrlich` already uses for the amino-acid skeleton.
+    **Read AND debited since D-115 — the 5:2-inverse re-route, built.** D-97 read the alcohol
+    pool without debiting it and drew the whole ester from ``S``, naming the carbon re-route as
+    a deferred refinement on the grounds that it is **mass-negligible** (~0.5 mg/L of ester
+    against an ~86 mg/L alcohol pool). That reasoning was correct and remains correct; what
+    D-114 established is that it does not bound what the re-route is *for*. Mass-negligible and
+    **observable**-negligible are different quantities: the deferral was 100 % of the ester's
+    valine enrichment, which was structurally pinned at zero for as long as every gram of ester
+    carbon came from sugar. So the acetylation now takes the C5 skeleton *from* the alcohol and
+    only the C2 acetyl group from ``S``, at
+    :data:`~fermentation.core.kinetics.carbon_routing.ALCOHOL_CARBON_SHARE` — the **exact
+    inverse** of the 5:2 split D-69's hydrolysis returns, reading the one shared ratio so the
+    two directions of one reaction cannot drift apart.
+
+    **The debit cannot empty the pool, and that is structural rather than guarded.** The rate is
+    itself first-order in this pool (D-97), so the draw decays to zero exactly as the pool does.
+    A clamp would be worse than useless here: it would silently break the ester's own mass
+    balance rather than prevent anything that can happen.
+
+    **What it buys — the ester carries label (D-115).** Because the C5 arrives as a unit from a
+    pool with a known valine-derived fraction, an ester molecule is labelled exactly when its
+    parent alcohol was, and the enrichment Rollero 2017 measures becomes a model output instead
+    of a structural zero. Both tracer slots are written here: the alcohol's is debited and the
+    ester's credited at the alcohol pool's *current* fraction. See
+    :class:`~fermentation.core.kinetics.carbon_routing.LabelTracer` for why the ester needs a
+    slot of its own rather than inheriting the alcohol's number at the analysis boundary.
 
     **A stated dependency, not a latent surprise (D-97).** Reading ``fusels`` means
     ``isoamyl_acetate`` synthesis **requires** :class:`FuselAlcoholsEhrlich` to be active — the
@@ -557,7 +588,17 @@ class EsterSynthesis(Process):
 
     name = "ester_synthesis"
     tier = Tier.PLAUSIBLE
-    touches = (*(spec.pool for spec in ESTER_SPECS), "S")
+    #: Since D-115 this also **debits** the precursor alcohol (the 5:2-inverse re-route) and
+    #: writes the two valine-label tracer slots, so all three join the three ester pools and
+    #: ``S``. The D-97-era ``touches`` deliberately excluded ``isoamyl_alcohol`` — "read, never
+    #: debited" — and a test asserted that exclusion; D-115 retires both, which is the
+    #: *point* of the beat rather than a regression (see the class doc).
+    touches = (
+        *(spec.pool for spec in ESTER_SPECS),
+        "S",
+        ISOAMYL_ALCOHOL.pool,
+        *(tracer.tracer_pool for tracer in VALINE_LABEL_TRACERS),
+    )
     #: ``K_sugar_uptake`` is shared with the fermentative-uptake flux this tracks;
     #: ``E_a_esters`` (sourced per medium — steep beer / flat wine, D-21) and ``T_ref``
     #: set the temperature shape, shared by all three esters (D-96). Each ester has its own
@@ -583,14 +624,42 @@ class EsterSynthesis(Process):
             rate = params[spec.k_param] * flux * f_t
             if spec.precursor_pool is not None:
                 # ATF1 is FAR from saturated in this alcohol ([S] ~ 0.5-1 mM vs Km ~29.8 mM),
-                # so its supply limits the rate first-order (D-97). READ ONLY — the pool is
-                # never debited; the ester's carbon still comes from S (see the class doc).
+                # so its supply limits the rate first-order (D-97).
                 # Clamped >= 0 so a solver undershoot cannot flip synthesis negative.
                 rate *= max(float(y[schema.slice(spec.precursor_pool)][0]), 0.0)
             d[schema.slice(spec.pool)] = rate
             # Each ester draws at ITS OWN carbon fraction (C4/C7/C8) — the D-96 split's
             # ledger payoff: no ester's carbon is booked through a stand-in molecule.
-            _draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(spec.species))
+            ester_carbon = rate * carbon_mass_fraction(spec.species)
+            if spec.precursor_pool is None:
+                _draw_carbon_from_sugar(d, y, schema, ester_carbon)
+                continue
+
+            # --- the D-115 re-route: the C5 comes OFF the alcohol, only C2 off sugar ---------
+            # The exact inverse of the D-69 hydrolysis split, using the same shared ratio. Two
+            # sources, split 5:2 by carbon, which is mole-for-mole with the ester: the alcohol
+            # gives up one whole molecule per ester molecule made.
+            precursor = _FUSEL_SPEC_BY_POOL[spec.precursor_pool]
+            alcohol_carbon = ester_carbon * ALCOHOL_CARBON_SHARE
+            alcohol_rate = alcohol_carbon / carbon_mass_fraction(precursor.species)
+            d[schema.slice(spec.precursor_pool)] -= alcohol_rate
+            _draw_carbon_from_sugar(d, y, schema, ester_carbon * ACETYL_CARBON_SHARE)
+            # The debit cannot drive the pool negative: `rate` is itself FIRST-ORDER in this
+            # pool (D-97), so the draw decays to zero exactly as the pool does — first-order
+            # decay, not a fixed subtraction. No clamp is needed and none is used, because a
+            # clamp here would silently break the ester's own mass balance instead.
+
+            # --- and the label rides across with it (D-115) ---------------------------------
+            # Rollero's enrichment is a MOLECULE fraction and the C5 transfers as a unit, so an
+            # ester molecule is labelled exactly when its parent alcohol was: both the alcohol
+            # debit and the ester credit go at the alcohol pool's CURRENT fraction. This is the
+            # only flow that moves label from the alcohol to the ester.
+            f_alcohol = labelled_fraction(y, schema, TRACER_BY_BULK[spec.precursor_pool])
+            if f_alcohol > 0.0:
+                d[schema.slice(TRACER_BY_BULK[spec.precursor_pool].tracer_pool)] -= (
+                    alcohol_rate * f_alcohol
+                )
+                d[schema.slice(TRACER_BY_BULK[spec.pool].tracer_pool)] += rate * f_alcohol
         return d
 
 
@@ -751,7 +820,15 @@ class FuselAminoAcidReroute(Process):
     #: not make higher alcohols, so the re-route can no longer starve the consumers that live on
     #: those pools (yeast swap, MLF growth, Brett growth, Maillard browning). That absence is the
     #: whole D-100 decoupling and is pinned by a test.
-    touches = ("S", "N", "CO2", *(spec.precursor_amino_acid for spec in FUSEL_SPECS))
+    #: Since D-115 it also credits the **alcohol** label tracer: this is where a gram of isoamyl
+    #: alcohol first becomes valine-derived, so it is where the label enters the model.
+    touches = (
+        "S",
+        "N",
+        "CO2",
+        *(spec.precursor_amino_acid for spec in FUSEL_SPECS),
+        VALINE_LABEL_TRACERS[0].tracer_pool,
+    )
     #: Recomputes the fusel rate (so it reads the producer's parameters) plus ``K_amino_acids``
     #: and each precursor's ``must_aa_fraction_*`` for the relative-depletion gates (D-100). Since
     #: D-111 it also reads each secondary route's share **and its precursor's non-Ehrlich
@@ -793,6 +870,15 @@ class FuselAminoAcidReroute(Process):
             )
             refund += draw.refund_carbon
             co2_carbon += draw.co2_carbon
+            # D-115: this branch's alcohol carries VALINE's label iff valine is what it was
+            # sourced from. Credited as grams of the labelled MOLECULE (Rollero's enrichment is
+            # a molecule fraction), and only for the labelled precursor — the leucine → isoamyl
+            # primary branch feeds the same pool and must NOT be credited here.
+            tracer = TRACER_BY_BULK.get(draw.alcohol.pool)
+            if tracer is not None and draw.precursor.species == LABELLED_PRECURSOR:
+                d[schema.slice(tracer.tracer_pool)] += draw.alcohol_carbon / carbon_mass_fraction(
+                    draw.alcohol.species
+                )
         if refund <= 0.0:
             return d
         d[schema.slice("N")] = nitrogen  # DEAMINATION: precursor N → ammonium (the D-33 branch)
@@ -882,7 +968,14 @@ class EsterVolatilization(Process):
 
     name = "ester_volatilization"
     tier = Tier.PLAUSIBLE
-    touches = (*(spec.pool for spec in ESTER_SPECS), *(spec.gas_pool for spec in ESTER_SPECS))
+    #: Since D-115 the banana ester's label tracer joins them: stripping removes labelled and
+    #: unlabelled molecules alike, so the tracer must fall with the pool or the enrichment would
+    #: drift upward for no physical reason.
+    touches = (
+        *(spec.pool for spec in ESTER_SPECS),
+        *(spec.gas_pool for spec in ESTER_SPECS),
+        VALINE_LABEL_TRACERS[1].tracer_pool,
+    )
     #: ``K_sugar_uptake``/``E_a_uptake`` are shared with the fermentative uptake whose CO2
     #: stream does the stripping (gas-flow factor); ``dH_ester_volatil`` is the sourced
     #: ethyl-acetate Henry's-law partition enthalpy (gas/liquid factor); ``T_ref`` anchors
@@ -916,4 +1009,14 @@ class EsterVolatilization(Process):
             # so each transfer is carbon-neutral independently (D-96).
             d[schema.slice(spec.pool)] = -rate
             d[schema.slice(spec.gas_pool)] = rate
+            # D-115: stripping is NON-FRACTIONATING — the headspace takes labelled and unlabelled
+            # molecules in the proportion the liquid holds them, so the tracer is debited at the
+            # pool's own fraction and the *fraction* is left exactly where it was. Omitting this
+            # would be the classic tracer bug: mass leaves, label does not, and the enrichment
+            # climbs toward 100% purely because the pool shrank. (A real isotope effect on
+            # volatility exists and is utterly negligible at these masses; not modelled, and it
+            # would be a fractionation term here rather than an omission.)
+            tracer = TRACER_BY_BULK.get(spec.pool)
+            if tracer is not None:
+                d[schema.slice(tracer.tracer_pool)] -= rate * labelled_fraction(y, schema, tracer)
         return d
