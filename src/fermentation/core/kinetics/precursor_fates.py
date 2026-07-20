@@ -99,8 +99,33 @@ byte-for-byte the validated core. The compile seam additionally *disables* this 
 ``amino_acids_gpl ≤ 0``, the D-32 tier-isolability pattern. It is only valid while the re-route
 is active (it scales that Process's draw), so the two are kept paired.
 
-Tier: **speculative** — it inherits the re-route's speculative rate parameters, and two of its
-five fractions (phenylalanine, isoleucine's fallback) are author estimates or bounds.
+Tier: **speculative** — it inherits the re-route's speculative rate parameters. **[D-117: all five
+fractions now rest on measurements**, phenylalanine's last of all (Minebois 2025, U-13C
+phenylalanine). Two of the five still ship as *bounds* rather than values — isoleucine's because its
+true lump is unknown, phenylalanine's because its true lump is **known and unshippable** (below).
+The Process tier does not move: it is set by the re-route's rates, not by these fractions.**]**
+
+**[D-117 — phenylalanine's fraction was WRONG, not merely unsourced, and the error is this
+docstring's own trap.** D-104 shipped ``f_non_ehrlich_phenylalanine = 0.53``. Minebois 2025 measures
+Sc sending **2.5%** of consumed phenylalanine to 2-phenylethanol and **53.1%** to protein — so the
+lump is **0.975**, and the old 0.53 sat almost exactly on the *protein share*, i.e. on the trap the
+paragraph above says this beat "measured its way out of". It fell in again for the one precursor it
+could not check, and the coincidence made the error look derived. The stated derivation ("the mean
+of Crépin's four measured splits") did not even yield 0.53 — that mean is 0.749. **A value whose
+stated derivation does not reproduce it is a defect even while it is only "speculative".**
+
+**AND THE MEASURED LUMP CANNOT BE SHIPPED — this Process is why.** The draw scales ``f/(1−f)``,
+which goes **1.13 → 39** between 0.53 and 0.975. At 0.975 the joint (D-32 swap + this sink) carbon
+refund reaches **1.125× growth's own draw**: it refunds more carbon than growth was ever charged,
+which is gluconeogenesis, and it trips the hard ``< 1.0`` guard in
+``test_the_joint_carbon_refund_never_creates_sugar``. The cause is **the missing de-novo route, not
+the parameter**: this model charges *all* of its ``k``-calibrated 2-phenylethanol to consumed
+phenylalanine, while reality builds ~97% of 2-PE from **de-novo phenylpyruvate**. So the sink must
+eat phenylalanine at ~40× the Ehrlich draw to feed an alcohol reality mostly makes from sugar —
+**the same shape as the isoamyl/KIC problem this docstring already describes, one precursor over.**
+The shipped value is therefore Minebois's protein share, **0.531, an explicit lower bound**, and the
+blocker is pinned by ``test_the_sourced_lump_breaks_the_carbon_refund_guard``, which is *designed to
+fail* when the phenylpyruvate route lands. See DECISIONS D-117.]**
 """
 
 from __future__ import annotations

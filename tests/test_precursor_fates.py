@@ -297,6 +297,75 @@ def test_the_joint_nitrogen_refund_exceeds_growths_draw_at_pitch_and_that_is_dea
     assert 1.0 < worst_n < 1.20, f"joint N refund {worst_n:.3f}x — outside the documented band"
 
 
+def test_the_sourced_lump_breaks_the_carbon_refund_guard(full_params):
+    """WHY `f_non_ehrlich_phenylalanine` SHIPS AT A BOUND AND NOT AT ITS MEASURED VALUE (D-117).
+
+    Minebois 2025 measures phenylalanine's true non-Ehrlich lump at **0.975** (2.5% of consumed
+    phenylalanine reaches 2-phenylethanol). The parameter ships **0.531** — Minebois's *protein*
+    share, an explicit lower bound. **This test is the reason**, and it exists so that reason is
+    executable rather than a paragraph someone can talk themselves out of.
+
+    **Set the sourced lump and the model stops conserving carbon.** The sink refunds the drawn
+    precursor's carbon to sugar; its draw scales ``f/(1−f)``, which goes **1.13 → 39** between the
+    bound and the measurement. Measured here: the joint (swap + sink) carbon refund reaches
+    **1.125× growth's own draw**, i.e. it hands back more carbon than growth was ever charged.
+    That is **gluconeogenesis**, which fermenting yeast do not do — prime directive 1, and the
+    hard `< 1.0` guard two tests up. (The joint N refund also goes 1.095 → **1.549×**, far past the
+    documented "slight deamination" band; but nitrogen has a physical home for the excess —
+    deamination to ammonium — and **carbon has none**. That asymmetry is why the N band is soft and
+    documented while the C guard is hard.)
+
+    **Do NOT read the ProcessSet-level `dS/dt ≤ 0` as absolution.** It still holds at 0.975, because
+    fermentation's sugar *consumption* swamps the fictitious refund in the sum. A breach that a
+    larger flux hides is still a breach — the guard is at the Process level precisely so it cannot
+    be masked. Widening either band to admit 0.975 would be the D-103 trap (a band used to acquit a
+    model) and "weaken the test for green", simultaneously.
+
+    **The cause is structural and is not the parameter's fault.** The model charges *all* of its
+    ``k``-calibrated 2-phenylethanol to consumed phenylalanine; reality builds ~97% of 2-PE **de
+    novo from phenylpyruvate**. Without that route, honouring the measured lump forces the sink to
+    eat phenylalanine at ~40× the Ehrlich draw to feed an alcohol reality mostly makes from sugar.
+    **The sourced value and the missing de-novo route are inseparable — the route is the unlock,
+    and a refund clamp would be a band-aid over a conservation law.**
+
+    **When the phenylpyruvate route lands, this test should FAIL** — that is its purpose. Delete it
+    and set the parameter to 0.975 in the same commit.
+    """
+    traj, compiled = _run(amino_acids_gpl=1.0)
+    entry = compiled.parameters["f_non_ehrlich_phenylalanine"]
+
+    # The shipped value is the bound, and the band's top is the measurement it cannot yet reach.
+    assert entry.value == pytest.approx(0.531)
+    assert entry.uncertainty is not None
+    assert entry.uncertainty.high == pytest.approx(0.975)
+
+    # At the shipped bound the guards hold with room...
+    n_at_bound, c_at_bound = _worst_joint_refund(traj, compiled)
+    assert c_at_bound < 1.0 and 1.0 < n_at_bound < 1.20
+
+    # ...and at the SOURCED value the carbon guard breaks. Measured, not asserted from prose.
+    pv = compiled.param_values
+    pv["f_non_ehrlich_phenylalanine"] = entry.uncertainty.high
+    dur = compiled.t_span_h[1]
+    blocked = simulate(
+        compiled.process_set, pv, compiled.y0, compiled.t_span_h,
+        t_eval=np.linspace(0.0, dur, int(dur) + 1),
+    )
+    assert blocked.success, blocked.message
+
+    class _Shim:
+        process_set = compiled.process_set
+        param_values = pv
+
+    worst_n, worst_c = _worst_joint_refund(blocked, _Shim())
+    assert worst_c > 1.0, (
+        f"the sourced lump {entry.uncertainty.high} no longer breaks the carbon guard "
+        f"(joint C refund {worst_c:.3f}x) — if the de-novo phenylpyruvate route landed, SHIP 0.975 "
+        "and delete this test; if something else changed, find out what before trusting it"
+    )
+    assert worst_n > 1.20, f"joint N refund {worst_n:.3f}x — the N story moved too, re-derive both"
+
+
 # -- isolability --------------------------------------------------------------
 
 

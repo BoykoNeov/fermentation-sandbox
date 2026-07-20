@@ -11308,3 +11308,219 @@ is dead anyway. Reporting only the verdict would have buried a result worth keep
   isoleucine** and **phenylpyruvate** node routes; the isoamyl-magnitude / monotone-in-N lever (D-112 Finding
   4); closure O₂ ingress; acetaldehyde in maturation + the 0-vs-2.7 unsulfited floor; the ester/alcohol ratio
   running marginally above 1 (D-115); the deferred tail.
+
+---
+
+## D-117 — the last speculative `f_i`, sourced and then REFUSED BY A CONSERVATION LAW: 0.53 was the protein-share trap wearing a mean's clothing, and the true 0.975 creates sugar
+
+**Scope.** D-116 closed with `f_non_ehrlich_phenylalanine` (0.53, speculative) named "the most valuable
+unsourced number in the fusel layer" and a dedicated 2-phenylethanol tracer search called "a cheap,
+well-scoped beat". This is that beat. It went three steps further than scoped, and the third is the
+result: **the study exists** (Minebois 2025); **the shipped value was not merely unsourced but wrong,
+and unreproducible from its own stated derivation**; and **the correct value cannot be shipped**,
+because the model's sink breaches carbon conservation when asked to carry it.
+
+**Outcome: SOURCED BUT BLOCKED.** The measurement is 0.975; what ships is **0.531**, Minebois's measured
+*protein* share, as an explicit lower bound, with the blocker pinned as an executable test and the
+de-novo phenylpyruvate route named as the exact unlock. **This is not a closed parameter and must not be
+read as one.**
+
+### Finding 1 — the source exists, and its denominator is the one the model needs
+
+**Minebois et al. 2025** (*Microb. Biotechnol.* 18:e70087, PMC12008174, CC BY) labels **U-13C
+phenylalanine** — alongside leucine, valine, and 15N ammonium/arginine/glutamine — in synthetic must,
+*S. cerevisiae* T73, 300 mg N/L, at **T4 = beginning of stationary phase**, i.e. the same growth stage
+Crépin's fractions are quoted at. For Sc:
+
+| fate of consumed phenylalanine | Minebois Fig. 6A |
+|---|---|
+| → proteinogenic phenylalanine | **53.1%** |
+| → 2-phenylethanol | **2.5%** |
+
+`f_non_ehrlich_phenylalanine` = 1 − (this alcohol's share) = **0.975** — the *true* lump, against a
+shipped 0.53. **Finding 4 is why the file does not now read 0.975.**
+
+**The denominator was the whole gate and the paper states it with a worked example.** VERBATIM (Fig. 6A
+caption): *"The percentages shown in the coloured boxes correspond for each species to the quantity of
+labelling incorporated into the proteinogenic amino acid or volatile compound, divided by the total
+amount of labelled amino acid consumed at that sampling point (e.g., for Valine in Sc: 47.4% = 126
+mM/266 mM)."* That example checks out (126/266 = 47.37%), which is a self-consistency test the phrasing
+alone could not give.
+
+**This mattered: the phrase is genuinely ambiguous and the first read of it was wrong.** "The
+contribution of consumed 13C-phenylalanine to its production" reads equally as *share of consumed Phe*
+(what the model needs) or *share of 2-PE from consumed Phe* (which says nothing about `f`). A
+sub-model asked "which denominator?" answered confidently for the first — but it was a leading question,
+and its answer conflated "not total volatiles" with "of consumed Phe". **Only the figure caption
+settles it.** The 2-PE literature's dominant genre — bioproduction yields from resting cells or
+Phe-as-sole-N-source — would have supplied a confident wrong number here with no warning label.
+
+### Finding 2 — 0.53 was the protein-share trap, and the coincidence is the reason it survived
+
+`precursor_fates.py`'s header says the sink's parameter is **a lump of every non-Ehrlich fate**, and
+names using the *protein share* instead as "the trap this beat fell into and measured its way out of"
+— the trap that, on threonine, put propanol at 55.7% catabolic against a sourced 19%. **For
+phenylalanine, D-104 fell into it anyway**, for the one precursor it had no measurement to check
+against. Minebois's protein share is **53.1%**; the shipped value was **0.53**.
+
+**And the entry's stated derivation never produced its value.** It claimed 0.53 was "the mean of
+Crépin's four measured splits (0.815/0.85/0.82/0.51)". That mean is **0.749**. With the current valine
+(0.62) it is 0.691. The band 0.38–0.86 was not "their full range" either (0.51–0.85). **Under no reading
+does the stated method yield the stated number** — it has been unreproducible since it shipped at D-104
+(7de49ac), and `git log -L` confirms no commit since touched it.
+
+**The lesson is not "check the arithmetic".** It is that **a wrong number wearing a derivation is harder
+to see than a bare guess**. A value tagged `speculative` invites re-examination; a value tagged
+speculative *plus a stated method* reads as already-reasoned and gets skipped — twice here, since D-116
+tabulated this very row while auditing the `f_i` and read past both defects. The mis-derivation and the
+protein-share collision are the same failure: **0.53 looked derived, and it was neither derived nor
+independent — it was the number the trap produces.**
+
+### Finding 3 — the sources cross-validate on valine and conflict on leucine, and the conflict is recorded, not averaged
+
+Minebois and Crépin share two labelled species, and they do not agree equally:
+
+| quantity (S. cerevisiae, consumed → alcohol) | Minebois 2025 | Crépin 2017 / project value |
+|---|---|---|
+| valine → isobutanol | 14.6% | 15% — **agrees to 0.4 pp** |
+| leucine → isoamyl alcohol | 29.3% (protein 25%) | protein **77–86%** — **conflicts hard** |
+
+**The valine agreement is what licenses the phenylalanine number**: it shows the two labs' denominators
+are commensurate, independently of the phrasing. **The leucine conflict is what widens its band**: the
+two cannot both be right about leucine, and a lab that disagrees with Crépin by ~3x on one species may
+carry a systematic offset into another. Per **D-103**, both are recorded as bands; neither is averaged
+into the other, and no leucine parameter was touched on Minebois's authority. Tier is **plausible** —
+the evidentiary class of the Crépin `f_i` (real per-species tracer, right organism, right matrix, one
+time point) — not validated, because of that conflict.
+
+**Band 0.53–0.975, and its two ends are different KINDS of number** — the low end is Minebois's measured
+*protein share* (a lower bound on the lump), the high end is the measured *lump* itself. That is a
+consequence of Finding 4, not of the sourcing: an uncertainty band would ordinarily sit around 0.975
+(the method spread against Crépin plus room for 2-PE still forming after T4 would put it near
+0.96–0.99), but the shipped value is a bound rather than an estimate, so the band spans **bound to
+measurement**. Its upper end is explicitly **not ensemble-samplable** — see Finding 4.
+
+### Finding 4 — the sourced value BREAKS CARBON CONSERVATION, so it is measured, recorded, and not shipped
+
+The sink draws `ehrlich_draw · f/(1−f)`. That multiplier goes **1.13 → 39** between the old value and
+the measurement. Measured on the sink's own probe must, sweeping `f_phe`:
+
+| `f_phe` | joint N refund | joint C refund | verdict |
+|---|---|---|---|
+| 0.53 (old) | 1.095x | 0.590x | ok |
+| 0.90 | 1.190x | 0.701x | ok |
+| 0.94 | 1.270x | 0.795x | N band blown |
+| 0.96 | 1.369x | 0.913x | N band blown |
+| **0.975 (sourced)** | **1.549x** | **1.125x** | **creates sugar** |
+
+At the sourced lump the joint (D-32 swap + D-104 sink) carbon refund **exceeds growth's own draw** —
+the model hands back more carbon than growth was ever charged. That is **gluconeogenesis**, which
+fermenting yeast do not do, and it trips `test_the_joint_carbon_refund_never_creates_sugar`, the hard
+`< 1.0` guard D-104 installed for exactly this. **Prime directive 1 breach; the value cannot ship.**
+
+**Nitrogen and carbon are not symmetric here, and that asymmetry is the whole argument.** The joint N
+refund also leaves its band (1.095 → 1.549x), but excess *nitrogen* has a physical home — deamination
+to ammonium — which is why that band is soft, documented, and was already re-authored once at D-106.
+Excess *carbon* has none. **That is why the N band is a tripwire and the C guard is a law.**
+
+**The ProcessSet-level `dS/dt ≤ 0` still holds at 0.975 and that is NOT absolution.** Net sugar never
+goes positive because fermentation's *consumption* swamps the fictitious refund in the sum. **A breach
+a larger flux hides is still a breach** — the guard sits at the Process level precisely so it cannot be
+masked. Reading `dS/dt = 0` as "physical after all" was the beat's live near-miss; the discriminator is
+that the refund credits sugar that was never charged, regardless of what else is draining the pool.
+
+**The cause is structural and is not the parameter's fault.** The model charges *all* of its
+`k_2_phenylethanol`-calibrated 2-PE to **consumed phenylalanine**; reality builds ~97% of 2-PE **de novo
+from phenylpyruvate**. Without that route, honouring the measured lump forces the sink to eat
+phenylalanine at ~40x the Ehrlich draw to feed an alcohol reality mostly makes from sugar. **The sourced
+value and the missing de-novo route are inseparable.** The route is the unlock; a refund clamp would be
+a band-aid over a conservation law and is explicitly rejected.
+
+**What ships: 0.531, Minebois's measured PROTEIN share, as an explicit lower bound** — the isoleucine
+pattern. **The difference from isoleucine must not be tidied away:** isoleucine ships its protein share
+because the true lump is *unknown*; phenylalanine's is *known* (0.975) and shipped low only because the
+model cannot carry it. Band **0.53–0.975** spans bound to measurement, with the upper end flagged
+un-samplable. **The blocker is pinned executably** by a new test,
+`test_the_sourced_lump_breaks_the_carbon_refund_guard`, which asserts the guard holds at 0.531 and
+*breaks* at 0.975 — and which is **designed to fail** when the de-novo route lands, at which point the
+instruction in its docstring is to ship 0.975 and delete it.
+
+**The near-miss worth naming: the first absorption probe said GREEN.** It measured the five alcohols
+(all +0.0003%, three orders inside D-104's "<1%" invariant) and the precursor pools (~1e-9, numerically
+zero in both runs — the −99%/+1370% deltas printed there are noise-over-noise and mean nothing). Every
+one of those readings is true and none of them touch the refund ratios, which are **transient, peak at
+pitch, and never appear in an end-state**. The suite caught what the probe was not built to see.
+**A hand-rolled probe agreeing with your hypothesis is not evidence the suite would.**
+
+### Finding 5 — D-109's tripwire fired as designed, and only one of its two legs died
+
+`test_2_phenylethanol_carries_no_sourced_de_novo_floor` pinned `tier: speculative` /
+`source: "author estimate"` so that *"a future beat that sources phenylalanine moves it deliberately"*.
+It failed on this change and nothing else did. Both legs were re-derived:
+
+- **Leg 1, "the precursor is unsourced" — DEAD.** Sourced, per-compound, right organism and matrix.
+- **Leg 2, "the floor is inside the parameter's own band" — DEAD, and measured.** The old band's low
+  end (0.38) gave 78.6% de novo, *under* the 80% floor. Over the new band (0.53–0.975) the de-novo share
+  runs **83.6% → 99.1%** — clear at both ends, which the old band was not.
+- **The SCOPE leg — SURVIVES, and 2-PE stays excluded on it alone.** The floor is justified as "Crépin
+  81% newly-synthesised 2-KB; Rollero >90% CCM" — measurements of **2-ketobutyrate** and bulk CCM.
+  **Neither lab measured phenylpyruvate.** Sourcing `f_phe` does not retroactively widen what Crépin's
+  2-KB number describes.
+
+**This is the beat where D-104's rule was cheapest to spend and it was not spent.** 2-PE now *passes*
+the floor at both band ends; admitting it on someone else's citation would have been free, green, and
+wrong. **Passing is not the same as being covered.**
+
+### Lessons
+
+(i) **A wrong number wearing a derivation hides better than a bare guess.** `speculative` invites
+re-examination; `speculative` + a stated method reads as already-reasoned. Both defects here — the false
+mean and the protein-share collision — survived D-116's own audit of this exact table because the row
+*looked* worked out. **Checking that a stated derivation reproduces its value is a different act from
+judging whether the value is plausible**, and only the first would have caught this.
+(ii) **"Sourceable" and "shippable" are different gates, and D-116's Lesson (i) has now landed twice in
+opposite directions.** There the constant was sourceable but useless without a flux; here it is
+sourceable, correct, and *rejected by a conservation law* the model enforces. **A number can be right
+about the world and still be un-shippable against a model that lacks the structure it presumes.** That
+is a finding about the model, not a defect in the source — and it names its own unlock.
+(iii) **When a guard trips, check whether the quantity it guards has a physical home before deciding
+it is too strict.** Excess N refund does (deamination); excess C refund does not (gluconeogenesis).
+That asymmetry, not the size of the violation, is what made one a soft band and the other a law.
+(iv) **A system-level invariant holding does not absolve a Process-level breach it is masking.**
+`dS/dt ≤ 0` survived at 0.975 only because fermentation out-consumes the fictitious refund.
+(v) **A coincidence between a guess and a real measurement diagnoses the error rather than excusing
+it.** 0.53 ≈ 53.1% because the guess was drawn toward the same wrong quantity the trap names — and the
+shipped bound is now 0.531, which is *the same number with completely different standing*. **Anyone
+reading the diff will see the value barely move; the note must carry why that is not a no-op.**
+(vi) **Cross-validating a new source cuts both ways and both halves must be reported.** Valine agreeing
+to 0.4 pp is why the phenylalanine number is usable; leucine conflicting ~3x is why the tier is not
+validated. Reporting only the agreement would have been the flattering half of the same check.
+(vii) **A green measurement is not a licence to widen a citation's scope** (Finding 5).
+
+### Next
+
+- **`f_non_ehrlich_phenylalanine` is SOURCED BUT BLOCKED — not closed.** The measurement (0.975) exists
+  and is recorded; the shipped 0.531 is a bound. **The de-novo phenylpyruvate route is the exact
+  unlock**, which promotes it from "a node route we might build" to **the thing standing between a
+  measured number and the model**. When it lands: ship 0.975, delete
+  `test_the_sourced_lump_breaks_the_carbon_refund_guard`, in one commit.
+- **2-PE's own de-novo share is the sharp, small next step and it feeds the same build.** Minebois
+  Fig. 6A splits each volatile labelled/unlabelled, the unlabelled being *"de novo synthesised from CCM
+  precursors"* — that is 2-PE's de-novo share **measured directly**, i.e. the size of the missing route.
+  Extract it and it both admits 2-PE to `_SOURCED_FUSEL_SPECS` under its own citation and sizes the
+  build. **Not extracted here rather than guessed.**
+- **Isoleucine's fraction is now the layer's only remaining non-measurement** — a protein-share *bound*,
+  so active amyl alcohol stays over-attributed by an unknown margin. **Minebois 2025 is the first place
+  to look**; it labelled leu/val/phe, so check the SI for ile.
+- **THE MINEBOIS NUMBERS ARE SINGLE-HOST.** Read off the PMC open-access deposit; Wiley's full text and
+  PDF both return HTTP 402. The internal checks are the caption's worked example (126/266 = 47.37%) and
+  the valine agreement — **not** an independent re-read, which is what D-116's closing note demands of
+  anything entering a parameter file. **0.531 is live in `wine_generic.yaml`, so re-reading Fig. 6A off
+  the PDF is an outstanding obligation, not a nicety.**
+- **The Minebois/Crépin leucine conflict (29.3% vs 77–86% to protein) is unresolved and is not this
+  beat's to resolve.** It bears directly on D-104's inversion — a lab measuring leucine's protein share
+  at 25% changes what "inverted" even means — so the un-inversion build should open by pricing it.
+- Unchanged from D-113/D-114/D-115/D-116: the un-inversion build, still owner-gated on in-situ [E], the
+  de-novo-KIC synthesis flux, and decarboxylase competition; the **KMV → isoleucine** node route; the
+  isoamyl-magnitude / monotone-in-N lever; closure O2 ingress; acetaldehyde in maturation + the 0-vs-2.7
+  unsulfited floor; the ester/alcohol ratio marginally above 1; the deferred tail.

@@ -85,19 +85,22 @@ _AGING_DAYS = 720.0
 #: between them — recorded as two bands, never averaged (D-103).
 _SOURCED_DE_NOVO_FLOOR = 0.80
 
-#: The precursor Crépin/Rollero do **not** label. ``f_non_ehrlich_phenylalanine`` is
-#: ``tier: speculative``, ``source: "author estimate"``, band 0.38–0.86 — so 2-phenylethanol's
-#: de-novo share is a **model artifact**, not a reproduction of anything measured, and the floor
-#: above does not bind it. See :func:`test_2_phenylethanol_carries_no_sourced_de_novo_floor`.
-_UNSOURCED_PRECURSOR = "phenylalanine"
+#: The precursor excluded from the floor above. **It is no longer excluded for being unsourced**
+#: (D-117 sourced it: Minebois 2025, U-13C phenylalanine, ``f`` = 0.975, plausible) but because the
+#: FLOOR's own citations — Crépin's 2-KB, Rollero's CCM — never measured **phenylpyruvate**. The
+#: name is deliberately not ``_UNSOURCED_*`` any more: that would keep asserting a dead reason.
+#: See :func:`test_2_phenylethanol_carries_no_sourced_de_novo_floor` for both legs.
+_FLOOR_EXCLUDED_PRECURSOR = "phenylalanine"
 
-#: The four alcohols whose precursors Crépin actually labelled ([13C] leu/ile/val/thr) — the only
-#: ones the sourced floor may be asserted against. Derived from the registry rather than hand-listed
-#: so a sixth alcohol cannot silently inherit a floor no source covers (D-104: **a cited number
-#: binds only the SET it describes** — and this test is where that rule is easiest to break, because
-#: parametrizing over all of ``FUSEL_SPECS`` looks more thorough, not less).
+#: The four alcohols whose keto acids the floor's own sources actually describe ([13C] leu/ile/val,
+#: thr → Crépin's 2-KB, Rollero's CCM). Derived from the registry rather than hand-listed so a sixth
+#: alcohol cannot silently inherit a floor no source covers (D-104: **a cited number binds only the
+#: SET it describes** — and this test is where that rule is easiest to break, because parametrizing
+#: over all of ``FUSEL_SPECS`` looks more thorough, not less). D-117 is the proof it is easy: 2-PE
+#: now *passes* the floor by a wide margin and still may not be admitted to it on someone else's
+#: citation.
 _SOURCED_FUSEL_SPECS = tuple(
-    s for s in FUSEL_SPECS if s.precursor_amino_acid != _UNSOURCED_PRECURSOR
+    s for s in FUSEL_SPECS if s.precursor_amino_acid != _FLOOR_EXCLUDED_PRECURSOR
 )
 
 #: The routes that ALSO eat the speciated precursors. Disabled where the ``f : (1−f)`` split
@@ -305,53 +308,66 @@ def test_every_sourced_fusel_is_de_novo_dominated(spec):
 
 
 def test_2_phenylethanol_carries_no_sourced_de_novo_floor():
-    """Why 2-PE is excluded from the floor above — and why that is not a convenience (D-109).
+    """Why 2-PE is *still* excluded from the floor above — on ONE leg now, not two (D-117).
 
-    **Neither Crépin nor Rollero labels phenylalanine.** Crépin's tracers are [13C] leu/ile/val/thr;
-    Rollero's are U-13C valine/leucine. ``f_non_ehrlich_phenylalanine`` is accordingly
-    ``tier: speculative``, ``source: "author estimate"``, band **0.38–0.86** — taken as the mean of
-    Crépin's four measured splits because *"there is no mechanistic argument available to place
-    phenylalanine within that range"*. So 2-PE's de-novo share is a **model artifact**, and
-    asserting it against a floor justified as "Crépin's 81%, Rollero's >90%" would apply a number
-    to a set it does not describe — **D-104's rule, in the test that most invites breaking it**.
+    **This test was D-109's tripwire and it fired.** It pinned ``tier: speculative`` /
+    ``source: "author estimate"`` so that *"a future beat that sources phenylalanine moves it
+    deliberately"*. D-117 is that beat: **Minebois et al. 2025 labels U-13C phenylalanine** in
+    synthetic must with *S. cerevisiae*, and ``f_non_ehrlich_phenylalanine`` is now **0.975,
+    plausible**, off a stated consumed-precursor denominator. Both of the old exclusion's legs are
+    re-examined below; **one died, one stands**, and keeping the exclusion for the surviving reason
+    is the point of the test.
 
-    **And it is not academic: the floor is inside the parameter's own uncertainty band.** At the
-    default ``f_phe = 0.53`` 2-PE measures **83.8%** de novo, but at the band's low end
-    (``f_phe = 0.38``) it is **78.6%** — under the 80% floor. So parametrizing the sourced floor
-    over all five would assert something ``f_phe``'s own provenance entry contradicts, and **an
-    ensemble sampling that band would fail it** — the realistic way it would ever have been found.
-    (The four sourced alcohols clear the floor with room: 87.9 / 94.9 / 95.3 / 98.9%.)
+    **Leg 1 — "the precursor is unsourced" — IS DEAD.** It is sourced, per-compound, in the right
+    organism and matrix, at the same growth stage Crépin quotes. This leg can never be cited again.
 
-    This test exists so the exclusion reads as a **sourcing boundary** rather than an omission, and
-    so a future beat that sources phenylalanine moves it deliberately — the shape of
-    ``test_methionine_has_no_non_ehrlich_fraction`` (D-104).
+    **Leg 2 — "the floor is inside the parameter's own band" — IS ALSO DEAD, and measured so.**
+    The old band's low end (0.38) gave **78.6%** de novo, *under* the 80% floor. D-117's band is
+    **0.53–0.975**, over which the de-novo share runs **83.6% → 99.1%** — clear at both ends. An
+    ensemble sampling this band clears the floor everywhere, which the old one did not.
+
+    **What survives is narrower and is purely a SCOPE claim: the floor's own sources do not
+    describe this keto acid.** The floor is justified as *"Crépin 81% newly-synthesised 2-KB;
+    Rollero >90% CCM"* — measurements of **2-ketobutyrate** and of bulk central-carbon contribution.
+    Neither lab measured **phenylpyruvate**. Sourcing ``f_phe`` does not retroactively widen what
+    Crépin's 2-KB number describes, so admitting 2-PE to a floor carrying that citation would still
+    be **D-104's rule broken — a cited number binding a set it does not describe** — even though the
+    model would now pass. **Passing is not the same as being covered, and this is the beat where
+    that distinction was easiest to spend.**
+
+    **The next beat is therefore sharp and small:** Minebois's Figure 6A splits each volatile into
+    labelled/unlabelled (*"the unlabelled fraction ... represents the ... volatile compounds de novo
+    synthesised from CCM precursors"*), which is **2-PE's de-novo share measured directly**. Extract
+    that number and 2-PE joins ``_SOURCED_FUSEL_SPECS`` under its *own* citation — with 97.9% of
+    headroom already measured. It was not extracted here rather than guessed.
     """
     cs = compile_scenario(_scenario(aging=False))
-    param = non_ehrlich_fraction_param(_UNSOURCED_PRECURSOR)
+    param = non_ehrlich_fraction_param(_FLOOR_EXCLUDED_PRECURSOR)
     entry = cs.parameters[param]
+    spec = next(s for s in FUSEL_SPECS if s.precursor_amino_acid == _FLOOR_EXCLUDED_PRECURSOR)
 
-    # The exclusion is justified by the PROVENANCE, so the provenance is what is pinned. If a future
-    # beat sources phenylalanine, this fails and the exclusion must be revisited on purpose.
-    assert entry.tier is Tier.SPECULATIVE, f"{param} is no longer speculative — re-check the floor"
-    assert entry.provenance.source == "author estimate"
-    assert _UNSOURCED_PRECURSOR not in {s.precursor_amino_acid for s in _SOURCED_FUSEL_SPECS}
+    # Leg 1 is dead: pin that it is sourced, so nobody re-argues the exclusion from "unsourced".
+    assert entry.tier is Tier.PLAUSIBLE, f"{param} changed tier — re-derive BOTH legs, not just it"
+    assert entry.provenance.source != "author estimate"
+    assert "Minebois" in entry.provenance.source
 
-    # ...AND THE FLOOR REALLY IS INSIDE THE BAND — MEASURED, because the first draft of this very
-    # test asserted `uncertainty.low < value < uncertainty.high` under a comment claiming exactly
-    # the sentence below. That is trivially true of every parameter in the file and says nothing
-    # about the floor: the beat's own "the sentence and the assertion are not the same claim",
-    # committed in the fix for committing it. The claim needs a RUN at the band's low end.
+    # Leg 2 is dead: the floor is OUTSIDE the band now, asserted with RUNS at both ends rather than
+    # stated in prose. D-109's own lesson — the first draft of this test asserted
+    # `low < value < high` under a comment claiming the floor was inside the band, which is
+    # trivially true of every parameter and says nothing. The claim needs the runs.
     assert entry.uncertainty is not None
-    spec = next(s for s in FUSEL_SPECS if s.precursor_amino_acid == _UNSOURCED_PRECURSOR)
-    at_low_end = _de_novo_share(spec, f_override=entry.uncertainty.low)
-    at_default = _de_novo_share(spec)
-    assert at_default >= _SOURCED_DE_NOVO_FLOOR, "2-PE clears the floor at the default f_phe..."
-    assert at_low_end < _SOURCED_DE_NOVO_FLOOR, (
-        f"...but at f_phe={entry.uncertainty.low} (this parameter's OWN sourced band) 2-PE is "
-        f"{at_low_end:.1%} de novo, under the {_SOURCED_DE_NOVO_FLOOR:.0%} floor — which is why "
-        "it is excluded rather than merely comfortable. If this no longer holds, the exclusion "
-        "should be revisited on the evidence rather than kept by inertia"
-    )
+    for edge in (entry.uncertainty.low, entry.uncertainty.high):
+        share = _de_novo_share(spec, f_override=edge)
+        assert share > _SOURCED_DE_NOVO_FLOOR, (
+            f"2-PE is {share:.1%} de novo at f_phe={edge} — back under the "
+            f"{_SOURCED_DE_NOVO_FLOOR:.0%} floor, so leg 2 of the exclusion has revived "
+            "and the docstring above is stale"
+        )
+
+    # ...and yet it stays excluded, on the SCOPE leg alone. If a beat sources phenylpyruvate's own
+    # de-novo share (Minebois Fig. 6A), this is the assertion to move — deliberately, as D-109
+    # intended and D-117 honoured.
+    assert _FLOOR_EXCLUDED_PRECURSOR not in {s.precursor_amino_acid for s in _SOURCED_FUSEL_SPECS}
 
 
 def test_alpha_kb_production_is_exactly_threonine_independent():
