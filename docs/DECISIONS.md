@@ -12363,3 +12363,116 @@ green; full suite is the standing after-check.
 - **The equilibrium floor** stays unmeasured; **Makhotkina & Kilmartin 2012** (PMID 22868118) may
   corroborate the isoamyl k/E_a and carry ethyl-ester rates — worth a fetch (the same author-hosted /
   secondary-copy discipline that unblocked R&O here).
+
+## D-124 — the pH-explicit ester-hydrolysis rate: acetate fade now tracks wine pH, first-order in [H+] (the D-123 follow-on, built)
+
+**D-123 flagged this exact build as "the natural follow-on … now sourceable" and deferred it as
+the owner's call. The owner called it.** This entry makes `EsterHydrolysis` **acid-catalysed**: the
+isoamyl-acetate fade rate now scales with `[H+]`, so a lower-pH wine fades its banana ester faster —
+R&O's headline finding, which the pre-D-124 pH-blind rate (a single value pinned at pH 3.36) could
+not express. The rate becomes
+`d(isoamyl_acetate)/dt = -k_ester_hydrolysis · f(T) · h(pH) · max(0, isoamyl_acetate - eq)` with
+`h(pH) = 10^(pH_ref - pH) = [H+]/[H+]_ref`, `pH` the sim's own charge-balance solution
+(`ph_of_state`, D-18). `h = 1` at the reference pH 3.36, so the D-123 anchor and every pH-3.36
+trajectory are byte-for-byte unchanged.
+
+### The paper resolved the crux — and overturned a confounded reading (the methodological point)
+
+The load-bearing question was the **pH-response shape**: at a fixed reference pH only `k_obsd(pH_ref)`
+is identifiable (the D-97 lesson), so making pH dynamic, the slope IS the new content and must be
+sourced, not assumed (D-98). A first pass reasoned from the two R&O **wines** already in the repo
+(Pinot pH 3.36 → 54.72e-9/s; Chardonnay pH 2.94 → 98.73e-9/s) to an apparent `[H+]` order **n ≈ 0.61**
+(~×4/pH, *sub*-first-order) and nearly built a two-parameter `k_0 + k_H[H+]` fit on those two points.
+
+**Reading the paper (R&O's scanned PDF, rendered page-by-page — the D-123 retrieval path) killed
+that.** R&O ran a **controlled** pH series in **model solutions** where pH was the *only* variable
+(Table V isoamyl acetate: pH 2.95/3.58/4.10 → 129.2/32.60/14.10 e-9/s), fit by Table VI's graphic
+second-order constant **k_H+ = 1.111e-4 L/mol/s at r = 0.999** (Table VII matrix k_H+ = 1.24e-4), and
+concludes velocity **"varies directly with [H+] in a linear manner"** — first-order. The two-wine
+n ≈ 0.61 was **confounded**: Pinot and Chardonnay differ in matrix, not just pH, which is exactly the
+confounding R&O separated out (Table VI "empirical but not accurate" → Table VII matrix solution). The
+proposed attenuation mechanism (ethanol/ionic strength) is **explicitly denied**: *"Ethanol … 10–14%
+… had little effect on the rates."* And *"in both wines the acetate esters behaved as in model
+solutions."* The decisive cross-check: model-solution k_H+ × [H+] at Pinot pH 3.36 = **54.1e-9/s vs
+the measured Pinot wine 54.72e-9/s** — near-exact, so first-order [H+] anchored at Pinot is
+self-consistent. *Lesson (fifth of its kind): a clean single-variable experiment beats a slope fit to
+two confounded field points, and the primary source has to be read, not reasoned around.*
+
+### What shipped
+
+- **`pH_ref_ester_hydrolysis` = 3.36** (new aging.yaml param, R&O page 929 "The pH was 3.36", Pinot
+  noir). **Pinned** (`low = high = 3.36`, zero-width ⇒ the ensemble never samples it) because it is
+  **degenerate with `k`**: only `k/[H+]_ref` (R&O's true second-order k_H+) is identifiable, so a band
+  on pH_ref would just reshuffle into k and double-count its spread. The identifiable uncertainty lives
+  entirely in `k`.
+- **`k_ester_hydrolysis` band NARROWED** 1.3e-4–4.0e-4 → 1.6e-4–2.5e-4. The old band's width was the
+  **wine-to-wine pH spread** (model 1.06e-4 / Pinot 1.80e-4 / Chardonnay 3.22e-4), which is now carried
+  *explicitly* by `h(pH)`; what remains is the at-reference Pinot k_obsd SD (~11%) × the floor-graft
+  range. The value (2.2e-4) is unchanged. D-123's "single-pH pin" caveat on `k` is **retired**.
+- **Wine-only gate.** `EsterHydrolysis` runs in both media, but the pH system is wine-only (D-18) — a
+  beer state has no acid/`cation_charge` slots and `ph_of_state` would return ~7. So `h` is applied
+  only when `"cation_charge" in schema`; beer keeps `h = 1.0` and hydrolyses at the pH_ref-anchored
+  rate — **byte-for-byte the pre-D-124 beer behaviour** (prime directive #3). When D-18's deferred
+  beer-pH system lands, the gate engages automatically.
+- **Bounded (D-46).** `ph_of_state` clamps pH to [0,14], so `h` is finite (~2e-11 … ~2.3e3) even under
+  a BDF Jacobian probe that pushes `cation_charge` out of range — the derivative stays a total, bounded
+  function of state.
+
+### Known limit — the tartrate intercept (honest, owner-endorsed; the deferred refinement named)
+
+R&O's `[H+]` plots do **not** pass through the origin: there is a **pH-invariant** tartaric/bitartrate
+catalysis term (Table VII `k_H2T`/`k_HT-`). It is *not* "100× smaller than the [H+] term" — that 100×
+is the ratio of rate *constants*; because [tartrate] ≫ [H+] (~0.05 M vs ~4e-4 M) the *contribution* is
+**~8% of the rate at pH 3.36, rising to ~30% by pH 4.1** (least-squares on Table V: k_obsd =
+4.4e-9 + 1.11e-4·[H+]). The pure-`[H+]` law folds tartrate into the Pinot anchor and then wrongly
+scales it with `[H+]`, so vs R&O's model-solution law it is **exact at 3.36, within ~±6% over pH
+3.0–3.5 (most reds), ~−13% at pH 3.8, ~−27% at pH 4.1** (high-pH whites). Still a large gain over the
+pH-**blind** model, which applied the pH-3.36 rate across a ~16× `[H+]` range with **0%** tracking.
+The full `k_0' + k_H+[H+] + k_H2T[H2T] + k_HT-[HT-]` law (Table VII constants + the tartrate speciation
+the sim already computes for pH) is the **deferred** refinement — one mechanism per beat; this beat
+delivers the dominant `[H+]` term. A fixed-floor half-measure would be *less* principled, since the
+real intercept scales with TA.
+
+### Tier
+
+`pH_ref` kept **speculative** to preserve the aging axis's uniform speculative floor
+(`test_tier_floored_at_speculative`); on its own 3.36 is a measured value, and the FORM is
+R&O-measured (r = 0.999). The residual tartrate-intercept error is the honest reason the composite
+stays speculative. Output tier is speculative regardless (D-1 param-tier propagation + speculative
+FORM).
+
+### Two reconcile passes with the advisor (both recorded)
+
+The advisor first recommended the sub-first-order two-parameter fit and "do not fall back to
+first-order." On the reconcile — presenting R&O's controlled model-solution series, the r = 0.999
+linear fit, the ethanol-null result, and the near-exact Pinot reproduction — it **conceded fully**
+("you're right and I was wrong; my n ≈ 0.61 confounded pH with matrix") and endorsed the design, then
+added the three refinements above (the tartrate intercept is a *contribution* not a *constant* ratio;
+document the mis-scaling rather than "fold into the anchor"; test against the model-solution law, not
+the Chardonnay wine number). All three are folded in.
+
+### Receipts
+
+`aging.yaml` (new pinned `pH_ref_ester_hydrolysis`; `k` band narrowed + conditions/tier notes
+rewritten; header rate equation gains `h(pH)`), `aging.py` (`EsterHydrolysis.derivatives` gains the
+wine-gated first-order `[H+]` factor; class + module docstrings; `reads` gains `pH_ref`),
+`test_aging.py` (`_aged_wine` carries an acid load; new `_wine_at_ph` helper; `store` fixture now loads
+`acidbase.yaml`; the 3 absolute closed-form tests recompute the pH factor; `test_metadata` reads set;
++6 tests: `test_ph_ref_is_in_reads`, `test_reference_ph_gives_unit_factor_byte_for_byte`,
+`test_rate_is_first_order_in_hydrogen_ion`, `test_lower_ph_hydrolyses_faster`,
+`test_beer_ester_hydrolysis_is_ph_blind_byte_for_byte`,
+`test_integrated_lower_ph_wine_fades_more_over_a_year`). `ruff check`/`ruff format --check`/`mypy`
+clean; the aging.yaml validates through the `Parameter` schema; full suite green.
+
+### Next
+
+- **The pH-explicit *equilibrium floor*** — `isoamyl_acetate_eq` is still a fixed author estimate;
+  R&O's mechanism is a Berthelot esterification equilibrium set by acid+alcohol concentrations, so a
+  pH/composition-dependent floor is the coherent extension of this beat (but R&O measures no floor —
+  it stays blocked on a source).
+- **The full multi-species `[H+]`/`[H2T]`/`[HT-]` law** (Table VII + the sim's tartrate speciation) —
+  retires the ~±6–27% tartrate-intercept error above. Bigger build, owner's call.
+- **`ethyl_acetate` formation / `ethyl_hexanoate` hydrolysis** — unchanged from D-123: both blocked
+  on a rate for *those* pools (ethyl acetate absent from R&O; ethyl hexanoate shows no appreciable
+  wine change). **Makhotkina & Kilmartin 2012** (PMID 22868118) may carry the ethyl-ester rates —
+  worth a fetch (the author-hosted / secondary-copy discipline that unblocked R&O).

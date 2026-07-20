@@ -148,9 +148,13 @@ _MAILLARD_MELANOIDIN_N = nitrogen_mass_fraction("maillard_melanoidin")
 def store():
     # Real wine parameters (T_ref, biomass_C_fraction, ...) MERGED with the aging.yaml
     # hydrolysis constants — the shared, medium-agnostic aging file (D-69). This mirrors the
-    # compile seam D-70 will wire; here the test loads it directly.
+    # compile seam D-70 wires; here the test loads it directly. acidbase.yaml (the pH-system
+    # pKa constants) is now REQUIRED: since D-124 EsterHydrolysis solves the wine pH for its
+    # first-order [H+] factor, exactly as a compiled wine scenario carries acidbase.yaml (D-18).
     return load_parameters(
-        default_data_dir() / "wine_generic.yaml", default_data_dir() / "aging.yaml"
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "aging.yaml",
+        default_data_dir() / "acidbase.yaml",
     )
 
 
@@ -162,12 +166,37 @@ def params(store):
 def _aged_wine(schema: StateSchema, *, ester: float = 0.1, t: float = 293.15, **kw) -> FloatArray:
     """A finished, racked wine at the start of aging: yeast gone (X=0), dry (S=0), with the
     liquid ``esters`` pool pre-loaded (nothing produces it during aging — the Process only
-    decays it). ``isoamyl_alcohol``/``Byp`` default to 0 so their aging gains are unambiguous."""
+    decays it). ``isoamyl_alcohol``/``Byp`` default to 0 so their aging gains are unambiguous.
+
+    Carries a real acid load (``tartaric`` + ``cation_charge`` ⇒ pH ≈ 3.3, the ``_sulfited_wine``
+    values) so ``ph_of_state`` solves into the wine range — REQUIRED since D-124 made the
+    hydrolysis rate pH-dependent (an acid-free state would solve to ~pH 7 and crush the rate). A
+    test wanting an exact target pH overrides ``cation_charge`` (see :func:`_wine_at_ph`)."""
     y = schema.pack({"X": 0.0, "S": [0.0], "E": 100.0, "N": 0.0, "T": t, "CO2": 0.0})
     y[schema.slice("isoamyl_acetate")] = ester
+    if "cation_charge" in schema:  # wine only — the beer schema has no acid/pH slots (D-18)
+        y[schema.slice("tartaric")] = 4.0
+        y[schema.slice("cation_charge")] = 0.012
     for name, val in kw.items():
         y[schema.slice(name)] = val
     return y
+
+
+def _wine_at_ph(
+    schema: StateSchema,
+    params: Mapping[str, float],
+    target_ph: float,
+    *,
+    ester: float = 0.1,
+    t: float = 293.15,
+) -> FloatArray:
+    """An aged wine whose acid load + back-solved ``cation_charge`` reproduce ``target_ph`` exactly
+    (the ``solve_cation_charge`` inverse-anchoring idiom, D-18) — for pinning the pH-dependent
+    hydrolysis rate at a known pH (D-124)."""
+    tartaric = 4.0
+    totals = {"tartaric": tartaric / M_TARTARIC}
+    cation = solve_cation_charge(totals, 0.0, build_pka_map(params), target_ph)
+    return _aged_wine(schema, ester=ester, t=t, tartaric=tartaric, cation_charge=cation)
 
 
 # -- metadata -----------------------------------------------------------------
@@ -196,6 +225,7 @@ def test_metadata():
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
         "isoamyl_acetate_eq",
+        "pH_ref_ester_hydrolysis",  # the first-order [H+] factor's reference pH (D-124)
         "T_ref",
     }
 
@@ -210,7 +240,10 @@ def test_derivative_matches_closed_form(params):
     d = EsterHydrolysis().derivatives(0.0, y, schema, params)
 
     f_t = arrhenius_factor(t, params["E_a_ester_hydrolysis"], params["T_ref"])
-    rate = params["k_ester_hydrolysis"] * f_t * (ester - params["isoamyl_acetate_eq"])
+    # D-124: the rate is now first-order in [H+] too — recompute the pH factor the way the Process
+    # does (the SulfiteOxidation-test idiom of recomputing the driver from the solved pH).
+    h_factor = 10.0 ** (params["pH_ref_ester_hydrolysis"] - ph_of_state(y, schema, params))
+    rate = params["k_ester_hydrolysis"] * f_t * h_factor * (ester - params["isoamyl_acetate_eq"])
     carbon_released = rate * _ESTER_C
 
     assert schema.get(d, "isoamyl_acetate") == pytest.approx(-rate)
@@ -330,12 +363,15 @@ def test_rises_with_temperature(params):
 
 
 def test_factor_is_one_at_reference_temperature(params):
-    # At T_ref the Arrhenius factor is exactly 1, so the rate is the bare first-order term.
+    # At T_ref the Arrhenius factor is exactly 1, so the rate is the first-order term times only
+    # the pH factor (D-124). Build the wine at the REFERENCE pH so h(pH) is also exactly 1 and the
+    # rate is the bare k*(ester - eq) — the byte-for-byte anchor at (T_ref, pH_ref).
     schema = wine_schema()
     ester = 0.1
-    d = EsterHydrolysis().derivatives(
-        0.0, _aged_wine(schema, ester=ester, t=params["T_ref"]), schema, params
+    y = _wine_at_ph(
+        schema, params, params["pH_ref_ester_hydrolysis"], ester=ester, t=params["T_ref"]
     )
+    d = EsterHydrolysis().derivatives(0.0, y, schema, params)
     expected = params["k_ester_hydrolysis"] * (ester - params["isoamyl_acetate_eq"])
     assert schema.get(d, "isoamyl_acetate") == pytest.approx(-expected)
 
@@ -354,7 +390,9 @@ def test_reanchored_params_sit_in_the_ramey_ough_measured_ranges(params):
     # D-69 author estimates would fail — notably k = 1.0e-4, which coincided with R&O's MODEL-
     # solution value (~1.06e-4) and sits below the real-wine band this re-anchor adopts.
     assert 55000.0 <= params["E_a_ester_hydrolysis"] <= 69000.0  # R&O wine 59-64, model 69 kJ/mol
-    assert 1.3e-4 <= params["k_ester_hydrolysis"] <= 4.0e-4  # R&O wine, floor-grafted (D-123)
+    # D-124 NARROWED this band: the wine-to-wine pH spread that widened it to 4.0e-4 is now carried
+    # by the explicit 10^(pH_ref - pH) factor, so k is the at-reference-pH rate (Pinot, grafted).
+    assert 1.6e-4 <= params["k_ester_hydrolysis"] <= 2.5e-4  # R&O Pinot at pH 3.36, floor-grafted
 
 
 def test_reanchored_rate_reproduces_ramey_ough_young_wine_fade(params):
@@ -365,12 +403,112 @@ def test_reanchored_rate_reproduces_ramey_ough_young_wine_fade(params):
     # at). With the old k = 1.0e-4 the sim rate would be ~44% of R&O's, so this pins the re-anchor.
     schema = wine_schema()
     ester = 1.0e-3  # g/L = 1.0 mg/L, a representative young-wine isoamyl acetate
-    d = EsterHydrolysis().derivatives(
-        0.0, _aged_wine(schema, ester=ester, t=params["T_ref"]), schema, params
+    # R&O's k_obsd is the PINOT NOIR (pH 3.36) value, so evaluate at the reference pH where the
+    # first-order [H+] factor is exactly 1.0 (D-124) — the fade is then the pinned k*(ester - eq).
+    y = _wine_at_ph(
+        schema, params, params["pH_ref_ester_hydrolysis"], ester=ester, t=params["T_ref"]
     )
+    d = EsterHydrolysis().derivatives(0.0, y, schema, params)
     sim_fade = -float(schema.get(d, "isoamyl_acetate"))  # g/L/h, the modelled disappearance rate
     ramey_ough_fade = _RAMEY_OUGH_PINOT_KOBS_PER_H_20C * ester  # R&O's measured k_obsd*[ester]
     assert sim_fade == pytest.approx(ramey_ough_fade, rel=0.05)
+
+
+# -- pH dependence: first-order in [H+], acetate fade tracks wine pH (decision D-124) ----------
+# R&O 1980's headline: ester hydrolysis is acid-catalysed and varies DIRECTLY with [H+] in a linear
+# manner (model-solution Table V/VI, r=0.999). EsterHydrolysis scales its rate by [H+]/[H+]_ref =
+# 10^(pH_ref - pH), so a lower-pH wine fades its banana ester faster. h == 1 at the reference pH
+# (byte-for-byte the D-123 anchor) and in beer (no pH system, D-18).
+
+
+def test_ph_ref_is_in_reads(params):
+    # The pH factor reads pH_ref_ester_hydrolysis, so it is declared (tier propagation, D-1). The
+    # plausible pH-system params (pKa_*, cation_charge) read inside ph_of_state are NOT declared —
+    # the Process is already speculative (the SulfiteOxidation convention).
+    assert "pH_ref_ester_hydrolysis" in EsterHydrolysis().reads
+    assert "pH_ref_ester_hydrolysis" in params  # and it is actually loaded (aging.yaml)
+
+
+def test_reference_ph_gives_unit_factor_byte_for_byte(params):
+    # At pH_ref the [H+] factor is exactly 1.0, so the rate is the pre-D-124 k*f_t*excess — the
+    # D-123 anchor and every pH-3.36 trajectory are preserved byte-for-byte (prime directive #3).
+    schema = wine_schema()
+    ester, t = 0.1, 298.15  # off T_ref so f_t bites and the check is non-vacuous
+    y = _wine_at_ph(schema, params, params["pH_ref_ester_hydrolysis"], ester=ester, t=t)
+    assert ph_of_state(y, schema, params) == pytest.approx(params["pH_ref_ester_hydrolysis"])
+    d = EsterHydrolysis().derivatives(0.0, y, schema, params)
+    f_t = arrhenius_factor(t, params["E_a_ester_hydrolysis"], params["T_ref"])
+    expected = params["k_ester_hydrolysis"] * f_t * (ester - params["isoamyl_acetate_eq"])
+    assert schema.get(d, "isoamyl_acetate") == pytest.approx(-expected)
+
+
+def test_rate_is_first_order_in_hydrogen_ion(params):
+    # R&O's law: velocity varies DIRECTLY with [H+] in a LINEAR manner. Dropping pH by log10(2)
+    # doubles [H+], so the disappearance rate exactly doubles — the first-order pin.
+    schema = wine_schema()
+    ester, t = 0.1, 293.15
+    hi_ph = 3.6
+    lo_ph = hi_ph - float(np.log10(2.0))  # [H+] doubled
+    rate_hi = -schema.get(
+        EsterHydrolysis().derivatives(
+            0.0, _wine_at_ph(schema, params, hi_ph, ester=ester, t=t), schema, params
+        ),
+        "isoamyl_acetate",
+    )
+    rate_lo = -schema.get(
+        EsterHydrolysis().derivatives(
+            0.0, _wine_at_ph(schema, params, lo_ph, ester=ester, t=t), schema, params
+        ),
+        "isoamyl_acetate",
+    )
+    assert rate_lo == pytest.approx(2.0 * rate_hi)
+
+
+def test_lower_ph_hydrolyses_faster(params):
+    # THE new observable (the pH-blind model could not express it): a lower-pH wine fades its banana
+    # ester faster (R&O: "pH is far more important than total acidity"). Spans the wine range.
+    schema = wine_schema()
+    low = EsterHydrolysis().derivatives(
+        0.0, _wine_at_ph(schema, params, 3.0, ester=0.1), schema, params
+    )
+    high = EsterHydrolysis().derivatives(
+        0.0, _wine_at_ph(schema, params, 3.8, ester=0.1), schema, params
+    )
+    assert -schema.get(low, "isoamyl_acetate") > -schema.get(high, "isoamyl_acetate") > 0.0
+    # The fusel/Byp products rise correspondingly more in the faster (lower-pH) wine.
+    assert schema.get(low, "isoamyl_alcohol") > schema.get(high, "isoamyl_alcohol") > 0.0
+
+
+def test_beer_ester_hydrolysis_is_ph_blind_byte_for_byte(params):
+    # Beer has no pH system (D-18), so the [H+] factor is held at 1.0 (the cation_charge gate) and
+    # the beer rate is the pH_ref-anchored k*f_t*excess — byte-for-byte the pre-D-124 beer behaviour
+    # (prime directive #3: the pH build must not silently perturb the other medium).
+    beer = beer_schema()
+    ester, t = 0.08, 298.15
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": t, "CO2": 0.0})
+    yb[beer.slice("isoamyl_acetate")] = ester
+    d = EsterHydrolysis().derivatives(0.0, yb, beer, params)
+    f_t = arrhenius_factor(t, params["E_a_ester_hydrolysis"], params["T_ref"])
+    expected = params["k_ester_hydrolysis"] * f_t * (ester - params["isoamyl_acetate_eq"])
+    assert beer.get(d, "isoamyl_acetate") == pytest.approx(-expected)
+
+
+def test_integrated_lower_ph_wine_fades_more_over_a_year(params):
+    # END-TO-END (the deliverable): over a year of aging, a lower-pH wine loses MORE of its banana
+    # ester than a higher-pH wine at the same temperature — acetate fade tracks wine pH (D-124).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [EsterHydrolysis()], strict=True)
+    ester0, span = 0.1, (0.0, 24.0 * 365.0)
+    low = simulate(
+        ps, params=params, y0=_wine_at_ph(schema, params, 3.0, ester=ester0), t_span=span
+    )
+    high = simulate(
+        ps, params=params, y0=_wine_at_ph(schema, params, 3.8, ester=ester0), t_span=span
+    )
+    assert low.success and high.success, (low.message, high.message)
+    low_end = float(low.series("isoamyl_acetate")[-1])
+    high_end = float(high.series("isoamyl_acetate")[-1])
+    assert low_end < high_end < ester0  # both fade; the acidic wine fades further
 
 
 # -- integrated aging segment (conservation + direction) ----------------------

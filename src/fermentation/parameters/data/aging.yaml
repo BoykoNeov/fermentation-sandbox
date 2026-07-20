@@ -12,11 +12,14 @@
 # THE PROCESS (fermentation.core.kinetics.aging.EsterHydrolysis):
 #
 #   d(isoamyl_acetate)/dt
-#       = -k_ester_hydrolysis * f(T) * max(0, isoamyl_acetate - isoamyl_acetate_eq)
+#       = -k_ester_hydrolysis * f(T) * h(pH) * max(0, isoamyl_acetate - isoamyl_acetate_eq)
 #
 # a first-order NET decay of the ``isoamyl_acetate`` pool toward a lower equilibrium floor
 # ``isoamyl_acetate_eq`` (NOT decay-to-zero), warmed by an Arrhenius factor f(T) = arrhenius_factor(
-# T, E_a_ester_hydrolysis, T_ref) so warm aging degrades the fruity banana ester faster.
+# T, E_a_ester_hydrolysis, T_ref) so warm aging degrades the fruity banana ester faster, AND
+# (since D-124) acid-catalysed by h(pH) = 10^(pH_ref_ester_hydrolysis - pH) = [H+]/[H+]_ref so a
+# LOWER-pH wine hydrolyses FASTER (R&O's "pH matters more than total acidity"; first-order in [H+]).
+# h(pH) = 1 at pH_ref, and is WINE-ONLY (beer has no pH system, D-18 => h == 1, the pH_ref rate).
 # The released carbon (c(isoamyl_acetate) — the REAL molecule since D-96, not a stand-in) is
 # routed to ``isoamyl_alcohol`` (the alcohol product, its own D-99 pool — not the retired
 # ``fusels`` lump) + ``Byp`` (the acid product) — see the Process docstring for the 5:2 split,
@@ -52,18 +55,20 @@
 # test_tier_floored_at_speculative and the milestone-3 framing) and because the Process is
 # speculative in FORM (Tier-3 frontier), so it floors its outputs at speculative regardless of input
 # tiers (parameter-tier propagation, D-1). E_a alone would justify PLAUSIBLE; k carries a
-# floor-graft + single-pH pin (see its notes). isoamyl_acetate_eq remains a genuine author estimate
-# (R&O measures no floor).
+# floor-graft (its D-123 single-pH pin is RETIRED at D-124 — pH is now explicit via
+# pH_ref_ester_hydrolysis, whose FORM is R&O-measured first-order [H+] catalysis but whose residual
+# tartrate-intercept error keeps the composite speculative). isoamyl_acetate_eq remains a genuine
+# author estimate (R&O measures no floor).
 
 # -- FIRST-ORDER HYDROLYSIS RATE: esters -> alcohol + acid, toward equilibrium -----------
 k_ester_hydrolysis:
   value: 2.2e-4
   unit: "1/h"   # d(isoamyl_acetate)/dt = -k_ester_hydrolysis * f(T) * max(0, isoamyl_acetate - isoamyl_acetate_eq)
   tier: speculative
-  uncertainty: { low: 1.3e-4, high: 4.0e-4, note: "the R&O-measured isoamyl-acetate wine range at T_ref = 20 C, floor-grafted: model solution ~1.06e-4, Pinot noir (pH 3.36) ~1.80e-4, Chardonnay (pH 2.94) ~3.22e-4 /h (Tables I/IX/VIII, 21.1 C shifted to 20 C via E_a); the pH spread dominates the wine-to-wine range. Half-life ln2/k ~ 3100 h (~4 months) at the value, the observed timescale over which young wine's fruity acetate esters fade" }
+  uncertainty: { low: 1.6e-4, high: 2.5e-4, note: "NARROWED AT D-124: the band is now the AT-REFERENCE-pH uncertainty, because the pH spread that used to dominate it (model 1.06e-4 / Pinot pH 3.36 1.80e-4 / Chardonnay pH 2.94 3.22e-4) is now carried EXPLICITLY by the 10^(pH_ref - pH) factor (see pH_ref_ester_hydrolysis) rather than lumped into k. What remains is the Pinot k_obsd measurement SD (Table IX, ~11%: 54.72 +/- 6.32 e-9 => ~1.6-2.0e-4 /h at 20 C) times the 1.0-1.25 floor-graft range => ~1.6-2.5e-4. Half-life ln2/k ~ 3100 h (~4 months) at the value and pH 3.36, the observed timescale over which young wine's fruity acetate esters fade" }
   provenance:
     source: "Ramey & Ough 1980, 'Volatile ester hydrolysis or formation during storage of model solutions and wines', J. Agric. Food Chem. 28(5):928-934 — MEASURED (was author-estimate until D-123, when the paper became readable as an open scanned PDF on the author's winery site; the ACS copy is paywalled). Table IX (Pinot noir, pH 3.36): isoamyl (+active amyl) acetate pseudo-first-order k_obsd = 54.72e-9 /s at 21.1 C => 1.80e-4 /h at T_ref = 20 C (shifted via E_a_ester_hydrolysis). Table VIII (Chardonnay, pH 2.94): 98.73e-9 /s => 3.22e-4 /h; Table I (model solution): 32.60e-9 /s => 1.06e-4 /h. The old D-69 estimate (1.0e-4) coincided with R&O's MODEL-solution value; this re-anchors to the real-WINE measurement."
-    conditions: "wine matrix, pinned to Pinot noir pH 3.36 (a typical red); first-order in the `isoamyl_acetate` excess over equilibrium, at T_ref = 293.15 K. R&O's headline is a STEEP [H+] dependence (~x9 per pH unit, Table V), which the sim's pH-blind rate does not carry — so this value pins a reference pH. A pH-explicit rate IS now sourceable (R&O Tables VI/VII give the second-order [H+] constants and the sim computes pH in acidbase.py); that is the deferred larger build (D-123), not this beat."
+    conditions: "wine matrix, the rate AT THE REFERENCE pH 3.36 (R&O's Pinot noir, a typical red); first-order in the `isoamyl_acetate` excess over equilibrium AND (since D-124) first-order in [H+] via the 10^(pH_ref - pH) factor, at T_ref = 293.15 K. R&O's headline STEEP [H+] dependence (Table V/VI, ~x9-x10 per pH unit, r=0.999) is now CARRIED by that factor (D-124 built the pH-explicit rate D-123 flagged as deferred). k is thus the value at pH_ref; off-reference wines scale by [H+]/[H+]_ref. See pH_ref_ester_hydrolysis for the FORM's provenance and the tartrate-intercept known limit."
     notes: "RE-ANCHORED AT D-123 (D-121's 'reopens the moment a rate constant lands' trigger). Two author modeling choices ride on the measured core, which is why the composite stays SPECULATIVE though k_obsd itself is plausible-grade: (1) the x1.25 FLOOR-GRAFT — R&O saw log-linear decay over 200 d (NO floor; k_obsd is a pure first-order disappearance constant), whereas EsterHydrolysis decays toward isoamyl_acetate_eq, so at the sim's ~1 mg/L young level the floor eats ~20% of the driving force and k_sim*(ester-eq) must be inflated to reproduce R&O's observed k_obsd*ester (test_reanchored_rate_reproduces_ramey_ough_young_wine_fade); (2) the single pinned pH. Owner chose 'match R&O's observed fade' over 'match R&O's number' (k_sim = k_obsd, ~15-25% slower than they saw). The +active amyl coelution (R&O's wine peak is isoamyl + active amyl acetate) is a minor same-ester-bond C5-acetate proxy. Process floors outputs at speculative regardless (D-1)."
 
 # -- ACTIVATION ENERGY: warmer aging hydrolyses faster (now a measured magnitude) --------
@@ -76,6 +81,20 @@ E_a_ester_hydrolysis:
     source: "Ramey & Ough 1980, J. Agric. Food Chem. 28(5):928-934 — MEASURED (was author-estimate/ordering-only until D-123; see k_ester_hydrolysis for the open-PDF provenance). Table X (activation energies in WINE): isoamyl (+active amyl) acetate E_a = 14.1 kcal/mol (Pinot noir, r=-1.00) and 15.3 kcal/mol (Chardonnay, r=-0.997); Table II (model solution): 16.5 kcal/mol. 14.1 kcal/mol x 4184 = 59.0 kJ/mol. Anchored to Pinot noir, the same wine as the k_ester_hydrolysis anchor."
     conditions: "Arrhenius activation energy of isoamyl-acetate hydrolysis in a wine matrix, at T_ref = 293.15 K. Pinot noir value."
     notes: "RE-ANCHORED AT D-123 from D-69's author estimate (60000, 'only the ORDERING sourced, magnitude speculative'). The old guess already sat inside R&O's measured wine range (59-64 kJ/mol), so the value barely moved (60->59); the substance of the change is PROVENANCE — the magnitude is now a real measurement (r ~ -1.00 across model + both wines), not an estimate. Kept SPECULATIVE to preserve the aging axis's uniform speculative floor (relied on by test_tier_floored_at_speculative and the milestone-3 framing); on its own this measurement would justify PLAUSIBLE, a clean future promotion should the axis-wide floor be revisited. The warmer-is-faster DIRECTION (E_a > 0) remains the load-bearing behavioural claim — why warm cellars age wine faster and cold storage preserves fruity esters."
+
+# -- REFERENCE pH: hydrolysis is FIRST-ORDER in [H+]; k is anchored at this pH (decision D-124) --
+# EsterHydrolysis scales its rate by [H+]/[H+]_ref = 10^(pH_ref - pH), so acetate fade tracks wine
+# pH (the sim solves pH in acidbase.py, D-18). At pH_ref the factor is 1.0, so k is the rate there
+# and every pre-D-124 pH-3.36 trajectory is byte-for-byte unchanged (the D-123 anchor preserved).
+pH_ref_ester_hydrolysis:
+  value: 3.36
+  unit: "pH"   # dimensionless; the wine pH k_ester_hydrolysis is anchored to
+  tier: speculative
+  uncertainty: { low: 3.36, high: 3.36, note: "PINNED (zero-width => never sampled by the ensemble; the runtime pins high<=low to value). It is DEGENERATE with k_ester_hydrolysis: only the product k/[H+]_ref = R&O's true second-order k_H+ (Table VI/VII, isoamyl acetate ~1.11-1.24e-4 L/mol/s) is identifiable, so a band on pH_ref would just reshuffle into k and double-count k's spread. The identifiable uncertainty lives entirely in k; pH_ref is a fixed anchor definition, not an uncertain quantity." }
+  provenance:
+    source: "Ramey & Ough 1980, J. Agric. Food Chem. 28(5):928-934, page 929: 'The pH was 3.36' (the Pinot noir, Oakville CA, whose k_obsd anchors k_ester_hydrolysis via Table IX). Readable as the open scanned PDF on the author's winery site (rameywine.com); the ACS copy is paywalled (D-123)."
+    conditions: "the reference pH of the first-order [H+] scaling 10^(pH_ref - pH) that EsterHydrolysis applies; wine-only (beer has no pH system, D-18, so a beer state keeps the factor at 1.0 and hydrolyses at the pH_ref-anchored rate)."
+    notes: "ADDED AT D-124 (the pH-explicit hydrolysis build; the natural follow-on D-123 flagged). R&O measured, in MODEL SOLUTIONS where pH was the only variable, that isoamyl-acetate hydrolysis varies DIRECTLY with [H+] in a LINEAR (first-order) manner: Table V k_obsd at pH 2.95/3.58/4.10 = 129.2/32.60/14.10 e-9 /s, fit by Table VI's graphic second-order constant k_H+ = 1.111e-4 L/mol/s at r=0.999 (and Table VII's matrix k_H+ = 1.24e-4). R&O: 'pH is far more important in determining rates of ester hydrolysis than is total acidity', 'H+ ~100x more active than tartrate', and 'in both wines the acetate esters behaved as in model solutions'. So the FORM is first-order in [H+], anchored at the Pinot reference. (The earlier reading of a sub-first-order slope from the two WINES was CONFOUNDED - Pinot vs Chardonnay differ in matrix, not just pH; R&O also states ethanol 10-14% has no effect, ruling out an ethanol attenuation.) KNOWN LIMIT (the tartrate intercept, honest): R&O's [H+] plots do NOT pass through the origin - a pH-INVARIANT tartaric/bitartrate catalysis term (Table VII k_H2T/k_HT-, ~8% of the rate at pH 3.36 rising to ~30% by pH 4.1) that this pure-[H+] law wrongly scales with [H+]. Net error vs R&O's model-solution law: EXACT at 3.36, within ~+/-6% over pH 3.0-3.5 (most reds), ~-13% at 3.8, ~-27% at 4.1 (high-pH whites). Still a large gain over the pH-BLIND model (which applied the pH-3.36 rate to a ~16x [H+] range with 0% tracking). The full k_0' + k_H+[H+] + k_H2T[H2T] + k_HT-[HT-] law (Table VII constants + the tartrate speciation the sim already computes for pH) is the DEFERRED refinement - one mechanism per beat; this beat delivers the dominant [H+] term. Kept speculative for the aging axis's uniform floor (test_tier_floored_at_speculative); on its own 3.36 is a measured value."
 
 # -- EQUILIBRIUM FLOOR: the residuum the pool decays TOWARD, not to zero ------------------
 isoamyl_acetate_eq:

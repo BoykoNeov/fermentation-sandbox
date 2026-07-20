@@ -913,3 +913,18 @@ uncertainty bands.
 > behaviour change, ruff clean, YAMLs parse. Correct historical ("until D-99") + category shorthand
 > LEFT intact. The one substantive OPEN fusel item — a **dynamic spectrum** (per-species `E_a` + gates
 > to break D-99's fixed-spectrum limit) — stays **blocked on sourcing**. See D-122.]**
+>
+> **[D-123 → D-124 — THE ESTER-AGING BEAT, UNBLOCKED AND MADE pH-EXPLICIT. D-123 re-anchored
+> `k_ester_hydrolysis`/`E_a_ester_hydrolysis` from D-69 author estimates to **Ramey & Ough 1980**'s
+> real-wine isoamyl-acetate measurement (the paywalled paper read as an open scanned PDF on the
+> author's winery site). **D-124** then built the pH-explicit rate D-123 flagged as the natural
+> follow-on: `EsterHydrolysis` is now acid-catalysed, `rate *= h(pH) = 10^(pH_ref - pH) = [H+]/[H+]_ref`
+> anchored at Pinot pH 3.36 (`h = 1` there ⇒ byte-for-byte the D-123 anchor), so a **lower-pH wine
+> fades its banana ester faster** — R&O's "pH matters more than total acidity", first-order in `[H+]`
+> (Table V/VI, r = 0.999). The primary source **overturned** a confounded sub-first-order reading taken
+> from two different wines (Pinot vs Chardonnay), and `pH_ref` is a **pinned** param (degenerate with
+> `k`), wine-only (beer keeps `h = 1`, D-18). KNOWN LIMIT: the pH-invariant tartrate-catalysis intercept
+> (~8% at pH 3.36 → ~30% at pH 4.1) is folded into the anchor and mis-scaled, so the pure-`[H+]` law is
+> exact at 3.36 and within ~±6%/−13%/−27% at pH 3.5/3.8/4.1 — the full multi-species law (Table VII) is
+> DEFERRED. Ester-formation (`ethyl_acetate`) + `ethyl_hexanoate` hydrolysis stay blocked on their own
+> rates (Makhotkina & Kilmartin 2012 a candidate fetch). See D-123/D-124.]**

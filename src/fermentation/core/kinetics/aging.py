@@ -141,15 +141,17 @@ real, coherent aging phenomena, and the D-68 reason this was chosen as the first
 Process (it moves OAVs the D-67 lens already reads, needing no new extraction driver and no
 new state pool). The rate::
 
-    d(esters)/dt = -k_ester_hydrolysis · f(T) · max(0, esters - isoamyl_acetate_eq)
+    d(esters)/dt = -k_ester_hydrolysis · f(T) · h(pH) · max(0, esters - isoamyl_acetate_eq)
 
 is **net decay toward a lower equilibrium floor** ``isoamyl_acetate_eq``, *not* decay-to-zero
 (D-68):
 below ``isoamyl_acetate_eq`` the rate is zero. Framing this as "net decay toward a lower floor"
 is the same fixed-composition honesty the D-67 sensory lump carries. ``f(T) = arrhenius_factor(T,
 E_a_ester_hydrolysis, T_ref)`` gives the sourced **warmer-ages-faster** direction (cold
-cellars preserve fruity esters). No fermentative-flux gate — aging runs when the flux is
-zero — so unlike the M2 producers this Process is driven by temperature and the pool alone.
+cellars preserve fruity esters), and ``h(pH) = 10**(pH_ref_ester_hydrolysis - pH)`` the sourced
+**lower-pH-ages-faster** first-order [H+] acid catalysis (D-124, wine-only; see the
+:class:`EsterHydrolysis` docstring). No fermentative-flux gate — aging runs when the flux is
+zero — so unlike the M2 producers this Process is driven by temperature, wine pH, and the pool.
 
 **The "deferred half" this docstring used to name DOES NOT EXIST TO BUILD (decision D-121).**
 Until D-121 the text above claimed the bidirectional reality was that *"ethyl esters of fatty
@@ -477,10 +479,12 @@ _ETHYL_BRIDGE_SPECIES = "ethylidene"
 class EsterHydrolysis(Process):
     """Aging hydrolysis of the fruity banana ester toward equilibrium (decisions D-69/D-96).
 
-    ``d(isoamyl_acetate)/dt = -k_ester_hydrolysis · f(T) · max(0, isoamyl_acetate -
+    ``d(isoamyl_acetate)/dt = -k_ester_hydrolysis · f(T) · h(pH) · max(0, isoamyl_acetate -
     isoamyl_acetate_eq)`` — first-order net decay of the ``isoamyl_acetate`` pool toward the lower
     equilibrium floor ``isoamyl_acetate_eq`` (not to zero), with ``f(T) = arrhenius_factor(T,
-    E_a_ester_hydrolysis, T_ref)`` the sourced warmer-ages-faster factor. The released ester
+    E_a_ester_hydrolysis, T_ref)`` the sourced warmer-ages-faster factor and ``h(pH) =
+    10**(pH_ref_ester_hydrolysis - pH)`` the sourced first-order [H+] acid-catalysis factor
+    (D-124; see the pH paragraph below). The released ester
     carbon (``rate·c(isoamyl_acetate)``) is split **5:2** into ``fusels`` (isoamyl alcohol,
     the alcohol product) and ``Byp`` (succinic-stand-in acetic acid, the acid product) — so
     aging fades the banana OAV, raises the fusel OAV, and drifts VA/pH up. See the module
@@ -508,6 +512,29 @@ class EsterHydrolysis(Process):
     a byproduct-free configuration, where the ester pools are identically zero and this Process
     is inert. Ethyl hexanoate hydrolysis is likewise deferred.
 
+    **Acetate fade tracks wine pH — first-order in [H+] (D-124).** Ramey & Ough's headline is
+    that ester hydrolysis is acid-catalysed: in model solutions where pH was the *only* variable,
+    isoamyl-acetate ``k_obsd`` rose linearly with ``[H+]`` (Table V/VI, r = 0.999), and they
+    conclude velocity "varies directly with [H+] in a linear manner" — "pH is far more important in
+    determining rates of ester hydrolysis than is total acidity." So the rate carries a first-order
+    ``h(pH) = [H+]/[H+]_ref = 10**(pH_ref_ester_hydrolysis - pH)`` factor: a lower-pH wine fades its
+    banana ester faster, exactly the pH-blind model could not express. ``h`` is **1.0 at the
+    reference pH 3.36** (R&O's Pinot noir, the wine ``k`` is anchored to), so a pH-3.36 wine is
+    byte-for-byte the pre-D-124 Process and the D-123 anchor is preserved; ``pH`` is the sim's own
+    charge-balance solution (:func:`ph_of_state`, D-18). **Wine-only**: beer's pH system is deferred
+    (D-18), so a beer state keeps ``h = 1.0`` (the ``cation_charge`` slot is the gate) and
+    hydrolyses at the pH_ref-anchored rate — byte-for-byte the pre-D-124 beer behaviour. *Known
+    limit* (honest, the tartrate intercept): R&O's ``[H+]`` plots do not pass through the origin — a
+    pH-invariant tartaric/bitartrate catalysis term (~8% of the rate at pH 3.36, ~30% by pH 4.1)
+    that this pure-``[H+]`` law wrongly scales with ``[H+]``, so the law is exact at 3.36, within
+    ~±6% over pH 3.0–3.5 (most reds), and under-predicts ~13%/27% at pH 3.8/4.1. The full
+    multi-species law
+    (Table VII ``k_H+``/``k_H2T``/``k_HT-`` + the sim's tartrate speciation) is the deferred
+    refinement — one mechanism per beat; this beat delivers the dominant ``[H+]`` term. (The earlier
+    reading of a *sub*-first-order slope was confounded — it came from Pinot vs Chardonnay, two
+    different *wines*, not R&O's single-variable pH series; R&O also reports ethanol 10–14% has no
+    effect, ruling out an ethanol attenuation.)
+
     Off during the ferment (no fermentative-flux gate; it is temperature- and pool-driven);
     enabled only in a post-fermentation aging segment (D-68/D-70). Tier **speculative**.
     """
@@ -530,15 +557,21 @@ class EsterHydrolysis(Process):
         "Byp",
         *(tracer.tracer_pool for tracer in VALINE_LABEL_TRACERS),
     )
-    #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``isoamyl_acetate_eq`` are this Process's own
-    #: (aging.yaml, D-69; ``k``/``E_a`` re-anchored to Ramey & Ough 1980's real-wine measurement at
-    #: D-123, ``isoamyl_acetate_eq`` still author-estimate); ``T_ref`` is shared with every other
-    #: Arrhenius rate. Their tiers cap the ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output
-    #: tiers via parameter-tier propagation (D-1).
+    #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``isoamyl_acetate_eq``/
+    #: ``pH_ref_ester_hydrolysis`` are this Process's own (aging.yaml, D-69; ``k``/``E_a``
+    #: re-anchored to Ramey & Ough 1980's real-wine measurement at D-123; ``pH_ref`` added at D-124
+    #: for the first-order [H+] factor; ``isoamyl_acetate_eq`` still author-estimate); ``T_ref`` is
+    #: shared
+    #: with every other Arrhenius rate. Their tiers cap the
+    #: ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output tiers via parameter-tier propagation
+    #: (D-1). The plausible pH-system params read *inside* :func:`ph_of_state` (``pKa_*``,
+    #: ``cation_charge``) are omitted — this Process is already speculative, so they cap nothing
+    #: (the :class:`SulfiteOxidation` / MalolacticConversion convention).
     reads: tuple[str, ...] = (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
         "isoamyl_acetate_eq",
+        "pH_ref_ester_hydrolysis",
         "T_ref",
     )
 
@@ -555,7 +588,21 @@ class EsterHydrolysis(Process):
             return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_ester_hydrolysis"], params["T_ref"])
-        rate = params["k_ester_hydrolysis"] * f_t * excess  # g isoamyl acetate/L/h decayed
+        # First-order in [H+] (specific-acid catalysis, Ramey & Ough 1980, decision D-124):
+        # hydrolysis "varies directly with [H+] in a linear manner" (Table V/VI, r=0.999), so the
+        # rate scales by [H+]/[H+]_ref = 10^(pH_ref - pH) about the Pinot-noir reference pH k is
+        # anchored at (D-123). A lower-pH wine fades its banana ester FASTER ("pH is far more
+        # important than total acidity"). WINE-ONLY: beer's pH system is deferred (D-18) — a beer
+        # state carries no acid/cation slots and ph_of_state would return ~7, so the factor is held
+        # at 1.0 there and the rate is the pH_ref-anchored value, byte-for-byte the pre-D-124 beer
+        # behaviour. Bounded (D-46): ph_of_state clamps pH to [0, 14], so h_factor is finite
+        # (~2e-11 .. ~2.3e3) even under a BDF Jacobian probe that pushes cation_charge out of its
+        # physical range — the derivative stays a total, bounded function of state.
+        h_factor = 1.0
+        if "cation_charge" in schema:  # the wine pH-system marker (absent from the beer schema)
+            ph = ph_of_state(y, schema, params)
+            h_factor = 10.0 ** (params["pH_ref_ester_hydrolysis"] - ph)
+        rate = params["k_ester_hydrolysis"] * f_t * h_factor * excess  # g isoamyl acetate/L/h
 
         # The released carbon is now the REAL molecule's (isoamyl acetate, C7) — D-96 retired
         # D-69's debit-as-ethyl-acetate / split-as-isoamyl-acetate stand-in. Split it 5:2 and
