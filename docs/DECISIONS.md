@@ -11101,6 +11101,23 @@ and its docstring says why tightening it would be a regression in fidelity dress
 The seven remaining failures were `touches` declarations and schema-size listings. **No conservation test moved**, which
 is the signal that mattered: 1167 passed on the first full run with the build in.
 
+### The coverage gap the green suite could not see
+
+The four label-carrying flows shipped with three derivative-level tests. The fourth —
+`EsterHydrolysis`'s return — had only a `touches` assertion, and **nothing else in the suite could have
+covered it**: that Process is inert through every fermentation-phase run, so the enrichment tests never
+reach it, and conservation is blind to the tracers by construction. Its `f_ester` math was green by
+absence. Closed with `test_hydrolysis_returns_the_label_with_the_c5_so_aging_cannot_dilute_the_enrichment`,
+which pins both halves — the ester side is non-fractionating, **and** the returned alcohol carries the
+ester's fraction. The second half is the one the wiring exists for (omit it and an aging segment quietly
+dilutes the alcohol's enrichment with returns booked as unlabelled) and was the unchecked one. **Verified
+by mutation:** deleting the alcohol-side credit fails it on the exact value (0.0 vs 2.553e-06).
+
+This is the D-106/D-108 family in its quietest form: not two callers agreeing by luck, but **one caller
+that no test disagreed with**, in a Process the suite's runs never activate. A phase-gated Process is
+structurally easy to ship unverified, because the runs that would exercise it are the ones nobody writes
+for a fermentation beat.
+
 ### Lessons
 
 (i) **An "architectural blocker" deserves one hard look at its category before it becomes a design.** D-114 correctly
@@ -11112,7 +11129,11 @@ after valine is gone" is true and was measured. It does *not* imply the label is
 because the early 7 % draws from a far richer pool. **Mass shares and label shares are different quantities** — the
 same D-105/D-111/D-113/D-114 refrain (the ledger is blind to the attribution that is the whole finding), reappearing
 one level in, inside the *corroboration* rather than inside the claim.
-(iii) **When an option collapses under scrutiny, say so and re-ask rather than picking a neighbour.** The one-slot
+(iii) **"All tests pass" says nothing about a Process the tests never activate.** The hydrolysis label
+return shipped green because no run in the suite turns that Process on, and the one ledger that would
+notice is weight-blind to tracers by design. **Ask which Processes a beat's runs actually execute**, not
+whether the suite is green.
+(iv) **When an option collapses under scrutiny, say so and re-ask rather than picking a neighbour.** The one-slot
 design was offered, chosen, and then proved to occupy no coherent niche. Silently expanding to two would have delivered
 a scope the owner never approved; silently retreating to zero would have overridden a decision they had just made.
 

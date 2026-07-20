@@ -1065,20 +1065,6 @@ def test_stripping_is_non_fractionating_so_it_cannot_inflate_the_enrichment(para
     )
 
 
-def _retired_d114_test_the_ester_carries_no_label(params):  # pragma: no cover - see below
-    """RETIRED at D-115, kept as the record of what was measured and why it stopped being true.
-
-    D-114 measured the model's isoamyl-acetate enrichment as **structurally** zero: the ester's
-    carbon came wholly from ``S``, so no parameter could have moved it. The finding was correct
-    and its premise is now deliberately gone - the D-115 re-route sources the C5 off the alcohol
-    pool. Its live successors are
-    :func:`test_the_acetylation_sources_its_c5_off_the_alcohol_and_only_its_c2_off_sugar` (the
-    carbon) and :func:`test_the_label_rides_across_the_acetylation_at_the_alcohol_pools_fraction`
-    (the label). Kept un-collected rather than deleted because the *reason* a green test went red
-    is the beat's whole content, and a deleted test leaves no trace of that.
-    """
-
-
 def test_banana_rate_is_first_order_in_the_fusel_pool(params):
     """The MECHANISM at the derivative level: double the precursor, double the banana rate -
     and leave the other two esters exactly where they were.

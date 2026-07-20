@@ -38,6 +38,8 @@ from fermentation.core.chemistry import (
     M_ALPHA_KETOBUTYRATE,
     M_CO2,
     M_ETHANOL,
+    M_ISOAMYL_ACETATE,
+    M_ISOAMYL_OH,
     M_MALIC,
     M_METHIONAL,
     M_O2,
@@ -4473,3 +4475,53 @@ def test_fading_tier_floored_at_speculative(poly_store):
     for pool in ("o2", "anthocyanin", "faded_anthocyanin"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, poly_store.tier_map()) is Tier.SPECULATIVE
+
+
+def test_hydrolysis_returns_the_label_with_the_c5_so_aging_cannot_dilute_the_enrichment(params):
+    """D-115 - the label comes back with the carbon, at the ESTER's own fraction.
+
+    Hydrolysis is the exact reverse of the acetylation, so an ester molecule that was
+    valine-derived returns a valine-derived alcohol molecule, mole for mole. Two things have to
+    hold and neither is implied by the other:
+
+    * **the ester side is non-fractionating** - the tracer falls at the pool's own fraction, so
+      decaying the pool leaves its enrichment where it was;
+    * **the alcohol side carries that fraction across** - the returned alcohol is credited as
+      labelled in the ester's proportion. **This is the half the wiring exists for.** Omit it and
+      an aging segment silently dilutes the alcohol pool's enrichment with returned molecules
+      booked as unlabelled - a drift that no conservation test could ever catch, because a tracer
+      slot carries no carbon weight by construction (the D-89/D-90 family).
+
+    Deliberately debited at ``f_ester`` and **not** at the alcohol's fraction: using the alcohol's
+    would assume the ester tracks it, which is the very thing the two-slot design exists to
+    measure rather than assert (the D-98/D-108 vacuity trap, relocated into the RHS).
+
+    Covered here because nothing else can: this Process is inert through every fermentation-phase
+    run in the suite, so the enrichment tests in ``test_fusel_reroute.py`` never exercise it.
+    """
+    schema = wine_schema()
+    ester = 0.1
+    for fraction in (0.0, 0.25, 1.0):
+        y = _aged_wine(schema, ester=ester, t=298.15)
+        y[schema.slice("isoamyl_acetate_valine")] = ester * fraction
+        d = EsterHydrolysis().derivatives(0.0, y, schema, params)
+
+        decayed = -float(d[schema.slice("isoamyl_acetate")][0])
+        assert decayed > 0.0, "vacuous: no hydrolysis at this state"
+
+        # (a) the ester side is non-fractionating.
+        assert -float(d[schema.slice("isoamyl_acetate_valine")][0]) == pytest.approx(
+            decayed * fraction, rel=1e-12
+        ), "hydrolysis must consume labelled and unlabelled ester in the pool's own proportion"
+
+        # (b) the returned ALCOHOL carries exactly the ester's fraction - the half that keeps an
+        # aging segment from diluting the alcohol pool's enrichment.
+        returned = float(d[schema.slice("isoamyl_alcohol")][0])
+        returned_label = float(d[schema.slice("isoamyl_alcohol_valine")][0])
+        assert returned > 0.0, "vacuous: no alcohol is being returned"
+        assert returned_label == pytest.approx(returned * fraction, rel=1e-12), (
+            "the returned alcohol's labelled fraction must equal the ester's - the C5 skeleton "
+            "comes back as a unit, so the molecule fraction crosses the reaction unchanged"
+        )
+        # ...and mole for mole with the ester consumed, which is what makes the two independent.
+        assert returned / M_ISOAMYL_OH == pytest.approx(decayed / M_ISOAMYL_ACETATE, rel=1e-12)
