@@ -11915,6 +11915,13 @@ That said, the direction is informative and worth recording: **all three alcohol
 dominated in-study, 91–96%**, so D-118's finding is not a phenylalanine peculiarity. The depletion
 gate's availability/provenance confusion is a *class* of error across the fusel layer.
 
+> **[SUPERSEDED BY D-120 — the second sentence above does not follow from the first, and it is
+> wrong in the actionable direction.** All three *are* de-novo dominated in-study; the model is
+> nonetheless **more** de-novo than Minebois for all three (2-PE 0.23×, isoamyl 0.55×, isobutanol
+> 0.59× of her amino-acid share), so none of them over-attributes and the de-novo cap — a
+> one-directional ceiling — cannot help any of them. The isoamyl entry named just above is
+> **refused**, not deferred. See D-120.]**
+
 ### Verification provenance, stated because it is not the usual one
 
 The D-118 commit (`1500fd7`) went out on ruff + `ruff format --check` + mypy run directly in-session,
@@ -11935,3 +11942,130 @@ than a silent "green".
 - Unchanged from D-118: the phenylalanine-responsive share (feedback inhibition); the de-novo
   decarboxylation CO₂; isoleucine's bound; the Minebois/Crépin leucine conflict; the un-inversion
   build; the KMV → isoleucine route; closure O₂ ingress; acetaldehyde in maturation; the deferred tail.
+
+## D-120 — the isoamyl de-novo entry, refused by measurement: a one-directional ceiling cannot fix an under-attribution
+
+**The build was requested, scoped, and is not being made.** D-118 named "isoamyl's de-novo entry"
+as the next build — "one entry plus a sourced number" — and D-119 carried it forward with the
+cross-must caveat priced rather than inherited. Neither beat measured the one quantity that decides
+whether the entry helps: **which side of the cap the model is already on.** Measured, it is on the
+wrong side, and so are the other two. Nothing ships: no parameter, no `DE_NOVO_FUSEL_ROUTES` entry.
+
+### The instrument is one-directional, and that is the whole argument
+
+`DeNovoFuselRoute` is applied at `byproducts.py:446` as `gate *= (1 − f_de_novo)`. It is a
+**ceiling**: it can only ever *reduce* how much of an alcohol is sourced from its amino acid. So it
+is warranted **iff the model over-attributes**. 2-phenylethanol did, by ~11× (D-118). The question
+was never asked of isoamyl.
+
+### Measured — the class hypothesis is refuted, and by the SIGN
+
+Exact state differences at the characterization must (`amino_acids_gpl = 1.0`, which is ≈ Minebois's
+own must — 28 mg/L Phe against her 26.8), other precursor consumers dropped so the D-104 `f : (1−f)`
+split invariant is exact rather than nearly-true:
+
+| alcohol | model AA share | Minebois in-study | ratio | verdict |
+|---|---|---|---|---|
+| 2-phenylethanol | 0.87 % | 3.72 % | 0.23× | under → cap cannot help |
+| isoamyl alcohol | 2.94 % (leu 1.13 + val 1.81) | 5.34 % | 0.55× | under → cap cannot help |
+| isobutanol | 5.14 % | 8.78 % | 0.59× | under → cap cannot help |
+
+**Every alcohol attributes LESS to amino acids than Minebois measures.** D-119's closing claim —
+"all three are de-novo dominated in-study, so D-118's finding is a *class* of error across the fusel
+layer" — is therefore **wrong in the actionable direction**. It is true that all three are de-novo
+dominated; it does not follow that the model under-does the de-novo share. It over-does it.
+
+**The verdict does not depend on the branch decomposition.** Isoamyl is the only alcohol with two
+amino-acid branches, so its 2.94% is a reconstruction. But leucine *alone* (1.13%) is already below
+Minebois's leucine label alone (77/3392 = 2.27%), and valine alone (1.81%) below hers (104/3392 =
+3.07%). Both branches under-attribute independently; any error in the split leaves the sign intact.
+
+**And the denominators are comparable here, unlike D-119's case.** The model makes 4008 µM isoamyl
+against Minebois's 3392 — 1.18×, not the ~2× that made 2-PE's in-study fraction untransplantable. So
+for isoamyl the direct comparison *survives* the cross-must caveat instead of hiding behind it.
+
+### The second, independent kill: the cap cannot reach the branch doing the work
+
+The cap is looked up on `spec.pool` inside the **primary** loop only. Isoamyl's valine → KIC branch
+is computed further down from `SECONDARY_FUSEL_ROUTES` and never consults
+`DE_NOVO_SHARE_BY_ALCOHOL`. So `f_de_novo_isoamyl_alcohol` would throttle leucine (1.13%) and leave
+valine (1.81%, **the larger branch**) untouched — while the number it would be sourced from,
+`1 − I.E`, is defined over *both* labels. Wrong direction and wrong reach: the parameter's semantics
+cannot be represented by the mechanism at **any** dose.
+
+### The third, and it is the deepest: a rate knob on a supply-limited quantity
+
+The cap multiplies the availability gate — a **rate**. At realistic doses every precursor is fully
+consumed (valine, leucine, phenylalanine all end at ≤0.01% remaining), so the total drawn is fixed
+by **supply**, and the realised share sits on D-112's `(1−f) × pool / alcohol` mass-conservation
+ceiling. A rate knob cannot move a supply-limited total. D-112 found precisely this for leucine — "a
+gate cap does not move the realised share, because leucine is too scarce to persist under any draw
+rate" — and it generalises across the layer.
+
+**Measured on the SHIPPED parameter, which is the uncomfortable part:** at this must,
+`f_de_novo_2_phenylethanol` moves 2-PE's realised amino-acid share by **~0** (0.871% at 0.9827,
+0.871% at 0.0 — phenylalanine exhausts either way). The cap only bites at `amino_acids_gpl = 4.0`,
+where phenylalanine stops exhausting (31% left) and the share moves 2.39% → 1.66%.
+
+**This does not make D-118 wrong, and the distinction is the content.** The route's *measured* job
+is the instantaneous **carbon-refund guard** — that 0.975 became shippable because the joint refund
+fell from 1.125× growth's draw to 0.584× — and that is pinned by its own counterfactual in
+`test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable`. The refund is an instantaneous
+ratio; the realised share is an integrated total under exhaustion. Both statements hold at once.
+
+What does **not** survive is reading the route as the fix for the 18.9% over-attribution.
+`DeNovoFuselRoute`'s own docstring motivates the route that way ("the model sources 18.9% … against
+a derived ~1.7%"), but at this dose that correction was delivered by `f_non_ehrlich_phenylalanine`
+going 0.53 → 0.975, and the route is inert beside it. **The prose states an attribution
+justification for a parameter whose measured effect here is on the guard.** Recorded, not repaired:
+the parameter is load-bearing and correct where it is load-bearing.
+
+### What the dose sweep actually shows, stated carefully
+
+| `amino_acids_gpl` | 2-PE | isoamyl | isobutanol |
+|---|---|---|---|
+| 0.0 | 0.00 % | 0.00 % | 0.00 % |
+| 1.0 | 0.87 % | 2.94 % | 5.14 % |
+| 2.0 | 1.44 % | 4.94 % | 8.64 % |
+| 4.0 | 1.66 % | 8.17 % | 14.29 % |
+
+At 4.0 isoamyl and isobutanol exceed Minebois's fixed shares. **That is not a sign-flip and must not
+be recorded as one.** Her number is measured at *her* must (≈1.0); reality's de-novo share also falls
+as precursor is dosed, by the feedback inhibition already recorded in 2-PE's static-share caveat. The
+honest comparison at 4.0 is against reality-at-4.0, which is unmeasured — it is the Querol ask. The
+flag flips against a target that stopped applying three rows up.
+
+The rise is the *correct* shape, and it supplies the mechanism behind the refusal: **the quantity is
+dose-dependent and a static `f_de_novo` freezes it at one value** — the D-104 static-f class error.
+Probed directly on the clean case (isobutanol, single branch, cap applies fully): capping at her
+0.9122 moves 5.140% → 5.136% at dose 1.0 (inert, as above) and 14.29% → 8.46% at dose 4.0. So the
+proposed value is not a corrective at any dose — inert where it is anchored, and where it finally
+bites it is chasing a target that no longer describes the regime.
+
+### Receipts
+
+`tests/test_fusel_catabolic_shape.py` (the D-112 measurement suite, its natural home) gains two:
+
+- `test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warranted` — pins all three
+  shares below Minebois's, via a helper that counts **every** branch rather than the primary only.
+  If a future beat makes any alcohol over-attribute, the entry question genuinely re-opens for that
+  alcohol and this fails.
+- `test_the_de_novo_cap_is_inert_where_the_precursor_exhausts` — pins the exhaustion premise and the
+  shipped cap's ~0 effect on the realised share, so the "rate knob on a supply-limited quantity"
+  argument fails loudly if either moves.
+
+### Next
+
+- **The class question is closed; do not re-open it as a build.** No alcohol warrants a de-novo cap.
+  D-119's "class of error" sentence is superseded by this entry.
+- **`f_non_ehrlich_leucine` is the live lever on isoamyl, not a route.** The model↔Minebois isoamyl
+  gap is dominated by *which* leucine `f` is believed: Crépin's 0.815 (shipped) versus the ~0.29
+  implied by Minebois — the open D-103 conflict, two bands never averaged. **This is not
+  corroboration**: her `f` and her de-novo share are one study, and their mutual consistency is
+  internal, not independent agreement (D-118/D-119's own lesson). It sharpens the conflict's stakes,
+  it does not resolve them.
+- **Ask Querol** — unchanged, and now carries a second question: the de-novo share's *dose response*,
+  which is what would replace a static `f_de_novo` with the right shape.
+- Unchanged from D-119: the single-host obligation; the phenylalanine-responsive share; the de-novo
+  decarboxylation CO₂; isoleucine's bound; the un-inversion build; the KMV → isoleucine route;
+  closure O₂ ingress; acetaldehyde in maturation; the deferred tail.

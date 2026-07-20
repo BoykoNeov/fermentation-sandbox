@@ -856,3 +856,29 @@ uncertainty bands.
 > (2-PE 0.963, isoamyl 0.946, isobutanol 0.912), so **D-118's finding is a CLASS of error, not a phenylalanine
 > peculiarity** — but those numbers inherit the same cross-must caveat and are NOT drop-in `f_de_novo` values for the
 > isoamyl beat. Sharpened ask: Phe dose vs total 2-PE (Querol, aquerol@iata.csic.es). See D-119.]**
+
+> **[D-120 REFUSES THE ISOAMYL DE-NOVO ENTRY — measured, not built, and it CLOSES the class question above.
+> Nothing ships: no parameter, no `DE_NOVO_FUSEL_ROUTES` entry.** The de-novo cap is applied as
+> `gate *= (1 - f_de_novo)`, a ONE-DIRECTIONAL ceiling that can only REDUCE amino-acid sourcing — so it is
+> warranted only where the model OVER-attributes. Measured at the characterization must (~= Minebois's own),
+> every alcohol is on the wrong side: **2-PE 0.87% vs her 3.72%, isoamyl 2.94% (leu 1.13 + val 1.81) vs 5.34%,
+> isobutanol 5.14% vs 8.78%** — each attributes LESS to amino acids than she measures, so a ceiling cannot help
+> any of them. **D-119's "CLASS of error" sentence is SUPERSEDED**: all three are de-novo dominated in-study,
+> but it does not follow that the model under-does the de-novo share — it OVER-does it. The verdict is robust to
+> isoamyl's branch decomposition (leucine alone 1.13% < her 2.27%; valine alone 1.81% < her 3.07%), and unlike
+> D-119's case the denominators are comparable (4008 vs 3392 uM = 1.18x), so the comparison survives the
+> cross-must caveat rather than hiding behind it. **TWO FURTHER, INDEPENDENT KILLS:** (1) WRONG REACH — the cap
+> keys on `spec.pool` in the PRIMARY loop only, so it would throttle leucine and leave valine (the LARGER branch)
+> untouched, while `1 - I.E` is defined over both labels; (2) WRONG INSTRUMENT — the cap multiplies a RATE, but
+> every precursor fully exhausts at realistic doses, so the realised share sits on D-112's `(1-f) x pool / alcohol`
+> mass-conservation ceiling and no rate knob moves a supply-limited total. **Measured on the SHIPPED parameter:
+> `f_de_novo_2_phenylethanol` moves 2-PE's realised share by ~0 here** (0.871% at 0.9827, 0.871% at 0.0). That does
+> NOT make D-118 wrong — the route's measured job is the instantaneous carbon-refund guard (1.125x -> 0.584x, pinned
+> by its own counterfactual test), a different quantity from the integrated share. What does not survive is reading
+> the route as the fix for the 18.9% over-attribution: at this dose that was delivered by `f_non_ehrlich_phenylalanine`
+> 0.53 -> 0.975. **THE aa=4.0 CROSSOVER IS NOT A SIGN-FLIP** — reality's de-novo share also falls under dosing
+> (feedback inhibition), so comparing a 4x-dosed model to her 1x-dose number compares against a target that stopped
+> applying; the rise is the CORRECT shape and is exactly why a STATIC `f_de_novo` is the wrong form (the D-104
+> static-f class). **The live lever on isoamyl is `f_non_ehrlich_leucine`, not a route** — Crepin's 0.815 vs the
+> ~0.29 implied by Minebois, the open D-103 conflict; her `f` and her de-novo share are ONE study, so their
+> consistency is internal, NOT corroboration. Receipts: two tripwires in `test_fusel_catabolic_shape.py`. See D-120.]**

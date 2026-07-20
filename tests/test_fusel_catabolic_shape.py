@@ -35,7 +35,12 @@ import pytest
 from fermentation.core.chemistry import CARBON_ATOMS, carbon_mass_fraction
 from fermentation.core.kinetics.amino_acid_pools import depletion_gate as _orig_gate
 from fermentation.core.kinetics.byproducts import ehrlich_draws
-from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS, ISOAMYL_ALCOHOL
+from fermentation.core.kinetics.carbon_routing import (
+    FUSEL_SPECS,
+    ISOAMYL_ALCOHOL,
+    SECONDARY_FUSEL_ROUTES,
+    non_ehrlich_fraction_param,
+)
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
@@ -278,3 +283,134 @@ def test_the_valine_route_does_not_touch_leucines_anabolic_split():
     d_bio = abs(bio_on - bio_off) / bio_off
     assert d_ehrlich < 1e-4, f"leucine consumed (∝ D_ehrlich,leu) moved {d_ehrlich:.1e} with route"
     assert d_bio < 1e-4, f"total biomass (∝ D_bio,leu) moved {d_bio:.1e} with the route"
+
+
+# -- D-120: the de-novo CAP is the wrong instrument for isoamyl (and for the class) -------------
+
+
+#: Minebois 2025 Fig. 6A, Sc (T73) at T4 — ``labelled µM / total µM`` per alcohol, i.e. the share
+#: of that alcohol built FROM ITS AMINO ACID. Bar semantics are per-bar and MIXED (D-119): 2-PE's
+#: large number is the total, isoamyl's and isobutanol's are the unlabelled segment.
+_MINEBOIS_AMINO_ACID_SHARE = {
+    "2_phenylethanol": 4.05 / 109.0,  # 3.72 %
+    "isoamyl_alcohol": (77.0 + 104.0) / 3392.0,  # 5.34 % — leucine AND valine labels
+    "isobutanol": 39.0 / 444.0,  # 8.78 %
+}
+
+
+def _amino_acid_share(traj, schema, params, pool: str) -> float:
+    """This alcohol's carbon share sourced from amino acids — EVERY branch, not just the primary.
+
+    :func:`_de_novo_share` counts an alcohol's ``precursor_amino_acid`` only. Isoamyl uniquely has
+    a second (valine → KIC, :data:`SECONDARY_FUSEL_ROUTES`), and Minebois's de-novo share is
+    ``1 − I.E`` over BOTH its labels — so comparing her number to a primary-only share would
+    understate the model against its own target. Exact state differences throughout (D-103).
+    """
+    spec = next(s for s in FUSEL_SPECS if s.pool == pool)
+    alcohol_carbon = _end(traj, schema, pool) * carbon_mass_fraction(spec.species)
+    n_alc = CARBON_ATOMS[spec.species]
+    route = next(r for r in SECONDARY_FUSEL_ROUTES if r.precursor == "valine")
+    share_val_iso = params[route.share_param]
+
+    def consumed(species: str) -> float:
+        return float(traj.y[schema.slice(species), 0][0]) - _end(traj, schema, species)
+
+    precursor = spec.precursor_amino_acid
+    # valine's (1−f) splits again between isobutanol (primary) and isoamyl (secondary), so the
+    # primary share is NOT (1−f) for it — using (1−f) would double-count the isoamyl branch.
+    primary_share = (
+        1.0 - params[non_ehrlich_fraction_param("valine")] - share_val_iso
+        if precursor == "valine"
+        else 1.0 - params[non_ehrlich_fraction_param(precursor)]
+    )
+    # ×n/(n+1) removes the D-106 decarboxylation CO₂: a full mole of precursor per mole of alcohol.
+    total = (
+        primary_share
+        * consumed(precursor)
+        * carbon_mass_fraction(precursor)
+        * n_alc
+        / (n_alc + 1.0)
+    )
+    if pool == "isoamyl_alcohol":
+        total += (
+            share_val_iso
+            * consumed("valine")
+            * carbon_mass_fraction("valine")
+            * n_alc
+            / CARBON_ATOMS["valine"]
+        )
+    return float(total / alcohol_carbon)
+
+
+def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warranted():
+    """D-118's "class of error" hypothesis, tested across all three — and REFUTED (decision D-120).
+
+    D-118 capped 2-phenylethanol's amino-acid sourcing and left "isoamyl's de-novo entry" as the
+    next build, on the premise that all three alcohols are de-novo dominated in-study so the error
+    is a *class*. **Measured, none of the three warrants the cap, and the sign is the reason.**
+
+    :class:`~fermentation.core.kinetics.carbon_routing.DeNovoFuselRoute` is applied as
+    ``gate *= (1 − f_de_novo)``: a ONE-DIRECTIONAL ceiling that can only ever REDUCE amino-acid
+    sourcing. It is therefore warranted **iff the model over-attributes** to amino acids. Against
+    Minebois's own in-study shares every alcohol sits on the *other* side — the model attributes
+    LESS to amino acids than she measures — so the cap would drive all three further from the
+    measurement it would be sourced from.
+
+    This is the tripwire for the refused build: if a future beat makes any alcohol over-attribute,
+    the de-novo-entry question genuinely re-opens for that alcohol and this fails.
+    """
+    traj, schema = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
+    params = compile_scenario(_scenario(aging=False)).param_values
+
+    for pool, measured in _MINEBOIS_AMINO_ACID_SHARE.items():
+        model = _amino_acid_share(traj, schema, params, pool)
+        assert 0.0 < model < measured, (
+            f"{pool}: model sources {model:.2%} of it from amino acids against Minebois's "
+            f"{measured:.2%}. D-120 refused a de-novo cap for isoamyl because a (1−f_de_novo) "
+            "ceiling can only REDUCE amino-acid sourcing and every alcohol was already under. If "
+            "this one now over-attributes, that refusal must be re-derived for it"
+        )
+
+
+def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts():
+    """Why the cap is the wrong INSTRUMENT, not merely the wrong direction (decision D-120).
+
+    The cap multiplies the availability gate, i.e. a RATE. Where a precursor is fully consumed the
+    total drawn is fixed by SUPPLY, so the realised amino-acid share sits on the D-112
+    ``(1−f) × pool / alcohol`` mass-conservation ceiling and no rate knob can move it. D-112 found
+    exactly this for leucine ("a gate cap does not move the realised share"); it generalises.
+
+    **Measured on the SHIPPED parameter:** at the characterization must, phenylalanine exhausts
+    with or without the cap, so ``f_de_novo_2_phenylethanol`` moves 2-PE's realised share by ~0.
+
+    This does NOT make D-118 wrong, and the distinction is the point. The route's *measured* job is
+    the instantaneous carbon-refund guard — pinned by its own counterfactual in
+    ``test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable`` — which is a different
+    quantity from the integrated realised share. What does not survive is reading the route as the
+    fix for the 18.9% over-attribution: at this dose that correction was delivered by
+    ``f_non_ehrlich_phenylalanine`` (0.53 → 0.975), and the route is inert beside it.
+    """
+    shipped, _ = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
+    uncapped, schema = _run(
+        aging=False,
+        drop=_OTHER_PRECURSOR_CONSUMERS,
+        set_params={"f_de_novo_2_phenylethanol": 0.0},
+    )
+    params = compile_scenario(_scenario(aging=False)).param_values
+
+    initial = float(shipped.y[schema.slice("phenylalanine"), 0][0])
+    left = _end(shipped, schema, "phenylalanine") / initial
+    assert left < 0.01, (
+        f"phenylalanine no longer exhausts ({left:.1%} left) — the supply-limited premise of this "
+        "test has moved, and the cap may now bite on the realised share"
+    )
+
+    with_cap = _amino_acid_share(shipped, schema, params, "2_phenylethanol")
+    without = _amino_acid_share(
+        uncapped, schema, {**params, "f_de_novo_2_phenylethanol": 0.0}, "2_phenylethanol"
+    )
+    assert abs(with_cap - without) < 1e-3 * without, (
+        f"the de-novo cap moved 2-PE's realised amino-acid share {without:.4%} → {with_cap:.4%}. "
+        "It measured inert at D-120 because phenylalanine exhausts either way; if it now bites, "
+        "the argument that a cap cannot fix an under-attribution needs re-deriving"
+    )
