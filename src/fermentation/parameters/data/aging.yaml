@@ -12,14 +12,29 @@
 # THE PROCESS (fermentation.core.kinetics.aging.EsterHydrolysis):
 #
 #   d(isoamyl_acetate)/dt
-#       = -k_ester_hydrolysis * f(T) * h(pH) * max(0, isoamyl_acetate - isoamyl_acetate_eq)
+#       = -k_ester_hydrolysis * f(T) * h(pH, [tartrate]) * max(0, isoamyl_acetate - isoamyl_acetate_eq)
 #
 # a first-order NET decay of the ``isoamyl_acetate`` pool toward a lower equilibrium floor
 # ``isoamyl_acetate_eq`` (NOT decay-to-zero), warmed by an Arrhenius factor f(T) = arrhenius_factor(
 # T, E_a_ester_hydrolysis, T_ref) so warm aging degrades the fruity banana ester faster, AND
-# (since D-124) acid-catalysed by h(pH) = 10^(pH_ref_ester_hydrolysis - pH) = [H+]/[H+]_ref so a
-# LOWER-pH wine hydrolyses FASTER (R&O's "pH matters more than total acidity"; first-order in [H+]).
-# h(pH) = 1 at pH_ref, and is WINE-ONLY (beer has no pH system, D-18 => h == 1, the pH_ref rate).
+# acid-catalysed by a normalized MULTI-SPECIES factor (D-124 built the dominant [H+] term; D-125
+# added the tartrate terms):
+#
+#   h(pH, [tartrate]) = N(pH, [tartrate]) / N(pH_ref, tartaric_ref)
+#   N(pH, T)          = [H+] + r_h2t_ester_hydrolysis*[H2T] + r_ht_ester_hydrolysis*[HT-]
+#
+# — Ramey & Ough 1980's FULL rate law k_obsd = k_H+[H+] + k_H2T[H2T] + k_HT-[HT-] (Table VII, their
+# 3x3 matrix solve), divided through by k_H+ so only the two dimensionless RATIOS survive (k_H+
+# cancels; the D-97 identifiability discipline). [H2T]/[HT-] are the undissociated-tartaric and
+# bitartrate concentrations from the sim's OWN tartaric speciation (neutral_fraction/bisulfite_
+# fraction on the `tartaric` state slot, D-18) — the same machinery the pH solver runs. h = 1 at
+# (pH_ref, tartaric_ref) => byte-for-byte the D-123/D-124 anchor there. A LOWER-pH wine hydrolyses
+# FASTER (R&O's "pH matters more than total acidity"; the [H+] backbone dominates), and off the
+# reference the tartrate terms bite: near-null at typical red pH (~3.3-3.6) but +16%/+31%/+40% at pH
+# 3.8/4.1/4.3 — the high-pH-white correction D-124's pure-[H+] law under-predicted. WINE-ONLY (beer
+# has no pH system, D-18 => h == 1, the pH_ref rate). tartaric_ref-vs-0 tartrate: an UNDOSED wine
+# (tartaric = 0) is NOT byte-for-byte with D-124 — it runs ~0.9% faster than the tartrate-bearing
+# reference, the correct tartrate-dependence D-124 lacked (see r_h2t/r_ht/tartaric_ref below).
 # The released carbon (c(isoamyl_acetate) — the REAL molecule since D-96, not a stand-in) is
 # routed to ``isoamyl_alcohol`` (the alcohol product, its own D-99 pool — not the retired
 # ``fusels`` lump) + ``Byp`` (the acid product) — see the Process docstring for the 5:2 split,
@@ -56,9 +71,11 @@
 # speculative in FORM (Tier-3 frontier), so it floors its outputs at speculative regardless of input
 # tiers (parameter-tier propagation, D-1). E_a alone would justify PLAUSIBLE; k carries a
 # floor-graft (its D-123 single-pH pin is RETIRED at D-124 — pH is now explicit via
-# pH_ref_ester_hydrolysis, whose FORM is R&O-measured first-order [H+] catalysis but whose residual
-# tartrate-intercept error keeps the composite speculative). isoamyl_acetate_eq remains a genuine
-# author estimate (R&O measures no floor).
+# pH_ref_ester_hydrolysis, R&O-measured first-order [H+] catalysis). The tartrate refinement
+# (r_h2t_ester_hydrolysis / r_ht_ester_hydrolysis / tartaric_ref_ester_hydrolysis) is BUILT at D-125
+# from R&O Table VII, retiring D-124's high-pH-white under-prediction; kept speculative because R&O
+# themselves flag their matrix solve as "not exact" (the negative k_H2T; see r_h2t). isoamyl_acetate_eq
+# remains a genuine author estimate (R&O measures no floor).
 
 # -- FIRST-ORDER HYDROLYSIS RATE: esters -> alcohol + acid, toward equilibrium -----------
 k_ester_hydrolysis:
@@ -94,7 +111,56 @@ pH_ref_ester_hydrolysis:
   provenance:
     source: "Ramey & Ough 1980, J. Agric. Food Chem. 28(5):928-934, page 929: 'The pH was 3.36' (the Pinot noir, Oakville CA, whose k_obsd anchors k_ester_hydrolysis via Table IX). Readable as the open scanned PDF on the author's winery site (rameywine.com); the ACS copy is paywalled (D-123)."
     conditions: "the reference pH of the first-order [H+] scaling 10^(pH_ref - pH) that EsterHydrolysis applies; wine-only (beer has no pH system, D-18, so a beer state keeps the factor at 1.0 and hydrolyses at the pH_ref-anchored rate)."
-    notes: "ADDED AT D-124 (the pH-explicit hydrolysis build; the natural follow-on D-123 flagged). R&O measured, in MODEL SOLUTIONS where pH was the only variable, that isoamyl-acetate hydrolysis varies DIRECTLY with [H+] in a LINEAR (first-order) manner: Table V k_obsd at pH 2.95/3.58/4.10 = 129.2/32.60/14.10 e-9 /s, fit by Table VI's graphic second-order constant k_H+ = 1.111e-4 L/mol/s at r=0.999 (and Table VII's matrix k_H+ = 1.24e-4). R&O: 'pH is far more important in determining rates of ester hydrolysis than is total acidity', 'H+ ~100x more active than tartrate', and 'in both wines the acetate esters behaved as in model solutions'. So the FORM is first-order in [H+], anchored at the Pinot reference. (The earlier reading of a sub-first-order slope from the two WINES was CONFOUNDED - Pinot vs Chardonnay differ in matrix, not just pH; R&O also states ethanol 10-14% has no effect, ruling out an ethanol attenuation.) KNOWN LIMIT (the tartrate intercept, honest): R&O's [H+] plots do NOT pass through the origin - a pH-INVARIANT tartaric/bitartrate catalysis term (Table VII k_H2T/k_HT-, ~8% of the rate at pH 3.36 rising to ~30% by pH 4.1) that this pure-[H+] law wrongly scales with [H+]. Net error vs R&O's model-solution law: EXACT at 3.36, within ~+/-6% over pH 3.0-3.5 (most reds), ~-13% at 3.8, ~-27% at 4.1 (high-pH whites). Still a large gain over the pH-BLIND model (which applied the pH-3.36 rate to a ~16x [H+] range with 0% tracking). The full k_0' + k_H+[H+] + k_H2T[H2T] + k_HT-[HT-] law (Table VII constants + the tartrate speciation the sim already computes for pH) is the DEFERRED refinement - one mechanism per beat; this beat delivers the dominant [H+] term. Kept speculative for the aging axis's uniform floor (test_tier_floored_at_speculative); on its own 3.36 is a measured value."
+    notes: "ADDED AT D-124 (the pH-explicit hydrolysis build; the natural follow-on D-123 flagged). R&O measured, in MODEL SOLUTIONS where pH was the only variable, that isoamyl-acetate hydrolysis varies DIRECTLY with [H+] in a LINEAR (first-order) manner: Table V k_obsd at pH 2.95/3.58/4.10 = 129.2/32.60/14.10 e-9 /s, fit by Table VI's graphic second-order constant k_H+ = 1.111e-4 L/mol/s at r=0.999 (and Table VII's matrix k_H+ = 1.24e-4). R&O: 'pH is far more important in determining rates of ester hydrolysis than is total acidity', 'H+ ~100x more active than tartrate', and 'in both wines the acetate esters behaved as in model solutions'. So the FORM is first-order in [H+], anchored at the Pinot reference. (The earlier reading of a sub-first-order slope from the two WINES was CONFOUNDED - Pinot vs Chardonnay differ in matrix, not just pH; R&O also states ethanol 10-14% has no effect, ruling out an ethanol attenuation.) KNOWN LIMIT (the tartrate intercept, honest): R&O's [H+] plots do NOT pass through the origin - a pH-INVARIANT tartaric/bitartrate catalysis term (Table VII k_H2T/k_HT-, ~8% of the rate at pH 3.36 rising to ~30% by pH 4.1) that this pure-[H+] law wrongly scales with [H+]. Net error vs R&O's model-solution law: the pure-[H+] law under-predicts ~-16% at 3.8, ~-31% at 4.1 (high-pH whites). BUILT AT D-125: the full k_H+[H+] + k_H2T[H2T] + k_HT-[HT-] law (Table VII constants, divided through by k_H+ into the two ratios r_h2t/r_ht below, + the tartrate speciation the sim already computes for pH) retires that high-pH under-prediction. D-125 ALSO CORRECTED this note's magnitude: reading Table VII, the tartrate NET contribution at pH 3.36 is ~-1% (NOT the +8% D-124 estimated from a crude linear-intercept proxy) — the two tartrate terms nearly cancel at reds (see r_h2t) — so the pure-[H+] law was already essentially exact for typical reds, and the real correction is entirely at high-pH whites. Kept speculative for the aging axis's uniform floor (test_tier_floored_at_speculative); on its own 3.36 is a measured value."
+
+# -- TARTRATE CATALYSIS: the two non-[H+] catalytic species, as ratios to k_H+ (decision D-125) --
+# R&O's FULL solved rate law is k_obsd = k_H+[H+] + k_H2T[H2T] + k_HT-[HT-] (Table VII, their 3x3
+# matrix solve on Table V's three model-solution pH points; k_0/k_OH- explicitly dropped as
+# negligible in acid). Dividing through by k_H+ leaves the two DIMENSIONLESS ratios below — the only
+# identifiable new numbers, since k_H+ cancels in EsterHydrolysis's normalized factor h = N(pH,T)/
+# N(pH_ref,T_ref) (the D-97 discipline: store the identifiable quantity, not a degenerate constant).
+# [H2T]/[HT-] come from the sim's own tartaric speciation (neutral_fraction/bisulfite_fraction on the
+# `tartaric` state slot). PAYOFF: the tartrate terms are near-null at typical red pH (~-1% at 3.36 —
+# the two nearly cancel) but bitartrate (HT-) wins as pH rises off the reds, giving +16%/+31%/+40% at
+# pH 3.8/4.1/4.3 — the high-pH-white correction D-124's pure-[H+] law under-predicted.
+r_h2t_ester_hydrolysis:
+  value: -3.266e-3
+  unit: "dimensionless"   # k_H2T / k_H+ (both L mol^-1 s^-1, so the ratio is dimensionless)
+  tier: speculative
+  uncertainty: { low: -8.0e-3, high: 0.0, note: "NEGATIVE, and R&O say so is 'not likely' — a negative rate constant would mean undissociated tartaric acid INHIBITS hydrolysis. R&O read it as evidence 'the simplified catalytic model is not exact' (the 3x3 matrix absorbing model error into the low-pH-dominant H2T term). The PHYSICS: bitartrate (HT-) is the real catalyst (positive r_ht); the negative H2T term partially cancels it at reds (largest [H2T] at low pH) and fades toward whites, giving the ~-1% net at pH 3.36 and the clean +30% at pH 4.1. Banded to 0 at the high end (R&O's own doubt: the inhibition may be an artifact) and ~2.4x the point value at the low end (Table VII cross-ester k_H2T scatter -1.09e-7..-8.82e-7 => factor-of-several). Single-point matrix solve, no SD reported." }
+  provenance:
+    source: "Ramey & Ough 1980, J. Agric. Food Chem. 28(5):928-934, Table VII (isoamyl acetate row, matrix solution of second-order constants in model solutions, L mol^-1 s^-1): k_H+ = 1.24e-4, k_H2T = -4.05e-7, k_HT- = 1.78e-7. r_h2t = k_H2T/k_H+ = -4.05e-7/1.24e-4 = -3.266e-3. Open scanned PDF on the author's winery site (rameywine.com); the ACS copy is paywalled (D-123)."
+    conditions: "the H2T (undissociated tartaric acid) catalysis coefficient of isoamyl-acetate hydrolysis RELATIVE to the [H+] coefficient, applied to [H2T] in mol/L from the sim's tartaric speciation; wine-only (beer has no pH system, D-18)."
+    notes: "ADDED AT D-125 (the multi-species tartrate law D-124 flagged as its deferred refinement; the owner's call to build it). SHIPPED AS R&O'S EMPIRICAL VALUE, negative and all — reducing it to zero would be un-sourced tampering (the D-98 trap: invent a physically-nicer number no measurement supports). The negative sign is explained by the physics (above), not apologised for. R&O speciated with Usseglio-Tomasset 12%-ethanol dissociation constants; the sim speciates with its own aqueous pKa (3.04/4.37), a documented ~5% mismatch that the normalized ratio form washes out near the reference. The non-circular validation is the high-pH RATE RATIO, not absolute-k reproduction: measured k(4.10)/k(3.58) = 0.433, pure-[H+] predicts 0.302, this multi-species law gives ~0.41 — closing ~82% of the gap despite the pKa mismatch (test_high_ph_rate_ratio_matches_ramey_ough)."
+  # r_ht is the bitartrate (HT-) catalysis coefficient — POSITIVE, the real catalyst, dominant at
+  # high pH (its fraction peaks between the two tartaric pKas, ~3.7). The physics story pairs it with
+  # r_h2t above: the two terms are a difference of ~10x-larger opposing contributions at reds (=> the
+  # fragile ~-1% net there) and HT- wins cleanly at whites (=> the robust +30%).
+r_ht_ester_hydrolysis:
+  value: 1.436e-3
+  unit: "dimensionless"   # k_HT- / k_H+ (both L mol^-1 s^-1, so the ratio is dimensionless)
+  tier: speculative
+  uncertainty: { low: 0.7e-3, high: 3.5e-3, note: "POSITIVE (bitartrate is a genuine catalyst) and the term DRIVING the high-pH-white correction. Banded ~+/-2.4x about the point value (single matrix-solve point, no SD; Table VII cross-ester k_HT- scatter 1.67e-7..8.69e-7 supports a factor-of-several). The high end steepens the white correction; the low end softens it, but the SIGN and the qualitative +30%-at-pH-4.1 result hold across the band." }
+  provenance:
+    source: "Ramey & Ough 1980, J. Agric. Food Chem. 28(5):928-934, Table VII (isoamyl acetate row): k_HT- = 1.78e-7, k_H+ = 1.24e-4 L mol^-1 s^-1. r_ht = k_HT-/k_H+ = 1.78e-7/1.24e-4 = 1.436e-3. Same open scanned PDF as r_h2t / D-123."
+    conditions: "the HT- (bitartrate) catalysis coefficient of isoamyl-acetate hydrolysis RELATIVE to the [H+] coefficient, applied to [HT-] in mol/L from the sim's tartaric speciation; wine-only."
+    notes: "ADDED AT D-125. Bitartrate is the physically-real tartrate catalyst; its fraction peaks near pH 3.7 (between tartaric pKa 3.04 and 4.37), which is why the tartrate correction grows from ~null at red pH to +30-40% at white pH. See r_h2t for the full physics + validation story."
+
+# -- REFERENCE TARTRATE: the tartrate level the multi-species factor is normalized at (decision D-125) --
+# h = N(pH, tartaric_wine) / N(pH_ref, tartaric_ref). This is R&O's model-solution tartrate (the matrix
+# Table VII was solved in), and it is CLOSE to R&O's Pinot-noir wine TA (0.76 g/100mL as tartaric ~=
+# 0.05 M) that k_ester_hydrolysis anchors to — so the sub-1% "k is a wine anchor but tartaric_ref is a
+# model solution" inconsistency washes out. PINNED (a sourced reference definition, not an uncertain
+# quantity — the identifiable uncertainty lives in the two ratios; the D-124 pH_ref precedent).
+tartaric_ref_ester_hydrolysis:
+  value: 7.5
+  unit: "g/L"   # 0.75 g/100 mL tartaric = 7.5 g/L = ~0.05 mol/L (converted via M_TARTARIC in code)
+  tier: speculative
+  uncertainty: { low: 7.5, high: 7.5, note: "PINNED (zero-width => never sampled; the runtime pins high<=low to value). It is the fixed tartrate level of R&O's model solution (a sourced reference definition), at which h = 1 by construction => byte-for-byte the D-123/D-124 anchor. Sampling it would just reshuffle into the two ratios' normalization; the identifiable tartrate uncertainty lives entirely in r_h2t/r_ht." }
+  provenance:
+    source: "Ramey & Ough 1980, J. Agric. Food Chem. 28(5):928-934, Materials and Methods (page 929): model solutions were 'acidulated with tartaric acid to 0.75 g/100 mL' = 7.5 g/L. This is the matrix in which the Table VII second-order constants (r_h2t/r_ht) were solved, so it is the correct tartrate level to normalize the ratio factor at."
+    conditions: "the reference total tartaric acid (g/L) at which EsterHydrolysis's normalized multi-species factor h(pH, tartrate) equals 1 (paired with pH_ref = 3.36); wine-only."
+    notes: "ADDED AT D-125. A wine at pH_ref with tartaric != tartaric_ref is NO LONGER byte-for-byte with D-124: an UNDOSED wine (tartaric_gpl default 0) runs ~0.9% faster than this tartrate-bearing reference, which is the correct tartrate-dependence D-124 (pH-only) lacked — a small, honest supersession of D-124's 'byte-for-byte at pH 3.36 regardless of tartrate'. The beat is INERT (factor reduces to the pure-[H+] D-124 form to within that ~0.9%) unless the must doses tartaric_gpl."
 
 # -- EQUILIBRIUM FLOOR: the residuum the pool decays TOWARD, not to zero ------------------
 isoamyl_acetate_eq:

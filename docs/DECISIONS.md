@@ -12476,3 +12476,123 @@ clean; the aging.yaml validates through the `Parameter` schema; full suite green
   on a rate for *those* pools (ethyl acetate absent from R&O; ethyl hexanoate shows no appreciable
   wine change). **Makhotkina & Kilmartin 2012** (PMID 22868118) may carry the ethyl-ester rates —
   worth a fetch (the author-hosted / secondary-copy discipline that unblocked R&O).
+
+## D-125 — the FULL multi-species tartrate-catalysis law: ester hydrolysis now reads bitartrate, not just [H+] (D-124's deferred refinement, built — and its premise corrected)
+
+**D-124 shipped the dominant `[H+]` term and named "the full `k_H+[H+] + k_H2T[H2T] + k_HT-[HT-]`
+law (Table VII + the tartrate speciation the sim already computes)" as its deferred refinement,
+owner's call. The owner called it.** `EsterHydrolysis`'s acid-catalysis factor is now the *normalized
+multi-species* ratio
+`h(pH, [tartrate]) = N(pH, tartaric_wine) / N(pH_ref, tartaric_ref)` with
+`N = [H+] + r_h2t·[H2T] + r_ht·[HT-]` — Ramey & Ough 1980's full solved rate law (Table VII, their
+3×3 matrix on Table V's three model-solution pH points; `k_0`/`k_OH-` explicitly dropped as
+negligible in acid) divided through by `k_H+`, so only the two dimensionless ratios survive (the D-97
+identifiability discipline). `[H2T]`/`[HT-]` come from the sim's OWN tartaric speciation
+(`neutral_fraction` = H₂T share, `bisulfite_fraction` = HT⁻ share, on the `tartaric` state slot) —
+the same machinery the wine pH solver runs, so they never drift from the charge balance.
+
+### Reading Table VII INVERTED the premise the owner's pick rested on (the measurement, before the build)
+
+D-124's notes claimed the tartrate contribution was "~8% of the rate at pH 3.36, rising to ~30% by pH
+4.1." **The advisor's steer was: reading Table VII is orientation, not interpretation — go get the
+numbers first, they decide whether the beat is even worth building.** The scanned R&O PDF
+(rameywine.com, the D-123 retrieval path) gave Table VII's isoamyl-acetate row: `k_H+ = 1.24e-4`,
+**`k_H2T = -4.05e-7` (NEGATIVE)**, `k_HT- = +1.78e-7` L/mol/s. Computed with the sim's own tartaric
+pKa (3.04/4.37) at R&O's model-solution tartrate (0.05 M), the tartrate NET contribution is **~-1% at
+pH 3.36 (NOT +8%)** — the two terms nearly cancel at red pH — rising to **+16%/+31%/+40% at pH
+3.8/4.1/4.3**. So the correction the owner set out to make (D-124's "-13%/-27% under-prediction at pH
+3.8/4.1") is **real, but entirely a high-pH-WHITE effect**; at typical red pH the pure-`[H+]` law was
+already essentially exact, and the "8% at reds" was a crude linear-intercept proxy for
+speciation-driven curvature. **Surfaced this inversion to the owner as a build/redirect fork; owner
+confirmed "proceed — build it."**
+
+### The negative k_H2T is R&O's own suspect constant — shipped faithfully, explained not apologised for
+
+R&O flag their own `k_H2T < 0` as physically "not likely" (undissociated tartaric can't *inhibit*
+hydrolysis) — evidence "the simplified catalytic model is not exact" (their 3×3 fit absorbing model
+error into the low-pH-dominant H₂T term). The advisor's framing (adopted): read the two tartrate
+terms as one story — **bitartrate (HT⁻) is the real catalyst**, its fraction peaking between the
+tartaric pKas (~3.7), so `k_HT-[HT-]` grows as pH rises off the reds; the negative `k_H2T` partially
+cancels it at reds (where [H₂T] is largest) and fades toward whites. That single fact explains the
+whole shape: near-total cancellation at 3.36 (the fragile ~-1%, a difference of two ~10×-larger
+opposing terms) and clean HT⁻-driven +30% at whites. **Reducing `k_H2T` to a "physically nicer" zero
+would be the D-98 trap** (invent a number no measurement supports); it ships as R&O's empirical value
+with the physics recorded.
+
+### The ratio form — byte-for-byte, no double-count, only ratios identifiable
+
+`k_ester_hydrolysis` is **unchanged**. The factor normalizes at `(pH_ref = 3.36, tartaric_ref =
+7.5 g/L)` = R&O's model-solution tartrate (close to the Pinot-noir wine TA 0.76 g/100mL the `k` anchor
+came from, so the "`k` is a wine anchor but `tartaric_ref` is a model solution" inconsistency washes
+out at <1%), so `h = 1` there and the D-123/D-124 anchor is preserved byte-for-byte — no pulling the
+intercept out of `k`, no double-count (the anchor already bakes in the reference tartrate's
+catalysis). Dividing through by `k_H+` leaves only `r_h2t = k_H2T/k_H+ = -3.266e-3` and
+`r_ht = k_HT-/k_H+ = 1.436e-3` as the new sourced numbers; `k_H+` (R&O's model-solution constant,
+degenerate with the wine anchor) is never stored. `tartaric_ref` is **pinned** (a sourced reference
+definition, the D-124 `pH_ref` precedent).
+
+### The validation is the high-pH RATE RATIO, not absolute-k (non-circular despite the pKa mismatch)
+
+R&O speciated with Usseglio-Tomasset 12%-ethanol dissociation constants; the sim uses its own aqueous
+pKa — a real ~5% mismatch (my computed k reproduces Table V's points to ~2-6%). Absolute-`k`
+reproduction would be circular (Table VII was *solved* on those points). The clean check: **the
+model's `k(4.10)/k(3.58)` reproduces R&O's MEASURED ratio** — Table V gives 14.10/32.60 = **0.433**;
+the pure-`[H+]` law (D-124) predicts only 0.302; **the multi-species law gives 0.410**, closing ~82%
+of the high-pH gap *despite* the wrong pKa. That ratio is the deliverable test
+(`test_high_ph_rate_ratio_matches_ramey_ough`).
+
+### Honest limits (recorded, not hidden)
+
+1. **Byte-for-byte is superseded, not preserved.** It now holds at `(pH_ref AND tartaric_ref)`; an
+   **undosed** wine (`tartaric_gpl` default 0) runs **~0.9% faster** than the tartrate-bearing
+   reference — the tartrate-dependence D-124 (pH-only) structurally lacked, physically correct
+   (removing the net-slightly-inhibitory reference tartrate speeds it a hair). D-124's `_wine_at_ph`
+   test load was realigned from 4.0 g/L to `tartaric_ref` so the reference tests stay byte-for-byte;
+   a new `test_off_reference_tartrate_changes_the_rate` pins the divergence.
+2. The **beat is inert** (reduces to D-124's pure-`[H+]` form to within that ~0.9%) unless the must
+   doses `tartaric_gpl` — surfaced to the owner as material to prioritisation; owner proceeded.
+3. The pKa-model mismatch above (~5%, ratio-washed near the reference).
+
+### Two advisor passes (both recorded)
+
+Pass 1 (before the fetch): "reverse the order — read Table VII first; it tells you whether the beat is
+worth building; if illegible, blocked-on-sourcing, don't guess `k_H2T`/`k_HT-` (PD#2). The ratio form
+resolves the anchoring; only the ratios are identifiable." Pass 2 (after the fetch, reconciling the
+inverted magnitudes): "build it faithfully, all three constants including the negative `k_H2T`; the
+physics dissolves the negative-constant worry; the validation is the high-pH ratio, not absolute-`k`;
+don't test the fragile reds sign; surface the corrected premise to the owner." Both folded in; the
+owner confirmed the build after the corrected-premise FYI.
+
+### Tier
+
+All three params **speculative** (the aging axis's uniform floor,
+`test_tier_floored_at_speculative`) — and here it is an honest floor, not just a convention: R&O
+themselves call the matrix solve "not exact" (the negative `k_H2T`), and the sim/paper speciation
+mismatch is real. Output tier speculative regardless (D-1 + speculative FORM).
+
+### Receipts
+
+`aging.yaml` (3 new params `r_h2t_ester_hydrolysis`/`r_ht_ester_hydrolysis` [dimensionless Table VII
+ratios] + pinned `tartaric_ref_ester_hydrolysis` [7.5 g/L]; header rate equation → multi-species;
+`pH_ref` note's "deferred refinement" retired + the +8%→~1% magnitude corrected; tier-summary note),
+`aging.py` (`_tartrate_hydrolysis_backbone` + `_acid_catalysis_factor` module helpers reusing
+`ACID_STATE["tartaric"]`/`neutral_fraction`/`bisulfite_fraction`; `EsterHydrolysis.derivatives` calls
+the factor; class + reads docstrings; `reads` gains the 3 params), `test_aging.py` (`_wine_at_ph`
+tartrate default → `tartaric_ref`; the closed-form + reference-temp + byte-for-byte tests recompute
+the multi-species factor; `test_rate_is_first_order_in_hydrogen_ion` reframed to
+`test_without_tartrate_the_backbone_is_first_order_in_hydrogen_ion` [the law is deliberately NOT pure
+first-order with tartrate]; +`test_tartrate_law_params_in_reads`, +`test_high_ph_rate_ratio_matches_
+ramey_ough`, +`test_off_reference_tartrate_changes_the_rate`; `test_metadata` reads set). `ruff
+check`/`ruff format`/`mypy` clean; aging.yaml validates through the `Parameter` schema; full suite
+green.
+
+### Next
+
+- **The `[H2T]`/`[HT-]` law is the last tartrate-catalysis refinement** — the multi-species law is
+  complete. What remains open on the ester axis is unchanged from D-124: the **pH-explicit
+  equilibrium floor** (`isoamyl_acetate_eq` still an author estimate — R&O measures no floor, blocked
+  on a source), and **`ethyl_acetate` formation / `ethyl_hexanoate` hydrolysis** (both blocked on a
+  rate for those pools; **Makhotkina & Kilmartin 2012**, PMID 22868118, a candidate fetch).
+- **Per-ester tartrate ratios** — Table VII gives `k_H2T`/`k_HT-` for all six esters; only isoamyl
+  acetate is anchored here (the only pool `EsterHydrolysis` hydrolyses, D-96). Reopens if another
+  ester's hydrolysis is ever built.

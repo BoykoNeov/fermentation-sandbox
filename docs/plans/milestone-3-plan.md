@@ -928,3 +928,25 @@ uncertainty bands.
 > exact at 3.36 and within ~±6%/−13%/−27% at pH 3.5/3.8/4.1 — the full multi-species law (Table VII) is
 > DEFERRED. Ester-formation (`ethyl_acetate`) + `ethyl_hexanoate` hydrolysis stay blocked on their own
 > rates (Makhotkina & Kilmartin 2012 a candidate fetch). See D-123/D-124.]**
+>
+> **[D-125 — THE FULL MULTI-SPECIES TARTRATE-CATALYSIS LAW, BUILT (D-124's named deferred refinement;
+> 1198 tests, benchmarks 16/16). `EsterHydrolysis`'s acid factor is now the normalized ratio
+> `h = N(pH, tartaric_wine)/N(pH_ref, tartaric_ref)`, `N = [H+] + r_h2t·[H2T] + r_ht·[HT-]` — R&O 1980's
+> full Table VII rate law divided through by `k_H+` (only the two dimensionless ratios identifiable, the
+> D-97 discipline), speciating `[H2T]`/`[HT-]` from the sim's OWN tartaric slot (`neutral_fraction`/
+> `bisulfite_fraction`, the pH-solver machinery). READING TABLE VII INVERTED THE PREMISE the owner's pick
+> rested on: the tartrate net at pH 3.36 is ~−1% (NOT D-124's estimated +8% — a crude linear-intercept
+> proxy for speciation curvature), and the real correction is entirely a HIGH-pH-WHITE effect
+> (+16%/+31%/+40% at pH 3.8/4.1/4.3) — surfaced as a build/redirect fork, owner confirmed build. `k_H2T`
+> is NEGATIVE (R&O's own "not likely" — their matrix absorbing model error); shipped faithfully, explained
+> by the physics (bitartrate HT- is the real catalyst, peaking ~pH 3.7; the negative H2T term cancels it
+> at reds, fades toward whites) rather than tampered to zero (the D-98 trap). `k_ester_hydrolysis`
+> UNCHANGED; normalized at (pH_ref 3.36, tartaric_ref = R&O's 7.5 g/L model solution) ⇒ byte-for-byte
+> there. VALIDATION is the high-pH RATE RATIO, not absolute-k (circular): model `k(4.10)/k(3.58)` = 0.410
+> vs R&O measured 0.433 vs pure-[H+] 0.302 — closes ~82% of the gap despite the sim's aqueous-pKa vs R&O's
+> 12%-ethanol speciation (~5%, ratio-washed). HONEST supersession: an UNDOSED wine (tartaric_gpl 0) runs
+> ~0.9% faster than the tartrate-bearing reference (the dependence D-124 lacked), and the beat is inert
+> without dosed tartaric. Two advisor passes (read-Table-VII-first steer; build-faithfully reconcile after
+> the inversion). The tartrate-catalysis axis is now COMPLETE. Next unchanged: the equilibrium floor
+> (blocked, no source), ethyl_acetate formation / ethyl_hexanoate hydrolysis (blocked; Makhotkina 2012 a
+> candidate fetch). See D-125.]**

@@ -246,9 +246,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fermentation.core.acidbase import (
+    ACID_STATE,
     SO2_STATE_KEY,
+    bisulfite_fraction,
     bisulfite_so2_at_ph,
     free_acetaldehyde,
+    neutral_fraction,
     ph_of_state,
 )
 from fermentation.core.chemistry import (
@@ -475,6 +478,64 @@ _OAK_COMPOUND_CEILINGS: tuple[tuple[str, str], ...] = (
 _BRIDGE_ACETALDEHYDE_SPECIES = "acetaldehyde"
 _ETHYL_BRIDGE_SPECIES = "ethylidene"
 
+#: The ``tartaric`` acid spec (molar mass + diprotic pKa param names) reused by
+#: :class:`EsterHydrolysis`'s multi-species acid-catalysis factor (decision D-125). Speciating
+#: through the SAME :data:`~fermentation.core.acidbase.ACID_STATE` entry the wine pH solver uses
+#: keeps ``[H2T]``/``[HT-]`` from ever drifting away from the charge balance.
+_TARTARIC_SPEC = ACID_STATE["tartaric"]
+
+
+def _tartrate_hydrolysis_backbone(
+    ph: float,
+    tartaric_total_molar: float,
+    r_h2t: float,
+    r_ht: float,
+    pkas: tuple[float, ...],
+) -> float:
+    """R&O's multi-species hydrolysis backbone ``N(pH, T) = [H+] + r_h2t·[H2T] + r_ht·[HT-]``.
+
+    Ramey & Ough 1980's full Table VII rate law ``k_obsd = k_H+[H+] + k_H2T[H2T] + k_HT-[HT-]``
+    divided through by ``k_H+`` (decision D-125), so ``r_h2t``/``r_ht`` are the two dimensionless
+    Table VII ratios and the result is in mol/L (dimensionally like ``[H+]``). ``[H2T]``/``[HT-]``
+    are the undissociated-tartaric and bitartrate concentrations from the sim's own tartaric
+    speciation — :func:`~fermentation.core.acidbase.neutral_fraction` (the H₂T share) and
+    :func:`~fermentation.core.acidbase.bisulfite_fraction` (the HT⁻ share) on the diprotic tartaric
+    pKas — so they never diverge from the charge-balance pH.
+    """
+    h = float(10.0 ** (-ph))  # float() pins the type (float**float widens to Any)
+    h2t = neutral_fraction(h, pkas) * tartaric_total_molar
+    ht = bisulfite_fraction(h, pkas) * tartaric_total_molar
+    return h + r_h2t * h2t + r_ht * ht
+
+
+def _acid_catalysis_factor(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
+) -> float:
+    """The normalized multi-species acid-catalysis factor ``h(pH, [tartrate])`` (decision D-125).
+
+    ``h = max(0, N(pH, tartaric_wine)) / N(pH_ref, tartaric_ref)`` — R&O's Table VII backbone
+    (:func:`_tartrate_hydrolysis_backbone`) at the wine's solved pH and its own ``tartaric`` state
+    slot, over the same backbone at the reference ``(pH_ref, tartaric_ref)``. So ``h = 1`` at the
+    reference => byte-for-byte the D-123/D-124 anchor there, and off it the [H+] backbone dominates
+    while the tartrate terms add the high-pH-white correction. The wine's total tartaric is the
+    ``tartaric`` state slot (g/L => mol/L via the acid's molar mass); the reference is the sourced
+    ``tartaric_ref_ester_hydrolysis`` (R&O's 7.5 g/L model solution). The ``max(0, ...)`` guard
+    keeps
+    the factor non-negative even if a clamped-pH BDF Jacobian probe (D-46) drove the backbone
+    negative — it stays positive across pH [0, 14] in the realistic range (the [H+] term dominates
+    at low pH; the tartrate fractions vanish at high pH), so the guard is belt-and-suspenders.
+    """
+    r_h2t = params["r_h2t_ester_hydrolysis"]
+    r_ht = params["r_ht_ester_hydrolysis"]
+    pkas = tuple(params[name] for name in _TARTARIC_SPEC.pka_param_names)
+    tartaric_wine = float(y[schema.slice("tartaric")][0]) / _TARTARIC_SPEC.molar_mass
+    tartaric_ref = params["tartaric_ref_ester_hydrolysis"] / _TARTARIC_SPEC.molar_mass
+    numerator = _tartrate_hydrolysis_backbone(ph, tartaric_wine, r_h2t, r_ht, pkas)
+    denominator = _tartrate_hydrolysis_backbone(
+        params["pH_ref_ester_hydrolysis"], tartaric_ref, r_h2t, r_ht, pkas
+    )
+    return max(0.0, numerator) / denominator
+
 
 class EsterHydrolysis(Process):
     """Aging hydrolysis of the fruity banana ester toward equilibrium (decisions D-69/D-96).
@@ -512,27 +573,50 @@ class EsterHydrolysis(Process):
     a byproduct-free configuration, where the ester pools are identically zero and this Process
     is inert. Ethyl hexanoate hydrolysis is likewise deferred.
 
-    **Acetate fade tracks wine pH — first-order in [H+] (D-124).** Ramey & Ough's headline is
-    that ester hydrolysis is acid-catalysed: in model solutions where pH was the *only* variable,
-    isoamyl-acetate ``k_obsd`` rose linearly with ``[H+]`` (Table V/VI, r = 0.999), and they
-    conclude velocity "varies directly with [H+] in a linear manner" — "pH is far more important in
-    determining rates of ester hydrolysis than is total acidity." So the rate carries a first-order
-    ``h(pH) = [H+]/[H+]_ref = 10**(pH_ref_ester_hydrolysis - pH)`` factor: a lower-pH wine fades its
-    banana ester faster, exactly the pH-blind model could not express. ``h`` is **1.0 at the
-    reference pH 3.36** (R&O's Pinot noir, the wine ``k`` is anchored to), so a pH-3.36 wine is
+    **Acetate fade tracks wine pH — the multi-species acid-catalysis law (D-124 [H+] term,
+    D-125 tartrate terms).** Ramey & Ough's headline is that ester hydrolysis is acid-catalysed: in
+    model solutions where pH was the *only* variable, isoamyl-acetate ``k_obsd`` rose with ``[H+]``
+    (Table V/VI, r = 0.999), and they conclude velocity "varies directly with [H+] in a linear
+    manner" — "pH is far more important in determining rates of ester hydrolysis than is total
+    acidity." R&O's *full* solved rate law (Table VII, their 3×3 matrix on Table V's three pH
+    points,
+    ``k_0``/``k_OH-`` dropped as negligible in acid) is
+    ``k_obsd = k_H+[H+] + k_H2T[H2T] + k_HT-[HT-]``. So the rate carries the normalized factor
+    ``h(pH, [tartrate]) = N(pH, tartaric_wine) / N(pH_ref, tartaric_ref)`` with
+    ``N = [H+] + r_h2t·[H2T] + r_ht·[HT-]`` (that law divided through by ``k_H+``, so only the two
+    dimensionless Table VII ratios survive — the D-97 identifiability discipline);
+    ``[H2T]``/``[HT-]``
+    are the sim's own tartaric speciation (:func:`_acid_catalysis_factor`). ``h`` is **1.0 at the
+    reference (pH 3.36, tartaric_ref = R&O's 7.5 g/L model solution)**, so a wine there is
     byte-for-byte the pre-D-124 Process and the D-123 anchor is preserved; ``pH`` is the sim's own
-    charge-balance solution (:func:`ph_of_state`, D-18). **Wine-only**: beer's pH system is deferred
-    (D-18), so a beer state keeps ``h = 1.0`` (the ``cation_charge`` slot is the gate) and
-    hydrolyses at the pH_ref-anchored rate — byte-for-byte the pre-D-124 beer behaviour. *Known
-    limit* (honest, the tartrate intercept): R&O's ``[H+]`` plots do not pass through the origin — a
-    pH-invariant tartaric/bitartrate catalysis term (~8% of the rate at pH 3.36, ~30% by pH 4.1)
-    that this pure-``[H+]`` law wrongly scales with ``[H+]``, so the law is exact at 3.36, within
-    ~±6% over pH 3.0–3.5 (most reds), and under-predicts ~13%/27% at pH 3.8/4.1. The full
-    multi-species law
-    (Table VII ``k_H+``/``k_H2T``/``k_HT-`` + the sim's tartrate speciation) is the deferred
-    refinement — one mechanism per beat; this beat delivers the dominant ``[H+]`` term. (The earlier
-    reading of a *sub*-first-order slope was confounded — it came from Pinot vs Chardonnay, two
-    different *wines*, not R&O's single-variable pH series; R&O also reports ethanol 10–14% has no
+    charge-balance solution (:func:`ph_of_state`, D-18). A lower-pH wine still fades its banana
+    ester
+    faster (the ``[H+]`` term dominates), and off the reference the tartrate terms bite: near-null
+    at
+    typical red pH (~−1% at 3.36 — the negative ``k_H2T`` and positive ``k_HT-`` nearly cancel
+    there)
+    but **+16%/+31%/+40% at pH 3.8/4.1/4.3**, the high-pH-white correction D-124's pure-``[H+]`` law
+    under-predicted (bitartrate, the real catalyst, peaks between the tartaric pKas ~3.7).
+    **Wine-only**:
+    beer's pH system is deferred (D-18), so a beer state keeps ``h = 1.0`` (the ``cation_charge``
+    slot
+    is the gate) and hydrolyses at the pH_ref-anchored rate — byte-for-byte the pre-D-124 beer
+    behaviour. *Honest limits*: (1) an **undosed** wine (tartaric = 0) is NOT byte-for-byte with
+    D-124
+    — it runs ~0.9% faster than the tartrate-bearing reference, the tartrate-dependence D-124
+    lacked;
+    (2) ``k_H2T`` is **negative**, which R&O call physically "not likely" (their matrix absorbing
+    model
+    error) — it is shipped as their empirical value, not tampered to zero (see
+    ``r_h2t_ester_hydrolysis``);
+    (3) R&O speciated with 12%-ethanol constants, the sim with its own aqueous pKa, a ~5% mismatch
+    the
+    ratio form washes out near the reference. The validation is the high-pH rate RATIO, not
+    absolute-``k``: measured ``k(4.10)/k(3.58)`` = 0.433, pure-``[H+]`` gives 0.302, this law ~0.41.
+    (The earlier reading of a *sub*-first-order slope was confounded — it came from Pinot vs
+    Chardonnay,
+    two different *wines*, not R&O's single-variable pH series; R&O also reports ethanol 10–14% has
+    no
     effect, ruling out an ethanol attenuation.)
 
     Off during the ferment (no fermentative-flux gate; it is temperature- and pool-driven);
@@ -560,18 +644,23 @@ class EsterHydrolysis(Process):
     #: ``k_ester_hydrolysis``/``E_a_ester_hydrolysis``/``isoamyl_acetate_eq``/
     #: ``pH_ref_ester_hydrolysis`` are this Process's own (aging.yaml, D-69; ``k``/``E_a``
     #: re-anchored to Ramey & Ough 1980's real-wine measurement at D-123; ``pH_ref`` added at D-124
-    #: for the first-order [H+] factor; ``isoamyl_acetate_eq`` still author-estimate); ``T_ref`` is
-    #: shared
-    #: with every other Arrhenius rate. Their tiers cap the
-    #: ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output tiers via parameter-tier propagation
-    #: (D-1). The plausible pH-system params read *inside* :func:`ph_of_state` (``pKa_*``,
-    #: ``cation_charge``) are omitted — this Process is already speculative, so they cap nothing
-    #: (the :class:`SulfiteOxidation` / MalolacticConversion convention).
+    #: for the [H+] factor; ``isoamyl_acetate_eq`` still author-estimate); the three tartrate-law
+    # : params
+    # (``r_h2t_ester_hydrolysis``/``r_ht_ester_hydrolysis``/``tartaric_ref_ester_hydrolysis``)
+    #: were added at D-125 for the multi-species factor; ``T_ref`` is shared with every other
+    #: Arrhenius rate. Their tiers cap the ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output
+    #: tiers via parameter-tier propagation (D-1). The plausible pH-system params read *inside*
+    #: :func:`ph_of_state` AND the tartaric speciation (``pKa_tartaric_*``, ``cation_charge``) are
+    #: omitted — this Process is already speculative, so they cap nothing (the
+    #: :class:`SulfiteOxidation` / MalolacticConversion convention).
     reads: tuple[str, ...] = (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
         "isoamyl_acetate_eq",
         "pH_ref_ester_hydrolysis",
+        "r_h2t_ester_hydrolysis",
+        "r_ht_ester_hydrolysis",
+        "tartaric_ref_ester_hydrolysis",
         "T_ref",
     )
 
@@ -588,20 +677,27 @@ class EsterHydrolysis(Process):
             return d
         temp = float(y[schema.slice("T")][0])
         f_t = arrhenius_factor(temp, params["E_a_ester_hydrolysis"], params["T_ref"])
-        # First-order in [H+] (specific-acid catalysis, Ramey & Ough 1980, decision D-124):
-        # hydrolysis "varies directly with [H+] in a linear manner" (Table V/VI, r=0.999), so the
-        # rate scales by [H+]/[H+]_ref = 10^(pH_ref - pH) about the Pinot-noir reference pH k is
-        # anchored at (D-123). A lower-pH wine fades its banana ester FASTER ("pH is far more
-        # important than total acidity"). WINE-ONLY: beer's pH system is deferred (D-18) — a beer
+        # Multi-species acid catalysis (Ramey & Ough 1980 Table VII, decisions D-124/D-125): the
+        # normalized factor h(pH, [tartrate]) = N(pH, tartaric_wine)/N(pH_ref, tartaric_ref), where
+        # N = [H+] + r_h2t*[H2T] + r_ht*[HT-] is R&O's full solved rate law divided through by k_H+.
+        # D-124 shipped the dominant [H+] backbone; D-125 added the two tartrate terms (bitartrate
+        # is
+        # the real catalyst, so a HIGH-pH white — where [HT-] peaks — hydrolyses faster than the
+        # pure-[H+] law predicted). h = 1 at (pH_ref, tartaric_ref) => byte-for-byte the D-123
+        # anchor.
+        # A lower-pH wine still fades its banana ester FASTER ("pH is far more important than total
+        # acidity"; the [H+] term dominates). WINE-ONLY: beer's pH system is deferred (D-18) — a
+        # beer
         # state carries no acid/cation slots and ph_of_state would return ~7, so the factor is held
-        # at 1.0 there and the rate is the pH_ref-anchored value, byte-for-byte the pre-D-124 beer
-        # behaviour. Bounded (D-46): ph_of_state clamps pH to [0, 14], so h_factor is finite
-        # (~2e-11 .. ~2.3e3) even under a BDF Jacobian probe that pushes cation_charge out of its
-        # physical range — the derivative stays a total, bounded function of state.
+        # at
+        # 1.0 there and the rate is the pH_ref-anchored value, byte-for-byte the pre-D-124 beer
+        # behaviour. Bounded (D-46): ph_of_state clamps pH to [0, 14] and _acid_catalysis_factor
+        # guards N >= 0, so h_factor stays finite even under a BDF Jacobian probe that pushes
+        # cation_charge out of range — the derivative stays a total, bounded function of state.
         h_factor = 1.0
         if "cation_charge" in schema:  # the wine pH-system marker (absent from the beer schema)
             ph = ph_of_state(y, schema, params)
-            h_factor = 10.0 ** (params["pH_ref_ester_hydrolysis"] - ph)
+            h_factor = _acid_catalysis_factor(y, schema, params, ph)
         rate = params["k_ester_hydrolysis"] * f_t * h_factor * excess  # g isoamyl acetate/L/h
 
         # The released carbon is now the REAL molecule's (isoamyl acetate, C7) — D-96 retired

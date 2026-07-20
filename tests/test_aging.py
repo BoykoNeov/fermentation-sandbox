@@ -23,9 +23,12 @@ import pytest
 
 from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
 from fermentation.core.acidbase import (
+    ACID_STATE,
+    bisulfite_fraction,
     bisulfite_so2_at_ph,
     build_pka_map,
     free_acetaldehyde,
+    neutral_fraction,
     ph_of_state,
     solve_cation_charge,
 )
@@ -77,6 +80,7 @@ from fermentation.core.kinetics.aging import (
     _ISOAMYL_ALCOHOL_CARBONS,
     _MAILLARD_PRODUCTS,
     _SO2_PER_O2,
+    _tartrate_hydrolysis_backbone,
 )
 from fermentation.core.kinetics.amino_acid_pools import (
     AMINO_ACID_SPECS,
@@ -189,11 +193,17 @@ def _wine_at_ph(
     *,
     ester: float = 0.1,
     t: float = 293.15,
+    tartaric: float | None = None,
 ) -> FloatArray:
     """An aged wine whose acid load + back-solved ``cation_charge`` reproduce ``target_ph`` exactly
     (the ``solve_cation_charge`` inverse-anchoring idiom, D-18) — for pinning the pH-dependent
-    hydrolysis rate at a known pH (D-124)."""
-    tartaric = 4.0
+    hydrolysis rate at a known pH (D-124/D-125).
+
+    ``tartaric`` defaults to the sourced reference ``tartaric_ref_ester_hydrolysis`` (R&O's 7.5 g/L
+    model solution) so that at ``target_ph = pH_ref`` the D-125 multi-species factor is exactly 1.0
+    and the anchor is byte-for-byte. A test probing tartrate-dependence overrides it (D-125)."""
+    if tartaric is None:
+        tartaric = params["tartaric_ref_ester_hydrolysis"]
     totals = {"tartaric": tartaric / M_TARTARIC}
     cation = solve_cation_charge(totals, 0.0, build_pka_map(params), target_ph)
     return _aged_wine(schema, ester=ester, t=t, tartaric=tartaric, cation_charge=cation)
@@ -225,7 +235,10 @@ def test_metadata():
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
         "isoamyl_acetate_eq",
-        "pH_ref_ester_hydrolysis",  # the first-order [H+] factor's reference pH (D-124)
+        "pH_ref_ester_hydrolysis",  # the multi-species factor's reference pH (D-124)
+        "r_h2t_ester_hydrolysis",  # k_H2T/k_H+, the undissociated-tartaric ratio (D-125)
+        "r_ht_ester_hydrolysis",  # k_HT-/k_H+, the bitartrate ratio (D-125)
+        "tartaric_ref_ester_hydrolysis",  # the reference tartrate the factor normalizes at (D-125)
         "T_ref",
     }
 
@@ -240,9 +253,26 @@ def test_derivative_matches_closed_form(params):
     d = EsterHydrolysis().derivatives(0.0, y, schema, params)
 
     f_t = arrhenius_factor(t, params["E_a_ester_hydrolysis"], params["T_ref"])
-    # D-124: the rate is now first-order in [H+] too — recompute the pH factor the way the Process
-    # does (the SulfiteOxidation-test idiom of recomputing the driver from the solved pH).
-    h_factor = 10.0 ** (params["pH_ref_ester_hydrolysis"] - ph_of_state(y, schema, params))
+    # D-124/D-125: the rate carries the multi-species acid-catalysis factor. Recompute it INLINE
+    # from R&O's backbone (the SulfiteOxidation-test idiom of rebuilding the driver from the solved
+    # pH + the state) rather than calling the Process helper, so this is an independent check:
+    # N(pH, T) = [H+] + r_h2t*[H2T] + r_ht*[HT-], normalized at (pH_ref, tartaric_ref).
+    pkas = tuple(params[n] for n in ACID_STATE["tartaric"].pka_param_names)
+    m_tart = ACID_STATE["tartaric"].molar_mass
+
+    def _backbone(ph: float, tart_gpl: float) -> float:
+        h = float(10.0**-ph)
+        t_mol = tart_gpl / m_tart
+        return float(
+            h
+            + params["r_h2t_ester_hydrolysis"] * neutral_fraction(h, pkas) * t_mol
+            + params["r_ht_ester_hydrolysis"] * bisulfite_fraction(h, pkas) * t_mol
+        )
+
+    tart_wine = float(schema.get(y, "tartaric"))
+    h_factor = _backbone(ph_of_state(y, schema, params), tart_wine) / _backbone(
+        params["pH_ref_ester_hydrolysis"], params["tartaric_ref_ester_hydrolysis"]
+    )
     rate = params["k_ester_hydrolysis"] * f_t * h_factor * (ester - params["isoamyl_acetate_eq"])
     carbon_released = rate * _ESTER_C
 
@@ -364,8 +394,9 @@ def test_rises_with_temperature(params):
 
 def test_factor_is_one_at_reference_temperature(params):
     # At T_ref the Arrhenius factor is exactly 1, so the rate is the first-order term times only
-    # the pH factor (D-124). Build the wine at the REFERENCE pH so h(pH) is also exactly 1 and the
-    # rate is the bare k*(ester - eq) — the byte-for-byte anchor at (T_ref, pH_ref).
+    # the acid-catalysis factor (D-124/D-125). Build the wine at the REFERENCE pH AND reference
+    # tartrate (the _wine_at_ph default) so h(pH, tartrate) is also exactly 1 and the rate is the
+    # bare k*(ester - eq) — the byte-for-byte anchor at (T_ref, pH_ref, tartaric_ref).
     schema = wine_schema()
     ester = 0.1
     y = _wine_at_ph(
@@ -414,59 +445,101 @@ def test_reanchored_rate_reproduces_ramey_ough_young_wine_fade(params):
     assert sim_fade == pytest.approx(ramey_ough_fade, rel=0.05)
 
 
-# -- pH dependence: first-order in [H+], acetate fade tracks wine pH (decision D-124) ----------
-# R&O 1980's headline: ester hydrolysis is acid-catalysed and varies DIRECTLY with [H+] in a linear
-# manner (model-solution Table V/VI, r=0.999). EsterHydrolysis scales its rate by [H+]/[H+]_ref =
-# 10^(pH_ref - pH), so a lower-pH wine fades its banana ester faster. h == 1 at the reference pH
-# (byte-for-byte the D-123 anchor) and in beer (no pH system, D-18).
+# -- pH dependence: the multi-species acid-catalysis law, acetate fade tracks wine pH ---------
+# (decisions D-124 [H+] backbone, D-125 tartrate terms). R&O 1980's full solved law is k_obsd =
+# k_H+[H+] + k_H2T[H2T] + k_HT-[HT-] (Table VII). EsterHydrolysis scales its rate by the normalized
+# factor h = N(pH, tartaric_wine)/N(pH_ref, tartaric_ref), N = [H+] + r_h2t[H2T] + r_ht[HT-]. A
+# lower-pH wine fades its banana ester faster (the [H+] backbone dominates); h == 1 at the reference
+# (pH_ref AND tartaric_ref, byte-for-byte the D-123 anchor) and in beer (no pH system, D-18).
 
 
 def test_ph_ref_is_in_reads(params):
-    # The pH factor reads pH_ref_ester_hydrolysis, so it is declared (tier propagation, D-1). The
-    # plausible pH-system params (pKa_*, cation_charge) read inside ph_of_state are NOT declared —
-    # the Process is already speculative (the SulfiteOxidation convention).
+    # The factor reads pH_ref_ester_hydrolysis, so it is declared (tier propagation, D-1). The
+    # plausible pH-system params (pKa_*, cation_charge) read inside ph_of_state / the tartaric
+    # speciation are NOT declared — the Process is already speculative (the SulfiteOxidation
+    # convention).
     assert "pH_ref_ester_hydrolysis" in EsterHydrolysis().reads
     assert "pH_ref_ester_hydrolysis" in params  # and it is actually loaded (aging.yaml)
 
 
-def test_reference_ph_gives_unit_factor_byte_for_byte(params):
-    # At pH_ref the [H+] factor is exactly 1.0, so the rate is the pre-D-124 k*f_t*excess — the
-    # D-123 anchor and every pH-3.36 trajectory are preserved byte-for-byte (prime directive #3).
+def test_tartrate_law_params_in_reads(params):
+    # D-125's three tartrate-law params are declared (so their speculative tiers propagate to the
+    # output pools, D-1) and actually loaded (aging.yaml).
+    for name in (
+        "r_h2t_ester_hydrolysis",
+        "r_ht_ester_hydrolysis",
+        "tartaric_ref_ester_hydrolysis",
+    ):
+        assert name in EsterHydrolysis().reads
+        assert name in params
+
+
+def test_reference_gives_unit_factor_byte_for_byte(params):
+    # At the reference (pH_ref AND tartaric_ref) the acid-catalysis factor is exactly 1.0, so the
+    # rate is the pre-D-124 k*f_t*excess — the D-123 anchor and every reference trajectory are
+    # preserved byte-for-byte (prime directive #3). _wine_at_ph defaults tartaric to tartaric_ref.
     schema = wine_schema()
     ester, t = 0.1, 298.15  # off T_ref so f_t bites and the check is non-vacuous
     y = _wine_at_ph(schema, params, params["pH_ref_ester_hydrolysis"], ester=ester, t=t)
     assert ph_of_state(y, schema, params) == pytest.approx(params["pH_ref_ester_hydrolysis"])
+    assert float(schema.get(y, "tartaric")) == pytest.approx(
+        params["tartaric_ref_ester_hydrolysis"]
+    )
     d = EsterHydrolysis().derivatives(0.0, y, schema, params)
     f_t = arrhenius_factor(t, params["E_a_ester_hydrolysis"], params["T_ref"])
     expected = params["k_ester_hydrolysis"] * f_t * (ester - params["isoamyl_acetate_eq"])
     assert schema.get(d, "isoamyl_acetate") == pytest.approx(-expected)
 
 
-def test_rate_is_first_order_in_hydrogen_ion(params):
-    # R&O's law: velocity varies DIRECTLY with [H+] in a LINEAR manner. Dropping pH by log10(2)
-    # doubles [H+], so the disappearance rate exactly doubles — the first-order pin.
-    schema = wine_schema()
-    ester, t = 0.1, 293.15
+def test_without_tartrate_the_backbone_is_first_order_in_hydrogen_ion(params):
+    # D-125's [H+] BACKBONE: with no tartrate the law reduces to R&O's pure first-order form (the
+    # D-124 behaviour). N(pH, 0) = [H+], so dropping pH by log10(2) doubles [H+] and doubles the
+    # backbone exactly. (With tartrate present the law is DELIBERATELY not pure first-order — the
+    # speciation adds curvature; that is what the high-pH ratio test below measures.) Tested at the
+    # backbone helper because an acid-free wine cannot be brought to an acidic pH
+    # (solve_cation_charge
+    # rejects the negative strong-cation charge it would need).
+    pkas = tuple(params[n] for n in ACID_STATE["tartaric"].pka_param_names)
+    r_h2t, r_ht = params["r_h2t_ester_hydrolysis"], params["r_ht_ester_hydrolysis"]
     hi_ph = 3.6
     lo_ph = hi_ph - float(np.log10(2.0))  # [H+] doubled
-    rate_hi = -schema.get(
-        EsterHydrolysis().derivatives(
-            0.0, _wine_at_ph(schema, params, hi_ph, ester=ester, t=t), schema, params
-        ),
-        "isoamyl_acetate",
-    )
-    rate_lo = -schema.get(
-        EsterHydrolysis().derivatives(
-            0.0, _wine_at_ph(schema, params, lo_ph, ester=ester, t=t), schema, params
-        ),
-        "isoamyl_acetate",
-    )
-    assert rate_lo == pytest.approx(2.0 * rate_hi)
+    n_hi = _tartrate_hydrolysis_backbone(hi_ph, 0.0, r_h2t, r_ht, pkas)
+    n_lo = _tartrate_hydrolysis_backbone(lo_ph, 0.0, r_h2t, r_ht, pkas)
+    assert n_hi == pytest.approx(10.0**-hi_ph)  # no tartrate ⇒ backbone is [H+] alone
+    assert n_lo == pytest.approx(2.0 * n_hi)  # first-order in [H+]
+
+
+def test_high_ph_rate_ratio_matches_ramey_ough(params):
+    # THE D-125 deliverable + its NON-CIRCULAR validation (not absolute-k, which would need R&O's
+    # own
+    # 12%-ethanol speciation): the model's k(pH 4.10)/k(pH 3.58) reproduces R&O's MEASURED ratio,
+    # which the pure-[H+] law (D-124) could not. R&O Table V (isoamyl acetate, model solution):
+    # k_obsd(4.10)/k_obsd(3.58) = 14.10/32.60 = 0.433. Pure-[H+] predicts [H+](4.10)/[H+](3.58) =
+    # 10^(3.58-4.10) = 0.302. The multi-species law closes most of that gap (bitartrate catalysis at
+    # high pH). Evaluated at R&O's model-solution tartrate (the default), the apples-to-apples
+    # matrix.
+    schema = wine_schema()
+    ester, t = 0.1, 293.15
+
+    def rate(ph: float) -> float:
+        d = EsterHydrolysis().derivatives(
+            0.0, _wine_at_ph(schema, params, ph, ester=ester, t=t), schema, params
+        )
+        return -float(schema.get(d, "isoamyl_acetate"))
+
+    model_ratio = rate(4.10) / rate(3.58)
+    ramey_ough_ratio = 14.10 / 32.60  # Table V measured k_obsd, isoamyl acetate
+    pure_h_ratio = 10.0 ** (3.58 - 4.10)  # what D-124's [H+]-only law would give
+    # Much closer to R&O than pure-[H+], and within ~5% of the measured ratio (the residual is the
+    # sim's aqueous pKa vs R&O's 12%-ethanol speciation — the documented, ratio-washed mismatch).
+    assert model_ratio == pytest.approx(ramey_ough_ratio, rel=0.06)
+    assert abs(model_ratio - ramey_ough_ratio) < abs(pure_h_ratio - ramey_ough_ratio)
 
 
 def test_lower_ph_hydrolyses_faster(params):
-    # THE new observable (the pH-blind model could not express it): a lower-pH wine fades its banana
-    # ester faster (R&O: "pH is far more important than total acidity"). Spans the wine range.
+    # THE headline observable (the pH-blind model could not express it): a lower-pH wine fades its
+    # banana ester faster (R&O: "pH is far more important than total acidity"; the [H+] backbone
+    # dominates over the wine range). Spans the wine range at the reference tartrate.
     schema = wine_schema()
     low = EsterHydrolysis().derivatives(
         0.0, _wine_at_ph(schema, params, 3.0, ester=0.1), schema, params
@@ -477,6 +550,27 @@ def test_lower_ph_hydrolyses_faster(params):
     assert -schema.get(low, "isoamyl_acetate") > -schema.get(high, "isoamyl_acetate") > 0.0
     # The fusel/Byp products rise correspondingly more in the faster (lower-pH) wine.
     assert schema.get(low, "isoamyl_alcohol") > schema.get(high, "isoamyl_alcohol") > 0.0
+
+
+def test_off_reference_tartrate_changes_the_rate(params):
+    # D-125's NEW state-dependence (D-124 was pH-only, tartrate-blind): at a FIXED high pH — where
+    # bitartrate (HT-) is the dominant tartrate species — MORE tartaric acid hydrolyses FASTER.
+    # This pins that the factor reads the `tartaric` state slot, and it is the honest supersession
+    # of
+    # D-124's "byte-for-byte at pH 3.36 regardless of tartrate": off the reference tartrate the rate
+    # diverges. (At LOW pH the negative k_H2T flips this; tested here at pH 3.8 where the sign is
+    # clean.)
+    schema = wine_schema()
+    ph = 3.8
+
+    def rate(tart: float) -> float:
+        d = EsterHydrolysis().derivatives(
+            0.0, _wine_at_ph(schema, params, ph, ester=0.1, tartaric=tart), schema, params
+        )
+        return -float(schema.get(d, "isoamyl_acetate"))
+
+    # Ascending tartrate ⇒ ascending rate at high pH (bitartrate catalysis grows with [tartrate]).
+    assert 0.0 < rate(2.0) < rate(params["tartaric_ref_ester_hydrolysis"]) < rate(10.0)
 
 
 def test_beer_ester_hydrolysis_is_ph_blind_byte_for_byte(params):
