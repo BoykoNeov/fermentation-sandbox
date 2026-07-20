@@ -11412,9 +11412,11 @@ the measurement. Measured on the sink's own probe must, sweeping `f_phe`:
 | **0.975 (sourced)** | **1.549x** | **1.125x** | **creates sugar** |
 
 At the sourced lump the joint (D-32 swap + D-104 sink) carbon refund **exceeds growth's own draw** —
-the model hands back more carbon than growth was ever charged. That is **gluconeogenesis**, which
-fermenting yeast do not do, and it trips `test_the_joint_carbon_refund_never_creates_sugar`, the hard
+the model hands back more carbon than growth was ever charged. The refund is a **sparing credit**
+whose ceiling *is* growth's draw, so past 1.0 it stops crediting sugar and **creates extracellular
+sugar in `S`**, and it trips `test_the_joint_carbon_refund_never_creates_sugar`, the hard
 `< 1.0` guard D-104 installed for exactly this. **Prime directive 1 breach; the value cannot ship.**
+**This is a mass-balance violation, not a forbidden pathway — see Finding 7.**
 
 **Nitrogen and carbon are not symmetric here, and that asymmetry is the whole argument.** The joint N
 refund also leaves its band (1.095 → 1.549x), but excess *nitrogen* has a physical home — deamination
@@ -11482,7 +11484,7 @@ out[name] = float(rng.triangular(lo, val, hi))
 ```
 
 With `triangular(0.53, 0.531, 0.975)` roughly **1 draw in 900 lands above the ~0.96 breach point** — so
-a 1000-member ensemble on a dosed scenario would reliably produce a gluconeogenesis member. **A value
+a 1000-member ensemble on a dosed scenario would reliably produce a sugar-creating member. **A value
 proven to break a conservation law was sitting in a machine-readable field, protected only by a comment
 in a sibling field.** The suite could not catch it because every test exercises the *default* value; the
 band's edges are exercised by nothing but the sampler.
@@ -11508,6 +11510,52 @@ the suite**, which is the point: a green suite is evidence about the default, an
 the thing the default never visits.
 
 
+### Finding 7 — the guard was described with the wrong word, and the owner caught it (post-hoc correction)
+
+Everything above originally called the `worst_c ≥ 1.0` overrun **"gluconeogenesis, which fermenting
+yeast do not do."** The owner challenged exactly that: *gluconeogenesis is real, and the model should
+not run from reality.* **They are right, and the wording was wrong.** Wine yeast do run gluconeogenic
+and glyoxylate flux — Minebois's own group studies it in stationary phase — so writing "we do not
+permit it" stated a false position on the biology and made a bookkeeping guard look like a modelling
+prejudice.
+
+**What the guard actually forbids.** The sink refunds to `S`, the **extracellular** sugar pool — what
+Brix and SG measure. Real gluconeogenesis produces **intracellular** glucose-6-phosphate destined for
+trehalose, glycogen and cell-wall glucan; it is glucose-repressed throughout an active ferment
+(FBP1/PCK1), and **yeast do not excrete glucose**. So the pathway could never deposit a gram in `S`,
+and `worst_c < 1.0` does not forbid it. What the guard forbids is sugar appearing in the must from
+nowhere — a mass-balance violation no organism performs.
+
+**And the refund was never gluconeogenesis in the first place.** It is a **sparing credit**:
+amino-acid carbon substitutes for sugar that growth's stoichiometry already charged, so that sugar is
+handed back. The credit has a hard ceiling — you cannot spare more than growth drew — and that
+ceiling *is* `worst_c = 1.0`. **The guard is the validity boundary of the proxy, not a magic
+threshold.** Below it the reading is sound; above it the same line stops crediting and starts
+inventing. So at 0.975 the model is not doing suppressed biochemistry; it is refunding 1.125× a debt
+that was only ever 1.0. **Arithmetic, not physiology** — which is also why building a gluconeogenesis
+Process would not rescue the value.
+
+**Was a gluconeogenesis Process worth building anyway?** Assessed and declined, on four grounds:
+(1) `grep` finds **no glycogen, trehalose, storage-carbon, lag or viability state anywhere in
+`src/`** — the flux's only real destinations do not exist, leaving `S` as its sole legal target,
+i.e. the wrong one; (2) glucose repression keeps it near zero across the entire span where the model
+has sugar, kinetics and benchmarks; (3) it touches **no observable this project produces** — not
+Brix/SG, ethanol, the five higher alcohols, esters, or the aging layer; (4) where it is genuinely
+active (post-sugar-exhaustion stationary phase) the M3 aging layer has no live yeast metabolism at
+all — autolysis dominates. The honest steelman is **beer repitching**, where glycogen at cropping
+drives next-generation lag and viability — but that glycogen is built from residual maltose directly
+via G6P → UDP-glucose, so the build is a **storage-carbon pool**, not gluconeogenesis. Recorded here
+under that name; **deliberately not added to the open-candidates list** — the owner scoped this beat
+to the wording correction only.
+
+**Scope of the correction.** Reworded in `precursor_fates.py`, `tests/test_precursor_fates.py`, this
+entry, and the parameter's YAML note. **The D-32-era occurrences (this file's earlier entries,
+`chemistry.py`, `amino_acids.py`, `milestone-2-tasks.md`) are deliberately left alone** — DECISIONS is
+an append-only archive and rewriting past entries to match present understanding destroys the record.
+Note that D-32 phrased it *more* carefully than D-117 did — "gluconeogenesis **to sugar**, which
+fermenting yeast do not do" — and D-117 dropped the qualifier that was carrying the argument.
+
+
 ### Lessons
 
 (i) **A wrong number wearing a derivation hides better than a bare guess.** `speculative` invites
@@ -11521,8 +11569,9 @@ sourceable, correct, and *rejected by a conservation law* the model enforces. **
 about the world and still be un-shippable against a model that lacks the structure it presumes.** That
 is a finding about the model, not a defect in the source — and it names its own unlock.
 (iii) **When a guard trips, check whether the quantity it guards has a physical home before deciding
-it is too strict.** Excess N refund does (deamination); excess C refund does not (gluconeogenesis).
-That asymmetry, not the size of the violation, is what made one a soft band and the other a law.
+it is too strict.** Excess N refund does (deamination to ammonium); excess C refund does not — no
+yeast process puts free sugar back into the must. That asymmetry, not the size of the violation, is
+what made one a soft band and the other a law.
 (iv) **A system-level invariant holding does not absolve a Process-level breach it is masking.**
 `dS/dt ≤ 0` survived at 0.975 only because fermentation out-consumes the fictitious refund.
 (v) **A coincidence between a guess and a real measurement diagnoses the error rather than excusing
@@ -11542,6 +11591,14 @@ rejection is not complete until it is unreachable, and prose in an adjacent fiel
 landed *after* a full green suite — one after a masked exit code (`cmd | tail && ...` returns `tail`'s
 status, which is always 0), one after a genuine 1184-pass run and a push. **Both were found by reading
 code, not by running it.**
+(x) **Name a guard for what it forbids, not for the nearest-sounding pathway.** Finding 7: calling the
+`worst_c ≥ 1.0` overrun "gluconeogenesis" asserted a false position on real yeast biology and
+disguised a mass-balance boundary as a modelling prejudice — it invited the entirely fair objection
+*"that happens, why are we suppressing it?"*, which cost a round-trip to answer. The correct name was
+sitting in the code the whole time: the refund is a **sparing credit**, and `1.0` is where the credit
+runs out. **A guard whose stated reason is wrong will eventually be argued away on the strength of
+that wrong reason** — and here the person arguing would have been right about the biology and wrong
+about the code, which is the worst shape a review can take.
 
 ### Next
 

@@ -67,7 +67,8 @@ _PHE_PROTEIN_SHARE_BOUND = 0.531
 
 #: The measured non-Ehrlich LUMP, 1 − 0.025 (Minebois 2025: 2.5% of consumed phenylalanine reaches
 #: 2-phenylethanol). **This is the true value and the model cannot carry it** — at 0.975 the D-104
-#: sink's joint carbon refund exceeds growth's own draw, which is gluconeogenesis. It is a CONSTANT
+#: sink's joint carbon refund exceeds growth's own draw — past the sparing credit's ceiling, so the
+#: refund stops crediting sugar and starts inventing it in ``S``. It is a CONSTANT
 #: HERE rather than the YAML band's upper end precisely so the ensemble sampler cannot reach it;
 #: see :func:`test_the_sourced_lump_breaks_the_carbon_refund_guard`.
 _PHE_MEASURED_LUMP = 0.975
@@ -250,8 +251,10 @@ def test_the_joint_carbon_refund_never_creates_sugar(full_params):
     # now refund biomass carbon — the D-32 swap (on {arginine, generic}) and this sink (on the
     # C-RICH precursors: leucine C:N 5.5, phenylalanine 7.7, both ABOVE biomass's 4.3). Their
     # joint guarantee is NOT structural the way D-32's was for the swap alone: nothing bounds
-    # f/(1-f) against growth's draw. Refunding more carbon than growth drew would CREATE SUGAR —
-    # gluconeogenesis, which fermenting yeast do not do. This is the unphysical failure; pin it.
+    # f/(1-f) against growth's draw. The refund is a SPARING CREDIT and you cannot spare more sugar
+    # than growth was charged: past 1.0 it CREATES extracellular sugar in `S`. That is a
+    # mass-balance violation, not a metabolic pathway (D-117) — nothing puts glucose back into the
+    # must, and gluconeogenesis would not either (intracellular G6P, never secreted). Pin it.
     traj, compiled = _run(amino_acids_gpl=1.0)
     _, worst_c = _worst_joint_refund(traj, compiled)
     assert worst_c < 1.0, f"joint C refund reached {worst_c:.2f}x growth's draw — creates sugar"
@@ -321,8 +324,12 @@ def test_the_sourced_lump_breaks_the_carbon_refund_guard(full_params):
     precursor's carbon to sugar; its draw scales ``f/(1−f)``, which goes **1.13 → 39** between the
     bound and the measurement. Measured here: the joint (swap + sink) carbon refund reaches
     **1.125× growth's own draw**, i.e. it hands back more carbon than growth was ever charged.
-    That is **gluconeogenesis**, which fermenting yeast do not do — prime directive 1, and the
-    hard `< 1.0` guard two tests up. (The joint N refund also goes 1.095 → **1.549×**, far past the
+    The refund is a *sparing credit* and its ceiling is exactly growth's draw, so past 1.0 it
+    **creates extracellular sugar in `S`** — prime directive 1, and the hard `< 1.0` guard two
+    tests up. **This is a mass-balance violation, not a suppressed pathway** (D-117): real
+    gluconeogenesis makes intracellular G6P for trehalose/glycogen, is glucose-repressed during
+    fermentation, and is never secreted — modelling it would not license this overrun.
+    (The joint N refund also goes 1.095 → **1.549×**, far past the
     documented "slight deamination" band; but nitrogen has a physical home for the excess —
     deamination to ammonium — and **carbon has none**. That asymmetry is why the N band is soft and
     documented while the C guard is hard.)

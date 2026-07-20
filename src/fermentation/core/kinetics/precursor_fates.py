@@ -29,6 +29,18 @@ to sugar** and **its nitrogen to ammonium** — the D-32 swap shape, one molecul
 physical reading is that a precursor spent on biomass *spares* the sugar and ammonium growth's
 stoichiometry already charged.
 
+**The refund is a SPARING CREDIT, and the credit has a ceiling — this is what the hard ``< 1.0``
+guard is.** You cannot spare more sugar than growth was ever charged. Below that ceiling the proxy
+is sound; at and above it the identical line of code stops *crediting* sugar and starts *inventing*
+it, and the refund lands in ``S`` — the **extracellular** pool, the one Brix and SG measure. So the
+guard is a mass-balance boundary, the validity limit of the sparing reading, **not a claim that a
+metabolic pathway is forbidden.** Naming that overrun "gluconeogenesis" (as this docstring did until
+D-117, and as the D-32 entries still loosely do) is wrong and worth not repeating: real
+gluconeogenesis yields **intracellular** glucose-6-phosphate bound for trehalose, glycogen and
+cell-wall glucan, it is glucose-repressed throughout an active ferment, and **yeast do not excrete
+glucose** — so it could never put a gram into ``S``. Building a gluconeogenesis Process would
+therefore not license the overrun; the overrun is arithmetic, not physiology.
+
 **Why it rides the re-route's draw rather than growth.** Anchoring to growth (``w_i·dX/dt`` at
 biomass composition) is the obvious form and it is **measurably wrong**: it makes each precursor's
 split fall out of *demand*, and the model's Ehrlich demand pulls the **amino acid**, so the
@@ -117,7 +129,7 @@ stated derivation does not reproduce it is a defect even while it is only "specu
 **AND THE MEASURED LUMP CANNOT BE SHIPPED — this Process is why.** The draw scales ``f/(1−f)``,
 which goes **1.13 → 39** between 0.53 and 0.975. At 0.975 the joint (D-32 swap + this sink) carbon
 refund reaches **1.125× growth's own draw**: it refunds more carbon than growth was ever charged,
-which is gluconeogenesis, and it trips the hard ``< 1.0`` guard in
+and it trips the hard ``< 1.0`` guard in
 ``test_the_joint_carbon_refund_never_creates_sugar``. The cause is **the missing de-novo route, not
 the parameter**: this model charges *all* of its ``k``-calibrated 2-phenylethanol to consumed
 phenylalanine, while reality builds ~97% of 2-PE from **de-novo phenylpyruvate**. So the sink must
