@@ -30,7 +30,11 @@ The shared variables (decisions D-B / D-4):
     ethyl_acetate    ethyl acetate    g/L (solventy/nail-polish acetate ester — D-96)
     isoamyl_acetate  isoamyl acetate  g/L (banana acetate ester — D-96)
     ethyl_hexanoate  ethyl hexanoate  g/L (apple/pineapple fatty-acid ethyl ester — D-96)
-    fusels fusel/higher alcohols g/L (Ehrlich pathway; lumped produced-only pool)
+    isoamyl_alcohol / active_amyl_alcohol / isobutanol / propanol / 2_phenylethanol
+                                 g/L (the five Ehrlich higher alcohols, produced-only; each its
+                                 own molecule since D-99 — the split of the former lumped
+                                 ``fusels`` pool, which weighted and perceived all five as
+                                 isoamyl alcohol)
     acetolactate α-acetolactate  g/L (vicinal-diketone precursor reservoir — decision D-26)
     diacetyl diacetyl (VDK)      g/L (buttery off-note; produced then reabsorbed — D-26)
     butanediol 2,3-butanediol    g/L (flavour-inactive diacetyl-reduction product — D-26)
@@ -46,17 +50,18 @@ The shared variables (decisions D-B / D-4):
 
 Sugar is always a vector so beer's sequential glucose → maltose → maltotriose
 uptake needs no structural change to also support wine's single lumped sugar.
-``X_dead``, ``Gly``, ``Byp``, the three ester pools, ``fusels`` and the VDK pools
-(``acetolactate``/``diacetyl``/``butanediol``) start at zero at pitch and are only
-accumulated by the kinetics, so they declare a default initial of 0
+``X_dead``, ``Gly``, ``Byp``, the three ester pools, the five higher-alcohol pools and
+the VDK pools (``acetolactate``/``diacetyl``/``butanediol``) start at zero at pitch and
+are only accumulated by the kinetics, so they declare a default initial of 0
 (`VarSpec.default`) and need not be named at every initial-condition call site. The
-ester/``fusels`` pools are filled by the Tier-2 byproduct Processes wired below;
+ester and higher-alcohol pools are filled by the Tier-2 byproduct Processes wired below;
 the three VDK pools by the diacetyl-pathway Processes (decision D-26).
 Under **decision D-19 (option a1)** those Processes route the aroma carbon *out of
-``S``* and ``total_carbon`` weights the pools (each ester as ITSELF since D-96, fusels as
-isoamyl alcohol), so they are real carbon-accounted state alongside ``Gly``/``Byp`` — not
-diagnostic re-expressions. The former ``Byp`` double-count (it once lumped higher
-alcohols) is resolved by carving them out of ``Y_byproduct_sugar``; the draw touches
+``S``* and ``total_carbon`` weights the pools (each ester as ITSELF since D-96, each higher
+alcohol as ITSELF since D-99), so they are real carbon-accounted state alongside
+``Gly``/``Byp`` — not diagnostic re-expressions. The former ``Byp`` double-count (it once
+lumped higher alcohols) is resolved by carving them out of ``Y_byproduct_sugar``; the draw
+touches
 only ``S`` (never ``E``/``CO2``), so turning the byproducts on perturbs the core only
 by the trace sugar they consume. See ``docs/plans/milestone-2-tasks.md`` and the
 ``kinetics.byproducts`` module docstring.

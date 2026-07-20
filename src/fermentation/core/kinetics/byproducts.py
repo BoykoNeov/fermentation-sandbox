@@ -1,8 +1,8 @@
 """Temperature-/metabolism-driven aroma byproducts — esters and fusel alcohols.
 
 The first Milestone-2 (Tier-2) beat (decision D-18 build order). Two *additive*
-Processes that fill the produced-only ester and ``fusels`` pools the schema gained in the
-byproducts beat. Since **decision D-96** "the ester pool" is three single-molecule pools —
+Processes that fill the produced-only ester and higher-alcohol pools the schema gained in
+the byproducts beat. Since **decision D-96** "the ester pool" is three single-molecule pools —
 ``ethyl_acetate`` / ``isoamyl_acetate`` / ``ethyl_hexanoate``, registered in
 :data:`~fermentation.core.kinetics.carbon_routing.ESTER_SPECS` — not one lump; see that
 registry for why the lump could not survive contact with its own OAV readout. Both are
@@ -49,8 +49,9 @@ brake, and the stripping dynamics all perturb the clean cancellation.
 **Carbon accounting — option (a)/a1 (decision D-19): carbon routed from sugar.**
 Each Process draws its species' carbon *out of ``S``* and the pools are weighted in
 ``total_carbon`` (each ester by its OWN molecule's carbon fraction since D-96 — C4/C7/C8 —
-and fusels by isoamyl alcohol's), so esters and fusels are **real carbon-accounted state**
-under one consistent rule with ``Gly`` and ``Byp`` (D-16) — not diagnostic re-expressions.
+and each higher alcohol by its OWN molecule's since D-99), so esters and fusels are **real
+carbon-accounted state** under one consistent rule with ``Gly`` and ``Byp`` (D-16) — not
+diagnostic re-expressions.
 This is the user's call (2026-06-29),
 chosen over the interim option (b) (pools outside ``total_carbon``) and the
 closure-neutral a2 variant (transfer from ``E``/``Byp`` without a sugar draw).
@@ -68,10 +69,10 @@ wine's one slot and beer's three.
 
 **The ``Byp`` double-count, resolved.** ``Byp`` formerly lumped "organic acids +
 higher alcohols" (booked as succinic acid). Fusels *are* higher alcohols, so weighting
-a separate ``fusels`` pool on top would book that carbon twice. Under D-19 ``Byp`` is
+separate higher-alcohol pools on top would book that carbon twice. Under D-19 ``Byp`` is
 re-anchored to **organic acids / polyols only** (``Y_byproduct_sugar`` reduced to drop
-the higher-alcohol share); the higher alcohols now live solely in the carbon-routed
-``fusels`` pool. No overlap remains.
+the higher-alcohol share); the higher alcohols now live solely in the five carbon-routed
+``FUSEL_SPECS`` pools (D-99). No overlap remains.
 
 **Both carbon sources are bookkeeping stand-ins, not metabolic claims (D-19).**
 (i) The Ehrlich pathway builds fusels from *amino-acid* skeletons, but ``N`` (YAN)
@@ -96,7 +97,7 @@ the CO2 appears exactly where a mechanism is asserted, and stays absent where on
 fraction of the fusel carbon off the sugar stand-in and onto that amino-acid pool — the
 *physically-faithful* Ehrlich source — and **deaminates**, releasing the consumed amino
 acids' nitrogen to the ammonium ``N`` pool. It is a separate wine-only *swap* Process (it
-never touches ``fusels``; production stays here), sharing the one
+never touches the five higher-alcohol pools; production stays here), sharing the one
 :func:`fusel_production_rate` so its sugar refund matches this producer's draw exactly. That
 deamination branch is the prerequisite the re-route was long deferred on (D-19/D-32); see
 :class:`FuselAminoAcidReroute` for the closure algebra and the arginine N-over-release caveat.
@@ -524,9 +525,10 @@ class EsterSynthesis(Process):
     term.** ATF1 acetylates an *alcohol*, and Fujii 1998 (Appl. Environ. Microbiol.
     64:4076-4078) measures its ``Km`` for isoamyl alcohol at ~29.8 mM while stating outright
     that *"a major rate-limiting factor for isoamyl acetate production is the amount of isoamyl
-    alcohol"*. The ``fusels`` pool runs ~0.5-1 mM — **~30-60x below that Km** — so the enzyme
-    sits far down its linear stretch and the rate is **first-order in the pool**:
-    ``d(isoamyl_acetate)/dt = k · fusels · X · S/(K_su+S) · f(T)``. Ethyl acetate gets no such
+    alcohol"*. The ``isoamyl_alcohol`` pool runs ~0.5-1 mM — **~30-60x below that Km** — so the
+    enzyme sits far down its linear stretch and the rate is **first-order in the pool**:
+    ``d(isoamyl_acetate)/dt = k · isoamyl_alcohol · X · S/(K_su+S) · f(T)``. Ethyl acetate gets
+    no such
     term because *its* precursor is ethanol (~2 M, orders of magnitude above any mM-scale Km)
     ⇒ ATF1 is saturated in it ⇒ zeroth-order. Same enzyme, same rate law, opposite limits: the
     asymmetry is **derived from the two precursors' concentrations**, not an exemption.
@@ -540,12 +542,13 @@ class EsterSynthesis(Process):
     the ``Km`` lives where it does its real work: in the parameter's provenance, as the sourced
     justification for this rate law's *form*.
 
-    **What this buys — the banana note becomes YAN-responsive.** Reading the ``fusels`` pool
-    makes isoamyl acetate inherit the nitrogen dependence of the Ehrlich pathway that builds its
-    precursor: a low-YAN ferment makes less isoamyl alcohol, hence less banana. Before D-97 the
-    ester was **YAN-blind** (flat ~0.758 mg/L across YAN 40-250 mg/L, where ``fusels`` swung
-    2.9x) because every ester shared one plain flux shape. Note this couples to the *pool*, not
-    to the fusel *production rate*: the alcohol **persists** after nitrogen is exhausted (in a
+    **What this buys — the banana note becomes YAN-responsive.** Reading the ``isoamyl_alcohol``
+    pool makes isoamyl acetate inherit the nitrogen dependence of the Ehrlich pathway that builds
+    its precursor: a low-YAN ferment makes less isoamyl alcohol, hence less banana. Before D-97
+    the ester was **YAN-blind** (flat ~0.758 mg/L across YAN 40-250 mg/L, where the isoamyl
+    alcohol pool swung 2.9x) because every ester shared one plain flux shape. Note this couples
+    to the *pool*, not the fusel *production rate*: the alcohol **persists** after nitrogen is
+    exhausted (in a
     wine run ``N`` empties around day 2 with ~75 % of the sugar still unfermented), and ATF1 goes
     on acetylating it for as long as the flux supplies acetyl-CoA. Coupling to the rate would
     have stopped the banana dead at day 2 with 51 mg/L of its substrate sitting in the vessel.
@@ -588,22 +591,25 @@ class EsterSynthesis(Process):
     parameters and ``touches``, not through state dependencies — a pre-existing property of the
     tier system, not something this coupling introduces.)
 
-    **Ensemble consequence (D-97).** Because the rate multiplies ``[fusels]``,
-    ``isoamyl_acetate`` now **inherits the fusel pool's variance** (via ``k_fusel`` / ``K_n`` /
-    ``E_a_fusels``) under a D-24 ensemble sweep. That is *more* correct — the precursor's
-    uncertainty genuinely is the ester's — but it means the band widens beyond what
+    **Ensemble consequence (D-97).** Because the rate multiplies ``[isoamyl_alcohol]``,
+    ``isoamyl_acetate`` now **inherits that alcohol pool's variance** (via ``k_isoamyl_alcohol`` /
+    ``K_n`` / ``E_a_fusels``) under a D-24 ensemble sweep. That is *more* correct — the
+    precursor's uncertainty genuinely is the ester's — but it means the band widens beyond what
     ``k_isoamyl_acetate``'s own uncertainty implies. The parameter's "pins the same
-    concentration span" note is a statement about the **point estimate** holding ``fusels``
-    fixed; it is not a claim about the ensemble band.
+    concentration span" note is a statement about the **point estimate** holding
+    ``isoamyl_alcohol`` fixed; it is not a claim about the ensemble band.
 
-    **Two inherited caveats, named not buried (D-97).** (i) ``fusels`` is a **lumped** pool
-    (isoamyl alcohol representative, but really all the higher alcohols), so reading it whole as
-    the ATF1 substrate over-states the true isoamyl-alcohol supply. The over-statement is
-    absorbed into the re-anchored ``k``; what it costs is that the *YAN-response* assumes the
-    lump's composition is fixed — the D-66 caveat, honest here because ``fusels`` is genuinely
-    flagged lumped. (ii) Isoamyl acetate now inherits :class:`FuselAlcoholsEhrlich`'s
-    **speculative monotone-in-N** shape, including its admitted omission of the low-YAN
-    biosynthetic rise. Both sit inside this Process's existing plausible/speculative framing.
+    **Two caveats, named not buried.** (i) **[RETIRED at D-99/D-115.]** D-97 warned that
+    ``fusels`` was a **lumped** pool, so reading it whole as the ATF1 substrate over-stated the
+    true isoamyl-alcohol supply and made the YAN-response assume a fixed lump composition. D-99
+    speciated that lump into five single-molecule pools and D-115 pointed this coupling at
+    ``isoamyl_alcohol`` specifically (see ``touches``), so the substrate now **is** the alcohol
+    the enzyme sees — no over-statement, and no fixed-lump-composition assumption. The honest
+    residue is only that all five higher alcohols still share one N-gate and one ``E_a_fusels``
+    (the "fixed spectrum" limit, D-99), but the isoamyl supply this reads is its own pool.
+    (ii) Isoamyl acetate now inherits :class:`FuselAlcoholsEhrlich`'s **speculative
+    monotone-in-N** shape, including its admitted omission of the low-YAN biosynthetic rise. It
+    sits inside this Process's existing plausible/speculative framing.
     """
 
     name = "ester_synthesis"
@@ -686,17 +692,19 @@ class EsterSynthesis(Process):
 class FuselAlcoholsEhrlich(Process):
     """Fusel (higher) alcohols via the Ehrlich pathway — amino-acid-derived, warm.
 
-    ``d(fusels)/dt = k_fusel · X · S_total/(K_sugar_uptake + S_total) ·
-    N/(K_n + N) · f(T)`` with ``f(T) = arrhenius_factor(T, E_a_fusels, T_ref)``. The
+    ``d(<alcohol_i>)/dt = k_<alcohol_i> · X · S_total/(K_sugar_uptake + S_total) ·
+    N/(K_n + N) · f(T)`` for each of the five higher alcohols in ``FUSEL_SPECS`` (D-99), with
+    ``f(T) = arrhenius_factor(T, E_a_fusels, T_ref)``. The
     Ehrlich pathway makes higher alcohols by transamination/decarboxylation of
     amino acids, so production is gated on yeast-assimilable nitrogen availability
     (``N/(K_n + N)``, sharing the growth nitrogen half-saturation ``K_n``) on top of
     the fermentative flux — front-loading fusels into the nitrogen-replete early
     ferment, as observed. Steeper-than-uptake ``E_a_fusels`` gives the
-    warmer-is-more direction. The fusel carbon (booked as isoamyl alcohol) is routed
-    *out of ``S``* via :func:`_draw_carbon_from_sugar` (option a1, D-19), so it
-    touches ``fusels`` and ``S`` — never ``E``/``CO2`` — and ``total_carbon`` (which
-    now weights ``fusels``) closes exactly. The sugar source is a bookkeeping
+    warmer-is-more direction. Each alcohol's carbon (weighted by its **own** molecule since
+    D-99, no longer all as isoamyl alcohol) is routed *out of ``S``* via
+    :func:`_draw_carbon_from_sugar` (option a1, D-19), so this touches the five ``FUSEL_SPECS``
+    pools and ``S`` — never ``E``/``CO2`` — and ``total_carbon`` (which weights each pool by
+    itself) closes exactly. The sugar source is a bookkeeping
     stand-in for the amino-acid skeleton (``N`` carries no carbon); see the module
     docstring.
 
@@ -758,7 +766,7 @@ class FuselAminoAcidReroute(Process):
     exactly the prerequisite the fusel re-route was deferred on (D-19/D-32); it also demonstrates
     the aa→N release path a later MLF-with-growth model needs.
 
-    **A swap, not a producer — it never touches ``fusels``.** Like the D-32
+    **A swap, not a producer — it never touches any higher-alcohol pool.** Like the D-32
     :class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation` swap, this leaves the
     *production* entirely to :class:`FuselAlcoholsEhrlich` (both call the one
     :func:`fusel_production_rate`); it only moves the carbon *source*. **Per alcohol** ``i``
@@ -850,7 +858,7 @@ class FuselAminoAcidReroute(Process):
     tier = Tier.SPECULATIVE
     #: Refunds carbon to ``S``, debits **each alcohol's own precursor**, releases nitrogen to
     #: ``N``, and emits the decarboxylation ``CO2`` (D-106 — the term whose absence made the draw
-    #: ``(n-1)/n``). Never touches ``fusels`` — production stays entirely in
+    #: ``(n-1)/n``). Never touches any higher-alcohol pool — production stays entirely in
     #: :class:`FuselAlcoholsEhrlich`
     #: — and, since D-100, **never touches ``amino_acids``/``amino_acids_generic``**: arginine does
     #: not make higher alcohols, so the re-route can no longer starve the consumers that live on

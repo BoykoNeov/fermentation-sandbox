@@ -265,8 +265,8 @@ def draw_precursor_carbon(
     * ``test_every_true_strecker_route_draws_1_to_1_when_the_process_is_actually_driven`` pins the
       **code**, by driving each Process and reading the debit off ``dy/dt``;
     * ``test_the_ehrlich_reroute_charges_one_co2_per_precursor_mole_when_driven`` does the same for
-      the re-route (D-106), which needs its own test because it never touches ``fusels`` — its CO₂
-      is the only product rate on its ``dy/dt`` to divide by.
+      the re-route (D-106), which needs its own test because it never touches any higher-alcohol
+      pool — its CO₂ is the only product rate on its ``dy/dt`` to divide by.
 
     **Only the second catches implementation drift, and conservation catches neither** — measured at
     D-105: deleting the CO₂ term from :class:`~fermentation.core.kinetics.aging.StreckerDegradation`

@@ -901,3 +901,15 @@ uncertainty bands.
 > sourcing, NOT refused** (contrast D-120, where direction was the kill) — it reopens the moment a rate
 > constant lands. `ethyl_acetate` is the better first build when one does: high-confidence rise, bulk pool,
 > but it needs a *formation* term `EsterHydrolysis` cannot provide. See D-121.]**
+
+> **[D-122 — "speciate the fusels lump" was ALREADY DONE (D-99); the residue was DOC-ROT, now swept.**
+> The `fusels` lump split into five single-molecule pools at D-99 and D-110 records "no pool is lumped
+> any more" — so the standing "speciate fusels" breadcrumb in this plan (and in D-98's "Next:") named
+> already-built work. What remained was stale prose that still called `fusels` a single lumped pool:
+> the worst was `EsterSynthesis`'s caveat (i) claiming reading `fusels` "over-states the true
+> isoamyl-alcohol supply" — BACKWARDS since D-115 reads the `isoamyl_alcohol` pool directly. Fixed
+> across `byproducts.py` / `carbon_routing.py` (its `precursor_pool="fusels"` comment contradicted its
+> own `="isoamyl_alcohol"` registry) / `media.py` / `chemistry.py` / `wine_generic.yaml`. Docs-only, no
+> behaviour change, ruff clean, YAMLs parse. Correct historical ("until D-99") + category shorthand
+> LEFT intact. The one substantive OPEN fusel item — a **dynamic spectrum** (per-species `E_a` + gates
+> to break D-99's fixed-spectrum limit) — stays **blocked on sourcing**. See D-122.]**

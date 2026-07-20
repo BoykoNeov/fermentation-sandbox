@@ -126,11 +126,11 @@ Y_byproduct_sugar:
   value: 0.012
   unit: "g/g"   # g minor byproducts (succinic-equivalent) / g sugar consumed
   tier: speculative
-  uncertainty: { low: 0.007, high: 0.018, note: "organic acids + polyols only (succinic + acetic + 2,3-butanediol), ~1.7-4.5 g/L; higher alcohols now in the fusels pool" }
+  uncertainty: { low: 0.007, high: 0.018, note: "organic acids + polyols only (succinic + acetic + 2,3-butanediol), ~1.7-4.5 g/L; higher alcohols now in their own five pools (D-99)" }
   provenance:
     source: "author estimate lumping measured wine organic acids/polyols (succinic 0.5-1.5, acetic 0.3-0.6, 2,3-butanediol 0.5-1.5 g/L); per-g yields e.g. succinic ~0.005, acetic ~0.002 g/g"
     conditions: "S. cerevisiae dry wine; minor non-glycerol byproducts EXCLUDING higher alcohols, carbon-accounted as succinic acid (C4H6O4)"
-    notes: "Glycerol is the dominant byproduct; this lump captures the rest of the ORGANIC ACIDS / POLYOLS (succinic, acetic, 2,3-butanediol), ~1.7-4.5 g/L -> Y ~ 0.007-0.018 g/g; we take 0.012 (-> ~2.9 g/L). DECISION D-19 RE-ANCHOR: was 0.014 and lumped higher alcohols too, but higher alcohols (~0.15-0.5 g/L, ~0.0017 g/g) now have their own carbon-routed `fusels` pool (booked as isoamyl alcohol), so they are carved OUT of Byp here to avoid double-counting that carbon in total_carbon - the reduction is exactly that higher-alcohol share. SPECULATIVE: still a lump of several species with a single representative carbon fraction (succinic acid), not a measured single quantity. Booked into the Byp pool. Together with Y_glycerol_sugar this gives an emergent realised Y_E ~ 0.486, consistent with the literature 0.46-0.48 (the carve-out plus the trace fusel/ester sugar draw nearly cancel, so ABV is essentially unchanged)."
+    notes: "Glycerol is the dominant byproduct; this lump captures the rest of the ORGANIC ACIDS / POLYOLS (succinic, acetic, 2,3-butanediol), ~1.7-4.5 g/L -> Y ~ 0.007-0.018 g/g; we take 0.012 (-> ~2.9 g/L). DECISION D-19 RE-ANCHOR: was 0.014 and lumped higher alcohols too, but higher alcohols (~0.15-0.5 g/L, ~0.0017 g/g) now have their own five carbon-routed higher-alcohol pools (D-99, each booked as its own molecule), so they are carved OUT of Byp here to avoid double-counting that carbon in total_carbon - the reduction is exactly that higher-alcohol share. SPECULATIVE: still a lump of several species with a single representative carbon fraction (succinic acid), not a measured single quantity. Booked into the Byp pool. Together with Y_glycerol_sugar this gives an emergent realised Y_E ~ 0.486, consistent with the literature 0.46-0.48 (the carve-out plus the trace fusel/ester sugar draw nearly cancel, so ABV is essentially unchanged)."
 
 must_fermentable_fraction:
   value: 0.93

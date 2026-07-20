@@ -107,8 +107,9 @@ M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O
 #: byproduct pool. It carries the carbon of the ``Byp`` state variable so that
 #: pool's carbon is accounted from a real formula rather than an ad-hoc fraction
 #: (decision D-16). Under D-19 ``Byp`` is *organic acids / polyols only*: the higher
-#: alcohols it formerly lumped now have their own carbon-routed ``fusels`` pool, so
-#: there is no double-count between ``Byp`` (succinic) and ``fusels`` (isoamyl).
+#: alcohols it formerly lumped now have their own carbon-routed pools (the five
+#: ``FUSEL_SPECS``, D-99), so there is no double-count between ``Byp`` (succinic) and those
+#: higher-alcohol pools.
 M_SUCCINIC = 4 * _M_C + 6 * _M_H + 4 * _M_O
 #: Ethyl acetate, C4H8O2 — the ``ethyl_acetate`` pool's own species (decision D-96: the
 #: pool *is* this molecule; before D-96 it stood in for a lumped ``esters`` pool whose OAV

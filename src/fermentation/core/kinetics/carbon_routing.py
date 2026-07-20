@@ -92,9 +92,10 @@ class EsterSpec:
 #: concentration to ATF1's measured ``Km`` for it (~29.8 mM for isoamyl alcohol; Fujii 1998,
 #: Appl. Environ. Microbiol. 64:4076-4078, citing Yoshioka & Hashimoto 1981):
 #:
-#: * ``isoamyl_acetate`` — its precursor is *isoamyl alcohol*, the ``fusels`` pool, which runs
-#:   ~0.5-1 mM: **~30-60x BELOW Km** ⇒ the enzyme sits far down its linear stretch ⇒ the rate
-#:   is **first-order in the pool** (``precursor_pool="fusels"``). Fujii states the conclusion
+#: * ``isoamyl_acetate`` — its precursor is *isoamyl alcohol*, the ``isoamyl_alcohol`` pool,
+#:   which runs ~0.5-1 mM: **~30-60x BELOW Km** ⇒ the enzyme sits far down its linear stretch ⇒
+#:   the rate is **first-order in the pool** (``precursor_pool="isoamyl_alcohol"``). Fujii states
+#:   the conclusion
 #:   outright: *"a major rate-limiting factor for isoamyl acetate production is the amount of
 #:   isoamyl alcohol in the sake mash"*. This is what makes the banana note **YAN-responsive**
 #:   — it inherits the nitrogen dependence of the Ehrlich pathway that builds its precursor.

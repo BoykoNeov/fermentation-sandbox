@@ -236,7 +236,7 @@ class PrecursorNonEhrlichFates(Process):
     name = "precursor_non_ehrlich_fates"
     tier = Tier.SPECULATIVE
     #: Debits **each alcohol's own precursor**, refunds carbon to ``S`` and nitrogen to ``N``.
-    #: Never touches ``fusels`` (production stays in the producer) and never touches
+    #: Never touches any higher-alcohol pool (production stays in the producer) and never touches
     #: ``amino_acids``/``amino_acids_generic`` — the D-100 decoupling: arginine does not make
     #: higher alcohols, so this sink cannot starve the yeast swap / MLF / Brett / Maillard
     #: consumers that live on those pools. Same ``touches`` set as the re-route it scales.

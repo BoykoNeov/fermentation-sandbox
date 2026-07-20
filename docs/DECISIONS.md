@@ -12187,3 +12187,65 @@ No test is added — there is no new behaviour to pin, and pinning the *current*
 - Unchanged from D-120: the class question stays closed; `f_non_ehrlich_leucine` / D-103 remains the
   live isoamyl lever and the owner's call; the Querol ask; the single-host obligation; the deferred
   tail.
+
+## D-122 — the `fusels`-is-lumped doc-rot, swept: D-99/D-115 speciated the pool but left stale prose that still called it a lump (docs-only)
+
+**What was asked vs what was there.** The task came in as "speciate the fusels lump" — but the
+lump was already gone: **D-99** split `fusels` into five single-molecule pools
+(`isoamyl_alcohol` / `active_amyl_alcohol` / `isobutanol` / `propanol` / `2_phenylethanol`) and
+**D-110** records "no pool in the project is lumped any more." The request rode in on two stale
+"Next:" breadcrumbs — the milestone-3 plan's line-324 note and D-98's "Next:" tail both name
+"speciate the fusels lump," and both were written *before* D-99, the very next decision, did it.
+What actually remained was the **doc-rot those decisions left behind**: prose, comments, a schema
+table and two param notes that still described a single lumped `fusels` pool. This entry is that
+cleanup. **No code, no parameter, no behaviour changed** — `git diff` is docstrings/comments/YAML
+notes only; the suite is untouched by construction.
+
+### Why a stale caveat is worse than no caveat
+
+The load-bearing fix is `byproducts.py`'s `EsterSynthesis` caveat (i). It claimed that reading the
+**lumped** `fusels` pool "over-states the true isoamyl-alcohol supply" and that the YAN-response
+"assumes the lump's composition is fixed." That is **backwards since D-115**, which pointed the
+ATF1 coupling at the `isoamyl_alcohol` pool *specifically* (`touches`): the substrate now **is** the
+alcohol the enzyme sees, so there is no over-statement and no fixed-lump-composition assumption. A
+reader trusting the caveat would have "corrected" for a bias the model no longer carries. Replaced
+with a `[RETIRED at D-99/D-115]` note stating what the caveat used to warn and why it no longer
+applies, keeping the one honest residue (all five alcohols still share one N-gate and one
+`E_a_fusels` — the "fixed spectrum" limit, D-99).
+
+### The other sites
+
+- **`carbon_routing.py:97`** contradicted its *own* registry 40 lines down: the ATF1 bullet said
+  `precursor_pool="fusels"` while `ESTER_SPECS` sets `precursor_pool="isoamyl_alcohol"`. Fixed the
+  bullet to match the code.
+- **`byproducts.py` `FuselAlcoholsEhrlich` docstring** still wrote the rate law as
+  `d(fusels)/dt = k_fusel · …` with carbon "booked as isoamyl alcohol" and "touches `fusels`" —
+  a single pool and a `k_fusel` param that have not existed since D-99. Rewritten to the five
+  `FUSEL_SPECS` pools, each weighted by its own molecule.
+- **`media.py`** schema-doc table listed one `fusels` "lumped produced-only pool" row (no such
+  slot); replaced with the five real pools. Plus three narrative references.
+- **`chemistry.py`**, **`wine_generic.yaml`** (lines 129/133), and the ATF1-substrate/ensemble
+  prose in `EsterSynthesis` — the same singular-pool phrasing, corrected.
+
+### Scope discipline — what was deliberately left
+
+Only **present-tense factual claims contradicted by the code** were touched. Left intact: correct
+**historical** references ("until D-99 a single lumped `fusels` pool …", "the alcohols it formerly
+lumped"), **category shorthand** ("fusel alcohols", "the fusel carbon"), the correct **contrast**
+"each `k` … never a share of a lumped `k_fusel`" (which asserts the *absence* of a lumped constant,
+accurately), and `wine_generic.yaml`'s `k_isoamyl_acetate` note — already a model of correct
+post-D-99 documentation (it walks through the D-99 re-anchor and explicitly retires the entry's own
+lump caveat). D-98's `psychophysics.yaml` caveat (iv) in the archive is left as the historical
+record it is; the params themselves were correctly reconciled at D-99 and carry no stale keys.
+
+### Verification
+
+`ruff check` + `ruff format --check` clean on all six touched Python files; both medium YAMLs parse;
+no `src` file registers or reads a `fusels` slot (the only literal `"fusels"` string left in `src`
+before this was the wrong `precursor_pool` comment, now fixed). Because nothing executable changed,
+the 1187-test suite is unaffected — run post-commit as the standing after-check.
+
+**Next:** unchanged from D-121. The substantive fusel item that *is* open — a **dynamic spectrum**
+(per-species `E_a` + per-amino-acid gates, to break the D-99 fixed-spectrum limit) — stays **blocked
+on sourcing**: D-99 is explicit that author-estimated per-species activation energies would lower
+fidelity while looking like they raised it. It reopens when measured values land.
