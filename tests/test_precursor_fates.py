@@ -61,6 +61,18 @@ def full_params():
     ).resolve()
 
 
+#: Minebois 2025's measured PROTEIN share of consumed phenylalanine (Sc, Fig. 6A) — a sourced
+#: LOWER BOUND on the non-Ehrlich lump, and what `f_non_ehrlich_phenylalanine` ships as (D-117).
+_PHE_PROTEIN_SHARE_BOUND = 0.531
+
+#: The measured non-Ehrlich LUMP, 1 − 0.025 (Minebois 2025: 2.5% of consumed phenylalanine reaches
+#: 2-phenylethanol). **This is the true value and the model cannot carry it** — at 0.975 the D-104
+#: sink's joint carbon refund exceeds growth's own draw, which is gluconeogenesis. It is a CONSTANT
+#: HERE rather than the YAML band's upper end precisely so the ensemble sampler cannot reach it;
+#: see :func:`test_the_sourced_lump_breaks_the_carbon_refund_guard`.
+_PHE_MEASURED_LUMP = 0.975
+
+
 def _run(*, amino_acids_gpl: float | None, days: float = 14.0, yan_mgl: float = 250.0):
     initial: dict[str, float] = {"brix": 24.0, "yan_mgl": yan_mgl, "pitch_gpl": 0.25}
     if amino_acids_gpl is not None:
@@ -328,16 +340,29 @@ def test_the_sourced_lump_breaks_the_carbon_refund_guard(full_params):
     **The sourced value and the missing de-novo route are inseparable — the route is the unlock,
     and a refund clamp would be a band-aid over a conservation law.**
 
+    **THIS TEST IS WHERE THE MEASURED 0.975 LIVES.** The YAML band is deliberately **zero-width**,
+    because `sample_parameters` draws every parameter over ``[low, high]`` — a band reaching 0.975
+    would put a value that breaks carbon conservation into a field the ensemble *consumes*, and
+    ~1 draw in 900 lands above the ~0.96 breach point. So the honest interval cannot be expressed
+    there, and this constant is its home instead: unsampleable, and asserted rather than annotated.
+
     **When the phenylpyruvate route lands, this test should FAIL** — that is its purpose. Delete it
-    and set the parameter to 0.975 in the same commit.
+    and set the parameter to 0.975 (with a real band) in the same commit.
     """
     traj, compiled = _run(amino_acids_gpl=1.0)
     entry = compiled.parameters["f_non_ehrlich_phenylalanine"]
 
-    # The shipped value is the bound, and the band's top is the measurement it cannot yet reach.
-    assert entry.value == pytest.approx(0.531)
+    # The shipped value is Minebois's protein share — a sourced LOWER BOUND, not an estimate.
+    assert entry.value == pytest.approx(_PHE_PROTEIN_SHARE_BOUND)
+
+    # ...and the band is pinned shut ON PURPOSE, so no ensemble can wander into the breach.
     assert entry.uncertainty is not None
-    assert entry.uncertainty.high == pytest.approx(0.975)
+    assert entry.uncertainty.high <= entry.uncertainty.low, (
+        "f_non_ehrlich_phenylalanine's band is no longer zero-width — an ensemble can now draw "
+        f"toward the measured {_PHE_MEASURED_LUMP} lump, which breaks the carbon guard below. "
+        "Either the de-novo phenylpyruvate route landed (then ship the lump and delete this test) "
+        "or a band was widened without pricing the conservation breach"
+    )
 
     # At the shipped bound the guards hold with room...
     n_at_bound, c_at_bound = _worst_joint_refund(traj, compiled)
@@ -345,7 +370,7 @@ def test_the_sourced_lump_breaks_the_carbon_refund_guard(full_params):
 
     # ...and at the SOURCED value the carbon guard breaks. Measured, not asserted from prose.
     pv = compiled.param_values
-    pv["f_non_ehrlich_phenylalanine"] = entry.uncertainty.high
+    pv["f_non_ehrlich_phenylalanine"] = _PHE_MEASURED_LUMP
     dur = compiled.t_span_h[1]
     blocked = simulate(
         compiled.process_set, pv, compiled.y0, compiled.t_span_h,
@@ -359,9 +384,9 @@ def test_the_sourced_lump_breaks_the_carbon_refund_guard(full_params):
 
     worst_n, worst_c = _worst_joint_refund(blocked, _Shim())
     assert worst_c > 1.0, (
-        f"the sourced lump {entry.uncertainty.high} no longer breaks the carbon guard "
-        f"(joint C refund {worst_c:.3f}x) — if the de-novo phenylpyruvate route landed, SHIP 0.975 "
-        "and delete this test; if something else changed, find out what before trusting it"
+        f"the sourced lump {_PHE_MEASURED_LUMP} no longer breaks the carbon guard (joint C refund "
+        f"{worst_c:.3f}x) — if the de-novo phenylpyruvate route landed, SHIP the lump and delete "
+        "this test; if something else changed, find out what before trusting it"
     )
     assert worst_n > 1.20, f"joint N refund {worst_n:.3f}x — the N story moved too, re-derive both"
 

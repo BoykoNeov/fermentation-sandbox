@@ -323,8 +323,12 @@ def test_2_phenylethanol_carries_no_sourced_de_novo_floor():
 
     **Leg 2 — "the floor is inside the parameter's own band" — IS ALSO DEAD, and measured so.**
     The old band's low end (0.38) gave **78.6%** de novo, *under* the 80% floor. D-117's band is
-    **0.53–0.975**, over which the de-novo share runs **83.6% → 99.1%** — clear at both ends. An
-    ensemble sampling this band clears the floor everywhere, which the old one did not.
+    **zero-width at the shipped bound 0.531**, where the de-novo share is **83.6%** — clear, and
+    unsamplable besides. (It is zero-width on purpose: the honest interval reaches the measured
+    lump 0.975, which breaks carbon conservation, so it is held in a test constant rather than in
+    a field the ensemble draws from — see ``test_the_sourced_lump_breaks_the_carbon_refund_guard``.
+    Across that *real* interval the de-novo share runs 83.6% → 99.1%, clear at both ends, so leg 2
+    stays dead however the band is later restored.)
 
     **What survives is narrower and is purely a SCOPE claim: the floor's own sources do not
     describe this keto acid.** The floor is justified as *"Crépin 81% newly-synthesised 2-KB;

@@ -11393,12 +11393,10 @@ into the other, and no leucine parameter was touched on Minebois's authority. Ti
 the evidentiary class of the Crépin `f_i` (real per-species tracer, right organism, right matrix, one
 time point) — not validated, because of that conflict.
 
-**Band 0.53–0.975, and its two ends are different KINDS of number** — the low end is Minebois's measured
-*protein share* (a lower bound on the lump), the high end is the measured *lump* itself. That is a
-consequence of Finding 4, not of the sourcing: an uncertainty band would ordinarily sit around 0.975
-(the method spread against Crépin plus room for 2-PE still forming after T4 would put it near
-0.96–0.99), but the shipped value is a bound rather than an estimate, so the band spans **bound to
-measurement**. Its upper end is explicitly **not ensemble-samplable** — see Finding 4.
+**The band is ZERO-WIDTH, and that is the subtlest call in the beat — see Finding 6.** The honest
+interval runs from the shipped bound (0.531) to the measured lump (0.975); an ordinary uncertainty band
+would sit near 0.96–0.99 (the method spread against Crépin, plus room for 2-PE still forming after T4).
+**None of that may go in the `uncertainty` field**, because that field is *drawn from*.
 
 ### Finding 4 — the sourced value BREAKS CARBON CONSERVATION, so it is measured, recorded, and not shipped
 
@@ -11471,6 +11469,45 @@ It failed on this change and nothing else did. Both legs were re-derived:
 the floor at both band ends; admitting it on someone else's citation would have been free, green, and
 wrong. **Passing is not the same as being covered.**
 
+### Finding 6 — the blocked value would have leaked back in through the ENSEMBLE, and a prose warning does not stop a sampler
+
+The first fix for Finding 4 shipped `value: 0.531` with band **0.53–0.975** — bound to measurement —
+carrying a `DO NOT ENSEMBLE-SAMPLE THE UPPER END` note. **The full suite passed, and the tree was still
+wrong.** `uncertainty` is not documentation; `runtime/ensemble.py::sample_parameters` draws **every**
+parameter over `[low, high]` when `names is None`:
+
+```python
+lo, hi, val = p.uncertainty.low, p.uncertainty.high, p.value
+out[name] = float(rng.triangular(lo, val, hi))
+```
+
+With `triangular(0.53, 0.531, 0.975)` roughly **1 draw in 900 lands above the ~0.96 breach point** — so
+a 1000-member ensemble on a dosed scenario would reliably produce a gluconeogenesis member. **A value
+proven to break a conservation law was sitting in a machine-readable field, protected only by a comment
+in a sibling field.** The suite could not catch it because every test exercises the *default* value; the
+band's edges are exercised by nothing but the sampler.
+
+**The fix is not to cap the band at a runnable number.** Capping at ~0.96 would be a magic number — it
+has no provenance, it is simply the largest value the guard tolerates — and it would falsely assert the
+true value might be 0.96 when the measurement says 0.975. **The fix is to stop expressing the interval
+in a field that is consumed**: the band is pinned **zero-width at 0.531** (which `sample_parameters`
+explicitly honours — `hi <= lo` ⇒ pinned, no draw), and the measured lump lives as a test constant
+`_PHE_MEASURED_LUMP = 0.975`, asserted by `test_the_sourced_lump_breaks_the_carbon_refund_guard` and
+guarded by an assertion that the band **stays** zero-width. Nothing is lost: the value is still recorded,
+still executable, and now unreachable by any sampler.
+
+**A zero-width band here does NOT mean "certain" — it means the field cannot honestly hold this
+parameter's uncertainty**, and both the YAML note and the test say so in those words. That is a real
+cost of the representation, paid deliberately: an *unstatable* interval is better than an *unphysical*
+one, when the field's consumer is a random draw.
+
+**This is D-109's own prediction, arriving.** That beat reasoned about "an ensemble sampling that band
+would fail it — **the realistic way it would ever have been found**" — and named band-edge sampling as
+the failure vector two decisions before it happened. **It was found by re-reading `ensemble.py`, not by
+the suite**, which is the point: a green suite is evidence about the default, and a band is precisely
+the thing the default never visits.
+
+
 ### Lessons
 
 (i) **A wrong number wearing a derivation hides better than a bare guess.** `speculative` invites
@@ -11496,6 +11533,15 @@ reading the diff will see the value barely move; the note must carry why that is
 to 0.4 pp is why the phenylalanine number is usable; leucine conflicting ~3x is why the tier is not
 validated. Reporting only the agreement would have been the flattering half of the same check.
 (vii) **A green measurement is not a licence to widen a citation's scope** (Finding 5).
+(viii) **`uncertainty` is not a comment field — it is an INPUT, and a value that cannot run must not
+be written there** (Finding 6). The first fix passed the entire suite with a carbon-breaking value at a
+band edge, because tests exercise the default and only the sampler visits the edges. **When rejecting a
+value as unphysical, check every machine-readable field that value could still enter through** — the
+rejection is not complete until it is unreachable, and prose in an adjacent field does not make it so.
+(ix) **A durable, pushed, green deliverable is not the same as a verified one.** Findings 4 and 6 both
+landed *after* a full green suite — one after a masked exit code (`cmd | tail && ...` returns `tail`'s
+status, which is always 0), one after a genuine 1184-pass run and a push. **Both were found by reading
+code, not by running it.**
 
 ### Next
 
