@@ -11837,20 +11837,33 @@ bars carry printed numbers, so this is a *number extraction*, not a pixel measur
 
 | alcohol | labelled (µM) | unlabelled (µM) | total (µM) | printed I.E | de-novo share |
 |---|---|---|---|---|---|
-| 2-phenylethanol | ~4.2 (printed `4`) | 109 | ~113 | 3.7 % | **0.963** |
+| 2-phenylethanol | ~4.05 (printed `4`) | ~105 | **109** | 3.7 % | **0.963** |
 | isoamyl alcohol | 77 (leu) + 104 (val) | 3211 | 3392 | 2.3 % / 3.1 % | **0.946** |
 | isobutanol | 39 (val) | 405 | 444 | 8.8 % | **0.912** |
 
-**The bar semantics had to be derived, not assumed, and the obvious reading is wrong.** The large
-number is the **unlabelled segment**, not the total. Taking it as the total reproduces isobutanol's
-I.E as 9.63% against a printed 8.8%; taking it as the unlabelled segment gives 8.78%. Isoamyl agrees
-on the same reading (2.27%/3.07% vs printed 2.3%/3.1%). 2-PE then needs its labelled `4` to be a
-rounded ~4.17, which recovers **both** printed numbers at once — 4.17/113 = 3.69% (the I.E) and
-4.17/162 = 2.57% (the 2.5% D-117/D-118 are built on). Three independent cross-checks, plus the
-caption's own worked example (126/266 = 47.37% vs printed 47.4%).
+**The bar semantics had to be derived, not assumed — and they are MIXED across the panel, which is
+why no universal rule about them belongs here.** For **2-PE the large number is the TOTAL**; for
+**isoamyl and isobutanol it is the UNLABELLED segment**. Each is forced by arithmetic, not preference:
+
+- *2-PE.* Two printed constraints, and only one reading satisfies both. The flux box gives labelled
+  = 2.5% × 162 µM consumed Phe = **4.05 µM**; the I.E then gives total = 4.05/0.037 = **109**. That
+  reading hits both printed numbers exactly (2.50% and 3.72%). Reading 109 as *unlabelled* forces
+  labelled to ~4.17 and yields 4.17/162 = **2.57%, which rounds to 2.6, not the printed 2.5**.
+- *Isobutanol.* The OCR is independently confirmed rather than trusted: valine's flux box (14.6% of
+  266 µM consumed valine) predicts **38.8 µM**, matching the printed `39`. Then 39/0.088 = **443**, so
+  405 must be the unlabelled segment (as a total it gives 9.6% against a printed 8.8%).
+- *Isoamyl.* Same reading as isobutanol — 2.27%/3.07% against printed 2.3%/3.1%.
+
+Plus the caption's own worked example (126/266 = 47.37% vs printed 47.4%).
+
+**The de-novo share is `1 − I.E` and is therefore ROBUST to the split** — which is why this
+correction changes no conclusion below. It is recorded because the first pass asserted a *uniform*
+"big = unlabelled" rule and reached 2.57% ≈ 2.5% to keep it. That rounding gloss was the tell, and
+sanding off a mismatch to protect a tidy rule is the same genre of error D-118 caught in the Rollero
+mis-citation, one notch subtler and committed by this entry rather than inherited.
 
 **That is the real gain and it is worth stating plainly: the 2.5% numerator is now corroborated
-independently of the algebra that consumed it.** D-118 could only reach 4.17 µM by multiplying a
+independently of the algebra that consumed it.** D-118 could only reach ~4 µM by multiplying a
 reported percentage by a reconstructed must composition. The bar states the µM directly, and the two
 agree. Whatever else is uncertain here, the numerator is not.
 
@@ -11860,9 +11873,9 @@ The in-study de-novo share is **0.963**, not the shipped 0.9827, and the first i
 measured value therefore *breaches* the D-118 carbon guard (analytic breach point 0.971). **That is
 wrong, and the way it is wrong is the content of this entry.**
 
-0.963 has Minebois's *own* total 2-PE (~113 µM) as its denominator. The model's total is Wang's
+0.963 has Minebois's *own* total 2-PE (109 µM) as its denominator. The model's total is Wang's
 meta-analytic wine mean, ~235 µM. Applying 0.963 to the model demands 235 × 0.037 = **8.7 µM** from a
-phenylalanine branch that can supply at most ~4.2 µM. It "breaches" because it over-charges Phe by
+phenylalanine branch that can supply at most ~4.05 µM. It "breaches" because it over-charges Phe by
 2×, not because reality does. **A de-novo fraction is not scale-invariant, and a denominator cannot
 be transplanted between fermentations.**
 

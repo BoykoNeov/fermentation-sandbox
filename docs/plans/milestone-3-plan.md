@@ -838,13 +838,15 @@ uncertainty bands.
 
 > **[D-119 READS MINEBOIS FIG. 6A — the unlock D-118 named — AND NOTHING SHIPS. `f_de_novo_2_phenylethanol` stays
 > 0.9827, `f_non_ehrlich_phenylalanine` stays 0.975; only the caveat's standing changes. Read off the PMC deposit's
-> figure image (Wiley still 402). Sc 2-PE: ~4.2 uM labelled / 109 uM unlabelled / ~113 uM total, printed I.E 3.7%.
-> **The bar semantics needed deriving and the obvious reading is wrong** — the large number is the UNLABELLED segment
-> (as total it reproduces isobutanol's I.E as 9.63% vs a printed 8.8%; as unlabelled, 8.78%, and isoamyl agrees).
-> **The gain is the NUMERATOR, not the fraction:** 4.17/113 = 3.69% and 4.17/162 = 2.57% recover both printed numbers,
-> so the 2.5% D-117/D-118 rest on is corroborated in uM independently of the algebra. **TWO WRONG INSTINCTS, both
+> figure image (Wiley still 402). Sc 2-PE: ~4.05 uM labelled against a 109 uM TOTAL, printed I.E 3.7%.
+> **The bar semantics needed deriving per bar and are MIXED** — for 2-PE the large number is the TOTAL (the flux box
+> gives labelled = 2.5% x 162 uM consumed Phe = 4.05, and the I.E then gives total = 4.05/0.037 = 109, hitting both
+> printed numbers exactly), while for isoamyl and isobutanol it is the UNLABELLED segment (valine's 14.6% x 266 uM
+> predicts 38.8 vs printed 39, and 39/0.088 = 443 forces 405 to be unlabelled). **The de-novo share is 1 - I.E and is
+> robust to the split.** **The gain is the NUMERATOR, not the fraction:** the 2.5% D-117/D-118 rest on is now
+> corroborated in uM independently of the algebra. **TWO WRONG INSTINCTS, both
 > recorded because the errors are instructive:** (1) "the measured 0.963 breaches the 0.971 guard" — no, 0.963 has
-> Minebois's ~113 uM total as its denominator, and transplanting it demands 8.7 uM from a branch that supplies ~4.2;
+> Minebois's 109 uM total as its denominator, and transplanting it demands 8.7 uM from a branch that supplies ~4.05;
 > **a de-novo fraction is not scale-invariant**; (2) "0.963 is a T4 snapshot that climbs to 0.9827" — refuted by Panel
 > B, where the fraction is **FLAT at ~3.7%** (labelled 4 -> 4.8 uM as total 109 -> 130 uM). What actually holds 0.9827
 > up is a single cross-must scaling assumption (a Wang-typical wine carries ~Minebois-like Phe while making ~2x her
