@@ -451,7 +451,16 @@
 > (isoamyl ← leucine **and** valine: Crépin's 23% via KIC = D-104's named missing route); the prize is D-104's inverted
 > split (**open** — D-104 measured that near-equilibrium transamination does *not* un-invert); the **parsimony question is
 > open both ways** (per-species rates ≈ the five `f_i`, but **BAT1/BAT2 are shared** across leu/ile/val ⇒ a shared-BAT
-> partition could be *cheaper* — prototype + source before deciding); and a **tracer stoichiometry trap** is already
+> partition could be *cheaper* — prototype + source before deciding) **[D-116 CLOSES THIS: shared-BAT is a parsimony
+> LOSS, and the trade was decided before any prototype ran. The transaminase rate IS sourceable (Koonthongkaew 2022
+> Table 2, Km + kcat for both paralogs, six substrates), and D-109's structural premise is CONFIRMED — the paralogs
+> agree to 1.2% on leucine. But the `f_i` it would replace are not cheap constants: **four of the five are sourced
+> Crépin tracer measurements**, and the one speculative entry (phenylalanine) is **not a BAT substrate**, so the
+> mechanism can never reach the number that most wants replacing. The trade is 3 sourced in-matrix constants → 6
+> in-vitro ones + an unsourced protein flux + an unsourced [E]: more invented numbers at a worse tier. **The D-98 trap
+> does not dissolve, it RELOCATES to [E]** — kcat is not a flux — so D-113's owner gate reattaches to [E] + the
+> de-novo-KIC and decarboxylase fluxes, not to the transaminase rate. Per-species sourced `f_i` stand. See D-116.]**;
+> and a **tracer stoichiometry trap** is already
 > visible (isoamyl's valine-derived carbon is {3,4,5}/5 depending which carbons the two decarboxylations remove — **both
 > close the ledger**, so the atom assignment must be sourced, not assumed). See D-109.]**
 >

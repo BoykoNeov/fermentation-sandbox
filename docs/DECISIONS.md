@@ -124,6 +124,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 - [**D-113**](#d-113--the-node-measured-against-the-inversion-it-was-kept-for-d-111s-valine-route-leaves-leucine-bit-invariant-so-the-split-it-must-un-invert-is-untouched) — the node measured against the inversion it was kept for: D-111's valine route leaves leucine …
 - [**D-114**](#d-114--the-acetate-check-the-esters-enrichment-is-structurally-zero-because-the-model-attributes-flows-and-the-ester-draws-from-a-stock) — the acetate check: the ester's enrichment is structurally zero because the model attributes flows …
 - [**D-115**](#d-115--the-acetate-enrichment-built-an-isotope-tracer-is-physics-not-metadata-so-d-1-was-never-the-obstacle) — the acetate enrichment, built: an isotope tracer is physics, not metadata, so D-1 was never …
+- [**D-116**](#d-116--d-109s-parsimony-question-answered-the-transaminase-rate-is-sourceable-and-the-partition-is-still-a-parsimony-loss-because-the-f_i-it-would-replace-are-already-measured) — D-109's parsimony question, answered: the transaminase rate IS sourceable and the partition is …
 <!-- END INDEX -->
 
 ## Process decisions (project setup)
@@ -11147,3 +11148,152 @@ a scope the owner never approved; silently retreating to zero would have overrid
   routes; the isoamyl-magnitude / monotone-in-N lever (D-112 Finding 4); closure O₂ ingress; acetaldehyde in maturation
   + the 0-vs-2.7 unsulfited floor; the deferred tail.
 - **No longer on the list:** the isoamyl-acetate carbon re-route, which had stood on every "Next" since D-97.
+
+## D-116 â€” D-109's parsimony question, answered: the transaminase rate IS sourceable, and the partition is still a parsimony loss because the `f_i` it would replace are already measured
+
+**D-109 left one live thread â€” "per-species vs shared BAT1/BAT2 transaminase" â€” with the instruction that it
+"must not be pre-judged in either direction... Prototype and source it before deciding." D-116 sourced it and
+prototyped it. The result splits: the transaminase rate, which D-113 called an author estimate and gated the
+build behind, is *fully sourceable* â€” and the parsimony trade still runs backwards, for a reason that has
+nothing to do with the rate.** Findings only â€” **no physics changed**, no parameter file touched, no `src/`
+edit. The prototype lives outside the tree.
+
+**The owner's scope was "measure, then build if sourceable."** The rate is sourceable; the **build is still
+not unlocked**, because the number the *model* needs is not the number the *paper* reports. That distinction
+is this entry's main result and is set out in Finding 3.
+
+### Finding 1 â€” the rate is sourceable, and D-113's "author estimate" premise was wrong
+
+D-113 gated the un-inversion build on the grounds that kinetically-limited transamination "rests on an
+invented transaminase rate, the D-98 trap." That premise does not survive contact with the literature.
+Koonthongkaew *et al.* 2022 (*Appl. Environ. Microbiol.* 88(13):e00557-22, Table 2) reports **Km and kcat for
+both paralogs across all six substrates** â€” the three branched-chain keto acids and the three amino acids.
+Verified by two independent fetches (PMC and the ASM publisher version) agreeing on all twelve values.
+
+Ehrlich-facing (catabolic, amino-acid-as-substrate) direction, Km in mM / kcat in sâ»Â¹:
+
+| species | Bat1Î”N16 Km | Bat1Î”N16 kcat | Bat2 Km | Bat2 kcat | Bat1 kcat/Km | Bat2 kcat/Km |
+|---|---|---|---|---|---|---|
+| valine | 0.454 | 3.37 | 0.511 | 2.71 | 7.42 | 5.30 |
+| leucine | 0.285 | 3.51 | 0.189 | 2.30 | 12.32 | 12.17 |
+| isoleucine | 0.220 | 3.74 | 0.119 | 2.61 | 17.00 | 21.93 |
+
+Conditions: 30 Â°C, 200 mM potassium phosphate, pH 8.0 forward / 8.5 reverse, glutamate 100 mM donor.
+Construct: **Bat1Î”N16** â€” the N-terminal 16-residue mitochondrial targeting signal removed to permit
+purification; Bat2 full-length.
+
+**The "shared BAT" abstraction is itself defensible on the source's own numbers.** Both paralogs give the
+*same* substrate rank order, and on leucine they agree to **1.2%** (12.32 vs 12.17). D-109's structural
+premise â€” that BAT1/BAT2 can be treated as one enzyme across leu/ile/val â€” is confirmed. It is the
+*consequence* D-109 hoped for that fails.
+
+### Finding 2 â€” the parsimony trade runs backwards, and it needs no prototype to see
+
+D-109 framed the hoped-for win as "one BAT rate + the de-novo fluxes, emergent, **fewer constants than three
+`f_i`**." That framing rests on the `f_i` being cheap constants worth replacing. **They are not â€” four of the
+five are sourced tracer measurements**, read straight off `wine_generic.yaml`:
+
+| parameter | value | tier | provenance |
+|---|---|---|---|
+| `f_non_ehrlich_leucine` | 0.815 | plausible | CrÃ©pin 2017, [Â¹Â³Câ‚†]leucine tracer |
+| `f_non_ehrlich_valine` | 0.62 | plausible | CrÃ©pin 2017, [Â¹Â³Câ‚…]valine tracer |
+| `f_non_ehrlich_isoleucine` | 0.51 | plausible | CrÃ©pin 2017, [Â¹Â³Câ‚†]isoleucine tracer |
+| `f_non_ehrlich_threonine` | 0.82 | plausible | CrÃ©pin 2017, [Â¹Â³Câ‚„]threonine tracer |
+| `f_non_ehrlich_phenylalanine` | 0.53 | **speculative** | author estimate |
+
+**Phenylalanine â€” the one speculative entry, and so the only one a parsimony win could actually rescue â€” is
+not a BAT substrate at all** (it goes via Aro8/Aro9; threonine goes via ILV1). So the parsimony question can
+only ever reach the **three BAT `f_i`, and all three are already sourced, in-matrix, plausible-tier**. The
+one number that most wants replacing is structurally out of reach of the mechanism proposed to replace it.
+
+The trade is therefore: **3 sourced-plausible in-matrix tracer constants â†’ 6 in-vitro constants** (pH 8.0/8.5,
+30 Â°C, purified and truncated enzyme) **plus an unsourced protein-incorporation flux plus, for any absolute
+rate, an unsourced in-situ [E]**. That is *more* invented numbers at a *worse* tier â€” a parsimony **loss on
+count and on provenance simultaneously**. D-107's precedent ("the faithful form had *fewer* invented numbers")
+is what D-109 hoped would repeat; measured, it inverts.
+
+**This argument is assumption-free and is the finding.** It required sourcing, not simulation.
+
+### Finding 3 â€” the D-98 trap does not dissolve, it RELOCATES, so the owner gate reattaches one layer down
+
+The scope was "build if sourceable," on the premise that sourcing the rate dissolves the D-98 trap. **It does
+not â€” and the reason is that kcat is not a flux.** A kinetically-limited transamination needs an absolute
+rate, `Vmax = kcatÂ·[E]`; Table 2 gives kcat, not the in-situ enzyme level under fermentation. **[E] is a fresh
+author estimate**, and the trap re-enters through the concentration rather than the rate constant.
+
+Two further rates the full un-inversion build needs, and which Koonthongkaew sources *none* of: the
+**de-novo-KIC synthesis flux** and the **decarboxylase competition** at the keto-acid pool. The leucine
+*relief* D-113 identified as the thing the inversion actually needs depends on both.
+
+**So D-113's gate reattaches â€” to [E] and the de-novo/decarboxylase fluxes, which are different numbers from
+the transaminase constant the owner cleared.** Shipping through on "the rate was sourceable" would satisfy the
+letter of the scope while voiding its premise. Surfaced, not built.
+
+Note the one place [E] *does* cancel: **within** the BAT step, ratios among val/leu/ile are [E]-free, so a
+*relative* partition is computable from sourced numbers alone. But `f_i` is not a within-BAT ratio â€” it is the
+split between the Ehrlich branch and **protein incorporation**, and that branch point puts BAT against the
+ribosome, whose flux is unsourced. [E] cancels for a quantity the model does not need and fails to cancel for
+the one it does.
+
+### Finding 4 â€” the ordering test is inconclusive in BOTH directions, and the second trap is the subtler one
+
+The prototype asked whether shared-BAT preference reproduces the measured Ehrlich-share ordering. It does not
+answer, and **both readings mislead**:
+
+* **The naive reading falsely MATCHES.** Taking valine's Ehrlich draw as its isobutanol share (0.15) gives
+  measured order ile > leu > val, exactly the kcat/Km order â€” apparent confirmation. It is wrong: valine's
+  transamination to KIV feeds *both* isobutanol (0.15) *and* the D-111 chain-elongation route to KIC â†’ isoamyl
+  (0.23, `f_valine_to_isoamyl`). Both are downstream of the **same** BAT step, so valine's BAT draw is 0.38.
+  The naive reading **hides 60% of valine's draw**.
+* **The corrected reading falsely CONVINCES.** With valine at 0.38 the order becomes ile > val > leu and the
+  match breaks â€” tempting the headline "shared-BAT predicts the *opposite* for leucine." But the test's
+  monotonicity assumption (Ehrlich share monotonic in kcat/Km) holds only if protein incorporation scales as
+  intracellular [AA] with a shared constant. Under **fixed-biomass-composition** protein demand, [AA]áµ¢ does
+  not cancel and the rank test has no force â€” **and the confound lands squarely on leucine**, the load-bearing
+  species: leucine is the most abundant of the three in yeast protein, so a low Ehrlich share is expected from
+  **demand alone**, with BAT disfavouring nothing. No biomass composition was sourced to resolve it, and D-104
+  already measured that no biomass composition fixes the inversion.
+
+**Flagging only the naive trap while sitting in the subtler one would have been the D-108/D-114 shape** â€” a
+correction that stops one step short of the error it is correcting. Both are recorded.
+
+**What survives every protein model** (the assumption-free kernel, read straight off Table 2): **BAT ranks
+leucine ABOVE valine â€” 12.32 vs 7.42, both paralogs agreeing. Leucine is not BAT-disfavoured.** So shared-BAT
+substrate preference *cannot* be the thing routing leucine away from Ehrlich; whatever does it lives upstream
+in de-novo KIC, or in protein demand. That is consistent with D-113's finding that the inversion needs a
+leucine **relief**, not a valine **drain**, and it needs no monotonicity assumption to state.
+
+### Lessons
+
+(i) **"Is it sourceable?" and "is the sourced number the one the model needs?" are different questions, and
+the second is the gate.** Table 2 is a genuinely excellent source that answers the question as *asked* and
+still does not unlock the build, because a rate constant is not a flux without an enzyme level. **A gate
+phrased on sourcing a constant can be satisfied while its purpose is voided** â€” check what the model would
+actually multiply the constant by.
+(ii) **A parsimony argument must price what it REPLACES, not only what it costs.** D-109's framing counted
+constants on the new side and assumed the old side was cheap. The old side was four sourced tracer
+measurements, and the single speculative one was out of the mechanism's reach â€” which reverses the verdict
+before any prototype runs.
+(iii) **A near-miss is symmetric; finding one trap is evidence you are standing in another.** The naive valine
+reading and the corrected one fail in opposite directions, and only the *first* was obvious. Having caught a
+flattering error is not a licence to trust the corrected one.
+(iv) **A confirmed premise can carry a refuted conclusion.** D-109's structural claim â€” BAT1/BAT2 are shared
+enough to model as one enzyme â€” is *confirmed* to 1.2% on leucine. The parsimony win it was raised to support
+is dead anyway. Reporting only the verdict would have buried a result worth keeping.
+
+### Next
+
+- **D-109's parsimony question is CLOSED: shared-BAT is a parsimony loss, and per-species sourced `f_i`
+  stand.** It should come off every future "Next" list; it has been on them since D-109.
+- **The un-inversion build remains owner-gated, but the gate has MOVED** â€” no longer on the transaminase rate
+  (sourced, Finding 1) but on **in-situ [E]**, the **de-novo-KIC synthesis flux**, and the **decarboxylase
+  competition**. A build beat should open by trying to source those three, exactly as this one opened on the
+  transaminase.
+- **`f_non_ehrlich_phenylalanine` (0.53, speculative, band 0.38â€“0.86) is now the most valuable unsourced
+  number in the fusel layer** â€” it is the only speculative `f_i`, and D-116 establishes that the BAT mechanism
+  can never reach it. A dedicated 2-phenylethanol tracer search is a cheap, well-scoped beat.
+- Unchanged from D-113/D-114/D-115: the de-novo-KIC leucine-relief build (D-104's inversion); the **KMV â†’
+  isoleucine** and **phenylpyruvate** node routes; the isoamyl-magnitude / monotone-in-N lever (D-112 Finding
+  4); closure Oâ‚‚ ingress; acetaldehyde in maturation + the 0-vs-2.7 unsulfited floor; the ester/alcohol ratio
+  running marginally above 1 (D-115); the deferred tail.
+
