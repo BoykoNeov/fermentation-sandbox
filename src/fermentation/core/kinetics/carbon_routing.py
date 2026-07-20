@@ -473,6 +473,79 @@ SECONDARY_FUSEL_ROUTES: tuple[SecondaryFuselRoute, ...] = (
     ),
 )
 
+
+@dataclass(frozen=True)
+class DeNovoFuselRoute:
+    """An alcohol whose skeleton is mostly built **de novo**, not from its amino acid (D-118).
+
+    :data:`SECONDARY_FUSEL_ROUTES` adds a second *amino-acid* precursor. This registry does the
+    opposite: it caps how much of an alcohol may be sourced from **any** consumed amino acid,
+    because the molecule is predominantly assembled from central carbon metabolism.
+
+    **Why the depletion gate is not already this, though a docstring said it was.**
+    :class:`~fermentation.core.kinetics.byproducts.FuselAminoAcidReroute` claims the
+    anabolic/catabolic split "falls out of the must spectrum" via each precursor's D-100
+    relative-depletion gate. **Measured, that claim fails for phenylalanine by ~11×**: at a
+    wine-like must (28 mg/L Phe) the model sources **18.9%** of its 2-phenylethanol from consumed
+    phenylalanine, against a derived **~1.7%**. The gate models *availability*, and phenylalanine
+    is available — it is simply not what most 2-phenylethanol is made from. Availability and
+    provenance are different quantities, and the gate only ever encoded the first.
+
+    **The physical constraint the gate cannot see.** A wine must carries ~28 mg/L phenylalanine
+    (0.17 mM) and the wine makes ~28.7 mg/L 2-phenylethanol (0.24 mM) — **more alcohol than
+    precursor, in moles**. Sourcing it from phenylalanine is not merely over-attributed, it is
+    stoichiometrically impossible; the shikimate route to phenylpyruvate has to supply the rest.
+    The gate lets the re-route take ~90% of it early and drain the pool anyway, because nothing in
+    its form compares the alcohol's demand to the precursor's supply.
+
+    **It is a SOURCING fact and never reaches the producer** — the D-109/D-111 constraint.
+    :class:`~fermentation.core.kinetics.byproducts.FuselAlcoholsEhrlich` makes exactly as much
+    2-phenylethanol as before; this only changes where that carbon came from, so an undosed run
+    stays byte-for-byte (the share multiplies a gate that is already 0).
+    """
+
+    #: The alcohol whose amino-acid sourcing is capped — must exist in :data:`FUSEL_SPECS`.
+    alcohol_pool: str
+    #: ``f_de_novo_<alcohol>``: the fraction of this alcohol built from central carbon metabolism
+    #: rather than from its consumed amino acid. The primary Ehrlich branch is scaled by
+    #: ``(1 − this)``, so the residue stays on the producer's sugar stand-in — which
+    #: :class:`~fermentation.core.kinetics.byproducts.FuselAminoAcidReroute` already documents as
+    #: "the **correct** book for de-novo synthesis".
+    share_param: str
+
+
+#: The de-novo-dominated alcohols (decision D-118). One entry: **2-phenylethanol**, the route
+#: D-117 named as the blocker on shipping phenylalanine's measured non-Ehrlich lump ("THE SOURCED
+#: VALUE AND THE MISSING PHENYLPYRUVATE ROUTE ARE INSEPARABLE — build that route and this becomes
+#: 0.975").
+#:
+#: **THE SHARE IS A CONSISTENCY-CLOSURE, NOT A SECOND MEASUREMENT — do not present it as one.**
+#: Algebraically ``(1 − f_de_novo) = (1 − f_non_ehrlich_phenylalanine) · consumed_Phe / total_2PE``,
+#: so this parameter and ``f_non_ehrlich_phenylalanine`` both trace to Minebois 2025's **single**
+#: 2.5% number; they are one fact expressed against two denominators, not two studies agreeing.
+#: Reading them as mutual corroboration would be this project's oldest error inverted — untidying
+#: one measurement into two and calling the echo evidence (D-96/D-102/D-108/D-109, and D-117's own
+#: "a coincidence between a guess and a real measurement diagnoses the error rather than excusing
+#: it"). Its tier is therefore **capped at** ``f_non_ehrlich_phenylalanine``'s, never above.
+#:
+#: The genuinely independent quantity — Minebois Fig. 6A's *unlabelled* bar fraction, whose
+#: denominator is total 2-phenylethanol — is the number that would make this a measurement. It is
+#: reported only as a figure; the underlying values live in supplementary datasets released
+#: "upon reasonable request" (verified, not assumed). **That fetch is the named unlock for
+#: promoting this parameter from derived to measured.**
+DE_NOVO_FUSEL_ROUTES: tuple[DeNovoFuselRoute, ...] = (
+    DeNovoFuselRoute(
+        alcohol_pool="2_phenylethanol",
+        share_param="f_de_novo_2_phenylethanol",
+    ),
+)
+
+#: ``alcohol_pool -> share_param`` so the sourcing layer can look a route up without scanning.
+DE_NOVO_SHARE_BY_ALCOHOL: dict[str, str] = {
+    r.alcohol_pool: r.share_param for r in DE_NOVO_FUSEL_ROUTES
+}
+
+
 #: CO₂ released per alcohol on the **primary** Ehrlich route: the pathway decarboxylates exactly
 #: once (transamination → decarboxylation → reduction). Named here beside
 #: :attr:`SecondaryFuselRoute.co2_per_alcohol`, which is 2 for the valine → KIC route, so the

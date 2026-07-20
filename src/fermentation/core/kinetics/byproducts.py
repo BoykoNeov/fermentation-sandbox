@@ -150,6 +150,8 @@ from fermentation.core.kinetics.carbon_routing import (
     ACETYL_CARBON_SHARE,
     ALCOHOL_CARBON_SHARE,
     CO2_PER_PRIMARY_EHRLICH_ALCOHOL,
+    DE_NOVO_FUSEL_ROUTES,
+    DE_NOVO_SHARE_BY_ALCOHOL,
     ESTER_SPECS,
     FUSEL_SPECS,
     ISOAMYL_ALCOHOL,
@@ -426,6 +428,24 @@ def ehrlich_draws(
         gate = depletion_gate(y, schema, params, (precursor,))
         if gate <= 0.0:
             continue  # exhausted ⇒ this alcohol stays wholly on the sugar stand-in
+        # D-118: an alcohol built mostly from central carbon metabolism may only be sourced from
+        # its amino acid up to (1 − f_de_novo). The gate models AVAILABILITY; this models
+        # PROVENANCE, and for 2-phenylethanol they differ by ~11× (see DeNovoFuselRoute). Applied
+        # MULTIPLICATIVELY rather than as a min() cap so the gate's dynamics survive underneath —
+        # the share scales what the gate would otherwise attribute, and an undosed run is still
+        # byte-for-byte (gate 0 ⇒ 0, whatever the share).
+        de_novo_param = DE_NOVO_SHARE_BY_ALCOHOL.get(spec.pool)
+        if de_novo_param is not None:
+            de_novo = params[de_novo_param]
+            if not 0.0 <= de_novo < 1.0:
+                raise ValueError(
+                    f"{de_novo_param}={de_novo} outside [0, 1): it is the fraction of "
+                    f"{spec.pool} built de novo rather than from consumed "
+                    f"{spec.precursor_amino_acid}"
+                )
+            gate *= 1.0 - de_novo
+            if gate <= 0.0:
+                continue
         branch = _branch(precursor, spec, gate * fusel_carbon, CO2_PER_PRIMARY_EHRLICH_ALCOHOL)
         draws.append(branch)
         primary_by_precursor[spec.precursor_amino_acid] = branch
@@ -775,6 +795,22 @@ class FuselAminoAcidReroute(Process):
     spectrum and the fusel demand instead of being a fitted fraction. The sugar stand-in it leaves
     behind is no longer an embarrassment but the **correct** book for de-novo synthesis.
 
+    **[D-118 — TRUE IN SHAPE, WRONG BY AN ORDER OF MAGNITUDE FOR ONE MOLECULE. Read the paragraph
+    above with this caveat attached.]** The gate does make the split emergent, but "emergent" is not
+    "calibrated": measured at a wine-like must, this Process sourced **18.9%** of its
+    2-phenylethanol from consumed phenylalanine against a derived **~1.7%** — an ~11×
+    over-attribution the paragraph above would have you believe was already handled. **The gate
+    encodes availability, not provenance.** Phenylalanine is available; it is simply not what most
+    2-phenylethanol is made from, and a gate on the precursor's own concentration cannot express
+    that — least of all here, where the must carries *fewer moles of phenylalanine than the wine
+    makes of the alcohol*, so full sourcing is stoichiometrically impossible rather than merely
+    generous. :data:`~fermentation.core.kinetics.carbon_routing.DE_NOVO_FUSEL_ROUTES` caps the
+    branch for exactly the alcohols where the two quantities diverge. Only 2-phenylethanol is
+    listed; **the other four are unmeasured, not verified innocent**, and isoamyl alcohol is the
+    live suspect — D-104's inverted leucine split and D-113's "un-inverting leucine remains an
+    unsourced build (de-novo-KIC relief …)" describe this same gap one precursor over, and this
+    registry is the structure that would carry that fix once a leucine number is sourced.
+
     **The D-33 nitrogen over-release lump is RETIRED (decision D-100).** D-33 had to document that
     sourcing fusel carbon through N-rich arginine deaminated ``c_fusel/c_aa·y_N`` ≈ 0.78 g N per g
     fusel carbon — roughly **4× the real leucine→isoamyl-alcohol N:C** (leucine carries one amino
@@ -846,6 +882,8 @@ class FuselAminoAcidReroute(Process):
         *(SPEC_BY_SPECIES[spec.precursor_amino_acid].fraction_param for spec in FUSEL_SPECS),
         *(route.share_param for route in SECONDARY_FUSEL_ROUTES),
         *(non_ehrlich_fraction_param(route.precursor) for route in SECONDARY_FUSEL_ROUTES),
+        # D-118: the de-novo share caps each listed alcohol's primary branch.
+        *(route.share_param for route in DE_NOVO_FUSEL_ROUTES),
     )
 
     def derivatives(

@@ -11627,3 +11627,189 @@ about the code, which is the worst shape a review can take.
   de-novo-KIC synthesis flux, and decarboxylase competition; the **KMV → isoleucine** node route; the
   isoamyl-magnitude / monotone-in-N lever; closure O2 ingress; acetaldehyde in maturation + the 0-vs-2.7
   unsulfited floor; the ester/alcohol ratio marginally above 1; the deferred tail.
+
+---
+
+## D-118 — the de-novo phenylpyruvate route: a gate that measured availability was asked a question about provenance
+
+**Status: shipped.** `f_non_ehrlich_phenylalanine` ships at its **measured 0.975** with a real,
+fully sampler-safe band (0.531 → 0.975). D-117's zero-width pin is retired. The unlock is
+`DE_NOVO_FUSEL_ROUTES`, which caps 2-phenylethanol's phenylalanine branch at `1 − f_de_novo`.
+
+### What D-117 handed over, and what was actually wrong
+
+D-117 closed with a clean story: the sourced lump is correct, the model cannot carry it, and *"the
+sourced value and the missing phenylpyruvate route are inseparable — build that route and this
+becomes 0.975."* That story was right about the fix and **wrong about the defect's location**, and
+the difference is this entry's content.
+
+The suspicion going in was that the model had no de-novo mechanism at all. It has one, and
+`byproducts.py` says so at length: the D-100 depletion gate throttles each precursor's re-route as
+that precursor depletes, *"so the anabolic/catabolic ratio falls out of the must spectrum and the
+fusel demand instead of being a fitted fraction. The sugar stand-in it leaves behind is no longer an
+embarrassment but the **correct** book for de-novo synthesis."*
+
+**Measured, that paragraph is true in shape and wrong by an order of magnitude for this molecule.**
+At a wine-like must the model sourced **18.9%** of its 2-phenylethanol from consumed phenylalanine,
+against a derived **~1.7%** — an **~11× over-attribution** the docstring would have you believe was
+already handled.
+
+**The one-line diagnosis: the gate encodes availability; the question was provenance.** Phenylalanine
+*is* available — the gate reads that correctly. It simply is not what most 2-phenylethanol is made
+from. No gate on the precursor's own concentration can express that distinction, because the
+distinction is not about the precursor's concentration.
+
+**The stoichiometric tell the gate structurally cannot see.** A wine must carries ~0.17 mM
+phenylalanine; the wine makes ~0.24 mM 2-phenylethanol. **More alcohol than precursor, in moles.**
+Full phenylalanine sourcing was therefore not merely generous, it was *impossible* — and nothing in
+the gate's form compares an alcohol's demand against its precursor's supply, so it drained the pool
+at ~90% attribution without complaint.
+
+### The probe that redirected the build (and the two wrong turns it caught)
+
+The build was gated on one number — the de-novo share α — and nearly went out on two wrong premises.
+
+**Wrong turn 1: a half-remembered source.** The plan opened believing Rollero 2017 might show 2-PE as
+mostly *phenylalanine*-derived, which would have made the route unbuildable. **Rollero labelled only
+leucine and valine**; it never measured 2-PE, so it could not speak to this at all. Recalled
+literature was treated as evidence until checked — D-103's "a cited number binds only the set it
+describes", arriving as a *mis*-citation rather than an over-extension.
+
+**Wrong turn 2: a constant α, which the failing test's own scenario disproved.** The first design was
+a fixed de-novo share. The objection landed that this is flat in phenylalanine and would override the
+gate exactly where the guard breaks — the breaching scenario is `amino_acids_gpl=1.0`, read as a
+heavy dose, and real de-novo synthesis is feedback-inhibited by phenylalanine, so a dosed must should
+go Ehrlich-*dominant*. If true, the fix would not be a de-novo route at all but the sink's refund
+**destination**, and the named deliverable and the actual fix would have diverged.
+
+**The probe dissolved it: `amino_acids_gpl=1.0` is not a phenylalanine dose.** Phenylalanine is 2.8%
+of the must spectrum, so 1 g/L of amino acids is **28 mg/L Phe** — essentially Minebois's own must
+(26.8). The regime where a constant share would be wrong **is barely reachable in this model**, and
+the guard scenario sits right on the calibration point.
+
+| case | Phe (mg/L) | Phe-derived share of 2-PE | `worst_c` | minus Phe |
+|---|---|---|---|---|
+| undosed | 0.00 | 0.000% | 0.0000 | 0.0000 |
+| Minebois ~26.8 | 26.80 | 18.33% | 0.5883 | 0.5724 |
+| dosed 0.2 g/L | 5.60 | 5.91% | 0.4523 | 0.4406 |
+| **guard scenario (1.0 g/L)** | 28.00 | **18.88%** | 0.5902 | 0.5742 |
+
+The decomposition also **reproduced D-117's 1.125 from the other direction**: phenylalanine
+contributes 0.0159 at f=0.531, and scaling by (39 / 1.132) gives 0.55, i.e. 0.574 + 0.55 = **1.12**.
+A number that had only ever been *observed* became *predicted*, which is what licensed predicting the
+post-route value (0.582) before measuring it (**0.584**).
+
+### The parameter, and the honesty constraint on it
+
+`f_de_novo_2_phenylethanol = 0.9827`, derived: Minebois's must carries 26.8 mg/L Phe (0.1622 mM);
+Fig. 6A sends 2.5% of consumed phenylalanine to 2-PE (0.004055 mM); Wang 2024's mean wine 2-PE is
+28.7 mg/L (0.2349 mM); so the phenylalanine-derived share of total 2-PE is **1.73%**.
+
+**IT IS A CONSISTENCY-CLOSURE, NOT A SECOND MEASUREMENT, AND THE ENTRY SAYS SO IN THREE PLACES.**
+Algebraically `(1 − f_de_novo) = (1 − f_non_ehrlich_phenylalanine) · consumed_Phe / total_2PE`, so
+this parameter and `f_non_ehrlich_phenylalanine` both trace to Minebois's **single 2.5% number** —
+one fact against two denominators. Presenting them as two studies agreeing would be **D-117's own
+lesson (v) inverted**: there, a coincidence between a guess and a measurement diagnosed an error;
+here, a coincidence between two expressions of one measurement would diagnose nothing at all. Its
+tier is **capped at** `f_non_ehrlich_phenylalanine`'s and may never exceed it.
+
+**The genuinely independent number exists and was chased.** Minebois Fig. 6A's *unlabelled* bar
+fraction has total 2-phenylethanol as its denominator and is independent of `f`. It is published only
+as a figure; the underlying values sit in supplementary DataSets released *"upon reasonable request"*
+— **verified by fetching, not assumed**. That fetch is the named unlock for promoting this parameter
+from derived to measured.
+
+### Bands: the D-117 defect not repeated
+
+D-117's hard-won rule is that a rejected value must be **unreachable**, not merely documented — it
+took two follow-up commits to learn. Two bands here, both priced against it:
+
+- `f_non_ehrlich_phenylalanine` → **0.531 … 0.975, mode at the top.** Asymmetric on purpose: 0.975 is
+  the measured lump and 0.531 the measured *protein* share, which is a hard **lower** bound (protein
+  is one of the lump's fates), so all the uncertainty is on the downside. Every point is now
+  sampler-safe — the refund is monotone in `f` and peaks at **0.584×** at the band's top.
+- `f_de_novo_2_phenylethanol` → **0.971 … 0.991, clamped at a MODEL limit rather than an evidence
+  spread, and the note says so.** The honest spread from must-Phe (10–60 mg/L) and wine 2-PE
+  (10–100 mg/L) is roughly 0.95–0.995, whose low end **would** break the carbon guard. The breach
+  point is analytic — `(1 − f_de_novo)·39 = 0.531/0.469` ⇒ **0.971** — and
+  `test_the_de_novo_share_stays_above_its_analytic_breach_point` **recomputes it** rather than
+  trusting the note, because a claimed number nobody recomputes is the D-96/D-109 defect class.
+
+### The test was inverted, not deleted
+
+`test_the_sourced_lump_breaks_the_carbon_refund_guard` was *designed to fail* here and instructed its
+own deletion. Deleting it would have discarded executable knowledge, so it became
+`test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable`: same three quantities, opposite
+assertions, **plus a counterfactual** that sets `f_de_novo = 0` and pins that the identical 0.975
+breaches again (measured 1.125× vs 0.584×). Without it the suite could not distinguish *"the route
+fixed it"* from *"something drifted and happens to mask it"* — the D-108/D-109 vacuity trap, where a
+test measures an outcome it also assumes.
+
+### Recorded, not tuned
+
+- **The realised share under-shoots: 1.00% flux-weighted (peak 1.57%) against the ~1.73% anchor**, a
+  ~1.7× miss, because the share multiplies a gate that keeps throttling as phenylalanine depletes.
+  The two are also not strictly commensurate (cumulative-to-T4 vs flux-weighted over the run).
+  Under-attribution is the **guard-safe** direction, so it is recorded rather than corrected by a
+  fitted factor — the D-107 discipline.
+- **Static-share caveat, the D-104 static-`f` class.** Real de-novo synthesis is feedback-inhibited
+  by phenylalanine, so under heavy dosing reality shifts Ehrlich-dominant and this fixed share
+  under-charges phenylalanine. Guard-safe, and barely reachable (2.8% of the spectrum). A
+  Phe-responsive share is the named refinement.
+- **The de-novo decarboxylation CO₂ is not charged.** De novo runs phenylpyruvate C9 → 2-PE C8 +
+  CO₂, but the producer draws only C8, so this **widens a gap that has existed for the `(1−gate)`
+  share since D-19** rather than creating one; `total_carbon` still closes exactly (carbon never
+  drawn is never lost). ~2.5 mg C/L against ~90 g/L CO₂ (~3e-5). Charging it properly touches all
+  five alcohols in **both** media — beer sources every fusel de novo — and would move the §2.2 beer
+  benchmarks. Deliberately out of scope.
+- **Only 2-phenylethanol is listed, and the other four are unmeasured rather than verified
+  innocent.** Isoamyl alcohol is the live suspect: D-104's inverted leucine split and D-113's
+  "un-inverting leucine remains an unsourced build (de-novo-KIC relief …)" are **this same gap one
+  precursor over**, and `DE_NOVO_FUSEL_ROUTES` is the structure that would carry that fix.
+
+### Lessons
+
+(i) **A docstring claiming a mechanism is emergent is a claim about calibration, not just shape — and
+nothing fails when it goes stale.** `byproducts.py` had said the anabolic/catabolic split "falls out
+of the must spectrum" since D-100. It does; it just falls out ~11× wrong for one molecule, and the
+sentence was load-bearing enough that D-117 wrote "the model has no de-novo route" *and* D-118 opened
+believing the opposite could be true. **The D-109/D-110 stale-prose class, now with a measured
+magnitude attached.**
+(ii) **Availability and provenance are different quantities, and a Monod gate can only ever express
+the first.** "How much of X is there" cannot answer "is X what this was made from". When the two
+diverge, no re-tuning of the gate's half-saturation closes the gap — the model needs a second
+quantity, which is what this registry is.
+(iii) **Check what the scenario actually is before theorising about the regime it represents.** The
+whole "constant α is wrong because dosed musts go Ehrlich-dominant" objection was sound physics
+aimed at a scenario that does not exist: `amino_acids_gpl=1.0` is 28 mg/L phenylalanine, not a dose.
+One `print` of the initial pool would have retired the argument before it was made — and it is the
+same shape as D-109's probe, which measured a 0.42% response and mistook the sugar ledger for the
+competition.
+(iv) **Deriving a companion parameter from a measurement you already ship does not give you two
+sources — it gives you one fact and two denominators.** The temptation to present `f` and `f_de_novo`
+as mutual corroboration was real and would have been the strongest-looking part of this entry.
+**Un-tidying one measurement into two and calling the echo agreement is D-117 lesson (v) run
+backwards.**
+(v) **A test written to fail is worth more inverted than deleted.** Its own docstring said "delete it
+in the same commit". Inverting it instead kept the breach executable *and* forced the counterfactual
+that makes the causal claim checkable — the difference between asserting the route works and
+demonstrating it is what works.
+
+### Next
+
+- **Extract Minebois Fig. 6A's unlabelled bar fraction for 2-PE.** It is the direct, independent
+  de-novo share and would promote `f_de_novo_2_phenylethanol` from consistency-closure to
+  measurement, retiring this entry's biggest caveat. Supplementary DataSets are request-gated; the
+  corresponding author is the path.
+- **Price the same over-attribution for the other four alcohols**, isoamyl first. The registry exists
+  now, so each is one entry plus a sourced number — and leucine's would bear directly on D-104's
+  inversion, which D-112/D-113 measured as untouched by the valine route.
+- **A phenylalanine-responsive de-novo share** (feedback inhibition), which would retire the
+  static-share caveat and make dosed musts behave correctly.
+- **The de-novo decarboxylation CO₂**, both media, priced against the §2.2 beer benchmarks.
+- **The single-host obligation is now LARGER, not smaller.** D-117 flagged re-reading Fig. 6A off a
+  second host as outstanding while 0.531 was live. Two parameters now rest on that one figure, both
+  in `wine_generic.yaml`, one of them at the measured value. Wiley returns HTTP 402.
+- Unchanged from D-113→D-117: isoleucine's bound; the Minebois/Crépin leucine conflict (29.3% vs
+  77–86%), which the un-inversion build must open by pricing; the un-inversion build itself; the
+  KMV → isoleucine route; closure O₂ ingress; acetaldehyde in maturation; the deferred tail.

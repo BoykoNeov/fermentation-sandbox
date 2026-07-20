@@ -24,7 +24,7 @@ from fermentation.core.kinetics import (
     fusel_carbon_draw,
 )
 from fermentation.core.kinetics.byproducts import ehrlich_draws, fusel_carbon_draw_by_species
-from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
+from fermentation.core.kinetics.carbon_routing import DE_NOVO_FUSEL_ROUTES, FUSEL_SPECS
 from fermentation.core.media import get_medium, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -242,7 +242,23 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
     kic_isoamyl_c = share_iso * consumed_valine_c  # valine C5 -> isoamyl C5, so 1:1 in carbon
     extra_refund = kic_isoamyl_c * 3.0 / 5.0
     assert extra_refund > 0.0, "vacuous: the D-111 KIC branch contributed nothing"
-    assert sugar_refund_c == pytest.approx(g * fusel_carbon + extra_refund, rel=1e-12)
+    # D-118: a de-novo-dominated alcohol's primary branch is capped at (1 - f_de_novo), so the
+    # producer's draw for the de-novo share is deliberately NOT refunded — that carbon genuinely
+    # did come from sugar (the shikimate route to phenylpyruvate), which is the whole content of
+    # the route. Derived from the registry rather than hard-coded, so a second de-novo entry
+    # cannot silently invalidate this closed form.
+    de_novo_forgone = 0.0
+    for route in DE_NOVO_FUSEL_ROUTES:
+        alcohol_c = next(
+            c
+            for spec, c in fusel_carbon_draw_by_species(y, schema, full_params)
+            if spec.pool == route.alcohol_pool
+        )
+        de_novo_forgone += g * full_params[route.share_param] * alcohol_c
+    assert de_novo_forgone > 0.0, "vacuous: the D-118 de-novo cap withheld nothing"
+    assert sugar_refund_c == pytest.approx(
+        g * fusel_carbon - de_novo_forgone + extra_refund, rel=1e-12
+    )
     # The carbon debited ACROSS THE FIVE PRECURSORS — each at its OWN carbon fraction. Before
     # D-100 this was one debit at arginine's fraction; the sum is what must now match, because each
     # alcohol eats a different molecule. Since D-106 it matches refund + CO2, not refund alone.
@@ -256,7 +272,11 @@ def test_reroute_matches_the_producer_draw_exactly(full_params):
     # Its sugar refund is 3/5 of that branch (not the whole of it, as on the primary routes), which
     # is why the extra term is `extra_refund` and not `kic_isoamyl_c` — the missing 2/5 is the two
     # CO2, already inside `co2_c`.
-    assert aa_debit_c == pytest.approx(g * fusel_carbon + extra_refund + co2_c, rel=1e-12)
+    # D-118's cap enters here for the same reason it entered the refund identity above: the
+    # de-novo share is never sourced from phenylalanine, so the precursors never give it up.
+    assert aa_debit_c == pytest.approx(
+        g * fusel_carbon - de_novo_forgone + extra_refund + co2_c, rel=1e-12
+    )
     # The CO2 is a real share of the draw, not a rounding term: one carbon per alcohol means the
     # precursors give up ~1/n MORE carbon than they did before D-106. Pin that it is neither zero
     # nor the whole draw, so a silently-dropped term cannot pass as "approximately equal".

@@ -61,16 +61,19 @@ def full_params():
     ).resolve()
 
 
-#: Minebois 2025's measured PROTEIN share of consumed phenylalanine (Sc, Fig. 6A) — a sourced
-#: LOWER BOUND on the non-Ehrlich lump, and what `f_non_ehrlich_phenylalanine` ships as (D-117).
+#: Minebois 2025's measured PROTEIN share of consumed phenylalanine (Sc, Fig. 6A). A hard LOWER
+#: BOUND on the non-Ehrlich lump (protein is one of the lump's fates, so the lump cannot be
+#: smaller). D-117 shipped it as the *value*; since D-118 it is the **floor of the band**.
 _PHE_PROTEIN_SHARE_BOUND = 0.531
 
 #: The measured non-Ehrlich LUMP, 1 − 0.025 (Minebois 2025: 2.5% of consumed phenylalanine reaches
-#: 2-phenylethanol). **This is the true value and the model cannot carry it** — at 0.975 the D-104
-#: sink's joint carbon refund exceeds growth's own draw — past the sparing credit's ceiling, so the
-#: refund stops crediting sugar and starts inventing it in ``S``. It is a CONSTANT
-#: HERE rather than the YAML band's upper end precisely so the ensemble sampler cannot reach it;
-#: see :func:`test_the_sourced_lump_breaks_the_carbon_refund_guard`.
+#: 2-phenylethanol). **[D-118: THE MODEL CARRIES THIS NOW — it is the shipped value.]** Until the
+#: de-novo phenylpyruvate route landed it could not: at 0.975 the D-104 sink's joint carbon refund
+#: reached 1.125× growth's own draw, past the sparing credit's ceiling, inventing extracellular
+#: sugar in ``S``. It lived here as an unsampleable constant for exactly that reason. With
+#: 2-phenylethanol's phenylalanine branch capped by ``f_de_novo_2_phenylethanol`` the same value
+#: measures 0.584×, and the YAML band reaches it safely;
+#: see :func:`test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable`.
 _PHE_MEASURED_LUMP = 0.975
 
 
@@ -312,90 +315,106 @@ def test_the_joint_nitrogen_refund_exceeds_growths_draw_at_pitch_and_that_is_dea
     assert 1.0 < worst_n < 1.20, f"joint N refund {worst_n:.3f}x — outside the documented band"
 
 
-def test_the_sourced_lump_breaks_the_carbon_refund_guard(full_params):
-    """WHY `f_non_ehrlich_phenylalanine` SHIPS AT A BOUND AND NOT AT ITS MEASURED VALUE (D-117).
+def test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable(full_params):
+    """THE D-117 BLOCKER, RESOLVED — and this test is the inverse of the one it replaces (D-118).
 
-    Minebois 2025 measures phenylalanine's true non-Ehrlich lump at **0.975** (2.5% of consumed
-    phenylalanine reaches 2-phenylethanol). The parameter ships **0.531** — Minebois's *protein*
-    share, an explicit lower bound. **This test is the reason**, and it exists so that reason is
-    executable rather than a paragraph someone can talk themselves out of.
+    Its predecessor, ``test_the_sourced_lump_breaks_the_carbon_refund_guard``, was **designed to
+    fail** when the de-novo phenylpyruvate route landed, and instructed its own deletion. Deleting
+    it would have thrown away the executable knowledge, so it is inverted instead: the same three
+    quantities are measured, and each now asserts the *opposite* outcome **plus the counterfactual
+    that proves the route is the cause**.
 
-    **Set the sourced lump and the model stops conserving carbon.** The sink refunds the drawn
-    precursor's carbon to sugar; its draw scales ``f/(1−f)``, which goes **1.13 → 39** between the
-    bound and the measurement. Measured here: the joint (swap + sink) carbon refund reaches
-    **1.125× growth's own draw**, i.e. it hands back more carbon than growth was ever charged.
-    The refund is a *sparing credit* and its ceiling is exactly growth's draw, so past 1.0 it
-    **creates extracellular sugar in `S`** — prime directive 1, and the hard `< 1.0` guard two
-    tests up. **This is a mass-balance violation, not a suppressed pathway** (D-117): real
-    gluconeogenesis makes intracellular G6P for trehalose/glycogen, is glucose-repressed during
-    fermentation, and is never secreted — modelling it would not license this overrun.
-    (The joint N refund also goes 1.095 → **1.549×**, far past the
-    documented "slight deamination" band; but nitrogen has a physical home for the excess —
-    deamination to ammonium — and **carbon has none**. That asymmetry is why the N band is soft and
-    documented while the C guard is hard.)
+    **What changed.** D-117 shipped ``f_non_ehrlich_phenylalanine`` at Minebois's *protein* share
+    (0.531, a lower bound) because the measured **lump** (0.975) drove the D-104 sink's joint
+    carbon refund to **1.125x growth's own draw** — past the sparing credit's ceiling, inventing
+    extracellular sugar in ``S``. The cause was never the parameter: the model charged *all* of its
+    ``k``-calibrated 2-phenylethanol to consumed phenylalanine, while the molecule is
+    overwhelmingly built de novo. D-118's
+    :data:`~fermentation.core.kinetics.carbon_routing.DE_NOVO_FUSEL_ROUTES` caps that branch, and
+    the measured lump now ships.
 
-    **Do NOT read the ProcessSet-level `dS/dt ≤ 0` as absolution.** It still holds at 0.975, because
-    fermentation's sugar *consumption* swamps the fictitious refund in the sum. A breach that a
-    larger flux hides is still a breach — the guard is at the Process level precisely so it cannot
-    be masked. Widening either band to admit 0.975 would be the D-103 trap (a band used to acquit a
-    model) and "weaken the test for green", simultaneously.
-
-    **The cause is structural and is not the parameter's fault.** The model charges *all* of its
-    ``k``-calibrated 2-phenylethanol to consumed phenylalanine; reality builds ~97% of 2-PE **de
-    novo from phenylpyruvate**. Without that route, honouring the measured lump forces the sink to
-    eat phenylalanine at ~40× the Ehrlich draw to feed an alcohol reality mostly makes from sugar.
-    **The sourced value and the missing de-novo route are inseparable — the route is the unlock,
-    and a refund clamp would be a band-aid over a conservation law.**
-
-    **THIS TEST IS WHERE THE MEASURED 0.975 LIVES.** The YAML band is deliberately **zero-width**,
-    because `sample_parameters` draws every parameter over ``[low, high]`` — a band reaching 0.975
-    would put a value that breaks carbon conservation into a field the ensemble *consumes*, and
-    ~1 draw in 900 lands above the ~0.96 breach point. So the honest interval cannot be expressed
-    there, and this constant is its home instead: unsampleable, and asserted rather than annotated.
-
-    **When the phenylpyruvate route lands, this test should FAIL** — that is its purpose. Delete it
-    and set the parameter to 0.975 (with a real band) in the same commit.
+    **The counterfactual is the load-bearing half.** Asserting only that 0.975 is now safe would
+    not distinguish "the route fixed it" from "something else drifted and happens to mask it" —
+    the D-108/D-109 vacuity trap, where a test measures an outcome it also assumes. So this
+    switches the route **off** at the same parameter values and pins that the identical 0.975
+    breaches again.
     """
     traj, compiled = _run(amino_acids_gpl=1.0)
     entry = compiled.parameters["f_non_ehrlich_phenylalanine"]
 
-    # The shipped value is Minebois's protein share — a sourced LOWER BOUND, not an estimate.
-    assert entry.value == pytest.approx(_PHE_PROTEIN_SHARE_BOUND)
+    # The MEASURED lump ships now — not the bound.
+    assert entry.value == pytest.approx(_PHE_MEASURED_LUMP)
 
-    # ...and the band is pinned shut ON PURPOSE, so no ensemble can wander into the breach.
+    # ...and its band is real rather than pinned shut, which was D-117's whole compromise.
     assert entry.uncertainty is not None
-    assert entry.uncertainty.high <= entry.uncertainty.low, (
-        "f_non_ehrlich_phenylalanine's band is no longer zero-width — an ensemble can now draw "
-        f"toward the measured {_PHE_MEASURED_LUMP} lump, which breaks the carbon guard below. "
-        "Either the de-novo phenylpyruvate route landed (then ship the lump and delete this test) "
-        "or a band was widened without pricing the conservation breach"
+    assert entry.uncertainty.high > entry.uncertainty.low, (
+        "f_non_ehrlich_phenylalanine's band is zero-width again — the D-117 pin was a workaround "
+        "for a breach the de-novo route removed, not a permanent shape"
     )
+    assert entry.uncertainty.high == pytest.approx(_PHE_MEASURED_LUMP)
+    assert entry.uncertainty.low == pytest.approx(_PHE_PROTEIN_SHARE_BOUND)
 
-    # At the shipped bound the guards hold with room...
-    n_at_bound, c_at_bound = _worst_joint_refund(traj, compiled)
-    assert c_at_bound < 1.0 and 1.0 < n_at_bound < 1.20
+    # THE BAND'S WHOLE SPAN MUST BE SAFE, not merely its mode — the D-117 follow-up lesson
+    # ("a rejected value is not rejected until it is unreachable"). The refund scales
+    # monotonically in f, so the top of the band is the worst case and pinning it suffices.
+    worst_n, worst_c = _worst_joint_refund(traj, compiled)
+    assert worst_c < 1.0, f"joint C refund {worst_c:.3f}x at the shipped lump — creates sugar"
+    assert 1.0 < worst_n < 1.20, f"joint N refund {worst_n:.3f}x — outside the documented band"
 
-    # ...and at the SOURCED value the carbon guard breaks. Measured, not asserted from prose.
-    pv = compiled.param_values
-    pv["f_non_ehrlich_phenylalanine"] = _PHE_MEASURED_LUMP
+    # THE COUNTERFACTUAL: switch the de-novo route off and the SAME lump breaches again. This is
+    # what makes the assertions above attributable to the route rather than to drift.
+    pv = dict(compiled.param_values)
+    pv["f_de_novo_2_phenylethanol"] = 0.0
     dur = compiled.t_span_h[1]
-    blocked = simulate(
-        compiled.process_set, pv, compiled.y0, compiled.t_span_h,
+    without = simulate(
+        compiled.process_set,
+        pv,
+        compiled.y0,
+        compiled.t_span_h,
         t_eval=np.linspace(0.0, dur, int(dur) + 1),
     )
-    assert blocked.success, blocked.message
+    assert without.success, without.message
 
     class _Shim:
         process_set = compiled.process_set
         param_values = pv
 
-    worst_n, worst_c = _worst_joint_refund(blocked, _Shim())
-    assert worst_c > 1.0, (
-        f"the sourced lump {_PHE_MEASURED_LUMP} no longer breaks the carbon guard (joint C refund "
-        f"{worst_c:.3f}x) — if the de-novo phenylpyruvate route landed, SHIP the lump and delete "
-        "this test; if something else changed, find out what before trusting it"
+    _, worst_c_off = _worst_joint_refund(without, _Shim())
+    assert worst_c_off > 1.0, (
+        f"with the de-novo route OFF the sourced lump no longer breaches (joint C refund "
+        f"{worst_c_off:.3f}x) — either the sink's refund destination changed or the guard moved. "
+        "The route is supposed to be the ONLY thing standing between 0.975 and a breach; if it is "
+        "not, this beat's causal claim is wrong and D-118 needs re-deriving"
     )
-    assert worst_n > 1.20, f"joint N refund {worst_n:.3f}x — the N story moved too, re-derive both"
+    # ...and the route must be doing real work, not rounding: an order of magnitude between them.
+    assert worst_c_off > 1.5 * worst_c
+
+
+def test_the_de_novo_share_stays_above_its_analytic_breach_point(full_params):
+    """The band's floor is a MODEL limit, and it is derived here rather than trusted (D-118).
+
+    ``f_de_novo_2_phenylethanol``'s lower bound is not a measurement spread — it is the point
+    where the phenylalanine branch grows enough to break the carbon guard at the shipped lump.
+    The breach point is analytic: the sink's draw scales ``f/(1-f)``, so the de-novo-capped phe
+    refund is ``(1 - f_de_novo) * f/(1-f)``, and it reaches the pre-route (and safely-shipping)
+    0.531 configuration's ``0.531/0.469`` when ``(1 - f_de_novo) * 39 == 1.132``.
+
+    Pinned because the YAML note *claims* this number, and a claimed number nobody recomputes is
+    the D-96/D-109 class of defect this project keeps re-learning.
+    """
+    f = full_params["f_non_ehrlich_phenylalanine"]
+    _, compiled = _run(amino_acids_gpl=1.0, days=1.0)
+    entry = compiled.parameters["f_de_novo_2_phenylethanol"]
+
+    breach_point = 1.0 - (_PHE_PROTEIN_SHARE_BOUND / (1.0 - _PHE_PROTEIN_SHARE_BOUND)) / (
+        f / (1.0 - f)
+    )
+    assert breach_point == pytest.approx(0.971, abs=5e-4), breach_point
+    assert entry.uncertainty is not None
+    assert entry.uncertainty.low >= breach_point, (
+        f"f_de_novo_2_phenylethanol's band floor {entry.uncertainty.low} is below the analytic "
+        f"breach point {breach_point:.4f} — an ensemble draw can now break the carbon guard"
+    )
 
 
 # -- isolability --------------------------------------------------------------

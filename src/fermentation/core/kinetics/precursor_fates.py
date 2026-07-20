@@ -126,18 +126,51 @@ could not check, and the coincidence made the error look derived. The stated der
 of Crépin's four measured splits") did not even yield 0.53 — that mean is 0.749. **A value whose
 stated derivation does not reproduce it is a defect even while it is only "speculative".**
 
-**AND THE MEASURED LUMP CANNOT BE SHIPPED — this Process is why.** The draw scales ``f/(1−f)``,
-which goes **1.13 → 39** between 0.53 and 0.975. At 0.975 the joint (D-32 swap + this sink) carbon
-refund reaches **1.125× growth's own draw**: it refunds more carbon than growth was ever charged,
-and it trips the hard ``< 1.0`` guard in
-``test_the_joint_carbon_refund_never_creates_sugar``. The cause is **the missing de-novo route, not
-the parameter**: this model charges *all* of its ``k``-calibrated 2-phenylethanol to consumed
-phenylalanine, while reality builds ~97% of 2-PE from **de-novo phenylpyruvate**. So the sink must
+**AND THE MEASURED LUMP COULD NOT BE SHIPPED — this Process was why.** The draw scales
+``f/(1−f)``, which goes **1.13 → 39** between 0.53 and 0.975. At 0.975 the joint (D-32 swap + this
+sink) carbon refund reached **1.125× growth's own draw**: it refunded more carbon than growth was
+ever charged, tripping the hard ``< 1.0`` guard in
+``test_the_joint_carbon_refund_never_creates_sugar``. The cause was **the missing de-novo route, not
+the parameter**: the model charged *all* of its ``k``-calibrated 2-phenylethanol to consumed
+phenylalanine, while reality builds ~97% of 2-PE from **de-novo phenylpyruvate**. So the sink had to
 eat phenylalanine at ~40× the Ehrlich draw to feed an alcohol reality mostly makes from sugar —
 **the same shape as the isoamyl/KIC problem this docstring already describes, one precursor over.**
-The shipped value is therefore Minebois's protein share, **0.531, an explicit lower bound**, and the
-blocker is pinned by ``test_the_sourced_lump_breaks_the_carbon_refund_guard``, which is *designed to
-fail* when the phenylpyruvate route lands. See DECISIONS D-117.]**
+See DECISIONS D-117.]**
+
+**[D-118 — THE ROUTE LANDED AND THE MEASURED LUMP NOW SHIPS.**
+:data:`~fermentation.core.kinetics.carbon_routing.DE_NOVO_FUSEL_ROUTES` caps 2-phenylethanol's
+phenylalanine branch at ``1 − f_de_novo_2_phenylethanol``, so this sink rides a phenylalanine draw
+~11× smaller and ``f_non_ehrlich_phenylalanine`` ships at **0.975 with a real, fully sampler-safe
+band** (0.531 → 0.975). Measured at the guard scenario: the joint carbon refund is **0.584×**
+growth's draw, where the identical 0.975 reached 1.125× before the route.
+
+**What the route corrected was a claim, not just a number.**
+:class:`~fermentation.core.kinetics.byproducts.FuselAminoAcidReroute` states that the
+anabolic/catabolic split "falls out of the must spectrum" through each precursor's depletion gate,
+and calls the sugar stand-in "the **correct** book for de-novo synthesis". That is true in *shape*
+and was wrong by an order of magnitude for this molecule: measured before D-118, the model sourced
+**18.9%** of its 2-phenylethanol from consumed phenylalanine against a derived **~1.7%**. The gate
+models **availability**; the de-novo share models **provenance**. Phenylalanine *is* available — it
+simply is not what most 2-phenylethanol is made from, and no gate on the precursor's own
+concentration can express that. **The stoichiometric tell the gate cannot see**: a wine must carries
+~0.17 mM phenylalanine and the wine makes ~0.24 mM 2-phenylethanol — *more alcohol than precursor,
+in moles* — so full phenylalanine sourcing was not merely over-attributed but impossible.
+
+**THE RESIDUAL MISS IS RECORDED, NOT TUNED (the D-107 discipline).** The realised phenylalanine
+share is **1.00%** flux-weighted (peak 1.57%) against the ~1.73% anchor — a ~1.7× *under*-shoot,
+because the share multiplies a gate that keeps throttling as phenylalanine depletes. The two
+numbers are also not strictly commensurate: Minebois's is cumulative incorporation to T4, this is a
+flux-weighted average over the whole run. Under-attribution is the **guard-safe** direction (it
+cannot over-refund), so it is documented rather than corrected by a fitted factor.
+
+**KNOWN CARRY-FORWARD — the de-novo decarboxylation CO₂ is not charged.** De-novo synthesis runs
+phenylpyruvate (C9) → 2-phenylethanol (C8) + CO₂, but the producer draws only the alcohol's C8 from
+sugar, so moving carbon onto the de-novo share widens a gap that has existed for the ``(1−gate)``
+share since D-19 — it does **not** create a new one, and ``total_carbon`` still closes exactly
+(carbon that is never drawn is never lost). Magnitude ~2.5 mg C/L against ~90 g/L of CO₂, i.e.
+~3e-5. Charging it properly would touch all five alcohols in **both** media — beer sources every
+fusel de novo — and would move the §2.2 beer benchmarks, so it is deliberately out of this beat's
+scope. See DECISIONS D-118.]**
 """
 
 from __future__ import annotations
@@ -148,6 +181,7 @@ from fermentation.core.chemistry import carbon_mass_fraction, nitrogen_mass_frac
 from fermentation.core.kinetics.amino_acid_pools import SPEC_BY_SPECIES
 from fermentation.core.kinetics.byproducts import ehrlich_draws
 from fermentation.core.kinetics.carbon_routing import (
+    DE_NOVO_FUSEL_ROUTES,
     FUSEL_SPECS,
     SECONDARY_FUSEL_ROUTES,
     non_ehrlich_fraction_param,
@@ -223,6 +257,10 @@ class PrecursorNonEhrlichFates(Process):
         # D-111: the shared draw helper resolves every secondary route's share, so this Process
         # reads it too — the lump it books is scaled against those branches as well.
         *(route.share_param for route in SECONDARY_FUSEL_ROUTES),
+        # D-118: and every de-novo share, which CAPS a primary branch — so it scales this lump
+        # too. This is the whole reason the sourced 0.975 became shippable: the lump rides a
+        # phenylalanine draw that is now ~11x smaller.
+        *(route.share_param for route in DE_NOVO_FUSEL_ROUTES),
     )
 
     def derivatives(

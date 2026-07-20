@@ -460,6 +460,29 @@
 > in-vitro ones + an unsourced protein flux + an unsourced [E]: more invented numbers at a worse tier. **The D-98 trap
 > does not dissolve, it RELOCATES to [E]** — kcat is not a flux — so D-113's owner gate reattaches to [E] + the
 > de-novo-KIC and decarboxylase fluxes, not to the transaminase rate. Per-species sourced `f_i` stand. See D-116.]**;
+>
+> **[D-118 BUILDS THE DE-NOVO PHENYLPYRUVATE ROUTE D-117 NAMED AS THE UNLOCK — and relocates the defect D-117
+> diagnosed. D-117 said the model "has no de-novo route"; it HAS one (the D-100 depletion gate), and `byproducts.py`
+> has claimed since D-100 that the anabolic/catabolic split therefore "falls out of the must spectrum". **Measured:
+> true in shape, ~11x wrong for this molecule** — the model sourced **18.9%** of its 2-phenylethanol from consumed
+> phenylalanine against a derived **~1.7%**. The one-line diagnosis: **the gate encodes AVAILABILITY, and the question
+> was PROVENANCE.** Phenylalanine *is* available; it is simply not what most 2-PE is made from, and no half-saturation
+> re-tune expresses that. The stoichiometric tell the gate structurally cannot see: the must carries ~0.17 mM Phe and
+> the wine makes ~0.24 mM 2-PE — **more alcohol than precursor, in moles**, so full sourcing was impossible, not merely
+> generous. SHIPPED: `DE_NOVO_FUSEL_ROUTES`, a sourcing-layer registry capping an alcohol's amino-acid branch at
+> `1 - f_de_novo` (producer and undosed isolability untouched), and **`f_non_ehrlich_phenylalanine` now ships at its
+> measured 0.975** with a real band 0.531 -> 0.975 (joint C refund 1.125x -> **0.584x**). Two traps caught by probing
+> rather than reasoning: (1) a **half-remembered source** — Rollero 2017 labelled only leu/val and never measured 2-PE,
+> so it could not speak to this (D-103 as a *mis*-citation); (2) a **constant-share objection aimed at a scenario that
+> does not exist** — the breaching `amino_acids_gpl=1.0` is only **28 mg/L Phe** (Phe is 2.8% of the spectrum), i.e.
+> essentially Minebois's own must, not the heavy dose that would make feedback inhibition bite. `f_de_novo` is a
+> **consistency-closure, NOT a second source** (it and `f` are Minebois's single 2.5% against two denominators), tier
+> capped at `f`'s, and its band is clamped at the **analytic breach point 0.971** — a MODEL limit, not an evidence
+> spread — which a test recomputes rather than trusts. The designed-to-fail
+> `test_the_sourced_lump_breaks_the_carbon_refund_guard` was **inverted, not deleted**, gaining a counterfactual that
+> sets `f_de_novo = 0` and pins that the identical 0.975 breaches again. Carry-forwards recorded not tuned: realised
+> share under-shoots (1.00% vs ~1.73%, guard-safe), the static share ignores feedback inhibition, and the de-novo
+> decarboxylation CO2 is uncharged (widening a gap present since D-19, ~3e-5, both media). 1184->1185. See D-118.]**;
 > and a **tracer stoichiometry trap** is already
 > visible (isoamyl's valine-derived carbon is {3,4,5}/5 depending which carbons the two decarboxylations remove — **both
 > close the ledger**, so the atom assignment must be sourced, not assumed). See D-109.]**
