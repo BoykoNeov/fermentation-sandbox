@@ -226,16 +226,16 @@ def test_aging_params_ride_in_every_compiled_scenario():
         assert name in cs.parameters
 
 
-# -- the emergent aging headline (esters fade, isoamyl alcohol + Byp rise) ----
+# -- the emergent aging headline: banana ester fades → isoamyl alcohol rises; EtOAc → equilibrium
 
 
 def test_aging_fades_esters_and_raises_isoamyl_alcohol_end_to_end():
-    # The end-to-end payoff: an aged wine finishes with LOWER esters and HIGHER
-    # isoamyl_alcohol/Byp than
-    # the otherwise-identical un-aged wine. Both runs share the identical ferment (aging is off
-    # until the breakpoint), so any difference at the end is exactly the aging Process's doing —
-    # a clean A/B that also proves isolability (the un-aged run never activates the Process).
-    aged = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)])).run()
+    # The end-to-end payoff: an aged wine finishes with LOWER banana ester and HIGHER
+    # isoamyl_alcohol than the otherwise-identical un-aged wine. Both runs share the identical
+    # ferment (aging is off until the breakpoint), so any end difference is exactly the aging
+    # Processes' doing — a clean A/B that also proves isolability (un-aged never activates them).
+    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
+    aged = cs.run()
     plain = compile_scenario(_wine([])).run()
     assert aged.success and plain.success
 
@@ -243,18 +243,28 @@ def test_aging_fades_esters_and_raises_isoamyl_alcohol_end_to_end():
     ester_plain = float(plain.series("isoamyl_acetate")[-1])
     isoamyl_aged = float(aged.series("isoamyl_alcohol")[-1])
     isoamyl_plain = float(plain.series("isoamyl_alcohol")[-1])
-    byp_aged = float(aged.series("Byp")[-1])
-    byp_plain = float(plain.series("Byp")[-1])
+    etoac_aged = float(aged.series("ethyl_acetate")[-1])
+    etoac_plain = float(plain.series("ethyl_acetate")[-1])
 
     # The wine actually made ester during the ferment, so there is something to hydrolyse.
     assert ester_plain > 0.0
-    # Aging hydrolyses the banana acetate ester: less ester, more isoamyl alcohol + Byp at the
-    # end. Since D-99 the alcohol lands in the isoamyl pool SPECIFICALLY — hydrolysing isoamyl
-    # acetate yields 3-methylbutan-1-ol and nothing else, so the old lump silently credited a
-    # share of it to four other molecules.
+    # EsterHydrolysis (D-69) hydrolyses the banana acetate ester: less ester, more isoamyl alcohol
+    # at the end. Since D-99 the alcohol lands in the isoamyl pool SPECIFICALLY: hydrolysing
+    # isoamyl acetate yields 3-methylbutan-1-ol and nothing else. This isoamyl_alcohol rise is the
+    # CLEAN payoff: no other aging Process touches that pool.
     assert ester_aged < ester_plain
     assert isoamyl_aged > isoamyl_plain
-    assert byp_aged > byp_plain
+    # EthylAcetateEsterification (D-127) relaxes ethyl acetate toward its esterification eq.
+    # The freshly-fermented wine sits just BELOW eq (~48.9 vs 51 mg/L), so — exactly
+    # as Shinohara 1979 found for new wines (E-rate ~7.5% climbing toward the ~10% table-wine
+    # equilibrium) — aging FORMS ethyl acetate, and the aged pool ends at its floor.
+    assert etoac_aged > etoac_plain
+    assert etoac_aged == pytest.approx(cs.param_values["ethyl_acetate_eq"], abs=5e-4)
+    # NOTE (D-127): Byp is NO LONGER a clean "rises with aging" marker. Two aging routes now move it
+    # oppositely: isoamyl-acetate hydrolysis ADDS acetic to Byp, while ethyl-acetate FORMATION
+    # (above) CONSUMES it — and the ethyl_acetate pool dwarfs the trace isoamyl_acetate pool,
+    # so the formation draw slightly outweighs the hydrolysis gain: net Byp barely moves (can dip).
+    # Acid bookkeeping is verified by the carbon-closure end-to-end test, not a naive Byp sign.
 
 
 def test_aging_does_not_strip_esters_below_the_equilibrium_floor():

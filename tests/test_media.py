@@ -497,7 +497,9 @@ HOP_PROCESSES = {"iso_alpha_acid_loss"}
 # Aging chemistry (Milestone 3 / Tier-3, decisions D-68..D-74): the medium-agnostic §4.1 aging
 # Processes, ester_hydrolysis (D-69, banana-acetate fade), ethyl_hexanoate_hydrolysis (D-126, the
 # apple-ethyl-ester fade — the sibling hydrolysis, Makhotkina & Kilmartin 2012),
-# oxidative_acetaldehyde (D-71, the O₂-driven ethanol oxidation) and phenolic_browning (D-74, the
+# ethyl_acetate_esterification (D-127, the bidirectional ethyl-acetate relaxation toward its
+# esterification equilibrium — forms below eq, fades above), oxidative_acetaldehyde (D-71, the
+# O₂-driven ethanol oxidation) and phenolic_browning (D-74, the
 # O₂-driven browning that accumulates the A420 index). All medium-agnostic (hydrolysis/oxidation are
 # molecule/pH properties, and esters/fusels/Byp/acetaldehyde/o2/A420 exist in both schemas; both
 # media carry autoxidising polyphenols), so present in a bare build_process_set for BOTH media — but
@@ -507,6 +509,7 @@ HOP_PROCESSES = {"iso_alpha_acid_loss"}
 AGING_PROCESSES = {
     "ester_hydrolysis",
     "ethyl_hexanoate_hydrolysis",
+    "ethyl_acetate_esterification",
     "oxidative_acetaldehyde",
     "phenolic_browning",
 }
