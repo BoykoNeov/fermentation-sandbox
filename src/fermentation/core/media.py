@@ -101,6 +101,7 @@ from fermentation.core.kinetics import (
     EsterSynthesis,
     EsterVolatilization,
     EthanolInactivation,
+    EthanolToleranceDeath,
     EthylAcetateEsterification,
     EthylHexanoateHydrolysis,
     FuselAlcoholsEhrlich,
@@ -1133,6 +1134,24 @@ _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
     ColemanQuadraticDeathTemperature,
 )
 
+#: Ethanol-tolerance ceiling (decision D-129) — the super-linear viability collapse that
+#: gives the *linear, unbounded* Coleman death (``_PRIMARY_FERMENTATION_PROCESSES``) the
+#: ceiling it lacks past its 265-300 g/L validated envelope. Kept in its OWN isolable tuple
+#: (prime directive #3): a ProcessSet built without it is exactly the Coleman-only core, and
+#: because :class:`EthanolToleranceDeath` is ``k_d2·max(E − E_tol, 0)²`` — identically zero
+#: for ``E ≤ ethanol_tolerance`` — an in-envelope ferment (E stays below the strain rating) is
+#: **byte-for-byte** the core even with it wired on. It only bites when ethanol overshoots the
+#: rated tolerance, sticking a high-sugar must sweet instead of over-fermenting to an
+#: impossible ABV. Medium-agnostic (yeast dying past its own tolerance), like
+#: :class:`EthanolInactivation`, so wired into BOTH media (both carry ``ethanol_tolerance`` and
+#: ``k_d2_ethanol_tolerance_death``); on a normal beer/wine it is inert (E never reaches
+#: tolerance). One honest tier consequence (the D-26/D-27 always-on-speculative parallel): it
+#: is the first *speculative* Process to touch the biomass pools, so the STRUCTURAL
+#: ``tier_of("X")``/``tier_of("X_dead")`` drop PLAUSIBLE→SPECULATIVE — but the term is inert in
+#: the validated envelope, and the param-aware biomass tier is unaffected where the Coleman
+#: brake's own reads already set it. See D-129 and the ``inactivation`` module docstring.
+_ETHANOL_CEILING_PROCESSES: tuple[Callable[[], Process], ...] = (EthanolToleranceDeath,)
+
 #: Tier-2 temperature-/metabolism-driven aroma byproducts (Milestone 2, decision
 #: D-18/D-19): ester synthesis and Ehrlich-pathway fusel alcohols. Kept as a
 #: *separate* tuple from the validated-core primary set so the speculative beat stays
@@ -1830,6 +1849,7 @@ MEDIA: dict[str, Medium] = {
         schema=wine_schema(),
         process_factories=(
             _PRIMARY_FERMENTATION_PROCESSES
+            + _ETHANOL_CEILING_PROCESSES
             + _TEMPERATURE_PROCESSES
             + _BYPRODUCT_PROCESSES
             + _VDK_PROCESSES
@@ -1866,6 +1886,7 @@ MEDIA: dict[str, Medium] = {
         schema=beer_schema(),
         process_factories=(
             _PRIMARY_FERMENTATION_PROCESSES
+            + _ETHANOL_CEILING_PROCESSES
             + _TEMPERATURE_PROCESSES
             + _BYPRODUCT_PROCESSES
             + _VDK_PROCESSES

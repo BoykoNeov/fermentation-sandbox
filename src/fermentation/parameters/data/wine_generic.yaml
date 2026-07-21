@@ -154,6 +154,16 @@ ethanol_tolerance:
     conditions: "S. cerevisiae var. bayanus (Prise de Mousse), the strain Coleman 2007 used"
     notes: "18% v/v * 0.789 g/mL = 142 g/L. Read by EthanolInhibition as the wall E_max in f = (1 - E/E_max)^n. CAVEAT on tier: the VALUE is the strain's well-corroborated max-ABV spec (the same strain Coleman fitted), and the semantics line up (max ABV achievable ~ where rate->0 = E_max); but the Luong-wall FORM is our modelling choice, not Coleman's (they instead use an ethanol-driven death term k_d = k'_d*E). A 24 Brix must makes ~135 g/L ethanol at dryness, so this tolerance lets the strain finish - consistent with reality and NOT reverse-engineered from the benchmark."
 
+k_d2_ethanol_tolerance_death:
+  value: 1.0e-3
+  unit: "(g/L)^-2 h^-1"   # Phi = k_d2 * max(E - E_tol, 0)^2 has units 1/h
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 3.0e-2, note: "swept over 2.5 orders in D-129; qualitative outcome (stick-sweet past tolerance) holds across the whole band - only the residual-sugar AMOUNT moves" }
+  provenance:
+    source: "author estimate; tolerance-gated quadratic FORM after Schenk et al. 2014 (arXiv:1412.6068), Phi(E) simplified to the one-sided C1 form max(E-E_tol,0)^2 that is EXACTLY inert below tolerance"
+    conditions: "S. cerevisiae; read by EthanolToleranceDeath as the curvature of the super-linear death added past ethanol_tolerance (decision D-129). WHERE the ceiling sits is the SOURCED ethanol_tolerance (142 g/L); k_d2 sets only HOW SHARPLY the ferment arrests above it"
+    notes: "Phi(E) = k_d2 * max(E - ethanol_tolerance, 0)^2 [1/h] extra specific death, moved X->X_dead within the Coleman death mechanism (D-13-compatible, NOT an uptake wall, no double-count). Coleman 2007's k_d = k'_d*E is linear/unbounded and was validated only over 265-300 g/L sugar; this supplies the missing ceiling beyond that envelope. SPECULATIVE because the value 1.0e-3 is our choice: the D-129 sweep over k_d2 in [1e-4, 3e-2] shows the sticking THRESHOLD (which Brix leaves residual sugar) and the arrest-ABV PLATEAU are set by the sourced 142 g/L and are shape-INSENSITIVE; only the residual-sugar amount depends on k_d2. NOT tuned to a target: at 1.0e-3 a 36 Brix must arrests at ~152 g/L EtOH (~19.3% ABV) leaving ~72 g/L residual sugar (a stuck sweet high-alcohol wine) instead of fermenting bone-dry to an impossible ~187 g/L / 23.7% ABV; a 24/28 Brix must (E < 142) is BYTE-FOR-BYTE the Coleman-only core (max(.,0)^2 = 0 below tolerance). k_d2 -> inf gives a hard wall at E_tol; k_d2 -> 0 recovers Coleman (no ceiling)."
+
 ethanol_inhibition_exponent:
   value: 2.0
   unit: "dimensionless"

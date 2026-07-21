@@ -137,6 +137,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 - [**D-126**](#d-126--the-candidate-fetch-spent-makhotkina--kilmartin-2012-unblocks-ethyl_hexanoate-hydrolysis-its-own-sibling-process-built-not-ethyl_acetate-formation-still-blocked) — the candidate fetch, spent: Makhotkina & Kilmartin 2012 unblocks `ethyl_hexanoate` hydrolysis (its …
 - [**D-127**](#d-127--ethyl_acetate-formation-unblocked-as-an-explicitly-model-based-term-the-third-ester-process-and-the-only-bidirectional-one) — `ethyl_acetate` formation, unblocked as an explicitly model-based term: the 3rd ester Process, the …
 - [**D-128**](#d-128--luong-1985-ethanol-inhibition-provenance-re-anchored-to-the-measured-production-exponent-a--and-a-coleman-cross-validation-that-surfaced-the-cores-missing-ethanol-ceiling-b) — Luong 1985 ethanol inhibition: provenance re-anchored to the measured production exponent (A), plus a …
+- [**D-129**](#d-129--the-missing-ethanol-ceiling-built-ethanoltolerancedeath-a-super-linear-viability-collapse-past-the-sourced-strain-tolerance-so-high-sugar-musts-stick-instead-of-over-fermenting) — the missing ethanol ceiling, built: `EthanolToleranceDeath`, a super-linear viability collapse past the …
 <!-- END INDEX -->
 
 ## Process decisions (project setup)
@@ -12917,3 +12918,95 @@ scripts and the full finding at `M:\claud_projects\temp\ferment\_findings\D-128-
   it needs the owner's explicit go-ahead before building (surfaced, not built here).
 - The remaining anchored axes stay untouched: SO2 carbonyl binding (Barbe 2000), MLF fatty-acid
   inhibition (Lonvaud-Funel 1988), oxidation O2-consumption (Ferreira 2015).
+
+## D-129 — the missing ethanol ceiling, built: `EthanolToleranceDeath`, a super-linear viability collapse past the sourced strain tolerance, so high-sugar musts STICK instead of over-fermenting
+
+**Fork.** D-128 (B) surfaced a live core gap: Coleman's death `k_d = k'_d·E` is linear and
+**unbounded** in ethanol, so past its validated envelope a high-sugar must over-ferments to an
+impossible ABV instead of *sticking* sweet like a real dessert/icewine must. Owner greenlit the
+fix with the criterion **"chase what is more honest, closer to reality."** Three candidate closures:
+(A) an out-of-envelope *validity guard* (honest label, no new physics); (B) an *ethanol-tolerance
+mechanism* that actually makes the must stick; (C) *substrate/osmotic inhibition*.
+
+**C rejected by physics, on the record.** Substrate inhibition is a rate knob on a supply-limited
+quantity — it slows uptake but *lifts as S drops*, so the ferment finishes **late, not stuck**; it
+cannot leave residual sugar. Only an ethanol-tolerance mechanism produces sticking, so it is the
+load-bearing one. (The osmotic realism knob is a separate, secondary axis, not this fix.)
+
+**Sourcing legwork first (provenance gate).** A ceiling is an extension *beyond* the one sourced
+keystone, so it needs its own source before any code:
+- **Coleman, Fish & Block 2007** (read directly, PMC2074923): `k_d = k'_d·E` linear/unbounded, **no
+  ceiling by construction**; validated **only over 265-300 g/L initial sugar (~26.5-30 °Brix)**, no
+  high-sugar caution. This *reframes the "bug"*: the core reproduces Coleman **faithfully inside his
+  own envelope** (28 °Brix dries at ~140 g/L EtOH < the strain's rated 142) and only over-ferments
+  when *extrapolated past ~300 g/L*, where no ceiling exists because his data never needed one.
+- **Cramer, Vlassides & Block 2002** (the keystone's parent): same family, same linear death.
+- **MOMAF / Malherbe, Fromion, Sablayrolles 2004**: logistic carrying-capacity + N limitation, **no
+  ethanol death term at all** — the strongest wine model also has no ceiling.
+- **Schenk et al. 2014** (arXiv:1412.6068): a wine model *with* a tolerance-gated death term of
+  exactly the right shape — `Φ(E) = [½ + (1/π)arctan(k_d1(E−tol))]·k_d2(E−tol)²` **inside the death
+  term** (D-13-compatible) — **but its parameters are phenomenological/assumed** (`tol=70` a
+  math-convenience value, no derivation). So: **the FORM is sourced, measured wine-strain PARAMETERS
+  are not.** The on-point ethanol-tolerance-of-transport paper is paywalled/unobtained.
+
+**Resolution (advisor-reconciled): a speculative-tagged term whose honesty is a checkable property,
+not an intent claim.** The form is sourced (Schenk), the tolerance anchor is sourced
+(`ethanol_tolerance` = 142 g/L, EC-1118). Only the *shape sharpness* is speculative. That + "closer
+to reality" legitimizes a speculative term **iff** it survives a discriminating test — replacing the
+unverifiable "I didn't tune to outcome" with data.
+
+**Built form (simplified from Schenk for structural inertness):**
+```
+Φ(E) = k_d2 · max(E − E_tol, 0)²      [1/h] extra specific death, moved X → X_dead
+```
+The one-sided `max(·,0)²` is **exactly zero below `E_tol`** (drops Schenk's arctan sign-gate, whose
+two-sided `(E−tol)²` *grows* to ~576 at 24-Brix's 118 g/L and leaks unless `k_d1` is huge — the
+"rejected values must be unreachable" reflex) and is **C¹-smooth at `E_tol`** (no BDF kink). It is an
+addition to the **same** cumulative death mechanism as `EthanolInactivation` — **not** an
+instantaneous uptake wall — so it does **not** double-count ethanol toxicity (respects D-13).
+Carbon/nitrogen-neutral by construction (X and X_dead share one composition).
+
+**The discriminating sweep (`ceiling_xval.py`, tol=142 fixed, k_d2 ∈ [1e-4, 3e-2], 2.5 orders):**
+- **GATE 1 — structural isolability:** 24- AND 28-Brix are **byte-for-byte** the Coleman-only core,
+  `max|dE| = max|dS| = 0.000e+00` across the *whole* sweep (both finish below 142 → `over ≤ 0`
+  early-return → identically zero). Not param-luck — structural.
+- **GATE 2 — sourced-vs-shape:** 32/36-Brix **stick** (leave residual sugar) at *every* k_d2; 24/28
+  *never* do. The **sticking threshold** (which Brix leaves residual sugar) and the **arrest-ABV
+  plateau** (E clusters 145-162 g/L even at the weakest damping) are set by the **sourced 142** and
+  are **shape-insensitive**; `k_d2 → ∞` ⇒ hard wall at `E_tol`, `k_d2 → 0` ⇒ Coleman (no ceiling).
+  **Only the residual-sugar amount** moves with k_d2 (36-Brix: 52 → 86 g/L). → the honest tiering
+  split: qualitative behavior sourced, quantitative amount speculative.
+
+**Shipped.** `EthanolToleranceDeath` (SPECULATIVE), its own isolable tuple `_ETHANOL_CEILING_PROCESSES`
+wired into **both** media (medium-agnostic, like `EthanolInactivation`; both carry `ethanol_tolerance`
+and the new `k_d2_ethanol_tolerance_death`). Shipped `k_d2 = 1.0e-3 (g/L)⁻²h⁻¹` (speculative, round
+mid-band): a 36 °Brix must arrests at ~152 g/L EtOH (~19.3% ABV) leaving ~72 g/L residual sugar (a
+stuck sweet high-alcohol wine) instead of ~187 g/L / 23.7% ABV bone-dry. **WHERE the ceiling sits =
+sourced (142); HOW SHARP = speculative.** Not tuned to any target (the stick-sweet outcome holds
+across the whole swept band). Beer carries the same value (transferred, unbenchmarked; inert below
+its 90 g/L tolerance, so every normal beer is byte-for-byte).
+
+**Honest tier consequence.** It is the first *speculative* Process to touch the biomass pools, so the
+STRUCTURAL `tier_of("X")`/`tier_of("X_dead")` drop PLAUSIBLE→SPECULATIVE (the D-26/D-27
+always-on-speculative parallel). The term is inert in the validated envelope, and the param-aware
+biomass tier is unaffected where the Coleman brake's own reads already set it.
+
+### Receipts
+- `src/fermentation/core/kinetics/inactivation.py` — `EthanolToleranceDeath` + module-docstring
+  paragraph; `kinetics/__init__.py` export; `core/media.py` `_ETHANOL_CEILING_PROCESSES` wired into
+  both media.
+- `parameters/data/{wine,beer}_generic.yaml` — `k_d2_ethanol_tolerance_death` (speculative, full
+  provenance: Schenk form, sourced-142 anchor, D-129 sweep, non-tuning argument).
+- `tests/test_kinetics_ethanol_ceiling.py` (9 tests: closed form, exact inertness ≤ tol,
+  biomass-neutrality, quadratic-in-overshoot, guards, tier propagation, in-envelope byte-for-byte,
+  high-sugar sticks + conserves C/N). `tests/test_media.py` exact-set updated (`CEILING_PROCESSES`).
+- Sourcing + sweep durable at `M:\claud_projects\temp\ferment\_findings\D-129-highsugar-ceiling-sourcing.md`.
+
+### Next
+- **Deferred (secondary realism, sourced-gated):** osmotic/substrate inhibition for ~200+ g/L musts —
+  a *separate* knob from this ethanol ceiling; only worth building if a wine-strain osmotic law is
+  sourced. **Sharper k_d2 / measured parameters:** if the paywalled ethanol-tolerance-of-transport
+  paper (or equivalent) is later obtained and yields a measured wine-strain law, re-anchor `k_d2`
+  (and consider promoting the term's tier).
+- The anchored axes remain: SO2 carbonyl binding (Barbe 2000), MLF fatty-acid inhibition
+  (Lonvaud-Funel 1988), oxidation O2-consumption (Ferreira 2015).

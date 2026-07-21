@@ -141,6 +141,16 @@ ethanol_tolerance:
     conditions: "generic top-fermenting ale strain"
     notes: "Read by EthanolInhibition as the wall E_max. A 1.048 OG wort attenuates to only ~5% ABV (~40 g/L ethanol), well below tolerance, so for the M1 beer benchmark this term is essentially non-limiting. de Andres-Toro instead tie the wall to stoichiometry (E_max = 0.5*S0); we keep a fixed strain tolerance for parity with the wine file. Speculative: no specific strain sourced."
 
+k_d2_ethanol_tolerance_death:
+  value: 1.0e-3
+  unit: "(g/L)^-2 h^-1"   # Phi = k_d2 * max(E - E_tol, 0)^2 has units 1/h
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 3.0e-2, note: "transferred from the wine value; beer high-gravity sticking is not benchmarked in M1" }
+  provenance:
+    source: "author estimate (transferred from the wine k_d2); tolerance-gated quadratic FORM after Schenk et al. 2014 (arXiv:1412.6068)"
+    conditions: "generic ale yeast; read by EthanolToleranceDeath as the curvature of the super-linear death past ethanol_tolerance (decision D-129). WHERE the ceiling sits is ethanol_tolerance (90 g/L); k_d2 sets only how sharply a very-high-gravity beer arrests"
+    notes: "Phi(E) = k_d2 * max(E - ethanol_tolerance, 0)^2 [1/h] extra specific death, X->X_dead within the Coleman death mechanism (D-13-compatible). A normal beer attenuates to ~40 g/L ethanol (~5% ABV), far below the 90 g/L tolerance, so this term is EXACTLY zero (byte-for-byte the Coleman-only core) on every M1 beer; it only bites on a very-high-gravity beer pushed past ~11.4% ABV. Value transferred from wine (1.0e-3), unbenchmarked for beer - speculative. See D-129 for the wine sweep receipts."
+
 ethanol_inhibition_exponent:
   value: 2.0
   unit: "dimensionless"

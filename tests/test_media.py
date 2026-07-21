@@ -391,6 +391,12 @@ CORE_PROCESSES = {
     "sugar_uptake_to_ethanol_co2",
     "ethanol_inactivation",
 }
+# Ethanol-tolerance ceiling (decision D-129): the super-linear viability collapse past the
+# strain tolerance that gives the linear Coleman death the ceiling it lacks beyond its
+# validated envelope. Its own isolable tuple, wired into BOTH media (medium-agnostic, like
+# ethanol_inactivation); Φ = k_d2·max(E − E_tol, 0)² is exactly zero below tolerance, so a
+# normal ferment is byte-for-byte the Coleman-only core and it only bites a high-sugar must.
+CEILING_PROCESSES = {"ethanol_tolerance_death"}
 # Tier-2 aroma byproducts (Milestone 2, decisions D-18/D-19/D-20): additive aroma
 # Processes plus the ester gas-stripping sink (ester_volatilization, D-20: liquid
 # esters → the esters_gas headspace pool). Wired in by default but isolable (prime
@@ -602,6 +608,7 @@ WINE_DMS_PROCESSES = {"smm_hydrolysis"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
+        | CEILING_PROCESSES
         | TEMPERATURE_PROCESSES
         | BYPRODUCT_PROCESSES
         | VDK_PROCESSES
@@ -631,6 +638,7 @@ EXPECTED_PROCESSES = {
     ),
     "beer": (
         CORE_PROCESSES
+        | CEILING_PROCESSES
         | TEMPERATURE_PROCESSES
         | BYPRODUCT_PROCESSES
         | VDK_PROCESSES
