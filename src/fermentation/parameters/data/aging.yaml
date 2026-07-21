@@ -264,6 +264,83 @@ ethyl_hexanoate_eq:
     notes: "AUTHOR ESTIMATE (D-126), the ethyl-hexanoate analogue of isoamyl_acetate_eq. Below the floor the rate is zero (no spurious motion; the reverse FORMATION half is not modelled). STILL A STAND-IN: a fixed absolute equilibrium replaces the true acid/alcohol-concentration-dependent one — but for ONE molecule, so no lump-composition caveat. The graft on k_ethyl_hexanoate_hydrolysis is calibrated to THIS floor at the ~0.4 mg/L young level; moving the floor moves the graft (they are jointly pinned by test_ethyl_hexanoate_rate_reproduces_makhotkina_young_wine_fade)."
 
 # ======================================================================================
+# ETHYL ACETATE esterification (decision D-127, the THIRD ester Process and the ONLY bidirectional
+# one). fermentation.core.kinetics.aging.EthylAcetateEsterification:
+#
+#   d(ethyl_acetate)/dt = -k_ethyl_acetate_esterification * f(T) * h(pH) * (ethyl_acetate - eq)
+#
+# SIGNED (not max(0,...)): above eq the term FADES ethyl acetate (net hydrolysis -> ethanol + acetic
+# acid), below eq it FORMS it (net esterification, ethanol + acetic acid -> ethyl acetate). Ethyl
+# acetate sits ~AT its esterification equilibrium in sound wine (~10% of the acetic acid as ethyl
+# ester; Shinohara 1979), so a sound wine barely moves while a high-VA / high-EtOAc wine fades toward
+# eq and a low one forms toward it. It is the ONLY ester whose formation half the sim models (the
+# other two defer it); the isolation-at-zero exception this creates is owner-accepted (D-127) and
+# safe (total_carbon closes either sign; total_mass is asserted only on byproduct-free configs, where
+# aging is disabled). f(T) is the Arrhenius warmer-faster factor; h(pH) = 10^(pH_ref - pH) the simple
+# first-order [H+] acid catalysis (D-124 form, wine-only, NO tartrate law — the D-125 per-ester ratios
+# are isoamyl-acetate's and are not ported, the D-126 restraint).
+#
+# WHY BUILT NOW / WHY SPECULATIVE ON BOTH RATE AND EQUILIBRIUM. D-121/D-126 left ethyl-acetate
+# formation "blocked on sourcing": no study measures a wine-condition ethyl-acetate rate constant
+# (absent from Ramey & Ough 1980's eight esters AND from Makhotkina & Kilmartin 2012). D-127 does NOT
+# lift that with a measured k — it assembles a MODEL-DERIVED speculative term from open sources, and
+# is tagged accordingly (both the two hydrolysis siblings anchor k to a real wine MEASUREMENT; this
+# one does not, so it is the aging axis' most-speculative ester term). The sources: Shinohara, Shimizu
+# & Shimazu 1979 (Agric. Biol. Chem. 43(11):2351-2358 — the equilibrium POSITION and the approach
+# TIME), Berthelot & Pean de Saint-Gilles 1862-63 (Ke ~ 4, corroborating the ceiling), and Ramey &
+# Ough 1980 (the MEASURED acetate-cluster k_H+, a consistent lower bound on the relaxation rate).
+# Rayne & Forest 2016 lists ethyl acetate by name but its CALCULATED constants run 6-18x off R&O's
+# MEASURED ones, so its absolute number is NOT used — only its confirmation that EtOAc is a
+# hydrolysable acetate ester at wine pH, and its ethanol-insensitivity result (which, citing R&O's own
+# model-wine-vs-real comparison, justifies porting these model-solution numbers to real wine).
+# ALL speculative — the aging axis is the Tier-3 frontier and here the rate and equilibrium are both
+# order-of-magnitude estimates; the Process floors its outputs at speculative regardless (D-1).
+
+# -- RELAXATION RATE toward the ethyl-acetate esterification equilibrium (first-order, signed) -------
+k_ethyl_acetate_esterification:
+  value: 1.0e-3
+  unit: "1/h"   # d(ethyl_acetate)/dt = -k_ethyl_acetate_esterification * f(T) * h(pH) * (ethyl_acetate - eq)
+  tier: speculative
+  uncertainty: { low: 4.6e-4, high: 1.4e-3, note: "WIDE (no measured k exists). The band is Shinohara's ~3-month-to-equilibrium approach at 20 C read as 1 time-constant (k = 1/2190 h = 4.6e-4 /h) to ~3 time-constants / 95% (k = 3/2190 h = 1.37e-3 /h). Ramey & Ough 1980's MEASURED acetate-cluster k_H+ (~1.1-1.5e-4 L/mol/s) gives the HYDROLYSIS component ~2.7e-4 /h at pH 3.3 — below the band, consistent (the relaxation constant this form needs is k_hydrolysis + k_esterification, so it must exceed the hydrolysis component alone). Half-life ln2/k ~ 700 h (~1 month) at the value and pH_ref — the timescale over which a high-EtOAc wine's excess relaxes toward equilibrium." }
+  provenance:
+    source: "MODEL-DERIVED author estimate (no wine-condition ethyl-acetate rate constant is published — absent from Ramey & Ough 1980's eight esters and from Makhotkina & Kilmartin 2012). Anchored to Shinohara, Shimizu & Shimazu 1979, Agric. Biol. Chem. 43(11):2351-2358, Fig. 2: ethyl acetate 'reached the maximum level after three months' at room temperature (20 +/- 5 C) in a 14% ethanol model solution — a first-order approach to equilibrium with k ~1e-3 /h. Cross-checked against Ramey & Ough 1980, J. Agric. Food Chem. 28(5):928-934, Table VI/VII acetate-cluster k_H+ (isoamyl/isobutyl/hexyl/2-phenylethyl acetate, sharing ethyl acetate's acetyl bond), ~1.1-1.5e-4 L/mol/s -> ~2.7e-4 /h hydrolysis component at pH 3.3, a consistent lower bound."
+    conditions: "wine matrix, the relaxation rate AT THE REFERENCE pH 3.3 (Shinohara's table-wine / model-solution pH); signed first-order in the (ethyl_acetate - eq) gap AND first-order in [H+] via the 10^(pH_ref - pH) factor, at T_ref = 293.15 K. Shinohara: 30 C is 2-3x room temp and 5 C is <1/10, a steep temperature dependence CARRIED by f(T) (see E_a). k is thus the value at pH_ref; off-reference wines scale by [H+]/[H+]_ref."
+    notes: "D-127. This is a RELAXATION constant (k_hydrolysis + k_esterification), which is what the signed toward-equilibrium form needs — NOT a one-directional disappearance constant, so unlike the two hydrolysis siblings there is NO floor-graft (the relaxation-to-a-fixed-floor form is self-limiting by construction). SPECULATIVE: no measured wine k exists; Shinohara gives an approach TIME (not a fitted rate) and Rayne 2016's calculated ethyl-acetate k_A runs 6-18x off R&O's measured acetate values so it is not usable as an absolute. Process floors outputs at speculative regardless (D-1)."
+
+# -- ACTIVATION ENERGY: warmer relaxes ethyl acetate toward equilibrium faster ---------------------
+E_a_ethyl_acetate_esterification:
+  value: 75000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 50000.0, high: 100000.0, note: "Shinohara 1979: the ethyl-ester relaxation is ~2-3x faster at 30 C than at 20 C (Q10 ~2-3 => E_a ~50-75 kJ/mol) and <1/10 as fast at 5 C than at 20 C (a factor >10 over 15 C => Q10 ~4-5 => E_a ~90-110 kJ/mol) — a NON-Arrhenius steepening at low temperature, so the band 50-100 kJ/mol spans the two regimes. Consistent with the measured ester Arrhenius energies (Ramey & Ough 1980 isoamyl acetate 59 kJ/mol; Makhotkina 2012 ethyl hexanoate 68 kJ/mol), which sit inside it." }
+  provenance:
+    source: "MODEL-DERIVED author estimate from Shinohara, Shimizu & Shimazu 1979, Agric. Biol. Chem. 43(11):2351-2358 (p2355-2357): the speed of ethyl-ester formation/approach-to-equilibrium is ~2-3x faster at 30 C than at room temperature and <1/10 as fast at 5 C. Reading those two ratios as Q10 gives E_a ~50-110 kJ/mol; the value 75 kJ/mol is the mid of the high-temperature (20-30 C) regime, near the measured ester activation energies (R&O 1980 59 kJ/mol; Makhotkina 2012 68 kJ/mol)."
+    conditions: "Arrhenius activation energy of the ethyl-acetate esterification/hydrolysis relaxation in a wine matrix, at T_ref = 293.15 K. The temperature SHAPE only — the 20 C rate itself is k_ethyl_acetate_esterification."
+    notes: "D-127. The load-bearing claim is the DIRECTION (E_a > 0: warm cellars relax EtOAc toward equilibrium faster, cold storage holds it — Shinohara's explicit low-temperature-preservation recommendation). SPECULATIVE (aging-axis floor); the non-Arrhenius steepening at low temperature makes a single E_a an honest floor, not a precise slope."
+
+# -- EQUILIBRIUM: the level ethyl acetate relaxes toward from EITHER side (~10% of acetic; author est.)
+ethyl_acetate_eq:
+  value: 0.051
+  unit: "g/L"   # the esterification equilibrium the ethyl_acetate pool relaxes toward (signed, both sides)
+  tier: speculative
+  uncertainty: { low: 0.035, high: 0.084, note: "Shinohara's acetic E-rate spans ~6.8-16.4% in table wines (avg ~8-10%); at a representative sound-wine acetic ~0.35 g/L that is ethyl acetate ~35-84 mg/L (0.035-0.084 g/L). The value 51 mg/L is ~10% E-rate at 0.35 g/L acetic — right at the sim's calibrated ~50 mg/L young level, so a SOUND wine sits ~at equilibrium and barely moves, while a high-VA wine (>~60 mg/L) fades toward it and a low one forms toward it. Unlike isoamyl_acetate_eq / ethyl_hexanoate_eq (floors ~25% of the young level, esters far ABOVE equilibrium), EtOAc's eq is ~AT the young level because it is NOT far from equilibrium young." }
+  provenance:
+    source: "MODEL-DERIVED author estimate. Shinohara, Shimizu & Shimazu 1979, Agric. Biol. Chem. 43(11):2351-2358, Tables I-IV: the acetic-acid esterification rate (E-rate = acetic-as-ethyl-ester / total acetic) averages ~8-10% in table wine (12% EtOH, pH 3.3) — i.e. ~10% of the acetic acid sits as ethyl acetate at equilibrium. At a representative sound-wine acetic ~0.35 g/L: acetic-as-ester = 0.10 * 0.35 = 0.035 g/L, as ethyl acetate = 0.035 * (88.1/60.05) = 0.051 g/L. Berthelot & Pean de Saint-Gilles 1862-63 Ke ~ 4 corroborates the ~10-14% esterified ceiling; the two agree."
+    conditions: "generic wine/beer; the esterification equilibrium of the `ethyl_acetate` pool in that molecule's own g/L. Its role is to make the relaxation SIGNED (toward a floor from either side) — this is the one ester the sim lets FORM as well as fade."
+    notes: "D-127, FIXED-ABSOLUTE STAND-IN (owner call): the true equilibrium tracks the acetic-acid AND ethanol concentrations (Berthelot Ke = [ester][water]/([acid][alcohol])), but the sim has no clean acetic pool (acetic lives in the Byp succinic stand-in, D-16), so a concentration-coupled eq would be a stand-in on a stand-in; a fixed target sidesteps that. The consequence is deliberate and correct physics: a sound wine (~50 mg/L, ~at this eq) barely moves — EtOAc is roughly stable in sound aged wine — while the term acts mainly on high-VA / high-EtOAc wines (fading them toward equilibrium, the EtOAc DECREASE Shinohara observed in stored wine, p2357). The total EtOAc formed/faded is bounded by the (eq - pool) gap, so the acetic drawn from / added to Byp stays negligible vs the pool."
+
+# -- REFERENCE pH the relaxation rate is anchored to (the [H+] acid-catalysis factor's pivot) -------
+pH_ref_ethyl_acetate_esterification:
+  value: 3.3
+  unit: "pH"   # dimensionless; the wine pH k_ethyl_acetate_esterification is anchored to
+  tier: speculative
+  uncertainty: { low: 3.3, high: 3.3, note: "PINNED (zero-width => never sampled by the ensemble; the runtime pins high<=low to value). DEGENERATE with k_ethyl_acetate_esterification: only the product k/[H+]_ref is identifiable, so a band on pH_ref would just reshuffle into k (the pH_ref_ester_hydrolysis convention). The identifiable uncertainty lives entirely in k; pH_ref is a fixed anchor definition." }
+  provenance:
+    source: "Shinohara, Shimizu & Shimazu 1979, Agric. Biol. Chem. 43(11):2351-2358: the table wines whose ~8-10% acetic E-rate anchors ethyl_acetate_eq, and the 14% ethanol model solution whose ~3-month approach anchors k_ethyl_acetate_esterification, are both at pH ~3.3 (p2353-2354). The [H+] acid-catalysis FORM is Ramey & Ough 1980's (acetate esters hydrolyse first-order in [H+]); pH_ref is the pH at which k is quoted."
+    conditions: "the reference wine pH at which k_ethyl_acetate_esterification is the relaxation rate; off-reference wines scale by 10^(pH_ref - pH) (D-124 form). Wine-only — beer holds h = 1 (no pH system, D-18)."
+    notes: "D-127. Anchored at Shinohara's ~3.3, close to isoamyl's pH_ref_ester_hydrolysis 3.36 (R&O's Pinot). The tartrate refinement (D-125) is NOT applied — the per-ester tartrate ratios are isoamyl-acetate's and are not ported (the D-126 restraint), so this is the pure first-order [H+] factor only."
+
+# ======================================================================================
 # OXIDATIVE aging (decision D-71, the first §4.1 OXIDATIVE aging Process). The head of the
 # dissolved-O2 sub-axis.
 #

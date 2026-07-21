@@ -101,6 +101,7 @@ from fermentation.core.kinetics import (
     EsterSynthesis,
     EsterVolatilization,
     EthanolInactivation,
+    EthylAcetateEsterification,
     EthylHexanoateHydrolysis,
     FuselAlcoholsEhrlich,
     FuselAminoAcidReroute,
@@ -1255,6 +1256,7 @@ _HOPS_PROCESSES: tuple[Callable[[], Process], ...] = (IsoAlphaAcidLoss,)
 _AGING_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterHydrolysis,
     EthylHexanoateHydrolysis,
+    EthylAcetateEsterification,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
 )

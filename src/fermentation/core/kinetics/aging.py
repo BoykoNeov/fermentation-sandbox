@@ -184,14 +184,23 @@ the ethyl-hexanoate hydrolysis in real Sauvignon blanc (36% lost over 12 months 
 k_obs + E_a). So the apple/pineapple ethyl ester fades on aging the SAME direction as the banana
 acetate — a second, sibling hydrolysis Process rather than a term on this one.
 
-``ethyl_acetate`` is the remaining case and the one exception among the acetates: it **increases**
-on storage (ethanol at ~2 M plus accumulating acetic acid put it *below* its esterification
-equilibrium). It is deliberately left inert: its direction is known but the **rate is not** — it is
-absent from R&O's esters AND from Makhotkina & Kilmartin 2012 (which measures no ethyl acetate at
-all; Table 1 covers acetate esters of higher alcohols + ethyl esters of fatty/branched acids, and
-ethyl acetate — the ethyl ester of acetic acid — is neither), and no canonical study covers a
-~51 mg/L pool. So ``ethyl_acetate`` formation stays **blocked on sourcing**, not refused; the
-D-126 fetch unblocked one ester's hydrolysis, NOT a whole ethyl-ester sub-axis.
+``ethyl_acetate`` **now ships its own bidirectional relaxation**
+(:class:`EthylAcetateEsterification`, decision D-127) — the THIRD ester Process and the only one
+that both forms and fades. It is the exception among the acetates: rather than sitting far above
+equilibrium like the banana/apple esters, ethyl acetate sits *near* its esterification equilibrium
+in sound wine (~10% of the acetic acid as its ethyl ester; Shinohara, Shimizu & Shimazu 1979), so
+the sign of the flux depends on which side of the floor the pool is on — a high-VA / high-EtOAc wine
+**fades** it toward equilibrium (the EtOAc *decrease* Shinohara observed in stored wine), a
+below-equilibrium one **forms** it. **No measured rate exists** (ethyl acetate is absent from R&O's
+eight esters AND from Makhotkina & Kilmartin 2012), so — unlike the two hydrolysis siblings, whose k
+is a real wine measurement — D-127's rate AND equilibrium are **model-derived** (Shinohara's
+~3-month approach time + ~10% equilibrium fraction, Berthelot's Ke ~ 4, and R&O 1980's *measured*
+acetate-cluster k_H+ as a consistency cross-check; Rayne & Forest 2016's *calculated* value runs
+6-18x off R&O and is NOT used as an absolute). This is the doubly-speculative corner of the aging
+axis, so ``ethyl_acetate`` formation is no longer **blocked on sourcing** — it is built as an
+explicitly model-based speculative term (owner call, D-127), the one ester whose formation half the
+sim models (the other two defer it; see :class:`EthylAcetateEsterification` for the owner-accepted
+isolation-at-zero exception this creates).
 
 **Carbon — an on-ledger inter-pool transfer (conservation is back in force, D-68).** Unlike
 the D-67 sensory readout (a pure diagnostic off the ledger), this is the first aging RHS
@@ -373,6 +382,36 @@ if CARBON_ATOMS[_ETHYL_HEXANOATE.species] != _ETHANOL_CARBONS + _HEXANOIC_ACID_C
         f"The {_ETHANOL_CARBONS}:{_HEXANOIC_ACID_CARBONS} hydrolysis split must "
         f"partition every carbon of {_ETHYL_HEXANOATE.species} "
         f"({CARBON_ATOMS[_ETHYL_HEXANOATE.species]} C)."
+    )
+
+#: The acetate ester the D-127 aging esterification acts on — ethyl acetate, the bulk
+#: solventy/nail-polish acetate ester (``ESTER_SPECS[0]``). Unlike the two hydrolysis Processes
+#: above, this one is **bidirectional** (:class:`EthylAcetateEsterification`): ethyl acetate sits
+#: *near* its esterification equilibrium in sound wine, so the SIGN of the flux depends on which
+#: side of the floor the pool is on — the only ester whose formation half the sim models (D-127
+#: owner call; the other esters defer formation).
+_ETHYL_ACETATE: EsterSpec = ESTER_SPECS[0]
+
+#: The 2:2 (= 1:1) carbon split of ethyl acetate between ``E`` (ethanol) and ``Byp`` (acetic acid,
+#: the succinic stand-in), set by the reversible esterification **ethanol + acetic acid ⇌ ethyl
+#: acetate + water**: the ethyl group carries 2 carbons (from ethanol), the acetyl group 2 (from
+#: acetic acid). Stoichiometry of a named reaction — a code-with-citation constant like the other
+#: two splits, not an empirical YAML parameter. The SAME two fractions release and re-deposit the
+#: carbon, so ``total_carbon`` closes to machine precision for **either flux sign** (forming debits
+#: ``E``/``Byp`` and credits ``ethyl_acetate``; fading does the reverse). Ethanol → the core ``E``
+#: slot (its honest destination, the :class:`EthylHexanoateHydrolysis` precedent); acetic acid →
+#: ``Byp`` (the succinic-acid stand-in the two hydrolysis Processes already use for their acid
+#: product — there is no dedicated acetic pool).
+_ETOAC_ETHANOL_CARBONS = CARBON_ATOMS["ethanol"]  # the ethyl group ← ethanol (C2), → core E slot
+_ETOAC_ACETYL_CARBONS = 2  # the acetyl group ← acetic acid (C2), → Byp (succinic stand-in)
+_ETOAC_ETHANOL_SHARE = _ETOAC_ETHANOL_CARBONS / (_ETOAC_ETHANOL_CARBONS + _ETOAC_ACETYL_CARBONS)
+_ETOAC_ACETYL_SHARE = 1.0 - _ETOAC_ETHANOL_SHARE
+
+if CARBON_ATOMS[_ETHYL_ACETATE.species] != _ETOAC_ETHANOL_CARBONS + _ETOAC_ACETYL_CARBONS:
+    raise AssertionError(  # pragma: no cover - structural invariant, D-127
+        f"The {_ETOAC_ETHANOL_CARBONS}:{_ETOAC_ACETYL_CARBONS} esterification split must "
+        f"partition every carbon of {_ETHYL_ACETATE.species} "
+        f"({CARBON_ATOMS[_ETHYL_ACETATE.species]} C)."
     )
 
 #: Ethanol and acetaldehyde are both C2, so the oxidative ``ethanol → acetaldehyde`` transfer is
@@ -895,6 +934,164 @@ class EthylHexanoateHydrolysis(Process):
         )
         d[schema.slice("Byp")] = (
             _HEXANOIC_CARBON_SHARE * carbon_released / carbon_mass_fraction(_BYP_SPECIES)
+        )
+        return d
+
+
+class EthylAcetateEsterification(Process):
+    """Aging esterification of ethyl acetate toward equilibrium — the **bidirectional** one (D-127).
+
+    The **third** ester Process on the aging axis and the one exception among them: where
+    :class:`EsterHydrolysis` (banana acetate) and :class:`EthylHexanoateHydrolysis` (apple ethyl
+    ester) only **decay** toward a floor (both esters sit far *above* their equilibrium young),
+    ethyl acetate sits *near* its esterification equilibrium in sound wine, so this Process relaxes
+    it toward that equilibrium **from either side** — the only ester whose *formation* half the sim
+    models. The rate::
+
+        d(ethyl_acetate)/dt = -k_ethyl_acetate_esterification * f(T) * h(pH) * (ethyl_acetate - eq)
+
+    is a **signed** first-order relaxation toward ``ethyl_acetate_eq`` (note: NOT wrapped in
+    ``max(0, ...)``—that is the whole point). ``ethyl_acetate > eq`` => a net **hydrolysis** (EtOAc
+    -> ethanol + acetic acid, fading the solventy note — the EtOAc *decrease* Shinohara 1979 saw in
+    stored high-EtOAc wines); ``ethyl_acetate < eq`` => **formation** (ethanol + acetic acid ->
+    EtOAc, the slow rise of a below-equilibrium wine). ``f(T) = arrhenius_factor(T,
+    E_a_ethyl_acetate_esterification, T_ref)`` is the sourced warmer-relaxes-faster factor, and
+    ``h(pH) = 10**(pH_ref_ethyl_acetate_esterification - pH)`` the acid-catalysis factor.
+
+    **Sourced from Shinohara, Shimizu & Shimazu 1979 (equilibrium position + approach time) — a
+    model-derived SPECULATIVE term (D-127).** No study measures a wine-condition ethyl-acetate rate
+    constant (it is absent from Ramey & Ough 1980's eight esters and from Makhotkina & Kilmartin
+    2012), so this is *not* a measured k like the two hydrolysis siblings—it is assembled from open
+    sources and tagged accordingly:
+
+    * **Equilibrium** (``ethyl_acetate_eq``): Shinohara's acetic-acid esterification rate (E-rate)
+      averages ~8-10% in table wine (12% EtOH, pH 3.3), i.e. ~10% of the acetic acid sits as its
+      ethyl ester at equilibrium; at a representative sound-wine acetic ~0.35 g/L that is ~51 mg/L
+      EtOAc — right at the sim's calibrated ~50 mg/L young level, so a **sound wine is ~at
+      equilibrium and this term barely moves it** (correct physics), while a high-VA / high-EtOAc
+      wine (>~60 mg/L) fades toward it, a low one forms toward it. Berthelot's Ke ~ 4 corroborates
+      the ~10-14% esterified ceiling; the two agree. **Fixed absolute floor** (author-estimate
+      stand-in, D-127 owner call), the same simplification :class:`EthylHexanoateHydrolysis` makes —
+      the true equilibrium tracks the acetic-acid and ethanol concentrations, but the sim has no
+      clean acetic pool (acetic lives in the ``Byp`` succinic stand-in, D-16), so coupling ``eq`` to
+      it would be a stand-in on a stand-in; a fixed target sidesteps that.
+    * **Rate** (``k_ethyl_acetate_esterification``): Shinohara's EtOAc reaches equilibrium in
+      ~3 months at 20 C in model solution (Fig. 2), a first-order relaxation k ~1e-3 /h — the
+      relaxation constant this form needs (= k_hydrolysis + k_esterification). Ramey & Ough 1980's
+      *measured* acetate-cluster k_H+ (~1.1-1.5e-4 L/mol/s, the isoamyl/isobutyl/hexyl/2-phenylethyl
+      acetates that share EtOAc's acetyl bond) give the hydrolysis *component* ~2.7e-4 /h at
+      pH 3.3 — a consistent lower bound (component < total relaxation). Rayne & Forest 2016 lists
+      ethyl acetate by name but its *calculated* constants run 6-18x off R&O's *measured* values, so
+      its absolute number is NOT used; it serves only to confirm EtOAc is a hydrolysable acetate
+      ester at wine pH and (its ethanol-insensitivity result, citing R&O's model-wine-vs-real
+      comparison) to justify porting these model-solution numbers to wine.
+
+    **Acid catalysis — the simple first-order [H+] factor (D-124 form, no tartrate terms).** Ethyl
+    acetate is an acetate ester, the family R&O measured strong ``[H+]`` catalysis for, and acid
+    catalyses esterification and hydrolysis *equally* (it is a catalyst — it speeds the approach to
+    equilibrium in both directions; R&O: "whichever direction ... speeded by lower pH and higher
+    temperature"). So the signed rate carries ``h(pH) = 10**(pH_ref - pH)``—the D-124 pure-``[H+]``
+    factor, NOT the D-125 multi-species tartrate law, whose per-ester ratios are isoamyl-acetate's
+    and are not ported (the same restraint :class:`EthylHexanoateHydrolysis` shows, D-126).
+    **Wine-only**: beer carries no pH system (D-18), so ``h = 1`` there (the ``cation_charge`` slot
+    is the gate) and the term relaxes at the ``pH_ref``-anchored rate. Bounded (D-46):
+    ``ph_of_state`` clamps pH to [0, 14], so ``h`` stays finite under a BDF Jacobian probe.
+
+    **Carbon — a signed on-ledger inter-pool transfer that closes to machine precision either way.**
+    Ethyl acetate (C4) <=> ethanol (C2) + acetic acid (C2), split 2:2 (=1:1). The carbon leaving (or
+    entering) ``ethyl_acetate`` is re-deposited through (or drawn from) each partner pool's own
+    carbon fraction, so ``total_carbon`` closes for **either flux sign**: forming debits ``E`` +
+    ``Byp`` and credits ``ethyl_acetate``; fading reverses. Ethanol lands in / comes from the
+    core ``E`` slot (the :class:`EthylHexanoateHydrolysis` precedent), acetic acid the ``Byp``
+    succinic stand-in.
+
+    **The isolation-at-zero exception — owner-accepted (D-127).** Every other ester Process is
+    ``max(0, ester - eq)`` and so is exactly inert on an empty pool; this one is **not** — at
+    ``ethyl_acetate = 0`` the term is ``-k*f*h*(0 - eq) > 0``, a *formation* flux from ``E`` +
+    ``Byp``. That is deliberate (a wine with no ethyl acetate really would form some toward
+    equilibrium), the reason this is the sim's only forming ester. It is still **isolable**
+    (directive #3): like every aging Process it is *disabled at the compile seam* (D-70) unless
+    ``begin_aging`` is scheduled, so the validated core and its conservation tests — which never
+    schedule aging — never see it. ``total_carbon`` closes regardless of sign, so no carbon test is
+    affected. The only thing the formation-at-zero flux perturbs is ``total_mass``: forming EtOAc
+    debits ``E`` (a ``{S, E, CO2}`` sub-ledger pool) into the off-ledger ester, the
+    :class:`OxidativeAcetaldehyde` / :class:`EthylHexanoateHydrolysis` pattern — and ``total_mass``
+    is asserted only on **byproduct-free** configs, where aging is disabled and this Process is
+    absent. The total EtOAc ever formed is bounded by the small gap ``(eq - ethyl_acetate_0) ~ 8
+    mg/L``, so the acetic acid drawn from ``Byp`` (~4 mg/L) can never approach the ``Byp`` pool (~1
+    g/L) — the relaxation-to-a-fixed-floor form is self-limiting, no guard needed.
+
+    Off during the ferment (temperature-, pH-, and pool-driven, no fermentative-flux gate); enabled
+    only in a post-fermentation aging segment (D-68/D-70). Tier **speculative** — the aging-axis
+    frontier, and here doubly so: unlike the two hydrolysis siblings (whose k is a real wine
+    measurement), this term's rate AND equilibrium are both model-derived order-of-magnitude
+    estimates. Parameter-tier propagation (D-1) caps the ``ethyl_acetate`` / ``E`` / ``Byp`` outputs
+    at speculative.
+    """
+
+    name = "ethyl_acetate_esterification"
+    tier = Tier.SPECULATIVE
+    #: Relaxes the ``ethyl_acetate`` pool toward its equilibrium and routes the (signed) carbon
+    #: to/from ETHANOL (the core ``E`` slot) and acetic acid (``Byp``, the succinic stand-in) — a
+    #: signed on-ledger inter-pool transfer, so it touches those three and nothing else. ``E`` is in
+    #: the ``total_mass`` sub-ledger (the :class:`OxidativeAcetaldehyde` /
+    #: :class:`EthylHexanoateHydrolysis` precedent; see the class docstring), so total_CARBON — not
+    #: total_mass — is the invariant this Process closes exactly, for either flux sign.
+    touches = (_ETHYL_ACETATE.pool, "E", "Byp")
+    #: ``k_ethyl_acetate_esterification`` / ``E_a_ethyl_acetate_esterification`` /
+    #: ``ethyl_acetate_eq`` / ``pH_ref_ethyl_acetate_esterification`` are this Process's own
+    #: (aging.yaml, D-127; all model-derived author estimates—Shinohara 1979 equilibrium + approach
+    #: time, R&O 1980 acetate cluster as the rate cross-check). ``T_ref`` is shared with every other
+    #: Arrhenius rate. Their speculative tiers cap the ``ethyl_acetate`` / ``E`` / ``Byp`` output
+    #: tiers (D-1). The plausible pH-system params read *inside* :func:`ph_of_state` (``pKa_*``,
+    #: ``cation_charge``) are omitted—this Process is already speculative, so they cap nothing (the
+    #: :class:`EsterHydrolysis` convention). Unlike :class:`EsterHydrolysis` it reads no
+    #: tartrate-ratio params: the D-125 law is isoamyl-acetate's, not ported (the
+    #: D-126 restraint).
+    reads: tuple[str, ...] = (
+        "k_ethyl_acetate_esterification",
+        "E_a_ethyl_acetate_esterification",
+        "ethyl_acetate_eq",
+        "pH_ref_ethyl_acetate_esterification",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        ester = float(y[schema.slice(_ETHYL_ACETATE.pool)][0])
+        # SIGNED gap toward the equilibrium floor — the D-127 crux: NOT max(0, ...). Above eq the
+        # term fades EtOAc (net hydrolysis); below eq it forms EtOAc (esterification). Only ester
+        # that relaxes from either side (the other two decay-only). Zero exactly at equilibrium.
+        gap = ester - params["ethyl_acetate_eq"]
+        if gap == 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_ethyl_acetate_esterification"], params["T_ref"])
+        # Simple first-order [H+] acid catalysis (D-124 form, NOT the D-125 tartrate law — the
+        # per-ester tartrate ratios are isoamyl-acetate's and are not ported, the D-126 restraint).
+        # Acid catalyses BOTH directions equally, so h(pH) multiplies the signed rate. WINE-ONLY:
+        # beer carries no pH system (D-18), so h = 1 there (cation_charge is the gate). Bounded:
+        # ph_of_state clamps pH to [0, 14] (D-46), so h stays finite under a BDF Jacobian probe.
+        h_factor = 1.0
+        if "cation_charge" in schema:  # the wine pH-system marker (absent from the beer schema)
+            ph = ph_of_state(y, schema, params)
+            h_factor = float(10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph))
+        # Signed rate (g ethyl acetate/L/h): >0 hydrolysis (fade), <0 esterification (form).
+        rate = params["k_ethyl_acetate_esterification"] * f_t * h_factor * gap
+
+        # Split the (signed) C4 carbon 2:2 and route via each partner pool's own carbon fraction,
+        # so total_carbon closes to machine precision for EITHER sign (ethyl acetate C4 <=> ethanol
+        # C2 + acetic acid C2). Fade (rate>0): EtOAc-, E+, Byp+. Form (rate<0): EtOAc+,
+        # E down, Byp down. Ethanol <-> core E (its honest destination); acetic acid <-> Byp (the
+        # succinic stand-in). See the class docstring for why touching E (a total_mass{S,E,CO2}
+        # pool) is safe: the EthylHexanoateHydrolysis precedent; total_mass asserted byproduct-free.
+        carbon_moved = rate * carbon_mass_fraction(_ETHYL_ACETATE.species)  # signed g C/L/h
+        d[schema.slice(_ETHYL_ACETATE.pool)] = -rate
+        d[schema.slice("E")] = _ETOAC_ETHANOL_SHARE * carbon_moved / carbon_mass_fraction("ethanol")
+        d[schema.slice("Byp")] = (
+            _ETOAC_ACETYL_SHARE * carbon_moved / carbon_mass_fraction(_BYP_SPECIES)
         )
         return d
 

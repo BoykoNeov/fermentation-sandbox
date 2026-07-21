@@ -59,6 +59,7 @@ from fermentation.core.kinetics import (
     Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
+    EthylAcetateEsterification,
     EthylHexanoateHydrolysis,
     MaillardBrowning,
     MaillardStrecker,
@@ -117,6 +118,8 @@ _BYP_SHARE = 2.0 / 7.0
 #: Carbon fractions of the two pools the oxidation transfer moves carbon between (E → acetaldehyde).
 _ETHANOL_C = carbon_mass_fraction("ethanol")
 _ACET_C = carbon_mass_fraction("acetaldehyde")
+#: Carbon fraction of ethyl acetate (C4) — the D-127 bidirectional esterification pool.
+_ETHYL_ACETATE_C = carbon_mass_fraction("ethyl_acetate")
 #: Carbon fraction of the ethylidene bridge (C2H4) — the D-80 split-ledger on-ledger capture
 #: species.
 _ETHYLIDENE_C = carbon_mass_fraction("ethylidene")
@@ -823,6 +826,127 @@ def test_ethyl_hexanoate_wired_into_both_media():
     for medium in ("wine", "beer"):
         names = {p().name for p in get_medium(medium).process_factories}
         assert "ethyl_hexanoate_hydrolysis" in names
+
+
+# =====================================================================================
+# EthylAcetateEsterification (decision D-127) — the THIRD ester Process and the ONLY bidirectional
+# one: ethyl acetate sits ~AT its esterification equilibrium, so it FADES toward the floor from
+# above (net hydrolysis → ethanol + acetic acid) and FORMS toward it from below (net esterification
+# ← ethanol + acetic acid). Model-derived speculative rate + equilibrium (Shinohara 1979 approach
+# time + ~10% E-rate; R&O 1980 acetate-cluster cross-check). These tests pin the metadata, the
+# signed carbon closure for BOTH directions, the sign flip about eq, the integrated fade and form,
+# and the both-media wiring.
+
+
+def test_ethyl_acetate_esterification_metadata():
+    p = EthylAcetateEsterification()
+    assert p.name == "ethyl_acetate_esterification"
+    assert p.tier is Tier.SPECULATIVE
+    # Signed inter-pool transfer: ethyl_acetate <=> ethanol (E) + acetic acid (Byp, succinic).
+    assert set(p.touches) == {"ethyl_acetate", "E", "Byp"}
+    assert set(p.reads) == {
+        "k_ethyl_acetate_esterification",
+        "E_a_ethyl_acetate_esterification",
+        "ethyl_acetate_eq",
+        "pH_ref_ethyl_acetate_esterification",
+        "T_ref",
+    }
+
+
+def test_ethyl_acetate_eq_sits_near_the_young_level(params):
+    # Unlike the two hydrolysis floors (~25% of their young ester, far ABOVE equilibrium), ethyl
+    # acetate's equilibrium is ~AT the sim's calibrated ~50 mg/L young level — that is the whole
+    # reason this Process is bidirectional (a sound wine barely moves; it acts on off-equilibrium
+    # wines). Pin that the floor is in the sound-wine 30–80 mg/L band.
+    assert mgl_to_gpl(30.0) < params["ethyl_acetate_eq"] < mgl_to_gpl(80.0)
+
+
+@pytest.mark.parametrize("side", ["above", "below"])
+def test_ethyl_acetate_carbon_closes_per_rhs_both_directions(params, side):
+    # The signed C4 ⇌ C2 (ethanol) + C2 (acetic) transfer closes total_carbon to machine precision
+    # for EITHER flux sign — fading (ester>eq) and forming (ester<eq). This is the D-127 crux: the
+    # SAME split releases/deposits, so closure holds regardless of direction.
+    schema = wine_schema()
+    eq = params["ethyl_acetate_eq"]
+    ester = eq * 2.0 if side == "above" else eq * 0.5
+    # Seed a realistic Byp so a forming flux (which DEBITS Byp) has acetic to draw from.
+    y = _aged_wine(schema, ester=0.0, t=298.15, ethyl_acetate=ester, Byp=1.0)
+    d = EthylAcetateEsterification().derivatives(0.0, y, schema, params)
+    # Carbon leaving ethyl_acetate == carbon entering E + Byp (signed), to machine precision.
+    residual = (
+        schema.get(d, "ethyl_acetate") * _ETHYL_ACETATE_C
+        + schema.get(d, "E") * _ETHANOL_C
+        + schema.get(d, "Byp") * _BYP_C
+    )
+    assert residual == pytest.approx(0.0, abs=1e-15)
+    # Direction check: above eq fades (ester↓, E↑, Byp↑); below eq forms (ester↑, E↓, Byp↓).
+    if side == "above":
+        assert schema.get(d, "ethyl_acetate") < 0.0
+        assert schema.get(d, "E") > 0.0 and schema.get(d, "Byp") > 0.0
+    else:
+        assert schema.get(d, "ethyl_acetate") > 0.0
+        assert schema.get(d, "E") < 0.0 and schema.get(d, "Byp") < 0.0
+    # Touches nothing else — no sugar, CO2, biomass, or the other ester pools.
+    for var in ("X", "S", "N", "CO2", "isoamyl_acetate", "isoamyl_alcohol", "ethyl_hexanoate"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_ethyl_acetate_inert_exactly_at_equilibrium(params):
+    # At ethyl_acetate == eq the signed gap is exactly zero, so the Process contributes
+    # byte-for-byte nothing — the pivot of the bidirectional relaxation.
+    schema = wine_schema()
+    y = _aged_wine(schema, ester=0.0, t=298.15, ethyl_acetate=params["ethyl_acetate_eq"])
+    d = EthylAcetateEsterification().derivatives(0.0, y, schema, params)
+    for var in ("ethyl_acetate", "E", "Byp"):
+        assert schema.get(d, var) == 0.0
+
+
+def test_ethyl_acetate_aging_fades_high_va_wine_and_closes_carbon(params, store):
+    # Integrated aging of a HIGH-EtOAc wine (above eq): the solventy note fades toward — not past —
+    # its equilibrium (Shinohara's observed EtOAc decrease in stored wine), E and Byp rise, and
+    # total_CARBON closes to machine precision. Strict touches contract, only this Process active.
+    schema = wine_schema()
+    ea0 = params["ethyl_acetate_eq"] * 2.0  # a high-VA / high-EtOAc wine, above equilibrium
+    y0 = _aged_wine(schema, ester=0.0, t=293.15, ethyl_acetate=ea0, Byp=1.0)
+    e0 = float(schema.get(y0, "E"))
+    ps = ProcessSet(schema, [EthylAcetateEsterification()], strict=True)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success, traj.message
+    ea_end = float(traj.series("ethyl_acetate")[-1])
+    assert params["ethyl_acetate_eq"] <= ea_end < ea0  # fades toward, not past, equilibrium
+    assert float(traj.series("E")[-1]) > e0  # ethanol released to core E
+    assert float(traj.series("Byp")[-1]) > 1.0  # acetic acid → Byp (succinic stand-in)
+    assert_nonnegative(traj, ("ethyl_acetate", "Byp"), atol=1e-12)
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+def test_ethyl_acetate_aging_forms_in_below_equilibrium_wine(params, store):
+    # The FORMATION half — the one the sim models for this ester alone (D-127). A below-equilibrium
+    # wine's ethyl acetate RISES toward eq, consuming ethanol (E↓) and acetic acid (Byp↓), and
+    # total_CARBON still closes. Byp is seeded realistically so the tiny acetic draw won't go under.
+    schema = wine_schema()
+    ea0 = params["ethyl_acetate_eq"] * 0.5  # below equilibrium → forms
+    y0 = _aged_wine(schema, ester=0.0, t=293.15, ethyl_acetate=ea0, Byp=1.0)
+    e0, byp0 = float(schema.get(y0, "E")), float(schema.get(y0, "Byp"))
+    ps = ProcessSet(schema, [EthylAcetateEsterification()], strict=True)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success, traj.message
+    ea_end = float(traj.series("ethyl_acetate")[-1])
+    assert ea0 < ea_end <= params["ethyl_acetate_eq"]  # forms toward, not past, equilibrium
+    assert float(traj.series("E")[-1]) < e0  # ethanol consumed by esterification
+    assert float(traj.series("Byp")[-1]) < byp0  # acetic acid consumed
+    assert_nonnegative(traj, ("ethyl_acetate", "Byp"), atol=1e-12)
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+def test_ethyl_acetate_wired_into_both_media():
+    # Wired into the medium-agnostic _AGING_PROCESSES (like the two hydrolysis siblings); the
+    # ethyl_acetate pool exists in both media, and h(pH) is held at 1 in beer (no pH system, D-18).
+    for medium in ("wine", "beer"):
+        names = {p().name for p in get_medium(medium).process_factories}
+        assert "ethyl_acetate_esterification" in names
 
 
 # -- tier propagation ---------------------------------------------------------

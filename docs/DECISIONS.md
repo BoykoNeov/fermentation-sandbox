@@ -12727,3 +12727,112 @@ through the schema; full suite green.
   factor the same way D-124/D-125 did for isoamyl. The D-125 per-ester-ratio trigger, now tripped.
 - **`ethyl_hexanoate_eq`** is an author estimate (like `isoamyl_acetate_eq`); a measured
   ethyl-hexanoate equilibrium level would promote it and re-pin the graft.
+
+## D-127 — `ethyl_acetate` formation, unblocked as an explicitly model-based term: the THIRD ester Process, and the only BIDIRECTIONAL one
+
+**D-126's "Next" left `ethyl_acetate` formation as the one blocked ester term — "reopens only if a
+study lands a real-wine ethyl-acetate rate". No such study exists (confirmed again this round). D-127
+does NOT lift the block with a measured rate; it builds the term as an explicitly MODEL-DERIVED
+speculative Process, on the owner's standing rule that speculative axes are buildable if clearly
+tagged speculative/model-based, not confirmed data.** The trigger was a book/paper sweep the owner
+supplied (`manual_sources/2`): Shinohara, Shimizu & Shimazu 1979 (Agric. Biol. Chem. 43(11):2351-2358),
+Rayne & Forest 2016 (Flavour Fragr. J., DOI 10.1002/ffj.3327), Garofolo & Piracci 1994 (Bull. O.I.V.
+67(757-758)), plus Barbe 2000 / Luong 1985 / Lonvaud-Funel 1988 for future axes. The full read is at
+`M:\claud_projects\temp\ferment\_findings\` (book-sweep.md + obtained-articles.md).
+
+### The mechanism — bidirectional, and the discovery that reframed it
+
+Unlike the two hydrolysis siblings (`EsterHydrolysis` banana acetate, `EthylHexanoateHydrolysis` apple
+ethyl ester), which sit far ABOVE equilibrium young and only DECAY toward a floor, ethyl acetate sits
+~AT its esterification equilibrium in sound wine. Shinohara measures the acetic-acid esterification
+rate (E-rate = acetic-as-ethyl-ester / total acetic) at **~8-10 % in table wine** (12 % EtOH, pH 3.3),
+i.e. ~10 % of the acetic acid is ethyl acetate at equilibrium. At a representative sound-wine acetic
+~0.35 g/L that is **~51 mg/L EtOAc — right at the sim's calibrated ~50 mg/L young level** (wine_generic
+`k_ethyl_acetate`, a 21-day 24-Brix run lands ~50 mg/L). So a SOUND wine is already at its EtOAc
+equilibrium and this term barely moves it; it acts mainly on off-equilibrium wines — a high-VA /
+high-EtOAc wine FADES toward equilibrium (the EtOAc *decrease* Shinohara observed in stored wine,
+p2357), a below-equilibrium one FORMS toward it. **This corrected a wrong claim in the codebase:** the
+`aging.py` docstring asserted EtOAc "sits *below* its equilibrium and *increases* on storage" — the
+research says it is roughly AT equilibrium and moves both ways. `EthylAcetateEsterification` is
+therefore a SIGNED relaxation `-k*f(T)*h(pH)*(ethyl_acetate - eq)` (NOT `max(0, ...)`), the only ester
+the sim lets form as well as fade.
+
+### The forks — both put to the owner
+
+1. **Equilibrium formulation.** Shinohara's eq is a FRACTION of the acetic pool, but the sim has no
+   clean acetic slot (acetic lives in `Byp`, the succinic stand-in, D-16), so coupling `eq` to it is a
+   stand-in on a stand-in. Owner chose **fixed author-estimate `ethyl_acetate_eq` = 0.051 g/L** (the
+   `ethyl_hexanoate_eq` idiom) over a Byp-coupled eq. Consequence: total EtOAc formed/faded is bounded
+   by the small `(eq - pool)` gap, so the acetic drawn from / added to `Byp` stays negligible.
+2. **Term shape.** Decay-only (clean, isolable-at-zero, consistent with the other esters' deferred
+   formation) vs bidirectional (faithful to Shinohara, but breaks isolation-at-zero and is the only
+   forming ester). Owner chose **bidirectional (faithful)**, accepting the isolation-at-zero exception.
+
+### The isolation-at-zero exception — owner-accepted, and why it is safe
+
+Every other ester Process is `max(0, ester - eq)` and so is exactly inert on an empty pool; this one is
+not — at `ethyl_acetate = 0` the term is `-k*f*h*(0 - eq) > 0`, a formation flux from `E` + `Byp`. It
+stays ISOLABLE (prime directive #3) because — like the whole aging tuple — it is DISABLED at the
+compile seam (D-70) unless `begin_aging` fires, so the validated core and its conservation tests never
+see it. `total_CARBON` closes for EITHER flux sign (the signed C4 <=> ethanol C2 + acetic C2 split, 1:1,
+releases/deposits through the same fractions). The only ledger the formation-at-zero flux perturbs is
+`total_mass` (forming EtOAc debits `E`, a {S,E,CO2} pool, into the off-ledger ester — the
+`OxidativeAcetaldehyde` / `EthylHexanoateHydrolysis` precedent), and `total_mass` is asserted only on
+byproduct-free configs, where aging is disabled and this Process is absent.
+
+### The sources — model-derived, and the honest limits
+
+- **Rate** `k_ethyl_acetate_esterification = 1.0e-3 /h` at pH_ref 3.3, T_ref 20 C: Shinohara's EtOAc
+  reaches equilibrium in ~3 months at 20 C in model solution (Fig. 2) — a first-order RELAXATION
+  constant (= k_hydrolysis + k_esterification), which is exactly what the signed toward-equilibrium
+  form needs, so NO floor-graft (unlike the two siblings). R&O 1980's MEASURED acetate-cluster k_H+
+  (~1.1-1.5e-4 L/mol/s, the isoamyl/isobutyl/hexyl/2-phenylethyl acetates sharing EtOAc's acetyl bond)
+  gives the hydrolysis COMPONENT ~2.7e-4 /h at pH 3.3 — a consistent lower bound (component < total
+  relaxation; the two are NOT in conflict, they measure different things). Banded 4.6e-4-1.4e-3 (1-3
+  Shinohara time-constants).
+- **Equilibrium** `ethyl_acetate_eq = 0.051 g/L`: Shinohara ~10 % E-rate at ~0.35 g/L acetic. Berthelot
+  & Pean de Saint-Gilles 1862-63 `Ke ~ 4` corroborates the ~10-14 % esterified ceiling. Banded
+  0.035-0.084 (Shinohara's 6.8-16.4 % table-wine range).
+- **`E_a` = 75 kJ/mol** (banded 50-100): Shinohara's 30 C = 2-3x RT and 5 C < 1/10 RT (Q10 ~2-5); the
+  measured ester `E_a` (R&O isoamyl 59, Makhotkina ethyl hexanoate 68) sit inside the band.
+- **Rayne & Forest 2016 lists ethyl acetate by name** (log kA = -4.43) but its CALCULATED (SPARC/QSAR)
+  constants run **6-18x off R&O's MEASURED** values for the six overlapping esters, with rank-order
+  disagreement — so its absolute number is NOT used. It serves only to confirm EtOAc is a hydrolysable
+  acetate ester at wine pH, and its ethanol-insensitivity result (citing R&O's own model-vs-real
+  comparison) justifies porting these model-solution numbers to wine.
+- **pH factor**: the simple first-order [H+] `h(pH) = 10^(pH_ref - pH)` (D-124 form), NOT the D-125
+  multi-species tartrate law — those per-ester ratios are isoamyl-acetate's and are not ported (the
+  D-126 restraint). Wine-only (beer holds `h = 1`, D-18). Acid catalyses both directions equally.
+
+### Tier — doubly speculative
+
+All four params speculative. Doubly so vs the two siblings: their `k` is a real WINE MEASUREMENT
+(R&O / Makhotkina), whereas D-127's rate AND equilibrium are BOTH model-derived order-of-magnitude
+estimates (Shinohara gives an approach TIME and an equilibrium FRACTION, not a fitted rate; Rayne's
+calculated number is unusable as an absolute). Output tier speculative regardless (D-1).
+
+### Receipts
+
+`aging.yaml` (4 new params `k_ethyl_acetate_esterification` [1.0e-3 /h] / `E_a_ethyl_acetate_esterification`
+[75 kJ/mol] / `ethyl_acetate_eq` [0.051 g/L] / `pH_ref_ethyl_acetate_esterification` [3.3, pinned], each
+full-provenance through the `Parameter` schema; a new "ETHYL ACETATE esterification" header block).
+`aging.py` (new `EthylAcetateEsterification` Process + module constants `_ETHYL_ACETATE` /
+`_ETOAC_ETHANOL_SHARE` / `_ETOAC_ACETYL_SHARE` + the 2:2 structural-invariant assert; the
+module-docstring "blocked on sourcing" paragraph rewritten — the wrong "sits below equilibrium /
+increases" claim corrected). `media.py` + `scenario/compile.py` (imported + wired into
+`_AGING_PROCESSES` and `_AGING_GATED_PROCESSES`, medium-agnostic, begin_aging-gated).
+`kinetics/__init__.py` (exported). `test_aging.py` (8 new tests: metadata, eq-near-young-level, signed
+carbon closure BOTH directions + direction check, inert-exactly-at-eq, integrated fade of a high-VA
+wine + carbon closure, integrated FORM below equilibrium + carbon closure, wired-into-both-media).
+`ruff check` / `ruff format` / `mypy` clean; aging.yaml validates through the schema; full suite green.
+
+### Next
+
+- **`ethyl_acetate_eq` / `k` are model-derived**, not measured — a study giving a real-wine EtOAc
+  esterification/hydrolysis rate (or an EtOAc-specific `Ke`) would promote them and could retire the
+  fixed-eq stand-in for a Byp/acetic-coupled equilibrium (deferred here for lack of a clean acetic pool).
+- **The forming branched-ester family** (diethyl succinate / ethyl lactate / ethyl isovalerate, D-121)
+  still has no pool and no rate; building it is a pool-addition decision, not a fetch.
+- **Future axes now have provenance-grade anchors in hand** (from the same sweep, not yet built): SO2
+  carbonyl binding (Barbe 2000 + Handbook Vol 1 Kd set), core-ferment ethanol inhibition (Luong 1985),
+  MLF fatty-acid inhibition (Lonvaud-Funel 1988), oxidation O2-consumption (Ferreira 2015).

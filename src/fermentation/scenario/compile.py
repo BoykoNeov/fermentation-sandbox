@@ -49,6 +49,7 @@ from fermentation.core.kinetics import (
     Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
+    EthylAcetateEsterification,
     EthylHexanoateHydrolysis,
     FuselAminoAcidReroute,
     IsoAlphaAcidLoss,
@@ -186,6 +187,7 @@ _BRETT_GATED_PROCESSES = (
 _AGING_GATED_PROCESSES = (
     EsterHydrolysis,
     EthylHexanoateHydrolysis,
+    EthylAcetateEsterification,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     SulfiteOxidation,
