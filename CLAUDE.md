@@ -50,11 +50,19 @@ ensembles live in `runtime` as a wrapper. Physics never lives in `scenario`.
 
 ```bash
 uv sync                 # install deps + dev tools
-uv run pytest -q        # tests (must stay green)
+uv run pytest -n auto   # FULL suite in parallel — ~1.6 min vs ~11.5 min serial (must stay green)
+uv run pytest tests/test_<module>.py   # iteration loop: just the file you're editing (~2-5 s)
+uv run pytest -n auto --lf             # after a red run: re-run only what failed
 uv run pytest -m benchmark   # §2.2 acceptance benchmarks (skipped until kinetics)
 uv run ruff check .     # lint    (also: ruff format .)
 uv run mypy             # types (strict on src; tests exempt from signature reqs)
 ```
+
+The suite is ~1250 independent `solve_ivp` integrations, so it is embarrassingly
+parallel: `pytest-xdist`'s `-n auto` gives a ~7× wall-clock win on a many-core box.
+`tests/conftest.py` pins BLAS/OpenMP to one thread per worker (before numpy imports) —
+without that pin, N workers each spawn N BLAS threads and the parallel run is *slower*
+than pinned. Plain `uv run pytest -q` still works (serial, ~11.5 min); prefer `-n auto`.
 
 ## Repo etiquette
 

@@ -5,6 +5,18 @@ Also home to :func:`seed_amino_acids`, the one place the D-100 must-spectrum see
 that every amino-acid consumer's tests state the same thing by the same means.
 """
 
+# Pin BLAS/OpenMP to a single thread PER PROCESS — this must run before numpy is
+# first imported (below), so it lives at the very top of the root conftest. The
+# suite is ~1250 independent solve_ivp integrations run process-parallel under
+# ``pytest -n auto`` (pytest-xdist); with the default thread pools each of N
+# workers would spawn N BLAS threads (N×N oversubscription) and the parallel run
+# is *slower* than pinned — measured 382s unpinned vs 98s pinned on 16 cores.
+# ``setdefault`` so an explicit outer override still wins.
+import os
+
+for _var in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
 from collections.abc import Mapping
 
 import pytest

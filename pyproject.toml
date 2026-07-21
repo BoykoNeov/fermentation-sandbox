@@ -22,6 +22,7 @@ Repository = "https://github.com/BoykoNeov/fermentation-sandbox"
 dev = [
     "pytest>=8.2",
     "pytest-cov>=5.0",
+    "pytest-xdist>=3.6",
     "hypothesis>=6.100",
     "ruff>=0.5",
     "mypy>=1.10",
@@ -46,6 +47,9 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM", "C4"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["N802", "N803", "N806"]  # allow physics-style capitalized names in tests
+# conftest pins BLAS threads via os.environ before numpy is imported, so imports
+# deliberately follow module-level code (E402).
+"tests/conftest.py" = ["N802", "N803", "N806", "E402"]
 
 [tool.mypy]
 python_version = "3.13"
