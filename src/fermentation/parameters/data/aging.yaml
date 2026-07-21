@@ -53,15 +53,19 @@
 #     (Ramey & Ough 1980, Tables IX/X for isoamyl acetate and Table I for ethyl hexanoate; Marais
 #     1978). v1 models this fade on ``isoamyl_acetate`` ALONE (D-96), and D-123 re-anchors its
 #     k / E_a to R&O's real-wine measurement.
+#     k / E_a to R&O's real-wine measurement. ``ethyl_hexanoate`` hydrolysis NOW SHIPS TOO
+#     (EthylHexanoateHydrolysis, D-126) — its own sibling Process, anchored to Makhotkina &
+#     Kilmartin 2012's real-wine kinetics (see the ETHYL HEXANOATE HYDROLYSIS block below).
 #   * The family that FORMS on aging is the BRANCHED / polyprotic-acid ethyl esters (diethyl
 #     succinate, ethyl lactate, ethyl isovalerate), which sit BELOW equilibrium young — and the sim
 #     tracks NONE of them (D-121 retired D-69's original claim that ``ethyl_hexanoate`` was that
 #     family; it is not — it hydrolyses WITH the acetates). ``ethyl_acetate`` is the one acetate
 #     exception: it too FORMS on storage (ethanol ~2 M + accumulating acetic acid put it below its
-#     esterification equilibrium). Neither a formation term nor ethyl_hexanoate hydrolysis ships:
-#     R&O gives ethyl_hexanoate only a MODEL-solution k (its own WINE data show no appreciable
-#     change), and ethyl_acetate is absent from the paper entirely — so both stay BLOCKED ON
-#     SOURCING (D-121). Below isoamyl_acetate_eq the rate is zero (no spurious motion).
+#     esterification equilibrium). Its FORMATION term still does NOT ship: ethyl_acetate is absent
+#     from BOTH R&O and Makhotkina & Kilmartin 2012 (which measures no ethyl acetate at all), so it
+#     stays BLOCKED ON SOURCING (D-121/D-126). D-126 unblocked ONE ester's hydrolysis
+#     (ethyl_hexanoate), NOT a whole ethyl-ester sub-axis. Below each ester's eq the rate is zero
+#     (no spurious motion).
 #
 # TIER. ALL speculative — but since D-123 that is a FLOOR choice, not an admission the numbers are
 # guesses. k_ester_hydrolysis and E_a_ester_hydrolysis are now MEASURED (Ramey & Ough 1980,
@@ -172,6 +176,92 @@ isoamyl_acetate_eq:
     source: "author estimate (UNCHANGED at D-123, when k_ester_hydrolysis/E_a_ester_hydrolysis were re-anchored to a now-readable Ramey & Ough 1980): R&O does NOT measure this floor — their 200-day storage is log-linear in log[ester] (Fig 2, r ~ -1.00), i.e. NO equilibrium was reached within the window, so a floor cannot be read off it. R&O's 'esters approach an equilibrium set by their acid+alcohol, not zero' is the stated MECHANISM (intro, Berthelot esterification equilibrium), not a measured isoamyl-acetate value. Anchored instead to ISOAMYL ACETATE's own scale: aged wines retain a fraction of their young isoamyl acetate (the classic loss-of-fruitiness with bottle age), not none of it."
     conditions: "generic wine/beer; the equilibrium of the `isoamyl_acetate` pool, in that molecule's own g/L (decision D-96)"
     notes: "RE-ANCHORED AT D-96, and the rename is the point. This was `esters_eq = 5 mg/L`, the LUMPED pool's floor 'booked as ethyl-acetate-equivalent g/L (the D-19 esters mass weighting)' — i.e. it carried the SAME ledger/lens split identity D-96 removed from the pools themselves, and its own notes called it 'the aging analogue of the D-67 fixed-lump-composition assumption'. Once EsterHydrolysis debits `isoamyl_acetate` (~0.76 mg/L in a young wine) a 5 mg/L floor sits ABOVE the entire pool, so `max(0, ester - eq)` is always 0 and the Process NEVER FIRES — D-69's whole fruity->fusel fade silently disabled, with every conservation test still green (a Process that does nothing conserves everything perfectly). Caught by `test_aging_does_not_strip_esters_below_the_equilibrium_floor`. At 0.2 mg/L the floor is ~26% of the young level, so aging strips ~74% of the banana and leaves a residuum. STILL A STAND-IN: a fixed absolute equilibrium replaces the true acid/alcohol-concentration-dependent one — but it is now a stand-in for ONE molecule's equilibrium rather than a lump's aggregate, so the composition half of the caveat is gone. Its role remains to make the decay NET (toward a floor) rather than decay-to-zero, which would over-strip (D-68). Below the floor the rate is zero (the reverse ester FORMATION half is the deferred bidirectional term)."
+
+# ======================================================================================
+# ETHYL HEXANOATE HYDROLYSIS (decision D-126, the SECOND hydrolysis Process on the ester axis).
+#
+# THE PROCESS (fermentation.core.kinetics.aging.EthylHexanoateHydrolysis):
+#
+#   d(ethyl_hexanoate)/dt = -k_ethyl_hexanoate_hydrolysis * f(T)
+#                            * max(0, ethyl_hexanoate - ethyl_hexanoate_eq)
+#
+# Ethyl hexanoate (the APPLE/PINEAPPLE medium-chain fatty-acid ethyl ester, C8) hydrolyses on aging
+# to ETHANOL + hexanoic acid, fading wine's apple/pineapple note the SAME direction the acetates fade
+# (Makhotkina & Kilmartin 2012, real NZ Sauvignon blanc: 36% of the ethyl hexanoate present was lost
+# over 12 months at 18 C). The released carbon (C8) splits 2:6 -> ETHANOL (C2, deposited in the core
+# E slot) + hexanoic acid (C6, deposited in Byp, the succinic-acid stand-in — no dedicated hexanoic
+# pool). See the EthylHexanoateHydrolysis docstring for the carbon algebra and why routing ethanol to
+# E follows the OxidativeAcetaldehyde precedent (an aging Process MAY touch the total_mass{S,E,CO2}
+# sub-ledger; total_mass is asserted only on byproduct-free configs where this Process is inert, so
+# total_CARBON is the invariant it closes to machine precision).
+#
+# WHY BUILT NOW — D-126 retires D-121's "blocked on sourcing" for ethyl_hexanoate. D-121/D-123 left
+# BOTH ethyl_hexanoate hydrolysis and ethyl_acetate formation blocked: R&O gave ethyl_hexanoate only
+# a MODEL-solution k (its own WINE data showed no appreciable change), and ethyl_acetate is absent
+# from R&O entirely. The Makhotkina & Kilmartin 2012 fetch (PMID 22868118) supplies the REAL-WINE
+# ethyl-hexanoate hydrolysis kinetics R&O lacked — Table 2 pseudo-first-order k_obs at 5/10/18/28 C,
+# Table 3 E_a = 68 kJ/mol / A = 4e4 /s — so the ethyl_hexanoate blocker LIFTS. ethyl_acetate
+# formation STAYS BLOCKED: the paper measures NO ethyl acetate at all (Table 1 covers acetate esters
+# of higher alcohols + ethyl esters of fatty/branched acids; ethyl acetate, the ethyl ester of acetic
+# acid, is neither). So this fetch unblocks ONE ester's hydrolysis, NOT a whole ethyl-ester sub-axis:
+# the branched-ester family that FORMS on aging (diethyl succinate / ethyl lactate / ethyl
+# isovalerate, D-121) still has no pool, and ethyl_acetate formation still has no rate.
+#
+# FLOOR + GRAFT — house-consistent with isoamyl (D-123), the owner's D-126 choice over floor-less.
+# Makhotkina's k_obs is a pure first-order DISAPPEARANCE constant (Eq 2: r = -k_obs*[ester], with NO
+# equilibrium floor over the storage window), but esters approach a nonzero equilibrium, not zero
+# (Makhotkina/R&O: esters "remain at a near constant equilibrium concentration depending on their
+# initial, post-fermentation levels"; ethyl butanoate did NOT change over 12 months precisely because
+# it was already at equilibrium). So EthylHexanoateHydrolysis decays toward ethyl_hexanoate_eq (author
+# estimate, ~0.1 mg/L) and k is GRAFTED up (x1.33) so that k_sim*(ester - eq) reproduces Makhotkina's
+# observed k_obs*[ester] at the sim's ~0.4 mg/L young level — exactly the D-123 floor-graft the
+# isoamyl rate carries. Floor-less (eq = 0) was rejected: it would over-fade the apple note past
+# ~1-2 y of aging (~85% lost at 2 y), destroying it past where the real equilibrium stops it.
+#
+# TIER — ALL speculative (the aging axis's uniform floor, test_tier_floored_at_speculative), and here
+# an HONEST floor: Makhotkina's Arrhenius fit for THIS ester is poor (r^2 = 0.572, E_a SE = 30 on 68,
+# ~44%), so while the 20 C anchor is robust (20 C sits mid-data, and the Table-2 interpolation and the
+# Table-3 Arrhenius fit agree at ~1.1e-4 /h), the temperature SLOPE is weak. The DIRECTION
+# (hydrolyses, warmer-faster, fades the apple note) is solid and confirmed (36% loss at 12 mo/18 C).
+# NO pH FACTOR (minimal, D-126): unlike isoamyl (D-124 [H+], D-125 tartrate), ethyl hexanoate's
+# pH/tartrate catalysis is DEFERRED — Makhotkina gives no per-pH ethyl-hexanoate series and R&O's
+# Table VII per-ester constants are isoamyl-acetate's, not ported here (that would assume
+# transferability the sources do not license). k is anchored at Makhotkina's Sauvignon-blanc wine pH.
+# The pH-explicit refinement (R&O Table VII, IF it lists ethyl hexanoate/caproate) is the clean
+# follow-on — the D-125 "reopens if another ester's hydrolysis is ever built" trigger, now tripped.
+
+# -- FIRST-ORDER HYDROLYSIS RATE: ethyl hexanoate -> ethanol + hexanoic acid, toward equilibrium ----
+k_ethyl_hexanoate_hydrolysis:
+  value: 1.47e-4
+  unit: "1/h"   # d(ethyl_hexanoate)/dt = -k_ethyl_hexanoate_hydrolysis * f(T) * max(0, ethyl_hexanoate - ethyl_hexanoate_eq)
+  tier: speculative
+  uncertainty: { low: 9.0e-5, high: 2.5e-4, note: "WIDE: Makhotkina's k_obs is poorly determined for this ester (Table 2 SE at 18 C is 1.35 on 2.72e-8 /s, ~50%; Table 3 r^2 = 0.572). The band spans roughly the graft (x1.33) applied to Makhotkina's k_obs range at 20 C. Half-life ln2/k ~ 4700 h (~6.5 months) at the value, T_ref, ~0.4 mg/L young level — consistent with the paper's 36% loss over 12 months at 18 C (a warmer, faster point)." }
+  provenance:
+    source: "Makhotkina & Kilmartin 2012, 'Hydrolysis and formation of volatile esters in New Zealand Sauvignon blanc wine', Food Chemistry 135(2012):486-493 (PMID 22868118; doi:10.1016/j.foodchem.2012.05.034). Table 2 pseudo-first-order k_obs for ETHYL HEXANOATE hydrolysis in REAL Sauvignon blanc (six 2009 wines): 0.29 / 2.49 / 2.72 / 4.71 e-8 /s at 5 / 10 / 18 / 28 C. Interpolating log(k) linearly in 1/T between 18 and 28 C to T_ref = 20 C gives ~3.05e-8 /s = 1.10e-4 /h; the Table 3 Arrhenius fit (E_a = 68 kJ/mol, A = 4e4 /s) gives 1.10e-4 /h INDEPENDENTLY — the 20 C anchor is robust even though the slope is not (r^2 = 0.572). GRAFTED x1.33 to 1.47e-4 /h (see notes)."
+    conditions: "wine matrix (NZ Sauvignon blanc, ~3.0-3.5 pH — the paper does not tabulate per-wine pH), first-order in the `ethyl_hexanoate` excess over equilibrium, at T_ref = 293.15 K. NO explicit pH factor (D-126): the rate is anchored at Makhotkina's wine pH and the pH/tartrate dependence is DEFERRED (unlike isoamyl's D-124/D-125), because no per-pH ethyl-hexanoate data exist and R&O's per-ester Table VII constants are not ported."
+    notes: "FLOOR-GRAFT (D-126, the isoamyl D-123 idiom): Makhotkina's k_obs is a pure disappearance constant (Eq 2, NO floor), but EthylHexanoateHydrolysis decays toward ethyl_hexanoate_eq, so at the sim's ~0.4 mg/L young level the ~0.1 mg/L floor eats ~1/4 of the driving force and k must be inflated by 0.4/(0.4-0.1) = 1.33 so k_sim*(ester - eq) reproduces the observed k_obs*[ester] (test_ethyl_hexanoate_rate_reproduces_makhotkina_young_wine_fade). Owner chose floored+grafted over floor-less eq=0 (D-126). Composite stays SPECULATIVE though k_obs is a real wine measurement: the graft, the eq floor, and the poor Arrhenius fit all ride on it; the Process floors its outputs at speculative regardless (D-1). E_a for the temperature shape is Makhotkina's compound-specific 68 kJ/mol (E_a_ethyl_hexanoate_hydrolysis)."
+
+# -- ACTIVATION ENERGY: warmer aging hydrolyses ethyl hexanoate faster (a poorly-determined slope) --
+E_a_ethyl_hexanoate_hydrolysis:
+  value: 68000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 38000.0, high: 98000.0, note: "Makhotkina Table 3 gives E_a = 68 kJ/mol with SE = 30 kJ/mol (r^2 = 0.572 — the second-worst Arrhenius fit of the ten esters), so the band is the +/- 1 SE range 38-98 kJ/mol. Q10 ~2.0-2.5 at 20 C but very uncertain. Note isoamyl acetate's E_a is far better determined (R&O r ~ -1.00, 59 kJ/mol; Makhotkina's own isoamyl-acetate value is 68 kJ/mol SE 19) — 59 sits inside this band and would be a defensible better-determined proxy for the temperature SHAPE, but the compound-specific 68 is kept as what was actually measured for THIS ester." }
+  provenance:
+    source: "Makhotkina & Kilmartin 2012, Food Chemistry 135:486-493, Table 3: ethyl hexanoate hydrolysis in NZ Sauvignon blanc, E_a = 68 kJ/mol, SE = 30 kJ/mol, A = 4e4 /s, r^2 = 0.572. Arrhenius fit of the Table 2 k_obs over 5/10/18/28 C (Eq 3-4)."
+    conditions: "Arrhenius activation energy of ethyl-hexanoate hydrolysis in a Sauvignon blanc wine matrix, at T_ref = 293.15 K. Compound-specific (this ester's own poorly-determined slope), not isoamyl-borrowed."
+    notes: "The temperature SHAPE only — the 20 C rate itself is k_ethyl_hexanoate_hydrolysis (robustly anchored). Because r^2 = 0.572, the SLOPE is weak: 2-point subsets of Table 2 give E_a anywhere from ~40 (10<->28 C) to ~68 (full fit) kJ/mol. The load-bearing claim is only the DIRECTION (E_a > 0: warmer ages faster, cold storage preserves the apple note), which every subset and Makhotkina's headline agree on. Kept SPECULATIVE (aging-axis floor); the poor fit makes this an honest floor, not just a convention."
+
+# -- EQUILIBRIUM FLOOR: the apple ester relaxes toward a nonzero equilibrium, not zero (author est.) -
+ethyl_hexanoate_eq:
+  value: 1.0e-4
+  unit: "g/L"   # the lower equilibrium the ethyl_hexanoate pool relaxes toward (net-decay floor)
+  tier: speculative
+  uncertainty: { low: 3.0e-5, high: 2.5e-4, note: "the hydrolysis-equilibrium level of ethyl hexanoate, ~0.03-0.25 mg/L — below typical young levels (~0.1-1 mg/L; the sim calibrates ~0.4 mg/L) so most of the apple note fades with age, a residuum remains. ~25% of the sim's young level, mirroring isoamyl_acetate_eq's ~26%." }
+  provenance:
+    source: "author estimate: NEITHER Makhotkina & Kilmartin 2012 NOR Ramey & Ough 1980 measures this floor. Makhotkina's Eq 2 is pure log-linear disappearance (no equilibrium reached in the window), so a floor cannot be read off it; the 'esters approach a nonzero equilibrium set by their acid+alcohol' is the stated MECHANISM (Berthelot esterification equilibrium; ethyl butanoate's non-change over 12 months is cited AS an already-at-equilibrium ester), not a measured ethyl-hexanoate value. Anchored instead to ethyl hexanoate's own scale: aged wines retain a fraction of their young apple ester, not none of it — the same reasoning as isoamyl_acetate_eq (D-96)."
+    conditions: "generic wine/beer; the equilibrium of the `ethyl_hexanoate` pool, in that molecule's own g/L. Its role is to make the decay NET (toward a floor) rather than decay-to-zero, which would over-strip the apple note (the D-68/D-126 floored-not-floorless choice)."
+    notes: "AUTHOR ESTIMATE (D-126), the ethyl-hexanoate analogue of isoamyl_acetate_eq. Below the floor the rate is zero (no spurious motion; the reverse FORMATION half is not modelled). STILL A STAND-IN: a fixed absolute equilibrium replaces the true acid/alcohol-concentration-dependent one — but for ONE molecule, so no lump-composition caveat. The graft on k_ethyl_hexanoate_hydrolysis is calibrated to THIS floor at the ~0.4 mg/L young level; moving the floor moves the graft (they are jointly pinned by test_ethyl_hexanoate_rate_reproduces_makhotkina_young_wine_fade)."
 
 # ======================================================================================
 # OXIDATIVE aging (decision D-71, the first §4.1 OXIDATIVE aging Process). The head of the

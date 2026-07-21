@@ -49,6 +49,7 @@ from fermentation.core.kinetics import (
     Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
+    EthylHexanoateHydrolysis,
     FuselAminoAcidReroute,
     IsoAlphaAcidLoss,
     MaillardBrowning,
@@ -137,7 +138,9 @@ _BRETT_GATED_PROCESSES = (
 )
 
 #: The aging Processes ``begin_aging`` enables (decisions D-70/D-71/D-72/D-74/D-75/D-77/D-78/D-79):
-#: :class:`EsterHydrolysis` (the ester-fade), :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol
+#: :class:`EsterHydrolysis` (the banana-acetate fade), :class:`EthylHexanoateHydrolysis` (the D-126
+#: apple-ethyl-ester fade — the sibling hydrolysis, Makhotkina & Kilmartin 2012),
+#: :class:`OxidativeAcetaldehyde` (the O₂-driven ethanol
 #: oxidation), :class:`PhenolicBrowning` (the O₂-driven browning, D-74, accumulating ``A420``) and
 #: :class:`SulfiteOxidation` (the O₂-driven SO₂ scavenging, D-72) and :class:`StreckerDegradation`
 #: (the O₂/amino-acid-driven Strecker aldehydes, D-75). The first three are medium-agnostic
@@ -182,6 +185,7 @@ _BRETT_GATED_PROCESSES = (
 #: aging.yaml/oak.yaml/polymerization.yaml parameters are guarded together at the verb boundary.
 _AGING_GATED_PROCESSES = (
     EsterHydrolysis,
+    EthylHexanoateHydrolysis,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     SulfiteOxidation,
@@ -711,8 +715,10 @@ def _load_parameters(
         # shared files — collision-free names, inert for wine.
         base / "hops.yaml",
         # Aging chemistry (decision D-70): the ester-hydrolysis constants (k_ester_hydrolysis,
-        # E_a_ester_hydrolysis, isoamyl_acetate_eq) the post-fermentation EsterHydrolysis
-        # Process reads.
+        # E_a_ester_hydrolysis, isoamyl_acetate_eq) the post-fermentation EsterHydrolysis Process
+        # reads — and, since D-126, the ethyl-hexanoate-hydrolysis constants
+        # (k_ethyl_hexanoate_hydrolysis, E_a_ethyl_hexanoate_hydrolysis, ethyl_hexanoate_eq) its
+        # sibling EthylHexanoateHydrolysis reads.
         # Medium-agnostic (acid-catalysed hydrolysis is a molecule/pH property, the
         # vicinal_diketones.yaml pattern) and collision-free, so loaded universally like the other
         # shared files; INERT until a begin_aging intervention enables the Process (which is

@@ -495,15 +495,21 @@ KETO_ACID_PROCESSES = {
 # compile seam when no hops are scheduled (the MLF/Brett isolability pattern).
 HOP_PROCESSES = {"iso_alpha_acid_loss"}
 # Aging chemistry (Milestone 3 / Tier-3, decisions D-68..D-74): the medium-agnostic §4.1 aging
-# Processes, ester_hydrolysis (D-69), oxidative_acetaldehyde (D-71, the O₂-driven ethanol oxidation)
-# and phenolic_browning (D-74, the O₂-driven browning that accumulates the A420 index). All
-# medium-agnostic (hydrolysis/oxidation are molecule/pH properties, and esters/fusels/Byp/
-# acetaldehyde/o2/A420 exist in both schemas; both media carry autoxidising polyphenols), so present
-# in a bare build_process_set for BOTH media — but DISABLED unconditionally at the compile seam
-# (aging is inherently post-ferment, no aging at t0), re-enabled only by a begin_aging intervention.
-# An un-aged run is byte-for-byte the pre-aging core (the MLF/Brett isolability pattern, but with no
-# t0 co-inoculation path).
-AGING_PROCESSES = {"ester_hydrolysis", "oxidative_acetaldehyde", "phenolic_browning"}
+# Processes, ester_hydrolysis (D-69, banana-acetate fade), ethyl_hexanoate_hydrolysis (D-126, the
+# apple-ethyl-ester fade — the sibling hydrolysis, Makhotkina & Kilmartin 2012),
+# oxidative_acetaldehyde (D-71, the O₂-driven ethanol oxidation) and phenolic_browning (D-74, the
+# O₂-driven browning that accumulates the A420 index). All medium-agnostic (hydrolysis/oxidation are
+# molecule/pH properties, and esters/fusels/Byp/acetaldehyde/o2/A420 exist in both schemas; both
+# media carry autoxidising polyphenols), so present in a bare build_process_set for BOTH media — but
+# DISABLED unconditionally at the compile seam (aging is inherently post-ferment, no aging at t0),
+# re-enabled only by a begin_aging intervention. An un-aged run is byte-for-byte the pre-aging core
+# (the MLF/Brett isolability pattern, but with no t0 co-inoculation path).
+AGING_PROCESSES = {
+    "ester_hydrolysis",
+    "ethyl_hexanoate_hydrolysis",
+    "oxidative_acetaldehyde",
+    "phenolic_browning",
+}
 # WINE-ONLY aging: sulfite_oxidation (D-72, the O₂-driven SO₂ scavenging) reads wine-only so2_total
 # acid-pH slots (beer's pH/SO₂ system is deferred, D-18); strecker_degradation (D-75, the O₂/amino-
 # acid-driven Strecker aldehydes methional + phenylacetaldehyde) reads wine-only amino_acids and

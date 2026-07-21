@@ -177,14 +177,21 @@ author's winery site) measures the isoamyl-acetate hydrolysis rate *in real wine
 ``E_a_ester_hydrolysis`` (previously author estimates). D-121's "canonical source is paywalled,
 never the evidence" is superseded for the rate; it stands for the direction split.
 
-``ethyl_acetate`` is the **third** case and the one exception among the acetates: it
-**increases** on storage (ethanol at ~2 M plus accumulating acetic acid put it *below* its
-esterification equilibrium). It is deliberately left inert here — see D-121/D-123 for why neither
-it nor ``ethyl_hexanoate`` ships a term: for ``ethyl_acetate`` the direction is known but the
-**rate is not** (it is absent from R&O's eight esters, and no canonical study covers a 51 mg/L
-pool), and ``ethyl_hexanoate`` has a R&O *model-solution* k (Table I) but their own real-wine
-data show it does not change appreciably — so a term would invent motion the source denies. Both
-stay **blocked on sourcing**, not refused.
+``ethyl_hexanoate`` **now ships its own hydrolysis** (:class:`EthylHexanoateHydrolysis`, decision
+D-126): the D-121/D-123 block ("R&O gives it only a model-solution k; their own real-wine data show
+no appreciable change") is **lifted** by Makhotkina & Kilmartin 2012 (PMID 22868118), which measured
+the ethyl-hexanoate hydrolysis in real Sauvignon blanc (36% lost over 12 months at 18 C; Table 2/3
+k_obs + E_a). So the apple/pineapple ethyl ester fades on aging the SAME direction as the banana
+acetate — a second, sibling hydrolysis Process rather than a term on this one.
+
+``ethyl_acetate`` is the remaining case and the one exception among the acetates: it **increases**
+on storage (ethanol at ~2 M plus accumulating acetic acid put it *below* its esterification
+equilibrium). It is deliberately left inert: its direction is known but the **rate is not** — it is
+absent from R&O's esters AND from Makhotkina & Kilmartin 2012 (which measures no ethyl acetate at
+all; Table 1 covers acetate esters of higher alcohols + ethyl esters of fatty/branched acids, and
+ethyl acetate — the ethyl ester of acetic acid — is neither), and no canonical study covers a
+~51 mg/L pool. So ``ethyl_acetate`` formation stays **blocked on sourcing**, not refused; the
+D-126 fetch unblocked one ester's hydrolysis, NOT a whole ethyl-ester sub-axis.
 
 **Carbon — an on-ledger inter-pool transfer (conservation is back in force, D-68).** Unlike
 the D-67 sensory readout (a pure diagnostic off the ledger), this is the first aging RHS
@@ -286,9 +293,11 @@ from fermentation.core.kinetics.carbon_routing import (
     ACETYLATION_ACETYL_CARBONS,
     ACETYLATION_ALCOHOL_CARBONS,
     ALCOHOL_CARBON_SHARE,
+    ESTER_SPECS,
     HYDROLYSING_ESTER,
     ISOAMYL_ALCOHOL,
     VALINE_LABEL_TRACERS,
+    EsterSpec,
     labelled_fraction,
 )
 from fermentation.core.process import Process
@@ -336,6 +345,34 @@ if CARBON_ATOMS[HYDROLYSING_ESTER.species] != _ISOAMYL_ALCOHOL_CARBONS + _ACETIC
         f"The {_ISOAMYL_ALCOHOL_CARBONS}:{_ACETIC_ACID_CARBONS} hydrolysis split must "
         f"partition every carbon of {HYDROLYSING_ESTER.species} "
         f"({CARBON_ATOMS[HYDROLYSING_ESTER.species]} C)."
+    )
+
+#: The ethyl ester the D-126 aging hydrolysis acts on — ethyl hexanoate, the apple/pineapple
+#: medium-chain fatty-acid ethyl ester (``ESTER_SPECS[2]``). Its real-wine hydrolysis kinetics
+#: come from Makhotkina & Kilmartin 2012 (the SECOND ester hydrolysis Process;
+#: :class:`EsterHydrolysis` fades the banana acetate, this one the apple ethyl ester). See
+#: :class:`EthylHexanoateHydrolysis`.
+_ETHYL_HEXANOATE: EsterSpec = ESTER_SPECS[2]
+
+#: The 2:6 carbon split of the released ester carbon between ``E`` and ``Byp`` (decision D-126),
+#: set by the hydrolysis reaction **ethyl hexanoate → ethanol + hexanoic acid**: ethanol carries 2
+#: carbons, hexanoic acid 6. Stoichiometry of a named reaction — a code-with-citation constant like
+#: the chemistry carbon counts, not an empirical/uncertain YAML parameter. Unlike the isoamyl 5:2
+#: (whose alcohol product, isoamyl alcohol, is a sensory-active fusel), BOTH products here are
+#: sensorially inert bulk/trace sinks: ETHANOL routes to the core ``E`` slot (its honest destination
+#: — the isoamyl module docstring pre-blessed this) and HEXANOIC ACID to ``Byp`` (the succinic-acid
+#: stand-in; there is no dedicated hexanoic pool). Carbon closes for any split summing to 1; 2:6 is
+#: the true stoichiometry of the debited molecule (C8 → ethanol C2 + hexanoic acid C6).
+_ETHANOL_CARBONS = CARBON_ATOMS["ethanol"]  # the alcohol product → core E slot
+_HEXANOIC_ACID_CARBONS = 6  # the acid product → Byp (succinic stand-in); hexanoic acid is C6
+_ETHANOL_CARBON_SHARE = _ETHANOL_CARBONS / (_ETHANOL_CARBONS + _HEXANOIC_ACID_CARBONS)  # 2/8 = 1/4
+_HEXANOIC_CARBON_SHARE = 1.0 - _ETHANOL_CARBON_SHARE  # 6/8 = 3/4
+
+if CARBON_ATOMS[_ETHYL_HEXANOATE.species] != _ETHANOL_CARBONS + _HEXANOIC_ACID_CARBONS:
+    raise AssertionError(  # pragma: no cover - structural invariant, D-126
+        f"The {_ETHANOL_CARBONS}:{_HEXANOIC_ACID_CARBONS} hydrolysis split must "
+        f"partition every carbon of {_ETHYL_HEXANOATE.species} "
+        f"({CARBON_ATOMS[_ETHYL_HEXANOATE.species]} C)."
     )
 
 #: Ethanol and acetaldehyde are both C2, so the oxidative ``ethanol → acetaldehyde`` transfer is
@@ -571,7 +608,10 @@ class EsterHydrolysis(Process):
     simplification, not an oversight. Were it added, ethanol's honest destination is the core
     ``E`` slot — safe, because ``total_mass`` is scoped to ``{S, E, CO2}`` and asserted only on
     a byproduct-free configuration, where the ester pools are identically zero and this Process
-    is inert. Ethyl hexanoate hydrolysis is likewise deferred.
+    is inert. **Ethyl hexanoate hydrolysis now ships as its own sibling Process**
+    (:class:`EthylHexanoateHydrolysis`, D-126) — which realises exactly that ethanol→``E`` routing
+    the paragraph above anticipated; ethyl acetate hydrolysis remains the deferred v1
+    simplification.
 
     **Acetate fade tracks wine pH — the multi-species acid-catalysis law (D-124 [H+] term,
     D-125 tartrate terms).** Ramey & Ough's headline is that ester hydrolysis is acid-catalysed: in
@@ -729,6 +769,133 @@ class EsterHydrolysis(Process):
                 * f_ester
                 / carbon_mass_fraction(ISOAMYL_ALCOHOL.species)
             )
+        return d
+
+
+class EthylHexanoateHydrolysis(Process):
+    """Aging hydrolysis of the fruity APPLE ester toward equilibrium (decision D-126).
+
+    The **second** ester-hydrolysis Process on the aging axis and the sibling of
+    :class:`EsterHydrolysis`: where that one fades the banana acetate (``isoamyl_acetate``), this
+    one fades the apple/pineapple ethyl ester (``ethyl_hexanoate``), the SAME
+    young-fruit-fades-with-age direction (D-121's direction split: straight-chain medium-chain
+    fatty-acid ethyl esters hydrolyse WITH the acetates, not against them). The rate::
+
+        d(ethyl_hexanoate)/dt = -k_ethyl_hexanoate_hydrolysis · f(T)
+                                 · max(0, ethyl_hexanoate - ethyl_hexanoate_eq)
+
+    is first-order net decay of the ``ethyl_hexanoate`` pool toward the lower equilibrium floor
+    ``ethyl_hexanoate_eq`` (not to zero), with ``f(T) = arrhenius_factor(T,
+    E_a_ethyl_hexanoate_hydrolysis, T_ref)`` the sourced warmer-ages-faster factor. Fades the apple
+    OAV — one of wine's highest-OAV odorants and the apple-vs-banana swing pool for the ``fruity``
+    axis (D-96/D-98), so an aging segment can shift that attribution as the two fruity esters fade
+    at different rates.
+
+    **Sourced from Makhotkina & Kilmartin 2012 (real-wine kinetics; D-126 lifts the D-121 block).**
+    R&O 1980 gave ethyl hexanoate only a MODEL-solution k and their own wine data showed no
+    appreciable change, so D-121/D-123 left it "blocked on sourcing". Makhotkina & Kilmartin 2012
+    (PMID 22868118) measured the REAL Sauvignon-blanc hydrolysis (Table 2 pseudo-first-order k_obs
+    at 5/10/18/28 C; Table 3 E_a = 68 kJ/mol; 36% of the ethyl hexanoate lost over 12 months at
+    18 C), which now anchors ``k_ethyl_hexanoate_hydrolysis`` / ``E_a_ethyl_hexanoate_hydrolysis``.
+    The 20 C rate anchor is robust (Table-2 interpolation and the Table-3 Arrhenius fit agree at
+    ~1.1e-4 /h) even though the Arrhenius slope is poorly determined (r^2 = 0.572); see aging.yaml.
+    **Floored + grafted** exactly as the isoamyl rate (D-123): Makhotkina's k_obs is a floor-less
+    disappearance constant, so ``k`` is inflated ~x1.33 so ``k_sim·(ester - eq)`` reproduces the
+    observed ``k_obs·[ester]`` at the ~0.4 mg/L young level (owner's D-126 choice over floor-less
+    eq=0).
+
+    **NO pH factor — the pH/tartrate catalysis is DEFERRED (D-126), unlike isoamyl (D-124/D-125).**
+    Makhotkina gives no per-pH ethyl-hexanoate series and R&O's Table VII per-ester tartrate
+    constants are isoamyl-acetate's (not ported — that would assume transferability the sources do
+    not license), so the rate is anchored at Makhotkina's Sauvignon-blanc wine pH and carries no
+    ``h(pH)`` term. This mirrors isoamyl's OWN history (D-123 anchored the rate; D-124 added the pH
+    term later). The pH-explicit refinement is the clean follow-on — the D-125 "reopens if another
+    ester's hydrolysis is ever built" trigger, now tripped.
+
+    **Carbon — an on-ledger inter-pool transfer (D-126).** Ethyl hexanoate (C8) hydrolyses to
+    ETHANOL (C2) + hexanoic acid (C6), split 2:6. The released ester carbon
+    (``rate·c(ethyl_hexanoate)``) is re-deposited through each product pool's own carbon fraction,
+    so ``total_carbon`` closes to machine precision for any split summing to 1. The **ethanol**
+    carbon lands in the **core ``E`` slot** (its honest destination — the :class:`EsterHydrolysis`
+    docstring pre-blessed this for exactly this build) and the **hexanoic-acid** carbon in ``Byp``
+    (the succinic-acid stand-in; there is no dedicated hexanoic pool — the same D-16 acid stand-in
+    ``EsterHydrolysis`` uses for acetic acid).
+
+    **Why touching ``E`` is safe — the OxidativeAcetaldehyde precedent.** ``E`` is in the
+    ``total_mass`` sub-ledger ``{S, E, CO2}``, so unlike :class:`EsterHydrolysis` (which touches
+    only off-ledger aroma pools) this Process makes ``total_mass`` non-flat on an ACTIVE aging
+    config — ``E`` gains ethanol from ``ethyl_hexanoate``, a pool outside the sub-ledger. This is
+    exactly the :class:`OxidativeAcetaldehyde` pattern (which DEBITS ``E`` → acetaldehyde on an
+    O₂-dosed config, opposite sign): ``total_mass`` is asserted only on **byproduct-free** configs
+    (aroma pools zero), where this Process is inert (``ethyl_hexanoate`` = 0 ⇒ rate 0), so the
+    validated-core mass check stays exact. total_CARBON is the invariant this Process closes to
+    machine precision; the ethanol mass appearing in ``E`` corresponds to real untracked hydrolysis
+    water (the D-8/D-16/D-26 gap), and it is utterly negligible (~1e-6 g/L even over years).
+    ``total_mass`` is deliberately NOT asserted flat on this Process's own integrated-aging test
+    (see ``test_ethyl_hexanoate_aging_closes_carbon_and_fades_apple``).
+
+    Off during the ferment in practice (temperature- and pool-driven; k is slow — half-life ~6
+    months — so decay over a days-long ferment is negligible, and the pool sits near its young
+    level); enabled across the whole post-fermentation aging span. Tier **speculative** (the
+    aging-axis floor; the poor Arrhenius fit makes it an honest floor). Isolable (prime directive
+    #3): below the floor, or with the pool empty, it contributes exactly zero.
+    """
+
+    name = "ethyl_hexanoate_hydrolysis"
+    tier = Tier.SPECULATIVE
+    #: Decays the ``ethyl_hexanoate`` pool and routes the released carbon to ETHANOL (the core
+    #: ``E`` slot) and hexanoic acid (``Byp``, the succinic stand-in) — an on-ledger inter-pool
+    #: transfer, so it touches those three and nothing else. ``E`` is in the ``total_mass``
+    #: sub-ledger (the OxidativeAcetaldehyde precedent; see the class docstring), so total_CARBON —
+    #: not total_mass — is the invariant this Process closes exactly. No fusel/label pools (unlike
+    #: EsterHydrolysis): ethyl hexanoate has no valine label, and its alcohol product is bulk
+    #: ethanol, not a fusel.
+    touches = (_ETHYL_HEXANOATE.pool, "E", "Byp")
+    #: ``k_ethyl_hexanoate_hydrolysis`` / ``E_a_ethyl_hexanoate_hydrolysis`` /
+    #: ``ethyl_hexanoate_eq`` are this Process's own (aging.yaml, D-126; k/E_a from Makhotkina &
+    #: Kilmartin 2012 real-wine hydrolysis, eq an author estimate). ``T_ref`` is shared with every
+    #: other Arrhenius rate.
+    #: Their speculative tiers cap the ``ethyl_hexanoate`` / ``E`` / ``Byp`` output tiers (D-1). NO
+    #: pH-system params are read — the pH/tartrate catalysis is deferred (D-126), so unlike
+    #: EsterHydrolysis this Process reads no ``pH_ref`` / tartrate-ratio / ``cation_charge`` params.
+    reads: tuple[str, ...] = (
+        "k_ethyl_hexanoate_hydrolysis",
+        "E_a_ethyl_hexanoate_hydrolysis",
+        "ethyl_hexanoate_eq",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        ester = float(y[schema.slice(_ETHYL_HEXANOATE.pool)][0])
+        # Net decay toward the equilibrium floor: the excess above the floor, never below zero.
+        # max(0, ...) with ethyl_hexanoate_eq > 0 also absorbs a solver undershoot (ester < 0 ⇒ 0).
+        excess = max(0.0, ester - params["ethyl_hexanoate_eq"])
+        if excess <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_ethyl_hexanoate_hydrolysis"], params["T_ref"])
+        # NO pH factor (D-126): the pH/tartrate catalysis is deferred (no per-pH ethyl-hexanoate
+        # data; R&O's per-ester Table VII constants are isoamyl-acetate's, not ported). The rate is
+        # anchored at Makhotkina's Sauvignon-blanc wine pH — medium-independent, so it runs the same
+        # in wine and beer, unlike EsterHydrolysis's wine-only h(pH).
+        rate = params["k_ethyl_hexanoate_hydrolysis"] * f_t * excess  # g ethyl hexanoate/L/h
+
+        # Split the released C8 carbon 2:6 and re-deposit through each product pool's own carbon
+        # fraction, so total_carbon closes to machine precision (ethyl hexanoate C8 → ethanol C2 +
+        # hexanoic acid C6). Ethanol → core E (its honest destination); hexanoic acid → Byp (the
+        # succinic-acid stand-in, no dedicated hexanoic pool). See the class docstring for why
+        # routing to E — a total_mass{S,E,CO2} pool — is the OxidativeAcetaldehyde precedent.
+        carbon_released = rate * carbon_mass_fraction(_ETHYL_HEXANOATE.species)  # g C/L/h
+        d[schema.slice(_ETHYL_HEXANOATE.pool)] = -rate
+        d[schema.slice("E")] = (
+            _ETHANOL_CARBON_SHARE * carbon_released / carbon_mass_fraction("ethanol")
+        )
+        d[schema.slice("Byp")] = (
+            _HEXANOIC_CARBON_SHARE * carbon_released / carbon_mass_fraction(_BYP_SPECIES)
+        )
         return d
 
 

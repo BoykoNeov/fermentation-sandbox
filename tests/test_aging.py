@@ -59,6 +59,7 @@ from fermentation.core.kinetics import (
     Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
+    EthylHexanoateHydrolysis,
     MaillardBrowning,
     MaillardStrecker,
     OakExtraction,
@@ -89,7 +90,7 @@ from fermentation.core.kinetics.amino_acid_pools import (
     assimilable_carbon_per_nitrogen,
 )
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
-from fermentation.core.media import beer_schema, wine_schema
+from fermentation.core.media import beer_schema, get_medium, wine_schema
 from fermentation.core.process import Process, ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -668,6 +669,160 @@ def test_integrated_aging_closes_carbon_beer_multislot(store):
     assert float(traj.series("isoamyl_acetate")[-1]) < 0.08
     f_c = beer.value("biomass_C_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+# ==============================================================================================
+# ETHYL HEXANOATE HYDROLYSIS (decision D-126) — the apple/pineapple ethyl ester fades on aging, the
+# sibling of EsterHydrolysis. Real-wine kinetics from Makhotkina & Kilmartin 2012 (PMID 22868118).
+# Floored + grafted (the isoamyl D-123 idiom); NO pH factor (deferred, D-126). Routes the released
+# carbon 2:6 → ethanol (core E slot, the OxidativeAcetaldehyde precedent) + hexanoic acid (Byp).
+# ==============================================================================================
+
+#: Makhotkina & Kilmartin 2012 ethyl-hexanoate hydrolysis k_obs at 20 C, /h. The Table 2
+#: interpolation (18↔28 C) and the Table 3 Arrhenius fit (E_a=68 kJ/mol, A=4e4/s) agree at
+#: ~1.1e-4 /h. The grafted k_sim reproduces this k_obs·[ester] at the young level (D-126).
+_MAKHOTKINA_ETHYL_HEXANOATE_KOBS_PER_H_20C = 1.10e-4
+#: The representative young ethyl-hexanoate level the graft is calibrated at (~0.4 mg/L, the sim's
+#: calibrated young value; sensory.yaml/wine_generic.yaml). Mirrors isoamyl's 1.0 mg/L point.
+_ETHYL_HEXANOATE_YOUNG_REF = 4.0e-4  # g/L
+
+
+def test_ethyl_hexanoate_metadata():
+    p = EthylHexanoateHydrolysis()
+    assert p.name == "ethyl_hexanoate_hydrolysis"
+    # Speculative: the aging axis is the Tier-3 frontier; here an honest floor (poor Arrhenius fit).
+    assert p.tier is Tier.SPECULATIVE
+    # An on-ledger inter-pool transfer: decays ethyl_hexanoate, routes carbon to ETHANOL (the core
+    # E slot) and hexanoic acid (Byp). Unlike EsterHydrolysis it touches E — a total_mass{S,E,CO2}
+    # pool (the OxidativeAcetaldehyde precedent) — and carries no fusel/label pools (ethyl hexanoate
+    # has no valine label and its alcohol product is bulk ethanol, not a fusel).
+    assert set(p.touches) == {"ethyl_hexanoate", "E", "Byp"}
+
+
+def test_ethyl_hexanoate_reads_declared_and_loaded(params):
+    p = EthylHexanoateHydrolysis()
+    for name in (
+        "k_ethyl_hexanoate_hydrolysis",
+        "E_a_ethyl_hexanoate_hydrolysis",
+        "ethyl_hexanoate_eq",
+        "T_ref",
+    ):
+        assert name in p.reads  # declared (tier propagation, D-1)
+        assert name in params  # and actually loaded (aging.yaml)
+    # NO pH-system params are read — the pH/tartrate catalysis is DEFERRED (D-126), unlike
+    # EsterHydrolysis which reads pH_ref_ester_hydrolysis + the D-125 tartrate ratios.
+    assert not any(r.startswith(("pH_ref", "r_h2t", "r_ht", "tartaric_ref")) for r in p.reads)
+
+
+def test_ethyl_hexanoate_params_in_makhotkina_ranges(params):
+    # Provenance teeth: k / E_a fall in Makhotkina & Kilmartin 2012's measured ranges (k grafted).
+    assert 9.0e-5 <= params["k_ethyl_hexanoate_hydrolysis"] <= 2.5e-4
+    assert 38000.0 <= params["E_a_ethyl_hexanoate_hydrolysis"] <= 98000.0  # 68 ± 30 kJ/mol
+    # The floor sits below the young apple level so most of it fades (a residuum remains).
+    assert 0.0 < params["ethyl_hexanoate_eq"] < _ETHYL_HEXANOATE_YOUNG_REF
+
+
+def test_ethyl_hexanoate_rate_reproduces_makhotkina_young_wine_fade(params):
+    # THE floor-graft's design claim (D-126, the isoamyl D-123 idiom): EthylHexanoateHydrolysis
+    # decays toward ethyl_hexanoate_eq, but Makhotkina's k_obs is a floor-less disappearance
+    # constant, so k was grafted (~×1.33) so that at the ~0.4 mg/L young level the sim's rate
+    # k_sim·(ester − eq) reproduces the observed k_obs·[ester]. No pH factor, so a bare wine does.
+    schema = wine_schema()
+    y = _aged_wine(schema, ester=0.0, t=params["T_ref"], ethyl_hexanoate=_ETHYL_HEXANOATE_YOUNG_REF)
+    d = EthylHexanoateHydrolysis().derivatives(0.0, y, schema, params)
+    sim_fade = -float(schema.get(d, "ethyl_hexanoate"))  # g/L/h, the modelled disappearance rate
+    makhotkina_fade = _MAKHOTKINA_ETHYL_HEXANOATE_KOBS_PER_H_20C * _ETHYL_HEXANOATE_YOUNG_REF
+    assert sim_fade == pytest.approx(makhotkina_fade, rel=0.05)
+
+
+def test_ethyl_hexanoate_carbon_split_is_two_to_six(params):
+    # The released C8 carbon splits 2:6 → ethanol (E, 1/4) + hexanoic acid (Byp, 3/4), re-deposited
+    # through each pool's own carbon fraction so the transfer is carbon-exact for any split summing
+    # to 1. Pin the exact routing (mirror of the isoamyl 5:2 derivative test).
+    schema = wine_schema()
+    y = _aged_wine(schema, ester=0.0, t=params["T_ref"], ethyl_hexanoate=_ETHYL_HEXANOATE_YOUNG_REF)
+    d = EthylHexanoateHydrolysis().derivatives(0.0, y, schema, params)
+    rate = -float(schema.get(d, "ethyl_hexanoate"))
+    carbon_released = rate * carbon_mass_fraction("ethyl_hexanoate")
+    assert schema.get(d, "E") == pytest.approx(0.25 * carbon_released / _ETHANOL_C)
+    assert schema.get(d, "Byp") == pytest.approx(0.75 * carbon_released / _BYP_C)
+    # Carbon-exact: carbon out of the ester equals carbon into E + Byp.
+    c_in = schema.get(d, "E") * _ETHANOL_C + schema.get(d, "Byp") * _BYP_C
+    assert c_in == pytest.approx(carbon_released, rel=1e-12)
+
+
+def test_ethyl_hexanoate_no_ph_factor(params):
+    # D-126 minimal choice: NO pH/tartrate catalysis (deferred). Unlike EsterHydrolysis (whose rate
+    # rises at low pH, D-124), this rate is pH-INDEPENDENT — the fade at pH 3.0 equals the fade at
+    # pH 4.0 for the same pool. Anchored at Makhotkina's wine pH; the pH refinement is the named
+    # follow-on. (Contrast the isoamyl low-pH-fades-faster behaviour.)
+    schema = wine_schema()
+    proc = EthylHexanoateHydrolysis()
+    low = _wine_at_ph(schema, params, 3.0, ester=0.0, t=params["T_ref"])
+    low[schema.slice("ethyl_hexanoate")] = _ETHYL_HEXANOATE_YOUNG_REF
+    high = _wine_at_ph(schema, params, 4.0, ester=0.0, t=params["T_ref"])
+    high[schema.slice("ethyl_hexanoate")] = _ETHYL_HEXANOATE_YOUNG_REF
+    fade_low = -float(schema.get(proc.derivatives(0.0, low, schema, params), "ethyl_hexanoate"))
+    fade_high = -float(schema.get(proc.derivatives(0.0, high, schema, params), "ethyl_hexanoate"))
+    assert fade_low == pytest.approx(fade_high, rel=1e-12)
+
+
+def test_ethyl_hexanoate_warmer_ages_faster(params):
+    # The load-bearing DIRECTION (E_a > 0): a warmer wine fades its apple ester faster (cold storage
+    # preserves it). Makhotkina's headline, and the only claim the poor Arrhenius fit (r²=0.572)
+    # robustly supports.
+    schema = wine_schema()
+    proc = EthylHexanoateHydrolysis()
+    cold = _aged_wine(schema, ester=0.0, t=283.15, ethyl_hexanoate=_ETHYL_HEXANOATE_YOUNG_REF)
+    warm = _aged_wine(schema, ester=0.0, t=303.15, ethyl_hexanoate=_ETHYL_HEXANOATE_YOUNG_REF)
+    fade_cold = -float(schema.get(proc.derivatives(0.0, cold, schema, params), "ethyl_hexanoate"))
+    fade_warm = -float(schema.get(proc.derivatives(0.0, warm, schema, params), "ethyl_hexanoate"))
+    assert fade_warm > fade_cold > 0.0
+
+
+def test_ethyl_hexanoate_isolable_below_equilibrium(params):
+    # Isolability (prime directive #3): below the floor the Process contributes exactly nothing —
+    # an aging segment on an apple-ester-poor wine is byte-for-byte the no-aging state.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [EthylHexanoateHydrolysis()], strict=True)
+    y = _aged_wine(schema, ester=0.0, ethyl_hexanoate=params["ethyl_hexanoate_eq"] * 0.5)
+    assert np.array_equal(ps.total_derivatives(0.0, y, params), schema.zeros())
+
+
+def test_ethyl_hexanoate_aging_closes_carbon_and_fades_apple(params, store):
+    # Integrated aging segment (racked dry wine, X=0, S=0) with ONLY EthylHexanoateHydrolysis active
+    # under the strict touches contract. The apple ester fades toward (not past) its floor, E and
+    # Byp rise, and total_CARBON closes to machine precision — the on-ledger transfer
+    # ethyl_hexanoate → ethanol (E) + hexanoic acid (Byp).
+    schema = wine_schema()
+    ps = ProcessSet(schema, [EthylHexanoateHydrolysis()], strict=True)
+    eh0 = _ETHYL_HEXANOATE_YOUNG_REF
+    y0 = _aged_wine(schema, ester=0.0, t=293.15, ethyl_hexanoate=eh0)
+    e0 = float(schema.get(y0, "E"))
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
+    assert traj.success, traj.message
+    eh_end = float(traj.series("ethyl_hexanoate")[-1])
+    assert params["ethyl_hexanoate_eq"] <= eh_end < eh0  # fades toward, not past, the floor
+    assert float(traj.series("E")[-1]) > e0  # ethanol released into the core E slot
+    assert float(traj.series("Byp")[-1]) > 0.0  # hexanoic acid → Byp (succinic stand-in)
+    assert_nonnegative(traj, ("ethyl_hexanoate", "Byp"), atol=1e-12)
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    # total_mass is DELIBERATELY NOT asserted flat here (contrast the isoamyl
+    # test_integrated_aging_closes_carbon_and_fades_esters, which does): E is in the
+    # total_mass{S,E,CO2} sub-ledger, and this Process ADDS ethanol to E from ethyl_hexanoate (a
+    # pool OUTSIDE the sub-ledger), so total_mass gains a hair — exactly the OxidativeAcetaldehyde
+    # precedent (which loses E-mass to acetaldehyde). The gain corresponds to real untracked
+    # hydrolysis water (the D-8/D-16/D-26 stand-in gap) and is ~1e-6 g/L even over a year; the
+    # invariant this Process closes exactly is total_CARBON.
+
+
+def test_ethyl_hexanoate_wired_into_both_media():
+    # The Process is wired into the medium-agnostic _AGING_PROCESSES (like EsterHydrolysis), so both
+    # a compiled wine and beer carry it — the ethyl_hexanoate pool exists in both (D-96).
+    for medium in ("wine", "beer"):
+        names = {p().name for p in get_medium(medium).process_factories}
+        assert "ethyl_hexanoate_hydrolysis" in names
 
 
 # -- tier propagation ---------------------------------------------------------
