@@ -13194,6 +13194,16 @@ cleaner than D-130's two-source split.
   `MalolacticDeath` rate gap (mcfa 0 vs 150 µM) = `0.000e+00` (bacteriostatic, death still fires on
   SO2) — the D-39 lesson verified numerically AND structurally (`mcfa_inhib_mlf` in conversion/growth
   `reads`, absent from death `reads`).
+- **Done-check — INTEGRATED trajectory (advisor, `mcfa_trajectory_check.py`):** GATE 2 tests the
+  instantaneous rate, but "stuck MLF" is an integrated outcome and `g_FA` gates BOTH conversion and
+  growth (a compounding the D-130 equilibrium lacked). Co-inoc runs (22 Brix, malic 4 g/L, 20 °C,
+  21 d) at MCFA 0/50/93/145/220 µM degraded **100/100/93.7/62.6/31.7 %** of malic — a smooth
+  sluggish→stuck gradient with **no overshoot to zero** at moderate load (only ~220 µM genuinely
+  stalls). `X_mlf` barely moves (0.200→0.198 in all cases) because amino acids deplete ~1.3 d
+  (D-23/D-32), so the g_FA-on-growth compounding is negligible in the co-inoc window — the
+  conversion-rate suppression carries it. Milder than Table 4 (49 %/14 d, ~93 µM) but that is a
+  regime/timescale artifact (co-inoc low-ethanol 21 d vs sequential 11 %-ethanol wine 14 d) — the
+  headline is confirmed end-to-end, not overshot.
 
 ### Receipts
 - `core/chemistry.py` — `M_OCTANOIC_ACID` (C8H16O2) + `MOLAR_MASS`/`CARBON_ATOMS`(8)/`NITROGEN_ATOMS`(0).

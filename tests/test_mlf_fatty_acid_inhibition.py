@@ -179,8 +179,12 @@ def test_conversion_rate_monotone_in_mcfa(params):
 
 
 def test_mcfa_gates_growth_too(params):
-    # The shared environmental gate throttles MalolacticGrowth as well as conversion (Lonvaud-Funel
-    # Table 3: bacterial growth is inhibited by the MCFA mixture too), by the SAME g_FA factor.
+    # The shared environmental gate throttles MalolacticGrowth as well as conversion — Lonvaud-Funel
+    # Table 3 confirms the DIRECTION (the MCFA mixture inhibits bacterial growth too), but Table 3's
+    # growth dose-response is NOT Table 6's resting-cell activity response: applying the same
+    # activity-calibrated g_FA to growth is the v1 shared-gate MODELING choice (the pH/EtOH/SO₂
+    # gates already act on both), not a sourced growth==activity equivalence. Here we pin that the
+    # growth rate carries EXACTLY that g_FA factor (the shared-gate wiring), not some other path.
     schema = wine_schema()
     growth = MalolacticGrowth()
     dx0 = float(
