@@ -21,6 +21,15 @@ touchdown smooth — ``f'(E_max) = 0``, so the rate eases to zero with no deriva
 kink for the BDF solver to choke on (a raw ``n=1`` linear form has that kink). At
 ``E=0`` the factor is 1 (no inhibition); it decreases monotonically to 0.
 
+Because this modifier scales *uptake* (= the production flux), the Luong exponent
+that measures it is his **production** value ``gamma ~ 1`` (linear regime <30 g/L
+EtOH, ``P'm ~ 105-114 g/L``), **not** his growth value ``alpha ~ 0.8`` — growth is
+the flux M1 deliberately leaves alone (below). ``ethanol_inhibition_exponent`` ships
+at ``n = 2``, an intentional super-linear *deviation* from that measured ``gamma ~ 1``
+bought purely for the ``f'(E_max) = 0`` smoothness — see the parameter's provenance
+and decision **D-128** (which re-anchored the provenance to Luong and cross-checked
+this dormant wall against the wired Coleman brake).
+
 **Conservation is automatic.** The factor scales uptake's entire ``(dS, dE, dCO2)``
 contribution by one scalar, so the Gay-Lussac carbon/mass balance uptake already
 respects is preserved — a slower carbon-neutral flux is still carbon-neutral.

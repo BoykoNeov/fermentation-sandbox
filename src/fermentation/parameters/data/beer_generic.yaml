@@ -145,11 +145,11 @@ ethanol_inhibition_exponent:
   value: 2.0
   unit: "dimensionless"
   tier: speculative
-  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent" }
+  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent; Luong's MEASURED production value is gamma~1 (linear), the low end here" }
   provenance:
-    source: "author estimate"
-    conditions: "generic ale yeast; Levenspiel 1980 / Luong 1985 inhibition form"
-    notes: "Exponent n in f = (1 - E/E_max)^n. de Andres-Toro et al. 1998 use n=1 (f = 1 - E/(0.5*S0)) for beer; we keep n=2 for a C1-smooth touchdown (BDF solver). Form is literature-backed, exponent is our numerical choice - speculative."
+    source: "n=2 is our numerical smoothing choice; the measured anchor is Luong 1985 (Biotechnol. Bioeng. 27:280), production law nu/nu_max = [1 - E/P'm]^gamma with gamma~1 (linear)"
+    conditions: "generic ale yeast; EthanolInhibition scales the UPTAKE (= production) flux, so Luong's PRODUCTION exponent gamma~1 applies (not his growth alpha~0.8)"
+    notes: "Exponent n in f = (1 - E/E_max)^n. Luong 1985 measures the true production exponent as gamma~1 (linear); de Andres-Toro et al. 1998 use exactly that n=1 wall (f = 1 - E/(0.5*S0)) for beer. We deviate upward to n=2 for a C1-smooth touchdown (f'(E_max)=0, no BDF kink). Value 2.0 is our numerical choice, not Luong's - speculative. INERT in the shipped core (EthanolInhibition unwired, D-13); provenance upgrade only (D-128)."
 
 # -- Ethanol-driven cell inactivation (the timescale brake, decision D-13) -----
 # Read by EthanolInactivation (moves mass X -> X_dead). Beer barely reaches its

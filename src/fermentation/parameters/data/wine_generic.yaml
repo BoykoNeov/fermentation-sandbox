@@ -158,11 +158,11 @@ ethanol_inhibition_exponent:
   value: 2.0
   unit: "dimensionless"
   tier: speculative
-  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent" }
+  uncertainty: { low: 1.0, high: 3.0, note: "Levenspiel/Luong toxic-power exponent; Luong's MEASURED production value is gamma~1 (linear), the low end here" }
   provenance:
-    source: "author estimate"
-    conditions: "generic S. cerevisiae; Levenspiel 1980 / Luong 1985 inhibition form"
-    notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. n=1 is the raw linear (Ghose-Tyagi) form with a derivative kink at E_max; de Andres-Toro et al. 1998 use exactly this n=1 wall (f = 1 - E/(0.5*S0)) for beer. We keep n=2 so the touchdown is C1-smooth for the BDF solver and gives a 'tolerant then collapse' viability shape; the form has literature backing but the exponent itself is our numerical choice, hence speculative."
+    source: "n=2 is our numerical smoothing choice; the measured anchor is Luong 1985 (Biotechnol. Bioeng. 27:280), production law nu/nu_max = [1 - E/P'm]^gamma with gamma~1 (linear regime <30 g/L EtOH), P'm~105-114 g/L"
+    conditions: "S. cerevisiae; EthanolInhibition scales the fermentative UPTAKE (= production) flux, so Luong's PRODUCTION exponent gamma~1 is the applicable measurement (NOT his growth exponent alpha~0.8, which targets a flux this modifier deliberately leaves alone - see inhibition.py)"
+    notes: "Exponent n in f = (1 - E/E_max)^n applied to the fermentative uptake flux. Luong 1985 MEASURES the true production exponent as gamma~1 (linear); de Andres-Toro et al. 1998 use exactly that n=1 wall (f = 1 - E/(0.5*S0)) for beer. We deviate UPWARD to n=2 as a documented super-linear smoothing so the touchdown is C1-smooth (f'(E_max)=0, no derivative kink for the BDF solver) and gives a 'tolerant then collapse' viability shape - n=2 inhibits MORE in the interior than Luong's measured n=1. Still speculative: the value 2.0 is our numerical choice, not Luong's number. INERT in the shipped core - EthanolInhibition is unwired (D-13, replaced by the cumulative Coleman brake EthanolInactivation); this re-anchor is a provenance upgrade, not a behaviour change (D-128)."
 
 biomass_carrying_capacity:
   value: 2.5
@@ -1018,7 +1018,7 @@ mlf_ethanol_exponent:
   provenance:
     source: "author estimate; Levenspiel 1980 / Luong 1985 inhibition form, matching the yeast ethanol_inhibition_exponent choice"
     conditions: "O. oeni in wine; exponent of the ethanol wall on the conversion rate"
-    notes: "Exponent n in g_EtOH = (1 - E/E_max)^n. Kept at n=2 (as for the yeast EthanolInhibition) so the rate eases to zero with no derivative kink at E_max - C1-smooth for the BDF solver. The form has literature backing (Luong); the exponent itself is a numerical choice, hence speculative."
+    notes: "Exponent n in g_EtOH = (1 - E/E_max)^n. Kept at n=2 (as for the yeast EthanolInhibition) so the rate eases to zero with no derivative kink at E_max - C1-smooth for the BDF solver. The form has literature backing (Luong); the exponent itself is a numerical choice, hence speculative. NOT re-anchored to Luong 1985: Luong measured S. cerevisiae, this wall is O. oeni - anchoring an O. oeni exponent to a yeast paper would be worse provenance, not better (D-128); an O. oeni-specific exponent is unsourced."
 
 molecular_so2_inhib_mlf:
   value: 2.0e-4

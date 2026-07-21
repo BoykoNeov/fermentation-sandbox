@@ -135,6 +135,8 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 - [**D-124**](#d-124--the-ph-explicit-ester-hydrolysis-rate-acetate-fade-now-tracks-wine-ph-first-order-in-h-the-d-123-follow-on-built) — the pH-explicit ester-hydrolysis rate: acetate fade now tracks wine pH, first-order in [H+] (the …
 - [**D-125**](#d-125--the-full-multi-species-tartrate-catalysis-law-ester-hydrolysis-now-reads-bitartrate-not-just-h-d-124s-deferred-refinement-built--and-its-premise-corrected) — the FULL multi-species tartrate-catalysis law: ester hydrolysis now reads bitartrate, not just [H+] …
 - [**D-126**](#d-126--the-candidate-fetch-spent-makhotkina--kilmartin-2012-unblocks-ethyl_hexanoate-hydrolysis-its-own-sibling-process-built-not-ethyl_acetate-formation-still-blocked) — the candidate fetch, spent: Makhotkina & Kilmartin 2012 unblocks `ethyl_hexanoate` hydrolysis (its …
+- [**D-127**](#d-127--ethyl_acetate-formation-unblocked-as-an-explicitly-model-based-term-the-third-ester-process-and-the-only-bidirectional-one) — `ethyl_acetate` formation, unblocked as an explicitly model-based term: the 3rd ester Process, the …
+- [**D-128**](#d-128--luong-1985-ethanol-inhibition-provenance-re-anchored-to-the-measured-production-exponent-a--and-a-coleman-cross-validation-that-surfaced-the-cores-missing-ethanol-ceiling-b) — Luong 1985 ethanol inhibition: provenance re-anchored to the measured production exponent (A), plus a …
 <!-- END INDEX -->
 
 ## Process decisions (project setup)
@@ -12836,3 +12838,82 @@ wine + carbon closure, integrated FORM below equilibrium + carbon closure, wired
 - **Future axes now have provenance-grade anchors in hand** (from the same sweep, not yet built): SO2
   carbonyl binding (Barbe 2000 + Handbook Vol 1 Kd set), core-ferment ethanol inhibition (Luong 1985),
   MLF fatty-acid inhibition (Lonvaud-Funel 1988), oxidation O2-consumption (Ferreira 2015).
+
+## D-128 — Luong 1985 ethanol inhibition: provenance re-anchored to the measured production exponent (A), and a Coleman cross-validation that surfaced the core's missing ethanol ceiling (B)
+
+**D-127's "Next" listed "core-ferment ethanol inhibition (Luong 1985)" as a future axis with an anchor
+in hand. Fetched and read (`obtained-articles.md`), Luong turned out NOT to be a missing mechanism: the
+core already arrests fermentation, and Luong is the DELIBERATELY-RETIRED alternative.** The owner picked
+the axis, then — after I surfaced the collision — chose the **A+B** slice (provenance re-anchor +
+cross-validation), explicitly NOT re-wiring Luong into the core (which would reverse D-13 and
+double-count). Two advisor passes shaped the scope.
+
+### The collision — Luong is the losing side of D-13
+
+The core's ethanol arrest is `EthanolInactivation` (Coleman 2007) — **cumulative, stateful cell death**
+`k_d = k'_d·E` moving `X`→`X_dead`. The Luong/Levenspiel **instantaneous wall** `(1 − E/E_max)^n` still
+exists in code as `EthanolInhibition` but is **unwired** from default media: **D-13** pulled it because
+running both would double-count ethanol toxicity. So a naive "build Luong into the core" reverses a
+settled decision. Luong's *form* is live only in `MalolacticConversion`'s O. oeni ethanol gate (which
+borrowed the yeast wall's `n=2`).
+
+### A — provenance re-anchor (behaviour-NEUTRAL)
+
+`ethanol_inhibition_exponent` (wine + beer) kept its **value 2.0** but its provenance was rewritten from
+bare "author estimate" to cite **Luong 1985** (Biotechnol. Bioeng. 27:280). Two disciplines from the
+advisor: (i) **the applicable Luong exponent is the PRODUCTION one, γ ≈ 1** (linear regime <30 g/L,
+P'm ≈ 105–114 g/L) — because `EthanolInhibition` scales *uptake* = the production flux — **NOT** his growth
+exponent α ≈ 0.8, which targets a flux this modifier deliberately leaves alone; (ii) `n = 2` is framed as
+an intentional **super-linear DEVIATION** from that measured γ ≈ 1, bought purely for `f'(E_max) = 0`
+smoothness (no BDF kink), and stays **speculative** (the value is our numerical choice, not Luong's
+number). Setting the literal to 1.0 was rejected: it would reintroduce the derivative kink and force a
+rewrite of the smoothness rationale that is a *live* feature in the one place the form runs (MLF), for no
+behaviour gain (the yeast modifier is unwired). **`mlf_ethanol_exponent` was deliberately NOT touched** —
+Luong measured *S. cerevisiae*; anchoring an *O. oeni* exponent to a yeast paper is worse provenance, not
+better (a one-line note records this). `inhibition.py`'s docstring gained the γ-vs-α + n=2-deviation
+paragraph. Zero behaviour change: the relevant 68 tests and the full suite stay green.
+
+### B — Coleman cross-validation (read-only), and the gap it surfaced
+
+The advisor flagged the trap: Coleman has **no wall** — it is cumulative death tuned to EC-1118 (142 g/L
+tolerance) — so absolute cessation ethanol will NOT match Luong's P'm, and that is a **strain** difference,
+not a validation failure; do not tune to manufacture agreement. Running the shipped 24-Brix benchmark
+ferment plus high-sugar musts (read-only) confirmed the divergence and surfaced something sharper:
+
+**`ethanol_tolerance` (142 g/L = EC-1118's rated 18% ABV) is read ONLY by the dormant/unwired
+`EthanolInhibition`. The wired core has NO ethanol ceiling** — Coleman's death RATE, not a rate wall, is
+the only brake. Consequence (all musts finish ~dry at 20 °C):
+
+| Brix | final EtOH | ABV | verdict |
+|------|-----------|-----|---------|
+| 24 | 118.2 g/L | 15.0% | realistic — substrate-limited (the benchmark regime) |
+| 28 | 140.5 g/L | 17.8% | ~ at strain tolerance |
+| 32 | 163.6 g/L | 20.7% | implausible |
+| 36 | 186.7 g/L | 23.7% | impossible for wine yeast |
+
+Coleman sustains flux far past Luong's wall (50 % of peak dE/dt at E ≈ 107 g/L vs Luong's ≈ 52–57) and
+lets ethanol exceed EC-1118's *own* rated 142 g/L, because the brake is a death rate, not a ceiling. **The
+24-Brix benchmark HIDES this** — it finishes dry at a realistic 118 g/L / 15 % ABV before any ethanol
+ceiling would bite. Push the sugar up and the core **over-ferments to absurd ABV instead of STICKING with
+residual sugar** like a real icewine/dessert must. This is a **latent core fidelity gap** (no ethanol
+ceiling on the wired path), unvalidated because D-13's removal of the wall was only ever checked against
+the 24-Brix dryness benchmark; high-sugar musts (>~200 g/L sugar; 36 Brix ≈ 360 g/L) also want the
+substrate inhibition the sweep flagged and the core also lacks. B is therefore an honest, strain-caveated
+**negative** corroboration — the two mechanisms diverge — plus a surfaced gap, NOT a manufactured match.
+
+### Receipts
+
+`wine_generic.yaml` + `beer_generic.yaml` (`ethanol_inhibition_exponent` provenance rewritten;
+`mlf_ethanol_exponent` note). `inhibition.py` (docstring). No code logic, no parameter *values*, no wiring
+changed — A is provenance-only, B is read-only. ruff + mypy clean; full suite green. Cross-validation
+scripts and the full finding at `M:\claud_projects\temp\ferment\_findings\D-128-luong-xval.md`.
+
+### Next
+
+- **The high-sugar over-fermentation gap is the real candidate** surfaced here: the wired core has no
+  ethanol ceiling, so it makes implausible ABV / never sticks at high sugar. Closing it means an
+  ethanol-ceiling / stuck-high-sugar mechanism (re-examining D-13's scope *outside* the benchmark
+  regime — a strain-tolerance cap and/or substrate inhibition >~200 g/L), and it is a **core** change, so
+  it needs the owner's explicit go-ahead before building (surfaced, not built here).
+- The remaining anchored axes stay untouched: SO2 carbonyl binding (Barbe 2000), MLF fatty-acid
+  inhibition (Lonvaud-Funel 1988), oxidation O2-consumption (Ferreira 2015).
