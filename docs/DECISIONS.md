@@ -13025,3 +13025,101 @@ biomass tier is unaffected where the Coleman brake's own reads already set it.
   (and consider promoting the term's tier).
 - The anchored axes remain: SO2 carbonyl binding (Barbe 2000), MLF fatty-acid inhibition
   (Lonvaud-Funel 1988), oxidation O2-consumption (Ferreira 2015).
+
+## D-130 — botrytis SO2 carbonyl binding: 5-oxofructose as a must-composition input (Barbe 2000), the 4th competing carbonyl, so a botrytized must correctly binds far more SO2
+
+**Picked the "SO2 carbonyl binding (Barbe 2000)" axis; owner said "go with your call."** On
+inspection it is the **D-128 collision pattern again**: the axis is ~80% built and Barbe is only
+*partly* a missing mechanism. Surfaced the fork to the owner with a recommendation (per the D-128
+precedent that scope is the owner's call), who chose **"Build B + fold in A."** Two advisor passes
+shaped it (pre-work fork-sharpening; the gluconolactone-reconciliation kill).
+
+### What was already built vs. what Barbe genuinely adds
+
+The SO2 free/bound split was already a **multi-carbonyl competitive-Langmuir equilibrium**:
+acetaldehyde (D-28) + pyruvate + α-ketoglutarate (D-51), one shared bisulfite root solved by
+`brentq` in `acidbase.bound_so2_molar` — already generalized to **N carbonyls**, with the three
+core Kd's already sourced to **Burroughs & Sparks 1973** (i.e. the "Handbook Vol 1 Kd set"). So
+the machinery + the core Kd's are done. **Barbe 2000's genuine new content is the BOTRYTIS
+carbonyls** — compounds *Botrytis cinerea* makes ON THE BERRY (pre-crush), which the model has no
+organism to produce. The advisor's reframe dissolved the "no Botrytis organism" objection: these
+are a **must-composition INPUT** (the SAME category as dosed SO2 or tartaric), not a fermentation
+product the model fails to make — so B is *more* honest as an input than a production term would be.
+
+### A — provenance corroboration (behaviour-neutral)
+
+Barbe 2000 re-anchors the same acetaldehyde/pyruvate/2-oxoglutarate Kd set (from Blouin / B&S);
+added as a one-line **corroborating** citation to the three existing `K_*_so2` source strings. A
+footnote, not the deliverable.
+
+### B — 5-oxofructose, the dominant botrytis binder, built (the real deliverable)
+
+**Load-check resolved from primary sources (the advisor's tier gate, mine to settle):** the sourced
+material gives not just the Kd but the measured LOAD and the persistence:
+- **Kd 0.33 mM** (B&S 1973b via Barbe / Handbook Vol 1 Table 8.7) — a strong binder, ~4× weaker
+  than acetaldehyde but comparable to α-KG.
+- **Load ~80-150 mg/L, "frequently of the order of 100 mg/l in wines made from botrytized grapes"**
+  (Handbook §8.4 citing Barbe 2000; Wine Chemistry & Biochemistry cites Barbe 2000/2002 for the
+  80-150 range) — a **measured** range, not an author estimate → tier **plausible**, not speculative.
+- **Yeast-INERT: "concentrations not altered by alcoholic fermentation"** — so it persists unchanged
+  into the bottle and dominates a botrytized wine's high SO2-combining power (Barbe: **4-78% of all
+  SO2 combinations**; 5-oxofructose alone ~60% in advanced botrytis).
+
+**Design (follows the `so2_total` dosed-slot precedent exactly).** A new inert wine-only state slot
+`oxofructose` (g/L), set at compile from the scenario key `oxofructose_mgl` (mg/L→g/L, default 0),
+**touched by no Process** (external must input) — so it is a constant that competes in the binding
+equilibrium. New universal Kd param `K_5_oxofructose_so2` (plausible). `_bound_molar_split` extended
+3→4 carbonyls (acetaldehyde stays index 0 so `free_acetaldehyde` reads its share unchanged);
+threaded through all four `_speciate_at_ph` call sites. Carbon-weighted (C6) in `total_carbon` as an
+inert constant term (drifts 0 — the citrate/tartaric precedent); nitrogen-free.
+
+**DHA and gluconolactone deliberately NOT modelled (sourced, honest).**
+- **Dihydroxyacetone** is TRANSIENT — "metabolized by yeast during fermentation and is no longer a
+  factor in forming combinations in wine" (Handbook via Barbe). So the finished-wine binding is
+  dominated by the persistent 5-oxofructose; DHA omission is sourced-correct.
+- **Gluconolactone** is **blocked on sourcing (the D-121 pattern), not refused** — the advisor caught
+  that its Kd (4.2 mM) does not reconcile with its own sourced binding point (100 mg/L → 21.6 mg/L
+  bound, Bertrand & Guillou; Langmuir predicts ~4× less), and worse, what botrytis musts *measure* is
+  **gluconic acid**, mostly NOT the lactone that binds — the gluconic⇌lactone split is unsourced. So
+  the owner's "5-oxofructose + gluconolactone" pick was **narrowed to 5-oxofructose**, surfaced, with
+  gluconolactone documented as reopening the moment a clean lactone-fraction/Kd source lands.
+
+### The discriminating check (D-129 GATE pattern; `oxofructose_xval.py`)
+
+- **GATE 1 — structural isolability:** at `oxofructose = 0` the 4-carbonyl split is **byte-for-byte**
+  the D-51 3-carbonyl form: `max|Δbound| = 0.000e+00` across a whole SO2-dose sweep, checked against
+  an INDEPENDENT hand-computed 3-carbonyl bound (the Langmuir term is *exactly* 0, not param-luck).
+  Every non-botrytis wine is unchanged.
+- **GATE 2 — sourced OUTCOME (not tuned magnitude):** at the sourced ~100 mg/L load in a finished
+  wine (dose 60 mg/L, pH 3.5, typical acet/pyr/α-KG residuals), 5-oxofructose accounts for **12.1%
+  of bound SO2** (inside Barbe's 4-78% band; low end because this background carries heavy competing
+  yeast carbonyls — an advanced-botrytis sweet must pushes it toward Barbe's ~60%), and **molecular
+  (antimicrobial) SO2 collapses 42%** (170→98 µg/L). That collapse is the point: it **opens the
+  MLF/Brett antimicrobial gates** (a botrytized must needs a higher SO2 dose for the same
+  protection). Monotone across the sourced 80-150 mg/L range — direction shape-insensitive, only the
+  exact bound amount rides the load (the honest tier split: qualitative behaviour sourced-robust,
+  quantitative amount plausible).
+
+### Receipts
+- `core/chemistry.py` — `M_5_OXOFRUCTOSE` (C6H10O6) + `MOLAR_MASS`/`CARBON_ATOMS`(6)/`NITROGEN_ATOMS`(0).
+- `core/acidbase.py` — `OXOFRUCTOSE_KEY` / `OXOFRUCTOSE_SO2_BINDING_PARAM` consts, `_oxofructose_molar`
+  helper, `_bound_molar_split`/`_speciate_at_ph` extended 3→4 carbonyls (+ all 4 call sites and the
+  `free_acetaldehyde` unpack); `So2Speciation` / `SO2_STATE_KEY` caveats refreshed (omits now only
+  sugars + deferred gluconolactone).
+- `core/media.py` — `oxofructose` wine VarSpec (default 0, wine-only, inert).
+- `scenario/compile.py` — `oxofructose_mgl` → `oxofructose` slot (mg/L→g/L, default 0) + allowed-key.
+- `validation/conservation.py` — `oxofructose` carbon-weighted (C6, inert constant term).
+- `parameters/data/acidbase.yaml` — `K_5_oxofructose_so2` (plausible, full provenance + the
+  gluconolactone-deferral rationale) + Barbe corroboration folded into the 3 existing Kd source strings.
+- `tests/test_so2_botrytis_carbonyl.py` (13 tests: metadata/tier, chemistry registry, wine-only,
+  GATE 1 isolability, GATE 2 collapse, Barbe-band share, monotonicity, frees-acetaldehyde,
+  carbon-neutral inert pool, scenario wiring, typo-still-fails, tier stays plausible).
+- `tests/test_media.py` exact-set updated (`WINE_SO2_SLOTS` + size 86→87).
+- Sourcing + sweep durable at `M:\claud_projects\temp\ferment\oxofructose_xval.py` and the
+  `_findings/obtained-articles.md` / `book-sweep.md` Barbe notes.
+
+### Next
+- **Gluconolactone** reopens the moment a clean gluconic⇌lactone-fraction (or a lactone-specific Kd
+  that reconciles with the measured binding point) is sourced — the second persistent botrytis binder.
+- The anchored axes remain: MLF fatty-acid inhibition (Lonvaud-Funel 1988), oxidation O2-consumption
+  (Ferreira 2015). SUGARS remain the last unmodelled SO2 binder (weak per mole, but present in bulk).

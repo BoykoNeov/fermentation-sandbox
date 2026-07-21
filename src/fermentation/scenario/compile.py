@@ -339,6 +339,10 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "malic_gpl",
             "initial_ph",
             "so2_total_mgl",
+            # 5-oxofructose botrytis carbonyl SO₂-binder must input (decision D-130); mg/L,
+            # absent ⇒ 0 (a non-botrytis must — the binding equilibrium is byte-for-byte the
+            # D-51 3-carbonyl form). Set for a botrytized/sweet wine (~80-150 mg/L typical).
+            "oxofructose_mgl",
             "mlf_pitch_gpl",
             "carrying_capacity_gpl",
             "citrate_gpl",
@@ -491,6 +495,15 @@ def _wine_initial(
         # charge is a scoped omission the inverse anchoring would absorb at t=0 anyway (D-22).
         # Free/bound are derived from this total + acetaldehyde at the solved pH (D-28).
         "so2_total": mgl_to_gpl(_optional(values, "so2_total_mgl", 0.0)),
+        # 5-Oxofructose — the dominant BOTRYTIS-specific SO2-binding carbonyl (decision D-130);
+        # mg/L→g/L, default 0 (a non-botrytis must). Botrytis oxidises must fructose ON THE BERRY
+        # (pre-crush), so it is a must-composition INPUT like the SO2 dose above, not a
+        # fermentation product — carried as an inert slot no Process touches. Yeast-inert (Handbook
+        # Vol 1 via Barbe 2000: "not altered by alcoholic fermentation"), so it persists into the
+        # bottle and drives a botrytized wine's high SO2-combining power; typical botrytis load
+        # ~80-150 mg/L. Off the charge balance (like so2_total), so it does NOT enter the cation
+        # back-solve. At 0 the binding equilibrium is byte-for-byte the D-51 3-carbonyl form.
+        "oxofructose": mgl_to_gpl(_optional(values, "oxofructose_mgl", 0.0)),
         # DMS potential — the grape-borne precursor of aged-wine DMS (decision D-102), in
         # DMS-EQUIVALENT µg/L. Unlike every other optional above, this does NOT default to 0: it
         # defaults to the SOURCED must level (dms_potential_initial). The distinction is real —

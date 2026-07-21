@@ -36,7 +36,7 @@ SHARED = (
 #: readout (decision D-22), then the malolactic-catalyst slot (decision D-23); beer does
 #: not (its acid system, SO₂ and MLF are deferred).
 WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "citrate", "cation_charge")
-WINE_SO2_SLOTS = ("so2_total",)
+WINE_SO2_SLOTS = ("so2_total", "oxofructose")
 WINE_MLF_SLOTS = ("X_mlf", "X_mlf_dead")
 WINE_AMINO_ACID_SLOTS = ("amino_acids",)
 # The non-assimilable cell-wall debris pool yeast autolysis fills (D-34).
@@ -182,7 +182,8 @@ def test_wine_schema_has_single_sugar_slot():
     # h2s + h2s_gas, D-29 production / D-42 CO2-stripping sink, o2 — the dissolved-oxygen
     # aging substrate, D-71 — and A420 — the oxidative-browning index, D-74)
     # + 3 wine-only acid slots
-    # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + X_mlf + X_mlf_dead
+    # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + 1 oxofructose botrytis
+    # SO₂-binder must input (D-130) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
     # (D-34) + 8 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols — the p-coumaric
     # branch, D-40; ferulic_acid, vinylguaiacols, ethylguaiacols — the ferulic branch, D-55;
@@ -233,7 +234,7 @@ def test_wine_schema_has_single_sugar_slot():
     # the valine-derived part of each pool, in g/L of the labelled molecule). OFF the carbon
     # ledger, and necessarily so: each is a sub-quantity of a pool already weighted there, so
     # giving them weight would double-count every labelled gram.
-    assert schema.size == 86
+    assert schema.size == 87
 
 
 def test_beer_schema_has_three_sequential_sugars():

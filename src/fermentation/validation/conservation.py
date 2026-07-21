@@ -195,6 +195,15 @@ def total_carbon(
     # so every gram of precursor nitrogen must land in N rather than ride along here.
     if "alpha_ketobutyrate" in schema:
         w[schema.slice("alpha_ketobutyrate")] = carbon_mass_fraction("alpha_ketobutyrate")
+    # Botrytis 5-oxofructose SO₂-binder (decision D-130): a dosed, carbon-bearing (C6) must input,
+    # INERT — no Process touches it, so it is a constant term that drifts 0 and total_carbon closes
+    # exactly as before (the citrate/tartaric dosed-input precedent above). Its grape-fructose
+    # carbon originates OUTSIDE the sugar→ethanol ledger (Botrytis oxidised it pre-crush), so it
+    # never flows across this balance; it is weighted only so the absolute carbon total is complete.
+    # Nitrogen-free (an oxidised sugar), so absent from total_nitrogen. Empty on a non-botrytis run
+    # (constant 0 term) — byte-for-byte the pre-D-130 core.
+    if "oxofructose" in schema:
+        w[schema.slice("oxofructose")] = carbon_mass_fraction("5_oxofructose")
     # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
     # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
     # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that

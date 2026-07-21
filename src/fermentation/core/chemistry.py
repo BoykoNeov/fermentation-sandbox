@@ -88,6 +88,17 @@ M_ALPHA_KETOGLUTARATE = 5 * _M_C + 6 * _M_H + 5 * _M_O
 #: second is why this pool unblocks the mercaptan's 5× under-draw: the four carbons D-45 had to
 #: discard finally have somewhere to go.
 M_ALPHA_KETOBUTYRATE = 4 * _M_C + 6 * _M_H + 3 * _M_O
+#: 5-Oxo-D-fructose (5-keto-fructose), C6H10O6 — the dominant BOTRYTIS-specific carbonyl
+#: SO₂-binder (decision D-130). A hexodiulose formed by *Botrytis cinerea* (and acetic-acid
+#: bacteria) oxidising must fructose ON THE BERRY, pre-crush, so it is a **must-composition
+#: input**, not a fermentation product — the model carries it as an inert dosed slot, never
+#: produced or consumed by any Process (Barbe 2000, J. Agric. Food Chem. 48:3413; Ribéreau-Gayon
+#: et al., Handbook of Enology Vol. 1 §8.4). It is **not metabolized by yeast** ("concentrations
+#: not altered by alcoholic fermentation", Handbook via Barbe), so unlike the transient
+#: dihydroxyacetone it persists unchanged into finished wine and accounts for the bulk of a
+#: botrytized wine's high SO₂-combining power. Carbon-bearing (C6, weighted in ``total_carbon``);
+#: as an inert pool it is a constant term that drifts 0, so conservation is untouched.
+M_5_OXOFRUCTOSE = 6 * _M_C + 10 * _M_H + 6 * _M_O
 #: Carbon dioxide, CO2.
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
@@ -460,6 +471,7 @@ MOLAR_MASS: dict[str, float] = {
     "pyruvate": M_PYRUVATE,
     "alpha_ketoglutarate": M_ALPHA_KETOGLUTARATE,
     "alpha_ketobutyrate": M_ALPHA_KETOBUTYRATE,
+    "5_oxofructose": M_5_OXOFRUCTOSE,
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
@@ -531,6 +543,13 @@ CARBON_ATOMS: dict[str, int] = {
     #: the mercaptan's ``5 = 1 + 4`` split (methionine → methanethiol + this) and sotolon's
     #: ``6 = 4 + 2`` aldol (this + acetaldehyde). Both are exact *because* the atom counts are.
     "alpha_ketobutyrate": 4,
+    #: 5-Oxofructose (C6H10O6) carries six carbons — the botrytis-specific SO₂-binder must input
+    #: (decision D-130). Weighted here for correctness of the absolute carbon total; as an INERT
+    #: pool (no Process touches it) it is a constant term that drifts 0, so total_carbon closes
+    #: exactly as before — the citrate/tartaric dosed-input precedent. Its grape-fructose carbon
+    #: originates OUTSIDE the model (Botrytis oxidised it pre-crush), so it never enters or leaves
+    #: the sugar→ethanol ledger; it only occupies the count so the sum is complete.
+    "5_oxofructose": 6,
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,
@@ -649,6 +668,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: makes ``total_nitrogen`` close through both, and why sotolon — built from this pool — is
     #: the one aging product that releases **no** ammonium.
     "alpha_ketobutyrate": 0,
+    #: 5-Oxofructose is nitrogen-free (an oxidised sugar), so the botrytis-carbonyl must-input
+    #: pool is absent from total_nitrogen (decision D-130).
+    "5_oxofructose": 0,
     "CO2": 0,
     "glycerol": 0,
     "succinic_acid": 0,

@@ -158,7 +158,7 @@ K_acetaldehyde_so2:
   tier: plausible
   uncertainty: { low: 2.0e-7, high: 2.1e-6, note: "order-of-magnitude literature scatter: apparent Kd 1.5e-6 (pH 3.3) - 2.06e-6 (pH 3.5); Blouin's ~0.04% free acetaldehyde at 30 mg/L free SO2 implies ~2e-7. Wide band spans both." }
   provenance:
-    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders (the canonical carbonyl-bisulphite dissociation constants); apparent Kd 1.5e-6 (pH 3.3) - 2.06e-6 (pH 3.5) reported across the wine literature (e.g. Food Chemistry 2020, doi 10.1016/j.foodchem.2020.127173; AJEV 76:0760008, 2025); Blouin (1966) via SciELO S2224-79042018000200001"
+    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders (the canonical carbonyl-bisulphite dissociation constants); apparent Kd 1.5e-6 (pH 3.3) - 2.06e-6 (pH 3.5) reported across the wine literature (e.g. Food Chemistry 2020, doi 10.1016/j.foodchem.2020.127173; AJEV 76:0760008, 2025); Blouin (1966) via SciELO S2224-79042018000200001. CORROBORATED (decision D-130) by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419, which re-anchors this same acetaldehyde/pyruvate/2-oxoglutarate Kd set (from Blouin / Burroughs & Sparks) while measuring the additional botrytis carbonyls; and by Ribéreau-Gayon et al., Handbook of Enology Vol. 1 §8.4 (Table 8.5)."
     conditions: "wine, ~pH 3.3-3.5, cellar temperature; apparent (concentration-based) dissociation constant"
     notes: "Dissociation constant of the acetaldehyde-hydroxysulphonate adduct, the strongest carbonyl-SO2 bond in wine (acetaldehyde is the principal SO2 binder). REFERENCED TO BISULFITE HSO3- (the reactive species), so the binding solver uses [HSO3-] = free_SO2 * bisulfite_fraction(pH) and pH enters the equilibrium mechanistically. The literature apparent constants are usually quoted per TOTAL free SO2 at a stated pH; at wine pH bisulfite is ~0.94-0.99 of free SO2, so the bisulfite-vs-total-free basis differs by <=5% (well inside the order-of-magnitude band). tier=plausible: measured constants applied to wine as apparent values, with a wide band. SCOPE (pre-D-51): acetaldehyde-only binder — real bound SO2 also sits on pyruvate / alpha-ketoglutarate / sugars; D-51 adds the two keto-acid binders below to the SAME equilibrium (sugars remain unmodelled, so the 'total' slot is still a slight overclaim on the name, now smaller)."
 
@@ -177,7 +177,7 @@ K_pyruvate_so2:
   tier: plausible
   uncertainty: { low: 1.5e-4, high: 2.0e-3, note: "Burroughs & Sparks report 5.55e-4 at pH 3.3; a later secondary review rounds pyruvate's Kd to ~2e-4 mol/L, order-of-magnitude consistent. Band spans both plus apparent-pKa pH drift across the wine range (3.3-3.8, same drift acetaldehyde's band carries)." }
   provenance:
-    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I: equilibrium constants for the dissociation of carbonyl bisulphite compounds (J. Sci. Food Agric. 24:187-198) -- apparent Kd 5.55e-4 mol/L at pH 3.3, the same canonical source as K_acetaldehyde_so2 (a direct cross-check: that paper's acetaldehyde value 1.5e-6 matches this codebase's independently-sourced K_acetaldehyde_so2 exactly)."
+    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I: equilibrium constants for the dissociation of carbonyl bisulphite compounds (J. Sci. Food Agric. 24:187-198) -- apparent Kd 5.55e-4 mol/L at pH 3.3, the same canonical source as K_acetaldehyde_so2 (a direct cross-check: that paper's acetaldehyde value 1.5e-6 matches this codebase's independently-sourced K_acetaldehyde_so2 exactly). CORROBORATED (decision D-130) by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419, and the Handbook of Enology Vol. 1 §8.4 Kd set."
     conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like K_acetaldehyde_so2"
     notes: "Second-strongest carbonyl-SO2 binder in wine after acetaldehyde (Jackowetz & Mira de Orduna 2013). Competes with acetaldehyde and alpha-ketoglutarate for the SAME shared bisulfite pool in the D-51 multi-carbonyl equilibrium (acidbase.bound_so2_molar) -- a competitive-Langmuir partition, NOT an independent binding (three carbonyls cannot each claim the same free SO2). tier=plausible: a measured constant applied to wine as an apparent value, banded for pH-drift and the secondary-source scatter."
 
@@ -193,6 +193,37 @@ K_alpha_kg_so2:
   tier: plausible
   uncertainty: { low: 4.0e-5, high: 5.0e-4, note: "Burroughs & Sparks report 1.4e-4 at pH 3.3; a later secondary review rounds oxoglutaric acid's Kd to ~5e-4 mol/L, order-of-magnitude consistent (the wider end of this band covers it). Band also spans the same apparent-pKa pH-drift margin as the other two binding constants." }
   provenance:
-    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I (J. Sci. Food Agric. 24:187-198) -- apparent Kd 1.4e-4 mol/L at pH 3.3 for 2-ketoglutaric acid, the same canonical source and cross-checked acetaldehyde value as K_pyruvate_so2."
+    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I (J. Sci. Food Agric. 24:187-198) -- apparent Kd 1.4e-4 mol/L at pH 3.3 for 2-ketoglutaric acid, the same canonical source and cross-checked acetaldehyde value as K_pyruvate_so2. CORROBORATED (decision D-130) by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419, and the Handbook of Enology Vol. 1 §8.4 Kd set."
     conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like K_acetaldehyde_so2"
     notes: "Third carbonyl-SO2 binder in the D-51 multi-carbonyl equilibrium, sharing the same bisulfite pool as acetaldehyde and pyruvate (acidbase.bound_so2_molar). tier=plausible: a measured constant applied to wine as an apparent value, banded for pH-drift and secondary-source scatter."
+
+# -- 5-Oxofructose-bisulfite binding (decision D-130) -- the dominant BOTRYTIS carbonyl binder --
+#
+# 5-Oxofructose (5-keto-fructose, C6H10O6) + HSO3- <-> its alpha-hydroxysulphonate adduct, the
+# SAME 1:1 equilibrium form as the three yeast carbonyls above, referenced to bisulfite for the
+# SAME reason. It is a hexodiulose that Botrytis cinerea (and acetic-acid bacteria) form ON THE
+# BERRY by oxidising must fructose -- so it enters the model as a MUST-COMPOSITION INPUT (the
+# `oxofructose` slot, scenario key `oxofructose_mgl`), never a fermentation product, and is
+# INERT (no Process touches it). Its defining trait (Handbook Vol 1 sec 8.4 via Barbe 2000):
+# "concentrations are not altered by alcoholic fermentation" -- unlike the transient
+# dihydroxyacetone (reduced by yeast during AF, no longer a factor in finished wine, and so
+# DELIBERATELY NOT MODELLED here), 5-oxofructose PERSISTS unchanged into the bottle and dominates
+# a botrytized wine's high SO2-combining power. At Kd 3.3e-4 mol/L it is a strong binder (~4x
+# weaker than acetaldehyde but comparable to alpha-KG), so a ~100 mg/L botrytis load binds a
+# large share of a typical SO2 dose -- reproducing the sourced "4-78% of all SO2 combinations"
+# that Barbe attributes to it, and collapsing free/molecular SO2 (which opens the MLF/Brett
+# antimicrobial gates: a botrytized must needs a higher SO2 dose for the same protection).
+# GLUCONOLACTONE (the other persistent botrytis binder Barbe names) is DEFERRED, not modelled:
+# its Kd (4.2 mM, Handbook Table 8.5) does not reconcile with its own sourced binding point
+# (100 mg/L -> 21.6 mg/L bound SO2, Bertrand & Guillou 1999; Langmuir predicts ~4x less), and
+# what botrytis musts actually MEASURE is gluconic acid, mostly NOT the lactone that binds -- the
+# gluconic-acid <-> lactone split is unsourced. Blocked on sourcing (the D-121 pattern), not refused.
+K_5_oxofructose_so2:
+  value: 3.3e-4
+  unit: "mol/L"
+  tier: plausible
+  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "Burroughs & Sparks (1973b) report ~0.33 mM; band spans the same apparent-pKa pH-drift margin (wine pH 3.3-3.8) as the three yeast-carbonyl binding constants plus reasonable measurement scatter for this less-studied compound." }
+  provenance:
+    source: "Burroughs & Sparks (1973b), Sulphite-binding power of wines and ciders II, apparent Kd ~0.33 mM for 5-oxofructose (keto-5-fructose), as compiled by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419 and Ribereau-Gayon et al., Handbook of Enology Vol. 1 sec 8.4 (Table 8.7)."
+    conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like the three yeast-carbonyl constants above."
+    notes: "The dominant botrytis-specific carbonyl-SO2 binder (decision D-130), added to the SAME shared-bisulfite competitive-Langmuir equilibrium as acetaldehyde/pyruvate/alpha-KG (acidbase.bound_so2_molar). Enters via the inert `oxofructose` must-input slot (default 0 -> byte-for-byte the D-51 3-carbonyl form; a non-botrytis wine is unchanged). Typical botrytized-must LOAD is ~80-150 mg/L (Barbe 2000/2002; Handbook Vol 1: '5-oxofructose content frequently of the order of 100 mg/l in wines made from botrytized grapes'), set per-scenario via oxofructose_mgl -- the load is sourced (a measured range), not an author estimate. tier=plausible: measured Kd + measured load applied to wine as apparent values; the SO2-collapse OUTCOME is the sourced-robust claim (Barbe's 4-78%-of-combinations), the exact per-run split rides the load."

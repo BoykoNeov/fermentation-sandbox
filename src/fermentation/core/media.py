@@ -503,6 +503,17 @@ def wine_schema() -> StateSchema:
             "split + molecular-fraction readout derived at solved pH (D-22/D-28)",
         ),
         VarSpec(
+            "oxofructose",
+            "g/L",
+            default=0.0,
+            description="5-oxofructose (5-keto-fructose) — the dominant BOTRYTIS-specific SO2 "
+            "binder (D-130); a must-composition input (Botrytis oxidises must fructose on the "
+            "berry), inert (no Process touches it), yeast-INERT so it persists into the bottle. "
+            "The 4th competing carbonyl in the shared-bisulfite equilibrium; default 0 => a "
+            "non-botrytis wine is byte-for-byte the D-51 3-carbonyl form. Carbon-active (C6, "
+            "weighted in total_carbon as an inert constant term). Dosed via oxofructose_mgl",
+        ),
+        VarSpec(
             "X_mlf",
             "g/L",
             default=0.0,
