@@ -13001,6 +13001,21 @@ biomass tier is unaffected where the Coleman brake's own reads already set it.
   biomass-neutrality, quadratic-in-overshoot, guards, tier propagation, in-envelope byte-for-byte,
   high-sugar sticks + conserves C/N). `tests/test_media.py` exact-set updated (`CEILING_PROCESSES`).
 - Sourcing + sweep durable at `M:\claud_projects\temp\ferment\_findings\D-129-highsugar-ceiling-sourcing.md`.
+- **Test collateral (one aging test recalibrated, like `ef502df` did for the ester Processes).**
+  `test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciated` runs at
+  `_SWEET_BRIX = 70.0` (botrytis) — exactly the regime the ceiling fixes. Two assertions were pinned
+  to the *pre-ceiling* run, which fermented that must to an impossible **~42% ABV** (E≈332 g/L); with
+  D-129 it correctly arrests at **~20% ABV** (E≈160 g/L, ~540 g/L residual). (1) The absolute arginine
+  floor `arg_on > 1e-3` was calibrated to that 42%-ABV run; the arrested ferment makes less biomass →
+  less autolysis over 730 days → arginine ends ~8× lower (8.99e-4). Replaced with the *real* invariant
+  `arg_on == approx(arg_off, rel=1e-3)` (the reroute doesn't touch arginine — holds to 4 sig figs) plus
+  a loose `> 1e-4` sanity floor (still ~90× above the ~1e-5 drained pathology). (2) `sotolon_on <
+  sotolon_off` pinned the *sign* of a ~1e-6-relative threonine-competition effect that is below the
+  model's numerical resolution — it was +3e-6 pre-D-129 and −2e-6 with the ceiling (a coin at the
+  solver floor). Replaced with `approx(rel=1e-3)`; docstring corrected to state the competition is
+  real chemistry but sub-resolution here. The stale `_SWEET_BRIX` comment (also read by three sibling
+  tests, which pass *non-vacuously* — they assert residual-sugar `>50` and OAV `>1`, both strengthened
+  by the sweeter arrest) was updated. Full suite green after the fix.
 
 ### Next
 - **Deferred (secondary realism, sourced-gated):** osmotic/substrate inhibition for ~200+ g/L musts —

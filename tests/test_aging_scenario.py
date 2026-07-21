@@ -871,7 +871,9 @@ _MAILLARD_ALDEHYDES = (
     "2_methylpropanal",
     "sotolon",
 )
-_SWEET_BRIX = 70.0  # botrytis-level must → arrests with ~130 g/L residual sugar (a SWEET wine)
+_SWEET_BRIX = 70.0  # botrytis-level must → D-129 ceiling arrests it at ~20% ABV (E≈160 g/L)
+# leaving ~540 g/L residual sugar (a lusciously sweet wine). Before D-129 the Coleman-only core
+# ran this must to an impossible ~42% ABV (E≈332 g/L); the ceiling is why it now sticks sweet.
 _SWEET_AGING_DAYS = 730.0  # a multi-year sweet-wine aging tail (thermal aging is slow)
 
 #: **Why the Strecker scenarios below age SUR LIE (decision D-104).** They used to age with no
@@ -1108,24 +1110,35 @@ def test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciate
 
     # THE FIX, at the pool the pathology ran through: arginine now ends at essentially the same
     # level whether fusels are re-routed or not. The reroute cannot touch it — arginine makes no
-    # higher alcohol, so `FuselAminoAcidReroute.touches` does not name it. What little difference
-    # remains is second-order (the reroute spares sugar, which shifts the ferment slightly).
+    # higher alcohol, so `FuselAminoAcidReroute.touches` does not name it. THE ASSERTION IS THAT
+    # EQUALITY, not any absolute level: with/without the reroute agree to ~4 sig figs (the residual
+    # difference is second-order sugar-sparing). The old absolute floor (1e-3) was calibrated to the
+    # pre-D-129 run that fermented this 70-Brix must to an impossible ~42% ABV; D-129 now arrests it
+    # at ~20% ABV, so it makes less biomass → less autolysis release over 730 days → arginine ends
+    # ~8× lower (8.99e-4). That level is not the claim; the loose floor below only rules out the
+    # ~1e-5 DRAINED pathology the retired lumped model produced (this is still ~90× above it).
     arg_on = float(with_reroute.series("amino_acids")[-1])
     arg_off = float(without.series("amino_acids")[-1])
-    assert arg_on > 0.5 * arg_off  # was ~1e-5 vs ~0.2 under the lump: five orders down
-    assert arg_on > 1.0e-3
+    assert arg_on == pytest.approx(arg_off, rel=1e-3)  # reroute leaves arginine untouched
+    assert arg_on > 1.0e-4  # loose sanity bound: NOT the ~1e-5 drained-to-zero pathology
 
     # THE CONSEQUENCE, inverted: sotolon is perceptible WITH the reroute running. The old test
     # asserted OAV < 0.01 here and > 1.0 without; both routes now clear the threshold.
     sotolon_on = float(oav_series(with_reroute.as_trajectory(), thresholds, "sotolon")[-1])
+    sotolon_off = float(oav_series(without.as_trajectory(), thresholds, "sotolon")[-1])
     assert sotolon_on > 1.0
-    assert float(oav_series(without.as_trajectory(), thresholds, "sotolon")[-1]) > 1.0
+    assert sotolon_off > 1.0
 
-    # WHAT D-100 DOES NOT CLAIM TO FIX — the honest boundary. Threonine feeds BOTH propanol
-    # (Ehrlich) and sotolon (D-87), so the reroute still costs sotolon something. That competition
-    # is REAL CHEMISTRY over one molecule, unlike the retired fusels-vs-arginine competition, so
-    # the model SHOULD show it: sotolon stays below its no-reroute value, just no longer silenced.
-    assert sotolon_on < float(oav_series(without.as_trajectory(), thresholds, "sotolon")[-1])
+    # WHAT D-100 DOES NOT CLAIM TO FIX — the honest boundary, corrected at D-129. Threonine feeds
+    # BOTH propanol (Ehrlich) and sotolon (D-87), so the reroute competes for one molecule — but in
+    # THIS model that competition is below numerical resolution: sotolon_on vs sotolon_off differ by
+    # ~1e-6 relative, and the sign is not robust (it was +3e-6 with the pre-D-129 core and −2e-6
+    # with the ceiling — a coin at the solver's tolerance floor, not a signal). An earlier version
+    # asserted `sotolon_on < sotolon_off`; that pinned the sign of noise and D-129's perturbation
+    # flipped it. We assert only what the model resolves: both routes clear the perception threshold
+    # (above) and the reroute no longer SILENCES sotolon (the actual D-100 point). The threonine
+    # cost is real chemistry but sub-resolution here — do not re-assert its sign.
+    assert sotolon_on == pytest.approx(sotolon_off, rel=1e-3)  # competition below model resolution
 
 
 def test_thermal_aroma_from_drained_precursors_requires_autolysis():
