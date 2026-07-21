@@ -514,6 +514,19 @@ def wine_schema() -> StateSchema:
             "weighted in total_carbon as an inert constant term). Dosed via oxofructose_mgl",
         ),
         VarSpec(
+            "mcfa",
+            "g/L",
+            default=0.0,
+            description="medium-chain fatty acids (octanoic+decanoic, as octanoic-equivalent) — "
+            "the aggregate yeast-secreted MLF INHIBITOR (D-131, Lonvaud-Funel 1988). A "
+            "wine-composition-at-MLF input (S. cerevisiae excretes C8/C10 during AF; hexanoic C6 "
+            "is inert to O. oeni so it is excluded), inert (no Process touches it — v1 defers the "
+            "yeast-synthesis production layer). Read by malolactic_environmental_gate as a "
+            "bacteriostatic gate g_FA=exp(-[MCFA]/scale) that throttles conversion/citrate/growth "
+            "(NOT death, per D-39); default 0 => byte-for-byte the pre-D-131 MLF. Carbon-active "
+            "(C8, weighted in total_carbon as an inert constant term). Dosed via mcfa_mgl",
+        ),
+        VarSpec(
             "X_mlf",
             "g/L",
             default=0.0,

@@ -343,6 +343,11 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             # absent ⇒ 0 (a non-botrytis must — the binding equilibrium is byte-for-byte the
             # D-51 3-carbonyl form). Set for a botrytized/sweet wine (~80-150 mg/L typical).
             "oxofructose_mgl",
+            # Aggregate medium-chain fatty acids (octanoic+decanoic, octanoic-equivalent) that
+            # inhibit MLF (decision D-131); mg/L, absent ⇒ 0 (byte-for-byte the pre-D-131 MLF).
+            # ~3 mg/L is a normal-AF wine (barely bites); ~15-22 mg/L a stressed/N-deficient AF
+            # (halves→stalls MLF — the classic yeast-strain-dependent stuck MLF, Lonvaud-Funel).
+            "mcfa_mgl",
             "mlf_pitch_gpl",
             "carrying_capacity_gpl",
             "citrate_gpl",
@@ -504,6 +509,14 @@ def _wine_initial(
         # ~80-150 mg/L. Off the charge balance (like so2_total), so it does NOT enter the cation
         # back-solve. At 0 the binding equilibrium is byte-for-byte the D-51 3-carbonyl form.
         "oxofructose": mgl_to_gpl(_optional(values, "oxofructose_mgl", 0.0)),
+        # Medium-chain fatty acids (octanoic+decanoic, octanoic-equivalent) — the aggregate
+        # yeast-secreted MLF inhibitor (decision D-131, Lonvaud-Funel 1988); mg/L→g/L, default 0.
+        # A wine-composition-at-MLF INPUT, not a produced quantity (v1 defers the yeast-synthesis
+        # production layer), so like so2_total/oxofructose it is a dosed inert slot no Process
+        # touches. Read only by malolactic_environmental_gate (g_FA); at 0 the MLF is byte-for-byte
+        # the pre-D-131 form. Off the charge balance (a weak acid, mostly protonated at wine pH;
+        # its trace dissociation is a scoped omission like SO2's bisulfite charge, D-22).
+        "mcfa": mgl_to_gpl(_optional(values, "mcfa_mgl", 0.0)),
         # DMS potential — the grape-borne precursor of aged-wine DMS (decision D-102), in
         # DMS-EQUIVALENT µg/L. Unlike every other optional above, this does NOT default to 0: it
         # defaults to the SOURCED must level (dms_potential_initial). The distinction is real —

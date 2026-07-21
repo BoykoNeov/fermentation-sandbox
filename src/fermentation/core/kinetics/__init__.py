@@ -93,6 +93,7 @@ from fermentation.core.kinetics.malolactic import (
     OenococcusDiacetylReduction,
     cardinal_temperature_factor,
     malolactic_environmental_gate,
+    malolactic_fatty_acid_gate,
     malolactic_toxicity_gate,
 )
 from fermentation.core.kinetics.mercaptans import AutolyticMercaptan
@@ -188,5 +189,6 @@ __all__ = [
     "fusel_rate_shape",
     "iso_alpha_fraction",
     "malolactic_environmental_gate",
+    "malolactic_fatty_acid_gate",
     "malolactic_toxicity_gate",
 ]

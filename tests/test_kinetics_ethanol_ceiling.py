@@ -173,8 +173,18 @@ def test_high_sugar_sticks_and_conserves(params, store):
 
     f_c = store.value("biomass_C_fraction")
     f_n = store.value("biomass_N_fraction")
-    assert_conserved(stuck, total_carbon(schema, biomass_carbon_fraction=f_c), rtol=1e-5,
-                     atol=1e-6, label="carbon")
-    assert_conserved(stuck, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), rtol=1e-5,
-                     atol=1e-6, label="nitrogen")
+    assert_conserved(
+        stuck,
+        total_carbon(schema, biomass_carbon_fraction=f_c),
+        rtol=1e-5,
+        atol=1e-6,
+        label="carbon",
+    )
+    assert_conserved(
+        stuck,
+        total_nitrogen(schema, biomass_nitrogen_fraction=f_n),
+        rtol=1e-5,
+        atol=1e-6,
+        label="nitrogen",
+    )
     assert_nonnegative(stuck, ("X", "S", "N", "E", "CO2", "X_dead"), atol=1e-7)

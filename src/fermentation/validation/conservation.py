@@ -204,6 +204,14 @@ def total_carbon(
     # (constant 0 term) — byte-for-byte the pre-D-130 core.
     if "oxofructose" in schema:
         w[schema.slice("oxofructose")] = carbon_mass_fraction("5_oxofructose")
+    # MCFA MLF-inhibitor pool (decision D-131): the aggregate yeast-secreted octanoic+decanoic
+    # acids, carried octanoic-equivalent (C8), INERT — no Process touches it (v1 defers the
+    # yeast-synthesis production layer), so it is a constant term that drifts 0 and total_carbon
+    # closes exactly as before, like the oxofructose must-input above. Weighted only so the
+    # absolute carbon total is complete; nitrogen-free, so absent from total_nitrogen. Empty on a
+    # run with no MCFA dose (constant 0 term) — byte-for-byte the pre-D-131 core.
+    if "mcfa" in schema:
+        w[schema.slice("mcfa")] = carbon_mass_fraction("octanoic_acid")
     # Wine acid slots (decision D-18): the pH charge balance reads these, and the MLF
     # Process (decision D-23, when Oenococcus oeni is pitched) moves carbon malic (C4) ->
     # lactic (C3) + CO2 (C1) — balanced mole-for-mole — so they are weighted here for that

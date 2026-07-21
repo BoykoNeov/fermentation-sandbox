@@ -13123,3 +13123,99 @@ inert constant term (drifts 0 — the citrate/tartaric precedent); nitrogen-free
   that reconciles with the measured binding point) is sourced — the second persistent botrytis binder.
 - The anchored axes remain: MLF fatty-acid inhibition (Lonvaud-Funel 1988), oxidation O2-consumption
   (Ferreira 2015). SUGARS remain the last unmodelled SO2 binder (weak per mole, but present in bulk).
+
+## D-131 — MLF medium-chain-fatty-acid inhibition (Lonvaud-Funel 1988): `mcfa`, a yeast-secreted must-input that adds a bacteriostatic `g_FA` gate, so a high-MCFA (stressed-AF) wine gets a sluggish/stuck MLF emergently
+
+**Owner picked the axis outright** ("work on mlf fatty acid inhibition"). One advisor pass
+(pre-build) shaped it; its blocking check — resolve the source's red/white × C10/C12 confound from
+the primary before committing a number — turned out load-bearing (see below). Within-axis
+implementation was mine to make and document, the D-130 precedent.
+
+### What existed vs. what Lonvaud-Funel adds
+MLF is a mature 7-Process arc (D-23→D-53) with a shared multiplicative environmental gate
+`g_pH·g_EtOH·g_SO2·γ(T)` (`malolactic_environmental_gate`, consumed by conversion/citrate/growth;
+death reads SO2 directly, the D-39 split). What was **missing**: the yeast-secreted C8/C10 fatty
+acids that inhibit *O. oeni* — the sourced mechanism behind the module's own opening line ("MLF
+fermentability of wines from the same must differs by the AF yeast strain"). No free-MCFA pool
+existed (ester-hydrolysis hexanoic acid is lumped to `Byp`), so the inhibitor concentration is
+genuinely new state.
+
+### The A/B fork the advisor dissolved
+FA-inhibition needs a source of the free MCFA concentration. **A** = MCFA as an inert
+wine-composition-at-MLF **input** slot (the response `g_FA(conc)` is the sourced, isolable, minimal
+unit); **B** = yeast MCFA *synthesis* during AF (a production layer). The advisor's read: the fork
+is mostly illusory — A is the correct first slice regardless, B is a separable production layer
+almost certainly sourcing-walled (per-yeast MCFA yields = the unsourced-fusel / D-121 pattern), and
+B reads A's gate anyway. Built A; deferred B. The "AF product, not a must input" worry dissolves:
+the model's claim is the **response**, not the concentration — exactly the D-130 oxofructose reframe.
+
+### The primary re-read that overturned the book-sweep note (the advisor's blocking check)
+The compressed D-127 note said "decanoic C10 23 µM → **TOTAL** inhibition (red)". The **primary**
+(Lonvaud-Funel Table 5) says decanoic 23 µM in red wine → **"marked delay,"** NOT total; **total**
+inhibition was **dodecanoic (C12) 2.5 µM in WHITE wine** — a different acid AND a different matrix.
+Calibrating a "C10 total-inhibition threshold at 23 µM" would have been silently wrong (the exact
+potency × matrix confound the advisor flagged). C12/palmitoleic (C16:1) are *bactericidal* → a
+future death term, not this bacteriostatic gate.
+
+### Calibration — Table 6 (single matrix, direct rate)
+The clean target is **Table 6**: resting-cell malolactic ACTIVITY (= the malate-decarboxylation
+rate the conversion gate multiplies) in ONE white wine (12% EtOH, pH 3.45, malic 4.5 g/L, 4×10⁸
+cell/mL) vs a graded MCFA mixture. octanoic+decanoic totals of **20 / 100 / 150 µM lost 13 / 60 /
+80 %** of activity → `g_FA` ≈ 0.87 / 0.40 / 0.20. Hexanoic (C6) ≈ no effect (Table 4) ⇒ excluded;
+C8+C10 carry it synergistically ⇒ one octanoic-equivalent aggregate pool (the advisor's "single
+aggregate, not two-with-synergy"). **The same paper sources the realistic LOAD band** — FA1 (20 µM,
+~3 mg/L) is "the average amount encountered in most wines" — so one source covers response AND load,
+cleaner than D-130's two-source split.
+
+### Design (the `oxofructose`/`so2_total` dosed-slot precedent)
+- New inert wine-only state slot `mcfa` (g/L, octanoic-equivalent), set at compile from `mcfa_mgl`
+  (mg/L→g/L, default 0), **touched by no Process**. Carbon-weighted (C8, `octanoic_acid` registered
+  in chemistry) in `total_carbon` as an inert constant term (drifts 0); nitrogen-free.
+- New gate factor `g_FA = exp(−[MCFA]_molar / mcfa_inhib_mlf)` (the g_SO2 exponential idiom),
+  `[MCFA]_molar = mcfa / M_octanoic`. Scale `mcfa_inhib_mlf = 1.09e-4 mol/L`, **plausible**
+  (real-wine measured activity-vs-MCFA), calibrated to FA2 (100 µM → 0.40); reproduces FA1/FA3 to
+  ~5%. Does NOT lift the MLF output tier — `k_mlf` is speculative, so malic/lactic stay speculative
+  via `Tier.combine` (the advisor's "tier won't move MLF").
+- **Placement honours D-39:** `g_FA` folded into `malolactic_environmental_gate` (conversion /
+  citrate / growth), a **new `_MLF_FATTY_ACID_READS` group** — deliberately NOT into
+  `malolactic_toxicity_gate` (the "would-be death driver" `1 − toxicity`), so a bacteriostatic
+  "can't convert" signal can never reach `MalolacticDeath` even if death is ever rewired.
+- **v1 scope owned (all documented in the source):** protein protection (autolysate cut inhibition
+  ~50%→30% ⇒ fixed low-protein matrix), cell-density dependence (same FA → 60% at 4×10⁸ but 7% at
+  1×10⁹ cell/mL ⇒ density-independent), progressive membrane-alteration onset (steady-state only),
+  and the yeast MCFA-synthesis production layer (B, sourcing-gated).
+
+### The discriminating check (D-129 GATE pattern; `mcfa_xval.py`)
+- **GATE 1 — structural isolability:** `g_FA(mcfa=0) = 1.0` EXACTLY and `env_gate − toxicity·γ(T) =
+  0.000e+00` across a pH/EtOH/SO2 sweep — every no-MCFA MLF run is byte-for-byte the pre-D-131 form.
+- **GATE 2 — sourced OUTCOME:** a stressed-AF load (FA2, ~14.4 mg/L octanoic-eq) collapses the
+  conversion rate to a **0.400 ratio** (60% loss, the Table-6 point) — the emergent sluggish/stuck
+  MLF. Calibration band g_FA = 0.832/0.400/0.253 vs measured 0.87/0.40/0.20; monotone; and
+  `MalolacticDeath` rate gap (mcfa 0 vs 150 µM) = `0.000e+00` (bacteriostatic, death still fires on
+  SO2) — the D-39 lesson verified numerically AND structurally (`mcfa_inhib_mlf` in conversion/growth
+  `reads`, absent from death `reads`).
+
+### Receipts
+- `core/chemistry.py` — `M_OCTANOIC_ACID` (C8H16O2) + `MOLAR_MASS`/`CARBON_ATOMS`(8)/`NITROGEN_ATOMS`(0).
+- `core/kinetics/malolactic.py` — `malolactic_fatty_acid_gate` helper + `g_FA` folded into
+  `malolactic_environmental_gate`; `_MLF_FATTY_ACID_READS` group (→ `_MLF_GATE_READS`); `MCFA_STATE_KEY`;
+  module + gate docstrings refreshed (rate form now `…·γ(T)·g_FA`). Exported from `kinetics/__init__.py`.
+- `core/media.py` — `mcfa` wine VarSpec (default 0, wine-only, inert).
+- `scenario/compile.py` — `mcfa_mgl` → `mcfa` slot (mg/L→g/L, default 0) + allowed-key.
+- `validation/conservation.py` — `mcfa` carbon-weighted (C8, inert constant term).
+- `parameters/data/wine_generic.yaml` — `mcfa_inhib_mlf` (plausible, full provenance + Table-6
+  calibration + v1-deferral rationale).
+- `tests/test_mlf_fatty_acid_inhibition.py` (14 tests: metadata/tier, chemistry registry, wine-only,
+  GATE 1 isolability, GATE 2 collapse, Table-6 band, monotonicity, gates-growth-too,
+  death-independence numerical + structural-reads, carbon-neutral inert pool, scenario wiring,
+  typo-still-fails, MLF tier stays speculative).
+- `tests/test_media.py` exact-set updated (`WINE_MLF_SLOTS` gains `mcfa`; size 87→88).
+- Sourcing + GATE sweep durable at `M:\claud_projects\temp\ferment\mcfa_xval.py` and
+  `_findings/D-131-mlf-fatty-acid-xval.md`; primary at `manual_sources/2/_txt/10.1002@jsfa.2740440209.txt`.
+
+### Next
+- **B — yeast MCFA synthesis** (make `mcfa` a produced quantity, not a dosed input): reopens if
+  per-yeast-strain C8/C10 yield coefficients are sourced (currently the unsourced-fusel / D-121 wall).
+- Protein-protection and cell-density terms reopen if a sourced quantitative form lands (both would
+  read the existing `mcfa` slot + `amino_acids`/`X_mlf` — no new state).
+- Still anchored, unbuilt: oxidation O2-consumption (Ferreira 2015); gluconolactone (D-130 defer).

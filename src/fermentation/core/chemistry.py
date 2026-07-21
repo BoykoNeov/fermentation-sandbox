@@ -99,6 +99,19 @@ M_ALPHA_KETOBUTYRATE = 4 * _M_C + 6 * _M_H + 3 * _M_O
 #: botrytized wine's high SO₂-combining power. Carbon-bearing (C6, weighted in ``total_carbon``);
 #: as an inert pool it is a constant term that drifts 0, so conservation is untouched.
 M_5_OXOFRUCTOSE = 6 * _M_C + 10 * _M_H + 6 * _M_O
+#: Octanoic (caprylic) acid, C8H16O2 — the representative species of the aggregate yeast-derived
+#: medium-chain-fatty-acid (MCFA) pool that inhibits malolactic fermentation (decision D-131,
+#: Lonvaud-Funel, Joyeux & Desens 1988, J. Sci. Food Agric. 44:183). During anaerobic alcoholic
+#: fermentation *S. cerevisiae* secretes C6/C8/C10 fatty acids as lipid-synthesis by-products;
+#: hexanoic (C6) has ~no effect on *O. oeni* while octanoic (C8) and decanoic (C10) carry the
+#: inhibition synergistically (Lonvaud-Funel Table 4). The model lumps the **effective**
+#: (octanoic+decanoic) pool into one inert ``mcfa`` slot expressed as octanoic-equivalent — C8
+#: dominates the molar burden (~70 %), so octanoic is the representative mass for the g/L↔mol/L
+#: conversion the inhibition gate needs and for the ``total_carbon`` weight. Like ``5_oxofructose``
+#: it is a **wine-composition-at-MLF input**: no Process produces or consumes it (v1 defers the
+#: yeast-synthesis production layer, D-131), so as an inert pool it is a constant term that drifts
+#: 0 and leaves conservation untouched. Carbon-bearing (C8).
+M_OCTANOIC_ACID = 8 * _M_C + 16 * _M_H + 2 * _M_O
 #: Carbon dioxide, CO2.
 M_CO2 = 1 * _M_C + 2 * _M_O
 #: Water, H2O (hydrolysis bookkeeping for di-/trisaccharide uptake).
@@ -472,6 +485,7 @@ MOLAR_MASS: dict[str, float] = {
     "alpha_ketoglutarate": M_ALPHA_KETOGLUTARATE,
     "alpha_ketobutyrate": M_ALPHA_KETOBUTYRATE,
     "5_oxofructose": M_5_OXOFRUCTOSE,
+    "octanoic_acid": M_OCTANOIC_ACID,
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
@@ -550,6 +564,9 @@ CARBON_ATOMS: dict[str, int] = {
     #: originates OUTSIDE the model (Botrytis oxidised it pre-crush), so it never enters or leaves
     #: the sugar→ethanol ledger; it only occupies the count so the sum is complete.
     "5_oxofructose": 6,
+    #: Octanoic acid (C8) — the representative of the inert MCFA MLF-inhibitor pool (D-131). Like
+    #: 5-oxofructose it never fluxes, so its carbon count only completes the ledger sum.
+    "octanoic_acid": 8,
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,
@@ -671,6 +688,9 @@ NITROGEN_ATOMS: dict[str, int] = {
     #: 5-Oxofructose is nitrogen-free (an oxidised sugar), so the botrytis-carbonyl must-input
     #: pool is absent from total_nitrogen (decision D-130).
     "5_oxofructose": 0,
+    #: Octanoic acid is nitrogen-free (a fatty acid), so the MCFA MLF-inhibitor pool is absent
+    #: from total_nitrogen (decision D-131).
+    "octanoic_acid": 0,
     "CO2": 0,
     "glycerol": 0,
     "succinic_acid": 0,

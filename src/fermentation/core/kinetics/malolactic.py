@@ -59,7 +59,7 @@ the glycerol-on caveat, D-16.)
 
 **Rate form — substrate-limited, catalyst-scaled, multiplicatively gated.**
 
-    r = k_mlf · X_mlf · [malate]/(K_mlf + [malate]) · g_pH · g_EtOH · g_SO₂ · γ(T)
+    r = k_mlf · X_mlf · [malate]/(K_mlf + [malate]) · g_pH · g_EtOH · g_SO₂ · γ(T) · g_FA
 
 * ``k_mlf · X_mlf`` — specific malolactic activity times the (constant) bacterial
   concentration. Linear in ``X_mlf`` so the dose sets the timescale and the growth beat
@@ -86,6 +86,14 @@ the glycerol-on caveat, D-16.)
   qualitatively wrong above ~25 °C (decision D-23 explicitly scoped "a temperature
   optimum"). All terms are temperature *differences*, so the form is identical in K or °C
   (the cardinals are stored in K for canonical consistency, sourced in °C).
+* **fatty-acid gate** ``g_FA = exp(−[MCFA]/mcfa_inhib_mlf)`` — the yeast-secreted medium-chain
+  fatty acids (octanoic + decanoic, the ``mcfa`` inert must-input slot) that inhibit *O. oeni*
+  (:func:`malolactic_fatty_acid_gate`, Lonvaud-Funel et al. 1988, decision D-131). Exponential
+  (the g_SO₂ idiom), in (0, 1], and **exactly 1 when ``mcfa = 0``** — so a run with no MCFA dose
+  is byte-for-byte the pre-D-131 rate. It is the mechanism behind the empirical fact this module's
+  opening cites: MLF fermentability of wines from the *same* must differs by the AF yeast strain —
+  strains differ in MCFA output, so a high-MCFA strain leaves a sluggish/stuck MLF. Bacteriostatic
+  ("can't convert"), so it lives in the growth/conversion gate and NOT in the death term (D-39).
 
 **Performance / isolability — guard before the pH solve.** Reading the solved pH costs a
 ``brentq`` per RHS evaluation, so the Process returns a zero contribution *before* solving
@@ -122,6 +130,7 @@ from fermentation.core.chemistry import (
     M_DIACETYL,
     M_LACTIC,
     M_MALIC,
+    M_OCTANOIC_ACID,
 )
 from fermentation.core.kinetics.amino_acid_pools import (
     ASSIMILABLE_SPECS,
@@ -178,11 +187,24 @@ _MLF_TOXICITY_READS: tuple[str, ...] = (
 )
 #: The cardinal-temperature parameters of the growth/conversion gate (Rosso optimum γ(T)).
 _MLF_TEMP_READS: tuple[str, ...] = ("T_min_mlf", "T_opt_mlf", "T_max_mlf")
+#: The medium-chain-fatty-acid inhibition parameter (decision D-131). Deliberately grouped SEPARATE
+#: from the toxicity reads: g_FA is folded into :func:`malolactic_environmental_gate` (conversion /
+#: citrate / growth), NOT into :func:`malolactic_toxicity_gate` — the toxicity gate exists as the
+#: *would-be death driver* (``1 − toxicity``), and MCFA is a **bacteriostatic** "can't convert"
+#: signal, not a bactericidal one, so keeping it out of toxicity structurally guarantees it can
+#: never reach :class:`MalolacticDeath` even if death is ever rewired (the D-39 lesson).
+_MLF_FATTY_ACID_READS: tuple[str, ...] = ("mcfa_inhib_mlf",)
 #: The full *O. oeni* environmental-gate parameters, shared by the growth/conversion Processes (the
 #: malate conversion and the citrate → diacetyl branch, D-31). Declared once so those Processes'
 #: ``reads`` tuples and :func:`malolactic_environmental_gate` cannot drift apart. Order preserved
-#: from before the D-39 toxicity/temperature split so every consumer's ``reads`` is byte-identical.
-_MLF_GATE_READS: tuple[str, ...] = (*_MLF_TOXICITY_READS, *_MLF_TEMP_READS)
+#: from before the D-39 toxicity/temperature split (toxicity, then temperature) so every consumer's
+#: ``reads`` is stable; the D-131 fatty-acid param is appended last.
+_MLF_GATE_READS: tuple[str, ...] = (*_MLF_TOXICITY_READS, *_MLF_TEMP_READS, *_MLF_FATTY_ACID_READS)
+
+#: State-slot key of the aggregate MCFA MLF-inhibitor pool (decision D-131). Read like the
+#: ``so2_total`` slot (a dosed inert composition input), NOT a param, so it is absent from every
+#: ``reads`` tuple — only its scale parameter ``mcfa_inhib_mlf`` is declared (see above).
+MCFA_STATE_KEY = "mcfa"
 
 
 def malolactic_toxicity_gate(
@@ -215,30 +237,73 @@ def malolactic_toxicity_gate(
     return float(gate_ph * gate_eth * gate_so2)
 
 
+def malolactic_fatty_acid_gate(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+) -> float:
+    """The medium-chain-fatty-acid inhibition factor ``g_FA = exp(−[MCFA]/scale)`` ∈ (0, 1] (D-131).
+
+    Yeast secrete C8/C10 fatty acids during alcoholic fermentation; they progressively inhibit the
+    malolactic activity of *O. oeni* (Lonvaud-Funel, Joyeux & Desens 1988, *J. Sci. Food Agric.*
+    44:183). This bacteriostatic gate throttles the malate-conversion / citrate / growth rate as the
+    aggregate MCFA burden rises, so a high-MCFA wine (a stressed / nitrogen-deficient AF, or an
+    MCFA-heavy yeast strain) exhibits the classic **stuck / sluggish MLF** *emergently* — the
+    paper's headline that MLF fermentability tracks the AF yeast strain.
+
+    ``g_FA = exp(−[MCFA]_molar / mcfa_inhib_mlf)`` where ``[MCFA]_molar = mcfa / M_octanoic``
+    converts the dosed g/L (octanoic-equivalent) to mol/L. The exponential FORM reuses the module's
+    own g_SO₂ idiom, and the scale is calibrated to Lonvaud-Funel Table 6 (resting-cell malolactic
+    activity in white wine at 4×10⁸ cell/mL vs a graded MCFA mixture): octanoic+decanoic totals of
+    20 / 100 / 150 µM lost 13 / 60 / 80 % of activity, i.e. ``g_FA`` ≈ 0.87 / 0.40 / 0.20 — the
+    source's ``scale`` ≈ 1.1×10⁻⁴ mol/L. Exactly 1 when ``mcfa = 0`` (undosed) — so a run with no
+    MCFA dose is byte-for-byte the pre-D-131 gate — and smooth, monotone-decreasing, bounded (0, 1].
+
+    **v1 scope owned (all documented in the source, deferred here).** The gate reads MCFA
+    concentration only, so it omits (a) the *protein protection* Lonvaud-Funel measured — yeast
+    autolysate/peptides cut the inhibition roughly in half (50 %→30 %), so this gate represents a
+    fixed, low-protein matrix and *over*-inhibits a protein-rich (lees-aged) wine; (b) the *cell-
+    density* dependence — the same MCFA lost 60 % of activity at 4×10⁸ but only 7 % at 1×10⁹
+    cell/mL, whereas the model's ``X_mlf``-independent gate applies the same fraction at any
+    density; and (c) the *progressive membrane alteration* (inhibition deepened with contact time),
+    captured only as its steady-state value. Hexanoic (C6) is excluded from the pool (≈no effect);
+    dodecanoic (C12) and palmitoleic (C16:1), which Lonvaud-Funel found *bactericidal*, are a
+    separate future death term, not this bacteriostatic gate.
+    """
+    mcfa_gpl = float(y[schema.slice(MCFA_STATE_KEY)][0]) if MCFA_STATE_KEY in schema else 0.0
+    if mcfa_gpl <= 0.0:
+        return 1.0  # undosed ⇒ exp(0) = 1 exactly (byte-for-byte the pre-D-131 gate)
+    mcfa_molar = mcfa_gpl / M_OCTANOIC_ACID
+    return float(math.exp(-mcfa_molar / params["mcfa_inhib_mlf"]))
+
+
 def malolactic_environmental_gate(
     y: FloatArray, schema: StateSchema, params: Mapping[str, float], ph: float
 ) -> float:
-    """The shared *O. oeni* environmental gate ``g_pH · g_EtOH · g_SO₂ · γ(T)`` ∈ [0, 1].
+    """The shared *O. oeni* environmental gate ``g_pH · g_EtOH · g_SO₂ · γ(T) · g_FA`` ∈ [0, 1].
 
     Every *O. oeni* growth/conversion activity — malate conversion (D-23), citrate → diacetyl
     (D-31) and bacterial growth (D-38) — is throttled by the *same* environment, so they multiply
     their rate by this one factor (a shared helper, decision D-31): the :func:`malolactic_\
     toxicity_gate` chemistry (pH · ethanol · SO₂) times the Rosso cardinal-temperature optimum
-    γ(T). The caller passes the *already-solved* ``ph`` (each Process solves it once via
+    γ(T) times the medium-chain-fatty-acid inhibition :func:`malolactic_fatty_acid_gate` g_FA
+    (decision D-131). The caller passes the *already-solved* ``ph`` (each Process solves it once via
     :func:`ph_of_state`, after its cheap ``X_mlf``/substrate guards) so this helper never
     triggers a second ``brentq``; molecular SO₂ is partitioned at that same pH. See the
     module docstring for each term's form and sourcing.
 
-    Since the D-39 split this is ``toxicity · γ(T)`` with the multiplication grouped exactly as
-    before (``((g_pH·g_EtOH)·g_SO₂)·γ(T)``), so the three growth/conversion consumers' rates are
-    byte-for-byte unchanged.
+    **g_FA lives HERE, not in :func:`malolactic_toxicity_gate` (the D-131 placement, honouring
+    D-39).** The toxicity gate is the *would-be death driver* (``1 − toxicity``); MCFA inhibition is
+    bacteriostatic ("can't convert"), not bactericidal, so folding it in *this* gate — read only by
+    the growth/conversion consumers, never by :class:`MalolacticDeath` (which reads molecular SO₂
+    directly) — structurally guarantees it can never accelerate death. On a run with no MCFA dose
+    ``g_FA = 1`` exactly, so the three consumers' rates are byte-for-byte the pre-D-131 values.
     """
     toxicity = malolactic_toxicity_gate(y, schema, params, ph)
     temp = float(y[schema.slice("T")][0])
     gamma_t = cardinal_temperature_factor(
         temp, params["T_min_mlf"], params["T_opt_mlf"], params["T_max_mlf"]
     )
-    return float(toxicity * gamma_t)
+    g_fa = malolactic_fatty_acid_gate(y, schema, params)
+    return float(toxicity * gamma_t * g_fa)
 
 
 class MalolacticConversion(Process):

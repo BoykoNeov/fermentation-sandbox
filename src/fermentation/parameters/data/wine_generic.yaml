@@ -1040,6 +1040,16 @@ molecular_so2_inhib_mlf:
     conditions: "O. oeni in wine; exponential decay scale of the molecular-SO2 inhibition gate on the conversion rate"
     notes: "Read by MalolacticConversion: g_SO2 = exp(-[SO2]_molecular / s), where [SO2]_molecular (g/L) is partitioned from the dosed free SO2 at the SOLVED pH (D-22) - so this gate is the first RHS consumer of the molecular-SO2 readout, and rising pH (which LOWERS molecular SO2) further frees MLF. Scale ~0.2 mg/L molecular: g_SO2 ~ 0.018 at 0.8 mg/L molecular (strong arrest), ~1 when undosed. DIRECTION strongly sourced (molecular SO2 is THE antimicrobial species winemakers use to control/prevent MLF); the exact scale and exponential FORM are the speculative modelling choice."
 
+mcfa_inhib_mlf:
+  value: 1.09e-4
+  unit: "mol/L"   # decay scale of g_FA = exp(-[MCFA]_molar / mcfa_inhib_mlf); [MCFA] as octanoic-equiv
+  tier: plausible
+  uncertainty: { low: 0.9e-4, high: 1.45e-4, note: "the three Lonvaud-Funel Table 6 points (octanoic+decanoic 20/100/150 uM -> 13/60/80% activity loss) imply scales of 144/109/93 uM; band ~90-145 uM (0.9e-4 - 1.45e-4 mol/L). Wide because the true inhibition also depends on bacterial density and wine protein, neither in the v1 gate." }
+  provenance:
+    source: "Lonvaud-Funel, Joyeux & Desens 1988, J. Sci. Food Agric. 44(2):183-191, Table 6 (Influence of Fatty Acids on the Rate of Malic Acid Decarboxylation by L. oenos resting cells) - the real-wine dose-response of malolactic ACTIVITY vs a graded medium-chain-fatty-acid mixture"
+    conditions: "Leuconostoc oenos (= Oenococcus oeni) resting cells in a white wine, ethanol 12% v/v, pH 3.45, malic 4.5 g/L, 4x10^8 cell/mL; MCFA mixture at octanoic+decanoic totals of 20 (FA1, 'the average amount encountered in most wines'), 100 (FA2), 150 uM (FA3), each losing 13, 60, 80% of malolactic activity respectively"
+    notes: "Read by malolactic_fatty_acid_gate (D-131): g_FA = exp(-[MCFA]_molar / mcfa_inhib_mlf), [MCFA]_molar = mcfa (g/L, octanoic-equivalent) / M_octanoic. Calibrated to the FA2 point (100 uM octanoic+decanoic -> 60% activity loss -> g_FA=0.40 -> scale = 100e-6/ln(1/0.40) = 1.09e-4 mol/L); reproduces FA1 (20 uM -> g_FA 0.833 vs measured 0.87) and FA3 (150 uM -> 0.253 vs 0.20) within the biological scatter. MAGNITUDE is sourced (real-wine measured activity vs MCFA -> plausible tier); the exponential FORM, the single-aggregate-pool lumping (hexanoic excluded as ~inert, octanoic+decanoic as octanoic-equiv), and the omission of the source's protein-protection and cell-density dependences are the modelling choices (v1 deferrals, see malolactic_fatty_acid_gate). Does NOT lift the MLF output tier: k_mlf is speculative, so malic/lactic stay speculative via Tier.combine. GATE-2 anchor: ~3 mg/L (octanoic-eq) is the normal-AF 'average wine' (g_FA~0.83, barely bites); ~15-22 mg/L a stressed/N-deficient AF (g_FA 0.40->0.25, halves->stalls MLF) - the sourced realistic load band, same paper."
+
 T_min_mlf:
   value: 281.15
   unit: "K"   # cardinal minimum (8 C) of the Rosso CTMI temperature optimum gamma(T)

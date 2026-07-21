@@ -22,9 +22,11 @@ import json
 import pathlib
 import sys
 
-# The distilled file is ~60 lines. 150 leaves generous headroom for a real status
+# The distilled file is ~60 lines. 200 leaves generous headroom for a real status
 # update while still catching the changelog shape (the bloated copies ran 550+).
-LINE_CAP = 150
+# Raised 150 -> 200 on 2026-07-21 at the owner's request (the live-threads block grew
+# with the D-130/D-131 aging builds; still well below the changelog regime).
+LINE_CAP = 200
 TARGET_NAME = "project-fermentation-sandbox.md"
 
 
