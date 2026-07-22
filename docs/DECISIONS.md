@@ -13511,13 +13511,27 @@ k_browning_eff = (k_browning_base + k_browning_phenolic * (tannin + anthocyanin)
   estimate specifically so a default-copper wine reproduces the D-132/D-133 rate EXACTLY, not
   approximately. Corroborated by Danilewicz's cited "mean free/labile Cu ~0.3 mg/L" (Wiese & Schwedt
   1997) and by the Carrascón white/rosé dataset (0.140-0.345 mg/L).
-- **`k_copper_multiplier` = 2000 L/g**, digitized by eye from Danilewicz Figure 4's f/g curves
+- **`k_copper_multiplier` = 600 L/g**, digitized by eye from Danilewicz Figure 4's f/g curves
   (Cu=0.15/0.5 mg/L at Fe=5 mg/L, bracketing Ferreira's real-wine Cu range — the steeper low-Cu
   behaviour in curve e, Cu=0.05, sits below real wine's range and is deliberately not used, since the
   paper's own text says iron-redox-cycling becomes rate-limiting at higher Cu, i.e. the true
-  dependence saturates and a LOCAL linear read near `copper_typical` is the honest scope). Wide
-  uncertainty band (600-5000 L/g): checked that Ferreira's real-wine Cu extremes (0.168/0.679 mg/L)
-  stay positive at both band edges (no runaway or sign-flip across the sourced range).
+  dependence saturates and a LOCAL linear read near `copper_typical` is the honest scope).
+  **RECALIBRATED DOWN from the raw digitized read (~2000 L/g) on a THIRD advisor pass**, run after the
+  build was already green and committed: the raw slope alone gave copper-ALONE a 2.24x rate ratio
+  across Ferreira's real-wine Cu range (0.168-0.679 mg/L), but Ferreira's own paper caps the TOTAL
+  between-wine spread from EVERY compositional factor combined (Cu, Mn, pH, TPI, phenolic acids...) at
+  "never > factor 2.2" — assigning the whole multi-factor budget to copper alone over-spends it, and
+  two further reasons bias the raw read high: (a) Danilewicz dosed FREE CuSO4 in a model system, while
+  "most copper is under complex forms in wine" (Ferreira) — free copper is more catalytically active;
+  (b) Danilewicz's single-exposure kinetics may sit closer to Ferreira's steep INITIAL-rate copper
+  sensitivity (~15x spread) than the STEADY rate (~2.2x total) this term is scoped to. Owner chose to
+  move the point estimate to the old band's floor (600 L/g) rather than keep 2000-as-shipped or merely
+  widen the band. Uncertainty band 200-1500 L/g (re-centered on the new value): checked every band
+  point keeps copper-alone inside Ferreira's 2.2x total-spread envelope (200 => 1.10x; 600 => 1.32x;
+  1500 => 1.89x) — none over-spends the budget, unlike the original 2000 L/g point (2.24x, over
+  budget) or its original 5000 L/g high edge (a corrected 3.09x, also over budget — a documentation
+  arithmetic slip in the first pass read it as 2.09x, understating how far over the original band's
+  high edge actually ran).
 - **Why the ratio design sidesteps the SO2-to-O2 translation problem.** Danilewicz measures
   SO2-consumption (a downstream H2O2-scavenging proxy), not O2-consumption directly, and real
   measured SO2:O2 molar ratios vary enormously (0.3-2.7, Ferreira/Carrascón's own data) — but because
@@ -13541,11 +13555,11 @@ k_browning_eff = (k_browning_base + k_browning_phenolic * (tannin + anthocyanin)
 - **Isolable (GATE-1, mean-centered):** at `copper == copper_typical` (an un-overridden wine's
   default), `f_copper == 1` exactly — byte-for-byte the D-132/D-133 rate. Absent from beer's schema,
   guarded like tannin/anthocyanin (`f_copper` stays 1, beer keeps the unboosted rate). Clamped at
-  `f_copper >= 0` in-Process (the tannin/anthocyanin `max(0.0, ...)` precedent) — unreachable at the
-  shipped central `k_copper_multiplier` (copper is already floored at >=0, and `1 -
-  2000*2.6e-4 = 0.48 > 0`), but genuinely bites at the high end of the parameter's own uncertainty
-  band (5000 L/g gives `1 - 5000*2.6e-4 = -0.3` at copper=0) — confirmed by a dedicated test using an
-  inflated `k_copper_multiplier`, so the clamp is verified, not dead code.
+  `f_copper >= 0` in-Process (the tannin/anthocyanin `max(0.0, ...)` precedent) — unreachable anywhere
+  in the shipped band (copper is already floored at >=0, and even the band's high edge, `1 -
+  1500*2.6e-4 = 0.61 > 0`, stays positive), so the clamp is exercised only via a dedicated test using
+  a synthetic, deliberately-inflated `k_copper_multiplier` override — confirming the guard fires
+  correctly rather than being untested dead code, without claiming the shipped band itself needs it.
 
 ### Receipts
 - `parameters/data/aging.yaml` — new `copper_typical` / `k_copper_multiplier` blocks (full `Parameter`
@@ -13567,11 +13581,16 @@ k_browning_eff = (k_browning_base + k_browning_phenolic * (tannin + anthocyanin)
   `k_copper_multiplier` (so the guard is verified, not untested dead code).
 - `tests/test_media.py` — `WINE_COPPER_SLOTS` constant; schema-names tuple and `schema.size` (89 → 90)
   updated.
-- Full suite green: `ruff check .`, `mypy` (109 files), `pytest -n auto` (1278 passed, 91.0s).
+- Full suite green: `ruff check .`, `mypy` (109 files), `pytest -n auto` (1278 passed, 91.0s) — BOTH
+  before and after the magnitude recalibration (`k_copper_multiplier` 2000 → 600 L/g), since no test
+  hardcodes the value; every assertion reads `params["k_copper_multiplier"]` dynamically except the
+  clamp test, which deliberately overrides it, so the recalibration needed no test changes beyond
+  updating two stale comments (`test_browning_copper_multiplier_stays_positive_at_zero_copper`'s and
+  this record's own text) that quoted the old numeric example.
 
 ### Next
 - None outstanding for D-134 itself. The Danilewicz-sourced slope is an honest, wide-banded,
-  graph-digitized estimate — a cleaner fit (a printed table, not a chart) would be the natural
-  follow-on if one is ever found, but is not chased here. D-132's other deferred items
-  (tail-acceleration, gluconolactone, MLF protein-protection) remain open, tracked under
-  D-132/D-130/D-131.
+  graph-digitized-then-budget-recalibrated estimate — a cleaner fit (a printed table, not a chart,
+  ideally with copper isolated from co-varying Mn/pH/phenolics) would be the natural follow-on if one
+  is ever found, but is not chased here. D-132's other deferred items (tail-acceleration,
+  gluconolactone, MLF protein-protection) remain open, tracked under D-132/D-130/D-131.

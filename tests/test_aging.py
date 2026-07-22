@@ -1520,12 +1520,12 @@ def test_browning_copper_multiplier_absent_on_beer(params):
 
 
 def test_browning_copper_multiplier_stays_positive_at_zero_copper(params):
-    # At the current central k_copper_multiplier, zero copper (f_copper = 1 - k*copper_typical =
-    # 0.48 with the shipped values) SLOWS but does not reverse the rate. This does not exercise the
+    # At the current central k_copper_multiplier, zero copper (f_copper = 1 - k*copper_typical ~
+    # 0.84 with the shipped values) SLOWS but does not reverse the rate. This does not exercise the
     # in-Process max(0.0, ...) clamp itself (unreachable at the shipped magnitude — copper is
     # already floored at >=0 and 1 - k_copper_multiplier*copper_typical stays positive at the
-    # central value), but pins the direction: the sink is still real and monotonically consuming
-    # o2, never a spurious source.
+    # central value, and even at the band's high edge), but pins the direction: the sink is still
+    # real and monotonically consuming o2, never a spurious source.
     schema = wine_schema()
     o2, t = 0.03, 298.15
     d = PhenolicBrowning().derivatives(
