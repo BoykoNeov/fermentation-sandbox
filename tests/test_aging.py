@@ -1546,8 +1546,7 @@ def test_browning_copper_multiplier_clamp_prevents_negative_rate(params):
     clamped_params = dict(params)
     clamped_params["k_copper_multiplier"] = 5000.0
     assert (
-        1.0 + clamped_params["k_copper_multiplier"] * (0.0 - clamped_params["copper_typical"])
-        < 0.0
+        1.0 + clamped_params["k_copper_multiplier"] * (0.0 - clamped_params["copper_typical"]) < 0.0
     )  # sanity: this really would go negative unclamped
     d = PhenolicBrowning().derivatives(
         0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, copper=0.0), schema, clamped_params
@@ -1904,17 +1903,13 @@ def test_burst_oxidation_does_not_reuse_phenolic_driver(params):
     o2, burst = 0.008, 3.3e-3
     no_phenolics = AntioxidantBurstOxidation().derivatives(
         0.0,
-        _aged_wine(
-            schema, ester=0.0, o2=o2, burst_antioxidant=burst, tannin=0.0, anthocyanin=0.0
-        ),
+        _aged_wine(schema, ester=0.0, o2=o2, burst_antioxidant=burst, tannin=0.0, anthocyanin=0.0),
         schema,
         params,
     )
     typical_red = AntioxidantBurstOxidation().derivatives(
         0.0,
-        _aged_wine(
-            schema, ester=0.0, o2=o2, burst_antioxidant=burst, tannin=2.0, anthocyanin=0.3
-        ),
+        _aged_wine(schema, ester=0.0, o2=o2, burst_antioxidant=burst, tannin=2.0, anthocyanin=0.3),
         schema,
         params,
     )

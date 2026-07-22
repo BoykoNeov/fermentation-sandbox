@@ -50,6 +50,7 @@ from fermentation.core.kinetics import (
     BrettGrowth,
     BrettVinylphenolReduction,
     Caramelization,
+    ClosureOxygenIngress,
     EllagitanninOxidation,
     EsterHydrolysis,
     EthylAcetateEsterification,
@@ -210,6 +211,7 @@ _AGING_GATED_PROCESSES = (
     SMMHydrolysis,
     BoundHydrogenSulfideRelease,
     BoundMethanethiolRelease,
+    ClosureOxygenIngress,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -749,6 +751,51 @@ _INITIAL_BUILDERS: dict[str, Callable[[Mapping[str, float], float, ParameterSet]
 }
 
 
+#: The closure menu (decision D-136), in ascending order of steady oxygen transmission — which is
+#: the ORDERING Lopes et al. 2007 actually establishes and the most defensible claim this axis
+#: makes ("low in screw-caps and 'technical' corks, intermediate in conventional natural cork
+#: stoppers, and high in synthetic closures"). Each name maps to ``otr_<name>`` in ``closure.yaml``,
+#: so the value carries full provenance instead of being an inlined constant (prime directive #2).
+#:
+#: NOTE the order: **technical cork sits BELOW screwcap**, which contradicts the widely repeated
+#: "screwcaps are the least permeable closure" (Godden et al. 2005, quoted in Oliveira et al. 2013's
+#: own introduction). Both are true on their own terms — the screwcap's famous number is `<500
+#: µL/day` *at the moment of bottling*, headspace air trapped at sealing rather than transmission
+#: through the liner, which dominates any comparison made on a total-including-burst basis. At
+#: steady state, which is what this axis models, technical cork wins. Do not "fix" this ordering.
+_CLOSURES: tuple[str, ...] = (
+    "hermetic",
+    "technical_cork",
+    "screwcap",
+    "natural_cork",
+    "synthetic_nomacorc",
+    "synthetic_supremecorq",
+)
+
+
+def _closure_otr(closure: str, parameters: ParameterSet) -> float:
+    """The named closure's steady oxygen transmission rate [g/L/h] (decision D-136).
+
+    Resolves ``scenario.closure`` against :data:`_CLOSURES` and returns the sourced ``otr_<name>``
+    value from ``closure.yaml``. Both failure modes are loud and name the menu, in the
+    ``_ALLOWED_KEYS`` spirit: an unknown closure name is a scenario error (not a silent fallback to
+    no ingress, which would quietly age the wine wrongly), and a missing parameter file is a
+    configuration error surfaced HERE at compile rather than as a bare ``KeyError`` mid-run.
+    """
+    if closure not in _CLOSURES:
+        raise ValueError(
+            f"unknown scenario.closure {closure!r}; expected one of {', '.join(_CLOSURES)} "
+            "(decision D-136)"
+        )
+    name = f"otr_{closure}"
+    if name not in parameters:
+        raise ValueError(
+            f"scenario.closure {closure!r} needs parameter {name!r}, which is not loaded; "
+            "closure.yaml is missing from the parameter set (decision D-136)"
+        )
+    return float(parameters[name].value)
+
+
 def _iso_alpha_at_pitch(scenario: Scenario, parameters: ParameterSet) -> float:
     """Iso-alpha-acids [g/L] delivered to the fermenter from the boil (decision D-64).
 
@@ -888,6 +935,14 @@ def _load_parameters(
         # like the other shared files — collision-free names, inert for beer. INERT until a
         # begin_aging enable, and doubly so on an unseeded reservoir.
         base / "bound_sulfides.yaml",
+        # Closure oxygen ingress (decision D-136): the steady per-closure OTRs Lopes et al.
+        # 2007 measured, converted to g/L/h for a 750 mL bottle. Loaded universally like the
+        # other shared files (collision-free names, inert for beer) but WINE-ONLY in effect —
+        # only wine carries the closure_otr slot and wires ClosureOxygenIngress. UNLIKE every
+        # other file here these are read at COMPILE time (to seed the state slot) rather than
+        # per-RHS-step, so a scenario naming a `closure` without this file fails loudly in
+        # _closure_otr. INERT until a begin_aging enable, and at closure=hermetic/absent.
+        base / "closure.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 
@@ -2089,6 +2144,28 @@ def compile_scenario(
         y0[medium.schema.slice("iso_alpha")] = _iso_alpha_at_pitch(scenario, parameters)
     elif IsoAlphaAcidLoss.name in process_set:
         process_set.disable(IsoAlphaAcidLoss.name)
+
+    # Closure oxygen ingress (decision D-136): seed the `closure_otr` state slot from the named
+    # closure's sourced OTR. The `iso_alpha` pattern above exactly — a scenario-level choice
+    # resolved once here at the compile boundary rather than read per-RHS-step, because a closure
+    # does not change during a run. It rides in STATE rather than as a parameter the Process reads
+    # because the scenario layer has no parameter-override seam, so a per-run choice has nowhere
+    # else to live (the `copper`/`bound_h2s` precedent, D-134/D-135).
+    #
+    # Absent `closure` ⇒ the slot keeps its 0.0 VarSpec default ⇒ ClosureOxygenIngress contributes
+    # byte-for-byte zero and the whole pre-D-136 aging axis is bit-identical. UNLIKE the D-134
+    # copper case, 0 is the correct neutral here: it is an additive source, and a zero-ingress
+    # bottle is a real measured case (Lopes et al. 2007 found only their flame-sealed control fully
+    # air-tight), not an unphysical setting. Nothing reads the slot until `begin_aging` enables the
+    # Process, so a scenario that names a closure but never ages is inert rather than wrong.
+    if scenario.closure is not None:
+        if "closure_otr" not in medium.schema:
+            raise ValueError(
+                f"scenario has 'closure' but medium {scenario.medium!r} has no closure-ingress "
+                "model (no 'closure_otr' state); closure oxygen ingress is wine-only "
+                "(decision D-136)"
+            )
+        y0[medium.schema.slice("closure_otr")] = _closure_otr(scenario.closure, parameters)
 
     # MLF isolability (decisions D-23, D-31): the malolactic Processes are wired into the wine
     # medium but contribute nothing until Oenococcus oeni is pitched. When it is not, DISABLE

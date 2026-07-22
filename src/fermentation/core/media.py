@@ -96,6 +96,7 @@ from fermentation.core.kinetics import (
     BrettGrowth,
     BrettVinylphenolReduction,
     Caramelization,
+    ClosureOxygenIngress,
     ColemanQuadraticDeathTemperature,
     DiacetylReduction,
     EllagitanninOxidation,
@@ -1122,6 +1123,25 @@ def wine_schema() -> StateSchema:
             "bonded form identically makes the release exactly carbon-neutral instead of a "
             "carbon-creating transfer. Nitrogen-free. Decision D-135",
         ),
+        VarSpec(
+            "closure_otr",
+            "g/L/h",
+            default=0.0,
+            description="the bottle closure's steady oxygen transmission rate — the O₂ SUPPLY "
+            "term (decision D-136). UNLIKE every other slot here this is not a concentration but "
+            "a RATE carried in state: ClosureOxygenIngress adds it straight to d(o2)/dt, so the "
+            "slot IS the flux. It rides in state rather than as a parameter because a closure is "
+            "a per-run choice and the scenario layer has no parameter-override seam; _wine_initial "
+            "seeds it from the named `closure` key's sourced OTR (closure.yaml), the copper/"
+            "bound_h2s precedent. Turns O₂ from the finite add_oxygen STOCK into a FLOW, which is "
+            "what lets a bottle age oxidatively (cork/synthetic) or reductively (screwcap/"
+            "technical) on its own. Nothing reads it until begin_aging. 0 IS the neutral value "
+            "here — a hermetic seal, itself a measured case (Lopes 2007's flame-sealed control) — "
+            "so an unspecified closure leaves the whole pre-D-136 aging axis byte-for-byte "
+            "unchanged, the OPPOSITE call to D-134's copper where 0 was unphysical. Carries the "
+            "750 mL bottle scope folded in at provenance time; off every ledger, like the o2 it "
+            "feeds. Decision D-136",
+        ),
     ]
     return StateSchema(specs)
 
@@ -1521,6 +1541,23 @@ _BOUND_SULFIDE_PROCESSES: tuple[Callable[[], Process], ...] = (
     BoundHydrogenSulfideRelease,
     BoundMethanethiolRelease,
 )
+
+#: WINE-ONLY closure oxygen-ingress Process (decision D-136) — the O₂ **supply** term, and the only
+#: Process on the whole axis that ADDS to ``o2`` rather than drawing it down. Every oxidative sink
+#: from D-71 onward consumed a finite charge dosed by ``add_oxygen``; this makes O₂ a *flow*, so
+#: ``o2`` quasi-steady-states near zero and the closure's OTR — not the sinks' rate constants —
+#: becomes the master throttle on SO₂ depletion, browning and prémox. Zero-order by construction:
+#: the published OTRs are measured into an O₂-scavenging sink, so the atmospheric gradient is
+#: already baked in and a gradient term would double-count it. STEADY permeation only — the
+#: first-month bottling burst (trapped cork/headspace air, 10–150× higher) stays an ``add_oxygen``
+#: bolus rather than a second pool, which would re-litigate D-133. Reads NO parameter: the rate
+#: rides in the ``closure_otr`` state slot, seeded at the compile seam from the named ``closure``'s
+#: sourced OTR (``closure.yaml``), the ``copper``/``bound_h2s`` precedent. Wine-only (crown-cap OTR
+#: is real, but the data and this axis are wine-centric). Kept in its OWN tuple (isolable,
+#: directive #3): DISABLED at the compile seam, re-enabled by ``begin_aging``, and byte-for-byte
+#: inert at ``closure_otr = 0`` — which is a *measured* case (Lopes 2007's flame-sealed control),
+#: not an idealisation, so an unspecified closure leaves the pre-D-136 axis bit-identical.
+_CLOSURE_INGRESS_PROCESSES: tuple[Callable[[], Process], ...] = (ClosureOxygenIngress,)
 
 #: Oak-extraction aging Process (decision D-77) — the barrel/chip extractive axis. WINE + BARREL-
 #: BEER (D-86: wired into BOTH media — the oak axis is a wood property, not a grape one).
@@ -2018,6 +2055,7 @@ MEDIA: dict[str, Medium] = {
             + _TANNIN_ETHYL_TANNIN_PROCESSES
             + _DMS_PROCESSES
             + _BOUND_SULFIDE_PROCESSES
+            + _CLOSURE_INGRESS_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

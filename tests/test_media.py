@@ -172,6 +172,16 @@ WINE_COPPER_SLOTS = ("copper",)
 # the release closes total_carbon exactly.
 WINE_BOUND_SULFIDE_SLOTS = ("bound_h2s", "bound_methanethiol")
 
+# WINE-ONLY closure oxygen ingress (decision D-136): the bottle closure's steady oxygen
+# transmission rate, the O2 SUPPLY term. UNLIKE every other slot this is not a concentration but
+# a RATE carried in state — ClosureOxygenIngress adds it straight to d(o2)/dt — because a closure
+# is a per-run choice and the scenario layer has no parameter-override seam (the copper/bound_h2s
+# seeding precedent, but carrying a rate rather than a level). Off every ledger, like the o2 it
+# feeds. Default 0 = a hermetic seal, itself a measured case, so an unspecified closure leaves the
+# whole pre-D-136 aging axis byte-for-byte unchanged — the OPPOSITE call to D-134's copper, where
+# 0 was an unphysical multiplier and the default had to be the population mean.
+WINE_CLOSURE_SLOTS = ("closure_otr",)
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -201,6 +211,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_BURST_ANTIOXIDANT_SLOTS
         + WINE_COPPER_SLOTS
         + WINE_BOUND_SULFIDE_SLOTS
+        + WINE_CLOSURE_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -271,7 +282,11 @@ def test_wine_schema_has_single_sugar_slot():
     # sourced levels. bound_h2s is off every ledger like the carbon-free h2s it feeds, while
     # bound_methanethiol IS carbon-weighted, at the free thiol's own fraction, so the release closes
     # total_carbon exactly rather than creating carbon).
-    assert schema.size == 92
+    # + 1 D-136 closure_otr slot (the bottle closure's steady oxygen transmission rate — the O2
+    # SUPPLY term, and the only slot here that carries a RATE rather than a concentration, because
+    # a closure is a per-run choice and the scenario layer has no parameter-override seam. Off
+    # every ledger like the o2 it feeds; 0 = hermetic, so an unspecified closure is inert).
+    assert schema.size == 93
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -653,6 +668,15 @@ WINE_DMS_PROCESSES = {"smm_hydrolysis"}
 # absent by decision (its mechanism is unidentified in the source), so these are lower bounds.
 # Same compile-disable / begin_aging re-enable as the rest of the aging axis.
 WINE_BOUND_SULFIDE_PROCESSES = {"bound_h2s_release", "bound_methanethiol_release"}
+# WINE-ONLY closure oxygen ingress (decision D-136): the O2 SUPPLY term, and the ONLY Process on
+# the whole axis that ADDS to o2 rather than drawing it down. Every oxidative sink from D-71
+# onward consumed a finite charge dosed by add_oxygen; this makes O2 a FLOW, so o2 quasi-steady-
+# states near zero and the closure's OTR — not the sinks' rate constants — becomes the master
+# throttle on SO2 depletion, browning and premox. Zero-order (the published OTRs are measured into
+# an O2-consuming sink, so the atmospheric gradient is already baked in). STEADY permeation only:
+# the first-month bottling burst stays an add_oxygen bolus. Reads NO parameter — the rate rides in
+# the closure_otr state slot. Same compile-disable / begin_aging re-enable as the rest of the axis.
+WINE_CLOSURE_PROCESSES = {"closure_oxygen_ingress"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -684,6 +708,7 @@ EXPECTED_PROCESSES = {
         | WINE_TANNIN_ETHYL_TANNIN_PROCESSES
         | WINE_DMS_PROCESSES
         | WINE_BOUND_SULFIDE_PROCESSES
+        | WINE_CLOSURE_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

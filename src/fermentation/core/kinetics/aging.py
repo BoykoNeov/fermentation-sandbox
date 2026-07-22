@@ -4125,3 +4125,117 @@ class BoundMethanethiolRelease(Process):
         d[schema.slice("bound_methanethiol")] = -rate
         d[schema.slice("methanethiol")] = rate
         return d
+
+
+class ClosureOxygenIngress(Process):
+    """Steady oxygen permeation through the bottle closure — the O₂ SUPPLY term (D-136).
+
+    ``d(o2)/dt = +closure_otr``, a constant source read straight out of the state slot. It closes a
+    gap this module had already named against itself, in
+    :class:`SotolonAldolCondensation`'s docstring (D-108): *"a* sealed *wine here has strictly zero
+    O₂ ingress (no closure permeation …), so a sealed sulfited bottle never ages toward prémox at
+    all. That is the limitation to state."* It no longer is.
+
+    **THE REFRAME: O₂ STOPS BEING A STOCK AND BECOMES A FLOW.** Every O₂ sink on this axis — D-71
+    ethanol oxidation, D-72 sulfite, D-74 browning, D-75 Strecker, D-78 ellagitannin, D-79/D-80
+    condensation, D-81 fading, D-133 burst — was built against a *finite* charge dosed by
+    ``add_oxygen``, and their calibration story was "the products saturate as the charge is spent".
+    Under continuous ingress that story inverts: the consumers are collectively far faster than the
+    closure, so ``o2`` **quasi-steady-states just above zero** at ``o2* ≈ closure_otr / Σᵢkᵢ`` and
+    the oxidative endpoints accumulate at ``closure_otr · (kᵢ / Σⱼkⱼ)``. **The closure becomes the
+    master throttle and the individual rate constants become a splitting rule.** That is not a
+    defect to design around, it is the physics: oxidation in a sealed bottle is supply-limited,
+    which is why the same wine is a different wine under a screwcap and under a synthetic stopper.
+    The practical consequence for anyone reading this axis: past this Process, ``k_so2_oxidation``
+    and friends barely move the SO₂ *depletion time* — the OTR does.
+
+    **Zero-order, and the sources force it rather than merely permit it.** Both primaries (Lopes
+    et al. 2007; Oliveira et al. 2013) measure ingress into a *reduced indigo-carmine solution* — an
+    O₂-scavenging sink that pins dissolved O₂ near zero, i.e. the same condition a consuming wine
+    imposes. The ~atmospheric partial-pressure gradient is therefore already inside every published
+    OTR, so re-expressing the rate as proportional to ``(p_atm − p_wine)`` would **double-count**
+    it, and would additionally need a headspace model the engine does not have. Oliveira measured
+    the constant form directly: *"stabilizing a low and rather constant ingress rate from the third
+    to twelfth months."*
+
+    **Steady permeation ONLY — the bottling burst is deliberately somebody else's job.** Every
+    closure's first-month rate is 10–150× its steady rate (Oliveira: *"35 % of the overall ingress
+    occurred in the first five days, 59 % in the first month"*), but that burst is not permeation:
+    it is the cork's own trapped air decompressing as the stopper relaxes in the bottleneck, and
+    for a screwcap it is headspace air trapped at sealing. A one-off release of a finite trapped
+    charge is exactly what ``add_oxygen`` already expresses, so it is dosed, not modelled — building
+    it as a decaying pool here would re-run D-133's burst-pool argument for no gain. Simulating a
+    freshly bottled wine wants **both**: an ``add_oxygen`` bolus *and* a closure.
+
+    **The rate lives in STATE, not in ``reads``, and that is why ``reads`` is empty.** A closure is
+    a per-run choice and the scenario layer has no parameter-override seam, so ``closure_otr`` is
+    seeded at the compile seam from the named closure's sourced OTR (``closure.yaml``) — the
+    ``copper`` (D-134) / ``bound_h2s`` (D-135) precedent. Two consequences worth stating rather than
+    discovering: this Process reads **no** parameter, so its output tier comes from
+    :attr:`tier` alone rather than by D-1 parameter-tier propagation (the shipped OTRs are
+    ``speculative`` too, so the result is identical either way); and ``simulate_ensemble``, which
+    holds ``y0`` fixed and samples only parameters, will **not** propagate the OTR uncertainty band
+    — the same limitation copper and the bound sulfides already carry, and the D-67 threshold note
+    one layer up.
+
+    **Temperature-flat by decision (the D-135 precedent), with a sharper consequence than D-135's.**
+    Neither primary reports one closure at two temperatures, so no permeation activation energy is
+    fitted and none is shipped. But because ingress is flat while every *consumer* keeps its
+    Arrhenius term, and the endpoints are ingress-limited, warming a cellar mostly reshuffles the
+    ``kᵢ/Σk`` split and lowers standing ``[o2]`` instead of raising the total oxidative burden. Real
+    warm storage oxidises faster partly *because* OTR rises, so **warm-storage output from this axis
+    is a lower bound**.
+
+    **Scope: a standard 750 mL bottle.** OTR is a flux through a *stopper* (mass/time) and is
+    volume-independent as published; the conversion to the engine's g/L/h folds in 750 mL at
+    provenance time (``closure.yaml``), keeping the engine volume-agnostic. ``batch_volume_liters``
+    is deliberately **not** reused — that is fermenter volume for hop dosing, and per-bottle ingress
+    does not depend on how big the batch was. A magnum genuinely ages at half these concentration
+    rates; that is real chemistry and it is not expressible here.
+
+    **Isolability is exact and 0 is the RIGHT default — the opposite call to D-134.** For copper, 0
+    was an unphysical multiplier and the VarSpec default had to be the population mean. Here 0 is
+    both the isolability gate *and* a physically real endpoint: Lopes et al. found that of every
+    sealing system tested, *"only the control (bottle sealed by flame) was completely air-tight"*,
+    so a hermetic closure is a measured limiting case, not an idealisation. An un-specified closure
+    therefore leaves the entire pre-D-136 aging axis **byte-for-byte** unchanged. Wine-only (the
+    slot is absent from beer's schema — crown-cap OTR is real but the data and this axis are
+    wine-centric), aging-gated at the compile seam, and clamped non-negative so a mis-seeded
+    negative can never turn the closure into an O₂ *sink*.
+
+    **Conservation is trivial and that is worth one line.** ``o2`` is carbon-free and sits off every
+    ledger (like ``h2s``/``iso_alpha``/``A420``), so ingress moves nothing conserved — no
+    carbon-weighting subtlety of the kind D-135's ``bound_methanethiol`` needed. ``touches =
+    ("o2",)`` and nothing else. Tier **speculative**: the underlying measurements are real and
+    replicated, but each shipped OTR flattens a wide between-stopper band (natural cork's CV is
+    67 %/49 % across 593 bottles) to a single constant.
+    """
+
+    name = "closure_oxygen_ingress"
+    tier = Tier.SPECULATIVE
+    #: The only slot touched: dissolved O2, which is carbon-free and on NO conservation ledger, so
+    #: a source term here moves nothing that must balance. This is the only Process on the axis
+    #: that *adds* to ``o2`` — every other one draws it down.
+    touches = ("o2",)
+    #: EMPTY BY DESIGN, not an oversight: the rate is carried in the ``closure_otr`` state slot
+    #: (seeded at the compile seam from ``closure.yaml``), so this Process reads no parameter at
+    #: all. See the class docstring for the two consequences (tier source; ensemble propagation).
+    reads: tuple[str, ...] = ()
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        if "closure_otr" not in schema:
+            # Hard no-op on a medium without the slot (beer) — wine-only, see the docstring.
+            return d
+        otr = float(y[schema.slice("closure_otr")][0])
+        if otr <= 0.0:
+            # `hermetic` / un-specified closure: byte-for-byte zero, the isolability gate. The
+            # `<= 0` also floors a mis-seeded negative rather than letting it drain the o2 pool.
+            return d
+
+        # A constant source. No `o2` read and no gradient term: the published OTR is already
+        # measured against an O2-consuming sink, so the driving gradient is baked in (docstring).
+        d[schema.slice("o2")] = otr
+        return d

@@ -90,6 +90,22 @@ class Scenario(BaseModel):
     #: Boil temperature [°C]. Default 100 (sea-level boil); lower for a whirlpool/high-altitude
     #: boil, which slows isomerization (the Malowicki Arrhenius temperature dependence).
     boil_celsius: float = Field(default=100.0, gt=0.0)
+    #: Bottle closure, naming its steady oxygen transmission rate (wine, decision D-136). One of
+    #: ``hermetic`` / ``technical_cork`` / ``screwcap`` / ``natural_cork`` / ``synthetic_nomacorc``
+    #: / ``synthetic_supremecorq``; the compile seam looks the name up in ``closure.yaml`` and seeds
+    #: the ``closure_otr`` state slot from the sourced Parameter, so the choice carries provenance
+    #: instead of being a bare number. A NAMED MENU rather than a float precisely because prime
+    #: directive #2 forbids inlining a constant — an arbitrary OTR would have no source.
+    #:
+    #: ``None`` (the default) is treated as ``hermetic``: no ingress, the whole aging axis
+    #: byte-for-byte as it was before D-136. This is a genuine physical limiting case, not just a
+    #: disable switch — Lopes et al. 2007 found a flame-sealed bottle to be the only truly air-tight
+    #: seal they tested. Naming ``hermetic`` explicitly is the way to say "sealed, and I mean it".
+    #:
+    #: STEADY permeation only. The bottling burst (trapped cork/headspace air, 10–150× the steady
+    #: rate over the first month) is a separate one-off dose — add an ``add_oxygen`` intervention at
+    #: the ``begin_aging`` day for a freshly bottled wine. Scope: a standard 750 mL bottle.
+    closure: str | None = Field(default=None)
     duration_days: float = Field(default=14.0, gt=0.0)
 
     @field_validator("name", "medium")

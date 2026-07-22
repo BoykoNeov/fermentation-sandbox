@@ -1,0 +1,190 @@
+# Closure oxygen ingress -- the OTR menu that decides oxidative vs reductive bottle aging
+# (decision D-136)
+#
+# THE GAP THIS CLOSES, NAMED IN THE CODE BEFORE IT WAS FILLED. SotolonAldolCondensation's
+# docstring (D-108) says it outright: "a *sealed* wine here has strictly zero O2 ingress (no
+# closure permeation -- the same gap D-102 named for DMS leaving through the closure), so a sealed
+# sulfited bottle never ages toward premox at all. That is the limitation to state." Every O2 sink
+# on the aging axis (D-71 ethanol oxidation, D-72 sulfite, D-74 phenolic browning, D-75 Strecker,
+# D-78 ellagitannin, D-79/D-80 condensation, D-81 anthocyanin fading, D-133 burst) drew on a FINITE
+# dosed charge from `add_oxygen`. This file supplies the missing FLOW.
+#
+# THE TWO PRIMARIES. Both read as rendered PDF pages, not through a summarising fetch (the D-102
+# lesson: a summarising fetch is a source of leads, never of constants).
+#
+#   P1. Lopes, P., Saucier, C., Teissedre, P.-L., & Glories, Y. (2007). "Main routes of oxygen
+#       ingress through different closures into wine bottles." J. Agric. Food Chem. 55(13),
+#       5167-5170. DOI 10.1021/jf0706023. Read via the authors' own trade reprint, "Oxygen
+#       transmission through different closures into wine bottles", Practical Winery & Vineyard
+#       July/August 2007, which prints the SAME experiment's Table I in full.
+#       (The ACS copy is paywalled; the reprint is openly hosted at brocku.ca/ccovi. The D-123 /
+#       D-135 lesson a third time: "paywalled" is a property of ONE HOST, not of the paper.)
+#
+#   P2. Oliveira, V., Lopes, P., Cabral, M., & Pereira, H. (2013). "Kinetics of oxygen ingress
+#       into wine bottles closed with natural cork stoppers of different qualities."
+#       Am. J. Enol. Vitic. 64(3), 395-399. DOI 10.5344/ajev.2013.13009. Open author deposit on
+#       ResearchGate (uploaded by H. Pereira). Natural cork only, but 593 bottles of it.
+#
+# P1's Table I -- the whole menu below, in uL O2/day, transcribed verbatim:
+#
+#   Closure Type            | First month | Horizontal        | Vertical
+#   Screw cap (tin liner)   | <500 [a]    | 0.2-0.7           | --
+#   "Technical" corks       | 15-40       | 0.1-0.4           | 0.1-0.9
+#   Natural corks           | 25-45       | 1.7-6.1[b] 0.1-2.3[c] | 0.5-4.4[b] 0.1-2.7[c]
+#   Nomacorc synthetic      | 30-40       | 6                 | 8-9
+#   SupremeCorq synthetic   | 35-45       | 11-15             | 11-12
+#   [a] at moment of bottling  [b] 2-12 months  [c] 12-36 months (horiz.) / 12-28 (vert.)
+#
+# WHAT IS SHIPPED IS THE **STEADY** COLUMN, NOT THE FIRST MONTH -- AND THAT IS THE WHOLE DESIGN.
+# Every closure's first-month rate is 10-150x its steady rate, and P2 quantifies how dominant that
+# burst is: "35% of the overall ingress occurred in the first five days, 59% in the first month,
+# and 78% in the first three months". It is NOT modelled here, and the reason is mechanistic, not
+# convenient -- P2 identifies it as the CORK'S OWN trapped air decompressing, not atmospheric
+# permeation: "The higher air pressure within the cells due to the compression of the stopper in
+# the bottleneck certainly will increase ingress rates immediately after bottling[;] as oxygen
+# ingress progresses, the pressure decreases and so the ingress rates, until reaching a rather
+# constant value." A one-off release of a finite trapped charge is precisely what the D-71
+# `add_oxygen` verb already expresses, and re-building it as a decaying pool would re-litigate
+# D-133's burst-pool argument for no gain. So: this file is the STEADY permeation, `add_oxygen`
+# is the bottling burst, and the two do not overlap. An author simulating a freshly bottled wine
+# should dose BOTH.
+#
+# WHY ZERO-ORDER (a constant source, not a gradient-driven one). Both primaries measure ingress
+# into a REDUCED INDIGO-CARMINE SOLUTION -- an O2-scavenging sink that holds dissolved O2 near
+# zero, which is exactly what a consuming wine does. The ~atmospheric partial-pressure gradient is
+# therefore already baked into every number below, and re-expressing the rate as proportional to
+# (p_atm - p_wine) would double-count it AND require a headspace model the engine does not have.
+# The constant form is also what P2 measured directly: "stabilizing a low and rather constant
+# ingress rate from the third to twelfth months."
+#
+# THE UNIT CONVERSION IS THE AUTHORS' OWN, NOT AN IMPOSED ONE. P1's table is in uL O2/day; the
+# model needs g/L/h. P2's Discussion quotes P1's group as "2.43 to 8.73 ug/day (1.7 to 6.1
+# uL/day)" -- both ratios give 1.43 ug O2 per uL (2.43/1.7 = 1.4294; 8.73/6.1 = 1.4311), i.e. a
+# molar volume of 22.4 L/mol, STP. That is NOT the 20 C of P1's own thermostat (which would give
+# 24.06 L/mol -> 1.330 ug/uL, 7.5% lower). The authors' 1.43 is used anyway, deliberately, so the
+# numbers below reproduce the published ug/day figures EXACTLY rather than silently disagreeing
+# with both papers by 7.5%. The full conversion, applied identically to every value here:
+#
+#   g/L/h = (uL/day) * 1.43e-6 g/uL / 24 h/day / 0.750 L  =  (uL/day) * 7.9444e-8
+#
+# THE 750 mL IS A SCOPE DECISION, AND IT IS THE ONLY PLACE A VOLUME ENTERS. OTR is a flux through
+# a STOPPER (mass/time), so it is volume-independent as published -- both primaries in fact used
+# 375 mL bottles. Only the conversion to the engine's g/L needs a volume, and the standard 750 mL
+# bottle is folded in HERE, at provenance time, so the engine stays volume-agnostic (it has no
+# concept of container size; `batch_volume_liters` is FERMENTER volume for hop dosing and is
+# deliberately NOT reused -- per-bottle ingress does not depend on how big the batch was).
+# CONSEQUENCE, stated so it is never read as an oversight: **the aging model is a standard 750 mL
+# bottle.** A magnum ages at half these concentration rates; a half-bottle at double. That is real
+# chemistry (it is why large formats age more slowly) and it is NOT expressible here.
+#
+# TEMPERATURE-FLAT BY DECISION (the D-135 precedent). P1 ran at a controlled 20 +/- 1 C; P2 at
+# uncontrolled room temperature (13.6-27.8 C). Neither resolves an OTR activation energy, and
+# neither reports the same closure at two temperatures, so no Arrhenius term is fitted and none is
+# shipped. The consequence has a sharper edge here than it did for D-135 and must be stated: since
+# ingress is flat while every CONSUMER keeps its Arrhenius term, and (see below) the O2 endpoints
+# go supply-limited, the total oxidative burden of a warm cellar is UNDER-predicted -- real warm
+# storage oxidises faster partly BECAUSE the closure's OTR rises. Warm-storage predictions from
+# this axis are lower bounds.
+#
+# THE ORDERING IS THE ROBUST CLAIM; THE MAGNITUDES ARE A BAND. The spread from technical cork to
+# SupremeCorq is ~52x, and that ordering (technical <= screwcap < natural < Nomacorc < SupremeCorq)
+# is P1's own conclusion verbatim: "low in screw-caps and 'technical' corks, intermediate in
+# conventional natural cork stoppers, and high in synthetic closures."
+#
+# AN ORDERING CORRECTION WORTH RECORDING, BECAUSE THE FOLKLORE SAYS OTHERWISE. It is widely
+# repeated -- including in P2's own introduction, citing Godden et al. 2005 -- that "screwcaps were
+# the closures least permeable to oxygen". P1's Table I says TECHNICAL CORK is lower at steady
+# state (0.1-0.4 vs 0.2-0.7 uL/day). Both can be true at once, and P1 explains how: the screwcap's
+# headline number is `<500 uL/day AT THE MOMENT OF BOTTLING` -- "the insertion of oxygen contained
+# within the screw-cap in bottle headspace at the time of sealing" -- which dominates any
+# comparison made on a total-including-burst basis, exactly the basis Godden used (a 36-month
+# mean). Once the burst is separated out, as it is here, technical cork wins. The measured steady
+# ordering is what ships.
+#
+# NOT SOURCED FROM, AND WHY. Dieval, Vidal & Aagaard (2011), Packaging Technol. Sci. 24:375-385,
+# doi 10.1002/pts.945 -- the luminescence OTR method for co-extruded closures -- is Wiley-paywalled
+# with only a ResearchGate "Request PDF" stub, and is NOT read; nothing here rests on it. Likewise
+# Karbowiak et al. (2010) Crit. Rev. Food Sci. Nutr. 50:20-52 (a review, so secondary anyway) and
+# the 2026 Science Advances mechanism paper (doi 10.1126/sciadv.aed3023, HTTP 403). Lopes et al.
+# 2005 (JAFC 53:6967) and 2006 (JAFC 54:6741) reach this file ONLY through P1/P2's own quotation
+# of them and are used solely as corroboration, never as a shipped value.
+#
+# TIER: ALL SPECULATIVE, and the reason is the same for every entry. The underlying measurements
+# are real and replicated, but each shipped number is a SINGLE CONSTANT standing in for a rate that
+# the sources report as a RANGE across stoppers of one type (natural cork's between-stopper
+# coefficient of variation is 67% and 49% in P2 -- real heterogeneity in the bark, not measurement
+# error), and flattening a wide empirical band to a point estimate is a modelling act, not a
+# measurement. This mirrors D-135, where the measured reservoir LEVELS were tagged `plausible` and
+# the RATES read off a regression were tagged `speculative`. Here everything is a rate.
+#
+# ENSEMBLE CAVEAT (the D-67 threshold note, same shape). These parameters seed a STATE SLOT at
+# compile time rather than being read by the Process at each step, so `simulate_ensemble` -- which
+# holds y0 fixed and samples only parameters -- will NOT propagate the OTR bands into the output
+# spread. Identical in kind to `copper_typical` (D-134) and `bound_h2s_initial` (D-135), which seed
+# state the same way. To explore OTR uncertainty, run the named closures as separate scenarios.
+
+# -- HERMETIC: the measured zero, named rather than implied ---------------------------------
+otr_hermetic:
+  value: 0.0
+  unit: "g/L/h"   # d(o2)/dt = +otr, a constant source
+  tier: speculative
+  uncertainty: { low: 0.0, high: 0.0, note: "exactly zero, with no band: this is the definitional no-ingress case, not an estimate of a small one. It is also the isolability gate (prime directive 3) -- ClosureOxygenIngress contributes byte-for-byte zero here, so a hermetic run is bit-identical to the whole pre-D-136 aging axis" }
+  provenance:
+    source: "Lopes et al. 2007 (P1), Results: of every sealing system tested over 36 months, 'only the control (bottle sealed by flame) was completely air-tight'. So a true zero-ingress closure is a MEASURED limiting case in the primary itself, not an idealisation invented here."
+    conditions: "flame-sealed glass ampoule; 20 +/- 1 C, 36 months. No commercial closure achieves this."
+    notes: "Named explicitly rather than left as the absence of a `closure` key, deliberately: the D-45 hard-zero lesson is that an unstated zero reads as an oversight while a NAMED zero reads as a choice. A scenario that wants no ingress should say `closure: hermetic` and mean it. This is also the one entry whose value is not a flattened band, which is why its uncertainty is degenerate rather than merely narrow."
+
+# -- TECHNICAL CORK (agglomerated + natural discs: Twin Top, Neutrocork) ---------------------
+otr_technical_cork:
+  value: 1.99e-8
+  unit: "g/L/h"
+  tier: speculative
+  uncertainty: { low: 7.94e-9, high: 7.15e-8, note: "low = P1's horizontal floor (0.1 uL/day); high = P1's VERTICAL ceiling (0.9 uL/day), taken rather than the horizontal 0.4 so the band spans both storage orientations P1 measured. => 0.17 mg/L/yr central, band 0.07-0.63" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, 'Technical' corks (Twin Top and Neutrocork), horizontal storage after the first month: 0.1-0.4 uL/day. Central value 0.25 uL/day (band midpoint) * 7.9444e-8 = 1.99e-8 g/L/h. Corroborated by the paper's own text: 'Technical cork stoppers (Twin Top and Neutrocork) exhibited a low level of oxygen permeation (0.1 to 0.4 uL per day)'."
+    conditions: "375 mL flint bottles, reduced indigo-carmine solution, 20 +/- 1 C, 65 +/- 1 % RH, 4 replicates, horizontal storage months 2-36; converted to a 750 mL bottle at 1.43 ug O2/uL (see the file header). Steady permeation only -- P1's first-month rate for this closure is 15-40 uL/day, 60-160x higher."
+    notes: "THE LOWEST-INGRESS COMMERCIAL CLOSURE IN THE PRIMARY, below screwcap -- see the ordering-correction note in the file header before 'fixing' this. Corroborated independently by P2's introduction, which reports technical cork at 'low and constant rates 0.003 mg O2/month (2 to 36 months)' = 0.1 ug/day = 0.07 uL/day, at/below this band's floor and from a different experiment (Lopes et al. 2006). P1 also notes technical corks were 'essentially impermeable to atmospheric oxygen during the first 24 months'."
+
+# -- SCREWCAP (saran-tin liner: Stelvin, Auscap, Cospak, CSA) --------------------------------
+otr_screwcap:
+  value: 3.58e-8
+  unit: "g/L/h"
+  tier: speculative
+  uncertainty: { low: 1.59e-8, high: 5.56e-8, note: "P1's full printed range 0.2-0.7 uL/day. => 0.31 mg/L/yr central, band 0.18-0.49. NOTE P1's own text says '0.2 to 0.6 uL per day' where its Table I says 0.2-0.7 -- a genuine text/table mismatch in the source. The TABLE is taken as authoritative (the D-135 lesson: transcribing the table changed four numbers taken from the same paper's prose); the difference is well inside the band either way" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, screw caps with saran-tin liners (Stelvin, Auscap, Cospak, CSA), horizontal storage after the first month: 0.2-0.7 uL/day, with the paper reporting 'no significant differences between manufacturers'. Central value 0.45 uL/day * 7.9444e-8 = 3.58e-8 g/L/h."
+    conditions: "as otr_technical_cork (375 mL, indigo carmine, 20 C, 65 % RH); horizontal, 18 months for the screwcap arm. Converted to 750 mL at 1.43 ug O2/uL."
+    notes: "THE FIRST-MONTH FIGURE IS NOT PERMEATION AND IS NOT MODELLED. P1 lists '<500 uL/day' for screwcaps in the first month, footnoted 'at moment of bottling' -- it is the air trapped in the cap's headspace at sealing, not transmission through the liner: 'The apparent entry of oxygen into wine bottles was substantially higher during bottling than in the following 18 months of storage. This appeared to be due to the insertion of oxygen contained within the screw-cap in bottle headspace at the time of sealing.' Dose it with `add_oxygen` if simulating a real bottling line. This one-off charge is why screwcap is often ranked the LEAST permeable closure on a total-including-burst basis while ranking above technical cork at steady state. P1 also links the low steady rate to the reductive risk this axis cannot yet show: 'too low oxygen ingress rates, as shown by screw-cap closures and glass ampoules, promotes the development of rubbery or struck flint sulfide-like aroma characters (post-bottling reduction)' -- in this model that appears as the ABSENCE of oxidative markers, not as extra sulfide (D-135 is release-only and reads no O2)."
+
+# -- NATURAL CORK ---------------------------------------------------------------------------
+otr_natural_cork:
+  value: 1.19e-7
+  unit: "g/L/h"
+  tier: speculative
+  uncertainty: { low: 7.94e-9, high: 4.85e-7, note: "0.1-6.1 uL/day: the union of P1's two natural-cork windows (1.7-6.1 at 2-12 months, 0.1-2.3 at 12-36). => 1.04 mg/L/yr central, band 0.07-4.25. This band is deliberately the widest of any closure and it is REAL between-stopper heterogeneity, not measurement scatter: P2 measured 593 bottles and found 12-month ingress spanning 0.3-4.8 mg with coefficients of variation of 67% and 49%, and attributes it to 'the natural differing features in the cell dimensions and air volume within the stopper's structure'" }
+  provenance:
+    source: "TWO INDEPENDENT PRIMARIES, cross-validated. P1 (Lopes et al. 2007) Table I, natural corks, horizontal: 1.7-6.1 uL/day over months 2-12 and 0.1-2.3 uL/day over months 12-36. P2 (Oliveira et al. 2013) Table 2 measured the same quantity directly in 593 bottles and reports a months-4-12 mean of 2.51 ug/day = 1.755 uL/day (per class: 0.76 / 1.38 / 2.41 ug/day for classes 1-3). The shipped 1.5 uL/day is the central value of the region where the two agree, * 7.9444e-8 = 1.19e-7 g/L/h."
+    conditions: "45x24 mm (P1) and 45x24 mm (P2) natural cork; 375 mL bottles, indigo-carmine colorimetry; P1 at 20 +/- 1 C controlled, P2 at 13.6-27.8 C room. Steady permeation, months 4+ (P2) / months 2+ (P1). Converted to a 750 mL bottle at 1.43 ug O2/uL."
+    notes: "THE CROSS-VALIDATION IS THE POINT: P2's independently measured 1.755 uL/day falls at the bottom edge of P1's 2-12 month band AND inside P1's 12-36 month band, from experiments with 4 and 593 replicates respectively. A THIRD, weaker corroboration runs the right way too: Godden et al. 2005 (via P2's introduction) reports natural cork at a mean 1.60 mg O2/stopper/yr over 36 months = 4.4 ug/day, HIGHER than the steady 2.5 ug/day because a 36-month mean still carries the first-month burst. ONE NUMBER, NOT TWO: P1's 2-12 vs 12-36 month split (a further decline with age) is smaller than this band's width, so shipping two natural-cork constants would assert a resolution the data does not support. CAUTION on P1's prose: its text says ingress 'then rose gradually (0.1 to 2.3 uL per day)' where its own Table I shows the later window is LOWER than the earlier one. The table is taken as authoritative and the direction is a DECLINE; the prose sentence is treated as a slip, and is recorded here rather than smoothed over."
+
+# -- SYNTHETIC, extruded (Nomacorc classic) --------------------------------------------------
+otr_synthetic_nomacorc:
+  value: 4.77e-7
+  unit: "g/L/h"
+  tier: speculative
+  uncertainty: { low: 3.97e-7, high: 7.15e-7, note: "5-9 uL/day: P1 prints a single 6 for horizontal and 8-9 for vertical, so the band spans both orientations with a modest extension below the one horizontal point. => 4.18 mg/L/yr central, band 3.48-6.27 -- roughly 4x natural cork and 13x screwcap" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, Nomacorc classic synthetic closure (43x22 mm), horizontal storage after the first month: 6 uL/day (vertical 8-9). 6 * 7.9444e-8 = 4.77e-7 g/L/h."
+    conditions: "as the other P1 entries (375 mL, indigo carmine, 20 C, 65 % RH, 4 replicates). Converted to 750 mL at 1.43 ug O2/uL."
+    notes: "P1: synthetic closures 'exhibited the highest oxygen permeation, reaching the limit of quantification for our method (2.5 mL of oxygen) within 140 and 290 days' (Nomacorc and SupremeCorq respectively) -- i.e. these closures ran the experiment off-scale, which is itself the finding. Unlike natural cork, Nomacorc was 'permeable to atmospheric oxygen, mainly AFTER the first month of storage', so for this closure the steady term is the dominant one rather than a tail. Corroborating direction from P2's introduction: synthetic stoppers were 'the least successful barriers to oxygen, reaching a mean oxygen ingress of 9.33 mg in the first month' (Lopes et al. 2005)."
+
+# -- SYNTHETIC, injection-moulded (SupremeCorq) ----------------------------------------------
+otr_synthetic_supremecorq:
+  value: 1.03e-6
+  unit: "g/L/h"
+  tier: speculative
+  uncertainty: { low: 8.74e-7, high: 1.19e-6, note: "P1's printed range 11-15 uL/day (horizontal; vertical 11-12 sits inside it). => 9.05 mg/L/yr central, band 7.66-10.45. The most permeable closure in the primary, ~52x otr_technical_cork -- that ratio, not either endpoint, is what this file is really asserting" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, SupremeCorq 45 synthetic closure, horizontal storage after the first month: 11-15 uL/day (vertical 11-12). Central 13 uL/day * 7.9444e-8 = 1.03e-6 g/L/h."
+    conditions: "as the other P1 entries (375 mL, indigo carmine, 20 C, 65 % RH, 4 replicates). Converted to 750 mL at 1.43 ug O2/uL."
+    notes: "Kept as a SEPARATE entry from Nomacorc rather than lumped into one 'synthetic' value because P1 measures them a factor of ~2 apart -- larger than the gap between screwcap and natural cork -- so a single synthetic constant would erase a distinction the source actually resolves. At this rate a wine takes up ~45 mg/L of O2 over five years, which is why P1's Results link synthetic closures to 'wines with a high level of browning and high-oxidized aroma scores'."

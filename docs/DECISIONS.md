@@ -144,6 +144,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 - [**D-133**](#d-133--ferreira-2015-day-1-o2-consumption-spike-a-finite-burst_antioxidant-pool-scavenged-alongside-phenolicbrownings-steady-sink-closes-the-gap-between-d-132s-calibrated-average-rate-and-ferreiras-measured-day-1-initial-rate) — Ferreira 2015 day-1 O2-consumption spike: a finite `burst_antioxidant` pool, scavenged alongside `PhenolicBrowning`'s steady sin …
 - [**D-134**](#d-134--copper-dependence-of-the-o2-consumption-rate-a-mean-centered-fcu-multiplier-on-phenolicbrownings-rate-sourced-from-a-controlled-model-wine-kinetics-experiment-after-three-natural-wine-pls-surveys-turned-out-to-bury-copper-un-extractably-in-collinear-multivariate-fits) — copper-dependence of the O2-consumption rate: a mean-centered `f(Cu)` multiplier on `PhenolicBrowning`'s rate, sourced from a co …
 - [**D-135**](#d-135--bottle-reduction-sulfides-metal-complexed-h2smesh-reservoirs-released-first-order-during-anaerobic-bottle-aging-after-the-primary-d-101-recorded-as-unreadable-turned-out-to-be-open--and-to-say-the-mechanism-d-101-guessed-for-it-was-the-wrong-one) — bottle-reduction sulfides: metal-complexed H2S/MeSH reservoirs released first-order during anaerobic bottle aging, after the pri …
+- [**D-136**](#d-136--closure-oxygen-ingress-a-zero-order-per-closure-otr-that-turns-o2-from-a-dosed-stock-into-a-continuous-flow-making-the-closure--not-any-sinks-rate-constant--the-throttle-on-oxidative-aging-and-lifting-a-limitation-d-108-had-written-into-the-code-against-itself) — closure oxygen ingress: a zero-order per-closure OTR that turns O2 from a dosed STOCK into a continuous FLOW, making t …
 <!-- END INDEX -->
 
 ## Process decisions (project setup)
@@ -13761,5 +13762,210 @@ found in wine"*. The bonded reservoir is demonstrably not the methionine pool we
 - **Copper coupling** waits on a real binding constant, and must be asymmetric when it arrives.
 - The reservoir-formation route (fermentative H2S meeting must copper) is unmodelled; it would
   replace the pitch-seeding simplification with a binding equilibrium.
+- D-132's other deferred items (tail-acceleration, gluconolactone, MLF protein-protection) remain
+  open, tracked under D-132/D-130/D-131.
+
+## D-136 — closure oxygen ingress: a zero-order per-closure OTR that turns O2 from a dosed STOCK
+into a continuous FLOW, making the closure — not any sink's rate constant — the throttle on
+oxidative aging, and lifting a limitation D-108 had written into the code against itself
+
+Owner picked "closure O2 ingress" off the open-beat menu (2026-07-22 session, same day as
+D-132/D-133/D-134/D-135). **The menu I offered was three-quarters stale** and that is worth
+recording before anything else: I listed oak extraction, tannin–anthocyanin polymerization and
+Maillard/sotolon as open beats, reading them off `docs/plans/milestone-3-plan.md`'s "Deferred /
+later beats" section. All three have been BUILT for many decisions (`OakExtraction`,
+`TanninAnthocyaninCondensation`, `AcetaldehydeBridgedCondensation`, `SotolonAldolCondensation`,
+`AnthocyaninFading`, …). The plan file's deferred list is a breadcrumb that later decisions burned
+down without editing it — exactly the failure the archive already names. **Check the code, not the
+plan, before offering a menu.** The one item the owner picked was the one genuinely unbuilt, and
+the code says so in its own voice (see below).
+
+### The gap, named in the repo before it was filled
+`SotolonAldolCondensation`'s docstring (D-108) states the limitation outright:
+
+> **The real bound is one layer out and is NOT this Process's**: a *sealed* wine here has strictly
+> zero O₂ ingress (no closure permeation — the same gap D-102 named for DMS leaving through the
+> closure), so a sealed sulfited bottle never ages toward prémox at all. **That is the limitation
+> to state**, not "SO₂ is permanent", which was false.
+
+Every O₂ sink from D-71 onward — ethanol oxidation, D-72 sulfite, D-74 browning, D-75 Strecker,
+D-78 ellagitannin, D-79/D-80 condensation, D-81 fading, D-133 burst — drew on a **finite charge**
+dosed by `add_oxygen`. There was no supply term. This decision is the supply term.
+
+### THE REFRAME, and it is the whole beat: O2 stops being a stock and becomes a flow
+The advisor's framing, adopted: the oxidative sub-axis was calibrated against a bolus, so its
+characteristic behaviour was *saturation as the charge is spent*. Under continuous ingress the
+consumers are collectively far faster than any closure, so `o2` **quasi-steady-states just above
+zero** at `o2* ≈ otr / Σkᵢ` and the endpoints accumulate at `otr · (kᵢ / Σⱼkⱼ)`. **The closure
+becomes the master throttle and the individual rate constants become a splitting rule.** So the
+acceptance test is emphatically *not* "o2 depletes" (it does not — it pins). It is "the oxidative
+endpoints are ordered by OTR over years", plus the sharper corollary below. Measured over a
+5-year integration:
+
+| closure | standing o2* µg/L | SO₂ left mg/L | A420 | sotolon µg/L |
+|---|---|---|---|---|
+| none / `hermetic` | 0.000 | 60.00 | 0.000 | 0.042 |
+| technical cork | 2.57 | 56.74 | 0.001 | 0.042 |
+| screwcap | 4.86 | 54.14 | 0.001 | 0.042 |
+| natural cork | 21.7 | 40.79 | 0.004 | 0.042 |
+| Nomacorc | 720 | 4.86 | 0.059 | 0.132 |
+| SupremeCorq | 2047 | 3.68 | 0.272 | 3.114 |
+
+**The corollary is the sharpest single result here.** A **16× swing in `k_so2_oxidation`**
+(0.25× → 4×) moves the 5-year SO₂ endpoint only **44.4 → 39.6 mg/L**, while a closure swap at a
+*fixed* rate constant moves it **54.1 → 4.9**. O₂ is supply-limited; the sink constants barely
+matter. This is the "measure which side before building" lesson appearing as *correct* behaviour
+rather than as a defect, and a test pins it so that anyone trying to tune this axis through a
+sink's rate constant learns immediately why it does not work.
+
+### Sourcing — two primaries, read as rendered PDF pages, cross-validating each other
+- **P1. Lopes, Saucier, Teissedre & Glories 2007**, *J. Agric. Food Chem.* 55(13):5167-5170,
+  doi 10.1021/jf0706023. The ACS copy is paywalled; the authors' own trade reprint (*Practical
+  Winery & Vineyard*, July/Aug 2007), which prints the **same experiment's Table I in full**, is
+  openly hosted at brocku.ca/ccovi. **The D-123/D-135 lesson for the third time: "paywalled" is a
+  property of ONE HOST.** Table I is the entire closure menu in µL O₂/day, and — crucially — it
+  splits "First month" from "the subsequent months of storage".
+- **P2. Oliveira, Lopes, Cabral & Pereira 2013**, *Am. J. Enol. Vitic.* 64(3):395-399,
+  doi 10.5344/ajev.2013.13009. Open author deposit (ResearchGate, uploaded by H. Pereira).
+  Natural cork only, but **593 bottles** of it, and its Table 2 resolves ingress rate by time
+  window down to a months-4–12 steady value.
+
+**The cross-validation the sources never performed on each other:** P2's independently measured
+steady natural-cork rate is **2.51 µg/day = 1.755 µL/day**, which falls at the bottom edge of P1's
+2–12-month band (1.7–6.1) and inside P1's 12–36-month band (0.1–2.3). Two experiments, 4 vs 593
+replicates, agreeing on the number. A third, weaker check runs the right way too: Godden et al.
+2005's 1.60 mg/stopper/yr for natural cork is *higher* than the steady rate, as it must be, because
+a 36-month mean still carries the first-month burst. A test asserts P2's value sits inside the
+shipped band, so the cross-validation is enforced rather than merely written down.
+
+### The unit conversion is the AUTHORS' own, deliberately not "corrected"
+P1 prints µL/day; the engine needs g/L/h. P2's Discussion quotes P1's group as "2.43 to 8.73 µg/day
+(1.7 to 6.1 µL/day)" — **both ratios give 1.43 µg O₂/µL** (2.43/1.7 = 1.4294; 8.73/6.1 = 1.4311),
+i.e. a 22.4 L/mol molar volume, **STP — not the 20 °C of P1's own thermostat**, which would give
+1.330 µg/µL. The authors' 1.43 is used anyway, on purpose, so the shipped numbers reproduce the
+published µg/day figures exactly instead of silently disagreeing with both papers by 7.5 %. A test
+re-derives the whole chain (`1.43e-6 / 24 / 0.750`) from its three factors so it cannot inherit an
+arithmetic error from the code it checks.
+
+### THE ORDERING CORRECTION — the folklore is wrong, and the primary explains why
+It is widely repeated — **including in P2's own introduction**, citing Godden et al. 2005, and it
+was also the advisor's initial steer — that *"screwcaps were the closures least permeable to
+oxygen"*. P1's Table I says **technical cork is lower at steady state** (0.1–0.4 vs 0.2–0.7
+µL/day). Both are true on their own terms, and P1 says how: the screwcap's famous figure is
+`<500 µL/day` **at the moment of bottling**, footnoted as such — *"the insertion of oxygen
+contained within the screw-cap in bottle headspace at the time of sealing"* — which dominates any
+comparison made on a total-including-burst basis, exactly the basis Godden used. Once the burst is
+separated out, technical cork wins. **The measured steady ordering ships**, with a dedicated test
+(`test_technical_cork_is_below_screwcap`) whose docstring exists to stop it being "fixed" back to
+the folklore. The advisor retracted its own steer when shown the table.
+
+### Design — five decisions, each with the alternative it rejected
+- **Zero-order constant source, NOT gradient-driven on `[o2]`.** Both primaries measure ingress
+  into a *reduced indigo-carmine solution* — an O₂-scavenging sink that pins dissolved O₂ near
+  zero, i.e. the condition a consuming wine imposes. The ~atmospheric gradient is therefore
+  **already baked into every published OTR**, so a `(p_atm − p_wine)` term would double-count it
+  *and* need a headspace model the engine lacks. P2 measured the constant form directly:
+  *"stabilizing a low and rather constant ingress rate from the third to twelfth months."*
+- **STEADY permeation only — the bottling burst is deliberately `add_oxygen`'s job.** Every
+  closure's first month runs 10–150× its steady rate (P2: *"35 % of the overall ingress occurred in
+  the first five days, 59 % in the first month"*), but P2 identifies that burst mechanistically as
+  **the cork's own trapped air decompressing**, not atmospheric permeation: *"The higher air
+  pressure within the cells due to the compression of the stopper in the bottleneck … as oxygen
+  ingress progresses, the pressure decreases and so the ingress rates, until reaching a rather
+  constant value."* A one-off release of a finite trapped charge is precisely what `add_oxygen`
+  already expresses; rebuilding it as a decaying pool would re-litigate D-133 for no gain. A test
+  pins time-invariance so nobody quietly adds one.
+- **The rate rides in STATE, and `reads` is EMPTY.** A closure is a per-run choice and the scenario
+  layer has **no parameter-override seam** (checked, not assumed), so the rate has nowhere else to
+  live: new wine-only slot `closure_otr` (g/L/h), seeded at the compile seam from the named
+  closure's sourced Parameter — the `copper` (D-134) / `bound_h2s` (D-135) precedent, except
+  carrying a *rate* rather than a *level*. Two consequences are stated rather than discovered: the
+  output tier comes from `Process.tier` alone (no D-1 parameter-tier propagation — same result,
+  since the OTRs are speculative too), and **`simulate_ensemble` will not propagate the OTR bands**
+  because it holds `y0` fixed and samples only parameters. That is identical in kind to the
+  limitation `copper_typical` and `bound_h2s_initial` already carry, and to D-67's threshold note.
+- **A NAMED MENU, not a bare number** (`closure: "natural_cork"` → `otr_natural_cork` in
+  `closure.yaml`). An arbitrary float would be a constant without provenance, which prime directive
+  #2 forbids. Unknown names raise loudly *and list the menu*; a numeric escape hatch was considered
+  and rejected as a second way to do the same thing that reintroduces the un-sourced number.
+- **Seeded at must-initial, not by a `begin_aging` mutation** — the D-135 `bound_sulfides`
+  precedent ("seeded at pitch; nothing reads it until `begin_aging`, so it is observationally
+  identical"), which keeps `begin_aging` a pure phase switch and dissolves the "a closure is not
+  must composition" objection the same way D-135 dissolved it.
+
+### Isolability — and it is the OPPOSITE call to D-134
+`closure_otr` defaults to **0**, and here 0 is both the isolability gate *and* a physically real
+endpoint: P1 found that of every sealing system tested, *"only the control (bottle sealed by flame)
+was completely air-tight"*. Contrast D-134, where 0 copper was an unphysical multiplier and the
+VarSpec default had to be the population mean to avoid the D-45 hard-zero defect. An unspecified
+closure therefore leaves the entire pre-D-136 aging axis **byte-for-byte** unchanged — verified by
+a test asserting `hermetic` and an absent `closure` produce *array-equal* trajectories. `hermetic`
+is nonetheless a **named** option, because the D-45 lesson is that an unstated zero reads as an
+oversight while a named zero reads as a choice. Wine-only (crown-cap OTR is real, but the data and
+this axis are wine-centric); the `<= 0` guard also floors a mis-seeded negative so a closure can
+never become an O₂ *sink*. Conservation is trivial and stated: `o2` is carbon-free and off every
+ledger, so `touches = ("o2",)` moves nothing that must balance — no D-135-style carbon-weighting
+subtlety.
+
+### Scope limits, stated so they never later read as oversights
+- **The aging model is a standard 750 mL bottle.** OTR is a flux through a *stopper* (mass/time)
+  and is volume-independent as published — both primaries in fact used 375 mL bottles. Only the
+  conversion to g/L needs a volume, and it is folded in at *provenance* time so the engine stays
+  volume-agnostic. `batch_volume_liters` is deliberately **not** reused: that is fermenter volume
+  for hop dosing, and per-bottle ingress does not depend on batch size. A magnum genuinely ages at
+  half these concentration rates; that is real chemistry and is not expressible here.
+- **Temperature-flat by decision** (D-135 precedent): neither primary reports one closure at two
+  temperatures, so no permeation `E_a` is fitted and none is shipped. The consequence has a sharper
+  edge than D-135's and is recorded: because ingress is flat while every *consumer* keeps its
+  Arrhenius term, and the endpoints are ingress-limited, **warm-storage output from this axis is a
+  lower bound** — real warm storage oxidises faster partly *because* OTR rises.
+- **Not coupled to D-135's sulfides, and a test does not pretend otherwise.** The screwcap→reduction
+  link is real and sourced (P1: too-low ingress promotes *"rubbery or struck flint sulfide-like
+  aroma characters"*), but D-135 is release-only and reads no O₂, so the sulfide trajectory is
+  closure-**independent** in this model. In the model, reduction shows up as the *absence of
+  oxidative markers*, not as extra sulfide. The headline test asserts SO₂/A420/sotolon and
+  deliberately says so in its docstring.
+
+### Receipts
+- New `parameters/data/closure.yaml` — 6 OTR parameters (hermetic + technical cork + screwcap +
+  natural cork + Nomacorc + SupremeCorq), all **speculative** (each flattens a wide between-stopper
+  band to a point; natural cork's CV is 67 %/49 % across 593 bottles — real heterogeneity in the
+  bark, not measurement error), with a header documenting the sourcing chase, the burst/steady
+  split, the zero-order argument, the authors'-own-conversion decision and the ordering correction.
+- `core/media.py` — `closure_otr` VarSpec appended last to `wine_schema()` (D-100/D-102/D-133/D-134
+  convention, so every existing wine slot index is unchanged; wine schema **92 → 93**), plus the
+  `_CLOSURE_INGRESS_PROCESSES` tuple wired into wine only.
+- `core/kinetics/aging.py` — `ClosureOxygenIngress`, `touches = ("o2",)`, `reads = ()`.
+- `scenario/schema.py` — new top-level `closure: str | None` field (the `batch_volume_liters`
+  precedent: a dedicated field for something `initial: dict[str, float]` cannot express, since the
+  menu is a *name*).
+- `scenario/compile.py` — `_CLOSURES` menu + `_closure_otr()` lookup; seeding at the `iso_alpha`
+  call site; `closure.yaml` added to `shared_files`; `ClosureOxygenIngress` added to
+  `_AGING_GATED_PROCESSES`.
+- `tests/test_closure_ingress.py` — 29 new tests, most of them cross-checks against the primaries
+  rather than restatements of the code (published-rate reproduction per closure, the P2 band
+  cross-validation, the strict ordering, the technical-cork-below-screwcap guard, exact
+  isolability, time-invariance, the supply-limited claim, o2 non-negativity and boundedness over
+  5 years).
+- `tests/test_media.py` — the two predicted shared-registry breakages: slot enumeration
+  (`WINE_CLOSURE_SLOTS`, size 92 → 93) and process-name set (`WINE_CLOSURE_PROCESSES`).
+- Full suite green: `ruff check .`, `mypy` (111 files), `pytest -n auto` — **1323 passed, 86.0 s**.
+- Sourcing findings + both PDFs durable at `M:\claud_projects\temp\d136-closure-otr\`.
+
+### Next
+- **OTR(T)** — the temperature dependence, if a source ever reports one closure at two storage
+  temperatures. Would upgrade warm-storage output from a lower bound to a prediction.
+- **The bottling burst as a first-class object.** Currently an author-supplied `add_oxygen`; P1/P2
+  both quantify it per closure (first-month columns), so it *could* be a sourced auto-dose. Left
+  out deliberately to keep the D-133 line clean, not for lack of data.
+- **Closure-driven reduction** stays unmodellable: it needs D-135's de novo route (blocked at
+  source) or an O₂-coupled sulfide term, and D-135 records that any copper coupling must be
+  asymmetric between H₂S and MeSH.
+- **Unread and parked, nothing rests on them:** Diéval, Vidal & Aagaard 2011 (*Packaging Technol.
+  Sci.* 24:375-385, doi 10.1002/pts.945, Wiley-paywalled, ResearchGate stub only); Karbowiak et al.
+  2010 (a review); the 2026 *Science Advances* mechanism paper (doi 10.1126/sciadv.aed3023, HTTP
+  403) — the natural place a permeation `E_a` would be settled if it becomes readable.
+- **Bottle format** (magnum/half) is the other unexpressible axis; it needs a container volume the
+  engine deliberately does not have.
 - D-132's other deferred items (tail-acceleration, gluconolactone, MLF protein-protection) remain
   open, tracked under D-132/D-130/D-131.
