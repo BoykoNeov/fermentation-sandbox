@@ -157,6 +157,12 @@ WINE_DMS_SLOTS = ("dms_potential", "dms")
 # than defaulting to 0.
 WINE_BURST_ANTIOXIDANT_SLOTS = ("burst_antioxidant",)
 
+# The copper multiplier input (decision D-134), appended last (the D-100/D-102/D-133 convention).
+# A mean-centered catalytic boost on PhenolicBrowning's rate (Danilewicz 2007) — not a new sink,
+# just a multiplier input, off every ledger. Like burst_antioxidant, a GRAPE/must-composition
+# property seeded from `copper_typical` rather than defaulting to 0.
+WINE_COPPER_SLOTS = ("copper",)
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -184,6 +190,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_SPECIATED_AA_SLOTS
         + WINE_DMS_SLOTS
         + WINE_BURST_ANTIOXIDANT_SLOTS
+        + WINE_COPPER_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -247,7 +254,9 @@ def test_wine_schema_has_single_sugar_slot():
     # + 1 D-133 burst_antioxidant slot (the finite, unidentified, non-SO2 antioxidant pool that
     # produces Ferreira's day-1 O2-consumption spike — a GRAPE-composition input like
     # dms_potential, off every ledger).
-    assert schema.size == 89
+    # + 1 D-134 copper slot (a mean-centered multiplier input on PhenolicBrowning's rate — not a
+    # new sink, off every ledger, seeded from copper_typical like burst_antioxidant/dms_potential).
+    assert schema.size == 90
 
 
 def test_beer_schema_has_three_sequential_sugars():

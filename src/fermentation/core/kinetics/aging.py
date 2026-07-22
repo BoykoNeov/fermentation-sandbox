@@ -1389,6 +1389,29 @@ class PhenolicBrowning(Process):
     result — see :data:`aging.yaml`'s ``k_browning_phenolic`` provenance and D-133's separate
     antioxidant-pool scope, which must not reuse this driver).
 
+    **A mean-centered copper multiplier rides on top (D-134, Danilewicz 2007).** Ferreira's
+    own between-wine spread is **copper-driven**, not phenolic (D-133's territory) — but D-132's
+    ``k_browning_phenolic`` was ITSELF calibrated against 15 real wines that already contained
+    copper at an average 0.261 mg/L, so copper's *average* effect already rides inside the
+    0.58 mg/L/day anchor. A non-mean-centered copper term would double-count it. Instead::
+
+        f_copper = 1 + k_copper_multiplier · ([copper] − copper_typical)
+        k_browning_eff *= f_copper
+
+    ``f_copper == 1`` exactly when ``copper == copper_typical`` (the same Ferreira-dataset
+    average ``k_browning_phenolic`` is anchored at), so an un-overridden wine is **byte-for-byte**
+    the D-132/D-133 rate; only atypically high/low-copper wines deviate. Multiplies the *whole*
+    ``k_browning_eff`` (base + phenolic), not a separate additive term, because copper catalyses
+    the generic metal-driven O₂-activation step feeding phenol autoxidation broadly (Danilewicz's
+    mechanism), not a phenolic-substrate-specific one. Sourced from a **controlled model-wine
+    kinetics experiment** (Fe/Cu independently dosed), not a natural-wine survey — Ferreira 2015's
+    own Cu coefficient (and two follow-up Carrascón/Marrufo-Curtido papers') are each buried
+    un-extractably inside mean-centered multivariate PLS fits against co-predictors this sim
+    doesn't track; Danilewicz's controlled design sidesteps that collinearity. No iron state:
+    Ferreira found iron **not** rate-limiting in real wine (always in surplus), so a variable
+    iron input would be inert in the realistic regime — see :data:`aging.yaml`'s
+    ``k_copper_multiplier`` provenance for the full sourcing chase and the digitization method.
+
     **First-order in ``[o2]`` — re-confirmed, not replaced, at the D-132 revisit.** Ferreira's
     own *within-cycle* diagnostic (Ln[O₂] vs. time, the standard first-order test) shows the
     bulk of a saturation cycle **is** locally first-order; the "cumulative uptake looks linear
@@ -1448,9 +1471,12 @@ class PhenolicBrowning(Process):
     purely *reductive* aging — unchanged by this Process. At zero grape phenolics (a white or beer
     run, or a red before the D-79 must inputs are dosed) ``k_browning_eff`` is byte-for-byte
     ``k_browning_base`` — the pre-D-132 rate — another isolability guard (the D-129/D-131 GATE-1
-    pattern). Tier **speculative** (the aging axis is the Tier-3 frontier; the browning *form* —
-    O₂-limited, warmer-faster, phenolic-driven — is sourced, the rate and per-O₂ absorbance yield
-    are order-of-magnitude estimates).
+    pattern). At ``copper == copper_typical`` (an un-overridden wine's default, D-134)
+    ``f_copper == 1`` exactly, so the D-132/D-133 rate is unchanged; absent from beer's schema,
+    ``f_copper`` stays 1 there too (the same guard idiom as tannin/anthocyanin). Tier
+    **speculative** (the aging axis is the Tier-3 frontier; the browning *form* — O₂-limited,
+    warmer-faster, phenolic-driven, copper-catalysed — is sourced, the rate and per-O₂ absorbance
+    yield are order-of-magnitude estimates).
     """
 
     name = "phenolic_browning"
@@ -1465,12 +1491,17 @@ class PhenolicBrowning(Process):
     #: ``k_browning_base``/``k_browning_phenolic``/``E_a_browning``/``y_a420_per_o2`` are this
     #: Process's own (aging.yaml, D-74/D-132); ``T_ref`` is shared with every Arrhenius rate. Tiers
     #: cap the ``o2``/``A420`` output tiers via parameter-tier propagation (D-1).
+    #: ``copper_typical``/``k_copper_multiplier`` (D-134) are this Process's own too;
+    #: ``tannin``/``anthocyanin``/``copper`` are read-only state, like ``T``, so they are not
+    #: part of ``touches``.
     reads: tuple[str, ...] = (
         "k_browning_base",
         "k_browning_phenolic",
         "E_a_browning",
         "y_a420_per_o2",
         "T_ref",
+        "copper_typical",
+        "k_copper_multiplier",
     )
 
     def derivatives(
@@ -1497,10 +1528,24 @@ class PhenolicBrowning(Process):
         k_browning_eff = params["k_browning_base"] + params["k_browning_phenolic"] * (
             tannin + anthocyanin
         )
+        # D-134: copper catalyses the metal-driven O2-activation step feeding phenol autoxidation
+        # (Danilewicz 2007), so it multiplies the WHOLE k_browning_eff rather than adding another
+        # term. MEAN-CENTERED on copper_typical (the same real-wine level D-132's phenolic-boost
+        # coefficient is already implicitly calibrated at) so a wine at copper_typical is
+        # byte-for-byte the D-132/D-133 rate — f_copper == 1 exactly there, not merely close.
+        # Guarded (not gated) like tannin/anthocyanin: absent from beer's schema, f_copper stays 1
+        # (beer keeps the unboosted D-132 rate). ``max(0.0, ...)`` guards the same solver-undershoot
+        # / pathological-low-copper case as the tannin/anthocyanin reads above.
+        copper = max(0.0, float(y[schema.slice("copper")][0])) if "copper" in schema else None
+        f_copper = (
+            max(0.0, 1.0 + params["k_copper_multiplier"] * (copper - params["copper_typical"]))
+            if copper is not None
+            else 1.0
+        )
         # This route's SHARE of the O₂-depletion rate (the larger, dominant share — D-74),
         # first-order
         # in o2 like the ethanol route; ProcessSet sums the sinks so the pool depletes once.
-        r_o2 = k_browning_eff * f_t * o2  # g O2/L/h consumed by the browning route
+        r_o2 = k_browning_eff * f_copper * f_t * o2  # g O2/L/h consumed by the browning route
         d[schema.slice("o2")] = -r_o2  # this route's O₂ share is consumed (off every ledger)
         # Every mol O₂ this route consumes raises the A420 absorbance index by y_a420_per_o2 (AU per
         # mol O₂/L). moles O₂ = r_o2 / M_O2. A420 is an optical index (off every ledger), not a

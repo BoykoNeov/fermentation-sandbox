@@ -13418,3 +13418,160 @@ d(burst_antioxidant)/dt = -y_burst_per_o2 · r_o2
 ### Next
 - None outstanding for D-133 itself. D-132's other deferred items (tail-acceleration, gluconolactone,
   MLF protein-protection) remain open, tracked under D-132/D-130/D-131.
+
+## D-134 — copper-dependence of the O2-consumption rate: a mean-centered `f(Cu)` multiplier on
+`PhenolicBrowning`'s rate, sourced from a controlled model-wine kinetics experiment after three
+natural-wine PLS surveys turned out to bury copper un-extractably in collinear multivariate fits
+
+Owner picked "copper-dependence" off the D-132/D-133 follow-up menu (2026-07-22 session, same day as
+D-132/D-133). The sourcing chase and the design fork it forced are both part of the record — this
+decision is as much about *how* a plausible-looking source turned out to be unusable, twice, before
+a genuinely usable one was found, as it is about the final multiplier.
+
+### The sourcing chase — three surveys blocked, one controlled experiment worked
+Advisor was consulted before any build (per the batch-end/advisor discipline) and immediately flagged
+that Ferreira 2015's own Cu coefficient (Table 4, initial-rate PLS model: `+0.311 Cu`) is not
+separable: the model's intercept (4.05) is within noise of the measured mean initial rate (3.82,
+Table 2), meaning the predictors are mean-centered, so the equation is only valid evaluated as a
+whole — lifting `+0.311·Cu` out while ignoring the co-predictors (gallic acid, ellagic acid, TPI,
+petunidin...) it was fit alongside repeats the "denominators don't transplant" mistake logged from
+the Minebois/D-119 episode. Advisor's recommendation: don't build from Ferreira; chase the book-sweep's
+Vivas 2002 lead (`M:\claud_projects\temp\ferment\_findings\D-127`'s FUTURE-oxidation note) or drop it.
+
+**Vivas 2002 — dead end.** `Vivas, N. (2002) Les oxydations et les réductions dans les moûts et les
+vins, Éditions Féret, Bordeaux` is a French-language specialty oenology monograph sold only as a
+physical book (Fnac/Decitre/Amazon.fr, no ebook edition found); the one place citing it with any
+specificity (`Hyphenated Techniques in Grape and Wine Chemistry`, local corpus) gives only a
+qualitative mention, no extractable number.
+
+**Two more Ferreira-lab papers found via web search — SAME blocker, now confirmed structural, not a
+one-paper accident.** Carrascón, Bueno, Fernandez-Zurbano & Ferreira (JAFC, open PDF at
+`zaguan.unizar.es/record/75373`, "Oxygen and SO2 consumption rates in white and rosé wines") gives
+Table 3 PLS models (5/20/30-day OCR, each `= <mean> + <2-3 flavonol/cinnamic-acid terms> + <0.09-0.17
+Cu>`) whose intercepts again equal the measured mean OCR to the decimal — mean-centered again, same
+extraction trap, different co-predictors (quercetin/kaempferol glycosides, cinnamic acids) this sim
+does not track. Carrascón, Vallverdú-Queralt, Meudec, Sommerer, Fernandez-Zurbano & Ferreira (Food
+Chem. 2018, open PDF at `zaguan.unizar.es/record/78067`, "The kinetics of oxygen and SO2 consumption
+by red wines") gives a THIRD independent PLS model (Table 4 model 1: `Initial rate = 4.560 − 0.766
+Acetaldehyde − 0.469 Gallic acid − 0.475 Catechin terminal + 0.195 A620 + 0.310 Epigallocatechin +
+0.306 Cu`, intercept 4.560 = the measured mean exactly) — same trap a third time, on an independent
+8-wine dataset, with a Cu coefficient (0.306) suspiciously close to Ferreira 2015's own 0.311. Across
+three independent wine surveys from the same lab, copper's OCR effect has never been published in
+isolation — always one term inside a mean-centered multivariate fit against co-predictors this model
+doesn't carry. This is now a property of how the whole research program reports the finding, not an
+extraction failure specific to one paper. Findings durable at
+`M:\claud_projects\temp\ferment\_findings\D-134-copper-ocr-sourcing.md`.
+
+**Danilewicz 2007 — the one that worked, because it's a controlled experiment, not a survey.**
+`Danilewicz, J.C. (2007), 'Interaction of Sulfur Dioxide, Polyphenols, and Oxygen in a Wine-Model
+System: Central Role of Iron and Copper', Am. J. Enol. Vitic. 58(1):53-60` (open full text,
+ajevonline.org) independently DOSES Fe and Cu in a model-wine system rather than surveying them as
+natural covariates — sidestepping the collinearity problem entirely. Figure 4 (SO2-reduction-vs-time
+curves at Fe=5 mg/L fixed — wine-realistic — Cu=0.05/0.15/0.5 mg/L) gives a genuinely isolable
+Cu-at-fixed-Fe slope, though only as a graph (no fitted rate constants are printed in the text).
+
+### The design fork — advisor caught a double-counting error before any code was written
+The owner's first pick, once Danilewicz was in hand, was to digitize Figure 4 and build BOTH a copper
+AND an iron state with a synergistic Fe×Cu term (mirroring the paper's own headline finding: "the two
+metals together produced a far greater rate increase than the sum of rates observed when they were
+tested singly"). Advisor, consulted again before implementation, caught two problems:
+
+1. **Double-counting.** D-132's `k_browning_phenolic` was calibrated against Ferreira's 15 real wines,
+   which already contained copper (Table 1: 0.168-0.679 mg/L, mean 0.261). Copper's AVERAGE catalytic
+   effect is therefore already baked into the 0.58 mg/L/day anchor; an added, non-mean-centered Cu
+   term would double-count it and break the D-132/D-133 calibration plus every aging test pinned to
+   that number.
+2. **An inert iron knob.** Ferreira 2015 (the SAME dataset D-132 anchors on) explicitly found iron
+   NOT rate-limiting in real wine ("iron was not found to be a limiting factor... even in the normal
+   to low range") — it is always in surplus, so a variable iron input would be inert in the realistic
+   regime (the inverse of the D-112/D-119 "rate knob on a supply-limited quantity" lesson: iron is in
+   surplus, not supply-limited, so a knob on it does nothing). Danilewicz's Fe=0 curves are an
+   artificial deficiency real wine never has.
+
+**Reframed, smaller design (owner-approved after the advisor catch):** a single copper state, no iron
+state, a MEAN-CENTERED multiplier rather than a new additive sink or a cloned burst-pool.
+
+### Design — `f(Cu)` multiplies the whole D-132 rate, mean-centered at Ferreira's own dataset average
+```
+f_copper = 1 + k_copper_multiplier * (copper - copper_typical)
+k_browning_eff = (k_browning_base + k_browning_phenolic * (tannin + anthocyanin)) * f_copper   # D-134 * D-132
+```
+- **New wine-only state** `copper` (g/L). UNLIKE `burst_antioxidant`/`dms_potential`, 0 is NOT this
+  pool's neutral value (it multiplies, not adds), so the structural `VarSpec` default is set EQUAL
+  to `copper_typical` (2.6e-4 g/L) rather than 0 — the D-45 hard-zero defect would otherwise silently
+  apply a wrong ~0.5x multiplier to any bare `wine_schema().pack()` construction (unit tests, or
+  future scenario code bypassing `_wine_initial`), not merely leave the multiplier at its no-op
+  value. `_wine_initial` still explicitly re-derives the same value from `copper_typical` for the
+  compile pipeline (redundant by design: the compile-time seeding tracks the YAML parameter if it
+  ever moves; the VarSpec literal is only the structural fallback for code that never calls
+  `_wine_initial`). Scenarios override via `copper_gpl` (the `tannin_gpl`/`burst_antioxidant_gpl`
+  pattern).
+- **`copper_typical` = 2.6e-4 g/L (0.261 mg/L)** — Ferreira 2015's OWN 15-red-wine average (Table 1),
+  the SAME dataset `k_browning_phenolic` is calibrated against, chosen over an independent central
+  estimate specifically so a default-copper wine reproduces the D-132/D-133 rate EXACTLY, not
+  approximately. Corroborated by Danilewicz's cited "mean free/labile Cu ~0.3 mg/L" (Wiese & Schwedt
+  1997) and by the Carrascón white/rosé dataset (0.140-0.345 mg/L).
+- **`k_copper_multiplier` = 2000 L/g**, digitized by eye from Danilewicz Figure 4's f/g curves
+  (Cu=0.15/0.5 mg/L at Fe=5 mg/L, bracketing Ferreira's real-wine Cu range — the steeper low-Cu
+  behaviour in curve e, Cu=0.05, sits below real wine's range and is deliberately not used, since the
+  paper's own text says iron-redox-cycling becomes rate-limiting at higher Cu, i.e. the true
+  dependence saturates and a LOCAL linear read near `copper_typical` is the honest scope). Wide
+  uncertainty band (600-5000 L/g): checked that Ferreira's real-wine Cu extremes (0.168/0.679 mg/L)
+  stay positive at both band edges (no runaway or sign-flip across the sourced range).
+- **Why the ratio design sidesteps the SO2-to-O2 translation problem.** Danilewicz measures
+  SO2-consumption (a downstream H2O2-scavenging proxy), not O2-consumption directly, and real
+  measured SO2:O2 molar ratios vary enormously (0.3-2.7, Ferreira/Carrascón's own data) — but because
+  `k_copper_multiplier` is a RATIO (`rate(Cu)/rate(copper_typical)`), any FIXED conversion factor
+  between the two cancels exactly, leaving only the graph-digitization uncertainty as the real,
+  load-bearing limitation rather than compounding it with stoichiometric-translation uncertainty too.
+- **Multiplies the WHOLE `k_browning_eff` (base + phenolic), not a separate additive term** — copper
+  catalyses the generic metal-driven O2-activation step feeding phenol autoxidation broadly
+  (Danilewicz's mechanism: Cu facilitates Fe(II)/Fe(III) redox cycling, accelerating H2O2 production
+  upstream of whichever phenolic substrate then gets oxidised), not a phenolic-substrate-specific
+  step, so scoping it to just the phenolic term would be an arbitrary restriction the mechanism
+  doesn't support.
+- **Does NOT touch `k_ethanol_oxidation`** (the D-132 browning-side-only restraint, extended: nothing
+  sources how copper's boost should split between the ethanol-oxidation and browning routes any more
+  than the phenolic boost did — the same "acetaldehyde may be under-produced" caveat now covers
+  copper too).
+- **Does NOT touch `AntioxidantBurstOxidation`/`burst_antioxidant_initial`** — D-133's pool already
+  implicitly carries copper-driven BETWEEN-WINE VARIANCE on the day-1-burst axis as an untracked-Cu
+  proxy; this multiplier is scoped to the D-132 STEADY rate only, so the two do not double-count each
+  other.
+- **Isolable (GATE-1, mean-centered):** at `copper == copper_typical` (an un-overridden wine's
+  default), `f_copper == 1` exactly — byte-for-byte the D-132/D-133 rate. Absent from beer's schema,
+  guarded like tannin/anthocyanin (`f_copper` stays 1, beer keeps the unboosted rate). Clamped at
+  `f_copper >= 0` in-Process (the tannin/anthocyanin `max(0.0, ...)` precedent) — unreachable at the
+  shipped central `k_copper_multiplier` (copper is already floored at >=0, and `1 -
+  2000*2.6e-4 = 0.48 > 0`), but genuinely bites at the high end of the parameter's own uncertainty
+  band (5000 L/g gives `1 - 5000*2.6e-4 = -0.3` at copper=0) — confirmed by a dedicated test using an
+  inflated `k_copper_multiplier`, so the clamp is verified, not dead code.
+
+### Receipts
+- `parameters/data/aging.yaml` — new `copper_typical` / `k_copper_multiplier` blocks (full `Parameter`
+  provenance: Ferreira 2015 Table 1 for the typical value, Danilewicz 2007 Figure 4 for the
+  multiplier slope, both speculative), plus a header block documenting the sourcing chase and the
+  advisor-caught design fork so it is not re-litigated from scratch.
+- `core/media.py` — new `copper` `VarSpec` in `wine_schema()`, default deliberately `2.6e-4` (not 0 —
+  see the isolability discussion above), appended last (D-100/D-102/D-133 convention).
+- `core/kinetics/aging.py` — `PhenolicBrowning`: docstring rewritten for D-134 (the mean-centering
+  argument, the sourcing-chase summary, the no-iron-state reasoning); `reads` gains
+  `copper_typical`/`k_copper_multiplier`; `derivatives` computes `f_copper` from a guarded, clamped
+  `copper` read and multiplies the existing `k_browning_eff` by it before computing `r_o2`.
+- `scenario/compile.py` — `copper_gpl` added to the wine `_ALLOWED_KEYS`; `copper` seeded in
+  `_wine_initial` via the `burst_antioxidant`-precedent fallback (defaults to `copper_typical`, not
+  0); `copper_typical`/`k_copper_multiplier` added to the `begin_aging` param-presence guard tuple.
+- `tests/test_aging.py` — `test_browning_metadata`'s `reads` set updated; 6 new tests: closed-form
+  match, isolability at `copper_typical`, monotone rise with copper, guarded absence on beer, stays
+  positive (not clamped) at the shipped magnitude, and the clamp genuinely firing at an inflated
+  `k_copper_multiplier` (so the guard is verified, not untested dead code).
+- `tests/test_media.py` — `WINE_COPPER_SLOTS` constant; schema-names tuple and `schema.size` (89 → 90)
+  updated.
+- Full suite green: `ruff check .`, `mypy` (109 files), `pytest -n auto` (1278 passed, 91.0s).
+
+### Next
+- None outstanding for D-134 itself. The Danilewicz-sourced slope is an honest, wide-banded,
+  graph-digitized estimate — a cleaner fit (a printed table, not a chart) would be the natural
+  follow-on if one is ever found, but is not chased here. D-132's other deferred items
+  (tail-acceleration, gluconolactone, MLF protein-protection) remain open, tracked under
+  D-132/D-130/D-131.

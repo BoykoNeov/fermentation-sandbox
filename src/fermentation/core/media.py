@@ -1054,6 +1054,32 @@ def wine_schema() -> StateSchema:
             "and so2_total by construction. Default 0 ⇒ an un-seeded/older ParameterSet compiles "
             "inertly (byte-for-byte the pre-D-133 case)",
         ),
+        # The D-134 copper multiplier input, appended LAST so existing wine slot indices are
+        # unchanged (the D-100/D-102/D-133 convention). A mean-centered catalytic boost on
+        # PhenolicBrowning's rate (Danilewicz 2007: copper markedly accelerates the metal-catalysed
+        # O2-activation step upstream of phenol autoxidation) — NOT a new sink, just a multiplier
+        # read by PhenolicBrowning, so it touches no ledger and moves nothing conserved.
+        VarSpec(
+            "copper",
+            "g/L",
+            default=2.6e-4,
+            description="dissolved copper (decision D-134) — a GRAPE/must-composition property "
+            "(like dms_potential/burst_antioxidant). UNLIKE those two, 0 is NOT this pool's "
+            "neutral value: it multiplies (not adds to) PhenolicBrowning's rate, and the "
+            "multiplier's neutral point is copper_typical (2.6e-4 g/L = 0.261 mg/L, the same "
+            "Ferreira-2015-dataset average k_browning_phenolic is calibrated at), not 0. So the "
+            "structural VarSpec default is deliberately set EQUAL to copper_typical, not 0 — the "
+            "D-45 hard-zero defect would otherwise silently apply a wrong ~0.5x multiplier to "
+            "every bare `wine_schema().pack()` construction (unit tests, or any future scenario "
+            "code bypassing `_wine_initial`), not merely leave the multiplier at its no-op value. "
+            "`_wine_initial` still explicitly re-derives the same value from the sourced "
+            "copper_typical parameter (redundant by design: the compile-time seeding is the "
+            "authoritative source, tracking the YAML parameter if it ever moves; this literal is "
+            "only the structural fallback for code that never calls `_wine_initial`). Read "
+            "(never written) by PhenolicBrowning's f(Cu) multiplier; at copper == copper_typical "
+            "the multiplier is exactly 1, byte-for-byte the D-132/D-133 calibrated rate. Off "
+            "every ledger (a trace metal, not an organic pool)",
+        ),
     ]
     return StateSchema(specs)
 

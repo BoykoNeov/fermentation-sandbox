@@ -654,6 +654,73 @@ y_a420_per_o2:
     conditions: "AU of A420 (dimensionless absorbance, 1 cm path) per mol O2 consumed by the browning route, generic wine/beer at T_ref = 293.15 K. Beer browning (oxidative staling darkening) is the same o-diphenol autoxidation, less dominant than in white wine; the same coefficient is used medium-agnostically as an order-of-magnitude stand-in."
     notes: "SPECULATIVE magnitude (the most speculative parameter in this file -- an order-of-magnitude author estimate for an untabulated quantity, banded an order of magnitude). The load-bearing claim is only that oxidative aging produces VISIBLE, monotonic browning (A420 climbs with O2 exposure) -- not the exact absorbance. A420 is an optical index off every ledger, so this yield moves nothing conserved (the pigment's carbon comes from an untracked phenol pool -- sidestepped by using an absorbance, not a mass)."
 
+# -- COPPER MULTIPLIER: a mean-centered catalytic boost on the browning rate (decision D-134) ------
+# f(Cu) = 1 + k_copper_multiplier * (copper - copper_typical), multiplying k_browning_eff (the WHOLE
+# D-132 base+phenolic sum, since copper catalyses the generic O2-activation step upstream of which
+# phenolic substrate gets oxidised, not a phenolic-specific mechanism). MEAN-CENTERED so a wine at
+# copper_typical is byte-for-byte unchanged from D-132/D-133 (f(copper_typical) = 1 exactly) --
+# D-132's k_browning_phenolic was ITSELF calibrated against Ferreira's 15 real wines, which already
+# contained copper (Table 1: 0.168-0.679 mg/L) at an average of 0.261 mg/L, so copper's AVERAGE
+# catalytic effect is already baked into the 0.58 mg/L/day anchor. A non-mean-centered term would
+# double-count it and break the D-132/D-133 calibration plus every aging test pinned to that number
+# (advisor-caught fork, 2026-07-22 build session: the owner's first design -- two new states, copper
+# AND iron, with a synergistic Fe*Cu term cloning D-133's exhausting-pool shape -- was rejected for
+# this smaller, correctness-fixed one before any code was written).
+#
+# NO IRON STATE: Ferreira 2015 (the SAME dataset D-132 anchors on) explicitly found iron NOT
+# rate-limiting in real wine ("iron was not found to be a limiting factor even if the iron levels...
+# were in the normal to low range") -- it is always in surplus, so a variable iron input would be
+# INERT in the realistic regime (the inverse of the D-112/D-119 "rate knob on a supply-limited
+# quantity" lesson -- iron is in surplus, not supply-limited, so a knob on it does nothing). Danilewicz
+# 2007's Fe=0 curves are an artificial deficiency real wine never has.
+#
+# SOURCE OF THE SLOPE: Danilewicz, J.C. (2007), 'Interaction of Sulfur Dioxide, Polyphenols, and
+# Oxygen in a Wine-Model System: Central Role of Iron and Copper', Am. J. Enol. Vitic. 58(1):53-60 --
+# a CONTROLLED model-wine kinetics experiment (independently dosed Fe/Cu), not a natural-wine survey,
+# so it sidesteps the collinearity problem that blocks Ferreira 2015's OWN PLS-model Cu coefficient
+# (0.311, Table 4) and the two Carrascon/Marrufo-Curtido follow-up papers' Cu coefficients (0.306 red,
+# 0.089-0.172 white/rose) -- all THREE are un-extractable single terms inside mean-centered
+# multivariate fits against co-predictors (gallic acid, epigallocatechin, quercetin/kaempferol
+# glycosides...) this sim does not track; see the D-134 DECISIONS.md entry and
+# `M:\claud_projects\temp\ferment\_findings\D-134-copper-ocr-sourcing.md` for the full sourcing chase.
+# Danilewicz Figure 4 (SO2-reduction-vs-time curves at Fe=5 mg/L fixed -- wine-realistic -- Cu =
+# 0.05/0.15/0.5 mg/L) gives a genuinely isolable Cu-at-fixed-Fe slope, DIGITIZED BY EYE (no fitted
+# rate constants are printed in the paper's text): curves f (Cu=0.15) and g (Cu=0.5) reach a common
+# -20 mg/L SO2-reduction milestone at approximately t=22-25h and t=12-15h respectively; using
+# 1/time-to-milestone as a rate proxy gives rate(g)/rate(f) ~ 2.1 over that Cu range. The steeper
+# low-Cu behaviour visible in curve e (Cu=0.05, below real wine's range) is NOT used -- real wine Cu
+# (Ferreira's 15-wine range 0.168-0.679 mg/L) sits inside the f-to-g bracket, so that is the locally
+# relevant segment (the paper's own text: iron-catalysed redox cycling becomes rate-limiting at
+# higher Cu, so the true form saturates -- a local linear read near copper_typical is the honest
+# scope, not a global fit).
+#
+# WHY THE RATIO SIDESTEPS THE SO2-TO-O2 TRANSLATION PROBLEM: Danilewicz measures SO2-consumption
+# (a downstream H2O2-scavenging proxy for the underlying O2-activation rate), not O2-consumption
+# directly, and real measured SO2:O2 molar ratios vary enormously (0.3-2.7 per Ferreira/Carrascon's
+# own data) -- BUT k_copper_multiplier is a RATIO (rate(Cu)/rate(copper_typical)), so any FIXED
+# SO2-to-O2 conversion factor cancels exactly, leaving only the graph-digitization uncertainty (the
+# real, load-bearing limitation) rather than compounding it with stoichiometric-translation
+# uncertainty too.
+copper_typical:
+  value: 2.6e-4
+  unit: "g/L"   # 0.261 mg/L; the copper level D-132's k_browning_phenolic calibration is implicitly anchored at
+  tier: speculative
+  uncertainty: { low: 1.7e-4, high: 6.8e-4, note: "Ferreira 2015's own 15-red-wine range (Table 1: 0.168-0.679 mg/L), the SAME dataset D-132's phenolic-boost coefficient is calibrated against, so the central value is that dataset's own mean (0.261 mg/L) rather than a round number. Corroborated by Danilewicz 2007's cited 'mean free/labile Cu ~0.3 mg/L' (Wiese & Schwedt 1997) and by Carrascon et al.'s white/rose dataset (Cu 0.140-0.345 mg/L) -- consistent order of magnitude across three independent surveys." }
+  provenance:
+    source: "Marrufo-Curtido, Ferreira & Escudero (2015), J. Agric. Food Chem. -- Table 1, Cu column across the same 15 red wines D-132's k_browning_phenolic is calibrated against. Mean = 0.261 mg/L (own calculation from the 15 listed values)."
+    conditions: "generic red wine; the copper level at which the D-134 multiplier f(Cu) = 1 exactly, i.e. byte-for-byte the D-132/D-133 calibrated rate."
+    notes: "D-134. Chosen to be the SAME dataset D-132 already calibrated k_browning_phenolic against (not an independent central estimate) so that a run at this default copper level reproduces the D-132/D-133 anchor EXACTLY, not approximately -- the mean-centering that makes the whole multiplier design isolable. A run that never overrides `copper_gpl` seeds copper to this value (the dms_potential/burst_antioxidant precedent: copper is a grape-composition property, not a winemaking dose, so it does NOT default to 0)."
+
+k_copper_multiplier:
+  value: 2000.0
+  unit: "L/g"   # f(Cu) = 1 + k_copper_multiplier * (copper[g/L] - copper_typical[g/L])
+  tier: speculative
+  uncertainty: { low: 600.0, high: 5000.0, note: "graph-digitized from Danilewicz 2007 Figure 4 (see the block header above) -- a genuinely wide band, since the source is a by-eye read of a printed curve (no fitted rate constants given in the text) local-linearized from a visibly saturating (Fe-redox-cycling-limited) underlying dependence. At the band edges, Ferreira's real-wine Cu extremes (0.168/0.679 mg/L) still give a POSITIVE multiplier (checked: low end 600 => f(0.168)=0.94/f(0.679)=1.25; high end 5000 => f(0.168)=0.53/f(0.679)=2.09) -- no runaway or sign-flip across the sourced real-wine range at either edge." }
+  provenance:
+    source: "Danilewicz (2007), Am. J. Enol. Vitic. 58(1):53-60, Figure 4 -- SO2-reduction-vs-time curves at Fe=5 mg/L (wine-realistic) fixed, Cu=0.05/0.15/0.5 mg/L (curves e/f/g). Digitized by eye (approximate -20 mg/L SO2-reduction milestone times), NOT read off a table -- the paper reports no fitted rate constants for these curves, only the qualitative 'markedly influenced by copper concentration' + Figure 4 itself. Local slope from curves f/g (Cu=0.15/0.5, bracketing Ferreira's real-wine Cu range) ~ 2.0-2.1 per mg/L, i.e. ~2000 L/g."
+    conditions: "the LOCAL slope of the O2-activation-rate-vs-copper dependence near copper_typical, in a model-wine system with Fe fixed at a wine-realistic 5 mg/L and a catechol proxy (4-methylcatechol, 1.2 g/L, simulating a high-polyphenol red) present. Applied as a multiplier on k_browning_eff (D-132's whole base+phenolic sum), not a separate additive rate, since copper catalyses the generic O2-activation step feeding phenol autoxidation broadly, not a phenolic-substrate-specific step."
+    notes: "D-134. Does NOT touch k_ethanol_oxidation (the D-132 browning-side-only restraint, extended: nothing sources how copper's boost should split between the ethanol-oxidation and browning routes any more than the phenolic boost did -- see PhenolicBrowning's docstring for the shared caveat). Does NOT touch AntioxidantBurstOxidation/burst_antioxidant_initial (D-133's pool ALREADY implicitly carries copper-driven BETWEEN-WINE VARIANCE on the day-1-burst axis as an untracked-Cu proxy; this multiplier is scoped to the D-132 STEADY rate only, so the two do not double-count each other). MEAN-CENTERED BY DESIGN (the D-132/D-133 double-counting trap, reapplied): f(copper_typical) = 1 exactly, so an un-overridden wine (copper defaults to copper_typical) reproduces the D-132/D-133 calibration byte-for-byte; only atypically high/low-copper wines deviate. Clamped at f >= 0 in-Process (a solver-undershoot / pathological-low-copper guard, the tannin/anthocyanin max(0,...) precedent) since a raw linear extrapolation could in principle go negative far outside the sourced Cu range."
+
 # ======================================================================================
 # INITIAL-BURST ANTIOXIDANT POOL (decision D-133): a finite, fast-reacting non-SO2 antioxidant
 # producing the Ferreira 2015 day-1 O2-consumption spike, ON TOP of (never inside) the D-132

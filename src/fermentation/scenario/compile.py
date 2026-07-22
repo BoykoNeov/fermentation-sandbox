@@ -399,6 +399,14 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             # Ferreira found >15x between-wine spread (Cu-driven, untracked here). Explicit 0 is
             # still honoured, and makes the Process byte-for-byte inert.
             "burst_antioxidant_gpl",
+            # Dissolved copper in g/L-equivalent mg/L input (decision D-134) — the mean-centered
+            # multiplier PhenolicBrowning reads. Like dms_potential_ugl/burst_antioxidant_gpl,
+            # absent does NOT mean 0: it falls back to the sourced copper_typical, because copper
+            # is a property every must/wine carries rather than a winemaking dose (a 0 default
+            # would understate a typical wine's browning rate, not merely leave the multiplier
+            # isolable at zero). Scenarios SHOULD override it to explore atypical copper wines;
+            # explicit 0 is still honoured (an explicit, documented deviation, not silent).
+            "copper_gpl",
         }
     ),
     "beer": frozenset(
@@ -616,6 +624,19 @@ def _wine_initial(
                 if "burst_antioxidant_initial" in parameters
                 else 0.0
             ),
+        ),
+        # Dissolved copper (decision D-134), g/L. Like burst_antioxidant/dms_potential, this is NOT
+        # a winemaking dose but a must-composition property every wine carries — so it does NOT
+        # default to 0: it falls back to the sourced copper_typical, the SAME level D-132's
+        # k_browning_phenolic is implicitly calibrated at (so an un-overridden wine reproduces the
+        # D-132/D-133 rate byte-for-byte via PhenolicBrowning's mean-centered f(Cu) = 1). Scenarios
+        # override via `copper_gpl` to explore atypical-copper wines. Absent from the ParameterSet
+        # ⇒ 0.0 (an un-seeded/older ParameterSet compiles, but is NOT byte-for-byte D-132 — see
+        # the `copper` VarSpec docstring).
+        "copper": _optional(
+            values,
+            "copper_gpl",
+            parameters["copper_typical"].value if "copper_typical" in parameters else 0.0,
         ),
     }
     if "initial_ph" in values:
@@ -1865,6 +1886,11 @@ def _verb_begin_aging(
         "k_browning_phenolic",
         "E_a_browning",
         "y_a420_per_o2",
+        # Copper multiplier on the browning rate (D-134): a mean-centered f(Cu) boost, guarded
+        # before reading in-Process (like the tannin/anthocyanin phenolic-boost reads), so these
+        # can never be missing-when-needed in practice; guarded here for parity.
+        "copper_typical",
+        "k_copper_multiplier",
         # Initial-burst antioxidant pool (D-133): the finite, fast-reacting non-SO2 sink that
         # produces Ferreira's day-1 O2-consumption spike. Substrate-gated on burst_antioxidant
         # (guarded before reading params in-Process, like Strecker/EllagitanninOxidation), so these

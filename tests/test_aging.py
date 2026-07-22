@@ -1349,6 +1349,8 @@ def test_browning_metadata():
         "E_a_browning",
         "y_a420_per_o2",
         "T_ref",
+        "copper_typical",
+        "k_copper_multiplier",
     }
 
 
@@ -1445,6 +1447,115 @@ def test_browning_phenolic_boost_absent_on_beer(params):
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
     r_o2 = params["k_browning_base"] * f_t * o2
     assert beer.get(d, "o2") == pytest.approx(-r_o2)
+
+
+def test_browning_copper_multiplier_matches_closed_form(params):
+    # D-134: f_copper = 1 + k_copper_multiplier * (copper - copper_typical), multiplying the WHOLE
+    # k_browning_eff (base + phenolic), not a separate additive term — copper catalyses the
+    # generic O2-activation step feeding phenol autoxidation broadly (Danilewicz 2007).
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    tannin, anthocyanin = 2.0, 0.3
+    copper = 5.0e-4  # above copper_typical (2.6e-4) -> a faster-than-typical wine
+    y = _aged_wine(
+        schema, ester=0.0, t=t, o2=o2, tannin=tannin, anthocyanin=anthocyanin, copper=copper
+    )
+    d = PhenolicBrowning().derivatives(0.0, y, schema, params)
+    f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
+    k_eff = params["k_browning_base"] + params["k_browning_phenolic"] * (tannin + anthocyanin)
+    f_copper = 1.0 + params["k_copper_multiplier"] * (copper - params["copper_typical"])
+    assert f_copper > 1.0  # sanity: this dose is above copper_typical
+    r_o2 = k_eff * f_copper * f_t * o2
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
+
+
+def test_browning_copper_multiplier_isolable_at_typical_copper(params):
+    # MEAN-CENTERED isolability (D-134's whole design point): explicitly dosing copper at
+    # copper_typical is byte-for-byte the case without the copper multiplier at all (f_copper == 1
+    # exactly) — an un-overridden wine reproduces the D-132/D-133 calibrated rate, not merely an
+    # approximation of it.
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    typical = PhenolicBrowning().derivatives(
+        0.0,
+        _aged_wine(schema, ester=0.0, t=t, o2=o2, copper=params["copper_typical"]),
+        schema,
+        params,
+    )
+    baseline = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2), schema, params
+    )
+    assert np.array_equal(typical, baseline)
+
+
+def test_browning_copper_multiplier_rises_with_copper(params):
+    # Monotone in copper (the D-134 sourced ordering — more copper, faster O2 uptake, Danilewicz
+    # 2007's "markedly influenced by copper concentration").
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    low = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, copper=1.7e-4), schema, params
+    )
+    high = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, copper=6.8e-4), schema, params
+    )
+    assert -schema.get(high, "o2") > -schema.get(low, "o2") > 0.0
+    assert schema.get(high, "A420") > schema.get(low, "A420") > 0.0
+
+
+def test_browning_copper_multiplier_absent_on_beer(params):
+    # `copper` is a wine-only must-input slot, absent from beer's schema. The Process guards its
+    # absence rather than gating the whole run (the tannin/anthocyanin precedent): beer still
+    # browns, at the un-multiplied (f_copper = 1) rate.
+    beer = beer_schema()
+    assert "copper" not in beer
+    o2, t = 0.03, 298.15
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": t, "CO2": 0.0})
+    yb[beer.slice("o2")] = o2
+    d = PhenolicBrowning().derivatives(0.0, yb, beer, params)
+    f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
+    r_o2 = params["k_browning_base"] * f_t * o2
+    assert beer.get(d, "o2") == pytest.approx(-r_o2)
+
+
+def test_browning_copper_multiplier_stays_positive_at_zero_copper(params):
+    # At the current central k_copper_multiplier, zero copper (f_copper = 1 - k*copper_typical =
+    # 0.48 with the shipped values) SLOWS but does not reverse the rate. This does not exercise the
+    # in-Process max(0.0, ...) clamp itself (unreachable at the shipped magnitude — copper is
+    # already floored at >=0 and 1 - k_copper_multiplier*copper_typical stays positive at the
+    # central value), but pins the direction: the sink is still real and monotonically consuming
+    # o2, never a spurious source.
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    d = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, copper=0.0), schema, params
+    )
+    assert schema.get(d, "o2") < 0.0  # a genuine O2 sink, never a source
+    assert schema.get(d, "A420") > 0.0
+
+
+def test_browning_copper_multiplier_clamp_prevents_negative_rate(params):
+    # At the HIGH end of k_copper_multiplier's own sourced uncertainty band (5000 L/g, aging.yaml),
+    # zero copper WOULD flip f_copper negative (1 - 5000*2.6e-4 = -0.3) without the in-Process
+    # max(0.0, ...) clamp — exercising the clamp directly (not reachable at the shipped central
+    # value, per the test above) confirms it actually guards a real edge of the sourced band, not
+    # dead code.
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    clamped_params = dict(params)
+    clamped_params["k_copper_multiplier"] = 5000.0
+    assert (
+        1.0 + clamped_params["k_copper_multiplier"] * (0.0 - clamped_params["copper_typical"])
+        < 0.0
+    )  # sanity: this really would go negative unclamped
+    d = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, copper=0.0), schema, clamped_params
+    )
+    # Clamped to f_copper == 0 ⇒ the browning route contributes NOTHING (not a negative/source
+    # rate) — o2/A420 both sit at exactly zero for this route at this pathological dose.
+    assert schema.get(d, "o2") == 0.0
+    assert schema.get(d, "A420") == 0.0
 
 
 def test_browning_typical_red_lands_in_ferreira_band(params):
