@@ -145,6 +145,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 - [**D-134**](#d-134--copper-dependence-of-the-o2-consumption-rate-a-mean-centered-fcu-multiplier-on-phenolicbrownings-rate-sourced-from-a-controlled-model-wine-kinetics-experiment-after-three-natural-wine-pls-surveys-turned-out-to-bury-copper-un-extractably-in-collinear-multivariate-fits) — copper-dependence of the O2-consumption rate: a mean-centered `f(Cu)` multiplier on `PhenolicBrowning`'s rate, sourced from a co …
 - [**D-135**](#d-135--bottle-reduction-sulfides-metal-complexed-h2smesh-reservoirs-released-first-order-during-anaerobic-bottle-aging-after-the-primary-d-101-recorded-as-unreadable-turned-out-to-be-open--and-to-say-the-mechanism-d-101-guessed-for-it-was-the-wrong-one) — bottle-reduction sulfides: metal-complexed H2S/MeSH reservoirs released first-order during anaerobic bottle aging, after the pri …
 - [**D-136**](#d-136--closure-oxygen-ingress-a-zero-order-per-closure-otr-that-turns-o2-from-a-dosed-stock-into-a-continuous-flow-making-the-closure--not-any-sinks-rate-constant--the-throttle-on-oxidative-aging-and-lifting-a-limitation-d-108-had-written-into-the-code-against-itself) — closure oxygen ingress: a zero-order per-closure OTR that turns O2 from a dosed STOCK into a continuous FLOW, making t …
+- [**D-137**](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing) — the O2 sink partition audit: SO2 takes ~90% of the whole 5-year O2 budget and never exhausts, and the acetaldehyde/phenolic sign is inverted by …
 <!-- END INDEX -->
 
 ## Process decisions (project setup)
@@ -13969,3 +13970,229 @@ subtlety.
   engine deliberately does not have.
 - D-132's other deferred items (tail-acceleration, gluconolactone, MLF protein-protection) remain
   open, tracked under D-132/D-130/D-131.
+
+## D-137 — the O2 sink partition audit: SO2 takes ~90% of the whole 5-year O2 budget and never exhausts, and the acetaldehyde/phenolic sign is inverted by mechanism — measured, one provenance fix shipped, the cascade rebuild approved but gated on sourcing
+
+**Status: MEASURED, not built.** One documentation fix shipped (`f0a705f`). The structural
+rebuild this audit motivates is **owner-approved but deliberately not started** — it is gated on
+primary sourcing that is only half done. Everything below is a measurement or a sourced fact;
+nothing here is a proposal dressed as a finding.
+
+Repro scripts + full write-ups: `M:\claud_projects\temp\d137-o2-partition\`
+(`partition.py`, `followup.py`, `surlie.py`, `so2_swing.py`, `FINDINGS.md`,
+`GATE1-branching-sourcing.md`).
+
+### Why this axis, and why the premise it was launched on was wrong
+
+D-136 turned O2 from a dosed stock into a continuous flow, and its own docstring observed that
+"the individual rate constants become a splitting rule." Seven Processes draw on `o2`
+(`phenolic_browning`, `oxidative_acetaldehyde`, `sulfite_oxidation`, `antioxidant_burst_oxidation`,
+`strecker_degradation`, `ellagitannin_oxidation`, `anthocyanin_fading`) and one supplies it. Each
+sink's `k` was calibrated in isolation, before the supply term existed. The audit asked whether
+the resulting partition survives contact with a real trajectory.
+
+**The framing it started from — "under a dosed stock the partition only reallocated a fixed dose;
+under a flow it sets absolute levels" — is false, and the correction matters.** Every sink is
+first-order in `o2`, so `o2` cancels out of `fraction_i = k_i f_i g_i / Σ(k_j f_j g_j)`. The
+partition was *equally* load-bearing before D-136. Verified rather than argued: scaling `o2` by
+0.1×/1×/10×/100× at a fixed state, at three points along a real trajectory, leaves every
+fraction identical to four decimal places while the total scales exactly linearly.
+
+What D-136 *did* change is the weighting. A dosed charge is front-loaded and is spent while the
+depleting substrates are still present; a closure flow keeps supplying O2 after they are gone. So
+the **cumulative** share is not `o2`-invariant — it drifts **21.8 pp** under a 4× OTR swing — and
+that drift is entirely driver depletion (the SO2 endpoint falls 41.3 → 5.2 mg/L), not a missing
+term. Both statements are true; conflating them is what produced the wrong framing.
+
+### The census — cumulative mg O2/L over 5 years, natural cork unless stated
+
+| run | SO2 | browning | ethanol→acetald. | ellagitannin | Strecker | anthocyanin |
+|---|---|---|---|---|---|---|
+| white, sulfited | **92.4 %** | 4.6 % | 3.1 % | – | 0 | – |
+| red, sulfited | **89.7 %** | 7.3 % | 2.9 % | – | 0 | 0.12 % |
+| red + oak, sulfited | **86.1 %** | 6.9 % | 2.8 % | 4.0 % | 0 | 0.12 % |
+| red + oak + sur lie, sulfited | **86.0 %** | 6.9 % | 2.8 % | 4.0 % | 0.13 % | 0.12 % |
+| red, **unsulfited** | 0 | **69.9 %** | 29.7 % | – | 0 | 0.41 % |
+| red + oak + sur lie, **unsulfited** | 0 | **48.8 %** | 20.3 % | 29.6 % | 0.92 % | 0.38 % |
+| red, **SupremeCorq** (13 µL/day) | 32.4 % | **45.9 %** | 21.6 % | – | 0 | 0.13 % |
+
+Mass balance closes in every run: supplied − consumed equals the residual dissolved `o2` endpoint
+to 4–5 significant figures.
+
+### F1 — SO2 owns the budget end to end, and a normal dose never exhausts
+
+A natural cork supplies **5.2 mg/L O2 in five years**. At the 2:1 mass stoichiometry that spends
+only ~19 mg/L of SO2, so a 60 mg/L dose finishes at **41 mg/L** and is still 89.5 % of the
+instantaneous flux on the last day. The regime this audit was aimed at — SO2 exhausts, the
+browning:ethanol split takes over the tail — **is not the regime a realistically sulfited,
+realistically closed wine is ever in.** It arrives only unsulfited, or under the most permeable
+closures on the D-136 menu.
+
+**Read this as a property of the current architecture, not a bald fact** — see F2: in the
+mechanism the sources describe, SO2 is not a direct O2 sink at all.
+
+### F2 — the acetaldehyde/phenolic sign is inverted by mechanism (the finding that matters)
+
+Monotone, natural cork, 5 y: tannin 0 / 1 / 2 / 4 g/L gives final acetaldehyde 0.327 / 0.320 /
+0.315 / 0.311 mg/L while A420 rises 0.0037 → 0.0066. **More phenolics, less acetaldehyde.**
+
+In Wildenradt & Singleton 1974 and Danilewicz 2003/2007 — the very sources `k_browning_base`'s
+provenance cites — ethanol oxidation is **downstream** of phenol autoxidation: O2 oxidises
+o-diphenols to quinones + H2O2, and that H2O2 is what oxidises ethanol. `aging.yaml` concedes the
+sequential mechanism in prose ("only a fraction of that H2O2 goes on to oxidise ethanol") while
+the code sums two **independent parallel sinks** competing for one pool.
+
+Three things sharpen it:
+
+- **It is D-132-activated, not longstanding.** The phenol dependence is folded into a constant in
+  *every* phenol-catalysed sink by the YAML's own admission (`k_ethanol_oxidation` "folds the
+  o-diphenol/Fe catalyst concentration into the k"; `k_so2_oxidation` "folds the metal/o-diphenol
+  catalysis into k... as with k_ethanol_oxidation"). D-132 made it explicit in **exactly one**.
+  Before D-132 acetaldehyde was *flat* in phenolic load; D-132 turned flat into inverted. This is
+  a side effect of a decision recently shipped, not a defect sitting there since D-71.
+- **No consistent parallel patch recovers the sign.** Propagate D-132's phenolic term to the other
+  phenol-catalysed sinks and the common factor appears in both numerator and denominator of every
+  `fraction_i` and cancels under O2-limitation — acetaldehyde goes **flat**, not increasing. The
+  parallel-sink frame **cannot express** the coupling. That, not the size of the error, is why the
+  fix is architectural.
+- **Where it matters.** The −4.8 % under natural cork is the well-protected wine, the case the
+  axis barely needs to model. F2 governs the unsulfited / leaky / low-SO2 regime, where browning
+  and ethanol oxidation are 70/30 of the entire budget — the case the whole D-71→D-136 arc exists
+  to predict.
+
+### F3 — `k_so2_oxidation` barely moves SO2 and dominates every marker that does not read it
+
+A 16× swing (red, natural cork, 5 y) — the same swing D-136's
+`test_so2_depletion_is_supply_limited_not_rate_limited` uses:
+
+| `k_so2` scale | 0.25 | 0.5 | 1.0 | 2.0 | 4.0 | spread |
+|---|---|---|---|---|---|---|
+| SO2 mg/L | 45.60 | 42.91 | 41.19 | 40.16 | 39.59 | **1.15×** |
+| A420 | 0.01712 | 0.01106 | 0.00651 | 0.00379 | 0.00228 | **7.5×** |
+| acetaldehyde mg/L | 0.927 | 0.567 | 0.319 | 0.170 | 0.088 | **10.5×** |
+
+D-136 is right that the parameter is nearly irrelevant to the quantity it governs. What it did not
+measure is that the same parameter is the **dominant uncertainty on the markers it does not
+touch**, because those markers live on the ~10 % residual slice F1 identified and `k_so2_oxidation`
+decides that slice's size. Its shipped band is 0.05–2.0, a **40× range**, wider than the 16× swung
+here. Neither `PhenolicBrowning` nor `OxidativeAcetaldehyde` reads it, so nothing in the provenance
+of `k_browning_base` / `k_ethanol_oxidation` / `y_a420_per_o2` / `y_acetaldehyde_per_o2` hints at
+the dependence. **A cross-Process uncertainty coupling that D-136 created and no record stated.**
+
+It also means that test's docstring — *"if someone ever 'fixes' this axis by tuning a sink's rate
+constant, that test says why it did not work"* — is true for SO2 and **false for A420 and
+acetaldehyde**, where tuning `k_so2_oxidation` moves the answer by an order of magnitude.
+
+### F4 — the one thing shipped: a stale provenance ratio, qualified
+
+`k_so2_oxidation`'s `uncertainty.note` claimed the SO2 route runs "~8-16x the COMBINED always-on
+O2-depletion rate". That is the **zero-phenolic** number left unqualified: correct for white/beer
+against `k_ethanol_oxidation + k_browning_base = 5e-4 /h`, but D-132 lifted a typical red's
+`k_browning_eff` to ~2.9e-3 /h, making the red ratio **~1.3–2.6×**. The note predates D-132 and was
+not revisited when D-132 changed its denominator. The load-bearing ORDERING claim survives (SO2
+still takes 92.4 % white / 89.7 % red), so only the factor was stale. Corrected in place, together
+with F1's non-exhaustion result and F3's coupling. **Documentation only — no value, code or test
+changed.**
+
+### F5 — scope note: the Strecker route never fires in a clean bottle-aged wine
+
+`methionine` and `phenylalanine` are **exactly 0 at `begin_aging`** (fermentation consumes them),
+so `StreckerDegradation` contributes exactly 0 O2 and 0 methional / phenylacetaldehyde unless the
+run opts into an `amino_acids_gpl` dose or lees autolysis (D-76) — with sur lie it claims 0.13 %
+(sulfited) / 0.92 % (unsulfited). Not a defect: every shipped D-75/D-76 test doses or autolyses
+deliberately, and a wine racked off its lees genuinely has little assimilable amino acid left. But
+**methional, the cooked-potato premox marker, is closure-independent in the default aging path**,
+which is worth stating beside D-136's premox claim (that test tracks sotolon, which is not
+amino-acid gated, so it is not wrong — the premox story is simply narrower than it reads).
+
+### F6 — oak is the second-largest sink once SO2 is gone
+
+`ellagitannin_oxidation` takes **29.6 %** of the unsulfited oaked red's O2, more than ethanol
+oxidation. D-78's sacrificial-tannin claim behaving as designed, with a number attached for the
+first time.
+
+### The decision, and the gate it is behind
+
+Presented as a spectrum; the owner chose the **faithful cascade**: an explicit H2O2 intermediate,
+with phenol oxidation as the O2 gate and **ethanol and SO2 competing downstream**, so that SO2 is a
+direct O2 reactant at **neither** node. Then, before any code: **pull the primaries first.**
+
+**Gate 1 (sourcing) passed — and the source was already in holdings.** *Understanding Wine
+Chemistry* 2nd ed. (Waterhouse, Sacks & Jeffery) Ch. 24 carries the cascade as **Figure 24.13,
+"Key branch point for H2O2."** Waterhouse co-authored Elias & Waterhouse 2010, on which the branch
+rests. Both endpoints of the branch are now pinned:
+
+| free SO2 | fate of H2O2 |
+|---|---|
+| 0 | → •OH → acetaldehyde, **1:1 molar** (Elias & Waterhouse 2010, anoxic, Fe 50 µM) |
+| ≥ **250 µM (16 mg/L)** | Fenton **fully prevented**; → sulfate |
+
+The 1:1 is an **anoxic, Fe-excess, deliberately unopposed limit — an upper bound by construction,
+never a wine-realistic yield.** Two further corroborations: the •OH product split is
+concentration-weighted and therefore derivable ("very non-selective... products roughly parallel
+the concentrations of oxidizable substrates"), and Danilewicz 2007 independently confirms the 2:1
+the model already ships — "two moles of bisulfite react simply with one mole of oxygen."
+Danilewicz 2007 also reports **marked Fe/Cu synergism** ("when iron and copper were added
+separately, only a modest increase resulted — however, when combined, marked synergism"), which
+argues for re-homing D-134's copper onto the O2-activation step rather than leaving it a
+browning-only multiplier.
+
+### The correction that must travel with F2 — the sourced sign is NOT unambiguously positive
+
+Ch. 24 says phenolics are **both pro-oxidant and antioxidant**. More phenolics raise O2 consumption
+(⇒ more H2O2 ⇒ more Fenton ⇒ more acetaldehyde), *but* hydroxycinnamates **quench the
+1-hydroxyethyl radical before it becomes acetaldehyde** (Fig. 24.14; Gislason, Currie & Waterhouse
+2011), and the book explicitly declines to settle the net: "the relative rates of
+carbonyl-generating pathways and the importance of each is still under investigation."
+
+The defect F2 names still stands — the model's inversion arises from O2 *competition*, a mechanism
+the sources say does not exist, so it gets a defensible-looking sign for a mechanism that is not
+there. But **the rebuild is not guaranteed to flip the sign, and the cascade must be approved on
+mechanism fidelity rather than on a promised sign change.** Anyone approving it on "it will make
+acetaldehyde rise with phenolics" is approving the wrong thing.
+
+### Surfaced in passing, and probably bigger than the cascade
+
+Bueno et al., quoted in the same chapter: the rise in oxidised-aroma carbonyls in real wine is
+"well modeled by the expected release from **bound SO2 adducts**" until molecular SO2 < 0.05 mg/L,
+and de novo formation "becomes more critical only once the wine is severely" oxidised. **The
+dominant real-wine route is adduct release — not either de novo route the model actually builds
+(D-71 Fenton, D-75 Strecker).** D-47's free/bound treatment is an equilibrium, so some of this may
+already be emergent, but nothing in the project states the ordering or tests it. **Deserves its
+own D-record regardless of how the cascade proceeds.**
+
+### Receipts
+
+- `parameters/data/aging.yaml` — `k_so2_oxidation`'s `uncertainty.note` qualified (F4), plus F1's
+  non-exhaustion and F3's coupling recorded there. The only file changed. `ruff` + `mypy` (111) +
+  `pytest -n auto` (**1325 passed**) all green.
+- Diagnostics + findings durable at `M:\claud_projects\temp\d137-o2-partition\`.
+
+### Next — the build is gated, and these gates are not optional
+
+- **Gate 1 remainder.** **McArdle & Hoffmann 1983** (`10.1021/j150644a024`, ACS-paywalled) is the
+  literal branch-competition rate constant (H2O2 + HSO3⁻ at low pH) and would replace the
+  two-endpoint interpolation with real competition kinetics — **highest-value remaining fetch**;
+  atmospheric-chemistry literature cites it heavily, so a secondary is likely reachable. Also
+  open: **Gislason 2011** (the counter-sign quench term) and **Danilewicz 2016**. Elias &
+  Waterhouse 2010 itself is **blocked so far** — ACS paywalled, `waterhouse.ucdavis.edu` returns
+  403, Penn State Pure has metadata only. Per D-123/D-135/D-136 that is a per-host statement, not
+  a verdict on the paper. New lead worth adding: *"Acid complexation of iron controls the fate of
+  hydrogen peroxide in model wine"*, **Food Chemistry** (2021).
+- **Gate 2 — the sink→node map, for all seven sinks, not the three in the F2 discussion.**
+  browning → quinone polymerisation; ethanol → H2O2/Fenton; SO2 → **both** H2O2 and quinone;
+  Strecker → quinone + amino acid; ellagitannin / anthocyanin-fade → quinone-side reductants,
+  each decided explicitly. `h2o2` and `quinone` become state slots that quasi-steady-state near
+  zero under D-136's flow, exactly as `o2` now does, and the node rate constants become the new
+  partition. Carbon ledger: `h2o2` off the books like `o2`; `quinone` carries phenol carbon;
+  acetaldehyde keeps D-71's exact carbon borrow from `E`. **Do not double-count quinone** — it is
+  produced at the O2 step *and* on the H2O2 → catechol branch. Copper (D-134) re-homes to the
+  O2-activation step, so it scales the whole cascade rather than the browning rate.
+- **Gate 3 — enumerate the expected-red tests and why, before touching code.** Many of the 1325
+  encode parallel competition *as correctness*. Each rewrite needs a per-test reality
+  justification, never a bulk update. Strong recommendation: build the cascade as an **isolable
+  alternative process-set** run alongside the existing one, confirming total O2 uptake still lands
+  on Ferreira before the default is flipped — so the suite stays green throughout instead of
+  going big-bang red.
+- **The reversal's true blast radius is D-71 / D-72 / D-74 / D-132 plus D-133 / D-134** and both
+  colour-oxidation Processes — not the three Processes F2 discusses.
