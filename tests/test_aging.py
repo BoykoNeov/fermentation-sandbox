@@ -56,6 +56,7 @@ from fermentation.core.chemistry import (
 from fermentation.core.kinetics import (
     AcetaldehydeBridgedCondensation,
     AnthocyaninFading,
+    AntioxidantBurstOxidation,
     Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
@@ -1640,6 +1641,300 @@ def test_browning_tier_floored_at_speculative(store):
     for pool in ("o2", "A420"):
         assert ps.tier_of(pool) is Tier.SPECULATIVE
         assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
+
+
+# =====================================================================================
+# AntioxidantBurstOxidation (decision D-133) — the FOURTH oxidative sub-axis sink: a finite,
+# fast-reacting, non-SO2 antioxidant pool (``burst_antioxidant``) that scavenges O2 at the day-1
+# rate Ferreira 2015 measured (0.54-8.2 mg/L/day, R^2=0 vs the D-132 steady average). Bilinear in
+# [o2]*[burst_antioxidant], Arrhenius warmer-faster, mass-based consumption yield. TWO HARD GUARDS
+# (owner-locked): (1) never reads tannin/anthocyanin (D-132's driver -- the burst is
+# phenolic-independent); (2) never touches so2_total (D-72's substrate -- Ferreira's rates are
+# SO2-independent, so this is a genuinely separate residual). Calibrated as the EXCESS over the
+# D-132 steady rate (both draw the same shared o2 pool), sized to exhaust within Ferreira's ~10-day
+# saturation cycle. These tests pin the closed form, the bilinear substrate dependence, the double
+# isolability (inert without O2 or without the burst pool), the wine-only no-op on beer, the
+# warmer-faster ordering, BOTH guards (structurally and numerically), the off-every-ledger
+# invariance, the Ferreira excess/total-band calibration, the exhausted-equals-pure-steady
+# identity, the pool's own exhaustion timescale, and the speculative tier floor.
+
+
+def test_burst_oxidation_metadata():
+    p = AntioxidantBurstOxidation()
+    assert p.name == "antioxidant_burst_oxidation"
+    assert p.tier is Tier.SPECULATIVE
+    # Consumes its O2 share and spends the burst_antioxidant pool it scavenges — both off every
+    # ledger, so nothing conserved moves. Touches those two and nothing else.
+    assert set(p.touches) == {"o2", "burst_antioxidant"}
+    assert set(p.reads) == {
+        "k_burst_oxidation",
+        "E_a_burst_oxidation",
+        "y_burst_per_o2",
+        "T_ref",
+    }
+    # Guards 1 & 2 (D-133), structurally: neither the D-132 phenolic driver nor the D-72 SO2
+    # substrate ever appears in touches/reads, so this Process cannot double-count either sibling
+    # sink by construction (not merely by convention).
+    assert "tannin" not in p.reads and "anthocyanin" not in p.reads
+    assert "tannin" not in p.touches and "anthocyanin" not in p.touches
+    assert "so2_total" not in p.reads and "so2_total" not in p.touches
+
+
+def test_burst_oxidation_matches_closed_form(params):
+    schema = wine_schema()
+    o2, burst, t = 0.008, 3.3e-3, 298.15  # off T_ref so the Arrhenius factor bites
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2, burst_antioxidant=burst)
+    d = AntioxidantBurstOxidation().derivatives(0.0, y, schema, params)
+    f_t = arrhenius_factor(t, params["E_a_burst_oxidation"], params["T_ref"])
+    r_o2 = params["k_burst_oxidation"] * f_t * o2 * burst
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "burst_antioxidant") == pytest.approx(-params["y_burst_per_o2"] * r_o2)
+    # Touches ONLY o2 + burst_antioxidant — nothing else moves.
+    for var in schema.names:
+        if var not in ("o2", "burst_antioxidant"):
+            assert schema.get(d, var) == 0.0
+
+
+def test_burst_oxidation_bilinear_in_both_substrates(params):
+    schema = wine_schema()
+    base = AntioxidantBurstOxidation().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, o2=0.008, burst_antioxidant=3.3e-3), schema, params
+    )
+    dbl_o2 = AntioxidantBurstOxidation().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, o2=0.016, burst_antioxidant=3.3e-3), schema, params
+    )
+    dbl_burst = AntioxidantBurstOxidation().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, o2=0.008, burst_antioxidant=6.6e-3), schema, params
+    )
+    assert schema.get(dbl_o2, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
+    assert schema.get(dbl_burst, "o2") == pytest.approx(2.0 * schema.get(base, "o2"))
+
+
+def test_burst_oxidation_inert_without_oxygen(params):
+    # No oxidant ⇒ no scavenging: a reductive begin_aging (no add_oxygen) is byte-for-byte the case
+    # without this Process. Also the o2 < 0 solver-undershoot guard.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AntioxidantBurstOxidation()], strict=True)
+    assert np.array_equal(
+        ps.total_derivatives(
+            0.0, _aged_wine(schema, ester=0.0, o2=0.0, burst_antioxidant=3.3e-3), params
+        ),
+        schema.zeros(),
+    )
+    assert np.array_equal(
+        AntioxidantBurstOxidation().derivatives(
+            0.0,
+            _aged_wine(schema, ester=0.0, o2=-1e-6, burst_antioxidant=3.3e-3),
+            schema,
+            params,
+        ),
+        schema.zeros(),
+    )
+
+
+def test_burst_oxidation_inert_without_burst_pool(params):
+    # No burst pool (un-seeded ParameterSet, or a pool already exhausted) ⇒ no burst scavenging:
+    # byte-for-byte the pre-D-133 (D-132-only) case. Also the burst < 0 solver-undershoot guard.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AntioxidantBurstOxidation()], strict=True)
+    assert np.array_equal(
+        ps.total_derivatives(
+            0.0, _aged_wine(schema, ester=0.0, o2=0.008, burst_antioxidant=0.0), params
+        ),
+        schema.zeros(),
+    )
+    assert np.array_equal(
+        AntioxidantBurstOxidation().derivatives(
+            0.0,
+            _aged_wine(schema, ester=0.0, o2=0.008, burst_antioxidant=-1e-9),
+            schema,
+            params,
+        ),
+        schema.zeros(),
+    )
+
+
+def test_burst_oxidation_rises_with_temperature(params):
+    # The sourced ordering (E_a_burst_oxidation > 0): warmer storage burns through the burst pool
+    # faster.
+    schema = wine_schema()
+    cold = AntioxidantBurstOxidation().derivatives(
+        0.0,
+        _aged_wine(schema, ester=0.0, o2=0.008, burst_antioxidant=3.3e-3, t=283.15),
+        schema,
+        params,
+    )
+    warm = AntioxidantBurstOxidation().derivatives(
+        0.0,
+        _aged_wine(schema, ester=0.0, o2=0.008, burst_antioxidant=3.3e-3, t=303.15),
+        schema,
+        params,
+    )
+    assert schema.get(warm, "o2") < schema.get(cold, "o2") < 0.0
+
+
+def test_burst_oxidation_is_wine_only_noop_on_beer(params):
+    # WINE-ONLY: Ferreira's dataset is exclusively red wine, so burst_antioxidant is absent from
+    # beer's schema — the guard makes this a hard no-op there even if it were wired in.
+    beer = beer_schema()
+    assert "burst_antioxidant" not in beer
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 293.15, "CO2": 0.0})
+    yb[beer.slice("o2")] = 0.008
+    assert np.array_equal(
+        AntioxidantBurstOxidation().derivatives(0.0, yb, beer, params), beer.zeros()
+    )
+
+
+def test_burst_oxidation_does_not_reuse_phenolic_driver(params):
+    # GUARD 1 (D-133, owner-locked), numerically: Ferreira's initial rate is UNCORRELATED with
+    # grape phenolics (unlike the D-132 steady rate), so this Process must be blind to
+    # tannin/anthocyanin — dosing them changes nothing about the burst rate.
+    schema = wine_schema()
+    o2, burst = 0.008, 3.3e-3
+    no_phenolics = AntioxidantBurstOxidation().derivatives(
+        0.0,
+        _aged_wine(
+            schema, ester=0.0, o2=o2, burst_antioxidant=burst, tannin=0.0, anthocyanin=0.0
+        ),
+        schema,
+        params,
+    )
+    typical_red = AntioxidantBurstOxidation().derivatives(
+        0.0,
+        _aged_wine(
+            schema, ester=0.0, o2=o2, burst_antioxidant=burst, tannin=2.0, anthocyanin=0.3
+        ),
+        schema,
+        params,
+    )
+    assert np.array_equal(no_phenolics, typical_red)
+
+
+def test_burst_oxidation_does_not_double_count_sulfite_oxidation(so2_params):
+    # GUARD 2 (D-133, owner-locked), numerically: Ferreira reports BOTH his rates SO2-independent,
+    # so this Process must never read so2_total/bisulfite — dosing SO2 changes nothing about the
+    # burst rate, and running it alongside SulfiteOxidation is two genuinely independent draws on
+    # the shared o2 pool (ProcessSet's ki/SUM(k) split), never a re-count of SO2's own protection.
+    schema = wine_schema()
+    o2, burst = 0.008, 3.3e-3
+    unsulfited = AntioxidantBurstOxidation().derivatives(
+        0.0, _sulfited_wine(schema, so2=0.0, o2=o2, burst_antioxidant=burst), schema, so2_params
+    )
+    sulfited = AntioxidantBurstOxidation().derivatives(
+        0.0, _sulfited_wine(schema, so2=0.05, o2=o2, burst_antioxidant=burst), schema, so2_params
+    )
+    assert np.array_equal(unsulfited, sulfited)
+    # Structural: the two sinks together simply SUM two independent draws — no interaction term —
+    # so the combined o2 derivative equals the two solo derivatives added.
+    both = ProcessSet(schema, [AntioxidantBurstOxidation(), SulfiteOxidation()], strict=True)
+    y = _sulfited_wine(schema, so2=0.05, o2=o2, burst_antioxidant=burst)
+    combined = both.total_derivatives(0.0, y, so2_params)
+    solo_burst = AntioxidantBurstOxidation().derivatives(0.0, y, schema, so2_params)
+    solo_so2 = SulfiteOxidation().derivatives(0.0, y, schema, so2_params)
+    assert schema.get(combined, "o2") == pytest.approx(
+        schema.get(solo_burst, "o2") + schema.get(solo_so2, "o2")
+    )
+
+
+def test_burst_oxidation_moves_nothing_conserved(params, store):
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AntioxidantBurstOxidation()], strict=True)
+    y0 = _aged_wine(schema, ester=0.0, o2=0.008, burst_antioxidant=3.3e-3)
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 30.0))  # ~1 month
+    assert traj.success, traj.message
+    f_c = store.value("biomass_C_fraction")
+    f_n = store.value("biomass_N_fraction")
+    assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(traj, total_mass(schema), label="mass")
+    assert_conserved(traj, total_nitrogen(schema, biomass_nitrogen_fraction=f_n), label="nitrogen")
+    assert_nonnegative(traj, ("o2", "burst_antioxidant"), atol=1e-9)
+
+
+def test_burst_oxidation_tier_floored_at_speculative(store):
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AntioxidantBurstOxidation()])
+    for pool in ("o2", "burst_antioxidant"):
+        assert ps.tier_of(pool) is Tier.SPECULATIVE
+        assert ps.tier_of(pool, store.tier_map()) is Tier.SPECULATIVE
+
+
+def test_burst_oxidation_excess_lands_near_ferreira_target(params):
+    # THE D-133 CALIBRATION: at a fresh ~8 mg/L O2 charge and the sourced typical burst charge,
+    # this Process's OWN excess rate lands near the ~1.0 mg/L/day target — Ferreira's
+    # representative "2.7x average" day-1 case minus the D-132 steady ~0.58 mg/L/day average (see
+    # aging.yaml's k_burst_oxidation/burst_antioxidant_initial provenance for the arithmetic).
+    schema = wine_schema()
+    o2 = 0.008  # ~8 mg/L, T_ref (f_t = 1, no Arrhenius correction needed)
+    burst = params["burst_antioxidant_initial"]
+    y = _aged_wine(schema, ester=0.0, o2=o2, burst_antioxidant=burst)
+    d = AntioxidantBurstOxidation().derivatives(0.0, y, schema, params)
+    excess_rate_mg_l_day = -schema.get(d, "o2") * 1000.0 * 24.0
+    assert 0.7 <= excess_rate_mg_l_day <= 1.3
+
+
+def test_burst_oxidation_plus_steady_lands_in_ferreira_initial_band(params):
+    # The TOTAL day-1 rate (D-132 steady + this Process's burst, both drawing the SAME shared o2
+    # pool) lands within Ferreira's observed initial-rate band (0.54-8.2 mg/L/day) for a typical
+    # red — the two Processes summing, no double-count, no re-baseline — and is materially ABOVE
+    # the D-132 steady-only total (0.5-0.7): the burst is a genuine addition, not a rounding
+    # artifact.
+    schema = wine_schema()
+    o2 = 0.008
+    tannin, anthocyanin = 2.0, 0.3  # the "typical red" anchor (polymerization.yaml D-79/D-81/D-84)
+    burst = params["burst_antioxidant_initial"]
+    y = _aged_wine(
+        schema, ester=0.0, o2=o2, tannin=tannin, anthocyanin=anthocyanin, burst_antioxidant=burst
+    )
+    brown = PhenolicBrowning().derivatives(0.0, y, schema, params)
+    ethanol = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
+    burst_d = AntioxidantBurstOxidation().derivatives(0.0, y, schema, params)
+    steady_only_mg_l_day = (-schema.get(brown, "o2") - schema.get(ethanol, "o2")) * 1000.0 * 24.0
+    total_rate_mg_l_day = steady_only_mg_l_day + (-schema.get(burst_d, "o2")) * 1000.0 * 24.0
+    assert 0.54 <= total_rate_mg_l_day <= 8.2
+    assert total_rate_mg_l_day > 1.2 * steady_only_mg_l_day
+
+
+def test_burst_oxidation_exhausted_equals_pure_steady_rate(params):
+    # GUARD 2 restated as a NUMBER: once the burst pool is spent (burst_antioxidant = 0), the total
+    # O2-depletion rate is BYTE-FOR-BYTE the D-132 steady rate — "once exhausted, only the steady
+    # rate remains" holds to machine precision, since this Process's own contribution is exactly
+    # zero.
+    schema = wine_schema()
+    o2 = 0.008
+    tannin, anthocyanin = 2.0, 0.3
+    y_exhausted = _aged_wine(
+        schema, ester=0.0, o2=o2, tannin=tannin, anthocyanin=anthocyanin, burst_antioxidant=0.0
+    )
+    steady_alone = ProcessSet(schema, [PhenolicBrowning(), OxidativeAcetaldehyde()], strict=True)
+    with_burst = ProcessSet(
+        schema,
+        [AntioxidantBurstOxidation(), PhenolicBrowning(), OxidativeAcetaldehyde()],
+        strict=True,
+    )
+    assert np.array_equal(
+        steady_alone.total_derivatives(0.0, y_exhausted, params),
+        with_burst.total_derivatives(0.0, y_exhausted, params),
+    )
+
+
+def test_burst_pool_exhausts_within_first_saturation_cycle(params):
+    # THE D-133 TIMESCALE CLAIM: Ferreira reports the average rate "constant across saturations
+    # 2-5" — i.e. the burst is spent by the SECOND ~10-day saturation cycle. Isolate the pool's own
+    # depletion kinetics with an AMPLE (non-limiting) O2 supply, so o2 stays roughly constant over
+    # the window and the burst pool's decay is not confounded by O2 itself running out. By day 10
+    # the pool should be down to a small residual.
+    schema = wine_schema()
+    ps = ProcessSet(schema, [AntioxidantBurstOxidation()], strict=True)
+    burst_0 = params["burst_antioxidant_initial"]
+    y0 = _aged_wine(schema, ester=0.0, o2=0.5, burst_antioxidant=burst_0)  # o2 not limiting
+    traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 10.0))  # ~10 days
+    assert traj.success, traj.message
+    burst_series = np.asarray(traj.series("burst_antioxidant"), dtype=float)
+    burst_end = float(burst_series[-1])
+    assert -1e-9 <= burst_end < 0.1 * burst_0
+    # Monotone depletion (up to solver-precision noise), never meaningfully negative.
+    assert np.all(np.diff(burst_series) <= 1e-9)
+    assert_nonnegative(traj, ("burst_antioxidant",), atol=1e-9)
 
 
 # =====================================================================================

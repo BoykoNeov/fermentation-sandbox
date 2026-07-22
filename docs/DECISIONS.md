@@ -13328,3 +13328,93 @@ d(o2)/dt = -k_browning_eff · f(T) · [o2]        # still first-order in o2, Arr
   small, currently-unsourceable residual, documented not built.
 - Still anchored, unbuilt: gluconolactone (D-130 defer); protein-protection/cell-density MLF terms
   (D-131 defer).
+
+## D-133 — Ferreira 2015 day-1 O2-consumption spike: a finite `burst_antioxidant` pool, scavenged
+alongside `PhenolicBrowning`'s steady sink, closes the gap between D-132's calibrated-average rate
+and Ferreira's measured day-1 initial rate
+
+Design locked at the same 2026-07-21/07-22 sessions as D-132; full handoff was durable at
+`M:\claud_projects\temp\ferment\_findings\D-132-133-ferreira-o2-consumption-design.md`, scoped
+explicitly in D-132's own "Next" section. This record supersedes the handoff doc as the canonical
+account.
+
+### What existed vs. what D-133 adds
+D-132 calibrated `PhenolicBrowning`'s `k_browning_eff` to reproduce Ferreira's **average**
+O2-depletion rate (0.5-0.7 mg/L/day) for a typical red. Ferreira also reports a **day-1** rate of
+0.54-8.2 mg/L/day — far wider, and uncorrelated with the average (R²=0 wine-to-wine) — driven by
+copper and an unidentified, non-phenolic, non-SO2 antioxidant that is present at the start of each
+saturation cycle and exhausted within it (the paper's own framing: "wines... consume oxygen faster
+initially, then settle to a near-constant rate"). Nothing in the model tracked a *depletable* sink
+before this decision; `SulfiteOxidation` (D-72) and `PhenolicBrowning` (D-74/D-132) are both
+steady-state (non-exhausting) by construction. D-132's own "Next" section required this pool to
+avoid reusing the phenolic driver and to avoid double-counting `SulfiteOxidation`.
+
+### Design — a depletable pool with its own O2-scavenging Process, additive on top of D-132
+```
+r_o2 = k_burst_oxidation · f(T) · [o2] · [burst_antioxidant]
+d(o2)/dt              += -r_o2
+d(burst_antioxidant)/dt = -y_burst_per_o2 · r_o2
+```
+- **New wine-only state slot** `burst_antioxidant` (g/L, `default=0.0`, appended last in
+  `wine_schema()` per the D-100/D-102 convention) — off every ledger (`total_carbon`/`total_mass`/
+  `total_nitrogen` don't weight it; an unidentified compound has no defensible elemental formula to
+  assign). Seeded via `_wine_initial`'s `burst_antioxidant_gpl` override or, absent that, a sourced
+  `burst_antioxidant_initial` YAML default — the `dms_potential` precedent (D-45): a grape-derived
+  quantity must not silently default to 0, or the model asserts real wines never have this pool.
+- **New Process** `AntioxidantBurstOxidation` (speculative tier), reading its own `o2`/
+  `burst_antioxidant` state and `k_burst_oxidation`/`E_a_burst_oxidation`/`y_burst_per_o2`/`T_ref`
+  params — never reads `tannin`/`anthocyanin`/`so2_total`, so it cannot be confused with, or
+  double-count, D-132's phenolic boost or D-72's sulfite sink. Structural no-op if `burst_antioxidant`
+  or `o2` isn't in the schema (beer, or any medium without the slot); value-gated at `o2 <= 0` or
+  `burst_antioxidant <= 0` (self-exhausting: once spent, the Process is a true zero, not an
+  epsilon-decaying tail).
+- **Mass-based yield, not molar** — `y_burst_per_o2 = 1.0 g/g`, an honest 1:1 default (the
+  `EllagitanninOxidation`/`y_ellag_per_o2` precedent for a lumped, unidentified compound), since
+  nothing is known about the antioxidant's stoichiometry against O2.
+- **Calibration is "excess over D-132's steady rate," never the full measured band** — because
+  `AntioxidantBurstOxidation` and `PhenolicBrowning` draw the *same* `o2` pool simultaneously, target
+  only the day-1 EXCESS above D-132's already-calibrated ~0.58 mg/L/day steady rate (the "D-132
+  additive-never-total trap," reapplied): target excess ≈ 1.0 mg/L/day at a fresh 8 mg/L O2 charge.
+  `k_burst_oxidation` (1.6 L/(g·h)) and `burst_antioxidant_initial` (3.3e-3 g/L) are jointly solved
+  from two constraints — (a) the day-1 excess-rate target at `t=0`, and (b) Ferreira's report that
+  the average rate is constant across saturation cycles 2-5, i.e. the burst pool must be ~95%+
+  exhausted within one ~10-day saturation cycle — with `y_burst_per_o2` fixed at 1.0. `E_a_burst_oxidation`
+  (50000.0 J/mol) is borrowed from sibling Arrhenius terms (`E_a_browning`/`E_a_so2_oxidation`; no
+  burst-specific temperature series exists in Ferreira) but still gets its own YAML parameter per
+  prime directive #2 — never shared by reference.
+- **Isolable / additive by design:** at `burst_antioxidant = 0` (unset or exhausted), combined
+  `ProcessSet` output is byte-for-byte identical to running `PhenolicBrowning` alone (verified via
+  `np.array_equal`) — no interaction term, no re-baseline of D-132's rate. Dosing `tannin`,
+  `anthocyanin`, or SO2 leaves the burst rate unchanged (verified numerically), confirming the
+  structural claim that this Process is blind to those pools.
+
+### Receipts
+- `core/media.py` — new `VarSpec("burst_antioxidant", "g/L", default=0.0, ...)` appended at the end
+  of `wine_schema()`'s specs.
+- `parameters/data/aging.yaml` — new block: `k_burst_oxidation`, `E_a_burst_oxidation`,
+  `y_burst_per_o2`, `burst_antioxidant_initial`, each full `Parameter` provenance (Ferreira 2015
+  source, calibration-target conditions, uncertainty bands, speculative tier).
+- `core/kinetics/aging.py` — new module-docstring paragraph ("the finite initial burst... D-133");
+  new class `AntioxidantBurstOxidation(Process)` inserted between `PhenolicBrowning` and
+  `StreckerDegradation`.
+- `core/kinetics/__init__.py` — export added (import + `__all__`).
+- `scenario/compile.py` — import added; `AntioxidantBurstOxidation` added to
+  `_AGING_GATED_PROCESSES` (off during ferment, on at `begin_aging`, the D-68/D-70 pattern); three
+  params added to the `begin_aging` param-presence guard tuple; `burst_antioxidant` seeded in
+  `_wine_initial` via the `dms_potential`-precedent fallback; `burst_antioxidant_gpl` added to
+  `_validate_initial_keys`'s wine-medium allowlist (**found only via manual smoke-test** — the
+  allowlist is a separate gate from the guard tuple and the seeding block, easy to miss when adding
+  a new dosable key).
+- `tests/test_aging.py` — import added; 15 new tests: structural no-op absent the slot/at zero O2 or
+  zero burst, self-exhaustion to a true zero, conservation (carbon/mass/nitrogen — nitrogen needs
+  `biomass_nitrogen_fraction=`), blindness to `tannin`/`anthocyanin`/SO2 dosing, additivity with
+  `PhenolicBrowning` (byte-for-byte at exhaustion), the day-1 excess-rate calibration check, the
+  combined-rate-lands-in-Ferreira's-full-band check, and the saturation-cycle exhaustion-timescale
+  check.
+- `tests/test_media.py` — `WINE_BURST_ANTIOXIDANT_SLOTS` constant; schema-names tuple and
+  `schema.size` (88 → 89) updated.
+- Full suite green: `ruff check .`, `mypy` (109 files), `pytest -n auto` (1272 passed, 85.25s).
+
+### Next
+- None outstanding for D-133 itself. D-132's other deferred items (tail-acceleration, gluconolactone,
+  MLF protein-protection) remain open, tracked under D-132/D-130/D-131.

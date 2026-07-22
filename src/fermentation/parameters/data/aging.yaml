@@ -655,6 +655,86 @@ y_a420_per_o2:
     notes: "SPECULATIVE magnitude (the most speculative parameter in this file -- an order-of-magnitude author estimate for an untabulated quantity, banded an order of magnitude). The load-bearing claim is only that oxidative aging produces VISIBLE, monotonic browning (A420 climbs with O2 exposure) -- not the exact absorbance. A420 is an optical index off every ledger, so this yield moves nothing conserved (the pigment's carbon comes from an untracked phenol pool -- sidestepped by using an absorbance, not a mass)."
 
 # ======================================================================================
+# INITIAL-BURST ANTIOXIDANT POOL (decision D-133): a finite, fast-reacting non-SO2 antioxidant
+# producing the Ferreira 2015 day-1 O2-consumption spike, ON TOP of (never inside) the D-132
+# steady-state phenolic-driven rate above.
+#
+# THE PROCESS (fermentation.core.kinetics.aging.AntioxidantBurstOxidation, WINE-ONLY):
+#
+#   d(o2)/dt                = -k_burst_oxidation * f(T) * [o2] * [burst_antioxidant]  (bilinear)
+#   d(burst_antioxidant)/dt = -y_burst_per_o2 * r_o2                                   (mass yield)
+#
+# Ferreira measured a day-1 O2-consumption rate of 0.54-8.2 mg/L/day -- more than an order of
+# magnitude faster than, and UNCORRELATED with (R^2 = 0), the steady 0.5-0.7 mg/L/day average the
+# D-132 phenolic-driven rate already reproduces. The paper's own between-wine correlates for BOTH
+# rates are Cu-POSITIVE and SO2-/phenolic-INDEPENDENT ("an unknown antioxidant"), so this Process
+# is deliberately its OWN pool: it does NOT read tannin/anthocyanin (D-132's driver -- reusing it
+# would contradict the sourced finding that the burst is phenolic-independent) and does NOT touch
+# so2_total (SulfiteOxidation's substrate, D-72 -- Ferreira's rates are reported SO2-independent,
+# so this residual is genuinely separate, not a re-count of SO2 protection).
+#
+# CALIBRATED AS THE EXCESS OVER STEADY, NOT THE FULL INITIAL BAND (the D-132 additive-never-total
+# trap, reapplied here). Both this Process and PhenolicBrowning draw the SAME shared o2 pool
+# simultaneously, so on day 1 the TOTAL rate = D-132 steady + this Process's burst. Ferreira notes
+# "in 12/15 wines initial >= 2.7x average" -- a representative day-1 TOTAL of ~2.7 * 0.58 =~ 1.57
+# mg/L/day for a typical red. Sizing this Process to the FULL initial band on top of the
+# already-Ferreira-calibrated D-132 steady rate would over-count the median wine by ~30%; this
+# Process's target is the EXCESS, 1.57 - 0.58 =~ 1.0 mg/L/day at a fresh 8 mg/L O2 charge, T_ref
+# = 20 C.
+#
+# TWO JOINT CONSTRAINTS pin k_burst_oxidation and the initial charge separately (one target alone
+# under-determines the pair): (a) the excess RATE at t=0 (above); (b) Ferreira reports the average
+# rate "constant across saturations 2-5" -- i.e. the burst is spent by the SECOND ~10-day
+# saturation cycle. With y_burst_per_o2 = 1.0 g/g (the honest 1:1 default for an unidentified
+# antioxidant -- no evidence, unlike ellagitannin's lumped macromolecule, of a multi-site
+# stoichiometry), constraint (b) requires k_burst_oxidation * o2_0 =~ 3/240h =~ 0.0125/h (~95%
+# spent in 10 days), giving k_burst_oxidation =~ 1.6 L/(g*h); constraint (a) then pins the typical
+# initial charge burst_antioxidant_initial =~ 3.3e-3 g/L. Once exhausted, only the D-132 steady
+# rate remains -- the "scavenges until exhausted" shape SulfiteOxidation (D-72) established, for a
+# genuinely distinct, non-renewable, non-SO2 pool.
+k_burst_oxidation:
+  value: 1.6
+  unit: "L/(g*h)"   # d(o2)/dt = -k_burst_oxidation * f(T) * [o2] * [burst_antioxidant]  (bilinear)
+  tier: speculative
+  uncertainty: { low: 0.5, high: 5.0, note: "bimolecular O2xburst_antioxidant rate constant at T_ref = 20 C. Sized (jointly with y_burst_per_o2) so the pool is ~95% spent within Ferreira's ~10-day saturation cycle (his average rate is 'constant across saturations 2-5' -- i.e. the burst does not recur). The load-bearing claim is the SHAPE (a fast, self-exhausting sink, the SulfiteOxidation precedent), not this exact rate constant -- burst_antioxidant_initial is the between-wine spread knob (Ferreira's initial rate spans 0.54-8.2 mg/L/day, R^2=0 vs average), not this rate. Banded an order of magnitude." }
+  provenance:
+    source: "Marrufo-Curtido, Ferreira & Escudero (2015), J. Agric. Food Chem. -- 15 real red wines, repeated O2-saturation cycles. The initial (day-1) O2-consumption rate is 0.54-8.2 mg/L/day, uncorrelated (R^2=0) with the steady 0.5-0.7 mg/L/day average, and both rates are Fe-/SO2-independent but strongly Cu-dependent (an 'unknown antioxidant'). The paper does not resolve a rate constant for this pool directly (it is not modelled as a discrete kinetic species in the source) -- this is CALIBRATED to reproduce the reported EXHAUSTION TIMESCALE (gone by saturation cycle 2) jointly with the excess-rate target below."
+    conditions: "generic red wine at cellar pH/temperature; bilinear in the dissolved-o2 pool and the burst_antioxidant pool (both g/L) at T_ref = 293.15 K."
+    notes: "SOURCED SHAPE (a finite, fast, self-exhausting O2 scavenger distinct from the renewable D-78 oak buffer and the always-on D-132 phenolic route -- the D-72 SulfiteOxidation 'protects until exhausted' analogue, but non-SO2) + SPECULATIVE magnitude. Does NOT read tannin/anthocyanin (D-132's driver) or so2_total (D-72's substrate) -- structurally independent, so it cannot double-count either sibling sink."
+
+E_a_burst_oxidation:
+  value: 50000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 70000.0, note: "Ferreira's saturation-cycle trials were not run across a temperature series (unlike the D-102 SMM-hydrolysis Arrhenius study), so no burst-specific activation energy is sourced. Set EQUAL to the sibling oxidative E_a's (E_a_browning/E_a_ethanol_oxidation/E_a_so2_oxidation, all 50 kJ/mol -- the same coupled O2-reduction chemistry), an explicit borrowed order-of-magnitude, not a derivation. Only the SIGN (warmer => faster scavenging, so warm storage burns through the burst pool faster) is load-bearing." }
+  provenance:
+    source: "author estimate, borrowed from the sibling O2-consuming Processes' activation energies (Singleton 1987; Danilewicz 2003/2007 coupled-oxidation mechanism) -- Ferreira 2015 itself gives no temperature series for the initial-burst rate."
+    conditions: "equivalent Arrhenius activation energy of the burst-antioxidant O2-scavenging reaction at T_ref = 293.15 K."
+    notes: "Its OWN parameter (not reused from E_a_browning/E_a_so2_oxidation) per prime directive #2 -- the burst pool is a chemically distinct, unidentified antioxidant, so it gets its own provenance entry even though the value coincides with its siblings (the E_a_so2_oxidation precedent). Only the DIRECTION is sourced; the magnitude is an explicit unverified borrow, documented rather than silently assumed."
+
+# -- MASS-BASED CONSUMPTION YIELD: how much burst_antioxidant one g of its O2 draw spends ----------
+y_burst_per_o2:
+  value: 1.0
+  unit: "g/g"   # g burst_antioxidant consumed per g O2 scavenged; d(burst_antioxidant)/dt = -y_burst_per_o2 * r_o2
+  tier: speculative
+  uncertainty: { low: 0.3, high: 3.0, note: "g unidentified antioxidant spent per g O2 it scavenges. Unlike y_ellag_per_o2 (2.0, a lumped macromolecule with multiple galloyl/gallate reactive sites), nothing is known about this pool's chemical identity, so 1.0 (a plain 1:1 mass ratio) is the honest 'no fake precision' default rather than an assumed multi-site stoichiometry. Banded an order of magnitude; sized jointly with k_burst_oxidation so the pool empties within Ferreira's ~10-day saturation-cycle timescale -- the LOAD-BEARING claim is that the pool IS finite and DOES exhaust, not this exact ratio." }
+  provenance:
+    source: "author estimate: absent any evidence for the burst antioxidant's chemical identity (Ferreira 2015 reports only that it correlates with Cu and not with SO2/phenolics), a 1:1 mass ratio is the minimal, unbiased assumption -- the y_ellag_per_o2 idiom (mass-based, no fake molar mass for an unspeciated pool) without borrowing that Process's multi-site multiplier."
+    conditions: "g burst_antioxidant consumed per g O2 scavenged by this route, generic red wine at T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude, MASS-based (no molar mass for an unidentified compound -- the y_ellag_per_o2 idiom). Off every ledger (burst_antioxidant, like o2/A420/ellagitannin), so this consumption moves nothing conserved. Jointly with k_burst_oxidation, sets the EXHAUSTION timescale (Ferreira: gone by saturation cycle 2) -- not independently meaningful."
+
+# -- INITIAL CHARGE: the grape-composition burst_antioxidant dose a fresh wine carries ----------
+burst_antioxidant_initial:
+  value: 3.3e-3
+  unit: "g/L"   # DMS-equivalent-style GRAPE composition input; seeds the burst_antioxidant state slot (D-133)
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 2.5e-2, note: "typical (central) charge sized so the day-1 EXCESS rate (over the D-132 steady rate) lands at ~1.0 mg/L/day at a fresh 8 mg/L O2 charge -- Ferreira's representative '2.7x average' case (2.7 * 0.58 - 0.58 =~ 1.0 mg/L/day). Banded to span Ferreira's full observed between-wine range: the low end (~5.0e-4) reproduces a near-zero-burst wine (his lowest initial rate, 0.54 mg/L/day, is actually BELOW the steady average -- essentially no burst); the high end (~2.5e-2) reproduces his most Cu-loaded outlier (initial ~8.2 mg/L/day, ~7.5 mg/L/day excess). This is the between-wine SPREAD knob -- Ferreira's actual driver (copper, unmeasured antioxidant chemistry) is untracked, so this initial charge is a calibration device standing in for that untracked variability, not a measured antioxidant concentration." }
+  provenance:
+    source: "Marrufo-Curtido, Ferreira & Escudero (2015) -- initial (day-1) O2-consumption rate 0.54-8.2 mg/L/day across 15 red wines, R^2=0 vs the steady average, Cu-positive/SO2-negative/phenolic-neutral. The paper does not identify or quantify the antioxidant species, so this initial charge is CALIBRATED (not measured) to reproduce the reported rate band via the model's own k_burst_oxidation/y_burst_per_o2."
+    conditions: "GRAPE-composition input (like dms_potential_initial), g/L, generic red wine at crush. Scenarios override via burst_antioxidant_gpl (the tannin_gpl/anthocyanin_gpl pattern)."
+    notes: "SOURCED MAGNITUDE TARGET (Ferreira's initial-rate band) + SPECULATIVE mechanism (a discrete finite pool is a modelling choice, not Ferreira's own framing) + SPECULATIVE central value. NOT a winemaking dose (the D-45/D-102 distinction): defaults to this sourced level rather than 0, so an un-overridden red wine still shows the day-1 burst Ferreira found in essentially every wine tested -- a 0 default would be the hard-zero defect (a Process that silently never fires)."
+
+# ======================================================================================
 # STRECKER DEGRADATION (decision D-75, the WINE-ONLY, SUBSTRATE-GATED oxidative aging sink that
 # produces the Strecker aldehydes). The oxidative-aroma axis: aged wine smells of cooked potato +
 # honey.

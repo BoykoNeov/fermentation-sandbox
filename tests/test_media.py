@@ -150,6 +150,13 @@ WINE_SPECIATED_AA_SLOTS = (
 # dose (a 0 default is the D-45 hard-zero defect).
 WINE_DMS_SLOTS = ("dms_potential", "dms")
 
+# The initial-burst antioxidant pool (decision D-133), appended last (the D-100/D-102 convention).
+# A finite, unidentified, non-SO2 antioxidant that scavenges O2 at Ferreira 2015's measured day-1
+# rate, distinct from both the D-132 phenolic driver and the D-72 SO2 substrate. Like
+# `dms_potential`, a GRAPE-composition property — seeded from `burst_antioxidant_initial` rather
+# than defaulting to 0.
+WINE_BURST_ANTIOXIDANT_SLOTS = ("burst_antioxidant",)
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -176,6 +183,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_MAILLARD_BROWNING_SLOTS
         + WINE_SPECIATED_AA_SLOTS
         + WINE_DMS_SLOTS
+        + WINE_BURST_ANTIOXIDANT_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -236,7 +244,10 @@ def test_wine_schema_has_single_sugar_slot():
     # the valine-derived part of each pool, in g/L of the labelled molecule). OFF the carbon
     # ledger, and necessarily so: each is a sub-quantity of a pool already weighted there, so
     # giving them weight would double-count every labelled gram.
-    assert schema.size == 88
+    # + 1 D-133 burst_antioxidant slot (the finite, unidentified, non-SO2 antioxidant pool that
+    # produces Ferreira's day-1 O2-consumption spike — a GRAPE-composition input like
+    # dms_potential, off every ledger).
+    assert schema.size == 89
 
 
 def test_beer_schema_has_three_sequential_sugars():

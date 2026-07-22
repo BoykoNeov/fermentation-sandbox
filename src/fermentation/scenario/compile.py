@@ -38,6 +38,7 @@ from fermentation.core.kinetics import (
     AcetaldehydeBridgedCondensation,
     AminoAcidAssimilation,
     AnthocyaninFading,
+    AntioxidantBurstOxidation,
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
     BiomassCarryingCapacity,
@@ -191,6 +192,7 @@ _AGING_GATED_PROCESSES = (
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     SulfiteOxidation,
+    AntioxidantBurstOxidation,
     StreckerDegradation,
     OakExtraction,
     EllagitanninOxidation,
@@ -389,6 +391,14 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             # default is Syrah's, which over-predicts a low-DMSp variety (see dms.yaml). Explicit 0
             # is still honoured, and makes the Process byte-for-byte inert.
             "dms_potential_ugl",
+            # The grape's initial-burst antioxidant charge in g/L (decision D-133) — the finite,
+            # unidentified, non-SO2 pool AntioxidantBurstOxidation scavenges. Like
+            # dms_potential_ugl, absent does NOT mean 0: it falls back to the sourced
+            # burst_antioxidant_initial (a 0 default would assert every wine's Ferreira-measured
+            # day-1 O2-burst is absent — the D-45 hard-zero defect). Scenarios SHOULD override it:
+            # Ferreira found >15x between-wine spread (Cu-driven, untracked here). Explicit 0 is
+            # still honoured, and makes the Process byte-for-byte inert.
+            "burst_antioxidant_gpl",
         }
     ),
     "beer": frozenset(
@@ -590,6 +600,23 @@ def _wine_initial(
         # begin_aging (aging is post-ferment), so present-but-un-aged wine carries them inertly too.
         "anthocyanin": _optional(values, "anthocyanin_gpl", 0.0),
         "tannin": _optional(values, "tannin_gpl", 0.0),
+        # Initial-burst antioxidant pool (decision D-133), g/L. Like dms_potential, this is NOT a
+        # winemaking dose but a GRAPE-composition property every must carries — so, unlike
+        # so2_total/tannin/anthocyanin above, it does NOT default to 0: it falls back to the
+        # sourced burst_antioxidant_initial. Defaulting to 0 would assert every wine's Ferreira-
+        # measured day-1 O2-burst is zero (the D-45 hard-zero defect). Scenarios override via
+        # `burst_antioxidant_gpl` — and should, since Ferreira found >15x between-wine spread
+        # (0.54-8.2 mg/L/day initial rate, Cu-driven, untracked here). Absent from the
+        # ParameterSet ⇒ 0.0, so older parameter sets still compile inertly.
+        "burst_antioxidant": _optional(
+            values,
+            "burst_antioxidant_gpl",
+            (
+                parameters["burst_antioxidant_initial"].value
+                if "burst_antioxidant_initial" in parameters
+                else 0.0
+            ),
+        ),
     }
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
@@ -1838,6 +1865,13 @@ def _verb_begin_aging(
         "k_browning_phenolic",
         "E_a_browning",
         "y_a420_per_o2",
+        # Initial-burst antioxidant pool (D-133): the finite, fast-reacting non-SO2 sink that
+        # produces Ferreira's day-1 O2-consumption spike. Substrate-gated on burst_antioxidant
+        # (guarded before reading params in-Process, like Strecker/EllagitanninOxidation), so these
+        # can never be missing-when-needed in practice; guarded here for parity.
+        "k_burst_oxidation",
+        "E_a_burst_oxidation",
+        "y_burst_per_o2",
         # Oak extraction (D-77): the non-oxidative barrel/chip axis begin_aging also enables. Only
         # the shared rate + activation energy are guarded here (the 15 toast-specific yields — 4
         # aroma + ellagitannin — are guarded at the add_oak verb, which is the only reader that

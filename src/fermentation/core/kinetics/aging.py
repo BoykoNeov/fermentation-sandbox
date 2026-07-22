@@ -110,6 +110,23 @@ always (monotonic; no clamp). Medium-agnostic (both media carry autoxidising pol
 oxidatively — D-74 supersedes D-73's provisional "wine-only" parenthetical), so wired into both
 media like :class:`OxidativeAcetaldehyde`.
 
+**The finite initial burst: an unidentified antioxidant pool (D-133).** Ferreira 2015 also
+measured a **day-1** O₂-consumption rate (0.54–8.2 mg/L/day) more than an order of magnitude
+faster than, and *uncorrelated* with (R² = 0), the steady average D-132 already reproduces —
+correlated instead with **copper** and an *unmeasured, non-phenolic, non-SO₂* antioxidant.
+:class:`AntioxidantBurstOxidation` models this as its **own finite pool** (``burst_antioxidant``,
+a grape-composition input like ``dms_potential``, D-102): deliberately **not** keyed off
+``tannin``/``anthocyanin`` (D-132's driver — the burst is phenolic-*independent*) and touching
+**no** SO₂ state (:class:`SulfiteOxidation`'s D-72 substrate — Ferreira's rates are reported
+SO₂-independent, so this is a genuinely separate residual, not a re-count of SO₂ protection). Sized
+as the **excess over the D-132 steady rate**, since both Processes draw the same shared ``o2``
+pool simultaneously (the D-132 additive-never-total trap, reapplied): the day-1 *total* is steady
++ burst, so calibrating this Process to the *full* initial band would double-count the
+already-Ferreira-calibrated steady rate. Once the pool is spent — by Ferreira's own account,
+within the first ~10-day saturation cycle — only the D-132 steady rate remains: the
+:class:`SulfiteOxidation` "scavenges until exhausted" shape, for a distinct, non-renewable,
+non-SO₂ antioxidant.
+
 **Off during the ferment, on during an aging segment (D-68/D-70).** These Processes ARE wired
 into both media's ProcessSet (D-70) but **disabled at the compile seam** — a ``begin_aging``
 scheduled event enables them for a long post-fermentation segment (the ``simulate_scheduled``
@@ -1490,6 +1507,143 @@ class PhenolicBrowning(Process):
         # mass —
         # so nothing conserved moves and no carbon is borrowed (unlike the ethanol route).
         d[schema.slice("A420")] = params["y_a420_per_o2"] * (r_o2 / M_O2)
+        return d
+
+
+class AntioxidantBurstOxidation(Process):
+    """Oxidative aging: dissolved O₂ scavenges a finite, unidentified antioxidant burst (D-133).
+
+    Ferreira 2015 (the same 15-red-wine, repeated-O₂-saturation-cycle dataset D-132 draws on)
+    measured **two** rates, not one. The **steady** rate (0.5–0.7 mg/L/day, constant across
+    saturation cycles 2–5) is what :class:`PhenolicBrowning`'s D-132 phenolic boost already
+    reproduces. The **day-1** rate (0.54–8.2 mg/L/day) is faster by more than an order of
+    magnitude and **uncorrelated** with the steady rate (R² = 0) — the paper's own between-wine
+    correlates for *both* rates are **copper-positive** and **SO₂-/phenolic-independent** (an
+    "unknown antioxidant"). This Process is the **fourth** sibling to claim a share of the shared
+    ``o2`` budget (after :class:`OxidativeAcetaldehyde`, :class:`SulfiteOxidation` and
+    :class:`PhenolicBrowning`), modelling that day-1 spike as a **finite, fast-reacting, non-SO₂
+    antioxidant pool** that scavenges O₂ preferentially until it is spent — after which only the
+    D-132 steady rate remains. Structurally this is the :class:`SulfiteOxidation` "protects until
+    exhausted" shape (D-72), but for a chemically distinct, **non-renewable**, **non-SO₂** pool
+    (contrast :class:`EllagitanninOxidation`'s *renewable* oak buffer, D-78).
+
+    **Two hard guards, both structural (owner-locked design, not a convention this Process could
+    silently drift from):**
+
+    1. **Does NOT reuse the D-132 phenolic driver.** Ferreira's initial rate is *uncorrelated*
+       with grape phenolics (unlike the steady rate D-132 keys off ``tannin``/``anthocyanin``) —
+       reusing that driver here would contradict the sourced finding. This Process's ``reads``
+       and ``derivatives`` never mention ``tannin`` or ``anthocyanin``; its substrate is the new,
+       independent ``burst_antioxidant`` pool alone.
+    2. **Does NOT double-count :class:`SulfiteOxidation` (D-72).** SO₂'s "protects until
+       exhausted" sink already supplies part of a real wine's fast-initial-then-declining O₂
+       draw. Ferreira reports *both* his rates as SO₂-independent, so the burst is a genuinely
+       separate, non-SO₂ residual — this Process never reads ``so2_total`` or bisulfite, so it
+       cannot structurally collide with :class:`SulfiteOxidation`'s own draw on the shared ``o2``
+       pool (the two are independent, competing sinks — the ``kᵢ / Σk`` split
+       :class:`ProcessSet` already gives every sibling, no diversion logic to write).
+
+    ``d(o2)/dt = −r`` with ``r = k_burst_oxidation · f(T) · [o2] · [burst_antioxidant]`` —
+    **bilinear** in the dissolved-O₂ pool and the burst driver (the :class:`SulfiteOxidation` /
+    :class:`EllagitanninOxidation` form), ``f(T) = arrhenius_factor(T, E_a_burst_oxidation,
+    T_ref)`` — its **own** activation energy (prime directive #2), borrowed in *magnitude* from
+    the sibling oxidative E_a's since Ferreira ran no temperature series for the burst
+    specifically (only the *direction*, warmer-scavenges-faster, is sourced). The pool is spent
+    at a **mass-based** yield::
+
+        d(burst_antioxidant)/dt = −y_burst_per_o2 · r
+
+    ``y_burst_per_o2 = 1.0 g/g`` — a plain 1:1 ratio, the honest "no fake precision" default for
+    an antioxidant of **unknown identity** (contrast :class:`EllagitanninOxidation`'s
+    ``y_ellag_per_o2 = 2.0``, which assumes a lumped macromolecule with several reactive sites;
+    nothing here justifies that assumption).
+
+    **Calibrated as the EXCESS over steady, never the full initial band (the D-132
+    additive-never-total trap, reapplied).** This Process and :class:`PhenolicBrowning` draw the
+    *same* shared ``o2`` pool simultaneously, so a fresh wine's day-1 *total* rate is
+    ``steady + burst``. Sizing this Process to Ferreira's *full* initial band on top of the
+    already-Ferreira-calibrated D-132 steady rate would over-count: the target here is the
+    **excess**. Ferreira notes "12/15 wines' initial rate ≥ 2.7× average" — a representative
+    day-1 total of ``2.7 × 0.58 ≈ 1.57 mg/L/day``; the excess is ``1.57 − 0.58 ≈ 1.0 mg/L/day`` at
+    a fresh 8 mg/L O₂ charge (T_ref = 20 °C). Two joint constraints (the excess *rate*, and
+    Ferreira's report that the average is "constant across saturations 2–5" — i.e. the burst is
+    gone by the *second* ~10-day cycle) jointly pin ``k_burst_oxidation`` and
+    ``burst_antioxidant_initial`` separately; see :data:`aging.yaml`'s provenance for the
+    arithmetic. The between-wine spread Ferreira measured (>15×, R² = 0, Cu-driven) is carried by
+    the initial-charge parameter, not the rate constant — the ``dms_potential`` precedent for a
+    grape-composition property with genuine between-wine variability.
+
+    **A grape-composition input, not a winemaking dose (the D-45/D-102 ``dms_potential``
+    precedent).** ``burst_antioxidant`` defaults to the *sourced* ``burst_antioxidant_initial``
+    in ``_wine_initial``, not to 0: a 0 default would silently assert that every wine's
+    Ferreira-measured day-1 burst is absent — the D-45 hard-zero defect. Scenarios override via
+    ``burst_antioxidant_gpl`` (the ``tannin_gpl``/``anthocyanin_gpl`` pattern) to dial the
+    between-wine spread explicitly.
+
+    **Off every ledger, no conservation term (the :class:`SulfiteOxidation` precedent).** Both
+    ``o2`` and ``burst_antioxidant`` (an unidentified compound with no clean molar mass — grape-
+    derived, like ``tannin``/``dms_potential``) are unweighted, so scavenging it to untracked
+    products moves **nothing conserved** — this Process touches only those two slots.
+
+    **Wine-only + isolable + doubly substrate-gated (prime directive #3).** Ferreira's dataset is
+    exclusively red wine, and — like :class:`SulfiteOxidation` — the new pool is wired into the
+    *wine* medium only; ``"burst_antioxidant" not in schema`` is a hard no-op on beer. Wired
+    **disabled at the compile seam**; ``begin_aging`` enables it alongside its oxidative siblings
+    (:data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no O₂ dosed, or once the
+    pool is exhausted, the ``o2 ≤ 0`` / ``burst_antioxidant ≤ 0`` guards return byte-for-byte zero
+    — a reductive aging, an un-seeded pool (older ``ParameterSet``s without
+    ``burst_antioxidant_initial``), or a post-exhaustion trajectory all fall back to exactly the
+    pre-D-133 D-132 rate. Tier **speculative** (the aging axis is the Tier-3 frontier; the *form*
+    — a finite, self-exhausting, non-SO₂ O₂ scavenger — is sourced, the rate/yield/charge
+    magnitudes order-of-magnitude estimates).
+    """
+
+    name = "antioxidant_burst_oxidation"
+    tier = Tier.SPECULATIVE
+    #: Consumes its share of the dissolved-O₂ substrate and spends the ``burst_antioxidant`` pool
+    #: it scavenges — both slots off every ledger, so nothing conserved moves; it touches those two
+    #: and nothing else (never ``tannin``/``anthocyanin``/``so2_total`` — the two D-133 guards).
+    touches = ("o2", "burst_antioxidant")
+    #: ``k_burst_oxidation``/``E_a_burst_oxidation``/``y_burst_per_o2`` are this Process's own
+    #: (aging.yaml, D-133); ``T_ref`` is shared with every Arrhenius rate. Their tiers cap the
+    #: ``o2``/``burst_antioxidant`` output tiers via parameter-tier propagation (D-1).
+    reads: tuple[str, ...] = (
+        "k_burst_oxidation",
+        "E_a_burst_oxidation",
+        "y_burst_per_o2",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        # Wine-only slot (Ferreira's dataset is exclusively red wine): a hard no-op on any schema
+        # without it, belt-and-suspenders to the wine-only wiring.
+        if "burst_antioxidant" not in schema or "o2" not in schema:
+            return d
+        o2 = float(y[schema.slice("o2")][0])
+        burst = float(y[schema.slice("burst_antioxidant")][0])
+        # No oxidant OR no burst pool left ⇒ no scavenging: a reductive aging, an un-seeded pool,
+        # or a post-exhaustion trajectory are all byte-for-byte the case without this Process (only
+        # the D-132 steady rate remains). Gate on the STATE before reading any of this Process's
+        # own params (the EllagitanninOxidation/Strecker discipline). ``<= 0`` also absorbs solver
+        # undershoot.
+        if o2 <= 0.0 or burst <= 0.0:
+            return d
+        temp = float(y[schema.slice("T")][0])
+        f_t = arrhenius_factor(temp, params["E_a_burst_oxidation"], params["T_ref"])
+        # This route's SHARE of the O₂-depletion rate (bilinear in o2 and the burst driver, the
+        # SulfiteOxidation/EllagitanninOxidation form) — substrate-gated on burst_antioxidant, so
+        # it adds ON TOP of the D-132 steady rate with no re-baseline (D-72/D-75/D-78 rule).
+        # ProcessSet sums the sinks, so o2 splits by kᵢ/Σk across every active oxidative Process.
+        r_o2 = params["k_burst_oxidation"] * f_t * o2 * burst  # g O2/L/h via the burst route
+        d[schema.slice("o2")] = -r_o2
+        # The pool is spent at a MASS-based yield (g burst_antioxidant / g O2) — its chemical
+        # identity is unknown, so an M_burst_antioxidant would be fake precision (the
+        # y_ellag_per_o2 idiom). Both slots off every ledger, so this consumption moves nothing
+        # conserved.
+        d[schema.slice("burst_antioxidant")] = -params["y_burst_per_o2"] * r_o2
         return d
 
 

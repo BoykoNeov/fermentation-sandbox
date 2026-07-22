@@ -1033,6 +1033,27 @@ def wine_schema() -> StateSchema:
             "it accumulates rather than settling to a residual. Off every ledger (with "
             "dms_potential — see that slot). Default 0 ⇒ no DMS at pitch. Decision D-102",
         ),
+        # The D-133 initial-burst antioxidant pool, appended LAST so existing wine slot indices are
+        # unchanged (the D-100/D-102 convention). An unidentified, non-SO2 antioxidant Ferreira 2015
+        # found positively Cu-correlated and phenolic/SO2-independent — its OWN pool, deliberately
+        # NOT keyed off tannin/anthocyanin (D-132's driver) or so2_total (D-72's substrate), so
+        # AntioxidantBurstOxidation cannot double-count either sibling sink.
+        VarSpec(
+            "burst_antioxidant",
+            "g/L",
+            default=0.0,
+            description="an unidentified, fast-reacting non-SO2 antioxidant (decision D-133) — a "
+            "GRAPE-composition property (like dms_potential), not a winemaking dose, so "
+            "_wine_initial seeds it from the sourced burst_antioxidant_initial rather than 0 (a 0 "
+            "default would silently assert every wine's Ferreira-measured day-1 O2-burst is "
+            "zero — the D-45 hard-zero defect). Scavenged by AntioxidantBurstOxidation, which "
+            "produces the fast day-1 O2-consumption rate Ferreira 2015 measured (0.54-8.2 "
+            "mg/L/day, uncorrelated with the steady D-132 rate); once exhausted, only the D-132 "
+            "phenolic-driven rate remains. Off every ledger (grape-derived, the "
+            "dms_potential/tannin precedent) and its own pool, independent of tannin/anthocyanin "
+            "and so2_total by construction. Default 0 ⇒ an un-seeded/older ParameterSet compiles "
+            "inertly (byte-for-byte the pre-D-133 case)",
+        ),
     ]
     return StateSchema(specs)
 
