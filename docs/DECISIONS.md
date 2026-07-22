@@ -14151,6 +14151,49 @@ there. But **the rebuild is not guaranteed to flip the sign, and the cascade mus
 mechanism fidelity rather than on a promised sign change.** Anyone approving it on "it will make
 acetaldehyde rise with phenolics" is approving the wrong thing.
 
+### The regime confound — and why the cascade will NOT flip the sign either
+
+**This project's own lesson applied to itself** ([[feedback-measure-which-side-before-building]]:
+"a rate knob on a supply-limited quantity"). F2 as first written compares the model against a
+sourced sign measured in a *different regime*, and the correction is sharper than the
+"not-guaranteed" caveat above.
+
+**The datum is already in the census and was half-missed: total O2 consumed is
+phenol-independent.** White 5.193, red 5.194, red+oak 5.195 mg/L over five years — identical.
+Under D-136's supply limitation the closure fixes the total; phenolic load cannot change how much
+O2 is consumed, only how it is divided. So **acetaldehyde-vs-phenol in a bottle is pure partition
+arithmetic**, nothing else.
+
+The sources' positive sign was measured **O2-replete, over a fixed window** — ample O2, vary
+phenol, and more phenol consumes more O2 *within the window*, hence more H2O2 and more
+acetaldehyde. That is a rate-over-fixed-window effect. **It does not survive integration to full
+O2 conversion**, which is exactly what a sealed bottle does.
+
+**Therefore the faithful cascade will not make acetaldehyde rise with phenolic load in a bottle
+either.** In the cascade, O2 → H2O2 is supply-capped (~1:1) and H2O2 branches on [Fe] vs
+[HSO3⁻] — neither of which depends on phenol. The *only* phenol-dependent term on that branch is
+the hydroxycinnamate quench of the 1-hydroxyethyl radical, and it is **negative**. The cascade
+therefore lands acetaldehyde **phenol-neutral to phenol-negative**, set by the Fe/SO2 branching.
+
+This does not weaken the case for building it — the cascade's job is to make the *mechanism* right
+(ethanol oxidation downstream of phenol oxidation; SO2 a direct O2 reactant at neither node), and
+that remains the correct reason. But it changes what may be written as an acceptance test:
+
+> **Do not write an acceptance test expecting phenol ⇒ more acetaldehyde, and never tune the
+> cascade to produce one.** That target is a regime artifact of the O2-replete experiments, not a
+> property of bottle aging. Anyone who forces it will be fitting the model to the wrong regime.
+
+It also unifies two findings that looked separate: **F2 and F3 are the same lever seen twice.**
+The acetaldehyde predictor is the H2O2 branching, which is why `k_so2_oxidation` — the current
+model's stand-in for that branching — moves acetaldehyde 10.5x while barely moving SO2.
+
+**Consequently McArdle & Hoffmann 1983 is not merely the highest-value remaining fetch, it is the
+crux.** The H2O2 + HSO3⁻ rate constant measured against the Fenton rate *is* the branching, *is*
+the acetaldehyde predictor, and *is* the test of whether the cascade is parameterizable at all.
+The 250 µM threshold and the 1:2 ratio already in hand are corroboration; this one is the
+mechanism. It deserves a dedicated pass through the atmospheric-chemistry secondaries, where it is
+cited constantly, before it is parked as blocked.
+
 ### Surfaced in passing, and probably bigger than the cascade
 
 Bueno et al., quoted in the same chapter: the rise in oxidised-aroma carbonyls in real wine is
