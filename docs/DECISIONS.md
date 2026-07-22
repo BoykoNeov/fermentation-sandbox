@@ -14239,3 +14239,165 @@ own D-record regardless of how the cascade proceeds.**
   going big-bang red.
 - **The reversal's true blast radius is D-71 / D-72 / D-74 / D-132 plus D-133 / D-134** and both
   colour-oxidation Processes — not the three Processes F2 discusses.
+
+### Gate 1 closed — all four primaries in hand, and the O2 gate is neither phenol nor SO2 but iron
+
+Owner instruction was "pull the four primaries first." Done, plus a fifth that outweighs three of
+them. **The headline is not the branching ratio Gate 1 went looking for.** It is that the cascade
+sketched in F2 still has the wrong species at the top.
+
+| primary | got | how |
+|---|---|---|
+| McArdle & Hoffmann 1983 | **rate law + constant**, confirmed against two independent secondaries | ACS paywalled; recovered from atmospheric-chemistry compilations where it is a standard citation |
+| Danilewicz 2016 | **abstract verbatim** + the 1:2 / 1:1.7 / 1:1 series | `ajevonline.org/content/67/1/13` renders the abstract |
+| Gislason, Currie & Waterhouse 2011 | title + mechanism + result | secondaries; cited in the dissertation below |
+| Elias & Waterhouse 2010 | still no full text | but its content is quoted at length inside the dissertation below |
+| **Nguyen & Waterhouse 2021** (the new lead) | **FULL TEXT, open access** | UC eScholarship hosts Nguyen's UC Davis dissertation; the paper is Chapter 4 verbatim |
+
+The eScholarship hit is the D-123/D-135/D-136 lesson paying off a fourth time: a paywalled paper's
+content is often sitting in the first author's institutional thesis. `pdftotext -layout` extracts
+it cleanly where `WebFetch` returns binary.
+
+**Danilewicz 2011 (AJEV 62(3):319-328, "Key Role of Iron") is the one that matters most**, and it
+was not on the list:
+
+> "the initial O2 uptake increased with increasing concentrations of Fe(II) and Cu(II), indicating
+> that **Fe was the initial reactant**" — polyphenols do *not* react directly with O2, and
+> **sulfite does not react directly with O2** either; "nucleophiles such as sulfite accelerate
+> oxidation by reacting with quinones."
+
+So the O2 gate is **Fe(II) + O2**. Phenols, sulfite and ethanol are all downstream, competing for
+the *reduced-oxygen intermediates* (H2O2, quinone) and for Fe(III) — never for O2. F2 as written
+put phenol oxidation at the gate; that is closer than the shipped code but still wrong. The correct
+top of the cascade is iron, with phenols and sulfite as the reductant supply that keeps it turning.
+
+**This retro-explains F1 and dissolves its paradox.** The audit measured SO2 taking ~90% of the
+5-year O2 budget through a direct SO2 + O2 Process. Danilewicz says SO2 consumes ~none of the O2
+directly — but *enables* nearly all of it, because without a nucleophile to clear the quinones
+"after an initial uptake of O2 very little further reaction occurred." SO2's share of the budget is
+right in magnitude and inverted in role: the model has the dominant **competitor** where reality has
+the dominant **enabler**. The 1:2 O2:SO2 stoichiometry comes out the same either way, which is
+precisely why D-72's wrong mechanism has been producing a right-looking number for as long as it
+has. Same failure mode as F2, one level up.
+
+**Copper re-homes on the same evidence.** Fe(II) *and* Cu(II) both raise initial O2 uptake, and
+Danilewicz 2007's Fe/Cu synergism says the effect is joint, not independent. D-134's copper belongs
+at the O2-activation step, scaling the whole cascade — not as a browning-rate multiplier. Gate 2
+already suspected this; it is now sourced.
+
+#### The branch number, and why the one in-wine measurement of it cannot calibrate anything
+
+Nguyen & Waterhouse Ch. 4 is the only measurement of the H2O2 branch *in model wine at
+wine-realistic SO2*: anoxic, 12% EtOH, 50 mM acid, Fe(II) 100 uM, H2O2 600 uM, SO2 600 uM
+(38.4 mg/L), pH 3.0 and 4.0. Two classes of number come out of it, and they do **not** have equal
+standing.
+
+**Trustworthy — Table 4.1, pseudo-first-order k for H2O2 consumption, no SO2 (1/s):**
+
+| acid | pH 3.0 | pH 4.0 |
+|---|---|---|
+| tartrate | 2.92e-2 | 8.15e-2 |
+| malate | 2.19e-2 | 9.14e-2 |
+| citrate | 6.90e-2 | 1.43e-1 |
+| 12:12:1 blend | 2.71e-2 | 8.67e-2 |
+
+tau ~ 24 s at pH 3.0, far slower than mixing, so these are real. They also give the *pH* and *acid
+composition* dependence of the Fenton limb for free — and note the blend is predicted to within 10%
+by the weighted average of its components, so the model can carry one lumped organic-acid term
+rather than three.
+
+**Not trustworthy as a calibration target — the with-SO2 branch yield.** At 600 uM SO2 the measured
+acetaldehyde is ~1/6 of the no-SO2 yield (55-80 uM for tartrate/malate/blend, 121-133 uM for
+citrate). Set against the McArdle competition this is a ~150x discrepancy at pH 3.0:
+
+| pH | k_Fenton (1/s) | k_SO2 (1/s) | predicted Fenton share | measured |
+|---|---|---|---|---|
+| 3.0 | 2.92e-2 | 41.2 | 0.07% | ~11% |
+| 4.0 | 8.15e-2 | 4.43 | 1.8% | ~11% |
+
+**The discrepancy is a mixing fingerprint, not a mechanism fingerprint.** It collapses from 150x to
+6x as the SO2 reaction slows toward the homogenization timescale — at pH 3.0 the predicted H2O2
+half-life against bisulfite is **17 ms**, which no bolus addition into a stirred 100 mL flask can
+outrun. The tempting mechanistic reading (inner-sphere control: H2O2 commits to the iron complex
+before bisulfite can reach it) predicts the *opposite* trend, since iron complexation is stronger at
+pH 4.0 and the gap should widen there. It narrows. The data go the mixing way.
+
+So the honest verdict is narrower than "the bulk competition is falsified" and narrower than "the
+branch is calibrated":
+
+> **The branch is SO2-gated and small while free SO2 persists. The only in-wine measurement of it
+> is mixing-limited and therefore bounds the Fenton share from above; it can neither calibrate a
+> bulk competition nor refute one.** A real bottle under D-136 generates H2O2 slowly and *in situ* —
+> no bolus, no mixing limit — so the bulk competition plausibly does govern there, and it says SO2
+> wins by ~1400:1 at 38 mg/L free SO2.
+
+That is not a new result so much as D-137's result arriving by a second road: SO2-gated, Fenton
+irrelevant until free SO2 is spent, acetaldehyde phenol-neutral to phenol-negative.
+
+#### Three traps this pass nearly imported
+
+1. **"The H2O2 + S(IV) rate is pH-independent above pH 2."** True in atmospheric chemistry, false in
+   wine, and the reason is a regime difference of exactly the D-137 kind. There, S(IV) is buffered by
+   Henry's-law equilibrium with gas-phase SO2 so [HSO3-] scales as 1/[H+] and cancels the [H+] in the
+   rate law. In wine free SO2 is a **fixed dissolved pool** with no gas reservoir, so above pKa1
+   (1.86) HSO3- is saturated and the rate carries the full [H+] factor: **~10x slower per pH unit,
+   pH 3 to 4.** Importing the atmospheric simplification would silently delete a real pH knob.
+2. **Elias & Waterhouse's "250 uM free SO2 prevents the Fenton reaction"** is a
+   detection-over-a-fixed-window statement, i.e. the same regime confound already recorded in D-137.
+   Read that way it stops contradicting Nguyen's "1/6 still gets through at 600 uM," and the apparent
+   lab-to-lab conflict mostly dissolves. Do not encode 250 uM as a threshold.
+3. **McArdle's constant was measured in water, not 12% ethanol.** The lower dielectric slows an
+   ion-molecule reaction — a real 2-5x transfer caveat, nowhere near the 150x above. If it is ever
+   carried into the model it is `plausible` at best, never `validated`.
+
+#### Gislason 2011 — the counter-sign term has no carrier in the current state vector
+
+The quench is specific and structural:
+
+> caffeic acid "significantly decreased the production of acetaldehyde in deaerated model wine
+> containing hydrogen peroxide and iron(II)"; the 1-hydroxyethyl radical reacts with it **by
+> addition to the double bond of the cinnamate side chain**, giving an allylic alcohol, in
+> competition with oxidation to acetaldehyde.
+
+The reactive feature is the **side-chain double bond**, not the catechol ring. So the quencher pool
+is the hydroxycinnamates — caffeic, p-coumaric, ferulic, caftaric — and **flavan-3-ols, tannins and
+anthocyanins are not quenchers**, having no such side chain. The D-137 audit established that the
+model's phenolic terms read `tannin + anthocyanin`. **There is therefore no state variable in which
+the counter-sign term could live.** Either the cascade adds a hydroxycinnamate pool with its own
+provenance entry, or it ships knowingly without the only sourced negative term on acetaldehyde —
+and that choice must be recorded, not defaulted. (A further wrinkle, unresolved: the 1-HER/caffeate
+reaction is reported to switch from reduction to oxidation with pH, so the sign of this term may
+itself be pH-dependent across 3.0-4.0.)
+
+#### Danilewicz 2016 — a sourced calibration target the model currently misses
+
+> "the O2:SO2 molar reaction ratio is close to **1:2** in ideal experimental conditions... The
+> reaction ratio was found to be decreased down to **1:1.7 in most wines**... [with quinones blocked
+> by benzenesulfinic acid] the molar reaction ratio was then reduced to **1:1**... sulfite is fully
+> effective in removing hydrogen peroxide and... the reduction from the theoretical 1:2 was due to
+> limited interaction with polyphenol oxidation products."
+
+Three points, not one, and they separate the two nodes cleanly: **1:1 is the H2O2 node alone**
+(quinone route blocked), **1:2 is both nodes running ideally**, **1:1.7 is real wine**, the shortfall
+being incomplete quinone capture. That is a genuine acceptance benchmark for the rebuilt cascade and
+a stronger test than any single ratio: it constrains the two branches *separately*. The model ships
+1:2 flat (D-72). Real wines are 1:1.7. **Do not patch the 2 to 1.7** — the whole point is that the
+cascade should produce 1.7 as an emergent consequence of partial quinone capture, and a fitted 1.7
+would destroy the only test that distinguishes the two nodes.
+
+#### Revised state of the gates
+
+- **Gate 1: CLOSED.** Branching is sourceable; the sources are in hand; and they changed the design
+  twice (iron at the gate, hydroxycinnamates as the missing carrier) before a line of code was
+  written. Both changes would have been expensive to discover after the build.
+- **Gate 2 (sink -> node map): now partly answered and partly harder.** Copper's re-homing is
+  sourced. But the map is no longer "which sink attaches to which node" — with iron at the gate,
+  *no* sink attaches to O2 except iron, and all seven current O2 sinks must be re-expressed as
+  consumers of H2O2, quinone, or Fe(III). That is a larger rewrite than F2 scoped.
+- **Gate 3 (expected-red enumeration): unchanged and still mandatory.** The isolable-alternative
+  -process-set recommendation now matters more, not less, given Gate 2 grew.
+- **Still open, unchanged:** adduct release (pathway 3) deserves its own D-record.
+
+**Receipts:** `M:\claud_projects\temp\d137-gate1\` — `redox.txt` (Nguyen dissertation, full text),
+`branch_check.py` (the competition arithmetic and the table above), `GATE1-branching-sourcing.md`
+(the full sourcing log).
