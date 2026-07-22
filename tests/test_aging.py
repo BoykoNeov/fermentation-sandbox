@@ -1318,7 +1318,7 @@ def test_sulfite_oxidation_tier_floored_at_speculative(so2_store):
 # PhenolicBrowning (decision D-74) — the first ALWAYS-ON sink on the shared ``o2`` budget (D-71):
 # dissolved O₂ oxidises phenolics → brown pigment, accumulating the ``A420`` browning index (an
 # optical absorbance, dimensionless AU — NOT a mass). First-order in [o2] (its OWN, DOMINANT share
-# ``k_browning`` > ``k_ethanol_oxidation``), Arrhenius warmer-faster. Touches only ``o2`` +
+# ``k_browning_base`` > ``k_ethanol_oxidation``), Arrhenius warmer-faster. Touches only ``o2`` +
 # ``A420``,
 # BOTH off every ledger — so it moves NOTHING conserved (the cleanest aging Process; not even a
 # carbon borrow). MEDIUM-AGNOSTIC (both media brown; ``A420`` exists in both schemas). These tests
@@ -1339,9 +1339,16 @@ def test_browning_metadata():
     # Consumes its O₂ share and books the oxidised phenol as the A420 browning index — both off
     # every
     # ledger, so nothing conserved moves. Touches those two and nothing else (not even a carbon
-    # borrow).
+    # borrow). tannin/anthocyanin are READ (D-132) but never written, so — like T elsewhere — they
+    # are not part of touches.
     assert set(p.touches) == {"o2", "A420"}
-    assert set(p.reads) == {"k_browning", "E_a_browning", "y_a420_per_o2", "T_ref"}
+    assert set(p.reads) == {
+        "k_browning_base",
+        "k_browning_phenolic",
+        "E_a_browning",
+        "y_a420_per_o2",
+        "T_ref",
+    }
 
 
 def test_browning_matches_closed_form(params):
@@ -1350,7 +1357,9 @@ def test_browning_matches_closed_form(params):
     y = _aged_wine(schema, ester=0.0, t=t, o2=o2)
     d = PhenolicBrowning().derivatives(0.0, y, schema, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
-    r_o2 = params["k_browning"] * f_t * o2
+    # No tannin/anthocyanin dosed ⇒ k_browning_eff is byte-for-byte k_browning_base (D-132
+    # isolability at zero grape phenolics).
+    r_o2 = params["k_browning_base"] * f_t * o2
     assert schema.get(d, "o2") == pytest.approx(-r_o2)
     assert schema.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
     # Touches ONLY o2 + A420 — nothing else moves (not even E/acetaldehyde: browning borrows no
@@ -1363,16 +1372,94 @@ def test_browning_matches_closed_form(params):
 def test_browning_is_dominant_share_over_ethanol_oxidation(params):
     # The load-bearing D-74 ordering: browning is the DOMINANT always-on O₂ sink, so at the same
     # [o2]
-    # it draws a larger O₂ rate than ethanol oxidation (k_browning > k_ethanol_oxidation), and the
-    # two
-    # shares sum to the calibrated always-on total (5.0e-4) that holds the O₂-depletion timescale.
-    assert params["k_browning"] > params["k_ethanol_oxidation"]
-    assert params["k_browning"] + params["k_ethanol_oxidation"] == pytest.approx(5.0e-4)
+    # it draws a larger O₂ rate than ethanol oxidation (k_browning_base > k_ethanol_oxidation), and
+    # the
+    # two BASELINE shares sum to the calibrated always-on total (5.0e-4) that holds the
+    # O₂-depletion
+    # timescale (D-132 leaves this floor untouched; a real red's effective rate is higher still).
+    assert params["k_browning_base"] > params["k_ethanol_oxidation"]
+    assert params["k_browning_base"] + params["k_ethanol_oxidation"] == pytest.approx(5.0e-4)
     schema = wine_schema()
     y = _aged_wine(schema, ester=0.0, o2=0.03)
     brown = PhenolicBrowning().derivatives(0.0, y, schema, params)
     ethanol = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
     assert -schema.get(brown, "o2") > -schema.get(ethanol, "o2") > 0.0
+
+
+def test_browning_phenolic_boost_matches_closed_form(params):
+    # D-132: dosed tannin + anthocyanin lift k_browning_eff above the baseline. Closed form:
+    # k_browning_eff = k_browning_base + k_browning_phenolic * (tannin + anthocyanin).
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    tannin, anthocyanin = 2.0, 0.3  # the "typical red" anchor (polymerization.yaml D-79/D-81/D-84)
+    y = _aged_wine(schema, ester=0.0, t=t, o2=o2, tannin=tannin, anthocyanin=anthocyanin)
+    d = PhenolicBrowning().derivatives(0.0, y, schema, params)
+    f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
+    k_eff = params["k_browning_base"] + params["k_browning_phenolic"] * (tannin + anthocyanin)
+    assert k_eff > params["k_browning_base"]  # the boost strictly raises the rate
+    r_o2 = k_eff * f_t * o2
+    assert schema.get(d, "o2") == pytest.approx(-r_o2)
+    assert schema.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
+
+
+def test_browning_phenolic_boost_isolable_at_zero_phenolics(params):
+    # D-132 isolability (the D-129/D-131 GATE-1 pattern): explicitly dosing zero tannin AND zero
+    # anthocyanin is byte-for-byte the case without the phenolic term at all.
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    zero = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, tannin=0.0, anthocyanin=0.0), schema, params
+    )
+    baseline = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2), schema, params
+    )
+    assert np.array_equal(zero, baseline)
+
+
+def test_browning_phenolic_boost_rises_with_phenolic_load(params):
+    # Monotone in combined grape phenolics: more tannin+anthocyanin ⇒ faster O₂ uptake / A420 rise
+    # (the D-132 sourced ordering — more phenolics, more oxidation).
+    schema = wine_schema()
+    o2, t = 0.03, 298.15
+    low = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, tannin=0.5, anthocyanin=0.05), schema, params
+    )
+    high = PhenolicBrowning().derivatives(
+        0.0, _aged_wine(schema, ester=0.0, t=t, o2=o2, tannin=2.0, anthocyanin=0.3), schema, params
+    )
+    assert -schema.get(high, "o2") > -schema.get(low, "o2") > 0.0
+    assert schema.get(high, "A420") > schema.get(low, "A420") > 0.0
+
+
+def test_browning_phenolic_boost_absent_on_beer(params):
+    # tannin/anthocyanin are wine-only must-input slots (D-79), absent from beer's schema. The
+    # Process guards their absence rather than gating the whole run (unlike a wine-only Process):
+    # beer still browns, at the unboosted k_browning_base rate.
+    beer = beer_schema()
+    assert "tannin" not in beer and "anthocyanin" not in beer
+    o2, t = 0.03, 298.15
+    yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": t, "CO2": 0.0})
+    yb[beer.slice("o2")] = o2
+    d = PhenolicBrowning().derivatives(0.0, yb, beer, params)
+    f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
+    r_o2 = params["k_browning_base"] * f_t * o2
+    assert beer.get(d, "o2") == pytest.approx(-r_o2)
+
+
+def test_browning_typical_red_lands_in_ferreira_band(params):
+    # THE D-132 HEADLINE CALIBRATION: at a fresh ~8 mg/L O₂ saturation charge and a typical red's
+    # grape phenolic load, the TOTAL O₂-depletion rate (ethanol oxidation + browning) lands in
+    # Ferreira 2015's measured real-wine average of 0.5-0.7 mg/L/day — the previous medium-agnostic
+    # rate under-predicted this by ~6-8x (see aging.yaml's k_browning_phenolic provenance).
+    schema = wine_schema()
+    o2 = 0.008  # ~8 mg/L, T_ref (f_t = 1, no Arrhenius correction needed)
+    tannin, anthocyanin = 2.0, 0.3
+    y = _aged_wine(schema, ester=0.0, o2=o2, tannin=tannin, anthocyanin=anthocyanin)
+    brown = PhenolicBrowning().derivatives(0.0, y, schema, params)
+    ethanol = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
+    total_rate_g_l_h = -schema.get(brown, "o2") - schema.get(ethanol, "o2")
+    total_rate_mg_l_day = total_rate_g_l_h * 1000.0 * 24.0
+    assert 0.5 <= total_rate_mg_l_day <= 0.7
 
 
 def test_browning_is_first_order_in_oxygen(params):
@@ -1428,7 +1515,7 @@ def test_browning_is_medium_agnostic_on_beer(params):
     yb[beer.slice("o2")] = o2
     d = PhenolicBrowning().derivatives(0.0, yb, beer, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
-    r_o2 = params["k_browning"] * f_t * o2
+    r_o2 = params["k_browning_base"] * f_t * o2
     assert beer.get(d, "o2") == pytest.approx(-r_o2)
     assert beer.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
 
@@ -1480,8 +1567,9 @@ def test_browning_diverts_o2_and_suppresses_acetaldehyde(params, store):
     o2_0 = 0.04  # ~40 mg/L O₂ charge
     # A LONG span so BOTH runs fully plateau (the O₂ charge is spent): the ethanol-only run depletes
     # O₂ at the slower k_ethanol_oxidation alone, so it needs the long tail to reach its ceiling —
-    # only once both have plateaued does the clean partition ratio k_ethanol/(k_ethanol+k_browning)
-    # hold (in finite time the slower run lags its ceiling and the ratio reads high).
+    # only once both have plateaued does the clean partition ratio
+    # k_ethanol/(k_ethanol+k_browning_base) hold (in finite time the slower run lags its ceiling and
+    # the ratio reads high).
     span = (0.0, 24.0 * 365.0 * 5.0)
 
     def run(processes: list[Process]) -> Trajectory:
@@ -1499,13 +1587,14 @@ def test_browning_diverts_o2_and_suppresses_acetaldehyde(params, store):
     # Browning diverts O₂ ⇒ LESS oxidative acetaldehyde, and it builds visible brown (A420 > 0)
     # where
     # the ethanol-only run browns none. The suppression tracks the share: browning takes
-    # ~k_browning /
-    # (k_browning + k_ethanol) of the O₂, so acetaldehyde falls toward the ethanol share ~40%.
+    # ~k_browning_base /
+    # (k_browning_base + k_ethanol) of the O₂, so acetaldehyde falls toward the ethanol share ~40%
+    # (no tannin/anthocyanin dosed here ⇒ k_browning_eff is byte-for-byte k_browning_base, D-132).
     assert acet_diverted < acet_alone
     assert float(with_browning.series("A420")[-1]) > 0.0
     assert float(ethanol_only.series("A420")[-1]) == 0.0
     share_ethanol = params["k_ethanol_oxidation"] / (
-        params["k_ethanol_oxidation"] + params["k_browning"]
+        params["k_ethanol_oxidation"] + params["k_browning_base"]
     )
     assert acet_diverted == pytest.approx(share_ethanol * acet_alone, rel=0.05)
     # Carbon still closes (E → acetaldehyde the only on-ledger move; o2/A420 off every ledger).
@@ -3509,11 +3598,12 @@ def test_furaneol_and_caramelization_coexist_without_collision(caramel_oak_store
 # PROTECTION: an oaked + oxygenated wine browns LESS (lower A420) and makes LESS oxidative
 # acetaldehyde than an un-oaked wine at the same O₂ dose (the D-72 "SO₂ protects" threshold with a
 # RENEWABLE buffer). Substrate-gated on ellagitannin ⇒ adds on top with NO re-baseline of the
-# k_ethanol_oxidation + k_browning = 5.0e-4 anchor. Off every ledger (both slots unweighted), so it
-# moves nothing conserved. These tests pin the closed form, the bilinearity, the reaction-scale
-# temperature ordering, the doubly-substrate-gated inertness (KeyError-safe without oak.yaml), the
-# wine-only no-op on beer, THE PROTECTION SPINE (partial, not total), the sacrificial-consumption
-# softening (astringency_series), the off-every-ledger invariance, and the speculative tier floor.
+# k_ethanol_oxidation + k_browning_base = 5.0e-4 anchor. Off every ledger (both slots unweighted),
+# so it moves nothing conserved. These tests pin the closed form, the bilinearity, the
+# reaction-scale temperature ordering, the doubly-substrate-gated inertness (KeyError-safe without
+# oak.yaml), the wine-only no-op on beer, THE PROTECTION SPINE (partial, not total), the
+# sacrificial-consumption softening (astringency_series), the off-every-ledger invariance, and the
+# speculative tier floor.
 
 
 @pytest.fixture

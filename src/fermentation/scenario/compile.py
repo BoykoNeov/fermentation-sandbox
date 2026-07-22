@@ -1834,7 +1834,8 @@ def _verb_begin_aging(
         "y_acetaldehyde_per_o2",
         "k_so2_oxidation",
         "E_a_so2_oxidation",
-        "k_browning",
+        "k_browning_base",
+        "k_browning_phenolic",
         "E_a_browning",
         "y_a420_per_o2",
         # Oak extraction (D-77): the non-oxidative barrel/chip axis begin_aging also enables. Only

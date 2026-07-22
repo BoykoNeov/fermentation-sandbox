@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-22T07:09:38.134Z
+  modified: 2026-07-22T07:45:02.717Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation
@@ -19,20 +19,24 @@ here (see [[feedback-batch-end-ritual]]). This file is capped at 200 lines
 re-cut; keep entries to a name plus a one-line hook and let the reader open the
 D-record.
 
-- `docs/DECISIONS.md` — every decision D-1 … D-131, with fork, choice, reasoning.
+- `docs/DECISIONS.md` — every decision D-1 … D-132, with fork, choice, reasoning.
   **The canonical archive.** Its `<!-- END INDEX -->` TOC lags — it stops at
-  D-129; the entries themselves are current (body reaches D-131).
+  D-129; the entries themselves are current (body reaches D-132).
 - `docs/ARCHITECTURE.md` — layering, package map, core/runtime/scenario seams.
 - `docs/plans/milestone-*.md` — task checklists per milestone.
 - `CLAUDE.md` — prime directives (tiers, provenance, one-directional deps).
 
-**Status (2026-07-21 — at D-131):** M0/M1/M2 **complete**; **Milestone 3**
-(sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress. **D-131** built MLF
+**Status (2026-07-22 — at D-132):** M0/M1/M2 **complete**; **Milestone 3**
+(sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress. **D-132** made
+`PhenolicBrowning`'s O2-consumption rate phenolic-driven (Ferreira 2015):
+`k_browning_eff = k_browning_base + k_browning_phenolic·(tannin+anthocyanin)`,
+additive not proportional, isolable at zero phenolics, first-order-in-o2
+re-confirmed not replaced. **D-131** built MLF
 medium-chain-fatty-acid inhibition (`mcfa` inert must-input slot, bacteriostatic
 `g_FA` gate on conversion/growth NOT death, Lonvaud-Funel 1988 Table 6, plausible).
 **D-130** built botrytis SO2 binding (`oxofructose` must-input, 4th carbonyl, Barbe
-2000). **D-129** built the ethanol ceiling `EthanolToleranceDeath`. ruff + mypy (109)
-+ full pytest all green. Collection counts drift ±1–2 between beats; not a real delta.
+2000). ruff + mypy (109) + full pytest all green (1256). Collection counts drift
+±1–2 between beats; not a real delta.
 
 **DONE — do NOT re-propose these (I did, twice, from stale "Next:" breadcrumbs;
 see [[feedback-verify-latest-state-not-breadcrumbs]]):** ALL lumps are speciated —
@@ -150,26 +154,25 @@ remaining work is blocked on external sourcing**, not on more building.
   closure O₂ ingress (load-bearing on the sotolon headline) and acetaldehyde in
   maturation + the 0-vs-2.7 unsulfited floor.
 
-- **NEXT UP — D-132/D-133 Ferreira 2015 O₂-consumption — DESIGN LOCKED WITH OWNER,
-  RE-CONFIRMED after a 2026-07-22 revisit, NOT YET BUILT.** Full handoff:
-  `M:\claud_projects\temp\ferment\_findings\D-132-133-ferreira-o2-consumption-design.md`
-  (source already local: `manual_sources/2/_txt/ferreira2015.txt`). Owner-resolved forks:
-  **two records**. **D-132 (build first) = phenolic-driven O₂ rate**, form
-  `k_browning_eff = k_browning_base + k_browning_phenolic·([tannin]+[anthocyanin])`, keep
-  FIRST-order in `[o2]` — **the 2026-07-22 revisit seriously considered zero-order** (Ferreira's
-  cumulative-uptake R²>0.989 headline looked like grounds to switch) **and reverted**: that
-  number is a cross-cycle re-saturation artifact (5 same-start-point checkpoints), while the
-  paper's own within-cycle diagnostic (Ln[O₂] vs time) shows the bulk of each cycle IS
-  first-order — no MM/`Km` needed, closed not deferred. **Additive baseline + boost, NEVER pure
-  proportionality** (else white/beer browning → 0 — whites/beer brown via UNtracked phenolics;
-  no red/white axis). Boost applies to `k_browning` only, not `k_ethanol_oxidation` (re-confirmed
-  minimal-assumption, not derived — ship with the caveat that acetaldehyde may be under-produced
-  at high phenolic load, partition-vs-phenolic deferred). Fixes the ~6–8× too-slow error (current
-  5.0e-4/h ⇒ ~0.1 vs Ferreira 0.5–0.7 mg/L/day); end-states are yield-set so they DON'T move,
-  only timescale → half-life/time-point tests break, end-state tests survive. **D-133 (later) =
-  initial-burst antioxidant pool** (day-1 rate, R²=0 vs avg), OWN pool — must NOT reuse the
-  phenolic driver (Ferreira: initial rate +Cu, −phenolics) and must NOT double-count
-  `SulfiteOxidation` (D-72). D-128 re-anchor pattern; all O₂ outputs stay SPECULATIVE.
+- **D-132 SHIPPED — Ferreira 2015 phenolic-driven O₂ rate. Do NOT re-propose.**
+  `k_browning` renamed `k_browning_base` (unchanged, 3.0e-4/h) + new
+  `k_browning_phenolic` (1.1e-3 L/(g·h)) boost on `tannin+anthocyanin` (D-79,
+  guarded absent on beer). First-order-in-`[o2]` re-examined at the 2026-07-22
+  revisit and RE-CONFIRMED (Ferreira's R²>0.989 "linear" headline is a
+  cross-cycle re-saturation artifact; the paper's own within-cycle Ln[O₂]-vs-time
+  diagnostic is first-order) — no MM/`Km`. Additive baseline+boost (never pure
+  proportionality — else white/beer browning → 0). Boost is browning-side only,
+  NOT `k_ethanol_oxidation` (documented caveat: acetaldehyde may be
+  under-produced at high phenolic load). Typical red (2.3 g/L tannin+
+  anthocyanin) now lands ~0.58 mg/L/day at fresh 8 mg/L O₂ — in Ferreira's
+  0.5–0.7 band (was ~0.1, a ~6–8× error). Isolable at zero phenolics (GATE-1).
+  Full receipts + 5 new tests in `docs/DECISIONS.md` D-132.
+- **NEXT UP — D-133 initial-burst antioxidant pool, NOT YET BUILT.** Finite
+  non-SO2 antioxidant pool for Ferreira's day-1 fast rate (0.54–8.2 mg/L/day,
+  R²=0 vs average, Cu-positive/phenolic-negative) — OWN pool, must NOT reuse
+  D-132's phenolic driver and must NOT double-count `SulfiteOxidation` (D-72).
+  D-128 re-anchor pattern; all O₂ outputs stay SPECULATIVE. Design handoff still
+  at `M:\claud_projects\temp\ferment\_findings\D-132-133-ferreira-o2-consumption-design.md`.
 - **Standing rule that outlived its bullet (D-66):** direction is the owner's call,
 every time — ask before picking the next milestone (see
 [[feedback-discuss-disagreements]]).

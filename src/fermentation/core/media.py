@@ -1432,21 +1432,21 @@ _OAK_PROCESSES: tuple[Callable[[], Process], ...] = (OakExtraction,)
 #: Ellagitannin O₂-scavenging aging Process (decision D-78) — the BRIDGE from the oak extractive
 #: axis to the O₂ sub-axis. WINE + BARREL-BEER (D-86: wired into BOTH media alongside
 #: ``_OAK_PROCESSES`` — the ``ellagitannin`` slots and the ``o2`` pool are both medium-agnostic).
-#: :class:`EllagitanninOxidation` is the fourth oxidative
-#: sibling to claim a share of the shared ``o2`` budget (after
-#: ``OxidativeAcetaldehyde``/``PhenolicBrowning``/ ``SulfiteOxidation``): oak's hydrolysable tannin
-#: (the ``ellagitannin`` pool that ``OakExtraction`` fills) is a sacrificial antioxidant — dissolved
-#: O₂ oxidises it (bilinear ``[o2]·[ellagitannin]``, the :class:`SulfiteOxidation` form), CONSUMING
-#: the tannin as it scavenges. So an oaked + oxygenated beverage browns LESS and accumulates LESS
-#: oxidative acetaldehyde than an un-oaked one at the same O₂ dose — the oak-PROTECTION emergent
-#: (the D-78 spine, the D-72 "SO₂ protects" threshold with a *renewable* buffer: the wood
-#: re-supplies tannin below the ceiling). SUBSTRATE-GATED on the ``ellagitannin`` pool ⇒ zero unless
-#: oak is dosed ⇒ adds on top of the anchor with NO re-baseline (the D-72/D-75 rule;
-#: ``k_ethanol_oxidation + k_browning = 5.0e-4`` untouched). Wired into BOTH media (D-86), unlike
-#: wine-only ``_STRECKER_PROCESSES``. OFF EVERY LEDGER (both ``o2`` and ``ellagitannin``
-#: are unweighted), so — like ``SulfiteOxidation`` — it moves nothing conserved. Kept in its OWN
-#: tuple (isolable, directive #3): DISABLED at compile and re-enabled by ``begin_aging`` (its name
-#: rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no oak dosed the
+#: :class:`EllagitanninOxidation` is the fourth oxidative sibling to claim a share of the shared
+#: ``o2`` budget (after ``OxidativeAcetaldehyde``/``PhenolicBrowning``/ ``SulfiteOxidation``): oak's
+#: hydrolysable tannin (the ``ellagitannin`` pool that ``OakExtraction`` fills) is a sacrificial
+#: antioxidant — dissolved O₂ oxidises it (bilinear ``[o2]·[ellagitannin]``, the
+#: :class:`SulfiteOxidation` form), CONSUMING the tannin as it scavenges. So an oaked + oxygenated
+#: beverage browns LESS and accumulates LESS oxidative acetaldehyde than an un-oaked one at the same
+#: O₂ dose — the oak-PROTECTION emergent (the D-78 spine, the D-72 "SO₂ protects" threshold with a
+#: *renewable* buffer: the wood re-supplies tannin below the ceiling). SUBSTRATE-GATED on the
+#: ``ellagitannin`` pool ⇒ zero unless oak is dosed ⇒ adds on top of the anchor with NO re-baseline
+#: (the D-72/D-75 rule; ``k_ethanol_oxidation + k_browning_base = 5.0e-4`` untouched). Wired into
+#: BOTH media (D-86), unlike wine-only ``_STRECKER_PROCESSES``. OFF EVERY LEDGER (both ``o2`` and
+#: ``ellagitannin`` are unweighted), so — like ``SulfiteOxidation`` — it moves nothing conserved.
+#: Kept in its OWN tuple (isolable, directive #3): DISABLED at compile and re-enabled by
+#: ``begin_aging`` (its name rides in
+#: :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no oak dosed the
 #: ``ellagitannin`` pool is 0 ⇒ byte-for-byte inert. Params live in ``oak.yaml`` (with the tannin's
 #: extraction yields — all ellagitannin data together).
 _ELLAGITANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (EllagitanninOxidation,)
@@ -1455,19 +1455,19 @@ _ELLAGITANNIN_PROCESSES: tuple[Callable[[], Process], ...] = (EllagitanninOxidat
 #: colour-stabilization + astringency-softening axis, the DOMINANT softening mechanism D-77/D-78
 #: deferred. :class:`TanninAnthocyaninCondensation` is the second **non-oxidative** aging Process
 #: (after :class:`OakExtraction`) and a **third separate axis**: as a finished red wine ages, free
-#: grape ``anthocyanin`` and condensed ``tannin`` combine (bilinear ``[anthocyanin]·[tannin]``,
-#: the :class:`SulfiteOxidation` form) into a stable polymeric pigment — softening the astringency
-#: and stabilizing the colour. **OAK- AND O₂-INDEPENDENT** (the D-79 crux): it draws NO share of the
+#: grape ``anthocyanin`` and condensed ``tannin`` combine (bilinear ``[anthocyanin]·[tannin]``, the
+#: :class:`SulfiteOxidation` form) into a stable polymeric pigment — softening the astringency and
+#: stabilizing the colour. **OAK- AND O₂-INDEPENDENT** (the D-79 crux): it draws NO share of the
 #: shared ``o2`` budget (unlike every D-71..D-78 oxidative sink) and reads NO oak pool — grape
-#: condensed ``tannin`` differs from oak hydrolysable ``ellagitannin`` (D-78), so a
-#: steel-tank red with no oak and no oxygen still polymerizes (a reused-ellagitannin design would
-#: wrongly require ``add_oak``). Wired into the *wine* medium only (both grape slots are wine-only),
-#: like ``_OAK_PROCESSES``/``_ELLAGITANNIN_PROCESSES``. OFF EVERY LEDGER (both grape pools are
+#: condensed ``tannin`` differs from oak hydrolysable ``ellagitannin`` (D-78), so a steel-tank red
+#: with no oak and no oxygen still polymerizes (a reused-ellagitannin design would wrongly require
+#: ``add_oak``). Wired into the *wine* medium only (both grape slots are wine-only), like
+#: ``_OAK_PROCESSES``/``_ELLAGITANNIN_PROCESSES``. OFF EVERY LEDGER (both grape pools are
 #: unweighted, the ``iso_alpha``/``ellagitannin`` precedent), so — like :class:`OakExtraction` — it
 #: moves nothing conserved. DOUBLY substrate-gated on ``anthocyanin`` AND ``tannin`` ⇒ zero unless
 #: BOTH are dosed (a white / no-tannin wine is byte-for-byte inert) ⇒ adds ON TOP, NO re-baseline
-#: (and trivially so — no ``o2`` term, so it never touches the ``k_ethanol_oxidation + k_browning``
-#: anchor). The polymeric-pigment product is a POST-HOC readout
+#: (and trivially so — no ``o2`` term, so it never touches the ``k_ethanol_oxidation +
+#: k_browning_base`` anchor). The polymeric-pigment product is a POST-HOC readout
 #: (:func:`~fermentation.analysis.polymeric_pigment_series` = ``anthocyanin₀ − anthocyanin``), NOT a
 #: state slot (the A420 discriminator — anthocyanin's single fate makes it reconstructible). Kept in
 #: its OWN isolable tuple (directive #3): DISABLED at compile and re-enabled by ``begin_aging`` (its

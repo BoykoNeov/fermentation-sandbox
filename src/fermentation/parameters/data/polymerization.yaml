@@ -61,7 +61,7 @@
 # SUBSTRATE-GATED ⇒ ADDS ON TOP, NO RE-BASELINE (and trivially so — it touches no o2). Doubly gated
 # on anthocyanin AND tannin (zero unless BOTH are dosed), so a white wine (no anthocyanin) or a
 # no-tannin run is byte-for-byte the case without this Process. Because it draws no o2 it does not
-# even interact with the k_ethanol_oxidation + k_browning = 5.0e-4 always-on anchor — a wholly
+# even interact with the k_ethanol_oxidation + k_browning_base = 5.0e-4 always-on anchor — a wholly
 # separate, non-oxidative axis (the OakExtraction diffusion-axis precedent, but on grape pools).
 #
 # SCOPE:
@@ -283,7 +283,7 @@ y_acetaldehyde_per_anthocyanin:
 #
 # SUBSTRATE-GATED => adds on top, NO re-baseline. Bilinear in [anthocyanin], zero unless a red must is
 # dosed, so a white / no-anthocyanin (and all-beer) run is byte-for-byte the case without this
-# Process (the k_ethanol_oxidation + k_browning = 5.0e-4 anchor untouched). A red wine dosed with BOTH
+# Process (the k_ethanol_oxidation + k_browning_base = 5.0e-4 anchor untouched). A red wine dosed with BOTH
 # anthocyanin and o2 DOES now split its o2 one more way — the physically-correct cost of a new
 # oxidative sink competing with the D-71..D-78 siblings (documented, not silent). Wine-only + disabled
 # at compile, enabled by begin_aging (aging is post-ferment).

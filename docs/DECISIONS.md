@@ -13229,3 +13229,99 @@ cleaner than D-130's two-source split.
 - Protein-protection and cell-density terms reopen if a sourced quantitative form lands (both would
   read the existing `mcfa` slot + `amino_acids`/`X_mlf` — no new state).
 - Still anchored, unbuilt: oxidation O2-consumption (Ferreira 2015); gluconolactone (D-130 defer).
+
+## D-132 — Ferreira 2015 O2-consumption rate: `PhenolicBrowning` becomes phenolic-driven (`k_browning_eff = k_browning_base + k_browning_phenolic·(tannin+anthocyanin)`), so a real red's O2 uptake lands in-band instead of ~6-8x too slow
+
+Design **locked with the owner across two sessions** (2026-07-21 build-scoping, 2026-07-22
+build-day revisit that re-pressure-tested the rate-law fork and reverted to the original design
+unchanged — see the "Revisit" section below). Full handoff was durable at
+`M:\claud_projects\temp\ferment\_findings\D-132-133-ferreira-o2-consumption-design.md`; this
+record supersedes it as the canonical account.
+
+### What existed vs. what Ferreira adds
+`PhenolicBrowning` (D-74) already models the dominant always-on O2 sink (`d(o2)/dt =
+-k_browning·f(T)·[o2]`, medium-agnostic, accumulating the `A420` browning index) at a rate
+anchored only loosely to "Singleton weeks-to-months" — `k_ethanol_oxidation + k_browning =
+5.0e-4 /h` gives ~0.1 mg/L/day at a fresh 8 mg/L O2 charge. Marrufo-Curtido, Ferreira & Escudero
+2015 (*J. Agric. Food Chem.*; 15 real red wines, repeated O2-saturation cycles) measured
+**0.5-0.7 mg/L/day** (between-wine spread never > 2.2x) — the model under-predicted by ~6-8x. The
+grape-phenolic pools this under-prediction should key off (`tannin`, `anthocyanin`, D-79) already
+exist and are wine-only; nothing tracked them against the O2-depletion rate before this decision.
+
+### The 2026-07-22 revisit (re-examined, not re-litigated)
+Before building, the owner asked to reconsider the design. Two forks were pressure-tested; one
+nearly flipped, then reverted on a primary-source check:
+
+- **Rate-law fork (first-order vs. zero-order vs. Michaelis-Menten) — RE-CONFIRMED first-order.**
+  Ferreira's "cumulative O2 uptake is linear, R²>0.989" headline (Figure 3) looked like grounds to
+  switch to zero-order. It is not: that regression fits only the ~5 cumulative-consumed
+  checkpoints at the END of each saturation cycle, each restarting from the same ~8 mg/L dose — a
+  **cross-cycle re-saturation artifact**, not an instantaneous-rate test. The paper's own
+  within-cycle diagnostic (Figure 2, Ln[O2] vs. time, the standard first-order test) reports the
+  linear model holds through the bulk of each cycle. The two departures are at the extremes (a
+  fast initial Fe(II)-driven burst — D-133's territory — and a low-O2-tail acceleration the paper
+  itself says "resists simple kinetic models"), not the bulk. **Conclusion: first-order-in-`[o2]`
+  stands, sourced directly by the within-cycle diagnostic; no `Km` needed.**
+- **Ethanol-oxidation-boost fork — RE-CONFIRMED browning-only.** The phenolic boost applies to
+  `k_browning` alone, not `k_ethanol_oxidation` — a minimal assumption (holding the existing
+  0.4:0.6 partition constant), not a derivation, shipped with an explicit caveat (acetaldehyde may
+  be under-produced at high phenolic load; partition-vs-phenolic-load deferred).
+
+### Design — additive baseline + phenolic boost (owner-chosen fork)
+```
+k_browning_eff = k_browning_base + k_browning_phenolic · ([tannin] + [anthocyanin])
+d(o2)/dt = -k_browning_eff · f(T) · [o2]        # still first-order in o2, Arrhenius as before
+```
+- **Renamed** `k_browning` → `k_browning_base` (value unchanged, 3.0e-4 /h) — the medium-agnostic
+  floor. **New** `k_browning_phenolic` (1.1e-3 L/(g·h), plausible-anchored/speculative) — reads the
+  wine-only `tannin`/`anthocyanin` state (D-79), guarded (`"tannin" in schema` /
+  `"anthocyanin" in schema`) rather than gated, so beer/white keep running the always-on sink at
+  the unboosted baseline instead of no-opping like a true wine-only Process.
+  `k_ethanol_oxidation` is untouched (2.0e-4 /h).
+- **Additive by design, never pure proportionality** (the correctness trap the owner flagged
+  twice): if the boost term stood alone, a white/beer run (zero tracked phenolics) would brown at
+  exactly zero, contradicting `PhenolicBrowning`'s own gold→amber→brown / beer-staling claim.
+  Whites and beer brown too, via phenolics this model does not speciate — the baseline stands in
+  for that untracked chemistry.
+- **Calibration** — a *typical* red (~2.0 g/L condensed tannin + ~0.3 g/L anthocyanin = 2.3 g/L,
+  the existing `polymerization.yaml` D-79/D-81/D-84 "typical red" anchors) lands the *total*
+  O2-depletion rate (`k_ethanol_oxidation + k_browning_eff`) at a fresh 8 mg/L charge at **~0.58
+  mg/L/day** — in Ferreira's 0.5-0.7 band. Solved: `k_browning_phenolic = (target_k_total -
+  k_ethanol_oxidation - k_browning_base) / 2.3 g/L ≈ 1.1e-3 L/(g·h)`. This is a **calibration
+  device**, not a fitted phenolic-kinetics constant — Ferreira's own between-wine driver is copper
+  and an unmeasured antioxidant, not phenolics (that's D-133's territory); this term only
+  reproduces the sourced red-vs-white/beer *magnitude* gap via the pools the model already tracks.
+  A simple additive sum of the two grape pools (tannin ~7x anthocyanin at the anchor, so tannin
+  dominates regardless) — no sourced weighting between the two phenolic classes exists to justify
+  anything more elaborate.
+- **Isolable at zero grape phenolics (the D-129/D-131 GATE-1 pattern):** `k_browning_eff` is
+  byte-for-byte `k_browning_base` when `tannin = anthocyanin = 0` — a white, an un-dosed red, or
+  any beer run is unchanged from the pre-D-132 rate.
+
+### Receipts
+- `parameters/data/aging.yaml` — `k_browning` renamed to `k_browning_base` (value unchanged) across
+  header comments and provenance; new `k_browning_phenolic` block (full Parameter provenance:
+  Ferreira 2015 source, calibration-target conditions, additive-design notes).
+- `core/kinetics/aging.py` — `PhenolicBrowning`: docstring rewritten for D-132 (rate-law revisit,
+  additive form, guard pattern); `reads` gains `k_browning_base`/`k_browning_phenolic`; `derivatives`
+  computes `k_browning_eff` from guarded `tannin`/`anthocyanin` reads (not added to `touches` — read,
+  never written, the `T`/`SulfiteOxidation`-pH-read precedent). Prose mentions of `k_browning` in
+  sibling Processes' docstrings (`OxidativeAcetaldehyde`, `StreckerDegradation`,
+  `EllagitanninOxidation`, `TanninAnthocyaninCondensation`, `AnthocyaninFading`) renamed to
+  `k_browning_base` for accuracy (the anchor equation is unchanged, just the parameter's name).
+- `core/media.py`, `scenario/compile.py` (the `begin_aging` param-presence guard list) — renamed +
+  added the new key.
+- `tests/test_aging.py` — renamed `k_browning` references; added 5 new tests: phenolic-boost closed
+  form, isolability at zero phenolics, monotone rise with phenolic load, guarded absence on beer, and
+  the headline Ferreira-band calibration check (typical red lands 0.5-0.7 mg/L/day at 8 mg/L O2).
+- Full suite green: `ruff check .`, `mypy`, `pytest -n auto` (1256 passed).
+
+### Next
+- **D-133 — initial-burst antioxidant pool** (own scope, separate record): a finite non-SO2
+  antioxidant pool producing Ferreira's day-1 fast rate (0.54-8.2 mg/L/day, R²=0 vs average,
+  Cu-positive/phenolic-negative). Must NOT reuse this decision's phenolic driver and must NOT
+  double-count `SulfiteOxidation` (D-72).
+- Tail-acceleration at the low-O2 end (Ferreira: "resists simple kinetic models") — a genuine,
+  small, currently-unsourceable residual, documented not built.
+- Still anchored, unbuilt: gluconolactone (D-130 defer); protein-protection/cell-density MLF terms
+  (D-131 defer).

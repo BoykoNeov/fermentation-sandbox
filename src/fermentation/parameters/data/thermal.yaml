@@ -223,7 +223,7 @@ k_caramelization:
   provenance:
     source: "author estimate anchored to the ORDERING that thermal caramelization of residual sugar is the non-oxidative browning route of aged SWEET/thermal wines (Sauternes amber-to-brown, Madeira/baked-wine deep colour), distinct from the O2-driven phenolic browning of D-74. Caramelization/thermal-dehydration kinetics (classic food chemistry -- Kroh; caramel formation is a canonical thermal, O2-independent browning)."
     conditions: "generic sweet wine; pseudo-first-order in the residual-sugar vector S, at T_ref = 293.15 K. WINE-ONLY (v1 bundling); O2-INDEPENDENT (no o2 term). Consumes core S into the melanoidin carbon-park."
-    notes: "SOURCED FORM (sugar-driven, heat-accelerated, O2-INDEPENDENT browning) + SPECULATIVE magnitude. The thermal MIRROR of the O2-driven k_browning (D-74). The FIRST aging Process to consume core S -- its carbon parks in the on-ledger melanoidin pool so total_carbon closes."
+    notes: "SOURCED FORM (sugar-driven, heat-accelerated, O2-INDEPENDENT browning) + SPECULATIVE magnitude. The thermal MIRROR of the O2-driven k_browning_base (D-74). The FIRST aging Process to consume core S -- its carbon parks in the on-ledger melanoidin pool so total_carbon closes."
 
 # -- ACTIVATION ENERGY: caramelization is STRONGLY warmer-faster (the sourced ORDERING) --------
 # Same high band as E_a_maillard_strecker (D-87): caramelization/Maillard chemistry is far more

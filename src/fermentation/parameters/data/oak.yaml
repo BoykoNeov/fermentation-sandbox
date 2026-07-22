@@ -56,7 +56,7 @@
 # so EllagitanninOxidation — like SulfiteOxidation — moves nothing conserved (mass-based consumption
 # yield y_ellag_per_o2, no fake molar mass for the lumped macromolecule). Its O2 draw is
 # SUBSTRATE-GATED on the ellagitannin pool (zero unless oak is dosed), so — the D-72/D-75 rule — it
-# adds on top of the anchor with NO re-baseline of k_ethanol_oxidation + k_browning = 5.0e-4.
+# adds on top of the anchor with NO re-baseline of k_ethanol_oxidation + k_browning_base = 5.0e-4.
 #
 # SCOPE (v1), flagged loudly:
 #   * ELLAGITANNIN astringency SOFTENING here is the OXIDATIVE-CONSUMPTION contributor ONLY (the
@@ -544,7 +544,7 @@ oak_yield_ellagitannin_heavy:
 # SulfiteOxidation form). Ellagitannin scavenges O2, diverting it from browning + ethanol oxidation,
 # so an oaked+oxygenated wine browns less and accumulates less oxidative acetaldehyde — oak PROTECTION.
 # SUBSTRATE-GATED on the ellagitannin pool => zero unless oak is dosed => adds ON TOP of the anchor
-# with NO re-baseline (the D-72/D-75 rule; k_ethanol_oxidation + k_browning = 5.0e-4 untouched). BANDED
+# with NO re-baseline (the D-72/D-75 rule; k_ethanol_oxidation + k_browning_base = 5.0e-4 untouched). BANDED
 # so suppression is PARTIAL — a MAJOR but not total O2 sink: at a ~50–100 mg/L ellagitannin charge
 # (0.05–0.1 g/L) the pseudo-first-order O2 rate k*[ellag] ~ 2.5e-4–5e-4 /h is ~0.5–1x the 5.0e-4
 # always-on total, so ellagitannin takes roughly a third-to-half of the O2 (a clear, VISIBLE protection
@@ -558,9 +558,9 @@ k_ellagitannin_oxidation:
   value: 5.0e-3
   unit: "L/(g*h)"   # d(o2)/dt = -k_ellagitannin_oxidation * f(T) * [o2] * [ellagitannin]  (bilinear)
   tier: speculative
-  uncertainty: { low: 1.0e-3, high: 2.0e-2, note: "bimolecular O2xellagitannin rate constant at T_ref = 20 C. The LOAD-BEARING claim is the ORDERING (ellagitannin scavenges O2 faster than ethanol => oak protects), not the magnitude: at a 50–100 mg/L ellagitannin charge the pseudo-first-order O2 rate k*[ellag] ~ 2.5e-4–5e-4 /h is ~0.5–1x the always-on total (k_ethanol_oxidation + k_browning = 5e-4; D-74), so ellagitannin takes roughly a third-to-half of the O2 — a MAJOR, VISIBLE, but PARTIAL protection (banded so it never monopolizes the O2). Renewable (wood re-supplies below the ceiling), so buffering is SUSTAINED, unlike SO2's finite pool." }
+  uncertainty: { low: 1.0e-3, high: 2.0e-2, note: "bimolecular O2xellagitannin rate constant at T_ref = 20 C. The LOAD-BEARING claim is the ORDERING (ellagitannin scavenges O2 faster than ethanol => oak protects), not the magnitude: at a 50–100 mg/L ellagitannin charge the pseudo-first-order O2 rate k*[ellag] ~ 2.5e-4–5e-4 /h is ~0.5–1x the always-on total (k_ethanol_oxidation + k_browning_base = 5e-4; D-74), so ellagitannin takes roughly a third-to-half of the O2 — a MAJOR, VISIBLE, but PARTIAL protection (banded so it never monopolizes the O2). Renewable (wood re-supplies below the ceiling), so buffering is SUSTAINED, unlike SO2's finite pool." }
   provenance:
-    source: "author estimate anchored to the ORDERING that oak hydrolysable tannins (ellagitannins) are potent O2 scavengers that PROTECT wine from oxidation during barrel aging / micro-oxygenation (Vivas & Glories 1996 on ellagitannin oxygen consumption; Danilewicz on wine antioxidant phenolics; the galloyl/gallate groups reduce O2/H2O2 in the coupled-oxidation cascade). The bimolecular constant folds the catalysis into k (no explicit catalyst pool, as with k_so2_oxidation/k_browning)."
+    source: "author estimate anchored to the ORDERING that oak hydrolysable tannins (ellagitannins) are potent O2 scavengers that PROTECT wine from oxidation during barrel aging / micro-oxygenation (Vivas & Glories 1996 on ellagitannin oxygen consumption; Danilewicz on wine antioxidant phenolics; the galloyl/gallate groups reduce O2/H2O2 in the coupled-oxidation cascade). The bimolecular constant folds the catalysis into k (no explicit catalyst pool, as with k_so2_oxidation/k_browning_base)."
     conditions: "generic wine at cellar pH/temperature; bilinear in the dissolved-o2 pool and the ellagitannin pool (both g/L) at T_ref = 293.15 K."
     notes: "SOURCED FORM (bilinear O2xellagitannin, tannin out-competing ethanol for O2 => oak protects the wine, browning + acetaldehyde SUPPRESSED — the D-78 spine, the D-72 SO2-protection analogue with a RENEWABLE buffer) + SPECULATIVE magnitude. Banded so protection is PARTIAL (a third-to-half of the O2), never total. The mass-based consumption yield (y_ellag_per_o2) — not this rate — sets HOW MUCH tannin a given O2 flux spends."
 
