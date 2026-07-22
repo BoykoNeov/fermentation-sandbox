@@ -14240,11 +14240,14 @@ own D-record regardless of how the cascade proceeds.**
 - **The reversal's true blast radius is D-71 / D-72 / D-74 / D-132 plus D-133 / D-134** and both
   colour-oxidation Processes — not the three Processes F2 discusses.
 
-### Gate 1 closed — all four primaries in hand, and the O2 gate is neither phenol nor SO2 but iron
+### Gate 1 closed — three primaries in hand, the fourth secondhand, and the O2 gate is neither phenol nor SO2 but iron
 
-Owner instruction was "pull the four primaries first." Done, plus a fifth that outweighs three of
-them. **The headline is not the branching ratio Gate 1 went looking for.** It is that the cascade
-sketched in F2 still has the wrong species at the top.
+Owner instruction was "pull the four primaries first." Three came back directly; **Elias & Waterhouse
+2010 is still not obtained as a primary** and is represented here only by quotation inside other
+sources — that gap is real and is not closed by this pass. What does close Gate 1 is a fifth source
+that was not on the list and outweighs three of them. **The headline is not the branching ratio
+Gate 1 went looking for.** It is that the cascade sketched in F2 still has the wrong species at the
+top.
 
 | primary | got | how |
 |---|---|---|
@@ -14261,10 +14264,20 @@ it cleanly where `WebFetch` returns binary.
 **Danilewicz 2011 (AJEV 62(3):319-328, "Key Role of Iron") is the one that matters most**, and it
 was not on the list:
 
-> "the initial O2 uptake increased with increasing concentrations of Fe(II) and Cu(II), indicating
-> that **Fe was the initial reactant**" — polyphenols do *not* react directly with O2, and
-> **sulfite does not react directly with O2** either; "nucleophiles such as sulfite accelerate
-> oxidation by reacting with quinones."
+**PARAPHRASE, not verbatim** — this came back from a summarizing fetch labelled "Abstract Summary"
+(the Danilewicz 2016 fetch above *was* labelled verbatim; this one was not). Treat the wording as
+mine and the direction as the paper's, which its title states outright:
+
+> *(paraphrased)* initial O2 uptake rises with increasing Fe(II) **and** Cu(II), indicating Fe is the
+> initial reactant; polyphenols are oxidised by Fe(III) rather than by O2 directly, and sulfite acts
+> on quinones and H2O2 rather than on O2 — "nucleophiles such as sulfite accelerate oxidation by
+> reacting with quinones."
+
+The direction is safe — it is the paper's title ("Key Role of Iron"), it matches Danilewicz 2007's
+Fe/Cu synergism, and it matches the dissertation's mechanism throughout. **Pull the real abstract
+before any of this is cited in a parameter's `source:` field.** Note also the accurate strength of
+the claim is *negligible relative to the iron-mediated route*, not literally zero: direct
+polyphenol + O2 and sulfite + O2 reactions exist but are far too slow to matter at wine pH.
 
 So the O2 gate is **Fe(II) + O2**. Phenols, sulfite and ethanol are all downstream, competing for
 the *reduced-oxygen intermediates* (H2O2, quinone) and for Fe(III) — never for O2. F2 as written
@@ -14315,12 +14328,20 @@ citrate). Set against the McArdle competition this is a ~150x discrepancy at pH 
 | 3.0 | 2.92e-2 | 41.2 | 0.07% | ~11% |
 | 4.0 | 8.15e-2 | 4.43 | 1.8% | ~11% |
 
-**The discrepancy is a mixing fingerprint, not a mechanism fingerprint.** It collapses from 150x to
-6x as the SO2 reaction slows toward the homogenization timescale — at pH 3.0 the predicted H2O2
-half-life against bisulfite is **17 ms**, which no bolus addition into a stirred 100 mL flask can
-outrun. The tempting mechanistic reading (inner-sphere control: H2O2 commits to the iron complex
-before bisulfite can reach it) predicts the *opposite* trend, since iron complexation is stronger at
-pH 4.0 and the gap should widen there. It narrows. The data go the mixing way.
+**The discrepancy is a mixing fingerprint, not a mechanism fingerprint** — and the argument is the
+*pH-flatness*, not the change in gap size. The measured Fenton share is ~11% at **both** pH levels
+(Fig. 4.6 assigns the two pH bars the same significance letter within each acid); the bulk model
+predicts it should rise ~25x from pH 3.0 to 4.0, because the McArdle rate carries [H+] while the
+Fenton limb speeds up with pH. So the gap "closing" from 150x to 6x is the *prediction* climbing to
+meet a flat measurement, not the measurement falling.
+
+Transport control is **pH-blind**, which is exactly what a flat measurement looks like. And the
+predicted H2O2 half-life against bisulfite is **17 ms at pH 3.0 and 156 ms at pH 4.0** — both far
+under the homogenization time of a bolus injected into a stirred 100 mL flask, so *neither* pH
+escapes mixing limitation and flatness is the expected result. The tempting mechanistic reading
+(inner-sphere control: H2O2 commits to the iron complex before bisulfite can reach it) is **refuted
+by the same flatness**: iron complexation strengthens with pH, so it predicts the Fenton share
+should *rise* from pH 3.0 to 4.0. It does not move.
 
 So the honest verdict is narrower than "the bulk competition is falsified" and narrower than "the
 branch is calibrated":
@@ -14361,13 +14382,34 @@ The quench is specific and structural:
 
 The reactive feature is the **side-chain double bond**, not the catechol ring. So the quencher pool
 is the hydroxycinnamates — caffeic, p-coumaric, ferulic, caftaric — and **flavan-3-ols, tannins and
-anthocyanins are not quenchers**, having no such side chain. The D-137 audit established that the
-model's phenolic terms read `tannin + anthocyanin`. **There is therefore no state variable in which
-the counter-sign term could live.** Either the cascade adds a hydroxycinnamate pool with its own
-provenance entry, or it ships knowingly without the only sourced negative term on acetaldehyde —
-and that choice must be recorded, not defaulted. (A further wrinkle, unresolved: the 1-HER/caffeate
-reaction is reported to switch from reduction to oxidation with pH, so the sign of this term may
-itself be pH-dependent across 3.0-4.0.)
+anthocyanins are not quenchers**, having no such side chain.
+
+**CORRECTED (same session, before Gate 1 was called closed).** The first write-up of this section
+concluded "there is therefore no state variable in which the counter-sign term could live," reasoning
+from the D-137 audit's finding that the *browning* term reads `tannin + anthocyanin`. That was an
+extrapolation from one Process to the whole 93-slot schema, and it is **wrong**. The carrier already
+exists: **`hydroxycinnamics`** (D-40, p-coumaric as the representative species for the free
+hydroxycinnamic-acid must pool) and **`ferulic_acid`** (D-55, split out of that lump) are live state
+slots, read and written by `brett.py`. Both carry the cinnamate side-chain double bond that *is*
+Gislason's reactive feature, so they are structurally the right pool, not a proxy. Grape must carries
+~10-200 mg/L free hydroxycinnamics — the same order as free SO2, so the term is not a rounding error.
+
+Two consequences, both for Gate 2 rather than for the sourcing:
+
+- **The cascade's only sourced negative term on acetaldehyde is representable today**, with no new
+  state slot and no new provenance entry for the pool itself (a rate constant would still be needed).
+- **But the pool is already spoken for.** `brett.py` consumes `hydroxycinnamics` and `ferulic_acid`
+  by decarboxylation to the vinylphenols. A quench term would draw on the *same* pool, so the two
+  become competitors and the coupling must be deliberate — Brett activity would suppress the
+  antioxidant quench, and vice versa. That is a real cross-domain interaction the cascade must
+  declare, not discover.
+
+The lesson is the one this project keeps relearning in a new costume: **"the model can't represent X"
+is a claim about the whole schema, and cannot be inferred from the one Process that happens not to
+read X.** Check the schema, not the caller.
+
+(A further wrinkle, unresolved: the 1-HER/caffeate reaction is reported to switch from reduction to
+oxidation with pH, so the sign of this term may itself be pH-dependent across 3.0-4.0.)
 
 #### Danilewicz 2016 — a sourced calibration target the model currently misses
 
