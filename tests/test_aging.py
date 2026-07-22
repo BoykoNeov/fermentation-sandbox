@@ -1462,6 +1462,34 @@ def test_browning_typical_red_lands_in_ferreira_band(params):
     assert 0.5 <= total_rate_mg_l_day <= 0.7
 
 
+def test_browning_integrated_red_ages_faster_than_white(params, store):
+    # D-132 done-check (the D-131 precedent: an instantaneous-rate pin is not the same claim as an
+    # INTEGRATED trajectory outcome). Run PhenolicBrowning-only aging segments from the same O₂
+    # charge, one with a typical red's grape phenolic load and one with none (the white/beer
+    # case), and confirm the red genuinely ages faster over real time: more O₂ consumed and more
+    # A420 built at a matched time point — not just a higher instantaneous rate at t=0.
+    schema = wine_schema()
+    o2_0 = 0.008  # ~8 mg/L, Ferreira's saturation dose
+
+    def run(tannin: float, anthocyanin: float) -> Trajectory:
+        ps = ProcessSet(schema, [PhenolicBrowning()], strict=True)
+        y0 = _aged_wine(schema, ester=0.0, o2=o2_0, tannin=tannin, anthocyanin=anthocyanin)
+        traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 30.0))  # ~1 month
+        assert traj.success, traj.message
+        return traj
+
+    white = run(0.0, 0.0)
+    red = run(2.0, 0.3)
+    assert float(red.series("o2")[-1]) < float(white.series("o2")[-1])
+    assert float(red.series("A420")[-1]) > float(white.series("A420")[-1])
+    # Off-every-ledger invariance holds regardless of the dosed grape phenolics: carbon AND mass
+    # both stay exactly flat (tannin/anthocyanin are constant, unwritten reads — the Process moves
+    # nothing conserved either way).
+    f_c = store.value("biomass_C_fraction")
+    assert_conserved(red, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+    assert_conserved(red, total_mass(schema), label="mass")
+
+
 def test_browning_is_first_order_in_oxygen(params):
     # First-order in the O₂ pool (its own share of the shared substrate): twice the dissolved O₂ ⇒
     # twice the instantaneous browning rate. This linearity is what makes A420 SATURATE as O₂ is

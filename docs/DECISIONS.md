@@ -13311,10 +13311,13 @@ d(o2)/dt = -k_browning_eff · f(T) · [o2]        # still first-order in o2, Arr
   `k_browning_base` for accuracy (the anchor equation is unchanged, just the parameter's name).
 - `core/media.py`, `scenario/compile.py` (the `begin_aging` param-presence guard list) — renamed +
   added the new key.
-- `tests/test_aging.py` — renamed `k_browning` references; added 5 new tests: phenolic-boost closed
-  form, isolability at zero phenolics, monotone rise with phenolic load, guarded absence on beer, and
-  the headline Ferreira-band calibration check (typical red lands 0.5-0.7 mg/L/day at 8 mg/L O2).
-- Full suite green: `ruff check .`, `mypy`, `pytest -n auto` (1256 passed).
+- `tests/test_aging.py` — renamed `k_browning` references; added 6 new tests: phenolic-boost closed
+  form, isolability at zero phenolics, monotone rise with phenolic load, guarded absence on beer, the
+  headline Ferreira-band calibration check (typical red lands 0.5-0.7 mg/L/day at 8 mg/L O2), and (an
+  advisor-prompted addition, the D-131 done-check precedent — instantaneous rate ≠ integrated outcome)
+  an integrated-trajectory check that a phenolic-loaded red genuinely consumes more O2 and builds more
+  A420 than a zero-phenolic run over real time, not just at t=0.
+- Full suite green: `ruff check .`, `mypy`, `pytest -n auto` (1257 passed).
 
 ### Next
 - **D-133 — initial-burst antioxidant pool** (own scope, separate record): a finite non-SO2

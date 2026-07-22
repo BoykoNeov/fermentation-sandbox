@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-22T07:45:02.717Z
+  modified: 2026-07-22T07:54:17.145Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation
@@ -35,7 +35,7 @@ re-confirmed not replaced. **D-131** built MLF
 medium-chain-fatty-acid inhibition (`mcfa` inert must-input slot, bacteriostatic
 `g_FA` gate on conversion/growth NOT death, Lonvaud-Funel 1988 Table 6, plausible).
 **D-130** built botrytis SO2 binding (`oxofructose` must-input, 4th carbonyl, Barbe
-2000). ruff + mypy (109) + full pytest all green (1256). Collection counts drift
+2000). ruff + mypy (109) + full pytest all green (1257). Collection counts drift
 ±1–2 between beats; not a real delta.
 
 **DONE — do NOT re-propose these (I did, twice, from stale "Next:" breadcrumbs;
