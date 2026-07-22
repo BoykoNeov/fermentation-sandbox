@@ -4141,13 +4141,25 @@ class ClosureOxygenIngress(Process):
     condensation, D-81 fading, D-133 burst — was built against a *finite* charge dosed by
     ``add_oxygen``, and their calibration story was "the products saturate as the charge is spent".
     Under continuous ingress that story inverts: the consumers are collectively far faster than the
-    closure, so ``o2`` **quasi-steady-states just above zero** at ``o2* ≈ closure_otr / Σᵢkᵢ`` and
-    the oxidative endpoints accumulate at ``closure_otr · (kᵢ / Σⱼkⱼ)``. **The closure becomes the
-    master throttle and the individual rate constants become a splitting rule.** That is not a
-    defect to design around, it is the physics: oxidation in a sealed bottle is supply-limited,
-    which is why the same wine is a different wine under a screwcap and under a synthetic stopper.
-    The practical consequence for anyone reading this axis: past this Process, ``k_so2_oxidation``
-    and friends barely move the SO₂ *depletion time* — the OTR does.
+    closure, so ``o2`` **quasi-steady-states** at ``o2* ≈ closure_otr / Σᵢkᵢ`` and the oxidative
+    endpoints accumulate at ``closure_otr · (kᵢ / Σⱼkⱼ)``. **The closure becomes the master throttle
+    and the individual rate constants become a splitting rule.** That is not a defect to design
+    around, it is the physics: oxidation in a sealed bottle is supply-limited, which is why the same
+    wine is a different wine under a screwcap and under a synthetic stopper. The practical
+    consequence for anyone reading this axis: past this Process, ``k_so2_oxidation`` and friends
+    barely move the SO₂ *depletion time* — the OTR does.
+
+    **How low ``o2*`` actually sits, and what holds the ceiling up — do not read "near zero" as
+    universal.** Measured over five years, standing ``o2`` runs 2.6 µg/L under technical cork and
+    22 µg/L under natural cork (genuinely near zero), but **2.0 mg/L under SupremeCorq** — a quarter
+    of air saturation. The endpoints still scale with OTR either way, so the supply-limited claim is
+    unaffected; the *level* is not uniformly negligible. What bounds it at all is
+    :class:`OxidativeAcetaldehyde`: ethanol sits at ~100 g/L and is effectively inexhaustible, so
+    ``k_ethanol_oxidation`` is an **always-on, never-saturating, first-order-in-o2 sink**, and the
+    physical ceiling is ``closure_otr / k_ethanol_oxidation`` — *not* zero, and not a property of
+    this Process. That constant has already been retuned once (5.0e-4 → 2.0e-4 at D-73 to make room
+    for :class:`PhenolicBrowning`); anyone lowering it again should re-check that the most permeable
+    closure still cannot drive dissolved O₂ past saturation.
 
     **Zero-order, and the sources force it rather than merely permit it.** Both primaries (Lopes
     et al. 2007; Oliveira et al. 2013) measure ingress into a *reduced indigo-carmine solution* — an

@@ -40,6 +40,7 @@ from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime.schedule import simulate_scheduled
 from fermentation.scenario.compile import compile_scenario
 from fermentation.scenario.schema import Intervention, Scenario, TemperaturePoint
+from fermentation.validation import assert_conserved, total_carbon
 
 #: Lopes et al. 2007 (J. Agric. Food Chem. 55:5167-5170) Table I, steady horizontal-storage oxygen
 #: ingress in **uL O2/day**, transcribed from the paper. These are the published observations the
@@ -475,3 +476,49 @@ def test_ingress_is_disabled_until_begin_aging():
     scenario = scenario.model_copy(update={"interventions": []})
     compiled = compile_scenario(scenario)
     assert compiled.process_set.enabled_snapshot()[ClosureOxygenIngress.name] is False
+
+
+def test_carbon_closes_over_a_closure_driven_five_year_run():
+    """Conservation is a TEST here, not just an argument (prime directive: "a model that creates
+    mass is broken regardless of how good its curves look").
+
+    This passes for a structural reason — ``o2`` is carbon-free and off every ledger, and each
+    downstream consumer's own carbon closure is identical whether the O2 arrived as an
+    ``add_oxygen`` bolus or as a continuous flux — so it is deliberately a cheap
+    belt-and-suspenders rather than a discovery. It is worth having anyway: D-136 introduces a
+    large NEW continuous flux driving acetaldehyde, browning and sulfate over five years, and
+    "the ledger was structurally safe" is the kind of claim that should be checked rather than
+    asserted. Run under the most permeable closure, where the flux is largest.
+    """
+    compiled, trajectory = _age("synthetic_supremecorq")
+    # Non-trivial: the run must actually have oxidised something, or this checks nothing.
+    assert _final(compiled, trajectory, "A420") > 0.0
+    carbon_fraction = compiled.param_values["biomass_C_fraction"]
+    assert_conserved(
+        trajectory,
+        total_carbon(compiled.schema, biomass_carbon_fraction=carbon_fraction),
+        label="carbon (closure-driven aging)",
+    )
+
+
+def test_the_oxygen_ceiling_is_held_up_by_ethanol_oxidation():
+    """The bound on standing ``o2`` is ``otr / k_ethanol_oxidation``, and it is worth naming.
+
+    ``test_dissolved_oxygen_stays_non_negative_and_bounded`` asserts dissolved O2 stays under air
+    saturation, but that is not luck and it is not this Process's doing: ethanol is effectively
+    inexhaustible, so :class:`OxidativeAcetaldehyde` is an always-on, never-saturating,
+    first-order-in-o2 sink that caps the quasi-steady level. ``k_ethanol_oxidation`` was already
+    retuned once (5.0e-4 -> 2.0e-4 at D-73); this test makes the dependency explicit, so that
+    lowering it again fails HERE with a clear reason rather than silently pushing the saturation
+    test toward its limit.
+    """
+    compiled, trajectory = _age("synthetic_supremecorq")
+    o2 = trajectory.y[compiled.schema.slice("o2")][0]
+    otr = float(compiled.y0[compiled.schema.slice("closure_otr")][0])
+    ceiling = otr / compiled.param_values["k_ethanol_oxidation"]
+
+    # The standing level must sit at or below the single-sink ceiling — below it, because the
+    # other sinks take their share too.
+    assert o2.max() <= ceiling
+    # ... and that ceiling must itself be sub-saturation, which is the real safety margin.
+    assert ceiling < 8.0e-3
