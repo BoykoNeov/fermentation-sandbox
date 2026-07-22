@@ -282,6 +282,15 @@ def total_carbon(
     # identity final == initial + Σ flows still holds even though total_carbon(state) drops.
     if "methanethiol" in schema:
         w[schema.slice("methanethiol")] = carbon_mass_fraction("methanethiol")
+    # The metal-complexed thiol reservoir (decision D-135) is weighted at the SAME carbon fraction
+    # as the free pool it feeds, and that identity is the whole point: BoundMethanethiolRelease is a
+    # 1:1 transfer of one molecule between two slots (complexed CH3SH -> free CH3SH — the ligand is
+    # the same molecule, only its binding state changes), so equal weights make the release close
+    # total_carbon to machine precision. Weighting the bonded form at 0 instead would read as carbon
+    # CREATED out of nothing on every release step. Contrast bound_h2s, deliberately absent here:
+    # H2S is carbon-free, so its reservoir sits off the ledger exactly as the free h2s pool does.
+    if "bound_methanethiol" in schema:
+        w[schema.slice("bound_methanethiol")] = carbon_mass_fraction("methanethiol")
     # Brett volatile-phenol pools (decision D-40): the decarboxylase routes carbon hydroxycinnamics
     # (p-coumaric, C9) → vinylphenols (C8) + CO2 (C1), carbon-closing mole-for-mole like malic →
     # lactic + CO2; the reductase moves vinylphenols (C8) → ethylphenols (C8), a mole-for-mole C8 →

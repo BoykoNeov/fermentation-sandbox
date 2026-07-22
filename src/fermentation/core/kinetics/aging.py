@@ -3932,3 +3932,196 @@ class SMMHydrolysis(Process):
         d[schema.slice("dms_potential")] = -rate
         d[schema.slice("dms")] = rate
         return d
+
+
+class BoundHydrogenSulfideRelease(Process):
+    """Free H₂S released from its metal-complexed reservoir in the bottle (decision D-135).
+
+    ``d(bound_h2s)/dt = -k_bound_h2s_release · bound_h2s`` and ``d(h2s)/dt = +`` the same rate — a
+    first-order emptying of a **measured** reservoir straight into the free pool the D-67 OAV lens
+    reads. This is the model's answer to the question :mod:`~fermentation.core.kinetics.mercaptans`
+    has flagged as unanswerable since D-101: *why does a sealed, reductive wine get worse in
+    bottle?* It gets worse because most of its sulfide was never gone — it was bound.
+
+    **THE MECHANISM IS A RESERVOIR, NOT A PRECURSOR — and that reversal is why this beat became
+    buildable.** D-101 parked bottle reduction because it assumed the route was hydrolysis of
+    unmodelled thioacetates/disulfides, whose primaries were unreadable. Franco-Luesma & Ferreira
+    2016 measured *free and total* H₂S in 24 Spanish wines and found **94 % of a red wine's H₂S is
+    already present at bottling**, held as reversible non-volatile complexes with Cu(II) and other
+    cations. Anoxic storage converts bonded → free. Nothing needs to be *made*; something needs to
+    be *let go*. That is a one-pool first-order decay, and its rate is measurable in real bottles.
+
+    **The rate is ANCHORED AT CELLAR TEMPERATURE, and the accelerated data is deliberately unused.**
+    The paper reports both a controlled 21-day 50 °C experiment and a regression across 16 real
+    reds of different vintages under ordinary storage. This Process takes the *ambient* number
+    (1.9 ± 0.7 % of the bonded pool per year) because an aging bottle is what the model simulates.
+    The 50 °C rate is ~1250× faster; transferring it would need an activation energy, and the
+    ambient storage temperature is **never stated in the paper**, so no E_a is fitted and none is
+    shipped. **The Process is therefore temperature-flat** — the
+    :class:`~fermentation.core.kinetics.hydrogen_sulfide.HydrogenSulfideProduction` v1 precedent —
+    and it must not be used to predict warm or accelerated storage. See ``bound_sulfides.yaml``.
+
+    **The strongest evidence it is right is a check the paper never ran on itself.** Two of its
+    regressions are independent: the *bonded fraction* declines 1.9 %/yr, and the *free form* rises
+    0.38 ± 0.11 µg/L/yr. Multiplying this Process's k by its seeded reservoir predicts
+    **0.374 µg/L/yr** — 98 % of the separately-measured free-form slope. The reservoir enters that
+    prediction multiplicatively, so ``bound_h2s_initial`` is corroborated by the same arithmetic.
+
+    **SCOPE — release only; the de novo route is ABSENT, and the authors say why it must be.**
+    Free sulfide accumulates by two routes and this Process is one of them. Deferring the other is
+    not convenience: the paper lists *"the chemical nature of the processes causing de novo
+    formation"* among the questions "which will have to be further addressed". Shipping a rate for
+    a mechanism its own discoverers call unidentified is what prime directive 2 forbids. **The cost
+    is a number, not a caveat** — Table 4's mass balance says release is **90.3 %** of red-wine
+    free-H₂S accumulation, so for a red wine this omission is small. For a **white** it is 58 %,
+    and the model under-predicts by ~2×. Both are carried as ``release_share_h2s_*`` parameters.
+
+    **Not copper-coupled, on purpose.** The paper's PLS models do relate total H₂S positively to Cu
+    (+0.227 reds, +0.303 whites), so the D-134 ``copper`` state is an obvious hook. It is not taken:
+    a regression coefficient over a static composition survey is not a binding stoichiometry (it
+    yields no µg-bound-per-µg-Cu), and the red model explains only 78 % of variance at RMSE
+    3.90 µg/L against a 20.8 µg/L mean. The reservoir is seeded from the *measured* bonded fraction
+    instead, and coupling waits for a real binding constant. Note the asymmetry that would be
+    required: copper does **not** trap the thiol (see :class:`BoundMethanethiolRelease`).
+
+    **No double-count with :class:`~fermentation.core.kinetics.hydrogen_sulfide.\
+    AutolyticHydrogenSulfide`.** That Process makes H₂S from yeast lees during autolysis; this one
+    releases H₂S that was made during fermentation and immediately complexed. Different substrate,
+    different phase, no shared pool but the free ``h2s`` sink they both legitimately fill.
+
+    **Conservation — moves nothing conserved.** H₂S is carbon-free (0 carbon in
+    :mod:`fermentation.core.chemistry`), so both slots sit off every ledger and the transfer is the
+    D-74 A420 argument exactly. ``bound_h2s + h2s`` is invariant to machine precision *in the
+    bottle*, and that is a test — though it is an identity of this Process alone, not of the run:
+    the D-42 CO₂-stripping sink also writes ``h2s``, and it is inert only because aging is
+    post-dryness with no CO₂ stream.
+
+    **Isolability — wine-only, aging-gated, and doubly inert (prime directive #3).** Touches only
+    ``{bound_h2s, h2s}``; wired into wine's aging tuple and disabled at compile with the rest of the
+    aging axis. An un-aged wine is byte-for-byte the pre-D-135 model, and so is an aged one whose
+    reservoir was explicitly seeded to 0. Tier **speculative** (the rate constant is a first-order
+    reading of a regression slope the paper never fitted a rate law to).
+    """
+
+    name = "bound_h2s_release"
+    tier = Tier.SPECULATIVE
+    #: A transfer between the bonded reservoir and the free pool — one molecule changing binding
+    #: state, so 1:1 with no yield and no molar-mass conversion. Both slots are OFF every ledger
+    #: (H2S is carbon-free), so this touches these two and nothing else. No ``o2``: complex
+    #: dissociation is not an oxidation — this is the ANOXIC route, and the paper measured it under
+    #: strict argon precisely to exclude oxygen.
+    touches = ("bound_h2s", "h2s")
+    #: Its own rate constant (``bound_sulfides.yaml``, D-135), whose tier caps the released ``h2s``
+    #: output tier via parameter-tier propagation (D-1). **No ``T_ref``/E_a**: the Process is
+    #: temperature-flat by decision, not by omission (see the docstring). ``bound_h2s_initial`` is
+    #: NOT read here — it seeds the slot at the compile seam; it does not drive the rate.
+    reads: tuple[str, ...] = ("k_bound_h2s_release",)
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        reservoir = float(y[schema.slice("bound_h2s")][0])
+        if reservoir <= 0.0:
+            # No bonded reservoir ⇒ no release (the un-seeded no-op, and the isolability guarantee).
+            # A first-order decay cannot drive the pool negative, so this is a guard against solver
+            # undershoot, not a clamp on real physics — the SMMHydrolysis precedent.
+            return d
+        rate = params["k_bound_h2s_release"] * reservoir  # g/L/h
+
+        # 1:1: the ligand is the same molecule either way, only its binding state changes. What
+        # leaves the reservoir enters the free pool exactly, so bound_h2s + h2s is invariant to
+        # machine precision under this Process.
+        d[schema.slice("bound_h2s")] = -rate
+        d[schema.slice("h2s")] = rate
+        return d
+
+
+class BoundMethanethiolRelease(Process):
+    """Free methanethiol released from its metal-complexed reservoir in the bottle (D-135).
+
+    ``d(bound_methanethiol)/dt = -k_bound_methanethiol_release · bound_methanethiol`` and
+    ``d(methanethiol)/dt = +`` the same rate — the :class:`BoundHydrogenSulfideRelease` twin, and
+    the piece :mod:`~fermentation.core.kinetics.mercaptans` names as its own missing beat: *"Route
+    (2) makes MeSH regardless of lees (screwcap reduction is the classic case), and this model
+    cannot show it at all."* It can now.
+
+    **A SEPARATE POOL AND A SEPARATE RATE — the species asymmetry is measured, twice.** Bonded MeSH
+    releases faster than bonded H₂S in *both* of Franco-Luesma & Ferreira 2016's regimes and in the
+    same direction: **8.1 %/yr vs 1.9 %/yr** in real bottles (4.3×), and 0.126 /day vs 0.065 /day at
+    50 °C (1.9×, derived from Tables 1/4 — the paper prints fractions, not constants). The *ratio*
+    does not reproduce between regimes, which is an honest caveat on both numbers; the *ordering*
+    does, and one lumped sulfide reservoir could not express it. The reservoirs differ as sharply:
+    62 % of a red's MeSH is bonded against 94 % of its H₂S, and the bonded MeSH pool is **~14×
+    smaller** in absolute terms (1.4 vs 19.7 µg/L), which is why bottle reduction reads as
+    H₂S-dominated by mass even though the thiol moves faster and its threshold is comparable.
+
+    **THE UNDER-CLAIM IS THE HEADLINE HERE, NOT A FOOTNOTE.** For H₂S in red wine, release is
+    90.3 % of the story. For methanethiol it is **47.5 % in reds and 24.1 % in whites and rosés** —
+    de novo formation *dominates*. So this Process is structurally a **lower bound** on a wine's
+    reductive thiol, and for a white it is a loose one: expect ~4× under-prediction. That is
+    accepted rather than patched because the de novo mechanism is unidentified *in the source*
+    (see :class:`BoundHydrogenSulfideRelease`), and a rate without a mechanism is what prime
+    directive 2 forbids. The four ``release_share_*`` parameters carry the size of the gap as data.
+
+    **And the model predicts its own shortfall, which is the beat's best internal evidence.**
+    This k times the seeded reservoir gives 0.113 µg/L/yr of free MeSH against the paper's
+    separately-regressed **0.23 ± 0.06 µg/L/yr** — i.e. release-only covers **49 %**. Table 4's
+    mass balance, from a different experiment at a different temperature, independently says
+    **47.5 %**. The gap lands where the source says it should, to 1.5 points.
+
+    **Explicitly NOT copper-coupled — and here the data argues against coupling, not merely for
+    silence.** Total MeSH enters *both* PLS models with a **negative** copper coefficient (−0.140
+    reds, −0.164 whites), on which the authors conclude *"the role of copper as trapping agent of
+    MeSH is not really important in this case"*. Copper traps H₂S; it does not meaningfully trap
+    the thiol. Any future coupling to the D-134 ``copper`` state must therefore be **asymmetric**
+    between the two species — a shared metal-binding term would be positively wrong, not merely
+    coarse. (Note this Process still writes the pool that the ``add_copper`` fining verb removes:
+    D-45 precipitates free thiol as copper mercaptide. Fining a wine and then aging it releases
+    more thiol from a reservoir fining never touched — which is the real, and correct, behaviour.)
+
+    **No double-count with :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan`, and
+    the source says so independently.** That Process draws **methionine** during lees autolysis;
+    this one empties a metal-complex reservoir. The paper's models put methionine in with a
+    *negative* coefficient in both, concluding *"the residual amount of methionine in wine is not a
+    major source of the total MeSH found in wine"* — so the bonded reservoir is demonstrably not
+    the methionine pool wearing a different hat.
+
+    **Conservation — ON the carbon ledger, unlike the H₂S twin, and that is deliberate.**
+    Methanethiol carries one carbon (D-45 weights the free pool at its carbon fraction), so
+    ``bound_methanethiol`` is weighted **identically** in
+    :mod:`fermentation.core.validation.conservation`. Equal weights make the release exactly
+    carbon-neutral; weighting the bonded form at 0 instead would read as carbon *created* on every
+    step. ``total_carbon`` closes to machine precision through the transfer, and that is a test.
+
+    **Isolability — wine-only, aging-gated, doubly inert (prime directive #3).** Touches only
+    ``{bound_methanethiol, methanethiol}``, both wine-only; disabled at compile with the aging axis
+    and a no-op on an unseeded reservoir. Tier **speculative**, as for the twin.
+    """
+
+    name = "bound_methanethiol_release"
+    tier = Tier.SPECULATIVE
+    #: A 1:1 transfer between the bonded reservoir and the free pool. UNLIKE the H2S twin both slots
+    #: are carbon-weighted (at the same fraction), so the transfer is carbon-neutral rather than
+    #: off-ledger. No ``o2``: complex dissociation is not an oxidation.
+    touches = ("bound_methanethiol", "methanethiol")
+    #: Its own rate constant (``bound_sulfides.yaml``, D-135). Temperature-flat by decision — no
+    #: E_a, no ``T_ref`` (see the docstring). ``bound_methanethiol_initial`` seeds the slot at the
+    #: compile seam and is not read here.
+    reads: tuple[str, ...] = ("k_bound_methanethiol_release",)
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        reservoir = float(y[schema.slice("bound_methanethiol")][0])
+        if reservoir <= 0.0:
+            # The un-seeded no-op / solver-undershoot guard (see the H2S twin).
+            return d
+        rate = params["k_bound_methanethiol_release"] * reservoir  # g/L/h
+
+        # 1:1 in the same molecule, so the carbon into `methanethiol` equals the carbon out of
+        # `bound_methanethiol` at the shared weight and total_carbon closes exactly.
+        d[schema.slice("bound_methanethiol")] = -rate
+        d[schema.slice("methanethiol")] = rate
+        return d

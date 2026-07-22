@@ -1,0 +1,126 @@
+# Bottle-reduction sulfides — release of metal-complexed H2S / methanethiol (decision D-135)
+#
+# THE ONE SOURCE. Every constant here comes from a single primary:
+#
+#   Franco-Luesma, E., & Ferreira, V. (2016). "Reductive off-odors in wines: Formation and
+#   release of H2S and methanethiol during the accelerated anoxic storage of wines."
+#   Food Chemistry 199, 42-50. DOI 10.1016/j.foodchem.2015.11.111.
+#   Accepted manuscript open at https://zaguan.unizar.es/record/56225/files/texto_completo.pdf
+#
+# (Decision D-101 cited this paper as "J. Agric. Food Chem." That was WRONG -- it is Food
+#  Chemistry. The JAFC sulfide-kinetics paper is a SEPARATE 2025 one, doi 10.1021/acs.jafc.5c04010,
+#  which is paywalled and REMAINS UNREAD. Nothing here comes from it, and the search-summary
+#  numbers circulating for it are unverified leads that must not be used.)
+#
+# WHY THIS PAPER SETTLES A BEAT D-101 PARKED AS UNBUILDABLE. D-101 refused to build bottle
+# reduction because it assumed the mechanism was hydrolysis of unmodelled thioacetate/disulfide
+# precursors, for which no primary was readable. The measurement says the mechanism is something
+# else and simpler: the great majority of a wine's H2S and MeSH is already there at bottling, held
+# as REVERSIBLE NON-VOLATILE COMPLEXES with Cu(II) and other cations, and anoxic storage converts
+# bonded -> free. That is a reservoir being emptied, not a precursor being cleaved -- and the
+# reservoir is measured (total minus free) in 24 wines.
+#
+# WHAT IS DELIBERATELY NOT MODELLED, IN THE AUTHORS' OWN WORDS. The paper splits the accumulation
+# of free sulfides between RELEASE from complexes and DE NOVO formation, and this file implements
+# ONLY the release half. The de novo half is not deferred for convenience: the authors list
+# "the chemical nature of the processes causing de novo formation" among the questions "which will
+# have to be further addressed" (line 420 of the accepted manuscript). Shipping a rate for a
+# mechanism its own discoverers describe as unidentified is exactly what prime directive 2 forbids.
+# The COST of that choice is quantified, not hand-waved -- see release_share_* below.
+#
+# TEMPERATURE: THE ANCHOR IS AMBIENT, AND THE 50 C DATA IS NOT USED AS A RATE.
+# The paper reports two regimes. (1) A controlled 21-day accelerated experiment at 50 C. (2) A
+# regression across 16 real red wines of different vintages stored under ordinary retail/cellar
+# conditions. The rates below are taken from (2), because (2) IS the model's use case -- a bottle
+# in a cellar. Using (1) would be wrong by ~1250x: reds release bonded H2S at ~0.065/day at 50 C
+# against ~1.9%/YEAR at ambient. That ratio implies an activation energy near 158 kJ/mol, but the
+# ambient storage temperature is NOWHERE STATED in the paper, so that Ea rests on a guess and is
+# NOT shipped -- not even as a banded parameter. The consequence is stated plainly under each k:
+# these rates are TEMPERATURE-FLAT, and the Processes must not be used to predict warm or
+# accelerated storage. (The H2S-production Process's own v1 temperature-flat simplification is the
+# in-repo precedent for recording this rather than inventing an exponent.)
+
+# -- FIRST-ORDER RELEASE RATE: bonded H2S -> free H2S -------------------------------------
+k_bound_h2s_release:
+  value: 2.19e-6
+  unit: "1/h"   # d(bound_h2s)/dt = -k_bound_h2s_release * bound_h2s
+  tier: speculative
+  uncertainty: { low: 1.38e-6, high: 3.01e-6, note: "the propagated 1.9 +/- 0.7 %/yr regression band, converted the same way as the central value. => a bonded-H2S half-life of 27 years at cellar temperature (band 18-50 yr), i.e. the reservoir is barely dented over a normal drinking window and free H2S rises almost linearly. That slowness is the finding, not an artifact: it is why bottle reduction is a slow fault that shows up in mature wine rather than a young one" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Food Chemistry 199:42-50, the ambient/cellar regression across the 16 red wines: the bonded H2S fraction falls from 96.9 +/- 0.89 % (2012 vintage) to 87.8 +/- 4.0 % (2008 or older), which the authors read as a release of 1.9 +/- 0.7 % of the bonded forms per year (P<0.05). Converted to a first-order constant: k = -ln(1 - 0.019) / yr = 0.01918/yr = 2.19e-6 /h (365.25 d/yr)."
+    conditions: "red wine, sealed bottle, ordinary retail/cellar storage; first-order in bound_h2s. TEMPERATURE-FLAT (see the file header): the paper does not state the storage temperature of these wines, so no Arrhenius term is fitted and none is shipped."
+    notes: "SOURCED MAGNITUDE, AUTHOR-ASSUMED FORM. The 1.9 %/yr is the paper's own number; the first-order READING of it is this project's (the paper prints no rate law and no rate constant anywhere). Over the small fractional change actually observed (~9 points in 4 years) first-order and zero-order are indistinguishable, so the exponential shape is a convention, not a measurement -- it is chosen because it cannot drive the pool negative and needs no floor (the SMMHydrolysis precedent). CROSS-CHECK, AND IT PASSES INDEPENDENTLY: the paper separately regresses the FREE form and gets +0.38 +/- 0.11 ug/L/yr. Multiplying this k by the seeded reservoir (bound_h2s_initial = 19.7 ug/L) predicts 0.374 ug/L/yr -- 98% of the measured value, from two regressions the paper never compared to each other. The 50 C experiment gives 0.065/day for the same quantity (bonded 19.7 -> 5.0 ug/L in 21 days, derived here from Tables 1 and 4; the paper prints fractions, not constants) and is used ONLY as that consistency check, never as a rate."
+
+# -- FIRST-ORDER RELEASE RATE: bonded methanethiol -> free methanethiol --------------------
+k_bound_methanethiol_release:
+  value: 9.64e-6
+  unit: "1/h"   # d(bound_methanethiol)/dt = -k_bound_methanethiol_release * bound_methanethiol
+  tier: speculative
+  uncertainty: { low: 6.33e-6, high: 1.30e-5, note: "the propagated 8.1 +/- 2.7 %/yr regression band. => a bonded-MeSH half-life of 8.2 years at cellar temperature (band 6.1-12.5 yr) -- more than 3x shorter than bonded H2S's 27 yr" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Food Chemistry 199:42-50, same ambient regression across the 16 red wines: the bonded MeSH fraction falls from 74.1 +/- 7.2 % (2012) to 40 +/- 6.2 % (2008 or older), read by the authors as a release of 8.1 +/- 2.7 % of the bonded forms per year (P<0.01). Converted identically: k = -ln(1 - 0.081) / yr = 0.08447/yr = 9.64e-6 /h."
+    conditions: "red wine, sealed bottle, ordinary retail/cellar storage; first-order in bound_methanethiol. TEMPERATURE-FLAT, as for the H2S twin."
+    notes: "WHY THIS IS A SEPARATE PARAMETER AND NOT A SHARED SULFIDE RATE -- the species asymmetry is confirmed at BOTH measured temperatures and in the same direction. Ambient: MeSH releases at 8.1 %/yr against H2S's 1.9 %/yr (4.3x). Accelerated 50 C: 0.126/day against 0.065/day (1.9x), derived here from Tables 1/4. The ratio itself is not reproducible between regimes -- which is a real caveat on both numbers -- but the ORDERING is, and a single lumped sulfide reservoir could not express it. THE CROSS-CHECK IS DELIBERATELY WEAKER HERE, AND THAT IS THE POINT: this k times bound_methanethiol_initial (1.4 ug/L) predicts 0.113 ug/L/yr of free MeSH against the paper's measured +0.23 +/- 0.06 ug/L/yr -- only 49%. That shortfall is NOT an error to tune away. It is the missing de novo route, and 49% agrees with the independently-measured 47.5% release share (release_share_methanethiol_red) from the 50 C mass balance. The model under-predicts free MeSH by ~2x BY CONSTRUCTION and the size of the gap is itself sourced."
+
+# -- THE RESERVOIRS: a WINE property at bottling, not a winemaking dose --------------------
+bound_h2s_initial:
+  value: 19.7
+  unit: "ug/L"   # seeds bound_h2s (via ug/L -> g/L at the compile seam)
+  tier: plausible
+  uncertainty: { low: 11.6, high: 27.8, note: "+/- the measured SD of total H2S across the 16 reds (8.1 ug/L); the free form is small enough (1.1 +/- 0.1) that the total's spread is the reservoir's spread. The full observed range is wider still -- individual red totals run 12.1 to 44.9 ug/L -- so this band is one SD, not the envelope" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Table 1: red-wine averages of total H2S 20.8 +/- 0.7 ug/L and free H2S 1.1 +/- 0.1 ug/L across 16 Spanish red wines, i.e. 94% bonded. Reservoir = total - free = 19.7 ug/L."
+    conditions: "generic RED wine at bottling, before aging. Whites and roses carry MORE (25.7 - 2.0 = 23.7 ug/L, 92% bonded), not less -- scenarios modelling a white should override bound_h2s_ugl to 23.7."
+    notes: "TIER IS PLAUSIBLE, NOT SPECULATIVE, AND ALONE IN THIS FILE IN THAT -- this is a directly measured concentration in 24 real commercial wines by a validated method (reported reproducibility RSD 5.3% on total H2S), not a rate read out of a regression slope. The red default follows the house convention set by D-132/D-133/D-134, all of which calibrate generic wine on a red dataset. INDEPENDENTLY CORROBORATED by the rate cross-check under k_bound_h2s_release: the reservoir enters that prediction multiplicatively, so a badly wrong reservoir would have broken the 98% agreement with the free-form regression. NOT COUPLED TO THE D-134 copper STATE, deliberately. Table 2's PLS models do relate total H2S positively to Cu (+0.227 in reds, +0.303 in whites), but a PLS regression coefficient on a static composition survey is not a binding stoichiometry -- it yields no ug-bound-per-ug-Cu -- and the reds model explains only 78% of variance at an RMSE of 3.90 ug/L against a 20.8 ug/L mean. So the reservoir is seeded from the measured bonded fraction and copper coupling waits for a real binding constant."
+
+bound_methanethiol_initial:
+  value: 1.4
+  unit: "ug/L"   # seeds bound_methanethiol
+  tier: plausible
+  uncertainty: { low: 0.7, high: 2.1, note: "+/- the measured SD of total MeSH across the 16 reds (0.67 ug/L). Individual red totals run 1.08 to 4.20 ug/L" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Table 1: red-wine averages of total MeSH 2.3 +/- 0.1 ug/L and free MeSH 0.9 +/- 0.0 ug/L, i.e. 62% bonded. Reservoir = total - free = 1.4 ug/L."
+    conditions: "generic RED wine at bottling, before aging. Whites and roses carry roughly HALF (2.6 - 1.8 = 0.8 ug/L, only 31% bonded) -- the red/white difference is real for MeSH, unlike for H2S where the reservoirs are comparable."
+    notes: "THE RESERVOIR IS ~14x SMALLER THAN THE BONDED H2S ONE, which is why bottle reduction reads as H2S-dominated by mass even though MeSH is released faster and has a comparable sensory threshold. NOT COPPER-COUPLED, and here the data actively argues against coupling rather than merely failing to support it: total MeSH enters BOTH of Table 2's PLS models with a NEGATIVE copper coefficient (-0.140 reds, -0.164 whites), on which the authors conclude that 'the role of copper as trapping agent of MeSH is not really important in this case'. Copper traps H2S; it does not meaningfully trap MeSH. Any future coupling must therefore be ASYMMETRIC between the two species, and a shared metal-binding term would be wrong. SEPARATELY: methionine is a NEGATIVE term in both MeSH models, and the authors read this as evidence that 'the residual amount of methionine in wine is not a major source of the total MeSH found in wine' -- which is the independent argument that this reservoir does NOT double-count AutolyticMercaptan (D-45), whose substrate is exactly that methionine."
+
+# -- THE COVERAGE GAP: how much of reality release-only accounts for ----------------------
+# NOT rates and not read by any Process. These are the paper's measured mass-balance split,
+# carried as data so the deliberate under-claim is a checkable number rather than a caveat in a
+# docstring. The Processes in this file model the RELEASE column only; these say how big that
+# column is. All four from Table 4 (mass balance of the 21-day 50 C anoxic storage).
+release_share_h2s_red:
+  value: 0.903
+  unit: "dimensionless"
+  tier: validated
+  uncertainty: { low: 0.903, high: 0.903, note: "a reported mass-balance share, not an estimate -- carried exactly as printed. The band is degenerate because there is nothing to band: the paper prints one number per cell" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Table 4: of a total 16.2 ug/L increase in free H2S in red wines over 21 days at 50 C, 14.7 ug/L (90.3%) is attributed to release from complexes and 9.7% to de novo formation. The de novo residual is NOT statistically significant in reds -- total H2S increments are 'ns' for 11 of the 16 wines and the group mean 1.6 +/- 3.8 ug/L straddles zero."
+    conditions: "red wine, 21 days anoxic storage at 50 C. Shares are expected to shift at cellar temperature; the authors expect the PATTERN to hold ('not change dramatically at lower temperatures, at least in relative terms') and cite a separate 25 C study agreeing on both directions."
+    notes: "THE BEST CASE FOR THIS BEAT. Release-only captures ~90% of red-wine H2S aging, and the ambient cross-check under k_bound_h2s_release lands at 98%. Red-wine bottle H2S is essentially a solved problem in this model."
+release_share_h2s_white:
+  value: 0.580
+  unit: "dimensionless"
+  tier: validated
+  uncertainty: { low: 0.580, high: 0.580, note: "as printed; see release_share_h2s_red" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Table 4: whites and roses, 13.0 of 22.5 ug/L free-H2S increase attributed to release (58.0%), 42.0% to de novo formation (total H2S increment 9.4 ug/L, P<0.0001 -- unlike in reds, significant)."
+    conditions: "white/rose wine, 21 days anoxic storage at 50 C."
+    notes: "A white wine's H2S is only ~58% release, so this model under-predicts it by ~2x even before the MeSH gap below."
+release_share_methanethiol_red:
+  value: 0.475
+  unit: "dimensionless"
+  tier: validated
+  uncertainty: { low: 0.475, high: 0.475, note: "as printed; see release_share_h2s_red" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Table 4: red wines, 1.3 of 2.7 ug/L free-MeSH increase attributed to release (47.5%), 52.5% to de novo formation (total MeSH increment 1.4 ug/L, P<1e-10)."
+    conditions: "red wine, 21 days anoxic storage at 50 C."
+    notes: "INDEPENDENTLY REPRODUCED BY THIS MODEL'S OWN ARITHMETIC, which is the strongest internal evidence the design is right: k_bound_methanethiol_release x bound_methanethiol_initial predicts 49% of the paper's separately-measured ambient free-MeSH accumulation. 49% against a 47.5% mass-balance share, from a different experiment at a different temperature."
+release_share_methanethiol_white:
+  value: 0.241
+  unit: "dimensionless"
+  tier: validated
+  uncertainty: { low: 0.241, high: 0.241, note: "as printed; see release_share_h2s_red" }
+  provenance:
+    source: "Franco-Luesma & Ferreira 2016, Table 4: whites and roses, 0.9 of 3.8 ug/L free-MeSH increase attributed to release (24.1%), 75.9% to de novo formation. The bonded MeSH fraction in these wines falls from 31% to 0% -- the reservoir empties completely and 'release is nearly completed in less than one week'."
+    conditions: "white/rose wine, 21 days anoxic storage at 50 C."
+    notes: "THE WORST CASE, AND THE NUMBER THIS FILE EXISTS TO MAKE UNMISSABLE. For methanethiol in white and rose wine, release accounts for less than a quarter of what actually happens: the model will under-predict by roughly 4x. A white wine's reductive MeSH development is DOMINATED by the de novo route the file header refuses to model. Anyone reading this model's MeSH output for a white wine is reading a lower bound, and a loose one."

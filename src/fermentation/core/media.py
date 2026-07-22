@@ -88,6 +88,8 @@ from fermentation.core.kinetics import (
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
     BiomassCarryingCapacity,
+    BoundHydrogenSulfideRelease,
+    BoundMethanethiolRelease,
     BrettDeath,
     BrettDecarboxylation,
     BrettEthanolToxicity,
@@ -1080,6 +1082,46 @@ def wine_schema() -> StateSchema:
             "the multiplier is exactly 1, byte-for-byte the D-132/D-133 calibrated rate. Off "
             "every ledger (a trace metal, not an organic pool)",
         ),
+        # The D-135 bottle-reduction reservoirs, appended LAST so existing wine slot indices are
+        # unchanged (the D-100/D-102/D-133/D-134 convention). Franco-Luesma & Ferreira 2016 measured
+        # both the FREE and the TOTAL forms of H2S/MeSH in 24 wines and found the great majority is
+        # held as reversible non-volatile complexes with Cu(II) and other cations — 94%/62% bonded
+        # in reds. Anoxic bottle storage converts bonded -> free, which is what makes a sealed
+        # reductive wine go stinky over years. These two slots ARE that bonded reservoir.
+        VarSpec(
+            "bound_h2s",
+            "g/L",
+            default=0.0,
+            description="metal-complexed (non-volatile, 'bonded') hydrogen sulfide — the reservoir "
+            "that releases free H2S during anaerobic bottle aging (decision D-135). Measured as "
+            "total minus free (Franco-Luesma & Ferreira 2016): 94% of a red wine's total H2S and "
+            "92% of a white's is held this way, chiefly as Cu(II)-H2S complexes. Released "
+            "first-order by BoundHydrogenSulfideRelease into the free h2s slot. A WINE-composition "
+            "property, not a winemaking dose, so _wine_initial seeds it from the sourced "
+            "bound_h2s_initial rather than 0 (a 0 default would assert bottled wine never turns "
+            "reductive — the D-45 hard-zero defect). UNLIKE D-134's copper, 0 IS this pool's "
+            "neutral value: it is a first-order SOURCE, so an un-seeded pool makes the Process "
+            "byte-for-byte inert rather than wrong. Off every ledger, exactly like the carbon-free "
+            "free h2s it feeds (registered with 0 carbon in chemistry; its sulfur is untracked "
+            "since there is no sulfate/sulfur state). Decision D-135",
+        ),
+        VarSpec(
+            "bound_methanethiol",
+            "g/L",
+            default=0.0,
+            description="metal-complexed (non-volatile, 'bonded') methanethiol — the reservoir "
+            "that releases free MeSH during anaerobic bottle aging (decision D-135), the "
+            "bound_h2s twin. 62% of a red wine's total MeSH is bonded, 31% of a white's "
+            "(Franco-Luesma & Ferreira 2016), and it releases ~2x FASTER than bonded H2S at both "
+            "measured temperatures — which is why the two carry separate pools and separate rate "
+            "constants rather than one lumped sulfide reservoir. Released by "
+            "BoundMethanethiolRelease into the free methanethiol slot. Seeded from the sourced "
+            "bound_methanethiol_initial (the bound_h2s/dms_potential precedent); 0 is neutral and "
+            "inert. ON THE CARBON LEDGER at methanethiol's own carbon fraction — unlike bound_h2s, "
+            "because the free methanethiol it feeds is carbon-weighted (D-45), so weighting the "
+            "bonded form identically makes the release exactly carbon-neutral instead of a "
+            "carbon-creating transfer. Nitrogen-free. Decision D-135",
+        ),
     ]
     return StateSchema(specs)
 
@@ -1453,6 +1495,32 @@ _MAILLARD_BROWNING_PROCESSES: tuple[Callable[[], Process], ...] = (MaillardBrown
 #: (its name rides in :data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no
 #: precursor seeded ⇒ byte-for-byte inert (the ``dms_potential <= 0`` guard). Params: ``dms.yaml``.
 _DMS_PROCESSES: tuple[Callable[[], Process], ...] = (SMMHydrolysis,)
+
+#: Bottle-reduction sulfide-release aging Processes (decision D-135) — the aged-wine "rotten egg /
+#: drains" pair. WINE-ONLY. These close the gap :mod:`~fermentation.core.kinetics.mercaptans` has
+#: named since D-101: the model could make reductive sulfides on the lees (D-44/D-45) but could not
+#: show a *bottled* wine turning reductive at all, which is the classic screwcap fault. The answer
+#: turned out not to need the unmodelled thioacetate/disulfide precursors D-101 was blocked on:
+#: Franco-Luesma & Ferreira 2016 measured free AND total forms and found 94 %/62 % of a red wine's
+#: H₂S/MeSH is ALREADY THERE at bottling, bound in reversible Cu(II)-and-other-cation complexes, and
+#: anoxic storage simply lets it go. So each Process is a first-order emptying of a **measured**
+#: reservoir into the free pool the D-67 OAV lens reads — 1:1, same molecule, only its binding state
+#: changing, hence no yield parameter and no molar-mass conversion (the ``dms_potential`` idiom).
+#: TWO Processes and not one, because the species asymmetry is measured at two temperatures and in
+#: the same direction (MeSH releases 4.3× faster than H₂S in real bottles) and a lumped reservoir
+#: could not carry it. LEDGER-SPLIT, and deliberately: ``bound_h2s``/``h2s`` are off every ledger
+#: (H₂S is carbon-free), while ``bound_methanethiol`` IS carbon-weighted at the same fraction as
+#: the free ``methanethiol`` pool it feeds (D-45), so its release closes ``total_carbon`` exactly
+#: instead of creating carbon. Wine-only: the constants are wine-anchored and the reservoir is a
+#: property of a finished wine. Kept in its OWN tuple (isolable, directive #3): DISABLED at the
+#: compile seam and re-enabled by ``begin_aging``. With no reservoir seeded ⇒ byte-for-byte inert
+#: (the ``<= 0`` guards). RELEASE ONLY — the co-measured *de novo* route is absent by decision
+#: (its mechanism is unidentified in the source), so these are LOWER BOUNDS: ~90 % of the truth for
+#: red H₂S but only ~24 % for white MeSH. Params + the mass-balance shares: ``bound_sulfides.yaml``.
+_BOUND_SULFIDE_PROCESSES: tuple[Callable[[], Process], ...] = (
+    BoundHydrogenSulfideRelease,
+    BoundMethanethiolRelease,
+)
 
 #: Oak-extraction aging Process (decision D-77) — the barrel/chip extractive axis. WINE + BARREL-
 #: BEER (D-86: wired into BOTH media — the oak axis is a wood property, not a grape one).
@@ -1949,6 +2017,7 @@ MEDIA: dict[str, Medium] = {
             + _TANNIN_SELF_POLYMERIZATION_PROCESSES
             + _TANNIN_ETHYL_TANNIN_PROCESSES
             + _DMS_PROCESSES
+            + _BOUND_SULFIDE_PROCESSES
         ),
         modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
     ),

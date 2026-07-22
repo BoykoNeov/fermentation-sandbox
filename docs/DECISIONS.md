@@ -8501,7 +8501,14 @@ formation makes MeSH regardless of lees — screwcap reduction is the classic ca
 precursors** — a beat, **not** a patch and **not** a re-anchoring of `y_mercaptan`.
 **THE EVIDENCE FLOOR IS ITSELF THE RESULT.** This rests on **secondary reviews read through summarising fetches**; the primaries that
 would settle route dominance — **Smith 2015** (*Aust. J. Grape Wine Res.*) and **Franco-Luesma & Ferreira 2016** (*JAFC*, anoxic-storage
-formation) — are **paywalled and UNREAD** (one targeted attempt each: 402, and reCAPTCHA). At this project's bar that grade licenses
+formation) — are **paywalled and UNREAD** (one targeted attempt each: 402, and reCAPTCHA).
+[**Corrected at D-135 — two errors in that one clause.** (a) The journal is wrong: it is
+***Food Chemistry* 199:42-50**, not *JAFC* (the JAFC sulfide paper is a separate, still-unread 2025
+kinetics one). (b) It is **no longer unread** — an accepted manuscript is openly deposited at
+`zaguan.unizar.es/record/56225` and was read in full. Reading it **inverted this decision's premise**:
+the route is not thioacetate/disulfide hydrolysis but release from reversible metal complexes that
+are already present at bottling. The *deferral recorded here was still correct* — see D-135. Smith
+2015 remains paywalled and unread.] At this project's bar that grade licenses
 **softening a claim and recording a gap**; it does **not** license reshaping a route or re-anchoring a yield on working, deliberately
 designed code. **"Cannot source it to primary yet" IS the answer, not a prelude to building on summaries.** An **absence-of-evidence
 trap was caught in the act**: *"the fetch did not surface autolysis"* is a fact about a summarising model's output, **not about the
@@ -13594,3 +13601,159 @@ k_browning_eff = (k_browning_base + k_browning_phenolic * (tannin + anthocyanin)
   ideally with copper isolated from co-varying Mn/pH/phenolics) would be the natural follow-on if one
   is ever found, but is not chased here. D-132's other deferred items (tail-acceleration,
   gluconolactone, MLF protein-protection) remain open, tracked under D-132/D-130/D-131.
+
+## D-135 — bottle-reduction sulfides: metal-complexed H2S/MeSH reservoirs released first-order
+during anaerobic bottle aging, after the primary D-101 recorded as unreadable turned out to be
+open — and to say the mechanism D-101 guessed for it was the wrong one
+
+Owner picked "bottle-reduction sulfides" off the open-beat menu (2026-07-22 session, same day as
+D-132/D-133/D-134), explicitly expecting a sourcing chase first because `mercaptans.py` had flagged
+the beat as source-blocked since D-101. The chase is the substance of this record: it lifted a block
+the project had recorded as standing, and in doing so **inverted the beat's premise**.
+
+### The block D-101 set, and why it was right to set it
+D-101 refused to model bottle reduction and said so in terms this decision must honour rather than
+quietly overrule:
+
+> the **bottle-aged MeSH route** (blocked on primary sources + unmodelled thioacetate/disulfide
+> precursors) ... the primaries that would settle route dominance — **Smith 2015** and
+> **Franco-Luesma & Ferreira 2016** — are **paywalled and UNREAD** ... **"Cannot source it to
+> primary yet" IS the answer, not a prelude to building on summaries.**
+
+That judgement stands and is not being reversed. What changed is *availability*, not the standard:
+Franco-Luesma & Ferreira's **accepted manuscript is openly deposited** in the Universidad de
+Zaragoza's institutional repository (`zaguan.unizar.es/record/56225`). It was read in full — the PDF
+pages directly, not through a summarising fetch, per D-102's earned lesson that **a summarising
+fetch is a source of leads, never of constants**. (`WebFetch` in fact refused the file outright, its
+compression defeating quote verification; the pages were read as rendered images instead.)
+
+**Two citation defects found and fixed.** D-101 and `mercaptans.py` both cite the paper as
+*J. Agric. Food Chem.* It is **Food Chemistry 199:42-50 (2016)**, DOI 10.1016/j.foodchem.2015.11.111
+(verified against PubMed 26775942). The JAFC sulfide paper is a *separate* 2025 kinetics one
+(doi 10.1021/acs.jafc.5c04010) which is **403-paywalled and remains unread**; the search-summary
+numbers circulating for it (half-lives 0.89/24.6/160 months, precursors 1.4–2.96 mg/L) are recorded
+as **unverified leads that must not ship**, and nothing here rests on them. An untrue provenance
+string is exactly what prime directive #2 forbids, so `mercaptans.py`'s line is corrected in place.
+
+### THE PREMISE INVERSION — the mechanism is a reservoir, not a precursor
+D-101 assumed bottle reduction needed new pools of **thioacetates and disulfides** hydrolysing to
+free thiol. The measurement says otherwise, and the correction is the reason this beat became
+buildable at all. Franco-Luesma & Ferreira measured **free AND total** H2S/MeSH in 24 Spanish wines
+(16 red, 8 white/rosé) and found the great majority of both is **already present at bottling**, held
+as **reversible non-volatile complexes with Cu(II) and other cations**. Anoxic storage converts
+bonded → free. Nothing needs to be *made*; something needs to be *let go*.
+
+That is a one-pool first-order decay whose reservoir is **directly measured** (Table 1: reds 94 %
+of total H2S and 62 % of total MeSH are bonded) — not a precursor pool of unknown identity and
+unknown size. **The beat was correctly deferred at D-101 and the mechanism guessed for it was still
+wrong**, which is the strongest argument in the archive for deferring rather than estimating.
+
+### Transcription first — the owner's call, and it changed four numbers
+Offered "build release-only now" vs "transcribe Tables 1–4 first", the owner chose **transcribe**.
+That was the right call: reading the tables rather than the prose corrected the pre-transcription
+working notes in four places, two of them load-bearing.
+
+- Initial bonded **MeSH** fraction: recorded as 47 % from prose; the tables say **62 % reds / 31 %
+  whites**. The 47.5 % figure is the *release share*, a different row that had been conflated.
+- White/rosé H2S endpoint: recorded as "0–54 % bonded"; the group means are **92 % → 31 %**.
+- The bonded **H2S reservoirs of reds and whites are comparable** (19.7 vs 23.7 µg/L) — whites carry
+  *more*. So the red/white H2S difference is a **rate** difference, not a reservoir one. Nothing in
+  the prose said this.
+- No fitted rate constant appears anywhere in the paper; every k here is derived from the tables.
+
+### THE CROSS-VALIDATION — three independent parts of the paper agreeing, which the paper never checked
+The strongest evidence this design is right is an arithmetic the source never performed on itself.
+Its ambient regression reports **two independent observables**: the bonded *fraction* declining
+(%/yr), and the *free* form accumulating (µg/L/yr). Multiplying the first by the measured reservoir
+must reproduce the second if release dominates:
+
+| | reservoir × release %/yr | = predicted free gain | measured free gain | ratio |
+|---|---|---|---|---|
+| H2S, reds  | 19.7 × 1.9 %/yr | 0.374 µg/L/yr | 0.38 ± 0.11 | **98 %** |
+| MeSH, reds | 1.4 × 8.1 %/yr  | 0.113 µg/L/yr | 0.23 ± 0.06 | **49 %** |
+
+And those two ratios are **Table 4's release shares**, measured in a different experiment at a
+different temperature: **90.3 %** and **47.5 %**. Three parts of the paper — the 50 °C mass balance,
+the ambient bonded-fraction regression, and the ambient free-form regression — agree that red-wine
+H2S is nearly all release and red-wine MeSH is about half. Agreement to 8 points and 1.5 points.
+Because the reservoir enters multiplicatively, this simultaneously corroborates the seeded levels.
+
+### Design — two pools, two Processes, and three things deliberately NOT built
+`BoundHydrogenSulfideRelease`: `d(bound_h2s)/dt = -k · bound_h2s`, `d(h2s)/dt = +` the same.
+`BoundMethanethiolRelease`: the same shape on `{bound_methanethiol, methanethiol}`. 1:1 with no
+yield parameter and no molar-mass conversion — the ligand is the same molecule either way, only its
+binding state changes (the `dms_potential` idiom).
+
+- **TWO Processes, not one.** Bonded MeSH releases **4.3× faster** than bonded H2S in the ambient
+  regression and **1.9× faster** at 50 °C. The ratio does not reproduce between regimes (an honest
+  caveat on both), but the **ordering** does, and a lumped sulfide reservoir could not carry it.
+- **Ledger-split, deliberately.** `bound_h2s` sits off every ledger like the carbon-free `h2s` it
+  feeds; `bound_methanethiol` **is** carbon-weighted, at the free thiol's own fraction (D-45), so
+  the transfer closes `total_carbon` exactly. Weighting it 0 instead would read as carbon *created*
+  on every step — a defect a green suite would not otherwise have caught.
+- **NOT built #1 — de novo formation.** The paper splits free-sulfide accumulation between release
+  and de novo, and only release is modelled. This is not convenience: the authors list *"the
+  chemical nature of the processes causing de novo formation"* among the questions "which will have
+  to be further addressed". A rate for a mechanism its own discoverers call unidentified is what
+  prime directive #2 forbids. **The cost is quantified, not confessed** — four `release_share_*`
+  parameters carry the mass balance, and the worst case is loud: **white-wine MeSH is only 24.1 %
+  release, so the model under-predicts it ~4×.** A test asserts the MeSH coverage stays *below* 0.6,
+  so if anyone ever quietly adds a de novo route the suite says so.
+- **NOT built #2 — copper coupling.** D-134's `copper` state is an obvious hook and is not taken.
+  Table 2's PLS models are correlations on *static composition*, not binding stoichiometries: no
+  µg-bound-per-µg-Cu is extractable, and the reds H2S model explains only 78 % of variance at RMSE
+  3.90 µg/L against a 20.8 µg/L mean. **The data also argues against a naive coupling**: copper is
+  *positive* in both H2S models (+0.227, +0.303) but **negative** in both MeSH models (−0.140,
+  −0.164), on which the authors conclude *"the role of copper as trapping agent of MeSH is not
+  really important in this case"*. Any future coupling must be **asymmetric between the two
+  species** — a shared metal-binding term would be positively wrong, not merely coarse.
+- **NOT built #3 — temperature dependence.** The rates are the **ambient/cellar** regression's
+  (1.9 %/yr H2S, 8.1 %/yr MeSH), because a bottle in a cellar is what the model simulates. The
+  50 °C data is used *only* as a consistency check, never as a rate: it is ~1250× faster, and
+  transferring it needs an activation energy that would rest on a storage temperature **the paper
+  never states**. The derived ~158 kJ/mol is therefore **not shipped in any form**, not even banded.
+  The Processes are **temperature-flat by decision**, with a test pinning that (identical
+  derivatives at 285 K and 305 K, and neither Process may read `T_ref` or an `E_a`). They must not
+  be used to predict warm or accelerated storage.
+
+### No double-count, and the source says so independently
+`AutolyticMercaptan` (D-45) draws **methionine** during lees autolysis; this releases a metal-complex
+reservoir. Different substrate, different phase. The paper corroborates the separation without being
+asked to: methionine enters **both** total-MeSH models with a *negative* coefficient, on which the
+authors conclude *"the residual amount of methionine in wine is not a major source of the total MeSH
+found in wine"*. The bonded reservoir is demonstrably not the methionine pool wearing a hat.
+
+### Receipts
+- Two new wine-only slots (`bound_h2s`, `bound_methanethiol`), appended last per the
+  D-100/D-102/D-133/D-134 convention, so every existing wine slot index is unchanged; wine schema
+  90 → **92**. Both seeded from sourced levels rather than 0 (the D-45 hard-zero defect: a 0 default
+  would assert no bottled wine ever turns reductive), overridable via `bound_h2s_ugl` /
+  `bound_methanethiol_ugl`, and explicit 0 is honoured and byte-for-byte inert.
+- Seeded at **pitch**, not at bottling — a stated v1 simplification. Nothing reads or writes either
+  slot until `begin_aging`, so it is observationally identical; what it cannot express is the
+  reservoir being *built* during fermentation, which needs a binding constant nobody has published.
+- New `bound_sulfides.yaml` (4 rate/level parameters + 4 mass-balance shares), all from the one
+  primary. The two reservoir levels are tier **plausible** — directly measured concentrations in 24
+  commercial wines (RSD 5.3 %) — and are alone in the file in that; both rates are **speculative**
+  (a first-order *reading* of a regression slope the paper never fitted a rate law to; over the ~9
+  points of change actually observed, first- and zero-order are indistinguishable, so the
+  exponential shape is a convention chosen because it cannot drive the pool negative).
+- 16 new tests in `tests/test_bound_sulfides.py`, most of them cross-checks between parts of the
+  paper rather than restatements of the code. Two `test_media.py` exact-set enumerations updated
+  (slot list + size 90 → 92; process-name set) — the predicted shared-registry breakage.
+- `mercaptans.py`'s D-101 SCOPE paragraph updated in place: the gap is marked CLOSED, the wrong
+  guessed mechanism is kept visible as the lesson, and the journal mis-citation is corrected.
+- Full suite green: `ruff check .`, `mypy` (110 files), `pytest -n auto` — **1294 passed, 84.2 s**.
+
+### Next
+- **De novo formation** stays blocked, and the blocker is now *sourced* rather than assumed: the
+  mechanism is unidentified in the primary itself. The unread 2025 JAFC kinetics paper
+  (doi 10.1021/acs.jafc.5c04010) is the natural place it would be settled if it ever becomes
+  readable. Until then, white-wine MeSH output is a ~4× under-prediction and must be read as a
+  lower bound, not a total.
+- **Smith 2015** (*Aust. J. Grape Wine Res.* 21:S1) remains paywalled and unread.
+- **Copper coupling** waits on a real binding constant, and must be asymmetric when it arrives.
+- The reservoir-formation route (fermentative H2S meeting must copper) is unmodelled; it would
+  replace the pitch-seeding simplification with a binding equilibrium.
+- D-132's other deferred items (tail-acceleration, gluconolactone, MLF protein-protection) remain
+  open, tracked under D-132/D-130/D-131.

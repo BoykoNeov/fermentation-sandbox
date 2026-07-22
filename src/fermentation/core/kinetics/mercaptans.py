@@ -73,10 +73,25 @@ thioacetates and disulfides. So:
   needs a new Process over precursors (thioacetates/disulfides) that are not modelled — a beat of
   its own, **not** a re-anchoring of ``y_mercaptan``.
 
+  **CLOSED AT D-135, and the guessed mechanism above was WRONG.** The gap is now filled by
+  :class:`~fermentation.core.kinetics.aging.BoundMethanethiolRelease`, and it needed no
+  thioacetate/disulfide pool: Franco-Luesma & Ferreira 2016 measured *free and total* MeSH and
+  found **62 % of a red wine's is already present at bottling**, held in reversible metal
+  complexes that anoxic storage releases. The bottled wine was never short of thiol — it was
+  short of *free* thiol. This paragraph is kept as written because the shape of the miss is the
+  lesson: the beat was correctly identified and correctly deferred, and the mechanism guessed
+  for it was still not the real one. **That is the case for deferring rather than estimating.**
+  (Release is only ~47.5 % of red / ~24 % of white MeSH accumulation, so that Process is a lower
+  bound; the co-measured *de novo* route stays unbuilt, its mechanism unidentified in the source
+  itself.)
+
 **Evidence grade, stated because it bounds the above.** The route survey rests on secondary reviews;
 the primary sources that would settle which route dominates (Smith 2015, *Aust. J. Grape Wine Res.*
-21:S1; Franco-Luesma & Ferreira 2016, *J. Agric. Food Chem.*, on anoxic-storage formation) are
-paywalled and **unread**. That grade is enough to stop this docstring claiming MeSH comes *chiefly*
+21:S1; Franco-Luesma & Ferreira 2016 on anoxic-storage formation) are paywalled and **unread**.
+[D-135: the second of those is no longer unread — an accepted manuscript is open in the authors'
+institutional repository, and it is *Food Chemistry* 199:42-50, **not** *J. Agric. Food Chem.* as
+this line and D-101 both had it. Smith 2015 remains unread.] That grade is enough to stop this
+docstring claiming MeSH comes *chiefly*
 from the lees — it does not say so any more — and enough to record the omission; it is **not**
 enough to re-shape the route or re-anchor the yield. The threshold is independently corroborated:
 ``threshold_mercaptans_wine`` = 3.0 µg/L against a reported wine MeSH threshold of 1.8–3.1 µg/L.

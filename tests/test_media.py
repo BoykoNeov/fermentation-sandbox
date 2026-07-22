@@ -163,6 +163,15 @@ WINE_BURST_ANTIOXIDANT_SLOTS = ("burst_antioxidant",)
 # property seeded from `copper_typical` rather than defaulting to 0.
 WINE_COPPER_SLOTS = ("copper",)
 
+# The bottle-reduction reservoirs (decision D-135), appended last (the D-100/D-102/D-133/D-134
+# convention). The metal-complexed ("bonded") H2S/MeSH that Franco-Luesma & Ferreira 2016 measured
+# as 94 %/62 % of a red wine's total, and that anoxic bottle storage releases into the free pools.
+# Like dms_potential/burst_antioxidant, wine-composition properties seeded from their sourced levels
+# rather than defaulting to 0. LEDGER-SPLIT: bound_h2s is off every ledger (H2S is carbon-free)
+# while bound_methanethiol is carbon-weighted at the same fraction as the free pool it feeds, so
+# the release closes total_carbon exactly.
+WINE_BOUND_SULFIDE_SLOTS = ("bound_h2s", "bound_methanethiol")
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -191,6 +200,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_DMS_SLOTS
         + WINE_BURST_ANTIOXIDANT_SLOTS
         + WINE_COPPER_SLOTS
+        + WINE_BOUND_SULFIDE_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -256,7 +266,12 @@ def test_wine_schema_has_single_sugar_slot():
     # dms_potential, off every ledger).
     # + 1 D-134 copper slot (a mean-centered multiplier input on PhenolicBrowning's rate — not a
     # new sink, off every ledger, seeded from copper_typical like burst_antioxidant/dms_potential).
-    assert schema.size == 90
+    # + 2 D-135 bound-sulfide reservoirs (bound_h2s, bound_methanethiol — the metal-complexed forms
+    # anoxic bottle storage releases into the free pools; wine-composition inputs seeded from their
+    # sourced levels. bound_h2s is off every ledger like the carbon-free h2s it feeds, while
+    # bound_methanethiol IS carbon-weighted, at the free thiol's own fraction, so the release closes
+    # total_carbon exactly rather than creating carbon).
+    assert schema.size == 92
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -628,6 +643,16 @@ WINE_MAILLARD_BROWNING_PROCESSES = {"maillard_browning"}
 # yeast DMSO reduction), and transferring these would be the same wort→wine mechanism error D-102
 # rejects Scheuren's activation energy for. Same disable / begin_aging re-enable.
 WINE_DMS_PROCESSES = {"smm_hydrolysis"}
+# WINE-ONLY bottle reduction (decision D-135): bound_h2s_release / bound_methanethiol_release —
+# the metal-complexed sulfide reservoirs emptying into the free h2s/methanethiol pools during
+# anaerobic bottle aging. These close the gap D-101 recorded as unmodellable: the model could make
+# reductive sulfides on the lees but could not show a BOTTLED wine turning reductive, which is the
+# classic screwcap fault. TWO Processes, not one, because bonded MeSH releases ~4.3x faster than
+# bonded H2S in the source's ambient regression and a lumped reservoir could not carry that. Each
+# touches only its own reservoir + free pool. RELEASE ONLY — the co-measured de novo route is
+# absent by decision (its mechanism is unidentified in the source), so these are lower bounds.
+# Same compile-disable / begin_aging re-enable as the rest of the aging axis.
+WINE_BOUND_SULFIDE_PROCESSES = {"bound_h2s_release", "bound_methanethiol_release"}
 EXPECTED_PROCESSES = {
     "wine": (
         CORE_PROCESSES
@@ -658,6 +683,7 @@ EXPECTED_PROCESSES = {
         | WINE_TANNIN_SELF_POLY_PROCESSES
         | WINE_TANNIN_ETHYL_TANNIN_PROCESSES
         | WINE_DMS_PROCESSES
+        | WINE_BOUND_SULFIDE_PROCESSES
     ),
     "beer": (
         CORE_PROCESSES

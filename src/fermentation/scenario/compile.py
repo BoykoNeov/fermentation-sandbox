@@ -42,6 +42,8 @@ from fermentation.core.kinetics import (
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
     BiomassCarryingCapacity,
+    BoundHydrogenSulfideRelease,
+    BoundMethanethiolRelease,
     BrettDeath,
     BrettDecarboxylation,
     BrettEthanolToxicity,
@@ -206,6 +208,8 @@ _AGING_GATED_PROCESSES = (
     Caramelization,
     MaillardBrowning,
     SMMHydrolysis,
+    BoundHydrogenSulfideRelease,
+    BoundMethanethiolRelease,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -407,6 +411,18 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             # isolable at zero). Scenarios SHOULD override it to explore atypical copper wines;
             # explicit 0 is still honoured (an explicit, documented deviation, not silent).
             "copper_gpl",
+            # The wine's metal-complexed ("bonded") sulfide reservoirs at bottling, in µg/L
+            # (decision D-135) — what BoundHydrogenSulfideRelease / BoundMethanethiolRelease empty
+            # into the free h2s / methanethiol pools during anaerobic bottle aging. Like
+            # dms_potential_ugl / burst_antioxidant_gpl / copper_gpl, absent does NOT mean 0: they
+            # fall back to the sourced bound_h2s_initial / bound_methanethiol_initial, because 94 %
+            # and 62 % of a red wine's H2S and MeSH are bonded at bottling (Franco-Luesma & Ferreira
+            # 2016) and defaulting to 0 would assert that no bottled wine ever turns reductive —
+            # the D-45 hard-zero defect. Scenarios SHOULD override for a WHITE: whites carry MORE
+            # bonded H2S (23.7 µg/L) and about HALF the bonded MeSH (0.8 µg/L) of the red defaults.
+            # Explicit 0 is still honoured and makes both Processes byte-for-byte inert.
+            "bound_h2s_ugl",
+            "bound_methanethiol_ugl",
         }
     ),
     "beer": frozenset(
@@ -557,6 +573,41 @@ def _wine_initial(
             )
         ),
         "dms": 0.0,  # produced-only: no DMS at pitch, it accumulates over bottle aging
+        # The metal-complexed sulfide reservoirs (decision D-135), µg/L. Like dms_potential above
+        # these do NOT default to 0 but to their sourced levels: Franco-Luesma & Ferreira 2016
+        # measured free AND total H2S/MeSH in 24 wines and found 94 %/62 % of a red's is already
+        # bound at bottling, so 0 would assert that a sealed wine never turns reductive (the D-45
+        # hard-zero defect — the very gap D-101 recorded as unmodellable). Seeded at PITCH rather
+        # than at bottling as a v1 simplification: the reservoir is a property of the *finished*
+        # wine, but nothing reads or writes either slot until `begin_aging` enables the release
+        # Processes, so carrying it inertly through fermentation is observationally identical to
+        # seeding it at the aging boundary — and it is the oxofructose/mcfa "dosed inert slot"
+        # idiom. What it CANNOT express is the reservoir being *built* during fermentation (real
+        # bonded sulfide forms as fermentative H2S meets must copper), which needs a binding
+        # equilibrium and a binding constant nobody has published — see bound_sulfides.yaml.
+        # Absent from the ParameterSet ⇒ 0.0, so older parameter sets still compile inertly.
+        "bound_h2s": ugl_to_gpl(
+            _optional(
+                values,
+                "bound_h2s_ugl",
+                (
+                    parameters["bound_h2s_initial"].value
+                    if "bound_h2s_initial" in parameters
+                    else 0.0
+                ),
+            )
+        ),
+        "bound_methanethiol": ugl_to_gpl(
+            _optional(
+                values,
+                "bound_methanethiol_ugl",
+                (
+                    parameters["bound_methanethiol_initial"].value
+                    if "bound_methanethiol_initial" in parameters
+                    else 0.0
+                ),
+            )
+        ),
         # Oenococcus oeni dose driving malolactic conversion (D-23); g/L, default 0 (no
         # MLF). Inert catalyst in v1 (no Process grows/kills it) and carbon-free, so an
         # undosed run is byte-for-byte the validated core; the compile step below disables
@@ -829,6 +880,14 @@ def _load_parameters(
         # wine-anchored constants must not be used for (see dms.yaml / the Process docstring);
         # INERT until a begin_aging enable.
         base / "dms.yaml",
+        # Bottle-reduction sulfides (decision D-135): the release rates of the metal-complexed
+        # H2S/MeSH reservoirs Franco-Luesma & Ferreira 2016 measured, the sourced at-bottling
+        # reservoir levels that seed them, and the mass-balance shares recording how much of real
+        # sulfide aging the release-only model accounts for. Wine-only in effect (only wine carries
+        # the bound_h2s/bound_methanethiol slots + wires the two Processes), but loaded universally
+        # like the other shared files — collision-free names, inert for beer. INERT until a
+        # begin_aging enable, and doubly so on an unseeded reservoir.
+        base / "bound_sulfides.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 
