@@ -6,10 +6,27 @@ hand-maintained index is a staleness bug waiting to happen -- the same class as
 the "D-1 ... D-37" pointer this repo's ARCHITECTURE.md carried until D-111, and
 the "D-1 ... D-50" one in the project memory. Generate it instead of typing it.
 
-Rewrites everything between the INDEX markers, in place. Idempotent.
+The block carries three things, all derived:
+
+1. **A subsystem cut** -- coarse buckets from keyword rules over titles, so
+   "where did we decide X" is one grep for a bucket name instead of eyeballing
+   137 prose titles. Multi-membership, so the counts do not partition.
+   Deliberately NOT hand-maintained; fix a misfiling by editing `TOPIC_RULES`.
+2. **A correction map** -- back-edges derived from `**Corrects:** D-N — ...` /
+   `**Flags:** D-N — ...` markers in the *correcting* record, so a corrected
+   record grows a visible warning it never has to be edited to receive. The
+   marker is forward-declared (you know what you are correcting as you write it),
+   which keeps the archive append-only.
+3. **The full ordered list.**
+
+Why markers rather than inference: DECISIONS.md carries ~2300 D-number
+cross-references, and "D-57 corrects D-56" is not separable from "D-57 cites
+D-56" by keyword. An inferred map would be confidently wrong.
 
     uv run python tools/gen_decisions_toc.py          # rewrite the index
     uv run python tools/gen_decisions_toc.py --check  # exit 1 if stale (CI-able)
+
+Rewrites everything between the INDEX markers, in place. Idempotent.
 """
 
 from __future__ import annotations
@@ -29,7 +46,219 @@ END = "<!-- END INDEX -->"
 # (e.g. "### D-19 sourcing step", "### D-104's split ...") are h3 and must not match.
 HEADING = re.compile(r"^## (D-(\d+)) — (.+)$", re.MULTILINE)
 
+# A later record declaring what it corrects. Targets may be a comma list when one
+# clause covers several records (D-137's blast radius). "Flags" = the correction is
+# identified and agreed but NOT yet in the code; "Corrects" = it shipped.
+MARKER = re.compile(
+    r"^\*\*(Corrects|Flags):\*\* ((?:D-\d+(?:,\s*)?)+) — (.+)$",
+    re.MULTILINE,
+)
+
 TITLE_MAX = 100
+
+# Buckets are NOT a partition: a record appears under every bucket it matches,
+# because D-137 genuinely is both an O2 record and an SO2 one, and D-125 is both an
+# ester record and a pH one. Membership-by-match also removes the ordering
+# fragility a first-match-wins scheme has -- with priority ordering, whichever of
+# {sulfur, oxidation, esters} ran first mis-filed the records that span two.
+#
+# Needles are regexes matched against the lowercased title. They must be: `o[2₂]`
+# needs the lookbehind or it matches inside "so₂"/"co₂" (this silently swept every
+# SO2 record into the oxidation bucket on the first pass).
+TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
+    (
+        "Oxidation, O₂ & aging",
+        (
+            r"(?<![a-z])o[2₂]",
+            r"oxygen",
+            r"oxidat",
+            r"aging",
+            r"\baged\b",
+            r"browning",
+            r"anthocyanin",
+            r"colou?r",
+            r"closure",
+            r"\botr\b",
+            r"tannin",
+            r"quinone",
+            r"fenton",
+            r"\biron\b",
+            r"antioxidant",
+            r"thermal",
+            r"maturation",
+            r"\bbottle",
+        ),
+    ),
+    (
+        "Sulfur, SO₂ & sulfides",
+        (
+            r"so[2₂]",
+            r"sulfite",
+            r"sulfur",
+            r"h[2₂]s\b",
+            r"hydrogen sulfide",
+            r"mercapt",
+            r"thiol",
+            r"methanethiol",
+            r"\bdms\b",
+            r"\bsmm\b",
+            r"sulfide",
+            r"carbonyl",
+            r"oxofructose",
+        ),
+    ),
+    (
+        "MLF, Brett & mixed culture",
+        (
+            # `mlf\b` without a leading boundary on purpose: `\bmlf\b` misses
+            # "k_senescence_mlf" (D-53), since "_" counts as a word character.
+            r"mlf\b",
+            r"malolactic",
+            r"oenococcus",
+            r"brett",
+            r"diacetyl",
+            r"citrate",
+            r"vicinal",
+            r"\bpof\b",
+            r"volatile phenol",
+            r"\bmcfa\b",
+            r"bacterial",
+        ),
+    ),
+    (
+        "Fusels, amino acids & nitrogen",
+        (
+            r"fusel",
+            r"ehrlich",
+            r"amino",
+            r"keto[ -]acid",
+            r"pyruvate",
+            r"ketoglutarate",
+            r"phenylalanine",
+            r"leucine",
+            r"phenylethanol",
+            r"isoamyl",
+            r"isobutanol",
+            r"propanol",
+            r"autoly",
+            r"nitrogen",
+            r"\bdap\b",
+            r"transaminase",
+            r"f_non_ehrlich",
+            r"\bf_i\b",
+            r"protein",
+            r"catabolic",
+            r"anabolic",
+        ),
+    ),
+    (
+        "Esters, aroma & sensory",
+        (
+            r"ester",
+            r"hydrolysis",
+            r"acetate",
+            r"volatiliz",
+            r"stripping",
+            r"henry",
+            r"aroma",
+            r"\boav\b",
+            r"sensory",
+            r"descriptor",
+            r"threshold",
+            r"stevens",
+            r"masking",
+            r"compression",
+        ),
+    ),
+    (
+        "pH, acids & speciation",
+        (
+            r"\bph\b",
+            r"\bph[-,]",
+            r"charge balance",
+            r"tartrate",
+            r"tartaric",
+            r"speciation",
+            r"acidit",
+            r"acidif",
+            r"add_acid",
+        ),
+    ),
+    (
+        "Core kinetics, yeast & ethanol",
+        (
+            r"sugar",
+            r"uptake",
+            r"growth",
+            r"ethanol",
+            r"biomass",
+            r"arrhenius",
+            r"temperature",
+            r"\bdeath\b",
+            r"inactivation",
+            r"tolerance",
+            r"luong",
+            r"coleman",
+            r"yield",
+            r"glycerol",
+            r"acetaldehyde",
+            r"\badh\b",
+            r"rate[ -]modifier",
+            r"senescence",
+        ),
+    ),
+    (
+        "Validation, benchmarks & provenance",
+        (
+            r"benchmark",
+            r"validation",
+            r"conservation",
+            r"audit",
+            r"\btier",
+            r"ensemble",
+            r"monte",
+            r"sobol",
+            r"\blhs\b",
+            r"provenance",
+            r"sourcing",
+            r"digitization",
+            r"cross-validation",
+            r"\bxval\b",
+            r"\bfig\.",
+            r"corroborat",
+            r"blocker",
+            r"unsourced",
+        ),
+    ),
+    (
+        "Scenario, events, units & tooling",
+        (
+            r"\bevent",
+            r"intervention",
+            r"\bverb",
+            r"scenario",
+            r"schema",
+            r"tooling",
+            r"\bindex\b",
+            r"docstring",
+            r"doc-rot",
+            r"docs-only",
+            r"\bhop",
+            r"\bibu\b",
+            r"\bboil",
+            r"\bunits?\b",
+            r"media",
+            r"solver",
+            r"registry",
+            r"\bslot",
+            r"toggle",
+            r"\blump",
+            r"speciate",
+        ),
+    ),
+]
+
+UNBUCKETED = "Matching no rule (a `TOPIC_RULES` gap — fix the rules, not this line)"
 
 
 def slug(heading_text: str) -> str:
@@ -60,24 +289,118 @@ def shorten(title: str) -> str:
     return flat[:TITLE_MAX].rsplit(" ", 1)[0].rstrip(",;:—-") + " …"
 
 
-def build_index(text: str) -> tuple[str, int]:
-    rows = []
-    for match in HEADING.finditer(text):
-        label, number, title = match.group(1), int(match.group(2)), match.group(3)
-        anchor = slug(f"{label} — {title}")
-        rows.append((number, f"- [**{label}**](#{anchor}) — {shorten(title)}"))
+def topics_of(title: str) -> list[str]:
+    """Every matching bucket. Fuzzy by construction; edit TOPIC_RULES to refile."""
+    haystack = " ".join(title.split()).lower()
+    return [
+        name
+        for name, needles in TOPIC_RULES
+        if any(re.search(needle, haystack) for needle in needles)
+    ]
 
-    rows.sort(key=lambda row: row[0])
-    listing = "\n".join(row for _, row in rows)
+
+def body_without_index(text: str) -> str:
+    """Strip the generated block so a re-run never parses its own previous output."""
+    return re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), "", text, flags=re.DOTALL)
+
+
+def find_wrapped_headings(body: str) -> list[str]:
+    """A `## D-N —` heading hard-wrapped onto following lines.
+
+    Markdown ATX headings are single-line: GitHub renders only the first physical
+    line as the heading, the remainder becomes a stray paragraph, and the anchor
+    this script computes then points at a heading that does not exist. Four
+    headings (D-133..D-136) shipped that way before this guard existed.
+    """
+    bad: list[str] = []
+    lines = body.split("\n")
+    for i, line in enumerate(lines[:-1]):
+        match = re.match(r"^## (D-\d+) — ", line)
+        if not match:
+            continue
+        nxt = lines[i + 1].strip()
+        # A real record always breaks to a blank line after the heading.
+        if nxt and not nxt.startswith(("#", "**", "-", ">", "|", "```")):
+            bad.append(f"{match.group(1)} (line {i + 1})")
+    return bad
+
+
+def build_index(text: str) -> tuple[str, int]:
+    body = body_without_index(text)
+
+    records: list[tuple[int, str, str, str]] = []  # (n, label, title, anchor)
+    for match in HEADING.finditer(body):
+        label, number, title = match.group(1), int(match.group(2)), match.group(3)
+        records.append((number, label, title, slug(f"{label} — {title}")))
+    records.sort(key=lambda row: row[0])
+
+    anchor_of = {label: anchor for _, label, _, anchor in records}
+
+    # Back-edges: corrected record -> [(kind, correcting label)]
+    back: dict[str, list[tuple[str, str]]] = {}
+    for match in MARKER.finditer(body):
+        kind, targets = match.group(1), match.group(2)
+        # Which record does this marker live in? The nearest heading above it.
+        preceding = list(HEADING.finditer(body, 0, match.start()))
+        if not preceding:
+            continue
+        source = preceding[-1].group(1)
+        for target in re.findall(r"D-\d+", targets):
+            back.setdefault(target, []).append((kind, source))
+
+    # --- subsystem cut (multi-membership; counts deliberately do not sum to len) ---
+    buckets: dict[str, list[str]] = {}
+    for _, label, title, _ in records:
+        hits = topics_of(title)
+        for name in hits or [UNBUCKETED]:
+            buckets.setdefault(name, []).append(label)
+    order = [name for name, _ in TOPIC_RULES] + [UNBUCKETED]
+    topic_lines = [
+        f"- **{name}** ({len(buckets[name])}) — {', '.join(buckets[name])}"
+        for name in order
+        if name in buckets
+    ]
+
+    # --- ordered list, with warnings ---
+    listing = []
+    for _, label, title, anchor in records:
+        row = f"- [**{label}**](#{anchor}) — {shorten(title)}"
+        for kind, source in back.get(label, []):
+            verb = "corrected by" if kind == "Corrects" else "flagged by"
+            src_anchor = anchor_of.get(source)
+            link = f"[{source}](#{src_anchor})" if src_anchor else source
+            row += f" — ⚠ **{verb} {link}**"
+        listing.append(row)
+
+    corrected = len(back)
     block = (
         f"{BEGIN}\n"
         f"## Index\n\n"
-        f"{len(rows)} engineering decisions. Titles are trimmed; the full record is "
-        f"at each link. Regenerate with `uv run python tools/gen_decisions_toc.py`.\n\n"
-        f"{listing}\n"
+        f"{len(records)} engineering decisions. Titles are trimmed; the full record is "
+        f"at each link. Regenerate with `uv run python tools/gen_decisions_toc.py` "
+        f"(`--check` in CI).\n\n"
+        f"⚠ on a row means a **later decision corrected or flagged it** — follow the "
+        f"pointer before trusting that record. `corrected by` = the fix shipped; "
+        f"`flagged by` = the reversal is agreed but **not yet in the code**.\n\n"
+        f"**The correction map is INCOMPLETE.** It is built only from explicit "
+        f"`**Corrects:**` / `**Flags:**` markers, and those are backfilled so far only "
+        f"for the corrections a title announced ({corrected} records marked). "
+        f"**Absence of ⚠ is NOT a guarantee that a record is current** — a superseding "
+        f"decision that never declared itself will not show here. When a record is "
+        f"load-bearing, grep its D-number: `Grep 'D-<n>' docs/DECISIONS.md`.\n\n"
+        f"### By subsystem\n\n"
+        f"Coarse first cut for *where did we decide X*. A record appears under **every** "
+        f"bucket it matches (D-137 is an O₂ record *and* an SO₂ one), so the counts do "
+        f"not sum to {len(records)} and a bucket is a search aid, not a partition. "
+        f"Keyword-derived from titles only — a record whose title omits the term will "
+        f"be missing, so grep the body when a bucket looks short. The ordered list "
+        f"below is authoritative.\n\n"
+        f"{chr(10).join(topic_lines)}\n\n"
+        f"### All records, in order\n\n"
+        f"{chr(10).join(listing)}\n"
         f"{END}"
     )
-    return block, len(rows)
+    return block, len(records)
 
 
 def main() -> int:
@@ -86,12 +409,22 @@ def main() -> int:
     args = parser.parse_args()
 
     text = DECISIONS.read_text(encoding="utf-8")
-    index, count = build_index(text)
 
     if BEGIN not in text or END not in text:
         print(f"error: index markers not found in {DECISIONS}", file=sys.stderr)
         return 2
 
+    wrapped = find_wrapped_headings(body_without_index(text))
+    if wrapped:
+        print(
+            "error: these D-headings are hard-wrapped across lines, so GitHub will "
+            "render only the first line as a heading and the generated anchor will be "
+            f"dead -- join each onto one line: {', '.join(wrapped)}",
+            file=sys.stderr,
+        )
+        return 2
+
+    index, count = build_index(text)
     updated = re.sub(
         re.escape(BEGIN) + r".*?" + re.escape(END),
         lambda _: index,
@@ -107,7 +440,9 @@ def main() -> int:
         return 0
 
     if updated != text:
-        DECISIONS.write_text(updated, encoding="utf-8")
+        # newline="\n" matters: the default translates to CRLF on Windows and
+        # rewrites the whole file, which .gitattributes (eol=lf) then has to undo.
+        DECISIONS.write_text(updated, encoding="utf-8", newline="\n")
         print(f"index regenerated ({count} entries)")
     else:
         print(f"index already current ({count} entries)")

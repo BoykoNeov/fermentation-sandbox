@@ -7,7 +7,9 @@ scheduling, discrete interventions and stochastic ensembles). Milestone 3 — th
 sensory/OAV + aging frontier, Tier-3 — is in progress. The
 original brief is [`FERMENTATION_SIM_HANDOFF.md`](FERMENTATION_SIM_HANDOFF.md);
 the per-decision record and where we deviated from it are in
-[`DECISIONS.md`](DECISIONS.md) (D-1 … D-111), which is the canonical archive.
+[`DECISIONS.md`](DECISIONS.md), which is the canonical archive. Deliberately no
+`D-1 … D-n` range here — that pointer has gone stale twice; the archive's own
+generated index carries the live count.
 
 ## Layering
 

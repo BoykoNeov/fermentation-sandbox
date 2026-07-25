@@ -35,5 +35,8 @@ jobs:
       - name: Type check (mypy)
         run: uv run mypy
 
+      - name: Decisions index is current
+        run: uv run python tools/gen_decisions_toc.py --check
+
       - name: Test (pytest)
         run: uv run pytest -n auto -q
