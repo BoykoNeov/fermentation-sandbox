@@ -124,6 +124,20 @@ M_WATER = 2 * _M_H + 1 * _M_O
 #: species registration, only this weight to convert the g/L O₂ consumed into the moles that set
 #: the acetaldehyde yield (``y_acetaldehyde_per_o2`` mol acetaldehyde per mol O₂).
 M_O2 = 2 * _M_O
+#: o-Benzoquinone, C6H4O2 — the STAND-IN weight for the lumped ``quinone`` oxidant-currency pool
+#: the oxidative cascade routes through (decision D-141; sized as the one new slot at D-138).
+#: Carried as a plain molar mass like :data:`M_O2`/``M_WATER``, and deliberately NOT registered in
+#: ``MOLAR_MASS``/``CARBON_ATOMS`` below: the ``quinone`` pool is **off every conservation ledger**
+#: (fork D2 — an oxidant currency whose carbon comes from the *untracked* o-diphenol pool lumped
+#: into ``k_browning_base``, exactly as ``A420``'s pigment carbon does), so it needs no species
+#: registration, only this weight to convert the moles of O₂ activated into the grams of quinone
+#: the activation node deposits. **A STAND-IN, not a claim:** wine's real o-quinones are the
+#: oxidation products of caftaric/coutaric acid and the flavan-3-ols, all far heavier — the pool
+#: lumps them, and because it is off-ledger and every rate through it is calibrated in g/L, the
+#: choice of weight cancels out of the O₂ budget and shows up only in the numeric scale of the
+#: pool itself. o-Benzoquinone is used because it is the bare o-diphenol → o-quinone couple those
+#: species all share.
+M_QUINONE = 6 * _M_C + 4 * _M_H + 2 * _M_O
 #: Glycerol, C3H8O3 — the principal fermentation byproduct (realised-yield sink,
 #: decision D-16).
 M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O

@@ -145,6 +145,16 @@ from fermentation.core.kinetics.carbon_routing import (
     FUSEL_SPECS,
     VALINE_LABEL_TRACERS,
 )
+from fermentation.core.kinetics.oxidative_cascade import (
+    OxygenActivation,
+    PeroxideEthanolOxidation,
+    PeroxideSulfiteOxidation,
+    QuinoneAnthocyaninFading,
+    QuinoneEllagitanninOxidation,
+    QuinonePolymerization,
+    QuinoneStreckerDegradation,
+    QuinoneSulfonation,
+)
 from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import StateSchema, VarSpec
 
@@ -1471,6 +1481,13 @@ _AGING_PROCESSES: tuple[Callable[[], Process], ...] = (
     EsterHydrolysis,
     EthylHexanoateHydrolysis,
     EthylAcetateEsterification,
+)
+
+#: The medium-agnostic half of the DIRECT oxidative alternative (D-71/D-74) — split out of
+#: ``_AGING_PROCESSES`` at D-141 so the oxidative axis can be swapped as a unit. These two used to
+#: ride in the tuple above; the three ester Processes that remain there are *non-oxidative* and are
+#: wired unconditionally, under both alternatives.
+_OXIDATIVE_DIRECT_SHARED: tuple[Callable[[], Process], ...] = (
     OxidativeAcetaldehyde,
     PhenolicBrowning,
 )
@@ -2081,71 +2098,160 @@ _WINE_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: The registry of known media. Adding a beverage family = adding an entry here
 #: (and, at the I/O boundary, an initial-composition vocabulary in
 #: ``fermentation.scenario.compile``).
-MEDIA: dict[str, Medium] = {
-    "wine": Medium(
-        name="wine",
-        schema=wine_schema(),
-        process_factories=(
-            _PRIMARY_FERMENTATION_PROCESSES
-            + _ETHANOL_CEILING_PROCESSES
-            + _TEMPERATURE_PROCESSES
-            + _BYPRODUCT_PROCESSES
-            + _VDK_PROCESSES
-            + _ACETALDEHYDE_PROCESSES
-            + _KETO_ACID_PROCESSES
-            + _H2S_PROCESSES
-            + _MLF_PROCESSES
-            + _MLF_GROWTH_PROCESSES
-            + _BRETT_PROCESSES
-            + _BRETT_GROWTH_PROCESSES
-            + _POF_PROCESSES
-            + _AMINO_ACID_PROCESSES
-            + _AUTOLYSIS_PROCESSES
-            + _AGING_PROCESSES
-            + _OXIDATIVE_SO2_PROCESSES
-            + _STRECKER_PROCESSES
-            + _MAILLARD_STRECKER_PROCESSES
-            + _CARAMELIZATION_PROCESSES
-            + _MAILLARD_BROWNING_PROCESSES
-            + _OAK_PROCESSES
-            + _ELLAGITANNIN_PROCESSES
-            + _POLYMERIZATION_PROCESSES
-            + _ACETALDEHYDE_BRIDGE_PROCESSES
-            + _ANTHOCYANIN_FADING_PROCESSES
-            + _THERMAL_FADE_PROCESSES
-            + _TANNIN_SELF_POLYMERIZATION_PROCESSES
-            + _TANNIN_ETHYL_TANNIN_PROCESSES
-            + _DMS_PROCESSES
-            + _BOUND_SULFIDE_PROCESSES
-            + _CLOSURE_INGRESS_PROCESSES
-        ),
-        modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
-    ),
-    "beer": Medium(
-        name="beer",
-        schema=beer_schema(),
-        process_factories=(
-            _PRIMARY_FERMENTATION_PROCESSES
-            + _ETHANOL_CEILING_PROCESSES
-            + _TEMPERATURE_PROCESSES
-            + _BYPRODUCT_PROCESSES
-            + _VDK_PROCESSES
-            + _ACETALDEHYDE_PROCESSES
-            + _H2S_PROCESSES
-            + _HOPS_PROCESSES
-            + _AGING_PROCESSES
-            + _CARAMELIZATION_PROCESSES
-            + _OAK_PROCESSES
-            + _ELLAGITANNIN_PROCESSES
-        ),
-        modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
-    ),
+#: **The two mutually-exclusive oxidative alternatives** (decision D-141, designed at D-139).
+#:
+#: Every other ``_*_PROCESSES`` tuple in this module is **additive**: off at the compile seam,
+#: switched on by ``begin_aging``, and an un-aged run is byte-for-byte the pre-aging core. The
+#: oxidative cascade is **not that shape**. Toggling it off must *restore* the direct sinks rather
+#: than delete the oxidative axis, so exactly one of these two tuples is wired into a given build
+#: and the other is unreachable. That is the only reading of prime directive #3 that means
+#: anything here — the pre-cascade Process set has to stay reachable as a *named alternative*, so
+#: the pre-cascade suite keeps a configuration in which it passes unmodified.
+#:
+#: DIRECT (D-71/D-72/D-74/D-75/D-78/D-81): six sinks each drawing its own share straight from the
+#: shared ``o2`` pool, splitting it by ``k_i / sum(k)`` through ``ProcessSet``'s summing. Reads as
+#: competition and sums correctly, but asserts that ethanol, bisulfite, phenolics, amino acids,
+#: anthocyanin and oak tannin each react with **dissolved O2** — which Gate 1 (D-137) found they
+#: do not.
+#:
+#: CASCADE (D-141): one Fe(II)+O2 activation node consumes all the O2 and makes two oxidants per
+#: mole; every former sink is re-homed onto whichever oxidant actually oxidises it. See
+#: :mod:`~fermentation.core.kinetics.oxidative_cascade`.
+_OXIDATIVE_DIRECT_WINE: tuple[Callable[[], Process], ...] = (
+    _OXIDATIVE_DIRECT_SHARED
+    + _OXIDATIVE_SO2_PROCESSES
+    + _STRECKER_PROCESSES
+    + _ELLAGITANNIN_PROCESSES
+    + _ANTHOCYANIN_FADING_PROCESSES
+)
+_OXIDATIVE_DIRECT_BEER: tuple[Callable[[], Process], ...] = (
+    _OXIDATIVE_DIRECT_SHARED + _ELLAGITANNIN_PROCESSES
+)
+
+#: The cascade's medium-agnostic core: the activation node, the Fenton/ethanol H2O2 branch, the
+#: oak-tannin quinone sink (oak is in both media, D-86) and the always-available polymerization
+#: fate that bounds ``quinone`` and carries ``A420``.
+_OXIDATIVE_CASCADE_SHARED: tuple[Callable[[], Process], ...] = (
+    OxygenActivation,
+    PeroxideEthanolOxidation,
+    QuinoneEllagitanninOxidation,
+    QuinonePolymerization,
+)
+#: The wine-only cascade nodes: both halves of D-72's SPLIT (the H2O2 node and the quinone
+#: sulfonation node — the pair whose ratio is Danilewicz's emergent 1:1/1:2/1:1.7 series), plus
+#: the two re-homed wine-only nucleophiles. All read wine-only state (``so2_total`` and the pH
+#: system, ``amino_acids``, ``anthocyanin``), exactly as their direct predecessors did.
+_OXIDATIVE_CASCADE_WINE: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_SHARED + (
+    PeroxideSulfiteOxidation,
+    QuinoneSulfonation,
+    QuinoneStreckerDegradation,
+    QuinoneAnthocyaninFading,
+)
+_OXIDATIVE_CASCADE_BEER: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_SHARED
+
+#: Which alternative :data:`MEDIA` wires. The cascade is the default because it is the structure
+#: the three gates (D-137/D-138/D-139) concluded is correct; ``"direct"`` reaches the pre-cascade
+#: set through :func:`get_medium`, which is what keeps the old behaviour testable rather than
+#: merely described.
+_OXIDATIVE_SETS: dict[str, dict[str, tuple[Callable[[], Process], ...]]] = {
+    "cascade": {"wine": _OXIDATIVE_CASCADE_WINE, "beer": _OXIDATIVE_CASCADE_BEER},
+    "direct": {"wine": _OXIDATIVE_DIRECT_WINE, "beer": _OXIDATIVE_DIRECT_BEER},
 }
 
 
-def get_medium(name: str) -> Medium:
-    """Look up a registered :class:`Medium` by name."""
+def _build_media(
+    oxidative: dict[str, tuple[Callable[[], Process], ...]],
+) -> dict[str, Medium]:
+    """Assemble the medium registry around one of the two oxidative alternatives (D-141).
+
+    A function rather than a literal so both alternatives can be built from the *same* wiring —
+    if the two registries were written out separately, a Process added to one and forgotten in
+    the other would be a silent divergence, and the whole point of the replacement design is that
+    the pre-cascade set stays genuinely reachable rather than approximately so.
+    """
+    return {
+        "wine": Medium(
+            name="wine",
+            schema=wine_schema(),
+            process_factories=(
+                _PRIMARY_FERMENTATION_PROCESSES
+                + _ETHANOL_CEILING_PROCESSES
+                + _TEMPERATURE_PROCESSES
+                + _BYPRODUCT_PROCESSES
+                + _VDK_PROCESSES
+                + _ACETALDEHYDE_PROCESSES
+                + _KETO_ACID_PROCESSES
+                + _H2S_PROCESSES
+                + _MLF_PROCESSES
+                + _MLF_GROWTH_PROCESSES
+                + _BRETT_PROCESSES
+                + _BRETT_GROWTH_PROCESSES
+                + _POF_PROCESSES
+                + _AMINO_ACID_PROCESSES
+                + _AUTOLYSIS_PROCESSES
+                + _AGING_PROCESSES
+                + oxidative["wine"]
+                + _MAILLARD_STRECKER_PROCESSES
+                + _CARAMELIZATION_PROCESSES
+                + _MAILLARD_BROWNING_PROCESSES
+                + _OAK_PROCESSES
+                + _POLYMERIZATION_PROCESSES
+                + _ACETALDEHYDE_BRIDGE_PROCESSES
+                + _THERMAL_FADE_PROCESSES
+                + _TANNIN_SELF_POLYMERIZATION_PROCESSES
+                + _TANNIN_ETHYL_TANNIN_PROCESSES
+                + _DMS_PROCESSES
+                + _BOUND_SULFIDE_PROCESSES
+                + _CLOSURE_INGRESS_PROCESSES
+            ),
+            modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
+        ),
+        "beer": Medium(
+            name="beer",
+            schema=beer_schema(),
+            process_factories=(
+                _PRIMARY_FERMENTATION_PROCESSES
+                + _ETHANOL_CEILING_PROCESSES
+                + _TEMPERATURE_PROCESSES
+                + _BYPRODUCT_PROCESSES
+                + _VDK_PROCESSES
+                + _ACETALDEHYDE_PROCESSES
+                + _H2S_PROCESSES
+                + _HOPS_PROCESSES
+                + _AGING_PROCESSES
+                + oxidative["beer"]
+                + _CARAMELIZATION_PROCESSES
+                + _OAK_PROCESSES
+            ),
+            modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
+        ),
+    }
+
+
+#: The registry as wired with the **cascade** (decision D-141) — the default build.
+MEDIA: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["cascade"])
+#: The registry as wired with the **direct** pre-cascade sinks — the isolable alternative
+#: (D-139). Not a legacy shim: prime directive #3 requires the pre-cascade oxidative axis to stay
+#: reachable and testable, and this is where it is reached. Reached through
+#: ``get_medium(name, oxidative="direct")``.
+MEDIA_DIRECT_OXIDATIVE: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["direct"])
+
+
+def get_medium(name: str, *, oxidative: str = "cascade") -> Medium:
+    """Look up a registered :class:`Medium` by name.
+
+    ``oxidative`` selects which of the two **mutually exclusive** oxidative alternatives is
+    wired (decision D-141, designed at D-139): ``"cascade"`` — the default — routes every former
+    O2 sink behind one Fe(II)+O2 activation node, while ``"direct"`` restores the six pre-cascade
+    sinks that each drew straight on ``o2``. Exactly one is ever present in a given ``Medium``;
+    they are never both wired, because both draw on the same pool and would double-count it.
+    """
+    if oxidative not in _OXIDATIVE_SETS:
+        raise KeyError(
+            f"Unknown oxidative set {oxidative!r}; known sets: {sorted(_OXIDATIVE_SETS)}"
+        )
+    registry = MEDIA if oxidative == "cascade" else MEDIA_DIRECT_OXIDATIVE
     try:
-        return MEDIA[name]
+        return registry[name]
     except KeyError:
-        raise KeyError(f"Unknown medium {name!r}; known media: {sorted(MEDIA)}") from None
+        raise KeyError(f"Unknown medium {name!r}; known media: {sorted(registry)}") from None

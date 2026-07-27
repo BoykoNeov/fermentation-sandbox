@@ -86,6 +86,16 @@ from fermentation.core.kinetics.amino_acid_pools import (
 )
 from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.kinetics.hops import iso_alpha_fraction
+from fermentation.core.kinetics.oxidative_cascade import (
+    OxygenActivation,
+    PeroxideEthanolOxidation,
+    PeroxideSulfiteOxidation,
+    QuinoneAnthocyaninFading,
+    QuinoneEllagitanninOxidation,
+    QuinonePolymerization,
+    QuinoneStreckerDegradation,
+    QuinoneSulfonation,
+)
 from fermentation.core.kinetics.temperature import RAMP_RATE
 from fermentation.core.media import get_medium
 from fermentation.core.process import ProcessSet
@@ -212,6 +222,19 @@ _AGING_GATED_PROCESSES = (
     BoundHydrogenSulfideRelease,
     BoundMethanethiolRelease,
     ClosureOxygenIngress,
+    # The D-141 oxidative cascade. Both alternatives are listed: the enable loop guards on
+    # ``name in process_set``, so whichever set a given build wired is switched on and the other
+    # is skipped silently — which is exactly what makes the two isolable at this seam too.
+    # (That same guard is why AntioxidantBurstOxidation above has never run: it is listed here
+    # and wired into no medium, so the loop skips it every time. Pinned at D-140, still open.)
+    OxygenActivation,
+    PeroxideEthanolOxidation,
+    PeroxideSulfiteOxidation,
+    QuinoneSulfonation,
+    QuinoneStreckerDegradation,
+    QuinoneAnthocyaninFading,
+    QuinoneEllagitanninOxidation,
+    QuinonePolymerization,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -2098,6 +2121,7 @@ def compile_scenario(
     parameter_paths: Sequence[str | Path] | None = None,
     data_dir: str | Path | None = None,
     strict: bool = False,
+    oxidative: str = "cascade",
 ) -> CompiledScenario:
     """Compile a declarative scenario into an integrable :class:`CompiledScenario`.
 
@@ -2106,11 +2130,17 @@ def compile_scenario(
     ``<medium>_<strain>.yaml`` under ``data_dir`` (or the packaged data dir);
     ``strict=True`` enables the Process ``touches`` contract on the returned set.
 
+    ``oxidative`` selects which of the two mutually exclusive oxidative alternatives is wired
+    (decision D-141): ``"cascade"`` — the default — routes every former O2 sink behind one
+    Fe(II)+O2 activation node, and ``"direct"`` restores the six pre-cascade sinks that each
+    drew straight on ``o2``. It is passed through to
+    :func:`~fermentation.core.media.get_medium`; see there for why both must stay reachable.
+
     Raises ``KeyError`` for an unknown medium, ``ValueError`` for an invalid
     initial composition or missing temperature, and ``FileNotFoundError`` when the
     medium/strain has no parameter file yet.
     """
-    medium = get_medium(scenario.medium)
+    medium = get_medium(scenario.medium, oxidative=oxidative)
     _validate_initial_keys(scenario)
 
     builder = _INITIAL_BUILDERS.get(scenario.medium)

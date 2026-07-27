@@ -101,6 +101,18 @@ from fermentation.core.kinetics.malolactic import (
     malolactic_toxicity_gate,
 )
 from fermentation.core.kinetics.mercaptans import AutolyticMercaptan
+from fermentation.core.kinetics.oxidative_cascade import (
+    OxygenActivation,
+    PeroxideEthanolOxidation,
+    PeroxideSulfiteOxidation,
+    QuinoneAnthocyaninFading,
+    QuinoneEllagitanninOxidation,
+    QuinonePolymerization,
+    QuinoneStreckerDegradation,
+    QuinoneSulfonation,
+    activation_rate,
+    h2o2_branch_fraction,
+)
 from fermentation.core.kinetics.precursor_fates import (
     NON_EHRLICH_FRACTION_PARAMS,
     PrecursorNonEhrlichFates,
@@ -127,6 +139,16 @@ __all__ = [
     "AminoAcidAssimilation",
     "AnthocyaninFading",
     "AntioxidantBurstOxidation",
+    "OxygenActivation",
+    "PeroxideEthanolOxidation",
+    "PeroxideSulfiteOxidation",
+    "QuinoneAnthocyaninFading",
+    "QuinoneEllagitanninOxidation",
+    "QuinonePolymerization",
+    "QuinoneStreckerDegradation",
+    "QuinoneSulfonation",
+    "activation_rate",
+    "h2o2_branch_fraction",
     "AutolyticHydrogenSulfide",
     "AutolyticMercaptan",
     "BiomassCarryingCapacity",

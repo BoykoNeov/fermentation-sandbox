@@ -926,3 +926,117 @@ f_methional:
     source: "author estimate of the relative phenylalanine- vs methionine-derived Strecker flux. Phenylalanine is consistently among the most abundant amino acids in grape must (tens+ mg/L) while methionine is a minor sulfur amino acid (low mg/L) -- so oxidation-derived phenylacetaldehyde generally exceeds methional in must-derived Strecker degradation (Escudero et al. 2000, 2002; Ferreira -- both aldehydes are the dominant oxidation-derived Strecker markers of aged white wine, with methional the potent low-µg/L trace and phenylacetaldehyde reaching tens-to-hundreds of µg/L)."
     conditions: "generic wine; mol fraction of the lumped Strecker aldehyde output booked as methional (C4H8OS) vs phenylacetaldehyde (C8H8O), at T_ref = 293.15 K. Since D-100 each route draws its REAL precursor (methionine / phenylalanine) and each is gated on its own pool, so this split is literal methionine:phenylalanine chemistry — the pre-D-100 arginine-lump caveat is retired. The split itself remains an estimate of abundance x reactivity (see the uncertainty note)."
     notes: "SPECULATIVE magnitude. Sets the BALANCE between phenylacetaldehyde's honey note (the majority product) and methional's cooked-potato off-note (opposite sensory valence -- the reason the owner chose TWO pools over one lump, D-75). The split is PRODUCTION flux only; per-compound perceptibility lives in threshold_methional_wine / threshold_phenylacetaldehyde_wine (so it is not double-counted here). Off the stoichiometric-constant track (contrast the 5:2 ester split): an empirical composition estimate, hence a YAML parameter."
+
+# =========================================================================================
+# THE OXIDATIVE CASCADE (decision D-141) — the Fe(II)+O2 ACTIVATION NODE
+# =========================================================================================
+# Gate 1 (D-137) found that in wine NOTHING attaches to dissolved O2 except iron: the
+# rate-determining step is Fe(II) + O2 -> H2O2 + Fe(III), and every "O2 sink" this model has
+# carried since D-71 is really a consumer of one of the two OXIDANTS that step makes.
+# Gate 2 (D-138) measured which of those oxidants need state slots: H2O2 does NOT (17 ms
+# half-life => quasi-steady-state is the numerically CORRECT treatment, not a simplification
+# of one) and Fe(III) does NOT (reduced 3.3-63x faster than O2 is consumed, ~18x at
+# representative wine pH/copper); only o-quinone does, and it is the ONE new slot.
+#
+# WHY THE RATE LAW READS POOLS AND NOT A FOLDED CONSTANT. Nguyen's own conclusion is that
+# "the ability of wine to reduce iron(III) likely declines as it ages, whether by exhaustion
+# of phenols or of nucleophiles, such that it eventually limits the rate of oxygen
+# consumption". D-138 recorded the FALSIFIER: if activation reads only [o2] and a lumped k,
+# effective O2 uptake stays FLAT across five years where Nguyen predicts it should DECLINE.
+# So the catalyst-turnover term is explicit — activation is proportional to the REDUCTANT
+# pools that return Fe(III) to Fe(II):
+#
+#   r_O2 = (k_activation_floor
+#           + k_activation_phenolic * ([tannin] + [anthocyanin] + [hydroxycinnamics])
+#           + k_activation_bisulfite * [HSO3-]) * f_Cu * f(T) * [o2]
+#
+# THE THREE COEFFICIENTS ARE NOT NEW NUMBERS. They are the constants D-73/D-74/D-132/D-72
+# already calibrated, RE-EXPRESSED as one un-partitioned total instead of three independent
+# draws on the same pool:
+#   * k_activation_floor      = k_ethanol_oxidation + k_browning_base = 5.0e-4 /h — the
+#     "always-on" total those two were explicitly derived by PARTITIONING (see
+#     k_ethanol_oxidation's own provenance: "the TOTAL pseudo-first-order O2-depletion
+#     constant is ~5.0e-4/h, of which this is the ethanol-oxidation SHARE"). The cascade
+#     un-partitions it, so the anchor returns to the form it was sourced in.
+#   * k_activation_phenolic   = k_browning_phenolic (D-132, Ferreira's measured red-wine rate)
+#   * k_activation_bisulfite  = k_so2_oxidation (D-72)
+# Verified: at copper == copper_typical and hydroxycinnamics == 0 this reproduces the summed
+# pre-cascade O2-depletion rate EXACTLY (ratio 1.0000) across bare white/beer, a typical red,
+# and a sulfited red — three regimes spanning ~20x. It is a re-expression, not a re-fit.
+#
+# THE TWO PLACES IT IS *NOT* EXACT, both deliberate and both recorded rather than tuned away:
+#   1. COPPER'S REACH CHANGES (+9.5% at 0.5 mg/L Cu). D-134 fitted k_copper_multiplier with
+#      copper multiplying BROWNING only (~60% of the always-on rate); on the activation node it
+#      multiplies the whole total INCLUDING the bisulfite term. That is exactly D-138's
+#      constraint 4 ("a constant fitted to one structure does not survive being moved to
+#      another") landing for the third time, after D-133's burst and copper itself — but now
+#      BOUNDED: a no-op at typical copper, +9.5% at the US legal limit. Danilewicz's own
+#      measurement is what justifies the move (D-138: copper has NO discernible effect on
+#      Fe(III) reduction at any pH, while O2 consumption rises with it — so the acceleration is
+#      entirely on the O2-activation side, which is where it now lives).
+#   2. HYDROXYCINNAMICS BECOMES A REDUCTANT (+1.7% at 0.1 g/L). A genuinely new term, required
+#      by the falsifier above: caffeic/caftaric acid is wine's principal o-diphenol and the
+#      Fe(III) reductant Nguyen's decline runs on. It defaults to 0 (an optional must input),
+#      so no existing scenario moves. NOTE the D-139 L9 scope limit: this READS the pool as a
+#      catalyst-turnover rate term and does NOT DRAW it, so no carbon moves and the D2
+#      off-ledger decision holds. A future beat that makes quinone production CONSUME
+#      hydroxycinnamics must re-open D2 with draw_precursor_carbon.
+# -----------------------------------------------------------------------------------------
+k_activation_floor:
+  value: 5.0e-4
+  unit: "1/h"   # r_O2 = (k_activation_floor + ...) * f_Cu * f(T) * [o2]
+  tier: speculative
+  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "the reductant-independent FLOOR of the Fe(II)+O2 activation rate at T_ref = 20 C — the O2-uptake rate of a beverage carrying none of the tracked reductant pools (a beer, or a white with no dosed phenolics/SO2). Inherits the band of the total it un-partitions: k_ethanol_oxidation (4.0e-5..8.0e-4) plus k_browning_base together anchor a total O2 half-life ln2/k ~ 350-7000 h (~2 weeks to ~10 months) for a dissolved-O2 charge, the timescale over which stored wine scavenges a saturating dose. The load-bearing claim is that the floor is NON-ZERO: a medium with no tracked reductant still oxidises, which is what keeps beer's measured 71% packaging-O2 consumption alive under fork D3 (medium-agnostic activation). A floor of 0 would freeze beer's o2 flat forever, and before D-140 no test asserted otherwise (D-139 measured it; D-140 guarded it)." }
+  provenance:
+    source: "the D-73/D-74 anchored TOTAL O2-depletion constant, un-partitioned. NOT a new measurement: k_ethanol_oxidation's own provenance states 'the TOTAL pseudo-first-order O2-depletion constant is ~5.0e-4/h, of which this is the ethanol-oxidation SHARE (~40%) and k_browning_base the dominant browning share (~60%)', and k_browning_base's states the sum is held at 5.0e-4 as the anchor. The underlying anchor is Singleton 1987 (oxidation of wines) / Wildenradt & Singleton 1974 — a saturating O2 charge is scavenged over weeks-to-months at cellar temperature. Under the cascade the two shares stop being independent O2 draws and become BRANCH FATES downstream of one activation node, so the constant returns to the summed form it was sourced in."
+    conditions: "generic wine/beer at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool at T_ref = 293.15 K, with every tracked reductant pool at zero. The iron catalysing the step is folded into this constant and into the reductant coefficients — there is NO iron state slot, and D-134/D-138 both decided against one on Ferreira 2015's finding that iron is not rate-limiting in real wine (always in surplus), so a variable iron input would be inert in the realistic regime."
+    notes: "SPECULATIVE magnitude, inherited unchanged from the constants it sums — this entry adds no new uncertainty, it re-expresses existing uncertainty. SOURCED FORM: Gate 1 (D-137, from Danilewicz and Nguyen) established that O2 reacts with nothing but Fe(II) in wine, which is what makes a single activation node the correct structure rather than N independent sinks on one pool. MEDIUM-AGNOSTIC (fork D3): beer carries no copper, no iron and none of the reductant slots, so beer's activation IS this floor — the guarded-missing-slot idiom PhenolicBrowning already uses for copper (D-134). That relocates beer's oxidation into a constant rather than dissolving the problem (D-139 said exactly this), but the constant is not a NEW debt: it is the same lumped anchor beer's O2 uptake already rode on before the cascade, in the same shared aging.yaml, at the same value."
+
+k_activation_phenolic:
+  value: 1.1e-3
+  unit: "L/(g*h)"   # boost per combined g/L of tannin + anthocyanin + hydroxycinnamics
+  tier: speculative
+  uncertainty: { low: 5.0e-4, high: 2.5e-3, note: "RE-HOMED k_browning_phenolic, band carried over unchanged: banded around the central 1.1e-3 L/(g*h) that lands a typical red (2.3 g/L combined tannin+anthocyanin) at Ferreira's measured ~0.5-0.7 mg/L/day average O2-consumption rate. What the coefficient MEANS changes even though its value does not: pre-cascade it read 'more phenolics => faster browning', a rate boost on one sink; here it reads 'more o-diphenol => faster Fe(III) reduction => faster Fe(II)+O2 activation', a catalyst-TURNOVER term. That reading is stronger, not weaker — Nguyen measures Fe(III) reduction by o-diphenols directly, whereas the pre-cascade form had phenolics accelerating a step (phenol autoxidation by O2) that Gate 1 showed does not happen." }
+  provenance:
+    source: "Marrufo-Curtido, Ferreira & Escudero (2015), J. Agric. Food Chem. — the SAME calibration k_browning_phenolic carries (15 real red wines, repeated O2-saturation cycles, average O2-consumption rate 0.5-0.7 mg/L/day), re-pointed from the browning sink onto the activation node. Nguyen (Table 3.1) supplies the mechanism the pre-cascade form lacked: Fe(III) is reduced by o-diphenols, and that reduction is what returns Fe(II) for the next O2 activation."
+    conditions: "generic wine at cellar pH/temperature; linear boost to k_activation_floor per combined g/L of grape tannin + anthocyanin (D-79 must-input slots) + hydroxycinnamics (the D-40 Brett-precursor pool, wine's principal o-diphenol). All three reads are guarded — a schema without them contributes 0 — so beer and a bare white sit at the floor. T_ref = 293.15 K."
+    notes: "SOURCED MAGNITUDE TARGET + SPECULATIVE slope, unchanged from k_browning_phenolic. ONE SUBSTANTIVE EXTENSION: the sum now includes hydroxycinnamics, which the pre-cascade browning boost did not read. That is required by D-138's falsifier (the activation law must read the reductant pools or Nguyen's aging DECLINE cannot emerge) and is mechanistically the best-founded of the three — caffeic/caftaric acid is the o-diphenol wine-oxidation chemistry is actually written about. It defaults to 0, so no existing scenario changes; at a dosed 0.1 g/L it raises the total activation rate 1.7%. It is READ, never DRAWN — the D2 off-ledger decision depends on that distinction."
+
+k_activation_bisulfite:
+  value: 0.2
+  unit: "L/(g*h)"   # boost per g/L of free bisulfite (expressed as SO2)
+  tier: speculative
+  uncertainty: { low: 0.05, high: 2.0, note: "RE-HOMED k_so2_oxidation, band carried over unchanged. THE MEANING CHANGES, AND THAT IS THE POINT OF THE WHOLE REBUILD: pre-cascade this constant made bisulfite react with O2 DIRECTLY, which Gate 1 (D-137) showed does not happen — sulfite is not an O2 scavenger, it is an H2O2 and quinone scavenger. Here it is a catalyst-turnover term (bisulfite reduces Fe(III), regenerating Fe(II)), which is how SO2 accelerates O2 uptake WITHOUT reacting with O2. The magnitude is retained because it is what reproduces D-137's measured partition (SO2 taking ~90% of the 5-year O2 budget); the mechanism it now encodes is the sourced one rather than the one that could not have been right." }
+  provenance:
+    source: "the D-72 k_so2_oxidation constant, re-pointed from a direct O2xbisulfite draw onto the activation node's catalyst-turnover term. Underlying anchor unchanged (Danilewicz 2003/2007 oxygen-reduction mechanism; Boulton et al. 1996 — SO2 protects wine by intercepting the O2/H2O2/quinone cascade). Danilewicz 2016 is what FORCES the re-home: it measures sulfite consuming O2 at 1:1 when the quinone route is blocked and 1:2 when it is open, a series a direct O2xbisulfite reaction cannot produce at all."
+    conditions: "generic wine at cellar pH/temperature; linear boost to k_activation_floor per g/L of FREE bisulfite (HSO3-, expressed as SO2, derived through acidbase.bisulfite_so2_at_ph at the solved pH — bound bisulfite is already spent). Wine-only in effect: beer has no so2_total slot and no pH system (D-18), so the term is 0 there. T_ref = 293.15 K."
+    notes: "SPECULATIVE magnitude, SOURCED ORDERING (free bisulfite is a faster reductant than the always-on floor, so while SO2 lasts it dominates the activation rate — D-137 measured 92.4% of the 5-year O2 budget in a white, 89.7% in a red). The 2:1 SO2:O2 stoichiometry that rode with the OLD constant does NOT ride with this one: under the cascade the SO2 actually oxidised is whatever the H2O2 node and the quinone-sulfonation node consume, and their ratio is the Danilewicz 1:1 / 1:2 / 1:1.7 series — an EMERGENT quantity and the rebuild's whole falsifiable test. Do not re-introduce a fixed stoichiometry here."
+
+E_a_activation:
+  value: 50000.0
+  unit: "J/mol"
+  tier: speculative
+  uncertainty: { low: 30000.0, high: 70000.0, note: "Q10 ~1.5-2.6 at 20 C. The three constants this node un-partitions (E_a_ethanol_oxidation, E_a_browning, E_a_so2_oxidation) all carry 50000.0 with this same band, and k_ethanol_oxidation's provenance states the ethanol and browning shares 'carry the SAME E_a (same coupled-oxidation cascade)'. Under the cascade that shared temperature dependence stops being a coincidence three separate entries had to maintain and becomes a single property of the single rate-determining step — the structurally honest form, since Arrhenius behaviour belongs to the step that determines the rate." }
+  provenance:
+    source: "the common activation energy the three pre-cascade oxidative constants already shared (E_a_ethanol_oxidation / E_a_browning / E_a_so2_oxidation, all 50000.0 J/mol). Wine-oxidation activation energies cluster at ~30-70 kJ/mol, and Nguyen's Fe(II)-autoxidation measurements are consistent with that range."
+    conditions: "generic wine/beer; Arrhenius factor on the Fe(II)+O2 activation rate at T_ref = 293.15 K. Applies to the WHOLE activation rate — floor and every reductant term alike — because they are all the same elementary step, differing only in how fast the catalyst is returned."
+    notes: "Only the DIRECTION (E_a > 0, warmer => faster oxidation) is the sourced, load-bearing claim; the magnitude is speculative and banded around a Q10 ~2. Kept as its OWN parameter rather than reusing E_a_browning (prime directive #2): the activation node is a distinct reaction from phenol browning and gets its own provenance entry even though the values coincide."
+
+# -----------------------------------------------------------------------------------------
+# THE QUINONE POLYMERIZATION FATE — the always-available sink that keeps quinone bounded
+# -----------------------------------------------------------------------------------------
+# Every OTHER quinone consumer is a re-home: it keeps its own existing rate constant and reads
+# [quinone] where it used to read [o2] (bisulfite sulfonation, Strecker degradation,
+# anthocyanin fading, ellagitannin). This one is genuinely new, and it is what makes A420 a
+# quinone FATE rather than an O2 yield: uncaptured quinone polymerises to brown pigment. It
+# must exist for a structural reason as well as a chemical one — with no always-on sink, an
+# unsulfited beverage carrying no nucleophiles would accumulate quinone without bound.
+k_quinone_polymerization:
+  value: 4.2e-2
+  unit: "1/h"   # d(quinone)/dt -= k_quinone_polymerization * f(T) * [quinone]
+  tier: speculative
+  uncertainty: { low: 4.2e-3, high: 4.2e-1, note: "first-order polymerization constant of uncaptured o-quinone at T_ref = 20 C, banded a full order each way around a ~1 day mean lifetime (1/k = 23.8 h). THE LIFETIME IS ASSERTED, NOT MEASURED — D-138 inverted the representability threshold to conclude quinone clears the 28.5 s floor 'by orders of magnitude' on the grounds that in-wine quinone-nucleophile lifetimes are hours-to-days, and recorded explicitly that this is a literature RECOLLECTION rather than a transcribed number. The pull that would replace it is Nikolantonaki & Waterhouse 2012, 'A method to quantify quinone reaction rates with wine relevant nucleophiles'. Until that is pulled this is the single weakest number in the cascade, and it is flagged as such rather than dressed up. What the band DOES constrain is robust: anywhere in it quinone's mean lifetime is >= 2.4 h, three orders above the 28.5 s representability floor, so the state-slot decision (D-138) survives the entire band." }
+  provenance:
+    source: "author estimate anchored to the hours-to-days in-wine o-quinone lifetime D-138 used to size the slot (asserted there, still asserted here). Mechanistically the pigment-forming fate is well established — o-quinones polymerise and condense to the brown melanoidin-like pigment measured as absorbance at 420 nm, the classic browning chemistry D-74 built A420 on — but no in-wine rate constant for it is in hand."
+    conditions: "generic wine/beer at cellar pH/temperature; first-order in the quinone pool alone (no co-substrate — this is the fate of quinone that NO nucleophile captured), Arrhenius-scaled on E_a_activation, at T_ref = 293.15 K. Deliberately NOT gated on any pool, so it is available in every medium and every scenario: it is the reason quinone is bounded."
+    notes: "SPECULATIVE magnitude, and the cascade's weakest link — named here rather than buried. Its ROLE is what makes SO2's colour protection EMERGENT: quinone captured by bisulfite (sulfonation) never reaches this fate, so a sulfited wine browns less with no explicit 'SO2 protects colour' term anywhere in the model. That is the same shape as D-72's 'SO2 protects until exhausted', one level deeper, and it is checkable. Its VALUE is only weakly load-bearing for A420 MAGNITUDE: because quinone production is set by the activation node and this is the default fate, over the long run A420 tracks TOTAL quinone production far more closely than it tracks this constant — the constant sets the pool's steady-state level (and hence how much is available to nucleophiles), not the integrated pigment."

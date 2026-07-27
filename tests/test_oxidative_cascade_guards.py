@@ -99,12 +99,13 @@ BEER_OXIDATIVE_SINKS = frozenset(
 def _compile_with_old_oxidative_set(scenario: Scenario) -> CompiledScenario:
     """Compile ``scenario`` with the DIRECT (pre-cascade) oxidative sinks wired.
 
-    **This function and its sibling below are the only seams the cascade build is expected
-    to edit**, and only to select ``_OXIDATIVE_DIRECT_PROCESSES`` once that alternative
-    exists. Today there is one oxidative axis, so this is a plain compile. Everything else
-    in this module — the name lists, the tolerances, the pinned numbers — is the guard.
+    **This function and its sibling below are the only seams the cascade build was expected
+    to edit**, and only to select the direct alternative once it existed. D-141 built the
+    cascade and made it the default wiring, so both seams now pass ``oxidative="direct"``.
+    Everything else in this module — the name lists, the tolerances, the pinned numbers —
+    is the guard, and none of it moved.
     """
-    return compile_scenario(scenario)
+    return compile_scenario(scenario, oxidative="direct")
 
 
 def _direct_oxidative_process_set(medium: str):
@@ -114,9 +115,10 @@ def _direct_oxidative_process_set(medium: str):
     that the membership test has somewhere to be pointed *at* after the rebuild: without
     it, once the cascade becomes a medium's default wiring, the test would go red with no
     seam to select, and the only move left would be editing the expectation — which is the
-    single thing this module forbids.
+    single thing this module forbids. That is exactly what happened at D-141, and the seam
+    did its job: selecting ``oxidative="direct"`` here was the whole fix.
     """
-    return get_medium(medium).build_process_set(strict=True)
+    return get_medium(medium, oxidative="direct").build_process_set(strict=True)
 
 
 def _integrate(compiled: CompiledScenario, *, days: float, n: int = 4000):
