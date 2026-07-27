@@ -15321,3 +15321,79 @@ an absolute lifetime — and the strict `xfail` will turn the suite red the mome
 it cannot be closed silently. It still must not be closed by fitting: either buy Danilewicz 2016
 and Nikolantonaki 2012, or find the branching from a third source. The missing post-Fenton O2
 draw is the cheaper structural candidate and would move r in the right direction on its own.
+
+### AMENDED, same day — the operating point violated the reference's own exclusion criterion, and fixing it INVERTS the headline
+
+**The heading above and the "4-7×" result are withdrawn.** Both were measured at a dose where
+the benchmark had already left the regime Miao's band covers.
+
+Miao excludes his own wine #1 (ratio 0.8443) because its free SO2 ran 8 → 3 mg/L: *"when SO2
+approaches very low levels, oxidation reactions must necessarily involve other components, and
+thus the ratio of reaction with O2 must change."* The shipped test stated that bound **in prose
+and never enforced it**. Measured at the shipped `WINE_REALISTIC_SO2 = 40.0`, free SO2 at the end
+of the window was **2.8 mg/L (direct)** and **6.8 mg/L (cascade)** — i.e. both alternatives were
+being regressed through exactly the curvature the reference removes. The monotone climb of r²
+with dose (0.990 → 0.998 → 1.000) was that curvature showing, and it was read as a good fit.
+
+Re-measured at the lowest dose where free SO2 stays above 10 mg/L on **both** alternatives
+through the whole window (80 mg/L total), with the shipped scenario and the shipped regression:
+
+| set | blocked (→1) | real | ideal (→2) | span | free SO2 end |
+| --- | --- | --- | --- | --- | --- |
+| direct | 1.7707 | **1.7707** | 1.7710 | **0.0003** | 17.8 mg/L |
+| cascade | 0.9767 | **1.1339** | 1.8354 | **0.859** | 31.1 mg/L |
+
+**The conclusion inverts.** The cascade reads **1.1339 — inside Miao's own 1.0972-1.6621** — and
+the calibrated direct set reads **1.7707, ABOVE it**, in the part of the union envelope only
+Danilewicz's dataset reaches. So at a valid operating point the two alternatives *straddle* the
+reference rather than the cascade falling short of it. The `xfail(strict=True)` asserting a 4-7×
+quinone-capture shortfall was wrong and is gone; the band test now passes on its merits, and
+`test_the_operating_point_satisfies_miaos_exclusion_criterion` enforces the bound in code so this
+cannot recur silently.
+
+**What survives untouched is the falsifier**, which is why it was the right thing to build the
+file around: the traverse is 0.0003 for the direct set against 0.859 for the cascade — a ratio of
+~2900×, wider at the corrected operating point than at the wrong one. No choice of dose softens
+it. Both limits also re-confirm at the asymptote (blocked 0.9977 → 1, ideal 1.9975 → 2).
+
+### The deeper finding, which the first version recorded as an unrelated side-note
+
+The section above reported the sim's sulfite buffering capacity as low against all eight of
+Miao's wines and moved on. It is not a side-note — **it is precisely why his operating point is
+unreachable.** His wines carry a bound-SO2 reservoir up to total/free = 153/23 = 6.6 that keeps
+free SO2 topped up under a 2 × 7 mg/L O2 challenge starting from only 9-28 mg/L free. The sim's
+is ~1.35. So dosing to *his free SO2* exhausts the pool inside the window, and dosing to *stay
+above his floor* starts at ~59 mg/L free — about 2× his highest wine. **No dose satisfies both
+ends.** Every band comparison in this record is therefore an envelope check at the wrong sulfite
+level, not a validation, and the in-band cascade result does **not** settle D-141's
+quinone-branching question. That is now asserted rather than conceded
+(`test_the_sim_cannot_actually_reach_miaos_operating_point`), so it fails loudly if the
+under-binding is ever fixed without this record being revisited.
+
+The under-bound SO2 pool is thus promoted from "recorded because it was found" to **the blocking
+prerequisite for any quantitative use of this benchmark.**
+
+### A third measurement error, caught by the new guard on its first run
+
+The guard's first execution reported free SO2 of 0.3 mg/L where the truth was 17.8: the array had
+already been divided by `M_SO2` for the molar regression and was then scaled by 1000, giving
+mmol/L. Caught only because the assertion printed the number it compared. That is the third
+plausible-green trap in this batch, after `ProcessSet.disable()` and the `param_values` property
+— and unlike those two it would have made a *passing* test look like a failing one rather than
+the reverse.
+
+**Tally: ten cascade-era claims falsified by re-measuring rather than by building, and four of
+them in this record alone — three of which were written by the author of the paragraph warning
+that un-remeasured cascade-era numbers are wrong about half the time.** The rate is not
+improving; what has improved is that the guards now catch them within the batch.
+
+### What this does NOT change
+
+The two `Corrects:` markers stand. D-141's "structurally cannot produce" is still wrong — more
+clearly so, since the direct set now lands in the envelope at *both* operating points. And
+D-138's "1.7 must emerge" is still the wrong target: 1.7 remains above Miao's whole range, and
+the corrected cascade value (1.1339) is nowhere near it. Nothing here re-opens either.
+
+Full suite after the amendment: **1380 passed**, `ruff` and `mypy` clean. The benchmark is 9
+tests, 20 s (free SO2 is speciated at the 8 sample points only — mapping the coupled
+four-carbonyl solve over all 6000 stored columns tripled the file's runtime).

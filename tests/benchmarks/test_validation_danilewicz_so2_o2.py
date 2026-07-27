@@ -30,13 +30,13 @@ structure both datasets agree on — the two limits, the strict ordering between
 real-wine band read as the union of the two reported ranges.
 
 **The falsifier, and what it actually is.** D-141 claimed the direct set "structurally cannot
-produce" this series. Measured, that claim needs a sharper statement: the direct set reproduces
-a real-wine *number* in band perfectly well (1.3875 at wine-realistic SO2 — see
-``test_direct_set_reproduces_the_real_wine_number``), because its fixed ``_SO2_PER_O2 = 2`` times
-bisulfite's share of a six-way O2 competition can land anywhere in (0, 2). What it cannot do is
-*move between the limits by blocking a route*, because it has no route to block. Blocking the
-quinone route changes the direct set's ratio by <0.001 and the cascade's by ~0.16. **That
-traverse — not the value 1.7 — is the rebuild's falsifiable content.**
+produce" this series. Measured, that claim needs a sharper statement: the direct set reaches a
+real-wine *number* inside the envelope perfectly well (1.7707), because its fixed
+``_SO2_PER_O2 = 2`` times bisulfite's share of a six-way O2 competition can land anywhere in
+(0, 2). What it cannot do is *move between the limits by blocking a route*, because it has no
+route to block. Blocking the quinone route changes the direct set's ratio by **0.0003** and the
+cascade's by **0.859**. **That traverse — not the value 1.7 — is the rebuild's falsifiable
+content**, and it is the one assertion here that no choice of operating point can soften.
 
 **The exactness of the two limits is emergent, not fitted.** Both asymptotes fall out of
 stoichiometry constants that are all 1 (``_H2O2_PER_O2``, ``_QUINONE_PER_O2``, ``_SO2_PER_H2O2``,
@@ -46,20 +46,32 @@ numerical one — bisulfite shares the H2O2 node with ethanol, so its share of t
 until SO2 is large. That is the same qualification Danilewicz makes when he calls the model-wine
 quinone reduction "near quantitative" rather than quantitative.
 
-**What is red, and must stay red.** ``test_cascade_lands_in_the_observed_band`` is an
-``xfail(strict=True)``: at wine-realistic SO2 the cascade returns 0.9888, BELOW Miao's
-1.0972-1.6621. Decomposed (the identity ``r = H2O2 share to sulfite + quinone share to
-sulfite``), the cascade's quinone share is 0.0584 where the band needs ~0.37-0.74. That is
-D-141's "~100x fork" restated as a measurement: closing it needs roughly **4-7x** more quinone
-reaching bisulfite, not 100x — a far smaller and better-posed gap than D-141 could state. It is
-the same defect D-141 saw from the other side as A420 running 4.20x high in a sulfited wine.
-Do NOT close this by fitting a constant; see D-142. When it is genuinely fixed the strict xfail
-turns the suite red and forces this file to be updated.
+**THE OPERATING POINT IS THE WHOLE BALLGAME, and this file got it wrong once.** Miao excludes
+his own wine #1 because its free SO2 ran 8 -> 3 mg/L. The first version of this file stated that
+bound in prose, never enforced it, and ran at a dose where free SO2 ended at **2.8 mg/L**
+(direct) and 6.8 (cascade) — squarely inside the excluded regime. Every ratio it reported was
+reading the curvature Miao removes, and the conclusion it drew was the opposite of the truth: it
+shipped an ``xfail(strict=True)`` claiming the cascade fell BELOW the band by 4-7x on quinone
+capture. Re-measured where the exclusion criterion actually holds, the cascade reads **1.1339 —
+inside Miao's own 1.0972-1.6621** — and the calibrated direct set reads **1.7707, ABOVE it**.
+``test_the_operating_point_satisfies_miaos_exclusion_criterion`` now enforces the bound in code.
+
+**But the agreement is at the wrong operating point, and that is the real finding.** The sim
+under-binds SO2: its buffering capacity is below Miao's on both alternatives, so it has no bound
+reservoir to replenish free SO2 under the O2 challenge. To stay above his floor it must be dosed
+to ~59 mg/L free — roughly 2x his highest wine. **No dose matches his operating point at both
+ends of the window.** So the in-band result is an envelope check at the wrong sulfite level, not
+a validation, and the quinone-branching question D-141 left open is NOT settled by it. That
+constraint is asserted, not merely conceded, by
+``test_the_sim_cannot_actually_reach_miaos_operating_point``.
 """
+
+from typing import NamedTuple
 
 import numpy as np
 import pytest
 
+from fermentation.core import acidbase
 from fermentation.runtime.schedule import simulate_scheduled
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint
 from fermentation.scenario.compile import compile_scenario
@@ -83,8 +95,20 @@ DANILEWICZ_BAND = (1.29, 2.03)
 #: envelope they jointly support.
 OBSERVED_BAND = (min(MIAO_BAND[0], DANILEWICZ_BAND[0]), max(MIAO_BAND[1], DANILEWICZ_BAND[1]))
 
-#: A dose whose free SO2 at test start (25.0 mg/L) sits inside Miao's own 9-28 mg/L spread.
-WINE_REALISTIC_SO2 = 40.0
+#: Miao's sulfite buffering capacity (Δtotal SO2 / Δfree SO2) across the same eight wines.
+MIAO_BUFFERING_BAND = (1.2526, 1.9882)
+#: Miao excludes his wine #1 because its free SO2 ran 8 -> 3 mg/L: "when SO2 approaches very low
+#: levels, oxidation reactions must necessarily involve other components, and thus the ratio of
+#: reaction with O2 must change". Every ratio compared to his band must hold above this.
+FREE_SO2_FLOOR_MGL = 10.0
+
+#: The operating point. Chosen as the LOWEST dose at which free SO2 stays above
+#: :data:`FREE_SO2_FLOOR_MGL` through the whole window on BOTH alternatives — enforced by
+#: ``test_the_operating_point_satisfies_miaos_exclusion_criterion`` rather than asserted in prose.
+#: It was 40.0 when this file first shipped, which was a DEFECT: free SO2 ended at 2.8 mg/L
+#: (direct) and 6.8 (cascade), i.e. inside the regime Miao's own band excludes, and every ratio
+#: measured there was reading the curvature he removes. See D-142's amendment.
+WINE_REALISTIC_SO2 = 80.0
 #: Far above any legal wine. Present ONLY to show the two limits are asymptotes at exactly 1 and
 #: 2 rather than approximate coincidences.
 LIMIT_SO2 = 500.0
@@ -143,7 +167,18 @@ def _scenario(so2_mgl: float) -> Scenario:
     )
 
 
-def _ratio(so2_mgl: float, oxidative: str, mode: str) -> float:
+class _Run(NamedTuple):
+    """One accelerated-oxidation run, reduced to the three things Miao reports plus the guard."""
+
+    #: Miao Table 2 — d(total SO2) / d(O2 consumed), molar.
+    ratio: float
+    #: Miao Table 3 — d(total SO2) / d(free SO2). The sulfite buffering capacity.
+    buffering: float
+    #: Free SO2 [mg/L] at each of the eight sample points, for the exclusion-criterion guard.
+    free_mgl: tuple[float, ...]
+
+
+def _run(so2_mgl: float, oxidative: str, mode: str) -> _Run:
     """Miao's SO2:O2 molar reaction ratio, by his own regression method.
 
     ``mode`` is ``"real"``, ``"blocked"`` (quinone route trapped, Danilewicz's benzenesulfinic
@@ -185,13 +220,33 @@ def _ratio(so2_mgl: float, oxidative: str, mode: str) -> float:
     hours = [t0h + (r * ROUND + d) * 24.0 for r in range(N_ROUNDS) for d in (0.0, 1.0, 3.0, 5.0)]
     x = np.array([float(np.interp(h, traj.t, consumed)) for h in hours]) / M_O2
     y = np.array([float(np.interp(h, traj.t, total_so2)) for h in hours]) / M_SO2
-    slope, _ = np.polyfit(x, y, 1)
-    return float(-slope)  # SO2 falls as O2 is consumed; report the positive ratio
+    # Free SO2 is speciated at the eight SAMPLE points only, not mapped over all 6000 stored
+    # columns: the coupled four-carbonyl binding solve is expensive and this file only ever reads
+    # it at Miao's sampling schedule (mapping it wholesale tripled the file's runtime).
+    # ``free_so2`` is g/L; keep that array for the mg/L guard and divide only for the molar
+    # regression. (Scaling the mol/L array by 1000 gives mmol/L, not mg/L — that slip made the
+    # exclusion guard read 0.3 where the truth was 17.8.)
+    f_gpl = np.array(
+        [
+            acidbase.free_so2(
+                traj.y[:, int(np.argmin(np.abs(traj.t - h)))], compiled.schema, params
+            )
+            for h in hours
+        ]
+    )
+    f = f_gpl / M_SO2
+    ratio = -float(np.polyfit(x, y, 1)[0])  # SO2 falls as O2 is consumed; report it positive
+    free_factor = -float(np.polyfit(x, f, 1)[0])
+    return _Run(
+        ratio=ratio,
+        buffering=ratio / free_factor if free_factor else float("nan"),
+        free_mgl=tuple(float(v) * 1000.0 for v in f_gpl),
+    )
 
 
 @pytest.fixture(scope="module")
-def ratios() -> dict[tuple[str, str, float], float]:
-    """Every ratio this file needs, integrated once each."""
+def runs() -> dict[tuple[str, str, float], _Run]:
+    """Every run this file needs, integrated once each."""
     wanted = [
         ("cascade", "real", WINE_REALISTIC_SO2),
         ("cascade", "blocked", WINE_REALISTIC_SO2),
@@ -202,36 +257,75 @@ def ratios() -> dict[tuple[str, str, float], float]:
         ("direct", "blocked", WINE_REALISTIC_SO2),
         ("direct", "ideal", WINE_REALISTIC_SO2),
     ]
-    return {key: _ratio(key[2], key[0], key[1]) for key in wanted}
+    return {key: _run(key[2], key[0], key[1]) for key in wanted}
+
+
+# -- the operating point must be one the reference band actually covers ------------------------
+
+
+def test_the_operating_point_satisfies_miaos_exclusion_criterion(runs):
+    """Free SO2 stays above 10 mg/L at every sample point, on BOTH alternatives.
+
+    This enforces in code the bound the first version of this file only stated in prose, and it
+    is the guard that would have caught that defect: at the original 40 mg/L dose free SO2 ended
+    at 2.8 mg/L (direct) and 6.8 (cascade), inside the very regime Miao excludes his wine #1 for.
+    Every band comparison below is meaningless without it.
+    """
+    for alternative in ("direct", "cascade"):
+        free = runs[(alternative, "real", WINE_REALISTIC_SO2)].free_mgl
+        assert min(free) > FREE_SO2_FLOOR_MGL, f"{alternative} fell to {min(free):.1f} mg/L"
+
+
+def test_the_sim_cannot_actually_reach_miaos_operating_point(runs):
+    """Characterizes the gap that makes every band comparison here CONDITIONAL, not clean.
+
+    Miao's wines carry a large bound-SO2 reservoir (total/free up to 153/23 = 6.6) that keeps
+    free SO2 topped up under a 2 x 7 mg/L O2 challenge at free SO2 of only 9-28 mg/L. The sim
+    under-binds SO2 (a limitation ``analysis.bound_so2_series`` already concedes in its own
+    docstring, and which D-51's three extra carbonyls did not close), so its buffering capacity
+    lands BELOW Miao's range on both alternatives. The consequence is structural: to keep free
+    SO2 above his floor the sim must be dosed to ~59 mg/L free, roughly 2x his highest wine.
+    **There is no dose that matches his operating point at both ends of the window.**
+
+    Asserted as a regression guard on the CURRENT gap, in the idiom of
+    ``test_validation_varela2004.py``: do not widen it to make CI green — close it by modelling
+    the missing binders, and update D-142 when the direction changes.
+    """
+    for alternative in ("direct", "cascade"):
+        buffering = runs[(alternative, "real", WINE_REALISTIC_SO2)].buffering
+        assert buffering < MIAO_BUFFERING_BAND[0], (
+            f"{alternative} buffering {buffering:.3f} has risen into Miao's "
+            f"{MIAO_BUFFERING_BAND} — the under-binding gap has closed; update D-142"
+        )
 
 
 # -- the two limits: emergent stoichiometry, not fitted values ---------------------------------
 
 
-def test_blocked_quinone_route_gives_one_so2_per_o2(ratios):
+def test_blocked_quinone_route_gives_one_so2_per_o2(runs):
     """Danilewicz's 1:1 — quinone trapped, so only H2O2 can oxidise bisulfite.
 
     Asserted at the asymptote, because at finite SO2 the limit is approached from BELOW:
     bisulfite shares the H2O2 node with ethanol, so its share of that node is <1.
     """
-    assert ratios[("cascade", "blocked", LIMIT_SO2)] == pytest.approx(1.0, abs=0.01)
+    assert runs[("cascade", "blocked", LIMIT_SO2)].ratio == pytest.approx(1.0, abs=0.01)
 
 
-def test_uncontested_quinone_gives_two_so2_per_o2(ratios):
+def test_uncontested_quinone_gives_two_so2_per_o2(runs):
     """Danilewicz's 1:2 — bisulfite takes BOTH oxidising equivalents one O2 makes.
 
     This is the number that must emerge rather than be asserted, and it does: every
     stoichiometry constant on the path is 1, so 2 is a consequence of "one O2 yields one H2O2
     and one quinone", never a fitted yield.
     """
-    assert ratios[("cascade", "ideal", LIMIT_SO2)] == pytest.approx(2.0, abs=0.02)
+    assert runs[("cascade", "ideal", LIMIT_SO2)].ratio == pytest.approx(2.0, abs=0.02)
 
 
-def test_the_series_is_strictly_ordered_at_wine_realistic_sulfite(ratios):
-    """1:1 < real wine < 1:2, with real strictly interior — the whole point of "partial capture"."""
-    blocked = ratios[("cascade", "blocked", WINE_REALISTIC_SO2)]
-    real = ratios[("cascade", "real", WINE_REALISTIC_SO2)]
-    ideal = ratios[("cascade", "ideal", WINE_REALISTIC_SO2)]
+def test_the_series_is_strictly_ordered_at_wine_realistic_sulfite(runs):
+    """1:1 < real wine < 1:2, with real strictly interior — the whole point of partial capture."""
+    blocked = runs[("cascade", "blocked", WINE_REALISTIC_SO2)].ratio
+    real = runs[("cascade", "real", WINE_REALISTIC_SO2)].ratio
+    ideal = runs[("cascade", "ideal", WINE_REALISTIC_SO2)].ratio
     assert blocked < real < ideal
     # and the interior point is not merely nudged off either limit
     assert real - blocked > 0.02
@@ -241,7 +335,7 @@ def test_the_series_is_strictly_ordered_at_wine_realistic_sulfite(ratios):
 # -- the falsifier: only one of the two alternatives can traverse the series --------------------
 
 
-def test_direct_set_cannot_move_between_the_limits(ratios):
+def test_direct_set_cannot_move_between_the_limits(runs):
     """The rebuild's falsifiable content, stated as the thing the direct set CANNOT do.
 
     Blocking or freeing the quinone route leaves the direct set's ratio unchanged to <0.01,
@@ -249,24 +343,24 @@ def test_direct_set_cannot_move_between_the_limits(ratios):
     competing constants zeroed for the "ideal" arm are themselves direct O2 sinks there, which
     perturbs the six-way O2 competition very slightly.
     """
-    blocked = ratios[("direct", "blocked", WINE_REALISTIC_SO2)]
-    ideal = ratios[("direct", "ideal", WINE_REALISTIC_SO2)]
+    blocked = runs[("direct", "blocked", WINE_REALISTIC_SO2)].ratio
+    ideal = runs[("direct", "ideal", WINE_REALISTIC_SO2)].ratio
     assert abs(ideal - blocked) < 0.01
 
 
-def test_cascade_traverses_the_series(ratios):
-    """The same manipulation moves the cascade by more than an order of magnitude more.
+def test_cascade_traverses_the_series(runs):
+    """The same manipulation moves the cascade by three orders of magnitude more.
 
     Guarded as a ratio against the direct set's residual rather than as a bare threshold, so it
     keeps meaning if either alternative's absolute numbers move.
     """
     cascade_span = (
-        ratios[("cascade", "ideal", WINE_REALISTIC_SO2)]
-        - ratios[("cascade", "blocked", WINE_REALISTIC_SO2)]
+        runs[("cascade", "ideal", WINE_REALISTIC_SO2)].ratio
+        - runs[("cascade", "blocked", WINE_REALISTIC_SO2)].ratio
     )
     direct_span = abs(
-        ratios[("direct", "ideal", WINE_REALISTIC_SO2)]
-        - ratios[("direct", "blocked", WINE_REALISTIC_SO2)]
+        runs[("direct", "ideal", WINE_REALISTIC_SO2)].ratio
+        - runs[("direct", "blocked", WINE_REALISTIC_SO2)].ratio
     )
     assert cascade_span > 0.4
     assert cascade_span > 50.0 * direct_span
@@ -275,35 +369,32 @@ def test_cascade_traverses_the_series(ratios):
 # -- agreement with the measured band ----------------------------------------------------------
 
 
-def test_direct_set_reproduces_the_real_wine_number(ratios):
-    """The SHIPPED default lands inside the observed envelope, at wine-realistic SO2.
+def test_cascade_lands_in_the_observed_band(runs):
+    """The cascade reads 1.1339 — inside Miao's OWN range (1.0972-1.6621), not merely the union.
 
-    This is a regression guard on the calibrated set, not a vindication of its mechanism: it
-    reaches an in-band number through a fixed ``_SO2_PER_O2 = 2`` scaled by bisulfite's share of
-    a six-way competition for O2, which is exactly the structure Gate 1 (D-137) found to be
-    mechanistically false. Right number, wrong reason — and the test above is what says so.
+    This inverts what this file asserted when it first shipped, and the inversion is entirely an
+    artefact of the operating point: at the invalid 40 mg/L dose the cascade read 0.9888 and this
+    was an ``xfail(strict=True)`` claiming a 4-7x quinone-capture shortfall. Measured where Miao's
+    own exclusion criterion is satisfied, there is no shortfall to claim. **The quinone-branching
+    question is not thereby settled** — see ``test_the_sim_cannot_actually_reach_miaos_operating
+    _point``: agreement is reached at ~2x his free SO2, so this is an in-envelope result at the
+    wrong operating point, not a validation. It stays a regression guard, not a vindication.
+    """
+    lo, hi = MIAO_BAND
+    assert lo <= runs[("cascade", "real", WINE_REALISTIC_SO2)].ratio <= hi
+
+
+def test_direct_set_overshoots_miaos_range_but_stays_in_the_union_envelope(runs):
+    """The SHIPPED default reads 1.7707 — above Miao's 1.6621, inside Danilewicz's 1.29-2.03.
+
+    So at a valid operating point the two alternatives straddle the reference: the cascade sits
+    inside Miao's own range and the calibrated direct set sits above it, in the part of the
+    envelope only Danilewicz's dataset covers. That is a much weaker result for the direct set
+    than this file first recorded, and it is not evidence for its mechanism either way — it
+    reaches its number through a fixed ``_SO2_PER_O2 = 2`` scaled by bisulfite's share of a
+    six-way competition for O2, the structure Gate 1 (D-137) found to be mechanistically false.
     """
     lo, hi = OBSERVED_BAND
-    assert lo <= ratios[("direct", "real", WINE_REALISTIC_SO2)] <= hi
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "D-142: the cascade returns 0.9888 at wine-realistic SO2, below Miao's 1.0972-1.6621. "
-        "Its quinone-to-sulfite share is 0.058 where the band needs ~0.37-0.74, i.e. 4-7x too "
-        "little quinone reaching bisulfite. This is D-141's open ~100x fork, now measured and "
-        "much better posed. It must NOT be closed by fitting k_quinone_polymerization -- "
-        "Nikolantonaki & Waterhouse 2012, the pull that would settle it, is paywalled and its "
-        "abstract's rate constants are pseudo-first-order at unstated concentrations."
-    ),
-)
-def test_cascade_lands_in_the_observed_band(ratios):
-    """The gap that keeps the cascade non-default, asserted rather than described.
-
-    Deliberately an ``xfail(strict=True)`` and not a widened band or a skip: when the quinone
-    branching is genuinely fixed this turns the suite RED and forces the file to be updated,
-    which a ``skip`` would not.
-    """
-    lo, hi = OBSERVED_BAND
-    assert lo <= ratios[("cascade", "real", WINE_REALISTIC_SO2)] <= hi
+    ratio = runs[("direct", "real", WINE_REALISTIC_SO2)].ratio
+    assert lo <= ratio <= hi
+    assert ratio > MIAO_BAND[1]
