@@ -1,4 +1,4 @@
-"""D-142: the SO2:O2 molar reaction ratio — Danilewicz's structural series, measured against data.
+"""D-142, reworked at D-144: the SO2:O2 molar reaction ratio — Danilewicz's structural series.
 
 Sources, and which one backs which assertion:
 
@@ -52,7 +52,7 @@ low-sulfite regime where — Miao's words — "oxidation reactions must necessar
 components, and thus the ratio of reaction with O2 must change". Every ratio it reported was
 reading that curvature, and the conclusion it drew was the opposite of the truth: it shipped an
 ``xfail(strict=True)`` claiming the cascade fell BELOW the band by 4-7x on quinone capture.
-Re-measured clear of the curvature regime, the cascade reads **1.1339 — inside Miao's own
+Re-measured clear of the curvature regime, the cascade reads **1.1338 — inside Miao's own
 1.0972-1.6621** — and the calibrated direct set reads **1.7707, ABOVE it**.
 ``test_the_operating_point_clears_the_curvature_floor`` now enforces the bound in code.
 
@@ -66,7 +66,7 @@ strictness is kept anyway, are recorded on :data:`SIM_CURVATURE_FLOOR_MGL`.
 
 **The direct half of that inversion is robust; the cascade half is dose-contingent.** The direct
 set is above Miao at every valid dose and immovable. The cascade **straddles Miao's floor**:
-1.0704 at 60 (out), 1.1035 at 70, 1.1339 at 80 (in) — and 80 is the shared operating point only
+1.0704 at 60 (out), 1.1034 at 70, 1.1338 at 80 (in) — and 80 is the shared operating point only
 because the *direct* set exhausts its free SO2 at 60. So the cascade's in-band result is a
 statement about a dose the other alternative forced, with ~3.4% headroom. Asserted as the
 straddle it is (``test_cascade_brackets_miaos_lower_bound_across_its_valid_dose_range``), not as
@@ -461,13 +461,24 @@ def test_sulfite_buffering_matches_miao_on_his_own_statistic(runs):
     D-143, and the low one fails.
     """
     lo, hi = MIAO_BUFFERING_BAND
-    secants = {
-        alt: runs[(alt, "real", WINE_REALISTIC_SO2)].buffering_secant
-        for alt in ("direct", "cascade")
-    }
-    for alternative, secant in secants.items():
-        assert lo <= secant <= hi, f"{alternative} secant {secant:.4f} outside Miao's {lo}-{hi}"
-    assert secants["direct"] == pytest.approx(secants["cascade"], abs=1e-9)
+    # Every REAL-mode run this file integrates, i.e. both alternatives across the whole valid dose
+    # range — not just the two at the shared operating point, because dose-invariance is the load-
+    # bearing half of the claim and asserting it only at one dose would be the exact shape of the
+    # verdicts this file has already withdrawn. Confined to real mode on purpose, though not
+    # because it would fail otherwise: the ``blocked``/``ideal`` arms at LIMIT_SO2 = 500 read the
+    # same 1.319717. They are excluded because they are limit probes rather than operating points,
+    # so they are outside the claim — and at 500 mg/L D-47's acetaldehyde lock-in could one day
+    # hold a pool, which would move the secant for a legitimate reason.
+    secants = {key: run.buffering_secant for key, run in runs.items() if key[1] == "real"}
+    assert len(secants) >= 5, "the invariance claim needs more than the operating point"
+    for key, secant in secants.items():
+        assert lo <= secant <= hi, f"{key} secant {secant:.4f} outside Miao's {lo}-{hi}"
+    reference = secants[("direct", "real", WINE_REALISTIC_SO2)]
+    for key, secant in secants.items():
+        assert secant == pytest.approx(reference, abs=1e-9), (
+            f"{key} secant {secant:.9f} differs from {reference:.9f} — the buffering statistic "
+            "has become operating-point dependent, which is the whole reason it was trusted"
+        )
 
 
 def test_the_oxidation_path_slope_is_a_different_quantity(runs):
@@ -631,7 +642,7 @@ def test_cascade_traverses_the_series(runs):
 def test_cascade_brackets_miaos_lower_bound_across_its_valid_dose_range(runs):
     """The cascade STRADDLES Miao's floor: out of band at its lowest valid dose, in above it.
 
-    Measured: 1.0704 at 60 (below 1.0972), 1.1035 at 70, 1.1339 at 80 — so "the cascade lands in
+    Measured: 1.0704 at 60 (below 1.0972), 1.1034 at 70, 1.1338 at 80 — so "the cascade lands in
     Miao's band" is true only from ~70 upward, and the shared operating point that makes it true
     was forced by the *direct* set's exhaustion, not by the cascade.
 

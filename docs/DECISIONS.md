@@ -15709,11 +15709,20 @@ Measured at the shared operating point:
 | addition-method secant | **1.3197** | **1.3197** | **1.2526-1.9882** |
 | oxidation-path slope | 1.1761 | 1.1333 | — |
 
-`test_sulfite_buffering_matches_miao_on_his_own_statistic` asserts the secant is in band, and
-asserts the two alternatives agree to 1e-9 — the secant is a property of the carbonyl pools and the
-pH, so neither the oxidative set nor the SO2 dose moves it. **That invariance is the point**: it is
-why this statistic, unlike the ratio, is not an artefact of the operating point, and it was measured
-across doses 40-100 on both sets, reading 1.3197 at every one.
+`test_sulfite_buffering_matches_miao_on_his_own_statistic` asserts the secant is in band across
+**every real-mode run this file integrates** — both alternatives over the whole valid dose range,
+agreeing to 1e-9 — because the secant is a property of the carbonyl pools and the pH, so neither
+the oxidative set nor the SO2 dose moves it. **That invariance is the point**: it is why this
+statistic, unlike the ratio, is not an artefact of the operating point. Measured across doses
+40-100 on both sets it reads 1.3197 at every one, and 1.319717 at `LIMIT_SO2` = 500 too — the
+limit arms are left out of the assertion because they are limit probes rather than operating
+points, not because they would fail.
+
+(The first draft asserted only the two runs at the shared operating point while the docstring
+claimed the dose sweep — coverage claimed in prose for a measurement that had been left in a probe
+file. The invariance is the load-bearing half of the argument; asserting it at one dose would have
+been the exact shape of the two verdicts this file already withdrew.
+[[feedback-conceded-caveats-are-not-coverage]])
 
 `test_the_oxidation_path_slope_is_a_different_quantity` guards the category error itself. Leaving
 the oxidation-path number in the `_Run` where a later reader can reach for it is only safe if
@@ -15802,6 +15811,16 @@ two things and neither was the binding solver:
    model solves. `M_O2`/`M_SO2` and the four carbonyl molar masses are now imported from
    `core.chemistry` instead of retyped.
 
+   **It moved two quoted digits, and no assertion could have caught that.** The ratio is
+   `slope(total/M_SO2 vs consumed/M_O2)`, so the masses do not cancel: re-measured through the
+   file's own `_run`, the cascade straddle goes 1.1339 → **1.1338** at dose 80 and 1.1035 →
+   **1.1034** at 70 (60 and the direct 1.7707 are unmoved at four decimals; the secant is unmoved
+   entirely, `M_SO2` cancelling everywhere but `h` vs `K`). Every assertion here is a *band*, so
+   the suite stayed green through a change that invalidated prose — the numbers in D-142/D-143
+   are left as measured, since the archive is append-only, and this record's are the corrected
+   ones. **Re-measure quoted decimals after a units change; a green band asserts nothing about
+   them.**
+
 Re-stated as **pure algebra** — free → total in closed form, total → free through
 `bound_so2_molar`, no state, no pH solve, no scenario — the worst error over a 120-point grid
 (5 pH x 3 acetaldehyde pools x 2 keto-acid scalings x 4 free levels) is **4.3e-10 mg/L**. The pinned
@@ -15823,7 +15842,7 @@ read a wrong secant with nothing going red. [[feedback-check-the-schema-not-the-
 
 Every downstream number and every other assertion. `WINE_REALISTIC_SO2` stays 80,
 `CASCADE_VALID_DOSES` stays (60, 70, 80), the traverse falsifier (direct 0.0003 vs cascade 0.859)
-stands, the cascade straddle (1.0704 / 1.1035 / 1.1339) stands, the direct set still reads 1.7707
+stands, the cascade straddle (1.0704 / 1.1034 / 1.1338) stands, the direct set still reads 1.7707
 above Miao's ceiling and inside Danilewicz's, the two limits still emerge at 1 and 2. The cascade
 stays **non-default**; `k_copper_multiplier` stays 600; the fate gap and its two paywalled sources
 are untouched. The dosing schedule is **not** changed — D-143's must-60 grid is a separate owner
