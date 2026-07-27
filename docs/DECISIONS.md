@@ -15397,3 +15397,41 @@ the corrected cascade value (1.1339) is nowhere near it. Nothing here re-opens e
 Full suite after the amendment: **1380 passed**, `ruff` and `mypy` clean. The benchmark is 9
 tests, 20 s (free SO2 is speciated at the 8 sample points only — mapping the coupled
 four-carbonyl solve over all 6000 stored columns tripled the file's runtime).
+
+### SECOND amendment, same day — the inversion's cascade half is dose-contingent, and the amendment above stated it as settled
+
+The paragraph above reports "the cascade reads **1.1339** — inside Miao's own 1.0972-1.6621" as
+though it were a property of the cascade. It is a property of the cascade **at one dose**, and
+that dose was chosen for the *direct* set's benefit.
+
+Measured across the doses where the **cascade alone** satisfies the exclusion criterion:
+
+| dose (mg/L total SO2) | cascade r | free SO2 end | in Miao's band? |
+| --- | --- | --- | --- |
+| 60 | **1.0704** | 17.4 | **NO** — below the 1.0972 floor |
+| 70 | 1.1035 | 24.0 | yes |
+| 80 (shared point) | 1.1339 | 31.1 | yes |
+| 120 | 1.2380 | 63.5 | yes |
+
+**The cascade straddles Miao's lower bound.** It is valid from 60 and out of band there; the
+direct set is *not* valid at 60 (free SO2 ends at 8.2 mg/L), which is the only reason the shared
+comparison point is 80. So the corrected headline should read: *the cascade brackets Miao's floor
+across its valid range and sits inside the band from ~70 upward; the direct set sits above the
+band at every valid dose.* Only the second clause is unconditional.
+
+The margin makes this worth stating rather than filing as pedantry. `MIAO_BAND` and
+`OBSERVED_BAND` share the floor 1.0972, so a bare `lo <= ratio` assertion at the shared operating
+point is a **3.4%-headroom** claim on a coarse dose grid — an unrelated model change flips it and
+produces a red that reads as a physics regression when it is a dose artefact. The test now
+asserts the straddle (out at the lowest valid dose, in at the shared one, monotone between), plus
+the asymmetry itself in `test_the_shared_operating_point_is_forced_by_the_direct_set`.
+
+**This is the same failure mode as the first amendment, in the opposite direction and one level
+up.** The first shipped a single-dose verdict from an invalid dose. This one shipped a
+single-dose verdict from a valid dose while treating it as dose-independent. Both were caught by
+asking "over what range is this true?" rather than "is this true?" — which is now the standing
+question for anything this benchmark reports.
+
+Tally: **eleven** cascade-era claims falsified by re-measuring, five of them inside this record.
+
+Benchmark is 10 tests, 34 s. Full suite green, `ruff` and `mypy` clean.

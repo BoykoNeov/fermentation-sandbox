@@ -56,6 +56,15 @@ capture. Re-measured where the exclusion criterion actually holds, the cascade r
 inside Miao's own 1.0972-1.6621** — and the calibrated direct set reads **1.7707, ABOVE it**.
 ``test_the_operating_point_satisfies_miaos_exclusion_criterion`` now enforces the bound in code.
 
+**The direct half of that inversion is robust; the cascade half is dose-contingent.** The direct
+set is above Miao at every valid dose and immovable. The cascade **straddles Miao's floor**:
+1.0704 at 60 (out), 1.1035 at 70, 1.1339 at 80 (in) — and 80 is the shared operating point only
+because the *direct* set exhausts its free SO2 at 60. So the cascade's in-band result is a
+statement about a dose the other alternative forced, with ~3.4% headroom. Asserted as the
+straddle it is (``test_cascade_brackets_miaos_lower_bound_across_its_valid_dose_range``), not as
+a single in-band number — which is the mistake this file already made once, in the other
+direction.
+
 **But the agreement is at the wrong operating point, and that is the real finding.** The sim
 under-binds SO2: its buffering capacity is below Miao's on both alternatives, so it has no bound
 reservoir to replenish free SO2 under the O2 challenge. To stay above his floor it must be dosed
@@ -102,13 +111,20 @@ MIAO_BUFFERING_BAND = (1.2526, 1.9882)
 #: reaction with O2 must change". Every ratio compared to his band must hold above this.
 FREE_SO2_FLOOR_MGL = 10.0
 
-#: The operating point. Chosen as the LOWEST dose at which free SO2 stays above
-#: :data:`FREE_SO2_FLOOR_MGL` through the whole window on BOTH alternatives — enforced by
-#: ``test_the_operating_point_satisfies_miaos_exclusion_criterion`` rather than asserted in prose.
-#: It was 40.0 when this file first shipped, which was a DEFECT: free SO2 ended at 2.8 mg/L
-#: (direct) and 6.8 (cascade), i.e. inside the regime Miao's own band excludes, and every ratio
-#: measured there was reading the curvature he removes. See D-142's amendment.
+#: The shared operating point: the lowest dose ON THE TESTED GRID {40, 60, 70, 80, 100, 120} at
+#: which free SO2 stays above :data:`FREE_SO2_FLOOR_MGL` through the whole window on BOTH
+#: alternatives — enforced by ``test_the_operating_point_satisfies_miaos_exclusion_criterion``
+#: rather than asserted in prose. It was 40.0 when this file first shipped, which was a DEFECT:
+#: free SO2 ended at 2.8 mg/L (direct) and 6.8 (cascade), i.e. inside the regime Miao's own band
+#: excludes, and every ratio measured there was reading the curvature he removes.
+#:
+#: **It is forced by the DIRECT set, not the cascade.** The cascade alone is valid from 60
+#: (free SO2 ends at 17.4 mg/L); the direct set is not (8.2 mg/L). So any statement about the
+#: cascade *at this dose* is contingent on a dose the other alternative required — which is why
+#: ``test_cascade_brackets_miaos_lower_bound`` measures its whole valid range instead.
 WINE_REALISTIC_SO2 = 80.0
+#: Doses at which the CASCADE alone satisfies the exclusion criterion, lowest first.
+CASCADE_VALID_DOSES = (60.0, 70.0, 80.0)
 #: Far above any legal wine. Present ONLY to show the two limits are asymptotes at exactly 1 and
 #: 2 rather than approximate coincidences.
 LIMIT_SO2 = 500.0
@@ -256,6 +272,8 @@ def runs() -> dict[tuple[str, str, float], _Run]:
         ("direct", "real", WINE_REALISTIC_SO2),
         ("direct", "blocked", WINE_REALISTIC_SO2),
         ("direct", "ideal", WINE_REALISTIC_SO2),
+        *[("cascade", "real", d) for d in CASCADE_VALID_DOSES if d != WINE_REALISTIC_SO2],
+        ("direct", "real", CASCADE_VALID_DOSES[0]),
     ]
     return {key: _run(key[2], key[0], key[1]) for key in wanted}
 
@@ -369,19 +387,36 @@ def test_cascade_traverses_the_series(runs):
 # -- agreement with the measured band ----------------------------------------------------------
 
 
-def test_cascade_lands_in_the_observed_band(runs):
-    """The cascade reads 1.1339 — inside Miao's OWN range (1.0972-1.6621), not merely the union.
+def test_cascade_brackets_miaos_lower_bound_across_its_valid_dose_range(runs):
+    """The cascade STRADDLES Miao's floor: out of band at its lowest valid dose, in above it.
 
-    This inverts what this file asserted when it first shipped, and the inversion is entirely an
-    artefact of the operating point: at the invalid 40 mg/L dose the cascade read 0.9888 and this
-    was an ``xfail(strict=True)`` claiming a 4-7x quinone-capture shortfall. Measured where Miao's
-    own exclusion criterion is satisfied, there is no shortfall to claim. **The quinone-branching
-    question is not thereby settled** — see ``test_the_sim_cannot_actually_reach_miaos_operating
-    _point``: agreement is reached at ~2x his free SO2, so this is an in-envelope result at the
-    wrong operating point, not a validation. It stays a regression guard, not a vindication.
+    Measured: 1.0704 at 60 (below 1.0972), 1.1035 at 70, 1.1339 at 80 — so "the cascade lands in
+    Miao's band" is true only from ~70 upward, and the shared operating point that makes it true
+    was forced by the *direct* set's exhaustion, not by the cascade.
+
+    Asserting the straddle rather than one in-band number is deliberate. The band's floor and the
+    cascade's value differ by ~3.4% at the shared operating point, on a coarse dose grid; a bare
+    ``lo <= ratio`` there would be a 3%-headroom assertion masquerading as agreement, and any
+    unrelated model change would flip it into a confusing red. This states what was actually
+    measured, and it is the second time in this file's short life that a single-dose verdict on
+    this quantity turned out to be an artefact of the dose.
     """
-    lo, hi = MIAO_BAND
-    assert lo <= runs[("cascade", "real", WINE_REALISTIC_SO2)].ratio <= hi
+    ratios = [runs[("cascade", "real", d)].ratio for d in CASCADE_VALID_DOSES]
+    assert ratios == sorted(ratios), "ratio should rise monotonically with sulfite"
+    assert ratios[0] < MIAO_BAND[0], "lowest valid dose should sit BELOW Miao's floor"
+    assert MIAO_BAND[0] <= ratios[-1] <= MIAO_BAND[1], "shared operating point should be in band"
+
+
+def test_the_shared_operating_point_is_forced_by_the_direct_set(runs):
+    """Why the comparison is made at 80 and not at the cascade's own lowest valid dose.
+
+    At 60 the cascade clears Miao's floor and the direct set does not, so 60 cannot be used for a
+    like-for-like comparison. This records the asymmetry rather than leaving it as a bare
+    constant, because it is exactly what makes the cascade's in-band result contingent.
+    """
+    low = CASCADE_VALID_DOSES[0]
+    assert min(runs[("cascade", "real", low)].free_mgl) > FREE_SO2_FLOOR_MGL
+    assert min(runs[("direct", "real", low)].free_mgl) < FREE_SO2_FLOOR_MGL
 
 
 def test_direct_set_overshoots_miaos_range_but_stays_in_the_union_envelope(runs):

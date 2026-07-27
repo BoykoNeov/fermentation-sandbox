@@ -22,11 +22,15 @@ import json
 import pathlib
 import sys
 
-# The distilled file is ~60 lines. 200 leaves generous headroom for a real status
+# The distilled file is ~60 lines. The cap leaves generous headroom for a real status
 # update while still catching the changelog shape (the bloated copies ran 550+).
 # Raised 150 -> 200 on 2026-07-21 at the owner's request (the live-threads block grew
 # with the D-130/D-131 aging builds; still well below the changelog regime).
-LINE_CAP = 200
+# Raised 200 -> 250 on 2026-07-27 at the owner's request: the oxidative-cascade axis
+# (D-137..D-142) carries an unusual density of live PROHIBITIONS -- the cap was forcing
+# real guardrails to be evicted to make room for newer ones, which is the opposite of
+# what it exists to prevent. Still less than half the changelog regime.
+LINE_CAP = 250
 TARGET_NAME = "project-fermentation-sandbox.md"
 
 
