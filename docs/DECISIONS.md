@@ -15618,3 +15618,52 @@ own record; every D-140 pin it moves is priced there, not here.
 four were found by asking *what exactly did the reference measure, and did I measure the same
 thing?* The new twist is that the mismatched statistic was named in the source's own figure
 caption, inside a table D-142 used a number from without transcribing.
+
+### Same-day amendment — the guard finding is stronger without its assumption, and the headline needs its tier
+
+Two corrections, neither reversing anything above.
+
+**1. Table 4 prints the endpoint; the O2-dose assumption was never needed.** The section above
+derived "three of seven in-band wines fall below 10 mg/L" from `free0 - depletion x 7.3`, and
+carried the assumed O2 dose as a caveat. It is unnecessary: Table 4 regresses free SO2 (y, mg/L)
+on **dissolved** O2 (x, mg/L), so `x = 0` is O2 exhaustion and **the printed intercept is the free
+SO2 that wine ends a round with**.
+
+| wine | Table 1 free0 | Table 4 intercept = free SO2 at O2 exhaustion | passes >10? | in his band? |
+| --- | --- | --- | --- | --- |
+| 1 | 9 | **2.7369** | NO | NO - excluded |
+| **2** | 15 | **6.3826** | **NO** | **yes** |
+| **3** | 20 | **9.0102** | **NO** | **yes** |
+| **4** | 20 | **7.2373** | **NO** | **yes** |
+| **5** | 22 | **7.8348** | **NO** | **yes** |
+| 6-8 | 23-28 | 12.258 / 13.544 / 17.576 | yes | yes |
+
+**FOUR** of the seven wines that define the band fail the guard defending it, not three. The
+reading is confirmed by the source: wine #1's intercept **2.7369** reproduces Miao's own prose
+*"before dropping to 3 mg/L"*. The superseded arithmetic landed near the printed intercepts on
+four of five wines - an unnoticed self-check - but was wrong by 5 mg/L on wine 5 and **flipped its
+verdict**. Removing the assumption strengthened the conclusion; that is the argument for removing
+assumptions rather than caveating them.
+
+**2. The headline is `speculative`, and saying so makes it stronger.** The secant is set almost
+entirely by pyruvate (0.3407 mM) and alpha-KG (0.1369 mM) - acetaldehyde moves it ~0.01. Both are
+the quasi-steady ratio of two **`tier: speculative` author-estimate** rate constants (D-49/D-50),
+bounded by Jackowetz & Mira de Orduna 2013. The **negative** claim - that D-142 compared an
+oxidation-path slope at 37-59 mg/L against an addition-method secant over 4-52 - is a category
+error in the comparison and is **tier-independent**. The **positive** claim, "the sim reads 1.32,
+in band", is **speculative** and must travel that way (Prime Directive 1).
+
+Evaluated at those pools' **own shipped uncertainty bounds** (pyruvate 10-100, alpha-KG 7-70 mg/L,
+both printed in the YAML `uncertainty` notes):
+
+| corner | pyruvate | alpha-KG | secant |
+| --- | --- | --- | --- |
+| low | 10 mg/L | 7 mg/L | 1.1242 |
+| nominal (shipped) | 30 mg/L | 20 mg/L | **1.3370** |
+| high | 100 mg/L | 70 mg/L | 2.1046 |
+
+**The parameters' own uncertainty band BRACKETS Miao's 1.2526-1.9882**, and his band maps back to
+pyruvate 25-90 / alpha-KG 17-60 mg/L, inside those bounds. So the finding does not rest on the
+nominal pools being right: **no pool value inside the shipped uncertainty resurrects an
+"under-binds" verdict across his range.** This also subsumes the ad-hoc 1x-3x multiplier sweep
+above - that sweep was rediscovering the parameters' own printed bounds.
