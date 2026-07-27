@@ -11,7 +11,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 
 ⚠ on a row means a **later decision corrected or flagged it** — follow the pointer before trusting that record. `corrected by` = the fix shipped; `flagged by` = the reversal is agreed but **not yet in the code**.
 
-**The correction map is INCOMPLETE.** It is built only from explicit `**Corrects:**` / `**Flags:**` markers, and those are backfilled so far only for the corrections a title announced (19 records marked). **Absence of ⚠ is NOT a guarantee that a record is current** — a superseding decision that never declared itself will not show here. When a record is load-bearing, grep its D-number: `Grep 'D-<n>' docs/DECISIONS.md`.
+**The correction map is INCOMPLETE.** It is built only from explicit `**Corrects:**` / `**Flags:**` markers, and those are backfilled so far only for the corrections a title announced (20 records marked). **Absence of ⚠ is NOT a guarantee that a record is current** — a superseding decision that never declared itself will not show here. When a record is load-bearing, grep its D-number: `Grep 'D-<n>' docs/DECISIONS.md`.
 
 ### By subsystem
 
@@ -165,7 +165,7 @@ Coarse first cut for *where did we decide X*. A record appears under **every** b
 - [**D-134**](#d-134--copper-dependence-of-the-o2-consumption-rate-a-mean-centered-fcu-multiplier-on-phenolicbrownings-rate-sourced-from-a-controlled-model-wine-kinetics-experiment-after-three-natural-wine-pls-surveys-turned-out-to-bury-copper-un-extractably-in-collinear-multivariate-fits) — copper-dependence of the O2-consumption rate: a mean-centered `f(Cu)` multiplier on … — ⚠ **flagged by [D-137](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing)**
 - [**D-135**](#d-135--bottle-reduction-sulfides-metal-complexed-h2smesh-reservoirs-released-first-order-during-anaerobic-bottle-aging-after-the-primary-d-101-recorded-as-unreadable-turned-out-to-be-open--and-to-say-the-mechanism-d-101-guessed-for-it-was-the-wrong-one) — bottle-reduction sulfides: metal-complexed H2S/MeSH reservoirs released first-order during …
 - [**D-136**](#d-136--closure-oxygen-ingress-a-zero-order-per-closure-otr-that-turns-o2-from-a-dosed-stock-into-a-continuous-flow-making-the-closure--not-any-sinks-rate-constant--the-throttle-on-oxidative-aging-and-lifting-a-limitation-d-108-had-written-into-the-code-against-itself) — closure oxygen ingress: a zero-order per-closure OTR that turns O2 from a dosed STOCK into a …
-- [**D-137**](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing) — the O2 sink partition audit: SO2 takes ~90% of the whole 5-year O2 budget and never exhausts, and …
+- [**D-137**](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing) — the O2 sink partition audit: SO2 takes ~90% of the whole 5-year O2 budget and never exhausts, and … — ⚠ **corrected by [D-138](#d-138--gate-2-closed-the-seven-o2-sinks-re-expressed-as-h2o2--quinone-consumers-and-the-measurement-showing-the-rebuild-is-one-new-state-slot-not-the-larger-than-f2-rewrite-d-137-feared)**
 - [**D-138**](#d-138--gate-2-closed-the-seven-o2-sinks-re-expressed-as-h2o2--quinone-consumers-and-the-measurement-showing-the-rebuild-is-one-new-state-slot-not-the-larger-than-f2-rewrite-d-137-feared) — Gate 2 closed: the seven O2 sinks re-expressed as H2O2 / quinone consumers, and the measurement …
 <!-- END INDEX -->
 
@@ -14485,11 +14485,12 @@ would destroy the only test that distinguishes the two nodes.
 
 ## D-138 — Gate 2 closed: the seven O2 sinks re-expressed as H2O2 / quinone consumers, and the measurement showing the rebuild is one new state slot, not the larger-than-F2 rewrite D-137 feared
 
+**Corrects:** D-137 — its Gate 2 sizing ("a larger rewrite than F2 scoped"); measured, the rewrite is wider but shallower.
 **Flags:** D-75, D-78, D-81 — the three O2 sinks D-137's blanket flag counted but never named individually. All three must re-express as quinone (or, for D-81, quinone-vs-peroxide) consumers. Not yet rebuilt; the code still draws each of them directly on `o2`.
 
 **Status: MEASURED + MAPPED, not built.** No code, no parameter and no test changed. Gate 3
 (expected-red enumeration) is open and still mandatory before any build. Full map + receipts:
-`M:\claud_projects\temp\d138-gate2\` (`GATE2-node-map.md`, `qss_check.py`).
+`M:\claud_projects\temp\d138-gate2\` (`GATE2-node-map.md`, `qss_check.py`, `qss_check2.py`).
 
 ### The claim D-137 left behind, and why it does not survive measurement
 
@@ -14503,43 +14504,81 @@ assumption that three intermediates become three pools. Measured, they do not.
 
 ### The measurement that sets the size — slots or algebra is a NUMERICS question
 
-Whether an intermediate is a state slot or quasi-steady-state algebra is decidable, not a matter
-of taste. `[X]_ss = production flux / pseudo-first-order consumption rate`; if that lands below
-`solve_ivp`'s absolute tolerance (`atol = 1e-9` g/L, scalar, `runtime/integrate.py`) the pool sits
-inside the solver's noise band — and every downstream consumer carries a `<= 0` guard, so a pool
-random-walking through zero switches the whole cascade off and on.
+**AMENDED, same day, before anything was built on it.** The first pass of this section made one
+arithmetic error and applied its criterion to one intermediate out of three. Both are fixed below.
+**The slot count is unchanged**; what changes is that two of the three verdicts are now measured
+rather than asserted, and Fe(III)'s rests on a different argument than it did. Receipts:
+`qss_check.py` (H2O2 only, the first pass) and `qss_check2.py` (all three).
 
-Measured against a real D-137 red / sulfited / natural-cork trajectory (total O2 flux 1.17e-7
-g/L/h at one month, 1.19e-7 at the 5-year tail — flat, because D-136 supply limitation pins it):
+**Two independent things decide a slot, and they must not be collapsed:**
 
-| intermediate | regime | pseudo-1st-order k | `[X]_ss` | vs `atol` |
-|---|---|---|---|---|
-| H2O2 | vs bisulfite, 40 mg/L free SO2 | 1.47e5 /h (17 ms half-life) | 8.5e-13 g/L | **0.00085x** |
-| H2O2 | vs Fe(II) Fenton, no SO2 | 1.05e2 /h (Nguyen Table 4.1) | 1.18e-9 g/L | **1.2x** |
+1. **Timescale separation** — is QSS *accurate*? The primary argument, and tolerance-independent.
+2. **Representability** — `[X]_ss = production flux / pseudo-first-order consumption rate` against
+   `solve_ivp`'s absolute tolerance (`atol = 1e-9` g/L, scalar, `runtime/integrate.py`). Below
+   `atol` the pool sits inside the solver's noise band, and since every downstream consumer carries
+   a `<= 0` guard it random-walks through zero and switches the whole cascade off and on.
 
-Inverted, the criterion is clean: **a pool is representable only if its lifetime is >~ 29 s.**
-H2O2's real lifetime is 17 ms sulfited and ~24 s unsulfited — and 24 s is the *slow* limb. Both
-fail, three orders of magnitude in the regime that matters and sitting *on* the noise floor in the
-one that does not.
+Measured against a real D-137 red / sulfited / natural-cork trajectory (total O2 flux 1.19e-7
+g O2/L/h at the 5-year tail — flat, because D-136 supply limitation pins it). The representability
+threshold inverts to a **mean lifetime of 28.5 s** — `1/k`, **not** the half-life `ln2/k`:
 
-**So `h2o2` is not a state slot** — not by preference but because it is unrepresentable at the
-project's tolerances. The escape hatches (an array `atol`, which `solve_ivp` accepts, or a
-rescaled unit for that one slot) are runtime changes with their own blast radius and are not
-justified, because **QSS here is not an approximation**: at a 17 ms lifetime against a five-year
-integration the differential and algebraic formulations agree to ~10 decimal places, and only the
-algebraic one is representable and non-stiff. QSS is the numerically *correct* treatment.
+| intermediate | regime | k /h | mean lifetime | `[X]_ss` | vs `atol` | |
+|---|---|---|---|---|---|---|
+| H2O2 | vs bisulfite, 40 mg/L free SO2 | 1.47e5 | 24.5 ms | 8.6e-13 g/L | **8.6e-4 x** | FAIL |
+| H2O2 | vs Fe(II) Fenton, no SO2 | 1.05e2 | 34.2 s | 1.20e-9 g/L | **1.2 x** | PASS |
+| Fe(III) | o-diphenol reduction, k1 fast | 1.02 | 59 min | 4.1e-7 g/L | **4.1e2 x** | PASS |
+| Fe(III) | o-diphenol reduction, k2 slow | 2.82e-1 | 3.55 h | 1.47e-6 g/L | **1.5e3 x** | PASS |
 
-**`quinone` passes the same test comfortably** (lifetimes hours-to-days), and it is the
-intermediate Danilewicz says accumulates and blocks the cycle — "without a nucleophile to clear
-the quinones, after an initial uptake of O2 very little further reaction occurred." It is a
-genuine pool, and the only one.
+**The first pass said "both fail". It was wrong**, and its own table said so: it compared H2O2's
+*half-life* (~24 s unsulfited) against a *mean-lifetime* threshold. The unsulfited Fenton limb
+**passes, marginally** — 1.2 x atol. The conclusion is unaffected, for the reason that should have
+led the section:
 
-**`Fe(III)` is not a slot either**, and this record introduces no new caveat by saying so:
-Ferreira 2015 — D-134's own anchor dataset — found iron **not rate-limiting in real wine**, always
-in surplus, which is exactly why D-134 refused an iron state. The scope limit is D-134's existing
-one: Danilewicz's text has iron-redox *cycling* becoming rate-limiting at higher Cu, so the QSS
-collapse fails precisely where D-134's local-linear copper read already saturates. Total-iron
-surplus and Fe(III) quasi-steady-state are **different claims**; they happen to share a boundary.
+**`h2o2` is not a state slot, on timescale separation first.** At a **17 ms half-life** against a
+five-year integration the differential and algebraic formulations agree to ~10 decimal places, and
+only the algebraic one is non-stiff. **QSS is the numerically correct treatment here, not a
+simplification of it** — and that holds whatever the tolerance or the concentration unit.
+Representability corroborates it in the regime that matters (sulfited: 8.6e-4 x atol, three orders
+under) and is also why the escape hatches do not help: an array `atol` (`solve_ivp` accepts one) or
+a rescaled unit for that slot buys representability **without touching the stiffness**.
+
+**`Fe(III)` is also not a slot — but on separate grounds, and it does not inherit H2O2's
+certainty.** Fe(III) **passes** representability by 400–1500x; nothing about tolerance excludes it.
+It is QSS because Nguyen **Table 3.1** measures Fe(III) reduction and O2 consumption *in the same
+experiment*: at pH 3.0, no copper, k1 = 1.7e-2 /min and k2 = 4.7e-3 /min against an O2-consumption
+k of 7.5e-5 /min. Taking the **slow** limb — the one that governs at steady state — that is a
+**63x** separation (227x on the fast limb). The paper draws the conclusion itself: "rate constants
+for iron(III) reduction were significantly higher than those for oxygen consumption in all cases...
+iron(II) oxidation is the rate-determining reaction for the wine oxidation pathway."
+
+This **replaces** the first pass's justification, which leaned on Ferreira 2015 total-iron surplus —
+an argument this record itself conceded was a different claim from Fe(III) quasi-steady-state. The
+new one is the Gate 1 paper, one table, both constants measured side by side. **Whether 63x is
+enough across five years is a judgment, and is recorded as one, not as a margin.**
+
+**The binding caveat is now aging, not copper.** Nguyen continues: "the ability of wine to reduce
+iron(III) **likely declines as it ages**, whether by exhaustion of phenols or of nucleophiles, such
+that it **eventually limits the rate of oxygen consumption**." A five-year integration reaches into
+exactly that regime. D-134's copper-saturation boundary is not wrong, it is simply no longer the
+limit that binds. **Consequence for Gate 3, with a falsifier:** the activation rate law must read
+the *reductant pools* (`tannin` / `anthocyanin` / `hydroxycinnamics` / `bisulfite`) rather than a
+folded constant, or the decline cannot emerge at all. Falsifier — if activation reads only `o2` and
+a lumped k, effective O2 uptake stays **flat** across five years where Nguyen predicts it should
+**decline**. Checkable against the trajectory this record already runs.
+
+**Derived and NOT checked against measurement:** the same arithmetic puts Fe(II):Fe(III) at
+~2000:1 (3 mg/L total Fe). Nguyen calls high Fe(II):Fe(III) ratios "commonly observed for wines in
+storage", but Danilewicz 2016b and 2018 *measured* that ratio and neither has been pulled.
+Directionally corroborated, numerically unverified — **do not cite it as agreement.**
+
+**`quinone` is the one new slot — ASSERTED, not measured.** No in-wine quinone-nucleophile rate
+constant is in hand, so it is absent from the table above. Inverted instead: anything above a 28.5 s
+lifetime is representable, and quinone-nucleophile lifetimes in wine are hours-to-days, clearing it
+by orders of magnitude — but that is a literature recollection, not a transcribed number. **The pull
+is Nikolantonaki & Waterhouse 2012**, "A method to quantify quinone reaction rates with wine
+relevant nucleophiles" (cited by Nguyen). Quinone is also the intermediate Danilewicz says
+accumulates and blocks the cycle — but that quote comes from the **paraphrased** 2011 source flagged
+below, so on its own it corroborates nothing.
 
 ### Why no new architecture is needed
 
@@ -14592,7 +14631,7 @@ Recorded as undetermined-by-the-sources; forcing a node would fit a mechanism to
 artefact. D-133's prohibition still binds either way — it reads none of
 `tannin`/`anthocyanin`/`so2_total` and must not be wired to them.
 
-### Three constraints no source will ever raise
+### Four constraints no source will ever raise
 
 1. **Beer loses its O2 sink entirely.** `OxidativeAcetaldehyde` (ungated) and `PhenolicBrowning`
    (guarded, not gated) both run in beer today. If the sole O2 consumer becomes an
@@ -14609,6 +14648,13 @@ artefact. D-133's prohibition still binds either way — it reads none of
    depletion gate specified in the map — a cross-domain interaction to **declare, not discover**.
    (Carried wrinkle: the 1-HER/caffeate reaction reportedly switches from reduction to oxidation
    with pH, so this term's *sign* may be pH-dependent across 3.0-4.0.)
+4. **Moving copper off `PhenolicBrowning` invalidates D-134's calibration.** `k_copper_multiplier`
+   was fitted with copper multiplying *browning*; re-homing copper onto the activation node changes
+   what the constant multiplies, so re-deriving it against the dataset that produced it is a
+   **re-fit, not a validation**. This is the second instance of the problem already recorded above
+   for D-133's burst — **a constant fitted to one structure does not survive being moved to
+   another** — and the general rule is worth more than either case. Belongs in Gate 3's
+   expected-red list.
 
 ### What Gate 2 deliberately does not settle
 
@@ -14624,5 +14670,7 @@ is pulled.
 
 - **Gate 1: CLOSED** (D-137).
 - **Gate 2: CLOSED.** Node map above; three nodes sourced, one self-corroborated, two unsourced
-  forks named as forks, one recorded undetermined rather than forced.
+  forks named as forks, one recorded undetermined rather than forced. Slot count **one** — measured
+  for H2O2 and Fe(III), and `quinone` labelled *asserted* with a named pull rather than dressed up
+  as measured.
 - **Gate 3: OPEN, unchanged, still mandatory.** No code before it.
