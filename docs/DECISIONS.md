@@ -14874,18 +14874,38 @@ were found by reading the measured output rather than by trusting the scenario.
 **The "bit-for-bit" phrasing of D-139 §3 was not carried into the code.** `solve_ivp` is
 deterministic for identical inputs but not reproducible to machine precision across
 scipy/BLAS builds; a 1e-12 pin becomes a flake and is then loosened, which is worse than no
-pin. The tolerance is **rtol 1e-6** (plus atol 1e-15 for `phenylacetaldehyde` at ~2e-9 g/L),
-chosen for what it must catch — the cascade moves these at the percent level, so 1e-6 has
-four orders of margin. Writing "bit-for-bit" above an rtol=1e-6 assertion would have been
-the same prose-vs-code drift D-138 found in the sink docstrings and D-139 §2.2 predicts
-recurring in `analysis.py`.
+pin.
 
-**One seam, named in the file.** The build will need the guards to run against the direct
-alternative once `_OXIDATIVE_DIRECT_PROCESSES` exists. That is confined to a single helper,
-`_compile_with_old_oxidative_set`, documented as the only line the build may touch. The
-name lists, tolerances and pinned numbers are explicitly not the build's to adjust, because
-D-139's own L6 concedes that the `test_aging*.py` / `test_closure_ingress.py` magnitudes
-*will* be re-derived by the build — which is precisely the moment those stop guarding.
+**AMENDED, same day — the first tolerance this record shipped was itself unmeasured, and
+this is the third defect in the guards found by checking rather than by building.** The
+paragraph originally claimed **rtol 1e-6** "chosen for what it must catch … four orders of
+margin", plus `atol 1e-15` for `phenylacetaldehyde`. Both were wrong, and wrong in the way
+this whole record is about — a number asserted in prose that argues its own carefulness.
+`simulate_scheduled` integrates with **BDF at rtol=1e-6, atol=1e-9**, so the pin sat at
+*exactly the solver's own error budget* and had **zero** margin, not four orders; and
+`pytest.approx` passes on *either* bound, so an atol of 1e-15 under a rel band of 2.3e-15
+could never bind. The floor was then **measured** (`probe_solver_noise.py`) by re-integrating
+four orders tighter and differencing: `so2_total`/`o2` ~1e-8; `methional`, `ellagitannin`,
+`A420`, `acetaldehyde` 1e-7…1e-6; `faded_anthocyanin` 6.1e-6; and two outliers,
+`phenylacetaldehyde` **6.7e-4** and `anthocyanin` **2.9e-3**. The outliers are near-exhausted
+pools (2.3e-9 and 1.14e-6 g/L) where relative error is meaningless, so they take **absolute**
+floors at ~10× their measured absolute noise rather than a looser global band. Shipped:
+**rtol 1e-4**, atol `{anthocyanin: 1e-7, phenylacetaldehyde: 1e-11}`. Loosening it 100× cost
+nothing in sharpness — a **0.1%** change to `k_so2_oxidation` fires 8 of the 18 pins and a 1%
+change fires 17. The guard's resolution is bounded by the integrator, not by the constant:
+adding `quinone` as slot 94 perturbs BDF's RMS-weighted error norm (93 → 94) and hence step
+selection, with no model change at all.
+
+**Two seams, named in the file** — and the second exists because the first was not enough.
+As first committed, the membership test called `get_medium(...)` directly while its own
+failure message instructed the build to point it at `_compile_with_old_oxidative_set`, a
+function it never called. Once the cascade becomes a medium's default wiring that test goes
+red with **no seam to select**, leaving the build only the move this file forbids: editing
+the expectation. It now routes through a sibling, `_direct_oxidative_process_set`. Every test
+here goes through one of the two, so none can be stranded. The name lists, tolerances and
+pinned numbers are explicitly not the build's to adjust, because D-139's own L6 concedes that
+the `test_aging*.py` / `test_closure_ingress.py` magnitudes *will* be re-derived by the build
+— which is precisely the moment those stop guarding.
 
 ### The seven O2 sinks are six
 
@@ -14922,8 +14942,12 @@ explicit time and never by grid index, which also removes `baselines.py`'s `inde
 post-dose anchor — a number that silently moves with `t_eval`.
 
 Both corrections were found the way D-138's three were: by checking a number rather than by
-reading the prose around it. That is now four Gate-3-era predictions falsified by checking
-and zero by building, which is the cheap direction for it to happen in.
+reading the prose around it — as were the three defects in this record's own guards (the
+stranded membership test and the two tolerance errors amended above). That is seven
+cascade-era claims falsified by checking and zero by building, which is the cheap direction
+for it to happen in, and it is now consistent enough to be a rule rather than a run of luck:
+**on this axis, a number that has not been re-measured since it was written down is wrong
+about half the time — including the ones written down while warning about exactly that.**
 
 ### What the guards do NOT cover
 
