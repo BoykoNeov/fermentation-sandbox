@@ -14504,11 +14504,14 @@ assumption that three intermediates become three pools. Measured, they do not.
 
 ### The measurement that sets the size — slots or algebra is a NUMERICS question
 
-**AMENDED, same day, before anything was built on it.** The first pass of this section made one
-arithmetic error and applied its criterion to one intermediate out of three. Both are fixed below.
-**The slot count is unchanged**; what changes is that two of the three verdicts are now measured
-rather than asserted, and Fe(III)'s rests on a different argument than it did. Receipts:
-`qss_check.py` (H2O2 only, the first pass) and `qss_check2.py` (all three).
+**AMENDED TWICE, same day, before anything was built on it.** Three defects, all of the same
+family — **a narrow measurement written up in the voice of a general one**: (1) a half-life
+compared against a mean-lifetime threshold, which made a passing limb read as failing; (2) the
+criterion run on one intermediate of three while the other two were written as though measured;
+(3) one cell of a six-cell table quoted as the timescale separation, from its most favourable row.
+Each is corrected in place below. **The slot count is unchanged at one** — what changed is that
+the verdicts now carry the evidence they claimed. Receipts: `qss_check.py` (the first pass, H2O2
+only) and `qss_check2.py` (all three intermediates, full Table 3.1 grid).
 
 **Two independent things decide a slot, and they must not be collapsed:**
 
@@ -14545,22 +14548,52 @@ a rescaled unit for that slot buys representability **without touching the stiff
 **`Fe(III)` is also not a slot — but on separate grounds, and it does not inherit H2O2's
 certainty.** Fe(III) **passes** representability by 400–1500x; nothing about tolerance excludes it.
 It is QSS because Nguyen **Table 3.1** measures Fe(III) reduction and O2 consumption *in the same
-experiment*: at pH 3.0, no copper, k1 = 1.7e-2 /min and k2 = 4.7e-3 /min against an O2-consumption
-k of 7.5e-5 /min. Taking the **slow** limb — the one that governs at steady state — that is a
-**63x** separation (227x on the fast limb). The paper draws the conclusion itself: "rate constants
-for iron(III) reduction were significantly higher than those for oxygen consumption in all cases...
-iron(II) oxidation is the rate-determining reaction for the wine oxidation pathway."
+experiment*.
+
+**Second amendment: the first version of this paragraph quoted ONE CELL of that table.** It took
+the slow limb (right) while sitting on the no-copper row (wrong), and reported "63x" — a
+conservative-*sounding* selection concealing a non-conservative one. That is the same shape as the
+half-life error corrected above, which is the point: the fix for an asserted number is the whole
+grid, not a better cell. Slow limb `k2` over the O2-consumption `k`, all six cells:
+
+| pH | Cu (mg/L) | `k2` /min | `k_O2` /min | separation |
+|---|---|---|---|---|
+| 3.0 | 0 | 4.7e-3 | 7.5e-5 | 62.7x |
+| 3.0 | 0.6 | 3.1e-3 | 3.9e-4 | 7.9x |
+| 3.5 | 0 | 2.5e-3 | 1.4e-4 | **17.9x** |
+| 3.5 | 0.6 | 3.0e-3 | 5.5e-4 | 5.5x |
+| 4.0 | 0 | 2.4e-3 | 2.9e-4 | 8.3x |
+| 4.0 | 0.6 | 2.5e-3 | 7.5e-4 | **3.3x** |
+
+**The separation is 3.3x–63x, not 63x.** The representative wine cell (pH 3.5, copper under the
+0.5 mg/L US legal limit) is **~18x** — a ~6% QSS error, defensible. The worst corner is pH 4.0 at
+0.6 mg/L copper: **3.3x**, ~30% error, *not* defensible — but the paper calls that copper level "an
+extreme scenario" that **exceeds the legal limit**, so it is out of spec rather than out of scope.
+**The slot decision survives. The margin is far thinner than one cell made it look.**
+
+**Copper binds too — the earlier "aging, not copper" was wrong.** Copper compresses the separation
+~8x, and the mechanism makes that sharp rather than incidental: the paper reports copper has **no
+discernible effect on Fe(III) reduction** at any of the three pH levels, while oxygen consumption
+"increased with higher pH and with the inclusion of copper". The compression is therefore **entirely
+on the O2 side** — copper accelerates Fe(II)+O2 and nothing else. That is *precisely* the
+measurement justifying copper's re-homing onto the activation node in the map above, and it is the
+same measurement that erodes the QSS margin. **One finding, both consequences.** D-134's copper
+boundary is not superseded by this record; it is re-derived from the Gate 1 paper's own table.
 
 This **replaces** the first pass's justification, which leaned on Ferreira 2015 total-iron surplus —
 an argument this record itself conceded was a different claim from Fe(III) quasi-steady-state. The
-new one is the Gate 1 paper, one table, both constants measured side by side. **Whether 63x is
-enough across five years is a judgment, and is recorded as one, not as a margin.**
+paper draws the conclusion directly: "rate constants for iron(III) reduction were significantly
+higher than those for oxygen consumption in all cases... iron(II) oxidation is the rate-determining
+reaction for the wine oxidation pathway." **Whether ~18x is enough across five years is a judgment,
+and is recorded as one, not as a margin.**
 
-**The binding caveat is now aging, not copper.** Nguyen continues: "the ability of wine to reduce
+**Aging binds as well, and is the limb still unquantified.** Nguyen continues: "the ability of wine to reduce
 iron(III) **likely declines as it ages**, whether by exhaustion of phenols or of nucleophiles, such
 that it **eventually limits the rate of oxygen consumption**." A five-year integration reaches into
-exactly that regime. D-134's copper-saturation boundary is not wrong, it is simply no longer the
-limit that binds. **Consequence for Gate 3, with a falsifier:** the activation rate law must read
+exactly that regime, and unlike copper this limb has **no number attached** — the table measures
+fresh model wine, not aged. So the two caveats are asymmetric: **copper is quantified and bounded
+(~8x compression, at an over-limit dose), aging is directional only.** Do not treat the second as
+though the first's arithmetic covered it. **Consequence for Gate 3, with a falsifier:** the activation rate law must read
 the *reductant pools* (`tannin` / `anthocyanin` / `hydroxycinnamics` / `bisulfite`) rather than a
 folded constant, or the decline cannot emerge at all. Falsifier — if activation reads only `o2` and
 a lumped k, effective O2 uptake stays **flat** across five years where Nguyen predicts it should
