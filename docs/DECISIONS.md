@@ -15030,13 +15030,56 @@ previously did not (**+1.7%**).
 That is the claim this record is willing to defend. Everything below is why it was not
 enough to ship the cascade as default.
 
+**AMENDED, same day — the paragraph above overstates its own result in four ways, and one of
+its corroborations is false.** The re-expression is real, but it is *narrower* than written
+and it is exact for a *reason* the original paragraph did not give. Re-measured
+(`temp\d141-cascade\probe_reexpression_grid.py`, `probe_per_process_o2.py`), at `T_ref` with
+every other direct sink starved:
+
+| copper | low phenolic | mid | high |
+| --- | --- | --- | --- |
+| 0 | 0.937553 | 0.971716 | 0.990366 |
+| **`copper_typical`** | **1.000000** | **1.000000** | **1.000000** |
+| 4× typical | 1.129794 | 1.052859 | 1.017065 |
+
+1. **It is a claim about TWO Processes, not about "total O2 activation."** The activation node
+   re-expresses `OxidativeAcetaldehyde` + `PhenolicBrowning` and nothing else. The direct
+   set's other four O2 sinks draw on `o2` **independently**, while the cascade makes them
+   branch shares of the one activation rate that draw no extra O2. `anthocyanin_fading` alone
+   is −5.00e-6 against the pair's −6.16e-6 — comparable in size, and entirely unaccounted for.
+   Instantaneous **totals**, realistic state: cascade/direct = **0.94 / 0.65 / 0.58** at
+   low/mid/high phenolic. The rebuild does *not* reproduce the direct set's O2 draw rate.
+2. **The exactness is an algebraic identity, not three lucky checks** — and it holds only at
+   `copper == copper_typical` (2.6e-4 g/L), where `f_Cu == 1`. Because
+   `k_activation_phenolic == k_browning_phenolic` (both 1.1e-3) *and*
+   `k_activation_floor == k_ethanol_oxidation + k_browning_base`, the phenolic term cancels
+   identically at every load. That is a stronger statement than "1.0000 at three points" and
+   it should have been made by reading the two constants, not by sampling.
+3. **The span is 6.85×, not ~20×,** and the copper divergence is a two-sided range, not
+   "+9.5%": **−6.2%…−1.0%** at zero copper and **+1.7%…+13.0%** at 4× typical. The **+1.7%**
+   hydroxycinnamics figure *does* reproduce — at `[hydroxycinnamics] = 0.02 g/L` — but it is
+   load-dependent (+8.7% at 0.1, +17.3% at 0.2) and was written as though it were a bound.
+4. **The integrated 1.01× O2 budget does NOT corroborate the re-expression** — it was cited
+   below as though it did. Under a closure, O2 **supply** is the throttle (D-136), so both
+   alternatives consume essentially all arriving O2 despite the ~2× gap in instantaneous
+   capacity. Budget agreement is evidence that the system is **supply-limited**, and it would
+   look identical if the rate law were badly wrong. It is not a check on the rate law at all.
+
+None of this changes the shipping decision — it strengthens it. A rebuild whose *total* O2
+draw rate lands at 0.58–0.94× of the calibrated set, with the shortfall concentrated in the
+sinks that were fitted individually, is exactly a rebuild that must not silently become the
+default. And this is the eighth cascade-era claim falsified by re-measuring rather than by
+building — written, once again, by the author of the paragraph two records back warning that
+un-remeasured numbers on this axis are wrong about half the time.
+
 ### Why the cascade is built and NOT default: re-homing a bilinear sink rescales it
 
 A direct sink is `k · [o2] · [S]`. Its cascade replacement is `k · [quinone] · [S]`. Same
 constant, same substrate — but the *rate* is multiplied by `[quinone]_ss / [o2]_ss`, which
 is **~0.06 unsulfited** and strongly scenario-dependent. So the O2 **budget** reproduces
-(1.01× unsulfited, 0.88× sulfited, consistent with the ratio-1.0000 activation result), while
-the **fates** move by up to 25×:
+(1.01× unsulfited, 0.88× sulfited — see amendment point 4: this reflects **supply limitation
+under the closure**, and is *not* corroboration of the rate law), while the **fates** move by
+up to 25×:
 
 | quantity | unsulfited | sulfited |
 | --- | --- | --- |
