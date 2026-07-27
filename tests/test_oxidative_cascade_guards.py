@@ -34,11 +34,12 @@ grid-dependent index anchoring of the first script).
 **EDITING THESE TESTS IS THE THING THEY FORBID.** D-139's L6 already concedes that the
 magnitude expectations in ``test_aging*.py`` and ``test_closure_ingress.py`` will be
 re-derived by the build — which is exactly the moment they stop guarding anything. These
-three are the ones that must survive un-re-derived. The single seam the build is expected
-to touch is :func:`_compile_with_old_oxidative_set`, and only to point it at the
-``_OXIDATIVE_DIRECT_PROCESSES`` alternative once that alternative exists; the name list
-and the pinned numbers below are not the build's to adjust. If a pin moves, that is a
-finding for the decision record, not a tolerance to widen.
+three are the ones that must survive un-re-derived. Exactly two seams exist for the build to
+touch — :func:`_compile_with_old_oxidative_set` and :func:`_direct_oxidative_process_set` —
+and only to point them at the ``_OXIDATIVE_DIRECT_PROCESSES`` alternative once it exists.
+Every test here routes through one of them, so no test can be left with nowhere to be
+pointed; the name lists, tolerances and pinned numbers are not the build's to adjust. If a
+pin moves, that is a finding for the decision record, not a tolerance to widen.
 
 **A correction this file records, found while taking the baselines.** D-138 and D-139
 both speak of *"the seven O2 sinks"*, and D-139's isolability design specifies
@@ -98,12 +99,24 @@ BEER_OXIDATIVE_SINKS = frozenset(
 def _compile_with_old_oxidative_set(scenario: Scenario) -> CompiledScenario:
     """Compile ``scenario`` with the DIRECT (pre-cascade) oxidative sinks wired.
 
-    **This function is the single seam the cascade build is expected to edit**, and only
-    to select ``_OXIDATIVE_DIRECT_PROCESSES`` once that alternative exists. Today there is
-    only one oxidative axis, so it is a plain compile. Everything else in this module —
-    the name lists, the tolerances, the pinned numbers — is the guard, not the seam.
+    **This function and its sibling below are the only seams the cascade build is expected
+    to edit**, and only to select ``_OXIDATIVE_DIRECT_PROCESSES`` once that alternative
+    exists. Today there is one oxidative axis, so this is a plain compile. Everything else
+    in this module — the name lists, the tolerances, the pinned numbers — is the guard.
     """
     return compile_scenario(scenario)
+
+
+def _direct_oxidative_process_set(medium: str):
+    """The bare :class:`ProcessSet` for ``medium`` with the DIRECT oxidative sinks wired.
+
+    The membership seam, sibling to :func:`_compile_with_old_oxidative_set`. It exists so
+    that the membership test has somewhere to be pointed *at* after the rebuild: without
+    it, once the cascade becomes a medium's default wiring, the test would go red with no
+    seam to select, and the only move left would be editing the expectation — which is the
+    single thing this module forbids.
+    """
+    return get_medium(medium).build_process_set(strict=True)
 
 
 def _integrate(compiled: CompiledScenario, *, days: float, n: int = 4000):
@@ -291,17 +304,37 @@ _WINE_PINS: dict[str, tuple[float, float]] = {
     "ellagitannin": (5.923487479412e-02, 5.997209704187e-02),
 }
 
-#: Tolerance chosen for what it must CATCH, not for how tight it can be made. D-139 §3 asks
-#: for the old set to reproduce the current trajectory "bit-for-bit"; that phrasing does not
-#: survive contact with ``solve_ivp``, whose output is deterministic for identical inputs but
-#: not reproducible to machine precision across scipy/BLAS builds — a 1e-12 pin becomes a
-#: flake and then gets loosened, which is worse than no pin. The cascade moves these
-#: quantities at the percent level, so 1e-6 detects it with four orders of margin.
-_PIN_RTOL = 1e-6
+#: Tolerance chosen for what it must CATCH, and MEASURED rather than asserted.
+#:
+#: D-139 §3 asks the old set to reproduce the current trajectory "bit-for-bit". That phrasing
+#: does not survive contact with the integrator: ``simulate_scheduled`` runs **BDF at
+#: rtol=1e-6, atol=1e-9**, so a pin at 1e-6 asserts at exactly the solver's own error budget
+#: and has no margin at all. The noise floor was measured (``probe_solver_noise.py``) by
+#: re-integrating this scenario with the solver tightened four orders to rtol=1e-10 and
+#: comparing — that difference IS the shipped run's error:
+#:
+#:   so2_total, o2                                  ~1e-8
+#:   methional, ellagitannin, A420, acetaldehyde    1e-7 … 1e-6
+#:   faded_anthocyanin                              6.1e-6
+#:   phenylacetaldehyde                             6.7e-4     <- near-exhausted pool
+#:   anthocyanin                                    2.9e-3     <- near-exhausted pool
+#:
+#: 1e-4 sits ~16x above the worst well-behaved slot and 100x below a 1% model change, which
+#: is far smaller than anything the cascade does to these quantities.
+#:
+#: **The guard's resolution is bounded by the integrator, not by this constant** — tightening
+#: it below ~1e-5 would pin solver noise, and adding the ``quinone`` slot alone perturbs step
+#: selection (BDF's error norm is RMS-weighted over the state vector, so 93 -> 94 slots shifts
+#: it) without any model change at all.
+_PIN_RTOL = 1e-4
 
-#: ``phenylacetaldehyde`` sits at ~2e-9 g/L; a relative tolerance alone would be asserting
-#: on solver noise for that slot.
-_PIN_ATOL = 1e-15
+#: Two slots are near-exhausted pools where a RELATIVE tolerance is meaningless: ``anthocyanin``
+#: has faded to 1.14e-6 g/L by 2 y and ``phenylacetaldehyde`` sits at ~2.3e-9 g/L, so the
+#: solver's absolute error dominates their relative error. Each gets an absolute floor set
+#: ~10x their measured absolute noise (3.3e-9 and 1.6e-12 respectively), which still leaves
+#: the pin meaningful: 1e-7 is 0.2% of anthocyanin at 1 y, 1e-11 is 0.4% of
+#: phenylacetaldehyde at 2 y. Every other slot is pinned on the relative tolerance alone.
+_PIN_ATOL: dict[str, float] = {"anthocyanin": 1e-7, "phenylacetaldehyde": 1e-11}
 
 
 @pytest.fixture(scope="module")
@@ -315,13 +348,13 @@ def test_the_wired_oxidative_set_is_exactly_the_direct_sinks(medium):
     # Membership, asserted by NAME. This is what stops the cascade from being wired in
     # alongside the direct sinks and quietly double-counting the o2 pool: after the
     # rebuild, the direct alternative must present exactly these names and no others.
-    process_set = get_medium(medium).build_process_set(strict=True)
+    process_set = _direct_oxidative_process_set(medium)
     touching = {p.name for p in process_set.active if "o2" in p.touches}
     expected = BEER_OXIDATIVE_SINKS if medium == "beer" else OLD_OXIDATIVE_SINKS | O2_SOURCES
     assert touching == expected, (
         f"{medium}'s O2-touching Process set changed. Under the cascade this test must be "
-        "satisfied by selecting the DIRECT alternative in "
-        "_compile_with_old_oxidative_set — not by editing this expectation."
+        "satisfied by selecting the DIRECT alternative in _direct_oxidative_process_set — "
+        "not by editing this expectation."
     )
 
 
@@ -347,7 +380,7 @@ def test_old_oxidative_set_reproduces_its_trajectory(wine_trajectory_run, slot, 
     hours = (_WINE_FERMENT_DAYS + 365.25 * years) * 24.0
     expected = _WINE_PINS[slot][0 if years == 1.0 else 1]
     actual = _at(trajectory, compiled, slot, hours)
-    assert actual == pytest.approx(expected, rel=_PIN_RTOL, abs=_PIN_ATOL), (
+    assert actual == pytest.approx(expected, rel=_PIN_RTOL, abs=_PIN_ATOL.get(slot, 0.0)), (
         f"{slot} at {years:g} y moved from {expected:.6e} to {actual:.6e} under the direct "
         "oxidative set. The direct set is supposed to be untouched by the cascade — this is "
         "a finding for the decision record, not a tolerance to widen."
