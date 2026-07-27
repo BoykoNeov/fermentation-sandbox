@@ -2149,10 +2149,27 @@ _OXIDATIVE_CASCADE_WINE: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_
 )
 _OXIDATIVE_CASCADE_BEER: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_SHARED
 
-#: Which alternative :data:`MEDIA` wires. The cascade is the default because it is the structure
-#: the three gates (D-137/D-138/D-139) concluded is correct; ``"direct"`` reaches the pre-cascade
-#: set through :func:`get_medium`, which is what keeps the old behaviour testable rather than
-#: merely described.
+#: Which alternative :data:`MEDIA` wires. **The DIRECT set is the default, and the cascade is
+#: the opt-in alternative** — the opposite of what D-141 set out to ship, and the reason is
+#: measured rather than cautious.
+#:
+#: The cascade reproduces the O2 *budget* essentially exactly (ratio 1.01 unsulfited, 0.88 at
+#: 60 mg/L SO2) but redistributes the *fates* by up to 25x: browning runs 1.4x high unsulfited
+#: and 4.2x high sulfited, and the Strecker aldehydes run 20-25x LOW. The cause is structural.
+#: Re-homing a bilinear sink from ``k*[o2]*[S]`` to ``k*[quinone]*[S]`` keeps the constant but
+#: silently rescales the rate by ``[quinone]_ss / [o2]_ss``, which is ~0.06 unsulfited and is
+#: scenario-dependent — so "the same constant against a different oxidant" is NOT
+#: magnitude-neutral. That is D-138's constraint 4 ("a constant fitted to one structure does not
+#: survive being moved to another") landing for the fourth time, after D-133's burst, D-134's
+#: copper, and this rebuild's own copper re-home.
+#:
+#: Closing the gap means either a ~100x smaller ``k_quinone_polymerization`` (a ~100-day quinone
+#: lifetime, against the hours-to-days D-138 asserted) or much larger quinone-side nucleophile
+#: constants. **Nothing in hand adjudicates that**, and fitting it would be exactly the move
+#: D-138 refused for D-133's burst — a mechanism fitted to a calibration artefact. So the
+#: calibrated pre-cascade set stays default (prime directive #3: the validated core is protected)
+#: while the cascade stays fully wired, reachable and tested, pending the Nikolantonaki &
+#: Waterhouse 2012 pull. It is one line to flip back.
 _OXIDATIVE_SETS: dict[str, dict[str, tuple[Callable[[], Process], ...]]] = {
     "cascade": {"wine": _OXIDATIVE_CASCADE_WINE, "beer": _OXIDATIVE_CASCADE_BEER},
     "direct": {"wine": _OXIDATIVE_DIRECT_WINE, "beer": _OXIDATIVE_DIRECT_BEER},
@@ -2228,29 +2245,33 @@ def _build_media(
     }
 
 
-#: The registry as wired with the **cascade** (decision D-141) — the default build.
-MEDIA: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["cascade"])
-#: The registry as wired with the **direct** pre-cascade sinks — the isolable alternative
-#: (D-139). Not a legacy shim: prime directive #3 requires the pre-cascade oxidative axis to stay
-#: reachable and testable, and this is where it is reached. Reached through
-#: ``get_medium(name, oxidative="direct")``.
-MEDIA_DIRECT_OXIDATIVE: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["direct"])
+#: The registry as wired with the **direct** pre-cascade sinks — the default build, because it
+#: is the calibrated one (see :data:`_OXIDATIVE_SETS`).
+MEDIA: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["direct"])
+#: The registry as wired with the **cascade** (decision D-141) — fully built, wired and tested,
+#: but opt-in until its quinone-branch constants are sourced. Reached through
+#: ``get_medium(name, oxidative="cascade")``. NOT dead code in the
+#: ``AntioxidantBurstOxidation`` sense D-140 pinned: that Process is wired into no medium at all
+#: and is therefore unreachable, whereas every Process here is wired into a real registry and
+#: covered by ``test_media.py`` + ``test_oxidative_cascade_guards.py``.
+MEDIA_CASCADE_OXIDATIVE: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["cascade"])
 
 
-def get_medium(name: str, *, oxidative: str = "cascade") -> Medium:
+def get_medium(name: str, *, oxidative: str = "direct") -> Medium:
     """Look up a registered :class:`Medium` by name.
 
     ``oxidative`` selects which of the two **mutually exclusive** oxidative alternatives is
-    wired (decision D-141, designed at D-139): ``"cascade"`` — the default — routes every former
-    O2 sink behind one Fe(II)+O2 activation node, while ``"direct"`` restores the six pre-cascade
-    sinks that each drew straight on ``o2``. Exactly one is ever present in a given ``Medium``;
-    they are never both wired, because both draw on the same pool and would double-count it.
+    wired (decision D-141, designed at D-139): ``"direct"`` — the default — is the six calibrated
+    pre-cascade sinks that each draw straight on ``o2``, and ``"cascade"`` routes every one of
+    them behind a single Fe(II)+O2 activation node. Exactly one is ever present in a given
+    ``Medium``; they are never both wired, because both draw on the same pool and a build
+    carrying both would double-count it silently.
     """
     if oxidative not in _OXIDATIVE_SETS:
         raise KeyError(
             f"Unknown oxidative set {oxidative!r}; known sets: {sorted(_OXIDATIVE_SETS)}"
         )
-    registry = MEDIA if oxidative == "cascade" else MEDIA_DIRECT_OXIDATIVE
+    registry = MEDIA_CASCADE_OXIDATIVE if oxidative == "cascade" else MEDIA
     try:
         return registry[name]
     except KeyError:

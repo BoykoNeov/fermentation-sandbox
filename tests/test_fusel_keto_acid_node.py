@@ -107,18 +107,22 @@ _SOURCED_FUSEL_SPECS = tuple(
 #: invariant is used to size the Ehrlich draw from a state difference, so that invariant is
 #: EXACT rather than approximately true (they measure inert in this regime anyway — but "measures
 #: inert" is a reason to verify, not to assume: D-106).
-#: ``quinone_strecker_degradation`` is the D-141 cascade's name for the oxidative Strecker route
-#: that was ``strecker_degradation`` before the rebuild — the same chemistry drawing the same
-#: speciated precursors, re-homed from a direct ``o2`` draw onto the quinone that actually
-#: oxidises the amino acid. This module was a **Gate 3 miss**: D-139 enumerated the expected reds
-#: by subsystem (aging, media, closure) and never looked for a cross-domain consumer of an aging
-#: Process *name*, so the rename surfaced here unpredicted. It surfaced LOUDLY only because
-#: ``_run`` calls ``disable(name)`` rather than filtering — see the note there, which is now
-#: vindicated rather than merely careful.
+#: ``strecker_degradation`` is the DIRECT oxidative set's name, and the direct set is the default
+#: wiring (D-141), so this is the name ``disable`` must find. Under the cascade the same chemistry
+#: is ``quinone_strecker_degradation`` — if the cascade ever becomes the default, this entry moves
+#: with it.
+#:
+#: **Recorded because this module was a Gate 3 miss.** D-139 enumerated the expected reds by
+#: subsystem (aging, media, closure) and never looked for a cross-domain consumer of an aging
+#: Process *name*, so when D-141 briefly made the cascade the default, five tests here and five in
+#: ``test_fusel_catabolic_shape.py`` went red unpredicted. They failed LOUDLY only because ``_run``
+#: calls ``disable(name)`` rather than filtering — see the note there, now vindicated rather than
+#: merely careful. A filter would have silently disabled nothing and quietly changed what the
+#: ``f : (1-f)`` invariant was measuring.
 _OTHER_PRECURSOR_CONSUMERS = (
     "alpha_kb_excretion",
     "maillard_strecker",
-    "quinone_strecker_degradation",
+    "strecker_degradation",
     "autolytic_mercaptan",
 )
 

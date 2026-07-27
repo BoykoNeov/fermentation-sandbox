@@ -50,6 +50,14 @@ from fermentation.core.kinetics.aging import (
     TanninAnthocyaninCondensation,
 )
 from fermentation.core.kinetics.amino_acid_pools import AMINO_ACID_SPECS
+from fermentation.core.kinetics.oxidative_cascade import (
+    PeroxideEthanolOxidation,
+    PeroxideSulfiteOxidation,
+    QuinoneEllagitanninOxidation,
+    QuinonePolymerization,
+    QuinoneStreckerDegradation,
+    QuinoneSulfonation,
+)
 from fermentation.core.media import get_medium
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir
@@ -376,15 +384,21 @@ def test_begin_aging_drives_the_beer_scenario_path():
 
 
 def test_oxidative_acetaldehyde_disabled_and_gated_with_ester_hydrolysis():
-    # OxidativeAcetaldehyde rides the same aging tuple: wired into the medium, DISABLED at compile,
-    # enabled by the SAME begin_aging reconfigure as EsterHydrolysis (one gate for the aging axis).
-    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
-    assert OxidativeAcetaldehyde.name in cs.process_set
-    assert not cs.process_set.is_enabled(OxidativeAcetaldehyde.name)  # off at compile
-    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
-    assert event.reconfigure is not None
-    event.reconfigure(cs.process_set)
-    assert cs.process_set.is_enabled(OxidativeAcetaldehyde.name)  # begin_aging turns it on too
+    # The ethanol-oxidation node rides the same aging tuple: wired into the medium, DISABLED at
+    # compile, enabled by the SAME begin_aging reconfigure as EsterHydrolysis (one gate for the
+    # whole aging axis). Asserted on BOTH oxidative alternatives (D-141) — the gating contract is
+    # a property of the compile seam, so selecting the other set must not weaken it.
+    for oxidative, process in (
+        ("cascade", PeroxideEthanolOxidation),
+        ("direct", OxidativeAcetaldehyde),
+    ):
+        cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]), oxidative=oxidative)
+        assert process.name in cs.process_set
+        assert not cs.process_set.is_enabled(process.name)  # off at compile
+        event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+        assert event.reconfigure is not None
+        event.reconfigure(cs.process_set)
+        assert cs.process_set.is_enabled(process.name)  # begin_aging turns it on too
 
 
 def test_add_oxygen_doses_the_o2_slot():
@@ -486,18 +500,28 @@ def test_add_oxygen_rejects_unknown_params():
 
 
 def test_sulfite_oxidation_gated_by_begin_aging_wine_only():
-    # SulfiteOxidation is WINE-ONLY (reads wine-only so2_total/pH slots) — present in the wine set,
-    # absent from beer — and rides the SAME aging gate: disabled at compile, enabled by begin_aging.
-    assert SulfiteOxidation.name in get_medium("wine").build_process_set()
-    assert SulfiteOxidation.name not in get_medium("beer").build_process_set()
-
-    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
-    assert SulfiteOxidation.name in cs.process_set
-    assert not cs.process_set.is_enabled(SulfiteOxidation.name)  # off at compile
-    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
-    assert event.reconfigure is not None
-    event.reconfigure(cs.process_set)
-    assert cs.process_set.is_enabled(SulfiteOxidation.name)  # begin_aging turns it on too
+    # Sulfite oxidation is WINE-ONLY (reads wine-only so2_total/pH slots) — present in the wine
+    # set, absent from beer — and rides the SAME aging gate: disabled at compile, enabled by
+    # begin_aging.
+    #
+    # Under the cascade it is TWO Processes, not one (D-138/D-141): H2O2 + HSO3- and quinone +
+    # HSO3-. That split is the whole falsifiable test, because one Process cannot produce
+    # Danilewicz's 1:1 / 1:2 / 1:1.7 series. Both halves must be wine-only and both must ride the
+    # gate, so the loop asserts the contract for each.
+    for oxidative, processes in (
+        ("cascade", (PeroxideSulfiteOxidation, QuinoneSulfonation)),
+        ("direct", (SulfiteOxidation,)),
+    ):
+        for process in processes:
+            assert process.name in get_medium("wine", oxidative=oxidative).build_process_set()
+            assert process.name not in get_medium("beer", oxidative=oxidative).build_process_set()
+            cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]), oxidative=oxidative)
+            assert process.name in cs.process_set
+            assert not cs.process_set.is_enabled(process.name)  # off at compile
+            event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+            assert event.reconfigure is not None
+            event.reconfigure(cs.process_set)
+            assert cs.process_set.is_enabled(process.name)  # begin_aging turns it on too
 
 
 def test_so2_suppresses_oxidative_acetaldehyde_end_to_end():
@@ -545,15 +569,21 @@ def test_so2_dosed_oxidative_run_closes_carbon_end_to_end():
 
 
 def test_phenolic_browning_disabled_and_gated_with_begin_aging():
-    # PhenolicBrowning rides the same aging tuple: wired into the medium, DISABLED at compile,
-    # enabled by the SAME begin_aging reconfigure as the other aging Processes (one gate).
-    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]))
-    assert PhenolicBrowning.name in cs.process_set
-    assert not cs.process_set.is_enabled(PhenolicBrowning.name)  # off at compile
-    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
-    assert event.reconfigure is not None
-    event.reconfigure(cs.process_set)
-    assert cs.process_set.is_enabled(PhenolicBrowning.name)  # begin_aging turns it on too
+    # The browning node rides the same aging tuple: wired into the medium, DISABLED at compile,
+    # enabled by the SAME begin_aging reconfigure as the other aging Processes (one gate). Under
+    # the cascade the A420-carrying node is QuinonePolymerization — browning is a quinone FATE
+    # rather than an O2 yield (D-141) — so the name changes while the gating contract does not.
+    for oxidative, process in (
+        ("cascade", QuinonePolymerization),
+        ("direct", PhenolicBrowning),
+    ):
+        cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)]), oxidative=oxidative)
+        assert process.name in cs.process_set
+        assert not cs.process_set.is_enabled(process.name)  # off at compile
+        event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+        assert event.reconfigure is not None
+        event.reconfigure(cs.process_set)
+        assert cs.process_set.is_enabled(process.name)  # begin_aging turns it on too
 
 
 def test_oxidative_aging_browns_the_wine_end_to_end():
@@ -649,15 +679,21 @@ def test_strecker_gated_by_begin_aging_wine_only():
     # StreckerDegradation is WINE-ONLY (reads wine-only amino_acids + deaminates to N) — present in
     # the wine set, absent from beer — and rides the aging gate: disabled at compile, then on by
     # begin_aging (the SulfiteOxidation pattern).
-    assert StreckerDegradation.name in get_medium("wine").build_process_set()
-    assert StreckerDegradation.name not in get_medium("beer").build_process_set()
-    cs = compile_scenario(_wine([_begin_aging(_FERMENT_DAYS)], amino_acids_gpl=0.5))
-    assert StreckerDegradation.name in cs.process_set
-    assert not cs.process_set.is_enabled(StreckerDegradation.name)  # off at compile
-    event = next(e for e in cs.events if e.label.startswith("begin_aging"))
-    assert event.reconfigure is not None
-    event.reconfigure(cs.process_set)
-    assert cs.process_set.is_enabled(StreckerDegradation.name)  # begin_aging turns it on
+    for oxidative, process in (
+        ("cascade", QuinoneStreckerDegradation),
+        ("direct", StreckerDegradation),
+    ):
+        assert process.name in get_medium("wine", oxidative=oxidative).build_process_set()
+        assert process.name not in get_medium("beer", oxidative=oxidative).build_process_set()
+        cs = compile_scenario(
+            _wine([_begin_aging(_FERMENT_DAYS)], amino_acids_gpl=0.5), oxidative=oxidative
+        )
+        assert process.name in cs.process_set
+        assert not cs.process_set.is_enabled(process.name)  # off at compile
+        event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+        assert event.reconfigure is not None
+        event.reconfigure(cs.process_set)
+        assert cs.process_set.is_enabled(process.name)  # begin_aging turns it on
 
 
 def test_strecker_produces_aldehydes_with_oxygen_and_amino_acids():
@@ -1591,16 +1627,18 @@ def test_ellagitannin_oxidation_gated_by_begin_aging_both_media():
     # begin_aging reconfigure. Barrel-beer oak (D-86): the ellagitannin slot and o2 pool are both
     # medium-agnostic, so — unlike the wine-only Strecker/SulfiteOxidation — it is wired into BOTH
     # media and present (disabled-then-enabled) in each.
-    for scenario in (_wine([_begin_aging(_FERMENT_DAYS)]), _beer([_begin_aging(14.0)])):
-        cs = compile_scenario(scenario)
-        assert EllagitanninOxidation.name in cs.process_set
-        assert not cs.process_set.is_enabled(
-            EllagitanninOxidation.name
-        )  # off at compile (post-ferment)
-        event = next(e for e in cs.events if e.label.startswith("begin_aging"))
-        assert event.reconfigure is not None
-        event.reconfigure(cs.process_set)
-        assert cs.process_set.is_enabled(EllagitanninOxidation.name)  # begin_aging turns it on
+    for oxidative, process in (
+        ("cascade", QuinoneEllagitanninOxidation),
+        ("direct", EllagitanninOxidation),
+    ):
+        for scenario in (_wine([_begin_aging(_FERMENT_DAYS)]), _beer([_begin_aging(14.0)])):
+            cs = compile_scenario(scenario, oxidative=oxidative)
+            assert process.name in cs.process_set
+            assert not cs.process_set.is_enabled(process.name)  # off at compile (post-ferment)
+            event = next(e for e in cs.events if e.label.startswith("begin_aging"))
+            assert event.reconfigure is not None
+            event.reconfigure(cs.process_set)
+            assert cs.process_set.is_enabled(process.name)  # begin_aging turns it on
 
 
 def test_add_oak_sets_the_ellagitannin_ceiling_and_rate_params_ride_along():

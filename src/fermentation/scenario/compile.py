@@ -2121,7 +2121,7 @@ def compile_scenario(
     parameter_paths: Sequence[str | Path] | None = None,
     data_dir: str | Path | None = None,
     strict: bool = False,
-    oxidative: str = "cascade",
+    oxidative: str = "direct",
 ) -> CompiledScenario:
     """Compile a declarative scenario into an integrable :class:`CompiledScenario`.
 
@@ -2131,10 +2131,10 @@ def compile_scenario(
     ``strict=True`` enables the Process ``touches`` contract on the returned set.
 
     ``oxidative`` selects which of the two mutually exclusive oxidative alternatives is wired
-    (decision D-141): ``"cascade"`` — the default — routes every former O2 sink behind one
-    Fe(II)+O2 activation node, and ``"direct"`` restores the six pre-cascade sinks that each
-    drew straight on ``o2``. It is passed through to
-    :func:`~fermentation.core.media.get_medium`; see there for why both must stay reachable.
+    (decision D-141): ``"direct"`` — the default — is the six calibrated pre-cascade sinks that
+    each draw straight on ``o2``, and ``"cascade"`` routes them all behind one Fe(II)+O2
+    activation node. It is passed through to :func:`~fermentation.core.media.get_medium`; see
+    there for why the cascade is built but not yet default.
 
     Raises ``KeyError`` for an unknown medium, ``ValueError`` for an invalid
     initial composition or missing temperature, and ``FileNotFoundError`` when the

@@ -58,6 +58,16 @@ the pre-cascade constants re-expressed as one un-partitioned total — see ``agi
 :data:`k_quinone_polymerization`, the always-available fate that keeps quinone bounded and makes
 ``A420`` a quinone *fate* rather than an O2 *yield*.
 
+**That economy does not make the re-home magnitude-neutral, and D-141 measured that it is not.**
+Keeping ``k`` while swapping ``[o2]`` for ``[quinone]`` rescales every bilinear sink by
+``[quinone]_ss / [o2]_ss`` — ~0.06 in an unsulfited red, and scenario-dependent because the two
+pools are set by different balances. Measured against the direct set on the same scenario, the O2
+*budget* reproduces (1.01x unsulfited, 0.88x at 60 mg/L SO2) while the *fates* move by up to 25x:
+A420 1.4x/4.2x high, the Strecker aldehydes 20-25x low. **This module is therefore built, wired
+and tested but NOT the default wiring** — see :data:`~fermentation.core.media._OXIDATIVE_SETS`
+for why closing that gap is a sourcing problem (Nikolantonaki & Waterhouse 2012) and not a
+tuning one.
+
 **Medium-agnostic (fork D3), with a floor.** Beer carries no copper, no iron and none of the
 reductant slots, so every read here is guarded and beer's activation sits at
 ``k_activation_floor`` — the same lumped anchor its O2 uptake already rode on. D-139 measured
@@ -468,7 +478,10 @@ class QuinoneSulfonation(Process):
             float(y[schema.slice("T")][0]), params["E_a_activation"], params["T_ref"]
         )
         # Bilinear in the quinone pool and its nucleophile, at the SAME constant D-72 calibrated
-        # against o2 — the re-home is a change of oxidant, not of magnitude.
+        # against o2. NOTE, measured at D-141 and stated here because an earlier version of this
+        # comment claimed the opposite: re-using the constant is NOT magnitude-neutral. The rate
+        # is rescaled by [quinone]_ss / [o2]_ss (~0.06 unsulfited, scenario-dependent), which is
+        # why the cascade is not the default wiring — see media._OXIDATIVE_SETS.
         r_q = params["k_so2_oxidation"] * f_t * quinone * bisulfite  # g quinone/L/h
         d[schema.slice("quinone")] = -r_q
         d[schema.slice(SO2_STATE_KEY)] = -_SO2_PER_QUINONE * (r_q / M_QUINONE) * M_SO2

@@ -586,19 +586,54 @@ HOP_PROCESSES = {"iso_alpha_acid_loss"}
 # DISABLED unconditionally at the compile seam (aging is inherently post-ferment, no aging at t0),
 # re-enabled only by a begin_aging intervention. An un-aged run is byte-for-byte the pre-aging core
 # (the MLF/Brett isolability pattern, but with no t0 co-inoculation path).
+# D-141 split the two OXIDATIVE members out of this set (into OXIDATIVE_DIRECT_SHARED below), so
+# what remains here is the medium-agnostic NON-oxidative aging axis — wired unconditionally under
+# both oxidative alternatives.
 AGING_PROCESSES = {
     "ester_hydrolysis",
     "ethyl_hexanoate_hydrolysis",
     "ethyl_acetate_esterification",
-    "oxidative_acetaldehyde",
-    "phenolic_browning",
 }
 # WINE-ONLY aging: sulfite_oxidation (D-72, the O₂-driven SO₂ scavenging) reads wine-only so2_total
 # acid-pH slots (beer's pH/SO₂ system is deferred, D-18); strecker_degradation (D-75, the O₂/amino-
 # acid-driven Strecker aldehydes methional + phenylacetaldehyde) reads wine-only amino_acids and
 # deaminates to N — so — like the MLF/Brett Processes — both are wired into the wine medium only.
 # Same compile-seam disable / begin_aging re-enable as the rest.
-WINE_AGING_PROCESSES = {"sulfite_oxidation", "strecker_degradation"}
+WINE_AGING_PROCESSES: set[str] = set()  # D-141 moved both into OXIDATIVE_DIRECT_WINE below
+
+# ---------------------------------------------------------------------------------------
+# The two MUTUALLY EXCLUSIVE oxidative alternatives (decision D-141, designed at D-139).
+# ---------------------------------------------------------------------------------------
+# Exactly one is wired into a given build. This is NOT the additive shape every other tuple in
+# media.py has: toggling the cascade off must RESTORE the direct sinks, not delete the oxidative
+# axis, so the pre-cascade Process set stays reachable as a named alternative and the pre-cascade
+# suite keeps a configuration in which it passes unmodified (prime directive #3).
+#
+# DIRECT (D-71/D-72/D-74/D-75/D-78/D-81) — six sinks each drawing its own share straight from the
+# shared o2 pool. Sums correctly, but asserts that ethanol, bisulfite, phenolics, amino acids,
+# anthocyanin and oak tannin each react with dissolved O2, which Gate 1 (D-137) found they do not.
+OXIDATIVE_DIRECT_SHARED = {"oxidative_acetaldehyde", "phenolic_browning"}
+OXIDATIVE_DIRECT_OAK = {"ellagitannin_oxidation"}
+OXIDATIVE_DIRECT_WINE = {"sulfite_oxidation", "strecker_degradation", "anthocyanin_fading"}
+
+# CASCADE (D-141) — one Fe(II)+O2 activation node consumes ALL the o2 and makes two oxidants per
+# mole (one H2O2, one quinone); every former sink is re-homed onto whichever one actually oxidises
+# it. Note the count is EIGHT against the direct six: sulfite_oxidation SPLITS in two
+# (peroxide_sulfite_oxidation + quinone_sulfonation), which is what lets Danilewicz's
+# 1:1 / 1:2 / 1:1.7 series be reproduced at all, and quinone_polymerization is the new
+# always-available fate that bounds the quinone pool and carries A420.
+OXIDATIVE_CASCADE_SHARED = {
+    "oxygen_activation",
+    "peroxide_ethanol_oxidation",
+    "quinone_ellagitannin_oxidation",
+    "quinone_polymerization",
+}
+OXIDATIVE_CASCADE_WINE = {
+    "peroxide_sulfite_oxidation",
+    "quinone_sulfonation",
+    "quinone_strecker_degradation",
+    "quinone_anthocyanin_fading",
+}
 # NON-oxidative oak aging, SHARED by wine and barrel-beer (decision D-86): oak_extraction (D-77, the
 # barrel/chip aroma-extractive axis) reads the oak ceiling/extractive slots and draws no O₂ — a
 # SEPARATE axis from the oxidative siblings. ellagitannin_oxidation (D-78) is the BRIDGE: it draws
@@ -606,7 +641,10 @@ WINE_AGING_PROCESSES = {"sulfite_oxidation", "strecker_degradation"}
 # protection), reading the ellagitannin pool. Both wired into BOTH media (the oak axis is a wood
 # property; both schemas carry the slots via _oak_specs), same compile-seam disable / begin_aging
 # re-enable.
-OAK_PROCESSES = {"oak_extraction", "ellagitannin_oxidation"}
+# D-141 moved ellagitannin_oxidation out of this set: it is the oak axis's BRIDGE to the oxidative
+# sub-axis, so it swaps with the oxidative alternative (to quinone_ellagitannin_oxidation) while
+# oak_extraction, which draws no oxidant at all, is wired unconditionally.
+OAK_PROCESSES = {"oak_extraction"}
 # WINE-ONLY, NON-oxidative aging (D-79): tannin_anthocyanin_condensation condenses the two GRAPE
 # pools (anthocyanin + condensed tannin) into stable polymeric pigment — the red-wine colour-
 # stabilization + astringency-softening axis. A THIRD separate axis: it draws no O₂ (unlike every
@@ -624,7 +662,7 @@ WINE_BRIDGE_PROCESSES = {"acetaldehyde_bridged_condensation"}
 # faded_anthocyanin slot (bilinear [o2]·[anthocyanin], the ellagitannin_oxidation form), drawing the
 # shared o2 pool so SO₂ protection is emergent. Wine-only, same compile-seam disable / begin_aging
 # re-enable.
-WINE_FADING_PROCESSES = {"anthocyanin_fading"}
+WINE_FADING_PROCESSES: set[str] = set()  # D-141 moved it into OXIDATIVE_DIRECT_WINE above
 # WINE-ONLY O₂-INDEPENDENT thermal anthocyanin-fade Process (decision D-83) — the second, non-
 # oxidative fate that fades free anthocyanin to the SAME colourless faded_anthocyanin slot, but by a
 # thermal/hydrolytic route needing NO oxygen (first-order [anthocyanin]). Touching no o2, SO₂ does
@@ -721,6 +759,8 @@ EXPECTED_PROCESSES = {
         | CARAMELIZATION_PROCESSES
         | WINE_MAILLARD_BROWNING_PROCESSES
         | OAK_PROCESSES
+        | OXIDATIVE_CASCADE_SHARED
+        | OXIDATIVE_CASCADE_WINE
         | WINE_POLYMERIZATION_PROCESSES
         | WINE_BRIDGE_PROCESSES
         | WINE_FADING_PROCESSES
@@ -741,9 +781,24 @@ EXPECTED_PROCESSES = {
         | H2S_PROCESSES
         | HOP_PROCESSES
         | AGING_PROCESSES
+        | OXIDATIVE_CASCADE_SHARED
         | CARAMELIZATION_PROCESSES
         | OAK_PROCESSES
     ),
+}
+
+#: The same registry as it must look with the DIRECT alternative selected. Derived from
+#: :data:`EXPECTED_PROCESSES` by set difference rather than written out again, so the two can
+#: never drift into describing different builds — the same reason ``media._build_media`` is a
+#: function rather than two literals.
+EXPECTED_PROCESSES_DIRECT = {
+    "wine": (EXPECTED_PROCESSES["wine"] - OXIDATIVE_CASCADE_SHARED - OXIDATIVE_CASCADE_WINE)
+    | OXIDATIVE_DIRECT_SHARED
+    | OXIDATIVE_DIRECT_OAK
+    | OXIDATIVE_DIRECT_WINE,
+    "beer": (EXPECTED_PROCESSES["beer"] - OXIDATIVE_CASCADE_SHARED)
+    | OXIDATIVE_DIRECT_SHARED
+    | OXIDATIVE_DIRECT_OAK,
 }
 # Per-rate Arrhenius modifiers wire into both media. Wine additionally carries the opt-in
 # biomass carrying-capacity cap (decision D-30) — enabled in a bare build, but disabled at the
@@ -768,8 +823,44 @@ def test_registered_media_wire_the_full_kinetic_set(medium):
     # additionally carries the malolactic Process (D-23) and the opt-in carrying-capacity
     # modifier (D-30); beer does not (no malic/lactic; carrying cap is wine-only in v1).
     pset = get_medium(medium).build_process_set(strict=True)
+    assert {p.name for p in pset.active} == EXPECTED_PROCESSES_DIRECT[medium]
+    assert {m.name for m in pset.active_modifiers} == EXPECTED_MODIFIERS[medium]
+
+
+@pytest.mark.parametrize("medium", ["wine", "beer"])
+def test_the_cascade_oxidative_alternative_is_wired_and_complete(medium):
+    # Prime directive #3 for the D-141 replacement, in the direction it actually shipped: the
+    # cascade is BUILT and must stay genuinely REACHABLE rather than becoming the dead code
+    # AntioxidantBurstOxidation turned out to be (D-140 — defined, exported, unit-tested, wired
+    # into no medium, and therefore never run). Everything outside the oxidative axis must be
+    # identical between the two builds — that is what makes them an alternative rather than two
+    # different models — and the modifiers must not move at all.
+    pset = get_medium(medium, oxidative="cascade").build_process_set(strict=True)
     assert {p.name for p in pset.active} == EXPECTED_PROCESSES[medium]
     assert {m.name for m in pset.active_modifiers} == EXPECTED_MODIFIERS[medium]
+
+
+@pytest.mark.parametrize("medium", ["wine", "beer"])
+def test_the_two_oxidative_alternatives_are_mutually_exclusive(medium):
+    # They both draw on the same o2 pool, so a build carrying BOTH would double-count it
+    # silently — the failure mode the replacement design exists to make impossible. Asserted
+    # as disjointness of what is actually wired, not of the expectation constants.
+    # Both selections named explicitly rather than leaning on the default, so this test keeps
+    # meaning whichever alternative is default at the time (D-141 flipped that once already).
+    cascade = {p.name for p in get_medium(medium, oxidative="cascade").build_process_set().active}
+    direct = {p.name for p in get_medium(medium, oxidative="direct").build_process_set().active}
+    assert cascade & OXIDATIVE_DIRECT_SHARED == set()
+    assert direct & OXIDATIVE_CASCADE_SHARED == set()
+    # ...and everything that is NOT oxidative is shared between them, so selecting the
+    # alternative cannot quietly drop an unrelated Process.
+    all_oxidative = (
+        OXIDATIVE_CASCADE_SHARED
+        | OXIDATIVE_CASCADE_WINE
+        | OXIDATIVE_DIRECT_SHARED
+        | OXIDATIVE_DIRECT_OAK
+        | OXIDATIVE_DIRECT_WINE
+    )
+    assert cascade - all_oxidative == direct - all_oxidative
 
 
 def test_wine_growth_arrhenius_scales_the_amino_acid_swap_but_uptake_does_not():
