@@ -370,6 +370,43 @@ def test_the_burst_oxidation_process_is_wired_into_no_medium():
         assert "antioxidant_burst_oxidation" not in process_set
 
 
+@pytest.mark.parametrize("medium", ["wine", "beer"])
+def test_quinone_is_identically_zero_under_the_direct_set(medium):
+    # D-139's ISOLABILITY CONDITION, made executable. The cascade's one new slot (D-141's
+    # `quinone`, sized at D-138) is shared by both media and appended last to each, but while
+    # the DIRECT oxidative alternative is selected nothing may produce it: "quinone must stay
+    # identically 0 under the old set ... and if it does not, the sets are not isolable".
+    #
+    # Asserted STRUCTURALLY — no Process wired under the direct set declares `quinone` in its
+    # `touches` — rather than by integrating and finding the pool still 0. A trajectory check
+    # is the weaker claim: it can pass merely because the scenario never reached the producing
+    # regime, and that false negative is self-sealing. `touches` is the contract ProcessSet
+    # enforces under strict=True, so a Process that wrote quinone without declaring it would
+    # already be a hard error. The trajectory form is asserted separately, on both media's
+    # runs, by test_quinone_stays_zero_along_both_guard_trajectories.
+    process_set = _direct_oxidative_process_set(medium)
+    schema = get_medium(medium).schema
+    assert "quinone" in schema, "the slot is shared — fork D1 — so BOTH media must carry it"
+    touchers = {p.name for p in process_set.active if "quinone" in p.touches}
+    assert touchers == set(), (
+        f"{medium}: {sorted(touchers)} touch quinone while the DIRECT set is selected. The two "
+        "oxidative sets are mutually exclusive (D-139) — this is a wiring error, not a "
+        "tolerance to widen."
+    )
+
+
+def test_quinone_stays_zero_along_both_guard_trajectories(wine_trajectory_run, beer_runs):
+    # The dynamic half of the isolability condition, over the two longest runs this file
+    # already integrates: a 2 y corked red and a 120 d oaked beer, both with O2 flowing and
+    # every direct sink active. Exact equality, not a tolerance — an untouched slot is not
+    # merely small, it is bit-for-bit its seeded 0, and anything else means a Process is
+    # writing a slot it did not declare.
+    runs = [wine_trajectory_run, beer_runs[True]]
+    for compiled, trajectory in runs:
+        quinone = trajectory.y[compiled.schema.slice("quinone")][0]
+        assert float(np.max(np.abs(quinone))) == 0.0
+
+
 @pytest.mark.parametrize("slot", sorted(_WINE_PINS))
 @pytest.mark.parametrize("years", [1.0, 2.0], ids=["1y", "2y"])
 def test_old_oxidative_set_reproduces_its_trajectory(wine_trajectory_run, slot, years):

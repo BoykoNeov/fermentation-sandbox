@@ -436,6 +436,59 @@ def _oak_specs() -> list[VarSpec]:
     ]
 
 
+def _quinone_spec() -> VarSpec:
+    """The oxidative cascade's one new state slot (decision D-141; sized at D-138).
+
+    Declared here and appended **LAST to each schema separately** — deliberately *not* added to
+    :func:`_common_specs`, which sits at the FRONT of both layouts and would shift every
+    medium-only index in both media. That is the ``melanoidin`` (D-88/D-90) precedent: a slot in
+    *both* media that is still declared per-schema, so the append-last convention
+    (D-100/D-102/D-133/D-134/D-136) holds and existing indices are untouched.
+
+    **Shared, not wine-only (fork D1).** Under the cascade ``A420`` stops being an O₂ *yield* and
+    becomes a quinone *fate*, and :class:`PhenolicBrowning` runs in **both** media (D-74, on the
+    shared-``aging.yaml`` argument), so beer needs the slot whichever way the unsourced
+    ``EllagitanninOxidation`` fork (D-138) is later resolved. Beer produces its quinone from the
+    same lumped ``k_browning_base`` catalyst it already uses — no o-diphenol pool exists in either
+    medium (D-74), which is exactly why this is a *currency* slot and not a phenol pool.
+
+    **Off every ledger (fork D2).** Quinone is an oxidant currency, **read and reduced, never
+    drawn from a weighted pool**: its carbon comes from the same *untracked* o-diphenol pool
+    ``k_browning_base`` lumps, so — like ``A420``/``o2``/``ellagitannin`` — there is no conserved
+    quantity to move. This is a scope commitment as much as a bookkeeping one: the cascade
+    re-homes existing O₂ draws and introduces **no new draw on ``hydroxycinnamics`` /
+    ``ferulic_acid``**, the two carbon-weighted precursors D-139's L9 priced. Build such a draw
+    later and this decision must be re-opened *with* ``draw_precursor_carbon`` — the D-80
+    split-ledger machinery exists for it.
+
+    ``default=0.0`` is the neutral AND the inert value (the ``closure_otr`` call, not the
+    ``copper`` one): with the direct oxidative set wired nothing produces quinone, so the slot is
+    identically 0 and every pre-cascade trajectory is byte-for-byte unchanged. That identity is
+    :data:`~fermentation.core.media.MEDIA`'s isolability condition and is asserted as a test —
+    if ``quinone`` is not exactly 0 under the direct set, the two sets are not isolable (D-139).
+    """
+    return VarSpec(
+        "quinone",
+        "g/L",
+        default=0.0,
+        description="o-quinone — the oxidative cascade's shared two-electron oxidant currency "
+        "(decision D-141; sized as the ONE new slot at D-138). Produced when Fe(III) oxidises "
+        "o-diphenols downstream of the Fe(II)+O₂ activation node (decision D-137's Gate 1 "
+        "finding: nothing but iron attaches to O₂ directly), and reduced by the nucleophiles "
+        "that compete for it — bisulfite (sulfonation), amino acids (Strecker), anthocyanin, "
+        "ellagitannin — with the branch fractions emerging from a shared pure denominator rather "
+        "than from per-sink O₂ shares. A STATE slot rather than a quasi-steady-state algebraic "
+        "term because its in-wine nucleophile lifetime is hours-to-days, orders above the 28.5 s "
+        "representability floor D-138 measured, so unlike H₂O₂ (17 ms half-life ⇒ QSS is the "
+        "numerically CORRECT treatment, not a simplification) it is both representable and "
+        "non-stiff. NOTE: that lifetime is ASSERTED, not measured — the pull is Nikolantonaki & "
+        "Waterhouse 2012. Off every ledger (its carbon comes from the untracked o-diphenol pool "
+        "lumped into k_browning_base, the A420/o2 idiom) and in BOTH media (fork D1). Default "
+        "0 ⇒ identically 0 under the direct oxidative set, which is what makes the two sets "
+        "isolable (decision D-139)",
+    )
+
+
 def wine_schema() -> StateSchema:
     """Wine state layout: a single lumped fermentable sugar slot, plus the wine-only
     charge-active acid + strong-cation slots the pH charge-balance solver reads
@@ -1143,6 +1196,11 @@ def wine_schema() -> StateSchema:
             "feeds. Decision D-136",
         ),
     ]
+    # The D-141 oxidative-cascade oxidant currency, appended LAST so existing wine slot indices
+    # are unchanged (the D-100/D-102/D-133/D-134/D-136 convention). Shared with beer, which
+    # appends the SAME spec at the end of its own layout — see _quinone_spec for why a slot in
+    # both media is still declared per-schema rather than in _common_specs.
+    specs.append(_quinone_spec())
     return StateSchema(specs)
 
 
@@ -1204,6 +1262,10 @@ def beer_schema() -> StateSchema:
             "melanoidin MASS itself is not a sensory pool. In BOTH media (D-90)",
         )
     )
+    # The D-141 oxidative-cascade oxidant currency, appended LAST so existing beer slot indices
+    # are unchanged. The SAME spec wine appends (fork D1 = shared): beer runs PhenolicBrowning
+    # (D-74) and under the cascade A420 is a quinone fate, so beer needs the slot too.
+    specs.append(_quinone_spec())
     return StateSchema(specs)
 
 

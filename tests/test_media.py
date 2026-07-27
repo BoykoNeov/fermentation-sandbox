@@ -182,6 +182,14 @@ WINE_BOUND_SULFIDE_SLOTS = ("bound_h2s", "bound_methanethiol")
 # 0 was an unphysical multiplier and the default had to be the population mean.
 WINE_CLOSURE_SLOTS = ("closure_otr",)
 
+# The oxidative cascade's one new slot (decision D-141, sized at D-138): the shared o-quinone
+# oxidant currency. In BOTH media (fork D1 — beer runs PhenolicBrowning, D-74, and under the
+# cascade A420 is a quinone FATE rather than an O2 yield), yet appended LAST to each schema
+# separately rather than added to the shared front block — the melanoidin/D-90 precedent — so no
+# existing medium-only index moves. Off every ledger (fork D2: an oxidant currency whose carbon
+# comes from the untracked o-diphenol pool k_browning_base already lumps).
+QUINONE_SLOTS = ("quinone",)
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -212,6 +220,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_COPPER_SLOTS
         + WINE_BOUND_SULFIDE_SLOTS
         + WINE_CLOSURE_SLOTS
+        + QUINONE_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -286,12 +295,18 @@ def test_wine_schema_has_single_sugar_slot():
     # SUPPLY term, and the only slot here that carries a RATE rather than a concentration, because
     # a closure is a per-run choice and the scenario layer has no parameter-override seam. Off
     # every ledger like the o2 it feeds; 0 = hermetic, so an unspecified closure is inert).
-    assert schema.size == 93
+    # + 1 D-141 quinone slot (the oxidative cascade's shared o-quinone oxidant currency — the ONE
+    # new slot D-138 sized the rebuild at, after measuring that H2O2 and Fe(III) are both quasi-
+    # steady-state. Shared with beer, fork D1; off every ledger, fork D2; identically 0 while the
+    # direct oxidative set is wired, which is what makes the two sets isolable, D-139).
+    assert schema.size == 94
 
 
 def test_beer_schema_has_three_sequential_sugars():
     schema = beer_schema()
-    assert schema.names == SHARED + BEER_HOP_SLOTS + OAK_SLOTS + CARAMELIZATION_SLOTS
+    assert schema.names == (
+        SHARED + BEER_HOP_SLOTS + OAK_SLOTS + CARAMELIZATION_SLOTS + QUINONE_SLOTS
+    )
     s = schema.spec("S")
     assert s.size == 3
     assert s.components == ("glucose", "maltose", "maltotriose")
@@ -311,7 +326,9 @@ def test_beer_schema_has_three_sequential_sugars():
     # agnostic — beer's residual dextrins caramelize too, so melanoidin is appended to beer_schema
     # too, ON total_carbon; the N-incorporating maillard_melanoidin stays wine-only, D-32) = 40
     # + 2 D-115 valine-label tracer slots (see the wine-schema note above) = 46
-    assert schema.size == 46
+    # + 1 shared quinone oxidant-currency slot (D-141, fork D1 — appended last to EACH schema,
+    # the melanoidin/D-90 precedent, so no beer index moves) = 47
+    assert schema.size == 47
 
 
 def test_shared_variable_units_are_canonical():
@@ -359,6 +376,10 @@ def test_shared_variable_units_are_canonical():
         "ellagitannin": "g/L",  # oak hydrolysable tannin — taste + O₂ scavenger (D-78)
         "ellagitannin_ceiling": "g/L",
         "melanoidin": "g/L",  # caramelization carbon-park (D-88; medium-agnostic D-90)
+        # The oxidative cascade's oxidant currency (D-141) — a CONCENTRATION in the canonical
+        # g/L, unlike A420's dimensionless AU: quinone is a real (if lumped) species pool that
+        # gets produced and reduced, not an optical index. Shared, fork D1.
+        "quinone": "g/L",
     }
 
 
