@@ -14732,9 +14732,27 @@ The enumeration is not flat. Naming these is Gate 3's job; **deciding** them is 
 | D3 | activation medium-agnostic vs wine-only | beer keeps an O2 sink; `k_activation`'s beer value is unsourced | **beer's O2 freezes — now a measured number, below** |
 | D4 | activation's tier | speculative ⇒ `Tier.combine` drags every downstream aging output down | plausible ⇒ no tier movement |
 
-**D2 and D4 are silent if wrong.** D2 breaks only once carbon is wired. D4 changes published
-output tiers with **nothing currently pinning an aging output's tier** (verified) — so a tier
-regression there ships green.
+**AMENDED, same day: two of this record's own predictions were wrong.** The first draft said
+"D2 and D4 are silent if wrong", claiming **nothing currently pins an aging output's tier**.
+Checked properly, `test_aging.py` carries **55 `Tier.` assertions, 35 of them `tier_of` pool
+checks**. **D4 is therefore LOUD, not silent** — every re-homed sink's tier is pinned, and the
+activation node's tier propagates through `Tier.combine` into assertions that already exist.
+That is better news than the record originally carried, and the error is recorded rather than
+quietly edited because **this record's stated measure is that a mis-predicted red counts as a
+Gate 3 miss** — including when the gate mis-predicts in its own favour. Two misses so far
+(this and the struck `test_attribution.py`), both found by checking rather than by building.
+
+**L9 — carbon conservation is LOUD under BOTH branches of D2**, which the fork as first written
+priced wrong. `quinone`'s *own* ledger entry is what D2 decides; but the cascade also puts a new
+quinone-producing **draw** on pools `conservation.py` already carbon-weights —
+`hydroxycinnamics` (as `p_coumaric_acid`) and `ferulic_acid`, both explicit
+`carbon_mass_fraction` entries. Carbon therefore moves **regardless** of how D2 is decided, so
+`test_validation.py` and
+`test_closure_ingress.py::test_carbon_closes_over_a_closure_driven_five_year_run` are loud reds,
+not D2-conditional silent ones. **Precisely scoped:** only the *hydroxycinnamic* route moves
+carbon — `tannin`/`anthocyanin` sit **off** the ledger by the D-79/D-81 split-ledger decision, so
+a quinone drawn from grape tannin moves nothing conserved. The two precursor families behave
+differently and the build must not treat them alike.
 
 ### The loud reds
 
@@ -14807,9 +14825,11 @@ baseline. **A guard written after the rebuild can only ratify whatever the rebui
 
 - **Gate 1: CLOSED** (D-137) — the O2 gate is Fe(II)+O2.
 - **Gate 2: CLOSED** (D-138, amended twice) — node map; one new slot, not three.
-- **Gate 3: CLOSED by this record.** 8 loud reds (one predicted red struck after checking), 5
-  silent reds with baselines taken **before** the build, 4 forks priced, isolability designed as a
-  replacement. **The build may begin.**
+- **Gate 3: CLOSED by this record.** 10 loud reds (L9 carbon added, D4 promoted from silent, one
+  predicted red struck), 4 silent reds with baselines taken **before** the build, 4 forks priced,
+  isolability designed as a replacement. **Two of the gate's own predictions were wrong and are
+  recorded as misses** — the enumeration is falsifiable, so it can be, and was. **The build may
+  begin.**
 - Deliberately **not** decided here, to keep this gate independent of the build: the rate laws
   themselves, D1-D4, and `AntioxidantBurstOxidation`'s node (D-138: undetermined by the sources).
 - Carried forward unchanged: `quinone`'s lifetime is **asserted, not measured** (pull Nikolantonaki
