@@ -18,4 +18,5 @@
 - [Conceded caveats aren't coverage](feedback-conceded-caveats-are-not-coverage.md) — naming your own gap in prose doesn't discharge it; run the criterion on every branch or label it asserted
 - [Pin tolerance vs solver tolerance](feedback-pin-tolerance-vs-solver-tolerance.md) — measure the noise floor; BDF runs at rtol=1e-6, and `approx` passes on EITHER bound
 - [Transcribe tables, not prose](feedback-transcribe-tables-not-prose.md) — the table beat the prose twice (4 numbers, then a direction); a search summary once shipped a fabricated E_a
+- [Memory is one tracked copy](feedback-memory-is-one-tracked-copy.md) — the C: harness path is a junction into `.claude/memory`; never sync or mirror it, there is nothing to sync
 - [Best-practices reference](reference-claude-best-practices.md) — rosmur claudecode-best-practices URL to apply
