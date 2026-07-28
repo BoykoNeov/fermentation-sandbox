@@ -4,7 +4,7 @@
 - [Batch-end ritual](feedback-batch-end-ritual.md) — on batch/planning/session end: distilled status to memory, full entry to DECISIONS.md, commit + push
 - [Always commit + push](feedback-always-commit-push.md) — commit and push to main the moment work is done; never gate the commit on pytest/mypy/ruff
 - [Discuss disagreements](feedback-discuss-disagreements.md) — surface design disagreements before building; specs aren't gospel
-- [Project: Fermentation Sandbox](project-fermentation-sandbox.md) — status + repo; M0/M1/M2 complete, aging build order fully built, Milestone-3 at D-158 (the assertion-surface sweep is DONE; drawability is a FOURTH surface — 66 of the seam's 247 bands are structurally undrawable — and D-157's one live band-vs-assertion contradiction is now CLOSED in the band's favour). Prohibitions + pointers only; per-decision archive is docs/DECISIONS.md
+- [Project: Fermentation Sandbox](project-fermentation-sandbox.md) — status + repo; M0/M1/M2 complete, aging build order fully built, Milestone-3 at D-159 (drawability now PINNED as a mechanism: the structural count is **61 not 66**, there are FOUR consumption modes, and the sweep exposed a LIVE sampler-coverage defect — the pKa set is read at runtime, declared nowhere, never sampled, so D-24's stated behaviour never shipped; flagged, not fixed). Prohibitions + pointers only; per-decision archive is docs/DECISIONS.md
 - [Never pipe checks to tail](feedback-never-pipe-checks-to-tail.md) — `cmd | tail && ...` returns tail's exit 0 and hides ruff/pytest failures
 - [Full suite before "green"](feedback-full-suite-before-green.md) — a new Process in a shared registry breaks exact-set + end-to-end tests outside the domain suite; don't claim green until full pytest passes
 - [Verify latest state, not breadcrumbs](feedback-verify-latest-state-not-breadcrumbs.md) — old "Next:" lists get burned down by later decisions; check the latest D-record + code before proposing work
@@ -19,6 +19,7 @@
 - ["Paywalled" is one host, not a paper](feedback-paywalled-is-one-host.md) — check author/institutional/thesis/trade-reprint copies before recording a source as blocked; wrong 4× so far
 - [Conceded caveats aren't coverage](feedback-conceded-caveats-are-not-coverage.md) — naming your own gap in prose doesn't discharge it; run the criterion on every branch or label it asserted
 - [Count and print your skips](feedback-count-and-print-your-skips.md) — a harness that silently drops what it can't parse reports "5 of 5 clean" on a denominator it never measured; D-157's live defect was in the dropped two
+- [A null result needs a positive control](feedback-a-null-result-needs-a-positive-control.md) — "nothing moved" is not unreachability: five Process-read parameters froze too; pair the null with a mechanism-shaped consequential half
 - [Pin tolerance vs solver tolerance](feedback-pin-tolerance-vs-solver-tolerance.md) — measure the noise floor; BDF runs at rtol=1e-6, and `approx` passes on EITHER bound
 - [Transcribe tables, not prose](feedback-transcribe-tables-not-prose.md) — the table beat the prose twice (4 numbers, then a direction); a search summary once shipped a fabricated E_a
 - [Memory is one tracked copy](feedback-memory-is-one-tracked-copy.md) — the C: harness path is a junction into `.claude/memory`; never sync or mirror it, there is nothing to sync

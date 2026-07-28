@@ -200,7 +200,9 @@ def test_the_oak_yield_is_consumed_into_the_ceiling_slot_by_the_verb():
     """
     compiled = compile_scenario(_scenario())
     (oak_event,) = [e for e in compiled.events if e.mutate is not None and "oak" in e.label]
-    after = oak_event.mutate(compiled.schema, compiled.y0)
+    mutate = oak_event.mutate
+    assert mutate is not None
+    after = mutate(compiled.schema, compiled.y0)
 
     ceiling = float(after[compiled.schema.slice("vanillin_ceiling")][0])
     expected = OAK_GPL * compiled.parameters.value(f"oak_yield_vanillin_{OAK_TOAST}")

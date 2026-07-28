@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-28T17:37:06.053Z
+  modified: 2026-07-28T19:31:52.305Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,8 +26,8 @@ it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedba
 ## Status (2026-07-28)
 
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-158**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1450 passed**. Wine schema **94 slots** / beer **47**
+**D-159**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1460 passed**. Wine schema **94 slots** / beer **47**
 — `quinone` in both regardless of set. **Three** oxidative sets (`direct` default / `cascade` / `direct_burst`).
 Most remaining Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -37,11 +37,11 @@ D-156's still named the withdrawn "under-bound SO₂ pool" (D-143) as open.
 - **All lumps are speciated**: esters→3 (D-96), fusels→5 (D-99), amino_acids→8 (D-100), mercaptans a
   methanethiol false-lump (D-110); `lumped` stays **dormant**. **Beat 1b (descriptor projection) COMPLETE**
   (D-95 + D-98); only masking remains, `cosα`-blocked.
-- **Shipped and spent, not unbuilt:** D-128, D-129 (`EthanolToleranceDeath`), D-130, D-131, D-132/133/134,
-  D-135, D-136. **Isoamyl de-novo entry — REFUSED at D-120, measured not built**: a rate knob on a
-  supply-limited quantity [[feedback-measure-which-side-before-building]].
-- **Closed:** leucine shortfall (D-112); shared-BAT parsimony (D-116); Rollero (D-115); ester-aging "deferred
-  half" (D-121). **Beer 3-sugar kinetics are NOT in the 5 beer books** — don't re-sweep.
+- **Shipped and spent, not unbuilt:** D-128, D-129 (`EthanolToleranceDeath`), D-130 … D-136. **Isoamyl de-novo
+  entry — REFUSED at D-120, measured not built**: a rate knob on a supply-limited quantity
+  [[feedback-measure-which-side-before-building]]. **Closed:** leucine shortfall (D-112); shared-BAT parsimony
+  (D-116); Rollero (D-115); ester-aging "deferred half" (D-121). **Beer 3-sugar kinetics are NOT in the 5 beer
+  books** — don't re-sweep.
 
 ## Live prohibitions, by axis
 
@@ -52,35 +52,37 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   quantity is itself sampled — and take the **joint** worst case over every band involved.
 - **FOUR surfaces (D-157), TWO distributions.** compile-seam **247 DISTINCT** varying, **triangular** — **NOT
   279**: that is a per-*file* sum double-counting `beer_generic` names `wine_generic` also defines (149+98+32);
-  wine 247 / beer 181 per medium are right. **Only ~181 are ever DRAWN; 66 are structurally undrawable** —
-  **three consumption modes, only the first sampled**: Process-read DRAWN; **compile-consumed**
-  (`float(parameters["x"].value)` — `_closure_otr`, `_iso_alpha_at_pitch`, pKa/initial-pH + SO2 solvers, every
-  `*_initial`) and **verb-consumed** (`_verb_add_copper`, `_verb_add_oak`) **NEVER** — firing five verbs left the
-  count **152, unchanged**. **Check drawability BEFORE calling a point-assertion a defect** (181 = union over 13
-  scenarios, a *lower* bound). **19 of the 33 names in BOTH medium files carry DIFFERENT bands, some disjoint**
+  wine 247 / beer 181 per medium are right. **Structural = 61, NOT D-157's 66 (D-159)** — 66 was a union over 13
+  scenarios; 5 (`E_a_pof`, `k_pof_decarb{,_ferulic}`, `biomass_carrying_capacity`, `k_iso_alpha_loss`) are merely
+  **scenario-inert**, a 14th scenario draws them. Predicate = **declared `reads`**, not a census. **FOUR** modes:
+  Process-read DRAWN; **compile-consumed** (`_closure_otr`, `_iso_alpha_at_pitch`, `*_initial`), **verb-consumed**
+  (`_verb_add_copper/_oak`) and **declared-by-an-UNREGISTERED-class** (`ethanol_inhibition_exponent`, D-13
+  unwired) **NEVER**. **19 of the 33 names in BOTH medium files carry DIFFERENT bands, some disjoint**
   (`E_a_esters` wine 40–70k vs beer 120–265k). `psychophysics.yaml` **24, UNIFORM**
   (`compression.py::_axis_draws` — deliberate, never "fix" to triangular); `sensory.yaml` **36, NEVER sampled**
   (`load_thresholds` standalone) — **do not re-audit those 36**. **Never apply the triangular mass statistic to
   psychophysics** — 16 points off, anti-conservative.
   **PINNED (D-156, `tests/test_sampling_surfaces.py`) — do not re-audit, do not "simplify".** Its
-  `SHARED_FILES` is restated **on purpose** (deriving it = D-108/D-109 vacuity). **TWO triangular
-  defaults** — `ensemble.py:108` and `:444`, separate paths, separate tests. **A distribution test at
-  `x == mode` is vacuous** (both laws put `(mode−lo)/(hi−lo)` below the mode) — sample **off-mode**.
-  **Removal** is deliberately not *separately* pinned (all 14 drops already RED by consumption);
-  **addition** had no backstop — that is what D-156 closed.
+  `SHARED_FILES` is restated **on purpose** (deriving it = D-108/D-109 vacuity — the same trap that made
+  D-159's census version vacuous). **TWO triangular defaults** — `ensemble.py:108` and `:444`, separate
+  paths/tests. **A distribution test at `x == mode` is vacuous** — sample **off-mode**. **Removal** is not
+  *separately* pinned (all 14 drops already RED by consumption); **addition** is what D-156 closed.
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
   **INTERNALLY, no fetch**: ask which number is *sourced*, not which is right — 84 = Shinohara's 16.4% E-rate;
   **30–80 occurred ONCE in the repo, in the test comment asserting it**. Corrects **D-127**. Test **recomputes**
   all three points (`abs=5e-4` = 3-dp half-width; never `rel`, never `round(x,3)` — pins *formatting*). Band =
   E-rate spread at **FIXED acetic 0.35** ⇒ documented narrowing, **NOT** the point-vs-band shape.
+- **LIVE DEFECT, flagged not fixed (D-159) — the pKa set is read at RUNTIME and declared NOWHERE.** `ph_of_state`
+  reads it for Processes in **5** modules; **no Process declares any `pKa_*`** ⇒ the sampler **never** draws it.
+  **D-24's "when MLF is pitched the pKa set enters scope" NEVER SHIPPED** (measured 54→73 names, **zero pKa**
+  either way; `exclude=` has **no caller in `src/`**). 24/94 slots move; `isoamyl_acetate` endpoint **14–20%**.
 - **Closure ordering: ~42% inverted on joint draws, but declaration-level ONLY — do not "fix" it.** Two `otr_*`
   never coexist in a run (one `scenario.closure` → the **`closure_otr` STATE slot**, `compile.py:2254`; the
-  sampler draws parameters, not state), so **"it goes live when OTR becomes Process-read" is WRONG**. **D-157
-  licensed NO guard**; **12** assertions left undecided [[feedback-count-and-print-your-skips]].
+  sampler draws parameters, not state). **12** assertions still undecided
+  [[feedback-count-and-print-your-skips]]. D-159 pins the consumption half (`test_drawability_surface.py`).
 - **The prose flag is REFUSED, measured not asserted** — 44 of 51 hits matched `ceiling` alone (oak's
-  *extraction asymptote*). **Never re-run or "tighten" the regex**: the archive uses `RECALIBRATED`/
-  `ceiling`/`upper bound` for HEALTHY provenance too, so prose cannot separate "argued down from X"
-  from "X is inside and excluded". Only a **measured per-parameter bound** finds it.
+  *extraction asymptote*). **Never re-run or "tighten" the regex**: the archive uses `RECALIBRATED`/`ceiling`/
+  `upper bound` for HEALTHY provenance too. Only a **measured per-parameter bound** finds it.
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**)
   and `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed* by the test, the
   template both now follow).
@@ -117,9 +119,8 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   copper-**orthogonal** L16 (D-151) — never dismiss that as Nguyen's dosing. His is an *initial* statistic on a
   *steady* node ⇒ **the pH term's home is the burst**. Guard 5's bound is an **OBSERVED spread, NOT a ceiling**.
   Re-open needs a **within-wine** steady-OCR series, ≥3 levels, measuring Cu.
-- **`initial_ph` anchors t=0 only** — **no way to SET an aging pH**.
-- First-order in `[o2]`; **no MM/`Km`**. **Do NOT re-attempt the Ferreira/Carrascón PLS extraction** — all three
-  blocked (`_findings/D-134-copper-ocr-sourcing.md`).
+- **`initial_ph` anchors t=0 only** — **no way to SET an aging pH**. First-order in `[o2]`; **no MM/`Km`**. **Do
+  NOT re-attempt the Ferreira/Carrascón PLS extraction** — all three blocked (`_findings/D-134-*.md`).
 - **The O2 gate is Fe(II)+O2**; SO2 is right in *size*, **INVERTED in role** (enabler, not competitor) — which is
   why **D-72's wrong mechanism yields a right-looking 1:2**; never read that ratio as confirmation.
 - **Never re-fix the acetaldehyde/phenolic inversion inside the parallel frame — it provably cancels.** Approve
@@ -130,10 +131,9 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 **Burst — WIRED and NON-DEFAULT (D-147). Not dead code, not unbuilt, not refused.**
 - `oxidative="direct_burst"` = direct **+** burst, a **superset**, not a mechanism. **No `cascade_burst`**
   (D-138 stays UNDETERMINED; its "transient modifier" is FLAGGED).
-- **Never make it default** — moves all 31 D-140 pins and re-opens the Danilewicz direct arm, **moot under this
-  placement: do not re-derive.**
-- **The split is UNPINNED and stays so** — C1 pins only the **product**, C2 fails **structurally**. **Never
-  re-solve it** (D-146's second-unmeasured-number trap). Unlock: **Ferreira 2015 per-cycle O₂ curves**.
+- **Never make it default** — moves all 31 D-140 pins and re-opens the Danilewicz direct arm, **moot: do not
+  re-derive.** **The split is UNPINNED and stays so** — C1 pins only the **product**, C2 fails **structurally**.
+  **Never re-solve it** (D-146's second-unmeasured-number trap). Unlock: **Ferreira 2015 per-cycle O₂ curves**.
 - **Self-exhaustion is Ferreira's PROTOCOL, not the sink** (~1400× the cork flux) ⇒ a permanent **~37% tax that
   GROWS to a plateau**; two guards forbid calling it transient — **never relax to a "pool depletes" check**.
   **Seed follows the consumer**: **0.0** outside `direct_burst`; dosing `burst_antioxidant_gpl` with no consumer
@@ -197,10 +197,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 
 **Sulfides (D-135) + closures (D-136)**
 - Do NOT rebuild bottle reduction as thioacetate/disulfide precursors — D-101's mechanism guess was WRONG.
-  **Release only** (white MeSH ~4× under-predicted: a limitation, not a bug); **no copper coupling** (a future one
-  must be asymmetric); **temperature-FLAT** — never ship my ~158 kJ/mol.
-- **Technical cork ships BELOW screwcap** (at the nominals only — D-157); µL→µg is the authors' own **1.43**
-  (STP); seven "do not fix" traps in D-136.
+  **Release only** (white MeSH ~4× under-predicted: a limitation, not a bug); **no copper coupling** (a future
+  one must be asymmetric); **temperature-FLAT** — never ship my ~158 kJ/mol.
+- **Technical cork ships BELOW screwcap** (nominals only — D-157); µL→µg is the authors' own **1.43** (STP); seven
+  "do not fix" traps in D-136. `ClosureOxygenIngress.reads` is **`()` by design**, already pinned.
 
 **Fusels / 2-PE (D-117 → D-120)**
 - `f_non_ehrlich_phenylalanine` = 0.975, `f_de_novo_2_phenylethanol` = 0.9827. **Never put 0.963 in a sampled
@@ -208,21 +208,21 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   scale-invariant.**
 - **The blocker moved, it did not lift** — now "does the Phe flux scale with total 2-PE?"; the **"only a T4
   snapshot" defence is REFUTED** (flat). The shipped 2-PE cap is **INERT at the realistic dose** — a carbon-refund
-  guard, **not** the 18.9% fix; never conflate.
-- The live lever on isoamyl is `f_non_ehrlich_leucine`, not a route. Crépin's 0.815 (shipped) vs Minebois's
-  implied ~0.29 = open **D-103** conflict — **never averaged**. Rayne 2016 CALC ester k is 6–18× off R&O MEASURED.
+  guard, **not** the 18.9% fix; never conflate. The live lever on isoamyl is `f_non_ehrlich_leucine`, not a route.
+  Crépin's 0.815 vs Minebois's implied ~0.29 = open **D-103** conflict — **never averaged**. Rayne 2016 CALC
+  ester k is 6–18× off R&O MEASURED.
 
 **Esters (D-123 → D-127)**
 - Three ester Processes ship, all SPECULATIVE. `k_H2T` is NEGATIVE and shipped faithfully (wine-only). **No pH
-  factor** on hexanoate/EtOAc — R&O Table VII ratios are isoamyl's.
-- **Direction facts:** MCFA esters hydrolyse **WITH** the acetates; the *forming* family is branched/polyprotic
-  ethyl esters — none tracked. Ethyl decanoate trap: **no uniform C4–C10 constant**.
-- **Sourcing corrections. D-131:** book-sweep note **WRONG**, primary **Table 6** is the calibration. **D-130:**
-  DHA omitted, gluconolactone deferred. **D-129:** WHERE sourced, HOW-SHARP spec. `k_d2`.
+  factor** on hexanoate/EtOAc — R&O Table VII ratios are isoamyl's. **Direction facts:** MCFA esters hydrolyse
+  **WITH** the acetates; the *forming* family is branched/polyprotic ethyl esters — none tracked. Ethyl decanoate
+  trap: **no uniform C4–C10 constant**. **Sourcing corrections. D-131:** book-sweep note **WRONG**, primary
+  **Table 6** is the calibration. **D-130:** DHA omitted, gluconolactone deferred. **D-129:** WHERE/HOW-SHARP.
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
-uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession. **"Bound SO₂ under-modelled" is NOT one — D-143.**
+uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession. **"Bound SO₂
+under-modelled" is NOT one — D-143.** **Nor is the pKa sampling gap — that is a live defect (D-159).**
 
 ## Open asks / external
 
@@ -232,9 +232,9 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ
   [E] + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d157-assertion-surface\`, `d158-etoac-eq\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**),
-  `d149-copper-refit\` (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\`
-  (**SDs**+bound); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds** (D-150).
+  `d15{7,8,9}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\` (Nguyen
+  **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\` (**SDs**+bound);
+  `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds** (D-150).
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
 
@@ -242,8 +242,8 @@ Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B); peptide pool; v
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose;
 acetaldehyde in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic
 inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142).
-**`add_copper` never writes the `copper` slot** — needs a residual-Cu fraction (its binding constants are
-verb-consumed ⇒ never sampled). D-143/4 ← D-145.
+**`add_copper` never writes the `copper` slot** — needs a residual-Cu fraction (binding constants are
+verb-consumed ⇒ never sampled). D-143/4 ← D-145. **pKa `reads` fix (D-159) — the named next beat.**
 
 ## Standing rule
 **Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only

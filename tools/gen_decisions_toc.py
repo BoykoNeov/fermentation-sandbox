@@ -250,6 +250,13 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             # matches 1 title; `\bsurface` was tried and rejected because it sweeps in
             # D-128, whose "surfaced" is the verb -- the D-53 misfiling trap again.
             r"\bassertion",
+            # D-159 swept DRAWABILITY -- which banded parameters the sampler can reach at
+            # all -- and its title, like D-157's, carries no chemistry word. `\bdrawab`
+            # matches exactly those two titles (D-157 "measuring DRAWABILITY", D-159 "the
+            # drawability claim"), which is the pair that shares the subject. `\bsampler`
+            # was tried and rejected: it is the right word but it sweeps D-24/D-25/D-37,
+            # the ensemble-machinery records, which already file under `ensemble`.
+            r"\bdrawab",
         ),
     ),
     (
