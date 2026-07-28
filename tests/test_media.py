@@ -153,8 +153,10 @@ WINE_DMS_SLOTS = ("dms_potential", "dms")
 # The initial-burst antioxidant pool (decision D-133), appended last (the D-100/D-102 convention).
 # A finite, unidentified, non-SO2 antioxidant that scavenges O2 at Ferreira 2015's measured day-1
 # rate, distinct from both the D-132 phenolic driver and the D-72 SO2 substrate. Like
-# `dms_potential`, a GRAPE-composition property — seeded from `burst_antioxidant_initial` rather
-# than defaulting to 0.
+# `dms_potential`, a GRAPE-composition property — but UNLIKE it, the seed FOLLOWS ITS CONSUMER
+# (decision D-147): `burst_antioxidant_initial` under `oxidative="direct_burst"`, 0.0 otherwise.
+# D-133's D-45 "absent does not mean 0" argument inverts where no Process can draw the pool, and
+# for four decisions no medium wired one. See `tests/test_burst_oxidative_set.py`.
 WINE_BURST_ANTIOXIDANT_SLOTS = ("burst_antioxidant",)
 
 # The copper multiplier input (decision D-134), appended last (the D-100/D-102/D-133 convention).

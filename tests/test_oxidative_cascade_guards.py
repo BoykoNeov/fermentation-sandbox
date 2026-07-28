@@ -53,6 +53,18 @@ by nothing. Verified by compiling wine *with* ``burst_antioxidant_gpl`` dosed an
 the Process still absent. This is recorded rather than fixed because wiring it would move
 every number pinned here, and D-138's constraint on where it belongs (a transient modifier
 on the activation node, *not* a node of its own) is the rebuild's call to make.
+
+**Superseded in part by D-147, and the part that changed matters to this file.** The call
+was made: the burst is wired into a THIRD oxidative set, ``oxidative="direct_burst"``, and
+is **not** in the default. So the paragraph above is still true of every build these 31
+pins are taken on — the wired count in the DEFAULT set is still six — but "wired into no
+medium at all" is no longer true of the package. The pins here did not move and were not
+re-derived, which is precisely why the burst went opt-in: wiring it into the default would
+have moved them by up to 37% (``o2`` -37.4%, ``A420`` -36.4% at 2 y), on the strength of a
+joint calibration whose second constraint fails end-to-end. See
+``tests/test_burst_oxidative_set.py`` for what wiring it does and what now forbids
+re-describing it as a transient. The ``burst_antioxidant`` seed now follows its consumer,
+so the "seeded and then consumed by nothing" defect is gone from the default build.
 """
 
 from __future__ import annotations
@@ -360,16 +372,30 @@ def test_the_wired_oxidative_set_is_exactly_the_direct_sinks(medium):
     )
 
 
-def test_the_burst_oxidation_process_is_wired_into_no_medium():
-    # NOT an endorsement — a pin on a documented discrepancy. D-138/D-139 describe "seven
-    # O2 sinks"; six are wired. AntioxidantBurstOxidation (D-133) exists, is exported and
-    # is listed in compile._AGING_GATED_PROCESSES, but no medium wires it, so its
-    # burst_antioxidant pool is seeded and never drawn. If the cascade build wires it (or
-    # deliberately retires it), this test is the one that should be updated, in the same
-    # commit as the decision record that says which — so the change cannot pass silently.
+def test_the_burst_oxidation_process_is_wired_into_no_default_medium():
+    # UPDATED AT D-147, which is what this test asked for: "if the cascade build wires it (or
+    # deliberately retires it), this test is the one that should be updated, in the same commit
+    # as the decision record that says which — so the change cannot pass silently."
+    #
+    # What changed is the STATUS of the absence, not the absence. D-133's Process is no longer
+    # wired into *no medium at all* — `oxidative="direct_burst"` wires it (D-147), so it is
+    # reachable, isolable and covered by tests/test_burst_oxidative_set.py. It stays out of the
+    # DEFAULT build because only one of D-133's two joint constraints survives being run
+    # end-to-end: the day-1 excess holds (0.93-0.95 vs ~1.0 mg/L/day), the self-exhaustion does
+    # not, and under a natural cork the sink becomes a permanent ~37% tax on every oxidative fate
+    # rather than the transient D-133 describes.
+    #
+    # So this remains a pin on a discrepancy — now a deliberate one — and it is what keeps the
+    # 31 pins in this file meaningful: they are direct-set numbers, and they only stay direct-set
+    # numbers while the burst is absent from the default.
     for medium in ("wine", "beer"):
         process_set = get_medium(medium).build_process_set(strict=True)
         assert "antioxidant_burst_oxidation" not in process_set
+    # ...and the other half of the same fact, without which "absent from the default" would be
+    # indistinguishable from "absent everywhere" — the state D-140 actually found.
+    assert "antioxidant_burst_oxidation" in get_medium(
+        "wine", oxidative="direct_burst"
+    ).build_process_set(strict=True)
 
 
 @pytest.mark.parametrize("medium", ["wine", "beer"])

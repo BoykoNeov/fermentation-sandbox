@@ -2024,11 +2024,24 @@ def test_burst_oxidation_exhausted_equals_pure_steady_rate(params):
 
 
 def test_burst_pool_exhausts_within_first_saturation_cycle(params):
-    # THE D-133 TIMESCALE CLAIM: Ferreira reports the average rate "constant across saturations
-    # 2-5" — i.e. the burst is spent by the SECOND ~10-day saturation cycle. Isolate the pool's own
-    # depletion kinetics with an AMPLE (non-limiting) O2 supply, so o2 stays roughly constant over
-    # the window and the burst pool's decay is not confounded by O2 itself running out. By day 10
-    # the pool should be down to a small residual.
+    # THE PROCESS'S OWN DEPLETION KINETICS, at an O2 concentration NO WINE REACHES — and that
+    # caveat is the point of the rename below, not a footnote.
+    #
+    # RELABELLED AT D-147. This test was called "THE D-133 TIMESCALE CLAIM" and read as certifying
+    # constraint 2 (Ferreira's average rate "constant across saturations 2-5", i.e. the pool spent
+    # by the second ~10-day cycle). It cannot certify that, because it sets o2 = 0.5 g/L — 500
+    # mg/L, ~62x air saturation, against the ~8 mg/L a saturated wine actually holds — on the
+    # stated grounds that "the burst pool's decay is not confounded by O2 itself running out".
+    # Running out is not a confound; it is the binding constraint. Spending this pool takes 3.3
+    # mg/L of O2 through this route alone, and at a REAL charge the Process competes with five
+    # siblings and never gets it: end-to-end the pool plateaus at 39.2% left with SO2 present, and
+    # 77.7% remains after two years under a natural cork.
+    #
+    # What survives here is genuine and worth keeping: this Process, ISOLATED and given unlimited
+    # oxidant, depletes its pool monotonically and never goes meaningfully negative. That is a
+    # rate-law and guard property. The TIMESCALE claim is measured — and refused — in
+    # tests/test_burst_oxidative_set.py, which pins the plateau at a reachable 8 mg/L charge so
+    # this operating point cannot be mistaken for evidence again.
     schema = wine_schema()
     ps = ProcessSet(schema, [AntioxidantBurstOxidation()], strict=True)
     burst_0 = params["burst_antioxidant_initial"]

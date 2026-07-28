@@ -84,6 +84,7 @@ from fermentation.core.kinetics import (
     AlphaKetoglutarateReassimilation,
     AminoAcidAssimilation,
     AnthocyaninFading,
+    AntioxidantBurstOxidation,
     ArrheniusTemperature,
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
@@ -2128,6 +2129,19 @@ _OXIDATIVE_DIRECT_BEER: tuple[Callable[[], Process], ...] = (
     _OXIDATIVE_DIRECT_SHARED + _ELLAGITANNIN_PROCESSES
 )
 
+#: The DIRECT set plus D-133's initial-burst antioxidant sink — the seventh O2 sink, wired at
+#: last (decision D-147). **Opt-in, never the default**, and the reason is measured rather than
+#: cautious: see :data:`_OXIDATIVE_SETS`.
+#:
+#: WINE-ONLY, like ``burst_antioxidant`` itself — Ferreira 2015's dataset is exclusively red wine
+#: and beer carries no such slot, so beer's burst set is its direct set unchanged. That is a real
+#: identity, not an oversight: ``get_medium("beer", oxidative="direct_burst")`` is the direct beer
+#: build, because the only thing this alternative adds is wine-only.
+_OXIDATIVE_BURST_WINE: tuple[Callable[[], Process], ...] = _OXIDATIVE_DIRECT_WINE + (
+    AntioxidantBurstOxidation,
+)
+_OXIDATIVE_BURST_BEER: tuple[Callable[[], Process], ...] = _OXIDATIVE_DIRECT_BEER
+
 #: The cascade's medium-agnostic core: the activation node, the Fenton/ethanol H2O2 branch, the
 #: oak-tannin quinone sink (oak is in both media, D-86) and the always-available polymerization
 #: fate that bounds ``quinone`` and carries ``A420``.
@@ -2170,9 +2184,35 @@ _OXIDATIVE_CASCADE_BEER: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_
 #: calibrated pre-cascade set stays default (prime directive #3: the validated core is protected)
 #: while the cascade stays fully wired, reachable and tested, pending the Nikolantonaki &
 #: Waterhouse 2012 pull. It is one line to flip back.
+#:
+#: ``"direct_burst"`` (decision D-147) is the DIRECT set plus D-133's
+#: :class:`~fermentation.core.kinetics.aging.AntioxidantBurstOxidation`. It exists because that
+#: Process shipped at D-133 wired into **no** medium — defined, exported, unit-tested, listed in
+#: ``compile._AGING_GATED_PROCESSES``, and in no ``ProcessSet``, so the ``begin_aging`` enable loop
+#: skipped it silently for four decisions (D-140 found it, D-147 measured it). **It is opt-in for a
+#: measured reason, and the reason is not caution:**
+#:
+#: D-133's two joint constraints pin ``k_burst_oxidation`` and ``burst_antioxidant_initial``
+#: SEPARATELY. Run end-to-end for the first time at D-147, constraint 1 (the ~1.0 mg/L/day day-1
+#: excess) HOLDS — the burst's own draw is 0.93-0.95 mg/L/day at Ferreira's own operating point.
+#: Constraint 2 (the pool ~95% spent within one ~10-day saturation cycle) FAILS, and structurally:
+#: spending the pool takes 3.3 mg/L of O2 through this route alone, and the burst wins only ~35% of
+#: an 8 mg/L charge, so with SO2 present the pool PLATEAUS at 39.2% left because the oxygen runs
+#: out first. Under the DEFAULT operating point — a corked bottle — it is worse: the cork delivers
+#: 2.09 mg/L of O2 in two years against a pool sized to absorb 3.3, so the "fast, self-exhausting
+#: sink" becomes a PERMANENT ~37% tax on every oxidative fate (``o2`` -37.4%, ``A420`` -36.4%,
+#: ``acetaldehyde`` -30.5% at 2 y, growing monotonically to a plateau rather than fading).
+#:
+#: **The self-exhausting SHAPE is a property of Ferreira's saturation protocol, not of the sink** —
+#: he delivers ~8 mg/L per 10-day cycle, a cork delivers 2.09 mg/L per two years, ~1400x apart. So
+#: the calibration survives only where it was taken, and making it default would re-derive all 31
+#: D-140 pins on the strength of a joint solve whose second half does not hold. Wiring it HERE
+#: instead keeps the default byte-for-byte while making the Process reachable, isolable and
+#: testable — the same treatment, and the same reason, as the cascade above.
 _OXIDATIVE_SETS: dict[str, dict[str, tuple[Callable[[], Process], ...]]] = {
     "cascade": {"wine": _OXIDATIVE_CASCADE_WINE, "beer": _OXIDATIVE_CASCADE_BEER},
     "direct": {"wine": _OXIDATIVE_DIRECT_WINE, "beer": _OXIDATIVE_DIRECT_BEER},
+    "direct_burst": {"wine": _OXIDATIVE_BURST_WINE, "beer": _OXIDATIVE_BURST_BEER},
 }
 
 
@@ -2250,28 +2290,57 @@ def _build_media(
 MEDIA: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["direct"])
 #: The registry as wired with the **cascade** (decision D-141) — fully built, wired and tested,
 #: but opt-in until its quinone-branch constants are sourced. Reached through
-#: ``get_medium(name, oxidative="cascade")``. NOT dead code in the
-#: ``AntioxidantBurstOxidation`` sense D-140 pinned: that Process is wired into no medium at all
-#: and is therefore unreachable, whereas every Process here is wired into a real registry and
-#: covered by ``test_media.py`` + ``test_oxidative_cascade_guards.py``.
+#: ``get_medium(name, oxidative="cascade")``. NOT dead code in the sense D-140 pinned for
+#: ``AntioxidantBurstOxidation`` — every Process here is wired into a real registry and covered by
+#: ``test_media.py`` + ``test_oxidative_cascade_guards.py``. **That comparison is retired at
+#: D-147**: the burst now has a registry of its own below, so "wired into no medium at all" no
+#: longer describes anything in this package.
 MEDIA_CASCADE_OXIDATIVE: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["cascade"])
+#: The registry as wired with the **direct set plus D-133's initial-burst sink** (decision D-147) —
+#: reachable, isolable and tested, but opt-in because only ONE of D-133's two joint constraints
+#: survives being run end-to-end (see :data:`_OXIDATIVE_SETS`). Reached through
+#: ``get_medium(name, oxidative="direct_burst")``.
+MEDIA_BURST_OXIDATIVE: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["direct_burst"])
+
+#: ``oxidative`` selection → the registry built with it. One entry per :data:`_OXIDATIVE_SETS` key,
+#: so a set added there without a registry here fails at import rather than silently falling back
+#: to the default (which is how a "new alternative" would quietly become the old one).
+_MEDIA_REGISTRIES: dict[str, dict[str, Medium]] = {
+    "direct": MEDIA,
+    "cascade": MEDIA_CASCADE_OXIDATIVE,
+    "direct_burst": MEDIA_BURST_OXIDATIVE,
+}
+assert set(_MEDIA_REGISTRIES) == set(_OXIDATIVE_SETS), (
+    f"every oxidative set needs a built registry; sets={sorted(_OXIDATIVE_SETS)} "
+    f"registries={sorted(_MEDIA_REGISTRIES)}"
+)
 
 
 def get_medium(name: str, *, oxidative: str = "direct") -> Medium:
     """Look up a registered :class:`Medium` by name.
 
-    ``oxidative`` selects which of the two **mutually exclusive** oxidative alternatives is
-    wired (decision D-141, designed at D-139): ``"direct"`` — the default — is the six calibrated
-    pre-cascade sinks that each draw straight on ``o2``, and ``"cascade"`` routes every one of
-    them behind a single Fe(II)+O2 activation node. Exactly one is ever present in a given
-    ``Medium``; they are never both wired, because both draw on the same pool and a build
-    carrying both would double-count it silently.
+    ``oxidative`` selects which oxidative alternative is wired (decision D-141, designed at D-139;
+    extended at D-147):
+
+    - ``"direct"`` — the default — the six calibrated pre-cascade sinks that each draw straight
+      on ``o2``.
+    - ``"cascade"`` — routes every one of those six behind a single Fe(II)+O2 activation node.
+    - ``"direct_burst"`` — the direct six **plus** D-133's ``AntioxidantBurstOxidation``, the
+      seventh sink, whose exhaustion constraint does not survive end-to-end (D-147).
+
+    ``"direct"`` and ``"cascade"`` are **mutually exclusive** — exactly one is ever present in a
+    given ``Medium``, because both draw on the same pool and a build carrying both would
+    double-count it silently. ``"direct_burst"`` is a **superset of direct**, not a third
+    mechanism: it adds a sink to that frame rather than re-homing one, which is why it is not an
+    alternative to the cascade but an extension of the direct set. D-138 explicitly refused to give
+    the burst a node in the cascade frame ("UNDETERMINED — do not force a node"), so there is no
+    ``cascade_burst`` and there should not be one until a source says where it belongs.
     """
     if oxidative not in _OXIDATIVE_SETS:
         raise KeyError(
             f"Unknown oxidative set {oxidative!r}; known sets: {sorted(_OXIDATIVE_SETS)}"
         )
-    registry = MEDIA_CASCADE_OXIDATIVE if oxidative == "cascade" else MEDIA
+    registry = _MEDIA_REGISTRIES[oxidative]
     try:
         return registry[name]
     except KeyError:

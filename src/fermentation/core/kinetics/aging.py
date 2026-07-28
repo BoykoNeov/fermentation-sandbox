@@ -1619,11 +1619,16 @@ class AntioxidantBurstOxidation(Process):
     grape-composition property with genuine between-wine variability.
 
     **A grape-composition input, not a winemaking dose (the D-45/D-102 ``dms_potential``
-    precedent).** ``burst_antioxidant`` defaults to the *sourced* ``burst_antioxidant_initial``
-    in ``_wine_initial``, not to 0: a 0 default would silently assert that every wine's
-    Ferreira-measured day-1 burst is absent — the D-45 hard-zero defect. Scenarios override via
-    ``burst_antioxidant_gpl`` (the ``tannin_gpl``/``anthocyanin_gpl`` pattern) to dial the
-    between-wine spread explicitly.
+    precedent) — but only where this Process is wired (D-147).** ``burst_antioxidant`` defaults to
+    the *sourced* ``burst_antioxidant_initial`` in ``_wine_initial``, not to 0: a 0 default would
+    silently assert that every wine's Ferreira-measured day-1 burst is absent — the D-45 hard-zero
+    defect. Scenarios override via ``burst_antioxidant_gpl`` (the ``tannin_gpl``/``anthocyanin_gpl``
+    pattern) to dial the between-wine spread explicitly. **That argument inverts where nothing can
+    draw the pool**, which is what the builds below this Process are: with no consumer the model
+    already asserts the burst never happens, and a non-zero seed *additionally* asserts an
+    antioxidant present and never spent. So ``compile._resolve_burst_antioxidant_seed`` applies the
+    fallback under ``oxidative="direct_burst"`` and seeds 0.0 otherwise, and dosing the pool into a
+    build that cannot consume it raises.
 
     **Off every ledger, no conservation term (the :class:`SulfiteOxidation` precedent).** Both
     ``o2`` and ``burst_antioxidant`` (an unidentified compound with no clean molar mass — grape-
@@ -1631,7 +1636,7 @@ class AntioxidantBurstOxidation(Process):
     products moves **nothing conserved** — this Process touches only those two slots.
 
     **Wine-only + isolable + doubly substrate-gated (prime directive #3).** Ferreira's dataset is
-    exclusively red wine, and — like :class:`SulfiteOxidation` — the new pool is wired into the
+    exclusively red wine, so — like :class:`SulfiteOxidation` — this Process is wired into the
     *wine* medium only; ``"burst_antioxidant" not in schema`` is a hard no-op on beer. Wired
     **disabled at the compile seam**; ``begin_aging`` enables it alongside its oxidative siblings
     (:data:`~fermentation.scenario.compile._AGING_GATED_PROCESSES`). With no O₂ dosed, or once the
@@ -1641,6 +1646,34 @@ class AntioxidantBurstOxidation(Process):
     pre-D-133 D-132 rate. Tier **speculative** (the aging axis is the Tier-3 frontier; the *form*
     — a finite, self-exhausting, non-SO₂ O₂ scavenger — is sourced, the rate/yield/charge
     magnitudes order-of-magnitude estimates).
+
+    **WHICH wine medium, and why this is not the default (decision D-147).** The paragraph above
+    said "the *wine* medium" from D-133 until D-147, and it was **false the whole time**: this
+    Process was in no medium's ``process_factories``, so the ``begin_aging`` enable loop — which
+    guards ``name in process_set`` — skipped it silently for four decisions. D-140 found it; D-147
+    measured it and wired it into ``oxidative="direct_burst"``, reachable through
+    ``get_medium(..., oxidative=...)`` / ``compile_scenario(..., oxidative=...)``, **not** into the
+    default ``"direct"`` build.
+
+    It is opt-in because D-133's two constraints jointly pin ``k_burst_oxidation`` and
+    ``burst_antioxidant_initial`` *separately*, and only one survives end-to-end. **Constraint 1
+    (the ~1.0 mg/L/day day-1 excess) HOLDS** — this Process's own draw is 0.93–0.95 mg/L/day at
+    Ferreira's own operating point. **Constraint 2 (the pool ~95% spent within one ~10-day
+    saturation cycle) FAILS structurally:** spending the pool takes 3.3 mg/L of O₂ through this
+    route alone, and against five competing siblings it wins only ~35% of an 8 mg/L charge, so with
+    SO₂ present it plateaus at 39.2% left *because the oxygen runs out first*. So the **product**
+    of the two constants is constrained and the **split** between them is not.
+
+    **The self-exhausting shape above is Ferreira's protocol, not this sink.** He delivers ~8 mg/L
+    per ~10-day saturation cycle; a natural cork delivers 2.09 mg/L per *two years*, ~1400× less,
+    against a pool sized to absorb 3.3. Under the default closure 77.7% of the pool is still
+    present at 2 y, this Process's share of ``Σk`` never decays, and it acts as a **permanent ~37%
+    suppression** of every oxidative fate (``o2`` −37.4%, ``A420`` −36.4%, ``acetaldehyde`` −30.5%
+    at 2 y) that *grows* monotonically to a plateau instead of fading. Making that the default would
+    re-derive all 31 D-140 pins on a calibration whose second half does not hold, so it does not.
+    Do **not** re-solve the split to rescue constraint 2 without the named unlock — Ferreira 2015's
+    **per-cycle O₂ consumption curves**, which pin ``burst_antioxidant_initial`` independently;
+    without them, choosing a new charge is a second unmeasured number propping up the first.
     """
 
     name = "antioxidant_burst_oxidation"

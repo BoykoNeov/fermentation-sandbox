@@ -97,7 +97,7 @@ from fermentation.core.kinetics.oxidative_cascade import (
     QuinoneSulfonation,
 )
 from fermentation.core.kinetics.temperature import RAMP_RATE
-from fermentation.core.media import get_medium
+from fermentation.core.media import Medium, get_medium
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier, combine
@@ -421,12 +421,14 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             # is still honoured, and makes the Process byte-for-byte inert.
             "dms_potential_ugl",
             # The grape's initial-burst antioxidant charge in g/L (decision D-133) — the finite,
-            # unidentified, non-SO2 pool AntioxidantBurstOxidation scavenges. Like
-            # dms_potential_ugl, absent does NOT mean 0: it falls back to the sourced
-            # burst_antioxidant_initial (a 0 default would assert every wine's Ferreira-measured
-            # day-1 O2-burst is absent — the D-45 hard-zero defect). Scenarios SHOULD override it:
-            # Ferreira found >15x between-wine spread (Cu-driven, untracked here). Explicit 0 is
-            # still honoured, and makes the Process byte-for-byte inert.
+            # unidentified, non-SO2 pool AntioxidantBurstOxidation scavenges. Unlike its
+            # dms_potential_ugl/copper_gpl siblings, the D-45 "absent does not mean 0" fallback is
+            # CONDITIONAL ON THE CONSUMER BEING WIRED (decision D-147): it falls back to the sourced
+            # burst_antioxidant_initial under ``oxidative="direct_burst"``, and to 0.0 otherwise.
+            # The D-45 argument INVERTS without the Process — with nothing able to draw the pool, a
+            # non-zero seed does not assert "this wine has a day-1 burst", it asserts an antioxidant
+            # that exists and is never spent, which is strictly worse than 0 and visible in output.
+            # Dosing it into a build that cannot consume it is an ERROR, not a silent no-op.
             "burst_antioxidant_gpl",
             # Dissolved copper in g/L-equivalent mg/L input (decision D-134) — the mean-centered
             # multiplier PhenolicBrowning reads. Like dms_potential_ugl/burst_antioxidant_gpl,
@@ -692,6 +694,11 @@ def _wine_initial(
         # `burst_antioxidant_gpl` — and should, since Ferreira found >15x between-wine spread
         # (0.54-8.2 mg/L/day initial rate, Cu-driven, untracked here). Absent from the
         # ParameterSet ⇒ 0.0, so older parameter sets still compile inertly.
+        #
+        # D-147: the fallback above is CONDITIONAL and this builder cannot see the condition — it
+        # does not know which oxidative set was selected. `_resolve_burst_antioxidant_seed` in
+        # `compile_scenario` applies that condition after the pack, the `iso_alpha`/hops precedent
+        # below it. Read the two together: the D-45 fallback is right only where the consumer is.
         "burst_antioxidant": _optional(
             values,
             "burst_antioxidant_gpl",
@@ -844,6 +851,45 @@ def _iso_alpha_at_pitch(scenario: Scenario, parameters: ParameterSet) -> float:
         alpha0_gpl = (hop.alpha_acid_percent / 100.0) * hop.grams / volume
         total_iso_gpl += alpha0_gpl * iso_alpha_fraction(hop.boil_minutes, boil_temp_k, resolved)
     return total_iso_gpl * resolved["hop_utilization_efficiency"]
+
+
+def _resolve_burst_antioxidant_seed(
+    scenario: Scenario, medium: Medium, process_set: ProcessSet, y0: FloatArray
+) -> None:
+    """Make the ``burst_antioxidant`` seed follow its consumer (decision D-147).
+
+    ``_wine_initial`` seeds the slot from the sourced ``burst_antioxidant_initial`` on the D-45
+    "absent does not mean 0" reasoning D-133 borrowed from ``dms_potential``: *a 0 default would
+    silently assert that every wine's Ferreira-measured day-1 O2-burst is absent*. That reasoning
+    is sound **only where something can draw the pool**, and D-133 shipped
+    :class:`~fermentation.core.kinetics.aging.AntioxidantBurstOxidation` wired into no medium at
+    all. D-140 found the discrepancy; D-147 measured what it costs.
+
+    **Without the consumer the D-45 argument inverts.** With nothing able to draw it, the model
+    already asserts the burst never happens — the missing Process says that, not the seed — and the
+    non-zero seed *additionally* asserts an antioxidant that is present and is never spent, for the
+    whole life of the wine. That is strictly worse than 0, and unlike a quiet modelling choice it
+    is **visible in output**: a 2 y run of the default build emits ``burst_antioxidant`` constant at
+    3.3e-3 g/L with ``ptp == 0.0`` exactly.
+
+    So the seed is conditional on the wiring, and dosing the pool into a build that cannot consume
+    it **raises** rather than silently seeding an inert number — the ``hops``-without-a-bitterness-
+    model precedent one block up in :func:`compile_scenario`. A build that *does* wire the Process
+    (``oxidative="direct_burst"``) keeps D-133's fallback unchanged, because there the argument for
+    it is the one D-133 actually made.
+    """
+    if "burst_antioxidant" not in medium.schema:
+        return  # beer: no slot, nothing to resolve (Ferreira's dataset is red wine only)
+    if AntioxidantBurstOxidation.name in process_set:
+        return  # the consumer is wired ⇒ D-133's sourced fallback stands, as written
+    if "burst_antioxidant_gpl" in scenario.initial:
+        raise ValueError(
+            "scenario dosed 'burst_antioxidant_gpl' but the compiled oxidative set wires no "
+            f"{AntioxidantBurstOxidation.name!r} Process, so nothing can draw the pool and the "
+            "dose would sit in the output unspent (decision D-147). Compile with "
+            "oxidative='direct_burst' to wire the consumer, or drop the dose."
+        )
+    y0[medium.schema.slice("burst_antioxidant")] = 0.0
 
 
 def _validate_initial_keys(scenario: Scenario) -> None:
@@ -2130,11 +2176,14 @@ def compile_scenario(
     ``<medium>_<strain>.yaml`` under ``data_dir`` (or the packaged data dir);
     ``strict=True`` enables the Process ``touches`` contract on the returned set.
 
-    ``oxidative`` selects which of the two mutually exclusive oxidative alternatives is wired
-    (decision D-141): ``"direct"`` — the default — is the six calibrated pre-cascade sinks that
-    each draw straight on ``o2``, and ``"cascade"`` routes them all behind one Fe(II)+O2
-    activation node. It is passed through to :func:`~fermentation.core.media.get_medium`; see
-    there for why the cascade is built but not yet default.
+    ``oxidative`` selects which oxidative alternative is wired (decisions D-141/D-147):
+    ``"direct"`` — the default — is the six calibrated pre-cascade sinks that each draw straight on
+    ``o2``; ``"cascade"`` routes them all behind one Fe(II)+O2 activation node; ``"direct_burst"``
+    is the direct six plus D-133's ``AntioxidantBurstOxidation``. It is passed through to
+    :func:`~fermentation.core.media.get_medium`; see there for why neither non-default alternative
+    is default. Under ``"direct_burst"`` the ``burst_antioxidant`` slot is seeded from the sourced
+    ``burst_antioxidant_initial``; under the other two it is seeded 0.0 and dosing
+    ``burst_antioxidant_gpl`` raises (see :func:`_resolve_burst_antioxidant_seed`).
 
     Raises ``KeyError`` for an unknown medium, ``ValueError`` for an invalid
     initial composition or missing temperature, and ``FileNotFoundError`` when the
@@ -2174,6 +2223,8 @@ def compile_scenario(
         y0[medium.schema.slice("iso_alpha")] = _iso_alpha_at_pitch(scenario, parameters)
     elif IsoAlphaAcidLoss.name in process_set:
         process_set.disable(IsoAlphaAcidLoss.name)
+
+    _resolve_burst_antioxidant_seed(scenario, medium, process_set, y0)
 
     # Closure oxygen ingress (decision D-136): seed the `closure_otr` state slot from the named
     # closure's sourced OTR. The `iso_alpha` pattern above exactly — a scenario-level choice
