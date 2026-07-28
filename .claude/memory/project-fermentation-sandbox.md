@@ -26,7 +26,7 @@ it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedba
 ## Status (2026-07-28)
 
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-159**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+**D-160**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
 leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1460 passed**. Wine schema **94 slots** / beer **47**
 — `quinone` in both regardless of set. **Three** oxidative sets (`direct` default / `cascade` / `direct_burst`).
 Most remaining Milestone-3 work is **blocked on external sourcing**, not on building.
@@ -40,8 +40,7 @@ D-156's still named the withdrawn "under-bound SO₂ pool" (D-143) as open.
 - **Shipped and spent, not unbuilt:** D-128, D-129 (`EthanolToleranceDeath`), D-130 … D-136. **Isoamyl de-novo
   entry — REFUSED at D-120, measured not built**: a rate knob on a supply-limited quantity
   [[feedback-measure-which-side-before-building]]. **Closed:** leucine shortfall (D-112); shared-BAT parsimony
-  (D-116); Rollero (D-115); ester-aging "deferred half" (D-121). **Beer 3-sugar kinetics are NOT in the 5 beer
-  books** — don't re-sweep.
+  (D-116); Rollero (D-115); ester-aging (D-121). **Beer 3-sugar kinetics are NOT in the 5 beer books.**
 
 ## Live prohibitions, by axis
 
@@ -54,14 +53,14 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   279**: that is a per-*file* sum double-counting `beer_generic` names `wine_generic` also defines (149+98+32);
   wine 247 / beer 181 per medium are right. **Structural = 61, NOT D-157's 66 (D-159)** — 66 was a union over 13
   scenarios; 5 (`E_a_pof`, `k_pof_decarb{,_ferulic}`, `biomass_carrying_capacity`, `k_iso_alpha_loss`) are merely
-  **scenario-inert**, a 14th scenario draws them. Predicate = **declared `reads`**, not a census. **FOUR** modes:
-  Process-read DRAWN; **compile-consumed** (`_closure_otr`, `_iso_alpha_at_pitch`, `*_initial`), **verb-consumed**
-  (`_verb_add_copper/_oak`) and **declared-by-an-UNREGISTERED-class** (`ethanol_inhibition_exponent`, D-13
-  unwired) **NEVER**. **19 of the 33 names in BOTH medium files carry DIFFERENT bands, some disjoint**
-  (`E_a_esters` wine 40–70k vs beer 120–265k). `psychophysics.yaml` **24, UNIFORM**
-  (`compression.py::_axis_draws` — deliberate, never "fix" to triangular); `sensory.yaml` **36, NEVER sampled**
-  (`load_thresholds` standalone) — **do not re-audit those 36**. **Never apply the triangular mass statistic to
-  psychophysics** — 16 points off, anti-conservative.
+  **scenario-inert**. Predicate = **declared `reads`**, not a census. **FOUR** modes: Process-read DRAWN;
+  **compile-consumed** (`_closure_otr`, `_iso_alpha_at_pitch`, `*_initial`), **verb-consumed**
+  (`_verb_add_copper/_oak`), **declared-by-an-UNREGISTERED-class** (`ethanol_inhibition_exponent`) **NEVER**.
+  A 5th — runtime-read via a helper, declared nowhere — existed and is **closed at D-160**.
+  **19 of the 33 names in BOTH medium files carry DIFFERENT bands, some disjoint** (`E_a_esters` wine 40–70k vs
+  beer 120–265k). `psychophysics.yaml` **24, UNIFORM** (`compression.py::_axis_draws` — deliberate, never "fix"
+  to triangular); `sensory.yaml` **36, NEVER sampled** (`load_thresholds`) — **do not re-audit those 36**.
+  **Never apply the triangular mass statistic to psychophysics** — 16 points off, anti-conservative.
   **PINNED (D-156, `tests/test_sampling_surfaces.py`) — do not re-audit, do not "simplify".** Its
   `SHARED_FILES` is restated **on purpose** (deriving it = D-108/D-109 vacuity — the same trap that made
   D-159's census version vacuous). **TWO triangular defaults** — `ensemble.py:108` and `:444`, separate
@@ -70,22 +69,23 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
   **INTERNALLY, no fetch**: ask which number is *sourced*, not which is right — 84 = Shinohara's 16.4% E-rate;
   **30–80 occurred ONCE in the repo, in the test comment asserting it**. Corrects **D-127**. Test **recomputes**
-  all three points (`abs=5e-4` = 3-dp half-width; never `rel`, never `round(x,3)` — pins *formatting*). Band =
-  E-rate spread at **FIXED acetic 0.35** ⇒ documented narrowing, **NOT** the point-vs-band shape.
-- **LIVE DEFECT, flagged not fixed (D-159) — the pKa set is read at RUNTIME and declared NOWHERE.** `ph_of_state`
-  reads it for Processes in **5** modules; **no Process declares any `pKa_*`** ⇒ the sampler **never** draws it.
-  **D-24's "when MLF is pitched the pKa set enters scope" NEVER SHIPPED** (measured 54→73 names, **zero pKa**
-  either way; `exclude=` has **no caller in `src/`**). 24/94 slots move; `isoamyl_acetate` endpoint **14–20%**.
+  all three points (`abs=5e-4` = 3-dp half-width; never `rel`/`round(x,3)` — pins *formatting*). Band = E-rate
+  spread at **FIXED acetic 0.35** ⇒ documented narrowing, **NOT** the point-vs-band shape.
+- **`reads` has TWO masters — tier propagation AND sampler scope (D-160, fixes D-159's defect).**
+  `PH_SYSTEM_READS`/`SO2_BINDING_READS` (`acidbase.py`) → 19 members/5 modules. **Keep DISJOINT** (pinned:
+  `EsterHydrolysis`/`EthylAcetateEsterification` solve pH, never partition SO₂) and **derived**, never re-listed.
+  **`temperature_ramp_rate` stays undeclared BY DESIGN** (`temperature.py:32-37`) — "declare everything the
+  sweep records" is WRONG. No tier moved. **Every pH-dependent aging band predates this and is UNDERSTATED** —
+  restating them = the next beat; never cite an old spread as current without re-measuring.
 - **Closure ordering: ~42% inverted on joint draws, but declaration-level ONLY — do not "fix" it.** Two `otr_*`
   never coexist in a run (one `scenario.closure` → the **`closure_otr` STATE slot**, `compile.py:2254`; the
   sampler draws parameters, not state). **12** assertions still undecided
-  [[feedback-count-and-print-your-skips]]. D-159 pins the consumption half (`test_drawability_surface.py`).
+  [[feedback-count-and-print-your-skips]]; D-159 pins consumption (`test_drawability_surface.py`).
 - **The prose flag is REFUSED, measured not asserted** — 44 of 51 hits matched `ceiling` alone (oak's
   *extraction asymptote*). **Never re-run or "tighten" the regex**: the archive uses `RECALIBRATED`/`ceiling`/
   `upper bound` for HEALTHY provenance too. Only a **measured per-parameter bound** finds it.
-- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**)
-  and `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed* by the test, the
-  template both now follow).
+- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
+  `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor — joint margin
   **3.07e-5**. **D-153's "unguarded" was WRONG; D-155 REFUSED the guard** (4-arm matrix caught every
   arm ⇒ decoration); hardened instead — the breach test reads the band **edge**, not the nominal.
@@ -222,7 +222,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
 uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession. **"Bound SO₂
-under-modelled" is NOT one — D-143.** **Nor is the pKa sampling gap — that is a live defect (D-159).**
+under-modelled" is NOT one — D-143.** (The pKa sampling gap WAS a live defect; fixed at D-160.)
 
 ## Open asks / external
 
@@ -232,9 +232,9 @@ under-modelled" is NOT one — D-143.** **Nor is the pKa sampling gap — that i
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ
   [E] + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\` (Nguyen
-  **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\` (**SDs**+bound);
-  `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds** (D-150).
+  `d15{7,8,9}-*\`, `d160-undeclared-reads\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**),
+  `d149-copper-refit\` (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\`
+  (**SDs**+bound); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds** (D-150).
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
 
@@ -243,7 +243,7 @@ yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-5
 acetaldehyde in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic
 inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142).
 **`add_copper` never writes the `copper` slot** — needs a residual-Cu fraction (binding constants are
-verb-consumed ⇒ never sampled). D-143/4 ← D-145. **pKa `reads` fix (D-159) — the named next beat.**
+verb-consumed ⇒ never sampled). D-143/4 ← D-145.
 
 ## Standing rule
 **Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only
