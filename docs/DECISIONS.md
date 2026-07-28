@@ -16500,7 +16500,7 @@ Suite still **1418 passed**; ruff + mypy clean. No pin moved, in either directio
 
 **Status: MEASURED + GUARDED, nothing built.** Two tests in `tests/test_brett.py` (§22), no new
 Process, no new parameter, no RHS change. Suite **1420 passed** (was 1418); ruff + mypy clean.
-Receipts: `M:\claud_projects\temp\d148-overdraw\` (`probe.py`, `probe2.py`, `falsify.py`).
+Receipts: `M:\claud_projects\temp\ferment\d148-overdraw\` (`probe.py`, `probe2.py`, `falsify.py`).
 
 ### What §2.4 actually still asked, after D-141
 
