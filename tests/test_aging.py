@@ -38,9 +38,11 @@ from fermentation.core.chemistry import (
     M_2_METHYLPROPANAL,
     M_3_METHYLBUTANAL,
     M_ACETALDEHYDE,
+    M_ACETIC,
     M_ALPHA_KETOBUTYRATE,
     M_CO2,
     M_ETHANOL,
+    M_ETHYL_ACETATE,
     M_ISOAMYL_ACETATE,
     M_ISOAMYL_OH,
     M_MALIC,
@@ -854,12 +856,66 @@ def test_ethyl_acetate_esterification_metadata():
     }
 
 
-def test_ethyl_acetate_eq_sits_near_the_young_level(params):
-    # Unlike the two hydrolysis floors (~25% of their young ester, far ABOVE equilibrium), ethyl
-    # acetate's equilibrium is ~AT the sim's calibrated ~50 mg/L young level — that is the whole
-    # reason this Process is bidirectional (a sound wine barely moves; it acts on off-equilibrium
-    # wines). Pin that the floor is in the sound-wine 30–80 mg/L band.
-    assert mgl_to_gpl(30.0) < params["ethyl_acetate_eq"] < mgl_to_gpl(80.0)
+#: Shinohara, Shimizu & Shimazu 1979 Tables I-IV: the acetic-acid **E-rate** (the fraction of
+#: total acetic acid sitting as its ethyl ester at equilibrium) in table wines — the measured
+#: span and the ~10 % representative point ``ethyl_acetate_eq``'s value is taken at (D-127).
+#: These three drive the parameter's three band points; see the test below.
+_SHINOHARA_E_RATE = (0.068, 0.10, 0.164)
+#: The representative SOUND-wine acetic acid the E-rate is applied to (D-127). Held FIXED: the
+#: band is E-rate uncertainty at one acetic level, not the sound-wine acetic spread (D-158).
+_SOUND_WINE_ACETIC_GPL = 0.35
+#: Half-width of a 3-decimal rounding. The shipped band points are the derivation below rounded
+#: for readability, so this is the tolerance the provenance claim is entitled to — NOT a fudge
+#: factor, and deliberately not `rel` (D-158; cf. the D-154 recompute-the-bound convention).
+_THREE_DP_HALF_WIDTH = 5e-4
+
+
+def test_ethyl_acetate_eq_band_is_shinoharas_e_rate_span_transcribed(store):
+    """All THREE band points are recomputed from Shinohara's E-rate span, not trusted (D-158).
+
+    Unlike the two hydrolysis floors (~25 % of their young ester, far ABOVE equilibrium), ethyl
+    acetate's equilibrium is ~AT the sim's calibrated ~50 mg/L young level — the whole reason
+    this Process is bidirectional (a sound wine barely moves; the term acts on off-equilibrium
+    wines). Its predecessor pinned that as "the floor is in the sound-wine 30-80 mg/L band",
+    asserted at the **nominal**.
+
+    That interval was the fourth instance of D-157's recurring shape, and the only LIVE one the
+    point-assertion sweep found: ``ethyl_acetate_eq`` is drawn by the ensemble, its band's high
+    edge is 0.084 g/L, and **0.99 % of triangular draws landed outside the interval the test's
+    own claim excluded**. D-157 called the remedy a sourcing question. It resolved *internally*:
+    30-80 appeared nowhere but that one comment — not in D-127, not in the YAML — while 84 is
+    ``0.164 x 0.35 x M_ETHYL_ACETATE/M_ACETIC``, Shinohara's own high E-rate transcribed. The
+    band was the sourced artefact and the assertion was not, so the assertion is what moves.
+
+    Recomputing rather than re-pinning is the D-154/D-118 template, and it is what makes this a
+    guard instead of a restatement: a consistent **re-sourcing** (a different E-rate span with a
+    band moved to match) stays green, while either half moving alone goes red. Measured, not
+    assumed — with the band's high edge at the unsourced 0.080 the whole suite was green at 1450
+    passed, which is what licenses this guard under D-155/D-156's standard.
+    """
+    entry = store["ethyl_acetate_eq"]
+    assert entry.uncertainty is not None
+    shipped = (entry.uncertainty.low, entry.value, entry.uncertainty.high)
+
+    # acetic-as-ester [g/L] -> ethyl acetate [g/L], in that molecule's own mass (D-127).
+    acetic_to_etoac = M_ETHYL_ACETATE / M_ACETIC
+    derived = tuple(e * _SOUND_WINE_ACETIC_GPL * acetic_to_etoac for e in _SHINOHARA_E_RATE)
+
+    for label, ship, drv, e_rate in zip(
+        ("band low", "value", "band high"), shipped, derived, _SHINOHARA_E_RATE, strict=True
+    ):
+        assert ship == pytest.approx(drv, abs=_THREE_DP_HALF_WIDTH), (
+            f"ethyl_acetate_eq's {label} ({ship} g/L) is not Shinohara's {e_rate:.1%} E-rate at "
+            f"{_SOUND_WINE_ACETIC_GPL} g/L acetic, which derives {drv:.6f} g/L. Either the band "
+            "point moved without its E-rate or the E-rate moved without its band point — a band "
+            "edge here is a TRANSCRIPTION, never a round number chosen for looking sound. This "
+            "is the D-157 defect's home: an unsourced 30-80 mg/L interval once excluded the "
+            "band's own sourced high edge."
+        )
+
+    # ...and the band is ordered, with the nominal AT the ~10% representative E-rate rather than
+    # centred by construction — the near-the-young-level claim the predecessor carried.
+    assert shipped[0] < shipped[1] < shipped[2]
 
 
 @pytest.mark.parametrize("side", ["above", "below"])

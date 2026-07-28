@@ -149,6 +149,14 @@ M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O
 #: ``FUSEL_SPECS``, D-99), so there is no double-count between ``Byp`` (succinic) and those
 #: higher-alcohol pools.
 M_SUCCINIC = 4 * _M_C + 6 * _M_H + 4 * _M_O
+#: Acetic acid, C2H4O2 — the acid half of ethyl acetate's esterification equilibrium.
+#: **NOT a tracked pool**: under D-16 acetic acid has no state slot of its own, its carbon
+#: living in the ``Byp`` succinic stand-in above, which is exactly why D-127 shipped a
+#: FIXED ``ethyl_acetate_eq`` rather than a Berthelot equilibrium coupled to [acetic].
+#: The mass is here because the *provenance* of that fixed target is a stoichiometric
+#: conversion (acetic-as-ester → ethyl acetate) and a test recomputes it (D-158). It is
+#: deliberately absent from ``MOLAR_MASS`` below — there is no acetic pool to weigh.
+M_ACETIC = 2 * _M_C + 4 * _M_H + 2 * _M_O
 #: Ethyl acetate, C4H8O2 — the ``ethyl_acetate`` pool's own species (decision D-96: the
 #: pool *is* this molecule; before D-96 it stood in for a lumped ``esters`` pool whose OAV
 #: was read as a *different* molecule — see the module note below). Carbon-routed from
