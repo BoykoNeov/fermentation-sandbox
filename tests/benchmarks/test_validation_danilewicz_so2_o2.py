@@ -548,6 +548,56 @@ def test_the_analytic_locus_is_the_shipped_binding_solver():
             assert recovered == pytest.approx(free_mgl, abs=1e-8), f"pH {ph}, free {free_mgl}"
 
 
+def test_the_buffering_secant_is_a_weak_binder_statistic():
+    """Miao's Table 3 slope must stay a WEAK-binder statistic: acetaldehyde saturated across it.
+
+    This guards the *justification* for the assertion above, which nothing else can (D-145). Over
+    Miao's addition span the bisulfite activity ``h`` is far above acetaldehyde's dissociation
+    constant — ``h/K`` = 41 at free 4 mg/L and 528 at 52 — so acetaldehyde is saturated at BOTH
+    ends of the secant and contributes a CONSTANT to total SO2. It moves the intercept, not the
+    slope. That is why the shipped secant sits in Miao's band on the strength of the keto-acids
+    alone, why a 5x reservoir moves it only 3.1% (against 4x of intercept), and therefore why
+    D-145 could refuse a must-dosed schedule on the grounds that the reservoir it builds cannot
+    move this number. Miao says the same thing in the Figure 5 caption: "there are weak binders in
+    wine that bind only to a fraction of the added SO2".
+
+    **The secant pin above cannot catch this.** On this scenario's late-only schedule acetaldehyde
+    is 0, so the secant is set by the keto-acids and is completely insensitive to acetaldehyde's
+    K: re-parameterise ``SO2_BINDING_PARAM``, or add a fifth binder with a small K, and 1.3197
+    keeps passing to 1e-9 while the reasoning under it silently stops being true. Pure algebra —
+    no state, no integration.
+    """
+    params = dict(compile_scenario(_scenario(WINE_REALISTIC_SO2), oxidative="direct").param_values)
+    pkas = tuple(float(params[n]) for n in acidbase.SO2_PKA_PARAM_NAMES)
+    lo_mgl, hi_mgl = MIAO_ADDITION_SPAN_MGL
+
+    # The strong end of the plausible white-wine pH range gives the SMALLEST bisulfite activity and
+    # so the weakest saturation — assert the worst case, not a comfortable midpoint.
+    beta = acidbase.bisulfite_fraction(10.0**-3.80, pkas)
+    h_lo = beta * (lo_mgl / 1000.0 / M_SO2)
+
+    k_acetaldehyde = float(params[acidbase.SO2_BINDING_PARAM])
+    assert h_lo / k_acetaldehyde > 20.0, (
+        f"acetaldehyde (K = {k_acetaldehyde:.3g} M) is no longer saturated at the BOTTOM of Miao's "
+        f"addition span: h/K = {h_lo / k_acetaldehyde:.1f} at free {lo_mgl} mg/L. It now "
+        "contributes to the SLOPE, so the buffering secant has stopped being a weak-binder "
+        "statistic and the reservoir CAN move it — re-read D-145 before trusting either the pin "
+        "above or the refusal of a must-dosed schedule."
+    )
+
+    # And the converse, which is what makes the statistic informative at all: the weak binders must
+    # NOT be saturated, or the secant would collapse to 1.0 and measure nothing.
+    for key, k_param, _mass in _SO2_BINDERS:
+        if key == acidbase.ACETALDEHYDE_KEY:
+            continue
+        k_weak = float(params[k_param])
+        h_hi = beta * (hi_mgl / 1000.0 / M_SO2)
+        assert h_hi / k_weak < 20.0, (
+            f"{key} (K = {k_weak:.3g} M) has become saturated by the TOP of Miao's span "
+            f"(h/K = {h_hi / k_weak:.1f}): it can no longer carry the secant's slope"
+        )
+
+
 def test_the_operating_point_sits_above_miaos_wines(runs):
     """The band comparisons here are envelope checks, not a like-for-like validation.
 

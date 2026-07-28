@@ -16018,12 +16018,28 @@ alternatives. The first is why nothing gets built; the second is why the number 
 
 ### What changes
 
-**Nothing in the shipped benchmark.** The schedule stays late-only; `WINE_REALISTIC_SO2` stays 80;
-`CASCADE_VALID_DOSES` stays (60, 70, 80); the straddle (1.0704 / 1.1034 / 1.1338), the traverse
-(direct 0.0003 vs cascade 0.859), the direct 1.7707, the secant 1.3197 and its 1e-9 invariance pin
-all stand untouched. Because the schedule does not change, the secant-invariance breakage a must
-dose would have caused never arises. The cascade stays **non-default**; `k_copper_multiplier` stays
-600; the fate gap and its two paywalled sources are untouched.
+**No measured quantity in the shipped benchmark.** The schedule stays late-only;
+`WINE_REALISTIC_SO2` stays 80; `CASCADE_VALID_DOSES` stays (60, 70, 80); the straddle (1.0704 /
+1.1034 / 1.1338), the traverse (direct 0.0003 vs cascade 0.859), the direct 1.7707, the secant
+1.3197 and its 1e-9 invariance pin all stand untouched. Because the schedule does not change, the
+secant-invariance breakage a must dose would have caused never arises. The cascade stays
+**non-default**; `k_copper_multiplier` stays 600; the fate gap and its two paywalled sources are
+untouched.
+
+**One guard is added, on the JUSTIFICATION rather than on a number.**
+`test_the_buffering_secant_is_a_weak_binder_statistic` asserts `h/K > 20` for acetaldehyde at the
+bottom of Miao's addition span, and `h/K < 20` for the three weak binders at the top. Pure
+algebra, no integration.
+
+It exists because **the secant pin cannot catch this, and it is the only assertion that would
+have to.** On the late-only schedule acetaldehyde is 0, so the secant is set by the keto-acids and
+is *completely insensitive* to acetaldehyde's K — re-parameterise `SO2_BINDING_PARAM`, or add a
+fifth binder with a small K, and 1.3197 keeps passing to 1e-9 while the saturation argument that
+licenses this record's refusal silently stops being true. The measured margins are real rather
+than decorative: `h/K` = 41.19 at the worst-case pH 3.80 against the threshold of 20 (it trips if
+K grows 2.1x), and the weak binders sit at 1.45-5.74. This is the same move D-144 made when it
+promoted the locus probe into the suite: the secant became load-bearing, so what the secant rests
+on got a guard. What it rests on has now moved one level down.
 
 One documentation fix. `test_sulfite_buffering_matches_miao_on_his_own_statistic` explained its
 invariance as *"the secant is a property of the carbonyl pools and the pH — neither of which the
@@ -16036,3 +16052,9 @@ if a must-dosed schedule is ever adopted.
 **Tally: eighteen cascade-era claims falsified by re-measuring.** The two new ones are a category
 error committed by the very record that established the category, and a units omission that made a
 reference's own equation look broken when it closes to 15%.
+
+Both errors were committed by **re-derived probe helpers**, not by the shipped module — which is
+why every statistic in this beat was imported from `tests/benchmarks/test_validation_danilewicz_so2_o2.py`
+instead. The working notes that produced them (`temp\d143-so2-binding\FINDINGS.md`,
+`probe_operating_point.py`) carry SUPERSEDED headers pointing here, because they are grep targets
+for the next beat and an un-annotated stale number is how this cycle repeats.
