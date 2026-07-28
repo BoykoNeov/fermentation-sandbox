@@ -69,10 +69,13 @@ so the "seeded and then consumed by nothing" defect is gone from the default bui
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 
 from fermentation.core.media import get_medium
+from fermentation.parameters import default_data_dir, load_parameters
 from fermentation.runtime.schedule import simulate_scheduled
 from fermentation.scenario.compile import CompiledScenario, compile_scenario
 from fermentation.scenario.schema import Intervention, Scenario, TemperaturePoint
@@ -1317,4 +1320,329 @@ def test_a_separable_f_ph_times_f_cu_is_rejected_by_the_copper_orthogonal_design
         f"the pH effect is measured as STRONGER at high copper (swing {swing:.4f}x), reversing "
         "the direction Nguyen 2021 shows. Two experiments disagreeing in sign is a different "
         "finding from two agreeing, and needs a record."
+    )
+
+
+# ------------------------------------------------------------------------------------
+# Guard 7 — the copper NULL turned into a BOUND, in the same design (D-152).
+# ------------------------------------------------------------------------------------
+#
+# D-151 measured copper's own main effect in the only copper-orthogonal design in this
+# archive's evidence set and found it non-significant: F = 0.23 on the duration statistic,
+# F = 2.87 on R_max and pointing the WRONG way (more copper, LOWER max rate). It flagged
+# that against D-134 and D-149 -- the two records that argued over whether
+# ``k_copper_multiplier`` should go UP -- but refused to act, because *"it is a null, not a
+# bound"*. Its Next named the fix: *"the SDs in Table 2 would support one, and that
+# computation was not attempted here."*
+#
+# This section is that computation. A null says "no effect was detected"; a bound says "an
+# effect this large is excluded", and only the second can be pointed at a constant.
+#
+# **THE FRAME IS THE SAME ONE THE CONSTANT WAS FITTED IN, WHICH IS WHY THIS TRANSFERS.**
+# ``k_copper_multiplier`` was digitized from Danilewicz 2007 Figure 4 -- a MODEL WINE with
+# FREE CuSO4 -- and then cut 2000 -> 600 with the explicit reason that *"free copper is more
+# catalytically active, biasing the digitized slope high for real wine"*. This dataset is a
+# dealcoholized grape-extract reconstitution with dosed CuCl2: the same class of medium, with
+# the same free-copper bias, over a copper span (0.1-0.8 mg/L) that brackets Ferreira's own
+# 15-red-wine range (0.168-0.679). So this is not a non-wine bound aimed at a wine value --
+# it is a bound and a value in one frame, and the bound pushes FURTHER in the direction
+# D-134's own correction already went.
+#
+# **AND IT IS LOOSE IN THE SAFE DIRECTION, TWICE.** ``R_max`` is a maximum rate on a single
+# saturation, i.e. an initial-rate-class statistic in D-150 leg 3's sorting, while the
+# multiplier scales a node calibrated to Ferreira's repeated-saturation cycles-2-to-5 steady
+# rate (D-132). This archive's own pattern is that initial-rate statistics are MORE
+# factor-sensitive than steady ones (Ferreira: ~15x initial between-wine spread against ~2.2x
+# steady; D-150: every steep published pH slope turned out to be an initial-rate slope). That
+# is an argument with its evidence, not a theorem -- but it points the same way as the
+# free-copper bias, so a steady-rate bound in real wine should be TIGHTER than this one.
+
+#: Table 2's ``+/- SD`` half, over FIVE replicates ("Five replicates were performed for each
+#: one of the 16 experimental conditions and for each type of oxygen-saturated GEw").
+#: NEW at D-152 -- D-151 transcribed the means only. Taken independently from the PMC deposit
+#: and the EuropePMC ``fullTextXML``, which agree on all 48 cells and reproduce D-151's means
+#: exactly; that agreement is the only provenance these SDs have, since the paper prints no
+#: pooled statistic to check them against.
+_CQ_RMAX_SD: dict[str, dict[int, float]] = {
+    "A": {1: 0.8, 2: 1.2, 3: 0.6, 4: 0.6, 5: 0.5, 6: 0.9, 7: 1.0, 8: 1.2,
+          9: 0.6, 10: 0.7, 11: 0.7, 12: 2.6, 13: 1.0, 14: 0.5, 15: 0.2, 16: 1.7},
+    "B": {1: 0.4, 2: 1.2, 3: 0.5, 4: 0.8, 5: 1.5, 6: 1.0, 7: 2.5, 8: 0.9,
+          9: 1.0, 10: 0.4, 11: 0.3, 12: 0.7, 13: 1.7, 14: 0.3, 15: 0.4, 16: 1.1},
+    "C": {1: 0.4, 2: 0.4, 3: 0.6, 4: 0.9, 5: 1.1, 6: 0.4, 7: 1.8, 8: 1.2,
+          9: 0.8, 10: 0.5, 11: 0.4, 12: 0.4, 13: 0.7, 14: 0.7, 15: 0.4, 16: 1.1},
+}
+_CQ_N_REPLICATES = 5
+
+#: Student's t at df = 38, TWO-SIDED 95%. Pinned rather than imported, like ``_CQ_F_CRIT``.
+#: Two-sided deliberately, and this is the load-bearing methodological choice in the section:
+#: copper's point estimate is NEGATIVE (ratio 0.789x marginal), so a one-sided 95% upper limit
+#: lands at essentially zero effect and would "exclude" every candidate value down to and
+#: including the shipped one -- purely because the noise happened to fall on that side of zero.
+#: A bound that excludes everything because its point estimate went the other way is not a
+#: measurement of anything.
+_CQ_T_CRIT_38_TWO_SIDED = 2.0244
+
+#: The two copper re-fits this archive has already rejected. Both were rejected on Ferreira's
+#: 2.2x TOTAL between-wine spread budget -- an argument about how much room copper may take
+#: from other factors. The bound below is an argument about copper's own measured size, from
+#: a design in which copper varies independently. Two unrelated routes to one exclusion.
+_D134_REJECTED_RAW_DANILEWICZ = 2000.0  # the raw Fig-4 digitization, cut to 600 at D-134
+_D149_REJECTED_REFIT_NGUYEN = 2092.0  # what Nguyen 2021 Table 3.1 implies; D-149 closed it
+
+
+def _cq_design_matrix(conds: list[int]) -> tuple[np.ndarray, list[str]]:
+    """Intercept + 2 GEw block dummies + 6 main effects + pH x Cu, in +/-1 coding.
+
+    Ten columns over 48 rows => df_error 38, i.e. **exactly the model behind the F(1, 38)
+    Guard 6 reports**. On the full design this least-squares fit is algebraically identical to
+    :func:`_cq_anova`'s level-mean sum-of-squares decomposition, and the guard below asserts
+    that rather than assuming it. It is used here because a fit carries standard errors on its
+    coefficients, which a sum-of-squares table does not.
+    """
+    names = ["intercept", "GEw_B", "GEw_C", *_CQ_FACTORS, "pH_x_Cu"]
+    rows = [
+        [
+            1.0,
+            1.0 if gew == "B" else 0.0,
+            1.0 if gew == "C" else 0.0,
+            *[float(_cq_sign(cond, f)) for f in _CQ_FACTORS],
+            float(_cq_sign(cond, "pH") * _cq_sign(cond, "Cu")),
+        ]
+        for gew in _CQ_GEWS
+        for cond in conds
+    ]
+    return np.asarray(rows), names
+
+
+def _cq_fit(values: dict[str, dict[int, float]], conds: list[int]) -> dict[str, Any]:
+    x, names = _cq_design_matrix(conds)
+    y = np.asarray([values[g][c] for g in _CQ_GEWS for c in conds], dtype=float)
+    beta, *_ = np.linalg.lstsq(x, y, rcond=None)
+    resid = y - x @ beta
+    df_error = len(y) - x.shape[1]
+    return {
+        "names": names,
+        "beta": beta,
+        "mse": float(resid @ resid) / df_error,
+        "df_error": df_error,
+        "xtx_inv": np.linalg.inv(x.T @ x),
+    }
+
+
+def _cq_copper_ratio_upper_bound(mse_override: float | None = None) -> dict[str, Any]:
+    """The upper limit of a two-sided 95% interval on copper's effect on ``R_max``.
+
+    **Taken at pH 3.3, the SIMPLE effect, not the pH-averaged main effect.** That is the
+    conservative estimand and the reason is structural. D-151 measured a real pH x Cu
+    interaction, so this design does not contain one copper ratio -- it contains two: 1.155x
+    at pH 3.3 and 0.633x at pH 3.9. ``f_Cu`` is pH-independent (D-150 refused an ``f_pH``),
+    so the model asserts a SINGLE ratio, and a bound on a single ratio must accommodate the
+    pH at which copper looks biggest rather than an average across two genuinely different
+    slopes. Real red wine's 3.4-3.8 sits between the design's two levels.
+
+    Condition 12 -- the one ``R_max`` outlier (33.0/30.7/6.4) -- is KEPT, and the direction of
+    that choice is the opposite of D-151's. There, dropping it made the interaction stronger.
+    Here it sits in the pH-3.9/Cu-0.1 cell, so it does not touch the pH-3.3 point estimate at
+    all (+0.9333 hPa/h either way) and only inflates the error term: dropping it would TIGHTEN
+    this bound from 1.754x to 1.417x. Keeping it is both the wider interval and the model
+    Guard 6 already ships.
+    """
+    conds = sorted(_CQ_DESIGN)
+    model = _cq_fit(_CQ_RMAX, conds)
+    names = model["names"]
+    contrast = np.zeros(len(names))
+    contrast[names.index("Cu")] = 2.0  # +/-1 coding: low -> high is two units
+    contrast[names.index("pH_x_Cu")] = -2.0  # ... evaluated at the pH-3.3 level
+    diff = float(contrast @ model["beta"])
+    mse = model["mse"] if mse_override is None else mse_override
+    se = float(np.sqrt(mse * (contrast @ model["xtx_inv"] @ contrast)))
+    base = float(
+        np.mean(
+            [
+                _CQ_RMAX[g][c]
+                for g in _CQ_GEWS
+                for c in conds
+                if _cq_sign(c, "Cu") < 0 and _cq_sign(c, "pH") < 0
+            ]
+        )
+    )
+    return {
+        "diff_hPa_h": diff,
+        "se_hPa_h": se,
+        "low_copper_reference_mean": base,
+        "ratio_point": (base + diff) / base,
+        "ratio_upper_bound": (base + diff + _CQ_T_CRIT_38_TWO_SIDED * se) / base,
+        "mse": mse,
+        "df_error": model["df_error"],
+    }
+
+
+def _cq_ratio_to_k(ratio: float, copper_typical_gpl: float) -> float:
+    """The ``k_copper_multiplier`` implied by a given R_max ratio across 0.1 -> 0.8 mg/L Cu.
+
+    ``f(Cu) = 1 + k * (Cu - copper_typical)``, so
+    ``ratio = (1 + k*(Cu_hi - typ)) / (1 + k*(Cu_lo - typ))``, which inverts to the expression
+    below. The conversion depends on where the mean-centering sits, so the guards run it
+    across ``copper_typical``'s OWN declared band rather than at its point value alone.
+    """
+    d_hi = 0.8e-3 - copper_typical_gpl
+    d_lo = 0.1e-3 - copper_typical_gpl
+    return (ratio - 1.0) / (d_hi - ratio * d_lo)
+
+
+@pytest.fixture(scope="module")
+def aging_parameters():
+    """``aging.yaml`` as a ``ParameterSet`` — the shipped copper value and band, from source."""
+    return load_parameters(default_data_dir() / "aging.yaml")
+
+
+def test_the_copper_orthogonal_bound_excludes_the_two_copper_refits_the_archive_rejected(
+    aging_parameters,
+):
+    # WHAT THIS FORBIDS: re-opening `k_copper_multiplier` upward by arguing that the O2-budget
+    # rejection of 2000/2092 was only ever a BUDGET argument -- that Ferreira's 2.2x ceiling is
+    # about how much room copper may take from other factors, so a direct measurement of copper
+    # could still license those values. It cannot. This bounds copper's own size in a design
+    # where copper varies independently of everything else, and both rejected values sit
+    # outside it. Guard 4 and this guard now reject them by two unrelated routes.
+    #
+    #   pH 3.3 simple effect on R_max:  +0.933 +/- 1.776 hPa/h on a 6.008 low-copper mean
+    #   two-sided 95% upper limit:      ratio <= 1.754x across 0.1 -> 0.8 mg/L Cu
+    #   converted:                      k_copper_multiplier <= 918 L/g
+    #
+    # The conversion is run across `copper_typical`'s whole declared band (0.168-0.679 mg/L),
+    # over which the bound moves 1003 -> 663 L/g, and the exclusions must hold at the LOOSEST
+    # end. Nothing is hardcoded: the bound is recomputed from the transcribed table and the
+    # centring is read from the ParameterSet, so correcting either moves the guard with it.
+    bound = _cq_copper_ratio_upper_bound()
+    assert bound["df_error"] == 38, "the error df moved; _CQ_T_CRIT_38_TWO_SIDED is pinned at 38"
+
+    # The fit must be the same model Guard 6's sum-of-squares route reports, or the two
+    # readings of this one table have silently drifted apart.
+    anova = _cq_anova(_CQ_RMAX)
+    model = _cq_fit(_CQ_RMAX, sorted(_CQ_DESIGN))
+    names = model["names"]
+    for term in ("Cu", "pH_x_Cu"):
+        i = names.index(term)
+        f_from_fit = float(model["beta"][i] ** 2 / (model["mse"] * model["xtx_inv"][i, i]))
+        assert f_from_fit == pytest.approx(anova[f"F_{term}"], rel=1e-9), (
+            f"the least-squares fit and _cq_anova disagree on F_{term} ({f_from_fit:.6f} vs "
+            f"{anova[f'F_{term}']:.6f}). They must be the same model -- Guard 6's F(1,38) and "
+            "this bound's standard errors are taken from the same residual."
+        )
+
+    typical = aging_parameters["copper_typical"]
+    k_bounds = {
+        label: _cq_ratio_to_k(bound["ratio_upper_bound"], gpl)
+        for label, gpl in (
+            ("copper_typical band low", typical.uncertainty.low),
+            ("copper_typical value", typical.value),
+            ("copper_typical band high", typical.uncertainty.high),
+        )
+    }
+    loosest = max(k_bounds.values())
+    for name, rejected in (
+        ("D-134's raw Danilewicz digitization", _D134_REJECTED_RAW_DANILEWICZ),
+        ("D-149's re-fit from Nguyen 2021 Table 3.1", _D149_REJECTED_REFIT_NGUYEN),
+    ):
+        assert loosest < rejected, (
+            f"{name} ({rejected:.0f} L/g) is NOT excluded by the copper-orthogonal bound: the "
+            f"loosest bound across copper_typical's band is {loosest:.0f} L/g (ratio <= "
+            f"{bound['ratio_upper_bound']:.4f}x; per-centring "
+            f"{ {k: round(v) for k, v in k_bounds.items()} }). If this is red because the R_max "
+            "transcription changed, the transcription is wrong. If the bound genuinely rose "
+            "past a value D-134 and D-149 both rejected, that retires the only direct "
+            "measurement of copper's size in this record -- a finding for a decision record, "
+            "not a threshold to move."
+        )
+
+
+def test_the_shipped_copper_multiplier_is_not_excluded_by_the_copper_orthogonal_bound(
+    aging_parameters,
+):
+    # WHAT THIS FORBIDS: raising `k_copper_multiplier` past the only direct, copper-orthogonal
+    # measurement of copper's own size in this record. Guard 4 bounds copper by its O2 BUDGET
+    # (how much of Ferreira's 2.2x between-wine spread copper alone may spend); this bounds it
+    # by a measurement of copper itself. A value can clear the budget and still be excluded here.
+    #
+    # It asserts the shipped VALUE only, and that is deliberate: the band's declared HIGH edge,
+    # 1500 L/g, is ALREADY excluded (918 < 1500), so asserting the band would be red on arrival
+    # -- and would go red again if anyone later narrowed the band correctly. That exceedance is
+    # a live finding recorded at D-152, not something this test can express; the failure message
+    # below carries it so it cannot be lost.
+    param = aging_parameters["k_copper_multiplier"]
+    typical = aging_parameters["copper_typical"]
+    bound = _cq_copper_ratio_upper_bound()
+    k_bound = min(
+        _cq_ratio_to_k(bound["ratio_upper_bound"], gpl)
+        for gpl in (typical.uncertainty.low, typical.value, typical.uncertainty.high)
+    )
+    assert param.value <= k_bound, (
+        f"k_copper_multiplier = {param.value:.0f} L/g is EXCLUDED by the copper-orthogonal "
+        f"bound of {k_bound:.0f} L/g (tightest across copper_typical's band; ratio <= "
+        f"{bound['ratio_upper_bound']:.4f}x at pH 3.3, the loosest pH slice, two-sided 95%). "
+        "Carrasco-Quiroz 2022's L16 is the only design in this record where copper varies "
+        "independently of pH, and it is the same class of medium the value was digitized from. "
+        "Raising the value past this needs a second copper-orthogonal experiment, not a "
+        "re-reading of Nguyen's table (D-149). NOTE, already true and recorded at D-152: the "
+        "band's HIGH edge (1500 L/g) sits above this bound, and runtime/ensemble.py draws "
+        "triangular(low, value, high) -- so ~29% of ensemble draws land on values this "
+        "measurement excludes. That is the open item; the shipped value is not."
+    )
+
+
+def test_the_printed_replicate_sds_cannot_carry_the_copper_bound():
+    # WHAT THIS FORBIDS: rebuilding the bound above on the printed replicate SDs -- the obvious
+    # thing to try, since D-151's own Next says "the SDs in Table 2 would support one", and
+    # wrong by an order of magnitude in the DANGEROUS direction.
+    #
+    # A Table 2 cell is a mean of five replicates, so D-151's residual is
+    # sigma^2_structure + sigma^2_rep/5. Decomposed:
+    #
+    #   pooled within-cell SD          1.006 hPa/h   (df 192)
+    #   its share of a cell mean       0.202         (sigma^2_rep / 5)
+    #   D-151's residual MSE          18.923
+    #   => replicate noise is 1.1% of the residual; the rest is unmodelled structure
+    #   => a replicate-only standard error understates by 9.7x
+    #
+    # So the SDs' real contribution is NEGATIVE: they prove they cannot carry the bound, which
+    # is why the bound above uses the between-condition residual. That is not merely the
+    # conservative choice, it is the only defensible one, and it is now measured rather than
+    # asserted. A replicate-error bound reads ratio <= 0.983x -- i.e. it excludes the shipped
+    # value, the whole band, and any positive copper effect at all -- on 1.1% of the variance.
+    #
+    # The reductio, on the SAME column and so independent of which column the paper's
+    # categorical verdict came from: under a replicate-only error term copper's own F on R_max
+    # is 269 against a critical value of 3.89. The paper reports copper as NOT significant.
+    # Whatever error term produced that verdict, it was not these SDs.
+    sds = [_CQ_RMAX_SD[g][c] for g in _CQ_GEWS for c in _CQ_DESIGN]
+    assert len(sds) == 48, "the R_max SD transcription is not 16 conditions x 3 GEw"
+    s2_rep_on_a_cell_mean = (sum(s * s for s in sds) / len(sds)) / _CQ_N_REPLICATES
+
+    model = _cq_fit(_CQ_RMAX, sorted(_CQ_DESIGN))
+    share = s2_rep_on_a_cell_mean / model["mse"]
+    understatement = float(np.sqrt(model["mse"] / s2_rep_on_a_cell_mean))
+
+    assert share < 0.10, (
+        f"replicate noise is {share:.1%} of D-151's residual (sigma^2_rep/5 = "
+        f"{s2_rep_on_a_cell_mean:.4f} against MSE {model['mse']:.4f}). D-152's whole reason for "
+        "using the between-condition residual is that this share is ~1%; if the two error terms "
+        "have converged, the bound should be re-derived on the tighter one -- deliberately, in "
+        "a record, not by editing this threshold."
+    )
+    assert understatement > 3.0, (
+        f"a replicate-only standard error would understate by only {understatement:.2f}x, "
+        "against the 9.7x measured at D-152. The anti-conservatism argument that rules the SDs "
+        "out as an error term is what this asserts; it must be re-made, not assumed."
+    )
+
+    # And state by how much the choice of error term actually moves the thing that matters.
+    on_residual = _cq_copper_ratio_upper_bound()["ratio_upper_bound"]
+    on_replicates = _cq_copper_ratio_upper_bound(mse_override=s2_rep_on_a_cell_mean)[
+        "ratio_upper_bound"
+    ]
+    assert on_replicates < on_residual, (
+        f"the replicate-error bound ({on_replicates:.4f}x) is not tighter than the "
+        f"between-condition one ({on_residual:.4f}x) -- the anti-conservatism this test exists "
+        "to forbid has reversed sign, and D-152's choice of error term needs re-deriving."
     )
