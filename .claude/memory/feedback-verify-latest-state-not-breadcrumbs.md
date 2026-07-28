@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 14c4cd91-8005-4d3b-8620-c315b1e7cf0b
-  modified: 2026-07-20T17:55:31.025Z
+  modified: 2026-07-22T12:05:49.987Z
 ---
 
 Before proposing a task as "open" — or starting it — **verify it against the
@@ -25,10 +25,25 @@ current backlog is the trap. This project's lumps are ALL gone: esters→3 (D-96
 fusels→5 (D-99), amino_acids→8 (D-100), mercaptans was a false lump = methanethiol
 (D-110). See [[project-fermentation-sandbox]].
 
+**It happened AGAIN at D-136 (2026-07-22), from a different breadcrumb source,
+so the rule is broader than "Next:" lists.** Asked "what is next," I offered a
+menu of four beats read off `docs/plans/milestone-3-plan.md`'s **"Deferred /
+later beats"** section — and **three of the four were already built**: oak
+extraction, tannin–anthocyanin polymerization, and Maillard/sotolon all ship as
+`OakExtraction`, `TanninAnthocyaninCondensation`, `AcetaldehydeBridgedCondensation`,
+`SotolonAldolCondensation`, `AnthocyaninFading` in `core/kinetics/aging.py`. One
+`grep -n "^class " src/fermentation/core/kinetics/aging.py` would have caught it
+in a single call, before the menu was shown. **The milestone plan files are
+append-only narrative; their forward-looking sections are never edited when a
+decision closes an item.** Treat them exactly like a stale "Next:" tail.
+
 **How to apply:** When picking or proposing "what's next," treat old "Next:"
-lists as leads, not truth. Confirm each candidate against (a) the most recent
-DECISIONS entries and (b) the code — grep for the state slot / Process / param
-it would add and check it isn't already there. Only present a task as buildable
-after that check. A "Next:" tail is only reliable in the *latest* decision;
-every earlier one has been partly consumed. Cross-check with
+lists **and the milestone plans' deferred/later sections** as leads, not truth.
+Confirm each candidate against (a) the most recent DECISIONS entries and (b) the
+code — grep for the state slot / Process / param it would add and check it isn't
+already there. **Cheapest sufficient check for this project: list the Process
+classes (`grep "^class " core/kinetics/*.py`) and the `parameters/data/*.yaml`
+files** — a built beat almost always shows up as one of each. Only present a
+task as buildable after that check. A "Next:" tail is only reliable in the
+*latest* decision; every earlier one has been partly consumed. Cross-check with
 [[feedback-measure-which-side-before-building]] (measure before building).

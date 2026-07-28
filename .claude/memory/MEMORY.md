@@ -4,12 +4,18 @@
 - [Batch-end ritual](feedback-batch-end-ritual.md) — on batch/planning/session end: distilled status to memory, full entry to DECISIONS.md, commit + push
 - [Always commit + push](feedback-always-commit-push.md) — commit and push to main the moment work is done; never gate the commit on pytest/mypy/ruff
 - [Discuss disagreements](feedback-discuss-disagreements.md) — surface design disagreements before building; specs aren't gospel
-- [Project: Fermentation Sandbox](project-fermentation-sandbox.md) — status + repo; M0/M1/M2 complete, Milestone-3/Tier-3 aging in progress at D-127. Per-decision archive: docs/DECISIONS.md
+- [Project: Fermentation Sandbox](project-fermentation-sandbox.md) — status + repo; M0/M1/M2 complete, aging build order fully built, Milestone-3 at D-147 (the D-133 burst wired opt-in as a third oxidative set after measurement: constraint 1 holds, constraint 2 fails structurally, the split stays unpinned; cascade and burst both non-default). Prohibitions + pointers only; per-decision archive is docs/DECISIONS.md
 - [Never pipe checks to tail](feedback-never-pipe-checks-to-tail.md) — `cmd | tail && ...` returns tail's exit 0 and hides ruff/pytest failures
 - [Full suite before "green"](feedback-full-suite-before-green.md) — a new Process in a shared registry breaks exact-set + end-to-end tests outside the domain suite; don't claim green until full pytest passes
 - [Verify latest state, not breadcrumbs](feedback-verify-latest-state-not-breadcrumbs.md) — old "Next:" lists get burned down by later decisions; check the latest D-record + code before proposing work
+- [Check the schema, not the caller](feedback-check-the-schema-not-the-caller.md) — "the model can't represent X" is a schema claim; one Process not reading X proves nothing, and false negatives are self-sealing
 - [Rejected values must be unreachable](feedback-rejected-values-must-be-unreachable.md) — an unphysical value in a sampled field is a live defect a green suite won't catch
+- [Validate calibrations in the frame that binds](feedback-validate-calibrations-in-the-frame-that-binds.md) — solved in isolation + tested in isolation is self-sealing; a constraint that only binds under competition dies when you remove it
 - [Name guards for what they forbid](feedback-name-guards-for-what-they-forbid.md) — a guard mislabelled with a real mechanism invites a fair objection and gets argued away
 - [Measure which side before building](feedback-measure-which-side-before-building.md) — a one-directional corrective only helps in one direction; check the sign, the reach, and whether it's a rate knob on a supply-limited quantity
-- [No PowerShell here-strings in Bash](feedback-no-powershell-heredoc-in-bash.md) — `@'...'@` in the Bash tool silently corrupts commit messages; exit 0 proves nothing
+- [Commit messages corrupted by shells](feedback-no-powershell-heredoc-in-bash.md) — PS here-strings in Bash, and `Out-File -Encoding utf8`'s BOM; exit 0 proves nothing
+- ["Paywalled" is one host, not a paper](feedback-paywalled-is-one-host.md) — check author/institutional/thesis/trade-reprint copies before recording a source as blocked; wrong 4× so far
+- [Conceded caveats aren't coverage](feedback-conceded-caveats-are-not-coverage.md) — naming your own gap in prose doesn't discharge it; run the criterion on every branch or label it asserted
+- [Pin tolerance vs solver tolerance](feedback-pin-tolerance-vs-solver-tolerance.md) — measure the noise floor; BDF runs at rtol=1e-6, and `approx` passes on EITHER bound
+- [Transcribe tables, not prose](feedback-transcribe-tables-not-prose.md) — the table beat the prose twice (4 numbers, then a direction); a search summary once shipped a fabricated E_a
 - [Best-practices reference](reference-claude-best-practices.md) — rosmur claudecode-best-practices URL to apply
