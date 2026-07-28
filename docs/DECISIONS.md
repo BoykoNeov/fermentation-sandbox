@@ -18054,6 +18054,50 @@ number that would have been reached anyway.
   have a measured bound at all; this is one of them, and the other (`f_de_novo_2_phenylethanol`)
   is already clamped and guarded.
 
+### Amendment 1 — the joint-sampling claim verified against DRAWS, and D-152's 29% turns out to understate the defect
+
+The record above argues for 662.8 over 918 entirely from a claim about **joint independent
+draws** — but every check it shipped (the new guard, all five falsification arms) operates on
+`uncertainty.high` as a *declared value*. None of them drew anything. That is the same
+"solved in isolation, tested in isolation" shape this archive keeps re-learning, so the claim
+is now measured directly: 200,000 joint draws of `(k_copper_multiplier, copper_typical)` from
+the shipped `ParameterSet` through `sample_parameters`, checking every realized pair against
+`k <= k_bound(copper_typical_drawn)`. Receipts: `joint_draws.py` + `joint_draws.json`.
+
+| band high | violating pairs / 200,000 | share | worst margin |
+|---|---|---|---|
+| **662.8 — as shipped** | **0** | **0.0000%** | **+17.691 L/g** |
+| 918.0 — the shipped-centring bound | 10,019 | **5.01%** | −231.83 L/g |
+| 1500.0 — the pre-D-154 edge | 75,258 | **37.63%** | −803.67 L/g |
+
+**The counterfactuals are the point, twice over.**
+
+- **918 leaves 1 ensemble member in 20 drawing an excluded `k`.** Had this beat taken D-152's
+  headline number — the obvious, quotable one — it would have fixed 84% of the defect and
+  declared it closed, with a green suite. The joint-sampling argument is not a refinement of
+  the answer; it is the difference between fixing this and appearing to.
+- **The pre-D-154 defect was larger than D-152 measured: 37.6%, not ~29.0%.** Both are right
+  about different things. D-152's 29.0% is `P(k > 918)` with `copper_typical` **held at its
+  shipped 0.261 mg/L**; under the ensemble's actual behaviour `copper_typical` is drawn too, and
+  a high draw tightens the bound the same member's `k` must clear. Holding a sampled quantity
+  fixed while measuring a sampling defect understates it. Recorded because the archive now
+  carries two numbers for one defect and the difference is not an error in either.
+
+**Why the shipped arm's margin is +17.7 and not ~0.** The tightest bound is at
+`copper_typical`'s band maximum, and a triangular draw reaches its edge with vanishing
+probability — so over 200,000 members the realized worst case sits just inside. The declared
+edge is exactly right; the drawn one never quite gets there.
+
+### Amendment 1b — the mode-position row, and why it is not just a number
+
+The table above reports the mode position moving 0.308 → 0.864 without saying what follows from
+it. At `mode_c = 0.864` the triangular is steeply left-skewed, so the **ensemble's median**
+`k_copper_multiplier` falls relative to the old band even though the nominal value is unchanged
+at 600. Any pin that reads an ensemble percentile rather than the deterministic nominal would
+therefore move. The full suite (1444 passed) says none does — the D-140 pins are nominal-run
+pins — but that is the reason the row is in the table, and stating the number without the
+consequence was the omission.
+
 ### Next
 
 - **The `f_non_ehrlich_phenylalanine` high-edge guard is still unbuilt** (D-153): it is
