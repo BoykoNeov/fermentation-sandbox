@@ -449,9 +449,19 @@ def test_sulfite_buffering_matches_miao_on_his_own_statistic(runs):
     3 (1.2734) and 4 (1.3955). There was no binding gap to close. (D-143)
 
     Identical on both alternatives, and at every dose, because the secant is a property of the
-    carbonyl pools and the pH — neither of which the oxidative alternative or the SO2 dose moves.
-    That invariance is asserted here too: it is the reason this statistic, unlike the ratio, is
-    not an artefact of the operating point.
+    carbonyl pools and the pH, and neither is moved by the oxidative alternative or by the SO2
+    dose *on this scenario's schedule*. That invariance is asserted here too: it is the reason
+    this statistic, unlike the ratio, is not an artefact of the operating point.
+
+    **The invariance belongs to the schedule, not to the statistic** (D-145). This scenario doses
+    SO2 once, a day before the end of fermentation, which leaves acetaldehyde at 0 (measured:
+    -1.1e-12 mol/L, solver noise; :func:`_binder_pools` clamps it) — so the dose has no pool to
+    move. A dose in the MUST does build the reservoir and does move the secant, to 1.3517 at
+    must-100. That is a legitimate move, not a regression: acetaldehyde's K is 1.5e-6 M against
+    h ~ 1e-4 over Miao's span, so it is saturated at both ends of the secant and shifts the
+    INTERCEPT rather than the slope — 3.1% of slope across a 5x reservoir, against 4x of
+    intercept. D-145 measured a must-dosed schedule and refused it for unrelated reasons; if one
+    is ever adopted, this assertion's tolerance must be re-derived rather than widened.
 
     **Tier: speculative** (Prime Directive 1). Pyruvate and alpha-ketoglutarate carry the whole
     secant and are quasi-steady ratios of ``tier: speculative`` author estimates; at their own
