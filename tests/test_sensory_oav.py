@@ -308,3 +308,101 @@ def test_single_molecule_thresholds_do_not_declare_a_lump_caveat(thresholds):
                 f"{c.pool} ({medium}) is flagged lumped=False but its threshold declares a "
                 "fixed-lump-composition assumption"
             )
+
+
+# -- D-146: sotolon is chiral, the threshold is the racemate's, and the split is REFUSED ----
+
+#: Pons et al. 2008 (J. Agric. Food Chem. 56:1606-1610), Table-free abstract values, transcribed
+#: verbatim: *"The perception threshold of (S)-sotolon (0.8 microg/L) in model wine solution was
+#: 100 times lower than that of the (R) form (89 microg/L)"*. **Reference data, deliberately NOT
+#: parameters** — they never reach a rate law or an OAV, and putting them in ``sensory.yaml``
+#: would invite exactly the wiring this test forbids. They are used here only as a **ratio**,
+#: where the model-solution matrix factor divides out.
+PONS_2008_THRESHOLD_S_UGL = 0.8
+PONS_2008_THRESHOLD_R_UGL = 89.0
+
+
+def test_the_sotolon_threshold_is_the_racemates_and_the_pool_is_read_against_it(thresholds):
+    """The shipped threshold must stay a RACEMATE-in-wine value, not an enantiomer's (D-146).
+
+    Sotolon has a stereocentre at C5 and its enantiomers differ ~111×. D-107's deferred list
+    concluded from that spread that *"one racemic pool against one threshold is a lump, and the
+    ~100× spread means the OAV is soft by that much"*. Both halves are wrong, and this test is
+    the second half's refutation in code.
+
+    Pons had to **separate the enantiomers by preparative HPLC** to threshold them, so every
+    earlier wine threshold — the ones this entry actually cites — was measured by spiking the
+    racemate, the only form that existed. And the model's pool is racemic because its only route
+    (:class:`~fermentation.core.kinetics.aging.SotolonAldolCondensation`) is a **non-enzymatic**
+    aldol with no chiral influence. Pool and threshold therefore sit at the same enantiomeric
+    ratio, which is commensurate rather than lumped.
+
+    **What this forbids, precisely:** re-pointing ``threshold_sotolon_wine`` at either
+    enantiomer's model-solution value — 0.8 (the (S) form), 1.6 (the "half the pool is (S)"
+    arithmetic), or 89 (the (R) form). It does **not** forbid re-sourcing the racemate threshold
+    within its band; a better racemate number is a straight improvement and must stay possible.
+    """
+    value = thresholds.value("threshold_sotolon_wine")
+    for forbidden, why in (
+        (PONS_2008_THRESHOLD_S_UGL, "the (S) enantiomer's model-solution threshold"),
+        (2.0 * PONS_2008_THRESHOLD_S_UGL, "0.8 doubled for a 50:50 pool — the double-count"),
+        (PONS_2008_THRESHOLD_R_UGL, "the (R) enantiomer's model-solution threshold"),
+    ):
+        assert value != pytest.approx(forbidden, rel=1e-3), (
+            f"threshold_sotolon_wine has been set to {forbidden} µg/L, {why}. The pool is "
+            "racemic and this threshold must be the RACEMATE's, measured in wine (D-146)."
+        )
+    # The racemate band the cited literature actually supports (~5-19 µg/L in wine), which is
+    # also the file's own uncertainty band. Widening below 2.0 is how the (S) value would creep
+    # in wearing the racemate's name.
+    entry = thresholds["threshold_sotolon_wine"]
+    assert entry.uncertainty.low >= 2.0
+    assert entry.uncertainty.high <= 20.0
+    assert entry.uncertainty.low <= value <= entry.uncertainty.high
+    # The provenance must SAY it is the racemate's, because the number alone cannot: 8.0 is not
+    # self-identifying, and this is the one fact a future beat needs before touching it.
+    text = (entry.provenance.conditions + " " + entry.provenance.notes).lower()
+    assert "racemate" in text and "racemic" in text
+
+
+def test_the_racemic_assumption_costs_at_most_2x_under_and_56x_over(thresholds):
+    """The enantiomer spread bounds the OAV **asymmetrically**, and D-107 read it as symmetric.
+
+    Pons' pair is a *model-solution* measurement, which this file's matrix rule excludes from a
+    wine pool outright (cf. ``threshold_dms_wine``, and the D-99 beer-fusel OTC exclusion). Used
+    as a **ratio** the matrix factor divides out, and that is the only defensible use of it: it
+    says how far a wine whose sotolon is not 50:50 departs from this racemic reading.
+
+    The answer is not "soft by ~111×" in either direction. An (S)-extreme wine reads at most
+    ~2× **above** the racemic OAV; an (R)-extreme wine reads up to ~56× **below** it. So the
+    model's exposure is **overstatement**, and the understatement it can commit is bounded by a
+    factor of two. Real wines reach neither extreme — Pons reports *excess*, not purity — so
+    these are outer bounds on a scope limit, not an error band on the shipped number.
+
+    **Computed under the MAX rule, the projector this project actually ships** (D-95), and
+    cross-checked against the additive rule the OAV lens refuses (D-67): the two agree to ~1%,
+    so the conclusion does not rest on the additivity assumption. That second proof is the
+    reason this can be stated at all.
+    """
+
+    def by_max(s_fraction: float) -> float:
+        return max(
+            s_fraction / PONS_2008_THRESHOLD_S_UGL,
+            (1.0 - s_fraction) / PONS_2008_THRESHOLD_R_UGL,
+        )
+
+    def by_sum(s_fraction: float) -> float:
+        return (
+            s_fraction / PONS_2008_THRESHOLD_S_UGL + (1.0 - s_fraction) / PONS_2008_THRESHOLD_R_UGL
+        )
+
+    for rule in (by_max, by_sum):
+        racemic = rule(0.5)
+        assert rule(1.0) / racemic == pytest.approx(2.0, rel=0.02), "the (S)-extreme ceiling"
+        assert racemic / rule(0.0) == pytest.approx(56.0, rel=0.02), "the (R)-extreme floor"
+    # The asymmetry is the finding: the two extremes are NOT equidistant from racemic, which is
+    # precisely what "soft by ~100x" concealed. The full span is the raw threshold ratio.
+    assert (by_max(1.0) / by_max(0.0)) == pytest.approx(
+        PONS_2008_THRESHOLD_R_UGL / PONS_2008_THRESHOLD_S_UGL
+    )
+    assert by_max(1.0) / by_max(0.5) < by_max(0.5) / by_max(0.0)

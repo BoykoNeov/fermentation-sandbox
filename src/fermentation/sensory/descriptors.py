@@ -204,32 +204,44 @@ def descriptor_tier(contributing: Iterable[Tier]) -> Tier:
 class DescriptorReading:
     """One descriptor axis at a single time — its contributors, the loudest, and the floor.
 
-    ``oav`` is the **maximum** over ``contributors``, never the sum (see the module docstring's
-    additivity through-line): it is ``dominant``'s OAV, i.e. "the loudest thing making this
-    smell malty, and how far over threshold it is". ``lumped`` propagates D-66's
+    ``magnitude`` is the **maximum** over ``contributors``, never the sum (see the module
+    docstring's additivity through-line): it is ``dominant``'s reading, i.e. "the loudest thing
+    making this smell malty, and how far over threshold it is". ``lumped`` propagates D-66's
     fixed-lump-composition honesty cost from the *dominant* contributor — a descriptor driven
     by a lumped pool inherits that pool's assumption, and the caveat must not vanish just
     because it crossed a layer.
 
-    ``rule`` names the projector that produced this reading, and it exists because ``oav`` is
-    **not the same quantity under every projector** (D-98). :class:`MaxRuleProjector` puts a
-    raw OAV there; :class:`~fermentation.sensory.compression.StevensProjector` puts a
-    compressed *perceived intensity* (``OAV ** n``) there; the seam's own docstring anticipates
-    a future panel-trained model emitting genuine intensities. Those are different quantities
-    sharing one field — exactly the split identity D-96 called a category error (one pool,
-    two molecular identities, in two layers), and D-96's rule was that the honest fix is
-    another *pool*, never another disclaimer. So the reading **self-identifies** rather than
-    relying on a caller to remember which projector it called. The quantities do agree on the
-    one semantic that matters most: both equal 1 **at** the perception threshold, so
-    ``above_threshold`` means the same thing under either rule. Renaming ``oav`` to a
-    projector-neutral ``magnitude`` is the deeper fix, deferred at D-98 as churn across slice
-    1's callers and tests for no new observable.
+    ``rule`` names the projector that produced this reading, and it exists because
+    ``magnitude`` is **not the same quantity under every projector** (D-98).
+    :class:`MaxRuleProjector` puts a raw OAV there;
+    :class:`~fermentation.sensory.compression.StevensProjector` puts a compressed *perceived
+    intensity* (``OAV ** n``) there; the seam's own docstring anticipates a future panel-trained
+    model emitting genuine intensities. Those are different quantities sharing one field —
+    exactly the split identity D-96 called a category error (one pool, two molecular identities,
+    in two layers), and D-96's rule was that the honest fix is another *pool*, never another
+    disclaimer. So the reading **self-identifies** rather than relying on a caller to remember
+    which projector it called. The quantities do agree on the one semantic that matters most:
+    both equal 1 **at** the perception threshold, so ``above_threshold`` means the same thing
+    under either rule.
+
+    **The field was called ``oav`` from D-95 to D-146, and D-98 recorded the rename as the
+    deeper fix while shipping the ``rule`` tag instead** ("deferred as churn across slice 1's
+    callers and tests for no new observable"). D-146 does it. The name was the last place the
+    category error still spoke: a caller reading ``reading.oav`` off a Stevens projection got a
+    compressed intensity under a name asserting it was a concentration ratio, and the ``rule``
+    tag could only *warn* about that after the fact. **The rename is deliberately narrow** —
+    only this field held two quantities. :class:`~fermentation.sensory.oav.OAVReading.oav`,
+    :func:`~fermentation.sensory.oav.oav_series` and :func:`~fermentation.sensory.oav.oav_tier`
+    are **not** renamed: they are OAVs under every projector, and renaming them would make the
+    codebase less precise in the name of a fix about precision.
     """
 
     descriptor: str
     contributors: Mapping[str, float]
     dominant: str
-    oav: float
+    #: The axis reading under ``rule`` — a raw OAV under ``max``, a compressed intensity under
+    #: ``stevens``. Projector-neutral **by name** since D-146; ``rule`` says which it is.
+    magnitude: float
     above_threshold: bool
     lumped: bool
     tier: Tier
@@ -306,13 +318,16 @@ class MaxRuleProjector:
         for axis in axes_for_medium(profile.medium):
             contributors = {pool: profile.readings[pool].oav for pool in axis.pools}
             dominant = max(contributors, key=lambda p: contributors[p])
-            oav = contributors[dominant]
+            # Under THIS projector the magnitude happens to be a raw OAV — which is exactly why
+            # the field is not called `oav` (D-146): `StevensProjector` puts `OAV ** n` in the
+            # same slot, and one field holding two quantities is the D-96 category error.
+            magnitude = contributors[dominant]
             readings[axis.name] = DescriptorReading(
                 descriptor=axis.name,
                 contributors=contributors,
                 dominant=dominant,
-                oav=oav,
-                above_threshold=oav > 1.0,
+                magnitude=magnitude,
+                above_threshold=magnitude > 1.0,
                 lumped=profile.readings[dominant].lumped,
                 tier=descriptor_tier(profile.readings[p].tier for p in axis.pools),
             )

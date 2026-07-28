@@ -465,7 +465,7 @@ def test_slice_one_is_unaffected_by_slice_two(thresholds):
     pools = {"diacetyl": _at_oav(thresholds, "diacetyl", "wine", 4.0)}
     profile = sensory_profile(_traj(wine_schema(), pools), thresholds)
     reading = MaxRuleProjector().project(profile).readings["buttery"]
-    assert reading.oav == pytest.approx(4.0)  # uncompressed — the raw OAV, as before D-98
+    assert reading.magnitude == pytest.approx(4.0)  # uncompressed — the raw OAV, as before D-98
     assert reading.rule == "max"
 
 

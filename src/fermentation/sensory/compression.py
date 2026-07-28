@@ -164,8 +164,9 @@ class StevensProjector:
     compound can be detectable at a lower concentration than another and still be the weaker
     smell at realistic levels), and it is this projector's entire reason to exist.
 
-    **Reading its output honestly.** :attr:`DescriptorReading.oav` holds a compressed intensity
-    here, not an OAV, and :attr:`DescriptorReading.rule` says so (``"stevens"``). Every number
+    **Reading its output honestly.** :attr:`DescriptorReading.magnitude` holds a compressed
+    intensity here, not an OAV — the field was called ``oav`` until D-146, which is the whole
+    reason it was renamed — and :attr:`DescriptorReading.rule` says which it is. Every number
     it reports rides on 21 author estimates; consult :func:`dominant_flip_sensitivity` before
     believing any ``dominant`` it names. ``MaxRuleProjector`` remains the default precisely
     because its claim is weaker.
@@ -202,7 +203,7 @@ class StevensProjector:
                 descriptor=axis.name,
                 contributors=contributors,
                 dominant=dominant,
-                oav=intensity,
+                magnitude=intensity,
                 # identical to `profile.readings[dominant].oav > 1.0` — compression is
                 # threshold-preserving, and a test pins that equivalence rather than trusting it.
                 above_threshold=intensity > 1.0,

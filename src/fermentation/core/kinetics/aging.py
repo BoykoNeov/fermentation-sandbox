@@ -2100,6 +2100,22 @@ class SotolonAldolCondensation(Process):
     intermediate — the same test D-49 applied to pyruvate, answered the other way because the
     reaction that consumes this pool happens where no intracellular pool can reach.
 
+    **AND IT IS THEREFORE RACEMIC, which is what makes the OAV commensurate (decision D-146).**
+    Sotolon carries a stereocentre at C5, and its enantiomers differ ~111× in potency — Pons
+    *et al.* 2008 measured (S) at 0.8 µg/L against (R) at 89 µg/L in model wine. An aldol run
+    "by a purely chemical mechanism" has no chiral influence, so **this Process makes a 50:50
+    pool**, and ``threshold_sotolon_wine`` is a racemate threshold (Pons had to separate the
+    enantiomers *by preparative HPLC* to threshold them, so every earlier wine value was
+    measured by spiking the racemate). Pool and threshold sit at the same enantiomeric ratio.
+    D-107's deferred list called this "a lump ... soft by [~100×]" and **that is withdrawn**:
+    (R) and (S) are one molecule, and the spread does not propagate to an OAV whose threshold
+    was measured at the pool's own ratio. What the racemic claim *does* cost is a scope limit —
+    Pons found R-excess and S-excess wines, which arrive by routes this model does not carry
+    (its ~20-month racemization is slow enough to preserve them), and against those the reading
+    is **overstated by up to ~56× or understated by at most ~2×**. See ``sensory.yaml`` for the
+    derivation and ``tests/test_sensory_oav.py`` for the executable bound; this is the same
+    shape as ``methanethiol``'s "models only the autolytic route" limit, one Process over.
+
     **WHY THIS IS NOT IN :class:`MaillardStrecker` ANY MORE (the D-107 move).** Sotolon rode the
     thermal Strecker Process from D-87 to D-106 carrying two exception flags — ``decarboxylates=
     False`` and ``de_novo=True`` — and D-104 noted that "the two flags travel together for the same

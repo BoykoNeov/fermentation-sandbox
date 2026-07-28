@@ -19,7 +19,7 @@ the full suite staying green is the end-to-end proof).
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 
 import numpy as np
 import pytest
@@ -40,8 +40,11 @@ from fermentation.sensory.descriptors import (
 )
 from fermentation.sensory.oav import (
     AROMA_COMPOUNDS,
+    OAVReading,
     SensoryProfile,
     load_thresholds,
+    oav_series,
+    oav_tier,
     sensory_profile,
 )
 
@@ -168,8 +171,8 @@ def test_descriptor_reads_the_max_never_the_sum(thresholds):
         },
     )
     malty = profile.readings["malty"]
-    assert malty.oav == pytest.approx(4.2)
-    assert malty.oav != pytest.approx(5.6)  # the sum — explicitly NOT what we report
+    assert malty.magnitude == pytest.approx(4.2)
+    assert malty.magnitude != pytest.approx(5.6)  # the sum — explicitly NOT what we report
     assert malty.dominant == "3_methylbutanal"
     assert malty.contributors == pytest.approx(
         {"2_methylbutanal": 1.1, "3_methylbutanal": 4.2, "2_methylpropanal": 0.3}
@@ -190,7 +193,7 @@ def test_sub_threshold_contributors_never_sum_into_a_perceived_descriptor(thresh
             for p in ("2_methylbutanal", "3_methylbutanal", "2_methylpropanal")
         },
     )
-    assert profile.readings["malty"].oav == pytest.approx(0.4)
+    assert profile.readings["malty"].magnitude == pytest.approx(0.4)
     assert profile.readings["malty"].above_threshold is False
     assert "malty" not in profile.above_threshold()
 
@@ -207,7 +210,7 @@ def test_dominant_names_the_argmax_and_tracks_it(thresholds):
         },
     )
     assert h2s_loud.readings["sulfidic"].dominant == "h2s"
-    assert h2s_loud.readings["sulfidic"].oav == pytest.approx(3.0)
+    assert h2s_loud.readings["sulfidic"].magnitude == pytest.approx(3.0)
 
     merc_loud = _project(
         thresholds,
@@ -254,7 +257,7 @@ def test_clean_run_raises_no_false_descriptor(thresholds):
         profile = _project(thresholds, schema, {})
         assert profile.above_threshold() == []
         for reading in profile:
-            assert reading.oav == 0.0
+            assert reading.magnitude == 0.0
             assert reading.above_threshold is False
 
 
@@ -263,7 +266,7 @@ def test_descriptor_is_monotone_in_its_pools(thresholds):
     schema = wine_schema()
     lo = _project(thresholds, schema, {"isoamyl_acetate": 1.0e-3})
     hi = _project(thresholds, schema, {"isoamyl_acetate": 2.0e-3})
-    assert 0.0 < lo.readings["fruity"].oav < hi.readings["fruity"].oav
+    assert 0.0 < lo.readings["fruity"].magnitude < hi.readings["fruity"].magnitude
 
     # Raising a NON-dominant contributor leaves the descriptor unmoved (it is still not loudest)
     # — monotone non-decreasing, not strictly increasing. That is the max rule, working.
@@ -283,7 +286,9 @@ def test_descriptor_is_monotone_in_its_pools(thresholds):
             "methanethiol": _at_oav(thresholds, "methanethiol", "wine", 1.5),
         },
     )
-    assert bumped.readings["sulfidic"].oav == pytest.approx(base.readings["sulfidic"].oav)
+    assert bumped.readings["sulfidic"].magnitude == pytest.approx(
+        base.readings["sulfidic"].magnitude
+    )
 
 
 def _with_lumped_thiol(thresholds, *, h2s_oav: float, thiol_oav: float) -> SensoryProfile:
@@ -483,7 +488,7 @@ def test_an_alternative_projector_swaps_in(thresholds):
                     descriptor=axis.name,
                     contributors=contributors,
                     dominant=dominant,
-                    oav=total,
+                    magnitude=total,
                     above_threshold=total > 1.0,
                     lumped=profile.readings[dominant].lumped,
                     tier=descriptor_tier(profile.readings[p].tier for p in axis.pools),
@@ -504,8 +509,45 @@ def test_an_alternative_projector_swaps_in(thresholds):
     )
     oav_profile = sensory_profile(traj, thresholds)
     # Same input, different rule: the stub's additive malty clears threshold where v1's does not.
-    assert MaxRuleProjector().project(oav_profile).readings["malty"].oav == pytest.approx(0.4)
-    assert stub.project(oav_profile).readings["malty"].oav == pytest.approx(1.2)
+    assert MaxRuleProjector().project(oav_profile).readings["malty"].magnitude == pytest.approx(0.4)
+    assert stub.project(oav_profile).readings["malty"].magnitude == pytest.approx(1.2)
+
+
+# -- D-146: the projector-neutral field name, and the names deliberately NOT renamed ----
+
+
+def test_a_descriptor_reading_carries_no_field_named_oav(thresholds):
+    """`DescriptorReading` must not name its axis reading ``oav`` — it is not always one.
+
+    The D-98 category error in its last hiding place: `MaxRuleProjector` puts a raw OAV in this
+    field and `StevensProjector` puts ``OAV ** n``, so a field *named* ``oav`` asserts a
+    concentration ratio for a value that may be a compressed intensity. `rule` could only warn
+    after the fact. **What this forbids, precisely:** re-adding an ``oav`` attribute (or alias
+    property) to `DescriptorReading`. It does not forbid the name anywhere else — see the
+    companion test below, which requires it to survive where it is true.
+    """
+    profile = _project(thresholds, wine_schema(), {"diacetyl": 1.0e-5})
+    reading = profile.readings["buttery"]
+    assert not hasattr(reading, "oav")
+    assert isinstance(reading.magnitude, float)
+    assert "oav" not in {f.name for f in fields(DescriptorReading)}
+
+
+def test_the_rename_did_not_touch_the_quantities_that_really_are_oavs(thresholds):
+    """`OAVReading.oav` / `oav_series` / `oav_tier` keep the name, because it is accurate there.
+
+    The D-146 rename is narrow **on purpose**: beat 1a computes ``concentration / threshold``
+    under every projector — there is no second quantity sharing those names, so renaming them
+    would spend churn to make the codebase *less* precise, in the name of a fix about precision.
+    This test is the half of the decision that a grep for ``magnitude`` cannot show, and it is
+    what makes a future "finish the rename" sweep fail loudly rather than look like tidying.
+    """
+    traj = _traj(wine_schema(), {"diacetyl": _at_oav(thresholds, "diacetyl", "wine", 3.0)})
+    profile = sensory_profile(traj, thresholds)
+    assert profile.readings["diacetyl"].oav == pytest.approx(3.0)
+    assert "oav" in {f.name for f in fields(OAVReading)}
+    assert oav_series(traj, thresholds, "diacetyl")[-1] == pytest.approx(3.0)
+    assert oav_tier(Tier.VALIDATED, Tier.VALIDATED) is Tier.SPECULATIVE
 
 
 # -- D-96 regression: the fruity OAV is PHYSICAL on a real run ----------------
@@ -557,8 +599,8 @@ def test_fruity_oav_is_physical_on_a_real_wine_run(thresholds, brett):
     profile, descriptors = _finished_wine_profile(thresholds, **extra)
 
     fruity = descriptors.readings["fruity"]
-    assert 1.0 < fruity.oav < 200.0, (
-        f"fruity OAV {fruity.oav:.1f} is outside the physical band — the pre-D-96 lumped "
+    assert 1.0 < fruity.magnitude < 200.0, (
+        f"fruity OAV {fruity.magnitude:.1f} is outside the physical band — the pre-D-96 lumped "
         f"reading was 761 (dominant {fruity.dominant})"
     )
     # The number must come from a REAL molecule, and MAX must be choosing between real
