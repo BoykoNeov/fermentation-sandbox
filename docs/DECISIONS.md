@@ -16633,8 +16633,11 @@ degraded to one drawer, and guard 2 fires when a third writer appears.
 The corner is the worst case for **draw magnitude** — the rate is monotone increasing in each `k`
 and decreasing in each `K`, so the band interior cannot draw harder. It is **not** provably the
 worst case for **solver undershoot**: the K sweep above shows undershoot is not monotone in the
-same parameters. The guard covers one configuration; the band interior is covered by the
-structural argument, not by the run.
+same parameters, and the 0.3 g/L Brett arm is 6× worse than the 50 g/L one. The guard therefore
+runs **both** in-band Brett doses measured above rather than only the one that maximises the draw
+— picking by draw magnitude would have guarded the *better*-behaved of the two, on a rationale
+this record's own data undercuts. The rest of the band interior is covered by the structural
+argument, not by the run.
 
 ### Next
 
@@ -16642,7 +16645,9 @@ structural argument, not by the run.
   and the Brett/POF pair it actually meant is measured and guarded. A genuine re-opening needs a
   **new drawer** on these pools, which guard 2 will surface.
 - The largest remaining D-139 leftover is now **§2.5, the copper re-fit against D-134**, which
-  D-143 already noted arrives with a printed table arguing `k_copper_multiplier` should go **up**.
+  D-143 already noted arrives with a printed table arguing `k_copper_multiplier` should go **up**
+  — and the standing prohibition binds unchanged beside it: **do not move 600**. D-142's isolated-Cu
+  table is direction/order only, and reading that forward-pointer as licence is the whole risk.
 - The clamp-freeze asymmetry is recorded above as a live-but-unreachable defect; it becomes real
   the moment any draw on a carbon-weighted pool stops being first-order in that pool, which is a
   general property worth checking the next time a precursor draw is added anywhere.

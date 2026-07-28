@@ -1435,31 +1435,39 @@ def test_the_summed_decarboxylase_draw_cannot_drive_either_precursor_negative():
     `(n_states, n_times)`, so `y[-1]` is the last slot's time series and NOT the final state — the
     D-147 amendment's defect. `series()` indexes by name and sidesteps it.
 
-    Tolerance is `assert_nonnegative`'s own 1e-9 g/L solver-noise floor. **A failure here is a
-    finding for the record, not a test to relax**: it would mean a draw on these pools is no
-    longer first-order as its own pool empties, which is the premise the "no shared depletion
-    gate" decision (D-148) rests on. Measured headroom when written: worst excursion -5.2e-11 g/L
-    on `hydroxycinnamics`, -5.6e-11 on `ferulic_acid`, both recovering.
+    Tolerance is `assert_nonnegative`'s own 1e-9 g/L solver-noise floor, and **the failure message
+    deliberately does not claim every red is a mechanism finding.** D-148 measured the in-band
+    excursion to be *anti-correlated* with the draw rate (a 0.3 g/L Brett dose is 6x worse than
+    50 g/L) and non-monotone in K — i.e. BDF step selection, not over-draw. A marginal red is
+    therefore step selection until the K sweep says otherwise; the zero-order signature that IS a
+    finding is orders of magnitude larger (-2.4e-04 when falsified). Both in-band arms D-148
+    measured are run here, so the guard covers what was measured rather than one point of it.
     """
-    compiled, traj = _run_overdraw_corner()
+    for brett_gpl, expected in ((50.0, -5.24e-11), (0.3, -3.13e-10)):
+        compiled, traj = _run_overdraw_corner(brett_gpl=brett_gpl)
 
-    # The competition must actually BE the competition — a guard that silently degraded to one
-    # drawer would still pass and would assert nothing about summing.
-    active = {p.name for p in compiled.process_set.active}
-    assert {"brett_decarboxylation", "yeast_pof_decarboxylation"} <= active
+        # The competition must actually BE the competition — a guard that silently degraded to one
+        # drawer would still pass and would assert nothing about summing.
+        active = {p.name for p in compiled.process_set.active}
+        assert {"brett_decarboxylation", "yeast_pof_decarboxylation"} <= active
 
-    for pool in _SHARED_PRECURSORS:
-        series = traj.series(pool)
-        assert series.shape == (traj.t.size,)  # a broadcast cannot silently empty this
-        worst = float(np.min(series))
-        assert worst >= -1e-9, (
-            f"{pool} was over-drawn to {worst:.3e} g/L by the summed Brett + POF decarboxylase "
-            "draw. This is a FINDING, not a test to relax: it means a draw on this pool is no "
-            "longer Monod in the pool it draws, and the D-148 decision NOT to build a shared "
-            "depletion gate is premised on every such draw being first-order as the pool empties."
-        )
-        # And the pool is genuinely worked, not merely untouched — the corner has to bite.
-        assert float(series[-1]) < 0.01 * float(series[0])
+        for pool in _SHARED_PRECURSORS:
+            series = traj.series(pool)
+            assert series.shape == (traj.t.size,)  # a broadcast cannot silently empty this
+            worst = float(np.min(series))
+            assert worst >= -1e-9, (
+                f"{pool} reached {worst:.3e} g/L at X_brett={brett_gpl} g/L under the summed "
+                f"Brett + POF decarboxylase draw (D-148 measured {expected:.2e} here). "
+                "A LARGE negative (>= ~1e-6, the zero-order signature D-148 reproduced at "
+                "-2.4e-04) is a FINDING, not a test to relax: it means a draw on this pool is no "
+                "longer Monod in the pool it draws, and the decision NOT to build a shared "
+                "depletion gate is premised on every such draw being first-order as the pool "
+                "empties. A MARGINAL negative is BDF step selection — the in-band excursion is "
+                "anti-correlated with the draw rate and non-monotone in K — so re-run the K sweep "
+                "in probe2.py before concluding either."
+            )
+            # And the pool is genuinely worked, not merely untouched — the corner has to bite.
+            assert float(series[-1]) < 0.01 * float(series[0])
 
 
 def test_only_the_two_decarboxylases_may_draw_the_shared_precursors():
