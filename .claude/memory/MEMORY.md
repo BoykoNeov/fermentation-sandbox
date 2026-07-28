@@ -4,7 +4,7 @@
 - [Batch-end ritual](feedback-batch-end-ritual.md) — on batch/planning/session end: distilled status to memory, full entry to DECISIONS.md, commit + push
 - [Always commit + push](feedback-always-commit-push.md) — commit and push to main the moment work is done; never gate the commit on pytest/mypy/ruff
 - [Discuss disagreements](feedback-discuss-disagreements.md) — surface design disagreements before building; specs aren't gospel
-- [Project: Fermentation Sandbox](project-fermentation-sandbox.md) — status + repo; M0/M1/M2 complete, aging build order fully built, Milestone-3 at D-147 (the D-133 burst wired opt-in as a third oxidative set after measurement: constraint 1 holds, constraint 2 fails structurally, the split stays unpinned; cascade and burst both non-default). Prohibitions + pointers only; per-decision archive is docs/DECISIONS.md
+- [Project: Fermentation Sandbox](project-fermentation-sandbox.md) — status + repo; M0/M1/M2 complete, aging build order fully built, Milestone-3 at D-156 (the sampling-surface split is now pinned by tests after a matrix found four arms unguarded; cascade and burst both wired and non-default). Prohibitions + pointers only; per-decision archive is docs/DECISIONS.md
 - [Never pipe checks to tail](feedback-never-pipe-checks-to-tail.md) — `cmd | tail && ...` returns tail's exit 0 and hides ruff/pytest failures
 - [Full suite before "green"](feedback-full-suite-before-green.md) — a new Process in a shared registry breaks exact-set + end-to-end tests outside the domain suite; don't claim green until full pytest passes
 - [Verify latest state, not breadcrumbs](feedback-verify-latest-state-not-breadcrumbs.md) — old "Next:" lists get burned down by later decisions; check the latest D-record + code before proposing work
@@ -12,6 +12,7 @@
 - [Rejected values must be unreachable](feedback-rejected-values-must-be-unreachable.md) — an unphysical value in a sampled field is a live defect a green suite won't catch
 - [Validate calibrations in the frame that binds](feedback-validate-calibrations-in-the-frame-that-binds.md) — solved in isolation + tested in isolation is self-sealing; a constraint that only binds under competition dies when you remove it
 - [Name guards for what they forbid](feedback-name-guards-for-what-they-forbid.md) — a guard mislabelled with a real mechanism invites a fair objection and gets argued away
+- [Mutate the premise before building the guard](feedback-mutate-the-premise-before-building-the-guard.md) — break what the guard would protect and see if the suite already goes red; refused D-155, licensed D-156
 - [Measure which side before building](feedback-measure-which-side-before-building.md) — a one-directional corrective only helps in one direction; check the sign, the reach, and whether it's a rate knob on a supply-limited quantity
 - [Commit messages corrupted by shells](feedback-no-powershell-heredoc-in-bash.md) — PS here-strings in Bash, and `Out-File -Encoding utf8`'s BOM; exit 0 proves nothing
 - ["Paywalled" is one host, not a paper](feedback-paywalled-is-one-host.md) — check author/institutional/thesis/trade-reprint copies before recording a source as blocked; wrong 4× so far
