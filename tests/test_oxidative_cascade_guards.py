@@ -663,9 +663,7 @@ def test_copper_may_not_over_spend_ferreiras_between_wine_spread(
 
 
 @pytest.mark.parametrize("oxidative", sorted(_COPPER_MULTIPLIED_DRAWS))
-def test_only_the_declared_o2_draw_responds_to_the_copper_multiplier(
-    copper_dose_states, oxidative
-):
+def test_only_the_declared_o2_draw_responds_to_the_copper_multiplier(copper_dose_states, oxidative):
     # WHAT THIS FORBIDS: silently re-homing copper onto another O2 sink, or adding a second one.
     # D-138 constraint 4 is that "a constant fitted to one structure does not survive being moved
     # to another" — D-141 moved copper from `phenolic_browning` (61% of unsulfited uptake) onto
@@ -762,16 +760,12 @@ def _ph_scenario(*, initial_ph: float, so2_mgl: float) -> Scenario:
     """
     interventions: list[Intervention] = [
         Intervention(day=_PH_FERMENT_DAYS, action="begin_aging"),
-        Intervention(
-            day=_PH_FERMENT_DAYS, action="add_oxygen", params={"o2_mgl": _PH_O2_DOSE_MGL}
-        ),
+        Intervention(day=_PH_FERMENT_DAYS, action="add_oxygen", params={"o2_mgl": _PH_O2_DOSE_MGL}),
     ]
     if so2_mgl > 0.0:
         interventions.insert(
             0,
-            Intervention(
-                day=_PH_FERMENT_DAYS - 1.0, action="add_so2", params={"so2_mgl": so2_mgl}
-            ),
+            Intervention(day=_PH_FERMENT_DAYS - 1.0, action="add_so2", params={"so2_mgl": so2_mgl}),
         )
     return Scenario(
         name=f"d150-ph{initial_ph:g}-so2{so2_mgl:g}",
@@ -890,5 +884,437 @@ def test_ph_may_not_out_spend_the_between_wine_steady_rate_spread(
         "not a claimed ceiling. If this is red, a pH term was added to the O2 draw: that needs "
         "a decision record saying which statistic it was sourced from (D-150 measured the "
         "steep published slopes to belong to the day-1 INITIAL rate, not the steady one) and "
-        "how it separates from k_copper_multiplier, which Nguyen's own table says it does not."
+        "how it separates from k_copper_multiplier -- which TWO independent experiments now say "
+        "it does not: Nguyen 2021's own table (swing 2.011x per pH unit) and, since D-151, "
+        "Carrasco-Quiroz 2022's copper-ORTHOGONAL L16 (swing 1.826x, F(1,38) = 5.95). See "
+        "Guard 6."
+    )
+
+
+# ------------------------------------------------------------------------------------
+# Guard 6 — pH x copper is NOT separable, corroborated in a copper-orthogonal design (D-151).
+# ------------------------------------------------------------------------------------
+#
+# D-150 refused an ``f_pH`` term on the activation node on three legs. Leg 2 was the
+# structural one: the architecture's rate modifiers are multiplicative and independent
+# (D-10), so ``f_pH * f_Cu`` asserts the copper ratio is the same at every pH — and
+# Nguyen & Waterhouse 2021 Table 3.1 shows it swinging 2.011x across one pH unit. The
+# standing objection to that leg was that Nguyen's copper is dosed into the same wells the
+# pH is set in, so the "interaction" could be an artefact of a non-orthogonal design.
+#
+# This section closes that objection with the unlock D-150's amendment named. Carrasco-Quiroz
+# et al. 2022 crosses pH against copper in a genuine L16 orthogonal array, and the pH x Cu
+# interaction is significant there too, in the same direction and at a comparable magnitude.
+# **Leg 2 now rests on two independent experiments in two different media.**
+
+#: Carrasco-Quiroz, Martinez-Gil, Nevares, Martinez-Martinez, Sanchez-Gomez &
+#: del Alamo-Sanza (2022), *Foods* 11(13):1961, doi 10.3390/foods11131961 (PMC9266014).
+#: Table 1, the L16(2^15) Taguchi design, as ``condition -> (pH, Fe, Cu, Mn, EtOH, AcH)``
+#: in the paper's own units (mg/L except pH and %v/v). The MDPI host refuses automated
+#: fetches; the PMC deposit and the EuropePMC ``fullTextXML`` both serve it and were
+#: transcribed independently, agreeing cell-for-cell.
+_CQ_DESIGN: dict[int, tuple[float, float, float, float, float, float]] = {
+    1: (3.3, 1, 0.1, 4, 15, 30),
+    2: (3.3, 8, 0.1, 1, 15, 30),
+    3: (3.3, 8, 0.1, 4, 12, 10),
+    4: (3.9, 1, 0.8, 1, 12, 10),
+    5: (3.9, 8, 0.1, 1, 12, 30),
+    6: (3.9, 1, 0.8, 4, 15, 30),
+    7: (3.9, 1, 0.1, 1, 15, 10),
+    8: (3.9, 8, 0.8, 4, 12, 10),
+    9: (3.3, 8, 0.8, 1, 12, 30),
+    10: (3.3, 8, 0.8, 4, 15, 10),
+    11: (3.3, 1, 0.1, 1, 12, 10),
+    12: (3.9, 1, 0.1, 4, 12, 30),
+    13: (3.9, 8, 0.8, 1, 15, 30),
+    14: (3.3, 1, 0.8, 4, 12, 30),
+    15: (3.3, 1, 0.8, 1, 15, 10),
+    16: (3.9, 8, 0.1, 4, 15, 10),
+}
+_CQ_FACTORS = ("pH", "Fe", "Cu", "Mn", "EtOH", "AcH")
+#: (low, high) level of each factor exactly as printed in the Methods.
+_CQ_LEVELS: dict[str, tuple[float, float]] = {
+    "pH": (3.3, 3.9),
+    "Fe": (1, 8),
+    "Cu": (0.1, 0.8),
+    "Mn": (1, 4),
+    "EtOH": (12, 15),
+    "AcH": (10, 30),
+}
+#: The three grape-extract wines the whole array was run on. They are a BLOCK, not a factor:
+#: different extracts, same 16 conditions each.
+_CQ_GEWS = ("A", "B", "C")
+
+#: Table 2, ``R_max`` (hPa/h) — "maximum value of the oxygen consumption/rate curve".
+#: A MAXIMUM rate on a single saturation, i.e. an initial-rate-class statistic in D-150 leg 3's
+#: sorting, not the repeated-saturation steady rate the activation node is calibrated to (D-132).
+_CQ_RMAX: dict[str, dict[int, float]] = {
+    "A": {
+        1: 5.6,
+        2: 8.3,
+        3: 8.3,
+        4: 8.1,
+        5: 10.0,
+        6: 7.7,
+        7: 19.7,
+        8: 12.6,
+        9: 7.6,
+        10: 9.4,
+        11: 5.6,
+        12: 33.0,
+        13: 12.5,
+        14: 8.6,
+        15: 6.7,
+        16: 12.0,
+    },
+    "B": {
+        1: 6.4,
+        2: 7.9,
+        3: 7.7,
+        4: 7.2,
+        5: 12.3,
+        6: 8.1,
+        7: 9.3,
+        8: 13.0,
+        9: 7.3,
+        10: 8.8,
+        11: 4.3,
+        12: 30.7,
+        13: 12.3,
+        14: 7.9,
+        15: 6.9,
+        16: 13.2,
+    },
+    "C": {
+        1: 4.6,
+        2: 5.1,
+        3: 5.3,
+        4: 4.5,
+        5: 8.1,
+        6: 4.4,
+        7: 6.2,
+        8: 9.6,
+        9: 5.0,
+        10: 5.7,
+        11: 3.0,
+        12: 6.4,
+        13: 7.4,
+        14: 5.0,
+        15: 4.4,
+        16: 8.8,
+    },
+}
+#: Table 2, ``delta O_90_10`` (hPa) and ``delta t_O_90_10`` (h). Carried ONLY to reproduce the
+#: paper's printed significance verdict below. Their quotient is **not** a rate this archive
+#: licenses: the numerator spans 1.49x (CV 0.074) across all 48 rows while the denominator
+#: spans 4.79x (CV 0.398), so the quotient correlates with 1/dt at r = 0.988 — it is a
+#: DURATION statistic wearing rate units, over one saturation of a dealcoholized grape-extract
+#: reconstitution. See the verdict test's docstring.
+_CQ_DO90: dict[str, dict[int, float]] = {
+    "A": {
+        1: 85.0,
+        2: 96.9,
+        3: 100.7,
+        4: 101.6,
+        5: 103.0,
+        6: 112.1,
+        7: 99.5,
+        8: 106.1,
+        9: 95.0,
+        10: 95.8,
+        11: 103.6,
+        12: 97.6,
+        13: 111.7,
+        14: 102.7,
+        15: 100.1,
+        16: 107.8,
+    },
+    "B": {
+        1: 101.6,
+        2: 97.0,
+        3: 100.7,
+        4: 96.8,
+        5: 112.0,
+        6: 113.4,
+        7: 97.0,
+        8: 108.1,
+        9: 93.7,
+        10: 99.4,
+        11: 94.3,
+        12: 95.1,
+        13: 112.7,
+        14: 101.6,
+        15: 104.8,
+        16: 112.6,
+    },
+    "C": {
+        1: 98.2,
+        2: 94.4,
+        3: 94.9,
+        4: 94.3,
+        5: 120.2,
+        6: 102.9,
+        7: 101.8,
+        8: 110.1,
+        9: 99.2,
+        10: 95.5,
+        11: 80.9,
+        12: 101.1,
+        13: 111.1,
+        14: 96.8,
+        15: 92.5,
+        16: 104.8,
+    },
+}
+_CQ_DT90: dict[str, dict[int, float]] = {
+    "A": {
+        1: 46.5,
+        2: 29.0,
+        3: 33.6,
+        4: 36.8,
+        5: 36.3,
+        6: 35.5,
+        7: 26.7,
+        8: 17.8,
+        9: 42.5,
+        10: 27.3,
+        11: 52.2,
+        12: 17.4,
+        13: 21.8,
+        14: 31.9,
+        15: 37.2,
+        16: 21.1,
+    },
+    "B": {
+        1: 42.4,
+        2: 33.0,
+        3: 35.1,
+        4: 46.4,
+        5: 39.4,
+        6: 34.2,
+        7: 35.1,
+        8: 19.0,
+        9: 43.2,
+        10: 29.1,
+        11: 59.9,
+        12: 18.9,
+        13: 20.8,
+        14: 35.4,
+        15: 42.8,
+        16: 19.1,
+    },
+    "C": {
+        1: 65.8,
+        2: 52.1,
+        3: 52.0,
+        4: 68.5,
+        5: 51.1,
+        6: 77.3,
+        7: 59.1,
+        8: 28.8,
+        9: 57.6,
+        10: 47.7,
+        11: 83.4,
+        12: 44.7,
+        13: 39.0,
+        14: 61.5,
+        15: 74.8,
+        16: 31.8,
+    },
+}
+
+#: The paper prints exactly two things this transcription can be checked against.
+#: (1) Prose, on the pH main effect on ``R_max``: it rises "from 6.5 to 11.6 hPa/h".
+_CQ_PRINTED_RMAX_PH_LEVEL_MEANS = (6.5, 11.6)
+#: (2) A categorical verdict over all six factors: "pH, Fe2+ and Mn2+ being the significant
+#: conditions" (ANOVA/LSD, p < 0.05).
+_CQ_PRINTED_SIGNIFICANT = frozenset({"pH", "Fe", "Mn"})
+
+
+def _cq_sign(cond: int, factor: str) -> int:
+    """-1 at the factor's low level, +1 at its high level, as printed in Table 1."""
+    lo, _hi = _CQ_LEVELS[factor]
+    return -1 if _CQ_DESIGN[cond][_CQ_FACTORS.index(factor)] == lo else +1
+
+
+def _cq_anova(values: dict[str, dict[int, float]]) -> dict[str, float]:
+    """Six main effects + the pH x Cu interaction, over the 48 condition x GEw means.
+
+    **This is NOT the paper's error term and no p-value from it is the paper's.** Table 2
+    reports means of five replicates, so the replicate variance is not recoverable from the
+    printed table; the residual here is that of the 48 condition x GEw means and absorbs every
+    unmodelled interaction. That makes it a *conservative* error term for the effects it does
+    fit, and it is used for exactly two things: reproducing the paper's categorical verdict as
+    a transcription check, and estimating the pH x Cu interaction the paper never reports.
+    """
+    ys = [values[g][c] for g in _CQ_GEWS for c in _CQ_DESIGN]
+    n = len(ys)
+    grand = sum(ys) / n
+    sst = sum((y - grand) ** 2 for y in ys)
+    # GEw enters as a block: three different extracts, not a level of anything.
+    ss_block = sum(
+        len(_CQ_DESIGN) * (sum(values[g][c] for c in _CQ_DESIGN) / len(_CQ_DESIGN) - grand) ** 2
+        for g in _CQ_GEWS
+    )
+    ss: dict[str, float] = {}
+    for f in _CQ_FACTORS:
+        lo = [values[g][c] for g in _CQ_GEWS for c in _CQ_DESIGN if _cq_sign(c, f) < 0]
+        hi = [values[g][c] for g in _CQ_GEWS for c in _CQ_DESIGN if _cq_sign(c, f) > 0]
+        ss[f] = (
+            len(lo) * (sum(lo) / len(lo) - grand) ** 2 + len(hi) * (sum(hi) / len(hi) - grand) ** 2
+        )
+    ss_cells = 0.0
+    for a in (-1, 1):
+        for b in (-1, 1):
+            cell = [
+                values[g][c]
+                for g in _CQ_GEWS
+                for c in _CQ_DESIGN
+                if _cq_sign(c, "pH") == a and _cq_sign(c, "Cu") == b
+            ]
+            ss_cells += len(cell) * (sum(cell) / len(cell) - grand) ** 2
+    ss["pH_x_Cu"] = ss_cells - ss["pH"] - ss["Cu"]
+    df_error = n - 1 - 2 - len(_CQ_FACTORS) - 1
+    mse = (sst - ss_block - sum(ss[f] for f in _CQ_FACTORS) - ss["pH_x_Cu"]) / df_error
+    out = {f"F_{k}": v / mse for k, v in ss.items()}
+    out["df_error"] = float(df_error)
+    return out
+
+
+#: F(1, 38) at p = 0.05. Pinned rather than imported so the guard states its own threshold.
+_CQ_F_CRIT = 4.0982
+
+
+def test_the_carrasco_quiroz_l16_design_is_orthogonal_and_ph_x_cu_is_unaliased():
+    # WHAT THIS FORBIDS: claiming a copper-ORTHOGONAL pH reading from a design that is not
+    # orthogonal. The entire value of this dataset over Nguyen's is that copper varies
+    # independently of pH; if the transcription of Table 1 were wrong, the pH x Cu interaction
+    # the sibling guard measures could be any other factor's main effect wearing a disguise,
+    # and leg 2's corroboration would be circular.
+    for f in _CQ_FACTORS:
+        assert sum(_cq_sign(c, f) for c in _CQ_DESIGN) == 0, (
+            f"factor {f} is not balanced 8/8 across the 16 conditions — Table 1 is mis-transcribed"
+        )
+    for i, a in enumerate(_CQ_FACTORS):
+        for b in _CQ_FACTORS[i + 1 :]:
+            dot = sum(_cq_sign(c, a) * _cq_sign(c, b) for c in _CQ_DESIGN)
+            assert dot == 0, f"{a} and {b} are not orthogonal (dot = {dot}); Table 1 is wrong"
+    # The interaction column itself must be free of every studied main effect, or the
+    # interaction estimate is confounded with one of them.
+    for f in _CQ_FACTORS:
+        dot = sum(_cq_sign(c, "pH") * _cq_sign(c, "Cu") * _cq_sign(c, f) for c in _CQ_DESIGN)
+        assert dot == 0, (
+            f"the pH x Cu interaction column is aliased with the {f} main effect (dot = {dot}). "
+            "The interaction estimate below would then be unattributable, and leg 2's "
+            "corroboration collapses."
+        )
+
+
+def test_the_carrasco_quiroz_transcription_reproduces_its_papers_printed_ph_level_means():
+    # WHAT THIS FORBIDS: a silent transcription error in the R_max column, which is the only
+    # column the load-bearing guard below reads. D-150 recorded this paper as "direction and
+    # order only" precisely because its 6.5 -> 11.6 hPa/h comes from PROSE describing a figure.
+    # Recomputing those two numbers from Table 2 is what converts it from prose into a sourced
+    # table: the table reproduces the prose, so the prose was reporting the pH main effect.
+    #
+    # The match is 0.47% on the high level, NOT exact, and that is stated rather than rounded
+    # away. No defensible aggregation lands on 11.6 -- arithmetic level means give 11.546,
+    # geometric 10.116, mean-of-per-GEw-means 11.546. The residual is consistent with Table 2
+    # being printed to one decimal place; it is not consistent with a different statistic.
+    lo = [_CQ_RMAX[g][c] for g in _CQ_GEWS for c in _CQ_DESIGN if _cq_sign(c, "pH") < 0]
+    hi = [_CQ_RMAX[g][c] for g in _CQ_GEWS for c in _CQ_DESIGN if _cq_sign(c, "pH") > 0]
+    got = (sum(lo) / len(lo), sum(hi) / len(hi))
+    for computed, printed in zip(got, _CQ_PRINTED_RMAX_PH_LEVEL_MEANS, strict=True):
+        assert computed == pytest.approx(printed, rel=0.006), (
+            f"recomputed R_max pH level means {got[0]:.4f} / {got[1]:.4f} against the paper's "
+            f"printed {_CQ_PRINTED_RMAX_PH_LEVEL_MEANS}. The Table 2 R_max transcription is "
+            "wrong, and it is what the separability guard below reads."
+        )
+
+
+def test_the_carrasco_quiroz_transcription_reproduces_its_papers_printed_significance_verdict():
+    # WHAT THIS FORBIDS: a GROSS transcription error in Table 2's two duration columns. It
+    # reproduces a CATEGORICAL verdict across all six factors -- "pH, Fe2+ and Mn2+ being the
+    # significant conditions" -- which is why this dataset's transcription is trusted at all.
+    #
+    # ITS SENSITIVITY IS MEASURED, NOT ASSUMED, and it is coarse. The verdict's margins are
+    # wide (pH 34.9, Fe 18.3, Mn 13.6 against Cu 0.23, EtOH 0.63, AcH 0.14 -- crit 4.10), so:
+    #   - the smallest single-cell error it catches is 43% (dt B/13, 20.8 -> 11.9): a one-digit
+    #     slip does NOT fire it;
+    #   - a factor-aligned column distortion IS caught (dt scaled 1.5x on Fe-high drops Mn);
+    #   - a GEw block permutation (A <-> C) and a halved condition-11 row are NOT caught.
+    # These two columns feed nothing else -- the load-bearing R_max column is checked separately
+    # above, and that check IS single-digit sensitive (33.0 -> 3.0 fires it). So this is a
+    # coarse check on non-load-bearing columns, stated at the resolution it actually has.
+    #
+    # It runs on delta-O_90_10 / delta-t_O_90_10, which is the only statistic here that
+    # reproduces the verdict. **That is a transcription check and nothing else.** That quotient
+    # correlates with 1/dt at r = 0.988 (numerator CV 0.074, denominator CV 0.398): it is a
+    # DURATION statistic in rate units, measured over ONE saturation of a dealcoholized
+    # grape-extract reconstitution, and the activation node is calibrated to Ferreira's
+    # repeated-saturation cycles-2-to-5 rate in real wine (D-132). Those are different physical
+    # quantities, which is why Fe lights up here (F = 18.3) and vanishes on R_max (F = 0.017).
+    #
+    # DO NOT read a separability result off this statistic. Its pH x Cu interaction is
+    # non-significant (F = 0.47), and D-151 records explicitly that this does NOT retire leg 2
+    # for the node -- it is a limit on how far this dataset reaches, not a licence.
+    rate = {g: {c: _CQ_DO90[g][c] / _CQ_DT90[g][c] for c in _CQ_DESIGN} for g in _CQ_GEWS}
+    result = _cq_anova(rate)
+    significant = frozenset(f for f in _CQ_FACTORS if result[f"F_{f}"] > _CQ_F_CRIT)
+    f_by_factor = {f: round(result[f"F_{f}"], 2) for f in _CQ_FACTORS}
+    assert significant == _CQ_PRINTED_SIGNIFICANT, (
+        f"recomputed significant factors {sorted(significant)} against the paper's printed "
+        f"{sorted(_CQ_PRINTED_SIGNIFICANT)} (F: {f_by_factor}, crit {_CQ_F_CRIT}). "
+        "Table 2's delta-O_90_10 / delta-t_O_90_10 columns are mis-transcribed."
+    )
+
+
+def test_a_separable_f_ph_times_f_cu_is_rejected_by_the_copper_orthogonal_design():
+    # WHAT THIS FORBIDS: reinstating the pH term D-150 refused by arguing that Nguyen's
+    # pH/copper interaction is an artefact of his non-orthogonal dosing. It is not. Copper is
+    # an independent factor here (proven by the orthogonality guard above), and the interaction
+    # survives.
+    #
+    # The architecture's rate modifiers are multiplicative and independent (D-10), so any
+    # f_pH * f_Cu asserts the pH ratio is IDENTICAL at every copper level. This measures that
+    # assertion against the data: a separable model requires a swing of exactly 1.000x.
+    #
+    #   measured, R_max:  pH ratio 2.354x at Cu 0.1 mg/L vs 1.289x at Cu 0.8 mg/L
+    #                     -> swing 1.826x over the 3.3-3.9 span, F(1,38) = 5.95, p = 0.0195
+    #   Nguyen 2021:      swing 2.011x over one pH unit, opposite axis of the same table
+    #
+    # Same direction (pH's effect is weaker at high copper), comparable magnitude, two media,
+    # two designs. Dropping condition 12 -- the one R_max outlier (33.0/30.7/6.4), which sits
+    # in the pH-3.9/Cu-0.1 cell -- makes the interaction STRONGER, not weaker (F = 9.27,
+    # p = 0.0044), so it is not an outlier artefact.
+    #
+    # Red-able on the real hazard: replacing the four cell means with their best multiplicative
+    # -separable reconstruction drops F to 0.26, far below _CQ_F_CRIT. The statistic responds
+    # to separability itself, not merely to the size of the numbers.
+    result = _cq_anova(_CQ_RMAX)
+    assert result["df_error"] == 38.0, "the error df moved; _CQ_F_CRIT is pinned at F(1, 38)"
+
+    cells: dict[tuple[int, int], float] = {}
+    for a in (-1, 1):
+        for b in (-1, 1):
+            xs = [
+                _CQ_RMAX[g][c]
+                for g in _CQ_GEWS
+                for c in _CQ_DESIGN
+                if _cq_sign(c, "pH") == a and _cq_sign(c, "Cu") == b
+            ]
+            cells[(a, b)] = sum(xs) / len(xs)
+    swing = (cells[(1, -1)] / cells[(-1, -1)]) / (cells[(1, 1)] / cells[(-1, 1)])
+
+    assert result["F_pH_x_Cu"] > _CQ_F_CRIT, (
+        f"the pH x Cu interaction is F = {result['F_pH_x_Cu']:.3f} against F(1,38) crit "
+        f"{_CQ_F_CRIT} (swing {swing:.4f}x). If this is green-turned-red by editing the table, "
+        "the transcription is wrong. If it genuinely fell below the threshold, leg 2 of D-150 "
+        "would rest on Nguyen alone again -- that is a finding for a decision record, not a "
+        "threshold to lower."
+    )
+    assert swing > 1.0, (
+        f"the pH effect is measured as STRONGER at high copper (swing {swing:.4f}x), reversing "
+        "the direction Nguyen 2021 shows. Two experiments disagreeing in sign is a different "
+        "finding from two agreeing, and needs a record."
     )
