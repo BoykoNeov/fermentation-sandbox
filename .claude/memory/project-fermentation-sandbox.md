@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-28T13:05:13.451Z
+  modified: 2026-07-28T13:19:20.135Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,8 +26,8 @@ it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedba
 ## Status (2026-07-28)
 
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-153**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1443 passed**. Wine schema **94 slots** / beer **47**
+**D-154**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1444 passed**. Wine schema **94 slots** / beer **47**
 — `quinone` in both regardless of set. **Three** oxidative sets (`direct` default / `cascade` / `direct_burst`).
 Most remaining Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -56,9 +56,9 @@ Most remaining Milestone-3 work is **blocked on external sourcing**, not on buil
   (oak's *extraction asymptote*). **Never re-run or "tighten" the regex**: the archive uses
   `RECALIBRATED`/`ceiling`/`upper bound` for HEALTHY provenance too, so prose cannot separate
   "argued down from X" from "X is inside and excluded". Only a **measured per-parameter bound** finds it.
-- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (the live defect below) and
+- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band now clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, already guarded** — analytic breach point *recomputed* by
-  the test, the template to copy).
+  the test, the template both now follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor — joint margin
   **3.07e-5**, unguarded. Its top-mode is deliberate (0.531 is a hard *measured* protein floor).
   **0.963 lying inside its band is a COINCIDENCE, not a second defect** — D-119 forbids
@@ -74,8 +74,12 @@ Most remaining Milestone-3 work is **blocked on external sourcing**, not on buil
 - **BOUNDED, not null (D-152):** copper-orthogonal L16 gives **k ≤ 918 L/g**, excluding 2092, 2000 and band-high
   1500 under all six arms (Guard 7). **Never rebuild on Table 2's SDs; keep condition 12; NEVER cite it as
   evidence FOR 600** (only 1 of 6 arms admits 600) — one-directional, against higher k only.
-- **LIVE DEFECT:** 1500 is excluded yet `ensemble.py` draws `triangular(200,600,1500)` ⇒ **~29% of draws
-  excluded** [[feedback-rejected-values-must-be-unreachable]]. **Next beat = the BAND, not the value.**
+- **BAND FIXED (D-154) — was the live defect; do not re-propose it.** High **1500 → 662.8** L/g: the bound at
+  `copper_typical`'s **MAXIMUM**, not the shipped-centring 918, because `copper_typical` is **itself sampled**
+  and `k_bound` *decreases* in it — joint draws bind at its max (the 918 arm goes RED, so this is load-bearing).
+  **Never adopt D-152's printed "663"** — exact is 662.802522, so 663 ships red. Value/low edge/`copper_typical`
+  **untouched**; Ferreira's 2.2× budget is **no longer** the high-side constraint. Guard **recomputes** the
+  bound + asserts the monotonicity, never reads the note [[feedback-rejected-values-must-be-unreachable]].
 - **No Fe(III) state** — not D-134's "iron in surplus": QSS rests on a **~18× separation**.
 - **A pH term on activation/`k_browning_eff` is REFUSED (D-150)** — never re-open on "Nguyen's table shows strong
   pH dependence". Strongest leg is **inseparability from copper**, corroborated by Carrasco-Quiroz's

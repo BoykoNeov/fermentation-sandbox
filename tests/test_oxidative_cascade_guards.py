@@ -1364,12 +1364,60 @@ def test_a_separable_f_ph_times_f_cu_is_rejected_by_the_copper_orthogonal_design
 #: exactly; that agreement is the only provenance these SDs have, since the paper prints no
 #: pooled statistic to check them against.
 _CQ_RMAX_SD: dict[str, dict[int, float]] = {
-    "A": {1: 0.8, 2: 1.2, 3: 0.6, 4: 0.6, 5: 0.5, 6: 0.9, 7: 1.0, 8: 1.2,
-          9: 0.6, 10: 0.7, 11: 0.7, 12: 2.6, 13: 1.0, 14: 0.5, 15: 0.2, 16: 1.7},
-    "B": {1: 0.4, 2: 1.2, 3: 0.5, 4: 0.8, 5: 1.5, 6: 1.0, 7: 2.5, 8: 0.9,
-          9: 1.0, 10: 0.4, 11: 0.3, 12: 0.7, 13: 1.7, 14: 0.3, 15: 0.4, 16: 1.1},
-    "C": {1: 0.4, 2: 0.4, 3: 0.6, 4: 0.9, 5: 1.1, 6: 0.4, 7: 1.8, 8: 1.2,
-          9: 0.8, 10: 0.5, 11: 0.4, 12: 0.4, 13: 0.7, 14: 0.7, 15: 0.4, 16: 1.1},
+    "A": {
+        1: 0.8,
+        2: 1.2,
+        3: 0.6,
+        4: 0.6,
+        5: 0.5,
+        6: 0.9,
+        7: 1.0,
+        8: 1.2,
+        9: 0.6,
+        10: 0.7,
+        11: 0.7,
+        12: 2.6,
+        13: 1.0,
+        14: 0.5,
+        15: 0.2,
+        16: 1.7,
+    },
+    "B": {
+        1: 0.4,
+        2: 1.2,
+        3: 0.5,
+        4: 0.8,
+        5: 1.5,
+        6: 1.0,
+        7: 2.5,
+        8: 0.9,
+        9: 1.0,
+        10: 0.4,
+        11: 0.3,
+        12: 0.7,
+        13: 1.7,
+        14: 0.3,
+        15: 0.4,
+        16: 1.1,
+    },
+    "C": {
+        1: 0.4,
+        2: 0.4,
+        3: 0.6,
+        4: 0.9,
+        5: 1.1,
+        6: 0.4,
+        7: 1.8,
+        8: 1.2,
+        9: 0.8,
+        10: 0.5,
+        11: 0.4,
+        12: 0.4,
+        13: 0.7,
+        14: 0.7,
+        15: 0.4,
+        16: 1.1,
+    },
 }
 _CQ_N_REPLICATES = 5
 
@@ -1569,11 +1617,11 @@ def test_the_shipped_copper_multiplier_is_not_excluded_by_the_copper_orthogonal_
     # (how much of Ferreira's 2.2x between-wine spread copper alone may spend); this bounds it
     # by a measurement of copper itself. A value can clear the budget and still be excluded here.
     #
-    # It asserts the shipped VALUE only, and that is deliberate: the band's declared HIGH edge,
-    # 1500 L/g, is ALREADY excluded (918 < 1500), so asserting the band would be red on arrival
-    # -- and would go red again if anyone later narrowed the band correctly. That exceedance is
-    # a live finding recorded at D-152, not something this test can express; the failure message
-    # below carries it so it cannot be lost.
+    # It asserts the shipped VALUE only. When written (D-152) that was forced: the band's HIGH
+    # edge was 1500 L/g and already excluded, so asserting the band would have been red on
+    # arrival. D-154 narrowed the edge to the bound, so the band is now assertable and the
+    # sibling test below does exactly that. This one stays value-only so the two failure modes
+    # stay distinguishable -- "the value moved" and "the edge moved" are different findings.
     param = aging_parameters["k_copper_multiplier"]
     typical = aging_parameters["copper_typical"]
     bound = _cq_copper_ratio_upper_bound()
@@ -1588,11 +1636,59 @@ def test_the_shipped_copper_multiplier_is_not_excluded_by_the_copper_orthogonal_
         "Carrasco-Quiroz 2022's L16 is the only design in this record where copper varies "
         "independently of pH, and it is the same class of medium the value was digitized from. "
         "Raising the value past this needs a second copper-orthogonal experiment, not a "
-        "re-reading of Nguyen's table (D-149). NOTE, already true and recorded at D-152: the "
-        "band's HIGH edge (1500 L/g) sits above this bound, and runtime/ensemble.py draws "
-        "triangular(low, value, high) -- so ~29% of ensemble draws land on values this "
-        "measurement excludes. That is the open item; the shipped value is not."
+        "re-reading of Nguyen's table (D-149). If THIS is red rather than its sibling below, "
+        "the VALUE moved, not the band edge -- and the value is closed by D-149."
     )
+
+
+def test_the_copper_bands_high_edge_is_not_excluded_by_its_own_bound(aging_parameters):
+    # WHAT THIS FORBIDS: re-widening `k_copper_multiplier`'s band past the measurement that
+    # set its edge -- the defect D-152 found and D-154 fixed, made unrepeatable.
+    #
+    # THE POINT OF THIS TEST IS THE SAMPLER, not the declaration. `runtime/ensemble.py` draws
+    # `triangular(low, value, high)`, so a band edge is not documentation: every point up to it
+    # is REACHABLE. Before D-154 the edge was 1500 L/g against a bound of 918, and ~29% of
+    # ensemble draws landed on values this measurement excludes (D-152, flagged not fixed).
+    # `rejected-values-must-be-unreachable`, live, in a field a green suite did not catch.
+    #
+    # WHY THE TIGHTEST CENTRING AND NOT THE SHIPPED 918. The ratio->k conversion depends on
+    # where the mean-centering sits, `k_bound` is DECREASING in `copper_typical`, and
+    # `copper_typical` is ITSELF a sampled band ([0.168, 0.679] mg/L). The two are drawn
+    # INDEPENDENTLY, so the binding constraint is `copper_typical` at its MAXIMUM: 662.8 L/g,
+    # not the 918 that holds only at the shipped centring. The sibling test above already took
+    # `min()` across the centring band for this reason; this extends the same argument from the
+    # value to the edge, which is the whole of D-154.
+    #
+    # Recomputed here, never trusted from the YAML note -- the D-118 breach-point template
+    # (`test_the_de_novo_share_stays_above_its_analytic_breach_point`), because a claimed number
+    # nobody recomputes is the D-96/D-109 defect class. It also catches the rounding trap that
+    # would otherwise have shipped red: the exact bound is 662.802522 and D-152 PRINTED 663.
+    param = aging_parameters["k_copper_multiplier"]
+    typical = aging_parameters["copper_typical"]
+    bound = _cq_copper_ratio_upper_bound()
+    k_bound = min(
+        _cq_ratio_to_k(bound["ratio_upper_bound"], gpl)
+        for gpl in (typical.uncertainty.low, typical.value, typical.uncertainty.high)
+    )
+    # The binding centring must be copper_typical's HIGH edge -- if that ever stops being true
+    # the argument above is wrong, and taking a min() would silently keep this test green.
+    assert k_bound == _cq_ratio_to_k(bound["ratio_upper_bound"], typical.uncertainty.high), (
+        "the tightest copper bound is no longer at copper_typical's band MAXIMUM, so k_bound is "
+        "not monotone decreasing in the centring -- D-154's joint-sampling argument needs redoing"
+    )
+    assert param.uncertainty.high <= k_bound, (
+        f"k_copper_multiplier's band HIGH edge ({param.uncertainty.high} L/g) is EXCLUDED by the "
+        f"copper-orthogonal bound of {k_bound:.4f} L/g (at copper_typical's band maximum "
+        f"{typical.uncertainty.high * 1e3:.3f} mg/L; ratio <= "
+        f"{bound['ratio_upper_bound']:.4f}x at pH 3.3, the loosest pH slice, two-sided 95%). "
+        "ensemble.py samples this band, so an excluded edge is REACHABLE, not merely declared. "
+        "Re-widening needs a second copper-orthogonal experiment in real wine on a STEADY rate "
+        "(D-152's named unlock) -- not a re-reading of Nguyen's table (D-149), and not this "
+        "dataset read harder. NOTE the edge is deliberately truncated DOWN from the exact bound: "
+        "D-152 printed 663 and the exact value is 662.802522, so 663 would fail here."
+    )
+    # ...and the band must still be a band: value strictly inside, low edge untouched by D-154.
+    assert param.uncertainty.low < param.value < param.uncertainty.high
 
 
 def test_the_printed_replicate_sds_cannot_carry_the_copper_bound():

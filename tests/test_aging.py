@@ -1536,11 +1536,13 @@ def test_browning_copper_multiplier_stays_positive_at_zero_copper(params):
 
 
 def test_browning_copper_multiplier_clamp_prevents_negative_rate(params):
-    # At the HIGH end of k_copper_multiplier's own sourced uncertainty band (5000 L/g, aging.yaml),
-    # zero copper WOULD flip f_copper negative (1 - 5000*2.6e-4 = -0.3) without the in-Process
-    # max(0.0, ...) clamp — exercising the clamp directly (not reachable at the shipped central
-    # value, per the test above) confirms it actually guards a real edge of the sourced band, not
-    # dead code.
+    # 5000 L/g is a SYNTHETIC override chosen well ABOVE k_copper_multiplier's sourced band, not
+    # the band's edge — the comment here claimed the latter and was wrong even when the edge was
+    # 1500 (D-154 narrowed it to 662.8, where f(0) = 0.83, comfortably positive). The clamp is
+    # deliberately unreachable from the shipped band, which is why exercising it needs a value
+    # from outside: at 5000, zero copper WOULD flip f_copper negative (1 - 5000*2.6e-4 = -0.3)
+    # without the in-Process max(0.0, ...) clamp. That makes this a guard against a pathological
+    # override, not against a reachable draw — and saying so is the point of the correction.
     schema = wine_schema()
     o2, t = 0.03, 298.15
     clamped_params = dict(params)
