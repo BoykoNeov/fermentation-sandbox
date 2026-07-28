@@ -281,6 +281,8 @@ from collections.abc import Mapping
 
 from fermentation.core.acidbase import (
     ACID_STATE,
+    PH_SYSTEM_READS,
+    SO2_BINDING_READS,
     SO2_STATE_KEY,
     bisulfite_fraction,
     bisulfite_so2_at_ph,
@@ -747,9 +749,13 @@ class EsterHydrolysis(Process):
     #: were added at D-125 for the multi-species factor; ``T_ref`` is shared with every other
     #: Arrhenius rate. Their tiers cap the ``isoamyl_acetate``/``isoamyl_alcohol``/``Byp`` output
     #: tiers via parameter-tier propagation (D-1). The plausible pH-system params read *inside*
-    #: :func:`ph_of_state` AND the tartaric speciation (``pKa_tartaric_*``, ``cation_charge``) are
-    #: omitted — this Process is already speculative, so they cap nothing (the
-    #: :class:`SulfiteOxidation` / MalolacticConversion convention).
+    #: :func:`ph_of_state` — which the D-125 tartaric speciation factor also goes through — ARE
+    #: declared (decision D-160). They still cap nothing (plausible against a speculative
+    #: Process, the old :class:`SulfiteOxidation` / MalolacticConversion rationale), but ``reads``
+    #: also scopes the ensemble sampler: undeclared, the pKa bands never entered this Process's
+    #: reported spread, which D-159 measured at 14–20 % of nominal on ``isoamyl_acetate``.
+    #: NOT the SO₂-binding set — this Process solves pH but never partitions SO₂.
+    #: ``cation_charge`` is STATE, not a parameter, so it is not a read.
     reads: tuple[str, ...] = (
         "k_ester_hydrolysis",
         "E_a_ester_hydrolysis",
@@ -759,6 +765,7 @@ class EsterHydrolysis(Process):
         "r_ht_ester_hydrolysis",
         "tartaric_ref_ester_hydrolysis",
         "T_ref",
+        *PH_SYSTEM_READS,
     )
 
     def derivatives(
@@ -1061,9 +1068,12 @@ class EthylAcetateEsterification(Process):
     #: (aging.yaml, D-127; all model-derived author estimates—Shinohara 1979 equilibrium + approach
     #: time, R&O 1980 acetate cluster as the rate cross-check). ``T_ref`` is shared with every other
     #: Arrhenius rate. Their speculative tiers cap the ``ethyl_acetate`` / ``E`` / ``Byp`` output
-    #: tiers (D-1). The plausible pH-system params read *inside* :func:`ph_of_state` (``pKa_*``,
-    #: ``cation_charge``) are omitted—this Process is already speculative, so they cap nothing (the
-    #: :class:`EsterHydrolysis` convention). Unlike :class:`EsterHydrolysis` it reads no
+    #: tiers (D-1). The plausible pH-system params read *inside* :func:`ph_of_state` ARE declared
+    #: (D-160, the :class:`EsterHydrolysis` convention — reversed there too): they cap nothing, but
+    #: they scope the sampler. NOT the SO₂-binding set — this Process solves pH and never
+    #: partitions SO₂, and declaring binding constants it does not touch would be a false
+    #: dependency. ``cation_charge`` is STATE, not a parameter, so it is not a read. Unlike
+    #: :class:`EsterHydrolysis` it reads no
     #: tartrate-ratio params: the D-125 law is isoamyl-acetate's, not ported (the
     #: D-126 restraint).
     reads: tuple[str, ...] = (
@@ -1072,6 +1082,7 @@ class EthylAcetateEsterification(Process):
         "ethyl_acetate_eq",
         "pH_ref_ethyl_acetate_esterification",
         "T_ref",
+        *PH_SYSTEM_READS,
     )
 
     def derivatives(
@@ -1305,10 +1316,17 @@ class SulfiteOxidation(Process):
     #: those two and nothing else.
     touches = ("o2", "so2_total")
     #: ``k_so2_oxidation``/``E_a_so2_oxidation`` are its own (aging.yaml, D-72); ``T_ref`` is shared
-    #: with every Arrhenius rate. The pKa/binding params read through ``acidbase`` (to
-    #: derive free bisulfite at the solved pH) are omitted — all plausible, and the Process is
-    #: already speculative, so they add no tier headline (the MalolacticConversion/brett rule).
-    reads: tuple[str, ...] = ("k_so2_oxidation", "E_a_so2_oxidation", "T_ref")
+    #: with every Arrhenius rate. The pKa/binding params read through ``acidbase`` (to derive free
+    #: bisulfite at the solved pH) ARE now declared (D-160): they still add no tier headline — all
+    #: plausible against a speculative Process — but ``reads`` also scopes the ensemble sampler,
+    #: and omitting them held this Process's reported spread flat in the pKa/binding bands.
+    reads: tuple[str, ...] = (
+        "k_so2_oxidation",
+        "E_a_so2_oxidation",
+        "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -2314,8 +2332,16 @@ class SotolonAldolCondensation(Process):
     #: ``k_sotolon_aldol`` is this Process's own second-order rate constant (thermal.yaml, D-107);
     #: ``E_a_maillard_strecker`` is a **carry-over**, not a claim that this reaction shares the
     #: Strecker activation energy (see the class docstring); ``T_ref`` is shared with every
-    #: Arrhenius rate. Their tiers cap the output tier via parameter-tier propagation (D-1).
-    reads: tuple[str, ...] = ("k_sotolon_aldol", "E_a_maillard_strecker", "T_ref")
+    #: Arrhenius rate. Their tiers cap the output tier via parameter-tier propagation (D-1). The
+    #: pH-system and SO₂-binding sets are the indirect reads of this Process's
+    #: ``free_acetaldehyde``/``ph_of_state`` call (decision D-160).
+    reads: tuple[str, ...] = (
+        "k_sotolon_aldol",
+        "E_a_maillard_strecker",
+        "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -3261,16 +3287,18 @@ class AcetaldehydeBridgedCondensation(Process):
     #: the
     #: direct route (D-79, same lumped adduct stoichiometry); ``T_ref`` is shared with every
     #: Arrhenius
-    #: rate. The SO₂/pH params read inside :func:`free_acetaldehyde`/:func:`ph_of_state` are omitted
-    #: —
-    #: all plausible and the Process is already speculative, so they add no tier headline (the D-47
-    #: :class:`AcetaldehydeReduction` / MLF-gate precedent). Tiers cap the outputs via D-1.
+    #: rate. The SO₂/pH params read inside :func:`free_acetaldehyde`/:func:`ph_of_state` ARE now
+    #: declared (D-160, reversing the D-47 :class:`AcetaldehydeReduction` / MLF-gate precedent):
+    #: they still add no tier headline — all plausible, the Process already speculative — but
+    #: ``reads`` also scopes the ensemble sampler. Tiers cap the outputs via D-1.
     reads: tuple[str, ...] = (
         "k_acetaldehyde_bridge",
         "E_a_acetaldehyde_bridge",
         "y_acetaldehyde_per_anthocyanin",
         "y_tannin_per_anthocyanin",
         "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     )
 
     def derivatives(
@@ -3791,13 +3819,16 @@ class TanninEthylTanninCondensation(Process):
     #: Process's own (polymerization.yaml, D-85 — its own acetaldehyde yield, distinct from D-80's
     #: ``y_acetaldehyde_per_anthocyanin`` since one acetaldehyde bridges TWO flavanols here);
     #: ``T_ref`` is shared with every Arrhenius rate. The SO₂/pH params read inside
-    #: :func:`free_acetaldehyde`/:func:`ph_of_state` are omitted (all plausible, the Process is
-    #: already speculative — the D-47/D-80 precedent). Tiers cap the outputs via D-1.
+    #: :func:`free_acetaldehyde`/:func:`ph_of_state` ARE declared (D-160, reversing the D-47/D-80
+    #: precedent): still no tier headline (all plausible, the Process already speculative), but
+    #: ``reads`` also scopes the ensemble sampler. Tiers cap the outputs via D-1.
     reads: tuple[str, ...] = (
         "k_tannin_ethyl_tannin",
         "E_a_tannin_ethyl_tannin",
         "y_acetaldehyde_per_tannin",
         "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     )
 
     def derivatives(

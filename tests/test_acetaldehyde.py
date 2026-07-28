@@ -24,6 +24,7 @@ import numpy as np
 import pytest
 
 from fermentation.core import acidbase
+from fermentation.core.acidbase import PH_SYSTEM_READS, SO2_BINDING_READS
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
     M_ETHANOL,
@@ -57,9 +58,14 @@ _ETH_PER_ACET = M_ETHANOL / M_ACETALDEHYDE
 @pytest.fixture
 def store():
     # Wine kinetics PLUS the shared acetaldehyde constants (k_acetaldehyde, k_acet_reduction…).
+    # acidbase.yaml is REQUIRED since D-160: AcetaldehydeReduction declares the pH-system and
+    # SO₂-binding params it reads inside free_acetaldehyde/ph_of_state (the D-47 SO₂-protection
+    # path), and `_reads_tier` raises on a declared read with no tier rather than defaulting
+    # (D-1). Every compiled wine scenario merges acidbase.yaml (D-18), so this mirrors the seam.
     return load_parameters(
         default_data_dir() / "wine_generic.yaml",
         default_data_dir() / "acetaldehyde.yaml",
+        default_data_dir() / "acidbase.yaml",
     )
 
 
@@ -102,7 +108,16 @@ def test_reduction_metadata():
     assert p.name == "acetaldehyde_reduction"
     assert p.tier is Tier.SPECULATIVE
     assert set(p.touches) == {"acetaldehyde", "E"}
-    assert set(p.reads) == {"k_acet_reduction", "E_a_acet_reduction", "T_ref"}
+    # The pH-system and SO₂-binding sets are declared since D-160 (they are read inside
+    # free_acetaldehyde/ph_of_state). Asserted via the shared tuples, not re-listed, so a new
+    # acid or a fifth carbonyl binder updates the pin with the code instead of breaking it.
+    assert set(p.reads) == {
+        "k_acet_reduction",
+        "E_a_acet_reduction",
+        "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    }
 
 
 # -- production closed form & guards ------------------------------------------

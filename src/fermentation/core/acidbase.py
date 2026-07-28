@@ -199,6 +199,44 @@ OXOFRUCTOSE_SO2_BINDING_PARAM = "K_5_oxofructose_so2"
 SO2_PKA_PARAM_NAMES: tuple[str, ...] = ("pKa_sulfurous_1", "pKa_sulfurous_2")
 
 
+# -- what calling these helpers COSTS a Process in `reads` (decision D-160) ----
+#
+# `Process.reads` serves TWO masters: parameter-tier propagation (D-1) and the
+# ensemble sampler's scope (`_schedule_reads`, ensemble.py:243). A Process that
+# reaches a parameter through a helper depends on it exactly as much as one that
+# indexes `params` directly -- but until D-160 the convention (D-39/D-47/D-80/
+# D-125/D-126) omitted these names, reasoning only on the tier axis: "this Process
+# is already speculative, so they cap nothing". That is TRUE for tiers -- measured,
+# every reader is SPECULATIVE and every name here is PLAUSIBLE, so declaring them
+# moves no tier -- and FALSE for sampling, which is the half that was missed. An
+# undeclared read leaves the name out of the sampled set under EVERY scenario, so
+# the reported spread of a pH-dependent output was silently narrower than the
+# parameter's own band justifies. D-24's point 3 ("when MLF is pitched the pKa set
+# enters scope") describes behaviour that never shipped, because nothing declared it.
+#
+# Both tuples are DERIVED from the registries the helpers themselves iterate, never
+# re-listed, so a new acid or a fifth carbonyl binder cannot leave a caller behind.
+
+#: What a Process reads indirectly by calling :func:`ph_of_state` (or anything built
+#: on it, e.g. :func:`titratable_acidity`): the charge-balance pKa set, via
+#: :func:`build_pka_map`. Splat into that Process's ``reads``.
+PH_SYSTEM_READS: tuple[str, ...] = PKA_PARAM_NAMES
+
+#: What a Process reads indirectly by calling the SO₂ speciation readouts
+#: (:func:`free_acetaldehyde`, :func:`bisulfite_so2_at_ph`, :func:`molecular_so2_at_ph`):
+#: the sulfurous pKa pair plus the four competing carbonyl-bisulfite dissociation
+#: constants. **Disjoint from** :data:`PH_SYSTEM_READS` — SO₂ is not in the charge
+#: balance (D-22), so a pH-only caller must NOT declare these. Those callers reach the
+#: pH solve too, so in practice they splat both.
+SO2_BINDING_READS: tuple[str, ...] = (
+    *SO2_PKA_PARAM_NAMES,
+    SO2_BINDING_PARAM,
+    PYRUVATE_SO2_BINDING_PARAM,
+    ALPHA_KG_SO2_BINDING_PARAM,
+    OXOFRUCTOSE_SO2_BINDING_PARAM,
+)
+
+
 # -- speciation ---------------------------------------------------------------
 
 

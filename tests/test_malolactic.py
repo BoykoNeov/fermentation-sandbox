@@ -20,6 +20,7 @@ import pytest
 
 from fermentation.analysis import ph_series
 from fermentation.core import acidbase
+from fermentation.core.acidbase import PH_SYSTEM_READS, SO2_BINDING_READS
 from fermentation.core.chemistry import (
     M_CO2,
     M_LACTIC,
@@ -27,6 +28,7 @@ from fermentation.core.chemistry import (
     M_TARTARIC,
     carbon_mass_fraction,
 )
+from fermentation.core.kinetics.amino_acid_pools import ASSIMILABLE_SPECS
 from fermentation.core.kinetics.malolactic import (
     MalolacticConversion,
     MalolacticDeath,
@@ -709,7 +711,15 @@ def test_senescence_needs_no_ph_solve(params):
         "ethanol_tolerance_mlf",
         "k_senescence_starvation_scale",
         "K_aa_mlf",
+        # The D-100 shares that scale K_aa_mlf into the relative-depletion gate — read through
+        # `depletion_gate`, declared since D-160. These are amino-acid pool params, NOT pH/SO₂
+        # ones, so the "no brentq" property this test exists to protect is untouched; the
+        # assertion below is what actually pins it.
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
     }
+    # The point of the test, stated directly: no acidbase/SO₂ parameter is declared, so no
+    # pH solve can slip in behind a future edit.
+    assert not set(MalolacticSenescence.reads) & (set(PH_SYSTEM_READS) | set(SO2_BINDING_READS))
 
 
 def test_senescence_tier_is_speculative():

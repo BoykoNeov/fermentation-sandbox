@@ -123,6 +123,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fermentation.core.acidbase import (
+    PH_SYSTEM_READS,
+    SO2_BINDING_READS,
     SO2_STATE_KEY,
     free_acetaldehyde,
     ph_of_state,
@@ -239,10 +241,12 @@ class AcetaldehydeReduction(Process):
     (:func:`fermentation.core.acidbase.free_acetaldehyde`) rather than the total — the
     hydroxysulphonate adduct cannot be reduced — so SO₂ locks acetaldehyde in. The guard is
     exact: an unsulfited run pays no per-RHS pH ``brentq`` and is byte-for-byte the D-27 core.
-    ``touches`` is unchanged (still only ``acetaldehyde``/``E``); ``reads`` is unchanged too —
-    the SO₂/pH params are read *inside* :func:`free_acetaldehyde`/:func:`ph_of_state` and the
-    output is already speculative, so declaring them would not move any tier (the MLF-gate
-    precedent, D-39).
+    ``touches`` is unchanged (still only ``acetaldehyde``/``E``). ``reads`` DOES declare the
+    SO₂/pH params read *inside* :func:`free_acetaldehyde`/:func:`ph_of_state` (decision D-160,
+    reversing the D-39 MLF-gate precedent). The old rationale — "the output is already
+    speculative, so declaring them would not move any tier" — is true and beside the point:
+    ``reads`` also scopes the ensemble sampler, so omitting them made this Process's reported
+    spread ignore the pKa/binding bands entirely.
     """
 
     name = "acetaldehyde_reduction"
@@ -250,8 +254,16 @@ class AcetaldehydeReduction(Process):
     touches = ("acetaldehyde", "E")
     #: ``k_acet_reduction`` sets the enzymatic reduction magnitude; ``E_a_acet_reduction``
     #: and ``T_ref`` set the temperature shape. Their tiers cap the outputs via
-    #: parameter-tier propagation (D-1). Reads viable ``X`` from state.
-    reads: tuple[str, ...] = ("k_acet_reduction", "E_a_acet_reduction", "T_ref")
+    #: parameter-tier propagation (D-1). Reads viable ``X`` from state. The pH-system and
+    #: SO₂-binding sets are the INDIRECT reads of the ``free_acetaldehyde``/``ph_of_state``
+    #: call in ``derivatives`` (D-160) — declared so the sampler draws them.
+    reads: tuple[str, ...] = (
+        "k_acet_reduction",
+        "E_a_acet_reduction",
+        "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]

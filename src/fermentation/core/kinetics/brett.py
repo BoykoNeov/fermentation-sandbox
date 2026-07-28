@@ -79,6 +79,8 @@ import math
 from collections.abc import Mapping
 
 from fermentation.core.acidbase import (
+    PH_SYSTEM_READS,
+    SO2_BINDING_READS,
     SO2_STATE_KEY,
     molecular_so2_at_ph,
     ph_of_state,
@@ -111,11 +113,18 @@ from fermentation.core.tiers import Tier
 #: pH/ethanol terms (Brett is acid- and ethanol-tolerant, D-40). :class:`BrettDeath` (pt3) does NOT
 #: splat this tuple: it uses an *Arrhenius* temperature factor, not the cardinal γ(T), so it reads
 #: only ``molecular_so2_inhib_brett`` (the SO₂ scale) explicitly, not the ``T_*_brett`` cardinals.
+#: The pH/SO₂ parameters the gate's consumers reach INDIRECTLY (decision D-160): each solves
+#: ``ph_of_state`` before calling the gate, and the gate partitions molecular SO₂ at that pH.
+#: This is NOT a reversal of "no pH/ethanol terms" above — Brett's *gate* still has no pH term;
+#: these are the pH SOLVER's own inputs, declared so the sampler draws them. Appended last so
+#: the existing order is untouched. Every consumer is speculative, so no tier moves.
 _BRETT_GATE_READS: tuple[str, ...] = (
     "molecular_so2_inhib_brett",
     "T_min_brett",
     "T_opt_brett",
     "T_max_brett",
+    *PH_SYSTEM_READS,
+    *SO2_BINDING_READS,
 )
 
 
@@ -691,6 +700,10 @@ class BrettDeath(Process):
         "E_a_death_brett",
         "T_ref",
         "molecular_so2_inhib_brett",
+        # Declared without splatting _BRETT_GATE_READS (D-160): death still must NOT read the
+        # T_*_brett cardinals, but it does solve ph_of_state + molecular_so2_at_ph itself.
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     )
 
     def derivatives(

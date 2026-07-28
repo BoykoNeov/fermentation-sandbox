@@ -24,6 +24,8 @@ import pytest
 from fermentation.analysis import astringency_series, color_series, polymeric_pigment_series
 from fermentation.core.acidbase import (
     ACID_STATE,
+    PH_SYSTEM_READS,
+    SO2_BINDING_READS,
     bisulfite_fraction,
     bisulfite_so2_at_ph,
     build_pka_map,
@@ -247,7 +249,13 @@ def test_metadata():
         "r_ht_ester_hydrolysis",  # k_HT-/k_H+, the bitartrate ratio (D-125)
         "tartaric_ref_ester_hydrolysis",  # the reference tartrate the factor normalizes at (D-125)
         "T_ref",
+        # The pH solver's own inputs, read inside ph_of_state — declared since D-160. This is the
+        # Process whose spread D-159 measured at 14-20 % of nominal on isoamyl_acetate when the
+        # pKa set was forced; undeclared, none of that reached the reported band.
+        *PH_SYSTEM_READS,
     }
+    # Disjoint from the SO₂-binding set: hydrolysis solves pH, it never partitions SO₂.
+    assert not set(p.reads) & set(SO2_BINDING_READS)
 
 
 # -- closed form & the 5:2 split ----------------------------------------------
@@ -853,7 +861,12 @@ def test_ethyl_acetate_esterification_metadata():
         "ethyl_acetate_eq",
         "pH_ref_ethyl_acetate_esterification",
         "T_ref",
+        # The pH solver's own inputs, read inside ph_of_state — declared since D-160. NOT the
+        # SO₂-binding set: this Process solves pH but never partitions SO₂ (D-160 keeps the two
+        # tuples disjoint so a pH-only caller cannot acquire a false SO₂ dependency).
+        *PH_SYSTEM_READS,
     }
+    assert not set(p.reads) & set(SO2_BINDING_READS)
 
 
 #: Shinohara, Shimizu & Shimazu 1979 Tables I-IV: the acetic-acid **E-rate** (the fraction of
@@ -1210,9 +1223,16 @@ def test_sulfite_oxidation_metadata():
     # Consumes the O₂ substrate and oxidises the free-bisulfite share of so2_total — both off every
     # ledger, so nothing conserved moves. Touches those two and nothing else.
     assert set(p.touches) == {"o2", "so2_total"}
-    # Only its OWN aging params + shared T_ref; the plausible pKa/binding params read via acidbase
-    # are omitted (Process already speculative — the MalolacticConversion/brett convention).
-    assert set(p.reads) == {"k_so2_oxidation", "E_a_so2_oxidation", "T_ref"}
+    # Its OWN aging params + shared T_ref + the pKa/binding params it reads via acidbase to derive
+    # free bisulfite at the solved pH. Those were omitted until D-160 on a tier argument (Process
+    # already speculative, so they cap nothing) that ignored the sampler half of `reads`.
+    assert set(p.reads) == {
+        "k_so2_oxidation",
+        "E_a_so2_oxidation",
+        "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    }
 
 
 def test_sulfite_oxidation_matches_closed_form(so2_params):
@@ -2498,8 +2518,15 @@ def maillard_store():
     # Wine params + the thermal.yaml constants (k_maillard_strecker, E_a_maillard_strecker, the six
     # w_maillard_* weights) and — for the shared K_amino_acids gate — wine_generic.yaml, the
     # shared_files the D-87 compile seam wires. (The plain ``store`` fixture omits thermal.yaml.)
+    # acidbase.yaml is REQUIRED since D-160: SotolonAldolCondensation declares the pH-system and
+    # SO₂-binding params it reads through free_acetaldehyde/ph_of_state, and `_reads_tier` raises
+    # on a declared read with no tier rather than defaulting (D-1). Every compiled wine scenario
+    # merges acidbase.yaml (D-18), so this mirrors the seam — the same reason the plain ``store``
+    # fixture took it on at D-124.
     return load_parameters(
-        default_data_dir() / "wine_generic.yaml", default_data_dir() / "thermal.yaml"
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "thermal.yaml",
+        default_data_dir() / "acidbase.yaml",
     )
 
 
@@ -2934,7 +2961,16 @@ def test_sotolon_aldol_metadata():
     assert "CO2" not in p.touches
     assert "N" not in p.touches
     assert "threonine" not in p.touches  # threonine is sotolon's GRANDparent, not its precursor
-    assert set(p.reads) == {"k_sotolon_aldol", "E_a_maillard_strecker", "T_ref"}
+    assert set(p.reads) == {
+        "k_sotolon_aldol",
+        "E_a_maillard_strecker",
+        "T_ref",
+        # Read inside free_acetaldehyde/ph_of_state — declared since D-160 (the aldol reads FREE
+        # acetaldehyde, D-108, so it solves pH and partitions SO₂ like every other free-carbonyl
+        # consumer).
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    }
 
 
 def test_the_sotolon_aldol_draws_one_mole_of_each_substrate_when_driven(maillard_params):
@@ -4624,6 +4660,9 @@ def test_bridge_metadata():
         "y_acetaldehyde_per_anthocyanin",
         "y_tannin_per_anthocyanin",
         "T_ref",
+        # Read inside free_acetaldehyde/ph_of_state — declared since D-160.
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     }
 
 
@@ -5389,6 +5428,9 @@ def test_tannin_ethyl_metadata():
         "E_a_tannin_ethyl_tannin",
         "y_acetaldehyde_per_tannin",
         "T_ref",
+        # Read inside free_acetaldehyde/ph_of_state — declared since D-160.
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     }
 
 

@@ -83,7 +83,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fermentation.core.acidbase import SO2_STATE_KEY, bisulfite_so2_at_ph, ph_of_state
+from fermentation.core.acidbase import (
+    PH_SYSTEM_READS,
+    SO2_BINDING_READS,
+    SO2_STATE_KEY,
+    bisulfite_so2_at_ph,
+    ph_of_state,
+)
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
     M_CO2,
@@ -311,6 +317,9 @@ class OxygenActivation(Process):
         "k_copper_multiplier",
         "copper_typical",
         "T_ref",
+        # Indirect, via the _free_so2 helper's ph_of_state + bisulfite_so2_at_ph (D-160).
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     )
 
     def derivatives(
@@ -364,6 +373,9 @@ class PeroxideEthanolOxidation(Process):
         "k_ethanol_oxidation",
         "k_so2_oxidation",
         "T_ref",
+        # Indirect, via the _free_so2 helper's ph_of_state + bisulfite_so2_at_ph (D-160).
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     )
 
     def derivatives(
@@ -418,6 +430,9 @@ class PeroxideSulfiteOxidation(Process):
         "k_ethanol_oxidation",
         "k_so2_oxidation",
         "T_ref",
+        # Indirect, via the _free_so2 helper's ph_of_state + bisulfite_so2_at_ph (D-160).
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
     )
 
     def derivatives(
@@ -460,7 +475,15 @@ class QuinoneSulfonation(Process):
     name = "quinone_sulfonation"
     tier = Tier.SPECULATIVE
     touches = ("quinone", "so2_total")
-    reads: tuple[str, ...] = ("k_so2_oxidation", "E_a_activation", "T_ref")
+    #: The pH-system and SO₂-binding sets are the indirect reads of this Process's own
+    #: ``_free_so2`` call — ``ph_of_state`` + ``bisulfite_so2_at_ph`` (decision D-160).
+    reads: tuple[str, ...] = (
+        "k_so2_oxidation",
+        "E_a_activation",
+        "T_ref",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -511,12 +534,19 @@ class QuinoneStreckerDegradation(Process):
         "methionine",
         "phenylalanine",
     )
+    #: The last two entries are the D-100 relative-depletion gate's inputs, read indirectly
+    #: through ``depletion_gate`` (decision D-160): the shared ``K_amino_acids`` half-saturation
+    #: and each routed precursor's must-spectrum share. Derived from ``_STRECKER_ROUTES`` and the
+    #: spec registry rather than re-listed, so adding a third Strecker route cannot leave the
+    #: declaration behind.
     reads: tuple[str, ...] = (
         "k_strecker",
         "E_a_strecker",
         "y_strecker_per_o2",
         "f_methional",
         "T_ref",
+        "K_amino_acids",
+        *(SPEC_BY_SPECIES[precursor].fraction_param for _pool, precursor in _STRECKER_ROUTES),
     )
 
     def derivatives(

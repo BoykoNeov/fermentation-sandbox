@@ -118,6 +118,8 @@ import math
 from collections.abc import Mapping
 
 from fermentation.core.acidbase import (
+    PH_SYSTEM_READS,
+    SO2_BINDING_READS,
     SO2_STATE_KEY,
     molecular_so2_at_ph,
     ph_of_state,
@@ -199,7 +201,17 @@ _MLF_FATTY_ACID_READS: tuple[str, ...] = ("mcfa_inhib_mlf",)
 #: ``reads`` tuples and :func:`malolactic_environmental_gate` cannot drift apart. Order preserved
 #: from before the D-39 toxicity/temperature split (toxicity, then temperature) so every consumer's
 #: ``reads`` is stable; the D-131 fatty-acid param is appended last.
-_MLF_GATE_READS: tuple[str, ...] = (*_MLF_TOXICITY_READS, *_MLF_TEMP_READS, *_MLF_FATTY_ACID_READS)
+#: The pH/SO₂ parameters the gate's consumers reach INDIRECTLY (decision D-160): each of
+#: them solves ``ph_of_state`` before calling the gate, and the toxicity term partitions
+#: molecular SO₂ at that pH. Appended LAST so the D-39/D-131 ordering above is untouched.
+#: Declared for the SAMPLER's sake — every consumer is speculative, so no tier moves.
+_MLF_GATE_READS: tuple[str, ...] = (
+    *_MLF_TOXICITY_READS,
+    *_MLF_TEMP_READS,
+    *_MLF_FATTY_ACID_READS,
+    *PH_SYSTEM_READS,
+    *SO2_BINDING_READS,
+)
 
 #: State-slot key of the aggregate MCFA MLF-inhibitor pool (decision D-131). Read like the
 #: ``so2_total`` slot (a dosed inert composition input), NOT a param, so it is absent from every
@@ -701,8 +713,18 @@ class MalolacticDeath(Process):
     #: Arrhenius temperature shape; ``molecular_so2_inhib_mlf`` is the SO₂ decay scale (reused from
     #: the conversion gate — arrest-scale = kill-scale, a documented simplification). NOT the
     #: pH/ethanol toxicity params (death drops them, D-39). Their tiers cap the ``X_mlf``/
-    #: ``X_mlf_dead`` output tiers via parameter-tier propagation (D-1).
-    reads: tuple[str, ...] = ("k_death_mlf", "E_a_death_mlf", "T_ref", "molecular_so2_inhib_mlf")
+    #: ``X_mlf_dead`` output tiers via parameter-tier propagation (D-1). The pH-system and
+    #: SO₂-binding sets ARE declared (D-160): dropping the toxicity *gate* did not drop the
+    #: ``ph_of_state`` + ``molecular_so2_at_ph`` calls this Process still makes, and those are
+    #: reads the sampler must see. This does not reinstate the D-39 pH/ethanol toxicity params.
+    reads: tuple[str, ...] = (
+        "k_death_mlf",
+        "E_a_death_mlf",
+        "T_ref",
+        "molecular_so2_inhib_mlf",
+        *PH_SYSTEM_READS,
+        *SO2_BINDING_READS,
+    )
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -823,7 +845,11 @@ autolysis.YeastAutolysis` reads only the yeast ``X_dead`` pool, so senescing bac
     #: Arrhenius temperature shape (shared with :class:`MalolacticDeath`). The D-52 stress terms
     #: read ``ethanol_tolerance_mlf``/``K_aa_mlf`` (half-saturation scales reused from the
     #: conversion/growth gates) and their own dimensionless ceilings
-    #: ``k_senescence_ethanol_scale``/``k_senescence_starvation_scale``. Still NO SO₂/pH params.
+    #: ``k_senescence_ethanol_scale``/``k_senescence_starvation_scale``. Still NO SO₂/pH params —
+    #: this Process genuinely never solves pH (the D-160 sweep confirms it reads none), which is
+    #: why it is the one MLF Process that does not splat ``_MLF_GATE_READS``. The assimilable
+    #: pools' must-spectrum shares ARE declared (D-160): ``K_aa_mlf`` is scaled by them into the
+    #: D-100 relative-depletion gate, so the starvation term reads them indirectly.
     #: Their tiers cap the ``X_mlf``/``X_mlf_dead`` output tiers via parameter-tier propagation
     #: (D-1).
     reads: tuple[str, ...] = (
@@ -834,6 +860,9 @@ autolysis.YeastAutolysis` reads only the yeast ``X_dead`` pool, so senescing bac
         "ethanol_tolerance_mlf",
         "k_senescence_starvation_scale",
         "K_aa_mlf",
+        # The shares that scale K_aa_mlf into the D-100 relative-depletion gate, declared
+        # from the same registry MalolacticGrowth uses so the two cannot drift (D-160).
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
     )
 
     def derivatives(
