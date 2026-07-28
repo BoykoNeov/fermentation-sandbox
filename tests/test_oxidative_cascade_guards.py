@@ -690,3 +690,205 @@ def test_only_the_declared_o2_draw_responds_to_the_copper_multiplier(
         "to what it multiplies (D-138 constraint 4) — re-homing or adding a draw invalidates it "
         "and needs a re-fit recorded, not this expectation edited."
     )
+
+
+# ------------------------------------------------------------------------------------
+# Guard 5 — the pH response's O2 BUDGET (D-150).
+# ------------------------------------------------------------------------------------
+
+#: Carrascon, Vallverdu-Queralt, Meudec, Sommerer, Fernandez-Zurbano & Ferreira (2018),
+#: *Food Chemistry* 249:172-179, Tables 1 + 2 joined: eight commercial Spanish red wines
+#: measured on the SAME repeated-air-saturation protocol Ferreira 2015 used (the protocol
+#: D-132/D-133 are anchored on), as ``(code, pH, initial OCR, average OCR mg/L/day)``.
+#:
+#: This dataset is used rather than Ferreira's because it supplies the pH span and the
+#: observed rate spread FROM THE SAME WINES — no mixing of one paper's span with another
+#: paper's ceiling, which is the frame error D-149 was written to catch.
+_CARRASCON_2018_REDS: tuple[tuple[str, float, float, float], ...] = (
+    ("G1_09", 3.32, 3.70, 0.980),
+    ("G2_13", 3.26, 4.90, 0.905),
+    ("G3_14", 3.29, 1.95, 0.930),
+    ("G4_14", 3.31, 4.29, 0.970),
+    ("T1_11", 3.51, 4.40, 0.880),
+    ("T2_12", 3.60, 5.13, 0.980),
+    ("T3_10", 3.61, 6.83, 1.160),
+    ("T4_14", 3.58, 5.29, 1.250),
+)
+
+#: The one statistic the paper prints against this exact pairing (Table 3): the correlation
+#: between pH and the INITIAL OCR. It is the transcription's own check — see
+#: ``test_the_carrascon_transcription_reproduces_its_papers_printed_correlation``. The "#"
+#: it carries in the paper means p(t) < 0.1, i.e. NOT significant at 0.05: the paper's own
+#: verdict is "only pH kept a non-significant positive correlation with initial OCRs".
+_CARRASCON_PRINTED_R_PH_INITIAL = 0.689
+
+#: Span and spread DERIVED from the transcription above, never hardcoded — editing a wine
+#: moves both together, the way Guard 4 reads the copper band's high edge off the
+#: ``ParameterSet`` instead of pinning a number the band may no longer contain.
+_CARRASCON_PH_LO = min(w[1] for w in _CARRASCON_2018_REDS)
+_CARRASCON_PH_HI = max(w[1] for w in _CARRASCON_2018_REDS)
+#: **An OBSERVED spread, NOT a claimed ceiling.** Ferreira 2015's 2.2x is a stated maximum
+#: over 15 wines ("never > factor 2.2"); this is merely what these 8 wines happened to show
+#: on the STEADY (average) rate — the frame ``k_activation_*`` / ``k_browning_eff`` live in,
+#: as opposed to the day-1 initial rate, which is ``burst_antioxidant``'s axis (D-133). It is
+#: the right comparator because it comes from the same wines as the span, and it is a weaker
+#: claim than Ferreira's; a green result here is NOT an endorsement of any pH response.
+_CARRASCON_STEADY_SPREAD = max(w[3] for w in _CARRASCON_2018_REDS) / min(
+    w[3] for w in _CARRASCON_2018_REDS
+)
+
+_PH_FERMENT_DAYS = 20.0
+_PH_O2_DOSE_MGL = 8.0
+#: Both arms are measured. Unsulfited is the worst case for the DIRECT sets (a pH term at the
+#: ``f_Cu`` slot multiplies 62.4% of unsulfited uptake against 37.1% at 30 mg/L SO2, because
+#: copper-free ``sulfite_oxidation`` dilutes it). The sulfited arm is the only one where the
+#: model has ANY pH response today — ``k_activation_bisulfite * hso3`` through pH-dependent
+#: ``free_bisulfite`` (D-149) — so dropping it would leave the one live route unguarded.
+_PH_SO2_LEVELS = (0.0, 30.0)
+
+
+def _ph_scenario(*, initial_ph: float, so2_mgl: float) -> Scenario:
+    """The Guard 4 red, with ``initial_ph`` swept at a FIXED acid load.
+
+    Only the back-solved strong-cation charge moves, so the sweep isolates pH rather than
+    re-titrating the wine. The acids are declared for the reason D-149's amendment records:
+    with ``tartaric_gpl``/``malic_gpl`` defaulted to 0 this wine solves to pH 2.924 and the
+    solver then REFUSES a lower ``initial_ph`` outright.
+
+    ``initial_ph`` anchors t=0, not the aging pH: byproducts accumulate through the ferment
+    and pull it down, so 3.26/3.61 here arrive at the dose as 3.2084/3.5135. The guard asserts
+    on the ratio between two runs of one sweep, so the offset cancels — but there is no way to
+    SET an aging pH in this engine, and a future pH beat needs to know that.
+    """
+    interventions: list[Intervention] = [
+        Intervention(day=_PH_FERMENT_DAYS, action="begin_aging"),
+        Intervention(
+            day=_PH_FERMENT_DAYS, action="add_oxygen", params={"o2_mgl": _PH_O2_DOSE_MGL}
+        ),
+    ]
+    if so2_mgl > 0.0:
+        interventions.insert(
+            0,
+            Intervention(
+                day=_PH_FERMENT_DAYS - 1.0, action="add_so2", params={"so2_mgl": so2_mgl}
+            ),
+        )
+    return Scenario(
+        name=f"d150-ph{initial_ph:g}-so2{so2_mgl:g}",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 0.25,
+            "anthocyanin_gpl": 0.3,
+            "tannin_gpl": 2.0,
+            "amino_acids_gpl": 0.5,
+            "tartaric_gpl": 6.0,
+            "malic_gpl": 3.0,
+            "initial_ph": initial_ph,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=_PH_FERMENT_DAYS + 1.0,
+        closure="hermetic",
+        interventions=interventions,
+    )
+
+
+@pytest.fixture(scope="module")
+def ph_dose_states():
+    """``{(oxidative, so2, initial_ph): (compiled, params, t, y)}`` at the instant of the dose."""
+    states: dict[
+        tuple[str, float, float], tuple[CompiledScenario, dict[str, float], float, np.ndarray]
+    ]
+    states = {}
+    for oxidative in sorted(_COPPER_MULTIPLIED_DRAWS):
+        for so2_mgl in _PH_SO2_LEVELS:
+            for initial_ph in (_CARRASCON_PH_LO, _CARRASCON_PH_HI):
+                compiled = compile_scenario(
+                    _ph_scenario(initial_ph=initial_ph, so2_mgl=so2_mgl), oxidative=oxidative
+                )
+                params = dict(compiled.param_values)  # a property: a FRESH dict per access
+                t_end = (_PH_FERMENT_DAYS + 1.0) * 24.0
+                trajectory = simulate_scheduled(
+                    compiled.process_set,
+                    params,
+                    compiled.y0.copy(),
+                    (0.0, t_end),
+                    events=compiled.events,
+                    t_eval=np.linspace(0.0, t_end, 2001),
+                )
+                index = int(np.searchsorted(trajectory.t, _PH_FERMENT_DAYS * 24.0 + 1e-9))
+                # trajectory.y is (n_states, n_times): a COLUMN is the state (D-147 amendment).
+                states[(oxidative, so2_mgl, initial_ph)] = (
+                    compiled,
+                    params,
+                    float(trajectory.t[index]),
+                    np.asarray(trajectory.y[:, index], dtype=float),
+                )
+    return states
+
+
+def test_the_carrascon_transcription_reproduces_its_papers_printed_correlation():
+    # WHAT THIS FORBIDS: a silent transcription error in the eight wines above, which are the
+    # only thing setting the span and the spread the sibling guard asserts on. The paper prints
+    # exactly one statistic against this pairing (Table 3, r(pH, initial OCR) = 0.689), so
+    # recomputing it checks the pH column and the initial-OCR column against the source rather
+    # than trusting them — the D-149 precedent, where every (k1+k2)/2 entry in Nguyen's table
+    # was reproduced from its own printed k1, k2 before the table was used.
+    ph = [w[1] for w in _CARRASCON_2018_REDS]
+    initial = [w[2] for w in _CARRASCON_2018_REDS]
+    n = len(ph)
+    mean_ph, mean_i = sum(ph) / n, sum(initial) / n
+    cov = sum((a - mean_ph) * (b - mean_i) for a, b in zip(ph, initial, strict=True))
+    var_ph = sum((a - mean_ph) ** 2 for a in ph)
+    var_i = sum((b - mean_i) ** 2 for b in initial)
+    r = cov / (var_ph * var_i) ** 0.5
+    assert r == pytest.approx(_CARRASCON_PRINTED_R_PH_INITIAL, abs=0.005), (
+        f"recomputed r(pH, initial OCR) = {r:.4f} against the paper's printed "
+        f"{_CARRASCON_PRINTED_R_PH_INITIAL}. The transcription of Carrascon 2018 Tables 1+2 "
+        "above is wrong, and it is what sets both the pH span and the steady-rate spread the "
+        "sibling guard asserts on."
+    )
+
+
+@pytest.mark.parametrize("oxidative", sorted(_COPPER_MULTIPLIED_DRAWS))
+@pytest.mark.parametrize("so2_mgl", _PH_SO2_LEVELS, ids=["unsulfited", "so2_30"])
+def test_ph_may_not_out_spend_the_between_wine_steady_rate_spread(
+    ph_dose_states, oxidative, so2_mgl
+):
+    # WHAT THIS FORBIDS: giving the O2 draw a pH dependence strong enough that pH ALONE moves
+    # total uptake, across a real red's own pH span, further than every compositional factor
+    # COMBINED moved the steady rate across the wines that span was measured on.
+    #
+    # It is green at 1.0000x (unsulfited) / ~1.006x (sulfited) today, because the model has no
+    # pH term on the O2 draw at all — the D-140 "written while it still passes" pattern. What
+    # makes it live is that the obvious source for such a term fails it: Nguyen & Waterhouse
+    # 2021 Table 3.1's zero-copper column rises 3.87x per pH unit, which over this span is
+    # 1.51x, and injected at the slot f_Cu occupies it lands at 1.5104x unsulfited / 1.5213x
+    # sulfited in the CASCADE (where it would multiply ~100% of uptake) against an observed
+    # 1.420x. In both direct sets the same exponent stays inside, at 1.32x / 1.15x. Identical
+    # in shape to the copper failure Guard 4 forbids: one constant, over budget in one
+    # structure and not another (D-138 constraint 4).
+    #
+    # It does NOT assert that the model's near-zero pH response is CORRECT — it is not; real
+    # wine's steady rate rises ~1.62x per pH unit (D-150) and the model delivers ~1.006x. This
+    # guard bounds the response from ABOVE only, and the under-response is recorded at D-150
+    # as an open gap rather than guarded here, because nothing sources a within-wine pH rate
+    # law to guard it against.
+    compiled_lo, params_lo, t_lo, y_lo = ph_dose_states[(oxidative, so2_mgl, _CARRASCON_PH_LO)]
+    compiled_hi, params_hi, t_hi, y_hi = ph_dose_states[(oxidative, so2_mgl, _CARRASCON_PH_HI)]
+    rate_lo = -sum(_o2_draws(compiled_lo, params_lo, t_lo, y_lo).values())
+    rate_hi = -sum(_o2_draws(compiled_hi, params_hi, t_hi, y_hi).values())
+    assert rate_lo > 0.0 and rate_hi > 0.0, "no O2 is being consumed — the arm is not measuring"
+
+    spread = rate_hi / rate_lo
+    assert spread <= _CARRASCON_STEADY_SPREAD, (
+        f"{oxidative} (SO2 {so2_mgl:g} mg/L): pH alone moves total O2 uptake {spread:.4f}x "
+        f"across Carrascon 2018's own 8-red pH span ({_CARRASCON_PH_LO}-{_CARRASCON_PH_HI}), "
+        f"past the {_CARRASCON_STEADY_SPREAD:.3f}x those same 8 wines showed on the STEADY "
+        "rate from every compositional factor combined. Note this bound is an OBSERVED spread, "
+        "not a claimed ceiling. If this is red, a pH term was added to the O2 draw: that needs "
+        "a decision record saying which statistic it was sourced from (D-150 measured the "
+        "steep published slopes to belong to the day-1 INITIAL rate, not the steady one) and "
+        "how it separates from k_copper_multiplier, which Nguyen's own table says it does not."
+    )
