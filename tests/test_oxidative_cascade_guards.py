@@ -491,3 +491,192 @@ def test_a420_baseline_survives_the_rebuild(wine_a420_run, years):
     hours = (_WINE_FERMENT_DAYS + 365.25 * years) * 24.0
     actual = _at(trajectory, compiled, "A420", hours)
     assert actual == pytest.approx(_A420_PINS[years], rel=_PIN_RTOL, abs=1e-12)
+
+
+# ------------------------------------------------------------------------------------
+# Guard 4 — the copper multiplier's O2 BUDGET (D-139 §2.5, measured and closed at D-149).
+# ------------------------------------------------------------------------------------
+
+#: D-134 set ``k_copper_multiplier`` by ONE acceptance test: Ferreira 2015 caps the TOTAL
+#: between-wine O2-consumption-rate spread from every compositional factor combined (Cu, Mn,
+#: pH, TPI, phenolic acids…) at "never > factor 2.2", so copper ALONE must not over-spend it.
+#: That is the arithmetic that forced the raw digitized 2000 L/g down to 600.
+#:
+#: ``aging.yaml``'s uncertainty note checks it on ``f_Cu`` **in isolation** — a ratio of the
+#: multiplier, never of any run's O2 uptake, while Ferreira's 2.2x is a spread in MEASURED
+#: TOTAL RATE. D-149 re-ran it in the frame that binds, and the isolated check turns out to be
+#: exactly the CASCADE's number (copper multiplies 100% of that set's uptake) and a strict
+#: upper bound for the direct sets (61% / 22% share, unsulfited / sulfited). So the guard is
+#: written in the total-uptake form, which is the binding one under every wiring.
+_FERREIRA_CU_LO_GPL = 1.68e-4  # Ferreira 2015 Table 1's own 15-red-wine copper range …
+_FERREIRA_CU_HI_GPL = 6.79e-4  # … whose mean (2.61e-4) is `copper_typical`.
+_FERREIRA_SPREAD_CEILING = 2.2
+
+_COPPER_FERMENT_DAYS = 20.0
+_COPPER_O2_DOSE_MGL = 8.0
+
+#: The O2 draw ``k_copper_multiplier`` is allowed to move, per oxidative set. NOT an assertion
+#: about which Processes *read* copper — it is measured by re-evaluating every active Process's
+#: O2 contribution with the multiplier zeroed and collecting the ones whose draw moves, so a
+#: Process that reached copper by a route nobody declared still shows up here.
+_COPPER_MULTIPLIED_DRAWS: dict[str, frozenset[str]] = {
+    "direct": frozenset({"phenolic_browning"}),  # D-134, on k_browning_eff
+    "direct_burst": frozenset({"phenolic_browning"}),  # the burst sink is copper-free
+    "cascade": frozenset({"oxygen_activation"}),  # D-141's re-home, onto the WHOLE node
+}
+
+
+def _copper_scenario(copper_gpl: float) -> Scenario:
+    """A typical red (the D-132 phenolic anchor), unsulfited, dosed 8 mg/L O2 at aging.
+
+    UNSULFITED deliberately: that is the worst case for the direct sets, whose copper-free
+    ``sulfite_oxidation`` otherwise dilutes copper's share of total uptake (measured 61% -> 22%
+    at 60 mg/L SO2). Guarding the sulfited arm would guard the better-behaved one.
+
+    Runs only one day past the dose — the assertion is the INSTANTANEOUS draw at the dose, so
+    integrating the aging tail would cost time and buy nothing.
+    """
+    return Scenario(
+        name=f"d149-copper-{copper_gpl:.3e}",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 0.25,
+            "anthocyanin_gpl": 0.3,
+            "tannin_gpl": 2.0,
+            "amino_acids_gpl": 0.5,
+            "copper_gpl": copper_gpl,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=_COPPER_FERMENT_DAYS + 1.0,
+        closure="hermetic",
+        interventions=[
+            Intervention(day=_COPPER_FERMENT_DAYS, action="begin_aging"),
+            Intervention(
+                day=_COPPER_FERMENT_DAYS,
+                action="add_oxygen",
+                params={"o2_mgl": _COPPER_O2_DOSE_MGL},
+            ),
+        ],
+    )
+
+
+def _o2_draws(
+    compiled: CompiledScenario, params: dict[str, float], t: float, y: np.ndarray
+) -> dict[str, float]:
+    """Every active Process's own contribution to ``d[o2]/dt`` at ``(t, y)``, in g/L/h."""
+    o2_slice = compiled.schema.slice("o2")
+    draws: dict[str, float] = {}
+    for process in compiled.process_set.active:
+        contribution = np.asarray(process.derivatives(t, y, compiled.schema, params))
+        value = float(contribution[o2_slice][0])
+        if value != 0.0:
+            draws[process.name] = value
+    return draws
+
+
+@pytest.fixture(scope="module")
+def copper_dose_states():
+    """``{(oxidative, copper_gpl): (compiled, params, t, y)}`` at the instant of the O2 dose.
+
+    Both copper levels are integrated per set rather than evaluated off one shared state. The
+    state at the dose IS copper-independent today (nothing reads ``copper`` until
+    ``begin_aging`` enables the aging Processes, and the dose lands at that same instant) — but
+    building that in would assume the very thing this guard exists to notice if it changes.
+    """
+    states: dict[tuple[str, float], tuple[CompiledScenario, dict[str, float], float, np.ndarray]]
+    states = {}
+    for oxidative in sorted(_COPPER_MULTIPLIED_DRAWS):
+        for copper_gpl in (_FERREIRA_CU_LO_GPL, _FERREIRA_CU_HI_GPL):
+            compiled = compile_scenario(_copper_scenario(copper_gpl), oxidative=oxidative)
+            params = dict(compiled.param_values)  # a property: a FRESH dict per access (D-142)
+            t_end = (_COPPER_FERMENT_DAYS + 1.0) * 24.0
+            trajectory = simulate_scheduled(
+                compiled.process_set,
+                params,
+                compiled.y0.copy(),
+                (0.0, t_end),
+                events=compiled.events,
+                t_eval=np.linspace(0.0, t_end, 2001),
+            )
+            index = int(np.searchsorted(trajectory.t, _COPPER_FERMENT_DAYS * 24.0 + 1e-9))
+            # trajectory.y is (n_states, n_times): a COLUMN is the state (D-147 amendment).
+            states[(oxidative, copper_gpl)] = (
+                compiled,
+                params,
+                float(trajectory.t[index]),
+                np.asarray(trajectory.y[:, index], dtype=float),
+            )
+    return states
+
+
+@pytest.mark.parametrize("oxidative", sorted(_COPPER_MULTIPLIED_DRAWS))
+@pytest.mark.parametrize("at_band_high", [False, True], ids=["shipped", "band_high"])
+def test_copper_may_not_over_spend_ferreiras_between_wine_spread(
+    copper_dose_states, oxidative, at_band_high
+):
+    # WHAT THIS FORBIDS: raising `k_copper_multiplier` — or widening its band — until copper
+    # ALONE accounts for more total-O2-uptake spread, across Ferreira's own 15-wine copper
+    # range, than Ferreira measured for every compositional factor COMBINED.
+    #
+    # It is the live constraint, not a historical one. D-142 found Nguyen & Waterhouse 2021's
+    # printed isolated-Cu table (Table 3.1, pH 3.5: 1.4e-4 -> 5.5e-4 /min over 0 -> 0.6355 mg/L
+    # Cu, a 3.93x rise), and D-143 and D-148 both carried it forward as "a printed table arguing
+    # k_copper_multiplier should go UP". D-149 converted it into the parameter: it implies
+    # 2092 L/g, and at 2092 the cascade lands at 2.32x — over budget. Converted, the table
+    # re-derives the value D-134 already rejected. It is not licence to move 600.
+    #
+    # Run at BOTH the shipped value and the band's declared HIGH edge, and the high edge is read
+    # from the ParameterSet rather than hardcoded, so widening the band moves the guard with it
+    # instead of leaving it pinned to a number the band no longer contains.
+    compiled_lo, params_lo, t_lo, y_lo = copper_dose_states[(oxidative, _FERREIRA_CU_LO_GPL)]
+    compiled_hi, params_hi, t_hi, y_hi = copper_dose_states[(oxidative, _FERREIRA_CU_HI_GPL)]
+    if at_band_high:
+        k_high = compiled_lo.parameters["k_copper_multiplier"].uncertainty.high
+        params_lo = {**params_lo, "k_copper_multiplier": k_high}
+        params_hi = {**params_hi, "k_copper_multiplier": k_high}
+
+    rate_lo = -sum(_o2_draws(compiled_lo, params_lo, t_lo, y_lo).values())
+    rate_hi = -sum(_o2_draws(compiled_hi, params_hi, t_hi, y_hi).values())
+    assert rate_lo > 0.0 and rate_hi > 0.0, "no O2 is being consumed — the arm is not measuring"
+
+    spread = rate_hi / rate_lo
+    assert spread <= _FERREIRA_SPREAD_CEILING, (
+        f"{oxidative}: copper alone moves total O2 uptake {spread:.4f}x across Ferreira's own "
+        f"real-wine copper range ({_FERREIRA_CU_LO_GPL * 1e3:.3f}-{_FERREIRA_CU_HI_GPL * 1e3:.3f}"
+        f" mg/L), over his {_FERREIRA_SPREAD_CEILING}x ceiling for EVERY compositional factor "
+        "combined. That is the arithmetic that forced 2000 -> 600 at D-134, and a re-fit to "
+        "Nguyen 2021's printed table lands at 2092 L/g and fails here. If this is red, the value "
+        "or the band moved — that is a finding for the decision record, not a ceiling to raise."
+    )
+
+
+@pytest.mark.parametrize("oxidative", sorted(_COPPER_MULTIPLIED_DRAWS))
+def test_only_the_declared_o2_draw_responds_to_the_copper_multiplier(
+    copper_dose_states, oxidative
+):
+    # WHAT THIS FORBIDS: silently re-homing copper onto another O2 sink, or adding a second one.
+    # D-138 constraint 4 is that "a constant fitted to one structure does not survive being moved
+    # to another" — D-141 moved copper from `phenolic_browning` (61% of unsulfited uptake) onto
+    # `oxygen_activation` (100%), and the re-fit that implies went four decisions without being
+    # run. This makes the next such move LOUD.
+    #
+    # It does NOT certify that the multiplied share is right for any set — the sibling test above
+    # is what bounds that. It certifies only that the inventory is closed, and it is deliberately
+    # weaker than that wording for exactly that reason.
+    compiled, params, t, y = copper_dose_states[(oxidative, _FERREIRA_CU_HI_GPL)]
+    draws = _o2_draws(compiled, params, t, y)
+    zeroed = _o2_draws(compiled, {**params, "k_copper_multiplier": 0.0}, t, y)
+    responders = {
+        name
+        for name, value in draws.items()
+        if abs(value - zeroed.get(name, 0.0)) > 1e-18 * max(1.0, abs(value))
+    }
+    assert draws, "no active Process draws O2 — the arm is not measuring"
+    assert responders == _COPPER_MULTIPLIED_DRAWS[oxidative], (
+        f"{oxidative}: the O2 draws responding to k_copper_multiplier are {sorted(responders)}, "
+        f"expected {sorted(_COPPER_MULTIPLIED_DRAWS[oxidative])}. Copper's calibration is scoped "
+        "to what it multiplies (D-138 constraint 4) — re-homing or adding a draw invalidates it "
+        "and needs a re-fit recorded, not this expectation edited."
+    )

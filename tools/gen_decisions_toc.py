@@ -83,6 +83,7 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"quinone",
             r"fenton",
             r"\biron\b",
+            r"copper",  # iron's sibling on the metal-catalysis axis (D-134/D-141/D-149)
             r"antioxidant",
             r"thermal",
             r"maturation",

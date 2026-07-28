@@ -1357,7 +1357,12 @@ def _verb_add_copper(
     (the racking-debris precedent), so the run-wide identity ``final == initial + Σ flows`` still
     holds. **On a default (autolysis-off) wine ``mercaptans ≡ 0``, so add_copper is carbon-neutral
     there** — the carbon flow appears only once the D-45 pool is non-empty. SCOPE (v1): the removal
-    lever only. Residual copper (excess Cu left in the wine) is untracked; copper is imperfect on
+    lever only. Residual copper (excess Cu left in the wine) is untracked — and D-149 notes what
+    that costs now that D-134 gave wine a ``copper`` STATE slot driving ``f_Cu``: this verb writes
+    ``h2s``/``methanethiol`` and **never** that slot, so the model's two coppers never meet. Fining
+    a wine cannot raise its oxidation rate here, though residual copper is the commonest way real
+    wine's copper level rises. Left unfixed deliberately: closing it means choosing a
+    residual-copper fraction, and nothing sources one. Copper is also imperfect on
     mercaptans and useless on the disulfides they oxidise to (see ``copper_mercaptan_binding``). The
     ``mercaptans`` slot is wine-only, so on a medium without it copper binds H₂S alone.
     """
