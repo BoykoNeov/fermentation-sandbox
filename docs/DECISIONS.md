@@ -17197,3 +17197,13 @@ and this record transcribed Carrascón's Tables 1+2 and checked them against the
 r = 0.689. Both *data* transcriptions were verified. The *citations* were not, and they came from
 exactly the source class the archive already distrusts for numbers — a search summary. A
 bibliographic field is a claim like any other.
+
+**A concrete unlock the Next above did not name.** Carrasco-Quiroz 2022 is the **only
+copper-orthogonal design** in this record's evidence set, and its L16 independently found pH
+significant and **Cu not** — a partial, independent corroboration of leg 2 from a different
+experiment. Its **Table 2 is condition-by-condition raw data** (16 conditions x 3 grape-extract
+reconstitutions x 11 kinetic parameters). Recovered, an L16 main-effects computation over that
+table would give a pH slope **with copper orthogonalised**, which no source here supplies — and it
+would be a *table*, not the figure prose this record refused to source from. That is a cheaper
+unlock than the within-wine pH series named above, and it bears on leg 2 rather than leg 3, so it
+would not on its own license a term. It was not recoverable in this beat's fetches.
