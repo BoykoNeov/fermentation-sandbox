@@ -530,8 +530,15 @@ def _copper_scenario(copper_gpl: float) -> Scenario:
     """A typical red (the D-132 phenolic anchor), unsulfited, dosed 8 mg/L O2 at aging.
 
     UNSULFITED deliberately: that is the worst case for the direct sets, whose copper-free
-    ``sulfite_oxidation`` otherwise dilutes copper's share of total uptake (measured 61% -> 22%
+    ``sulfite_oxidation`` otherwise dilutes copper's share of total uptake (measured 61% -> 21%
     at 60 mg/L SO2). Guarding the sulfited arm would guard the better-behaved one.
+
+    The acids are declared rather than defaulted. ``tartaric_gpl``/``malic_gpl`` both default to
+    0.0, and a red with no titratable acidity solves to **pH 2.924** — outside any real red's
+    3.4-3.8. It does not move this guard (unsulfited, so there is no pH-dependent term anywhere
+    in the O2 draw, measured at exactly 1.0000x across pH 3.0-4.0), but calling that wine "a
+    typical red" in the docstring of a guard about a real-wine calibration would be false, and
+    the sulfited share it is contrasted against is genuinely pH-dependent.
 
     Runs only one day past the dose — the assertion is the INSTANTANEOUS draw at the dose, so
     integrating the aging tail would cost time and buy nothing.
@@ -547,6 +554,9 @@ def _copper_scenario(copper_gpl: float) -> Scenario:
             "tannin_gpl": 2.0,
             "amino_acids_gpl": 0.5,
             "copper_gpl": copper_gpl,
+            "tartaric_gpl": 6.0,
+            "malic_gpl": 3.0,
+            "initial_ph": 3.5,
         },
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
         duration_days=_COPPER_FERMENT_DAYS + 1.0,

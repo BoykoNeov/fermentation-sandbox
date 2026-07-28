@@ -16854,3 +16854,70 @@ budget-constrained calibration device, exactly as its provenance says.
 - Unchanged and still open: the quinone branching (D-145), closure OTR(T) and the bottling-burst
   auto-dose (D-136), acetaldehyde in maturation, the Danilewicz 1:1/1:2/1:1.7 benchmark, and the
   D-147 §8 unlock (Ferreira 2015's per-cycle O₂ consumption curves) for the burst split.
+
+### Amendment — Ferreira's ceiling never bound in the wiring D-134 shipped into, and the probe wine had no acids
+
+Found in review immediately after the record above shipped, and appended rather than edited in
+place (the D-147 precedent). Receipts: `probe5.py`, `probe2.py` re-run.
+
+**1. The Scope section's "the one constraint which produced it still holds across the whole band
+under all three wirings" is true, and says much less than it sounds.** It holds because it is
+*slack*, not because it is satisfied at the margin. Run at the value D-134 actually rejected:
+
+| k | direct SO₂ 0 | direct SO₂ 60 | cascade SO₂ 0 | cascade SO₂ 60 |
+|---|---|---|---|---|
+| 600 (shipped) | 1.198× | 1.070× | 1.324× | 1.324× |
+| **2000 (rejected)** | **1.721× ok** | **1.247× ok** | **2.252× OVER** | **2.251× OVER** |
+
+The cascade crosses 2.2× at **k = 1927 L/g**. The direct set does not cross it anywhere in the
+range this beat measured — not at 2000, not at Nguyen's 2092 (1.759×).
+
+**So Ferreira's ceiling did not adjudicate the rejection of 2000.** D-134's stated arithmetic —
+"the raw slope alone gave copper-alone a 2.24× rate ratio … assigning the entire multi-factor
+budget to copper alone over-spends it" — is `f_Cu` in **isolation**, which this record has just
+shown is the *cascade's* statistic. The cascade did not exist for another seven decisions. In the
+only structure that existed at D-134, copper multiplied 61% of unsulfited uptake and 2000 L/g
+lands comfortably inside the budget it was said to over-spend.
+
+**This does not move 600, and the record's own reasoning is why.** The two objections §"the re-fit
+actually performed" names as binding against Nguyen — free CuSO₄ in model wine against "most copper
+is under complex forms in wine", and single-exposure kinetics nearer Ferreira's steep *initial*-rate
+sensitivity than the *steady* rate this term is scoped to — are properties of the **source**, not of
+the wiring, and they applied to Danilewicz's Figure 4 exactly as they apply to Nguyen's Table 3.1.
+They survive this amendment untouched. What changes is which argument is load-bearing: the budget
+check is a **backstop that the cascade makes real**, not the thing that picked the number.
+
+Stated because the failure mode is silent. A future source arguing 1200 L/g would clear the ceiling
+in every wiring and the guard would stay green — correctly, since a guard that fires on everything
+forbids nothing. Whoever weighs that source must know the ceiling is not the adjudicator and that
+the model-wine objections are, or they will read a green suite as an endorsement.
+
+**2. The probe and guard wine declared no titratable acidity, and solved to pH 2.924.**
+`tartaric_gpl` and `malic_gpl` both default to 0.0 and neither was set — the same omission that made
+the pH sweep in `probe3.py` throw "below the acid load's intrinsic pH" and get patched there alone.
+pH 2.924 is outside any real red's 3.4–3.8, and `free_bisulfite` — hence the whole **sulfited**
+column of the share table — is a function of pH. Fixed in both (tartaric 6.0 g/L, malic 3.0 g/L,
+`initial_ph` 3.5) and re-taken:
+
+- **The unsulfited arms are byte-identical**: 0.83964 / 0.54948 / 1.85177 mg/L/day and spreads
+  1.1983× / 1.3244× / 1.0898×, unchanged to every printed digit. That is the *measurement* of what
+  §"pH" argued structurally — with no SO₂ there is no pH-dependent term anywhere in the O₂ draw —
+  and it is why the guards' assertions do not move.
+- **The sulfited column does move, in the direction that strengthens the guard's design choice.**
+  `sulfite_oxidation` rises 1.479 → 1.544 mg/L/day (more HSO₃⁻ at the higher pH), so copper's share
+  falls: direct **22.1% → 21.5%**, direct_burst **15.4% → 15.1%**, and the sulfited total-uptake
+  ratios fall with them (1.0717× → 1.0698×, 1.0499× → 1.0490×). The sulfited arm is therefore even
+  *more* diluted than the record's table said, so guarding the unsulfited arm as the worst case is
+  more right rather than less.
+
+**The record above therefore carries the PRE-FIX sulfited column** (the archive is append-only, so
+it is superseded here rather than edited). The corrected sulfited rows in full:
+
+| set | SO₂ 60, the O₂ drawers | Cu share | total spread |
+|---|---|---|---|
+| direct | sulfite_oxidation 1.544 (64.8%) · **phenolic_browning 0.513 (21.5%)** · anthocyanin_fading 0.288 (12.1%) · oxidative_acetaldehyde 0.038 (1.6%) | **21.5%** | 1.0698× |
+| direct_burst | sulfite_oxidation 1.543 (45.5%) · antioxidant_burst 1.012 (29.8%) · **phenolic_browning 0.513 (15.1%)** · anthocyanin_fading 0.288 (8.5%) | **15.1%** | 1.0490× |
+| cascade | **oxygen_activation 2.008 (100%)** | **100%** | 1.3242× |
+
+Guards re-run green (9 passed) and all four falsification arms re-verified after the change, since
+a scenario edit underneath a guard is exactly the move that can quietly disarm it.
