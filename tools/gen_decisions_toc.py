@@ -244,6 +244,12 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             # without dragging in every record that merely mentions a guard in passing.
             r"\bguard",
             r"\bmutation",
+            # D-157 swept the ASSERTION surface (the constraints) rather than the sampler
+            # surface (the bands), and its title carries none of the chemistry words. Same
+            # family as the two above -- a record whose subject is the test. `\bassertion`
+            # matches 1 title; `\bsurface` was tried and rejected because it sweeps in
+            # D-128, whose "surfaced" is the verb -- the D-53 misfiling trap again.
+            r"\bassertion",
         ),
     ),
     (
