@@ -252,14 +252,23 @@ def test_the_direct_set_is_unmoved_by_the_burst_set_existing(direct_run, slot, y
 def test_an_empty_burst_pool_reproduces_the_direct_trajectory_exactly():
     # The isolability condition in its strongest form: with the pool explicitly dosed to 0 the
     # burst set is not merely close to the direct set, it is the SAME model — the Process's
-    # `burst <= 0` guard returns byte-for-byte zero, so every downstream slot must agree bitwise.
-    # An `approx` here would pass on a set that had quietly started contributing.
+    # `burst <= 0` guard returns byte-for-byte zero, so adding it perturbs no RHS value, BDF
+    # selects identical steps, and every slot must agree bitwise. An `approx` here would pass on a
+    # set that had quietly started contributing.
+    #
+    # Compare the WHOLE (n_states, n_times) array. This first shipped as `.y[-1]`, which is not the
+    # final state vector but the LAST SLOT's time series — `quinone`, identically 0.0 under both
+    # sets by `test_quinone_is_identically_zero_under_the_direct_set`. It compared zeros to zeros
+    # and would have passed on any divergence whatsoever: the exact defect class this decision
+    # spends four sections indicting, committed inside the test that certifies it. Amended at D-147
+    # rather than quietly rewritten, because "isolability is checked bitwise" is already in the
+    # append-only archive.
     direct = compile_scenario(wine_scenario(), oxidative="direct")
     empty = compile_scenario(wine_scenario(burst_gpl=0.0), oxidative="direct_burst")
-    assert np.array_equal(
-        _integrate(direct, n=800).y[-1],
-        _integrate(empty, n=800).y[-1],
-    )
+    direct_y = _integrate(direct, n=800).y
+    empty_y = _integrate(empty, n=800).y
+    assert direct_y.shape == empty_y.shape
+    assert np.array_equal(direct_y, empty_y)
 
 
 # ------------------------------------------------------------------------------------

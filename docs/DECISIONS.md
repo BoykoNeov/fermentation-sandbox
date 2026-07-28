@@ -16444,3 +16444,50 @@ block; without it, any value for the split is a guess wearing a joint solve's co
 - Unchanged and still load-bearing: the quinone branching (D-145), closure O₂ ingress, acetaldehyde in maturation.
   D-139's own leftovers — the Brett/quench over-draw (§2.4) and the copper re-fit against D-134 (§2.5) — are still
   open, and are now the largest un-blocked items on the oxidative axis.
+
+### Amendment — the isolability guard was vacuous, and constraint 1 is stronger than §2 stated
+
+Found in review, immediately after the record above shipped. Appended rather than edited in place.
+
+**1. `test_an_empty_burst_pool_reproduces_the_direct_trajectory_exactly` asserted nothing.** §7
+claims isolability is checked *"bitwise, not approximately"*. It was written as
+`np.array_equal(direct.y[-1], empty.y[-1])` — and `trajectory.y` is `(n_states, n_times)`, so
+`y[-1]` is not the final state vector but **the last slot's time series**. The last wine slot is
+`quinone`, which is identically `0.0` under both sets (already pinned by
+`test_quinone_is_identically_zero_under_the_direct_set`). The assertion compared zeros to zeros and
+would have passed on *any* divergence whatsoever.
+
+**This is the defect class this record spends four sections indicting, committed inside the test
+that certifies its central isolability claim** — a green assertion whose framing deletes its own
+content, one file over from §3's 500 mg/L operating point. That it happened here, in the same beat,
+is the strongest available evidence that the pattern is not a property of D-133's author but of the
+move: an assertion is written to express a belief, and the shape that expresses it is not checked
+against the shape that tests it.
+
+**Fixed by comparing the whole `(n_states, n_times)` array**, plus a shape assertion so a silent
+broadcast cannot restore the hole. **The claim survives: equality holds bitwise across all 94 slots
+and 800 grid points.** That is the expected result and worth stating as mechanism rather than luck —
+the `burst <= 0` guard returns `schema.zeros()`, adding exact zeros perturbs no RHS value, so BDF
+selects identical steps. Had it *not* held bitwise, that would have been a finding about the solver
+path, not a licence to fall back to `allclose`. §7's sentence is now true.
+
+**2. §2's "0.929 / 0.949 at the instantaneous reading" is mislabelled, and the correction favours
+D-133.** Those two figures are **0.25-day means**, the shortest window the sweep measured — already
+declining, since the charge depletes from the first hour. The genuinely instantaneous rate at
+D-133's stated point is `k_burst_oxidation · [o2] · [burst_antioxidant]` = `1.6 × 0.008 × 0.0033`
+= 4.224e-5 g/L/h = **1.0138 mg/L/day**, against a ~1.0 target — and it reproduces the isolated unit
+test's 1.014 exactly, as it must, being the same expression at the same state.
+
+So **constraint 1 holds more tightly than the record states**: ~+1.4% instantaneous rather than
+−5 to −7%, with the decline to 0.93/0.95 over the first six hours being real competition for a
+depleting charge rather than calibration error. Nothing else in the record moves — the split is
+still unpinned, because constraint 1 pins only the *product* however precisely it is read, and it is
+constraint 2 that failed. §8's prohibition stands unchanged.
+
+**3. `_MEDIA_REGISTRIES`' consistency check was an `assert`**, which `python -O` strips. Converted
+to a `raise`: a check that disappears under a flag is not one. Its job is also narrower than first
+written — `get_medium` would raise a bare `KeyError` for an unbuilt set anyway, so what this buys is
+failing at *import* with both key lists named, not preventing a silent fallback to the default.
+The comment now says that instead of the stronger claim.
+
+Suite still **1418 passed**; ruff + mypy clean. No pin moved, in either direction.

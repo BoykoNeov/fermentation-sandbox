@@ -2302,18 +2302,21 @@ MEDIA_CASCADE_OXIDATIVE: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["casca
 #: ``get_medium(name, oxidative="direct_burst")``.
 MEDIA_BURST_OXIDATIVE: dict[str, Medium] = _build_media(_OXIDATIVE_SETS["direct_burst"])
 
-#: ``oxidative`` selection → the registry built with it. One entry per :data:`_OXIDATIVE_SETS` key,
-#: so a set added there without a registry here fails at import rather than silently falling back
-#: to the default (which is how a "new alternative" would quietly become the old one).
+#: ``oxidative`` selection → the registry built with it. One entry per :data:`_OXIDATIVE_SETS` key.
+#: A set declared there but not built here fails **at import**, with the two key lists in the
+#: message, rather than at whatever call site first selects it — :func:`get_medium` would otherwise
+#: raise a bare ``KeyError`` naming only the requested string. A ``raise``, not an ``assert``:
+#: ``python -O`` strips assertions, and a consistency check that disappears under a flag is not one.
 _MEDIA_REGISTRIES: dict[str, dict[str, Medium]] = {
     "direct": MEDIA,
     "cascade": MEDIA_CASCADE_OXIDATIVE,
     "direct_burst": MEDIA_BURST_OXIDATIVE,
 }
-assert set(_MEDIA_REGISTRIES) == set(_OXIDATIVE_SETS), (
-    f"every oxidative set needs a built registry; sets={sorted(_OXIDATIVE_SETS)} "
-    f"registries={sorted(_MEDIA_REGISTRIES)}"
-)
+if set(_MEDIA_REGISTRIES) != set(_OXIDATIVE_SETS):
+    raise RuntimeError(
+        "every oxidative set needs a built registry; "
+        f"sets={sorted(_OXIDATIVE_SETS)} registries={sorted(_MEDIA_REGISTRIES)}"
+    )
 
 
 def get_medium(name: str, *, oxidative: str = "direct") -> Medium:
