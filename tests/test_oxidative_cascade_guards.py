@@ -697,7 +697,7 @@ def test_only_the_declared_o2_draw_responds_to_the_copper_multiplier(
 # ------------------------------------------------------------------------------------
 
 #: Carrascon, Vallverdu-Queralt, Meudec, Sommerer, Fernandez-Zurbano & Ferreira (2018),
-#: *Food Chemistry* 249:172-179, Tables 1 + 2 joined: eight commercial Spanish red wines
+#: *Food Chemistry* 241:206-214, Tables 1 + 2 joined: eight commercial Spanish red wines
 #: measured on the SAME repeated-air-saturation protocol Ferreira 2015 used (the protocol
 #: D-132/D-133 are anchored on), as ``(code, pH, initial OCR, average OCR mg/L/day)``.
 #:

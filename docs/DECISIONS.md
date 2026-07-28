@@ -17164,3 +17164,36 @@ and no source supplies one.
   auto-dose (D-136), acetaldehyde in maturation, the Danilewicz 1:1/1:2/1:1.7 benchmark, the
   D-147 §8 unlock for the burst split, the missing post-Fenton secondary O₂ draw (D-142), the
   under-bound SO₂ pool (D-142), and the `add_copper`/`copper`-slot disconnect (D-149).
+
+
+### Amendment — two citations in the record above are wrong, and neither was verified before it shipped
+
+Caught in review minutes after the commit, and appended rather than edited in place (the
+D-147/D-149 precedent). **Neither error touches a measurement**; both are attributions, and both
+were asserted from a search summary instead of checked against the record.
+
+1. **Carrascón 2018 is *Food Chemistry* 241:206-214, not 249:172-179.** Authors and title as
+   stated (Carrascón, Vallverdú-Queralt, Meudec, Sommerer, Fernandez-Zurbano & Ferreira, "The
+   kinetics of oxygen and SO2 consumption by red wines. What do they tell about oxidation
+   mechanisms and about changes in wine composition?"), verified against the locally held
+   accepted manuscript and PubMed 28958520 / doi 10.1016/j.foodchem.2017.08.090. The volume and
+   pages I wrote belong to **no** paper I read; they were invented alongside a *different*
+   Ferreira-group 2018 OCR paper that surfaced in the same search (Marrufo-Curtido, Carrascón,
+   Bueno, Ferreira & Escudero, *Food Chem* **248**:37-45, "A procedure for the measurement of
+   Oxygen Consumption Rates (OCRs) in red wines"). **Fixed in place in the test file**, which is
+   code and not append-only.
+
+2. **The Taguchi study is Carrasco-Quiroz, Martínez-Gil, Nevares, Martínez-Martínez,
+   Sánchez-Gómez & del Alamo-Sanza (2022), *Foods* 11(13):1961** (doi 10.3390/foods11131961), not
+   "Fernández-Pérez et al." — a name that appears nowhere in it. Its content as described above is
+   correct: L16 (2^15) orthogonal array, pH 3.3/3.9 crossed against Fe, Cu, Mn, alcoholic strength
+   and acetaldehyde; pH, Fe and Mn significant, **Cu not**; `R_max` 6.5 → 11.6 hPa/h. It remains
+   **direction and order only** for the reason already stated — those numbers are prose describing
+   Figure 2, and the paper carries no level-means table.
+
+**The lesson is the one already in this archive, applied to a field it had not been applied to.**
+D-149 re-verified Nguyen's Table 3.1 against the primary before converting a single number from it,
+and this record transcribed Carrascón's Tables 1+2 and checked them against the paper's own printed
+r = 0.689. Both *data* transcriptions were verified. The *citations* were not, and they came from
+exactly the source class the archive already distrusts for numbers — a search summary. A
+bibliographic field is a claim like any other.
