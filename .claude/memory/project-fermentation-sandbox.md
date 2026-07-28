@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-28T11:00:41.661Z
+  modified: 2026-07-28T13:05:13.451Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,7 +26,7 @@ it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedba
 ## Status (2026-07-28)
 
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-152**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+**D-153**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
 leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1443 passed**. Wine schema **94 slots** / beer **47**
 — `quinone` in both regardless of set. **Three** oxidative sets (`direct` default / `cascade` / `direct_burst`).
 Most remaining Milestone-3 work is **blocked on external sourcing**, not on building.
@@ -44,6 +44,25 @@ Most remaining Milestone-3 work is **blocked on external sourcing**, not on buil
   half" (D-121). **Beer 3-sugar kinetics are NOT in the 5 beer books** — don't re-sweep.
 
 ## Live prohibitions, by axis
+
+**Sampled bands (D-153) — the archive-wide sweep is DONE. Do not re-run it.**
+- **THREE surfaces, TWO distributions.** compile-seam **279** varying, **triangular**
+  (`ensemble.py`; wine 247 / beer 181 reachable in one run); `psychophysics.yaml` **24**,
+  **UNIFORM** (`compression.py::_axis_draws` — deliberate, never "fix" it to triangular);
+  `sensory.yaml` **36**, **NEVER sampled** (`load_thresholds` is standalone) — **do not re-audit
+  those 36**. **Never apply the triangular mass statistic to psychophysics** — 16 points off, and
+  anti-conservative.
+- **The prose flag is REFUSED, measured not asserted** — 44 of 51 hits matched `ceiling` alone
+  (oak's *extraction asymptote*). **Never re-run or "tighten" the regex**: the archive uses
+  `RECALIBRATED`/`ceiling`/`upper bound` for HEALTHY provenance too, so prose cannot separate
+  "argued down from X" from "X is inside and excluded". Only a **measured per-parameter bound** finds it.
+- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (the live defect below) and
+  `f_de_novo_2_phenylethanol` (**D-118, already guarded** — analytic breach point *recomputed* by
+  the test, the template to copy).
+- **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor — joint margin
+  **3.07e-5**, unguarded. Its top-mode is deliberate (0.531 is a hard *measured* protein floor).
+  **0.963 lying inside its band is a COINCIDENCE, not a second defect** — D-119 forbids
+  *assigning* it (different denominator), not drawing near it [[feedback-check-the-schema-not-the-caller]].
 
 **Oxidation (D-132 → D-137, D-149 → D-152)**
 - D-132's phenolic boost is **additive, never proportional**, browning-side only.
