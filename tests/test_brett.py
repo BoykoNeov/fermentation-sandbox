@@ -38,6 +38,7 @@ from fermentation.core.media import wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
+from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.scenario.schema import Intervention
 from fermentation.units.convert import mgl_to_gpl
@@ -1348,3 +1349,149 @@ def test_pof_net_conversion_falls_with_warmer_fermentation():
     vp_cool = float(cool.series("vinylphenols")[-1])
     vp_warm = float(warm.series("vinylphenols")[-1])
     assert vp_cool > vp_warm > 0.0
+
+
+# -- 22. the Brett/POF over-draw of the shared precursor pools (decision D-148) ----
+#
+# D-138 constraint 3 asserted that two Processes drawing one precursor pool under `ProcessSet`
+# summing "can over-draw it" and "needs a shared depletion gate", and D-139 carried it forward as
+# §2.4 ("still untested"). D-141 discharged the *quench* half — the oxidative cascade READS
+# `hydroxycinnamics` as a reductant term in `activation_rate` and never draws it — so the live
+# competition is the two decarboxylases below, on BOTH precursor pools.
+#
+# Measured (D-148): summing is NOT the mechanism. Every draw on these pools routes through
+# `_decarboxylation_branch`, whose Monod term is taken in the pool it draws, so each draw is
+# first-order as its own pool empties and the SUM of first-order draws is still first-order. A
+# single drawer at a zero-order corner (K -> 0) over-draws on its own, and at the declared
+# parameter band the two-drawer corner is indistinguishable from the one-drawer corner
+# (-5.2e-11 vs -4.8e-11 g/L, both inside `assert_nonnegative`'s 1e-9 solver-noise tolerance and
+# both recovering). So NO shared depletion gate is built: it would be a second unmeasured coupling
+# propping up a non-problem.
+
+#: The uncertainty-band corner that maximises the summed draw, taken from `wine_generic.yaml`'s own
+#: `uncertainty` entries: every decarboxylase rate at its band HIGH, every precursor
+#: half-saturation at its band LOW (small K pushes the Monod toward 1 — the zero-order shape that
+#: is the only thing that can over-draw). Nominal values in the trailing comments.
+_OVERDRAW_CORNER = {
+    "k_brett_decarb": 2.0e-5,  # nominal 5.0e-6, band 1.0e-6 .. 2.0e-5
+    "k_brett_decarb_ferulic": 1.2e-5,  # nominal 3.0e-6, band 6.0e-7 .. 1.2e-5
+    "k_pof_decarb": 2.0e-5,  # nominal 2.5e-6, band 1.0e-6 .. 2.0e-5
+    "k_pof_decarb_ferulic": 1.2e-5,  # nominal 1.5e-6, band 6.0e-7 .. 1.2e-5
+    "K_hydroxycinnamic": 1.0e-4,  # nominal 5.0e-4, band 1.0e-4 .. 2.0e-3
+    "K_hydroxycinnamic_ferulic": 7.4e-5,  # nominal 3.7e-4, band 7.4e-5 .. 1.5e-3
+}
+
+#: The two pools both decarboxylases draw, and the only two the over-draw question is about.
+_SHARED_PRECURSORS = ("hydroxycinnamics", "ferulic_acid")
+
+
+def _run_overdraw_corner(*, brett_gpl: float = 50.0, days: float = 40.0, n_eval: int = 2000):
+    """Both decarboxylases at the band corner, co-inoculated — peak flux and X_brett TOGETHER.
+
+    Co-inoculation rather than the D-40 pt4 post-AF pitch (`_run_brett_pitched_post_af`) on
+    purpose: the over-draw needs both draws at maximum *simultaneously*, and POF's catalyst is the
+    fermentative flux, which is gone by the time a realistic Brett contamination arrives. A 50 g/L
+    Brett dose is deliberately unphysical for the same reason — the question is whether the
+    STRUCTURE can over-draw, not whether a realistic wine does.
+
+    Precursors are dosed low (10 / 6 mg/L, the bottom of the ~10-200 mg/L must range) so the pools
+    reach the Monod roll-off region early, while the draws are still at full strength.
+
+    Overrides go through a copy of `param_values` — the property returns a fresh `resolve()` on
+    every access, so mutating it in place edits a throwaway (the D-143 probe trap).
+    """
+    scenario = _wine_scenario(
+        days=days,
+        hydroxycinnamic_gpl=0.010,
+        ferulic_acid_gpl=0.006,
+        brett_pitch_gpl=brett_gpl,
+        pof_positive=1.0,
+    )
+    compiled = compile_scenario(scenario, strict=True)
+    params = dict(compiled.param_values)
+    params.update(_OVERDRAW_CORNER)
+    traj = simulate_scheduled(
+        compiled.process_set,
+        params,
+        compiled.y0,
+        compiled.t_span_h,
+        events=compiled.events,
+        t_eval=np.linspace(0.0, days * 24.0, n_eval),
+        param_tiers=compiled.parameters.tier_map(),
+    )
+    return compiled, traj
+
+
+def test_the_summed_decarboxylase_draw_cannot_drive_either_precursor_negative():
+    """Both decarboxylases at the band corner leave `hydroxycinnamics`/`ferulic_acid` >= 0.
+
+    The guard D-138 constraint 3 / D-139 §2.4 asked for. It forbids the SUMMED draw over-drawing
+    a shared precursor — not "the pool is eventually consumed", which is true here and would pass
+    over exactly the transient negative excursion this exists to catch.
+
+    Asserted as the minimum over the WHOLE trajectory, per pool. A final-value check would be
+    vacuous: both pools legitimately end at ~0 (fully converted), so an endpoint assertion cannot
+    distinguish "converted" from "over-drawn and frozen". `trajectory.y` is
+    `(n_states, n_times)`, so `y[-1]` is the last slot's time series and NOT the final state — the
+    D-147 amendment's defect. `series()` indexes by name and sidesteps it.
+
+    Tolerance is `assert_nonnegative`'s own 1e-9 g/L solver-noise floor. **A failure here is a
+    finding for the record, not a test to relax**: it would mean a draw on these pools is no
+    longer first-order as its own pool empties, which is the premise the "no shared depletion
+    gate" decision (D-148) rests on. Measured headroom when written: worst excursion -5.2e-11 g/L
+    on `hydroxycinnamics`, -5.6e-11 on `ferulic_acid`, both recovering.
+    """
+    compiled, traj = _run_overdraw_corner()
+
+    # The competition must actually BE the competition — a guard that silently degraded to one
+    # drawer would still pass and would assert nothing about summing.
+    active = {p.name for p in compiled.process_set.active}
+    assert {"brett_decarboxylation", "yeast_pof_decarboxylation"} <= active
+
+    for pool in _SHARED_PRECURSORS:
+        series = traj.series(pool)
+        assert series.shape == (traj.t.size,)  # a broadcast cannot silently empty this
+        worst = float(np.min(series))
+        assert worst >= -1e-9, (
+            f"{pool} was over-drawn to {worst:.3e} g/L by the summed Brett + POF decarboxylase "
+            "draw. This is a FINDING, not a test to relax: it means a draw on this pool is no "
+            "longer Monod in the pool it draws, and the D-148 decision NOT to build a shared "
+            "depletion gate is premised on every such draw being first-order as the pool empties."
+        )
+        # And the pool is genuinely worked, not merely untouched — the corner has to bite.
+        assert float(series[-1]) < 0.01 * float(series[0])
+
+
+def test_only_the_two_decarboxylases_may_draw_the_shared_precursors():
+    """Exactly two Processes declare the precursor pools in `touches` — the inventory is CLOSED.
+
+    What makes the over-draw structurally impossible is not that there happen to be two drawers,
+    but that every drawer takes its Monod in the pool it draws (`_decarboxylation_branch`). This
+    forbids a third drawer arriving without that question being re-asked: `ProcessSet(strict=True)`
+    enforces `touches`, so any new Process writing these slots must appear here and this test goes
+    red. It does NOT certify that a new drawer would be Monod-gated — it makes adding one loud.
+
+    The oxidative cascade is the near miss worth naming: `activation_rate` READS
+    `hydroxycinnamics` as one of `_PHENOLIC_REDUCTANT_POOLS` but never writes it (D-141's D2 —
+    `quinone` is off-ledger precisely because nothing new claims this pool), so it correctly does
+    not appear.
+    """
+    for oxidative in ("direct", "cascade", "direct_burst"):
+        compiled = compile_scenario(
+            _wine_scenario(
+                hydroxycinnamic_gpl=0.010,
+                ferulic_acid_gpl=0.006,
+                brett_pitch_gpl=0.3,
+                pof_positive=1.0,
+            ),
+            strict=True,
+            oxidative=oxidative,
+        )
+        for pool in _SHARED_PRECURSORS:
+            drawers = {p.name for p in compiled.process_set.active if pool in p.touches}
+            assert drawers == {"brett_decarboxylation", "yeast_pof_decarboxylation"}, (
+                f"a Process outside the two decarboxylases now writes {pool!r} under "
+                f"oxidative={oxidative!r}: {sorted(drawers)}. The D-148 no-shared-gate decision "
+                "assumes every draw on this pool is Monod in the pool it draws — re-measure the "
+                "over-draw corner before adding one."
+            )
