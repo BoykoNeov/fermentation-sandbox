@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-28T13:19:20.135Z
+  modified: 2026-07-28T13:22:44.044Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -76,7 +76,9 @@ Most remaining Milestone-3 work is **blocked on external sourcing**, not on buil
   evidence FOR 600** (only 1 of 6 arms admits 600) — one-directional, against higher k only.
 - **BAND FIXED (D-154) — was the live defect; do not re-propose it.** High **1500 → 662.8** L/g: the bound at
   `copper_typical`'s **MAXIMUM**, not the shipped-centring 918, because `copper_typical` is **itself sampled**
-  and `k_bound` *decreases* in it — joint draws bind at its max (the 918 arm goes RED, so this is load-bearing).
+  and `k_bound` *decreases* in it — joint draws bind at its max. **Never take 918**: measured over 200k joint
+  draws it still violates **5.01%** of pairs (1500 violates **37.6%**, so D-152's 29% — computed at a *fixed*
+  centring — **understates** it). Verify sampling claims **on draws, not edges**.
   **Never adopt D-152's printed "663"** — exact is 662.802522, so 663 ships red. Value/low edge/`copper_typical`
   **untouched**; Ferreira's 2.2× budget is **no longer** the high-side constraint. Guard **recomputes** the
   bound + asserts the monotonicity, never reads the note [[feedback-rejected-values-must-be-unreachable]].
