@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-28T16:04:51.909Z
+  modified: 2026-07-28T17:37:06.053Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,7 +26,7 @@ it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedba
 ## Status (2026-07-28)
 
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-157**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+**D-158**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
 leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1450 passed**. Wine schema **94 slots** / beer **47**
 — `quinone` in both regardless of set. **Three** oxidative sets (`direct` default / `cascade` / `direct_burst`).
 Most remaining Milestone-3 work is **blocked on external sourcing**, not on building.
@@ -58,19 +58,21 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   `*_initial`) and **verb-consumed** (`_verb_add_copper`, `_verb_add_oak`) **NEVER** — firing five verbs left the
   count **152, unchanged**. **Check drawability BEFORE calling a point-assertion a defect** (181 = union over 13
   scenarios, a *lower* bound). **19 of the 33 names in BOTH medium files carry DIFFERENT bands, some disjoint**
-  (`E_a_esters` wine 40–70k vs beer 120–265k). `psychophysics.yaml` **24**,
-  **UNIFORM** (`compression.py::_axis_draws` — deliberate, never "fix" to triangular); `sensory.yaml`
-  **36**, **NEVER sampled** (`load_thresholds` standalone) — **do not re-audit those 36**. **Never
-  apply the triangular mass statistic to psychophysics** — 16 points off, anti-conservative.
+  (`E_a_esters` wine 40–70k vs beer 120–265k). `psychophysics.yaml` **24, UNIFORM**
+  (`compression.py::_axis_draws` — deliberate, never "fix" to triangular); `sensory.yaml` **36, NEVER sampled**
+  (`load_thresholds` standalone) — **do not re-audit those 36**. **Never apply the triangular mass statistic to
+  psychophysics** — 16 points off, anti-conservative.
   **PINNED (D-156, `tests/test_sampling_surfaces.py`) — do not re-audit, do not "simplify".** Its
   `SHARED_FILES` is restated **on purpose** (deriving it = D-108/D-109 vacuity). **TWO triangular
   defaults** — `ensemble.py:108` and `:444`, separate paths, separate tests. **A distribution test at
   `x == mode` is vacuous** (both laws put `(mode−lo)/(hi−lo)` below the mode) — sample **off-mode**.
   **Removal** is deliberately not *separately* pinned (all 14 drops already RED by consumption);
   **addition** had no backstop — that is what D-156 closed.
-- **ONE LIVE contradiction, D-157 → owner's call, NOT fixed.** `ethyl_acetate_eq` band high **84 mg/L** is
-  outside the **30–80** interval `test_aging.py:862` asserts; drawable, **0.99%** of draws escape. Remedy is a
-  **sourcing** question (narrow band vs widen assertion) — do not guess it into a guard. Flags **D-127**.
+- **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
+  **INTERNALLY, no fetch**: ask which number is *sourced*, not which is right — 84 = Shinohara's 16.4% E-rate;
+  **30–80 occurred ONCE in the repo, in the test comment asserting it**. Corrects **D-127**. Test **recomputes**
+  all three points (`abs=5e-4` = 3-dp half-width; never `rel`, never `round(x,3)` — pins *formatting*). Band =
+  E-rate spread at **FIXED acetic 0.35** ⇒ documented narrowing, **NOT** the point-vs-band shape.
 - **Closure ordering: ~42% inverted on joint draws, but declaration-level ONLY — do not "fix" it.** Two `otr_*`
   never coexist in a run (one `scenario.closure` → the **`closure_otr` STATE slot**, `compile.py:2254`; the
   sampler draws parameters, not state), so **"it goes live when OTR becomes Process-read" is WRONG**. **D-157
@@ -220,8 +222,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
-uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession. **"Bound SO₂ under-modelled"
-is NOT one — D-143.**
+uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession. **"Bound SO₂ under-modelled" is NOT one — D-143.**
 
 ## Open asks / external
 
@@ -231,17 +232,16 @@ is NOT one — D-143.**
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ
   [E] + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d157-assertion-surface\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
-  (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\` (**SDs**+bound);
-  `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds** (D-150).
+  `d157-assertion-surface\`, `d158-etoac-eq\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**),
+  `d149-copper-refit\` (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\`
+  (**SDs**+bound); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds** (D-150).
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
 
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B); peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose;
 acetaldehyde in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic
-inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142);
-**`ethyl_acetate_eq`'s 84-vs-80 mg/L contradiction (D-157) — sourcing call.**
+inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142).
 **`add_copper` never writes the `copper` slot** — needs a residual-Cu fraction (its binding constants are
 verb-consumed ⇒ never sampled). D-143/4 ← D-145.
 
