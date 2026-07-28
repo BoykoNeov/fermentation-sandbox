@@ -238,6 +238,12 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"corroborat",
             r"blocker",
             r"unsourced",
+            # A record whose subject is the TEST rather than the chemistry: a guard, or a
+            # mutation matrix run to decide whether one is owed (D-155). Both are narrow --
+            # 3 and 2 titles respectively -- so they file the methodology records here
+            # without dragging in every record that merely mentions a guard in passing.
+            r"\bguard",
+            r"\bmutation",
         ),
     ),
     (

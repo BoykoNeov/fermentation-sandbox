@@ -390,7 +390,7 @@ def test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable(full_params)
     assert worst_c_off > 1.5 * worst_c
 
 
-def test_the_de_novo_share_stays_above_its_analytic_breach_point(full_params):
+def test_the_de_novo_share_stays_above_its_analytic_breach_point():
     """The band's floor is a MODEL limit, and it is derived here rather than trusted (D-118).
 
     ``f_de_novo_2_phenylethanol``'s lower bound is not a measurement spread — it is the point
@@ -401,20 +401,49 @@ def test_the_de_novo_share_stays_above_its_analytic_breach_point(full_params):
 
     Pinned because the YAML note *claims* this number, and a claimed number nobody recomputes is
     the D-96/D-109 class of defect this project keeps re-learning.
+
+    **Evaluated at phe's band MAXIMUM, not its nominal (D-155).** Both parameters are sampled and
+    drawn INDEPENDENTLY, and ``breach()`` is strictly increasing in ``f`` — so the constraint that
+    must hold for every joint draw is the one at ``f``'s top, not at its point value. Today those
+    coincide (D-118 put the mode on the high edge because 0.531 is a hard measured protein floor),
+    which is why the nominal form was safe; but it was safe by a coincidence enforced in a
+    *different* test, ``test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable``, whose
+    subject is the D-117 band shape and which has no idea it is holding a conservation property
+    (it pins ``uncertainty.high == _PHE_MEASURED_LUMP``). Reading the edge
+    here makes this test self-sufficient. Measured, not assumed: widening phe's high edge alone
+    left this test GREEN before the change and turns it red after (D-155's mutation A).
     """
-    f = full_params["f_non_ehrlich_phenylalanine"]
     _, compiled = _run(amino_acids_gpl=1.0, days=1.0)
     entry = compiled.parameters["f_de_novo_2_phenylethanol"]
+    phe = compiled.parameters["f_non_ehrlich_phenylalanine"]
+    assert phe.uncertainty is not None
+    f = phe.uncertainty.high  # the joint worst case; see the docstring
 
     breach_point = 1.0 - (_PHE_PROTEIN_SHARE_BOUND / (1.0 - _PHE_PROTEIN_SHARE_BOUND)) / (
         f / (1.0 - f)
     )
-    assert breach_point == pytest.approx(0.971, abs=5e-4), breach_point
+    # SAFETY FIRST, sanity second — deliberately this order. The pin below has an abs=5e-4
+    # tolerance against a margin of 3.07e-5, i.e. ~16x looser than the headroom it sits beside,
+    # so a drift that consumes the entire margin passes it. That is not a hole (the assert here
+    # is exact and binding) but it does mean the pin must not be the first thing to fire, or an
+    # unsafe band reports itself as "the breach point isn't 0.971".
     assert entry.uncertainty is not None
     assert entry.uncertainty.low >= breach_point, (
         f"f_de_novo_2_phenylethanol's band floor {entry.uncertainty.low} is below the analytic "
-        f"breach point {breach_point:.4f} — an ensemble draw can now break the carbon guard"
+        f"breach point {breach_point:.6f} — an ensemble draw can now break the carbon guard. "
+        f"Computed at f_non_ehrlich_phenylalanine's band HIGH edge ({f}), which is the joint "
+        "worst case because breach() increases in f and the two are drawn independently. So this "
+        "is red if EITHER band moved: phe's top edge up, or the de-novo floor down."
     )
+    # ...and the monotonicity that makes the band's top the worst case, checked not assumed.
+    lower = 1.0 - (_PHE_PROTEIN_SHARE_BOUND / (1.0 - _PHE_PROTEIN_SHARE_BOUND)) / (
+        phe.value / (1.0 - phe.value)
+    )
+    assert lower <= breach_point, (
+        "breach() is no longer increasing in f_non_ehrlich_phenylalanine, so its band's TOP is "
+        "not the joint worst case and this test is checking the wrong end of the band"
+    )
+    assert breach_point == pytest.approx(0.971, abs=5e-4), breach_point
 
 
 # -- isolability --------------------------------------------------------------
