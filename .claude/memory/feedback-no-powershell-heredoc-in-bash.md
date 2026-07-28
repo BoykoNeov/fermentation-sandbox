@@ -1,11 +1,11 @@
 ---
 name: feedback-no-powershell-heredoc-in-bash
-description: "Commit messages get silently corrupted by shell mechanics: PowerShell here-strings in the Bash tool, and Out-File -Encoding utf8's BOM — verify %s before pushing"
+description: "Commit messages get corrupted by shell mechanics: PS here-strings in the Bash tool, Out-File's BOM, and embedded double quotes splitting the arg to native git — write the message to a file and use -F"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 4c5542b6-994d-42ff-9b5f-a6dbc7d14d50
-  modified: 2026-07-27T08:26:49.497Z
+  modified: 2026-07-28T11:40:23.359Z
 ---
 
 This environment exposes **two shells with different syntax**: the PowerShell
@@ -47,7 +47,23 @@ verify **after `git push`** — in one `&&` chain that committed and pushed
 together. **The chain is the bug.** `git commit && git push` in a single command
 removes the only window in which the check is worth anything.
 
-**How to apply:** never put `git commit` and `git push` in the same command —
+**A THIRD mechanic, 2026-07-28: embedded double quotes split the argument.**
+`git commit -m @'...'@` in the **PowerShell** tool — closing `'@` at column 0,
+exactly as this memory prescribed — still failed. PS 5.1 does **not** escape a
+`"` inside the string when handing it to a native exe, so `git`'s own
+command-line parser re-splits the argument at the quote. A message containing
+`D-72's "right-looking 1:2"` reached git as several args and died with
+`fatal: Invalid path '1:/2 trap was folded back in...'`. **Nothing was
+committed** — and I only noticed because the fragment happened to resemble a
+path. Had the tail parsed cleanly, git would have committed a **truncated
+message at exit 0**, the silent failure this whole memory is about. So the
+`@'...'@` advice above is **necessary but not sufficient**: it protects `$` and
+backticks, not `"`.
+
+**How to apply:** for any commit message containing a double quote — or just by
+default for multi-paragraph messages — **write it with the Write tool and use
+`git commit -F <file>`**. That has now survived where `-m` failed twice. Never
+put `git commit` and `git push` in the same command —
 commit, verify `%s`, then push as a separate call. In the Bash tool use a real
 bash heredoc —
 `git commit -F - <<'EOF' ... EOF` (quoted `EOF` keeps `$` and backticks literal)
