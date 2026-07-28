@@ -17483,7 +17483,8 @@ It contains two:
 
 `f_Cu` is pH-independent — D-150 refused an `f_pH` and D-151 hardened that refusal — so the
 model asserts a **single** ratio, and a bound on a single ratio must accommodate the pH at
-which copper looks biggest rather than an average across two genuinely different slopes. Real
+which copper looks biggest. **That clause is narrowed by amendment 1 below** -- the marginal is
+not meaningless, it is the arm that would over-claim. Real
 red wine's 3.4–3.8 sits between the design's two levels. **pH 3.3 is therefore the conservative
 estimand, and it is also the loosest**, which is the right coincidence to check rather than to
 enjoy: taking the widest defensible interval is what stops this from being a bound chosen for
@@ -17653,6 +17654,75 @@ responds to the measurement, not merely to what is written in the YAML.
   not a second finding, and certainly not licence for a protective copper term.
 - **It does not touch leg 1.** No mechanism is supplied for anything. D-150's opening
   prohibition stands.
+
+### Amendment 1 — the six arms printed, because the shipped 600's survival rests on exactly one of them
+
+The record above swept the *centring* (`copper_typical` 0.168 → 0.679) and reported that "600
+survives at every centring." True, and misleading by omission: **centring was the only dimension
+swept in that sentence.** Across the two dimensions that actually define an arm — outlier handling
+and estimand — the picture is not symmetric, and the record printed the ratios but stopped before
+converting the marginal.
+
+| arm | ratio upper limit | **k upper bound** | admits 600? |
+|---|---|---|---|
+| all 16 / **pH 3.3** *(shipped)* | 1.754× | **918** | **yes** |
+| drop cond 12 / pH 3.3 | 1.417× | 544 | no |
+| all 16 / marginal | 1.041× | **58** | no |
+| drop cond 12 / marginal | 1.095× | **133** | no |
+| all 16 / pH 3.9 | 0.887× | −166 | no |
+| drop cond 12 / pH 3.9 | 1.002× | 3 | no |
+
+**Two things follow, and they point in opposite directions.**
+
+**The exclusions are untouched, and are stronger than the record claimed.** Every one of the six
+arms bounds k below 1500. So the exclusion of 1500, 2000 and 2092 — the `Flags`, the two-routes
+argument, the whole ensemble-reach finding — depends on **no** choice made in this beat. It
+survives any defensible reading of this table. That is a better result than "the loosest arm
+excludes them."
+
+**The survival of 600 depends on exactly one arm: the one that was shipped.** Not two, as the
+loosest-arm rule might suggest — `drop cond 12 / pH 3.3` bounds k at 544 and excludes it too. And
+**both marginal arms land below the parameter's own band low edge of 200**, which is the condition
+that must be stated in its own words: *under the pH-averaged reading, no value in
+`k_copper_multiplier`'s declared band is consistent with this dataset.*
+
+**And one clause above over-reached.** The record justified the pH-3.3 estimand partly by calling
+the marginal "an average across two genuinely different slopes," implying it is not a real
+quantity. It is. Real red wine's 3.4–3.8 straddles the design's two levels, and interpolating to
+3.6 gives **~0.894×** — near the marginal's 0.789×. For a wine at 3.6 the marginal is arguably the
+*more* apt reading. The defensible argument is narrower: `f_Cu` is pH-independent while the data
+are not, so **no single-ratio bound is fully coherent**, and the loosest slice is the conservative
+resolution — chosen so as not to over-claim, **not** because it is the better point estimate.
+
+**So the honest scope statement is:** this dataset does **not** support 600. It fails to exclude
+600 at the pH slice where copper looks largest, and excludes it everywhere else. That is a
+one-directional result — it is evidence against values above the shipped one, and it is *not*
+evidence for the shipped one. It also makes the record's own conclusion firmer, not softer: **the
+band is the beat**, and a re-derivation should weigh that five of six arms put the whole band's
+upper half — and two put the entire band — outside this measurement.
+
+**Two smaller corrections in the same pass.**
+
+- **The two-sided justification was argued on an arm that was not shipped.** The record motivates
+  it by the marginal's *negative* point estimate, where one-sided would collapse the bound to ~0.
+  The shipped pH-3.3 arm has a *positive* estimate (+0.933), and there one-sided gives 812 L/g
+  against the two-sided 918 — looser reasoning, same direction, much smaller effect. Two-sided
+  remains right and remains the wider choice; the dramatic version of the argument belongs to the
+  marginal.
+- **"Two hosts" claims more independence than it has.** PMC and the EuropePMC `fullTextXML` are
+  two renderings of one publisher deposit, and both fetches were summarised by the same model, so
+  they are not two independent transcriptions. What actually carries the SD provenance is that
+  both reproduce D-151's *independently verified* means cell-for-cell — including the printing
+  artefact at condition 16 / GEw-A (`12. ± 1.7`) — so the fetch that delivered the SDs is
+  demonstrably reading the right table. Inherited from D-151, which made the same claim.
+
+**Guard change, in the same pass:** Guard 7's third test carried a vacuous second assertion.
+`understatement` is `sqrt(1/share)`, so `understatement > 3.0` is *implied* by `share < 0.10` and
+could never fail independently — a decoration reading as a check, in a file whose whole discipline
+is that a guard forbids something. It is replaced by the independent fact: under a replicate-only
+error term copper's F on `R_max` is 269 against crit 3.89, i.e. copper would be **significant**,
+while the paper reports it as not. That is a statement about the SDs rather than about their size,
+and it fails if the two error terms ever converge. Suite **1443 passed**; ruff + mypy clean.
 
 ### Next
 

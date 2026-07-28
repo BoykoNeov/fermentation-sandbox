@@ -1435,10 +1435,14 @@ def _cq_copper_ratio_upper_bound(mse_override: float | None = None) -> dict[str,
     **Taken at pH 3.3, the SIMPLE effect, not the pH-averaged main effect.** That is the
     conservative estimand and the reason is structural. D-151 measured a real pH x Cu
     interaction, so this design does not contain one copper ratio -- it contains two: 1.155x
-    at pH 3.3 and 0.633x at pH 3.9. ``f_Cu`` is pH-independent (D-150 refused an ``f_pH``),
-    so the model asserts a SINGLE ratio, and a bound on a single ratio must accommodate the
-    pH at which copper looks biggest rather than an average across two genuinely different
-    slopes. Real red wine's 3.4-3.8 sits between the design's two levels.
+    at pH 3.3 and 0.633x at pH 3.9. ``f_Cu`` is pH-independent (D-150 refused an ``f_pH``), so
+    the model asserts a SINGLE ratio, and the data are internally inconsistent with any such
+    ratio. **No single-ratio bound is fully coherent here, so the loosest slice is taken as the
+    conservative resolution -- NOT because it is the better point estimate.** The pH-averaged
+    marginal is not meaningless: real red wine's 3.4-3.8 straddles the design's levels, and
+    interpolating to 3.6 gives ~0.894x, near the marginal's 0.789x. It is simply the arm that
+    would let this dataset claim more than it can support -- it bounds k at 58 L/g, below the
+    parameter's own band. D-152's amendment 1 prints all six arms rather than this one.
 
     Condition 12 -- the one ``R_max`` outlier (33.0/30.7/6.4) -- is KEPT, and the direction of
     that choice is the opposite of D-151's. There, dropping it made the interaction stronger.
@@ -1625,15 +1629,26 @@ def test_the_printed_replicate_sds_cannot_carry_the_copper_bound():
 
     assert share < 0.10, (
         f"replicate noise is {share:.1%} of D-151's residual (sigma^2_rep/5 = "
-        f"{s2_rep_on_a_cell_mean:.4f} against MSE {model['mse']:.4f}). D-152's whole reason for "
+        f"{s2_rep_on_a_cell_mean:.4f} against MSE {model['mse']:.4f}; a replicate-only standard "
+        f"error would understate by {understatement:.2f}x). D-152's whole reason for "
         "using the between-condition residual is that this share is ~1%; if the two error terms "
         "have converged, the bound should be re-derived on the tighter one -- deliberately, in "
         "a record, not by editing this threshold."
     )
-    assert understatement > 3.0, (
-        f"a replicate-only standard error would understate by only {understatement:.2f}x, "
-        "against the 9.7x measured at D-152. The anti-conservatism argument that rules the SDs "
-        "out as an error term is what this asserts; it must be re-made, not assumed."
+    # NOT a second threshold on the same quantity. `understatement` is sqrt(1/share), so any
+    # assertion on it is implied by the one above and would be decoration in a file whose whole
+    # discipline is that a guard forbids something. This asserts the independent fact instead:
+    # under a replicate-only error term copper would be SIGNIFICANT on this column, while the
+    # paper reports it as not. That is a statement about the SDs, not about their size.
+    i_cu = model["names"].index("Cu")
+    f_cu_on_replicates = float(
+        model["beta"][i_cu] ** 2 / (s2_rep_on_a_cell_mean * model["xtx_inv"][i_cu, i_cu])
+    )
+    assert f_cu_on_replicates > _CQ_F_CRIT, (
+        f"under a replicate-only error term copper's F on R_max is {f_cu_on_replicates:.1f}, "
+        f"NOT past crit — so the reductio D-152 rests on has failed. The paper reports copper as "
+        "non-significant; if the printed SDs can now reproduce that verdict, they may be the "
+        "paper's own error term after all and the bound should be re-derived on them."
     )
 
     # And state by how much the choice of error term actually moves the thing that matters.
