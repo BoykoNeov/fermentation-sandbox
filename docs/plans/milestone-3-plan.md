@@ -950,3 +950,34 @@ uncertainty bands.
 > the inversion). The tartrate-catalysis axis is now COMPLETE. Next unchanged: the equilibrium floor
 > (blocked, no source), ethyl_acetate formation / ethyl_hexanoate hydrolysis (blocked; Makhotkina 2012 a
 > candidate fetch). See D-125.]**
+
+> **[PLAN LAG, stated so it is not mistaken for coverage: this file's beat blocks stop at D-125, while the
+> archive is at D-146. D-126–D-145 are recorded in `docs/DECISIONS.md` only, and backfilling them is not
+> this beat's scope. The block below is added because it CLOSES two named items of this plan's own
+> deferred tail, which would otherwise still read as open here.]**
+>
+> **[D-146 — THE MILESTONE-3 TAIL: two of three shipped, the third BLOCKED. (i) `oav` → `magnitude`
+> DONE — the rename this plan and D-98 both deferred as "churn for no new observable". Scoped to
+> `DescriptorReading.oav` ONLY, the one field holding two quantities (raw OAV under `MaxRuleProjector`,
+> `OAV ** n` under `StevensProjector`); `OAVReading.oav` / `oav_series` / `oav_tier` / `sensory/oav.py`
+> KEEP the name because they are OAVs under every projector, and a test pins that half so a future
+> "finish the rename" sweep fails loudly. (ii) SOTOLON ENANTIOMERS — REFUSED, and D-107's "one racemic
+> pool against one threshold is a lump, soft by ~100×" WITHDRAWN. Pons 2008 had to separate the
+> enantiomers by preparative HPLC to threshold them, so every earlier wine value (Guichard/Pham/Etiévant,
+> Pham 1995, Cutzach — the ones this file cites) was measured by spiking the RACEMATE; the pool is racemic
+> because `SotolonAldolCondensation` is a non-enzymatic aldol; pool and threshold are therefore
+> COMMENSURATE. Splitting the OAV would double-count AND import a model-solution matrix `sensory.yaml`
+> already excludes (the D-102 DMS rule, the D-99 beer-OTC rule). What the racemic claim costs is a SCOPE
+> LIMIT and it is ASYMMETRIC — at most ~2× under, up to ~56× over — robust to the additivity the lens
+> refuses (max 2.00/55.6, additive 1.98/56.1). (iii) METHIONINE SINK + `methionol` — the D-118
+> stoichiometric gate PASSES (methionol is 20–39% of must methionine, not phenylalanine-impossible) and
+> the sink is STILL unbuildable: `f_non_ehrlich_methionine` is ILL-POSED, spanning +0.421 to −1.355 across
+> ONE paper's 22-strain panel, i.e. leaving its own `[0, 1)` domain. Crépin never DETECTED methionine
+> (GC-MS) and Rollero fed U-¹³C leucine/valine, so both sink sources are structurally incapable, not
+> merely silent; the de-novo rescue that saved phenylalanine needs `f_de_novo_methionol`, whose only route
+> is sulfate assimilation — a second unmeasured number. NOTHING BUILT: no `FUSEL_SPECS` entry, no slot, no
+> parameter. Named unlock: a ¹³C-methionine tracer resolving methionol's must-vs-de-novo provenance at a
+> wine-realistic methionine level. (iv) Stale prose fixed in passing — sotolon's acetaldehyde carbons come
+> off the acetaldehyde pool, not the threonine draw, since D-107. 1385 → 1389 passed, both measured; ruff
+> + mypy clean; the racemate guard mutation-tested. Deferred tail: `sotolon enantiomers` and
+> `oav → magnitude` STRUCK; `methionine's sink + methionol` RE-LABELLED **BLOCKED**. See D-146.]**

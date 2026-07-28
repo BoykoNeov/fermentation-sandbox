@@ -136,6 +136,10 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"ketoglutarate",
             r"phenylalanine",
             r"leucine",
+            # D-146: `methionine` had NO rule in any bucket, though it is one of the
+            # eight speciated pools and the subject of D-105/D-106. `methionol` is its
+            # Ehrlich alcohol (named, blocked, never built) and buckets with it.
+            r"methion",
             r"phenylethanol",
             r"isoamyl",
             r"isobutanol",
@@ -162,6 +166,11 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"henry",
             r"aroma",
             r"\boav\b",
+            # D-146: `sotolon` had no rule anywhere either, despite owning a Process
+            # since D-107 and a threshold since D-87. NB a `magnitude` rule was tried
+            # for the oav->magnitude rename and reverted: it swept in D-53, whose
+            # "magnitude" is a rate constant's. The rename record buckets on `sotolon`.
+            r"sotolon",
             r"sensory",
             r"descriptor",
             r"threshold",
