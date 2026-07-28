@@ -16163,6 +16163,13 @@ composition** (FEMS Yeast Res 2021, foab038: methionol 1.5–6.1 mg/L):
 | lowest | 1.5 mg/L | 14.13 | 0.579 | **+0.421** |
 | highest | 6.1 mg/L | 57.45 | **2.355** | **−1.355** |
 
+**The two concentration ranges in this section are not in conflict, and the difference is the whole reason the gate
+passed while the parameter failed.** The 20–39% gate used **typical white-wine** methionol (507–998 µg/L); this table
+uses **one controlled strain panel's full spread** (1.5–6.1 mg/L, foab038 — the better source, read rather than
+summarised). A feasibility gate is rightly asked at typical concentrations; a *parameter's domain* must hold across
+the range a real strain can produce, and this one does not. **Reporting only the gate would have been the narrowing
+D-101/D-108 warn about** — it is the range where the answer looks safe.
+
 The parameter's declared domain is `[0, 1)` and `PrecursorNonEhrlichFates` raises outside it. **The derived value is
 negative for most of a single study's strain range** — above an Ehrlich share of 1.0 the wine makes more methionol
 than the must supplied methionine, the D-118 tell arriving one precursor over but only at the top of the range. The
@@ -16200,8 +16207,12 @@ without it, both parameters are guesses.
 `threshold_sotolon_wine`'s provenance still said sotolon's *"2 acetaldehyde-derived carbons are still lumped into that
 threonine draw"* and named it *"the threonine/acetaldehyde-derived furanone"*. Both predate **D-107**, which moved
 sotolon out of `MaillardStrecker` into `SotolonAldolCondensation` — where the acetaldehyde carbons are debited off the
-**acetaldehyde pool** by an explicit `d(acetaldehyde)/dt = −n_sot · M_ACETALDEHYDE` term, and threonine is sotolon's
-*grand*parent via α-ketobutyrate rather than its direct precursor. The parameter file is the file furthest from the
+**acetaldehyde pool**, and threonine is sotolon's *grand*parent via α-ketobutyrate rather than its direct precursor.
+**Confirmed in the executing body, not the docstring** (`aging.py:2330-2332`: `d[sotolon] = n_sot · M_SOTOLON`,
+`d[alpha_ketobutyrate] = −n_sot · M_ALPHA_KETOBUTYRATE`, `d[acetaldehyde] = −n_sot · M_ACETALDEHYDE`, and **no
+threonine term at all**) — checking the code rather than the class docstring is the point, since a docstring is
+exactly the artifact this finding is about, and reading one to convict another would repeat the error. The parameter
+file is the file furthest from the
 mechanism, so nothing it does fails when its prose goes stale — the lesson D-109 and D-110 both landed, arriving here
 on a third file in a beat that was reading it for another reason entirely.
 
