@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-28T14:55:30.615Z
+  modified: 2026-07-28T14:58:51.528Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -59,8 +59,9 @@ Most remaining Milestone-3 work is **blocked on external sourcing**, not on buil
   (deriving it from `_load_parameters` = D-108/D-109 vacuity). **TWO triangular defaults, not one** —
   `ensemble.py:108` and `:444` are separate paths and need separate tests. **A distribution test at
   `x == mode` is vacuous**: both laws put `(mode−lo)/(hi−lo)` below the mode, so sample **off-mode**.
-  The **removal** direction is deliberately unpinned (all 14 shared-file drops already RED by
-  consumption); the **addition** direction had **no** backstop at all — that is what D-156 closed.
+  The **removal** direction is deliberately not *separately* pinned — all 14 shared-file drops are
+  already RED by consumption, and the seam test catches it incidentally too (set equality fires both
+  ways); the **addition** direction had **no** backstop — that is what D-156 closed.
 - **The prose flag is REFUSED, measured not asserted** — 44 of 51 hits matched `ceiling` alone
   (oak's *extraction asymptote*). **Never re-run or "tighten" the regex**: the archive uses
   `RECALIBRATED`/`ceiling`/`upper bound` for HEALTHY provenance too, so prose cannot separate
