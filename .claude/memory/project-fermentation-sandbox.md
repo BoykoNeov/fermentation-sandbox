@@ -75,8 +75,8 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   `PH_SYSTEM_READS`/`SO2_BINDING_READS` (`acidbase.py`) → 19 members/5 modules. **Keep DISJOINT** (pinned:
   `EsterHydrolysis`/`EthylAcetateEsterification` solve pH, never partition SO₂) and **derived**, never re-listed.
   **`temperature_ramp_rate` stays undeclared BY DESIGN** (`temperature.py:32-37`) — "declare everything the
-  sweep records" is WRONG. No tier moved. **Every pH-dependent aging band predates this and is UNDERSTATED** —
-  restating them = the next beat; never cite an old spread as current without re-measuring.
+  sweep records" is WRONG. No tier moved. **Every pH-dependent aging band predates this and is NOT COMPARABLE**
+  (sorted draw order moved, not just width) — re-measure; never reason about the delta. Next beat.
 - **Closure ordering: ~42% inverted on joint draws, but declaration-level ONLY — do not "fix" it.** Two `otr_*`
   never coexist in a run (one `scenario.closure` → the **`closure_otr` STATE slot**, `compile.py:2254`; the
   sampler draws parameters, not state). **12** assertions still undecided

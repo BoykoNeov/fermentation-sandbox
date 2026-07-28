@@ -18914,8 +18914,10 @@ the row that proves it. Left undeclared, as designed.
 Every one of the 21 readers is SPECULATIVE; every one of the 13 names is PLAUSIBLE. No
 reader's declared tier exceeds the tier of anything it silently read, so
 `combine(SPECULATIVE, PLAUSIBLE) = SPECULATIVE` and **declaring the 13 moves no tier**.
-That was a falsifiable prediction before the mutation, and it held: of the 10 tests the
-mutation reddened, **not one asserted a wrong tier value**. The two tier tests failed by
+That was a falsifiable prediction before the mutation, and it held: of the 9 tests the
+mutation reddened, **not one asserted a wrong tier value**. (The shipped fix reddened a
+10th, `test_senescence_needs_no_ph_solve` — but via the amino-acid declarations, which
+were not in the mutation; it is not evidence either way here.) The two tier tests failed by
 `KeyError` — `_reads_tier` raises on a declared read absent from `param_tiers`
 (`process.py:45-49`, D-1) and their fixtures were narrower than any real run. So the
 convention was right on the axis it reasoned about and silent on the one that mattered.
@@ -18971,25 +18973,48 @@ full suite, then `git checkout -- src/` with `git status` **and** a marker re-sc
 |---|---|---|---|
 | 0 | the 13 declared as shipped | red set scopes the beat | **9 failed / 1451 passed** — 7 exact-set `reads` pins + 2 `KeyError` |
 | A | tier assertions under arm 0 | GREEN if the tier prediction holds | **GREEN** — no tier *value* assertion failed; both tier reds were fixture-scope `KeyError` |
-| B | `EsterHydrolysis` given `SO2_BINDING_READS` too | RED — it never partitions SO₂ | **RED**, and now pinned: `assert not set(p.reads) & set(SO2_BINDING_READS)` |
+| B | `EsterHydrolysis` given `SO2_BINDING_READS` too, **run after the fix shipped** | RED — it never partitions SO₂ | **RED**, 1 test (`test_aging.py::test_metadata`) |
 
 Arm B is the one that earns the two-tuple design: without it the disjointness is a
 comment, and the next editor merges the tuples because "they're all acidbase params".
+**Reported precisely, because the arm is weaker than it looks.** What went red is the
+*exact-set* pin, which fires first and short-circuits the dedicated
+`assert not set(p.reads) & set(SO2_BINDING_READS)` on the line below it — so that
+assertion was verified separately (it reports `overlap=6` under the mutation), not by
+the red. And unlike arms 0a–0c, which measured *behaviour*, arm B is close to
+tautological: it perturbs a declaration and a declaration-shaped assertion catches it.
+It licenses the explicit guard as legible, not as load-bearing.
+
+**Correction to this record's first version, made minutes after it was committed:** the
+arm B row originally read "**RED**, and now pinned" and had **not been run** — the fix
+added `*PH_SYSTEM_READS` and the disjointness assertion, but never mutated
+`EsterHydrolysis` to carry `SO2_BINDING_READS`. The cell asserted a measurement that did
+not exist. It has since been run (above), restored with `git checkout -- src/` and
+`git status` verified, and the 256-test file re-run green. Recorded rather than quietly
+overwritten: an arm reported as run but not run is precisely the failure this matrix
+discipline exists to prevent, and D-159 logged arms 0b/0c rather than discard them for
+the same reason.
 
 ### What this record does NOT do
 
 - It does not touch D-157's remaining two (12 undecided assertions; D-136 ordering scoping).
-- It does not re-measure the spreads it widens. D-159 measured `isoamyl_acetate` at
+- It does not re-measure the spreads it changes. D-159 measured `isoamyl_acetate` at
   13.99/16.69/20.09 % of nominal across seeds when the pKa set was **forced**; that is now
   the default path, but **every reported band in the archive that involved a pH-dependent
   aging output was computed under the narrower sampler** and is not restated here.
+  **State this as NOT COMPARABLE, not as "understated."** `_resolve_sample_names` returns
+  `tuple(sorted(chosen))` and the sampler draws per name in that order, so adding 13 names
+  shifts the draw sequence for every name sorting after them: an old number and a new one
+  are different experiments, not the same experiment at two widths. The *expectation* is
+  widening where the output is pH-sensitive; the direction is unmeasured.
 - It does not pin any count. 247/186/61 (D-159) and 19/13/5/1 (here) live in the durable
   artefact, not in assertions.
 
 ### Next
 
 - **Restating the affected bands is the natural next beat.** The archive's pH-dependent
-  aging spreads were all measured pre-D-160; they are now understated by a known mechanism.
+  aging spreads were all measured pre-D-160 and are not comparable to a run made now
+  (the draw order moved, above); re-measure rather than reason about the delta.
 - The 12 undecided assertions (needs runtime bound evaluation), and scoping D-136's
   ordering claim to `closure.yaml`'s notes — both still open from D-157.
 - Durable artefacts: `M:\claud_projects\temp\ferment\d160-undeclared-reads\` (`FINDINGS.md`,
