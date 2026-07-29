@@ -50,9 +50,10 @@ perturbed nothing". It runs at the *same* ``n_members``, span and settings as th
   13 names over the two helper families), and every one is drawn by default now, so the
   class is drawable and adding it here would fail half 2 for the correct reason.
   Forcing it in isolation still moves 24 of 94 state slots — but D-161 measured what that
-  is worth against a full sampled set, and against the other 156 names only *one* slot
-  (``isoamyl_acetate``, via ``ester_hydrolysis``'s ``pH_ref_ester_hydrolysis`` term) is
-  measurably affected; the other 23 sit at a POST/PRE spread ratio of 1.000.
+  is worth against a *full* sampled set and found that only one of those slots survives the
+  competition, via ``ester_hydrolysis``'s ``pH_ref_ester_hydrolysis`` term. The per-slot
+  numbers live in that record, deliberately: nothing here asserts them, and a measured
+  figure in an unpinned docstring is the same thing that went stale above.
 * ``ethanol_inhibition_exponent`` is undrawable for a fourth reason D-157 did not name —
   its ``EthanolInhibition`` is deliberately not wired into any medium (D-13: it would
   double-count ``EthanolInactivation``; ``media.py:1328`` retains the class "for
