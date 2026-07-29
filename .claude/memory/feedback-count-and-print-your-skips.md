@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 390b406d-8aa0-41a7-bf5d-21877a7769f1
-  modified: 2026-07-28T15:59:54.684Z
+  modified: 2026-07-29T06:21:41.449Z
 ---
 
 When a harness filters, parses, or evaluates its way to a population, **count and print
@@ -29,3 +29,16 @@ and undecided is not a synonym for safe — false negatives are the self-sealing
 it [[feedback-conceded-caveats-are-not-coverage]]. Related:
 [[feedback-mutate-the-premise-before-building-the-guard]],
 [[feedback-rejected-values-must-be-unreachable]].
+
+**Amendment (D-163): printing the ledger is necessary, not sufficient — reconcile the
+headline against it.** The band-edge campaign *did* print its skip ledger, and the prose two
+paragraphs above it still read "all 678 edges moved, in both directions". Both came from the
+same run. The trap is that `failed_to_mutate == 0` and `edges_moved == 678` are **different
+claims**: the first says every edge the operator *targeted* landed, the second says every
+edge *exists* in the targeted set. Six half-edges were never targeted at all (value sitting
+on its own band edge, so a rescale-about-the-nominal moves nothing), making the real
+denominator 672. So: after a run, take each headline number and re-derive it **from the
+ledger**, not from the intent of the code that produced it. A ledger nobody subtracts from
+the headline is decoration. The blind spot is also worth naming rather than just counting —
+here those six turned out to be exactly the six the archive had already enumerated at D-153
+for an unrelated reason, which made the gap a *characterised* bound instead of a loose end.
