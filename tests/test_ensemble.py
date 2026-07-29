@@ -435,8 +435,12 @@ def test_wine_ensemble_scopes_to_active_reads_and_conserves_carbon(sampler):
         active_reads.update(m.reads)
     assert set(ens.sampled_names) <= active_reads
     assert "q_sugar_max" in ens.sampled_names  # a kinetic driver is in scope
-    # MLF is undosed here, so the pKa set (its reads) is NOT active and NOT sampled —
-    # the D-24 no-op-avoidance and the pH-anchor safety both fall out of the scoping.
+    # The pKa/SO₂-binding set IS sampled here, MLF undosed or not: it is read at runtime by
+    # the aging/acetaldehyde/oxidative Processes through ph_of_state and the SO₂ helpers, and
+    # D-160 declared it on all of them, so all 13 names are in scope on this scenario. This
+    # comment used to claim the opposite ("MLF is undosed, so the pKa set is not active and
+    # not sampled") on D-24's premise that the set belonged to MLF; D-159 disproved that
+    # premise and D-160 fixed the declarations. Pinning the anchor is `exclude=`, not scoping.
 
     # Every sampled member conserves carbon to solver tolerance — a sampled parameter
     # set must never break a balance (prime directive; the structural draw-from-S

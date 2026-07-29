@@ -41,13 +41,18 @@ perturbed nothing". It runs at the *same* ``n_members``, span and settings as th
 
 **Two classes are deliberately absent as exemplars.**
 
-* The **acidbase pKa set is NOT structural** and must never be added here. ``ph_of_state``
-  (``acidbase.py:390``) reads it at runtime for Processes in five kinetics modules, but no
-  Process declares any ``pKa_*`` in ``reads``, so the sampler never perturbs it. That is a
-  *defect* — a live sampler-coverage gap flagged by D-159, not an example of one. Forcing
-  the 9 compiled pKa names moves 24 of 94 state slots and shifts ``isoamyl_acetate``'s
-  200-day endpoint by 14-20 % of nominal (three seeds), via ``ester_hydrolysis``'s
-  ``pH_ref_ester_hydrolysis`` term.
+* The **acidbase pKa/SO₂-binding set is NOT structural** and must never be added here.
+  ``ph_of_state`` (``acidbase.py:390``) reads the pKa set at runtime for Processes in five
+  kinetics modules, and ``free_acetaldehyde``/``bisulfite_so2_at_ph`` read the four
+  carbonyl-bisulfite constants the same way. Until D-160 no Process declared any of them, so
+  the sampler never perturbed them — that was a *defect* (flagged by D-159), not an example
+  of one. **D-160 shipped the declarations** (``PH_SYSTEM_READS``/``SO2_BINDING_READS``,
+  13 names over the two helper families), and every one is drawn by default now, so the
+  class is drawable and adding it here would fail half 2 for the correct reason.
+  Forcing it in isolation still moves 24 of 94 state slots — but D-161 measured what that
+  is worth against a full sampled set, and against the other 156 names only *one* slot
+  (``isoamyl_acetate``, via ``ester_hydrolysis``'s ``pH_ref_ester_hydrolysis`` term) is
+  measurably affected; the other 23 sit at a POST/PRE spread ratio of 1.000.
 * ``ethanol_inhibition_exponent`` is undrawable for a fourth reason D-157 did not name —
   its ``EthanolInhibition`` is deliberately not wired into any medium (D-13: it would
   double-count ``EthanolInactivation``; ``media.py:1328`` retains the class "for
