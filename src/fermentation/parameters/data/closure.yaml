@@ -87,9 +87,42 @@
 # this axis are lower bounds.
 #
 # THE ORDERING IS THE ROBUST CLAIM; THE MAGNITUDES ARE A BAND. The spread from technical cork to
-# SupremeCorq is ~52x, and that ordering (technical <= screwcap < natural < Nomacorc < SupremeCorq)
-# is P1's own conclusion verbatim: "low in screw-caps and 'technical' corks, intermediate in
-# conventional natural cork stoppers, and high in synthetic closures."
+# SupremeCorq is ~52x. But "THE ORDERING" IS THREE CLAIMS OF THREE DIFFERENT STRENGTHS, and this
+# paragraph used to merge them and attribute all three to P1 "verbatim". Scoped in D-162, which
+# measured each separately on 200k independent triangular draws of the bands below:
+#
+#   (1) P1's THREE-TIER grouping -- "low in screw-caps and 'technical' corks, intermediate in
+#       conventional natural cork stoppers, and high in synthetic closures" -- IS P1's own
+#       conclusion verbatim, and it is the claim that survives the bands: max(low) < natural <
+#       min(synthetic) breaches only 2.4 % of joint draws. THIS is the robust one.
+#   (2) technical_cork < screwcap is NOT in that sentence. It is read off P1's Table I NOMINALS
+#       (0.25 vs 0.45 uL/day) and it is the folklore correction noted below. Under independent
+#       draws of the two bands it INVERTS 40.7 % of the time. Kept, sourced and still asserted,
+#       but it is a WITHIN-TIER refinement of P1's conclusion, not that conclusion. (This chain
+#       was written `technical <= screwcap` here while both tests assert a strict `<`; the tests
+#       are right -- Table I separates the nominals -- so the hedge is removed rather than the
+#       assertion weakened.)
+#       AND THE 40.7 % IS MOSTLY AN ARTEFACT OF HOW THE TWO BANDS WERE BUILT, not of the
+#       measurements overlapping. `otr_technical_cork`'s high edge is deliberately P1's VERTICAL
+#       ceiling (0.9 uL/day) so the band spans both orientations P1 measured; `otr_screwcap`'s
+#       0.2-0.7 is HORIZONTAL ONLY, because P1's Table I prints "--" for screwcap vertical -- it
+#       was never measured. The two bands are therefore not commensurable, and a joint draw pits
+#       a two-orientation band against a one-orientation one. Measured like-for-like (technical
+#       cork restricted to its horizontal window 0.1-0.4, everything else identical) the inversion
+#       falls 40.7 % -> 4.7 %. This is NOT a licence to narrow the shipped band: spanning both
+#       orientations is the right call for a parameter a user may store either way, and dropping
+#       it would discard real measured range. It is a statement about what the 40.7 % means.
+#   (3) Nomacorc < SupremeCorq is also not in that sentence (both are "synthetic"). It is robust
+#       for a DIFFERENT reason than (1): these two bands do not overlap at all, so it never inverts.
+#
+# The 5-way strict chain the menu asserts therefore breaches 41.9 % of joint draws -- and 94.2 % of
+# those breaches are (2) alone. THIS IS NOT A LIVE DEFECT, and D-162 re-measured why rather than
+# inheriting the claim: `scenario.closure` resolves ONE otr_* into the `closure_otr` STATE SLOT at
+# compile time and `simulate_ensemble` holds y0 fixed, so two otr_* values can never be co-resident
+# in one run and the sampler cannot reach them at all -- forcing all five into the sampled set moves
+# 0 of 94 state slots, against 54 of 94 for a live control. What the 41.9 % does say is a
+# CROSS-ENSEMBLE property of the shipped bands: "which closure ages slower" could flip between two
+# independently sampled ensembles, if anything ever drew them.
 #
 # AN ORDERING CORRECTION WORTH RECORDING, BECAUSE THE FOLKLORE SAYS OTHERWISE. It is widely
 # repeated -- including in P2's own introduction, citing Godden et al. 2005 -- that "screwcaps were

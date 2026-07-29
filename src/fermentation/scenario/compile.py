@@ -781,10 +781,13 @@ _INITIAL_BUILDERS: dict[str, Callable[[Mapping[str, float], float, ParameterSet]
 }
 
 
-#: The closure menu (decision D-136), in ascending order of steady oxygen transmission — which is
-#: the ORDERING Lopes et al. 2007 actually establishes and the most defensible claim this axis
-#: makes ("low in screw-caps and 'technical' corks, intermediate in conventional natural cork
-#: stoppers, and high in synthetic closures"). Each name maps to ``otr_<name>`` in ``closure.yaml``,
+#: The closure menu (decision D-136), in ascending order of steady oxygen transmission. What Lopes
+#: et al. 2007 actually establishes is the THREE-TIER grouping — "low in screw-caps and 'technical'
+#: corks, intermediate in conventional natural cork stoppers, and high in synthetic closures" — and
+#: that is the defensible claim; the two WITHIN-TIER orderings this tuple additionally asserts
+#: (technical cork vs screwcap, Nomacorc vs SupremeCorq) come off Table I's nominals, not off that
+#: sentence, and they are not equally strong. D-162 measured each against the shipped bands; the
+#: scoping lives in ``closure.yaml``'s header. Each name maps to ``otr_<name>`` in ``closure.yaml``,
 #: so the value carries full provenance instead of being an inlined constant (prime directive #2).
 #:
 #: NOTE the order: **technical cork sits BELOW screwcap**, which contradicts the widely repeated

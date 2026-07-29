@@ -53,6 +53,28 @@ _PUBLISHED_ULDAY: dict[str, float] = {
     "synthetic_supremecorq": 13.0,  # printed range 11-15, central value
 }
 
+#: The UNCERTAINTY BAND edges, in the same published uL/day units (decision D-162). The nominals
+#: above have been pinned since D-136; these were not, and a mutation showed any edge could be
+#: silently moved with the suite still green. Each entry records whether the edge is a number P1
+#: PRINTED or a construction this file made — the two are not interchangeable and the difference
+#: is exactly what the ordering-scoping note in closure.yaml turns on.
+_PUBLISHED_BAND_ULDAY: dict[str, tuple[float, float]] = {
+    # P1 prints horizontal 0.1-0.4 AND vertical 0.1-0.9 for technical corks. The high edge is
+    # deliberately the VERTICAL ceiling so the band spans both orientations P1 measured.
+    "technical_cork": (0.1, 0.9),
+    # P1's full printed horizontal range. No vertical figure exists — Table I prints "--" — so
+    # unlike technical cork this band covers ONE orientation. That asymmetry is not a defect
+    # (it is what the source measured) but it is why the two bands are not commensurable.
+    "screwcap": (0.2, 0.7),
+    # The union of P1's two natural-cork windows: 1.7-6.1 (months 2-12) and 0.1-2.3 (12-36).
+    "natural_cork": (0.1, 6.1),
+    # P1 prints a single 6 horizontal and 8-9 vertical. The high edge is printed; the LOW edge
+    # of 5 is this file's own modest extension below the single horizontal point, not a P1 number.
+    "synthetic_nomacorc": (5.0, 9.0),
+    # P1's printed horizontal range; its vertical 11-12 sits inside it.
+    "synthetic_supremecorq": (11.0, 15.0),
+}
+
 #: The unit conversion, re-derived here from its three independent factors rather than imported, so
 #: this test cannot inherit an arithmetic error from the code it checks:
 #:   1.43 ug O2/uL   -- the Lopes group's OWN factor, recovered from Oliveira 2013's Discussion
@@ -279,16 +301,42 @@ def test_shipped_otr_reproduces_the_published_rate(params, closure):
     assert shipped == pytest.approx(expected, rel=0.01)
 
 
+@pytest.mark.parametrize("closure", sorted(_PUBLISHED_BAND_ULDAY))
+def test_shipped_band_edges_reproduce_the_published_range(params, closure):
+    """The BAND edges carry provenance too — and until D-162 nothing pinned them.
+
+    The nominals have been pinned to Table I since D-136 by the test above; the band edges were
+    not pinned at all. ``test_every_otr_is_speculative_and_banded`` only checks the band is
+    ordered and non-degenerate, so any edge could be moved to any other value and the suite
+    stayed green — measured, not assumed: silently replacing ``otr_technical_cork``'s high edge
+    (P1's *vertical* 0.9 uL/day) with the *horizontal* 0.4 passed all 1460 tests. That edge is
+    load-bearing, because the closure bands are built to DIFFERENT ORIENTATION SCOPES and that
+    asymmetry is what D-162's scoping note about the ordering rests on.
+
+    Each edge below is annotated with whether it is a number P1 printed or a construction this
+    file made from P1's numbers, so the distinction cannot be lost by a later edit.
+    """
+    low_ulday, high_ulday = _PUBLISHED_BAND_ULDAY[closure]
+    uncertainty = params[f"otr_{closure}"].uncertainty
+    assert uncertainty is not None
+    assert uncertainty.low == pytest.approx(low_ulday * _ULDAY_TO_GPLH, rel=0.01)
+    assert uncertainty.high == pytest.approx(high_ulday * _ULDAY_TO_GPLH, rel=0.01)
+
+
 def test_hermetic_is_exactly_zero(params):
     """Not "small": exactly 0, because it is the definitional no-ingress case."""
     assert params["otr_hermetic"].value == 0.0
 
 
 def test_closure_menu_is_strictly_ascending_in_otr(params):
-    """THE ROBUST CLAIM. Magnitudes are a band; the ordering is what the primary establishes.
+    """The ordering at the NOMINALS — and that scope is the whole of what this pins.
 
     Lopes et al. 2007's own conclusion, verbatim: "low in screw-caps and 'technical' corks,
-    intermediate in conventional natural cork stoppers, and high in synthetic closures."
+    intermediate in conventional natural cork stoppers, and high in synthetic closures." That
+    sentence establishes three TIERS. This chain is strictly stronger: it adds an ordering
+    *within* the low tier and one *within* the synthetic tier, neither of which the sentence
+    makes, and the two are not equally well supported by the shipped bands. D-162 measured all
+    three claims on joint draws — see ``closure.yaml``'s header for the scoping and the figures.
     """
     values = [params[f"otr_{name}"].value for name in _ASCENDING]
     assert values == sorted(values)
@@ -304,6 +352,12 @@ def test_technical_cork_is_below_screwcap(params):
     famous figure is "<500 uL/day AT THE MOMENT OF BOTTLING" — headspace air trapped at sealing,
     not transmission — which dominates any total-including-burst comparison. This test exists so
     the sourced steady ordering cannot be quietly reverted to the folklore one.
+
+    SCOPE, per D-162: this is a claim about the two NOMINALS, and only about them. It is a
+    refinement read off Table I, not part of the three-tier conclusion the primary states, and the
+    two bands overlap heavily enough that independent draws invert it often. That is not a live
+    defect — one run holds one closure and the sampler cannot reach these — but the assertion
+    should not be read as carrying the bands with it.
     """
     assert params["otr_technical_cork"].value < params["otr_screwcap"].value
 
