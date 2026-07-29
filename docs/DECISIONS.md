@@ -19323,6 +19323,13 @@ format and mypy clean.
   and D-155 refused it, now re-verified rather than inherited.
 - It does not generalise the commensurability finding. Whether other parameter files pair
   bands built to different scopes is unmeasured; only the closure menu was examined.
+- **It does not pin the PRINTED/CONSTRUCTED distinction itself** — those annotations are
+  comments on `_PUBLISHED_BAND_ULDAY`, and nothing asserts them. `synthetic_nomacorc`'s low
+  edge of 5 µL/day is now pinned exactly as firmly as P1's printed 9, with only a comment
+  marking that one is this file's construction. That is a smaller instance of the shape this
+  record corrects in D-136's header, left unbuilt deliberately: a guard on a comment is not a
+  guard, and the fix is a provenance field on the edge rather than another assertion. Named
+  here so the new table is not read as fully provenance-pinned.
 - It does not touch D-157's remaining item (the 12 undecided assertions).
 
 ### Next
