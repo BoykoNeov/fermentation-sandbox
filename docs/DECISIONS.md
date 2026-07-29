@@ -19459,6 +19459,21 @@ inside which band, and preserves pairwise overlap by construction. A **translati
 claim is "652 edges are unpinned against rescaling", **not** "652 edges can be moved to any
 other value", which §4 refutes for at least 24 of them.
 
+**The 652 spans three sampling surfaces, and "unguarded" is not equally strong on all of
+them.** The shrink-bias rationale above is a statement about the *triangular* compile-seam
+surface, and by D-157's taxonomy not every band is on it:
+
+| surface | edges in the 652 | what a GREEN there means |
+|---|---|---|
+| compile-seam, **triangular** | ~535 | the ensemble *could* have noticed the move and did not |
+| `psychophysics`, **uniform** | 48 | same, but the triangular argument above does not apply to it |
+| `sensory`, **never sampled** | 69 | **no dynamic channel exists** — only a static reader could ever catch it |
+
+`sensory`'s 69 are unguarded in the weaker sense: nothing samples those bands, so no test
+*could* have detected the move except by naming `.uncertainty`. That is a documentation gap,
+not a missed detection. Stated because comparing edges across surfaces built to different
+scopes is the error D-162 spent a whole record on.
+
 ### 4. Scoring the prediction
 
 | file | predicted | measured | |
@@ -19472,7 +19487,10 @@ other value", which §4 refutes for at least 24 of them.
 
 **The static census's negative half scored exactly.** It predicted 13 files / 141 varying
 bands / 282 edges GREEN in both directions off nothing but a grep; those arms mutated 141
-bands and returned 26 consecutive GREENs. For these files, "no test names the edge" and "no
+bands and returned 26 consecutive GREENs. **278**, not 282, of those edges were actually
+reachable — the 4-edge gap is precisely the immovable half-edges sitting inside these files
+(`copper_h2s_binding#high`, `copper_mercaptan_binding#high`, `Y_glycerol_sugar#low`,
+`Y_byproduct_sugar#low`); the other two of §3's six sit in `sensory` and `wine_generic`. For these files, "no test names the edge" and "no
 test detects the edge moving" coincide. The `sensory` call is the sharpest hit — it required
 getting the *direction* right (GREEN on shrink, RED on widen), not just the file.
 
