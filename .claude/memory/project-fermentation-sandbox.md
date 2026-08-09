@@ -26,7 +26,7 @@ make room for guardrails is the defect**. Distil real slack, never evict a prohi
 
 ## Status (2026-08-09)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-166**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+**D-167**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
 leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1498 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
@@ -77,8 +77,9 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **Band EDGES measured ARCHIVE-WIDE (D-163), 73 arms — do NOT re-run the sweep.** Of **678** live edges (339
   varying bands) only **19 guarded** (→**23**, D-164); **652** move both directions suite-green; **14 of 18 files
   wholly unguarded**. **Scale-only** operator provably **cannot** fire `psychophysics`'s disjointness (needs a
-  **translation** operator); **6 half-edges immovable** = D-153 Leg 4's six. **Flags D-162.** Buildable = the
-  **55 externally-sourced** unguarded bands (`acidbase`'s 13 pKa first). **The prose flag is REFUSED, measured not
+  **translation** operator); **6 half-edges immovable** = D-153 Leg 4's six. **Flags D-162.** Its "**55
+  externally-sourced** bands, `acidbase`'s 13 pKa first" is **CORRECTED by D-167 — do not build it** (see below:
+  4 edges, and that slice is the emptiest). **The prose flag is REFUSED, measured not
   asserted** — 44 of 51 hits matched `ceiling` alone (oak's *extraction asymptote*); **never re-run or "tighten" the regex**; only a **measured per-parameter bound** finds it.
 - **CLASS (d) CLOSED at the seam (D-164) — do NOT recentre the band.** The override mints a `Parameter` carrying
   the base's band ⇒ `_value_in_range` gated `carrying_capacity_gpl`/`autolysis_rate_per_h` by an *epistemic* band,
@@ -106,6 +107,20 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   wine's active set** (Luong wall superseded). **A nominal ON a band edge is inert by construction** — an edge
   screen cannot classify it [[feedback-nominal-on-a-band-edge-is-not-inertness]]. **Beer is UNCENSUSABLE**
   (`_ALLOWED_KEYS["beer"]`: no acid input, pH 7.0). Pinned `test_switch_site_census.py` (**11**), **6 arms / 9 of 11**.
+- **The "buildable 55" is RESCOPED and its first slice CLOSED (D-167). Corrects D-163's §7 headline** — its predicate
+  was `"author estimate" in provenance.source`, the **VALUE's** field, reported as a claim about **EDGES**
+  [[feedback-name-the-field-your-predicate-read]]. Of **110** edges: **4** are a parameter-specific published span
+  (`pKa_sulfurous_1`, `dms_potential_initial`), **14** a chemical-**CLASS** range (6 share one `[35k,75k]` band),
+  **15 DERIVED** (author arithmetic on a printed ± — the **strong** class, and the one a source-field predicate
+  **cannot** find; `bound_sulfides`'s 4 are the case), **4** adopted points, **73 NO account of the span**.
+  **`acidbase`'s 13 are the EMPTIEST slice, not the first** — 8 pKa bands with no account at all; **TERMINAL, CRC is a
+  reference book and [[feedback-paywalled-is-one-host]] does NOT transfer.** Screen was wrong twice, both caught by
+  hand: **kJ/mol-vs-J/mol took 14→42**, and a note quoting its own invented edge is **anti-evidence**
+  [[feedback-a-text-screen-has-units-and-self-reference]]. **44 of 339** bands cite a source while declaring the band
+  the author's (**11 say "AUTHOR-ESTIMATED"**); 44 is a **screen**, the 11 were read. `sensory`'s 7 here is
+  **provenance, not sampling** — no breach of "do not re-audit those 36". **NO GUARD SHIPS**; the residue is a
+  **missing band-provenance schema field**, D-164 §6's field from the other side — **do not design it in a record**.
+  **Flags 5 CONTRADICTED bands** (`E_a_esters`, thermal ×3, `E_a_oak_extraction` cite a range their edges fall outside).
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
@@ -240,8 +255,8 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..6}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
-  (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
+  `d15{7,8,9}-*\`, `d16{0..7}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B); peptide pool; variety-specific DMSp;
