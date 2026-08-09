@@ -56,6 +56,8 @@ uv run pytest -n auto --lf             # after a red run: re-run only what faile
 uv run pytest -m benchmark   # §2.2 acceptance benchmarks (skipped until kinetics)
 uv run ruff check .     # lint    (also: ruff format .)
 uv run mypy             # types (strict on src; tests exempt from signature reqs)
+
+uv run python tools/nicepytest.py -n 12   # same, at BelowNormal — when sharing the box
 ```
 
 The suite is ~1250 independent `solve_ivp` integrations, so it is embarrassingly
@@ -63,6 +65,25 @@ parallel: `pytest-xdist`'s `-n auto` gives a ~7× wall-clock win on a many-core 
 `tests/conftest.py` pins BLAS/OpenMP to one thread per worker (before numpy imports) —
 without that pin, N workers each spawn N BLAS threads and the parallel run is *slower*
 than pinned. Plain `uv run pytest -q` still works (serial, ~11.5 min); prefer `-n auto`.
+
+**Sharing the machine.** `-n auto` takes every logical CPU at normal priority, which
+makes the desktop — and any other suite running concurrently — crawl. Measured on the
+8-core/16-thread dev box: the suite runs in **119 s alone and 363 s** while another
+project's 26-worker suite runs beside it. `tools/nicepytest.py` drops to
+`BELOW_NORMAL_PRIORITY_CLASS` before importing pytest and forwards every argument
+verbatim; the class is inherited, so all N workers run at base priority 6 (verified by
+walking the process tree). Priority and worker count are complementary, not
+alternatives — priority makes the suite *yield* a core it already holds, a smaller `-n`
+never takes it. Under a CPU-bound competitor only the latter preserves that
+competitor's throughput.
+
+**Do not switch to `--dist worksteal` or `loadscope`.** The default `--dist load` hands
+each worker a contiguous chunk (~46 tests at 16 workers), which keeps a whole test file
+together and lets expensive module-scoped fixtures be paid once.
+`tests/benchmarks/test_validation_danilewicz_so2_o2.py` is the case that matters: 12 of
+its 14 tests share one `runs` fixture costing ~50 s, and the durations profile confirms
+it is instantiated exactly once. Worksteal re-queues tests across workers and would
+re-pay that fixture per stealing worker — it buys balance and sells it back at a loss.
 
 ## Repo etiquette
 
