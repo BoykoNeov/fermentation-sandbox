@@ -257,6 +257,13 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             # was tried and rejected: it is the right word but it sweeps D-24/D-25/D-37,
             # the ensemble-machinery records, which already file under `ensemble`.
             r"\bdrawab",
+            # D-167/D-168 ask where a band's SPAN came from, as against where its value
+            # came from -- neither title carries a chemistry word, and D-168's carries no
+            # existing needle at all. `\baccount` matches exactly that pair, the same
+            # narrowness as `\bassertion` and `\bdrawab` above. `\bband` was tried and
+            # rejected: 19 titles, sweeping in every record that merely banded a number
+            # (D-103, D-132, D-142, D-144, D-148) -- the D-53 misfiling trap again.
+            r"\baccount",
         ),
     ),
     (

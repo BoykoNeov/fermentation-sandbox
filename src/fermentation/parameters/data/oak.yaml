@@ -347,15 +347,17 @@ oak_yield_furaneol_heavy:
 
 # -- ACTIVATION ENERGY: warmer extracts faster, but WEAKLY (diffusion-limited) -----------------
 # DELIBERATELY LOW and its OWN parameter (prime directive #2): oak extraction is DIFFUSION-limited,
-# not a chemical reaction, so its temperature sensitivity is WEAK — well below the 50-60 kJ/mol of
-# the reaction-driven ester-hydrolysis / oxidation / browning / Strecker E_a's. A near-T-independent
+# not a chemical reaction, so its temperature sensitivity is WEAK — well below the reaction-driven
+# ester-hydrolysis / oxidation / browning / Strecker E_a's, which ship at nominal 50,000 and band
+# [30000, 70000] (D-168 states the BAND here, not just the nominal: the old high edge 35,000 sat
+# INSIDE that band and inverted the ordering it claims). A near-T-independent
 # first cut is defensible; a small positive E_a keeps the honest "warmer barrels extract a little
 # faster" direction without over-claiming a strong Arrhenius dependence a diffusion process does not have.
 E_a_oak_extraction:
   value: 20000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 10000.0, high: 35000.0, note: "Q10 ~1.3-1.6 at 20 C — a WEAK temperature dependence, deliberately well below the reaction E_a's (~50-60 kJ/mol). Diffusion coefficients rise with temperature but far more gently than reaction rates (liquid-diffusion activation energies ~10-25 kJ/mol). The SOURCED, load-bearing claim is only the SIGN (warmer extracts a little faster); the magnitude is speculative, banded, and intentionally small." }
+  uncertainty: { low: 10000.0, high: 25000.0, note: "Q10 [1.15, 1.40] at 20 C, nominal 1.31 — a WEAK temperature dependence, well below the reaction E_a's (nominal 50,000, banded [30000, 70000]). Diffusion coefficients rise with temperature but far more gently than reaction rates. D-168 NARROWED the high edge 35,000 → 25,000 so the band EQUALS its cited external range: liquid-phase diffusion activation energies ~10-25 kJ/mol. The retired 35,000 came from a SECOND account this note also carried ('Q10 ~1.3-1.6', which maps to [19.4, 34.7] kJ/mol); the two accounts overlap only over [19.4, 25] kJ/mol, and the shipped band had taken the low of one and the high of the other. Only the kJ/mol account is EXTERNAL, so it is the one the band follows — the Q10 figures quoted above are now DERIVED from the band, not an independent claim about it. A consequence, and deliberately NOT the reason for the change: the 'well below the reaction E_a's' ordering now holds at the JOINT band edges (25,000 vs the reaction low 30,000, margin +5,000 J/mol), where the old high edge inverted it in 0.0354 % of independent joint draws. The SOURCED, load-bearing claim remains only the SIGN (warmer extracts a little faster); the magnitude is speculative, banded, and intentionally small." }
   provenance:
     source: "SOURCED ORDERING: diffusion-limited extraction accelerates with temperature but WEAKLY (liquid-phase diffusion activation energies ~10-25 kJ/mol; warmer barrels/cellars extract oak aroma somewhat faster). Distinct from the reaction-driven aging E_a's — a diffusion process, not a chemical reaction, so a much lower E_a."
     conditions: "equivalent Arrhenius activation energy of the aggregate oak-extractive diffusion at T_ref = 293.15 K"

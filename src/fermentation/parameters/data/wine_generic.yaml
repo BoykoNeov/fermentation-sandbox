@@ -936,7 +936,7 @@ E_a_fusels:
 # D-21 SUPERSEDES D-20: D-20 used a FUDGED per-medium E_a_ester_volatil (wine 130k / beer 40k)
 # to invert wine while keeping beer rising. But a SOURCED Henry's-law stripping is the same
 # in both media, so it CANNOT give opposite directions alone. The wine/beer direction
-# therefore lives in SYNTHESIS E_a_esters (sourced per medium: wine flat ~15k / beer steep
+# therefore lives in SYNTHESIS E_a_esters (sourced per medium: wine flat 55.1k / beer steep
 # ~200k), and the stripping is one shared physical mechanism. dH_ester_volatil is the SOURCED
 # ethyl-acetate partition enthalpy; E_a_ester_volatil (the fudge) is RETIRED.
 # Verified empirically (14/20/25 C): wine liquid esters fall ~103/61/38 mg/L; beer rise.

@@ -677,7 +677,9 @@ def test_integrated_wine_aroma_temperature_directions():
     #     direction for the harsh higher alcohols; carries warmer⇒more-aroma for wine.
     #   * LIQUID esters FALL with T — the inversion: the physical Henry's-law stripping
     #     (sensitivity E_a_uptake + dH_ester_volatil ~ 100 kJ/mol) outruns wine's WEAK
-    #     synthesis (E_a_esters ~ 15k, Mouret), so the warm ferment's esters end up in the
+    #     synthesis (E_a_esters = 55,100 = E_a_uptake exactly, the condition for T-flat
+    #     integrated production — Mouret-flat, D-21; NOT the "~15k" this comment carried
+    #     before D-168), so the warm ferment's esters end up in the
     #     gas, not the wine (Rollero 2014). The wine/beer split lives in synthesis (D-21).
     #   * VOLATILIZED esters_gas rises with T — the stripped fraction the headspace
     #     pool catches, and the proof the inversion is evaporation, not lost synthesis.
