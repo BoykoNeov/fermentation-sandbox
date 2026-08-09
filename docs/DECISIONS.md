@@ -21281,3 +21281,78 @@ band edge moved.** Suite **1518 passed** (1517 + the new guard), `ruff` and `myp
 - Durable artefacts: `M:\claud_projects\temp\ferment\d170-q10-generalise\` — `FINDINGS.md`,
   `q10_fields.py`, `orderings.py`, `drawability.py`, `probe_active.py`, `maillard_edge.py`,
   `q10_criterion.py`, `mutate.py`, every `.log`, and `pre_edit_tree/`.
+
+### Amendment (same day) — the ordering screen's RECALL was unmeasured, and measuring it moved the count up
+
+§3's counts were produced by a resolution rule that **silently dropped claims**. For each
+ordering word the harness walked `ALL_NAMES` sorted longest-first and `break`ed on the first
+sibling found in the window — so **when a window named two parameters, the longer string won
+regardless of which one the sentence was about**, and the other claim was never emitted, never
+evaluated and never counted.
+
+**It fired on a row §3 hand-killed as a false positive.** `oak.yaml`'s ellagitannin note reads
+*"… E_a_ethanol_oxidation / E_a_strecker) and DELIBERATELY well above the weak diffusion
+`E_a_oak_extraction` …"*. `E_a_ethanol_oxidation` (21 chars) beat `E_a_oak_extraction` (18), so
+the harness emitted the wrong pair, the hand-reading correctly discarded it — and **D-168 §3's
+own ordering 2 vanished without appearing in any denominator**. That is
+`feedback-count-and-print-your-skips` committed by this record against this record's own
+harness, one beat after D-168 did the same thing with its regex.
+
+**Fixed and re-measured.** Every sibling in a window is now emitted (a shorter name that is a
+substring of a longer hit is still folded, and that rule is stated rather than assumed), and the
+count of multi-name windows — the previously unmeasured denominator — is printed:
+
+| | §3 as published | amended |
+|---|---|---|
+| distinct candidate claims | 49 | **69** |
+| evaluable at a joint band edge | 24 | **36** |
+| windows naming MORE THAN ONE sibling | **not measured** | **21** |
+
+**Recall control, now in the harness.** D-168 §3's three hand-transcribed orderings are the
+known-true set; all three are recovered **with the correct sibling**
+(`E_a_maillard_strecker > E_a_browning`, `E_a_ellagitannin_oxidation > E_a_oak_extraction`,
+beer `E_a_esters > dH_ester_volatil`). A screen that cannot re-find the claims a previous record
+read by hand has unmeasured recall, and its counts are lower bounds — which is what §3's were.
+
+**Twelve rows are new. Two matter, and one of them is not benign.**
+
+* **`E_a_ellagitannin_oxidation > E_a_oak_extraction`** — D-168 §3's ordering 2, the one that
+  *inverted* there. Post-D-168 (oak's high edge 35k → 25k) it **HOLDS**: joint-edge margin
+  **+5,000 J/mol**, breach 0.0000 %, and both members are drawn together in wine + aging and
+  beer + aging. A seventh instance of the shape, currently satisfied — and a clean confirmation
+  that D-168's narrowing did what it claimed.
+* **`ethanol_tolerance_mlf < ethanol_tolerance`** — *"Set to ~14 % ABV (110 g/L), BELOW the yeast
+  `ethanol_tolerance` (142 g/L) — O. oeni is less ethanol-tolerant than the yeast"*, a sourced
+  biological direction. Nominal margin +32 g/L; **joint-edge margin −5 g/L**; breach **0.0362 %**
+  over 2×10⁶ draws; **LIVE** (both drawn in wine + MLF, wine + MLF + Brett, wine + aging), and
+  **unguarded**. A new live instance, on an axis §3 never reached.
+* **`wine_generic::E_a_fusels`'s note is FALSE AT THE SHIPPED NOMINALS** — not at a band edge.
+  It read *"all > `E_a_uptake` (55,100); below `E_a_esters` as the ester/fusel ratio rises with
+  T"*. That is **beer's** ordering (beer `E_a_esters` = 200,000) shipped in the **wine** file:
+  wine's `E_a_esters` is **55,100**, set `== E_a_uptake` by D-21 so run-integrated synthesis is
+  ~T-independent, and this 70,000 sits **14,900 J/mol ABOVE** it. The wine ester/fusel ratio
+  therefore FALLS with T — which is the *deliberate* wine design (liquid esters fall with T
+  through the stripping sink). This is the **fourth carrier** of the wine-`E_a_esters` confusion
+  D-168 §4 killed in three others, and the only one that survived because no screen had ever
+  emitted the pair. **Note corrected; no number moved.**
+* The remaining new rows are the same ellagitannin window's *"matching the oxidative siblings"*
+  read as *"above"* them — false positives of the kind §3 already documents.
+
+**§3's headline is corrected.** "Five live instances, not four" was a lower bound stated as a
+census — the shape D-163 §7 got wrong and D-167 corrected, arriving here from the recall side
+rather than the field side. The measured position:
+
+* **7 invariants found**, of which **1 HOLDS** (ellagitannin/oak, +5,000), **1 TOUCHES at zero**
+  (`E_a_decarb`, now guarded), and **5 BREACH and are unguarded** — `y_acetaldehyde_per_tannin`
+  34.22 %, `k_death_brett` 23.09 %, `y_methanethiol` 19.36 %, `y_a420_per_maillard_melanoidin`
+  16.37 %, `ethanol_tolerance_mlf` 0.0362 % — plus D-118's guarded pair.
+* Recall is now measured **against D-168's three** and against nothing else. **Seven is still a
+  lower bound**: a screen keyed on ordering words cannot find an ordering stated without one.
+  Any future count off `orderings.py` must say which control it was validated against.
+
+Also settled, from the same review: `.claude/hooks/check_memory_size.py` was verified to *bite*
+rather than merely exit 0 — fed a deliberately 9-line block it reports both the block and the
+300-line backstop, and reports clean on the shipped file. An exit code with no output is not
+evidence a check ran.
+
+Suite **1518 passed**, `ruff` and `mypy` clean; the amendment moved one note and no number.

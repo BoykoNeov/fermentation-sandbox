@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-09T21:14:56.746Z
+  modified: 2026-08-09T21:25:17.126Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -127,14 +127,18 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   set). **7 rounding-class = notational, MEASURED** (±5 %, every high edge rounded **UP**) — left unedited on
   purpose. `E_a_acet_reduction`'s low is the **NOMINAL's** Q10; `E_a_smm_hydrolysis` a **one-directional**
   +8.4/+4.9 % offset; **both bands unchanged since introduction ⇒ wrong when WRITTEN, not stale**.
-- **The recurring shape is FIVE live instances, not four (D-170) — the ordering screen (`orderings.py`) is
-  REUSABLE but it is a SCREEN**: 49 candidates → 24 evaluable → **5 invariants**, and **two-pass hand reading
-  is NOT optional** (pass 1 killed 12, pass 2 killed 5 more — *"comparable"* is not an ordering, and
-  `mu_max_mlf`'s hit was its note naming **its own** quantity). **Filter through the SAMPLER, not the files.**
-  **`E_a_decarb > E_a_reduction`'s joint margin is EXACTLY 0** (60,000 == 60,000, intent **UNRECORDED**) —
-  guard shipped, arms A/B **GREEN before** it ⇒ coverage was nominal-scoped. **NO number moved**: nominal
-  90,000 sits **above its own cited anchor** [67,704, 81,176] ⇒ ill-posed (D-168 §1). **FOUR breaches still
-  unguarded**: `y_acetaldehyde_per_tannin` 34.2 %, `k_death_brett` 23.1 %, `y_methanethiol` 19.4 %, `y_a420_per_maillard_melanoidin` 16.4 %.
+- **The recurring shape is ≥7 invariants, 5 BREACHING — a LOWER BOUND, never a census (D-170 + amd).** The
+  screen's `break` kept only the **LONGEST name** in a window and dropped the rest: 49→**69** candidates,
+  24→**36** evaluable, **21** multi-name windows never measured — it silently dropped **D-168 §3's OWN
+  ordering 2**. **Always run the recall control** (D-168's three) and **filter through the SAMPLER, not the
+  files**; **two-pass hand reading is NOT optional** (*"comparable"* isn't an ordering; `mu_max_mlf`'s hit was
+  its note naming its **OWN** quantity). **UNGUARDED:** `y_acetaldehyde_per_tannin` 34.2 %, `k_death_brett`
+  23.1 %, `y_methanethiol` 19.4 %, `y_a420_per_maillard_melanoidin` 16.4 %, `ethanol_tolerance_mlf` 0.036 %.
+  **`wine E_a_fusels`'s "below `E_a_esters`" was FALSE AT THE NOMINALS** — beer's ordering in wine's file, the **4th** carrier of D-168 §4's.
+- **`E_a_decarb > E_a_reduction`'s joint margin is EXACTLY 0 (D-170)** — 60,000 == 60,000, intent
+  **UNRECORDED** (never infer it); guard shipped with both edges **RECOMPUTED**, and arms A/B were **GREEN
+  before** it ⇒ the coverage was **nominal-scoped only**. **NO number moved**: the nominal 90,000 sits
+  **above its own cited anchor** [67,704, 81,176] ⇒ "move the band to its cited range" is **ill-posed** (D-168 §1).
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
   `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** (2.0309 flat) in the scenario its own
   note names, with the positive control moving; the pool ends at **0.63 of 0.8 g/L** ⇒ the competition is not

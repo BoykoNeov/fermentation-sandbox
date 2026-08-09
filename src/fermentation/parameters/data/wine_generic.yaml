@@ -917,7 +917,7 @@ E_a_fusels:
   value: 70000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100); below E_a_esters as the ester/fusel ratio rises with T" }
+  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100). D-170 CORRECTION: this note also said 'below E_a_esters as the ester/fusel ratio rises with T', which is BEER's ordering (E_a_esters 200,000) shipped in the wine file. WINE's E_a_esters is 55,100 -- set == E_a_uptake by D-21 so run-integrated synthesis is ~T-independent -- so this 70,000 sits 14,900 J/mol ABOVE it and the wine ester/fusel ratio FALLS with T, which is the DELIBERATE wine design (liquid esters fall with T through the stripping sink; see E_a_esters' own note). The claim was false at wine's shipped NOMINALS, not merely at a band edge. The fourth carrier of the wine-E_a_esters confusion D-168 killed in three others" }
   provenance:
     source: "Direction sourced from primary wine data (Mouret 2015, doi:10.1016/j.bej.2015.07.017: higher alcohols generally produced in larger amounts at higher temperature) + brewing/enology consensus (warmer => accelerated Ehrlich amino-acid conversion => more fusels). No fusel kinetic model of our form exists (de Andres-Toro has no fusel term)"
     conditions: "S. cerevisiae wine; equivalent Arrhenius activation energy at T_ref = 293.15 K"

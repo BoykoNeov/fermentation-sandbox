@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 390b406d-8aa0-41a7-bf5d-21877a7769f1
-  modified: 2026-07-29T06:21:41.449Z
+  modified: 2026-08-09T21:25:53.742Z
 ---
 
 When a harness filters, parses, or evaluates its way to a population, **count and print
@@ -42,3 +42,20 @@ ledger**, not from the intent of the code that produced it. A ledger nobody subt
 the headline is decoration. The blind spot is also worth naming rather than just counting —
 here those six turned out to be exactly the six the archive had already enumerated at D-153
 for an unrelated reason, which made the gap a *characterised* bound instead of a loose end.
+
+**Amendment (D-170): a RESOLUTION rule drops things too, and it leaves no `continue` to
+count.** The ordering screen matched a claim's sibling by walking candidate names
+longest-first and `break`ing on the first hit — so a sentence naming two parameters silently
+resolved to the **longer string**, and the other claim was never emitted at all. There was no
+skip to print, because from the harness's point of view nothing was skipped. It dropped
+**D-168 §3's own ordering 2** that way, and the mis-resolved row was then hand-killed as a
+false positive, which hid the loss twice. Removing the `break` took 49 → 69 candidates and
+24 → 36 evaluable, and exposed a note that was **false at the shipped nominals**.
+**So: measure RECALL against a known-true set, not just skips.** Any screen re-covering
+ground a previous record worked by hand should re-find that record's findings *with the
+correct binding*, and print the ambiguous-input count (here: 21 windows naming >1 sibling —
+the denominator nobody had). Until that control exists, every count off the screen is a
+**lower bound**, and must be written as one — calling it a census is the D-163 §7 error
+arriving from the recall side. Pairs with
+[[feedback-a-null-result-needs-a-positive-control]] (same discipline, other direction) and
+[[feedback-a-screen-is-not-idempotent-under-its-own-repair]].
