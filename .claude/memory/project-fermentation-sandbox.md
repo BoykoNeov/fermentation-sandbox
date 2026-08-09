@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-09T12:41:16.757Z
+  modified: 2026-08-09T18:36:08.202Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,7 +26,7 @@ make room for guardrails is the defect**. Distil real slack, never evict a prohi
 
 ## Status (2026-08-09)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-167**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+**D-168**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
 leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1498 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
@@ -121,6 +121,24 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   **provenance, not sampling** — no breach of "do not re-audit those 36". **NO GUARD SHIPS**; the residue is a
   **missing band-provenance schema field**, D-164 §6's field from the other side — **do not design it in a record**.
   **Flags 5 CONTRADICTED bands** (`E_a_esters`, thermal ×3, `E_a_oak_extraction` cite a range their edges fall outside).
+- **Those 5 are CLOSED (D-168) — do NOT re-open them as "bands that contradict their sources".** Four carry a
+  **SECOND** account (a **Q10 at 20 °C**, determined by the band through the shipped `arrhenius_factor`) that
+  D-167 never read, and it **disagrees**: thermal "~100–150" vs Q10 "~3–4.5" → **[81.2, 111.1]**; oak "~10–25" vs
+  "~1.3–1.6" → **[19.4, 34.7]** — near-disjoint, so **"move it to its cited range" is ILL-POSED**
+  [[feedback-a-note-can-state-its-span-twice]]. Thermal's **[80k,130k] matches neither NOR their union** ⇒
+  **AUTHOR-CONSTRUCTED**, note-only; a 3rd claim ("Q10 ~3.5" = 92.6k) vs nominal **3.87**. **Beer's contradiction
+  DISSOLVES**: high 265k **IS** the printed top, low 120k is the model-internal stripping floor the note already
+  names — nominal sum **exactly 100,100** but **JOINT worst case 118,000 ⇒ margin +2,000**, not ~20,000; nominal
+  200k is itself **below** the cited 221–265k, deliberately. **Decider = the ORDERINGS at JOINT band edges** (the
+  D-118 shape): thermal +10,000 / **0.0000 %** (the positive control), beer +2,000 / 0.0000 %, **oak INVERTS**
+  −5,000 / **0.0354 %**. ⇒ **`E_a_oak_extraction` high 35k → 25k SHIPPED** (**Corrects D-77**), justified by the
+  **citation** (band now == "~10–25 kJ/mol"), the ordering repair a **consequence**
+  [[feedback-name-guards-for-what-they-forbid]]. **NEVER assign edges to accounts from proximity** — 80k↔81.18k,
+  35k↔34.73k is invented provenance. **The 1498-green proves NOTHING** — D-163 Stage 3 already recorded
+  `oak:E_a_oak_extraction` shrink/widen GREEN; a 29 %-of-span move noticed by nothing is the *prediction*. **NO
+  GUARD** (a Q10-span pin is a bijection restatement). Wine `E_a_esters` **~15k was stale in 3 carriers** — ships
+  **55,100 == `E_a_uptake`**, D-21's condition for T-flat production. `TOPIC_RULES` gained `\baccount` (2 titles;
+  `\bband` **rejected**, 19).
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
@@ -255,7 +273,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..7}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  `d15{7,8,9}-*\`, `d16{0..8}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
