@@ -56,7 +56,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   `psychophysics.yaml` **24, UNIFORM** (deliberate, never "fix" to triangular; **never apply the triangular mass
   statistic to it** — 16 points off, anti-conservative); `sensory.yaml` **36, NEVER sampled — do not re-audit those
   36**. `SHARED_FILES` restated **on purpose** (deriving it = D-108/D-109 vacuity). **TWO triangular defaults** —
-  `ensemble.py:108`/`:444`. **A test at `x == mode` is vacuous** — sample **off-mode**. **Removal** is not *separately* pinned (all 14 drops RED).
+  `ensemble.py:108`/`:444`. **A distribution test at `x == mode` is vacuous** — sample **off-mode**. **Removal** is not *separately* pinned (all 14 drops RED).
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
   **INTERNALLY, no fetch**: which number is *sourced*? 84 = Shinohara's 16.4% E-rate; **30–80 occurred ONCE, in the
   test comment asserting it**. Corrects **D-127**. Test **recomputes** all three (`abs=5e-4`; never `rel`/`round(x,3)` — pins *formatting*). Band = E-rate spread at **FIXED acetic 0.35**, a documented narrowing.
@@ -64,7 +64,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   `PH_SYSTEM_READS`/`SO2_BINDING_READS` (`acidbase.py`) → 19 members/5 modules. **Keep DISJOINT** (pinned) and
   **derived**, never re-listed. **`temperature_ramp_rate` stays undeclared BY DESIGN**; no tier moved.
   **RESTATEMENT DONE (D-161) — never re-run it.** Affected class = **ONE** row, a 9-name `only=` **ISOLATION** not a
-  band; its seed spread is **SORTED** [[feedback-a-majority-is-not-a-direction]]. Through the shipped sampler the fix
+  band; its "13.99/16.69/20.09 across seeds 0/1/2" is **SORTED** [[feedback-a-majority-is-not-a-direction]]. Through the shipped sampler the fix
   is **undetectable**; predicted **widening NOT observed** (10/24, p=0.54). D-159 pins consumption (`test_drawability_surface.py`).
 - **Closure ordering SCOPED (D-162) — do not "fix", narrow or re-measure it.** **Three** claims: P1's
   **three-tier** grouping is its conclusion verbatim (breach **2.4%**); `technical<screwcap` (**40.7%**) and
@@ -98,7 +98,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   code sites** — a `params[`-operand grep returns **4** and misses `ethanol_tolerance` itself. Classify **bitwise**
   (`np.array_equal`, fixed `t_eval`), never by epsilon; **populate the must** — run 1 integrated **water** (17
   read-DEAD vs 7). Only **2 of 66** read params are switch-gated; the other 5 read-DEAD are **structural no-ops**
-  (36-Brix control). Window **[24.56, 28.45] °Brix**, reference **0.56 below** ⇒ **inertness is a MARGIN**, held
+  (36-Brix control). Window **[24.56, 28.45] °Brix**, reference **0.56 below** ⇒ **`reads` reach is an UPPER BOUND** (D-165: `k_d2` **bitwise inert** at 24 Brix) **and inertness is a MARGIN**, held
   open by `Y_glycerol_sugar`/`Y_byproduct_sugar` — Gay-Lussac ceiling **125.4 > 120**, diversion OFF ⇒ **122.96,
   inside the window** [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. **`ethanol_inhibition` is NOT in
   wine's active set** (Luong wall superseded). **A nominal ON a band edge is inert by construction** — an edge
