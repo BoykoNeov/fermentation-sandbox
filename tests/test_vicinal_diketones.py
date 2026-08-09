@@ -594,3 +594,44 @@ def test_co2_tier_reflects_the_speculative_decarb_trace(store):
     # Param-aware tier (what users see): SPECULATIVE either way — no headline change from VDK.
     assert core.tier_of("CO2", tm) is Tier.SPECULATIVE
     assert with_decarb.tier_of("CO2", tm) is Tier.SPECULATIVE
+
+
+# -- the sourced ordering, at the JOINT BAND EDGE ------------------------------
+
+
+def test_the_decarb_reduction_ordering_survives_both_bands(store):
+    """``E_a_decarb > E_a_reduction`` must hold for every JOINT draw, not just the nominals.
+
+    Both notes state this ordering as the load-bearing, sourced claim — *"held WELL ABOVE
+    ``E_a_reduction`` (45k) so decarboxylation is the temperature-critical rate-limiting
+    step"* and, from the other side, *"held BELOW ``E_a_decarb`` (90k)"*. Each cites the
+    other's **nominal**. Both are banded, and the ensemble sampler draws them independently
+    (both are declared ``reads`` of Processes active in every scenario tried), so the
+    constraint has to be evaluated at the joint worst case: ``decarb.low`` against
+    ``reduction.high``. This is the archive's recurring shape — a constraint verified at a
+    POINT where the sampler reads a BAND (D-118, D-154, D-155, D-157, D-168 §3).
+
+    **Why this is not decoration** (`feedback-mutate-the-premise-before-building-the-guard`,
+    D-170): the premise was broken first and the suite watched. Widening
+    ``E_a_reduction``'s high edge 60k → 90k, and dropping ``E_a_decarb``'s low edge 60k →
+    40k, each make the bands OVERLAP — and both arms left this file, the sampling-surface
+    pins and the parameter suite fully GREEN. Only moving the *nominal* across
+    (``E_a_decarb`` 90k → 40k) is caught, by
+    ``test_warmer_ferment_is_cleaner_the_diacetyl_rest``. So the existing coverage is
+    nominal-scoped, exactly as D-118's was, and the band-scoped half was unguarded.
+
+    The margin is **exactly zero** today: ``decarb.low == reduction.high == 60,000`` J/mol.
+    The non-strict ordering therefore holds for every joint draw (a strict one does not —
+    the two can be drawn equal, at which point both Arrhenius factors coincide and the
+    mechanism both notes call load-bearing degenerates). Whether the two edges were set to
+    meet deliberately is **not recorded anywhere in the archive**, so this asserts what is
+    measurable and says nothing about intent. Both sides are RECOMPUTED from the store —
+    pinning the literal 60,000 would pass for the wrong reason if either band moved
+    (D-154's ``k_bound`` precedent).
+    """
+    decarb, reduction = store["E_a_decarb"], store["E_a_reduction"]
+    # The nominal ordering, which the diacetyl-rest acceptance test already covers.
+    assert decarb.value > reduction.value
+    # The joint worst case: the lowest decarb the sampler can draw against the highest
+    # reduction. No joint draw may invert the ordering.
+    assert decarb.uncertainty.low >= reduction.uncertainty.high

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-09T18:45:24.074Z
+  modified: 2026-08-09T21:14:56.746Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -24,10 +24,10 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
 - `docs/ARCHITECTURE.md` (seams); `docs/plans/milestone-*.md` ("Active beat: sensory" header is **STALE**, closed
   at D-95/D-98); `CLAUDE.md` (prime directives + archive conventions).
 
-## Status (2026-08-09)
+## Status (2026-08-10)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-169**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1517 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-170**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1518 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -119,13 +119,26 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   [[feedback-name-guards-for-what-they-forbid]]); wine `E_a_esters` ships **55,100 == `E_a_uptake`** (D-21). Beer's
   **DISSOLVES**, leaving the axis's **tightest joint margin, +2,000 J/mol**. **NEVER assign edges to accounts from
   proximity**, and **do not re-draft the WITHDRAWN `Corrects: D-77`** (nominal-scoped, never states the band).
-- **The Q10 cross-check GENERALISES — D-168 §1b, the beat's largest OPEN leftover.** Of **21 checkable** notes,
-  **15 DISAGREE** with their own band — but **stratify: 6 GROSS / 2 moderate / 7 rounding**, a flat 15 misleads.
-  **The positive control is ONE band reused six times, not six successes.** **3 GROSS sit outside D-167 §5**
-  (`E_a_decarb`, `E_a_ethyl_hexanoate_hydrolysis`, `E_a_ethyl_acetate_esterification`) — they fail on the **Q10
-  axis** while their kJ/mol citation is fine, so **no citation-shaped screen can see them**. **Run it on the
-  PRE-edit tree** — rewritten notes quote retired claims and reformat past the regex
-  [[feedback-a-text-screen-has-units-and-self-reference]].
+- **D-168 §1b's Q10 sweep is CLOSED (D-170) — never re-run it expecting a defect count.** On this tree it
+  returns **15 again, for the OPPOSITE reason**: repairing a note (writing BOTH accounts in) makes a worst-gap
+  screen score it **WORSE** — **the sweep is NOT idempotent under its own repair**, and a naive re-run reads
+  "no progress". **Field-complete (all FOUR text fields) reproduced 21/15 EXACTLY — the predicted delta did
+  NOT happen**; what it buys is **9 params carrying two Q10 claims in two FIELDS** (2 outside the checkable
+  set). **7 rounding-class = notational, MEASURED** (±5 %, every high edge rounded **UP**) — left unedited on
+  purpose. `E_a_acet_reduction`'s low is the **NOMINAL's** Q10; `E_a_smm_hydrolysis` a **one-directional**
+  +8.4/+4.9 % offset; **both bands unchanged since introduction ⇒ wrong when WRITTEN, not stale**.
+- **The recurring shape is FIVE live instances, not four (D-170) — the ordering screen (`orderings.py`) is
+  REUSABLE but it is a SCREEN**: 49 candidates → 24 evaluable → **5 invariants**, and **two-pass hand reading
+  is NOT optional** (pass 1 killed 12, pass 2 killed 5 more — *"comparable"* is not an ordering, and
+  `mu_max_mlf`'s hit was its note naming **its own** quantity). **Filter through the SAMPLER, not the files.**
+  **`E_a_decarb > E_a_reduction`'s joint margin is EXACTLY 0** (60,000 == 60,000, intent **UNRECORDED**) —
+  guard shipped, arms A/B **GREEN before** it ⇒ coverage was nominal-scoped. **NO number moved**: nominal
+  90,000 sits **above its own cited anchor** [67,704, 81,176] ⇒ ill-posed (D-168 §1). **FOUR breaches still
+  unguarded**: `y_acetaldehyde_per_tannin` 34.2 %, `k_death_brett` 23.1 %, `y_methanethiol` 19.4 %, `y_a420_per_maillard_melanoidin` 16.4 %.
+- **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
+  `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** (2.0309 flat) in the scenario its own
+  note names, with the positive control moving; the pool ends at **0.63 of 0.8 g/L** ⇒ the competition is not
+  binding. **Not a value change**; deciding it needs D-89's calibration scenario, which it **never pins**.
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
@@ -260,7 +273,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..8}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d170-q10-generalise\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)

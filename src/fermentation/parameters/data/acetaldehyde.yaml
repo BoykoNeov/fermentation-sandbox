@@ -142,7 +142,7 @@ E_a_acet_reduction:
   value: 45000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 30000.0, high: 60000.0, note: "Q10 ~1.8-2.3 at 20 C; a moderate enzymatic activation energy typical of yeast oxidoreductases (cf. the diacetyl-reduction E_a_reduction 45k, D-26)" }
+  uncertainty: { low: 30000.0, high: 60000.0, note: "Q10 [1.501, 2.252] at 20 C across the band, nominal 1.839, through the shipped arrhenius_factor; a moderate enzymatic activation energy typical of yeast oxidoreductases (cf. the diacetyl-reduction E_a_reduction 45k, D-26). D-170 CORRECTION: this note previously said 'Q10 ~1.8-2.3', which is NOT this band's conversion -- its 1.8 is the NOMINAL's Q10 (1.839, off by 0.039) while the band's low edge gives 1.501 (off by 0.299). It was a nominal-scoped claim parked in the band's note; the band never moved (identical to its introducing commit e3882aa), so this was inconsistent when written, not stale" }
   provenance:
     source: "author estimate; a moderate enzymatic activation energy typical of yeast alcohol/aldehyde dehydrogenases"
     conditions: "generic yeast; equivalent Arrhenius activation energy of acetaldehyde reduction at T_ref = 293.15 K"
