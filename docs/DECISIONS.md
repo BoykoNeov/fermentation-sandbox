@@ -11,7 +11,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 
 ⚠ on a row means a **later decision corrected or flagged it** — follow the pointer before trusting that record. `corrected by` = the fix shipped; `flagged by` = the reversal is agreed but **not yet in the code**.
 
-**The correction map is INCOMPLETE.** It is built only from explicit `**Corrects:**` / `**Flags:**` markers, and those are backfilled so far only for the corrections a title announced (46 records marked). **Absence of ⚠ is NOT a guarantee that a record is current** — a superseding decision that never declared itself will not show here. When a record is load-bearing, grep its D-number: `Grep 'D-<n>' docs/DECISIONS.md`.
+**The correction map is INCOMPLETE.** It is built only from explicit `**Corrects:**` / `**Flags:**` markers, and those are backfilled so far only for the corrections a title announced (45 records marked). **Absence of ⚠ is NOT a guarantee that a record is current** — a superseding decision that never declared itself will not show here. When a record is load-bearing, grep its D-number: `Grep 'D-<n>' docs/DECISIONS.md`.
 
 ### By subsystem
 
@@ -105,7 +105,7 @@ Coarse first cut for *where did we decide X*. A record appears under **every** b
 - [**D-74**](#d-74--phenolicbrowning-built-oxidative-browning-is-the-first-always-on-o-sink-and-it-makes-the-browning-visible-41) — `PhenolicBrowning` built: oxidative browning is the first *always-on* O₂ sink, and it makes the … — ⚠ **flagged by [D-137](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing)**
 - [**D-75**](#d-75--streckerdegradation-built-the-oamino-acid-strecker-aldehydes-cooked-potato--honey-a-wine-only-substrate-gated-sink-41) — `StreckerDegradation` built: the O₂/amino-acid Strecker aldehydes (cooked-potato + honey), a … — ⚠ **flagged by [D-138](#d-138--gate-2-closed-the-seven-o2-sinks-re-expressed-as-h2o2--quinone-consumers-and-the-measurement-showing-the-rebuild-is-one-new-state-slot-not-the-larger-than-f2-rewrite-d-137-feared)**
 - [**D-76**](#d-76--the-emergent-sur-lie--strecker-pathway-lees-autolysis-d-34-refills-amino_acids-and-feeds-streckerdegradation-d-75-with-no-new-physics-41) — The emergent **sur-lie → Strecker** pathway: lees autolysis (D-34) refills `amino_acids` and feeds …
-- [**D-77**](#d-77--oakextraction-built-the-barrelchip-aroma-extractive-axis--the-first-non-oxidative-aging-process-a-separate-axis-no-o-41) — `OakExtraction` built: the barrel/chip aroma-extractive axis — the FIRST non-oxidative aging … — ⚠ **corrected by [D-168](#d-168--d-167-5s-five-contradicted-bands-worked-four-of-the-five-carry-a-second-numeric-account-nobody-reconciled-the-two-accounts-are-near-disjoint-so-move-the-band-to-its-cited-range-was-ill-posed-for-most-of-them-and-the-deciding-measurement-turned-out-to-be-an-ordering-that-inverts-inside-its-own-bands)**
+- [**D-77**](#d-77--oakextraction-built-the-barrelchip-aroma-extractive-axis--the-first-non-oxidative-aging-process-a-separate-axis-no-o-41) — `OakExtraction` built: the barrel/chip aroma-extractive axis — the FIRST non-oxidative aging …
 - [**D-78**](#d-78--ellagitanninoxidation-built-the-oak-tannin-o-scavenging-sink--oak-protects-the-wine-the-bridge-from-the-oak-axis-to-the-o-sub-axis-41) — `EllagitanninOxidation` built: the oak-tannin O₂-scavenging sink — oak **PROTECTS** the wine, the … — ⚠ **flagged by [D-138](#d-138--gate-2-closed-the-seven-o2-sinks-re-expressed-as-h2o2--quinone-consumers-and-the-measurement-showing-the-rebuild-is-one-new-state-slot-not-the-larger-than-f2-rewrite-d-137-feared)**
 - [**D-79**](#d-79--tanninanthocyanincondensation-built-red-wine-colour-stabilization--astringency-softening--the-dominant-mechanism-a-third-non-oxidative-axis-on-grape-pools-41) — `TanninAnthocyaninCondensation` built: red-wine colour stabilization + astringency softening — the …
 - [**D-80**](#d-80--acetaldehydebridgedcondensation-built-the-acetaldehyde-bridged-ethylidene-route--the-split-ledger-colour-beat-the-first-link-from-the-oxidative-sub-axis-to-red-wine-colour-41) — `AcetaldehydeBridgedCondensation` built: the acetaldehyde-bridged (ethylidene) route — the … — ⚠ **corrected by [D-160](#d-160--d-159s-flagged-pka-gap-fixed-after-a-recording-proxy-sweep-proved-the-class-is-13-names-reached-through-two-helper-families-not-9-through-one--and-that-the-convention-it-overturns-was-right-about-tiers-and-silent-about-sampling)**
@@ -20667,9 +20667,22 @@ failure mode to avoid.
 
 ## D-168 — D-167 §5's five contradicted bands worked: four of the five carry a SECOND numeric account nobody reconciled, the two accounts are near-disjoint so "move the band to its cited range" was ill-posed for most of them, and the deciding measurement turned out to be an ORDERING that inverts inside its own bands
 
-**Corrects:** D-77 — its "`E_a_oak_extraction` = 20 kJ/mol … well below the ~50–60 kJ/mol reaction E_a's of every oxidative sibling" is a NOMINAL-level ordering. Those reaction E_a's band `[30000, 70000]`, and oak's old high edge `35000` sat *inside* that band, inverting the ordering in 0.0354 % of independent joint draws. Oak's high edge now ships at `25000` and the ordering holds at the joint edges.
+**No D-record is corrected here, and that is itself a finding.** Both candidates were considered and both rejected:
 
-**This record does NOT correct D-167.** Its §5 table is factually true as written — all five bands do cite a range their edges fall outside. What is new is a *second* account those notes also carry, which §5 did not read, and which changes what the fix is. D-167 offered "move the band **or** correct the note"; this record takes the second for four bands and the first for one, and supplies the measured reason.
+- **D-77** was marked `Corrects` in this record's first draft and the marker was **withdrawn on
+  re-reading**. Its sentence — *"`E_a_oak_extraction` = 20 kJ/mol (its own param), well below the
+  ~50–60 kJ/mol reaction E_a's of every oxidative sibling"* — is **nominal-scoped throughout**: the
+  value 20,000 is unchanged and still well below 50,000. D-77 says nothing whatever about oak's
+  *band*, which is the only thing D-168 moved. A ⚠ on D-77 would tell every future reader it
+  contains an error it does not contain, and the index cannot catch a semantically wrong marker —
+  `tests/test_decisions_index.py` validates only that a target exists and is earlier.
+- **D-167** is not corrected either: its §5 table is factually true as written. What is new is a
+  *second* account those notes also carry, which §5 did not read.
+
+**A grep of the whole archive finds NO D-record that ever stated the oak band.** That is not an
+accident of this beat — it is §7's missing-field finding arriving as a negative result: a band's
+span lives only in YAML free text, so there was never a record to correct. D-167 offered "move the
+band **or** correct the note"; this record takes the second for four bands and the first for one.
 
 ### 1. Four of the five notes carry TWO numeric accounts, and they disagree
 
@@ -20703,6 +20716,44 @@ an edge as construction. Writing that assignment into a shipped note would *inve
 D-167 §4's SELF-RESTATEMENT anti-pattern, committed from the authoring side. Only oak's **low**
 edge is an exact match (`10000` == the cited 10 kJ/mol), and only beer (§2) has its account named
 in the note itself.
+
+### 1b. The conversion has a POSITIVE CONTROL, and the defect is 15 of 21 archive-wide
+
+§1's thermal row is a control for the *ordering* measurement, not for the *conversion*. Without a
+note whose two accounts **agree**, "they disagree" could be an artefact of how the Q10 is computed
+(`feedback-a-null-result-needs-a-positive-control`). It is not. Swept over every parameter file,
+against the **pre-D-168 tree** (see the harness caveat below):
+
+| | |
+|---|---|
+| notes mentioning Q10 | **29** |
+| stating it as a RANGE, `unit: J/mol`, varying band ⇒ **CHECKABLE** | **21** |
+| stating a Q10 *point* (constrains the nominal, not the band) ⇒ skipped | **8** |
+| **AGREE** — band reproduces the note's own Q10 range | **6** |
+| **DISAGREE** | **15** — GROSS 6, moderate 2, rounding 7 |
+
+**The control:** `aging.yaml`'s `E_a_strecker` / `E_a_browning` / `E_a_ethanol_oxidation` /
+`E_a_so2_oxidation` / `E_a_activation` and `oak.yaml`'s `E_a_ellagitannin_oxidation` all band
+`[30000, 70000]`, all state *"Q10 ~1.5-2.6"*, and all convert to **1.501-2.579**. Exact. The method
+reproduces a note that was built consistently, so the 15 that fail are the notes, not the method.
+**But this control is ONE band reused six times, not six independent successes** — the agreeing
+class is a single consistently-built entry, and it should be cited at that weight.
+
+**Stratify or the count misleads.** A 0.14 miss is a rounding convention; a 1.3 miss is a different
+claim. GROSS (worse endpoint gap > 0.5): `vicinal_diketones::E_a_decarb` (**1.609**), the thermal
+three (**1.309**), `aging::E_a_ethyl_hexanoate_hydrolysis` (**1.267**),
+`aging::E_a_ethyl_acetate_esterification` (**0.870**). **Three of those six are outside D-167 §5's
+five entirely** — they disagree on the Q10 axis while their kJ/mol citation is fine, which is why a
+citation-shaped screen never saw them. `oak::E_a_oak_extraction`'s own Q10 gap is only **0.155**,
+*rounding* class: oak was moved on its **citation**, not on this axis, and the record should not be
+read as claiming otherwise.
+
+**Harness caveat, self-inflicted.** Run against the post-edit tree the sweep reports 18 checkable,
+not 21: the three thermal notes were reformatted to `Q10 [2.95, 5.81]` and fell out of the regex,
+and oak's rewritten note **quotes its own retired `~1.3-1.6` claim**, which then scored as a live
+one. That is exactly `feedback-a-text-screen-has-units-and-self-reference`'s self-reference trap,
+committed by this record's own edits against this record's own harness. The pre-edit tree
+(`git show 609c63e:…`) is the only honest input, and the 21/6/15 above is from it.
 
 ### 2. Beer is the one where the "contradiction" dissolves on reading
 
@@ -20749,6 +20800,14 @@ thermal's. The sourced SIGN (`E_a > 0`) was never at risk: the low edge is 10,00
   now **is** the cited external range `~10-25 kJ/mol`. Nominal 20,000 stays strictly interior (no
   value-on-an-edge, per D-166). Q10 becomes `[1.145, 1.403]`, nominal 1.311, and the note now
   states those as **derived from the band**, not as an independent account of it.
+  **This MOVES THE SAMPLED CENTRAL TENDENCY and "1498 passed" must not be read as "inconsequential"**
+  — D-165 is the record whose whole point is that sampled central tendency ≠ nominal. The triangular
+  mean falls `(10+20+35)/3 = 21,667` → `(10+20+25)/3 = **18,333**`, **−15.4 %**, and D-165's own
+  statistic `(lo+m+hi)/3m` crosses from **1.083 (above nominal)** to **0.917 (below nominal)**: every
+  ensemble run now draws a *lower* average oak temperature-sensitivity than before, and the sampled
+  average moves from one side of the nominal to the other. D-165's headline counts are unaffected —
+  `r = hi/lo` goes 3.5 → 2.5, so oak stays out of the `r ≥ 10` bucket of 123, and the band is still
+  live and varying, so the 339 is unchanged.
   **The citation is the reason; the ordering repair is a consequence** — recorded in that order on
   purpose (`feedback-name-guards-for-what-they-forbid`: a change justified by the arguable
   mechanism gets argued away, and "two speculative author bands overlap" is arguable in a way
@@ -20798,6 +20857,14 @@ absent field.** Its shape is still deliberately not proposed here.
 - **D-167 §5 is CLOSED.** Four resolved as notes, one as a shipped narrowing. Do not re-open the
   five as "bands that contradict their sources" — they were four two-account bands and one real
   numeric defect.
+- **New, and the largest item this beat turned up:** **15 of 21** checkable Q10-range notes
+  disagree with their own band (§1b), of which **6 are GROSS**. Three of the six are outside
+  D-167 §5 entirely — `vicinal_diketones::E_a_decarb` (gap **1.609**),
+  `aging::E_a_ethyl_hexanoate_hydrolysis` (**1.267**), `aging::E_a_ethyl_acetate_esterification`
+  (**0.870**) — because they disagree on the **Q10 axis** while their kJ/mol citation is fine, so
+  no citation-shaped screen can see them. Cheap (no source needed, the check is arithmetic on
+  shipped code); the 7 *rounding*-class ones are almost certainly notational and should be
+  triaged out before any of this is called a defect count.
 - **New:** the joint-edge ordering guard (§6) is the licensed non-vacuous candidate on this
   surface. Run the mutation arms first; expect several to be caught already, as at D-155.
 - **New:** beer `E_a_esters`'s **+2,000 J/mol** joint margin (§2) is the tightest ordering margin
@@ -20807,4 +20874,5 @@ absent field.** Its shape is still deliberately not proposed here.
   bands as the natural pin target; `biomass_N_fraction`'s hardcoded `[0.03, 0.15]` in `compile.py`;
   D-157's 12 undecided assertions, still unpersisted; a *translation* operator.
 - Durable artefacts: `M:\claud_projects\temp\ferment\d168-contradicted-bands\` (`q10.py`,
-  `liveness.py`, `ordering.py`, `ordering.log`).
+  `liveness.py`, `ordering.py`, `ordering.log`, `q10_sweep.py`, `q10_sweep.log`,
+  `q10_sweep_preedit.log`, `pre_edit_data/`).

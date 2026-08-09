@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-09T18:36:08.202Z
+  modified: 2026-08-09T18:45:24.074Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -131,14 +131,26 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   names — nominal sum **exactly 100,100** but **JOINT worst case 118,000 ⇒ margin +2,000**, not ~20,000; nominal
   200k is itself **below** the cited 221–265k, deliberately. **Decider = the ORDERINGS at JOINT band edges** (the
   D-118 shape): thermal +10,000 / **0.0000 %** (the positive control), beer +2,000 / 0.0000 %, **oak INVERTS**
-  −5,000 / **0.0354 %**. ⇒ **`E_a_oak_extraction` high 35k → 25k SHIPPED** (**Corrects D-77**), justified by the
-  **citation** (band now == "~10–25 kJ/mol"), the ordering repair a **consequence**
-  [[feedback-name-guards-for-what-they-forbid]]. **NEVER assign edges to accounts from proximity** — 80k↔81.18k,
-  35k↔34.73k is invented provenance. **The 1498-green proves NOTHING** — D-163 Stage 3 already recorded
-  `oak:E_a_oak_extraction` shrink/widen GREEN; a 29 %-of-span move noticed by nothing is the *prediction*. **NO
-  GUARD** (a Q10-span pin is a bijection restatement). Wine `E_a_esters` **~15k was stale in 3 carriers** — ships
-  **55,100 == `E_a_uptake`**, D-21's condition for T-flat production. `TOPIC_RULES` gained `\baccount` (2 titles;
-  `\bband` **rejected**, 19).
+  −5,000 / **0.0354 %**. ⇒ **`E_a_oak_extraction` high 35k → 25k SHIPPED**, justified by the **citation** (band
+  now == "~10–25 kJ/mol"), the ordering repair a **consequence** [[feedback-name-guards-for-what-they-forbid]].
+  **CORRECTS NOTHING — a `Corrects: D-77` was drafted and WITHDRAWN**: D-77's sentence is nominal-scoped (value
+  20k, still well below 50k) and never states the *band*; no D-record ever stated it, which is §7's missing-field
+  finding as a **negative result**. **NEVER assign edges to accounts from proximity** — 80k↔81.18k, 35k↔34.73k is
+  invented provenance. **The 1498-green proves NOTHING** — D-163 Stage 3 already recorded `oak:E_a_oak_extraction`
+  shrink/widen GREEN; a 29 %-of-span move noticed by nothing is the *prediction*. But it is **NOT inconsequential**:
+  triangular mean **21,667 → 18,333 (−15.4 %)**, D-165's `(lo+m+hi)/3m` crossing **1.083 → 0.917** (above nominal to
+  below); `r` 3.5→2.5 so the `r≥10` 123 and the 339 are unaffected. **NO GUARD** (a Q10-span pin is a bijection
+  restatement). Wine `E_a_esters` **~15k was stale in 3 carriers** — ships **55,100 == `E_a_uptake`**, D-21's
+  condition for T-flat production. `TOPIC_RULES` gained `\baccount` (2 titles; `\bband` **rejected**, 19).
+- **The Q10 cross-check GENERALISES — D-168 §1b, the beat's largest leftover.** Archive-wide: **29** notes mention
+  Q10, **21 CHECKABLE** (`unit: J/mol` + varying band + a Q10 *range*; 8 are point claims), **6 AGREE / 15
+  DISAGREE** = **6 GROSS / 2 moderate / 7 rounding** — *stratify, a flat 15 misleads*. **The positive control is
+  ONE band reused six times, not six successes** (`aging`'s 5 + `E_a_ellagitannin_oxidation`, all `[30k,70k]` →
+  1.501-2.579 vs "~1.5-2.6", exact). **3 GROSS are outside D-167 §5** (`E_a_decarb` 1.609,
+  `E_a_ethyl_hexanoate_hydrolysis` 1.267, `E_a_ethyl_acetate_esterification` 0.870) — they fail on the **Q10 axis**
+  with a fine kJ/mol citation, invisible to any citation-shaped screen. **Run it on the PRE-edit tree**: my own
+  rewritten notes quote their retired claims and reformat past the regex, dropping 21→18
+  [[feedback-a-text-screen-has-units-and-self-reference]].
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
