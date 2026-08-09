@@ -20951,12 +20951,23 @@ is the same move that failed four times, just larger, and a ceiling at 700 gets 
 (a block costs 4–8 lines, not 21), so it should stop biting on its own. If it bites anyway,
 that is evidence worth having **before** a fifth raise.
 
-It **bites immediately**: this record's own 7-line memory block took the file 297 → **305**, and
-the backstop fired. That is not evidence against the design — it is the un-done re-cut, and the
-arithmetic says so. The five over-cap blocks hold **64** lines; at cap they hold **40**, so
-distilling them alone returns **24** lines and lands the file at **281**. The backstop was
-therefore left firing on purpose rather than silenced by evicting an older guardrail, which is
-the one move this record exists to forbid.
+It bit immediately — this record's own 7-line memory block took the file 297 → **305** — and the
+re-cut then ran **in the same session**, on the owner's call. Predicted first from the block
+arithmetic: five over-cap blocks holding **64** lines where the cap holds **40**, so **24**
+returned, landing at **281**. It landed at **281**; all seven findings cleared, the backstop
+went silent, and **nothing was evicted** — the one move this record exists to forbid.
+
+The cut rule was this record's own: keep **trigger + verdict + anchor**, plus any number that
+*is* the prohibition (`247` not 279; structural `61`; oak `35k → 25k`; `E_a_esters` `55,100`;
+beer's `+2,000`). **Audited, not assumed** — **zero** D-record anchors and **zero** `feedback-*`
+links were lost, so every pointer survived and only evidence left.
+
+And the *"already held losslessly in `DECISIONS.md`"* clause that licenses every such cut was
+**run, not conceded**: 20 dropped figures sampled, **20 present**. One needed a notation-aware
+second look — the memory's shorthand `[35k,75k]` is this file's `[35000, 75000]`, a
+literal-string miss of exactly the shape §4's screen made twice. **A grep for the memory's own
+notation is not a test of the archive**, so the check must be run per-figure, in the archive's
+units, before any future re-cut claims losslessness.
 
 ### 4. A digit-density check was designed and REJECTED — on measurement
 
@@ -21008,10 +21019,11 @@ records it cites, which is the usability win over the previous generic prose.
 
 ### Next
 
-- **The re-cut is NOT done and is the owner's call.** Five bullets and one index row are over
-  cap today. The rule for cutting is §4's: a prohibition needs its **trigger, verdict and
-  anchor**; the measurements it cites are already held losslessly here and are grep-able, so
-  they go. Numbers that *are* the prohibition stay.
+- **The re-cut is DONE** (§3): 306 → **281**, hook green, nothing evicted, no anchor or
+  `feedback-*` link lost. The rule it applied is the standing one for every future cut — a
+  prohibition keeps its **trigger, verdict and anchor**, the measurements it cites go, and
+  numbers that *are* the prohibition stay. **Verify losslessness per figure in the archive's own
+  notation** before claiming it; the memory's shorthand will not match.
 - **Do NOT raise `LINE_CAP` a fifth time without first showing the per-bullet check did not
   bite.** §1 is the standing rebuttal to "just raise it": the fill rate followed the cap.
 - **A machine-derivable retirement candidate exists and is not built:** `gen_decisions_toc.py`

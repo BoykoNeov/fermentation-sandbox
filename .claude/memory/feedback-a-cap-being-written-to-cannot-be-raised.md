@@ -28,9 +28,15 @@ single poolable budget was. Raising it buys one beat and re-arms the same failur
 - **Move the pressure to shape, not size.** Cap the *per-item* footprint so the only way to
   comply is to distil the new item — eviction of an old one then cannot satisfy the check.
   Cap **blocks/paragraphs, not just list items**, or the content re-types itself one level in.
-- **Enumerate every surface the budget covers** before capping one. Two of three
-  session-boot surfaces are now measured; `CLAUDE.md` is not, and is where the next
-  displacement goes.
+- **Enumerate every surface the budget covers** before capping one, and don't overstate
+  what a cap covers: `CLAUDE.md` is a boot surface and is unmeasured, and `MEMORY.md` is
+  capped per **row**, so row **count** is still an open channel.
+- **Run the criterion that licenses the cut.** "It's held losslessly elsewhere" justified
+  every measurement dropped and was asserted three times before being checked
+  [[feedback-conceded-caveats-are-not-coverage]]. 20 of 20 sampled figures were present —
+  but one only matched in the archive's notation (`[35000, 75000]`, not the memory's
+  `[35k,75k]`), so grep the target's units, not your own
+  [[feedback-a-text-screen-has-units-and-self-reference]].
 - **Distrust a metric that a stronger-looking signal explains.** A digit-density check looked
   clean at 217-vs-65 and was rejected: normalised per line the "evidence-dense" block ran ~10
   digits/line against a short prohibition's ~20, so it was reading item SIZE

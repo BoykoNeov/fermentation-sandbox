@@ -96,13 +96,13 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   (8), **6 arms killing 6 of 8**. **Attribution NOT monotone in `r`**; direction does **not** transfer. Log-tri
   measured/flagged/**NOT shipped** — median=nominal is an **identity** [[feedback-pair-the-arm-with-its-baseline]].
 - **Mechanism B CLOSED — the switch-site census (D-166); B's surface is PARAMETERS, not code sites** (corrects
-  D-165's "Next" — a `params[`-operand grep misses `ethanol_tolerance` itself). Classify **bitwise**
-  (`np.array_equal`, fixed `t_eval`), **never by epsilon**, and **populate the must** first. Only **2 of 66** read
-  params are switch-gated ⇒ **`reads` reach is an UPPER BOUND**, **and inertness is a MARGIN** — held open here by
-  two byproduct-yield bands, and a **documented toggle** (Gay-Lussac diversion OFF) puts the reference must inside
-  the window with no Brix change [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. **A nominal ON a band
-  edge is inert by construction** [[feedback-nominal-on-a-band-edge-is-not-inertness]]. **`ethanol_inhibition` is
-  NOT in wine's active set.** **Beer is UNCENSUSABLE** (`_ALLOWED_KEYS["beer"]`: no acid input, pH 7.0).
+  D-165's "Next": a `params[` grep misses `ethanol_tolerance`). Classify **bitwise** (fixed `t_eval`), **never by
+  epsilon**; **populate the must** first. Only **2 of 66** read params are switch-gated ⇒ **`reads` reach is an
+  UPPER BOUND**, **and inertness is a MARGIN** — held open by two byproduct-yield bands and closed by a
+  **documented toggle** (Gay-Lussac diversion OFF) [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. **A
+  nominal ON a band edge is inert by construction** [[feedback-nominal-on-a-band-edge-is-not-inertness]].
+  **`ethanol_inhibition` is NOT in wine's active set**; **beer is UNCENSUSABLE** (`_ALLOWED_KEYS["beer"]`: no acid
+  input, pH 7.0). Pinned `tests/test_switch_site_census.py`.
 - **The "buildable 55" is RESCOPED and its first slice CLOSED (D-167) — corrects D-163's §7 headline**, whose
   predicate tested the **VALUE's** `provenance.source` and was reported as a claim about **EDGES**
   [[feedback-name-the-field-your-predicate-read]]. Of 110 edges only **4** are a parameter-specific published span
