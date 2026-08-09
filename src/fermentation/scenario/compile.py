@@ -1074,16 +1074,54 @@ def _apply_nitrogen_dependent_yield(scenario: Scenario, parameters: ParameterSet
     return parameters.merge(ParameterSet([override]), override=True)
 
 
+def _override_in_band(base: Parameter, value: float, knob: str) -> float:
+    """Forbid a scenario override that would land outside the reference parameter's band.
+
+    Decision D-164. The bound is real and load-bearing, but it was previously enforced
+    only as a SIDE EFFECT: an override is built as a new :class:`Parameter` carrying the
+    base's ``uncertainty``, so ``Parameter._value_in_range`` rejected it — with a message
+    naming the *parameter's epistemic band*, never the *scenario knob the user actually
+    set*. This states the same bound up front, named for what it forbids.
+
+    Why the band is the admissible range **today**: the ensemble sampler draws this
+    parameter as ``triangular(low, value, high)`` (``runtime.ensemble.sample_parameters``,
+    and ``_inverse_cdf`` via ``scipy.stats.triang`` with ``c = (val-lo)/(hi-lo)``), which
+    *requires* ``low <= value <= high``. Both knobs' parameters are confirmed present in
+    the sampled-name set of the very run that enables them, so an out-of-band override
+    would break a live call site, not merely an abstract invariant.
+
+    This deliberately does NOT decouple the epistemic band from the admissible range —
+    that needs its own provenance-bearing field, and D-164 flags it. Note the asymmetry it
+    leaves: to sweep further you must widen the band in the YAML *with provenance*, which
+    is the intended cost.
+    """
+    u = base.uncertainty
+    if not (u.low <= value <= u.high):
+        raise ValueError(
+            f"scenario knob {knob!r}={value:g} is outside the admissible override range "
+            f"[{u.low:g}, {u.high:g}] {base.unit} for parameter {base.name!r} "
+            f"(decision D-164). A scenario override must stay inside the reference "
+            f"parameter's stated band: the ensemble sampler draws it as "
+            f"triangular(low, value, high), which requires low <= value <= high. "
+            f"To sweep beyond this, widen {base.name!r}'s uncertainty band in the "
+            f"parameter YAML with provenance — do not widen it here."
+        )
+    return value
+
+
 def _override_carrying_capacity(parameters: ParameterSet, cap_gpl: float) -> ParameterSet:
     """Override the reference ``biomass_carrying_capacity`` with a scenario opt-in value.
 
     Only reached when a wine scenario passes ``carrying_capacity_gpl > 0`` (decision D-30),
     so the biomass cap modifier is enabled and its cap ``K`` is the scenario's value rather
-    than the YAML reference — letting a demonstration sweep the cap. Keeps the reference
-    parameter's units/tier/uncertainty (the form and confidence are unchanged; only the
-    operating point moves) and records the override in provenance for the audit trail.
+    than the YAML reference — letting a demonstration sweep the cap **within the reference
+    band** (:func:`_override_in_band`, decision D-164 — the sweep is bounded, and the YAML
+    band is what bounds it). Keeps the reference parameter's units/tier/uncertainty (the
+    form and confidence are unchanged; only the operating point moves) and records the
+    override in provenance for the audit trail.
     """
     base = parameters["biomass_carrying_capacity"]
+    _override_in_band(base, cap_gpl, "carrying_capacity_gpl")
     override = Parameter(
         name="biomass_carrying_capacity",
         value=cap_gpl,
@@ -1108,11 +1146,13 @@ def _override_autolysis_rate(parameters: ParameterSet, rate_per_h: float) -> Par
 
     Reached only when a wine scenario passes ``autolysis_rate_per_h > 0`` (which enables the
     autolysis Process), so the rate is the scenario's value rather than the YAML reference —
-    letting a demonstration sweep the *sur lie* timescale. Keeps the reference parameter's
+    letting a demonstration sweep the *sur lie* timescale **within the reference band**
+    (:func:`_override_in_band`, decision D-164). Keeps the reference parameter's
     units/tier/uncertainty (only the operating point moves) and records the override in
     provenance, mirroring :func:`_override_carrying_capacity`.
     """
     base = parameters["k_autolysis"]
+    _override_in_band(base, rate_per_h, "autolysis_rate_per_h")
     override = Parameter(
         name="k_autolysis",
         value=rate_per_h,
