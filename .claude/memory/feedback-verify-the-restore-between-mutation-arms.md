@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 1289a7da-873a-4fc1-882a-f8c7f961f6e7
-  modified: 2026-08-09T11:30:48.069Z
+  modified: 2026-08-09T12:41:34.488Z
 ---
 
 **Between mutation arms, verify the file actually got restored — and include at least one arm whose
@@ -39,3 +39,16 @@ So: **any arm whose expected verdict matches the harness's failure mode is unsco
 proves the harness works** — for exception-counting harnesses the failure mode is "raises", so the
 control must be an arm that must NOT raise. Write the controls into the harness from the first run,
 not after a suspicious result. See [[feedback-compute-the-clean-fix-before-adopting-it]].
+
+**An arm's COLOUR is not coverage — capture which test it killed (D-165).** A harness that reads only
+pytest's `-q` summary knows an arm went red, never *what* went red, so every arm→test attribution is
+inferred. D-165's A2 anchored on `if distribution == "triangular":`, which occurs **twice** in
+`ensemble.py` (8-space indent in `sample_parameters`, 4-space in `_inverse_cdf`); a first-occurrence
+replace hit the wrong one, so the arm meant to cover the load-bearing *median* test covered a different
+test, that test had **no arm at all**, and the record shipped claiming "5 of 5 arms as predicted". Red
+was the expected answer, so nothing looked wrong. **How to apply:** run arms with `-rf --tb=no` and
+**without `-x`** (which stops the file early and hides second kills — A1 was really killing two tests),
+parse the `FAILED …::test_name` lines per arm, then print the set of tests killed by *at least one*
+arm against the file's full test list and **name the uncovered ones in the record**. Assert
+uniqueness of the anchor before mutating. A "6 of 6 arms" claim and a "6 of 8 tests covered" claim are
+different claims; only the second is coverage.

@@ -34,8 +34,17 @@ flagged, not adopted, exactly as D-164 §6 did with the admissible-range field.
 parameter store and asserts it equals the ``_LO``/``_VAL``/``_HI`` these tests compute
 from. Without it every other test here would derive its expectation from its own
 constants and pass against any YAML whatsoever — the D-108/D-109 self-derivation shape.
-Each test below was checked against its own mutation arm (D-155 standard); the arms are
-named in D-165 §5.
+
+**Mutation coverage, measured rather than asserted (D-165 §7, corrected).** Six arms kill
+**6 of these 8 tests**, and the harness records *which* test each arm killed rather than
+inferring it from a summary line — the first run of that harness anchored on a string that
+occurs twice in ``ensemble.py``, mutated ``sample_parameters`` instead of ``_inverse_cdf``,
+and left the median test (the load-bearing one) with no arm while reporting "5 of 5". The
+two tests **no arm kills** are named here rather than left to be discovered:
+``test_triangular_mean_is_displaced_by_the_band_width``, which is arithmetic over this
+file's own constants and is therefore covered only by the non-vacuity pin above, and
+``test_but_they_do_not_de_sensitise_against_a_log_scale_shape``, whose subject is a shape
+the module does not implement and so has nothing in ``src`` to mutate.
 """
 
 from __future__ import annotations

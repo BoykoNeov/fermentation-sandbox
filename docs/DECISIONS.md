@@ -19904,7 +19904,11 @@ Sampling was used only to verify the closed forms.
 | **median** ≥ 3× nominal | 12 | 3.6 % |
 
 By tier: 283 live SPECULATIVE (115 wide, 40.6 %), 54 live PLAUSIBLE (8 wide, 14.8 %) — and
-**no VALIDATED band is live at all**. Worst row, in *both* `wine_generic` and
+**no VALIDATED band is live at all**. That tally is over the 337 with a non-zero nominal;
+the two the ratio filter drops (`Y_byproduct_sugar`, `Y_glycerol_sugar`, both value 0.0 with
+band [0.0, 0.02], and both genuinely **drawn in beer**) are SPECULATIVE as well, checked
+rather than assumed — so the claim holds across all 339 live bands, not just the 337.
+Worst row, in *both* `wine_generic` and
 `beer_generic`: `k_d2_ethanol_tolerance_death`, `r = 300`, mean 10.37×, **median 9.18×**,
 P5 1.30×, P95 23.42×.
 
@@ -20003,13 +20007,44 @@ from the store and asserts it equals the constants the other tests compute from.
 the file would derive its expectations from itself — the D-108/D-109 shape, and the same
 self-derivation D-164 §5 had to name in its own test file.
 
-### 7. Mutation arms — 5 of 5 as predicted, restores SHA-verified between arms
+### 7. Mutation arms — 6 of 6 as predicted, 6 of 8 tests covered, restores SHA-verified
 
-A1 move `k_autolysis`'s band edge: RED. A2 neuter the triangular inverse-CDF branch: RED.
-A3 map "uniform" log-scale so the two *offered* shapes disagree: RED. A4 move
-`ethanol_tolerance`'s low edge 120 → 110: RED. **A5, designed GREEN** — rename an unrelated
-band (`E_a_autolysis`) in the same file: GREEN, so the RED arms are not measuring "any YAML
-edit breaks it".
+**This section was wrong when first written and is corrected here in the same beat.** Run 1
+reported "5 of 5 arms as predicted" and claimed A2 neutered the triangular *inverse-CDF*
+branch. It did not. The anchor `if distribution == "triangular":` occurs **twice** in
+`ensemble.py` — at 8-space indent in `sample_parameters` (:147) and at 4-space indent in
+`_inverse_cdf` (:164) — and a first-occurrence replace hit the sampler. So the arm that was
+supposed to cover the **median** test, the load-bearing one that defeats "the ensemble never
+reports the mean", covered a different test entirely, and the median test had **no arm at
+all** while the record claimed otherwise.
+
+It survived because `run_tests` returned only pytest's `-q` summary line: every arm→test
+attribution was **inferred from a colour, never measured**. `-x` compounded it, stopping
+each arm before the rest of the file ran. This is [[feedback-count-and-print-your-skips]]
+one level up — the harness did not silently drop *inputs*, it silently dropped the
+*attribution*, and an aggregate "5 of 5" read as coverage it never had.
+
+Re-run with anchors disambiguated, `-rf --tb=no` and no `-x`, and the failing test names
+parsed per arm:
+
+| arm | verdict | test(s) actually killed |
+|---|---|---|
+| A1 `k_autolysis` band high 1e-2 → 2e-2 | RED | the non-vacuity pin **and** the MC-path test |
+| **A2a** `_inverse_cdf` triangular branch neutered | RED | **the median test** and the designed-null |
+| A2b `sample_parameters` triangular branch (run 1's real A2) | RED | the MC-path test |
+| A3 "uniform" mapped log-scale | RED | the offered-pair agreement test |
+| A4 `ethanol_tolerance` low edge 120 → 110 | RED | the 0.5 % margin guard |
+| **A5, designed GREEN** — `k_h2s` band edge, a band this scenario genuinely **draws** | GREEN | none |
+
+A5 was also strengthened: run 1's control renamed `E_a_autolysis`, which could have been
+green merely because nothing in the 24-Brix path reads it. Moving a *drawn* band's edge
+changes the ensemble for real and still leaves all eight tests green.
+
+**Two of the eight tests are killed by no arm, and that is stated rather than discovered
+later.** `test_triangular_mean_is_displaced_by_the_band_width` is arithmetic over the file's
+own constants, so only the non-vacuity pin covers it; and
+`test_but_they_do_not_de_sensitise_against_a_log_scale_shape` has a subject the module does
+not implement, so there is nothing in `src` to mutate.
 
 The restore check **fired for real** on the first run: `Path.write_text` translated the
 repo's LF endings to CRLF, so a byte-exact restore silently failed while the *content* was

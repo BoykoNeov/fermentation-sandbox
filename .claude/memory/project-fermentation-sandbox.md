@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-09T12:33:20.345Z
+  modified: 2026-08-09T12:41:16.757Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -96,7 +96,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   **no VALIDATED band live**; worst `k_d2_ethanol_tolerance_death` **r=300, median 9.18×**; **84** log-symmetric,
   **27** say "order of magnitude" **in prose no code reads**. **Corrects D-24**: outer percentiles de-sensitise
   across the **two linear shapes offered** (1.30×), **not** log-scale (**3.71×**) — pinned
-  `tests/test_band_shape_sampling.py` (8), 5-of-5 arms. **`reads` reach is an UPPER BOUND**: `k_d2` **bitwise
+  `tests/test_band_shape_sampling.py` (8), **6 arms killing 6 of 8**. **`reads` reach is an UPPER BOUND**: `k_d2` **bitwise
   inert** at 24 Brix, **margin to `ethanol_tolerance`'s band LOW = 0.5%**, now a test. **Attribution NOT monotone
   in `r`**; direction does **not** transfer. Log-tri measured/flagged/**NOT shipped** — median=nominal is an
   **identity** [[feedback-pair-the-arm-with-its-baseline]].
