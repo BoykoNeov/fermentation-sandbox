@@ -30,7 +30,12 @@ import sys
 # (D-137..D-142) carries an unusual density of live PROHIBITIONS -- the cap was forcing
 # real guardrails to be evicted to make room for newer ones, which is the opposite of
 # what it exists to prevent. Still less than half the changelog regime.
-LINE_CAP = 250
+# Raised 250 -> 300 on 2026-08-09 at the owner's request, for the same failure mode,
+# now observed directly: landing D-166 cost three live prohibitions to distillation
+# (the `reads`-reach UPPER BOUND, D-161's seed triple, D-162's like-for-like figure),
+# and only the first two were caught by reading the diff back. When the cap starts
+# deleting guardrails to make room for guardrails, the cap is the defect.
+LINE_CAP = 300
 TARGET_NAME = "project-fermentation-sandbox.md"
 
 

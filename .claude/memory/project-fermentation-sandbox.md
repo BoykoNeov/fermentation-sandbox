@@ -12,7 +12,9 @@ metadata:
 
 **Session-boot context: PROHIBITIONS and POINTERS only** — not a changelog. Every bullet is *what it forbids* +
 the D-record to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue past
-it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedback-batch-end-ritual]]).
+it from this file.** **Cap 300** (`.claude/hooks/check_memory_size.py`; [[feedback-batch-end-ritual]]) — raised from
+250 on 2026-08-09 because landing D-166 evicted three live prohibitions to fit; **a cap that deletes guardrails to
+make room for guardrails is the defect**. Distil real slack, never evict a prohibition to buy a line.
 
 ## Where the records are
 - `docs/DECISIONS.md` — canonical archive, **~20.5k lines: never read it linearly.** Generated top block gives a
