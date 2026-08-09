@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 1289a7da-873a-4fc1-882a-f8c7f961f6e7
-  modified: 2026-07-28T17:37:28.816Z
+  modified: 2026-08-09T11:30:48.069Z
 ---
 
 **Between mutation arms, verify the file actually got restored — and include at least one arm whose
@@ -29,3 +29,13 @@ value back — and run the untouched baseline as its own arm at both ends. Desig
 green: for a guard that pins a derivation, the green arm is a *consistent* re-sourcing (move the source
 number and the shipped number together), which is also the arm that proves the guard pins the
 derivation rather than the literals. See [[feedback-mutate-the-premise-before-building-the-guard]].
+
+**Generalises past mutation matrices to any scored harness (D-164).** The first run of a
+*pre-registered repro* reported 9 of 9 arms raising, with two predictions marked AS PREDICTED — and
+every arm had raised for one unrelated reason (the scenario carried no `temperature_schedule`, so
+nothing ever reached the code under test). Two predictions confirmed themselves against a harness that
+never ran the experiment. The three designed-GREEN control arms are the only thing that showed it.
+So: **any arm whose expected verdict matches the harness's failure mode is unscored until a control
+proves the harness works** — for exception-counting harnesses the failure mode is "raises", so the
+control must be an arm that must NOT raise. Write the controls into the harness from the first run,
+not after a suspicious result. See [[feedback-compute-the-clean-fix-before-adopting-it]].

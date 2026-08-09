@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-07-29T06:20:13.462Z
+  modified: 2026-08-09T11:29:58.519Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -15,7 +15,6 @@ the D-record to read for *why*. If a prohibition looks unconvincing, **go read i
 it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedback-batch-end-ritual]]).
 
 ## Where the records are
-
 - `docs/DECISIONS.md` — canonical archive, **~18.5k lines: never read it linearly.** Generated top block gives a
   subsystem cut, ordered list, and **correction map (⚠)**. **The ⚠ lives only in the index** — check a record's
   index row before trusting it. Append per `CLAUDE.md`'s `Corrects:`/`Flags:`, then `tools/gen_decisions_toc.py`
@@ -23,13 +22,12 @@ it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedba
 - `docs/ARCHITECTURE.md` (seams); `docs/plans/milestone-*.md` ("Active beat: sensory" header is **STALE**, closed
   at D-95/D-98); `CLAUDE.md` (prime directives + archive conventions).
 
-## Status (2026-07-29)
-
+## Status (2026-08-09)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-163**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1465 passed**. Wine schema **94 slots** / beer **47** —
-`quinone` in both regardless of set. **Three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most
-remaining Milestone-3 work is **blocked on external sourcing**, not on building.
+**D-164**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1479 passed**. Wine **94 slots** / beer **47**, `quinone`
+in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
+Milestone-3 work is **blocked on external sourcing**, not on building.
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -83,15 +81,21 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   horizontal-only ⇒ like-for-like **4.7%**). Declaration-level ONLY, re-measured at HEAD: one `scenario.closure`
   → the **`closure_otr` STATE slot** (`compile.py:2254`); forcing all 5 moves **0 of 94** vs **54** (`mu_max`). **12** assertions undecided [[feedback-count-and-print-your-skips]] — **the list was never persisted**.
 - **Band EDGES measured ARCHIVE-WIDE (D-163), 73 arms — do NOT re-run the sweep.** Of **678** live edges (339
-  varying bands) only **19 are guarded**; **652** move both directions suite-green; **14 of 18 files wholly
-  unguarded**. **Scale-only** operator: provably **cannot** fire `psychophysics`'s disjointness (24 bands — needs
-  a **translation** operator), and **6 half-edges are immovable** = exactly D-153 Leg 4's six. **CLASS (d), the
-  real finding: `compile.py`'s override seam mints a `Parameter` carrying the base's band, so `_value_in_range`
-  gates `carrying_capacity_gpl`/`autolysis_rate_per_h` by an *epistemic* band** — 5 shrink REDs that are **NOT**
-  guards. **Flags D-162.** Buildable = the **55 externally-sourced** unguarded bands (`acidbase`'s 13 pKa first).
-- **The prose flag is REFUSED, measured not asserted** — 44 of 51 hits matched `ceiling` alone (oak's
-  *extraction asymptote*). **Never re-run or "tighten" the regex** (the archive uses those words for HEALTHY
-  provenance too); only a **measured per-parameter bound** finds it.
+  varying bands) only **19 guarded** (→**23**, D-164); **652** move both directions suite-green; **14 of 18 files
+  wholly unguarded**. **Scale-only** operator provably **cannot** fire `psychophysics`'s disjointness (24 bands —
+  needs a **translation** operator); **6 half-edges immovable** = D-153 Leg 4's six. **Flags D-162.** Buildable =
+  the **55 externally-sourced** unguarded bands (`acidbase`'s 13 pKa first). **The prose flag is REFUSED,
+  measured not asserted** — 44 of 51 hits matched `ceiling` alone (oak's *extraction asymptote*); **never re-run
+  or "tighten" the regex** (the archive uses those words for HEALTHY provenance too); only a **measured
+  per-parameter bound** finds it.
+- **CLASS (d) CLOSED at the seam (D-164) — do NOT recentre the band.** The override mints a `Parameter` carrying
+  the base's band ⇒ `_value_in_range` gated `carrying_capacity_gpl`/`autolysis_rate_per_h` by an *epistemic* band,
+  naming the **parameter** not the **knob**; now stated (`_override_in_band`, **no new constants**) + pinned
+  (`test_scenario_override_bounds.py`, 14). **Multiplicative recentre BUILT, MEASURED, REJECTED** — `k_autolysis`
+  log-symmetric ⇒ **3.71×** the request vs shipped **0.67×**: structurally clean, arithmetically wrong. **The
+  ensemble/nominal gap is NOT an override defect** — cap non-biting **76.8%** with **NO** override vs 68.6% with
+  ⇒ **wide-band** artefact, OPEN and bigger than class (d). Range **still** = the band (**Flags**). `test_autolysis`
+  sits on the **exact** 1e-2 high edge ⇒ narrowing it breaks a scenario test for non-autolysis reasons.
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
@@ -195,13 +199,12 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **Sotolon's OAV is NOT enantiomer-split** — `threshold_sotolon_wine` is the **racemate's**, pool racemic; D-107's "soft by ~100×" is **withdrawn**.
 - **Do not "finish" the `oav`→`magnitude` rename.** Scoped to `DescriptorReading.oav` alone —
   `OAVReading.oav`/`oav_series`/`oav_tier` are genuine OAVs and a test fails if swept. **`TOPIC_RULES`
-  (`tools/gen_decisions_toc.py`) is where a new record's bucket is fixed — edit the rules, not the heading.**
-  Has `methion`/`sotolon`/`assertion`; a `magnitude` rule **misfiles D-53** and `surface` **misfiles D-128**.
+  (`tools/gen_decisions_toc.py`) fixes a new record's bucket — edit the rules, not the heading.** Has
+  `methion`/`sotolon`/`assertion`; a `magnitude` rule **misfiles D-53** and `surface` **misfiles D-128**.
 
 **Sulfides (D-135) + closures (D-136)**
 - Do NOT rebuild bottle reduction as thioacetate/disulfide precursors — D-101's mechanism guess was WRONG.
-  **Release only** (white MeSH ~4× under-predicted: a limitation, not a bug); **no copper coupling** (a future
-  one must be asymmetric); **temperature-FLAT** — never ship my ~158 kJ/mol.
+  **Release only** (white MeSH ~4× under-predicted: a limitation, not a bug); **no copper coupling** (a future one must be asymmetric); **temperature-FLAT** — never ship my ~158 kJ/mol.
 - **Technical cork ships BELOW screwcap** (nominals only — D-162); µL→µg is the authors' own **1.43** (STP); seven
   "do not fix" traps in D-136. `ClosureOxygenIngress.reads` is **`()` by design**, pinned. **Its 10 band edges are
   the archive's ONLY two-sided provenance pins besides `ethyl_acetate_eq`** (D-162/D-163)
@@ -227,24 +230,21 @@ Realised Phe share under-shoots (guard-safe); static share ignores feedback inhi
 uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession. **"Bound SO₂ under-modelled" is NOT one — D-143.** (pKa sampling gap: was a live defect, fixed D-160, restated D-161.)
 
 ## Open asks / external
-
 - **Ask Querol** (`aquerol@iata.csic.es`) for raw SI: Phe dose vs total 2-PE. ¹³C Ile rides along.
 - **Single-host obligation OPEN** — Minebois rests on one PMC deposit, two live parameters on one figure
   [[feedback-paywalled-is-one-host]]. **PMC + EuropePMC are ONE deposit, not two sources** (D-152 amd 1).
-- **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ
-  [E] + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
+- **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
+  + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..3}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
-  (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\`, `d163-band-edges\` (the 73-arm
-  mutation harness, reusable); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds** (D-150).
+  `d15{7,8,9}-*\`, `d16{0..4}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\`, `d163-band-edges\` (73-arm
+  mutation harness, reusable), `d164-override-gate\`; `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
-
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B); peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose;
 acetaldehyde in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic
 inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142). **`add_copper` never writes the `copper` slot** — needs a residual-Cu fraction. D-143/4 ← D-145.
 
 ## Standing rule
-**Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only
-UNBLOCKED options (D-66, [[feedback-discuss-disagreements]]).
+**Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only UNBLOCKED options (D-66, [[feedback-discuss-disagreements]]).
