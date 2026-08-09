@@ -297,9 +297,10 @@ in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/
 - **NEVER raise the total cap again without first showing the per-block cap did not bite (D-169).** It was a
   **TARGET, not a limit**: the file sat at **exactly 250 for 13 consecutive commits / 12 days**, then took **47 of
   the next 50 lines the day it moved to 300** — the fill rate followed the cap, so all four raises were futile.
-  Total is now a **BACKSTOP**; **shape** binds. A **digit-density check was REJECTED on measurement** — confounded
-  by block size (21-line narrative ~10 digits/line vs a 3-line prohibition's ~20), and it penalises hardest the
-  guardrails that are **nothing but corrected values**. **`CLAUDE.md` is the third boot surface and is UNMEASURED** —
-  capping one file already displaced a 950-char status paragraph into `MEMORY.md`'s row; expect the next one there.
+  Total is now a **BACKSTOP**; **shape** binds. **When it binds, the licensed move is ⚠-COLLAPSE RETIREMENT** —
+  a record superseded per the correction map drops to a pointer — **never a raise, never eviction**. A
+  **digit-density check was REJECTED on measurement** (confounded by block size; it penalises hardest the
+  guardrails that are nothing but corrected values). **`CLAUDE.md` is a boot surface and is UNMEASURED**, and
+  `MEMORY.md` is capped **per row, not in total** — row COUNT is the open channel; expect displacement there.
 
 **Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only UNBLOCKED options (D-66, [[feedback-discuss-disagreements]]).

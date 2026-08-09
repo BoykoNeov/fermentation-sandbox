@@ -20987,10 +20987,15 @@ displacement go unseen.
 
 ### 6. The residue: `CLAUDE.md` is the third boot surface and is still unmeasured
 
-Two of three session-boot surfaces are now measured. `CLAUDE.md` loads every session, is
-uncapped, and is where a displaced prohibition can go next — the same arbitrage one level out,
-now demonstrated rather than hypothesised. **No check ships for it** (out of scope), but the
-next raise request should have it in view.
+`CLAUDE.md` loads every session, is uncapped, and is where a displaced prohibition can go next
+— the same arbitrage one level out, now demonstrated rather than hypothesised. **No check
+ships for it** (out of scope), but the next raise request should have it in view.
+
+And `MEMORY.md` is measured **per row, not in total**, so "two of three surfaces are covered"
+would overstate it: row **count** is the untouched channel — a row that cannot grow long can
+still be joined by more rows, and this record added one. **36** rows at a **211**-char median
+is already boot weight comparable to the project file's. That is the *healthy* kind of
+accumulation, one memory per lesson, so no cap is proposed — but the surface is not closed.
 
 ### 7. Tests pin the hook's LOGIC, never the live files' compliance
 
