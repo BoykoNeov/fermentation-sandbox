@@ -20,7 +20,16 @@ What these tests forbid, in order:
    edges move in both directions with the full suite green; these four are guarded because
    they are load-bearing for a live gate, not merely descriptive.
 4. A narrowed band that silently invalidates a shipped scenario. ``test_autolysis`` runs at
-   EXACTLY the 1e-2 high edge, so the closed interval is itself the contract.
+   EXACTLY the 1e-2 high edge — four call sites (:192, :254, :269, :290) — so the closed
+   interval is itself the contract. (``test_aging_scenario``'s ``_SUR_LIE_RATE`` is 1e-3,
+   well inside; only ``test_autolysis`` sits on the edge.)
+
+Load-bearing dependency, stated because it is otherwise invisible: every test below except
+``test_shipped_band_edges_are_what_the_gate_is_built_on`` derives its probe values FROM
+``_BANDS``. Widen a YAML band and update ``_BANDS`` to match, and all of them silently
+follow and pin nothing new. **The equality test is what makes the rest non-vacuous** — it is
+the only assertion here that compares a transcribed constant against the shipped file. Same
+self-sealing shape D-108/D-109 got bitten by: a check derived from its own subject.
 """
 
 from __future__ import annotations

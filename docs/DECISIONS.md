@@ -19784,6 +19784,13 @@ Recentring does not fix "the ensemble ignores the override" — on a log-wide ba
 amplifies it. **Rejected on measurement, not on taste.** This is the most transferable thing
 in the record: the structurally-clean fix was the wrong one, and only the arithmetic said so.
 
+**Do not apply §3's own correction to this table.** §3 establishes that `mean/nominal` is a
+wide-band property and therefore says nothing about an override *in isolation*. The table
+above is not that comparison: it puts **two candidate override behaviours against each other
+at the same band width and the same request**, so the wide-band confound is common to both
+columns and cancels. The statistic is unusable as an absolute and valid as a contrast — which
+is exactly why the rejection survives §3.
+
 ### 5. Mutation arms — 8 of 8 as predicted, restore hash-verified between every arm
 
 SHRINK and WIDEN on each of the two bands: 4 RED. Removing either gate call: RED. Dropping
@@ -19794,6 +19801,14 @@ YAML edit breaks it".
 
 Both *widen* arms go RED. That is the direction D-163 measured as unguarded across 652 of
 678 archive edges. Four edges move from unguarded to guarded: **19 → 23** archive-wide.
+
+Two precisions on the edge-sitting claim, checked rather than carried from D-163: the four
+call sites are `tests/test_autolysis.py` :192, :254, :269, :290, and they are the **only**
+ones on an edge — `test_aging_scenario`'s `_SUR_LIE_RATE` is `1.0e-3`, well inside. And the
+new test file's own dependency is now stated in its docstring: every test in it except the
+band-equality one derives its probes **from** the `_BANDS` dict it declares, so that one
+equality assertion is what keeps the other five non-vacuous. A check derived from its own
+subject is the D-108/D-109 shape.
 
 Full suite `uv run pytest -n auto`: **1479 passed**. `ruff` clean. `mypy` clean.
 
