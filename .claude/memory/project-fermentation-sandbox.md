@@ -12,9 +12,9 @@ metadata:
 
 **Session-boot context: PROHIBITIONS and POINTERS only** — not a changelog. Every bullet is *what it forbids* +
 the D-record to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue past
-it from this file.** **Cap 300** (`.claude/hooks/check_memory_size.py`; [[feedback-batch-end-ritual]]) — raised from
-250 on 2026-08-09 because landing D-166 evicted three live prohibitions to fit; **a cap that deletes guardrails to
-make room for guardrails is the defect**. Distil real slack, never evict a prohibition to buy a line.
+it from this file.** **Caps: 8 lines per BLOCK, 320 chars per `MEMORY.md` index row, 300 lines total as a
+BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ritual]]). Distil the NEW block;
+**never evict an old prohibition to buy a line** — the per-block cap exists so eviction cannot satisfy it.
 
 ## Where the records are
 - `docs/DECISIONS.md` — canonical archive, **~20.5k lines: never read it linearly.** Generated top block gives a
@@ -294,4 +294,12 @@ yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-5
 in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142); **`add_copper` never writes the `copper` slot** (needs a residual-Cu fraction); D-143/4 ← D-145.
 
 ## Standing rule
+- **NEVER raise the total cap again without first showing the per-block cap did not bite (D-169).** It was a
+  **TARGET, not a limit**: the file sat at **exactly 250 for 13 consecutive commits / 12 days**, then took **47 of
+  the next 50 lines the day it moved to 300** — the fill rate followed the cap, so all four raises were futile.
+  Total is now a **BACKSTOP**; **shape** binds. A **digit-density check was REJECTED on measurement** — confounded
+  by block size (21-line narrative ~10 digits/line vs a 3-line prohibition's ~20), and it penalises hardest the
+  guardrails that are **nothing but corrected values**. **`CLAUDE.md` is the third boot surface and is UNMEASURED** —
+  capping one file already displaced a 950-char status paragraph into `MEMORY.md`'s row; expect the next one there.
+
 **Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only UNBLOCKED options (D-66, [[feedback-discuss-disagreements]]).
