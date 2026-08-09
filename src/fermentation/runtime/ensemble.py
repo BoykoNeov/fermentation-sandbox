@@ -39,7 +39,21 @@ floats).
   sourced, benchmarked most-likely estimate. ``uniform`` is available for a caller
   who wants to discard the point estimate. The reported band uses outer percentiles
   (P5/P95 by default), which keeps the full bracket visible and de-sensitises the
-  result to the shape choice.
+  result to the shape choice **across the two shapes offered here, both of which are
+  linear in the parameter** — at a decade-wide band the triangular and uniform P5/P95
+  agree to within 1.30× (decision D-165). It does **not** de-sensitise the result to a
+  *log-scale* shape, and that is the gap that matters: 123 of the archive's 337 live
+  bands span ``hi/lo >= 10`` and 84 of those put the nominal at the **geometric** centre,
+  so a linear triangular over them puts the sampled median as much as 9.18× the stated
+  nominal (worst: ``k_d2_ethanol_tolerance_death``, ``hi/lo = 300``). On the reference
+  decade band the log-triangular P5 is 3.71× away from the triangular P5 — far outside
+  the 1.30× the offered pair agree to. A log-scale shape is **not** offered, because
+  which bands were stated multiplicatively is not something the schema records: an
+  :class:`Uncertainty` carries endpoints only, so the sampler must assume linear for
+  every band (27 of the 123 say "order of magnitude"/"factor of" in their *prose*
+  provenance, which no code reads). Making that choice per-parameter needs a
+  provenance-bearing shape field — agreed as the right end state, deliberately not
+  shipped (D-165 §6), the same call D-164 §6 made on the admissible-range field.
 * By default only the parameters the **active** Process set ``reads`` are sampled
   (the rest are no-ops on the trajectory), so the spread means "sensitivity of *this*
   scenario". ``only`` overrides that set; ``exclude`` removes names from it.

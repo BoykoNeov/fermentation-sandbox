@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-09T11:29:58.519Z
+  modified: 2026-08-09T12:33:20.345Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -24,8 +24,8 @@ it from this file.** **Cap 250** (`.claude/hooks/check_memory_size.py`; [[feedba
 
 ## Status (2026-08-09)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-164**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1479 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-165**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1487 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -47,55 +47,59 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **THE RECURRING SHAPE, 4 instances (D-118, D-154, D-155, D-157): a constraint verified at a POINT
   where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
   quantity is itself sampled — and take the **joint** worst case over every band involved.
-- **FOUR surfaces (D-157), TWO distributions.** compile-seam **247 DISTINCT** varying, **triangular** — **NOT
-  279** (a per-*file* sum double-counting shared `wine_generic` names; wine 247 / beer 181 are right).
-  **Structural = 61, NOT D-157's 66 (D-159)** — 5 (`E_a_pof`, `k_pof_decarb{,_ferulic}`,
-  `biomass_carrying_capacity`, `k_iso_alpha_loss`) are merely **scenario-inert**. Predicate = **declared
-  `reads`**, not a census. **FOUR** modes: Process-read DRAWN; **compile-consumed** (`_closure_otr`,
-  `_iso_alpha_at_pitch`, `*_initial`), **verb-consumed** (`_verb_add_copper/_oak`),
-  **declared-by-UNREGISTERED-class** (`ethanol_inhibition_exponent`) **NEVER**. **19 of the 33 names in BOTH
-  medium files carry DIFFERENT bands, some disjoint** (`E_a_esters` wine 40–70k vs beer 120–265k).
-  `psychophysics.yaml` **24, UNIFORM** (`compression.py::_axis_draws` — deliberate, never "fix" to triangular);
-  `sensory.yaml` **36, NEVER sampled** — **do not re-audit those 36**. **Never apply the triangular mass
-  statistic to psychophysics** (16 points off, anti-conservative). **PINNED (D-156,
-  `tests/test_sampling_surfaces.py`) — do not re-audit, do not "simplify".** Its `SHARED_FILES` is restated **on
-  purpose** (deriving it = D-108/D-109 vacuity, which made D-159's census version vacuous). **TWO triangular
-  defaults** — `ensemble.py:108` and `:444`. **A distribution test at `x == mode` is vacuous** — sample
-  **off-mode**. **Removal** is not *separately* pinned (all 14 drops already RED by consumption).
+- **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not
+  re-audit, do not "simplify".** compile-seam **247 DISTINCT** varying, **triangular** — **NOT 279** (a per-*file*
+  sum double-counting shared names; wine 247 / beer 181). **Structural = 61, NOT D-157's 66 (D-159)** — 5 are
+  merely **scenario-inert**. Predicate = **declared `reads`**. **FOUR** modes: Process-read DRAWN;
+  compile-consumed, verb-consumed, and **declared-by-UNREGISTERED-class** (`ethanol_inhibition_exponent`)
+  **NEVER**. **19 of the 33 names in BOTH medium files carry DIFFERENT bands, some disjoint** (`E_a_esters` wine
+  40–70k vs beer 120–265k). `psychophysics.yaml` **24, UNIFORM** (deliberate, never "fix" to triangular);
+  `sensory.yaml` **36, NEVER sampled** — **do not re-audit those 36**; **never apply the triangular mass statistic
+  to psychophysics** (16 points off, anti-conservative). `SHARED_FILES` is restated **on purpose** (deriving it =
+  D-108/D-109 vacuity). **TWO triangular defaults** — `ensemble.py:108` and `:444`. **A distribution test at
+  `x == mode` is vacuous** — sample **off-mode**. **Removal** is not *separately* pinned (all 14 drops RED).
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
   **INTERNALLY, no fetch**: ask which number is *sourced* — 84 = Shinohara's 16.4% E-rate; **30–80 occurred ONCE,
   in the test comment asserting it**. Corrects **D-127**. Test **recomputes** all three (`abs=5e-4`; never
   `rel`/`round(x,3)` — pins *formatting*). Band = E-rate spread at **FIXED acetic 0.35**, a documented narrowing.
 - **`reads` has TWO masters — tier propagation AND sampler scope (D-160, fixes D-159's defect).**
-  `PH_SYSTEM_READS`/`SO2_BINDING_READS` (`acidbase.py`) → 19 members/5 modules. **Keep DISJOINT** (pinned:
-  `EsterHydrolysis`/`EthylAcetateEsterification` solve pH, never partition SO₂) and **derived**, never re-listed.
-  **`temperature_ramp_rate` stays undeclared BY DESIGN** (`temperature.py:32-37`); no tier moved. **RESTATEMENT
-  DONE (D-161) — never re-run it.** Affected class = **ONE** row, a 9-name `only=` **ISOLATION** not a band; its
-  "13.99/16.69/20.09 across seeds 0/1/2" is **SORTED** [[feedback-a-majority-is-not-a-direction]]. Through the
-  shipped sampler the fix is **undetectable**; predicted **widening NOT observed** (10/24, p=0.54); **one**
-  (`isoamyl_acetate`) of 24 survives. D-159 pins consumption (`test_drawability_surface.py`).
-- **Closure ordering SCOPED (D-162) — do not "fix", narrow or re-measure it.** It is **three** claims: P1's
+  `PH_SYSTEM_READS`/`SO2_BINDING_READS` (`acidbase.py`) → 19 members/5 modules. **Keep DISJOINT** (pinned) and
+  **derived**, never re-listed. **`temperature_ramp_rate` stays undeclared BY DESIGN**; no tier moved.
+  **RESTATEMENT DONE (D-161) — never re-run it.** Affected class = **ONE** row, a 9-name `only=` **ISOLATION**
+  not a band; its "13.99/16.69/20.09 across seeds 0/1/2" is **SORTED**
+  [[feedback-a-majority-is-not-a-direction]]. Through the shipped sampler the fix is **undetectable**; predicted
+  **widening NOT observed** (10/24, p=0.54). D-159 pins consumption (`test_drawability_surface.py`).
+- **Closure ordering SCOPED (D-162) — do not "fix", narrow or re-measure it.** **Three** claims: P1's
   **three-tier** grouping is its conclusion verbatim (breach **2.4%**); `technical<screwcap` (**40.7%**) and
   `nomacorc<supremecorq` (**0.0%**) are Table-I **nominals**, not that sentence. 94% of the 41.9% chain breach is
-  that one pair, and **~9/10 of THAT is band SCOPE** (technical's high edge = P1's *vertical* 0.9, screwcap
-  horizontal-only ⇒ like-for-like **4.7%**). Declaration-level ONLY, re-measured at HEAD: one `scenario.closure`
-  → the **`closure_otr` STATE slot** (`compile.py:2254`); forcing all 5 moves **0 of 94** vs **54** (`mu_max`). **12** assertions undecided [[feedback-count-and-print-your-skips]] — **the list was never persisted**.
+  that one pair, **~9/10 of THAT band SCOPE** (like-for-like **4.7%**). Declaration-level ONLY: one
+  `scenario.closure` → the **`closure_otr` STATE slot**; forcing all 5 moves **0 of 94** vs **54** (`mu_max`).
+  **12** assertions undecided [[feedback-count-and-print-your-skips]] — **the list was never persisted**.
 - **Band EDGES measured ARCHIVE-WIDE (D-163), 73 arms — do NOT re-run the sweep.** Of **678** live edges (339
   varying bands) only **19 guarded** (→**23**, D-164); **652** move both directions suite-green; **14 of 18 files
-  wholly unguarded**. **Scale-only** operator provably **cannot** fire `psychophysics`'s disjointness (24 bands —
-  needs a **translation** operator); **6 half-edges immovable** = D-153 Leg 4's six. **Flags D-162.** Buildable =
-  the **55 externally-sourced** unguarded bands (`acidbase`'s 13 pKa first). **The prose flag is REFUSED,
-  measured not asserted** — 44 of 51 hits matched `ceiling` alone (oak's *extraction asymptote*); **never re-run
-  or "tighten" the regex** (the archive uses those words for HEALTHY provenance too); only a **measured
-  per-parameter bound** finds it.
+  wholly unguarded**. **Scale-only** operator provably **cannot** fire `psychophysics`'s disjointness (needs a
+  **translation** operator); **6 half-edges immovable** = D-153 Leg 4's six. **Flags D-162.** Buildable = the
+  **55 externally-sourced** unguarded bands (`acidbase`'s 13 pKa first). **The prose flag is REFUSED, measured
+  not asserted** — 44 of 51 hits matched `ceiling` alone (oak's *extraction asymptote*); **never re-run or
+  "tighten" the regex**; only a **measured per-parameter bound** finds it.
 - **CLASS (d) CLOSED at the seam (D-164) — do NOT recentre the band.** The override mints a `Parameter` carrying
   the base's band ⇒ `_value_in_range` gated `carrying_capacity_gpl`/`autolysis_rate_per_h` by an *epistemic* band,
   naming the **parameter** not the **knob**; now stated (`_override_in_band`, **no new constants**) + pinned
   (`test_scenario_override_bounds.py`, 14). **Multiplicative recentre BUILT, MEASURED, REJECTED** — `k_autolysis`
   log-symmetric ⇒ **3.71×** the request vs shipped **0.67×**: structurally clean, arithmetically wrong. **The
   ensemble/nominal gap is NOT an override defect** — cap non-biting **76.8%** with **NO** override vs 68.6% with
-  ⇒ **wide-band** artefact, OPEN and bigger than class (d). Range **still** = the band (**Flags**). `test_autolysis`
+  ⇒ **wide-band** artefact. Range **still** = the band (**Flags**). `test_autolysis`
   sits on the **exact** 1e-2 high edge ⇒ narrowing it breaks a scenario test for non-autolysis reasons.
+- **WIDE-BAND artefact SPLIT, Mechanism A CLOSED (D-165) — do NOT re-census bands, do NOT ship a shape field.**
+  **TWO** mechanisms: **A** log-width (`(lo+m+hi)/3m`), **B** threshold proximity — D-164's 76.8% is **B, not
+  width**; censusing together = the D-162 muddle. **A:** 351→**339 live**; `r≥10` **123 (36.5%)**, `lo≤0` **6**,
+  **no VALIDATED band live**; worst `k_d2_ethanol_tolerance_death` **r=300, median 9.18×**; **84** log-symmetric,
+  **27** say "order of magnitude" **in prose no code reads**. **Corrects D-24**: outer percentiles de-sensitise
+  across the **two linear shapes offered** (1.30×), **not** log-scale (**3.71×**) — pinned
+  `tests/test_band_shape_sampling.py` (8), 5-of-5 arms. **`reads` reach is an UPPER BOUND**: `k_d2` **bitwise
+  inert** at 24 Brix, **margin to `ethanol_tolerance`'s band LOW = 0.5%**, now a test. **Attribution NOT monotone
+  in `r`**; direction does **not** transfer. Log-tri measured/flagged/**NOT shipped** — median=nominal is an
+  **identity** [[feedback-pair-the-arm-with-its-baseline]].
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
@@ -117,26 +121,24 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   evidence FOR 600** (only 1 of 6 arms admits 600) — one-directional, against higher k only.
 - **BAND FIXED (D-154) — was the live defect; do not re-propose it.** High **1500 → 662.8** L/g: the bound at
   `copper_typical`'s **MAXIMUM**, not the shipped-centring 918, because `copper_typical` is **itself sampled**
-  and `k_bound` *decreases* in it — joint draws bind at its max. **Never take 918**: over 200k joint draws it
-  still violates **5.01%** of pairs (1500 violates **37.6%**, so D-152's 29% — at a *fixed* centring —
-  **understates** it). Verify sampling claims **on draws, not edges**. **Never adopt D-152's printed "663"** —
-  exact is 662.802522, so 663 ships red. Value/low edge/`copper_typical` **untouched**; Ferreira's 2.2× budget
-  is **no longer** the high-side constraint. Guard **recomputes** the bound + asserts monotonicity, never reads
-  the note [[feedback-rejected-values-must-be-unreachable]].
-- **No Fe(III) state** — not D-134's "iron in surplus": QSS rests on a **~18× separation**.
+  and `k_bound` *decreases* in it. **Never take 918**: over 200k joint draws it still violates **5.01%** of pairs
+  (1500 violates **37.6%**, so D-152's 29% **understates** it). Verify sampling claims **on draws, not edges**.
+  **Never adopt D-152's printed "663"** — exact is 662.802522, so 663 ships red. Value/low
+  edge/`copper_typical` **untouched**. Guard **recomputes** the bound + asserts monotonicity, never reads the
+  note [[feedback-rejected-values-must-be-unreachable]]. **No Fe(III) state** — not D-134's "iron in surplus": QSS rests on a **~18× separation**.
 - **A pH term on activation/`k_browning_eff` is REFUSED (D-150)** — never re-open on "Nguyen's table shows strong
   pH dependence". Strongest leg is **inseparability from copper**, corroborated by Carrasco-Quiroz's
   copper-**orthogonal** L16 (D-151) — never dismiss that as Nguyen's dosing. His is an *initial* statistic on a
-  *steady* node ⇒ **the pH term's home is the burst**. Guard 5's bound is an **OBSERVED spread, NOT a ceiling**.
-  Re-open needs a **within-wine** steady-OCR series, ≥3 levels, measuring Cu.
+  *steady* node ⇒ **the pH term's home is the burst**. Guard 5's bound is an **OBSERVED spread, NOT a ceiling**;
+  re-open needs a **within-wine** steady-OCR series, ≥3 levels, measuring Cu.
 - **`initial_ph` anchors t=0 only** — **no way to SET an aging pH**. First-order in `[o2]`; **no MM/`Km`**. **Do
   NOT re-attempt the Ferreira/Carrascón PLS extraction** — all three blocked (`_findings/D-134-*.md`).
 - **The O2 gate is Fe(II)+O2**; SO2 is right in *size*, **INVERTED in role** (enabler, not competitor) — which is
-  why **D-72's wrong mechanism yields a right-looking 1:2**; never read that ratio as confirmation.
-- **Never re-fix the acetaldehyde/phenolic inversion inside the parallel frame — it provably cancels.** Approve
-  the cascade on MECHANISM only; **never tune to phenol ⇒ more MeCHO.**
-- Danilewicz 2011 is **PARAPHRASE** — pull the abstract before it backs a `source:`; its in-wine branch is
-  **mixing-limited**, and its atmospheric pH-independence does **NOT** transfer to wine.
+  why **D-72's wrong mechanism yields a right-looking 1:2**; never read that ratio as confirmation. **Never
+  re-fix the acetaldehyde/phenolic inversion inside the parallel frame — it provably cancels**; approve the
+  cascade on MECHANISM only, **never tune to phenol ⇒ more MeCHO**. Danilewicz 2011 is **PARAPHRASE** — pull the
+  abstract before it backs a `source:`; in-wine **mixing-limited**, atmospheric pH-independence does **NOT**
+  transfer to wine.
 
 **Burst — WIRED and NON-DEFAULT (D-147). Not dead code, not unbuilt, not refused.**
 - `oxidative="direct_burst"` = direct **+** burst, a **superset**, not a mechanism. **No `cascade_burst`**
@@ -147,8 +149,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **Self-exhaustion is Ferreira's PROTOCOL, not the sink** (~1400× the cork flux) ⇒ a permanent **~37% tax that
   GROWS to a plateau**; two guards forbid calling it transient — **never relax to a "pool depletes" check**.
   **Seed follows the consumer**: **0.0** outside `direct_burst`; dosing `burst_antioxidant_gpl` with no consumer
-  **raises** (D-45's "absent ≠ 0" **inverts**). Ferreira's **2.7× does not discriminate** and is D-133
-  **paraphrase** — pull it before it backs a `source:`.
+  **raises** (D-45's "absent ≠ 0" **inverts**). Ferreira's **2.7× does not discriminate**, and is paraphrase.
 
 **Cascade — BUILT and NON-DEFAULT (D-141). Do not re-build; do not flip it silently.**
 - `core/kinetics/oxidative_cascade.py`, 8 Processes, `quinone` the one new slot, OFF the ledger (`h2o2` QSS is
@@ -158,25 +159,24 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   settling sources are **paywalled (nine hosts)**; abstract K values are **never a `source:` field**
   [[feedback-conceded-caveats-are-not-coverage]].
 - **Never re-derive `k_activation_floor` as a fit** — it **is** `k_ethanol_oxidation + k_browning_base` and does
-  **not** reproduce direct's TOTAL; the O2 budget agreeing is **supply limitation (D-136), NOT a rate-law
-  check**. Activation **reads the reductant pools** — never lump.
-- The 31 D-140 guards stand — **never re-derive their pins**; edit only the two seams. Beer's O2 is a **floor
-  `>=5 mg/L`**, never 5.71. Pin rtol **1e-4** [[feedback-pin-tolerance-vs-solver-tolerance]]; `quinone == 0.0` under direct is **exact**.
+  **not** reproduce direct's TOTAL; the O2 budget agreeing is **supply limitation (D-136), NOT a rate-law check**.
+  Activation **reads the reductant pools** — never lump. The 31 D-140 guards stand — **never re-derive their
+  pins**; edit only the two seams. Beer's O2 is a **floor `>=5 mg/L`**, never 5.71. Pin rtol **1e-4**
+  [[feedback-pin-tolerance-vs-solver-tolerance]]; `quinone == 0.0` under direct is **exact**.
 - **Benchmark EXISTS and is ACTIVE** (`tests/benchmarks/test_validation_danilewicz_so2_o2.py`, 15 tests, no
   xfail/skip — **not open work**). **Never pin 1.7** — one dataset's mode, above the other's whole range; assert
-  the limits 1/2 + bands. The falsifier is the **traverse** (D-141's "structurally cannot produce" was wrong).
+  the limits 1/2 + bands. The falsifier is the **traverse** (D-141's "structurally cannot produce" was wrong). Quinone branching **NOT settled**.
 - **Operating point is load-bearing — enforce the >10 free-SO₂ floor, never state it in prose.** It is
   `SIM_CURVATURE_FLOOR_MGL`, **NOT Miao's criterion — never re-encode his**; keep the value + excluded-wines
-  table, never restore the name. **Never report a single-dose verdict on this ratio** (direct unconditional,
-  cascade **straddles**). The **"4–7× quinone shortfall" + its `xfail` are WITHDRAWN**.
+  table. **Never report a single-dose verdict on this ratio** (direct unconditional, cascade **straddles**). The
+  **"4–7× quinone shortfall" + its `xfail` are WITHDRAWN**.
 - **"The sim under-binds SO₂" is WITHDRAWN (D-143) — never re-assert**; never compare an addition-method secant
   with an oxidation-path slope (concretely `oxidation_path_slope` vs `MIAO_BUFFERING_BAND`); **never re-run a
-  pool sweep**. Acetaldehyde 0.0000 mM at D-142's operating point is a **scenario artefact**, not a schema gap.
+  pool sweep**. Acetaldehyde 0.0000 mM at D-142's operating point is a **scenario artefact**, not a schema gap. **A green suite proves nothing about a quoted decimal — every assertion is a band.**
 - **The four D-142 artefacts are FIXED (D-144)** — Miao's **Table 4 intercepts ARE free SO₂ at O₂ exhaustion**:
   **read the intercept, never recompute from an assumed dose**. D-144's test **NAMES NO CAUSE — keep it that
   way**. Locus guard is **pure algebra** (a state route re-entangles `ph_of_state`); masses from `core.chemistry`
   (**M_SO2 = 64.058**); `_SO2_BINDERS` reads all **four**.
-- **A green suite proves nothing about a quoted decimal — every assertion is a band.** Quinone branching **NOT settled**.
 
 **Dosing schedule — REFUSED (D-145). Never re-propose must-dosing; benchmark unchanged.**
 - **D-143's "five for five" is three for five.** **Import statistics from the shipped benchmark module** —
@@ -189,14 +189,14 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **§2.4 CLOSED (D-148) — never re-open as "the Brett/quench over-draw": no quench draw exists.** Live pair was
   Brett/POF; **summing is NOT the mechanism**. **Never build the shared depletion gate** — `depletion_gate`'s 8
   sites buy per-draw first-orderness `_decarboxylation_branch` already has. Out-of-band numbers are **BDF step
-  artefacts**. Live but unreachable: an undershot pool **freezes negative**. Cross-domain trap: aging Process
-  **names** are enumerated by `tests/test_fusel_*.py`.
+  artefacts**; an undershot pool **freezes negative**. Aging Process **names** are enumerated by `test_fusel_*`.
 
 **Milestone-3 tail (D-146) — two REFUSED, one BLOCKED; do not re-open as unbuilt**
 - **Methionine sink + `methionol` is BLOCKED, not deferred.** Don't build it, don't pick a value:
   `f_non_ehrlich_methionine` is **ill-posed** (leaves its own `[0,1)` domain across one panel). The D-118 gate
-  **passes** ⇒ the block is on the parameter; Crépin/Rollero **structurally incapable**, not silent. Unlock: **¹³C-methionine tracer**.
-- **Sotolon's OAV is NOT enantiomer-split** — `threshold_sotolon_wine` is the **racemate's**, pool racemic; D-107's "soft by ~100×" is **withdrawn**.
+  **passes** ⇒ the block is on the parameter; Crépin/Rollero **structurally incapable**, not silent. Unlock:
+  **¹³C-methionine tracer**. **Sotolon's OAV is NOT enantiomer-split** — `threshold_sotolon_wine` is the
+  **racemate's**, pool racemic; D-107's "soft by ~100×" is **withdrawn**.
 - **Do not "finish" the `oav`→`magnitude` rename.** Scoped to `DescriptorReading.oav` alone —
   `OAVReading.oav`/`oav_series`/`oav_tier` are genuine OAVs and a test fails if swept. **`TOPIC_RULES`
   (`tools/gen_decisions_toc.py`) fixes a new record's bucket — edit the rules, not the heading.** Has
@@ -236,15 +236,15 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..4}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
-  (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d152-copper-bound\`, `d163-band-edges\` (73-arm
-  mutation harness, reusable), `d164-override-gate\`; `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
+  `d15{7,8,9}-*\`, `d16{0..5}-*\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\` + `d165-wide-band\` (reusable
+  mutation/census harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B); peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose;
 acetaldehyde in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic
-inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142). **`add_copper` never writes the `copper` slot** — needs a residual-Cu fraction. D-143/4 ← D-145.
+inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142); **`add_copper` never writes the `copper` slot** (needs a residual-Cu fraction); D-143/4 ← D-145.
 
 ## Standing rule
 **Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only UNBLOCKED options (D-66, [[feedback-discuss-disagreements]]).
