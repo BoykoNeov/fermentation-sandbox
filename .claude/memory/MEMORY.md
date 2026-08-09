@@ -26,6 +26,7 @@
 - [Pair the arm with its baseline](feedback-pair-the-arm-with-its-baseline.md) — `only=`/`exclude=` shift the RNG draw sequence, so an arm and its baseline are two different random ensembles; pair on a fixed LHS hypercube, and test inertness with `only=[name]`, never `exclude`
 - [Pin the band, not just the nominal](feedback-pin-the-band-not-the-nominal.md) — a pinned nominal leaves the band edges unguarded (swapping one passed 1460 tests); mark each edge PRINTED vs CONSTRUCTED, and never compare bands built to different scopes
 - [Pin tolerance vs solver tolerance](feedback-pin-tolerance-vs-solver-tolerance.md) — measure the noise floor; BDF runs at rtol=1e-6, and `approx` passes on EITHER bound
+- [Enumerate competitors before timing](feedback-enumerate-competitors-before-timing.md) — other agent sessions run 26-worker pytest on this box; the same suite measured 119 s and 363 s, so prefer counts over durations
 - [Transcribe tables, not prose](feedback-transcribe-tables-not-prose.md) — the table beat the prose twice (4 numbers, then a direction); a search summary once shipped a fabricated E_a
 - [Memory is one tracked copy](feedback-memory-is-one-tracked-copy.md) — the C: harness path is a junction into `.claude/memory`; never sync or mirror it, there is nothing to sync
 - [Best-practices reference](reference-claude-best-practices.md) — rosmur claudecode-best-practices URL to apply
