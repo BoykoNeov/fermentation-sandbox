@@ -26,8 +26,8 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
 
 ## Status (2026-08-09)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-168**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1498 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-169**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1517 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -50,15 +50,13 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
   quantity is itself sampled — and take the **joint** worst case over every band involved.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
-  do not "simplify".** compile-seam **247 DISTINCT** varying, **triangular** — **NOT 279** (a per-*file* sum
-  double-counting shared names; wine 247 / beer 181). **Structural = 61, NOT D-157's 66 (D-159)** — 5 are merely
-  **scenario-inert**. Predicate = **declared `reads`**. **FOUR** modes: Process-read DRAWN; compile-consumed,
-  verb-consumed, and **declared-by-UNREGISTERED-class** (`ethanol_inhibition_exponent`) **NEVER**. **19 of the 33
-  names in BOTH medium files carry DIFFERENT bands, some disjoint** (`E_a_esters` wine 40–70k vs beer 120–265k).
-  `psychophysics.yaml` **24, UNIFORM** (deliberate, never "fix" to triangular; **never apply the triangular mass
-  statistic to it** — 16 points off, anti-conservative); `sensory.yaml` **36, NEVER sampled — do not re-audit those
-  36**. `SHARED_FILES` restated **on purpose** (deriving it = D-108/D-109 vacuity). **TWO triangular defaults** —
-  `ensemble.py:108`/`:444`. **A distribution test at `x == mode` is vacuous** — sample **off-mode**. **Removal** is not *separately* pinned (all 14 drops RED).
+  do not "simplify".** Use these counts, they are the corrected ones: compile-seam **247 DISTINCT** varying —
+  **NOT 279** (a per-*file* sum double-counting shared names); **structural 61, NOT D-157's 66** (D-159, 5 merely
+  scenario-inert). Predicate = **declared `reads`**; **declared-by-UNREGISTERED-class is NEVER drawn**. **A shared
+  name can carry DIFFERENT, even disjoint, bands per medium** (19 of 33). `psychophysics.yaml` is **UNIFORM** —
+  never "fix" to triangular, and **never apply the triangular mass statistic to it** (anti-conservative);
+  `sensory.yaml`'s **36 are NEVER sampled — do not re-audit them**. `SHARED_FILES` restated **on purpose**
+  (deriving it = D-108/D-109 vacuity). **A distribution test at `x == mode` is vacuous** — sample **off-mode**.
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
   **INTERNALLY, no fetch**: which number is *sourced*? 84 = Shinohara's 16.4% E-rate; **30–80 occurred ONCE, in the
   test comment asserting it**. Corrects **D-127**. Test **recomputes** all three (`abs=5e-4`; never `rel`/`round(x,3)` — pins *formatting*). Band = E-rate spread at **FIXED acetic 0.35**, a documented narrowing.
@@ -97,59 +95,36 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   **two linear shapes offered** (1.30×), **not** log-scale (**3.71×**) — pinned `tests/test_band_shape_sampling.py`
   (8), **6 arms killing 6 of 8**. **Attribution NOT monotone in `r`**; direction does **not** transfer. Log-tri
   measured/flagged/**NOT shipped** — median=nominal is an **identity** [[feedback-pair-the-arm-with-its-baseline]].
-- **Mechanism B CLOSED — the switch-site census (D-166). Corrects D-165's "Next": B's surface is PARAMETERS, not
-  code sites** — a `params[`-operand grep returns **4** and misses `ethanol_tolerance` itself. Classify **bitwise**
-  (`np.array_equal`, fixed `t_eval`), never by epsilon; **populate the must** — run 1 integrated **water** (17
-  read-DEAD vs 7). Only **2 of 66** read params are switch-gated; the other 5 read-DEAD are **structural no-ops**
-  (36-Brix control). Window **[24.56, 28.45] °Brix**, reference **0.56 below** ⇒ **`reads` reach is an UPPER BOUND** (D-165: `k_d2` **bitwise inert** at 24 Brix) **and inertness is a MARGIN**, held
-  open by `Y_glycerol_sugar`/`Y_byproduct_sugar` — Gay-Lussac ceiling **125.4 > 120**, diversion OFF ⇒ **122.96,
-  inside the window** [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. **`ethanol_inhibition` is NOT in
-  wine's active set** (Luong wall superseded). **A nominal ON a band edge is inert by construction** — an edge
-  screen cannot classify it [[feedback-nominal-on-a-band-edge-is-not-inertness]]. **Beer is UNCENSUSABLE**
-  (`_ALLOWED_KEYS["beer"]`: no acid input, pH 7.0). Pinned `test_switch_site_census.py` (**11**), **6 arms / 9 of 11**.
-- **The "buildable 55" is RESCOPED and its first slice CLOSED (D-167). Corrects D-163's §7 headline** — its predicate
-  was `"author estimate" in provenance.source`, the **VALUE's** field, reported as a claim about **EDGES**
-  [[feedback-name-the-field-your-predicate-read]]. Of **110** edges: **4** are a parameter-specific published span
-  (`pKa_sulfurous_1`, `dms_potential_initial`), **14** a chemical-**CLASS** range (6 share one `[35k,75k]` band),
-  **15 DERIVED** (author arithmetic on a printed ± — the **strong** class, and the one a source-field predicate
-  **cannot** find; `bound_sulfides`'s 4 are the case), **4** adopted points, **73 NO account of the span**.
-  **`acidbase`'s 13 are the EMPTIEST slice, not the first** — 8 pKa bands with no account at all; **TERMINAL, CRC is a
-  reference book and [[feedback-paywalled-is-one-host]] does NOT transfer.** Screen was wrong twice, both caught by
-  hand: **kJ/mol-vs-J/mol took 14→42**, and a note quoting its own invented edge is **anti-evidence**
-  [[feedback-a-text-screen-has-units-and-self-reference]]. **44 of 339** bands cite a source while declaring the band
-  the author's (**11 say "AUTHOR-ESTIMATED"**); 44 is a **screen**, the 11 were read. `sensory`'s 7 here is
-  **provenance, not sampling** — no breach of "do not re-audit those 36". **NO GUARD SHIPS**; the residue is a
-  **missing band-provenance schema field**, D-164 §6's field from the other side — **do not design it in a record**.
-  **Flags 5 CONTRADICTED bands** (`E_a_esters`, thermal ×3, `E_a_oak_extraction` cite a range their edges fall outside).
+- **Mechanism B CLOSED — the switch-site census (D-166); B's surface is PARAMETERS, not code sites** (corrects
+  D-165's "Next" — a `params[`-operand grep misses `ethanol_tolerance` itself). Classify **bitwise**
+  (`np.array_equal`, fixed `t_eval`), **never by epsilon**, and **populate the must** first. Only **2 of 66** read
+  params are switch-gated ⇒ **`reads` reach is an UPPER BOUND**, **and inertness is a MARGIN** — held open here by
+  two byproduct-yield bands, and a **documented toggle** (Gay-Lussac diversion OFF) puts the reference must inside
+  the window with no Brix change [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. **A nominal ON a band
+  edge is inert by construction** [[feedback-nominal-on-a-band-edge-is-not-inertness]]. **`ethanol_inhibition` is
+  NOT in wine's active set.** **Beer is UNCENSUSABLE** (`_ALLOWED_KEYS["beer"]`: no acid input, pH 7.0).
+- **The "buildable 55" is RESCOPED and its first slice CLOSED (D-167) — corrects D-163's §7 headline**, whose
+  predicate tested the **VALUE's** `provenance.source` and was reported as a claim about **EDGES**
+  [[feedback-name-the-field-your-predicate-read]]. Of 110 edges only **4** are a parameter-specific published span
+  and **73 have NO account** of it; the **strong** class is **DERIVED** (author arithmetic on a printed ±) and **no
+  source-field predicate can find it**. **`acidbase`'s 13 are the EMPTIEST slice, not the first — TERMINAL**: CRC
+  is a reference book, so [[feedback-paywalled-is-one-host]] does **NOT** transfer. The screen was wrong twice,
+  both caught by hand [[feedback-a-text-screen-has-units-and-self-reference]]; `sensory`'s 7 is **provenance, not
+  sampling**. **NO GUARD SHIPS** — the residue is a **missing band-provenance schema field, not designable here.**
 - **Those 5 are CLOSED (D-168) — do NOT re-open them as "bands that contradict their sources".** Four carry a
-  **SECOND** account (a **Q10 at 20 °C**, determined by the band through the shipped `arrhenius_factor`) that
-  D-167 never read, and it **disagrees**: thermal "~100–150" vs Q10 "~3–4.5" → **[81.2, 111.1]**; oak "~10–25" vs
-  "~1.3–1.6" → **[19.4, 34.7]** — near-disjoint, so **"move it to its cited range" is ILL-POSED**
-  [[feedback-a-note-can-state-its-span-twice]]. Thermal's **[80k,130k] matches neither NOR their union** ⇒
-  **AUTHOR-CONSTRUCTED**, note-only; a 3rd claim ("Q10 ~3.5" = 92.6k) vs nominal **3.87**. **Beer's contradiction
-  DISSOLVES**: high 265k **IS** the printed top, low 120k is the model-internal stripping floor the note already
-  names — nominal sum **exactly 100,100** but **JOINT worst case 118,000 ⇒ margin +2,000**, not ~20,000; nominal
-  200k is itself **below** the cited 221–265k, deliberately. **Decider = the ORDERINGS at JOINT band edges** (the
-  D-118 shape): thermal +10,000 / **0.0000 %** (the positive control), beer +2,000 / 0.0000 %, **oak INVERTS**
-  −5,000 / **0.0354 %**. ⇒ **`E_a_oak_extraction` high 35k → 25k SHIPPED**, justified by the **citation** (band
-  now == "~10–25 kJ/mol"), the ordering repair a **consequence** [[feedback-name-guards-for-what-they-forbid]].
-  **CORRECTS NOTHING — a `Corrects: D-77` was drafted and WITHDRAWN**: D-77's sentence is nominal-scoped (value
-  20k, still well below 50k) and never states the *band*; no D-record ever stated it, which is §7's missing-field
-  finding as a **negative result**. **NEVER assign edges to accounts from proximity** — 80k↔81.18k, 35k↔34.73k is
-  invented provenance. **The 1498-green proves NOTHING** — D-163 Stage 3 already recorded `oak:E_a_oak_extraction`
-  shrink/widen GREEN; a 29 %-of-span move noticed by nothing is the *prediction*. But it is **NOT inconsequential**:
-  triangular mean **21,667 → 18,333 (−15.4 %)**, D-165's `(lo+m+hi)/3m` crossing **1.083 → 0.917** (above nominal to
-  below); `r` 3.5→2.5 so the `r≥10` 123 and the 339 are unaffected. **NO GUARD** (a Q10-span pin is a bijection
-  restatement). Wine `E_a_esters` **~15k was stale in 3 carriers** — ships **55,100 == `E_a_uptake`**, D-21's
-  condition for T-flat production. `TOPIC_RULES` gained `\baccount` (2 titles; `\bband` **rejected**, 19).
-- **The Q10 cross-check GENERALISES — D-168 §1b, the beat's largest leftover.** Archive-wide: **29** notes mention
-  Q10, **21 CHECKABLE** (`unit: J/mol` + varying band + a Q10 *range*; 8 are point claims), **6 AGREE / 15
-  DISAGREE** = **6 GROSS / 2 moderate / 7 rounding** — *stratify, a flat 15 misleads*. **The positive control is
-  ONE band reused six times, not six successes** (`aging`'s 5 + `E_a_ellagitannin_oxidation`, all `[30k,70k]` →
-  1.501-2.579 vs "~1.5-2.6", exact). **3 GROSS are outside D-167 §5** (`E_a_decarb` 1.609,
-  `E_a_ethyl_hexanoate_hydrolysis` 1.267, `E_a_ethyl_acetate_esterification` 0.870) — they fail on the **Q10 axis**
-  with a fine kJ/mol citation, invisible to any citation-shaped screen. **Run it on the PRE-edit tree**: my own
-  rewritten notes quote their retired claims and reformat past the regex, dropping 21→18
+  **SECOND** account (a **Q10 at 20 °C**) D-167 never read, near-disjoint from the first ⇒ **"move it to its cited
+  range" is ILL-POSED** [[feedback-a-note-can-state-its-span-twice]]; thermal's matches neither ⇒
+  **AUTHOR-CONSTRUCTED**. Decider = **the ORDERINGS at JOINT band edges** (D-118's shape) ⇒ **`E_a_oak_extraction`
+  high 35k → 25k SHIPPED** (justified by the **citation**, ordering repair a **consequence**
+  [[feedback-name-guards-for-what-they-forbid]]); wine `E_a_esters` ships **55,100 == `E_a_uptake`** (D-21). Beer's
+  **DISSOLVES**, leaving the axis's **tightest joint margin, +2,000 J/mol**. **NEVER assign edges to accounts from
+  proximity**, and **do not re-draft the WITHDRAWN `Corrects: D-77`** (nominal-scoped, never states the band).
+- **The Q10 cross-check GENERALISES — D-168 §1b, the beat's largest OPEN leftover.** Of **21 checkable** notes,
+  **15 DISAGREE** with their own band — but **stratify: 6 GROSS / 2 moderate / 7 rounding**, a flat 15 misleads.
+  **The positive control is ONE band reused six times, not six successes.** **3 GROSS sit outside D-167 §5**
+  (`E_a_decarb`, `E_a_ethyl_hexanoate_hydrolysis`, `E_a_ethyl_acetate_esterification`) — they fail on the **Q10
+  axis** while their kJ/mol citation is fine, so **no citation-shaped screen can see them**. **Run it on the
+  PRE-edit tree** — rewritten notes quote retired claims and reformat past the regex
   [[feedback-a-text-screen-has-units-and-self-reference]].
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
