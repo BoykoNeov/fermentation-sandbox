@@ -386,30 +386,59 @@ pH_ref_ethyl_acetate_esterification:
 # TIER. ALL speculative — the oxidation FORM (O2-limited, warmer-faster) is sourced, but every
 # magnitude is an order-of-magnitude estimate and the aging axis is the Tier-3 frontier.
 
-# -- ETHANOL-OXIDATION SHARE OF THE O2-DEPLETION RATE (first-order in o2, O2-limited) -----
-# D-73: this is the ETHANOL-OXIDATION SHARE of the total O2-depletion rate, NOT the total (D-71
-# framed it as the total; D-73 supersedes that). Each always-on O2 sink owns its own first-order-in-
-# o2 rate; ProcessSet sums them, so the pool depletes once and O2 splits by k_i/sum(k). The empirical
-# TOTAL O2-scavenging timescale (weeks-to-months) is the ANCHOR the shares partition. D-74: phenolic
-# browning is now a co-resident always-on sink, and the DOMINANT one, so this value was REDUCED
-# 5.0e-4 -> 2.0e-4 and k_browning_base (3.0e-4) takes the larger share, with k_ethanol_oxidation +
-# k_browning_base = 5.0e-4 HOLDING that total (the anchor, and the O2-depletion timescale, unchanged).
-# The two shares carry the SAME E_a (same coupled-oxidation cascade — see E_a_browning), so their
-# sum is exactly 5.0e-4 * f(T) at every temperature, not just at T_ref. Substrate-gated sinks (SO2,
-# D-72) add on top without touching this, since they are zero without their substrate. A further
-# Strecker sink was FORECAST here to "reduce this share again (its k joining the 5.0e-4 sum)", but
-# D-75 SUPERSEDES that: StreckerDegradation is SUBSTRATE-GATED (on amino_acids) and wine-only, so it
-# adds ON TOP without re-baselining the anchor (the SulfiteOxidation rule), and this value is
-# UNCHANGED. See the STRECKER DEGRADATION section below and decision D-75.
-k_ethanol_oxidation:
-  value: 2.0e-4
-  unit: "1/h"   # d(o2)/dt = -k_ethanol_oxidation * f(T) * [o2]  (ethanol route's share of O2 depletion)
+# -- THE ALWAYS-ON O2-DEPLETION TOTAL, AND THE ONE FRACTION THAT SPLITS IT (D-172) --------
+# ONE DEGREE OF FREEDOM, ONE DRAW. D-73/D-74 partitioned the always-on O2-depletion rate into an
+# ethanol-oxidation share and a browning share and stated, in three separate notes, that the two
+# are a PARTITION of a fixed 5.0e-4 — browning = total - ethanol, one degree of freedom. They then
+# shipped as two INDEPENDENT draws, so the sum they were documented to hold spanned
+# [2.4e-4, 1.2e-3] and equalled 5.0e-4 at exactly one point of a two-dimensional band. D-141 added
+# k_activation_floor, documented as that same sum, as a third entry with a third band. D-171 §6
+# flagged all of this; D-172 repairs it by REPARAMETERISING rather than by coupling the sampler:
+#
+#     k_ethanol_oxidation  ==  k_o2_depletion_total *      f_ethanol_o2_share
+#     k_browning_base      ==  k_o2_depletion_total * (1 - f_ethanol_o2_share)
+#     k_activation_floor   ==  k_o2_depletion_total                              (the cascade's floor)
+#
+# so the identity holds BY CONSTRUCTION at every draw, in every oxidative set, and the three
+# retired entries become in-Process products (the k_browning_eff idiom PhenolicBrowning already
+# uses). The two derived nominals are EXACT in float64 — 5.0e-4*0.4 == 2.0e-4 and 5.0e-4*0.6 ==
+# 3.0e-4 both reproduce bitwise, which is why the partition is expressed as TWO PRODUCTS and not as
+# `total - ethanol` (that form gives 3.0000000000000003e-4 and would red every isolability pin for
+# a non-physical reason). MEASURED, not assumed — see D-172.
+#
+# WHY NOT COUPLE THE SAMPLER INSTEAD. A post-draw hook deriving browning := 5.0e-4 - ethanol cannot
+# ship at all: ethanol's own shipped high, 8.0e-4, drives browning NEGATIVE. The reparameterisation
+# needs no band moved to be well-posed, which is the whole reason it is the form that shipped.
+#
+# WHAT THIS DOES NOT DO. It does not close the D-74 ordering claim (browning is the DOMINANT
+# share). That claim is now exactly `f_ethanol_o2_share < 0.5`, a ONE-parameter ONE-edge question
+# against a band whose own note licenses 0.6 — so it still breaches, on 12.5% of draws instead of
+# D-171's measured 55.20%. Closing it needs that high edge moved to 0.5, which is a narrowing, and
+# both parents are `author estimate`: D-171's rule applies and NO edge is moved here.
+#
+# Each share carries the SAME E_a (same coupled-oxidation cascade — see E_a_browning), so the sum
+# is exactly k_o2_depletion_total * f(T) at every temperature, not just at T_ref. Substrate-gated
+# sinks (SO2 at D-72, Strecker at D-75, ellagitannin at D-77) add ON TOP without re-baselining the
+# total, since they are zero without their substrate — the SulfiteOxidation rule, unchanged.
+k_o2_depletion_total:
+  value: 5.0e-4
+  unit: "1/h"   # d(o2)/dt = -(k_o2_depletion_total * ...) * f(T) * [o2]  (always-on total)
   tier: speculative
-  uncertainty: { low: 4.0e-5, high: 8.0e-4, note: "ethanol-oxidation share of the first-order O2-consumption rate at T_ref = 20 C, ~40% of the 5.0e-4 always-on total (browning takes the dominant ~60%, k_browning_base). Banded ~0.2-0.6x the total (the ethanol:browning split is uncertain — see k_browning_base); the SUM k_ethanol_oxidation + k_browning_base = 5.0e-4 => the total O2 half-life ln2/k ~ 350-7000 h (~2 weeks to ~10 months) for the dissolved-O2 charge is preserved (wine scavenges a saturating O2 dose over weeks-to-months at cellar temperature). D-74 reduced this from 5.0e-4 (the D-73 sole-always-on-sink value) as browning claimed its share. D-171 FLAG (identified, NOT repaired -- needs owner direction, and repairing it would move a shipped sampling surface). This band contradicts its own stated construction rule: 'Banded ~0.2-0.6x the total' of 5.0e-4 licenses [1.0e-4, 3.0e-4], but the shipped band is [4.0e-5, 8.0e-4] = 0.08-1.6x, and a 1.6x SHARE of a total is not a share. Two consequences that need no edge move to state: (a) even the note-licensed high 3.0e-4 still exceeds k_browning_base's low 2.0e-4, so the ordering breaches at the joint edge either way (margin -1.0e-4); (b) the rule's own 0.6x exceeds 0.5, so the rule admits the inversion of 'this is the SMALLER share' that the same note calls load-bearing. SEPARATELY: this constant and k_browning_base are documented as a PARTITION of a fixed 5.0e-4 (one degree of freedom, browning = total - ethanol) but ship as two INDEPENDENT draws, with k_activation_floor documented as that same sum making a third -- the sum spans [2.4e-4, 1.2e-3] against a 5.0e-4 anchor that tests/test_aging.py asserts at a single point." }
+  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "the TOTAL always-on first-order O2-consumption rate at T_ref = 20 C, before any substrate-gated sink adds on top: what a stored beverage scavenges a dissolved-O2 charge with. This band is k_activation_floor's SHIPPED band, carried over UNCHANGED (D-172 moved no declared edge), and it corresponds to an O2 half-life ln2/k of 693-6931 h. PROVENANCE OF THE EDGES, since the archive holds three different claimants and they disagree (D-172, and never assign an edge to an account from proximity -- D-168): (1) LOW 1.0e-4 is agreed by all three -- k_activation_floor's shipped low, D-71's original shipped low, and the 7000 h end of the half-life text -- so it is as PRINTED as this axis gets. (2) HIGH 1.0e-3 is CONSTRUCTED and has NO account: it makes a clean decade with the low, it is not what k_activation_floor's own note claims to inherit ('the band of the total it un-partitions' would be [2.4e-4, 1.2e-3]), and it is not what the half-life text in this same file says. (3) The PRINTED alternative is 2.0e-3: D-71 shipped exactly this parameter -- value 5.0e-4, band [1.0e-4, 2.0e-3] -- as the sole always-on sink before D-74 partitioned it (commit e1105ae), and its note's 'half-life ln2/k ~ 350-7000 h' is arithmetically exact for that band (346.6 h and 6931.5 h). That sentence still survives VERBATIM in this file, where it now describes a band twice as narrow at the fast end. Adopting 2.0e-3 would be a RESTORATION with printed provenance, not a new number -- it is left to the owner because it moves a declared edge, which D-171's rule reserves." }
   provenance:
-    source: "author estimate anchored to the timescale over which dissolved oxygen is consumed in stored wine (Singleton 1987, oxidation of wines; Wildenradt & Singleton 1974, 'The production of aldehydes as a result of oxidation of polyphenolic compounds and its relation to wine aging'). A saturating O2 charge is scavenged over weeks-to-months at cellar temperature; the TOTAL pseudo-first-order O2-depletion constant is ~5.0e-4/h, of which this is the ethanol-oxidation SHARE (~40%) and k_browning_base the dominant browning share (~60%), folding the o-diphenol/Fe catalyst concentration into the k's (no general phenol pool tracked in v1)."
-    conditions: "generic wine/beer at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool at T_ref = 293.15 K, the ethanol route's share of the total depletion (k_ethanol_oxidation + k_browning_base = 5.0e-4). The catalytic phenol/metal chemistry is lumped into this constant; the per-O2 acetaldehyde yield of the route is y_acetaldehyde_per_o2."
-    notes: "SOURCED FORM (O2-limited, first-order in the finite O2 pool => SATURATING acetaldehyde, not the unbounded ethanol-first alternative — the D-71 design crux) + SPECULATIVE magnitude (order-of-magnitude, banded to the weeks-to-months O2-scavenging timescale). The load-bearing sourced claims are (1) O2 is the rate-limiter, (2) warmer oxidises faster (E_a_ethanol_oxidation), and (3) ethanol oxidation is the SECONDARY O2 fate behind phenol autoxidation (=> this is the SMALLER share; k_browning_base the larger). D-74: reduced 5.0e-4 -> 2.0e-4 as the always-on PhenolicBrowning claimed the dominant share; the sum with k_browning_base holds the total depletion rate (the anchor)."
+    source: "author estimate anchored to the timescale over which dissolved oxygen is consumed in stored wine (Singleton 1987, oxidation of wines; Wildenradt & Singleton 1974, 'The production of aldehydes as a result of oxidation of polyphenolic compounds and its relation to wine aging'). A saturating O2 charge is scavenged over weeks-to-months at cellar temperature. NOT A NEW NUMBER: this is the constant D-71 shipped as the sole always-on O2 sink, which D-73/D-74 partitioned into k_ethanol_oxidation + k_browning_base and D-141 re-summed as k_activation_floor. All three notes state the total is 5.0e-4; D-172 makes it the single sampled object those statements always described. The o-diphenol/Fe catalyst concentration is folded into the k (no general phenol pool tracked in v1)."
+    conditions: "generic wine/beer at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool at T_ref = 293.15 K, with every substrate-gated sink at zero. Under the DIRECT set this total is split between the ethanol-oxidation and browning routes by f_ethanol_o2_share; under the CASCADE set it is the reductant-independent activation floor and the same fraction weights the H2O2 ethanol branch. There is no iron state slot -- D-134/D-138 both decided against one on Ferreira 2015's finding that iron is not rate-limiting in real wine."
+    notes: "SOURCED FORM (O2-limited, first-order in the finite O2 pool => SATURATING acetaldehyde, not the unbounded ethanol-first alternative -- the D-71 design crux) + SPECULATIVE magnitude. The load-bearing sourced claims are (1) O2 is the rate-limiter and (2) warmer oxidises faster (E_a_ethanol_oxidation / E_a_browning, deliberately equal so the partition is temperature-independent). The claim that the floor is NON-ZERO is load-bearing for beer: a medium carrying none of the tracked reductant pools still oxidises, which is what keeps beer's measured 71% packaging-O2 consumption alive under fork D3. A floor of 0 would freeze beer's o2 flat forever (D-139 measured it; D-140 guarded it)."
+
+f_ethanol_o2_share:
+  value: 0.4
+  unit: "dimensionless"   # ethanol route's fraction of k_o2_depletion_total; browning takes 1 - this
+  tier: speculative
+  uncertainty: { low: 0.2, high: 0.6, note: "the ethanol-oxidation route's share of the always-on O2-depletion total; phenolic browning takes the complement. Band taken VERBATIM from the construction rule the two retired entries already stated in their own notes -- k_ethanol_oxidation's 'Banded ~0.2-0.6x the total' and k_browning_base's 'Banded ~0.4-0.8x the total', which are the same rule written from the two ends and agree exactly. NOT a new author estimate: it is the only edge pair in this repair with a printed account, and D-172 introduces no other. THE ORDERING IS NOT CLOSED BY THIS BAND, and the note says so where the breach is: D-74's load-bearing claim is that browning is the DOMINANT share, i.e. this fraction is BELOW 0.5, but the rule's own high edge is 0.6. So the claim breaches on P(f >= 0.5) = 0.1^2/(0.4*0.2) = 12.50% of triangular draws -- down from the 55.20% D-171 measured for the two independent bands, with NO edge moved, but not to zero. Narrowing this high edge to 0.5 would close it exactly; that is a narrowing licensed by nothing but the author's own prose, which is the move D-171 refused seven times. Left open ON PURPOSE, guarded at the nominal only, and recomputed rather than restated by tests/test_aging.py." }
+  provenance:
+    source: "author estimate anchored to the ORDERING that o-diphenol autoxidation is the PRIMARY consumer of dissolved O2 in wine oxidation, ahead of ethanol oxidation (Singleton 1987, oxidation of wines; Danilewicz 2003/2007, oxygen-reduction mechanism -- O2 reacts first with catechols/gallates to o-quinones + H2O2, and only a FRACTION of that H2O2 goes on to oxidise ethanol; Wildenradt & Singleton 1974). The sources fix the DIRECTION (this fraction is below one half); the magnitude 0.4 is the D-74 modelling choice and the band is the spread D-73/D-74 already recorded for it."
+    conditions: "generic wine/beer at cellar pH/temperature, T_ref = 293.15 K. Dimensionless and temperature-INDEPENDENT by construction: both routes carry the same E_a, so the split is the same at every temperature. Under the CASCADE set the same fraction is the H2O2 ethanol branch weight, competing against k_so2_oxidation * [HSO3-] -- so at zero free bisulfite the branch is 1.0 and this parameter cancels out of the trajectory entirely (measured bitwise, D-172)."
+    notes: "SPECULATIVE magnitude, SOURCED DIRECTION. This is the ONE degree of freedom the always-on O2 partition actually has; before D-172 it was carried implicitly by three independently drawn rate constants whose documented identity therefore held at a single point. Nothing here re-fits: 0.4 is exactly the ratio the D-74 nominals encoded (2.0e-4 of 5.0e-4), and 5.0e-4*0.4 and 5.0e-4*0.6 reproduce those nominals bitwise in float64."
 
 # -- ACTIVATION ENERGY: warmer aging oxidises faster (sourced ordering) -------------------
 E_a_ethanol_oxidation:
@@ -587,15 +616,19 @@ E_a_so2_oxidation:
 # choice, not a claim that browning and oxidation have identical activation energies; see E_a_browning).
 # RENAMED k_browning -> k_browning_base at D-132 (value unchanged) so the phenolic-boosted effective
 # rate (k_browning_eff, code-only, not a YAML parameter) has an unambiguous baseline to add onto.
-k_browning_base:
-  value: 3.0e-4
-  unit: "1/h"   # d(o2)/dt = -k_browning_eff * f(T) * [o2]  (baseline share of O2 depletion at zero grape phenolics)
-  tier: speculative
-  uncertainty: { low: 2.0e-4, high: 4.0e-4, note: "medium-agnostic BASELINE browning share of the first-order O2-consumption rate at T_ref = 20 C (zero grape phenolics -- a white/beer run), ~60% of the 5.0e-4 always-on total (ethanol oxidation the secondary ~40%, k_ethanol_oxidation). Banded ~0.4-0.8x the total: phenol autoxidation is the DOMINANT O2 sink in wine oxidation, but the exact ethanol:browning split is uncertain (both routes are lumped, catalyst folded into k). The load-bearing claim is the ORDERING (k_browning_base > k_ethanol_oxidation -- browning gets the majority of the O2 even at the floor), NOT the exact fraction; the SUM k_browning_base + k_ethanol_oxidation = 5.0e-4 preserves the total O2-scavenging timescale regardless of the split. A REAL red wine's effective rate is higher still, via k_browning_phenolic (D-132). D-171: 'The load-bearing claim is the ORDERING (k_browning_base > k_ethanol_oxidation)' is asserted only at the NOMINAL (tests/test_aging.py::test_browning_is_dominant_share_over_ethanol_oxidation); joint draws invert on 55.20%, the highest breach rate measured in the archive. A pure BAND move (k_ethanol_oxidation's high 8.0e-4 -> 2.9e-4, nominal untouched) leaves the full 1518-test suite green -- the D-170 section-5 shape measured on this pair. This band ([2.0e-4,4.0e-4] = 0.4-0.8x the total) DOES obey its own stated construction rule; its sibling's does not, see k_ethanol_oxidation's D-171 FLAG." }
-  provenance:
-    source: "author estimate anchored to the ORDERING that o-diphenol autoxidation is the PRIMARY consumer of dissolved O2 in wine oxidation, ahead of ethanol oxidation (Singleton 1987, oxidation of wines; Danilewicz 2003/2007, oxygen-reduction mechanism -- O2 reacts first with catechols/gallates to o-quinones + H2O2, and only a fraction of that H2O2 goes on to oxidise ethanol; Wildenradt & Singleton 1974). The pseudo-first-order rate constant folds the o-diphenol/Fe/Cu catalyst concentration into k (no explicit phenol pool tracked in v1, as with k_ethanol_oxidation). Retained as the medium-agnostic FLOOR at D-132 (Ferreira 2015 anchors the phenolic boost on top, not this baseline -- white/beer have no comparable measured acceleration)."
-    conditions: "generic wine/beer at cellar pH/temperature and ZERO grape tannin/anthocyanin; pseudo-first-order in the dissolved-o2 pool at T_ref = 293.15 K, the browning route's baseline (dominant) share of the total depletion (k_browning_base + k_ethanol_oxidation = 5.0e-4). The catalytic phenol/metal chemistry is lumped into this constant; the per-O2 browning yield is y_a420_per_o2; a real red's effective rate is higher via k_browning_phenolic."
-    notes: "SOURCED FORM (O2-limited, first-order in the finite O2 pool; browning the DOMINANT always-on O2 sink so it diverts the majority of the O2 from ethanol oxidation, suppressing acetaldehyde -- the always-on analogue of the D-72 SO2 threshold) + SPECULATIVE magnitude. Load-bearing sourced claims: (1) phenol autoxidation > ethanol oxidation for O2 (=> k_browning_base > k_ethanol_oxidation), (2) warmer browns faster (E_a_browning). The 5.0e-4 total is the anchor; this share and k_ethanol_oxidation partition it (D-74, the always-on sink D-73 enabled); D-132 leaves this floor untouched and adds the phenolic boost on top."
+#
+# RETIRED AS A YAML ENTRY AT D-172. `k_browning_base` is now DERIVED, in-Process, as
+# `k_o2_depletion_total * (1 - f_ethanol_o2_share)` == 3.0e-4 at the nominals (exact in float64) --
+# the same in-Process-composite idiom `k_browning_eff` itself already uses one level up. It was not
+# retired for tidiness: it and `k_ethanol_oxidation` were documented as a partition of one fixed
+# total and drawn independently anyway, so the identity they asserted held at a single point of a
+# two-dimensional band (D-171 §6). Its provenance is NOT lost -- the ORDERING claim it carried
+# ("phenol autoxidation is the PRIMARY consumer of dissolved O2, ahead of ethanol oxidation", from
+# Singleton 1987 / Danilewicz 2003/2007 / Wildenradt & Singleton 1974) is now the sourced DIRECTION
+# of `f_ethanol_o2_share`, where it is a statement about ONE number and can be read at a glance:
+# browning dominates iff that fraction is below 0.5. Its band, "~0.4-0.8x the total", was the same
+# construction rule as its sibling's "~0.2-0.6x" written from the other end, and the two agree
+# exactly; that agreed rule is now `f_ethanol_o2_share`'s band, the only edge pair D-172 ships.
 
 # -- PHENOLIC BOOST: grape tannin+anthocyanin lift the browning rate toward Ferreira's measured red-
 # wine O2-consumption average (decision D-132) ----------------------------------------------------
@@ -982,15 +1015,22 @@ f_methional:
 #      off-ledger decision holds. A future beat that makes quinone production CONSUME
 #      hydroxycinnamics must re-open D2 with draw_precursor_carbon.
 # -----------------------------------------------------------------------------------------
-k_activation_floor:
-  value: 5.0e-4
-  unit: "1/h"   # r_O2 = (k_activation_floor + ...) * f_Cu * f(T) * [o2]
-  tier: speculative
-  uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "the reductant-independent FLOOR of the Fe(II)+O2 activation rate at T_ref = 20 C — the O2-uptake rate of a beverage carrying none of the tracked reductant pools (a beer, or a white with no dosed phenolics/SO2). Inherits the band of the total it un-partitions: k_ethanol_oxidation (4.0e-5..8.0e-4) plus k_browning_base together anchor a total O2 half-life ln2/k ~ 350-7000 h (~2 weeks to ~10 months) for a dissolved-O2 charge, the timescale over which stored wine scavenges a saturating dose. The load-bearing claim is that the floor is NON-ZERO: a medium with no tracked reductant still oxidises, which is what keeps beer's measured 71% packaging-O2 consumption alive under fork D3 (medium-agnostic activation). A floor of 0 would freeze beer's o2 flat forever, and before D-140 no test asserted otherwise (D-139 measured it; D-140 guarded it)." }
-  provenance:
-    source: "the D-73/D-74 anchored TOTAL O2-depletion constant, un-partitioned. NOT a new measurement: k_ethanol_oxidation's own provenance states 'the TOTAL pseudo-first-order O2-depletion constant is ~5.0e-4/h, of which this is the ethanol-oxidation SHARE (~40%) and k_browning_base the dominant browning share (~60%)', and k_browning_base's states the sum is held at 5.0e-4 as the anchor. The underlying anchor is Singleton 1987 (oxidation of wines) / Wildenradt & Singleton 1974 — a saturating O2 charge is scavenged over weeks-to-months at cellar temperature. Under the cascade the two shares stop being independent O2 draws and become BRANCH FATES downstream of one activation node, so the constant returns to the summed form it was sourced in."
-    conditions: "generic wine/beer at cellar pH/temperature; pseudo-first-order in the dissolved-o2 pool at T_ref = 293.15 K, with every tracked reductant pool at zero. The iron catalysing the step is folded into this constant and into the reductant coefficients — there is NO iron state slot, and D-134/D-138 both decided against one on Ferreira 2015's finding that iron is not rate-limiting in real wine (always in surplus), so a variable iron input would be inert in the realistic regime."
-    notes: "SPECULATIVE magnitude, inherited unchanged from the constants it sums — this entry adds no new uncertainty, it re-expresses existing uncertainty. SOURCED FORM: Gate 1 (D-137, from Danilewicz and Nguyen) established that O2 reacts with nothing but Fe(II) in wine, which is what makes a single activation node the correct structure rather than N independent sinks on one pool. MEDIUM-AGNOSTIC (fork D3): beer carries no copper, no iron and none of the reductant slots, so beer's activation IS this floor — the guarded-missing-slot idiom PhenolicBrowning already uses for copper (D-134). That relocates beer's oxidation into a constant rather than dissolving the problem (D-139 said exactly this), but the constant is not a NEW debt: it is the same lumped anchor beer's O2 uptake already rode on before the cascade, in the same shared aging.yaml, at the same value."
+# RETIRED AS A YAML ENTRY AT D-172. `k_activation_floor` IS `k_o2_depletion_total` -- its own
+# provenance said so ("the D-73/D-74 anchored TOTAL O2-depletion constant, un-partitioned"), and
+# D-172 makes that an identity instead of a claim in prose. The cascade reads the total directly.
+#
+# WHAT CARRIED OVER, AND WHAT DID NOT. Value 5.0e-4 and band [1.0e-4, 1.0e-3] carried over
+# UNCHANGED to `k_o2_depletion_total` -- D-172 moved no declared edge. What did NOT carry over is
+# this entry's claim to "inherit the band of the total it un-partitions": that band would have been
+# [2.4e-4, 1.2e-3] (the arithmetic sum of the two shares' independent bands), which is neither what
+# shipped here nor what the half-life text in this file says. The three disagreeing accounts of
+# that HIGH edge are now written out in `k_o2_depletion_total`'s own note, with the printed
+# alternative (2.0e-3, D-71's shipped band at commit e1105ae) named and left to the owner.
+#
+# The load-bearing NON-ZERO claim survives verbatim on the new entry: a medium carrying none of the
+# tracked reductant pools still oxidises, which keeps beer's measured 71% packaging-O2 consumption
+# alive under fork D3. A floor of 0 would freeze beer's o2 flat forever (D-139 measured it, D-140
+# guarded it, and those guards are untouched here because the nominal is bitwise unchanged).
 
 k_activation_phenolic:
   value: 1.1e-3

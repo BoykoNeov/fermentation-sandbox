@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-09T21:25:17.126Z
+  modified: 2026-08-10T08:37:32.785Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,8 +26,8 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
 
 ## Status (2026-08-10)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-171**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1524 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-172**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1531 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -119,31 +119,32 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   [[feedback-name-guards-for-what-they-forbid]]); wine `E_a_esters` ships **55,100 == `E_a_uptake`** (D-21). Beer's
   **DISSOLVES**, leaving the axis's **tightest joint margin, +2,000 J/mol**. **NEVER assign edges to accounts from
   proximity**, and **do not re-draft the WITHDRAWN `Corrects: D-77`** (nominal-scoped, never states the band).
-- **D-168 §1b's Q10 sweep is CLOSED (D-170) — never re-run it expecting a defect count.** On this tree it
-  returns **15 again, for the OPPOSITE reason**: repairing a note (writing BOTH accounts in) makes a worst-gap
-  screen score it **WORSE** — **the sweep is NOT idempotent under its own repair**, and a naive re-run reads
-  "no progress". **Field-complete (all FOUR text fields) reproduced 21/15 EXACTLY — the predicted delta did
-  NOT happen**; what it buys is **9 params carrying two Q10 claims in two FIELDS** (2 outside the checkable
-  set). **7 rounding-class = notational, MEASURED** (±5 %, every high edge rounded **UP**) — left unedited on
-  purpose. `E_a_acet_reduction`'s low is the **NOMINAL's** Q10; `E_a_smm_hydrolysis` a **one-directional**
-  +8.4/+4.9 % offset; **both bands unchanged since introduction ⇒ wrong when WRITTEN, not stale**.
+- **D-168 §1b's Q10 sweep is CLOSED (D-170) — never re-run it expecting a defect count.** It returns **15 again,
+  for the OPPOSITE reason**: repairing a note makes a worst-gap screen score it **WORSE** ⇒ **NOT idempotent under
+  its own repair**; a naive re-run reads "no progress". **Field-complete (all FOUR fields) reproduced 21/15
+  EXACTLY — the predicted delta did NOT happen.** **7 rounding-class = notational, MEASURED**, left unedited on
+  purpose. `E_a_acet_reduction`/`E_a_smm_hydrolysis`: **wrong when WRITTEN, not stale** (D-172 inverts this).
 - **The recurring shape: 7 invariants BREACH and NOT ONE can be guarded where it breaches (D-171; corrects
   D-170's "5").** Recall holes found the extra two: **a `>` is not an ordering WORD**, the **AMBIGUOUS-PARSE
   quarantine was never revisited**, *"steeper"* **inverts on a retention fraction**. `E_a_decarb`'s shape does NOT
-  transfer: its margin is **exactly 0** (60,000 == 60,000, intent UNRECORDED) while all 7 are **NEGATIVE** ⇒
-  `low >= high` needs an edge moved and **an `author estimate` cannot license a narrowing ⇒ ZERO edges moved**.
-  Guards are **nominal-scoped ONLY**, each naming the breach it does NOT forbid: `k_browning_base` **55.2 %**,
-  `y_acetaldehyde_per_tannin` 34.2, `k_death_brett` 23.1, `E_a_fusels` 0.005; `y_methanethiol` 19.4 is left
-  **UNGUARDED** — no source fixes its branch ratio, so a guard would pin my own prose.
-- **A guard can NAME the ordering and still not fire on it (D-171 §4)** —
-  `test_integrated_wine_aroma_temperature_directions` survives `E_a_fusels`/`E_a_uptake` **fully inverted**: its
-  sensitivity sits **above** the −3,000 J/mol its own bands permit, and the asserts that DO fire reproduce
-  **bitwise** with the ordering intact. **FLAGGED, not repaired:** `k_ethanol_oxidation`'s band is **0.08–1.6×**
-  the total vs its own note's *"0.2–0.6×"*; it + `k_browning_base` + `k_activation_floor` are **1 dof, 3 draws**.
+  transfer (margin **exactly 0**, intent UNRECORDED) while all 7 are **NEGATIVE** ⇒ `low >= high` needs an edge
+  moved and **an `author estimate` cannot license a narrowing ⇒ ZERO edges moved**. Guards **nominal-scoped ONLY**,
+  each naming the breach it does NOT forbid (`y_acetaldehyde_per_tannin` 34.2 %, `k_death_brett` 23.1, `E_a_fusels`
+  0.005); `y_methanethiol` 19.4 stays **UNGUARDED** — a guard would pin my own prose.
+- **A guard can NAME the ordering and still not fire on it (D-171 §4)** — `test_integrated_wine_aroma_
+  temperature_directions` survives `E_a_fusels`/`E_a_uptake` **fully inverted**: its sensitivity sits
+  **above** the −3,000 J/mol its own bands permit.
+- **O2 partition REPARAMETERISED, both D-171 flags closed (D-172) — never re-add the three retired names.**
+  `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor` GONE ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`,
+  **two PRODUCTS, never `total-total*f`** (1 ULP; **361 tests stay GREEN** on it). Breach **55.20 → 12.54 %**
+  (pre-registered 12.50), **ZERO edges moved**, nominals **bitwise** vs `413c809`. **Never 3 co-drawn — max 2**;
+  cascade's pair is **total vs its own SHARE**, live only **with SO₂**. **A DISSOLVED, not repaired**; the sum
+  assert is now an **IDENTITY ⇒ vacuous**. **The total's high 1.0e-3 has NO account** — printed alt **2.0e-3**
+  (D-71 `e1105ae`; its *"350–7000 h"* text was right when WRITTEN, then **stale**). **OWNER'S CALL, not mine.**
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
-  `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** (2.0309 flat) in the scenario its own
-  note names, with the positive control moving; the pool ends at **0.63 of 0.8 g/L** ⇒ the competition is not
-  binding. **Not a value change**; deciding it needs D-89's calibration scenario, which it **never pins**.
+  `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names
+  (positive control moving; pool ends **0.63 of 0.8 g/L** ⇒ competition not binding). **Not a value
+  change**; deciding it needs D-89's calibration scenario, which it **never pins**.
 - **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
   `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
@@ -202,10 +203,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **Do NOT close the fate gap by tuning** — fates move up to **25×** purely from re-homing the rate law. Both
   settling sources are **paywalled (nine hosts)**; abstract K values are **never a `source:` field**
   [[feedback-conceded-caveats-are-not-coverage]].
-- **Never re-derive `k_activation_floor` as a fit** — it **is** `k_ethanol_oxidation + k_browning_base` and does
-  **not** reproduce direct's TOTAL; the O2 budget agreeing is **supply limitation (D-136), NOT a rate-law check**.
-  Activation **reads the reductant pools** — never lump. The 31 D-140 guards stand — **never re-derive their
-  pins**; edit only the two seams. Beer's O2 is a **floor `>=5 mg/L`**, never 5.71. Pin rtol **1e-4**
+- **Never re-derive the activation floor as a fit** (name retired at D-172, above) — the O2 budget
+  agreeing is **supply limitation (D-136), NOT a rate-law check**. Activation **reads the reductant
+  pools** — never lump. The 31 D-140 guards stand — **never re-derive their pins**; edit only the two
+  seams. Beer's O2 is a **floor `>=5 mg/L`**, never 5.71. Pin rtol **1e-4**
   [[feedback-pin-tolerance-vs-solver-tolerance]]; `quinone == 0.0` under direct is **exact**.
 - **Benchmark EXISTS and is ACTIVE** (`tests/benchmarks/test_validation_danilewicz_so2_o2.py`, 15 tests, no
   xfail/skip — **not open work**). **Never pin 1.7** — one dataset's mode, above the other's whole range; assert

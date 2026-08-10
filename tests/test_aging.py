@@ -96,6 +96,7 @@ from fermentation.core.kinetics.amino_acid_pools import (
     assimilable_carbon_per_nitrogen,
 )
 from fermentation.core.kinetics.amino_acids import AMINO_ACID_SPECIES
+from fermentation.core.kinetics.o2_partition import o2_depletion_shares
 from fermentation.core.media import beer_schema, get_medium, wine_schema
 from fermentation.core.process import Process, ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -1051,7 +1052,11 @@ def test_oxidation_metadata():
     # Consumes the O₂ substrate, books the oxidised carbon as acetaldehyde borrowed from E.
     assert set(p.touches) == {"o2", "acetaldehyde", "E"}
     assert set(p.reads) == {
-        "k_ethanol_oxidation",
+        # D-172: `k_ethanol_oxidation` is no longer a YAML entry -- this route's constant is the
+        # ethanol half of the always-on O2-depletion total, so BOTH halves of that partition are
+        # declared and the product is formed in-Process.
+        "k_o2_depletion_total",
+        "f_ethanol_o2_share",
         "E_a_ethanol_oxidation",
         "y_acetaldehyde_per_o2",
         "T_ref",
@@ -1065,7 +1070,7 @@ def test_oxidation_matches_closed_form(params):
     d = OxidativeAcetaldehyde().derivatives(0.0, y, schema, params)
 
     f_t = arrhenius_factor(t, params["E_a_ethanol_oxidation"], params["T_ref"])
-    r_o2 = params["k_ethanol_oxidation"] * f_t * o2
+    r_o2 = o2_depletion_shares(params)[0] * f_t * o2
     acet_rate = params["y_acetaldehyde_per_o2"] * (r_o2 / M_O2) * M_ACETALDEHYDE
 
     assert schema.get(d, "o2") == pytest.approx(-r_o2)
@@ -1420,7 +1425,9 @@ def test_browning_metadata():
     # are not part of touches.
     assert set(p.touches) == {"o2", "A420"}
     assert set(p.reads) == {
-        "k_browning_base",
+        # D-172: `k_browning_base` is no longer a YAML entry -- see OxidativeAcetaldehyde above.
+        "k_o2_depletion_total",
+        "f_ethanol_o2_share",
         "k_browning_phenolic",
         "E_a_browning",
         "y_a420_per_o2",
@@ -1438,7 +1445,7 @@ def test_browning_matches_closed_form(params):
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
     # No tannin/anthocyanin dosed ⇒ k_browning_eff is byte-for-byte k_browning_base (D-132
     # isolability at zero grape phenolics).
-    r_o2 = params["k_browning_base"] * f_t * o2
+    r_o2 = o2_depletion_shares(params)[1] * f_t * o2
     assert schema.get(d, "o2") == pytest.approx(-r_o2)
     assert schema.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
     # Touches ONLY o2 + A420 — nothing else moves (not even E/acetaldehyde: browning borrows no
@@ -1448,31 +1455,32 @@ def test_browning_matches_closed_form(params):
             assert schema.get(d, var) == 0.0
 
 
-def test_browning_is_dominant_share_over_ethanol_oxidation(params):
+def test_browning_is_dominant_share_over_ethanol_oxidation(params, store):
     # The load-bearing D-74 ordering: browning is the DOMINANT always-on O₂ sink, so at the same
-    # [o2]
-    # it draws a larger O₂ rate than ethanol oxidation (k_browning_base > k_ethanol_oxidation), and
-    # the
-    # two BASELINE shares sum to the calibrated always-on total (5.0e-4) that holds the
-    # O₂-depletion
-    # timescale (D-132 leaves this floor untouched; a real red's effective rate is higher still).
+    # [o2] it draws a larger O₂ rate than ethanol oxidation, and the two BASELINE shares sum to the
+    # calibrated always-on total that holds the O₂-depletion timescale (D-132 leaves this floor
+    # untouched; a real red's effective rate is higher still).
     #
-    # D-171 SCOPE, so this is not read as more than it is. Both asserts below hold at the
-    # NOMINAL and nowhere else:
-    #   * the ORDERING inverts on 55.20% of joint draws (k_browning_base [2.0e-4,4.0e-4] vs
-    #     k_ethanol_oxidation [4.0e-5,8.0e-4], joint-edge margin -6.0e-4) -- the highest breach
-    #     rate measured in the archive. Moving k_ethanol_oxidation's HIGH edge alone
-    #     (8.0e-4 -> 2.9e-4, nominal untouched) leaves the full 1518-test suite green, so the
-    #     band-scoped half is unguarded. It is also unguardable today: the joint-edge assertion
-    #     (`low >= high`, the test_vicinal_diketones E_a_decarb shape) is FALSE here, and both
-    #     parameters are `author estimate`, which cannot license narrowing a band.
-    #   * the SUM anchor holds at exactly one point of a two-dimensional band: the two spans
-    #     add to [2.4e-4, 1.2e-3] against the 5.0e-4 asserted here. The notes document the two
-    #     as a PARTITION of that fixed total (one degree of freedom) while the sampler draws
-    #     them independently, and k_activation_floor is documented as the same sum yet ships as
-    #     a third independent draw. Flagged in k_ethanol_oxidation's note for owner direction.
-    assert params["k_browning_base"] > params["k_ethanol_oxidation"]
-    assert params["k_browning_base"] + params["k_ethanol_oxidation"] == pytest.approx(5.0e-4)
+    # D-172 SCOPE, superseding D-171's. The two shares are no longer independent YAML entries:
+    # they are `k_o2_depletion_total` times `f_ethanol_o2_share` and its complement, so
+    #   * the SUM anchor is now an IDENTITY, true by construction at every draw. It is asserted
+    #     below because it is cheap, NOT because it is a strengthened guard -- D-171's version of
+    #     this assert held at exactly one point of a two-dimensional band, and the repair did not
+    #     make that assert stronger, it made it VACUOUS. The falsifiable content moved entirely
+    #     into the ordering assert above it.
+    #   * the ORDERING is now exactly `f_ethanol_o2_share < 0.5` -- ONE parameter, ONE edge. It is
+    #     still asserted only at the NOMINAL, and it still BREACHES: that band's own construction
+    #     rule ("~0.2-0.6x the total", quoted from the two retired entries) licenses 0.6, so
+    #     P(f >= 0.5) = 0.1^2/(0.4*0.2) = 12.50% of triangular draws invert it. That is down from
+    #     the 55.20% D-171 measured for the two independent bands, with NO edge moved -- but it is
+    #     not zero, and closing it needs the high edge narrowed to 0.5 on the strength of the
+    #     author's own prose, which is the narrowing D-171 refused seven times.
+    k_ethanol, k_browning = o2_depletion_shares(params)
+    assert k_browning > k_ethanol
+    assert k_browning + k_ethanol == pytest.approx(params["k_o2_depletion_total"])
+    # The breach is stated as a live band fact, not as prose: the high edge admits the inversion.
+    high = store["f_ethanol_o2_share"].uncertainty.high
+    assert high > 0.5, "f_ethanol_o2_share's band no longer admits the D-74 ordering breach"
     schema = wine_schema()
     y = _aged_wine(schema, ester=0.0, o2=0.03)
     brown = PhenolicBrowning().derivatives(0.0, y, schema, params)
@@ -1489,8 +1497,8 @@ def test_browning_phenolic_boost_matches_closed_form(params):
     y = _aged_wine(schema, ester=0.0, t=t, o2=o2, tannin=tannin, anthocyanin=anthocyanin)
     d = PhenolicBrowning().derivatives(0.0, y, schema, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
-    k_eff = params["k_browning_base"] + params["k_browning_phenolic"] * (tannin + anthocyanin)
-    assert k_eff > params["k_browning_base"]  # the boost strictly raises the rate
+    k_eff = o2_depletion_shares(params)[1] + params["k_browning_phenolic"] * (tannin + anthocyanin)
+    assert k_eff > o2_depletion_shares(params)[1]  # the boost strictly raises the rate
     r_o2 = k_eff * f_t * o2
     assert schema.get(d, "o2") == pytest.approx(-r_o2)
     assert schema.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
@@ -1536,7 +1544,7 @@ def test_browning_phenolic_boost_absent_on_beer(params):
     yb[beer.slice("o2")] = o2
     d = PhenolicBrowning().derivatives(0.0, yb, beer, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
-    r_o2 = params["k_browning_base"] * f_t * o2
+    r_o2 = o2_depletion_shares(params)[1] * f_t * o2
     assert beer.get(d, "o2") == pytest.approx(-r_o2)
 
 
@@ -1553,7 +1561,7 @@ def test_browning_copper_multiplier_matches_closed_form(params):
     )
     d = PhenolicBrowning().derivatives(0.0, y, schema, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
-    k_eff = params["k_browning_base"] + params["k_browning_phenolic"] * (tannin + anthocyanin)
+    k_eff = o2_depletion_shares(params)[1] + params["k_browning_phenolic"] * (tannin + anthocyanin)
     f_copper = 1.0 + params["k_copper_multiplier"] * (copper - params["copper_typical"])
     assert f_copper > 1.0  # sanity: this dose is above copper_typical
     r_o2 = k_eff * f_copper * f_t * o2
@@ -1606,7 +1614,7 @@ def test_browning_copper_multiplier_absent_on_beer(params):
     yb[beer.slice("o2")] = o2
     d = PhenolicBrowning().derivatives(0.0, yb, beer, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
-    r_o2 = params["k_browning_base"] * f_t * o2
+    r_o2 = o2_depletion_shares(params)[1] * f_t * o2
     assert beer.get(d, "o2") == pytest.approx(-r_o2)
 
 
@@ -1747,7 +1755,7 @@ def test_browning_is_medium_agnostic_on_beer(params):
     yb[beer.slice("o2")] = o2
     d = PhenolicBrowning().derivatives(0.0, yb, beer, params)
     f_t = arrhenius_factor(t, params["E_a_browning"], params["T_ref"])
-    r_o2 = params["k_browning_base"] * f_t * o2
+    r_o2 = o2_depletion_shares(params)[1] * f_t * o2
     assert beer.get(d, "o2") == pytest.approx(-r_o2)
     assert beer.get(d, "A420") == pytest.approx(params["y_a420_per_o2"] * (r_o2 / M_O2))
 
@@ -1825,9 +1833,12 @@ def test_browning_diverts_o2_and_suppresses_acetaldehyde(params, store):
     assert acet_diverted < acet_alone
     assert float(with_browning.series("A420")[-1]) > 0.0
     assert float(ethanol_only.series("A420")[-1]) == 0.0
-    share_ethanol = params["k_ethanol_oxidation"] / (
-        params["k_ethanol_oxidation"] + params["k_browning_base"]
-    )
+    # D-172: the ethanol share of the O2 is now the split fraction itself, by construction --
+    # k_eth / (k_eth + k_brn) == total*f / total == f. Written as the ratio anyway, from the same
+    # helper the Processes use, so this still fails if the partition stops summing to the total,
+    # rather than silently agreeing with a restated 0.4.
+    k_eth, k_brn = o2_depletion_shares(params)
+    share_ethanol = k_eth / (k_eth + k_brn)
     assert acet_diverted == pytest.approx(share_ethanol * acet_alone, rel=0.05)
     # Carbon still closes (E → acetaldehyde the only on-ledger move; o2/A420 off every ledger).
     f_c = store.value("biomass_C_fraction")

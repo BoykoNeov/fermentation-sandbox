@@ -329,6 +329,7 @@ from fermentation.core.kinetics.carbon_routing import (
     EsterSpec,
     labelled_fraction,
 )
+from fermentation.core.kinetics.o2_partition import o2_depletion_shares
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -1216,11 +1217,15 @@ class OxidativeAcetaldehyde(Process):
     #: nothing else — ``o2`` is off every ledger, so only the ``E → acetaldehyde`` transfer is on
     #: the carbon books, and it closes exactly.
     touches = ("o2", "acetaldehyde", "E")
-    #: ``k_ethanol_oxidation``/``E_a_ethanol_oxidation``/``y_acetaldehyde_per_o2`` are this
-    #: Process's own (aging.yaml, D-71); ``T_ref`` is shared with every Arrhenius rate. Tiers cap
-    #: ``o2``/``acetaldehyde``/``E`` output tiers via parameter-tier propagation (D-1).
+    #: ``E_a_ethanol_oxidation``/``y_acetaldehyde_per_o2`` are this Process's own (aging.yaml,
+    #: D-71); ``T_ref`` is shared with every Arrhenius rate. Tiers cap ``o2``/``acetaldehyde``/``E``
+    #: output tiers via parameter-tier propagation (D-1). This route's rate constant is no longer
+    #: its own entry: D-172 replaced ``k_ethanol_oxidation`` with the total it was always
+    #: documented to be a share of, plus the one fraction that splits it, so BOTH names are
+    #: declared here and the product is formed in-Process (:func:`o2_depletion_shares`).
     reads: tuple[str, ...] = (
-        "k_ethanol_oxidation",
+        "k_o2_depletion_total",
+        "f_ethanol_o2_share",
         "E_a_ethanol_oxidation",
         "y_acetaldehyde_per_o2",
         "T_ref",
@@ -1240,7 +1245,10 @@ class OxidativeAcetaldehyde(Process):
         f_t = arrhenius_factor(temp, params["E_a_ethanol_oxidation"], params["T_ref"])
         # This route's SHARE of the O₂-depletion rate (D-73), not the whole flux: sibling sinks draw
         # their own shares and ProcessSet sums, so O₂ splits by kᵢ/Σk and the pool depletes once.
-        r_o2 = params["k_ethanol_oxidation"] * f_t * o2  # g O2/L/h consumed by the ethanol route
+        # D-172: this route's rate constant is the ethanol half of the always-on O2-depletion
+        # total, formed here rather than read as its own entry (see :mod:`o2_partition`).
+        k_ethanol_oxidation, _ = o2_depletion_shares(params)
+        r_o2 = k_ethanol_oxidation * f_t * o2  # g O2/L/h consumed by the ethanol route
         # Every mol O₂ this route consumes yields y_acetaldehyde_per_o2 mol acetaldehyde — the TRUE
         # per-O₂ yield of the route (D-73), not shaded for competitors. moles O2 = r_o2/M_O2.
         acet_rate = params["y_acetaldehyde_per_o2"] * (r_o2 / M_O2) * M_ACETALDEHYDE  # g/L/h
@@ -1513,7 +1521,10 @@ class PhenolicBrowning(Process):
     #: ``tannin``/``anthocyanin``/``copper`` are read-only state, like ``T``, so they are not
     #: part of ``touches``.
     reads: tuple[str, ...] = (
-        "k_browning_base",
+        # D-172: the baseline share is derived from the total and the split fraction rather than
+        # being its own entry, so this Process declares both halves of that partition.
+        "k_o2_depletion_total",
+        "f_ethanol_o2_share",
         "k_browning_phenolic",
         "E_a_browning",
         "y_a420_per_o2",
@@ -1543,9 +1554,11 @@ class PhenolicBrowning(Process):
         anthocyanin = (
             max(0.0, float(y[schema.slice("anthocyanin")][0])) if "anthocyanin" in schema else 0.0
         )
-        k_browning_eff = params["k_browning_base"] + params["k_browning_phenolic"] * (
-            tannin + anthocyanin
-        )
+        # D-172: the medium-agnostic baseline is the browning half of the always-on total, formed
+        # here rather than read as its own constant — the same in-Process-composite shape
+        # ``k_browning_eff`` itself has one level up.
+        _, k_browning_base = o2_depletion_shares(params)
+        k_browning_eff = k_browning_base + params["k_browning_phenolic"] * (tannin + anthocyanin)
         # D-134: copper catalyses the metal-driven O2-activation step feeding phenol autoxidation
         # (Danilewicz 2007), so it multiplies the WHOLE k_browning_eff rather than adding another
         # term. MEAN-CENTERED on copper_typical (the same real-wine level D-132's phenolic-boost

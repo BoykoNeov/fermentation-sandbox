@@ -107,6 +107,7 @@ from fermentation.core.kinetics.amino_acid_pools import (
     draw_precursor_carbon,
 )
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
+from fermentation.core.kinetics.o2_partition import o2_depletion_shares
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -235,7 +236,7 @@ def activation_rate(
     reductants = sum(_pool(y, schema, name) for name in _PHENOLIC_REDUCTANT_POOLS)
     hso3 = free_bisulfite(y, schema, params) if bisulfite is None else bisulfite
     k_eff = (
-        params["k_activation_floor"]
+        params["k_o2_depletion_total"]
         + params["k_activation_phenolic"] * reductants
         + params["k_activation_bisulfite"] * hso3
     )
@@ -276,7 +277,9 @@ def h2o2_branch_fraction(
     where :data:`k_quinone_polymerization` plays that role).
     """
     hso3 = free_bisulfite(y, schema, params) if bisulfite is None else bisulfite
-    w_ethanol = params["k_ethanol_oxidation"]
+    # D-172: the ethanol weight is still "the pre-cascade constant, re-used rather than re-fitted"
+    # — that constant is now the ethanol half of the always-on total, formed rather than read.
+    w_ethanol, _ = o2_depletion_shares(params)
     w_bisulfite = params["k_so2_oxidation"] * hso3
     total = w_ethanol + w_bisulfite
     if total <= 0.0:
@@ -310,7 +313,7 @@ class OxygenActivation(Process):
     #: derive free bisulfite are omitted — all plausible, and this Process is already speculative,
     #: so they add no tier headline (the SulfiteOxidation/MalolacticConversion rule).
     reads: tuple[str, ...] = (
-        "k_activation_floor",
+        "k_o2_depletion_total",
         "k_activation_phenolic",
         "k_activation_bisulfite",
         "E_a_activation",
@@ -364,13 +367,13 @@ class PeroxideEthanolOxidation(Process):
     #: rebuild.
     touches = ("acetaldehyde", "E")
     reads: tuple[str, ...] = (
-        "k_activation_floor",
+        "k_o2_depletion_total",
         "k_activation_phenolic",
         "k_activation_bisulfite",
         "E_a_activation",
         "k_copper_multiplier",
         "copper_typical",
-        "k_ethanol_oxidation",
+        "f_ethanol_o2_share",
         "k_so2_oxidation",
         "T_ref",
         # Indirect, via the _free_so2 helper's ph_of_state + bisulfite_so2_at_ph (D-160).
@@ -421,13 +424,13 @@ class PeroxideSulfiteOxidation(Process):
     tier = Tier.SPECULATIVE
     touches = ("so2_total",)
     reads: tuple[str, ...] = (
-        "k_activation_floor",
+        "k_o2_depletion_total",
         "k_activation_phenolic",
         "k_activation_bisulfite",
         "E_a_activation",
         "k_copper_multiplier",
         "copper_typical",
-        "k_ethanol_oxidation",
+        "f_ethanol_o2_share",
         "k_so2_oxidation",
         "T_ref",
         # Indirect, via the _free_so2 helper's ph_of_state + bisulfite_so2_at_ph (D-160).

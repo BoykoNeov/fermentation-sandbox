@@ -33,6 +33,7 @@ import numpy as np
 import pytest
 
 from fermentation.core.kinetics import ClosureOxygenIngress
+from fermentation.core.kinetics.o2_partition import o2_depletion_shares
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.tiers import Tier
@@ -561,15 +562,18 @@ def test_the_oxygen_ceiling_is_held_up_by_ethanol_oxidation():
     ``test_dissolved_oxygen_stays_non_negative_and_bounded`` asserts dissolved O2 stays under air
     saturation, but that is not luck and it is not this Process's doing: ethanol is effectively
     inexhaustible, so :class:`OxidativeAcetaldehyde` is an always-on, never-saturating,
-    first-order-in-o2 sink that caps the quasi-steady level. ``k_ethanol_oxidation`` was already
-    retuned once (5.0e-4 -> 2.0e-4 at D-73); this test makes the dependency explicit, so that
-    lowering it again fails HERE with a clear reason rather than silently pushing the saturation
-    test toward its limit.
+    first-order-in-o2 sink that caps the quasi-steady level. The ethanol route's constant
+    was already retuned once (5.0e-4 -> 2.0e-4 at D-73) and reparameterised again at D-172
+    (it is now ``k_o2_depletion_total * f_ethanol_o2_share``); this test makes that explicit, so
+    that lowering EITHER factor fails HERE with a clear reason rather than silently pushing the
+    saturation test toward its limit.
     """
     compiled, trajectory = _age("synthetic_supremecorq")
     o2 = trajectory.y[compiled.schema.slice("o2")][0]
     otr = float(compiled.y0[compiled.schema.slice("closure_otr")][0])
-    ceiling = otr / compiled.param_values["k_ethanol_oxidation"]
+    # D-172: `k_ethanol_oxidation` is no longer an entry -- it is the ethanol half of the
+    # always-on total, so the single-sink ceiling is formed from the same helper the Process uses.
+    ceiling = otr / o2_depletion_shares(compiled.param_values)[0]
 
     # The standing level must sit at or below the single-sink ceiling — below it, because the
     # other sinks take their share too.
