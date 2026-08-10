@@ -100,6 +100,12 @@ _FERMENT_DAYS = 20.0
 _AGING_YEARS = 5.0
 _TOTAL_DAYS = _FERMENT_DAYS + _AGING_YEARS * 365.25
 
+#: Dissolved-O2 air saturation, ~8 mg/L at 20 C. Two DIFFERENT quantities are checked against it
+#: here and they are not interchangeable (D-172 s6): the single-sink CEILING ``otr/k_ethanol`` is a
+#: BOUND, and ``o2.max()`` is the STATE. A ceiling above this means the bound stops discriminating;
+#: a state above it is unphysical.
+_AIR_SATURATION_GPL = 8.0e-3
+
 
 @pytest.fixture(scope="module")
 def params():
@@ -471,7 +477,7 @@ def test_dissolved_oxygen_stays_non_negative_and_bounded():
         compiled, trajectory = _age(closure)
         o2 = trajectory.y[compiled.schema.slice("o2")][0]
         assert o2.min() >= 0.0
-        assert o2.max() < 8.0e-3
+        assert o2.max() < _AIR_SATURATION_GPL
 
 
 def test_premox_needs_a_permeable_closure():
@@ -579,19 +585,18 @@ def test_the_oxygen_ceiling_is_held_up_by_ethanol_oxidation():
       gives 5.15e-2. But the retired ``k_ethanol_oxidation``'s own band low 4.0e-5 already gave
       2.58e-2, 3.2x over, so D-172 did not introduce this — it doubled it. A ceiling above 8.0e-3
       means the BOUND stops being informative, NOT that o2 gets there.
-    * **The ACTUAL standing ``o2`` — INTRODUCED by D-172, measured on both trees.** ``o2.max()`` at
-      the post-D-172 total-low is **9.68e-3, ABOVE the 8.0e-3 air saturation two tests here
-      assert**. On the pre-D-172 tree (413c809) NO arm reaches it: both retired constants at their
-      band lows give 4.27e-3, 1.9x of headroom. The mechanism is that standing o2 is ``otr / SUM
-      k``, so ``f_ethanol_o2_share`` cancels and only the TOTAL matters — and D-172 lowered the
-      reachable minimum sum from ``4.0e-5 + 2.0e-4 = 2.4e-4`` to a flat ``1.0e-4`` by carrying
-      ``k_activation_floor``'s band across rather than the sum of the two lows. "No declared edge
-      moved" was true of every edge and still changed what the JOINT surface reaches.
+    * **The ACTUAL standing ``o2`` — introduced by D-172, REPAIRED at D-173.** ``o2.max()`` at the
+      post-D-172 total-low was **9.68e-3, ABOVE air saturation**, because standing o2 is ``otr /
+      SUM k``: ``f_ethanol_o2_share`` cancels and only the TOTAL reaches this slot, and D-172
+      lowered the reachable minimum sum from ``4.0e-5 + 2.0e-4 = 2.4e-4`` to a flat ``1.0e-4``.
+      "No declared edge moved" was true of every edge and still changed what the JOINT surface
+      reaches. D-173 moved that low edge back to 2.4e-4 on the measurement, and
+      :func:`test_the_low_edge_of_the_o2_total_cannot_draw_a_supersaturated_wine` is what now
+      holds it — read that test, not this one, for the band-level claim.
 
-    So this assert guards the nominal against edits and does NOT establish that the margin is held
-    open across the declared band. Do not read it as the latter. The edge move that would close it
-    is the owner's (D-171), and ``k_activation_floor``'s own note already names the alternative
-    band [2.4e-4, 1.2e-3] that restores the pre-D-172 reach exactly.
+    So this assert guards the NOMINAL against edits. It still does not establish the CEILING's
+    margin across the band, and that breach is untouched: at the joint edge the bound reaches
+    5.15e-2 and goes uninformative. Only the state claim was repairable by an edge move.
     """
     compiled, trajectory = _age("synthetic_supremecorq")
     o2 = trajectory.y[compiled.schema.slice("o2")][0]
@@ -604,4 +609,80 @@ def test_the_oxygen_ceiling_is_held_up_by_ethanol_oxidation():
     # other sinks take their share too.
     assert o2.max() <= ceiling
     # ... and that ceiling must itself be sub-saturation, which is the real safety margin.
-    assert ceiling < 8.0e-3
+    assert ceiling < _AIR_SATURATION_GPL
+
+
+def _o2_max_at_total(total: float, *, oxidative: str = "direct") -> float:
+    """``o2.max()`` over a five-year run with the always-on O2 total forced to ``total``.
+
+    Compiles fresh every call ON PURPOSE: ``begin_aging`` leaves the aging Processes ENABLED on
+    the ``ProcessSet`` it fires against, so a reused compiled object starts the next integration
+    from a different enabled set and every arm after the first is a different scenario.
+    """
+    compiled = compile_scenario(_scenario("synthetic_supremecorq"), oxidative=oxidative)
+    values = dict(compiled.param_values)  # a property returning a fresh dict -- mutate the copy
+    values["k_o2_depletion_total"] = total
+    trajectory = simulate_scheduled(
+        compiled.process_set,
+        values,
+        compiled.y0,
+        (0.0, _TOTAL_DAYS * 24.0),
+        events=compiled.events,
+        t_eval=np.linspace(0.0, _TOTAL_DAYS * 24.0, 2000),
+    )
+    return float(trajectory.y[compiled.schema.slice("o2")][0].max())
+
+
+def test_the_low_edge_of_the_o2_total_cannot_draw_a_supersaturated_wine():
+    """D-173: the band's LOW edge must not put dissolved O2 above air saturation. The STATE, not
+    the bound.
+
+    This is the guard the D-172 amendment left open. ``k_o2_depletion_total``'s shipped low was
+    1.0e-4, and at that draw ``o2.max()`` reached 9.68e-3 under the most permeable closure on the
+    menu — a *sampled field able to draw a physically impossible state*, which no green suite
+    catches because nothing was asserting off the nominal.
+
+    **Three things make this a guard rather than a decoration.**
+
+    1. The edge is READ from the compile seam, never restated. Re-lowering the YAML edge fails
+       HERE, which is the whole point; a hard-coded 2.4e-4 would only pin this file to itself.
+    2. MONOTONICITY is asserted, so "the low edge is the worst case" is *run* rather than assumed
+       — and it doubles as the anti-self-confirmation control: if the override silently failed to
+       apply, all three arms would return the same number and the ordering assert would fail.
+       (`feedback-verify-the-restore-between-mutation-arms`.)
+    3. Both shipped oxidative sets are covered. The cascade reads the same total as its activation
+       floor and breached too (8.35e-3 at the retired low), so guarding ``direct`` alone would
+       leave half the surface open.
+
+    **What this does NOT claim.** The margin at the low edge is 1.88x on this arm alone, but the
+    joint over the other twelve banded parameters that reach ``d(o2)/dt`` closes it to **1.14x**
+    (7.02e-3), and the cascade's is **1.04x**. Both are measured (D-173) and neither is guarded
+    here — the joint corner costs 30+ integrations. The ``closure_otr`` band is a third surface
+    again: it is NOT sampled (``ClosureOxygenIngress.reads == ()`` by design), but at supremecorq's
+    printed high of 15 uL/day the corner reaches 8.16e-3, so what keeps this margin open includes
+    a design decision about the sampler and not only the edges below.
+    """
+    compiled = compile_scenario(_scenario("synthetic_supremecorq"))
+    band = compiled.parameters["k_o2_depletion_total"].uncertainty
+    nominal = compiled.parameters["k_o2_depletion_total"].value
+    assert band is not None and band.low is not None and band.high is not None
+
+    at_low = _o2_max_at_total(band.low)
+    assert at_low < _AIR_SATURATION_GPL, (
+        f"k_o2_depletion_total's low edge {band.low:.2e} draws o2.max() = {at_low:.3e} g/L, at or "
+        f"above air saturation {_AIR_SATURATION_GPL:.1e} -- an unphysical state in a sampled "
+        "field. See D-173 before lowering this edge."
+    )
+
+    # Standing o2 is otr/SUM(k), so it DECREASES in the total: the low edge is the worst case, and
+    # this ordering is what says so. It also fails if the override never took effect.
+    at_nominal = _o2_max_at_total(nominal)
+    at_high = _o2_max_at_total(band.high)
+    assert at_low > at_nominal > at_high
+
+    # The nominal is the paired GREEN arm: it must pass with room to spare, or the arms above are
+    # not separating the edge from the scenario.
+    assert at_nominal < _AIR_SATURATION_GPL / 3.0
+
+    # The cascade set reads the same total as its activation floor and breached identically.
+    assert _o2_max_at_total(band.low, oxidative="cascade") < _AIR_SATURATION_GPL

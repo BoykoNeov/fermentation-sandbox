@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-10T08:37:32.785Z
+  modified: 2026-08-10T13:57:34.582Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,8 +26,8 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
 
 ## Status (2026-08-10)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-172**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1531 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-173**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1532 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -88,8 +88,8 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **WIDE-BAND artefact SPLIT, Mechanism A CLOSED (D-165) — do NOT re-census bands, do NOT ship a shape field.**
   **TWO** mechanisms: **A** log-width (`(lo+m+hi)/3m`), **B** threshold proximity — D-164's 76.8% is **B, not
   width**; censusing together = the D-162 muddle. **A:** 351→**339 live**, `r≥10` **123 (36.5%)**, `lo≤0` **6**, **no
-  VALIDATED band live** (**338**/**122** since D-172 — by ARITHMETIC; a whole-dir dedupe gives **306**, a DIFFERENT
-  denominator); worst `k_d2_ethanol_tolerance_death` **r=300**; **84** log-symmetric, **27** say "order of
+  VALIDATED band live** (**338/121/83** log-sym MEASURED at D-173; a whole-dir dedupe gives **306**, a DIFFERENT
+  denominator); worst `k_d2_ethanol_tolerance_death` **r=300**; **27** say "order of
   magnitude" **in prose no code reads**. **Corrects D-24**: outer percentiles de-sensitise across the **two linear
   shapes offered** (1.30×), **not** log-scale (**3.71×**) — pinned `tests/test_band_shape_sampling.py` (8), **6 arms
   killing 6 of 8**. **Attribution NOT monotone in `r`.** Log-tri **NOT shipped** [[feedback-pair-the-arm-with-its-baseline]].
@@ -136,11 +136,11 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   vacuous**. **The total's high 1.0e-3 has NO account** (printed alt **2.0e-3**, D-71) — **OWNER'S CALL.**
 - **D-172 amdt — SAME defect one level up, FLAGGED not repaired:** `E_a_ethanol_oxidation`/`E_a_browning` are **TWO
   entries**, identical value AND band ⇒ split T-independent **at `T_ref` ONLY**; D-74's *"exact at every T"* is nominal-only.
-- **D-172 §6 — LIVE REGRESSION, OWNER'S CALL, do NOT re-derive (§6 has the both-tree table).** Separate **BOUND**
-  from **STATE**: `ceiling<8.0e-3` is pre-existing/doubled, but **`o2.max()` reaches 9.68e-3 > the 8.0e-3 two tests
-  assert** at `k_o2_depletion_total`'s low (`413c809`: 4.27e-3). **`Σk ≡ total` ⇒ `f_ethanol_o2_share` CANCELS —
-  only the TOTAL's band reaches `o2`.** **"No edge moved" ≠ "no reach changed."** Fix needs no new provenance
-  (`aging.yaml`: **[2.4e-4, 1.2e-3]**) but **CONTRADICTS D-172 §5's "1.0e-4"** [[feedback-rejected-values-must-be-unreachable]].
+- **D-172 §6 SHIPPED (D-173) — the ONE measurement-licensed edge move; NEVER re-lower to 1.0e-4** (it drew
+  9.68e-3 > 8.0e-3 air sat). `k_o2_depletion_total` = **[2.4e-4, 1.0e-3]**: **licence is the MEASUREMENT, not the
+  [2.4e-4, 1.2e-3] account** ⇒ **one edge of two ON PURPOSE, HIGH still unaccounted/owner's**. **The joint is NOT
+  (total×share) — share CANCELS**: 38 params swept, **12 raise `o2` ⇒ margin 1.14×/cascade 1.04×, NOT 1.9× — do
+  NOT re-run.** Guard = compile seam + **monotonicity**. **Residual `closure_otr` UNSAMPLED — Flags D-136.**
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
   `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names
   (positive control moving; pool ends **0.63 of 0.8 g/L** ⇒ competition not binding). **Not a value

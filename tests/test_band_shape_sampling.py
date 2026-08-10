@@ -18,11 +18,14 @@ The two offered shapes agree to within 1.30x at both ends; the log-scale shape s
 exercised and silent about the case the wide bands need. The docstring now says so, and
 these tests are what keep it honest.
 
-**Why this matters beyond a docstring.** 123 of 337 live bands span ``hi/lo >= 10``, and
-84 of those put the nominal at the *geometric* centre — for which a linear triangular has
+**Why this matters beyond a docstring.** 121 of 338 live bands span ``hi/lo >= 10``, and
+83 of those put the nominal at the *geometric* centre — for which a linear triangular has
 mean ``(lo+m+hi)/3`` and is therefore dominated by ``hi``. The worst,
 ``k_d2_ethanol_tolerance_death`` (``hi/lo = 300``), draws a median 9.18x its own stated
-nominal, in every wine and beer ensemble.
+nominal, in every wine and beer ensemble. (Those two counts are re-measured per record and
+drift with the parameter files: D-165 read 123 of 337 and 84; D-172's retirements left 122;
+D-173's low-edge move on ``k_o2_depletion_total`` leaves the figures printed above. They are
+census output, NOT asserted here — the asserts below are all on ``k_autolysis``.)
 
 **What is deliberately NOT pinned here: a fix.** No shape field is shipped. Which bands
 were stated multiplicatively is not in the schema — :class:`Uncertainty` carries endpoints
