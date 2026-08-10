@@ -221,8 +221,13 @@ def test_forcing_an_oak_yield_band_into_the_sample_cannot_move_the_run():
     """Half 2 — drawn across its band, ``oak_yield_vanillin_medium`` changes nothing.
 
     The measured half of D-157's cleanest evidence: firing the intervention verbs left the
-    drawn count unchanged at 152 of 247. The verb reads ``.value`` off the ParameterSet at
-    compile time, so the per-member draw never reaches it.
+    drawn count unchanged at 152 of 247 (**246 since D-172**, which retired three varying
+    bands and added two; the drawn count is unaffected because none of the five is drawn by
+    this un-aged scenario). The verb reads ``.value`` off the ParameterSet at compile time,
+    so the per-member draw never reaches it.
+
+    NOTE these are PROSE, not asserts, which is why retiring three parameters turned nothing
+    red — recorded as a live gap in the surface guards at D-172 §8.
     """
     compiled = compile_scenario(_scenario())
     ensemble = _forced(compiled, "oak_yield_vanillin_medium")

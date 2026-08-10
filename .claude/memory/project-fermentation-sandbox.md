@@ -50,8 +50,8 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
   quantity is itself sampled — and take the **joint** worst case over every band involved.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
-  do not "simplify".** Use these counts, they are the corrected ones: compile-seam **247 DISTINCT** varying —
-  **NOT 279** (a per-*file* sum double-counting shared names); **structural 61, NOT D-157's 66** (D-159, 5 merely
+  do not "simplify".** Use these counts: compile-seam **246 DISTINCT** varying (**247 pre-D-172**) — **NOT 279**
+  (a per-*file* sum double-counting shared names); **structural 61, NOT D-157's 66** (D-159, 5 merely
   scenario-inert). Predicate = **declared `reads`**; **declared-by-UNREGISTERED-class is NEVER drawn**. **A shared
   name can carry DIFFERENT, even disjoint, bands per medium** (19 of 33). `psychophysics.yaml` is **UNIFORM** —
   never "fix" to triangular, and **never apply the triangular mass statistic to it** (anti-conservative);
@@ -73,12 +73,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   `scenario.closure` → the **`closure_otr` STATE slot**; forcing all 5 moves **0 of 94** vs **54** (`mu_max`).
   **12** assertions undecided [[feedback-count-and-print-your-skips]] — **the list was never persisted**.
 - **Band EDGES measured ARCHIVE-WIDE (D-163), 73 arms — do NOT re-run the sweep.** Of **678** live edges (339
-  varying bands) only **19 guarded** (→**23**, D-164); **652** move both directions suite-green; **14 of 18 files
-  wholly unguarded**. **Scale-only** operator provably **cannot** fire `psychophysics`'s disjointness (needs a
-  **translation** operator); **6 half-edges immovable** = D-153 Leg 4's six. **Flags D-162.** Its "**55
-  externally-sourced** bands, `acidbase`'s 13 pKa first" is **CORRECTED by D-167 — do not build it** (see below:
-  4 edges, and that slice is the emptiest). **The prose flag is REFUSED, measured not
-  asserted** — 44 of 51 hits matched `ceiling` alone (oak's *extraction asymptote*); **never re-run or "tighten" the regex**; only a **measured per-parameter bound** finds it.
+  bands) only **19 guarded** (→**23**, D-164); **652** move both ways suite-green; **14 of 18 files wholly
+  unguarded**. **Scale-only** provably **cannot** fire `psychophysics`'s disjointness (needs **translation**); **6
+  half-edges immovable** = D-153 Leg 4's. **Flags D-162.** Its "**55 externally-sourced**" is **CORRECTED by D-167**.
+  **Prose flag REFUSED, measured** — 44 of 51 hits were `ceiling` alone; **never re-run or "tighten" the regex**.
 - **CLASS (d) CLOSED at the seam (D-164) — do NOT recentre the band.** The override mints a `Parameter` carrying
   the base's band ⇒ `_value_in_range` gated `carrying_capacity_gpl`/`autolysis_rate_per_h` by an *epistemic* band,
   naming the **parameter** not the **knob**; now stated (`_override_in_band`, **no new constants**) + pinned
@@ -89,12 +87,12 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   sits on the **exact** 1e-2 high edge ⇒ narrowing it breaks a scenario test for non-autolysis reasons.
 - **WIDE-BAND artefact SPLIT, Mechanism A CLOSED (D-165) — do NOT re-census bands, do NOT ship a shape field.**
   **TWO** mechanisms: **A** log-width (`(lo+m+hi)/3m`), **B** threshold proximity — D-164's 76.8% is **B, not
-  width**; censusing together = the D-162 muddle. **A:** 351→**339 live**; `r≥10` **123 (36.5%)**, `lo≤0` **6**, **no
-  VALIDATED band live**; worst `k_d2_ethanol_tolerance_death` **r=300, median 9.18×**; **84** log-symmetric, **27**
-  say "order of magnitude" **in prose no code reads**. **Corrects D-24**: outer percentiles de-sensitise across the
-  **two linear shapes offered** (1.30×), **not** log-scale (**3.71×**) — pinned `tests/test_band_shape_sampling.py`
-  (8), **6 arms killing 6 of 8**. **Attribution NOT monotone in `r`**; direction does **not** transfer. Log-tri
-  measured/flagged/**NOT shipped** — median=nominal is an **identity** [[feedback-pair-the-arm-with-its-baseline]].
+  width**; censusing together = the D-162 muddle. **A:** 351→**339 live**, `r≥10` **123 (36.5%)**, `lo≤0` **6**, **no
+  VALIDATED band live** (**338**/**122** since D-172 — by ARITHMETIC; a whole-dir dedupe gives **306**, a DIFFERENT
+  denominator); worst `k_d2_ethanol_tolerance_death` **r=300**; **84** log-symmetric, **27** say "order of
+  magnitude" **in prose no code reads**. **Corrects D-24**: outer percentiles de-sensitise across the **two linear
+  shapes offered** (1.30×), **not** log-scale (**3.71×**) — pinned `tests/test_band_shape_sampling.py` (8), **6 arms
+  killing 6 of 8**. **Attribution NOT monotone in `r`.** Log-tri **NOT shipped** [[feedback-pair-the-arm-with-its-baseline]].
 - **Mechanism B CLOSED — the switch-site census (D-166); B's surface is PARAMETERS, not code sites** (corrects
   D-165's "Next": a `params[` grep misses `ethanol_tolerance`). Classify **bitwise** (fixed `t_eval`), **never by
   epsilon**; **populate the must** first. Only **2 of 66** read params are switch-gated ⇒ **`reads` reach is an
@@ -103,14 +101,12 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   nominal ON a band edge is inert by construction** [[feedback-nominal-on-a-band-edge-is-not-inertness]].
   **`ethanol_inhibition` is NOT in wine's active set**; **beer is UNCENSUSABLE** (`_ALLOWED_KEYS["beer"]`: no acid
   input, pH 7.0). Pinned `tests/test_switch_site_census.py`.
-- **The "buildable 55" is RESCOPED and its first slice CLOSED (D-167) — corrects D-163's §7 headline**, whose
-  predicate tested the **VALUE's** `provenance.source` and was reported as a claim about **EDGES**
-  [[feedback-name-the-field-your-predicate-read]]. Of 110 edges only **4** are a parameter-specific published span
-  and **73 have NO account** of it; the **strong** class is **DERIVED** (author arithmetic on a printed ±) and **no
-  source-field predicate can find it**. **`acidbase`'s 13 are the EMPTIEST slice, not the first — TERMINAL**: CRC
-  is a reference book, so [[feedback-paywalled-is-one-host]] does **NOT** transfer. The screen was wrong twice,
-  both caught by hand [[feedback-a-text-screen-has-units-and-self-reference]]; `sensory`'s 7 is **provenance, not
-  sampling**. **NO GUARD SHIPS** — the residue is a **missing band-provenance schema field, not designable here.**
+- **The "buildable 55" is RESCOPED, first slice CLOSED (D-167) — corrects D-163's §7 headline**, whose predicate
+  tested the **VALUE's** `provenance.source` and was reported about **EDGES**
+  [[feedback-name-the-field-your-predicate-read]]. Of 110 edges only **4** are a parameter-specific published span,
+  **73 have NO account**; the **strong** class is **DERIVED** ⇒ **no source-field predicate can find it**.
+  **`acidbase`'s 13 are the EMPTIEST slice — TERMINAL** (CRC is a reference book ⇒ [[feedback-paywalled-is-one-host]]
+  does **NOT** transfer). Screen wrong twice [[feedback-a-text-screen-has-units-and-self-reference]]. **NO GUARD SHIPS.**
 - **Those 5 are CLOSED (D-168) — do NOT re-open them as "bands that contradict their sources".** Four carry a
   **SECOND** account (a **Q10 at 20 °C**) D-167 never read, near-disjoint from the first ⇒ **"move it to its cited
   range" is ILL-POSED** [[feedback-a-note-can-state-its-span-twice]]; thermal's matches neither ⇒
@@ -140,7 +136,11 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   (pre-registered 12.50), **ZERO edges moved**, nominals **bitwise** vs `413c809`. **Never 3 co-drawn — max 2**;
   cascade's pair is **total vs its own SHARE**, live only **with SO₂**. **A DISSOLVED, not repaired**; the sum
   assert is now an **IDENTITY ⇒ vacuous**. **The total's high 1.0e-3 has NO account** — printed alt **2.0e-3**
-  (D-71 `e1105ae`; its *"350–7000 h"* text was right when WRITTEN, then **stale**). **OWNER'S CALL, not mine.**
+  (D-71 `e1105ae`; *"350–7000 h"* right when WRITTEN, then **stale**). **OWNER'S CALL.**
+- **D-172 amdt — the SAME defect one level up, FLAGGED not repaired:** `E_a_ethanol_oxidation`/`E_a_browning` have
+  identical value AND band but are **TWO entries** ⇒ the split is T-independent **at `T_ref` ONLY** (0.155–0.708 at
+  45 °C), so D-74's *"exact at every T"* is nominal-only. `test_closure_ingress`'s `ceiling<8.0e-3` was **already
+  breached pre-D-172** (3.2× over) and D-172 **doubles** it — a pre-existing shape, **NOT a regression**.
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
   `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names
   (positive control moving; pool ends **0.63 of 0.8 g/L** ⇒ competition not binding). **Not a value

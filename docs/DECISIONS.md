@@ -102,7 +102,7 @@ Coarse first cut for *where did we decide X*. A record appears under **every** b
 - [**D-71**](#d-71--oxidativeacetaldehyde-built-the-oxidative-aging-axis-opens-on-a-dissolved-o-pool-41) — `OxidativeAcetaldehyde` built: the oxidative aging axis opens on a dissolved-O₂ pool (§4.1) — ⚠ **flagged by [D-137](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing)**
 - [**D-72**](#d-72--sulfiteoxidation-built-so-scavenging-is-the-first-sink-on-the-shared-o-budget-41) — `SulfiteOxidation` built: SO₂ scavenging is the first sink on the shared O₂ budget (§4.1) — ⚠ **flagged by [D-137](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing)**
 - [**D-73**](#d-73--o-sub-axis-reworked-for-always-on-sinks-k_ethanol_oxidation-is-a-share-not-the-total-41) — O₂ sub-axis reworked for *always-on* sinks: `k_ethanol_oxidation` is a **share**, not the total …
-- [**D-74**](#d-74--phenolicbrowning-built-oxidative-browning-is-the-first-always-on-o-sink-and-it-makes-the-browning-visible-41) — `PhenolicBrowning` built: oxidative browning is the first *always-on* O₂ sink, and it makes the … — ⚠ **flagged by [D-137](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing)** — ⚠ **flagged by [D-171](#d-171--the-beat-was-guard-the-five-ordering-breaches-and-not-one-of-them-can-be-guarded-where-it-breaches-every-joint-edge-margin-is-negative-so-the-d-170-guard-shape-needs-a-band-edge-moved-and-no-citation-licenses-that--but-proving-the-five-are-unguarded-took-four-rounds-because-rounds-1-and-2-each-attributed-a-red-to-the-archive-that-belonged-to-something-else-and-the-pair-whose-consequence-guard-names-the-ordering-does-not-fire-when-the-ordering-is-fully-inverted)**
+- [**D-74**](#d-74--phenolicbrowning-built-oxidative-browning-is-the-first-always-on-o-sink-and-it-makes-the-browning-visible-41) — `PhenolicBrowning` built: oxidative browning is the first *always-on* O₂ sink, and it makes the … — ⚠ **flagged by [D-137](#d-137--the-o2-sink-partition-audit-so2-takes-90-of-the-whole-5-year-o2-budget-and-never-exhausts-and-the-acetaldehydephenolic-sign-is-inverted-by-mechanism--measured-one-provenance-fix-shipped-the-cascade-rebuild-approved-but-gated-on-sourcing)** — ⚠ **flagged by [D-171](#d-171--the-beat-was-guard-the-five-ordering-breaches-and-not-one-of-them-can-be-guarded-where-it-breaches-every-joint-edge-margin-is-negative-so-the-d-170-guard-shape-needs-a-band-edge-moved-and-no-citation-licenses-that--but-proving-the-five-are-unguarded-took-four-rounds-because-rounds-1-and-2-each-attributed-a-red-to-the-archive-that-belonged-to-something-else-and-the-pair-whose-consequence-guard-names-the-ordering-does-not-fire-when-the-ordering-is-fully-inverted)** — ⚠ **flagged by [D-172](#d-172--the-one-degree-of-freedom-three-independent-draws-flag-is-a-claim-about-the-files-and-not-about-any-ensemble-no-run-ever-draws-all-three-but-two-are-live-in-every-aged-arm-and-the-pair-the-cascade-draws-is-a-total-against-its-own-share--repaired-by-reparameterising-rather-than-by-coupling-the-sampler-which-drops-the-archives-highest-ordering-breach-rate-from-5520--to-1254--with-no-edge-moved)**
 - [**D-75**](#d-75--streckerdegradation-built-the-oamino-acid-strecker-aldehydes-cooked-potato--honey-a-wine-only-substrate-gated-sink-41) — `StreckerDegradation` built: the O₂/amino-acid Strecker aldehydes (cooked-potato + honey), a … — ⚠ **flagged by [D-138](#d-138--gate-2-closed-the-seven-o2-sinks-re-expressed-as-h2o2--quinone-consumers-and-the-measurement-showing-the-rebuild-is-one-new-state-slot-not-the-larger-than-f2-rewrite-d-137-feared)**
 - [**D-76**](#d-76--the-emergent-sur-lie--strecker-pathway-lees-autolysis-d-34-refills-amino_acids-and-feeds-streckerdegradation-d-75-with-no-new-physics-41) — The emergent **sur-lie → Strecker** pathway: lees autolysis (D-34) refills `amino_acids` and feeds …
 - [**D-77**](#d-77--oakextraction-built-the-barrelchip-aroma-extractive-axis--the-first-non-oxidative-aging-process-a-separate-axis-no-o-41) — `OakExtraction` built: the barrel/chip aroma-extractive axis — the FIRST non-oxidative aging …
@@ -21541,6 +21541,7 @@ docstring scoped, six guards added, **no number moved**.
 
 **Corrects:** D-171 — its §6 "one degree of freedom, three independent draws" is true of the parameter files and false of every ensemble: the maximum co-drawn in one run is two, and under the cascade the live pair is the total against one of its own shares, not share against share.
 **Flags:** D-141 — `k_activation_floor`'s high edge 1.0e-3 has no account; it is carried over unchanged into `k_o2_depletion_total` because moving it is the owner's call, not mine.
+**Flags:** D-74 — `E_a_ethanol_oxidation` and `E_a_browning` are two entries with identical value AND identical band, drawn independently, while `E_a_browning`'s note claims the partition is exact "at every T"; the amendment below measures it. The rate constants are repaired here; the activation energies carry the same defect and still ship.
 
 Owner's direction was **"B then A"**: fix the partition first so that `k_ethanol_oxidation`'s
 band question falls out as a consequence rather than as an independent sampling-surface move.
@@ -21728,3 +21729,96 @@ bearing for anything the suite checks.
   repo at `M:\claud_projects\temp\ferment\d172-partition\`.
 
 Suite **1531 passed** (1524 + 7), `ruff` and `mypy` clean. Three parameters retired, two shipped, one new pure helper, seven guards added, **no declared edge moved and no nominal changed — the latter verified bitwise against `413c809`, not asserted.**
+
+### Amendment (same day) — three claims this record shipped without running: a boot-surface count it invalidated in the imperative, a temperature-independence claim true only at T_ref, and a "price of the coupling" conceded instead of taken to the joint edge — where the bound it doubles was already breached before D-172 touched it
+
+Self-correcting, so it carries no `Corrects:` marker; the outward flag it raises is declared
+on the record's own marker line above (`Flags: D-74`).
+
+### 1. The count D-172 invalidated, in a file that says "use these counts"
+
+D-172 §8 noticed that the D-156/D-157 surface counts live in *prose* (a docstring in
+`test_drawability_surface.py`) rather than in asserts, and that retiring three parameters
+therefore turned nothing red. It filed that as a gap. It is worse than a gap: the
+session-boot memory states those counts **in the imperative** ("Use these counts, they are
+the corrected ones"), so the next session would have been instructed to use a number D-172
+had just made wrong.
+
+Re-measured with the same predicate (compile-seam, distinct, `high > low`): **246**, against
+the recorded 247 — exactly the −1 that three retirements and two additions predict. Fixed in
+the memory row and in the docstring, both of which now name D-172.
+
+**D-165's Mechanism-A census is corrected by ARITHMETIC, not by a re-run**, because the
+memory forbids re-censusing bands and because a re-run would have changed the denominator: a
+whole-directory dedupe-by-name gives 306, not 339, and the ~33 gap is the shared names that
+carry different bands per medium. Reporting 306 against 339 would have been the D-156
+"279 vs 247" error in a new costume — the harness printed the warning and it was heeded. On
+D-165's own denominator: live varying bands **339 → 338** (retired `k_ethanol_oxidation`
+r=20, `k_browning_base` r=2, `k_activation_floor` r=10; added `k_o2_depletion_total` r=10,
+`f_ethanol_o2_share` r=3), and the `r >= 10` bucket **123 → 122**. All five live in the
+shared `aging.yaml`, so each is counted once and the arithmetic is sound.
+
+### 2. The temperature-independence claim is false off T_ref
+
+`f_ethanol_o2_share`'s shipped `conditions` said the split is *"temperature-INDEPENDENT by
+construction: both routes carry the same E_a"*. `E_a_ethanol_oxidation` and `E_a_browning`
+have the same value (50,000) and the same band ([30,000, 70,000]) — and are **two entries**,
+so the sampler draws them independently. The realised ethanol share
+`f·f_E / (f·f_E + (1−f)·f_B)` against a nominal 0.400:
+
+| T | worst low | worst high | spread |
+|---|---|---|---|
+| 5 °C | 0.2158 | 0.6176 | 0.402 |
+| 15 °C | 0.3340 | 0.4699 | 0.136 |
+| **20 °C (T_ref)** | 0.4000 | 0.4000 | **0.000** |
+| 30 °C | 0.2795 | 0.5339 | 0.254 |
+| 45 °C | 0.1551 | 0.7077 | 0.553 |
+
+Zero at T_ref by definition — both Arrhenius factors are 1 there — and nowhere else. So
+`E_a_browning`'s own claim that the sum is *"5.0e-4 · f(T) exactly at every T, not just
+T_ref"* is true at the nominal and false in an ensemble. **This is D-172's own defect one
+level up**, on the activation energies rather than the rate constants, and it is **flagged,
+not repaired**: merging the two E_a entries is a separate beat with its own provenance
+question, since prime directive #2 gave each distinct reaction its own entry deliberately.
+The note is corrected to say what is actually true.
+
+### 3. The "price of the coupling" taken to the joint edge — where it was already breached
+
+D-172 §6 measured the two derived shares reaching wider than the bands they replaced and
+called it "the price of the coupling, not a defect". That is prose where a measurement was
+available, on the archive's single most-repeated shape (a constraint verified at a POINT
+where the sampler reads a BAND) — `feedback-conceded-caveats-are-not-coverage`, which D-172
+cited for a different point in the same record.
+
+Run against the first target, `test_closure_ingress`'s `ceiling = otr / k_ethanol` followed
+by `assert ceiling < 8.0e-3`, which that test calls *"the real safety margin"*:
+
+| | k_ethanol | ceiling | vs 8.0e-3 |
+|---|---|---|---|
+| nominal (what the test runs) | 2.00e-4 | 5.15e-3 | PASS |
+| **pre-D-172** reachable low (retired band's own 4.0e-5) | 4.00e-5 | 2.58e-2 | **BREACHED, 3.2× over** |
+| post-D-172 joint edge (`total_lo × f_lo`) | 2.00e-5 | 5.15e-2 | BREACHED, **2.0× worse** |
+
+**The attribution matters and the baseline row is what establishes it**
+(`feedback-pair-the-red-with-an-ordering-preserving-baseline`): the bound was **already
+breached at the pre-D-172 band low**, so this is a pre-existing instance of the recurring
+shape, not something D-172 introduced. What D-172 did is **double it**. Reporting it as a
+regression would have been as wrong as leaving it unmeasured.
+
+Not repaired, for the D-171 reason: closing it needs a band edge moved, and
+`k_o2_depletion_total`'s low is the one edge in this repair that **all three** competing
+accounts agree on (§5 of the record). The test's docstring now claims "lowering EITHER factor
+fails HERE", which is a reachability claim — it is true at the nominal and the numbers above
+are what it does not say. Left for the owner alongside the 1.0e-3 vs 2.0e-3 high-edge
+decision, since both are edge moves on the same parameter.
+
+### 4. Limits
+
+* §1's 246 is measured; §1's 338/122 is **arithmetic on D-165's denominator**, and is labelled
+  as such rather than presented as a re-run. If that denominator is ever rebuilt, rebuild it —
+  do not reconcile it against the 306 this amendment's harness printed.
+* §3 sweeps **one** point-verified constraint, named. The rest of what reads the two new
+  parameters is not swept here, and this record does not claim it is clean.
+
+Suite **1531 passed**, `ruff` and `mypy` clean. Two notes corrected, one docstring corrected,
+**no value and no band edge moved.**
