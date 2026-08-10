@@ -21527,7 +21527,11 @@ notes, *"no clean molar mass"* — which is precisely the uncertainty those band
   never exercised. "No scenario tried" is not "structurally undrawable".
 * The note corrections quote the orderings they correct, so the D-170 §2 non-idempotence
   applies: **a re-run of the text screen will re-flag these repaired notes.** Any future
-  count must diff membership against the pre-repair tree, not compare totals.
+  count must diff membership against the pre-repair tree, not compare totals. **The
+  pre-repair tree is commit `3c45216`** — `git show 3c45216:src/fermentation/parameters/data/<f>`
+  reconstructs it, which is the only place it survives (the screen itself lives under
+  `M:\claud_projects\temp\ferment\d171-ordering-guards\`, outside the repo). Naming the
+  baseline is what makes that diff runnable later instead of merely recommended.
 
 Suite **1524 passed** (1518 + 6), `ruff` and `mypy` clean. Nine notes corrected, one test
 docstring scoped, six guards added, **no number moved**.

@@ -73,7 +73,20 @@ def thermal():
 
 
 def _inverts(store, lo_name: str, hi_name: str) -> bool:
-    """True iff some JOINT draw can invert `lo_name < hi_name` (bands overlap)."""
+    """True iff some JOINT draw can invert the ordering — i.e. the two bands overlap.
+
+    ARGUMENT ORDER IS ALWAYS (the one that should be SMALLER, the one that should be LARGER),
+    never the order the neighbouring assert happens to be written in. For a `>` assert the
+    two therefore look reversed, and that is deliberate:
+
+        assert value(A) > value(B)          # A is the larger
+        assert _inverts(store, "B", "A")    # so B is `lo_name` -- NOT a typo
+
+    Do not "tidy" the args to match the assert: it would silently stop tracking the overlap
+    and start asserting something else that is also True today. The inversion condition is
+    `smaller.uncertainty.high > larger.uncertainty.low` — the sampler can draw the one that
+    should be smaller near its top while the other is near its bottom.
+    """
     return bool(store[lo_name].uncertainty.high > store[hi_name].uncertainty.low)
 
 
@@ -189,6 +202,8 @@ def test_maillard_melanoidins_are_browner_per_mass_than_caramelization_polymers(
     pinned (the D-89 problem) — so the ordering, not either magnitude, is the claim.
     """
     assert thermal.value("y_a420_per_maillard_melanoidin") > thermal.value("y_a420_per_melanoidin")
+    # A `>` ordering, so the SIBLING is `lo_name` here: [0.1, 1.5] against [0.2, 3.0] means the
+    # caramelan yield can be drawn at 1.5 while the Maillard one sits at 0.2. See _inverts.
     assert _inverts(thermal, "y_a420_per_melanoidin", "y_a420_per_maillard_melanoidin")
 
 
