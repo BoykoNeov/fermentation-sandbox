@@ -649,22 +649,27 @@ def test_the_low_edge_of_the_o2_total_cannot_draw_a_supersaturated_wine():
     2. MONOTONICITY is asserted, so "the low edge is the worst case" is *run* rather than assumed
        — and it doubles as the anti-self-confirmation control: if the override silently failed to
        apply, all three arms would return the same number and the ordering assert would fail.
-       (`feedback-verify-the-restore-between-mutation-arms`.)
+       (`feedback-verify-the-restore-between-mutation-arms`.) It is asserted on the band's own
+       GEOMETRIC INTERIOR, never on the nominal: with the nominal as the middle point, RAISING the
+       low edge toward it collapses the ordering and this test would go RED on a change that makes
+       the physics *safer* — a guard that forbids the safe direction is one that gets argued away
+       (`feedback-name-guards-for-what-they-forbid`).
     3. Both shipped oxidative sets are covered. The cascade reads the same total as its activation
        floor and breached too (8.35e-3 at the retired low), so guarding ``direct`` alone would
        leave half the surface open.
 
-    **What this does NOT claim.** The margin at the low edge is 1.88x on this arm alone, but the
-    joint over the other twelve banded parameters that reach ``d(o2)/dt`` closes it to **1.14x**
-    (7.02e-3), and the cascade's is **1.04x**. Both are measured (D-173) and neither is guarded
-    here — the joint corner costs 30+ integrations. The ``closure_otr`` band is a third surface
-    again: it is NOT sampled (``ClosureOxygenIngress.reads == ()`` by design), but at supremecorq's
-    printed high of 15 uL/day the corner reaches 8.16e-3, so what keeps this margin open includes
-    a design decision about the sampler and not only the edges below.
+    **What this does NOT claim.** The margin at the low edge is 1.88x on this arm alone. The joint
+    over the eleven OTHER sink parameters that reach ``d(o2)/dt`` closes it to **1.59x** (direct)
+    and **1.41x** (cascade). Two further surfaces are not sink constants and are held out of that
+    figure: ``T_ref``, which detunes every ``f(T)`` at once rather than perturbing one sink
+    (including it gives 1.14x / 1.04x), and ``closure_otr``, the NUMERATOR — not sampled at all
+    (``ClosureOxygenIngress.reads == ()`` by design), but at supremecorq's printed high of 15
+    uL/day the corner reaches 8.16e-3, back above saturation. All measured at D-173, none guarded
+    here (the corner costs 30+ integrations per arm), so what holds this margin open includes two
+    decisions about the sampler surface and not only the edges below.
     """
     compiled = compile_scenario(_scenario("synthetic_supremecorq"))
     band = compiled.parameters["k_o2_depletion_total"].uncertainty
-    nominal = compiled.parameters["k_o2_depletion_total"].value
     assert band is not None and band.low is not None and band.high is not None
 
     at_low = _o2_max_at_total(band.low)
@@ -675,14 +680,17 @@ def test_the_low_edge_of_the_o2_total_cannot_draw_a_supersaturated_wine():
     )
 
     # Standing o2 is otr/SUM(k), so it DECREASES in the total: the low edge is the worst case, and
-    # this ordering is what says so. It also fails if the override never took effect.
-    at_nominal = _o2_max_at_total(nominal)
+    # this ordering is what says so rather than assuming it. The middle point is the band's
+    # GEOMETRIC centre, which is strictly interior for ANY band the schema admits -- so no edge
+    # move in the safe direction can collapse the ordering (see the docstring). It also fails if
+    # the override never took effect, since three equal numbers cannot be strictly ordered.
+    at_mid = _o2_max_at_total(float(np.sqrt(band.low * band.high)))
     at_high = _o2_max_at_total(band.high)
-    assert at_low > at_nominal > at_high
+    assert at_low > at_mid > at_high
 
-    # The nominal is the paired GREEN arm: it must pass with room to spare, or the arms above are
-    # not separating the edge from the scenario.
-    assert at_nominal < _AIR_SATURATION_GPL / 3.0
+    # The mildest arm is the paired GREEN control: it must clear saturation with room to spare, or
+    # these arms are not separating the edge from the scenario.
+    assert at_high < _AIR_SATURATION_GPL / 3.0
 
     # The cascade set reads the same total as its activation floor and breached identically.
     assert _o2_max_at_total(band.low, oxidative="cascade") < _AIR_SATURATION_GPL

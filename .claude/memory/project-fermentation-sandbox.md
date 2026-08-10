@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-10T13:57:34.582Z
+  modified: 2026-08-10T14:08:52.471Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -136,11 +136,11 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   vacuous**. **The total's high 1.0e-3 has NO account** (printed alt **2.0e-3**, D-71) — **OWNER'S CALL.**
 - **D-172 amdt — SAME defect one level up, FLAGGED not repaired:** `E_a_ethanol_oxidation`/`E_a_browning` are **TWO
   entries**, identical value AND band ⇒ split T-independent **at `T_ref` ONLY**; D-74's *"exact at every T"* is nominal-only.
-- **D-172 §6 SHIPPED (D-173) — the ONE measurement-licensed edge move; NEVER re-lower to 1.0e-4** (it drew
-  9.68e-3 > 8.0e-3 air sat). `k_o2_depletion_total` = **[2.4e-4, 1.0e-3]**: **licence is the MEASUREMENT, not the
-  [2.4e-4, 1.2e-3] account** ⇒ **one edge of two ON PURPOSE, HIGH still unaccounted/owner's**. **The joint is NOT
-  (total×share) — share CANCELS**: 38 params swept, **12 raise `o2` ⇒ margin 1.14×/cascade 1.04×, NOT 1.9× — do
-  NOT re-run.** Guard = compile seam + **monotonicity**. **Residual `closure_otr` UNSAMPLED — Flags D-136.**
+- **D-172 §6 SHIPPED (D-173) — the ONE measurement-licensed edge move; NEVER re-lower to 1.0e-4** (drew `o2` >
+  air sat). `k_o2_depletion_total` = **[2.4e-4, 1.0e-3]**: **licence is the MEASUREMENT, not the [2.4e-4, 1.2e-3]
+  account** ⇒ **one edge of two ON PURPOSE, HIGH unaccounted/owner's**. **Joint is NOT (total×share) — share
+  CANCELS**; 38 swept ⇒ **sink-joint 1.59×/cascade 1.41×** (1.14/1.04 only WITH `T_ref`, not a sink) — **do NOT
+  re-run.** Guard = seam + monotonicity at the **GEOMETRIC centre** (nominal ⇒ a safe *raise* REDs). **Flags D-136.**
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
   `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names
   (positive control moving; pool ends **0.63 of 0.8 g/L** ⇒ competition not binding). **Not a value

@@ -22043,3 +22043,42 @@ integrations per run is too expensive for the suite, so the shipped guard holds 
 the corner margins (1.14x direct, 1.04x cascade) are recorded here and nowhere enforced. Beer is not
 swept — it has no closure model at all (`closure` on a beer scenario is a hard compile error), so the
 ingress term that creates this question does not exist there.
+
+### 8. Amendment (same day) — the headline margin counts a member this record itself calls not-a-sink, and the guard's monotonicity arm forbade the safe direction
+
+Two defects, both in what shipped an hour earlier, both caught by review rather than by the suite.
+
+**(a) The heading's 1.14x is a THREE-SURFACE figure, not the sink joint.** §2's corner includes
+`T_ref` at 298.15 — and §2 itself parenthesises `T_ref` as "not a sink constant", §3 puts
+`closure_otr` in a separate class for the same reason, and the harness printed the split. So the
+headline asserts the tighter number while the body explains why that member does not belong in it.
+The cascade's 1.04x in §3 carries the same contamination and was never run the other way. Measured
+here, sink constants only (11 parameters, `T_ref` held out):
+
+| set | corner + shipped low 1.0e-4 | corner + D-173 low 2.4e-4 |
+|---|---|---|
+| direct, sinks only | 1.1117e-2 (0.72x) | 5.0409e-3 (**1.59x**) |
+| direct, sinks + `T_ref` | 1.4165e-2 (0.56x) | 7.0230e-3 (1.14x) |
+| cascade, sinks only | 1.1487e-2 (0.70x) | 5.6640e-3 (**1.41x**) |
+| cascade, sinks + `T_ref` | 1.4002e-2 (0.57x) | 7.7287e-3 (1.04x) |
+
+**The sink-joint margin is 1.59x (direct) and 1.41x (cascade).** 1.14x / 1.04x are three-surface
+figures and should be quoted only with `T_ref` named. Every arm at the shipped low is above
+saturation and every arm at 2.4e-4 is below it, so the *conclusion* is unchanged in all four rows —
+it is the number in the heading that is over-tight. The heading is left as written (append-only);
+read it as the three-surface figure it is.
+
+**(b) The guard forbade the safe direction.** §5's monotonicity arm was `at_low > at_nominal >
+at_high`. Raising the low edge *toward* the nominal — a change that makes the physics safer —
+collapses that ordering and turns the guard RED for it. A guard that fires on the safe direction is
+one the next reader argues away, which is `feedback-name-guards-for-what-they-forbid` landing on a
+guard written in the same commit that cites the lesson. Fixed by taking the middle arm at the band's
+**geometric centre** `sqrt(lo*hi)`, strictly interior for any band the schema admits, and by moving
+the paired GREEN control onto the *high* arm (`at_high < sat/3`), whose direction is also safe. Both
+mutation arms re-run: low edge raised to 5.0e-4 → **GREEN**; low edge re-lowered to 1.0e-4 → **RED**,
+still naming the edge and the value. The nominal arm is dropped, so the guard now costs four
+integrations rather than five.
+
+Neither defect was reachable by the suite: (a) is prose and (b) only fires on a mutation nobody had
+run — the mutation discipline covers *removing* the protection, and this was the arm that
+*strengthens* it.
