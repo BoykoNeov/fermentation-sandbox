@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-10T18:09:33.381Z
+  modified: 2026-08-10T18:23:05.484Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -125,8 +125,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **O2 partition REPARAMETERISED (D-172) — never re-add `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor`**
   ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`, **two PRODUCTS, never `total-total*f`** (1 ULP). Breach **55.20 →
   12.54 %**, **ZERO edges moved**. **Never 3 co-drawn — max 2.** Sum assert now an **IDENTITY ⇒ vacuous**. Retired-name
-  flag **DISCHARGED** (D-175: 7 hits, 4 field kinds). Still FLAGGED not repaired — `E_a_ethanol_oxidation`/`E_a_browning`
-  are **TWO entries**, same value AND band ⇒ split T-independent **at `T_ref` ONLY**.
+  flag **DISCHARGED** (D-175). Still FLAGGED — `E_a_ethanol_oxidation`/`E_a_browning` are **TWO entries**, same value AND band ⇒ split T-independent **at `T_ref` ONLY**.
 - **`k_o2_depletion_total` = [2.4e-4, 2.0e-3]; each edge on its OWN ground.** LOW **never back to 1.0e-4** (D-173: drew
   `o2` > air sat; licence = MEASUREMENT). HIGH = D-71's printed 2.0e-3 (D-174, `e1105ae`), **DOCUMENT only** — 1.0e-3's
   account died with the low it was round against. **Do NOT re-run** the 38-param joint (share CANCELS) or the 200×
@@ -140,7 +139,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.** `k_maillard_browning`'s
   **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names (positive control moving; pool ends
   **0.63 of 0.8 g/L** ⇒ not binding). **Not a value change**; deciding it needs D-89's calibration scenario, never pinned.
-- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and  `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
+- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow, as does D-176's joint-corner guard).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
   top-mode deliberate (0.531 = hard *measured* protein floor). **D-153's "unguarded" was WRONG; D-155 REFUSED
   the guard** (4-arm matrix caught every arm ⇒ decoration); hardened instead — the breach test reads the band
@@ -264,8 +263,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **EtOAc eq is BERTHELOT-COUPLED (D-176, corrects D-127) — `ethyl_acetate_eq` is NOT the equilibrium**, it is
   its value at an anchor, ×`acetic_acid_typical`×ethanol. **`ethanol_ref_ester_eq` 94.68 = 12 % v/v E-rate matrix,
   NEVER the 14 % RATE matrix**; refs PINNED ⇒ moving one is refused **at load**. **Beer HYDROLYSES** ⇒ kills the
-  negative `Byp` (pool **0, no producer**, D-16 **Flagged**); **wine +24 %**. Acetic band IARC ale **[12,155]
-  PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted, not tuned**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
+  negative `Byp` (pool **0, no producer**, D-16 **Flagged**) — but that is a **MARGIN, +0.741 mg/L at the JOINT
+  corner of TWO bands** (flips at **+3.6 % ethanol**; 0 of 180 members reach it), **never an impossibility**;
+  **wine +24 %**. Acetic band IARC ale **[12,155]
+  PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

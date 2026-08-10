@@ -22677,3 +22677,58 @@ Suite **1540 passed** (1537 + 3), `ruff`, `ruff format` and `mypy` clean.
 * **The beer endpoint is below the published range** (§5). Closing it needs an aging-phase ester
   synthesis term or a kinetic barrier, neither of which is sourced here.
 * **No frequency claim.** The band corners are reachable values, not likelihoods.
+
+### 8. Amendment (same day) — §5's "credited and never debited" was verified at NOMINALS, and the equilibrium it describes is a PRODUCT OF TWO BANDED quantities
+
+Found by review, not by the suite. §5 states the beer pool is "credited and never debited" without
+qualification, and `test_beer_aging_never_drives_the_byproduct_pool_negative` integrates exactly
+one beer at nominal parameters. But `eq = ethyl_acetate_eq × acetic_factor × ethanol_factor`, and
+**both** `ethyl_acetate_eq` **[0.035, 0.084]** (D-158, deliberately never narrowed) and
+`acetic_acid_typical` **[0.012, 0.155]** are live bands. This is the archive's most repeated defect
+shape — **a constraint verified at a POINT where the sampler reads a BAND**
+(D-118/D-154/D-155/D-157/D-170) — and §7's "one dose, one style, one duration" does **not**
+discharge it ([[feedback-conceded-caveats-are-not-coverage]]).
+
+| arm | equilibrium | gap vs packaged 21.322 mg/L | direction |
+|---|---|---|---|
+| nominal × nominal | 6.732 mg/L | **+14.591** | hydrolyse |
+| `eq` HIGH × acetic nominal | 11.087 mg/L | +10.235 | hydrolyse |
+| `eq` nominal × acetic HIGH | 12.496 mg/L | +8.827 | hydrolyse |
+| **`eq` HIGH × acetic HIGH (JOINT)** | **20.581 mg/L** | **+0.741** | hydrolyse |
+
+**The claim survives, but as a MARGIN of 3.4 %, not as an impossibility**
+([[feedback-a-margin-is-a-claim-about-what-holds-it-open]]). At the joint corner the sign flips if
+beer's packaging ethanol reaches **54.27 g/L — only +3.60 % above the nominal 52.38**. The nominal
+arm has **20×** that headroom, which is exactly why a nominal-only guard reported it as comfortable.
+
+**What holds it open, measured rather than argued.** Over **180 members (3 seeds × 60)** the worst
+`Byp` is **exactly +0.000e+00** and **0 members** go negative. Two independent things hold it:
+beer's packaging ethanol never exceeds **52.30 g/L** across the ensemble (below the 54.27 flip), and
+the two bands are drawn **independently**, so a triangular sampler puts vanishing density at both
+endpoints at once. Neither is a guarantee — a scenario or medium-file edit reaches the corner
+directly, which is what the new guard is for.
+
+**`acetic_acid_typical` IS drawn — checked, not assumed.** 60 **distinct** values per seed spanning
+**[0.01575, 0.14618]** of the [0.012, 0.155] band. So declaring the three coupling names in `reads`
+did what D-160 says it must, and the coupling's one live band is not decoration. **The green suite
+proved nothing here either way**: the compile-seam "246 distinct varying" figure is **PROSE in a
+docstring, not an assertion** (`tests/test_drawability_surface.py`, recorded as a live gap at
+D-172 §8), so adding a banded name to a registered Process's `reads` could not have moved a number
+anything checks. It had to be measured.
+
+**The guard.** `test_beer_hydrolysis_margin_survives_the_JOINT_band_corner` reads **both edges off
+the shipped bands** (never transcribed), takes beer's packaged ester and ethanol from a **real
+compiled run**, and asserts the corner still hydrolyses *and* that the headroom stays inside a
+stated bound — so an edge creeping toward the flip is visible before it crosses. Two further arms,
+each restored byte-for-byte with SHA-256 verified:
+
+| arm | edit | verdict | what the RED names |
+|---|---|---|---|
+| **A0** unchanged | — | **GREEN** | — |
+| **A4** beer acetic high 0.155 → 0.30 | `beer_generic.yaml` | **RED** | `..._survives_the_JOINT_band_corner` |
+| **A5** `ethyl_acetate_eq` high 0.084 → 0.12 | `aging.yaml` | **RED** | `..._survives_the_JOINT_band_corner` |
+
+**Nothing measured or shipped in §0–§7 moves.** Every figure there is a nominal-arm measurement and
+none came from this corner; what changes is that §5's unqualified "never debited" is **withdrawn
+and restated as a margin with its own guard**. `mypy` re-run clean after the final test edit — the
+earlier claim predated it. Suite **1541 passed** (1540 + 1).

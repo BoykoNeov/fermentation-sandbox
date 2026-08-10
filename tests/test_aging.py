@@ -1145,6 +1145,74 @@ def test_beer_ethyl_acetate_equilibrium_is_not_wines(store):
     assert beer_eq < 0.0237
 
 
+def test_beer_hydrolysis_margin_survives_the_JOINT_band_corner():
+    # D-176 amendment. The guard above integrates ONE beer at NOMINAL parameters, and "beer
+    # hydrolyses" is a comparison between beer's packaged ester and an equilibrium that is a
+    # PRODUCT OF TWO BANDED quantities: `ethyl_acetate_eq` [0.035, 0.084] (D-158, deliberately
+    # never narrowed) and `acetic_acid_typical` [0.012, 0.155]. A claim verified at a point where
+    # the sampler reads a band is the archive's most repeated defect shape (D-118/D-154/D-155/
+    # D-157/D-170), so the JOINT worst case is taken here rather than assumed.
+    #
+    # It is a MARGIN, not an impossibility (feedback-a-margin-is-a-claim-about-what-holds-it-open):
+    # at the joint high corner the equilibrium reaches 20.581 mg/L against a packaged 21.322 mg/L
+    # -- only +0.741 mg/L of room, and the sign flips if beer's ethanol reaches 54.27 g/L (+3.60%).
+    # Measured over 180 ensemble members (3 seeds x 60) the pool never went negative and packaging
+    # ethanol never exceeded 52.30 g/L, so the corner is not REACHED; it is also not FORBIDDEN.
+    # This test pins the margin so that widening either band, or moving either anchor, goes RED
+    # here rather than silently re-opening the negative pool.
+    beer_params = load_parameters(
+        default_data_dir() / "beer_generic.yaml",
+        default_data_dir() / "aging.yaml",
+        default_data_dir() / "acidbase.yaml",
+    )
+    resolved = beer_params.resolve()
+    corner = dict(resolved)
+    # The joint HIGH corner -- both edges read off the shipped bands, never transcribed.
+    corner["ethyl_acetate_eq"] = beer_params["ethyl_acetate_eq"].uncertainty.high
+    corner["acetic_acid_typical"] = beer_params["acetic_acid_typical"].uncertainty.high
+    # Beer's packaging ester and ethanol, from a real compiled run rather than assumed.
+    from fermentation.scenario import (
+        Intervention,
+        Scenario,
+        TemperaturePoint,
+        compile_scenario,
+    )
+
+    compiled = compile_scenario(
+        Scenario(
+            name="d176-joint-corner",
+            medium="beer",
+            initial={
+                "glucose_gpl": 15.0,
+                "maltose_gpl": 70.0,
+                "maltotriose_gpl": 15.0,
+                "yan_mgl": 200.0,
+                "pitch_gpl": 1.0,
+            },
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+            interventions=[Intervention(day=14.0, action="begin_aging")],
+            duration_days=180.0,
+        )
+    )
+    traj = compiled.run(t_eval=np.array([0.0, 14.0 * 24.0, 180.0 * 24.0]))
+    packaged = float(traj.series("ethyl_acetate")[1])
+    ethanol = float(traj.series("E")[1])
+
+    eq_corner = EthylAcetateEsterification.equilibrium(ethanol, corner)
+    # THE ASSERTION: even with both bands at their high edges, beer still hydrolyses.
+    assert eq_corner < packaged, (
+        f"joint band corner puts beer's equilibrium at {eq_corner * 1000:.3f} mg/L against a "
+        f"packaged {packaged * 1000:.3f} mg/L -- beer would FORM and drive Byp negative again"
+    )
+    # ...and the margin is small enough that it must be stated, not assumed: this pins the
+    # headroom itself, so a band edge creeping toward the flip is visible before it crosses.
+    assert 0.0 < (packaged - eq_corner) < 0.002  # g/L; measured +0.741 mg/L
+    # The nominal arm has ~20x that headroom -- which is exactly why a nominal-only guard
+    # would have reported this margin as comfortable.
+    eq_nominal = EthylAcetateEsterification.equilibrium(ethanol, resolved)
+    assert (packaged - eq_nominal) > 10.0 * (packaged - eq_corner)
+
+
 def test_ethyl_acetate_wired_into_both_media():
     # Wired into the medium-agnostic _AGING_PROCESSES (like the two hydrolysis siblings); the
     # ethyl_acetate pool exists in both media, and h(pH) is held at 1 in beer (no pH system, D-18).
