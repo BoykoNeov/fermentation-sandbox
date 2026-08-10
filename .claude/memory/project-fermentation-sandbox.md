@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-10T15:01:34.601Z
+  modified: 2026-08-10T18:09:33.381Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -25,10 +25,12 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
 
 ## Status (2026-08-10)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-175**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1537 passed**. Wine **94 slots** / beer **47**, `quinone`
-in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
-Milestone-3 work is **blocked on external sourcing**, not on building.
+**D-176**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
+**1540**. Wine **94 slots** / beer **45 compiled**, `quinone` in both regardless of set; **three** oxidative sets
+(`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**, not building.
+**OPEN BEAT, owner-opened at D-176: beer's real acid-base** (malt phosphate; solver is ready — `ACID_STATE` is
+medium-agnostic BY DESIGN — but `mean_charge`/`neutral_fraction`/`bisulfite_fraction` **raise above diprotic**, so
+phosphate needs an n-protic branch **added beside**, never a rewrite of the 1/2-pKa branches: wine must stay bitwise).
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -57,25 +59,22 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   `sensory.yaml`'s **36 are NEVER sampled — do not re-audit them**. `SHARED_FILES` restated **on purpose**
   (deriving it = D-108/D-109 vacuity). **A distribution test at `x == mode` is vacuous** — sample **off-mode**.
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
-  **INTERNALLY, no fetch**: which number is *sourced*? 84 = Shinohara's 16.4% E-rate; **30–80 occurred ONCE, in the
-  test comment asserting it**. Corrects **D-127**. Test **recomputes** all three (`abs=5e-4`; never `rel`/`round(x,3)` — pins *formatting*). Band = E-rate spread at **FIXED acetic 0.35**, a documented narrowing.
+  **INTERNALLY, no fetch** (84 = Shinohara's 16.4 % E-rate; 30–80 lived ONLY in the test comment asserting it).
+  Test **recomputes** all three (`abs=5e-4`; never `rel`/`round(x,3)` — pins *formatting*). Band = E-rate spread at **FIXED acetic 0.35** — the acetic SPREAD is `acetic_acid_typical`'s, D-176.
 - **`reads` has TWO masters — tier propagation AND sampler scope (D-160, fixes D-159's defect).**
   `PH_SYSTEM_READS`/`SO2_BINDING_READS` (`acidbase.py`) → 19 members/5 modules. **Keep DISJOINT** (pinned) and
   **derived**, never re-listed. **`temperature_ramp_rate` stays undeclared BY DESIGN**; no tier moved.
   **RESTATEMENT DONE (D-161) — never re-run it.** Affected class = **ONE** row, a 9-name `only=` **ISOLATION** not a
   band; its "13.99/16.69/20.09 across seeds 0/1/2" is **SORTED** [[feedback-a-majority-is-not-a-direction]]. Through the shipped sampler the fix
   is **undetectable**; predicted **widening NOT observed** (10/24, p=0.54). D-159 pins consumption (`test_drawability_surface.py`).
-- **Closure ordering SCOPED (D-162) — do not "fix", narrow or re-measure it.** **Three** claims: P1's
-  **three-tier** grouping is its conclusion verbatim (breach **2.4%**); `technical<screwcap` (**40.7%**) and
-  `nomacorc<supremecorq` (**0.0%**) are Table-I **nominals**, not that sentence. 94% of the 41.9% chain breach is
-  that one pair, **~9/10 of THAT band SCOPE** (like-for-like **4.7%**). Declaration-level ONLY: one
-  `scenario.closure` → the **`closure_otr` STATE slot**; forcing all 5 moves **0 of 94** vs **54** (`mu_max`).
-  **12** assertions undecided [[feedback-count-and-print-your-skips]] — **the list was never persisted**.
+- **Closure ordering SCOPED (D-162) — do not "fix", narrow or re-measure it.** **Three** claims: P1's **three-tier**
+  grouping is its conclusion verbatim; `technical<screwcap` and `nomacorc<supremecorq` are Table-I **nominals**, not
+  that sentence, and one pair carries 94 % of the chain breach. Declaration-level ONLY: one `scenario.closure` →
+  the **`closure_otr` STATE slot**. **12** assertions undecided [[feedback-count-and-print-your-skips]] — **list never persisted**.
 - **Band EDGES measured ARCHIVE-WIDE (D-163), 73 arms — do NOT re-run the sweep.** Of **678** live edges (339
   bands) only **19 guarded** (→**23**, D-164); **652** move both ways suite-green; **14 of 18 files wholly
   unguarded**. **Scale-only** provably **cannot** fire `psychophysics`'s disjointness (needs **translation**); **6
-  half-edges immovable** = D-153 Leg 4's. **Flags D-162.** Its "**55 externally-sourced**" is **CORRECTED by D-167**.
-  **Prose flag REFUSED, measured** — 44 of 51 hits were `ceiling` alone; **never re-run or "tighten" the regex**.
+  half-edges immovable** = D-153 Leg 4's. **Flags D-162.** Its "**55 externally-sourced**" is **CORRECTED by D-167**. **Prose flag REFUSED** — 44 of 51 hits were `ceiling` alone; **never re-run or "tighten" that regex**.
 - **CLASS (d) CLOSED at the seam (D-164) — do NOT recentre the band.** The override mints a `Parameter` carrying
   the base's band ⇒ `_value_in_range` gated `carrying_capacity_gpl`/`autolysis_rate_per_h` by an *epistemic* band,
   naming the **parameter** not the **knob**; now stated (`_override_in_band`, **no new constants**) + pinned
@@ -86,12 +85,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   sits on the **exact** 1e-2 high edge ⇒ narrowing it breaks a scenario test for non-autolysis reasons.
 - **WIDE-BAND artefact SPLIT, Mechanism A CLOSED (D-165) — do NOT re-census bands, do NOT ship a shape field.**
   **TWO** mechanisms: **A** log-width (`(lo+m+hi)/3m`), **B** threshold proximity — D-164's 76.8% is **B, not width**;
-  censusing together = the D-162 muddle. **A:** 351→**339 live**, `r≥10` **123 (36.5%)**, `lo≤0` **6**, **no VALIDATED
-  band live** (**338/121/83** log-sym MEASURED at D-173; a whole-dir dedupe gives **306**, a DIFFERENT denominator);
-  worst `k_d2_ethanol_tolerance_death` **r=300**; **27** say "order of magnitude" **in prose no code reads**.
-  **Corrects D-24**: outer percentiles de-sensitise across the **two linear shapes offered** (1.30×), **not** log-scale
-  (**3.71×**) — pinned `tests/test_band_shape_sampling.py` (8), **6 arms killing 6 of 8**. **Attribution NOT monotone
-  in `r`.** Log-tri **NOT shipped** [[feedback-pair-the-arm-with-its-baseline]].
+  censusing together = the D-162 muddle. **A:** 351→**339 live**, `r≥10` **123**, `lo≤0` **6**, **no VALIDATED band
+  live** (**338/121/83** log-sym at D-173; whole-dir dedupe **306**, a DIFFERENT denominator); worst
+  `k_d2_ethanol_tolerance_death` **r=300**; **27** say "order of magnitude" **in prose no code reads**. **Corrects
+  D-24**: outer percentiles de-sensitise across the **two linear shapes offered** (1.30×), **not** log-scale (3.71×) — pinned `tests/test_band_shape_sampling.py`. **Attribution NOT monotone in `r`.** Log-tri **NOT shipped** [[feedback-pair-the-arm-with-its-baseline]].
 - **Mechanism B CLOSED — the switch-site census (D-166); B's surface is PARAMETERS, not code sites** (corrects D-165's
   "Next": a `params[` grep misses `ethanol_tolerance`). Classify **bitwise** (fixed `t_eval`), **never by epsilon**;
   **populate the must** first. Only **2 of 66** read params are switch-gated ⇒ **`reads` reach is an UPPER BOUND**, **and
@@ -115,9 +112,8 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   proximity**, and **do not re-draft the WITHDRAWN `Corrects: D-77`** (nominal-scoped, never states the band).
 - **D-168 §1b's Q10 sweep is CLOSED (D-170) — never re-run it expecting a defect count.** It returns **15 again,
   for the OPPOSITE reason**: repairing a note makes a worst-gap screen score it **WORSE** ⇒ **NOT idempotent under
-  its own repair**; a naive re-run reads "no progress". **Field-complete (all FOUR fields) reproduced 21/15
-  EXACTLY — the predicted delta did NOT happen.** **7 rounding-class = notational, MEASURED**, left unedited on
-  purpose. `E_a_acet_reduction`/`E_a_smm_hydrolysis`: **wrong when WRITTEN, not stale** (D-172 inverts this).
+  its own repair**; a naive re-run reads "no progress". Field-complete reproduced **21/15 EXACTLY** — predicted
+  delta did NOT happen. **7 rounding-class = notational**, unedited on purpose. `E_a_acet_reduction`/`E_a_smm_hydrolysis`: **wrong when WRITTEN, not stale** (D-172 inverts this).
 - **The recurring shape: 7 invariants BREACH and NOT ONE can be guarded where it breaches (D-171; corrects
   D-170's "5").** Recall holes found the extra two: **a `>` is not an ordering WORD**, the **AMBIGUOUS-PARSE
   quarantine was never revisited**, *"steeper"* **inverts on a retention fraction**. `E_a_decarb`'s shape does NOT
@@ -125,9 +121,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   moved and **an `author estimate` cannot license a narrowing ⇒ ZERO edges moved**. Guards **nominal-scoped ONLY**,
   each naming the breach it does NOT forbid (`y_acetaldehyde_per_tannin` 34.2 %, `k_death_brett` 23.1, `E_a_fusels`
   0.005); `y_methanethiol` 19.4 stays **UNGUARDED** — a guard would pin my own prose.
-- **A guard can NAME the ordering and still not fire on it (D-171 §4)** — `test_integrated_wine_aroma_
-  temperature_directions` survives `E_a_fusels`/`E_a_uptake` **fully inverted**: its sensitivity sits
-  **above** the −3,000 J/mol its own bands permit.
+- **A guard can NAME the ordering and still not fire on it (D-171 §4)** — `test_integrated_wine_aroma_temperature_directions` survives `E_a_fusels`/`E_a_uptake` **fully inverted**: its sensitivity sits **above** the −3,000 J/mol its own bands permit.
 - **O2 partition REPARAMETERISED (D-172) — never re-add `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor`**
   ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`, **two PRODUCTS, never `total-total*f`** (1 ULP). Breach **55.20 →
   12.54 %**, **ZERO edges moved**. **Never 3 co-drawn — max 2.** Sum assert now an **IDENTITY ⇒ vacuous**. Retired-name
@@ -262,11 +256,16 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   guard, **not** the 18.9% fix; never conflate. The live lever on isoamyl is `f_non_ehrlich_leucine`, not a route.
   Crépin's 0.815 vs Minebois's implied ~0.29 = open **D-103** conflict — **never averaged**. Rayne 2016 CALC ester k is 6–18× off R&O MEASURED.
 
-**Esters (D-123 → D-127)**
-- Three ester Processes ship, all SPECULATIVE. `k_H2T` is NEGATIVE and shipped faithfully (wine-only). **No pH
-  factor** on hexanoate/EtOAc — R&O Table VII ratios are isoamyl's. **Direction facts:** MCFA esters hydrolyse
-  **WITH** the acetates; the *forming* family is branched/polyprotic ethyl esters — none tracked. Ethyl decanoate
-  trap: **no uniform C4–C10 constant**. **Sourcing corrections. D-131:** book-sweep note **WRONG**, primary **Table 6** is the calibration. **D-130:** DHA omitted, gluconolactone deferred. **D-129:** WHERE/HOW-SHARP.
+**Esters (D-123 → D-127, D-176)**
+- Three ester Processes ship, all SPECULATIVE. `k_H2T` NEGATIVE, shipped faithfully (wine-only). **No pH factor**
+  on hexanoate/EtOAc — R&O T-VII ratios are isoamyl's. MCFA esters hydrolyse **WITH** the acetates; the *forming*
+  family is branched/polyprotic ethyl esters, **none tracked**; **no uniform C4–C10 constant**. **D-131:**
+  book-sweep note WRONG, primary **T6** calibrates. **D-130:** DHA omitted. **D-129:** WHERE/HOW-SHARP.
+- **EtOAc eq is BERTHELOT-COUPLED (D-176, corrects D-127) — `ethyl_acetate_eq` is NOT the equilibrium**, it is
+  its value at an anchor, ×`acetic_acid_typical`×ethanol. **`ethanol_ref_ester_eq` 94.68 = 12 % v/v E-rate matrix,
+  NEVER the 14 % RATE matrix**; refs PINNED ⇒ moving one is refused **at load**. **Beer HYDROLYSES** ⇒ kills the
+  negative `Byp` (pool **0, no producer**, D-16 **Flagged**); **wine +24 %**. Acetic band IARC ale **[12,155]
+  PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted, not tuned**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
