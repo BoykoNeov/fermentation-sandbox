@@ -21822,3 +21822,25 @@ decision, since both are edge moves on the same parameter.
 
 Suite **1531 passed**, `ruff` and `mypy` clean. Two notes corrected, one docstring corrected,
 **no value and no band edge moved.**
+
+### 5. Follow-up (same day) — the amendment left the docstring it convicted uncorrected
+
+The amendment's §3 measured that `test_the_oxygen_ceiling_is_held_up_by_ethanol_oxidation`'s
+docstring claim — *"lowering EITHER factor fails HERE"* — is true at the nominal and silent
+about the band, then corrected two **other** notes for that same class of error (§1's
+`test_drawability_surface.py` docstring, §2's `f_ethanol_o2_share` conditions) and shipped
+this one unchanged. That is the amendment failing its own standard, and it is **not** gated on
+the owner's edge decision: moving an edge is the owner's call, stating what the assert does
+and does not establish is prose.
+
+The docstring in `tests/test_closure_ingress.py` now carries the four measured numbers
+(`otr = 1.03e-6`; nominal 5.15e-3 PASS, joint band edge 5.15e-2 BREACHED, pre-D-172 band low
+2.58e-2 already breached, threshold 8.0e-3), the attribution that the breach is **pre-existing
+and doubled rather than introduced**, and the explicit scope line: *the assert guards the
+nominal against edits and does NOT establish that the margin is held open across the declared
+band*. All four numbers were **re-measured in this tree** rather than copied from the
+amendment's table.
+
+Note what this does and does not close: it makes the test honest about its own reach. The
+breach itself is still open and still the owner's, alongside the `1.0e-3` vs `2.0e-3` high-edge
+decision on the same parameter. **No value, no band edge, and no assert changed** — prose only.

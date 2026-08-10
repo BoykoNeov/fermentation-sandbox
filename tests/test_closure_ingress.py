@@ -567,6 +567,19 @@ def test_the_oxygen_ceiling_is_held_up_by_ethanol_oxidation():
     (it is now ``k_o2_depletion_total * f_ethanol_o2_share``); this test makes that explicit, so
     that lowering EITHER factor fails HERE with a clear reason rather than silently pushing the
     saturation test toward its limit.
+
+    **That "fails HERE" is a claim about the NOMINALS, and the band already breaches it without
+    anyone editing anything** (D-172 amendment §3; the recurring shape is a constraint verified at
+    a POINT where the sampler reads a BAND). Measured with ``otr = 1.03e-6``: nominal
+    ``k_ethanol = 2.00e-4`` gives ceiling 5.15e-3 and PASSES; the post-D-172 joint band edge
+    (``k_o2_depletion_total`` low 1.0e-4 x ``f_ethanol_o2_share`` low 0.2 = 2.0e-5) gives 5.15e-2,
+    which BREACHES the 8.0e-3 below. **The breach is NOT something D-172 introduced** — the retired
+    ``k_ethanol_oxidation``'s own band low 4.0e-5 gave 2.58e-2, already 3.2x over, and that baseline
+    row is what fixes the attribution rather than the arm alone; what D-172 did is double it. Not
+    repaired, for D-171's reason: closing it needs a declared edge moved, and
+    ``k_o2_depletion_total``'s low is the one edge in that repair all three competing accounts
+    agree on. So this assert guards the nominal against edits, and does NOT establish that the
+    margin is held open across the declared band. Do not read it as the latter.
     """
     compiled, trajectory = _age("synthetic_supremecorq")
     o2 = trajectory.y[compiled.schema.slice("o2")][0]
