@@ -21,13 +21,12 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
   subsystem cut, ordered list, and **correction map (⚠)**. **The ⚠ lives only in the index** — check a record's
   index row before trusting it. Append per `CLAUDE.md`'s `Corrects:`/`Flags:`, then `tools/gen_decisions_toc.py`
   (**edit `TOPIC_RULES` if a new record buckets nowhere**). **File is LF.**
-- `docs/ARCHITECTURE.md` (seams); `docs/plans/milestone-*.md` ("Active beat: sensory" header is **STALE**, closed
-  at D-95/D-98); `CLAUDE.md` (prime directives + archive conventions).
+- `docs/ARCHITECTURE.md` (seams); `docs/plans/milestone-*.md` ("Active beat: sensory" header is **STALE**, closed  at D-95/D-98); `CLAUDE.md` (prime directives + archive conventions).
 
 ## Status (2026-08-10)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-174**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1534 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-175**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1537 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -86,21 +85,20 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   ⇒ **wide-band** artefact. Range **still** = the band (**Flags**). `test_autolysis`
   sits on the **exact** 1e-2 high edge ⇒ narrowing it breaks a scenario test for non-autolysis reasons.
 - **WIDE-BAND artefact SPLIT, Mechanism A CLOSED (D-165) — do NOT re-census bands, do NOT ship a shape field.**
-  **TWO** mechanisms: **A** log-width (`(lo+m+hi)/3m`), **B** threshold proximity — D-164's 76.8% is **B, not
-  width**; censusing together = the D-162 muddle. **A:** 351→**339 live**, `r≥10` **123 (36.5%)**, `lo≤0` **6**, **no
-  VALIDATED band live** (**338/121/83** log-sym MEASURED at D-173; a whole-dir dedupe gives **306**, a DIFFERENT
-  denominator); worst `k_d2_ethanol_tolerance_death` **r=300**; **27** say "order of
-  magnitude" **in prose no code reads**. **Corrects D-24**: outer percentiles de-sensitise across the **two linear
-  shapes offered** (1.30×), **not** log-scale (**3.71×**) — pinned `tests/test_band_shape_sampling.py` (8), **6 arms
-  killing 6 of 8**. **Attribution NOT monotone in `r`.** Log-tri **NOT shipped** [[feedback-pair-the-arm-with-its-baseline]].
-- **Mechanism B CLOSED — the switch-site census (D-166); B's surface is PARAMETERS, not code sites** (corrects
-  D-165's "Next": a `params[` grep misses `ethanol_tolerance`). Classify **bitwise** (fixed `t_eval`), **never by
-  epsilon**; **populate the must** first. Only **2 of 66** read params are switch-gated ⇒ **`reads` reach is an
-  UPPER BOUND**, **and inertness is a MARGIN** — held open by two byproduct-yield bands and closed by a
-  **documented toggle** (Gay-Lussac diversion OFF) [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. **A
-  nominal ON a band edge is inert by construction** [[feedback-nominal-on-a-band-edge-is-not-inertness]].
-  **`ethanol_inhibition` is NOT in wine's active set**; **beer is UNCENSUSABLE** (`_ALLOWED_KEYS["beer"]`: no acid
-  input, pH 7.0). Pinned `tests/test_switch_site_census.py`.
+  **TWO** mechanisms: **A** log-width (`(lo+m+hi)/3m`), **B** threshold proximity — D-164's 76.8% is **B, not width**;
+  censusing together = the D-162 muddle. **A:** 351→**339 live**, `r≥10` **123 (36.5%)**, `lo≤0` **6**, **no VALIDATED
+  band live** (**338/121/83** log-sym MEASURED at D-173; a whole-dir dedupe gives **306**, a DIFFERENT denominator);
+  worst `k_d2_ethanol_tolerance_death` **r=300**; **27** say "order of magnitude" **in prose no code reads**.
+  **Corrects D-24**: outer percentiles de-sensitise across the **two linear shapes offered** (1.30×), **not** log-scale
+  (**3.71×**) — pinned `tests/test_band_shape_sampling.py` (8), **6 arms killing 6 of 8**. **Attribution NOT monotone
+  in `r`.** Log-tri **NOT shipped** [[feedback-pair-the-arm-with-its-baseline]].
+- **Mechanism B CLOSED — the switch-site census (D-166); B's surface is PARAMETERS, not code sites** (corrects D-165's
+  "Next": a `params[` grep misses `ethanol_tolerance`). Classify **bitwise** (fixed `t_eval`), **never by epsilon**;
+  **populate the must** first. Only **2 of 66** read params are switch-gated ⇒ **`reads` reach is an UPPER BOUND**, **and
+  inertness is a MARGIN** — held open by two byproduct-yield bands, closed by a **documented toggle** (Gay-Lussac
+  diversion OFF) [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. **A nominal ON a band edge is inert by
+  construction** [[feedback-nominal-on-a-band-edge-is-not-inertness]]. **`ethanol_inhibition` is NOT in wine's active
+  set**; **beer is UNCENSUSABLE** (`_ALLOWED_KEYS["beer"]`: no acid input, pH 7.0). Pinned `tests/test_switch_site_census.py`.
 - **The "buildable 55" is RESCOPED, first slice CLOSED (D-167) — corrects D-163's §7 headline**, whose predicate
   tested the **VALUE's** `provenance.source` and was reported about **EDGES**
   [[feedback-name-the-field-your-predicate-read]]. Of 110 edges only **4** are a parameter-specific published span,
@@ -130,23 +128,25 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **A guard can NAME the ordering and still not fire on it (D-171 §4)** — `test_integrated_wine_aroma_
   temperature_directions` survives `E_a_fusels`/`E_a_uptake` **fully inverted**: its sensitivity sits
   **above** the −3,000 J/mol its own bands permit.
-- **O2 partition REPARAMETERISED (D-172) — never re-add `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor`.**
-  ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`, **two PRODUCTS, never `total-total*f`** (1 ULP; 361 GREEN).
-  Breach **55.20 → 12.54 %**, **ZERO edges moved**. **Never 3 co-drawn — max 2.** Sum assert now an **IDENTITY ⇒
-  vacuous**.
-- **D-172 amdt — SAME defect one level up, FLAGGED not repaired:** `E_a_ethanol_oxidation`/`E_a_browning` are **TWO
-  entries**, identical value AND band ⇒ split T-independent **at `T_ref` ONLY**; D-74's *"exact at every T"* is nominal-only.
-- **`k_o2_depletion_total` = [2.4e-4, 2.0e-3]; each edge on its OWN ground.** LOW **never back to 1.0e-4** (D-173:
-  drew `o2` > air sat; licence = MEASUREMENT). HIGH = D-71's printed 2.0e-3 (D-174, `e1105ae`), **DOCUMENT only** —
-  1.0e-3's sole account died when D-173 deleted the low it was round against. **Do NOT re-run** the 38-param joint
-  (share CANCELS ⇒ 1.59×/1.41×) or the 200× sweep (no high-side unphysicality); **raising is NOT free** — starves
-  gated sinks, moves SO2:O2 both ways. Suite blind both ways ⇒ edges + note-span **PINNED**. **Flags D-136/D-172**.
-- **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
-  `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names
-  (positive control moving; pool ends **0.63 of 0.8 g/L** ⇒ competition not binding). **Not a value
-  change**; deciding it needs D-89's calibration scenario, which it **never pins**.
-- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and
-  `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
+- **O2 partition REPARAMETERISED (D-172) — never re-add `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor`**
+  ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`, **two PRODUCTS, never `total-total*f`** (1 ULP). Breach **55.20 →
+  12.54 %**, **ZERO edges moved**. **Never 3 co-drawn — max 2.** Sum assert now an **IDENTITY ⇒ vacuous**. Retired-name
+  flag **DISCHARGED** (D-175: 7 hits, 4 field kinds). Still FLAGGED not repaired — `E_a_ethanol_oxidation`/`E_a_browning`
+  are **TWO entries**, same value AND band ⇒ split T-independent **at `T_ref` ONLY**.
+- **`k_o2_depletion_total` = [2.4e-4, 2.0e-3]; each edge on its OWN ground.** LOW **never back to 1.0e-4** (D-173: drew
+  `o2` > air sat; licence = MEASUREMENT). HIGH = D-71's printed 2.0e-3 (D-174, `e1105ae`), **DOCUMENT only** — 1.0e-3's
+  account died with the low it was round against. **Do NOT re-run** the 38-param joint (share CANCELS) or the 200×
+  sweep; **raising is NOT free** — starves gated sinks, moves SO2:O2 both ways. Suite blind both ways ⇒ **PINNED**.
+- **Oak's O2 share is a JOINT (D-175) — never restore "never monopolizes", never re-measure the span.** WITHDRAWN as
+  false (**corrects D-78**): **4.58-88.40 %** reachable at 4 g/L vs 48.62 % nominal ⇒ "third-to-half" is the NOMINAL arm.
+  **TWO bands not three** — `oak_yield_*` drawn but **UNREACHABLE** (D-159), `oak_gpl` unbanded. **DIRECT only** (cascade
+  REPLACES ⇒ Process ABSENT); **`T_ref` only** (3 `E_a` ⇒ 75.6-94.6 % at 5 C); **red does NOT rescue it** (80.4 %) —
+  phenolics deplete **95 %** ⇒ `k_browning_eff` **4.35e-4** not t=0 **2.83e-3** (**Flags D-137**). **ZERO edges moved**,
+  suite blind. D-174's `0.125-2.08x` **NOT** corrected — it scoped itself to the denominator.
+- **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.** `k_maillard_browning`'s
+  **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names (positive control moving; pool ends
+  **0.63 of 0.8 g/L** ⇒ not binding). **Not a value change**; deciding it needs D-89's calibration scenario, never pinned.
+- **Exactly TWO parameters have a real bound**: `k_copper_multiplier` (**band clamped to it, D-154**) and  `f_de_novo_2_phenylethanol` (**D-118, guarded** — breach point *recomputed*, the template both follow).
 - **`f_non_ehrlich_phenylalanine`'s HIGH edge is load-bearing** for D-118's floor (joint margin **3.07e-5**);
   top-mode deliberate (0.531 = hard *measured* protein floor). **D-153's "unguarded" was WRONG; D-155 REFUSED
   the guard** (4-arm matrix caught every arm ⇒ decoration); hardened instead — the breach test reads the band
@@ -279,7 +279,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d170-q10-generalise\`/`d171-ordering-guards\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d170-q10-generalise\`/`d171-ordering-guards\`/`d175-ellagitannin-joint\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)

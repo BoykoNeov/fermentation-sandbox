@@ -2933,14 +2933,26 @@ class EllagitanninOxidation(Process):
     in ``[ellagitannin]``, which is zero unless oak is dosed (``add_oak``), so — exactly like
     :class:`SulfiteOxidation` (gated on SO₂) and :class:`StreckerDegradation` (gated on amino acids)
     — this sink is **zero without its substrate** and therefore **adds on top** of the shared O₂
-    budget with **no re-baseline**: ``k_ethanol_oxidation + k_browning_base = 5.0e-4`` (the
-    always-on anchor) is **untouched**, and the no-oak trajectory (either medium) is byte-for-byte
-    kept. A nice illustration that the substrate-gated / always-on distinction — not the magnitude —
-    is what's load-bearing: ``k_ellagitannin_oxidation`` is banded so that, when oak *is* present,
-    this is a **major** sink (it takes roughly a third-to-half of the O₂), yet it still needs no
-    re-baseline (unlike the always-on :class:`PhenolicBrowning`, which forced the D-74 re-baseline).
-    It is banded so the protection is **partial** — an oaked beverage still shows *some* oxidative
-    character.
+    budget with **no re-baseline**: ``k_o2_depletion_total = 5.0e-4`` (the always-on anchor, D-172's
+    single entry for the ``k_ethanol_oxidation + k_browning_base`` pair this line used to name) is
+    **untouched**, and the no-oak trajectory (either medium) is byte-for-byte kept. A nice
+    illustration that the substrate-gated / always-on distinction — not the magnitude — is what's
+    load-bearing: when oak *is* present this is a **major** sink, yet it still needs no re-baseline
+    (unlike the always-on :class:`PhenolicBrowning`, which forced the D-74 re-baseline).
+
+    **How major is a joint, not a point (D-175).** This docstring used to say the banding made the
+    protection **partial** — "roughly a third-to-half of the O₂", "an oaked beverage still shows
+    *some* oxidative character". That is the **nominal** arm, and it is **withdrawn**: over the two
+    bands the sampler can reach (``k_ellagitannin_oxidation`` and ``k_o2_depletion_total``), at the
+    ``oak.yaml`` note's own 4 g/L light-toast dose, the measured share of the aging-phase O₂ budget
+    spans **4.58 % to 88.40 %** against 48.62 % at both nominals — so the sink **can** monopolize
+    the O₂, and the banding named as the reason it could not is what makes it possible. The
+    measurement is **direct-set only**, and structurally so: the sets are *replacements* (D-141), so
+    under ``oxidative="cascade"`` this Process is **absent** rather than re-wired, and
+    :class:`~fermentation.core.kinetics.oxidative_cascade.QuinoneEllagitanninOxidation` reads the
+    same constant against ``quinone`` instead, touching no ``o2`` at all. See the
+    ``k_ellagitannin_oxidation`` note for the red-wine, SO₂, off-``T_ref`` and scenario-dose
+    scopes, all measured.
 
     **Off every ledger, no conservation term (the :class:`SulfiteOxidation` precedent).** Both
     ``o2`` (D-71) and ``ellagitannin`` (wood-derived, off
