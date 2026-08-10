@@ -26,8 +26,8 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
 
 ## Status (2026-08-10)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-170**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1518 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-171**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1524 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -127,18 +127,19 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   set). **7 rounding-class = notational, MEASURED** (±5 %, every high edge rounded **UP**) — left unedited on
   purpose. `E_a_acet_reduction`'s low is the **NOMINAL's** Q10; `E_a_smm_hydrolysis` a **one-directional**
   +8.4/+4.9 % offset; **both bands unchanged since introduction ⇒ wrong when WRITTEN, not stale**.
-- **The recurring shape is ≥7 invariants, 5 BREACHING — a LOWER BOUND, never a census (D-170 + amd).** The
-  screen's `break` kept only the **LONGEST name** in a window and dropped the rest: 49→**69** candidates,
-  24→**36** evaluable, **21** multi-name windows never measured — it silently dropped **D-168 §3's OWN
-  ordering 2**. **Always run the recall control** (D-168's three) and **filter through the SAMPLER, not the
-  files**; **two-pass hand reading is NOT optional** (*"comparable"* isn't an ordering; `mu_max_mlf`'s hit was
-  its note naming its **OWN** quantity). **UNGUARDED:** `y_acetaldehyde_per_tannin` 34.2 %, `k_death_brett`
-  23.1 %, `y_methanethiol` 19.4 %, `y_a420_per_maillard_melanoidin` 16.4 %, `ethanol_tolerance_mlf` 0.036 %.
-  **`wine E_a_fusels`'s "below `E_a_esters`" was FALSE AT THE NOMINALS** — beer's ordering in wine's file, the **4th** carrier of D-168 §4's.
-- **`E_a_decarb > E_a_reduction`'s joint margin is EXACTLY 0 (D-170)** — 60,000 == 60,000, intent
-  **UNRECORDED** (never infer it); guard shipped with both edges **RECOMPUTED**, and arms A/B were **GREEN
-  before** it ⇒ the coverage was **nominal-scoped only**. **NO number moved**: the nominal 90,000 sits
-  **above its own cited anchor** [67,704, 81,176] ⇒ "move the band to its cited range" is **ill-posed** (D-168 §1).
+- **The recurring shape: 7 invariants BREACH and NOT ONE can be guarded where it breaches (D-171; corrects
+  D-170's "5").** Recall holes found the extra two: **a `>` is not an ordering WORD**, the **AMBIGUOUS-PARSE
+  quarantine was never revisited**, *"steeper"* **inverts on a retention fraction**. `E_a_decarb`'s shape does NOT
+  transfer: its margin is **exactly 0** (60,000 == 60,000, intent UNRECORDED) while all 7 are **NEGATIVE** ⇒
+  `low >= high` needs an edge moved and **an `author estimate` cannot license a narrowing ⇒ ZERO edges moved**.
+  Guards are **nominal-scoped ONLY**, each naming the breach it does NOT forbid: `k_browning_base` **55.2 %**,
+  `y_acetaldehyde_per_tannin` 34.2, `k_death_brett` 23.1, `E_a_fusels` 0.005; `y_methanethiol` 19.4 is left
+  **UNGUARDED** — no source fixes its branch ratio, so a guard would pin my own prose.
+- **A guard can NAME the ordering and still not fire on it (D-171 §4)** —
+  `test_integrated_wine_aroma_temperature_directions` survives `E_a_fusels`/`E_a_uptake` **fully inverted**: its
+  sensitivity sits **above** the −3,000 J/mol its own bands permit, and the asserts that DO fire reproduce
+  **bitwise** with the ordering intact. **FLAGGED, not repaired:** `k_ethanol_oxidation`'s band is **0.08–1.6×**
+  the total vs its own note's *"0.2–0.6×"*; it + `k_browning_base` + `k_activation_floor` are **1 dof, 3 draws**.
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
   `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** (2.0309 flat) in the scenario its own
   note names, with the positive control moving; the pool ends at **0.63 of 0.8 g/L** ⇒ the competition is not
@@ -277,7 +278,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d170-q10-generalise\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d170-q10-generalise\`/`d171-ordering-guards\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)

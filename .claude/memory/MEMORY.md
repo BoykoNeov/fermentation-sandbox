@@ -36,4 +36,5 @@
 - [Transcribe tables, not prose](feedback-transcribe-tables-not-prose.md) — the table beat the prose twice (4 numbers, then a direction); a search summary once shipped a fabricated E_a
 - [Memory is one tracked copy](feedback-memory-is-one-tracked-copy.md) — the C: harness path is a junction into `.claude/memory`; never sync or mirror it, there is nothing to sync
 - [A cap being written to can't be raised](feedback-a-cap-being-written-to-cannot-be-raised.md) — the file sat at exactly 250 for 13 commits, then took 47 of 50 lines the day the cap moved; and the overflow relocated to the uncapped sibling
+- [Pair the RED with an ordering-preserving baseline](feedback-pair-the-red-with-an-ordering-preserving-baseline.md) — a same-sized move WITHOUT the flip killed the identical tests; attribute at ASSERT granularity, and check what the RED names, not that it is red
 - [Best-practices reference](reference-claude-best-practices.md) — rosmur claudecode-best-practices URL to apply

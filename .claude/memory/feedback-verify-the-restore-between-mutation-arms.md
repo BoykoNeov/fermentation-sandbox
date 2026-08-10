@@ -52,3 +52,15 @@ parse the `FAILED …::test_name` lines per arm, then print the set of tests kil
 arm against the file's full test list and **name the uncovered ones in the record**. Assert
 uniqueness of the anchor before mutating. A "6 of 6 arms" claim and a "6 of 8 tests covered" claim are
 different claims; only the second is coverage.
+
+**Verify the APPLY, not just the RESTORE — a schema rejection wears the same colour as a finding
+(D-171).** Round 1 of D-171 moved each nominal across its ordering. For three arms the crossing point
+lay *outside that parameter's own uncertainty band*, and `Parameter` enforces `low <= value <= high`,
+so the store refused to load and pytest died at **collection**. All three reported RED. One of them
+was the **known-RED control**: it "matched its prediction" having never executed the assertion it
+existed to exercise, certifying a harness that was never tested. The restore was fine; the *apply* was
+not, and it still produced the predicted colour. **How to apply:** pre-flight every mutated tree
+through the real loader before running the suite, print the values it read back, and report a load
+failure as **INVALID — never RED**. Where a single-parameter crossing is schema-illegal, move *both*
+members toward each other onto their own band edges. See
+[[feedback-pair-the-red-with-an-ordering-preserving-baseline]].

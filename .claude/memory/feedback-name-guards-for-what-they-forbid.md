@@ -33,3 +33,23 @@ is the worst shape a review can take. Corollary: this project's oldest lesson
 (D-96/D-102/D-108/D-109) is that *code can be right while its stated reason is
 wrong* — the label on an invariant is exactly that failure mode. Related:
 [[feedback-discuss-disagreements]].
+
+**The other half: a CORRECTLY-labelled guard can still be insensitive at the breach
+its own bands permit (D-171).**
+`test_integrated_wine_aroma_temperature_directions` calls itself *"THE load-bearing
+regression guard for the per-pool E_a ordering"* and asserts the consequence
+`cold[fusels] < warm[fusels]`, commented *"FUSELS rise with T (E_a_fusels >
+E_a_uptake)"*. Set the pair to the worst joint draw the bands allow — the ordering
+**fully inverted**, −3,000 J/mol — and that assert **passes**. The asserts that do
+fire there reproduce *bitwise* when one parameter moves alone with the ordering
+intact, so they react to magnitude. Worse than an absent guard: an absent guard is
+found by a census, while this one names the right mechanism and survives any review
+that reads it rather than runs it.
+
+**How to apply:** never credit a consequence-form guard with covering an ordering
+until you have mutated to the *actual worst joint draw* and watched it go red. If it
+stays green, add a store-level assert scoped to what it can see, and write the
+measured insensitivity into the docstring. Every guard must state the breach rate it
+does **not** forbid, or it gets read as covering it. See
+[[feedback-pair-the-red-with-an-ordering-preserving-baseline]] and
+[[feedback-mutate-the-premise-before-building-the-guard]].

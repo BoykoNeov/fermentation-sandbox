@@ -446,7 +446,7 @@ E_a_fusels:
   value: 70000.0
   unit: "J/mol"
   tier: speculative
-  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100); below E_a_esters as the ester/fusel ratio rises with T" }
+  uncertainty: { low: 60000.0, high: 250000.0, note: "all > E_a_uptake (55,100); below E_a_esters as the ester/fusel ratio rises with T D-171: 'all > E_a_uptake (55,100)' is a NOMINAL claim -- this band's low (60,000) sits BELOW E_a_uptake's high (63,000), so joint draws invert on 0.0021% (margin -3,000 J/mol). Guarded at the NOMINAL ONLY (tests/test_sourced_ordering_invariants.py), for both media." }
   provenance:
     source: "brewing consensus (warmer => accelerated Ehrlich amino-acid conversion => more fusels; ester/fusel ratio rises with T). No fusel kinetic model of our form sourced (de Andres-Toro has no fusel term)"
     conditions: "ale yeast; equivalent Arrhenius activation energy at T_ref = 293.15 K"

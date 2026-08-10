@@ -1456,6 +1456,21 @@ def test_browning_is_dominant_share_over_ethanol_oxidation(params):
     # two BASELINE shares sum to the calibrated always-on total (5.0e-4) that holds the
     # O₂-depletion
     # timescale (D-132 leaves this floor untouched; a real red's effective rate is higher still).
+    #
+    # D-171 SCOPE, so this is not read as more than it is. Both asserts below hold at the
+    # NOMINAL and nowhere else:
+    #   * the ORDERING inverts on 55.20% of joint draws (k_browning_base [2.0e-4,4.0e-4] vs
+    #     k_ethanol_oxidation [4.0e-5,8.0e-4], joint-edge margin -6.0e-4) -- the highest breach
+    #     rate measured in the archive. Moving k_ethanol_oxidation's HIGH edge alone
+    #     (8.0e-4 -> 2.9e-4, nominal untouched) leaves the full 1518-test suite green, so the
+    #     band-scoped half is unguarded. It is also unguardable today: the joint-edge assertion
+    #     (`low >= high`, the test_vicinal_diketones E_a_decarb shape) is FALSE here, and both
+    #     parameters are `author estimate`, which cannot license narrowing a band.
+    #   * the SUM anchor holds at exactly one point of a two-dimensional band: the two spans
+    #     add to [2.4e-4, 1.2e-3] against the 5.0e-4 asserted here. The notes document the two
+    #     as a PARTITION of that fixed total (one degree of freedom) while the sampler draws
+    #     them independently, and k_activation_floor is documented as the same sum yet ships as
+    #     a third independent draw. Flagged in k_ethanol_oxidation's note for owner direction.
     assert params["k_browning_base"] > params["k_ethanol_oxidation"]
     assert params["k_browning_base"] + params["k_ethanol_oxidation"] == pytest.approx(5.0e-4)
     schema = wine_schema()
