@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-10T14:08:52.471Z
+  modified: 2026-08-10T15:01:34.601Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -26,8 +26,8 @@ BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ri
 
 ## Status (2026-08-10)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-173**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
-leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1532 passed**. Wine **94 slots** / beer **47**, `quinone`
+**D-174**. Aging build order **built** — `aging.py` carries 24 Processes; sensory 1a/1b closed. **D-139's
+leftovers ALL closed** (§2.4 D-148, §2.5 D-149). Suite **1534 passed**. Wine **94 slots** / beer **47**, `quinone`
 in both regardless of set; **three** oxidative sets (`direct` default/`cascade`/`direct_burst`). Most remaining
 Milestone-3 work is **blocked on external sourcing**, not on building.
 
@@ -133,14 +133,14 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **O2 partition REPARAMETERISED (D-172) — never re-add `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor`.**
   ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`, **two PRODUCTS, never `total-total*f`** (1 ULP; 361 GREEN).
   Breach **55.20 → 12.54 %**, **ZERO edges moved**. **Never 3 co-drawn — max 2.** Sum assert now an **IDENTITY ⇒
-  vacuous**. **The total's high 1.0e-3 has NO account** (printed alt **2.0e-3**, D-71) — **OWNER'S CALL.**
+  vacuous**.
 - **D-172 amdt — SAME defect one level up, FLAGGED not repaired:** `E_a_ethanol_oxidation`/`E_a_browning` are **TWO
   entries**, identical value AND band ⇒ split T-independent **at `T_ref` ONLY**; D-74's *"exact at every T"* is nominal-only.
-- **D-172 §6 SHIPPED (D-173) — the ONE measurement-licensed edge move; NEVER re-lower to 1.0e-4** (drew `o2` >
-  air sat). `k_o2_depletion_total` = **[2.4e-4, 1.0e-3]**: **licence is the MEASUREMENT, not the [2.4e-4, 1.2e-3]
-  account** ⇒ **one edge of two ON PURPOSE, HIGH unaccounted/owner's**. **Joint is NOT (total×share) — share
-  CANCELS**; 38 swept ⇒ **sink-joint 1.59×/cascade 1.41×** (1.14/1.04 only WITH `T_ref`, not a sink) — **do NOT
-  re-run.** Guard = seam + monotonicity at the **GEOMETRIC centre** (nominal ⇒ a safe *raise* REDs). **Flags D-136.**
+- **`k_o2_depletion_total` = [2.4e-4, 2.0e-3]; each edge on its OWN ground.** LOW **never back to 1.0e-4** (D-173:
+  drew `o2` > air sat; licence = MEASUREMENT). HIGH = D-71's printed 2.0e-3 (D-174, `e1105ae`), **DOCUMENT only** —
+  1.0e-3's sole account died when D-173 deleted the low it was round against. **Do NOT re-run** the 38-param joint
+  (share CANCELS ⇒ 1.59×/1.41×) or the 200× sweep (no high-side unphysicality); **raising is NOT free** — starves
+  gated sinks, moves SO2:O2 both ways. Suite blind both ways ⇒ edges + note-span **PINNED**. **Flags D-136/D-172**.
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
   `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names
   (positive control moving; pool ends **0.63 of 0.8 g/L** ⇒ competition not binding). **Not a value
