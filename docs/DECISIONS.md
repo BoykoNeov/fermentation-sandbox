@@ -11,7 +11,7 @@ relevant) how it deviates from the handoff brief. The handoff explicitly states
 
 ⚠ on a row means a **later decision corrected or flagged it** — follow the pointer before trusting that record. `corrected by` = the fix shipped; `flagged by` = the reversal is agreed but **not yet in the code**.
 
-**The correction map is INCOMPLETE.** It is built only from explicit `**Corrects:**` / `**Flags:**` markers, and those are backfilled so far only for the corrections a title announced (50 records marked). **Absence of ⚠ is NOT a guarantee that a record is current** — a superseding decision that never declared itself will not show here. When a record is load-bearing, grep its D-number: `Grep 'D-<n>' docs/DECISIONS.md`.
+**The correction map is INCOMPLETE.** It is built only from explicit `**Corrects:**` / `**Flags:**` markers, and those are backfilled so far only for the corrections a title announced (49 records marked). **Absence of ⚠ is NOT a guarantee that a record is current** — a superseding decision that never declared itself will not show here. When a record is load-bearing, grep its D-number: `Grep 'D-<n>' docs/DECISIONS.md`.
 
 ### By subsystem
 
@@ -201,7 +201,7 @@ Coarse first cut for *where did we decide X*. A record appears under **every** b
 - [**D-170**](#d-170--d-168s-q10-cross-check-generalised-twice-off-one-field-onto-four-which-changed-the-count-by-nothing-and-is-itself-the-result-and-off-five-notes-onto-every-ordering-claim-in-the-archive-which-found-the-recurring-verified-at-a-point-sampled-over-a-band-shape-has-five-live-instances-and-one-guard--plus-a-sweep-that-scores-a-repaired-note-worse-than-the-broken-one-it-replaced) — D-168's Q10 cross-check generalised twice: off one FIELD onto four, which changed the count by … — ⚠ **corrected by [D-171](#d-171--the-beat-was-guard-the-five-ordering-breaches-and-not-one-of-them-can-be-guarded-where-it-breaches-every-joint-edge-margin-is-negative-so-the-d-170-guard-shape-needs-a-band-edge-moved-and-no-citation-licenses-that--but-proving-the-five-are-unguarded-took-four-rounds-because-rounds-1-and-2-each-attributed-a-red-to-the-archive-that-belonged-to-something-else-and-the-pair-whose-consequence-guard-names-the-ordering-does-not-fire-when-the-ordering-is-fully-inverted)**
 - [**D-171**](#d-171--the-beat-was-guard-the-five-ordering-breaches-and-not-one-of-them-can-be-guarded-where-it-breaches-every-joint-edge-margin-is-negative-so-the-d-170-guard-shape-needs-a-band-edge-moved-and-no-citation-licenses-that--but-proving-the-five-are-unguarded-took-four-rounds-because-rounds-1-and-2-each-attributed-a-red-to-the-archive-that-belonged-to-something-else-and-the-pair-whose-consequence-guard-names-the-ordering-does-not-fire-when-the-ordering-is-fully-inverted) — The beat was "guard the five ordering breaches" and not one of them can be guarded where it … — ⚠ **corrected by [D-172](#d-172--the-one-degree-of-freedom-three-independent-draws-flag-is-a-claim-about-the-files-and-not-about-any-ensemble-no-run-ever-draws-all-three-but-two-are-live-in-every-aged-arm-and-the-pair-the-cascade-draws-is-a-total-against-its-own-share--repaired-by-reparameterising-rather-than-by-coupling-the-sampler-which-drops-the-archives-highest-ordering-breach-rate-from-5520--to-1254--with-no-edge-moved)**
 - [**D-172**](#d-172--the-one-degree-of-freedom-three-independent-draws-flag-is-a-claim-about-the-files-and-not-about-any-ensemble-no-run-ever-draws-all-three-but-two-are-live-in-every-aged-arm-and-the-pair-the-cascade-draws-is-a-total-against-its-own-share--repaired-by-reparameterising-rather-than-by-coupling-the-sampler-which-drops-the-archives-highest-ordering-breach-rate-from-5520--to-1254--with-no-edge-moved) — The "one degree of freedom, three independent draws" flag is a claim about the FILES and not about … — ⚠ **corrected by [D-173](#d-173--the-one-edge-this-archive-has-moved-on-a-measurement-rather-than-a-document-k_o2_depletion_totals-low-let-the-sampler-draw-a-supersaturated-wine-and-closing-it-took-the-joint-over-twelve-other-sinks-to-show-the-repair-holds--at-114x-not-the-19x-the-flag-predicted)** — ⚠ **flagged by [D-174](#d-174--the-high-edge-which-no-measurement-forces-and-which-had-no-account-d-71s-printed-20e-3-restored-after-running-the-null-d-173-only-conceded--and-the-raising-it-only-lowers-standing-o2-that-licensed-leaving-it-alone-turns-out-to-be-true-and-incomplete)**
-- [**D-173**](#d-173--the-one-edge-this-archive-has-moved-on-a-measurement-rather-than-a-document-k_o2_depletion_totals-low-let-the-sampler-draw-a-supersaturated-wine-and-closing-it-took-the-joint-over-twelve-other-sinks-to-show-the-repair-holds--at-114x-not-the-19x-the-flag-predicted) — The one edge this archive has moved on a measurement rather than a document … — ⚠ **corrected by [D-174](#d-174--the-high-edge-which-no-measurement-forces-and-which-had-no-account-d-71s-printed-20e-3-restored-after-running-the-null-d-173-only-conceded--and-the-raising-it-only-lowers-standing-o2-that-licensed-leaving-it-alone-turns-out-to-be-true-and-incomplete)**
+- [**D-173**](#d-173--the-one-edge-this-archive-has-moved-on-a-measurement-rather-than-a-document-k_o2_depletion_totals-low-let-the-sampler-draw-a-supersaturated-wine-and-closing-it-took-the-joint-over-twelve-other-sinks-to-show-the-repair-holds--at-114x-not-the-19x-the-flag-predicted) — The one edge this archive has moved on a measurement rather than a document …
 - [**D-174**](#d-174--the-high-edge-which-no-measurement-forces-and-which-had-no-account-d-71s-printed-20e-3-restored-after-running-the-null-d-173-only-conceded--and-the-raising-it-only-lowers-standing-o2-that-licensed-leaving-it-alone-turns-out-to-be-true-and-incomplete) — The high edge, which no measurement forces and which had no account: D-71's printed 2.0e-3 …
 <!-- END INDEX -->
 
@@ -22086,7 +22086,6 @@ run — the mutation discipline covers *removing* the protection, and this was t
 
 ## D-174 — The high edge, which no measurement forces and which had no account: D-71's printed 2.0e-3 restored, after running the null D-173 only conceded — and the "raising it only lowers standing o2" that licensed leaving it alone turns out to be true and incomplete
 
-**Corrects:** D-173 — its §4 licensed leaving this edge to the owner on the grounds that "raising it only *lowers* standing o2". Measured here: raising it also takes O2 away from every substrate-gated sink, which moves the SO2:O2 reaction ratio at an edge draw and carries the CASCADE set out of the Miao/Danilewicz envelope. The direction was right; the word "only" was wrong.
 **Flags:** D-172 — six notes across `oak.yaml`, `polymerization.yaml` and `thermal.yaml` still name `k_ethanol_oxidation + k_browning_base` as a live pair, and one of them (`k_ellagitannin_oxidation`) states oak's O2 protection as a RATIO to that total: "~0.5-1x", which across the total's band is now 0.125-2.08x. Identified, not repaired — it is six notes in three files, not an edge move.
 
 Owner's direction was **work the high edge**, naming both candidates. That is the owner's call being exercised on the axis D-172 and D-173 both deferred, so this ships rather than asks.
@@ -22254,3 +22253,53 @@ self-confirming — the same edit reaches a guard in another file.
 * `closure_otr`'s band is still not sampled (D-136, flagged at D-173) and `T_ref` is still the
   member that must be named when the joint-corner margins are quoted (D-173 amendment). Neither
   moved here.
+
+### 8. Amendment (same day) — the headline finding was read off a paraphrase, and the `Corrects` marker convicted a parenthetical of a claim it does not make
+
+Three defects in what shipped an hour earlier, all found by review rather than by the suite. The
+first strengthens the licence, the second withdraws a back-edge from the correction map, and the
+third is this record's own defect class landing on a file it had just measured.
+
+**(a) §1's account of 1.0e-3 came from D-173's note, not from D-141 — and the primary source says
+something stronger.** §1 wrote that "1.0e-3's only recorded rationale was a clean decade with
+1.0e-4". That phrase is D-172's and D-173's *description* of an edge they both call unaccounted;
+it is not what D-141 recorded. Read at the source (`git show a96ebf1:...aging.yaml`), the entry
+that introduced this edge states **two** accounts for its band and **neither of them is 1.0e-3**:
+
+> `uncertainty: { low: 1.0e-4, high: 1.0e-3, note: "... Inherits the band of the total it
+> un-partitions: k_ethanol_oxidation (4.0e-5..8.0e-4) plus k_browning_base together anchor a
+> total O2 half-life ln2/k ~ 350-7000 h (~2 weeks to ~10 months) ..." }`
+
+The inherit-claim computes **1.2e-3**. The half-life sentence — carried verbatim from D-71 —
+renders **[1.0e-4, 2.0e-3]**. So D-141 shipped a high edge that contradicts both of the accounts
+in its own note, and one of those accounts is the number D-174 restored. The correct statement is
+therefore not "its rationale dissolved at D-173" but **"it never had one, and the note it shipped
+under printed 2.0e-3"**. §4's licence stands and is stronger than it was written;
+`feedback-verify-latest-state-not-breadcrumbs` — a load-bearing claim was taken from a downstream
+paraphrase, and the paraphrase was mild rather than wrong.
+
+**(b) `Corrects: D-173` is withdrawn.** D-173 §4 reads: "nothing measured forces it (raising it
+only *lowers* standing o2), so D-172's owner's-call … stands open." In its own context the
+parenthetical is the **direction on the o2 slot** — the subject of the two sections immediately
+above it — and it is the *reason* nothing forces the edge, not an assertion that no other surface
+moves. §2 of this record **confirms** that conclusion at 200×; §3 measures a different surface it
+did not cover. Convicting it of exclusivity would be D-172's amendment repeating itself, where a
+docstring was convicted of a nominal-only claim and then shipped unchanged. A wrong back-edge is
+worse than a missing one, because "check the index row before trusting a record you jumped to" is
+this archive's navigation contract. The marker is removed and the relationship is an **extension**:
+D-174 runs the null D-173 conceded and sweeps a surface D-173 did not. The heading's "true and
+incomplete" already said so; the marker did not. (The commit message for the parent commit says
+"'only' was wrong" — that is over-strong for the same reason and is superseded here.)
+
+**(c) The benchmark file's own headroom claim is now held open by a band edge, and it was left
+saying otherwise.** `test_validation_danilewicz_so2_o2.py` states the cascade sits inside Miao's
+band "with ~3.4% headroom". §3 measured a draw at this record's new high edge taking it to 1.0655
+— outside — and the file was left asserting the clean version. That is D-170's "verified at a
+point, sampled over a band" shape, and this commit is its cause. Repaired in the file: a paragraph
+naming `k_o2_depletion_total`'s high as what spends that headroom, both sets' figures, and the
+scope (edge draws, not shipped results — every test there runs at the nominal).
+
+**(d) Run labels, for the matched pair in §5.** "1532 passed at 1.0e-3" is HEAD before this beat
+(`df9b119`, D-173's own figure); "1532 passed at 2.0e-3" was taken today on the edited tree before
+any test was written. Same tree, one YAML edit apart — a legitimate pair, but the rows are from
+two different runs and `feedback-a-majority-is-not-a-direction` asks that they say so.

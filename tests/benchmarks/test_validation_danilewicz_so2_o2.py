@@ -73,6 +73,16 @@ straddle it is (``test_cascade_brackets_miaos_lower_bound_across_its_valid_dose_
 a single in-band number — which is the mistake this file already made once, in the other
 direction.
 
+**That headroom is held open by a BAND EDGE as well as by the dose (D-174).** Every number in
+this file is measured at the parameter nominals, and ``k_o2_depletion_total`` — the always-on O2
+total, which competes with ``SulfiteOxidation`` for the same O2 — is sampled over
+[2.4e-4, 2.0e-3]. At its high edge the cascade reads **1.0655, below Miao's floor**, spending
+exactly this headroom; the direct set reads **1.4829, INTO his band** from the 1.7707 it sits
+above at the nominal. Neither is a shipped result and no edge move touches the tests here, but
+"verified at a point, sampled over a band" is D-170's recurring shape and this file's headline is
+an instance of it. Do not quote the 3.4% as a margin over the model's uncertainty — it is a
+margin at one draw.
+
 **The agreement is at an operating point above Miao's wines — but NOT because the sim under-binds
 SO2, which is what this file used to say (D-143 withdrew it).** Miao's buffering capacity is the
 slope of an SO2 **addition** series on an unchanged wine (his Table 3 caption, n = 15, free SO2
