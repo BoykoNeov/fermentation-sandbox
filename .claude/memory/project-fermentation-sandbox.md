@@ -130,17 +130,17 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
 - **A guard can NAME the ordering and still not fire on it (D-171 §4)** — `test_integrated_wine_aroma_
   temperature_directions` survives `E_a_fusels`/`E_a_uptake` **fully inverted**: its sensitivity sits
   **above** the −3,000 J/mol its own bands permit.
-- **O2 partition REPARAMETERISED, both D-171 flags closed (D-172) — never re-add the three retired names.**
-  `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor` GONE ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`,
-  **two PRODUCTS, never `total-total*f`** (1 ULP; **361 tests stay GREEN** on it). Breach **55.20 → 12.54 %**
-  (pre-registered 12.50), **ZERO edges moved**, nominals **bitwise** vs `413c809`. **Never 3 co-drawn — max 2**;
-  cascade's pair is **total vs its own SHARE**, live only **with SO₂**. **A DISSOLVED, not repaired**; the sum
-  assert is now an **IDENTITY ⇒ vacuous**. **The total's high 1.0e-3 has NO account** — printed alt **2.0e-3**
-  (D-71 `e1105ae`; *"350–7000 h"* right when WRITTEN, then **stale**). **OWNER'S CALL.**
-- **D-172 amdt — the SAME defect one level up, FLAGGED not repaired:** `E_a_ethanol_oxidation`/`E_a_browning` have
-  identical value AND band but are **TWO entries** ⇒ the split is T-independent **at `T_ref` ONLY** (0.155–0.708 at
-  45 °C), so D-74's *"exact at every T"* is nominal-only. `test_closure_ingress`'s `ceiling<8.0e-3` was **already
-  breached pre-D-172** (3.2× over) and D-172 **doubles** it — a pre-existing shape, **NOT a regression**.
+- **O2 partition REPARAMETERISED (D-172) — never re-add `k_ethanol_oxidation`/`k_browning_base`/`k_activation_floor`.**
+  ⇒ `k_o2_depletion_total` × `f_ethanol_o2_share`, **two PRODUCTS, never `total-total*f`** (1 ULP; 361 GREEN).
+  Breach **55.20 → 12.54 %**, **ZERO edges moved**. **Never 3 co-drawn — max 2.** Sum assert now an **IDENTITY ⇒
+  vacuous**. **The total's high 1.0e-3 has NO account** (printed alt **2.0e-3**, D-71) — **OWNER'S CALL.**
+- **D-172 amdt — SAME defect one level up, FLAGGED not repaired:** `E_a_ethanol_oxidation`/`E_a_browning` are **TWO
+  entries**, identical value AND band ⇒ split T-independent **at `T_ref` ONLY**; D-74's *"exact at every T"* is nominal-only.
+- **D-172 §6 — LIVE REGRESSION, OWNER'S CALL, do NOT re-derive (§6 has the both-tree table).** Separate **BOUND**
+  from **STATE**: `ceiling<8.0e-3` is pre-existing/doubled, but **`o2.max()` reaches 9.68e-3 > the 8.0e-3 two tests
+  assert** at `k_o2_depletion_total`'s low (`413c809`: 4.27e-3). **`Σk ≡ total` ⇒ `f_ethanol_o2_share` CANCELS —
+  only the TOTAL's band reaches `o2`.** **"No edge moved" ≠ "no reach changed."** Fix needs no new provenance
+  (`aging.yaml`: **[2.4e-4, 1.2e-3]**) but **CONTRADICTS D-172 §5's "1.0e-4"** [[feedback-rejected-values-must-be-unreachable]].
 - **D-89's sotolon caution is FLAGGED, not resolved (D-170 §6) — do NOT treat it as a live bound.**
   `k_maillard_browning`'s **whole band** moves sotolon OAV by **<1e-4** in the scenario its own note names
   (positive control moving; pool ends **0.63 of 0.8 g/L** ⇒ competition not binding). **Not a value

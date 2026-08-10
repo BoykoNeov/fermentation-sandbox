@@ -568,18 +568,30 @@ def test_the_oxygen_ceiling_is_held_up_by_ethanol_oxidation():
     that lowering EITHER factor fails HERE with a clear reason rather than silently pushing the
     saturation test toward its limit.
 
-    **That "fails HERE" is a claim about the NOMINALS, and the band already breaches it without
-    anyone editing anything** (D-172 amendment §3; the recurring shape is a constraint verified at
-    a POINT where the sampler reads a BAND). Measured with ``otr = 1.03e-6``: nominal
-    ``k_ethanol = 2.00e-4`` gives ceiling 5.15e-3 and PASSES; the post-D-172 joint band edge
-    (``k_o2_depletion_total`` low 1.0e-4 x ``f_ethanol_o2_share`` low 0.2 = 2.0e-5) gives 5.15e-2,
-    which BREACHES the 8.0e-3 below. **The breach is NOT something D-172 introduced** — the retired
-    ``k_ethanol_oxidation``'s own band low 4.0e-5 gave 2.58e-2, already 3.2x over, and that baseline
-    row is what fixes the attribution rather than the arm alone; what D-172 did is double it. Not
-    repaired, for D-171's reason: closing it needs a declared edge moved, and
-    ``k_o2_depletion_total``'s low is the one edge in that repair all three competing accounts
-    agree on. So this assert guards the nominal against edits, and does NOT establish that the
-    margin is held open across the declared band. Do not read it as the latter.
+    **That "fails HERE" is a claim about the NOMINALS, and the band breaches it without anyone
+    editing anything** (D-172 amendment §3/§6; the recurring shape is a constraint verified at a
+    POINT where the sampler reads a BAND). Two DIFFERENT quantities breach, with opposite
+    attributions, and conflating them is the trap this paragraph exists to close:
+
+    * **The CEILING below (a single-sink BOUND) — pre-existing, doubled by D-172.** With
+      ``otr = 1.03e-6``: nominal ``k_ethanol = 2.00e-4`` gives 5.15e-3, PASS; the post-D-172 joint
+      band edge (``k_o2_depletion_total`` low 1.0e-4 x ``f_ethanol_o2_share`` low 0.2 = 2.0e-5)
+      gives 5.15e-2. But the retired ``k_ethanol_oxidation``'s own band low 4.0e-5 already gave
+      2.58e-2, 3.2x over, so D-172 did not introduce this — it doubled it. A ceiling above 8.0e-3
+      means the BOUND stops being informative, NOT that o2 gets there.
+    * **The ACTUAL standing ``o2`` — INTRODUCED by D-172, measured on both trees.** ``o2.max()`` at
+      the post-D-172 total-low is **9.68e-3, ABOVE the 8.0e-3 air saturation two tests here
+      assert**. On the pre-D-172 tree (413c809) NO arm reaches it: both retired constants at their
+      band lows give 4.27e-3, 1.9x of headroom. The mechanism is that standing o2 is ``otr / SUM
+      k``, so ``f_ethanol_o2_share`` cancels and only the TOTAL matters — and D-172 lowered the
+      reachable minimum sum from ``4.0e-5 + 2.0e-4 = 2.4e-4`` to a flat ``1.0e-4`` by carrying
+      ``k_activation_floor``'s band across rather than the sum of the two lows. "No declared edge
+      moved" was true of every edge and still changed what the JOINT surface reaches.
+
+    So this assert guards the nominal against edits and does NOT establish that the margin is held
+    open across the declared band. Do not read it as the latter. The edge move that would close it
+    is the owner's (D-171), and ``k_activation_floor``'s own note already names the alternative
+    band [2.4e-4, 1.2e-3] that restores the pre-D-172 reach exactly.
     """
     compiled, trajectory = _age("synthetic_supremecorq")
     o2 = trajectory.y[compiled.schema.slice("o2")][0]

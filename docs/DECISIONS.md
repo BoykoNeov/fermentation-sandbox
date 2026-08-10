@@ -21844,3 +21844,69 @@ amendment's table.
 Note what this does and does not close: it makes the test honest about its own reach. The
 breach itself is still open and still the owner's, alongside the `1.0e-3` vs `2.0e-3` high-edge
 decision on the same parameter. **No value, no band edge, and no assert changed** — prose only.
+
+### 6. The follow-up's own correction — a BOUND going uninformative and a STATE going unphysical are two claims, and only the first is pre-existing
+
+Self-correcting inside D-172, so **no marker line** — a record cannot flag itself and the
+generator rejects the self-edge. Stated as prose instead: `k_o2_depletion_total`'s low edge
+1.0e-4 makes dissolved `o2` reachably exceed air saturation in the direct set under the
+highest-OTR closure, and the pre-D-172 surface did not. Not repaired here (it is a
+declared-edge move, D-171's rule), but it is now a MEASURED forcing reason rather than a
+tidiness preference.
+
+§3 and §5 both reported the `ceiling < 8.0e-3` breach and stopped there. The ceiling is a
+**single-sink bound**, and the test's own comment says the standing level sits strictly below
+it "because the other sinks take their share too". So a ceiling of 5.15e-2 establishes that the
+*bound* stops discriminating — it does **not** establish that `o2` gets there. Neither section
+said so, and "BREACHED" invites the stronger reading. That is the conceded-caveat-instead-of-a-
+number shape §3 exists to convict, committed inside §3 itself
+(`feedback-conceded-caveats-are-not-coverage`).
+
+Measured, one integration per arm, `synthetic_supremecorq` (the highest-OTR closure, so the
+worst case on the menu), `o2.max()` against the 8.0e-3 two tests in this file assert:
+
+| tree | arm | Σk | ceiling | `o2.max()` | |
+|---|---|---|---|---|---|
+| this | nominal | 5.0e-4 | 5.15e-3 | 2.0498e-3 | below sat |
+| this | share low ALONE (0.2) | 5.0e-4 | 1.03e-2 | 2.0504e-3 | below sat |
+| this | share high ALONE (0.6) | 5.0e-4 | 3.43e-3 | 2.0501e-3 | below sat |
+| this | **total low ALONE (1.0e-4)** | 1.0e-4 | 2.58e-2 | **9.6756e-3** | **ABOVE SAT** |
+| this | joint low (1.0e-4 x 0.2) | 1.0e-4 | 5.15e-2 | **9.6881e-3** | **ABOVE SAT** |
+| `413c809` | nominal | 5.0e-4 | 5.15e-3 | 2.0498e-3 | below sat |
+| `413c809` | **both retired lows (4.0e-5 + 2.0e-4)** | 2.4e-4 | 2.58e-2 | 4.2732e-3 | below sat, **1.9x headroom** |
+| `413c809` | `k_ethanol` low alone | 3.4e-4 | 2.58e-2 | 3.0203e-3 | below sat |
+
+**The two nominal rows agree to every printed digit across the two trees**, which is the control
+that these are comparable ensembles and not two different scenarios
+(`feedback-pair-the-arm-with-its-baseline`). Read the `413c809` row against the two ABOVE SAT
+rows and the attribution is the opposite of §3's and §5's: **on the actual state, D-172
+introduced the reachability; on the ceiling, it inherited and doubled it.**
+
+**Mechanism, and why "no declared edge moved" did not protect this.** Standing `o2` is
+`otr / Σk`, and `Σk = total·f + total·(1−f) ≡ total` — so `f_ethanol_o2_share` **cancels out of
+the quantity entirely** (the three share-only rows above move `o2.max()` by 6e-7, which is the
+identity showing through, not a small effect). Only the TOTAL's band reaches this. Pre-D-172 the
+reachable minimum sum was `k_ethanol_oxidation` low + `k_browning_base` low = **2.4e-4**, because
+two independent draws each had their own floor; post-D-172 it is a flat **1.0e-4**, because the
+repair carried `k_activation_floor`'s shipped band across rather than the sum of the two lows.
+Every individual edge is unmoved and the joint surface still reaches 2.4x lower. **This is the
+D-172 headline claim's own blind spot** — that record proved reparameterising fixed the ordering
+breach *with no edge moved*, and no-edge-moved is not no-reach-changed.
+
+**The repair needs no new provenance and is already written down.** `k_activation_floor`'s note
+claims to inherit "the band of the total it un-partitions", which `aging.yaml` itself computes as
+**[2.4e-4, 1.2e-3]** — exactly the pre-D-172 reachable sum. Adopting that low restores the old
+reach by construction. It is left to the owner because it moves a declared edge, and because it
+**contradicts D-172 §5's finding that 1.0e-4 is the one edge all three competing accounts agree
+on** — those accounts were reasoning about the floor parameter and none of them had this
+measurement. An unphysical value reachable in a sampled field is a live defect a green suite will
+not catch (`feedback-rejected-values-must-be-unreachable`), so this is not a preference.
+
+**Limits.** One closure (the worst on the menu), one scenario family (direct), one state slot.
+The cascade set and the other closures are not swept here and this section does not claim they
+are clean. The two ABOVE SAT arms are corner draws of a triangular sampler — reachable, not
+likely, and this section makes no frequency claim.
+
+Prose and measurement only: **no value, no band edge, and no assert changed.** The docstring in
+`tests/test_closure_ingress.py` now separates the two quantities; §5's "one docstring corrected"
+should be read as two.
