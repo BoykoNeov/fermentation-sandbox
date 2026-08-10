@@ -658,6 +658,14 @@ def test_the_low_edge_of_the_o2_total_cannot_draw_a_supersaturated_wine():
        floor and breached too (8.35e-3 at the retired low), so guarding ``direct`` alone would
        leave half the surface open.
 
+    **The high edge moved under this test at D-174 (1.0e-3 -> 2.0e-3) and every arm here got
+    safer**, which is the whole reason the guard is written off the seam: ``at_mid`` follows to
+    6.93e-4 and ``at_high`` falls to 5.13e-4 g/L, 15.6x under saturation where it was 7.8x. D-174
+    swept the total to 1.0e-1 — 200x the nominal — looking for a high-side channel to any
+    impossible state on either oxidative set and on beer's dosed pool, and found none; the
+    positive control on that same harness reproduced the 9.68e-3 breach below. So "raising this
+    edge only makes the state safer" is now measured rather than conceded.
+
     **What this does NOT claim.** The margin at the low edge is 1.88x on this arm alone. The joint
     over the eleven OTHER sink parameters that reach ``d(o2)/dt`` closes it to **1.59x** (direct)
     and **1.41x** (cascade). Two further surfaces are not sink constants and are held out of that

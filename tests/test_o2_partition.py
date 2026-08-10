@@ -25,6 +25,8 @@ guard``): see D-172 §9 for which arms the shipped suite already caught and whic
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 
@@ -181,3 +183,68 @@ def test_the_d74_ordering_is_still_open_at_the_split_fractions_high_edge(aging_p
     )
     breach = (high - 0.5) ** 2 / ((high - lo) * (high - mode))
     assert breach == pytest.approx(0.125, abs=5e-4)
+
+
+#: ``k_ethanol_oxidation`` and ``k_browning_base``'s own shipped lows, as D-172 retired them.
+#: Their SUM is exactly the low edge D-173 adopted — recomputed here rather than restated, so
+#: "2.4e-4 is the reach the archive had before D-172" is run instead of asserted. Exact in
+#: float64 (``4.0e-5 + 2.0e-4 == 2.4e-4``), so no tolerance is needed or wanted.
+_RETIRED_SHARE_LOWS = (4.0e-5, 2.0e-4)
+#: D-71's shipped high for this same parameter at commit ``e1105ae``, restored at D-174. A
+#: TRANSCRIPTION from the archive, not a derivation — there is nothing to recompute it from,
+#: which is exactly why it needs pinning.
+_D71_HIGH = 2.0e-3
+
+
+def test_the_o2_totals_band_edges_are_pinned_to_the_accounts_that_set_them(aging_params):
+    """Both edges of ``k_o2_depletion_total``, each against the account that put it there.
+
+    **What this forbids is SILENCE, not a direction.** Measured at D-174: with the shipped suite
+    at 1532 passed, this band's high edge moves 1.0e-3 -> 2.0e-3 — a doubling — and *nothing*
+    goes red. That is D-163's finding landing on the one band whose other edge D-173 had to move
+    because the sampler could draw an impossible state from it. Both edges now carry an account
+    (D-173 measured the low, D-174 restored the high from D-71) and neither account is derivable
+    from the code, so a pin is the only thing that makes a future move announce itself.
+
+    Its sibling below checks the note's half-life sentence against these same edges. They are two
+    tests and not two asserts on purpose: in one function the first failure masks the second, so
+    the two mutation arms that separate "an edge moved" from "an edge moved and its prose did not
+    follow" would print identically (``feedback-pair-the-red-with-an-ordering-preserving-
+    baseline`` — attribute at ASSERT granularity, which here means one claim per test).
+    """
+    band = aging_params["k_o2_depletion_total"].uncertainty
+    assert band is not None
+
+    assert band.low == sum(_RETIRED_SHARE_LOWS), (
+        f"the low edge {band.low:.2e} is no longer the reachable minimum sum of the two shares "
+        f"D-172 retired ({' + '.join(f'{v:.1e}' for v in _RETIRED_SHARE_LOWS)}). D-173 moved it "
+        "there on a MEASUREMENT (the sampler could otherwise draw a supersaturated wine) -- see "
+        "tests/test_closure_ingress.py for the guard that runs it."
+    )
+    assert band.high == _D71_HIGH, (
+        f"the high edge {band.high:.2e} is not D-71's shipped high {_D71_HIGH:.1e} (commit "
+        "e1105ae), which D-174 restored as the only candidate with a printed account. Moving it "
+        "is allowed; moving it silently is not -- 1.0e-3 sat here for three records on the "
+        "strength of making a clean decade with a low that D-173 then removed."
+    )
+
+
+def test_the_notes_half_life_span_is_the_shipped_edges_rendered(aging_params):
+    """The band and the sentence in its note are two statements of one fact — kept in step.
+
+    **This is the defect this axis has actually suffered, twice.** D-74 moved the band and left
+    D-71's ``half-life ln2/k ~ 350-7000 h`` describing the old one; D-141 copied that same
+    sentence onto a third band; D-172 §5 was the record that finally caught it, four records
+    later. So the span is RECOMPUTED from the shipped edges rather than trusted (the D-154 idiom,
+    ``feedback-a-note-can-state-its-span-twice``).
+
+    A consistent re-sourcing — both an edge and the sentence moved together — leaves this GREEN
+    and reds only the pin above, which is what makes the pair diagnostic instead of redundant.
+    """
+    band = aging_params["k_o2_depletion_total"].uncertainty
+    assert band is not None
+    span = f"{math.log(2.0) / band.high:.0f}-{math.log(2.0) / band.low:.0f} h"
+    assert span in band.note, (
+        f"the note does not print the half-life span its own edges imply ({span}). An edge moved "
+        "and its sentence did not follow -- the exact drift D-172 §5 found running since D-74."
+    )

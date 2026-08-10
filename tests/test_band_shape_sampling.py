@@ -24,7 +24,9 @@ mean ``(lo+m+hi)/3`` and is therefore dominated by ``hi``. The worst,
 ``k_d2_ethanol_tolerance_death`` (``hi/lo = 300``), draws a median 9.18x its own stated
 nominal, in every wine and beer ensemble. (Those two counts are re-measured per record and
 drift with the parameter files: D-165 read 123 of 337 and 84; D-172's retirements left 122;
-D-173's low-edge move on ``k_o2_depletion_total`` leaves the figures printed above. They are
+D-173's low-edge move on ``k_o2_depletion_total`` leaves the figures printed above, and
+D-174's high-edge move on the same band takes its ``hi/lo`` from 4.17 to 8.33 — still under
+10, so the figures hold there too, BY ARITHMETIC rather than by a re-run census. They are
 census output, NOT asserted here — the asserts below are all on ``k_autolysis``.)
 
 **What is deliberately NOT pinned here: a fix.** No shape field is shipped. Which bands
