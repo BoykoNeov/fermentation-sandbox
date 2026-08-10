@@ -479,3 +479,18 @@ dH_ester_volatil:
     source: "Ethyl-acetate Henry's-law solubility constant temperature dependence d(ln kH)/d(1/T) ~ 5300-5700 K (NIST Chemistry WebBook / Sander compilation, doi:10.5194/acp-15-4399-2015) => dissolution enthalpy ~ -46 kJ/mol => gas/liquid partition rises with T with effective enthalpy ~ +45 kJ/mol"
     conditions: "ethyl acetate, gas/liquid (air/water) partition; van't Hoff form anchored at T_ref = 293.15 K"
     notes: "IDENTICAL to the wine value (45,000 J/mol) by design: the ethyl-acetate gas/liquid partition is a property of the MOLECULE, the same in beer and wine (Morakul 2011). It is the PHYSICAL stripping T-lever (Q10 ~ 1.8) that replaced D-20's fudged E_a_ester_volatil. The wine/beer ester direction comes from synthesis E_a_esters (beer steep / wine flat), NOT this. Same NIST/Sander sourcing + Morakul-ethanol-term simplification as wine_generic.yaml (see there). SPECULATIVE tier (simplification + abs-value transfer), though the enthalpy is sourced."
+
+# -- Typical acetic-acid level, read by the ester equilibrium (D-176) ------------------------------
+# The BEER counterpart of wine_generic.yaml's acetic_acid_typical, and the reason D-176 exists:
+# before it, EthylAcetateEsterification drove beer's ethyl acetate toward a WINE equilibrium
+# (51 mg/L, 2.15x the published beer mean) funded from a Byp pool beer starts at exactly 0 with no
+# producer, which drove that pool negative and the reported pH to 10.5.
+acetic_acid_typical:
+  value: 0.0835
+  unit: "g/L"   # acetic acid of a finished ale
+  tier: speculative
+  uncertainty: { low: 0.012, high: 0.155, note: "BOTH EDGES PRINTED. IARC Monographs, 'Chemical Composition of Alcoholic Beverages, Additives and Contaminants' (NCBI Bookshelf NBK531662) sect. 3.2.c: 'Acetic acid is the most abundant, occurring at 12-155 mg/l in ales, 22-107 mg/l in lagers and 30-35 mg/l in stouts.' This file is the generic ALE file (see its header), so the ALE range is the band verbatim; the lager and stout ranges both sit inside it. The VALUE is the arithmetic midpoint of that printed range and is AUTHOR-CONSTRUCTED -- no source prints a typical-ale acetic, so the nominal is a construction and the EDGES are the sourced content (feedback-pin-the-band-not-the-nominal)." }
+  provenance:
+    source: "IARC Monographs, 'Chemical Composition of Alcoholic Beverages, Additives and Contaminants', NCBI Bookshelf NBK531662, sect. 3.2.c (volatile acids): '12-155 mg/l in ales'. Value = (12 + 155)/2 = 83.5 mg/L, the midpoint of the printed ale range."
+    conditions: "finished ale, packaged; total acetic acid. NOT a sour/wild beer -- those run into the g/L and are outside this band."
+    notes: "D-176. Read ONLY by EthylAcetateEsterification, as a ratio against acetic_ref_ester_eq (aging.yaml). DELIBERATELY NOT Wang, Frank & Steinhaus 2024 (J. Agric. Food Chem., 'Molecular Insights into the Aroma Difference between Beer and Wine') Table 1's 311 mg/L: that is an arithmetic mean over a 32-study survey that includes sour/wild beers whose acetic runs into the g/L, so it is a survey mean and not a typical-beer level. It is worth recording WHY it is tempting -- Wang's Table 1 also gives beer ethyl acetate 23.7 mg/L, and Berthelot-scaling the wine anchor by Wang's OWN acetic reproduces 21.5 mg/L, agreeing with Wang's own observed value to 10%. Two beverages, one Berthelot constant, 10% agreement: that is evidence the RATE LAW transfers, which is what licenses D-176's coupling. It is NOT evidence for 311 as a nominal, because both of Wang's means are inflated together by the same sour-beer tail, which is exactly why their ratio survives. The style-resolved IARC ranges are the right anchor for a generic ale."

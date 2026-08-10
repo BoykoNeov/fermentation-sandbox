@@ -1642,3 +1642,19 @@ k_pof_decarb_ferulic:
     source: "Same Edlin et al. 1998 (Appl. Microbiol. Biotechnol. 49:511-517) Vmax ratio (ferulic/p-coumaric ~0.606) as k_brett_decarb_ferulic, applied here because YeastPOFDecarboxylation models the SAME cinnamate/ferulic-acid decarboxylase (Pad1/Fdc1) as BrettDecarboxylation"
     conditions: "POF+ S. cerevisiae in wine during active fermentation; specific decarboxylase activity on ferulic acid scaling the fermentative flux, the ferulic-branch analogue of k_pof_decarb"
     notes: "Read by YeastPOFDecarboxylation's ferulic branch (decision D-55). VALUE = k_pof_decarb * 0.606 (the sourced ratio, reused from the Brett branch since it is the same enzyme). K_hydroxycinnamic_ferulic (defined in the Brett section above) is shared between both Processes, exactly as K_hydroxycinnamic already is."
+
+# -- Typical acetic-acid (volatile-acidity) level, read by the ester equilibrium (D-176) -----------
+# Berthelot's equilibrium ester scales with acid x alcohol. EthylAcetateEsterification reads this
+# as the ACID factor, divided by acetic_ref_ester_eq (aging.yaml). Wine's value is set EQUAL to
+# that reference on purpose, so wine's acid factor is exactly 1.0 and D-176 moves wine's
+# equilibrium through the ALCOHOL factor only. It is NOT state: acetic has no slot (D-16, it is
+# lumped into the Byp succinic stand-in), which is the half of the D-127 concession that stands.
+acetic_acid_typical:
+  value: 0.35
+  unit: "g/L"   # acetic acid (volatile acidity) of a sound finished wine
+  tier: speculative
+  uncertainty: { low: 0.20, high: 0.60, note: "Sound-wine volatile acidity. IARC (NCBI Bookshelf NBK531662) sect. 3.3.d reports German wine VA 'about 300 mg/l'; legal ceilings there are far higher (900-1200 mg/L) and describe FAULTY wine, so they are deliberately NOT the band. The band is the sound-wine spread around the 0.35 anchor, author-constructed: the LOW 0.20 is a clean, low-VA white and the HIGH 0.60 a sound but VA-forward red, both below the ~0.7 g/L threshold at which acetic becomes a recognised fault. CONSTRUCTED, not printed -- neither edge is transcribed from a source (feedback-pin-the-band-not-the-nominal). The VALUE 0.35 IS printed (see source)." }
+  provenance:
+    source: "Shinohara, Shimizu & Shimazu 1979, Agric. Biol. Chem. 43(11):2351-2358: 'a representative sound-wine acetic ~0.35 g/L', the same figure ethyl_acetate_eq's own derivation uses. Corroborated by IARC Monographs 'Chemical Composition of Alcoholic Beverages, Additives and Contaminants' (NCBI Bookshelf NBK531662) sect. 3.3.d: volatile acidity of German wines 'about 300 mg/l'."
+    conditions: "sound finished table wine at cellar temperature; total acetic acid (free + esterified is NOT included -- this is the acid pool the Berthelot equilibrium multiplies)"
+    notes: "D-176. Read ONLY by EthylAcetateEsterification, and only as a ratio against acetic_ref_ester_eq -- so at the shipped value the wine acid factor is exactly 1.0 and this parameter is INERT for wine at its nominal by construction (feedback-nominal-on-a-band-edge-is-not-inertness does NOT apply: the value equals the REFERENCE, not a band edge, and the band interior moves the equilibrium both ways). Its band is live: at 0.20 wine's equilibrium falls to 0.571x and at 0.60 rises to 1.714x. NOT a state slot and NOT dosed from a scenario -- adding a real acetic pool is the D-16 byproduct-speciation question, deliberately not opened here."

@@ -41,6 +41,7 @@ from fermentation.core.kinetics.aging import (
     Caramelization,
     EllagitanninOxidation,
     EsterHydrolysis,
+    EthylAcetateEsterification,
     MaillardStrecker,
     OakExtraction,
     OxidativeAcetaldehyde,
@@ -263,11 +264,20 @@ def test_aging_fades_esters_and_raises_isoamyl_alcohol_end_to_end():
     assert ester_aged < ester_plain
     assert isoamyl_aged > isoamyl_plain
     # EthylAcetateEsterification (D-127) relaxes ethyl acetate toward its esterification eq.
-    # The freshly-fermented wine sits just BELOW eq (~48.9 vs 51 mg/L), so — exactly
-    # as Shinohara 1979 found for new wines (E-rate ~7.5% climbing toward the ~10% table-wine
-    # equilibrium) — aging FORMS ethyl acetate, and the aged pool ends at its floor.
+    # The freshly-fermented wine sits just BELOW eq, so — exactly as Shinohara 1979 found for new
+    # wines (E-rate ~7.5% climbing toward the ~10% table-wine equilibrium) — aging FORMS ethyl
+    # acetate, and the aged pool ends at its floor.
     assert etoac_aged > etoac_plain
-    assert etoac_aged == pytest.approx(cs.param_values["ethyl_acetate_eq"], abs=5e-4)
+    # D-176: that floor is the BERTHELOT-COUPLED equilibrium, recomputed here from the shipped seam
+    # at the wine's own final ethanol — never transcribed (D-154/D-158). It is ~24% ABOVE the bare
+    # `ethyl_acetate_eq` parameter this used to pin, because the sim's aged wine reaches ~117 g/L
+    # ethanol against the 94.68 g/L (12% v/v) table wines the anchor was measured in. That gap is
+    # the whole content of the coupling, so it is asserted rather than tolerated.
+    eq_coupled = EthylAcetateEsterification.equilibrium(
+        float(aged.series("E")[-1]), cs.param_values
+    )
+    assert etoac_aged == pytest.approx(eq_coupled, abs=5e-4)
+    assert eq_coupled > cs.param_values["ethyl_acetate_eq"] * 1.15
     # NOTE (D-127): Byp is NO LONGER a clean "rises with aging" marker. Two aging routes now move it
     # oppositely: isoamyl-acetate hydrolysis ADDS acetic to Byp, while ethyl-acetate FORMATION
     # (above) CONSUMES it — and the ethyl_acetate pool dwarfs the trace isoamyl_acetate pool,

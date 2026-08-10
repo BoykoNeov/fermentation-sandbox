@@ -1043,9 +1043,19 @@ class EthylAcetateEsterification(Process):
     debits ``E`` (a ``{S, E, CO2}`` sub-ledger pool) into the off-ledger ester, the
     :class:`OxidativeAcetaldehyde` / :class:`EthylHexanoateHydrolysis` pattern — and ``total_mass``
     is asserted only on **byproduct-free** configs, where aging is disabled and this Process is
-    absent. The total EtOAc ever formed is bounded by the small gap ``(eq - ethyl_acetate_0) ~ 8
-    mg/L``, so the acetic acid drawn from ``Byp`` (~4 mg/L) can never approach the ``Byp`` pool (~1
-    g/L) — the relaxation-to-a-fixed-floor form is self-limiting, no guard needed.
+    absent.
+
+    **The "no guard needed" argument was WINE-ONLY and is corrected here (D-176).** It used to read:
+    the total EtOAc ever formed is bounded by the small gap, so the acetic drawn from ``Byp``
+    (~4 mg/L) can never approach the ``Byp`` pool (~1 g/L), self-limiting. Both halves are wine
+    facts. Beer's ``Byp`` is **exactly 0** at every time (D-16 gives beer zero byproduct diversion
+    and beer has no producer for the pool), so "negligible vs the pool" had no referent there —
+    measured, an aged beer's ``Byp`` reached −1.89e-2 g/L and the *reported* pH 10.5050, which is
+    nothing but the sign-inverted arithmetic of an empty charge balance. The D-176 Berthelot
+    coupling (see :meth:`equilibrium`) removes the cause rather than flooring the pool: beer's own
+    acid × alcohol put its equilibrium BELOW its packaged ester level, so beer hydrolyses and
+    ``Byp`` is credited. The guard is now a test, not an argument — the suite asserts
+    ``Byp`` non-negative on a **beer** aging trajectory, which is where the claim actually binds.
 
     Off during the ferment (temperature-, pH-, and pool-driven, no fermentative-flux gate); enabled
     only in a post-fermentation aging segment (D-68/D-70). Tier **speculative** — the aging-axis
@@ -1077,14 +1087,52 @@ class EthylAcetateEsterification(Process):
     #: :class:`EsterHydrolysis` it reads no
     #: tartrate-ratio params: the D-125 law is isoamyl-acetate's, not ported (the
     #: D-126 restraint).
+    #: ``acetic_acid_typical`` / ``acetic_ref_ester_eq`` / ``ethanol_ref_ester_eq`` are the D-176
+    #: Berthelot coupling's three names. They MUST be declared: ``reads`` has two masters (D-160)
+    #: and an undeclared read leaves the name out of the sampled set under every scenario — which
+    #: would silently hide ``acetic_acid_typical``'s band, the one live band the coupling adds.
     reads: tuple[str, ...] = (
         "k_ethyl_acetate_esterification",
         "E_a_ethyl_acetate_esterification",
         "ethyl_acetate_eq",
+        "acetic_acid_typical",
+        "acetic_ref_ester_eq",
+        "ethanol_ref_ester_eq",
         "pH_ref_ethyl_acetate_esterification",
         "T_ref",
         *PH_SYSTEM_READS,
     )
+
+    @staticmethod
+    def equilibrium(ethanol_gpl: float, params: Mapping[str, float]) -> float:
+        """The Berthelot-coupled equilibrium [g/L] this Process relaxes toward (decision D-176).
+
+        ``Ke = [ester][water]/([acid][alcohol])`` ⇒ the equilibrium **ester** is proportional to
+        acid × alcohol. D-127 shipped a fixed absolute because "the sim has no clean acetic pool
+        (acetic lives in the ``Byp`` succinic stand-in, D-16)". That is true of the ACID factor and
+        false of the ALCOHOL factor — ethanol is the core ``E`` slot in every medium — so D-176
+        withdraws the alcohol half of the concession and supplies the acid half as a per-medium
+        sourced level rather than as state.
+
+        ``eq = ethyl_acetate_eq · (acetic_acid_typical / acetic_ref_ester_eq) ·
+        (ethanol / ethanol_ref_ester_eq)``, which is **exactly** ``ethyl_acetate_eq`` at the anchor
+        conditions it was measured at (Shinohara's 12 % v/v, acetic 0.35 g/L table wines), so the
+        anchor keeps its meaning and its D-158 band.
+
+        **This is what makes the Process medium-correct.** Before D-176 it drove BEER's ethyl
+        acetate toward wine's 51 mg/L — 2.15× the published beer mean of 23.7 mg/L (Wang, Frank &
+        Steinhaus 2024, *J. Agric. Food Chem.*, Table 1, 32-study survey) — and funded the
+        formation out of a ``Byp`` pool beer starts at exactly 0 with no producer, so the pool went
+        negative and the *reported* pH went alkaline (10.5, measured). Coupled, beer's equilibrium
+        sits below its packaged level, so beer HYDROLYSES: ``Byp`` is credited, never debited.
+
+        Clamped ≥ 0: BDF's Jacobian probe can push ``E`` negative, and a negative equilibrium would
+        flip the relaxation's sign mid-probe. Keeps the derivative a total, bounded function of
+        state (D-46), exactly as ``ph_of_state``'s [0, 14] clamp does for the pH factor.
+        """
+        acid_factor = params["acetic_acid_typical"] / params["acetic_ref_ester_eq"]
+        alcohol_factor = max(ethanol_gpl, 0.0) / params["ethanol_ref_ester_eq"]
+        return params["ethyl_acetate_eq"] * acid_factor * alcohol_factor
 
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
@@ -1094,7 +1142,11 @@ class EthylAcetateEsterification(Process):
         # SIGNED gap toward the equilibrium floor — the D-127 crux: NOT max(0, ...). Above eq the
         # term fades EtOAc (net hydrolysis); below eq it forms EtOAc (esterification). Only ester
         # that relaxes from either side (the other two decay-only). Zero exactly at equilibrium.
-        gap = ester - params["ethyl_acetate_eq"]
+        # D-176: the equilibrium is Berthelot-coupled to the medium's OWN acid x alcohol, so it is
+        # read from state per call rather than straight out of params. At the anchor conditions it
+        # equals ethyl_acetate_eq exactly, so a wine at Shinohara's 12% v/v is byte-for-byte D-127.
+        ethanol = float(y[schema.slice("E")][0])
+        gap = ester - self.equilibrium(ethanol, params)
         if gap == 0.0:
             return d
         temp = float(y[schema.slice("T")][0])

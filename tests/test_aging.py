@@ -860,6 +860,12 @@ def test_ethyl_acetate_esterification_metadata():
         "k_ethyl_acetate_esterification",
         "E_a_ethyl_acetate_esterification",
         "ethyl_acetate_eq",
+        # The D-176 Berthelot coupling's three names. Declared, not merely used: `reads` has two
+        # masters (D-160) and an undeclared read would drop `acetic_acid_typical`'s band out of
+        # the sampler under every scenario -- the one live band the coupling adds.
+        "acetic_acid_typical",
+        "acetic_ref_ester_eq",
+        "ethanol_ref_ester_eq",
         "pH_ref_ethyl_acetate_esterification",
         "T_ref",
         # The pH solver's own inputs, read inside ph_of_state — declared since D-160. NOT the
@@ -965,8 +971,13 @@ def test_ethyl_acetate_carbon_closes_per_rhs_both_directions(params, side):
 def test_ethyl_acetate_inert_exactly_at_equilibrium(params):
     # At ethyl_acetate == eq the signed gap is exactly zero, so the Process contributes
     # byte-for-byte nothing — the pivot of the bidirectional relaxation.
+    # D-176: the pivot is the COUPLED equilibrium, read from the state's own ethanol, not the bare
+    # `ethyl_acetate_eq` parameter. Seeding the parameter here used to be the same thing and no
+    # longer is; the test would pass only for a wine sitting exactly at the 94.68 g/L anchor.
     schema = wine_schema()
-    y = _aged_wine(schema, ester=0.0, t=298.15, ethyl_acetate=params["ethyl_acetate_eq"])
+    y = _aged_wine(schema, ester=0.0, t=298.15)
+    eq = EthylAcetateEsterification.equilibrium(float(schema.get(y, "E")), params)
+    y[schema.slice("ethyl_acetate")] = eq
     d = EthylAcetateEsterification().derivatives(0.0, y, schema, params)
     for var in ("ethyl_acetate", "E", "Byp"):
         assert schema.get(d, var) == 0.0
@@ -995,7 +1006,11 @@ def test_ethyl_acetate_aging_fades_high_va_wine_and_closes_carbon(params, store)
 def test_ethyl_acetate_aging_forms_in_below_equilibrium_wine(params, store):
     # The FORMATION half — the one the sim models for this ester alone (D-127). A below-equilibrium
     # wine's ethyl acetate RISES toward eq, consuming ethanol (E↓) and acetic acid (Byp↓), and
-    # total_CARBON still closes. Byp is seeded realistically so the tiny acetic draw won't go under.
+    # total_CARBON still closes.
+    # Byp is seeded at a WINE level (1.0 g/L) here on purpose. That seed used to be the reason this
+    # Process never drove the pool negative, and the premise did not hold in beer, where Byp is
+    # exactly 0 — see test_beer_aging_never_drives_the_byproduct_pool_negative, which is the arm
+    # this seed was hiding (D-176).
     schema = wine_schema()
     ea0 = params["ethyl_acetate_eq"] * 0.5  # below equilibrium → forms
     y0 = _aged_wine(schema, ester=0.0, t=293.15, ethyl_acetate=ea0, Byp=1.0)
@@ -1004,12 +1019,130 @@ def test_ethyl_acetate_aging_forms_in_below_equilibrium_wine(params, store):
     traj = simulate(ps, params=params, y0=y0, t_span=(0.0, 24.0 * 365.0))
     assert traj.success, traj.message
     ea_end = float(traj.series("ethyl_acetate")[-1])
-    assert ea0 < ea_end <= params["ethyl_acetate_eq"]  # forms toward, not past, equilibrium
+    # D-176: the ceiling is the COUPLED equilibrium at this wine's own ethanol, which is ABOVE the
+    # bare parameter (the state carries 100 g/L against the 94.68 g/L anchor). Recomputed from the
+    # shipped seam, never transcribed (D-154/D-158).
+    eq_end = EthylAcetateEsterification.equilibrium(float(traj.series("E")[-1]), params)
+    assert ea0 < ea_end <= eq_end  # forms toward, not past, equilibrium
+    assert eq_end > params["ethyl_acetate_eq"]  # and the coupling is what moved the ceiling
     assert float(traj.series("E")[-1]) < e0  # ethanol consumed by esterification
     assert float(traj.series("Byp")[-1]) < byp0  # acetic acid consumed
     assert_nonnegative(traj, ("ethyl_acetate", "Byp"), atol=1e-12)
     f_c = store.value("biomass_C_fraction")
     assert_conserved(traj, total_carbon(schema, biomass_carbon_fraction=f_c), label="carbon")
+
+
+def test_ethyl_acetate_equilibrium_is_berthelot_coupled_to_acid_and_alcohol(params):
+    # D-176. Ke = [ester][water]/([acid][alcohol]) => the equilibrium ESTER scales with acid x
+    # alcohol. Both factors are asserted SEPARATELY, and the anchor identity is asserted exactly:
+    # at the conditions ethyl_acetate_eq was measured at, the coupling must be a no-op, which is
+    # what lets the D-158 band keep its meaning.
+    eq0 = params["ethyl_acetate_eq"]
+    anchor_e = params["ethanol_ref_ester_eq"]
+
+    # (1) the anchor identity — exact, not approximate: at the reference ethanol AND the reference
+    # acetic the coupled equilibrium IS the shipped parameter.
+    assert params["acetic_acid_typical"] == params["acetic_ref_ester_eq"]  # wine, by construction
+    assert EthylAcetateEsterification.equilibrium(anchor_e, params) == pytest.approx(eq0, rel=1e-12)
+
+    # (2) the ALCOHOL factor is linear and is the half D-127 declined for a reason that only ever
+    # applied to the acid half ("the sim has no clean acetic pool" — ethanol IS state).
+    assert EthylAcetateEsterification.equilibrium(2.0 * anchor_e, params) == pytest.approx(
+        2.0 * eq0, rel=1e-12
+    )
+
+    # (3) the ACID factor, exercised by moving acetic_acid_typical alone — a beer-sized acid level
+    # against the same ethanol must lower the equilibrium by exactly that ratio.
+    beer_acid = dict(params)
+    beer_acid["acetic_acid_typical"] = 0.0835  # the shipped generic-ale value
+    assert EthylAcetateEsterification.equilibrium(anchor_e, beer_acid) == pytest.approx(
+        eq0 * 0.0835 / params["acetic_ref_ester_eq"], rel=1e-12
+    )
+
+    # (4) clamped >= 0 so a BDF Jacobian probe that pushes E negative cannot flip the relaxation's
+    # SIGN mid-probe (the D-46 total-and-bounded contract, as ph_of_state's [0, 14] clamp is).
+    assert EthylAcetateEsterification.equilibrium(-50.0, params) == 0.0
+
+
+def test_beer_aging_never_drives_the_byproduct_pool_negative(store):
+    # THE D-176 GUARD, and the arm the adjacent wine tests could not run: they seed Byp = 1.0 g/L
+    # ("so the tiny acetic draw won't go under"), and beer's Byp is EXACTLY 0 at every time — D-16
+    # gives beer zero byproduct diversion and beer has no producer for the pool. So the
+    # "self-limiting, no guard needed" argument was a WINE fact asserted of both media.
+    #
+    # Pre-D-176 this assertion failed with `Byp went negative: -1.889e-02 at t=4.32e+03h`: the
+    # Process chased WINE's 51 mg/L equilibrium in beer and funded the formation out of the empty
+    # pool, which also drove the REPORTED pH to 10.5050 (nothing but the sign-inverted arithmetic
+    # of an empty charge balance). Coupled to beer's own acid x alcohol the equilibrium sits BELOW
+    # beer's packaged ester, so beer HYDROLYSES and the pool is credited, never debited.
+    #
+    # Asserted on a compiled BEER scenario rather than on a hand-built state, because the defect
+    # was reachable only through the real compile + begin_aging path.
+    from fermentation.scenario import (  # local import, the file's own convention
+        Intervention,
+        Scenario,
+        TemperaturePoint,
+        compile_scenario,
+    )
+
+    scenario = Scenario(
+        name="d176-beer-byp-guard",
+        medium="beer",
+        initial={
+            "glucose_gpl": 15.0,
+            "maltose_gpl": 70.0,
+            "maltotriose_gpl": 15.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 1.0,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[Intervention(day=14.0, action="begin_aging")],
+        duration_days=180.0,
+    )
+    compiled = compile_scenario(scenario)
+    # Stored columns straddling the ferment/aging boundary: index 1 is PACKAGING (day 14, when
+    # begin_aging fires), not t=0 — at pitch the ester pool is 0 because it is produced during the
+    # ferment, so comparing against column 0 would test the ferment, not the aging relaxation.
+    traj = compiled.run(t_eval=np.array([0.0, 14.0 * 24.0, 180.0 * 24.0]))
+    # The guard proper. atol is the solver noise floor, NOT a tolerance for a real excursion: the
+    # pre-D-176 failure was 1.9e-2, seven orders above this (feedback-pin-tolerance-vs-solver-tol).
+    assert_nonnegative(traj, ("Byp",), atol=1e-12)
+    # ...and it must be non-negative for the RIGHT REASON — the pool is CREDITED, i.e. beer's ester
+    # fades. A gate that switched the Process off in beer would also pass the line above, so this
+    # is what distinguishes the shipped fix from that alternative.
+    assert float(traj.series("Byp")[-1]) > 0.0
+    ethyl_acetate = traj.series("ethyl_acetate")
+    assert float(ethyl_acetate[-1]) < float(ethyl_acetate[1])  # packaging -> 180 d: FADES
+
+
+def test_beer_ethyl_acetate_equilibrium_is_not_wines(store):
+    # D-176's headline, recomputed from the shipped parameters rather than transcribed. Loading the
+    # BEER medium file must give an equilibrium far below the wine one: the pre-D-176 behaviour
+    # drove beer to wine's 51 mg/L, which is 2.15x the published beer mean of 23.7 mg/L (Wang,
+    # Frank & Steinhaus 2024, J. Agric. Food Chem., Table 1, a 32-study survey).
+    beer_params = load_parameters(
+        default_data_dir() / "beer_generic.yaml",
+        default_data_dir() / "aging.yaml",
+        default_data_dir() / "acidbase.yaml",
+    ).resolve()
+    wine_params = load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "aging.yaml",
+        default_data_dir() / "acidbase.yaml",
+    ).resolve()
+    # At one shared ethanol the ONLY difference is the acid factor, so this isolates it.
+    shared_ethanol = 52.0
+    beer_eq = EthylAcetateEsterification.equilibrium(shared_ethanol, beer_params)
+    wine_eq = EthylAcetateEsterification.equilibrium(shared_ethanol, wine_params)
+    assert beer_eq < wine_eq
+    assert beer_eq / wine_eq == pytest.approx(
+        beer_params["acetic_acid_typical"] / wine_params["acetic_acid_typical"], rel=1e-12
+    )
+    # And beer's equilibrium must land BELOW the published beer mean, which is the measured,
+    # deliberately-accepted deviation D-176 records: the model has no aging-phase ester SYNTHESIS,
+    # so it relaxes to the chemical equilibrium while real beer is held ABOVE it enzymatically.
+    # Pinned as an inequality against a published number, never as a fitted value.
+    assert beer_eq < 0.0237
 
 
 def test_ethyl_acetate_wired_into_both_media():

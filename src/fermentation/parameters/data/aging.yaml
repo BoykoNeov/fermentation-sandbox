@@ -329,6 +329,34 @@ ethyl_acetate_eq:
     conditions: "generic wine/beer; the esterification equilibrium of the `ethyl_acetate` pool in that molecule's own g/L. Its role is to make the relaxation SIGNED (toward a floor from either side) — this is the one ester the sim lets FORM as well as fade."
     notes: "D-127, FIXED-ABSOLUTE STAND-IN (owner call): the true equilibrium tracks the acetic-acid AND ethanol concentrations (Berthelot Ke = [ester][water]/([acid][alcohol])), but the sim has no clean acetic pool (acetic lives in the Byp succinic stand-in, D-16), so a concentration-coupled eq would be a stand-in on a stand-in; a fixed target sidesteps that. The consequence is deliberate and correct physics: a sound wine (~50 mg/L, ~at this eq) barely moves — EtOAc is roughly stable in sound aged wine — while the term acts mainly on high-VA / high-EtOAc wines (fading them toward equilibrium, the EtOAc DECREASE Shinohara observed in stored wine, p2357). The total EtOAc formed/faded is bounded by the (eq - pool) gap, so the acetic drawn from / added to Byp stays negligible vs the pool. D-158: the high edge 0.084 STANDS and is not narrowed. D-157 found it outside the 30-80 mg/L interval test_ethyl_acetate_eq_sits_near_the_young_level asserted (0.99% of triangular draws escaped) and called the remedy a sourcing question; it resolved INTERNALLY, against the test — 30-80 appeared nowhere but that one test comment, while 84 is 0.164 * 0.35 * (M_ETHYL_ACETATE/M_ACETIC), Shinohara's own high E-rate transcribed. tests/test_aging.py now RECOMPUTES all three band points from the E-rate span instead of pinning literals, so a consistent re-sourcing stays green while either half moving alone goes red. Note the band is E-rate uncertainty at a FIXED acetic 0.35 g/L, not the sound-wine acetic spread (which would widen it): acetic has no state slot (D-16) so it is not a sampled quantity, making this a documented narrowing rather than D-157's recurring point-vs-band shape."
 
+# -- THE CONDITIONS ethyl_acetate_eq IS ANCHORED AT (D-176) ---------------------------------------
+# Berthelot's equilibrium is Ke = [ester][water]/([acid][alcohol]), so the equilibrium ESTER scales
+# with acid x alcohol. D-127 shipped ethyl_acetate_eq as a FIXED ABSOLUTE because the sim has no
+# clean acetic pool; D-176 withdraws the alcohol half of that concession (ethanol IS state) and
+# supplies the acid half as a per-medium sourced level (acetic_acid_typical, in the medium files).
+# These two entries are the conditions the 0.051 g/L anchor was measured at: they are DEFINITIONS
+# of that anchor, not free parameters, which is why both are PINNED (zero-width => never sampled).
+# Moving either without re-deriving ethyl_acetate_eq changes the equilibrium for every medium.
+acetic_ref_ester_eq:
+  value: 0.35
+  unit: "g/L"   # the acetic-acid level ethyl_acetate_eq's E-rate arithmetic was evaluated at
+  tier: speculative
+  uncertainty: { low: 0.35, high: 0.35, note: "PINNED (zero-width => never sampled; the runtime pins high<=low to value). This is not an uncertain quantity: it is the acetic concentration ethyl_acetate_eq's own derivation multiplies by (0.10 * 0.35 * M_ETHYL_ACETATE/M_ACETIC = 0.051 g/L). A band here would double-count the band ethyl_acetate_eq already carries, which D-158 established is E-rate spread AT THIS FIXED ACETIC. The sound-wine acetic SPREAD is carried by acetic_acid_typical instead, per medium." }
+  provenance:
+    source: "Shinohara, Shimizu & Shimazu 1979, Agric. Biol. Chem. 43(11):2351-2358, Tables I-IV, as already transcribed into ethyl_acetate_eq's own provenance: 'a representative sound-wine acetic ~0.35 g/L'. Corroborated independently by IARC Monographs, 'Chemical Composition of Alcoholic Beverages, Additives and Contaminants' (NCBI Bookshelf NBK531662) sect. 3.3.d, which reports the volatile acidity of German wines as 'about 300 mg/l'."
+    conditions: "the acetic-acid concentration at which ethyl_acetate_eq = 0.051 g/L holds. Reference condition, not a wine property."
+    notes: "D-176. Extracted from ethyl_acetate_eq's prose into its own entry so the coupling can divide by it. NOT a new number: 0.35 g/L appears verbatim in ethyl_acetate_eq's source field and has since D-127. Wine's acetic_acid_typical is set EQUAL to this on purpose, so the acid factor is exactly 1.0 for wine and the wine equilibrium moves only through ethanol -- the D-176 wine change is one effect, not two."
+
+ethanol_ref_ester_eq:
+  value: 94.68
+  unit: "g/L"   # the ethanol level ethyl_acetate_eq's E-rate was MEASURED at (12% v/v x 789 g/L)
+  tier: speculative
+  uncertainty: { low: 94.68, high: 94.68, note: "PINNED (zero-width => never sampled). A definition of the anchor, like acetic_ref_ester_eq. NB this is the TABLE-WINE ethanol (12% v/v), which is the matrix the EQUILIBRIUM E-rate was measured in -- deliberately NOT the 14% v/v model solution that anchors the RATE constant k_ethyl_acetate_esterification (see pH_ref_ethyl_acetate_esterification's source field, which cites both). Using 14% here would inflate the anchor ethanol by 16.7% and silently lower every medium's equilibrium by the same factor." }
+  provenance:
+    source: "Shinohara, Shimizu & Shimazu 1979, Agric. Biol. Chem. 43(11):2351-2358: the table wines whose ~8-10% acetic E-rate anchors ethyl_acetate_eq are '12% EtOH, pH 3.3' -- transcribed verbatim from ethyl_acetate_eq's own source field, which has carried it since D-127. 12% v/v x 789 g/L ethanol density = 94.68 g/L."
+    conditions: "the ethanol concentration at which ethyl_acetate_eq = 0.051 g/L holds. Reference condition, not a wine property."
+    notes: "D-176. The half of the D-127 concession that was never necessary: D-127 declined a concentration-coupled equilibrium because 'the sim has no clean acetic pool (acetic lives in the Byp succinic stand-in)'. True of the ACID factor; false of the ALCOHOL factor, which is the core `E` state slot in every medium. The sim's aged wine sits at ~117 g/L ethanol, so wine's equilibrium rises ~24% against the fixed 0.051 -- a Berthelot consequence, measured at D-176, not a re-tuning."
+
 # -- REFERENCE pH the relaxation rate is anchored to (the [H+] acid-catalysis factor's pivot) -------
 pH_ref_ethyl_acetate_esterification:
   value: 3.3
