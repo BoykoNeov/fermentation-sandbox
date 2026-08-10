@@ -16,6 +16,8 @@
 - [Verify the restore between mutation arms](feedback-verify-the-restore-between-mutation-arms.md) — a silent restore failure makes every arm you expect RED confirm itself; always design one arm to be GREEN
 - [Compute the clean fix before adopting it](feedback-compute-the-clean-fix-before-adopting-it.md) — the structurally-cleanest candidate came out 3.71× off where the shipped one was 0.67×; and a consequential number needs its own baseline before you attribute it to your mechanism
 - [Measure which side before building](feedback-measure-which-side-before-building.md) — a one-directional corrective only helps in one direction; check the sign, the reach, and whether it's a rate knob on a supply-limited quantity
+- [CRLF joins inflate line count](feedback-crlf-join-inflates-line-count.md) — splitting a CRLF file on `
+` and rejoining leaves a lone ``; `splitlines()` counts it, so the compression that should shed a line adds one
 - [Commit messages corrupted by shells](feedback-no-powershell-heredoc-in-bash.md) — PS here-strings in Bash, and `Out-File -Encoding utf8`'s BOM; exit 0 proves nothing
 - ["Paywalled" is one host, not a paper](feedback-paywalled-is-one-host.md) — check author/institutional/thesis/trade-reprint copies before recording a source as blocked; wrong 4× so far
 - [Conceded caveats aren't coverage](feedback-conceded-caveats-are-not-coverage.md) — naming your own gap in prose doesn't discharge it; run the criterion on every branch or label it asserted

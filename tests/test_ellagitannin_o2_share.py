@@ -79,10 +79,15 @@ def test_the_reachable_joint_is_recomputed_from_the_shipped_edges(params):
     )
     high = _share(k.high, y.uncertainty.high, total.low)
 
-    # Recomputed, not transcribed: these three follow from the six edges above and the 4 g/L dose.
-    assert low == pytest.approx(0.0160, abs=5e-4)
-    assert nominal == pytest.approx(0.5000, abs=5e-4)
-    assert high == pytest.approx(0.9586, abs=5e-4)
+    # These three follow from the six edges above and the 4 g/L dose. The tolerance is deliberately
+    # 1e-6 rather than the 5e-4 this test first shipped with: at 5e-4 the expected values for `low`
+    # and `high` could be — and were — copied from the adjacent R column instead of the share
+    # (R = 0.0160 vs share 0.015748; R/(1+R) = 0.958904 vs a transcribed 0.9586), because R ~ share
+    # when R << 1 and R/(1+R) ~ 1 when R >> 1. A tolerance that admits the neighbouring quantity is
+    # not a recompute pin. See D-175 amendment (a) — the guard's own defect class, caught by review.
+    assert low == pytest.approx(0.015748, abs=1e-6)
+    assert nominal == pytest.approx(0.500000, abs=1e-6)
+    assert high == pytest.approx(0.958904, abs=1e-6)
 
     # The claim the withdrawn parenthetical denied: at the high corner this sink takes the great
     # majority of the O2. Asserted as the INEQUALITY, so it survives a re-sourced edge that keeps
@@ -93,8 +98,8 @@ def test_the_reachable_joint_is_recomputed_from_the_shipped_edges(params):
     # band cannot reach a run (D-159). These are the corners the measured figures come from.
     ens_low = _share(k.low, y.value, total.high)
     ens_high = _share(k.high, y.value, total.low)
-    assert ens_low == pytest.approx(0.0476, abs=5e-4)
-    assert ens_high == pytest.approx(0.8929, abs=5e-4)
+    assert ens_low == pytest.approx(0.047619, abs=1e-6)
+    assert ens_high == pytest.approx(0.892857, abs=1e-6)
 
     # Supply limitation makes the static estimate a tight UPPER bound on the measured share, in the
     # same direction at every corner (D-136 + D-175's pool/ceiling median of 0.96-0.998).

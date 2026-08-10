@@ -22461,3 +22461,36 @@ Suite **1537 passed** (1534 + three), `ruff`, `ruff format` and `mypy` clean.
 * **`oak_yield_ellagitannin_*` stays drawn-and-unreachable.** D-159 pins it, this record uses it,
   and neither fixes it — the ceiling would have to be resolved per-draw rather than at compile
   time, which is the same seam `closure_otr` sits on (D-136/D-162/D-173).
+
+### 10. Amendment (same day) — the guard's own expected values were transcribed, and two of the five were the wrong column
+
+Found by review, not by the suite, in the file whose §7 claims the corner shares are "**recomputed**
+from the shipped edges, never transcribed (D-154/D-158)". That claim is true of the *computation*
+and was false of the *comparison*: `_share(...)` recomputes correctly, and then the result was
+checked against constants copied from the adjacent **R** column of §2's table.
+
+| corner | R | share `R/(1+R)` | asserted | passed because |
+|---|---|---|---|---|
+| low | 0.016000 | **0.015748** | `0.0160` — **R, not the share** | `R ≈ share` when `R << 1`; margin 2.5e-4 under `abs=5e-4` |
+| high | 23.333333 | **0.958904** | `0.9586` — mis-rounded | `R/(1+R) → 1` when `R >> 1`; margin 3.0e-4 under `abs=5e-4` |
+| nominal / ens_low / ens_high | 1.0 / 0.05 / 8.3333 | 0.500000 / 0.047619 / 0.892857 | correct | — |
+
+**The tolerance is the defect, not the two digits.** `abs=5e-4` is wide enough to admit the
+*neighbouring quantity* at both ends of the range, which is precisely where R and `R/(1+R)`
+converge — so the pin could not distinguish the thing it exists to pin. Tightened to `abs=1e-6`,
+at which neither substitution passes, and the reason is stated in the test rather than left as a
+number. This is D-174 amendment (c) repeating: a figure that a band edge makes load-bearing, left
+stale in the file that asserts it.
+
+**Nothing measured or concluded moves.** Every *shipped* figure is a measured trajectory share
+(4.58 / 48.62 / 88.40 %, 3.88 / 41.13 / 80.38 %, 33.72 / 60.37 %, 1.51 / 95.53 %) and none came
+from this column; §2's "R = 0.500-1.000 ⇒ 33.3-50.0 %" is right, and it is the arm that matters
+because it is the one reproducing the old note's own arithmetic. `RESULTS.md`'s static column
+carried the same two slips (1.60 → 1.57 %, 95.86 → 95.89 %) and is corrected.
+`PREREGISTERED.md` is **left untouched**: it prints the two corners at one decimal, where both
+round identically, and a pre-registration edited after the run is worth nothing either way.
+
+**What this says about §7's licence measurement.** It does not weaken it — the full-suite arm that
+established the shipped suite is blind to a halved edge ran against the *file*, not against these
+constants, and A1 still reds on a genuine recompute. But "recomputed, never transcribed" is a claim
+about a whole assertion, and half of one was transcribed.
