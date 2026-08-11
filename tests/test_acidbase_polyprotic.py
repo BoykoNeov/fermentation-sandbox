@@ -187,40 +187,89 @@ def test_no_pkas_raises():
 # asserted in prose, so that the day either stops holding, the suite says so.
 
 
-def test_no_shipped_acid_reaches_the_general_branch():
-    """Every acid this engine currently ships has ≤ 2 pKas ⇒ the new branch is unreachable.
+def test_the_general_branch_is_live_and_exactly_one_acid_reaches_it():
+    """D-179 fired the trigger D-178 armed: beer's citrate is the first ≥3-pKa acid shipped.
 
-    This is why D-178 could add it without a trajectory comparison. It is DESIGNED to fail
-    the moment beer's citric acid lands — at which point the real before/after comparison
-    becomes necessary and this test's message says so.
+    The D-178 form of this test asserted that NO shipped acid reached the general branch, and
+    read :data:`ACID_STATE` to check it. It is rewritten rather than retired because it went
+    **falsely green** at D-179: ``ACID_STATE`` became wine's registry alone, so the assertion
+    kept passing while citrate — three pKas — went live in beer's. A guard that names one
+    medium's registry cannot police a claim about *every* shipped acid, so this iterates
+    :data:`ACID_REGISTRIES` and would notice a new acid in either medium.
     """
-    from fermentation.core.acidbase import ACID_STATE, BYP_AS_SUCCINIC
+    from fermentation.core.acidbase import ACID_REGISTRIES, BYP_AS_SUCCINIC
 
-    protons = {name: spec.protons for name, spec in ACID_STATE.items()}
+    protons = {
+        f"{medium}.{name}": spec.protons
+        for medium, registry in ACID_REGISTRIES.items()
+        for name, spec in registry.items()
+    }
     protons["Byp"] = BYP_AS_SUCCINIC.protons
-    assert protons == {"tartaric": 2, "malic": 2, "lactic": 1, "Byp": 2}
-    assert all(n <= 2 for n in protons.values()), (
-        "a shipped acid now has >= 3 pKas, so the general branch is LIVE: D-178's "
-        "'unchanged is structural' argument no longer holds and the before/after "
-        "trajectory comparison (pre-registered R5/R7) must actually be run"
+    assert protons == {
+        "wine.tartaric": 2,
+        "wine.malic": 2,
+        "wine.lactic": 1,
+        "beer.lactic": 1,
+        "beer.acetic": 1,
+        "beer.citrate": 3,
+        "beer.malic": 2,
+        "beer.succinic": 2,
+        "beer.peptide_buffer": 1,
+        "Byp": 2,
+    }
+    polyprotic = {name for name, n in protons.items() if n >= 3}
+    assert polyprotic == {"beer.citrate"}, (
+        "the set of acids reaching the n-protic branch changed; D-178/D-179 justify that "
+        "branch on citrate alone, so a new member needs its own sourcing and its own "
+        "before/after comparison"
     )
+    # And WINE still reaches none of it — the structural half of "wine is unchanged".
+    assert all(protons[f"wine.{n}"] <= 2 for n in ("tartaric", "malic", "lactic"))
 
 
-def test_the_gate_rename_selects_the_same_branch_in_both_media():
-    """`cation_charge` → `tartaric` changes no medium's branch, because of slot presence.
+def test_the_registries_are_scoped_so_wine_does_not_gain_citrate():
+    """The load-bearing separation: both media carry a ``citrate`` SLOT, one charge balance.
 
-    Wine carries BOTH slots (gate taken, before and after); beer carries NEITHER (gate
-    skipped, before and after). The rename only stops being a no-op when a medium has one
-    slot without the other — which is exactly what beer becomes next, hence the message.
+    Wine's ``citrate`` is a carbon-active MLF substrate deliberately kept out of the pH
+    balance (D-31); beer's is charge-active and triprotic (D-179). A single union registry
+    would silently make wine's charge-active — which is why the registries are per-medium and
+    selected by an explicit medium label rather than by sniffing for a slot.
+
+    This is the assertion that fails first if anyone "simplifies" the two registries back
+    into one.
+    """
+    from fermentation.core.acidbase import acid_registry
+    from fermentation.core.media import beer_schema, wine_schema
+
+    wine, beer = wine_schema(), beer_schema()
+    assert "citrate" in wine and "citrate" in beer, "both media carry the slot"
+    assert "citrate" not in acid_registry(wine), (
+        "wine's citrate has entered the charge balance — that is D-31's stated v1 omission "
+        "being reversed, which is a decision with its own before/after comparison to run, "
+        "not a side effect of scoping beer's acids"
+    )
+    assert "citrate" in acid_registry(beer)
+    assert set(acid_registry(wine)) == {"tartaric", "malic", "lactic"}
+
+
+def test_beer_gained_the_pH_system_and_wine_kept_its_slots():
+    """Beer now carries ``cation_charge`` WITHOUT ``tartaric`` — the asymmetry D-178 predicted.
+
+    The D-178 form of this test asserted beer had *neither* slot, and said in its own failure
+    message that the day beer carried one without the other, the gate rename would stop being
+    a no-op and the trajectories would have to be compared. That day is D-179; the comparison
+    was run (see the record), and this is the same invariant restated for the new layout.
+
+    What matters now is the *direction* of the asymmetry: ``EsterHydrolysis`` gates on
+    ``tartaric`` (grape tartrate catalysis, which does not transfer), so it stays OFF for beer
+    — while ``EthylAcetateEsterification`` gates on ``cation_charge`` and therefore switches
+    ON. Reversing either gate silently changes which medium ages how.
     """
     from fermentation.core.media import beer_schema, wine_schema
 
     wine, beer = wine_schema(), beer_schema()
     assert ("tartaric" in wine, "cation_charge" in wine) == (True, True)
-    assert ("tartaric" in beer, "cation_charge" in beer) == (False, False)
-    for schema, label in ((wine, "wine"), (beer, "beer")):
-        assert ("cation_charge" in schema) == ("tartaric" in schema), (
-            f"{label} now carries one of cation_charge/tartaric without the other, so the "
-            "D-178 gate rename is no longer a no-op for it and its trajectories must be "
-            "compared before/after"
-        )
+    assert ("tartaric" in beer, "cation_charge" in beer) == (False, True), (
+        "beer must carry the cation WITHOUT grape tartaric: tartrate catalysis is grape "
+        "chemistry (D-125) and must stay off for beer, while the pH system itself is now on"
+    )

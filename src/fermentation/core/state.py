@@ -74,13 +74,14 @@ class StateSchema:
     for how a physical state maps onto the flat numpy vector the solver sees.
     """
 
-    def __init__(self, specs: Sequence[VarSpec]) -> None:
+    def __init__(self, specs: Sequence[VarSpec], *, medium: str = "") -> None:
         if not specs:
             raise ValueError("StateSchema requires at least one variable")
         names = [s.name for s in specs]
         if len(names) != len(set(names)):
             raise ValueError(f"Duplicate variable names in schema: {names}")
 
+        self._medium = medium
         self._specs: tuple[VarSpec, ...] = tuple(specs)
         self._slices: dict[str, slice] = {}
         cursor = 0
@@ -93,6 +94,26 @@ class StateSchema:
     def size(self) -> int:
         """Total length of the flat state array."""
         return self._size
+
+    @property
+    def medium(self) -> str:
+        """Which beverage family this layout is, or ``""`` for an unlabelled schema.
+
+        A **label**, not physics: it exists so a consumer that must behave differently per
+        medium can say which one it has, instead of inferring it from the presence of a slot.
+        Decision D-179 added it for exactly one such consumer — the charge-active acid registry
+        in :mod:`fermentation.core.acidbase`, where wine and beer disagree about a slot they
+        BOTH carry (``citrate`` is charge-active in beer and, per D-31, deliberately not in
+        wine). No amount of slot-sniffing can separate those two cases, and the D-178 gate bug
+        is the standing evidence that trying is a defect: ``EsterHydrolysis`` used "does this
+        schema have ``cation_charge``?" as a stand-in for "is this wine?", and the two stopped
+        coinciding the moment beer grew a pH system.
+
+        The default ``""`` keeps every hand-built test schema working and resolves to the
+        historical (wine) behaviour wherever a registry is selected, so adding this changed no
+        existing caller.
+        """
+        return self._medium
 
     @property
     def names(self) -> tuple[str, ...]:

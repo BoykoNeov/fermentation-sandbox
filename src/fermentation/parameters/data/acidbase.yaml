@@ -97,6 +97,92 @@ pKa_succinic_2:
     conditions: "25 C, zero ionic strength; applied to wine as an apparent constant (decision D-18)"
     notes: "Second dissociation of succinic acid. Mostly bound at wine pH. CAVEAT (D-18): Byp also lumps neutral 2,3-butanediol, so reading the whole pool as a diprotic acid slightly OVERSTATES its acid charge (~1-1.5 mM vs the ~20 mM buffer) — a documented minor approximation."
 
+# == BEER's charge-active acids (decision D-179) ================================
+#
+# The pKas of the acids in BEER_ACIDS that wine does not already supply. Beer shares
+# lactic / malic / succinic with the entries above (same molecules, same constants), so
+# only acetic, citric and the lumped peptide buffer are new here.
+#
+# NOTE the acetic comment at the head of this file ("folded into the succinic-equivalent
+# Byp read for now; add a separate `acetic` species only if Byp is later speciated"). That
+# is still true OF WINE and is not contradicted here: beer gets its own `acetic` STATE slot
+# because beer's acetic is a measured dosed input, while wine's remains inside the Byp lump.
+# Wine's charge balance does not read pKa_acetic — the acid registries are per-medium.
+
+# -- Acetic acid, C2H4O2 (monoprotic) — beer's volatile acid --------------------
+pKa_acetic:
+  value: 4.756
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 4.74, high: 4.78, note: "thermodynamic pKa at 25 C, I=0; the textbook value is quoted 4.74-4.78 across sources" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-179, the D-18 simplification)"
+    notes: "Acetic (ethanoic) acid. Its pKa sits INSIDE beer's pH window (~4.0-4.6), so unlike phosphate it is a genuine buffer there — but it is a minor one by concentration (measured: 0.012 of the 0.110 organic-acid buffering index). Wine folds acetic into the Byp succinic-equivalent lump instead (see this file's header), so this constant is read by BEER only."
+
+# -- Citric acid, C6H8O7 (TRIPROTIC) — the n-protic branch's reason to exist ----
+#
+# Peyer 2017 (PhD thesis, UCC, CORA 10468/4694) sec 5.5, quoting Li et al. 2016 and Coote &
+# Kirsop 1976: "The majority of BC is provided by peptides and polypeptides containing these
+# amino acids as well as organic acids (e.g. citrate)." Citrate is NAMED by the source.
+#
+# Two of its three pKas (3.128 and 4.761) sit inside beer's own pH window, which is what makes
+# it a real buffer there -- and what makes it the first shipped acid to reach the general
+# n-protic speciation branch added in D-178. Contrast phosphate (2.15 / 7.20 / 12.35), the acid
+# that beat was opened on: also triprotic, but with every pKa FAR from beer's pH, so its charge
+# is ~0.99 flat across pH 4.0-4.6 and an inverse-anchored cation absorbs it entirely.
+pKa_citric_1:
+  value: 3.128
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 3.09, high: 3.15, note: "thermodynamic pKa1 at 25 C, I=0; apparent value in beer shifts with ionic strength" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-179)"
+    notes: "First dissociation of citric (2-hydroxypropane-1,2,3-tricarboxylic) acid. Sits just BELOW beer's pH window, so the first proton is largely off across the whole window and this step contributes buffering at the acidic edge."
+
+pKa_citric_2:
+  value: 4.761
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 4.73, high: 4.78, note: "thermodynamic pKa2 at 25 C, I=0" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-179)"
+    notes: "Second dissociation of citric acid, and the load-bearing one: at 4.761 it sits essentially ON beer's pH window (~4.0-4.6), which is where buffering is maximal. This is why citrate outweighs its concentration share — measured, citric is the SECOND-largest organic-acid contributor to beer's buffering index (0.024 of 0.110) despite lactic being present at comparable levels."
+
+pKa_citric_3:
+  value: 6.396
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 6.37, high: 6.42, note: "thermodynamic pKa3 at 25 C, I=0; well above beer pH so the third proton is mostly bound there" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-179)"
+    notes: "Third dissociation of citric acid. Well above beer's pH, so the third proton is largely bound there and contributes little buffering — but it is carried so the speciation is exact across the full [0, 14] solver bracket, exactly as pKa_sulfurous_2 is (see D-22). Its presence is what makes citrate a THREE-pKa acid and therefore the first user of the n-protic branch."
+
+# -- The lumped peptide/polypeptide buffer (monoprotic site) — decision D-179 ----
+#
+# WHAT ACTUALLY BUFFERS BEER. Peyer 2017 sec 5.5 (after Li et al. 2016) puts FREE amino acids
+# at only ~10% of wort's buffering capacity -- "little contribution ... is made by aspartate
+# (pKa 3.86), glutamic acid (pKa 4.25) and histidine (pKa 6.04)" -- and attributes the majority
+# to "peptides and polypeptides containing these amino acids as well as organic acids". Sec 5.5
+# corroborates mechanistically: boiling drops BC 1.34 -> 1.21 "likely due to the coagulation and
+# precipitation of buffering high-molecular proteins and minerals as hot trub".
+#
+# So this is ONE lumped pool of buffering SITES with ONE effective pKa, not an amino-acid model.
+# The pKa is the side-chain carboxyl of the residues the source names; the value is glutamate's
+# and the BAND spans the sourced window (aspartate 3.86 to 4.50).
+pKa_peptide_buffer:
+  value: 4.25
+  unit: "pH units"
+  tier: speculative
+  uncertainty: { low: 3.86, high: 4.50, note: "the SOURCED residue window: aspartate 3.86 and glutamic acid 4.25 are the two side-chain pKas Peyer names as beer-relevant; 4.50 is the upper edge over which the back-solved capacity stays stable (10.75 / 10.28 / 10.45 mM, a 5% spread). Both edges PRINTED-derived; the band is NOT a symmetric guess around the nominal." }
+  provenance:
+    source: "Peyer, L. (2017), 'Lactic acid bacteria fermentation of wort as a tool to add functionality in malting, brewing and novel beverages', PhD thesis, University College Cork, CORA handle 10468/4694, section 5.5 (published as Peyer et al. 2017, J. Inst. Brew. 123(4)) -- quoting Li et al. 2016 and Coote & Kirsop 1976 for the residue pKas and the peptide attribution."
+    conditions: "wort/beer, 25 C; an EFFECTIVE (lumped) constant standing for the side-chain carboxyls of Asp/Glu residues borne on peptides and polypeptides, not a measured constant of any single species."
+    notes: "tier=SPECULATIVE, and deliberately so -- this is a lumped stand-in for a protein population, not a measured molecular constant, and it is the one parameter that makes beer's pH tier speculative (acidbase.ph_tier is scoped per medium at D-179 precisely so this does NOT drag wine's pH tier down for an acid wine does not carry). THE HONEST LIMITATION: the capacity that pairs with this pKa was back-solved against a published WORT titration at pH 5.5, where the fit is well-conditioned; at BEER's pH 4.4 the identical fitted solutions give a buffering index from 0.32 to 0.59 across this band -- a factor of ~1.9. The calibration frame is not the frame that binds, which is why the pairing ships as a band and never as a nominal."
+
 # -- Sulfurous acid, H2SO3 / SO2.H2O (diprotic) — the free-SO2 speciation set ----
 #
 # READOUT-ONLY (decision D-22). Unlike the acids above, these pKas are NOT in the

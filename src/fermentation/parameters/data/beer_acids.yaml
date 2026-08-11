@@ -1,0 +1,153 @@
+# Beer's acid COMPOSITION — the levels the charge balance is dosed with (decision D-179).
+#
+# Companion to acidbase.yaml, which holds the pKa CONSTANTS. This file holds the sourced
+# CONCENTRATIONS: how much of each acid a beer actually carries. Split because they answer
+# different questions and re-source independently — a pKa is a property of the molecule, a
+# level is a property of the beverage.
+#
+# SHARED, loaded universally like dms.yaml / closure.yaml / bound_sulfides.yaml (the names are
+# collision-free) but BEER-ONLY IN EFFECT: only beer's schema carries these slots and only
+# beer's acid registry (acidbase.BEER_ACIDS) reads them, so every value here is inert for wine.
+#
+# ============================ THE SOURCE ============================
+#
+# Tyrell, T., Reimann, S., Folz, R., Harms, D., Hinrichs, J., Offer, G. (Versuchs- und
+# Lehranstalt fuer Brauerei in Berlin, VLB), "Screening of Brewery Yeast Strains Regarding
+# Organic Acid Profile in Order to Find Low Succinic Acid Producer", BrewingScience 66
+# (July/August 2013), 75-76. Open-access PDF from brewingscience.de. TABLE 1, "Concentration
+# of organic acids in beer [ppm]", is a compilation over four literature sources split by
+# fermentation type. Transcribed from the printed table, not from a search summary
+# ([[feedback-transcribe-tables-not-prose]]).
+#
+# Every band below is the Coote & Kirsop TOP-FERMENTING (ale) column, so BOTH EDGES ARE
+# PRINTED. The nominal is the midpoint of that printed range and is therefore AUTHOR-
+# CONSTRUCTED -- stated explicitly on each entry, because a pinned nominal that looks sourced
+# is the failure mode [[feedback-pin-the-band-not-the-nominal]] exists to prevent.
+#
+# ====================== TWO OPEN SOURCE CONFLICTS ======================
+#
+# Neither is resolved here and NEITHER IS AVERAGED (the D-103 precedent).
+#
+# 1. SUCCINIC, a factor of ~25. Tyrell Table 1 gives 51-153 ppm (Coote/Kirsop top), 36-166
+#    (Coote/Kirsop bottom), 41-67 (Enebo), 50-150 (Briggs); Park et al. 2017 (Food Sci.
+#    Biotechnol. 26(2):349-355) independently reports 37.0-56.2 mg/L. Against those, the
+#    archive's D-176 flag on D-16 quotes ~900-3500 mg/L. Two independent sources against one,
+#    non-overlapping. This file ships the Tyrell/Park magnitude and records the conflict.
+#
+# 2. ACETIC, a STYLE TRANSPOSITION rather than a magnitude conflict. IARC gives 12-155 as the
+#    ALE range (that is what D-176's acetic_acid_typical band is built on); Tyrell's Table 1
+#    gives the near-identical 12-156 as Coote/Kirsop's BOTTOM-fermenting (lager) column, and
+#    22-107 as the top-fermenting (ale) one. The same two ranges, assigned to opposite
+#    fermentation types -- one of the two transposed the columns. Not repairable from here (I
+#    cannot tell which is right), so this file uses Tyrell's assignment consistently with the
+#    rest of the table and flags the disagreement. Whichever way it goes it is a coin-flip on
+#    style, not an order of magnitude.
+
+# -- Lactic acid ---------------------------------------------------------------
+lactic_typical_beer:
+  value: 0.1405
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.048, high: 0.233, note: "BOTH EDGES PRINTED: Tyrell 2013 Table 1, Coote & Kirsop top-fermenting column, 48-233 ppm. The nominal is the midpoint of that printed range and is AUTHOR-CONSTRUCTED, not a printed central value." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-76, Table 1 (compilation after Coote & Kirsop 1976), top-fermenting column."
+    conditions: "finished beer, top-fermenting (ale); total lactic acid by the compiled literature methods."
+    notes: "The LARGEST single organic-acid contributor to beer's buffering index as measured on this engine's own charge balance (0.042 of the 0.110 organic-acid total at ale-mid, pH 4.4) -- ahead of citric despite citric's pKa2 sitting closer to beer's pH, because lactic is present at higher molar concentration. Monoprotic (pKa 3.86)."
+
+# -- Acetic acid ---------------------------------------------------------------
+acetic_typical_beer:
+  value: 0.0645
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.022, high: 0.107, note: "BOTH EDGES PRINTED: Tyrell 2013 Table 1, Coote & Kirsop TOP-fermenting column, 22-107 ppm. Nominal = midpoint, AUTHOR-CONSTRUCTED. SEE THE HEADER: an open style transposition means this band and the 12-156 lager band may be swapped between ale and lager." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-76, Table 1 (compilation after Coote & Kirsop 1976), top-fermenting column."
+    conditions: "finished beer, top-fermenting (ale)."
+    notes: "DISTINCT from `acetic_acid_typical` (aging.yaml, D-176), which is the acetic LEVEL the ethyl-acetate Berthelot equilibrium reads per medium. Same molecule, two different consumers: that one sets an ester equilibrium, this one enters the charge balance. They are not required to agree numerically -- and currently do not, because D-176's is built on the IARC assignment and this on Tyrell's, which is exactly the transposition flagged in the header. Recorded rather than silently reconciled."
+
+# -- Citric acid ---------------------------------------------------------------
+citric_typical_beer:
+  value: 0.107
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.056, high: 0.158, note: "BOTH EDGES PRINTED: Tyrell 2013 Table 1, Coote & Kirsop top-fermenting column, 56-158 ppm. Nominal = midpoint, AUTHOR-CONSTRUCTED." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-76, Table 1 (compilation after Coote & Kirsop 1976), top-fermenting column. Named as a buffering organic acid by Peyer (2017), PhD thesis UCC, CORA 10468/4694, section 5.5."
+    conditions: "finished beer, top-fermenting (ale); malt-derived (wort carries citrate) rather than a fermentation product."
+    notes: "THE TRIPROTIC ONE -- the acid that makes the n-protic speciation branch (D-178) live for the first time, and the only shipped acid with three pKas. Second-largest contributor to beer's organic-acid buffering index (0.024 of 0.110), punching above its concentration because pKa2 = 4.761 sits essentially ON beer's pH window. Peyer section 5.5 names citrate specifically ('as well as organic acids (e.g. citrate)'), so its inclusion is sourced rather than inferred."
+
+# -- Malic acid ----------------------------------------------------------------
+malic_typical_beer:
+  value: 0.0545
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.014, high: 0.095, note: "BOTH EDGES PRINTED: Tyrell 2013 Table 1, Coote & Kirsop top-fermenting column, 14-95 ppm. Nominal = midpoint, AUTHOR-CONSTRUCTED." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-76, Table 1 (compilation after Coote & Kirsop 1976), top-fermenting column."
+    conditions: "finished beer, top-fermenting (ale)."
+    notes: "Same molecule as wine's MLF substrate, but INERT in beer -- beer wires no malolactic Processes, so nothing consumes it. Diprotic; contributes 0.015 of the 0.110 organic-acid buffering index."
+
+# -- Succinic acid -------------------------------------------------------------
+succinic_typical_beer:
+  value: 0.102
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.051, high: 0.153, note: "BOTH EDGES PRINTED: Tyrell 2013 Table 1, Coote & Kirsop top-fermenting column, 51-153 ppm. Nominal = midpoint, AUTHOR-CONSTRUCTED. THE BAND DOES NOT SPAN THE CONFLICT -- see the header: a separate source reports ~900-3500 mg/L, ~25x higher, and widening this band to cover it would fabricate a continuum between two disjoint claims." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-76, Table 1 (compilation after Coote & Kirsop 1976), top-fermenting column. CORROBORATED independently by Park et al. (2017), Food Sci. Biotechnol. 26(2):349-355 (abstract), reporting 37.0-56.2 mg/L for beer."
+    conditions: "finished beer, top-fermenting (ale)."
+    notes: "Beer's succinic is a DOSED MEASURED INPUT in its own state slot, which is why it does not ride in the Byp succinic-equivalent lump the way wine's does: Byp is a PRODUCED pool (D-16) and beer has no producer for it, so folding a measured composition into an empty production lump would confuse a measurement with a fate. Two independent sources (Tyrell, Park) agree on this magnitude against one that does not -- recorded as an open conflict, deliberately not averaged."
+
+# -- The lumped peptide/polypeptide buffer capacity -----------------------------
+#
+# THE ONE PARAMETER THAT CARRIES BEER'S ACTUAL BUFFERING, and the one with the weakest
+# provenance. Read the pKa_peptide_buffer notes in acidbase.yaml alongside this.
+#
+# HOW IT WAS OBTAINED (not a guess, not a fit to this model's own output): the capacity is
+# BACK-SOLVED so that this engine's charge balance reproduces a PUBLISHED wort buffering
+# capacity, BC = 1.18, measured by Peyer's own protocol (375 uL of 1 M HCl into 25 mL, BC =
+# log10[ H+ added / H+ increase ]) on top of the organic acids above. That is the D-18
+# inverse-anchoring shape one level up: absorb an unknown into a single term back-solved from
+# a measurement, and claim predicted CHANGES rather than the absolute.
+#
+# WHY IT IS WELL-CONDITIONED: across the whole sourced pKa window the back-solve barely moves
+# -- 10.75 mM at pKa 3.86, 10.28 at 4.25, 10.45 at 4.50, a 5% spread. The capacity is fixed by
+# the MEASUREMENT, not by the assumption.
+#
+# WHY IT IS STILL SPECULATIVE -- three stacked mismatches, none of them hidden:
+#   1. THE FIT IS BLIND TO THE FRAME THAT BINDS. It is anchored at wort pH 5.5. At BEER's pH
+#      4.4 the identical fitted solutions give BC from 0.32 to 0.59 depending on where in the
+#      pKa window the pKa sits -- a factor of ~1.9 that the fit does not constrain at all.
+#   2. 1.18 IS WORT, NOT BEER. No published BC for finished beer was found at any host.
+#   3. THE ACID TABLE FITTED ALONGSIDE IS BEER's. Wort carries malt-derived citrate/malate but
+#      none of the fermentation acids, so the two acid populations are not the same.
+# So this is a well-conditioned back-solve against a MIS-MATCHED target, which is a weaker and
+# different claim from "beer's peptide buffer is 10.3 mM".
+#
+# WHY THIS BAND IS PINNED ZERO-WIDTH, AND WHY THAT IS THE HONEST CHOICE RATHER THAN A DODGE:
+#
+# The capacity and the pKa are NOT INDEPENDENT. The capacity is a FUNCTION of the pKa via the
+# back-solve -- each assumed pKa has exactly one capacity that reproduces BC = 1.18 (3.86 ->
+# 10.75 mM, 4.25 -> 10.28, 4.50 -> 10.45). The ensemble sampler draws every banded parameter
+# independently, so giving BOTH a band would generate pairs like (pKa 3.86, capacity 10.28)
+# that reproduce NO measurement at all -- a wider reported spread built out of combinations
+# the calibration excludes. Banding the free variable and pinning the derived one is the only
+# coherent option the machinery allows.
+#
+# It is also what the measurement says: across the whole sourced pKa window the back-solved
+# capacity moves by 5%, while the buffering index it implies AT BEER'S pH moves by a factor of
+# ~1.9. The capacity is fixed by the measurement; the pKa is the thing genuinely unconstrained.
+# So the consequential band rides pKa_peptide_buffer (acidbase.yaml) and this is pinned.
+#
+# A pinned value takes no hypercube dimension and consumes no randomness (ensemble.py's
+# zero-width short-circuit), so this pin does NOT narrow the reported beer spread -- the pKa
+# band still moves it. Do not "restore" a band here without also making the pair sample jointly.
+peptide_buffer_capacity_beer:
+  value: 1.5125
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 1.5125, high: 1.5125, note: "PINNED zero-width, and deliberately -- see the block above. The capacity is DERIVED from pKa_peptide_buffer by the back-solve, not independently uncertain, so its uncertainty is carried by that pKa's band instead of duplicated here. The value is the 10.28 mM that pairs with the nominal pKa 4.25, converted at glutamate's 147.13 g/mol. NB it would otherwise sit exactly ON the low edge of the 10.28-10.75 mM range, which is the un-classifiable case tests/test_switch_site_census.py guards against." }
+  provenance:
+    source: "Back-solved against the published wort buffering capacity BC = 1.18 reported by Peyer, L. (2017), PhD thesis, University College Cork, CORA handle 10468/4694, sections 5.3.4 (the BC definition and titration protocol) and 5.4.3 / abstract (the measured values: 0.94 at mash-in, 1.18 control wort, 1.21 post-boil, 1.24 with added protease, 1.34 max over the proteolytic rest)."
+    conditions: "back-solved at wort pH 5.5 on top of the Tyrell ale-mid organic acids above, using Peyer's own fast-BC protocol reproduced on this engine's charge balance. Applied at BEER pH (~4.0-4.6), which is NOT the pH it was fitted at."
+    notes: "tier=SPECULATIVE for the three stacked mismatches in the header block, the first of which is the decisive one: solved in a frame that does not bind [[feedback-validate-calibrations-in-the-frame-that-binds]]. Represented as glutamate-equivalent monoprotic buffering SITES (see M_GLUTAMIC in core/chemistry.py), off every ledger -- beer's protein is untracked as carbon and nitrogen alike, so this pool perturbs no conservation sum. It is also the parameter that makes beer's pH tier speculative; acidbase.ph_tier is scoped per medium (D-179) so that this does not drag WINE's pH tier down for a pool wine does not carry."

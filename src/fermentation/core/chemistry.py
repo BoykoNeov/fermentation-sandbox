@@ -345,6 +345,20 @@ M_METHIONINE = 5 * _M_C + 11 * _M_H + 1 * _M_N + 2 * _M_O + 1 * _M_S
 #: from YAN by definition), so it is inert and absent from the pool — the ~48 %-of-must-AA proline
 #: fraction simply never enters the model (the dose is an *assimilable* amino-acid dose).
 M_GLUTAMINE = 5 * _M_C + 10 * _M_H + 2 * _M_N + 3 * _M_O
+#: L-glutamic acid, C5H9NO4 — the representative species for BEER's lumped **peptide buffer**
+#: pool (decision D-179). Beer's buffering is dominated not by free amino acids but by the
+#: side-chain carboxyls of the **peptides and polypeptides** carrying them (Peyer 2017 §5.5,
+#: after Li et al. 2016: free aspartate/glutamate/histidine "account for ca. 10 % of the total
+#: BC"; boiling drops BC 1.34 → 1.21 through "coagulation and precipitation of buffering
+#: high-molecular proteins ... as hot trub"). The model tracks one lumped pool of *buffering
+#: sites*, and glutamate is the natural equivalent species: its side-chain pKa (4.25) sits in
+#: the middle of the sourced window and it is one of the three residues the source names.
+#: So the pool is read as "glutamate-equivalent buffering sites", the ``Byp``-as-succinic and
+#: ``mcfa``-as-octanoic idiom. It is OFF EVERY LEDGER — beer's protein is not tracked as
+#: carbon or nitrogen anywhere in this engine (D-32 gave the amino-acid pools to wine only), so
+#: there is no conserved quantity for it to perturb; the molar mass exists ONLY to convert the
+#: g/L state slot into the mol/L the charge balance needs.
+M_GLUTAMIC = 5 * _M_C + 9 * _M_H + 1 * _M_N + 4 * _M_O
 #: β-glucan / mannoprotein repeat unit, anhydroglucose C6H10O5 (glucose minus one water, the
 #: polysaccharide monomer) — the representative species for the non-assimilable cell-wall
 #: **debris** pool yeast autolysis leaves behind (decision D-34). Dead-cell biomass is C-rich

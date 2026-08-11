@@ -92,7 +92,10 @@ from scipy.optimize import brentq
 from fermentation.core.chemistry import (
     M_5_OXOFRUCTOSE,
     M_ACETALDEHYDE,
+    M_ACETIC,
     M_ALPHA_KETOGLUTARATE,
+    M_CITRIC,
+    M_GLUTAMIC,
     M_LACTIC,
     M_MALIC,
     M_PYRUVATE,
@@ -130,15 +133,70 @@ class AcidSpec:
         return len(self.pka_param_names)
 
 
-#: The charge-active acids carried as wine state slots (decision D-18, wine-only).
-#: Beer's phosphate-buffered system is a different acid set with no sourced data yet
-#: and is explicitly deferred — extend this mapping when it lands. ``lactic`` is
+#: The charge-active acids carried as WINE state slots (decision D-18). ``lactic`` is
 #: produced-only (the MLF product), but it is charge-active the moment it exists.
-ACID_STATE: dict[str, AcidSpec] = {
+#:
+#: **Unchanged by D-179, and that is load-bearing.** Beer's set is a SEPARATE registry
+#: (:data:`BEER_ACIDS`) rather than an extension of this one, so wine resolves to the
+#: identical three-entry dict it always has — which is what makes "wine is unchanged" a
+#: structural fact rather than a numerical coincidence (see :func:`acid_registry`).
+WINE_ACIDS: dict[str, AcidSpec] = {
     "tartaric": AcidSpec(M_TARTARIC, ("pKa_tartaric_1", "pKa_tartaric_2")),
     "malic": AcidSpec(M_MALIC, ("pKa_malic_1", "pKa_malic_2")),
     "lactic": AcidSpec(M_LACTIC, ("pKa_lactic",)),
 }
+
+#: The charge-active acids carried as BEER state slots (decision D-179).
+#:
+#: The beat that added these was opened on **malt phosphate**, which is not here: its pKas
+#: (2.15 / 7.20) sit 2-3 units either side of beer's pH, so its mean charge is ~0.99 flat
+#: across pH 4.0-4.6 and — under this module's INVERSE-ANCHORED cation — a species of
+#: constant charge is absorbed by the anchor outright. It would not be a weak buffer but
+#: very nearly a no-op. Peyer 2017 §5.5 (quoting Li et al. 2016) questions phosphate's
+#: contribution directly, so this is corroborated rather than merely derived. See D-178.
+#:
+#: What that source names instead is **citrate** — and citrate is triprotic with two pKas
+#: (3.13, 4.76) INSIDE beer's window, which is the whole reason the n-protic branch
+#: (:func:`_polyprotic_terms`, D-178) exists. It is the first shipped acid to reach it.
+#:
+#: ``citrate`` is the reason these registries are per-medium instead of one union: wine
+#: carries a ``citrate`` slot too, but D-31 deliberately kept it OUT of the charge balance
+#: (carbon-active, not charge-active). A union registry would silently make wine's citrate
+#: charge-active — a change that may well be closer to reality, but is a different beat's
+#: to make. Flagged on D-31, not fixed here.
+#:
+#: **Not shipped: pyruvic.** Measured as the smallest contributor (0.007 of the 0.110
+#: organic-acid buffering index, ~6 %), and its natural slot name collides with wine's
+#: *dynamic* ``pyruvate`` pool — the largest blast radius for the least fidelity. A
+#: deliberate omission, not an oversight.
+#:
+#: ``succinic`` is beer's own slot even though beer also carries ``Byp``: beer's is a
+#: MEASURED DOSED INPUT (Tyrell 2013 Table 1, 36-166 ppm), while ``Byp`` is a produced lump
+#: that beer still has no producer for (D-16, open). Different things, different slots.
+BEER_ACIDS: dict[str, AcidSpec] = {
+    "lactic": AcidSpec(M_LACTIC, ("pKa_lactic",)),
+    "acetic": AcidSpec(M_ACETIC, ("pKa_acetic",)),
+    "citrate": AcidSpec(M_CITRIC, ("pKa_citric_1", "pKa_citric_2", "pKa_citric_3")),
+    "malic": AcidSpec(M_MALIC, ("pKa_malic_1", "pKa_malic_2")),
+    "succinic": AcidSpec(M_SUCCINIC, ("pKa_succinic_1", "pKa_succinic_2")),
+    "peptide_buffer": AcidSpec(M_GLUTAMIC, ("pKa_peptide_buffer",)),
+}
+
+#: Which registry each medium's charge balance uses (decision D-179). Keyed by
+#: :attr:`~fermentation.core.state.StateSchema.medium` — an explicit LABEL, never inferred
+#: from which slots happen to be present, because the one slot that discriminates
+#: (``citrate``) is present in both.
+ACID_REGISTRIES: dict[str, dict[str, AcidSpec]] = {"wine": WINE_ACIDS, "beer": BEER_ACIDS}
+
+#: Historical name for wine's registry, kept because a dozen call sites (and every wine
+#: test) refer to it. It is wine's set, NOT the union — see :func:`acid_registry`.
+ACID_STATE: dict[str, AcidSpec] = WINE_ACIDS
+
+#: Every acid any medium may carry, keyed by slot name — for name→spec lookups that are
+#: medium-independent (molar mass, proton count, pKa parameter names). Distinct from the
+#: per-medium registries above, which decide *membership of the charge balance*. A slot
+#: name maps to the same molecule in every medium, so the union is well-defined.
+ALL_ACIDS: dict[str, AcidSpec] = {**WINE_ACIDS, **BEER_ACIDS}
 
 #: The existing ``Byp`` minor-byproduct pool is *read* as a succinic-equivalent diprotic
 #: acid for the charge balance (decision D-18, coupling #2 "include-by-reading"): zero
@@ -148,10 +206,42 @@ ACID_STATE: dict[str, AcidSpec] = {
 BYP_KEY = "Byp"
 BYP_AS_SUCCINIC = AcidSpec(M_SUCCINIC, ("pKa_succinic_1", "pKa_succinic_2"))
 
-#: Every pKa parameter name the solver may read — the single list :func:`ph_tier`
-#: and the compile/analysis ``build_pka_map`` adapters iterate, so the sites cannot drift.
+
+def acid_registry(schema: StateSchema) -> dict[str, AcidSpec]:
+    """The charge-active acid set for ``schema``'s medium (decision D-179).
+
+    Selected by the schema's explicit ``medium`` LABEL, never by sniffing which slots are
+    present — because the slot that discriminates the two registries (``citrate``) is present
+    in both, and because using a slot as a stand-in for a medium is the exact defect D-178
+    had to repair in ``EsterHydrolysis``.
+
+    An unlabelled schema (``medium == ""``, every hand-built test state) falls back to
+    :data:`WINE_ACIDS`, which is the behaviour every such caller had before this function
+    existed — so the fallback is *continuity*, not a guess.
+    """
+    return ACID_REGISTRIES.get(schema.medium, WINE_ACIDS)
+
+
+#: Every pKa parameter name the solver may read, across ALL media — the single list
+#: ``build_pka_map`` iterates and the one Processes splat into ``reads``, so the sites
+#: cannot drift.
+#:
+#: **This is the union, and that is a deliberate, costed choice (decision D-179.)** The
+#: alternative — keep it at wine's seven names — would leave beer's five new pKa bands out
+#: of the sampled set under every scenario, which is precisely the silent band-narrowing
+#: D-160 diagnosed and fixed: an undeclared read does not merely under-document a
+#: dependency, it makes the reported spread narrower than the parameter's own provenance
+#: justifies. The price is paid on the other side: ``sample_parameters`` consumes its names
+#: **in order**, so five extra banded names shift a WINE ensemble's draw sequence. Wine's
+#: nominal trajectories are bit-for-bit unchanged (``resolve()`` does not touch this list);
+#: wine's ensemble *realisations* move, while the bands they estimate do not. D-179 measured
+#: that cost rather than assuming it — see the record.
 PKA_PARAM_NAMES: tuple[str, ...] = tuple(
-    name for spec in (*ACID_STATE.values(), BYP_AS_SUCCINIC) for name in spec.pka_param_names
+    dict.fromkeys(  # ordered de-dup: media share acids (lactic, malic, succinic)
+        name
+        for spec in (*WINE_ACIDS.values(), *BEER_ACIDS.values(), BYP_AS_SUCCINIC)
+        for name in spec.pka_param_names
+    )
 )
 
 #: **Total** SO₂ — a wine-only state slot (g/L of SO₂-equivalent), dosed at pitch and
@@ -446,19 +536,31 @@ def build_pka_map(params: Mapping[str, float]) -> dict[str, tuple[float, ...]]:
     Single source of truth reused by ``ph_of_state``, the analysis series helpers and the
     compile back-solve, so the three call sites cannot drift in how they read pKa. Keyed
     by acid slot name plus :data:`BYP_KEY`.
+
+    Built over :data:`ALL_ACIDS` (the union), not over one medium's registry, and it needs no
+    ``schema`` argument for a precise reason: the map is a pure **lookup table**, and which of
+    its entries are consulted is decided downstream by :func:`_totals_molar`, which *is*
+    medium-scoped. A wine charge balance therefore reads exactly the three entries it always
+    read and is bit-for-bit unchanged, while the extra keys sit unused. Keeping the union here
+    is what lets every existing caller keep its one-argument signature (decision D-179).
     """
     out: dict[str, tuple[float, ...]] = {
-        name: tuple(params[n] for n in spec.pka_param_names) for name, spec in ACID_STATE.items()
+        name: tuple(params[n] for n in spec.pka_param_names) for name, spec in ALL_ACIDS.items()
     }
     out[BYP_KEY] = tuple(params[n] for n in BYP_AS_SUCCINIC.pka_param_names)
     return out
 
 
 def _totals_molar(y: FloatArray, schema: StateSchema) -> dict[str, float]:
-    """Acid slot concentrations present in ``schema``, converted g/L → mol/L."""
+    """Acid slot concentrations present in ``schema``, converted g/L → mol/L.
+
+    Iterates the medium's OWN registry (:func:`acid_registry`, D-179) — the one place the
+    wine/beer split actually bites, because wine and beer disagree about whether the
+    ``citrate`` slot they both carry belongs in the charge balance.
+    """
     return {
         name: float(y[schema.slice(name)][0]) / spec.molar_mass
-        for name, spec in ACID_STATE.items()
+        for name, spec in acid_registry(schema).items()
         if name in schema
     }
 
@@ -475,6 +577,38 @@ def _cation(y: FloatArray, schema: StateSchema) -> float:
     if "cation_charge" not in schema:
         return 0.0
     return float(y[schema.slice("cation_charge")][0])
+
+
+def ph_system_is_anchored(y: FloatArray, schema: StateSchema) -> bool:
+    """Does this state carry a pH that means anything? (decision D-179)
+
+    The honest gate for any pH-dependent rate, replacing the ``"cation_charge" in schema``
+    slot-presence test that stood in for "is this wine" until beer grew a pH system too.
+
+    Slot presence stopped being sufficient the moment BOTH media had the slot. A schema can
+    carry ``cation_charge`` and still hold no pH information: with no ``initial_ph`` given,
+    nothing is back-solved, every acid slot is 0, and the charge balance reduces to pure
+    water — whose electroneutral pH is **7.0**. That is not a claim about the beverage, and
+    feeding it to an acid-catalysis factor anchored at pH 3.3 produces a ~5000x rate change
+    out of nothing. Holding the factor at its reference value is the correct "no information"
+    behaviour; inventing pH 7 beer is not.
+
+    The strong cation is the right discriminator because inverse anchoring is what *creates*
+    the information: it is written only by the compile seam, only from a measured
+    ``initial_ph``, and it is strictly positive whenever it is written at all (a negative
+    solve raises instead). So ``cation_charge > 0`` means "someone measured this beverage's
+    pH and the balance was anchored to it".
+
+    KNOWN, DELIBERATELY UNREPAIRED (flagged on D-127/D-176): an un-anchored WINE — no
+    ``initial_ph`` and no dosed acids — hit the same pH-7.0 path before this function existed,
+    and every such wine has been ageing its ethyl acetate against water's pH. This gate closes
+    that case too. Any wine that anchors (the realistic one) is unaffected: its cation is
+    positive, so the gate opens exactly as before and its trajectories are bit-for-bit
+    unchanged.
+    """
+    if "cation_charge" not in schema:
+        return False
+    return float(y[schema.slice("cation_charge")][0]) > 0.0
 
 
 def ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
@@ -523,11 +657,11 @@ def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, 
 
     eq_per_l = byp * (BYP_AS_SUCCINIC.protons - mean_charge(h, pka_map[BYP_KEY]))
     for name, conc in totals.items():
-        eq_per_l += conc * (ACID_STATE[name].protons - mean_charge(h, pka_map[name]))
+        eq_per_l += conc * (ALL_ACIDS[name].protons - mean_charge(h, pka_map[name]))
     return eq_per_l * (M_TARTARIC / 2.0)
 
 
-def ph_tier(params_tier_of: Mapping[str, Tier]) -> Tier:
+def ph_tier(params_tier_of: Mapping[str, Tier], schema: StateSchema | None = None) -> Tier:
     """The tier of a derived pH/TA value — computed EXPLICITLY (decision D-18).
 
     The lowest of the pKa parameter tiers floored at ``PLAUSIBLE`` (applying 25 °C / I=0
@@ -536,8 +670,17 @@ def ph_tier(params_tier_of: Mapping[str, Tier]) -> Tier:
     separate from the resolved-float hot-loop signature above. It must NOT read the tier
     of the inert acid *state* slots (no Process touches them, so ``ProcessSet.tier_of``
     returns ``VALIDATED`` for them — which would over-report pH's confidence).
+
+    **``schema`` scopes it to one medium's acids (decision D-179), and omitting it is now a
+    real over-report.** Beer's lumped peptide buffer is honestly ``speculative``; combined
+    globally it would drag WINE's pH tier PLAUSIBLE → SPECULATIVE for an acid wine does not
+    carry. Passing the schema reports each medium's pH at the tier its OWN acids justify —
+    wine plausible, beer speculative. ``None`` keeps the historical whole-registry behaviour
+    for callers that have no schema to hand.
     """
-    tiers = [params_tier_of[n] for n in PKA_PARAM_NAMES if n in params_tier_of]
+    registry = ALL_ACIDS if schema is None else acid_registry(schema)
+    names = {n for spec in (*registry.values(), BYP_AS_SUCCINIC) for n in spec.pka_param_names}
+    tiers = [params_tier_of[n] for n in PKA_PARAM_NAMES if n in names and n in params_tier_of]
     return combine([*tiers, Tier.PLAUSIBLE])
 
 
@@ -920,7 +1063,9 @@ def molecular_so2(y: FloatArray, schema: StateSchema, params: Mapping[str, float
     return speciate_so2(y, schema, params).molecular
 
 
-def molecular_so2_tier(params_tier_of: Mapping[str, Tier]) -> Tier:
+def molecular_so2_tier(
+    params_tier_of: Mapping[str, Tier], schema: StateSchema | None = None
+) -> Tier:
     """Tier of the derived SO₂-speciation values — computed EXPLICITLY (decisions D-22/D-28/D-51).
 
     The readout solves pH (so it inherits every pH-solver pKa tier, exactly as
@@ -932,9 +1077,18 @@ def molecular_so2_tier(params_tier_of: Mapping[str, Tier]) -> Tier:
     inputs). Like :func:`ph_tier` it must NOT read the inert SO₂/acetaldehyde/keto-acid/acid
     *state*-slot tiers (which ``tier_of`` reports ``VALIDATED`` for, since no Process touches
     them directly here).
+
+    **``schema`` scopes the pH half to one medium's acids, exactly as :func:`ph_tier` does
+    (decision D-179), and for the same reason.** This readout is wine-only in practice (beer
+    carries no ``so2_total`` slot), so combining over the *global* pKa list would let beer's
+    speculative lumped peptide buffer drag a WINE SO₂ number to ``SPECULATIVE`` — an acid the
+    wine does not carry, in a readout the beer never reaches. That this function needed the
+    same treatment was NOT predicted when ``ph_tier`` was scoped; it is the second site of one
+    root cause (a tier combined over every medium's parameters at once), found by the suite.
     """
+    registry = ALL_ACIDS if schema is None else acid_registry(schema)
     names = (
-        *PKA_PARAM_NAMES,
+        *(n for spec in (*registry.values(), BYP_AS_SUCCINIC) for n in spec.pka_param_names),
         *SO2_PKA_PARAM_NAMES,
         SO2_BINDING_PARAM,
         PYRUVATE_SO2_BINDING_PARAM,

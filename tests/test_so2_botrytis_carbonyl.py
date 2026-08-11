@@ -284,6 +284,9 @@ def test_unknown_key_still_fails_loudly():
 
 def test_speciation_tier_stays_plausible(pset):
     # The new Kd is plausible, so the molecular-SO₂ readout tier is unmoved (still gated by the
-    # pH-solver pKa tiers + the binding constants — all plausible).
-    tier = acidbase.molecular_so2_tier(pset.tier_map())
+    # pH-solver pKa tiers + the binding constants — all plausible). SCOPED TO WINE since D-179:
+    # this readout is wine's (beer has no so2_total slot), and an unscoped call would fold in
+    # beer's speculative lumped peptide buffer — an acid absent from both this wine and this
+    # readout.
+    tier = acidbase.molecular_so2_tier(pset.tier_map(), wine_schema())
     assert tier is Tier.PLAUSIBLE

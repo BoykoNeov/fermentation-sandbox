@@ -453,7 +453,32 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
         }
     ),
     "beer": frozenset(
-        {"glucose_gpl", "maltose_gpl", "maltotriose_gpl", "yan_mgl", "pitch_gpl", "ethanol_gpl"}
+        # initial_ph is the OPT-IN GATE for beer's whole pH system (decision D-179), exactly as
+        # it is for wine (D-18): absent ⇒ every acid slot and the cation stay 0, the charge
+        # balance is empty and the run is byte-for-byte the pre-D-179 beer. Present ⇒ the acid
+        # slots are seeded from their sourced levels and the strong cation is back-solved to
+        # reproduce the given pH (inverse anchoring).
+        #
+        # The five acid keys override those sourced levels individually — the "hold the must,
+        # spike the leucine" shape of the D-100 amino-acid overrides. Each is in g/L.
+        # peptide_buffer_gpl overrides the lumped protein buffer; set it to 0 to run the
+        # organic-acids-only arm (which measures ~1/6th of real wort's buffering — the honest
+        # under-prediction the peptide term exists to close).
+        {
+            "glucose_gpl",
+            "maltose_gpl",
+            "maltotriose_gpl",
+            "yan_mgl",
+            "pitch_gpl",
+            "ethanol_gpl",
+            "initial_ph",
+            "lactic_gpl",
+            "acetic_gpl",
+            "citric_gpl",
+            "malic_gpl",
+            "succinic_gpl",
+            "peptide_buffer_gpl",
+        }
     ),
 }
 
@@ -745,11 +770,92 @@ def _wine_initial(
     return initial
 
 
+#: Beer's charge-active acid slots and the sourced level each is seeded from when the pH
+#: system is opted into (decision D-179). Slot → (scenario override key, parameter name).
+#: Ordered so the back-solve below is deterministic. ``peptide_buffer`` rides in the same
+#: table because it enters the charge balance identically — it is simply not an organic acid.
+_BEER_ACID_SEEDS: tuple[tuple[str, str, str], ...] = (
+    ("lactic", "lactic_gpl", "lactic_typical_beer"),
+    ("acetic", "acetic_gpl", "acetic_typical_beer"),
+    ("citrate", "citric_gpl", "citric_typical_beer"),
+    ("malic", "malic_gpl", "malic_typical_beer"),
+    ("succinic", "succinic_gpl", "succinic_typical_beer"),
+    ("peptide_buffer", "peptide_buffer_gpl", "peptide_buffer_capacity_beer"),
+)
+
+
+def _beer_acids(values: Mapping[str, float], parameters: ParameterSet) -> dict[str, float]:
+    """Beer's acid doses (decision D-179) — sourced levels, individually overridable.
+
+    **``initial_ph`` is the gate, and absent means zero.** This is the OPPOSITE call to
+    ``dms_potential`` / ``copper`` / ``burst_antioxidant``, where absent falls back to a
+    sourced level because the quantity is a property every must carries (the D-45 hard-zero
+    argument). The distinction is D-147's: a fallback is only right where the CONSUMER is
+    wired, and here the consumer is a charge balance that is meaningless without its
+    counter-cation. Seeding acids into a beer with no ``initial_ph`` would give an acid load
+    with no strong cation — the very configuration D-178 measured at pH 4.47 and called
+    "plausible-looking, produced by nothing real". So the whole system opts in together.
+
+    With ``initial_ph`` given, each slot takes its sourced level (Tyrell 2013 for the organic
+    acids, the back-solve for the peptide buffer) unless the scenario overrides it. An
+    override REPLACES that slot outright — including an explicit ``0.0``, which is how the
+    organic-acids-only arm is run.
+    """
+    if "initial_ph" not in values:
+        return {slot: 0.0 for slot, _, _ in _BEER_ACID_SEEDS}
+    out: dict[str, float] = {}
+    for slot, key, param in _BEER_ACID_SEEDS:
+        default = parameters[param].value if param in parameters else 0.0
+        out[slot] = _optional(values, key, default)
+    return out
+
+
+def _beer_cation(
+    values: Mapping[str, float], acids: Mapping[str, float], parameters: ParameterSet
+) -> float:
+    """Back-solve beer's net strong cation from its measured ``initial_ph`` (decision D-179).
+
+    The same inverse anchoring wine has used since D-18, now that beer has an acid load to
+    anchor against: the claim is that the model predicts pH *changes*, not absolute initial
+    pH, and the absolute is an input. ``Byp`` is 0 at pitch (beer has no producer for it), so
+    the anchor is set by the named acids alone.
+
+    Returns 0.0 when no ``initial_ph`` is given — with every acid slot also 0 (see
+    :func:`_beer_acids`) that is an empty charge balance, byte-for-byte the pre-D-179 beer.
+    """
+    if "initial_ph" not in values:
+        return 0.0
+    totals_molar = {slot: gpl / acidbase.BEER_ACIDS[slot].molar_mass for slot, gpl in acids.items()}
+    try:
+        return acidbase.solve_cation_charge(
+            totals_molar,
+            byp_succinic_molar=0.0,
+            pka_map=acidbase.build_pka_map(parameters.resolve()),
+            target_ph=float(values["initial_ph"]),
+        )
+    except ValueError as exc:  # initial_ph below the acid load's intrinsic pH
+        raise ValueError(f"beer scenario.initial['initial_ph'] is unphysical: {exc}") from exc
+    except KeyError as exc:  # acidbase.yaml / beer_acids.yaml pKa parameters not loaded
+        raise ValueError(
+            "beer scenario gives 'initial_ph' but the pKa parameters are missing "
+            f"({exc}); include acidbase.yaml in parameter_paths (the default lookup "
+            "merges it automatically)."
+        ) from exc
+
+
 def _beer_initial(
     values: Mapping[str, float], temperature_k: float, parameters: ParameterSet
 ) -> _Initial:
+    acids = _beer_acids(values, parameters)
     return {
         "X": _require(values, "pitch_gpl", "beer"),
+        # Beer's charge-active acids + the inverse-anchored strong cation (decision D-179).
+        # Every slot is INERT — no Process touches any of them — because beer still has no
+        # organic-acid producer (D-16, open). So beer's pH is properly buffered but does not
+        # FALL during fermentation the way a real beer's does; it drifts only through Byp,
+        # which the ethyl-acetate hydrolysis credits (D-176). A stated scope boundary.
+        **acids,
+        "cation_charge": _beer_cation(values, acids, parameters),
         "S": [
             _require(values, "glucose_gpl", "beer"),
             _require(values, "maltose_gpl", "beer"),
@@ -1015,6 +1121,13 @@ def _load_parameters(
         # per-RHS-step, so a scenario naming a `closure` without this file fails loudly in
         # _closure_otr. INERT until a begin_aging enable, and at closure=hermetic/absent.
         base / "closure.yaml",
+        # Beer's acid COMPOSITION (decision D-179): the sourced Tyrell 2013 levels the beer
+        # charge balance is dosed with, plus the back-solved lumped peptide-buffer capacity.
+        # Loaded universally like the other shared files (collision-free names) but BEER-ONLY
+        # in effect — only beer's schema carries these slots and only beer's acid registry
+        # reads them, so every value is inert for wine. Like closure.yaml these are read at
+        # COMPILE time (to seed the state slots), not per-RHS-step.
+        base / "beer_acids.yaml",
     ]
     return load_parameters(path, *(f for f in shared_files if f.exists()))
 

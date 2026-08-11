@@ -289,6 +289,7 @@ from fermentation.core.acidbase import (
     free_acetaldehyde,
     neutral_fraction,
     ph_of_state,
+    ph_system_is_anchored,
 )
 from fermentation.core.chemistry import (
     CARBON_ATOMS,
@@ -697,11 +698,14 @@ class EsterHydrolysis(Process):
     there)
     but **+16%/+31%/+40% at pH 3.8/4.1/4.3**, the high-pH-white correction D-124's pure-``[H+]`` law
     under-predicted (bitartrate, the real catalyst, peaks between the tartaric pKas ~3.7).
-    **Wine-only**:
-    beer's pH system is deferred (D-18), so a beer state keeps ``h = 1.0`` (the ``cation_charge``
-    slot
-    is the gate) and hydrolyses at the pH_ref-anchored rate — byte-for-byte the pre-D-124 beer
-    behaviour. *Honest limits*: (1) an **undosed** wine (tartaric = 0) is NOT byte-for-byte with
+    **Wine-only, and it stays wine-only now that beer HAS a pH system (D-179).** The gate is the
+    ``tartaric`` slot (renamed from ``cation_charge`` at D-178, which had been standing in for
+    "is this wine" and would have *raised* on a beer state once beer gained the cation): this is
+    Ramey & Ough's **tartrate** catalysis, grape chemistry that does not transfer. A beer state
+    keeps ``h = 1.0`` and hydrolyses at the pH_ref-anchored rate — byte-for-byte the pre-D-124
+    beer behaviour. Contrast :class:`EthylAcetateEsterification`, whose factor is the plain
+    ``[H+]`` form and which therefore DOES apply to an anchored beer.
+    *Honest limits*: (1) an **undosed** wine (tartaric = 0) is NOT byte-for-byte with
     D-124
     — it runs ~0.9% faster than the tartrate-bearing reference, the tartrate-dependence D-124
     lacked;
@@ -1028,9 +1032,17 @@ class EthylAcetateEsterification(Process):
     temperature"). So the signed rate carries ``h(pH) = 10**(pH_ref - pH)``—the D-124 pure-``[H+]``
     factor, NOT the D-125 multi-species tartrate law, whose per-ester ratios are isoamyl-acetate's
     and are not ported (the same restraint :class:`EthylHexanoateHydrolysis` shows, D-126).
-    **Wine-only**: beer carries no pH system (D-18), so ``h = 1`` there (the ``cation_charge`` slot
-    is the gate) and the term relaxes at the ``pH_ref``-anchored rate. Bounded (D-46):
-    ``ph_of_state`` clamps pH to [0, 14], so ``h`` stays finite under a BDF Jacobian probe.
+    **NO LONGER WINE-ONLY (decision D-179).** Beer gained a charge-balance pH, and because this
+    factor is the plain ``[H+]`` form (nothing grape-specific in it), an **anchored** beer gets a
+    real one. The sign surprises: ``pH_ref`` is 3.3, a TABLE WINE — *more* acidic than beer — so
+    beer at ~4.4 gets ``h = 0.079`` and relaxes **~12.6x slower** (5x at pH 4.0, 20x at 4.6).
+    Since D-176 established that beer *hydrolyses* ethyl acetate, catalysis makes beer's solventy
+    note **linger instead of clearing** (measured: ~2x the residual after 400 d — the rate factor
+    and the outcome factor are different numbers, because the pool relaxes toward a floor).
+    The gate is **anchoring, not slot presence** (:func:`~fermentation.core.acidbase.\
+    ph_system_is_anchored`): both media carry ``cation_charge`` now, and an un-anchored state's
+    charge balance is empty, i.e. pure water at pH 7.0 — a number no scenario supplied. Bounded
+    (D-46): ``ph_of_state`` clamps pH to [0, 14], so ``h`` stays finite under a BDF Jacobian probe.
 
     **Carbon — a signed on-ledger inter-pool transfer that closes to machine precision either way.**
     Ethyl acetate (C4) <=> ethanol (C2) + acetic acid (C2), split 2:2 (=1:1). The carbon leaving (or
@@ -1162,11 +1174,21 @@ class EthylAcetateEsterification(Process):
         f_t = arrhenius_factor(temp, params["E_a_ethyl_acetate_esterification"], params["T_ref"])
         # Simple first-order [H+] acid catalysis (D-124 form, NOT the D-125 tartrate law — the
         # per-ester tartrate ratios are isoamyl-acetate's and are not ported, the D-126 restraint).
-        # Acid catalyses BOTH directions equally, so h(pH) multiplies the signed rate. WINE-ONLY:
-        # beer carries no pH system (D-18), so h = 1 there (cation_charge is the gate). Bounded:
+        # Acid catalyses BOTH directions equally, so h(pH) multiplies the signed rate.
+        #
+        # NO LONGER WINE-ONLY (decision D-179). Beer now has a charge-balance pH, so an anchored
+        # beer gets a real h — and it goes the way the naive reading does NOT expect. The
+        # reference is Shinohara's TABLE WINE at pH 3.3, which is MORE acidic than beer: at beer's
+        # ~4.4, h = 10^(3.3-4.4) = 0.079, so the relaxation runs ~12.6x SLOWER (5x at pH 4.0,
+        # 20x at 4.6), not faster. Since D-176 established that beer HYDROLYSES ethyl acetate,
+        # applying catalysis makes beer's solventy note LINGER rather than clear. Measured before
+        # it shipped and adopted deliberately as the more faithful behaviour.
+        #
+        # The gate is ANCHORING, not slot presence: both media carry cation_charge now, and an
+        # un-anchored state's "pH" is water's 7.0 — see acidbase.ph_system_is_anchored. Bounded:
         # ph_of_state clamps pH to [0, 14] (D-46), so h stays finite under a BDF Jacobian probe.
         h_factor = 1.0
-        if "cation_charge" in schema:  # the wine pH-system marker (absent from the beer schema)
+        if ph_system_is_anchored(y, schema):
             ph = ph_of_state(y, schema, params)
             h_factor = float(10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph))
         # Signed rate (g ethyl acetate/L/h): >0 hydrolysis (fade), <0 esterification (form).

@@ -50,12 +50,18 @@ from fermentation.sensory.oav import load_thresholds
 
 DATA = default_data_dir()
 
-#: The 14 medium-agnostic files ``scenario.compile._load_parameters`` merges alongside the
+#: The 15 medium-agnostic files ``scenario.compile._load_parameters`` merges alongside the
 #: medium file. Restated here ON PURPOSE: this list IS the pinned quantity, so deriving it
 #: from the module under test would make the assertion vacuous (the D-108/D-109 shape). The
 #: band CONTENTS are still read from the YAML, never restated — the D-100 lesson.
+#:
+#: ``beer_acids`` (decision D-179) is loaded universally like ``dms``/``closure``/
+#: ``bound_sulfides``, so it appears in a WINE run's parameter set too. That is the
+#: established pattern and it is harmless: the names are collision-free and no wine slot or
+#: registry reads them, so every value is inert for wine.
 SHARED_FILES = (
     "acidbase",
+    "beer_acids",
     "vicinal_diketones",
     "acetaldehyde",
     "keto_acids",

@@ -1212,7 +1212,107 @@ def wine_schema() -> StateSchema:
     # appends the SAME spec at the end of its own layout — see _quinone_spec for why a slot in
     # both media is still declared per-schema rather than in _common_specs.
     specs.append(_quinone_spec())
-    return StateSchema(specs)
+    return StateSchema(specs, medium="wine")
+
+
+def _beer_acid_specs() -> list[VarSpec]:
+    """Beer's charge-active acid slots + its inverse-anchored cation (decision D-179).
+
+    The state half of the beer-pH beat whose solver half was D-178. Every slot is an INERT
+    DOSED INPUT — no Process touches any of them — because beer still has no organic-acid
+    producer (D-16, open). So beer's acids are a *composition*, not a *fate*: the pH they set
+    is real and buffered, but it will not fall during fermentation the way a real beer's does.
+    That is a stated scope boundary of this beat, not an oversight.
+
+    The set is Tyrell et al. 2013 Table 1 (BrewingScience 66:75-76), a printed compilation of
+    ranges by fermentation type — so both band edges are PRINTED rather than author-constructed
+    ([[pin-the-band-not-the-nominal]]). ``pyruvic`` is deliberately absent (smallest measured
+    contributor, and its name would collide with wine's dynamic ``pyruvate``); ``phosphate`` is
+    absent because it cannot buffer at beer's pH at all (D-178).
+
+    ``peptide_buffer`` is the one non-organic-acid slot and the one that carries beer's actual
+    buffering: Peyer 2017 §5.5 attributes the majority of wort's buffering capacity to peptides
+    and polypeptides, with free amino acids only ~10 %. It is a LUMPED buffering-site pool read
+    as glutamate-equivalent, off every ledger, and its capacity is **back-solved from a
+    published titration** rather than guessed — the D-18 inverse-anchoring shape one level up.
+
+    ``default=0.0`` throughout is load-bearing exactly as it is for wine's acid slots: a beer
+    scenario that names no acids compiles, every slot is 0, the charge balance is empty and the
+    run is byte-for-byte the pre-D-179 beer.
+    """
+    return [
+        VarSpec(
+            "lactic",
+            "g/L",
+            default=0.0,
+            description="lactic acid (beer input; monoprotic). The LARGEST single contributor "
+            "to beer's organic-acid buffering (measured: 0.042 of the 0.110 index). Unlike "
+            "wine's same-named slot — which is produced-only, the MLF product — beer's is a "
+            "dosed composition input, since beer has no acid producer (D-16, open)",
+        ),
+        VarSpec(
+            "acetic",
+            "g/L",
+            default=0.0,
+            description="acetic acid (beer input; monoprotic, pKa 4.76 — inside beer's window). "
+            "Beer's own slot because wine has none: wine folds acetic into the Byp "
+            "succinic-equivalent lump (D-18). NB the sourced band is under an open style "
+            "transposition — two sources assign the same two ranges to OPPOSITE fermentation "
+            "types (D-178 flagged it on D-176); this uses Tyrell's assignment",
+        ),
+        VarSpec(
+            "citrate",
+            "g/L",
+            default=0.0,
+            description="citric acid (beer input; TRIPROTIC — the first shipped acid to reach "
+            "the n-protic speciation branch D-178 built, with two pKas 3.13/4.76 inside beer's "
+            "own pH window). Named by Peyer 2017 §5.5 as an organic acid providing a majority "
+            "share of wort buffering. Wine carries a citrate slot too but deliberately keeps it "
+            "OUT of the charge balance (carbon-active only, D-31) — which is why the acid "
+            "registries are per-medium rather than one union (D-179)",
+        ),
+        VarSpec(
+            "malic",
+            "g/L",
+            default=0.0,
+            description="malic acid (beer input; diprotic). Same molecule as wine's MLF "
+            "substrate, but inert here — beer wires no malolactic Processes",
+        ),
+        VarSpec(
+            "succinic",
+            "g/L",
+            default=0.0,
+            description="succinic acid (beer input; diprotic). Beer's OWN slot even though beer "
+            "also carries Byp, because they are different things: this is a measured dosed "
+            "input (Tyrell 36-166 ppm) while Byp is a produced lump with no beer producer. "
+            "CAVEAT: succinic carries a live ~25x source conflict (Tyrell 36-166 and Park "
+            "37.0-56.2 mg/L against a separate ~900-3500 mg/L band) — recorded open, NOT "
+            "averaged (the D-103 precedent)",
+        ),
+        VarSpec(
+            "peptide_buffer",
+            "g/L",
+            default=0.0,
+            description="lumped peptide/polypeptide buffering sites, read as "
+            "glutamate-equivalent (decision D-179). What actually buffers beer: Peyer 2017 "
+            "§5.5 puts free amino acids at only ~10 % of wort's buffering capacity and "
+            "attributes the majority to the peptides and polypeptides carrying those residues "
+            "(corroborated by boiling dropping BC 1.34 -> 1.21 as proteins precipitate as hot "
+            "trub). Capacity is BACK-SOLVED from a published wort titration, not guessed — but "
+            "the fit is anchored at wort pH 5.5 and is NOT constrained at beer's own pH, where "
+            "the identical fitted solutions span a factor of ~1.9. Shipped as a BAND for that "
+            "reason, never as a nominal. Off every ledger (beer's protein is untracked)",
+        ),
+        VarSpec(
+            "cation_charge",
+            "mol/L",
+            default=0.0,
+            description="net strong-cation charge, constant; back-solved from initial_ph "
+            "(the D-18 inverse anchoring, extended to beer at D-179). A charge density "
+            "(mol+/L), not a mass concentration. Default 0 => a beer scenario naming no "
+            "initial_ph carries an empty charge balance and is byte-for-byte the pre-D-179 beer",
+        ),
+    ]
 
 
 def beer_schema() -> StateSchema:
@@ -1277,7 +1377,11 @@ def beer_schema() -> StateSchema:
     # are unchanged. The SAME spec wine appends (fork D1 = shared): beer runs PhenolicBrowning
     # (D-74) and under the cascade A420 is a quinone fate, so beer needs the slot too.
     specs.append(_quinone_spec())
-    return StateSchema(specs)
+    # The BEER charge-active acid set (decision D-179) — appended LAST, after the D-141
+    # quinone slot, so every existing beer index is unchanged (the append-last convention,
+    # D-100/D-102/D-133/D-134/D-136/D-141).
+    specs += _beer_acid_specs()
+    return StateSchema(specs, medium="beer")
 
 
 @dataclass(frozen=True)

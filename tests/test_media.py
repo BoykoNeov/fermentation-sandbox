@@ -192,6 +192,28 @@ WINE_CLOSURE_SLOTS = ("closure_otr",)
 # comes from the untracked o-diphenol pool k_browning_base already lumps).
 QUINONE_SLOTS = ("quinone",)
 
+# Beer's charge-active acid set + its inverse-anchored strong cation (decision D-179) — the
+# state half of the beer-pH beat whose solver half was D-178. Appended LAST to beer's layout
+# so every pre-existing beer index is unchanged.
+#
+# NB `citrate` appears in BOTH media's slot lists and is charge-active in only ONE of them:
+# wine keeps it out of the pH balance (carbon-active only, D-31). That is why the acid
+# registries are per-medium — see test_acidbase_polyprotic's registry-scoping guard.
+#
+# `peptide_buffer` is not an organic acid: it is the lumped peptide/polypeptide buffering-site
+# pool that carries most of beer's real buffering (Peyer 2017 §5.5). `pyruvic` is deliberately
+# ABSENT (smallest measured contributor, and it would collide with wine's dynamic `pyruvate`),
+# and so is `phosphate` — the acid this beat was opened on, which cannot buffer at beer's pH.
+BEER_ACID_SLOTS = (
+    "lactic",
+    "acetic",
+    "citrate",
+    "malic",
+    "succinic",
+    "peptide_buffer",
+    "cation_charge",
+)
+
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
 # fermentation-lost hop bitterness (decision D-64). Beer-only, exactly as wine's acid/MLF/Brett
 # slots are wine-only; off the carbon ledger (exogenous hop-derived mass).
@@ -307,7 +329,7 @@ def test_wine_schema_has_single_sugar_slot():
 def test_beer_schema_has_three_sequential_sugars():
     schema = beer_schema()
     assert schema.names == (
-        SHARED + BEER_HOP_SLOTS + OAK_SLOTS + CARAMELIZATION_SLOTS + QUINONE_SLOTS
+        SHARED + BEER_HOP_SLOTS + OAK_SLOTS + CARAMELIZATION_SLOTS + QUINONE_SLOTS + BEER_ACID_SLOTS
     )
     s = schema.spec("S")
     assert s.size == 3
@@ -330,7 +352,11 @@ def test_beer_schema_has_three_sequential_sugars():
     # + 2 D-115 valine-label tracer slots (see the wine-schema note above) = 46
     # + 1 shared quinone oxidant-currency slot (D-141, fork D1 — appended last to EACH schema,
     # the melanoidin/D-90 precedent, so no beer index moves) = 47
-    assert schema.size == 47
+    # + 7 beer acid-system slots (D-179): the FIVE charge-active organic acids beer actually
+    # carries (lactic/acetic/citrate/malic/succinic, Tyrell 2013 Table 1), the lumped
+    # peptide_buffer pool that supplies most of beer's real buffering, and the cation_charge
+    # back-solved from initial_ph. Appended last, so again no pre-existing beer index moves = 54
+    assert schema.size == 54
 
 
 def test_shared_variable_units_are_canonical():
@@ -382,7 +408,34 @@ def test_shared_variable_units_are_canonical():
         # g/L, unlike A420's dimensionless AU: quinone is a real (if lumped) species pool that
         # gets produced and reduced, not an optical index. Shared, fork D1.
         "quinone": "g/L",
+        # Beer's acid system (D-179): the five organic acids and the lumped peptide-buffer
+        # pool are all mass concentrations in g/L like every other species; cation_charge is
+        # the one heterogeneous slot, a CHARGE DENSITY in mol/L (the D-18 idiom, extended to
+        # beer). peptide_buffer is g/L of glutamate-equivalent buffering sites — a mass, so
+        # that the g/L → mol/L conversion the charge balance needs is an ordinary molar-mass
+        # division rather than a special case.
+        "lactic": "g/L",
+        "acetic": "g/L",
+        "citrate": "g/L",
+        "malic": "g/L",
+        "succinic": "g/L",
+        "peptide_buffer": "g/L",
+        "cation_charge": "mol/L",
     }
+
+
+def test_beer_acid_slot_units_are_canonical():
+    """Beer's D-179 acid slots, pinned separately from the shared-layout dict above.
+
+    Deliberately a mirror of ``test_wine_acid_slot_units_are_canonical``: the two media now
+    both have a pH system, and the thing most likely to go wrong quietly is the ONE slot whose
+    unit is not g/L. A cation_charge accidentally declared in g/L would still integrate, still
+    conserve, and silently mis-scale every beer pH by the molar mass it never applied.
+    """
+    units = {spec.name: spec.unit for spec in beer_schema().specs}
+    for acid in ("lactic", "acetic", "citrate", "malic", "succinic", "peptide_buffer"):
+        assert units[acid] == "g/L", f"beer's {acid} must be a mass concentration"
+    assert units["cation_charge"] == "mol/L", "a charge density, NOT a mass concentration"
 
 
 def test_wine_acid_slot_units_are_canonical():

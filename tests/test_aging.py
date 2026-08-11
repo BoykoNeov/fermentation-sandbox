@@ -590,9 +590,15 @@ def test_off_reference_tartrate_changes_the_rate(params):
 
 
 def test_beer_ester_hydrolysis_is_ph_blind_byte_for_byte(params):
-    # Beer has no pH system (D-18), so the [H+] factor is held at 1.0 (the cation_charge gate) and
-    # the beer rate is the pH_ref-anchored k*f_t*excess — byte-for-byte the pre-D-124 beer behaviour
-    # (prime directive #3: the pH build must not silently perturb the other medium).
+    # Beer holds the [H+] factor at 1.0 and its rate is the pH_ref-anchored k*f_t*excess —
+    # byte-for-byte the pre-D-124 beer behaviour (prime directive #3).
+    #
+    # THE REASON CHANGED AT D-179, THE BEHAVIOUR DID NOT. This used to hold because beer had no
+    # pH system at all; beer now has one. It still holds because this Process gates on
+    # `"tartaric" in schema` (renamed at D-178 from the cation slot it used as a stand-in for
+    # "is this wine"): the D-125 law is Ramey & Ough's TARTRATE catalysis, grape chemistry that
+    # does not transfer to beer. Contrast EthylAcetateEsterification, which gates on anchoring
+    # and therefore DOES now apply to beer — see test_beer_ethyl_acetate_*.
     beer = beer_schema()
     ester, t = 0.08, 298.15
     yb = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": t, "CO2": 0.0})
@@ -1215,10 +1221,100 @@ def test_beer_hydrolysis_margin_survives_the_JOINT_band_corner():
 
 def test_ethyl_acetate_wired_into_both_media():
     # Wired into the medium-agnostic _AGING_PROCESSES (like the two hydrolysis siblings); the
-    # ethyl_acetate pool exists in both media, and h(pH) is held at 1 in beer (no pH system, D-18).
+    # ethyl_acetate pool exists in both media. Since D-179 h(pH) is NOT held at 1 in beer —
+    # an anchored beer gets a real acid-catalysis factor (see the three tests below).
     for medium in ("wine", "beer"):
         names = {p().name for p in get_medium(medium).process_factories}
         assert "ethyl_acetate_esterification" in names
+
+
+# -- D-179: beer's ethyl acetate now feels acid catalysis, and it goes the "wrong" way --
+
+
+def test_beer_ethyl_acetate_acid_catalysis_slows_rather_than_speeds(params):
+    """The pre-registered prediction that missed by SIGN, pinned so it cannot drift back.
+
+    The intuition "beer is acidic, acid catalyses, therefore faster" is wrong here, and the
+    reason is the *reference*: ``pH_ref_ethyl_acetate_esterification`` is 3.3 — Shinohara's
+    table wines — which is MORE acidic than beer. So for beer at 4.4,
+    ``h = 10^(3.3-4.4) = 0.079`` and the relaxation runs ~12.6x SLOWER, not faster.
+
+    Asserted as an inequality against 1.0 plus the arithmetic, rather than as a pinned rate,
+    so it fails loudly if anyone "fixes" the direction back.
+    """
+    for ph, expected in ((4.0, 0.1995), (4.3, 0.1000), (4.4, 0.0794), (4.6, 0.0501)):
+        h = 10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph)
+        assert h == pytest.approx(expected, rel=1e-3)
+        assert h < 1.0, "beer sits ABOVE the wine reference pH, so catalysis must SLOW it"
+
+
+def test_beer_ethyl_acetate_lingers_when_the_ph_system_is_anchored():
+    """The integrated consequence, measured before it shipped (decision D-179).
+
+    D-176 established that beer HYDROLYSES ethyl acetate (its Berthelot equilibrium sits below
+    the packaged level). Slowing that relaxation therefore makes the solventy note LINGER.
+    Both arms are the same scenario; the only difference is whether ``initial_ph`` opts the pH
+    system in — so this is the paired before/after, not two different beers.
+
+    NB the rate factor and the outcome factor are different numbers and must not be conflated:
+    the RATE is ~12.6x slower, but the pool relaxes toward a floor, so the end-of-aging ester
+    is ~2x higher, not ~12x. Pinned loosely (a ratio window) because the exact value rides
+    several speculative aging parameters.
+    """
+    from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
+
+    base = {
+        "glucose_gpl": 15.0,
+        "maltose_gpl": 70.0,
+        "maltotriose_gpl": 15.0,
+        "yan_mgl": 200.0,
+        "pitch_gpl": 1.0,
+    }
+
+    def end_ester(initial: dict[str, float]) -> float:
+        c = compile_scenario(
+            Scenario(
+                name="d179-etoac",
+                medium="beer",
+                initial=initial,
+                temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+                interventions=[Intervention(day=14.0, action="begin_aging")],
+                duration_days=400.0,
+            )
+        )
+        return float(c.run().series("ethyl_acetate")[-1]) * 1000.0  # mg/L
+
+    unanchored = end_ester(dict(base))
+    anchored = end_ester({**base, "initial_ph": 4.4})
+    assert anchored > unanchored, "acid catalysis at beer pH must SLOW the fade, not speed it"
+    assert 1.5 < anchored / unanchored < 3.0, (
+        f"the size of the lingering changed materially ({anchored / unanchored:.2f}x); "
+        "D-179 measured ~2.0x and adopted it deliberately — re-measure before re-pinning"
+    )
+
+
+def test_unanchored_beer_does_not_age_against_waters_ph(params):
+    """The defect D-179 found while building, and the reason the gate is ANCHORING.
+
+    Giving beer a ``cation_charge`` slot made the old ``"cation_charge" in schema`` gate open
+    for EVERY beer — including one that never asked for a pH. Such a state's charge balance is
+    empty, so it solves to pure water's pH 7.0, and the factor becomes 10^(3.3-7) ≈ 2e-4: a
+    ~5000x rate change conjured out of a scenario that supplied no pH at all.
+
+    Nothing in the suite caught this, because no test pinned beer's ethyl-acetate factor —
+    which is exactly why this test exists.
+    """
+    from fermentation.core.acidbase import ph_of_state, ph_system_is_anchored
+
+    beer = beer_schema()
+    y = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 298.15, "CO2": 0.0})
+    assert not ph_system_is_anchored(y, beer), "an un-anchored beer must not claim a pH"
+    # The trap made concrete: the number the old gate would have handed the rate law.
+    assert ph_of_state(y, beer, params) == pytest.approx(7.0, abs=1e-6)
+    # And an anchored one IS live.
+    y_anchored = y.copy()
+    y_anchored[beer.slice("cation_charge")] = 0.009223
+    assert ph_system_is_anchored(y_anchored, beer)
 
 
 # -- tier propagation ---------------------------------------------------------

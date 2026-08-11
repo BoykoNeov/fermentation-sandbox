@@ -18,7 +18,7 @@ import pytest
 from fermentation.analysis import ph_series, titratable_acidity_series
 from fermentation.core import acidbase
 from fermentation.core.chemistry import M_LACTIC, M_MALIC, M_TARTARIC
-from fermentation.core.media import wine_schema
+from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
@@ -272,7 +272,25 @@ def test_titratable_acidity_in_band(params):
 def test_ph_tier_is_plausible(pset):
     # Computed explicitly (not inherited): the lowest pKa tier floored at plausible. The
     # pKa params are all plausible, and pH is never validated however good the pKa source.
-    assert acidbase.ph_tier(pset.tier_map()) is Tier.PLAUSIBLE
+    #
+    # SCOPED TO WINE since D-179. The schema argument is not decoration: beer's lumped
+    # peptide buffer is honestly speculative, so an unscoped call combines it in and reports
+    # SPECULATIVE — for an acid this wine does not carry. Asking about wine's pH now means
+    # saying "wine".
+    assert acidbase.ph_tier(pset.tier_map(), wine_schema()) is Tier.PLAUSIBLE
+
+
+def test_ph_tier_unscoped_is_conservative_not_wine(pset):
+    """The no-schema default reports the WORST tier across all media, and that is deliberate.
+
+    A caller with no schema does not know which medium it holds. Defaulting to wine's set
+    would be back-compatible and would quietly over-report a beer pH as plausible; defaulting
+    to the union can only ever under-claim. Prime directive #1 says an output's tier is the
+    LOWEST of its inputs, so the conservative default is the correct one — but it is a real
+    behaviour change from D-178, so it is pinned rather than left implicit.
+    """
+    assert acidbase.ph_tier(pset.tier_map()) is Tier.SPECULATIVE
+    assert acidbase.ph_tier(pset.tier_map(), beer_schema()) is Tier.SPECULATIVE
 
 
 # -- analysis series + the emergent Byp pH drift (the second demonstration) ----

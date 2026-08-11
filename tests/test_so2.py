@@ -208,7 +208,12 @@ def test_molecular_so2_zero_when_slot_absent(params):
 def test_molecular_so2_tier_is_plausible(pset):
     # Combines BOTH pKa sets (pH solver + sulfurous), floored at plausible: the readout
     # solves pH (every pH pKa) and partitions free SO₂ (the sulfurous pKa). All plausible.
-    assert acidbase.molecular_so2_tier(pset.tier_map()) is Tier.PLAUSIBLE
+    #
+    # SCOPED TO WINE since D-179, for the reason the readout is wine-only in the first place:
+    # beer has no so2_total slot, so an unscoped call would let beer's speculative peptide
+    # buffer drag a wine SO₂ number down for an acid that appears in neither this wine nor
+    # this readout.
+    assert acidbase.molecular_so2_tier(pset.tier_map(), wine_schema()) is Tier.PLAUSIBLE
 
 
 # -- 8. PRIME DIRECTIVE #3: SO₂ is readout-only — leaves pH and carbon untouched ---
@@ -535,10 +540,10 @@ def test_emergent_free_so2_dips_then_locks_in_a_stranded_acetaldehyde_residual()
 def test_speciation_tier_drops_with_binding_constant(pset, params):
     # The tier now folds in the binding constant K too (D-28): all plausible ⇒ plausible,
     # but a speculative K drags the whole speciation readout to speculative.
-    assert acidbase.molecular_so2_tier(pset.tier_map()) is Tier.PLAUSIBLE
+    assert acidbase.molecular_so2_tier(pset.tier_map(), wine_schema()) is Tier.PLAUSIBLE
     tiers = dict(pset.tier_map())
     tiers[acidbase.SO2_BINDING_PARAM] = Tier.SPECULATIVE
-    assert acidbase.molecular_so2_tier(tiers) is Tier.SPECULATIVE
+    assert acidbase.molecular_so2_tier(tiers, wine_schema()) is Tier.SPECULATIVE
 
 
 # == 11. D-82: the reversible SO₂/pH masking readout (anthocyanin coloured fraction) ============
