@@ -24591,6 +24591,16 @@ arithmetic was run **before** the design was proposed: boot is `8,234 + 8,831 + 
 non-blank original lines, exactly **three** are absent afterwards, all three deliberate — the caps
 sentence reworded, `D-184` → `D-185`, and the old section heading replaced by the ledger.
 
+**The ledger introduces a failure mode the 406-line version did not have, so it was checked
+separately.** A subject whose former heading contributes *no* clause is invisible unless someone
+opens its file — worse than being buried in a long page, because the long page at least contained
+the words. Screening the 18 former headings against the ledger for a distinctive token each found
+**three genuine gaps**: sulfides, closures and fusels/2-PE were named in a list but carried no
+prohibition. Fixed by naming them — do not rebuild bottle reduction as thioacetate precursors,
+release is temperature-flat, technical cork ships below screwcap, never put 0.963 in a sampled
+field — plus the Q10 sweep's non-idempotence, which had the same gap. All ten distinct subjects now
+carry at least one clause; **a merged subject file must never leave a former heading wordless.**
+
 The hook (`.claude/hooks/check_memory_size.py`) now gives the detail files **the same
 `BLOCK_LINE_CAP`** and reports them **apart from** the three boot surfaces. Same cap because an
 uncapped destination beside a capped source is an arbitrage, not a relief valve — the same failure

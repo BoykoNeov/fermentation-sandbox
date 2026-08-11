@@ -60,7 +60,8 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   → `.claude/memory/prohibitions/sampling-surfaces.md`
 - **Band edges & provenance (D-163 → D-176)** — the 73-arm edge sweep DONE; class (d), BOTH wide-band
   mechanisms, the switch-site census and the "buildable 55" all CLOSED; the O2 partition
-  reparameterised; oak's share is a JOINT. **ZERO edges moved** bar `E_a_oak_extraction`.
+  reparameterised; oak's share is a JOINT. **ZERO edges moved** bar `E_a_oak_extraction`. The Q10
+  sweep is **NOT idempotent under its own repair — never re-run it expecting a defect count.**
   → `.claude/memory/prohibitions/band-edges-and-provenance.md`
 - **Oxidation — direct set + burst (D-132 → D-137, D-147, D-149 → D-152)** — burst is **WIRED and
   NON-DEFAULT**, not dead code and not refused; copper 600 L/g CLOSED and BOUNDED; a pH term on
@@ -69,8 +70,10 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
 - **Oxidation — cascade + SO2 dosing (D-141 → D-148)** — cascade is **BUILT and NON-DEFAULT**, benchmark
   ACTIVE not open work; must-dosing REFUSED; "the sim under-binds SO2" WITHDRAWN; §2.4 CLOSED.
   → `.claude/memory/prohibitions/oxidation-cascade-and-dosing.md`
-- **Aroma compounds + Milestone-3 tail (D-117 → D-136, D-146, D-176)** — esters/fusels/2-PE/sulfides/
-  closures; methionine sink is **BLOCKED not deferred**; the `oav`→`magnitude` rename must NOT be
+- **Aroma compounds + Milestone-3 tail (D-117 → D-136, D-146, D-176)** — methionine sink is **BLOCKED
+  not deferred**; **do NOT rebuild bottle reduction as thioacetate/disulfide precursors** (D-101's
+  mechanism guess was WRONG) and sulfide release is **temperature-FLAT**; technical cork ships BELOW
+  screwcap; **never put 0.963 in a sampled field**; the `oav`→`magnitude` rename must NOT be
   "finished"; EtOAc eq is Berthelot-coupled. → `.claude/memory/prohibitions/aroma-and-milestone-3-tail.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
