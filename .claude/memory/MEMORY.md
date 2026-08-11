@@ -18,7 +18,7 @@
 - [Measure which side before building](feedback-measure-which-side-before-building.md) — a one-directional corrective only helps in one direction; check the sign, the reach, and whether it's a rate knob on a supply-limited quantity
 - [CRLF joins inflate line count](feedback-crlf-join-inflates-line-count.md) — splitting a CRLF file on `
 ` and rejoining leaves a lone ``; `splitlines()` counts it, so the compression that should shed a line adds one
-- [Commit messages corrupted by shells](feedback-no-powershell-heredoc-in-bash.md) — PS here-strings in Bash, and `Out-File -Encoding utf8`'s BOM; exit 0 proves nothing
+- [Commit messages corrupted by shells](feedback-no-powershell-heredoc-in-bash.md) — PS here-strings in Bash, and `Out-File -Encoding utf8`'s BOM; exit 0 proves nothing — and verify with a binary read, since `git cat-file | od -c` invents CRLF in the pipe and reported 118 CRs in a message with zero
 - ["Paywalled" is one host, not a paper](feedback-paywalled-is-one-host.md) — check author/institutional/thesis/trade-reprint copies before recording a source as blocked; wrong 4× so far
 - [Conceded caveats aren't coverage](feedback-conceded-caveats-are-not-coverage.md) — naming your own gap in prose doesn't discharge it; run the criterion on every branch or label it asserted
 - [Count and print your skips](feedback-count-and-print-your-skips.md) — a harness that silently drops what it can't parse reports "5 of 5 clean" on a denominator it never measured; D-157's live defect was in the dropped two

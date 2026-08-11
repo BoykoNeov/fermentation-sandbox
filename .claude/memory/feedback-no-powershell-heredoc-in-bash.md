@@ -69,6 +69,15 @@ bash heredoc —
 `git commit -F - <<'EOF' ... EOF` (quoted `EOF` keeps `$` and backticks literal)
 — for *short* messages only. In the PowerShell tool use `@'...'@` with the
 closing `'@` at column 0. Never mix. If routing through a file, write it with
-the Write tool, not `Out-File`. **Verify with `git log -1 --format='%s' | xxd |
-head -1` before pushing** — a visual check does not catch a BOM, and the whole
-point is that every failure in this family exits 0.
+the Write tool, not `Out-File`. **Verify before pushing** — a visual check does not catch a
+BOM, and the whole point is that every failure in this family exits 0.
+
+**But verify with a BINARY read, never through a Git Bash pipe.** `git cat-file commit HEAD |
+od -c` (and `git log --format=%B | xxd`) reported **118 CR bytes** in a message that has
+**zero** — MSYS translates LF → CRLF *inside the pipe*, so the instrument invents exactly the
+corruption it is being used to rule out, and it does so for **every** commit in the repo, which
+makes it look like a confirmed repo-wide defect rather than a measurement artefact. Read the
+object in Python instead: `subprocess.run(["git","cat-file","commit","HEAD"],
+capture_output=True).stdout` then `.count(b"\r")` and check `[:3] != b"\xef\xbb\xbf"`. A check
+whose false-positive rate is 100 % is worse than no check — it would have sent me to "fix"
+clean history [[feedback-name-the-field-your-predicate-read]].
