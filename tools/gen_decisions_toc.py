@@ -192,6 +192,14 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"acidit",
             r"acidif",
             r"add_acid",
+            # D-182: dissolved CO2 entered the charge balance and its heading names neither
+            # "pH" nor "acidity" -- it is about a species, so it read as unbucketed. Both
+            # rules are deliberately narrow (each matches exactly one heading today): a bare
+            # `co[2₂]` would sweep every record that mentions the ethanol/CO2 split, which is
+            # most of the core-kinetics axis, and `acid` unanchored would sweep nearly all of
+            # them. Bucket by the SPECIES, not by the word "acid".
+            r"carbonic",
+            r"dissolved co[2₂]",
         ),
     ),
     (
