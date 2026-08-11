@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T11:49:23.309Z
+  modified: 2026-08-11T12:47:21.438Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -25,12 +25,12 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-11)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-178**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
-**1564**. Wine **94 slots** / beer **45 compiled**, `quinone` in both regardless of set; **three** oxidative sets
-(`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**, not building.
-**BEAT IN PROGRESS — beer's acid-base, HALF SHIPPED at D-178** (n-protic branch + gate rename, below). Still to
-build: beer's acid STATE + scenario inputs + inverse-anchored `cation_charge`, the **peptide band**, the EtOAc
-apply. **`ACID_STATE` is medium-agnostic BY DESIGN**; adding to it grows `PKA_PARAM_NAMES`→`PH_SYSTEM_READS`.
+**D-179**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
+**1572**. Wine **94 slots** / beer **54** (47 pre-D-179), `quinone` in both regardless of set; **three** oxidative
+sets (`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**.
+**Beer's acid-base BEAT IS COMPLETE (D-178 solver + D-179 state)** — beer has acids, a peptide-buffer band and an
+inverse-anchored `cation_charge`. **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry,
+beside `BEER_ACIDS`, keyed off `StateSchema.medium`. **Next beat is the owner's call.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -268,7 +268,25 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
 
-**Beer acid-base (D-178) — half shipped; the PREMISE was wrong**
+**Beer acid-base, part 2 — the STATE (D-179). Beat COMPLETE; do not re-propose any of it as unbuilt.**
+- **NEVER merge `WINE_ACIDS`/`BEER_ACIDS` into one registry.** Both media carry a **`citrate` slot** and only
+  beer's is charge-active (wine's is carbon-only, **D-31 Flagged not fixed**) ⇒ a union silently changes wine.
+  Keyed by **`StateSchema.medium`, an explicit LABEL — never sniff slots** (that is D-178's bug). Wine resolves
+  to the identical dict: pKa values **bitwise** (`float.hex()`), 94 slots, `ph_tier` PLAUSIBLE.
+- **`ph_tier`/`molecular_so2_tier` take a schema and MUST be passed one**; unscoped = **conservative union**
+  (SPECULATIVE), never wine — beer's peptide buffer is speculative and would drag wine down. **`PH_SYSTEM_READS`
+  is the union ON PURPOSE**: it shifts a wine ensemble's draw SEQUENCE (nominals/bands unchanged), and the
+  alternative is D-160's silent band-narrowing. **Beer's acids are INERT** — composition, not fate (D-16 open).
+- **The EtOAc gate is ANCHORING (`ph_system_is_anchored`), NEVER slot presence.** Beer gaining `cation_charge`
+  opened the old gate for beers with an **empty balance ⇒ pH 7.0 ⇒ 5000×**; also closes it for un-anchored WINE.
+  `initial_ph` is beer's **opt-in gate** (absent ⇒ all acids 0, byte-for-byte pre-D-179). EtOAc **lingers 2.03×**
+  (6.73→13.69 mg/L/400 d) — **rate 12.6× ≠ outcome 2.03×**, the pool relaxes to a floor. pH drifts **−0.0041 via Byp**.
+- **`peptide_buffer_capacity_beer` is PINNED zero-width ON PURPOSE** — it is a **function of the pKa** via the
+  back-solve, so banding both samples pairs reproducing **no measurement**. Band rides **`pKa_peptide_buffer`
+  [3.86,4.50]**, which IS sampled (11.96-14.61 mg/L; pinned control 0.000000). BC **0.309-0.544** with the peptide
+  term vs **0.103** without. **A compile-time dose is in no `reads` ⇒ never sampled** — check before calling it a band.
+
+**Beer acid-base (D-178) — the SOLVER half; the PREMISE was wrong**
 - **NEVER re-propose malt phosphate as beer's buffer.** pKas **2.15/7.20** vs beer ~4.3 ⇒ charge **0.9867→0.9990
   FLAT** over 4.0-4.6; 0.15 mEq/L/pH even at 700 mg/L vs organic acids' ~2.3 — and an **inverse anchor absorbs a
   constant charge**, so it is a **near no-op, not a weak buffer**. Source questions it too. **Citrate** (triprotic,

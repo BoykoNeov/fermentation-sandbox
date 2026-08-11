@@ -40,4 +40,5 @@
 - [Memory is one tracked copy](feedback-memory-is-one-tracked-copy.md) — the C: harness path is a junction into `.claude/memory`; never sync or mirror it, there is nothing to sync
 - [A cap being written to can't be raised](feedback-a-cap-being-written-to-cannot-be-raised.md) — pinned at exactly 250 for 13 commits, then at 300 for 8 more with every block under cap: a per-item cap can't rescue a total and retirement couldn't pay for it, so delete the threshold and report the number (D-177)
 - [Pair the RED with an ordering-preserving baseline](feedback-pair-the-red-with-an-ordering-preserving-baseline.md) — a same-sized move WITHOUT the flip killed the identical tests; attribute at ASSERT granularity, and check what the RED names, not that it is red
+- [Grep finds claims, not guards](feedback-grep-finds-claims-not-guards.md) — all 4 "expected red" hits were COMMENTS, so the red list read as coverage where there was none and the beat's only live defect lived in that gap; check each hit is an `assert`. A guard is only as broad as the registry it names
 - [Best-practices reference](reference-claude-best-practices.md) — rosmur claudecode-best-practices URL to apply
