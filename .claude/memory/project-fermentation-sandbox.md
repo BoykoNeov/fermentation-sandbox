@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-10T18:23:05.484Z
+  modified: 2026-08-11T11:49:23.309Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -23,14 +23,14 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   (**edit `TOPIC_RULES` if a new record buckets nowhere**). **File is LF.**
 - `docs/ARCHITECTURE.md` (seams); `docs/plans/milestone-*.md` ("Active beat: sensory" header is **STALE**, closed  at D-95/D-98); `CLAUDE.md` (prime directives + archive conventions).
 
-## Status (2026-08-10)
+## Status (2026-08-11)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-176**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
-**1540**. Wine **94 slots** / beer **45 compiled**, `quinone` in both regardless of set; **three** oxidative sets
+**D-178**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
+**1564**. Wine **94 slots** / beer **45 compiled**, `quinone` in both regardless of set; **three** oxidative sets
 (`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**, not building.
-**OPEN BEAT, owner-opened at D-176: beer's real acid-base** (malt phosphate; solver is ready — `ACID_STATE` is
-medium-agnostic BY DESIGN — but `mean_charge`/`neutral_fraction`/`bisulfite_fraction` **raise above diprotic**, so
-phosphate needs an n-protic branch **added beside**, never a rewrite of the 1/2-pKa branches: wine must stay bitwise).
+**BEAT IN PROGRESS — beer's acid-base, HALF SHIPPED at D-178** (n-protic branch + gate rename, below). Still to
+build: beer's acid STATE + scenario inputs + inverse-anchored `cation_charge`, the **peptide band**, the EtOAc
+apply. **`ACID_STATE` is medium-agnostic BY DESIGN**; adding to it grows `PKA_PARAM_NAMES`→`PH_SYSTEM_READS`.
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -267,6 +267,20 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   corner of TWO bands** (flips at **+3.6 % ethanol**; 0 of 180 members reach it), **never an impossibility**;
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
+
+**Beer acid-base (D-178) — half shipped; the PREMISE was wrong**
+- **NEVER re-propose malt phosphate as beer's buffer.** pKas **2.15/7.20** vs beer ~4.3 ⇒ charge **0.9867→0.9990
+  FLAT** over 4.0-4.6; 0.15 mEq/L/pH even at 700 mg/L vs organic acids' ~2.3 — and an **inverse anchor absorbs a
+  constant charge**, so it is a **near no-op, not a weak buffer**. Source questions it too. **Citrate** (triprotic,
+  2 pKas in range, source-NAMED) is why the n-protic branch exists. Pinned `test_acidbase_polyprotic.py` (17).
+- **Brewing's BC is a DIMENSIONLESS LOG RATIO, not mEq/L/pH** — that UNIT, not the paywall, is why **9 hosts
+  failed**. Open host = **Peyer 2017 UCC thesis, CORA `10468/4694`** (= the 402'd jib.447). Beer today **0.001**,
+  organic acids alone **~0.20**, published wort **1.18** ⇒ **peptides are the majority**; free amino acids ~10 %.
+- **n-protic dispatches at `len>=3` ONLY and is NOT bitwise BY DESIGN** — never route 1/2-pKa through it, never
+  delete the fast paths as duplication. **`EsterHydrolysis`'s gate is `"tartaric" in schema`** — the old
+  `cation_charge` "wine marker" would **CRASH** beer once beer has a cation. **EtOAc `pH_ref`=3.3, beer is ABOVE
+  it ⇒ 5-20× SLOWER, not faster** (my pre-reg had the sign inverted). **Succinic 36-166 vs ~900-3500 — never
+  average.** D-176's acetic [12,155]: IARC calls it ALE, Coote/Kirsop calls the same range LAGER — **transposed**.
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

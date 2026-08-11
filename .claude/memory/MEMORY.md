@@ -4,6 +4,7 @@
 - [Batch-end ritual](feedback-batch-end-ritual.md) — on batch/planning/session end: distilled status to memory, full entry to DECISIONS.md, commit + push
 - [Always commit + push](feedback-always-commit-push.md) — commit and push to main the moment work is done; never gate the commit on pytest/mypy/ruff
 - [Discuss disagreements](feedback-discuss-disagreements.md) — surface design disagreements before building; specs aren't gospel
+- [Closer to reality decides](feedback-closer-to-reality-decides.md) — never offer "hold it unchanged" as a peer to a more faithful option; ship the faithful one and record the size. A surprising magnitude means re-check the reasoning, not retreat
 - [Project: Fermentation Sandbox](project-fermentation-sandbox.md) — status + repo; M0/M1/M2 done, aging built, Milestone-3 at D-176 (beer acid-base = OPEN beat). **Read it before proposing any Milestone-3 work** — prohibitions + pointers; several closed axes read as unbuilt from outside. Archive: docs/DECISIONS.md
 - [Never pipe checks to tail](feedback-never-pipe-checks-to-tail.md) — `cmd | tail && ...` returns tail's exit 0 and hides ruff/pytest failures
 - [Full suite before "green"](feedback-full-suite-before-green.md) — a new Process in a shared registry breaks exact-set + end-to-end tests outside the domain suite; don't claim green until full pytest passes
