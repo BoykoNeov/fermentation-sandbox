@@ -87,6 +87,27 @@ evidence density -- and the highest-value guardrails are the ones that are nothi
 corrected values ("never re-narrow 0.084 to 0.08", "247 not 279"). It would have penalised
 precisely what must be retained.
 
+THE DETAIL FILES ARE MEASURED TOO, AND WHY THEY ARE NOT BOOT SURFACES (2026-08-12)
+----------------------------------------------------------------------------------
+D-185 split the project memory's per-subject prohibitions into `.claude/memory/prohibitions/`,
+reached BY PATH from a ledger in the core file. They carry no MEMORY.md row on purpose: an
+index row is the one thing that WOULD have made them cost boot tokens (6 rows ~= +4.9%, 18 ~=
++14.6% of the 27.8KB boot), and the user's stated worry was boot cost. So they are measured
+here but reported apart from the three boot surfaces, and the report says so.
+
+They get the SAME BLOCK_LINE_CAP as the file they came out of. Not because they are expensive
+-- they are not loaded until read -- but because the content is identical in kind, and an
+uncapped destination beside a capped source is the arbitrage this hook already exists to close
+(cf. the column-0 paragraph note on BLOCK_LINE_CAP). Every line moved across was already under
+the cap, so this is inert on arrival by construction; it binds on what is written next.
+
+What the split does NOT do is bound the number of records, and that was measured rather than
+assumed: growth lives in the SETTLED tail (entries citing records 40+ beats back went 0 -> 22,
+monotone, while the live frontier held steady at 6-17 across two months). A budget on that tail
+was designed and REJECTED -- reading all 22, every one is a live prohibition, so age does not
+measure settledness and the guard could never be satisfied. Granularity was the affordable fix;
+the tail is genuinely incompressible and is expected to keep growing.
+
 STILL NOT COVERED: the global ~/.claude/CLAUDE.md is a fourth boot surface, lives outside the
 repo, and is deliberately out of scope here. MEMORY.md is capped per ROW, so row COUNT
 remains an open channel -- 5 rows at 2026-06-23, 40 at 2026-08-11, +1 per record.
@@ -107,6 +128,10 @@ INDEX_NAME = "MEMORY.md"
 GUIDE_NAME = "CLAUDE.md"
 
 MEMORY_DIR = (".claude", "memory")
+
+# Per-subject prohibition detail, split out of the project memory at D-185 and reached by path
+# from its ledger. Measured, but NOT a boot surface -- see the docstring.
+DETAIL_DIR = "prohibitions"
 
 # One top-level block == one distilled record. Measured 2026-08-09 across the 49 bullets then
 # live: median 4 lines, 44 of 49 at or under 8. The five over were the five most recent beats
@@ -236,6 +261,21 @@ def collect(root: pathlib.Path) -> tuple[list[Finding], list[str]]:
             continue
         findings.extend(block_findings(name, text, cap) if cap else index_findings(text))
         reported.append(f"  {name}: {_shape(text)}")
+
+    # Reported APART from the three above: these are reached by path, never auto-loaded, so
+    # their lines are not boot cost. They still carry the block cap -- same content, and an
+    # uncapped destination beside a capped source is an arbitrage, not a relief valve.
+    detail = sorted((memory / DETAIL_DIR).glob("*.md")) if (memory / DETAIL_DIR).is_dir() else []
+    total = 0
+    for path in detail:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        findings.extend(block_findings(f"{DETAIL_DIR}/{path.name}", text, BLOCK_LINE_CAP))
+        total += len(text.splitlines())
+    if detail:
+        reported.append(f"  {DETAIL_DIR}/: {len(detail)} files, {total} lines (by path, NOT boot)")
     return findings, reported
 
 

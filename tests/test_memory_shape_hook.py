@@ -309,3 +309,51 @@ def test_report_is_capped_and_says_how_many_it_elided(
     assert f"{count + 1} finding(s)" in message  # + the fixture's long index row
     assert message.count("block is") == hook.MAX_REPORTED
     assert f"and {count + 1 - hook.MAX_REPORTED} more" in message
+
+
+# ------------------------------------------- the split-out detail files (D-185)
+
+
+def _detail(hook: ModuleType, repo: pathlib.Path, name: str, text: str) -> pathlib.Path:
+    directory = repo.joinpath(*hook.MEMORY_DIR, hook.DETAIL_DIR)
+    directory.mkdir(exist_ok=True)
+    (directory / name).write_text(text, encoding="utf-8")
+    return repo.joinpath(*hook.MEMORY_DIR, hook.PROJECT_NAME)
+
+
+def test_detail_files_carry_the_same_block_cap_as_their_source(
+    hook: ModuleType, repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An uncapped destination beside a capped source is an arbitrage, not a relief valve.
+
+    The whole point of the split is that prohibitions move house, not that they escape the
+    discipline -- so a narrative block must trip in ``prohibitions/`` exactly as it would in
+    the file it was carved out of.
+    """
+    target = _detail(hook, repo, "beer.md", _bullet(hook.BLOCK_LINE_CAP + 1))
+    message = _emit(hook, monkeypatch, target)["systemMessage"]
+    assert f"{hook.DETAIL_DIR}/beer.md" in message
+    assert f"block is {hook.BLOCK_LINE_CAP + 1} lines" in message
+
+
+def test_detail_files_are_reported_apart_from_the_boot_surfaces(
+    hook: ModuleType, repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Their lines are not boot cost -- they are reached by path and never auto-loaded.
+
+    Folding them into the boot totals would misreport the one number the split was chosen to
+    hold flat, so the report has to name them separately and say why.
+    """
+    target = _detail(hook, repo, "beer.md", _bullet(3))
+    _detail(hook, repo, "oxidation.md", _bullet(4))
+    message = _emit(hook, monkeypatch, target)["systemMessage"]
+    assert f"{hook.DETAIL_DIR}/: 2 files, 7 lines (by path, NOT boot)" in message
+
+
+def test_no_detail_directory_is_silent_rather_than_an_error(
+    hook: ModuleType, repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The hook predates the split and must keep working where nothing was ever split."""
+    target = repo.joinpath(*hook.MEMORY_DIR, hook.PROJECT_NAME)
+    message = _emit(hook, monkeypatch, target)["systemMessage"]
+    assert hook.DETAIL_DIR not in message
