@@ -149,13 +149,18 @@ M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O
 #: ``FUSEL_SPECS``, D-99), so there is no double-count between ``Byp`` (succinic) and those
 #: higher-alcohol pools.
 M_SUCCINIC = 4 * _M_C + 6 * _M_H + 4 * _M_O
-#: Acetic acid, C2H4O2 — the acid half of ethyl acetate's esterification equilibrium.
-#: **NOT a tracked pool**: under D-16 acetic acid has no state slot of its own, its carbon
-#: living in the ``Byp`` succinic stand-in above, which is exactly why D-127 shipped a
-#: FIXED ``ethyl_acetate_eq`` rather than a Berthelot equilibrium coupled to [acetic].
-#: The mass is here because the *provenance* of that fixed target is a stoichiometric
-#: conversion (acetic-as-ester → ethyl acetate) and a test recomputes it (D-158). It is
-#: deliberately absent from ``MOLAR_MASS`` below — there is no acetic pool to weigh.
+#: Acetic acid, C2H4O2 — the acid half of ethyl acetate's esterification equilibrium, and
+#: since D-179/D-180 a **tracked, produced BEER pool** in its own right.
+#:
+#: The comment here used to read "NOT a tracked pool … deliberately absent from ``MOLAR_MASS``
+#: below — there is no acetic pool to weigh", which was true under D-16 (acetic's carbon lived
+#: in the ``Byp`` succinic stand-in, which is why D-127 shipped a FIXED ``ethyl_acetate_eq``
+#: rather than a Berthelot equilibrium coupled to [acetic]). D-179 gave beer an ``acetic``
+#: state slot, but an INERT one — a dosed constant is invisible to a conservation *difference*,
+#: so no ledger weight was needed and none was added. **D-180 is what makes it load-bearing**:
+#: the acid is now produced from sugar carbon, so without an entry in ``MOLAR_MASS``/
+#: ``CARBON_ATOMS`` below the draw would read as carbon *destroyed*. Wine is unaffected —
+#: it carries no ``acetic`` slot.
 M_ACETIC = 2 * _M_C + 4 * _M_H + 2 * _M_O
 #: Ethyl acetate, C4H8O2 — the ``ethyl_acetate`` pool's own species (decision D-96: the
 #: pool *is* this molecule; before D-96 it stood in for a lumped ``esters`` pool whose OAV
@@ -525,6 +530,9 @@ MOLAR_MASS: dict[str, float] = {
     "CO2": M_CO2,
     "glycerol": M_GLYCEROL,
     "succinic_acid": M_SUCCINIC,
+    #: Acetic acid joined this registry at D-180, when beer's inert ``acetic`` slot
+    #: gained a producer and its carbon therefore had to be weighable. See ``M_ACETIC``.
+    "acetic_acid": M_ACETIC,
     "ethyl_acetate": M_ETHYL_ACETATE,
     "isoamyl_acetate": M_ISOAMYL_ACETATE,
     "ethyl_hexanoate": M_ETHYL_HEXANOATE,
@@ -606,6 +614,7 @@ CARBON_ATOMS: dict[str, int] = {
     "CO2": 1,
     "glycerol": 3,
     "succinic_acid": 4,
+    "acetic_acid": 2,
     "ethyl_acetate": 4,
     #: Isoamyl acetate (C7H14O2) carries SEVEN carbons and ethyl hexanoate (C8H16O2) EIGHT —
     #: each ester pool is weighted by its OWN molecule (decision D-96), so a liquid→gas strip
@@ -730,6 +739,7 @@ NITROGEN_ATOMS: dict[str, int] = {
     "CO2": 0,
     "glycerol": 0,
     "succinic_acid": 0,
+    "acetic_acid": 0,
     "ethyl_acetate": 0,
     "isoamyl_acetate": 0,
     "ethyl_hexanoate": 0,

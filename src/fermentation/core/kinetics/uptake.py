@@ -72,6 +72,9 @@ from fermentation.core.chemistry import (
     ethanol_yield,
     sugar_species,
 )
+from fermentation.core.kinetics.carbon_routing import (
+    fermentative_uptake_rates as _fermentative_uptake_rates,
+)
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -132,17 +135,12 @@ class SugarUptakeToEthanolCO2(Process):
             return d
 
         s_slice = schema.slice("S")
-        s_block = y[s_slice]
         species = sugar_species(schema)
-        # Clamp each slot to >= 0 *before* it enters a Monod term or a repression
-        # denominator: a small negative solver excursion would otherwise flip the
-        # uptake sign (creating sugar, driving E/CO2 negative). Mirrors the guards
-        # in GrowthNitrogenLimited.
-        s = [max(float(s_block[i]), 0.0) for i in range(len(species))]
+        # NB the per-slot clamp to >= 0 that keeps a small negative solver excursion from
+        # flipping the uptake sign (creating sugar, driving E/CO2 negative) now lives inside
+        # ``fermentative_uptake_rates`` with the rest of the rate arithmetic — it moved with
+        # the code it guards, so the two callers cannot guard differently.
 
-        q_max = params["q_sugar_max"]
-        k_su = params["K_sugar_uptake"]
-        k_rep = params["K_repression"]
         # Realised-yield byproduct diversion (decision D-16). Default 0 ⇒ the
         # theoretical Gay-Lussac core (togglable off). ``.get`` keeps hand-built
         # test param maps that predate these knobs working as the pure core.
@@ -166,15 +164,15 @@ class SugarUptakeToEthanolCO2(Process):
             gly_slice = schema.slice("Gly")
             byp_slice = schema.slice("Byp")
 
-        repression = 1.0  # the most-preferred sugar (slot 0) is never repressed
+        # The per-slot rates come from the shared helper (decision D-180) so the organic-acid
+        # producer books its yield against the SAME flux this Process ferments — see
+        # :func:`~fermentation.core.kinetics.carbon_routing.fermentative_uptake_rates` for why
+        # two callers must not each re-derive it. Extracted verbatim: bitwise unchanged.
+        rates = _fermentative_uptake_rates(y, schema, params)
         for i, sp in enumerate(species):
-            if i > 0:
-                # Suppress this sugar while the next-more-preferred one remains.
-                repression *= k_rep / (k_rep + s[i - 1])
-            s_i = s[i]
-            if s_i <= 0.0:
+            r_i = rates[i]  # g sugar_i /L/h
+            if r_i <= 0.0:
                 continue
-            r_i = q_max * x * (s_i / (k_su + s_i)) * repression  # g sugar_i /L/h
             d[s_slice.start + i] = -r_i
             if divert:
                 # Share of this sugar's carbon still fermented to ethanol+CO2.

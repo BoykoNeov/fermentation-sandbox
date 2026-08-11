@@ -123,6 +123,7 @@ from fermentation.core.kinetics import (
     MalolacticSenescence,
     OakExtraction,
     OenococcusDiacetylReduction,
+    OrganicAcidExcretion,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     PrecursorNonEhrlichFates,
@@ -2199,6 +2200,46 @@ _WINE_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
     ColemanQuadraticDeathTemperature,
 )
 
+#: Beer's yeast-produced organic acids (decision D-180) — the producer that turns beer's acid
+#: slots from a *composition* into a *fate*, and beer's pH from an input into a prediction.
+#:
+#: Kept in its own isolable tuple (prime directive #3) exactly like the dosed MLF organism and
+#: the opt-in autolysis pair, and for the same reason: the compile seam DISABLES it whenever a
+#: beer scenario names no ``initial_ph``. That is not tidiness, it is a correctness gate. The
+#: acid slots and the counter-cation opt in together (D-179) — absent ``initial_ph``, every
+#: slot is 0 and the charge balance is EMPTY, which
+#: :func:`~fermentation.core.acidbase.charge_balance_is_populated` reports as "this beverage
+#: does not claim a pH". Leaving the producer on would let such a beer fill those slots from
+#: sugar mid-run and thereby ACQUIRE a charge balance nothing supplied — an un-anchored beer
+#: would start aging against a pH it invented, which is the D-179 defect wearing a new hat.
+#: Disabled, an un-anchored beer stays byte-for-byte the pre-D-179 beer.
+_BEER_ORGANIC_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (OrganicAcidExcretion,)
+
+#: Beer growth/uptake Arrhenius modifiers (decision D-180). Identical to
+#: :data:`_PRIMARY_FERMENTATION_MODIFIERS` except the **uptake** Arrhenius also scales the
+#: organic-acid producer — the mirror image of wine's :data:`_WINE_FERMENTATION_MODIFIERS`,
+#: where it is the *growth* Arrhenius that gains an extra target for the amino-acid swap.
+#:
+#: CORRECTNESS COUPLING, the same one D-32 states for that swap. ``OrganicAcidExcretion``
+#: books a YIELD against the fermentative sugar flux, recomputing it from the shared
+#: :func:`~fermentation.core.kinetics.carbon_routing.fermentative_uptake_rates` helper — the
+#: *unmodified* rates. Uptake's own contribution is then scaled by this Arrhenius factor, so
+#: unless the producer is scaled by the identical factor its yield would be taken against a
+#: flux the solver never ran: a cold beer would ferment slowly while making acid at the warm
+#: rate, and g-acid-per-g-sugar would silently stop being a constant. Naming it here is what
+#: keeps the yield a yield at every temperature.
+#:
+#: Note the asymmetry with the fusel re-route, which is deliberately NOT a modifier target:
+#: that Process recomputes the *fusel* rate, which carries its own ``E_a_fusels`` and is
+#: scaled by nothing, so scaling its refund would break the draw it must match exactly. The
+#: rule in both cases is the same — track whatever flux you recompute, scaled the way that
+#: flux is actually scaled.
+_BEER_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
+    ArrheniusTemperature.for_growth,
+    lambda: ArrheniusTemperature.for_uptake(OrganicAcidExcretion.name),
+    ColemanQuadraticDeathTemperature,
+)
+
 
 #: The registry of known media. Adding a beverage family = adding an entry here
 #: (and, at the I/O boundary, an initial-composition vocabulary in
@@ -2383,8 +2424,9 @@ def _build_media(
                 + oxidative["beer"]
                 + _CARAMELIZATION_PROCESSES
                 + _OAK_PROCESSES
+                + _BEER_ORGANIC_ACID_PROCESSES
             ),
-            modifier_factories=_PRIMARY_FERMENTATION_MODIFIERS,
+            modifier_factories=_BEER_FERMENTATION_MODIFIERS,
         ),
     }
 

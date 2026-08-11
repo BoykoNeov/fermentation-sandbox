@@ -1,9 +1,24 @@
-# Beer's acid COMPOSITION — the levels the charge balance is dosed with (decision D-179).
+# Beer's acid COMPOSITION and PRODUCTION (decisions D-179, D-180).
 #
 # Companion to acidbase.yaml, which holds the pKa CONSTANTS. This file holds the sourced
 # CONCENTRATIONS: how much of each acid a beer actually carries. Split because they answer
 # different questions and re-source independently — a pKa is a property of the molecule, a
 # level is a property of the beverage.
+#
+# ================== WHAT D-180 CHANGED, AND WHY IT HAD TO ==================
+#
+# D-179 dosed the *_typical_beer levels below at t=0 and left every slot inert. That put a
+# FINISHED BEER's acid composition into a WORT, and it meant beer's pH could not fall during
+# fermentation the way a real beer's does. D-180 gives those slots a producer — so the seeds
+# had to move to WORT levels in the same beat, because a producer bolted onto finished-beer
+# seeds would land at roughly twice the measured beer (verified: pH 4.26, below any real beer).
+#
+# So this file now holds THREE kinds of number, and they must not be confused:
+#   *_typical_wort   the t=0 seed. What a wort carries.            (D-180, seeds the state)
+#   Y_*_sugar_beer   the production yield, g acid / g sugar.       (D-180, read by the Process)
+#   *_typical_beer   the FINISHED level. Read by NO Process — it is the documented target the
+#                    production is checked against, and the literature compilation that the
+#                    D-180 trial data is compared to. Kept deliberately; see its own block.
 #
 # SHARED, loaded universally like dms.yaml / closure.yaml / bound_sulfides.yaml (the names are
 # collision-free) but BEER-ONLY IN EFFECT: only beer's schema carries these slots and only
@@ -42,6 +57,24 @@
 #    cannot tell which is right), so this file uses Tyrell's assignment consistently with the
 #    rest of the table and flags the disagreement. Whichever way it goes it is a coin-flip on
 #    style, not an order of magnitude.
+
+# ======================================================================================
+# GROUP 1 — FINISHED-BEER levels. Read by NO Process since D-180 (they were the t=0 seeds
+# until then), so be clear about what still consumes them, because "kept for documentation"
+# is how a parameter rots:
+#
+#   tests/test_organic_acids.py::test_a_beer_seeded_at_finished_beer_levels_would_overshoot
+#
+# recomputes, from these values, the counterfactual that FORCED the seeds to move — producing
+# a ferment's worth of acid on top of an already-finished composition lands below any real
+# beer. Keeping them keeps that reason falsifiable instead of merely written down.
+#
+# They are NOT what the produced levels are checked against. That comparison uses Tyrell's own
+# EBC-tube day-7 measurements, which live in the test module: a DIFFERENT dataset from these,
+# which are Coote & Kirsop's literature COMPILATION (Table 1). The two disagree in places --
+# this beat's beers finish at ~118 mg/L acetic against Table 1's 22-107 ale range -- and that
+# disagreement is real and left standing, not averaged away.
+# ======================================================================================
 
 # -- Lactic acid ---------------------------------------------------------------
 lactic_typical_beer:
@@ -98,6 +131,186 @@ succinic_typical_beer:
     conditions: "finished beer, top-fermenting (ale)."
     notes: "Beer's succinic is a DOSED MEASURED INPUT in its own state slot, which is why it does not ride in the Byp succinic-equivalent lump the way wine's does: Byp is a PRODUCED pool (D-16) and beer has no producer for it, so folding a measured composition into an empty production lump would confuse a measurement with a fate. Two independent sources (Tyrell, Park) agree on this magnitude against one that does not -- recorded as an open conflict, deliberately not averaged."
 
+# ======================================================================================
+# GROUP 2 — THE WORT SEEDS and THE PRODUCTION YIELDS (decision D-180).
+#
+# ------------------------------- THE SOURCE -------------------------------
+#
+# The SAME paper as group 1, but a different and much better part of it. Tyrell et al. (2013)
+# did not only compile Table 1; they ran their own trials in 2 L EBC fermentation tubes on ONE
+# wort (12 degP Bavarian Pilsner malt extract, Weyermann; iso-alpha to 20 BU; pasteurised,
+# pitched at 15 degC) with FOUR yeast strains (their 6, 7, 15, 31), and reported:
+#
+#   * the concentration of every organic acid at days 0-7        (their Figs 6-14)
+#   * the pH and apparent extract of the SAME ferments           (their Fig 4)
+#
+# That matched pair is what makes this beat possible. The acid figures give both ends of the
+# difference -- wort AND beer, same wort, same trial -- so the yields are a measured DIFFERENCE
+# rather than two studies subtracted. And the pH curve is then a FREE PREDICTION: nothing below
+# is fitted to it, so comparing the modelled pH trajectory against Fig 4 is a real test.
+#
+# ------------------- EVERY NUMBER HERE IS A FIGURE READ -------------------
+#
+# Group 1's bands are PRINTED table ranges. These are not: they are read off plotted curves at
+# 520-600 dpi, and they must never acquire table-grade provenance downstream. Each entry states
+# its figure and its read tolerance (one gridline spacing / 10, i.e. +-1.5 to +-4 ppm).
+# The reads are archived with the rendered crops under
+# M:\claud_projects\temp\ferment\d180-beer-acid-production\.
+#
+# ------------------------ WHICH ACIDS GET A PRODUCER ------------------------
+#
+# Tyrell's own Table 2 classifies each acid's behaviour over the ferment. FOUR rise (acetic,
+# lactic, malic, succinic) and get a yield below. CITRIC DOES NOT, and that is sourced three
+# separate ways: their section 1.5 (citric "basically depends on concentrations of wort"),
+# Table 2 ("very slight increase over fermentation: final concentration mostly determined by
+# wort concentration"), and their Fig 12, whose four strains scatter +-20 ppm around the wort
+# value with no trend. So citrate keeps a wort seed and stays INERT. Do not give it a yield.
+#
+# THREE acids FALL over the ferment -- pyruvic 22->~1, formic 26->~5, oxalic 22->~5 ppm -- and
+# NONE of them is a beer state slot (D-179 refused pyruvic on a name collision with wine's
+# dynamic pyruvate pool; formic and oxalic were never shipped). The model therefore cannot lose
+# that anion charge, which makes its acid-driven acidification ONE-SIDED. This is sized, not
+# hidden: see the D-180 record. It is the larger half of why the predicted pH agrees as well as
+# it does -- do NOT read the agreement as validation of the produced acids alone.
+#
+# ------------------------- THE SUGAR DIVISOR -------------------------
+#
+# A yield needs the sugar its numerator was produced from, and Tyrell report extract, not sugar.
+# Derived once, here, so every yield below shares it:
+#
+#   apparent extract 12.35 -> 2.675 %w/w (Fig 4, mean of the four strains)
+#     => apparent attenuation           (12.35 - 2.675) / 12.35        = 0.78340
+#     => real attenuation               x 0.81                          = 0.63455
+#        ("Vw ~ Vs * 0.81", PRINTED in Craft Beers: Fortification, Processing and Production,
+#         section 3.7 "Real Attenuation" -- the standard Balling relation)
+#     => real extract fermented         0.63455 x 12.35 %w/w            = 7.8368 %w/w
+#     => at wort SG 1 + 0.004 x 12.35 = 1.0494                          = 82.24 g/L
+#
+#   SUGAR CONSUMED = 82.24 g/L. Every Y_* below is (beer - wort) mg/L / 1000 / 82.24.
+#
+# Two derived steps (the 0.81 and the SG linearisation) sit between the printed extract curve
+# and this number, so it is `plausible`, not `validated`, and each yield inherits that.
+#
+# ------------------------------ THE BANDS ------------------------------
+#
+# Nominal = the MEAN over the four strains and is therefore AUTHOR-CONSTRUCTED. Both band edges
+# are a single named strain's own measured delta, so unlike group 1's midpoint-nominal the
+# EDGES here are measurements [[feedback-pin-the-band-not-the-nominal]]. The band is real
+# biological spread -- Tyrell's whole paper is that strain choice moves succinic several-fold --
+# NOT a read uncertainty, which is ~10x smaller.
+# ======================================================================================
+
+# -- Wort seeds: what the wort carries at pitch --------------------------------
+#
+# ONE WORT, MEASURED ONCE. The band on each is the FIGURE READ TOLERANCE and nothing else. It
+# is NOT a between-wort band and must never be described as one: Tyrell's own section 1.2 says
+# malt organic acid content varies with "grain variety, fertilization, year, region, stage of
+# maturity, dryness and grain specific micro flora, as well as malting parameters" -- named as
+# large, quantified nowhere. So the reported spread from these four bands UNDERSTATES the real
+# wort-to-wort spread by an unknown factor. Widening them to guess at it would fabricate a
+# number; that is why they stay narrow and say so.
+
+lactic_typical_wort:
+  value: 0.048
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.046, high: 0.050, note: "READ TOLERANCE ONLY (+-2 ppm on a 20 ppm gridline), NOT a between-wort band -- see the group header. All four strains superimpose at day 0 in Fig 10, as they must: it is one wort." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 10 (lactic acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "12 degP Bavarian Pilsner malt-extract wort (Weyermann), 20 BU iso-alpha, pasteurised, at pitch (15 degC)."
+    notes: "Beer's lactic is roughly a third malt-derived and two thirds yeast-produced on this trial (48 ppm wort -> 87-142 ppm beer). That makes wine's and beer's same-named slot finally the same KIND of thing -- both partly produced -- though by different organisms (wine's is the MLF bacterium's, beer's the yeast's)."
+
+acetic_typical_wort:
+  value: 0.059
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.056, high: 0.062, note: "READ TOLERANCE ONLY (+-3 ppm on a 40 ppm gridline), NOT a between-wort band -- see the group header." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 13 (acetic acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "as lactic_typical_wort -- same wort, same trial."
+    notes: "DISTINCT from `acetic_acid_typical` (aging.yaml, D-176), which is the acetic level the ethyl-acetate Berthelot equilibrium reads per medium and is still a compile-time constant. D-180 makes beer's acetic a STATE that moves; the ester equilibrium does not yet read that state. Recorded as a live coupling, not closed here."
+
+citric_typical_wort:
+  value: 0.205
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.201, high: 0.209, note: "READ TOLERANCE ONLY (+-4 ppm on a 40 ppm gridline), NOT a between-wort band -- see the group header." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 12 (citric acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "as lactic_typical_wort -- same wort, same trial."
+    notes: "THE INERT ONE, and the only shipped acid with no yield -- sourced three ways (their 1.5, Table 2, and Fig 12's trendless +-20 ppm scatter). Still the triproticone that makes the n-protic branch (D-178) live, and still the second-largest organic-acid buffer term. NB this wort carries 205 ppm against Table 1's 56-158 ppm ale BEER range: a malt-extract wort is citrate-rich relative to that compilation, which is a wort difference, not a contradiction."
+
+malic_typical_wort:
+  value: 0.078
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.076, high: 0.080, note: "READ TOLERANCE ONLY (+-2 ppm on a 20 ppm gridline), NOT a between-wort band -- see the group header." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 9 (malic acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "as lactic_typical_wort -- same wort, same trial."
+    notes: "Mostly malt-derived: 78 ppm of a final 81-116. Its yield is correspondingly the smallest and the most strain-divided (strain 15 produces essentially none, strain 31 half as much again as the mean) -- Tyrell's own 3.2.1 reports exactly this and says they could not find a strain low in BOTH malic and succinic."
+
+succinic_typical_wort:
+  value: 0.015
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.0135, high: 0.0165, note: "READ TOLERANCE ONLY (+-1.5 ppm on a 20 ppm gridline), NOT a between-wort band -- see the group header." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 14 (succinic acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "as lactic_typical_wort -- same wort, same trial."
+    notes: "THE MOST NEARLY-PURE FERMENTATION PRODUCT of the five: 15 ppm in the wort against 32-76 in the beers, so ~70-80 % of a beer's succinic is made during fermentation. This is the acid Tyrell's whole paper is about."
+
+# -- Production yields: g acid formed per g sugar fermented ---------------------
+#
+# Read by OrganicAcidExcretion (core/kinetics/organic_acids.py). Beer-only in effect: no wine
+# Process declares them, so they are never drawn for a wine ensemble.
+#
+# THE FOUR TOGETHER DIVERT 2.435e-3 g/g -- about 1/5 of wine's single Y_byproduct_sugar (0.012)
+# and ~0.24 % of the sugar. That is why they are routed as an EXTRA sliver off S (the D-19
+# byproduct idiom) rather than through uptake's D-16 yields: the D-16 route rescales the
+# ethanol/CO2 split and would move beer's CO2-ratio benchmark, while this route leaves
+# dX/dN/dE/dCO2 byte-for-byte identical.
+
+Y_acetic_sugar_beer:
+  value: 0.000714383
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.000559346, high: 0.0008147, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DELTA: low = strain 6 (+46 ppm), high = strain 7 (+67 ppm), over Tyrell's four EBC-tube strains. Nominal = the four-strain MEAN and is AUTHOR-CONSTRUCTED. Strain spread, not read uncertainty (which is ~10x smaller)." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 13 (day 0 vs day 7) over the sugar divisor derived in this file's group-2 header. FIGURE READ."
+    conditions: "12 degP malt-extract wort, 15 degC, 4 strains, 7 days to a flat extract; yield taken over the whole ferment."
+    notes: "THE SHAPE IS WRONG AND THE SIZE IS RIGHT -- state both. Acetic is the one acid with a strong TRANSIENT: it PEAKS at ~200 ppm around day 2 (3.4x the wort level) and falls back to 105-126 by day 7, because yeast re-assimilate it (Tyrell Table 2: '++' at lower Krausen, '-' at collapse). A flux-linked monotone producer reproduces the day-7 endpoint by construction and DROPS that peak entirely, exactly as keto_acids.py's flux-linked pyruvate drops its own mid-ferment peak-then-decline. Modelling it needs an excretion/re-assimilation PAIR on the keto-acid template; deliberately not built here on one dataset."
+
+Y_lactic_sugar_beer:
+  value: 0.000863339
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.000474228, high: 0.00114301, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DELTA: low = strain 15 (+39 ppm), high = strain 6 (+94 ppm). Nominal = the four-strain MEAN, AUTHOR-CONSTRUCTED. A 2.4x strain spread -- the widest of the four." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 10 (day 0 vs day 7) over the sugar divisor derived in this file's group-2 header. FIGURE READ."
+    conditions: "as Y_acetic_sugar_beer -- same wort, same trial, same divisor."
+    notes: "THE WORST SHAPE FIT OF THE FOUR. Lactic is flat until day 2 and rises hardest between days 2 and 7 (Table 2: 'increase from high Krausen state on'), i.e. it is still climbing after the extract curve has gone flat. A flux-linked producer makes it EARLY instead, and stops when sugar does. Tyrell name the candidate mechanism themselves -- 'a rising amount of dead cells towards the end of fermentation may increase perhaps organic acid concentration in beer due to yeast autolysis' -- and this engine already has an autolysis Process, so a later beat has a route. Not taken here: one dataset cannot separate a late excretion from an autolytic release."
+
+Y_succinic_sugar_beer:
+  value: 0.000562386
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.000206715, high: 0.000741742, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DELTA: low = strain 7 (+17 ppm), high = strain 15 (+61 ppm). Nominal = the four-strain MEAN, AUTHOR-CONSTRUCTED. A 3.6x strain spread -- and finding it is the entire point of the source paper." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 14 (day 0 vs day 7) over the sugar divisor derived in this file's group-2 header. FIGURE READ."
+    conditions: "as Y_acetic_sugar_beer -- same wort, same trial, same divisor."
+    notes: "THE OPEN ~25x CONFLICT CHANGES CHARACTER HERE, and that is worth stating where the number lives. As a composition (succinic_typical_beer) the disagreement between Tyrell/Park's 36-166 mg/L and the ~900-3500 mg/L D-176 flagged on D-16 was inert -- a dosed level nothing read. As a YIELD it is a CARBON-FLUX claim: 900-3500 mg/L over this divisor is 0.011-0.043 g/g, i.e. up to 3.5x wine's ENTIRE byproduct diversion for a single acid, which would be visible in attenuation and in the carbon ledger. This entry ships the two-source (Tyrell + Park) magnitude and the band does NOT span the conflict -- widening it would fabricate a continuum between disjoint claims (the D-103 precedent). The conflict is now falsifiable, which it was not before."
+
+Y_malic_sugar_beer:
+  value: 0.000294873
+  unit: "g/g"
+  tier: plausible
+  uncertainty: { low: 0.0000364791, high: 0.000462069, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DELTA: low = strain 15 (+3 ppm, i.e. essentially no production), high = strain 31 (+38 ppm). Nominal = the four-strain MEAN, AUTHOR-CONSTRUCTED. The low edge is NEAR ZERO ON PURPOSE: one of Tyrell's four strains genuinely does not make malic, so a sampler draw near this edge is a real yeast, not a degenerate corner." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 9 (day 0 vs day 7) over the sugar divisor derived in this file's group-2 header. FIGURE READ."
+    conditions: "as Y_acetic_sugar_beer -- same wort, same trial, same divisor."
+    notes: "The smallest of the four and the only one whose band nearly reaches zero. Same molecule as wine's MLF SUBSTRATE, and the direction is opposite: wine's malic is consumed by Oenococcus, beer's is made by the yeast. Beer still wires no malolactic Process, so nothing consumes it here."
+
 # -- The lumped peptide/polypeptide buffer capacity -----------------------------
 #
 # THE ONE PARAMETER THAT CARRIES BEER'S ACTUAL BUFFERING, and the one with the weakest
@@ -110,25 +323,49 @@ succinic_typical_beer:
 # inverse-anchoring shape one level up: absorb an unknown into a single term back-solved from
 # a measurement, and claim predicted CHANGES rather than the absolute.
 #
-# WHY IT IS WELL-CONDITIONED: across the whole sourced pKa window the back-solve barely moves
-# -- 10.75 mM at pKa 3.86, 10.28 at 4.25, 10.45 at 4.50, a 5% spread. The capacity is fixed by
-# the MEASUREMENT, not by the assumption.
+# RE-ANCHORED AT D-180 -- 1.5125 -> 1.6708 g/L, +10.5 %. NOT a re-fit and not a correction of
+# arithmetic: the identical back-solve, run over the WORT acid table (group 2) instead of the
+# FINISHED-BEER one. Peyer's BC = 1.18 is a measurement ON WORT, so fitting it on top of beer's
+# acids was mismatch #3 of the three this block already admitted to, and D-180 is the first
+# moment a wort acid table existed to close it. One of the three stacked mismatches is
+# therefore GONE; the other two (below) stand.
 #
-# WHY IT IS STILL SPECULATIVE -- three stacked mismatches, none of them hidden:
+# ITS EFFECT IS SMALL AND WAS MEASURED SEPARATELY, not bundled with the seed change it shipped
+# beside: more buffering means LESS acidification, so it works AGAINST the beat's headline. On
+# the D-180 reference ferment the predicted pH drop is 0.6361 at the old capacity and 0.6165 at
+# the new one -- the re-anchor costs 0.020 pH units, ~3 % of the drop. Measuring the two changes
+# apart is what makes the headline attributable [[feedback-pair-the-red-with-an-ordering-preserving-baseline]].
+#
+# WHY IT IS WELL-CONDITIONED: across the whole sourced pKa window the back-solve barely moves
+# -- on the wort table, 11.87 mM at pKa 3.86, 11.36 at 4.25, 11.55 at 4.50, a 4.5 % spread
+# (it was 10.75 / 10.28 / 10.45 on the beer table). The capacity is fixed by the MEASUREMENT,
+# not by the assumption, and that stays true under the D-180 re-anchor.
+#
+# WHY IT IS STILL SPECULATIVE -- two stacked mismatches (was three; D-180 closed one):
 #   1. THE FIT IS BLIND TO THE FRAME THAT BINDS. It is anchored at wort pH 5.5. At BEER's pH
 #      4.4 the identical fitted solutions give BC from 0.32 to 0.59 depending on where in the
 #      pKa window the pKa sits -- a factor of ~1.9 that the fit does not constrain at all.
+#      D-180 makes this WORSE, not better, and that must be said plainly: a static beer sat at
+#      one pH, so the un-constrained factor applied at one point. A D-180 beer TRAVERSES from
+#      wort pH 5.5-5.65 down to ~4.9-5.1, so the term is now asked to buffer correctly across
+#      the entire span, which is precisely the job it was never validated for
+#      [[feedback-validate-calibrations-in-the-frame-that-binds]]. It is also why the peptide
+#      pKa -- not any acid yield -- is the parameter that MOVES the predicted pH drop most
+#      (0.514 to 0.744 pH units across its band, i.e. 63-92 % of the measured 0.8125; see the
+#      D-180 record).
 #   2. 1.18 IS WORT, NOT BEER. No published BC for finished beer was found at any host.
-#   3. THE ACID TABLE FITTED ALONGSIDE IS BEER's. Wort carries malt-derived citrate/malate but
-#      none of the fermentation acids, so the two acid populations are not the same.
-# So this is a well-conditioned back-solve against a MIS-MATCHED target, which is a weaker and
-# different claim from "beer's peptide buffer is 10.3 mM".
+#   3. CLOSED AT D-180. The acid table fitted alongside was BEER's, against a WORT measurement;
+#      it is now the wort table. Kept in the list, struck through rather than deleted, so that
+#      a reader of the D-179 record can see what happened to it.
+# So this is a well-conditioned back-solve against a target that is still mismatched in pH but
+# no longer in composition -- a weaker and different claim from "beer's peptide buffer is
+# 11.4 mM".
 #
 # WHY THIS BAND IS PINNED ZERO-WIDTH, AND WHY THAT IS THE HONEST CHOICE RATHER THAN A DODGE:
 #
 # The capacity and the pKa are NOT INDEPENDENT. The capacity is a FUNCTION of the pKa via the
 # back-solve -- each assumed pKa has exactly one capacity that reproduces BC = 1.18 (3.86 ->
-# 10.75 mM, 4.25 -> 10.28, 4.50 -> 10.45). The ensemble sampler draws every banded parameter
+# 11.87 mM, 4.25 -> 11.36, 4.50 -> 11.55). The ensemble sampler draws every banded parameter
 # independently, so giving BOTH a band would generate pairs like (pKa 3.86, capacity 10.28)
 # that reproduce NO measurement at all -- a wider reported spread built out of combinations
 # the calibration excludes. Banding the free variable and pinning the derived one is the only
@@ -143,11 +380,11 @@ succinic_typical_beer:
 # zero-width short-circuit), so this pin does NOT narrow the reported beer spread -- the pKa
 # band still moves it. Do not "restore" a band here without also making the pair sample jointly.
 peptide_buffer_capacity_beer:
-  value: 1.5125
+  value: 1.6707620638415932
   unit: "g/L"
   tier: speculative
-  uncertainty: { low: 1.5125, high: 1.5125, note: "PINNED zero-width, and deliberately -- see the block above. The capacity is DERIVED from pKa_peptide_buffer by the back-solve, not independently uncertain, so its uncertainty is carried by that pKa's band instead of duplicated here. The value is the 10.28 mM that pairs with the nominal pKa 4.25, converted at glutamate's 147.13 g/mol. NB it would otherwise sit exactly ON the low edge of the 10.28-10.75 mM range, which is the un-classifiable case tests/test_switch_site_census.py guards against." }
+  uncertainty: { low: 1.6707620638415932, high: 1.6707620638415932, note: "PINNED zero-width, and deliberately -- see the block above. The capacity is DERIVED from pKa_peptide_buffer by the back-solve, not independently uncertain, so its uncertainty is carried by that pKa's band instead of duplicated here. The value is the 11.36 mM that pairs with the nominal pKa 4.25, converted at glutamate's 147.13 g/mol. Carried at FULL PRECISION on purpose: it is a root of the back-solve, and a rounded copy would make the BC = 1.18 round-trip test pass only to a tolerance rather than exactly (the D-154 '663 vs 662.802522' lesson)." }
   provenance:
     source: "Back-solved against the published wort buffering capacity BC = 1.18 reported by Peyer, L. (2017), PhD thesis, University College Cork, CORA handle 10468/4694, sections 5.3.4 (the BC definition and titration protocol) and 5.4.3 / abstract (the measured values: 0.94 at mash-in, 1.18 control wort, 1.21 post-boil, 1.24 with added protease, 1.34 max over the proteolytic rest)."
-    conditions: "back-solved at wort pH 5.5 on top of the Tyrell ale-mid organic acids above, using Peyer's own fast-BC protocol reproduced on this engine's charge balance. Applied at BEER pH (~4.0-4.6), which is NOT the pH it was fitted at."
-    notes: "tier=SPECULATIVE for the three stacked mismatches in the header block, the first of which is the decisive one: solved in a frame that does not bind [[feedback-validate-calibrations-in-the-frame-that-binds]]. Represented as glutamate-equivalent monoprotic buffering SITES (see M_GLUTAMIC in core/chemistry.py), off every ledger -- beer's protein is untracked as carbon and nitrogen alike, so this pool perturbs no conservation sum. It is also the parameter that makes beer's pH tier speculative; acidbase.ph_tier is scoped per medium (D-179) so that this does not drag WINE's pH tier down for a pool wine does not carry."
+    conditions: "back-solved at wort pH 5.5 on top of the *_typical_wort organic acids above (decision D-180; it was the finished-beer table until then), using Peyer's own fast-BC protocol reproduced on this engine's charge balance. Applied from wort pH down through beer pH (~4.9-5.1), which SPANS rather than sits at the pH it was fitted at."
+    notes: "tier=SPECULATIVE for the two remaining stacked mismatches in the header block, the first of which is the decisive one and which D-180 made harder rather than easier: solved at one pH, now asked to buffer across a traverse [[feedback-validate-calibrations-in-the-frame-that-binds]]. Represented as glutamate-equivalent monoprotic buffering SITES (see M_GLUTAMIC in core/chemistry.py), off every ledger -- beer's protein is untracked as carbon and nitrogen alike, so this pool perturbs no conservation sum. It is also the parameter that makes beer's pH tier speculative; acidbase.ph_tier is scoped per medium (D-179) so that this does not drag WINE's pH tier down for a pool wine does not carry. Since D-180 it is additionally the single parameter the predicted pH DROP is most sensitive to -- 0.514 to 0.744 units across pKa_peptide_buffer's band, against a measured 0.75-0.87 -- so a test of that drop must be built to the band, never to this nominal."

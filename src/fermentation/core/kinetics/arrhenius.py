@@ -144,11 +144,19 @@ class ArrheniusTemperature(RateModifier):
         )
 
     @classmethod
-    def for_uptake(cls) -> ArrheniusTemperature:
-        """Arrhenius scaling of the fermentative sugar-uptake flux (reads ``E_a_uptake``)."""
+    def for_uptake(cls, *also_scales: str) -> ArrheniusTemperature:
+        """Arrhenius scaling of the fermentative sugar-uptake flux (reads ``E_a_uptake``).
+
+        ``also_scales`` names further Processes that must carry the *identical* factor because
+        they recompute the uptake flux rather than adding one of their own — beer's
+        ``OrganicAcidExcretion`` (decision D-180), which books a yield per gram of sugar
+        fermented and would otherwise take that yield against a flux the solver never ran. The
+        same extra-target mechanism ``for_growth`` has carried since D-32 for the amino-acid
+        swap; see :data:`~fermentation.core.media._BEER_FERMENTATION_MODIFIERS`.
+        """
         return cls(
             name="arrhenius_uptake",
-            modifies=SugarUptakeToEthanolCO2.name,
+            modifies=(SugarUptakeToEthanolCO2.name, *also_scales),
             activation_energy="E_a_uptake",
         )
 

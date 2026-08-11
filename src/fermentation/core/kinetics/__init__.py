@@ -101,6 +101,13 @@ from fermentation.core.kinetics.malolactic import (
     malolactic_toxicity_gate,
 )
 from fermentation.core.kinetics.mercaptans import AutolyticMercaptan
+from fermentation.core.kinetics.organic_acids import (
+    ORGANIC_ACID_SPECS,
+    OrganicAcidExcretion,
+    OrganicAcidSpec,
+    organic_acid_carbon_draw,
+    organic_acid_rates,
+)
 from fermentation.core.kinetics.oxidative_cascade import (
     OxygenActivation,
     PeroxideEthanolOxidation,
@@ -171,6 +178,7 @@ __all__ = [
     "BoundMethanethiolRelease",
     "ClosureOxygenIngress",
     "SotolonAldolCondensation",
+    "ORGANIC_ACID_SPECS",
     "OakExtraction",
     "OxidativeAcetaldehyde",
     "PhenolicBrowning",
@@ -201,6 +209,8 @@ __all__ = [
     "MalolacticGrowth",
     "MalolacticSenescence",
     "OenococcusDiacetylReduction",
+    "OrganicAcidExcretion",
+    "OrganicAcidSpec",
     "PyruvateExcretion",
     "PyruvateReassimilation",
     "SugarUptakeToEthanolCO2",
@@ -219,6 +229,8 @@ __all__ = [
     "fusel_rate_shape",
     "iso_alpha_fraction",
     "malolactic_environmental_gate",
+    "organic_acid_carbon_draw",
+    "organic_acid_rates",
     "malolactic_fatty_acid_gate",
     "malolactic_toxicity_gate",
 ]

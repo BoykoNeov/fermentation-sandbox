@@ -22,6 +22,7 @@ carbon ledger, the OAV aroma set), so a fourth ester is *one entry*, not a new c
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
@@ -623,6 +624,57 @@ def refund_carbon_to_sugar(
     for i in range(len(species)):
         if s[i] > 0.0:
             d[s_slice.start + i] += carbon * s[i] / carbon_total
+
+
+def fermentative_uptake_rates(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+) -> list[float]:
+    """Per-slot fermentative sugar-uptake rate ``r_i`` [g sugar_i /L/h] (decision D-180).
+
+    ``q_sugar_max · X · s_i/(K_sugar_uptake + s_i) · repression_i``, where the sequential
+    repression term is the running product ``Π_{j<i} K_repression/(K_repression + s_j)`` that
+    holds beer's maltose back while glucose remains (wine's single slot never enters it).
+    Returns one entry per sugar slot, ``0.0`` for a slot that is empty or negative.
+
+    **This exists as a shared helper for one reason: two callers must not each re-derive it.**
+    :class:`~fermentation.core.kinetics.uptake.SugarUptakeToEthanolCO2` consumes these rates to
+    make ethanol and CO₂; :class:`~fermentation.core.kinetics.organic_acids.OrganicAcidExcretion`
+    consumes the *same* rates to book a yield of organic acid per gram of sugar fermented. A
+    yield is only a yield if its denominator is the flux that actually ran — so the moment the
+    two arithmetics diverge, the yield silently stops being one. That is exactly the drift D-106
+    caught (two callers "computing the same thing" agreed by luck until one changed) and the
+    same one-helper discipline D-33/D-99 apply to the fusel draw and its refund.
+
+    Extracted from the uptake Process verbatim, in its original operation order, so uptake's
+    trajectories stay **bitwise** unchanged — pinned by
+    ``tests/test_organic_acids.py::test_uptake_rates_helper_is_bitwise_the_uptake_process``.
+
+    NB these are the UNMODIFIED rates. Every :class:`~fermentation.core.process.RateModifier`
+    that scales uptake (the uptake Arrhenius) must also name any Process built on this helper,
+    or the acid yield would be taken against a flux the solver never ran — the D-32
+    correctness coupling, in the form it takes here.
+    """
+    x = float(y[schema.slice("X")][0])
+    species = sugar_species(schema)
+    if x <= 0.0:
+        return [0.0] * len(species)
+    s_block = y[schema.slice("S")]
+    s = [max(float(s_block[i]), 0.0) for i in range(len(species))]
+    q_max = params["q_sugar_max"]
+    k_su = params["K_sugar_uptake"]
+    k_rep = params["K_repression"]
+
+    rates = [0.0] * len(species)
+    repression = 1.0  # the most-preferred sugar (slot 0) is never repressed
+    for i in range(len(species)):
+        if i > 0:
+            # Suppress this sugar while the next-more-preferred one remains.
+            repression *= k_rep / (k_rep + s[i - 1])
+        s_i = s[i]
+        if s_i <= 0.0:
+            continue
+        rates[i] = q_max * x * (s_i / (k_su + s_i)) * repression
+    return rates
 
 
 def fermentative_flux_shape(y: FloatArray, schema: StateSchema, k_sat: float) -> float:

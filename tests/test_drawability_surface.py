@@ -221,13 +221,22 @@ def test_forcing_an_oak_yield_band_into_the_sample_cannot_move_the_run():
     """Half 2 — drawn across its band, ``oak_yield_vanillin_medium`` changes nothing.
 
     The measured half of D-157's cleanest evidence: firing the intervention verbs left the
-    drawn count unchanged at 152 of 247 (**246 since D-172**, which retired three varying
-    bands and added two; the drawn count is unaffected because none of the five is drawn by
-    this un-aged scenario). The verb reads ``.value`` off the ParameterSet at compile time,
-    so the per-member draw never reaches it.
+    drawn count unchanged at 152 of 247. The verb reads ``.value`` off the ParameterSet at
+    compile time, so the per-member draw never reaches it.
+
+    **The DENOMINATOR moves with every banded parameter the archive adds, and it is prose.**
+    247 at D-157 → 246 at D-172 (three varying bands retired, two added) → 257 at D-179 (beer's
+    five pKas) → **266 at D-180** (five ``*_typical_wort`` seeds and four ``Y_*_sugar_beer``
+    yields; ``peptide_buffer_capacity_beer`` stays pinned zero-width and so is still not
+    counted). The 152 is unaffected each time, because none of the added names is drawn by this
+    un-aged scenario.
 
     NOTE these are PROSE, not asserts, which is why retiring three parameters turned nothing
-    red — recorded as a live gap in the surface guards at D-172 §8.
+    red — recorded as a live gap in the surface guards at D-172 §8 and STILL OPEN. So the
+    number above is only as current as the last person who re-ran the count: **re-measure it,
+    do not cite it.** Deliberately not converted to an assertion here — pinning it would fire
+    on every future parameter addition regardless of relevance, which is a chore rather than a
+    guard, and D-172 §8's gap is about the surface tests generally, not this one line.
     """
     compiled = compile_scenario(_scenario())
     ensemble = _forced(compiled, "oak_yield_vanillin_medium")

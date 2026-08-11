@@ -66,6 +66,7 @@ from fermentation.core.kinetics import (
     MalolacticSenescence,
     OakExtraction,
     OenococcusDiacetylReduction,
+    OrganicAcidExcretion,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     PrecursorNonEhrlichFates,
@@ -774,12 +775,25 @@ def _wine_initial(
 #: system is opted into (decision D-179). Slot → (scenario override key, parameter name).
 #: Ordered so the back-solve below is deterministic. ``peptide_buffer`` rides in the same
 #: table because it enters the charge balance identically — it is simply not an organic acid.
+#:
+#: **These are WORT levels since D-180, and that change was forced, not chosen.** Until then
+#: they were the ``*_typical_beer`` levels — a FINISHED BEER's acid composition dosed into a
+#: wort at pitch, which was harmless only for as long as nothing produced acid. D-180 gives
+#: four of these slots a producer, and a producer on top of finished-beer seeds finishes at
+#: roughly twice the measured beer (verified: pH 4.26, below any real beer). So "give beer an
+#: acid producer" and "start beer from a wort" are one decision.
+#:
+#: ``initial_ph``'s own contract is UNCHANGED — it still means "reproduce this pH at t=0". What
+#: changed is which pH a caller should hand it: a beer scenario compiles at PITCH, so the
+#: physical input is now the wort pH (~5.4-5.7), not the finished beer's, and the finished
+#: beer's pH becomes an OUTPUT. A scenario that still passes 4.4 is not an error and is not
+#: rejected — it describes a wort that is already at beer pH, and it will finish lower still.
 _BEER_ACID_SEEDS: tuple[tuple[str, str, str], ...] = (
-    ("lactic", "lactic_gpl", "lactic_typical_beer"),
-    ("acetic", "acetic_gpl", "acetic_typical_beer"),
-    ("citrate", "citric_gpl", "citric_typical_beer"),
-    ("malic", "malic_gpl", "malic_typical_beer"),
-    ("succinic", "succinic_gpl", "succinic_typical_beer"),
+    ("lactic", "lactic_gpl", "lactic_typical_wort"),
+    ("acetic", "acetic_gpl", "acetic_typical_wort"),
+    ("citrate", "citric_gpl", "citric_typical_wort"),
+    ("malic", "malic_gpl", "malic_typical_wort"),
+    ("succinic", "succinic_gpl", "succinic_typical_wort"),
     ("peptide_buffer", "peptide_buffer_gpl", "peptide_buffer_capacity_beer"),
 )
 
@@ -2454,6 +2468,23 @@ def compile_scenario(
     pof_positive = float(scenario.initial.get("pof_positive", 0.0) or 0.0)
     if pof_positive <= 0.0 and YeastPOFDecarboxylation.name in process_set:
         process_set.disable(YeastPOFDecarboxylation.name)
+
+    # Beer's organic-acid producer (decision D-180) rides the SAME opt-in gate as the acid
+    # slots it fills — ``initial_ph``, D-179's gate for beer's whole pH system. Absent ⇒
+    # DISABLE, and this one is a correctness gate rather than the usual tier/cost argument.
+    #
+    # Without ``initial_ph`` every acid slot AND the counter-cation are 0, which is an EMPTY
+    # charge balance — the state ``acidbase.charge_balance_is_populated`` reports as "this
+    # beverage does not claim a pH", so that the aging rate laws hold their pH factor at 1
+    # instead of aging against pure water's 7.0 (the defect D-179 shipped an amendment for).
+    # An ENABLED producer would fill those slots from sugar carbon as the ferment ran, so a
+    # beer that supplied no pH would ACQUIRE a populated charge balance mid-run and start
+    # aging against a pH nobody gave it. That is the same defect wearing a producer's hat, and
+    # it would arrive silently — the run stays green, the number just becomes fiction.
+    # Disabled, an un-anchored beer is byte-for-byte the pre-D-179 beer, and the empty acid
+    # slots keep their tier (``tier_of`` counts enabled, not nonzero, Processes).
+    if OrganicAcidExcretion.name in process_set and "initial_ph" not in scenario.initial:
+        process_set.disable(OrganicAcidExcretion.name)
 
     # Residual-nitrogen floor (decision D-30): the biomass carrying-capacity cap is a
     # deliberate DEPARTURE from the validated Coleman anchor (which caps nothing and strips

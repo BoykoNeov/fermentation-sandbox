@@ -1260,6 +1260,16 @@ def test_beer_ethyl_acetate_lingers_when_the_charge_balance_is_populated():
     the RATE is ~12.6x slower, but the pool relaxes toward a floor, so the end-of-aging ester
     is ~2x higher, not ~12x. Pinned loosely (a ratio window) because the exact value rides
     several speculative aging parameters.
+
+    **D-180 moved this number from 2.03x to 1.73x, and the reason is worth recording rather
+    than absorbing.** This arm passes ``initial_ph=4.4`` — a BEER pH — to a scenario that
+    compiles at PITCH on 100 g/L of wort sugar. Under D-179 that also dosed a finished beer's
+    acid levels at t=0; under D-180 the seeds are WORT levels, so the same 4.4 anchor is now
+    reached with a smaller acid load and a smaller counter-cation, and the producer then drives
+    the pH down to ~4.23 over the ferment. The window was NOT widened to accommodate that: 1.73
+    was already inside it. The scenario is left describing a wort that starts at beer pH, which
+    is unusual but not an error, because what this test pins is the ANCHORED-vs-UNANCHORED
+    contrast, and changing its inputs would change what it contrasts.
     """
     from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 

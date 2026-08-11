@@ -237,6 +237,25 @@ def total_carbon(
     # so it is a carbon term only — like malic/lactic, weighted here for the conversion.
     if "citrate" in schema:
         w[schema.slice("citrate")] = carbon_mass_fraction("citric_acid")
+    # Beer's own two acid slots (decision D-179 added them, D-180 made them matter). While
+    # every beer acid was an INERT dosed input these two needed no weight at all: a constant
+    # term is invisible to a conservation *difference*, and malic/lactic/citrate above were
+    # already weighted for wine's sake. D-180 gives acetic/lactic/succinic/malic a producer
+    # that routes their carbon OUT OF ``S`` (the D-19 idiom), so an unweighted pool would make
+    # that draw read as carbon destroyed. ``acetic`` is why ``acetic_acid`` entered
+    # ``MOLAR_MASS``/``CARBON_ATOMS`` at D-180 — it had been deliberately excluded on the
+    # grounds that no acetic pool existed to weigh.
+    #
+    # NO DOUBLE-COUNT WITH ``Byp``, and it is worth saying exactly why rather than trusting it:
+    # ``Byp`` is weighted at succinic acid's fraction above as a *produced lump*, and beer's
+    # ``succinic`` is a *separate pool*. They would double-count only if beer produced both,
+    # which is precisely what beer's ``Y_byproduct_sugar = 0`` prevents — a constraint that is
+    # load-bearing on the charge balance too (``BYP_AS_SUCCINIC``) and is pinned by
+    # ``tests/test_organic_acids.py``.
+    if "acetic" in schema:
+        w[schema.slice("acetic")] = carbon_mass_fraction("acetic_acid")
+    if "succinic" in schema:
+        w[schema.slice("succinic")] = carbon_mass_fraction("succinic_acid")
     # Amino-acid pool (decision D-32): a dosed, carbon- AND nitrogen-bearing wine pool. The
     # AminoAcidAssimilation swap debits it and refunds the displaced biomass carbon to sugar
     # and the displaced biomass nitrogen to ``N`` — a pure carbon/nitrogen-neutral transfer

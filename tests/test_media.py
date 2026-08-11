@@ -700,6 +700,15 @@ OXIDATIVE_CASCADE_WINE = {
 # sub-axis, so it swaps with the oxidative alternative (to quinone_ellagitannin_oxidation) while
 # oak_extraction, which draws no oxidant at all, is wired unconditionally.
 OAK_PROCESSES = {"oak_extraction"}
+
+# Beer's yeast-produced organic acids (decision D-180): the producer that turns beer's D-179
+# acid slots from a dosed composition into a fate, and beer's pH from an input into a
+# prediction. BEER-ONLY, and the asymmetry is the point -- wine's acids are a must composition
+# plus the MLF conversion, and no wine Process reads these yields, so a wine ensemble never
+# draws them. Wired unconditionally into the medium and DISABLED at the compile seam whenever a
+# scenario names no ``initial_ph`` (the D-179 pH-system gate), which is why it appears here in
+# the medium's full set but not in a compiled un-anchored beer.
+BEER_ORGANIC_ACID_PROCESSES = {"organic_acid_excretion"}
 # WINE-ONLY, NON-oxidative aging (D-79): tannin_anthocyanin_condensation condenses the two GRAPE
 # pools (anthocyanin + condensed tannin) into stable polymeric pigment — the red-wine colour-
 # stabilization + astringency-softening axis. A THIRD separate axis: it draws no O₂ (unlike every
@@ -839,6 +848,7 @@ EXPECTED_PROCESSES = {
         | OXIDATIVE_CASCADE_SHARED
         | CARAMELIZATION_PROCESSES
         | OAK_PROCESSES
+        | BEER_ORGANIC_ACID_PROCESSES
     ),
 }
 
