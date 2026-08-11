@@ -22977,7 +22977,23 @@ wine". The two coincide only while beer has no pH system, and `_acid_catalysis_f
 the **`tartaric`** slot, so the moment beer gains a cation the old gate would have opened on a
 state with no such slot and **RAISED** — not mis-modelled, crashed. Now `"tartaric" in schema`,
 which also states the physics honestly: this is Ramey & Ough's **tartrate** catalysis (D-125),
-grape chemistry that does not transfer. Wine and beer both bitwise; 1564 green.
+grape chemistry that does not transfer.
+
+**"Unchanged" here is STRUCTURAL, not a measured bitwise diff** — the pre-registered
+before/after trajectory comparison (R5/R7) was NOT run, and a green suite is not that check
+(the archive's own rule). The argument that stands in its place is stronger than a sampled
+comparison because it is exhaustive: **every shipped acid has <= 2 pKas** (tartaric 2, malic 2,
+lactic 1, `Byp`-as-succinic 2), so the new n-protic branch is **unreachable in any current
+run**; and for the gate rename **wine carries BOTH slots** (branch taken, as before) while
+**beer carries NEITHER** (branch skipped, as before), so no medium changes which branch it
+takes. Suite 1564 green corroborates but does not establish it. When beer gains
+`cation_charge` WITHOUT `tartaric`, this stops being vacuous and the real comparison must be
+run.
+
+The three identities above are checked as code, not asserted in prose:
+`test_no_shipped_acid_reaches_the_general_branch` and
+`test_the_gate_rename_selects_the_same_branch_in_both_media`
+(`tests/test_acidbase_polyprotic.py`).
 
 **Two SO2 tests updated, and this is not weakening a test to go green.** Both asserted
 `pytest.raises(ValueError, match="mono- and diprotic")` — they **pinned the exact ceiling this

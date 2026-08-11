@@ -177,3 +177,50 @@ def test_phosphate_is_nearly_inert_across_beers_ph_window():
 def test_no_pkas_raises():
     with pytest.raises(ValueError, match="at least one pKa"):
         _polyprotic_terms(1e-4, ())
+
+
+# -- the two identities D-178 rests its "unchanged" claim on ------------------
+#
+# The record does NOT claim a measured bitwise diff (the pre-registered before/after
+# trajectory comparison was not run). It claims two structural identities, which are
+# exhaustive where a sampled comparison would not be. They are checked here rather than
+# asserted in prose, so that the day either stops holding, the suite says so.
+
+
+def test_no_shipped_acid_reaches_the_general_branch():
+    """Every acid this engine currently ships has ≤ 2 pKas ⇒ the new branch is unreachable.
+
+    This is why D-178 could add it without a trajectory comparison. It is DESIGNED to fail
+    the moment beer's citric acid lands — at which point the real before/after comparison
+    becomes necessary and this test's message says so.
+    """
+    from fermentation.core.acidbase import ACID_STATE, BYP_AS_SUCCINIC
+
+    protons = {name: spec.protons for name, spec in ACID_STATE.items()}
+    protons["Byp"] = BYP_AS_SUCCINIC.protons
+    assert protons == {"tartaric": 2, "malic": 2, "lactic": 1, "Byp": 2}
+    assert all(n <= 2 for n in protons.values()), (
+        "a shipped acid now has >= 3 pKas, so the general branch is LIVE: D-178's "
+        "'unchanged is structural' argument no longer holds and the before/after "
+        "trajectory comparison (pre-registered R5/R7) must actually be run"
+    )
+
+
+def test_the_gate_rename_selects_the_same_branch_in_both_media():
+    """`cation_charge` → `tartaric` changes no medium's branch, because of slot presence.
+
+    Wine carries BOTH slots (gate taken, before and after); beer carries NEITHER (gate
+    skipped, before and after). The rename only stops being a no-op when a medium has one
+    slot without the other — which is exactly what beer becomes next, hence the message.
+    """
+    from fermentation.core.media import beer_schema, wine_schema
+
+    wine, beer = wine_schema(), beer_schema()
+    assert ("tartaric" in wine, "cation_charge" in wine) == (True, True)
+    assert ("tartaric" in beer, "cation_charge" in beer) == (False, False)
+    for schema, label in ((wine, "wine"), (beer, "beer")):
+        assert ("cation_charge" in schema) == ("tartaric" in schema), (
+            f"{label} now carries one of cation_charge/tartaric without the other, so the "
+            "D-178 gate rename is no longer a no-op for it and its trajectories must be "
+            "compared before/after"
+        )
