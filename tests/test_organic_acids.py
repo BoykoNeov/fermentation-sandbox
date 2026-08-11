@@ -426,8 +426,9 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     )
     assert max(joint) == pytest.approx(1.045, abs=0.02), (
         f"the joint high corner moved to {max(joint):.1%}; D-180 measured 104.5 % "
-        "(all four yields high, peptide pKa low) — a REACHABLE member that matches Tyrell's "
-        "drop, which is a statement about the band's width, not about the model being right"
+        "(all four yields high, peptide pKa low). NB this is a CORNER of a 5-D hypercube, not "
+        "a member any ensemble was seen to draw — it says the band is wide enough to cover "
+        "the measured drop, not that the model reproduces it"
     )
 
 

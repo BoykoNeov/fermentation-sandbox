@@ -23361,6 +23361,12 @@ D-155 and D-157. The joint measurement, as fraction of the measured 0.8125 drop:
 - **over the joint band: 41–105 %** — and the high-yield / low-pKa corner **reaches and slightly
   exceeds** the measured drop, so as a band-wide claim "must fall short" is **FALSE**.
 
+That corner is a **corner of a five-dimensional hypercube** (four yields at their high edge, the
+pKa at its low edge), computed algebraically — **not** a member some ensemble was seen to draw.
+Whether a run lands near it is a separate, draw-level question, and this archive has already
+measured the analogous case: D-176's joint corner of *two* bands was reachable in exactly this
+sense and **0 of 180 members reached it**. Verify sampling claims on draws, not edges (D-154).
+
 The first guard asserted `max(fraction) < 1.0` on a pKa-only sweep, and would have kept passing
 while a reachable member reproduced Tyrell's drop exactly. It now asserts the two scopes
 separately: the upper bound stays, **scoped to nominal yields**, and the joint span is pinned at
