@@ -23152,15 +23152,29 @@ solves to pure water — **pH 7.0** — and the factor becomes `10^(3.3−7) ≈
 rate change conjured out of a scenario that supplied no pH at all. The suite stayed green
 throughout.
 
-Fixed by gating on **anchoring**, not slot presence (`acidbase.ph_system_is_anchored`): the
-strong cation is written only by the compile seam, only from a measured `initial_ph`, and is
-strictly positive whenever written — so `cation_charge > 0` means "someone measured this
-beverage's pH". An un-anchored beverage holds `h = 1`, the honest no-information behaviour.
+Fixed by gating on a **populated charge balance**, not slot presence
+(`acidbase.charge_balance_is_populated`): a beverage with neither an anchor nor dosed acids
+holds `h = 1`, the honest no-information behaviour.
 
-This also closes the same latent case for **wine**: an un-anchored wine (no `initial_ph`, no
-dosed acids) has been ageing its ethyl acetate against water's pH since D-127. Any wine that
-anchors — the realistic one — is unaffected, cation positive, gate open, trajectories
-bit-for-bit unchanged.
+**The obvious tighter gate — `cation_charge > 0` — is WRONG, and it is wrong against wine.**
+It was written first, and it also suppresses a case that carries real information: a wine with
+`tartaric_gpl`/`malic_gpl` dosed but no `initial_ph` has cation 0 and a perfectly real acid
+load, solving to **pH 2.23** — the "weak acids alone give ~2.3 at must tartaric levels" this
+module's own header describes. Gating on anchoring alone swaps a legitimate **h ≈ 11.8** for
+1.0: an ~11.8x change to WINE, *larger than the beer artefact being closed and in the opposite
+direction*. So an acid load without an anchor still counts, and only a genuinely empty balance
+is refused.
+
+No scenario in the suite doses acids without an anchor (0 found by static scan), so the wrong
+gate would have shipped green — pinned now by
+`test_an_acid_dosed_wine_keeps_its_ph_factor_without_an_anchor`. Beer needs no special case:
+`_beer_acids` seeds every acid from `initial_ph` or not at all, so an un-anchored beer's
+balance is empty by construction under either rule.
+
+This also closes the same latent case for **wine**: a wine with neither an anchor nor dosed
+acids has been ageing its ethyl acetate against water's pH since D-127. Every wine that anchors
+OR carries acids — i.e. every realistic one — is unaffected, gate open, trajectories bit-for-bit
+unchanged.
 
 **Why nothing caught it.** Applying D-178's own lesson, I grepped for tests pinning the
 restriction being removed and found four "beer has no pH system" hits. **Not one of them is an

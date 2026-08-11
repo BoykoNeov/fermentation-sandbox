@@ -1248,7 +1248,7 @@ def test_beer_ethyl_acetate_acid_catalysis_slows_rather_than_speeds(params):
         assert h < 1.0, "beer sits ABOVE the wine reference pH, so catalysis must SLOW it"
 
 
-def test_beer_ethyl_acetate_lingers_when_the_ph_system_is_anchored():
+def test_beer_ethyl_acetate_lingers_when_the_charge_balance_is_populated():
     """The integrated consequence, measured before it shipped (decision D-179).
 
     D-176 established that beer HYDROLYSES ethyl acetate (its Berthelot equilibrium sits below
@@ -1294,7 +1294,7 @@ def test_beer_ethyl_acetate_lingers_when_the_ph_system_is_anchored():
 
 
 def test_unanchored_beer_does_not_age_against_waters_ph(params):
-    """The defect D-179 found while building, and the reason the gate is ANCHORING.
+    """The defect D-179 found while building, and why the gate tests POPULATION.
 
     Giving beer a ``cation_charge`` slot made the old ``"cation_charge" in schema`` gate open
     for EVERY beer — including one that never asked for a pH. Such a state's charge balance is
@@ -1304,17 +1304,49 @@ def test_unanchored_beer_does_not_age_against_waters_ph(params):
     Nothing in the suite caught this, because no test pinned beer's ethyl-acetate factor —
     which is exactly why this test exists.
     """
-    from fermentation.core.acidbase import ph_of_state, ph_system_is_anchored
+    from fermentation.core.acidbase import charge_balance_is_populated, ph_of_state
 
     beer = beer_schema()
     y = beer.pack({"X": 0.0, "S": [0.0, 0.0, 0.0], "E": 40.0, "N": 0.0, "T": 298.15, "CO2": 0.0})
-    assert not ph_system_is_anchored(y, beer), "an un-anchored beer must not claim a pH"
+    assert not charge_balance_is_populated(y, beer), "an un-anchored beer must not claim a pH"
     # The trap made concrete: the number the old gate would have handed the rate law.
     assert ph_of_state(y, beer, params) == pytest.approx(7.0, abs=1e-6)
     # And an anchored one IS live.
     y_anchored = y.copy()
     y_anchored[beer.slice("cation_charge")] = 0.009223
-    assert ph_system_is_anchored(y_anchored, beer)
+    assert charge_balance_is_populated(y_anchored, beer)
+
+
+def test_an_acid_dosed_wine_keeps_its_ph_factor_without_an_anchor(params):
+    """The gate must NOT be ``cation_charge > 0``, and this is the case that decides it.
+
+    A wine with ``tartaric``/``malic`` dosed but no ``initial_ph`` has cation 0 — nothing was
+    back-solved — yet its charge balance is emphatically *not* empty. It solves to **pH 2.23**,
+    the "weak acids alone give ~2.3 at must tartaric levels" the acidbase module header
+    describes, which is real information rather than the water artefact above.
+
+    Gating on anchoring alone would swap that legitimate ``h ≈ 11.8`` for 1.0 — an ~11.8x
+    change to WINE, larger than the beer artefact being closed and in the opposite direction.
+    No scenario in the suite currently doses acids without an anchor, so nothing would have
+    gone red; this test exists so the distinction cannot be quietly collapsed later.
+    """
+    from fermentation.core.acidbase import charge_balance_is_populated, ph_of_state
+
+    wine = wine_schema()
+    y = wine.pack({"X": 0.0, "S": [0.0], "E": 40.0, "N": 0.0, "T": 298.15, "CO2": 0.0})
+    assert not charge_balance_is_populated(y, wine)  # nothing dosed at all ⇒ the water case
+    assert ph_of_state(y, wine, params) == pytest.approx(7.0, abs=1e-6)
+
+    y[wine.slice("tartaric")] = 5.0
+    y[wine.slice("malic")] = 3.0
+    assert charge_balance_is_populated(y, wine), (
+        "an acid load with no anchor is still a real acid load; suppressing its pH factor "
+        "would change wine by ~11.8x to close a beer-only artefact"
+    )
+    ph = ph_of_state(y, wine, params)
+    assert ph == pytest.approx(2.2277, abs=1e-3)
+    h = 10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph)
+    assert h == pytest.approx(11.81, rel=1e-2)
 
 
 # -- tier propagation ---------------------------------------------------------

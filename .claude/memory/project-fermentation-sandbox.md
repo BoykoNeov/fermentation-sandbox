@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T12:47:21.438Z
+  modified: 2026-08-11T12:57:46.045Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -277,8 +277,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   (SPECULATIVE), never wine — beer's peptide buffer is speculative and would drag wine down. **`PH_SYSTEM_READS`
   is the union ON PURPOSE**: it shifts a wine ensemble's draw SEQUENCE (nominals/bands unchanged), and the
   alternative is D-160's silent band-narrowing. **Beer's acids are INERT** — composition, not fate (D-16 open).
-- **The EtOAc gate is ANCHORING (`ph_system_is_anchored`), NEVER slot presence.** Beer gaining `cation_charge`
-  opened the old gate for beers with an **empty balance ⇒ pH 7.0 ⇒ 5000×**; also closes it for un-anchored WINE.
+- **The EtOAc gate is a POPULATED BALANCE (`charge_balance_is_populated`), never slot presence and never
+  `cation>0`.** Slot presence gave beers an **empty balance ⇒ pH 7.0 ⇒ 5000×**; but `cation>0` is wrong the
+  OTHER way — an acid-dosed unanchored WINE is pH **2.23**, a real `h≈11.8`, so that gate changes wine MORE
+  than the beer bug it fixes. **0 suite scenarios hit it ⇒ either error ships green.**
   `initial_ph` is beer's **opt-in gate** (absent ⇒ all acids 0, byte-for-byte pre-D-179). EtOAc **lingers 2.03×**
   (6.73→13.69 mg/L/400 d) — **rate 12.6× ≠ outcome 2.03×**, the pool relaxes to a floor. pH drifts **−0.0041 via Byp**.
 - **`peptide_buffer_capacity_beer` is PINNED zero-width ON PURPOSE** — it is a **function of the pKa** via the

@@ -579,36 +579,45 @@ def _cation(y: FloatArray, schema: StateSchema) -> float:
     return float(y[schema.slice("cation_charge")][0])
 
 
-def ph_system_is_anchored(y: FloatArray, schema: StateSchema) -> bool:
-    """Does this state carry a pH that means anything? (decision D-179)
+def charge_balance_is_populated(y: FloatArray, schema: StateSchema) -> bool:
+    """Does this state's charge balance contain anything at all? (decision D-179)
 
     The honest gate for any pH-dependent rate, replacing the ``"cation_charge" in schema``
     slot-presence test that stood in for "is this wine" until beer grew a pH system too.
 
-    Slot presence stopped being sufficient the moment BOTH media had the slot. A schema can
-    carry ``cation_charge`` and still hold no pH information: with no ``initial_ph`` given,
-    nothing is back-solved, every acid slot is 0, and the charge balance reduces to pure
-    water — whose electroneutral pH is **7.0**. That is not a claim about the beverage, and
-    feeding it to an acid-catalysis factor anchored at pH 3.3 produces a ~5000x rate change
-    out of nothing. Holding the factor at its reference value is the correct "no information"
-    behaviour; inventing pH 7 beer is not.
+    **What it forbids**, stated as the thing that goes wrong rather than as a mechanism
+    ([[feedback-name-guards-for-what-they-forbid]]): aging a beverage against a pH that
+    **no scenario supplied**. Slot presence stopped being sufficient the moment BOTH media
+    carried ``cation_charge``. A schema can carry the slot and hold no pH information at all —
+    no ``initial_ph`` back-solved, every acid slot 0 — at which point the balance reduces to
+    pure water, whose electroneutral pH is **7.0**. Fed to an acid-catalysis factor anchored
+    at pH 3.3 that invents a ~5000x rate change out of nothing. Holding the factor at its
+    reference value is the correct "no information" behaviour.
 
-    The strong cation is the right discriminator because inverse anchoring is what *creates*
-    the information: it is written only by the compile seam, only from a measured
-    ``initial_ph``, and it is strictly positive whenever it is written at all (a negative
-    solve raises instead). So ``cation_charge > 0`` means "someone measured this beverage's
-    pH and the balance was anchored to it".
+    **It deliberately tests population, not anchoring.** ``cation_charge > 0`` alone would be
+    the tighter test and it is WRONG, in a way that costs wine: a wine with ``tartaric_gpl`` /
+    ``malic_gpl`` dosed but no ``initial_ph`` has cation 0 and a perfectly real acid load,
+    solving to **pH 2.23** — the "weak acids alone give ~2.3 at must tartaric levels" this
+    module's own header describes. That is genuine information, and suppressing it would swap
+    a legitimate ``h ≈ 11.8`` for 1.0: an 11.8x change to WINE, larger than the beer artefact
+    being closed and in the opposite direction. So an acid load without an anchor still counts.
 
-    KNOWN, DELIBERATELY UNREPAIRED (flagged on D-127/D-176): an un-anchored WINE — no
-    ``initial_ph`` and no dosed acids — hit the same pH-7.0 path before this function existed,
-    and every such wine has been ageing its ethyl acetate against water's pH. This gate closes
-    that case too. Any wine that anchors (the realistic one) is unaffected: its cation is
-    positive, so the gate opens exactly as before and its trajectories are bit-for-bit
-    unchanged.
+    Beer needs no special case: ``_beer_acids`` seeds every acid slot from ``initial_ph`` or
+    not at all, so an un-anchored beer's balance is empty *by construction* and this returns
+    False for it either way.
+
+    KNOWN, DELIBERATELY UNREPAIRED (flagged on D-127/D-176): a wine with neither an anchor nor
+    dosed acids hit the same pH-7.0 path before this function existed. This closes that case
+    too. Every wine that anchors OR carries acids — i.e. every realistic one — is unaffected,
+    gate open exactly as before, trajectories bit-for-bit unchanged.
     """
     if "cation_charge" not in schema:
         return False
-    return float(y[schema.slice("cation_charge")][0]) > 0.0
+    if float(y[schema.slice("cation_charge")][0]) > 0.0:
+        return True
+    return any(
+        float(y[schema.slice(name)][0]) > 0.0 for name in acid_registry(schema) if name in schema
+    )
 
 
 def ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:

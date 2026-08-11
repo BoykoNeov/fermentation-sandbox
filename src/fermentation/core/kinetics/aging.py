@@ -286,10 +286,10 @@ from fermentation.core.acidbase import (
     SO2_STATE_KEY,
     bisulfite_fraction,
     bisulfite_so2_at_ph,
+    charge_balance_is_populated,
     free_acetaldehyde,
     neutral_fraction,
     ph_of_state,
-    ph_system_is_anchored,
 )
 from fermentation.core.chemistry import (
     CARBON_ATOMS,
@@ -1039,9 +1039,10 @@ class EthylAcetateEsterification(Process):
     Since D-176 established that beer *hydrolyses* ethyl acetate, catalysis makes beer's solventy
     note **linger instead of clearing** (measured: ~2x the residual after 400 d — the rate factor
     and the outcome factor are different numbers, because the pool relaxes toward a floor).
-    The gate is **anchoring, not slot presence** (:func:`~fermentation.core.acidbase.\
-    ph_system_is_anchored`): both media carry ``cation_charge`` now, and an un-anchored state's
-    charge balance is empty, i.e. pure water at pH 7.0 — a number no scenario supplied. Bounded
+    The gate is a **populated charge balance, not slot presence**
+    (:func:`~fermentation.core.acidbase.charge_balance_is_populated`): both media carry
+    ``cation_charge`` now, and a state with neither an anchor nor dosed acids is pure water at
+    pH 7.0 — a number no scenario supplied. An acid load without an anchor still counts. Bounded
     (D-46): ``ph_of_state`` clamps pH to [0, 14], so ``h`` stays finite under a BDF Jacobian probe.
 
     **Carbon — a signed on-ledger inter-pool transfer that closes to machine precision either way.**
@@ -1184,11 +1185,12 @@ class EthylAcetateEsterification(Process):
         # applying catalysis makes beer's solventy note LINGER rather than clear. Measured before
         # it shipped and adopted deliberately as the more faithful behaviour.
         #
-        # The gate is ANCHORING, not slot presence: both media carry cation_charge now, and an
-        # un-anchored state's "pH" is water's 7.0 — see acidbase.ph_system_is_anchored. Bounded:
+        # The gate is a POPULATED charge balance, not slot presence: both media carry
+        # cation_charge now, and an empty balance's "pH" is water's 7.0 (but an acid load with
+        # no anchor still counts) — see acidbase.charge_balance_is_populated. Bounded:
         # ph_of_state clamps pH to [0, 14] (D-46), so h stays finite under a BDF Jacobian probe.
         h_factor = 1.0
-        if ph_system_is_anchored(y, schema):
+        if charge_balance_is_populated(y, schema):
             ph = ph_of_state(y, schema, params)
             h_factor = float(10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph))
         # Signed rate (g ethyl acetate/L/h): >0 hydrolysis (fade), <0 esterification (form).
