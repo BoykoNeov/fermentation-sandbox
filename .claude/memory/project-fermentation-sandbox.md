@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T14:17:23.229Z
+  modified: 2026-08-11T15:18:11.854Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -25,12 +25,12 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-11)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-180**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
-**1586**. Wine **94 slots** / beer **54**, `quinone` in both regardless of set; **three** oxidative
+**D-181**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
+**1595**. Wine **94 slots** / beer **57**, `quinone` in both regardless of set; **three** oxidative
 sets (`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**.
-**Beer's acid-base is COMPLETE across THREE beats — solver D-178, state D-179, PRODUCER D-180.**
+**Beer's acid-base is FOUR beats — solver D-178, state D-179, producer D-180, SINK D-181.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
-`StateSchema.medium`. **Beer's pH is now a PREDICTION, not an input.** **Next beat is the owner's call.**
+`StateSchema.medium`. **Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -269,6 +269,17 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   corner of TWO bands** (flips at **+3.6 % ethanol**; 0 of 180 members reach it), **never an impossibility**;
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
+
+**Beer acid-base, part 4 — the SINK (D-181). The headline now agrees WORSE, on purpose.**
+- **NEVER flux-link `WortAcidRemoval`** — Tyrell Table 2 scores all three `--` at LOWER Krausen and `0` after,
+  and the house idiom peaks MID-ferment. First-order to a **measured floor**, temperature-flat. **NO mechanism
+  asserted** ⇒ the 3 slots are **OFF every ledger** (`iso_alpha` idiom) and **absent from `MOLAR_MASS`** so a
+  future producer RAISES; never weight them "for completeness". **Corrects D-179**: buffering index ranks
+  these last, **charge REMOVED** ranks them with the produced four — a fully dissociated acid loses the MOST.
+- Nominal **42.7-62.2 %** (was 63-92), joint **8.7-81.4** (was 41-105): **nothing in the band reaches** now.
+  Missing base **+0.2094 pH**. Capacity re-anchored **1.6708→1.5481** (5-acid back-solve reproduces D-180
+  **bitwise**). ONE shared `k` (3x/⅓x moves pH **0.00011**). `pyruvic` ≠ wine's `pyruvate` — **reconcile before
+  beer ever wires keto-acids**. Only **dissolved CO2** left, opposite sign [[feedback-build-the-term-that-makes-agreement-worse-first]].
 
 **Beer acid-base, part 3 — the PRODUCER (D-180). Beat COMPLETE; beer's pH is now a PREDICTION.**
 - **Tyrell 2013 is TWO datasets — D-179 read only Table 1.** Its own EBC trials (Figs 4, 6-14) give ONE wort's

@@ -1,9 +1,11 @@
 ---
 name: feedback-pair-the-red-with-an-ordering-preserving-baseline
 description: "A RED from a mutation arm is only evidence about the thing you flipped if the same-sized move WITHOUT the flip stays green — and attribute at ASSERT granularity, not node"
-metadata:
+metadata: 
   node_type: memory
   type: feedback
+  originSessionId: f44ce489-1315-4e44-b277-2e9b54fd3682
+  modified: 2026-08-11T15:17:36.091Z
 ---
 
 **When a mutation arm goes RED, it is not evidence about the property you broke until you re-run the
@@ -38,6 +40,17 @@ sibling, credited with forbidding the inversion.
 * Run the **clean tree** over the same node set first. A node set that is not green unmutated cannot
   attribute anything ([[feedback-a-null-result-needs-a-positive-control]]).
 * GREEN arms need no baseline — a null has no attribution problem.
+
+**The cheapest tell that a RED is not about your claim: it is TOO BIG, or it names the wrong
+medium.** D-181 reverted a back-solved beer parameter to its pre-beat value to check the guard on
+it, and 24 tests went red — including WINE conservation tests, which no beer buffer capacity can
+reach. Cause: the value moved without its **pinned zero-width uncertainty band**, so it landed
+outside its own range and the *parameter store rejected it at load*. Every test that loads
+parameters fails, and none of them is evidence. Re-run coherently (value and band together) it
+fired **exactly one** test — the round-trip guard that exists for that claim. Recorded in the arm
+table as INVALID rather than deleted, so the count stays honest. Same shape as the schema
+rejection above, one beat later, which is why it is worth a scan of every arm's red list for
+"could this test even see what I changed?"
 
 **The general shape, which recurred three times in one beat at three different levels:** a RED was
 credited to the mechanism under test when it belonged to something else — first a schema rejection,
