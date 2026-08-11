@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-12)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-185**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1609**. Most remaining
+**D-186**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1622**. Most remaining
 work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
@@ -75,6 +75,10 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   mechanism guess was WRONG) and sulfide release is **temperature-FLAT**; technical cork ships BELOW
   screwcap; **never put 0.963 in a sampled field**; the `oav`→`magnitude` rename must NOT be
   "finished"; EtOAc eq is Berthelot-coupled. → `.claude/memory/prohibitions/aroma-and-milestone-3-tail.md`
+- **Aging-pH anchor (D-186)** — `set_ph` is **BUILT**: D-150's "no way to set an aging pH" is FALSE,
+  though ~8 records' copy-forward lists still say it. **Cation-MOVING, never a pH dial**; `add_acid`
+  is unchanged; the reachability check **cannot** move to compile; the opt-in gate's reason DIFFERS
+  per medium; adds **no** pH-rate dependence. → `.claude/memory/prohibitions/aging-ph-anchor.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
