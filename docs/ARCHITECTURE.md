@@ -337,22 +337,30 @@ on Python 3.13 and 3.14. Two of the test files guard documentation rather than p
 
 ## Checking this document
 
-Every count above is derived, not remembered. To re-derive them:
+Every count above is derived, not remembered. To re-derive them, from the repo root:
 
-```bash
+```
 uv run python -c "
+import pathlib, re
 from fermentation.core.media import MEDIA, get_medium
 for name in sorted(MEDIA):
     for ox in ('direct', 'cascade', 'direct_burst'):
         m = get_medium(name, oxidative=ox)
         print(name, ox, 'slots', m.schema.size, 'vars', len(m.schema.names),
               'procs', len(m.process_factories), 'mods', len(m.modifier_factories))
+root = pathlib.Path('src/fermentation')
+pat = re.compile(r'^class .*(?:Process|RateModifier)', re.M)
+print('parameter files', len(list((root / 'parameters/data').glob('*.yaml'))))
+print('test files', len(list(pathlib.Path('tests').rglob('test_*.py'))))
+print('kinetics impls', sum(len(pat.findall(p.read_text(encoding='utf-8')))
+                            for p in (root / 'core/kinetics').glob('*.py')))
 "
-ls src/fermentation/parameters/data/*.yaml | wc -l     # parameter files
-find tests -name 'test_*.py' | wc -l                   # test files
-grep -rhc '^class .*\(Process\|RateModifier\)' src/fermentation/core/kinetics/*.py \
-  | awk '{s+=$1} END {print s}'                        # kinetics implementations
 ```
+
+It is one Python call on purpose. The obvious version of this check is a handful of shell
+one-liners (`ls | wc -l`, `find`, `grep | awk`), and those run in Git Bash but **not** in
+PowerShell, which is this project's primary shell — so for many readers the check would simply
+error, while still *looking* like verification. A self-check that cannot execute is worse than none.
 
 If a number here disagrees with that output, **the code is right and this document is stale** —
 fix the document. Per `CLAUDE.md`, a beat that adds a Process, a state slot, a parameter file or a
