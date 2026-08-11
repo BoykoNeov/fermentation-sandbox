@@ -24129,8 +24129,13 @@ old → new in place.
 * Titratable acidity: **bitwise unchanged** in every medium.
 * Suite **1595 → 1606** (11 new tests); 18 pins re-derived; 32 call sites given the new
   required argument.
-* ``PKA_PARAM_NAMES`` **+1**, ``PH_SYSTEM_READS`` **+4** ⇒ the compile-seam distinct-varying
-  count moves again; it lives in a comment that says so, so re-measure rather than cite it.
+* ``PKA_PARAM_NAMES`` **+1**, ``PH_SYSTEM_READS`` **+4**. Re-measured rather than cited, and
+  **both halves of that comment were stale**: the compile-seam distinct-varying denominator is
+  **280** (266 at D-180, 277 at D-181), and the drawn NUMERATOR is **185, not the 152 the
+  comment had asserted unchanged since D-157**. That second one was false from **D-179**, which
+  made ``PH_SYSTEM_READS`` the cross-medium union *on purpose* and said so — putting beer's pKas
+  into a wine ensemble's sampled set while this line went on claiming none of the added names
+  was drawn. Two beats of silent drift, which is what D-172 §8's still-open gap costs.
 
 ### 16. Open, and deliberately not closed here
 

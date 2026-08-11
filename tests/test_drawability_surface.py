@@ -224,19 +224,33 @@ def test_forcing_an_oak_yield_band_into_the_sample_cannot_move_the_run():
     drawn count unchanged at 152 of 247. The verb reads ``.value`` off the ParameterSet at
     compile time, so the per-member draw never reaches it.
 
-    **The DENOMINATOR moves with every banded parameter the archive adds, and it is prose.**
-    247 at D-157 → 246 at D-172 (three varying bands retired, two added) → 257 at D-179 (beer's
-    five pKas) → **266 at D-180** (five ``*_typical_wort`` seeds and four ``Y_*_sugar_beer``
-    yields; ``peptide_buffer_capacity_beer`` stays pinned zero-width and so is still not
-    counted). The 152 is unaffected each time, because none of the added names is drawn by this
-    un-aged scenario.
+    **BOTH numbers are prose, both went stale, and D-182 caught them.** Re-measured at D-182
+    on this module's own ``_scenario()``:
+
+    * **DENOMINATOR — compile-seam distinct varying: 280.** 247 at D-157 → 246 at D-172 (three
+      varying bands retired, two added) → 257 at D-179 (beer's five pKas) → 266 at D-180 (five
+      ``*_typical_wort`` seeds, four ``Y_*_sugar_beer`` yields) → 277 at D-181 (three seeds,
+      three floors, one rate, four pKas) → **280 at D-182** (``pKa_carbonic_1``,
+      ``H_co2_beverage``, ``vant_hoff_co2_solubility``; ``T_ref_co2_solubility`` and
+      ``peptide_buffer_capacity_beer`` are pinned zero-width and so are not counted).
+    * **NUMERATOR — drawn by a default ensemble on this scenario: 185, NOT 152.** The claim
+      that "the 152 is unaffected each time, because none of the added names is drawn by this
+      scenario" **was false from D-179 onward** and nobody re-ran it. D-179 made
+      ``PH_SYSTEM_READS`` the *union* across media **on purpose**, which puts beer's pKas into
+      a WINE ensemble's sampled set — D-179 said so in its own record, and this line kept
+      asserting the opposite in prose. D-182 added four more names to that same tuple.
+
+    Reproduce both with ``ps[n].uncertainty.high > ps[n].uncertainty.low`` over
+    ``compiled.parameters.names``, and ``len(simulate_ensemble(...).sampled_names)`` on an
+    unforced ensemble.
 
     NOTE these are PROSE, not asserts, which is why retiring three parameters turned nothing
-    red — recorded as a live gap in the surface guards at D-172 §8 and STILL OPEN. So the
-    number above is only as current as the last person who re-ran the count: **re-measure it,
-    do not cite it.** Deliberately not converted to an assertion here — pinning it would fire
-    on every future parameter addition regardless of relevance, which is a chore rather than a
-    guard, and D-172 §8's gap is about the surface tests generally, not this one line.
+    red — recorded as a live gap in the surface guards at D-172 §8 and STILL OPEN. Two beats
+    of silent drift on the numerator is what that gap costs, and it is the reason the standing
+    instruction is **re-measure it, do not cite it**. Deliberately still not converted to an
+    assertion — pinning it would fire on every future parameter addition regardless of
+    relevance, which is a chore rather than a guard, and D-172 §8's gap is about the surface
+    tests generally, not this one line.
     """
     compiled = compile_scenario(_scenario())
     ensemble = _forced(compiled, "oak_yield_vanillin_medium")

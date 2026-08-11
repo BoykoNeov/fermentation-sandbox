@@ -56,11 +56,11 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   answer (8.7-81.4 → **7.6-82.2 %**): a shape recurring 6× is how I work, not bad luck. **D-182 did NOT
   recur it** — its 3 new dims went in the SHIPPING commit (9 dims, 19683 corners); that is the fix.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
-  do not "simplify".** Compile-seam distinct varying **266** (257 pre-D-180, 246 pre-D-179) — but that count is a
-  **COMMENT in `test_drawability_surface.py`, not an assert, so it goes STALE GREEN: re-measure, never cite it**.
-  **NOT 279** (per-*file* sum, double-counts shared names); **structural 61, NOT D-157's 66** (D-159, 5 merely
-  scenario-inert). Predicate = **declared `reads`**; **UNREGISTERED-class and compile-time doses are NEVER
-  drawn**. **A shared name can carry DISJOINT bands per medium** (19 of 33). `psychophysics.yaml` **UNIFORM** —
+  do not "simplify".** Compile-seam distinct varying **280**, drawn **185** — both a **COMMENT in
+  `test_drawability_surface.py`, not asserts ⇒ STALE GREEN: re-measure BOTH, never cite** (its "152 unaffected"
+  was false from **D-179**). **NOT 279** (per-*file* sum, double-counts shared names); **structural 61, NOT
+  D-157's 66** (D-159, 5 merely scenario-inert). Predicate = **declared `reads`**; **UNREGISTERED-class and
+  compile-time doses are NEVER drawn**. **A shared name carries DISJOINT bands per medium** (19 of 33). `psychophysics.yaml` **UNIFORM** —
   never "fix" to triangular, **never apply the triangular mass stat**; `sensory.yaml`'s **36 NEVER sampled**.
   `SHARED_FILES` restated **on purpose** (D-108/D-109 vacuity). **A test at `x == mode` is vacuous** — go off-mode.
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
