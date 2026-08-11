@@ -13,10 +13,11 @@ fitted to it. The acceptance section below is therefore a real external comparis
 a round-trip, with one exception which says so in its own name.
 
 **The headline is a compensation, not an agreement, and these tests are written to keep it
-that way.** Against a measured drop of 0.75-0.87 pH the model gives 0.514-0.744 across the
-sampled ``pKa_peptide_buffer`` band — but that is held open by two omitted terms of opposite
-sign (three wort acids that fall and are not state slots, ~+0.2-0.3 pH; dissolved CO₂, ~−0.3
-pH). No test here is named or phrased as validating the produced acids alone.
+that way.** Against a measured drop of 0.8125 pH the model gives 63-92 % at nominal yields
+across the sampled ``pKa_peptide_buffer`` band, and **41-105 % over the joint band** once the
+four sampled yields are varied too — held open by two omitted terms of opposite sign (three
+wort acids that fall and are not state slots, ~+0.2-0.3 pH; dissolved CO₂, ~−0.3 pH). No test
+here is named or phrased as validating the produced acids alone.
 """
 
 import pytest
@@ -337,33 +338,37 @@ def test_citrate_is_seeded_and_stays_inert():
     assert float(series[-1]) == pytest.approx(float(series[0]), abs=1e-12)
 
 
-def test_the_predicted_ph_drop_is_short_of_the_measured_one_across_the_whole_pka_band(
-    beer_params,
-):
-    """THE FREE PREDICTION — and the test is written to hold the shortfall, not the agreement.
+def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
+    """THE FREE PREDICTION — measured over the JOINT band, because five things are sampled.
 
     Nothing in ``beer_acids.yaml`` is fitted to pH, so comparing the modelled trajectory with
-    Tyrell's Fig. 4 is a genuine external test. It lands at **63-92 %** of the measured drop
-    depending on where ``pKa_peptide_buffer`` sits in its **sampled** band — a factor of ~1.45
-    spread, which is why this is pinned over the band and not at the nominal
-    [[feedback-pin-the-band-not-the-nominal]]. The peptide term, not any acid yield, is the
-    parameter the prediction is most sensitive to.
+    Tyrell's Fig. 4 is a genuine external test. Two scopes, and conflating them is the whole
+    trap this test exists to avoid:
 
-    **The band arm RE-ANCHORS the cation, and getting that wrong is the trap.** Re-reading the
-    shipped trajectory's pH at a different ``pKa_peptide_buffer`` while holding the
-    ``cation_charge`` the compile back-solved at the NOMINAL pKa measures the wrong thing: it
-    reports 72-80 %, and it also moves the START pH off the 5.65 the scenario supplied, which
-    no ensemble member ever does. A sampled member draws its pKa and the compile then
-    back-solves ITS cation to hit ``initial_ph``, so every member starts at 5.65 and they
-    differ only in where they end. That is what this reproduces — the recurring
-    verified-at-a-point / sampled-over-a-band shape, in the one place it would have quietly
-    understated the spread.
+    * **at nominal yields, across ``pKa_peptide_buffer``'s band: 63-92 %** of the measured
+      0.8125 pH drop. Here the model must fall SHORT, and the upper bound is asserted.
+    * **over the JOINT band — the four ``Y_*_sugar_beer`` are sampled too, and widely
+      (lactic 2.4x, succinic 3.6x, malic's low edge near zero): 41-105 %.** The high-yield /
+      low-pKa corner REACHES and slightly exceeds the measured drop.
 
-    THE UPPER BOUND IS THE POINT. The model must NOT reproduce the measured drop, because two
-    real terms of opposite sign are missing (three falling wort acids that are not state slots,
-    ~+0.2-0.3 pH; dissolved CO₂, ~−0.3 pH). If a future change makes this agree exactly, that
-    is a signal to go and find which of the two got added — not a success
-    [[feedback-a-margin-is-a-claim-about-what-holds-it-open]].
+    **So "the model must fall short" is true at nominal yields and FALSE over the reachable
+    band**, and the first version of this test asserted the strong form on the weak evidence —
+    a constraint verified at a POINT where the sampler reads a BAND, which is the shape this
+    archive has now hit five times. Take the joint worst case over every band involved.
+
+    That a corner reaches 100 % is NOT evidence a missing term arrived. It means the yield
+    bands are wide enough to cover the gap those terms leave — which is exactly why the
+    agreement is a margin rather than a validation
+    [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. Two real terms of opposite sign
+    are still absent (three falling wort acids that are not state slots, ~+0.2-0.3 pH;
+    dissolved CO2, ~-0.3 pH).
+
+    **The arm RE-ANCHORS the cation per member, and getting that wrong is the other trap.**
+    Re-reading the shipped trajectory's pH at a different pKa while holding the
+    ``cation_charge`` the compile back-solved at the NOMINAL pKa reports 72-80 % and moves the
+    START pH off the 5.65 the scenario supplied — which no ensemble member ever does. A member
+    draws its pKa and the compile back-solves ITS cation to hit ``initial_ph``, so every member
+    starts at 5.65 and they differ only in where they end.
     """
     compiled, res = _run(dict(TYRELL_SCENARIO))
     params = compiled.parameters.resolve()
@@ -371,38 +376,59 @@ def test_the_predicted_ph_drop_is_short_of_the_measured_one_across_the_whole_pka
     slots = ("lactic", "acetic", "citrate", "malic", "succinic", "peptide_buffer")
     molar = {s: acidbase.ALL_ACIDS[s].molar_mass for s in slots}
     start_molar = {s: float(res.series(s)[0]) / molar[s] for s in slots}
-    end_molar = {s: float(res.series(s)[-1]) / molar[s] for s in slots}
-    band = (
+    measured_drop = TYRELL_WORT_PH - sum(TYRELL_BEER_PH) / 2.0
+
+    # The fermentative flux the shipped run actually booked its yields against — recovered
+    # from what it produced, so this cannot drift from the run.
+    flux = (float(res.series("acetic")[-1]) - float(res.series("acetic")[0])) / params[
+        "Y_acetic_sugar_beer"
+    ]
+
+    def fraction(pka: float, pick: str) -> float:
+        member = {**pka_map, "peptide_buffer": (pka,)}
+        cation = acidbase.solve_cation_charge(start_molar, 0.0, member, TYRELL_WORT_PH)
+        start = acidbase.solve_ph(start_molar, cation, 0.0, member)
+        assert start == pytest.approx(TYRELL_WORT_PH, abs=1e-6), (
+            "every member must start at the supplied wort pH — that is what anchoring means"
+        )
+        end = dict(start_molar)
+        for spec in ORGANIC_ACID_SPECS:
+            p = beer_params[spec.yield_param]
+            y = {"lo": p.uncertainty.low, "nom": p.value, "hi": p.uncertainty.high}[pick]
+            end[spec.slot] = start_molar[spec.slot] + (y * flux) / molar[spec.slot]
+        return (start - acidbase.solve_ph(end, cation, 0.0, member)) / measured_drop
+
+    pka_band = (
         beer_params["pKa_peptide_buffer"].uncertainty.low,
         beer_params["pKa_peptide_buffer"].value,
         beer_params["pKa_peptide_buffer"].uncertainty.high,
     )
-    measured_drop = TYRELL_WORT_PH - sum(TYRELL_BEER_PH) / 2.0
 
-    fractions = []
-    for pka in band:
-        member = {**pka_map, "peptide_buffer": (pka,)}
-        # What compile_scenario does for THIS member: anchor the cation to the wort pH it
-        # was given, using the member's own pKa.
-        cation = acidbase.solve_cation_charge(start_molar, 0.0, member, TYRELL_WORT_PH)
-        start = acidbase.solve_ph(start_molar, cation, 0.0, member)
-        end = acidbase.solve_ph(end_molar, cation, 0.0, member)
-        assert start == pytest.approx(TYRELL_WORT_PH, abs=1e-6), (
-            "every member must start at the supplied wort pH — that is what anchoring means"
-        )
-        fractions.append((start - end) / measured_drop)
+    # Scope 1 — nominal yields. The "must fall short" claim lives HERE and nowhere else.
+    at_nominal = [fraction(pka, "nom") for pka in pka_band]
+    assert min(at_nominal) > 0.55, (
+        f"the predicted drop collapsed to {min(at_nominal):.0%} of Tyrell's measured one at "
+        "nominal yields; D-180 measured 63-92 % across the pKa band"
+    )
+    assert max(at_nominal) < 1.0, (
+        f"at NOMINAL yields the predicted drop reached {max(at_nominal):.0%} of the measured "
+        "one. It is supposed to fall short: the falling wort acids (pyruvic/formic/oxalic) and "
+        "dissolved CO2 are both absent and pull opposite ways. Find out which one arrived."
+    )
 
-    assert min(fractions) > 0.55, (
-        f"the predicted pH drop collapsed to {min(fractions):.0%} of Tyrell's measured one; "
-        "D-180 measured 63-92 % across this band"
+    # Scope 2 — the joint band the sampler can actually reach. NO upper bound is asserted
+    # here, because a corner legitimately exceeds the measured drop; what is pinned is the
+    # SPAN, so that a change which narrows or shifts it has to be looked at.
+    joint = [fraction(pka, pick) for pka in pka_band for pick in ("lo", "nom", "hi")]
+    assert min(joint) == pytest.approx(0.414, abs=0.02), (
+        f"the joint low corner moved to {min(joint):.1%}; D-180 measured 41.4 % "
+        "(all four yields at their low edge, peptide pKa at its high edge)"
     )
-    assert max(fractions) < 1.0, (
-        f"the predicted drop reached {max(fractions):.0%} of the measured one. It is supposed "
-        "to fall SHORT: the falling wort acids (pyruvic/formic/oxalic) and dissolved CO2 are "
-        "both absent, and they pull in opposite directions. Find out which one arrived."
+    assert max(joint) == pytest.approx(1.045, abs=0.02), (
+        f"the joint high corner moved to {max(joint):.1%}; D-180 measured 104.5 % "
+        "(all four yields high, peptide pKa low) — a REACHABLE member that matches Tyrell's "
+        "drop, which is a statement about the band's width, not about the model being right"
     )
-    # And the direction that makes it a beer at all: the pH must actually fall.
-    assert fractions[1] > 0.0
 
 
 def test_a_beer_seeded_at_finished_beer_levels_would_overshoot(beer_params):
@@ -415,33 +441,32 @@ def test_a_beer_seeded_at_finished_beer_levels_would_overshoot(beer_params):
     """
     params = beer_params.resolve()
     pka = acidbase.build_pka_map(params)
-    molar = {s: acidbase.ALL_ACIDS[s].molar_mass for s in ("lactic", "acetic", "malic", "succinic")}
+    # ALL FIVE finished-beer levels, citrate included. The counterfactual is the whole D-179
+    # seed set, so leaving citrate out would both understate it and leave
+    # ``citric_typical_beer`` read by nothing at all — which the YAML group-1 header claims is
+    # not the case. A prose claim its guard does not back is the shape
+    # [[feedback-grep-finds-claims-not-guards]] exists for.
+    slots = ("lactic", "acetic", "citrate", "malic", "succinic")
+    molar = {s: acidbase.ALL_ACIDS[s].molar_mass for s in slots}
+    seeds = {
+        s: beer_params[f"{'citric' if s == 'citrate' else s}_typical_beer"].value for s in slots
+    }
 
-    for seeds, expect_below in (
-        (
-            {
-                s: beer_params[f"{'citric' if s == 'citrate' else s}_typical_beer"].value
-                for s in molar
-            },
-            4.4,
-        ),
-    ):
-        totals = {s: g / molar[s] for s, g in seeds.items()}
-        totals["peptide_buffer"] = (
-            beer_params["peptide_buffer_capacity_beer"].value
-            / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
+    totals = {s: g / molar[s] for s, g in seeds.items()}
+    totals["peptide_buffer"] = (
+        beer_params["peptide_buffer_capacity_beer"].value
+        / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
+    )
+    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 4.4)
+    produced = dict(totals)
+    for spec in ORGANIC_ACID_SPECS:  # citrate is seeded but has no yield
+        produced[spec.slot] = (
+            produced[spec.slot] + (params[spec.yield_param] * TYRELL_SUGAR_GPL) / molar[spec.slot]
         )
-        cation = acidbase.solve_cation_charge(totals, 0.0, pka, expect_below)
-        produced = dict(totals)
-        for spec in ORGANIC_ACID_SPECS:
-            produced[spec.slot] = (
-                produced.get(spec.slot, 0.0)
-                + (params[spec.yield_param] * TYRELL_SUGAR_GPL) / molar[spec.slot]
-            )
-        assert acidbase.solve_ph(produced, cation, 0.0, pka) < 4.3, (
-            "producing on top of finished-beer seeds should overshoot below any real beer; "
-            "if it no longer does, the seeds or the yields have moved"
-        )
+    assert acidbase.solve_ph(produced, cation, 0.0, pka) < 4.3, (
+        "producing on top of finished-beer seeds should overshoot below any real beer; "
+        "if it no longer does, the seeds or the yields have moved"
+    )
 
 
 def test_wine_and_beer_schemas_disagree_about_which_slots_are_produced():

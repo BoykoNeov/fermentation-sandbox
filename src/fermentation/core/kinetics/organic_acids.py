@@ -18,10 +18,15 @@ Figs 6-14) *and* the pH and extract curves (their Fig 4). So the yields are a me
 **difference on one wort**, not two studies subtracted — and the pH curve is then a **free
 prediction**, because nothing in the parameter file is fitted to it.
 
-**What the free prediction says (read the D-180 record before quoting it).** Against a
-measured drop of 0.75-0.87 pH units the model produces 0.514-0.744 across the sampled
-``pKa_peptide_buffer`` band. That is most of it, and it is **not** a validation, because the
-agreement is held open by two omitted terms of opposite sign:
+**What the free prediction says (read the D-180 record before quoting it), and the scope it
+is true in.** Against a measured drop of 0.8125 pH units:
+
+* at **nominal yields**, across the sampled ``pKa_peptide_buffer`` band: **63-92 %** of it;
+* over the **JOINT** band — the four yields are sampled too, and widely: **41-105 %**.
+
+So "organic acid production accounts for most of the drop" is a NOMINAL-yield statement, and
+the high corner of the reachable band matches the measurement outright. Neither is a
+validation, because the agreement is held open by two omitted terms of opposite sign:
 
 * three wort acids that FALL over a real ferment (pyruvic 22→~1, formic 26→~5, oxalic
   22→~5 ppm) are not beer state slots, so the model cannot lose that anion charge — worth
@@ -80,13 +85,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fermentation.core.chemistry import (
-    M_ACETIC,
-    M_LACTIC,
-    M_MALIC,
-    M_SUCCINIC,
-    carbon_mass_fraction,
-)
+from fermentation.core.chemistry import carbon_mass_fraction
 from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar as _draw_carbon_from_sugar,
 )
@@ -105,12 +104,17 @@ class OrganicAcidSpec:
     ``species`` is the key :func:`~fermentation.core.chemistry.carbon_mass_fraction` weights
     the sugar draw by, so each acid's carbon is booked at **its own** molecule — the D-99
     correction applied here from the start rather than after a lumped stand-in ships.
+
+    **No molar mass here, deliberately.** It would duplicate
+    :data:`~fermentation.core.acidbase.ALL_ACIDS`, which is where every g/L -> mol/L conversion
+    in the charge balance already comes from; a second copy is the single-source-of-truth
+    failure this repo pins elsewhere. Callers needing mass read
+    ``ALL_ACIDS[spec.slot].molar_mass``.
     """
 
     slot: str
     yield_param: str
     species: str
-    molar_mass: float
 
 
 #: The acids beer's yeast PRODUCES, and the single source of truth every layer derives from
@@ -129,10 +133,10 @@ class OrganicAcidSpec:
 #: with wine's dynamic ``pyruvate`` pool), so there is nothing to drain. See the module
 #: docstring for what that omission is worth in pH.
 ORGANIC_ACID_SPECS: tuple[OrganicAcidSpec, ...] = (
-    OrganicAcidSpec("acetic", "Y_acetic_sugar_beer", "acetic_acid", M_ACETIC),
-    OrganicAcidSpec("lactic", "Y_lactic_sugar_beer", "lactic_acid", M_LACTIC),
-    OrganicAcidSpec("succinic", "Y_succinic_sugar_beer", "succinic_acid", M_SUCCINIC),
-    OrganicAcidSpec("malic", "Y_malic_sugar_beer", "malic_acid", M_MALIC),
+    OrganicAcidSpec("acetic", "Y_acetic_sugar_beer", "acetic_acid"),
+    OrganicAcidSpec("lactic", "Y_lactic_sugar_beer", "lactic_acid"),
+    OrganicAcidSpec("succinic", "Y_succinic_sugar_beer", "succinic_acid"),
+    OrganicAcidSpec("malic", "Y_malic_sugar_beer", "malic_acid"),
 )
 
 

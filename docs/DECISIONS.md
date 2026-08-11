@@ -23333,18 +23333,49 @@ band still does not span it (D-103). It is now falsifiable, which it was not bef
 
 ### 6. The free prediction, and why the agreement is a MARGIN
 
-Against a measured drop of **0.8125 pH** (5.65 → 4.78–4.90, four strains):
+**AMENDED BEFORE THE BEAT CLOSED — read the joint table, not the pKa one.** This section first
+reported the range below, which varies `pKa_peptide_buffer` across its band while holding the
+four `Y_*_sugar_beer` at nominal:
 
-| `pKa_peptide_buffer` | predicted beer pH | drop | fraction of measured |
+| `pKa_peptide_buffer` (yields at nominal) | predicted beer pH | drop | fraction of measured |
 |---|---|---|---|
 | 3.86 (low edge) | 4.906 | 0.744 | **91.6 %** |
 | 4.25 (nominal) | 5.044 | 0.606 | **74.6 %** |
 | 4.50 (high edge) | 5.136 | 0.514 | **63.2 %** |
 
+**The four yields are sampled too, and they carry the widest bands in the beat** (lactic 2.4×,
+succinic 3.6×, malic's low edge near zero). §7 below catches the point-vs-band shape for the
+peptide pKa and then commits it one level out. This archive's own standing prohibition names it:
+*whenever a guard or bound uses a nominal, check whether that quantity is itself sampled — and
+take the **joint** worst case over every band involved.* Fifth instance, after D-118, D-154,
+D-155 and D-157. The joint measurement, as fraction of the measured 0.8125 drop:
+
+| yields ↓ / pKa → | 3.86 | 4.25 | 4.50 |
+|---|---|---|---|
+| **low edges** | 63.7 % | 50.4 % | **41.4 %** |
+| **nominal** | 91.6 % | 74.6 % | 63.2 % |
+| **high edges** | **104.5 %** | 86.2 % | 73.9 % |
+
+- **at nominal yields: 63–92 %** — correct *in that scope*, and that is the scope in which the
+  "the model must fall SHORT" claim below is true;
+- **over the joint band: 41–105 %** — and the high-yield / low-pKa corner **reaches and slightly
+  exceeds** the measured drop, so as a band-wide claim "must fall short" is **FALSE**.
+
+The first guard asserted `max(fraction) < 1.0` on a pKa-only sweep, and would have kept passing
+while a reachable member reproduced Tyrell's drop exactly. It now asserts the two scopes
+separately: the upper bound stays, **scoped to nominal yields**, and the joint span is pinned at
+both corners with **no upper bound**.
+
+**This sharpens the compensation finding rather than weakening it.** A corner reaching 100 % is
+not evidence that a missing term arrived; it says the yield bands are wide enough to *cover* the
+gap the two omitted terms leave — which is exactly what makes the agreement a margin rather than
+a validation. Nothing shipped moved: no value, band or Process changed, only a reported range
+and the guard that policed it.
+
 So the measured organic-acid production accounts for **roughly two-thirds to nine-tenths** of
-beer's fermentation pH drop. **This must not be read as validating the produced acids**, and the
-pre-registration is what makes that visible. Three arms were computed before any code was
-written:
+beer's fermentation pH drop *at nominal yields*. **This must not be read as validating the
+produced acids**, and the pre-registration is what makes that visible. Three arms were computed
+before any code was written:
 
 - **A — the buildable one** (produce the four rising acids): 56–96 % of the drop.
 - **B — A plus draining the three acids that FALL** (pyruvic, formic, oxalic — none of them a
@@ -23426,6 +23457,12 @@ gave it — the D-179 defect wearing a producer's hat, arriving silently on a gr
   construction: re-measure it, never cite it. Deliberately not converted — pinning it would fire
   on every future parameter addition regardless of relevance.
 - **Suite 1586**, wine untouched.
+- **Two prose-vs-guard repairs made in the same pass.** `citric_typical_beer` had **no consumer
+  at all** while this record's own YAML header claimed the counterfactual test recomputed from
+  those values — that test built its seed dict over four slots, so the `'citric' if s ==
+  'citrate'` branch was dead. Citrate is now in the counterfactual, where it belongs anyway.
+  And `OrganicAcidSpec.molar_mass` was a second copy of `ALL_ACIDS[slot].molar_mass` read by
+  nothing; dropped, with the reason stated on the dataclass so it does not come back.
 
 ### 12. Mutation-tested before being trusted
 
