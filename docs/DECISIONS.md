@@ -24340,6 +24340,16 @@ most-repeated shape — a constraint verified at a POINT where the sampler reads
 instances, twice committed inside the record documenting the previous one. **Seventh instance not
 incurred.**
 
+**Verified on the sampler, not inferred from the declaration** — D-179's lesson is that a
+parameter can be declared in `reads` and still not reach the ensemble. Measured on a default beer
+ensemble: `Y_acetic_biomass_beer` **is** drawn, `Y_acetic_sugar_beer` is **not** (it left with its
+Process), and **76** names vary. **The pinned sampling surfaces (D-156/D-157) did not move, and
+that is explained rather than lucky**: one banded yield swapped for another keeps the count, and
+the three growth constants `AceticAcidOverflow` newly declares — `mu_max`/`K_s`/`K_n` — were
+*already* drawn through `GrowthNitrogenLimited`, so declaring them adds a dependency without
+adding a name. A `reads` addition that is a strict subset of an existing declaration is invisible
+to those surfaces **by construction**; do not read their silence as evidence nothing changed.
+
 ### 9. The pre-registered pH prediction, and why it is deliberately boring
 
 | | nominal, over the peptide-pKa band | joint band |
@@ -24373,10 +24383,13 @@ move must never be read as the beat earning something
 
 ### 11. Open, and deliberately not closed here
 
-- **The mid-ferment spike itself.** Unlocking it needs a dataset that **fixes the removal law** —
-  a second acetic time course on a *different* wort would do it, because the floor is currently
-  confounded with the strain spread. **Do not re-propose the pair without one**, and do not
-  re-propose the `keto_acids` template at all: §4 refutes it independently of any new data.
+- **The mid-ferment spike itself.** Unlocking it needs a dataset that **fixes the removal law**,
+  and the binding constraint is **precision and reach, not sample size** — §5(a)/(b) fail because
+  a 5-6 point decline at ±3 ppm cannot separate `−kA` from `−k(A−floor)`, so **more strains or
+  another wort will not help**. What would: **printed values** rather than a figure read, and
+  sampling **past day 7**, where the two laws diverge most and this dataset stops. **Do not
+  re-propose the pair without that**, and do not re-propose the `keto_acids` template at all —
+  §4 refutes it independently of any new data.
 - **Lactic's late rise** — D-180 §9's other shape failure, untouched, and now the only one of the
   two whose *producer* is still on a rate law its own source contradicts.
 - **The endpoint's YAN-vs-gravity direction is unmeasured in both models** (§6). Neither the

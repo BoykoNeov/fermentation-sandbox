@@ -522,10 +522,21 @@ def test_a_flux_linked_acetic_yield_puts_the_acid_where_the_source_says_it_is_no
     # curve is MONOTONE. It reaches its endpoint early and holds; it does not peak and fall.
     # Delivering the peak needs the re-assimilation half, which D-183 measured and REFUSED.
     shipped_series = np.asarray(res.series(ACETIC_SLOT), dtype=float)
-    assert float(shipped_series.max()) == pytest.approx(float(shipped_series[-1]), rel=1e-9), (
-        "acetic now overshoots its endpoint — something restored the re-assimilation half that "
-        "D-183 refused on duration-dependence, and the D-182 pH headline is now a function of "
-        "the run's duration. Read the D-183 record before keeping this"
+    # NON-DECREASING, not "ends at its maximum". The weaker form passes for any curve that
+    # overshoots and comes back to exactly the endpoint — which is precisely the re-assimilated
+    # transient this asserts the absence of — and it passes for the retired producer too.
+    #
+    # THE TOLERANCE IS A MEASURED NOISE FLOOR, not a round number: this pool is mathematically
+    # non-decreasing and the shipped BDF run still takes 38 negative steps out of 199, the worst
+    # −2.0e−10 g/L (−1.7e−9 relative to the pool). 1e−7 sits ~58× above that and ~1000× below
+    # the step a real re-assimilation term produces, so it separates the two rather than
+    # splitting the difference ([[feedback-pin-tolerance-vs-solver-tolerance]]).
+    steps = np.diff(shipped_series)
+    assert float(steps.min()) >= -1e-7 * float(shipped_series.max()), (
+        f"acetic decreases somewhere (worst step {float(steps.min()):.3e} g/L) — something "
+        "restored the re-assimilation half that D-183 refused on duration-dependence, and the "
+        "D-182 pH headline is now a function of the run's duration. Read the D-183 record "
+        "before keeping this"
     )
     assert shipped_rmse > 25.0, (
         "the shape error against Tyrell's own days collapsed; a MONOTONE curve cannot fit a "

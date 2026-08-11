@@ -96,8 +96,11 @@ fit sits on the bound at floor = 0, and the four strains split 2-2); and every l
 consistent with makes the endpoint a function of the solver horizon — 108 / 65 / 20 / 0 ppm at
 days 7 / 14 / 30 / 400 for the pure first-order form. A modelled beer's pH would then depend on
 how long the run was left going, which is worse than a missing transient. **Do not re-propose
-the pair without a dataset that fixes the removal law**; a second time course on a *different*
-wort would do it, because the strain spread is what the floor is currently confounded with.
+the pair without a dataset that fixes the removal law** — and note what that takes: **more
+strains or another wort will NOT do it**, because the binding constraint is the ±3 ppm read
+tolerance against a 5-6 point decline, not the sample size. What separates ``−kA`` from
+``−k(A−floor)`` is *precision and reach*: printed values rather than a figure read, and
+sampling **past day 7**, where the two laws diverge most and this dataset simply stops.
 
 **What shipping the production half alone actually bought**, stated so it is not over-read: the
 shape error against Tyrell's measured days 1-7 falls from **61.6 to 32.5 ppm RMSE** and the
