@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T13:01:14.665Z
+  modified: 2026-08-11T14:04:20.600Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -25,12 +25,12 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-11)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-179**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
-**1572**. Wine **94 slots** / beer **54** (47 pre-D-179), `quinone` in both regardless of set; **three** oxidative
+**D-180**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
+**1586**. Wine **94 slots** / beer **54**, `quinone` in both regardless of set; **three** oxidative
 sets (`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**.
-**Beer's acid-base BEAT IS COMPLETE (D-178 solver + D-179 state)** — beer has acids, a peptide-buffer band and an
-inverse-anchored `cation_charge`. **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry,
-beside `BEER_ACIDS`, keyed off `StateSchema.medium`. **Next beat is the owner's call.**
+**Beer's acid-base is COMPLETE across THREE beats — solver D-178, state D-179, PRODUCER D-180.**
+**`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
+`StateSchema.medium`. **Beer's pH is now a PREDICTION, not an input.** **Next beat is the owner's call.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -51,7 +51,7 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
   quantity is itself sampled — and take the **joint** worst case over every band involved.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
-  do not "simplify".** Compile-seam distinct varying **257** (246 pre-D-179, 247 pre-D-172) — but that count is a
+  do not "simplify".** Compile-seam distinct varying **266** (257 pre-D-180, 246 pre-D-179) — but that count is a
   **COMMENT in `test_drawability_surface.py`, not an assert, so it goes STALE GREEN: re-measure, never cite it**.
   **NOT 279** (per-*file* sum, double-counts shared names); **structural 61, NOT D-157's 66** (D-159, 5 merely
   scenario-inert). Predicate = **declared `reads`**; **UNREGISTERED-class and compile-time doses are NEVER
@@ -267,6 +267,22 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   corner of TWO bands** (flips at **+3.6 % ethanol**; 0 of 180 members reach it), **never an impossibility**;
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
+
+**Beer acid-base, part 3 — the PRODUCER (D-180). Beat COMPLETE; beer's pH is now a PREDICTION.**
+- **Tyrell 2013 is TWO datasets — D-179 read only Table 1.** Its own EBC trials (Figs 4, 6-14) give ONE wort's
+  acid course d0-d7 for 4 strains **plus the pH+extract of the SAME ferments** ⇒ wort seeds, yields and the
+  divisor. **FIGURE READS, never table-grade.** Seeds are `*_typical_wort` now: a producer on D-179's
+  finished-beer seeds lands **pH 4.26** ⇒ seeds+producer are **ONE decision**. Citrate gets **NO yield** (sourced 3×).
+- **The 63-92 % pH-drop agreement is a MARGIN, not validation.** Pre-reg's 3 arms: adding the 3 acids that FALL
+  (pyruvic/formic/oxalic, **no state slots**) makes it **WORSE** (32-70 %); +dissolved CO2 gives 76-104 %. Two
+  omitted terms of OPPOSITE sign. Guard is an **UPPER bound** — exact agreement means a term arrived. **Never read
+  `CO2` as carbonic acid: it is cumulative EVOLVED GAS.** Band arm must **RE-ANCHOR the cation per member** (fixed
+  nominal cation reports 72-80 % *and* moves the start pH).
+- **Beer `Y_byproduct_sugar`=0 is now LOAD-BEARING** — succinic would double-count (own slot + `Byp`). Yield rides
+  the **shared** `fermentative_uptake_rates` (bitwise-pinned) and **must** be named in `for_uptake`'s targets (D-32
+  coupling) else the yield breaks with temperature. Booked on the FERMENTATIVE flux = **97.12 %** of ΔS (growth
+  takes the rest) ⇒ ~2.9 % under the anchor, **stated not tuned**. Peptide capacity re-anchored on WORT acids
+  (1.5125→**1.6708**), closing mismatch #3 and **worsening #1** (now a traverse); costs 0.020 pH.
 
 **Beer acid-base, part 2 — the STATE (D-179). Beat COMPLETE; do not re-propose any of it as unbuilt.**
 - **NEVER merge `WINE_ACIDS`/`BEER_ACIDS` into one registry.** Both media carry a **`citrate` slot** and only
