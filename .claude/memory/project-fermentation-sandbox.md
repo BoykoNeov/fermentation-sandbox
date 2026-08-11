@@ -25,10 +25,10 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-11)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-181**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
-**1595**. Wine **94 slots** / beer **57**, `quinone` in both regardless of set; **three** oxidative
+**D-182**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
+**1606**. Wine **94 slots** / beer **57**, `quinone` in both regardless of set; **three** oxidative
 sets (`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**.
-**Beer's acid-base is FOUR beats — solver D-178, state D-179, producer D-180, SINK D-181.**
+**Beer acid-base = FIVE beats (D-178 solver → D-182 CO2); BOTH of D-180's omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
 `StateSchema.medium`. **Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
 
@@ -53,7 +53,8 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   **D-180 hit it while FIXING it; D-181 hit it while DOCUMENTING D-180's** — it added 3 floor bands to the
   same test and pinned the 2 pKas and 3 seeds it had just shipped. **Enumerate the drawn set from the
   registry, never by hand**, and assert the corner COUNT. It was invisible because it barely moved the
-  answer (8.7-81.4 → **7.6-82.2 %**): a shape recurring 6× is how I work, not bad luck.
+  answer (8.7-81.4 → **7.6-82.2 %**): a shape recurring 6× is how I work, not bad luck. **D-182 did NOT
+  recur it** — its 3 new dims went in the SHIPPING commit (9 dims, 19683 corners); that is the fix.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
   do not "simplify".** Compile-seam distinct varying **266** (257 pre-D-180, 246 pre-D-179) — but that count is a
   **COMMENT in `test_drawability_surface.py`, not an assert, so it goes STALE GREEN: re-measure, never cite it**.
@@ -272,6 +273,19 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
 
+**Beer acid-base, part 5 — dissolved CO2 (D-182). Both omitted terms BUILT; do not re-open.**
+- **NEVER read the `CO2` slot as dissolved** — it is cumulative EVOLVED GAS (~40 g/L beer, ~100 wine, vs
+  ~2 saturation); the balance reads **`min(evolved, C_sat(T))`**, unsmoothed. **No state slot, no registry
+  entry** (`_totals_molar` would skip it SILENTLY) — own positional arg beside `byp`, **REQUIRED not
+  defaulted**. Anchor is CO2-free by construction ⇒ D-178's phosphate absorption does NOT apply.
+- **MEDIUM-AGNOSTIC and measured, not preferred**: wine **0.0007 pH** (sits 3 units BELOW the apparent
+  pKa 6.43 — D-178's own geometry inverted), 400-d aged wine **≤1e-5**. **TA EXCLUDES it** (degassed
+  sample; bitwise-pinned). **NEVER gate it** [[feedback-a-gate-is-a-discontinuity-the-solver-probes]].
+- Headline **77.6-97.0 %** nominal / **63.8-109.4 %** joint (**9** dims, 19683 corners) — a corner reaches
+  again and that was PRE-REGISTERED. **The two terms are NOT additive**: D-181's +0.2094 is **+0.1128**
+  beside CO2, because carbonic dissociates MORE as pH rises. `pKa_carbonic_1` needed a HAND entry in
+  `PKA_PARAM_NAMES` (not a registry member ⇒ derivation skipped it). **1 atm only, no vessel pressure.**
+
 **Beer acid-base, part 4 — the SINK (D-181). The headline now agrees WORSE, on purpose.**
 - **NEVER flux-link `WortAcidRemoval`** — Tyrell Table 2 scores all three `--` at LOWER Krausen and `0` after,
   and the house idiom peaks MID-ferment. First-order to a **measured floor**, temperature-flat. **NO mechanism
@@ -282,9 +296,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   Denominator is **0.81** (extreme-strain mean) in code, **0.8125** in D-180 prose — **never mix them**.
   **All 4 new pKas are consequence-free** — `pKa_oxalic_2` was shipped as "the sensitive one" and is 0.027 pp:
   the claim was about a REAL beer (4.78-4.90), the model stops at **5.24**. Re-measure when CO2 lands.
-  Missing base **+0.2094 pH**. Capacity re-anchored **1.6708→1.5481** (5-acid back-solve reproduces D-180
+  Missing base **+0.2094 pH** — **but only CO2-FREE; it is +0.1128 since D-182**, never mix them.
+  Capacity re-anchored **1.6708→1.5481** (5-acid back-solve reproduces D-180
   **bitwise**). ONE shared `k` (3x/⅓x moves pH **0.00011**). `pyruvic` ≠ wine's `pyruvate` — **reconcile before
-  beer ever wires keto-acids**. Only **dissolved CO2** left, opposite sign [[feedback-build-the-term-that-makes-agreement-worse-first]].
+  beer ever wires keto-acids**. **Dissolved CO2 BUILT at D-182** — nothing of opposite sign left [[feedback-build-the-term-that-makes-agreement-worse-first]].
 
 **Beer acid-base, part 3 — the PRODUCER (D-180). Beat COMPLETE; beer's pH is now a PREDICTION.**
 - **Tyrell 2013 is TWO datasets — D-179 read only Table 1.** Its own EBC trials (Figs 4, 6-14) give ONE wort's
