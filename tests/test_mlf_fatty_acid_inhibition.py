@@ -69,7 +69,7 @@ def _octanoic_equiv_mgl(micromolar: float) -> float:
 
 def _anchor_cation(params: Mapping[str, float], tartaric: float, malic: float, ph: float) -> float:
     totals = {"tartaric": tartaric / M_TARTARIC, "malic": malic / M_MALIC, "lactic": 0.0}
-    return acidbase.solve_cation_charge(totals, 0.0, acidbase.build_pka_map(params), ph)
+    return acidbase.solve_cation_charge(totals, 0.0, 0.0, acidbase.build_pka_map(params), ph)
 
 
 def _mlf_state(

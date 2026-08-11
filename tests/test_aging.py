@@ -215,7 +215,7 @@ def _wine_at_ph(
     if tartaric is None:
         tartaric = params["tartaric_ref_ester_hydrolysis"]
     totals = {"tartaric": tartaric / M_TARTARIC}
-    cation = solve_cation_charge(totals, 0.0, build_pka_map(params), target_ph)
+    cation = solve_cation_charge(totals, 0.0, 0.0, build_pka_map(params), target_ph)
     return _aged_wine(schema, ester=ester, t=t, tartaric=tartaric, cation_charge=cation)
 
 
@@ -3505,7 +3505,7 @@ def _aldol_sulfitable(
     """An aging wine at pH ~3.4 with α-ketobutyrate, acetaldehyde and (maybe) SO₂ dosed."""
     tartaric, malic = 6.0, 3.0
     totals = {"tartaric": tartaric / M_TARTARIC, "malic": malic / M_MALIC, "lactic": 0.0}
-    cation = solve_cation_charge(totals, 0.0, build_pka_map(params), 3.4)
+    cation = solve_cation_charge(totals, 0.0, 0.0, build_pka_map(params), 3.4)
     y = schema.zeros()
     y[schema.slice("T")] = 298.15
     y[schema.slice("tartaric")] = tartaric

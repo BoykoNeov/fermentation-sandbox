@@ -766,6 +766,12 @@ def _wine_initial(
             initial["cation_charge"] = acidbase.solve_cation_charge(
                 totals_molar,
                 byp_succinic_molar=0.0,
+                # Dissolved CO2 is 0 at the anchor and that is STRUCTURAL, not a shortcut
+                # (decision D-182): a must has not fermented, so the ``CO2`` slot this term
+                # is derived from is 0. It is also exactly why the term moves the finished pH
+                # instead of vanishing — a species present at the anchor gets absorbed into
+                # the fitted cation and becomes a near no-op (D-178's phosphate result).
+                carbonic_molar=0.0,
                 pka_map=acidbase.build_pka_map(parameters.resolve()),
                 target_ph=float(values["initial_ph"]),
             )
@@ -861,6 +867,10 @@ def _beer_cation(
         return acidbase.solve_cation_charge(
             totals_molar,
             byp_succinic_molar=0.0,
+            # 0 for the same structural reason as wine's anchor above (decision D-182): a
+            # wort has not fermented, so its evolved-CO2 slot is 0 and the carbonic term is
+            # absent from the anchor — which is what leaves it free to move the finished pH.
+            carbonic_molar=0.0,
             pka_map=acidbase.build_pka_map(parameters.resolve()),
             target_ph=float(values["initial_ph"]),
         )

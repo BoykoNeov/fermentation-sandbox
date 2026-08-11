@@ -365,7 +365,7 @@ def _sulfitable_state(
     """A mid-ferment wine state at pH ~3.4 with viable yeast, dosed acetaldehyde and (maybe) SO₂."""
     tartaric, malic = 6.0, 3.0
     totals = {"tartaric": tartaric / M_TARTARIC, "malic": malic / M_MALIC, "lactic": 0.0}
-    cation = acidbase.solve_cation_charge(totals, 0.0, acidbase.build_pka_map(params), 3.4)
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, acidbase.build_pka_map(params), 3.4)
     y = schema.pack(
         {
             "X": x, "S": [150.0], "E": 40.0, "N": 0.1, "T": 293.15, "CO2": 0.0,

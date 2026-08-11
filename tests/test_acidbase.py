@@ -74,7 +74,7 @@ def _anchor_cation(
         "malic": malic_gpl / M_MALIC,
         "lactic": 0.0,
     }
-    return acidbase.solve_cation_charge(totals, 0.0, pka, target_ph)
+    return acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, target_ph)
 
 
 # -- 1. HEADLINE: malic→lactic deacidification raises pH 0.1–0.3 ---------------
@@ -106,9 +106,11 @@ def test_headline_malic_to_lactic_raises_ph(params, pka):
 
 def test_charge_residual_zero_at_solved_ph(pka):
     totals = {"tartaric": 6.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
-    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 3.4)
-    ph = acidbase.solve_ph(totals, cation, 0.0, pka)
-    assert acidbase.charge_residual(ph, totals, cation, 0.0, pka) == pytest.approx(0.0, abs=1e-9)
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 3.4)
+    ph = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
+    assert acidbase.charge_residual(ph, totals, cation, 0.0, 0.0, pka) == pytest.approx(
+        0.0, abs=1e-9
+    )
 
 
 # -- 3. monotonicity ----------------------------------------------------------
@@ -116,13 +118,13 @@ def test_charge_residual_zero_at_solved_ph(pka):
 
 def test_more_acid_lowers_ph_more_cation_raises_ph(pka):
     base = {"tartaric": 4.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
-    cation = acidbase.solve_cation_charge(base, 0.0, pka, 3.4)
-    ph = acidbase.solve_ph(base, cation, 0.0, pka)
+    cation = acidbase.solve_cation_charge(base, 0.0, 0.0, pka, 3.4)
+    ph = acidbase.solve_ph(base, cation, 0.0, 0.0, pka)
 
     more_tartaric = {**base, "tartaric": 6.0 / M_TARTARIC}
-    assert acidbase.solve_ph(more_tartaric, cation, 0.0, pka) < ph  # more acid → lower pH
+    assert acidbase.solve_ph(more_tartaric, cation, 0.0, 0.0, pka) < ph  # more acid → lower pH
 
-    assert acidbase.solve_ph(base, cation * 1.2, 0.0, pka) > ph  # more cation → higher pH
+    assert acidbase.solve_ph(base, cation * 1.2, 0.0, 0.0, pka) > ph  # more cation → higher pH
 
 
 # -- 4. smoothness / C¹ (guards a future in-loop BDF consumer) ----------------
@@ -134,7 +136,7 @@ def test_ph_is_smooth_in_acid(pka):
     ph = np.array(
         [
             acidbase.solve_ph(
-                {"tartaric": t, "malic": 3.0 / M_MALIC, "lactic": 0.0}, cation, 0.0, pka
+                {"tartaric": t, "malic": 3.0 / M_MALIC, "lactic": 0.0}, cation, 0.0, 0.0, pka
             )
             for t in tartaric
         ]
@@ -158,22 +160,22 @@ def test_solve_ph_clamps_huge_probe_cation_to_14(pka):
     # A probe cation two orders of magnitude above the physical ~0.03 mol/L: no acid load can
     # neutralise it, so the electroneutral pH lies above the window ⇒ clamp to 14, not raise.
     totals = {"tartaric": 6.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
-    assert acidbase.solve_ph(totals, 3.81, 0.0, pka) == 14.0
+    assert acidbase.solve_ph(totals, 3.81, 0.0, 0.0, pka) == 14.0
 
 
 def test_solve_ph_clamps_negative_probe_cation_to_0(pka):
     # The mirror probe: a large acid load with a strongly NEGATIVE strong-cation charge is
     # net-negative even fully protonated ⇒ electroneutral pH below the window ⇒ clamp to 0.
     totals = {"tartaric": 6.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
-    assert acidbase.solve_ph(totals, -2.0, 0.0, pka) == 0.0
+    assert acidbase.solve_ph(totals, -2.0, 0.0, 0.0, pka) == 0.0
 
 
 def test_solve_ph_physiological_cation_falls_through_to_brentq(pka):
     # The untouched path: a physiological cation still returns an interior root, unclamped and
     # bit-for-bit identical to the brentq result (the clamp branches are never taken).
     totals = {"tartaric": 6.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
-    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 3.4)
-    ph = acidbase.solve_ph(totals, cation, 0.0, pka)
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 3.4)
+    ph = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
     assert 0.0 < ph < 14.0
     assert ph == pytest.approx(3.4, abs=1e-6)  # inverts solve_cation_charge exactly
 
@@ -316,3 +318,233 @@ def test_ph_series_drifts_down_as_byp_accumulates():
     assert ta.shape == traj.t.shape and np.all(ta > 0.0)
     assert 6.0 <= ta[0] <= 9.0  # must value is trustworthy
     assert ta[-1] > ta[0]  # documents the artifact rise (do not assert end-of-ferment band)
+
+
+# ======================================================================================
+# D-182 — dissolved CO2 as carbonic acid in the charge balance
+# ======================================================================================
+
+
+def test_carbonic_is_not_a_member_of_any_acid_registry():
+    """The structural claim, asserted because getting it wrong FAILS SILENTLY.
+
+    Dissolved CO2 has no state slot: it is derived from ``CO2`` and ``T``. The acid registries
+    are lists of SLOTS, and ``_totals_molar`` skips any name not in the schema — so putting
+    ``carbonic`` in ``WINE_ACIDS``/``BEER_ACIDS`` would not raise, it would resolve to nothing
+    and the term would quietly vanish from the balance while looking present in the source.
+    That is why it travels as its own argument, the way ``Byp`` does.
+    """
+    for registry in (acidbase.WINE_ACIDS, acidbase.BEER_ACIDS, acidbase.ALL_ACIDS):
+        assert acidbase.CARBONIC_KEY not in registry
+    assert acidbase.CARBONIC_KEY not in wine_schema()
+    assert acidbase.CARBONIC_KEY not in beer_schema()
+    # ...but it IS a key in the pKa map, exactly like Byp, or charge_residual would KeyError.
+    data = default_data_dir()
+    pmap = acidbase.build_pka_map(
+        load_parameters(data / "wine_generic.yaml", data / "acidbase.yaml").resolve()
+    )
+    assert acidbase.CARBONIC_KEY in pmap and acidbase.BYP_KEY in pmap
+
+
+def test_the_carbonic_parameters_are_all_in_the_sampled_read_set():
+    """The D-160 guard, in the one place the derivation could not reach.
+
+    ``PKA_PARAM_NAMES`` derives itself from the acid registries so a new SLOT cannot be
+    forgotten. Carbonic is not a registry member, so the derivation would have skipped it and
+    ``pKa_carbonic_1`` would sit outside ``PH_SYSTEM_READS`` — undeclared, therefore never
+    sampled, therefore narrowing the reported spread of every pH-dependent output below what
+    its own provenance justifies. The three solubility parameters are not pKas at all and
+    could not have arrived by that route under any derivation.
+    """
+    for name in ("pKa_carbonic_1", *acidbase.CO2_SOLUBILITY_PARAMS):
+        assert name in acidbase.PH_SYSTEM_READS, f"{name} would never be sampled"
+    # Still disjoint from the SO2 set — a pH-only caller must not declare the binding Ks.
+    assert not set(acidbase.PH_SYSTEM_READS) & set(acidbase.SO2_BINDING_READS)
+
+
+def test_carbonic_is_monoprotic_and_never_reaches_the_polyprotic_branch(params):
+    """pKa2 (10.3) is omitted, not deferred: at any beverage pH the carbonate fraction is
+    below 1e-9, so a second proton would be arithmetic on nothing. Asserted rather than
+    asserted-in-prose, because "add the second pKa for completeness" is the obvious edit."""
+    assert acidbase.CARBONIC_AS_CO2.protons == 1
+    # What the omission is worth, computed with a hand-built diprotic set rather than quoted,
+    # at the HIGHEST pH any medium here starts from (a 5.65 wort, taken at 5.7 to be generous
+    # to the second proton). The number that matters is the RATIO to the first proton, not the
+    # absolute: an absolute threshold would silently pass on a pool that had grown.
+    diprotic = (params["pKa_carbonic_1"], 10.3)
+    h = 10.0 ** (-5.7)
+    mono = acidbase.mean_charge(h, (params["pKa_carbonic_1"],))
+    di = acidbase.mean_charge(h, diprotic)
+    assert (di - mono) / mono < 1e-4, (
+        f"the second proton adds {(di - mono) / mono:.2e} of the first proton's charge "
+        f"({di - mono:.2e} per mole against {mono:.3f}); D-182 measured 4.6e-05"
+    )
+
+
+def test_saturation_is_the_printed_constant_at_the_reference_and_falls_with_temperature(params):
+    """Henry's law with a van 't Hoff transfer — exact at T_ref, monotone decreasing above it.
+
+    At the reference temperature the transfer is exactly 1, so the model uses the PRINTED
+    in-beer constant unscaled (the ``T_ref`` idiom of the Arrhenius modifiers). Away from it
+    solubility falls as temperature rises, which is the direction every source states.
+    """
+    ref = params["T_ref_co2_solubility"]
+    assert acidbase.co2_saturation_gpl(ref, params) == pytest.approx(
+        params["H_co2_beverage"], rel=1e-12
+    ), "the transfer must be exactly 1 at the temperature the constant is quoted at"
+    temps = [275.0, 283.15, 288.15, 293.15, 303.15]
+    sats = [acidbase.co2_saturation_gpl(t, params) for t in temps]
+    assert all(a > b for a, b in zip(sats[:-1], sats[1:], strict=True)), (
+        "CO2 solubility must FALL as temperature rises"
+    )
+    # A lager at 10 C holds meaningfully more than an ale at 20 C — the reason this ships
+    # temperature-dependent rather than as one number.
+    assert sats[1] / sats[3] > 1.25
+
+
+def test_saturation_is_total_under_a_jacobian_probe(params):
+    """Bounded like ``solve_ph``'s bracket (D-46): ``num_jac`` perturbs the ``T`` slot, and a
+    non-positive temperature would make 1/T blow up. The probe must not be able to raise."""
+    assert acidbase.co2_saturation_gpl(0.0, params) == 0.0
+    assert acidbase.co2_saturation_gpl(-5.0, params) == 0.0
+    assert acidbase.co2_saturation_gpl(1e-6, params) >= 0.0
+
+
+def test_the_evolved_slot_is_capped_at_saturation_and_is_zero_before_fermentation(params):
+    """``min(evolved, saturation)`` — the two ends of the term's whole behaviour.
+
+    The ``CO2`` slot is a cumulative evolved-gas integral reaching ~40 g/L in a beer and
+    ~100 g/L in a wine, against a saturation near 2. Reading it directly would put twenty to
+    fifty times too much carbonic acid in the balance, which is the single most likely
+    misreading of this module.
+    """
+    schema = wine_schema()
+    m_co2 = acidbase.CARBONIC_AS_CO2.molar_mass
+    sat = acidbase.co2_saturation_gpl(293.15, params)
+
+    unfermented = _wine_state(schema, CO2=0.0, tartaric=5.0)
+    assert acidbase.dissolved_co2_molar(unfermented, schema, params) == 0.0
+
+    finished = _wine_state(schema, CO2=100.0, tartaric=5.0)
+    assert acidbase.dissolved_co2_molar(finished, schema, params) * m_co2 == pytest.approx(sat)
+
+    # Below saturation the liquid holds ALL of it — the mass-conservative half of the min.
+    early = _wine_state(schema, CO2=0.5, tartaric=5.0)
+    assert acidbase.dissolved_co2_molar(early, schema, params) * m_co2 == pytest.approx(0.5)
+
+    # Solver undershoot on the evolved pool cannot make the term negative.
+    undershot = _wine_state(schema, CO2=-1e-9, tartaric=5.0)
+    assert acidbase.dissolved_co2_molar(undershot, schema, params) == 0.0
+
+
+def test_the_inverse_anchor_cannot_absorb_the_carbonic_term(pka, params):
+    """THE STRUCTURAL REASON THIS TERM MOVES pH AT ALL, and the contrast that proves it.
+
+    D-178 rejected malt phosphate on the ground that a species of CONSTANT charge is absorbed
+    outright by the back-solved cation and is a near no-op. Dissolved CO2 escapes that only
+    because it is ~0 in the must/wort where the anchor is taken and saturated afterwards.
+
+    So this asserts BOTH halves: anchoring CO2-free and then finishing saturated moves the
+    finished pH, while anchoring a state that ALREADY carries the same CO2 gives it back —
+    the phosphate result, reproduced on purpose as the counterfactual.
+    """
+    totals = {"tartaric": 5.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
+    sat_molar = acidbase.co2_saturation_gpl(293.15, params) / acidbase.CARBONIC_AS_CO2.molar_mass
+
+    # Real ordering: anchor with no CO2, finish with it.
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 3.4)
+    ph_free = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
+    ph_saturated = acidbase.solve_ph(totals, cation, 0.0, sat_molar, pka)
+    assert ph_free == pytest.approx(3.4, abs=1e-9)
+    assert ph_saturated < ph_free, "dissolved CO2 must acidify"
+
+    # Counterfactual: the same CO2 present when the anchor is taken. The cation absorbs it and
+    # the finished pH is the anchor again — a no-op, exactly as D-178 measured for phosphate.
+    absorbed_cation = acidbase.solve_cation_charge(totals, 0.0, sat_molar, pka, 3.4)
+    ph_absorbed = acidbase.solve_ph(totals, absorbed_cation, 0.0, sat_molar, pka)
+    assert ph_absorbed == pytest.approx(3.4, abs=1e-9)
+    assert absorbed_cation > cation, "absorbing the anion charge takes MORE counter-cation"
+
+
+def test_titratable_acidity_models_a_degassed_sample(params):
+    """A titration is run on a DEGASSED sample, so carbonic must not count — and the check has
+    to be that TA is BITWISE unchanged by the CO2 in the state, not merely close.
+
+    OIV titratable acidity explicitly excludes carbonic (and sulfurous) acid; brewers and
+    winemakers degas before titrating for exactly this reason. The asymmetry with
+    ``ph_of_state``, which DOES read it, is the measurement convention rather than an
+    oversight — and it is the kind of asymmetry a later reader tidies away.
+    """
+    schema = wine_schema()
+    flat = _wine_state(schema, CO2=0.0, tartaric=5.0, malic=3.0, cation_charge=0.05)
+    carbonated = _wine_state(schema, CO2=100.0, tartaric=5.0, malic=3.0, cation_charge=0.05)
+
+    assert acidbase.titratable_acidity(flat, schema, params) == acidbase.titratable_acidity(
+        carbonated, schema, params
+    ), "TA must be bit-for-bit identical — it models a degassed sample"
+    # ...while pH is NOT, which is what makes the exclusion a choice rather than a no-op.
+    assert acidbase.ph_of_state(carbonated, schema, params) < acidbase.ph_of_state(
+        flat, schema, params
+    )
+
+
+def test_the_model_sits_below_the_printed_volumes_band_and_the_head_free_scope_is_why(params):
+    """The one cross-check that is independent of every shipped number.
+
+    "The Chemistry of Beer" sec 6.7.1 prints, as an OUTCOME rather than a constant, that beer
+    contains 1.2-1.7 volumes of CO2 after a normal nonpressurized fermentation (1 volume =
+    0.196 % w/w). The model gives ~1.02 volumes at 15 C. It lands BELOW that band, and the
+    reason is the scope stated in the YAML: this term is fixed at 1 atm CO2 partial pressure,
+    while a real tank carries metres of hydrostatic head. Pinned as DIRECTIONAL — model at or
+    under the printed low edge — never as a target to hit, because the two are not the same
+    quantity. Reproducing 1.7 volumes at 1 atm would need a fermentation at about -2 C.
+    """
+    gpl_per_volume = 1.96  # 1 volume = 0.196 % by weight, printed in the same sentence
+    for celsius in (10.0, 15.0, 20.0):
+        volumes = acidbase.co2_saturation_gpl(273.15 + celsius, params) / gpl_per_volume
+        assert 0.8 < volumes <= 1.2, (
+            f"at {celsius:g} C the model holds {volumes:.2f} volumes; it must stay at or below "
+            "the printed 1.2-1.7 band's low edge, which the head-free 1 atm scope explains. "
+            "Above it would mean the model had acquired vessel pressure from somewhere."
+        )
+
+
+def test_the_apparent_pka_is_the_right_one_and_the_true_one_would_overstate_the_charge(params):
+    """APPARENT, and the word is load-bearing: the constant is referenced to TOTAL dissolved
+    CO2, of which under 1 % is actually H2CO3. Our pool IS total dissolved CO2. Using the TRUE
+    carbonic pKa (3.7) against that pool would overstate the anion charge by hundreds of
+    times — the single most plausible wrong edit to this parameter, so its size is measured."""
+    h = 10.0 ** (-4.9)  # a finished beer
+    apparent = acidbase.mean_charge(h, (params["pKa_carbonic_1"],))
+    true_h2co3 = acidbase.mean_charge(h, (3.7,))
+    assert true_h2co3 / apparent == pytest.approx(32.7, rel=0.05), (
+        f"substituting the TRUE carbonic pKa would multiply the anion charge by "
+        f"{true_h2co3 / apparent:.1f}x at beer pH; D-182 measured 32.7x. The two constants "
+        "differ by 2.7 pKa units because under 1 % of dissolved CO2 is actually H2CO3 — if "
+        "this ratio has collapsed toward 1, the shipped value is no longer the apparent one."
+    )
+
+
+def test_a_wine_moves_but_barely_and_the_geometry_is_why(params, pka):
+    """The measured cost of shipping this MEDIUM-AGNOSTIC rather than beer-scoped.
+
+    Wine's pH sits ~3 units BELOW the apparent pKa, so under 0.1 % of its dissolved CO2 is
+    dissociated, against ~4.5 % at beer's pH. That is the identical geometric argument D-178
+    used to REJECT malt phosphate for beer, pointing the other way — which is what makes
+    "medium-agnostic" a physics statement rather than a convenience.
+    """
+    totals = {"tartaric": 5.0 / M_TARTARIC, "malic": 3.0 / M_MALIC, "lactic": 0.0}
+    sat_molar = acidbase.co2_saturation_gpl(293.15, params) / acidbase.CARBONIC_AS_CO2.molar_mass
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 3.4)
+    shift = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka) - acidbase.solve_ph(
+        totals, cation, 0.0, sat_molar, pka
+    )
+    assert 0.0 < shift < 0.005, (
+        f"the carbonic term moved a wine by {shift:.4f} pH; D-182 measured ~0.0007. It is "
+        "small BY GEOMETRY, and a large value here means either the pKa or the saturation "
+        "has moved somewhere it should not have."
+    )
+    # The dissociated fractions that produce that asymmetry, stated as the check itself.
+    frac_wine = acidbase.mean_charge(10.0 ** (-3.33), (params["pKa_carbonic_1"],))
+    frac_beer = acidbase.mean_charge(10.0 ** (-4.96), (params["pKa_carbonic_1"],))
+    assert frac_wine < 0.001 < 0.02 < frac_beer < 0.10

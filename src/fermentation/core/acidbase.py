@@ -76,7 +76,34 @@ simplification to affect only the slope (buffer capacity), where we claim only
 directional fidelity. Tier: **plausible** (CRC pKa values are measured, but applying
 25 °C / I=0 constants to wine is extrapolation).
 
-**Medium-agnostic.** The solver iterates only the :data:`ACID_STATE` slots present in
+**Dissolved CO₂ (decision D-182).** A fermenting beverage sits under its own evolving CO₂,
+so the liquid is saturated at ~1 atm CO₂ partial pressure — and dissolved CO₂ is a weak acid.
+It enters the balance as :func:`dissolved_co2_molar`, a *derived* quantity with **no state
+slot of its own**: the ``CO2`` slot this engine carries is CUMULATIVE EVOLVED GAS (~40 g/L in
+a beer, ~100 g/L in a wine) and must never be read as a dissolved concentration. What the
+balance reads is ``min(evolved, saturation(T))``, the mass-conservative statement that the
+liquid retains what it can hold and the rest leaves. Structurally it is the ``Byp``
+"include-by-reading" idiom (coupling #2, D-18) — its own positional argument beside
+``byp_succinic_molar``, never a member of an acid registry, because there is no slot for
+``_totals_molar`` to find and a registry entry would silently resolve to nothing.
+
+It survives the inverse anchor for a reason worth stating, because it is exactly the trap
+D-178 fell into with malt phosphate: a species of CONSTANT charge is absorbed outright by the
+back-solved cation and is a near no-op. Dissolved CO₂ is ~0 in must/wort and saturated in the
+finished beverage, so it is not constant — the anchor cannot absorb it.
+
+**Medium-agnostic**, and the wine half is measured rather than assumed. In WINE the term is
+worth 0.0007 pH, for the identical geometric reason D-178 rejected phosphate for beer: wine's
+pH sits ~3 units BELOW the apparent pKa (6.43), so under 0.1 % of the dissolved CO₂ is
+dissociated there against ~4.5 % at beer's pH. Across a 400-day aged wine every output moves
+by ≤1e-5 relative. Scoping the term to beer would therefore be a preference wearing physics'
+clothes. The **accepted deviation** that comes with it: this engine has no racking or
+degassing verb, so a modelled wine is a *sealed* wine and stays saturated for the whole aging
+span, where real still wine is degassed and finishes well below saturation. The model is
+self-consistent — a sealed vessel at equilibrium with its own headspace *is* saturated — and
+the gap costs the ≤1e-5 measured above.
+
+**Medium-agnostic (the acid registries).** The solver iterates only the acid slots present in
 the passed schema, so beer's future phosphate set drops in by extending that mapping;
 the in-loop signature ``(y, schema, params)`` matches ``Process.derivatives`` /
 ``RateModifier.factor`` so a future in-loop pH→rate hook is free.
@@ -84,6 +111,7 @@ the in-loop signature ``(y, schema, params)`` matches ``Process.derivatives`` /
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -95,6 +123,7 @@ from fermentation.core.chemistry import (
     M_ACETIC,
     M_ALPHA_KETOGLUTARATE,
     M_CITRIC,
+    M_CO2,
     M_FORMIC,
     M_GLUTAMIC,
     M_LACTIC,
@@ -225,6 +254,41 @@ ALL_ACIDS: dict[str, AcidSpec] = {**WINE_ACIDS, **BEER_ACIDS}
 BYP_KEY = "Byp"
 BYP_AS_SUCCINIC = AcidSpec(M_SUCCINIC, ("pKa_succinic_1", "pKa_succinic_2"))
 
+#: Dissolved CO₂ read as carbonic acid (decision D-182) — the SECOND "include-by-reading"
+#: entry, and like :data:`BYP_KEY` it is a key in the pKa map without being a member of any
+#: acid registry. It differs from ``Byp`` in one way that matters: ``Byp`` *is* a state slot,
+#: whereas this is derived from two others (:data:`CO2_EVOLVED_KEY` and the temperature),
+#: which is why :func:`_totals_molar` can never produce it and it travels as its own argument.
+CARBONIC_KEY = "carbonic"
+
+#: **Monoprotic on purpose.** Carbonic acid's second dissociation (pKa₂ ≈ 10.3) is omitted,
+#: not deferred. Measured rather than asserted: the carbonate CO₃²⁻ fraction is ~1e-10 at
+#: wine pH 3.4, ~1e-7 at beer pH 4.9 and ~4e-6 at the highest pH any medium here starts from
+#: (a 5.65 wort), where the second proton is worth 7.3e-6 charge per mole against the first
+#: proton's 0.158 — five orders of magnitude down. A consequence worth noting is that carbonic
+#: is therefore the one entry in the pKa map that never reaches :func:`_polyprotic_terms`.
+CARBONIC_AS_CO2 = AcidSpec(M_CO2, ("pKa_carbonic_1",))
+
+#: The **cumulative evolved CO₂** state slot (g/L). Named with the word "evolved" in it
+#: because the single most likely misreading of this module is to treat it as the dissolved
+#: concentration: it is the ferment's whole CO₂ production integral (~40 g/L for a beer,
+#: ~100 g/L for a wine), roughly 20-50× the amount the liquid can actually hold.
+CO2_EVOLVED_KEY = "CO2"
+
+#: The temperature state slot (K) — read by :func:`co2_saturation_gpl` and by nothing else in
+#: this module. It is the first time the pH solver has depended on temperature at all, which
+#: is why :func:`ph_of_state` is no longer a function of the acid slots alone.
+TEMPERATURE_KEY = "T"
+
+#: The three parameters :func:`co2_saturation_gpl` reads: the Henry constant, the temperature
+#: it is quoted at, and the van 't Hoff coefficient that transfers it to the run's own
+#: temperature. Grouped so :data:`PH_SYSTEM_READS` derives them rather than re-listing them.
+CO2_SOLUBILITY_PARAMS: tuple[str, ...] = (
+    "H_co2_beverage",
+    "T_ref_co2_solubility",
+    "vant_hoff_co2_solubility",
+)
+
 
 def acid_registry(schema: StateSchema) -> dict[str, AcidSpec]:
     """The charge-active acid set for ``schema``'s medium (decision D-179).
@@ -255,10 +319,23 @@ def acid_registry(schema: StateSchema) -> dict[str, AcidSpec]:
 #: nominal trajectories are bit-for-bit unchanged (``resolve()`` does not touch this list);
 #: wine's ensemble *realisations* move, while the bands they estimate do not. D-179 measured
 #: that cost rather than assuming it — see the record.
+#: **:data:`CARBONIC_AS_CO2` is listed explicitly and that is the whole point.** This tuple
+#: derives itself from the registries so a new *acid slot* cannot be forgotten — but carbonic
+#: acid is not a registry member (it has no slot, D-182), so the derivation would have skipped
+#: it silently, leaving ``pKa_carbonic_1`` out of ``PH_SYSTEM_READS`` and therefore out of the
+#: sampled set under every scenario. That is not an under-documented dependency, it is the
+#: silent band-narrowing D-160 diagnosed: the reported spread of a pH-dependent output would
+#: be narrower than the parameter's own provenance justifies. ``BYP_AS_SUCCINIC`` is in the
+#: same position and was already listed for the same reason.
 PKA_PARAM_NAMES: tuple[str, ...] = tuple(
     dict.fromkeys(  # ordered de-dup: media share acids (lactic, malic, succinic)
         name
-        for spec in (*WINE_ACIDS.values(), *BEER_ACIDS.values(), BYP_AS_SUCCINIC)
+        for spec in (
+            *WINE_ACIDS.values(),
+            *BEER_ACIDS.values(),
+            BYP_AS_SUCCINIC,
+            CARBONIC_AS_CO2,
+        )
         for name in spec.pka_param_names
     )
 )
@@ -336,8 +413,12 @@ SO2_PKA_PARAM_NAMES: tuple[str, ...] = ("pKa_sulfurous_1", "pKa_sulfurous_2")
 
 #: What a Process reads indirectly by calling :func:`ph_of_state` (or anything built
 #: on it, e.g. :func:`titratable_acidity`): the charge-balance pKa set, via
-#: :func:`build_pka_map`. Splat into that Process's ``reads``.
-PH_SYSTEM_READS: tuple[str, ...] = PKA_PARAM_NAMES
+#: :func:`build_pka_map`, **plus the three CO₂-solubility parameters** the dissolved-CO₂ term
+#: reaches through :func:`co2_saturation_gpl` (decision D-182). Splat into that Process's
+#: ``reads``. The three solubility names are not pKas and could not have arrived through
+#: :data:`PKA_PARAM_NAMES`; they are here because ``reads`` has two masters and the sampler
+#: half is the one that would have gone quiet (D-160).
+PH_SYSTEM_READS: tuple[str, ...] = (*PKA_PARAM_NAMES, *CO2_SOLUBILITY_PARAMS)
 
 #: What a Process reads indirectly by calling the SO₂ speciation readouts
 #: (:func:`free_acetaldehyde`, :func:`bisulfite_so2_at_ph`, :func:`molecular_so2_at_ph`):
@@ -470,19 +551,28 @@ def charge_residual(
     totals_molar: Mapping[str, float],
     cation: float,
     byp_succinic_molar: float,
+    carbonic_molar: float,
     pka_map: Mapping[str, tuple[float, ...]],
 ) -> float:
     """Net charge [eq/L] as a function of pH — zero at electroneutrality.
 
     ``(cation + [H⁺]) − ([OH⁻] + Σ acid-anion charge)``. ``totals_molar`` maps each acid
-    slot name to its mol/L; ``pka_map`` maps the same names (plus :data:`BYP_KEY`) to
-    pKa tuples; ``byp_succinic_molar`` is the ``Byp`` pool read as succinic-equivalent.
+    slot name to its mol/L; ``pka_map`` maps the same names (plus :data:`BYP_KEY` and
+    :data:`CARBONIC_KEY`) to pKa tuples; ``byp_succinic_molar`` is the ``Byp`` pool read as
+    succinic-equivalent and ``carbonic_molar`` the dissolved CO₂ (decision D-182).
     Monotonically decreasing in pH (cation/H⁺ fall, anion charge rises) ⇒ a single
     smooth root.
+
+    **``carbonic_molar`` is REQUIRED rather than defaulted to 0**, and the churn that cost
+    across the test suite is the point: a caller holding a state vector must say what
+    dissolved CO₂ that state carries, and a caller holding a hand-built totals map must say
+    it carries none. A default would make the omission invisible in exactly the callers most
+    likely to get it wrong — the same reasoning that keeps ``byp_succinic_molar`` positional.
     """
     h = 10.0 ** (-ph)
     oh = KW / h
     anion = byp_succinic_molar * mean_charge(h, pka_map[BYP_KEY])
+    anion += carbonic_molar * mean_charge(h, pka_map[CARBONIC_KEY])
     for name, conc in totals_molar.items():
         anion += conc * mean_charge(h, pka_map[name])
     return float((cation + h) - (oh + anion))
@@ -492,6 +582,7 @@ def solve_ph(
     totals_molar: Mapping[str, float],
     cation: float,
     byp_succinic_molar: float,
+    carbonic_molar: float,
     pka_map: Mapping[str, tuple[float, ...]],
 ) -> float:
     """Solve ``charge_residual = 0`` for pH, clamped to the physical window ``[0, 14]``.
@@ -509,7 +600,7 @@ def solve_ph(
     leaves the bracket (RK45/LSODA hold ``cation_charge`` constant), so every physiological
     call falls through to the identical ``brentq`` — bit-for-bit pH, byte-for-byte curves.
     """
-    args = (totals_molar, cation, byp_succinic_molar, pka_map)
+    args = (totals_molar, cation, byp_succinic_molar, carbonic_molar, pka_map)
     if charge_residual(0.0, *args) <= 0.0:
         return 0.0  # net-negative even fully protonated ⇒ electroneutral pH ≤ 0
     if charge_residual(14.0, *args) >= 0.0:
@@ -520,6 +611,7 @@ def solve_ph(
 def solve_cation_charge(
     totals_molar: Mapping[str, float],
     byp_succinic_molar: float,
+    carbonic_molar: float,
     pka_map: Mapping[str, tuple[float, ...]],
     target_ph: float,
 ) -> float:
@@ -530,10 +622,19 @@ def solve_cation_charge(
     is negative — that means ``target_ph`` is *below* what the acid load alone produces
     (an unphysical negative strong-cation charge), surfaced at compile rather than
     packed into a nonsense state.
+
+    **``carbonic_molar`` is here for symmetry with :func:`charge_residual`, and in practice
+    it is 0 at every anchoring site** — a must or a wort is anchored before anything has
+    fermented, so the ``CO2`` slot is 0 and the term vanishes. That is not a coincidence to
+    exploit by dropping the argument: it is precisely *why* dissolved CO₂ moves the finished
+    pH at all (decision D-182). A species present at the anchor is absorbed into the fitted
+    cation and becomes a near no-op — D-178's phosphate result. Anchoring a state that
+    already carries dissolved CO₂ (a partially-fermented start) would be wrong without it.
     """
     h = 10.0 ** (-target_ph)
     oh = KW / h
     anion = byp_succinic_molar * mean_charge(h, pka_map[BYP_KEY])
+    anion += carbonic_molar * mean_charge(h, pka_map[CARBONIC_KEY])
     for name, conc in totals_molar.items():
         anion += conc * mean_charge(h, pka_map[name])
     cation = oh + anion - h
@@ -567,7 +668,45 @@ def build_pka_map(params: Mapping[str, float]) -> dict[str, tuple[float, ...]]:
         name: tuple(params[n] for n in spec.pka_param_names) for name, spec in ALL_ACIDS.items()
     }
     out[BYP_KEY] = tuple(params[n] for n in BYP_AS_SUCCINIC.pka_param_names)
+    out[CARBONIC_KEY] = tuple(params[n] for n in CARBONIC_AS_CO2.pka_param_names)
     return out
+
+
+def co2_saturation_gpl(temp_k: float, params: Mapping[str, float]) -> float:
+    """Dissolved CO₂ [g/L] a beverage holds at saturation under 1 atm CO₂ (decision D-182).
+
+    Henry's law with a van 't Hoff transfer from the temperature the constant is quoted at::
+
+        C_sat(T) = H · exp( coefficient · (1/T − 1/T_ref) )
+
+    The coefficient is ``−d ln H / d(1/T)`` as the source compilation prints it (in kelvin),
+    so it enters as a plain positive multiplier rather than the negated ``E_a/R`` of
+    :func:`~fermentation.core.kinetics.arrhenius.arrhenius_factor`; solubility FALLS as
+    temperature rises, which the sign delivers. ``H`` is beer-measured (2.302 g/(L·atm) at
+    10 °C) and agrees with water at the same temperature to 0.9 %, which is what licenses
+    borrowing water's temperature *shape* for a beer-anchored magnitude.
+
+    **The partial pressure is fixed at 1 atm and there is no scenario field for it.** A
+    fermenting vessel's headspace is essentially pure CO₂ at atmospheric pressure, which is
+    the case this models. Real tanks carry metres of hydrostatic head and finish higher; the
+    EBC-tube trials this axis is validated against do not. Vessel pressure is a *scenario*
+    concept, not a parameter, and building one is a different beat.
+
+    Bounded and total: ``temp_k`` comes from a state slot a BDF Jacobian probe can perturb, so
+    the result is clamped ≥ 0 for the same reason :func:`solve_ph` clamps its bracket (D-46).
+    """
+    ref = params["T_ref_co2_solubility"]
+    coefficient = params["vant_hoff_co2_solubility"]
+    if temp_k <= 0.0:  # a Jacobian probe can push T below absolute zero; 1/T would blow up
+        return 0.0
+    # The exponent is clamped, not the result: at a probed temperature near zero kelvin
+    # ``1/T`` reaches ~1e6 and ``exp`` raises OverflowError, which would propagate out of a
+    # pure function the solver is entitled to call anywhere (D-46). Clamping at +/-700 keeps
+    # the result finite while preserving the physical limit — an enormous saturation simply
+    # means ``min(evolved, saturation)`` returns the whole evolved pool, which IS what an
+    # infinitely soluble gas would do. Never reached on a real trajectory.
+    exponent = min(max(coefficient * (1.0 / temp_k - 1.0 / ref), -700.0), 700.0)
+    return max(float(params["H_co2_beverage"] * math.exp(exponent)), 0.0)
 
 
 def _totals_molar(y: FloatArray, schema: StateSchema) -> dict[str, float]:
@@ -589,6 +728,57 @@ def _byp_succinic_molar(y: FloatArray, schema: StateSchema) -> float:
     if BYP_KEY not in schema:
         return 0.0
     return float(y[schema.slice(BYP_KEY)][0]) / BYP_AS_SUCCINIC.molar_mass
+
+
+def dissolved_co2_molar(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """Dissolved CO₂ [mol/L] of a state vector — ``min(evolved, saturation)`` (decision D-182).
+
+    The ``CO2`` slot is the ferment's **cumulative evolved-gas integral**, not a dissolved
+    concentration; it reaches ~40 g/L in a beer and ~100 g/L in a wine against a saturation
+    of ~2 g/L. Taking the minimum is the mass-conservative reading of that: until the ferment
+    has produced enough gas to saturate the liquid, the liquid holds all of it; after that it
+    holds saturation and the surplus leaves. So the term is 0 in an unfermented must or wort
+    — which is why the inverse-anchored cation cannot absorb it — and saturated within hours
+    of the ferment starting.
+
+    **``min`` is deliberately not smoothed.** The kink is the physical statement (retain,
+    then vent) and any softening function would be an unsourced shape; it is crossed once,
+    early, and the solver crosses it without complaint.
+
+    **IT IS DELIBERATELY *NOT* GATED ON :func:`charge_balance_is_populated`, and the version
+    that was is worth recording because it looked obviously right.** The reasoning for gating
+    was that an un-anchored wine — no ``initial_ph``, no acids — has no pH information, so it
+    should get no carbonic term either. That reasoning rested on a misreading: such a wine
+    solves to pH **2.92** with or without this term (2.9242 vs 2.9217), because its balance is
+    not empty at all — it carries ~2.6 g/L of ``Byp`` against a zero cation. The carbonic term
+    moves that fiction by 0.0025 pH. Fidelity is therefore a WASH on exactly the states the
+    gate would have covered, and what decides is numerics:
+
+    **a gate here is a discontinuity in the RHS, and BDF's Jacobian probe straddles it.**
+    Measured on one 1-year aging run: ``charge_residual`` was called 63,237 times and 34,950
+    of those calls saw a NON-zero carbonic term, on states whose ``cation_charge`` had been
+    perturbed from 0 to as little as **1.49e-17** by ``num_jac``. Those Jacobian entries are
+    differences taken across a jump — they are wrong, not merely noisy — and the 4 aging pins
+    the gated version broke were that defect showing through, not a tolerance question. The
+    ungated form is continuous, so the probe sees a smooth function and there is nothing to
+    straddle. It costs 18 re-derived aging pins (D-182 records each), all of them on a guard
+    wine no real scenario produces; the *anchored* wine, the physical case, moves ≤1e-5.
+
+    **A pre-existing finding this surfaced, flagged and not fixed here:**
+    :func:`charge_balance_is_populated` tests ``> 0.0`` on floats the solver perturbs, so it
+    has ALWAYS flipped under ``num_jac`` — for
+    :class:`~fermentation.core.kinetics.aging.EsterHydrolysis`'s acid-catalysis gate as much
+    as for anything. Sizing that is a beat of its own.
+
+    Returns 0 when either slot is missing, so every hand-built test state and every schema
+    predating this term behaves exactly as it did before. Clamped ≥ 0 against solver
+    undershoot on the evolved pool.
+    """
+    if CO2_EVOLVED_KEY not in schema or TEMPERATURE_KEY not in schema:
+        return 0.0
+    evolved = max(float(y[schema.slice(CO2_EVOLVED_KEY)][0]), 0.0)
+    saturation = co2_saturation_gpl(float(y[schema.slice(TEMPERATURE_KEY)][0]), params)
+    return min(evolved, saturation) / CARBONIC_AS_CO2.molar_mass
 
 
 def _cation(y: FloatArray, schema: StateSchema) -> float:
@@ -644,13 +834,22 @@ def ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float])
 
     ``params`` is the RESOLVED ``{name: float}`` map (what ``Process.derivatives`` /
     ``RateModifier.factor`` receive), so the future in-loop pH→rate hook is genuinely
-    free. Reads the ACID_STATE slots present in ``schema`` (g/L → mol/L via chemistry
-    molar masses), the ``cation_charge`` slot, and ``Byp`` as succinic-equivalent.
+    free. Reads the acid slots present in ``schema`` (g/L → mol/L via chemistry
+    molar masses), the ``cation_charge`` slot, ``Byp`` as succinic-equivalent, and — since
+    decision D-182 — the ``CO2`` and ``T`` slots, through :func:`dissolved_co2_molar`.
+
+    **Those last two are new dependencies of a function that used to read acid slots alone**,
+    and both exist in every medium's schema, so no ``in schema`` guard hides the change: any
+    state carrying evolved CO₂ now solves to a slightly lower pH than it did before. That is
+    the intended effect (measured: ~0.3 pH on a finished beer, 0.0007 on a wine); it is
+    flagged here because a caller reasoning about which slots move pH will otherwise not
+    think to look at the temperature.
     """
     return solve_ph(
         _totals_molar(y, schema),
         _cation(y, schema),
         _byp_succinic_molar(y, schema),
+        dissolved_co2_molar(y, schema, params),
         build_pka_map(params),
     )
 
@@ -675,12 +874,23 @@ def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, 
     succinic 0.5–1.5 g/L), not this function — which is exact given its inputs. Bounded for
     *pH* as minor (~1–1.5 mM vs ~20 mM buffer) by D-18; the *TA* impact is direct and
     larger. Use the t=0 must TA as the band check; treat the series as directional only.
+
+    **DISSOLVED CO₂ IS EXCLUDED, from both the pH solve and the equivalents sum, and the
+    asymmetry with :func:`ph_of_state` is the measurement convention rather than an
+    oversight** (decision D-182). A titration is run on a **degassed** sample — brewers and
+    winemakers degas precisely so that carbonic acid does not count, and OIV titratable
+    acidity explicitly excludes carbonic (and sulfurous) acid, which the sulfurous-acid header
+    in ``acidbase.yaml`` already records. Passing 0 for the carbonic term here therefore
+    *models the degassing step*, and it has to be 0 in BOTH places to be coherent: a degassed
+    sample's starting pH is the CO₂-free pH, so solving with carbonic and then dropping it
+    from the sum would be titrating a sample nobody degassed. This paragraph exists because
+    the asymmetry is precisely the kind of thing a later reader "fixes".
     """
     pka_map = build_pka_map(params)
     totals = _totals_molar(y, schema)
     cation = _cation(y, schema)
     byp = _byp_succinic_molar(y, schema)
-    ph = solve_ph(totals, cation, byp, pka_map)
+    ph = solve_ph(totals, cation, byp, 0.0, pka_map)
     h = 10.0 ** (-ph)
 
     eq_per_l = byp * (BYP_AS_SUCCINIC.protons - mean_charge(h, pka_map[BYP_KEY]))
@@ -707,7 +917,14 @@ def ph_tier(params_tier_of: Mapping[str, Tier], schema: StateSchema | None = Non
     for callers that have no schema to hand.
     """
     registry = ALL_ACIDS if schema is None else acid_registry(schema)
-    names = {n for spec in (*registry.values(), BYP_AS_SUCCINIC) for n in spec.pka_param_names}
+    names = {
+        n
+        for spec in (*registry.values(), BYP_AS_SUCCINIC, CARBONIC_AS_CO2)
+        for n in spec.pka_param_names
+    }
+    # Carbonic is in EVERY medium's scoped set (decision D-182) — unlike the acid registries
+    # there is nothing medium-specific about dissolved CO2, so it is added to the spec list
+    # rather than to one registry. It is ``plausible`` like the rest, so no tier moves.
     tiers = [params_tier_of[n] for n in PKA_PARAM_NAMES if n in names and n in params_tier_of]
     return combine([*tiers, Tier.PLAUSIBLE])
 
@@ -1116,7 +1333,11 @@ def molecular_so2_tier(
     """
     registry = ALL_ACIDS if schema is None else acid_registry(schema)
     names = (
-        *(n for spec in (*registry.values(), BYP_AS_SUCCINIC) for n in spec.pka_param_names),
+        *(
+            n
+            for spec in (*registry.values(), BYP_AS_SUCCINIC, CARBONIC_AS_CO2)
+            for n in spec.pka_param_names
+        ),
         *SO2_PKA_PARAM_NAMES,
         SO2_BINDING_PARAM,
         PYRUVATE_SO2_BINDING_PARAM,

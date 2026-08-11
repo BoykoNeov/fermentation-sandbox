@@ -18,34 +18,35 @@ Figs 6-14) *and* the pH and extract curves (their Fig 4). So the yields are a me
 **difference on one wort**, not two studies subtracted — and the pH curve is then a **free
 prediction**, because nothing in the parameter file is fitted to it.
 
-**What the free prediction says (read the D-180 and D-181 records before quoting it), and the
-scope it is true in.** Against a measured drop of **0.81** pH units — the mean of Tyrell's
-extreme strains, which is the denominator the code divides by; D-180's prose quotes 0.8125, the
-four-strain mean, and the two must not be mixed — SINCE D-181:
+**What the free prediction says (read the D-180, D-181 and D-182 records before quoting it),
+and the scope it is true in.** Against a measured drop of **0.81** pH units — the mean of
+Tyrell's extreme strains, which is the denominator the code divides by; D-180's prose quotes
+0.8125, the four-strain mean, and the two must not be mixed — SINCE D-182:
 
-* at **nominal**, across the sampled ``pKa_peptide_buffer`` band: **42.7-62.2 %** of it;
-* over the **JOINT** band — **six** drawn quantities, not one (the four yields, the three
-  floors, the three seeds, and the two new pKas, moved together per dimension): **7.6-82.2 %**.
+* at **nominal**, across the sampled ``pKa_peptide_buffer`` band: **77.6-97.0 %** of it;
+* over the **JOINT** band — **nine** drawn quantities, not one (the four yields, the three
+  floors, the three seeds, the two acid pKas and D-182's carbonic pKa plus two solubility
+  constants, moved together per dimension): **63.8-109.4 %**.
 
-**Those numbers were 63-92 % and 41-105 % at D-180, and they got worse on purpose.** D-180
-closed with its agreement held open by two omitted terms of OPPOSITE sign, and D-181 built the
-larger one — three wort acids a real ferment removes, which the model could not lose because
-they were not state (:class:`WortAcidRemoval`). Removing them removes anion charge, so the
-finished pH rises and the predicted drop shrinks. Nothing in the reachable band now covers the
-measurement, where a corner used to. **That is the honest state**, and it is the reason the
-D-180 agreement must never have been read as validation: it was propped up by an uncorrected
-error pulling the other way.
+**BOTH of the omitted terms D-180 named are now built, and the order they were built in is the
+point.** D-180 closed with its agreement held open by two terms of OPPOSITE sign and sized
+both. D-181 built the larger one first — three wort acids a real ferment removes, which the
+model could not lose because they were not state (:class:`WortAcidRemoval`) — which made the
+prediction agree WORSE, dropping it to 42.7-62.2 % at nominal and 7.6-82.2 % band-wide, with
+nothing in the reachable band covering the measurement. D-182 then built the other one,
+dissolved CO₂ as carbonic acid in the charge balance
+(:func:`~fermentation.core.acidbase.dissolved_co2_molar`), and the headline came back up.
 
-One omitted term remains, and it pulls the opposite way again:
+**Building them the other way round would have produced the same final number and a false
+story about it**: the flattering term would have arrived at 76-104 % agreement with D-181's
+same-sized error still in place, and nobody would have had a reason to look for it.
 
-* dissolved CO₂ at end-of-fermentation saturation is not in the charge balance — worth about
-  −0.3 pH. (The engine's ``CO2`` pool is *cumulative evolved gas*, not dissolved
-  concentration, so it must NOT be read as carbonic acid; that needs a saturation model.)
-
-It is a follow-up beat with a measured size, and it is not a reason to tune a yield. Note that
-building it will move the headline back UP toward the measurement — which after D-181 would be
-a real improvement rather than a compensation, and is precisely why the two were built in this
-order rather than the other.
+Two things about the recovered agreement, so it is not over-read. It is still a SHORTFALL at
+nominal (3-22 %), and the corner that now reaches the measurement is a corner of a
+nine-dimensional hypercube rather than a draw anyone observed. And the two terms are **not
+additive**: dissolved CO₂ dissociates more as pH rises, so it buffers AGAINST the falling
+acids' removal — the same three acids that were worth +0.2094 pH at D-181 are worth +0.1128 pH
+beside the CO₂ term. Adding their separately-measured sizes over-counts.
 
 **Mechanism — an extra sliver off ``S``, never uptake's yields.** There are two shipped ways
 to fund a byproduct's carbon, and the choice matters:
@@ -289,6 +290,13 @@ class WortAcidRemoval(Process):
     the headline number agree WORSE with the measurement, on purpose. Building the other omitted
     term (dissolved CO₂, the opposite sign) first would have moved the same number to near-exact
     agreement with an uncorrected error still in place.
+
+    **D-182 has since built that other term, and it HALVES what this one appears to be worth**
+    — not because these acids shrank, but because carbonic acid dissociates more the higher the
+    pH, so it pushes back against exactly the rise this Process causes. In isolation these three
+    acids move the finished pH by +0.2094; beside the CO₂ term, +0.1128.
+    ``test_removing_the_falling_acids_raises_the_finished_ph_by_the_predicted_amount`` asserts
+    BOTH numbers, so the buffering explanation stays falsifiable rather than merely asserted.
 
     **Why first-order-to-a-floor and NOT the flux-linked idiom this module's other Process
     uses.** Tyrell's Table 2 scores all three acids ``--`` (strong decrease) at *lower* Krausen

@@ -54,13 +54,40 @@ FERMENT_DAYS = 20.0
 YEARS = 2.0
 TOTAL_DAYS = FERMENT_DAYS + 365.25 * YEARS
 
+# ======================================================================================
+# WHY FOUR OF THE SIX NUMBERS BELOW MOVED AT D-182, AND WHAT WAS CHECKED FIRST
+#
+# D-182 put dissolved CO2 into the charge balance as carbonic acid. These tests state their
+# own failure meaning — "the burst leaked into the default build" — so that had to be
+# FALSIFIED before a single pin was touched, not assumed away:
+#
+#   * ``test_an_empty_burst_pool_reproduces_the_direct_trajectory_exactly`` — the bitwise
+#     isolability guard — still PASSES. Direct and burst-with-an-empty-pool are byte-for-byte
+#     the same model, which is the strongest available form of "the burst did not leak".
+#   * The direct-vs-burst SEPARATION, computed from these very numbers, is unchanged: o2
+#     37.2173 -> 37.2215 %, A420 35.8416 -> 35.8461 %, so2_total 2.2038 -> 2.2038 % at 1 y
+#     (worst move 0.0045 percentage points). The signal these pins exist to protect is intact.
+#
+# WHAT ACTUALLY MOVED, and why it is small and confined: this scenario's wine supplies no
+# ``initial_ph`` and no acids, so its charge balance carries only ``Byp`` against a zero
+# cation — a state no real scenario produces, solving to a fictional pH ~2.92. The carbonic
+# term shifts THAT by 0.0025 pH, which reaches these slots as ~2e-4 relative. An ANCHORED
+# wine — the physical case — moves <=1e-5 across 400 days (D-182 measured it).
+#
+# ``so2_total`` is NOT re-pinned in either dict: it moved by 2.4e-6 / 4.7e-6, inside the
+# tolerance, so its numbers are still D-140's and D-147's own. Only entries that actually
+# broke are restated, each one recorded old -> new in the D-182 record.
+# ======================================================================================
+
 #: D-140's own pins on the DIRECT set (``test_oxidative_cascade_guards._WINE_PINS``), restated here
 #: as the baseline the burst set is measured AGAINST. Not re-derived — copied, so that if the
 #: direct set ever moves, this file goes red for the same reason that one does.
 DIRECT_PINS: dict[str, tuple[float, float]] = {
-    "o2": (1.444070363339e-05, 1.576919862838e-05),
+    # D-182: 1.444070363339e-05, 1.576919862838e-05 before the carbonic term.
+    "o2": (1.444363621566332e-05, 1.577233131562574e-05),
     "so2_total": (5.650150172989e-02, 5.286949820113e-02),
-    "A420": (1.517312917092e-03, 2.586921779751e-03),
+    # D-182: 1.517312917092e-03, 2.586921779751e-03 before the carbonic term.
+    "A420": (1.5176242482004844e-03, 2.5874482824764554e-03),
 }
 
 #: The same three slots under ``direct_burst``, measured at D-147 (``measure_burst.py``). The
@@ -68,9 +95,11 @@ DIRECT_PINS: dict[str, tuple[float, float]] = {
 #: (A420) — taken by re-integrating the baseline at rtol 1e-8 on a 2x denser grid, because a pin
 #: asserted at 1e-4 while BDF runs at 1e-6 is not self-evidently above its own noise.
 BURST_PINS: dict[str, tuple[float, float]] = {
-    "o2": (9.066266268085e-06, 9.877702609069e-06),
+    # D-182: 9.066266268085e-06, 9.877702609069e-06 before the carbonic term.
+    "o2": (9.067499291264613e-06, 9.879107412627015e-06),
     "so2_total": (5.774665845617e-02, 5.536926474690e-02),
-    "A420": (9.734830029596e-04, 1.644029205926e-03),
+    # D-182: 9.734830029596e-04, 1.644029205926e-03 before the carbonic term.
+    "A420": (9.73614572391898e-04, 1.6442540384438962e-03),
 }
 
 _PIN_RTOL = 1e-4

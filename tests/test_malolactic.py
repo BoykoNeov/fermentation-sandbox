@@ -70,7 +70,7 @@ def _anchor_cation(pka, tartaric_gpl: float, malic_gpl: float, lactic_gpl: float
         "malic": malic_gpl / M_MALIC,
         "lactic": lactic_gpl / M_LACTIC,
     }
-    return acidbase.solve_cation_charge(totals, 0.0, pka, target_ph)
+    return acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, target_ph)
 
 
 def _wine_state(schema: StateSchema, params: Mapping[str, float], *, target_ph: float, **slots):

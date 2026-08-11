@@ -65,7 +65,7 @@ def _anchor_cation(
         "malic": malic_gpl / M_MALIC,
         "lactic": 0.0,
     }
-    return acidbase.solve_cation_charge(totals, 0.0, acidbase.build_pka_map(params), target_ph)
+    return acidbase.solve_cation_charge(totals, 0.0, 0.0, acidbase.build_pka_map(params), target_ph)
 
 
 def _wine_state(schema: StateSchema, **slots: float) -> FloatArray:

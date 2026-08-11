@@ -308,13 +308,29 @@ def _wine_scenario(*, oak: bool, amino_acids_gpl: float) -> Scenario:
 #: of bottle aging, measured on the pre-cascade code. The per-sink O2 *split* is
 #: deliberately NOT pinned — re-homing changes which Process draws the oxygen, which is the
 #: rebuild's whole purpose; what must not change is the state the direct set arrives at.
+#
+# FOUR OF THESE MOVED AT D-182, and the cause is NOT the one this test's own message names.
+# D-182 put dissolved CO2 into the charge balance as carbonic acid. The guard wine here
+# supplies no ``initial_ph`` and no acids, so its balance holds only ``Byp`` against a zero
+# cation — an unphysical state solving to pH ~2.92 — and the carbonic term shifts that by
+# 0.0025 pH, arriving in these slots as ~2e-4 relative. An ANCHORED wine, the physical case,
+# moves <=1e-5 across 400 days. The cascade is NOT implicated: its own isolability guards
+# (``test_quinone_is_identically_zero_under_the_direct_set`` and the burst file's bitwise
+# ``test_an_empty_burst_pool_reproduces_the_direct_trajectory_exactly``) still pass, and the
+# direct-vs-burst separation these numbers feed is unchanged to 0.0045 percentage points.
+# Each moved value is recorded old -> new below and in the D-182 record. The three that did
+# NOT move beyond tolerance keep D-140's own numbers, untouched.
 _WINE_PINS: dict[str, tuple[float, float]] = {
     # slot: (value at 1 y, value at 2 y)
-    "o2": (1.444070363339e-05, 1.576919862838e-05),
+    # D-182: 1.444070363339e-05, 1.576919862838e-05 before the carbonic term.
+    "o2": (1.444363621566332e-05, 1.577233131562574e-05),
     "so2_total": (5.650150172989e-02, 5.286949820113e-02),
-    "A420": (1.517312917092e-03, 2.586921779751e-03),
-    "acetaldehyde": (4.856388639843e-05, 1.032235022293e-04),
-    "methional": (2.394235591543e-07, 5.088022950883e-07),
+    # D-182: 1.517312917092e-03, 2.586921779751e-03 before the carbonic term.
+    "A420": (1.5176242482004844e-03, 2.5874482824764554e-03),
+    # D-182: 4.856388639843e-05, 1.032235022293e-04 before the carbonic term.
+    "acetaldehyde": (4.85736353454487e-05, 1.032442374762564e-04),
+    # D-182: 2.394235591543e-07, 5.088022950883e-07 before the carbonic term.
+    "methional": (2.39472898361291e-07, 5.089058045079665e-07),
     "phenylacetaldehyde": (1.084038787891e-09, 2.302542270316e-09),
     "anthocyanin": (4.364843106077e-05, 1.140357095547e-06),
     "faded_anthocyanin": (2.478027419280e-03, 2.479828995301e-03),
@@ -469,10 +485,17 @@ def test_old_oxidative_set_reproduces_its_trajectory(wine_trajectory_run, slot, 
 #: the 20 d ferment plus 2 y, i.e. ~day 375 — about ten days short of one year after
 #: begin_aging. A420 is still rising there, so its number is the smaller one. Interpolated
 #: at the stated time, 1 y is 1.556718e-3.
+#
+# D-182 moved both non-zero entries by ~2e-4 relative, for the reason recorded above
+# ``_WINE_PINS``: the carbonic term acting on a guard wine with no anchor and no acids. The
+# 0 y entry is exactly 0 and stays exactly 0, which is worth noting rather than skipping —
+# it is the check that the term adds no browning at t=0, where no CO2 has evolved yet.
 _A420_PINS: dict[float, float] = {
     0.0: 0.0,
-    1.0: 1.556717947222e-03,
-    2.0: 2.672718096007e-03,
+    # D-182: 1.556717947222e-03 before the carbonic term.
+    1.0: 1.5570397785895263e-03,
+    # D-182: 2.672718096007e-03 before the carbonic term.
+    2.0: 2.6732691692822456e-03,
 }
 
 

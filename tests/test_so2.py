@@ -71,7 +71,7 @@ def _anchor_cation(pka, tartaric_gpl: float, malic_gpl: float, target_ph: float)
         "malic": malic_gpl / M_MALIC,
         "lactic": 0.0,
     }
-    return acidbase.solve_cation_charge(totals, 0.0, pka, target_ph)
+    return acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, target_ph)
 
 
 def _wine_scenario(**initial_extra: float) -> Scenario:

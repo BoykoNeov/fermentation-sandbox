@@ -14,17 +14,24 @@ a round-trip, with one exception which says so in its own name.
 
 **D-181 adds the sink half** (section 5): the three wort acids Tyrell measure FALLING, which
 beer's model previously could not lose. That is why this file's headline numbers moved DOWN.
+**D-182 then adds dissolved CO₂** to the charge balance — the second of the two terms D-180
+named as omitted, pulling the opposite way — which is why they moved back UP.
 
-**The headline is a compensation, not an agreement, and these tests are written to keep it
-that way.** Against a measured drop of **0.81** pH — the mean of the extreme strains, which is
-what ``measured_drop`` below computes; D-180's prose quotes the four-strain mean 0.8125 and the
-two must not be mixed — the model gives **42.7-62.2 %** at nominal across the sampled
-``pKa_peptide_buffer`` band, and **7.6-82.2 % over the joint band** of all six drawn
-quantities. At D-180 those were 63-92 %
-and 41-105 %, and a corner of the joint band REACHED the measurement; after D-181 nothing in
-the band does. The agreement got worse because an error propping it up was removed — one
-omitted term of the opposite sign remains (dissolved CO₂, ~−0.3 pH). No test here is named or
-phrased as validating the produced acids alone.
+**BOTH of D-180's omitted terms are now built, and that changes what a shortfall means.**
+Against a measured drop of **0.81** pH — the mean of the extreme strains, which is what
+``measured_drop`` below computes; D-180's prose quotes the four-strain mean 0.8125 and the two
+must not be mixed — the model gives **77.6-97.0 %** at nominal across the sampled
+``pKa_peptide_buffer`` band, and **63.8-109.4 % over the joint band** of all NINE drawn
+quantities. The history of those two numbers is the whole story of this axis: 63-92 % and
+41-105 % at D-180 (with a corner reaching the measurement), 42.7-62.2 % and 7.6-82.2 % at
+D-181 (with nothing reaching), and now back above both — because D-181 removed an error that
+was propping the agreement up and D-182 supplied the term that was genuinely missing.
+
+**This still is not validation.** The nominal falls short by 3-22 %; the corner that reaches
+is a corner of a 9-dimensional hypercube, not a draw anyone observed; and the two shape
+failures section 9 records — acetic's mid-ferment transient and lactic's late rise — are
+unmodelled and are not charge-balance terms. No test here is named or phrased as validating
+the produced acids alone.
 """
 
 import pytest
@@ -262,18 +269,18 @@ def test_beer_byproduct_yield_stays_zero_or_succinic_double_counts(beer_params):
     params = beer_params.resolve()
     pka = acidbase.build_pka_map(params)
     totals = {"succinic": 0.102 / acidbase.ALL_ACIDS["succinic"].molar_mass}
-    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 4.4)
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 4.4)
 
-    honest = acidbase.solve_ph(totals, cation, 0.0, pka)
+    honest = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
     # The same succinic, half of it also booked through the Byp lump.
     doubled = acidbase.solve_ph(
-        {"succinic": totals["succinic"] * 0.5}, cation, totals["succinic"] * 0.5, pka
+        {"succinic": totals["succinic"] * 0.5}, cation, totals["succinic"] * 0.5, 0.0, pka
     )
     assert honest == pytest.approx(doubled, abs=1e-9), (
         "sanity: splitting succinic between its slot and Byp must be pH-neutral"
     )
     # ...which is precisely why ADDING a Byp on top of a full succinic slot is not.
-    inflated = acidbase.solve_ph(totals, cation, totals["succinic"], pka)
+    inflated = acidbase.solve_ph(totals, cation, totals["succinic"], 0.0, pka)
     assert inflated < honest - 0.05, (
         "a non-zero beer Y_byproduct_sugar would count succinic twice in the charge balance"
     )
@@ -365,30 +372,39 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     Tyrell's Fig. 4 is a genuine external test. Two scopes, and conflating them is the whole
     trap this test exists to avoid:
 
-    * **at nominal, across ``pKa_peptide_buffer``'s band: 42.7-62.2 %** of the measured
-      0.81 pH drop (D-181; it was 63-92 % at D-180). The model must fall SHORT here.
-    * **over the JOINT band — SIX drawn quantities, not one: 7.6-82.2 %.**
+    * **at nominal, across ``pKa_peptide_buffer``'s band: 77.6-97.0 %** of the measured
+      0.81 pH drop (D-182; 42.7-62.2 % at D-181, 63-92 % at D-180). The model must still fall
+      SHORT here.
+    * **over the JOINT band — NINE drawn quantities, not one: 63.8-109.4 %.**
 
-    **The joint band has grown twice, and the second time is the instructive one.** D-180's
-    amendment added the four ``Y_*_sugar_beer`` after the first version asserted "the model
-    must fall short" on the nominal alone — a constraint verified at a POINT where the sampler
-    reads a BAND. D-181 then shipped the three FLOORS as a third dimension and **committed the
-    identical mistake one level out**, holding ``pKa_oxalic_2``, ``pKa_pyruvic`` and the three
-    wort SEEDS at nominal while calling the result band-wide. All six are drawn; all six are
-    varied here. The measured cost was small (8.7-81.4 % → 7.6-82.2 %) and the headline claim
-    survived it — which is exactly why nothing but running it would have caught the omission.
+    **The joint band has grown three times, and the middle one is the instructive one.**
+    D-180's amendment added the four ``Y_*_sugar_beer`` after the first version asserted "the
+    model must fall short" on the nominal alone — a constraint verified at a POINT where the
+    sampler reads a BAND. D-181 then shipped the three FLOORS as a third dimension and
+    **committed the identical mistake one level out**, holding ``pKa_oxalic_2``,
+    ``pKa_pyruvic`` and the three wort SEEDS at nominal while calling the result band-wide.
+    D-182 adds the three the carbonic term brought (``pKa_carbonic_1``, ``H_co2_beverage``,
+    ``vant_hoff_co2_solubility``) in the same beat that ships them, rather than in the record
+    that documents the beat — which is what the two previous instances failed to do. All nine
+    are drawn; all nine are varied here, and the corner COUNT is asserted so a future
+    dimension cannot be added to the registry without being added here.
 
-    **What each dimension is worth, measured** (all-nominal fraction 0.5084, whole band each):
-    the peptide pKa moves it 0.427-0.622; the yields and floors comparably; the three seeds
-    ~0.015; the two new pKas **0.0003** — see ``pKa_oxalic_2``'s note for why the pKa that
-    ought to matter does not, and what would make it start mattering.
+    **What each dimension is worth, measured** (all-nominal fraction 0.8559, whole band each):
+    the peptide pKa moves it 0.776-0.970; the yields and floors comparably; the three seeds
+    ~0.015; ``pKa_oxalic_2``/``pKa_pyruvic`` **0.0003**; and of D-182's three, the carbonic
+    pKa is worth ~0.01 and the two solubility parameters ~0.01 between them — the CO2 term's
+    SIZE is consequential but its band is not, because both edges sit within 10 % of a
+    nominal that is itself a printed in-beer measurement.
 
-    **No corner reaches the measurement any more.** D-180's did (104.5 %), and that reach
-    belonged to the falling acids' absence rather than to the model. So the "is a corner
-    reaching?" question now has the opposite answer, and a future change that makes one reach
-    again is a signal to find out which omitted term arrived
-    [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. One real term of opposite sign
-    is still absent (dissolved CO2, ~-0.3 pH).
+    **A CORNER REACHES THE MEASUREMENT AGAIN, AND IT WAS PREDICTED IN ADVANCE.** D-180's did
+    (104.5 %), and that reach belonged to the falling acids' absence rather than to the model;
+    D-181 removed it and wrote that "a future change that makes one reach again is a signal to
+    find out which omitted term arrived"
+    [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. One has: dissolved CO2, the
+    last of the two terms D-180 named, built at D-182 and pre-registered at 76-104 % before a
+    line of it was written. **That does not make the model validated.** The nominal still
+    falls short by 3-22 %, the reaching member is a corner of a 9-D hypercube nobody was seen
+    to draw, and the acetic transient and lactic late rise (§9) remain unmodelled.
 
     **The arm RE-ANCHORS the cation per member, and getting that wrong is the other trap.**
     Re-reading the shipped trajectory's pH at a different pKa while holding the
@@ -425,7 +441,17 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         p = beer_params[param]
         return float({"lo": p.uncertainty.low, "nom": p.value, "hi": p.uncertainty.high}[pick])
 
-    def fraction(pka: float, pick: str, floor_pick: str, ox2: str, pyr: str, seed: str) -> float:
+    def fraction(
+        pka: float,
+        pick: str,
+        floor_pick: str,
+        ox2: str,
+        pyr: str,
+        seed: str,
+        carbonic: str,
+        henry: str,
+        vant_hoff: str,
+    ) -> float:
         # Every pKa this beat added is drawn too (PH_SYSTEM_READS is the union, D-179), so
         # pinning them here would be the same point-vs-band mistake one level further out.
         member = {
@@ -433,13 +459,14 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
             "peptide_buffer": (pka,),
             "oxalic": (pka_map["oxalic"][0], edge("pKa_oxalic_2", ox2)),
             "pyruvic": (edge("pKa_pyruvic", pyr),),
+            "carbonic": (edge("pKa_carbonic_1", carbonic),),
         }
         # ...and so are the three wort seeds, which set how much charge there is to lose.
         seeded = dict(start_molar)
         for seed_slot, seed_param in WORT_SEED_PARAMS.items():
             seeded[seed_slot] = edge(seed_param, seed) / molar[seed_slot]
-        cation = acidbase.solve_cation_charge(seeded, 0.0, member, TYRELL_WORT_PH)
-        start = acidbase.solve_ph(seeded, cation, 0.0, member)
+        cation = acidbase.solve_cation_charge(seeded, 0.0, 0.0, member, TYRELL_WORT_PH)
+        start = acidbase.solve_ph(seeded, cation, 0.0, 0.0, member)
         assert start == pytest.approx(TYRELL_WORT_PH, abs=1e-6), (
             "every member must start at the supplied wort pH — that is what anchoring means"
         )
@@ -454,7 +481,18 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         # first days of this 14-day run, which the endpoint-insensitivity test pins separately.
         for sink in WORT_ACID_SINKS:
             end[sink.slot] = edge(sink.floor_param, floor_pick) / molar[sink.slot]
-        return (start - acidbase.solve_ph(end, cation, 0.0, member)) / measured_drop
+        # D-182's carbonic term, at THIS member's own solubility parameters. It is 0 in the
+        # wort arm above and non-zero here, which is the whole shape of the term: the anchor
+        # cannot absorb what is not present when the anchor is taken.
+        member_params = {
+            **params,
+            "H_co2_beverage": edge("H_co2_beverage", henry),
+            "vant_hoff_co2_solubility": edge("vant_hoff_co2_solubility", vant_hoff),
+        }
+        sat = acidbase.co2_saturation_gpl(float(res.series("T")[-1]), member_params)
+        evolved = float(res.series("CO2")[-1])
+        carbonic_molar = min(evolved, sat) / acidbase.CARBONIC_AS_CO2.molar_mass
+        return (start - acidbase.solve_ph(end, cation, 0.0, carbonic_molar, member)) / measured_drop
 
     pka_band = (
         beer_params["pKa_peptide_buffer"].uncertainty.low,
@@ -463,17 +501,23 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     )
 
     # Scope 1 — everything nominal but the peptide pKa. The "must fall short" claim lives HERE.
-    at_nominal = [fraction(pka, "nom", "nom", "nom", "nom", "nom") for pka in pka_band]
-    assert min(at_nominal) > 0.35, (
+    at_nominal = [
+        fraction(pka, "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom") for pka in pka_band
+    ]
+    assert min(at_nominal) > 0.70, (
         f"the predicted drop collapsed to {min(at_nominal):.0%} of Tyrell's measured one at "
-        "nominal yields; D-181 measured 42.7-62.2 % across the pKa band (D-180's 63-92 % was "
-        "the same model unable to lose the falling acids' charge)"
+        "nominal yields; D-182 measured 77.6-97.0 % across the pKa band (D-181's 42.7-62.2 % "
+        "was the same model with no dissolved CO2 in its charge balance, and D-180's 63-92 % "
+        "was that model also unable to lose the falling acids' charge)"
     )
     assert max(at_nominal) < 1.0, (
         f"at NOMINAL yields the predicted drop reached {max(at_nominal):.0%} of the measured "
-        "one. It is supposed to fall short — and since D-181 the one term still missing pulls "
-        "the OTHER way (dissolved CO2, ~-0.3 pH), so reaching 100 % here means the model gained "
-        "acidification from somewhere unaccounted, not that the last omission arrived."
+        "one. It is still supposed to fall short: BOTH of the terms D-180 named as omitted "
+        "have now been built (D-181's falling acids, D-182's dissolved CO2), so reaching "
+        "100 % here no longer has a pending omission to explain it — it would mean the model "
+        "gained acidification from somewhere unaccounted. What is still missing is named in "
+        "this module's header: acetic's transient and lactic's late rise, neither of which is "
+        "a charge-balance term."
     )
 
     # Scope 2 — the joint band the sampler can actually reach. NO upper bound is asserted
@@ -484,30 +528,44 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     # which is exactly what D-180's amendment had to correct in this very test.
     picks = ("lo", "nom", "hi")
     joint = [
-        fraction(pka, pick, floor_pick, ox2, pyr, seed)
+        fraction(pka, pick, floor_pick, ox2, pyr, seed, carbonic, henry, vant_hoff)
         for pka in pka_band
         for pick in picks
         for floor_pick in picks
         for ox2 in picks
         for pyr in picks
         for seed in picks
+        for carbonic in picks
+        for henry in picks
+        for vant_hoff in picks
     ]
-    assert len(joint) == 3**6, "every drawn dimension must be varied, not a subset of them"
-    assert min(joint) == pytest.approx(0.076, abs=0.02), (
-        f"the joint low corner moved to {min(joint):.1%}; D-181 measured 7.6 % — yields at "
-        "their low edge, peptide pKa HIGH, floors at their LOW edge (the strains that clear "
-        "the most wort acid) and the seeds HIGH. A LOW floor means MORE acid removed and "
-        "therefore a SMALLER net drop, which is the opposite of the intuition that a lower "
-        "residue means a more acidic beer: what moves pH is charge lost, not acid left."
+    assert len(joint) == 3**9, "every drawn dimension must be varied, not a subset of them"
+    assert min(joint) == pytest.approx(0.638, abs=0.02), (
+        f"the joint low corner moved to {min(joint):.1%}; D-182 measured 63.8 % (D-181's was "
+        "7.6 %) — yields at their low edge, peptide pKa HIGH, floors at their LOW edge (the "
+        "strains that clear the most wort acid) and the seeds HIGH. A LOW floor means MORE "
+        "acid removed and therefore a SMALLER net drop, which is the opposite of the "
+        "intuition that a lower residue means a more acidic beer: what moves pH is charge "
+        "lost, not acid left. "
+        "THE LOW CORNER MOVED EIGHT TIMES MORE THAN THE HIGH ONE (7.6 -> 63.8 % against "
+        "82.2 -> 109.4 %), and the asymmetry is the carbonic term's own geometry rather than "
+        "a mistake: a member that predicts LITTLE acidification finishes at a HIGHER pH, and "
+        "carbonic acid dissociates more the higher the pH, so the CO2 contribution is largest "
+        "exactly where the acids contribute least. The joint band is therefore COMPRESSED, "
+        "from a 74.6-point span to a 45.6-point one — this term is a stabiliser of the "
+        "prediction, not just an offset to it."
     )
-    assert max(joint) == pytest.approx(0.822, abs=0.02), (
-        f"the joint high corner moved to {max(joint):.1%}; D-181 measured 82.2 % (yields "
-        "high, peptide pKa low, floors high, seeds low). NB this is a CORNER of a 6-D "
-        "hypercube, not a member any ensemble was seen to draw. **No corner reaches the "
-        "measured drop**: D-180's 104.5 % came from a model that could not lose the falling "
-        "acids' charge, and removing that error removed the reach with it. Nothing in the "
-        "band covers the measurement, which is the honest state — the remaining omitted "
-        "term (dissolved CO2) pulls the other way and is not built."
+    assert max(joint) == pytest.approx(1.094, abs=0.02), (
+        f"the joint high corner moved to {max(joint):.1%}; D-182 measured 109.4 % (D-181's "
+        "was 82.2 %) — yields high, peptide pKa low, floors high, seeds low, and the three "
+        "CO2 parameters at the edges that dissolve the most and dissociate it hardest. NB "
+        "this is a CORNER of a 9-D hypercube, not a member any ensemble was seen to draw. "
+        "**A corner REACHES the measured drop again, and it was pre-registered.** D-180 had "
+        "one at 104.5 %; D-181 removed it and wrote that a future change restoring it would "
+        "signal that an omitted term had arrived. One has — dissolved CO2, D-180's own arm C, "
+        "predicted at 76-104 % before D-182 was written. Reaching is therefore the EXPECTED "
+        "outcome here and not evidence the model is right: the nominal still falls short, and "
+        "no upper bound is asserted on this scope for the same reason it never was."
     )
 
 
@@ -537,13 +595,13 @@ def test_a_beer_seeded_at_finished_beer_levels_would_overshoot(beer_params):
         beer_params["peptide_buffer_capacity_beer"].value
         / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
     )
-    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 4.4)
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 4.4)
     produced = dict(totals)
     for spec in ORGANIC_ACID_SPECS:  # citrate is seeded but has no yield
         produced[spec.slot] = (
             produced[spec.slot] + (params[spec.yield_param] * TYRELL_SUGAR_GPL) / molar[spec.slot]
         )
-    assert acidbase.solve_ph(produced, cation, 0.0, pka) < 4.3, (
+    assert acidbase.solve_ph(produced, cation, 0.0, 0.0, pka) < 4.3, (
         "producing on top of finished-beer seeds should overshoot below any real beer; "
         "if it no longer does, the seeds or the yields have moved"
     )
@@ -725,18 +783,54 @@ def test_removing_the_falling_acids_raises_the_finished_ph_by_the_predicted_amou
     acids [[feedback-pair-the-red-with-an-ordering-preserving-baseline]] — in particular the
     peptide capacity is the same re-anchored value in both, so this measures the acids and not
     the re-anchor that shipped beside them.
+
+    **D-182 HALVED THE NUMBER, AND THAT IS A RESULT RATHER THAN A REGRESSION.** D-181 measured
+    this at +0.2094 pH with NO carbonic term in the balance. Dissolved CO2 (D-182) does not
+    merely add its own shift on top: it **buffers against this one**. Carbonic's dissociated
+    fraction RISES with pH (pKa 6.43 sits above the beer, so the model is on the steep side of
+    its curve), so removing the falling acids — which pushes pH up — makes carbonic give up
+    more charge, which pushes back. The same three acids are therefore worth +0.1128 pH in the
+    shipped model. **The two omitted terms D-180 named are not additive**, and anyone adding
+    their separately-measured sizes to predict a total will over-count.
+
+    So this asserts BOTH numbers: the shipped one, and D-181's own recomputed CO2-free on the
+    identical pair of end states. The second is what keeps D-181's claim falsifiable instead
+    of quietly superseded — and it is only possible because ``solve_ph`` takes the carbonic
+    term as an explicit argument rather than reading it implicitly.
     """
-    with_sinks, _c1, _r1 = _finished_ph({})
-    without, _c2, _r2 = _finished_ph({"pyruvic_gpl": 0.0, "formic_gpl": 0.0, "oxalic_gpl": 0.0})
+    with_sinks, c1, r1 = _finished_ph({})
+    without, c2, r2 = _finished_ph({"pyruvic_gpl": 0.0, "formic_gpl": 0.0, "oxalic_gpl": 0.0})
 
     assert with_sinks > without, (
         "removing the falling acids must RAISE the finished pH — that is the missing base "
         f"D-180 sized. Got {with_sinks:.4f} with them and {without:.4f} without."
     )
-    assert 0.15 < with_sinks - without < 0.35, (
-        f"the missing base is worth {with_sinks - without:.4f} pH here, outside D-180's "
-        "predicted +0.2-0.3 window. Either the seeds, the floors or the charge arithmetic "
-        "moved — the size of this term is the whole reason the beat was worth building."
+    assert with_sinks - without == pytest.approx(0.1128, abs=0.01), (
+        f"the missing base is worth {with_sinks - without:.4f} pH in the shipped model; "
+        "D-182 measured 0.1128. It is SMALLER than D-181's CO2-free 0.2094 because the "
+        "carbonic term buffers against the removal, not because the acids shrank — the "
+        "CO2-free assertion below is what tells those two explanations apart."
+    )
+
+    # The same two end states, re-solved with the carbonic term switched off. This must
+    # reproduce D-181's +0.2094 pH: if it does, the shipped shrinkage is the CO2 buffer; if it
+    # does not, something in the seeds, floors or charge arithmetic actually moved.
+    def co2_free(compiled, res) -> float:
+        params = compiled.parameters.resolve()
+        y = res.y[:, -1]
+        return acidbase.solve_ph(
+            acidbase._totals_molar(y, compiled.schema),
+            acidbase._cation(y, compiled.schema),
+            acidbase._byp_succinic_molar(y, compiled.schema),
+            0.0,
+            acidbase.build_pka_map(params),
+        )
+
+    co2_free_gap = co2_free(c1, r1) - co2_free(c2, r2)
+    assert 0.15 < co2_free_gap < 0.35, (
+        f"with the carbonic term off the missing base is worth {co2_free_gap:.4f} pH, outside "
+        "D-180's predicted +0.2-0.3 window that D-181 landed at 0.2094. The D-182 buffer "
+        "explanation for the shipped 0.1128 only holds if this arm still reproduces D-181."
     )
 
 
@@ -779,11 +873,11 @@ def test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc():
         params["peptide_buffer_capacity_beer"].value
         / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
     )
-    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 5.5)
-    ph_in = acidbase.solve_ph(totals, cation, 0.0, pka)
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 5.5)
+    ph_in = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
     f = v_in / v_fin
     diluted = {k: v * f for k, v in totals.items()}
-    ph_fin = acidbase.solve_ph(diluted, cation * f - (v_acid * c_acid) / v_fin, 0.0, pka)
+    ph_fin = acidbase.solve_ph(diluted, cation * f - (v_acid * c_acid) / v_fin, 0.0, 0.0, pka)
     h_inc = v_fin * 10.0 ** (-ph_fin) - v_in * 10.0 ** (-ph_in)
     bc = math.log10((v_acid * c_acid) / h_inc)
 

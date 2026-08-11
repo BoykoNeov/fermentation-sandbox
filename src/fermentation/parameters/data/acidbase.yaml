@@ -400,3 +400,112 @@ K_5_oxofructose_so2:
     source: "Burroughs & Sparks (1973b), Sulphite-binding power of wines and ciders II, apparent Kd ~0.33 mM for 5-oxofructose (keto-5-fructose), as compiled by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419 and Ribereau-Gayon et al., Handbook of Enology Vol. 1 sec 8.4 (Table 8.7)."
     conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like the three yeast-carbonyl constants above."
     notes: "The dominant botrytis-specific carbonyl-SO2 binder (decision D-130), added to the SAME shared-bisulfite competitive-Langmuir equilibrium as acetaldehyde/pyruvate/alpha-KG (acidbase.bound_so2_molar). Enters via the inert `oxofructose` must-input slot (default 0 -> byte-for-byte the D-51 3-carbonyl form; a non-botrytis wine is unchanged). Typical botrytized-must LOAD is ~80-150 mg/L (Barbe 2000/2002; Handbook Vol 1: '5-oxofructose content frequently of the order of 100 mg/l in wines made from botrytized grapes'), set per-scenario via oxofructose_mgl -- the load is sourced (a measured range), not an author estimate. tier=plausible: measured Kd + measured load applied to wine as apparent values; the SO2-collapse OUTCOME is the sourced-robust claim (Barbe's 4-78%-of-combinations), the exact per-run split rides the load."
+
+# ======================================================================================
+# DISSOLVED CO2 — the carbonic-acid term in the charge balance (decision D-182)
+# ======================================================================================
+#
+# D-180 turned beer's pH from an input into a prediction and closed by naming TWO omitted
+# terms of OPPOSITE sign. D-181 built the larger one — the wort acids a real ferment removes
+# — which made the prediction agree WORSE on purpose. This block is the other one, and it
+# pulls the other way.
+#
+# WHAT IS MODELLED. A fermenting beverage sits under its own evolving CO2, so the liquid is
+# saturated at ~1 atm CO2 partial pressure, and dissolved CO2 is a weak acid. What the charge
+# balance reads is min(evolved CO2, saturation): the mass-conservative statement that the
+# liquid retains what it can hold and the rest leaves. The engine's `CO2` state slot is
+# CUMULATIVE EVOLVED GAS and must NEVER be read as the dissolved concentration — reading it
+# directly would put ~40 g/L (beer) or ~100 g/L (wine) of carbonic acid in the balance.
+#
+# WHY IT IS NOT ABSORBED BY THE INVERSE-ANCHORED CATION, which is the trap D-178 fell into
+# with malt phosphate: a species carrying a CONSTANT charge is absorbed outright by the
+# back-solved cation and is a near no-op. Dissolved CO2 is ~0 in wort/must (nothing has
+# fermented yet) and saturated in the finished beverage, so it is not constant — it is
+# exactly the shape that survives anchoring.
+#
+# MEDIUM-AGNOSTIC, AND THE WINE HALF IS MEASURED RATHER THAN ASSUMED. The same term is in
+# every medium's balance because the physics is the same. In WINE it is worth 0.0007 pH,
+# for the identical geometric reason D-178 used to REJECT phosphate for beer: wine's pH
+# (~3.3) sits ~3 units BELOW the apparent pKa, so <0.1 % of the dissolved CO2 is dissociated
+# there, against ~4.5 % at beer's pH. Over a 400-day aged wine every output moves by <=1e-5
+# relative (worst: A420, 1.1e-5). Those numbers are the reason there is no medium key here:
+# scoping it to beer would be a preference wearing physics' clothes.
+#
+# THE ACCEPTED DEVIATION THAT COMES WITH IT. This engine has no racking or degassing verb, so
+# a modelled wine is a SEALED wine and stays saturated for the whole aging span. Real still
+# wine is racked and degassed and finishes well below saturation. The model is self-consistent
+# — a sealed vessel at equilibrium with its own headspace IS saturated — and the gap costs the
+# <=1e-5 measured above. Recorded, not tuned.
+#
+# SCOPE, stated because it is a limitation and not a rounding: the CO2 partial pressure is
+# fixed at 1 atm. There is no vessel-pressure scenario field and this beat does not invent one
+# (that is a scenario concept, not a parameter). Real tanks carry metres of hydrostatic head
+# and finish HIGHER than this says; the EBC-tube trials this axis is validated against do not,
+# which is why 1 atm is right for the target and an under-estimate for a brewery.
+#
+# THE CROSS-CHECK, which is independent of every number below. "The Chemistry of Beer"
+# (Bamforth ed.) sec 6.7.1 prints, as an OUTCOME rather than a constant, that beer contains
+# 1.2-1.7 volumes of CO2 after a normal nonpressurized fermentation, with 1 volume = 0.196 %
+# by weight => 2.35-3.33 g/L. The model gives 2.00 g/L at 15 C. It lands BELOW that band, and
+# the head-free 1-atm scope above is why: reproducing 1.7 volumes at 1 atm would need a
+# fermentation at -2 C. Pinned as a directional check (model <= the band's low edge), never as
+# a target to hit — the two are not the same quantity.
+
+# -- Apparent first dissociation constant of dissolved CO2 ----------------------
+#
+# APPARENT, and the word is load-bearing. The true carbonic-acid pKa1 is 3.7, but only <1 %
+# of dissolved CO2 is actually H2CO3 (hydration constant pKh = 2.8); the constant quoted for
+# practical work references the TOTAL dissolved CO2 pool, which is exactly what this model's
+# pool is. Using 3.7 here would over-state the anion charge by ~500x.
+pKa_carbonic_1:
+  value: 6.428
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 6.40, high: 6.456, note: "BOTH EDGES PRINTED-derived, from two independent texts at two temperatures: 6.40 is Understanding Wine Chemistry 2e Fig 3.8 ('Apparent pKa1 of CO2 = 6.4') at 25 C; 6.456 is Wine Flavour Chemistry Eq 3.7 ratio (4) ([H+][HCO3-]/([CO2]+[H2CO3]) = 3.5e-7) at 18 C. The nominal is the CONSTRUCTED midpoint and is NOT a third source. Part of the span is the sources' own 18-vs-25 C difference, which is an ACCEPTED DEVIATION: this pKa ships temperature-flat beside a temperature-DEPENDENT solubility, so the asymmetry is named here rather than left for a reader to find." }
+  provenance:
+    source: "Waterhouse, Sacks & Jeffery, Understanding Wine Chemistry (2nd ed.), sec 3.7 and Fig 3.8 (values from Wang et al. and references therein); corroborated by Clarke & Bakker, Wine Flavour Chemistry sec 3.8.2, Eq 3.7."
+    conditions: "aqueous, 18-25 C; an APPARENT (concentration-based) constant referenced to TOTAL dissolved CO2, not to H2CO3. Applied to beer and wine as an apparent constant, exactly as every other pKa in this file is (decision D-18)."
+    notes: "The second dissociation (pKa2 = 10.3) is omitted, not deferred: at pH 4-5.5 the carbonate CO3(2-) fraction is below 1e-9, so a second proton would be arithmetic on nothing. Carbonic acid is therefore MONOPROTIC here, which is also why it never reaches the n-protic branch. Read by the charge balance (acidbase.charge_residual) and DELIBERATELY NOT by titratable_acidity -- brewers and winemakers degas before titrating, and OIV titratable acidity explicitly excludes carbonic acid, which the exclusion here reproduces (see the sulfurous-acid header above for the same convention)."
+
+# -- Henry's-law solubility of CO2 in the beverage ------------------------------
+#
+# EACH EDGE ON ITS OWN GROUND (the D-173/D-174 discipline), and the nominal is neither edge.
+# The nominal is the only value in the sources that is a Henry constant, measured in BEER, at
+# exactly this block's reference temperature. The low edge is water. The high edge is the same
+# book's OTHER in-beer statement, which disagrees with its own constant by 10 %.
+H_co2_beverage:
+  value: 2.302
+  unit: "g/(L*atm)"
+  tier: plausible
+  uncertainty: { low: 2.282, high: 2.539, note: "LOW is CONSTRUCTED: Sander's compilation value for WATER (3.4e-4 mol/(m3*Pa) at 298.15 K) transferred to 283.15 K with vant_hoff_co2_solubility, = 2.282. Beer sitting 0.9 % ABOVE water is the direction ethanol predicts, so this edge is a floor rather than a rival. HIGH is CONSTRUCTED from the SAME book as the nominal: 'about 1.8 grams of carbon dioxide in 12 ounces' held at '1.7 atmospheres' at 4.5 C => 2.983 g/(L*atm), transferred to 283.15 K => 2.539. So the source states its own constant two ways that differ by 10 % once put on one temperature [[feedback-a-note-can-state-its-span-twice]] -- that internal spread IS this band, not a symmetric guess around the nominal." }
+  provenance:
+    source: "Pelter & Hopkins (eds.), The Chemistry of Beer: The Science in the Suds, ch. 13: 'The Henry's law constant for carbon dioxide in beer at 10 C (50 F) is 0.0798 volumes of gas (STP) per volume of beer per psi, 1.17 volumes per atmosphere, 0.0523 mole per liter per atmosphere or 2.30 grams per liter per atmosphere.' Low edge from Sander, R. (2023), 'Compilation of Henry's law constants for water as solvent', via henrys-law.org CAS 124-38-9 (recommended entry, Burkholder et al. 2019)."
+    conditions: "BEER, 10 C, 1 atm CO2 partial pressure. Value is the solubility at unit partial pressure, so the model's saturation concentration at 1 atm equals it after the van 't Hoff transfer to the run's own temperature."
+    notes: "The source states the same constant FOUR ways (volumes/psi, volumes/atm, mol/L/atm, g/L/atm) and all four agree to <1 % (0.0523 mol/L * 44.009 g/mol = 2.302; 1.17 vol * 1.96 g/L/vol = 2.29), which is what makes the transcription checkable [[feedback-transcribe-tables-not-prose]]. IN-BEER vs IN-WATER: Sander's water value at the same 10 C is 2.282 g/(L*atm), i.e. beer is 0.9 % above water -- so this parameter is BEER-specific in provenance but medium-agnostic in use, and applying it to wine (higher ethanol, which RAISES CO2 solubility) is an extrapolation that errs low. Understanding Wine Chemistry sec 3.7 states directly that solubility differences across the ethanol range of wine are small."
+
+# -- The reference temperature the solubility constant is quoted at -------------
+#
+# PINNED ZERO-WIDTH ON PURPOSE, the same call as peptide_buffer_capacity_beer (D-179): this
+# is not an independently measurable quantity, it is half of ONE measurement. H_co2_beverage
+# and this temperature are a PAIR -- banding the temperature while holding the constant would
+# sample (constant, temperature) combinations that reproduce no measurement at all.
+T_ref_co2_solubility:
+  value: 283.15
+  unit: "K"
+  tier: plausible
+  uncertainty: { low: 283.15, high: 283.15, note: "ZERO-WIDTH BY CONSTRUCTION. The source prints '10 C (50 F)' as the condition of its constant, so this carries no measurement error of its own; its uncertainty lives entirely in H_co2_beverage's band, which was built by transferring rival statements TO this temperature." }
+  provenance:
+    source: "Pelter & Hopkins (eds.), The Chemistry of Beer: The Science in the Suds, ch. 13 -- the stated condition of the Henry constant above."
+    conditions: "the temperature at which H_co2_beverage is quoted; the van 't Hoff transfer is exactly 1 here, so at 10 C the printed constant is used unscaled (the T_ref idiom of the Arrhenius modifiers, D-11)."
+    notes: "Distinct from the engine's shared `T_ref` (293.15 K, the temperature the GROWTH and UPTAKE rate constants are anchored at, wine_generic.yaml). Two different measurements anchored at two different temperatures; merging them would silently move this solubility by 25 %. tier=plausible rather than validated so it cannot RAISE the derived pH tier above what acidbase.ph_tier floors it at."
+
+# -- Temperature dependence of CO2 solubility -----------------------------------
+vant_hoff_co2_solubility:
+  value: 2300.0
+  unit: "K"
+  tier: plausible
+  uncertainty: { low: 2300.0, high: 2400.0, note: "BOTH EDGES PRINTED, in the same compilation: 2300 K is the RECOMMENDED entry (Burkholder et al. 2019, a literature review, the compilation's most reliable class); 2400 K is what several independently measured entries (Weiss 1974, Crovetto 1991) carry. The nominal sits ON the low edge deliberately -- it is the recommended value, not a midpoint -- which means a low-edge ensemble member is bitwise identical to the nominal one [[feedback-nominal-on-a-band-edge-is-not-inertness]]; classify over the band INTERIOR if this parameter is ever screened for inertness." }
+  provenance:
+    source: "Sander, R., 'Compilation of Henry's law constants for water as solvent', via henrys-law.org, CAS 124-38-9: recommended Hscp = 3.4e-4 mol/(m3*Pa) at 298.15 K with d ln(Hscp)/d(1/T) = 2300 K (Burkholder et al. 2019); other entries 2300-2400 K. This compilation is the source Understanding Wine Chemistry Fig 3.9 itself cites for the same curve."
+    conditions: "CO2 in WATER, near 298.15 K; the van 't Hoff coefficient -d ln H / d(1/T), applied here to a BEER-anchored constant. Borrowing water's temperature SHAPE is licensed by the anchor itself: the in-beer constant at 10 C (2.302) and water's at 10 C (2.282) agree to 0.9 %, so the two liquids are not distinguishable at this precision."
+    notes: "Enters as C_sat(T) = H_co2_beverage * exp(coefficient * (1/T - 1/T_ref_co2_solubility)) -- solubility FALLS as temperature rises, which is why the sign works out to a plain positive coefficient here rather than the negated E_a/R of the Arrhenius factor. Deliberately NOT expressed as an enthalpy in J/mol: the compilation prints kelvin, and converting would add a derived step to a transcribed number for no gain [[feedback-a-text-screen-has-units-and-self-reference]]. At the coefficient's own band this is worth ~1 % on the saturation concentration at 15 C, so it is the least consequential of the three."

@@ -320,12 +320,27 @@ def test_a_nominal_sitting_on_a_band_edge_cannot_be_classified_by_an_edge_screen
     read by an active Process, and are ACTIVE across the band interior -- exactly the case
     that would have manufactured two straddles. (These are the same two bands D-165 §2's
     ratio filter had to drop for a zero nominal.) Pinned so a new one cannot appear
-    unnoticed."""
+    unnoticed.
+
+    **``vant_hoff_co2_solubility`` joined at D-182, and its nominal sits on the low edge on
+    purpose** — 2300 K is the source compilation's RECOMMENDED entry (a literature review),
+    while 2400 K is what several independently measured entries carry, so the value has its
+    own ground and the band's high edge has a different one. Moving the nominal to a
+    midpoint purely to keep this set at three would be picking a number to satisfy a
+    harness. What this test asks of it is met instead: anyone screening that parameter for
+    inertness must classify over the band INTERIOR, because its low-edge run is the nominal
+    run bitwise, by construction.
+
+    NOTE this set now contains a READ parameter, which the old text's "wine's three are all
+    unread (hence DEAD anyway, so harmless)" no longer covers: the CO2 coefficient is reached
+    by every ``ph_of_state`` caller through ``PH_SYSTEM_READS``. So wine has acquired the
+    same live case beer already had."""
     wine_on_edge = _on_edge(_wine())
     assert wine_on_edge == {
         "f_non_ehrlich_phenylalanine",
         "copper_h2s_binding",
         "copper_mercaptan_binding",
+        "vant_hoff_co2_solubility",
     }, f"the wine nominal-on-edge set changed: {sorted(wine_on_edge)}"
 
     beer = Scenario(
