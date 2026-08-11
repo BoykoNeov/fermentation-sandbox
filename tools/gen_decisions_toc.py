@@ -200,6 +200,13 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             # them. Bucket by the SPECIES, not by the word "acid".
             r"carbonic",
             r"dissolved co[2₂]",
+            # D-183: the same failure one beat later, and the same fix. Its heading is about
+            # acetic acid's rate law and names neither "pH" nor "acidity", so it bucketed into
+            # core kinetics alone -- while the record it CORRECTS (D-180) sits in this bucket,
+            # which is the one place a reader chasing beer's acid axis would look. Anchored,
+            # and narrow for the reason stated above: "acetic" is a species, and it matches no
+            # other heading today ("acetaldehyde" and "acetate" do not contain it).
+            r"\bacetic\b",
         ),
     ),
     (
