@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T12:57:46.045Z
+  modified: 2026-08-11T13:01:14.665Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -51,13 +51,13 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
   quantity is itself sampled — and take the **joint** worst case over every band involved.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
-  do not "simplify".** Use these counts: compile-seam **246 DISTINCT** varying (**247 pre-D-172**) — **NOT 279**
-  (a per-*file* sum double-counting shared names); **structural 61, NOT D-157's 66** (D-159, 5 merely
-  scenario-inert). Predicate = **declared `reads`**; **declared-by-UNREGISTERED-class is NEVER drawn**. **A shared
-  name can carry DIFFERENT, even disjoint, bands per medium** (19 of 33). `psychophysics.yaml` is **UNIFORM** —
-  never "fix" to triangular, and **never apply the triangular mass statistic to it** (anti-conservative);
-  `sensory.yaml`'s **36 are NEVER sampled — do not re-audit them**. `SHARED_FILES` restated **on purpose**
-  (deriving it = D-108/D-109 vacuity). **A distribution test at `x == mode` is vacuous** — sample **off-mode**.
+  do not "simplify".** Compile-seam distinct varying **257** (246 pre-D-179, 247 pre-D-172) — but that count is a
+  **COMMENT in `test_drawability_surface.py`, not an assert, so it goes STALE GREEN: re-measure, never cite it**.
+  **NOT 279** (per-*file* sum, double-counts shared names); **structural 61, NOT D-157's 66** (D-159, 5 merely
+  scenario-inert). Predicate = **declared `reads`**; **UNREGISTERED-class and compile-time doses are NEVER
+  drawn**. **A shared name can carry DISJOINT bands per medium** (19 of 33). `psychophysics.yaml` **UNIFORM** —
+  never "fix" to triangular, **never apply the triangular mass stat**; `sensory.yaml`'s **36 NEVER sampled**.
+  `SHARED_FILES` restated **on purpose** (D-108/D-109 vacuity). **A test at `x == mode` is vacuous** — go off-mode.
 - **D-157's live contradiction CLOSED (D-158) — the band WON; never re-narrow 0.084 to 0.08.** Resolved
   **INTERNALLY, no fetch** (84 = Shinohara's 16.4 % E-rate; 30–80 lived ONLY in the test comment asserting it).
   Test **recomputes** all three (`abs=5e-4`; never `rel`/`round(x,3)` — pins *formatting*). Band = E-rate spread at **FIXED acetic 0.35** — the acetic SPREAD is `acetic_acid_typical`'s, D-176.
