@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T14:04:20.600Z
+  modified: 2026-08-11T14:17:23.229Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -47,9 +47,11 @@ still named the withdrawn "under-bound SO₂ pool" (D-143) as open.
 
 **Sampled bands (D-153 → D-157) — BOTH archive-wide sweeps are DONE. Do not re-run either.** The **sampler**
 surface (which bands exist) = D-153/D-156; the **assertion** surface (constraints checked at a point) = D-157.
-- **THE RECURRING SHAPE, 4 instances (D-118, D-154, D-155, D-157): a constraint verified at a POINT
+- **THE RECURRING SHAPE, 5 instances (D-118, D-154, D-155, D-157, D-180): a constraint verified at a POINT
   where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
   quantity is itself sampled — and take the **joint** worst case over every band involved.
+  **D-180 hit it while FIXING it** — its §7 re-anchored the pKa band correctly, then reported the headline
+  with the 4 sampled yields pinned at nominal. Fixing one band does not discharge the others.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
   do not "simplify".** Compile-seam distinct varying **266** (257 pre-D-180, 246 pre-D-179) — but that count is a
   **COMMENT in `test_drawability_surface.py`, not an assert, so it goes STALE GREEN: re-measure, never cite it**.
@@ -273,11 +275,13 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   acid course d0-d7 for 4 strains **plus the pH+extract of the SAME ferments** ⇒ wort seeds, yields and the
   divisor. **FIGURE READS, never table-grade.** Seeds are `*_typical_wort` now: a producer on D-179's
   finished-beer seeds lands **pH 4.26** ⇒ seeds+producer are **ONE decision**. Citrate gets **NO yield** (sourced 3×).
-- **The 63-92 % pH-drop agreement is a MARGIN, not validation.** Pre-reg's 3 arms: adding the 3 acids that FALL
-  (pyruvic/formic/oxalic, **no state slots**) makes it **WORSE** (32-70 %); +dissolved CO2 gives 76-104 %. Two
-  omitted terms of OPPOSITE sign. Guard is an **UPPER bound** — exact agreement means a term arrived. **Never read
-  `CO2` as carbonic acid: it is cumulative EVOLVED GAS.** Band arm must **RE-ANCHOR the cation per member** (fixed
-  nominal cation reports 72-80 % *and* moves the start pH).
+- **The pH-drop agreement is a MARGIN, not validation — and its RANGE IS SCOPED.** **63-92 % only at NOMINAL
+  yields**; over the **JOINT** band (4 sampled yields × pKa) it is **41-105 %**, so "must fall short" is TRUE at
+  nominal and **FALSE band-wide** — the archive's point-vs-band shape, **5th instance** (amendment). Upper-bound
+  guard is scoped to nominal; joint corners pinned with **NO** upper bound. Pre-reg's 3 arms: adding the 3 acids
+  that FALL (pyruvic/formic/oxalic, **no state slots**) makes it **WORSE** (32-70 %); +dissolved CO2 gives
+  76-104 % ⇒ two omitted terms of OPPOSITE sign. **Never read `CO2` as carbonic acid: cumulative EVOLVED GAS.**
+  Band arm must **RE-ANCHOR the cation per member** (fixed nominal cation reports 72-80 % *and* moves the start pH).
 - **Beer `Y_byproduct_sugar`=0 is now LOAD-BEARING** — succinic would double-count (own slot + `Byp`). Yield rides
   the **shared** `fermentative_uptake_rates` (bitwise-pinned) and **must** be named in `for_uptake`'s targets (D-32
   coupling) else the yield breaks with temperature. Booked on the FERMENTATIVE flux = **97.12 %** of ΔS (growth
