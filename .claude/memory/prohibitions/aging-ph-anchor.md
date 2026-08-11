@@ -22,8 +22,9 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
 - **`set_ph` is CATION-MOVING — never describe or extend it as a pH dial.** Raising pH = carbonate
   deacidification, lowering = **cation-exchange resin**; both real, which is what makes it shippable.
   **Acidifying by ADDITION stays `add_acid`** (acid onto its own slot, cation untouched) — never
-  merge the two. **D-65 DEFERRED this verb explicitly** ("a different, cation-moving verb"), so it
-  is deferred work built, not a new axis. Cation moved −5.67e−3 / +1.18e−2 mol/L in the receipts.
+  merge the two. **D-65 anticipated the CATEGORY, in its DOSE form** ("K-tartrate *additions*");
+  this ships the **TARGET** form an aging study needs — **never claim D-65 specified the API**.
+  Cation moved −5.67e−3 / +1.18e−2 mol/L in the receipts.
 - **`cation_charge_for_ph` must stay the inverse of `ph_of_state` TERM FOR TERM** — same per-medium
   registry (D-179), same `Byp`, same `min(evolved, C_sat(T))` (D-182). **A one-sided inverse passes
   every "pH moved the right way" test**; the guard that catches it is the **no-op round trip**

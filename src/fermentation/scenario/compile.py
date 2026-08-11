@@ -2166,9 +2166,12 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
     ferment/aging boundary (beside ``begin_aging``) and the wine ages at the pH you name.
 
     **It is a cation-moving verb, which is what makes it physical — this is NOT a pH dial.**
-    D-65 deferred exactly this ("potassium bitartrate / K-tartrate additions — deacidification
-    via a counter-cation, a different, cation-moving verb") as v1 scope; it is built here. Both
-    directions are real cellar operations acting on the same quantity:
+    D-65 anticipated the CATEGORY and deferred it as v1 scope ("potassium bitartrate / K-tartrate
+    **additions** — deacidification via a counter-cation, a different, cation-moving verb"). Note
+    what that names: the **dose** form. This ships the **target** form, which is the one an aging
+    study needs — you know the pH you want to compare at, not the gram-per-litre that reaches it.
+    So the axis was anticipated and the API was not. Both directions are real cellar operations
+    acting on the same quantity:
 
     - **raising pH** = deacidification with potassium/calcium carbonate — base in, strong
       cation up. The classic move on an over-acid wine.

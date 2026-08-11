@@ -24856,3 +24856,27 @@ defect you fear actually moves. A wrong *shared* input shifts the mean and leave
 intact, so a spread-ratio guard is blind to exactly the class of bug that motivated it — and blind
 in the reassuring direction. The general form: **falsify a guard against the defect it names before
 shipping it, and if it stays green, the honest output is the measurement without the guard.**
+### D-186 amendment 2 — two overstatements in the record above, both found in review and neither load-bearing
+
+Appended rather than edited in place, per the archive's append-only rule. Both were caught by
+re-reading the record against its own receipts — the check §5 describes performing on D-150's
+figures, which had not been turned on this record.
+
+**1. "Four of seven targets exact to the last bit" is THREE.** The round-trip errors were
+1.75e−11 / 1.19e−11 / 2.80e−13 / 4.44e−16 / 0.00e+00 / 9.46e−14 / 4.44e−16 at pH 2.80 through
+4.00. At pH ~3.4 one ulp is ~4.4e−16, so exactly three targets (3.40, 3.60, 4.00) land within one
+ulp; 3.80's 9.46e−14 is ~200 ulps — comfortably inside the "worst error 1.75e−11" headline, which
+is unaffected, but not "exact". The headline number and every conclusion drawn from it stand; only
+the count was wrong. Recorded because this is the archive that refuses D-152's printed "663" in
+favour of an exact 662.802522, and a miscounted ulp claim is the same species of error.
+
+**2. "D-65 deferred exactly this" (§2) overstates what D-65 said.** Its deferral names "potassium
+bitartrate / K-tartrate **additions**" — the DOSE form, a mass of salt onto the wine. This record
+ships the TARGET form: name the pH, back-solve the cation that reaches it. That is the form an
+aging study actually needs, because the input a comparison is designed around is the pH itself and
+not the grams that get there. So **D-65 anticipated the axis and did not specify the API**, and the
+claim that survives an objection is the weaker one. The verb docstring now carries the corrected
+version, and so does the memory ledger's subject file.
+
+Neither changes the design, the measurements, or any prohibition. What generalises is small and
+familiar: **a record that re-measures someone else's numbers should re-read its own.**
