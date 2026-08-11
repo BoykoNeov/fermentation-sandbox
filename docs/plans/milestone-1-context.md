@@ -1,5 +1,10 @@
 # Milestone 1 — context (key files & decisions)
 
+> **CLOSED — historical record, not a live plan.** Milestone 1 is complete; file paths and
+> counts below describe the code as it stood then. For current structure read
+> [`../ARCHITECTURE.md`](../ARCHITECTURE.md); for the canonical record,
+> [`../DECISIONS.md`](../DECISIONS.md).
+
 ## Where things live (built in Milestone 0)
 
 - **Tiers:** `src/fermentation/core/tiers.py` — `Tier`, `combine`.

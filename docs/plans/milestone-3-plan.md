@@ -1,6 +1,21 @@
 # Milestone 3 — Tier-3 (speculative frontier): sensory/OAV + aging chemistry
 
-> Status: **beat 1a built (D-67); aging axis opened (D-68); first aging Process built (D-69);
+> ## ⚠ THIS PAGE IS A FROZEN LOG, NOT A LIVE STATUS
+>
+> Milestone 3 is still the live milestone, but **the running log below stopped being maintained**:
+> it reaches D-118 in this header block and D-146 further down, and the project is well past both.
+> **Never read this page for what is done, open, or next.** Two beats have already been re-proposed
+> from it after they had shipped.
+>
+> - **What is built** → [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
+> - **What was decided and what is still open** → [`../DECISIONS.md`](../DECISIONS.md); its
+>   generated index carries the live record count and the correction map.
+> - **"Deferred / later beats" below is the known trap.** Several of those beats are closed. Check
+>   each against the archive index before proposing any of them.
+>
+> The log is kept because it records *reasoning* the archive summarises. It is history.
+
+> Status at the time of writing: **beat 1a built (D-67); aging axis opened (D-68); first aging Process built (D-69);
 > aging-phase scenario wiring landed (D-70); oxidative aging axis opened (D-71); SO₂ scavenging
 > — the first O₂ sink — built (D-72); O₂ sub-axis reworked for always-on sinks (D-73);
 > `PhenolicBrowning` — the first always-on sink, and the first VISIBLE oxidative product (the
@@ -640,7 +655,12 @@ gospel (CLAUDE.md); the owner's own framing put sensory first too.
 
 ---
 
-## Active beat: the sensory / OAV readout layer (handoff §4.2)
+## ~~Active beat~~ CLOSED beat: the sensory / OAV readout layer (handoff §4.2)
+
+> **CLOSED.** Beat 1a shipped, and beat 1b (descriptor projection, then Stevens compression)
+> closed at D-95 and D-98. This is not the active beat and has not been for a long time.
+> Only masking remains open on this axis, and it is blocked for want of per-pair interaction
+> coefficients. Design detail below is still accurate; the "active" framing is not.
 
 ### Placement & the isolation firewall (§4.2 cardinal rule)
 
@@ -771,6 +791,12 @@ uncertainty bands.
 ---
 
 ## Deferred / later beats (in order)
+
+> ⚠ **THIS LIST IS THE KNOWN RE-PROPOSAL TRAP — it has caused two.** Items are struck through as
+> they ship, but only up to roughly D-146; anything *not* struck through here may still have been
+> built, closed, or explicitly refused since. **An unstruck item is not evidence of open work.**
+> Check every candidate against [`../DECISIONS.md`](../DECISIONS.md)'s index — including its
+> correction map — before proposing it. The archive is the authority; this list is a snapshot.
 
 - ~~**1b. Descriptor-space projection**~~ — **slice 1 BUILT at D-95**, **slice 2 BUILT AND CLOSED
   at D-98**. Slice 1 (`sensory/descriptors.py`) maps the OAV vector onto a 14-axis (wine) /

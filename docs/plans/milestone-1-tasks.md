@@ -1,5 +1,10 @@
 # Milestone 1 — task checklist
 
+> **CLOSED — historical record, not a live plan.** Every box here is settled. An unchecked box
+> on this page is *not* an open task — it was superseded, not skipped. The live plan is
+> [`milestone-3-plan.md`](milestone-3-plan.md); the canonical record is
+> [`../DECISIONS.md`](../DECISIONS.md).
+
 - [x] Define wine `StateSchema` ({X, S(1), E, N, T, CO2}) and beer schema
       ({X, S(3), E, N, T, CO2}). → `fermentation.core.media` (`wine_schema`,
       `beer_schema`, `Medium`, `MEDIA`, `get_medium`).

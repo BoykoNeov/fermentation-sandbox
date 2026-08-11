@@ -1,6 +1,11 @@
 # Milestone 2 — Tier-2 (plausible mechanisms)
 
-> Status: **scoping**. Milestone 1 (the Tier-1 validated core) is closed: all three
+> **CLOSED — historical record, not a live plan.** Milestone 2 is complete. Nothing here is an
+> open task; do not read a task list on this page as work to pick up. The live plan is
+> [`milestone-3-plan.md`](milestone-3-plan.md) and the canonical record is
+> [`../DECISIONS.md`](../DECISIONS.md) (its generated index carries the live record count).
+
+> Status at the time of writing: **scoping**. Milestone 1 (the Tier-1 validated core) is closed: all three
 > §2.2 benchmarks green, D-8 → D-17. This plan opens Tier-2. The two opening calls
 > are recorded in **DECISIONS D-18**: pH is a full **charge-balance solver**
 > (derived-algebraic, couplings emerge — not a scripted tracked-pH), and the

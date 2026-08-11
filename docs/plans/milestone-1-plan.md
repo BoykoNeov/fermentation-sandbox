@@ -1,6 +1,11 @@
 # Milestone 1 — Tier-1 validated core
 
-> Status: **in progress**. Done: medium state schemas + the scenario→core
+> **CLOSED — historical record, not a live plan.** Milestone 1 is complete. Nothing here is an
+> open task; do not read a task list on this page as work to pick up. The live plan is
+> [`milestone-3-plan.md`](milestone-3-plan.md) and the canonical record is
+> [`../DECISIONS.md`](../DECISIONS.md) (its generated index carries the live record count).
+
+> Status at the time of writing: **in progress**. Done: medium state schemas + the scenario→core
 > `compile_scenario` seam (`fermentation.core.media`,
 > `fermentation.scenario.compile`); the carbon/nitrogen/mass conservation quantity
 > functions (`fermentation.validation.total_carbon`/`total_nitrogen`/`total_mass`

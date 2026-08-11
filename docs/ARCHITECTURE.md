@@ -1,20 +1,23 @@
 # Architecture
 
-This describes how the layers fit together. Milestones 0, 1 and 2 are complete
-(the tested skeleton; then single-strain isothermal primary fermentation passing
-both §2.2 benchmarks; then pH, aroma byproducts, SO₂, MLF, temperature
-scheduling, discrete interventions and stochastic ensembles). Milestone 3 — the
-sensory/OAV + aging frontier, Tier-3 — is in progress. The
-original brief is [`FERMENTATION_SIM_HANDOFF.md`](FERMENTATION_SIM_HANDOFF.md);
-the per-decision record and where we deviated from it are in
-[`DECISIONS.md`](DECISIONS.md), which is the canonical archive. Deliberately no
-`D-1 … D-n` range here — that pointer has gone stale twice; the archive's own
-generated index carries the live count.
+**What this document is:** a map of how the code is put together *right now* — layers, packages,
+the state vector, the Process registry, and where each subsystem lives. It answers "where does X
+live and what may it import."
+
+**What it is not:** a history. *Why* anything is shaped this way, what was tried and rejected, and
+what is still open all live in [`DECISIONS.md`](DECISIONS.md), which is the canonical archive.
+Individual D-numbers are cited here as pointers into it. Deliberately **no `D-1 … D-n` range and no
+milestone status line** — those pointers went stale twice; the archive's generated index carries
+the live count, and [`plans/milestone-3-plan.md`](plans/milestone-3-plan.md) is a frozen log, not a
+status. The original brief is [`FERMENTATION_SIM_HANDOFF.md`](FERMENTATION_SIM_HANDOFF.md)
+(reference, not gospel).
+
+Counts in this file are measured from the code, not remembered. Every one of them is reproducible
+by the snippet in [Checking this document](#checking-this-document) at the end.
 
 ## Layering
 
-Four layers with strictly one-directional dependencies — a lower layer never
-imports a higher one:
+Four layers with strictly one-directional dependencies — a lower layer never imports a higher one:
 
 ```
   scenario / validation   declarative recipes, benchmark comparison, analysis
@@ -29,310 +32,328 @@ imports a higher one:
   parameters / units      versioned data (value + provenance + tier); conversions
 ```
 
-Package map:
+`analysis` and `sensory` are **top-layer readouts**, siblings of `validation`: they consume a
+finished `Trajectory` and are imported by nothing lower. The chemistry never imports them back.
 
-| Layer | Package | Key types |
-|-------|---------|-----------|
-| parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` |
-| units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, … |
-| core | `fermentation.core` | `Tier`, `StateSchema`, `VarSpec`, `StateVector`, `Process`, `ProcessSet`, `RateModifier`, `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry` (molar masses, carbon/nitrogen fractions, Gay-Lussac split, `sugar_species`); `acidbase` (`solve_ph`, `ph_of_state`, `titratable_acidity`, `ph_tier`, `speciate_so2`, charge balance); `kinetics` (growth, uptake, ethanol inhibition, Arrhenius, esters/fusels, acetaldehyde, vicinal diketones, H₂S, malolactic, the speciated amino-acid pool registry (`amino_acid_pools`, D-100) + ledger, autolysis, temperature ramp, carrying-capacity cap) |
-| runtime | `fermentation.runtime` | `simulate`, `Trajectory`; `simulate_scheduled`, `ScheduledEvent`, `ScheduledTrajectory` (event loop); `simulate_ensemble`, `Ensemble` (stochastic wrapper) |
-| scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario` (`.run` / `.run_ensemble`); intervention verbs `add_dap` / `add_so2` / `rack` / `pitch_mlf` |
+### Package map
+
+| Layer | Package | Contents |
+|-------|---------|----------|
+| parameters | `fermentation.parameters` | `Parameter`, `Provenance`, `Uncertainty`, `ParameterSet`, `load_parameters`, `default_data_dir` — plus the 19 YAML data files |
+| units | `fermentation.units` | `brix_to_sg`, `sg_to_plato`, `abv_from_ethanol`, `ugl_to_gpl`, … |
+| core | `fermentation.core` | `Tier`; `StateSchema`, `VarSpec`, `StateVector`; `Process`, `ProcessSet`, `RateModifier`; `Medium`, `MEDIA`, `get_medium`, `wine_schema`, `beer_schema`; `chemistry`; `acidbase`; the `kinetics` subpackage |
+| runtime | `fermentation.runtime` | `simulate`, `Trajectory`; `simulate_scheduled`, `ScheduledEvent`, `ScheduledTrajectory`; `simulate_ensemble`, `Ensemble` |
+| scenario | `fermentation.scenario` | `Scenario`, `TemperaturePoint`, `Intervention`, `compile_scenario`, `CompiledScenario`; intervention verbs |
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
-| analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series`, `molecular_so2_series`, `ibu_series` (top-layer observables over a `Trajectory`) |
-| sensory | `fermentation.sensory` | `oav_series`, `sensory_profile`, `oav_tier`, `load_thresholds`, `AROMA_COMPOUNDS` — the speculative Tier-3 OAV aroma readout over a `Trajectory` (D-67); `MaxRuleProjector` + `DescriptorProjector` — descriptor projection (D-95); `StevensProjector`, `dominant_flip_sensitivity` — compression, isolable and non-default (D-98) |
+| analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series`, `molecular_so2_series`, `free_so2_series`, `bound_so2_series`, `ibu_series`, `astringency_series`, `polymeric_pigment_series`, `color_series`, `observed_color_series`, `attribute_spread` |
+| sensory | `fermentation.sensory` | `oav_series`, `sensory_profile`, `oav_tier`, `load_thresholds`, `AROMA_COMPOUNDS`; `MaxRuleProjector`/`DescriptorProjector`; `StevensProjector`, `dominant_flip_sensitivity` |
 
 ## The core
 
 ### State vector
-A single contiguous `float64` numpy array (`StateSchema` maps names → index
-slices). Keeping it a plain array is what lets `scipy.integrate.solve_ivp` drive
-it efficiently. Variables can be vectors: `S` (sugar) is one slot for wine and
-three (glucose/maltose/maltotriose) for beer, so beer is an *addition* not a
-rewrite.
 
-Initial v1 contents: viable biomass `X`, sugar(s) `S`, ethanol `E`, yeast
-assimilable nitrogen `N`, temperature `T`, evolved CO₂ (the experimentally
-measurable proxy — a primary validation channel). Plus *produced-only* pools that
-are 0 at pitch and only accumulate during fermentation: inactivated biomass
-`X_dead` (D-13), and the realised-yield byproduct sinks `Gly` (glycerol) and
-`Byp` (lumped minor byproducts) (D-16). These declare a `VarSpec.default` so
-`pack` fills them when omitted, while substrate/condition vars stay required.
+A single contiguous `float64` numpy array; `StateSchema` maps names → index slices. Keeping it a
+plain array is what lets `scipy.integrate.solve_ivp` drive it efficiently. Variables can be
+vectors: `S` (sugar) is one slot for wine and three for beer
+(glucose/maltose/maltotriose, in uptake order), so beer is an *addition*, not a rewrite.
 
-Milestone 2 grows the vector further with additive, isolable pools introduced by
-their respective Processes — aroma byproducts (`esters`/`fusels` and their gas
-sinks, `acetaldehyde`, diacetyl's α-acetolactate/`diacetyl`/butanediol pools,
-`h2s`), the wine acid/SO₂ system (`tartaric`/`malic`/`lactic`/`cation_charge`,
-`so2_total`), and the MLF/nitrogen machinery (`X_mlf`, `citrate`, the eight speciated
-amino-acid pools, `debris`). Each defaults to 0 (or is dosed at the compile seam) so a scenario that
-doesn't use it stays byte-for-byte the validated core (prime directive #3); most
-are detailed in the pH/aroma sections below and in `DECISIONS.md`.
+Current size, from `get_medium(...).schema`:
 
-### Process
-A `Process` contributes to `d(state)/dt`. It declares `name`, `tier`, and the
-state variables it `touches`, and implements
-`derivatives(t, y, schema, params) -> contribution`. `ProcessSet` sums the active
-Processes (that sum is what `solve_ivp` integrates) and, crucially, **derives the
-output tier** of each variable as the lowest tier among the Processes that touch
-it. Toggling a speculative Process off leaves the validated core intact.
+| Medium | Named variables | Float slots | Sugar slots |
+|--------|-----------------|-------------|-------------|
+| wine   | 94 | 94 | 1 |
+| beer   | 55 | 57 | 3 |
 
-In `strict=True` mode, `ProcessSet` verifies every Process only writes to the
-variables it declared — a cheap guard used in tests.
+Tier and uncertainty do **not** ride inside these floats — they are properties of Processes and
+parameters, derived at the analysis boundary (D-1).
 
-### Rate modifiers
-Some mechanisms *scale* an existing flux rather than *add* a new one — ethanol
-inhibition slows fermentative uptake; Arrhenius temperature scales every rate
-constant. Because `ProcessSet` **sums** Processes, these cannot be summed Processes
-(they would add to a derivative, not multiply it). A `RateModifier` declares which
-Processes it `modifies` (by name) and returns a scalar `factor`; `ProcessSet`
-multiplies that factor onto the *entire contribution vector* of each targeted
-Process before summing. Scaling a conserving Process's whole contribution by one
-scalar preserves its mass/atom balances, so a modifier never breaks conservation,
-and the `touches` contract still holds (scaling zeros stays zero). Modifiers are
-enabled/disabled and feed `tier_of` exactly like Processes — a speculative modifier
-drags the tier of the variables its target touches down to speculative.
-`EthanolInhibition` is the first modifier; `ArrheniusTemperature` reuses the hook,
-parameterised *per rate* (one instance per Process, each its own activation energy)
-and reference-anchored so `f = 1` at `T_ref`. Stacked modifiers on one Process (e.g.
-inhibition × Arrhenius on uptake) compose to a single scalar, so conservation still
-holds. (See DECISIONS #10, #11.)
+The vector is grown only by *additive, isolable pools* introduced by their own Processes. Each
+new pool declares a `VarSpec.default` (almost always 0, or is dosed at the compile seam) so a
+scenario that does not use it is byte-for-byte the validated core — prime directive #3. Broadly
+the wine-only slots cover the acid/SO₂ system, the speciated amino-acid and keto-acid pools, MLF
+and Brett biomass, the oxidative-aging products (browning index, Strecker aldehydes, quinone), the
+grape colour axis (anthocyanin/tannin/polymeric pigment), oak, closure and bound sulfides; the
+beer-only slots are its own organic acids (`acetic`, `formic`, `oxalic`, `pyruvic`, `succinic`),
+`peptide_buffer` and `iso_alpha`. `quinone` is present in **both** media regardless of which
+oxidative set is wired, so slot indices do not move when the set changes.
+
+### Process, ProcessSet, RateModifier
+
+A `Process` contributes to `d(state)/dt`. It declares `name`, `tier`, and the state variables it
+`touches`, and implements `derivatives(t, y, schema, params) -> contribution`. `ProcessSet` sums
+the active Processes — that sum is what `solve_ivp` integrates — and **derives the output tier** of
+each variable as the lowest tier among the Processes touching it. In `strict=True` mode it also
+verifies every Process writes only to the variables it declared (used throughout the tests).
+
+Some mechanisms *scale* an existing flux rather than *add* a new one. Because `ProcessSet` sums,
+those cannot be Processes; a `RateModifier` names the Processes it `modifies` and returns a scalar
+`factor`, which is multiplied onto the target's entire contribution vector before summing. Scaling
+a conserving Process's whole contribution by one scalar preserves its atom balances, so a modifier
+can never break conservation, and the `touches` contract still holds (scaling zeros stays zero).
+Modifiers toggle and feed `tier_of` exactly like Processes. Stacked modifiers on one Process
+compose to a single scalar (D-10, D-11).
+
+`core/kinetics/` holds **79** concrete `Process`/`RateModifier` implementations across 22 modules
+(the three base types live in `core/process.py`).
+
+### Kinetics modules
+
+| Module | Impls | What it covers |
+|--------|------:|----------------|
+| `growth.py` | 1 | biomass growth |
+| `uptake.py` | 1 | fermentative sugar uptake |
+| `inhibition.py` | 1 | ethanol inhibition (modifier) |
+| `arrhenius.py` | 2 | per-rate temperature scaling (modifier) |
+| `temperature.py` | 1 | driven temperature ramp |
+| `carrying_capacity.py` | 1 | biomass cap (modifier) |
+| `inactivation.py` | 2 | death, ethanol-tolerance death |
+| `autolysis.py` | 1 | autolysis → debris |
+| `byproducts.py` | 4 | glycerol and the realised-yield byproduct sinks |
+| `acetaldehyde.py` | 2 | the ethanol-carbon buffer intermediate (D-27) |
+| `vicinal_diketones.py` | 3 | α-acetolactate → diacetyl → butanediol |
+| `hydrogen_sulfide.py` | 3 | H₂S |
+| `mercaptans.py` | 1 | methanethiol — the last lumped aroma pool |
+| `amino_acids.py`, `amino_acid_pools.py` | 1 | the eight speciated amino-acid pools + ledger (D-100) |
+| `keto_acids.py` | 6 | pyruvate / α-ketoglutarate / α-ketobutyrate, excretion + reassimilation |
+| `carbon_routing.py` | — | shared carbon draw/refund helpers, ester and fusel route specs, label tracer |
+| `precursor_fates.py` | 1 | precursor partitioning |
+| `organic_acids.py` | 3 | beer's organic acids: excretion, acetic overflow, wort acid removal |
+| `malolactic.py` | 6 | MLF conversion, citrate, diacetyl reduction, growth/death/senescence |
+| `brett.py` | 6 | *Brettanomyces* growth/death/toxicity, decarboxylation, vinylphenol reduction, yeast POF |
+| `hops.py` | 1 | iso-α-acid loss (IBU) |
+| `aging.py` | 24 | the whole aging axis (below) |
+| `oxidative_cascade.py` | 8 | the Fe(II)+O₂ activation alternative (below) |
+| `o2_partition.py` | — | O₂ partitioning helper |
+
+`aging.py` is the largest single module. Its 24 Processes cover ester hydrolysis and
+esterification; the oxidative sinks (`OxidativeAcetaldehyde`, `SulfiteOxidation`,
+`PhenolicBrowning`, `AntioxidantBurstOxidation`, `StreckerDegradation`); the non-oxidative thermal
+routes (`MaillardStrecker`, `SotolonAldolCondensation`, `Caramelization`, `MaillardBrowning`); oak
+(`OakExtraction`, `EllagitanninOxidation`); the colour axis
+(`TanninAnthocyaninCondensation`, `AcetaldehydeBridgedCondensation`, `AnthocyaninFading`,
+`ThermalAnthocyaninFade`, `TanninSelfPolymerization`, `TanninEthylTanninCondensation`); and
+`SMMHydrolysis` (DMS), the two bound-sulfide releases, and `ClosureOxygenIngress`.
+
+## Media, the process registry, and the compile seam
+
+A **`Medium`** (`core/media.py`) is a plain record of four things: `name`, `schema`,
+`process_factories`, `modifier_factories`. It is assembled from ~35 named tuples
+(`_PRIMARY_FERMENTATION_PROCESSES`, `_AGING_PROCESSES`, `_MLF_PROCESSES`, `_BRETT_PROCESSES`, …),
+each an independently toggleable group. Every one of those groups except the oxidative sets is
+**additive**: off at the compile seam, switched on by an intervention, and an un-used group leaves
+the run byte-for-byte unchanged.
+
+`get_medium(name, *, oxidative="direct")` returns the wired medium. What each build contains:
+
+| Medium | Oxidative set | Processes | Modifiers |
+|--------|---------------|----------:|----------:|
+| wine | `direct` (default) | 62 | 4 |
+| wine | `cascade` | 64 | 4 |
+| wine | `direct_burst` | 63 | 4 |
+| beer | `direct` (default) | 27 | 3 |
+| beer | `cascade` | 28 | 3 |
+| beer | `direct_burst` | 27 | 3 |
+
+### The three oxidative sets (D-141, extended D-147)
+
+The oxidative axis is the one place where toggling is a *swap*, not an addition — both alternatives
+draw on the same `o2` pool, so a build carrying both would silently double-count it.
+
+- **`direct`** — the default. Six calibrated sinks each draw their own share straight from the
+  shared `o2` pool, split by `k_i / Σk` through `ProcessSet`'s summing. It reads as competition and
+  sums correctly, but asserts that ethanol, bisulfite, phenolics, amino acids, anthocyanin and oak
+  tannin each react with dissolved O₂ — which they do not.
+- **`cascade`** — routes all six behind a single Fe(II)+O₂ activation node that consumes the O₂ and
+  produces two oxidants per mole; each former sink is re-homed onto whichever oxidant actually
+  oxidises it. **Mutually exclusive with `direct`.**
+- **`direct_burst`** — `direct` plus one further sink (`AntioxidantBurstOxidation`). A *superset of
+  direct*, not a third mechanism, and opt-in rather than default. Wine-only in effect: beer's burst
+  build is identical to its direct build, because the slot the sink needs is wine-only. There is
+  deliberately no `cascade_burst`.
+
+### The compile seam
+
+`compile_scenario(scenario)` (`scenario/compile.py`) is the scenario→core seam and the **only**
+place industry units cross into canonical ones (°Brix → g/L, °C → K, days → hours). It validates
+the `scenario.initial` vocabulary per medium, seeds initial temperature from the schedule, loads
+`<medium>_<strain>.yaml` over the shared parameter files, assembles the medium's `ProcessSet`, and
+returns a `CompiledScenario` (`y0`, `process_set`, `parameters` + resolved `param_values`,
+`schema`, `t_span_h`) that drops straight into `simulate`. Beer's three sugars are supplied
+explicitly rather than split from a single OG — that wort spectrum is a provenance-backed
+parameter, not a constant in the seam (D-7).
+
+A `Scenario` is schema-validated YAML/JSON, **not** a custom DSL, and holds no physics.
 
 ## Confidence tiers
 
-`Tier` is an ordered enum (`VALIDATED > PLAUSIBLE > SPECULATIVE`). The trust of a
-combination is the `min` (`Tier.combine`). Tiers are a property of *Processes and
-parameters*, not of the raw floats flowing through the solver; an output's tier
-is computed at the analysis boundary. This satisfies "the tier travels to every
-output" without polluting the integration hot loop. (See DECISIONS #1.)
+`Tier` is an ordered enum (`VALIDATED > PLAUSIBLE > SPECULATIVE`); the trust of a combination is
+the `min` (`Tier.combine`). Tiers belong to *Processes and parameters*, not to the floats flowing
+through the solver, so the integration hot loop stays clean and an output's tier is computed at the
+analysis boundary (D-1).
 
-No Process or parameter is `VALIDATED` yet: that tier is reserved for checks against
-independent *measured* time-series, which do not exist yet (DECISIONS #C, #17).
-Passing the §2.2 benchmarks earns `PLAUSIBLE` — sound forms, sourced parameters,
-reproduces the keystone model — not `VALIDATED`.
+No Process or parameter is `VALIDATED`: that tier is reserved for checks against independent
+*measured* time-series, which the project does not have. Passing the §2.2 benchmarks earns
+`PLAUSIBLE` — sound forms, sourced parameters, reproduces the keystone model.
 
 ## Parameters with provenance
 
-Every kinetic/physical constant is a `Parameter` requiring value, units, tier,
-an `Uncertainty` range, and `Provenance` (source + measurement conditions). The
-Pydantic models reject any entry missing these, so "no magic numbers" is a hard
-load-time guarantee. Parameters live in YAML under
-`src/fermentation/parameters/data/`; strain-specific overlays merge on top of
-generic defaults (`ParameterSet.merge`).
+Every kinetic or physical constant is a `Parameter` requiring value, units, tier, an `Uncertainty`
+range, and `Provenance` (source + measurement conditions). The Pydantic models reject any entry
+missing these, so "no magic numbers" is a load-time guarantee, not a convention. Strain-specific
+overlays merge on top of generic defaults (`ParameterSet.merge`).
+
+The 19 files in `parameters/data/`: `wine_generic.yaml` and `beer_generic.yaml` (the per-medium
+bases); `acidbase.yaml`, `beer_acids.yaml`, `closure.yaml`; `acetaldehyde.yaml`,
+`keto_acids.yaml`, `vicinal_diketones.yaml`, `hydrogen_sulfide.yaml`, `bound_sulfides.yaml`,
+`dms.yaml`; `aging.yaml`, `oak.yaml`, `polymerization.yaml`, `thermal.yaml`; `hops.yaml`,
+`additions.yaml`; and the two that load **standalone**, outside any `CompiledScenario` —
+`sensory.yaml` and `psychophysics.yaml`.
 
 ## Units boundary
 
-Canonical internal units: concentration **g/L** (≡ SI kg/m³), temperature **K**,
-time **hours**. Industry units (°Brix, SG, °Plato, %ABV, °C, days) appear only on
-the far side of `fermentation.units`. (See DECISIONS #3.)
+Canonical internal units: concentration **g/L** (≡ SI kg/m³), temperature **K**, time **hours**.
+Industry units (°Brix, SG, °Plato, %ABV, °C, days) appear only on the far side of
+`fermentation.units` (D-3).
 
 ## Runtime
 
-`simulate(process_set, params, y0, t_span)` wraps `solve_ivp` with an implicit
-adaptive method (BDF by default — fermentation is stiff) and returns a
-`Trajectory` carrying the time grid, the state history, and the derived tier map.
+`simulate(process_set, params, y0, t_span)` wraps `solve_ivp` with an implicit adaptive method
+(BDF by default — fermentation is stiff) and returns a `Trajectory` carrying the time grid, state
+history, and derived tier map.
 
-Two wrappers layer on top of this without changing the pure core:
-- **Event loop** (`simulate_scheduled`, D-35) — segments a run at `ScheduledEvent`
-  breakpoints (mutate / reconfigure / param_update) and restarts `simulate` per
-  segment (a dose is a real discontinuity; BDF order-restart is correct — not
-  `solve_ivp(events=)`, which can't mutate-and-resume). It carries an external-flow
-  ledger so conservation across a jump is `final == initial + Σ flows`, and
-  min-combines the per-segment tier map. `events=()` is byte-for-byte plain
-  `simulate`. Temperature scheduling (a driven `TemperatureRamp`) and the discrete
-  intervention verbs (D-36) both ride this one mechanism; `CompiledScenario.run()`
-  always dispatches through it.
-- **Stochastic ensemble** (`simulate_ensemble`, D-24/25/37) — Monte-Carlo over the
-  parameters' `Uncertainty` bands (triangular default; LHS/Sobol via `qmc`), scoped
-  to the active Process set's reads, returning nominal + median + P5/P95 band and
-  per-member conservation. Randomness lives *only* here (seeded), keeping the core
-  pure and reproducible. `simulate_ensemble(events=…)` runs the ensemble over a
-  scheduled run (D-37).
+Two wrappers layer on top without changing the pure core:
 
-## Scenarios as data
+- **Event loop** (`simulate_scheduled`, D-35) — segments a run at `ScheduledEvent` breakpoints
+  (mutate / reconfigure / param_update) and restarts `simulate` per segment. A dose is a real
+  discontinuity, so a BDF order-restart is correct — not `solve_ivp(events=)`, which cannot
+  mutate-and-resume. It carries an external-flow ledger so conservation across a jump is
+  `final == initial + Σ flows`, and min-combines the per-segment tier map. `events=()` is
+  byte-for-byte plain `simulate`. Temperature scheduling and every discrete intervention verb ride
+  this one mechanism; `CompiledScenario.run()` always dispatches through it.
+- **Stochastic ensemble** (`simulate_ensemble`, D-24/25/37) — Monte-Carlo over the parameters'
+  `Uncertainty` bands (triangular default; LHS/Sobol via `qmc`), scoped to the active Process set's
+  reads, returning nominal + median + P5/P95 band and per-member conservation. Randomness lives
+  **only** here and is seeded, keeping the core pure and reproducible.
 
-A `Scenario` (schema-validated YAML/JSON, **not** a custom DSL) declares initial
-composition, organism/strain, temperature schedule, vessel, and a timeline of
-interventions. No physics lives here, which keeps sweeps, Monte Carlo, and
-cross-beverage reuse trivial.
+Note that `only=`/`exclude=` shift the draw sequence, so an arm and its baseline are two different
+random ensembles unless pinned to a fixed hypercube.
 
-## Media and the compile seam
+## pH as a derived pure function
 
-A **`Medium`** (`fermentation.core.media`) names a beverage family and fixes its
-`StateSchema` plus the Processes that act on it. `wine_schema()` has one sugar
-slot; `beer_schema()` has three (`glucose`/`maltose`/`maltotriose`, in uptake
-order). The `MEDIA` registry maps name → `Medium`; each medium fixes the Processes
-that act on it (the M1 kinetics core plus the M2 Tier-2 mechanisms, speculative
-ones staying isolable/togglable per prime directive #3).
+pH is **not** integrated — there is no `dpH/dt`. Like `total_carbon` and ABV it is an
+instantaneous, pure algebraic function of state: `core/acidbase.py` solves electroneutrality
+`Σ charge = 0` for `[H⁺]` (a 1-D monotonic root-find in pH-space via `brentq`) given the
+charge-active acids and a pKa set, and reports `pH = −log₁₀[H⁺]`. Building it as a full proton
+balance rather than a tracked-pH approximation is what makes the couplings — MLF deacidification,
+SO₂ speciation — *emerge* rather than be scripted (D-18).
 
-**`compile_scenario(scenario)`** (`fermentation.scenario.compile`) is the
-scenario→core seam and the *only* place industry units cross into canonical ones
-(°Brix → g/L, °C → K, days → hours). It validates the `scenario.initial`
-vocabulary (per-medium allowed keys, non-negativity, required fields), seeds the
-initial temperature from the schedule, loads `<medium>_<strain>.yaml`, assembles
-the medium's `ProcessSet`, and returns a `CompiledScenario` record (`y0`,
-`process_set`, `parameters` + resolved `param_values`, `schema`, `t_span_h`) that
-drops straight into `simulate`. Beer's three sugars are supplied explicitly rather
-than split from a single OG — that wort spectrum is a provenance-backed parameter,
-not a magic constant in the seam. (See DECISIONS #7.)
+**The acid registry is per-medium, not medium-agnostic (D-179).** `acidbase.acid_registry` selects
+off `StateSchema.medium`:
+
+- **`ACID_STATE` — wine's registry.** `tartaric`, `malic`, `lactic` plus `cation_charge`, the net
+  strong-cation charge density (mol⁺/L, K⁺-dominant). The cation is **mandatory** (weak acids alone
+  give pH ≈ 2.3 against a real ~3.3) and is **back-solved from a measured `initial_ph`** at the
+  compile seam, so the model predicts pH *changes*, not absolute initial pH.
+- **`BEER_ACIDS` — beer's registry**, beside it: `acetic`, `formic`, `oxalic`, `pyruvic`,
+  `succinic`, plus `peptide_buffer`. **Beer's pH is a prediction**, not an inverse-anchored fit
+  like wine's — which is the point, and also why it is the harder claim.
+
+The `Byp` pool is read as a succinic-equivalent acid (zero new carbon, so `total_carbon` is
+unchanged). Scalar `ph_of_state` / `titratable_acidity` are pure and live in core; the
+trajectory-series helpers need a `Trajectory` and therefore sit one layer up in
+`fermentation.analysis`.
+
+**SO₂ speciation** is the first pH consumer and is readout-only. `speciate_so2` solves pH from the
+organic acids, then splits total SO₂ into bound vs free via a competitive-Langmuir
+carbonyl-bisulfite equilibrium: `bound_so2_molar` takes `(molar_concentration, Kd)` per carbonyl
+and solves one shared reactive-bisulfite root, so each carbonyl's bound share is `Aᵢ·h/(Kᵢ+h)`.
+Competition is molar and the carbonyls differ greatly in molar mass, so this is worked in moles
+(acetaldehyde + pyruvate + α-ketoglutarate together, D-51). It returns the **molecular**
+(antimicrobial) fraction of *free* SO₂ — the coupling emerging, not scripted. SO₂ is kept out of
+the charge balance and out of titratable acidity, and is carbon-free, so dosing it leaves pH and
+`total_carbon` byte-for-byte. Its one RHS consumer is the MLF antimicrobial gate, which reads the
+*derived* free-molecular value, so the early acetaldehyde peak and the always-on keto-acid pools
+transiently sequester SO₂ and relax suppression.
+
+## Readout layers
+
+### `analysis` — chemistry observables
+
+Trajectory-level series that need no perception model: pH, titratable acidity, the three SO₂
+series, IBU, and the colour/mouthfeel axis (`astringency_series`, `polymeric_pigment_series`,
+`color_series`, `observed_color_series`), plus `attribute_spread`.
+
+### `sensory` — the speculative Tier-3 aroma lens
+
+Maps Odor-Activity-Values over a finished `Trajectory` (`OAV = concentration / threshold`). It adds
+**no state, no Process, no ledger entry**.
+
+- **The firewall.** The sensory layer consumes the chemistry; the chemistry never imports it back.
+  Thresholds load standalone (`load_thresholds()` reads `sensory.yaml`) and are **never** merged
+  into a `CompiledScenario`, so no RHS ever sees a perception threshold — stronger isolation than
+  any Tier-2 readout. A deliberate consequence: thresholds sit **outside** the ensemble sweep.
+- **The tier floor.** `oav_tier` returns `combine(input, threshold, SPECULATIVE)` — always
+  speculative, even for a validated input, because the sensory *mapping itself* is the canonical
+  speculative case.
+- **Matrix-specific thresholds, µg/L.** Keys are `threshold_<pool>_<beer|wine>` because
+  ethanol/matrix shift odor thresholds; `conditions` records the measurement matrix, and a
+  water/model-solution measurement is flagged as a matrix gap. `sensory_profile` reports
+  **per-compound** OAVs and above-threshold flags, never a summed scalar.
+- **Descriptor projection** (`sensory/descriptors.py`, D-95) projects the OAV vector onto 14 (wine)
+  / 9 (beer) descriptor axes behind the `DescriptorProjector` Protocol, so a panel-trained model
+  could swap in. It uses a **max rule, not a sum** — the layer beneath refuses to sum OAVs, so a
+  summing projector would silently reintroduce contested additivity. Each descriptor reports its
+  loudest contributor. Membership is structure (binary), so it lives in code and mints no
+  constants; the axis set is derived per medium, so beer can never report a wine-only descriptor.
+- **Stevens compression** (`sensory/compression.py`, D-98) compresses each contributor's OAV to a
+  perceived intensity (`I = OAV ** n`) *before* the max rule. **Isolable and not the default** —
+  delete `psychophysics.yaml` and the layer beneath is byte-for-byte unaffected. It can neither
+  invent nor silence a detectable smell (`I > 1` iff `OAV > 1`), and its exponents are author
+  estimates, so read it via `dominant_flip_sensitivity` rather than as a bare dominant.
+
+`mercaptans` (methanethiol) is the last lumped pool in the project; the lump caveat derives from
+the `AromaCompound.lumped` flag, not a hardcoded list, so it cannot linger on a pool that stopped
+being lumped.
 
 ## Validation
 
 Two disciplines, both as code:
-- **Conservation invariants** — `assert_conserved` / `assert_nonnegative` take a
-  model-supplied conserved-quantity function and check it holds to tolerance along
-  a trajectory. The chemistry-specific quantities are built by `total_carbon`,
-  `total_nitrogen`, and `total_mass`, which weight each state variable using the
-  shared stoichiometry in `fermentation.core.chemistry` — so a check can never
-  disagree with the kinetics it audits. Carbon and nitrogen are the rigorous atom
-  balances (the biomass C/N fraction is a passed-in Parameter); mass is scoped to
-  the abiotic `S + E + CO₂` conversion. (See DECISIONS #8.)
-- **Benchmark curves** — the §2.2 acceptance criteria are encoded as
-  `BenchmarkSpec` data; the wine and beer `tests/benchmarks/` now **pass** (5
-  benchmark tests), gated behind the `benchmark` pytest marker so they run via
-  `uv run pytest -m benchmark` rather than in the default suite. `ReferenceSeries`
-  + `compare_series` (RMSE/MAE) are the seam for scoring against *real* measured
-  datasets when we obtain them.
 
-## pH as a derived pure function (acid state + charge balance, D-18)
-
-pH is **not** an integrated state — there is no `dpH/dt`. Like `total_carbon` and ABV it
-is an instantaneous, pure algebraic function of state: `fermentation.core.acidbase` solves
-electroneutrality `Σ charge = 0` for `[H⁺]` (a 1-D monotonic root-find in pH-space, via
-`brentq`) given the charge-active acid concentrations and a pKa set, and reports
-`pH = −log₁₀[H⁺]`. Building it as a full proton balance (not a tracked-pH approximation)
-is what makes the Tier-2 couplings — MLF deacidification, SO₂ speciation — *emerge* rather
-than be scripted (DECISIONS #18).
-
-- **Acid state (wine only).** `wine_schema` appends four slots: `tartaric`, `malic`,
-  `lactic` (diprotic/diprotic/monoprotic wine acids, carbon-weighted in `total_carbon` for
-  a future MLF Process) and `cation_charge`, the net strong-cation charge density (mol⁺/L,
-  K⁺-dominant). The cation is **mandatory** (weak acids alone give pH ≈ 2.3 vs a real ~3.3)
-  and **back-solved from a measured `initial_ph`** at the compile seam (inverse anchoring),
-  so the model predicts pH *changes*, not absolute initial pH. `beer_schema` is untouched —
-  beer's acid system is deferred. The slots default to 0, so acid-free scenarios are inert
-  and the validated core is unaffected (prime directive #3).
-- **`Byp` include-by-reading.** The balance reads the existing `Byp` pool as a
-  succinic-equivalent acid — zero new carbon, so `total_carbon` is unchanged and the D-16
-  double-count is closed.
-- **The observable layer.** Scalar `ph_of_state` / `titratable_acidity` are pure and live
-  in core; the trajectory-series helpers (`ph_series`, `titratable_acidity_series`,
-  `molecular_so2_series`) need `Trajectory`, so they sit one layer up in the new top-layer
-  `fermentation.analysis` — mirroring how `units` provides scalar conversions and benchmarks
-  map ABV over a series. Tier is reported via `acidbase.ph_tier` (computed explicitly as
-  `plausible`, never the `VALIDATED` default of the inert acid slots).
-- **SO₂ speciation = the first pH consumer, readout-only (D-22, D-28, D-51).** `wine_schema`
-  appends a slot `so2_total` (total SO₂ as g/L SO₂-equivalent, dosed via `so2_total_mgl`,
-  conserved/inert). `acidbase.speciate_so2` solves pH from the organic acids, then splits the
-  total into **bound** vs **free** via a competitive-Langmuir carbonyl-bisulfite equilibrium:
-  `bound_so2_molar` takes a tuple of `(molar_concentration, Kd)` per carbonyl and solves one
-  shared "reactive bisulfite" root `h` via `brentq`, from which each carbonyl's bound share is
-  `Aᵢ·h/(Kᵢ+h)` — reducing exactly to the original D-28 single-carbonyl closed form
-  `(A−x)(C−x)β − Kx = 0` when only one carbonyl is active. **D-51** (2026-07-07) generalised D-28
-  from acetaldehyde alone to **acetaldehyde + pyruvate + α-ketoglutarate together**, all worked in
-  **moles** (`M_ACETALDEHYDE`/`M_PYRUVATE`/`M_ALPHA_KETOGLUTARATE`), since bisulfite competition
-  is molar and the three carbonyls have very different molar masses; `free_acetaldehyde` reads
-  back only acetaldehyde's own bound share, so competing keto-acid pools measurably reduce
-  acetaldehyde's SO₂ protection. Returns the **molecular** (antimicrobial) fraction
-  `1/(1+10^(pH−pKa₁))` (sulfurous pKa₁ 1.81) of *free* —
-  the D-18 coupling *emerging*, not scripted. It is **readout-only**: SO₂ is kept out of the
-  charge balance (the inverse anchoring makes in-balance vs readout identical at t=0) and out
-  of titratable acidity (OIV excludes it), and is carbon-free — so dosing it leaves pH and
-  `total_carbon` byte-for-byte (an isolability test pins this). At all carbonyls=0 the split
-  collapses to D-22 exactly (`free == total`). The lone RHS consumer is the MLF antimicrobial
-  gate, which reads the *derived* free-molecular SO₂ (bound SO₂ is not antimicrobial), so the
-  early acetaldehyde peak *and* the always-on keto-acid pools transiently/persistently sequester
-  SO₂ and relax suppression — an emergent competition. The bound-acetaldehyde-protected-from-ADH
-  feedback stays deferred (readout-only).
-- **Acetaldehyde** (`core/kinetics/acetaldehyde.py`, decision D-27) — the obligate main-
-  pathway intermediate, modelled as a transient **ethanol-carbon buffer**: flux-linked
-  production *borrows* a C2 slice of ethanol and viable-yeast-gated reduction *returns* it
-  (both mole-for-mole C2→C2). It de-lumps the uptake Process's single sugar→ethanol step
-  rather than adding a parallel pathway, so carbon closes touching neither `S` nor `CO2` and
-  the `E` endpoint (hence the §2.2 benchmarks) is preserved to relative ~1e-8. The early
-  produce-then-reabsorb peak emerges; a crash strands it (the D-26 live-yeast-gating shape).
-
-## The sensory / OAV readout — the speculative Tier-3 aroma lens (D-67)
-
-`fermentation.sensory` is a **top-layer readout** (sibling of `analysis`) that maps
-Odor-Activity-Values over a finished `Trajectory`: `OAV_i = concentration_i / threshold_i`
-for each aroma-active pool the chemistry already tracks (`esters`, `fusels`, `diacetyl`,
-`acetaldehyde`, `h2s`; wine adds `ethylphenols`/`ethylguaiacols`/`mercaptans`). It adds **no
-state, no Process, no ledger entry** — the full suite stays byte-for-byte green (isolation by
-construction). Opened as the first beat of Milestone 3 (`docs/plans/milestone-3-plan.md`).
-
-- **The §4.2 cardinal rule / firewall.** The sensory layer consumes the chemistry; the
-  chemistry never imports it back. Thresholds load **standalone** (`load_thresholds()` reads
-  `parameters/data/sensory.yaml`) and are **never** merged into any `CompiledScenario` at the
-  compile seam — no RHS reads a perception threshold, so the chemistry never even sees these
-  numbers (a stronger isolation than any Tier-2 readout, which *is* merged because a Process
-  reads it). A deliberate consequence (D-24): thresholds sit **outside** the ensemble sweep.
-- **The tier floor (§4.3 credibility firewall).** `oav_tier(input, threshold)` returns
-  `combine(input, threshold, SPECULATIVE)` → **always speculative, even for a validated
-  input**. The explicit `SPECULATIVE` is not redundant with the threshold's tier: the sensory
-  *mapping itself* is the canonical speculative case (`Tier` docstring). A pure-function test
-  (`oav_tier(VALIDATED, VALIDATED) is SPECULATIVE`) proves the floor non-vacuously — a
-  real-trajectory test would be a tautology since every aroma pool is speculative/plausible.
-- **Matrix-specific thresholds, µg/L.** Keys are `threshold_<pool>_<beer|wine>` because
-  ethanol/matrix shift odor thresholds; each `conditions` records the **measurement matrix**
-  (not the same as the application medium — a water/model-solution measurement is flagged as a
-  matrix gap in `notes`). Stored in µg/L (the literature unit), crossed to canonical g/L at
-  the boundary via `units.convert.ugl_to_gpl`. `sensory_profile` reports **per-compound** OAVs
-  + above-threshold flags (never a summed scalar — summing assumes contested additivity).
-- **Lumped pools (D-66) — only `mercaptans` remains.** The lump read one named
-  representative's threshold and paid an "assumes fixed lump composition" honesty cost in
-  provenance. D-96 split the esters, D-99 the fusels, and D-100 the `amino_acids` substrate
-  they draw on; `mercaptans` (methanethiol) is **the last lumped pool in the project**. The
-  guard derives from the `AromaCompound.lumped` flag rather than a hardcoded list, so the
-  caveat cannot linger on a pool that stopped being lumped. `iso_alpha`/IBU is
-  excluded — a *taste*, already read out by `ibu_series` (D-64).
-- **Descriptor projection — beat 1b slice 1 (D-95), `sensory/descriptors.py`.** Projects the
-  OAV vector onto a descriptor vocabulary: wine's 19 / beer's 10 aroma pools → **14 / 9 axes**
-  (`malty` collects three aldehydes; `ethylguaiacols` feeds both `smoky` and `clove_spice`).
-  Consumes a `SensoryProfile`; adds **no state, no Process, no ledger entry, no parameters**.
-  - **The max rule, not a sum — the load-bearing call.** `SensoryProfile` refuses to sum OAVs
-    (contested additivity, D-67), so a projector that summed per descriptor would silently
-    reintroduce what the layer beneath rejected. `MaxRuleProjector` reports each descriptor's
-    **loudest contributor** and names it (`dominant`) — asserting no additivity. *We never
-    assume additivity, at any layer.* Consequence: three pools at OAV 0.4 leave the descriptor
-    silent rather than faking a 1.2 smell no compound justifies.
-  - **Honest framing.** Under max, a descriptor clears iff one of its pools does, so
-    `above_threshold()` is a pure **regrouping** of beat 1a's flags — the layer adds vocabulary
-    + attribution, **not new above-threshold information**.
-  - **Membership is structure, not parameters** — binary (a pool feeds an axis or not), so it
-    lives in code like `AromaCompound.descriptor` (D-67) and mints no constants. The axis set
-    is **derived** per medium from `AROMA_COMPOUNDS` (`axes_for_medium`), so beer can never
-    report `barnyard` by construction, and beer's vocabulary is a strict subset of wine's.
-  - **The seam (§4.2).** `DescriptorProjector` is a Protocol — `project(SensoryProfile) ->
-    DescriptorProfile` — so a future panel-trained ML model swaps in without touching beat 1a
-    or the chemistry (proven by a test, not asserted). `descriptor_tier` repeats the D-67 floor
-    one layer up (the projection is itself a further leap), tested non-vacuously. The odor/taste
-    split is inherited free: consuming a `SensoryProfile` makes it structurally impossible for
-    `iso_alpha`/`ellagitannin` to leak into an aroma descriptor.
-
-- **Stevens compression — beat 1b slice 2 (D-98), `sensory/compression.py`.** `StevensProjector`
-  compresses each contributor's OAV to a perceived intensity (`I = OAV ** n`, per-compound `n`
-  from the standalone `parameters/data/psychophysics.yaml`) **before** the max rule. Arrives
-  through D-95's seam untouched; **isolable and NOT the default** (delete the YAML and slice 1
-  is byte-for-byte unaffected — PD#3).
-  - **Additivity survives.** Compression is **per-compound, below the combination rule**, which
-    is **still max** — it says nothing about how two compounds combine. Max is a deliberate
-    **under-claim**: mixture perception is hypoadditive (truth sits between max and sum), and
-    reaching that middle needs per-pair `cosα` coefficients that exist for no pair of our pools.
-  - **Its only new observable is `dominant`.** `I > 1` iff `OAV > 1` for any `n > 0`, so
-    compression can neither invent nor silence a detectable smell. A **global** exponent is a
-    provable no-op (monotone ⇒ argmax preserved), which is why the exponents are per-compound —
-    and per-compound exponents are unmeasured for these compounds, so all 21 are **author
-    estimates** (ordered by solubility per Cain 1969, which justifies the *ordering* and the
-    *spread's scale* — never a value; `source:` says `author estimate`, tested).
-  - **THE RESULT: no trustworthy flip exists, by theorem.** A robust flip needs two pools on one
-    axis with **disjoint** exponent bands; none do, because the bands are wide *because* the
-    values are guesses. **An honest band and a trustworthy flip from an estimate are mutually
-    exclusive** — so the layer is informative only where it is redundant. Read it via
-    `dominant_flip_sensitivity` (a *manual* Monte Carlo: like the thresholds, these load
-    standalone and sit outside the D-24 ensemble sweep), never as a bare `dominant`.
+- **Conservation invariants** — `assert_conserved` / `assert_nonnegative` take a model-supplied
+  conserved-quantity function and check it along a trajectory. `total_carbon`, `total_nitrogen` and
+  `total_mass` weight each state variable using the shared stoichiometry in `core/chemistry.py`, so
+  a check can never disagree with the kinetics it audits. Carbon and nitrogen are rigorous atom
+  balances; mass is scoped to the abiotic `S + E + CO₂` conversion (D-8).
+- **Benchmark curves** — the §2.2 acceptance criteria are encoded as `BenchmarkSpec` data and
+  **pass**, gated behind the `benchmark` pytest marker (`uv run pytest -m benchmark`).
+  `ReferenceSeries` + `compare_series` are the seam for scoring against real measured datasets.
 
 ## Testing & quality gates
 
-`uv run pytest` (unit + integration + conservation; benchmarks skipped),
-`uv run ruff check .`, `uv run mypy` (strict on `src`). CI runs all three on
-Python 3.13 and 3.14.
+`uv run pytest -n auto` (72 test files; unit, integration, conservation, sampling-surface and
+doc-consistency checks), `uv run ruff check .`, `uv run mypy` (strict on `src`). CI runs all three
+on Python 3.13 and 3.14. Two of the test files guard documentation rather than physics:
+`test_decisions_index.py` (the archive's generated index) and `test_memory_shape_hook.py`.
+
+## Checking this document
+
+Every count above is derived, not remembered. To re-derive them:
+
+```bash
+uv run python -c "
+from fermentation.core.media import MEDIA, get_medium
+for name in sorted(MEDIA):
+    for ox in ('direct', 'cascade', 'direct_burst'):
+        m = get_medium(name, oxidative=ox)
+        print(name, ox, 'slots', m.schema.size, 'vars', len(m.schema.names),
+              'procs', len(m.process_factories), 'mods', len(m.modifier_factories))
+"
+ls src/fermentation/parameters/data/*.yaml | wc -l     # parameter files
+find tests -name 'test_*.py' | wc -l                   # test files
+grep -rhc '^class .*\(Process\|RateModifier\)' src/fermentation/core/kinetics/*.py \
+  | awk '{s+=$1} END {print s}'                        # kinetics implementations
+```
+
+If a number here disagrees with that output, **the code is right and this document is stale** —
+fix the document. Per `CLAUDE.md`, a beat that adds a Process, a state slot, a parameter file or a
+package updates this file in the same commit.

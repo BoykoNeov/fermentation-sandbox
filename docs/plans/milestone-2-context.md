@@ -1,5 +1,10 @@
 # Milestone 2 — context (key files & decisions)
 
+> **CLOSED — historical record, not a live plan.** Milestone 2 is complete; file paths and
+> counts below describe the code as it stood then. For current structure read
+> [`../ARCHITECTURE.md`](../ARCHITECTURE.md); for the canonical record,
+> [`../DECISIONS.md`](../DECISIONS.md).
+
 ## Opening decisions (DECISIONS D-18)
 
 - **pH = full charge-balance solver**, derived-algebraic (no `dpH/dt`). Resolves the

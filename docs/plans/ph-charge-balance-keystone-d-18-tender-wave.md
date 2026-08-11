@@ -1,5 +1,11 @@
 # pH charge-balance keystone (D-18)
 
+> **CLOSED — historical record, not a live plan.** This beat shipped. Note that the wine acid
+> registry it describes is no longer medium-agnostic (D-179 made it wine's, beside the separate
+> beer acid set), and beer's pH is a prediction, not a fit. Read
+> [`../ARCHITECTURE.md`](../ARCHITECTURE.md) for current structure and
+> [`../DECISIONS.md`](../DECISIONS.md) for the record.
+
 ## Context
 
 Milestone 2's keystone. Today the engine has **no pH** — no pH/pKa/charge symbol

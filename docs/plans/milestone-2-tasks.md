@@ -1,5 +1,10 @@
 # Milestone 2 — task checklist
 
+> **CLOSED — historical record, not a live plan.** Every box here is settled. An unchecked box
+> on this page is *not* an open task — it was superseded, not skipped. The live plan is
+> [`milestone-3-plan.md`](milestone-3-plan.md); the canonical record is
+> [`../DECISIONS.md`](../DECISIONS.md).
+
 Build order per DECISIONS D-18: **byproducts/temperature first**, then the pH
 charge-balance keystone, then SO₂ / MLF / mixed cultures. The stochastic wrapper is
 physics-free and can run in parallel. Keep `pytest` / `ruff` / `mypy` green and the
