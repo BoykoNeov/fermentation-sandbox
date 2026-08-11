@@ -311,6 +311,151 @@ Y_malic_sugar_beer:
     conditions: "as Y_acetic_sugar_beer -- same wort, same trial, same divisor."
     notes: "The smallest of the four and the only one whose band nearly reaches zero. Same molecule as wine's MLF SUBSTRATE, and the direction is opposite: wine's malic is consumed by Oenococcus, beer's is made by the yeast. Beer still wires no malolactic Process, so nothing consumes it here."
 
+# ======================================================================================
+# GROUP 3 — THE THREE WORT ACIDS THAT FALL, and their removal (decision D-181).
+#
+# THE SAME PAPER, THE SAME FOUR FERMENTS, THE SAME FIGURE-READ DISCIPLINE as group 2 — these
+# are Figs 6 (pyruvic), 7 (oxalic) and 11 (formic) of the trials whose Figs 9/10/12/13/14 gave
+# group 2 its yields. Read off the same archived crops, so the two groups cannot drift apart.
+#
+# ------------------------- WHY THEY ARE HERE AT ALL -------------------------
+#
+# D-180 built the four acids that RISE and closed with the resulting pH prediction explicitly
+# held open by two omitted terms of OPPOSITE sign: this one (worth ~+0.2-0.3 pH of missing
+# base) and dissolved CO2 (~-0.3 pH). Building only the CO2 half would have moved the headline
+# to near-exact agreement while an uncorrected error still propped it up. This group builds the
+# base half FIRST, and it makes the headline agree WORSE. That is the point, not a cost.
+#
+# ---------------------- THE SHAPE IS SOURCED, NOT ASSUMED ----------------------
+#
+# Tyrell's Table 2 classifies all three IDENTICALLY: '--' (strong decrease) at lower Krausen,
+# '0' (no change) at high Krausen, '0' at Krausen collapse. So: a fast fall to a plateau within
+# the first day, then nothing for the remaining six. That is what `WortAcidRemoval` implements
+# --- first-order relaxation toward a MEASURED floor, temperature-flat.
+#
+# THE ARCHIVE'S DEFAULT IDIOM IS FLUX-LINKING AND IT IS WRONG HERE. A term riding the
+# fermentative flux (X * S/(K+S), what OrganicAcidExcretion and every keto-acid Process use)
+# peaks MID-ferment, because it is proportional to biomass. Table 2 says the decrease is over
+# by high Krausen. Flux-linking would put the removal exactly where the source says there is
+# none. Recorded so a later reader does not "restore" the house idiom.
+#
+# NO MECHANISM IS ASSERTED, because Tyrell assert none. Yeast uptake, calcium-oxalate
+# precipitation and adsorption onto cell walls are all plausible and the paper distinguishes
+# none of them; it reports only that the acids leave. The three slots are therefore OFF EVERY
+# LEDGER (the iso_alpha precedent: exogenous, carbon-bearing, adsorptively removed, weighted
+# nowhere) rather than routed to a metabolic destination the source does not support. The
+# omission that buys: ~19 mg C/L of malt carbon per litre is untracked, against ~33 g C/L on
+# the ledger --- 0.06 %, stated rather than hidden.
+#
+# ------------------------- TWO CONFLICTS, NOT SMOOTHED -------------------------
+#
+# 1. PYRUVIC'S DIRECTION IS SCALE-DEPENDENT WITHIN THIS ONE PAPER. Tyrell 3.1, laboratory
+#    scale: pyruvic INCREASES (maxima to 300 ppm, strain 10), and they write "The described
+#    reassimilation of pyruvic acids and its metabolization to acetic acid was not confirmed by
+#    trial set-up". Tyrell 3.2, the EBC tubes used here: strong DECREASE. They name the cause
+#    themselves --- higher oxygen intake, higher temperature and lower hydrostatic pressure at
+#    lab scale --- and say it hits acetic, formic, oxalic and pyruvic hardest. This file adopts
+#    the EBC direction because it is the same dataset group 2's yields came from, so the two
+#    halves of beer's acid model at least describe ONE ferment. It is a SIGN conflict on a
+#    modelled quantity, not a caveat, and a scenario at lab-scale conditions is outside what
+#    these numbers describe.
+#
+# 2. FORMIC'S CITATION CONTRADICTS ITS OWN DATA. Tyrell 1.5 cites Pueschner et al. [14]:
+#    citric, fumaric and formic "basically depend on concentrations of wort", i.e. raw-material
+#    determined and inert. Their own Fig 11 shows formic falling 26 -> 3.5-6 ppm within a day
+#    and their own Table 2 scores it '--'. The measurement is used and the citation is recorded
+#    as contradicted --- note that the SAME sentence is what makes citrate inert in group 2, so
+#    this is one sentence believed for one acid and disbelieved for another, on the strength of
+#    the authors' own figures in both cases.
+#
+# --------------------------- WHAT THE BANDS MEAN ---------------------------
+#
+# Seeds: READ TOLERANCE ONLY (+-0.5 ppm on 5 ppm gridlines) --- one wort, measured once, all
+# four strains superimposed at day 0. NOT a between-wort band; group 2's header explains why
+# that spread is unquantifiable from this source.
+#
+# Floors: BOTH EDGES ARE A NAMED STRAIN'S OWN MEASURED DAY-7 VALUE; the nominal is the
+# four-strain mean and is AUTHOR-CONSTRUCTED. Real biological spread, not read uncertainty.
+
+pyruvic_typical_wort:
+  value: 0.022
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.0215, high: 0.0225, note: "READ TOLERANCE ONLY (+-0.5 ppm on a 5 ppm gridline), NOT a between-wort band -- see the group header. All four strains superimpose at day 0 in Fig 6, as they must: it is one wort." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 6 (pyruvic acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "12 degP Bavarian Pilsner malt-extract wort (Weyermann), 20 BU iso-alpha, pasteurised, at pitch (15 degC)."
+    notes: "The acid D-179 declined to ship and D-181 ships. Its slot is `pyruvic`, deliberately NOT wine's `pyruvate` -- same molecule, opposite role. SEE CONFLICT 1 IN THE GROUP HEADER: the same authors measure this acid RISING at laboratory scale."
+
+formic_typical_wort:
+  value: 0.026
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.0255, high: 0.0265, note: "READ TOLERANCE ONLY (+-0.5 ppm on a 5 ppm gridline), NOT a between-wort band -- see the group header." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 11 (formic acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "as pyruvic_typical_wort -- same wort, same trial."
+    notes: "The largest anion-charge loss of the three despite the smallest mass loss: at 46.03 g/mol formic is the lightest acid in beer's registry, so its 21 mg/L fall is 0.47 mmol/L against pyruvic's 0.24. SEE CONFLICT 2 IN THE GROUP HEADER: Tyrell's own section 1.5 cites this acid as wort-determined and inert, which their Fig 11 contradicts."
+
+oxalic_typical_wort:
+  value: 0.022
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.0215, high: 0.0225, note: "READ TOLERANCE ONLY (+-0.5 ppm on a 5 ppm gridline), NOT a between-wort band -- see the group header." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 7 (oxalic acid development in EBC fermentation tubes), day 0. FIGURE READ, not a printed table."
+    conditions: "as pyruvic_typical_wort -- same wort, same trial."
+    notes: "THE DIPROTIC ONE, and the only one of the three whose second pKa (4.20) lies inside the pH range a fermenting beer traverses -- so its removed charge is not a flat 2 eq/mol but moves with pH, and pKa_oxalic_2 is the one new pKa constant the prediction is sensitive to. Calcium-oxalate precipitation (beer stone) is the standard brewing account of an oxalate fall and would make its floor a solubility limit rather than a metabolic one, but Tyrell do not test it and this file does not assert it."
+
+# -- The floors: where each acid stops falling ---------------------------------
+#
+# NOT a fitted parameter and not a free one: each floor is the four-strain MEAN of the measured
+# day-7 level, and the band edges are two NAMED strains' own day-7 values. Table 2's '0' at high
+# Krausen and at collapse is the source's own statement that a plateau exists; these numbers are
+# where it sits. What is NOT sourced is the mechanism holding it there.
+
+pyruvic_floor_beer:
+  value: 0.0013
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.0002, high: 0.002, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DAY-7 VALUE: low = strain 7 (0.2 ppm, essentially the axis), high = strain 15 (2.0 ppm). Nominal = the four-strain MEAN, AUTHOR-CONSTRUCTED. The low edge is NEAR ZERO because one strain genuinely clears this acid completely -- a real yeast, not a degenerate corner (the Y_malic_sugar_beer precedent)." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 6, day 7 over four strains. FIGURE READ."
+    conditions: "as pyruvic_typical_wort -- same wort, same trial, 7 days to a flat extract."
+    notes: "94 % of the wort level is removed. NB Fig 6's strain 6 falls to ~0.7 ppm on DAY 1 -- below this nominal floor -- and then drifts back up to ~1.3 by day 7. A monotone relaxation to a floor cannot represent an undershoot-then-recover; that strain is one of the two the rate fit below has to skip, and both skips are named there rather than silently dropped."
+
+formic_floor_beer:
+  value: 0.00475
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.0035, high: 0.006, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DAY-7 VALUE: low = strain 15 (3.5 ppm), high = strain 6 (6.0 ppm). Nominal = the four-strain MEAN, AUTHOR-CONSTRUCTED. NB Fig 11's legend carries TWO identical triangle markers (strains 7 and 31), so those two series are not separable by eye -- the two EDGE strains are the circle and the square and ARE identifiable, which is why the band edges can still be named." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 11, day 7 over four strains. FIGURE READ."
+    conditions: "as pyruvic_typical_wort -- same wort, same trial, 7 days to a flat extract."
+    notes: "82 % of the wort level is removed, the largest molar loss of the three."
+
+oxalic_floor_beer:
+  value: 0.005625
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 0.005, high: 0.006, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DAY-7 VALUE: low = strain 7 (5.0 ppm), high = strains 6 and 31 (6.0 ppm). Nominal = the four-strain MEAN, AUTHOR-CONSTRUCTED. The TIGHTEST band of the three, matching Tyrell Table 2's 'no' in the between-strain-difference column for this acid -- the band and the source's own qualitative judgement agree." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 7, day 7 over four strains. FIGURE READ."
+    conditions: "as pyruvic_typical_wort -- same wort, same trial, 7 days to a flat extract."
+    notes: "74 % of the wort level is removed. Fig 7 shows a shallow REBOUND after day 5 (all four strains drift up ~1 ppm), which a monotone relaxation cannot produce and which is smaller than the between-strain spread; reported, not modelled."
+
+# -- The removal rate ----------------------------------------------------------
+
+k_wort_acid_removal:
+  value: 0.068149
+  unit: "1/h"
+  tier: plausible
+  uncertainty: { low: 0.034929, high: 0.108533, note: "ONE CONSTANT FOR ALL THREE ACIDS, banded across the three acids' own fitted values (pyruvic 0.0349, oxalic 0.0610, formic 0.1085 /h) rather than shipped as three parameters. Tyrell Table 2 classifies all three IDENTICALLY and offers no per-acid rate, so three constants would assert a distinction the source does not make. The nominal is the mean of the three and is AUTHOR-CONSTRUCTED; the edges are two of the three acids' own fits. MEASURED TO BE INCONSEQUENTIAL FOR THE ENDPOINT: every value in this band clears the fall within ~1-3 days of a 7-day ferment, so the day-7 pH is insensitive to it (pre-registered as P4 and verified). It sets the SHAPE of the first two days, not the outcome." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Figs 6/7/11, inverted from the day-0 -> day-1 fall of each acid toward its own measured floor. FIGURE READ."
+    conditions: "12 degP malt-extract wort, 15 degC, 4 strains; A(t) = floor + (A0 - floor)*exp(-k*t) inverted at t = 24 h, averaged over the strains the two-parameter shape can represent."
+    notes: "TWO OF THE TWELVE STRAIN-ACID FITS ARE SKIPPED AND BOTH ARE NAMED: strain 6's pyruvic (day-1 read 0.7 ppm, BELOW its own day-7 floor of 1.3) and strain 15's formic (day-1 3.9 ppm, below its 4.75 floor). Both undershoot and recover, which a monotone relaxation cannot represent, so their implied k is undefined rather than large. Ten of twelve fits back the nominal [[feedback-count-and-print-your-skips]]. Temperature-flat: no Arrhenius factor, matching the acetaldehyde (D-27) and alpha-acetolactate (D-26) v1 calls, and unlike D-180's producer, which MUST ride the uptake Arrhenius because it is booked on the sugar flux -- this one is not."
+
 # -- The lumped peptide/polypeptide buffer capacity -----------------------------
 #
 # THE ONE PARAMETER THAT CARRIES BEER'S ACTUAL BUFFERING, and the one with the weakest
@@ -322,6 +467,20 @@ Y_malic_sugar_beer:
 # log10[ H+ added / H+ increase ]) on top of the organic acids above. That is the D-18
 # inverse-anchoring shape one level up: absorb an unknown into a single term back-solved from
 # a measurement, and claim predicted CHANGES rather than the absolute.
+#
+# RE-ANCHORED AGAIN AT D-181 -- 1.6708 -> 1.5481 g/L, -7.34 %. Same protocol, same BC = 1.18
+# target, third acid table: D-181 puts three more acids (pyruvic, formic, oxalic) in the wort,
+# and a capacity back-solved on a composition the model no longer has would reproduce nothing.
+# The re-anchor is FORCED by the seed change, exactly as D-180's was.
+#
+# ITS SIGN WAS PRE-REGISTERED AND IT WORKS AGAINST THIS BEAT TOO, in the opposite direction to
+# D-180's: three more wort acids buffer some of the titration themselves, so LESS peptide is
+# needed to reach BC = 1.18, so beer is LESS buffered and the predicted pH drop gets LARGER --
+# partially OFFSETTING the base that D-181 adds. Measured apart from the acids themselves
+# rather than bundled with them [[feedback-pair-the-red-with-an-ordering-preserving-baseline]].
+#
+# CONTROL: re-running this back-solve on the FIVE-acid wort table reproduces D-180's
+# 1.6707620638415932 BITWISE, so the -7.34 % is the acid table's doing and not the harness's.
 #
 # RE-ANCHORED AT D-180 -- 1.5125 -> 1.6708 g/L, +10.5 %. NOT a re-fit and not a correction of
 # arithmetic: the identical back-solve, run over the WORT acid table (group 2) instead of the
@@ -380,11 +539,11 @@ Y_malic_sugar_beer:
 # zero-width short-circuit), so this pin does NOT narrow the reported beer spread -- the pKa
 # band still moves it. Do not "restore" a band here without also making the pair sample jointly.
 peptide_buffer_capacity_beer:
-  value: 1.6707620638415932
+  value: 1.5480662315921656
   unit: "g/L"
   tier: speculative
-  uncertainty: { low: 1.6707620638415932, high: 1.6707620638415932, note: "PINNED zero-width, and deliberately -- see the block above. The capacity is DERIVED from pKa_peptide_buffer by the back-solve, not independently uncertain, so its uncertainty is carried by that pKa's band instead of duplicated here. The value is the 11.36 mM that pairs with the nominal pKa 4.25, converted at glutamate's 147.13 g/mol. Carried at FULL PRECISION on purpose: it is a root of the back-solve, and a rounded copy would make the BC = 1.18 round-trip test pass only to a tolerance rather than exactly (the D-154 '663 vs 662.802522' lesson)." }
+  uncertainty: { low: 1.5480662315921656, high: 1.5480662315921656, note: "PINNED zero-width, and deliberately -- see the block above. The capacity is DERIVED from pKa_peptide_buffer by the back-solve, not independently uncertain, so its uncertainty is carried by that pKa's band instead of duplicated here. The value is the 10.52 mM that pairs with the nominal pKa 4.25 on the EIGHT-acid wort table (D-181), converted at glutamate's 147.13 g/mol. Carried at FULL PRECISION on purpose: it is a root of the back-solve, and a rounded copy would make the BC = 1.18 round-trip test pass only to a tolerance rather than exactly (the D-154 '663 vs 662.802522' lesson)." }
   provenance:
     source: "Back-solved against the published wort buffering capacity BC = 1.18 reported by Peyer, L. (2017), PhD thesis, University College Cork, CORA handle 10468/4694, sections 5.3.4 (the BC definition and titration protocol) and 5.4.3 / abstract (the measured values: 0.94 at mash-in, 1.18 control wort, 1.21 post-boil, 1.24 with added protease, 1.34 max over the proteolytic rest)."
-    conditions: "back-solved at wort pH 5.5 on top of the *_typical_wort organic acids above (decision D-180; it was the finished-beer table until then), using Peyer's own fast-BC protocol reproduced on this engine's charge balance. Applied from wort pH down through beer pH (~4.9-5.1), which SPANS rather than sits at the pH it was fitted at."
+    conditions: "back-solved at wort pH 5.5 on top of ALL EIGHT *_typical_wort organic acids above (decision D-181; five of them at D-180, the finished-beer table before that), using Peyer's own fast-BC protocol reproduced on this engine's charge balance. Applied from wort pH down through beer pH (~4.9-5.2), which SPANS rather than sits at the pH it was fitted at."
     notes: "tier=SPECULATIVE for the two remaining stacked mismatches in the header block, the first of which is the decisive one and which D-180 made harder rather than easier: solved at one pH, now asked to buffer across a traverse [[feedback-validate-calibrations-in-the-frame-that-binds]]. Represented as glutamate-equivalent monoprotic buffering SITES (see M_GLUTAMIC in core/chemistry.py), off every ledger -- beer's protein is untracked as carbon and nitrogen alike, so this pool perturbs no conservation sum. It is also the parameter that makes beer's pH tier speculative; acidbase.ph_tier is scoped per medium (D-179) so that this does not drag WINE's pH tier down for a pool wine does not carry. Since D-180 it is additionally the single parameter the predicted pH DROP is most sensitive to -- 0.514 to 0.744 units across pKa_peptide_buffer's band at nominal yields, and 41-105 % of the measured drop over the JOINT band with the four sampled yields -- so a test of that drop must be built to the joint band, never to this nominal."

@@ -103,8 +103,11 @@ from fermentation.core.kinetics.malolactic import (
 from fermentation.core.kinetics.mercaptans import AutolyticMercaptan
 from fermentation.core.kinetics.organic_acids import (
     ORGANIC_ACID_SPECS,
+    WORT_ACID_SINKS,
     OrganicAcidExcretion,
     OrganicAcidSpec,
+    WortAcidRemoval,
+    WortAcidSinkSpec,
     organic_acid_carbon_draw,
     organic_acid_rates,
 )
@@ -179,6 +182,7 @@ __all__ = [
     "ClosureOxygenIngress",
     "SotolonAldolCondensation",
     "ORGANIC_ACID_SPECS",
+    "WORT_ACID_SINKS",
     "OakExtraction",
     "OxidativeAcetaldehyde",
     "PhenolicBrowning",
@@ -217,6 +221,8 @@ __all__ = [
     "TemperatureRamp",
     "YeastAutolysis",
     "YeastPOFDecarboxylation",
+    "WortAcidRemoval",
+    "WortAcidSinkSpec",
     "arrhenius_factor",
     "autolysis_flux",
     "biomass_growth_rate",

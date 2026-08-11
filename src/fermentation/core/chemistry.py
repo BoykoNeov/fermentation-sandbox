@@ -248,6 +248,25 @@ M_LACTIC = 3 * _M_C + 6 * _M_H + 3 * _M_O
 #: D-18 pH charge balance in v1 (a scoped omission the inverse anchoring absorbs at t=0, as
 #: for SO₂'s bisulfite charge, D-22), so it is carbon-active but not charge-active.
 M_CITRIC = 6 * _M_C + 8 * _M_H + 7 * _M_O
+#: Formic acid, CH2O2 — one of beer's three FALLING wort acids (decision D-181). Malt-derived,
+#: 26 mg/L in Tyrell's wort, removed to ~3.5-6 mg/L within a day of pitching. Monoprotic
+#: (pKa 3.75), and by far the most charge-dense of the three per gram: at 46 g/mol its 21.6 mg/L
+#: fall is the largest single anion-charge loss of the beat despite being the smallest mass.
+#:
+#: **Deliberately absent from ``MOLAR_MASS``/``CARBON_ATOMS`` below**, unlike ``M_ACETIC``
+#: above, and the contrast is the whole design: acetic is *produced from sugar* so its carbon
+#: crosses the ledger and must be weighable, while this acid arrives in the wort as malt carbon
+#: and is *removed from solution* by a mechanism the source does not attribute. That is the
+#: ``iso_alpha`` case exactly (exogenous, carbon-bearing, adsorptively removed, weighted
+#: nowhere), so these three sit OFF every ledger and the absence here is what makes that
+#: structural rather than promised: a future producer drawing from ``S`` would raise KeyError
+#: in ``carbon_mass_fraction`` instead of silently leaking carbon.
+M_FORMIC = 1 * _M_C + 2 * _M_H + 2 * _M_O
+#: Oxalic acid, C2H2O4 — the second of beer's three falling wort acids (decision D-181).
+#: DIPROTIC (pKa 1.25 / 4.14), and the only one of the three whose second pKa sits inside the
+#: pH range a fermenting beer traverses, so its removed charge is between 1 and 2 equivalents
+#: per mole rather than a flat 1. Off every ledger — see ``M_FORMIC``.
+M_OXALIC = 2 * _M_C + 2 * _M_H + 4 * _M_O
 #: α-acetolactate (2-acetolactic acid), C5H8O4 — the vicinal-diketone (VDK) precursor
 #: reservoir (decision D-26). Yeast excretes it during valine biosynthesis; it then
 #: *spontaneously* (non-enzymatically) oxidatively decarboxylates to diacetyl + CO2,

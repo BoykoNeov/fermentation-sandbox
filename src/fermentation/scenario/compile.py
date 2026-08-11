@@ -77,6 +77,7 @@ from fermentation.core.kinetics import (
     TanninEthylTanninCondensation,
     TanninSelfPolymerization,
     ThermalAnthocyaninFade,
+    WortAcidRemoval,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -460,11 +461,16 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
         # slots are seeded from their sourced levels and the strong cation is back-solved to
         # reproduce the given pH (inverse anchoring).
         #
-        # The five acid keys override those sourced levels individually — the "hold the must,
+        # The eight acid keys override those sourced levels individually — the "hold the must,
         # spike the leucine" shape of the D-100 amino-acid overrides. Each is in g/L.
         # peptide_buffer_gpl overrides the lumped protein buffer; set it to 0 to run the
         # organic-acids-only arm (which measures ~1/6th of real wort's buffering — the honest
         # under-prediction the peptide term exists to close).
+        #
+        # pyruvic/formic/oxalic (decision D-181) are the three the ferment REMOVES. Setting one
+        # to 0 is how the "what does the missing base cost" arm is run without touching code —
+        # and it is the only way to recover the pre-D-181 one-sided acidification, which is why
+        # they are overridable rather than fixed at their wort levels.
         {
             "glucose_gpl",
             "maltose_gpl",
@@ -478,6 +484,9 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "citric_gpl",
             "malic_gpl",
             "succinic_gpl",
+            "pyruvic_gpl",
+            "formic_gpl",
+            "oxalic_gpl",
             "peptide_buffer_gpl",
         }
     ),
@@ -794,6 +803,14 @@ _BEER_ACID_SEEDS: tuple[tuple[str, str, str], ...] = (
     ("citrate", "citric_gpl", "citric_typical_wort"),
     ("malic", "malic_gpl", "malic_typical_wort"),
     ("succinic", "succinic_gpl", "succinic_typical_wort"),
+    # The three that FALL (decision D-181). Seeded from the SAME wort as the five above —
+    # Tyrell's Figs 6/7/11 against their 9/10/12/13/14 — and drained by ``WortAcidRemoval``.
+    # They enter the cation back-solve below like any other acid, which is what makes the
+    # anchored start pH unchanged and the FINISHED pH higher: more acid at t=0 means a larger
+    # back-solved cation to still hit ``initial_ph``, and that cation stays when the acid goes.
+    ("pyruvic", "pyruvic_gpl", "pyruvic_typical_wort"),
+    ("formic", "formic_gpl", "formic_typical_wort"),
+    ("oxalic", "oxalic_gpl", "oxalic_typical_wort"),
     ("peptide_buffer", "peptide_buffer_gpl", "peptide_buffer_capacity_beer"),
 )
 
@@ -2483,8 +2500,15 @@ def compile_scenario(
     # it would arrive silently — the run stays green, the number just becomes fiction.
     # Disabled, an un-anchored beer is byte-for-byte the pre-D-179 beer, and the empty acid
     # slots keep their tier (``tier_of`` counts enabled, not nonzero, Processes).
-    if OrganicAcidExcretion.name in process_set and "initial_ph" not in scenario.initial:
-        process_set.disable(OrganicAcidExcretion.name)
+    #
+    # ``WortAcidRemoval`` (D-181) rides the identical gate, and its argument is the mirror
+    # image: absent ``initial_ph`` its three slots are 0, already below their floors, so the
+    # rate law is a no-op anyway — but an ENABLED Process holds those empty slots' tier below
+    # VALIDATED (``tier_of`` counts enabled Processes, not nonzero ones), so leaving it on
+    # would change what an un-anchored beer REPORTS about acids it does not carry.
+    for _acid_process in (OrganicAcidExcretion, WortAcidRemoval):
+        if _acid_process.name in process_set and "initial_ph" not in scenario.initial:
+            process_set.disable(_acid_process.name)
 
     # Residual-nitrogen floor (decision D-30): the biomass carrying-capacity cap is a
     # deliberate DEPARTURE from the validated Coleman anchor (which caps nothing and strips

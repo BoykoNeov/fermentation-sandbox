@@ -1,4 +1,4 @@
-"""Beer's organic-acid production — the acids yeast makes while it ferments (decision D-180).
+"""Beer's organic acids — what the ferment MAKES (D-180) and what it REMOVES (D-181).
 
 Until D-180 beer's acid slots (D-179) were a **composition**: dosed at pitch, touched by no
 Process, so a modelled beer's pH sat exactly where ``initial_ph`` put it for the whole run
@@ -18,24 +18,33 @@ Figs 6-14) *and* the pH and extract curves (their Fig 4). So the yields are a me
 **difference on one wort**, not two studies subtracted — and the pH curve is then a **free
 prediction**, because nothing in the parameter file is fitted to it.
 
-**What the free prediction says (read the D-180 record before quoting it), and the scope it
-is true in.** Against a measured drop of 0.8125 pH units:
+**What the free prediction says (read the D-180 and D-181 records before quoting it), and the
+scope it is true in.** Against a measured drop of 0.8125 pH units, SINCE D-181:
 
-* at **nominal yields**, across the sampled ``pKa_peptide_buffer`` band: **63-92 %** of it;
-* over the **JOINT** band — the four yields are sampled too, and widely: **41-105 %**.
+* at **nominal yields and floors**, across the sampled ``pKa_peptide_buffer`` band:
+  **42.7-62.2 %** of it;
+* over the **JOINT** band — the four yields and the three floors are sampled too, and widely:
+  **8.7-81.4 %**.
 
-So "organic acid production accounts for most of the drop" is a NOMINAL-yield statement, and
-the high corner of the reachable band matches the measurement outright. Neither is a
-validation, because the agreement is held open by two omitted terms of opposite sign:
+**Those numbers were 63-92 % and 41-105 % at D-180, and they got worse on purpose.** D-180
+closed with its agreement held open by two omitted terms of OPPOSITE sign, and D-181 built the
+larger one — three wort acids a real ferment removes, which the model could not lose because
+they were not state (:class:`WortAcidRemoval`). Removing them removes anion charge, so the
+finished pH rises and the predicted drop shrinks. Nothing in the reachable band now covers the
+measurement, where a corner used to. **That is the honest state**, and it is the reason the
+D-180 agreement must never have been read as validation: it was propped up by an uncorrected
+error pulling the other way.
 
-* three wort acids that FALL over a real ferment (pyruvic 22→~1, formic 26→~5, oxalic
-  22→~5 ppm) are not beer state slots, so the model cannot lose that anion charge — worth
-  about +0.2-0.3 pH of missing base;
+One omitted term remains, and it pulls the opposite way again:
+
 * dissolved CO₂ at end-of-fermentation saturation is not in the charge balance — worth about
   −0.3 pH. (The engine's ``CO2`` pool is *cumulative evolved gas*, not dissolved
   concentration, so it must NOT be read as carbonic acid; that needs a saturation model.)
 
-Each is a follow-up beat with a measured size. Neither is a reason to tune a yield.
+It is a follow-up beat with a measured size, and it is not a reason to tune a yield. Note that
+building it will move the headline back UP toward the measurement — which after D-181 would be
+a real improvement rather than a compensation, and is precisely why the two were built in this
+order rather than the other.
 
 **Mechanism — an extra sliver off ``S``, never uptake's yields.** There are two shipped ways
 to fund a byproduct's carbon, and the choice matters:
@@ -128,10 +137,10 @@ class OrganicAcidSpec:
 #: the wort value with no trend) all say the same thing three ways: beer's citrate is
 #: malt-derived, not a fermentation product. It keeps a wort seed and stays inert.
 #:
-#: The three acids that *fall* over a real ferment — pyruvic, formic, oxalic — are absent for a
-#: different reason: none is a beer state slot (D-179 refused pyruvic on the name collision
-#: with wine's dynamic ``pyruvate`` pool), so there is nothing to drain. See the module
-#: docstring for what that omission is worth in pH.
+#: The three acids that *fall* over a real ferment — pyruvic, formic, oxalic — are absent from
+#: THIS registry because they are not produced; they have their own, :data:`WORT_ACID_SINKS`,
+#: and their own Process (:class:`WortAcidRemoval`, D-181). Two registries rather than one with
+#: a sign, because the two halves share no parameter, no rate law and no ledger treatment.
 ORGANIC_ACID_SPECS: tuple[OrganicAcidSpec, ...] = (
     OrganicAcidSpec("acetic", "Y_acetic_sugar_beer", "acetic_acid"),
     OrganicAcidSpec("lactic", "Y_lactic_sugar_beer", "lactic_acid"),
@@ -228,4 +237,115 @@ class OrganicAcidExcretion(Process):
             d[schema.slice(spec.slot)] = rate
         # ONE draw for all four, each at its own molecule's carbon fraction.
         _draw_carbon_from_sugar(d, y, schema, organic_acid_carbon_draw(y, schema, params))
+        return d
+
+
+@dataclass(frozen=True)
+class WortAcidSinkSpec:
+    """One wort acid that is REMOVED during fermentation: its state slot and its floor.
+
+    Deliberately a different dataclass from :class:`OrganicAcidSpec` rather than the same one
+    with a sign: a produced acid needs a yield and a carbon ``species``, a removed one needs a
+    floor and has no carbon destination at all (see :class:`WortAcidRemoval`). Sharing a spec
+    would have made the two halves look interchangeable when their only common element is that
+    both end up in beer's charge balance.
+    """
+
+    slot: str
+    floor_param: str
+
+
+#: The acids beer's wort carries and LOSES (decision D-181) — the sink half of beer's acid
+#: model, and the single source of truth its Process, its ``touches``/``reads`` and its tests
+#: all derive from.
+#:
+#: All three are OFF EVERY LEDGER, which is why no ``species`` appears here and why none of
+#: them is in :data:`~fermentation.core.chemistry.MOLAR_MASS`. That is not an omission to fix
+#: later: it is the structural form of "this carbon leaves the beer by a route the source does
+#: not attribute" (the ``iso_alpha`` precedent, D-64). A future beat that gives one of these a
+#: producer drawing on ``S`` would need to add the weight *and* the species, and until it does
+#: the missing key raises instead of leaking carbon silently.
+WORT_ACID_SINKS: tuple[WortAcidSinkSpec, ...] = (
+    WortAcidSinkSpec("pyruvic", "pyruvic_floor_beer"),
+    WortAcidSinkSpec("formic", "formic_floor_beer"),
+    WortAcidSinkSpec("oxalic", "oxalic_floor_beer"),
+)
+
+
+class WortAcidRemoval(Process):
+    """The three wort acids that FALL — beer's missing base, built (decision D-181).
+
+    ``d(<acid>)/dt = −k_wort_acid_removal · max(<acid> − floor_<acid>, 0)`` for each entry of
+    :data:`WORT_ACID_SINKS`. First-order relaxation toward a **measured** floor, temperature-
+    flat, touching nothing but the three acid slots.
+
+    **What it is for.** D-180 turned beer's pH into a prediction by producing the four acids
+    that rise, and closed by naming two omitted terms of opposite sign that were holding its
+    agreement open. This is the larger of the two: three acids a real wort carries and a real
+    ferment removes (pyruvic 22 → ~1.3, formic 26 → ~4.75, oxalic 22 → ~5.6 mg/L), which the
+    model could not lose because they were not state. Removing them removes anion charge, which
+    raises the finished pH, which makes the predicted drop **smaller** — so this Process makes
+    the headline number agree WORSE with the measurement, on purpose. Building the other omitted
+    term (dissolved CO₂, the opposite sign) first would have moved the same number to near-exact
+    agreement with an uncorrected error still in place.
+
+    **Why first-order-to-a-floor and NOT the flux-linked idiom this module's other Process
+    uses.** Tyrell's Table 2 scores all three acids ``--`` (strong decrease) at *lower* Krausen
+    and ``0`` at both high Krausen and Krausen collapse: the fall is over within about a day and
+    nothing happens for the remaining six. A term riding
+    :func:`~fermentation.core.kinetics.carbon_routing.fermentative_uptake_rates` is proportional
+    to biomass and therefore peaks MID-ferment — it would put the removal exactly where the
+    source says there is none. The archive's default is flux-linking; here the default is wrong,
+    and this paragraph exists so it is not "restored".
+
+    **No mechanism is asserted, and the ledger treatment is what says so.** Yeast uptake,
+    calcium-oxalate precipitation and adsorption onto cell walls would all produce this curve;
+    Tyrell distinguish none of them and explicitly report that pyruvate re-assimilation was *not*
+    confirmed in their own lab-scale arm. So the acids' carbon is not routed to ``E``/``CO2``
+    (which would claim metabolism) nor to a precipitate pool (which would claim precipitation):
+    the three slots sit OFF every ledger, the ``iso_alpha`` treatment for exogenous mass that
+    leaves the liquid by an unattributed route. ``total_carbon`` closes exactly as before, and
+    **not** because this Process balances — because it touches nothing the ledger weighs. The
+    price is ~19 mg C/L of malt carbon per litre untracked against ~33 g C/L on the ledger.
+
+    **Beer-only and opt-in.** No wine Process reads these parameters and wine carries none of
+    these slots. Like D-180's producer, the compile seam DISABLES this Process when a beer
+    scenario supplies no ``initial_ph`` — not tidiness but the D-179 correctness gate: the acid
+    slots are 0 without that opt-in, and a Process free to run on them would have nothing to
+    remove but would still hold the empty slots' tier below VALIDATED.
+
+    Tier **plausible** — unlike :class:`~fermentation.core.kinetics.hops.IsoAlphaAcidLoss`,
+    whose structurally identical loss law is SPECULATIVE because its rate is an author estimate,
+    every number here (both endpoints and the rate) is read off a measured time course on a real
+    ferment. What is speculative is the *mechanism*, and the model does not claim one.
+    """
+
+    name = "wort_acid_removal"
+    tier = Tier.PLAUSIBLE
+    #: The three sink slots and nothing else — no ``S``, no ``E``, no ``CO2``. The shortest
+    #: ``touches`` of any producing/consuming Process in the engine, and that brevity is the
+    #: no-mechanism claim in machine-checkable form.
+    touches: tuple[str, ...] = tuple(spec.slot for spec in WORT_ACID_SINKS)
+    #: The shared rate constant plus the three floors. Derived from the registry so a fourth
+    #: sink cannot be added without its floor entering the sampler's scope (``reads`` has two
+    #: masters — tier propagation AND sampler scope, D-160).
+    reads: tuple[str, ...] = (
+        "k_wort_acid_removal",
+        *(spec.floor_param for spec in WORT_ACID_SINKS),
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        k = params["k_wort_acid_removal"]
+        for spec in WORT_ACID_SINKS:
+            pool = float(y[schema.slice(spec.slot)][0])
+            # Clamped at the floor rather than at zero: an acid already at (or, through solver
+            # undershoot, below) its floor has no removal term, so the pool cannot be driven
+            # negative and cannot be REFILLED by a sign flip either.
+            excess = pool - params[spec.floor_param]
+            if excess <= 0.0:
+                continue
+            d[schema.slice(spec.slot)] = -k * excess
         return d

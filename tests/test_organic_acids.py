@@ -12,12 +12,17 @@ difference on one wort, and the pH is a FREE prediction — nothing in the param
 fitted to it. The acceptance section below is therefore a real external comparison rather than
 a round-trip, with one exception which says so in its own name.
 
+**D-181 adds the sink half** (section 5): the three wort acids Tyrell measure FALLING, which
+beer's model previously could not lose. That is why this file's headline numbers moved DOWN.
+
 **The headline is a compensation, not an agreement, and these tests are written to keep it
-that way.** Against a measured drop of 0.8125 pH the model gives 63-92 % at nominal yields
-across the sampled ``pKa_peptide_buffer`` band, and **41-105 % over the joint band** once the
-four sampled yields are varied too — held open by two omitted terms of opposite sign (three
-wort acids that fall and are not state slots, ~+0.2-0.3 pH; dissolved CO₂, ~−0.3 pH). No test
-here is named or phrased as validating the produced acids alone.
+that way.** Against a measured drop of 0.8125 pH the model gives **42.7-62.2 %** at nominal
+yields and floors across the sampled ``pKa_peptide_buffer`` band, and **8.7-81.4 % over the
+joint band** once the four yields and three floors are varied too. At D-180 those were 63-92 %
+and 41-105 %, and a corner of the joint band REACHED the measurement; after D-181 nothing in
+the band does. The agreement got worse because an error propping it up was removed — one
+omitted term of the opposite sign remains (dissolved CO₂, ~−0.3 pH). No test here is named or
+phrased as validating the produced acids alone.
 """
 
 import pytest
@@ -25,7 +30,12 @@ import pytest
 from fermentation.core import acidbase
 from fermentation.core.acidbase import charge_balance_is_populated
 from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
-from fermentation.core.kinetics import ORGANIC_ACID_SPECS, OrganicAcidExcretion
+from fermentation.core.kinetics import (
+    ORGANIC_ACID_SPECS,
+    WORT_ACID_SINKS,
+    OrganicAcidExcretion,
+    WortAcidRemoval,
+)
 from fermentation.core.kinetics.carbon_routing import fermentative_uptake_rates
 from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.media import beer_schema, get_medium, wine_schema
@@ -373,7 +383,17 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     compiled, res = _run(dict(TYRELL_SCENARIO))
     params = compiled.parameters.resolve()
     pka_map = acidbase.build_pka_map(params)
-    slots = ("lactic", "acetic", "citrate", "malic", "succinic", "peptide_buffer")
+    slots = (
+        "lactic",
+        "acetic",
+        "citrate",
+        "malic",
+        "succinic",
+        "pyruvic",
+        "formic",
+        "oxalic",
+        "peptide_buffer",
+    )
     molar = {s: acidbase.ALL_ACIDS[s].molar_mass for s in slots}
     start_molar = {s: float(res.series(s)[0]) / molar[s] for s in slots}
     measured_drop = TYRELL_WORT_PH - sum(TYRELL_BEER_PH) / 2.0
@@ -384,7 +404,7 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "Y_acetic_sugar_beer"
     ]
 
-    def fraction(pka: float, pick: str) -> float:
+    def fraction(pka: float, pick: str, floor_pick: str) -> float:
         member = {**pka_map, "peptide_buffer": (pka,)}
         cation = acidbase.solve_cation_charge(start_molar, 0.0, member, TYRELL_WORT_PH)
         start = acidbase.solve_ph(start_molar, cation, 0.0, member)
@@ -396,6 +416,12 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
             p = beer_params[spec.yield_param]
             y = {"lo": p.uncertainty.low, "nom": p.value, "hi": p.uncertainty.high}[pick]
             end[spec.slot] = start_molar[spec.slot] + (y * flux) / molar[spec.slot]
+        # The D-181 sinks land ON their floors: every k in the band clears the fall inside the
+        # first days of this 14-day run, which the endpoint-insensitivity test pins separately.
+        for sink in WORT_ACID_SINKS:
+            p = beer_params[sink.floor_param]
+            f = {"lo": p.uncertainty.low, "nom": p.value, "hi": p.uncertainty.high}[floor_pick]
+            end[sink.slot] = f / molar[sink.slot]
         return (start - acidbase.solve_ph(end, cation, 0.0, member)) / measured_drop
 
     pka_band = (
@@ -404,31 +430,47 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         beer_params["pKa_peptide_buffer"].uncertainty.high,
     )
 
-    # Scope 1 — nominal yields. The "must fall short" claim lives HERE and nowhere else.
-    at_nominal = [fraction(pka, "nom") for pka in pka_band]
-    assert min(at_nominal) > 0.55, (
+    # Scope 1 — nominal yields AND nominal floors. The "must fall short" claim lives HERE.
+    at_nominal = [fraction(pka, "nom", "nom") for pka in pka_band]
+    assert min(at_nominal) > 0.35, (
         f"the predicted drop collapsed to {min(at_nominal):.0%} of Tyrell's measured one at "
-        "nominal yields; D-180 measured 63-92 % across the pKa band"
+        "nominal yields; D-181 measured 42.7-62.2 % across the pKa band (D-180's 63-92 % was "
+        "the same model unable to lose the falling acids' charge)"
     )
     assert max(at_nominal) < 1.0, (
         f"at NOMINAL yields the predicted drop reached {max(at_nominal):.0%} of the measured "
-        "one. It is supposed to fall short: the falling wort acids (pyruvic/formic/oxalic) and "
-        "dissolved CO2 are both absent and pull opposite ways. Find out which one arrived."
+        "one. It is supposed to fall short — and since D-181 the one term still missing pulls "
+        "the OTHER way (dissolved CO2, ~-0.3 pH), so reaching 100 % here means the model gained "
+        "acidification from somewhere unaccounted, not that the last omission arrived."
     )
 
     # Scope 2 — the joint band the sampler can actually reach. NO upper bound is asserted
     # here, because a corner legitimately exceeds the measured drop; what is pinned is the
-    # SPAN, so that a change which narrows or shifts it has to be looked at.
-    joint = [fraction(pka, pick) for pka in pka_band for pick in ("lo", "nom", "hi")]
-    assert min(joint) == pytest.approx(0.414, abs=0.02), (
-        f"the joint low corner moved to {min(joint):.1%}; D-180 measured 41.4 % "
-        "(all four yields at their low edge, peptide pKa at its high edge)"
+    # SPAN, so that a change which narrows or shifts it has to be looked at. D-181 adds the
+    # three FLOORS as a third band dimension: their edges are named strains' own day-7 values,
+    # so leaving them at nominal here would repeat the point-vs-band mistake one level out —
+    # which is exactly what D-180's amendment had to correct in this very test.
+    joint = [
+        fraction(pka, pick, floor_pick)
+        for pka in pka_band
+        for pick in ("lo", "nom", "hi")
+        for floor_pick in ("lo", "nom", "hi")
+    ]
+    assert min(joint) == pytest.approx(0.087, abs=0.02), (
+        f"the joint low corner moved to {min(joint):.1%}; D-181 measured 8.7 % — all four "
+        "yields at their low edge, peptide pKa HIGH, and the floors at their LOW edge, i.e. "
+        "the strains that clear the most wort acid. A LOW floor means MORE acid removed and "
+        "therefore a SMALLER net drop, which is the opposite of the intuition that a lower "
+        "residue means a more acidic beer: what moves pH here is charge lost, not acid left."
     )
-    assert max(joint) == pytest.approx(1.045, abs=0.02), (
-        f"the joint high corner moved to {max(joint):.1%}; D-180 measured 104.5 % "
-        "(all four yields high, peptide pKa low). NB this is a CORNER of a 5-D hypercube, not "
-        "a member any ensemble was seen to draw — it says the band is wide enough to cover "
-        "the measured drop, not that the model reproduces it"
+    assert max(joint) == pytest.approx(0.814, abs=0.02), (
+        f"the joint high corner moved to {max(joint):.1%}; D-181 measured 81.4 % (all four "
+        "yields high, peptide pKa low, floors HIGH). NB this is a CORNER of a 6-D hypercube, "
+        "not a member any ensemble was seen to draw. **The corner no longer reaches the "
+        "measured drop**: D-180's 104.5 % came from a model that could not lose the falling "
+        "acids' charge, and removing that error removed the reach with it. Nothing in the "
+        "band now covers the measurement, which is the honest state — the remaining omitted "
+        "term (dissolved CO2) pulls the other way and is not built."
     )
 
 
@@ -478,3 +520,308 @@ def test_wine_and_beer_schemas_disagree_about_which_slots_are_produced():
         assert spec.slot in beer
         assert carbon_mass_fraction(spec.species) > 0.0
     assert "acetic" not in wine and "succinic" not in wine
+
+
+# ======================================================================================
+# 5. The three acids that FALL — beer's missing base (decision D-181)
+#
+# D-180 closed with its agreement explicitly held open by two omitted terms of opposite sign
+# and sized both. This section is the larger one built: three malt-derived wort acids a real
+# ferment removes, which the model could not lose because they were not state. Every test here
+# is written so that the beat's own direction — the headline agrees WORSE — is asserted rather
+# than tolerated.
+# ======================================================================================
+
+#: Tyrell's EBC-tube day-0 and day-7 values for the three, in mg/L (Figs 6, 11, 7 — FIGURE
+#: READS). The wort seed, then the four-strain day-7 range the floor is the mean of.
+TYRELL_FALLING_PPM = {
+    "pyruvic": (22.0, (0.2, 2.0)),
+    "formic": (26.0, (3.5, 6.0)),
+    "oxalic": (22.0, (5.0, 6.0)),
+}
+
+
+def test_the_falling_acids_reach_their_measured_floors_and_stop():
+    """Acceptance: each acid falls from its wort seed and settles ON its measured floor.
+
+    Named a WIRING check like its D-180 counterpart, not a validation: the floors were read
+    off the same figures this compares against, so it is close to a round-trip. What it would
+    catch is a wrong seed, a sign error, an mg/L slip, or a removal that overshoots the floor.
+
+    The stronger claim is the second one — the pools do not merely *approach* the floor, they
+    are AT it well before the run ends, which is what makes the finished pH insensitive to the
+    rate constant (pinned separately below).
+    """
+    compiled, res = _run(dict(TYRELL_SCENARIO))
+    params = compiled.parameters.resolve()
+    for sink in WORT_ACID_SINKS:
+        seed_ppm, (lo_ppm, hi_ppm) = TYRELL_FALLING_PPM[sink.slot]
+        series = res.series(sink.slot)
+        floor = params[sink.floor_param]
+        assert float(series[0]) == pytest.approx(seed_ppm / 1000.0, rel=1e-9), (
+            f"{sink.slot} was not seeded at Tyrell's measured wort level"
+        )
+        assert float(series[-1]) == pytest.approx(floor, rel=1e-6), (
+            f"{sink.slot} finished at {float(series[-1]) * 1000:.2f} mg/L, not its measured "
+            f"floor of {floor * 1000:.2f}"
+        )
+        # The floor is the four-strain mean, so it must sit inside the measured spread.
+        assert lo_ppm / 1000.0 <= floor <= hi_ppm / 1000.0
+        # Never below the floor — checked on the trajectory rather than on the rate law, so a
+        # solver undershoot would show up here.
+        assert float(series.min()) >= floor - 1e-12, f"{sink.slot} was driven below its floor"
+
+
+def _finished_ph(over: dict[str, float], param_over: dict[str, float] | None = None):
+    """Finished pH of a Tyrell beer, with optional initial- and parameter-level overrides.
+
+    Goes through ``simulate_scheduled`` with ``compiled.events`` rather than a bare
+    ``simulate`` — the D-35 trap: a hand-wired call silently drops the schedule. ``param_values``
+    is a property returning a FRESH dict each access (a D-147 trap), so mutating the copy is
+    safe and mutating it in place would have been a no-op.
+    """
+    from fermentation.runtime import simulate_scheduled
+
+    compiled = compile_scenario(
+        Scenario(
+            name="d181",
+            medium="beer",
+            initial={**TYRELL_SCENARIO, **over},
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=14.0,
+        )
+    )
+    params = compiled.param_values
+    params.update(param_over or {})
+    res = simulate_scheduled(
+        compiled.process_set, params, compiled.y0, compiled.t_span_h, events=compiled.events
+    )
+    # ``ph_of_state`` on the final column rather than the whole series: only the endpoint is
+    # read here, and it keeps the helper working on a ScheduledTrajectory (which duck-types
+    # Trajectory but is not one).
+    ph = acidbase.ph_of_state(res.y[:, -1], compiled.schema, params)
+    return float(ph), compiled, res
+
+
+def test_the_removal_rate_does_not_move_the_finished_ph(beer_params):
+    """P4, pre-registered: the rate sets the SHAPE of the first days, not the outcome.
+
+    Every value in ``k_wort_acid_removal``'s band clears the fall inside the first days of a
+    14-day run, so the finished pH must be insensitive to it. This matters because the rate is
+    the weakest number in the beat — inverted from a single day-1 figure read, with two of the
+    twelve strain-acid fits unrepresentable — and it is what licenses shipping ONE shared
+    constant instead of three: if the endpoint moved with it, the parsimony would be buying
+    error rather than honesty.
+
+    A one-sided insensitivity claim is worthless without a positive control, so the same
+    comparison is run on a quantity that MUST move: the early pool, which is what the rate
+    actually sets [[feedback-a-null-result-needs-a-positive-control]].
+    """
+    base = beer_params["k_wort_acid_removal"].value
+
+    def arm(scale: float):
+        ph, _compiled, res = _finished_ph({}, {"k_wort_acid_removal": base * scale})
+        # The pool ~24 h in — where the rate constant actually lives.
+        day1 = int(res.t.searchsorted(24.0))
+        return ph, float(res.series("formic")[day1])
+
+    slow_ph, slow_day1 = arm(1.0 / 3.0)
+    fast_ph, fast_day1 = arm(3.0)
+
+    assert abs(fast_ph - slow_ph) < 0.005, (
+        f"tripling and thirding the removal rate moved the finished pH by "
+        f"{abs(fast_ph - slow_ph):.4f}. The floor is no longer being reached inside the run, "
+        "so the endpoint has started depending on a number that only sets the transient."
+    )
+    assert slow_day1 > fast_day1 * 1.5, (
+        f"the positive control did not move: day-1 formic was {slow_day1 * 1000:.3f} mg/L at "
+        f"1/3x and {fast_day1 * 1000:.3f} at 3x. If the rate moves neither the transient nor "
+        "the endpoint, the Process is not running and the insensitivity above is vacuous."
+    )
+
+
+def test_the_falling_acids_are_off_every_ledger_by_construction():
+    """P5: closure is untouched, and NOT because the removal is balanced.
+
+    The three slots carry real malt carbon out of the beer with no destination pool, which is
+    only legitimate because they are weighted nowhere — the ``iso_alpha`` treatment for
+    exogenous mass removed by an unattributed route. Two independent checks, because they fail
+    apart: the ledger weight really is zero at those slots, and the species really are absent
+    from the chemistry registries, so a future producer drawing one of them out of ``S`` raises
+    instead of silently leaking carbon.
+    """
+    from fermentation.core.chemistry import CARBON_ATOMS, MOLAR_MASS
+    from fermentation.validation.conservation import total_carbon
+
+    compiled, res = _run(dict(TYRELL_SCENARIO))
+    weights = total_carbon(
+        compiled.schema,
+        biomass_carbon_fraction=compiled.parameters["biomass_C_fraction"].value,
+    )
+    probe = compiled.schema.zeros()
+    for sink in WORT_ACID_SINKS:
+        probe[compiled.schema.slice(sink.slot)] = 1.0
+        assert weights(probe) == 0.0, (
+            f"{sink.slot} carries a carbon weight, so WortAcidRemoval destroys carbon: either "
+            "weight it AND give the removal a destination pool, or leave it off the ledger"
+        )
+        probe[compiled.schema.slice(sink.slot)] = 0.0
+        for name in (sink.slot, f"{sink.slot}_acid"):
+            assert name not in MOLAR_MASS and name not in CARBON_ATOMS
+
+    start, end = weights(res.y[:, 0]), weights(res.y[:, -1])
+    assert end == pytest.approx(start, rel=1e-9), (
+        f"carbon drifted {end - start:.6e} g C/L with the wort-acid sink active"
+    )
+
+
+def test_removing_the_falling_acids_raises_the_finished_ph_by_the_predicted_amount():
+    """THE BEAT'S OWN DIRECTION, asserted: this makes the model agree WORSE, on purpose.
+
+    Run against the pre-D-181 configuration — the same engine with the three acids dosed to
+    zero, which is exactly the one-sided acidification D-180 shipped — the finished pH must be
+    HIGHER and the predicted drop SMALLER. D-180 sized the omission at roughly +0.2-0.3 pH from
+    a static charge balance; this checks the built version lands in that window rather than
+    merely moving the right way.
+
+    Both arms are the same scenario with one override, so the ONLY difference is the three
+    acids [[feedback-pair-the-red-with-an-ordering-preserving-baseline]] — in particular the
+    peptide capacity is the same re-anchored value in both, so this measures the acids and not
+    the re-anchor that shipped beside them.
+    """
+    with_sinks, _c1, _r1 = _finished_ph({})
+    without, _c2, _r2 = _finished_ph({"pyruvic_gpl": 0.0, "formic_gpl": 0.0, "oxalic_gpl": 0.0})
+
+    assert with_sinks > without, (
+        "removing the falling acids must RAISE the finished pH — that is the missing base "
+        f"D-180 sized. Got {with_sinks:.4f} with them and {without:.4f} without."
+    )
+    assert 0.15 < with_sinks - without < 0.35, (
+        f"the missing base is worth {with_sinks - without:.4f} pH here, outside D-180's "
+        "predicted +0.2-0.3 window. Either the seeds, the floors or the charge arithmetic "
+        "moved — the size of this term is the whole reason the beat was worth building."
+    )
+
+
+def test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc():
+    """The re-anchor is a round-trip, so the round-trip is a test.
+
+    ``peptide_buffer_capacity_beer`` is back-solved so that this engine's charge balance
+    reproduces Peyer's published wort BC = 1.18 on top of the wort acid table. D-181 puts three
+    more acids in that table, so the capacity had to move (1.6708 -> 1.5481 g/L, -7.34 %) — and
+    a back-solved constant with no test is a number that silently stops meaning anything the
+    next time the table changes. This recomputes the titration from the SHIPPED parameters.
+
+    Two of the three stacked mismatches the capacity's own block admits to are untouched by
+    this check and stay open: it is fitted at wort pH and applied across a traverse, and 1.18
+    is a wort measurement with no published finished-beer counterpart.
+    """
+    import math
+
+    v_in, v_acid, c_acid = 25.0, 0.375, 1.0
+    v_fin = v_in + v_acid
+    data = default_data_dir()
+    params = load_parameters(
+        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    )
+    pka = acidbase.build_pka_map(params.resolve())
+    seeds = {
+        "lactic": "lactic_typical_wort",
+        "acetic": "acetic_typical_wort",
+        "citrate": "citric_typical_wort",
+        "malic": "malic_typical_wort",
+        "succinic": "succinic_typical_wort",
+        "pyruvic": "pyruvic_typical_wort",
+        "formic": "formic_typical_wort",
+        "oxalic": "oxalic_typical_wort",
+    }
+    totals = {
+        slot: params[p].value / acidbase.ALL_ACIDS[slot].molar_mass for slot, p in seeds.items()
+    }
+    totals["peptide_buffer"] = (
+        params["peptide_buffer_capacity_beer"].value
+        / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
+    )
+    cation = acidbase.solve_cation_charge(totals, 0.0, pka, 5.5)
+    ph_in = acidbase.solve_ph(totals, cation, 0.0, pka)
+    f = v_in / v_fin
+    diluted = {k: v * f for k, v in totals.items()}
+    ph_fin = acidbase.solve_ph(diluted, cation * f - (v_acid * c_acid) / v_fin, 0.0, pka)
+    h_inc = v_fin * 10.0 ** (-ph_fin) - v_in * 10.0 ** (-ph_in)
+    bc = math.log10((v_acid * c_acid) / h_inc)
+
+    assert bc == pytest.approx(1.18, abs=1e-9), (
+        f"the shipped peptide capacity reproduces BC = {bc:.6f}, not Peyer's published 1.18. "
+        "The wort acid table changed without the back-solve being re-run."
+    )
+
+
+def test_wine_never_wires_or_reads_the_wort_acid_sink():
+    """Beer-only, structurally — the D-180 isolability claim, restated for the sink half."""
+    wine = get_medium("wine").build_process_set(strict=True)
+    assert WortAcidRemoval.name not in {p.name for p in wine.active}
+    declared = {name for p in wine.active for name in p.reads}
+    assert not (set(WortAcidRemoval.reads) & declared)
+    schema = wine_schema()
+    for sink in WORT_ACID_SINKS:
+        assert sink.slot not in schema
+    # Wine carries the same MOLECULE as `pyruvic` under a different slot name, and that pool
+    # must stay charge-inactive: a union registry would make it charge-active behind this
+    # beat's back, which is the D-179 argument for per-medium registries, one acid later.
+    assert "pyruvate" in schema
+    assert "pyruvate" not in acidbase.WINE_ACIDS
+
+
+def test_an_unanchored_beer_keeps_the_sink_disabled_and_its_slots_empty():
+    """The same opt-in gate as the producer, for the same correctness reason (D-179/D-180)."""
+    unanchored = {k: v for k, v in TYRELL_SCENARIO.items() if k != "initial_ph"}
+    compiled, res = _run(unanchored)
+    assert WortAcidRemoval.name not in {p.name for p in compiled.process_set.active}
+    for sink in WORT_ACID_SINKS:
+        assert float(res.series(sink.slot)[0]) == 0.0
+        assert float(res.series(sink.slot)[-1]) == 0.0
+
+
+def test_the_sink_honours_its_touches_contract():
+    """``strict=True`` turns ``touches`` into a contract — and here it carries the claim.
+
+    ``WortAcidRemoval`` asserts no mechanism, and the machine-checkable form of that is its
+    ``touches``: three acid slots and nothing else. If ``S``, ``E`` or ``CO2`` ever appears
+    here, the Process has started claiming where the carbon went.
+    """
+    pset = get_medium("beer").build_process_set(strict=True)
+    assert WortAcidRemoval.name in pset
+    schema = beer_schema()
+    data = default_data_dir()
+    params = load_parameters(
+        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    ).resolve()
+    state = _beer_state(schema, pyruvic=0.022, formic=0.026, oxalic=0.022)
+    d = WortAcidRemoval().derivatives(0.0, state, schema, params)
+    touched = {n for n in schema.names if float(abs(d[schema.slice(n)]).sum()) > 0.0}
+    assert touched == {sink.slot for sink in WORT_ACID_SINKS}
+    for sink in WORT_ACID_SINKS:
+        assert float(d[schema.slice(sink.slot)][0]) < 0.0, f"{sink.slot} is not being removed"
+
+
+def test_an_acid_at_or_below_its_floor_is_frozen_not_refilled():
+    """The clamp is at the FLOOR, not at zero, and it must not run backwards.
+
+    A pool already at its floor has no removal term; a pool below it (solver undershoot, or a
+    scenario that doses less than the floor) must be frozen rather than topped back up. The
+    second case is the one a naive ``-k * (pool - floor)`` gets wrong: without the guard the
+    sign flips and the Process becomes a producer of an acid nothing produces.
+    """
+    schema = beer_schema()
+    data = default_data_dir()
+    params = load_parameters(
+        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    ).resolve()
+    for sink in WORT_ACID_SINKS:
+        floor = params[sink.floor_param]
+        for level in (floor, floor * 0.5, 0.0, -1e-12):
+            state = _beer_state(schema, **{sink.slot: level})
+            d = WortAcidRemoval().derivatives(0.0, state, schema, params)
+            assert float(d[schema.slice(sink.slot)][0]) == 0.0, (
+                f"{sink.slot} at {level} g/L (floor {floor}) produced a nonzero rate"
+            )

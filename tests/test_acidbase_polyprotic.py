@@ -213,6 +213,12 @@ def test_the_general_branch_is_live_and_exactly_one_acid_reaches_it():
         "beer.acetic": 1,
         "beer.citrate": 3,
         "beer.malic": 2,
+        # The D-181 falling acids. Oxalic is DIPROTIC, so citrate is still the only shipped
+        # acid that reaches the n-protic branch — the claim this test's name makes survives
+        # three new acids, which is the interesting part rather than an accident.
+        "beer.pyruvic": 1,
+        "beer.formic": 1,
+        "beer.oxalic": 2,
         "beer.succinic": 2,
         "beer.peptide_buffer": 1,
         "Byp": 2,

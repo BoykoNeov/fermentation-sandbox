@@ -201,15 +201,22 @@ QUINONE_SLOTS = ("quinone",)
 # registries are per-medium — see test_acidbase_polyprotic's registry-scoping guard.
 #
 # `peptide_buffer` is not an organic acid: it is the lumped peptide/polypeptide buffering-site
-# pool that carries most of beer's real buffering (Peyer 2017 §5.5). `pyruvic` is deliberately
-# ABSENT (smallest measured contributor, and it would collide with wine's dynamic `pyruvate`),
-# and so is `phosphate` — the acid this beat was opened on, which cannot buffer at beer's pH.
+# pool that carries most of beer's real buffering (Peyer 2017 §5.5).
+#
+# `pyruvic`/`formic`/`oxalic` (D-181) are the three the ferment REMOVES rather than produces —
+# wort inputs drained to a measured floor, and the reason D-179's "pyruvic is the smallest
+# buffering contributor" was a correct answer to the wrong question: what they contribute is
+# charge that LEAVES, not buffering. `phosphate` is still absent — the acid the beat was opened
+# on, which cannot buffer at beer's pH at all (D-178).
 BEER_ACID_SLOTS = (
     "lactic",
     "acetic",
     "citrate",
     "malic",
     "succinic",
+    "pyruvic",
+    "formic",
+    "oxalic",
     "peptide_buffer",
     "cation_charge",
 )
@@ -356,7 +363,11 @@ def test_beer_schema_has_three_sequential_sugars():
     # carries (lactic/acetic/citrate/malic/succinic, Tyrell 2013 Table 1), the lumped
     # peptide_buffer pool that supplies most of beer's real buffering, and the cation_charge
     # back-solved from initial_ph. Appended last, so again no pre-existing beer index moves = 54
-    assert schema.size == 54
+    # + 3 beer FALLING wort acids (D-181: pyruvic/formic/oxalic — malt-derived inputs the
+    # ferment removes, which is how beer's model can lose anion charge; OFF every ledger, the
+    # iso_alpha treatment). Appended before peptide_buffer/cation_charge, so beer's acid block
+    # grows in place while the shared layout ahead of it is untouched = 57
+    assert schema.size == 57
 
 
 def test_shared_variable_units_are_canonical():
@@ -419,6 +430,10 @@ def test_shared_variable_units_are_canonical():
         "citrate": "g/L",
         "malic": "g/L",
         "succinic": "g/L",
+        # The three D-181 falling acids. Same unit, same conversion, opposite direction.
+        "pyruvic": "g/L",
+        "formic": "g/L",
+        "oxalic": "g/L",
         "peptide_buffer": "g/L",
         "cation_charge": "mol/L",
     }
@@ -433,7 +448,17 @@ def test_beer_acid_slot_units_are_canonical():
     conserve, and silently mis-scale every beer pH by the molar mass it never applied.
     """
     units = {spec.name: spec.unit for spec in beer_schema().specs}
-    for acid in ("lactic", "acetic", "citrate", "malic", "succinic", "peptide_buffer"):
+    for acid in (
+        "lactic",
+        "acetic",
+        "citrate",
+        "malic",
+        "succinic",
+        "pyruvic",
+        "formic",
+        "oxalic",
+        "peptide_buffer",
+    ):
         assert units[acid] == "g/L", f"beer's {acid} must be a mass concentration"
     assert units["cation_charge"] == "mol/L", "a charge density, NOT a mass concentration"
 
@@ -708,7 +733,12 @@ OAK_PROCESSES = {"oak_extraction"}
 # draws them. Wired unconditionally into the medium and DISABLED at the compile seam whenever a
 # scenario names no ``initial_ph`` (the D-179 pH-system gate), which is why it appears here in
 # the medium's full set but not in a compiled un-anchored beer.
-BEER_ORGANIC_ACID_PROCESSES = {"organic_acid_excretion"}
+#
+# ``wort_acid_removal`` (D-181) is the other half of the same claim and rides the same gate: the
+# three acids Tyrell measure FALLING, drained to a measured floor. Both are here because "beer's
+# acids have a fate" needs a sink as well as a source — a model that can only ADD acid
+# acidifies one-sidedly, which is what D-180 sized at ~+0.2-0.3 pH and left open.
+BEER_ORGANIC_ACID_PROCESSES = {"organic_acid_excretion", "wort_acid_removal"}
 # WINE-ONLY, NON-oxidative aging (D-79): tannin_anthocyanin_condensation condenses the two GRAPE
 # pools (anthocyanin + condensed tannin) into stable polymeric pigment — the red-wine colour-
 # stabilization + astringency-softening axis. A THIRD separate axis: it draws no O₂ (unlike every

@@ -139,6 +139,7 @@ from fermentation.core.kinetics import (
     TanninSelfPolymerization,
     TemperatureRamp,
     ThermalAnthocyaninFade,
+    WortAcidRemoval,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -1219,17 +1220,27 @@ def wine_schema() -> StateSchema:
 def _beer_acid_specs() -> list[VarSpec]:
     """Beer's charge-active acid slots + its inverse-anchored cation (decision D-179).
 
-    The state half of the beer-pH beat whose solver half was D-178. Every slot is an INERT
-    DOSED INPUT — no Process touches any of them — because beer still has no organic-acid
-    producer (D-16, open). So beer's acids are a *composition*, not a *fate*: the pH they set
-    is real and buffered, but it will not fall during fermentation the way a real beer's does.
-    That is a stated scope boundary of this beat, not an oversight.
+    The state half of the beer-pH beat whose solver half was D-178. **The slots were inert
+    dosed inputs for exactly one decision.** D-180 gave four of them (acetic, lactic, succinic,
+    malic) a producer and D-181 gives three more (pyruvic, formic, oxalic) a *sink*, so beer's
+    acids are now a fate rather than a composition and beer's pH is a prediction rather than an
+    input. ``citrate`` is the one that stays inert, and that is sourced three ways (Tyrell §1.5,
+    their Table 2, their Fig 12) rather than left over.
 
-    The set is Tyrell et al. 2013 Table 1 (BrewingScience 66:75-76), a printed compilation of
-    ranges by fermentation type — so both band edges are PRINTED rather than author-constructed
-    ([[pin-the-band-not-the-nominal]]). ``pyruvic`` is deliberately absent (smallest measured
-    contributor, and its name would collide with wine's dynamic ``pyruvate``); ``phosphate`` is
+    The composition set is Tyrell et al. 2013 Table 1 (BrewingScience 66:75-76), a printed
+    compilation of ranges by fermentation type — so both band edges are PRINTED rather than
+    author-constructed ([[pin-the-band-not-the-nominal]]) — while the wort seeds and the
+    production/removal terms come from the same paper's own EBC-tube trials (Figs 4, 6-14),
+    which are FIGURE READS and must never acquire table-grade provenance. ``phosphate`` is
     absent because it cannot buffer at beer's pH at all (D-178).
+
+    **The three falling acids are on NO ledger, and the asymmetry with the produced four is the
+    design, not an oversight.** A produced acid's carbon comes out of ``S`` and must be weighted
+    in ``total_carbon`` or the draw reads as carbon destroyed. These three arrive in the wort as
+    malt carbon and are *removed from solution* by a mechanism the source does not attribute —
+    the ``iso_alpha`` case exactly (exogenous, carbon-bearing, adsorptively removed, weighted
+    nowhere). They are absent from ``MOLAR_MASS``/``CARBON_ATOMS`` so that a future producer
+    drawing them from sugar raises rather than silently leaking carbon.
 
     ``peptide_buffer`` is the one non-organic-acid slot and the one that carries beer's actual
     buffering: Peyer 2017 §5.5 attributes the majority of wort's buffering capacity to peptides
@@ -1289,6 +1300,41 @@ def _beer_acid_specs() -> list[VarSpec]:
             "CAVEAT: succinic carries a live ~25x source conflict (Tyrell 36-166 and Park "
             "37.0-56.2 mg/L against a separate ~900-3500 mg/L band) — recorded open, NOT "
             "averaged (the D-103 precedent)",
+        ),
+        VarSpec(
+            "pyruvic",
+            "g/L",
+            default=0.0,
+            description="pyruvic acid (beer WORT input; monoprotic, pKa 2.45 — far below beer's "
+            "window, so fully dissociated everywhere the model goes). One of the three acids "
+            "Tyrell 2013 measure FALLING steeply in the first day (22 -> ~1.3 mg/L): drained by "
+            "WortAcidRemoval (D-181) toward a measured floor, which is how the model loses anion "
+            "charge it previously could not. A DISTINCT slot from wine's dynamic `pyruvate` "
+            "overflow pool — same molecule, opposite role (produced vs consumed, SO2-binding vs "
+            "charge-active). Off every ledger. CAVEAT: this acid's direction is SCALE-DEPENDENT "
+            "within Tyrell's own paper — it RISES in their lab-scale trials and falls in the EBC "
+            "tubes; the EBC direction is used because that is the dataset D-180's yields came from",
+        ),
+        VarSpec(
+            "formic",
+            "g/L",
+            default=0.0,
+            description="formic acid (beer WORT input; monoprotic, pKa 3.75). Falls 26 -> "
+            "~4.75 mg/L over Tyrell's ferment; at 46 g/mol it is the lightest acid here and "
+            "therefore the largest anion-charge loss of the three despite the smallest mass. "
+            "Drained by WortAcidRemoval (D-181); off every ledger. CAVEAT: Tyrell §1.5 cites "
+            "Pueschner grouping formic with citric and fumaric as wort-determined and inert — "
+            "their own Fig 11 and Table 2 contradict that citation, and the data is used",
+        ),
+        VarSpec(
+            "oxalic",
+            "g/L",
+            default=0.0,
+            description="oxalic acid (beer WORT input; DIPROTIC, pKa 1.26/4.20). Falls 22 -> "
+            "~5.6 mg/L. The only one of the three with a pKa inside the pH range a fermenting "
+            "beer traverses, so its removed charge is between 1 and 2 equivalents per mole "
+            "rather than a flat 1 — and the only one of the four new pKa constants the "
+            "prediction is sensitive to. Drained by WortAcidRemoval (D-181); off every ledger",
         ),
         VarSpec(
             "peptide_buffer",
@@ -2213,7 +2259,15 @@ _WINE_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: sugar mid-run and thereby ACQUIRE a charge balance nothing supplied — an un-anchored beer
 #: would start aging against a pH it invented, which is the D-179 defect wearing a new hat.
 #: Disabled, an un-anchored beer stays byte-for-byte the pre-D-179 beer.
-_BEER_ORGANIC_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (OrganicAcidExcretion,)
+#:
+#: :class:`~fermentation.core.kinetics.organic_acids.WortAcidRemoval` (D-181) rides in the same
+#: tuple and under the same gate: it is the other half of the same claim — that beer's acids
+#: have a fate — and it must opt in with the cation for the identical reason. It is NOT a
+#: modifier target below, because unlike the producer it books nothing against the sugar flux.
+_BEER_ORGANIC_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
+    OrganicAcidExcretion,
+    WortAcidRemoval,
+)
 
 #: Beer growth/uptake Arrhenius modifiers (decision D-180). Identical to
 #: :data:`_PRIMARY_FERMENTATION_MODIFIERS` except the **uptake** Arrhenius also scales the

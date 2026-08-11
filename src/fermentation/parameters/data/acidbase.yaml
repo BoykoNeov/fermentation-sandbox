@@ -161,6 +161,82 @@ pKa_citric_3:
     conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-179)"
     notes: "Third dissociation of citric acid. Well above beer's pH, so the third proton is largely bound there and contributes little buffering — but it is carried so the speciation is exact across the full [0, 14] solver bracket, exactly as pKa_sulfurous_2 is (see D-22). Its presence is what makes citrate a THREE-pKa acid and therefore the first user of the n-protic branch."
 
+# ==============================================================================
+# THE THREE FALLING WORT ACIDS (decision D-181) — pyruvic, formic, oxalic.
+#
+# These are NOT a fourth flavour of beer acid: they are the same charge-active organic acids
+# as the block above, added because beer's model needed to be able to LOSE their anion charge.
+# Tyrell 2013's EBC-tube trials measure all three falling steeply within a day of pitching
+# (pyruvic 22 -> ~1.3, formic 26 -> ~4.75, oxalic 22 -> ~5.6 mg/L) and then flat. Until D-181
+# none was a beer state slot, so the model's acidification was ONE-SIDED — sized at D-180 as
+# roughly +0.2-0.3 pH of missing base and named there as the larger half of why the predicted
+# pH agreed as well as it did.
+#
+# WHY THE pKa VALUES BARELY MATTER HERE, AND WHY THEY ARE STILL CARRIED PROPERLY.
+# Two of the three (pyruvic 2.45, oxalic-1 1.25) sit 2-3 units BELOW anything a beer reaches,
+# so those protons are off across the whole trajectory and the acid carries a near-flat charge.
+# That is the same geometry D-178 used to REJECT malt phosphate — but the conclusion inverts,
+# and the reason is worth stating because it looks like a contradiction and is not. Phosphate
+# was rejected as a BUFFER: a species whose charge is flat contributes almost no dpH/dC, and an
+# inverse-anchored cation absorbs a constant charge outright. These acids are not proposed as
+# buffers. They are proposed as charge that LEAVES: a fully dissociated acid carries its full
+# -1 (or -2), so removing it removes the maximum possible anion charge per mole. Flat charge is
+# precisely what makes the effect large, where for a buffer it is what makes it nil.
+#
+# So the pH prediction is insensitive to pyruvic's and oxalic-1's exact values and sensitive to
+# how much acid is removed. The bands below are still the honest textbook spreads.
+# ==============================================================================
+
+# -- Pyruvic acid, C3H4O3 (monoprotic) -----------------------------------------
+#
+# THE SAME MOLECULE AS WINE'S `pyruvate` STATE POOL, and deliberately a DIFFERENT state slot
+# (`pyruvic`, beer-only). Wine's is a dynamic excreted-overflow keto-acid pool that binds SO2
+# (D-49/D-51); beer's is a malt-derived wort input that is removed early. D-179 declined to
+# ship it partly on that collision; D-181 ships it under a distinct name with the collision
+# stated rather than dissolved. If beer ever wires the keto-acid overflow Processes, the two
+# pools MUST be reconciled before both are charge-active, or one molecule is counted twice.
+pKa_pyruvic:
+  value: 2.45
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 2.39, high: 2.50, note: "thermodynamic pKa at 25 C, I=0. The band spans the textbook spread rather than a measurement spread: sources quote 2.39, 2.45 and 2.50 for the same constant. CONSEQUENCE-FREE BY CONSTRUCTION and measured to be so — 2.39 and 2.50 are both >2 units below any pH a modelled beer reaches, so the acid is >99.9% dissociated at either edge and the removed charge is 1.000 eq/mol either way." }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-181, the D-18 simplification)"
+    notes: "Pyruvic (2-oxopropanoic) acid. Read by BEER only: wine carries the same molecule as the `pyruvate` overflow pool, which is deliberately NOT charge-active (it is an SO2 binder and a carbon pool, D-49). One molecule, two media, two roles, two slots — see the block header."
+
+# -- Formic acid, CH2O2 (monoprotic) -------------------------------------------
+pKa_formic:
+  value: 3.75
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 3.74, high: 3.77, note: "thermodynamic pKa at 25 C, I=0; quoted 3.74-3.77 across sources" }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-181)"
+    notes: "Formic (methanoic) acid, the strongest of the simple carboxylic acids and the lightest at 46.03 g/mol. Its pKa sits just BELOW a fermenting beer's range, so it is ~90-98% dissociated across the traverse: the acid whose removal costs the most charge per milligram in this beat."
+
+# -- Oxalic acid, C2H2O4 (DIPROTIC) --------------------------------------------
+pKa_oxalic_1:
+  value: 1.26
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 1.25, high: 1.27, note: "BOTH EDGES PRINTED, in two standard references: 1.25 (CRC) and 1.27 (the value quoted alongside 4.27 in the analytical-chemistry tabulations). The nominal is their midpoint and is therefore AUTHOR-CONSTRUCTED, stated here because a pinned nominal that looks sourced is the failure mode. Consequence-free like pKa_pyruvic: 3+ units below any modelled beer pH, so the first proton is off everywhere on the trajectory and either edge gives the same charge." }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids), low edge; the 1.27 / 4.27 pair quoted in standard analytical tabulations, high edge."
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-181)"
+    notes: "First dissociation of oxalic (ethanedioic) acid — the strongest dicarboxylic acid. Carried so the speciation is exact across the full [0, 14] solver bracket, not because beer ever visits this pH."
+
+pKa_oxalic_2:
+  value: 4.203
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 4.14, high: 4.266, note: "BOTH EDGES PRINTED and the spread is REAL, not a rounding: 4.14 is CRC's thermodynamic pKa2, 4.266 is the value tabulated in standard analytical references for the same constant — a 0.13-unit disagreement between two textbook sources for one number. The nominal is their midpoint and is AUTHOR-CONSTRUCTED. THIS IS THE ONE pKa OF THE FOUR THE PREDICTION IS SENSITIVE TO (see the block header): it is the only one inside the pH range a fermenting beer traverses, so unlike the other three the edges here are not interchangeable." }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids), low edge; standard analytical-chemistry tabulations (the 1.27 / 4.27 pair), high edge."
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-181)"
+    notes: "Second dissociation of oxalic acid, and the load-bearing pKa of this beat: it sits inside a fermenting beer's window, so oxalate's mean charge moves over the traverse and its removal is NOT a flat 2 eq/mol. Contrast pyruvic and oxalic-1, whose charge is pinned at full dissociation everywhere the model goes. D-180's pre-registration used the bare 4.14; this entry bands it across the two published values instead, which is why a corrected arm B is not bit-identical to that file's."
+
 # -- The lumped peptide/polypeptide buffer (monoprotic site) — decision D-179 ----
 #
 # WHAT ACTUALLY BUFFERS BEER. Peyer 2017 sec 5.5 (after Li et al. 2016) puts FREE amino acids

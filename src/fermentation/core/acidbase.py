@@ -95,9 +95,11 @@ from fermentation.core.chemistry import (
     M_ACETIC,
     M_ALPHA_KETOGLUTARATE,
     M_CITRIC,
+    M_FORMIC,
     M_GLUTAMIC,
     M_LACTIC,
     M_MALIC,
+    M_OXALIC,
     M_PYRUVATE,
     M_SO2,
     M_SUCCINIC,
@@ -165,10 +167,23 @@ WINE_ACIDS: dict[str, AcidSpec] = {
 #: charge-active — a change that may well be closer to reality, but is a different beat's
 #: to make. Flagged on D-31, not fixed here.
 #:
-#: **Not shipped: pyruvic.** Measured as the smallest contributor (0.007 of the 0.110
-#: organic-acid buffering index, ~6 %), and its natural slot name collides with wine's
-#: *dynamic* ``pyruvate`` pool — the largest blast radius for the least fidelity. A
-#: deliberate omission, not an oversight.
+#: **``pyruvic``/``formic``/``oxalic`` joined at D-181, and the reason they were left out is
+#: worth keeping.** D-179 declined ``pyruvic`` as "the smallest contributor to the buffering
+#: index (0.007 of 0.110) for the largest blast radius", which was a correct reading of the
+#: question it asked — *what buffers beer* — and the wrong frame for what these three actually
+#: do. They are not buffers: Tyrell 2013 measure all three FALLING steeply in the first day of
+#: fermentation, so what they contribute is anion charge that LEAVES, and a species that is
+#: fully dissociated (pyruvic 2.45, oxalic-1 1.26) removes the maximum charge per mole rather
+#: than the minimum. Buffering index ranks them last; charge removed ranks them with the
+#: produced acids. D-180 sized the omission at roughly +0.2-0.3 pH of missing base and named
+#: it the larger half of why its predicted pH agreed as well as it did.
+#:
+#: ``pyruvic`` keeps a DISTINCT slot name from wine's dynamic ``pyruvate`` overflow pool
+#: (D-49/D-51) rather than sharing one. Same molecule, two roles: wine's is produced,
+#: SO₂-binding and carbon-active-but-charge-inactive; beer's is a malt-derived wort input that
+#: is charge-active and off every ledger. The collision D-179 named is stated, not dissolved —
+#: if beer ever wires the keto-acid overflow Processes, the two MUST be reconciled before both
+#: exist, or one molecule is counted twice in the balance.
 #:
 #: ``succinic`` is beer's own slot even though beer also carries ``Byp``: beer's is a
 #: MEASURED DOSED INPUT (Tyrell 2013 Table 1, 36-166 ppm), while ``Byp`` is a produced lump
@@ -179,6 +194,10 @@ BEER_ACIDS: dict[str, AcidSpec] = {
     "citrate": AcidSpec(M_CITRIC, ("pKa_citric_1", "pKa_citric_2", "pKa_citric_3")),
     "malic": AcidSpec(M_MALIC, ("pKa_malic_1", "pKa_malic_2")),
     "succinic": AcidSpec(M_SUCCINIC, ("pKa_succinic_1", "pKa_succinic_2")),
+    # The three that FALL (decision D-181) — wort inputs, drained by WortAcidRemoval.
+    "pyruvic": AcidSpec(M_PYRUVATE, ("pKa_pyruvic",)),
+    "formic": AcidSpec(M_FORMIC, ("pKa_formic",)),
+    "oxalic": AcidSpec(M_OXALIC, ("pKa_oxalic_1", "pKa_oxalic_2")),
     "peptide_buffer": AcidSpec(M_GLUTAMIC, ("pKa_peptide_buffer",)),
 }
 

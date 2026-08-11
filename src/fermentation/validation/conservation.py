@@ -252,6 +252,22 @@ def total_carbon(
     # which is precisely what beer's ``Y_byproduct_sugar = 0`` prevents — a constraint that is
     # load-bearing on the charge balance too (``BYP_AS_SUCCINIC``) and is pinned by
     # ``tests/test_organic_acids.py``.
+    #
+    # BEER'S THREE FALLING WORT ACIDS (pyruvic/formic/oxalic, decision D-181) ARE DELIBERATELY
+    # ABSENT FROM THIS FUNCTION, and adding them "for completeness" would BREAK closure rather
+    # than improve it. They are carbon-bearing and they are consumed — by ``WortAcidRemoval``,
+    # which routes their carbon nowhere, because Tyrell attribute no mechanism (yeast uptake,
+    # calcium-oxalate precipitation and cell-wall adsorption would all produce the observed
+    # curve, and they explicitly report that pyruvate re-assimilation was NOT confirmed). So
+    # they take the ``iso_alpha`` treatment: exogenous malt carbon removed from the liquid by an
+    # unattributed route, weighted nowhere, off every ledger. Weighting them here without also
+    # giving the removal a destination pool would make that removal read as carbon DESTROYED.
+    #
+    # The absence is enforced from the other end too: neither ``formic`` nor ``oxalic`` is in
+    # ``MOLAR_MASS``/``CARBON_ATOMS``, so a future producer that draws one of them out of ``S``
+    # raises in ``carbon_mass_fraction`` instead of leaking silently. Pinned by
+    # ``tests/test_organic_acids.py::test_the_falling_acids_are_off_every_ledger_by_construction``.
+    # The price is ~19 mg C/L of malt carbon untracked against ~33 g C/L on the ledger (0.06 %).
     if "acetic" in schema:
         w[schema.slice("acetic")] = carbon_mass_fraction("acetic_acid")
     if "succinic" in schema:
