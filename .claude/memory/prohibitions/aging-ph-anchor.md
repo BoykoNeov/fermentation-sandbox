@@ -43,6 +43,18 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
   tartrate too and **only the cation is booked**. **No carbon/nitrogen flow** (charge, not matter)
   and **no tier moves**; the zero is asserted **beside** a "the cation actually moved" check so it
   cannot pass vacuously. **Beer's finished pH stays a PREDICTION** (D-180) — this acts downstream of it.
+- **Under an ENSEMBLE the anchor is NOMINAL-ONLY — measured, and it is the PRECEDENT.** `y0` and
+  `events` are held fixed across members while each draws its own pKa set (**21** vary). Spread at
+  24 members: `initial_ph` **0.1273** at t=0 vs `set_ph` **0.1292** post-event, **ratio 1.015** —
+  same class, not a new weakness (a compile-time value is in no `reads` ⇒ never drawn).
+  **NEVER "fix" this one anchor alone**: the two would then disagree about a member's pH.
+- **The spread-ratio guard for that was DESIGNED and REJECTED — do not rebuild it.** Falsified
+  before shipping: a planted pKa shift throwing the **nominal** anchor **0.29 pH** off target moved
+  the ratio only **0.988 → 1.119**, green at any honest threshold. A wrong SHARED input shifts the
+  **mean**, not the **spread**, so the statistic was blind to the exact defect it named — and blind
+  reassuringly. **What catches it is the nominal-exactness pin, which already exists.**
+  General form: **falsify a guard against the defect it names; if it stays green, ship the
+  measurement WITHOUT the guard** [[feedback-a-spread-guard-misses-a-shared-input]].
 - **It adds NO pH-rate dependence anywhere.** The under-response stands: real wine ~**1.62×** per pH
   unit against the model's ~**1.006×** (D-150), and the pH term on the activation node is still
   **REFUSED** on two legs. What D-186 buys is that the gap is now measurable *at a stated pH*.

@@ -2211,6 +2211,17 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
     **It requires the scenario to have opted into the pH system** (``initial_ph`` present);
     :func:`_compile_interventions` enforces that, and the reason differs per medium, so both
     are stated there rather than one covering for the other.
+
+    **Under an ensemble the anchor is NOMINAL-ONLY — measured, and shared with ``initial_ph``.**
+    The resolved parameter map is captured here at compile, and ``simulate_ensemble`` holds
+    ``y0`` and ``events`` fixed across members while each member re-integrates with its own drawn
+    pKa set. So an off-nominal member does not sit at ``ph`` after this event — exactly as it does
+    not sit at ``initial_ph`` at t=0, for the identical reason (a compile-time value is in no
+    Process's ``reads`` and is never drawn). Sized rather than asserted, 24 members: ``initial_ph``
+    spreads **0.1273** pH at t=0 and this verb **0.1292** after the event, a ratio of **1.015**, so
+    it is the same class as the anchor it extends and not a new weakness. The nominal run is exact
+    either way. **Do not "fix" this one anchor alone** — the two would then disagree about what a
+    member's pH means, and the state-level one would be the odd anchor out.
     """
     _iv_check_keys(iv, frozenset({"ph"}), "set_ph")
     target_ph = _iv_float(iv, "ph", "set_ph")

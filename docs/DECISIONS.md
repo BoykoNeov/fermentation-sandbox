@@ -24793,3 +24793,66 @@ that had already been taken and would have been *overturned* by treating it as a
 distinguishing question is not how old the item is or how often it is repeated — it is **whether
 the record says nothing sources it, or says it was refused on that basis**. The first is an
 opening; the second is a closing that looks identical from the index.
+
+### D-186 amendment — the ensemble surface, and a guard for it that was DESIGNED, falsified and REJECTED because it could not fire
+
+Found in review immediately after the record above shipped, and appended rather than edited in
+place (the D-147/D-181 precedent). Receipts: `ensemble_probe.py`, `falsify.py` under
+`M:\claud_projects\temp\ferment\d186-set-ph\`.
+
+**1. The gap in §5: every test ran the nominal path.** `_verb_set_ph` captures the resolved
+parameter map at compile and the mutation solves the cation from it, while under an ensemble each
+member re-integrates with its **own drawn pKa set** — 21 pH-system parameters vary across members
+(`pKa_tartaric_1/2`, `pKa_malic_1/2`, `pKa_carbonic_1`, `H_co2_beverage`, `vant_hoff_co2_solubility`
+and the rest). If the two disagreed, the verb's headline claim would silently fail per member and
+nothing shipped would have noticed. This is the archive's recurring point-vs-band shape (D-118,
+D-154, D-155, D-157, D-180, D-181) arriving on a new surface.
+
+**2. What it actually does, measured — and it is the PRECEDENT, not a new weakness.**
+`simulate_ensemble` holds `y0` **and** `events` fixed across members, so the compile-seam anchor is
+nominal-only too. Both were measured on the same 24-member ensemble, wine, `initial_ph` 3.55 with
+`set_ph` 3.40 at the aging boundary:
+
+| anchor | where | member spread |
+|---|---|---|
+| `initial_ph` (D-18, pre-existing) | pH at t=0 | **0.1273** |
+| `set_ph` (this record) | pH after the event | **0.1292** |
+
+**Ratio 1.015.** The nominal run is exact for both (t=0 error 8.9e−16, post-event 1.6e−9). So the
+new anchor is the same class as the one it extends, which is what the sampling prohibition already
+predicts — a compile-time value is in no Process's `reads` and is therefore never drawn. The scope
+line now sits in the verb docstring, including the instruction **not to "fix" this one anchor
+alone**: the two would then disagree about what a member's pH means and the state-level one would
+be the odd anchor out.
+
+**3. The guard that was built on paper and REJECTED on falsification.** The obvious pin for §2 is
+the ratio itself — "`set_ph`'s off-nominal spread may not exceed `initial_ph`'s by more than 30 %"
+— guarding the real hazard, which is a future verb solving from a **different** parameter map than
+the run integrates against. It was sized (0.962 at 6 members, 0.988 at 8, 1.015 at 24) and then
+falsified before shipping, by planting exactly that defect: the anchor solves from a pKa map shifted
+by a constant.
+
+| planted pKa shift | nominal post-event pH | set_ph spread | ratio | verdict at 1.30 |
+|---|---|---|---|---|
+| none (shipped) | 3.400000 | 0.1048 | 0.988 | green |
+| +0.05 | 3.350988 | 0.1077 | 1.016 | green |
+| +0.15 | 3.253431 | 0.1129 | 1.064 | green |
+| +0.30 | **3.108756** | 0.1187 | **1.119** | **green** |
+
+**It cannot fire.** A defect that throws the *nominal* anchor 0.29 pH off target moves the ratio by
+0.13, nowhere near any threshold that would not also fire on noise. The reason is structural rather
+than a bad constant: a constant offset in the anchor's pKa map moves every member by nearly the same
+amount, so it lands in the **mean** and barely touches the **spread** — the statistic was measuring
+the wrong moment of the distribution. Shipping it would have produced precisely what the memory
+hook's own docstring rejects in another form: a guard that forbids nothing and reads as coverage.
+
+**What does detect the planted defect is the nominal error, and that is already pinned** —
+`test_the_aging_ph_is_the_one_asked_for_not_the_one_the_ferment_left` asserts the post-event pH to
+1e−5 and goes red at every shift in the table. So the correct outcome here was a **measured scope
+statement plus no new test**, not a test that would have made the surface look covered.
+
+**4. The transferable half.** Before pinning a spread, check which moment of the distribution the
+defect you fear actually moves. A wrong *shared* input shifts the mean and leaves the spread almost
+intact, so a spread-ratio guard is blind to exactly the class of bug that motivated it — and blind
+in the reassuring direction. The general form: **falsify a guard against the defect it names before
+shipping it, and if it stays green, the honest output is the measurement without the guard.**
