@@ -2154,6 +2154,128 @@ def _verb_add_acid(
     )
 
 
+def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet) -> ScheduledEvent:
+    """``set_ph`` — re-anchor the strong cation so the beverage sits at ``ph`` from this day on.
+
+    **The gap this closes (decision D-186, closing D-150's open item).** ``initial_ph`` anchors
+    t=0 and nothing else: the back-solved cation is computed with ``Byp`` = 0 at pitch, and the
+    ferment then drags pH somewhere the scenario never chose — D-150 measured ``initial_ph``
+    3.26/3.61 arriving at the oxygen dose as 3.2084/3.5135, a span of 0.3052 where 0.35 was
+    asked for. Since every oxidative and SO₂ rate in the aging phase reads pH, an aging study
+    at a *stated* pH was simply not writable. This verb makes it writable: put it at the
+    ferment/aging boundary (beside ``begin_aging``) and the wine ages at the pH you name.
+
+    **It is a cation-moving verb, which is what makes it physical — this is NOT a pH dial.**
+    D-65 deferred exactly this ("potassium bitartrate / K-tartrate additions — deacidification
+    via a counter-cation, a different, cation-moving verb") as v1 scope; it is built here. Both
+    directions are real cellar operations acting on the same quantity:
+
+    - **raising pH** = deacidification with potassium/calcium carbonate — base in, strong
+      cation up. The classic move on an over-acid wine.
+    - **lowering pH** = cation-exchange resin, which strips K⁺ and acidifies the wine without
+      adding anything. (Lowering pH by *acid addition* is a different operation and already
+      has a verb: ``add_acid`` doses tartaric/malic/lactic onto their own slots.)
+
+    So the model change — move ``cation_charge``, touch nothing else — corresponds to a real
+    treatment in either direction, and the verb is stated as the adjustment rather than as a
+    setter. **Two scope limits, stated rather than left implicit:**
+
+    1. **Cold stabilisation is NOT this verb.** KHT precipitation removes potassium *and*
+       tartrate; only the cation is booked here, so the tartaric slot is untouched. A scenario
+       wanting the tartrate loss too must also schedule the acid change itself.
+    2. **The ``CO2`` slot is deliberately untouched**, even though carbonate deacidification
+       evolves gas. That slot is the cumulative *evolved* integral, and the charge balance reads
+       ``min(evolved, C_sat(T))`` (decision D-182) — already saturated many times over by the
+       time anyone ages a wine, so adding the carbonate's CO₂ moves the dissolved term by
+       exactly nothing. Writing it anyway would be bookkeeping theatre.
+
+    **No external flow is booked, unlike ``add_acid`` and ``add_copper``.** A strong cation is
+    K⁺/Ca²⁺ charge, not a carbon or nitrogen species: ``cation_charge`` carries weight 0 in
+    ``total_carbon`` and is absent from ``total_nitrogen``, so the run-wide identity
+    ``final == initial + Σ flows`` closes across this jump with a zero contribution. (The
+    scheduler still records the state difference in its ledger, as it does for every mutation;
+    it simply weighs nothing.) No tier moves either — pH's tier is already the PLAUSIBLE-floored
+    pKa tier (D-18), and this writes a state slot rather than any parameter.
+
+    **Where the validation happens, which is the one place this verb differs from its
+    siblings.** Every other verb validates entirely at compile. The reachable pH range depends
+    on the *state* — the acid load and accumulated ``Byp`` at the moment of the adjustment — so
+    the "is this target reachable" check cannot be made until the event fires. What *is* checked
+    at compile: the param keys, the pH bracket, the ``cation_charge`` slot, and that the pKa and
+    CO₂-solubility parameters are loaded (the ``begin_aging`` discipline). The state-dependent
+    check runs inside the mutation and raises a ``ValueError`` naming the achievable floor.
+    That surfaces cleanly rather than as a mid-integration traceback, because
+    ``simulate_scheduled`` applies mutations *between* segments — the error comes out of the
+    event application with the verb's label, and no partial state is committed.
+
+    **It requires the scenario to have opted into the pH system** (``initial_ph`` present);
+    :func:`_compile_interventions` enforces that, and the reason differs per medium, so both
+    are stated there rather than one covering for the other.
+    """
+    _iv_check_keys(iv, frozenset({"ph"}), "set_ph")
+    target_ph = _iv_float(iv, "ph", "set_ph")
+    if not 0.0 < target_ph < 14.0:
+        raise ValueError(
+            f"intervention 'set_ph' at day {iv.day:g}: ph must lie strictly inside (0, 14), got "
+            f"{target_ph:g} — solve_ph reports the bracket ends as saturating answers, not roots "
+            "(decision D-46), so anchoring to one would not be invertible"
+        )
+    if "cation_charge" not in schema:
+        raise ValueError(
+            f"intervention 'set_ph' at day {iv.day:g} needs a 'cation_charge' slot, but medium "
+            f"{schema!r} has none — there is nothing to anchor with (decision D-18)"
+        )
+    resolved = parameters.resolve()
+    try:
+        # Evaluated for its KeyError, not its value: building the whole pKa lookup here makes a
+        # missing acidbase.yaml a scenario error NOW rather than when the event fires (the
+        # add_dap/begin_aging discipline). The map itself is rebuilt inside the mutation, where
+        # it is one dict comprehension over parameters that cannot have changed since.
+        acidbase.build_pka_map(resolved)
+    except KeyError as exc:
+        raise ValueError(
+            "intervention 'set_ph' needs the pKa parameters but they are missing "
+            f"({exc}); include acidbase.yaml in parameter_paths (the default lookup merges "
+            "it automatically)."
+        ) from exc
+    for name in (
+        # Read only at mutation time, inside dissolved_co2_molar — so unlike the pKa map above
+        # they cannot be guarded by evaluating them, and are named explicitly (decision D-182).
+        "H_co2_beverage",
+        "T_ref_co2_solubility",
+        "vant_hoff_co2_solubility",
+    ):
+        if name not in parameters:
+            raise ValueError(
+                f"intervention 'set_ph' at day {iv.day:g} needs {name!r} but it is missing; "
+                "include acidbase.yaml in parameter_paths (the default lookup merges it "
+                "automatically, decision D-182)."
+            )
+    cation_slice = schema.slice("cation_charge")
+    label = f"set_ph@{iv.day:g}d"
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        try:
+            out[cation_slice] = acidbase.cation_charge_for_ph(y, schema, resolved, target_ph)
+        except ValueError:
+            # Below the acid load's own pH: no cation addition reaches it, and removing cation
+            # bottoms out at zero. Name that floor — it is what the caller has to work with, and
+            # solve_ph is total (D-46) so computing it cannot itself raise.
+            floor_state = y.copy()
+            floor_state[cation_slice] = 0.0
+            floor = acidbase.ph_of_state(floor_state, schema, resolved)
+            raise ValueError(
+                f"intervention {label!r}: target pH {target_ph:g} is below this state's "
+                f"intrinsic pH {floor:.4f} — the acid load alone holds it there with zero "
+                "strong cation, so no deacidification or cation exchange reaches the target. "
+                "Raise the target, or lower the acid load."
+            ) from None
+        return out
+
+    return ScheduledEvent(time_h=days_to_hours(iv.day), label=label, mutate=mutate)
+
+
 def _verb_add_sugar(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet
 ) -> ScheduledEvent:
@@ -2326,6 +2448,7 @@ _INTERVENTION_VERBS: dict[
     "add_so2": _verb_add_so2,
     "add_copper": _verb_add_copper,
     "add_acid": _verb_add_acid,
+    "set_ph": _verb_set_ph,
     "add_sugar": _verb_add_sugar,
     "add_oxygen": _verb_add_oxygen,
     "add_oak": _verb_add_oak,
@@ -2334,6 +2457,22 @@ _INTERVENTION_VERBS: dict[
     "pitch_brett": _verb_pitch_brett,
     "begin_aging": _verb_begin_aging,
 }
+
+#: Verbs that may only be scheduled when the scenario opted into the pH system by giving
+#: ``initial_ph`` (decision D-186, riding D-179's gate). The check lives in
+#: :func:`_compile_interventions` rather than in the verb because a verb is handed only its own
+#: ``Intervention``, the schema and the parameters — never ``scenario.initial``.
+#:
+#: **The reason it is needed differs by medium, and neither reason covers for the other.**
+#: For BEER the failure is structural: without ``initial_ph`` every acid slot is 0 (D-179's
+#: opt-in), so anchoring would write a strong cation into an *empty* acid load — a charge
+#: balance with a counter-cation and nothing to counter, which solves to the top of the bracket
+#: and is not a beverage. For WINE the balance is not empty at all — ``tartaric``/``malic`` are
+#: seeded from their own scenario keys regardless, and D-182 measured an un-anchored wine at pH
+#: 2.92 off ``Byp`` alone — so the objection is epistemic rather than structural: re-anchoring a
+#: wine whose pH the scenario never supplied would let one intervention manufacture the pH
+#: information the whole D-18 inverse-anchoring design says must be an input.
+_PH_SYSTEM_VERBS: frozenset[str] = frozenset({"set_ph"})
 
 
 def _compile_interventions(
@@ -2353,6 +2492,13 @@ def _compile_interventions(
             raise ValueError(
                 f"scenario {scenario.name!r}: unknown intervention action {iv.action!r}; "
                 f"known verbs: {sorted(_INTERVENTION_VERBS)}"
+            )
+        if iv.action in _PH_SYSTEM_VERBS and "initial_ph" not in scenario.initial:
+            raise ValueError(
+                f"scenario {scenario.name!r}: intervention {iv.action!r} at day {iv.day:g} "
+                "needs the pH system, which is opted into by giving 'initial_ph' in "
+                "scenario.initial (decisions D-179/D-186); without it there is no anchored "
+                "pH for this verb to re-anchor"
             )
         if days_to_hours(iv.day) >= t_end_h:
             raise ValueError(

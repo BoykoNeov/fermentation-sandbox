@@ -263,6 +263,17 @@ unchanged). Scalar `ph_of_state` / `titratable_acidity` are pure and live in cor
 trajectory-series helpers need a `Trajectory` and therefore sit one layer up in
 `fermentation.analysis`.
 
+**Anchoring runs in two places, and they are different functions.** `solve_cation_charge` anchors
+at the *compile seam* from scenario inputs, with `Byp` and dissolved CO₂ structurally 0 because
+nothing has fermented. `cation_charge_for_ph` anchors a *state*, reading those two off the vector —
+the exact inverse of `ph_of_state`, term for term. The second exists because `initial_ph` fixes t=0
+only and the ferment then drags pH somewhere the scenario never chose, which made an aging study at
+a stated pH unwritable (D-150 measured the gap; D-186 closes it). The `set_ph` verb is its one
+caller: no Process touches `cation_charge`, so it is constant across a plain run and moves only at a
+scheduled adjustment. Both directions are real cellar operations on the same quantity — carbonate
+deacidification raises the cation, cation-exchange resin lowers it — which is why the verb is
+cation-moving rather than a pH dial; acidifying by *addition* is `add_acid` instead.
+
 **SO₂ speciation** is the first pH consumer and is readout-only. `speciate_so2` solves pH from the
 organic acids, then splits total SO₂ into bound vs free via a competitive-Langmuir
 carbonyl-bisulfite equilibrium: `bound_so2_molar` takes `(molar_concentration, Kd)` per carbonyl

@@ -854,6 +854,41 @@ def ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float])
     )
 
 
+def cation_charge_for_ph(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], target_ph: float
+) -> float:
+    """Strong-cation charge (mol⁺/L) that puts *this* state at ``target_ph`` (decision D-186).
+
+    The exact inverse of :func:`ph_of_state`, and its mirror term for term: it reads the same
+    acid slots, the same ``Byp``-as-succinic pool and the same ``min(evolved, C_sat(T))``
+    dissolved-CO₂ term, then hands them to :func:`solve_cation_charge` instead of
+    :func:`solve_ph`. Writing the result into the ``cation_charge`` slot and re-reading
+    ``ph_of_state`` returns ``target_ph`` to the closed form's own precision — there is no
+    root-find on this side, so the round trip is exact rather than converged.
+
+    **Why this exists as a state-level function rather than a compile-seam one.**
+    :func:`solve_cation_charge` already anchors a must or a wort, but only from *scenario
+    inputs* — the acids a recipe declares, with ``Byp`` and dissolved CO₂ structurally 0
+    because nothing has fermented yet. Anchoring a state part-way through a run cannot make
+    either assumption: fermentation byproducts have accumulated and the CO₂ term is saturated,
+    and both move the answer. Reading them off the state is what lets a caller set the pH of a
+    *finished* beverage, which the compile-seam anchor cannot express (decision D-150 recorded
+    the gap: ``initial_ph`` fixes t=0, and the ferment then drags pH somewhere else).
+
+    Raises ``ValueError`` (from :func:`solve_cation_charge`) when ``target_ph`` lies below what
+    this state's acid load reaches with *no* strong cation at all — the floor is
+    ``ph_of_state`` on the same state with the slot zeroed, and no cation addition can go
+    beneath it. Callers that can name a friendlier remedy should catch and re-raise.
+    """
+    return solve_cation_charge(
+        _totals_molar(y, schema),
+        _byp_succinic_molar(y, schema),
+        dissolved_co2_molar(y, schema, params),
+        build_pka_map(params),
+        target_ph,
+    )
+
+
 def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
     """Titratable acidity [g/L tartaric-equivalent] — a second derived pure function.
 

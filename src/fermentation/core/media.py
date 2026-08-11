@@ -533,7 +533,8 @@ def wine_schema() -> StateSchema:
     simply not meaningful for a no-acid scenario and is only *computed* when requested
     (``fermentation.analysis``). ``cation_charge`` is a charge density (mol⁺/L), not a
     mass concentration — state is already heterogeneous (``T`` in K) — back-solved from
-    the scenario's measured ``initial_ph`` at compile and held constant (D-18).
+    the scenario's measured ``initial_ph`` at compile (D-18). No Process touches it, so it holds
+    constant across a plain run; the ``set_ph`` verb re-anchors it at a scheduled day (D-186).
     ``so2_total`` (g/L of SO₂-equivalent) is a dosed input read by ``acidbase.speciate_so2``
     to derive the free/bound split (acetaldehyde-bound vs free) and the antimicrobial
     molecular fraction at the solved pH; it is **not** in the charge balance (readout-only,
@@ -562,8 +563,9 @@ def wine_schema() -> StateSchema:
             "cation_charge",
             "mol/L",
             default=0.0,
-            description="net strong-cation charge (K+-dominant), constant; "
-            "back-solved from initial_ph (D-18)",
+            description="net strong-cation charge (K+-dominant); back-solved from initial_ph "
+            "(D-18). No Process touches it, so it is constant across a plain run; the set_ph "
+            "verb re-anchors it mid-run (D-186)",
         ),
         VarSpec(
             "so2_total",
@@ -1356,8 +1358,9 @@ def _beer_acid_specs() -> list[VarSpec]:
             "cation_charge",
             "mol/L",
             default=0.0,
-            description="net strong-cation charge, constant; back-solved from initial_ph "
-            "(the D-18 inverse anchoring, extended to beer at D-179). A charge density "
+            description="net strong-cation charge; back-solved from initial_ph "
+            "(the D-18 inverse anchoring, extended to beer at D-179). No Process touches it; "
+            "the set_ph verb re-anchors it mid-run (D-186). A charge density "
             "(mol+/L), not a mass concentration. Default 0 => a beer scenario naming no "
             "initial_ph carries an empty charge balance and is byte-for-byte the pre-D-179 beer",
         ),

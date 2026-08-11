@@ -1042,3 +1042,243 @@ def test_add_sugar_missing_and_negative_params_raise():
         compile_scenario(_wine([Intervention(day=2.0, action="add_sugar", params={})]))
     with pytest.raises(ValueError, match="must be >= 0"):
         compile_scenario(_wine([_sugar(2.0, -10.0)]))
+
+
+# -- set_ph: the pH a beverage AGES at (decision D-186, closing D-150's open item) ------------
+
+# The ferment is long enough to reach dryness, so the aging breakpoint sits where every aging
+# Process actually runs and Byp has stopped moving; the tail is short because nothing here
+# asserts an aging MAGNITUDE — only which pH the aging segment runs at.
+_PH_FERMENT_DAYS = 20.0
+_PH_AGING_DAYS = 20.0
+_ANCHOR_PH = 3.60
+
+
+def _ph_wine(
+    interventions: list[Intervention],
+    *,
+    initial_ph: float | None = _ANCHOR_PH,
+) -> Scenario:
+    # tartaric/malic are seeded either way (they are their own scenario keys); initial_ph is what
+    # opts the pH system in, and omitting it is how the gate below is exercised.
+    initial: dict[str, float] = {
+        "brix": 24.0,
+        "yan_mgl": 250.0,
+        "pitch_gpl": 0.25,
+        "tartaric_gpl": 6.0,
+        "malic_gpl": 3.0,
+    }
+    if initial_ph is not None:
+        initial["initial_ph"] = initial_ph
+    return Scenario(
+        name="set-ph-test",
+        medium="wine",
+        initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=interventions,
+        duration_days=_PH_FERMENT_DAYS + _PH_AGING_DAYS,
+    )
+
+
+def _ph_beer(interventions: list[Intervention], *, initial_ph: float | None = 5.50) -> Scenario:
+    initial: dict[str, float] = {
+        "glucose_gpl": 15.0,
+        "maltose_gpl": 70.0,
+        "maltotriose_gpl": 15.0,
+        "yan_mgl": 150.0,
+        "pitch_gpl": 0.5,
+    }
+    if initial_ph is not None:
+        initial["initial_ph"] = initial_ph
+    return Scenario(
+        name="set-ph-beer-test",
+        medium="beer",
+        initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=18.0)],
+        interventions=interventions,
+        duration_days=_PH_FERMENT_DAYS + _PH_AGING_DAYS,
+    )
+
+
+def _set_ph(day: float, ph: float) -> Intervention:
+    return Intervention(day=day, action="set_ph", params={"ph": ph})
+
+
+def _aging_at(ph: float | None) -> list[Intervention]:
+    """``begin_aging`` at the ferment/aging boundary, optionally re-anchored to ``ph`` there."""
+    events = [Intervention(day=_PH_FERMENT_DAYS, action="begin_aging")]
+    if ph is not None:
+        events.append(_set_ph(_PH_FERMENT_DAYS, ph))
+    return events
+
+
+#: A grid that straddles the aging breakpoint by a hair on each side, so "the pH the aging
+#: segment runs at" is read from a real sample point rather than inferred. The breakpoint hour
+#: itself is deliberately NOT probed: an event time is a segment BOUNDARY, and which side of the
+#: mutation a sample there reports is an implementation detail of the driver, not a claim this
+#: verb should be pinned to. The driver also augments any ``t_eval`` with its own breakpoints,
+#: so the probes are located by TIME below rather than by index.
+_BOUNDARY_H = _PH_FERMENT_DAYS * 24.0
+_END_H = (_PH_FERMENT_DAYS + _PH_AGING_DAYS) * 24.0
+_PROBE_H = np.array([0.0, _BOUNDARY_H - 0.01, _BOUNDARY_H + 0.01, _END_H])
+
+
+def _ph_after_boundary(cs, traj) -> float:
+    """pH at the first sample strictly after the aging breakpoint — the pH aging runs at."""
+    i = int(np.argmax(traj.t > _BOUNDARY_H))
+    return acidbase.ph_of_state(traj.y[:, i], cs.schema, cs.param_values)
+
+
+def _ph_before_boundary(cs, traj) -> float:
+    """pH at the last sample strictly before the aging breakpoint (the untouched half)."""
+    i = int(np.max(np.flatnonzero(traj.t < _BOUNDARY_H)))
+    return acidbase.ph_of_state(traj.y[:, i], cs.schema, cs.param_values)
+
+
+def test_cation_charge_for_ph_inverts_ph_of_state_on_a_fermented_state():
+    # The core claim, at the state level: the new inverse is exact against the forward solver on a
+    # state that has FERMENTED — Byp accumulated and the dissolved-CO2 term saturated, the two
+    # things the compile-seam anchor gets to assume away. Round trip is closed-form on the cation
+    # side, so it is pinned far tighter than solve_ph's own 1e-10 brentq tolerance would need.
+    cs = compile_scenario(_ph_wine([]))
+    traj = cs.run()
+    y_dry = traj.y[:, -1]
+    schema, params = cs.schema, cs.param_values
+    assert traj.series("Byp")[-1] > 0.0  # the state really is fermented
+    assert acidbase.dissolved_co2_molar(y_dry, schema, params) > 0.0
+
+    cations = []
+    for target in (3.20, 3.40, 3.60, 3.80):
+        y = y_dry.copy()
+        y[schema.slice("cation_charge")] = acidbase.cation_charge_for_ph(y, schema, params, target)
+        assert acidbase.ph_of_state(y, schema, params) == pytest.approx(target, abs=1e-9)
+        cations.append(float(y[schema.slice("cation_charge")][0]))
+    # more base ⇒ higher pH: the inverse is monotone, which is what makes it a real anchor
+    assert cations == sorted(cations)
+
+
+def test_set_ph_to_the_states_own_ph_leaves_the_cation_where_it_was():
+    # Inertness stated as a round trip rather than as a byte-for-byte run: asking for the pH the
+    # state already has must return the cation already there. A one-sided inverse (say, one that
+    # silently dropped the carbonic term the forward solver reads) would still pass every
+    # "pH moved the right way" test and fail HERE.
+    cs = compile_scenario(_ph_wine([]))
+    traj = cs.run()
+    schema, params = cs.schema, cs.param_values
+    y_dry = traj.y[:, -1]
+    own_ph = acidbase.ph_of_state(y_dry, schema, params)
+    before = float(y_dry[schema.slice("cation_charge")][0])
+    after = acidbase.cation_charge_for_ph(y_dry, schema, params, own_ph)
+    assert after == pytest.approx(before, rel=1e-9)
+
+
+def test_the_aging_ph_is_the_one_asked_for_not_the_one_the_ferment_left():
+    # THE headline (D-186). Without the verb, the aging segment runs at whatever pH the ferment
+    # happened to leave — measurably BELOW the anchor, because Byp accumulates against a cation
+    # frozen at pitch (D-150's finding). With it, the aging segment runs at the stated pH.
+    drift_cs = compile_scenario(_ph_wine(_aging_at(None)))
+    drift = drift_cs.run(t_eval=_PROBE_H)
+    drifted_ph = _ph_after_boundary(drift_cs, drift)
+    assert drifted_ph < _ANCHOR_PH - 0.01, "the drift this verb exists to fix is not present"
+
+    set_cs = compile_scenario(_ph_wine(_aging_at(_ANCHOR_PH)))
+    set_traj = set_cs.run(t_eval=_PROBE_H)
+    # just before the breakpoint the run is untouched; just after it, the wine sits where asked
+    assert _ph_before_boundary(set_cs, set_traj) == pytest.approx(
+        _ph_before_boundary(drift_cs, drift), abs=1e-6
+    )
+    assert _ph_after_boundary(set_cs, set_traj) == pytest.approx(_ANCHOR_PH, abs=1e-5)
+
+
+def test_two_aging_arms_span_exactly_what_they_asked_for_where_initial_ph_falls_short():
+    # The defect, paired with its baseline (the D-150 measurement, re-taken): asking for a 0.35-unit
+    # pH SPAN via initial_ph delivers less than 0.35 at the aging boundary, because each arm drifts
+    # by its own amount. Asking via set_ph delivers 0.35. Both arms are measured the same way, so
+    # the comparison is of the two mechanisms and not of two protocols.
+    low, high = 3.30, 3.65
+    span_asked = high - low
+
+    def boundary_ph(scenario) -> float:
+        cs = compile_scenario(scenario)
+        return _ph_after_boundary(cs, cs.run(t_eval=_PROBE_H))
+
+    anchored = [boundary_ph(_ph_wine(_aging_at(None), initial_ph=p)) for p in (low, high)]
+    assert anchored[1] - anchored[0] < span_asked - 0.005, "initial_ph delivered the span asked for"
+
+    at_ph = [boundary_ph(_ph_wine(_aging_at(p))) for p in (low, high)]
+    assert at_ph[0] == pytest.approx(low, abs=1e-5)
+    assert at_ph[1] == pytest.approx(high, abs=1e-5)
+    assert at_ph[1] - at_ph[0] == pytest.approx(span_asked, abs=1e-5)
+
+
+def test_set_ph_books_a_flow_that_is_carbon_and_nitrogen_free():
+    # Unlike add_acid (+C) and add_copper (−C), a strong cation is charge, not matter the ledgers
+    # weigh: cation_charge carries weight 0 in total_carbon and is absent from total_nitrogen. So
+    # the jump is booked like every other mutation and contributes exactly nothing to either
+    # element — final == initial + Σ flows closes with a zero term, not with an excused one.
+    cs = compile_scenario(_ph_wine(_aging_at(3.40)))
+    traj = cs.run()
+    schema = cs.schema
+    c_of = total_carbon(schema, biomass_carbon_fraction=cs.param_values["biomass_C_fraction"])
+    n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
+
+    flow = next(f for f in traj.external_flows if f.label.startswith("set_ph"))
+    # the cation really moved — otherwise the zero below would be vacuous
+    assert flow.delta[schema.slice("cation_charge")][0] != 0.0
+    assert c_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+    assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
+    # and nothing else in the state was touched
+    others = np.delete(flow.delta, schema.slice("cation_charge").start)
+    assert np.count_nonzero(others) == 0
+    assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0), abs=1e-6)
+    assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0), abs=1e-9)
+
+
+def test_set_ph_moves_no_tier():
+    # pH's tier is already the PLAUSIBLE-floored pKa tier (D-18) and this writes a STATE slot, not
+    # a parameter — so the reported tier map must be identical to the same run without the verb.
+    plain = compile_scenario(_ph_wine(_aging_at(None))).run()
+    with_set = compile_scenario(_ph_wine(_aging_at(3.40))).run()
+    assert dict(with_set.tier_map) == dict(plain.tier_map)
+
+
+def test_a_target_below_the_acid_loads_own_ph_raises_and_names_the_floor():
+    # The one check that CANNOT be made at compile (the reachable range is a property of the state
+    # at the moment of the adjustment). It surfaces from the event application with the verb's
+    # label and the achievable floor, not as a bare traceback out of the solver.
+    cs = compile_scenario(_ph_wine(_aging_at(1.50)))
+    with pytest.raises(ValueError, match=r"set_ph@20d.*intrinsic pH"):
+        cs.run()
+
+
+def test_set_ph_needs_the_scenario_to_have_opted_into_the_ph_system():
+    # Both media, because the reason differs: beer without initial_ph has an EMPTY acid load, wine
+    # has a populated-but-unanchored one. The gate is the same and it fires at compile.
+    with pytest.raises(ValueError, match="needs the pH system"):
+        compile_scenario(_ph_wine(_aging_at(3.40), initial_ph=None))
+    with pytest.raises(ValueError, match="needs the pH system"):
+        compile_scenario(_ph_beer(_aging_at(4.20), initial_ph=None))
+
+
+def test_beer_can_set_its_aging_ph_too():
+    # Medium-agnostic by construction — it reads the medium's own acid registry (D-179) — so the
+    # beer path is exercised rather than assumed. Beer's finished pH is a PREDICTION (D-180), and
+    # this does not change that: it re-anchors from the day it fires, downstream of the prediction.
+    cs = compile_scenario(_ph_beer(_aging_at(4.20)))
+    traj = cs.run(t_eval=_PROBE_H)
+    assert _ph_after_boundary(cs, traj) == pytest.approx(4.20, abs=1e-5)
+
+
+def test_set_ph_vocabulary_errors_are_loud():
+    with pytest.raises(ValueError, match="missing required param 'ph'"):
+        compile_scenario(_ph_wine([Intervention(day=2.0, action="set_ph", params={})]))
+    with pytest.raises(ValueError, match=r"unknown param\(s\) \['target'\]"):
+        compile_scenario(
+            _ph_wine([Intervention(day=2.0, action="set_ph", params={"ph": 3.4, "target": 3.4})])
+        )
+    with pytest.raises(ValueError, match="must be >= 0"):
+        compile_scenario(_ph_wine([_set_ph(2.0, -1.0)]))
+    with pytest.raises(ValueError, match=r"strictly inside \(0, 14\)"):
+        compile_scenario(_ph_wine([_set_ph(2.0, 14.0)]))
+    with pytest.raises(ValueError, match=r"strictly inside \(0, 14\)"):
+        compile_scenario(_ph_wine([_set_ph(2.0, 0.0)]))
