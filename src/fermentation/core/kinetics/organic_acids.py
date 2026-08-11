@@ -70,15 +70,39 @@ succinic-equivalent (:data:`~fermentation.core.acidbase.BYP_AS_SUCCINIC`), so a 
 rate, so the run integral is a clean yield (``Y · ΔS``) on any beer, and it stops at dryness.
 Against Tyrell's own curves that is right for succinic and wrong in two named ways:
 
-* **acetic** really peaks at ~200 ppm around day 2 (3.4× the wort level) and falls back to
-  105-126 by day 7 as the yeast re-assimilate it. A monotone producer hits the endpoint and
-  drops the peak — the same concession :mod:`~fermentation.core.kinetics.keto_acids` already
-  makes for overflow pyruvate, and it needs the same excretion/re-assimilation *pair* to fix.
+* **acetic** really peaks around day 2 and falls back to 105-126 by day 7. **D-183 moved it off
+  this rate law** (:class:`AceticAcidOverflow`) after mapping Fig 13 onto Fig 4 showed 86 % of
+  its rise inside the first 15 % of the sugar flux. What that fixes is *when* the acid appears,
+  not the peak — see below.
 * **lactic** rises hardest *after* the extract curve goes flat (days 2-7). A flux-linked form
   makes it early instead. Tyrell name the candidate mechanism — end-of-ferment autolysis —
   and this engine has an autolysis Process, so a later beat has a route.
 
 Reported, not tuned: one dataset cannot separate a late excretion from an autolytic release.
+
+**THE MID-FERMENT SPIKE IS STILL NOT MODELLED, AND ITS FIX WAS REFUSED ON MEASUREMENT (D-183).**
+D-180 §9 proposed the :mod:`~fermentation.core.kinetics.keto_acids` template — an excretion /
+re-assimilation *pair*, both flux-linked. **The source's own figures falsify both halves of it**:
+
+* the *excretion* half, because production is growth-phase-confined (the 86 %/15 % above);
+* the *re-assimilation* half, because **half the fall happens at zero fermentative flux** —
+  between days 5 and 7 the extract curve is flat while acetic drops 141.5 → 117.75 ppm. A
+  co-metabolic term freezes the pool exactly there, which is the D-181 argument one figure over.
+
+So the removal was built as a probe and refused, for three measured reasons rather than a
+preference. Tyrell's decline **cannot discriminate** first-order from constant-rate (every fit
+gap is under the ±3 ppm figure-read tolerance); it **cannot identify a floor** (the mean's best
+fit sits on the bound at floor = 0, and the four strains split 2-2); and every law it *is*
+consistent with makes the endpoint a function of the solver horizon — 108 / 65 / 20 / 0 ppm at
+days 7 / 14 / 30 / 400 for the pure first-order form. A modelled beer's pH would then depend on
+how long the run was left going, which is worse than a missing transient. **Do not re-propose
+the pair without a dataset that fixes the removal law**; a second time course on a *different*
+wort would do it, because the strain spread is what the floor is currently confounded with.
+
+**What shipping the production half alone actually bought**, stated so it is not over-read: the
+shape error against Tyrell's measured days 1-7 falls from **61.6 to 32.5 ppm RMSE** and the
+endpoint lands on the four-strain mean by construction — but the curve is still **monotone**. A
+plateau reached early is not a transient.
 
 **Tier: plausible.** The yields are measured differences on a real wort with named strains at
 both band edges, but the divisor passes through two derived steps (real-vs-apparent
@@ -103,6 +127,7 @@ from fermentation.core.kinetics.carbon_routing import (
 from fermentation.core.kinetics.carbon_routing import (
     fermentative_uptake_rates as _fermentative_uptake_rates,
 )
+from fermentation.core.kinetics.growth import biomass_growth_rate as _biomass_growth_rate
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -143,12 +168,24 @@ class OrganicAcidSpec:
 #: THIS registry because they are not produced; they have their own, :data:`WORT_ACID_SINKS`,
 #: and their own Process (:class:`WortAcidRemoval`, D-181). Two registries rather than one with
 #: a sign, because the two halves share no parameter, no rate law and no ledger treatment.
+#:
+#: **``acetic`` LEFT THIS REGISTRY AT D-183 and must not be added back.** It is produced, but
+#: not on this rate law: Tyrell's Fig 4 puts 86 % of its rise inside the first 15 % of the
+#: fermentative flux, so it has its own growth-linked producer (:class:`AceticAcidOverflow`).
+#: A fifth entry here would double-count it *and* restore the shape the source falsifies.
 ORGANIC_ACID_SPECS: tuple[OrganicAcidSpec, ...] = (
-    OrganicAcidSpec("acetic", "Y_acetic_sugar_beer", "acetic_acid"),
     OrganicAcidSpec("lactic", "Y_lactic_sugar_beer", "lactic_acid"),
     OrganicAcidSpec("succinic", "Y_succinic_sugar_beer", "succinic_acid"),
     OrganicAcidSpec("malic", "Y_malic_sugar_beer", "malic_acid"),
 )
+
+#: The acid whose production is **growth**-linked rather than flux-linked (decision D-183), and
+#: the molecule its carbon is booked at. One acid, so a tuple registry would be ceremony — but
+#: the slot and the species are named here rather than inlined for the same single-source reason
+#: :data:`ORGANIC_ACID_SPECS` exists: the Process's ``touches``, the carbon draw and the tests
+#: all read these two names.
+ACETIC_SLOT = "acetic"
+ACETIC_SPECIES = "acetic_acid"
 
 
 def organic_acid_rates(
@@ -239,6 +276,80 @@ class OrganicAcidExcretion(Process):
             d[schema.slice(spec.slot)] = rate
         # ONE draw for all four, each at its own molecule's carbon fraction.
         _draw_carbon_from_sugar(d, y, schema, organic_acid_carbon_draw(y, schema, params))
+        return d
+
+
+class AceticAcidOverflow(Process):
+    """Acetic acid, produced with **growth** rather than with the sugar flux (decision D-183).
+
+    ``d(acetic)/dt = Y_acetic_biomass_beer · dX/dt``, with the acid's carbon drawn out of ``S``
+    at acetic acid's own C2 fraction, exactly as :class:`OrganicAcidExcretion` draws the other
+    three. Touches ``acetic`` and ``S`` and nothing else — in particular **not** ``X`` or ``N``:
+    it *reads* the growth rate, it does not add to it.
+
+    **The rate law is the whole content of this Process, and it is sourced twice.** Until D-183
+    acetic rode :data:`ORGANIC_ACID_SPECS` with the other three, i.e. a yield on the fermentative
+    sugar flux. Mapping Tyrell's Fig 13 (the acid) onto their Fig 4 (the extract of the *same*
+    ferments) with this file's own sugar divisor falsifies that:
+
+    * by day 1 the wort is **15 %** attenuated and acetic has already made **86 %** of its whole
+      rise (59 → 145 ppm of a 59 → 170.25 peak);
+    * their Table 2 scores acetic ``++`` (strong increase) at **lower** Krausen, ``o`` at high
+      Krausen and ``-`` at Krausen collapse — production over before the bulk of the sugar goes.
+
+    Nothing proportional to the sugar flux can do that. The shipped flux-linked form put acetic
+    at 65.7 ppm on day 1 and 74.4 on day 2 against a measured 145.0 and 170.25. Growth is the
+    denominator the source itself reaches for elsewhere: their Fig 15 normalises acid production
+    "related to grown cells" beside "related to fermented extract".
+
+    **What this fixes, and what it explicitly does NOT.** Anchored on the day-7 level, a modelled
+    beer now rises to 117.75 ppm by about day 1 and holds, which halves the shape error against
+    Tyrell's own days 1-7 (RMSE 61.6 → 32.5 ppm). It is still **monotone**: the measured
+    rise-then-fall is not reproduced, and this Process delivers **no mid-ferment spike**. The
+    re-assimilation half that would deliver one was built as a probe, measured, and **refused**
+    — see the module docstring. Do not read the improved RMSE as the transient being modelled.
+
+    **The D-32 correctness coupling, in the form it takes here.** This recomputes the *base*
+    growth rate from the shared :func:`~fermentation.core.kinetics.growth.biomass_growth_rate`,
+    the same helper the growth Process builds biomass with. Growth's realised rate is scaled by
+    ``ArrheniusTemperature.for_growth``, so this Process **must** be named as an extra target of
+    that modifier or its yield would be booked against a growth flux the solver never ran — a
+    cold beer would grow slowly while making acetic at the warm rate. Beer's medium does exactly
+    that. Note the target moved: the flux-linked form belonged to ``for_uptake``'s extra targets,
+    this one belongs to ``for_growth``'s, and leaving it on the old one would be silently wrong
+    rather than loudly broken. Beer wires no carrying-capacity modifier (that is wine-only), so
+    the growth Arrhenius is the complete list.
+
+    Tier **speculative**, one step below :class:`OrganicAcidExcretion`'s plausible, and the
+    reason is the denominator: the numerator is the same measured per-strain delta, but the
+    biomass it is divided by is *this model's*, not Tyrell's. That drops ``acetic``'s output tier
+    to speculative by parameter-tier propagation (D-1) — which changes no reported tier, because
+    beer's ``ph_tier`` is already speculative through the peptide buffer (D-179).
+    """
+
+    name = "acetic_acid_overflow"
+    tier = Tier.SPECULATIVE
+    #: The acid slot and ``S``. NOT ``X``/``N`` — reading the growth rate is not contributing to
+    #: it, and adding them would make ``ProcessSet(strict=True)`` permit a write that would
+    #: double-count biomass.
+    touches: tuple[str, ...] = (ACETIC_SLOT, "S")
+    #: The yield plus the three constants
+    #: :func:`~fermentation.core.kinetics.growth.biomass_growth_rate` reads. Declared here too
+    #: because ``reads`` has two masters — tier propagation AND sampler scope (D-160): leaving
+    #: the growth constants undeclared would narrow a beer ensemble's reported spread below what
+    #: this Process's own dependence justifies.
+    reads: tuple[str, ...] = ("Y_acetic_biomass_beer", "mu_max", "K_s", "K_n")
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        growth = _biomass_growth_rate(y, schema, params)
+        if growth <= 0.0:  # no growth ⇒ no overflow, which is what stops this at N exhaustion
+            return d
+        rate = params["Y_acetic_biomass_beer"] * growth  # [g acetic/L/h]
+        d[schema.slice(ACETIC_SLOT)] = rate
+        _draw_carbon_from_sugar(d, y, schema, rate * carbon_mass_fraction(ACETIC_SPECIES))
         return d
 
 

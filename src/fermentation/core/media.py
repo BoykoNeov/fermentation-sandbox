@@ -76,6 +76,7 @@ from fermentation.core.kinetics import (
     AcetaldehydeBridgedCondensation,
     AcetaldehydeProduction,
     AcetaldehydeReduction,
+    AceticAcidOverflow,
     AcetolactateDecarboxylation,
     AcetolactateExcretion,
     AlphaKetobutyrateExcretion,
@@ -2265,8 +2266,13 @@ _WINE_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: tuple and under the same gate: it is the other half of the same claim — that beer's acids
 #: have a fate — and it must opt in with the cation for the identical reason. It is NOT a
 #: modifier target below, because unlike the producer it books nothing against the sugar flux.
+#: :class:`~fermentation.core.kinetics.organic_acids.AceticAcidOverflow` (D-183) rides here too,
+#: under the same ``initial_ph`` gate: it is the same claim — that beer's acids have a fate —
+#: for the one acid whose production is growth-linked rather than flux-linked. It IS a modifier
+#: target below, but of the **growth** Arrhenius rather than uptake's.
 _BEER_ORGANIC_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     OrganicAcidExcretion,
+    AceticAcidOverflow,
     WortAcidRemoval,
 )
 
@@ -2289,8 +2295,17 @@ _BEER_ORGANIC_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
 #: scaled by nothing, so scaling its refund would break the draw it must match exactly. The
 #: rule in both cases is the same — track whatever flux you recompute, scaled the way that
 #: flux is actually scaled.
+#: **BOTH Arrhenius modifiers carry an extra target here, and which acid rides which is the
+#: whole D-183 change.** ``AceticAcidOverflow`` recomputes the *base* growth rate from the
+#: shared :func:`~fermentation.core.kinetics.growth.biomass_growth_rate`, so it must be scaled
+#: by the factor GROWTH actually runs at, exactly as wine's amino-acid swap is (D-32). Putting
+#: it on ``for_uptake`` beside the other three acids — where acetic used to sit, when it was a
+#: sugar-flux yield — would be silently wrong rather than loudly broken: the run would still
+#: integrate, and only a cold or hot beer would reveal the acid booked against the wrong flux.
+#: Beer wires no carrying-capacity modifier (wine-only), so these two are the complete list of
+#: things that scale growth.
 _BEER_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
-    ArrheniusTemperature.for_growth,
+    lambda: ArrheniusTemperature.for_growth(AceticAcidOverflow.name),
     lambda: ArrheniusTemperature.for_uptake(OrganicAcidExcretion.name),
     ColemanQuadraticDeathTemperature,
 )

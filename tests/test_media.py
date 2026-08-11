@@ -738,7 +738,18 @@ OAK_PROCESSES = {"oak_extraction"}
 # three acids Tyrell measure FALLING, drained to a measured floor. Both are here because "beer's
 # acids have a fate" needs a sink as well as a source — a model that can only ADD acid
 # acidifies one-sidedly, which is what D-180 sized at ~+0.2-0.3 pH and left open.
-BEER_ORGANIC_ACID_PROCESSES = {"organic_acid_excretion", "wort_acid_removal"}
+#
+# ``acetic_acid_overflow`` (D-183) is the THIRD member and the one that is not flux-linked. It
+# rides the same ``initial_ph`` gate for the same correctness reason as the producer, but it is a
+# target of the GROWTH Arrhenius rather than the uptake one, because its yield is per gram of
+# biomass formed rather than per gram of sugar fermented -- Tyrell's own Fig 4 puts 86 % of
+# acetic's rise inside the first 15 % of the sugar flux, so acetic left ``ORGANIC_ACID_SPECS``
+# and took its own rate law with it. The modifier assertions below are what pin that split.
+BEER_ORGANIC_ACID_PROCESSES = {
+    "organic_acid_excretion",
+    "acetic_acid_overflow",
+    "wort_acid_removal",
+}
 # WINE-ONLY, NON-oxidative aging (D-79): tannin_anthocyanin_condensation condenses the two GRAPE
 # pools (anthocyanin + condensed tannin) into stable polymeric pigment — the red-wine colour-
 # stabilization + astringency-softening axis. A THIRD separate axis: it draws no O₂ (unlike every
@@ -965,6 +976,33 @@ def test_wine_growth_arrhenius_scales_the_amino_acid_swap_but_uptake_does_not():
     mods = {m.name: m for m in get_medium("wine").build_process_set().active_modifiers}
     assert "amino_acid_assimilation" in mods["arrhenius_growth"].modifies
     assert "amino_acid_assimilation" not in mods["arrhenius_uptake"].modifies
+
+
+def test_beers_two_acid_producers_are_scaled_by_the_flux_each_one_recomputes():
+    # The same D-32 coupling as the wine test above, but beer has TWO acid producers on TWO
+    # different fluxes and the pairing is CROSSED — which is exactly why it needs its own guard
+    # rather than a comment. ``organic_acid_excretion`` (D-180) recomputes the fermentative
+    # uptake rates, so the UPTAKE Arrhenius must scale it; ``acetic_acid_overflow`` (D-183)
+    # recomputes the base GROWTH rate, so the GROWTH Arrhenius must.
+    #
+    # MEASURED, not assumed: swapping the two targets in ``media.py`` and re-running turns
+    # exactly TWO tests red — this one, and
+    # ``test_organic_acids.py::test_the_yield_is_a_yield_at_every_temperature``, which runs the
+    # same wort at 10 °C and 22 °C. Every other test in that module stays GREEN, because they
+    # all run at Tyrell's 15 °C where the two factors happen to be close. So this guard is not
+    # the only thing standing between the repo and a swapped pairing; what it adds is that it
+    # fails DECLARATIVELY and names the direction, where the other one fails as a 0.8 %
+    # numerical drift at the end of two 40-day integrations.
+    mods = {m.name: m for m in get_medium("beer").build_process_set().active_modifiers}
+    assert "acetic_acid_overflow" in mods["arrhenius_growth"].modifies
+    assert "acetic_acid_overflow" not in mods["arrhenius_uptake"].modifies
+    assert "organic_acid_excretion" in mods["arrhenius_uptake"].modifies
+    assert "organic_acid_excretion" not in mods["arrhenius_growth"].modifies
+    # ``wort_acid_removal`` books nothing against either flux (first-order to a floor,
+    # temperature-flat, D-181), so it must be a target of NEITHER.
+    assert not any(
+        "wort_acid_removal" in mods[n].modifies for n in ("arrhenius_growth", "arrhenius_uptake")
+    )
 
 
 def test_each_build_returns_fresh_kinetic_instances():

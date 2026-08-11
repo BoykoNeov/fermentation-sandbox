@@ -102,8 +102,11 @@ from fermentation.core.kinetics.malolactic import (
 )
 from fermentation.core.kinetics.mercaptans import AutolyticMercaptan
 from fermentation.core.kinetics.organic_acids import (
+    ACETIC_SLOT,
+    ACETIC_SPECIES,
     ORGANIC_ACID_SPECS,
     WORT_ACID_SINKS,
+    AceticAcidOverflow,
     OrganicAcidExcretion,
     OrganicAcidSpec,
     WortAcidRemoval,
@@ -181,6 +184,8 @@ __all__ = [
     "BoundMethanethiolRelease",
     "ClosureOxygenIngress",
     "SotolonAldolCondensation",
+    "ACETIC_SLOT",
+    "ACETIC_SPECIES",
     "ORGANIC_ACID_SPECS",
     "WORT_ACID_SINKS",
     "OakExtraction",
@@ -213,6 +218,7 @@ __all__ = [
     "MalolacticGrowth",
     "MalolacticSenescence",
     "OenococcusDiacetylReduction",
+    "AceticAcidOverflow",
     "OrganicAcidExcretion",
     "OrganicAcidSpec",
     "PyruvateExcretion",

@@ -265,11 +265,14 @@ succinic_typical_wort:
 # Read by OrganicAcidExcretion (core/kinetics/organic_acids.py). Beer-only in effect: no wine
 # Process declares them, so they are never drawn for a wine ensemble.
 #
-# THE FOUR TOGETHER DIVERT 2.435e-3 g/g -- about 1/5 of wine's single Y_byproduct_sugar (0.012)
-# and ~0.24 % of the sugar. That is why they are routed as an EXTRA sliver off S (the D-19
-# byproduct idiom) rather than through uptake's D-16 yields: the D-16 route rescales the
-# ethanol/CO2 split and would move beer's CO2-ratio benchmark, while this route leaves
-# dX/dN/dE/dCO2 byte-for-byte identical.
+# SINCE D-183 THIS GROUP IS THREE ACIDS, NOT FOUR -- acetic moved to its own growth-linked
+# yield below, because Tyrell's own Fig 4 falsifies flux-linkage for it (see there). The three
+# that remain divert 1.721e-3 g/g; adding acetic's growth-linked draw back gives 2.309e-3 g/g
+# on Tyrell's wort, still ~1/5 of wine's single Y_byproduct_sugar (0.012) and ~0.23 % of the
+# sugar. That is why they are routed as an EXTRA sliver off S (the D-19 byproduct idiom)
+# rather than through uptake's D-16 yields: the D-16 route rescales the ethanol/CO2 split and
+# would move beer's CO2-ratio benchmark, while this route leaves dX/dN/dE/dCO2 byte-for-byte
+# identical.
 
 Y_acetic_sugar_beer:
   value: 0.000714383
@@ -279,7 +282,7 @@ Y_acetic_sugar_beer:
   provenance:
     source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 13 (day 0 vs day 7) over the sugar divisor derived in this file's group-2 header. FIGURE READ."
     conditions: "12 degP malt-extract wort, 15 degC, 4 strains, 7 days to a flat extract; yield taken over the whole ferment."
-    notes: "THE SHAPE IS WRONG AND THE SIZE IS RIGHT -- state both. Acetic is the one acid with a strong TRANSIENT: it PEAKS at ~200 ppm around day 2 (3.4x the wort level) and falls back to 105-126 by day 7, because yeast re-assimilate it (Tyrell Table 2: '++' at lower Krausen, '-' at collapse). A flux-linked monotone producer reproduces the day-7 endpoint by construction and DROPS that peak entirely, exactly as keto_acids.py's flux-linked pyruvate drops its own mid-ferment peak-then-decline. Modelling it needs an excretion/re-assimilation PAIR on the keto-acid template; deliberately not built here on one dataset."
+    notes: "RETIRED AS A RATE CONSTANT AT D-183, READ BY NO PROCESS -- and kept for exactly the reason group 1's finished-beer levels are kept: it is the counterfactual that makes the retirement falsifiable. tests/test_organic_acids.py::test_a_flux_linked_acetic_yield_puts_the_acid_where_the_source_says_it_is_not recomputes, from THIS value, the day-1 and day-2 levels a flux-linked acetic producer gives (65.7 and 74.4 ppm) against Tyrell's measured 145.0 and 170.25. IT WAS NEVER A MEASURED YIELD: it is a measured DIFFERENCE (day 7 - day 0) divided by the sugar divisor, which is only a yield if production tracks the sugar flux -- and Tyrell's Fig 4 says it does not, since 86 % of the rise happens inside the first 15 % of that flux. Its implied gravity scaling of the endpoint therefore never had measured support and must not be defended as if it did. See Y_acetic_biomass_beer."
 
 Y_lactic_sugar_beer:
   value: 0.000863339
@@ -310,6 +313,49 @@ Y_malic_sugar_beer:
     source: "Tyrell et al. (2013), BrewingScience 66:75-84, Fig. 9 (day 0 vs day 7) over the sugar divisor derived in this file's group-2 header. FIGURE READ."
     conditions: "as Y_acetic_sugar_beer -- same wort, same trial, same divisor."
     notes: "The smallest of the four and the only one whose band nearly reaches zero. Same molecule as wine's MLF SUBSTRATE, and the direction is opposite: wine's malic is consumed by Oenococcus, beer's is made by the yeast. Beer still wires no malolactic Process, so nothing consumes it here."
+
+# -- Acetic's GROWTH-linked yield: g acetic formed per g biomass formed (D-183) -------
+#
+# THE ONE ACID WHOSE PRODUCTION IS NOT PROPORTIONAL TO THE SUGAR FLUX, and the source says so
+# twice. Read by AceticAcidOverflow (core/kinetics/organic_acids.py).
+#
+# ---------------------- WHY THE DENOMINATOR CHANGED ----------------------
+#
+# Tyrell's Fig 4 (apparent extract) maps their day axis onto cumulative sugar fermented using
+# this file's own group-2 divisor. Against their Fig 13:
+#
+#     day   apparent extract   sugar fermented   % attenuated   acetic
+#      0        12.35 %            0.00 g/L          0.0         59.00 ppm
+#      1        10.90 %           12.33 g/L         15.0        145.00 ppm
+#      2         6.60 %           48.88 g/L         59.4        170.25 ppm   <- peak
+#      7         2.70 %           82.03 g/L         99.7        117.75 ppm
+#
+# 86 % of the entire rise (59 -> 145 of 59 -> 170.25) happens inside the FIRST 15 % of the
+# fermentative flux. No term proportional to that flux can produce this. Tyrell's Table 2 says
+# the same thing qualitatively for acetic -- '++' (strong increase) at LOWER Krausen, 'o' (no
+# change) at high Krausen, '-' at Krausen collapse -- and their own Fig 15 normalises acid
+# production "related to grown cells" as well as "related to fermented extract", so a
+# per-biomass denominator is one the authors themselves use.
+#
+# ------------------- WHAT IS MEASURED AND WHAT IS NOT -------------------
+#
+# NUMERATOR MEASURED, DENOMINATOR MODELLED -- this is why the tier is speculative while the
+# three sugar-linked yields above are plausible. The numerator is the same per-strain day-7
+# delta over the same wort that D-180 read off Fig 13. The denominator is 1.754386 g/L, THIS
+# ENGINE's gross biomass increment on Tyrell's wort (N0 = 0.2 g/L over biomass_N_fraction
+# 0.114), because Tyrell report cell counts only for succinic and only in arbitrary units. So
+# the value cannot be checked against the source without re-running this model, and a change to
+# biomass_N_fraction, to the YAN of the anchor scenario, or to the growth law silently
+# re-scales what this yield means. Recorded, not hidden.
+Y_acetic_biomass_beer:
+  value: 0.0334875
+  unit: "g/g"
+  tier: speculative
+  uncertainty: { low: 0.02622, high: 0.03819, note: "BOTH EDGES ARE A NAMED STRAIN'S MEASURED DELTA over the same modelled biomass increment: low = strain 6 (+46 ppm), high = strain 7 (+67 ppm). Nominal = the four-strain MEAN and is AUTHOR-CONSTRUCTED. Identical numerators to Y_acetic_sugar_beer's band -- only the denominator differs -- so the strain spread is carried across the rate-law change unchanged rather than re-derived." }
+  provenance:
+    source: "Tyrell et al. (2013), BrewingScience 66:75-84, Figs. 13 and 4 (acetic course and extract course of the SAME four EBC-tube ferments). FIGURE READ, both."
+    conditions: "12 degP malt-extract wort, 15 degC, 4 strains; numerator = day-7 minus day-0 acetic, denominator = this model's gross biomass formed on that wort at yan_mgl 200."
+    notes: "THIS YIELD DOES NOT REPRODUCE THE PEAK AND IS NOT MEANT TO -- read the D-183 record before quoting it. It is anchored on the day-7 LEVEL (117.75 ppm, four-strain mean), so a modelled beer rises 59 -> 117.75 ppm by about day 1 and then holds. That is a MONOTONE curve, not the measured rise-then-fall: it halves the shape error against Tyrell's own days 1-7 (RMSE 61.6 -> 32.5 ppm) by fixing WHEN the acid appears, and it delivers NO spike. The re-assimilation half that would deliver one was measured and REFUSED at D-183 -- Tyrell's decline cannot discriminate first-order from constant-rate (every fit gap is under the +-3 ppm read tolerance), cannot identify a floor (the mean's best fit is floor = 0 on the bound), and every law it IS consistent with makes the endpoint depend on the solver horizon (endpoint 108 / 65 / 20 / 0 ppm at days 7 / 14 / 30 / 400), which would make a modelled beer's pH a function of run duration. THE ENDPOINT'S SCENARIO DEPENDENCE MOVES FROM GRAVITY TO NITROGEN and that is a real consequence: at fixed gravity, YAN 120 -> 280 mg/L now moves finished acetic where the flux-linked form was flat. Neither direction is measured; the growth-linked one is at least the mechanism's own."
 
 # ======================================================================================
 # GROUP 3 — THE THREE WORT ACIDS THAT FALL, and their removal (decision D-181).

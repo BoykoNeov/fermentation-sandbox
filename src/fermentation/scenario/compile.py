@@ -36,6 +36,7 @@ from fermentation.core import acidbase
 from fermentation.core.chemistry import sugar_species
 from fermentation.core.kinetics import (
     AcetaldehydeBridgedCondensation,
+    AceticAcidOverflow,
     AminoAcidAssimilation,
     AnthocyaninFading,
     AntioxidantBurstOxidation,
@@ -2516,7 +2517,13 @@ def compile_scenario(
     # rate law is a no-op anyway — but an ENABLED Process holds those empty slots' tier below
     # VALIDATED (``tier_of`` counts enabled Processes, not nonzero ones), so leaving it on
     # would change what an un-anchored beer REPORTS about acids it does not carry.
-    for _acid_process in (OrganicAcidExcretion, WortAcidRemoval):
+    #
+    # ``AceticAcidOverflow`` (D-183) rides it too, and for the FIRST of those two reasons rather
+    # than the second: it is a genuine producer, so left enabled it would fill the ``acetic``
+    # slot from sugar on a beer that supplied no pH — the correctness case, not the tier one.
+    # It is here rather than beside the growth Processes it reads because what gates it is the
+    # acid it makes, not the growth it tracks.
+    for _acid_process in (OrganicAcidExcretion, AceticAcidOverflow, WortAcidRemoval):
         if _acid_process.name in process_set and "initial_ph" not in scenario.initial:
             process_set.disable(_acid_process.name)
 

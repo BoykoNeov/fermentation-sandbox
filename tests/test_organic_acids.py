@@ -20,28 +20,46 @@ named as omitted, pulling the opposite way — which is why they moved back UP.
 **BOTH of D-180's omitted terms are now built, and that changes what a shortfall means.**
 Against a measured drop of **0.81** pH — the mean of the extreme strains, which is what
 ``measured_drop`` below computes; D-180's prose quotes the four-strain mean 0.8125 and the two
-must not be mixed — the model gives **77.6-97.0 %** at nominal across the sampled
-``pKa_peptide_buffer`` band, and **63.8-109.4 % over the joint band** of all NINE drawn
+must not be mixed — the model gives **77.8-97.3 %** at nominal across the sampled
+``pKa_peptide_buffer`` band, and **64.0-109.7 % over the joint band** of all TEN drawn
 quantities. The history of those two numbers is the whole story of this axis: 63-92 % and
 41-105 % at D-180 (with a corner reaching the measurement), 42.7-62.2 % and 7.6-82.2 % at
-D-181 (with nothing reaching), and now back above both — because D-181 removed an error that
-was propping the agreement up and D-182 supplied the term that was genuinely missing.
+D-181 (with nothing reaching), 77.6-97.0 % and 63.8-109.4 % at D-182 — because D-181 removed
+an error that was propping the agreement up and D-182 supplied the term that was genuinely
+missing — and now **D-183's +0.2 pp, which was pre-registered before a line of ``src/``
+changed**. That last move is deliberately too small to be a result: acetic's endpoint went from
+116.06 to 117.75 mg/L at 0.1233 pp of agreement per ppm, so a rate-law change that reshapes the
+whole acetic curve is **headline-neutral by construction** and must not be credited here.
 
-**This still is not validation.** The nominal falls short by 3-22 %; the corner that reaches
-is a corner of a 9-dimensional hypercube, not a draw anyone observed; and the two shape
-failures section 9 records — acetic's mid-ferment transient and lactic's late rise — are
-unmodelled and are not charge-balance terms. No test here is named or phrased as validating
+**D-183 also removes one of the two shape failures from the "unmodelled" list and hardens the
+other.** Acetic's producer moved from the sugar flux to **growth** (``AceticAcidOverflow``),
+because mapping Tyrell's Fig 13 onto their Fig 4 puts 86 % of acetic's rise inside the first
+15 % of the fermentative flux. That halves the shape error against their measured days 1-7
+(RMSE 61.6 → 32.5 ppm) and fixes *when* the acid appears — but the modelled curve is still
+**MONOTONE**. The mid-ferment spike is **still not modelled**, and the excretion/re-assimilation
+pair D-180 §9 proposed for it was built as a probe and **REFUSED on measurement**: the same
+figures falsify its re-assimilation half too (half the measured fall happens at zero
+fermentative flux), the decline cannot discriminate first-order from constant-rate at the ±3 ppm
+read tolerance, no floor is identifiable, and every law the data admits makes the endpoint a
+function of the solver horizon. Lactic's late rise is untouched.
+
+**This still is not validation.** The nominal falls short by 2.7-22.2 %; the corner that
+reaches is a corner of a 10-dimensional hypercube, not a draw anyone observed; and the spike
+above is a charge-balance non-term either way. No test here is named or phrased as validating
 the produced acids alone.
 """
 
+import numpy as np
 import pytest
 
 from fermentation.core import acidbase
 from fermentation.core.acidbase import charge_balance_is_populated
 from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
 from fermentation.core.kinetics import (
+    ACETIC_SLOT,
     ORGANIC_ACID_SPECS,
     WORT_ACID_SINKS,
+    AceticAcidOverflow,
     OrganicAcidExcretion,
     WortAcidRemoval,
 )
@@ -65,6 +83,26 @@ TYRELL_BEER_PPM = {
     "succinic": (32.0, 76.0),
     "malic": (81.0, 116.0),
 }
+#: Acetic's growth-linked yield parameter (D-183). Named once, here, because three tests and
+#: the isolability check all have to mean the same name.
+ACETIC_YIELD_PARAM = "Y_acetic_biomass_beer"
+
+#: Fig. 13, the acetic course of those same ferments, as the **four-strain mean per day** —
+#: the *peak of the mean* (170.25 ppm at day 2), NOT the mean of the four strains' own peaks
+#: (182.75 ppm), which is a different quantity and must not be substituted. Both are
+#: AUTHOR-CONSTRUCTED means over FIGURE READS at ±3 ppm. Day 0 and day 7 are cross-checked
+#: against D-180's independently recorded seed and per-strain deltas and agree exactly.
+TYRELL_ACETIC_MEAN_PPM = {
+    0: 59.00,
+    1: 145.00,
+    2: 170.25,
+    3: 161.75,
+    4: 153.25,
+    5: 141.50,
+    6: 130.00,
+    7: 117.75,
+}
+
 #: Fig. 4, same ferments: wort pH and the four strains' day-7 beer pH.
 TYRELL_WORT_PH = 5.65
 TYRELL_BEER_PH = (4.78, 4.90)
@@ -195,12 +233,23 @@ def test_wine_never_wires_or_reads_the_beer_acid_producer():
     """
     wine = get_medium("wine").build_process_set(strict=True)
     assert OrganicAcidExcretion.name not in {p.name for p in wine.active}
+    assert AceticAcidOverflow.name not in {p.name for p in wine.active}
 
-    yields = {spec.yield_param for spec in ORGANIC_ACID_SPECS}
+    yields = {spec.yield_param for spec in ORGANIC_ACID_SPECS} | {ACETIC_YIELD_PARAM}
     declared = {name for p in wine.active for name in p.reads}
     assert not (yields & declared), (
         f"a wine Process declares beer's organic-acid yields {sorted(yields & declared)}; "
         "that would put them in wine's sampled set and shift its draw sequence"
+    )
+    # SCOPED TO THE YIELD ON PURPOSE, and this is the one place the D-183 Process differs in
+    # kind from D-180's. `AceticAcidOverflow.reads` also names `mu_max`/`K_s`/`K_n`, which wine's
+    # own growth Process declares and MUST keep declaring — so the disjointness claim above
+    # cannot be "none of its reads appear in wine" without being false for a correct model.
+    # What has to be beer-only is the yield, because that is the only name whose presence in
+    # wine's sampled set would be a defect rather than a shared dependency.
+    assert set(AceticAcidOverflow.reads) & declared == {"mu_max", "K_s", "K_n"}, (
+        "the growth-linked producer's overlap with wine's declared reads changed; it must be "
+        "exactly the three growth constants it recomputes the growth rate from"
     )
 
 
@@ -218,9 +267,10 @@ def test_an_unanchored_beer_keeps_the_producer_disabled_and_its_acid_slots_empty
     compiled, res = _run(unanchored)
 
     assert OrganicAcidExcretion.name not in {p.name for p in compiled.process_set.active}
-    for spec in ORGANIC_ACID_SPECS:
-        assert float(res.series(spec.slot)[-1]) == 0.0, (
-            f"{spec.slot} grew on a beer that supplied no initial_ph"
+    assert AceticAcidOverflow.name not in {p.name for p in compiled.process_set.active}
+    for slot in (*(spec.slot for spec in ORGANIC_ACID_SPECS), ACETIC_SLOT):
+        assert float(res.series(slot)[-1]) == 0.0, (
+            f"{slot} grew on a beer that supplied no initial_ph"
         )
     # Sugar was fully fermented all the same — the run is a normal beer, just pH-less.
     assert float(res.series("S")[:, -1].sum()) < 0.1
@@ -239,9 +289,35 @@ def test_the_producer_honours_its_touches_contract():
     d = OrganicAcidExcretion().derivatives(0.0, _beer_state(schema), schema, params)
     touched = {n for n in schema.names if float(abs(d[schema.slice(n)]).sum()) > 0.0}
     assert touched <= set(OrganicAcidExcretion.touches)
-    # And it really does move all four acids plus sugar — an inert Process would pass the
+    # And it really does move all three acids plus sugar — an inert Process would pass the
     # subset check above vacuously.
     assert touched == {*(spec.slot for spec in ORGANIC_ACID_SPECS), "S"}
+    assert ACETIC_SLOT not in touched, (
+        "acetic left ORGANIC_ACID_SPECS at D-183; if the flux-linked producer moves it again "
+        "the acid is being made twice, once on each rate law"
+    )
+
+
+def test_the_growth_linked_producer_honours_its_touches_contract():
+    """The D-183 sibling — and the ``X``/``N`` exclusion is the claim worth pinning.
+
+    ``AceticAcidOverflow`` *reads* the growth rate and must not *contribute* to it. Declaring
+    ``X``/``N`` in ``touches`` would let a future edit add biomass or consume nitrogen here
+    while ``strict=True`` stayed green, and the second copy of growth's stoichiometry is exactly
+    the drift D-106 caught one module over.
+    """
+    pset = get_medium("beer").build_process_set(strict=True)
+    assert AceticAcidOverflow.name in pset
+    schema = beer_schema()
+    data = default_data_dir()
+    params = load_parameters(
+        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    ).resolve()
+    d = AceticAcidOverflow().derivatives(0.0, _beer_state(schema), schema, params)
+    touched = {n for n in schema.names if float(abs(d[schema.slice(n)]).sum()) > 0.0}
+    assert touched <= set(AceticAcidOverflow.touches)
+    assert touched == {ACETIC_SLOT, "S"}
+    assert not ({"X", "N"} & set(AceticAcidOverflow.touches))
 
 
 # ======================================================================================
@@ -347,6 +423,114 @@ def test_the_yield_is_a_yield_at_every_temperature():
             f"{spec.slot} differs by {abs(c - w) / w:.2%} between a 10 °C and a 22 °C ferment "
             "of the same wort; the producer is not carrying the uptake Arrhenius factor"
         )
+    # Acetic rides the SAME coupling against a DIFFERENT modifier (D-183). Its yield is per gram
+    # of biomass, and biomass is nitrogen-capped rather than temperature-capped, so the finished
+    # level must be temperature-invariant for the same reason — but only if the Process is named
+    # by the GROWTH Arrhenius. Left on the uptake one it would still integrate and still pass
+    # every other test in this file; this assert is what makes that mis-wiring loud.
+    cold_acetic = float(cold.series(ACETIC_SLOT)[-1])
+    warm_acetic = float(warm.series(ACETIC_SLOT)[-1])
+    assert cold_acetic == pytest.approx(warm_acetic, rel=2e-3), (
+        f"acetic differs by {abs(cold_acetic - warm_acetic) / warm_acetic:.2%} between a 10 °C "
+        "and a 22 °C ferment; the growth-linked producer is not carrying the GROWTH Arrhenius "
+        "factor (it is a `for_growth` extra target, not a `for_uptake` one)"
+    )
+
+
+def test_a_flux_linked_acetic_yield_puts_the_acid_where_the_source_says_it_is_not():
+    """THE COUNTERFACTUAL THAT RETIRED A RATE LAW (D-183) — recomputed, never hard-coded.
+
+    ``Y_acetic_sugar_beer`` is read by no Process since D-183. It is kept for the same reason
+    group 1's finished-beer levels are: it is the only thing that keeps the retirement
+    falsifiable instead of merely written down.
+
+    The retirement rests on mapping Tyrell's Fig 13 onto their Fig 4. By day 1 that wort is
+    **15 % attenuated** while acetic has already made **86 %** of its whole rise. So a yield on
+    the sugar flux — which is what ``Y_acetic_sugar_beer`` is, a measured day7−day0 difference
+    divided by a sugar divisor — must put the acid far too late. This recomputes exactly how
+    late, from the flux the shipped run actually booked (recovered through *lactic*, which still
+    rides that flux), rather than trusting a number in a comment.
+
+    It is a claim about SHAPE, not size: the same yield reproduces the day-7 endpoint by
+    construction, which is precisely why the error was invisible until the figure interiors were
+    read.
+    """
+    compiled, res = _run(dict(TYRELL_SCENARIO))
+    params = compiled.parameters.resolve()
+    t_h = np.asarray(res.t, dtype=float)
+    # The fermentative flux integral, recovered from an acid that still rides it.
+    lactic = np.asarray(res.series("lactic"), dtype=float)
+    phi = (lactic - lactic[0]) / params["Y_lactic_sugar_beer"]
+    seed = float(res.series(ACETIC_SLOT)[0]) * 1000.0
+
+    for day in (1, 2):
+        flux_linked = (
+            seed + params["Y_acetic_sugar_beer"] * float(np.interp(day * 24.0, t_h, phi)) * 1000.0
+        )
+        shipped = float(np.interp(day * 24.0, t_h, np.asarray(res.series(ACETIC_SLOT)))) * 1000.0
+        measured = TYRELL_ACETIC_MEAN_PPM[day]
+        assert flux_linked < measured - 60.0, (
+            f"day {day}: the retired flux-linked yield gives {flux_linked:.1f} mg/L against "
+            f"Tyrell's measured {measured:.2f}. If this gap has closed, the sugar-uptake "
+            "kinetics moved, and the whole basis for the D-183 rate-law change needs re-reading"
+        )
+        assert abs(shipped - measured) < abs(flux_linked - measured), (
+            f"day {day}: the shipped growth-linked producer ({shipped:.1f} mg/L) is no closer to "
+            f"the measured {measured:.2f} than the retired flux-linked one ({flux_linked:.1f}); "
+            "the rate-law change bought nothing"
+        )
+
+    # And the size claim: the shipped form halves the shape error over Tyrell's measured days.
+    days = [d for d in TYRELL_ACETIC_MEAN_PPM if d >= 1]
+    shipped_rmse = float(
+        np.sqrt(
+            np.mean(
+                [
+                    (
+                        float(np.interp(d * 24.0, t_h, np.asarray(res.series(ACETIC_SLOT))))
+                        * 1000.0
+                        - TYRELL_ACETIC_MEAN_PPM[d]
+                    )
+                    ** 2
+                    for d in days
+                ]
+            )
+        )
+    )
+    flux_rmse = float(
+        np.sqrt(
+            np.mean(
+                [
+                    (
+                        seed
+                        + params["Y_acetic_sugar_beer"]
+                        * float(np.interp(d * 24.0, t_h, phi))
+                        * 1000.0
+                        - TYRELL_ACETIC_MEAN_PPM[d]
+                    )
+                    ** 2
+                    for d in days
+                ]
+            )
+        )
+    )
+    assert shipped_rmse < 0.6 * flux_rmse, (
+        f"the growth-linked form scores {shipped_rmse:.1f} ppm RMSE against Tyrell's days 1-7 "
+        f"and the retired flux-linked one {flux_rmse:.1f}; D-183 measured 32.5 vs 61.6"
+    )
+    # THE HONEST CEILING, asserted so it cannot quietly be read as a transient: the shipped
+    # curve is MONOTONE. It reaches its endpoint early and holds; it does not peak and fall.
+    # Delivering the peak needs the re-assimilation half, which D-183 measured and REFUSED.
+    shipped_series = np.asarray(res.series(ACETIC_SLOT), dtype=float)
+    assert float(shipped_series.max()) == pytest.approx(float(shipped_series[-1]), rel=1e-9), (
+        "acetic now overshoots its endpoint — something restored the re-assimilation half that "
+        "D-183 refused on duration-dependence, and the D-182 pH headline is now a function of "
+        "the run's duration. Read the D-183 record before keeping this"
+    )
+    assert shipped_rmse > 25.0, (
+        "the shape error against Tyrell's own days collapsed; a MONOTONE curve cannot fit a "
+        "rise-then-fall well, so this passing would mean the comparison stopped being real"
+    )
 
 
 def test_citrate_is_seeded_and_stays_inert():
@@ -432,9 +616,16 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     measured_drop = TYRELL_WORT_PH - sum(TYRELL_BEER_PH) / 2.0
 
     # The fermentative flux the shipped run actually booked its yields against — recovered
-    # from what it produced, so this cannot drift from the run.
-    flux = (float(res.series("acetic")[-1]) - float(res.series("acetic")[0])) / params[
-        "Y_acetic_sugar_beer"
+    # from what it produced, so this cannot drift from the run. Recovered through LACTIC since
+    # D-183: acetic no longer rides this flux, and dividing its production by a yield it does
+    # not use would silently mis-scale every produced acid in this arm.
+    flux = (float(res.series("lactic")[-1]) - float(res.series("lactic")[0])) / params[
+        "Y_lactic_sugar_beer"
+    ]
+    # Acetic's own denominator (D-183): the gross biomass this run formed, N being growth's only
+    # consumer in beer. Recovered from the run for the same reason the flux is.
+    biomass_formed = (float(res.series("N")[0]) - max(float(res.series("N")[-1]), 0.0)) / params[
+        "biomass_N_fraction"
     ]
 
     def edge(param: str, pick: str) -> float:
@@ -451,6 +642,7 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         carbonic: str,
         henry: str,
         vant_hoff: str,
+        acetic_pick: str,
     ) -> float:
         # Every pKa this beat added is drawn too (PH_SYSTEM_READS is the union, D-179), so
         # pinning them here would be the same point-vs-band mistake one level further out.
@@ -477,6 +669,14 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
             end[spec.slot] = (
                 start_molar[spec.slot] + (edge(spec.yield_param, pick) * flux) / molar[spec.slot]
             )
+        # Acetic is the same construction against its OWN denominator (D-183). It is a separate
+        # dimension rather than a fourth member of `pick` because its band is a spread over a
+        # DIFFERENT quantity — g acid per g biomass, not per g sugar — so tying it to the other
+        # three would assert a correlation between two unrelated strain rankings.
+        end[ACETIC_SLOT] = (
+            start_molar[ACETIC_SLOT]
+            + (edge(ACETIC_YIELD_PARAM, acetic_pick) * biomass_formed) / molar[ACETIC_SLOT]
+        )
         # The D-181 sinks land ON their floors: every k in the band clears the fall inside the
         # first days of this 14-day run, which the endpoint-insensitivity test pins separately.
         for sink in WORT_ACID_SINKS:
@@ -502,7 +702,8 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
 
     # Scope 1 — everything nominal but the peptide pKa. The "must fall short" claim lives HERE.
     at_nominal = [
-        fraction(pka, "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom") for pka in pka_band
+        fraction(pka, "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom")
+        for pka in pka_band
     ]
     assert min(at_nominal) > 0.70, (
         f"the predicted drop collapsed to {min(at_nominal):.0%} of Tyrell's measured one at "
@@ -528,7 +729,7 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     # which is exactly what D-180's amendment had to correct in this very test.
     picks = ("lo", "nom", "hi")
     joint = [
-        fraction(pka, pick, floor_pick, ox2, pyr, seed, carbonic, henry, vant_hoff)
+        fraction(pka, pick, floor_pick, ox2, pyr, seed, carbonic, henry, vant_hoff, acetic_pick)
         for pka in pka_band
         for pick in picks
         for floor_pick in picks
@@ -538,11 +739,19 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         for carbonic in picks
         for henry in picks
         for vant_hoff in picks
+        for acetic_pick in picks
     ]
-    assert len(joint) == 3**9, "every drawn dimension must be varied, not a subset of them"
-    assert min(joint) == pytest.approx(0.638, abs=0.02), (
-        f"the joint low corner moved to {min(joint):.1%}; D-182 measured 63.8 % (D-181's was "
-        "7.6 %) — yields at their low edge, peptide pKa HIGH, floors at their LOW edge (the "
+    # TEN dimensions since D-183, and the tenth went in the SAME COMMIT that shipped the band it
+    # varies. That ordering is the archive's fix for its most-repeated shape — a constraint
+    # verified at a POINT where the sampler reads a BAND — which landed six times, twice inside
+    # the record documenting the previous instance. `Y_acetic_biomass_beer` replaced
+    # `Y_acetic_sugar_beer` in the drawn set, so the count of drawn quantities is unchanged; what
+    # changed is that acetic's band no longer moves with the other three yields' `pick`.
+    assert len(joint) == 3**10, "every drawn dimension must be varied, not a subset of them"
+    assert min(joint) == pytest.approx(0.640, abs=0.02), (
+        f"the joint low corner moved to {min(joint):.1%}; D-183 measures 64.0 % over TEN "
+        "dimensions (D-182 measured 63.8 % over nine; D-181's was 7.6 %) — "
+        "yields at their low edge, peptide pKa HIGH, floors at their LOW edge (the "
         "strains that clear the most wort acid) and the seeds HIGH. A LOW floor means MORE "
         "acid removed and therefore a SMALLER net drop, which is the opposite of the "
         "intuition that a lower residue means a more acidic beer: what moves pH is charge "
@@ -555,11 +764,12 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "from a 74.6-point span to a 45.6-point one — this term is a stabiliser of the "
         "prediction, not just an offset to it."
     )
-    assert max(joint) == pytest.approx(1.094, abs=0.02), (
-        f"the joint high corner moved to {max(joint):.1%}; D-182 measured 109.4 % (D-181's "
+    assert max(joint) == pytest.approx(1.097, abs=0.02), (
+        f"the joint high corner moved to {max(joint):.1%}; D-183 measures 109.7 % over TEN "
+        "dimensions (D-182 measured 109.4 % over nine; D-181's "
         "was 82.2 %) — yields high, peptide pKa low, floors high, seeds low, and the three "
         "CO2 parameters at the edges that dissolve the most and dissociate it hardest. NB "
-        "this is a CORNER of a 9-D hypercube, not a member any ensemble was seen to draw. "
+        "this is a CORNER of a 10-D hypercube, not a member any ensemble was seen to draw. "
         "**A corner REACHES the measured drop again, and it was pre-registered.** D-180 had "
         "one at 104.5 %; D-181 removed it and wrote that a future change restoring it would "
         "signal that an omitted term had arrived. One has — dissolved CO2, D-180's own arm C, "
