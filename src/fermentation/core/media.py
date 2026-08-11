@@ -1331,10 +1331,11 @@ def _beer_acid_specs() -> list[VarSpec]:
             "g/L",
             default=0.0,
             description="oxalic acid (beer WORT input; DIPROTIC, pKa 1.26/4.20). Falls 22 -> "
-            "~5.6 mg/L. The only one of the three with a pKa inside the pH range a fermenting "
-            "beer traverses, so its removed charge is between 1 and 2 equivalents per mole "
-            "rather than a flat 1 — and the only one of the four new pKa constants the "
-            "prediction is sensitive to. Drained by WortAcidRemoval (D-181); off every ledger",
+            "~5.6 mg/L. The only one of the three with a pKa inside the window a REAL beer "
+            "traverses, so it was expected to be the one new pKa the prediction is sensitive "
+            "to — measured, its whole band moves the predicted drop by 0.027 percentage "
+            "points, because THIS model only reaches pH 5.24 (D-181 amendment). Drained by "
+            "WortAcidRemoval (D-181); off every ledger",
         ),
         VarSpec(
             "peptide_buffer",

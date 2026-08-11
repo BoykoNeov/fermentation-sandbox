@@ -19,12 +19,13 @@ Figs 6-14) *and* the pH and extract curves (their Fig 4). So the yields are a me
 prediction**, because nothing in the parameter file is fitted to it.
 
 **What the free prediction says (read the D-180 and D-181 records before quoting it), and the
-scope it is true in.** Against a measured drop of 0.8125 pH units, SINCE D-181:
+scope it is true in.** Against a measured drop of **0.81** pH units — the mean of Tyrell's
+extreme strains, which is the denominator the code divides by; D-180's prose quotes 0.8125, the
+four-strain mean, and the two must not be mixed — SINCE D-181:
 
-* at **nominal yields and floors**, across the sampled ``pKa_peptide_buffer`` band:
-  **42.7-62.2 %** of it;
-* over the **JOINT** band — the four yields and the three floors are sampled too, and widely:
-  **8.7-81.4 %**.
+* at **nominal**, across the sampled ``pKa_peptide_buffer`` band: **42.7-62.2 %** of it;
+* over the **JOINT** band — **six** drawn quantities, not one (the four yields, the three
+  floors, the three seeds, and the two new pKas, moved together per dimension): **7.6-82.2 %**.
 
 **Those numbers were 63-92 % and 41-105 % at D-180, and they got worse on purpose.** D-180
 closed with its agreement held open by two omitted terms of OPPOSITE sign, and D-181 built the

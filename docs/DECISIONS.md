@@ -23753,3 +23753,84 @@ was not evidence about the capacity. Re-run coherently (value and band together)
 - **The floors' mechanism is unattributed.** Deciding between uptake, precipitation and
   adsorption needs an experiment this source does not contain — for oxalate specifically, a
   calcium series would separate a solubility floor from a metabolic one.
+
+### D-181 amendment — the point-vs-band shape, sixth instance, committed in the record that documented the fifth
+
+*(No `Corrects:`/`Flags:` marker: a record cannot mark itself, and the correction-map generator
+rejects a self-reference. This amendment corrects D-181's own §4 — the headline joint band was
+computed with two drawn pKa bands and three drawn seed bands pinned at nominal; re-measured over
+all six dimensions it is 7.6-82.2 %, not 8.7-81.4 %, and the conclusion survives.)*
+
+§4 reported the joint band as **8.7-81.4 %** and called it "the reachable band". It was not.
+The arm varied the peptide pKa, the four yields and the three floors, and held at nominal
+**`pKa_oxalic_2`, `pKa_pyruvic` and the three wort seeds** — every one of which this same beat
+had just added with a live band, and every one of which the sampler draws (`PH_SYSTEM_READS`
+is the union, so the two pKas are in wine's and beer's scope alike; the seeds ride the compile
+seam).
+
+**So the beat that opens by naming this archive's recurring shape — a constraint verified at a
+POINT where the sampler reads a BAND — committed it, in the very test D-180's amendment had
+already had to widen once for the same reason.** Fifth instance documented, sixth instance
+shipped, three commits apart.
+
+**Re-measured over all six dimensions (729 corners): 7.6-82.2 %.** The correction is small and
+the headline survives it — no corner reaches the measured drop, which is §4's whole claim. That
+is the honest outcome and also the uncomfortable one: **the error was invisible precisely
+because it did not change the answer**, so nothing but running it could have found it. Recorded
+rather than quietly amended, because a shape that recurs six times is a property of how I work
+and not a run of bad luck.
+
+#### What each dimension is actually worth, and the argument that failed
+
+Measured whole-band, against the all-nominal fraction 0.5084:
+
+| dimension | moves the predicted drop by |
+|---|---|
+| `pKa_peptide_buffer` | 0.427 → 0.622 (the dominant one, as D-180 found) |
+| the four yields, the three floors | comparable, per §4 |
+| the three wort seeds | ~0.015 |
+| **`pKa_oxalic_2`** | **0.000267** |
+| `pKa_pyruvic` | 0.000010 |
+
+`pKa_oxalic_2` was shipped with the note "**THIS IS THE ONE pKa OF THE FOUR THE PREDICTION IS
+SENSITIVE TO** … unlike the other three the edges here are not interchangeable". That is
+**wrong, and the way it is wrong is worth more than the correction**: the claim was made about
+the pH range a **real** beer traverses (4.78-4.90, where 4.20 genuinely bites) and tested
+against **this model**, which finishes at **5.24**. Oxalate never descends within a unit of
+pKa2, so it stays nearly fully dissociated throughout and its second proton is as
+consequence-free as pyruvic's. A statement about the beverage, asserted about the model.
+
+The under-acidification that makes it consequence-free is *this beat's own headline*. So the
+constant becomes load-bearing exactly when the model starts acidifying properly — i.e. when
+dissolved CO₂ lands (§14) — and the note now says to re-measure then rather than trusting it.
+`pKa_pyruvic`'s note claimed consequence-freeness "measured to be so" when nothing had measured
+it ([[feedback-conceded-caveats-are-not-coverage]]); the sweep makes the word true.
+
+#### Three smaller repairs in the same pass
+
+* **Provenance that names no reference.** Both oxalic pKa `source:` fields ended with "standard
+  analytical-chemistry tabulations (the 1.27 / 4.27 pair)" while the shipped nominal is a
+  midpoint between CRC's value and that unnamed one. By D-167's own standard — a `source` field
+  claiming a parameter-specific published span is exactly what this archive audits — an
+  unnameable citation for a specific digit is weaker than the house alternative. Both now follow
+  the `pKa_acetic` idiom: the source field names the one book, and the band is stated as a
+  **described spread** ("quoted 4.14-4.27 across sources") rather than two attributed digits.
+  The midpoint nominal is unchanged, so nothing numeric moves.
+* **Two denominators for one drop.** The record and both docstrings attributed the new
+  percentages to "a measured drop of 0.8125 pH" — D-180's prose figure, the four-strain mean —
+  while the code divides by **0.81**, the mean of the extreme strains. Inherited from D-180 and
+  carried forward next to numbers built on the other one. Both docstrings now name 0.81, say
+  where 0.8125 comes from, and say the two must not be mixed.
+* **`begin_aging` does not undo the gate — checked, not assumed.** The project's own trap list
+  records that `ProcessSet.disable()` is silently undone by `begin_aging`, and §10's isolability
+  claim rests on the disable holding. It does: `begin_aging` re-enables exactly
+  `_AGING_GATED_PROCESSES` (31 entries) and neither `wort_acid_removal` nor
+  `organic_acid_excretion` is in it. Behaviourally the sink was safe either way — its slots are
+  0 and the rate law no-ops — but the gate's stated purpose is the **tier** claim, which an
+  aging path could have broken silently.
+
+#### What this changes about the pins
+
+`test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band` now varies all six dimensions
+(3⁶ = 729 corners, asserted as a count so a future dimension cannot be silently omitted), and
+its corners are pinned at **0.076 / 0.822**. Every other number in D-181 stands.

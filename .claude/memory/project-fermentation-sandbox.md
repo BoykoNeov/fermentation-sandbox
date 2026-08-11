@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T15:18:11.854Z
+  modified: 2026-08-11T15:32:25.432Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -47,11 +47,13 @@ still named the withdrawn "under-bound SO₂ pool" (D-143) as open.
 
 **Sampled bands (D-153 → D-157) — BOTH archive-wide sweeps are DONE. Do not re-run either.** The **sampler**
 surface (which bands exist) = D-153/D-156; the **assertion** surface (constraints checked at a point) = D-157.
-- **THE RECURRING SHAPE, 5 instances (D-118, D-154, D-155, D-157, D-180): a constraint verified at a POINT
-  where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
+- **THE RECURRING SHAPE, 6 instances (D-118, D-154, D-155, D-157, D-180, D-181): a constraint verified at
+  a POINT where the sampler reads a BAND.** Whenever a guard or bound uses a nominal, check whether that
   quantity is itself sampled — and take the **joint** worst case over every band involved.
-  **D-180 hit it while FIXING it** — its §7 re-anchored the pKa band correctly, then reported the headline
-  with the 4 sampled yields pinned at nominal. Fixing one band does not discharge the others.
+  **D-180 hit it while FIXING it; D-181 hit it while DOCUMENTING D-180's** — it added 3 floor bands to the
+  same test and pinned the 2 pKas and 3 seeds it had just shipped. **Enumerate the drawn set from the
+  registry, never by hand**, and assert the corner COUNT. It was invisible because it barely moved the
+  answer (8.7-81.4 → **7.6-82.2 %**): a shape recurring 6× is how I work, not bad luck.
 - **FOUR surfaces (D-157), TWO distributions — PINNED (D-156, `tests/test_sampling_surfaces.py`): do not re-audit,
   do not "simplify".** Compile-seam distinct varying **266** (257 pre-D-180, 246 pre-D-179) — but that count is a
   **COMMENT in `test_drawability_surface.py`, not an assert, so it goes STALE GREEN: re-measure, never cite it**.
@@ -276,7 +278,10 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   asserted** ⇒ the 3 slots are **OFF every ledger** (`iso_alpha` idiom) and **absent from `MOLAR_MASS`** so a
   future producer RAISES; never weight them "for completeness". **Corrects D-179**: buffering index ranks
   these last, **charge REMOVED** ranks them with the produced four — a fully dissociated acid loses the MOST.
-- Nominal **42.7-62.2 %** (was 63-92), joint **8.7-81.4** (was 41-105): **nothing in the band reaches** now.
+- Nominal **42.7-62.2 %** (was 63-92), joint **7.6-82.2** (was 41-105): **nothing in the band reaches** now.
+  Denominator is **0.81** (extreme-strain mean) in code, **0.8125** in D-180 prose — **never mix them**.
+  **All 4 new pKas are consequence-free** — `pKa_oxalic_2` was shipped as "the sensitive one" and is 0.027 pp:
+  the claim was about a REAL beer (4.78-4.90), the model stops at **5.24**. Re-measure when CO2 lands.
   Missing base **+0.2094 pH**. Capacity re-anchored **1.6708→1.5481** (5-acid back-solve reproduces D-180
   **bitwise**). ONE shared `k` (3x/⅓x moves pH **0.00011**). `pyruvic` ≠ wine's `pyruvate` — **reconcile before
   beer ever wires keto-acids**. Only **dissolved CO2** left, opposite sign [[feedback-build-the-term-that-makes-agreement-worse-first]].

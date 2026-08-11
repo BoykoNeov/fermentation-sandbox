@@ -183,8 +183,19 @@ pKa_citric_3:
 # -1 (or -2), so removing it removes the maximum possible anion charge per mole. Flat charge is
 # precisely what makes the effect large, where for a buffer it is what makes it nil.
 #
-# So the pH prediction is insensitive to pyruvic's and oxalic-1's exact values and sensitive to
-# how much acid is removed. The bands below are still the honest textbook spreads.
+# So the pH prediction is insensitive to how the protons are distributed and sensitive to how
+# much acid is REMOVED. The bands below are still the honest textbook spreads.
+#
+# MEASURED, NOT REASONED (D-181 amendment). The first draft of this block said pKa_oxalic_2 was
+# "the one pKa the prediction is sensitive to", because at 4.20 it sits inside the pH range a
+# real beer traverses. Run over its whole band, it moves the predicted drop by 0.027 percentage
+# points, and pKa_pyruvic's whole band by 0.001. ALL FOUR are consequence-free, and the reason
+# the argument failed is worth more than the correction: THIS model's beer only reaches pH 5.24,
+# not the real 4.78-4.90, so oxalate never descends to within a unit of pKa2 and stays nearly
+# fully dissociated throughout. The claim was written about the BEVERAGE and tested against the
+# MODEL. It follows that these constants become consequential exactly when the model starts
+# acidifying properly -- i.e. when dissolved CO2 lands (D-181 sec 14) -- so re-measure then
+# rather than trusting this note [[feedback-conceded-caveats-are-not-coverage]].
 # ==============================================================================
 
 # -- Pyruvic acid, C3H4O3 (monoprotic) -----------------------------------------
@@ -199,7 +210,7 @@ pKa_pyruvic:
   value: 2.45
   unit: "pH units"
   tier: plausible
-  uncertainty: { low: 2.39, high: 2.50, note: "thermodynamic pKa at 25 C, I=0. The band spans the textbook spread rather than a measurement spread: sources quote 2.39, 2.45 and 2.50 for the same constant. CONSEQUENCE-FREE BY CONSTRUCTION and measured to be so — 2.39 and 2.50 are both >2 units below any pH a modelled beer reaches, so the acid is >99.9% dissociated at either edge and the removed charge is 1.000 eq/mol either way." }
+  uncertainty: { low: 2.39, high: 2.50, note: "thermodynamic pKa at 25 C, I=0. The band spans the textbook spread rather than a measurement spread: sources quote 2.39, 2.45 and 2.50 for the same constant. CONSEQUENCE-FREE, and MEASURED to be so rather than argued: swept edge to edge through the shipped charge balance, the whole band moves the predicted pH drop by 0.001 percentage points (0.508394 -> 0.508404 of the measured drop). 2.39 and 2.50 are both >2 units below any pH a modelled beer reaches, so the acid is >99.9% dissociated at either edge." }
   provenance:
     source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
     conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-181, the D-18 simplification)"
@@ -221,9 +232,9 @@ pKa_oxalic_1:
   value: 1.26
   unit: "pH units"
   tier: plausible
-  uncertainty: { low: 1.25, high: 1.27, note: "BOTH EDGES PRINTED, in two standard references: 1.25 (CRC) and 1.27 (the value quoted alongside 4.27 in the analytical-chemistry tabulations). The nominal is their midpoint and is therefore AUTHOR-CONSTRUCTED, stated here because a pinned nominal that looks sourced is the failure mode. Consequence-free like pKa_pyruvic: 3+ units below any modelled beer pH, so the first proton is off everywhere on the trajectory and either edge gives the same charge." }
+  uncertainty: { low: 1.25, high: 1.27, note: "A DESCRIBED SPREAD, NOT TWO ATTRIBUTED DIGITS -- the pKa_acetic idiom in this file. The constant is quoted 1.25-1.27 across sources; only the 1.25 is attributable to a reference I hold, so the band states the spread and the source field names the one book rather than assigning an edge to an unnamed tabulation (the D-167 standard: a source field claiming a parameter-specific published span is exactly what this archive audits). The nominal is the band midpoint and is AUTHOR-CONSTRUCTED. Consequence-free like pKa_pyruvic: 3+ units below any modelled beer pH, so the first proton is off everywhere on the trajectory and either edge gives the same charge." }
   provenance:
-    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids), low edge; the 1.27 / 4.27 pair quoted in standard analytical tabulations, high edge."
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
     conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-181)"
     notes: "First dissociation of oxalic (ethanedioic) acid — the strongest dicarboxylic acid. Carried so the speciation is exact across the full [0, 14] solver bracket, not because beer ever visits this pH."
 
@@ -231,11 +242,11 @@ pKa_oxalic_2:
   value: 4.203
   unit: "pH units"
   tier: plausible
-  uncertainty: { low: 4.14, high: 4.266, note: "BOTH EDGES PRINTED and the spread is REAL, not a rounding: 4.14 is CRC's thermodynamic pKa2, 4.266 is the value tabulated in standard analytical references for the same constant — a 0.13-unit disagreement between two textbook sources for one number. The nominal is their midpoint and is AUTHOR-CONSTRUCTED. THIS IS THE ONE pKa OF THE FOUR THE PREDICTION IS SENSITIVE TO (see the block header): it is the only one inside the pH range a fermenting beer traverses, so unlike the other three the edges here are not interchangeable." }
+  uncertainty: { low: 4.14, high: 4.266, note: "A DESCRIBED SPREAD, NOT TWO ATTRIBUTED DIGITS (see pKa_oxalic_1 for the same reasoning). The constant is quoted 4.14-4.27 across sources — a real 0.13-unit disagreement rather than a rounding — and only the 4.14 is attributable to a reference I hold, so the band states the spread and the source field names that one book. The nominal is the band midpoint and is AUTHOR-CONSTRUCTED. PREDICTED TO BE THE CONSEQUENTIAL ONE AND MEASURED NOT TO BE (D-181 amendment): the whole band moves the predicted pH drop by 0.027 percentage points, because THIS model only traverses to pH 5.24 and oxalate therefore stays nearly fully dissociated at both edges. See the block header -- the argument was made about a real beer and tested against the model, and it should start biting once the model acidifies properly." }
   provenance:
-    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids), low edge; standard analytical-chemistry tabulations (the 1.27 / 4.27 pair), high edge."
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of organic acids)"
     conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to beer as an apparent constant (decision D-181)"
-    notes: "Second dissociation of oxalic acid, and the load-bearing pKa of this beat: it sits inside a fermenting beer's window, so oxalate's mean charge moves over the traverse and its removal is NOT a flat 2 eq/mol. Contrast pyruvic and oxalic-1, whose charge is pinned at full dissociation everywhere the model goes. D-180's pre-registration used the bare 4.14; this entry bands it across the two published values instead, which is why a corrected arm B is not bit-identical to that file's."
+    notes: "Second dissociation of oxalic acid. It sits inside the window a REAL beer traverses (4.78-4.90), which is why it was expected to be load-bearing -- but this model finishes at 5.24, so oxalate's mean charge barely moves and its removal is close to a flat 2 eq/mol after all. Measured, not assumed; see the uncertainty note. D-180's pre-registration used the bare 4.14, which is why a corrected arm B is not bit-identical to that file's."
 
 # -- The lumped peptide/polypeptide buffer (monoprotic site) — decision D-179 ----
 #
