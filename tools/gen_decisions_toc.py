@@ -297,6 +297,10 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"docstring",
             r"doc-rot",
             r"docs-only",
+            # The structure/plan docs and their maintenance conventions (D-184).
+            r"architecture",
+            r"structure map",
+            r"\bstale\b",
             r"\bhop",
             r"\bibu\b",
             r"\bboil",

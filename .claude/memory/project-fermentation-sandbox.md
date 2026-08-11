@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T18:05:35.359Z
+  modified: 2026-08-11T22:10:25.435Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -17,17 +17,21 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 [[feedback-batch-end-ritual]]). Distil the NEW block; **never evict an old prohibition to buy a line.**
 
 ## Where the records are
-- `docs/DECISIONS.md` — canonical archive, **~20.5k lines: never read it linearly.** Generated top block gives a
+- `docs/DECISIONS.md` — canonical archive, **tens of thousands of lines: never read it linearly.** Generated top block gives a
   subsystem cut, ordered list, and **correction map (⚠)**. **The ⚠ lives only in the index** — check a record's
   index row before trusting it. Append per `CLAUDE.md`'s `Corrects:`/`Flags:`, then `tools/gen_decisions_toc.py`
   (**edit `TOPIC_RULES` if a new record buckets nowhere**). **File is LF.**
-- `docs/ARCHITECTURE.md` (seams); `docs/plans/milestone-*.md` ("Active beat: sensory" header is **STALE**, closed  at D-95/D-98); `CLAUDE.md` (prime directives + archive conventions).
+- `docs/ARCHITECTURE.md` — **the structure map: where things live, what imports what. Rebuilt from measurement
+  at D-184** (it had gone 127 archive-commits stale). Counts are DERIVED — a snippet at its foot re-derives every
+  one; if they disagree the code is right. **Update it in the SAME commit** as any Process/slot/param-file/package
+  change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
+  the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-11)
+## Status (2026-08-12)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-183**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
-**1609**. Wine **94 slots** / beer **57**, `quinone` in both regardless of set; **three** oxidative
-sets (`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**.
+**D-184**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1609**. Most remaining
+work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
+do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
 `StateSchema.medium`. **Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
