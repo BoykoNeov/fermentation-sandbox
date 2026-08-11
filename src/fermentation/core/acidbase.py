@@ -50,7 +50,14 @@ mole at proton concentration ``h`` is a smooth (C∞) function of ``h``:
   * monoprotic (one pKa): ``α₁ = Ka/(Ka + h)`` → mean charge ``α₁`` (one −1 site);
   * diprotic (two pKas): with ``D = h² + Ka₁·h + Ka₁·Ka₂`` the species fractions are
     ``[H₂A] = h²/D``, ``[HA⁻] = Ka₁·h/D``, ``[A²⁻] = Ka₁·Ka₂/D``; mean charge magnitude
-    ``(1·Ka₁·h + 2·Ka₁·Ka₂)/D``.
+    ``(1·Ka₁·h + 2·Ka₁·Ka₂)/D``;
+  * **n-protic, n ≥ 3** (decision D-178): the same algebra generalised in
+    :func:`_polyprotic_terms`, added BESIDE the two fast paths above and dispatched to only
+    at ``len(pkas) >= 3`` — so wine, whose acids are all mono/diprotic, is reproduced to the
+    last bit. Needed for **citric acid** in beer's balance (triprotic, two pKas inside beer's
+    own pH window). NOT needed for phosphate, which this beat was opened on: see
+    :func:`_polyprotic_terms` for why phosphate buffers beer poorly and is very nearly a
+    no-op under an inverse-anchored cation.
 
 Because every term is a smooth, monotone function of pH and the cation/H⁺ terms are
 too, :func:`charge_residual` is monotonically decreasing in pH ⇒ a single smooth root;
@@ -110,8 +117,9 @@ class AcidSpec:
 
     ``molar_mass`` converts the state slot's g/L to mol/L; ``pka_param_names`` lists
     the parameter-store names of its pKa(s) — one entry for a monoprotic acid, two
-    (in ascending order pKa₁ < pKa₂) for a diprotic one. ``protons`` (= number of
-    pKas) is the maximum anion charge, used by :func:`titratable_acidity`.
+    (in ascending order pKa₁ < pKa₂) for a diprotic one, three for a triprotic one such as
+    beer's citric acid (decision D-178). ``protons`` (= number of pKas) is the maximum anion
+    charge, used by :func:`titratable_acidity`.
     """
 
     molar_mass: float
@@ -240,12 +248,51 @@ SO2_BINDING_READS: tuple[str, ...] = (
 # -- speciation ---------------------------------------------------------------
 
 
+def _polyprotic_terms(h: float, pkas: tuple[float, ...]) -> tuple[list[float], float]:
+    """Unnormalised species terms of an n-protic acid, and their sum — the n ≥ 3 path (D-178).
+
+    Added BESIDE the mono- and diprotic fast paths below, never in place of them. With
+    ``B₀ = 1`` and ``B_k = Ka₁·…·Ka_k`` the cumulative acidity products, the species
+    distribution of an n-protic acid has denominator ``D = Σ_{k=0..n} B_k·hⁿ⁻ᵏ`` and term
+    ``k`` (= the species carrying charge magnitude ``k``) equal to ``B_k·hⁿ⁻ᵏ``. So
+
+      * mean anion charge   = ``Σ_{k} k·term_k / D``   (:func:`mean_charge`)
+      * neutral fraction    = ``term₀ / D``            (:func:`neutral_fraction`)
+      * singly-ionised frac = ``term₁ / D``            (:func:`bisulfite_fraction`)
+
+    which is the SAME algebra the two fast paths spell out by hand — but accumulated in a
+    different order, so it is **not bitwise** equal to them. That is exactly why the fast
+    paths stay: wine's pH must be reproduced to the last bit, and dispatching wine's
+    mono/diprotic acids through this loop would perturb it in the last places.
+    ``tests/test_acidbase_polyprotic.py`` pins the agreement to a tolerance and pins the
+    fast paths as still-taken.
+
+    **Why n = 3 is needed at all.** Beer's charge balance carries **citric acid**, which is
+    triprotic with TWO pKas (3.13, 4.76) inside beer's own pH window — and citrate is named
+    by the source (Peyer 2017 §5.5, after Li 2016 / Coote & Kirsop 1976) as one of the
+    organic acids providing the majority of wort's buffering. Phosphate, the acid this beat
+    was opened on, is NOT why: its pKas (2.15 / 7.20) sit far outside beer's window, so it is
+    a poor buffer there and — under this module's inverse-anchored cation — very nearly a
+    no-op, since its charge is ~0.99 flat across pH 4.0–4.6 and the anchor absorbs it.
+    """
+    if not pkas:
+        raise ValueError("an acid needs at least one pKa")
+    n = len(pkas)
+    cumulative = 1.0
+    terms = [h**n]
+    for i, pka in enumerate(pkas, start=1):
+        cumulative *= 10.0 ** (-pka)
+        terms.append(cumulative * h ** (n - i))
+    return terms, sum(terms)
+
+
 def mean_charge(h: float, pkas: tuple[float, ...]) -> float:
     """Mean anion charge magnitude per mole of an acid at proton concentration ``h``.
 
     Henderson-Hasselbalch: ``pkas`` are the pKa value(s) in ascending order — one for a
     monoprotic acid (``α₁ = Ka/(Ka + h)``), two for a diprotic one (via the partition
-    ``D = h² + Ka₁·h + Ka₁·Ka₂``). Returns a value in ``[0, len(pkas)]`` that rises
+    ``D = h² + Ka₁·h + Ka₁·Ka₂``), **three or more via :func:`_polyprotic_terms`** (D-178,
+    citric acid in beer). Returns a value in ``[0, len(pkas)]`` that rises
     smoothly as ``h`` falls (higher pH ⇒ more dissociated ⇒ more negative charge).
     """
     if len(pkas) == 1:
@@ -256,7 +303,8 @@ def mean_charge(h: float, pkas: tuple[float, ...]) -> float:
         ka2 = 10.0 ** (-pkas[1])
         denom = h * h + ka1 * h + ka1 * ka2
         return float((ka1 * h + 2.0 * ka1 * ka2) / denom)
-    raise ValueError(f"only mono- and diprotic acids supported, got {len(pkas)} pKa(s)")
+    terms, denom = _polyprotic_terms(h, pkas)
+    return float(sum(k * term for k, term in enumerate(terms)) / denom)
 
 
 def neutral_fraction(h: float, pkas: tuple[float, ...]) -> float:
@@ -264,7 +312,8 @@ def neutral_fraction(h: float, pkas: tuple[float, ...]) -> float:
 
     The complement of :func:`mean_charge`'s dissociation: the undissociated H₂A (or HA)
     share. Monoprotic ``h/(h + Ka)``; diprotic ``h²/D`` with the same partition
-    ``D = h² + Ka₁·h + Ka₁·Ka₂``. Used by the molecular-SO₂ readout (decision D-22): the
+    ``D = h² + Ka₁·h + Ka₁·Ka₂``; n-protic ``hⁿ/D`` via :func:`_polyprotic_terms` (D-178).
+    Used by the molecular-SO₂ readout (decision D-22): the
     *molecular* (antimicrobial) fraction of free SO₂ is exactly the undissociated
     SO₂·H₂O share. Rises smoothly toward 1 as ``h`` rises (lower pH ⇒ more protonated).
     """
@@ -276,7 +325,8 @@ def neutral_fraction(h: float, pkas: tuple[float, ...]) -> float:
         ka2 = 10.0 ** (-pkas[1])
         denom = h * h + ka1 * h + ka1 * ka2
         return float(h * h / denom)
-    raise ValueError(f"only mono- and diprotic acids supported, got {len(pkas)} pKa(s)")
+    terms, denom = _polyprotic_terms(h, pkas)
+    return float(terms[0] / denom)
 
 
 def bisulfite_fraction(h: float, pkas: tuple[float, ...]) -> float:
@@ -284,7 +334,8 @@ def bisulfite_fraction(h: float, pkas: tuple[float, ...]) -> float:
 
     The middle species between :func:`neutral_fraction` (H₂A) and the fully-dissociated
     form: monoprotic ``Ka/(Ka + h)`` (= its only anion), diprotic ``Ka₁·h/D`` with the
-    same partition ``D = h² + Ka₁·h + Ka₁·Ka₂``. Used by the free/bound-SO₂ split (decision
+    same partition ``D = h² + Ka₁·h + Ka₁·Ka₂``, n-protic ``Ka₁·hⁿ⁻¹/D`` via
+    :func:`_polyprotic_terms` (D-178). Used by the free/bound-SO₂ split (decision
     D-28): the bisulfite HSO₃⁻ share of free SO₂ is the reactive nucleophile that binds
     acetaldehyde, so ``[HSO₃⁻] = free_SO₂ · bisulfite_fraction(pH)``. At wine pH (well above
     the sulfurous pKa₁ ≈ 1.81 and below pKa₂ ≈ 7.2) this is ~0.94–0.99 — nearly all free SO₂
@@ -298,7 +349,8 @@ def bisulfite_fraction(h: float, pkas: tuple[float, ...]) -> float:
         ka2 = 10.0 ** (-pkas[1])
         denom = h * h + ka1 * h + ka1 * ka2
         return float(ka1 * h / denom)
-    raise ValueError(f"only mono- and diprotic acids supported, got {len(pkas)} pKa(s)")
+    terms, denom = _polyprotic_terms(h, pkas)
+    return float(terms[1] / denom)
 
 
 # -- the charge balance -------------------------------------------------------

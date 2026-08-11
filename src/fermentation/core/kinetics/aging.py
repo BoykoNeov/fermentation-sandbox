@@ -800,7 +800,16 @@ class EsterHydrolysis(Process):
         # guards N >= 0, so h_factor stays finite even under a BDF Jacobian probe that pushes
         # cation_charge out of range — the derivative stays a total, bounded function of state.
         h_factor = 1.0
-        if "cation_charge" in schema:  # the wine pH-system marker (absent from the beer schema)
+        # Gated on `tartaric`, the slot this factor actually READS -- not on `cation_charge`
+        # as a stand-in for "is this wine" (decision D-178). The two coincided while beer had
+        # no pH system at all, and the moment beer gains an inverse-anchored `cation_charge`
+        # they stop coinciding: `_acid_catalysis_factor` slices `tartaric`, so the old gate
+        # would have opened on a beer state that has no such slot and RAISED -- not merely
+        # mis-modelled. Naming the gate for what it forbids also states the physics honestly:
+        # this is Ramey & Ough's TARTRATE catalysis (D-125), which is grape chemistry and does
+        # not transfer. Whether beer should get the bare [H+] backbone (D-124) instead of 1.0
+        # is a separate, measured question -- see the D-178 record; it is NOT decided here.
+        if "tartaric" in schema:
             ph = ph_of_state(y, schema, params)
             h_factor = _acid_catalysis_factor(y, schema, params, ph)
         rate = params["k_ester_hydrolysis"] * f_t * h_factor * excess  # g isoamyl acetate/L/h

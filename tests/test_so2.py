@@ -141,9 +141,25 @@ def test_neutral_fraction_diprotic_matches_monoprotic_at_wine_ph(so2_pka):
         assert mono == pytest.approx(1.0 / (1.0 + 10.0 ** (ph - pka1)), abs=1e-12)
 
 
-def test_neutral_fraction_rejects_triprotic():
-    with pytest.raises(ValueError, match="mono- and diprotic"):
-        acidbase.neutral_fraction(1e-3, (1.8, 7.2, 9.0))
+def test_neutral_fraction_accepts_triprotic_since_d178_but_so2_stays_diprotic():
+    """D-178 lifted the triprotic rejection this test used to pin — deliberately, not to go green.
+
+    The old assertion was ``pytest.raises(ValueError, match="mono- and diprotic")``. Beer's
+    charge balance needs triprotic **citric** acid, so the ceiling is gone and a 3-pKa tuple now
+    returns a real fraction. What is worth guarding here is unchanged and is what this test now
+    says: **sulfurous acid is DIPROTIC**, so the SO₂ readouts must keep taking the diprotic fast
+    path — if they ever started routing through the general branch, D-22's molecular-SO₂ curve
+    would shift in its last bits for no reason.
+    """
+    fraction = acidbase.neutral_fraction(1e-3, (1.8, 7.2, 9.0))
+    assert 0.0 <= fraction <= 1.0
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("SO2 speciation reached the general n-protic branch")
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(acidbase, "_polyprotic_terms", _boom)
+        acidbase.neutral_fraction(1e-3, (1.81, 7.2))  # must not raise
 
 
 # -- 5. molecular_so2 off a compiled scenario = free × fraction(solved pH) -----
@@ -310,12 +326,14 @@ def test_bisulfite_fraction_dominates_free_so2_at_wine_ph(so2_pka):
         neutral = acidbase.neutral_fraction(h, so2_pka)
         assert 0.93 < beta < 0.995
         assert neutral + beta == pytest.approx(1.0, abs=1e-3)  # sulfite ~1e-4 at wine pH
-    # monoprotic branch = α₁, and triprotic is rejected like the sibling fractions
+    # monoprotic branch = α₁. The triprotic REJECTION this line used to assert was lifted at
+    # D-178 (beer's citric acid is triprotic); a 3-pKa tuple now returns the singly-ionised
+    # share instead of raising. See test_neutral_fraction_accepts_triprotic_since_d178_but_so2
+    # _stays_diprotic for the guard that replaced it.
     assert acidbase.bisulfite_fraction(1e-3, (1.81,)) == pytest.approx(
         10.0**-1.81 / (10.0**-1.81 + 1e-3)
     )
-    with pytest.raises(ValueError, match="mono- and diprotic"):
-        acidbase.bisulfite_fraction(1e-3, (1.8, 7.2, 9.0))
+    assert 0.0 <= acidbase.bisulfite_fraction(1e-3, (1.8, 7.2, 9.0)) <= 1.0
 
 
 def test_binding_equilibrium_algebra_solves_and_conserves(so2_pka):
