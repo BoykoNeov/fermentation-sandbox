@@ -1,6 +1,6 @@
 ---
 name: feedback-a-cap-being-written-to-cannot-be-raised
-description: Before raising any threshold, check whether the measured value sits exactly AT it across commits — that means the cap sets the fill rate, so raising it is futile and the overflow just relocates
+description: Before raising any threshold, check whether the measured value sits exactly AT it across commits — that means the cap sets the fill rate, so raising it is futile, the overflow relocates, and the honest end state may be to delete the threshold and report the number instead
 metadata:
   type: feedback
 ---
@@ -21,6 +21,20 @@ the day the cap moved to 300**. Content does not land on a round number 13 times
 each raise reproduces the harm it was meant to undo. The number was never the defect; being a
 single poolable budget was. Raising it buys one beat and re-arms the same failure.
 
+**The sequel (D-177) is the part to remember: a per-item cap does NOT rescue a total.** Keeping
+300 as a "backstop" behind the new per-block check lasted 10 sessions. It re-pinned at **exactly
+300 on 8 of the last 9 commits** while **every block sat under cap** — the file was simultaneously
+the healthy shape the design described and glued to the ceiling, because a per-item cap bounds
+what each new item **ADDS** and nothing bounds **how many items there are**. At ~1 record/session
+× ~3.5 lines, any fixed total is reached every ~10 sessions, at any value. **Size the escape
+hatch before trusting it**: the licensed retirement move covered 18 blocks / 59 of 300 lines, but
+reading them, nearly all were prohibitions their corrector *sharpened* rather than replaced, so
+real recovery was 5–15 lines — the hatch could not pay for the check. **A derived cap is not the
+fix either** (8×blocks against a file running 3.8× can never fire: a guard that forbids nothing
+reads as coverage). **The end state is to delete the threshold and REPORT the number** — with
+nothing to hit, it cannot be a target; being always printed, it cannot be vacuous; and the
+judgement call goes back to a person instead of being trimmed to a round number.
+
 **How to apply:**
 - **Measure before tuning.** `git log` the file, print the metric per commit. A flat line at
   the cap value is the diagnosis; a rising line indifferent to the cap is a different disease
@@ -28,9 +42,15 @@ single poolable budget was. Raising it buys one beat and re-arms the same failur
 - **Move the pressure to shape, not size.** Cap the *per-item* footprint so the only way to
   comply is to distil the new item — eviction of an old one then cannot satisfy the check.
   Cap **blocks/paragraphs, not just list items**, or the content re-types itself one level in.
-- **Enumerate every surface the budget covers** before capping one, and don't overstate
-  what a cap covers: `CLAUDE.md` is a boot surface and is unmeasured, and `MEMORY.md` is
-  capped per **row**, so row **count** is still an open channel.
+- **Enumerate every surface the budget covers** before capping one, and don't overstate what a
+  cap covers. Both named gaps proved real: `CLAUDE.md` was the unmeasured third boot surface and
+  had grown 66 → 138 lines (+30 the day the memory cap moved), now measured at D-177 with a cap
+  sized from **its own** distribution — importing the memory file's 8 would have fired on
+  legitimate documentation prose [[feedback-name-guards-for-what-they-forbid]]. `MEMORY.md` is
+  capped per **row**, so row **count** is still open (5 → 40).
+- **Say what the guard cannot see.** D-177's block cap would NOT have caught the +30-line day it
+  was written for — that arrived as two ~10-line blocks, and catching it needs a growth rate a
+  PostToolUse hook has no history for [[feedback-conceded-caveats-are-not-coverage]].
 - **Run the criterion that licenses the cut.** "It's held losslessly elsewhere" justified
   every measurement dropped and was asserted three times before being checked
   [[feedback-conceded-caveats-are-not-coverage]]. 20 of 20 sampled figures were present —

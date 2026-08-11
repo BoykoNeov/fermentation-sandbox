@@ -12,9 +12,9 @@ metadata:
 
 **Session-boot context: PROHIBITIONS and POINTERS only** — not a changelog. Every bullet is *what it forbids* +
 the D-record to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue past
-it from this file.** **Caps: 8 lines per BLOCK, 320 chars per `MEMORY.md` index row, 300 lines total as a
-BACKSTOP** (`.claude/hooks/check_memory_size.py`, D-169; [[feedback-batch-end-ritual]]). Distil the NEW block;
-**never evict an old prohibition to buy a line** — the per-block cap exists so eviction cannot satisfy it.
+it from this file.** **Caps: 8 lines per BLOCK here, 14 per block in `CLAUDE.md`, 320 chars per `MEMORY.md`
+index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_memory_size.py`;
+[[feedback-batch-end-ritual]]). Distil the NEW block; **never evict an old prohibition to buy a line.**
 
 ## Where the records are
 - `docs/DECISIONS.md` — canonical archive, **~20.5k lines: never read it linearly.** Generated top block gives a
@@ -288,13 +288,16 @@ yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-5
 in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142); **`add_copper` never writes the `copper` slot** (needs a residual-Cu fraction); D-143/4 ← D-145.
 
 ## Standing rule
-- **NEVER raise the total cap again without first showing the per-block cap did not bite (D-169).** It was a
-  **TARGET, not a limit**: the file sat at **exactly 250 for 13 consecutive commits / 12 days**, then took **47 of
-  the next 50 lines the day it moved to 300** — the fill rate followed the cap, so all four raises were futile.
-  Total is now a **BACKSTOP**; **shape** binds. **When it binds, the licensed move is ⚠-COLLAPSE RETIREMENT** —
-  a record superseded per the correction map drops to a pointer — **never a raise, never eviction**. A
-  **digit-density check was REJECTED on measurement** (confounded by block size; it penalises hardest the
-  guardrails that are nothing but corrected values). **`CLAUDE.md` is a boot surface and is UNMEASURED**, and
-  `MEMORY.md` is capped **per row, not in total** — row COUNT is the open channel; expect displacement there.
+- **NEVER put a whole-file line cap back (D-177, corrects D-169).** Raised 4× (150→300), then **REMOVED, not
+  raised a 5th**: at 300 the file **re-pinned — exactly 300 on 8 of 9 commits — with shape GREEN everywhere**,
+  because a per-block cap bounds what each record **ADDS**, and nothing bounds **how many**. D-169's licensed
+  ⚠-COLLAPSE RETIREMENT **cannot pay for it** — 18 blocks / **59 lines** cite only corrected records but nearly
+  all are prohibitions their corrector **SHARPENED**, so recovery is **5-15 lines** (1-4 sessions). A **DERIVED**
+  total (8×blocks) is **VACUOUS** (the file runs ~3.8×). Totals are now **REPORTED**: no threshold ⇒ no target.
+  A **digit-density check was REJECTED on measurement** (reads block SIZE; penalises corrected-value guardrails).
+- **`CLAUDE.md` is now MEASURED too** (14 lines/block, its own shape — 8 would fire on real docs). It grew
+  **66→138 lines**, **+30 the day the memory cap moved**, and now carries prohibitions. **Still open channels:
+  the GLOBAL `CLAUDE.md`** (outside the repo, out of scope) and **`MEMORY.md` row COUNT** (5→40 rows, +1/record).
+  **The hook cannot see growth RATE** — the +30 day arrived as two ~10-line blocks and would not fire.
 
 **Direction is the owner's call, every time** — ask before picking the next milestone/beat, offering only UNBLOCKED options (D-66, [[feedback-discuss-disagreements]]).

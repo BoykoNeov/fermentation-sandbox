@@ -276,6 +276,9 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"schema",
             r"tooling",
             r"\bindex\b",
+            # The session-boot surfaces and the hook that measures them (D-169, D-177).
+            r"\bmemory\b",
+            r"boot surface",
             r"docstring",
             r"doc-rot",
             r"docs-only",
