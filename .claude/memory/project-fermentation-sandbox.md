@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T15:32:25.432Z
+  modified: 2026-08-11T18:05:35.359Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -25,10 +25,10 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-11)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-182**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
-**1606**. Wine **94 slots** / beer **57**, `quinone` in both regardless of set; **three** oxidative
+**D-183**; `aging.py` 24 Processes, sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite
+**1609**. Wine **94 slots** / beer **57**, `quinone` in both regardless of set; **three** oxidative
 sets (`direct` default/`cascade`/`direct_burst`). Most remaining work is **blocked on external sourcing**.
-**Beer acid-base = FIVE beats (D-178 solver → D-182 CO2); BOTH of D-180's omitted terms BUILT.**
+**Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
 `StateSchema.medium`. **Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
 
@@ -272,6 +272,20 @@ surface (which bands exist) = D-153/D-156; the **assertion** surface (constraint
   corner of TWO bands** (flips at **+3.6 % ethanol**; 0 of 180 members reach it), **never an impossibility**;
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
+
+**Beer acid-base, part 6 — acetic's RATE LAW (D-183). The SPIKE is still NOT modelled.**
+- **NEVER re-propose the keto-acid excretion/re-assimilation pair for acetic** (D-180 §9's own
+  proposal): the figure INTERIORS refute BOTH halves — 86 % of the rise in the first **15 %** of the
+  flux, and **half the fall at ZERO flux**. Removal REFUSED on measurement: fit gaps all under the
+  ±3 ppm read tol, floor **unidentifiable** (mean fits the bound at 0), endpoint would be
+  **horizon-dependent** (108/65/20/**0** ppm at d7/14/30/400). Unlock = a 2nd wort's time course.
+- Acetic LEFT `ORGANIC_ACID_SPECS` (now **3**) for growth-linked `AceticAcidOverflow`; modifier moved
+  `for_uptake`→**`for_growth`** (mis-move is SILENT at 15 °C). Shipped curve **MONOTONE, asserted**;
+  RMSE 61.6→32.5 only fixes *when*. **`Y_acetic_sugar_beer` was NEVER a measured yield** — retired,
+  kept as the counterfactual [[feedback-a-derived-yield-encodes-its-rate-law]]. Joint band **10 dims,
+  59049 corners**, in the SHIPPING commit. Headline **77.8-97.3 %**: +0.2 pp, PRE-REGISTERED and
+  **headline-neutral by construction** (0.1233 pp/ppm) — never credit it. Endpoint scaling moved
+  **gravity → YAN**; neither direction is measured.
 
 **Beer acid-base, part 5 — dissolved CO2 (D-182). Both omitted terms BUILT; do not re-open.**
 - **NEVER read the `CO2` slot as dissolved** — it is cumulative EVOLVED GAS (~40 g/L beer, ~100 wine, vs

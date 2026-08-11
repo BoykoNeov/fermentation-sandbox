@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: eda906e6-10f9-4458-bce2-c2bce96f3ec9
-  modified: 2026-08-11T14:04:40.693Z
+  modified: 2026-08-11T18:05:03.813Z
 ---
 
 When a beat looks **blocked on an external number**, re-read the sources already on disk
@@ -19,6 +19,15 @@ authors' **own trials**, whose figures carry one wort's full day-0-to-day-7 acid
 four strains, **plus the pH and extract curves of the same ferments**. That single re-read
 supplied the seeds, the yields, the sugar divisor, **and** an independent falsification
 target — a matched dataset better than anything the archive had for the axis.
+
+**The second case (D-183) sharpens it: not only other FIGURES — the INTERIORS of the figures
+you already used.** D-180 read Figs 6-14 and Fig 4 for **two points each**, day 0 and day 7,
+because a yield is a difference. Three beats later the *interiors* of those same archived crops
+falsified **both halves** of the fix D-180 had proposed for acetic's transient: mapping the
+acid course onto the extract course puts 86 % of the rise inside the first 15 % of the sugar
+flux (production not flux-linked), and half the fall at **zero** flux (removal not flux-linked
+either). Endpoints give you **sizes**; interiors give you **rate laws** — and a beat that only
+needs sizes never notices it is assuming one [[feedback-a-derived-yield-encodes-its-rate-law]].
 
 **Why:** a paper gets mined for the one thing you went looking for. Tables are what a search
 surfaces and what [[feedback-transcribe-tables-not-prose]] trains you to prefer, so a
