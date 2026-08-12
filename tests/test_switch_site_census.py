@@ -355,9 +355,13 @@ def test_a_nominal_sitting_on_a_band_edge_cannot_be_classified_by_an_edge_screen
     §26.2.4.1 prints ">95 % of original value" — a floor with no ceiling but the physical
     1.0, the mirror image of ``bottling_burst_screwcap``'s published ceiling with no floor.
     The midpoint 0.975 was considered and rejected on the same grounds as the two entries
-    above: it would invent a central estimate no source contains, to satisfy a harness. This
-    one IS reached by the sampler (the verb reads it at compile), so it is a live case, not a
-    dead one — screen it over the band interior."""
+    above: it would invent a central estimate no source contains, to satisfy a harness. Like
+    ``bottling_burst_screwcap`` it is **compile-consumed and NOT sampler-reachable** — the verb
+    resolves ``.value`` at compile and the ``mutate`` closure captures a plain float, so the
+    draw cannot reach the credited copper. Measured, not argued: forcing it through the D-159
+    harness draws two distinct values (0.9699, 0.9573) and still returns ``max|dy| == 0.0``,
+    in the same scenario where ``k_copper_multiplier`` moves 1.27e-2 and ``mu_max`` 42.4. That
+    is pinned in ``test_residual_copper_fining.py``, not merely asserted here."""
     wine_on_edge = _on_edge(_wine())
     assert wine_on_edge == {
         "f_non_ehrlich_phenylalanine",

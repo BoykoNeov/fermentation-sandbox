@@ -110,6 +110,13 @@ copper_mercaptan_binding:
 # construction and would cost the tier). A band-edge sweep will therefore find the low arm
 # BITWISE IDENTICAL to nominal — that is arithmetic, not inertness (the D-164 trap).
 #
+# THE BAND IS DOCUMENTATION, NOT PROPAGATED UNCERTAINTY (D-191 amendment). This parameter is
+# COMPILE-CONSUMED: the add_copper verb resolves .value when the scenario compiles and its mutate
+# closure captures a plain float, so an ensemble perturbing the parameter dict CANNOT move the
+# credited copper. Measured: forcing the name draws two distinct values (0.9699, 0.9573) and still
+# returns max|dy| == 0.0, in a scenario where k_copper_multiplier moves 1.27e-2. It is
+# test_drawability_surface's class 2 (the _closure_otr shape), like bottling_burst_screwcap.
+#
 # WHAT THE WHOLE BAND IS WORTH: f_copper = 1 + 0.3*r at a 0.5 mg/L dose, so the band spans
 # 1.285-1.300 — 1.5 points of a ~30-point effect. The COUPLING is the finding here; where the
 # nominal sits inside the band is not, and is not worth re-litigating.

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 42d75f5f-6caf-4f0a-904b-2781dd61f15c
-  modified: 2026-08-12T07:18:03.101Z
+  modified: 2026-08-12T07:24:50.716Z
 ---
 
 **Live prohibitions — residual copper after fining.** Split out at D-185's pattern; the status
@@ -28,6 +28,12 @@ it as unbuilt, and do not "restore" the removal-only behaviour.**
   nominal: arithmetic, not inertness. It is in `test_switch_site_census`'s exact set **with all
   three `add_copper` parameters**, each there for one shared reason — one sourced edge, one
   constructed edge, no interior any source vouches for.
+- **The band is DOCUMENTATION, not propagated uncertainty (D-191 amd).** The parameter is
+  **COMPILE-CONSUMED** — the verb resolves `.value` at compile and `mutate` captures a float, so
+  an ensemble **cannot** move the credited copper: distinct draws (0.9699, 0.9573) still give
+  `max|dy| == 0.0` where `k_copper_multiplier` moves 1.27e-2. Class 2, the `_closure_otr` shape.
+  **Never derive an `f_copper` interval from this band.** The record's first version claimed the
+  OPPOSITE, justified by a parenthetical that refuted it — now PINNED as a test, not a docstring.
 - **Clark et al. 2015 is RENDERED, NOT READ** — the >95 % is UWC's rendering of it. Never cite it
   as agreeing or disagreeing beyond the sentence UWC prints (the D-190 amendment's rule).
 - **The sulfide half is MEASURED and NOT BUILT — do not call it a caveat and do not build it

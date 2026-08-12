@@ -26082,3 +26082,62 @@ suite/ruff/mypy arms. `tests/test_residual_copper_fining.py` (8 tests); `tests/t
 (one test renamed and widened, two added); `tests/test_switch_site_census.py` (census set + rationale);
 `tests/test_drawability_surface.py` (two stale docstrings); `parameters/data/additions.yaml`;
 `scenario/compile.py`; `core/media.py`; `docs/ARCHITECTURE.md` test-file count.
+
+### AMENDED, same day — the census docstring claimed the sampler reaches this parameter, and it does not
+
+Caught in review after the commit, and appended rather than edited in place (the D-147/D-149/
+D-187/D-190 precedent). **Neither item touches a measurement or a shipped value.**
+
+**1. §3's new census entry said the wrong thing about samplability, in a sentence that contradicts
+itself.**
+
+The `test_switch_site_census` docstring this record added claimed: *"This one IS reached by the
+sampler (the verb reads it at compile), so it is a live case, not a dead one."* The parenthetical
+refutes the claim it is offered as support for. **Reading at compile is exactly what makes a value
+unreachable**: `_verb_add_copper` resolves `.value` when the scenario compiles, and the `mutate`
+closure captures `residual_fraction` as a plain float, so an ensemble perturbing the parameter dict
+cannot change the credited copper. This is `test_drawability_surface`'s **class 2
+(compile-consumed)**, the `_closure_otr` shape — and the paragraph *directly above* the new one
+says of `bottling_burst_screwcap`: "not reached by any Process — the value seeds an event dose, so
+no sampler draws it." Same class, opposite claim, adjacent paragraphs.
+
+**Measured rather than reasoned about, on the fining scenario, with both halves the D-159 harness
+demands:**
+
+| forced name | distinct draws | `max｜dy｜` |
+|---|---|---|
+| `copper_fining_residual_fraction` | 0.969874, 0.957274 | **0.000000e+00** |
+| `k_copper_multiplier` | 543.387, 423.479 | 1.269287e-02 |
+| `mu_max` | 0.168767, 0.105516 | 4.237788e+01 |
+
+The draw genuinely varied and the run still did not move, in the same scenario where the multiplier
+this parameter feeds moves — so the zero is consumption, not a dead harness.
+
+**The honest consequence is a scope limit worth stating plainly: the retention band is
+documentation, not propagated uncertainty.** Its width tells a reader what the source does and does
+not pin; it does not reach any output through the ensemble machinery, so no `f_copper` interval is
+derivable from it. Corrected in the census docstring and in `additions.yaml`, and — because a
+docstring is a claim rather than a guard — **pinned as a test**
+(`test_the_retention_band_is_not_propagated_by_the_sampler`), which asserts the identity AND
+carries `k_copper_multiplier` as its positive control.
+
+**2. One isolability test could not support its name.**
+
+`test_a_wine_that_is_never_fined_is_byte_for_byte_the_pre_d191_model` compiled the *same* unfined
+scenario twice and asserted the trajectories matched. Both arms carry this change, so it was a
+solver-determinism check: it would have stayed green through the exact regression it names — a
+credit firing on unfined wines. Replaced with the two things that can actually fail: **no scheduled
+event mutates `copper`**, and the slot holds `copper_typical` across the **whole** run rather than
+only at the end. Renamed to `test_a_wine_that_is_never_fined_has_no_event_that_could_write_the_slot`.
+
+**3. The suite baseline, so nobody re-derives it.** This beat's 1694 is measured against **D-190's
+amended 1684**, not the **1687** the memory row carried: 1684 + 10 new tests = 1694. The 1687 was
+already stale when this beat started and has been replaced. Suite after this amendment:
+**1695 passed / 3 xfailed** (the new samplability pin).
+
+**The lesson landing on this record is §10 turned on itself.** §10 says an omission justified by a
+mechanism welds a world-claim onto a scope decision, where nobody re-reads it as a claim. Item 1 is
+the same shape one level up: a *census* entry justified by a parenthetical, where the parenthetical
+was the evidence *against* the sentence and no assert existed to catch it. The census had a
+neighbouring entry with the correct classification of the identical structure. Writing a claim next
+to its own counter-example is not enough; only running it is.

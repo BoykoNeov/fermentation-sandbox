@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 from fermentation.parameters import default_data_dir, load_parameters
+from fermentation.runtime import simulate_ensemble
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 
 _FERMENT_DAYS = 30.0
@@ -183,13 +184,66 @@ def test_the_finite_oxygen_dose_bounds_how_brown_the_wine_can_get():
 # -- isolability (prime directive #3) ------------------------------------------
 
 
-def test_a_wine_that_is_never_fined_is_byte_for_byte_the_pre_d191_model():
-    """No ``add_copper`` ⇒ nothing writes the slot ⇒ the D-132/D-133 rate is untouched."""
-    a = compile_scenario(_wine(fined=False)).run()
-    b = compile_scenario(_wine(fined=False)).run()
-    assert np.array_equal(a.y, b.y)
+def test_a_wine_that_is_never_fined_has_no_event_that_could_write_the_slot():
+    """No ``add_copper`` ⇒ no event writes ``copper`` ⇒ the D-132/D-133 rate is untouched.
+
+    Checks the two things that can actually fail: no scheduled event mutates the slot, and the
+    slot holds ``copper_typical`` end to end. An earlier draft compiled the same unfined
+    scenario TWICE and asserted the trajectories matched — which is a solver-determinism check,
+    not an isolability one: both arms carry this change, so it would have stayed green through
+    the very regression its name claims to guard (a credit firing on unfined wines).
+    """
     cs = compile_scenario(_wine(fined=False))
-    assert float(a.series("copper")[-1]) == cs.param_values["copper_typical"]
+    traj = cs.run()
+    assert not any(e.label.startswith("add_copper") for e in cs.events)
+
+    typical = cs.param_values["copper_typical"]
+    copper = np.asarray(traj.series("copper"), dtype=np.float64)
+    # Constant at the multiplier's neutral point for the WHOLE run, not merely at the end.
+    assert np.all(copper == typical)
+
+
+def test_the_retention_band_is_not_propagated_by_the_sampler():
+    """A scope limit, pinned rather than asserted in prose: the band's width is documentation.
+
+    ``copper_fining_residual_fraction`` is **compile-consumed** — ``_verb_add_copper`` resolves
+    ``.value`` when the scenario compiles and the ``mutate`` closure captures a plain float, so
+    an ensemble that perturbs the parameter dict cannot move the credited copper. This is
+    ``test_drawability_surface``'s class 2 (the ``_closure_otr`` shape), and it means the
+    uncertainty band does NOT reach any output through the ensemble machinery.
+
+    Two assertions, because either alone passes for the wrong reason: the draw must genuinely
+    happen (distinct values), and a Process-read parameter must MOVE in the same harness, or
+    "identical" cannot be told from a harness that perturbed nothing (the D-157 denominator).
+    """
+    compiled = compile_scenario(_wine(fined=True))
+    forced = simulate_ensemble(
+        compiled.process_set,
+        compiled.parameters,
+        compiled.y0,
+        compiled.t_span_h,
+        n_members=2,
+        seed=0,
+        only=["copper_fining_residual_fraction"],
+        events=compiled.events,
+    )
+    assert "copper_fining_residual_fraction" in forced.sampled_names
+    drawn = [float(m["copper_fining_residual_fraction"]) for m in forced.member_params]
+    assert len(set(drawn)) == 2, f"the draw did not vary: {drawn}"
+    assert np.array_equal(forced.members[0], forced.members[1])
+
+    # POSITIVE CONTROL, same harness and scenario: the multiplier this parameter feeds DOES move.
+    control = simulate_ensemble(
+        compiled.process_set,
+        compiled.parameters,
+        compiled.y0,
+        compiled.t_span_h,
+        n_members=2,
+        seed=0,
+        only=["k_copper_multiplier"],
+        events=compiled.events,
+    )
+    assert not np.array_equal(control.members[0], control.members[1])
 
 
 def test_beer_has_no_copper_slot_so_fining_only_removes_sulfide():
