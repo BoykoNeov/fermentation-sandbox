@@ -651,17 +651,55 @@ def test_add_copper_does_not_strip_a_negative_undershoot():
     assert float(ev.mutate(schema, y)[h2s][0]) == pytest.approx(-1.0e-9, rel=1e-12)
 
 
-def test_add_copper_lands_on_h2s_and_books_one_flow():
+def test_add_copper_lands_on_h2s_and_copper_and_books_one_flow():
     cs = compile_scenario(_wine([_copper(5.0, 0.5)]))
     traj = cs.run()
     assert len(traj.external_flows) == 1
     flow = traj.external_flows[0]
     assert flow.label == "add_copper@5d"
     schema = cs.schema
-    # Removal only: the h2s delta is ≤ 0 (copper never adds H₂S) and EVERY other slot delta is 0.
+    # The h2s delta is ≤ 0 (copper never ADDS H₂S) and the copper delta is > 0 (D-191: the dose
+    # stays in the wine). Those are the only two slots this verb may touch on a default wine —
+    # methanethiol is empty with autolysis off, so its removal is exactly 0 here.
     assert flow.delta[schema.slice("h2s")][0] <= 0.0
-    others = np.delete(flow.delta, schema.slice("h2s").start)
+    assert flow.delta[schema.slice("copper")][0] > 0.0
+    others = np.delete(
+        flow.delta, [schema.slice("h2s").start, schema.slice("copper").start]
+    )
     assert np.count_nonzero(others) == 0
+
+
+def test_add_copper_leaves_the_sourced_residual_share_in_the_wine():
+    """D-191: fining does not remove the copper — >95 % of the dose stays dissolved.
+
+    Pins the arithmetic against the PARAMETER rather than a literal, so a re-sourcing of
+    ``copper_fining_residual_fraction`` moves this test with it; the separate band test below is
+    what pins the sourced edge itself.
+    """
+    cs = compile_scenario(_wine([_copper(5.0, 0.5)]))
+    traj = cs.run()
+    schema = cs.schema
+    retained = cs.param_values["copper_fining_residual_fraction"]
+    background = cs.y0[schema.slice("copper")][0]
+    dosed_gpl = 0.5e-3  # 0.5 mg/L Cu in canonical g/L
+
+    # The slot ACCUMULATES onto the grape/must background rather than being set to the dose.
+    assert traj.y[schema.slice("copper"), -1][0] == pytest.approx(
+        background + retained * dosed_gpl, rel=1e-12
+    )
+    # And the background is copper_typical, so before the fining f_copper was exactly 1.
+    assert background == pytest.approx(cs.param_values["copper_typical"], rel=1e-12)
+
+
+def test_repeated_finings_accumulate_copper():
+    """Two doses leave twice the copper: the verb credits, it does not set."""
+    once = compile_scenario(_wine([_copper(5.0, 0.5)]))
+    twice = compile_scenario(_wine([_copper(5.0, 0.5), _copper(6.0, 0.5)]))
+    schema = once.schema
+    background = once.y0[schema.slice("copper")][0]
+    gained_once = once.run().y[schema.slice("copper"), -1][0] - background
+    gained_twice = twice.run().y[schema.slice("copper"), -1][0] - background
+    assert gained_twice == pytest.approx(2.0 * gained_once, rel=1e-12)
 
 
 def test_add_copper_perturbs_neither_carbon_nor_nitrogen():

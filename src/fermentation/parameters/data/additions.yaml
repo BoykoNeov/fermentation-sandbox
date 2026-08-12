@@ -35,16 +35,26 @@ dap_nitrogen_fraction:
 # -- Copper H2S-binding capacity (add_copper verb, decision D-44) ----------------------------
 #
 # Copper fining (copper sulfate) is the standard remediation for a reductive (H2S) fault: Cu(2+)
-# precipitates dissolved sulfide as insoluble copper sulfide (Cu2+ + H2S -> CuS(s) + 2 H+), a 1:1
-# molar reaction, and the CuS drops out with the lees. The add_copper verb doses copper by mass
-# (copper_mgl, mg/L Cu, the industry unit) and converts to the mass of H2S it can bind via this
-# factor; the verb then removes min(h2s_present, capacity) from the h2s pool (copper in excess
-# simply removes all dissolved H2S — the real "clears reduction" outcome). H2S is carbon-free, so
-# the removal perturbs neither elemental ledger (the add_so2 precedent). SCOPE (v1): the removal
-# lever only — RESIDUAL copper (excess Cu left in the wine, a haze/toxicity concern with its own
-# legal limit) is NOT tracked, and copper binding of MERCAPTANS (the other reductive off-aroma) is
-# deferred with the mercaptan pool (decision D-44). M(H2S) = 34.076 g/mol, M(Cu) = 63.546 g/mol =>
-# stoichiometric ceiling 34.076/63.546 = 0.536 g H2S bound / g Cu.
+# binds dissolved sulfide as copper sulfide (Cu2+ + H2S -> CuS + 2 H+), a 1:1 molar reaction. The
+# add_copper verb doses copper by mass (copper_mgl, mg/L Cu, the industry unit) and converts to the
+# mass of H2S it can bind via this factor; the verb then removes min(h2s_present, capacity) from
+# the h2s pool (copper in excess simply removes all dissolved H2S — the real "clears reduction"
+# outcome). H2S is carbon-free, so the removal perturbs neither elemental ledger (the add_so2
+# precedent). M(H2S) = 34.076 g/mol, M(Cu) = 63.546 g/mol => stoichiometric ceiling
+# 34.076/63.546 = 0.536 g H2S bound / g Cu.
+#
+# D-191 CORRECTS TWO CLAIMS THIS BLOCK USED TO MAKE. (1) "the CuS drops out with the lees" is the
+# pre-2015 account, and Understanding Wine Chemistry 2nd ed. Ch. 24 names it as such: "it was
+# INCORRECTLY ASSUMED in older textbooks that similar losses would occur in wine following addition
+# of copper salts" — the products are Cu(I)-sulfhydryl nanoparticles that stay DISPERSED, so
+# nothing settles and §26.2.4.1 concludes "copper additions are not necessarily a 'fining'
+# operation, as the copper remains in solution, albeit in a different form". (2) "RESIDUAL copper
+# ... is NOT tracked" is no longer true: copper_fining_residual_fraction below credits the dosed
+# copper to the `copper` slot, which is PhenolicBrowning's mean-centred multiplier input (D-134).
+# The sulfide-removal arithmetic above is UNCHANGED by both — the odour still goes; what changes is
+# that the metal now stays behind and catalyses oxidation, which is the trade-off UWC Table 26.2.1
+# prints as the cost of this treatment ("Residual copper, reappearance of off aromas, wine
+# oxidation, haze formation").
 copper_h2s_binding:
   value: 0.536
   unit: "g/g"   # g H2S bound per g copper (Cu), stoichiometric CuS (1:1 mol)
@@ -53,7 +63,7 @@ copper_h2s_binding:
   provenance:
     source: "stoichiometry of copper sulfide precipitation Cu2+ + H2S -> CuS(s) + 2 H+ (1:1 mol); the standard copper-fining remediation for reductive H2S (general enology; Rankine)"
     conditions: "copper(II) fining of dissolved H2S in wine; g H2S bound per g Cu dosed, at (idealised) stoichiometric completion"
-    notes: "Read by the add_copper verb to convert a copper dose (copper_mgl) into the H2S mass it removes. M(H2S) = 34.076, M(Cu) = 63.546 => 34.076/63.546 = 0.536 g H2S/g Cu at 1:1 stoichiometry. VALUE sits at the stoichiometric ceiling (near-complete binding, the demonstration lever); tier PLAUSIBLE (not validated like dap_nitrogen_fraction) because real copper fining is NOT perfectly stoichiometric — the 1:1-and-complete assumption is a model idealisation, banded down for imperfect efficiency. Residual copper is untracked (v1 scope, decision D-44)."
+    notes: "Read by the add_copper verb to convert a copper dose (copper_mgl) into the H2S mass it removes. M(H2S) = 34.076, M(Cu) = 63.546 => 34.076/63.546 = 0.536 g H2S/g Cu at 1:1 stoichiometry. VALUE sits at the stoichiometric ceiling (near-complete binding, the demonstration lever); tier PLAUSIBLE (not validated like dap_nitrogen_fraction) because real copper fining is NOT perfectly stoichiometric — the 1:1-and-complete assumption is a model idealisation, banded down for imperfect efficiency. D-191: residual copper is NO LONGER untracked (copper_fining_residual_fraction), and the band's 'colloidal CuS re-dissolution' clause now has a named mechanism — the complexes never left solution in the first place. This factor is unchanged: how much SULFIDE a gram of copper binds is a separate question from where the copper ends up."
 
 # -- Copper mercaptan-binding capacity (add_copper verb, decision D-45) ----------------------
 #
@@ -76,7 +86,42 @@ copper_mercaptan_binding:
   provenance:
     source: "stoichiometry of copper mercaptide precipitation Cu2+ + 2 RSH -> Cu(SR)2(s) + 2 H+ (1:2 mol); copper fining of reductive thiols (general enology; Rankine). The incompleteness/disulfide caveat: copper is an imperfect mercaptan fix (Swiegers et al. 2005; Ugliano volatile-sulfur reviews)"
     conditions: "copper(II) fining of dissolved mercaptans (methanethiol stand-in) in wine; g MeSH bound per g Cu, bound with copper LEFT after H2S, at (idealised) stoichiometric completion"
-    notes: "Read by the add_copper verb (D-45) to convert leftover copper into the mercaptan mass it removes. M(MeSH) = 48.107, M(Cu) = 63.546, Cu(SR)2 is 1 Cu : 2 thiol => 2*48.107/63.546 = 1.514 g MeSH/g Cu. VALUE at the stoichiometric ceiling (the user-chosen stoichiometric lever); tier PLAUSIBLE and banded DOWN HARDER than copper_h2s_binding because real copper fining is notably less complete for mercaptans than for sulfide and cannot touch the disulfides they oxidise to. Residual copper is untracked (v1 scope, decision D-45)."
+    notes: "Read by the add_copper verb (D-45) to convert leftover copper into the mercaptan mass it removes. M(MeSH) = 48.107, M(Cu) = 63.546, Cu(SR)2 is 1 Cu : 2 thiol => 2*48.107/63.546 = 1.514 g MeSH/g Cu. VALUE at the stoichiometric ceiling (the user-chosen stoichiometric lever); tier PLAUSIBLE and banded DOWN HARDER than copper_h2s_binding because real copper fining is notably less complete for mercaptans than for sulfide and cannot touch the disulfides they oxidise to. D-191: residual copper is NO LONGER untracked (copper_fining_residual_fraction); this binding factor is unchanged."
+
+# -- Residual copper left in the wine by fining (add_copper verb, decision D-191) -------------
+#
+# Copper fining does not remove the copper. Understanding Wine Chemistry 2nd ed. §26.2.4.1 measures
+# it: commercial white wines adjusted to 1 mg/L Cu with equimolar H2S kept "essentially unchanged
+# Cu content (>95% of original value)" through FILTERING or 5 days storage AND racking — the two
+# operations that would remove a precipitate — and concludes "copper additions are not necessarily
+# a 'fining' operation, as the copper remains in solution, albeit in a different form". Ch. 24
+# gives the form: Cu(I)-sulfhydryl nanoparticles (<100 nm) whose growth and precipitation is
+# INHIBITED by wine components such as glutathione. The older "it precipitates out with the lees"
+# account is named in that chapter as an incorrect assumption carried by older textbooks.
+#
+# WHY THE MODEL CARES: `copper` is PhenolicBrowning's mean-centred multiplier input (D-134), so
+# crediting the dose makes fining carry its real oxidative cost — the trade-off UWC Table 26.2.1
+# prints for this treatment. At the 0.5 mg/L dose the test suite uses, f_copper goes 1.000 -> 1.285.
+#
+# THE TWO BAND EDGES HAVE DIFFERENT STATUS, and a future sweep must not read them as symmetric:
+#   low  0.95 = PRINTED (">95% of original value", the only number the source states)
+#   high 1.00 = CONSTRUCTED (you cannot retain more copper than you dosed; a hard physical ceiling)
+# The VALUE sits ON the low edge, deliberately (it is the printed literal; 1.0 would be an author
+# construction and would cost the tier). A band-edge sweep will therefore find the low arm
+# BITWISE IDENTICAL to nominal — that is arithmetic, not inertness (the D-164 trap).
+#
+# WHAT THE WHOLE BAND IS WORTH: f_copper = 1 + 0.3*r at a 0.5 mg/L dose, so the band spans
+# 1.285-1.300 — 1.5 points of a ~30-point effect. The COUPLING is the finding here; where the
+# nominal sits inside the band is not, and is not worth re-litigating.
+copper_fining_residual_fraction:
+  value: 0.95
+  unit: "g/g"   # g Cu remaining dissolved per g Cu dosed (dimensionless retained fraction)
+  tier: plausible
+  uncertainty: { low: 0.95, high: 1.0, note: "0.95 is PRINTED ('>95% of original value' retained through filtering or 5 d storage + racking); 1.0 is CONSTRUCTED — the physical ceiling, since a dose cannot be more than fully retained. The source states no loss it could resolve, so the true value lies in (0.95, 1.0] and the band is one-sided by construction: it CANNOT be widened downward without contradicting the measurement, and cannot be widened upward at all. Real cellars do have slow copper sinks (lees adsorption, bentonite, ferrocyanide) but those are separate operations on longer timescales, not part of this event." }
+  provenance:
+    source: "Understanding Wine Chemistry 2nd ed. (Waterhouse, Sacks & Jeffery) §26.2.4.1 'Copper fining and sulfurous malodors' and Ch. 24 (metal-sulfhydryl pathway), READ LOCALLY IN FULL. The >95% retention is that textbook's RENDERING of Clark, Grant-Preece, Cleghorn & Scollary 2015 (Aust. J. Grape Wine Res. 21(1):30-39) — that paper is NOT held locally and was NOT read, so it must not be cited as agreeing or disagreeing on any point beyond the sentence UWC prints (the D-190 amendment's rule)."
+    conditions: "commercial WHITE wines adjusted to 1 mg/L Cu and equimolar H2S; retention measured after filtering, or after 5 days storage followed by racking. Ambient storage, no stated temperature. The model applies the fraction to the whole dose at any dose size and in red wine too — an extrapolation, see notes."
+    notes: "Read by the add_copper verb (D-191) to credit the `copper` slot with the retained share of the dose. THREE EXTRAPOLATIONS, all deliberate and none of them measured here. (1) BASIS: the fraction is applied to the WHOLE dose, matching the source's design — its wines were dosed WITH equimolar H2S, so >95% retention is a post-reaction figure and already includes whatever the sulfide bound. (2) MATRIX: measured in white wine, applied in red. (3) RANGE: f_copper is a linear mean-centred term digitised over the between-wine copper spread of NATURAL wines (copper_typical 0.261 mg/L); a fining dose pushes copper to ~0.74 mg/L (0.5 mg/L dose) or past the EU 1 mg/L legal limit at larger doses, which is linear extrapolation beyond the calibration range. NOTHING here re-opens k_copper_multiplier (§2.5 CLOSED at D-149) or its D-154 band — this parameter moves the slot the multiplier READS, not the multiplier. ACTIVITY CAVEAT, stated because the source states it: Ch. 24 says complexed copper sits 'almost entirely as Cu(I) in a non-labile (that is, less reactive) form', re-oxidised to the active Cu(II) by O2 or Fe(III). The model carries no lability distinction — the slot is a TOTAL copper concentration, which is the same basis k_copper_multiplier was calibrated on (total measured Cu in Ferreira's wines), and the browning term it feeds is already proportional to O2, the very thing that re-activates the copper. So the coupling is basis-consistent, but a wine fined and then held strictly anoxic has its copper credited at full catalytic weight when the source would call it less reactive."
 
 # -- Sucrose -> hexose inversion mass gain (add_sugar / chaptalization verb, decision D-65) ---
 #

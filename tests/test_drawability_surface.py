@@ -28,7 +28,7 @@ What *is* pinned is the **mechanism**, on one exemplar per structural class, and
 **Why both halves are required, measured rather than argued.** The first draft of this test
 was half 2 alone: force the name, assert the members are identical. It is unsound. Five
 genuinely Process-read names froze at *exactly* ``max|dy| == 0.0`` in the same harness —
-``k_copper_multiplier`` (the ``copper`` slot is never written, the D-149 disconnect),
+``k_copper_multiplier`` (no ``add_copper`` in *this* scenario — see the note below),
 ``ethanol_tolerance`` (``EthanolInactivation``'s term is clamped off below tolerance), and
 ``k_so2_oxidation`` / ``k_browning_base`` / ``k_ethanol_oxidation`` (supply-limited: no O₂
 in the scenario). "Frozen" conflates *unreachable by the sampler* with *reachable but zero
@@ -271,10 +271,21 @@ def test_the_same_harness_moves_a_process_read_parameter():
     ``mu_max`` is the pick because it drives the primary ferment from ``t0``, so it cannot
     be silently supply-limited the way the aging rate constants are: the same harness
     reports exactly 0.0 for ``k_so2_oxidation`` / ``k_browning_base`` /
-    ``k_ethanol_oxidation`` (no O₂ here), for ``k_copper_multiplier`` (the ``copper`` slot
-    is never written) and for ``ethanol_tolerance`` (its term is clamped off below
-    tolerance) — every one of them genuinely Process-read. A control drawn from that group
-    would have confirmed the wrong thing.
+    ``k_ethanol_oxidation`` (no O₂ here), for ``k_copper_multiplier`` (see below) and for
+    ``ethanol_tolerance`` (its term is clamped off below tolerance) — every one of them
+    genuinely Process-read. A control drawn from that group would have confirmed the wrong
+    thing.
+
+    **``k_copper_multiplier``'s freeze was SCENARIO-bound, and D-191 lifted it.** D-159
+    attributed it to "the ``copper`` slot is never written", which was true then and is the
+    right diagnosis: ``f_copper = 1 + k·(copper − copper_typical)`` is identically 1 for
+    *any* k when copper sits at ``copper_typical``, so the multiplier cannot matter until
+    something displaces the slot. Since D-191 the ``add_copper`` verb does. Measured in this
+    same harness (`d191-residual-copper/probe3_thaw.py`), forcing the name gives
+    ``max|dy|`` = **0.0** with no fining, **6.6e-4** with a 0.5 mg/L fining, and **1.3e-2**
+    with fining plus dosed O₂ — the copper displacement is what thaws it and the oxidant
+    only amplifies. This scenario has no ``add_copper``, so the 0.0 above still holds here;
+    it is no longer a statement about the model.
     """
     compiled = compile_scenario(_scenario())
     ensemble = _forced(compiled, "mu_max")

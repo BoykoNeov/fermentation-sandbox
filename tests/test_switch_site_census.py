@@ -344,12 +344,26 @@ def test_a_nominal_sitting_on_a_band_edge_cannot_be_classified_by_an_edge_screen
     purely to keep this set at four. The obligation this test names is met the same way as
     the CO2 coefficient's: anyone screening it must classify over the band interior. It is
     also not reached by any Process — the value seeds an event dose, so no sampler draws
-    it."""
+    it.
+
+    **``copper_fining_residual_fraction`` joined at D-191, and it completes a pattern worth
+    naming: ALL THREE of the ``add_copper`` verb's parameters now sit on an edge, for one
+    shared reason.** Each has exactly one edge with a source behind it and one that is
+    constructed, so there is no interior the sources vouch for. The two binding factors sit
+    on their HIGH edges (the stoichiometric ceilings of CuS and Cu(SR)₂, banded DOWN for
+    real-world incompleteness); the retention fraction sits on its LOW edge, because UWC
+    §26.2.4.1 prints ">95 % of original value" — a floor with no ceiling but the physical
+    1.0, the mirror image of ``bottling_burst_screwcap``'s published ceiling with no floor.
+    The midpoint 0.975 was considered and rejected on the same grounds as the two entries
+    above: it would invent a central estimate no source contains, to satisfy a harness. This
+    one IS reached by the sampler (the verb reads it at compile), so it is a live case, not a
+    dead one — screen it over the band interior."""
     wine_on_edge = _on_edge(_wine())
     assert wine_on_edge == {
         "f_non_ehrlich_phenylalanine",
         "copper_h2s_binding",
         "copper_mercaptan_binding",
+        "copper_fining_residual_fraction",
         "vant_hoff_co2_solubility",
         "bottling_burst_screwcap",
     }, f"the wine nominal-on-edge set changed: {sorted(wine_on_edge)}"

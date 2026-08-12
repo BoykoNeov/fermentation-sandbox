@@ -1150,7 +1150,11 @@ def wine_schema() -> StateSchema:
             "only the structural fallback for code that never calls `_wine_initial`). Read "
             "(never written) by PhenolicBrowning's f(Cu) multiplier; at copper == copper_typical "
             "the multiplier is exactly 1, byte-for-byte the D-132/D-133 calibrated rate. Off "
-            "every ledger (a trace metal, not an organic pool)",
+            "every ledger (a trace metal, not an organic pool). NO PROCESS writes it still, but "
+            "since D-191 the add_copper VERB does: copper fining leaves >95% of the dose dissolved "
+            "(it does not settle out — UWC 2nd ed. §26.2.4.1), so a fined wine browns faster. That "
+            "makes this the one slot whose value is a must-composition property AND an "
+            "intervention outcome",
         ),
         # The D-135 bottle-reduction reservoirs, appended LAST so existing wine slot indices are
         # unchanged (the D-100/D-102/D-133/D-134 convention). Franco-Luesma & Ferreira 2016 measured

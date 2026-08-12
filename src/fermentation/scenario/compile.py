@@ -1578,15 +1578,35 @@ def _verb_add_copper(
     from the wine as the precipitated mercaptide — a **negative external flow** the driver books
     (the racking-debris precedent), so the run-wide identity ``final == initial + Σ flows`` still
     holds. **On a default (autolysis-off) wine ``mercaptans ≡ 0``, so add_copper is carbon-neutral
-    there** — the carbon flow appears only once the D-45 pool is non-empty. SCOPE (v1): the removal
-    lever only. Residual copper (excess Cu left in the wine) is untracked — and D-149 notes what
-    that costs now that D-134 gave wine a ``copper`` STATE slot driving ``f_Cu``: this verb writes
-    ``h2s``/``methanethiol`` and **never** that slot, so the model's two coppers never meet. Fining
-    a wine cannot raise its oxidation rate here, though residual copper is the commonest way real
-    wine's copper level rises. Left unfixed deliberately: closing it means choosing a
-    residual-copper fraction, and nothing sources one. Copper is also imperfect on
-    mercaptans and useless on the disulfides they oxidise to (see ``copper_mercaptan_binding``). The
-    ``mercaptans`` slot is wine-only, so on a medium without it copper binds H₂S alone.
+    there** — the carbon flow appears only once the D-45 pool is non-empty. Copper is also
+    imperfect on mercaptans and useless on the disulfides they oxidise to (see
+    ``copper_mercaptan_binding``). The ``mercaptans`` slot is wine-only, so on a medium without it
+    copper binds H₂S alone.
+
+    **3. The copper stays behind (D-191), which closes D-149's "the two coppers never meet".**
+    Until D-191 this verb wrote ``h2s``/``methanethiol`` and **never** the ``copper`` slot D-134
+    gave wine, so fining could not raise a wine's oxidation rate — though residual copper is the
+    commonest way real wine's copper level rises. The stated reason for leaving it was that
+    "nothing sources a residual-copper fraction"; **that was false, and the source settles the
+    mechanism as well as the number.** Understanding Wine Chemistry 2nd ed. §26.2.4.1 reports white
+    wines dosed to 1 mg/L Cu with equimolar H₂S retaining >95 % of their copper through *filtering*
+    or *5 days settling plus racking*, and concludes copper additions "are not necessarily a
+    'fining' operation, as the copper remains in solution, albeit in a different form" — Ch. 24
+    gives that form as dispersed Cu(I)-sulfhydryl nanoparticles, and names the settles-with-the-lees
+    account this docstring used to give as an incorrect assumption of older textbooks. So the verb
+    now credits ``copper_fining_residual_fraction · dose`` to the ``copper`` slot.
+
+    The sulfide arithmetic above is **untouched** — the odour still goes. What changes is that a
+    fined wine now carries the oxidative cost UWC Table 26.2.1 prints for this treatment: at the
+    0.5 mg/L dose, ``f_copper`` 1.000 → 1.285, i.e. ~29 % faster phenolic browning. **Ledger:**
+    ``copper`` is off every ledger (a trace metal), so the credit weighs exactly zero in carbon and
+    nitrogen — the flow is booked and balances, the ``adjust_cations`` shape.
+
+    **What this does NOT do.** The complexes also re-release H₂S in storage (UWC §26.2.4.1, Ch. 24),
+    and the model owns a reservoir for exactly that (``bound_h2s``, D-135). This verb still
+    **annihilates** the sulfide rather than routing it there. That half was measured at D-191 and
+    left unbuilt as a scoped owner decision — see the record for the measured direction and size.
+    Do not read the copper credit as having closed it.
     """
     _iv_check_keys(iv, frozenset({"copper_mgl"}), "add_copper")
     copper_mgl = _iv_float(iv, "copper_mgl", "add_copper")
@@ -1612,6 +1632,24 @@ def _verb_add_copper(
     has_methanethiol = "methanethiol" in schema
     binding_merc = parameters["copper_mercaptan_binding"].value if has_methanethiol else 0.0
     merc_slice = schema.slice("methanethiol") if has_methanethiol else None
+    # D-191: the retained share of the dose, credited to the `copper` slot below. Guarded (not
+    # gated) on the slot the same way the thiol half is: `copper` is wine-only, and a medium
+    # without it simply keeps the removal behaviour. Missing parameter => hard error rather than a
+    # silent 0.0 default, because a 0.0 here would restore exactly the pre-D-191 behaviour while
+    # looking like a configured choice (the D-45 hard-zero defect).
+    has_copper = "copper" in schema
+    copper_slice = schema.slice("copper") if has_copper else None
+    if has_copper:
+        try:
+            residual_fraction = parameters["copper_fining_residual_fraction"].value
+        except KeyError as exc:
+            raise ValueError(
+                "intervention 'add_copper' needs 'copper_fining_residual_fraction' but it is "
+                f"missing ({exc}); include additions.yaml in parameter_paths (the default lookup "
+                "merges it automatically)."
+            ) from None
+    else:
+        residual_fraction = 0.0
 
     def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
         out = y.copy()
@@ -1625,6 +1663,14 @@ def _verb_add_copper(
             merc_present = max(float(out[merc_slice][0]), 0.0)
             removed_merc = min(merc_present, copper_left * binding_merc)
             out[merc_slice] = float(out[merc_slice][0]) - removed_merc
+        # 3. The copper STAYS (D-191). The retained fraction applies to the WHOLE dose, not to
+        # whatever is left after binding: the source's wines were dosed alongside equimolar H₂S, so
+        # >95 % retention is already a post-reaction figure — the copper-sulfhydryl complexes are
+        # themselves what stays dispersed. Accumulates onto the slot's current value rather than
+        # setting it, so repeated finings add up and the grape/must background (copper_typical) is
+        # preserved.
+        if copper_slice is not None:
+            out[copper_slice] = float(out[copper_slice][0]) + residual_fraction * copper_gpl
         return out
 
     return ScheduledEvent(
