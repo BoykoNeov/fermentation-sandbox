@@ -149,9 +149,14 @@ def test_the_far_anchor_is_hit_by_the_shipped_pair(params):
     two are a derived pair, not independent constants, so this is the invariant that a
     change to either must preserve.
     """
-    # rel=5e-3 is the SHIPPED ROUNDING, not slack: K is rounded 74.56 -> 74.6 in the YAML,
-    # which lands f(625) at 0.05005. Tightening this would pin the rounding, not the anchor.
+    # Two pins, because the loose one alone does not discriminate. rel=5e-3 on f(625) is the
+    # SHIPPED ROUNDING, not slack (K is rounded 74.56 -> 74.6, landing f(625) at 0.05005), but
+    # it leaves a window in which a hand-edited K would pass. The sharp pin is the DERIVATION
+    # itself: K is not an independent constant, it is a function of n.
     assert _factor(params, 625.0) == pytest.approx(0.05, rel=5e-3)
+    n = params["n_osmotic_inhibition"]
+    derived = (625.0 - params["S_osmotic_threshold"]) / ((1.0 / 0.05 - 1.0) ** (1.0 / n))
+    assert params["K_osmotic_inhibition"] == pytest.approx(derived, rel=1e-3)
 
 
 @pytest.mark.parametrize("n", [2.0, 3.0, 4.0, 6.0])
@@ -229,6 +234,20 @@ def test_a_concentrated_must_no_longer_ferments_to_an_impossible_abv():
     assert _sugar(on)[-1] > _sugar(off)[-1] + 200.0
 
 
+def test_the_concentrated_must_is_genuinely_stuck_not_merely_slow():
+    """The evidence behind D-192's ``Corrects: D-129`` marker, which claims more than "slow".
+
+    D-129 argued substrate inhibition "lifts as S drops, so the ferment finishes late, not
+    stuck; it cannot leave residual sugar". Run to 20 years the 881 g/L arm is unchanged from
+    ~1 year on, because ``EthanolInactivation`` drives viable biomass to zero long before the
+    brake lifts. It is arrested, not en route — so the marker is correct as written.
+    """
+    five, twenty = _run(70.0, osmotic=True, days=1825.0), _run(70.0, osmotic=True, days=7300.0)
+    assert _sugar(twenty)[-1] == pytest.approx(_sugar(five)[-1], rel=1e-3)
+    assert _sugar(twenty)[-1] > 700.0
+    assert float(np.asarray(twenty.series("X"))[-1]) < 1e-6, "biomass must be spent, not idle"
+
+
 def test_a_very_sweet_must_still_ferments_it_is_not_an_absorbing_state():
     """Asymptotic, not a wall.
 
@@ -242,19 +261,29 @@ def test_a_very_sweet_must_still_ferments_it_is_not_an_absorbing_state():
     assert float(np.asarray(traj.series("E"))[-1]) > 5.0
 
 
-def test_the_brake_is_negligible_across_normal_sweet_wine_and_that_is_not_hidden():
-    """Sauternes/TBA/icewine territory (~341-438 g/L) moves by well under a tenth of a %ABV.
+def test_across_sweet_wine_the_brake_changes_the_path_but_not_the_destination():
+    """Sauternes/TBA/icewine (~341-438 g/L) — and the distinction here is the whole point.
 
-    Recorded as a pin rather than left implicit: the term's whole consequence lives above
-    ~500 g/L, and anyone reading the module must not expect it to slow a botrytis ferment.
+    An earlier version of this test asserted only that final ABV moves "well under a tenth
+    of a %" and called the term *negligible* across this range. That was false as stated:
+    these musts sit above the 300 g/L threshold, so the brake IS engaged, and mid-run sugar
+    differs by 15 / 94 / 241 g/L at 32.2 / 36 / 40 °Brix. What is negligible is the
+    ENDPOINT — a supply-limited flux slowed on the way down still arrives (this is exactly
+    D-129's "late, not stuck", which holds *here* and fails only at the extreme regime the
+    test above covers).
+
+    So both halves are pinned: the trajectory must move, and the endpoint must not. A pin on
+    the endpoint alone would pass just as well if the modifier were dead.
     """
-    for brix in (32.2, 36.0, 40.0):
+    for brix, floor in ((32.2, 5.0), (36.0, 20.0), (40.0, 50.0)):
         on, off = _run(brix, osmotic=True), _run(brix, osmotic=False)
-        d = abs(
+        path = float(np.abs(_sugar(on) - _sugar(off)).max())
+        endpoint = abs(
             abv_from_ethanol(float(np.asarray(on.series("E"))[-1]))
             - abv_from_ethanol(float(np.asarray(off.series("E"))[-1]))
         )
-        assert d < 0.1, f"{brix} Brix moved {d:.3f} %ABV"
+        assert path > floor, f"{brix} Brix: brake not engaged mid-run (max|dS| {path:.2f})"
+        assert endpoint < 0.1, f"{brix} Brix moved the endpoint {endpoint:.4f} %ABV"
 
 
 def test_the_handbooks_200_vs_300_alcohol_statement_is_out_of_reach_and_that_is_deliberate():

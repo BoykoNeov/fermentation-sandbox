@@ -26145,7 +26145,7 @@ to its own counter-example is not enough; only running it is.
 
 ## D-192 — Osmotic/substrate inhibition at high sugar: built as a one-sided brake above Coleman's envelope, so an "unfermentable" concentrated must stops fermenting to 19.8 % ABV — and the textbook's own 200 g/L onset is refused because the keystone's constants already contain it
 
-**Corrects:** D-129 — "substrate inhibition ... cannot leave residual sugar" is false at high enough sugar; measured here, it leaves 232 g/L MORE residual than the ethanol ceiling alone.
+**Corrects:** D-129 — "substrate inhibition ... cannot leave residual sugar" is false at high enough sugar. Measured to 20 years: the arm converges at 755.4 g/L residual with viable biomass driven to ~0, i.e. genuinely STUCK, not "late, not stuck".
 **Corrects:** D-14 — `test_coleman_reconstruction.py` claimed its RMSE was "~1.3 g/L ... observed + ~50 % margin"; the measured values are 1.796 and 1.596 against a 2.0 threshold, an ~11 % margin.
 
 Owner picked this beat by name. It has sat on the "not started" tail since D-129 deferred it,
@@ -26237,7 +26237,7 @@ f(S) = 1 / (1 + ((S - S_thr)/K_osm)**n_osm)      for S >  S_thr
 - **`n_osmotic_inhibition` = 2**, the C1-smoothness floor (`f'(S_thr) = 0`; below 2 the factor has a
   derivative corner where the brake engages, and the modifier raises rather than letting BDF find
   it — D-182's lesson applied before the fact). Band [2, 6], and the ABV of an 881 g/L must spans
-  **3.83-5.36 %** across it, so HOW SHARP is genuinely underdetermined. WHERE is sourced twice over.
+  **2.00-5.59 %** across it, so HOW SHARP is genuinely underdetermined. WHERE is sourced twice over.
 - **Asymptotic, never zero, deliberately.** A hard wall at the unfermentable anchor makes a very
   sweet must an **absorbing state**: uptake exactly 0, growth nitrogen-capped, nothing left that can
   remove sugar — it could never ferment at all, ever. Real must at that concentration does ferment,
@@ -26248,9 +26248,12 @@ f(S) = 1 / (1 + ((S - S_thr)/K_osm)**n_osm)      for S >  S_thr
   coupling D-32 records. **Including growth is the choice that costs the headline**: at 70 °Brix it
   *raises* the arrested ABV from 5.36 % to 5.59 %, so the result is not bought with it.
 
-Effect: an 881 g/L must goes from **19.76 % ABV** to **5.36 %** (n=2) / **3.83 %** (n=4), leaving
-232 g/L more residual sugar. At 32-40 °Brix — Sauternes/TBA/icewine — the whole band moves final ABV
-by **under 0.1 %**, which is pinned rather than left implicit.
+Effect: an 881 g/L must goes from **19.76 % ABV** to **5.59 %** at the shipped `n = 2` (2.00 % at
+`n = 6`), leaving **199 g/L** more residual sugar — and it is genuinely arrested, not merely slow:
+run to 20 years the trajectory is unchanged from 1.1 years on, with viable biomass at ~0. At
+32-40 °Brix — Sauternes/TBA/icewine — the brake **reshapes the trajectory but not the endpoint**:
+mid-run sugar differs by 15/94/241 g/L at 32.2/36/40 °Brix while final ABV moves 0.0006/0.005/0.030 %.
+That distinction is pinned; "negligible" without it would be false.
 
 ### 5. What this deliberately does NOT reproduce, stated rather than implied
 
@@ -26312,6 +26315,34 @@ context, not as validation.
 - Pre-registration, four measurement harnesses and results durable at
   `M:\claud_projects\temp\ferment\d192-osmotic\`.
 - Suite **1730 passed / 3 xfailed** (was 1695).
+
+### Amendment (same session, before the beat closed)
+
+Two numbers in this record's first version were wrong and are corrected above rather than left
+standing, because both would mislead a reader about the shipped artifact.
+
+**1. The consequence figures quoted the wrong arm.** "5.36 % (n=2) / 3.83 % (n=4)" came from the
+*uptake-only* sweep in §3, not from what ships — and what ships scales **growth as well**, which
+§4 itself says. The shipped model gives **5.59 % at n=2 and 2.00 % at n=6**, leaving **199 g/L**
+more residual (not 232). The direction of the error is worth naming: including growth *raises*
+the arrested ABV, so quoting the uptake-only arm made the result look **better** than it is.
+Measuring a design decision on one arm and then reporting it for another is the same shape as
+D-183's laundering, one step earlier in the pipeline.
+
+**2. "Negligible across sweet wine" was false as stated, and its test was near-vacuous.** A
+32-40 °Brix must is *above* the 300 g/L threshold, so the brake is engaged there: mid-run sugar
+differs by **15 / 94 / 241 g/L**. What is negligible is only the **endpoint** (0.0006 / 0.005 /
+0.030 % ABV), because a supply-limited flux slowed on the way down still arrives — D-129's
+"late, not stuck", which holds in exactly this range and fails only past ~500 g/L. The test
+asserted the endpoint alone, so it would have passed with the modifier dead; it now pins **both**
+halves, and the trajectory half is what makes it a guard rather than a claim
+([[feedback-grep-finds-claims-not-guards]] in test form).
+
+**And one marker got stronger, not weaker.** The `Corrects: D-129` line originally rested on a
+400-day run, where "stuck" and "very slow" are indistinguishable. Run to **20 years** the arm is
+unchanged from ~1 year on, with viable biomass driven to ~0 by `EthanolInactivation` before the
+brake ever lifts. It is genuinely arrested, so the marker stands as written — and that is now
+pinned by its own test instead of inferred from a horizon that was too short to tell.
 
 **The lesson landing on this record.** The pre-registration predicted a growth-rate multiplier could
 not lower peak population, because nitrogen conserves `N + f_N*X`. That was right at a 2× slowdown

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T07:18:47.100Z
+  modified: 2026-08-12T08:24:32.833Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-12)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-191**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1694**. Most remaining
+**D-192**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1730**. Most remaining
 work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
@@ -107,6 +107,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   midpoint the 0.95; the **sulfide half is MEASURED, not built** (owner's call, live candidate);
   D-45's mercaptide carbon flow is **FLAGGED not fixed**.
   → `.claude/memory/prohibitions/residual-copper-fining.md`
+- **Osmotic inhibition at high sugar (D-192)** — **BUILT**, wine-only, threshold **300 g/L =
+  the TOP of Coleman's envelope, never the Handbook's printed 200** (that is inside the
+  keystone's own fit). The Handbook's "300 yields less than 200" is **FORFEITED on measurement**;
+  the Haldane form is **refuted on shape** (spans 1.51×, needs ~19×); never a hard zero (absorbing
+  state); `K`/`n` are a **derived pair, not two bands**. `_SWEET_BRIX=70` is OPEN, owner's call.
+  → `.claude/memory/prohibitions/osmotic-high-sugar.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
@@ -130,7 +136,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B) — **PYRUVATE/α-KG ONLY, priced not
 deferred; α-KB's was measured and REFUSED at D-189**; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
-in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); osmotic inhibition >~200 g/L (**unblocked, locally sourceable — offered and not picked**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); no post-Fenton O₂ draw (D-142); **residual copper is BUILT — D-191**; D-143/4 ← D-145.
+in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); no post-Fenton O₂ draw (D-142); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192**; D-143/4 ← D-145.
 
 ## Standing rule
 - **NEVER put a whole-file line cap back (D-177, corrects D-169).** Raised 4× (150→300), then **REMOVED, not
