@@ -30,9 +30,9 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-12)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-195**;
-sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1742**. Most remaining work is
-**blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-196**;
+sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1744**. Some
+"blocked on external sourcing" items are **NOT** — D-196's source was on disk for 20 records. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
@@ -126,6 +126,13 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the Haldane form is **refuted on shape** (spans 1.51×, needs ~19×); never a hard zero (absorbing
   state); `K`/`n` are a **derived pair, not two bands**. `_SWEET_BRIX=70` is OPEN, owner's call.
   → `.claude/memory/prohibitions/osmotic-high-sugar.md`
+- **Post-Fenton second O₂ (D-196)** — **BUILT** (cascade-only, still non-default): the radical
+  takes an O₂, `share × activation`. **NEVER "unsourced"** — 20 records said so, the book was on
+  disk. Per-ACETALDEHYDE not per-H₂O₂; 1.0 is an **upper bound** (hydroperoxyl limb named, not
+  built); Gate 1 not breached. Double-counting **died on supply-limitation**, D-141's budget
+  survives. The state-dependence is **load-bearing** — a flat surcharge of equal cost breaks BOTH
+  asymptotes. Copper re-fit is **exactly** a no-op. D-142 **CONFIRMED, not corrected**.
+  → `.claude/memory/prohibitions/post-fenton-second-o2.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
@@ -149,7 +156,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B) — **α-KG ONLY and INFERRED, never
 measured; α-KB REFUSED at D-189 and PYRUVATE at D-195, both spent**; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
-in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); no post-Fenton O₂ draw (D-142); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192**; D-143/4 ← D-145.
+in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145.
 
 ## Standing rule
 - **NEVER put a whole-file line cap back (D-177, corrects D-169).** Raised 4× (150→300), then **REMOVED, not
