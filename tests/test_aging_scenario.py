@@ -92,11 +92,12 @@ def _wine(
     duration_days: float | None = None,
 ) -> Scenario:
     # brix (default 24.0, byte-for-byte the pre-D-87 dry-fermenting helper) sets the must sugar; a
-    # botrytis-level brix (~70) ferments to the ethanol-inactivation ceiling and ARRESTS with a
-    # large
-    # RESIDUAL sugar — a SWEET wine — the driver the non-oxidative thermal MaillardStrecker (D-87)
-    # needs. (The modelled ABV at that brix runs high — a pre-existing EthanolInactivation
-    # calibration limit, orthogonal to D-87: what matters here is the residual sugar it leaves.)
+    # botrytis-level brix (`_SWEET_BRIX`, 38 since D-194) ferments to the ethanol-inactivation
+    # ceiling and ARRESTS with a large RESIDUAL sugar — a SWEET wine — the driver the non-oxidative
+    # thermal MaillardStrecker (D-87) needs. (The modelled ABV at that brix runs high — a
+    # pre-existing EthanolInactivation calibration limit, orthogonal to D-87: what matters here is
+    # the residual sugar it leaves.) **~70 will NOT do this since D-192**: the osmotic brake stops
+    # it arresting at all, so the wine is still fermenting when begin_aging fires — see _SWEET_BRIX.
     # duration_days overrides the default ferment+aging span (a longer sweet-wine aging tail).
     # amino_acids_gpl (default 0, byte-for-byte the pre-D-75 helper) doses the assimilable amino
     # must input the StreckerDegradation Process (D-75) draws its aldehyde carbon from; a residual
@@ -917,9 +918,30 @@ _MAILLARD_ALDEHYDES = (
     "2_methylpropanal",
     "sotolon",
 )
-_SWEET_BRIX = 70.0  # botrytis-level must → D-129 ceiling arrests it at ~20% ABV (E≈160 g/L)
-# leaving ~540 g/L residual sugar (a lusciously sweet wine). Before D-129 the Coleman-only core
-# ran this must to an impossible ~42% ABV (E≈332 g/L); the ceiling is why it now sticks sweet.
+#: A REAL botrytis must (decision D-194). Sauternes/TBA harvest at ~35-40 °Brix; 38.0 is 412 g/L
+#: in the model, ferments to the D-129 ethanol ceiling (E≈159.5 g/L) by well before the day-30
+#: `begin_aging` breakpoint, and ARRESTS there with **76 g/L residual sugar** — the driver the
+#: thermal MaillardStrecker/Caramelization routes read. Sugar then moves 76.7 → 76.4 g/L across the
+#: whole 730-day tail: genuinely stuck, not still going.
+#:
+#: **It was 70.0, and that was not a sweet wine — it was a must still fermenting (D-194).** The old
+#: value's comment credited the D-129 ethanol ceiling for arresting it at ~20% ABV. That was true
+#: when written and D-192 falsified it: `OsmoticSubstrateInhibition` brakes an 881 g/L must by ~76×,
+#: so at 70 °Brix `begin_aging` fired at **0.50% ABV** on a must losing 4.9 g/L of sugar over days
+#: 25-30, and the ferment ran on through the entire two-year aging tail (880.7 → 686.6 g/L,
+#: finishing at 7.66% ABV). Eleven scenarios named *sweet wine* were aging an actively fermenting
+#: must, and `assert S > 50.0` witnessed **unfermented** sugar rather than a stuck residual — it
+#: passed for the wrong reason. Re-anchoring is a scenario decision, not physics: the model is
+#: unchanged either side of it.
+#:
+#: **Why 38 and not 45.** 45 °Brix would reproduce real Sauternes' *residual* (120-150 g/L), but
+#: only by inflating the must past what botrytis must actually is — tuning a scenario input to
+#: conceal a known model limit (the modelled ceiling is 20.2% ABV against a real 13-14%; a
+#: pre-existing EthanolInactivation calibration limit, orthogonal to this). `_SWEET_BRIX` **is the
+#: must's Brix**, a quantity the winemaker measures, so it takes a real must's value and the
+#: residual is left to be whatever the model predicts. 38.0 also sits inside D-192's own measured
+#: 32-40 °Brix envelope, so it is not an extrapolation past that record.
+_SWEET_BRIX = 38.0
 _SWEET_AGING_DAYS = 730.0  # a multi-year sweet-wine aging tail (thermal aging is slow)
 
 #: **Why the Strecker scenarios below age SUR LIE (decision D-104).** They used to age with no
@@ -945,6 +967,73 @@ _SWEET_AGING_DAYS = 730.0  # a multi-year sweet-wine aging tail (thermal aging i
 #: model has no peptide pool at all (its dose is free amino acids only), so it cannot express that
 #: route — named in D-104, not built.
 _SUR_LIE_RATE = 1.0e-3  # 1/h; the D-34 opt-in autolysis rate that refills the precursor pools
+
+
+def _at_day(traj: ScheduledTrajectory, name: str, day: float) -> float:
+    """Linear-interpolate a series at a wall-clock day (``traj.t`` is in canonical hours)."""
+    return float(
+        np.interp(
+            day * 24.0,
+            np.asarray(traj.t, dtype=float),
+            np.asarray(traj.series(name), dtype=float),
+        )
+    )
+
+
+def test_the_sweet_scenarios_age_an_ARRESTED_wine_not_a_still_fermenting_must():
+    """The premise every ``_SWEET_BRIX`` scenario below asserts by NAME but none of them checked.
+
+    **This guard is owed because the suite demonstrably did not already forbid the failure
+    (D-194).** D-192 wired ``OsmoticSubstrateInhibition``, which brakes the old 70 °Brix must by
+    ~76× — and the whole of this file stayed **green** while eleven tests named *sweet wine* aged a
+    must that was still actively fermenting at 0.50 % ABV. Their sweetness assert
+    (``S > 50.0``) cannot tell the two regimes apart: it passes on **unfermented** sugar exactly as
+    it passes on a stuck residual, so it witnessed the premise's collapse without noticing it. That
+    is the mutate-the-premise test run for real, and it came back GREEN — which is what licenses a
+    new guard here rather than "the five asserts are the guard" (contrast D-189, where the
+    equivalent mutation went red on its own).
+
+    Two predicates, because "sweet" is two claims:
+
+    * **Arrived** — ``E`` at the ``begin_aging`` breakpoint is at the D-129 ethanol ceiling, not
+      somewhere on the way up. The ceiling is ~159.7 g/L; the anchor reaches 156.05 (19.77 % ABV)
+      and the retired 70 °Brix reaches **3.93**, so the 150.0 threshold sits ~4 % under the anchor
+      and ~40× over the failure. (The modelled ceiling being ~20 % ABV against a real 13-14 % is a
+      pre-existing EthanolInactivation calibration limit — orthogonal, and not what this pins.)
+    * **Stuck** — the residual is frozen across the aging tail. The anchor drifts **0.28 %** over
+      730 days; the retired value drifts **12.38 %**, still being eaten. A scenario whose sugar is
+      still falling is not aging a sweet wine, it is fermenting one.
+
+    The second arm is a **positive control, not decoration**: it re-runs the retired 70.0 and
+    asserts the guard's own predicates FAIL there. Without it a threshold that discriminated
+    nothing would read exactly like one that discriminates: one arm has to be expected GREEN and
+    one RED, or neither result carries information.
+    """
+
+    def arrived_and_stuck(brix: float) -> tuple[float, float]:
+        traj = compile_scenario(
+            _wine(
+                [_begin_aging(_FERMENT_DAYS)],
+                brix=brix,
+                duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
+            )
+        ).run()
+        assert traj.success
+        e_break = _at_day(traj, "E", _FERMENT_DAYS)
+        s_break = _at_day(traj, "S", _FERMENT_DAYS)
+        s_end = _at_day(traj, "S", _FERMENT_DAYS + _SWEET_AGING_DAYS)
+        return e_break, abs(s_end - s_break) / max(s_break, 1e-12)
+
+    # THE ANCHOR — expected GREEN.
+    e_break, drift = arrived_and_stuck(_SWEET_BRIX)
+    assert e_break > 150.0, f"ferment had not arrived by begin_aging: E={e_break:.2f} g/L"
+    assert drift < 0.02, f"residual sugar still moving across the aging tail: {drift:.4f}"
+
+    # THE MUTATION ARM — the retired 70.0, expected to FAIL BOTH predicates. This is why the
+    # value moved, pinned so it cannot silently move back.
+    e_break_70, drift_70 = arrived_and_stuck(70.0)
+    assert e_break_70 < 10.0, "70 Brix no longer stalls the ferment — re-check D-192's brake"
+    assert drift_70 > 0.10, "70 Brix no longer keeps fermenting through the tail"
 
 
 def test_maillard_gated_by_begin_aging_wine_only():
