@@ -786,6 +786,18 @@ def test_the_headline_ratio_is_set_by_the_quinone_branching_and_is_not_robust_to
     silently is ``k_quinone_polymerization`` being re-anchored with this file left reporting an
     in-band headline it no longer earns.
 
+    **How much room the nominal actually has, and what holds it open (D-200).** The in-band pass
+    is thinner than it reads: the nominal clears Miao's floor by **0.9646 %** (1.107886 against
+    1.0972). D-200 priced what is *missing* from the node against that headroom, by injecting a
+    non-depleting competing nucleophile through the same bilinear law. Glutathione at the level
+    UWC Ch. 5 gives ("no more than a few mg/L") takes **0.32 %** of the quinone node and moves the
+    headline **−0.04 %** — which is why it was measured and *not* built. Ascorbate at UWC's
+    printed 60 mg/L takes **8.09 %** and consumes the **entire** headroom on its own. So this
+    assertion's margin is not held open by anything the file controls; it is held open by the
+    **absence of ascorbate from the quinone node**. Adding it — and both its limbs push this ratio
+    *down*, since a peroxide-only O2 yields 0.9547 SO2/O2 against the real mix's 1.1079 — re-opens
+    the band question rather than merely nudging a number.
+
     Which assertion carries which duty, since they are not equal. The **monotonicity**, the
     **nominal-in-band** and the **low-edge-in-band** lines are what detect a re-anchoring: measured
     at D-199, moving the nominal one order down makes the low edge 1.7481 (above Miao's ceiling)
