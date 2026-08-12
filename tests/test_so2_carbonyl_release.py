@@ -38,11 +38,18 @@ import pytest
 from fermentation.core.acidbase import (
     _bound_molar_split,
     bisulfite_fraction,
+    free_acetaldehyde,
+    ph_of_state,
 )
 from fermentation.core.chemistry import M_ACETALDEHYDE, M_SO2
+from fermentation.core.media import wine_schema
+from fermentation.core.state import FloatArray, StateSchema
+from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime.ensemble import sample_parameters
-from fermentation.sensory.oav import AROMA_COMPOUNDS
+from fermentation.runtime.integrate import Trajectory
+from fermentation.sensory.oav import AROMA_COMPOUNDS, load_thresholds, oav_series
+from fermentation.units.convert import ugl_to_gpl
 
 #: The SO₂ acidity constants, by their real names in ``acidbase.yaml``.
 SO2_PKA_NAMES = ("pKa_sulfurous_1", "pKa_sulfurous_2")
@@ -68,6 +75,25 @@ def params(pset):
     return pset.resolve()
 
 
+def _constant_traj(schema: StateSchema, pools: dict[str, float], *, n: int = 4) -> Trajectory:
+    """A synthetic constant-in-time trajectory with the named pools set (all else 0).
+
+    Same idiom as ``tests/test_sensory_oav.py``: building the frozen Trajectory directly keeps
+    this a test of the READOUT rather than of any solver run.
+    """
+    y: FloatArray = np.zeros((schema.size, n), dtype=np.float64)
+    for pool, val in pools.items():
+        y[schema.slice(pool), :] = val
+    return Trajectory(
+        schema=schema,
+        t=np.linspace(0.0, 1.0, n),
+        y=y,
+        success=True,
+        message="",
+        tier_map=dict.fromkeys(schema.names, Tier.SPECULATIVE),
+    )
+
+
 def _bound_fraction(free_so2_mgl: float, k_acet: float, ph: float, pkas) -> float:
     """Bound share of acetaldehyde at a held FREE SO₂ — the basis the published claim uses.
 
@@ -90,9 +116,14 @@ def _bound_fraction(free_so2_mgl: float, k_acet: float, ph: float, pkas) -> floa
 def test_published_bound_fraction_holds_at_the_nominal(pset, params, ph, free_mgl, floor):
     """At the shipped Kd, acetaldehyde is bound in the published proportion at both points.
 
-    This is the agreement D-190 found and nothing had tested: the model's 99.5-99.7 % bound at
-    30 mg/L free SO₂ and 95.1-95.4 % at 2 mg/L are not a tuning, they are what Burroughs & Sparks'
-    Kd gives — and they land on the right side of a claim published in a different book entirely.
+    **This is an implementation check across a basis change, NOT independent corroboration of the
+    constant** (D-190 amendment). Table 17.2 of the same book prints acetaldehyde Kd = 1.5e-6,
+    bit-identical to the shipped value, and the Ch. 24 prose is Ch. 17's own arithmetic on it — so
+    agreement on the *constant* is guaranteed and proves nothing. What is NOT guaranteed is the
+    basis: this model references binding to bisulfite HSO₃⁻ with a pH-dependent β, while the
+    textbook's apparent Kd is quoted per TOTAL free SO₂ at a stated pH. Passing at 30 and 2 mg/L
+    across pH 3.0-3.8 is what pins that the two bases agree to within the ≤5 % the parameter
+    file's own note claims for them.
     """
     pkas = tuple(params[n] for n in SO2_PKA_NAMES)
     frac = _bound_fraction(free_mgl, params["K_acetaldehyde_so2"], ph, pkas)
@@ -250,29 +281,38 @@ def test_the_split_takes_exactly_four_carbonyls(params):
     assert out[1] == out[2] == out[3] == 0.0, "absent carbonyls must contribute exactly zero"
 
 
-def test_the_aroma_readout_reads_total_not_free():
+def test_the_aroma_readout_reads_total_not_free(params):
     """The OAV divides the TOTAL pool by the threshold — including for acetaldehyde.
 
     Three chemistry consumers read ``free_acetaldehyde`` (the D-27 reduction, the D-80 bridging
     and one aging term); the sensory readout reads none of them. In a sulfited wine that makes the
-    reported acetaldehyde OAV ~400x the perceptible quantity. D-190 did **not** change this: with
-    acetaldehyde at ~0.5 mg/L against a ~100 mg/L threshold the OAV is far below 1 either way, so
-    switching the readout would move no verdict while quietly making every other pool's OAV
-    inconsistent with it (only acetaldehyde has a free/bound split to read).
+    reported acetaldehyde OAV two-to-three orders of magnitude above the perceptible quantity.
+    D-190 did **not** change this: with acetaldehyde at ~0.5 mg/L against a ~100 mg/L threshold
+    the OAV is far below 1 either way, so switching the readout would move no verdict while
+    quietly making every other pool's OAV inconsistent with it (only acetaldehyde has a free/bound
+    split to read).
 
-    Pinned so the asymmetry is a recorded choice. The pool where it would bite is methional, and
-    that one is blocked above.
+    Asserted on BEHAVIOUR, not on the source text: a `getsource` check would break on any
+    harmless refactor and would pass if someone changed the behaviour while keeping the string
+    ([[feedback-grep-finds-claims-not-guards]], one level up). Pinned so the asymmetry is a
+    recorded choice. The pool where it would bite is methional, and that one is blocked above.
     """
-    import inspect
+    schema = wine_schema()
+    acet_gpl, so2_gpl = 5.0e-3, 60.0e-3
+    traj = _constant_traj(schema, {"acetaldehyde": acet_gpl, "so2_total": so2_gpl})
+    thresholds = load_thresholds()
+    threshold_gpl = ugl_to_gpl(thresholds.value("threshold_acetaldehyde_wine"))
 
-    from fermentation.sensory import oav
-
-    src = inspect.getsource(oav.oav_series)
-    assert "traj.series(pool)" in src, (
-        "oav_series no longer reads the raw pool; if it now reads a free share, D-190's scope "
-        "section is stale and this test should be replaced by one asserting the new behaviour"
+    reported = float(oav_series(traj, thresholds, "acetaldehyde")[-1])
+    assert reported == pytest.approx(acet_gpl / threshold_gpl, rel=1e-12), (
+        "oav_series no longer reports total/threshold for acetaldehyde; if it now reads the free "
+        "share, D-190's scope section is stale and this test should assert the new behaviour"
     )
-    assert "free_acetaldehyde" not in src, (
-        "the aroma readout has started reading free acetaldehyde — that is a real improvement, "
-        "but it needs a D-record and a decision about the other 22 pools that have no such split"
+
+    y = traj.y[:, -1]
+    free = free_acetaldehyde(y, schema, params, ph_of_state(y, schema, params))
+    assert free < acet_gpl, "no SO2 binding happened — the fixture is not exercising the split"
+    # The gap is the finding: the readout is orders of magnitude above the perceptible share.
+    assert reported / (free / threshold_gpl) > 100.0, (
+        "the total-vs-free gap has collapsed; re-read D-190 §2 before trusting either number"
     )

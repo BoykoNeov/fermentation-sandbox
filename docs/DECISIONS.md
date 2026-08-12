@@ -25844,3 +25844,60 @@ how often the sentence is false — 1.996 % here, on a sentence written as a fac
 `probe1..5.py` with captured output, and the control / mutated / final suite runs.
 `tests/test_so2_carbonyl_release.py` (22 tests); `parameters/data/acidbase.yaml` comment +
 two `source:` fields; `docs/ARCHITECTURE.md` test-file count.
+
+### AMENDED, same day — the "published literal" is not independent, and one leg of the Corrects marker was inferred from a figure caption
+
+Caught in review after the commit, and appended rather than edited in place (the D-147/D-149/
+D-187 precedent). **Neither error touches a measurement**; both are about what the measurements
+are evidence *for*, which is exactly the class D-187's amendment was about.
+
+**1. §2 overstates the cross-check. It is an implementation check, not corroboration.**
+
+The record says the 99.5-99.7 % / 95.1-95.4 % agreement "is not a tuning — it is what Burroughs
+and Sparks' Kd yields, landing on the right side of a claim published in a different book". That
+is wrong twice. *Understanding Wine Chemistry* Table 17.2 prints acetaldehyde Kd = **1.5e-6**,
+**bit-identical to the shipped constant**, and the Ch. 24 prose quoting ">99 % / >95 %" is Ch. 17's
+own arithmetic on Ch. 17's own Kd — Ch. 24 cites Ch. 17, so it is not a different book and not an
+independent measurement. Agreement on the *constant* was guaranteed and proves nothing.
+
+**What the check does earn is narrower and worth stating exactly.** This model references binding
+to bisulfite HSO3- with a pH-dependent beta, while the textbook's apparent Kd is quoted per
+**total free SO2** at a stated pH. So passing at both published points across pH 3.0-3.8 pins that
+the **bisulfite-basis implementation reproduces a total-free-basis statement built on the same
+constant**, to within the <=5 % the parameter file's own note claims for that basis difference.
+That is a real and previously untested property; it is not evidence that the constant is right.
+The interim `RESULTS.md` carried this caveat verbatim ("Agreement is not a coincidence — it is the
+same Kd") and the final rewrite dropped it. The test docstring is corrected in place.
+
+**2. The `Corrects: D-130` marker stands, but one of its two legs was never verified.**
+
+D-130's footnote named **two** corroborating sources. Only one was checked:
+
+- **FALSIFIED — Handbook of Enology Vol 1 §8.4.** Read directly. Table 8.5 and Figure 8.3 both
+  print the reverse ordering. This leg is what the marker rests on and it holds.
+- **UNVERIFIED — Barbe et al. 2000, J. Agric. Food Chem. 48:3413-3419.** **Not read.** Its
+  disagreement was *inferred* from Figure 8.3's caption reading "(Barbe, 2000)", which may be that
+  paper, a thesis, or another 2000 publication. The record and both `source:` fields stated it as
+  established. **It must not be cited as agreeing or disagreeing until pulled** — and the irony is
+  that inferring a citation from a secondary rendering is precisely what D-187's amendment
+  corrected, one record after the lesson was written down.
+
+Both `source:` fields are corrected in place to split the falsified leg from the unverified one.
+**Nothing in this changes the pyruvate/alpha-KG verdict** — the ordering is still contested by
+three locally-read printings and still reachable in 1.996 % of draws, and no value moves.
+
+**3. One test asserted source text rather than behaviour.**
+
+`test_the_aroma_readout_reads_total_not_free` checked `"traj.series(pool)" in
+inspect.getsource(oav_series)`. That breaks on a harmless refactor and passes if someone changes
+the behaviour while keeping the string — [[feedback-grep-finds-claims-not-guards]] one level up,
+in a file whose whole subject is claims that were never checked. Replaced with a behavioural pin
+on a synthetic trajectory: the readout must equal `total/threshold`, and the total-vs-free ratio
+must exceed 100×. Suite 1684 passed / 3 xfailed, unchanged in count.
+
+**The lesson landing on this record is its own §9 generalised.** §9 says a claim about two
+parameters is not covered by either one's band. The same shape applies to sources: a claim that
+source A corroborates value V is not established by reading a *rendering* of A inside source B,
+and "the model agrees with the literature" is not established when the literature's number **is**
+the model's number. In both cases the check ran, passed, and measured something other than what it
+was cited for.
