@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 720cec99-de09-483a-bafb-7296d361e840
-  modified: 2026-08-12T12:12:27.646Z
+  modified: 2026-08-12T13:14:47.438Z
 ---
 
 When a record concedes a known approximation and defends it with a magnitude ("it is only ~2 %,
@@ -30,6 +30,6 @@ find.
 concession covers — from the registry, not the prose — and measure **each** share. Ask "is the term
 this number describes the biggest one?" If it is not, the defence is unmade even though the number
 survives. Then check what the deviation is worth against data before treating removal as an
-improvement: D-197's naive de-duplication moved the model from 15 % below the measured band to 2.3×
-below it, so the lump was load-bearing and the honest output was a measurement plus
+improvement: D-197's naive de-duplication moved the model from 2.3× below the measured band to 8.1×
+below it (**never the 15 % → 2.3× pair — that is the flattering limb**), so the lump was load-bearing and the honest output was a measurement plus
 [[feedback-closer-to-reality-decides]] in reverse — record the size, keep the behaviour.

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T12:24:42.045Z
+  modified: 2026-08-12T13:14:53.163Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -105,7 +105,7 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
 - **Residual copper after fining (D-191)** — the credit is **BUILT**: `add_copper` writes the
   `copper` slot, D-44's "CuS drops out with the lees" is **FALSE**, D-149's "two coppers never
   meet" **CLOSED**, and the docstring's *"nothing sources one"* was false when written. Never
-  midpoint the 0.95; the **sulfide half is MEASURED, not built** (owner's call, live candidate);
+  midpoint the 0.95; the **sulfide half is MEASURED, not built** (NOT a live candidate — spent);
   D-45's mercaptide carbon flow is **FLAGGED not fixed** — **both spent at D-193, see the row above**.
   → `.claude/memory/prohibitions/residual-copper-fining.md`
 - **Fined sulfur's destination (D-193)** — the transfer into `bound_h2s`/`bound_methanethiol` is
