@@ -54,9 +54,27 @@ dryness, so the pool decays *sourceless* across that window by ``exp(−k · ∫
 sinks share ``k = 0.1`` and the same flux integral (~106 g/L·h between growth-end and dryness on a
 28 °C wine), so the surviving fraction is ~2e-5 for pyruvate and α-KG exactly as it is for
 α-ketobutyrate: **option B cannot be adopted for the source alone in any of these pools.** D-189
-measured this on α-ketobutyrate and REFUSED it there (see
-:class:`AlphaKetobutyrateExcretion`); D-49's original option-B item, which was written about
-**pyruvate**, stays **open** — with that price now attached, and NOT closed by D-189.
+measured this on α-ketobutyrate and REFUSED it there (see :class:`AlphaKetobutyrateExcretion`).
+
+**D-49's original option-B item — which was written about PYRUVATE — is now CLOSED, measured and
+REFUSED at D-195, on stronger grounds than α-ketobutyrate's.** Two things did not transfer from
+D-189, and both were measured rather than assumed:
+
+* **The gain here is real, not invisible.** Option B genuinely restores the transient: the pool
+  peaks at **122.5 mg/L**, in the literature's ~100s mg/L range, against the shipped monotone
+  30.0. α-KB's refusal could lean on the gain being unobservable; this one cannot.
+* **The cost is a disagreement with measured wine, not just with internal pins.** This residual
+  binds SO₂ through the D-51 equilibrium, so draining it (30.0 → 0.0 mg/L, survival 4.17e-5)
+  releases that SO₂: free SO₂ **33.1 → 42.8 mg/L (+29 %)**, bound **16.9 → 7.2 (−57 %)** — the
+  model reporting a wine as better protected than it is, an error in the flattering direction.
+  The shipped suite forbids it at **37 asserts across 7 files**, and the decisive one is a real-
+  data benchmark: Miao's sulfite-buffering secant falls to **1.1005**, outside his measured
+  1.2526–1.9882 band (``tests/benchmarks/test_validation_danilewicz_so2_o2.py``).
+
+**No guard was added and none is owed** — those 37 are the guard, and unlike the D-194 case the
+mutation was nowhere near green. **α-ketoglutarate was not measured**: same sink constant and the
+same D-51 coupling make the same outcome expected in kind and smaller in size (its residual is
+~20 mg/L), but that is an inference and is not claimed as a result.
 Re-assimilation returns
 carbon to ``E``/``CO2`` (not ``S``) because that is pyruvate's real metabolic fate (forward to
 ethanol, not back to sugar) — and a refund-to-sugar would be a no-op at post-dryness ``S = 0``
@@ -80,8 +98,17 @@ tolerance (verified at endpoint, not just transiently).
 **speculative**; parameter-tier propagation (D-1) caps the ``pyruvate`` output tier at
 speculative regardless. The excreted-overflow *mechanism* (yeast excretes pyruvate during
 active fermentation, re-assimilating it late) is textbook; only the RATE magnitudes are the
-author's estimates, tuned so the pool peaks in the real ~100s mg/L range and settles to a
-~10–40 mg/L finished-wine residual.
+author's estimates, tuned so the pool settles to a **~10–40 mg/L finished-wine residual**
+(measured: 30.0 mg/L, which is ``k_pyruvate_excretion / k_pyruvate_reassimilation`` exactly).
+
+**That residual is the ONLY thing the magnitudes were tuned to, and this paragraph used to claim
+otherwise (corrected at D-195).** It said they were also "tuned so the pool peaks in the real
+~100s mg/L range". They are not, and they *cannot* be: two paragraphs above, this same docstring
+says the pool "rises monotonically to the quasi-steady plateau" and that the real peak-then-decline
+transient is dropped in v1. A monotone rise to 30 mg/L has no peak — 30.0 is simultaneously the
+pool's maximum and its residual. The docstring was crediting the shipped model with the behaviour
+it elsewhere correctly says it does not have; the one shape that *would* produce a ~100s mg/L peak
+is the deferred option B, measured at 122.5 mg/L and refused at D-195.
 
 **α-Ketoglutarate (decision D-50) — same structure, ONE load-bearing difference in the carbon
 split.** :class:`AlphaKetoglutarateExcretion` / :class:`AlphaKetoglutarateReassimilation` mirror
@@ -319,8 +346,11 @@ class PyruvateReassimilation(Process):
     ride the same flux shape, the pool rises monotonically to the plateau rather than showing the
     real mid-ferment *peak-then-decline* (the descriptive transient overflow pyruvate really shows
     during exponential growth). Nothing reads the peak — D-51 reads only the finished-wine residual
-    — so the transient is dropped in v1; the growth-coupled excretion that would restore it (option
-    B) is deferred. Held temperature-flat (v1). ``pyruvate`` is clamped ≥ 0 and the shared
+    — so the transient is dropped in v1. The growth-coupled excretion that would restore it
+    (option B) is **no longer deferred: it was measured and REFUSED at D-195**, because it restores
+    the peak by spending the residual (30.0 → 0.0 mg/L), and that residual is what D-51 binds SO₂
+    with — see the module docstring for the sizes and the real-data benchmark that refuses it.
+    Held temperature-flat (v1). ``pyruvate`` is clamped ≥ 0 and the shared
     ``fermentative_flux_shape`` clamps ``X``/``S`` against solver undershoot. Mass carries a small
     gap (the oxidation moves untracked NAD(P)H) — carbon is the invariant. Tier **speculative**.
     """
