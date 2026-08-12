@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T08:24:32.833Z
+  modified: 2026-08-12T10:04:40.712Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-12)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-193**;
-sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1741**. Most remaining work is
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-195**;
+sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1742**. Most remaining work is
 **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
@@ -90,11 +90,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the closure menu's span. **Never a per-cell ratio off this ladder** (the model emits one constant);
   never group must-sulfited vs not; **D-47 protection WORKS** — competition owns the SIGN, a missing
   post-dryness source owns the SIZE. → `.claude/memory/prohibitions/acetaldehyde-ladder.md`
-- **Keto-acid excretion SHAPE — option B (D-49 → D-189)** — MEASURED and **REFUSED for
-  α-ketobutyrate**: a growth-linked source with the flux-linked sink **drains the pool it feeds**
-  (2.000 → 0.000 mg/L), and that arithmetic is **general to all three pools**. Both rescues built
-  and refused. **The suite ALREADY forbids it at 5 asserts — no guard is owed.** D-107's
-  shape-diagnosis is **corrected**: the miss is a competition. **Pyruvate's item stays OPEN.**
+- **Keto-acid excretion SHAPE — option B (D-49 → D-195)** — MEASURED and **REFUSED for BOTH
+  α-ketobutyrate (D-189) and PYRUVATE (D-195)**: a growth-linked source with the flux-linked sink
+  **drains the pool it feeds**, arithmetic **general to all three pools**. **Never argue pyruvate's
+  as invisible-gain — option B WORKS there.** Refused because draining the residual leaves
+  **Miao's measured band**, and a control pins that on the **RESIDUAL, not the shape**. **No guard
+  owed either time.** D-107's shape-diagnosis is **corrected**: the miss is a competition.
   → `.claude/memory/prohibitions/keto-acid-excretion-shape.md`
 - **Carbonyl release + the binding constants (D-190)** — release is **ALREADY EMERGENT** for
   acetaldehyde (stateless equilibrium, never build it); the aroma carbonyls bind **NOTHING** so
@@ -114,6 +115,11 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   booking is CORRECTED to **zero**, not shrunk. **D-135's rate-coupling refusal and its unmodelled
   SPONTANEOUS formation route both STAND**; its "a reservoir fining never touched" docstring does not.
   → `.claude/memory/prohibitions/fined-sulfur-destination.md`
+- **Sweet-wine scenario anchor (D-194)** — `_SWEET_BRIX` is **38.0**, D-192's OPEN item is
+  **CLOSED**. At 70 it was a must **still fermenting** (0.50 % ABV at the breakpoint), not a
+  weak wine. **Never anchor on the residual** — 45 °Brix was REJECTED as hiding the 20.2 % ABV
+  ceiling, which stays visible. `assert S > 50` passed for the WRONG REASON, and the green
+  mutation is what OWED the guard. → `.claude/memory/prohibitions/sweet-wine-anchor.md`
 - **Osmotic inhibition at high sugar (D-192)** — **BUILT**, wine-only, threshold **300 g/L =
   the TOP of Coleman's envelope, never the Handbook's printed 200** (that is inside the
   keystone's own fit). The Handbook's "300 yields less than 200" is **FORFEITED on measurement**;
@@ -140,8 +146,8 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
-Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B) — **PYRUVATE/α-KG ONLY, priced not
-deferred; α-KB's was measured and REFUSED at D-189**; peptide pool; variety-specific DMSp;
+Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B) — **α-KG ONLY and INFERRED, never
+measured; α-KB REFUSED at D-189 and PYRUVATE at D-195, both spent**; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
 in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); no post-Fenton O₂ draw (D-142); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192**; D-143/4 ← D-145.
 

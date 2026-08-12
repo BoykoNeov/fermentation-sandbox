@@ -1,9 +1,11 @@
 ---
 name: keto-acid-excretion-shape
 description: "The excreted keto-acid pools' rate SHAPE (D-49 option B), measured and refused for alpha-ketobutyrate at D-189"
-metadata:
+metadata: 
   node_type: memory
   type: project
+  originSessionId: 53cf9b2e-d59e-43b1-8918-019200d03f50
+  modified: 2026-08-12T10:03:55.517Z
 ---
 
 **Live prohibitions — the excreted keto-acid pools' rate shape.** Split out at D-185's pattern;
@@ -44,9 +46,14 @@ that sentence is now retired.**
   shape alone cannot reach 19 %, so no version was ever one constant from a match.
 - **`EthanolToleranceDeath` moves this share by EXACTLY NOTHING** (2.620 % with and without) —
   a killed hypothesis, do not re-run it.
-- **D-49's option B was written about PYRUVATE and stays OPEN** — with the decay price above
-  attached, NOT closed by D-189. Neither the motivation (no Crépin equivalent measured) nor
-  the cost (their residual binds SO₂, D-51, rather than feeding a two-year aldol) transfers.
+- **PYRUVATE's option B is CLOSED — REFUSED at D-195** (the "stays open" sentence is retired).
+  **Never argue it as invisible-gain: option B WORKS**, peaking **122.5** vs the shipped monotone
+  **30.0 mg/L**. Refused on COST — that residual is D-51's SO₂ binder, so draining it takes free
+  SO₂ **33.1 → 42.8 (+29 %)**, an error in the FLATTERING direction. **37 asserts across 7 files
+  forbid it; no guard owed.** Decisive: **Miao's secant 1.1005 vs measured 1.2526-1.9882** — and
+  a magnitude-only control pins that on **the RESIDUAL, not the shape** (1.100510 vs 1.100501),
+  so **no rescue variant with kinder timing exists** and the residual is **load-bearing for
+  agreement with real wine**. **α-KG INFERRED, never measured** — same sink `k`, same D-51.
 - **The share has ONE measurement route** — re-evaluating the rate law along the *unperturbed*
   trajectory. Disabling the other threonine consumers to isolate `d(threonine)` holds open the
   very gate the number is about and reports **87.8 %**. Never measure it that way.

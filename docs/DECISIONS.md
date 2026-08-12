@@ -26714,10 +26714,11 @@ mutation; 1742 passed under the control arm):
 measured band of **1.2526-1.9882**. Option B does not merely perturb internal pins — it takes the
 model **out of agreement with real measured wine**, which α-KB's refusal never had to show.
 
-Two honesty notes rather than hidden caveats. **Attribution:** the re-anchor holds total production
-fixed on *this* must; other tests use other musts, where it is held only approximately, so some
-share of the 37 is magnitude rather than pure shape. The Miao result is independent of that — a
-secant outside a measured band is a data disagreement either way. **Not a probe artifact:**
+Two honesty notes rather than hidden caveats. **Attribution — measured, see the amendment below:**
+the re-anchor holds total production fixed on *this* must; other tests use other musts, where it is
+held only approximately, so some share of the 37 is magnitude rather than pure shape. **A
+magnitude-only control settles it: Miao's failure belongs to the RESIDUAL, not to the shape**, which
+makes the refusal cleaner rather than weaker. **Not a probe artifact:**
 `test_carbon_closes_on_a_compiled_run` fails on its *premise* assert ("the pool genuinely
 accumulates", 3.5e-10 against > 10 mg/L), not on the carbon ledger. Carbon still closes.
 
@@ -26748,6 +26749,42 @@ either outcome — pyruvate has 27, α-KB had none, and both were refused withou
 **α-ketoglutarate was NOT measured and is not claimed.** Its sink shares the same `k = 0.1` and its
 residual binds SO₂ through the same D-51 equilibrium, so the same outcome is expected in kind and
 smaller in size (its residual is ~20 mg/L against pyruvate's 30) — an inference, labelled as one.
+
+### Amendment (same session) — the strongest sentence was the one unmeasured claim
+
+The record above originally said the Miao failure was *"independent of"* the attribution caveat,
+on the reasoning that "a secant outside a measured band is a data disagreement either way." That
+is an **assertion about attribution dressed as a tautology**, and it was the only unmeasured claim
+carrying weight in the verdict. Measured now.
+
+**The control:** keep the **shipped flux-linked shape** and collapse the residual by exactly the
+factor option B collapses it (survival 4.17e-5) — a same-sized move *without* the shape change
+([[feedback-pair-the-red-with-an-ordering-preserving-baseline]]).
+
+| arm | shape | Miao buffering secant | verdict |
+|---|---|---|---|
+| baseline | flux-linked | inside 1.2526-1.9882 | pass |
+| **option B** | growth-linked | **1.100501** | outside |
+| **magnitude-only** | **flux-linked (shipped)** | **1.100510** | outside |
+
+The two failing arms agree to **six significant figures**, and the same three benchmark tests fail
+in both. So the shape is not doing the work at all: **draining the residual by any route leaves
+Miao's band.**
+
+**This strengthens the refusal rather than qualifying it.** The original framing made the case
+against option B's *shape*, which invited the obvious rescue — find a different growth-linked form
+whose timing spares the residual. There is none to find: the objection attaches to the **residual
+itself**, and option B necessarily drains it, since that is the structural arithmetic D-189
+established (growth-linked source, flux-linked sink, `exp(-k INT flux)` across the gap). Any variant
+that keeps the residual is not option B.
+
+It also re-points the finding. §3 read as "option B disagrees with Miao"; the measured claim is
+**"the pyruvate residual is load-bearing for the model's agreement with Miao's real wines"** — a
+statement about the shipped model, not about a rejected variant, and one nothing in the archive
+had established. The residual was introduced at D-49 as a thing that *exists to bind SO₂* (D-51);
+this is the first measurement showing that binding is what keeps a real-data benchmark in band.
+
+Receipts: `d195_optionb.py`, `D195_ARM=magnitude`.
 
 ### Receipts
 

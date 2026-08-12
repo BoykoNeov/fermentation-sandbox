@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 2619e25d-f5ec-4f22-8c72-48d1de2dc5a3
-  modified: 2026-08-12T08:23:01.114Z
+  modified: 2026-08-12T10:03:04.680Z
 ---
 
 # Osmotic / substrate inhibition at high sugar — D-192
@@ -66,11 +66,14 @@ it is engaged; only the endpoint is unmoved (a supply-limited flux still arrives
   measured **1.7959 / 1.5956** against 2.0 = **~11 %**. Corrected in place. There is not 0.2 g/L
   of room inside that envelope for any new term.
 
-## OPEN — owner's call, deliberately not folded in
+## CLOSED at D-194 — was the OPEN item here, no longer owner's call
 
-**`_SWEET_BRIX = 70.0` in `test_aging_scenario.py` is not a botrytis must** (947 g/L raw;
-Sauternes is ~35-40 °Brix). All eleven scenarios still pass, but they now age a **1.4 % ABV**
-wine instead of 19.8 % — eleven tests whose names say sweet WINE. Re-anchoring it is a *scenario* decision, not physics.
+**`_SWEET_BRIX` is now 38.0** (a real botrytis must). See
+`.claude/memory/prohibitions/sweet-wine-anchor.md` — and note D-194 **corrected this file's own
+framing**: at 70 °Brix the scenarios were not aging a "1.4 % ABV wine", they were aging a must
+**still fermenting** (0.50 % ABV at the day-30 breakpoint, fermenting on through the whole
+730-day tail). The "947 g/L raw" figure above is **not** the model's initial `S` at 70 °Brix,
+which is **880.7 g/L**.
 
 **Tokay Aszu figures are NOT a validation anchor** — confounded by cold cellars and
 botrytis antifungals. Context only.

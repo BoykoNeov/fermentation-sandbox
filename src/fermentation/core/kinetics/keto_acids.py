@@ -70,6 +70,12 @@ D-189, and both were measured rather than assumed:
   The shipped suite forbids it at **37 asserts across 7 files**, and the decisive one is a real-
   data benchmark: Miao's sulfite-buffering secant falls to **1.1005**, outside his measured
   1.2526–1.9882 band (``tests/benchmarks/test_validation_danilewicz_so2_o2.py``).
+  **And that failure belongs to the residual, not to option B's shape** — a magnitude-only control
+  keeping this flux-linked form and collapsing the residual by the same factor lands the secant at
+  **1.100510** against option B's **1.100501**, six figures apart. So there is no rescue variant
+  with kinder timing: **draining this residual by any route leaves Miao's band.** Read forward,
+  that is a fact about what SHIPS — ``pyruvate``'s residual is load-bearing for the model's
+  agreement with real measured wine, not merely a pool that exists to bind SO₂.
 
 **No guard was added and none is owed** — those 37 are the guard, and unlike the D-194 case the
 mutation was nowhere near green. **α-ketoglutarate was not measured**: same sink constant and the
