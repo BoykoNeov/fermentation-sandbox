@@ -74,6 +74,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from fermentation.core.chemistry import M_ACETALDEHYDE, M_O2
 from fermentation.core.media import get_medium
 from fermentation.parameters import default_data_dir, load_parameters
 from fermentation.runtime.schedule import simulate_scheduled
@@ -548,7 +549,19 @@ _COPPER_O2_DOSE_MGL = 8.0
 _COPPER_MULTIPLIED_DRAWS: dict[str, frozenset[str]] = {
     "direct": frozenset({"phenolic_browning"}),  # D-134, on k_browning_eff
     "direct_burst": frozenset({"phenolic_browning"}),  # the burst sink is copper-free
-    "cascade": frozenset({"oxygen_activation"}),  # D-141's re-home, onto the WHOLE node
+    # D-141's re-home onto the WHOLE node, plus D-196's radical draw, which is copper-multiplied
+    # BY CONSTRUCTION (it is `share x activation_rate`, and activation carries f_Cu).
+    #
+    # THE RE-FIT THIS ENTRY'S OWN ASSERTION DEMANDS, MEASURED RATHER THAN WAIVED: it is a no-op,
+    # exactly. On the unsulfited copper scenario the total draw doubles (2.2902e-5 -> 4.5804e-5
+    # g/L/h at Ferreira's high copper, the new draw taking exactly 50%), and Ferreira's
+    # between-wine SPREAD is unchanged at **1.3245x on both arms, to four decimals**. The reason
+    # is structural and not a coincidence of this scenario: `h2o2_branch_fraction` reads only the
+    # ethanol/bisulfite weights, neither of which touches `copper`, so the new draw is a
+    # copper-INDEPENDENT multiple of a draw copper already scaled. Copper's share of total uptake
+    # therefore cannot move, which is the quantity D-134 fitted 600 L/g against.
+    # Receipts: `d196-post-fenton-o2/probe4.py`.
+    "cascade": frozenset({"oxygen_activation", "peroxide_ethanol_oxidation"}),
 }
 
 
@@ -1779,4 +1792,88 @@ def test_the_printed_replicate_sds_cannot_carry_the_copper_bound():
         f"the replicate-error bound ({on_replicates:.4f}x) is not tighter than the "
         f"between-condition one ({on_residual:.4f}x) -- the anti-conservatism this test exists "
         "to forbid has reversed sign, and D-152's choice of error term needs re-deriving."
+    )
+
+
+# ------------------------------------------------------------------------------------
+# Guard 8 — the second O2 the Fenton limb costs, and the state-dependence that keeps
+#           Danilewicz's two limits intact (decision D-196).
+# ------------------------------------------------------------------------------------
+
+
+def test_the_fenton_limb_draws_one_o2_per_acetaldehyde(copper_dose_states):
+    """`peroxide_ethanol_oxidation` consumes O2, 1:1 molar with the acetaldehyde it makes.
+
+    Until D-196 this Process drew **no O2 at all**: the 1-hydroxyethyl radical the Fenton limb
+    makes reacts with oxygen to give acetaldehyde (*Understanding Wine Chemistry* 2nd ed.,
+    24.4.4.1), so the limb costs two O2 per acetaldehyde and the module booked one.
+
+    WHAT THIS FORBIDS: silently dropping the draw again, or re-pinning it to the H2O2 flux
+    instead of to the acetaldehyde. The distinction is load-bearing rather than cosmetic — the
+    source names an unquantified competitor for the radical (hydroxycinnamate quenching), and
+    pinning per acetaldehyde is what absorbs it, because a quenched radical yields neither the
+    aldehyde nor the draw. Per H2O2 it would need a quench ratio nobody has published.
+
+    Asserted at a real cascade state rather than on a hand-built vector, and at machine
+    tolerance, because the claim is exact stoichiometry and not a magnitude.
+    """
+    compiled, params, t, y = copper_dose_states[("cascade", _FERREIRA_CU_HI_GPL)]
+    process = next(p for p in compiled.process_set.active if p.name == "peroxide_ethanol_oxidation")
+    d = process.derivatives(t, y, compiled.schema, params)
+
+    n_acetaldehyde = float(d[compiled.schema.slice("acetaldehyde")][0]) / M_ACETALDEHYDE
+    n_o2 = -float(d[compiled.schema.slice("o2")][0]) / M_O2
+    assert n_acetaldehyde > 0.0, "the arm is not measuring — this limb is making no acetaldehyde"
+    assert n_o2 == pytest.approx(n_acetaldehyde, rel=1e-12), (
+        f"the Fenton limb drew {n_o2:.6e} mol O2/L/h against {n_acetaldehyde:.6e} mol/L/h of "
+        "acetaldehyde. D-196's stoichiometry is 1:1 per ACETALDEHYDE; if that has changed the "
+        "hydroxycinnamate quench is no longer absorbed and needs its own parameter."
+    )
+    assert "o2" in process.touches, "the draw is undeclared — ProcessSet(strict=True) would raise"
+
+
+def test_the_radical_draw_is_bisulfite_dependent_not_a_flat_activation_surcharge(
+    copper_dose_states, ph_dose_states
+):
+    """D-196's draw must stay a *share* of activation, not a fixed fraction of it.
+
+    WHAT THIS FORBIDS: re-pinning the second O2 to the activation node at a constant rate. That
+    variant was built and measured, and it is not a stylistic difference — at the benchmark's
+    limit dose it reads **0.9717 against a 0.01 tolerance and 1.9455 against 0.02**, breaking
+    BOTH of Danilewicz's asymptotes, where the shipped share-weighted form leaves them at 0.9953
+    and 1.9926. The two forms cost the same on average (the mean share is 0.0267 at the operating
+    point) and differ by only 0.21 % on the real-wine ratio, so nothing else in the suite
+    separates them. (Receipts: ``d196-post-fenton-o2/probe3.py``.)
+
+    An earlier draft of this test asserted ``h2o2_branch_fraction`` directly and would have
+    passed on the flat variant unchanged — the branch fraction is not what the flat variant
+    changes. It measures the **realised draw** instead: the O2 this Process takes as a fraction
+    of the O2 the activation node takes, at two states whose free bisulfite differs.
+    """
+    unsulfited = copper_dose_states[("cascade", _FERREIRA_CU_HI_GPL)]
+    sulfited = ph_dose_states[("cascade", 30.0, _CARRASCON_PH_LO)]
+
+    fractions = {}
+    for label, (compiled, params, t, y) in (("unsulfited", unsulfited), ("so2_30", sulfited)):
+        draws = _o2_draws(compiled, params, t, y)
+        activation = -draws["oxygen_activation"]
+        assert activation > 0.0, f"{label}: the activation node is idle — not measuring"
+        fractions[label] = -draws["peroxide_ethanol_oxidation"] / activation
+
+    # Unsulfited: ethanol wins the whole H2O2 node, so the limb costs a second O2 for every
+    # activation and total uptake is exactly doubled.
+    assert fractions["unsulfited"] == pytest.approx(1.0, rel=1e-9), (
+        f"with no bisulfite the radical draw is {fractions['unsulfited']:.6f}x activation, not "
+        "1.0 — the ethanol branch no longer takes the whole H2O2 node and D-196's premise moved"
+    )
+    # Sulfited: bisulfite takes most of the node, so the surcharge collapses. A flat surcharge
+    # cannot produce both numbers, which is exactly what this forbids.
+    assert fractions["so2_30"] < 0.25, (
+        f"at 30 mg/L SO2 the radical draw is still {fractions['so2_30']:.4f}x activation. The "
+        "draw has stopped following the ethanol branch share, so it is behaving as a flat "
+        "surcharge — which breaks both Danilewicz asymptotes (see this test's docstring)."
+    )
+    assert fractions["unsulfited"] > 4.0 * fractions["so2_30"], (
+        "the draw's dependence on free bisulfite has collapsed to within a factor of 4 — "
+        "share-weighted and flat forms are no longer distinguishable here"
     )

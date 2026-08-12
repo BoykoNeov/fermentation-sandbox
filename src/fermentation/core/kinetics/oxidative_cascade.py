@@ -21,6 +21,13 @@ So **one mol of O2 yields two oxidising equivalents**: one H2O2 and one quinone.
 fact is the rebuild's whole falsifiable content, because it is what produces Danilewicz 2016's
 measured sulfite series without any of it being fitted:
 
+**One O2 more leaves the pool without yielding any oxidising equivalent at all** (D-196): the
+1-hydroxyethyl radical the Fenton limb makes reacts with O2 to give acetaldehyde, so that limb
+costs two O2 per acetaldehyde and only the first of them is an activation. See
+:data:`_O2_PER_ACETALDEHYDE`. The series below is unaffected at its limits and only there,
+because the draw is weighted by the ethanol branch's share of H2O2, which goes to zero exactly
+where the limits are asserted.
+
 * **1:1** — quinone route blocked (benzenesulfinic acid traps the quinone): only the H2O2 node
   can oxidise bisulfite, so one SO2 per O2.
 * **1:2** — both routes open and bisulfite wins both: two SO2 per O2.
@@ -148,6 +155,31 @@ _ACETALDEHYDE_PER_H2O2 = 1.0
 #: Ethanol debited per acetaldehyde formed — the carbon-exact C2 borrow (the D-27 reduction
 #: reversed), identical to :mod:`aging.py`'s ``_ETHANOL_PER_ACETALDEHYDE``.
 _ETHANOL_PER_ACETALDEHYDE = M_ETHANOL / M_ACETALDEHYDE
+
+#: Moles of O2 consumed by the 1-hydroxyethyl radical per mole of acetaldehyde it yields —
+#: the **second** O2 the Fenton limb costs, which this module did not book until D-196.
+#:
+#: Mechanism, printed: "reaction with the next highest concentration component of wine, ethanol,
+#: generates the major detectable product of the Fenton reaction, the 1-hydroxyethyl radical.
+#: **This radical goes on to react with oxygen and produce acetaldehyde** unless it can be
+#: quenched by other processes, such as reaction with hydroxycinnamates" (Waterhouse, Sacks &
+#: Jeffery, *Understanding Wine Chemistry* 2nd ed., 24.4.4.1). So one acetaldehyde made this way
+#: costs TWO O2: one activated at the iron node, one taken by the radical.
+#:
+#: **Why it is pinned per ACETALDEHYDE and not per H2O2.** The source names a competitor for the
+#: radical (hydroxycinnamate quenching) and gives no rate for it. That competition needs no
+#: parameter here, because quenching removes the acetaldehyde and the second O2 *together* — a
+#: quenched radical yields neither. Pinning the draw to the acetaldehyde this Process already
+#: forms therefore absorbs the unquantified quench into an already-calibrated rate; pinning it to
+#: the H2O2 flux would not, and would need the quench ratio nobody has published.
+#:
+#: **This is an UPPER BOUND on the NET draw, deliberately.** The radical's other product is the
+#: hydroperoxyl radical, which in principle returns to H2O2 via Fe(II) and hands an oxidising
+#: equivalent back — pushing the SO2:O2 ratio the other way. Nothing sources that limb's fate in
+#: wine (Danilewicz 2007's radical chain is *bisulfite* autoxidation, which he concludes does not
+#: run in wine because polyphenols intercept it), so it is named and NOT built. Recorded so a
+#: later recycling term cannot be credited with a cancellation.
+_O2_PER_ACETALDEHYDE = 1.0
 
 #: Moles of CO2 released per Strecker aldehyde formed (the amino acid's own carboxyl carbon).
 _CO2_PER_STRECKER_ALDEHYDE = 1.0
@@ -288,11 +320,20 @@ def h2o2_branch_fraction(
 
 
 class OxygenActivation(Process):
-    """The cascade's sole O2 consumer: Fe(II) + O2 -> H2O2 + Fe(III) (decision D-141).
+    """The cascade's O2 *activation* node: Fe(II) + O2 -> H2O2 + Fe(III) (decision D-141).
 
-    Every gram of O2 that leaves the pool leaves through here. Downstream Processes consume the
-    **oxidants** this makes, never ``o2`` itself, which is the structural content of Gate 1
-    (D-137): in wine, O2 reacts with essentially nothing but iron.
+    **No longer the sole O2 consumer** (D-196), and this docstring said it was in two places.
+    :class:`PeroxideEthanolOxidation` now books the second O2 the 1-hydroxyethyl radical takes.
+    Gate 1 (D-137) is **not** breached by that: its content is that ground-state wine molecules
+    — ethanol, bisulfite, phenols — do not react with O2, so O2 goes through iron. A
+    carbon-centred *radical* reacting with O2 at near-diffusion rate is not a counterexample to
+    that claim; it is the standard next step of the chain Gate 1's own source describes. What is
+    no longer true is the *bookkeeping* sentence, so it is corrected here rather than reinterpreted.
+
+    Every gram of O2 that enters the **oxidant-producing** path still enters through here.
+    Downstream Processes consume the **oxidants** this makes, never ``o2`` itself — with the one
+    radical exception above, which consumes O2 without producing an oxidant, and that asymmetry
+    is exactly why it moves the SO2:O2 ratio.
 
     Touches ``o2`` (consumed) and ``quinone`` (produced). H2O2 is *not* deposited anywhere — it
     is quasi-steady-state, so its consumers recompute the production flux from ``activation_rate``
@@ -362,10 +403,12 @@ class PeroxideEthanolOxidation(Process):
 
     name = "peroxide_ethanol_oxidation"
     tier = Tier.SPECULATIVE
-    #: Books the oxidised carbon as ``acetaldehyde``, borrowed carbon-exactly from ``E``. Does
-    #: NOT touch ``o2`` — that is OxygenActivation's alone, which is the whole point of the
-    #: rebuild.
-    touches = ("acetaldehyde", "E")
+    #: Books the oxidised carbon as ``acetaldehyde``, borrowed carbon-exactly from ``E``, and
+    #: — since D-196 — the **second O2** the 1-hydroxyethyl radical takes. This comment used to
+    #: read "does NOT touch ``o2`` — that is OxygenActivation's alone, which is the whole point
+    #: of the rebuild", and that was a real claim, not a formality: it is corrected rather than
+    #: quietly edited. The rebuild's point survives it (see :data:`_O2_PER_ACETALDEHYDE`).
+    touches = ("o2", "acetaldehyde", "E")
     reads: tuple[str, ...] = (
         "k_o2_depletion_total",
         "k_activation_phenolic",
@@ -399,6 +442,10 @@ class PeroxideEthanolOxidation(Process):
         rate = n_acet * M_ACETALDEHYDE
         d[schema.slice("acetaldehyde")] = rate
         d[schema.slice("E")] = -rate * _ETHANOL_PER_ACETALDEHYDE
+        # The radical's own O2 (D-196). Weighted by ``share``, so it vanishes as bisulfite takes
+        # the H2O2 node — which is what keeps Danilewicz's 1:1 and 1:2 asymptotes intact while a
+        # same-sized FIXED fraction on the activation node breaks both (measured, D-196 3).
+        d[schema.slice("o2")] = -_O2_PER_ACETALDEHYDE * n_acet * M_O2
         return d
 
 
