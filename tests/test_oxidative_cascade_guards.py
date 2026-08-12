@@ -2072,3 +2072,80 @@ def test_deleting_the_downstream_draws_more_than_halves_the_oxygen_uptake(wine_p
         f"{free_so2:.1f} mg/L (D-197 measured 14.0x here); if this falls toward 1 the downstream "
         "draws have been removed, and the O2 uptake with them"
     )
+
+
+# ------------------------------------------------------------------------------------
+# Guard 10 — the hydroperoxyl RECYCLING limb, refused and pinned (decision D-198).
+# ------------------------------------------------------------------------------------
+#
+# D-196 §5 named the 1-hydroxyethyl radical's other product — the hydroperoxyl radical, which
+# in principle returns an oxidising equivalent — and did not build it, calling
+# ``_O2_PER_ACETALDEHYDE = 1.0`` "an UPPER BOUND on the NET draw". D-198 measured that limb
+# rather than inheriting the label, and the refusal stands for reasons D-196 did not have:
+#
+#   * H2O2 is quasi-steady-state here, so a limb that RETURNS H2O2 feeds its own production
+#     flux. The balance is a geometric series, ``F = A/(1 - s)`` with ``s`` the ethanol branch
+#     share — a RATE-LAW change that removes the activation node's status as rate-determining
+#     step, not the stoichiometric tweak "upper bound on the net draw" implies. It draws MORE
+#     O2 than the shipped constant at every ``s > 0`` (by ``s²/(1-s)``), so the bound is not a
+#     bound.
+#   * ``s`` reaches exactly 1.0 in unsulfited wine (measured), where that series has a POLE.
+#     The arm is not integrable there: the solver dies with "required step size is less than
+#     spacing between numbers", and every number the harness prints is determined by the
+#     clamp put under the pole (21.4 mg/L of spread across six orders of clamp magnitude).
+#   * Three on-disk fates disagree — HO2· → H2O2 (Carrascón 2018; Marrufo 2018; Danilewicz
+#     2007), dismutation (both beer texts), and Haber-Weiss (*The Chemistry of Beer*) — and
+#     NONE is stated for the ethanol limb. UWC's Figure 24.13 draws this step with no
+#     co-product at all. The chain terminator that would make the series converge is the
+#     hydroxycinnamate quench, whose ratio is cited (Gislason et al.) but nowhere on disk.
+#
+# WHY A GUARD IS OWED. D-196's ``test_the_fenton_limb_draws_one_o2_per_acetaldehyde`` asserts a
+# RATIO, and the recycling limb scales O2 and acetaldehyde by the SAME factor — so it stays
+# GREEN under the very term D-196 §5 named. Measured, not assumed: the capped route-1 arm is
+# GREEN on that test (``d198-hydroperoxyl/d198_arms.py``). The uncapped arm is red, but red
+# because the FIXTURE crashes on the pole — a red that names nothing.
+# [[feedback-grep-finds-claims-not-guards]]
+
+
+def test_the_fenton_limb_returns_no_h2o2_to_the_node_it_drew_from(copper_dose_states):
+    """The ethanol limb's acetaldehyde flux is ``share × activation``, with no amplification.
+
+    WHAT THIS FORBIDS: adding a hydroperoxyl-recycling term — H2O2 handed back to the branch
+    node this limb drew from — on the strength of any of the three sourced-but-incompatible
+    fates. Every such term multiplies this limb's whole flux by a geometric sum ``1/(1 - c·s)``
+    (``c = 1`` for the HO2·→H2O2 route, ``0.5`` for dismutation), and that factor is invisible
+    to the 1:1 stoichiometry guard above because it scales the O2 and the acetaldehyde alike.
+
+    This asserts the flux against its own inputs instead: one acetaldehyde per H2O2 taking the
+    ethanol branch, and one H2O2 per O2 activated — the identity that holds only while the
+    limb is a pure CONSUMER of the H2O2 node.
+
+    If a future beat sources the quench ratio and builds the recycling, this test is the one to
+    change, and changing it means re-recording D-196's "upper bound" claim (D-198 measured it
+    false) and re-baselining ``k_o2_depletion_total``, which is calibrated on the assumption
+    that activation is rate-determining.
+    """
+    compiled, params, t, y = copper_dose_states[("cascade", _FERREIRA_CU_HI_GPL)]
+    process = next(p for p in compiled.process_set.active if p.name == "peroxide_ethanol_oxidation")
+    d = process.derivatives(t, y, compiled.schema, params)
+
+    n_acetaldehyde = float(d[compiled.schema.slice("acetaldehyde")][0]) / M_ACETALDEHYDE
+    assert n_acetaldehyde > 0.0, "the arm is not measuring — this limb is making no acetaldehyde"
+
+    from fermentation.core.kinetics.oxidative_cascade import (
+        activation_rate,
+        h2o2_branch_fraction,
+    )
+
+    share = h2o2_branch_fraction(y, compiled.schema, params, "ethanol")
+    expected = share * activation_rate(y, compiled.schema, params) / M_O2
+    amplification = n_acetaldehyde / expected
+    assert amplification == pytest.approx(1.0, rel=1e-12), (
+        f"the ethanol limb ran at {amplification:.6f}x share×activation. A factor >1 means H2O2 "
+        "is being returned to the branch node — the recycling limb D-196 §5 named and D-198 "
+        f"refused. At this state s={share:.6f}, so the HO2·→H2O2 route would read "
+        f"{1.0 / (1.0 - share):.6f}x and dismutation {1.0 / (1.0 - 0.5 * share):.6f}x. That is a "
+        "rate-law change, not a stoichiometry change: it needs the hydroxycinnamate quench "
+        "ratio (unpublished — the series has a pole at s=1, which unsulfited wine reaches) and "
+        "a re-baseline of k_o2_depletion_total."
+    )
