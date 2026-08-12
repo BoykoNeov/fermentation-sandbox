@@ -125,6 +125,7 @@ from fermentation.core.kinetics import (
     OakExtraction,
     OenococcusDiacetylReduction,
     OrganicAcidExcretion,
+    OsmoticSubstrateInhibition,
     OxidativeAcetaldehyde,
     PhenolicBrowning,
     PrecursorNonEhrlichFates,
@@ -1518,6 +1519,40 @@ _PRIMARY_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: brake's own reads already set it. See D-129 and the ``inactivation`` module docstring.
 _ETHANOL_CEILING_PROCESSES: tuple[Callable[[], Process], ...] = (EthanolToleranceDeath,)
 
+#: Osmotic/substrate inhibition at very high sugar (decision D-192) — the brake the wired
+#: core lacked on the *substrate* axis, the mirror of the ethanol ceiling above. Before it, a
+#: must got marginally FASTER per litre as it got sweeter (both Monod terms are saturated far
+#: below any must concentration) and an 881 g/L must — which the Handbook of Enology calls
+#: "practically unfermentable" — fermented to 19.8 % ABV.
+#:
+#: Kept in its OWN isolable tuple (prime directive #3) for the same reason as the ceiling, and
+#: with the same structural inertness argument: :class:`OsmoticSubstrateInhibition` returns the
+#: literal ``1.0`` by early return for ``S ≤ S_osmotic_threshold``, so every must whose sugar
+#: never reaches 300 g/L is **byte-for-byte** the pre-D-192 core. Measured at D-192: 24, 26 and
+#: 28 Brix (245/268/291 g/L) give ``max|dS| = max|dE| = 0.000e+00`` across the whole ``(K, n)``
+#: band, and the Coleman reconstruction RMSE is unchanged to nine decimals. That is why the
+#: threshold sits at the TOP of Coleman's 265-300 g/L validated envelope rather than at the
+#: Handbook's own ~200 g/L onset — below 300 g/L the inhibition is already absorbed into the
+#: Coleman constants this core is built on, and an explicit term would double-count it.
+#:
+#: **Wine only, and that is the inertness claim for beer** — the anchors are grape-must
+#: numbers and beer's literature supplies none, so beer is inert by NOT BEING WIRED, which
+#: is stronger than inertness by parameter value (the heaviest wort in the suite is ~250 g/L,
+#: but nothing in a parameter file would guarantee that for a barleywine). Wiring it into beer
+#: would additionally have to name :class:`OrganicAcidExcretion`, which re-derives the
+#: fermentative flux itself — the same coupling :data:`_BEER_FERMENTATION_MODIFIERS` warns
+#: about below.
+#:
+#: It scales GROWTH as well as uptake, because the Handbook's mechanism sentence is
+#: growth-mediated ("an elevated amount of sugar hinders yeast growth and decreases the maximum
+#: population"), and it therefore MUST also name :class:`AminoAcidAssimilation` — the identical
+#: correctness coupling decision D-32 records for the growth Arrhenius and the carrying-capacity
+#: modifier. Including growth is also the choice that costs the headline: at 70 Brix it *raises*
+#: the arrested ABV from 5.36 % to 5.59 %.
+_OSMOTIC_INHIBITION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
+    OsmoticSubstrateInhibition,
+)
+
 #: Tier-2 temperature-/metabolism-driven aroma byproducts (Milestone 2, decision
 #: D-18/D-19): ester synthesis and Ehrlich-pathway fusel alcohols. Kept as a
 #: *separate* tuple from the validated-core primary set so the speculative beat stays
@@ -2483,7 +2518,11 @@ def _build_media(
                 + _BOUND_SULFIDE_PROCESSES
                 + _CLOSURE_INGRESS_PROCESSES
             ),
-            modifier_factories=_WINE_FERMENTATION_MODIFIERS + _CARRYING_CAPACITY_MODIFIERS,
+            modifier_factories=(
+                _WINE_FERMENTATION_MODIFIERS
+                + _CARRYING_CAPACITY_MODIFIERS
+                + _OSMOTIC_INHIBITION_MODIFIERS
+            ),
         ),
         "beer": Medium(
             name="beer",

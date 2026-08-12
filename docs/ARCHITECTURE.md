@@ -93,7 +93,7 @@ can never break conservation, and the `touches` contract still holds (scaling ze
 Modifiers toggle and feed `tier_of` exactly like Processes. Stacked modifiers on one Process
 compose to a single scalar (D-10, D-11).
 
-`core/kinetics/` holds **79** concrete `Process`/`RateModifier` implementations across 22 modules
+`core/kinetics/` holds **80** concrete `Process`/`RateModifier` implementations across 23 modules
 (the three base types live in `core/process.py`).
 
 ### Kinetics modules
@@ -103,6 +103,7 @@ compose to a single scalar (D-10, D-11).
 | `growth.py` | 1 | biomass growth |
 | `uptake.py` | 1 | fermentative sugar uptake |
 | `inhibition.py` | 1 | ethanol inhibition (modifier) |
+| `osmotic.py` | 1 | high-sugar osmotic/substrate brake (modifier, wine-only) |
 | `arrhenius.py` | 2 | per-rate temperature scaling (modifier) |
 | `temperature.py` | 1 | driven temperature ramp |
 | `carrying_capacity.py` | 1 | biomass cap (modifier) |
@@ -147,9 +148,9 @@ the run byte-for-byte unchanged.
 
 | Medium | Oxidative set | Processes | Modifiers |
 |--------|---------------|----------:|----------:|
-| wine | `direct` (default) | 62 | 4 |
-| wine | `cascade` | 64 | 4 |
-| wine | `direct_burst` | 63 | 4 |
+| wine | `direct` (default) | 62 | 5 |
+| wine | `cascade` | 64 | 5 |
+| wine | `direct_burst` | 63 | 5 |
 | beer | `direct` (default) | 27 | 3 |
 | beer | `cascade` | 28 | 3 |
 | beer | `direct_burst` | 27 | 3 |
@@ -350,7 +351,7 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (75 test files; unit, integration, conservation, sampling-surface and
+`uv run pytest -n auto` (76 test files; unit, integration, conservation, sampling-surface and
 doc-consistency checks), `uv run ruff check .`, `uv run mypy` (strict on `src`). CI runs all three
 on Python 3.13 and 3.14. Two of the test files guard documentation rather than physics:
 `test_decisions_index.py` (the archive's generated index) and `test_memory_shape_hook.py`.

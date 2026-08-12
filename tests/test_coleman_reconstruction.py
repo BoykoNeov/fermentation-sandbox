@@ -107,8 +107,12 @@ def test_engine_reproduces_coleman_sugar_curve(n0_mgL: float) -> None:
     # must_fermentable_fraction-corrected sugar (~245 g/L at 24 Brix, decision D-16),
     # so we feed that same S0 to the Coleman reference rather than its raw ~264 g/L
     # default; the glycerol diversion leaves dS untouched, so the curves still track.
-    # Observed RMSE is ~1.3 g/L (~0.5 % of S0) at both N levels; the 2.0 g/L
-    # threshold is observed + ~50 % margin (NOT a loose pass).
+    # Observed RMSE is 1.796 g/L (80 mg N/L) and 1.596 (330), i.e. ~0.7 % of S0; the 2.0 g/L
+    # threshold leaves ~11 % headroom, NOT the ~50 % this comment claimed until D-192
+    # measured it. Corrected there rather than left as prose nobody had re-run: the margin is
+    # the number a future change is told it has to work with, and it was overstated 4x.
+    # It is a tight pin, which is precisely why D-192 placed its high-sugar brake ABOVE this
+    # envelope instead of inside it — there is not 0.2 g/L of room here for a new term.
     t_h, sugar = _our_sugar(n0_mgL)
     ref = _coleman_reference(n0_mgL, s0=float(sugar[0]))
     fit = compare_series(t_h, sugar, ref)

@@ -361,7 +361,40 @@ def test_a_nominal_sitting_on_a_band_edge_cannot_be_classified_by_an_edge_screen
     draw cannot reach the credited copper. Measured, not argued: forcing it through the D-159
     harness draws two distinct values (0.9699, 0.9573) and still returns ``max|dy| == 0.0``,
     in the same scenario where ``k_copper_multiplier`` moves 1.27e-2 and ``mu_max`` 42.4. That
-    is pinned in ``test_residual_copper_fining.py``, not merely asserted here."""
+    is pinned in ``test_residual_copper_fining.py``, not merely asserted here.
+
+    **D-192's three osmotic constants joined together, and they break the pattern above in
+    two ways that matter.**
+
+    First, they are the opposite of the copper case on reachability: all three are declared in
+    ``OsmoticSubstrateInhibition.reads`` and are evaluated on every derivative call, so a
+    sampler draw *does* reach them. The "harmless because unread" escape hatch does not apply.
+
+    Second — and this an edge screen cannot see at all — ``K_osmotic_inhibition`` and
+    ``n_osmotic_inhibition`` **do not have independent bands**. ``K`` is *derived* from ``n``
+    by the far anchor, ``K = 325/((1/0.05 - 1)**(1/n))``, so the admissible region is a
+    one-dimensional curve through the two-dimensional box, not the box. Screening either at
+    the other's edge produces an off-curve pair that misses the 625 g/L anchor both constants
+    exist to hit — not a weaker version of the shipped behaviour but a different model. This
+    is D-190's lesson (a claim about two parameters is not covered by either one's band)
+    arriving as a harness obligation rather than as prose: **the pair must be swept jointly,
+    along the curve, or not at all.**
+
+    Why each sits where it does:
+
+    * ``S_osmotic_threshold`` = 300 on the **high** edge of ``[265, 300]``. Both edges are
+      PRINTED — the band *is* Coleman 2007's own stated validated envelope, not a constructed
+      uncertainty — and the nominal is at the top on purpose, because that is what makes every
+      in-envelope must byte-for-byte inert. A midpoint would put the brake inside the range the
+      model's own growth and death constants were fitted over, double-counting inhibition
+      already absorbed into them.
+    * ``n_osmotic_inhibition`` = 2 on the **low** edge of ``[2, 6]``. That edge is not an
+      uncertainty bound but a **hard numerical floor**: below 2 the factor has a derivative
+      corner where the brake engages, and the modifier raises rather than integrating it. A
+      midpoint exponent would have strictly less justification than the floor.
+    * ``K_osmotic_inhibition`` = 74.6 on the **low** edge, purely as the image of ``n = 2``
+      under the derivation above. It has no independent nominal to move.
+    """
     wine_on_edge = _on_edge(_wine())
     assert wine_on_edge == {
         "f_non_ehrlich_phenylalanine",
@@ -370,6 +403,9 @@ def test_a_nominal_sitting_on_a_band_edge_cannot_be_classified_by_an_edge_screen
         "copper_fining_residual_fraction",
         "vant_hoff_co2_solubility",
         "bottling_burst_screwcap",
+        "S_osmotic_threshold",
+        "K_osmotic_inhibition",
+        "n_osmotic_inhibition",
     }, f"the wine nominal-on-edge set changed: {sorted(wine_on_edge)}"
 
     beer = Scenario(

@@ -142,6 +142,48 @@ must_fermentable_fraction:
     conditions: "ripe Vitis vinifera must; fraction of refractometric soluble solids that is fermentable hexose"
     notes: "Brix measures TOTAL dissolved solids as sucrose-equivalent, but in ripe must glucose+fructose are ~90-95% of the soluble solids (the rest is organic acids, minerals, phenolics - not fermentable). brix_to_sugar_gpl therefore OVERSTATES fermentable sugar; this fraction corrects it at the compile boundary (decision D-16): fermentable S0 = brix_to_sugar_gpl(brix) * 0.93. A MUST-COMPOSITION constant, not a yeast-strain kinetic constant - it lives in this file for now but would need re-homing if a second wine strain file is added (it would duplicate). Without it, a 24 Brix must reads 263.8 g/L hexose (ABV ~15.7% even at realised yield); with it, ~245 g/L -> ABV ~14.9%, the realistic potential alcohol of 24 Brix."
 
+# -- Osmotic / substrate inhibition at very high sugar (decision D-192) --------
+# One-sided thresholded brake on the fermentative flux AND growth:
+#   f(S) = 1                                                       for S <= S_osmotic_threshold
+#   f(S) = 1/(1 + ((S - S_osmotic_threshold)/K_osmotic)**n_osmotic) for S >  S_osmotic_threshold
+# Exactly 1 below the threshold BY EARLY RETURN, so every must that never reaches it is
+# byte-for-byte the pre-D-192 core. Read by OsmoticSubstrateInhibition; wine-only.
+# NOTE ON FRAME: the state variable S is FERMENTABLE HEXOSE g/L (must_fermentable_fraction
+# converts Brix at the compile boundary and its own unit says so). Literature numbers quoted
+# as "g of sugar per litre" are already in that frame; only Brix needs converting. All three
+# constants below are in the state frame.
+
+S_osmotic_threshold:
+  value: 300.0
+  unit: "g/L"
+  tier: plausible
+  uncertainty: { low: 265.0, high: 300.0, note: "the Coleman 2007 validated envelope itself, 265-300 g/L initial sugar; BOTH edges are PRINTED (this is the source's own stated range, not a constructed band)" }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884 (validated envelope); onset direction from Ribereau-Gayon et al. 2006, Handbook of Enology vol. 1 sec. 3.4.1"
+    doi: "10.1128/aem.00670-07"
+    conditions: "S. cerevisiae var. bayanus, Chardonnay must, 20 C; the sugar concentration above which this model's OWN growth/death constants are no longer backed by the data they were fitted to"
+    notes: "The Handbook's stated onset is ~200 g/L ('speed ... remains stable until about 200 g/l. Above this concentration, fermentation slows'), which is BELOW every normal wine must - 24 Brix loads at 245 g/L. That onset is DELIBERATELY NOT USED. This model's mu_max/K_n/k_prime_d come from Coleman 2007, whose fits are validated over 265-300 g/L initial sugar and contain NO substrate-inhibition term; whatever inhibition operates below 300 g/L is therefore already absorbed into those constants, and an explicit term there would double-count it. Placing the threshold at the TOP of that envelope makes the inertness of every in-envelope must STRUCTURAL (factor is the literal 1.0 by early return) rather than a tolerance argument. Measured at D-192: 24, 26 and 28 Brix are byte-for-byte identical (max|dS| = max|dE| = 0.000e+00) across the whole (K, n) band, and the Coleman reconstruction RMSE is unchanged to nine decimals. CONSEQUENCE FORFEITED, deliberately: the Handbook's 'alcohol production can be lower in a must containing 300 g/l than in another containing only 200 g/l' is NOT reproduced. D-192 measured the cost of reaching it - a Haldane brake with K_i ~ 17 g/L does reproduce it (8.83 % vs 13.17 % ABV) but is a 92 % brake at 200 g/L, i.e. a global rate cut rather than high-sugar inhibition, and it puts the Coleman RMSE at 170.9 against a 2.0 g/L threshold."
+
+K_osmotic_inhibition:
+  value: 74.6
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 74.6, high: 199.0, note: "the (K, n) pair is jointly constrained, NOT independently: K is DERIVED from n by the 625 g/L anchor, K = 325/((1/0.05 - 1)**(1/n)). The band's edges are n=2 (K=74.6) and n=6 (K=199.0). Never vary K alone - an off-pair K breaks the far anchor this constant exists to hit" }
+  provenance:
+    source: "Ribereau-Gayon et al. 2006, Handbook of Enology vol. 1 sec. 3.4.1 (far anchor); author estimate for the 0.05 reading of 'practically unfermentable'"
+    conditions: "grape must, 20 C; sets the width of the decay between the threshold and the concentration at which must is practically unfermentable"
+    notes: "Anchored by solving f(625) = 0.05 with n = 2, giving K = (625 - 300)/((1/0.05 - 1)**(1/2)) = 74.56, shipped rounded to 74.6. The 600-650 g/L range is PRINTED ('From 600 to 650 g of sugar per liter, the concentrated grape must becomes practically unfermentable'); 625 is its midpoint and 0.05 is a CONSTRUCTED reading of 'practically' - the source gives a verdict, not a rate. SPECULATIVE for that reason. The far anchor is deliberately NOT taken as an exact zero: a hard wall would make a very sweet must an ABSORBING state (uptake exactly 0, growth nitrogen-capped, nothing able to remove sugar - it could never ferment at all), whereas real must at that concentration does ferment, over years ('Tokay Aszu wines ferment for from two to five years or longer', Amerine & Joslyn / Applied Wine Chemistry and Technology p.104)."
+
+n_osmotic_inhibition:
+  value: 2.0
+  unit: "dimensionless"
+  tier: speculative
+  uncertainty: { low: 2.0, high: 6.0, note: "UNDERDETERMINED by the two anchors - every n in this band passes through both by construction. Low edge 2.0 is the C1-smoothness floor (below it the factor has a derivative corner at the threshold); high edge 6.0 is where the brake is already effectively a step. Pair each n with its own K (see K_osmotic_inhibition)" }
+  provenance:
+    source: "author estimate; the one-sided thresholded FORM follows Levenspiel 1980 / Luong 1985 (Table 23.1 eqs 23.9-23.10 in Concise Encyclopedia of Science and Technology of Wine ch. 23, after Marin 1999 AJEV 50(2):166), transferred from their PRODUCT axis to the SUBSTRATE axis"
+    conditions: "S. cerevisiae; sets only HOW SHARPLY the brake engages between the threshold and the unfermentable anchor, not WHERE it engages"
+    notes: "n = 2 is the minimum that keeps f C1-smooth at the threshold (f'(S_thr) = 0), the same numerical reason EthanolToleranceDeath uses a one-sided quadratic and ethanol_inhibition_exponent ships at 2. The transfer of Levenspiel/Luong's critical-concentration-with-toxic-power form from product to substrate is OUR step and is the speculative part; the literature's own substrate-inhibition form (Ghose & Tyagi 1979, eq 23.12, a Haldane term) was BUILT AND MEASURED AT D-192 AND REJECTED ON SHAPE: its inhibition group S^2/(K_S + S) grows only 1.51x between 200 and 300 g/L, so it cannot be flat at one and biting at the other - satisfying both statements the same literature makes would need ~19x, i.e. a power-law steepness of about n = 7.3. HOW SHARP is the speculative half of D-192's split; the consequence is confined to the extreme regime, where an 881 g/L must arrests at 5.36 % ABV (n=2) or 3.83 % (n=4). At 32-40 Brix the whole band is indistinguishable from no term at all."
+
 # -- Ethanol inhibition (Luong wall on the uptake flux, decision D-10) ---------
 
 ethanol_tolerance:

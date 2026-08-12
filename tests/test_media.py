@@ -911,12 +911,20 @@ EXPECTED_PROCESSES_DIRECT = {
 # compile seam unless a scenario passes carrying_capacity_gpl, so an undosed wine run is
 # byte-for-byte the validated core (the wine-only MLF *modifier* parallel).
 CARRYING_CAPACITY_MODIFIER = "biomass_carrying_capacity"
+# The high-sugar osmotic brake (decision D-192) is wine-only, and unlike the carrying cap it is
+# always ENABLED — it does not need a compile-seam gate, because it returns the literal 1.0 by
+# early return below S_osmotic_threshold and so is byte-for-byte inert on every must that never
+# reaches 300 g/L. Beer's inertness is that it is NOT WIRED, which is a stronger claim than a
+# parameter value: nothing in a parameter file would keep a hypothetical barleywine below the
+# threshold, whereas an unwired modifier cannot fire at any gravity.
+OSMOTIC_MODIFIER = "osmotic_substrate_inhibition"
 EXPECTED_MODIFIERS = {
     "wine": {
         "arrhenius_growth",
         "arrhenius_uptake",
         "coleman_death_temperature",
         CARRYING_CAPACITY_MODIFIER,
+        OSMOTIC_MODIFIER,
     },
     "beer": {"arrhenius_growth", "arrhenius_uptake", "coleman_death_temperature"},
 }

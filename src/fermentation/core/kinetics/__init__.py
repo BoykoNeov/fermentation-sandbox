@@ -114,6 +114,7 @@ from fermentation.core.kinetics.organic_acids import (
     organic_acid_carbon_draw,
     organic_acid_rates,
 )
+from fermentation.core.kinetics.osmotic import OsmoticSubstrateInhibition
 from fermentation.core.kinetics.oxidative_cascade import (
     OxygenActivation,
     PeroxideEthanolOxidation,
@@ -221,6 +222,7 @@ __all__ = [
     "AceticAcidOverflow",
     "OrganicAcidExcretion",
     "OrganicAcidSpec",
+    "OsmoticSubstrateInhibition",
     "PyruvateExcretion",
     "PyruvateReassimilation",
     "SugarUptakeToEthanolCO2",
