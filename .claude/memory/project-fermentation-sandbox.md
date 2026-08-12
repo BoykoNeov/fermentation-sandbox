@@ -30,9 +30,9 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-12)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-198**;
-sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1750**. Some
-"blocked on external sourcing" items are **NOT** — D-196's source was on disk for 20 records. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-199**;
+sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1751**. **"Blocked on external
+sourcing" was wrong 3× (D-191/196/199)** — and D-199's pull, on disk ~50 records, **still could not close it**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
@@ -147,6 +147,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   published quench ratio; and nothing here can **separate** the candidates (O₂ budget spans
   0.078 %). It is a **RATE-LAW** change (`A/(1−s)`), not stoichiometry. Do not re-open by
   re-sweeping the 24 texts. → `.claude/memory/prohibitions/hydroperoxyl-recycling.md`
+- **Quinone branching (D-145 → D-199)** — the named pull **Nikolantonaki & Waterhouse 2012 is ON
+  DISK** (Fig. 24.12 reprinted in UWC p. 331) after ~50 records — and **still cannot close it**:
+  it ranks NUCLEOPHILES, and the 84.78 % consumer has none. Now **blocked on STRUCTURE**; ascorbate
+  + GSH are top-group with **zero slots**. **1.7481 at ×0.01 REFUSED — never fit 1.7.** Band's high
+  edge reads 0.9738, **not D-174's instance**. Sulfonate is the **MINOR** product (>90 % reduction)
+  — corroborates fork D2. → `.claude/memory/prohibitions/quinone-branching.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.

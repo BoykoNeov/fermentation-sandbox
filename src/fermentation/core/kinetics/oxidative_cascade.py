@@ -142,8 +142,12 @@ _QUINONE_PER_O2 = 1.0
 #: Moles of bisulfite oxidised per mole of H2O2 (``HSO3- + H2O2 -> HSO4- + H2O``). Stoichiometry.
 _SO2_PER_H2O2 = 1.0
 
-#: Moles of bisulfite consumed per mole of quinone sulfonated (one nucleophilic addition of
-#: bisulfite to the quinone ring). Stoichiometry.
+#: Moles of bisulfite consumed per mole of quinone ~~sulfonated (one nucleophilic addition of
+#: bisulfite to the quinone ring)~~ **consumed by bisulfite, by EITHER route (D-199)**.
+#: Stoichiometry, and it is 1 both ways: the sulfonate route adds one bisulfite to the ring, and
+#: the reduction route — which *Understanding Wine Chemistry* §24.4.3.2 gives as >90 % of the
+#: reaction at wine pH — oxidises one bisulfite to sulfate while regenerating the o-diphenol.
+#: So the product identity D-199 corrected on :class:`QuinoneSulfonation` moves nothing here.
 _SO2_PER_QUINONE = 1.0
 
 #: Moles of acetaldehyde per mole of H2O2 taking the ethanol route (Fenton: ``H2O2 + Fe(II) ->
@@ -518,12 +522,31 @@ class PeroxideSulfiteOxidation(Process):
 
 
 class QuinoneSulfonation(Process):
-    """o-quinone + HSO3- -> sulfonate (decision D-141) — the SECOND half of D-72's split.
+    """o-quinone + bisulfite -> o-diphenol (major) / sulfonate (minor) — D-141, retitled D-199.
 
-    Bisulfite adds nucleophilically to the quinone ring, consuming both. This is the node that
-    lifts Danilewicz's series from 1:1 to 1:2 when it is open, and the node whose *partial*
-    capture produces the real-wine 1:1.7 — because the quinone it does not take goes to the
-    competing nucleophiles (Strecker, anthocyanin, ellagitannin) and to polymerisation.
+    Bisulfite consumes the quinone and is itself consumed. This is the node that lifts
+    Danilewicz's series from 1:1 to 1:2 when it is open, and the node whose *partial* capture
+    produces the real-wine 1:1.7 — because the quinone it does not take goes to the competing
+    nucleophiles (Strecker, anthocyanin, ellagitannin) and to polymerisation.
+
+    **The PRODUCT was named wrongly until D-199.** ~~"Bisulfite adds nucleophilically to the
+    quinone ring"~~ describes the *minor* route. *Understanding Wine Chemistry* 2nd ed. §24.4.3.2,
+    on an o-quinone **at wine pH**: *"most of the quinone (>90%) was reduced back to an o-diphenol,
+    but the reaction yielded a small fraction of the sulfonate"*. (The ~25 %-sulfonate figure in
+    the same passage is p-quinone at low pH, and at neutral pH the sulfonate becomes the only
+    product — so the split is pH-dependent and wine sits at the reduction end.)
+
+    **Nothing numerical moves, by construction**: either product consumes one bisulfite per
+    quinone, so ``_SO2_PER_QUINONE`` stays 1.0 and the emergent 1:2 limit is untouched, and both
+    products are off every ledger anyway. What changes is what the model is *claiming*.
+
+    **And the correction runs in fork D2's favour.** :class:`OxygenActivation` never debits the
+    o-diphenol that becomes the quinone (D-71/fork D2: "its carbon comes from the untracked
+    o-diphenol pool"). Under reduction that pool is *regenerated*, so not debiting it is right for
+    >90 % of this route's flux — the source corroborates the fork rather than breaking it. The
+    residual sulfonate route is the part that genuinely removes a phenolic permanently and is not
+    booked; recorded at D-199 rather than built, because no shipped pool is this route's substrate
+    (``hydroxycinnamics``/``tannin`` are activation *drivers*, not the o-diphenol consumed here).
 
     **1.7 is an output of this module, never an input to it.** It is set by how much quinone this
     Process wins against its siblings, which is set by each sibling's own pre-cascade rate
@@ -764,7 +787,12 @@ class QuinonePolymerization(Process):
     gated on a co-substrate. Without it, an unsulfited beverage carrying no nucleophiles would
     accumulate quinone without bound. Its rate constant is the cascade's weakest number —
     ``k_quinone_polymerization`` is anchored to an *asserted* hours-to-days quinone lifetime
-    (D-138), pending Nikolantonaki & Waterhouse 2012.
+    (D-138), ~~pending Nikolantonaki & Waterhouse 2012~~ **— STRUCK (D-199): that paper's key
+    figure is in hand (Figure 24.12, reprinted with permission in *Understanding Wine Chemistry*
+    2nd ed. p. 331, on disk since before D-141) and it does NOT settle this constant.** It ranks
+    *nucleophiles*; this Process is by construction the fate of quinone that **no** nucleophile
+    captured, so the figure has no entry for it and can have none. See
+    :data:`k_quinone_polymerization`'s note for what the figure does and does not adjudicate.
 
     Both slots off every ledger: ``quinone`` by fork D2, ``A420`` because an absorbance carries
     no mass at all (D-74's argument, which the re-home leaves intact).

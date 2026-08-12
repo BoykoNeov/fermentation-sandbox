@@ -26,7 +26,8 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
   [[feedback-pin-tolerance-vs-solver-tolerance]]; `quinone == 0.0` under direct is **exact**.
 - **Benchmark EXISTS and is ACTIVE** (`tests/benchmarks/test_validation_danilewicz_so2_o2.py`, 15 tests, no
   xfail/skip — **not open work**). **Never pin 1.7** — one dataset's mode, above the other's whole range; assert
-  the limits 1/2 + bands. The falsifier is the **traverse** (D-141's "structurally cannot produce" was wrong). Quinone branching **NOT settled**.
+  the limits 1/2 + bands. The falsifier is the **traverse** (D-141's "structurally cannot produce" was wrong). Quinone
+  branching **NOT settled — but its blocker is** (D-199, own file: `prohibitions/quinone-branching.md`).
 - **Operating point is load-bearing — enforce the >10 free-SO₂ floor, never state it in prose.** It is
   `SIM_CURVATURE_FLOOR_MGL`, **NOT Miao's criterion — never re-encode his**; keep the value + excluded-wines
   table. **Never report a single-dose verdict on this ratio** (direct unconditional, cascade **straddles**). The

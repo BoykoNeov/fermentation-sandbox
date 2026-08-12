@@ -338,11 +338,15 @@ class _Run(NamedTuple):
     free_mgl: tuple[float, ...]
 
 
-def _run(so2_mgl: float, oxidative: str, mode: str) -> _Run:
+def _run(so2_mgl: float, oxidative: str, mode: str, k_poly_scale: float = 1.0) -> _Run:
     """Miao's SO2:O2 molar reaction ratio, by his own regression method.
 
     ``mode`` is ``"real"``, ``"blocked"`` (quinone route trapped, Danilewicz's benzenesulfinic
     acid) or ``"ideal"`` (bisulfite wins both oxidising equivalents).
+
+    ``k_poly_scale`` multiplies ``k_quinone_polymerization`` (decision D-199), which is how the
+    branching of the quinone node is moved WITHOUT touching bisulfite's own rate constant. It is
+    applied after ``mode``, so ``"blocked"`` still means blocked.
     """
     compiled = compile_scenario(_scenario(so2_mgl), oxidative=oxidative)
     # NOTE ``CompiledScenario.param_values`` is a PROPERTY returning a fresh dict on each access,
@@ -354,6 +358,8 @@ def _run(so2_mgl: float, oxidative: str, mode: str) -> _Run:
         for name in _COMPETING_QUINONE_CONSTANTS:
             if name in params:
                 params[name] = 0.0
+    if k_poly_scale != 1.0 and "k_quinone_polymerization" in params:
+        params["k_quinone_polymerization"] *= k_poly_scale
     # The routes are blocked by their PARAMETERS rather than by ``ProcessSet.disable``, because
     # the ``begin_aging`` event re-enables every aging Process mid-run and silently undoes it.
 
@@ -425,6 +431,22 @@ def runs() -> dict[tuple[str, str, float], _Run]:
         ("direct", "real", CASCADE_VALID_DOSES[0]),
     ]
     return {key: _run(key[2], key[0], key[1]) for key in wanted}
+
+
+@pytest.fixture(scope="module")
+def quinone_band_runs() -> dict[str, tuple[float, _Run]]:
+    """The cascade at the two ENDS of ``k_quinone_polymerization``'s own declared band (D-199).
+
+    The scales are DERIVED from the parameter store, never transcribed from its note — the D-154
+    idiom, so widening or narrowing the band in YAML moves this guard instead of silently
+    leaving it pinned to a stale pair of numbers.
+    """
+    p = compile_scenario(_scenario(WINE_REALISTIC_SO2), oxidative="cascade").parameters[
+        "k_quinone_polymerization"
+    ]
+    lo, hi = p.uncertainty.low / p.value, p.uncertainty.high / p.value
+    return {"low": (lo, _run(WINE_REALISTIC_SO2, "cascade", "real", lo)),
+            "high": (hi, _run(WINE_REALISTIC_SO2, "cascade", "real", hi))}
 
 
 # -- the operating point must be one the reference band actually covers ------------------------
@@ -727,6 +749,58 @@ def test_cascade_brackets_miaos_lower_bound_across_its_valid_dose_range(runs):
     assert ratios == sorted(ratios), "ratio should rise monotonically with sulfite"
     assert ratios[0] < MIAO_BAND[0], "lowest valid dose should sit BELOW Miao's floor"
     assert MIAO_BAND[0] <= ratios[-1] <= MIAO_BAND[1], "shared operating point should be in band"
+
+
+def test_the_headline_ratio_is_set_by_the_quinone_branching_and_is_not_robust_to_its_band(
+    runs, quinone_band_runs
+):
+    """D-199: the in-band 1.1079 is a statement about ONE constant's nominal, not a robust result.
+
+    ``k_quinone_polymerization`` is the cascade's self-declared weakest number and the only knob
+    that moves bisulfite's share of the quinone node without touching bisulfite's own rate
+    constant — ``QuinoneSulfonation`` never reads it. Measured across the parameter's OWN
+    declared band (a full order each way):
+
+    ======================  ===================  ==============
+    ``k_quinone_polym.``    bisulfite's share    SO2:O2 ratio
+    ======================  ===================  ==============
+    high edge (x10)         1.86 %               0.9738
+    nominal                 15.21 %              1.1079
+    low edge (x0.1)         59.69 %              1.5172
+    ======================  ===================  ==============
+
+    So the headline moves from *below the 1:1 blocked-quinone limit* to two thirds of the way up
+    Miao's range, purely inside the declared uncertainty of one speculative constant. This is a
+    SECOND instance of D-174's "verified at a point, sampled over a band" shape and **not** that
+    one: D-174's is ``k_o2_depletion_total``, whose high edge reads 1.0655. Two different
+    constants, each independently taking this ratio below Miao's floor.
+
+    Reachability, stated narrowly: the parameter is sampled whenever the Process reading it is
+    active, so this is live in a *cascade ensemble* — but the cascade is non-default and no
+    shipped test runs a cascade ensemble, so it is reachable in a configuration nothing currently
+    runs rather than a live defect.
+
+    **A red here is not automatically a bug.** It means the sensitivity changed — because the
+    band was narrowed on evidence, or because the branching moved — and the D-199 record's
+    numbers must be re-measured rather than the assertion relaxed. What must never happen
+    silently is ``k_quinone_polymerization`` being re-anchored with this file left reporting an
+    in-band headline it no longer earns.
+    """
+    lo_scale, lo_run = quinone_band_runs["low"]
+    hi_scale, hi_run = quinone_band_runs["high"]
+    nominal = runs[("cascade", "real", WINE_REALISTIC_SO2)].ratio
+
+    assert lo_scale < 1.0 < hi_scale, "band edges must straddle the nominal"
+    # More polymerisation => less quinone left for bisulfite => a LOWER SO2:O2 ratio.
+    assert hi_run.ratio < nominal < lo_run.ratio, "ratio must fall monotonically in k_poly"
+    assert MIAO_BAND[0] <= nominal <= MIAO_BAND[1], "the NOMINAL is the in-band result"
+    assert MIAO_BAND[0] <= lo_run.ratio <= MIAO_BAND[1], "the low edge stays in band"
+    # The finding, made executable rather than left in prose as D-174's was.
+    assert hi_run.ratio < MIAO_BAND[0], (
+        "the high edge should leave Miao's band — if it no longer does, the branching or the "
+        "declared band has moved and D-199's measurements need re-running"
+    )
+    assert hi_run.ratio < 1.0, "and should fall below the 1:1 blocked-quinone limit"
 
 
 def test_the_shared_operating_point_is_forced_by_the_direct_set(runs):
