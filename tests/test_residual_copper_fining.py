@@ -42,9 +42,7 @@ def _wine(*, fined: bool, oxygen_mgl: float = 60.0) -> Scenario:
     interventions.append(Intervention(day=_FERMENT_DAYS, action="begin_aging"))
     if oxygen_mgl > 0.0:
         interventions.append(
-            Intervention(
-                day=_FERMENT_DAYS, action="add_oxygen", params={"o2_mgl": oxygen_mgl}
-            )
+            Intervention(day=_FERMENT_DAYS, action="add_oxygen", params={"o2_mgl": oxygen_mgl})
         )
     return Scenario(
         name="d191-residual-copper",
@@ -63,9 +61,7 @@ def _wine(*, fined: bool, oxygen_mgl: float = 60.0) -> Scenario:
 
 
 def test_the_retained_fraction_carries_its_provenance():
-    p = load_parameters(default_data_dir() / "additions.yaml")[
-        "copper_fining_residual_fraction"
-    ]
+    p = load_parameters(default_data_dir() / "additions.yaml")["copper_fining_residual_fraction"]
     assert p.value == 0.95
     assert p.tier.name.lower() == "plausible"
     # The source must be named, and the rendered-not-read flag must survive edits: the >95 %
@@ -82,9 +78,7 @@ def test_the_band_edges_have_the_status_the_source_gives_them():
     ON the printed edge deliberately, which means a band-edge sweep finds the low arm bitwise
     identical to nominal: that is arithmetic, not inertness (the D-164 trap).
     """
-    p = load_parameters(default_data_dir() / "additions.yaml")[
-        "copper_fining_residual_fraction"
-    ]
+    p = load_parameters(default_data_dir() / "additions.yaml")["copper_fining_residual_fraction"]
     assert p.uncertainty is not None
     assert p.uncertainty.low == 0.95 == p.value  # nominal ON the printed edge
     assert p.uncertainty.high == 1.0  # the physical ceiling
@@ -137,12 +131,8 @@ def test_a_fined_wine_browns_faster_than_an_unfined_one():
     assert float(plain.series("A420")[-1]) > 0.0
 
     at_h = (_FERMENT_DAYS + 0.01 * _AGING_DAYS) * 24.0
-    a_fined = float(
-        np.interp(at_h, fined.t, np.asarray(fined.series("A420"), dtype=np.float64))
-    )
-    a_plain = float(
-        np.interp(at_h, plain.t, np.asarray(plain.series("A420"), dtype=np.float64))
-    )
+    a_fined = float(np.interp(at_h, fined.t, np.asarray(fined.series("A420"), dtype=np.float64)))
+    a_plain = float(np.interp(at_h, plain.t, np.asarray(plain.series("A420"), dtype=np.float64)))
 
     # The expected size is RECOMPUTED from the parameters, not pinned as a literal, so a
     # re-sourcing of either the retention or the multiplier moves this test with the value.
