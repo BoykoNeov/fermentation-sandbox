@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T00:03:15.105Z
+  modified: 2026-08-12T00:10:54.609Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-12)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-187**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1693**. Most remaining
+**D-187**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1656**. Most remaining
 work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**

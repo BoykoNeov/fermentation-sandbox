@@ -1182,10 +1182,16 @@ def test_sealing_a_bottle_browns_it_more_over_five_years():
     burst_gpl = _seal_dose(sealed)
     assert out["sealed"]["o2"] < burst_gpl / 100.0
 
-    # It does NOT return to exactly the unsealed level, and the reason is a real coupling worth
-    # naming rather than a tolerance to widen: the sealed arm spent more of its SO2 (asserted
-    # above), and SO2 is itself an o2 sink, so the surviving arm holds o2 slightly LOWER. The
-    # standing level is set by what is left to consume it, not by what was dosed years earlier.
+    # It does NOT return to exactly the unsealed level (13.7% higher at five years), and the
+    # reason was MEASURED rather than inferred from the sign — the first draft of this comment
+    # asserted a mechanism it had only guessed, which is how D-101 happened. Receipt:
+    # `d187-bottling-burst/mechanism.txt`. The sealed arm spends more of its SO2 (asserted
+    # above), and SO2 is itself an o2 sink, so it ends with less of what consumes o2. What
+    # makes that CAUSAL rather than merely correlated: re-running the UNSEALED arm at a lower
+    # SO2 dose lands on the sealed arm's surviving SO2 and on its standing o2 at the SAME dose
+    # (~54.5 mg/L; at 55 the ratios are 1.016 and 0.979, at 53 they are 0.977 and 1.024). So
+    # standing o2 is a function of surviving SO2, and the bolus has no lasting effect except
+    # through it — which is D-136's supply-limited reframe holding, not an exception to it.
     assert out["sealed"]["o2"] > out["unsealed"]["o2"]
     assert out["sealed"]["o2"] < 2.0 * out["unsealed"]["o2"]
 

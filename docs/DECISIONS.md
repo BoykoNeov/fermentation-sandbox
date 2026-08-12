@@ -25096,3 +25096,51 @@ evidence for it. And when writing new notes, the number in the prose deserves th
 number in the field: two of the three errors here were caught only because the tests were written
 against the *published* literals, which is the one construction that can disagree with the file it
 is checking.
+
+### D-187 amendment — the record's own test counts were wrong in four places, which is the record's own lesson landing on the record
+
+Found in review immediately after D-187 shipped, and appended rather than edited in place (the
+D-147/D-181/D-186 precedent). The suite is **green at 1656**, and every count in §opening and §6
+above was wrong, in the same direction and for the same reason the lesson describes: they were
+prose, written from memory between two runs, and nothing pinned them.
+
+**What was claimed, and what is measured.** The baseline was re-derived from a worktree at the
+parent commit (`pytest --collect-only`), not remembered:
+
+| claim | shipped as | measured |
+| --- | --- | --- |
+| suite before → after | 1622 → **1693** | 1622 → **1656** |
+| delta | +71 | **+34** |
+| `test_closure_ingress.py` | 46 → 71 | **37 → 71** |
+| "25 new tests" (§6) | 25 | **18 test functions**, 34 collected |
+
+The 1693 came from adding the file's *new* count to the suite's *old* total; the "46" was read off
+a `-x` run that had stopped early, so it was the new file's count minus the failures, not the old
+file's. The "25" counted test functions and then called them tests, where four are parametrized
+(4 + 4 + 6 + 6 = 20 collected from 4 functions). **`Suite **1693**` was also wrong in the memory
+status line and is corrected there.**
+
+None of it is load-bearing — no shipped value, band, gate or test depends on a count — which is
+exactly why nobody would have caught it later. It belongs in the record because the lesson in §9 is
+that *a number in prose is unpinned by construction*, and the record making that argument shipped
+four unpinned numbers of its own within an hour of writing it. The generalisation is not "be more
+careful": it is that **a count is only trustworthy if the message that reports it also produced
+it**, and every number above now comes from a command whose output is in the receipts directory.
+
+**One further check, which came out the other way.** The full run *did* find a genuine interaction
+this record's §6 did not anticipate: `test_switch_site_census.py` pins the set of wine parameters
+whose nominal sits on a band edge, and `bottling_burst_screwcap` joins it — because the entry ships
+P1's `<500 µL` ceiling as its value on purpose (§3). It is added to the pinned set with the reason,
+not worked around. That is a test outside this beat's domain suite catching a new registry entry,
+which is the standing hazard for exactly this kind of addition, and it fired as designed.
+
+**And one claim in a test comment was upgraded from inference to measurement.** The five-year
+comparison ends with the sealed arm holding **13.7 %** more standing O₂ than the unsealed one, and
+the first draft of that comment *asserted* the cause — the sealed arm spends more SO₂, and SO₂ is
+itself an O₂ sink — after inferring it from the sign of a failed assertion. That is the shape of
+D-101's wrong mechanism. It is now measured: re-running the **unsealed** arm at a reduced SO₂ dose
+lands on the sealed arm's surviving SO₂ *and* on its standing O₂ at the **same** dose, ~54.5 mg/L
+(at 55 mg/L the two ratios are 1.016 and 0.979; at 53 mg/L, 0.977 and 1.024). Standing O₂ is
+therefore a function of surviving SO₂, and the bolus leaves no trace except through it — D-136's
+supply-limited reframe holding under a bolus rather than an exception to it. Receipt:
+`d187-bottling-burst/mechanism.txt`.
