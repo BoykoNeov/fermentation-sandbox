@@ -198,7 +198,7 @@ otr_natural_cork:
   provenance:
     source: "TWO INDEPENDENT PRIMARIES, cross-validated. P1 (Lopes et al. 2007) Table I, natural corks, horizontal: 1.7-6.1 uL/day over months 2-12 and 0.1-2.3 uL/day over months 12-36. P2 (Oliveira et al. 2013) Table 2 measured the same quantity directly in 593 bottles and reports a months-4-12 mean of 2.51 ug/day = 1.755 uL/day (per class: 0.76 / 1.38 / 2.41 ug/day for classes 1-3). The shipped 1.5 uL/day is the central value of the region where the two agree, * 7.9444e-8 = 1.19e-7 g/L/h."
     conditions: "45x24 mm (P1) and 45x24 mm (P2) natural cork; 375 mL bottles, indigo-carmine colorimetry; P1 at 20 +/- 1 C controlled, P2 at 13.6-27.8 C room. Steady permeation, months 4+ (P2) / months 2+ (P1). Converted to a 750 mL bottle at 1.43 ug O2/uL."
-    notes: "THE CROSS-VALIDATION IS THE POINT: P2's independently measured 1.755 uL/day falls at the bottom edge of P1's 2-12 month band AND inside P1's 12-36 month band, from experiments with 4 and 593 replicates respectively. A THIRD, weaker corroboration runs the right way too: Godden et al. 2005 (via P2's introduction) reports natural cork at a mean 1.60 mg O2/stopper/yr over 36 months = 4.4 ug/day, HIGHER than the steady 2.5 ug/day because a 36-month mean still carries the first-month burst. ONE NUMBER, NOT TWO: P1's 2-12 vs 12-36 month split (a further decline with age) is smaller than this band's width, so shipping two natural-cork constants would assert a resolution the data does not support. CAUTION on P1's prose: its text says ingress 'then rose gradually (0.1 to 2.3 uL per day)' where its own Table I shows the later window is LOWER than the earlier one. The table is taken as authoritative and the direction is a DECLINE; the prose sentence is treated as a slip, and is recorded here rather than smoothed over."
+    notes: "THE CROSS-VALIDATION IS THE POINT: P2's independently measured 1.755 uL/day falls at the bottom edge of P1's 2-12 month band AND inside P1's 12-36 month band, from experiments with 4 and 593 replicates respectively. A THIRD FIGURE IS TENSION, NOT CORROBORATION, AND THIS SENTENCE USED TO SAY THE OPPOSITE (corrected at D-187, which re-read P2): Godden et al. 2005 (via P2's introduction) reports natural cork at a mean 9.33 mg O2/stopper/YEAR -- not the 1.60 mg/yr recorded here at D-136, which is P2's NEXT sentence and belongs to synthetic closures' first month (see otr_synthetic_nomacorc, where the same transposition ran the other way). 9.33 mg/yr = 25.6 ug/day, ~12x this entry's steady 2.14 ug/day, and the first-month burst CANNOT absorb the gap: burst + steady gives ~2.2 mg over year 1 against Godden's 9.33 (bottling_burst_natural_cork). The resolution is METHOD, and P1 states it against Godden by name: values from stoppers measured without liquid contact are 'substantially lower than the oxygen transmission rates and 1000-fold variation reported by other studies', because 'contact with liquid is an important factor in oxygen transmission through corks'. Godden is therefore excluded on method rather than reconciled on arithmetic. ONE NUMBER, NOT TWO: P1's 2-12 vs 12-36 month split (a further decline with age) is smaller than this band's width, so shipping two natural-cork constants would assert a resolution the data does not support. CAUTION on P1's prose: its text says ingress 'then rose gradually (0.1 to 2.3 uL per day)' where its own Table I shows the later window is LOWER than the earlier one. The table is taken as authoritative and the direction is a DECLINE; the prose sentence is treated as a slip, and is recorded here rather than smoothed over."
 
 # -- SYNTHETIC, extruded (Nomacorc classic) --------------------------------------------------
 otr_synthetic_nomacorc:
@@ -209,7 +209,7 @@ otr_synthetic_nomacorc:
   provenance:
     source: "Lopes et al. 2007 (P1) Table I, Nomacorc classic synthetic closure (43x22 mm), horizontal storage after the first month: 6 uL/day (vertical 8-9). 6 * 7.9444e-8 = 4.77e-7 g/L/h."
     conditions: "as the other P1 entries (375 mL, indigo carmine, 20 C, 65 % RH, 4 replicates). Converted to 750 mL at 1.43 ug O2/uL."
-    notes: "P1: synthetic closures 'exhibited the highest oxygen permeation, reaching the limit of quantification for our method (2.5 mL of oxygen) within 140 and 290 days' (Nomacorc and SupremeCorq respectively) -- i.e. these closures ran the experiment off-scale, which is itself the finding. Unlike natural cork, Nomacorc was 'permeable to atmospheric oxygen, mainly AFTER the first month of storage', so for this closure the steady term is the dominant one rather than a tail. Corroborating direction from P2's introduction: synthetic stoppers were 'the least successful barriers to oxygen, reaching a mean oxygen ingress of 9.33 mg in the first month' (Lopes et al. 2005)."
+    notes: "P1: synthetic closures 'exhibited the highest oxygen permeation, reaching the limit of quantification for our method (2.5 mL of oxygen) within 140 and 290 days' (Nomacorc and SupremeCorq respectively) -- i.e. these closures ran the experiment off-scale, which is itself the finding. Unlike natural cork, Nomacorc was 'permeable to atmospheric oxygen, mainly AFTER the first month of storage', so for this closure the steady term is the dominant one rather than a tail. Corroborating direction from P2's introduction: synthetic stoppers were 'the least successful barriers to oxygen, reaching a mean oxygen ingress of 1.60 mg O2 in the first month' (Lopes et al. 2005). THAT NUMBER WAS RECORDED HERE AS 9.33 mg AT D-136 AND IS CORRECTED AT D-187: 9.33 is P2's PRECEDING sentence, Godden's natural-cork mg/stopper/YEAR (see otr_natural_cork). The repaired 1.60 mg is not a direction but a QUANTITATIVE cross-check, and it is the one this file's bottling-burst entries rest on: P1's own first-month column gives 1.50 mg/bottle for Nomacorc and 1.72 for SupremeCorq, so Lopes 2005's independently measured 1.60 for 'synthetic stoppers' falls BETWEEN the two closures it pools (bottling_burst_synthetic_nomacorc)."
 
 # -- SYNTHETIC, injection-moulded (SupremeCorq) ----------------------------------------------
 otr_synthetic_supremecorq:
@@ -221,3 +221,143 @@ otr_synthetic_supremecorq:
     source: "Lopes et al. 2007 (P1) Table I, SupremeCorq 45 synthetic closure, horizontal storage after the first month: 11-15 uL/day (vertical 11-12). Central 13 uL/day * 7.9444e-8 = 1.03e-6 g/L/h."
     conditions: "as the other P1 entries (375 mL, indigo carmine, 20 C, 65 % RH, 4 replicates). Converted to 750 mL at 1.43 ug O2/uL."
     notes: "Kept as a SEPARATE entry from Nomacorc rather than lumped into one 'synthetic' value because P1 measures them a factor of ~2 apart -- larger than the gap between screwcap and natural cork -- so a single synthetic constant would erase a distinction the source actually resolves. At this rate a wine takes up ~45 mg/L of O2 over five years, which is why P1's Results link synthetic closures to 'wines with a high level of browning and high-oxidized aroma scores'."
+
+# ============================================================================================
+# THE BOTTLING BURST -- the ONE-OFF charge the closure's own trapped air releases (decision D-187)
+# ============================================================================================
+#
+# WHAT THIS CLOSES. Everything above is the STEADY permeation, and the header says why the first
+# month was excluded from it: "this file is the STEADY permeation, `add_oxygen` is the bottling
+# burst, and the two do not overlap. An author simulating a freshly bottled wine should dose BOTH."
+# That left the burst an author-supplied `add_oxygen` number with NO provenance -- the one oxygen
+# input on the aging axis a user had to invent. D-136's own Next said it "could be a sourced
+# auto-dose ... left out deliberately to keep the D-133 line clean, NOT for lack of data". This
+# section is that data, from the same two primaries, read again rather than remembered.
+#
+# THE MECHANISM IS NOT PERMEATION, WHICH IS WHY IT IS A SEPARATE QUANTITY AND NOT A RATE.
+# P1: "the important increase in color change during first month is likely to be due to oxygen
+# within closures that diffuses out of the closure during compression." P2 measures the driver --
+# "the high internal pressure (from 0.6 to 0.9 MPa) created when natural cork stoppers are
+# compressed into the bottleneck could force air out of the cork structure" -- and sizes the
+# reservoir: a 24x45 mm natural stopper is 20.4 mL of which 80-85% is air in the cell lumen,
+# holding 4.9-5.2 mg (3.4-3.6 mL) of O2. The first month releases 27-29% of it. So this is a
+# FINITE STOCK emptying, not a flow, and it is dosed as a bolus for exactly the reason D-136 gave
+# for not modelling it: "a one-off release of a finite trapped charge is precisely what the D-71
+# `add_oxygen` verb already expresses, and re-building it as a decaying pool would re-litigate
+# D-133's burst-pool argument for no gain."
+#
+# THE ARITHMETIC, applied identically to every cylindrical entry below:
+#
+#   burst [uL]  = (P1 first-month rate [uL/day] - THIS FILE'S SHIPPED otr_<closure>) x 30 days
+#   burst [g/L] = burst [uL] x 1.43e-6 g/uL / 0.750 L      (the header's conversion and scope)
+#
+# THE SUBTRACTION IS AN ANTI-DOUBLE-COUNT AND IT BINDS. P1's first-month column is the TOTAL
+# ingress rate over month 1, which physically includes the steady permeation running underneath
+# the burst -- and `ClosureOxygenIngress` is already integrating that steady term from the moment
+# `begin_aging` fires. Dosing P1's first month unmodified would therefore count the steady share
+# twice. It is not a rounding correction for the permeable closures: over 30 days the steady term
+# is 1% of the first month for technical cork but 17% for Nomacorc and 32% for SupremeCorq.
+# CONSEQUENCE, and it is why `seal_bottle` refuses to be scheduled before `begin_aging`: the
+# subtraction assumes the steady Process is switched on across that first month. Seal the bottle at
+# or after the aging boundary, which is also the only physically meaningful place to seal it.
+#
+# ONE SCOPE PER BAND. `value` and BOTH edges subtract the SAME shipped otr_<closure>, so the
+# nominal is the exact midpoint of the band and the band's width is P1's printed first-month range
+# and nothing else. The alternative -- subtracting the steady BAND's edges -- would mix P1's
+# first-month scope with a steady band built to a different one (otr_natural_cork's value is drawn
+# from the P1/P2 agreement region, not from P1's 1.7-6.1 window), and the nominal would then not be
+# the midpoint of its own band. Every edge below is therefore PRINTED (P1 Table I, first-month
+# column) shifted by one shipped constant; only bottling_burst_screwcap's low edge is CONSTRUCTED,
+# and it says so.
+#
+# WHAT THE FIRST-MONTH COLUMN DOES *NOT* SAY. The four cylindrical bursts come out within
+# 1.16-1.44 mg/bottle of each other while the steady rates they sit beside span ~52x. That is a
+# statement ABOUT P1's TABLE, not a measured mechanism: its first-month ranges (15-40, 25-45,
+# 30-40, 35-45 uL/day) overlap so heavily that they do not separate the closures the way its steady
+# ranges do. It is consistent with P2's trapped-air mechanism -- every cylindrical closure is
+# compressed into the same bottleneck and gives up a similar charge -- but this file does not claim
+# the equality as a finding, and a source that resolved the four closures apart would not be in
+# conflict with anything shipped here.
+#
+# THE BOTTLING LINE'S OWN OXYGEN IS DELIBERATELY *NOT* IN THESE NUMBERS. P2 measured it and
+# removed it: "the value of 1.50 mg of oxygen (present in the bottle headspace due to the bottling
+# process) was withdrawn from all measurements ... Therefore the oxygen ingress was set at zero at
+# time 0" (its calibration section brackets it at 1.4 to 1.9 mg for a 375 mL bottle). P1's fill
+# oxygen was negligible by design -- "less than 9 ug/L, measured by polarographic probe". So both
+# primaries report a closure-attributable charge, and the two are commensurable. Headspace/filler
+# oxygen is a property of the LINE, not of the closure: it belongs to `add_oxygen`, where the
+# author states their own bottling practice, and folding a fixed 1.5 mg into every closure here
+# would silently dose a line nobody described. THE ONE EXCEPTION IS THE SCREWCAP, where P1 says the
+# charge IS headspace air -- see that entry.
+#
+# TIER: ALL SPECULATIVE, for the steady entries' reason plus one more. Each value flattens a wide
+# empirical range to a point (P2 measured the same quantity across 593 bottles and found month-1
+# ingress rates of 18.16 to 117.70 ug/day between its oxygen classes -- a 6.5x spread inside ONE
+# closure type), and each is additionally an INTEGRAL of a month-average rate rather than a
+# directly measured charge, except natural cork's, where P2 published the integral itself.
+
+# -- HERMETIC: the measured zero again, and the isolability gate ------------------------------
+bottling_burst_hermetic:
+  value: 0.0
+  unit: "g/L"   # a one-off dose onto `o2`, not a rate
+  tier: speculative
+  uncertainty: { low: 0.0, high: 0.0, note: "exactly zero, with no band, for the SAME reason as otr_hermetic: a flame-sealed ampoule has no compressed stopper to give up trapped air and no headspace inserted at sealing. This is the isolability gate for the verb (prime directive 3) -- a `seal_bottle` on a hermetic scenario doses byte-for-byte zero" }
+  provenance:
+    source: "Lopes et al. 2007 (P1), Results: of every sealing system tested, 'only the control (bottle sealed by flame) was completely air-tight'. The control shows no first-month step in Figure IA, which is the same observation that fixes otr_hermetic at zero."
+    conditions: "flame-sealed glass ampoule; 20 +/- 1 C, 36 months. No commercial closure achieves this."
+    notes: "Named rather than left as the absence of a key, the D-45 lesson: an unstated zero reads as an oversight, a named zero reads as a choice. Sealing a hermetic bottle is a legal, meaningful scenario -- it says 'this wine got nothing at bottling' with provenance, instead of saying it by omission."
+
+# -- TECHNICAL CORK (agglomerated + natural discs: Twin Top, Neutrocork) ----------------------
+bottling_burst_technical_cork:
+  value: 1.56e-3
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 8.44e-4, high: 2.27e-3, note: "P1's printed first-month range 15-40 uL/day, each edge less the shipped otr_technical_cork (0.25 uL/day) and integrated over 30 days => 442.5-1192.5 uL = 0.63-1.71 mg/bottle. Both edges PRINTED-shifted; nominal is their exact midpoint (817.5 uL = 1.17 mg/bottle)" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, 'Technical' corks (Twin Top and Neutrocork), FIRST MONTH: 15-40 uL/day, against the same closure's 0.1-0.4 uL/day thereafter. Central 27.5 uL/day less the shipped steady 0.25 uL/day, x 30 d x 7.9444e-8 (g/L)/(uL/day) = 1.56e-3 g/L."
+    conditions: "375 mL flint bottles, reduced indigo-carmine solution, 20 +/- 1 C, 65 +/- 1 % RH, 4 replicates; converted to a 750 mL bottle at 1.43 ug O2/uL (file header). The charge is per STOPPER, so the 750 mL scope divides it exactly as it divides the OTRs -- a magnum takes the same milligrams into twice the wine."
+    notes: "THE RATIO THIS CLOSURE MAKES VIVID: a 60-160x first-month multiple over its own steady rate, the largest on the menu, because its steady permeation is the lowest. Under technical cork the bottling burst is ~8.9 YEARS of steady ingress arriving on day one (817.5 uL against 91 uL/year), so a technical-cork bottle that is never sealed with this verb is not merely missing a small term -- it is missing most of the oxygen it will see in a decade. The same ratio for SupremeCorq is ~0.2 years, which is the honest way to state the asymmetry: the burst is a first-order term for tight closures and a footnote for leaky ones. Sourced note: P1 records these stoppers as 'essentially impermeable to atmospheric oxygen during the first 24 months', which is a statement about permeation and is NOT contradicted by this charge -- the charge comes out of the cork, not through it."
+
+# -- SCREWCAP: the one entry whose charge is HEADSPACE, and the one printed as a bound ---------
+bottling_burst_screwcap:
+  value: 9.53e-4
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 0.0, high: 9.53e-4, note: "AN UPPER BOUND, NOT A CENTRAL ESTIMATE, AND THE ONLY ENTRY HERE THAT IS. P1 prints '<500' -- a ceiling with no floor -- so high = 500 uL is PRINTED and low = 0.0 is CONSTRUCTED (P1 gives no floor, and a well-sparged line approaches zero). `value` is the CEILING itself rather than the midpoint of [0, ceiling]: the source contains one number and a midpoint would invent a second. Consequence: this entry reads worst-case, and a scenario wanting a typical screwcap line should say so with `add_oxygen` instead" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, screw caps (Stelvin, Auscap, Cospak, CSA), first month: '<500' uL, footnoted 'a at moment of bottling'. 500 uL x 1.43e-6 g/uL / 0.750 L = 9.53e-4 g/L."
+    conditions: "as the other P1 entries (375 mL, indigo carmine, 20 C, 65 % RH, 4 replicates), horizontal, 18 months for the screwcap arm. Converted to 750 mL at 1.43 ug O2/uL."
+    notes: "THIS IS NOT THE SAME MECHANISM AS THE CYLINDRICAL BURSTS, AND P1 SAYS SO: 'The apparent entry of oxygen into wine bottles was substantially higher during bottling than in the following 18 months of storage. This appeared to be due to the insertion of oxygen contained within the screw-cap in bottle headspace at the time of sealing.' A screwcap has no compressed body to give up trapped air; what it has is a headspace it seals over. That is why the file header's rule -- line/headspace oxygen belongs to `add_oxygen`, not here -- has its one exception exactly here: for a screwcap the headspace charge IS the closure's contribution. UNIT NOTE, and it is the reason this entry is not integrated over 30 days like its neighbours: P1's column is headed uL/day, but footnote [a] pins this cell to the MOMENT of bottling, so it is read as a one-off volume. Read the other way it would be 15000 uL -- ~21 mg into a 375 mL bottle -- which exceeds the oxygen in a plausible headspace several times over and is contradicted by P1's own Figure II, where the screwcap curves have not reached 0.5 mL after five months. THE ORDERING CONSEQUENCE, which runs the same way as the steady one: at 9.53e-4 this bound still sits BELOW every cylindrical closure's burst, so the folklore that screwcaps admit least oxygen holds for the first month even taken at its worst case -- the D-136 header's ordering correction is a STEADY-state claim and is not weakened here."
+
+# -- NATURAL CORK: the entry where the second primary published the integral itself ------------
+bottling_burst_natural_cork:
+  value: 1.92e-3
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 1.34e-3, high: 2.49e-3, note: "P1's printed first-month range 25-45 uL/day, each edge less the shipped otr_natural_cork (1.5 uL/day) over 30 days => 705-1305 uL = 1.01-1.87 mg/bottle. P2's independent month-1 figures land ALMOST but not entirely inside it, and the exception is recorded rather than smoothed: its Discussion average (1.43 mg/bottle) and its thicker-caliper mean (1.58 mg, n=467) fall inside, while its THINNER-caliper mean (0.97 mg) sits 3.5% BELOW the low edge (which is 1.005 mg/bottle). P2 attributes that gap to a real property P1 never varied -- 'cork planks with thinner caliper have a higher proportion of smaller cells with thicker cell walls, and less air-filled empty volume' -- so it is a variable this menu does not carry, not a disagreement about the same stopper. The band is NOT widened to P2's between-stopper spread (its oxygen classes run 0.55-3.53 mg over month 1) for the same reason otr_natural_cork ships one number: that spread is real heterogeneity, but it is heterogeneity a scenario expresses by choosing a closure, not by widening a band nothing draws from (the file's ENSEMBLE CAVEAT applies unchanged -- these seed a dose, not a sampled read)" }
+  provenance:
+    source: "TWO INDEPENDENT PRIMARIES MEASURING THE SAME MONTH, cross-validated. P1 (Lopes et al. 2007) Table I, natural corks, first month: 25-45 uL/day; central 35 less the shipped steady 1.5, x 30 d = 1005 uL = 1.44 mg/bottle => 1.92e-3 g/L. P2 (Oliveira et al. 2013) measured the first-month INTEGRAL directly in 593 bottles and reports it three ways: Table 1 caliper means of 0.97 and 1.58 mg at 1 month; a Discussion average of '27 to 29% (1.0 mL, or 1.43 mg)' of the stopper's own air; and a Table 2 all-class month-1 rate of 54.07 ug/day (= 1.62 mg over 30 d). P1's un-subtracted first-month total for the same quantity is 1.50 mg/bottle."
+    conditions: "45x24 mm natural cork; 375 mL bottles, indigo-carmine colorimetry; P1 at 20 +/- 1 C controlled with 4 replicates, P2 at 13.6-27.8 C room with 593 bottles. P2's figures have the 1.50 mg bottling-headspace charge already deducted, and P1's fill oxygen was 'less than 9 ug/L', so the two are commensurable and neither carries line oxygen. Converted to a 750 mL bottle at 1.43 ug O2/uL."
+    notes: "1.50 mg (P1, 4 replicates) vs 1.43 mg (P2, 593 bottles) is the closest agreement between these two experiments anywhere in this file -- 5%, on a quantity neither paper was primarily written to report. THE SHIPPED NUMBER IS P1'S, NOT A BLEND: P1 alone supplies a printed RANGE, so taking its midpoint keeps `value` and both edges on one scope (the header's ONE SCOPE PER BAND rule), and P2 then serves as the independent check the band must contain -- which it does, twice over. P2 also fixes what the charge IS: 27-29% of the 4.9-5.2 mg of O2 held in the stopper's own cell lumen, released by the 0.6-0.9 MPa the bottleneck compresses it to. SHAPE, STATED SO IT IS NEVER READ AS AN OVERSIGHT: P2 resolves the release over time -- '35% of the overall ingress of oxygen occurred in the first five days, 59% in the first month, and 78% in the first three months' -- while this parameter is dosed as an instantaneous bolus. The bolus therefore front-loads the charge by up to about a month against a source that could support a decaying pool. That is D-136's decision, not an unexamined default, and the alternative it declined is D-133's."
+
+# -- SYNTHETIC, extruded (Nomacorc classic) --------------------------------------------------
+bottling_burst_synthetic_nomacorc:
+  value: 1.66e-3
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 1.37e-3, high: 1.94e-3, note: "P1's printed first-month range 30-40 uL/day, each edge less the shipped otr_synthetic_nomacorc (6 uL/day) over 30 days => 720-1020 uL = 1.03-1.46 mg/bottle. The narrowest band on the menu, because P1's first-month range for this closure is the narrowest it prints" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, Nomacorc classic (43x22 mm), first month: 30-40 uL/day. Central 35 less the shipped steady 6.0, x 30 d = 870 uL = 1.24 mg/bottle => 1.66e-3 g/L."
+    conditions: "as the other P1 entries (375 mL, indigo carmine, 20 C, 65 % RH, 4 replicates). Converted to 750 mL at 1.43 ug O2/uL."
+    notes: "THE INDEPENDENT CHECK ON THIS ENTRY IS A NUMBER THIS FILE HAD RECORDED WRONG UNTIL D-187. Lopes et al. 2005, via P2's introduction, measured synthetic stoppers at 'a mean oxygen ingress of 1.60 mg O2 in the first month'; D-136 transcribed that as 9.33 mg, which is P2's PRECEDING sentence -- Godden's natural-cork mg/stopper/YEAR (see otr_natural_cork, where the transposition ran the other way). Repaired, it is a real cross-check: P1's un-subtracted first-month totals are 1.50 mg/bottle for Nomacorc and 1.72 for SupremeCorq, and Lopes 2005's 1.60 for 'synthetic stoppers' -- a POOL of both -- falls between them, from a different experiment by the same group. THE STEADY SUBTRACTION MATTERS MOST HERE AND BELOW: 180 of this closure's 1050 first-month uL are steady permeation (17%), against 1% for technical cork, so dosing P1's column unmodified would double-count a sixth of the charge."
+
+# -- SYNTHETIC, injection-moulded (SupremeCorq) ----------------------------------------------
+bottling_burst_synthetic_supremecorq:
+  value: 1.54e-3
+  unit: "g/L"
+  tier: speculative
+  uncertainty: { low: 1.26e-3, high: 1.83e-3, note: "P1's printed first-month range 35-45 uL/day, each edge less the shipped otr_synthetic_supremecorq (13 uL/day) over 30 days => 660-960 uL = 0.94-1.37 mg/bottle" }
+  provenance:
+    source: "Lopes et al. 2007 (P1) Table I, SupremeCorq 45, first month: 35-45 uL/day -- the HIGHEST first-month rate on the menu. Central 40 less the shipped steady 13.0, x 30 d = 810 uL = 1.16 mg/bottle => 1.54e-3 g/L."
+    conditions: "as the other P1 entries (375 mL, indigo carmine, 20 C, 65 % RH, 4 replicates). Converted to 750 mL at 1.43 ug O2/uL."
+    notes: "THE MENU'S MOST PERMEABLE CLOSURE HAS ITS SMALLEST BURST, AND THE INVERSION IS THE ARITHMETIC WORKING, NOT AN ERROR: P1's highest first-month rate (35-45) minus the highest steady rate (11-15) leaves the smallest excess, because 390 of its 1200 first-month uL (32%) are steady permeation this file already meters continuously. What that says physically is that for SupremeCorq the first month is not dominated by a trapped-air release at all -- P1 records this closure, unlike natural cork, as 'permeable to atmospheric oxygen, mainly AFTER the first month of storage'. So the burst is the least of this closure's problems and its 9.05 mg/L/yr steady rate is the whole story; the ordering of the BURSTS is not the ordering of the closures, and nothing in this file asserts that it is."

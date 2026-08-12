@@ -103,8 +103,11 @@ class Scenario(BaseModel):
     #: seal they tested. Naming ``hermetic`` explicitly is the way to say "sealed, and I mean it".
     #:
     #: STEADY permeation only. The bottling burst (trapped cork/headspace air, 10–150× the steady
-    #: rate over the first month) is a separate one-off dose — add an ``add_oxygen`` intervention at
-    #: the ``begin_aging`` day for a freshly bottled wine. Scope: a standard 750 mL bottle.
+    #: rate over the first month) is a separate one-off dose, and since D-187 it is sourced from
+    #: this same field: schedule a ``seal_bottle`` intervention at (or after) the ``begin_aging``
+    #: day and it doses ``bottling_burst_<closure>``. ``add_oxygen`` remains the verb for an oxygen
+    #: charge the author supplies — a bottling line's own headspace pickup, micro-oxygenation, a
+    #: barrel. A freshly bottled wine generally wants both. Scope: a standard 750 mL bottle.
     closure: str | None = Field(default=None)
     duration_days: float = Field(default=14.0, gt=0.0)
 

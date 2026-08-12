@@ -334,13 +334,24 @@ def test_a_nominal_sitting_on_a_band_edge_cannot_be_classified_by_an_edge_screen
     NOTE this set now contains a READ parameter, which the old text's "wine's three are all
     unread (hence DEAD anyway, so harmless)" no longer covers: the CO2 coefficient is reached
     by every ``ph_of_state`` caller through ``PH_SYSTEM_READS``. So wine has acquired the
-    same live case beer already had."""
+    same live case beer already had.
+
+    **``bottling_burst_screwcap`` joined at D-187, and it is the cleanest example yet of why
+    this set exists rather than being "fixed".** Its nominal sits on the HIGH edge because
+    Lopes et al. 2007 prints ``<500 uL`` — a ceiling with no floor — so the entry ships the
+    published bound and a CONSTRUCTED 0.0 low edge. The midpoint of ``[0, ceiling]`` was
+    considered and rejected: it would invent a central estimate the source does not contain,
+    purely to keep this set at four. The obligation this test names is met the same way as
+    the CO2 coefficient's: anyone screening it must classify over the band interior. It is
+    also not reached by any Process — the value seeds an event dose, so no sampler draws
+    it."""
     wine_on_edge = _on_edge(_wine())
     assert wine_on_edge == {
         "f_non_ehrlich_phenylalanine",
         "copper_h2s_binding",
         "copper_mercaptan_binding",
         "vant_hoff_co2_solubility",
+        "bottling_burst_screwcap",
     }, f"the wine nominal-on-edge set changed: {sorted(wine_on_edge)}"
 
     beer = Scenario(

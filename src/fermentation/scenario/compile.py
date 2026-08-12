@@ -977,6 +977,30 @@ def _closure_otr(closure: str, parameters: ParameterSet) -> float:
     return float(parameters[name].value)
 
 
+def _bottling_burst(closure: str, parameters: ParameterSet) -> float:
+    """The named closure's one-off bottling charge [g/L] (decision D-187).
+
+    :func:`_closure_otr`'s sibling, resolving ``bottling_burst_<name>`` instead of ``otr_<name>``,
+    with the same two loud failure modes for the same reasons. The two quantities are deliberately
+    separate parameters rather than one entry with a transient: the OTR is *permeation through* the
+    closure and this is the closure's *own trapped air* decompressing out of it — different
+    mechanisms, measured in different columns of Lopes et al. 2007's Table I, and only the second
+    is a finite stock.
+    """
+    if closure not in _CLOSURES:
+        raise ValueError(
+            f"unknown scenario.closure {closure!r}; expected one of {', '.join(_CLOSURES)} "
+            "(decision D-136)"
+        )
+    name = f"bottling_burst_{closure}"
+    if name not in parameters:
+        raise ValueError(
+            f"scenario.closure {closure!r} needs parameter {name!r}, which is not loaded; "
+            "closure.yaml is missing from the parameter set (decision D-187)"
+        )
+    return float(parameters[name].value)
+
+
 def _iso_alpha_at_pitch(scenario: Scenario, parameters: ParameterSet) -> float:
     """Iso-alpha-acids [g/L] delivered to the fermenter from the boil (decision D-64).
 
@@ -1664,6 +1688,74 @@ def _verb_add_oxygen(
     return ScheduledEvent(
         time_h=days_to_hours(iv.day),
         label=f"add_oxygen@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
+def _verb_seal_bottle(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet, scenario: Scenario
+) -> ScheduledEvent:
+    """``seal_bottle`` — dose the closure's OWN trapped-air charge at bottling (decision D-187).
+
+    **The gap this closes.** D-136 turned closure oxygen from a dosed stock into a continuous flow,
+    but deliberately shipped only the STEADY column of Lopes et al. 2007's Table I. Its first-month
+    column — 10–150× higher, and a different mechanism — was left to the author as a bare
+    ``add_oxygen`` number, which made it the one oxygen input on this axis with no provenance: the
+    quantity that decides whether a freshly bottled wine is modelled at all had to be invented at
+    the call site. D-136's own Next said the data was already in hand ("P1/P2 both quantify it per
+    closure … left out deliberately to keep the D-133 line clean, **not** for lack of data"). This
+    verb spends it.
+
+    **It is ``add_oxygen``'s dose with the number taken out of the author's hands.** The mutation is
+    identical — one bolus onto the ``o2`` slot, carbon- and nitrogen-free, no volume change — and
+    the ONLY difference is where the magnitude comes from: ``bottling_burst_<closure>`` in
+    ``closure.yaml``, resolved from ``scenario.closure``. That is the whole point, so the verb takes
+    **no params at all**: a scenario cannot say "seal it with a natural cork but dose 4 mg/L", which
+    would be an ``add_oxygen`` wearing a sourced verb's name. An author who wants their own number
+    still has ``add_oxygen``, and an author whose bottling line adds headspace oxygen on top of the
+    closure's charge should dose BOTH — the line's contribution is not a closure property and is
+    deliberately not in these parameters (see ``closure.yaml``'s bottling-burst header).
+
+    **Why it needs the scenario, and is therefore in :data:`_SCENARIO_INTERVENTION_VERBS`.** The
+    dose is a function of a *scenario-level* field, not of the intervention. Every other verb is
+    handed only its own ``Intervention``, the schema and the parameters — the ``set_ph`` gate
+    (D-186) already had to reach for ``scenario.initial`` and did it from
+    :func:`_compile_interventions` because a verb cannot see the scenario at all. This one needs the
+    scenario for its *value*, not merely for a gate, so it takes it as a fourth argument rather than
+    duplicating ``closure`` into ``params`` where the two could disagree.
+
+    **Two gates, both in :func:`_compile_interventions` and both loud** (see there): the scenario
+    must name a ``closure``, and the seal must not precede ``begin_aging``. The second is not
+    fastidiousness — the shipped charge is P1's first-month total *less the steady permeation over
+    the same 30 days*, an anti-double-count that assumes
+    :class:`~fermentation.core.kinetics.aging.ClosureOxygenIngress` is switched on across that
+    month. Sealing before the aging boundary would subtract a flux nobody paid. A third gate
+    (wine-only) was written and deleted because it provably cannot fire — D-136 rejects a
+    ``closure`` on beer before any intervention compiles, so the first gate is already the whole
+    medium check.
+
+    **``hermetic`` doses exactly 0.0**, so the verb is isolable in the prime-directive-3 sense: a
+    hermetic seal is byte-for-byte the run without it, and that zero is *named* in ``closure.yaml``
+    (the D-45 lesson) rather than expressed by leaving the intervention out.
+    """
+    _iv_check_keys(iv, frozenset(), "seal_bottle")
+    if "o2" not in schema:  # unreachable via the medium gate below; the add_oxygen symmetry guard
+        raise ValueError(
+            f"intervention 'seal_bottle' at day {iv.day:g} needs an 'o2' slot, but medium "
+            f"{schema!r} has none (decision D-187)"
+        )
+    assert scenario.closure is not None  # guaranteed by the _compile_interventions gate
+    added_gpl = _bottling_burst(scenario.closure, parameters)
+    o2_slice = schema.slice("o2")
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[o2_slice] += added_gpl
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"seal_bottle@{iv.day:g}d",
         mutate=mutate,
     )
 
@@ -2472,6 +2564,30 @@ _INTERVENTION_VERBS: dict[
     "begin_aging": _verb_begin_aging,
 }
 
+#: action verb → compiler that additionally needs the whole :class:`Scenario` (decision D-187).
+#:
+#: A SECOND table rather than a fourth parameter on every verb above, because the two kinds are
+#: genuinely different and the split says which is which: a verb in :data:`_INTERVENTION_VERBS`
+#: is a function of its own ``Intervention`` alone — it can be read, tested and reasoned about
+#: without knowing anything else about the run — while a verb here draws its magnitude from a
+#: scenario-level choice made elsewhere. ``seal_bottle`` is the first: its dose is whatever
+#: ``scenario.closure`` names. Widening all twelve signatures to carry a ``scenario`` almost none
+#: of them may look at would have made that distinction invisible instead of explicit.
+#:
+#: :func:`_compile_interventions` dispatches on this table first and both are searched before an
+#: action is called unknown, so the two are one namespace with one error message.
+_SCENARIO_INTERVENTION_VERBS: dict[
+    str, Callable[[Intervention, StateSchema, ParameterSet, Scenario], ScheduledEvent]
+] = {
+    "seal_bottle": _verb_seal_bottle,
+}
+
+#: Verbs whose dose is resolved from ``scenario.closure`` and which therefore require one
+#: (decision D-187). Separate from :data:`_SCENARIO_INTERVENTION_VERBS` because *needing the
+#: scenario* and *needing a closure* are different claims — a later scenario-level verb reading,
+#: say, ``batch_volume_liters`` would join the first set and not this one.
+_CLOSURE_SOURCED_VERBS: frozenset[str] = frozenset({"seal_bottle"})
+
 #: Verbs that may only be scheduled when the scenario opted into the pH system by giving
 #: ``initial_ph`` (decision D-186, riding D-179's gate). The check lives in
 #: :func:`_compile_interventions` rather than in the verb because a verb is handed only its own
@@ -2494,19 +2610,66 @@ def _compile_interventions(
 ) -> tuple[ScheduledEvent, ...]:
     """Compile ``scenario.interventions`` into timed :class:`ScheduledEvent`\\ s (decision D-36).
 
-    Each verb is looked up in :data:`_INTERVENTION_VERBS`; an unknown action raises loudly (the
-    ``_ALLOWED_KEYS`` discipline). An intervention at or after the run duration is rejected here
-    with a scenario-level message rather than deferred to ``simulate_scheduled``'s window check,
-    so the error names the scenario and the verb.
+    Each verb is looked up in :data:`_INTERVENTION_VERBS`, then in
+    :data:`_SCENARIO_INTERVENTION_VERBS` for the few whose *magnitude* comes from a scenario-level
+    field (D-187's ``seal_bottle``, whose dose is whatever ``scenario.closure`` names); an action in
+    neither raises loudly, naming both (the ``_ALLOWED_KEYS`` discipline). An intervention at or
+    after the run duration is rejected here with a scenario-level message rather than deferred to
+    ``simulate_scheduled``'s window check, so the error names the scenario and the verb.
+
+    **Cross-cutting gates live here, not in the verbs**, because a verb is handed only its own
+    ``Intervention``, the schema and the parameters: D-186's pH-system opt-in reads
+    ``scenario.initial``, and D-187's three closure gates read ``scenario.closure``,
+    ``scenario.medium`` and the *other* interventions (a ``seal_bottle`` may not precede
+    ``begin_aging``).
     """
     events: list[ScheduledEvent] = []
+    aging_days = [iv.day for iv in scenario.interventions if iv.action == "begin_aging"]
     for iv in scenario.interventions:
         verb = _INTERVENTION_VERBS.get(iv.action)
-        if verb is None:
+        scenario_verb = _SCENARIO_INTERVENTION_VERBS.get(iv.action)
+        if verb is None and scenario_verb is None:
             raise ValueError(
                 f"scenario {scenario.name!r}: unknown intervention action {iv.action!r}; "
-                f"known verbs: {sorted(_INTERVENTION_VERBS)}"
+                f"known verbs: "
+                f"{sorted({*_INTERVENTION_VERBS, *_SCENARIO_INTERVENTION_VERBS})}"
             )
+        if iv.action in _CLOSURE_SOURCED_VERBS:
+            # Gate 1 — the dose IS the closure, so there is nothing to dose without one. Silently
+            # skipping (or dosing zero) would let a scenario ask for a sourced bottling charge and
+            # receive none, which is the failure `_closure_otr` refuses for the same reason.
+            if scenario.closure is None:
+                raise ValueError(
+                    f"scenario {scenario.name!r}: intervention {iv.action!r} at day {iv.day:g} "
+                    "takes its dose from 'closure', which this scenario does not name; give one "
+                    f"of {', '.join(_CLOSURES)} (decision D-187). To dose an oxygen charge you "
+                    "supply yourself, use 'add_oxygen'"
+                )
+            # THERE IS DELIBERATELY NO WINE-ONLY GATE HERE, and its absence is measured rather
+            # than assumed. One was written, and it could not fire: this verb requires a
+            # `closure` (above), and `compile_scenario` rejects a `closure` on a medium without
+            # the `closure_otr` slot BEFORE it compiles any intervention (D-136). So a beer
+            # scenario reaching this line is already impossible — with a closure it died at the
+            # compile seam, without one it dies on the gate above. Adding a third message would
+            # have documented a path no scenario can take (the D-186 lesson: falsify a guard
+            # against the case it names, and if it cannot fire, do not ship it).
+            #
+            # Gate 2 — the anti-double-count in `bottling_burst_*` subtracts 30 days of steady
+            # permeation, which only runs once `begin_aging` has enabled ClosureOxygenIngress.
+            # Sealing earlier would net off a flux the run never paid. Bottling IS the start of
+            # bottle aging, so this rejects nothing an author would want to write.
+            if not aging_days or min(aging_days) > iv.day:
+                when = (
+                    f"the earliest 'begin_aging' is day {min(aging_days):g}"
+                    if aging_days
+                    else "this scenario never calls 'begin_aging'"
+                )
+                raise ValueError(
+                    f"scenario {scenario.name!r}: intervention {iv.action!r} at day {iv.day:g} "
+                    f"must be at or after 'begin_aging' ({when}); the sourced charge is net of "
+                    "the steady ingress over the same first month, which is not running until "
+                    "aging begins (decision D-187)"
+                )
         if iv.action in _PH_SYSTEM_VERBS and "initial_ph" not in scenario.initial:
             raise ValueError(
                 f"scenario {scenario.name!r}: intervention {iv.action!r} at day {iv.day:g} "
@@ -2520,7 +2683,11 @@ def _compile_interventions(
                 f"at or beyond the run duration ({scenario.duration_days:g} d); interventions "
                 "must fall within the run"
             )
-        events.append(verb(iv, schema, parameters))
+        if scenario_verb is not None:
+            events.append(scenario_verb(iv, schema, parameters, scenario))
+        else:
+            assert verb is not None  # one of the two tables matched, checked above
+            events.append(verb(iv, schema, parameters))
     return tuple(events)
 
 

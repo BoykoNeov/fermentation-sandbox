@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-11T22:10:25.435Z
+  modified: 2026-08-12T00:03:15.105Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-12)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-186**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1622**. Most remaining
+**D-187**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1693**. Most remaining
 work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
@@ -79,6 +79,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   though ~8 records' copy-forward lists still say it. **Cation-MOVING, never a pH dial**; `add_acid`
   is unchanged; the reachability check **cannot** move to compile; the opt-in gate's reason DIFFERS
   per medium; adds **no** pH-rate dependence. → `.claude/memory/prohibitions/aging-ph-anchor.md`
+- **Closure oxygen — steady + bottling burst (D-136 → D-162, D-187)** — BOTH columns of Lopes'
+  table now ship: `seal_bottle` is **BUILT** and D-136's "not for lack of data" is spent. Dose is
+  the first month **NET of steady** and must not precede `begin_aging`; screwcap is a **BOUND**,
+  never a midpoint; the burst ordering is NOT the closure ordering; line oxygen stays with
+  `add_oxygen`. OTR(T) and bottle format still blocked.
+  → `.claude/memory/prohibitions/closure-oxygen.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
@@ -101,7 +107,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B); peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; acetaldehyde
-in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) + bottling burst; no post-Fenton O₂ draw (D-142); **`add_copper` never writes the `copper` slot** (needs a residual-Cu fraction); D-143/4 ← D-145.
+in maturation + the 0-vs-2.7 floor; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); no post-Fenton O₂ draw (D-142); **`add_copper` never writes the `copper` slot** (needs a residual-Cu fraction); D-143/4 ← D-145.
 
 ## Standing rule
 - **NEVER put a whole-file line cap back (D-177, corrects D-169).** Raised 4× (150→300), then **REMOVED, not

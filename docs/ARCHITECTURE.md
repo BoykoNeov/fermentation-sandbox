@@ -184,6 +184,15 @@ parameter, not a constant in the seam (D-7).
 
 A `Scenario` is schema-validated YAML/JSON, **not** a custom DSL, and holds no physics.
 
+**Intervention verbs dispatch through two tables (D-187).** Almost every verb is a function of its
+own `Intervention` alone (`_INTERVENTION_VERBS`). `_SCENARIO_INTERVENTION_VERBS` holds the ones
+whose *magnitude* comes from a scenario-level field, and `seal_bottle` is the first: it doses
+`bottling_burst_<closure>` for whatever `scenario.closure` names, so its amount is sourced instead
+of author-supplied. Both tables are searched before an action is called unknown. Cross-cutting
+gates live in `_compile_interventions` rather than in the verbs, because a verb never sees the
+scenario: `set_ph` needs `initial_ph` (D-186), and `seal_bottle` needs a `closure` and must not
+precede `begin_aging` (the charge is net of that first month's steady ingress).
+
 ## Confidence tiers
 
 `Tier` is an ordered enum (`VALIDATED > PLAUSIBLE > SPECULATIVE`); the trust of a combination is

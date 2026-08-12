@@ -702,3 +702,514 @@ def test_the_low_edge_of_the_o2_total_cannot_draw_a_supersaturated_wine():
 
     # The cascade set reads the same total as its activation floor and breached identically.
     assert _o2_max_at_total(band.low, oxidative="cascade") < _AIR_SATURATION_GPL
+
+
+# ============================================================================================
+# THE BOTTLING BURST — the one-off charge `seal_bottle` doses (decision D-187)
+# ============================================================================================
+#
+# D-136 shipped the STEADY column of Lopes 2007's Table I and left its FIRST-MONTH column to the
+# author as a bare `add_oxygen` number. These tests guard the other column and the verb that
+# spends it. The load-bearing ones are:
+#
+#   * test_shipped_burst_is_the_published_first_month_NET_of_steady — the anti-double-count. The
+#     shipped charge is P1's first month MINUS 30 days of the steady rate this file already meters
+#     continuously, and for the synthetic closures that subtraction is 17-32% of the charge, not a
+#     rounding correction.
+#   * test_seal_bottle_before_begin_aging_is_rejected — the gate that keeps the subtraction honest.
+#     Nothing else in the suite notices if a scenario nets off a flux the run never paid.
+#   * test_natural_cork_burst_band_contains_the_second_primary — the cross-validation, and it is
+#     the strongest agreement between these two experiments anywhere in this file: P1's 4 replicates
+#     and P2's 593 bottles land 5% apart on a quantity neither paper was written to report.
+
+#: Lopes et al. 2007 Table I, **first-month** column, in uL O2/day — the published observations the
+#: shipped bursts must reproduce. Transcribed from the same rendered table as _PUBLISHED_ULDAY
+#: above, which is its neighbouring column.
+_PUBLISHED_FIRST_MONTH_ULDAY: dict[str, tuple[float, float]] = {
+    "technical_cork": (15.0, 40.0),
+    "natural_cork": (25.0, 45.0),
+    "synthetic_nomacorc": (30.0, 40.0),
+    "synthetic_supremecorq": (35.0, 45.0),
+}
+
+#: P1's screwcap cell, which is NOT a rate and is NOT integrated over the month: Table I prints
+#: "<500" footnoted "at moment of bottling", because a screwcap's charge is headspace air trapped
+#: at sealing rather than a stopper decompressing. A ceiling with no floor.
+_SCREWCAP_CEILING_UL = 500.0
+
+#: The days P1's first-month rates are averaged over. One month, read as 30 days.
+_BURST_DAYS = 30.0
+
+#: The one-off conversion: the same 1.43 ug/uL and 750 mL bottle as _ULDAY_TO_GPLH, but WITHOUT
+#: the /24 — a charge is a mass, not a rate. Re-derived here rather than imported, for the reason
+#: given above _ULDAY_TO_GPLH.
+_UL_TO_GPL = 1.43e-6 / 0.750
+
+#: Rounding slack. The shipped values are written to three significant figures, so a test of the
+#: arithmetic can be no tighter than that; every comparison below is exact arithmetic on published
+#: literals, NOT a solver output, so this bound is about the YAML's precision and nothing else.
+_ROUNDING_REL = 5e-3
+
+
+def _expected_burst_gpl(closure: str, params, *, edge: str = "value") -> float:
+    """P1's first-month figure for ``closure``, net of this file's shipped steady rate.
+
+    ``edge`` selects the printed first-month low, high or central rate. The steady rate subtracted
+    is the SHIPPED ``otr_<closure>`` at all three points — one scope per band, so the nominal is
+    the exact midpoint of the band (see closure.yaml's bottling-burst header for why the
+    alternative, subtracting the steady BAND's edges, mixes scopes).
+    """
+    low, high = _PUBLISHED_FIRST_MONTH_ULDAY[closure]
+    first_month = {"low": low, "high": high, "value": (low + high) / 2.0}[edge]
+    steady_ulday = _PUBLISHED_ULDAY[closure]
+    return (first_month - steady_ulday) * _BURST_DAYS * _UL_TO_GPL
+
+
+def _scenario_sealed(closure: str | None, *, seal_day: float | None = None, **kwargs) -> Scenario:
+    """:func:`_scenario` plus a ``seal_bottle`` at the aging boundary (the bottling day)."""
+    base = _scenario(closure, **kwargs)
+    day = _FERMENT_DAYS if seal_day is None else seal_day
+    return base.model_copy(
+        update={"interventions": [*base.interventions, Intervention(day=day, action="seal_bottle")]}
+    )
+
+
+def _seal_dose(compiled) -> float:
+    """The g/L the compiled ``seal_bottle`` event actually puts on the ``o2`` slot."""
+    events = [e for e in compiled.events if e.label.startswith("seal_bottle@")]
+    assert len(events) == 1, f"expected exactly one seal_bottle event, got {len(events)}"
+    before = compiled.y0.copy()
+    assert events[0].mutate is not None
+    after = events[0].mutate(compiled.schema, before)
+    o2 = compiled.schema.slice("o2")
+    return float(after[o2][0] - before[o2][0])
+
+
+# --------------------------------------------------------------------------------------------
+# The shipped charges, against the published column
+# --------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("closure", sorted(_PUBLISHED_FIRST_MONTH_ULDAY))
+def test_shipped_burst_is_the_published_first_month_net_of_steady(params, closure):
+    """The shipped charge is P1's first month MINUS the steady ingress over the same 30 days.
+
+    THE SUBTRACTION IS THE POINT, and it is why this cannot be checked by "is the burst bigger
+    than the steady rate". P1's first-month column is a TOTAL — the trapped-air release plus the
+    permeation running underneath it — while ``ClosureOxygenIngress`` is already integrating that
+    permeation from ``begin_aging``. Dosing the column unmodified would count the steady share
+    twice, and :func:`test_the_steady_subtraction_is_not_a_rounding_correction` measures how much
+    that would be.
+    """
+    expected = _expected_burst_gpl(closure, params)
+    shipped = params[f"bottling_burst_{closure}"].value
+    assert shipped == pytest.approx(expected, rel=_ROUNDING_REL)
+
+
+@pytest.mark.parametrize("closure", sorted(_PUBLISHED_FIRST_MONTH_ULDAY))
+def test_shipped_burst_band_edges_reproduce_the_published_range(params, closure):
+    """Both edges are P1's printed first-month range, shifted by ONE shipped constant.
+
+    The D-163 lesson applied to a new band while it is being written rather than after: a pinned
+    nominal leaves the edges free to move silently. Here every edge is PRINTED (Table I's
+    first-month column) less the shipped ``otr_<closure>``, so the band's WIDTH is exactly P1's
+    printed range — no orientation mixing, no second scope. If someone re-derives an edge by
+    subtracting the steady BAND instead, the nominal stops being the midpoint and this fails.
+    """
+    band = params[f"bottling_burst_{closure}"].uncertainty
+    assert band.low == pytest.approx(
+        _expected_burst_gpl(closure, params, edge="low"), rel=_ROUNDING_REL
+    )
+    assert band.high == pytest.approx(
+        _expected_burst_gpl(closure, params, edge="high"), rel=_ROUNDING_REL
+    )
+
+    # ONE SCOPE ⇒ the nominal is the exact midpoint. This is the assertion that fails if the
+    # edges are ever re-derived against the steady band's edges rather than its shipped value.
+    value = params[f"bottling_burst_{closure}"].value
+    assert value == pytest.approx((band.low + band.high) / 2.0, rel=_ROUNDING_REL)
+
+
+def test_the_steady_subtraction_is_not_a_rounding_correction(params):
+    """Measured, not asserted: what dosing P1's column unmodified would double-count.
+
+    1% for technical cork but ~17% for Nomacorc and ~32% for SupremeCorq — because the subtraction
+    scales with the steady rate, which spans ~52x across the menu while the first-month column
+    barely separates the closures at all. A reader who assumes "the burst dwarfs the steady term,
+    so netting it off is fussiness" is right about technical cork and wrong about the synthetics.
+    """
+    shares = {}
+    for closure, (low, high) in _PUBLISHED_FIRST_MONTH_ULDAY.items():
+        first_month_total = (low + high) / 2.0 * _BURST_DAYS
+        steady_over_the_month = _PUBLISHED_ULDAY[closure] * _BURST_DAYS
+        shares[closure] = steady_over_the_month / first_month_total
+
+    assert shares["technical_cork"] < 0.02
+    assert 0.15 < shares["synthetic_nomacorc"] < 0.20
+    assert 0.30 < shares["synthetic_supremecorq"] < 0.35
+
+    # And the shipped charges carry the subtraction: burst + steady*30d == the published total.
+    for closure in _PUBLISHED_FIRST_MONTH_ULDAY:
+        low, high = _PUBLISHED_FIRST_MONTH_ULDAY[closure]
+        published_total_gpl = (low + high) / 2.0 * _BURST_DAYS * _UL_TO_GPL
+        steady_gpl = _PUBLISHED_ULDAY[closure] * _BURST_DAYS * _UL_TO_GPL
+        shipped = params[f"bottling_burst_{closure}"].value
+        assert shipped + steady_gpl == pytest.approx(published_total_gpl, rel=_ROUNDING_REL)
+
+
+def test_screwcap_burst_is_an_upper_bound_and_says_so(params):
+    """P1 prints ``<500`` — one bound and no floor — so the entry is a CEILING, not a central value.
+
+    Shipping the midpoint of [0, ceiling] instead would invent a number the source does not
+    contain (the D-102 fabrication shape). The two consequences this pins: ``value`` sits ON the
+    high edge, and the low edge is 0.0. It is also the one entry NOT integrated over 30 days —
+    Table I's footnote pins that cell to the moment of bottling, because a screwcap's charge is
+    headspace air at sealing rather than a compressed stopper decompressing.
+    """
+    burst = params["bottling_burst_screwcap"]
+    expected = _SCREWCAP_CEILING_UL * _UL_TO_GPL
+    assert burst.value == pytest.approx(expected, rel=_ROUNDING_REL)
+    assert burst.uncertainty.high == pytest.approx(expected, rel=_ROUNDING_REL)
+    assert burst.uncertainty.low == 0.0
+    assert burst.value == burst.uncertainty.high  # a bound, not a centre
+
+    # Read as a RATE it would be 15000 uL — the reading this entry's note rejects, and the
+    # arithmetic that shows why: ~21 mg into a 375 mL bottle, an order of magnitude past every
+    # other closure's month-one charge.
+    as_a_rate = _SCREWCAP_CEILING_UL * _BURST_DAYS * _UL_TO_GPL
+    assert as_a_rate > 10.0 * max(
+        params[f"bottling_burst_{c}"].value for c in _PUBLISHED_FIRST_MONTH_ULDAY
+    )
+
+    # Even taken at its worst case the bound is the SMALLEST charge on the menu, so the folklore
+    # ordering survives month one. (D-136's ordering correction is a steady-state claim; this is
+    # a separate quantity and it happens to run the other way.)
+    for closure in _PUBLISHED_FIRST_MONTH_ULDAY:
+        assert burst.value < params[f"bottling_burst_{closure}"].value
+
+
+def test_natural_cork_burst_band_contains_the_second_primary(params):
+    """P2 measured this integral directly in 593 bottles; the band built from P1 must contain it.
+
+    P2's Table 1 gives month-1 totals of 0.97 and 1.58 mg/bottle by cork-plank caliper, and its
+    Discussion an average of 1.43 mg (27-29% of the 4.9-5.2 mg the stopper holds in its own cell
+    lumen). P1's un-subtracted first-month total for the same quantity is 1.50 mg. Both papers had
+    the bottling headspace removed — P2 deducts 1.50 mg explicitly, P1 measured fill oxygen at
+    "less than 9 ug/L" — so the two are commensurable.
+
+    THE CONTAINMENT IS NOT TOTAL, AND THIS TEST PINS THE EXCEPTION RATHER THAN AVERAGING IT AWAY:
+    P2's THINNER-caliper mean falls 3.5% below the band's low edge. That is not the two papers
+    disagreeing about one stopper — it is a variable P1 never varied (P2 measured cork-plank
+    caliper, and attributes the difference to lower air-filled lumen volume in thinner planks),
+    and this menu carries no caliper axis. Written as a bound so that widening the band to swallow
+    it, or narrowing the band past the figures that DO fall inside, both fail here.
+    """
+    band = params["bottling_burst_natural_cork"].uncertainty
+    per_bottle_to_gpl = 1e-3 / 0.750  # mg/bottle -> g/L in the file's 750 mL scope
+    for p2_mg in (1.43, 1.58):
+        assert band.low <= p2_mg * per_bottle_to_gpl <= band.high
+    thinner_caliper = 0.97 * per_bottle_to_gpl
+    assert thinner_caliper < band.low
+    assert thinner_caliper > 0.95 * band.low  # 3.5% below, and it must stay a near miss
+
+    # The headline agreement, on the un-subtracted totals the two papers actually report.
+    p1_total_mg = 35.0 * _BURST_DAYS * 1.43e-3
+    assert p1_total_mg == pytest.approx(1.43, rel=0.06)
+
+
+@pytest.mark.parametrize("closure", _ASCENDING)
+def test_every_burst_is_speculative_and_banded(params, closure):
+    """Same discipline as the OTRs: a tier, a band, and the value inside it.
+
+    All speculative for the OTRs' reason plus one — each is an INTEGRAL of a month-average rate
+    rather than a directly measured charge (natural cork excepted, where P2 published the
+    integral). ``hermetic`` is the deliberate degenerate case: exactly zero, band [0, 0].
+    """
+    burst = params[f"bottling_burst_{closure}"]
+    assert burst.tier is Tier.SPECULATIVE
+    assert burst.uncertainty.low <= burst.value <= burst.uncertainty.high
+    assert burst.unit == "g/L"  # a charge, not a rate — the OTRs are g/L/h
+    if closure == "hermetic":
+        assert burst.value == 0.0 and burst.uncertainty.high == 0.0
+    else:
+        assert burst.value > 0.0
+        assert burst.uncertainty.low < burst.uncertainty.high or closure == "screwcap"
+
+
+def test_the_burst_is_worth_years_of_steady_ingress_under_technical_cork(params):
+    """The 'so what', and it is why an unsealed technical-cork run is not merely slightly light.
+
+    Technical cork has the menu's lowest steady rate, so its one-off charge is worth ~9 YEARS of
+    permeation, arriving on day one. Asserted as a range rather than a point because both inputs
+    are banded; the claim is the order of magnitude, not the number.
+    """
+    burst = params["bottling_burst_technical_cork"].value
+    otr = params["otr_technical_cork"].value  # g/L/h
+    years = burst / (otr * 24.0 * 365.25)
+    assert 7.0 < years < 11.0
+
+    # The same ratio for the most permeable closure is a couple of months — the burst is a
+    # first-order term for tight closures and a footnote for leaky ones. The SPREAD is the claim:
+    # ~40x, on a quantity whose own values differ by less than 30% across the menu.
+    supreme_years = params["bottling_burst_synthetic_supremecorq"].value / (
+        params["otr_synthetic_supremecorq"].value * 24.0 * 365.25
+    )
+    assert supreme_years < 0.25
+    assert years > 30.0 * supreme_years
+
+
+# --------------------------------------------------------------------------------------------
+# The verb
+# --------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("closure", _ASCENDING)
+def test_seal_bottle_doses_the_sourced_charge(params, closure):
+    """The event puts exactly ``bottling_burst_<closure>`` on ``o2`` — read, never restated."""
+    compiled = compile_scenario(_scenario_sealed(closure))
+    assert _seal_dose(compiled) == pytest.approx(params[f"bottling_burst_{closure}"].value)
+
+
+def test_seal_bottle_is_add_oxygen_with_the_number_taken_out_of_the_authors_hands(params):
+    """Same mutation as ``add_oxygen``, differing ONLY in where the magnitude comes from.
+
+    This is what makes the verb safe to add to an axis with 31 pinned numbers: it introduces no
+    new mechanism, no new slot and no new flux — it is the D-71 dose with a sourced amount. If it
+    ever grows a second effect, this equivalence breaks.
+    """
+    burst_gpl = params["bottling_burst_natural_cork"].value
+    sealed = compile_scenario(_scenario_sealed("natural_cork"))
+    dosed = compile_scenario(
+        _scenario("natural_cork").model_copy(
+            update={
+                "interventions": [
+                    *_scenario("natural_cork").interventions,
+                    Intervention(
+                        day=_FERMENT_DAYS,
+                        action="add_oxygen",
+                        params={"o2_mgl": burst_gpl * 1000.0},
+                    ),
+                ]
+            }
+        )
+    )
+    o2 = sealed.schema.slice("o2")
+    a = [e for e in sealed.events if e.label.startswith("seal_bottle@")][0]
+    b = [e for e in dosed.events if e.label.startswith("add_oxygen@")][0]
+    assert a.mutate is not None and b.mutate is not None
+    # Neither may reconfigure the Process set: this is a dose, not a phase change.
+    assert a.reconfigure is None and b.reconfigure is None
+    ya = a.mutate(sealed.schema, sealed.y0.copy())
+    yb = b.mutate(dosed.schema, dosed.y0.copy())
+    assert float(ya[o2][0]) == pytest.approx(float(yb[o2][0]), rel=1e-12)
+    assert np.array_equal(np.delete(ya, o2), np.delete(yb, o2))
+
+
+def test_a_hermetic_seal_is_byte_for_byte_inert():
+    """Prime directive 3 for a VERB: sealing a hermetic bottle changes not one bit.
+
+    The named zero (D-45) doing its job — a scenario can say "this wine got nothing at bottling"
+    with provenance instead of by omission, and pay nothing for saying it.
+    """
+    without = compile_scenario(_scenario("hermetic"))
+    with_seal = compile_scenario(_scenario_sealed("hermetic"))
+    event = [e for e in with_seal.events if e.label.startswith("seal_bottle@")][0]
+    assert event.mutate is not None
+    assert np.array_equal(event.mutate(with_seal.schema, with_seal.y0.copy()), with_seal.y0)
+    assert np.array_equal(with_seal.y0, without.y0)
+
+
+def test_an_unsealed_scenario_is_exactly_the_pre_d187_run():
+    """Every scenario written before this verb existed is untouched by it.
+
+    The opt-in shape: the charge arrives only when a ``seal_bottle`` is scheduled, so D-136's
+    pins, D-140's 31 pins and every aging benchmark see the same trajectory they saw before.
+    """
+    before = compile_scenario(_scenario("natural_cork"))
+    assert not [e for e in before.events if e.label.startswith("seal_bottle@")]
+    assert len(before.events) == 2  # add_so2 + begin_aging, and nothing added implicitly
+
+
+def test_seal_bottle_takes_no_params():
+    """A scenario cannot say "seal it with natural cork but dose 4 mg/L".
+
+    That would be an ``add_oxygen`` wearing a sourced verb's name — the whole value of this verb
+    is that its magnitude is not the author's to choose. ``add_oxygen`` remains available for an
+    author-supplied charge, which is the honest way to write one.
+    """
+    scenario = _scenario("natural_cork")
+    with pytest.raises(ValueError, match="unknown param"):
+        compile_scenario(
+            scenario.model_copy(
+                update={
+                    "interventions": [
+                        *scenario.interventions,
+                        Intervention(
+                            day=_FERMENT_DAYS, action="seal_bottle", params={"o2_mgl": 4.0}
+                        ),
+                    ]
+                }
+            )
+        )
+
+
+def test_seal_bottle_without_a_closure_is_a_loud_error_that_names_the_menu():
+    """The dose IS the closure, so there is nothing to dose without one — and it must not be 0."""
+    with pytest.raises(ValueError, match="takes its dose from 'closure'"):
+        compile_scenario(_scenario_sealed(None))
+
+
+def test_seal_bottle_before_begin_aging_is_rejected():
+    """The gate that keeps the anti-double-count honest, and nothing else would catch it.
+
+    The shipped charge is net of 30 days of steady ingress, which only runs once ``begin_aging``
+    has enabled ``ClosureOxygenIngress``. Sealing earlier subtracts a flux the run never paid, and
+    the result is a quietly under-dosed wine — no error, no NaN, just a wrong number. Bottling IS
+    the start of bottle aging, so this rejects nothing an author would want to write.
+    """
+    with pytest.raises(ValueError, match="must be at or after 'begin_aging'"):
+        compile_scenario(_scenario_sealed("natural_cork", seal_day=_FERMENT_DAYS - 5.0))
+
+    # The same message covers a scenario that never ages at all.
+    scenario = _scenario("natural_cork")
+    never_ages = scenario.model_copy(
+        update={
+            "interventions": [iv for iv in scenario.interventions if iv.action != "begin_aging"]
+            + [Intervention(day=_FERMENT_DAYS, action="seal_bottle")]
+        }
+    )
+    with pytest.raises(ValueError, match="never calls 'begin_aging'"):
+        compile_scenario(never_ages)
+
+    # Sealing exactly AT the aging boundary is the intended usage and must be allowed.
+    compile_scenario(_scenario_sealed("natural_cork", seal_day=_FERMENT_DAYS))
+
+
+def test_seal_bottle_on_beer_is_rejected_by_the_d136_closure_gate():
+    """Wine-only — enforced by a guard that already existed, which is why this verb added none.
+
+    A wine-only gate WAS written for ``seal_bottle`` and then deleted, because it could not fire:
+    the verb requires a ``closure``, and ``compile_scenario`` rejects a ``closure`` on a medium
+    without the ``closure_otr`` slot before it compiles any intervention. A beer scenario
+    therefore dies at D-136's seam (this test) or, with no closure named, on the dose gate — never
+    on a message of D-187's own. This test pins the INTERACTION, so that a future change to
+    either guard cannot leave the combination silently legal.
+    """
+    beer = Scenario(
+        name="d187-beer",
+        medium="beer",
+        initial={
+            "glucose_gpl": 12.0,
+            "maltose_gpl": 60.0,
+            "maltotriose_gpl": 12.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 1.0,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=18.0)],
+        duration_days=30.0,
+        closure="natural_cork",
+        interventions=[
+            Intervention(day=10.0, action="begin_aging"),
+            Intervention(day=11.0, action="seal_bottle"),
+        ],
+    )
+    with pytest.raises(ValueError, match="closure oxygen ingress is wine-only"):
+        compile_scenario(beer)
+
+    # And with no closure to name, the dose gate catches it first — the other half of why the
+    # deleted third gate was unreachable.
+    with pytest.raises(ValueError, match="takes its dose from 'closure'"):
+        compile_scenario(beer.model_copy(update={"closure": None}))
+
+
+def test_an_unknown_verb_names_both_dispatch_tables():
+    """The two tables are one namespace: a typo must not be reported against half the menu."""
+    scenario = _scenario("natural_cork")
+    with pytest.raises(ValueError, match="unknown intervention action") as excinfo:
+        compile_scenario(
+            scenario.model_copy(
+                update={
+                    "interventions": [
+                        *scenario.interventions,
+                        Intervention(day=_FERMENT_DAYS, action="seal_botle"),
+                    ]
+                }
+            )
+        )
+    message = str(excinfo.value)
+    assert "seal_bottle" in message and "add_oxygen" in message
+
+
+# --------------------------------------------------------------------------------------------
+# What it does to a five-year bottle
+# --------------------------------------------------------------------------------------------
+
+
+def test_sealing_a_bottle_browns_it_more_over_five_years():
+    """The consequence, directionally: the charge is real oxygen and it goes where oxygen goes.
+
+    Directional rather than a magnitude (the Tier-3 risk rule). The comparison is the SAME closure
+    sealed and unsealed, so nothing but the one-off charge differs.
+    """
+    unsealed = compile_scenario(_scenario("technical_cork"))
+    sealed = compile_scenario(_scenario_sealed("technical_cork"))
+    span = (0.0, _TOTAL_DAYS * 24.0)
+    t_eval = np.linspace(*span, 2000)
+
+    out = {}
+    for name, compiled in (("unsealed", unsealed), ("sealed", sealed)):
+        trajectory = simulate_scheduled(
+            compiled.process_set,
+            dict(compiled.param_values),
+            compiled.y0,
+            span,
+            events=compiled.events,
+            t_eval=t_eval,
+        )
+        out[name] = {
+            "A420": _final(compiled, trajectory, "A420"),
+            "so2_total": _final(compiled, trajectory, "so2_total"),
+            "o2": _final(compiled, trajectory, "o2"),
+        }
+
+    assert out["sealed"]["A420"] > out["unsealed"]["A420"]
+    assert out["sealed"]["so2_total"] < out["unsealed"]["so2_total"]
+
+    # THE CHARGE IS SPENT, NOT STOCKPILED — the claim that says a bolus does not break D-136's
+    # supply-limited reframe. Five years on, standing o2 is under a HUNDREDTH of the dose (it
+    # runs ~2e-3 of it), i.e. back at the quasi-steady state the closure sets rather than holding
+    # any part of the bolus in reserve.
+    burst_gpl = _seal_dose(sealed)
+    assert out["sealed"]["o2"] < burst_gpl / 100.0
+
+    # It does NOT return to exactly the unsealed level, and the reason is a real coupling worth
+    # naming rather than a tolerance to widen: the sealed arm spent more of its SO2 (asserted
+    # above), and SO2 is itself an o2 sink, so the surviving arm holds o2 slightly LOWER. The
+    # standing level is set by what is left to consume it, not by what was dosed years earlier.
+    assert out["sealed"]["o2"] > out["unsealed"]["o2"]
+    assert out["sealed"]["o2"] < 2.0 * out["unsealed"]["o2"]
+
+
+def test_carbon_closes_over_a_sealed_five_year_run():
+    """A dosed charge must not become matter: ``o2`` is off every elemental ledger (the D-71 rule).
+
+    The same check D-136 ran for continuous ingress, re-run with a bolus on top — a verb that
+    quietly minted carbon would pass every other test in this section.
+    """
+    compiled = compile_scenario(_scenario_sealed("natural_cork"))
+    span = (0.0, _TOTAL_DAYS * 24.0)
+    trajectory = simulate_scheduled(
+        compiled.process_set,
+        dict(compiled.param_values),
+        compiled.y0,
+        span,
+        events=compiled.events,
+        t_eval=np.linspace(*span, 500),
+    )
+    assert _final(compiled, trajectory, "A420") > 0.0  # or the ledger checks nothing
+    carbon_fraction = compiled.param_values["biomass_C_fraction"]
+    assert_conserved(
+        trajectory,
+        total_carbon(compiled.schema, biomass_carbon_fraction=carbon_fraction),
+        label="carbon (sealed bottle, closure-driven aging)",
+    )
