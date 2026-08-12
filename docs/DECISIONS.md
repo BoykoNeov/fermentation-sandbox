@@ -27717,7 +27717,7 @@ further sourcing effort on the GSH level is warranted**, and that is the reason 
 than an excuse for having stopped.
 
 **Verdict 1: glutathione is MEASURED and NOT BUILT.** At the level its own book gives, it takes
-0.32 % of one node — 48× less than sulfonation, 268× less than polymerisation — and moves the
+0.32 % of one node — 1/48th of sulfonation's share and 1/268th of polymerisation's — and moves the
 model's headline by 0.04 %. Even the OIV-permitted 20 mg/L *addition* reaches only 2.07 %.
 
 ### 4. The margin the benchmark was standing on, and what holds it open

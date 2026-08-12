@@ -798,6 +798,16 @@ def test_the_headline_ratio_is_set_by_the_quinone_branching_and_is_not_robust_to
     *down*, since a peroxide-only O2 yields 0.9547 SO2/O2 against the real mix's 1.1079 — re-opens
     the band question rather than merely nudging a number.
 
+    **The top group has a fourth member, and its slot already exists (D-200, unbuilt).** Figure
+    24.12's letter `e` is SO2, ascorbate, glutathione **and H2S** — and `h2s` is a shipped slot
+    with no quinone-consuming Process anywhere. It is absent from the table above because it
+    cannot be seen from here: at a 10 µg/L fault level it would take **0.015 %** of the quinone
+    node, invisible against this ratio. Priced on its *own* pool instead it removes **21.9 %** of
+    the sulfide over one challenge, a fraction constant in the pool size. That is the standing
+    warning against reading this file's shares as a build priority: **the branching denominator
+    cannot see whether a consumer dominates its own reactant.** A separate beat, and an estimate
+    rather than a measurement — no such Process exists to run.
+
     Which assertion carries which duty, since they are not equal. The **monotonicity**, the
     **nominal-in-band** and the **low-edge-in-band** lines are what detect a re-anchoring: measured
     at D-199, moving the nominal one order down makes the low edge 1.7481 (above Miao's ceiling)
