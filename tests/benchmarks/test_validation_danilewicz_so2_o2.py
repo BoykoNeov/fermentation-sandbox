@@ -785,6 +785,15 @@ def test_the_headline_ratio_is_set_by_the_quinone_branching_and_is_not_robust_to
     numbers must be re-measured rather than the assertion relaxed. What must never happen
     silently is ``k_quinone_polymerization`` being re-anchored with this file left reporting an
     in-band headline it no longer earns.
+
+    Which assertion carries which duty, since they are not equal. The **monotonicity**, the
+    **nominal-in-band** and the **low-edge-in-band** lines are what detect a re-anchoring: measured
+    at D-199, moving the nominal one order down makes the low edge 1.7481 (above Miao's ceiling)
+    and one order up makes the nominal 0.9738 (out of band), so either direction is caught without
+    the two lines below. Those two are a **characterisation pin** on the finding itself and carry
+    no detection load. So if a future beat narrows this band on evidence until the high edge stays
+    in band, the correct response is to **delete those two assertions** — the finding they record
+    would have expired — and never to widen the bound to keep them green.
     """
     lo_scale, lo_run = quinone_band_runs["low"]
     hi_scale, hi_run = quinone_band_runs["high"]

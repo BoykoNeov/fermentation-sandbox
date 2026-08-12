@@ -27602,8 +27602,11 @@ failing the in-band assert. Its docstring says explicitly that a red means the s
 and this record must be re-measured — not that the assertion should be relaxed.
 [[feedback-a-threshold-cannot-separate-same-sign-regimes]]
 
-`docs/ARCHITECTURE.md` needs no change: no Process, slot, parameter file or test file is added —
-one test *function* joins an existing file, which that document does not enumerate.
+`docs/ARCHITECTURE.md` needs no change, **derived rather than reasoned** on D-198's precedent —
+the first draft of this record asserted it. Its own snippet re-run gives wine cascade 64 processes /
+94 slots, beer cascade 28 / 57, 19 parameter files, 77 test files, 80 kinetics implementations: every
+count already in the document. This beat adds no Process, slot, parameter file or test file — one test
+*function* joins an existing file, which that document does not enumerate.
 
 ### Still open
 
