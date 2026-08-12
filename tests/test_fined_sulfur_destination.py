@@ -105,12 +105,17 @@ def test_no_retention_fraction_is_applied_to_the_sulfur():
     assert float(flow.delta[schema.slice("copper")][0]) == pytest.approx(
         retained * (_DOSE_MGL / 1000.0), rel=1e-12
     )
-    # sulfur: the WHOLE bound mass, i.e. strictly more than the scaled version would be
+    # sulfur: the WHOLE bound mass. Asserted as a RATIO against 1, and separately as NOT the
+    # retained fraction. An earlier draft wrote `gained > retained * removed`, which is satisfied
+    # by any fraction above 0.95 — including 0.96 — so it would have passed on the very thing this
+    # test forbids while reading like coverage. That is this beat's own lesson turned on itself
+    # (D-193 §8): an assert that passes on the forbidden case is not a guard.
     for free, bound in (("h2s", "bound_h2s"), ("methanethiol", "bound_methanethiol")):
         removed = -float(flow.delta[schema.slice(free)][0])
         gained = float(flow.delta[schema.slice(bound)][0])
-        assert gained > retained * removed
-        assert gained == pytest.approx(removed, rel=1e-15)
+        assert removed > 0.0, free  # positive control: 0/0 would make the ratio meaningless
+        assert gained / removed == pytest.approx(1.0, rel=1e-15), free
+        assert gained / removed != pytest.approx(retained, rel=1e-3), free
 
 
 def test_the_free_pools_are_untouched_at_the_event():
