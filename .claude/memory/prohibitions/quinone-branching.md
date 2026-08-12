@@ -1,9 +1,11 @@
 ---
 name: quinone-branching
-description: "The quinone node's consumer split (D-145 to D-199) - the named pull is on disk, and it still cannot close the branching"
-metadata:
+description: "The quinone node's consumer split (D-145 to D-200) - the named pull is on disk and still cannot close the branching; the two missing nucleophiles are priced and only one is a gap"
+metadata: 
   node_type: memory
   type: project
+  originSessionId: ddd93c4d-92cd-49f0-aa3a-10aaf21a1123
+  modified: 2026-08-12T18:37:47.041Z
 ---
 
 **Live prohibitions — the quinone node's branching.** Detail split out per D-185's pattern; the
@@ -63,9 +65,37 @@ D-record — do not argue past it from this file.** **Never evict an old prohibi
   Strecker law is **gated, not bilinear** in the amino acid, so the normalisation is an
   **equivalence, not an identity**.
 
-Receipts: `M:\claud_projects\temp\ferment\d199-quinone-branching\` — `PREREGISTER.md` (**4 of 9
-predictions missed**, including the one the beat turned on), `RESULTS.md`, `FIG_24_12.md`,
-`probe_shares.py`, `probe_ordering.py`.
+**The two "missing slots" are PRICED, and only ONE is a gap (D-200).**
+- **Glutathione is MEASURED and NOT BUILT — never re-propose a GSH slot for the quinone node.**
+  At UWC **Ch. 5**'s real level ("no more than a few mg/L") it takes **0.32 %** of the node and
+  moves the SO2:O2 headline **0.04 %**. Even the OIV-permitted **20 mg/L addition** reaches only
+  2.07 %. Verdict is robust across the **whole 10× span** the book disputes (3 mg/L → 0.32 %,
+  30 → 3.15 %) and across k_rel 1.0-vs-1.26, so **no more sourcing on the GSH level is warranted**.
+- **Ch. 24's "<30 mg/L, <0.1 mM" is ~10× LOOSE against Ch. 5, the chapter it cites.** Both back
+  UWC's own conclusion so the looseness is invisible in prose — it bites the moment the number is
+  used quantitatively. `FIG_24_12.md` transcribed the loose bound in good faith; **never price GSH
+  off it.** Must-stage GSH (15-100 mg/L) is the **wrong regime** — that is PPO/GRP, not this node.
+- **Ascorbate is the material one: 8.09 % at UWC's printed 60 mg/L**, and it consumes the
+  benchmark nominal's **ENTIRE 0.9646 %** headroom above Miao's **printed** floor. Say
+  **"consumes the headroom", never "leaves the band"** — it misses by 0.0009, smaller than the
+  measured 10 % depletion correction.
+- **BOTH ascorbate limbs push the headline DOWN — never call them opposing.** The draft record
+  did and it was FALSE: `mode="blocked"` **is** a peroxide-only O2's yield (AA + O2 → H2O2, no
+  quinone) and reads **0.9547** vs the real mix's **1.1079**. So **D-181's build-the-worse-term
+  lesson does NOT apply**; neither limb can pay for the other, and AA cannot enter the cascade
+  without re-opening the band question.
+- **The guard's margin belongs to ascorbate's ABSENCE**, now stated in its docstring. **No guard
+  owed** — the existing `MIAO_BAND[0] <= nominal` assert already detects it; a margin assert would
+  pin tighter than the band and go brittle on solver noise.
+- **A share of QUINONE cannot see a consumer's own pool.** Moot for GSH (no slot ⇒ no pool, which
+  is what makes the verdict safe), **NOT moot for H2S** — top group's 4th member, the only one
+  whose slot the model **has**: **0.015 % of the node but 21.87 % of the sulfide pool**, constant
+  in pool size. **Separate beat, and an ESTIMATE not a measurement.**
+
+Receipts, both under `M:\claud_projects\temp\ferment\`: `d199-quinone-branching\` (**4 of 9
+predictions missed**, incl. the one the beat turned on) + `FIG_24_12.md`, and
+`d200-glutathione-share\` — 5 probes, the reusable one being `probe_nucleophile_share.py`,
+which injects a competing nucleophile into the compiled cascade.
 Related: [[feedback-check-the-blocker-is-still-blocking]],
 [[feedback-a-named-pull-may-not-answer-the-question]],
 [[feedback-name-the-field-your-predicate-read]], [[feedback-pin-the-band-not-the-nominal]].

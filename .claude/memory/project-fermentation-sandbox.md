@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T13:55:34.810Z
+  modified: 2026-08-12T18:38:17.366Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,10 +30,10 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-12)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-199**;
-sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1751**. **"Blocked on external
-sourcing" was wrong 3× (D-191/196/199)** — and D-199's pull, on disk ~50 records, **still could not close it**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
-do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-200**;
+sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1751 + 3 xfail**. **"Blocked on external
+sourcing" was wrong 3× (D-191/196/199)**; D-200 then **priced** the gap D-199 left instead of building it.
+**Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
 `StateSchema.medium`. **Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
@@ -147,12 +147,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   published quench ratio; and nothing here can **separate** the candidates (O₂ budget spans
   0.078 %). It is a **RATE-LAW** change (`A/(1−s)`), not stoichiometry. Do not re-open by
   re-sweeping the 24 texts. → `.claude/memory/prohibitions/hydroperoxyl-recycling.md`
-- **Quinone branching (D-145 → D-199)** — the named pull **Nikolantonaki & Waterhouse 2012 is ON
-  DISK** (Fig. 24.12 reprinted in UWC p. 331) after ~50 records — and **still cannot close it**:
-  it ranks NUCLEOPHILES, and the 84.78 % consumer has none. Now **blocked on STRUCTURE**; ascorbate
-  + GSH are top-group with **zero slots**. **1.7481 at ×0.01 REFUSED — never fit 1.7.** Band's high
-  edge reads 0.9738, **not D-174's instance**. Sulfonate is the **MINOR** product (>90 % reduction)
-  — corroborates fork D2. → `.claude/memory/prohibitions/quinone-branching.md`
+- **Quinone branching (D-145 → D-200)** — the named pull **is ON DISK** and **still cannot close
+  it** (ranks NUCLEOPHILES; the 84.78 % consumer has none). **Blocked on STRUCTURE.** The two
+  "missing slots" are now **PRICED and only ONE is a gap**: **GSH is MEASURED, NOT BUILT** (0.32 %
+  of the node — never re-propose it, and never price it off Ch. 24's bound, ~10× loose vs Ch. 5);
+  **ascorbate is 8.09 % and eats the guard's whole 0.96 % headroom**, with **BOTH limbs pushing
+  DOWN** (never "opposing"). **1.7481 at ×0.01 REFUSED.** High edge 0.9738, **not D-174's**.
+  Sulfonate is the **MINOR** product. New, separate: **quinone-H2S, 0.015 % of the node but
+  21.9 % of the sulfide pool.** → `.claude/memory/prohibitions/quinone-branching.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
