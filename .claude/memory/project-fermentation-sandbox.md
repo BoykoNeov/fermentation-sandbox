@@ -124,7 +124,7 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the TOP of Coleman's envelope, never the Handbook's printed 200** (that is inside the
   keystone's own fit). The Handbook's "300 yields less than 200" is **FORFEITED on measurement**;
   the Haldane form is **refuted on shape** (spans 1.51×, needs ~19×); never a hard zero (absorbing
-  state); `K`/`n` are a **derived pair, not two bands**. `_SWEET_BRIX=70` is OPEN, owner's call.
+  state); `K`/`n` are a **derived pair, not two bands**. `_SWEET_BRIX` is CLOSED at 38.0 (D-194).
   → `.claude/memory/prohibitions/osmotic-high-sugar.md`
 - **Post-Fenton second O₂ (D-196)** — **BUILT** (cascade-only, still non-default): the radical
   takes an O₂, `share × activation`. **NEVER "unsourced"** — 20 records said so, the book was on
