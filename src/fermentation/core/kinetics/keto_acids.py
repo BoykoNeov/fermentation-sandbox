@@ -47,7 +47,17 @@ Because both terms ride the same flux shape, the pool rises monotonically to the
 plateau ``k_pyruvate_excretion / k_pyruvate_reassimilation`` and freezes there — a v1
 simplification that drops the real mid-ferment *peak-then-decline* transient (overflow pyruvate's
 exponential-growth excretion). Nothing reads the peak; D-51 reads only the residual, so the growth-
-coupled excretion that would restore the transient (option B) is deferred. Re-assimilation returns
+coupled excretion that would restore the transient (option B) is deferred. **That deferral now has
+a measured price, and it is a structural one that applies to all three pools alike (D-189).** A
+growth-linked source stops at nitrogen exhaustion while this flux-linked sink keeps clearing to
+dryness, so the pool decays *sourceless* across that window by ``exp(−k · ∫flux dt)``. All three
+sinks share ``k = 0.1`` and the same flux integral (~106 g/L·h between growth-end and dryness on a
+28 °C wine), so the surviving fraction is ~2e-5 for pyruvate and α-KG exactly as it is for
+α-ketobutyrate: **option B cannot be adopted for the source alone in any of these pools.** D-189
+measured this on α-ketobutyrate and REFUSED it there (see
+:class:`AlphaKetobutyrateExcretion`); D-49's original option-B item, which was written about
+**pyruvate**, stays **open** — with that price now attached, and NOT closed by D-189.
+Re-assimilation returns
 carbon to ``E``/``CO2`` (not ``S``) because that is pyruvate's real metabolic fate (forward to
 ethanol, not back to sugar) — and a refund-to-sugar would be a no-op at post-dryness ``S = 0``
 anyway. ``total_carbon`` (which weights ``pyruvate`` at its own C3 fraction) closes to **machine
@@ -446,16 +456,36 @@ class AlphaKetobutyrateExcretion(Process):
     propanol/fusel balance is ≤0.0003%. Imposing a sourced 19% constant would add an invented number
     for **zero observable gain** — strictly worse than an honest emergent value.
 
-    **The diagnosis is the excretion SHAPE, inherited from this module's two older pools.** The rate
-    rides pyruvate/α-KG's ``X · S/(K+S)`` fermentative shape, which **peaks late** — long after
-    threonine has exhausted (the assimilable amino acids go in the first hours; the sugar flux peaks
-    days later). So a metabolite whose real overflow tracks **early amino-acid/nitrogen metabolism**
-    is sourced almost entirely de novo. **The module docstring already named this and deferred it**:
-    "Nothing reads the peak; D-51 reads only the residual, so the growth-coupled excretion that
-    would restore the transient (option B) is deferred." Enrichment **is** a timing quantity, so
-    D-107 is the beat that makes something read the peak — and option B's deferral is no longer
-    free.
-    Whether a growth-linked shape recovers the 19% is **untested**, and is the next step here.
+    **D-107 diagnosed this as the excretion SHAPE and named option B as the fix. D-189 measured
+    both halves of that, and the diagnosis is INCOMPLETE.** The rate rides pyruvate/α-KG's
+    ``X · S/(K+S)`` fermentative shape, which **peaks late** — long after threonine has exhausted
+    (the assimilable amino acids go in the first hours; the sugar flux peaks days later). That is
+    real, but it is not even the larger lever. On Crépin's own must, the realised share is
+    **2.62 %**; moving excretion onto the growth rate gives **11.03 %** (+8.4 points), while
+    removing D-104's anabolic threonine sink gives **14.92 %** (+12.3 points). **Neither reaches
+    Crépin's 19 %, and the two do not sum to it either — a third factor is unaccounted for.** The
+    gate is a *competition* for one molecule, not a timing artifact, and the sink is not a
+    candidate fix: its 77–86 % protein share is sourced, and Crépin's yeast ran the same
+    competition.
+
+    **Option B is therefore REFUSED for this pool, and the refusal is measured (D-189).** A
+    growth-linked source with this module's flux-linked sink **destroys the pool it feeds**: growth
+    ends at day 0.98 and dryness is at day 2.04, so the sink clears the residual by
+    ``exp(−0.1 × 106.4) ≈ 2.4e-5`` across that window — 2.000 mg/L → 0.000, and sotolon with it
+    (1.599 → 0.027 µg/L). Both rescues are priced and both are refused: growth-linking the *sink*
+    too (output-identical once re-anchored, share 11.70 %) asserts that yeast stop re-assimilating
+    when they stop dividing, which nothing sources and which contradicts the co-metabolic reasoning
+    in ``keto_acids.yaml``; re-anchoring the sink instead needs ``k_alpha_kb_reassimilation`` at
+    0.0196, **1.5× below its own declared band**. Both also cost the residual's ferment-invariance
+    (2.03× and 16.3× across 15–28 °C, against ~6e-7 today — the solver's floor).
+
+    **The trade on offer was invisible-gain-for-visible-cost**: D-107 records this share as inert
+    on every output and D-189 confirms it, so 2.62 % → 11 % changes no reported quantity, while the
+    residual it spends is read by the in-bottle sotolon aldol. The shipped suite already forbids
+    option B at **five asserts across three files** — sotolon's OAV in aged sweet wine, the premox
+    oxidation threshold, the D-100 tripwire, and the closure-permeability ordering, which collapses
+    to ``leaky == tight`` because sotolon loses its substrate entirely. No new guard was added:
+    those five are the guard.
 
     Held as a **hypothesis, not a verdict**: that D-104's ~18% (which it read as Crépin reproduced)
     was an artifact of evaluating the same gate at *aging* time, sur lie, after autolysis had
@@ -463,6 +493,15 @@ class AlphaKetobutyrateExcretion(Process):
     — and they do not fit one clean theory; D-104's was also a different *quantity* (sotolon's
     carbon
     share, not the pool's source). Suggestive, unmeasured, therefore not claimed.
+
+    **The 0.017 above is D-107's and D-189 did not reproduce it: the same quantity measures 0.0262
+    on Crépin's must (24 Brix, 180 mg N/L, 1.0 g/L amino acids, 28 °C, 14 d).** The files that set
+    this share have not changed since D-122, and no Process tested accounts for the difference;
+    D-107's record does not state its probe's must, so the two are not known to be commensurable.
+    Neither figure is pinned in a test — **a literal whose provenance is unknown is not pinnable**,
+    which is why D-189 reports its own with the must attached rather than asserting either. The
+    share is also scenario-bound in a way no single figure ever showed: **3.63 % at 15 °C, 3.15 %
+    at 20 °C, 2.62 % at 28 °C.**
 
     **The nitrogen is not decoration.** ``L-threonine → 2-oxobutanoate + NH₃`` (ILV1) is a genuine
     deamination and α-ketobutyrate is nitrogen-free, so *all* the drawn threonine's nitrogen lands
