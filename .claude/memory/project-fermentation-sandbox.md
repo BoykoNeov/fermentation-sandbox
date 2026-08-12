@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-12)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-188**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1665**. Most remaining
+**D-189**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1665**. Most remaining
 work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
@@ -90,6 +90,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the closure menu's span. **Never a per-cell ratio off this ladder** (the model emits one constant);
   never group must-sulfited vs not; **D-47 protection WORKS** — competition owns the SIGN, a missing
   post-dryness source owns the SIZE. → `.claude/memory/prohibitions/acetaldehyde-ladder.md`
+- **Keto-acid excretion SHAPE — option B (D-49 → D-189)** — MEASURED and **REFUSED for
+  α-ketobutyrate**: a growth-linked source with the flux-linked sink **drains the pool it feeds**
+  (2.000 → 0.000 mg/L), and that arithmetic is **general to all three pools**. Both rescues built
+  and refused. **The suite ALREADY forbids it at 5 asserts — no guard is owed.** D-107's
+  shape-diagnosis is **corrected**: the miss is a competition. **Pyruvate's item stays OPEN.**
+  → `.claude/memory/prohibitions/keto-acid-excretion-shape.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
@@ -106,11 +112,12 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d18{7,8}-*\`, `d170-q10-generalise\`/`d171-ordering-guards\`/`d175-ellagitannin-joint\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d18{7,8,9}-*\`, `d170-q10-generalise\`/`d171-ordering-guards\`/`d175-ellagitannin-joint\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
-Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B); peptide pool; variety-specific DMSp;
+Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B) — **PYRUVATE/α-KG ONLY, priced not
+deferred; α-KB's was measured and REFUSED at D-189**; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
 in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc; osmotic inhibition >~200 g/L; `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); no post-Fenton O₂ draw (D-142); **`add_copper` never writes the `copper` slot** (needs a residual-Cu fraction); D-143/4 ← D-145.
 
