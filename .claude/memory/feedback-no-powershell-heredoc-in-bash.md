@@ -60,6 +60,13 @@ message at exit 0**, the silent failure this whole memory is about. So the
 `@'...'@` advice above is **necessary but not sufficient**: it protects `$` and
 backticks, not `"`.
 
+**The THIRD mechanic RECURRED at D-188 (2026-08-12)**, in the PowerShell tool, from quoting a
+phrase — `"acetaldehyde in maturation + the 0-vs-2.7 floor"` — inside an otherwise correct
+`@'...'@`. Git re-split at the quotes and reported the words as pathspecs; **nothing was
+committed**, and `git add -A` (chained ahead of it on the same line) had already run, so the
+tree was staged with no commit. It failed loudly this time, but only by luck of what the
+fragments looked like. **The fix is one keystroke: do not put a `"` in a commit message.**
+
 **How to apply:** for any commit message containing a double quote — or just by
 default for multi-paragraph messages — **write it with the Write tool and use
 `git commit -F <file>`**. That has now survived where `-m` failed twice. Never
