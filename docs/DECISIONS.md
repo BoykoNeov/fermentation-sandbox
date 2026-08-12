@@ -170,7 +170,7 @@ Coarse first cut for *where did we decide X*. A record appears under **every** b
 - [**D-139**](#d-139--gate-3-closed-the-expected-red-enumeration-with-beers-silent-regression-measured-at-71-of-its-packaging-o2-rather-than-asserted-and-the-isolable-alternative-designed-as-a-replacement-not-an-addition) — Gate 3 closed: the expected-red enumeration, with beer's "silent regression" measured at 71% of its … — ⚠ **corrected by [D-140](#d-140--the-three-pre-build-guards-written-while-they-still-pass-and-two-gate-3-numbers-corrected-by-the-act-of-writing-them-the-seven-o2-sinks-are-six-and-the-1-y-a420-baseline-was-a-grid-artefact)** — ⚠ **corrected by [D-141](#d-141--the-oxidative-cascade-built-one-o2--one-h2o2--one-quinone-verified-to-reproduce-the-direct-sets-o2-uptake-to-ratio-10000--and-shipped-non-default-because-the-same-measurement-moves-the-fates-by-up-to-25)** — ⚠ **corrected by [D-148](#d-148--d-139-24-closed-by-measurement-the-brettpof-over-draw-cannot-fire-because-summing-is-not-the-mechanism--one-drawer-over-draws-at-a-zero-order-corner-and-two-are-indistinguishable-from-one-inside-the-band-so-no-shared-depletion-gate-is-built)**
 - [**D-140**](#d-140--the-three-pre-build-guards-written-while-they-still-pass-and-two-gate-3-numbers-corrected-by-the-act-of-writing-them-the-seven-o2-sinks-are-six-and-the-1-y-a420-baseline-was-a-grid-artefact) — The three pre-build guards, written while they still pass; and two Gate 3 numbers corrected by the …
 - [**D-141**](#d-141--the-oxidative-cascade-built-one-o2--one-h2o2--one-quinone-verified-to-reproduce-the-direct-sets-o2-uptake-to-ratio-10000--and-shipped-non-default-because-the-same-measurement-moves-the-fates-by-up-to-25) — The oxidative cascade built: one O2 → one H2O2 + one quinone, verified to reproduce the direct … — ⚠ **corrected by [D-142](#d-142--the-danilewicz-benchmark-written-against-data-rather-than-against-17-the-cascade-traverses-12-by-blocking-a-route-and-the-direct-set-cannot-move-at-all--but-it-is-the-direct-set-whose-number-lands-in-the-measured-band-and-the-cascades-shortfall-is-4-7-not-100)** — ⚠ **flagged by [D-172](#d-172--the-one-degree-of-freedom-three-independent-draws-flag-is-a-claim-about-the-files-and-not-about-any-ensemble-no-run-ever-draws-all-three-but-two-are-live-in-every-aged-arm-and-the-pair-the-cascade-draws-is-a-total-against-its-own-share--repaired-by-reparameterising-rather-than-by-coupling-the-sampler-which-drops-the-archives-highest-ordering-breach-rate-from-5520--to-1254--with-no-edge-moved)** — ⚠ **corrected by [D-196](#d-196--the-second-oxygen-the-fenton-limb-costs-built-the-1-hydroxyethyl-radical-takes-an-o-of-its-own-the-unsourced-label-on-it-was-refuted-by-a-book-already-on-disk-and-the-double-counting-objection-died-on-a-hermetic-o-pool-being-supply-limited-rather-than-rate-limited)**
-- [**D-142**](#d-142--the-danilewicz-benchmark-written-against-data-rather-than-against-17-the-cascade-traverses-12-by-blocking-a-route-and-the-direct-set-cannot-move-at-all--but-it-is-the-direct-set-whose-number-lands-in-the-measured-band-and-the-cascades-shortfall-is-4-7-not-100) — The Danilewicz benchmark, written against data rather than against 1.7: the cascade traverses 1↔2 … — ⚠ **flagged by [D-143](#d-143--the-bound-so-blocking-prerequisite-measured-instead-of-built-and-withdrawn-miaos-buffering-is-an-addition-method-secant-d-142-compared-it-against-an-oxidation-path-slope-at-2-6-his-free-so-and-on-his-own-statistic-the-shipped-four-carbonyl-budget-already-reads-132-inside-his-12526-19882)** — ⚠ **corrected by [D-144](#d-144--d-143s-four-flagged-artefacts-reworked-the-so2-buffering-comparison-re-made-on-miaos-addition-series-statistic-instead-of-an-oxidation-path-slope-13197-in-band-and-the-exclusion-guard-renamed-for-what-it-forbids-after-both-of-his-printed-criteria-were-measured-and-neither-did-its-job)** — ⚠ **corrected by [D-149](#d-149--d-139-25-closed-by-measurement-the-copper-re-fit-performed-at-last-and-the-printed-table-arguing-it-should-go-up-turns-out-to-re-derive-the-value-d-134-already-rejected--2092-lg-over-the-same-budget)** — ⚠ **flagged by [D-150](#d-150--the-activation-nodes-missing-ph-term-measured-and-refused-every-steep-published-ph-slope-turns-out-to-sit-on-the-day-1-initial-rate-not-the-steady-rate-this-node-carries-and-nguyens-own-table-says-ph-and-copper-are-not-separable--so-building-f_ph-would-re-open-the-copper-value-d-149-had-just-closed)** — ⚠ **corrected by [D-196](#d-196--the-second-oxygen-the-fenton-limb-costs-built-the-1-hydroxyethyl-radical-takes-an-o-of-its-own-the-unsourced-label-on-it-was-refuted-by-a-book-already-on-disk-and-the-double-counting-objection-died-on-a-hermetic-o-pool-being-supply-limited-rather-than-rate-limited)**
+- [**D-142**](#d-142--the-danilewicz-benchmark-written-against-data-rather-than-against-17-the-cascade-traverses-12-by-blocking-a-route-and-the-direct-set-cannot-move-at-all--but-it-is-the-direct-set-whose-number-lands-in-the-measured-band-and-the-cascades-shortfall-is-4-7-not-100) — The Danilewicz benchmark, written against data rather than against 1.7: the cascade traverses 1↔2 … — ⚠ **flagged by [D-143](#d-143--the-bound-so-blocking-prerequisite-measured-instead-of-built-and-withdrawn-miaos-buffering-is-an-addition-method-secant-d-142-compared-it-against-an-oxidation-path-slope-at-2-6-his-free-so-and-on-his-own-statistic-the-shipped-four-carbonyl-budget-already-reads-132-inside-his-12526-19882)** — ⚠ **corrected by [D-144](#d-144--d-143s-four-flagged-artefacts-reworked-the-so2-buffering-comparison-re-made-on-miaos-addition-series-statistic-instead-of-an-oxidation-path-slope-13197-in-band-and-the-exclusion-guard-renamed-for-what-it-forbids-after-both-of-his-printed-criteria-were-measured-and-neither-did-its-job)** — ⚠ **corrected by [D-149](#d-149--d-139-25-closed-by-measurement-the-copper-re-fit-performed-at-last-and-the-printed-table-arguing-it-should-go-up-turns-out-to-re-derive-the-value-d-134-already-rejected--2092-lg-over-the-same-budget)** — ⚠ **flagged by [D-150](#d-150--the-activation-nodes-missing-ph-term-measured-and-refused-every-steep-published-ph-slope-turns-out-to-sit-on-the-day-1-initial-rate-not-the-steady-rate-this-node-carries-and-nguyens-own-table-says-ph-and-copper-are-not-separable--so-building-f_ph-would-re-open-the-copper-value-d-149-had-just-closed)**
 - [**D-143**](#d-143--the-bound-so-blocking-prerequisite-measured-instead-of-built-and-withdrawn-miaos-buffering-is-an-addition-method-secant-d-142-compared-it-against-an-oxidation-path-slope-at-2-6-his-free-so-and-on-his-own-statistic-the-shipped-four-carbonyl-budget-already-reads-132-inside-his-12526-19882) — The bound-SO₂ "blocking prerequisite" measured instead of built, and withdrawn: Miao's buffering is … — ⚠ **corrected by [D-145](#d-145--the-dosing-schedule-measured-and-refused-d-143s-five-for-five-is-three-for-five-its-buffering-column-was-the-oxidation-path-slope-it-had-itself-just-withdrawn-and-its-ratio-was-read-at-free-so2-151-mgl-the-acetaldehyde-reservoir-provably-cannot-move-miaos-table-3-statistic-because-it-saturates-across-his-span-and-the-free-so2-depletion-gap-is-retired-rather-than-reframed)** — ⚠ **corrected by [D-149](#d-149--d-139-25-closed-by-measurement-the-copper-re-fit-performed-at-last-and-the-printed-table-arguing-it-should-go-up-turns-out-to-re-derive-the-value-d-134-already-rejected--2092-lg-over-the-same-budget)**
 - [**D-144**](#d-144--d-143s-four-flagged-artefacts-reworked-the-so2-buffering-comparison-re-made-on-miaos-addition-series-statistic-instead-of-an-oxidation-path-slope-13197-in-band-and-the-exclusion-guard-renamed-for-what-it-forbids-after-both-of-his-printed-criteria-were-measured-and-neither-did-its-job) — D-143's four flagged artefacts reworked: the SO2 buffering comparison re-made on Miao's …
 - [**D-145**](#d-145--the-dosing-schedule-measured-and-refused-d-143s-five-for-five-is-three-for-five-its-buffering-column-was-the-oxidation-path-slope-it-had-itself-just-withdrawn-and-its-ratio-was-read-at-free-so2-151-mgl-the-acetaldehyde-reservoir-provably-cannot-move-miaos-table-3-statistic-because-it-saturates-across-his-span-and-the-free-so2-depletion-gap-is-retired-rather-than-reframed) — The dosing schedule measured and refused: D-143's "five for five" is three for five (its buffering …
@@ -26800,12 +26800,11 @@ control arm). Files: `src/fermentation/core/kinetics/keto_acids.py`.
 
 **Corrects:** D-188 — its open-list entry "post-Fenton secondary O₂ draw (D-142, **unsourced**)". The mechanism is printed outright in a source that has been in `_txt/` since before D-142.
 **Corrects:** D-141 — two bookkeeping sentences it shipped in `oxidative_cascade.py`: `OxygenActivation`'s "the cascade's **sole** O2 consumer / every gram of O2 that leaves the pool leaves through here", and `PeroxideEthanolOxidation`'s "does **NOT** touch `o2` — that is OxygenActivation's alone". Both false as of this record. Gate 1 (D-137) is **not** breached — see §4.
-**Corrects:** D-142 — its "Next" claim that the missing draw "would move r in the **right** direction on its own". Measured, it moves the ratio **down** 2.3 % at the operating point that record's own amendment established, where the cascade already sits ~3 % above Miao's floor. It takes the dose-70 arm *out* of his band.
 
 ### 1. The item was never blocked
 
 Since D-142 the archive has carried "the missing post-Fenton secondary O₂ draw" on its open
-lists — **nineteen** copy-forward entries between D-142 and D-188 — and D-188's list
+lists — **twenty** copy-forward entries between D-142 and D-188 — and D-188's list
 labelled it `(D-142, unsourced)`. It is not unsourced. Waterhouse, Sacks & Jeffery,
 *Understanding Wine Chemistry* 2nd ed., §24.4.4.1, on disk in `_txt/`:
 
@@ -26815,7 +26814,7 @@ labelled it `(D-142, unsourced)`. It is not unsourced. Waterhouse, Sacks & Jeffe
 > by other processes, such as reaction with hydroxycinnamates."
 
 So one acetaldehyde made on that limb costs **two** O₂ — one activated at the iron node,
-one taken by the radical — and the cascade booked one. Nineteen lists carried the item and
+one taken by the radical — and the cascade booked one. Twenty records carried the item forward and
 none re-opened the source. [[feedback-check-the-blocker-is-still-blocking]]
 [[feedback-re-read-the-source-you-already-mined]]
 
@@ -26975,3 +26974,90 @@ probe, both addenda also pre-run; twelve predictions graded in `RESULTS.md`, thr
 (stoichiometric control), `probe4.py` (copper), `d196_arms.py`. Files:
 `src/fermentation/core/kinetics/oxidative_cascade.py`,
 `src/fermentation/parameters/data/aging.yaml`, `tests/test_oxidative_cascade_guards.py`.
+
+### Amendment (same session) — a `Corrects` marker withdrawn, the acetaldehyde consequence measured, and a probe whose baseline had gone stale under it
+
+Four corrections to the record above, none of which change what shipped.
+
+#### A. The `**Corrects:** D-142` marker is WITHDRAWN, and the deleted line is the correction
+
+The record as first written claimed D-142's "Next" sentence — *"the missing post-Fenton O₂ draw
+is the cheaper structural candidate and would move `r` in the **right** direction on its own"* —
+was falsified here. **It was not.** `r` is defined earlier in D-142 §3 as
+`(H2O2 share to sulfite) + (quinone share to sulfite)`, i.e. SO₂ per O₂, and D-142's own
+"Nor does it flip the bisulfite sign" paragraph says the missing draw "is also why the model
+**cannot dip below 1** the way Miao's wine #1 does". So "the right direction" meant *downward* —
+toward the sub-1 reach wine #1 (0.8443) demonstrates and the model could not attain.
+
+This beat **confirms** that: the draw lowers the ratio, and the cascade's lowest valid dose now
+reads 1.0330 against 1.0703. §7's finding is a **cost at the post-amendment operating point**,
+not a falsification of D-142's mechanism claim, and the two are compatible — the same downward
+move buys reach at the bottom and spends headroom at the top.
+
+The marker line has therefore been **deleted** rather than left standing, on D-168's own rule:
+"a ⚠ on D-77 would tell every future reader it contains an error it does not contain, and the
+index cannot catch a semantically wrong marker — `tests/test_decisions_index.py` validates only
+that a target exists and is earlier." Both other `Corrects` markers (D-188, D-141) stand and were
+re-read. Recorded here because deleting it silently would be the same class of error.
+
+#### B. The acetaldehyde consequence, which the first draft measured and then dropped
+
+Probe 1 measured the final acetaldehyde pool falling **3.9×** in an unsulfited red where the
+stoichiometry predicts 2×, and the record shipped without mentioning it — in a §7 titled
+"including what got worse". Acetaldehyde is the *product of the limb this record modified*, a
+sensory output and the model's strongest SO₂ binder, so the silence was the one bad option.
+
+Measured now, by integrating the limb's own contribution rather than reading the pool. **The
+identity holds:** production equals `mol O₂ consumed × share/(1 + share)` to **1.003×** (pre-D-196
+arm) and **1.006×** (shipped), so the term is arithmetically right and nothing is hiding in it.
+
+| unsulfited red, 60 d | pre-D-196 | shipped |
+|---|---|---|
+| ethanol limb produced | 1.0037e-2 g/L | 5.4642e-3 g/L (**1.84× less**) |
+| final acetaldehyde pool | 2.6572e-3 g/L | 6.8345e-4 g/L (**3.89× less**) |
+| retained fraction of production | 26.48 % | 12.51 % |
+
+**The pool is a residual, and that is the whole of the discrepancy.** ~87 % of the acetaldehyde
+this limb makes is consumed downstream — chiefly `acetaldehyde_reduction`, with
+`acetaldehyde_bridged_condensation` and `tannin_ethyl_tannin_condensation` taking the rest — so
+what survives to day 60 is a small remainder of a large throughput and moves by more than
+production does. The residual amplification beyond the production change is **not further
+attributed here**; the sinks are each first-order in acetaldehyde, so it is most likely the
+earlier completion of the O₂ pulse leaving the pool longer to decay, and that is a conjecture,
+labelled as one. It is the same shape D-195 found for pyruvate one commit earlier: the residual,
+not the flux, is what an outside number reads.
+
+**In a sulfited wine — the realistic case — none of this is visible:** at 60 mg/L SO₂ production
+falls 3.6 % (3.2975e-4 → 3.1796e-4 g/L), the pool falls the same 3.6 %, and the retained fraction
+is unchanged at 98.4 %. The dramatic figure belongs to the unsulfited arm alone.
+
+#### C. A probe whose baseline went stale under it, caught only by the identity check
+
+`probe1.py` captured `PeroxideEthanolOxidation.derivatives` **at import time** and toggled
+between that capture and a patched version. That was correct when written — and stopped being
+correct the moment the source was edited, because the capture then *was* the shipped D-196
+function. Its "base" arm silently became the shipped code and its "+radical" arm stacked a
+**second** draw on top.
+
+Nothing went red. The only symptom was the identity reading **0.503** where it had to read 1.0,
+and the first diagnosis of that was wrong too — a fine-grid re-run was tried on the theory that a
+fast O₂ decay was under-resolved, and returned the identical 0.503061, which is what ruled the
+numerical explanation out and pointed at the arms.
+
+**No shipped number is affected** — probe 1 ran before the source edit, so its printed figures
+are genuine, and probes 2-4 define their arms against the live attribute rather than a capture.
+The lesson is the general one: **a mutation harness that captures a baseline is only valid until
+the baseline moves, and it fails silently and green.** `probe5.py` defines the pre-D-196 arm as a
+suppression of the shipped function instead, which cannot go stale the same way.
+
+#### D. Two checkable numbers
+
+§1 said "**nineteen** copy-forward entries". Counted rather than estimated: **twenty** records
+carry the item — D-150 through D-166 unbroken, then D-186, D-187, D-188 — one line each. §1 has
+been corrected in place.
+
+`docs/ARCHITECTURE.md` needed no change, and that was **derived rather than reasoned**: its
+own snippet re-run gives wine cascade 64 processes / 94 slots, beer cascade 28 / 57, 19 parameter
+files, 77 test files, 80 kinetics implementations — every count already in the document. This
+beat adds no Process, slot, parameter file or package; it changes one `touches` tuple, which that
+document does not enumerate.
