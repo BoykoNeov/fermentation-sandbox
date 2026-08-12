@@ -25637,3 +25637,37 @@ nothing re-runs it.** D-107's "the diagnosis is the excretion SHAPE" was a reaso
 mechanism, and it stood unchallenged for 82 records while the *larger* lever sat one module over in
 a Process (D-104) that the same beat had shipped. The measurement cost one probe; the belief cost
 this beat its entire premise, which was that closing the shape would close the gap.
+
+### D-189 amendment — the control arm could not verify what it was cited for, which is this beat's own lesson landing on its harness
+
+Found in review immediately after D-189 shipped, and appended rather than edited in place.
+
+**The noop arm was structurally incapable of proving a restore.** `d189_optionb.py` binds
+`_ORIGINAL = AlphaKetobutyrateExcretion.derivatives` at *import*, and under `D189_ARM=noop`
+`pytest_configure` assigns that value straight back to the class. But the class has not been
+patched at that moment, so the assignment is a no-op by construction: **the arm is byte-identical
+to an unpatched run whether or not the mechanism works.** It therefore verifies that the plugin
+loads and the suite collects — worth having — and *not* that the patch restores. §4 cites
+[[feedback-verify-the-restore-between-mutation-arms]] and §9 says "control arm green before any red
+was trusted"; both overstate what that arm could deliver.
+
+**What actually licenses the five reds, and it is stronger than the arm was.** Two things. First,
+the option-B run produced **exactly five targeted failures** in three files rather than a broad
+collapse — a patch that had failed to apply produces zero reds, and one that had corrupted the
+process set produces many more than five. Second, the **post-hoc unpatched suite came back
+1662 passed / 3 xfailed**, identical to the control, which is a restore check made against the
+shipped tree rather than against the harness's own bookkeeping. The reds stand; the sentence
+justifying them was wrong.
+
+**The general form is exactly §10's lesson, one level up.** The lesson says the honest unit of a
+change is the invariant a *pair* maintains, not the term you edited. A mutation harness is the same
+shape: its two arms are a pair, and the invariant is "the only difference between them is the thing
+under test". A control arm that shares its code path with the unpatched baseline does not hold that
+invariant — it re-measures the baseline and reports agreement with itself. **An arm designed GREEN
+is only evidence if it could have come out RED**, and this one could not.
+
+The related process note, recorded because a later beat may reuse the plugin: the arms ran under
+`pytest -n auto`, so the patch had to reach the **xdist workers** via `PYTHONPATH`. It plainly did —
+five worker-executed asserts cannot fail on an unpatched class — but that propagation was inferred
+from the reds, never asserted, and should not be cited as verified machinery by whoever picks the
+plugin up next.
