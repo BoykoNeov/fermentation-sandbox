@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 1289a7da-873a-4fc1-882a-f8c7f961f6e7
-  modified: 2026-08-09T12:41:34.488Z
+  modified: 2026-08-12T12:12:43.181Z
 ---
 
 **Between mutation arms, verify the file actually got restored — and include at least one arm whose
@@ -64,3 +64,13 @@ through the real loader before running the suite, print the values it read back,
 failure as **INVALID — never RED**. Where a single-parameter crossing is schema-illegal, move *both*
 members toward each other onto their own band edges. See
 [[feedback-pair-the-red-with-an-ordering-preserving-baseline]].
+
+**The code under test can UNDO your mutation mid-run (D-197).** An arm that switched five O₂ sinks
+off with `ProcessSet.disable()` before integrating came back **bitwise identical** to the shipped
+arm — because `begin_aging` is an *event* that re-enables the aging set partway through the run, so
+the mutation was reverted by the very thing being measured. It read as "removing 62 % of the oxygen
+draw changes nothing", which is a finding-shaped result from a harness that never ran the
+experiment. **How to apply:** mutate at a level the run cannot rewrite (patch the class's
+`derivatives`, not the set's enabled flags), and keep a `noop` arm *designed* to be identical so
+"identical to shipped" is a verified restore rather than an ambiguous null. Ask what re-configures
+state mid-run — events, schedules, reconfigure hooks — before choosing where to cut.

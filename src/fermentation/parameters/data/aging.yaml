@@ -909,6 +909,21 @@ burst_antioxidant_initial:
 # only; the non-oxidative Maillard/sugar-dicarbonyl route (sweet wines, thermal) is deferred, which
 # keeps Strecker honestly on the o2 sub-axis.
 #
+# ITS SIZE, MEASURED AT D-197 (this paragraph asserted it for 122 records and nobody ran it). The
+# lump is FIVE draws, not one: sulfite_oxidation, anthocyanin_fading, oxidative_acetaldehyde,
+# strecker_degradation and ellagitannin_oxidation are all downstream of the shared quinone/H2O2
+# node, and each takes its own additive [o2] draw. Integrated over Carrascon's own saturation
+# cycle they take 35.6 % (unsulfited) to 76.1 % (60 mg/L SO2) of the O2 consumed -- so the lump's
+# size is the MAJORITY of the budget, not the ~2 % the k_strecker sentence above implies. The
+# k_strecker number is correct and is about the SMALLEST of the five: Strecker's own share of
+# consumed O2 measures 0.012-0.033 %, while anthocyanin_fading -- same idiom, never named here --
+# takes ~1000x more. NOT A DEFECT, and NOT a licence to de-duplicate: deleting the five draws
+# without re-baselining the primary one takes the modelled uptake from 0.75 to 0.38 mg O2/L/day
+# against Carrascon 2018's OBSERVED 0.88-1.25 band, i.e. from 15 % below the floor to 2.3x below
+# it. The double charge is LOAD-BEARING for agreement with measured oxygen uptake, which is a
+# reason for the out-of-scope decision above that D-75 never gave. Guarded in
+# tests/test_oxidative_cascade_guards.py (Guard 9).
+#
 # LEDGERS. o2 is off every ledger (D-71); the amino-acid draw + deamination is the EXACT D-45
 # mercaptans idiom (carbon from the precursor amino acid, nitrogen deaminated to N, product N-free),
 # extended with a CO2 decarboxylation term. CARBON closes to machine precision: C out of EACH

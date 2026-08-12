@@ -1,9 +1,11 @@
 ---
 name: prohibitions-post-fenton-second-o2
 description: "D-196 — the second O2 the Fenton limb costs: what shipped, why the double-counting objection died, and why the state-dependence is load-bearing"
-metadata:
+metadata: 
   node_type: memory
   type: project
+  originSessionId: 720cec99-de09-483a-bafb-7296d361e840
+  modified: 2026-08-12T12:12:52.901Z
 ---
 
 # The post-Fenton second oxygen — D-196
@@ -68,5 +70,10 @@ sub-1. A `Corrects: D-142` marker was shipped and **withdrawn in the same sessio
 
 ## Still open
 
-The hydroperoxyl recycling limb (unsourced). The activation node's pH term. The quinone
-branching. Receipts: `M:\claud_projects\temp\ferment\d196-post-fenton-o2\`.
+The hydroperoxyl recycling limb (unsourced — but **nine of the 22 on-disk texts mention the
+species**, and the one passage sampled says its detection **failed**, so a refusal is likely and
+would be MEASURED, D-197). **"The activation node's pH term" is NOT open — REFUSED at D-150** on
+two independent legs; this file's own list carried the refusal forward as a gap and D-197 corrected
+it. The quinone branching in the DEFAULT set is now **measured, not open** —
+→ `.claude/memory/prohibitions/quinone-double-charge.md`.
+Receipts: `M:\claud_projects\temp\ferment\d196-post-fenton-o2\`.

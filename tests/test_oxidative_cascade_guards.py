@@ -69,6 +69,7 @@ so the "seeded and then consumed by nothing" defect is gone from the default bui
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -1876,4 +1877,175 @@ def test_the_radical_draw_is_bisulfite_dependent_not_a_flat_activation_surcharge
     assert fractions["unsulfited"] > 4.0 * fractions["so2_30"], (
         "the draw's dependence on free bisulfite has collapsed to within a factor of 4 — "
         "share-weighted and flat forms are no longer distinguishable here"
+    )
+
+
+# ------------------------------------------------------------------------------------
+# Guard 9 — the direct set's O2 PARTITION, and the size of the quinone double charge
+#           (decision D-197).
+# ------------------------------------------------------------------------------------
+#
+# D-75 conceded an "inherited quinone double-count lump, documented and not fixed": the O2 is
+# mechanistically consumed at the phenol-oxidation step, making the o-quinones that then do the
+# Strecker deamination, so a separate ``k_strecker`` ``[o2]`` draw formally double-counts the
+# shared step. Its defence of the lump's SIZE cites ``k_strecker`` — "~2 % of the 5.0e-4 always-on
+# total at full aa gate … a minor in-band perturbation". That number is right, and it is about the
+# smallest of the five downstream draws. ``anthocyanin_fading``, which uses the identical
+# additive-on-top idiom and is never named in the concession, takes ~1000x more.
+#
+# These guards do not re-open the scope decision (the two-stage rework IS the cascade, D-141, and
+# it stays non-default). They pin what nothing pinned: WHICH drawers sit downstream of the shared
+# step, that Strecker's share stays negligible, and that the double charge is LOAD-BEARING — the
+# naive de-duplication (delete the downstream draws, re-baseline nothing) more than halves the
+# direct set's O2 uptake, moving it further from Carrascon's observed band rather than closer.
+#
+# Every number below is RECOMPUTED from the Processes; none is a pinned share read off a note.
+#
+# WHAT THESE GUARDS DO AND DO NOT ADD — measured, not asserted (D-197 §6). Four mutation arms were
+# run against the FULL suite, and NONE came back green, so on this project's own rule ("a green
+# mutation is what owes a guard", D-194) no guard was strictly owed:
+#
+#   arm            full-suite reds   pre-existing   new here
+#   o2only              67                64           3      naive de-duplication
+#   strecker100         30                29           1      k_strecker x100
+#   extradrawer          5                 2           3      a new O2 drawer, writing nothing
+#
+# The pre-existing reds are TRAJECTORY PINS: they fire because numbers moved, for any change to any
+# oxidative draw, and none of them says anything about the partition. What is new here is that the
+# partition's MEANING is asserted — which drawer is downstream of the shared step, that Strecker's
+# share stays under D-75's 1 %, and that the primary route alone is under half the uptake — so the
+# record's numbers cannot rot silently while the pins stay green on re-baselined values.
+
+#: Each O2-touching Process in the wine direct set, classified by whether it is the PRIMARY
+#: O2 consumer under the coupled mechanism or a step DOWNSTREAM of it. Read off this codebase's
+#: own two mechanisms, not an outside opinion: each "downstream" name has a cascade counterpart
+#: (``PeroxideSulfiteOxidation``, ``QuinoneStreckerDegradation``, ``QuinoneAnthocyaninFading``,
+#: ``QuinoneEllagitanninOxidation``, and the Fenton limb) that consumes H2O2 or quinone and — up
+#: to D-196's radical draw — no ``o2`` of its own.
+_O2_ROLE: dict[str, str] = {
+    "phenolic_browning": "primary",  # the phenol-autoxidation step itself
+    "oxidative_acetaldehyde": "downstream",  # H2O2 consumer (the D-73 additive-share lump)
+    "sulfite_oxidation": "downstream",  # H2O2 + quinone consumer (D-72)
+    "strecker_degradation": "downstream",  # quinone consumer (the D-75 lump)
+    "anthocyanin_fading": "downstream",  # quinone consumer (D-81)
+    "ellagitannin_oxidation": "downstream",  # quinone consumer (D-78)
+    "closure_oxygen_ingress": "source",  # not a sink at all (D-136)
+}
+
+
+def _per_process_o2_draws(
+    process_set, t: float, y: np.ndarray, params: Mapping[str, float]
+) -> dict[str, float]:
+    """``{Process.name: g O2/L/h it consumes}`` at ``(t, y)``, sinks positive, sources negative.
+
+    Modifier handling mirrors ``ProcessSet.total_derivatives`` so that a rate modifier scaling an
+    oxidative Process cannot silently fall out of the partition.
+    """
+    schema = process_set.schema
+    factors = {m.name: m.factor(t, y, schema, params) for m in process_set.active_modifiers}
+    draws: dict[str, float] = {}
+    for p in process_set.active:
+        if "o2" not in p.touches:
+            continue
+        contribution = p.derivatives(t, y, schema, params)
+        for m in process_set.active_modifiers:
+            if p.name in m.modifies:
+                contribution = contribution * factors[m.name]
+        draws[p.name] = -float(contribution[schema.slice("o2")][0])
+    return draws
+
+
+#: A year into the fixture's aging phase — well clear of the dose transient, with SO2 still
+#: present, oak extracted and the amino-acid gates part-depleted, i.e. all six sinks live.
+_PARTITION_HOURS = (_WINE_FERMENT_DAYS + 365.25) * 24.0
+
+
+@pytest.fixture(scope="module")
+def wine_partition(wine_trajectory_run):
+    """``(draws, sinks, total_sink_draw)`` for the wine run, one year into aging."""
+    compiled, trajectory = wine_trajectory_run
+    idx = int(np.argmin(np.abs(trajectory.t - _PARTITION_HOURS)))
+    y = trajectory.y[:, idx].copy()
+    draws = _per_process_o2_draws(
+        compiled.process_set, float(trajectory.t[idx]), y, compiled.param_values
+    )
+    sinks = {n: v for n, v in draws.items() if _O2_ROLE.get(n) != "source"}
+    return draws, sinks, sum(sinks.values())
+
+
+def test_every_direct_o2_drawer_is_classified_primary_or_downstream():
+    # The classification must cover the wired set EXACTLY. A new O2-drawing Process added to the
+    # direct set is then a red test rather than a silent change of denominator: the partition
+    # below would otherwise keep reporting shares of a total it no longer measures.
+    # A guard is only as broad as the registry it names, so the registry is read, never listed.
+    process_set = _direct_oxidative_process_set("wine")
+    touching = {p.name for p in process_set.active if "o2" in p.touches}
+    assert touching == set(_O2_ROLE), (
+        "wine's O2-touching Process set no longer matches the D-197 classification; classify the "
+        "new Process as primary/downstream/source (and say which in the decision record) rather "
+        "than deleting it from _O2_ROLE"
+    )
+    # ...and the split itself, so "classified" cannot degenerate into one bucket.
+    assert sum(1 for r in _O2_ROLE.values() if r == "primary") == 1
+    assert sum(1 for r in _O2_ROLE.values() if r == "downstream") == 5
+
+
+def test_the_partition_sums_to_the_process_sets_own_o2_derivative(
+    wine_trajectory_run, wine_partition
+):
+    # The partition is only a partition if it closes. Sinks minus the ingress source must equal
+    # the ProcessSet's own d(o2)/dt to machine precision — otherwise every share below is a
+    # fraction of a total the harness invented rather than the one the solver integrates.
+    compiled, trajectory = wine_trajectory_run
+    draws, _sinks, _total = wine_partition
+    idx = int(np.argmin(np.abs(trajectory.t - _PARTITION_HOURS)))
+    y = trajectory.y[:, idx].copy()
+    total_d = compiled.process_set.total_derivatives(
+        float(trajectory.t[idx]), y, compiled.param_values
+    )
+    assert -float(total_d[compiled.schema.slice("o2")][0]) == pytest.approx(
+        sum(draws.values()), rel=1e-12
+    )
+
+
+def test_strecker_takes_far_under_one_percent_of_the_direct_sets_oxygen(wine_partition):
+    # D-75's magnitude claim, MEASURED for the first time: "aa-throttled to well under 1 % of the
+    # O2 at cellar residual-aa". It holds with ~2 orders of magnitude to spare (D-197 measured
+    # 0.01-0.03 % of the sink total). Both bounds matter: the upper is D-75's claim, and the lower
+    # is what keeps this from passing because the Process quietly became a no-op — a green
+    # "share < 1 %" on a dead draw would assert nothing.
+    _draws, sinks, total = wine_partition
+    share = sinks["strecker_degradation"] / total
+    assert 0.0 < share < 0.01, f"Strecker's O2 share is {share:.4%}, outside (0, 1 %)"
+
+
+def test_the_downstream_draws_take_the_majority_of_the_oxygen(wine_partition):
+    # The size of the double charge, which D-75's defence never states: with SO2 present the steps
+    # downstream of the shared quinone/H2O2 node take the MAJORITY of the O2, not ~2 %. Asserted
+    # as "more than half" rather than at a pinned value, because the exact share moves with SO2,
+    # anthocyanin and oak while the fact does not.
+    _draws, sinks, total = wine_partition
+    downstream = sum(v for n, v in sinks.items() if _O2_ROLE[n] == "downstream")
+    assert downstream / total > 0.5, (
+        f"downstream draws take {downstream / total:.3%} of the direct set's O2; D-197 measured "
+        "62-76 % with SO2 present"
+    )
+    # ...and the single largest of them is NOT the one D-75's concession names.
+    biggest = max((v, n) for n, v in sinks.items() if _O2_ROLE[n] == "downstream")[1]
+    assert biggest != "strecker_degradation"
+
+
+def test_deleting_the_downstream_draws_more_than_halves_the_oxygen_uptake(wine_partition):
+    # THE LOAD-BEARING FACT, and the reason the naive de-duplication is not an improvement: the
+    # primary draw alone is less than half of what the direct set consumes. Carrascon's eight reds
+    # (Table 2, the same rows _CARRASCON_2018_REDS carries) average 0.88-1.25 mg O2/L/day; on
+    # Carrascon's own cycle rule the shipped set reads 0.75 at a comparable free SO2 and the naive
+    # de-duplication reads 0.38 — from 15 % below the observed floor to 2.3x below it. So removing
+    # the double charge without re-baselining the primary draw makes agreement with measured
+    # oxygen uptake WORSE, which is a reason for D-75's scope decision that D-75 did not give.
+    _draws, sinks, total = wine_partition
+    primary = sum(v for n, v in sinks.items() if _O2_ROLE[n] == "primary")
+    assert total / primary > 2.0, (
+        f"the direct set draws {total / primary:.3f}x the primary route alone; if this falls to ~1 "
+        "the downstream draws have been removed, and the O2 uptake with them"
     )

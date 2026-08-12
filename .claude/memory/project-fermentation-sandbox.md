@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T10:04:40.712Z
+  modified: 2026-08-12T12:13:12.429Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-12)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-196**;
-sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1744**. Some
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-197**;
+sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1749**. Some
 "blocked on external sourcing" items are **NOT** — D-196's source was on disk for 20 records. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
@@ -133,6 +133,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   survives. The state-dependence is **load-bearing** — a flat surcharge of equal cost breaks BOTH
   asymptotes. Copper re-fit is **exactly** a no-op. D-142 **CONFIRMED, not corrected**.
   → `.claude/memory/prohibitions/post-fenton-second-o2.md`
+- **Quinone double charge in the DEFAULT set (D-197)** — MEASURED: D-75's lump is **FIVE draws
+  taking 36-76 % of the O₂**, not the ~2 % its own defence cites (that number is TRUE and about the
+  **smallest** member; anthocyanin fading takes ~1000× more). **Never de-duplicate in the parallel
+  frame** — it is LOAD-BEARING: 0.75 → 0.38 vs Carrascón's measured 0.88-1.25. The two-stage rework
+  **is the cascade**, not unbuilt. The 15 % undershoot is an accepted deviation; NO guard was owed.
+  → `.claude/memory/prohibitions/quinone-double-charge.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
