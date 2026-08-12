@@ -642,12 +642,14 @@ def _wine_initial(
         # bound at bottling, so 0 would assert that a sealed wine never turns reductive (the D-45
         # hard-zero defect — the very gap D-101 recorded as unmodellable). Seeded at PITCH rather
         # than at bottling as a v1 simplification: the reservoir is a property of the *finished*
-        # wine, but nothing reads or writes either slot until `begin_aging` enables the release
+        # wine, but no PROCESS reads or writes either slot until `begin_aging` enables the release
         # Processes, so carrying it inertly through fermentation is observationally identical to
         # seeding it at the aging boundary — and it is the oxofructose/mcfa "dosed inert slot"
-        # idiom. What it CANNOT express is the reservoir being *built* during fermentation (real
-        # bonded sulfide forms as fermentative H2S meets must copper), which needs a binding
-        # equilibrium and a binding constant nobody has published — see bound_sulfides.yaml.
+        # idiom. D-193 NARROWS what follows: a `add_copper` fining now DOES build the reservoir
+        # mid-run, from the stoichiometry that verb already computes, so "the model cannot build
+        # bonded sulfide" is true only of the SPONTANEOUS route — bonded sulfide forming as
+        # fermentative H2S meets must copper with no intervention, which still needs a binding
+        # equilibrium and a binding constant nobody has published (see bound_sulfides.yaml).
         # Absent from the ParameterSet ⇒ 0.0, so older parameter sets still compile inertly.
         "bound_h2s": ugl_to_gpl(
             _optional(
@@ -1557,9 +1559,11 @@ def _verb_add_copper(
 ) -> ScheduledEvent:
     """``add_copper`` — copper-fine reductive sulfur (H₂S + mercaptans) out of the wine (D-44/D-45).
 
-    The remediation half of the reductive-fault beat. Copper (Cu²⁺, dosed as copper sulfate)
-    precipitates the dissolved reductive-sulfur compounds as insoluble copper salts that settle out
-    with the lees — the standard fix for the sur-lie "reduction"
+    The remediation half of the reductive-fault beat. Copper (Cu²⁺, dosed as copper sulfate) binds
+    the dissolved reductive-sulfur compounds into copper-sulfhydryl complexes that are no longer
+    volatile — so the *odour* goes, while the complexes themselves stay dispersed in the wine
+    (D-191/D-193; the settle-out-with-the-lees account is the retracted one) — the standard fix for
+    the sur-lie "reduction"
     :class:`~fermentation.core.kinetics.hydrogen_sulfide.AutolyticHydrogenSulfide` (D-44) and
     :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan` (D-45) build up un-stripped
     post-dryness. Doses copper by the industry unit (``copper_mgl``, mg/L Cu) and binds, in **order
@@ -1572,16 +1576,18 @@ def _verb_add_copper(
        **1:2 mol**, so a gram of Cu binds ~2.8× the thiol mass it does sulfide), capacity
        ``copper_left·copper_mercaptan_binding``; removes ``min(mercaptans, capacity)``.
 
-    Copper in excess simply clears all dissolved reductive sulfur (the real outcome). **Ledger:**
-    H₂S is carbon-free (D-29), so its removal perturbs neither elemental balance (the ``add_so2``
-    precedent); **mercaptans carry carbon** (methanethiol, D-45), so removing them removes carbon
-    from the wine as the precipitated mercaptide — a **negative external flow** the driver books
-    (the racking-debris precedent), so the run-wide identity ``final == initial + Σ flows`` still
-    holds. **On a default (autolysis-off) wine ``mercaptans ≡ 0``, so add_copper is carbon-neutral
-    there** — the carbon flow appears only once the D-45 pool is non-empty. Copper is also
-    imperfect on mercaptans and useless on the disulfides they oxidise to (see
-    ``copper_mercaptan_binding``). The ``mercaptans`` slot is wine-only, so on a medium without it
+    Copper in excess simply clears all dissolved reductive sulfur (the real outcome). Copper is
+    also imperfect on mercaptans and useless on the disulfides they oxidise to (see
+    ``copper_mercaptan_binding``). The ``methanethiol`` slot is wine-only, so on a medium without it
     copper binds H₂S alone.
+
+    **Ledger (D-193 changed this).** Both bound species now go to the wine's complexed reservoirs
+    rather than out of the system, so **the verb moves no carbon at all**: ``total_carbon`` closes
+    across the fining jump to machine precision (measured −1.19e-23 g/L, against −1.09e-06 g/L
+    before) and the external flow it books is elementally empty. H₂S was always carbon-free (D-29,
+    the ``add_so2`` precedent); the thiol's carbon used to be booked as a **negative external
+    flow** leaving the wine, which is the half of D-45 that D-191's ``Flags:`` marker identified as
+    resting on a retracted mechanism.
 
     **3. The copper stays behind (D-191), which closes D-149's "the two coppers never meet".**
     Until D-191 this verb wrote ``h2s``/``methanethiol`` and **never** the ``copper`` slot D-134
@@ -1602,11 +1608,45 @@ def _verb_add_copper(
     ``copper`` is off every ledger (a trace metal), so the credit weighs exactly zero in carbon and
     nitrogen — the flow is booked and balances, the ``adjust_cations`` shape.
 
-    **What this does NOT do.** The complexes also re-release H₂S in storage (UWC §26.2.4.1, Ch. 24),
-    and the model owns a reservoir for exactly that (``bound_h2s``, D-135). This verb still
-    **annihilates** the sulfide rather than routing it there. That half was measured at D-191 and
-    left unbuilt as a scoped owner decision — see the record for the measured direction and size.
-    Do not read the copper credit as having closed it.
+    **4. The sulfur stays behind too (D-193), which spends D-191's ``Flags:`` on D-45.**
+    Until D-193 the bound sulfur was **annihilated**: ``h2s``/``methanethiol`` were decremented and
+    nothing received them, so a fining permanently destroyed sulfur that the source says is still
+    in the bottle. The same paragraph that licenses the copper credit says the complexes
+    **regenerate H₂S during storage**, and the model has owned that reservoir since D-135. So the
+    bound mass is now **transferred, not deleted**::
+
+        removed_h2s  -> bound_h2s          (1:1, the same molecule in a different binding state)
+        removed_merc -> bound_methanethiol (likewise)
+
+    **The whole removed mass moves, with no retention fraction applied.** The 0.95 above is a
+    *printed lower bound* on copper retention measured after filtering or racking — operations this
+    verb does not model and cannot know happened (the repo has a separate ``rack`` verb, and this
+    parameter's own band note says those cellar sinks are "separate operations on longer
+    timescales, not part of this event"). Scaling the sulfur by it was measured and rejected: it
+    would convert a bound into a loss fraction and leave an invented 5 % as the only carbon
+    outflow, re-asserting the retracted mechanism at 1/20th size instead of discharging it. The
+    two shares therefore differ on purpose — copper 0.95 because that share is *sourced*, sulfur
+    1.0 because no source measures any loss at this event.
+
+    **The free pools are untouched at the event**: the removal arithmetic in 1–2 is byte-for-byte
+    what it was, so the odour fix is unchanged and only the destination differs.
+
+    **This is NOT the copper-coupled release D-135 refused.** That refusal is about the release
+    *rate constant* — a PLS regression coefficient "is not a binding stoichiometry" — and it stands
+    untouched: ``k_bound_h2s_release`` still reads no copper. What moves here is the *reservoir*,
+    seeded from a stoichiometry this verb already computes (``copper_h2s_binding``, 1:1 CuS).
+
+    **Named extrapolation on the thiol half.** Franco-Luesma & Ferreira 2016 give bonded MeSH a
+    *negative* copper coefficient and conclude copper's role as a MeSH trapping agent "is not
+    really important" — a statement about *natural* wine copper, not about a deliberate dose, which
+    forms Cu(SR)₂ by the very stoichiometry step 2 uses. So the destination is sound (UWC Ch. 24's
+    dispersed sulfhydryl nanoparticles cover the mercaptide — D-191's ``Flags:`` says so in those
+    words), but the *rate* at which fined thiol comes back out is unmeasured, and this reuses the
+    natural pool's 8.1 %/yr. Deleting it instead is the strictly worse claim: an instant, permanent,
+    total removal that the source contradicts outright.
+
+    Both reservoirs are wine-only, so the routing is guarded on the slots exactly as the copper
+    credit is: a medium without them keeps the removal-only behaviour.
     """
     _iv_check_keys(iv, frozenset({"copper_mgl"}), "add_copper")
     copper_mgl = _iv_float(iv, "copper_mgl", "add_copper")
@@ -1639,6 +1679,15 @@ def _verb_add_copper(
     # looking like a configured choice (the D-45 hard-zero defect).
     has_copper = "copper" in schema
     copper_slice = schema.slice("copper") if has_copper else None
+    # D-193: where the bound sulfur goes. Both reservoirs are wine-only, so each is guarded on its
+    # own slot the way the copper credit and the thiol half are — a medium without them keeps the
+    # removal-only behaviour rather than erroring. No parameter is read: the transfer is 1:1 by
+    # construction (one molecule changing binding state), which is exactly why no retention
+    # fraction is applied to it (see the docstring's part 4).
+    bound_h2s_slice = schema.slice("bound_h2s") if "bound_h2s" in schema else None
+    bound_merc_slice = (
+        schema.slice("bound_methanethiol") if "bound_methanethiol" in schema else None
+    )
     if has_copper:
         try:
             residual_fraction = parameters["copper_fining_residual_fraction"].value
@@ -1657,12 +1706,22 @@ def _verb_add_copper(
         h2s_present = max(float(out[h2s_slice][0]), 0.0)
         removed_h2s = min(h2s_present, copper_gpl * binding_h2s)
         out[h2s_slice] = float(out[h2s_slice][0]) - removed_h2s
+        # ...and it is COMPLEXED, not destroyed (D-193): the bound mass lands in the reservoir the
+        # aging release Process empties, so a fined wine can turn reductive again in the bottle the
+        # way the source says it does. Whole mass, no fraction — see the docstring's part 4.
+        if bound_h2s_slice is not None:
+            out[bound_h2s_slice] = float(out[bound_h2s_slice][0]) + removed_h2s
         # 2. Mercaptans with the copper left after binding H₂S (its stoichiometric share).
         if merc_slice is not None:
             copper_left = max(copper_gpl - removed_h2s / binding_h2s, 0.0)
             merc_present = max(float(out[merc_slice][0]), 0.0)
             removed_merc = min(merc_present, copper_left * binding_merc)
             out[merc_slice] = float(out[merc_slice][0]) - removed_merc
+            # Same transfer for the thiol (D-193), and this one also fixes the CARBON: the two
+            # slots carry the identical carbon weight, so the fining stops booking a carbon
+            # outflow that rested on the retracted precipitation mechanism.
+            if bound_merc_slice is not None:
+                out[bound_merc_slice] = float(out[bound_merc_slice][0]) + removed_merc
         # 3. The copper STAYS (D-191). The retained fraction applies to the WHOLE dose, not to
         # whatever is left after binding: the source's wines were dosed alongside equimolar H₂S, so
         # >95 % retention is already a post-reaction figure — the copper-sulfhydryl complexes are

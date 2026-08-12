@@ -311,10 +311,13 @@ def total_carbon(
     # plural), so this weighting is now the identity every single-molecule pool shows — the lookup
     # can no longer drift from the slot it weights. Nitrogen-free (the methionine N is deaminated
     # to the N pool), so it is absent from total_nitrogen. On an undosed / autolysis-off run the
-    # pool is empty and the Process disabled (constant 0 term). NOTE: the add_copper verb (D-45)
-    # removes the thiol as precipitated copper mercaptide — carbon that legitimately LEAVES the
-    # wine, booked as a negative external flow (the racking-debris precedent), so the run-wide
-    # identity final == initial + Σ flows still holds even though total_carbon(state) drops.
+    # pool is empty and the Process disabled (constant 0 term). NOTE (D-193 CORRECTS D-45 HERE):
+    # the add_copper verb binds the thiol as copper mercaptide, and that carbon does NOT leave the
+    # wine — the complexes stay dispersed (UWC Ch. 24; the settling account is retracted), so the
+    # verb now transfers the bound mass into bound_methanethiol below at the identical weight and
+    # the fining is carbon-neutral to machine precision. Through D-192 it was booked as a negative
+    # external flow "legitimately leaving the wine" on that retracted mechanism; the run-wide
+    # identity held either way (the driver books the raw delta), but the destination was wrong.
     if "methanethiol" in schema:
         w[schema.slice("methanethiol")] = carbon_mass_fraction("methanethiol")
     # The metal-complexed thiol reservoir (decision D-135) is weighted at the SAME carbon fraction

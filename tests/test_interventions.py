@@ -658,13 +658,25 @@ def test_add_copper_lands_on_h2s_and_copper_and_books_one_flow():
     flow = traj.external_flows[0]
     assert flow.label == "add_copper@5d"
     schema = cs.schema
-    # The h2s delta is ≤ 0 (copper never ADDS H₂S) and the copper delta is > 0 (D-191: the dose
-    # stays in the wine). Those are the only two slots this verb may touch on a default wine —
-    # methanethiol is empty with autolysis off, so its removal is exactly 0 here.
+    # The h2s delta is ≤ 0 (copper never ADDS H₂S), the copper delta is > 0 (D-191: the dose stays
+    # in the wine), and the bound_h2s delta is the EXACT NEGATIVE of the h2s one (D-193: the
+    # sulfide is complexed, not destroyed). Those are the only three slots this verb may touch on a
+    # default wine — methanethiol is empty with autolysis off, so its removal, and hence its own
+    # transfer, is exactly 0 here.
     assert flow.delta[schema.slice("h2s")][0] <= 0.0
     assert flow.delta[schema.slice("copper")][0] > 0.0
+    assert flow.delta[schema.slice("bound_h2s")][0] == pytest.approx(
+        -flow.delta[schema.slice("h2s")][0], rel=1e-15
+    )
+    # ...and the transfer is not vacuous: some H₂S really was bound on this wine.
+    assert flow.delta[schema.slice("bound_h2s")][0] > 0.0
     others = np.delete(
-        flow.delta, [schema.slice("h2s").start, schema.slice("copper").start]
+        flow.delta,
+        [
+            schema.slice("h2s").start,
+            schema.slice("copper").start,
+            schema.slice("bound_h2s").start,
+        ],
     )
     assert np.count_nonzero(others) == 0
 
@@ -710,8 +722,9 @@ def test_add_copper_perturbs_neither_carbon_nor_nitrogen():
     n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
     # On this DEFAULT wine (autolysis off) mercaptans ≡ 0, so copper binds only the carbon-free H₂S:
     # the removal contributes nothing to either ledger and both balances close with no correction
-    # term (the add_so2 case). Once the D-45 mercaptan pool is non-empty, mercaptan removal DOES
-    # book a carbon flow (test_add_copper_mercaptan_removal_books_a_carbon_flow) — hence "default".
+    # term (the add_so2 case). Since D-193 that holds on a THIOL-BEARING wine too — the mercaptide
+    # stays in the wine, so its carbon transfers rather than leaves
+    # (test_add_copper_mercaptan_removal_moves_no_carbon_out_of_the_wine).
     assert all(c_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
     assert all(n_of(f.delta) == pytest.approx(0.0, abs=1e-15) for f in traj.external_flows)
     assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0), abs=1e-6)
@@ -804,11 +817,18 @@ def test_add_copper_h2s_consumes_copper_before_mercaptans():
     assert float(out[merc][0]) == pytest.approx(1.0e-4, abs=1e-18)  # mercaptans untouched
 
 
-def test_add_copper_mercaptan_removal_books_a_carbon_flow():
-    # Mercaptans carry carbon (methanethiol, D-45), so removing them removes carbon from the wine as
-    # the precipitated mercaptide — a NEGATIVE carbon external flow (unlike the carbon-free H₂S
-    # removal). The run-wide identity final == initial + Σ flows must still hold (the racking-debris
-    # crown-jewel pattern), even though total_carbon(state) legitimately drops at the dose.
+def test_add_copper_mercaptan_removal_moves_no_carbon_out_of_the_wine():
+    # D-193 INVERTS THIS TEST'S CLAIM. Through D-192 it asserted `c_of(flow.delta) < 0.0` —
+    # mercaptans carry carbon, so binding them was booked as carbon LEAVING the wine. That rested
+    # on the precipitation mechanism D-191 found retracted: the mercaptide stays dispersed, so the
+    # carbon is transferred to bound_methanethiol at the identical weight and the fining is
+    # carbon-neutral to machine precision.
+    #
+    # WHY THE ASSERT IS A PIN AT ZERO AND NOT A SIGN CHECK. The old `< 0.0` does not survive as a
+    # guard in either direction: after the change the flow is float noise (~1e-23) whose SIGN is
+    # arbitrary — measured +6.7e-23 on this scenario and −1.2e-23 on the D-193 probe's — so it
+    # would pass or fail on rounding, not on behaviour. Hence a tolerance pin plus a positive
+    # control that the transfer actually happened.
     sc = Scenario(
         name="reduction-cu-carbon",
         medium="wine",
@@ -824,10 +844,17 @@ def test_add_copper_mercaptan_removal_books_a_carbon_flow():
     n_of = total_nitrogen(schema, biomass_nitrogen_fraction=cs.param_values["biomass_N_fraction"])
     assert len(traj.external_flows) == 1
     flow = traj.external_flows[0]
-    # copper fining removed carbon (mercaptans left the wine) but no nitrogen (thiols are N-free)
-    assert c_of(flow.delta) < 0.0
+    # POSITIVE CONTROL: thiol really was bound on this wine, and it landed in the bonded pool
+    # mole-for-mole. Without this the carbon zero below would also hold on a wine with no thiol.
+    removed = -flow.delta[schema.slice("methanethiol")][0]
+    assert removed > 0.0
+    assert flow.delta[schema.slice("bound_methanethiol")][0] == pytest.approx(removed, rel=1e-15)
+    # The fining moves NEITHER element: the thiol's carbon changed binding state inside the wine,
+    # and thiols are nitrogen-free as before.
+    assert c_of(flow.delta) == pytest.approx(0.0, abs=1e-18)
     assert n_of(flow.delta) == pytest.approx(0.0, abs=1e-15)
-    # crown-jewel: carbon closes across the jump once the external flow is counted
+    # crown-jewel: carbon closes across the jump — now with a zero correction term, not an excused
+    # one, which is the strongest form of the identity rather than a weaker one.
     assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0) + c_of(flow.delta), abs=1e-6)
     assert n_of(traj.y[:, -1]) == pytest.approx(n_of(cs.y0), abs=1e-9)
 

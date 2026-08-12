@@ -55,6 +55,13 @@ dap_nitrogen_fraction:
 # that the metal now stays behind and catalyses oxidation, which is the trade-off UWC Table 26.2.1
 # prints as the cost of this treatment ("Residual copper, reappearance of off aromas, wine
 # oxidation, haze formation").
+#
+# D-193 SPENDS THE OTHER HALF OF THAT SAME PARAGRAPH. UWC also says the complexes REGENERATE H2S
+# during storage, which is the "reappearance of off aromas" in that very table; the model has owned
+# the reservoir for it since D-135 (bound_h2s). Through D-192 the verb ANNIHILATED the sulfide it
+# bound. It now transfers it -- 1:1, whole mass, no fraction, because the 0.95 below is a retention
+# bound measured after FILTERING or RACKING, operations this event does not model. So a fined wine
+# can turn reductive again in the bottle, at the release rate D-135 sourced.
 copper_h2s_binding:
   value: 0.536
   unit: "g/g"   # g H2S bound per g copper (Cu), stoichiometric CuS (1:1 mol)
@@ -70,9 +77,12 @@ copper_h2s_binding:
 # Copper also precipitates MERCAPTANS (thiols) as copper mercaptide (Cu2+ + 2 RSH -> Cu(SR)2(s) +
 # 2 H+, a 1:2 Cu:thiol reaction), the SECOND half of copper fining. The add_copper verb binds H2S
 # FIRST (CuS is far more insoluble, Ksp ~1e-36, so sulfide is preferentially bound) and then binds
-# mercaptans with the LEFTOVER copper via this factor. Removing mercaptans removes CARBON from the
-# wine (methanethiol carries carbon, D-45), booked as a negative external flow (the racking-debris
-# precedent), so the run-wide ledger identity still holds. M(methanethiol CH3SH) = 48.107 g/mol,
+# mercaptans with the LEFTOVER copper via this factor. D-193 CORRECTS WHAT THIS BLOCK USED TO SAY
+# NEXT: "removing mercaptans removes CARBON from the wine, booked as a negative external flow".
+# It does not. The mercaptide is a dispersed Cu(I)-sulfhydryl nanoparticle that stays in the wine
+# (UWC Ch. 24 -- the same retraction that fixed the copper half at D-191), so the bound thiol is
+# TRANSFERRED into bound_methanethiol at the identical carbon weight and the fining moves no carbon
+# at all. M(methanethiol CH3SH) = 48.107 g/mol,
 # M(Cu) = 63.546 g/mol, 1 Cu : 2 thiol => 2*48.107/63.546 = 1.514 g MeSH bound / g Cu (a gram of
 # copper binds ~2.8x the thiol mass it does sulfide, since sulfide is 1:1). BANDED HARD: copper
 # fining is notably LESS effective on mercaptans than on H2S (slower, incomplete) and USELESS on

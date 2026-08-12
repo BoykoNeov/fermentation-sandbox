@@ -36,14 +36,17 @@ it as unbuilt, and do not "restore" the removal-only behaviour.**
   OPPOSITE, justified by a parenthetical that refuted it — now PINNED as a test, not a docstring.
 - **Clark et al. 2015 is RENDERED, NOT READ** — the >95 % is UWC's rendering of it. Never cite it
   as agreeing or disagreeing beyond the sentence UWC prints (the D-190 amendment's rule).
-- **The sulfide half is MEASURED and NOT BUILT — do not call it a caveat and do not build it
-  without the owner.** Routing fined H₂S into `bound_h2s` nearly **doubles** the reservoir
+- **The sulfide half is BUILT at D-193 — this bullet is SPENT.** The owner approved it; the routing
+  ships for BOTH species and D-45's carbon booking is corrected to zero. Read
+  [[fined-sulfur-destination]] before touching any of it; what follows is the D-191 measurement that
+  priced it. Routing fined H₂S into `bound_h2s` nearly **doubles** the reservoir
   (19.70 → 39.19 µg/L) but moves free H₂S only **25.415 → 26.505 µg/L (+1.09, 1.043×) at 3 y**,
   because release runs 1.9 %/yr. **`BoundH2SRelease` is "not copper-coupled, on purpose" (D-135)**
   — but that refusal rested on a PLS coefficient not being a stoichiometry, and the fining path
   **has** one, so this is a LIVE candidate, not a closed one.
-- **D-45's mercaptide carbon flow is FLAGGED, not fixed** — it books carbon as *leaving* the wine
-  on the same retracted precipitation mechanism; honest destination is `bound_methanethiol`.
+- **D-45's mercaptide carbon flow is FIXED at D-193** (was FLAGGED here): it no longer books carbon
+  as *leaving* the wine — the thiol transfers to `bound_methanethiol` and the fining is
+  carbon-neutral to machine precision. Do not restore the outflow.
 - **k_copper_multiplier's D-159 freeze was SCENARIO-bound and is now THAWED** — 0.0 unfined,
   6.62e-4 fined, 1.27e-2 fined+O₂ (control `mu_max` 42.4). D-159's prose diagnosis was **right**
   and is now obsolete; its two docstrings went **stale, not red** (no assert). **Nothing here

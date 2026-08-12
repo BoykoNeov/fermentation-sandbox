@@ -30,9 +30,9 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-12)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-192**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1730**. Most remaining
-work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-193**;
+sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1741**. Most remaining work is
+**blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
@@ -105,8 +105,15 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   `copper` slot, D-44's "CuS drops out with the lees" is **FALSE**, D-149's "two coppers never
   meet" **CLOSED**, and the docstring's *"nothing sources one"* was false when written. Never
   midpoint the 0.95; the **sulfide half is MEASURED, not built** (owner's call, live candidate);
-  D-45's mercaptide carbon flow is **FLAGGED not fixed**.
+  D-45's mercaptide carbon flow is **FLAGGED not fixed** — **both spent at D-193, see the row above**.
   → `.claude/memory/prohibitions/residual-copper-fining.md`
+- **Fined sulfur's destination (D-193)** — the transfer into `bound_h2s`/`bound_methanethiol` is
+  **BUILT**: fining complexes the sulfur, never destroys it, so a fining is **no longer permanent**.
+  **1:1, WHOLE mass — the sulfur is NOT scaled by the 0.95** (that variant was built and REJECTED;
+  copper 0.95 and sulfur 1.0 differ on purpose and a test forbids "harmonising" them). D-45's carbon
+  booking is CORRECTED to **zero**, not shrunk. **D-135's rate-coupling refusal and its unmodelled
+  SPONTANEOUS formation route both STAND**; its "a reservoir fining never touched" docstring does not.
+  → `.claude/memory/prohibitions/fined-sulfur-destination.md`
 - **Osmotic inhibition at high sugar (D-192)** — **BUILT**, wine-only, threshold **300 g/L =
   the TOP of Coleman's envelope, never the Handbook's printed 200** (that is inside the
   keystone's own fit). The Handbook's "300 yields less than 200" is **FORFEITED on measurement**;

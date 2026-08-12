@@ -4174,6 +4174,14 @@ class BoundHydrogenSulfideRelease(Process):
     instead, and coupling waits for a real binding constant. Note the asymmetry that would be
     required: copper does **not** trap the thiol (see :class:`BoundMethanethiolRelease`).
 
+    **D-193 narrows that, and does not breach it.** An ``add_copper`` fining now *adds* to this
+    reservoir — the verb binds H₂S by a real 1:1 stoichiometry (``copper_h2s_binding``) and the
+    bound mass has to go somewhere the source says it is (UWC §26.2.4.1: the complexes regenerate
+    H₂S in storage), so it is transferred here rather than annihilated. What stays refused is
+    exactly what was refused: this Process's **rate** reads no copper, ``reads`` is unchanged, and
+    an un-fined wine is byte-for-byte what it was. A seeded reservoir plus an event that can add to
+    it is not a copper-dependent rate law.
+
     **No double-count with :class:`~fermentation.core.kinetics.hydrogen_sulfide.\
     AutolyticHydrogenSulfide`.** That Process makes H₂S from yeast lees during autolysis; this one
     releases H₂S that was made during fermentation and immediately complexed. Different substrate,
@@ -4267,8 +4275,19 @@ class BoundMethanethiolRelease(Process):
     the thiol. Any future coupling to the D-134 ``copper`` state must therefore be **asymmetric**
     between the two species — a shared metal-binding term would be positively wrong, not merely
     coarse. (Note this Process still writes the pool that the ``add_copper`` fining verb removes:
-    D-45 precipitates free thiol as copper mercaptide. Fining a wine and then aging it releases
-    more thiol from a reservoir fining never touched — which is the real, and correct, behaviour.)
+    D-45 binds free thiol as copper mercaptide.)
+
+    **D-193 CORRECTS the parenthetical this paragraph used to end with**, which said fining
+    "releases more thiol from a reservoir fining never touched — the real, and correct, behaviour".
+    Fining now *does* touch it: the mercaptide is a dispersed Cu(I)-sulfhydryl nanoparticle that
+    stays in the wine (UWC Ch. 24), so the bound thiol is transferred into this reservoir instead of
+    being destroyed — which also stops the fining from booking that carbon out of the wine. The
+    negative PLS coefficient above is not contradicted: it says copper is not an important trap at
+    *natural* wine copper levels, which is a different claim from what a deliberate dose does by
+    stoichiometry. **The extrapolation this creates, named:** the fined-in mercaptide is released at
+    the natural pool's rate, which nothing measures. That is a weaker assumption than the
+    alternative it replaces (instant, total, permanent destruction of the thiol), not a stronger
+    one.
 
     **No double-count with :class:`~fermentation.core.kinetics.mercaptans.AutolyticMercaptan`, and
     the source says so independently.** That Process draws **methionine** during lees autolysis;
