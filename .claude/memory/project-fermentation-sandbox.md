@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T12:13:12.429Z
+  modified: 2026-08-12T12:24:42.045Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -136,8 +136,9 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
 - **Quinone double charge in the DEFAULT set (D-197)** — MEASURED: D-75's lump is **FIVE draws
   taking 36-76 % of the O₂**, not the ~2 % its own defence cites (that number is TRUE and about the
   **smallest** member; anthocyanin fading takes ~1000× more). **Never de-duplicate in the parallel
-  frame** — it is LOAD-BEARING: 0.75 → 0.38 vs Carrascón's measured 0.88-1.25. The two-stage rework
-  **is the cascade**, not unbuilt. The 15 % undershoot is an accepted deviation; NO guard was owed.
+  frame** — LOAD-BEARING: 0.384 → 0.109 vs Carrascón's measured 0.88-1.25. The two-stage rework
+  **is the cascade**, not unbuilt. **Use the 90 % limb, not the 7-day cap** (the cap flatters it to
+  "15 %"; real gap ~2.3×, an accepted deviation). NO guard was owed; margins ride on free SO₂.
   → `.claude/memory/prohibitions/quinone-double-charge.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;

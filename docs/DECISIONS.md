@@ -27160,19 +27160,30 @@ the repeated-air-saturation protocol D-132/D-133 are anchored on. Four comparabi
 Observed **average (steady) OCR: 0.88–1.25 mg O₂/L/day.** The *initial* OCR (1.95–6.83) is the burst
 axis (D-133, non-default) and is not this set's comparator.
 
-| arm | free SO₂ mg/L | comparable? | average OCR mg O₂/L/day | vs 0.88–1.25 |
-|---|---|---|---|---|
-| shipped, unsulfited | 0.00 | no (no SO₂) | 0.5325 | below |
-| **shipped, SO₂ 30** | **16.84** | **yes** | **0.7485** | **15 % below the floor** |
-| shipped, SO₂ 60 | 40.24 | **no — above every wine** | 0.9284 | (in band, unusable) |
-| naive de-duplication | any | — | **0.3807** | **2.31× below the floor** |
+**AMENDED IN THE SAME SESSION — the 7-day cap flattered the model, and the honest deviation is
+~4× bigger than this section first shipped.** Carrascón's rule has two limbs and I first reported
+only the one the model wins on. Under the **7-day cap** the window closes while the model's rate is
+still elevated and only 33–81 % of the charge is gone, where the eight reds reached ~85–91 %; under
+the paper's **primary** limb (90 % consumed, no cap) the same arms read far lower. Both limbs, one
+table — the primary limb is the comparator, the cap is the weaker one:
 
-**The SO₂ 60 arm lands in the band and must not be quoted**: its free SO₂ exceeds all eight wines.
-The honest reading is the SO₂ 30 arm — the shipped default set consumes O₂ **15 % more slowly than
-the slowest of eight real reds**. That is a deviation this record records and does not tune: the
+| arm | free SO₂ mg/L | comparable? | 7-day cap | **90 % rule (primary)** | vs floor 0.88 |
+|---|---|---|---|---|---|
+| shipped, unsulfited | 0.00 | no (no SO₂) | 0.5325 | 0.1769 | 0.20× |
+| **shipped, SO₂ 30** | **16.84** | **yes** | 0.7485 | **0.3840** | **0.44× — 2.3× below** |
+| shipped, SO₂ 60 | 40.24 | **no — above every wine** | 0.9284 | 0.6923 | 0.79× |
+| naive de-duplication, SO₂ 30 | 16.84 | — | 0.3807 | **0.1085** | **0.12× — 8.1× below** |
+
+**The SO₂ 60 arm lands in the band under the cap and must not be quoted**: its free SO₂ exceeds all
+eight wines, and under the primary rule it is below the floor anyway. The honest reading is the
+SO₂ 30 arm, and the cleanest statement of it avoids rate definitions entirely: **to consume the same
+90 % of the same ~8 mg/L charge the model takes 18.6 days where the eight reds took ~7–8, so its
+oxygen uptake is ~2.3× too slow.** That is a deviation this record records and does not tune: the
 constants it would move are D-72/D-73/D-74/D-81 anchors with their own provenance, and the existing
 pin on this axis (`test_burst_oxidation_plus_steady_lands_in_ferreira_initial_band`, 0.54–8.2
-mg/L/day) is far too wide to have noticed.
+mg/L/day) is far too wide to have noticed. **Never quote the 15 %** the first draft of this section
+carried — it is the cap limb, and it is the limb that flatters the model.
+[[feedback-a-derived-yield-encodes-its-rate-law]]
 
 **Comparability caveat, registered before the numbers existed:** eight commercial reds with their own
 phenolics, iron and copper against the D-132 anchor red. This is a **band-membership** check, never a
@@ -27182,15 +27193,22 @@ lands.
 ### 5. The naive de-duplication makes agreement WORSE — which is a reason D-75 never gave
 
 Switching the five downstream draws off their `o2` debit, **re-baselining nothing**, takes the
-modelled uptake to **0.3807 mg/L/day** — 0.509× the shipped value at the comparable point, and
-**2.31× below** the observed floor. The arm is deliberately named `naive`, not "clean": deleting the
-draws is *not* what a two-stage rework does. The rework re-baselines the primary draw, which is
-exactly why D-141 could verify the cascade **reproduces the direct set's total budget** (0.96–1.04×,
-re-measured at D-196). [[feedback-compute-the-clean-fix-before-adopting-it]]
+modelled uptake — both arms on the **same** rule, the paper's primary one — from **0.3840 to
+0.1085 mg/L/day**, i.e. **0.283×**, and from 2.3× below the observed floor to **8.1× below** it.
+(Under the weaker cap limb the same comparison reads 0.7485 → 0.3807 = 0.509×, so the amendment in
+§4 makes this finding **stronger**, not weaker: 3.5× rather than 2.0×.) The arm is deliberately named
+`naive`, not "clean": deleting the draws is *not* what a two-stage rework does. The rework
+re-baselines the primary draw, which is exactly why D-141 could verify the cascade **reproduces the
+direct set's total budget** (0.96–1.04×, re-measured at D-196).
+[[feedback-compute-the-clean-fix-before-adopting-it]]
+
+**The naive arm reads 0.1085 at BOTH 30 and 60 mg/L SO₂, to four decimals** — the tell that what
+survives the mutation is browning alone, which never reads SO₂. It is also the check that the arm
+did what it claims: an SO₂-independent number is only possible once every SO₂-coupled draw is gone.
 
 So the double charge is **load-bearing for agreement with measured oxygen uptake**: the model is
-already below the observed band *with* it, and de-duplicating it without a re-baseline would put it
-2.3× below. D-75 justified the out-of-scope call on effort ("a larger structural beat"); the
+already 2.3× below the observed band *with* it, and de-duplicating it without a re-baseline would put
+it 8.1× below. D-75 justified the out-of-scope call on effort ("a larger structural beat"); the
 measurement supplies a second, stronger reason — the naive edit is not a partial improvement, it is
 a regression. **Two mutation forms agree to four decimals** (`o2only` = drop the debit only,
 `off` = zero the whole contribution), so the finding does not rest on which is used.
@@ -27215,7 +27233,7 @@ Four arms, full suite:
 | `noop` (designed identical) | 0 | — | — |
 | `o2only` (naive de-duplication) | 67 | **64** | 3 |
 | `strecker100` (`k_strecker` ×100) | 30 | **29** | 1 |
-| `extradrawer` (a new O₂ drawer, writing nothing) | 5 | **2** | 3 |
+| `extradrawer` (a new O₂ drawer, writing nothing) | 5 | **2** | 1 + 2 crashes |
 
 **Not one arm was green, so on this project's own rule (D-194, "a green mutation is what owes a
 guard") no guard was strictly owed, and this record does not claim otherwise.** The 64 and 29
@@ -27225,6 +27243,19 @@ already catches a new drawer *by name*. What is new is that the partition's **me
 rather than only its values pinned, so this record's numbers cannot rot while the pins stay green on
 re-baselined values. Recorded in the test section header too, so the guards are not read as having
 closed a hole. [[feedback-grep-finds-claims-not-guards]]
+
+**And the `extradrawer` row is counted down, not up:** of its three new reds only **one** is the
+classification guard firing on purpose; the other two are `KeyError`s from `_O2_ROLE[n]` inside tests
+whose subject is something else. Loud, but incidental — calling them coverage would be the same
+inflation this record is about. [[feedback-name-the-field-your-predicate-read]]
+
+**The two ratio guards' margins are held open by free SO₂, and now say so.** At the fixture's
+sampling instant free SO₂ is 35.7 mg/L and `sulfite_oxidation` alone is **86.8 %** of the draw, so
+downstream/total measures **0.9288** (1.86× its threshold) and total/primary **14.04** (7.02×).
+Comfortable — but at the *same* composition without SO₂ the two read **35.6 %** and **1.55×**, i.e.
+**both thresholds fail**. So each guard carries an explicit `free_so2 > 1.0` premise assert whose
+message names the premise; without it, the day SO₂ depletes faster the red would blame the double
+charge for a change in the wine. [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]
 
 ### 7. Two defects in this beat's own harness, both found before anything was reported
 

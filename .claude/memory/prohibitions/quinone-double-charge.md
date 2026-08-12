@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 720cec99-de09-483a-bafb-7296d361e840
-  modified: 2026-08-12T12:12:09.878Z
+  modified: 2026-08-12T12:24:32.813Z
 ---
 
 # The quinone double charge in the default set — D-197
@@ -33,15 +33,20 @@ defence was conducted on the lump's smallest member. [[feedback-a-magnitude-defe
 
 - **The two-stage rework is NOT unbuilt — it is the cascade (D-141)**, wired, isolable, non-default
   by decision. D-75's out-of-scope call stands and is the owner's.
-- **Never de-duplicate inside the parallel frame.** Deleting the five downstream `o2` debits with no
-  re-baseline takes uptake **0.7485 → 0.3807 mg O₂/L/day** against Carrascón 2018's observed
-  **0.88–1.25** band: from 15 % below the floor to **2.31× below** it. The double charge is
-  **LOAD-BEARING for agreement with measured uptake** — a second reason D-75 never gave. Two
-  mutation forms agree to 4 decimals, so it does not rest on which is used.
-- **The SO₂ 60 arm lands in the band and is UNUSABLE** — its free SO₂ (40.2 mg/L) is above all eight
-  Carrascón wines (2.6–33.7). The comparable arm is SO₂ 30 (free 16.8) and it reads **15 % BELOW the
-  floor**. That undershoot is an **accepted deviation, recorded not tuned** — closing it means
-  moving D-72/D-73/D-74/D-81 anchors that carry their own provenance.
+- **Never de-duplicate inside the parallel frame.** On Carrascón's **primary** rule (90 % consumed)
+  deleting the five downstream `o2` debits with no re-baseline takes uptake **0.3840 → 0.1085
+  mg O₂/L/day** against their observed **0.88–1.25** band: from 2.3× below the floor to **8.1×
+  below**. **LOAD-BEARING for agreement with measured uptake** — a second reason D-75 never gave.
+- **Use the 90 % limb, NEVER the 7-day cap alone.** The cap closes the window while the model's rate
+  is still high (33–81 % consumed vs the reds' ~85–91 %) and flatters it to "15 % below" — the first
+  draft of D-197 §4 said that and was **amended in-session**. Cleanest framing avoids rates:
+  **18.6 d to consume 90 % of ~8 mg/L where eight real reds took ~7–8 d ⇒ ~2.3× too slow**, an
+  **accepted deviation, recorded not tuned** (closing it moves D-72/D-73/D-74/D-81 anchors).
+  The SO₂ 60 arm is **UNUSABLE** either way — free SO₂ 40.2 mg/L exceeds all eight wines (2.6–33.7).
+- **The two ratio guards' margins are held open by FREE SO₂, and each asserts that premise.** At the
+  fixture: free SO₂ 35.7 mg/L, sulfite alone **86.8 %**, so 0.9288 / 14.04× — but **unsulfited the
+  same composition reads 35.6 % / 1.55× and BOTH thresholds fail.** Never "fix" a red there by
+  loosening the threshold; the premise is what moved.
 - **Σk_eff/anchor (9.04× / 25.05×) does NOT discriminate** — browning's `k_eff` contains D-132's
   *sourced* phenolic boost. Downgraded before the campaign ran; never quote it as the lump's size.
 - **The partition is exactly kᵢ/Σkⱼ** (every sink first-order in `o2`), so it is level-independent;

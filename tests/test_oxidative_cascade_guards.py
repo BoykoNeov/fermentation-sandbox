@@ -75,6 +75,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from fermentation.core.acidbase import bisulfite_so2_at_ph, ph_of_state
 from fermentation.core.chemistry import M_ACETALDEHYDE, M_O2
 from fermentation.core.media import get_medium
 from fermentation.parameters import default_data_dir, load_parameters
@@ -1962,7 +1963,14 @@ _PARTITION_HOURS = (_WINE_FERMENT_DAYS + 365.25) * 24.0
 
 @pytest.fixture(scope="module")
 def wine_partition(wine_trajectory_run):
-    """``(draws, sinks, total_sink_draw)`` for the wine run, one year into aging."""
+    """``(draws, sinks, total_sink_draw, free_so2_mgl)`` for the wine run, one year into aging.
+
+    ``free_so2_mgl`` is returned because it is **what holds the two ratio guards' margins open**,
+    not decoration: at this state ``sulfite_oxidation`` alone is 86.8 % of the draw, and at the
+    same composition WITHOUT SO2 the measured shares are 35.6 % downstream / 1.55x total-over-
+    primary — i.e. both thresholds below would fail. A guard whose premise is unstated blames the
+    wrong mechanism the day it goes red. [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]
+    """
     compiled, trajectory = wine_trajectory_run
     idx = int(np.argmin(np.abs(trajectory.t - _PARTITION_HOURS)))
     y = trajectory.y[:, idx].copy()
@@ -1970,7 +1978,9 @@ def wine_partition(wine_trajectory_run):
         compiled.process_set, float(trajectory.t[idx]), y, compiled.param_values
     )
     sinks = {n: v for n, v in draws.items() if _O2_ROLE.get(n) != "source"}
-    return draws, sinks, sum(sinks.values())
+    ph = ph_of_state(y, compiled.schema, compiled.param_values)
+    free_so2 = float(bisulfite_so2_at_ph(y, compiled.schema, compiled.param_values, ph)) * 1e3
+    return draws, sinks, sum(sinks.values()), free_so2
 
 
 def test_every_direct_o2_drawer_is_classified_primary_or_downstream():
@@ -1997,7 +2007,7 @@ def test_the_partition_sums_to_the_process_sets_own_o2_derivative(
     # the ProcessSet's own d(o2)/dt to machine precision — otherwise every share below is a
     # fraction of a total the harness invented rather than the one the solver integrates.
     compiled, trajectory = wine_trajectory_run
-    draws, _sinks, _total = wine_partition
+    draws, _sinks, _total, _free_so2 = wine_partition
     idx = int(np.argmin(np.abs(trajectory.t - _PARTITION_HOURS)))
     y = trajectory.y[:, idx].copy()
     total_d = compiled.process_set.total_derivatives(
@@ -2014,7 +2024,7 @@ def test_strecker_takes_far_under_one_percent_of_the_direct_sets_oxygen(wine_par
     # 0.01-0.03 % of the sink total). Both bounds matter: the upper is D-75's claim, and the lower
     # is what keeps this from passing because the Process quietly became a no-op — a green
     # "share < 1 %" on a dead draw would assert nothing.
-    _draws, sinks, total = wine_partition
+    _draws, sinks, total, _free_so2 = wine_partition
     share = sinks["strecker_degradation"] / total
     assert 0.0 < share < 0.01, f"Strecker's O2 share is {share:.4%}, outside (0, 1 %)"
 
@@ -2024,11 +2034,18 @@ def test_the_downstream_draws_take_the_majority_of_the_oxygen(wine_partition):
     # downstream of the shared quinone/H2O2 node take the MAJORITY of the O2, not ~2 %. Asserted
     # as "more than half" rather than at a pinned value, because the exact share moves with SO2,
     # anthocyanin and oak while the fact does not.
-    _draws, sinks, total = wine_partition
+    _draws, sinks, total, free_so2 = wine_partition
     downstream = sum(v for n, v in sinks.items() if _O2_ROLE[n] == "downstream")
+    # The premise, asserted rather than assumed: without free SO2 this composition measures 35.6 %
+    # downstream and the threshold below is the wrong test to be running.
+    assert free_so2 > 1.0, (
+        f"free SO2 is {free_so2:.3f} mg/L at the sampling instant, so the majority claim below is "
+        "not the claim this state can test — the premise moved, not the double charge"
+    )
     assert downstream / total > 0.5, (
-        f"downstream draws take {downstream / total:.3%} of the direct set's O2; D-197 measured "
-        "62-76 % with SO2 present"
+        f"downstream draws take {downstream / total:.3%} of the direct set's O2 at free SO2 "
+        f"{free_so2:.1f} mg/L; D-197 measured 92.9 % on this cork fixture and 62-76 % on the "
+        "hermetic 8 mg/L-dosed runs"
     )
     # ...and the single largest of them is NOT the one D-75's concession names.
     biggest = max((v, n) for n, v in sinks.items() if _O2_ROLE[n] == "downstream")[1]
@@ -2037,15 +2054,21 @@ def test_the_downstream_draws_take_the_majority_of_the_oxygen(wine_partition):
 
 def test_deleting_the_downstream_draws_more_than_halves_the_oxygen_uptake(wine_partition):
     # THE LOAD-BEARING FACT, and the reason the naive de-duplication is not an improvement: the
-    # primary draw alone is less than half of what the direct set consumes. Carrascon's eight reds
+    # primary draw alone is a fraction of what the direct set consumes. Carrascon's eight reds
     # (Table 2, the same rows _CARRASCON_2018_REDS carries) average 0.88-1.25 mg O2/L/day; on
-    # Carrascon's own cycle rule the shipped set reads 0.75 at a comparable free SO2 and the naive
-    # de-duplication reads 0.38 — from 15 % below the observed floor to 2.3x below it. So removing
-    # the double charge without re-baselining the primary draw makes agreement with measured
-    # oxygen uptake WORSE, which is a reason for D-75's scope decision that D-75 did not give.
-    _draws, sinks, total = wine_partition
+    # Carrascon's PRIMARY cycle rule (90 % of the charge consumed) the shipped set reads 0.3840 at
+    # a comparable free SO2 and the naive de-duplication reads 0.1085 — 2.3x below the observed
+    # floor becoming 8.1x below it. So removing the double charge without re-baselining the primary
+    # draw makes agreement with measured oxygen uptake WORSE by a factor of 3.5, which is a reason
+    # for D-75's scope decision that D-75 did not give.
+    #
+    # The premise is the same free-SO2 one as above: unsulfited, this ratio measures 1.55x and the
+    # threshold would fail for a reason that has nothing to do with the double charge.
+    _draws, sinks, total, free_so2 = wine_partition
     primary = sum(v for n, v in sinks.items() if _O2_ROLE[n] == "primary")
+    assert free_so2 > 1.0, f"free SO2 is {free_so2:.3f} mg/L — the premise moved, see above"
     assert total / primary > 2.0, (
-        f"the direct set draws {total / primary:.3f}x the primary route alone; if this falls to ~1 "
-        "the downstream draws have been removed, and the O2 uptake with them"
+        f"the direct set draws {total / primary:.3f}x the primary route alone at free SO2 "
+        f"{free_so2:.1f} mg/L (D-197 measured 14.0x here); if this falls toward 1 the downstream "
+        "draws have been removed, and the O2 uptake with them"
     )

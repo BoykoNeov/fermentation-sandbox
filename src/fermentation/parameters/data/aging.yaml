@@ -917,11 +917,14 @@ burst_antioxidant_initial:
 # size is the MAJORITY of the budget, not the ~2 % the k_strecker sentence above implies. The
 # k_strecker number is correct and is about the SMALLEST of the five: Strecker's own share of
 # consumed O2 measures 0.012-0.033 %, while anthocyanin_fading -- same idiom, never named here --
-# takes ~1000x more. NOT A DEFECT, and NOT a licence to de-duplicate: deleting the five draws
-# without re-baselining the primary one takes the modelled uptake from 0.75 to 0.38 mg O2/L/day
-# against Carrascon 2018's OBSERVED 0.88-1.25 band, i.e. from 15 % below the floor to 2.3x below
-# it. The double charge is LOAD-BEARING for agreement with measured oxygen uptake, which is a
-# reason for the out-of-scope decision above that D-75 never gave. Guarded in
+# takes ~1000x more. NOT A DEFECT, and NOT a licence to de-duplicate: on Carrascon 2018's PRIMARY
+# cycle rule (90 % of the charge consumed) deleting the five draws without re-baselining the
+# primary one takes the modelled uptake from 0.3840 to 0.1085 mg O2/L/day against their OBSERVED
+# 0.88-1.25 band -- from 2.3x below the floor to 8.1x below it. The double charge is LOAD-BEARING
+# for agreement with measured oxygen uptake, which is a reason for the out-of-scope decision above
+# that D-75 never gave. The model's own 2.3x undershoot (18.6 d to consume 90 % of ~8 mg/L where
+# eight real reds took ~7-8 d) is an ACCEPTED DEVIATION, recorded not tuned -- closing it would
+# move D-72/D-73/D-74/D-81 anchors that carry their own provenance. Guarded in
 # tests/test_oxidative_cascade_guards.py (Guard 9).
 #
 # LEDGERS. o2 is off every ledger (D-71); the amino-acid draw + deamination is the EXACT D-45
