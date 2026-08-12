@@ -25374,3 +25374,50 @@ a spread of published values will always produce one flattering ratio.** When th
 near-constant across a treatment axis, per-cell ratios are drawn from a lottery whose prize is a
 number that reads like agreement. Report the structure — what the model *varies with* — and let the
 ratio be an illustration of it, never the headline.
+
+### D-188 amendment — the harness had two dosing paths and only one was pinned, and the derived-count rule caught a number the beat had reasoned itself out of checking
+
+Found in review immediately after D-188 shipped, and appended rather than edited in place (the
+D-147/D-181/D-186/D-187 precedent). Suite **1656 → 1665** (`pytest --collect-only -q` on both
+trees), so the record's opening 1664 and its §7 "8 tests, 5 passing and 3 xfail" are superseded by
+**9 tests, 6 passing and 3 `xfail(strict=True)`**. The headline numbers are untouched — nothing
+below moves a ladder value, an attribution or a floor.
+
+**1. Two dosing paths in one experiment, and the finding is about a dosing contrast.** The must
+dose runs through the scenario verb (`_verb_add_so2`); every tank top-up and the bottling dose
+write `so2_total` directly, because "maintained" has to be computed from the state. That is a
+harness assumption sitting exactly where the finding lives — *the must column behaves differently
+from the later columns* — and §2 asserted the harness was faithful without measuring it. Now
+pinned: `test_the_two_dosing_paths_are_the_same_mutation` compiles the verb and checks its
+mutation is **byte-identical** to `so2_total += mg/L / 1000` on the same state, with no clamp, no
+companion slot and no `param_update`. It passes, so the record's numbers stand — but it was an
+assumption until it was an assertion, which is D-108's lesson (vi) and the reason the check is
+worth its 20 lines. It is D-187's `seal_bottle` ≡ `add_oxygen` idiom, applied to the verb this
+beat leaned on rather than the one it built.
+
+**2. `ARCHITECTURE.md` said 72 test files and there are 73.** The beat reasoned — correctly on the
+letter of `CLAUDE.md` — that no Process, slot, parameter file or package changed, so no structural
+update was owed, and stopped there. But that file's counts are **derived**, and the rule is to
+*re-run the snippet* rather than reason about whether one moved. Run, it disagreed on one line.
+Fixed in this amendment's commit. **The general form is the same shape as this beat's own subject:
+a rule that says "update it when X changes" invites you to check whether X changed, when what the
+document actually promises is that every number in it is reproducible on demand.** The snippet
+takes ten seconds and needs no judgement; the judgement call is what got it wrong.
+
+**3. A magnitude pin was living inside the principle that forbids them.**
+`test_removing_the_sulfite_oxygen_competition_flips_the_sign_but_not_the_size` asserts
+`modelled_lift < 0.05`, in a **passing** test, while §6 says the pins here assert direction and
+never magnitude "because a magnitude is a fit target handed to whoever closes it". Both are right
+and the scoping was missing: §6's principle is about the **xfail block**, whose whole audience is
+the person closing the gap. The 5 % is a bound on *today's* model, and it is what makes "the size
+belongs elsewhere" falsifiable rather than rhetorical. Its docstring now says so, and says the
+right response when a post-dryness source lands is to **delete** it, not widen it. A test whose
+name promises an attribution and whose body enforces a threshold should say which it is.
+
+**One number in the record is arithmetic, not a command, and it is the one the record's own
+subject warns about.** The opening says the blocker had been built "51 records earlier" — that is
+D-136 to D-187 counted by hand, unlike the *20 copy-forward mentions after D-136* in §10, which
+came from a grep whose output is in the receipts. It is correct under the obvious reading. It is
+recorded here rather than amended because the point is the asymmetry: in a record arguing that
+prose numbers are unpinned by construction, the pinned one and the unpinned one sit two lines
+apart, and only the provenance tells them apart.

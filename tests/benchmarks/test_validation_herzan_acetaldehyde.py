@@ -304,6 +304,31 @@ def test_the_unsulfited_floor_is_no_longer_zero_and_the_closure_sets_it(floor_by
     assert max(permeable, key=lambda c: permeable[c]) == "synthetic_supremecorq"
 
 
+def test_the_two_dosing_paths_are_the_same_mutation():
+    """The must dose goes through the verb; the tank top-ups and bottling dose write the slot.
+
+    Two paths in one experiment, and the finding is precisely that the must column behaves
+    differently from the later columns — so the harness must not be the reason. ``_verb_add_so2``
+    has to be *exactly* ``so2_total += mg/L / 1000``: no clamp, no companion slot, no parameter
+    update. Asserted against the compiled event rather than read off the source, which is the
+    D-187 ``seal_bottle`` ≡ ``add_oxygen`` idiom — a verb cannot quietly grow a second effect.
+    """
+    dose_mgl = 60.0
+    compiled = compile_scenario(_scenario(dose_mgl, closure=_LADDER_CLOSURE))
+    events = [e for e in compiled.events if e.label.startswith("add_so2@")]
+    assert len(events) == 1
+    event = events[0]
+    assert event.param_update in (None, {}), "a dose must not move a parameter"
+
+    before = compiled.y0.copy()
+    assert event.mutate is not None
+    after = np.asarray(event.mutate(compiled.schema, before))
+
+    by_hand = before.copy()
+    by_hand[compiled.schema.slice("so2_total")] += dose_mgl / 1000.0
+    assert np.array_equal(after, by_hand)
+
+
 def test_the_white_wine_has_no_acetaldehyde_bridging_substrate():
     """Tannin and anthocyanin are zero here, so the bridging sinks are inert.
 
@@ -350,6 +375,12 @@ def test_removing_the_sulfite_oxygen_competition_flips_the_sign_but_not_the_size
     protection is real and does raise acetaldehyde. But it appears at about +1 %, against the
     paper's +298 %. **The competition owns the sign; the missing post-dryness source owns the
     size**, and a fix aimed at only one of them will not move this benchmark.
+
+    **The 5 % bound below is a bound on TODAY'S model and is EXPECTED to break** when a
+    post-dryness source lands — unlike the ``xfail`` block further down, which asserts published
+    directions only and never a published magnitude. It is here because it is what makes "the
+    size belongs elsewhere" falsifiable rather than rhetorical; whoever closes the gap should
+    delete it, not widen it.
     """
     with_competition = (ladder[(0.0, 0.0, 35.0)], ladder[(0.0, 30.0, 35.0)])
     assert with_competition[1] < with_competition[0]  # the shipped model runs the wrong way
