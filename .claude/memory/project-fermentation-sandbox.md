@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T00:10:54.609Z
+  modified: 2026-08-12T06:26:48.074Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-12)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at
-**D-189**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1665**. Most remaining
+**D-190**; sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1687**. Most remaining
 work is **blocked on external sourcing**. **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` —
 do NOT restate them here: that duplication is exactly what rotted the doc (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
@@ -96,6 +96,11 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   and refused. **The suite ALREADY forbids it at 5 asserts — no guard is owed.** D-107's
   shape-diagnosis is **corrected**: the miss is a competition. **Pyruvate's item stays OPEN.**
   → `.claude/memory/prohibitions/keto-acid-excretion-shape.md`
+- **Carbonyl release + the binding constants (D-190)** — release is **ALREADY EMERGENT** for
+  acetaldehyde (stateless equilibrium, never build it); the aroma carbonyls bind **NOTHING** so
+  Bueno's ordering is inexpressible and methional is **BLOCKED on a Kd**; diacetyl REFUSED on the
+  table's reliability; the pyruvate/α-KG ordering is corrected **in prose only — no value moved**,
+  and its reversal is reachable in **2.0 %** of draws. → `.claude/memory/prohibitions/carbonyl-release-and-binding.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.

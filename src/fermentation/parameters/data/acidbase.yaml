@@ -350,23 +350,36 @@ K_pyruvate_so2:
   tier: plausible
   uncertainty: { low: 1.5e-4, high: 2.0e-3, note: "Burroughs & Sparks report 5.55e-4 at pH 3.3; a later secondary review rounds pyruvate's Kd to ~2e-4 mol/L, order-of-magnitude consistent. Band spans both plus apparent-pKa pH drift across the wine range (3.3-3.8, same drift acetaldehyde's band carries)." }
   provenance:
-    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I: equilibrium constants for the dissociation of carbonyl bisulphite compounds (J. Sci. Food Agric. 24:187-198) -- apparent Kd 5.55e-4 mol/L at pH 3.3, the same canonical source as K_acetaldehyde_so2 (a direct cross-check: that paper's acetaldehyde value 1.5e-6 matches this codebase's independently-sourced K_acetaldehyde_so2 exactly). CORROBORATED (decision D-130) by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419, and the Handbook of Enology Vol. 1 §8.4 Kd set."
+    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I: equilibrium constants for the dissociation of carbonyl bisulphite compounds (J. Sci. Food Agric. 24:187-198) -- apparent Kd 5.55e-4 mol/L at pH 3.3, the same canonical source as K_acetaldehyde_so2 (a direct cross-check: that paper's acetaldehyde value 1.5e-6 matches this codebase's independently-sourced K_acetaldehyde_so2 exactly). D-130 recorded this as CORROBORATED by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419, and the Handbook of Enology Vol. 1 §8.4 Kd set; decision D-190 re-read that §8.4 set and it does NOT corroborate this value -- Table 8.5 prints pyruvic acid K = 0.3e-3 M and Figure 8.3 (captioned Barbe 2000) prints 0.2 mM, both smaller than the 2-oxoglutaric value beside them, i.e. the REVERSE of this codebase's ordering. D-130's corroboration line was a footnote to a 5-oxofructose beat and its numbers were never checked. The value is retained (Burroughs & Sparks is the primary and is not held locally); the disagreement is recorded rather than resolved. See the alpha-ketoglutarate comment below."
     conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like K_acetaldehyde_so2"
     notes: "Second-strongest carbonyl-SO2 binder in wine after acetaldehyde (Jackowetz & Mira de Orduna 2013). Competes with acetaldehyde and alpha-ketoglutarate for the SAME shared bisulfite pool in the D-51 multi-carbonyl equilibrium (acidbase.bound_so2_molar) -- a competitive-Langmuir partition, NOT an independent binding (three carbonyls cannot each claim the same free SO2). tier=plausible: a measured constant applied to wine as an apparent value, banded for pH-drift and the secondary-source scatter."
 
 # -- Alpha-ketoglutarate-bisulfite binding (decision D-51) -- the third carbonyl binder --
 #
 # Alpha-ketoglutarate (2-oxoglutaric acid) + HSO3- <-> its adduct, the SAME 1:1 form.
-# Roughly 93x weaker than acetaldehyde but slightly STRONGER than pyruvate (smaller Kd),
-# so per mole it is the second-most-avid binder even though its excreted pool (D-50,
-# nominal ~20 mg/L residual) is smaller than pyruvate's.
+# Roughly 93x weaker than acetaldehyde. Its excreted pool (D-50, nominal ~20 mg/L
+# residual) is smaller than pyruvate's.
+#
+# ORDERING IS CONTESTED, AND THE BAND KNOWS IT (decision D-190). This entry used to state
+# as a fact that alpha-KG is "slightly STRONGER than pyruvate (smaller Kd), so per mole it
+# is the second-most-avid binder". That is what the two NOMINALS say (1.4e-4 vs 5.55e-4,
+# both from Burroughs & Sparks 1973) -- but every secondary compilation held locally
+# reverses it: Handbook of Enology Vol 1 Table 8.5 (Usseglio-Tomasset 1995) prints pyruvic
+# 0.3e-3 M against 2-oxoglutaric 0.5e-3 M; the same volume's Figure 8.3 (captioned "Barbe,
+# 2000") prints 0.2 mM against 0.66 mM; Understanding Wine Chemistry 2e Table 17.2 prints
+# 1.4e-4 against 4.9e-4. All three make PYRUVATE the stronger binder. The uncertainty bands
+# below already span those magnitudes one parameter at a time, so the reversal is REACHABLE:
+# ~2.0% of independent draws (200k, D-190) satisfy K_pyruvate < K_alpha_kg. The nominals are
+# left where the primary put them -- Burroughs & Sparks 1973 is not held locally and choosing
+# among the secondaries would be a guess -- but the ordering must not be restated as a fact.
+# Guarded by tests/test_so2_carbonyl_release.py.
 K_alpha_kg_so2:
   value: 1.4e-4
   unit: "mol/L"
   tier: plausible
   uncertainty: { low: 4.0e-5, high: 5.0e-4, note: "Burroughs & Sparks report 1.4e-4 at pH 3.3; a later secondary review rounds oxoglutaric acid's Kd to ~5e-4 mol/L, order-of-magnitude consistent (the wider end of this band covers it). Band also spans the same apparent-pKa pH-drift margin as the other two binding constants." }
   provenance:
-    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I (J. Sci. Food Agric. 24:187-198) -- apparent Kd 1.4e-4 mol/L at pH 3.3 for 2-ketoglutaric acid, the same canonical source and cross-checked acetaldehyde value as K_pyruvate_so2. CORROBORATED (decision D-130) by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419, and the Handbook of Enology Vol. 1 §8.4 Kd set."
+    source: "Burroughs & Sparks (1973), Sulphite-binding power of wines and ciders I (J. Sci. Food Agric. 24:187-198) -- apparent Kd 1.4e-4 mol/L at pH 3.3 for 2-ketoglutaric acid, the same canonical source and cross-checked acetaldehyde value as K_pyruvate_so2. D-130 recorded this as CORROBORATED by Barbe et al. (2000), J. Agric. Food Chem. 48:3413-3419, and the Handbook of Enology Vol. 1 §8.4 Kd set; decision D-190 re-read that §8.4 set and it does NOT corroborate this value -- Table 8.5 prints 2-oxoglutaric acid K = 0.5e-3 M and Figure 8.3 (captioned Barbe 2000) prints 0.66 mM, both LARGER than the pyruvate value beside them, i.e. the REVERSE of this codebase's ordering. Understanding Wine Chemistry 2e Table 17.2 agrees with the reversal (4.9e-4 here, 1.4e-4 for pyruvate). The value is retained (Burroughs & Sparks is the primary and is not held locally); the disagreement is recorded rather than resolved, and the ordering is no longer asserted in the comment above."
     conditions: "wine, ~pH 3.3, cellar temperature; apparent (concentration-based) dissociation constant, referenced to bisulfite HSO3- like K_acetaldehyde_so2"
     notes: "Third carbonyl-SO2 binder in the D-51 multi-carbonyl equilibrium, sharing the same bisulfite pool as acetaldehyde and pyruvate (acidbase.bound_so2_molar). tier=plausible: a measured constant applied to wine as an apparent value, banded for pH-drift and secondary-source scatter."
 
