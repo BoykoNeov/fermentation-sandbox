@@ -173,12 +173,24 @@ _ETHANOL_PER_ACETALDEHYDE = M_ETHANOL / M_ACETALDEHYDE
 #: forms therefore absorbs the unquantified quench into an already-calibrated rate; pinning it to
 #: the H2O2 flux would not, and would need the quench ratio nobody has published.
 #:
-#: **This is an UPPER BOUND on the NET draw, deliberately.** The radical's other product is the
-#: hydroperoxyl radical, which in principle returns to H2O2 via Fe(II) and hands an oxidising
-#: equivalent back — pushing the SO2:O2 ratio the other way. Nothing sources that limb's fate in
-#: wine (Danilewicz 2007's radical chain is *bisulfite* autoxidation, which he concludes does not
-#: run in wine because polyphenols intercept it), so it is named and NOT built. Recorded so a
-#: later recycling term cannot be credited with a cancellation.
+#: ~~**This is an UPPER BOUND on the NET draw, deliberately.**~~ **STRUCK (D-198): it is a LOWER
+#: bound.** The radical's other product is the hydroperoxyl radical, which in principle returns to
+#: H2O2 via Fe(II) and hands an oxidising equivalent back. D-196 read that as a draw this constant
+#: over-charges. Measured, it is the opposite: H2O2 is quasi-steady-state here, so a limb that
+#: RETURNS H2O2 feeds its own production flux and closes as a geometric series, ``F = A/(1 - s)``
+#: with ``s`` the ethanol branch share. That draws ``s^2/(1 - s)`` MORE O2 than this constant at
+#: every ``s > 0`` — a RATE-LAW change that unseats the activation node as rate-determining step,
+#: not the stoichiometric over-charge "upper bound" implies.
+#:
+#: D-196's OTHER claim here — that the limb pushes the SO2:O2 ratio the other way — is
+#: **CONFIRMED** (the gap is ``1.5 s (1 - s)/(1 + s) >= 0``, zero only at the endpoints), and
+#: D-198's own pre-registration predicted it false. So is this one: nothing sources **that limb's**
+#: fate in wine (Danilewicz 2007's radical chain is *bisulfite* autoxidation, which he concludes
+#: does not run in wine because polyphenols intercept it). What D-198 added is that the species has
+#: THREE sourced fates in other contexts — HO2. -> H2O2, dismutation, Haber-Weiss — which disagree,
+#: and that the series has a pole at ``s = 1``, which unsulfited wine reaches. Still named and NOT
+#: built, now on four measured grounds rather than an inherited label. Recorded so a later
+#: recycling term cannot be credited with a cancellation.
 _O2_PER_ACETALDEHYDE = 1.0
 
 #: Moles of CO2 released per Strecker aldehyde formed (the amino acid's own carboxyl carbon).

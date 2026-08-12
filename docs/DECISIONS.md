@@ -27430,9 +27430,25 @@ pre-value exactly, which is what verifies the restore between arms.
 
 ### 8. What shipped
 
-One test. **No source file changed**: `_O2_PER_ACETALDEHYDE` stays 1.0, the cascade stays
-non-default, and no shipped number moves. The two `Corrects` markers above are the record's
-substantive content.
+One test, and **one struck comment**. `_O2_PER_ACETALDEHYDE` stays 1.0, the cascade stays
+non-default, and **no shipped number moves** — the only source edit is the "UPPER BOUND" clause
+in that constant's own comment, struck in place with the reason exactly as D-196 struck its two
+false bookkeeping sentences, rather than quietly reworded.
+
+**That edit was nearly missed, and the marker would have been the lie.** This record's first
+version claimed `Corrects: D-196 — the clause in §5 **and in the comment**` while changing only
+`DECISIONS.md` and the test file. `CLAUDE.md` is explicit that `Corrects` means the fix shipped
+and `Flags` means the code still carries the old behaviour, so the marker was a `Flags` wearing
+the other name — and `tests/test_decisions_index.py` validates only that a target exists and is
+earlier, so it passed green **by construction**. D-196's own amendment §A had to withdraw a
+semantically wrong marker for the same reason. The comment is now struck, which makes the marker
+true; the alternative was to split it into `Corrects` + `Flags`.
+
+Also derived rather than reasoned, on D-196 §D's precedent: `docs/ARCHITECTURE.md` needs no
+change. Its own snippet re-run gives wine cascade 64 processes / 94 slots, beer cascade 28 / 57,
+19 parameter files, 77 test files, 80 kinetics implementations — every count already in the
+document. This beat adds no Process, slot, parameter file or test file; it adds one test
+*function* to an existing file, which that document does not enumerate.
 
 ### Still open
 

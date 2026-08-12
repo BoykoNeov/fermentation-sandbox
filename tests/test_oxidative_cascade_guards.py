@@ -2133,12 +2133,23 @@ def test_the_fenton_limb_returns_no_h2o2_to_the_node_it_drew_from(copper_dose_st
     assert n_acetaldehyde > 0.0, "the arm is not measuring — this limb is making no acetaldehyde"
 
     from fermentation.core.kinetics.oxidative_cascade import (
+        _ACETALDEHYDE_PER_H2O2,
+        _H2O2_PER_O2,
         activation_rate,
         h2o2_branch_fraction,
     )
 
+    # Both stoichiometric constants are 1.0 today, and are multiplied in ANYWAY: leaving them out
+    # would make this test fire — with a message about hydroperoxyl recycling — if a later beat
+    # moved either one. A red that names the wrong mechanism is how a guard gets argued away.
     share = h2o2_branch_fraction(y, compiled.schema, params, "ethanol")
-    expected = share * activation_rate(y, compiled.schema, params) / M_O2
+    expected = (
+        _ACETALDEHYDE_PER_H2O2
+        * _H2O2_PER_O2
+        * share
+        * activation_rate(y, compiled.schema, params)
+        / M_O2
+    )
     amplification = n_acetaldehyde / expected
     assert amplification == pytest.approx(1.0, rel=1e-12), (
         f"the ethanol limb ran at {amplification:.6f}x share×activation. A factor >1 means H2O2 "
