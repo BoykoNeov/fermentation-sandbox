@@ -74,3 +74,19 @@ experiment. **How to apply:** mutate at a level the run cannot rewrite (patch th
 `derivatives`, not the set's enabled flags), and keep a `noop` arm *designed* to be identical so
 "identical to shipped" is a verified restore rather than an ambiguous null. Ask what re-configures
 state mid-run — events, schedules, reconfigure hooks — before choosing where to cut.
+
+**A green control certifies only its OWN mutation CHANNEL (D-201).** D-201 ran a proper null
+control — the injected Process present at zero rate — and it came back bitwise identical to
+baseline, exactly as designed. It certified nothing about the *other* arms, which mutated a
+**parameter** instead of injecting a Process, and which silently did not mutate at all:
+`CompiledScenario.param_values` is a **property** returning a fresh `parameters.resolve()` dict, so
+`compiled.param_values["k"] = v` writes into a throwaway that is discarded on the next access. Those
+arms returned removal fractions identical to the reference *to every printed digit* and read as a
+flawless confirmation of the prediction under test. The tell was that they were **too** identical —
+a real pool change perturbs the solver's step selection even when the predicted ratio is invariant.
+**How to apply:** a control licenses one channel only, so if arms mutate through two channels
+(inject a Process *and* override a parameter) each needs its own landing check. Make the check an
+assertion on an *observable that must move* — "the pool moved 0.5x, LANDED" — and `raise SystemExit`
+before reporting anything if it did not. Then D-197's trap fired again in the very next probe
+(`pset.disable()` re-enabled by `begin_aging`), and the landing check is what caught that one too:
+one habit covers a family of failures that each look like a clean result.

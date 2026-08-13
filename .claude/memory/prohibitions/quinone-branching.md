@@ -89,13 +89,38 @@ D-record — do not argue past it from this file.** **Never evict an old prohibi
   pin tighter than the band and go brittle on solver noise.
 - **A share of QUINONE cannot see a consumer's own pool.** Moot for GSH (no slot ⇒ no pool, which
   is what makes the verdict safe), **NOT moot for H2S** — top group's 4th member, the only one
-  whose slot the model **has**: **0.015 % of the node but 21.87 % of the sulfide pool**, constant
-  in pool size. **Separate beat, and an ESTIMATE not a measurement.**
+  whose slot the model **has**. **BUILT at D-201; the estimate's numbers were all wrong** — see
+  the block below.
 
-Receipts, both under `M:\claud_projects\temp\ferment\`: `d199-quinone-branching\` (**4 of 9
-predictions missed**, incl. the one the beat turned on) + `FIG_24_12.md`, and
-`d200-glutathione-share\` — 5 probes, the reusable one being `probe_nucleophile_share.py`,
-which injects a competing nucleophile into the compiled cascade.
-Related: [[feedback-check-the-blocker-is-still-blocking]],
+**The quinone-H2S sink is BUILT (D-201). Do not re-propose it, and do not cite D-200's estimate.**
+- **Every number D-200 §6 gave is superseded by measurement.** Node share 0.015 % → **0.0027 %**
+  (it priced a 10 µg/L pool; the model holds **2.031**). Removal 21.87 % → **9.78 %** at the
+  nominal. And **"constant in the pool size" is FALSE in the model** — 18.51-19.38 % over a 20×
+  span, because D-135's `bound_h2s_release` is a **zero-order source** the arithmetic had no term
+  for. Constancy holds for the sink *alone*, never for the model.
+- **`k_rel_h2s_quinone` = 1.0 from PRINTED PROSE** (*"a rate similar to hydrogen sulfide"*,
+  UWC §24.4.3.3). **Never restore D-200's 10^0.3 eye-read as the nominal.** Band [0.5, 2.0], both
+  edges CONSTRUCTED. The same sentence's *"six times faster than 3-MH"* is a printed cross-check
+  showing the eye-read **overstates log-gaps ~2.05×**, so **D-199's ±0.3-decade tolerance is
+  FLAGGED as too optimistic** — the prohibition on quoting that plot as a `source:` is unchanged.
+- **The law is SULFIDE-FIRST on purpose — never "simplify" it to quinone-first.** H2S is divalent
+  and nothing sources whether the adduct takes a second quinone, so `_QUINONE_PER_H2S` is written
+  where it cannot reach `d(h2s)/dt`. A guard mutates it 1→2 and pins that
+  [[feedback-relocate-the-unsourced-factor]]. The 1:1 **sulfide** side IS sourced (UWC files
+  thiols under *adduct*, not *reduction*), and the adduct is **stable ⇒ no release term is owed**.
+- **NEVER claim a detection-threshold crossing.** At nominal 2.031 → 1.833 µg/L vs a 1.6 threshold:
+  it does **not** cross, and it does not cross anywhere on this parameter's own band. Over the
+  joint hypercube (4 rate/level bands × the threshold's own [1.0, 15.0]) a crossing occurs in
+  **4.89 %** of members. It is a **corner**; the **removal fraction** is the finding.
+- **Every number is an UPPER BOUND within its band**, because the source's own clause — *"limited
+  in the presence of other thiols like GSH"* — describes competition the model cannot have (no GSH
+  slot). That is a **new and separate** reason to want one, **not** the denominator D-200 refused
+  GSH on; price it on its own terms.
+
+Receipts, all under `M:\claud_projects\temp\ferment\`: `d199-quinone-branching\` + `FIG_24_12.md`;
+`d200-glutathione-share\` (reusable: `probe_nucleophile_share.py`, injects a competing nucleophile
+into the compiled cascade); `d201-quinone-h2s\` (`SOURCES.md` = verbatim UWC + the eye-read
+calibration; `probe5_joint_crossing.py` = LHS over four bands, threshold swept over the same runs).
+Related: [[feedback-check-the-blocker-is-still-blocking]], [[feedback-relocate-the-unsourced-factor]],
 [[feedback-a-named-pull-may-not-answer-the-question]],
 [[feedback-name-the-field-your-predicate-read]], [[feedback-pin-the-band-not-the-nominal]].

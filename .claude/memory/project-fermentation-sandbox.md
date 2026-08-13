@@ -29,13 +29,13 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-12)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-200**;
-sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1751 + 3 xfail**. **"Blocked on external
-sourcing" was wrong 3× (D-191/196/199)**; D-200 then **priced** the gap D-199 left instead of building it.
+## Status (2026-08-13)
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-201**;
+sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1756 + 3 xfail**. **"Blocked on external
+sourcing" was wrong 3× (D-191/196/199)**; D-200 **priced** what D-199 left, **D-201 BUILT the H2S half**.
 **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
-**`ACID_STATE` is NO LONGER medium-agnostic** (D-179): it is *wine's* registry, beside `BEER_ACIDS`, keyed off
+**`ACID_STATE` is NO LONGER medium-agnostic** (D-179): *wine's* registry, beside `BEER_ACIDS`, keyed off
 `StateSchema.medium`. **Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
@@ -147,14 +147,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   published quench ratio; and nothing here can **separate** the candidates (O₂ budget spans
   0.078 %). It is a **RATE-LAW** change (`A/(1−s)`), not stoichiometry. Do not re-open by
   re-sweeping the 24 texts. → `.claude/memory/prohibitions/hydroperoxyl-recycling.md`
-- **Quinone branching (D-145 → D-200)** — the named pull **is ON DISK** and **still cannot close
-  it** (ranks NUCLEOPHILES; the 84.78 % consumer has none). **Blocked on STRUCTURE.** The two
-  "missing slots" are now **PRICED and only ONE is a gap**: **GSH is MEASURED, NOT BUILT** (0.32 %
-  of the node — never re-propose it, and never price it off Ch. 24's bound, ~10× loose vs Ch. 5);
-  **ascorbate is 8.09 % and eats the guard's whole 0.96 % headroom**, with **BOTH limbs pushing
-  DOWN** (never "opposing"). **1.7481 at ×0.01 REFUSED.** High edge 0.9738, **not D-174's**.
-  Sulfonate is the **MINOR** product. New, separate: **quinone-H2S, 0.015 % of the node but
-  21.9 % of the sulfide pool.** → `.claude/memory/prohibitions/quinone-branching.md`
+- **Quinone branching (D-145 → D-201)** — the named pull **is ON DISK** and **still cannot close
+  it** (ranks NUCLEOPHILES; the 84.78 % consumer has none). **Blocked on STRUCTURE.** **GSH is
+  MEASURED, NOT BUILT** (0.32 %; never price it off Ch. 24's bound, ~10× loose vs Ch. 5);
+  **ascorbate is 8.09 % and eats the guard's whole 0.96 % headroom**, **BOTH limbs push DOWN**.
+  **1.7481 at ×0.01 REFUSED.** High edge 0.9738, **not D-174's**. Sulfonate is the **MINOR**
+  product. **Quinone-H2S is BUILT (D-201) and D-200's estimate of it was wrong in EVERY number** —
+  incl. "constant in pool size", false in the model. **Never claim a threshold crossing; never
+  restore the eye-read nominal.** → `.claude/memory/prohibitions/quinone-branching.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
