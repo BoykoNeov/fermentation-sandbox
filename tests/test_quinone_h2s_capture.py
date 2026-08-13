@@ -34,6 +34,7 @@ import pytest
 
 from fermentation.core.chemistry import M_H2S, M_QUINONE
 from fermentation.core.kinetics import oxidative_cascade
+from fermentation.core.process import ProcessSet
 from fermentation.runtime.schedule import simulate_scheduled
 from fermentation.scenario.compile import compile_scenario
 from fermentation.scenario.schema import Intervention, Scenario, TemperaturePoint
@@ -203,6 +204,60 @@ def test_the_divalency_factor_cannot_move_the_sulfide(monkeypatch):
         atol=0.0,
         err_msg="the unsourced divalency factor reached the sulfide beyond its node share",
     )
+
+
+def test_the_touches_contract_holds_under_strict_and_the_parameter_is_sampled():
+    """The two contracts a new Process can satisfy *by assertion* and never have checked.
+
+    ``touches`` is enforced only when the set is built with ``strict=True`` (CLAUDE.md), and
+    nothing else in this file does that — ``compile_scenario`` builds a permissive set, so five
+    green guards above would not notice a Process writing outside its declaration.
+
+    ``reads`` has TWO masters (D-160, and the D-153→D-162 sampling work): parameter-tier
+    propagation, and the union in ``runtime.ensemble`` that decides which parameters an ensemble
+    perturbs at all. A parameter no ``reads`` tuple claims is silently **frozen** in every
+    ensemble — it would never be sampled, and no test that merely runs the model would see it.
+    """
+    compiled = compile_scenario(_scenario(), oxidative="cascade")
+    params = dict(compiled.param_values)
+    schema = compiled.schema
+
+    # `reads` -> the sampling surface.
+    surface: set[str] = set()
+    for p in compiled.process_set._processes.values():
+        surface.update(p.reads)
+    assert "k_rel_h2s_quinone" in surface, "the new parameter is frozen in every ensemble"
+
+    proc = compiled.process_set._processes[SINK]
+    assert not set(proc.reads) - set(params), "a declared read does not resolve"
+
+    # `touches` -> what the Process actually writes, at a state where it is live.
+    y = schema.zeros()
+    y[schema.slice("T")] = 293.15
+    y[schema.slice("quinone")] = 1.0e-3
+    y[schema.slice("h2s")] = 2.0e-6
+    d = proc.derivatives(0.0, y, schema, params)
+    written = {n for n in schema.names if float(np.atleast_1d(d[schema.slice(n)])[0]) != 0.0}
+    assert written == {"quinone", "h2s"}, f"wrote outside its touches: {written}"
+
+    # ...and the whole cascade integrated under the strict set, which is what enforces it.
+    strict = ProcessSet(
+        schema,
+        list(compiled.process_set._processes.values()),
+        modifiers=list(compiled.process_set._modifiers.values()),
+        strict=True,
+    )
+    for name, on in compiled.process_set.enabled_snapshot().items():
+        (strict.enable if on else strict.disable)(name)
+    traj = simulate_scheduled(
+        strict,
+        params,
+        compiled.y0.copy(),
+        (0.0, (T0 + AGE) * 24.0),
+        events=compiled.events,
+        t_eval=np.linspace(0.0, (T0 + AGE) * 24.0, 600),
+    )
+    assert float(traj.y[schema.slice("h2s"), -1][0]) > 0.0
 
 
 def test_one_sulfide_per_event_is_the_sourced_half(cascade_run):
