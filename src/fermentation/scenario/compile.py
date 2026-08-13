@@ -95,6 +95,7 @@ from fermentation.core.kinetics.oxidative_cascade import (
     PeroxideSulfiteOxidation,
     QuinoneAnthocyaninFading,
     QuinoneEllagitanninOxidation,
+    QuinoneHydrogenSulfideCapture,
     QuinonePolymerization,
     QuinoneStreckerDegradation,
     QuinoneSulfonation,
@@ -238,6 +239,12 @@ _AGING_GATED_PROCESSES = (
     QuinoneAnthocyaninFading,
     QuinoneEllagitanninOxidation,
     QuinonePolymerization,
+    # D-201's sulfide sink. Registering it here is NOT bookkeeping: every Process in the cascade
+    # is disabled at the compile seam and re-enabled by ``begin_aging`` off THIS tuple, so a
+    # cascade Process omitted from it is never disabled and therefore runs from t = 0 — through
+    # fermentation, against a quinone pool that is zero then, but with no gate saying so. D-200's
+    # throwaway probe hit exactly this and had to gate itself on ``quinone_sulfonation`` instead.
+    QuinoneHydrogenSulfideCapture,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.

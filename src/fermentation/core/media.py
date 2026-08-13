@@ -156,6 +156,7 @@ from fermentation.core.kinetics.oxidative_cascade import (
     PeroxideSulfiteOxidation,
     QuinoneAnthocyaninFading,
     QuinoneEllagitanninOxidation,
+    QuinoneHydrogenSulfideCapture,
     QuinonePolymerization,
     QuinoneStreckerDegradation,
     QuinoneSulfonation,
@@ -2410,13 +2411,20 @@ _OXIDATIVE_CASCADE_SHARED: tuple[Callable[[], Process], ...] = (
 )
 #: The wine-only cascade nodes: both halves of D-72's SPLIT (the H2O2 node and the quinone
 #: sulfonation node — the pair whose ratio is Danilewicz's emergent 1:1/1:2/1:1.7 series), plus
-#: the two re-homed wine-only nucleophiles. All read wine-only state (``so2_total`` and the pH
+#: the re-homed wine-only nucleophiles. All read wine-only state (``so2_total`` and the pH
 #: system, ``amino_acids``, ``anthocyanin``), exactly as their direct predecessors did.
+#:
+#: :class:`QuinoneHydrogenSulfideCapture` (D-201) is the one that is **not** a re-home — it is a
+#: genuinely new consumer, and it is wine-only for the same reason its siblings are: its source
+#: is wine chemistry, and beer's cascade tuple carries no nucleophile nodes at all. It is also
+#: the only member whose point is *not* its share of the quinone node (0.003 %, invisible) but
+#: its draw on its **own** reactant, the ``h2s`` pool.
 _OXIDATIVE_CASCADE_WINE: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_SHARED + (
     PeroxideSulfiteOxidation,
     QuinoneSulfonation,
     QuinoneStreckerDegradation,
     QuinoneAnthocyaninFading,
+    QuinoneHydrogenSulfideCapture,
 )
 _OXIDATIVE_CASCADE_BEER: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_SHARED
 

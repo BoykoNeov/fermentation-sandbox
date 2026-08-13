@@ -713,6 +713,11 @@ OXIDATIVE_CASCADE_WINE = {
     "quinone_sulfonation",
     "quinone_strecker_degradation",
     "quinone_anthocyanin_fading",
+    # D-201: the quinone-H2S sulfide sink. The only member here that is NOT a re-home of a
+    # pre-cascade sink — it is a genuinely new consumer, and the only one whose reason for
+    # existing is its draw on its OWN reactant rather than its share of the quinone node
+    # (0.003 %, invisible in the branching and in the Danilewicz benchmark alike).
+    "quinone_h2s_capture",
 }
 # NON-oxidative oak aging, SHARED by wine and barrel-beer (decision D-86): oak_extraction (D-77, the
 # barrel/chip aroma-extractive axis) reads the oak ceiling/extractive slots and draws no O₂ — a

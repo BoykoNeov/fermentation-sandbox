@@ -101,6 +101,7 @@ from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
     M_CO2,
     M_ETHANOL,
+    M_H2S,
     M_METHIONAL,
     M_O2,
     M_PHENYLACETALDEHYDE,
@@ -149,6 +150,31 @@ _SO2_PER_H2O2 = 1.0
 #: reaction at wine pH — oxidises one bisulfite to sulfate while regenerating the o-diphenol.
 #: So the product identity D-199 corrected on :class:`QuinoneSulfonation` moves nothing here.
 _SO2_PER_QUINONE = 1.0
+
+#: Moles of **quinone** consumed per mole of H2S captured (decision D-201). **This is the one
+#: number in this route the corpus does not give, and it is written on the quinone side ON
+#: PURPOSE.**
+#:
+#: The sulfide side is sourced and safe: *Understanding Wine Chemistry* §24.4.3 lists
+#: "condensation with nucleophilic thiols to yield an adduct" as a fate distinct from
+#: "reduction by bisulfite" and "reduction by ascorbic acid" — so the thiol route is a Michael
+#: addition giving a thiol-substituted catechol, **one sulfide per event**, not a two-electron
+#: redox oxidising S(-II) onward to elemental sulfur or polysulfide. That redox alternative was
+#: the specific reason to doubt 1:1, and the book assigns it to a different category.
+#:
+#: What is **not** sourced is that H2S is **divalent**: the adduct still carries a free -SH and
+#: could in principle add to a *second* quinone. Nothing in the corpus addresses it, and UWC is
+#: candid about the limits of its thiol analogies ("no specific studies to draw on ... not
+#: necessarily to the same extent", Chapter 10, of the aryl thiols).
+#:
+#: So the ambiguity is **relocated rather than assumed away**. Writing the law with the sulfide
+#: as the primary species puts this factor on ``quinone``, where a 1-vs-2 swing moves only this
+#: route's share of the quinone node — **measured at 0.0027 %, invisible at either value** — and
+#: leaves ``d(h2s)/dt`` *exactly* unchanged. The reported quantity is therefore independent of
+#: the thing the corpus does not say, which is what makes it shippable. Had the law been written
+#: quinone-first (the obvious way, and the way this beat's first probe wrote it) the same 2x
+#: would have landed straight on the headline.
+_QUINONE_PER_H2S = 1.0
 
 #: Moles of acetaldehyde per mole of H2O2 taking the ethanol route (Fenton: ``H2O2 + Fe(II) ->
 #: HO. + OH-``; ``HO. + ethanol -> 1-hydroxyethyl radical -> acetaldehyde``). Stoichiometry, and
@@ -593,6 +619,109 @@ class QuinoneSulfonation(Process):
         r_q = params["k_so2_oxidation"] * f_t * quinone * bisulfite  # g quinone/L/h
         d[schema.slice("quinone")] = -r_q
         d[schema.slice(SO2_STATE_KEY)] = -_SO2_PER_QUINONE * (r_q / M_QUINONE) * M_SO2
+        return d
+
+
+class QuinoneHydrogenSulfideCapture(Process):
+    """o-quinone captures dissolved H2S as a stable adduct — a sulfide sink (decision D-201).
+
+    **The route the branching cannot see.** Figure 24.12's top significance group (letter ``e``)
+    has four members: SO2, ascorbate, glutathione and **hydrogen sulfide**. D-200 priced the
+    other two absentees and refused glutathione at 0.32 % of the quinone node. H2S is the member
+    whose slot the model **already has**, and it is the case where a share of quinone is the
+    *wrong* denominator: this route takes **~0.003 % of the node** — invisible in the branching,
+    and it moves the benchmark's SO2:O2 headline by 0.0002 % — while removing **~10 % of the
+    dissolved sulfide pool** over one accelerated-oxidation challenge. A consumer taking a
+    negligible share of quinone can still be a material sink for its **own** reactant, and that
+    asymmetry is the entire reason this Process exists.
+
+    **It is also the model's first passive post-fermentation sulfide sink, which is structural
+    rather than numerical.** :class:`~hydrogen_sulfide.HydrogenSulfideProduction` and
+    :class:`~hydrogen_sulfide.HydrogenSulfideVolatilization` are *both* gated on the fermentative
+    sugar flux, so past dryness they switch off together and the residual is frozen; the only
+    things that could touch it afterwards were :class:`~aging.BoundHydrogenSulfideRelease` (a
+    *source*) and copper fining (an operator verb). Measured: with this Process absent the pool
+    drifts **+0.51 %** across the whole oxidation window. There was nothing passive on the sink
+    side at all.
+
+    **Sourcing — printed prose, never Figure 24.12's markers.** Chapter 10 states the route:
+    *"low-molecular weight thiols and H2S can be lost through reaction with o-quinones"*.
+    §24.4.3.3 gives the rate, again in words: *"SO2, ascorbate, and GSH all react very quickly,
+    and at a rate similar to hydrogen sulfide"* — which is why ``k_rel_h2s_quinone`` is **1.0**
+    and not D-200's eye-read 2.0. D-199's standing prohibition forbids that log plot as a
+    ``source:``, and this Process does not need it.
+
+    **The product is an adduct and it is stable, so nothing is released back.** §24.4.3 lists
+    thiol condensation as a fate distinct from bisulfite/ascorbate *reduction*, and §24.5 draws
+    the contrast explicitly: *"it would be more effective to remove MeSH as a quinone adduct
+    (which appears to be stable) than as a mixed disulfide (which can reform the original
+    malodorous thiol)"*. That is the sourced difference from D-135's metal-complexed reservoir,
+    which **does** give its sulfide back. **No release term is owed here, and that is read from
+    the book rather than assumed.**
+
+    **Scope limit, and it flatters this route rather than hiding behind it.** The same Chapter 10
+    sentence continues *"although such depletion will be limited in the presence of other thiols
+    like GSH"*. The model has no glutathione slot (D-200 refused one), so it sits in the
+    no-competing-thiol regime where this route runs at its **largest**. Every number above is an
+    upper bound within its band — a limitation of the model's thiol coverage, not of the sink.
+
+    **What is NOT claimed: a detection-threshold crossing.** At the nominal the pool falls
+    2.031 → 1.833 µg/L against a 1.6 µg/L threshold, so it does *not* cross. Across a joint
+    Latin-hypercube over this route's constant, ``k_so2_oxidation``, ``k_quinone_polymerization``,
+    ``k_h2s`` and the threshold's own [1.0, 15.0] band, a crossing occurs in **4.9 %** of members
+    — a corner, not a property. The defensible statement is the **removal fraction** (1.0-52.6 %
+    across the joint space, median 15.3 %), which is what the sourced constant actually sets.
+
+    **Isolability (prime directive #3).** Cascade-only and wine-only, alongside the other
+    nucleophile re-homes; the default build does not wire it, so no default-build observable
+    moves. Touches ``{quinone, h2s}`` and nothing else — H2S is carbon-free (D-29) and quinone's
+    carbon is off every ledger by construction (D-71 fork D2: :class:`OxygenActivation` never
+    debits the o-diphenol), so **no conservation law applies to this Process**. That is an
+    absence of applicability, not a passed check, and it is said here so a green conservation
+    suite is not read as coverage.
+    """
+
+    name = "quinone_h2s_capture"
+    tier = Tier.SPECULATIVE
+    touches = ("quinone", "h2s")
+    #: Rides ``k_so2_oxidation`` scaled by ``k_rel_h2s_quinone`` rather than inventing an
+    #: absolute rate — the same economy every re-homed cascade consumer uses. ``E_a_activation``
+    #: and ``T_ref`` are the shared Arrhenius pair the whole node runs on.
+    reads: tuple[str, ...] = (
+        "k_so2_oxidation",
+        "k_rel_h2s_quinone",
+        "E_a_activation",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        if "quinone" not in schema or "h2s" not in schema:
+            return d
+        quinone = _pool(y, schema, "quinone")
+        if quinone <= 0.0:
+            return d
+        # Clamped ≥ 0 against solver undershoot, the HydrogenSulfideVolatilization precedent —
+        # a guard on the integrator, not on the physics.
+        h2s = max(float(y[schema.slice("h2s")][0]), 0.0)
+        if h2s <= 0.0:
+            return d
+        f_t = arrhenius_factor(
+            float(y[schema.slice("T")][0]), params["E_a_activation"], params["T_ref"]
+        )
+        # UNIT BRIDGE. The shipped sibling law is ``k_so2_oxidation * f * [quinone] * [HSO3-]``
+        # with the nucleophile in g/L, so the effective MOLAR constant is
+        # ``k_so2_oxidation * M_SO2`` — and Figure 24.12 compares nucleophiles at equal MOLARITY,
+        # which is the comparison ``k_rel_h2s_quinone`` scales.
+        k_molar = params["k_so2_oxidation"] * params["k_rel_h2s_quinone"] * M_SO2
+        # That product has the units of the sibling's ``r_q``: **g quinone / L / h**, not a molar
+        # rate. Dividing by M_QUINONE is what turns it into events/L/h, and omitting that step
+        # inflates the sulfide draw by a factor of M_QUINONE (~108).
+        r_events = k_molar * f_t * quinone * (h2s / M_H2S) / M_QUINONE  # mol events / L / h
+        d[schema.slice("h2s")] = -r_events * M_H2S  # one sulfide per event — SOURCED
+        d[schema.slice("quinone")] = -_QUINONE_PER_H2S * r_events * M_QUINONE  # 1 or 2 — NOT
         return d
 
 
