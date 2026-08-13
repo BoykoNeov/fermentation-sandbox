@@ -445,8 +445,10 @@ def quinone_band_runs() -> dict[str, tuple[float, _Run]]:
         "k_quinone_polymerization"
     ]
     lo, hi = p.uncertainty.low / p.value, p.uncertainty.high / p.value
-    return {"low": (lo, _run(WINE_REALISTIC_SO2, "cascade", "real", lo)),
-            "high": (hi, _run(WINE_REALISTIC_SO2, "cascade", "real", hi))}
+    return {
+        "low": (lo, _run(WINE_REALISTIC_SO2, "cascade", "real", lo)),
+        "high": (hi, _run(WINE_REALISTIC_SO2, "cascade", "real", hi)),
+    }
 
 
 # -- the operating point must be one the reference band actually covers ------------------------
