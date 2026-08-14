@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-12T18:38:17.366Z
+  modified: 2026-08-14T06:38:43.017Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -29,10 +29,10 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-13)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, owner's pick at D-66) in progress, at **D-201**;
-sensory 1a/1b closed, **D-139's leftovers ALL closed** (D-148/D-149). Suite **1756 + 3 xfail**. **"Blocked on external
-sourcing" was wrong 3× (D-191/196/199)**; D-200 **priced** what D-199 left, **D-201 BUILT the H2S half**.
+## Status (2026-08-14)
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-202**; sensory 1a/1b + **D-139's
+leftovers ALL closed** (D-148/D-149). Suite **1764 + 3 xfail**. **"Blocked on external sourcing" wrong 3× (D-191/196/199)**.
+**D-202 ascorbate: Fig 24.12's top group COMPLETE, one of D-141's two branching closures RULED OUT.**
 **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
 **`ACID_STATE` is NO LONGER medium-agnostic** (D-179): *wine's* registry, beside `BEER_ACIDS`, keyed off
@@ -147,14 +147,20 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   published quench ratio; and nothing here can **separate** the candidates (O₂ budget spans
   0.078 %). It is a **RATE-LAW** change (`A/(1−s)`), not stoichiometry. Do not re-open by
   re-sweeping the 24 texts. → `.claude/memory/prohibitions/hydroperoxyl-recycling.md`
-- **Quinone branching (D-145 → D-201)** — the named pull **is ON DISK** and **still cannot close
-  it** (ranks NUCLEOPHILES; the 84.78 % consumer has none). **Blocked on STRUCTURE.** **GSH is
-  MEASURED, NOT BUILT** (0.32 %; never price it off Ch. 24's bound, ~10× loose vs Ch. 5);
-  **ascorbate is 8.09 % and eats the guard's whole 0.96 % headroom**, **BOTH limbs push DOWN**.
-  **1.7481 at ×0.01 REFUSED.** High edge 0.9738, **not D-174's**. Sulfonate is the **MINOR**
-  product. **Quinone-H2S is BUILT (D-201) and D-200's estimate of it was wrong in EVERY number** —
-  incl. "constant in pool size", false in the model. **Never claim a threshold crossing; never
-  restore the eye-read nominal.** → `.claude/memory/prohibitions/quinone-branching.md`
+- **Quinone branching (D-145 → D-202)** — the named pull **is ON DISK** and **still cannot close
+  it** (ranks NUCLEOPHILES; the 84.78 % consumer has none). **Blocked on STRUCTURE**, but D-202
+  **RULES OUT D-141's polymerisation-band closure**. **GSH is MEASURED, NOT BUILT** (0.32 %; never
+  price it off Ch. 24's bound, ~10× loose vs Ch. 5). **1.7481 at ×0.01 REFUSED.** High edge 0.9738,
+  **not D-174's**. Sulfonate is the **MINOR** product. **H2S BUILT (D-201), ascorbate BUILT
+  (D-202) — the top group is COMPLETE**; D-200's H2S estimate was wrong in EVERY number. **Never
+  claim a threshold crossing; never restore the eye-read nominal.**
+  → `.claude/memory/prohibitions/quinone-branching.md`
+- **Ascorbate on the quinone node (D-202)** — **BUILT**, wine/cascade, **default 0 and that is
+  SOURCED** ("new wine has negligible ascorbic acid"); enters only via `add_ascorbate`, **never
+  seed it**. **The published 2:1→1:1 signal is INEXPRESSIBLE at ANY rate** — 100× the printed
+  constant still gives 0.898, because the un-dosed baseline already sits at 1.108. **Never fit
+  `k_rel`.** No unsourced coefficient to relocate. Both un-built limbs push DOWN. Corpus searched:
+  24 texts, 203 mentions, **no O2-limb rate**. → `.claude/memory/prohibitions/ascorbate-quinone-route.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
@@ -178,7 +184,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B) — **α-KG ONLY and INFERRED, never
 measured; α-KB REFUSED at D-189 and PYRUVATE at D-195, both spent**; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
-in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145.
+in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145; **NEW at D-202: sotolon from ASCORBATE degradation via 2-ketobutyrate (UWC §9) — the model has both ends already; no rate in the corpus, and it would force `ascorbate` onto the carbon ledger.**
 
 ## Standing rule
 - **NEVER put a whole-file line cap back (D-177, corrects D-169).** Raised 4× (150→300), then **REMOVED, not
