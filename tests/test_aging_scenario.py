@@ -1211,6 +1211,98 @@ def test_so2_protection_erodes_as_oxygen_consumes_it_which_is_pons_premox():  # 
     assert _dry_sotolon_ugl([_add_so2(0.0, 60.0), _add_oxygen(_FERMENT_DAYS, 60.0)]) > 5.0
 
 
+#: Relative half-width of the D-203 fermentation-phase pins below. **CONSTRUCTED**, and chosen for
+#: REACH, not comfort: it is wide enough that the BDF solver's rtol=1e-6 noise floor is five orders
+#: away (nothing here is flaky) and narrow enough to fail on any inflation of ≥1.43×, well under the
+#: 3× that a plausible future beat could add to either substrate. It is NOT an uncertainty band —
+#: these are pins on a model output, not parameters.
+_FERMENT_SOTOLON_REL = 0.30
+
+
+def _sotolon_at_aging_start_ugl(interventions: list[Intervention], *, sweet: bool = False) -> float:
+    """Sotolon (µg/L) at the ``begin_aging`` breakpoint — i.e. made entirely DURING fermentation.
+
+    Same construction as :func:`_dry_sotolon_ugl` (sur lie, `FuselAminoAcidReroute` off) so the two
+    read the same wine at two times. The sample at ``t = _FERMENT_DAYS * 24`` is a single, exact
+    grid point — the segment restart does **not** duplicate it (verified: neighbours at 641.61 h and
+    733.27 h) — so the index is unambiguous and a tight pin is safe to place on it.
+    """
+    cs = compile_scenario(
+        _wine(
+            [_begin_aging(_FERMENT_DAYS), *interventions],
+            amino_acids_gpl=0.8,
+            autolysis_rate_per_h=_SUR_LIE_RATE,
+            brix=(_SWEET_BRIX if sweet else 24.0),
+            aging_celsius=20.0,
+            duration_days=_FERMENT_DAYS + 730.0,
+        )
+    )
+    cs.process_set.disable(FuselAminoAcidReroute.name)
+    traj = cs.run()
+    assert traj.success
+    t = np.asarray(traj.as_trajectory().t)
+    i = int(np.searchsorted(t, _FERMENT_DAYS * 24.0))
+    assert t[i] == pytest.approx(_FERMENT_DAYS * 24.0)  # the pin reads the breakpoint, not near it
+    return float(traj.series("sotolon")[i]) * 1e6
+
+
+def test_the_fermentation_phase_sotolon_offset_stays_a_small_absolute_constant():  # noqa: E501
+    """THE GUARD D-203 §7 OWED — and the reason it is a PIN and not a gate.
+
+    :class:`SotolonAldolCondensation` is **not** in ``_AGING_GATED_PROCESSES``, so unlike every
+    other aging Process it runs from t = 0, through fermentation. D-203 investigated that rather
+    than arguing it from docstrings and decided to **leave it ungated**: the aldol is purely
+    chemical and both substrates are genuinely present extracellularly in a real ferment (α-KB
+    is excreted by the yeast, and acetaldehyde is D-27's green-apple transient *and* the principal
+    SO₂-binder, with a measured peak running 4.19 → 72.60 mg/L as must SO₂ goes 0 → 100 — the D-47
+    stranding). Gating it would delete real chemistry. The D-49 warning that first looked like a
+    reason to gate is about **pyruvate**, not acetaldehyde, and does not apply.
+
+    **What the suite could not see.** Counterfactually gating the Process is a **GREEN mutation** —
+    every assertion in :func:`test_so2_protection_erodes_as_oxygen_consumes_it_which_is_pons_premox`
+    survives it (ratios 0.145 / 0.801 / 0.975, still monotone, still `[0] < 0.5` and `[-1] > 0.9`)
+    even though the sealed unsulfited wine goes to **nothing at all**. Nothing anywhere pinned this
+    term, in either direction.
+
+    **Why the pin is ABSOLUTE and never a share.** D-203's first draft reported the pre-aging
+    contribution as "100 % / 45 % / 22 %" and read that as alarming. It is a ratio artefact: every
+    arm shares one fermentation, so the numerator is a **constant** and only the denominator swings.
+    Pinning the share would re-commit exactly that error — it would go green on a doubled offset in
+    a wine that made twice as much sotolon later, which is the case that matters.
+
+    So the claim under test is the one that survived measurement: **the fermentation-phase offset is
+    a fixed, sub-perceptual number**, ~0.3 % of the 8 µg/L perception threshold in a dry wine and
+    ~3.6 % in the worst case found anywhere (the sweet calibration wine). If a later beat inflates
+    fermentation acetaldehyde or the α-ketobutyrate residual — `k_alpha_kb_excretion`'s own declared
+    band spans 5e-5…1e-3 around a 2e-4 nominal, a 5× lever — this term grows silently and, without
+    this test, no assertion in the suite notices.
+    """
+    thresholds = load_thresholds()
+    threshold = float(thresholds["threshold_sotolon_wine"].value)  # 8.0 µg/L, from sensory.yaml
+    # Each value below is PRINTED — measured on this model, not taken from literature. The ±30 %
+    # window around it is CONSTRUCTED (see `_FERMENT_SOTOLON_REL`).
+    arms = [
+        ("dry, unsulfited", [], False, 0.025302),
+        ("dry, must SO₂ 60", [_add_so2(0.0, 60.0)], False, 0.026757),
+        ("dry, must SO₂ 100", [_add_so2(0.0, 100.0)], False, 0.027669),
+        # The largest fermentation-phase offset found anywhere, and it gets its OWN pin: a ceiling
+        # loose enough to hold this arm is ~10× above the dry ones and would be blind to a 3× move
+        # there. One shared threshold would make the dry pins decorative.
+        ("sweet calibration wine", [], True, 0.284710),
+    ]
+    for label, interventions, sweet, expected in arms:
+        measured = _sotolon_at_aging_start_ugl(interventions, sweet=sweet)
+        # UPPER edge: the term must not grow. This is the silent-inflation guard.
+        assert measured < expected * (1.0 + _FERMENT_SOTOLON_REL), label
+        # LOWER edge: the term must not vanish. Gating the Process — the change D-203 considered and
+        # declined — drives this to exactly 0.0, so the decision is now visible to the suite and a
+        # future gate has to argue with a red test rather than slip past a green one.
+        assert measured > expected * (1.0 - _FERMENT_SOTOLON_REL), label
+        assert measured > 0.0, f"{label}: the aldol has been gated or silenced during fermentation"
+        # …and it stays sub-perceptual, which is the substantive reason ungated is acceptable.
+        assert measured < 0.05 * threshold, label
+
+
 def test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciated():
     """THE D-100 TRIPWIRE, FLIPPED (decision D-100; supersedes the D-99 known-limitation pin).
 

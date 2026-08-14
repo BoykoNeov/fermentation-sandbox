@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 760f4220-cd88-4a64-91d5-a5002cca53b9
-  modified: 2026-08-14T07:21:36.194Z
+  modified: 2026-08-14T07:37:13.808Z
 ---
 
 **Live prohibitions — ascorbate (vitamin C) at the quinone node.** Detail split out per D-185's
@@ -112,15 +112,22 @@ a line.**
   (peak 4.19→24.64→45.16→72.60 mg/L as must SO2 goes 0→100). Both substrates really coexist
   during fermentation, so **a gate would delete real chemistry**. The docstring's "sealed bottle,
   no living yeast" picks the **α-KB pool**, it does not switch the reaction off.
-- **A guard is still owed and it is NOT a gate**: pin the **absolute** offset as a small constant,
-  never the share. The counterfactual gate is a **GREEN mutation** — every assertion in
-  `test_so2_protection_erodes_as_the_free_so2_is_spent` survives it though the 5 mg/L ratio moves
-  0.178 → 0.145. Nothing in the suite sees this term.
+- **The guard SHIPPED at D-204** — `test_the_fermentation_phase_sotolon_offset_stays_a_small_absolute_constant`.
+  **Do not re-propose it as owed, and do not "simplify" it**: four arms with **separate** pins
+  (dry 0.025302 / 0.026757 / 0.027669, **sweet 0.284710**) — one shared ceiling makes the dry pins
+  decorative. **BOTH edges are asserted**: upper-only would go GREEN on the gate. ±30 % is
+  CONSTRUCTED for reach (fails at ≥1.43×), not an uncertainty band.
+- **The "nothing sees this term" claim is MEASURED, not inferred**: `k_alpha_kb_excretion` ×3
+  (2e-4→6e-4, **in band**) moves the offset exactly **3.00×** and **both** existing sotolon tests
+  stay GREEN. The gate arm reads **0.0**. First gate arm's red was a `NameError` at import —
+  **discarded, not counted**. §7's sweet 0.281699 is superseded by 0.284710 (probe5 built it
+  without sur-lie autolysis; every other sweet scenario ages sur lie, D-104).
 
 D-203 receipts under `M:\claud_projects\temp\ferment\d203-ascorbate-sotolon\` — `PREREGISTER.md`,
 `probe1_ceiling.py` (rate-free ceiling + the sealed null), `probe2_with_oxygen.py` (the O2 ladder
 that scoped it), `probe3_gate_attribution.py` (the aging-gate attribution, disabled arm = clean 0),
-`probe4_crossing_yield.py` (kills the calibration blocker, measures the crossing yields), `RECORD.md`.
+`probe4_crossing_yield.py` (kills the calibration blocker, measures the crossing yields),
+`probe6_guard_design.py` (D-204: the boundary-index neighbourhood + the four pinned values), `RECORD.md`.
 
 D-202 receipts under `M:\claud_projects\temp\ferment\d202-ascorbate\` — `PREREGISTER.md`, `probe1`
 (bridge vs D-200's 8.0915 %), `probe2` + `head-wt/` (the HEAD-plus-inert-pad control),
