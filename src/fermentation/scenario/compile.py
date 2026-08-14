@@ -94,6 +94,7 @@ from fermentation.core.kinetics.oxidative_cascade import (
     PeroxideEthanolOxidation,
     PeroxideSulfiteOxidation,
     QuinoneAnthocyaninFading,
+    QuinoneAscorbateReduction,
     QuinoneEllagitanninOxidation,
     QuinoneHydrogenSulfideCapture,
     QuinonePolymerization,
@@ -245,6 +246,11 @@ _AGING_GATED_PROCESSES = (
     # fermentation, against a quinone pool that is zero then, but with no gate saying so. D-200's
     # throwaway probe hit exactly this and had to gate itself on ``quinone_sulfonation`` instead.
     QuinoneHydrogenSulfideCapture,
+    # D-202's ascorbate route. It needs the aging gate for the same reason, and the reason is NOT
+    # weakened by its pool defaulting to 0: a scenario that doses ascorbate BEFORE ``begin_aging``
+    # (the natural way to model an addition at crush or at bottling) would otherwise have it
+    # scavenging quinone during fermentation.
+    QuinoneAscorbateReduction,
 )
 
 #: A name → value(s) mapping ready for :meth:`StateSchema.pack`.
@@ -1804,6 +1810,58 @@ def _verb_add_oxygen(
     )
 
 
+def _verb_add_ascorbate(
+    iv: Intervention, schema: StateSchema, parameters: ParameterSet
+) -> ScheduledEvent:
+    """``add_ascorbate`` — dose ascorbic acid (vitamin C) as an antioxidant (decision D-202).
+
+    **The verb exists because the pool's default is 0, and the default is 0 because the source
+    says so.** *Understanding Wine Chemistry* 2nd ed. §24.4.3.2: *"There is a small amount in
+    grapes that is quickly depleted during fermentation, such that new wine has a negligible
+    ascorbic acid content"*, and ascorbic acid is *"a permitted winemaking additive in most
+    wine-producing countries"* (Ch. 27). So ascorbate is a **dose**, never a must-composition
+    property — the opposite call to D-134's ``copper`` (where 0 was unphysical and the slot had to
+    be seeded from the typical level) and the same call as ``add_so2``/``add_oxygen``.
+
+    **The add_so2 / add_oxygen pattern exactly** (a dosed pool that is off every ledger): the
+    ``ascorbate`` slot carries no conservation weight — the carbon is exogenous, the oxidation
+    product is untracked, and the o-diphenol the reaction regenerates is off-ledger by fork D2 (see
+    ``M_ASCORBIC``) — so this flow perturbs no elemental balance and needs no external-flow
+    correction term, unlike the carbon-bearing ``add_acid``/``add_sugar`` doses. Concentration
+    model: no volume change on the addition (the shared verb caveat).
+
+    Wine-only, because the ``ascorbate`` slot is (the consumer,
+    :class:`~fermentation.core.kinetics.oxidative_cascade.QuinoneAscorbateReduction`, is a wine
+    cascade node). **Ordering note, and it differs from ``add_oxygen``'s:** a dose is *not* inert
+    before ``begin_aging`` in the way dosed O2 is. The consumer is aging-gated, so it will not run
+    early — but the ascorbate sits in the slot and is fully available the moment aging starts.
+    That is the faithful reading of an addition at crush or at bottling, which is when a winemaker
+    actually makes it. UWC's reference dose, and the one D-200/D-202 measure against, is
+    **60 mg/L**; the EU permits up to 250 mg/L. Neither is enforced here — the verb takes the
+    winemaker's number, as every other dosing verb does.
+    """
+    _iv_check_keys(iv, frozenset({"ascorbate_mgl"}), "add_ascorbate")
+    ascorbate_mgl = _iv_float(iv, "ascorbate_mgl", "add_ascorbate")
+    if "ascorbate" not in schema:
+        raise ValueError(
+            f"intervention 'add_ascorbate' at day {iv.day:g} needs an 'ascorbate' slot, but "
+            f"medium {schema!r} has none (the wine-only dosed antioxidant, decision D-202)"
+        )
+    added_gpl = mgl_to_gpl(ascorbate_mgl)
+    ascorbate_slice = schema.slice("ascorbate")
+
+    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+        out = y.copy()
+        out[ascorbate_slice] += added_gpl
+        return out
+
+    return ScheduledEvent(
+        time_h=days_to_hours(iv.day),
+        label=f"add_ascorbate@{iv.day:g}d",
+        mutate=mutate,
+    )
+
+
 def _verb_seal_bottle(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet, scenario: Scenario
 ) -> ScheduledEvent:
@@ -2669,6 +2727,7 @@ _INTERVENTION_VERBS: dict[
     "set_ph": _verb_set_ph,
     "add_sugar": _verb_add_sugar,
     "add_oxygen": _verb_add_oxygen,
+    "add_ascorbate": _verb_add_ascorbate,
     "add_oak": _verb_add_oak,
     "rack": _verb_rack,
     "pitch_mlf": _verb_pitch_mlf,

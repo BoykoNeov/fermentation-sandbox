@@ -155,6 +155,7 @@ from fermentation.core.kinetics.oxidative_cascade import (
     PeroxideEthanolOxidation,
     PeroxideSulfiteOxidation,
     QuinoneAnthocyaninFading,
+    QuinoneAscorbateReduction,
     QuinoneEllagitanninOxidation,
     QuinoneHydrogenSulfideCapture,
     QuinonePolymerization,
@@ -1223,6 +1224,34 @@ def wine_schema() -> StateSchema:
     # appends the SAME spec at the end of its own layout — see _quinone_spec for why a slot in
     # both media is still declared per-schema rather than in _common_specs.
     specs.append(_quinone_spec())
+    # The D-202 dosed antioxidant, appended after the quinone spec so every existing wine slot
+    # index — including quinone's — is unchanged (the D-100/D-102/D-133/D-134/D-136/D-141
+    # convention).
+    specs.append(
+        VarSpec(
+            "ascorbate",
+            "g/L",
+            default=0.0,
+            description="dissolved L-ascorbic acid (vitamin C) — the dosed antioxidant that "
+            "reduces o-quinones back to their o-diphenol form (decision D-202). Wine-only, and "
+            "read (never written) by QuinoneAscorbateReduction in the oxidative CASCADE; on the "
+            "direct oxidative set nothing touches it. **0 IS this pool's neutral value AND it is "
+            "the SOURCED default**, which is the rare case where those two coincide: Understanding "
+            "Wine Chemistry 2nd ed. §24.4.3.2 states 'there is a small amount in grapes that is "
+            "quickly depleted during fermentation, such that new wine has a negligible ascorbic "
+            "acid content'. So this is NOT the D-45 hard-zero defect (a 0 that silently asserts "
+            "something false) and NOT the D-134 copper case (where 0 was unphysical and the "
+            "structural default had to be the typical level) — the source says new wine has none, "
+            "so _wine_initial seeds nothing and the pool enters only through the add_ascorbate "
+            "VERB, the permitted winemaking additive of UWC Ch. 27. That is what keeps every "
+            "pre-D-202 trajectory bitwise unchanged and what makes the Danilewicz/Miao SO2:O2 "
+            "benchmark — an UN-DOSED wine — still the right thing to run without ascorbate. Off "
+            "every conservation ledger: the carbon is exogenous, its oxidation product "
+            "(dehydroascorbate) is not a pool, and the o-diphenol it regenerates is off-ledger by "
+            "fork D2 — see M_ASCORBIC in chemistry for the full argument and for the sotolon route "
+            "that would one day force it on",
+        )
+    )
     return StateSchema(specs, medium="wine")
 
 
@@ -2419,12 +2448,20 @@ _OXIDATIVE_CASCADE_SHARED: tuple[Callable[[], Process], ...] = (
 #: is wine chemistry, and beer's cascade tuple carries no nucleophile nodes at all. It is also
 #: the only member whose point is *not* its share of the quinone node (0.003 %, invisible) but
 #: its draw on its **own** reactant, the ``h2s`` pool.
+#:
+#: :class:`QuinoneAscorbateReduction` (D-202) completes Figure 24.12's top significance group —
+#: the last of its four members to be settled, and the one D-200 measured as MATERIAL (8.09 % of
+#: the quinone node at the book's printed 60 mg/L dose). It is wired here like the rest, but it is
+#: the only cascade member that is **also** inert by default *state* rather than by wiring: its
+#: ``ascorbate`` pool defaults to 0 because the source says new wine has none, so it costs nothing
+#: until a scenario calls ``add_ascorbate``.
 _OXIDATIVE_CASCADE_WINE: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_SHARED + (
     PeroxideSulfiteOxidation,
     QuinoneSulfonation,
     QuinoneStreckerDegradation,
     QuinoneAnthocyaninFading,
     QuinoneHydrogenSulfideCapture,
+    QuinoneAscorbateReduction,
 )
 _OXIDATIVE_CASCADE_BEER: tuple[Callable[[], Process], ...] = _OXIDATIVE_CASCADE_SHARED
 

@@ -191,6 +191,10 @@ WINE_CLOSURE_SLOTS = ("closure_otr",)
 # existing medium-only index moves. Off every ledger (fork D2: an oxidant currency whose carbon
 # comes from the untracked o-diphenol pool k_browning_base already lumps).
 QUINONE_SLOTS = ("quinone",)
+# The D-202 dosed antioxidant. Wine-only, appended AFTER the quinone slot so no existing wine
+# index moves, and the only slot in the wine layout whose 0 default is stated by a SOURCE rather
+# than merely neutral: UWC 2nd ed. section 24.4.3.2 says new wine has negligible ascorbic acid.
+WINE_ASCORBATE_SLOTS = ("ascorbate",)
 
 # Beer's charge-active acid set + its inverse-anchored strong cation (decision D-179) — the
 # state half of the beer-pH beat whose solver half was D-178. Appended LAST to beer's layout
@@ -252,6 +256,7 @@ def test_wine_schema_has_single_sugar_slot():
         + WINE_BOUND_SULFIDE_SLOTS
         + WINE_CLOSURE_SLOTS
         + QUINONE_SLOTS
+        + WINE_ASCORBATE_SLOTS
     )
     assert schema.spec("S").size == 1
     # 24 shared (X, S(1), E, N, T, CO2, X_dead, Gly, Byp, the 3 esters, the 5 higher
@@ -330,7 +335,12 @@ def test_wine_schema_has_single_sugar_slot():
     # new slot D-138 sized the rebuild at, after measuring that H2O2 and Fe(III) are both quasi-
     # steady-state. Shared with beer, fork D1; off every ledger, fork D2; identically 0 while the
     # direct oxidative set is wired, which is what makes the two sets isolable, D-139).
-    assert schema.size == 94
+    # + 1 D-202 ascorbate slot (the dosed antioxidant QuinoneAscorbateReduction reduces o-quinone
+    # with, completing Figure 24.12's four-member top group of quinone nucleophiles. Off every
+    # ledger — exogenous carbon, untracked dehydroascorbate product, and the o-diphenol it
+    # regenerates is off-ledger by fork D2. The ONLY Process in any build that is inert by default
+    # STATE rather than by wiring: this pool is 0 unless a scenario calls add_ascorbate).
+    assert schema.size == 95
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -718,6 +728,11 @@ OXIDATIVE_CASCADE_WINE = {
     # existing is its draw on its OWN reactant rather than its share of the quinone node
     # (0.003 %, invisible in the branching and in the Danilewicz benchmark alike).
     "quinone_h2s_capture",
+    # D-202: ascorbate, the LAST of Figure 24.12's four top-group nucleophiles to be settled (SO2
+    # shipped at D-141, GSH was priced and refused at D-200, H2S built at D-201). Also not a
+    # re-home, and the one D-200 measured as MATERIAL — 8.09 % of the quinone node at the book's
+    # printed 60 mg/L dose. It is wired here like the rest and inert until a scenario doses it.
+    "quinone_ascorbate_reduction",
 }
 # NON-oxidative oak aging, SHARED by wine and barrel-beer (decision D-86): oak_extraction (D-77, the
 # barrel/chip aroma-extractive axis) reads the oak ceiling/extractive slots and draws no O₂ — a

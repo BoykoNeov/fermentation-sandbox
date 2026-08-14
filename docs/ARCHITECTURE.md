@@ -61,7 +61,7 @@ Current size, from `get_medium(...).schema`:
 
 | Medium | Named variables | Float slots | Sugar slots |
 |--------|-----------------|-------------|-------------|
-| wine   | 94 | 94 | 1 |
+| wine   | 95 | 95 | 1 |
 | beer   | 55 | 57 | 3 |
 
 Tier and uncertainty do **not** ride inside these floats — they are properties of Processes and
@@ -72,7 +72,8 @@ new pool declares a `VarSpec.default` (almost always 0, or is dosed at the compi
 scenario that does not use it is byte-for-byte the validated core — prime directive #3. Broadly
 the wine-only slots cover the acid/SO₂ system, the speciated amino-acid and keto-acid pools, MLF
 and Brett biomass, the oxidative-aging products (browning index, Strecker aldehydes, quinone), the
-grape colour axis (anthocyanin/tannin/polymeric pigment), oak, closure and bound sulfides; the
+grape colour axis (anthocyanin/tannin/polymeric pigment), oak, closure, bound sulfides and the
+dosed antioxidant `ascorbate` (D-202); the
 beer-only slots are its own organic acids (`acetic`, `formic`, `oxalic`, `pyruvic`, `succinic`),
 `peptide_buffer` and `iso_alpha`. `quinone` is present in **both** media regardless of which
 oxidative set is wired, so slot indices do not move when the set changes.
@@ -93,7 +94,7 @@ can never break conservation, and the `touches` contract still holds (scaling ze
 Modifiers toggle and feed `tier_of` exactly like Processes. Stacked modifiers on one Process
 compose to a single scalar (D-10, D-11).
 
-`core/kinetics/` holds **81** concrete `Process`/`RateModifier` implementations across 23 modules
+`core/kinetics/` holds **82** concrete `Process`/`RateModifier` implementations across 23 modules
 (the three base types live in `core/process.py`).
 
 ### Kinetics modules
@@ -149,7 +150,7 @@ the run byte-for-byte unchanged.
 | Medium | Oxidative set | Processes | Modifiers |
 |--------|---------------|----------:|----------:|
 | wine | `direct` (default) | 62 | 5 |
-| wine | `cascade` | 65 | 5 |
+| wine | `cascade` | 66 | 5 |
 | wine | `direct_burst` | 63 | 5 |
 | beer | `direct` (default) | 27 | 3 |
 | beer | `cascade` | 28 | 3 |
@@ -170,7 +171,11 @@ draw on the same `o2` pool, so a build carrying both would silently double-count
   re-home: `QuinoneHydrogenSulfideCapture` (D-201, wine-only), the quinone→H₂S sulfide sink. It is
   the case where a share of the quinone node is the wrong measure of worth — it takes 0.003 % of
   that node while removing ~10 % of the dissolved sulfide pool over one oxidation challenge, and
-  it is the model's only passive post-fermentation sink on `h2s`.
+  it is the model's only passive post-fermentation sink on `h2s`. A second non-re-home joined it at
+  D-202: `QuinoneAscorbateReduction` (wine-only), which completes the four-member top group of
+  quinone nucleophiles. It is the only Process in any build that is inert by default *state* rather
+  than by wiring — its `ascorbate` slot defaults to 0 because the source says new wine has
+  negligible ascorbic acid, so it costs nothing until a scenario calls `add_ascorbate`.
 - **`direct_burst`** — `direct` plus one further sink (`AntioxidantBurstOxidation`). A *superset of
   direct*, not a third mechanism, and opt-in rather than default. Wine-only in effect: beer's burst
   build is identical to its direct build, because the slot the sink needs is wine-only. There is
@@ -355,7 +360,7 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (78 test files; unit, integration, conservation, sampling-surface and
+`uv run pytest -n auto` (79 test files; unit, integration, conservation, sampling-surface and
 doc-consistency checks), `uv run ruff check .`, `uv run mypy` (strict on `src`). CI runs all three
 on Python 3.13 and 3.14. Two of the test files guard documentation rather than physics:
 `test_decisions_index.py` (the archive's generated index) and `test_memory_shape_hook.py`.

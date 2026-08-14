@@ -138,6 +138,28 @@ M_O2 = 2 * _M_O
 #: pool itself. o-Benzoquinone is used because it is the bare o-diphenol → o-quinone couple those
 #: species all share.
 M_QUINONE = 6 * _M_C + 4 * _M_H + 2 * _M_O
+#: L-Ascorbic acid (vitamin C), C6H8O6 — the dosed antioxidant that reduces o-quinones back to
+#: their o-diphenol form (decision D-202). Carried as a plain molar mass like :data:`M_QUINONE`
+#: and deliberately NOT registered in ``MOLAR_MASS``/``CARBON_ATOMS``: the ``ascorbate`` pool is
+#: **off every conservation ledger**, on the same split-ledger reasoning D-80 states for the
+#: grape-phenolic bulk. Three things have to hold for that to be honest and all three do. (1) The
+#: carbon is **exogenous**: *Understanding Wine Chemistry* 2nd ed. §24.4.3.2 says "there is a small
+#: amount in grapes that is quickly depleted during fermentation, such that new wine has a
+#: negligible ascorbic acid content", so this pool is never fed from ``S`` or any on-ledger source
+#: — it arrives only through the ``add_ascorbate`` verb. (2) The **product** of the reaction that
+#: consumes it, dehydroascorbate, is not a pool, so weighting the substrate alone would read as
+#: carbon destroyed. (3) The pool it **regenerates** — the o-diphenol — is itself off-ledger by
+#: fork D2. So the whole transformation happens off-ledger at both ends, which is an absence of
+#: applicability rather than a passed check.
+#:
+#: **The alternative was considered and is what a later beat would have to build.** UWC §9 records
+#: that sotolon "arises in dry wines from the reaction between 2-ketobutyric acid, formed by either
+#: yeast metabolism **or ascorbic acid degradation**, and acetaldehyde" — and this model already
+#: carries ``alpha_ketobutyrate`` and ``SotolonAldolCondensation`` (D-107). A Process for that
+#: degradation route would deposit ON-ledger carbon and would force ascorbate onto the carbon
+#: ledger with a dehydroascorbate (or diketogulonate) product pool, the D-80 split-ledger capture.
+#: Nothing in the corpus gives its rate, so it is named here rather than guessed.
+M_ASCORBIC = 6 * _M_C + 8 * _M_H + 6 * _M_O
 #: Glycerol, C3H8O3 — the principal fermentation byproduct (realised-yield sink,
 #: decision D-16).
 M_GLYCEROL = 3 * _M_C + 8 * _M_H + 3 * _M_O

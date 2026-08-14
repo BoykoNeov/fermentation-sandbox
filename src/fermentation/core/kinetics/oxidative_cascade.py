@@ -99,6 +99,7 @@ from fermentation.core.acidbase import (
 )
 from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
+    M_ASCORBIC,
     M_CO2,
     M_ETHANOL,
     M_H2S,
@@ -175,6 +176,27 @@ _SO2_PER_QUINONE = 1.0
 #: quinone-first (the obvious way, and the way this beat's first probe wrote it) the same 2x
 #: would have landed straight on the headline.
 _QUINONE_PER_H2S = 1.0
+
+#: Moles of ascorbate consumed per mole of quinone reduced (decision D-202). **1.0, and unlike
+#: :data:`_QUINONE_PER_H2S` there is no unsourced factor here to relocate** — that is worth saying
+#: out loud, because D-201 made the relocation of an unsourced coefficient its headline lesson and
+#: the absence of one is not self-evident.
+#:
+#: Both sides are fixed by the same printed sentence plus the redox arithmetic it implies.
+#: *Understanding Wine Chemistry* 2nd ed. §24.4.3.2 lists the fate as "reduction by ascorbic acid
+#: **to regenerate the original o-diphenol**" — a two-electron reduction of the quinone, and
+#: ascorbate → dehydroascorbate is the matching two-electron oxidation. One ascorbate per quinone
+#: is then not a choice but a consequence, on BOTH sides at once. Contrast H2S, where the sulfide
+#: side was sourced (a 1:1 Michael adduct) while the quinone side was open, because the adduct
+#: still carries a free –SH that could in principle add to a second quinone. Ascorbate's oxidised
+#: form has no such second handle: dehydroascorbate is the fully oxidised species.
+#:
+#: What IS left open is the fate of the dehydroascorbate afterwards (it hydrolyses irreversibly to
+#: 2,3-diketogulonic acid and onward), and that is deliberately not modelled — see
+#: :data:`~fermentation.core.chemistry.M_ASCORBIC` for why it is also what would one day put this
+#: pool on the carbon ledger. It does not reach this coefficient: a product's later fate cannot
+#: change how much substrate one event consumed.
+_ASCORBATE_PER_QUINONE = 1.0
 
 #: Moles of acetaldehyde per mole of H2O2 taking the ethanol route (Fenton: ``H2O2 + Fe(II) ->
 #: HO. + OH-``; ``HO. + ethanol -> 1-hydroxyethyl radical -> acetaldehyde``). Stoichiometry, and
@@ -722,6 +744,118 @@ class QuinoneHydrogenSulfideCapture(Process):
         r_events = k_molar * f_t * quinone * (h2s / M_H2S) / M_QUINONE  # mol events / L / h
         d[schema.slice("h2s")] = -r_events * M_H2S  # one sulfide per event — SOURCED
         d[schema.slice("quinone")] = -_QUINONE_PER_H2S * r_events * M_QUINONE  # 1 or 2 — NOT
+        return d
+
+
+class QuinoneAscorbateReduction(Process):
+    """Ascorbate reduces o-quinone back to the o-diphenol — the dosed antioxidant (D-202).
+
+    **The last member of the top group, and the only one that was a real gap.** Figure 24.12's
+    letter-``e`` group is SO2, ascorbate, glutathione and H2S. Bisulfite has shipped since D-141;
+    D-200 priced glutathione at **0.32 %** of the quinone node and refused it; D-201 built H2S,
+    which takes 0.003 % of the node but ~10 % of its own pool. Ascorbate is the one D-200 called
+    **material**: **8.09 %** of the node at the dose the book prints, and worth the entire 0.96 %
+    margin by which the Danilewicz/Miao SO2:O2 benchmark clears Miao's floor.
+
+    **It is an ADDITIVE, and that is what keeps the benchmark honest rather than lucky.**
+    §24.4.3.2: *"There is a small amount in grapes that is quickly depleted during fermentation,
+    such that new wine has a negligible ascorbic acid content"*, and ascorbic acid is *"a permitted
+    winemaking additive in most wine-producing countries"*. So the ``ascorbate`` slot defaults to
+    **0** on the source's own authority, this Process is inert in every scenario that does not call
+    the ``add_ascorbate`` verb, and Miao's un-dosed wine is *correctly* ascorbate-free. D-200's
+    finding — that the benchmark's pass is held open by ascorbate's absence from the node — is
+    therefore preserved rather than discharged: the absence is now a modelled, dosable state
+    instead of a missing slot.
+
+    **The rate is printed prose, the stoichiometry is redox arithmetic.** §24.4.3.2 gives the rate
+    as *"it can reduce o-quinones back to their catechol form just as quickly"* (=>
+    ``k_rel_ascorbate_quinone`` = 1.0) and the reaction as *"Reduction by ascorbic acid to
+    regenerate the original o-diphenol"* (=> 1:1, see :data:`_ASCORBATE_PER_QUINONE`, which also
+    records that there is no unsourced coefficient here to relocate). Neither is read off Figure
+    24.12's log plot, which D-199's standing prohibition forbids as a ``source:``.
+
+    **The regenerated o-diphenol is not credited, and that is the D-71 fork-D2 convention rather
+    than an oversight.** :class:`OxygenActivation` never debits the o-diphenol pool when it mints a
+    quinone — the o-diphenol is untracked, lumped into the rate constants — so there is nothing to
+    credit it back to. This is exactly the reading D-199 settled for :class:`QuinoneSulfonation`,
+    whose *major* (>90 %) route is the same reduction: not debiting the diphenol is *right* for a
+    route that regenerates it.
+
+    **What this Process does NOT model, named rather than left silent.** Ascorbate has two further
+    documented effects on this axis and neither is built:
+
+    1. **The pro-oxidant limb.** §24.4.3.2: ascorbate *"does not rapidly consume H2O2 ... it
+       actually reacts with oxygen and produces H2O2 — so its use without SO2 can lead to enhanced
+       browning"*. This cannot be added as a ``Process`` at all: H2O2 is **quasi-steady-state** in
+       this module (no slot; every consumer recomputes the production flux from
+       :func:`activation_rate`), so an ascorbate-derived peroxide source is a change to the shared
+       branch-node **rate law**, the same class of change D-198 refused for the hydroperoxyl limb.
+    2. **The iron-cycling acceleration.** §24.3: *"white wines containing ascorbic acid will have
+       consumption rates more comparable to red wines"*. Mechanically distinct from (1) — it is
+       ascorbate acting as a reductant in the Fe(III)/Fe(II) turnover that
+       :data:`_PHENOLIC_REDUCTANT_POOLS` already models for the phenols. It is **not** built by
+       adding ``ascorbate`` to that tuple, and the reason is specific: that path mints
+       ``_QUINONE_PER_O2`` quinone for every O2 activated, because it assumes an o-diphenol did the
+       reducing. Ascorbate-driven turnover produces **no** quinone, so re-using the tuple would
+       invent oxidant the chemistry does not make.
+
+    **Both omissions push the SO2:O2 headline the same way this Process does — DOWN** (D-200
+    verdict 2, measured not argued: ``mode="blocked"`` reads 0.9547 against the real mix's
+    1.1079). So neither can be credited with cancelling this one, and D-181's
+    build-the-worse-term-first ordering does not apply here: there is no term of opposite sign.
+
+    **Isolability (prime directive #3).** Wine-only and cascade-only, alongside the other
+    nucleophile re-homes, and additionally inert at its default dose of 0. Touches
+    ``{quinone, ascorbate}``; **no conservation law applies** — quinone is off every ledger by
+    fork D2 and ``ascorbate`` is off every ledger as exogenous dosed carbon whose oxidation product
+    is untracked (see :data:`~fermentation.core.chemistry.M_ASCORBIC`). That is an absence of
+    applicability, not a passed check, and it is said here so a green conservation suite is not
+    read as coverage.
+    """
+
+    name = "quinone_ascorbate_reduction"
+    tier = Tier.SPECULATIVE
+    touches = ("quinone", "ascorbate")
+    #: Rides ``k_so2_oxidation`` scaled by ``k_rel_ascorbate_quinone``, the economy every re-homed
+    #: cascade consumer uses; ``E_a_activation``/``T_ref`` are the node's shared Arrhenius pair.
+    reads: tuple[str, ...] = (
+        "k_so2_oxidation",
+        "k_rel_ascorbate_quinone",
+        "E_a_activation",
+        "T_ref",
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        if "quinone" not in schema or "ascorbate" not in schema:
+            return d
+        quinone = _pool(y, schema, "quinone")
+        if quinone <= 0.0:
+            return d
+        # Clamped >= 0 against solver undershoot, the QuinoneHydrogenSulfideCapture precedent —
+        # a guard on the integrator, not on the physics.
+        ascorbate = max(float(y[schema.slice("ascorbate")][0]), 0.0)
+        if ascorbate <= 0.0:  # the DEFAULT case: an un-dosed wine, and the source's own state
+            return d
+        f_t = arrhenius_factor(
+            float(y[schema.slice("T")][0]), params["E_a_activation"], params["T_ref"]
+        )
+        # UNIT BRIDGE, written quinone-first so it is the sibling law with one substitution.
+        # QuinoneSulfonation is ``k_so2_oxidation * f * [quinone] * [bisulfite_g/L]`` -> g
+        # quinone/L/h; bisulfite in g/L is ``M_SO2 * (mol/L)``, so the effective MOLAR constant is
+        # ``k_so2_oxidation * M_SO2`` and ``k_rel_ascorbate_quinone`` scales it at equal MOLARITY,
+        # which is Figure 24.12's own comparison. Substituting ascorbate's molarity for
+        # bisulfite's therefore reproduces D-200's injected-nucleophile arm by construction — the
+        # check that this bridge is right is that the shipped Process matches that 8.0915 %.
+        k_molar = params["k_so2_oxidation"] * params["k_rel_ascorbate_quinone"] * M_SO2
+        r_q = k_molar * f_t * quinone * (ascorbate / M_ASCORBIC)  # g quinone / L / h
+        d[schema.slice("quinone")] = -r_q
+        # One ascorbate per quinone, sourced on both sides (see _ASCORBATE_PER_QUINONE). Unlike
+        # the H2S route there is no ambiguous factor to keep off the reported quantity, so the law
+        # is written the OBVIOUS way round rather than relocated.
+        d[schema.slice("ascorbate")] = -_ASCORBATE_PER_QUINONE * (r_q / M_QUINONE) * M_ASCORBIC
         return d
 
 
