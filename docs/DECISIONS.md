@@ -28401,19 +28401,40 @@ no arm can confirm itself (feedback-verify-the-restore-between-mutation-arms):
 | 60 | 20 | 2.126313 | 2.099563 | 1.26 % |
 | 60 | 60 | 7.687378 | 7.660628 | 0.35 % |
 
-**Nothing was changed, and the call is the owner's.** It is arguable both ways: Pham's aldol is a
-*purely chemical* reaction that does not switch off during fermentation, so a gate would be an
-artificial switch — but the Process's own docstring rests its entire D-49 pool-selection argument on
-the reaction running *"in a sealed bottle with no living yeast"*, and the constant is calibrated for
-*"multi-year warm sealed … aging"*, a frame that excludes fermentation, during which it draws on the
-transient acetaldehyde peak D-49 says must not be conflated with a persistent pool.
+**Nothing was changed.** The gate/no-gate question was then **investigated rather than argued from
+docstrings**, and the investigation (`probe5`) overturned both halves of this section's first draft.
 
-**Either way a guard is owed, because the counterfactual gate is a GREEN mutation.** Every assertion
-in `test_so2_protection_erodes_as_the_free_so2_is_spent` still passes under it (ratios 0.145 / 0.801
-/ 0.975 — monotone, `[0] < 0.5`, `[-1] > 0.9`; sealed sulfited `< 1.0`; oxidised `> 5.0`), even
-though the 5 mg/L protection ratio moves 0.178 → 0.145 and the sealed unsulfited wine goes from
-0.0253 µg/L to **nothing at all**. The suite cannot currently see which side of this design choice
-the model is on — feedback-a-threshold-cannot-separate-same-sign-regimes.
+**(a) The shares above are a ratio artefact — the numerator is a CONSTANT.** Every arm shares one
+fermentation, so the pre-aging contribution is a fixed offset of **0.025302 µg/L** unsulfited and
+**0.026757 µg/L** at 60 mg/L must SO2 — in *every* arm. That is **0.32–0.33 % of the 8 µg/L
+threshold**. The "100 %" is a small number over a smaller one; the share swings 0.32 %→100 % purely
+because the denominator does. Stressed, it stays small: heavy must SO2 (100 mg/L) gives 0.027669,
+and the largest case found is the **sweet calibration wine at 0.281699 µg/L — 3.5 % of threshold and
+3.78 % of its own total**, i.e. inside `k_sotolon_aldol`'s own order-of-magnitude band.
+**feedback-a-ratio-guard-cannot-see-a-common-factor**, committed and then caught by measurement.
+
+**(b) The D-49 argument for a gate is VOID.** The first draft argued the reaction draws on "the
+transient acetaldehyde peak D-49 says must not be conflated with a persistent pool". D-49's warning
+is about **pyruvate**. `acetaldehyde` is D-27's *"green apple transient"* **and the principal
+SO2-binder** — deliberately a real, persistent, extracellular pool. The model reproduces exactly
+that: peak fermentation acetaldehyde runs **4.19 → 24.64 → 45.16 → 72.60 mg/L** as must SO2 goes
+0 → 30 → 60 → 100, the D-47 stranding. **Both substrates are genuinely present, extracellularly,
+during fermentation**, so a purely chemical aldol proceeds and a gate would **delete real
+chemistry**, not restore a scope. The docstring's *"sealed bottle with no living yeast"* is an
+argument about **which α-KB pool** to use, not a claim the reaction is off during fermentation.
+
+**Verdict: leave it ungated.** Not because the omission was deliberate — it was not, and it is the
+hazard D-201's comment names — but because the behaviour it produces is the faithful one and the
+magnitude is negligible.
+
+**A guard is still owed, and it is NOT a gate.** The counterfactual gate is a **GREEN mutation**:
+every assertion in `test_so2_protection_erodes_as_the_free_so2_is_spent` survives it (ratios
+0.145 / 0.801 / 0.975 — monotone, `[0] < 0.5`, `[-1] > 0.9`; sealed sulfited `< 1.0`; oxidised
+`> 5.0`) even though the 5 mg/L protection ratio moves 0.178 → 0.145 and the sealed unsulfited wine
+goes to **nothing at all**. So nothing in the suite sees this term. What it owes is a pin on the
+**absolute** fermentation-phase offset staying a small constant — if a later beat inflates
+fermentation acetaldehyde or the α-KB residual, this term grows silently and no test notices.
+Pinning the *share* would be the same mistake as (a).
 
 ### 8. If it is ever built, isolability is exact and free
 
@@ -28450,4 +28471,6 @@ stoichiometric ceiling and the sealed-arm null), `probe2_with_oxygen.py` (the ox
 scoped that null, plus the trajectory showing where the sealed baseline is made),
 `probe3_gate_attribution.py` (the aging-gate attribution, with the disabled arm designed to be a
 clean zero), `probe4_crossing_yield.py` (the falsification of the calibration blocker and the
-measured crossing yields), `RECORD.md`.
+measured crossing yields), `probe5_gate_investigation.py` (the gate investigation that overturned
+§7's first draft — the absolute offset behind the shares, and the fermentation acetaldehyde peak
+against must SO2), `RECORD.md`.

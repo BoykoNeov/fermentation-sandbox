@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-14T07:14:58.913Z
+  modified: 2026-08-14T07:21:43.905Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -32,7 +32,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 ## Status (2026-08-14)
 M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-203**; sensory 1a/1b + **D-139's
 leftovers ALL closed** (D-148/D-149). Suite **1764 + 3 xfail**. **"Blocked on external sourcing" wrong 3× (D-191/196/199)**.
-**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route and left the sotolon aldol's MISSING AGING GATE open — owner's call.**
+**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route, and INVESTIGATED the sotolon aldol's missing aging gate — leave it UNGATED, a guard (not a gate) is owed.**
 **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT. `ACID_STATE`
 is NO LONGER medium-agnostic** (D-179): *wine's* registry beside `BEER_ACIDS`, keyed off `StateSchema.medium`.

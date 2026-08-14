@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 760f4220-cd88-4a64-91d5-a5002cca53b9
-  modified: 2026-08-14T07:15:41.292Z
+  modified: 2026-08-14T07:21:36.194Z
 ---
 
 **Live prohibitions — ascorbate (vitamin C) at the quinone node.** Detail split out per D-185's
@@ -101,14 +101,21 @@ a line.**
 - If ever built, **isolability is exact and free** (mass-action, 0 substrate ⇒ bitwise 0). D-202's
   carbon cost stands: on-ledger carbon forces `ascorbate` onto the ledger + a dehydroascorbate pool.
 
-**COUPLED, and OPEN — the owner's call (D-203 §7).** `SotolonAldolCondensation` is **NOT in
-`_AGING_GATED_PROCESSES`**, so it runs from t = 0 through fermentation. Measured: **100 %** of a
-sealed unsulfited dry sur-lie wine's sotolon, **45.3 %** of the sulfited sealed arm and **22.0 %**
-of the sulfited 5 mg/L O2 arm are made **before `begin_aging`**. Arguable both ways (a purely
-chemical aldol does not switch off vs. a docstring and a calibration that both say "sealed, no
-living yeast"). **Nothing was changed.** A guard IS owed either way: the counterfactual gate is a
-**GREEN mutation** — every assertion in `test_so2_protection_erodes_as_the_free_so2_is_spent`
-survives it though the 5 mg/L ratio moves 0.178 → 0.145.
+**COUPLED — `SotolonAldolCondensation` is NOT in `_AGING_GATED_PROCESSES` and runs from t = 0
+(D-203 §7). INVESTIGATED: leave it UNGATED. Do not re-propose a gate.**
+- **Never quote the pre-aging SHARE (100 % / 45.3 % / 22.0 %) — it is a ratio artefact.** The
+  numerator is a **CONSTANT**: 0.025302 µg/L unsulfited, 0.026757 at must-SO2 60, in *every* arm,
+  = **0.32-0.33 % of the 8 µg/L threshold**. Worst case found is the **sweet** anchor at 0.281699
+  (3.5 % of threshold). [[feedback-a-ratio-guard-cannot-see-a-common-factor]]
+- **The D-49 "transient acetaldehyde" argument for gating is VOID** — D-49 is about *pyruvate*;
+  `acetaldehyde` is D-27's green-apple transient **and the SO2-binder**, a real extracellular pool
+  (peak 4.19→24.64→45.16→72.60 mg/L as must SO2 goes 0→100). Both substrates really coexist
+  during fermentation, so **a gate would delete real chemistry**. The docstring's "sealed bottle,
+  no living yeast" picks the **α-KB pool**, it does not switch the reaction off.
+- **A guard is still owed and it is NOT a gate**: pin the **absolute** offset as a small constant,
+  never the share. The counterfactual gate is a **GREEN mutation** — every assertion in
+  `test_so2_protection_erodes_as_the_free_so2_is_spent` survives it though the 5 mg/L ratio moves
+  0.178 → 0.145. Nothing in the suite sees this term.
 
 D-203 receipts under `M:\claud_projects\temp\ferment\d203-ascorbate-sotolon\` — `PREREGISTER.md`,
 `probe1_ceiling.py` (rate-free ceiling + the sealed null), `probe2_with_oxygen.py` (the O2 ladder
