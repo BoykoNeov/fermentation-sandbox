@@ -16,7 +16,8 @@ D-record — do not argue past it from this file.** **Never evict an old prohibi
   The abundances **cannot reach it**: pool `dose·f_i/Σf` over gate `aa_i/(K·f_i + aa_i)` makes the
   fraction **CANCEL** — D-100's design, general to **all eight** pools (every gate **0.888889** at
   nominal, registry-enumerated). A **4× recompiled** change in the must's methionine moves aged
-  methional **0.06 %**. Deriving would **INVENT** a sensitivity the gate removes by design; that is
+  methional **0.06 %** in a sealed bottle and **0.20 %** under a 60 mg/L O₂ dose — **TWO regimes,
+  ~400× apart in level**. Deriving would **INVENT** a sensitivity the gate removes by design; that is
   the ground, "reactivity = 1 is unsourced" the LESSER reason. **Re-banding to the abundance-implied
   range is refused on the SAME ground** — it imports a constraint from the silenced channel.
 - **The D-101 note's "≈ 0.136" was WRONG when written** — it pairs Cabernet's methionine with the
@@ -38,7 +39,9 @@ D-record — do not argue past it from this file.** **Never evict an old prohibi
 - A second run on one `CompiledScenario` starts with the first's 22 aging Processes live **from
   t = 0**: **+10.3 %** on aged methional, active count unchanged at 49, nothing raised. **Bracket
   reused sets with `enabled_snapshot()`/`restore_enabled()`**; `simulate_ensemble` already does,
-  per member. **Do NOT "fix" it to restore** — measured, that fails **26 tests**, because the
-  O₂-partition guards read the configuration in force *at the end* of a run and get an empty dict.
+  per member. **Do NOT "fix" it to restore** — measured, that fails **26 tests in THREE modes**:
+  22 O₂-partition guards reading end-of-run configuration, **3 in the Herzan benchmark, which
+  restarts integration per SO₂ top-up and documents the reliance in its own `_run` docstring**,
+  and 1 asserting the enabled set directly.
   It is now stated in `simulate_scheduled`'s and `CompiledScenario.run`'s docstrings; before D-206
   it lived only in a comment inside `test_ensemble.py`.

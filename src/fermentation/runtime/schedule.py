@@ -199,9 +199,14 @@ def simulate_scheduled(
     **A run LEAVES the Process set reconfigured, and callers that reuse one must restore it
     (decision D-206).** ``reconfigure`` mutates ``process_set`` in place and nothing here puts it
     back, so after a ``begin_aging`` run the 22 aging Processes are still enabled. That is relied
-    on — the O₂-partition guards in ``test_oxidative_cascade_guards.py`` read the configuration in
-    force *at the end* of a run, and making this function restore turns their partition into an
-    empty dict (measured: 26 failures). The cost falls on anyone integrating **twice** off one
+    on: making this function restore fails **26 tests in three distinct modes** — 22 O₂-partition
+    guards in ``test_oxidative_cascade_guards.py`` that read the configuration in force *at the
+    end* of a run (their partition becomes an empty dict), 3 in
+    ``tests/benchmarks/test_validation_herzan_acetaldehyde.py``, which **restarts** the integration
+    at each SO₂ top-up and whose own ``_run`` docstring states the reliance ("the ``begin_aging``
+    switch fired in an earlier segment stays in force across the restarts"), and
+    ``test_pitch_mlf_mutates_catalyst_and_enables_exactly_the_gated_set``, which asserts the
+    enabled set directly. The cost falls on anyone integrating **twice** off one
     :class:`~fermentation.scenario.compile.CompiledScenario`: the second run starts with aging
     chemistry live from ``t = 0``, worth **+10.3 %** on aged methional, with the active-Process
     count unchanged and nothing raised. Bracket repeated runs with

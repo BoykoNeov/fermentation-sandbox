@@ -28810,6 +28810,19 @@ Autolysis is a real second channel and it damps the effect to about a quarter, b
 its sign. The cascade arm reproduces the direct arm to four figures, so nothing here is an artefact
 of which oxidative build is wired.
 
+**And the pair was re-run in a second REGIME, because the cancellation is gate-saturation
+arithmetic and a hard drawdown is exactly what changes saturation.** Every row above comes from a
+sealed bottle landing near 0.71 µg/L; §3's 60 mg/L arm reaches 275 µg/L, ~400× higher, drawing the
+pools far harder. There:
+
+| arm | span across the fraction's band | vs the bottle |
+|---|---|---|
+| sampler | **1.0215×** (+1.49 / −0.65 %) | the artefact SHRINKS (was 1.1428×) |
+| control | **1.0020×** (−0.17 / +0.03 %) | still flat (was 1.0006×) |
+
+So the control arm is flat in both regimes — 0.06 % in the bottle, 0.20 % under a heavy dose — and
+"the abundances cannot reach this output" is stated with two regimes behind it rather than one.
+
 ### 3. What the split itself is worth, and what the shipped band reaches
 
 Aged methional against `f_methional`, 60 mg/L O₂, 730 d:
@@ -28895,8 +28908,18 @@ designed to be GREEN (`feedback-verify-the-restore-between-mutation-arms`).
 
 **Whether to "fix" it was decided by mutation, not by taste**
 (`feedback-mutate-the-premise-before-building-the-guard`). Making it restore fails **26 tests**,
-and the mode is `wine_partition` returning an empty dict: those guards deliberately partition the
-O₂ draw across the Processes active *one year into aging*, which is post-run state. So the
+and the failure modes were **counted per test rather than generalised from the first one opened**
+(`feedback-grep-finds-claims-not-guards`, in the mirror — the first draft of this section inferred
+one mode from one `KeyError`):
+
+| mode | count | evidence |
+|---|---|---|
+| O₂-partition guards read the configuration in force at the END of a run | 22 | `wine_partition` returns `({}, {}, 0, …)` ⇒ `KeyError` |
+| the Herzan benchmark **restarts** the integration at each SO₂ top-up | 3 | its own `_run` docstring: "the `begin_aging` switch fired in an earlier segment stays in force across the restarts" |
+| a test asserting the enabled set directly after a run | 1 | `test_pitch_mlf_mutates_catalyst_and_enables_exactly_the_gated_set` |
+
+The middle row is the strongest evidence that this is a contract and not an oversight: a shipped
+validation benchmark documents the reliance in prose and depends on it numerically. So the
 persistence is load-bearing, and `simulate_ensemble` already restores per member — pinned by
 `test_scheduled_ensemble_restores_process_set_and_travels_tier`, whose comment states the contract
 outright: "unlike a single `cs.run()`, whose enable persists".
