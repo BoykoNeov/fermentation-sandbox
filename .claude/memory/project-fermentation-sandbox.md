@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-14T06:38:43.017Z
+  modified: 2026-08-14T07:14:58.913Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,13 +30,13 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-14)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-202**; sensory 1a/1b + **D-139's
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-203**; sensory 1a/1b + **D-139's
 leftovers ALL closed** (D-148/D-149). Suite **1764 + 3 xfail**. **"Blocked on external sourcing" wrong 3× (D-191/196/199)**.
-**D-202 ascorbate: Fig 24.12's top group COMPLETE, one of D-141's two branching closures RULED OUT.**
+**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route and left the sotolon aldol's MISSING AGING GATE open — owner's call.**
 **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
-**Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT.**
-**`ACID_STATE` is NO LONGER medium-agnostic** (D-179): *wine's* registry, beside `BEER_ACIDS`, keyed off
-`StateSchema.medium`. **Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
+**Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT. `ACID_STATE`
+is NO LONGER medium-agnostic** (D-179): *wine's* registry beside `BEER_ACIDS`, keyed off `StateSchema.medium`.
+**Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's

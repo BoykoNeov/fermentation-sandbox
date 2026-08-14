@@ -18,7 +18,8 @@
 - [Compute the clean fix before adopting it](feedback-compute-the-clean-fix-before-adopting-it.md) — the structurally-cleanest candidate came out 3.71× off where the shipped one was 0.67×; and a consequential number needs its own baseline before you attribute it to your mechanism
 - [Measure which side before building](feedback-measure-which-side-before-building.md) — a one-directional corrective only helps in one direction; check the sign, the reach, and whether it's a rate knob on a supply-limited quantity
 - [CRLF joins inflate line count](feedback-crlf-join-inflates-line-count.md) — splitting a CRLF file on `
-` and rejoining leaves a lone ``; `splitlines()` counts it, so the compression that should shed a line adds one
+` and rejoining leaves a lone `
+`; `splitlines()` counts it, so the compression that should shed a line adds one
 - [Commit messages corrupted by shells](feedback-no-powershell-heredoc-in-bash.md) — PS here-strings in Bash, and `Out-File -Encoding utf8`'s BOM; exit 0 proves nothing — and verify with a binary read, since `git cat-file | od -c` invents CRLF in the pipe and reported 118 CRs in a message with zero
 - ["Paywalled" is one host, not a paper](feedback-paywalled-is-one-host.md) — check author/institutional/thesis/trade-reprint copies before recording a source as blocked; wrong 4× so far
 - [Re-read the source you already mined](feedback-re-read-the-source-you-already-mined.md) — D-179 took Tyrell's table and stopped; the same PDF's trial FIGURES held the wort levels, the matching pH curve and the divisor that unblocked D-180. Re-read local sources in FULL before recording a block
@@ -67,4 +68,5 @@
 - [A hit can be two errors cancelling](feedback-a-hit-can-be-two-errors-cancelling.md) — a prediction that LANDS is evidence only if its inputs were: the 0.47% "hit" was an 8.2× wrong anchor (low edge read as nominal) × a 10× wrong concentration (a book loose vs its own cited chapter). Re-derive a hit (D-200)
 - [Relocate the unsourced factor](feedback-relocate-the-unsourced-factor.md) — a coefficient nothing sources constrains the algebraic FORM, not the beat: quinone-first the 2× hit the headline, sulfide-first a 0.003 % share. Guard the property; the trajectory is NOT bitwise (D-201)
 - [A pair constrains a response](feedback-a-pair-constrains-a-response.md) — a PAIR (one statistic ± a species) constrains a rate-free RESPONSE where one value constrains a level; broke a 4-beat "nothing adjudicates". A conceded deviation on the LEVEL eats the response's range: 100× the rate moved 10 % (D-202)
+- [Count the anchors before adding a parameter](feedback-count-the-anchors-before-adding-a-parameter.md) — "a second source breaks the calibration" was FALSE (the calibration wine carries the pool at 0.0); the real bar is one observable vs two free parameters. Pair a refusal with the crossing value (D-203)
 - [Best-practices reference](reference-claude-best-practices.md) — rosmur claudecode-best-practices URL to apply

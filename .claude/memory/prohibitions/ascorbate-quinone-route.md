@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 760f4220-cd88-4a64-91d5-a5002cca53b9
-  modified: 2026-08-14T06:33:49.232Z
+  modified: 2026-08-14T07:15:41.292Z
 ---
 
 **Live prohibitions — ascorbate (vitamin C) at the quinone node.** Detail split out per D-185's
@@ -73,17 +73,56 @@ a line.**
 - **Both omissions push the headline DOWN, same as the built route** — never credit either with
   cancelling it (D-200 verdict 2).
 
-**Newly opened (D-202), and priced on its own terms, not inherited.** UWC §9: sotolon comes from
-2-ketobutyric acid *"formed by either yeast metabolism **or ascorbic acid degradation**"*, and the
-model already has `alpha_ketobutyrate` + `SotolonAldolCondensation` (D-107). That route deposits
-**on-ledger** carbon and would force `ascorbate` onto the carbon ledger with a dehydroascorbate
-product pool (the D-80 split-ledger capture). **No rate in the corpus.**
+**The sotolon route — MEASURED and REFUSED at D-203, on IDENTIFIABILITY. Do not re-propose it as
+"blocked on a rate".**
+- **The source is the model's OWN keystone paper**, not a UWC §9 clause: ref [31] is **Pons *et al.*
+  2010** (JAFC 58:7273), already cited by `SotolonAldolCondensation` and by `k_sotolon_aldol`'s
+  `source:`. The route is its **first abstract result**. D-202's "nothing sources its rate" is true
+  of the *corpus* (7/24 texts, 19 mentions, every one outside UWC sourcing 2-KB to threonine or
+  methionine) but **under-reads the paper**. Never call the route thinly sourced.
+- **REFUSED because one anchor cannot fix two free parameters**: the node has one observable (the
+  5-20 µg/L anchor, model at 7.4461) and a build adds the yield *plus* leaves `k_sotolon_aldol` an
+  author estimate. **The "it breaks the calibration" objection is MEASURED FALSE** — the calibration
+  wine carries `ascorbate` = 0.0 throughout, so the route contributes exactly 0 there.
+  [[feedback-count-the-anchors-before-adding-a-parameter]]
+- **The item now carries a TARGET, not a shrug: ~10 % molar conversion** at 20 mg/L O2 crosses the
+  8 µg/L threshold; below ~1 % it is invisible; at 5 mg/L O2 + 60 SO2 it **never** crosses.
+  Ceiling (60 mg/L ascorbate, 1:1) = 34.78 mg/L α-KB = **16.97×** the model's 2.049.
+- **A second precursor source is worth EXACTLY ZERO without oxygen** — bitwise, 6 s.f., across the
+  whole 17× ladder, because the aldol is the *product* of two substrates and a sealed unsulfited dry
+  white has acetaldehyde ≈ 0. With O2 it is 16.8-17.4×. Never price this route without naming the O2.
+- Pons scopes his own measurement out **twice**: model wine at **40 °C / 6 months**, and his
+  conclusion is the pathway *"is also valid in white wines with no added ascorbic acid"* because
+  yeast 2-KB already reaches oxidised-wine levels. **Unblocking needs Pons 2010's FIGURES** (dose→
+  sotolon at 40 °C/6 mo; and the 2-KB × acetaldehyde series, which supplies the missing 2nd anchor).
+  **Closed on every host tried** — ACS 403, Wiley 402, HAL denied, OpenAlex/S2 `oa_status: closed`.
+  A search summary offered "1 µg/L from 10 mg/L 2-KB + 1 mg/L acetaldehyde" — **NOT recorded as a
+  value** [[feedback-transcribe-tables-not-prose]].
+- If ever built, **isolability is exact and free** (mass-action, 0 substrate ⇒ bitwise 0). D-202's
+  carbon cost stands: on-ledger carbon forces `ascorbate` onto the ledger + a dehydroascorbate pool.
 
-Receipts under `M:\claud_projects\temp\ferment\d202-ascorbate\` — `PREREGISTER.md`, `probe1`
+**COUPLED, and OPEN — the owner's call (D-203 §7).** `SotolonAldolCondensation` is **NOT in
+`_AGING_GATED_PROCESSES`**, so it runs from t = 0 through fermentation. Measured: **100 %** of a
+sealed unsulfited dry sur-lie wine's sotolon, **45.3 %** of the sulfited sealed arm and **22.0 %**
+of the sulfited 5 mg/L O2 arm are made **before `begin_aging`**. Arguable both ways (a purely
+chemical aldol does not switch off vs. a docstring and a calibration that both say "sealed, no
+living yeast"). **Nothing was changed.** A guard IS owed either way: the counterfactual gate is a
+**GREEN mutation** — every assertion in `test_so2_protection_erodes_as_the_free_so2_is_spent`
+survives it though the 5 mg/L ratio moves 0.178 → 0.145.
+
+D-203 receipts under `M:\claud_projects\temp\ferment\d203-ascorbate-sotolon\` — `PREREGISTER.md`,
+`probe1_ceiling.py` (rate-free ceiling + the sealed null), `probe2_with_oxygen.py` (the O2 ladder
+that scoped it), `probe3_gate_attribution.py` (the aging-gate attribution, disabled arm = clean 0),
+`probe4_crossing_yield.py` (kills the calibration blocker, measures the crossing yields), `RECORD.md`.
+
+D-202 receipts under `M:\claud_projects\temp\ferment\d202-ascorbate\` — `PREREGISTER.md`, `probe1`
 (bridge vs D-200's 8.0915 %), `probe2` + `head-wt/` (the HEAD-plus-inert-pad control),
 `probe3` (the monkeypatch that silently did nothing, kept as the worked example), `probe4`
 (rate sweep + polymerisation band), `probe5` (guard envelope vs the 2.75× near-miss),
 `probe6` (Table 24.3's pair across the band).
+
 Related: [[feedback-a-pair-constrains-a-response]], [[feedback-relocate-the-unsourced-factor]],
 [[feedback-a-null-result-needs-a-positive-control]], [[feedback-pin-the-band-not-the-nominal]],
-[[feedback-a-ratio-guard-cannot-see-a-common-factor]], [[feedback-check-the-blocker-is-still-blocking]].
+[[feedback-a-ratio-guard-cannot-see-a-common-factor]], [[feedback-check-the-blocker-is-still-blocking]],
+[[feedback-count-the-anchors-before-adding-a-parameter]], [[feedback-re-read-the-source-you-already-mined]],
+[[feedback-a-threshold-cannot-separate-same-sign-regimes]], [[feedback-same-species-different-reaction]].
