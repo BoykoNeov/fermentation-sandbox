@@ -28705,9 +28705,18 @@ appears in any of the 24 texts** (the only two hits are brandy *composition* tab
 shape as methional's Kd at D-190.
 
 **Its crossing value is deliberately NOT computed, and that is stated rather than left implicit**
-(`feedback-conceded-caveats-are-not-coverage`). Unlike the pH half, whose counterfactual needs only
-an exponent, this one needs the Keq *and* a new bound-acetaldehyde pool on the carbon ledger —
-pricing it would mean inventing the very constant whose absence is the block.
+(`feedback-conceded-caveats-are-not-coverage`): pricing it would mean inventing the very constant
+whose absence is the block.
+
+⚠ **The first draft of this section added "*and* a new bound-acetaldehyde pool on the carbon
+ledger" as a second cost, and that was an unchecked schema claim — corrected here by reading the
+schema** (`feedback-check-the-schema-not-the-caller`). There is **no** bound-acetaldehyde slot:
+`_bound_molar_split` is a pure function returning bound *shares*, and the `acetaldehyde` slot holds
+the TOTAL with the SO₂ binding riding as a **read-only overlay** (D-47's idiom, restated at D-108).
+An ethanol acetal would be another overlay on the identical pattern — `E` is already a state slot,
+the acetal-bound share would stay inside the same total, and no carbon booking would move. **So the
+structure is free and the block is the Keq ALONE.** That makes the refusal narrower and cleaner
+than drafted: a pure sourcing block with no structural excuse propping it up.
 
 ### 7. No guard, and the candidate was falsified rather than skipped
 

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 00a92466-5b3f-4515-a31f-d00c098d113d
-  modified: 2026-08-14T08:13:26.756Z
+  modified: 2026-08-14T08:17:32.821Z
 ---
 
 # Sotolon's pH and ethanol terms (D-205) — REFUSED, measured
@@ -32,9 +32,12 @@ in the docstring. **EXPRESSIBLE IS NOT IDENTIFIABLE** — that is the whole reco
 - **ethanol — BLOCKED on an equilibrium constant (the D-190 shape).** Mechanism IS sourced (UWC
   §9.5: acetaldehyde + ethanol → hemiacetal/1,1-diethoxyethane, which "remove acetaldehyde in its
   free form" = Pham's direction). **No Keq in any of the 24 corpus texts** — the only hits are
-  brandy composition tables in mg/L. **Its crossing value is deliberately NOT computed**: it would
-  need the Keq *and* a new bound-acetaldehyde pool on the carbon ledger, i.e. inventing the
-  constant whose absence is the block.
+  brandy composition tables in mg/L. **Its crossing value is deliberately NOT computed** — that
+  would mean inventing the constant whose absence IS the block. **The block is the Keq ALONE: the
+  structure is free.** (A first draft claimed it also needed a new bound-acetaldehyde pool on the
+  carbon ledger. Unchecked and FALSE — there is no such slot; `_bound_molar_split` returns *shares*
+  and the `acetaldehyde` slot holds the TOTAL, so an acetal is another **read-only overlay** with
+  `E` already a slot and no carbon booking moved.)
 
 ## Do not re-source these
 
