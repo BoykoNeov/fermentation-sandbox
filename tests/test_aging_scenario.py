@@ -1226,6 +1226,12 @@ def _sotolon_at_aging_start_ugl(interventions: list[Intervention], *, sweet: boo
     read the same wine at two times. The sample at ``t = _FERMENT_DAYS * 24`` is a single, exact
     grid point — the segment restart does **not** duplicate it (verified: neighbours at 641.61 h and
     733.27 h) — so the index is unambiguous and a tight pin is safe to place on it.
+
+    The 730-day tail is kept only to mirror :func:`_dry_sotolon_ugl` exactly; it is **not** load
+    bearing. Measured: all four pinned values are **bitwise identical** at tails of 730 d, 150 d and
+    1 d, because the segment restart solves the fermentation span independently of the total
+    ``duration_days``. Shortening it would buy ~27 % of this test's runtime (13.3 s → 9.7 s) at the
+    cost of that parity — a free trade in either direction, taken here for the parity.
     """
     cs = compile_scenario(
         _wine(

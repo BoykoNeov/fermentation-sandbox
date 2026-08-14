@@ -28544,6 +28544,14 @@ error that silently shifts a tightly-banded pin. Printed: neighbours at 641.61 h
 **no duplicate**, exact grid point. The test re-asserts `t[i] == approx(720.0)` so the check travels
 with the pin rather than living in a probe.
 
+**The aging tail is not load bearing.** `_sotolon_at_aging_start_ugl` keeps a 730-day tail purely
+to mirror `_dry_sotolon_ugl`'s construction. Measured after the fact: all four pinned values are
+**bitwise identical** at tails of 730 d, 150 d and 1 d — the segment restart solves the fermentation
+span independently of the total `duration_days`, so the pin is not span-sensitive and the
+`t[i] == approx(720.0)` assert is doing exactly as much work as claimed and no more. Shortening the
+tail would buy ~27 % of the test's runtime (13.3 s → 9.7 s); construction parity was taken instead,
+and the measurement is recorded so a later reader knows the trade is free in either direction.
+
 **No tautological assertion.** The pre-aging offset is identical across O2 doses, which looks like a
 finding and is not one: O2 is dosed *at* `_FERMENT_DAYS`, so pre-aging equality is true by
 construction. It is deliberately **not** asserted (feedback-a-tautology-can-smuggle-an-attribution).
