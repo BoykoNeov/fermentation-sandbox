@@ -30,9 +30,9 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-14)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-205**; sensory 1a/1b + **D-139's
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-206**; sensory 1a/1b + **D-139's
 leftovers ALL closed** (D-148/D-149). Suite **1765 + 3 xfail**. **"Blocked on external sourcing" wrong 3× (D-191/196/199)**.
-**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route + left the aldol UNGATED; D-204 SHIPPED the pin it owed; D-205 REFUSED Pham's pH+ethanol terms — "expressible" was never "identifiable".**
+**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route + left the aldol UNGATED; D-204 SHIPPED the pin it owed; D-205 REFUSED Pham's pH+ethanol terms and D-206 the Strecker split's derivation — "expressible" was never "identifiable", and neither is "modelled explicitly".**
 **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT. `ACID_STATE`
 is NO LONGER medium-agnostic** (D-179): *wine's* registry beside `BEER_ACIDS`, keyed off `StateSchema.medium`.
@@ -169,6 +169,13 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   (D-190 shape). **Pham 1995 UNREACHABLE, 2 hosts.** The emergent pH limb is a **DIFFERENT
   REACTION** and no substitute: 1.893 % where SO₂ is in excess, **0.003 %** where it decides.
   → `.claude/memory/prohibitions/sotolon-ph-and-ethanol.md`
+- **Strecker methional split (D-101 → D-206)** — deriving `f_methional` from the amino-acid
+  abundances is **REFUSED, measured**, and so is re-banding it: the abundances **cannot reach**
+  that output (gate cancels the fraction; a 4× recompiled change moves it **0.06 %**), so it is
+  the ONLY channel. D-101's "≈ 0.136" was a **mismatched pair** (true value 0.15152, 1.01 % off
+  the shipped 0.15) and its "queued as its own beat" clause is **deleted**. Also: a **reused**
+  `CompiledScenario` inherits the previous run's enables (**+10.3 %**) — a CONTRACT, "fixing" it
+  fails 26 tests. → `.claude/memory/prohibitions/strecker-methional-split.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
@@ -191,7 +198,8 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
 growth-linked excretion (D-49 opt B) — **α-KG ONLY and INFERRED, never
 measured; α-KB REFUSED at D-189 and PYRUVATE at D-195, both spent**; peptide pool; variety-specific DMSp;
-yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
+yeast-autolysate spectrum; re-anchor `f_methional` (**only from LITERATURE — deriving it from the
+model's own abundances is REFUSED at D-206, and so is re-banding it**); masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
 in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145; **NEW at D-202: sotolon from ASCORBATE degradation via 2-ketobutyrate (UWC §9) — the model has both ends already; no rate in the corpus, and it would force `ascorbate` onto the carbon ledger.**
 
 ## Standing rule

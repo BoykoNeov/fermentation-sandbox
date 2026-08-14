@@ -90,3 +90,17 @@ assertion on an *observable that must move* — "the pool moved 0.5x, LANDED" �
 before reporting anything if it did not. Then D-197's trap fired again in the very next probe
 (`pset.disable()` re-enabled by `begin_aging`), and the landing check is what caught that one too:
 one habit covers a family of failures that each look like a clean result.
+
+**A REUSED object is a third channel: run 2 is not a repeat of run 1 (D-206).** Two probes compiled
+one scenario and integrated it many times. `begin_aging`'s reconfigure **enables 22 aging Processes
+and nothing puts them back**, so every run after the first began with aging chemistry live from
+t = 0 — **+10.3 %** on the measured output, the active-Process **count unchanged at 49**, and no
+error. It is the D-197 trap inverted: there the run *undid* the mutation, here the run *keeps* a
+change the next arm inherits. The arms still differed plausibly, so nothing looked wrong.
+**How to apply:** when arms share any object — a compiled scenario, a Process set, a fixture — the
+cheapest possible control is **two identical runs asserted equal bitwise**, placed before the
+matrix and designed to be GREEN. It costs one extra run and it is the only thing that separates
+"the arms differ because of my mutation" from "the arms differ because of each other". And before
+"fixing" the leak, mutate it: making the restore unconditional here failed **26 tests**, because
+guards deliberately read the configuration in force *at the end* of a run — the persistence was a
+contract, undocumented at the call site. See [[feedback-mutate-the-premise-before-building-the-guard]].

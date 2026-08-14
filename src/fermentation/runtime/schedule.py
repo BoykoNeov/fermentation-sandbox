@@ -196,6 +196,19 @@ def simulate_scheduled(
     axis stays strictly monotone — no duplicate timestamps). With ``events=()`` this is a
     single :func:`simulate` call with identical arguments, hence byte-for-byte a plain run.
 
+    **A run LEAVES the Process set reconfigured, and callers that reuse one must restore it
+    (decision D-206).** ``reconfigure`` mutates ``process_set`` in place and nothing here puts it
+    back, so after a ``begin_aging`` run the 22 aging Processes are still enabled. That is relied
+    on — the O₂-partition guards in ``test_oxidative_cascade_guards.py`` read the configuration in
+    force *at the end* of a run, and making this function restore turns their partition into an
+    empty dict (measured: 26 failures). The cost falls on anyone integrating **twice** off one
+    :class:`~fermentation.scenario.compile.CompiledScenario`: the second run starts with aging
+    chemistry live from ``t = 0``, worth **+10.3 %** on aged methional, with the active-Process
+    count unchanged and nothing raised. Bracket repeated runs with
+    ``enabled_snapshot()``/``restore_enabled()`` — which is exactly what
+    :func:`~fermentation.runtime.ensemble.simulate_ensemble` does per member, so ensembles are
+    already safe (pinned by ``test_scheduled_ensemble_restores_process_set_and_travels_tier``).
+
     Raises ``ValueError`` for a bad ``y0`` shape, a non-positive span, or an event outside
     ``[t_span[0], t_span[1])``.
     """

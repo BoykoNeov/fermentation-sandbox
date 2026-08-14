@@ -302,6 +302,11 @@ class CompiledScenario:
         single-slope ramp. ``param_tiers`` defaults to the scenario's own tier map for honest
         D-1 reporting; ``t_eval``/solver kwargs pass straight through.
 
+        **Calling this twice on one compiled scenario does not repeat the run** — the events'
+        reconfigure persists, so the second call starts with the first's enables live from
+        ``t = 0``. See :func:`~fermentation.runtime.simulate_scheduled` for why that is the
+        contract and what to bracket a reused set with (decision D-206).
+
         The stochastic sibling is :meth:`run_ensemble`, which threads the same ``events`` into
         :func:`~fermentation.runtime.simulate_ensemble` (decision D-37).
         """

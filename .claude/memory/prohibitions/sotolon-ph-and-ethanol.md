@@ -34,10 +34,10 @@ in the docstring. **EXPRESSIBLE IS NOT IDENTIFIABLE** — that is the whole reco
   free form" = Pham's direction). **No Keq in any of the 24 corpus texts** — the only hits are
   brandy composition tables in mg/L. **Its crossing value is deliberately NOT computed** — that
   would mean inventing the constant whose absence IS the block. **The block is the Keq ALONE: the
-  structure is free.** (A first draft claimed it also needed a new bound-acetaldehyde pool on the
-  carbon ledger. Unchecked and FALSE — there is no such slot; `_bound_molar_split` returns *shares*
-  and the `acetaldehyde` slot holds the TOTAL, so an acetal is another **read-only overlay** with
-  `E` already a slot and no carbon booking moved.)
+  structure is free.** (A first draft's second cost — a new bound-acetaldehyde pool on the carbon
+  ledger — was unchecked and FALSE: no such slot exists, `_bound_molar_split` returns *shares* and
+  `acetaldehyde` holds the TOTAL, so an acetal is another **read-only overlay**, `E` already a slot,
+  no carbon booking moved.)
 
 ## Do not re-source these
 
