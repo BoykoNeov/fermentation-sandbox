@@ -2386,8 +2386,18 @@ class SotolonAldolCondensation(Process):
     D-27's.
 
     **Scope — named, not hidden.** (1) Pham also measures sotolon rising with **decreasing pH** and
-    **decreasing ethanol**; neither term is here, and the model has both quantities, so this is a
-    real omission rather than an inexpressible one. (2) Botrytised sweet wines may carry an
+    **decreasing ethanol**; neither term is here. ⚠ **This item said "the model has both
+    quantities, so this is a real omission rather than an inexpressible one", and ten records read
+    that as "buildable". D-205 measured it: EXPRESSIBLE IS NOT IDENTIFIABLE, and both halves are
+    REFUSED.** Pham is directional only (the paper is unreachable; the abstract carries no range,
+    no coefficient, no response surface) and the corpus adds nothing. For pH, two independently
+    motivated forms — acid catalysis in [H⁺], and the undissociated-α-KB fraction — agree with each
+    other within 17 %, so the *mechanism* is nearly free; but ``k_sotolon_aldol`` was calibrated
+    with **no pH term**, so no pH is its reference, and the same form at ``pH_ref`` 3.4 vs 3.0
+    reports **two oxidised wines or none** (2.51× apart, the analytic slide). For ethanol the
+    mechanism is sourced — acetaldehyde is sequestered as the hemiacetal/1,1-diethoxyethane, which
+    is Pham's direction — but **no equilibrium constant exists in any of the 24 corpus texts**, the
+    D-190 shape. **Do not "finish" this by picking a form.** (2) Botrytised sweet wines may carry an
     additional sugar/furanone contribution this Process does not model — what is modelled is the
     sourced aldol. (3) The **enantiomers are not split**: (S)-sotolon's threshold (~0.8 µg/L) is
     ~100× below (R)'s (~89 µg/L) (Pons *et al.*), so one racemic pool against one threshold is a
@@ -2466,6 +2476,15 @@ class SotolonAldolCondensation(Process):
         # acetaldehyde removes it from the total and the equilibrium re-splits) — the D-47 idiom.
         # The guard is EXACT: an unsulfited run pays no per-RHS pH `brentq` and is byte-for-byte the
         # D-107 total-acetaldehyde case, so every output D-107 measured is unmoved.
+        # THIS LINE IS ALSO THE ONLY PATH BY WHICH pH REACHES THIS RATE, and D-205 measured what it
+        # is worth. It is NOT Pham's pH effect (that is acid catalysis of the condensation; this is
+        # bisulfite competition for the carbonyl — same direction, different reaction). It moves
+        # sotolon 1.893 % across pH 3.0-3.8 in a SEALED sulfited wine, where SO2 is in excess over
+        # the carbonyls and 99.3 % of acetaldehyde is bound — and 0.003 % once O2 is dosed, because
+        # SO2 then becomes the limiting reagent and binds fully whatever the pH. So the response is
+        # confined to the regime the docstring already calls an unphysical isolate (zero O2 ingress,
+        # no closure permeation), and vanishes in the one that decides the 8 µg/L threshold.
+        # Unsulfited runs are pH-independent BITWISE, by the short-circuit above.
         if SO2_STATE_KEY in schema and float(y[schema.slice(SO2_STATE_KEY)][0]) > 0.0:
             acetaldehyde = free_acetaldehyde(y, schema, params, ph_of_state(y, schema, params))
             if acetaldehyde <= 0.0:  # all acetaldehyde bound ⇒ no free carbonyl to condense

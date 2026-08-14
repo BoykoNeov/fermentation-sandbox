@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-14T07:38:13.467Z
+  modified: 2026-08-14T08:14:05.629Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,9 +30,9 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-14)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-204**; sensory 1a/1b + **D-139's
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-205**; sensory 1a/1b + **D-139's
 leftovers ALL closed** (D-148/D-149). Suite **1765 + 3 xfail**. **"Blocked on external sourcing" wrong 3× (D-191/196/199)**.
-**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route + left the aldol UNGATED (investigated, not argued); D-204 SHIPPED the pin it owed — measured: nothing else saw the term.**
+**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route + left the aldol UNGATED; D-204 SHIPPED the pin it owed; D-205 REFUSED Pham's pH+ethanol terms — "expressible" was never "identifiable".**
 **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
 **Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT. `ACID_STATE`
 is NO LONGER medium-agnostic** (D-179): *wine's* registry beside `BEER_ACIDS`, keyed off `StateSchema.medium`.
@@ -161,6 +161,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   constant still gives 0.898, because the un-dosed baseline already sits at 1.108. **Never fit
   `k_rel`.** No unsourced coefficient to relocate. Both un-built limbs push DOWN. Corpus searched:
   24 texts, 203 mentions, **no O2-limb rate**. → `.claude/memory/prohibitions/ascorbate-quinone-route.md`
+- **Sotolon's pH + ethanol terms (D-205)** — **REFUSED, measured.** D-107's "the model has both
+  quantities, so a real omission rather than an inexpressible one" rode 10 records as *buildable*:
+  **expressible ≠ identifiable.** Two rival pH forms agree within **17 %**, so the mechanism is
+  nearly free — the loose parameter is the **REFERENCE pH** (`k_sotolon_aldol` was fitted with NO pH
+  term), and 3.4 vs 3.0 reports **two oxidised wines or none**. Ethanol is **BLOCKED on a Keq**
+  (D-190 shape). **Pham 1995 UNREACHABLE, 2 hosts.** The emergent pH limb is a **DIFFERENT
+  REACTION** and no substitute: 1.893 % where SO₂ is in excess, **0.003 %** where it decides.
+  → `.claude/memory/prohibitions/sotolon-ph-and-ethanol.md`
 - **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
   malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
   acetic's producer is growth-linked and the spike is NOT modelled.
@@ -181,7 +189,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
-Pham's pH + ethanol terms; growth-linked excretion (D-49 opt B) — **α-KG ONLY and INFERRED, never
+growth-linked excretion (D-49 opt B) — **α-KG ONLY and INFERRED, never
 measured; α-KB REFUSED at D-189 and PYRUVATE at D-195, both spent**; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional`; masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
 in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145; **NEW at D-202: sotolon from ASCORBATE degradation via 2-ketobutyrate (UWC §9) — the model has both ends already; no rate in the corpus, and it would force `ascorbate` onto the carbon ledger.**
