@@ -68,4 +68,7 @@ unconvincing, go read D-210 — do not argue past it from this file.**
 settling both push the **same way** as D-209's term, whose high `z̄` edge already lands at pH
 **4.783** against a window whose floor is **4.780** — 0.003 pH. Adding same-sign beer
 acidification now walks day 7 out of Tyrell's envelope from the other side, and D-209 §7 already
-located the residual as **uptake TIMING**. **Neither is refused — both wait on the timing beat.**
+located the residual as **uptake TIMING**. ~~Neither is refused — both wait on the timing beat.~~
+**BOTH ARE NOW REFUSED (D-214)**: antiport on sourcing (zero beer-text hits), trub because it is a
+**pre-pitch** event already inside the calibration whose post-anchor form is a charge violation.
+Do not re-propose either. → `.claude/memory/prohibitions/trub-settling-and-the-peptide-pair.md`

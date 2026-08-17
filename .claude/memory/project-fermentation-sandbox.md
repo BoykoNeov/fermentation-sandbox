@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-212**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1798 + 3 xfail**. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-214**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1811 + 3 xfail**. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
@@ -188,8 +188,8 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   Tyrell Fig. 4's **cell-count panel** (the third panel D-180/D-207 left uncropped); 0.098 was **2.88×**
   too fast — a **Droop→Monod** transfer, D-15's twin. **Never fit the pH course** (0.040 scores 8/8 and
   was REFUSED); EXTENT is a separate 6.3 % deviation; the `E_a` arm is measured and REFUSED. Band is
-  **DRAWN** and narrowed 7.00→1.29× from the fast end. **D-210's two terms are STILL PARKED** (high-edge
-  headroom 0.0028→0.0082) but the constraint now wants a term with a **TIME PROFILE**. D-183 FLAGGED.
+  **DRAWN** and narrowed 7.00→1.29× from the fast end. **D-210's two terms are NO LONGER PARKED —
+  BOTH CLOSED at D-214** (antiport unsourced, trub pre-pitch); §9's numbers → 0.0274/0.0086. D-183 FLAGGED.
   → `.claude/memory/prohibitions/beer-growth-rate-and-uptake-timing.md`
 - **Beer's WORT OXYGEN (D-213)** — **BUILT**: `o2` is seeded at **6.75 mg/L** (band 5.5-8.0, both
   edges PRINTED) and stripped by the yeast in the lag phase. **DELIBERATELY INERT — the owner
@@ -198,6 +198,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   on timing). **NOT a growth-Arrhenius target.** Isolability is exact at the DERIVATIVE, **not
   byte-for-byte** — proved MESH by CONVERGENCE. O₂→growth DECLINED; O₂→acetate stays REFUSED.
   → `.claude/memory/prohibitions/beer-wort-oxygen.md`
+- **Trub settling + the peptide PAIR (D-214)** — **REFUSED, and D-209 §8's BOTH parked terms are
+  now CLOSED.** Antiport is **ZERO hits in every beer text** (its 8 are LAB, in wine). Trub is
+  **PRE-PITCH** (boil + chill, *"removed before the wort is fermented"*) and **already inside the
+  1.18 control-wort anchor** — never call it an omission. A Process draining `peptide_buffer` is a
+  **CHARGE VIOLATION** (pH 7.08 / 11.66), not a small acidifier; pre-anchor it is refused on
+  **SHAPE** (day 7 is **3.40×** day 1, the inverse of the brief) and the window is **EMPTY by 9×**
+  at the high `z̄` edge. The capacity/pKa pair is **incoherent but NOT fixed — its own beat**.
+  D-211 §9's numbers → **0.0274 / 0.0086**. → `.claude/memory/prohibitions/trub-settling-and-the-peptide-pair.md`
 - **Beer's EARLY acetic rise (D-212)** — **REFUSED, pre-registered, BUILT NOTHING.** Never aim at
   Tyrell's day-1 **145.0**: the pH admits a **WINDOW** — **94.24-132.38** admitted by ALL 3 `z̄`
   arms (86-141 is the UNION, never quote it) — and 145 is **OUTSIDE at every arm**. The real

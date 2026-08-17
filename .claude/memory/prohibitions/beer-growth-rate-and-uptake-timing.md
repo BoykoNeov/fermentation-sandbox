@@ -54,6 +54,13 @@ prohibition looks unconvincing, go read D-211 — do not argue past it from this
   it is the diagnosis. This model has **one lumped N pool** and was applying the **fastest
   class's** timescale to all of it. Do not cite it to restore the old rate.
 
+**SUPERSEDED AT D-214: both parked terms are now CLOSED, not parked** — antiport has zero beer-text
+sourcing, trub is a pre-pitch event already inside the calibration and a charge violation after the
+anchor. §9's own two numbers are corrected to **0.0274** and **0.0086** (an adaptive-grid read; see
+`.claude/memory/prohibitions/trub-settling-and-the-peptide-pair.md`). The paragraph below is kept as
+written because the *brief* it states — beer wants acidification EARLY and none late — still stands
+and is still unanswered; only its two candidate answers are spent.
+
 **D-210's two parked terms are STILL PARKED — measured, not inferred.** K⁺/H⁺ antiport and trub
 protein settling were parked on the **high `z̄` edge**, not the nominal. Under the new rate the
 day-7 headroom above the floor goes **0.0028 → 0.0082 pH**: tripled, still closed to a constant

@@ -1407,6 +1407,134 @@ def test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc():
     )
 
 
+def test_no_process_touches_the_peptide_buffer_pool():
+    """The peptide pool is ANCHOR-TIME state, and a Process that drained it would break beer.
+
+    Trub settling was carried as an unbuilt same-sign acidification from D-209 sec 8 until D-214
+    measured it. It is not buildable as a fermentation-phase Process, and the reason is structural
+    rather than a missing rate: ``peptide_buffer`` rides ``_BEER_ACID_SEEDS``, so the t=0 cation
+    back-solve is fitted WITH this pool present as the counter-anion. Removing it after the anchor
+    leaves that cation with nothing to balance against, and the charge balance answers with
+    hydroxide. Measured at D-214: cutting 20 % of the pool at 6 h takes day 1 from pH 5.448 to
+    **7.085**, and cutting all of it takes day 7 to **11.66**. That is not a small same-sign term,
+    it is a charge-balance violation.
+
+    So this is a guard on a hazard the archive nearly walked into, not on a shipped number. The
+    mechanism is real — protein does drop out — but it drops out as hot trub in the BOIL and as
+    cold break during CHILLING, both before pitching, and *Chemistry of Beer* sec 2.9 says the
+    coagulate is "removed before the wort is fermented". The model already carries it there: the
+    capacity is back-solved from Peyer's 1.18 **control wort**, an already-boiled figure.
+
+    The pool being real state is exactly what makes this reachable — expressible is not buildable,
+    which is D-205's lesson arriving from the other direction.
+    """
+    beer = get_medium("beer").build_process_set(strict=True)
+    touching = sorted(p.name for p in beer.active if "peptide_buffer" in p.touches)
+    assert not touching, (
+        f"{touching} declares `peptide_buffer` in `touches`. That pool is the t=0 anchor's "
+        "counter-anion, not a fermentation-phase reservoir: draining it post-anchor drives the "
+        "charge balance alkaline (D-214 measures pH 7.08 for a 20 % cut at 6 h, 11.66 for a full "
+        "one). If a beat really means to model less buffering protein, it belongs PRE-anchor, in "
+        "`peptide_buffer_capacity_beer` or the `peptide_buffer_gpl` scenario key, where the "
+        "cation back-solve sees it."
+    )
+
+
+def _tyrell_ph_with_peptide_loss(data_dir, loss: float, day: float) -> float:
+    """Beer's degassed pH at ``day`` with ``loss`` of the wort's buffering protein gone PRE-pitch.
+
+    The loss is applied through the ``peptide_buffer_gpl`` scenario key, which is seeded before
+    the cation back-solve — the placement the sources actually describe (boil + chill), and the
+    only placement that is not a charge-balance violation (see the test above).
+    """
+    params = load_parameters(data_dir / "beer_acids.yaml")
+    capacity = params["peptide_buffer_capacity_beer"].value
+    compiled = compile_scenario(
+        Scenario(
+            name="d214-peptide-loss",
+            medium="beer",
+            initial={**TYRELL_SCENARIO, "peptide_buffer_gpl": capacity * (1.0 - loss)},
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=14.0,
+        ),
+        data_dir=data_dir,
+    )
+    res = compiled.run()
+    resolved = compiled.parameters.resolve()
+    states = np.asarray(res.y, dtype=float)
+    t_h = np.asarray(res.t, dtype=float)
+    y = np.array([np.interp(day * 24.0, t_h, states[i, :]) for i in range(states.shape[0])])
+    return float(acidbase.degassed_ph_of_state(y, compiled.schema, resolved))
+
+
+def test_losing_wort_protein_acidifies_late_not_early():
+    """The shape claim that refuses trub settling — asserted, because it is the whole argument.
+
+    D-211 sec 9 left a brief for the next beer-pH beat: beer wants **acidification early and none
+    late**, because at the high ``nitrogen_uptake_charge_beer`` edge day 1 sits above its ceiling
+    while day 7 has almost no headroom above its floor. Less buffering protein acidifies — that
+    part of D-209 sec 8 is right — but it does so with the OPPOSITE profile, because removing
+    buffer amplifies acid production, and acid production is cumulative. So the effect grows with
+    time instead of fading, and it is disqualified by its shape rather than by its size.
+
+    Pinning the ratio and not just the two deltas is the point: a beat that later proposes any
+    buffer-removal term is answered by this test, whatever magnitude it picks.
+    """
+    data_dir = default_data_dir()
+    base_1 = _tyrell_ph_with_peptide_loss(data_dir, 0.0, 1.0)
+    base_7 = _tyrell_ph_with_peptide_loss(data_dir, 0.0, 7.0)
+    lost_1 = _tyrell_ph_with_peptide_loss(data_dir, 0.20, 1.0)
+    lost_7 = _tyrell_ph_with_peptide_loss(data_dir, 0.20, 7.0)
+
+    # Tolerances are a solver-noise allowance, not a band: both runs are deterministic, so the
+    # measured 0.017252 / 0.058699 should reproduce exactly unless the model moved. A looser
+    # tolerance here would let the two values drift far enough to break the ratio below while
+    # both still "passed" [[feedback-pin-tolerance-vs-solver-tolerance]].
+    early, late = base_1 - lost_1, base_7 - lost_7
+    assert early == pytest.approx(0.01725, abs=0.0005), (
+        f"a 20 % pre-pitch protein loss moves day 1 by {early:.6f} pH; D-214 measures 0.017252"
+    )
+    assert late == pytest.approx(0.05870, abs=0.0015), (
+        f"a 20 % pre-pitch protein loss moves day 7 by {late:.6f} pH; D-214 measures 0.058699"
+    )
+    assert late > 3.0 * early, (
+        f"buffer removal is supposed to be LATE-weighted (D-214 measures day 7 at 3.4x day 1); "
+        f"here day 7 is {late / early:.2f}x day 1. If this ratio has fallen below 3, the shape "
+        "argument that refuses trub settling as an answer to D-211 sec 9's brief no longer holds "
+        "and the refusal needs re-measuring, not re-asserting."
+    )
+
+
+def test_the_trub_window_is_empty_at_the_edge_that_parks_it(tmp_path, beer_params):
+    """The refusal as arithmetic, on the arm the parking question actually lives on.
+
+    D-210 parked trub settling on the HIGH ``nitrogen_uptake_charge_beer`` edge and D-211 sec 9
+    re-priced it there, so the nominal cannot answer it [[feedback-pin-the-band-not-the-nominal]].
+    At that edge D-214 measures: day 1 needs a loss of **>= 27.6 %** to come inside its ceiling,
+    while day 7 can afford **<= 3.1 %** before falling through its floor. The window is empty by
+    about ninefold, so no protein-loss fraction satisfies both ends — which is why the refusal is
+    arithmetic rather than a judgement about how much trub a brewery carries over.
+
+    This asserts the tight half: a 5 % loss, well below what day 1 would need, already takes day 7
+    out of the envelope.
+    """
+    hi = beer_params["nitrogen_uptake_charge_beer"].uncertainty.high
+    data_dir = _beer_data_dir_with_nitrogen_charge(tmp_path, hi)
+    floor_7 = 4.804 - 0.024
+
+    assert _tyrell_ph_with_peptide_loss(data_dir, 0.0, 7.0) > floor_7, (
+        "the unmodified high edge should still be inside the day-7 envelope (D-211 sec 9 "
+        "measures 0.0086 pH of headroom on a fixed-grid read); if it is not, this test's "
+        "premise moved and the trub arithmetic below is scored against the wrong baseline"
+    )
+    with_loss_7 = _tyrell_ph_with_peptide_loss(data_dir, 0.05, 7.0)
+    assert with_loss_7 < floor_7, (
+        f"a 5 % pre-pitch protein loss puts day 7 at {with_loss_7:.4f}, which should be BELOW the "
+        f"admissible floor {floor_7:.4f}. D-214's refusal rests on day 7 affording only ~3 % while "
+        "day 1 needs ~28 %; if 5 % now fits, that window has opened and the refusal is stale."
+    )
+
+
 def test_wine_never_wires_or_reads_the_wort_acid_sink():
     """Beer-only, structurally — the D-180 isolability claim, restated for the sink half."""
     wine = get_medium("wine").build_process_set(strict=True)
