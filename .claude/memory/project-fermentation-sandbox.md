@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-17T15:41:29.694Z
+  modified: 2026-08-17T15:45:19.556Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -192,8 +192,9 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   headroom 0.0028→0.0082) but the constraint now wants a term with a **TIME PROFILE**. D-183 FLAGGED.
   → `.claude/memory/prohibitions/beer-growth-rate-and-uptake-timing.md`
 - **Beer's EARLY acetic rise (D-212)** — **REFUSED, pre-registered, BUILT NOTHING.** Never aim at
-  Tyrell's day-1 **145.0**: the pH admits a **WINDOW** (86-141 across the 3 `z̄` arms) and 145 is
-  **OUTSIDE at every arm** — the real shortfall is **+6 to +14**, a fifth of it, and hitting the
+  Tyrell's day-1 **145.0**: the pH admits a **WINDOW** — **94.24-132.38** admitted by ALL 3 `z̄`
+  arms (86-141 is the UNION, never quote it) — and 145 is **OUTSIDE at every arm**. The real
+  shortfall is **+6 to +14**, a fifth of it, and hitting the
   acetic target would move the pH OUT of band. Refused on **MECHANISM, not identifiability** (any
   front-load factor 1.67-2.78 works at all arms). **Four candidates, FOUR different deaths.**
   An ADDITIVE source is forbidden (breaks day 7 → 182.6). D-211 §13's sweep claim CORRECTED.

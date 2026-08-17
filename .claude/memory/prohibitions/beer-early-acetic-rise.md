@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 319bf67b-4e83-4c11-9ffb-068bbcb68911
-  modified: 2026-08-17T15:40:51.610Z
+  modified: 2026-08-17T15:45:24.785Z
 ---
 
 **Live prohibitions — beer's EARLY acetic rise and the day-1 pH window (D-212).** Detail split
@@ -20,6 +20,8 @@ it as unbuilt work.**
 - **NEVER aim at Tyrell's measured day-1 acetic of 145.0 mg/L.** The day-1 pH admits an acetic
   **WINDOW** — **94.24-141.22 / 90.20-136.82 / 86.11-132.38** mg/L at the lo/nom/hi arms of
   `nitrogen_uptake_charge_beer` — and **145.0 is ABOVE it at every arm** (by 3.78/8.18/12.62).
+  **The range admitted by ALL THREE arms is 94.24-132.38 — quote that, never the 86-141 UNION**
+  (the D-212 heading carries the union because a heading cannot hold three rows).
   The model's 80.13 is short by only **+6 to +14**, a **fifth** of the +64.87 the acetic curve
   implies. **A build that hit the acetic target would score as a success while moving the pH
   OUT of band.** Both numbers come from the same figure of the same paper.
