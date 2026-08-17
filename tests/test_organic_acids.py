@@ -106,6 +106,48 @@ TYRELL_ACETIC_MEAN_PPM = {
 #: Fig. 4, same ferments: wort pH and the four strains' day-7 beer pH.
 TYRELL_WORT_PH = 5.65
 TYRELL_BEER_PH = (4.78, 4.90)
+
+#: Fig. 4's pH panel as a COURSE — the four-strain envelope ``(low, high)`` per day, in the
+#: paper's own daily sampling ("yeast concentration, pH and extract development was checked
+#: daily", §2.4.2). D-207 transcribed it; D-180 had read this same panel for its two endpoints
+#: only, which is why the pH agreement was an endpoint number for four beats.
+#:
+#: **An envelope, NOT a mean.** The four strains are resolved individually and no mean is
+#: constructed, because a merged marker blob's centroid is not either marker's position — the
+#: trap D-180's ``TYRELL_ACETIC_MEAN_PPM`` note names for the acetic course ("peak of the mean",
+#: never "mean of the peaks"). Day 7's envelope is also the same *shape* of quantity as
+#: ``TYRELL_BEER_PH`` above, so the two are directly comparable.
+#:
+#: **Provenance: a PIXEL read, calibrated and cross-checked, not an eye read.** Least-squares
+#: y-calibration through the four printed gridlines (worst residual 0.0028 pH); the pH-5.0 line
+#: was withheld from the fit and is predicted at the exact midpoint of its neighbours; and day 0
+#: — where all four strains MUST coincide, being one wort — reads as an envelope of span 0.002
+#: pH centred on 5.6507 against the 5.65 D-180 recorded independently. The paper's prose is a
+#: fourth check: "only strain 7 shows a slightly higher pH-value throughout fermentation", and
+#: strain 7 is the top trace here.
+#:
+#: **READ TOLERANCE 0.024 pH**, and it is the *disagreement between two independent reads of
+#: this figure*, not the extraction precision (0.0028). At day 7 this read gives 4.804-4.916
+#: where D-180's eye read gave 4.78-4.90. Nothing is re-anchored on that: moving the shipped
+#: ``measured_drop`` from 0.81 to 0.792 would shift the headline fraction ~2 %, and that is a
+#: decision for a beat that means to take it, not a side effect of transcribing a curve.
+#:
+#: **No assert reads this yet, deliberately** (D-207 §guard): a pin on the day-1 shape would
+#: encode the defect the record measures, so a correct fix would have to delete it. It ships as
+#: DATA so the next beat has its target, the way ``Y_acetic_sugar_beer`` is kept unread to keep
+#: a retirement falsifiable.
+TYRELL_PH_COURSE = {
+    0: (5.652, 5.651),
+    1: (5.258, 5.377),
+    2: (4.871, 5.063),
+    3: (4.804, 5.036),
+    4: (4.764, 4.956),
+    5: (4.790, 4.936),
+    6: (4.804, 4.922),
+    7: (4.804, 4.916),
+}
+#: The tolerance above, named so a future assert cannot quietly pick a friendlier one.
+TYRELL_PH_READ_TOL = 0.024
 #: Fermentable sugar of that wort, derived in beer_acids.yaml's group-2 header from the
 #: printed extract curve (apparent → real attenuation → g/L). The whole yield anchor.
 TYRELL_SUGAR_GPL = 82.2388545
