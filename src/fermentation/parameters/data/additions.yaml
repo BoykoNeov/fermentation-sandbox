@@ -18,10 +18,17 @@
 # Diammonium phosphate (NH4)2HPO4 is the standard fermentation nitrogen supplement. The add_dap
 # verb doses it by mass (dap_gpl) and converts to the assimilable-nitrogen jump on the lumped N
 # slot via this fraction. Both ammonium groups are immediately assimilable YAN, so the whole
-# nitrogen content counts. The PHOSPHATE is a scoped omission — the model tracks no phosphorus
-# pool (P is not limiting in normal must), so the dose's phosphate is dropped; add_dap injects
-# only the nitrogen. Molar mass (NH4)2HPO4 = 132.06 g/mol; 2 N = 28.014 g/mol; fraction =
+# nitrogen content counts. Molar mass (NH4)2HPO4 = 132.06 g/mol; 2 N = 28.014 g/mol; fraction =
 # 28.014 / 132.06 = 0.2121 g N / g DAP.
+#
+# D-210 CORRECTS THIS BLOCK'S OLD CLOSING SENTENCE, which read: "The PHOSPHATE is a scoped
+# omission — the model tracks no phosphorus pool (P is not limiting in normal must), so the
+# dose's phosphate is dropped; add_dap injects only the nitrogen." The premise was sound and the
+# conclusion did not follow. A phosphorus POOL is indeed unnecessary — nothing here consumes
+# phosphorus — but the charge BALANCE never needed a pool, only a total, and the dropped
+# phosphate was ~0.95 equivalents per mole of un-booked anion charge. Dropping it left `add_dap`
+# adding a cation with no counter-anion: a salt booked as a base. Both ions now ship
+# (dap_phosphate_fraction below, and dap_nitrogen_charge for the ammonium's own charge).
 dap_nitrogen_fraction:
   value: 0.2121
   unit: "g/g"   # g assimilable nitrogen / g diammonium phosphate
@@ -30,7 +37,68 @@ dap_nitrogen_fraction:
   provenance:
     source: "exact stoichiometry of diammonium phosphate (NH4)2HPO4"
     conditions: "commercial DAP fermentation supplement; both ammonium groups counted as immediately assimilable YAN"
-    notes: "M((NH4)2HPO4) = 132.06 g/mol, 2 N = 28.014 g/mol -> 28.014/132.06 = 0.2121 g N/g DAP. Phosphate is DROPPED (no phosphorus pool in the model; P is non-limiting in normal must), so add_dap injects nitrogen only (decision D-36)."
+    notes: "M((NH4)2HPO4) = 132.06 g/mol, 2 N = 28.014 g/mol -> 28.014/132.06 = 0.2121 g N/g DAP. The phosphate is NO LONGER dropped (decision D-210): it enters the charge balance as the `phosphate` state slot via dap_phosphate_fraction. There is still no phosphorus pool and none is needed."
+
+# -- DAP's phosphate counter-anion (add_dap verb, decision D-210) -----------------------------
+#
+# Every mole of (NH4)2HPO4 brings one mole of phosphate with its two ammoniums. The `phosphate`
+# state slot carries it as PHOSPHORIC-ACID-EQUIVALENT g/L so the charge balance's ordinary
+# g/L -> mol/L conversion applies unchanged, hence a mass fraction rather than a mole count:
+# M(H3PO4) / M((NH4)2HPO4) = 97.994 / 132.056 = 0.74206 g H3PO4-equivalent per g DAP.
+#
+# WHAT THIS DOES TO A DOSED WINE, measured (D-210 probe 2). At the dose instant the salt is
+# electroneutral as it arrives (+2 ammonium, -2 hydrogen phosphate) and the balance gains
+# +2 - 0.95 = ~+1.05 net cation per mole, which IS the ~1.05 protons the dosed HPO4(2-) takes up
+# on its way to H2PO4(-) at wine pH — so the model's dose-time pH RISE is emergent and nothing
+# may add a separate proton-consumption term on top of it. After the yeast has taken the
+# ammonium up, the phosphate is what remains: -0.159 pH at 1.1 g/L, -0.043 pH at 0.3 g/L.
+#
+# THIS HALF OWNS THE ENDPOINT AND THE OTHER HALF OWNS THE EXCURSION -- measured, and it inverts
+# the pre-registration. Charging the dosed nitrogen correctly (dap_nitrogen_charge) moves a DRY
+# wine's final pH by exactly 0.0, because the dosed nitrogen is fully consumed either way and
+# the pool's charge returns to ~0 whatever it was; what it moves is the dose-time bump (+0.242
+# pH at Palma's dose against +0.066 shipped) and any run left holding nitrogen -- a stuck or
+# sluggish ferment, a sweet wine, or a horizon that ends before dryness. Shipping the nitrogen
+# half alone would have reported +0.242 pH as "DAP fixed" when the phosphate cancels 72 % of it.
+dap_phosphate_fraction:
+  value: 0.74206
+  unit: "g/g"   # g phosphoric-acid-equivalent phosphate / g diammonium phosphate
+  tier: validated
+  uncertainty: { low: 0.74206, high: 0.74206, note: "exact stoichiometry; not an uncertain parameter" }
+  provenance:
+    source: "exact stoichiometry of diammonium phosphate (NH4)2HPO4"
+    conditions: "commercial DAP fermentation supplement; one phosphate per formula unit, carried as phosphoric-acid-equivalent mass so the acid registry's own molar mass converts it"
+    notes: "M(H3PO4) = 97.994 g/mol, M((NH4)2HPO4) = 132.056 g/mol -> 97.994/132.056 = 0.74206. Phosphoric-acid-EQUIVALENT, not the phosphate ion's own mass: the slot is read through acidbase.PHOSPHATE_AS_PHOSPHORIC, whose molar mass is H3PO4's, and the pKas then place the protons at the solved pH. Diprotic there on purpose (2.15/7.20); see acidbase.yaml's dosed-phosphate block for why the third pKa is omitted rather than deferred."
+
+# -- The charge a DOSED nitrogen carries (add_dap verb, decision D-210) -----------------------
+#
+# D-209 put the assimilable-nitrogen pool on the cation side at its medium's COMPOSITION AVERAGE
+# (wine 0.3245, beer 0.1772 mol+ per mole of elemental N) and stated in its own scope section
+# that the average does not apply to a supplement. DAP is pure ammonium: every nitrogen arrives
+# as NH4(+), so its charge per mole N is exactly +1 — about 3x wine's average and 5.6x beer's.
+# The `nitrogen_charge_excess` state slot carries the difference, re-mixed at each dose by
+# acidbase.remix_nitrogen_charge_excess, so the pool's charge per mole is right without splitting
+# the pool into per-source slots.
+#
+# WHY A DOSE MAY CLAIM +1 WHEN THE MODEL'S OTHER NITROGEN INFLOWS MAY NOT. Eight Processes add to
+# `N` and their comments all call the product ammonium. Measured at D-210: ~88 % of that inflow
+# is AminoAcidAssimilation, which is an UN-DRAW rather than a deamination (dosed amino acids
+# substitute for the lumped pool in biomass, so the pool is not consumed and its composition is
+# unchanged — the average is exactly right). The remaining ~12 % are real deaminations whose true
+# charge is channel-dependent: 0 where the keto acid is excreted and retained, since its anion is
+# in no registry, and +1 where the keto acid is decarboxylated to a neutral alcohol and a proton
+# leaves the medium to balance. The average sits between those two errors (bracketed at <=0.033
+# pH transiently, ~2e-5 pH at the endpoint). A dose is the ONE channel where this model books
+# both arriving ions, which is what entitles it to the +1.
+dap_nitrogen_charge:
+  value: 1.0
+  unit: "mol/mol"   # mol+ per mole of elemental nitrogen in the dose
+  tier: validated
+  uncertainty: { low: 1.0, high: 1.0, note: "exact: the charge of the ammonium ion, one per nitrogen atom in (NH4)2HPO4. Not an uncertain parameter — it is the formula, and the pH-dependence a real ammonium pool would have (pKa 9.25) is 6 units away from anything either medium reaches." }
+  provenance:
+    source: "exact stoichiometry of diammonium phosphate (NH4)2HPO4: both nitrogens are ammonium, charge +1 each, one nitrogen atom each"
+    conditions: "commercial DAP fermentation supplement dosed into must or wort; charge stated per mole of ELEMENTAL nitrogen, the convention D-209's nitrogen_uptake_charge_* parameters use (arginine is +0.25/mol N there, not +1)"
+    notes: "Read by the add_dap verb, never by a Process. Contrast the medium averages in acidbase.yaml: wine 0.3245 and beer 0.1772, both compositional and both DERIVED. This one is stoichiometric, which is why its tier is VALIDATED where theirs is plausible. The excess this implies (+0.6755 for wine, +0.8228 for beer) is what lands in the nitrogen_charge_excess slot, mass-weighted against whatever nitrogen the pool already held."
 
 # -- Copper H2S-binding capacity (add_copper verb, decision D-44) ----------------------------
 #

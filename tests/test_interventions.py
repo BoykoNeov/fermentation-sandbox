@@ -33,6 +33,8 @@ from fermentation.units.convert import mgl_to_gpl
 from fermentation.validation.conservation import total_carbon, total_nitrogen
 
 _DAP_N_FRACTION = 0.2121  # exact (NH4)2HPO4 stoichiometry (additions.yaml)
+#: g phosphoric-acid-equivalent phosphate per g DAP — M(H3PO4)/M((NH4)2HPO4), D-210.
+_DAP_PHOSPHATE_FRACTION = 0.74206
 _COPPER_H2S_BINDING = 0.536  # g H2S bound / g Cu, stoichiometric CuS 1:1 (additions.yaml, D-44)
 
 
@@ -60,7 +62,14 @@ def _dap(day: float, dap_gpl: float) -> Intervention:
 # -- the dose lands on N and is booked as one external flow --------------------
 
 
-def test_add_dap_lands_on_nitrogen_and_books_one_flow():
+def test_add_dap_writes_both_ions_and_nothing_else():
+    """The dose is a SALT: nitrogen, its phosphate counter-anion, and the pool's charge (D-210).
+
+    This test used to assert ``count_nonzero(everything except N) == 0`` — "the whole injection
+    is on N". That assert was correct about the code and wrong about the compound, and widening
+    what the verb writes is exactly the kind of change it existed to catch. Now it pins all three
+    writes individually, so the same protection survives at the wider scope.
+    """
     cs = compile_scenario(_wine([_dap(2.0, 0.4)]))
     traj = cs.run()
 
@@ -70,20 +79,44 @@ def test_add_dap_lands_on_nitrogen_and_books_one_flow():
     assert flow.time_h == pytest.approx(48.0)  # 2 days in canonical hours
 
     schema = cs.schema
-    # The whole injection is on N (= dap_gpl * fraction); every other slot delta is zero.
     expected_n = 0.4 * _DAP_N_FRACTION
     assert flow.delta[schema.slice("N")][0] == pytest.approx(expected_n, rel=1e-12)
-    others = np.delete(flow.delta, schema.slice("N").start)
+    # The phosphate arrives with it, as phosphoric-acid-equivalent mass (D-210).
+    assert flow.delta[schema.slice("phosphate")][0] == pytest.approx(
+        0.4 * _DAP_PHOSPHATE_FRACTION, rel=1e-12
+    )
+    # And the pool's mean charge is re-mixed toward pure ammonium. This wine names no
+    # `initial_ph`, so the CHARGE stays gated off (D-179) while the composition slot still moves:
+    # nitrogen is not pH information on its own.
+    excess = flow.delta[schema.slice(acidbase.NITROGEN_CHARGE_EXCESS_KEY)][0]
+    assert excess > 0.0
+    written = {"N", "phosphate", acidbase.NITROGEN_CHARGE_EXCESS_KEY}
+    others = np.delete(flow.delta, [schema.slice(name).start for name in written])
     assert np.count_nonzero(others) == 0
 
 
-def test_dap_nitrogen_fraction_is_validated_and_exact():
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("dap_nitrogen_fraction", 0.2121),
+        ("dap_phosphate_fraction", _DAP_PHOSPHATE_FRACTION),
+        ("dap_nitrogen_charge", 1.0),
+    ],
+)
+def test_the_dap_stoichiometry_params_are_validated_and_exact(name: str, value: float):
+    """All three are formula, not measurement — VALIDATED with a zero-width band (D-36, D-210).
+
+    ``dap_nitrogen_charge`` = 1.0 belongs here rather than in ``acidbase.yaml`` beside the two
+    composition averages precisely because of this contrast: wine's 0.3245 and beer's 0.1772 are
+    DERIVED from composition tables and carry real bands, while the charge of an ammonium ion is
+    the compound's formula.
+    """
     cs = compile_scenario(_wine([_dap(2.0, 0.4)]))
-    frac = cs.parameters["dap_nitrogen_fraction"]
-    assert frac.tier is Tier.VALIDATED
-    assert frac.value == pytest.approx(0.2121)
+    param = cs.parameters[name]
+    assert param.tier is Tier.VALIDATED
+    assert param.value == pytest.approx(value)
     # exact stoichiometry ⇒ zero-width band, never swept by the ensemble
-    assert frac.uncertainty.low == frac.value == frac.uncertainty.high
+    assert param.uncertainty.low == param.value == param.uncertainty.high
 
 
 # -- conservation across the jump: final == initial + Σ flows (crown jewel) ----
@@ -113,8 +146,10 @@ def test_add_dap_leaves_carbon_untouched():
     f_c = cs.param_values["biomass_C_fraction"]
     c_of = total_carbon(schema, biomass_carbon_fraction=f_c)
 
-    # DAP injects nitrogen only (phosphate dropped, no carbon), so every flow is carbon-free
-    # and the single-run carbon balance still closes with no ledger correction term.
+    # DAP is nitrogen plus phosphate and neither carries carbon (D-210 put the phosphate in the
+    # charge balance, and phosphoric acid has no carbon atom — it is absent from MOLAR_MASS /
+    # CARBON_ATOMS for that reason), so every flow is still carbon-free and the single-run
+    # carbon balance closes with no ledger correction term.
     assert all(c_of(flow.delta) == pytest.approx(0.0, abs=1e-15) for flow in traj.external_flows)
     assert c_of(traj.y[:, -1]) == pytest.approx(c_of(cs.y0), abs=1e-6)
 
@@ -1347,3 +1382,255 @@ def test_set_ph_vocabulary_errors_are_loud():
         compile_scenario(_ph_wine([_set_ph(2.0, 14.0)]))
     with pytest.raises(ValueError, match=r"strictly inside \(0, 14\)"):
         compile_scenario(_ph_wine([_set_ph(2.0, 0.0)]))
+
+
+# -- D-210: DAP is a SALT, and both of its ions are in the charge balance -------
+
+
+_D210_DOSE_DAY = 3.0
+_D210_DAYS = 14.0
+
+
+def _dap_charge_wine(dap_gpl: float, *, dose_day: float = _D210_DOSE_DAY) -> Scenario:
+    """An ANCHORED wine (the D-210 arm), optionally dosed.
+
+    ``initial_ph`` is what opts the charge balance in (D-179), so an unanchored wine would show
+    none of this — nitrogen is not pH information on its own.
+    """
+    interventions = (
+        [Intervention(day=dose_day, action="add_dap", params={"dap_gpl": dap_gpl})]
+        if dap_gpl
+        else []
+    )
+    return Scenario(
+        name="d210-dap-charge",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 250.0,
+            "pitch_gpl": 0.25,
+            "tartaric_gpl": 6.0,
+            "malic_gpl": 3.0,
+            "initial_ph": 3.40,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=interventions,
+        duration_days=_D210_DAYS,
+    )
+
+
+def _end_state(dap_gpl: float, *, dose_day: float = _D210_DOSE_DAY):
+    cs = compile_scenario(_dap_charge_wine(dap_gpl, dose_day=dose_day))
+    traj = cs.run()
+    return cs, np.asarray(traj.y, float)[:, -1]
+
+
+def _ph_with(cs, state, *, ammonium: bool = True, phosphate: bool = True) -> float:
+    """pH of one state with either D-210 half switched off IN THE STATE.
+
+    Each half is isolated by zeroing its OWN slot, which is what makes the attribution honest:
+    the two have opposite signs at the dose instant, so a single "with/without the beat" number
+    would credit each with the other's cancellation.
+    """
+    probe = state.copy()
+    if not ammonium:
+        probe[cs.schema.slice(acidbase.NITROGEN_CHARGE_EXCESS_KEY)] = 0.0
+    if not phosphate:
+        probe[cs.schema.slice("phosphate")] = 0.0
+    return acidbase.ph_of_state(probe, cs.schema, cs.param_values)
+
+
+def test_a_dap_dose_permanently_acidifies_a_wine_through_its_phosphate():
+    """The endpoint claim, re-RUN and not re-scored (D-210).
+
+    ``ph_of_state`` is read inside ``EsterHydrolysis``, ``EthylAcetateEsterification``,
+    ``AcetaldehydeReduction``, ``PhenolicBrowning`` and both Strecker limbs, so a static
+    re-score of a fixed trajectory is an instrument and only a re-run is the claim (D-209 §6).
+    """
+    cs_undosed, undosed = _end_state(0.0)
+    ph_undosed = acidbase.ph_of_state(undosed, cs_undosed.schema, cs_undosed.param_values)
+
+    cs, dosed = _end_state(0.3)
+    ph_dosed = acidbase.ph_of_state(dosed, cs.schema, cs.param_values)
+
+    # A cellar dose leaves the wine measurably more acidic than the same wine undosed. Before
+    # D-210 this difference was ~2e-4 pH — the dose's kinetic side-effects only.
+    assert ph_dosed < ph_undosed - 0.03
+    assert ph_dosed == pytest.approx(3.1683, abs=2e-3)
+    assert ph_undosed == pytest.approx(3.2123, abs=2e-3)
+
+
+def test_the_phosphate_half_owns_the_endpoint_and_the_ammonium_half_the_excursion():
+    """Attribution at the granularity that can be wrong — and it INVERTS the pre-registration.
+
+    D-209 §8c predicted the dosed nitrogen's charge would matter because the acidification was
+    "understated by ~3x on the dosed fraction". True of the *excursion*, false of the endpoint:
+    on a DRY wine the dosed nitrogen is fully consumed either way, so the pool's charge returns
+    to ~0 whatever it was and the ammonium half is worth exactly ZERO at the end. Everything
+    permanent is the phosphate. Shipping the ammonium half alone would have credited it with
+    +0.235 pH of dose-time rise that the phosphate cancels 71 % of.
+    """
+    cs, end = _end_state(1.1)  # Palma 2012's refeed dose
+    both = acidbase.ph_of_state(end, cs.schema, cs.param_values)
+
+    # The dosed nitrogen is gone, so its charge cannot be in the endpoint either way.
+    assert float(end[cs.schema.slice("N")][0]) == pytest.approx(0.0, abs=1e-6)
+    assert _ph_with(cs, end, ammonium=False) == pytest.approx(both, abs=1e-9)
+    # The phosphate is still there and is the whole of it.
+    assert _ph_with(cs, end, phosphate=False) - both == pytest.approx(0.162, abs=5e-3)
+
+
+def test_the_ammonium_half_reaches_the_endpoint_when_nitrogen_is_left_standing():
+    """The ammonium half is not endpoint-free in general — only on a wine that finishes dry.
+
+    Dose late enough that the run's horizon ends with the supplement still in the pool (a stuck
+    or sluggish ferment, a sweet wine, or simply a short horizon) and standing NH4+ is real
+    cation charge: the wine reads 0.23 pH HIGHER than the pool-average charge said. That is the
+    case a "the ammonium half does nothing" reading of the test above would get wrong.
+    """
+    cs, end = _end_state(1.1, dose_day=12.0)
+    standing = float(end[cs.schema.slice("N")][0])
+    assert standing > 0.2  # the supplement is still there at the horizon
+    both = acidbase.ph_of_state(end, cs.schema, cs.param_values)
+    assert both - _ph_with(cs, end, ammonium=False) == pytest.approx(0.228, abs=5e-3)
+
+
+def test_the_dose_time_ph_rise_is_emergent_and_the_two_halves_oppose_there():
+    """At the dose instant the salt is electroneutral as it ARRIVES (+2 ammonium, -2 hydrogen
+    phosphate) and the balance gains ~+1.05 net cation per mole — which IS the ~1.05 protons the
+    dosed HPO4(2-) takes up on its way to H2PO4(-) at wine pH. So the pH rise falls out of the
+    balance, and nothing may add a proton-consumption term on top of it.
+
+    Pinned at 1.1 g/L, where the halves are largest: ammonium +0.235, phosphate -0.166, net
+    +0.070. A single with/without number would report only that net and hide both.
+    """
+    cs = compile_scenario(_dap_charge_wine(1.1))
+    traj = cs.run(t_eval=np.linspace(0.0, _D210_DAYS * 24.0, 2001))
+    y = np.asarray(traj.y, float)
+    k = int(np.searchsorted(np.asarray(traj.t, float), _D210_DOSE_DAY * 24.0 + 1e-9))
+    state = y[:, k]
+
+    both = acidbase.ph_of_state(state, cs.schema, cs.param_values)
+    ammonium_worth = both - _ph_with(cs, state, ammonium=False)
+    phosphate_worth = both - _ph_with(cs, state, phosphate=False)
+    assert ammonium_worth == pytest.approx(0.235, abs=8e-3)
+    assert phosphate_worth == pytest.approx(-0.166, abs=8e-3)
+    # Opposite signs, and the phosphate cancels most of the ammonium's bump.
+    assert ammonium_worth > 0.0 > phosphate_worth
+    assert abs(phosphate_worth) / ammonium_worth == pytest.approx(0.705, abs=0.05)
+
+
+def test_an_undosed_wine_carries_the_new_slots_at_exactly_zero():
+    """The isolability claim, in the only form checkable from inside (prime directive #3).
+
+    Both D-210 slots default to 0.0 and only ``add_dap`` writes them, so an undosed wine's charge
+    balance gains the exact float 0.0 — not a small number. ``nitrogen_charge_excess`` stores the
+    EXCESS over the medium average rather than the mean charge itself precisely so that this is
+    true without a sentinel: 0.0 is both the default and the correct undosed value.
+    """
+    cs, end = _end_state(0.0)
+    assert float(end[cs.schema.slice("phosphate")][0]) == 0.0
+    assert float(end[cs.schema.slice(acidbase.NITROGEN_CHARGE_EXCESS_KEY)][0]) == 0.0
+    # And the pool's charge is exactly the medium average, i.e. the D-209 value unchanged.
+    n_gpl = float(end[cs.schema.slice("N")][0])
+    assert acidbase.nitrogen_charge_molar(end, cs.schema, cs.param_values) == pytest.approx(
+        acidbase.nitrogen_charge_from_gpl(n_gpl, "wine", cs.param_values), rel=1e-12
+    )
+
+
+def _setph_after_dose(target_ph: float, *, set_day: float = 1.02) -> Scenario:
+    return Scenario(
+        name="d210-setph-after-dose",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 300.0,
+            "pitch_gpl": 0.25,
+            "tartaric_gpl": 2.0,
+            "initial_ph": 3.40,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[
+            Intervention(day=1.0, action="add_dap", params={"dap_gpl": 3.0}),
+            Intervention(day=set_day, action="set_ph", params={"ph": target_ph}),
+        ],
+        duration_days=_D210_DAYS,
+    )
+
+
+def test_a_set_ph_after_a_big_dap_dose_names_the_nitrogen_and_not_the_acid_load():
+    """The second way into ``cation_slot_after_nitrogen``, and a mis-diagnosis it exposed (D-210).
+
+    Two separate faults, both found here. First, D-209's guard was reachable only from the compile
+    seam, so its message said "Reduce yan_mgl, add acid, or raise initial_ph" — advice a mid-run
+    ``set_ph`` caller cannot act on, against a scenario key they did not use. After a dose the pool
+    carries up to 3x the average charge per mole N, so a target that was fine before the dose can
+    demand a negative remainder: 3 g/L of DAP into a low-acid wine puts 0.047 mol+/L of nitrogen
+    charge against the 0.045 a pH-4.5 target demands.
+
+    Second and worse, ``_verb_set_ph`` caught bare ``ValueError`` and rewrote it as "target pH is
+    below this state's intrinsic pH — the acid load alone holds it there". Every configuration
+    scanned while writing this test reported that message, and in every one of them the acid load
+    was NOT the cause. Hence ``NitrogenExceedsCationDemandError``: the two failures have different
+    remedies, so they need different messages.
+    """
+    with pytest.raises(acidbase.NitrogenExceedsCationDemandError, match=r"set_ph=4\.5 needs"):
+        compile_scenario(_setph_after_dose(4.5)).run()
+    with pytest.raises(ValueError, match="pure ammonium"):
+        compile_scenario(_setph_after_dose(4.5)).run()
+    # It is still a ValueError, so a caller catching the broad type is unaffected.
+    with pytest.raises(ValueError):
+        compile_scenario(_setph_after_dose(4.5)).run()
+
+
+def test_the_set_ph_floor_message_still_fires_where_the_acid_load_really_is_the_cause():
+    """The floor branch is narrowed by D-210, not removed — the positive control for the test above.
+
+    Once the supplement has been assimilated the pool's charge is ~0 and an unreachable target is
+    unreachable for the ordinary D-186 reason. Both branches must stay live, or "it names the
+    nitrogen" would be true by having only one branch left.
+
+    A normally-acidified wine, dosed at a cellar rate and re-anchored on day 6 when its nitrogen
+    is long gone: the floor is pH 2.1475 and a target below it reports the floor, not nitrogen.
+    """
+    scenario = Scenario(
+        name="d210-setph-floor",
+        medium="wine",
+        initial={
+            "brix": 24.0,
+            "yan_mgl": 250.0,
+            "pitch_gpl": 0.25,
+            "tartaric_gpl": 6.0,
+            "malic_gpl": 3.0,
+            "initial_ph": 3.40,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        interventions=[
+            Intervention(day=3.0, action="add_dap", params={"dap_gpl": 0.3}),
+            Intervention(day=6.0, action="set_ph", params={"ph": 2.0}),
+        ],
+        duration_days=_D210_DAYS,
+    )
+    with pytest.raises(ValueError, match="is below this state's intrinsic pH") as caught:
+        compile_scenario(scenario).run()
+    assert not isinstance(caught.value, acidbase.NitrogenExceedsCationDemandError)
+
+
+def test_the_compile_seam_guard_keeps_its_seed_shaped_remedy():
+    """At compile no dose can have fired, so the remedy is the scenario's own keys (D-209/D-210)."""
+    with pytest.raises(ValueError, match="Reduce yan_mgl"):
+        compile_scenario(
+            Scenario(
+                name="d210-unphysical-seed",
+                medium="wine",
+                initial={
+                    "brix": 24.0,
+                    "yan_mgl": 400.0,
+                    "pitch_gpl": 0.25,
+                    "tartaric_gpl": 2.0,
+                    "initial_ph": 2.90,
+                },
+                temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+                duration_days=_D210_DAYS,
+            )
+        )

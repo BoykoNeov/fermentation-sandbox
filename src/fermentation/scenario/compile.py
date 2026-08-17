@@ -781,6 +781,12 @@ def _wine_initial(
     if "initial_ph" in values:
         # Byp = 0 at pitch, so the anchoring cation reproduces initial_ph from the named
         # acids alone; as Byp accumulates during the ferment, pH drifts emergently.
+        # `phosphate` (D-210) is deliberately absent: nothing seeds it, so it is 0 at every
+        # anchor, and an absent key contributes nothing to `charge_residual`'s sum — which keeps
+        # this seam bitwise what it was. It is also the whole reason the dosed phosphate MOVES
+        # anything: a species present here is absorbed by the fitted cation (D-178's result), and
+        # one dosed later is not. If a native must phosphate is ever seeded, it belongs here and
+        # will correctly become a near no-op.
         acid_gpl = {"tartaric": tartaric, "malic": malic, "lactic": 0.0}
         totals_molar = {n: g / acidbase.ACID_STATE[n].molar_mass for n, g in acid_gpl.items()}
         try:
@@ -852,6 +858,11 @@ _BEER_ACID_SEEDS: tuple[tuple[str, str, str], ...] = (
     ("formic", "formic_gpl", "formic_typical_wort"),
     ("oxalic", "oxalic_gpl", "oxalic_typical_wort"),
     ("peptide_buffer", "peptide_buffer_gpl", "peptide_buffer_capacity_beer"),
+    # `phosphate` (D-210) is NOT here, and its absence is the reason it does anything. Malt
+    # phosphate really is in a wort — D-178 measured it and refused it as beer's buffer, because
+    # a near-constant charge PRESENT AT THE ANCHOR is absorbed by the back-solved cation. Only
+    # the DOSED phosphate `add_dap` writes is post-anchor, so only that one acidifies. Seeding a
+    # wort phosphate here would reproduce D-178's near-no-op, which is why it is not a gap.
 )
 
 
@@ -1529,31 +1540,73 @@ def _iv_str(iv: Intervention, key: str, verb: str) -> str:
 def _verb_add_dap(
     iv: Intervention, schema: StateSchema, parameters: ParameterSet
 ) -> ScheduledEvent:
-    """``add_dap`` — dose diammonium phosphate, injecting assimilable nitrogen (decision D-36).
+    """``add_dap`` — dose diammonium phosphate, BOTH of its ions (decisions D-36, D-210).
 
     Doses DAP by mass (``dap_gpl``, faithful to the commercial additive) and converts to the
     assimilable-nitrogen jump on the lumped ``N`` slot via the sourced ``dap_nitrogen_fraction``
-    (exact (NH₄)₂HPO₄ stoichiometry, VALIDATED). Phosphate is dropped — the model tracks no
-    phosphorus pool. The headline consequence is a *timing* effect the static D-29 lever could
-    not produce: restoring N mid-ferment momentarily closes the inverse H₂S gate
-    ``K_h2s_n/(K_h2s_n+N)`` while sugar (hence the flux the gate multiplies) is still present.
+    (exact (NH₄)₂HPO₄ stoichiometry, VALIDATED). The D-36 headline consequence is a *timing*
+    effect the static D-29 lever could not produce: restoring N mid-ferment momentarily closes
+    the inverse H₂S gate ``K_h2s_n/(K_h2s_n+N)`` while sugar (hence the flux the gate multiplies)
+    is still present.
+
+    **D-210 makes the dose a SALT rather than a nitrogen injection.** Until then this verb wrote
+    one slot, and the charge consequences of the other two thirds of the compound were both
+    missing:
+
+    * the dosed nitrogen was charged at its medium's *composition average* (D-209's ``z̄``),
+      when DAP's nitrogen is pure ammonium and carries **+1 per mole N** — 3× wine's average.
+      ``nitrogen_charge_excess`` now carries the difference, re-mixed against whatever the pool
+      already held by :func:`~fermentation.core.acidbase.remix_nitrogen_charge_excess`;
+    * the **phosphate was dropped entirely**, on the correct premise that no phosphorus pool
+      exists and the incorrect inference that therefore nothing was owed. The charge balance
+      needs a total, not a pool, and ~0.95 equivalents per mole of anion charge were going
+      unbooked — so the verb was adding a cation with no counter-anion, i.e. booking a salt as
+      a base. It now writes the ``phosphate`` slot too.
+
+    The two are ONE change, not two independent ones, and the ordering matters for what may be
+    claimed: the ammonium half moves a *dry* wine's final pH by exactly zero (the dosed nitrogen
+    leaves either way) while tripling the dose-time excursion, and the phosphate half is what
+    permanently acidifies (−0.159 pH at 1.1 g/L). Shipping the nitrogen half alone would have
+    credited it with +0.242 pH of dose-time rise that the phosphate cancels 72 % of.
+
+    Both new writes are guarded on slot presence rather than assumed, because a caller-supplied
+    schema predating D-210 must keep working exactly as it did.
     """
     _iv_check_keys(iv, frozenset({"dap_gpl"}), "add_dap")
     dap_gpl = _iv_float(iv, "dap_gpl", "add_dap")
     try:
         n_fraction = parameters["dap_nitrogen_fraction"].value
+        phosphate_fraction = parameters["dap_phosphate_fraction"].value
+        dosed_charge = parameters["dap_nitrogen_charge"].value
     except KeyError as exc:  # additions.yaml not loaded (caller-supplied parameter_paths)
         raise ValueError(
-            "intervention 'add_dap' needs 'dap_nitrogen_fraction' but it is missing "
-            f"({exc}); include additions.yaml in parameter_paths (the default lookup merges "
-            "it automatically)."
+            "intervention 'add_dap' needs 'dap_nitrogen_fraction', 'dap_phosphate_fraction' and "
+            f"'dap_nitrogen_charge' but one is missing ({exc}); include additions.yaml in "
+            "parameter_paths (the default lookup merges it automatically)."
         ) from None
     added_n_gpl = dap_gpl * n_fraction
+    added_phosphate_gpl = dap_gpl * phosphate_fraction
     n_slice = schema.slice("N")
+    phosphate_slice = schema.slice("phosphate") if "phosphate" in schema else None
+    excess_key = acidbase.NITROGEN_CHARGE_EXCESS_KEY
+    excess_slice = schema.slice(excess_key) if excess_key in schema else None
+    param_values = parameters.resolve()
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(mutate_schema: StateSchema, y: FloatArray) -> FloatArray:
         out = y.copy()
+        if excess_slice is not None:
+            # Re-mix BEFORE the nitrogen lands: the weighting is pool-before against dose.
+            out[excess_slice] = acidbase.remix_nitrogen_charge_excess(
+                float(y[n_slice][0]),
+                float(y[excess_slice][0]),
+                added_n_gpl,
+                float(dosed_charge),
+                mutate_schema.medium,
+                param_values,
+            )
         out[n_slice] += added_n_gpl
+        if phosphate_slice is not None:
+            out[phosphate_slice] += added_phosphate_gpl
         return out
 
     return ScheduledEvent(
@@ -2564,8 +2617,14 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
         out = y.copy()
         try:
             out[cation_slice] = acidbase.cation_charge_for_ph(y, schema, resolved, target_ph)
+        except acidbase.NitrogenExceedsCationDemandError:
+            # A DIFFERENT failure with a different remedy, so it passes through with its own
+            # message (decision D-210). Rewriting it as the floor case below blamed the acid load
+            # for a state whose nitrogen pool was the cause — reachable once `add_dap` puts a
+            # supplement's +1/mol N into the pool, and misleading exactly there.
+            raise
         except ValueError:
-            # Below the acid load's own pH: no cation addition reaches it, and removing cation
+            # Below the achievable floor: no cation addition reaches it, and removing cation
             # bottoms out at zero. Name that floor — it is what the caller has to work with, and
             # solve_ph is total (D-46) so computing it cannot itself raise.
             floor_state = y.copy()
@@ -2573,9 +2632,10 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
             floor = acidbase.ph_of_state(floor_state, schema, resolved)
             raise ValueError(
                 f"intervention {label!r}: target pH {target_ph:g} is below this state's "
-                f"intrinsic pH {floor:.4f} — the acid load alone holds it there with zero "
-                "strong cation, so no deacidification or cation exchange reaches the target. "
-                "Raise the target, or lower the acid load."
+                f"intrinsic pH {floor:.4f} — the acid load, plus whatever cation charge the "
+                "assimilable-nitrogen pool carries (D-209, and NOT the caller's to remove), "
+                "holds it there with zero strong cation, so no deacidification or cation "
+                "exchange reaches the target. Raise the target, or lower the acid load."
             ) from None
         return out
 

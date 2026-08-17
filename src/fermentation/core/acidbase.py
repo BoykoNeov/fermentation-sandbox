@@ -130,6 +130,7 @@ from fermentation.core.chemistry import (
     M_MALIC,
     M_NITROGEN,
     M_OXALIC,
+    M_PHOSPHORIC,
     M_PYRUVATE,
     M_SO2,
     M_SUCCINIC,
@@ -165,17 +166,49 @@ class AcidSpec:
         return len(self.pka_param_names)
 
 
+#: Dosed phosphate, read as phosphoric acid — the counter-anion of a DAP addition (D-210).
+#: In **both** registries below, and the symmetry is load-bearing rather than tidy: ``add_dap``
+#: is medium-agnostic, so scoping this to wine would leave a DAP-dosed *beer* booking the
+#: dose's ammonium (+1 per mole N, D-210) with no anion to meet it — a strong-base artefact of
+#: exactly the kind D-179's populated-balance gate exists to prevent, and worse than the
+#: omission it replaced.
+#:
+#: **DIPROTIC ON PURPOSE**, the ``CARBONIC_AS_CO2`` idiom. Phosphoric acid's third dissociation
+#: (pKa₃ ≈ 12.35) is omitted, not deferred: it is >6 pH units above anything either medium
+#: reaches and >4 above :func:`titratable_acidity`'s 8.2 endpoint, so it contributes ~7e-5 of
+#: an equivalent where the model goes. Carrying it would be actively *wrong* rather than
+#: merely idle, because ``AcidSpec.protons`` is the maximum anion charge TA reads as its
+#: endpoint approximation — a third pKa would add a full never-titratable equivalent per mole
+#: (0.63 g/L of phantom TA at a 1.1 g/L DAP dose).
+#:
+#: **Why this is not the phosphate D-178 refused.** That was *malt* phosphate, present in the
+#: wort at t=0: a species of near-constant charge sitting in the balance when ``initial_ph`` is
+#: back-solved is absorbed outright by the anchor, which is what made it a near no-op rather
+#: than a weak buffer. A DOSED phosphate arrives *after* the anchor, so nothing absorbs it and
+#: its ~0.95 anion charge per mole is a permanent acidification — measured at **-0.159 pH** on
+#: Palma's 1.1 g/L refeed and **-0.043 pH** on a 0.3 g/L cellar dose. Its *buffering* is
+#: genuinely negligible (0.97 mEq/L/pH against wine's ~47, i.e. 2.1 %) and that is precisely
+#: why the cheap alternative fails: a species whose charge is nearly constant still needs that
+#: constant CHOSEN, and the admissible range (0.876 at pH 3.0 to 1.000 fully dissociated) spans
+#: 0.022 pH at Palma's dose. The pKas remove the freedom; a fitted constant would be the free
+#: normalisation D-205 refused a term for.
+PHOSPHATE_AS_PHOSPHORIC = AcidSpec(M_PHOSPHORIC, ("pKa_phosphoric_1", "pKa_phosphoric_2"))
+
 #: The charge-active acids carried as WINE state slots (decision D-18). ``lactic`` is
 #: produced-only (the MLF product), but it is charge-active the moment it exists.
 #:
-#: **Unchanged by D-179, and that is load-bearing.** Beer's set is a SEPARATE registry
-#: (:data:`BEER_ACIDS`) rather than an extension of this one, so wine resolves to the
-#: identical three-entry dict it always has — which is what makes "wine is unchanged" a
+#: **Unchanged by D-179, and that was load-bearing.** Beer's set is a SEPARATE registry
+#: (:data:`BEER_ACIDS`) rather than an extension of this one, so wine resolved to the
+#: identical three-entry dict it always had — which is what made "wine is unchanged" a
 #: structural fact rather than a numerical coincidence (see :func:`acid_registry`).
+#: **D-210 adds a fourth member**, ``phosphate``, and the structural fact survives in the form
+#: that matters: the slot defaults to 0.0 and only ``add_dap`` ever writes it, so an undosed
+#: wine's charge balance gains the exact float ``0.0`` and is bitwise what it was.
 WINE_ACIDS: dict[str, AcidSpec] = {
     "tartaric": AcidSpec(M_TARTARIC, ("pKa_tartaric_1", "pKa_tartaric_2")),
     "malic": AcidSpec(M_MALIC, ("pKa_malic_1", "pKa_malic_2")),
     "lactic": AcidSpec(M_LACTIC, ("pKa_lactic",)),
+    "phosphate": PHOSPHATE_AS_PHOSPHORIC,
 }
 
 #: The charge-active acids carried as BEER state slots (decision D-179).
@@ -229,6 +262,9 @@ BEER_ACIDS: dict[str, AcidSpec] = {
     "formic": AcidSpec(M_FORMIC, ("pKa_formic",)),
     "oxalic": AcidSpec(M_OXALIC, ("pKa_oxalic_1", "pKa_oxalic_2")),
     "peptide_buffer": AcidSpec(M_GLUTAMIC, ("pKa_peptide_buffer",)),
+    # Dosed phosphate (D-210) — NOT the malt phosphate this beat refused; see
+    # PHOSPHATE_AS_PHOSPHORIC for why an anchor absorbs one and not the other.
+    "phosphate": PHOSPHATE_AS_PHOSPHORIC,
 }
 
 #: Which registry each medium's charge balance uses (decision D-179). Keyed by
@@ -310,6 +346,33 @@ NITROGEN_CHARGE_PARAM_NAMES: dict[str, str] = {
     "beer": "nitrogen_uptake_charge_beer",
     "wine": "nitrogen_uptake_charge_wine",
 }
+
+#: State slot holding how far this pool's mean charge sits **above its medium's composition
+#: average** (mol⁺ per mole N) — decision D-210. Zero for any must or wort, which is the whole
+#: reason the excess is the stored quantity rather than the mean charge itself: 0.0 is the
+#: correct value for an undosed beverage *and* the value every state vector defaults to, so no
+#: sentinel is needed to tell "no dose" from "uncharged pool". A slot holding the mean charge
+#: would need one, and comparing a state float against a sentinel is a gate the BDF Jacobian
+#: probe straddles ([[feedback-a-gate-is-a-discontinuity-the-solver-probes]]).
+#:
+#: **Constant except at dose events, and that is exact rather than approximate.** Uptake draws
+#: the lumped pool down proportionally, so charge-per-mole is invariant under drawdown; only an
+#: addition of differently-charged nitrogen moves it. No Process touches this slot — the
+#: ``cation_charge`` idiom — and ``add_dap`` re-mixes it.
+#:
+#: **What it deliberately does NOT correct.** Eight Processes add to ``N``, and their own
+#: comments call the returned nitrogen ammonium, which would suggest +1. Measured (D-210):
+#: ~88 % of that inflow is ``AminoAcidAssimilation``, which is an **un-draw** and not a
+#: deamination at all — dosed amino acids substitute for the lumped pool in biomass, so the
+#: pool is simply not consumed and its composition is unchanged, making the medium average
+#: exactly right. The remaining ~12 % are genuine deaminations whose true charge is
+#: channel-dependent: **0** where the keto acid is excreted and retained (its anion is not in
+#: any registry), **+1** where the keto acid is decarboxylated to a neutral alcohol and a
+#: proton comes out of the medium to balance. The medium average sits between those two errors,
+#: bracketed at **≤0.033 pH** transiently and **~2e-5 pH** at the endpoint of a maximal-refund
+#: wine. The dose is the one channel where this model books BOTH of the arriving ions, which is
+#: why it is the one channel that may claim +1.
+NITROGEN_CHARGE_EXCESS_KEY = "nitrogen_charge_excess"
 
 #: Both names, in a stable order, for :data:`PH_SYSTEM_READS` and for tier propagation. The
 #: **union** ships in every medium's parameter set (both live in ``acidbase.yaml``, which
@@ -822,9 +885,7 @@ def dissolved_co2_molar(y: FloatArray, schema: StateSchema, params: Mapping[str,
     return min(evolved, saturation) / CARBONIC_AS_CO2.molar_mass
 
 
-def nitrogen_charge_molar(
-    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
-) -> float:
+def nitrogen_charge_molar(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
     """Net charge the assimilable-nitrogen pool carries (mol⁺/L) — decision D-209.
 
     ``z̄ · [N]``, where ``[N]`` is the ``N`` slot in mol of elemental nitrogen per litre and
@@ -880,13 +941,42 @@ def nitrogen_charge_molar(
     """
     if NITROGEN_KEY not in schema or not charge_balance_is_populated(y, schema):
         return 0.0
+    excess = (
+        float(y[schema.slice(NITROGEN_CHARGE_EXCESS_KEY)][0])
+        if NITROGEN_CHARGE_EXCESS_KEY in schema
+        else 0.0
+    )
     return nitrogen_charge_from_gpl(
-        float(y[schema.slice(NITROGEN_KEY)][0]), schema.medium, params
+        float(y[schema.slice(NITROGEN_KEY)][0]), schema.medium, params, excess=excess
     )
 
 
+class NitrogenExceedsCationDemandError(ValueError):
+    """The nitrogen pool alone supplies more cation charge than a target pH demands (D-209/D-210).
+
+    A ``ValueError`` subclass rather than a bare one, and the reason is a mis-diagnosis D-210
+    found rather than a preference. :func:`cation_slot_after_nitrogen` and
+    :func:`solve_cation_charge` both raise when a target pH is unreachable, but for *different*
+    reasons with *different* remedies — the acid load being too strong, against the
+    assimilable-nitrogen pool's own charge being too large — and
+    :func:`~fermentation.scenario.compile._verb_set_ph` caught ``ValueError`` and rewrote both as
+    the first. So a nitrogen-bearing state reported "target pH is below this state's intrinsic pH,
+    the acid load alone holds it there", pointing the caller at an acid load that was not the
+    cause and at a remedy that would not help.
+
+    Only reachable at all since D-210 put a supplement's charge into the pool: before that the
+    nitrogen term was small enough relative to a plausible acid load that the ordering held in
+    practice. That is why this is a subclass and not a rewrite of the caller's message.
+    """
+
+
 def cation_slot_after_nitrogen(
-    total_cation: float, nitrogen_charge: float, target_ph: float, medium: str
+    total_cation: float,
+    nitrogen_charge: float,
+    target_ph: float,
+    medium: str,
+    *,
+    context: str = "initial_ph",
 ) -> float:
     """``total_cation - nitrogen_charge``, refusing a negative remainder (decision D-209).
 
@@ -907,20 +997,35 @@ def cation_slot_after_nitrogen(
     Raises ``ValueError`` naming nitrogen, because the remedy is a scenario change the caller can
     act on (less YAN, more acid, or a higher ``initial_ph``) and it is not the one
     :func:`solve_cation_charge`'s own message would suggest.
+
+    **Reachable from a second direction since D-210**, and ``context`` exists because of it.
+    ``set_ph`` (D-186) re-anchors mid-run through :func:`cation_charge_for_ph`, and after an
+    ``add_dap`` the pool's charge per mole N is up to 3× the medium average, so a ``set_ph`` to a
+    low target on a wine still holding its supplement can demand a negative remainder where the
+    same target was fine before the dose. D-209's message named ``initial_ph`` unconditionally,
+    which on that path points the reader at a scenario key they did not use and cannot fix the
+    run with — so the caller now says which verb it is, and the remedy is worded accordingly.
     """
     slot = total_cation - nitrogen_charge
     if slot < 0.0:
-        raise ValueError(
-            f"initial_ph={target_ph} needs {total_cation:.4e} mol+/L of cation charge, but this "
+        remedy = (
+            "Reduce yan_mgl, add acid, or raise initial_ph."
+            if context == "initial_ph"
+            else (
+                "Target a higher pH, dose less nitrogen, or re-anchor before the dose — a "
+                "supplement's nitrogen is pure ammonium and carries ~3x the must average (D-210)."
+            )
+        )
+        raise NitrogenExceedsCationDemandError(
+            f"{context}={target_ph} needs {total_cation:.4e} mol+/L of cation charge, but this "
             f"{medium}'s assimilable nitrogen already supplies {nitrogen_charge:.4e} (decision "
-            f"D-209) — leaving a negative strong-cation charge of {slot:.4e} mol/L. Reduce "
-            "yan_mgl, add acid, or raise initial_ph."
+            f"D-209) — leaving a negative strong-cation charge of {slot:.4e} mol/L. {remedy}"
         )
     return float(slot)
 
 
 def nitrogen_charge_from_gpl(
-    nitrogen_gpl: float, medium: str, params: Mapping[str, float]
+    nitrogen_gpl: float, medium: str, params: Mapping[str, float], *, excess: float = 0.0
 ) -> float:
     """:func:`nitrogen_charge_molar` off a bare g N/L figure instead of a state vector.
 
@@ -931,14 +1036,59 @@ def nitrogen_charge_from_gpl(
     :func:`solve_cation_charge` hands back, exactly as :func:`cation_charge_for_ph` does —
     otherwise a scenario's ``initial_ph`` would not be reproduced at t=0.
 
+    ``excess`` (decision D-210) is how far this particular pool's mean charge sits above the
+    medium's composition average — :data:`NITROGEN_CHARGE_EXCESS_KEY`, non-zero only after a
+    supplement dose. It defaults to 0 so the compile seam, where no dose can have fired yet,
+    reads exactly as it did at D-209.
+
     Returns 0 for a medium with no entry in :data:`NITROGEN_CHARGE_PARAM_NAMES`, or when that
     entry is missing from ``params`` (a caller-supplied ``parameter_paths`` without
-    ``acidbase.yaml``).
+    ``acidbase.yaml``) — the ``excess`` is dropped with it rather than standing alone, because
+    a medium whose composition average is unavailable has no baseline for an excess to be
+    relative to.
     """
     name = NITROGEN_CHARGE_PARAM_NAMES.get(medium)
     if name is None or name not in params:
         return 0.0
-    return float(params[name]) * (nitrogen_gpl / M_NITROGEN)
+    return (float(params[name]) + excess) * (nitrogen_gpl / M_NITROGEN)
+
+
+def remix_nitrogen_charge_excess(
+    pool_gpl: float,
+    pool_excess: float,
+    dosed_gpl: float,
+    dosed_charge_per_mole_n: float,
+    medium: str,
+    params: Mapping[str, float],
+) -> float:
+    """New :data:`NITROGEN_CHARGE_EXCESS_KEY` after a nitrogen dose (decision D-210).
+
+    The mass-weighted mean of what the pool already carried and what arrives — mass-weighted in
+    **nitrogen**, since the slot is per mole N and both terms are already per mole N::
+
+        excess' = (excess·N + (z_dose − z̄_medium)·ΔN) / (N + ΔN)
+
+    A supplement's charge is a property of the compound, not of the medium, so it enters as an
+    absolute charge and is converted to an excess here — that keeps the one place that knows
+    ``z̄_medium`` the same place that knows what an excess is relative to.
+
+    **Why a mean and not an accumulated charge.** Storing the pool's total charge would need a
+    Process to drain it in step with ``N``; storing its charge *per mole* needs nothing, because
+    proportional drawdown leaves the ratio alone. The trade is that a dose is a discrete re-mix
+    rather than an increment, which is exactly what an intervention is.
+
+    Guards the two states that have no meaningful mixture: a pool the solver has pushed
+    slightly negative (clamped to 0, so the dose then sets the excess outright) and a zero-mass
+    dose (leaves the excess untouched rather than dividing by the pool alone).
+    """
+    name = NITROGEN_CHARGE_PARAM_NAMES.get(medium)
+    zbar_medium = float(params[name]) if name is not None and name in params else 0.0
+    pool = max(pool_gpl, 0.0)
+    total = pool + dosed_gpl
+    if total <= 0.0:
+        return pool_excess
+    dose_excess = dosed_charge_per_mole_n - zbar_medium
+    return float((pool_excess * pool + dose_excess * dosed_gpl) / total)
 
 
 def _cation(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
@@ -1094,7 +1244,13 @@ def cation_charge_for_ph(
         target_ph,
     )
     return cation_slot_after_nitrogen(
-        total, nitrogen_charge_molar(y, schema, params), target_ph, schema.medium
+        total,
+        nitrogen_charge_molar(y, schema, params),
+        target_ph,
+        schema.medium,
+        # This is the mid-run re-anchor, so a failure here is a `set_ph` the state cannot reach —
+        # never an `initial_ph` the caller could lower (decision D-210).
+        context="set_ph",
     )
 
 

@@ -270,6 +270,55 @@ pKa_peptide_buffer:
     conditions: "wort/beer, 25 C; an EFFECTIVE (lumped) constant standing for the side-chain carboxyls of Asp/Glu residues borne on peptides and polypeptides, not a measured constant of any single species."
     notes: "tier=SPECULATIVE, and deliberately so -- this is a lumped stand-in for a protein population, not a measured molecular constant, and it is the one parameter that makes beer's pH tier speculative (acidbase.ph_tier is scoped per medium at D-179 precisely so this does NOT drag wine's pH tier down for an acid wine does not carry). THE HONEST LIMITATION: the capacity that pairs with this pKa was back-solved against a published WORT titration at pH 5.5, where the fit is well-conditioned; at BEER's pH 4.4 the identical fitted solutions give a buffering index from 0.32 to 0.59 across this band -- a factor of ~1.9. The calibration frame is not the frame that binds, which is why the pairing ships as a band and never as a nominal."
 
+# ==============================================================================
+# DOSED PHOSPHATE (decision D-210) — the counter-anion of a DAP addition.
+#
+# THIS IS NOT THE PHOSPHATE D-178 REFUSED, and the distinction is the whole beat. D-178 was
+# opened on MALT phosphate as beer's buffer and measured it a near no-op: its charge is ~0.99
+# flat across beer's window, and a species of constant charge PRESENT AT t=0 is absorbed
+# outright by the back-solved cation. Both halves of that argument are about a species the
+# anchor can see. `add_dap` doses (NH4)2HPO4 mid-run, AFTER the anchor, so nothing absorbs it:
+# ~0.95 equivalents of anion charge per mole arrive and never leave, worth -0.159 pH on Palma
+# 2012's 1.1 g/L refeed and -0.043 pH on a 0.3 g/L cellar dose. Until D-210 the model dropped
+# the phosphate entirely and booked only the dose's ammonium -- a cation with no counter-anion.
+#
+# WHY THE pKas AND NOT A FIXED CHARGE, which was measured before being decided. The dosed
+# phosphate's BUFFERING is genuinely negligible: dz/dpH = 0.117 at wine pH, so at Palma's 8.33
+# mmol/L it contributes 0.97 mEq/L/pH against wine's own ~47, i.e. 2.1 %. That invites replacing
+# it with one constant anion charge folded into cation_charge, no slot and no pKas. The
+# measurement refuses it: a nearly-constant charge still needs the constant CHOSEN, the
+# admissible range is 0.876 (pH 3.0) to 1.000 (fully dissociated), and end pH across that range
+# spans 0.022 pH at Palma's dose -- resolvable, and a free normalisation of exactly the kind
+# D-205 refused a term for. Two sourced pKas remove the freedom at the price of one state slot.
+#
+# DIPROTIC ON PURPOSE (the pKa_carbonic_1 idiom). Phosphoric acid's third dissociation, 12.35,
+# is omitted rather than deferred: it is >6 pH units above anything either medium reaches and >4
+# above titratable_acidity's 8.2 endpoint, so it is worth ~7e-5 of an equivalent where the model
+# goes. Carrying it would be actively WRONG, not merely idle -- AcidSpec.protons is the maximum
+# anion charge TA uses as its endpoint approximation, so a third pKa would add a full
+# never-titratable equivalent per mole: 0.63 g/L of phantom TA at a 1.1 g/L dose.
+# ==============================================================================
+
+pKa_phosphoric_1:
+  value: 2.15
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 2.12, high: 2.16, note: "thermodynamic pKa1 at 25 C, I=0. The narrow spread across sources is real -- this is a first dissociation measured many times -- and it is also nearly consequence-free here: at wine pH the phosphate is 87-97 % singly-dissociated either way. The consequential number in this block is the DOSE, not the constant." }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of inorganic acids); the same 2.15 / 7.20 / 12.35 triple already quoted in this file's citrate block and in acidbase.BEER_ACIDS as the acid D-178 was opened on."
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied to must/wort and beverage as an apparent constant, the D-179 convention for every pKa here"
+    notes: "First dissociation of phosphoric acid, H3PO4 -> H2PO4(-). This is the ONE dissociation that matters for a dosed phosphate: at wine pH 3.0-3.7 it puts the mean charge at 0.876-0.973, and at beer pH it is ~0.995. Value re-used rather than re-sourced on purpose -- D-178 already carried it in prose to justify REFUSING malt phosphate, and D-210 is the same constant reaching the opposite conclusion about a DOSED phosphate, so quoting a different number would hide that the two beats agree about the chemistry and differ only about what the anchor can absorb."
+
+pKa_phosphoric_2:
+  value: 7.20
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 7.19, high: 7.21, note: "thermodynamic pKa2 at 25 C, I=0. Sits ~1.5 units above the highest pH any medium here starts from (a 5.65 wort) and ~3.8 above wine, so it is off across the whole trajectory; it is carried because titratable_acidity titrates to 8.2, where this proton IS in play (z goes 0.947 at pH 3.4 to 1.910 at 8.2)." }
+  provenance:
+    source: "CRC Handbook of Chemistry and Physics (ionization constants of inorganic acids); same triple as pKa_phosphoric_1."
+    conditions: "25 C, zero ionic strength (thermodynamic pKa); applied as an apparent constant"
+    notes: "Second dissociation, H2PO4(-) -> HPO4(2-). Consequence-free for the pH SOLVE in both media and load-bearing for the TA READOUT, which is why it is carried while the third (12.35) is not: the titration endpoint at 8.2 is one unit above this pKa and four below that one. Carrying exactly the protons that are titratable makes TA's z_max endpoint approximation come out at 1.05 equivalents per mole against a true 0.963 (9 % over, inside the module's own stated approximation), where three pKas would give 2.05 (113 % over)."
+
 # -- Sulfurous acid, H2SO3 / SO2.H2O (diprotic) — the free-SO2 speciation set ----
 #
 # READOUT-ONLY (decision D-22). Unlike the acids above, these pKas are NOT in the
@@ -572,14 +621,24 @@ vant_hoff_co2_solubility:
 #
 # SCOPE -- BOTH VALUES ARE MUST/WORT COMPOSITION AVERAGES AND DO NOT APPLY TO **DOSED** NITROGEN.
 # `add_dap` doses diammonium phosphate, in which EVERY nitrogen arrives as NH4+, so the correct
-# zbar for the dosed increment is exactly **+1.0** -- about 3x the wine average below. The model
-# charges dosed nitrogen at the average because the `N` slot is a single lumped pool with no way
-# to distinguish must nitrogen from supplement, so a DAP-dosed wine's acidification is
-# UNDERSTATED, by roughly 3x on the dosed fraction alone. Separately, DAP's phosphate
-# counter-anion is not in the charge balance at all (D-178 measured malt phosphate as a near
-# no-op at wort pH and refused it as beer's buffer; that argument was never re-run for a DOSED
-# phosphate at wine pH). Both are stated rather than built: splitting the pool is a state-vector
-# change, and it is named here so a later beat finds it recorded instead of discovering it.
+# zbar for the dosed increment is exactly +1.0 -- about 3x the wine average below.
+#
+# **BOTH HALVES OF THIS SCOPE LINE ARE BUILT AT D-210**, and the note is kept rather than deleted
+# because the shape of what it got right and wrong is the useful part. The dosed increment now
+# carries +1.0 through the `nitrogen_charge_excess` state slot (see additions.yaml's
+# dap_nitrogen_charge), and DAP's phosphate counter-anion is in the charge balance as the
+# `phosphate` slot (dap_phosphate_fraction, with pKas in the dosed-phosphate block below).
+#
+# WHAT D-210 CORRECTS HERE: "a DAP-dosed wine's acidification is UNDERSTATED, by roughly 3x on
+# the dosed fraction alone". The 3x is right about the EXCURSION and wrong about the endpoint. On
+# a wine that ferments dry the dosed nitrogen is fully consumed either way, so the pool's charge
+# returns to ~0 whatever zbar was and the nitrogen half moves the final pH by exactly 0.0; what
+# it moves is the dose-time bump (+0.242 pH at 1.1 g/L instead of +0.066) and any run left
+# holding nitrogen -- a stuck ferment, a sweet wine, a horizon short of dryness (+0.228 pH). The
+# PERMANENT acidification is entirely the phosphate this note filed second: -0.159 pH at 1.1 g/L,
+# -0.043 at a 0.3 g/L cellar dose. Splitting the pool per source turned out unnecessary -- a
+# charge-per-mole is invariant under proportional drawdown, so one dimensionless slot re-mixed at
+# each dose does what a second nitrogen pool would have.
 
 nitrogen_uptake_charge_beer:
   value: 0.1772

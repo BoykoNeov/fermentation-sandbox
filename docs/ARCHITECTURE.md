@@ -61,8 +61,8 @@ Current size, from `get_medium(...).schema`:
 
 | Medium | Named variables | Float slots | Sugar slots |
 |--------|-----------------|-------------|-------------|
-| wine   | 95 | 95 | 1 |
-| beer   | 55 | 57 | 3 |
+| wine   | 97 | 97 | 1 |
+| beer   | 57 | 59 | 3 |
 
 Tier and uncertainty do **not** ride inside these floats — they are properties of Processes and
 parameters, derived at the analysis boundary (D-1).
@@ -203,6 +203,15 @@ gates live in `_compile_interventions` rather than in the verbs, because a verb 
 scenario: `set_ph` needs `initial_ph` (D-186), and `seal_bottle` needs a `closure` and must not
 precede `begin_aging` (the charge is net of that first month's steady ingress).
 
+**A dosing verb doses the whole compound, not the ion it was named for (D-210).** `add_dap` wrote
+only `N` for six milestones, on the premise that the model tracks no phosphorus pool. The premise
+was true and the inference was not: the charge balance needs a *total*, not a pool, and the dropped
+phosphate was ~0.95 equivalents per mole of anion charge — so the verb was booking a salt as a
+base. It now writes three slots (`N`, `phosphate`, `nitrogen_charge_excess`), all guarded on slot
+presence so a schema predating D-210 behaves as it did. The dose-time pH *rise* is emergent from
+the balance and must stay that way: +2 cation and ~−0.95 anion per mole leaves ~+1.05 net, which
+*is* the protons the dosed HPO₄²⁻ takes up becoming H₂PO₄⁻ at wine pH.
+
 ## Confidence tiers
 
 `Tier` is an ordered enum (`VALIDATED > PLAUSIBLE > SPECULATIVE`); the trust of a combination is
@@ -276,6 +285,13 @@ off `StateSchema.medium`:
 - **`BEER_ACIDS` — beer's registry**, beside it: `acetic`, `formic`, `oxalic`, `pyruvic`,
   `succinic`, plus `peptide_buffer`. **Beer's pH is a prediction**, not an inverse-anchored fit
   like wine's — which is the point, and also why it is the harder claim.
+- **`phosphate` is in BOTH registries (D-210)** — the one shared member, and shared because it is
+  the same species in the same role: the counter-anion of an `add_dap` dose, which is a verb either
+  medium can be given. Nothing seeds it, so it is 0 unless dosed. Diprotic on purpose: pKa₃ = 12.35
+  is beyond both the beverage and `titratable_acidity`'s endpoint, and `AcidSpec.protons` is what
+  TA subtracts from, so carrying it would invent an equivalent per mole rather than merely idle.
+  **Not the malt phosphate D-178 refused** — that one is present at t=0 and the inverse anchor
+  absorbs its near-constant charge; a dose lands after the anchor and is permanent.
 
 The `Byp` pool is read as a succinic-equivalent acid (zero new carbon, so `total_carbon` is
 unchanged). Scalar `ph_of_state` / `degassed_ph_of_state` / `titratable_acidity` are pure and live
@@ -306,14 +322,25 @@ module:
   threshold reads differently since D-209.
 - It is the **charge half only**: no medium models the pool per species, so uptake removes its
   charge but not its buffering, and that omitted half pushes the same way. A lower bound.
-- **`z̄` is a must/wort composition average and does NOT apply to dosed nitrogen.** `add_dap`
-  doses pure ammonium, whose true `z̄` is exactly +1, so a DAP-dosed wine is *understated* ~3× on
-  the dosed fraction; the `N` pool is lumped and cannot tell supplement from must nitrogen.
-  Stated, not built (splitting it is a state-vector change).
+- **`z̄` is a must/wort composition average, and a DOSE carries its own charge (D-210).**
+  `add_dap` doses pure ammonium, whose `z̄` is exactly +1 — 3× wine's average — and the
+  `nitrogen_charge_excess` slot records how far the pool sits above the average, re-mixed at each
+  dose by `remix_nitrogen_charge_excess`. One dimensionless slot rather than a second nitrogen
+  pool, because a charge-per-mole is invariant under proportional drawdown: only an addition of
+  differently-charged nitrogen moves it, so no Process touches it. The stored quantity is the
+  *excess* and not the mean charge so that 0.0 is both the default and the correct undosed value —
+  a mean-charge slot would need a sentinel, and a sentinel compared against a state float is a gate
+  `num_jac` straddles. The eight Processes that *add* to `N` keep the average, measured: ~88 % of
+  that inflow is an un-draw (`AminoAcidAssimilation`, where composition is unchanged) and the rest
+  are deaminations whose true charge is 0 or +1 depending on the keto acid's fate, bracketing the
+  average at ≤0.033 pH transiently and ~2e-5 at the endpoint.
 - The **negative-slot guard** is `cation_slot_after_nitrogen`. The subtraction runs after
   `solve_cation_charge`'s own negativity check and so escapes it; a high-YAN, low-acid,
   low-`initial_ph` must could ship a negative cation slot while its anchor round trip still
-  passed. All three sites route through the guard.
+  passed. All three sites route through the guard. It raises
+  `NitrogenExceedsCationDemandError`, a `ValueError` subclass, because `set_ph` after a dose
+  reaches it too and `_verb_set_ph` used to rewrite every failure as "below the acid load's
+  intrinsic pH" — blaming an acid load that was not the cause (D-210).
 
 **Two pH frames, and which one a caller wants is not a detail (D-208).** `ph_of_state` is the pH
 *inside the vessel*, dissolved CO₂ included — the only frame a rate may read, and what every

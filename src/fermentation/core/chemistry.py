@@ -30,6 +30,7 @@ _M_H = 1.008
 _M_O = 15.999
 _M_S = 32.06
 _M_N = 14.007
+_M_P = 30.974
 
 #: Atomic nitrogen, g/mol — exported because the ``N`` state slot is held as **elemental**
 #: nitrogen (g N/L, drawn against ``biomass_N_fraction``), so anything converting that slot to
@@ -295,6 +296,18 @@ M_FORMIC = 1 * _M_C + 2 * _M_H + 2 * _M_O
 #: pH range a fermenting beer traverses, so its removed charge is between 1 and 2 equivalents
 #: per mole rather than a flat 1. Off every ledger — see ``M_FORMIC``.
 M_OXALIC = 2 * _M_C + 2 * _M_H + 4 * _M_O
+#: Phosphoric acid, H3PO4 — the counter-anion a DAP dose brings with it (decision D-210).
+#: ``add_dap`` doses diammonium phosphate, (NH4)2HPO4, and until D-210 only its nitrogen
+#: entered the model at all; the phosphate was dropped on the grounds that no phosphorus pool
+#: exists. It does not need one: what the *charge balance* needs is a total, and the ``phosphate``
+#: state slot carries it as phosphoric-acid-equivalent g/L so the same g/L → mol/L conversion
+#: every other acid uses applies unchanged.
+#:
+#: **Carbon- AND nitrogen-free, so off every ledger** — the ``M_FORMIC`` case above with one
+#: extra reason: there is no phosphorus ledger to be off. Absent from ``MOLAR_MASS`` /
+#: ``CARBON_ATOMS`` / ``NITROGEN_ATOMS`` so that a future Process trying to weigh it raises
+#: instead of silently booking phosphorus as carbon.
+M_PHOSPHORIC = 3 * _M_H + _M_P + 4 * _M_O
 #: α-acetolactate (2-acetolactic acid), C5H8O4 — the vicinal-diketone (VDK) precursor
 #: reservoir (decision D-26). Yeast excretes it during valine biosynthesis; it then
 #: *spontaneously* (non-enzymatically) oxidatively decarboxylates to diacetyl + CO2,

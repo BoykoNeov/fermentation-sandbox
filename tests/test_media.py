@@ -35,7 +35,21 @@ SHARED = (
 #: is carbon-active-not-charge-active, D-31), then the free-SO₂ pool for the molecular-SO₂
 #: readout (decision D-22), then the malolactic-catalyst slot (decision D-23); beer does
 #: not (its acid system, SO₂ and MLF are deferred).
-WINE_ACID_SLOTS = ("tartaric", "malic", "lactic", "citrate", "cation_charge")
+#: `phosphate` and `nitrogen_charge_excess` joined at D-210, which made `add_dap` dose the whole
+#: SALT rather than only its nitrogen: the phosphate counter-anion is charge-active (~0.95 eq/mol
+#: at wine pH, and un-absorbed by the inverse anchor because a dose arrives after it), and the
+#: excess slot records how far the assimilable pool's mean charge sits above the must average,
+#: since a supplement's nitrogen is pure ammonium at +1/mol N against wine's 0.3245. Both default
+#: to 0.0 and only `add_dap` writes them, so an undosed wine is unchanged.
+WINE_ACID_SLOTS = (
+    "tartaric",
+    "malic",
+    "lactic",
+    "citrate",
+    "phosphate",
+    "cation_charge",
+    "nitrogen_charge_excess",
+)
 WINE_SO2_SLOTS = ("so2_total", "oxofructose")
 #: The MCFA MLF-inhibitor must-input (decision D-131) heads the MLF slots — an inert, dosed
 #: octanoic-equivalent pool that gates the malolactic rate (g_FA), then the catalyst pools.
@@ -210,8 +224,13 @@ WINE_ASCORBATE_SLOTS = ("ascorbate",)
 # `pyruvic`/`formic`/`oxalic` (D-181) are the three the ferment REMOVES rather than produces —
 # wort inputs drained to a measured floor, and the reason D-179's "pyruvic is the smallest
 # buffering contributor" was a correct answer to the wrong question: what they contribute is
-# charge that LEAVES, not buffering. `phosphate` is still absent — the acid the beat was opened
-# on, which cannot buffer at beer's pH at all (D-178).
+# charge that LEAVES, not buffering.
+#
+# `phosphate` arrived at D-210 and is NOT the acid D-178 refused. Malt phosphate — present in the
+# wort at t=0, absorbed by the back-solved cation, unable to buffer at beer's pH — is still
+# absent, and nothing seeds this slot. What it holds is the counter-anion of an `add_dap` dose,
+# which the verb can make in either medium, so leaving it out of beer would have let a dosed beer
+# book the ammonium with no anion to meet it. `nitrogen_charge_excess` is its partner slot.
 BEER_ACID_SLOTS = (
     "lactic",
     "acetic",
@@ -222,7 +241,9 @@ BEER_ACID_SLOTS = (
     "formic",
     "oxalic",
     "peptide_buffer",
+    "phosphate",
     "cation_charge",
+    "nitrogen_charge_excess",
 )
 
 # Beer appends the iso-alpha-acid (bitterness) slot to the shared set — the boil-derived,
@@ -340,7 +361,13 @@ def test_wine_schema_has_single_sugar_slot():
     # ledger — exogenous carbon, untracked dehydroascorbate product, and the o-diphenol it
     # regenerates is off-ledger by fork D2. The ONLY Process in any build that is inert by default
     # STATE rather than by wiring: this pool is 0 unless a scenario calls add_ascorbate).
-    assert schema.size == 95
+    # + 2 D-210 dose-salt slots (`phosphate` and `nitrogen_charge_excess`, both written ONLY by
+    # add_dap, which stopped dropping two thirds of the compound it doses: the phosphate
+    # counter-anion is charge-active and un-absorbed by the anchor because a dose lands after it,
+    # and the excess slot records that a supplement's nitrogen is pure ammonium at +1/mol N. Off
+    # every ledger — phosphoric acid carries neither carbon nor nitrogen, and the excess is a
+    # ratio. The second pair, after ascorbate, that is inert by default STATE: 0 unless dosed).
+    assert schema.size == 97
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -377,7 +404,12 @@ def test_beer_schema_has_three_sequential_sugars():
     # ferment removes, which is how beer's model can lose anion charge; OFF every ledger, the
     # iso_alpha treatment). Appended before peptide_buffer/cation_charge, so beer's acid block
     # grows in place while the shared layout ahead of it is untouched = 57
-    assert schema.size == 57
+    # + 2 D-210 dose-salt slots: `phosphate` (an `add_dap` dose's counter-anion, charge-active and
+    # NOT the malt phosphate D-178 refused — nothing seeds it) and `nitrogen_charge_excess` (how
+    # far the pool's mean charge sits above the wort average, raised only by a dose). Both media
+    # get both, since `add_dap` is medium-agnostic; both default to 0.0, so every wort in the
+    # suite is unchanged = 59
+    assert schema.size == 59
 
 
 def test_shared_variable_units_are_canonical():
@@ -445,7 +477,14 @@ def test_shared_variable_units_are_canonical():
         "formic": "g/L",
         "oxalic": "g/L",
         "peptide_buffer": "g/L",
+        # D-210's dose-salt pair, and their units are the interesting part: `phosphate` is a MASS
+        # (g/L of phosphoric-acid-equivalent) so the registry's ordinary molar-mass division
+        # applies, while `nitrogen_charge_excess` is the second heterogeneous slot in this schema
+        # — a dimensionless composition ratio, mol+ per mole of elemental N, neither a mass nor a
+        # charge density. Declaring it g/L would put it silently on any future mass sweep.
+        "phosphate": "g/L",
         "cation_charge": "mol/L",
+        "nitrogen_charge_excess": "mol/mol",
     }
 
 
@@ -468,9 +507,15 @@ def test_beer_acid_slot_units_are_canonical():
         "formic",
         "oxalic",
         "peptide_buffer",
+        "phosphate",
     ):
         assert units[acid] == "g/L", f"beer's {acid} must be a mass concentration"
     assert units["cation_charge"] == "mol/L", "a charge density, NOT a mass concentration"
+    assert units["nitrogen_charge_excess"] == "mol/mol", (
+        "a dimensionless composition ratio (D-210) — mol+ per mole of elemental N. Not a mass and "
+        "not a charge density: the pool's charge is this TIMES the N slot, so a g/L declaration "
+        "here would read as a concentration to anything sweeping the schema by unit"
+    )
 
 
 def test_wine_acid_slot_units_are_canonical():

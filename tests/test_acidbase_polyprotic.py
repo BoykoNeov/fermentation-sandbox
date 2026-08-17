@@ -158,6 +158,14 @@ def test_phosphate_is_nearly_inert_across_beers_ph_window():
     a species of constant charge is absorbed by the anchor entirely, so phosphate would be not
     merely a weak buffer but very nearly a no-op. Pinned so that "add malt phosphate" cannot be
     re-proposed without confronting the number.
+
+    **D-210 ships a ``phosphate`` slot and does NOT contradict this** — read the two together
+    before concluding either is stale. Every clause above turns on the species being present when
+    ``initial_ph`` is back-solved: that is what lets the anchor absorb it, and it is true of MALT
+    phosphate and false of an ``add_dap`` dose, which lands mid-run with nothing left to absorb it.
+    So the same near-flat charge measured here is what makes a *dosed* phosphate a near-permanent
+    ~0.95 equivalents per mole of anion charge (-0.159 pH at 1.1 g/L DAP) while making a *wort*
+    phosphate a no-op. Nothing seeds the slot, so this test's subject remains unbuilt.
     """
     charge_lo = mean_charge(10.0**-4.0, PHOSPHATE)
     charge_hi = mean_charge(10.0**-4.6, PHOSPHATE)
@@ -221,6 +229,14 @@ def test_the_general_branch_is_live_and_exactly_one_acid_reaches_it():
         "beer.oxalic": 2,
         "beer.succinic": 2,
         "beer.peptide_buffer": 1,
+        # Dosed phosphate (D-210), in BOTH registries because `add_dap` is medium-agnostic.
+        # It is the second acid that could have reached the n-protic branch and deliberately
+        # does NOT: phosphoric acid's pKa3 = 12.35 is carried nowhere, because `protons` is what
+        # `titratable_acidity` subtracts from and a third proton no titration reaches would
+        # invent a whole equivalent per mole. So the claim in this test's name survives a
+        # triprotic acid being added, which is a stronger check than it was before.
+        "wine.phosphate": 2,
+        "beer.phosphate": 2,
         "Byp": 2,
     }
     polyprotic = {name for name, n in protons.items() if n >= 3}
@@ -230,7 +246,7 @@ def test_the_general_branch_is_live_and_exactly_one_acid_reaches_it():
         "before/after comparison"
     )
     # And WINE still reaches none of it — the structural half of "wine is unchanged".
-    assert all(protons[f"wine.{n}"] <= 2 for n in ("tartaric", "malic", "lactic"))
+    assert all(protons[f"wine.{n}"] <= 2 for n in ("tartaric", "malic", "lactic", "phosphate"))
 
 
 def test_the_registries_are_scoped_so_wine_does_not_gain_citrate():
@@ -255,7 +271,12 @@ def test_the_registries_are_scoped_so_wine_does_not_gain_citrate():
         "not a side effect of scoping beer's acids"
     )
     assert "citrate" in acid_registry(beer)
-    assert set(acid_registry(wine)) == {"tartaric", "malic", "lactic"}
+    # `phosphate` joined BOTH registries at D-210 and is the exception that proves the rule: it is
+    # shared because it is the SAME species playing the same role in both media (the counter-anion
+    # of a dose `add_dap` can make in either), where citrate is one slot name for two different
+    # roles. A shared member is fine; a shared REGISTRY is what this test forbids.
+    assert set(acid_registry(wine)) == {"tartaric", "malic", "lactic", "phosphate"}
+    assert acid_registry(wine) is not acid_registry(beer)
 
 
 def test_beer_gained_the_pH_system_and_wine_kept_its_slots():

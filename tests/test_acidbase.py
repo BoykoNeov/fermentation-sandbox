@@ -17,7 +17,13 @@ import pytest
 
 from fermentation.analysis import ph_series, titratable_acidity_series
 from fermentation.core import acidbase
-from fermentation.core.chemistry import M_LACTIC, M_MALIC, M_NITROGEN, M_TARTARIC
+from fermentation.core.chemistry import (
+    M_LACTIC,
+    M_MALIC,
+    M_NITROGEN,
+    M_PHOSPHORIC,
+    M_TARTARIC,
+)
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -624,11 +630,24 @@ def test_a_wine_moves_but_barely_and_the_geometry_is_why(params, pka):
 #: table, which is exactly right: it is Jones & Pierce Group D and brewing yeast does not
 #: assimilate it, so the ``N`` pool (assimilable nitrogen by definition) excludes it.
 _PEYER_WORT_AMINO_ACIDS_MGL = {
-    "alanine": 36.9, "arginine": 47.6, "asparagine": 32.0, "aspartic": 27.5,
-    "glutamic": 22.2, "glutamine": 41.5, "glycine": 11.3, "histidine": 22.0,
-    "isoleucine": 23.4, "leucine": 50.7, "lysine": 30.2, "methionine": 10.2,
-    "phenylalanine": 41.7, "serine": 23.6, "threonine": 20.1, "tryptophan": 14.0,
-    "tyrosine": 30.8, "valine": 42.3,
+    "alanine": 36.9,
+    "arginine": 47.6,
+    "asparagine": 32.0,
+    "aspartic": 27.5,
+    "glutamic": 22.2,
+    "glutamine": 41.5,
+    "glycine": 11.3,
+    "histidine": 22.0,
+    "isoleucine": 23.4,
+    "leucine": 50.7,
+    "lysine": 30.2,
+    "methionine": 10.2,
+    "phenylalanine": 41.7,
+    "serine": 23.6,
+    "threonine": 20.1,
+    "tryptophan": 14.0,
+    "tyrosine": 30.8,
+    "valine": 42.3,
 }
 #: ``(molar mass, nitrogen atoms, pKa_COOH, pKa_NH3, (side-chain pKa, sign) | None)``.
 #: The nitrogen COUNT is the load-bearing column: ``zbar``'s denominator is ELEMENTAL nitrogen
@@ -758,13 +777,25 @@ def test_arginine_carries_four_nitrogens_per_unit_charge():
     [
         (
             "wine",
-            {"brix": 22.0, "yan_mgl": 200.0, "pitch_gpl": 0.25,
-             "tartaric_gpl": 6.0, "malic_gpl": 3.0, "initial_ph": 3.4},
+            {
+                "brix": 22.0,
+                "yan_mgl": 200.0,
+                "pitch_gpl": 0.25,
+                "tartaric_gpl": 6.0,
+                "malic_gpl": 3.0,
+                "initial_ph": 3.4,
+            },
         ),
         (
             "beer",
-            {"glucose_gpl": 12.0, "maltose_gpl": 57.0, "maltotriose_gpl": 13.0,
-             "yan_mgl": 200.0, "pitch_gpl": 1.0, "initial_ph": 5.65},
+            {
+                "glucose_gpl": 12.0,
+                "maltose_gpl": 57.0,
+                "maltotriose_gpl": 13.0,
+                "yan_mgl": 200.0,
+                "pitch_gpl": 1.0,
+                "initial_ph": 5.65,
+            },
         ),
     ],
 )
@@ -882,13 +913,19 @@ def test_a_high_nitrogen_low_acid_must_refuses_rather_than_shipping_a_negative_c
     ANION charge no scenario declared.
     """
     hostile = {
-        "brix": 22.0, "yan_mgl": 400.0, "pitch_gpl": 0.25,
-        "tartaric_gpl": 2.0, "malic_gpl": 0.5, "initial_ph": 2.9,
+        "brix": 22.0,
+        "yan_mgl": 400.0,
+        "pitch_gpl": 0.25,
+        "tartaric_gpl": 2.0,
+        "malic_gpl": 0.5,
+        "initial_ph": 2.9,
     }
     with pytest.raises(ValueError, match="assimilable nitrogen already supplies"):
         compile_scenario(
             Scenario(
-                name="d209-hostile", medium="wine", initial=hostile,
+                name="d209-hostile",
+                medium="wine",
+                initial=hostile,
                 temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
                 duration_days=1.0,
             )
@@ -898,7 +935,8 @@ def test_a_high_nitrogen_low_acid_must_refuses_rather_than_shipping_a_negative_c
     # would be a regression dressed as safety. Same nitrogen, more acid, and the slot is positive.
     compiled = compile_scenario(
         Scenario(
-            name="d209-ok", medium="wine",
+            name="d209-ok",
+            medium="wine",
             initial={**hostile, "tartaric_gpl": 3.0, "initial_ph": 3.0},
             temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
             duration_days=1.0,
@@ -933,3 +971,182 @@ def test_the_nitrogen_charge_moves_wine_molecular_so2_not_its_free_pool(params):
     assert abs(bi_after / bi_before - 1.0) < 0.01, (
         "the bisulfite fraction must be near-unchanged — D-209 moves speciation, not the pool"
     )
+
+
+# -- D-210: a dosed nitrogen's own charge, and the phosphate that arrives with it ----
+
+
+def test_remix_nitrogen_charge_excess_is_a_nitrogen_weighted_mean(params):
+    """The dose arithmetic, on its own (decision D-210).
+
+    A supplement's charge is a property of the compound (+1 per mole N for DAP's ammonium), and
+    the slot stores the EXCESS over the medium average, so the conversion happens in the one place
+    that knows the average. Weighted in NITROGEN because both terms are per mole N.
+    """
+    zbar = params["nitrogen_uptake_charge_wine"]
+
+    # Equal masses of must nitrogen (excess 0) and pure ammonium (excess 1 - zbar) ⇒ half way.
+    half = acidbase.remix_nitrogen_charge_excess(0.2, 0.0, 0.2, 1.0, "wine", params)
+    assert half == pytest.approx(0.5 * (1.0 - zbar), rel=1e-12)
+
+    # Dosing into an empty pool gives the dose's own excess outright.
+    assert acidbase.remix_nitrogen_charge_excess(0.0, 0.0, 0.3, 1.0, "wine", params) == (
+        pytest.approx(1.0 - zbar, rel=1e-12)
+    )
+
+    # A second dose compounds on the first rather than replacing it.
+    once = acidbase.remix_nitrogen_charge_excess(0.2, 0.0, 0.2, 1.0, "wine", params)
+    twice = acidbase.remix_nitrogen_charge_excess(0.4, once, 0.4, 1.0, "wine", params)
+    assert twice > once
+
+    # The two degenerate states, guarded rather than left to divide by zero: a pool the solver
+    # pushed slightly negative is clamped (so the dose sets the excess outright), and a zero-mass
+    # dose leaves it untouched.
+    assert acidbase.remix_nitrogen_charge_excess(-1e-12, 0.0, 0.3, 1.0, "wine", params) == (
+        pytest.approx(1.0 - zbar, rel=1e-9)
+    )
+    assert acidbase.remix_nitrogen_charge_excess(0.0, 0.42, 0.0, 1.0, "wine", params) == 0.42
+
+    # Beer's average is lower, so the SAME dose lands a LARGER excess there.
+    beer = acidbase.remix_nitrogen_charge_excess(0.2, 0.0, 0.2, 1.0, "beer", params)
+    assert beer > half
+
+
+def test_a_dosed_pools_charge_is_read_from_the_state_not_the_parameter(params):
+    """``nitrogen_charge_molar`` adds the state's excess to the medium average (D-210).
+
+    The pool's charge is no longer a pure function of ``N`` and the medium — that is the whole
+    content of the beat. Checked on hand-built states so it is the reading that is under test and
+    not a trajectory.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d210-dosed-pool",
+            medium="wine",
+            initial={
+                "brix": 22.0,
+                "yan_mgl": 200.0,
+                "pitch_gpl": 0.25,
+                "tartaric_gpl": 6.0,
+                "malic_gpl": 3.0,
+                "initial_ph": 3.40,
+            },
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+            duration_days=1.0,
+        )
+    )
+    schema, resolved = compiled.schema, compiled.param_values
+    y = np.asarray(compiled.y0, dtype=float)
+    base = acidbase.nitrogen_charge_molar(y, schema, resolved)
+    assert base > 0.0
+
+    dosed = y.copy()
+    dosed[schema.slice(acidbase.NITROGEN_CHARGE_EXCESS_KEY)] = (
+        1.0 - resolved["nitrogen_uptake_charge_wine"]
+    )
+    charged = acidbase.nitrogen_charge_molar(dosed, schema, resolved)
+    # An all-ammonium pool of the same size carries 1/zbar times the charge — ~3x for wine.
+    assert charged / base == pytest.approx(1.0 / resolved["nitrogen_uptake_charge_wine"], rel=1e-9)
+    assert charged / base == pytest.approx(3.08, abs=0.02)
+
+    # And a schema WITHOUT the slot behaves exactly as it did at D-209 — the pre-D-210 contract
+    # every hand-built state and caller-supplied schema relies on.
+    stripped = StateSchema(
+        [spec for spec in schema.specs if spec.name != acidbase.NITROGEN_CHARGE_EXCESS_KEY],
+        medium="wine",
+    )
+    y_stripped = stripped.zeros()
+    for name in stripped.names:
+        y_stripped[stripped.slice(name)] = y[schema.slice(name)]
+    assert acidbase.nitrogen_charge_molar(y_stripped, stripped, resolved) == pytest.approx(
+        base, rel=1e-12
+    )
+
+
+def test_dosed_phosphate_is_diprotic_and_the_third_pka_is_omitted_not_deferred(params):
+    """Phosphoric acid's third dissociation is left out, and the reason is TA (decision D-210).
+
+    ``AcidSpec.protons`` is the maximum anion charge :func:`titratable_acidity` uses as its
+    endpoint approximation, so carrying pKa₃ = 12.35 would add a full never-titratable equivalent
+    per mole rather than merely an idle one. Measured both ways here: what the third proton is
+    worth to the pH solve (nothing) against what it would cost the TA readout (a factor of two).
+    """
+    spec = acidbase.PHOSPHATE_AS_PHOSPHORIC
+    assert spec.protons == 2
+    assert spec.pka_param_names == ("pKa_phosphoric_1", "pKa_phosphoric_2")
+    assert acidbase.WINE_ACIDS["phosphate"] is spec
+    assert acidbase.BEER_ACIDS["phosphate"] is spec  # add_dap is medium-agnostic
+
+    two = (params["pKa_phosphoric_1"], params["pKa_phosphoric_2"])
+    three = (*two, 12.35)
+    # Across every pH either medium reaches, the third proton changes the charge by nothing.
+    # Worst case is the highest pH the model starts from, a 5.65 wort, and it is 1.1e-8.
+    for ph in (3.0, 3.4, 4.3, 5.65):
+        h = 10.0**-ph
+        assert acidbase.mean_charge(h, three) == pytest.approx(
+            acidbase.mean_charge(h, two), abs=1e-7
+        )
+    # At the TA endpoint it is still worth ~nothing to the CHARGE...
+    h_end = 10.0**-8.2
+    assert acidbase.mean_charge(h_end, three) - acidbase.mean_charge(h_end, two) < 1e-3
+    # ...while z_max, which is what TA subtracts from, would go 2 → 3: one whole phantom
+    # equivalent per mole, 0.63 g/L of invented TA at a 1.1 g/L DAP dose.
+    phantom = (3 - 2) * (1.1 * 0.74206 / M_PHOSPHORIC) * (M_TARTARIC / 2.0)
+    assert phantom == pytest.approx(0.63, abs=0.02)
+
+
+def test_dosed_phosphate_barely_buffers_and_that_is_why_the_pkas_are_needed(params):
+    """The measurement that chose the representation (decision D-210).
+
+    Its buffering is negligible — 2.1 % of wine's own capacity at Palma's dose — which invites
+    replacing the slot with one constant anion charge folded into ``cation_charge``. The
+    measurement refuses that: a nearly-constant charge still needs the constant CHOSEN, and the
+    admissible range spans 0.876 (pH 3.0) to 1.000 (fully dissociated) — worth 0.022 pH at that
+    dose, which is resolvable and would be a free normalisation of the kind D-205 refused a term
+    for. Two sourced pKas have no such freedom.
+    """
+    pkas = (params["pKa_phosphoric_1"], params["pKa_phosphoric_2"])
+
+    def z(ph: float) -> float:
+        return acidbase.mean_charge(10.0**-ph, pkas)
+
+    assert z(3.0) == pytest.approx(0.876, abs=0.003)
+    assert z(3.4) == pytest.approx(0.947, abs=0.003)
+    assert z(3.7) == pytest.approx(0.973, abs=0.003)
+
+    # Buffering: dz/dpH times the dosed concentration, against wine's own ~47 mEq/L/pH.
+    dz_dph = (z(3.45) - z(3.35)) / 0.1
+    palma_molar = 1.1 * 0.74206 / M_PHOSPHORIC
+    buffering_meq = 1000.0 * palma_molar * dz_dph
+    assert buffering_meq == pytest.approx(0.97, abs=0.05)
+    assert buffering_meq / 47.0 < 0.05  # under 5 % of wine's capacity
+
+    # The free constant's reach: the charge difference across its admissible range, in pH.
+    span_charge = (1.000 - z(3.0)) * palma_molar
+    assert 1000.0 * span_charge / 47.0 == pytest.approx(0.022, abs=0.004)
+
+
+def test_native_must_phosphate_would_be_absorbed_by_the_anchor(params):
+    """Why a DOSED phosphate acidifies and the wine's OWN phosphate is out of scope (D-210).
+
+    Not "phosphate is negligible" — that would invite the fair objection that D-210 just built a
+    phosphate term. The distinction is the anchor: *Concepts in Wine Chemistry* Ch. 1 puts wine's
+    native phosphate at 100-500 mg/L as PO4, all of it present when ``initial_ph`` is back-solved,
+    so its charge is absorbed into the fitted cation exactly as D-178 measured for malt phosphate.
+    What is left un-absorbed is only its pH-DEPENDENT remainder, and at the top of that range that
+    is ~1.3 % of wine's buffer capacity. A dose arrives after the anchor, so all ~0.95 equivalents
+    per mole of it are un-absorbed.
+    """
+    pkas = (params["pKa_phosphoric_1"], params["pKa_phosphoric_2"])
+    dz_dph = (
+        acidbase.mean_charge(10.0**-3.45, pkas) - acidbase.mean_charge(10.0**-3.35, pkas)
+    ) / 0.1
+    m_po4 = 94.971  # g/mol PO4, the unit the source reports
+    native_top_molar = 0.500 / m_po4
+    assert 1000.0 * native_top_molar * dz_dph / 47.0 < 0.02
+
+    # And a maximal legal dose (0.96 g/L DAP, the US ceiling that source also gives) is
+    # comparable to the wine's whole native pool — so "dosed" is not a small perturbation of it.
+    dosed_molar = 0.96 * 0.74206 / M_PHOSPHORIC
+    assert dosed_molar / native_top_molar == pytest.approx(1.4, abs=0.1)
+    assert dosed_molar / (0.100 / m_po4) == pytest.approx(6.9, abs=0.3)

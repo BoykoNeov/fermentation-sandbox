@@ -563,12 +563,40 @@ def wine_schema() -> StateSchema:
             "carbon source for MLF-derived diacetyl; carbon-active but not charge-active, D-31)",
         ),
         VarSpec(
+            "phosphate",
+            "g/L",
+            default=0.0,
+            description="dosed phosphate, read as phosphoric acid (decision D-210). Written ONLY "
+            "by add_dap, which doses (NH4)2HPO4: until D-210 the phosphate half of that salt was "
+            "dropped entirely, so the model booked a dose's ammonium with no counter-anion. "
+            "Diprotic here on purpose (pKa 2.15/7.20; the third at 12.35 is beyond both the "
+            "beverage and the TA endpoint). NOT the malt phosphate D-178 refused: that one sits "
+            "in the wort at t=0 and the inverse anchor absorbs its near-constant charge, while a "
+            "dose arrives after the anchor and is permanent (-0.159 pH at 1.1 g/L DAP). Default 0 "
+            "=> an undosed wine's balance gains the exact float 0.0 and is bitwise unchanged. "
+            "Carbon- AND nitrogen-free, so off every ledger",
+        ),
+        VarSpec(
             "cation_charge",
             "mol/L",
             default=0.0,
             description="net strong-cation charge (K+-dominant); back-solved from initial_ph "
             "(D-18). No Process touches it, so it is constant across a plain run; the set_ph "
             "verb re-anchors it mid-run (D-186)",
+        ),
+        VarSpec(
+            "nitrogen_charge_excess",
+            "mol/mol",
+            default=0.0,
+            description="how far the assimilable-nitrogen pool's mean charge sits ABOVE this "
+            "medium's must/wort composition average, per mole of elemental N (decision D-210). "
+            "0 for any must — the EXCESS is stored rather than the mean charge precisely so that "
+            "the default value and the correct undosed value are the same number, needing no "
+            "sentinel (a sentinel compared against a state float is a gate num_jac straddles). "
+            "Raised by add_dap, whose nitrogen is pure ammonium (+1/mol N against wine's 0.3245 "
+            "average). Constant except at dose events, since proportional drawdown leaves a "
+            "charge-per-mole alone: no Process touches it (the cation_charge idiom). Off every "
+            "ledger — it is a composition ratio, not a concentration",
         ),
         VarSpec(
             "so2_total",
@@ -1390,6 +1418,18 @@ def _beer_acid_specs() -> list[VarSpec]:
             "reason, never as a nominal. Off every ledger (beer's protein is untracked)",
         ),
         VarSpec(
+            "phosphate",
+            "g/L",
+            default=0.0,
+            description="dosed phosphate, read as phosphoric acid (decision D-210) — the same "
+            "slot wine carries, and present here for the same reason add_dap is medium-agnostic: "
+            "a DAP-dosed beer that booked the dose's ammonium without its counter-anion would "
+            "carry a strong-base artefact. This is NOT the malt phosphate D-178 refused as "
+            "beer's buffer (present at t=0, absorbed by the inverse anchor); nothing seeds this "
+            "slot, so every wort in the suite carries 0.0 and beer's balance is bitwise "
+            "unchanged. Off every ledger",
+        ),
+        VarSpec(
             "cation_charge",
             "mol/L",
             default=0.0,
@@ -1398,6 +1438,16 @@ def _beer_acid_specs() -> list[VarSpec]:
             "the set_ph verb re-anchors it mid-run (D-186). A charge density "
             "(mol+/L), not a mass concentration. Default 0 => a beer scenario naming no "
             "initial_ph carries an empty charge balance and is byte-for-byte the pre-D-179 beer",
+        ),
+        VarSpec(
+            "nitrogen_charge_excess",
+            "mol/mol",
+            default=0.0,
+            description="how far the assimilable-nitrogen pool's mean charge sits ABOVE this "
+            "medium's wort composition average, per mole of elemental N (decision D-210). 0 for "
+            "any wort; raised by add_dap, whose nitrogen is pure ammonium (+1/mol N against "
+            "beer's 0.1772 average). No Process touches it; off every ledger. See the wine "
+            "schema for why the EXCESS is the stored quantity rather than the mean charge",
         ),
     ]
 
