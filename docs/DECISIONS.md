@@ -30670,13 +30670,17 @@ answer it. At that edge, sweeping the pre-pitch loss fraction:
 
 | arm | day 1 needs a loss of | day 7 affords | window |
 |---|---|---|---|
-| `z̄` lo 0.1665 | day 1 already inside | ≤ 18.43 % | n/a |
-| `z̄` nom 0.1772 | not reached at any fraction probed | ≤ 10.80 % | n/a |
+| `z̄` lo 0.1665 | **> 40 %** — still outside at every fraction probed | ≤ 18.43 % | **EMPTY** |
+| `z̄` nom 0.1772 | **> 40 %** — still outside at every fraction probed | ≤ 10.80 % | **EMPTY** |
 | **`z̄` hi 0.1880** | **≥ 27.59 %** | **≤ 3.09 %** | **EMPTY, by ~9×** |
 
-So even granting a fraction the corpus never supplies, no value satisfies both ends: the loss that
-would bring day 1 inside its ceiling takes day 7 nine times past its floor. **The refusal is
-arithmetic, not a judgement about how much trub a brewery carries over.**
+**Day 1 is above its ceiling on all three arms**, and only the high arm comes inside within the
+range probed at all — the lo and nom arms are still outside at a 40 % loss, which is why their
+first column is a bound rather than a value. So even granting a fraction the corpus never supplies,
+no value satisfies both ends on any arm: on the high edge the loss that would bring day 1 inside
+takes day 7 nine times past its floor, and on the other two day 1 is not reachable at all before
+day 7 has long since gone. **The refusal is arithmetic, not a judgement about how much trub a
+brewery carries over.**
 
 ### 6. A live finding this beat measured and deliberately did NOT fix: the peptide pair is incoherent off-nominal
 

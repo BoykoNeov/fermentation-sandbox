@@ -64,6 +64,12 @@ unconvincing, go read D-210 — do not argue past it from this file.**
   DAP's numbers) and **the dosed `amino_acids` pool's own +1** (arginine, charge-inactive slot,
   **0.056 pH** on a maximal arm, sign genuinely unclear because autolysis REFILLS that pool).
 
+**SUPERSEDED AT D-214 — read this before the paragraph below.** Both items are now **REFUSED**,
+not parked: antiport has **zero beer-text sourcing**, and trub is a **pre-pitch** event already
+inside the calibration whose post-anchor form is a **charge violation**. The paragraph below is
+kept for *why they were parked in the first place*; it is no longer a reason to revisit either.
+→ `.claude/memory/prohibitions/trub-settling-and-the-peptide-pair.md`
+
 **Why D-210 did NOT take the other two items D-209 §8 named.** K⁺/H⁺ antiport and trub protein
 settling both push the **same way** as D-209's term, whose high `z̄` edge already lands at pH
 **4.783** against a window whose floor is **4.780** — 0.003 pH. Adding same-sign beer

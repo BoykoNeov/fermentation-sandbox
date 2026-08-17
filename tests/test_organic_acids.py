@@ -1517,6 +1517,15 @@ def test_the_trub_window_is_empty_at_the_edge_that_parks_it(tmp_path, beer_param
 
     This asserts the tight half: a 5 % loss, well below what day 1 would need, already takes day 7
     out of the envelope.
+
+    **Both margins here are small, and that is stated rather than hidden.** The control passes by
+    **+0.0086** pH and the assertion fails the floor by **−0.0054**. The archive has reported that
+    control quantity two ways — D-211 §9 said 0.0082, D-214 §7 says 0.0086 — and the difference was
+    a read artefact, not a model change (`argmin` over the solver's adaptive output against
+    `np.interp` onto the exact hour; this helper uses the latter, which is why it should read
+    0.0086). So if this test ever fails on the CONTROL line, check the read before the model: the
+    pass margin is comparable to the size of that old disagreement
+    [[feedback-read-a-fast-curve-on-a-fixed-grid]].
     """
     hi = beer_params["nitrogen_uptake_charge_beer"].uncertainty.high
     data_dir = _beer_data_dir_with_nitrogen_charge(tmp_path, hi)
