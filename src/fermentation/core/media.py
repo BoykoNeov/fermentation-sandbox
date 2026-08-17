@@ -142,6 +142,7 @@ from fermentation.core.kinetics import (
     TemperatureRamp,
     ThermalAnthocyaninFade,
     WortAcidRemoval,
+    WortOxygenUptake,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -290,7 +291,10 @@ def _common_specs(sugar: VarSpec) -> list[VarSpec]:
             "always-on O₂ sinks OxidativeAcetaldehyde (→ acetaldehyde, the 'sherry'/oxidised note) "
             "and PhenolicBrowning (→ brown pigment, D-74), plus wine's SulfiteOxidation. "
             "Carbon-free and on NO ledger (like h2s/iso_alpha). Default 0 ⇒ an un-oxygenated "
-            "(reductive) aging is byte-for-byte the ester-hydrolysis-only case",
+            "(reductive) aging is byte-for-byte the ester-hydrolysis-only case. BEER ALSO SEEDS "
+            "IT AT PITCHING (D-213): a cast wort is aerated (o2_wort_aeration_beer, 6.75 mg/L) "
+            "and WortOxygenUptake strips it during the lag phase, so beer's pool is back at 0 "
+            "long before any begin_aging — wine's post-ferment dosing is unaffected",
         ),
         VarSpec(
             "A420",
@@ -2398,6 +2402,19 @@ _BEER_ORGANIC_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     WortAcidRemoval,
 )
 
+#: Beer's wort oxygen (decision D-213) — the dissolved O₂ a pitched wort carries, stripped by the
+#: yeast during the lag phase. Its own tuple rather than a member of the acid tuple above, because
+#: it rides a *different* gate: the acid Processes opt in with ``initial_ph`` (D-179), while this
+#: one is unconditional — every real cast wort is aerated, and no anchoring choice is involved.
+#:
+#: **NOT a modifier target, and that is the correctness statement.** Both entries in
+#: :data:`_BEER_FERMENTATION_MODIFIERS` scale a Process that *recomputes* a rate the solver runs
+#: at a different scaling (D-183's growth recompute; D-180's uptake yield).
+#: :class:`~fermentation.core.kinetics.wort_oxygen.WortOxygenUptake` recomputes neither — it reads
+#: ``X`` and ``o2`` straight out of state — so scaling it would introduce exactly the mismatch the
+#: other two exist to prevent. See its module docstring.
+_BEER_WORT_OXYGEN_PROCESSES: tuple[Callable[[], Process], ...] = (WortOxygenUptake,)
+
 #: Beer growth/uptake Arrhenius modifiers (decision D-180). Identical to
 #: :data:`_PRIMARY_FERMENTATION_MODIFIERS` except the **uptake** Arrhenius also scales the
 #: organic-acid producer — the mirror image of wine's :data:`_WINE_FERMENTATION_MODIFIERS`,
@@ -2636,6 +2653,7 @@ def _build_media(
                 + _CARAMELIZATION_PROCESSES
                 + _OAK_PROCESSES
                 + _BEER_ORGANIC_ACID_PROCESSES
+                + _BEER_WORT_OXYGEN_PROCESSES
             ),
             modifier_factories=_BEER_FERMENTATION_MODIFIERS,
         ),

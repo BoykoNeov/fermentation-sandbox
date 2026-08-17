@@ -94,7 +94,7 @@ can never break conservation, and the `touches` contract still holds (scaling ze
 Modifiers toggle and feed `tier_of` exactly like Processes. Stacked modifiers on one Process
 compose to a single scalar (D-10, D-11).
 
-`core/kinetics/` holds **82** concrete `Process`/`RateModifier` implementations across 23 modules
+`core/kinetics/` holds **83** concrete `Process`/`RateModifier` implementations across 24 modules
 (the three base types live in `core/process.py`).
 
 ### Kinetics modules
@@ -120,6 +120,7 @@ compose to a single scalar (D-10, D-11).
 | `carbon_routing.py` | — | shared carbon draw/refund helpers, ester and fusel route specs, label tracer |
 | `precursor_fates.py` | 1 | precursor partitioning |
 | `organic_acids.py` | 3 | beer's organic acids: excretion, acetic overflow, wort acid removal |
+| `wort_oxygen.py` | 1 | beer's wort aeration O₂, stripped by the yeast in the lag phase (D-213) |
 | `malolactic.py` | 6 | MLF conversion, citrate, diacetyl reduction, growth/death/senescence |
 | `brett.py` | 6 | *Brettanomyces* growth/death/toxicity, decarboxylation, vinylphenol reduction, yeast POF |
 | `hops.py` | 1 | iso-α-acid loss (IBU) |
@@ -152,9 +153,9 @@ the run byte-for-byte unchanged.
 | wine | `direct` (default) | 62 | 5 |
 | wine | `cascade` | 66 | 5 |
 | wine | `direct_burst` | 63 | 5 |
-| beer | `direct` (default) | 27 | 3 |
-| beer | `cascade` | 28 | 3 |
-| beer | `direct_burst` | 27 | 3 |
+| beer | `direct` (default) | 28 | 3 |
+| beer | `cascade` | 29 | 3 |
+| beer | `direct_burst` | 28 | 3 |
 
 ### The three oxidative sets (D-141, extended D-147)
 
@@ -428,7 +429,7 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (79 test files; unit, integration, conservation, sampling-surface and
+`uv run pytest -n auto` (80 test files; unit, integration, conservation, sampling-surface and
 doc-consistency checks), `uv run ruff check .`, `uv run mypy` (strict on `src`). CI runs all three
 on Python 3.13 and 3.14. Two of the test files guard documentation rather than physics:
 `test_decisions_index.py` (the archive's generated index) and `test_memory_shape_hook.py`.

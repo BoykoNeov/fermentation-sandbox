@@ -72,6 +72,11 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"(?<![a-z])o[2₂]",
             r"oxygen",
             r"oxidat",
+            # Wort aeration (D-213). "aerobic" deliberately also catches "anaerobic": a record
+            # about the ABSENCE of oxygen belongs in the oxygen bucket just as much as one about
+            # its presence, and the bucket is a search aid rather than a partition.
+            r"aerat",
+            r"aerobic",
             r"aging",
             r"\baged\b",
             r"browning",

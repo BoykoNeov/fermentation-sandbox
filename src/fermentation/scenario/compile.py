@@ -507,6 +507,13 @@ _ALLOWED_KEYS: dict[str, frozenset[str]] = {
             "formic_gpl",
             "oxalic_gpl",
             "peptide_buffer_gpl",
+            # Wort aeration (decision D-213), in mg/L to match brewery practice and the source's
+            # own units — the ONE key here that is not an acid and not gated on `initial_ph`.
+            # Absent falls back to the sourced `o2_wort_aeration_beer`, because a cast wort is
+            # always aerated: this is D-147's "the quantity every wort carries" case, the same
+            # call as dms_potential/copper, NOT the acids' opt-in. Set it to 0 to recover the
+            # pre-D-213 anaerobic-from-t0 beer, which is how the isolability arm is run.
+            "o2_mgl",
         }
     ),
 }
@@ -948,10 +955,15 @@ def _beer_initial(
     return {
         "X": _require(values, "pitch_gpl", "beer"),
         # Beer's charge-active acids + the inverse-anchored strong cation (decision D-179).
-        # Every slot is INERT — no Process touches any of them — because beer still has no
-        # organic-acid producer (D-16, open). So beer's pH is properly buffered but does not
-        # FALL during fermentation the way a real beer's does; it drifts only through Byp,
-        # which the ethyl-acetate hydrolysis credits (D-176). A stated scope boundary.
+        #
+        # THIS COMMENT WAS STALE AND IS CORRECTED AT D-213. It used to say every slot here is
+        # inert "because beer still has no organic-acid producer (D-16, open)", and that beer's
+        # pH "does not FALL during fermentation the way a real beer's does". Both statements
+        # were overtaken and neither is true now: `OrganicAcidExcretion` and `WortAcidRemoval`
+        # (D-181) and `AceticAcidOverflow` (D-183) all move these slots, and beer's falling pH
+        # is a PREDICTION that agrees with Tyrell's measured course (D-207, re-framed to the
+        # decarbonated frame at D-208, and closed on day-1 timing at D-211). Found while adding
+        # the wort-oxygen seed below — the same class as the two prose numbers D-212 repaired.
         **acids,
         "cation_charge": _beer_cation(values, acids, parameters),
         "S": [
@@ -964,6 +976,12 @@ def _beer_initial(
         "T": temperature_k,
         "CO2": 0.0,
         "X_dead": 0.0,  # no inactivated biomass at pitch
+        # Wort aeration (decision D-213): a cast wort is aerated on its way to the fermenter, so
+        # beer's `o2` starts at the sourced level rather than the slot default of 0. Stripped by
+        # `WortOxygenUptake` during the lag phase. `o2_mgl` overrides it; 0 recovers the
+        # pre-D-213 anaerobic-from-t0 beer. NOTE it feeds nothing in the default set — the three
+        # O2 consumers are aging-gated — so this moves the `o2` column and no other.
+        "o2": mgl_to_gpl(_optional(values, "o2_mgl", parameters["o2_wort_aeration_beer"].value)),
         "Gly": 0.0,  # beer carries zero byproduct diversion in M1 (decision D-16)
         "Byp": 0.0,
         # Produced-only aroma pools, empty at pitch (decision D-19). The three ester pools and

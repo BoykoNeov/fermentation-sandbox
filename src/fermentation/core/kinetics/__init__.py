@@ -139,6 +139,7 @@ from fermentation.core.kinetics.vicinal_diketones import (
     AcetolactateExcretion,
     DiacetylReduction,
 )
+from fermentation.core.kinetics.wort_oxygen import O2_SLOT, WortOxygenUptake
 
 __all__ = [
     "AcetaldehydeBridgedCondensation",
@@ -187,6 +188,7 @@ __all__ = [
     "SotolonAldolCondensation",
     "ACETIC_SLOT",
     "ACETIC_SPECIES",
+    "O2_SLOT",
     "ORGANIC_ACID_SPECS",
     "WORT_ACID_SINKS",
     "OakExtraction",
@@ -231,6 +233,7 @@ __all__ = [
     "YeastPOFDecarboxylation",
     "WortAcidRemoval",
     "WortAcidSinkSpec",
+    "WortOxygenUptake",
     "arrhenius_factor",
     "autolysis_flux",
     "biomass_growth_rate",
