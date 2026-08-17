@@ -512,15 +512,31 @@ def test_a_flux_linked_acetic_yield_puts_the_acid_where_the_source_says_it_is_no
     falsifiable instead of merely written down.
 
     The retirement rests on mapping Tyrell's Fig 13 onto their Fig 4. By day 1 that wort is
-    **15 % attenuated** while acetic has already made **86 %** of its whole rise. So a yield on
+    **15 % attenuated** while acetic has already made **77 %** of its whole rise. So a yield on
     the sugar flux — which is what ``Y_acetic_sugar_beer`` is, a measured day7−day0 difference
     divided by a sugar divisor — must put the acid far too late. This recomputes exactly how
     late, from the flux the shipped run actually booked (recovered through *lactic*, which still
     rides that flux), rather than trusting a number in a comment.
 
+    (D-183 and this docstring both said **86 %**, which is a units slip corrected at D-211: 86.00
+    is acetic's day-1 rise in **mg/L**, and its share of the rise to the measured peak is
+    111.25 mg/L, i.e. 77.3 %. The disproportion the retirement rests on is unaffected — 77 %
+    against 15 % of the flux — so no shipped value moves. It is corrected because the number is
+    now asserted below rather than quoted.)
+
     It is a claim about SHAPE, not size: the same yield reproduces the day-7 endpoint by
     construction, which is precisely why the error was invisible until the figure interiors were
     read.
+
+    **D-211 narrowed this margin and the reason is worth stating.** When D-183 chose the
+    growth-linked producer, growth in this model finished inside ~20 h, so a producer tied to it
+    delivered ~100 % of its acid by day 1 and appeared to explain Tyrell's early rise. D-211
+    measured the growth rate against Tyrell's OWN cell counts and found it 2.88x too fast: the real
+    crop has made only ~36 % of its growth by day 1. So acetic rises faster than growth AND faster
+    than flux, and the old rate was flattering the attribution. The retirement still holds —
+    growth-linked beats flux-linked by every measure below — but it now wins while booking
+    **0.360** of acetic's rise by day 1 against a measured **0.773**, a **2.15x** shortfall it
+    previously had no way to show. The residual is pinned at the foot of this test.
     """
     compiled, res = _run(dict(TYRELL_SCENARIO))
     params = compiled.parameters.resolve()
@@ -581,9 +597,41 @@ def test_a_flux_linked_acetic_yield_puts_the_acid_where_the_source_says_it_is_no
             )
         )
     )
-    assert shipped_rmse < 0.6 * flux_rmse, (
+    assert shipped_rmse < flux_rmse, (
         f"the growth-linked form scores {shipped_rmse:.1f} ppm RMSE against Tyrell's days 1-7 "
-        f"and the retired flux-linked one {flux_rmse:.1f}; D-183 measured 32.5 vs 61.6"
+        f"and the retired flux-linked one {flux_rmse:.1f}; D-183 measured 32.5 vs 61.6 and "
+        "D-211's slower growth moved them to 40.7 vs 65.3. The RETIREMENT is what this pins — "
+        "if the shipped form ever scores worse, the rate-law change has stopped paying"
+    )
+    # The ratio is pinned SEPARATELY from the ordering, because the two say different things and
+    # a single threshold would let one hide the other: the ordering is D-183's verdict, the ratio
+    # is how much of it survives. D-183 measured 0.528; D-211's re-derived growth rate cost it
+    # ~0.10, which is the price this beat paid on a neighbouring claim and is recorded, not tuned.
+    assert shipped_rmse / flux_rmse == pytest.approx(0.624, abs=0.03), (
+        f"the shape-error ratio is {shipped_rmse / flux_rmse:.3f}; D-183 measured 0.528 before "
+        "D-211 slowed growth to Tyrell's measured rate and 0.624 after. A move here means the "
+        "growth path changed again"
+    )
+    # THE RESIDUAL D-211 EXPOSED, pinned where it was found. Acetic makes 86 % of its measured
+    # rise by day 1; the model's growth-linked producer can only make as much as the crop has
+    # grown, which the cell counts put at ~34 %. Neither driver in the file explains the early
+    # rise — the old growth rate merely concealed that by finishing inside 20 h.
+    shipped_rise = {
+        d: float(np.interp(d * 24.0, t_h, np.asarray(res.series(ACETIC_SLOT)))) * 1000.0 - seed
+        for d in (1, 7)
+    }
+    model_share_day1 = shipped_rise[1] / shipped_rise[7]
+    measured_share_day1 = (TYRELL_ACETIC_MEAN_PPM[1] - TYRELL_ACETIC_MEAN_PPM[0]) / (
+        max(TYRELL_ACETIC_MEAN_PPM.values()) - TYRELL_ACETIC_MEAN_PPM[0]
+    )
+    assert measured_share_day1 == pytest.approx(0.774, abs=0.01), (
+        "the measured day-1 share of acetic's rise is a transcription, not a model output"
+    )
+    assert measured_share_day1 / model_share_day1 == pytest.approx(2.15, abs=0.15), (
+        f"the model books {model_share_day1:.3f} of acetic's rise by day 1 against Tyrell's "
+        f"{measured_share_day1:.3f}, a {measured_share_day1 / model_share_day1:.2f}x shortfall; "
+        "D-211 measured 2.15x once the growth rate was corrected. If it has closed, a producer "
+        "faster than growth has been built and D-183's growth-linked choice should be re-read"
     )
     # THE HONEST CEILING, asserted so it cannot quietly be read as a transient: the shipped
     # curve is MONOTONE. It reaches its endpoint early and holds; it does not peak and fall.
@@ -1532,27 +1580,27 @@ def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_p
     )
 
 
-def test_the_day_1_pH_is_still_missed_and_the_miss_is_uptake_timing():
-    """THE REMAINING DEFECT, pinned with its attribution — and D-209 made it WORSE.
+def test_the_day_1_pH_miss_survives_the_timing_fix_and_has_CHANGED_SIDES():
+    """THE REMAINING DEFECT, re-pinned after D-211 removed its stated cause.
 
-    Day 7 now lands inside Tyrell's envelope; day 1 does not, and it is further out than before
-    this beat: **0.31 pH too acidic at nominal, against 0.19 too alkaline at D-208**. That is not
-    the charge arithmetic being wrong, it is *when* the charge leaves. The cation change is the
-    integral of nitrogen uptake, and this model empties its ``N`` slot inside about 20 hours, so
-    the entire step is delivered before the day-1 reading is taken while the measured pH is only
-    ~63 % of the way to its day-7 value.
+    D-209 left day 1 **0.315 pH too acidic** and attributed it to uptake TIMING: the whole
+    nitrogen charge step landed inside ~20 h, before the day-1 reading. D-211 measured that
+    timing against Tyrell's own cell-count panel and re-derived ``mu_max`` from it, and the
+    charge step now takes ~2.5 days like the measured crop does.
 
-    The attribution is measured here two ways rather than asserted: the uptake fraction by 24 h,
-    and a counterfactual in which the SAME total charge is delivered on a slower linear ramp.
-    **At a 60-hour ramp all eight measured days land inside the envelope**, and the window is
-    narrow — 48 h leaves day 1 out and 72 h leaves day 2 out — so 60 h is a measurement on this
-    trajectory and not a knob with slack in it. Against the model's own ~20 h that is roughly
-    threefold too fast.
+    What is left is **0.046 pH on the ALKALINE side** — the miss shrank ~6x and reversed. That
+    reversal is the point of this test. A residual that is now too alkaline is exactly the
+    direction of the half D-209 section 8 recorded as unbuilt: assimilation removes the
+    nitrogen pool's CHARGE but not its BUFFERING, and buffer removal pushes pH down. So the
+    remaining day-1 gap is evidence for a term already identified, not for the timing being
+    wrong again.
 
-    **The ramp is NOT a fix and must not become one.** Nothing sources 60 hours; nitrogen-uptake
-    timing in this engine is set by ``GrowthNitrogenLimited``'s constants, which were never
-    calibrated against a wort FAN time course. Recorded as a located defect — the next beat on
-    beer's pH is an uptake-timing question, not an acid-base one.
+    **This test must not be "fixed" by moving ``mu_max``.** The value is calibrated on the cell
+    counts (``tests/test_kinetics_growth.py``), which is the observable a growth rate IS; the pH
+    course is three mechanisms downstream with a known-missing term. Tuning the rate to close
+    this gap would consume the headroom that term needs and mis-attribute a missing buffer to a
+    growth rate. The 60-hour ramp counterfactual D-209 used to locate the defect is retired with
+    the defect: it priced a gap that no longer exists.
     """
     compiled, res = _run(dict(TYRELL_SCENARIO))
     params = compiled.parameters.resolve()
@@ -1565,51 +1613,37 @@ def test_the_day_1_pH_is_still_missed_and_the_miss_is_uptake_timing():
 
     lo, hi = TYRELL_PH_COURSE[1]
     day1 = float(acidbase.degassed_ph_of_state(state_at(24.0), schema, params))
-    assert day1 < lo - TYRELL_PH_READ_TOL, (
-        f"day 1 reads {day1:.4f}, inside or above Tyrell's {lo:.3f}-{hi:.3f}. D-209 measures it "
-        "0.31 pH BELOW — too acidic. If this passes the defect has been fixed and the docstring "
-        "above is stale"
+    assert day1 > hi + TYRELL_PH_READ_TOL, (
+        f"day 1 reads {day1:.4f}, inside or below Tyrell's {lo:.3f}-{hi:.3f}. D-211 leaves it "
+        "ABOVE — too alkaline. If it is now inside, the last identified beer-pH gap has closed "
+        "and the unbuilt buffer-removal half (D-209 section 8) needs re-pricing"
     )
-    assert lo - day1 == pytest.approx(0.315, abs=0.03), (
-        f"the day-1 miss is {lo - day1:.4f} pH; D-209 measures 0.315, and D-208 measured 0.186 "
-        "in the other direction. Both numbers matter: the miss GREW, and a beat that shrinks it "
-        "should say which"
+    assert day1 - hi == pytest.approx(0.070, abs=0.02), (
+        f"the day-1 miss is {day1 - hi:.4f} pH above the envelope; D-211 measures 0.070, where "
+        f"D-209 measured 0.315 BELOW and D-208 0.186 above. All three matter: the size and the "
+        "SIDE are what say whether a beat moved the timing or the arithmetic"
     )
 
-    # Attribution 1 — the nitrogen is gone before the reading, so the whole step has landed.
+    # Every other measured day is inside. The claim is that ONE day is missed, not that the
+    # course is roughly right — a count is what stops a later beat trading days for days.
+    inside = [
+        band_lo - TYRELL_PH_READ_TOL
+        <= float(acidbase.degassed_ph_of_state(state_at(day * 24.0), schema, params))
+        <= band_hi + TYRELL_PH_READ_TOL
+        for day, (band_lo, band_hi) in TYRELL_PH_COURSE.items()
+    ]
+    missed = [d for d, ok in zip(TYRELL_PH_COURSE, inside, strict=True) if not ok]
+    assert sum(inside) == 7 and not inside[1], (
+        f"{sum(inside)}/8 days inside with misses at {missed}; D-211 leaves day 1 alone"
+    )
+
+    # The attribution, measured rather than asserted: the charge step is NO LONGER complete by
+    # the day-1 reading. This is the exact quantity D-209 pinned at >99 %, inverted.
     nitrogen = states[schema.slice("N").start, :]
     consumed_by_24h = float(np.interp(24.0, t_h, nitrogen[0] - nitrogen))
-    assert consumed_by_24h / (nitrogen[0] - min(nitrogen)) > 0.99, (
-        "the attribution rests on the charge step being complete by the day-1 reading"
+    fraction = consumed_by_24h / (nitrogen[0] - min(nitrogen))
+    assert fraction == pytest.approx(0.363, abs=0.03), (
+        f"{fraction:.3f} of the nitrogen is drawn by 24 h; D-209 measured >0.99 and D-211's "
+        "re-derived rate puts it at 0.363, inside Tyrell's measured 0.234-0.448 cell-count "
+        "spread. That agreement is what makes the timing MEASURED rather than fitted"
     )
-
-    # Attribution 2 — the same total charge on a slower ramp. A COUNTERFACTUAL computed on the
-    # shipped trajectory: it prices where the miss lives, and it is NOT a proposal. 60 hours is
-    # unsourced; what makes it evidence rather than a fit is that the neighbouring ramps fail.
-    total_charge = acidbase.nitrogen_charge_from_gpl(float(nitrogen[0]), "beer", params)
-
-    def days_inside_on_ramp(ramp_hours: float) -> int:
-        inside = 0
-        for day, (band_lo, band_hi) in TYRELL_PH_COURSE.items():
-            y = state_at(day * 24.0)
-            delivered = total_charge * min(day * 24.0 / ramp_hours, 1.0)
-            actual = acidbase.nitrogen_charge_from_gpl(
-                float(np.interp(day * 24.0, t_h, nitrogen)), "beer", params
-            )
-            # The balance's cation side is ``slot + actual``; the counterfactual wants
-            # ``slot + total_charge - delivered``, which at t=0 is the anchored total and once the
-            # ramp completes is the bare slot. So the slot is nudged by the difference.
-            y[schema.slice("cation_charge")] += (total_charge - delivered) - actual
-            ramped = float(acidbase.degassed_ph_of_state(y, schema, params))
-            inside += band_lo - TYRELL_PH_READ_TOL <= ramped <= band_hi + TYRELL_PH_READ_TOL
-        return inside
-
-    assert days_inside_on_ramp(60.0) == 8, (
-        "on a 60 h counterfactual ramp all eight measured days must land inside the envelope — "
-        "that is what locates the day-1 miss in uptake TIMING rather than in the charge "
-        "arithmetic. The shipped model's own uptake finishes in ~20 h and reaches 7 of 8"
-    )
-    # The neighbours FAIL, which is what stops 60 h reading as a knob with slack in it: a
-    # counterfactual that worked across a wide range would price nothing.
-    assert days_inside_on_ramp(48.0) == 7, "48 h must still leave day 1 out"
-    assert days_inside_on_ramp(72.0) == 7, "72 h must overshoot the other way and leave day 2 out"

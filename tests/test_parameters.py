@@ -187,9 +187,13 @@ def test_load_shipped_beer_parameters():
         "dH_ester_volatil",
     }
     assert read_params <= set(ps.names)
-    # Sourced from Zamudio Lara et al. 2022 (open access).
+    # Re-derived at D-211 from Tyrell 2013 Fig. 4's cell-count panel — the growth
+    # curve of the same trial whose pH panel is beer's pH anchor. Zamudio still
+    # supplies the FORM and the temperature scaling; what it no longer supplies is
+    # the magnitude, because that transfer carried a Droop growth form into a Monod
+    # one (the same unfinished translation D-15 corrected on the sugar side).
     assert ps.tier_of("mu_max") is Tier.PLAUSIBLE
-    assert ps.value("mu_max") == pytest.approx(0.098)
+    assert ps.value("mu_max") == pytest.approx(0.034)
     assert ps.tier_of("K_sugar_uptake") is Tier.PLAUSIBLE
     # Honestly thinner than wine: transferred/derived values stay speculative.
     assert ps.tier_of("K_n") is Tier.SPECULATIVE  # transferred from the wine fit
