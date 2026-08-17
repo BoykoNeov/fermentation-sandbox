@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-17T16:17:21.133Z
+  modified: 2026-08-17T18:41:50.527Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-214**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1811 + 3 xfail**. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-215**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1812 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
@@ -206,6 +206,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   **SHAPE** (day 7 is **3.40×** day 1, the inverse of the brief) and the window is **EMPTY by 9×**
   at the high `z̄` edge. The capacity/pKa pair is **incoherent but NOT fixed — its own beat**.
   D-211 §9's numbers → **0.0274 / 0.0086**. → `.claude/memory/prohibitions/trub-settling-and-the-peptide-pair.md`
+- **Beer pH: the LITERATURE has none, and the acid COURSES were never scored (D-215)** — **NO model
+  change.** Corpus null on a missing acidifier: Ca-phosphate is **BOIL** (pre-pitch, like trub),
+  H⁺-ATPase is **LAB/wine only**, no beer BC-during-ferment, **Tyrell is still the ONLY pH curve**.
+  Figs 9/10/14 interiors read at last: the three `Y·ΔS` timing errors **OPPOSE and nearly cancel**
+  (succinic 25 pts LATE, malic 25 pts EARLY) — **no single fix helps all three**. The engine ferments
+  Tyrell's wort **~2.8× too slow at day 2 (21.2 vs 59.4 %), never scored** — but flux-matching
+  **OVERSHOOTS** (day 1 → 0.063 too *acidic*), so it is **NOT** established as the day-1 cause. pH
+  probe **INCONCLUSIVE**: noise floor 3.2× the headroom. → `.claude/memory/prohibitions/beer-acid-course-timing.md`
 - **Beer's EARLY acetic rise (D-212)** — **REFUSED, pre-registered, BUILT NOTHING.** Never aim at
   Tyrell's day-1 **145.0**: the pH admits a **WINDOW** — **94.24-132.38** admitted by ALL 3 `z̄`
   arms (86-141 is the UNION, never quote it) — and 145 is **OUTSIDE at every arm**. The real

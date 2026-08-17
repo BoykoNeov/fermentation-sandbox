@@ -177,6 +177,46 @@ TYRELL_PH_READ_TOL = 0.024
 #: printed extract curve (apparent → real attenuation → g/L). The whole yield anchor.
 TYRELL_SUGAR_GPL = 82.2388545
 
+#: Figs 9 (malic), 10 (lactic) and 14 (succinic) as COURSES — the four-strain mean per day, the
+#: same shape of quantity as :data:`TYRELL_ACETIC_MEAN_PPM` above and read at the same ±2 ppm
+#: figure tolerance ``beer_acids.yaml`` states for them.
+#:
+#: **These figures' interiors were never read until D-215.** D-180 mined Figs 6-14 for two points
+#: each (day 0, day 7) to build the yields; D-183 transcribed only Fig 13's interior, which is what
+#: retired acetic's flux-linked rate law. The other three carried a rate law nothing had ever
+#: scored against the days it claims to predict — the same endpoint-scored/trajectory-unscored gap
+#: D-207 found in the pH panel of this very figure set.
+#:
+#: **Anchored at BOTH ends against numbers recorded in earlier beats**, which is what makes the
+#: transcription checkable rather than merely careful (the argument D-183 used for Fig 13):
+#: lactic day 0 reads 47.75 against a recorded seed of 48 and its day-7 strain span 88-143 against
+#: a recorded 87-142, with strain 15 at +40 and strain 6 at +95 against ``Y_lactic_sugar_beer``'s
+#: recorded band edges of +39 and +94; malic reads 78 / 81-116 against a recorded 78 / 81-116,
+#: with strain 15 at +3 ("produces essentially none") and strain 31 at 1.57× the mean ("half as
+#: much again"); succinic reads 15 / 32-76 against a recorded 15 / 32-76.
+#:
+#: **Succinic is the CONTROL, not a third defendant** — see
+#: ``test_the_three_flux_linked_acid_courses_are_mistimed``. Its measured shape is the one closest
+#: to the shipped rate law, so a test that failed on all three alike would not be measuring timing.
+TYRELL_ACID_COURSE_PPM: dict[str, dict[int, float]] = {
+    "lactic": {0: 47.75, 1: 54.75, 2: 58.25, 3: 76.5, 4: 103.25, 5: 104.0, 6: 113.0, 7: 119.5},
+    "malic": {0: 78.0, 1: 75.75, 2: 77.0, 3: 76.75, 4: 98.25, 5: 93.0, 6: 96.75, 7: 102.25},
+    "succinic": {0: 15.0, 1: 23.75, 2: 36.25, 3: 48.75, 4: 59.25, 5: 56.25, 6: 61.25, 7: 61.25},
+}
+#: The ±2 ppm figure read tolerance, named so a later assert cannot quietly pick a friendlier one.
+TYRELL_ACID_COURSE_READ_TOL = 2.0
+
+#: Fig. 4's EXTRACT panel as a course — the fraction of the fermentable extract consumed by each
+#: day. Transcribed at D-183 §2 (apparent extract → real attenuation → g/L over this file's
+#: :data:`TYRELL_SUGAR_GPL` divisor) and used there to falsify acetic's flux-linkage.
+#:
+#: **It has never been scored against the model's own attenuation, and that is the gap D-215
+#: found.** Fig. 4 has three panels and each has now been read by a different beat for a different
+#: purpose — D-180 the extract endpoints, D-207 the pH panel, D-211 the cell-count panel — but no
+#: test has ever asked whether this engine ferments Tyrell's wort on Tyrell's schedule. It does
+#: not: see ``test_the_model_ferments_tyrells_wort_on_tyrells_schedule``.
+TYRELL_FLUX_FRACTION: dict[int, float] = {0: 0.0, 1: 0.150, 2: 0.594, 5: 1.003, 7: 0.997}
+
 #: slot -> the wort-seed parameter feeding it, for the three acids D-181 drains. Their bands
 #: are drawn, so the joint-band arm varies them; measured, they are worth ~1.5 % of the drop.
 WORT_SEED_PARAMS = {
@@ -469,6 +509,128 @@ def test_produced_acids_land_in_tyrells_measured_beer_bands():
         got = float(res.series(slot)[-1]) * 1000.0
         assert lo <= got <= hi, (
             f"{slot} finished at {got:.1f} mg/L, outside Tyrell's measured {lo}-{hi} mg/L"
+        )
+
+
+def _daily_ppm(res, slot: str, days: int = 7) -> dict[int, float]:
+    """A slot's value at each whole day [mg/L], read on a FIXED hourly grid.
+
+    Never index the solver's own output for a value at a named time: BDF places its steps
+    adaptively and the nearest one can sit 20+ minutes off the hour, which on a steep limb is a
+    double-digit percentage error that is stable enough to look measured
+    [[feedback-read-a-fast-curve-on-a-fixed-grid]].
+    """
+    grid = np.linspace(0.0, days * 24.0, days * 24 + 1)
+    series = np.interp(grid, res.t, np.asarray(res.series(slot), dtype=float)) * 1000.0
+    return {d: float(series[d * 24]) for d in range(days + 1)}
+
+
+@pytest.mark.xfail(strict=True, reason="D-215: the model ferments this wort ~2.8x too slowly")
+def test_the_model_ferments_tyrells_wort_on_tyrells_schedule():
+    """The extract panel of Fig. 4, scored against the model for the first time (D-215).
+
+    **Why this is an xfail and not a pin.** It states the thing that is true of the source and
+    false of the model, so a correct fix turns it GREEN and nothing has to be deleted — the D-208
+    idiom. A plain assert on the model's *current* fraction would encode the defect instead, which
+    is exactly why D-207 shipped the pH course as data no assert read.
+
+    The gap is not subtle. Tyrell's wort is **59.4 %** fermented by day 2; this engine books
+    **~21 %**, and does not reach dryness until about day 10 where their extract curve is flat by
+    day 5. The tolerance below is ±0.10 of the fermentable — roughly five times any plausible read
+    error on the extract panel — so this cannot be argued down to a transcription quibble.
+
+    **This is upstream of every acid course.** The acids are produced as ``Y · ΔS``, so an extract
+    curve that is too gradual makes every flux-linked acid too gradual with it. Fix this and the
+    acid courses move without any rate law changing; fix the acid rate laws while this stands and
+    they will be fitted to compensate for it [[feedback-a-margin-can-be-borrowed-from-a-defect]].
+
+    **What it does NOT claim.** It does not say the day-1 pH miss is caused by this. D-215 probed
+    that directly and could not attribute it: re-scoring the pH matched on extent rather than on
+    the calendar OVERSHOOTS, moving day 1 from 0.070 too alkaline to 0.063 too acidic. Both a
+    too-slow ferment and a too-generous acid yield are live, and they partly cancel on a
+    time-matched read. Do not cite this test as the diagnosis for D-211 §9's brief.
+    """
+    compiled, res = _run(dict(TYRELL_SCENARIO), days=7.0)
+    grid = np.linspace(0.0, 7 * 24.0, 7 * 24 + 1)
+    sugar = np.asarray(res.y, dtype=float)[compiled.schema.slice("S"), :]
+    total = np.vstack([np.interp(grid, res.t, row) for row in sugar]).sum(axis=0)
+    initial = float(total[0])
+    assert initial == pytest.approx(TYRELL_SUGAR_GPL, rel=1e-9), (
+        "the scenario is not carrying Tyrell's fermentable divisor, so the fractions below "
+        "would be measured against the wrong wort"
+    )
+    for day, measured in TYRELL_FLUX_FRACTION.items():
+        if day > 7:
+            continue
+        got = (initial - float(total[day * 24])) / initial
+        assert got == pytest.approx(measured, abs=0.10), (
+            f"day {day}: the model has fermented {got:.1%} of the wort against Tyrell's measured "
+            f"{measured:.1%}. Their extract panel is the driver of every flux-linked acid course "
+            "in this file; see TYRELL_FLUX_FRACTION."
+        )
+
+
+@pytest.mark.xfail(strict=True, reason="D-215: lactic/malic/succinic courses are mistimed")
+def test_the_three_flux_linked_acid_courses_are_mistimed():
+    """The three ``Y·ΔS`` acids against the days they claim to predict (D-215).
+
+    D-183 scored acetic against Fig. 13's interior and the flux-linked law lost. The other three
+    were never scored the same way — only their day-7 endpoints were, and those agree close to by
+    construction because the yields are ``(day7 − day0)/ΔS`` off these very curves
+    (``test_produced_acids_land_in_tyrells_measured_beer_bands`` says so in its own docstring).
+
+    Tolerance is **three times** the ±2 ppm figure read tolerance, so a failure here is a shape
+    disagreement and not a quarrel about pixels.
+
+    **The three do not fail the same way, and that is the finding**, not a nuisance:
+
+    * **succinic** is the closest to the shipped law and acts as the control — measured 45.9 % of
+      its rise done by day 2 against a modelled 20.5 %, i.e. the model is *late*;
+    * **malic** errs the other way, ~0 % measured against 20.5 % modelled, i.e. the model is
+      *early*;
+    * **lactic** sits between them and is nearly right at day 2, then falls behind.
+
+    So there is **no single timing correction that helps all three**, and the two large errors have
+    OPPOSITE sign — which is why the shared flux-linked shape survived four beats of endpoint
+    checks. A fix that made all three match by moving one rate law would be fitting a compromise,
+    not a mechanism [[feedback-a-hit-can-be-two-errors-cancelling]].
+    """
+    _, res = _run(dict(TYRELL_SCENARIO), days=7.0)
+    tol = 3.0 * TYRELL_ACID_COURSE_READ_TOL
+    for slot, course in TYRELL_ACID_COURSE_PPM.items():
+        got = _daily_ppm(res, slot)
+        for day, measured in course.items():
+            assert got[day] == pytest.approx(measured, abs=tol), (
+                f"{slot} day {day}: model {got[day]:.1f} vs Tyrell's measured {measured:.1f} "
+                f"mg/L (tolerance ±{tol:.0f}, i.e. 3× the figure read tolerance)"
+            )
+
+
+def test_the_acid_courses_are_anchored_to_numbers_recorded_before_them():
+    """The transcription's own check — and it is NOT an xfail, because it must hold today.
+
+    ``TYRELL_ACID_COURSE_PPM`` was read off the figures at D-215, years of beats after the seeds
+    and yields derived from the same figures were recorded. If the new reads did not reproduce
+    those older numbers, the transcription would be worthless and every conclusion resting on it
+    would be a fresh error rather than a measurement
+    [[feedback-a-hit-can-be-two-errors-cancelling]].
+
+    Day 0 against the shipped wort seed, and day 7 against the shipped measured beer band.
+    """
+    data = default_data_dir()
+    params = load_parameters(
+        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    ).resolve()
+    for slot, course in TYRELL_ACID_COURSE_PPM.items():
+        seed_ppm = params[f"{slot}_typical_wort"] * 1000.0
+        assert course[0] == pytest.approx(seed_ppm, abs=TYRELL_ACID_COURSE_READ_TOL), (
+            f"{slot}'s day-0 read {course[0]:.2f} disagrees with the shipped wort seed "
+            f"{seed_ppm:.2f} mg/L by more than the figure read tolerance"
+        )
+        lo, hi = TYRELL_BEER_PPM[slot]
+        assert lo - TYRELL_ACID_COURSE_READ_TOL <= course[7] <= hi + TYRELL_ACID_COURSE_READ_TOL, (
+            f"{slot}'s day-7 four-strain mean {course[7]:.2f} falls outside the recorded measured "
+            f"band {lo}-{hi} mg/L even allowing the read tolerance"
         )
 
 
