@@ -30399,6 +30399,12 @@ unseeded driver. This is the beat that closes it.
 `begin_aging`.** Aging is post-ferment; that gating is correct and is not touched here. So the
 seeded oxygen feeds **nothing** during fermentation, and this beat moves **no default trajectory**.
 
+> **§9 CORRECTS THE BASIS OF THIS CLAIM — read it before quoting this section.** The consumers'
+> aging-gating is *not* sufficient on its own. As first shipped, an **aged** beer WAS measurably
+> changed: `WortOxygenUptake` stayed enabled past the breakpoint and ate ~45 % of an `add_oxygen`
+> dose. Inertness holds because `begin_aging` now **disables** this Process, not because nothing
+> could ever read the pool. "No default trajectory" remains true; "nothing reads it" never was.
+
 It also cannot reach D-212's day-1 pH residual, and the reason is mechanism rather than magnitude —
 measured before building, not discovered after:
 

@@ -21,6 +21,15 @@ default set.** The three Processes that consume ``o2`` — :class:`OxidativeAcet
 tuple and disabled at the compile seam until ``begin_aging``. So seeding O₂ and removing it moves
 the ``o2`` column and **nothing else**.
 
+**That aging-gating is NOT sufficient on its own, and saying so was this beat's one real defect**
+(D-213 §9). As first shipped, this Process stayed enabled *past* the breakpoint and competed with
+those sinks for a dosed ``add_oxygen``, eating ~45 % of it — an **aged** beer was measurably
+changed. ``begin_aging`` therefore **disables** this Process, the first thing that verb has ever
+switched off; before the breakpoint the sinks are off and this is on, after it the reverse.
+**Inertness holds because that disable makes it hold**, not because nothing could ever read the
+pool. Do not remove the disable on the grounds that the consumers are aging-gated — that is
+precisely the reasoning the measurement refuted.
+
 **Said precisely, because the exact claim differs between the RHS and the trajectory** — the
 distinction D-42's ``h2s`` docstring draws, and the one
 [[feedback-pin-tolerance-vs-solver-tolerance]] exists to keep honest. The **derivative** of every
