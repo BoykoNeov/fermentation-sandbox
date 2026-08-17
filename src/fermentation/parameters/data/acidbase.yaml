@@ -523,3 +523,69 @@ vant_hoff_co2_solubility:
     source: "Sander, R., 'Compilation of Henry's law constants for water as solvent', via henrys-law.org, CAS 124-38-9: recommended Hscp = 3.4e-4 mol/(m3*Pa) at 298.15 K with d ln(Hscp)/d(1/T) = 2300 K (Burkholder et al. 2019); other entries 2300-2400 K. This compilation is the source Understanding Wine Chemistry Fig 3.9 itself cites for the same curve."
     conditions: "CO2 in WATER, near 298.15 K; the van 't Hoff coefficient -d ln H / d(1/T), applied here to a BEER-anchored constant. Borrowing water's temperature SHAPE is licensed by the anchor itself: the in-beer constant at 10 C (2.302) and water's at 10 C (2.282) agree to 0.9 %, so the two liquids are not distinguishable at this precision."
     notes: "Enters as C_sat(T) = H_co2_beverage * exp(coefficient * (1/T - 1/T_ref_co2_solubility)) -- solubility FALLS as temperature rises, which is why the sign works out to a plain positive coefficient here rather than the negated E_a/R of the Arrhenius factor. Deliberately NOT expressed as an enthalpy in J/mol: the compilation prints kelvin, and converting would add a derived step to a transcribed number for no gain [[feedback-a-text-screen-has-units-and-self-reference]]. At the coefficient's own band this is worth ~1 % on the saturation concentration at 15 C, so it is the least consequential of the three."
+
+# =============================================================================
+# Mean charge per mole of ASSIMILABLE NITROGEN (decision D-209)
+# =============================================================================
+#
+# The assimilable-nitrogen pool is not electrically neutral. It is ammonium plus a mixture of
+# amino acids whose side chains are charged at fermentation pH, so it sits on the CATION side
+# of the charge balance, and the yeast drawing it down is therefore an acidification: by
+# electroneutrality the liquid replaces the charge it loses with an equal charge of protons.
+#
+# THE MECHANISM IS SOURCED, and the obvious reading of it is wrong. Ribereau-Gayon, Handbook
+# of Enology Vol 1 sec 2.4.2: the permease "couples the transport of an amino acid molecule (or
+# ammonium ion) with the transport of a hydrogen ion ... Obviously, the proton that penetrates
+# the cell must then be exported to avoid acidification of the cytoplasm ... The membrane
+# ATPase ensures the excretion of the hydrogen ion across the plasmic membrane, acting as a
+# proton pump." The symport proton is RE-EXPORTED, so the symport cycle is proton-neutral and
+# contributes nothing net. That is why one number per medium suffices, and it CORRECTS the way
+# D-208 sec 6 framed the candidate: the two opposing halves are not "ammonium exports protons /
+# symport imports them", they are the CATIONIC species (ammonium, arginine, lysine, histidine)
+# against the ANIONIC ones (aspartate, glutamate).
+#
+# THE DENOMINATOR IS ELEMENTAL NITROGEN, not alpha-amino groups, because that is what the `N`
+# slot holds: seeded as g N/L from `yan_mgl`, drawn against `biomass_N_fraction` = 0.114 g N per
+# g cell. So arginine, which carries FOUR nitrogens per +1 charge, contributes +0.25 per mole N
+# and not +1. Reversing that convention inflates the cationic half roughly fourfold.
+#
+# PROLINE IS EXCLUDED FROM BOTH, on source in both media: it is Jones & Pierce Group D for beer
+# ("Group D: Proline" -- Pelter & Hopkins, The Chemistry of Beer, the A-D groups being ranked by
+# uptake rate, with ammonia in Group C i.e. assimilated), and for wine "Yeasts do not utilize
+# proline during fermentation, although it is one of the principal amino acids found in must"
+# (Handbook of Enology Vol 1). The `N` slot is assimilable nitrogen by definition, so a
+# total-FAN denominator would be a scope mismatch corrupting both the charge and the moles.
+#
+# CHARGES are speciated from standard backbone and side-chain pKa values at the medium's own
+# starting pH. The pool's real charge is mildly pH-dependent and this is held constant: measured
+# at +0.177 for wort at pH 5.65 rising to +0.188 at pH 4.86, a 6 % drift across a whole ferment.
+# Held constant in the direction of UNDERSTATEMENT.
+#
+# SCOPE -- THIS IS THE CHARGE HALF ONLY, SO BOTH VALUES ARE LOWER BOUNDS. Neither medium models
+# the assimilable pool per species (beer has no amino-acid slots at all, D-32), so assimilation
+# removes the pool's charge but not its BUFFERING, and a real wort's amino acids buffer near
+# beer's own pH. Buffer removal pushes pH the SAME way, so the omitted half can only make the
+# acidification larger. Two further sources of the same sign are identified and NOT built:
+# K+/H+ antiport (yeast accumulates potassium; Peyer Table 2 gives wort K+ at 550 mg/L) and the
+# precipitation of buffering high-molecular protein as trub. A closure that credits all of the
+# measured acidification to this term alone would be over-claiming.
+
+nitrogen_uptake_charge_beer:
+  value: 0.1772
+  unit: "mol+/mol N"
+  tier: plausible
+  uncertainty: { low: 0.1665, high: 0.1880, note: "BOTH EDGES DERIVED, and the band is the wort AMMONIUM range alone (Peyer Table 2's printed 25-30) -- the amino-acid contribution is a single composition column with no band of its own. The amino-acid half is +0.0395 of the nominal 0.1772, so ~78 % of this parameter is its ammonium term and the band is that term's width. A SCOPE ALTERNATIVE, deliberately NOT folded in as extra width: Table 2's column header says only 'mg/L', and reading its ammonia row as NH3 MASS rather than as N gives 20.6-24.7 mg N/L and hence zbar 0.1465-0.1651. The as-N reading is nominal because the same column's free-amino-acid row is demonstrably as-N (see notes), and mixing a units fork into a parameter band would disguise it as measurement error." }
+  provenance:
+    source: "DERIVED. Amino-acid composition: Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), Table 16 control column -- 18 free amino acids in mg/L in a malt wort. Wort ammonium: the same thesis, Table 2 ('Malt wort nutrients (10-12 degP)'), row 'Ammonia 25-30', compiled there from Clapperton 1971, Jancar 1983, Lie 1974 and MEBAK 2011. Assimilated set (proline excluded) on Jones & Pierce's A-D uptake groups via Pelter & Hopkins, The Chemistry of Beer. Mechanism: Ribereau-Gayon, Handbook of Enology Vol 1 sec 2.4.2."
+    conditions: "malt wort at pH 5.65, charge-weighted over the 18 measured free amino acids plus ammonium, per mole of ELEMENTAL nitrogen. Table 16's wort is diluted 50:50 and citrate-buffered, so only its RATIOS are used -- the buffer is citric acid plus trisodium citrate and adds no nitrogen, and 169/78 mg/L FAN for the undiluted vs diluted wort (that thesis's Table 15) confirms the 2x scaling."
+    notes: "UNITS CROSS-CHECK, because Table 2's column is headed only 'mg/L': summing Table 16 as elemental nitrogen and scaling to full strength gives 164 mg N/L, INSIDE Table 2's printed 150-230 free-amino-acid figure, whereas the same amino acids as COMPOUND mass would be ~1037 mg/L, far outside it. So that column reads as mg N/L and the ammonia row two lines below it is read the same way. Composition is a DIFFERENT wort from Tyrell 2013's, which is what the acceptance test scores against -- an accepted deviation, stated not tuned. Per-species arithmetic: arginine +1 over 4 N = +0.25/N; lysine +1 over 2 N = +0.5/N; histidine +0.71 (imidazole pKa 6.04) over 3 N; aspartate and glutamate -1 over 1 N each; asparagine, glutamine and tryptophan are zwitterions with a non-ionisable second nitrogen, so 0. tier=plausible on the tiers.py definition (sound mechanism with literature support, hard to validate quantitatively) -- speculative would drag WINE's ph_tier down from plausible for a term wine's own inputs support just as well, which is the D-179 asymmetry in reverse."
+
+nitrogen_uptake_charge_wine:
+  value: 0.3245
+  unit: "mol+/mol N"
+  tier: plausible
+  uncertainty: { low: 0.2105, high: 0.4098, note: "BOTH EDGES DERIVED from the Handbook's own printed partition of must nitrogen: ammonium 3-10 % of total N against amino acids 25-30 %, so the ammonium-to-amino-acid-nitrogen ratio spans 3/30 = 0.10 to 10/25 = 0.40. Roughly 2x wide, and honestly so -- that ratio is the dominant term. The amino-acid half alone is +0.1103, already ~3x beer's +0.0395, because must is arginine-dominated (220.5 mg/L of 2258) while carrying relatively little aspartate and glutamate. Nominal is evaluated at must pH 3.4 with the ratio at its midpoint." }
+  provenance:
+    source: "DERIVED. Amino-acid composition: Huang, Z. & Ough, C. S. (1989) via Jackson (ed.), Concise Encyclopedia of Science and Technology of Wine, Table 3.8 -- the 1983 CHARDONNAY column (10 samples). Ammonium share and the assimilability of each fraction: Ribereau-Gayon et al., Handbook of Enology Vol 1: 'the ammonium cation (3-10% of total nitrogen), amino acids (25-30%), polypeptides (25-40%) and proteins (5-10%)', with the same source stating S. cerevisiae cannot hydrolyse polypeptides or proteins."
+    conditions: "grape must at pH 3.4, charge-weighted over the 19 tabulated amino acids MINUS proline, plus ammonium, per mole of ELEMENTAL nitrogen. Assimilable pool = ammonium + amino acids - proline, on the Handbook's own statement about which fractions the yeast can use."
+    notes: "TABLE SELF-CHECK, and it is why this column was chosen over the other four: its 19 printed values sum to 2153.9 against a printed total of 2258.0, and the table's own footnote says the total 'Includes ethanolamine, gamma-aminobutyric acid, beta-alanine but not ammonia' -- so the 104.1 residual is exactly those three named species. The 1984 columns have an OCR-dropped cell and cannot be reconciled that way, so they are not used [[feedback-a-notes-field-is-unchecked-storage]]. The excluded 104.1 mg/L (4.6 % of the total) contains ethanolamine, which is cationic, so omitting it understates this value slightly -- the same direction as every other simplification here. Ammonia is EXPLICITLY absent from this table, which is why its share comes from a second source rather than being read off the same column. Cystine is carried as the dimer (2 N, neutral); ornithine is 0.0 in this must. Wine is far better buffered than beer (measured local buffer capacity 48 vs 2-5 mEq/L/pH), so this larger zbar moves an anchored wine's finished pH only about -0.05, against beer's -0.4."

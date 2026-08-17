@@ -784,6 +784,11 @@ def _wine_initial(
         acid_gpl = {"tartaric": tartaric, "malic": malic, "lactic": 0.0}
         totals_molar = {n: g / acidbase.ACID_STATE[n].molar_mass for n, g in acid_gpl.items()}
         try:
+            # The assimilable-nitrogen pool carries net POSITIVE charge and is present at the
+            # anchor, so the cation the target pH needs is partly supplied by ``N`` (decision
+            # D-209). Subtract that share, or the slot would double-count it and the must would
+            # not read back at ``initial_ph``. Must nitrogen is arginine-dominated, hence a
+            # wine-specific z-bar rather than beer's.
             initial["cation_charge"] = acidbase.solve_cation_charge(
                 totals_molar,
                 byp_succinic_molar=0.0,
@@ -795,6 +800,8 @@ def _wine_initial(
                 carbonic_molar=0.0,
                 pka_map=acidbase.build_pka_map(parameters.resolve()),
                 target_ph=float(values["initial_ph"]),
+            ) - acidbase.nitrogen_charge_from_gpl(
+                mgl_to_gpl(_require(values, "yan_mgl", "wine")), "wine", parameters.resolve()
             )
         except ValueError as exc:  # initial_ph below the acid load's intrinsic pH
             raise ValueError(f"wine scenario.initial['initial_ph'] is unphysical: {exc}") from exc
@@ -885,6 +892,10 @@ def _beer_cation(
         return 0.0
     totals_molar = {slot: gpl / acidbase.BEER_ACIDS[slot].molar_mass for slot, gpl in acids.items()}
     try:
+        # Wort nitrogen is on the cation side and present at the anchor, so its charge is
+        # subtracted off the fitted slot (decision D-209) — the same correction wine's anchor
+        # makes, with wort's own z-bar. Wort's amino-acid halves nearly cancel, so this is
+        # essentially the wort ammonium; the term is what lets beer's pH FALL as YAN is taken up.
         return acidbase.solve_cation_charge(
             totals_molar,
             byp_succinic_molar=0.0,
@@ -894,6 +905,8 @@ def _beer_cation(
             carbonic_molar=0.0,
             pka_map=acidbase.build_pka_map(parameters.resolve()),
             target_ph=float(values["initial_ph"]),
+        ) - acidbase.nitrogen_charge_from_gpl(
+            mgl_to_gpl(_require(values, "yan_mgl", "beer")), "beer", parameters.resolve()
         )
     except ValueError as exc:  # initial_ph below the acid load's intrinsic pH
         raise ValueError(f"beer scenario.initial['initial_ph'] is unphysical: {exc}") from exc

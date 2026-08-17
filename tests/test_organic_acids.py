@@ -65,12 +65,15 @@ charge-balance non-terms either way. No test here is named or phrased as validat
 acids alone.
 """
 
+import re
+import shutil
+
 import numpy as np
 import pytest
 
 from fermentation.core import acidbase
 from fermentation.core.acidbase import charge_balance_is_populated
-from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
+from fermentation.core.chemistry import M_NITROGEN, carbon_mass_fraction, sugar_species
 from fermentation.core.kinetics import (
     ACETIC_SLOT,
     ORGANIC_ACID_SPECS,
@@ -731,6 +734,12 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     biomass_formed = (float(res.series("N")[0]) - max(float(res.series("N")[-1]), 0.0)) / params[
         "biomass_N_fraction"
     ]
+    # D-209: the nitrogen the run started with and ended on, in g N/L. Recovered from the run for
+    # the same reason as the two above — the charge this arm removes must be the charge the
+    # solver's own nitrogen carried, not a nominal 200 mg/L that a scenario override could
+    # silently diverge from.
+    nitrogen_gpl_start = float(res.series("N")[0])
+    nitrogen_gpl_end = max(float(res.series("N")[-1]), 0.0)
 
     def edge(param: str, pick: str) -> float:
         p = beer_params[param]
@@ -747,6 +756,7 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         henry: str,
         vant_hoff: str,
         acetic_pick: str,
+        nitro: str,
     ) -> tuple[float, float]:
         """``(degassed, in_vessel)`` fraction of the measured drop for one band member.
 
@@ -767,11 +777,21 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         seeded = dict(start_molar)
         for seed_slot, seed_param in WORT_SEED_PARAMS.items():
             seeded[seed_slot] = edge(seed_param, seed) / molar[seed_slot]
+        # D-209: the wort's assimilable nitrogen is itself on the cation side, so the anchored
+        # total splits into a frozen slot plus a term that MOVES as the yeast takes the nitrogen
+        # up. The anchor is unaffected (the start uses the total, exactly as before), which is
+        # why `start` still lands on the supplied wort pH bit-for-bit; what changes is the END,
+        # where the pool is gone. Written as `cation` (the total at t=0) minus the charge the
+        # consumed nitrogen carried, so the arm mirrors the shipped code's re-allocation rather
+        # than re-deriving it.
+        zbar = edge("nitrogen_uptake_charge_beer", nitro)
+        nitrogen_charge_lost = zbar * (nitrogen_gpl_start - nitrogen_gpl_end) / M_NITROGEN
         cation = acidbase.solve_cation_charge(seeded, 0.0, 0.0, member, TYRELL_WORT_PH)
         start = acidbase.solve_ph(seeded, cation, 0.0, 0.0, member)
         assert start == pytest.approx(TYRELL_WORT_PH, abs=1e-6), (
             "every member must start at the supplied wort pH — that is what anchoring means"
         )
+        cation_end = cation - nitrogen_charge_lost
         end = dict(seeded)
         for spec in ORGANIC_ACID_SPECS:
             # Produced acids build on the RUN's seed, not the varied one: a yield is a measured
@@ -802,9 +822,9 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         sat = acidbase.co2_saturation_gpl(float(res.series("T")[-1]), member_params)
         evolved = float(res.series("CO2")[-1])
         carbonic_molar = min(evolved, sat) / acidbase.CARBONIC_AS_CO2.molar_mass
-        in_vessel = acidbase.solve_ph(end, cation, 0.0, carbonic_molar, member)
+        in_vessel = acidbase.solve_ph(end, cation_end, 0.0, carbonic_molar, member)
         # The frame Tyrell measured in (D-208): the same member with the sample decarbonated.
-        degassed = acidbase.solve_ph(end, cation, 0.0, 0.0, member)
+        degassed = acidbase.solve_ph(end, cation_end, 0.0, 0.0, member)
         return ((start - degassed) / measured_drop, (start - in_vessel) / measured_drop)
 
     pka_band = (
@@ -817,35 +837,40 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     # Tyrell is the degassed column; the in-vessel column is a property of the model and is
     # pinned beside it so the two can never be silently re-conflated (D-208).
     at_nominal = [
-        fraction(pka, "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom")
+        fraction(pka, "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom")
         for pka in pka_band
     ]
     degassed_nominal = [f[0] for f in at_nominal]
     vessel_nominal = [f[1] for f in at_nominal]
     # BOTH edges pinned, not just the one a floor would guard: swapping a band edge for its
     # neighbour has passed a one-sided pin before [[feedback-pin-the-band-not-the-nominal]].
-    assert min(degassed_nominal) == pytest.approx(0.432, abs=0.005), (
+    assert min(degassed_nominal) == pytest.approx(0.914, abs=0.005), (
         f"the degassed prediction moved to {min(degassed_nominal):.1%} of Tyrell's measured "
-        "0.81 pH drop at nominal yields; D-208 measures 43.2-62.9 % across the pKa band. This "
-        "is the number that compares with a published beer pH, and it is NOT the 77.8-97.3 % "
-        "this test reported for four beats — that was the in-vessel pH scored against a "
-        "decarbonated measurement"
+        "0.81 pH drop at nominal yields; D-209 measures 91.4-127.1 % across the pKa band, "
+        "against D-208's 43.2-62.9 % for the same arm before the nitrogen pool's charge was in "
+        "the balance. This is the number that compares with a published beer pH"
     )
-    assert max(degassed_nominal) == pytest.approx(0.629, abs=0.005), (
-        f"the degassed prediction's high edge moved to {max(degassed_nominal):.1%}; D-208 "
-        "measures 62.9 %. The shortfall this pin holds open is the subject of the xfail below"
+    assert max(degassed_nominal) == pytest.approx(1.271, abs=0.005), (
+        f"the degassed prediction's high edge moved to {max(degassed_nominal):.1%}; D-209 "
+        "measures 127.1 %, so at this arm's DAY-14 endpoint the high edge of the peptide pKa "
+        "band now OVERSHOOTS the measured drop. Two things keep that honest and neither is a "
+        "tuning knob: Tyrell's measurement stops at day 7 while this arm reads day 14, where "
+        "the model is still producing acid (the day-7 comparison is the acceptance test below, "
+        "101.7-107.1 %); and z-bar is DERIVED from published wort composition, never fitted"
     )
-    assert min(vessel_nominal) == pytest.approx(0.778, abs=0.005), (
-        f"the IN-VESSEL fraction moved to {min(vessel_nominal):.1%}; D-183 measures 77.8 % "
-        "(D-182's 77.6 %, and D-181's 42.7 % was this same model with no dissolved CO2 in its "
-        "charge balance). Pinned as a model property: no published beer pH is measured in this "
-        "frame, so a change here is a change to the vessel's chemistry, not to an agreement"
+    assert min(vessel_nominal) == pytest.approx(1.068, abs=0.005), (
+        f"the IN-VESSEL fraction moved to {min(vessel_nominal):.1%}; D-209 measures 106.8 % "
+        "(D-183's 77.8 %, D-182's 77.6 %, and D-181's 42.7 % was this same model with no "
+        "dissolved CO2 in its charge balance). Pinned as a model property: no published beer pH "
+        "is measured in this frame, so a change here is a change to the vessel's chemistry, not "
+        "to an agreement"
     )
-    assert max(vessel_nominal) == pytest.approx(0.973, abs=0.005), (
-        f"the IN-VESSEL fraction's high edge moved to {max(vessel_nominal):.1%}; D-183 measures "
-        "97.3 %. Still below 100 %: were it to exceed one, the model would be producing more "
-        "charge shift than Tyrell's beers did while ALSO carrying a term their measurement "
-        "excludes"
+    assert max(vessel_nominal) == pytest.approx(1.381, abs=0.005), (
+        f"the IN-VESSEL fraction's high edge moved to {max(vessel_nominal):.1%}; D-209 measures "
+        "138.1 % against D-183's 97.3 %. It now exceeds 1: the in-vessel pH carries a term the "
+        "measurement excludes AND the nitrogen charge, so it is expected to run above the "
+        "measured drop. The previous version of this pin asserted the opposite would be "
+        "surprising — that reasoning belonged to a model with no nitrogen term"
     )
 
     # Scope 2 — the joint band the sampler can actually reach. No upper bound is asserted on the
@@ -857,7 +882,9 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     # which is exactly what D-180's amendment had to correct in this very test.
     picks = ("lo", "nom", "hi")
     joint = [
-        fraction(pka, pick, floor_pick, ox2, pyr, seed, carbonic, henry, vant_hoff, acetic_pick)
+        fraction(
+            pka, pick, floor_pick, ox2, pyr, seed, carbonic, henry, vant_hoff, acetic_pick, nitro
+        )
         for pka in pka_band
         for pick in picks
         for floor_pick in picks
@@ -868,37 +895,46 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         for henry in picks
         for vant_hoff in picks
         for acetic_pick in picks
+        for nitro in picks
     ]
-    # TEN dimensions since D-183, and the tenth went in the SAME COMMIT that shipped the band it
-    # varies. That ordering is the archive's fix for its most-repeated shape — a constraint
-    # verified at a POINT where the sampler reads a BAND — which landed six times, twice inside
-    # the record documenting the previous instance. `Y_acetic_biomass_beer` replaced
-    # `Y_acetic_sugar_beer` in the drawn set, so the count of drawn quantities is unchanged; what
-    # changed is that acetic's band no longer moves with the other three yields' `pick`.
-    assert len(joint) == 3**10, "every drawn dimension must be varied, not a subset of them"
+    # ELEVEN dimensions since D-209, and the eleventh went in the SAME COMMIT that shipped the
+    # band it varies. That ordering is the archive's fix for its most-repeated shape — a
+    # constraint verified at a POINT where the sampler reads a BAND — which landed six times,
+    # twice inside the record documenting the previous instance. At D-183 the tenth was
+    # `Y_acetic_biomass_beer` replacing `Y_acetic_sugar_beer`, so the count did not move then;
+    # `nitrogen_uptake_charge_beer` is a genuine addition, and it is drawn because it is in
+    # `PH_SYSTEM_READS` (D-160's sampler-scope master).
+    assert len(joint) == 3**11, "every drawn dimension must be varied, not a subset of them"
     degassed_joint = [f[0] for f in joint]
     vessel_joint = [f[1] for f in joint]
-    # The measured frame first, because it is the one that compares with Tyrell (D-208). Both
-    # edges pinned, and the high edge carries the claim D-181 owned before the carbonic term:
-    # NOTHING in the band reaches the measurement.
-    assert min(degassed_joint) == pytest.approx(0.083, abs=0.02), (
-        f"the degassed joint low corner moved to {min(degassed_joint):.1%}; D-208 measures "
-        "8.3 %, against 7.6 % for the pre-carbonic model at D-181 — which is the point: with "
-        "the term excluded from the COMPARISON, the band returns to nearly where D-181 left it"
+    # The measured frame first, because it is the one that compares with Tyrell (D-208).
+    assert min(degassed_joint) == pytest.approx(0.712, abs=0.02), (
+        f"the degassed joint low corner moved to {min(degassed_joint):.1%}; D-209 measures "
+        "71.2 %, against D-208's 8.3 % and D-181's pre-carbonic 7.6 %. The low corner moved "
+        "further than the high one for the same reason it did at D-182: a member predicting "
+        "little acidification finishes at a higher pH, and the nitrogen term is a fixed charge "
+        "removal, so it buys the most where the acids buy the least"
     )
-    assert max(degassed_joint) == pytest.approx(0.827, abs=0.02), (
-        f"the degassed joint high corner moved to {max(degassed_joint):.1%}; D-208 measures "
-        "82.7 % (D-181's pre-carbonic 82.2 %)"
+    assert max(degassed_joint) == pytest.approx(1.401, abs=0.02), (
+        f"the degassed joint high corner moved to {max(degassed_joint):.1%}; D-209 measures "
+        "140.1 % (D-208's 82.7 %, D-181's pre-carbonic 82.2 %)"
     )
-    assert max(degassed_joint) < 1.0, (
-        f"a corner of the joint band reached {max(degassed_joint):.1%} of the measured drop IN "
-        "THE FRAME TYRELL MEASURED. Nothing is supposed to reach here: the in-vessel band does "
-        "reach (109.7 %) and for four beats that reach was read as the model catching up with "
-        "the measurement. If this fires, an acidification term genuinely arrived and the xfail "
-        "below should be re-scored before anything else is concluded"
+    # D-208 asserted `max(degassed_joint) < 1.0` here and wrote, in that assert's own failure
+    # message, that if it ever fired "an acidification term genuinely arrived and the xfail
+    # below should be re-scored before anything else is concluded". At D-209 it fired, the term
+    # had arrived, and the xfail flipped green. So the claim is INVERTED rather than deleted: a
+    # corner of the band must now reach, because a band whose top no longer covers the
+    # measurement would mean the term had been lost again.
+    assert max(degassed_joint) > 1.0, (
+        f"no corner of the joint band reaches the measured drop in the degassed frame "
+        f"({max(degassed_joint):.1%}). Since D-209 the nitrogen pool's charge is in the balance "
+        "and the band is expected to straddle 100 %; if this fires, that term has gone missing "
+        "or been re-scoped, and `test_the_model_reaches_tyrells_measured_beer_ph` should be the "
+        "next thing looked at"
     )
-    assert min(vessel_joint) == pytest.approx(0.640, abs=0.02), (
-        f"the joint low corner moved to {min(vessel_joint):.1%}; D-183 measures 64.0 % over TEN "
+    assert min(vessel_joint) == pytest.approx(0.928, abs=0.02), (
+        f"the joint low corner moved to {min(vessel_joint):.1%}; D-209 measures 92.8 % over "
+        "ELEVEN dimensions, D-183 measured 64.0 % over TEN "
         "dimensions (D-182 measured 63.8 % over nine; D-181's was 7.6 %) — "
         "yields at their low edge, peptide pKa HIGH, floors at their LOW edge (the "
         "strains that clear the most wort acid) and the seeds HIGH. A LOW floor means MORE "
@@ -913,8 +949,9 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "from a 74.6-point span to a 45.6-point one — this term is a stabiliser of the "
         "prediction, not just an offset to it."
     )
-    assert max(vessel_joint) == pytest.approx(1.097, abs=0.02), (
-        f"the joint high corner moved to {max(vessel_joint):.1%}; D-183 measures 109.7 % over TEN "
+    assert max(vessel_joint) == pytest.approx(1.495, abs=0.02), (
+        f"the joint high corner moved to {max(vessel_joint):.1%}; D-209 measures 149.5 % over "
+        "ELEVEN dimensions, D-183 measured 109.7 % over TEN "
         "dimensions (D-182 measured 109.4 % over nine; D-181's "
         "was 82.2 %) — yields high, peptide pKa low, floors high, seeds low, and the three "
         "CO2 parameters at the edges that dissolve the most and dissociate it hardest. NB "
@@ -929,29 +966,29 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="D-208: in the frame Tyrell measured in — MEBAK II 2.14 is 'pH (EBC)' and EBC 9.35's "
-    "scope is 'the determination of pH at 20 degC of DECARBONATED beer' — the model reaches only "
-    "43.2-62.9 % of the measured 0.81 pH drop and finishes day 7 at 5.2474 against a four-strain "
-    "envelope of 4.804-4.916. NOT a frame artefact: the day-7 pH is above that envelope for "
-    "EVERY retained-CO2 fraction in [0, 1] (4.9608 even fully carbonated), and the shipped "
-    "in-vessel agreement needed the sample to have retained 65 % of saturation to clear its own "
-    "0.70 floor. The missing acidification is ~0.4 pH and its source is unidentified",
-)
 def test_the_model_reaches_tyrells_measured_beer_ph():
-    """THE ACCEPTANCE CLAIM, and it fails — pinned as ``xfail`` the way D-188 pins Herzan's.
+    """THE ACCEPTANCE CLAIM, and since D-209 it **passes** — this was an ``xfail(strict)``.
 
-    D-207 read Fig. 4's pH panel as a course and found the shape wrong while the endpoint metric
-    passed; D-208 then settled the frame, and the endpoint metric does not pass either. What is
-    left is a single honest statement: **the model reproduces about half of beer's measured
-    acidification**, and nothing in the parameter bands or in the CO₂ residue closes that.
+    The history is the point, so it is kept rather than summarised. D-207 read Fig. 4's pH panel
+    as a course and found the shape wrong while the endpoint metric passed. D-208 settled the
+    measurement frame (a published beer pH is a decarbonated reading), whereupon the endpoint
+    metric did not pass either, and this test was written as an expected failure on the day-7
+    LEVEL: the model reached 43.2-62.9 % of the measured 0.81 pH drop and finished day 7 at
+    5.2474 against a four-strain envelope of 4.804-4.916, for every retained-CO₂ fraction in
+    [0, 1]. D-208 §5 chose the level over a day-1 shape pin precisely because *a fix flips it
+    green, which is what strict=True is for*. D-209 is that fix, and it flipped: the assimilable
+    nitrogen pool carries net positive charge, so the yeast taking it up acidifies the liquid,
+    and that term was missing from the charge balance rather than from the chemistry.
 
-    Asserted on the day-7 LEVEL rather than on the day-1 shape on purpose. D-207 §7 argued that a
-    pin on the day-1 overshoot would encode the defect it measured and a correct fix would have to
-    delete it; this one is the opposite — a fix flips it green, which is what ``strict=True`` is
-    for. It is also the one claim that survives the frame question: both independent reads of the
-    panel (this pixel read 4.804-4.916, D-180's eye read 4.78-4.90) put the model above them.
+    **What passing here does and does not license.** It says day 7 lands inside the envelope. It
+    does NOT say the course is reproduced: day 1 is still outside, and it is outside by MORE than
+    before D-209 (0.29-0.34 pH against 0.19), because the model empties its nitrogen inside 20 h
+    and so delivers the whole charge step before the day-1 reading. That is a statement about
+    nitrogen-uptake TIMING, not about the charge arithmetic, and it is pinned separately in
+    :func:`test_the_day_1_pH_is_still_missed_and_the_miss_is_uptake_timing`. Nor is the term the
+    whole of nitrogen uptake's effect: it is the charge half only, so it is a lower bound (see
+    ``acidbase.nitrogen_charge_molar``), and two further same-sign sources — K⁺/H⁺ antiport and
+    trub precipitation — are identified and unbuilt.
 
     ``TYRELL_PH_COURSE`` was shipped at D-207 as data no assert read. This is the assert that
     reads it, and it reads day 7 ONLY.
@@ -1186,7 +1223,25 @@ def test_removing_the_falling_acids_raises_the_finished_ph_by_the_predicted_amou
     peptide capacity is the same re-anchored value in both, so this measures the acids and not
     the re-anchor that shipped beside them.
 
-    **D-182 HALVED THE NUMBER, AND THAT IS A RESULT RATHER THAN A REGRESSION.** D-181 measured
+    **THIS NUMBER HAS NOW MOVED THREE TIMES, AND ONLY THE FIRST MOVE WAS ABOUT THE ACIDS.**
+    D-181 built them and measured +0.2094 pH with no carbonic term in the balance. D-182 added
+    dissolved CO2 and the shipped figure became +0.1128 — halved by buffering, not by the acids
+    shrinking, which is what the CO2-free arm below existed to prove. D-209 then put the
+    assimilable nitrogen pool's charge into the balance, which drops the finished pH by ~0.35,
+    and BOTH figures moved again: the CO2-free one fell to **+0.1417** while the shipped one
+    barely budged, to **+0.1111**.
+
+    The direction is the acids' own speciation. Pyruvic (pKa 2.39), formic (3.75) and oxalic
+    (1.25/4.14) are LESS dissociated at a lower pH, so removing them removes less charge — the
+    CO2-free measurement of the removal shrinks. Carbonic meanwhile dissociates less at the
+    lower pH too, so it buffers less against the removal, which pushes the shipped figure the
+    other way. The two therefore CONVERGE, from 0.097 apart to 0.031, and that convergence is
+    asserted below. The lesson generalises past this test: **none of these separately-measured
+    term sizes is a constant of the model — each is quoted at the pH the model reached when it
+    was measured**, so adding them to predict a total over-counts, and re-quoting an old one
+    without re-running it is a stale number [[feedback-a-summary-statistic-is-not-the-curve]].
+
+    D-182's own paragraph, kept because its reasoning is still correct at its own pH: D-181 measured
     this at +0.2094 pH with NO carbonic term in the balance. Dissolved CO2 (D-182) does not
     merely add its own shift on top: it **buffers against this one**. Carbonic's dissociated
     fraction RISES with pH (pKa 6.43 sits above the beer, so the model is on the steep side of
@@ -1214,25 +1269,40 @@ def test_removing_the_falling_acids_raises_the_finished_ph_by_the_predicted_amou
         "CO2-free assertion below is what tells those two explanations apart."
     )
 
-    # The same two end states, re-solved with the carbonic term switched off. This must
-    # reproduce D-181's +0.2094 pH: if it does, the shipped shrinkage is the CO2 buffer; if it
-    # does not, something in the seeds, floors or charge arithmetic actually moved.
+    # The same two end states, re-solved with the carbonic term switched off. Until D-209 this
+    # reproduced D-181's +0.2094 pH, which was what told the CO2-buffer explanation apart from
+    # "something in the seeds, floors or charge arithmetic actually moved". It no longer does,
+    # and the reason is the third movement of this same number (see the docstring).
     def co2_free(compiled, res) -> float:
         params = compiled.parameters.resolve()
         y = res.y[:, -1]
         return acidbase.solve_ph(
             acidbase._totals_molar(y, compiled.schema),
-            acidbase._cation(y, compiled.schema),
+            # ``params`` became required at D-209 (the nitrogen pool joined the cation side);
+            # this is exactly ``degassed_ph_of_state``, kept spelled out because the point of
+            # the arm is that only the carbonic argument differs from the shipped solve.
+            acidbase._cation(y, compiled.schema, params),
             acidbase._byp_succinic_molar(y, compiled.schema),
             0.0,
             acidbase.build_pka_map(params),
         )
 
     co2_free_gap = co2_free(c1, r1) - co2_free(c2, r2)
-    assert 0.15 < co2_free_gap < 0.35, (
-        f"with the carbonic term off the missing base is worth {co2_free_gap:.4f} pH, outside "
-        "D-180's predicted +0.2-0.3 window that D-181 landed at 0.2094. The D-182 buffer "
-        "explanation for the shipped 0.1128 only holds if this arm still reproduces D-181."
+    assert co2_free_gap == pytest.approx(0.1417, abs=0.01), (
+        f"with the carbonic term off the missing base is worth {co2_free_gap:.4f} pH; D-209 "
+        "measures 0.1417, against D-181's 0.2094 on the SAME arm. The fall is the acids' own "
+        "speciation at a lower pH, not a change to the acids: see the docstring. If this moves "
+        "back toward 0.21 the nitrogen term has stopped acting on the finished pH."
+    )
+    # The two numbers have CONVERGED, and pinning the gap between them is what makes the
+    # explanation falsifiable rather than merely plausible: if the fall were caused by something
+    # other than the finished pH moving down, there is no reason the carbonic-buffered and
+    # CO2-free measurements of the same removal would end up 0.03 apart instead of 0.10.
+    assert co2_free_gap - (with_sinks - without) == pytest.approx(0.031, abs=0.01), (
+        f"the CO2-free and shipped measurements of the same removal differ by "
+        f"{co2_free_gap - (with_sinks - without):.4f} pH; D-209 measures 0.031, against D-182's "
+        "0.097. Carbonic buffers against the removal in proportion to how dissociated it is, "
+        "and at D-209's lower finished pH it is less dissociated, so it pushes back less."
     )
 
 
@@ -1358,3 +1428,188 @@ def test_an_acid_at_or_below_its_floor_is_frozen_not_refilled():
             assert float(d[schema.slice(sink.slot)][0]) == 0.0, (
                 f"{sink.slot} at {level} g/L (floor {floor}) produced a nonzero rate"
             )
+
+
+def _beer_data_dir_with_nitrogen_charge(tmp_path, value: float):
+    """A copy of the packaged parameter dir with ``nitrogen_uptake_charge_beer`` set to ``value``.
+
+    Heavier than a ``param_values`` patch, and deliberately so: this parameter is read at COMPILE
+    time (both anchors subtract the nitrogen charge off the fitted cation) *and* at runtime (every
+    rate that reads pH). Patching the resolved map after compile would move only the runtime half
+    and leave the cation slot carrying the shipped value's subtraction — a silently wrong arm
+    rather than a broken one [[feedback-a-parameter-can-be-pinned-and-drawn]]. Copying the dir is
+    what makes both halves move together, so this helper is also the guard on that coupling.
+    """
+    dest = tmp_path / f"data_{value}"
+    shutil.copytree(default_data_dir(), dest)
+    path = dest / "acidbase.yaml"
+    text = path.read_text(encoding="utf-8")
+    text, n_value = re.subn(
+        r"^(nitrogen_uptake_charge_beer:\n  value: )[-0-9.eE]+$",
+        r"\g<1>" + repr(value),
+        text,
+        flags=re.MULTILINE,
+    )
+    zero_width = "{ low: " + repr(value) + ", high: " + repr(value) + ', note: "band arm" }'
+    band_pattern = (
+        r"^(nitrogen_uptake_charge_beer:\n(?:  (?!uncertainty)[^\n]*\n)*"
+        r"  uncertainty: )\{[^\n]*\}$"
+    )
+    text, n_band = re.subn(band_pattern, r"\g<1>" + zero_width, text, flags=re.MULTILINE)
+    assert (n_value, n_band) == (1, 1), "the parameter file's shape moved; fix this helper"
+    path.write_text(text, encoding="utf-8")
+    # The Parameter schema rejects a value outside its own band, so a loadable arm has to move
+    # both — checked here rather than discovered as a confusing compile error downstream.
+    assert load_parameters(path)["nitrogen_uptake_charge_beer"].value == value
+    return dest
+
+
+def _tyrell_degassed_ph_at_day(data_dir, day: float) -> float:
+    compiled = compile_scenario(
+        Scenario(
+            name="d209-edge",
+            medium="beer",
+            initial=dict(TYRELL_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=14.0,
+        ),
+        data_dir=data_dir,
+    )
+    res = compiled.run()
+    params = compiled.parameters.resolve()
+    states = np.asarray(res.y, dtype=float)
+    t_h = np.asarray(res.t, dtype=float)
+    y = np.array([np.interp(day * 24.0, t_h, states[i, :]) for i in range(states.shape[0])])
+    return float(acidbase.degassed_ph_of_state(y, compiled.schema, params))
+
+
+def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_path, beer_params):
+    """BOTH band edges, one threshold each — not a shared floor the tight edge rides for free.
+
+    ``test_the_model_reaches_tyrells_measured_beer_ph`` scores the NOMINAL value only, and a
+    nominal that passes says nothing about a band whose edges the sampler actually draws
+    [[feedback-pin-the-band-not-the-nominal]]. This runs the full model at the low, nominal and
+    high edges of ``nitrogen_uptake_charge_beer`` and pins each day-7 pH separately.
+
+    **The finding this test exists to hold visible: the HIGH edge very nearly overshoots.** With
+    the envelope at 4.804-4.916 and a 0.024 pH read tolerance, the admissible window is
+    [4.780, 4.940]; the high edge lands at 4.783, a margin of 0.003 pH. So the derived band does
+    not merely reach the measurement, it straddles the point of going past it — which is the
+    honest statement about a term whose size was derived from published wort composition and
+    never fitted, and which is a LOWER bound besides (the buffer-removal half of nitrogen uptake
+    is inexpressible here, and it pushes the same way). A future beat that adds any further
+    acidification has to re-examine this edge rather than celebrate it.
+    """
+    param = beer_params["nitrogen_uptake_charge_beer"]
+    lo_ph = _tyrell_degassed_ph_at_day(
+        _beer_data_dir_with_nitrogen_charge(tmp_path, param.uncertainty.low), 7.0
+    )
+    nom_ph = _tyrell_degassed_ph_at_day(
+        _beer_data_dir_with_nitrogen_charge(tmp_path, param.value), 7.0
+    )
+    hi_ph = _tyrell_degassed_ph_at_day(
+        _beer_data_dir_with_nitrogen_charge(tmp_path, param.uncertainty.high), 7.0
+    )
+    assert lo_ph > nom_ph > hi_ph, "more charge per mole N must mean a more acidic beer"
+
+    lo_bound, hi_bound = TYRELL_PH_COURSE[7]
+    window = (lo_bound - TYRELL_PH_READ_TOL, hi_bound + TYRELL_PH_READ_TOL)
+    for label, value in (("low", lo_ph), ("nominal", nom_ph), ("high", hi_ph)):
+        assert window[0] <= value <= window[1], (
+            f"the {label} edge finishes day 7 at {value:.4f}, outside Tyrell's envelope "
+            f"{lo_bound:.3f}-{hi_bound:.3f} widened by the {TYRELL_PH_READ_TOL} read tolerance"
+        )
+    # Each edge pinned on its own, so a shift that moved them together could not hide inside a
+    # single containment check.
+    assert lo_ph == pytest.approx(4.826, abs=0.01)
+    assert nom_ph == pytest.approx(4.804, abs=0.01)
+    assert hi_ph == pytest.approx(4.783, abs=0.01)
+    # ...and the high edge's margin, asserted as the small number it is rather than described.
+    assert 0.0 < hi_ph - window[0] < 0.01, (
+        f"the high edge's margin to the bottom of the admissible window is {hi_ph - window[0]:.4f}"
+        " pH; D-209 measures 0.003. If this has grown, something reduced the model's "
+        "acidification and the day-7 agreement is no longer as tight as D-209 recorded"
+    )
+
+
+def test_the_day_1_pH_is_still_missed_and_the_miss_is_uptake_timing():
+    """THE REMAINING DEFECT, pinned with its attribution — and D-209 made it WORSE.
+
+    Day 7 now lands inside Tyrell's envelope; day 1 does not, and it is further out than before
+    this beat: **0.31 pH too acidic at nominal, against 0.19 too alkaline at D-208**. That is not
+    the charge arithmetic being wrong, it is *when* the charge leaves. The cation change is the
+    integral of nitrogen uptake, and this model empties its ``N`` slot inside about 20 hours, so
+    the entire step is delivered before the day-1 reading is taken while the measured pH is only
+    ~63 % of the way to its day-7 value.
+
+    The attribution is measured here two ways rather than asserted: the uptake fraction by 24 h,
+    and a counterfactual in which the SAME total charge is delivered on a slower linear ramp.
+    **At a 60-hour ramp all eight measured days land inside the envelope**, and the window is
+    narrow — 48 h leaves day 1 out and 72 h leaves day 2 out — so 60 h is a measurement on this
+    trajectory and not a knob with slack in it. Against the model's own ~20 h that is roughly
+    threefold too fast.
+
+    **The ramp is NOT a fix and must not become one.** Nothing sources 60 hours; nitrogen-uptake
+    timing in this engine is set by ``GrowthNitrogenLimited``'s constants, which were never
+    calibrated against a wort FAN time course. Recorded as a located defect — the next beat on
+    beer's pH is an uptake-timing question, not an acid-base one.
+    """
+    compiled, res = _run(dict(TYRELL_SCENARIO))
+    params = compiled.parameters.resolve()
+    schema = compiled.schema
+    states = np.asarray(res.y, dtype=float)
+    t_h = np.asarray(res.t, dtype=float)
+
+    def state_at(hours: float):
+        return np.array([np.interp(hours, t_h, states[i, :]) for i in range(states.shape[0])])
+
+    lo, hi = TYRELL_PH_COURSE[1]
+    day1 = float(acidbase.degassed_ph_of_state(state_at(24.0), schema, params))
+    assert day1 < lo - TYRELL_PH_READ_TOL, (
+        f"day 1 reads {day1:.4f}, inside or above Tyrell's {lo:.3f}-{hi:.3f}. D-209 measures it "
+        "0.31 pH BELOW — too acidic. If this passes the defect has been fixed and the docstring "
+        "above is stale"
+    )
+    assert lo - day1 == pytest.approx(0.315, abs=0.03), (
+        f"the day-1 miss is {lo - day1:.4f} pH; D-209 measures 0.315, and D-208 measured 0.186 "
+        "in the other direction. Both numbers matter: the miss GREW, and a beat that shrinks it "
+        "should say which"
+    )
+
+    # Attribution 1 — the nitrogen is gone before the reading, so the whole step has landed.
+    nitrogen = states[schema.slice("N").start, :]
+    consumed_by_24h = float(np.interp(24.0, t_h, nitrogen[0] - nitrogen))
+    assert consumed_by_24h / (nitrogen[0] - min(nitrogen)) > 0.99, (
+        "the attribution rests on the charge step being complete by the day-1 reading"
+    )
+
+    # Attribution 2 — the same total charge on a slower ramp. A COUNTERFACTUAL computed on the
+    # shipped trajectory: it prices where the miss lives, and it is NOT a proposal. 60 hours is
+    # unsourced; what makes it evidence rather than a fit is that the neighbouring ramps fail.
+    total_charge = acidbase.nitrogen_charge_from_gpl(float(nitrogen[0]), "beer", params)
+
+    def days_inside_on_ramp(ramp_hours: float) -> int:
+        inside = 0
+        for day, (band_lo, band_hi) in TYRELL_PH_COURSE.items():
+            y = state_at(day * 24.0)
+            delivered = total_charge * min(day * 24.0 / ramp_hours, 1.0)
+            actual = acidbase.nitrogen_charge_from_gpl(
+                float(np.interp(day * 24.0, t_h, nitrogen)), "beer", params
+            )
+            # The balance's cation side is ``slot + actual``; the counterfactual wants
+            # ``slot + total_charge - delivered``, which at t=0 is the anchored total and once the
+            # ramp completes is the bare slot. So the slot is nudged by the difference.
+            y[schema.slice("cation_charge")] += (total_charge - delivered) - actual
+            ramped = float(acidbase.degassed_ph_of_state(y, schema, params))
+            inside += band_lo - TYRELL_PH_READ_TOL <= ramped <= band_hi + TYRELL_PH_READ_TOL
+        return inside
+
+    assert days_inside_on_ramp(60.0) == 8, (
+        "on a 60 h counterfactual ramp all eight measured days must land inside the envelope — "
+        "that is what locates the day-1 miss in uptake TIMING rather than in the charge "
+        "arithmetic. The shipped model's own uptake finishes in ~20 h and reaches 7 of 8"
+    )
+    # The neighbours FAIL, which is what stops 60 h reading as a knob with slack in it: a
+    # counterfactual that worked across a wide range would price nothing.
+    assert days_inside_on_ramp(48.0) == 7, "48 h must still leave day 1 out"
+    assert days_inside_on_ramp(72.0) == 7, "72 h must overshoot the other way and leave day 2 out"

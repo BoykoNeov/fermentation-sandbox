@@ -282,6 +282,27 @@ unchanged). Scalar `ph_of_state` / `degassed_ph_of_state` / `titratable_acidity`
 in core; the trajectory-series helpers need a `Trajectory` and therefore sit one layer up in
 `fermentation.analysis`.
 
+**The `N` slot is on the CATION side (D-209).** The assimilable-nitrogen pool is not electrically
+neutral — it is ammonium plus amino acids whose side chains are charged at fermentation pH — so
+`acidbase.nitrogen_charge_molar` adds `z̄ · [N]` mol⁺/L to the cation term, `z̄` being the mean
+charge per mole of **elemental** nitrogen (`nitrogen_uptake_charge_beer` / `_wine`, both in
+`acidbase.yaml` and both in `PH_SYSTEM_READS`). Consequences worth knowing before touching the
+module:
+
+- **This is where beer's pH gets its fall.** Nitrogen uptake is what makes the balance move, so
+  the term is the difference between reaching about half of beer's measured acidification and
+  reaching it (D-208 → D-209).
+- **It is a re-allocation at t=0, not an addition.** `cation_charge` was back-solved from
+  `initial_ph` and so already contained this charge, lumped and frozen; the slot now holds the
+  remainder and all three anchoring sites subtract the nitrogen term. Anchored pH and must TA at
+  t=0 are unchanged.
+- **`_cation` therefore takes `params`**, required and not defaulted, on the same reasoning that
+  keeps `carbonic_molar` positional — an omitted nitrogen term would be invisible otherwise.
+- **It rides D-179's opt-in gate.** `charge_balance_is_populated` must be true, or an un-anchored
+  beer's empty balance would get cation charge with no acid to meet it and read ~11 instead of 7.
+- It is the **charge half only**: no medium models the pool per species, so uptake removes its
+  charge but not its buffering, and that omitted half pushes the same way. A lower bound.
+
 **Two pH frames, and which one a caller wants is not a detail (D-208).** `ph_of_state` is the pH
 *inside the vessel*, dissolved CO₂ included — the only frame a rate may read, and what every
 pH-reading Process does read. `degassed_ph_of_state` is the same balance with that term zeroed,

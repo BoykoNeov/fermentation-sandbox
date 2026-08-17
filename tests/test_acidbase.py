@@ -17,7 +17,7 @@ import pytest
 
 from fermentation.analysis import ph_series, titratable_acidity_series
 from fermentation.core import acidbase
-from fermentation.core.chemistry import M_LACTIC, M_MALIC, M_TARTARIC
+from fermentation.core.chemistry import M_LACTIC, M_MALIC, M_NITROGEN, M_TARTARIC
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -49,13 +49,31 @@ def pka(params):
     return acidbase.build_pka_map(params)
 
 
+@pytest.fixture
+def beer_params():
+    """Beer's parameter set — needed for D-209's beer nitrogen-charge derivation."""
+    data = default_data_dir()
+    return load_parameters(
+        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    )
+
+
+#: The ``N`` these hand-built states carry. Named rather than inlined because since D-209 it is
+#: no longer pH-irrelevant: the assimilable-nitrogen pool is on the cation side of the balance,
+#: so :func:`_anchor_cation` has to subtract its charge to hit a target pH.
+_WINE_STATE_NITROGEN_GPL = 0.2
+
+
 def _wine_state(schema: StateSchema, **acids: float) -> FloatArray:
-    """A wine state vector with arbitrary (pH-irrelevant) bulk values + given acids."""
+    """A wine state vector with arbitrary bulk values + given acids.
+
+    ``N`` is NOT pH-irrelevant since D-209 — see :data:`_WINE_STATE_NITROGEN_GPL`.
+    """
     base: dict[str, float | list[float]] = {
         "X": 0.5,
         "S": [240.0],
         "E": 0.0,
-        "N": 0.2,
+        "N": _WINE_STATE_NITROGEN_GPL,
         "T": 293.15,
         "CO2": 0.0,
     }
@@ -68,13 +86,26 @@ def _anchor_cation(
     tartaric_gpl: float,
     malic_gpl: float,
     target_ph: float,
+    params: Mapping[str, float] | None = None,
 ) -> float:
+    """The ``cation_charge`` SLOT value that anchors a :func:`_wine_state` at ``target_ph``.
+
+    ``params`` is optional only so the pKa-map-only callers below keep working; pass it whenever
+    the anchored state is going to be read back through :func:`acidbase.ph_of_state`. Since
+    D-209 the assimilable-nitrogen pool is itself on the cation side, and ``_wine_state`` seeds
+    ``N`` at 0.2 g/L, so the slot is the solved TOTAL minus what that nitrogen supplies —
+    exactly the subtraction ``cation_charge_for_ph`` and both compile-seam anchors make. Without
+    it these states read back ~0.12 pH ABOVE their target.
+    """
     totals = {
         "tartaric": tartaric_gpl / M_TARTARIC,
         "malic": malic_gpl / M_MALIC,
         "lactic": 0.0,
     }
-    return acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, target_ph)
+    total = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, target_ph)
+    if params is None:
+        return total
+    return total - acidbase.nitrogen_charge_from_gpl(_WINE_STATE_NITROGEN_GPL, "wine", params)
 
 
 # -- 1. HEADLINE: malic→lactic deacidification raises pH 0.1–0.3 ---------------
@@ -87,7 +118,7 @@ def test_headline_malic_to_lactic_raises_ph(params, pka):
     # would land below 0.1; the fix for an out-of-band number is a more malic-rich must,
     # NOT widening the band (CLAUDE.md forbids weakening benchmark tests).
     schema = wine_schema()
-    cation = _anchor_cation(pka, 4.0, 4.0, 3.4)
+    cation = _anchor_cation(pka, 4.0, 4.0, 3.4, params)
     y0 = _wine_state(schema, tartaric=4.0, malic=4.0, lactic=0.0, cation_charge=cation)
     ph0 = acidbase.ph_of_state(y0, schema, params)
     assert ph0 == pytest.approx(3.4, abs=1e-3)  # anchoring exact at t=0
@@ -131,6 +162,9 @@ def test_more_acid_lowers_ph_more_cation_raises_ph(pka):
 
 
 def test_ph_is_smooth_in_acid(pka):
+    # No ``params`` argument here on purpose: this test feeds the cation straight to
+    # ``solve_ph`` with a hand-built totals map and never reads a STATE back, so there is no
+    # nitrogen slot in play and the D-209 subtraction would be wrong rather than merely unneeded.
     cation = _anchor_cation(pka, 5.0, 3.0, 3.4)
     tartaric = np.linspace(3.0, 7.0, 41) / M_TARTARIC
     ph = np.array(
@@ -262,7 +296,7 @@ def test_carbon_conserved_with_constant_acids():
 
 def test_titratable_acidity_in_band(params):
     schema = wine_schema()
-    cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4)
+    cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4, params)
     y = _wine_state(schema, tartaric=6.0, malic=3.0, lactic=0.0, cation_charge=cation)
     ta = acidbase.titratable_acidity(y, schema, params)
     assert 6.0 <= ta <= 9.0, f"TA {ta:.2f} g/L tartaric-equiv outside the 6–9 band"
@@ -298,17 +332,43 @@ def test_ph_tier_unscoped_is_conservative_not_wine(pset):
 # -- analysis series + the emergent Byp pH drift (the second demonstration) ----
 
 
-def test_ph_series_drifts_down_as_byp_accumulates():
-    # The acid slots are constant, but pH is NOT flat: Byp (core realised-yield diversion)
-    # grows over the ferment and the charge balance reads it (include-by-reading), so with
-    # the cation frozen at pitch the pH series drifts mildly DOWN — emergent, unscripted.
+def test_ph_series_drifts_down_from_byp_and_nitrogen_uptake():
+    """A wine's pH falls over a ferment for TWO reasons, and this decomposes them exactly.
+
+    The acid slots are constant, yet pH is not flat. Until D-209 the only driver was ``Byp``
+    (the core realised-yield diversion), which grows over the ferment and which the charge
+    balance reads by inclusion — worth a mild ~0.06 pH. D-209 adds the larger one: the
+    assimilable-nitrogen pool carries net positive charge, so the yeast consuming it removes
+    cation charge and the pH falls further. Total measured drift ~0.19 pH.
+
+    The decomposition needs no parameter surgery and no second run. Re-reading the END state
+    with ``N`` put back to its t=0 value makes the nitrogen term contribute exactly what it
+    contributed at the anchor, which is the frozen-constant case — i.e. bit-for-bit the
+    pre-D-209 balance — so the difference between that pH and the real end pH is the nitrogen
+    term's whole contribution, and the rest is ``Byp``.
+    """
     compiled = compile_scenario(_wine_scenario(tartaric_gpl=6.0, malic_gpl=3.0, initial_ph=3.4))
     traj = simulate(compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h)
     ph = ph_series(traj, compiled.param_values)
     ta = titratable_acidity_series(traj, compiled.param_values)
     assert ph[0] == pytest.approx(3.4, abs=1e-3)  # anchored at pitch
     drift = ph[0] - ph[-1]
-    assert 0.02 <= drift <= 0.15, f"Byp-driven pH drift {drift:.3f} outside the expected mild fall"
+    assert 0.10 <= drift <= 0.30, f"pH drift {drift:.3f} outside the expected mild fall"
+
+    schema, params_ = compiled.schema, compiled.param_values
+    end = np.asarray(traj.y[:, -1], dtype=float).copy()
+    end[schema.slice("N")] = traj.y[schema.slice("N"), 0]
+    byp_only_drift = ph[0] - acidbase.ph_of_state(end, schema, params_)
+    nitrogen_share = drift - byp_only_drift
+    assert 0.02 <= byp_only_drift <= 0.09, (
+        f"the Byp-only component is {byp_only_drift:.4f} pH; D-18 through D-208 measured this "
+        "whole drift at 0.02-0.15 and it was all Byp, so this component must not have moved"
+    )
+    assert nitrogen_share > byp_only_drift, (
+        f"nitrogen uptake contributes {nitrogen_share:.4f} pH against Byp's "
+        f"{byp_only_drift:.4f}; since D-209 it is the LARGER of the two drivers of a wine's "
+        "falling pH, and a reversal here means the term has been scoped away"
+    )
 
     # The MUST (t=0) TA is the fidelity-grade value, in the 6-9 g/L band. The TA SERIES
     # then RISES as Byp accumulates (whole pool read as titratable diprotic succinic) —
@@ -548,3 +608,259 @@ def test_a_wine_moves_but_barely_and_the_geometry_is_why(params, pka):
     frac_wine = acidbase.mean_charge(10.0 ** (-3.33), (params["pKa_carbonic_1"],))
     frac_beer = acidbase.mean_charge(10.0 ** (-4.96), (params["pKa_carbonic_1"],))
     assert frac_wine < 0.001 < 0.02 < frac_beer < 0.10
+
+
+# -- 12. the assimilable-nitrogen pool's charge (decision D-209) ---------------
+#
+# The pool is not electrically neutral: it is ammonium plus amino acids whose side chains are
+# charged at fermentation pH, so it sits on the CATION side and the yeast consuming it acidifies
+# the liquid. These tests pin the arithmetic, the re-allocation that keeps t=0 anchoring exact,
+# the opt-in gate, and — the one that matters most — the DERIVATION, so the provenance in
+# ``acidbase.yaml`` is executable rather than merely written down.
+
+#: Peyer 2017 Table 16 control column, mg/L, the 18 free amino acids of a malt wort. Transcribed
+#: here so ``nitrogen_uptake_charge_beer`` can be re-derived from its own cited source rather than
+#: trusted as a literal [[feedback-transcribe-tables-not-prose]]. Proline is absent from that
+#: table, which is exactly right: it is Jones & Pierce Group D and brewing yeast does not
+#: assimilate it, so the ``N`` pool (assimilable nitrogen by definition) excludes it.
+_PEYER_WORT_AMINO_ACIDS_MGL = {
+    "alanine": 36.9, "arginine": 47.6, "asparagine": 32.0, "aspartic": 27.5,
+    "glutamic": 22.2, "glutamine": 41.5, "glycine": 11.3, "histidine": 22.0,
+    "isoleucine": 23.4, "leucine": 50.7, "lysine": 30.2, "methionine": 10.2,
+    "phenylalanine": 41.7, "serine": 23.6, "threonine": 20.1, "tryptophan": 14.0,
+    "tyrosine": 30.8, "valine": 42.3,
+}
+#: ``(molar mass, nitrogen atoms, pKa_COOH, pKa_NH3, (side-chain pKa, sign) | None)``.
+#: The nitrogen COUNT is the load-bearing column: ``zbar``'s denominator is ELEMENTAL nitrogen
+#: because that is what the ``N`` slot holds, so arginine's +1 spreads over FOUR nitrogens and
+#: contributes +0.25 per mole N. Getting that convention backwards inflates the cationic half
+#: roughly fourfold, which is why it is asserted separately below.
+_AMINO_ACID_CHEMISTRY = {
+    "alanine": (89.09, 1, 2.34, 9.69, None),
+    "arginine": (174.20, 4, 2.17, 9.04, (12.48, +1)),
+    "asparagine": (132.12, 2, 2.02, 8.80, None),
+    "aspartic": (133.10, 1, 1.99, 9.90, (3.90, -1)),
+    "glutamic": (147.13, 1, 2.10, 9.47, (4.07, -1)),
+    "glutamine": (146.15, 2, 2.17, 9.13, None),
+    "glycine": (75.07, 1, 2.34, 9.60, None),
+    "histidine": (155.16, 3, 1.82, 9.17, (6.04, +1)),
+    "isoleucine": (131.17, 1, 2.36, 9.68, None),
+    "leucine": (131.17, 1, 2.36, 9.60, None),
+    "lysine": (146.19, 2, 2.18, 8.95, (10.53, +1)),
+    "methionine": (149.21, 1, 2.28, 9.21, None),
+    "phenylalanine": (165.19, 1, 1.83, 9.13, None),
+    "serine": (105.09, 1, 2.21, 9.15, None),
+    "threonine": (119.12, 1, 2.09, 9.10, None),
+    "tryptophan": (204.23, 2, 2.83, 9.39, None),
+    "tyrosine": (181.19, 1, 2.20, 9.11, (10.07, -1)),
+    "valine": (117.15, 1, 2.32, 9.62, None),
+}
+_WORT_PH = 5.65
+_NH4_PKA = 9.25
+_PEYER_WORT_AMMONIUM_MG_N_PER_L = (25.0, 30.0)  # Peyer Table 2, read as mg N/L
+_PEYER_DILUTION = 2.0  # Table 16's wort is CW0.5, diluted 50:50 with water
+
+
+def _fraction_protonated(ph: float, pka: float) -> float:
+    return float(1.0 / (1.0 + 10.0 ** (ph - pka)))
+
+
+def _amino_acid_charge(ph: float, name: str) -> float:
+    _, _, pka_cooh, pka_nh3, side = _AMINO_ACID_CHEMISTRY[name]
+    charge = -(1.0 - _fraction_protonated(ph, pka_cooh))  # alpha-COOH: -1 once deprotonated
+    charge += _fraction_protonated(ph, pka_nh3)  # alpha-NH3+: +1 while protonated
+    if side is not None:
+        pka, sign = side
+        if sign > 0:
+            charge += _fraction_protonated(ph, pka)
+        else:
+            charge -= 1.0 - _fraction_protonated(ph, pka)
+    return charge
+
+
+def _wort_amino_acid_pool(ph: float) -> tuple[float, float]:
+    """``(mmol elemental N, mmol charge)`` per litre of FULL-STRENGTH Peyer wort."""
+    nitrogen = charge = 0.0
+    for name, mgl in _PEYER_WORT_AMINO_ACIDS_MGL.items():
+        molar_mass, n_atoms = _AMINO_ACID_CHEMISTRY[name][0], _AMINO_ACID_CHEMISTRY[name][1]
+        mmol = mgl / molar_mass * _PEYER_DILUTION
+        nitrogen += mmol * n_atoms
+        charge += mmol * _amino_acid_charge(ph, name)
+    return nitrogen, charge
+
+
+def test_the_beer_nitrogen_charge_is_reproduced_from_its_cited_composition(beer_params):
+    """THE PROVENANCE, RE-DERIVED — the shipped number must fall out of its own sources.
+
+    ``nitrogen_uptake_charge_beer`` is a DERIVED parameter, which is the kind most easily
+    corrupted by a later edit: nothing about a lone float says which convention produced it.
+    So this recomputes it from Peyer's Table 16 amino acids plus Table 2's ammonium and checks
+    the shipped value and BOTH band edges land where the derivation puts them. It is also the
+    guard on the arginine convention: swap the elemental-nitrogen denominator for an
+    alpha-amino one and this fails by roughly the factor that error is worth.
+    """
+    nitrogen, charge = _wort_amino_acid_pool(_WORT_PH)
+    # Units cross-check, and it is the reason Table 2's ammonium row is read as mg N/L: the
+    # amino acids summed as ELEMENTAL nitrogen land inside Table 2's own printed 150-230 mg/L
+    # for the free-amino-acid row, whereas as compound mass they would be ~1037 and far outside.
+    assert 150.0 <= nitrogen * M_NITROGEN <= 230.0, (
+        f"the transcribed composition gives {nitrogen * M_NITROGEN:.1f} mg N/L, outside Peyer "
+        "Table 2's printed 150-230 for free amino acids — the two tables must be consistent or "
+        "the ammonium row's units are not established either"
+    )
+
+    param = beer_params["nitrogen_uptake_charge_beer"]
+    edges = []
+    for ammonium_mg_n in _PEYER_WORT_AMMONIUM_MG_N_PER_L:
+        n_ammonium = ammonium_mg_n / M_NITROGEN
+        total_n = nitrogen + n_ammonium
+        total_charge = charge + n_ammonium * _fraction_protonated(_WORT_PH, _NH4_PKA)
+        edges.append(total_charge / total_n)
+    assert min(edges) == pytest.approx(param.uncertainty.low, abs=5e-4)
+    assert max(edges) == pytest.approx(param.uncertainty.high, abs=5e-4)
+    assert param.value == pytest.approx(sum(edges) / 2.0, abs=5e-4), (
+        "the nominal must be the derivation's own midpoint, not a fitted value"
+    )
+
+    # THE NEAR-CANCELLATION, asserted because it is what makes this parameter essentially a
+    # measurement of wort AMMONIUM. The cationic amino acids (arginine, lysine, histidine) and
+    # the anionic ones (aspartate, glutamate) very nearly cancel, so the amino-acid half is a
+    # small residue and ~78 % of the shipped value is the ammonium term.
+    assert charge / nitrogen == pytest.approx(0.0395, abs=5e-4), (
+        f"the amino-acid-only charge is {charge / nitrogen:.4f} per mole N; D-209 measures "
+        "+0.0395. If this has grown, check the arginine convention first: it carries FOUR "
+        "nitrogens, so its +1 is worth +0.25 per mole N and not +1"
+    )
+    assert (charge / nitrogen) / param.value < 0.25, (
+        "the amino-acid half must stay the minor term — the ammonium share is what this "
+        "parameter mostly measures, and that is the single-source exposure the record names"
+    )
+
+
+def test_arginine_carries_four_nitrogens_per_unit_charge():
+    """The convention, isolated — a one-line guard on the easiest fourfold error here.
+
+    Named separately from the derivation above because a reader changing the denominator would
+    otherwise see only a band-edge mismatch, with nothing saying which convention is right.
+    """
+    molar_mass, n_atoms = _AMINO_ACID_CHEMISTRY["arginine"][:2]
+    assert n_atoms == 4
+    charge = _amino_acid_charge(_WORT_PH, "arginine")
+    assert charge == pytest.approx(1.0, abs=0.01), "arginine is +1 at wort pH (guanidinium 12.48)"
+    assert charge / n_atoms == pytest.approx(0.25, abs=0.01), (
+        "per mole of ELEMENTAL nitrogen — which is what the N slot holds — arginine is +0.25"
+    )
+    assert molar_mass == pytest.approx(174.2, abs=0.1)
+
+
+@pytest.mark.parametrize(
+    ("medium", "initial"),
+    [
+        (
+            "wine",
+            {"brix": 22.0, "yan_mgl": 200.0, "pitch_gpl": 0.25,
+             "tartaric_gpl": 6.0, "malic_gpl": 3.0, "initial_ph": 3.4},
+        ),
+        (
+            "beer",
+            {"glucose_gpl": 12.0, "maltose_gpl": 57.0, "maltotriose_gpl": 13.0,
+             "yan_mgl": 200.0, "pitch_gpl": 1.0, "initial_ph": 5.65},
+        ),
+    ],
+)
+def test_the_nitrogen_term_is_a_reallocation_so_the_anchor_is_untouched(medium, initial):
+    """t=0 IS UNCHANGED BY D-209, and this is the assert that would catch it if it were not.
+
+    ``cation_charge`` is back-solved from ``initial_ph``, so before D-209 it already contained
+    the nitrogen pool's charge — lumped and frozen as a constant. Making the pool explicit moves
+    that share out of the slot and onto the ``N`` state. Two consequences, both checked here for
+    BOTH media because the subtraction is duplicated at three sites (each compile-seam anchor and
+    ``cation_charge_for_ph``) and a sign error at any of them would silently anchor every must
+    and wort to the wrong pH rather than raise:
+
+    * the slot FALLS by exactly the nitrogen charge, so the cation SIDE is unchanged;
+    * the anchored pH still reproduces ``initial_ph`` to the closed form's own precision.
+
+    ``titratable_acidity`` is checked too: it solves its own starting pH off the same cation, so
+    a must's t=0 TA — the fidelity-grade value, per that function's caveat — must not move.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name=f"d209-anchor-{medium}",
+            medium=medium,
+            initial=dict(initial),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+            duration_days=1.0,
+        )
+    )
+    schema, params = compiled.schema, compiled.param_values
+    y0 = np.asarray(compiled.y0, dtype=float)
+
+    nitrogen_charge = acidbase.nitrogen_charge_molar(y0, schema, params)
+    assert nitrogen_charge > 0.0, "a nitrogen-bearing anchored state must carry positive charge"
+
+    assert acidbase.ph_of_state(y0, schema, params) == pytest.approx(
+        initial["initial_ph"], abs=1e-9
+    ), "the anchor must still reproduce initial_ph — the D-209 subtraction is what makes it so"
+
+    # The cation SIDE, reconstructed: slot + nitrogen must equal what the acids alone demand.
+    slot = float(y0[schema.slice("cation_charge")][0])
+    demanded = acidbase.solve_cation_charge(
+        acidbase._totals_molar(y0, schema),
+        acidbase._byp_succinic_molar(y0, schema),
+        acidbase.dissolved_co2_molar(y0, schema, params),
+        acidbase.build_pka_map(params),
+        float(initial["initial_ph"]),
+    )
+    assert slot + nitrogen_charge == pytest.approx(demanded, rel=1e-12), (
+        "the slot plus the nitrogen charge must be the total the target pH demands; if these "
+        "diverge the term has been double-counted or dropped at one of its three sites"
+    )
+    assert slot < demanded, "the slot must have FALLEN — that is what re-allocation means"
+
+    # And the round trip through the public state-level inverse, which must return the SLOT.
+    assert acidbase.cation_charge_for_ph(
+        y0, schema, params, float(initial["initial_ph"])
+    ) == pytest.approx(slot, rel=1e-12)
+
+
+def test_an_unanchored_beer_gets_no_nitrogen_charge(params):
+    """THE GATE, and it is load-bearing rather than defensive.
+
+    An un-anchored beer's charge balance is empty by construction (``_beer_acids`` seeds every
+    acid slot from ``initial_ph`` or not at all, D-179) but its ``N`` slot still holds ~200 mg/L.
+    Ungated, the nitrogen term would hand that empty balance ~0.0025 mol/L of cation charge with
+    no acid to meet it, and ``solve_ph`` would answer around 11 where such a state answered 7.0 —
+    a strong-base artefact in exactly the place D-179's gate exists to protect, and one that
+    reaches the aging trajectory through ``EsterHydrolysis``. So the term rides the same opt-in.
+    """
+    schema = beer_schema()
+    y = schema.zeros()
+    y[schema.slice("N")] = 0.2
+    y[schema.slice("T")] = 293.15
+    assert not acidbase.charge_balance_is_populated(y, schema)
+    assert acidbase.nitrogen_charge_molar(y, schema, params) == 0.0
+    assert acidbase.ph_of_state(y, schema, params) == pytest.approx(7.0, abs=1e-6), (
+        "an empty balance must still read 7.0 — nitrogen alone is not pH information"
+    )
+
+    # ...and with the balance populated by a single acid, the term switches on.
+    y[schema.slice("lactic")] = 0.3
+    assert acidbase.charge_balance_is_populated(y, schema)
+    assert acidbase.nitrogen_charge_molar(y, schema, params) > 0.0
+
+
+def test_a_nitrogen_free_state_is_bitwise_the_pre_d209_balance(params):
+    """Inertness where it can be claimed exactly: no nitrogen, no term.
+
+    The honest inertness check for this parameter, because a state with ``N`` = 0 makes the term
+    identically zero by construction rather than merely small — and unlike a band-edge screen
+    that is a real algebraic zero [[feedback-nominal-on-a-band-edge-is-not-inertness]].
+    """
+    schema = wine_schema()
+    cation = _anchor_cation(acidbase.build_pka_map(params), 6.0, 3.0, 3.4)
+    y = _wine_state(schema, tartaric=6.0, malic=3.0, lactic=0.0, cation_charge=cation, N=0.0)
+    assert acidbase.nitrogen_charge_molar(y, schema, params) == 0.0
+    assert acidbase.ph_of_state(y, schema, params) == pytest.approx(3.4, abs=1e-9), (
+        "with no nitrogen the balance is the pre-D-209 one, so the un-subtracted anchor is right"
+    )

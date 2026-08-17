@@ -31,6 +31,12 @@ _M_O = 15.999
 _M_S = 32.06
 _M_N = 14.007
 
+#: Atomic nitrogen, g/mol — exported because the ``N`` state slot is held as **elemental**
+#: nitrogen (g N/L, drawn against ``biomass_N_fraction``), so anything converting that slot to
+#: moles needs this exact figure rather than a local copy. Added at D-209, when the charge
+#: balance began reading ``N``; ``nitrogen_mass_fraction`` below already used it internally.
+M_NITROGEN = _M_N
+
 # -- molar masses of tracked species, g/mol (derived from their formulae) -----
 #: Glucose / fructose, C6H12O6 — the lumped wine hexose and beer's first sugar.
 M_GLUCOSE = 6 * _M_C + 12 * _M_H + 6 * _M_O

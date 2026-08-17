@@ -1297,9 +1297,17 @@ def test_beer_ethyl_acetate_lingers_when_the_charge_balance_is_populated():
     unanchored = end_ester(dict(base))
     anchored = end_ester({**base, "initial_ph": 4.4})
     assert anchored > unanchored, "acid catalysis at beer pH must SLOW the fade, not speed it"
-    assert 1.5 < anchored / unanchored < 3.0, (
+    # D-209 SHRANK THIS, and the direction is the mechanism rather than a regression. D-179
+    # measured 2.03x (6.73 -> 13.69 mg/L). The nitrogen pool's charge is now in the balance, so an
+    # anchored beer finishes ~0.3 pH LOWER; `EsterHydrolysis`'s `pH_ref` is 3.3 and beer sits
+    # ABOVE it, where the rate is 5-20x slower (D-178), so moving beer TOWARD the reference
+    # speeds hydrolysis up and the ester lingers less. Measured 1.38x (6.73 -> 9.31). The
+    # UNANCHORED arm is bit-for-bit D-179's 6.73 still, which is the check that the nitrogen term
+    # respects the same opt-in gate the acids do — see `acidbase.nitrogen_charge_molar`.
+    assert 1.2 < anchored / unanchored < 1.6, (
         f"the size of the lingering changed materially ({anchored / unanchored:.2f}x); "
-        "D-179 measured ~2.0x and adopted it deliberately — re-measure before re-pinning"
+        "D-209 measures ~1.38x, against D-179's ~2.0x before the nitrogen charge lowered "
+        "beer's finished pH — re-measure before re-pinning"
     )
 
 

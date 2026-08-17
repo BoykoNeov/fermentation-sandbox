@@ -128,6 +128,7 @@ from fermentation.core.chemistry import (
     M_GLUTAMIC,
     M_LACTIC,
     M_MALIC,
+    M_NITROGEN,
     M_OXALIC,
     M_PYRUVATE,
     M_SO2,
@@ -289,6 +290,38 @@ CO2_SOLUBILITY_PARAMS: tuple[str, ...] = (
     "vant_hoff_co2_solubility",
 )
 
+#: The assimilable-nitrogen state slot (g N/L). Read by the charge balance since decision
+#: D-209, because the pool is **not electrically neutral**: it is ammonium plus a mixture of
+#: amino acids whose side chains are charged at fermentation pH, so it carries net positive
+#: charge and *losing* it to the yeast acidifies the liquid.
+NITROGEN_KEY = "N"
+
+#: Mean charge carried per mole of **elemental** nitrogen in each medium's assimilable pool
+#: (decision D-209), keyed by :attr:`StateSchema.medium` on the D-179 discipline — an explicit
+#: label, never a slot sniff. Two names rather than one because the two media's nitrogen is
+#: compositionally different: wort nitrogen is ammonium plus a near-charge-balanced amino-acid
+#: mixture, must nitrogen is arginine-dominated, and arginine carries four nitrogens per +1.
+#:
+#: **The denominator is elemental nitrogen, not alpha-amino groups**, because that is what the
+#: ``N`` slot holds: it is seeded as g N/L and drawn down against ``biomass_N_fraction``
+#: (0.114 g N per g cell). So arginine contributes **+0.25 per mole N**, not +1 — the single
+#: easiest way to inflate the cationic half fourfold.
+NITROGEN_CHARGE_PARAM_NAMES: dict[str, str] = {
+    "beer": "nitrogen_uptake_charge_beer",
+    "wine": "nitrogen_uptake_charge_wine",
+}
+
+#: Both names, in a stable order, for :data:`PH_SYSTEM_READS` and for tier propagation. The
+#: **union** ships in every medium's parameter set (both live in ``acidbase.yaml``, which
+#: loads for wine and beer alike) for the same reason :data:`PH_SYSTEM_READS` is a union on
+#: purpose: a per-medium ``reads`` tuple would narrow one medium's reported ensemble spread
+#: below what the charge balance actually depends on (D-160), and a declared read with no
+#: tier raises rather than defaulting to VALIDATED (D-1).
+NITROGEN_CHARGE_PARAMS: tuple[str, ...] = (
+    NITROGEN_CHARGE_PARAM_NAMES["beer"],
+    NITROGEN_CHARGE_PARAM_NAMES["wine"],
+)
+
 
 def acid_registry(schema: StateSchema) -> dict[str, AcidSpec]:
     """The charge-active acid set for ``schema``'s medium (decision D-179).
@@ -418,7 +451,15 @@ SO2_PKA_PARAM_NAMES: tuple[str, ...] = ("pKa_sulfurous_1", "pKa_sulfurous_2")
 #: ``reads``. The three solubility names are not pKas and could not have arrived through
 #: :data:`PKA_PARAM_NAMES`; they are here because ``reads`` has two masters and the sampler
 #: half is the one that would have gone quiet (D-160).
-PH_SYSTEM_READS: tuple[str, ...] = (*PKA_PARAM_NAMES, *CO2_SOLUBILITY_PARAMS)
+#: Since D-209 it also carries both :data:`NITROGEN_CHARGE_PARAMS`, the mean charge per mole
+#: of assimilable nitrogen — not a pKa either, and on the cation side of the balance rather
+#: than the anion side, so like the solubility trio it could not have arrived via
+#: :data:`PKA_PARAM_NAMES`.
+PH_SYSTEM_READS: tuple[str, ...] = (
+    *PKA_PARAM_NAMES,
+    *CO2_SOLUBILITY_PARAMS,
+    *NITROGEN_CHARGE_PARAMS,
+)
 
 #: What a Process reads indirectly by calling the SO₂ speciation readouts
 #: (:func:`free_acetaldehyde`, :func:`bisulfite_so2_at_ph`, :func:`molecular_so2_at_ph`):
@@ -781,11 +822,101 @@ def dissolved_co2_molar(y: FloatArray, schema: StateSchema, params: Mapping[str,
     return min(evolved, saturation) / CARBONIC_AS_CO2.molar_mass
 
 
-def _cation(y: FloatArray, schema: StateSchema) -> float:
-    """The net strong-cation charge (mol⁺/L) from the state slot, or 0 if absent."""
-    if "cation_charge" not in schema:
+def nitrogen_charge_molar(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+) -> float:
+    """Net charge the assimilable-nitrogen pool carries (mol⁺/L) — decision D-209.
+
+    ``z̄ · [N]``, where ``[N]`` is the ``N`` slot in mol of elemental nitrogen per litre and
+    ``z̄`` is this medium's mean charge per mole of that nitrogen
+    (:data:`NITROGEN_CHARGE_PARAM_NAMES`). Positive, so the pool sits on the **cation** side
+    of the balance and drawing it down is an acidification.
+
+    **The mechanism is sourced rather than inferred**, which matters because the obvious
+    reading of it is wrong. Ribéreau-Gayon, *Handbook of Enology* Vol 1 §2.4.2: the permease
+    *"couples the transport of an amino acid molecule (or ammonium ion) with the transport of a
+    hydrogen ion … Obviously, the proton that penetrates the cell must then be exported to
+    avoid acidification of the cytoplasm … The membrane ATPase ensures the excretion of the
+    hydrogen ion"*. The symport proton is **re-exported**, so the symport cycle is
+    proton-neutral and contributes nothing net. What the liquid actually loses per assimilated
+    molecule is that molecule's **own charge**, which electroneutrality then makes the yeast
+    replace with an equal charge of protons. Hence one number per medium, and hence the two
+    opposing halves are *not* "ammonium out / symport in" — they are the **cationic** amino
+    acids (arginine, lysine, histidine) and ammonium against the **anionic** ones (aspartate,
+    glutamate). In wort those amino-acid halves very nearly cancel (``z̄`` = +0.039 from the
+    amino acids alone), so wort's ``z̄`` is dominated by its ammonium.
+
+    **This is a RE-ALLOCATION at t=0, not an addition.** ``cation_charge`` is back-solved from
+    ``initial_ph`` (:func:`cation_charge_for_ph`, :func:`solve_cation_charge`) and therefore
+    already contained this pool's charge, lumped and frozen as a constant. Making it explicit
+    moves that share out of the slot and onto the ``N`` state, so the anchored pH at t=0 is
+    unchanged to the closed form's precision while the pH now *responds* as nitrogen is
+    consumed. That is the whole content of D-209: nothing about the wort was wrong, the charge
+    simply could not move.
+
+    **Scope — this is the charge half only, so it is a LOWER bound.** Neither medium models
+    the assimilable pool per species (beer has no amino-acid slots at all, D-32), so removing
+    the pool removes its charge but not its *buffering*, and a real wort's amino acids buffer
+    near beer's own pH. Buffer removal pushes pH the **same** way, so the omitted half would
+    make the acidification larger, never smaller. ``z̄`` is also held constant while the real
+    pool's charge is mildly pH-dependent (measured: +0.177 at wort pH 5.65 rising to +0.188 at
+    pH 4.86, a 6 % drift across the whole run) — again in the direction of understatement.
+
+    **Gated on :func:`charge_balance_is_populated`, and that gate is load-bearing.** An
+    un-anchored beer has every acid slot and its cation at 0 — empty *by construction*, because
+    ``_beer_acids`` seeds them from ``initial_ph`` or not at all (D-179) — but it still carries
+    200-odd mg/L in the ``N`` slot. Ungated, this function would hand that empty balance
+    +0.0025 mol/L of cation charge with no acid to meet it, and ``solve_ph`` would answer around
+    **11** instead of the 7.0 such a state answered before: a strong-base artefact in exactly the
+    place D-179's gate exists to protect, and one that reaches the aging trajectory through
+    ``EsterHydrolysis``. Nitrogen is not pH information on its own, so where no scenario supplied
+    a charge balance it must not fabricate one. The compile seam agrees by construction — both
+    anchors subtract this only inside their ``initial_ph`` branch — so state reads and the anchor
+    stay consistent.
+
+    Returns 0 when either the ``N`` slot or this medium's parameter is absent, which is what
+    keeps a schema with no nitrogen (or a caller-supplied parameter set without
+    ``acidbase.yaml``) working rather than raising inside the charge balance.
+    """
+    if NITROGEN_KEY not in schema or not charge_balance_is_populated(y, schema):
         return 0.0
-    return float(y[schema.slice("cation_charge")][0])
+    return nitrogen_charge_from_gpl(
+        float(y[schema.slice(NITROGEN_KEY)][0]), schema.medium, params
+    )
+
+
+def nitrogen_charge_from_gpl(
+    nitrogen_gpl: float, medium: str, params: Mapping[str, float]
+) -> float:
+    """:func:`nitrogen_charge_molar` off a bare g N/L figure instead of a state vector.
+
+    The compile-seam counterpart, and it exists for the same reason
+    :func:`solve_cation_charge` takes a totals map rather than a state: the inverse anchor runs
+    while the initial state is still being *assembled*, so there is no vector to slice yet.
+    Both anchors (wine's and beer's) must subtract this from what
+    :func:`solve_cation_charge` hands back, exactly as :func:`cation_charge_for_ph` does —
+    otherwise a scenario's ``initial_ph`` would not be reproduced at t=0.
+
+    Returns 0 for a medium with no entry in :data:`NITROGEN_CHARGE_PARAM_NAMES`, or when that
+    entry is missing from ``params`` (a caller-supplied ``parameter_paths`` without
+    ``acidbase.yaml``).
+    """
+    name = NITROGEN_CHARGE_PARAM_NAMES.get(medium)
+    if name is None or name not in params:
+        return 0.0
+    return float(params[name]) * (nitrogen_gpl / M_NITROGEN)
+
+
+def _cation(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """Total charge on the cation side (mol⁺/L): the strong-cation slot **plus** nitrogen.
+
+    ``params`` became required at D-209 rather than defaulted, and the churn is the point —
+    the same reasoning that keeps ``carbonic_molar`` positional in :func:`charge_residual`.
+    A caller assembling a charge balance must say what nitrogen the state carries; a default
+    would make the omission invisible in exactly the call sites most likely to get it wrong.
+    """
+    slot = 0.0 if "cation_charge" not in schema else float(y[schema.slice("cation_charge")][0])
+    return slot + nitrogen_charge_molar(y, schema, params)
 
 
 def charge_balance_is_populated(y: FloatArray, schema: StateSchema) -> bool:
@@ -847,7 +978,7 @@ def ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float])
     """
     return solve_ph(
         _totals_molar(y, schema),
-        _cation(y, schema),
+        _cation(y, schema, params),
         _byp_succinic_molar(y, schema),
         dissolved_co2_molar(y, schema, params),
         build_pka_map(params),
@@ -878,7 +1009,7 @@ def degassed_ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str
     """
     return solve_ph(
         _totals_molar(y, schema),
-        _cation(y, schema),
+        _cation(y, schema, params),
         _byp_succinic_molar(y, schema),
         0.0,
         build_pka_map(params),
@@ -910,14 +1041,25 @@ def cation_charge_for_ph(
     this state's acid load reaches with *no* strong cation at all — the floor is
     ``ph_of_state`` on the same state with the slot zeroed, and no cation addition can go
     beneath it. Callers that can name a friendlier remedy should catch and re-raise.
+
+    **The nitrogen pool's own charge is subtracted off the answer** (decision D-209).
+    :func:`solve_cation_charge` returns the *total* cation-side charge the target pH needs,
+    and since D-209 part of that total is supplied by the ``N`` slot through
+    :func:`nitrogen_charge_molar`; what belongs in the ``cation_charge`` slot is the
+    remainder. Getting this subtraction wrong would not raise — it would silently anchor
+    every must and wort to the wrong pH — so the round trip (write the result into the slot,
+    read :func:`ph_of_state` back) is pinned as a test. It is also why the anchored pH at t=0
+    is unchanged by D-209 while the *slot* value falls: a nitrogen-bearing wort's charge was
+    always in the balance, just frozen inside the fitted constant.
     """
-    return solve_cation_charge(
+    total = solve_cation_charge(
         _totals_molar(y, schema),
         _byp_succinic_molar(y, schema),
         dissolved_co2_molar(y, schema, params),
         build_pka_map(params),
         target_ph,
     )
+    return total - nitrogen_charge_molar(y, schema, params)
 
 
 def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
@@ -954,7 +1096,7 @@ def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, 
     """
     pka_map = build_pka_map(params)
     totals = _totals_molar(y, schema)
-    cation = _cation(y, schema)
+    cation = _cation(y, schema, params)
     byp = _byp_succinic_molar(y, schema)
     ph = solve_ph(totals, cation, byp, 0.0, pka_map)
     h = 10.0 ** (-ph)
@@ -992,6 +1134,19 @@ def ph_tier(params_tier_of: Mapping[str, Tier], schema: StateSchema | None = Non
     # there is nothing medium-specific about dissolved CO2, so it is added to the spec list
     # rather than to one registry. It is ``plausible`` like the rest, so no tier moves.
     tiers = [params_tier_of[n] for n in PKA_PARAM_NAMES if n in names and n in params_tier_of]
+    # The nitrogen charge is on the cation side, so it reaches no pKa name and would have been
+    # skipped silently — the same gap ``pKa_carbonic_1`` fell into at D-182 (it is not a registry
+    # member, so the derivation missed it and it needed a hand entry). Scoped to the medium when
+    # a schema is given: this is genuinely per-medium, unlike carbonic, because the two media's
+    # nitrogen has different composition. Both are ``plausible``, so as shipped no tier moves —
+    # but that is a CONSEQUENCE of the tier choice, not a licence to re-tier freely: dropping
+    # either to speculative would take that medium's pH tier with it (decision D-209).
+    n_names = (
+        NITROGEN_CHARGE_PARAMS
+        if schema is None
+        else (NITROGEN_CHARGE_PARAM_NAMES.get(schema.medium, ""),)
+    )
+    tiers += [params_tier_of[n] for n in n_names if n in params_tier_of]
     return combine([*tiers, Tier.PLAUSIBLE])
 
 
