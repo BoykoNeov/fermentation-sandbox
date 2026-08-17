@@ -1,9 +1,11 @@
 ---
 name: beer-acid-base
 description: "All six beer acid-base beats (D-178 to D-183) - the beat is complete and beer's pH is a prediction"
-metadata:
+metadata: 
   node_type: memory
   type: project
+  originSessionId: 09a91935-982e-429a-ba2b-c094a06612d5
+  modified: 2026-08-17T08:32:47.404Z
 ---
 
 **Live prohibitions — beer acid-base.** Detail split out of
@@ -11,6 +13,17 @@ metadata:
 path. Read it when working on this subject. Every bullet is *what it forbids* + the D-record
 to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue
 past it from this file.** **Never evict an old prohibition to buy a line.**
+
+**Beer pH is validated on ONE NUMBER and the CURVE is now read (D-207). Test-only; nothing moved.**
+- **Never call the pH-drop test a TRAJECTORY test** — it scores ONE endpoint fraction (87.1 %, inside
+  its own 77.6-97.0) while day 1 is **0.195 pH too acidic, 8.1× the read tolerance**. Model is BELOW
+  the band early, ABOVE it days 4-7 (~2×, these do NOT carry it): it **overshoots then stalls**.
+  **85.1 % of the day-1 drop is D-182's CO₂ term**, saturating by day 1 then flat 13 d — its docstring
+  said "within hours"; unexamined ≠ hidden. Uptake confound RULED OUT (14.1 % vs measured 15 %).
+- **DEGASSING IS A FORK, NOT A CAVEAT** — frames give OPPOSITE diagnoses (CO₂-free falls too SLOW *and*
+  reaches 51 %). **MEBAK 2.14 = ZERO corpus hits, no printed pH literal** ⇒ unclosable here; day 7 is
+  ABOVE the strain envelope either way. `TYRELL_PH_COURSE` ships as **data NO assert reads** — a day-1
+  pin encodes the defect. **Nothing in the suite pins any pH SHAPE** (88 refs, 11 asserts, 2 walks).
 
 **Beer acid-base, part 6 — acetic's RATE LAW (D-183). The SPIKE is still NOT modelled.**
 - **NEVER re-propose the keto-acid excretion/re-assimilation pair for acetic** (D-180 §9's own

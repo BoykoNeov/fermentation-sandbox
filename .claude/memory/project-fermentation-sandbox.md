@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-14T08:14:05.629Z
+  modified: 2026-08-17T08:36:09.926Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -29,14 +29,14 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-14)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-206**; sensory 1a/1b + **D-139's
+## Status (2026-08-17)
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-207**; sensory 1a/1b + **D-139's
 leftovers ALL closed** (D-148/D-149). Suite **1765 + 3 xfail**. **"Blocked on external sourcing" wrong 3× (D-191/196/199)**.
-**D-202 ascorbate: Fig 24.12's top group COMPLETE, D-141's polymerisation-band closure RULED OUT; D-203 REFUSED its sotolon route + left the aldol UNGATED; D-204 SHIPPED the pin it owed; D-205 REFUSED Pham's pH+ethanol terms and D-206 the Strecker split's derivation — "expressible" was never "identifiable", and neither is "modelled explicitly".**
+**D-202 ascorbate COMPLETED Fig 24.12's top group; D-203/205/206 REFUSED the sotolon ascorbate route, Pham's pH+ethanol
+terms and the Strecker split — "expressible" was never "identifiable"; D-204 shipped the pin it owed.**
 **Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
-**Beer acid-base = SIX beats (D-178 solver → D-183 acetic's rate law); D-180's BOTH omitted terms BUILT. `ACID_STATE`
-is NO LONGER medium-agnostic** (D-179): *wine's* registry beside `BEER_ACIDS`, keyed off `StateSchema.medium`.
-**Beer's pH is a PREDICTION.** **Next beat is the owner's call.**
+**Beer acid-base = SIX beats (D-178→D-183), all BUILT; `ACID_STATE` is NO LONGER medium-agnostic** (D-179).
+**Beer's pH is a PREDICTION validated on ONE endpoint number — D-207 read the curve: 8.1× out on day 1. Next beat is the owner's call.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -176,9 +176,10 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the shipped 0.15) and its "queued as its own beat" clause is **deleted**. Also: a **reused**
   `CompiledScenario` inherits the previous run's enables (**+10.3 %**) — a CONTRACT, "fixing" it
   fails 26 tests. → `.claude/memory/prohibitions/strecker-methional-split.md`
-- **Beer acid-base — all six beats (D-178 → D-183)** — beat COMPLETE, beer's pH is a **PREDICTION**;
-  malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER dissolved;
-  acetic's producer is growth-linked and the spike is NOT modelled.
+- **Beer acid-base — six beats + the pH CURVE (D-178 → D-183, D-207)** — beat COMPLETE, beer's pH is a
+  **PREDICTION**; malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER
+  dissolved; acetic's producer is growth-linked and the spike is NOT modelled. **D-207: never call the
+  pH test a TRAJECTORY test — day 1 is 8.1× out, 85 % of it D-182's CO₂ term; degassing is a FORK.**
   → `.claude/memory/prohibitions/beer-acid-base.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
@@ -196,11 +197,12 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
-growth-linked excretion (D-49 opt B) — **α-KG ONLY and INFERRED, never
-measured; α-KB REFUSED at D-189 and PYRUVATE at D-195, both spent**; peptide pool; variety-specific DMSp;
+~~growth-linked excretion (D-49 opt B)~~ — **NOT a candidate: α-KB REFUSED (D-189), PYRUVATE REFUSED (D-195), and
+the draining arithmetic is STRUCTURAL AND GENERAL to all three pools, so α-KG is refused BY IMPLICATION** —
+inferred, not separately measured, and that is the only thing left open about it. Do not offer it as unbuilt; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional` (**only from LITERATURE — deriving it from the
 model's own abundances is REFUSED at D-206, and so is re-banding it**); masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
-in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145; **NEW at D-202: sotolon from ASCORBATE degradation via 2-ketobutyrate (UWC §9) — the model has both ends already; no rate in the corpus, and it would force `ascorbate` onto the carbon ledger.**
+in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145; ~~NEW at D-202: sotolon from ascorbate via 2-ketobutyrate~~ — **CLOSED at D-203, REFUSED on identifiability** (~10 % molar conversion is its target). This line said "new/open" for 4 records after its own refusal shipped; a **STALE-LIST instance**, cf. [[feedback-check-the-blocker-is-still-blocking]].
 
 ## Standing rule
 - **NEVER put a whole-file line cap back (D-177, corrects D-169).** Raised 4× (150→300), then **REMOVED, not
