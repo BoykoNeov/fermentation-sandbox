@@ -44,11 +44,19 @@ def _wine(
     yan_mgl: float = 80.0,
     days: float = 14.0,
     celsius: float = 20.0,
+    anchored: bool = False,
 ) -> Scenario:
+    # anchored (default False, byte-for-byte the pre-D-210 helper) seeds acids and an `initial_ph`,
+    # which is what opts the charge balance in (D-179). It matters to `add_dap` since D-210: the
+    # dose's two CHARGE writes ride that gate, so an unanchored wine gets the nitrogen jump D-36
+    # shipped for the H2S gate and nothing in the balance.
+    initial: dict[str, float] = {"brix": 24.0, "yan_mgl": yan_mgl, "pitch_gpl": 0.25}
+    if anchored:
+        initial |= {"tartaric_gpl": 6.0, "malic_gpl": 3.0, "initial_ph": 3.40}
     return Scenario(
         name="dap-test",
         medium="wine",
-        initial={"brix": 24.0, "yan_mgl": yan_mgl, "pitch_gpl": 0.25},
+        initial=initial,
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
         interventions=interventions,
         duration_days=days,
@@ -69,8 +77,11 @@ def test_add_dap_writes_both_ions_and_nothing_else():
     is on N". That assert was correct about the code and wrong about the compound, and widening
     what the verb writes is exactly the kind of change it existed to catch. Now it pins all three
     writes individually, so the same protection survives at the wider scope.
+
+    On an ANCHORED wine, because the two charge writes ride D-179's gate — see
+    ``test_an_unanchored_dose_puts_nothing_in_the_charge_balance`` for the other side.
     """
-    cs = compile_scenario(_wine([_dap(2.0, 0.4)]))
+    cs = compile_scenario(_wine([_dap(2.0, 0.4)], anchored=True))
     traj = cs.run()
 
     assert len(traj.external_flows) == 1
@@ -85,14 +96,49 @@ def test_add_dap_writes_both_ions_and_nothing_else():
     assert flow.delta[schema.slice("phosphate")][0] == pytest.approx(
         0.4 * _DAP_PHOSPHATE_FRACTION, rel=1e-12
     )
-    # And the pool's mean charge is re-mixed toward pure ammonium. This wine names no
-    # `initial_ph`, so the CHARGE stays gated off (D-179) while the composition slot still moves:
-    # nitrogen is not pH information on its own.
+    # And the pool's mean charge is re-mixed toward pure ammonium.
     excess = flow.delta[schema.slice(acidbase.NITROGEN_CHARGE_EXCESS_KEY)][0]
     assert excess > 0.0
     written = {"N", "phosphate", acidbase.NITROGEN_CHARGE_EXCESS_KEY}
     others = np.delete(flow.delta, [schema.slice(name).start for name in written])
     assert np.count_nonzero(others) == 0
+
+
+def test_an_unanchored_dose_puts_nothing_in_the_charge_balance():
+    """A nutrient addition is not pH information, and must not become it (D-210, D-179).
+
+    Found in review after the first green suite, and it was two faults rather than one. The
+    nitrogen half rides ``charge_balance_is_populated``; ``phosphate`` is an ordinary acid slot
+    that ``_totals_molar`` reads unconditionally. So on a wine with no ``initial_ph`` and no dosed
+    acids — an empty balance, and the shape of the Palma 2012 benchmark — the dose booked the
+    salt's ANION with its CATION suppressed, *and* opened the gate by writing an acid slot, which
+    switched the whole D-209 nitrogen term on for a beverage whose pH no scenario supplied. That
+    was worth pH 3.10 → **4.53** at the dose instant and **−0.647 pH** at the end.
+
+    Both writes are now atomic and gated together, so this wine's pH is what it was before D-210
+    and a dose cannot open the gate.
+    """
+    schema = compile_scenario(_wine([_dap(2.0, 1.1)])).schema
+    undosed_cs = compile_scenario(_wine([]))
+    dosed_cs = compile_scenario(_wine([_dap(2.0, 1.1)]))
+    undosed = np.asarray(undosed_cs.run().y, float)[:, -1]
+    dosed = np.asarray(dosed_cs.run().y, float)[:, -1]
+
+    # The gate is shut and the dose has not opened it.
+    assert not acidbase.charge_balance_is_populated(undosed, schema)
+    assert not acidbase.charge_balance_is_populated(dosed, schema)
+    assert float(dosed[schema.slice("phosphate")][0]) == 0.0
+    assert float(dosed[schema.slice(acidbase.NITROGEN_CHARGE_EXCESS_KEY)][0]) == 0.0
+    assert acidbase.nitrogen_charge_molar(dosed, schema, dosed_cs.param_values) == 0.0
+
+    # The nitrogen jump D-36 shipped for the H2S gate is untouched, so pH differs only by the
+    # kinetic consequences of the extra nitrogen — not by ~0.6 pH of half-booked salt.
+    ph_undosed = acidbase.ph_of_state(undosed, schema, undosed_cs.param_values)
+    ph_dosed = acidbase.ph_of_state(dosed, schema, dosed_cs.param_values)
+    assert abs(ph_dosed - ph_undosed) < 0.02, (
+        f"an unanchored wine's pH moved {ph_dosed - ph_undosed:+.4f} on a DAP dose; the charge "
+        "writes must ride D-179's gate, or a nutrient addition becomes pH information"
+    )
 
 
 @pytest.mark.parametrize(

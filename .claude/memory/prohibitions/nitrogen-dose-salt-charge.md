@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 41ccdfd6-1486-4600-8cb4-43288814b4cf
-  modified: 2026-08-17T12:44:25.597Z
+  modified: 2026-08-17T13:02:01.295Z
 ---
 
 **Live prohibitions — the nitrogen DOSE's charge (D-210).** Detail split out of
@@ -47,6 +47,13 @@ unconvincing, go read D-210 — do not argue past it from this file.**
   phosphate along and names H₂PO₄⁻). Absorbed at t=0; un-absorbed remainder **1.3 %** of wine's
   buffer capacity. US ceiling **960 mg/L** = 1.4-6.9× the native pool — **its unit is a named
   FORK** (mg DAP vs mg N), nothing ships from it.
+- **BOTH charge writes are ATOMIC and ride D-179's gate** — found in review AFTER the first green
+  suite. Ungated they were gated DIFFERENTLY: the nitrogen half checks
+  `charge_balance_is_populated`, `phosphate` is a plain acid slot. On an unanchored wine the dose
+  booked the ANION alone **and OPENED the gate** (acid slots are what it tests), so a *nutrient
+  addition* switched the whole D-209 term on: pH 3.103 → **4.530** at the dose, **−0.647** at the
+  end. **That is the Palma benchmark's shape** — its 37 stayed green because they score sugar and
+  ethanol. **Never gate only one half**; the `N` jump itself is NOT gated (D-36's H₂S gate).
 - **`NitrogenExceedsCationDemandError` exists because `_verb_set_ph` MASKED the diagnosis** — it
   caught bare `ValueError` and rewrote every failure as *"below the acid load's intrinsic pH"*,
   wrong in **every** dosed case probed, and its printed floor still contains the nitrogen charge.

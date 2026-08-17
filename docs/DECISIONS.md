@@ -29833,10 +29833,60 @@ it. Wine goes 95 → **97** slots, beer 57 → **59**.
 PG is the one that changes what the archive should believe: D-209 sized this candidate by the half
 that turns out not to move a finished wine at all.
 
+### 12. The follow-up the first green suite hid: the two halves were gated DIFFERENTLY
+
+Found in review after §1-11 shipped green, and it is the same shape as D-209 §8b — a defect the
+beat's own tests could not see because each checked one side.
+
+`nitrogen_charge_molar` rides D-179's opt-in gate; `phosphate` is an ordinary acid slot that
+`_totals_molar` reads unconditionally. On a wine with **no `initial_ph` and no dosed acids** — an
+empty charge balance — the consequences were two, and the second is the serious one:
+
+* the dose booked the salt's **anion** with its **cation** suppressed: the mirror image of the
+  strong-base artefact D-179's gate exists to prevent, and more acidic than the chemistry allows;
+* writing an acid slot **opened the gate**, because acid slots are what the gate tests. So a
+  *nutrient addition* switched the whole D-209 nitrogen term on for a beverage whose pH no scenario
+  had supplied — pH 3.103 → **4.530** at the dose instant, and **−0.647 pH** at the end against the
+  undosed control (2.940 → 2.292). It reaches every pH-reading Process.
+
+**That is the Palma 2012 benchmark's own shape**: synthetic medium, no `initial_ph`, no tartaric.
+Its 37 assertions stayed green because they score glucose and ethanol timing, which barely read pH —
+so this is D-179's own sentence coming true a second time: *"0 suite scenarios hit it ⇒ either error
+ships green."* The green benchmark suite in §10 was green for the wrong reason on this axis.
+
+The fix is **atomicity**: both charge writes ride the gate together, evaluated on the pre-dose state
+inside the event (an event is already a discontinuity, so this is not the forbidden kind of gate).
+Both or neither — a state must never say "this pool is ammonium-rich" while the phosphate that came
+with the ammonium is absent, which is also the safer failure mode if a later beat opens the gate for
+such a wine. The `N` jump D-36 shipped for the H₂S gate is untouched, an unanchored wine's pH is
+what it was before D-210 (moves <0.02 pH, purely the extra nitrogen's kinetics), and a dose can no
+longer open the gate. Suite **1792 passed, 3 xfailed**; 16 new tests.
+
+### 13. Two properties of the shipped term worth stating, neither of them measured against data
+
+**The pH numbers in §5 are PREDICTIONS, and the corpus has already been swept for an anchor.** All
+24 texts were searched for DAP against pH / acidity / buffering language. What that returns is the
+mechanism named (§7) and **no measured pH effect anywhere** — no before/after must pH on a DAP
+addition, no finished-wine pH against dose. So −0.162 pH and +0.235 pH are exactly the status
+beer's pH had at D-180: a prediction from sourced stoichiometry and sourced pKas, with no
+independent series to score. Recorded so a later beat does not re-run the sweep: the search is the
+receipt. The nearest validated quantity in reach would be a dosed must's **TA**, which the model
+moves 10.198 → 10.516 g/L at 0.3 g/L DAP (that value sits inside `titratable_acidity`'s own
+"trust t=0, not the end-of-ferment series" caveat, so it is data and not a claim).
+
+**The two new pKas enter `PH_SYSTEM_READS` automatically** — `PKA_PARAM_NAMES` derives from the
+registries, so no hand entry was needed (unlike `pKa_carbonic_1` at D-182, which reaches no
+registry member). The consequence is D-179's, restated: the sampler's scope grows by two, which
+**shifts the draw sequence of every pH-sampling wine ensemble** while leaving nominals and bands
+alone. Recorded because the archive holds ensemble spreads measured off the old sequence — D-186's
+`initial_ph` 0.1273 against `set_ph` 0.1292 over 24 members, whose *ratio* is the claim and is
+unaffected, but whose individual figures are not reproducible from a fresh run.
+
 ### Receipts
 
 `M:\claud_projects\temp\ferment\d210-dap-salt-charge\` — `PREREGISTER.md` (written before probe 1
 ran and before any implementation), `probe1_n_inflow_census` (the wrong question, kept),
 `probe1b_n_inflow_census` (the closing ledger), `probe1c_channel_split` (the un-draw finding),
 `probe2_phosphate_pricing` (the representation choice), `probe3_shipped_rerun` (the built arms and
-the attribution) and `probe4_setph_guard` (reachability), each with its JSON.
+the attribution), `probe4_setph_guard` (reachability) and `probe5_unanchored_asymmetry` (the
+section-12 gating fault), each with its JSON.

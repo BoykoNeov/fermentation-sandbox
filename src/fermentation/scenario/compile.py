@@ -1571,6 +1571,25 @@ def _verb_add_dap(
 
     Both new writes are guarded on slot presence rather than assumed, because a caller-supplied
     schema predating D-210 must keep working exactly as it did.
+
+    **The two charge writes ride D-179's opt-in gate, and that was found in review rather than
+    designed.** Without it the halves were gated *differently*: ``nitrogen_charge_molar`` checks
+    ``charge_balance_is_populated``, while ``phosphate`` is an ordinary acid slot that
+    ``_totals_molar`` reads unconditionally. Two things went wrong on a wine with no ``initial_ph``
+    and no dosed acids — an empty balance, which is the shape of the Palma 2012 benchmark:
+
+    * the dose booked the salt's ANION with its CATION suppressed, the mirror of the strong-base
+      artefact D-179's gate exists to prevent, and more acidic than the chemistry allows;
+    * worse, writing an acid slot **opened the gate**, because that is what the gate tests. So a
+      *nutrient addition* switched on the whole D-209 nitrogen term for a beverage whose pH no
+      scenario had supplied: pH 3.10 → **4.53** at the dose instant and **−0.647 pH** at the end,
+      reaching every pH-reading Process. A dose is not pH information (D-179's own principle).
+
+    Gating both writes together fixes both: an unanchored wine's balance gains nothing, the gate
+    cannot be opened by a dose, and the ``N`` jump D-36 shipped for the H₂S gate is untouched.
+    Evaluated on ``y`` (pre-mutation) and inside the event, so it is not a discontinuity in the
+    RHS — an event already is one, which is why the same gate would be forbidden in a Process
+    ([[feedback-a-gate-is-a-discontinuity-the-solver-probes]]).
     """
     _iv_check_keys(iv, frozenset({"dap_gpl"}), "add_dap")
     dap_gpl = _iv_float(iv, "dap_gpl", "add_dap")
@@ -1594,19 +1613,24 @@ def _verb_add_dap(
 
     def mutate(mutate_schema: StateSchema, y: FloatArray) -> FloatArray:
         out = y.copy()
-        if excess_slice is not None:
-            # Re-mix BEFORE the nitrogen lands: the weighting is pool-before against dose.
-            out[excess_slice] = acidbase.remix_nitrogen_charge_excess(
-                float(y[n_slice][0]),
-                float(y[excess_slice][0]),
-                added_n_gpl,
-                float(dosed_charge),
-                mutate_schema.medium,
-                param_values,
-            )
         out[n_slice] += added_n_gpl
-        if phosphate_slice is not None:
-            out[phosphate_slice] += added_phosphate_gpl
+        # The two CHARGE writes are atomic and ride D-179's gate together (decision D-210). Both,
+        # or neither: a state must never be able to say "this pool is ammonium-rich" while the
+        # phosphate that arrived with the ammonium is missing.
+        if acidbase.charge_balance_is_populated(y, mutate_schema):
+            if excess_slice is not None:
+                # Re-mixed against the pool BEFORE the nitrogen lands — the weighting is
+                # pool-before against dose, so `y` and not `out`.
+                out[excess_slice] = acidbase.remix_nitrogen_charge_excess(
+                    float(y[n_slice][0]),
+                    float(y[excess_slice][0]),
+                    added_n_gpl,
+                    float(dosed_charge),
+                    mutate_schema.medium,
+                    param_values,
+                )
+            if phosphate_slice is not None:
+                out[phosphate_slice] += added_phosphate_gpl
         return out
 
     return ScheduledEvent(
