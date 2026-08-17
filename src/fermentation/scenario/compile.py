@@ -79,6 +79,7 @@ from fermentation.core.kinetics import (
     TanninSelfPolymerization,
     ThermalAnthocyaninFade,
     WortAcidRemoval,
+    WortOxygenUptake,
     YeastAutolysis,
     YeastPOFDecarboxylation,
 )
@@ -981,7 +982,21 @@ def _beer_initial(
         # `WortOxygenUptake` during the lag phase. `o2_mgl` overrides it; 0 recovers the
         # pre-D-213 anaerobic-from-t0 beer. NOTE it feeds nothing in the default set — the three
         # O2 consumers are aging-gated — so this moves the `o2` column and no other.
-        "o2": mgl_to_gpl(_optional(values, "o2_mgl", parameters["o2_wort_aeration_beer"].value)),
+        #
+        # `if in parameters else 0.0` follows `_beer_acids`, and the fallback is deliberate: a
+        # parameter set that omits `beer_generic.yaml` is a deliberately reduced core (several
+        # tests compile against exactly that), and 0.0 is the pre-D-213 behaviour — i.e. the
+        # isolable default this Process is required to reduce to. Raising instead would make a
+        # reduced core uncompilable for the sake of a term that moves nothing.
+        "o2": mgl_to_gpl(
+            _optional(
+                values,
+                "o2_mgl",
+                parameters["o2_wort_aeration_beer"].value
+                if "o2_wort_aeration_beer" in parameters
+                else 0.0,
+            )
+        ),
         "Gly": 0.0,  # beer carries zero byproduct diversion in M1 (decision D-16)
         "Byp": 0.0,
         # Produced-only aroma pools, empty at pitch (decision D-19). The three ester pools and
@@ -2840,6 +2855,17 @@ def _verb_begin_aging(
         for aging_process in _AGING_GATED_PROCESSES:
             if aging_process.name in ps:
                 ps.enable(aging_process.name)
+        # THE FIRST THING begin_aging HAS EVER DISABLED (decision D-213), and it is the other
+        # half of the same switch rather than an exception to it. `WortOxygenUptake` is
+        # *pitched* yeast building membrane sterol in the lag phase; past the ferment/aging
+        # breakpoint the yeast is settled and dormant, and the O2 chemistry that matters is the
+        # aging set enabled just above. Left on, it competes with those sinks for a dosed
+        # `add_oxygen` and eats roughly half of it — which is exactly what
+        # `test_beer_depletes_its_packaging_oxygen` caught: packaging oxygen must be consumed by
+        # the oxidative sinks whose rates are calibrated against measured O2 depletion, not by a
+        # fermentation-phase term with an author-estimate constant.
+        if WortOxygenUptake.name in ps:
+            ps.disable(WortOxygenUptake.name)
 
     return ScheduledEvent(
         time_h=days_to_hours(iv.day),

@@ -815,6 +815,14 @@ BEER_ORGANIC_ACID_PROCESSES = {
     "acetic_acid_overflow",
     "wort_acid_removal",
 }
+# BEER-ONLY, FERMENTATION-phase (D-213): the dissolved O2 an aerated cast wort carries, stripped
+# by the yeast during the lag phase. Its own set rather than a member of the acid set above
+# because it rides a DIFFERENT gate -- the acids opt in with ``initial_ph``, this is
+# unconditional -- and because it is the one Process ``begin_aging`` DISABLES rather than
+# enables: past the breakpoint the yeast is settled and the aging sinks own the O2 pool.
+# It is deliberately INERT in the default set (nothing reads ``o2`` before aging), which is why
+# ``test_wort_oxygen.py`` carries the isolability evidence rather than this file.
+BEER_WORT_OXYGEN_PROCESSES = {"wort_oxygen_uptake"}
 # WINE-ONLY, NON-oxidative aging (D-79): tannin_anthocyanin_condensation condenses the two GRAPE
 # pools (anthocyanin + condensed tannin) into stable polymeric pigment — the red-wine colour-
 # stabilization + astringency-softening axis. A THIRD separate axis: it draws no O₂ (unlike every
@@ -955,6 +963,7 @@ EXPECTED_PROCESSES = {
         | CARAMELIZATION_PROCESSES
         | OAK_PROCESSES
         | BEER_ORGANIC_ACID_PROCESSES
+        | BEER_WORT_OXYGEN_PROCESSES
     ),
 }
 

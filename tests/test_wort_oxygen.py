@@ -19,7 +19,12 @@ import pytest
 
 from fermentation.core.kinetics.wort_oxygen import O2_SLOT, WortOxygenUptake
 from fermentation.parameters import default_data_dir, load_parameters
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import (
+    Intervention,
+    Scenario,
+    TemperaturePoint,
+    compile_scenario,
+)
 
 #: The D-180/D-211 reference wort, so every number here is comparable with the beer acid suite.
 TYRELL_SUGAR_GPL = 82.2388545
@@ -219,6 +224,38 @@ def test_an_unpitched_wort_holds_its_oxygen():
     state[schema.slice("X")] = 0.0
     d = WortOxygenUptake().derivatives(0.0, state, schema, params)
     assert float(d[schema.slice(O2_SLOT)][0]) == 0.0
+
+
+def test_begin_aging_disables_the_wort_oxygen_uptake():
+    """``begin_aging`` DISABLES this Process — the first thing that verb has ever switched off.
+
+    Not a tidiness point: left enabled it competes with the aging oxidative sinks for a dosed
+    ``add_oxygen`` and eats about half of it. That is a real defect the full suite caught —
+    ``test_beer_depletes_its_packaging_oxygen`` saw 4.38 mg/L of an 8.0 mg/L dose survive to the
+    post-dose sample — and packaging oxygen must be consumed by the sinks whose rates are
+    calibrated against measured O₂ depletion, not by a fermentation-phase term carrying an
+    author-estimate constant.
+
+    Physically it is the same switch as the enables beside it: this Process is *pitched* yeast
+    building membrane sterol in the lag phase, and past the ferment/aging breakpoint the yeast is
+    settled and dormant.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d213-aging",
+            medium="beer",
+            initial=dict(BEER_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=30.0,
+            interventions=[Intervention(day=14.0, action="begin_aging", params={})],
+        )
+    )
+    process_set = compiled.process_set
+    assert process_set.is_enabled(WortOxygenUptake.name), "should run during fermentation"
+    for event in compiled.events:
+        if event.reconfigure is not None:
+            event.reconfigure(process_set)
+    assert not process_set.is_enabled(WortOxygenUptake.name), "begin_aging must disable it"
 
 
 def test_wine_is_untouched_by_the_beer_wort_oxygen_process():

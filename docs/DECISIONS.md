@@ -30535,6 +30535,40 @@ P5 is the one worth flagging: it was pre-registered as a measurement and then **
 running it would have required enabling aging on a beer — which measures the aging axis, not this
 beat's claim. Recorded as not-tested rather than quietly dropped or reported as a miss.
 
+### 9. The follow-up the domain suite could not find: `begin_aging` now DISABLES something
+
+The domain suite (`tests/test_wort_oxygen.py`) was green. The **full** suite was not — 11 failures,
+and one of them was a real defect rather than an expectation needing an update.
+[[feedback-full-suite-before-green]] predicts exactly this shape: a new Process in a shared
+registry breaks exact-set and end-to-end tests *outside* its own domain suite.
+
+Eight were the expected-set updates (`test_media.py`, `test_oxidative_cascade_guards.py`) and one a
+`KeyError` on a deliberately reduced parameter set — the seed now falls back to 0.0 when
+`beer_generic.yaml` is absent, following `_beer_acids`, because 0.0 *is* the pre-D-213 behaviour
+this term must reduce to. **The defect was `test_beer_depletes_its_packaging_oxygen`**: of an 8.0
+mg/L `add_oxygen` dose, only **4.38 mg/L** survived to the post-dose sample.
+
+Cause: `WortOxygenUptake` was still enabled during aging, so it competed with the aging oxidative
+sinks for the dosed pool and took roughly half. **Packaging oxygen must be consumed by the sinks
+whose rates are calibrated against measured O₂ depletion, not by a fermentation-phase term
+carrying an author-estimate constant.**
+
+Fix: **`begin_aging` disables it — the first thing that verb has ever switched off.** That is the
+other half of the same switch rather than an exception to it: this Process is *pitched* yeast
+building membrane sterol in the lag phase, and past the breakpoint the yeast is settled and
+dormant. Before the breakpoint the sinks are off and this is on; after it, the reverse — so the
+two can never both act on the pool, which is also what keeps
+`test_the_wired_oxidative_set_is_exactly_the_direct_sinks` meaningful now that a non-oxidative
+Process appears in its membership set. That guard carries an explicit "do not satisfy this by
+editing the expectation" warning; it is satisfied here by adding a **separately named**
+`BEER_FERMENTATION_O2_CONSUMERS`, so the oxidative set keeps meaning exactly what it meant.
+
+**Worth stating because it inverts a claim made three sections above.** §2 says the term is inert
+because the O₂ consumers are aging-gated. That was true of the *default* trajectory and false of
+an *aged* one — a beer that runs `begin_aging` + `add_oxygen` was measurably changed, by ~45 % of
+its dosed oxygen, until this fix. The inertness claim now holds because the disable makes it hold,
+not because nothing could ever read the pool.
+
 ### Receipts
 
 `M:\claud_projects\temp\ferment\d213-beer-wort-oxygen\` — `PREREGISTER.md` (written before any

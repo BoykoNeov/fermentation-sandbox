@@ -113,6 +113,17 @@ BEER_OXIDATIVE_SINKS = frozenset(
     {"oxidative_acetaldehyde", "phenolic_browning", "ellagitannin_oxidation"}
 )
 
+#: Beer's FERMENTATION-phase O2 consumer (D-213) — the wort aeration the yeast strips in the lag
+#: phase. It touches ``o2`` and so appears in the membership assertion below, but it is **not an
+#: oxidative sink** and is deliberately kept in its own name so the set above keeps meaning
+#: "the direct oxidative alternative" exactly.
+#:
+#: It cannot double-count against either alternative, which is the property that test guards:
+#: ``begin_aging`` **disables** it (the first thing that verb has ever disabled), so it and the
+#: sinks are never simultaneously active on the same pool. Before the breakpoint the sinks are
+#: off and this is on; after it, the reverse.
+BEER_FERMENTATION_O2_CONSUMERS = frozenset({"wort_oxygen_uptake"})
+
 
 def _compile_with_old_oxidative_set(scenario: Scenario) -> CompiledScenario:
     """Compile ``scenario`` with the DIRECT (pre-cascade) oxidative sinks wired.
@@ -386,7 +397,11 @@ def test_the_wired_oxidative_set_is_exactly_the_direct_sinks(medium):
     # rebuild, the direct alternative must present exactly these names and no others.
     process_set = _direct_oxidative_process_set(medium)
     touching = {p.name for p in process_set.active if "o2" in p.touches}
-    expected = BEER_OXIDATIVE_SINKS if medium == "beer" else OLD_OXIDATIVE_SINKS | O2_SOURCES
+    expected = (
+        BEER_OXIDATIVE_SINKS | BEER_FERMENTATION_O2_CONSUMERS
+        if medium == "beer"
+        else OLD_OXIDATIVE_SINKS | O2_SOURCES
+    )
     assert touching == expected, (
         f"{medium}'s O2-touching Process set changed. Under the cascade this test must be "
         "satisfied by selecting the DIRECT alternative in _direct_oxidative_process_set — "

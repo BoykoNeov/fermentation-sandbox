@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-17T15:45:19.556Z
+  modified: 2026-08-17T16:17:21.133Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -35,8 +35,8 @@ closed** (D-148/9). Suite **1798 + 3 xfail**. **"Blocked on external sourcing" w
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
-D-207→D-209, D-211) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179); **D-212 is the NINTH and BUILT NOTHING —
-day-1 pH admits an acetic WINDOW that Tyrell's own measured 145 sits OUTSIDE at all 3 arms (a REFUSAL, pre-registered).**
+D-207→D-209, D-211) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING — day-1 pH admits an
+acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms. D-213 BUILT beer's wort O₂ — sourced, and INERT.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -191,6 +191,13 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   **DRAWN** and narrowed 7.00→1.29× from the fast end. **D-210's two terms are STILL PARKED** (high-edge
   headroom 0.0028→0.0082) but the constraint now wants a term with a **TIME PROFILE**. D-183 FLAGGED.
   → `.claude/memory/prohibitions/beer-growth-rate-and-uptake-timing.md`
+- **Beer's WORT OXYGEN (D-213)** — **BUILT**: `o2` is seeded at **6.75 mg/L** (band 5.5-8.0, both
+  edges PRINTED) and stripped by the yeast in the lag phase. **DELIBERATELY INERT — the owner
+  chose it knowing** (all 3 O₂ consumers are aging-gated); it stops beer claiming t=0 anaerobiosis
+  and defuses D-212 §7. Driver is biomass **PRESENT, never FORMED** (growth-coupled built + REJECTED
+  on timing). **NOT a growth-Arrhenius target.** Isolability is exact at the DERIVATIVE, **not
+  byte-for-byte** — proved MESH by CONVERGENCE. O₂→growth DECLINED; O₂→acetate stays REFUSED.
+  → `.claude/memory/prohibitions/beer-wort-oxygen.md`
 - **Beer's EARLY acetic rise (D-212)** — **REFUSED, pre-registered, BUILT NOTHING.** Never aim at
   Tyrell's day-1 **145.0**: the pH admits a **WINDOW** — **94.24-132.38** admitted by ALL 3 `z̄`
   arms (86-141 is the UNION, never quote it) — and 145 is **OUTSIDE at every arm**. The real
