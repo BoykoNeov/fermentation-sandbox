@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-17T14:47:47.880Z
+  modified: 2026-08-17T15:41:29.694Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,13 +30,13 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-211**; sensory 1a/1b + **D-139's leftovers ALL
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-212**; sensory 1a/1b + **D-139's leftovers ALL
 closed** (D-148/9). Suite **1798 + 3 xfail**. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
-D-207→D-209, D-211) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179). **D-211 CLOSED the uptake-timing residue —
-beer's `mu_max` was 2.88× too fast; day 1 is now 0.070 ALKALINE, the sign D-209 §8's unbuilt buffer half would fix.**
+D-207→D-209, D-211) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179); **D-212 is the NINTH and BUILT NOTHING —
+day-1 pH admits an acetic WINDOW that Tyrell's own measured 145 sits OUTSIDE at all 3 arms (a REFUSAL, pre-registered).**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -191,6 +191,13 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   **DRAWN** and narrowed 7.00→1.29× from the fast end. **D-210's two terms are STILL PARKED** (high-edge
   headroom 0.0028→0.0082) but the constraint now wants a term with a **TIME PROFILE**. D-183 FLAGGED.
   → `.claude/memory/prohibitions/beer-growth-rate-and-uptake-timing.md`
+- **Beer's EARLY acetic rise (D-212)** — **REFUSED, pre-registered, BUILT NOTHING.** Never aim at
+  Tyrell's day-1 **145.0**: the pH admits a **WINDOW** (86-141 across the 3 `z̄` arms) and 145 is
+  **OUTSIDE at every arm** — the real shortfall is **+6 to +14**, a fifth of it, and hitting the
+  acetic target would move the pH OUT of band. Refused on **MECHANISM, not identifiability** (any
+  front-load factor 1.67-2.78 works at all arms). **Four candidates, FOUR different deaths.**
+  An ADDITIVE source is forbidden (breaks day 7 → 182.6). D-211 §13's sweep claim CORRECTED.
+  → `.claude/memory/prohibitions/beer-early-acetic-rise.md`
 - **The nitrogen DOSE's charge (D-210)** — `add_dap` doses a **SALT** and BOTH ions are BUILT:
   `phosphate` (diprotic, both registries, NOT D-178's malt phosphate) and `nitrogen_charge_excess`
   (stores the EXCESS so 0.0 needs no sentinel; one slot, not a second N pool). **D-209 §8c sized
