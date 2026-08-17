@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: eda906e6-10f9-4458-bce2-c2bce96f3ec9
-  modified: 2026-08-11T18:05:03.813Z
+  modified: 2026-08-17T14:45:45.139Z
 ---
 
 When a beat looks **blocked on an external number**, re-read the sources already on disk
@@ -28,6 +28,15 @@ acid course onto the extract course puts 86 % of the rise inside the first 15 % 
 flux (production not flux-linked), and half the fall at **zero** flux (removal not flux-linked
 either). Endpoints give you **sizes**; interiors give you **rate laws** — and a beat that only
 needs sizes never notices it is assuming one [[feedback-a-derived-yield-encodes-its-rate-law]].
+
+**The third case (D-211) is the cheapest miss of the three: another PANEL of a figure two
+beats had already cropped.** Tyrell's Fig. 4 is three stacked panels of one trial — extract,
+pH, and **total cell count**. D-180 cropped the extract panel, D-207 the pH panel, and both
+saved the crops to disk. Nobody cropped the third. Meanwhile D-209 located beer's remaining pH
+defect as "uptake timing", D-210 parked two candidates behind it, and a test docstring recorded
+that the timing "was never calibrated against a wort FAN time course" — while the only measured
+growth curve the project has, for the very ferment being scored, sat in the panel below the one
+being read. It re-derived `mu_max` (2.88× too fast) with no new source at all.
 
 **Why:** a paper gets mined for the one thing you went looking for. Tables are what a search
 surfaces and what [[feedback-transcribe-tables-not-prose]] trains you to prefer, so a

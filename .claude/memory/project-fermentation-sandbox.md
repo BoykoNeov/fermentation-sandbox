@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-17T12:43:18.784Z
+  modified: 2026-08-17T14:47:47.880Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,13 +30,13 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-210**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1791 + 3 xfail**. **"Blocked on external sourcing" wrong 5× (D-191/196/199/208/209)**. D-202
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-211**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1798 + 3 xfail**. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
-in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **SEVEN** beats (D-178→D-183,
-D-207→D-209) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179); **D-209 CLOSED beer's ~0.4 pH — `N` is CATION-side,
-days 2-7 now IN Tyrell's envelope, D-208's xfail XPASSED. Beer-pH's open question is UPTAKE TIMING (~20 h vs ~60 h).**
+in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
+D-207→D-209, D-211) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179). **D-211 CLOSED the uptake-timing residue —
+beer's `mu_max` was 2.88× too fast; day 1 is now 0.070 ALKALINE, the sign D-209 §8's unbuilt buffer half would fix.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -182,8 +182,15 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   NOT modelled. **Never call the pH test a TRAJECTORY test** (D-207). A published pH is **DECARBONATED**
   — score only `degassed_ph_of_state` (D-208). **D-209 put the `N` pool on the CATION side and CLOSED the
   ~0.4 pH: `z̄` is DERIVED per ELEMENTAL N, never fit; symport is proton-NEUTRAL; t=0 is a RE-ALLOCATION;
-  it rides D-179's gate. Day 1 got WORSE — the residue is UPTAKE TIMING, not acid-base.**
+  it rides D-179's gate. Its "day 1 is UPTAKE TIMING" is CLOSED at D-211 — see the row below.**
   → `.claude/memory/prohibitions/beer-acid-base.md`
+- **Beer's growth RATE + uptake TIMING (D-211)** — `mu_max` **0.034**, band 0.031-0.040, MEASURED on
+  Tyrell Fig. 4's **cell-count panel** (the third panel D-180/D-207 left uncropped); 0.098 was **2.88×**
+  too fast — a **Droop→Monod** transfer, D-15's twin. **Never fit the pH course** (0.040 scores 8/8 and
+  was REFUSED); EXTENT is a separate 6.3 % deviation; the `E_a` arm is measured and REFUSED. Band is
+  **DRAWN** and narrowed 7.00→1.29× from the fast end. **D-210's two terms are STILL PARKED** (high-edge
+  headroom 0.0028→0.0082) but the constraint now wants a term with a **TIME PROFILE**. D-183 FLAGGED.
+  → `.claude/memory/prohibitions/beer-growth-rate-and-uptake-timing.md`
 - **The nitrogen DOSE's charge (D-210)** — `add_dap` doses a **SALT** and BOTH ions are BUILT:
   `phosphate` (diprotic, both registries, NOT D-178's malt phosphate) and `nitrogen_charge_excess`
   (stores the EXCESS so 0.0 needs no sentinel; one slot, not a second N pool). **D-209 §8c sized

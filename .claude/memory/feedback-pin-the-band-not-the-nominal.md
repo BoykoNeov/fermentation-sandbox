@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: f80af2b2-1bcc-4313-a84f-86ba7a57c1e8
-  modified: 2026-07-29T02:01:23.736Z
+  modified: 2026-08-17T14:45:57.866Z
 ---
 
 A guard that pins a parameter's **nominal** against its source leaves the **uncertainty band
@@ -32,6 +32,16 @@ P1 number at all. Bands built to different scopes are **not commensurable**, and
 them on joint draws manufactures apparent disagreement: the 40.7 % inversion fell to 4.7 %
 measured like-for-like. That is a reason to *state the scope*, never to narrow a band that
 honestly spans what the source measured.
+
+**The same asymmetry bites in reverse: a CONSTRAINT recorded at an edge must be re-measured at
+that edge.** D-210 parked two beer terms on a 0.003 pH margin measured at the **high** `z̄`
+edge. D-211 moved a different parameter, measured the nominal only, and I told the owner the
+beat had unparked them — from an arm the parking was never set on. Re-run at the edge, the
+headroom was 0.0028 → **0.0082 pH**: tripled, still parked. A margin is a claim about a
+specific arm ([[feedback-a-margin-is-a-claim-about-what-holds-it-open]]); "my change improved
+the nominal" is not an answer to it. Also worth stating when a band **spans a verdict change** —
+D-211's new band scores 7 of 8 days at its low edge and 8 at its high, so a nominal-pinned test
+would not hold at the edge, and that reads as a contradiction later unless it is written down.
 
 **How to apply:** When adding or auditing a provenance parameter, treat `value`, `low` and
 `high` as three separately-sourced quantities. Before trusting that a band is guarded, run
