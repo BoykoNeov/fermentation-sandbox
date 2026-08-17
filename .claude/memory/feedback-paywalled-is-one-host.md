@@ -10,7 +10,7 @@ metadata:
 
 Never record a source as "unreadable" / "paywalled" / "source-blocked" on the
 evidence of one host returning 402/403. In this project that call has been wrong
-**five times**, each time on a paper that was openly available elsewhere:
+**six times**, each time on a source that was openly available elsewhere:
 
 - **D-123** — Ramey & Ough 1980: author-hosted scanned PDF at `rameywine.com`.
 - **D-135** — Franco-Luesma: institutional repository (`zaguan.unizar.es/record/56225`).
@@ -26,6 +26,12 @@ evidence of one host returning 402/403. In this project that call has been wrong
   `fullTextXML`** endpoint both serve the full tables, and transcribing from both
   independently is its own cross-check. This one was worse than a false block: the
   record had already *named* the table as the one unlock the beat needed.
+
+- **D-208** — a **STANDARDS COLLECTION**, not a paper: MEBAK Band II 2.14, priced at ~60 %
+  unreachable in the pre-registration. The publisher's own site serves the method page, and
+  its decarbonation sentence is what closed the beat; the equivalent Analytica-EBC 9.35 scope
+  line is public too. **A standard is published by a body with a website** — check it before
+  pricing a purchased collection as a paywall.
 
 **Why:** a false block is not a neutral gap — it silently redirects the work into
 guessing. D-101 recorded bottle reduction as source-blocked and *guessed* a

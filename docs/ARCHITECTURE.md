@@ -278,9 +278,17 @@ off `StateSchema.medium`:
   like wine's — which is the point, and also why it is the harder claim.
 
 The `Byp` pool is read as a succinic-equivalent acid (zero new carbon, so `total_carbon` is
-unchanged). Scalar `ph_of_state` / `titratable_acidity` are pure and live in core; the
-trajectory-series helpers need a `Trajectory` and therefore sit one layer up in
+unchanged). Scalar `ph_of_state` / `degassed_ph_of_state` / `titratable_acidity` are pure and live
+in core; the trajectory-series helpers need a `Trajectory` and therefore sit one layer up in
 `fermentation.analysis`.
+
+**Two pH frames, and which one a caller wants is not a detail (D-208).** `ph_of_state` is the pH
+*inside the vessel*, dissolved CO₂ included — the only frame a rate may read, and what every
+pH-reading Process does read. `degassed_ph_of_state` is the same balance with that term zeroed,
+which is the frame *published* beer/wine pH values are measured in (Analytica-EBC 9.35: "pH at
+20 °C of decarbonated beer"), and it exists for scoring against literature only. The gap is ~0.29
+pH on a day-7 beer and ~0.0007 on a wine. `titratable_acidity` already excluded the term for the
+same reason.
 
 **Anchoring runs in two places, and they are different functions.** `solve_cation_charge` anchors
 at the *compile seam* from scenario inputs, with `Byp` and dissolved CO₂ structurally 0 because

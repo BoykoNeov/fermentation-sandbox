@@ -17,19 +17,32 @@ beer's model previously could not lose. That is why this file's headline numbers
 **D-182 then adds dissolved CO₂** to the charge balance — the second of the two terms D-180
 named as omitted, pulling the opposite way — which is why they moved back UP.
 
-**BOTH of D-180's omitted terms are now built, and that changes what a shortfall means.**
-Against a measured drop of **0.81** pH — the mean of the extreme strains, which is what
-``measured_drop`` below computes; D-180's prose quotes the four-strain mean 0.8125 and the two
-must not be mixed — the model gives **77.8-97.3 %** at nominal across the sampled
-``pKa_peptide_buffer`` band, and **64.0-109.7 % over the joint band** of all TEN drawn
-quantities. The history of those two numbers is the whole story of this axis: 63-92 % and
-41-105 % at D-180 (with a corner reaching the measurement), 42.7-62.2 % and 7.6-82.2 % at
-D-181 (with nothing reaching), 77.6-97.0 % and 63.8-109.4 % at D-182 — because D-181 removed
-an error that was propping the agreement up and D-182 supplied the term that was genuinely
-missing — and now **D-183's +0.2 pp, which was pre-registered before a line of ``src/``
-changed**. That last move is deliberately too small to be a result: acetic's endpoint went from
-116.06 to 117.75 mg/L at 0.1233 pp of agreement per ppm, so a rate-law change that reshapes the
-whole acetic curve is **headline-neutral by construction** and must not be credited here.
+**THE PH COMPARISON RUNS IN THE DEGASSED FRAME SINCE D-208, AND IT HALVES.** Tyrell's pH is a
+*decarbonated* reading (their cited MEBAK II 2.14 is "pH (EBC)"; Analytica-EBC 9.35's scope line
+is "the determination of pH at 20 °C of DECARBONATED beer"), while ``ph_of_state`` reports the pH
+inside the vessel — worth 0.29 pH at day 7 and 0.50 at day 1. Against a measured drop of **0.81**
+pH — the mean of the extreme strains, which is what ``measured_drop`` below computes; D-180's
+prose quotes the four-strain mean 0.8125 and the two must not be mixed — the model gives
+**43.2-62.9 %** at nominal across the sampled ``pKa_peptide_buffer`` band and **8.3-82.7 % over
+the joint band** of all TEN drawn quantities, so **nothing in the band reaches the measurement**.
+The numbers this file quoted for four beats — **77.8-97.3 %** at nominal, **64.0-109.7 %** joint,
+with a corner reaching — are the IN-VESSEL quantity; they are still pinned, as a property of the
+model rather than as an agreement with anything published.
+
+The history of those in-vessel numbers is most of the story of this axis: 63-92 % and 41-105 % at
+D-180 (with a corner reaching), 42.7-62.2 % and 7.6-82.2 % at D-181 (with nothing reaching),
+77.6-97.0 % and 63.8-109.4 % at D-182 — because D-181 removed an error that was propping the
+agreement up and D-182 supplied the term that was genuinely missing — and then **D-183's +0.2 pp,
+which was pre-registered before a line of ``src/`` changed**. That last move is deliberately too
+small to be a result: acetic's endpoint went from 116.06 to 117.75 mg/L at 0.1233 pp of agreement
+per ppm, so a rate-law change that reshapes the whole acetic curve is **headline-neutral by
+construction** and must not be credited here.
+
+**D-208 is the rest of that story and it is not another move along the same line**: the D-182 rise
+was real chemistry scored in the wrong frame, and re-scoring it returns the degassed comparison to
+within ~0.7 pp of the pre-carbonic D-181 numbers — close, but not identical, because D-183's
+acetic rate law and the seeds moved in between. Nothing was un-built to get there: the term stays
+in ``ph_of_state``, where every pH-reading Process needs it.
 
 **D-183 also removes one of the two shape failures from the "unmodelled" list and hardens the
 other.** Acetic's producer moved from the sugar flux to **growth** (``AceticAcidOverflow``),
@@ -43,10 +56,13 @@ fermentative flux), the decline cannot discriminate first-order from constant-ra
 read tolerance, no floor is identifiable, and every law the data admits makes the endpoint a
 function of the solver horizon. Lactic's late rise is untouched.
 
-**This still is not validation.** The nominal falls short by 2.7-22.2 %; the corner that
-reaches is a corner of a 10-dimensional hypercube, not a draw anyone observed; and the spike
-above is a charge-balance non-term either way. No test here is named or phrased as validating
-the produced acids alone.
+**This still is not validation, and since D-208 it is a named failure rather than a shortfall.**
+In the measured frame the nominal falls short by 37-57 %, the day-7 pH is above the four-strain
+envelope for every retained-CO₂ fraction in [0, 1], and the acceptance claim is carried by a
+``strict=True`` xfail (``test_the_model_reaches_tyrells_measured_beer_ph``) so it cannot be closed
+silently — the D-188 idiom. The acetic spike and lactic's late rise remain unmodelled and are
+charge-balance non-terms either way. No test here is named or phrased as validating the produced
+acids alone.
 """
 
 import numpy as np
@@ -132,10 +148,11 @@ TYRELL_BEER_PH = (4.78, 4.90)
 #: ``measured_drop`` from 0.81 to 0.792 would shift the headline fraction ~2 %, and that is a
 #: decision for a beat that means to take it, not a side effect of transcribing a curve.
 #:
-#: **No assert reads this yet, deliberately** (D-207 §guard): a pin on the day-1 shape would
-#: encode the defect the record measures, so a correct fix would have to delete it. It ships as
-#: DATA so the next beat has its target, the way ``Y_acetic_sugar_beer`` is kept unread to keep
-#: a retirement falsifiable.
+#: **Only day 7 is read by an assert, and only inside an ``xfail``** (D-208). D-207 shipped the
+#: whole course as data no assert read, on the ground that a pin on the day-1 SHAPE would encode
+#: the defect it measured and a correct fix would have to delete it. That still holds for days
+#: 1-6. Day 7 is different: it is a LEVEL the model misses in every measurement frame, so an
+#: expected-fail assert on it names the gap instead of protecting it, and a fix turns it green.
 #: **Day 0's pair is DEGENERATE and is stored ``(low, high)`` like every other day.** The four
 #: strains share one wort, so their true span is zero; the extraction returned 5.652 and 5.651,
 #: i.e. zero to within the 0.0028 pH extraction precision. It is ordered here rather than left
@@ -611,13 +628,35 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     """THE FREE PREDICTION — over the JOINT band of every quantity the sampler actually draws.
 
     Nothing in ``beer_acids.yaml`` is fitted to pH, so comparing the modelled trajectory with
-    Tyrell's Fig. 4 is a genuine external test. Two scopes, and conflating them is the whole
-    trap this test exists to avoid:
+    Tyrell's Fig. 4 is a genuine external test.
 
-    * **at nominal, across ``pKa_peptide_buffer``'s band: 77.6-97.0 %** of the measured
-      0.81 pH drop (D-182; 42.7-62.2 % at D-181, 63-92 % at D-180). The model must still fall
-      SHORT here.
-    * **over the JOINT band — NINE drawn quantities, not one: 63.8-109.4 %.**
+    **THE COMPARISON RUNS IN THE DEGASSED FRAME SINCE D-208, AND THAT IS THE WHOLE HEADLINE.**
+    Tyrell cite *"MEBAK, Band II, 4th edition … 2.14 (pH)"*; MEBAK's pH method is *"pH (EBC)"*
+    and instructs that carbonated beverages be decarbonated before measurement, and
+    Analytica-EBC 9.35 states its scope as *"the determination of pH at 20 °C of DECARBONATED
+    beer using a pH meter"*. So the published number is a **decarbonated** reading, while
+    ``ph_of_state`` reports the pH **inside the vessel** — the two differ by 0.29 pH at day 7
+    and 0.50 at day 1 (D-207 §5). For four beats this test scored the in-vessel pH against the
+    decarbonated measurement, and the agreement it reported was the frame difference:
+
+    * **at nominal, across ``pKa_peptide_buffer``'s band, DEGASSED — the comparison with
+      Tyrell: 43.2-62.9 %** of the measured 0.81 pH drop.
+    * **the same members IN-VESSEL: 77.8-97.3 %** — pinned here as a property of the model, and
+      **not** a comparison with anything published. This is the number D-180 → D-183 quote
+      (63-92 % at D-180, 42.7-62.2 % at D-181, 77.6-97.0 % at D-182), so their history is a
+      history of the in-vessel quantity.
+    * **over the JOINT band — TEN drawn quantities, not one: 8.3-82.7 % degassed,
+      63.8-109.7 % in-vessel.** In the measured frame **nothing in the band reaches the
+      measurement**, which is where D-181 left this axis before the carbonic term was built.
+
+    The degassed frame is a **bound, not a point**: a real decarbonation leaves a residue, so the
+    honest object is the one-parameter family "sample retained fraction ``s`` of saturation",
+    whose ends are the two columns above. D-208 walked it and **no member reproduces the
+    measured course** — the ``s`` that fits day 1 (0.150) leaves day 7 at 5.17 against a measured
+    4.804-4.916, and the day-7 pH sits above the four-strain envelope for every ``s`` in [0, 1].
+    That is why the acceptance claim now lives in the ``xfail`` below rather than in a floor here.
+
+    Two scopes, and conflating them is the other trap this test exists to avoid:
 
     **The joint band has grown three times, and the middle one is the instructive one.**
     D-180's amendment added the four ``Y_*_sugar_beer`` after the first version asserted "the
@@ -631,22 +670,29 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     are drawn; all nine are varied here, and the corner COUNT is asserted so a future
     dimension cannot be added to the registry without being added here.
 
-    **What each dimension is worth, measured** (all-nominal fraction 0.8559, whole band each):
+    **What each dimension is worth, measured** — IN-VESSEL (all-nominal fraction 0.8559, whole
+    band each). In the degassed frame the last three are **algebraically inert**: the term they
+    parameterise is multiplied by zero, so the degassed joint band holds 3⁷ distinct values in
+    3¹⁰ corners. That is inertness by construction, not the measured kind
+    [[feedback-a-nominal-on-a-band-edge-is-not-inertness]], and the corner count is asserted in
+    both frames so a new dimension still has to be added here:
     the peptide pKa moves it 0.776-0.970; the yields and floors comparably; the three seeds
     ~0.015; ``pKa_oxalic_2``/``pKa_pyruvic`` **0.0003**; and of D-182's three, the carbonic
     pKa is worth ~0.01 and the two solubility parameters ~0.01 between them — the CO2 term's
     SIZE is consequential but its band is not, because both edges sit within 10 % of a
     nominal that is itself a printed in-beer measurement.
 
-    **A CORNER REACHES THE MEASUREMENT AGAIN, AND IT WAS PREDICTED IN ADVANCE.** D-180's did
-    (104.5 %), and that reach belonged to the falling acids' absence rather than to the model;
-    D-181 removed it and wrote that "a future change that makes one reach again is a signal to
-    find out which omitted term arrived"
-    [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. One has: dissolved CO2, the
-    last of the two terms D-180 named, built at D-182 and pre-registered at 76-104 % before a
-    line of it was written. **That does not make the model validated.** The nominal still
-    falls short by 3-22 %, the reaching member is a corner of a 9-D hypercube nobody was seen
-    to draw, and the acetic transient and lactic late rise (§9) remain unmodelled.
+    **A CORNER REACHES THE MEASUREMENT AGAIN — AND SINCE D-208 ONLY IN THE WRONG FRAME.** D-180
+    had one at 104.5 %, and that reach belonged to the falling acids' absence rather than to the
+    model; D-181 removed it and wrote that "a future change that makes one reach again is a
+    signal to find out which omitted term arrived"
+    [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]. One did: dissolved CO2, the last
+    of the two terms D-180 named, built at D-182 and pre-registered at 76-104 %. D-208 then
+    settled which frame the measurement lives in, and **every one of those reaching corners is
+    in-vessel**: in the degassed frame the joint high corner is 82.7 %, so nothing reaches. The
+    signal D-181 asked for was real but it pointed at a **comparison** defect, not at an
+    arrived term — the term is right where it is and the scoring was not
+    [[feedback-a-summary-statistic-is-not-the-curve]].
 
     **The arm RE-ANCHORS the cation per member, and getting that wrong is the other trap.**
     Re-reading the shipped trajectory's pH at a different pKa while holding the
@@ -701,7 +747,13 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         henry: str,
         vant_hoff: str,
         acetic_pick: str,
-    ) -> float:
+    ) -> tuple[float, float]:
+        """``(degassed, in_vessel)`` fraction of the measured drop for one band member.
+
+        Both frames come out of ONE member so they cannot drift apart: everything up to the
+        endpoint solve is shared and only the carbonic term differs, which also keeps the cost
+        of the second frame to one extra root-find per corner rather than a second sweep.
+        """
         # Every pKa this beat added is drawn too (PH_SYSTEM_READS is the union, D-179), so
         # pinning them here would be the same point-vs-band mistake one level further out.
         member = {
@@ -750,7 +802,10 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         sat = acidbase.co2_saturation_gpl(float(res.series("T")[-1]), member_params)
         evolved = float(res.series("CO2")[-1])
         carbonic_molar = min(evolved, sat) / acidbase.CARBONIC_AS_CO2.molar_mass
-        return (start - acidbase.solve_ph(end, cation, 0.0, carbonic_molar, member)) / measured_drop
+        in_vessel = acidbase.solve_ph(end, cation, 0.0, carbonic_molar, member)
+        # The frame Tyrell measured in (D-208): the same member with the sample decarbonated.
+        degassed = acidbase.solve_ph(end, cation, 0.0, 0.0, member)
+        return ((start - degassed) / measured_drop, (start - in_vessel) / measured_drop)
 
     pka_band = (
         beer_params["pKa_peptide_buffer"].uncertainty.low,
@@ -758,30 +813,45 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         beer_params["pKa_peptide_buffer"].uncertainty.high,
     )
 
-    # Scope 1 — everything nominal but the peptide pKa. The "must fall short" claim lives HERE.
+    # Scope 1 — everything nominal but the peptide pKa, in BOTH frames. The comparison with
+    # Tyrell is the degassed column; the in-vessel column is a property of the model and is
+    # pinned beside it so the two can never be silently re-conflated (D-208).
     at_nominal = [
         fraction(pka, "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom", "nom")
         for pka in pka_band
     ]
-    assert min(at_nominal) > 0.70, (
-        f"the predicted drop collapsed to {min(at_nominal):.0%} of Tyrell's measured one at "
-        "nominal yields; D-182 measured 77.6-97.0 % across the pKa band (D-181's 42.7-62.2 % "
-        "was the same model with no dissolved CO2 in its charge balance, and D-180's 63-92 % "
-        "was that model also unable to lose the falling acids' charge)"
+    degassed_nominal = [f[0] for f in at_nominal]
+    vessel_nominal = [f[1] for f in at_nominal]
+    # BOTH edges pinned, not just the one a floor would guard: swapping a band edge for its
+    # neighbour has passed a one-sided pin before [[feedback-pin-the-band-not-the-nominal]].
+    assert min(degassed_nominal) == pytest.approx(0.432, abs=0.005), (
+        f"the degassed prediction moved to {min(degassed_nominal):.1%} of Tyrell's measured "
+        "0.81 pH drop at nominal yields; D-208 measures 43.2-62.9 % across the pKa band. This "
+        "is the number that compares with a published beer pH, and it is NOT the 77.8-97.3 % "
+        "this test reported for four beats — that was the in-vessel pH scored against a "
+        "decarbonated measurement"
     )
-    assert max(at_nominal) < 1.0, (
-        f"at NOMINAL yields the predicted drop reached {max(at_nominal):.0%} of the measured "
-        "one. It is still supposed to fall short: BOTH of the terms D-180 named as omitted "
-        "have now been built (D-181's falling acids, D-182's dissolved CO2), so reaching "
-        "100 % here no longer has a pending omission to explain it — it would mean the model "
-        "gained acidification from somewhere unaccounted. What is still missing is named in "
-        "this module's header: acetic's transient and lactic's late rise, neither of which is "
-        "a charge-balance term."
+    assert max(degassed_nominal) == pytest.approx(0.629, abs=0.005), (
+        f"the degassed prediction's high edge moved to {max(degassed_nominal):.1%}; D-208 "
+        "measures 62.9 %. The shortfall this pin holds open is the subject of the xfail below"
+    )
+    assert min(vessel_nominal) == pytest.approx(0.778, abs=0.005), (
+        f"the IN-VESSEL fraction moved to {min(vessel_nominal):.1%}; D-183 measures 77.8 % "
+        "(D-182's 77.6 %, and D-181's 42.7 % was this same model with no dissolved CO2 in its "
+        "charge balance). Pinned as a model property: no published beer pH is measured in this "
+        "frame, so a change here is a change to the vessel's chemistry, not to an agreement"
+    )
+    assert max(vessel_nominal) == pytest.approx(0.973, abs=0.005), (
+        f"the IN-VESSEL fraction's high edge moved to {max(vessel_nominal):.1%}; D-183 measures "
+        "97.3 %. Still below 100 %: were it to exceed one, the model would be producing more "
+        "charge shift than Tyrell's beers did while ALSO carrying a term their measurement "
+        "excludes"
     )
 
-    # Scope 2 — the joint band the sampler can actually reach. NO upper bound is asserted
-    # here, because a corner legitimately exceeds the measured drop; what is pinned is the
-    # SPAN, so that a change which narrows or shifts it has to be looked at. D-181 adds the
+    # Scope 2 — the joint band the sampler can actually reach. No upper bound is asserted on the
+    # IN-VESSEL band, because a corner of it legitimately exceeds the measured drop; what is
+    # pinned there is the SPAN, so that a change which narrows or shifts it has to be looked at.
+    # The DEGASSED band does carry one, since in the measured frame nothing reaches. D-181 adds the
     # three FLOORS as a third band dimension: their edges are named strains' own day-7 values,
     # so leaving them at nominal here would repeat the point-vs-band mistake one level out —
     # which is exactly what D-180's amendment had to correct in this very test.
@@ -806,8 +876,29 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     # `Y_acetic_sugar_beer` in the drawn set, so the count of drawn quantities is unchanged; what
     # changed is that acetic's band no longer moves with the other three yields' `pick`.
     assert len(joint) == 3**10, "every drawn dimension must be varied, not a subset of them"
-    assert min(joint) == pytest.approx(0.640, abs=0.02), (
-        f"the joint low corner moved to {min(joint):.1%}; D-183 measures 64.0 % over TEN "
+    degassed_joint = [f[0] for f in joint]
+    vessel_joint = [f[1] for f in joint]
+    # The measured frame first, because it is the one that compares with Tyrell (D-208). Both
+    # edges pinned, and the high edge carries the claim D-181 owned before the carbonic term:
+    # NOTHING in the band reaches the measurement.
+    assert min(degassed_joint) == pytest.approx(0.083, abs=0.02), (
+        f"the degassed joint low corner moved to {min(degassed_joint):.1%}; D-208 measures "
+        "8.3 %, against 7.6 % for the pre-carbonic model at D-181 — which is the point: with "
+        "the term excluded from the COMPARISON, the band returns to nearly where D-181 left it"
+    )
+    assert max(degassed_joint) == pytest.approx(0.827, abs=0.02), (
+        f"the degassed joint high corner moved to {max(degassed_joint):.1%}; D-208 measures "
+        "82.7 % (D-181's pre-carbonic 82.2 %)"
+    )
+    assert max(degassed_joint) < 1.0, (
+        f"a corner of the joint band reached {max(degassed_joint):.1%} of the measured drop IN "
+        "THE FRAME TYRELL MEASURED. Nothing is supposed to reach here: the in-vessel band does "
+        "reach (109.7 %) and for four beats that reach was read as the model catching up with "
+        "the measurement. If this fires, an acidification term genuinely arrived and the xfail "
+        "below should be re-scored before anything else is concluded"
+    )
+    assert min(vessel_joint) == pytest.approx(0.640, abs=0.02), (
+        f"the joint low corner moved to {min(vessel_joint):.1%}; D-183 measures 64.0 % over TEN "
         "dimensions (D-182 measured 63.8 % over nine; D-181's was 7.6 %) — "
         "yields at their low edge, peptide pKa HIGH, floors at their LOW edge (the "
         "strains that clear the most wort acid) and the seeds HIGH. A LOW floor means MORE "
@@ -822,8 +913,8 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "from a 74.6-point span to a 45.6-point one — this term is a stabiliser of the "
         "prediction, not just an offset to it."
     )
-    assert max(joint) == pytest.approx(1.097, abs=0.02), (
-        f"the joint high corner moved to {max(joint):.1%}; D-183 measures 109.7 % over TEN "
+    assert max(vessel_joint) == pytest.approx(1.097, abs=0.02), (
+        f"the joint high corner moved to {max(vessel_joint):.1%}; D-183 measures 109.7 % over TEN "
         "dimensions (D-182 measured 109.4 % over nine; D-181's "
         "was 82.2 %) — yields high, peptide pKa low, floors high, seeds low, and the three "
         "CO2 parameters at the edges that dissolve the most and dissociate it hardest. NB "
@@ -832,8 +923,51 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "one at 104.5 %; D-181 removed it and wrote that a future change restoring it would "
         "signal that an omitted term had arrived. One has — dissolved CO2, D-180's own arm C, "
         "predicted at 76-104 % before D-182 was written. Reaching is therefore the EXPECTED "
-        "outcome here and not evidence the model is right: the nominal still falls short, and "
-        "no upper bound is asserted on this scope for the same reason it never was."
+        "outcome here and not evidence the model is right — and since D-208 it is not even "
+        "evidence about the measurement: this frame is the pH INSIDE the vessel, and the "
+        "published number is a decarbonated reading, where the same corner reaches 82.7 %."
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="D-208: in the frame Tyrell measured in — MEBAK II 2.14 is 'pH (EBC)' and EBC 9.35's "
+    "scope is 'the determination of pH at 20 degC of DECARBONATED beer' — the model reaches only "
+    "43.2-62.9 % of the measured 0.81 pH drop and finishes day 7 at 5.2474 against a four-strain "
+    "envelope of 4.804-4.916. NOT a frame artefact: the day-7 pH is above that envelope for "
+    "EVERY retained-CO2 fraction in [0, 1] (4.9608 even fully carbonated), and the shipped "
+    "in-vessel agreement needed the sample to have retained 65 % of saturation to clear its own "
+    "0.70 floor. The missing acidification is ~0.4 pH and its source is unidentified",
+)
+def test_the_model_reaches_tyrells_measured_beer_ph():
+    """THE ACCEPTANCE CLAIM, and it fails — pinned as ``xfail`` the way D-188 pins Herzan's.
+
+    D-207 read Fig. 4's pH panel as a course and found the shape wrong while the endpoint metric
+    passed; D-208 then settled the frame, and the endpoint metric does not pass either. What is
+    left is a single honest statement: **the model reproduces about half of beer's measured
+    acidification**, and nothing in the parameter bands or in the CO₂ residue closes that.
+
+    Asserted on the day-7 LEVEL rather than on the day-1 shape on purpose. D-207 §7 argued that a
+    pin on the day-1 overshoot would encode the defect it measured and a correct fix would have to
+    delete it; this one is the opposite — a fix flips it green, which is what ``strict=True`` is
+    for. It is also the one claim that survives the frame question: both independent reads of the
+    panel (this pixel read 4.804-4.916, D-180's eye read 4.78-4.90) put the model above them.
+
+    ``TYRELL_PH_COURSE`` was shipped at D-207 as data no assert read. This is the assert that
+    reads it, and it reads day 7 ONLY.
+    """
+    compiled, res = _run(dict(TYRELL_SCENARIO))
+    params = compiled.parameters.resolve()
+    states = np.asarray(res.y, dtype=float)
+    t_h = np.asarray(res.t, dtype=float)
+    # Day 7 lands between solver steps, so interpolate the state slot-wise rather than taking
+    # the nearest sample: the pH is read off a state, not off a series of pHs.
+    y = np.array([np.interp(7 * 24.0, t_h, states[i, :]) for i in range(states.shape[0])])
+    modelled = acidbase.degassed_ph_of_state(y, compiled.schema, params)
+    lo, hi = TYRELL_PH_COURSE[7]
+    assert lo - TYRELL_PH_READ_TOL <= modelled <= hi + TYRELL_PH_READ_TOL, (
+        f"modelled degassed day-7 pH {modelled:.4f} is outside Tyrell's four-strain envelope "
+        f"{lo:.3f}-{hi:.3f} widened by the {TYRELL_PH_READ_TOL} pH read tolerance"
     )
 
 

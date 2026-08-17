@@ -854,6 +854,37 @@ def ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float])
     )
 
 
+def degassed_ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """pH this state would read **on a decarbonated sample** — the measurement frame (D-208).
+
+    Identical to :func:`ph_of_state` with the dissolved-CO₂ term set to zero, and it exists
+    because a published beer pH is not the pH inside the vessel. The standard methods say so in
+    their own scope lines: MEBAK's pH method is *"pH (EBC)"* and instructs that *"Karbonisierte
+    Getränke sind vor der Messung zu entkohlensäuern"*, and Analytica-EBC 9.35 is *"the
+    determination of pH at 20 °C of **decarbonated** beer using a pH meter"*. Comparing a
+    modelled in-vessel pH with such a reading mixes frames, and the mixing is worth ~0.29 pH on
+    a day-7 beer — 0.5 pH at day 1 (D-207 §5, D-208 §3).
+
+    **This is a comparison frame, never a rate frame.** Every Process that reads pH — ester
+    hydrolysis, acetaldehyde reduction, phenolic browning, the Strecker limbs — must keep
+    reading :func:`ph_of_state`, because a reaction inside a fermenting vessel sees the carbonic
+    acid that is actually dissolved in it. Use this function only where a modelled pH is scored
+    against a *published* one, exactly as :func:`titratable_acidity` already excludes the same
+    term because a titration is run on a degassed sample.
+
+    A real decarbonation leaves a residue, so this is the **bound** of a one-parameter family
+    (retained fraction ``s`` ∈ [0, 1]) whose other end is :func:`ph_of_state`, not a point
+    estimate. D-208 walks that family: no member of it reproduces Tyrell's measured course.
+    """
+    return solve_ph(
+        _totals_molar(y, schema),
+        _cation(y, schema),
+        _byp_succinic_molar(y, schema),
+        0.0,
+        build_pka_map(params),
+    )
+
+
 def cation_charge_for_ph(
     y: FloatArray, schema: StateSchema, params: Mapping[str, float], target_ph: float
 ) -> float:

@@ -30,13 +30,13 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-207**; sensory 1a/1b + **D-139's
-leftovers ALL closed** (D-148/D-149). Suite **1765 + 3 xfail**. **"Blocked on external sourcing" wrong 3× (D-191/196/199)**.
+M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-208**; sensory 1a/1b + **D-139's
+leftovers ALL closed** (D-148/D-149). Suite **1765 + 4 xfail**. **"Blocked on external sourcing" wrong 4× (D-191/196/199/208)**.
 **D-202 ascorbate COMPLETED Fig 24.12's top group; D-203/205/206 REFUSED the sotolon ascorbate route, Pham's pH+ethanol
-terms and the Strecker split — "expressible" was never "identifiable"; D-204 shipped the pin it owed.**
-**Slot/Process/oxidative-set counts live in `docs/ARCHITECTURE.md` — do NOT restate them here: that is what rotted it (D-184).**
-**Beer acid-base = SIX beats (D-178→D-183), all BUILT; `ACID_STATE` is NO LONGER medium-agnostic** (D-179).
-**Beer's pH is a PREDICTION validated on ONE endpoint number — D-207 read the curve: 8.1× out on day 1. Next beat is the owner's call.**
+terms and the Strecker split — "expressible" was never "identifiable"; D-204 shipped the pin it owed. Slot/Process/
+oxidative-set counts live in `docs/ARCHITECTURE.md` — never restate them here, that is what rotted it (D-184). Beer
+acid-base = SIX beats (D-178→D-183), all BUILT; `ACID_STATE` is NO LONGER medium-agnostic (D-179). Beer's pH
+validation HALVED at D-208 — the published number is DECARBONATED, model reaches 43-63 %, ~0.4 pH MISSING, no source.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -176,10 +176,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the shipped 0.15) and its "queued as its own beat" clause is **deleted**. Also: a **reused**
   `CompiledScenario` inherits the previous run's enables (**+10.3 %**) — a CONTRACT, "fixing" it
   fails 26 tests. → `.claude/memory/prohibitions/strecker-methional-split.md`
-- **Beer acid-base — six beats + the pH CURVE (D-178 → D-183, D-207)** — beat COMPLETE, beer's pH is a
-  **PREDICTION**; malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2` slot is NEVER
-  dissolved; acetic's producer is growth-linked and the spike is NOT modelled. **D-207: never call the
-  pH test a TRAJECTORY test — day 1 is 8.1× out, 85 % of it D-182's CO₂ term; degassing is a FORK.**
+- **Beer acid-base — six beats, the pH CURVE, the FRAME (D-178 → D-183, D-207, D-208)** — beat COMPLETE,
+  beer's pH is a **PREDICTION**; malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2`
+  slot is NEVER dissolved; acetic's producer is growth-linked and the spike is NOT modelled. **Never call
+  the pH test a TRAJECTORY test** (D-207). **D-208 CLOSED the degassing fork on EBC 9.35's scope line:
+  a published pH is DECARBONATED, so never score `ph_of_state` against one — `degassed_ph_of_state` is
+  comparison-ONLY. Agreement 43-63 %, nothing reaches, ~0.4 pH MISSING; D-207's day-1 sign is REVERSED.**
   → `.claude/memory/prohibitions/beer-acid-base.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)

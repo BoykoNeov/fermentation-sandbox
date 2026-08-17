@@ -14,16 +14,27 @@ path. Read it when working on this subject. Every bullet is *what it forbids* + 
 to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue
 past it from this file.** **Never evict an old prohibition to buy a line.**
 
-**Beer pH is validated on ONE NUMBER and the CURVE is now read (D-207). Test-only; nothing moved.**
+**The FRAME is CLOSED and beer's pH validation HALVES (D-208). The term stays; the comparison moved.**
+- **Tyrell's pH is a DECARBONATED reading** — MEBAK II 2.14 is *"pH (EBC)"*, EBC 9.35's scope is
+  *"pH at 20 °C of DECARBONATED beer"*. **Never score `ph_of_state` against a published pH**: use
+  `degassed_ph_of_state` (comparison ONLY — every pH-reading Process needs the in-vessel one).
+  Headline **43.2-62.9 %** nominal, **8.3-82.7 %** joint, **0 corners reach**. D-182's rise was
+  ~35 pp of FRAME, and the shipped `>0.70` floor needed the sample to keep **65 %** of saturation.
+- **The frame is a BOUND, so walk `s` ∈ [0,1]**: days 4-7 unreachable at EVERY `s`, and the `s`
+  fitting day 1 (0.150) leaves day 7 at 5.17. **Never re-anchor the floor to 43.2 %** — that pins
+  `s`=0; the claim is an `xfail(strict)` on the day-7 LEVEL. **~0.4 pH of acidification is MISSING.**
+
+**Beer pH was validated on ONE NUMBER and the CURVE read (D-207). Test-only; nothing moved.**
 - **Never call the pH-drop test a TRAJECTORY test** — it scores ONE endpoint fraction (87.1 %, inside
   its own 77.6-97.0) while day 1 is **0.195 pH too acidic, 8.1× the read tolerance**. Model is BELOW
   the band early, ABOVE it days 4-7 (~2×, these do NOT carry it): it **overshoots then stalls**.
   **85.1 % of the day-1 drop is D-182's CO₂ term**, saturating by day 1 then flat 13 d — its docstring
   said "within hours"; unexamined ≠ hidden. Uptake confound RULED OUT (14.1 % vs measured 15 %).
-- **DEGASSING IS A FORK, NOT A CAVEAT** — frames give OPPOSITE diagnoses (CO₂-free falls too SLOW *and*
-  reaches 51 %). **MEBAK 2.14 = ZERO corpus hits, no printed pH literal** ⇒ unclosable here; day 7 is
-  ABOVE the strain envelope either way. `TYRELL_PH_COURSE` ships as **data NO assert reads** — a day-1
-  pin encodes the defect. **Nothing in the suite pins any pH SHAPE** (88 refs, 11 asserts, 2 walks).
+- **Its day-1 SIGN is CORRECTED by D-208** — the fork it called unclosable closed CO₂-FREE, so day 1
+  is 7.8× out the OTHER way (not acidic enough) and §5's CO₂ attribution is off-frame. **MEBAK = ZERO
+  corpus hits was the wrong search, not a block** — the standard publishes its own scope line. Day 7
+  is ABOVE the envelope either way. Days 1-6 stay **data no assert reads** (a shape pin encodes the
+  defect); **nothing in the suite pins any pH SHAPE** (88 refs, 11 asserts, 2 walks).
 
 **Beer acid-base, part 6 — acetic's RATE LAW (D-183). The SPIKE is still NOT modelled.**
 - **NEVER re-propose the keto-acid excretion/re-assimilation pair for acetic** (D-180 §9's own
