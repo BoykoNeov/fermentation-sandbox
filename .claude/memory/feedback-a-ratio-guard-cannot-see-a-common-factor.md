@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: c5f901db-8b1f-4b2e-a63e-b0739efff44d
-  modified: 2026-08-12T13:56:37.328Z
+  modified: 2026-08-17T11:10:16.576Z
 ---
 
 D-196 shipped `test_the_fenton_limb_draws_one_o2_per_acetaldehyde`, asserting `n_o2 ==
@@ -24,6 +24,17 @@ have caught what a 1e-12 ratio check could not.
 that no candidate mechanism has that shape. If a term can multiply both sides, assert one side
 against its **own inputs** instead — D-198's replacement pins the acetaldehyde flux to
 `share × activation`, which only holds while the limb is a pure consumer of the node.
+
+**A SUM guard has the same blind spot as a ratio guard, and D-209 walked into it.** That beat split
+one back-solved constant into two terms (`cation_charge` slot + the nitrogen pool's charge) and
+guarded the split with the obvious round trip: write the state, read the pH back, assert it equals
+the anchor's target. It passed — in both media, to 1e-9 — on a scenario whose slot was
+**negative**, i.e. physically meaningless, because the two terms still *summed* to the correct
+total. Every anchoring check the beat wrote was invariant under exactly the error it was there to
+catch, so the defect was found in review and not by the suite. **A round trip through a sum cannot
+see an error in how that sum is SPLIT** — assert each part against its own admissible range
+(here: the slot must be ≥ 0, which the function being split already enforced before the split
+existed and which the split then escaped).
 
 **And check what a RED names, not that it is red.** The uncapped route-1 arm was red on both
 existing guards, which looked like coverage. It was the **fixture crashing** on the series' pole
