@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: dcd1ccd2-410e-4bfa-9d67-bd5e911c9dec
-  modified: 2026-08-17T14:47:10.694Z
+  modified: 2026-08-17T14:58:10.650Z
 ---
 
 **Live prohibitions — beer's growth RATE and uptake TIMING (D-211).** Detail split out of
@@ -61,6 +61,13 @@ same-sign term. **Never answer this from the nominal.** What DID change is the s
 sits **0.034 pH ABOVE** its ceiling at that same edge, where it sat 0.48 below. So beer's pH
 wants **acidification early and none late** — a term with a **time profile**, not a constant.
 That is the brief for the next beer-pH beat.
+
+**Three prose numbers were conditioned on the old rate and are now fixed — do not "re-correct".**
+**`q_sugar_max`'s high edge 1.5 is STILL RIGHT**: its `15.3 * 0.098` uses **Zamudio's** growth
+rate for **their** peak, not this file's. `15.3 * 0.034 = 0.52` lands on the nominal 0.5 and is a
+**trap**, not a discovery — and `q_sugar_max` is **banded and drawn**, so it is a live sampling
+surface. Its "1.5 attenuates a 1.048 wort in ~2 d" is **re-measured at 2.58 d** (D-15 unchanged).
+`test_beer_temperature_response.py`'s 10 °C midpoint is **7.46 d / 3.55×**, was 6.2 d / 2.9×.
 
 **D-183 is FLAGGED, not corrected.** Its growth-linked acetic producer still beats the retired
 flux-linked one (RMSE 40.7 vs 65.3), but the margin moved 0.528 → **0.624** because it had been
