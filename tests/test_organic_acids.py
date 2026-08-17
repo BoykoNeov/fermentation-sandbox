@@ -136,8 +136,13 @@ TYRELL_BEER_PH = (4.78, 4.90)
 #: encode the defect the record measures, so a correct fix would have to delete it. It ships as
 #: DATA so the next beat has its target, the way ``Y_acetic_sugar_beer`` is kept unread to keep
 #: a retirement falsifiable.
+#: **Day 0's pair is DEGENERATE and is stored ``(low, high)`` like every other day.** The four
+#: strains share one wort, so their true span is zero; the extraction returned 5.652 and 5.651,
+#: i.e. zero to within the 0.0028 pH extraction precision. It is ordered here rather than left
+#: as the raw ``(5.652, 5.651)`` the probe printed, so that ``lo <= x <= hi`` cannot fail on day
+#: 0 for a correct value — the span is noise, not a band.
 TYRELL_PH_COURSE = {
-    0: (5.652, 5.651),
+    0: (5.651, 5.652),
     1: (5.258, 5.377),
     2: (4.871, 5.063),
     3: (4.804, 5.036),
