@@ -189,8 +189,11 @@ TYRELL_SUGAR_GPL = 82.2388545
 #:
 #: **Anchored at BOTH ends against numbers recorded in earlier beats**, which is what makes the
 #: transcription checkable rather than merely careful (the argument D-183 used for Fig 13):
-#: lactic day 0 reads 47.75 against a recorded seed of 48 and its day-7 strain span 88-143 against
-#: a recorded 87-142, with strain 15 at +40 and strain 6 at +95 against ``Y_lactic_sugar_beer``'s
+#: lactic day 0 reads 47.75 against a recorded seed of 48 — the 0.25 is strain 7 reading 47 where
+#: the other three read 48, i.e. a per-strain read on one wort, NOT a disagreement with the seed;
+#: do not "correct" it to 48.0, that would be editing a transcription. Its day-7 span reads 88-143
+#: against a recorded 87-142, with strain 15 at +40 and strain 6 at +95 against
+#: ``Y_lactic_sugar_beer``'s
 #: recorded band edges of +39 and +94; malic reads 78 / 81-116 against a recorded 78 / 81-116,
 #: with strain 15 at +3 ("produces essentially none") and strain 31 at 1.57× the mean ("half as
 #: much again"); succinic reads 15 / 32-76 against a recorded 15 / 32-76.
@@ -544,6 +547,12 @@ def test_the_model_ferments_tyrells_wort_on_tyrells_schedule():
     acid courses move without any rate law changing; fix the acid rate laws while this stands and
     they will be fitted to compensate for it [[feedback-a-margin-can-be-borrowed-from-a-defect]].
 
+    **SCOPE: this is measured on ONE scenario** — Tyrell's wort, 15 °C, YAN 200, pitch 1.0 g/L. It
+    is a statement about how this engine ferments *that* wort, NOT an established property of beer's
+    kinetics in general; nothing here separates a scenario artefact (their EBC-tube trial, their
+    pitch rate) from a general rate defect. D-211 measured total attenuation at 6.08 d inside §2.2's
+    5-7 d window, which is consistent with either. Do not generalise this without measuring it.
+
     **What it does NOT claim.** It does not say the day-1 pH miss is caused by this. D-215 probed
     that directly and could not attribute it: re-scoring the pH matched on extent rather than on
     the calendar OVERSHOOTS, moving day 1 from 0.070 too alkaline to 0.063 too acidic. Both a
@@ -597,12 +606,23 @@ def test_the_three_flux_linked_acid_courses_are_mistimed():
     """
     _, res = _run(dict(TYRELL_SCENARIO), days=7.0)
     tol = 3.0 * TYRELL_ACID_COURSE_READ_TOL
+    got = {slot: _daily_ppm(res, slot) for slot in TYRELL_ACID_COURSE_PPM}
+
+    # DAY 2 FIRST, and across all three — because day 2 is where the opposing-sign finding
+    # lives and this test is what carries it. Iterating acid-by-acid instead would die on
+    # lactic's day 4 (a real but different miss) and the RED would never name the claim the
+    # record leads with [[feedback-grep-finds-claims-not-guards]].
     for slot, course in TYRELL_ACID_COURSE_PPM.items():
-        got = _daily_ppm(res, slot)
+        assert got[slot][2] == pytest.approx(course[2], abs=tol), (
+            f"{slot} day 2: model {got[slot][2]:.1f} vs Tyrell's measured {course[2]:.1f} mg/L. "
+            "Day 2 is where the three errors have OPPOSING signs — succinic late, malic early, "
+            f"lactic nearly right (tolerance ±{tol:.0f}, i.e. 3× the figure read tolerance)"
+        )
+    for slot, course in TYRELL_ACID_COURSE_PPM.items():
         for day, measured in course.items():
-            assert got[day] == pytest.approx(measured, abs=tol), (
-                f"{slot} day {day}: model {got[day]:.1f} vs Tyrell's measured {measured:.1f} "
-                f"mg/L (tolerance ±{tol:.0f}, i.e. 3× the figure read tolerance)"
+            assert got[slot][day] == pytest.approx(measured, abs=tol), (
+                f"{slot} day {day}: model {got[slot][day]:.1f} vs Tyrell's measured "
+                f"{measured:.1f} mg/L (tolerance ±{tol:.0f}, i.e. 3× the read tolerance)"
             )
 
 
