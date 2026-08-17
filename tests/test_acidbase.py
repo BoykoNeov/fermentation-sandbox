@@ -864,3 +864,72 @@ def test_a_nitrogen_free_state_is_bitwise_the_pre_d209_balance(params):
     assert acidbase.ph_of_state(y, schema, params) == pytest.approx(3.4, abs=1e-9), (
         "with no nitrogen the balance is the pre-D-209 one, so the un-subtracted anchor is right"
     )
+
+
+def test_a_high_nitrogen_low_acid_must_refuses_rather_than_shipping_a_negative_cation():
+    """D-209's subtraction escapes ``solve_cation_charge``'s own negativity check — so it guards.
+
+    That function raises when the cation a target pH demands is negative, because a negative
+    strong-cation charge is not something this model represents. D-209 subtracts the nitrogen
+    pool's share *afterwards*, which can push a positive demanded total to a negative remainder
+    with nothing looking.
+
+    **This shipped before the guard, and it shipped SELF-CONCEALINGLY**, which is why the test
+    names the scenario rather than the arithmetic: the anchor round trip still reproduced pH 2.9
+    exactly, because slot and nitrogen sum to the positive total, so every check D-209 wrote about
+    anchoring passed on a state whose cation slot was -0.0037 mol/L. The failure would only have
+    surfaced later, once the yeast took the nitrogen up and left the balance with a net strong
+    ANION charge no scenario declared.
+    """
+    hostile = {
+        "brix": 22.0, "yan_mgl": 400.0, "pitch_gpl": 0.25,
+        "tartaric_gpl": 2.0, "malic_gpl": 0.5, "initial_ph": 2.9,
+    }
+    with pytest.raises(ValueError, match="assimilable nitrogen already supplies"):
+        compile_scenario(
+            Scenario(
+                name="d209-hostile", medium="wine", initial=hostile,
+                temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+                duration_days=1.0,
+            )
+        )
+
+    # The neighbouring scenario must still COMPILE: a guard that refused ordinary high-YAN musts
+    # would be a regression dressed as safety. Same nitrogen, more acid, and the slot is positive.
+    compiled = compile_scenario(
+        Scenario(
+            name="d209-ok", medium="wine",
+            initial={**hostile, "tartaric_gpl": 3.0, "initial_ph": 3.0},
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+            duration_days=1.0,
+        )
+    )
+    y0 = np.asarray(compiled.y0, dtype=float)
+    assert float(y0[compiled.schema.slice("cation_charge")][0]) > 0.0
+
+
+def test_the_nitrogen_charge_moves_wine_molecular_so2_not_its_free_pool(params):
+    """The downstream reach worth knowing about: SPECIATION moves, the pool does not.
+
+    Molecular SO₂ — the antimicrobially active fraction, and the quantity a winemaking threshold
+    is stated against — is steeply pH-dependent near wine pH. D-209 drops an anchored wine's
+    finished pH by ~0.097, which raises molecular SO₂ by about a quarter while leaving free SO₂
+    essentially where it was. Asserted on hand-built states at the two pH values rather than
+    through two runs, so the test measures the speciation response and not a trajectory.
+    """
+    ph_before, ph_after = 3.338, 3.241  # measured end-of-ferment, term off vs shipped
+    pkas = (params["pKa_sulfurous_1"], params["pKa_sulfurous_2"])
+    frac_before = acidbase.molecular_so2_fraction(ph_before, pkas)
+    frac_after = acidbase.molecular_so2_fraction(ph_after, pkas)
+    assert frac_after / frac_before == pytest.approx(1.25, abs=0.03), (
+        f"a {ph_before - ph_after:.3f} pH fall raises the molecular SO2 fraction by "
+        f"{frac_after / frac_before:.3f}x; D-209 measures ~1.25x (0.228 -> 0.284 mg/L on the "
+        "anchored wine). This is why the record prices D-209's wine cost in SO2 as well as pH"
+    )
+    # The bisulfite fraction — which is most of the free pool — barely moves, which is the point:
+    # nothing was added to or taken from the SO2 pool, only its distribution over pH changed.
+    bi_before = acidbase.bisulfite_fraction(10.0 ** (-ph_before), pkas)
+    bi_after = acidbase.bisulfite_fraction(10.0 ** (-ph_after), pkas)
+    assert abs(bi_after / bi_before - 1.0) < 0.01, (
+        "the bisulfite fraction must be near-unchanged — D-209 moves speciation, not the pool"
+    )

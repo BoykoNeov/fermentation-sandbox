@@ -789,7 +789,7 @@ def _wine_initial(
             # D-209). Subtract that share, or the slot would double-count it and the must would
             # not read back at ``initial_ph``. Must nitrogen is arginine-dominated, hence a
             # wine-specific z-bar rather than beer's.
-            initial["cation_charge"] = acidbase.solve_cation_charge(
+            total_cation = acidbase.solve_cation_charge(
                 totals_molar,
                 byp_succinic_molar=0.0,
                 # Dissolved CO2 is 0 at the anchor and that is STRUCTURAL, not a shortcut
@@ -800,8 +800,14 @@ def _wine_initial(
                 carbonic_molar=0.0,
                 pka_map=acidbase.build_pka_map(parameters.resolve()),
                 target_ph=float(values["initial_ph"]),
-            ) - acidbase.nitrogen_charge_from_gpl(
-                mgl_to_gpl(_require(values, "yan_mgl", "wine")), "wine", parameters.resolve()
+            )
+            initial["cation_charge"] = acidbase.cation_slot_after_nitrogen(
+                total_cation,
+                acidbase.nitrogen_charge_from_gpl(
+                    mgl_to_gpl(_require(values, "yan_mgl", "wine")), "wine", parameters.resolve()
+                ),
+                float(values["initial_ph"]),
+                "wine",
             )
         except ValueError as exc:  # initial_ph below the acid load's intrinsic pH
             raise ValueError(f"wine scenario.initial['initial_ph'] is unphysical: {exc}") from exc
@@ -896,7 +902,7 @@ def _beer_cation(
         # subtracted off the fitted slot (decision D-209) — the same correction wine's anchor
         # makes, with wort's own z-bar. Wort's amino-acid halves nearly cancel, so this is
         # essentially the wort ammonium; the term is what lets beer's pH FALL as YAN is taken up.
-        return acidbase.solve_cation_charge(
+        total = acidbase.solve_cation_charge(
             totals_molar,
             byp_succinic_molar=0.0,
             # 0 for the same structural reason as wine's anchor above (decision D-182): a
@@ -905,8 +911,14 @@ def _beer_cation(
             carbonic_molar=0.0,
             pka_map=acidbase.build_pka_map(parameters.resolve()),
             target_ph=float(values["initial_ph"]),
-        ) - acidbase.nitrogen_charge_from_gpl(
-            mgl_to_gpl(_require(values, "yan_mgl", "beer")), "beer", parameters.resolve()
+        )
+        return acidbase.cation_slot_after_nitrogen(
+            total,
+            acidbase.nitrogen_charge_from_gpl(
+                mgl_to_gpl(_require(values, "yan_mgl", "beer")), "beer", parameters.resolve()
+            ),
+            float(values["initial_ph"]),
+            "beer",
         )
     except ValueError as exc:  # initial_ph below the acid load's intrinsic pH
         raise ValueError(f"beer scenario.initial['initial_ph'] is unphysical: {exc}") from exc

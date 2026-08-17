@@ -885,6 +885,40 @@ def nitrogen_charge_molar(
     )
 
 
+def cation_slot_after_nitrogen(
+    total_cation: float, nitrogen_charge: float, target_ph: float, medium: str
+) -> float:
+    """``total_cation - nitrogen_charge``, refusing a negative remainder (decision D-209).
+
+    The guard exists because D-209's subtraction runs *after*
+    :func:`solve_cation_charge`'s own negativity check and therefore escapes it. That function
+    raises when the cation a target pH demands is negative, since a negative strong-cation charge
+    is not something this model represents; subtracting the nitrogen pool's share afterwards can
+    push a *positive* demanded total to a negative remainder with nothing looking.
+
+    **Measured, not hypothesised.** A wine at ``yan_mgl`` 400, ``tartaric_gpl`` 2.0 and
+    ``initial_ph`` 2.9 demanded 0.00554 mol⁺/L in total while its nitrogen supplied 0.00927, so
+    the slot shipped at **-0.00373**. Worse, it shipped *silently and self-concealingly*: the
+    anchor round trip still reproduced pH 2.9 exactly, because the two terms sum to the positive
+    total, so every check D-209 wrote about anchoring passed on a state whose cation slot was
+    meaningless. The failure only appears later, when the yeast takes the nitrogen up and the
+    balance is left with a net strong-ANION charge the scenario never declared.
+
+    Raises ``ValueError`` naming nitrogen, because the remedy is a scenario change the caller can
+    act on (less YAN, more acid, or a higher ``initial_ph``) and it is not the one
+    :func:`solve_cation_charge`'s own message would suggest.
+    """
+    slot = total_cation - nitrogen_charge
+    if slot < 0.0:
+        raise ValueError(
+            f"initial_ph={target_ph} needs {total_cation:.4e} mol+/L of cation charge, but this "
+            f"{medium}'s assimilable nitrogen already supplies {nitrogen_charge:.4e} (decision "
+            f"D-209) — leaving a negative strong-cation charge of {slot:.4e} mol/L. Reduce "
+            "yan_mgl, add acid, or raise initial_ph."
+        )
+    return float(slot)
+
+
 def nitrogen_charge_from_gpl(
     nitrogen_gpl: float, medium: str, params: Mapping[str, float]
 ) -> float:
@@ -1059,7 +1093,9 @@ def cation_charge_for_ph(
         build_pka_map(params),
         target_ph,
     )
-    return total - nitrogen_charge_molar(y, schema, params)
+    return cation_slot_after_nitrogen(
+        total, nitrogen_charge_molar(y, schema, params), target_ph, schema.medium
+    )
 
 
 def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
@@ -1093,6 +1129,20 @@ def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, 
     sample's starting pH is the CO₂-free pH, so solving with carbonic and then dropping it
     from the sum would be titrating a sample nobody degassed. This paragraph exists because
     the asymmetry is precisely the kind of thing a later reader "fixes".
+
+    **THE NITROGEN CHARGE IS THE OPPOSITE ASYMMETRY, AND IT IS ALSO DELIBERATE** (decision
+    D-209). It goes into the pH solve above — through ``_cation``, which is why that call
+    passes ``params`` — but NOT into the equivalents sum. The two are coherent for a different
+    reason than carbonic's. What D-209 did at t=0 was a **re-allocation**: ``cation_charge`` was
+    back-solved from ``initial_ph`` and already contained the nitrogen pool's charge as a frozen
+    constant, so ``slot + nitrogen`` equals the old slot exactly and a must's t=0 TA is
+    **bitwise** what it was before D-209. Passing the term to the solve is therefore not adding
+    anything to a titration; it is keeping the starting pH the one this state actually has as the
+    pool drains. Leaving it out of the sum is the honest half: the term is a **net charge per mole
+    of nitrogen**, not a count of titratable protons, and nothing here speciates the pool
+    per-molecule, so there is no basis for the equivalents an amino-acid mixture would contribute
+    between the sample's pH and 8.2. Adding a guessed one would move the *must* TA — the only
+    value this function calls fidelity-grade.
     """
     pka_map = build_pka_map(params)
     totals = _totals_molar(y, schema)

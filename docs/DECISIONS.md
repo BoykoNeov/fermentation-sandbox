@@ -29503,6 +29503,47 @@ and because *The Chemistry of Beer*'s *"the pH falls as nitrogenous materials ar
 **buffer-removal** claim, a different mechanism with the same observable. A closure crediting all of
 beer's measured acidification to this term alone would be over-claiming.
 
+### 8b. The guard the subtraction needed, found in review and NOT by the suite
+
+`solve_cation_charge` raises when the cation a target pH demands is negative, because a negative
+strong-cation charge is not something this model represents. D-209's subtraction runs **after** that
+check and therefore escapes it. Measured on the corner that reaches it: a wine at `yan_mgl` 400,
+`tartaric_gpl` 2.0 and `initial_ph` 2.9 demands 0.00554 mol⁺/L in total while its nitrogen supplies
+**0.00927**, so the slot shipped at **-0.00373**.
+
+**It shipped silently and self-concealingly, which is the part worth recording.** The anchor round
+trip still reproduced pH 2.9 exactly — slot and nitrogen sum to the positive total — so every check
+§5 describes passed on a state whose cation slot was meaningless. The defect would have surfaced
+only once the yeast took the nitrogen up and left the balance with a net strong-anion charge no
+scenario declared. A round trip through a sum cannot see an error in how that sum is *split*.
+
+`cation_slot_after_nitrogen` now guards all three sites and names nitrogen in the message, since the
+remedy (less YAN, more acid, a higher `initial_ph`) is not the one `solve_cation_charge`'s own
+message would suggest. The neighbouring scenario — same nitrogen, `tartaric_gpl` 3.0, pH 3.0 — still
+compiles at a positive 0.00095, and a test pins both halves: a guard that refused ordinary high-YAN
+musts would be a regression dressed as safety.
+
+### 8c. Two scope lines this term owes, stated and not built
+
+**`z̄` is a must/wort composition average and does NOT apply to DOSED nitrogen.** `add_dap` doses
+diammonium phosphate, in which every nitrogen arrives as NH₄⁺, so the correct `z̄` for the dosed
+increment is exactly **+1.0** — about 3× the wine average. The `N` slot is one lumped pool with no
+way to tell supplement from must nitrogen, so a DAP-dosed wine's acidification is **understated**,
+by ~3× on the dosed fraction. Splitting the pool is a state-vector change; it is recorded here and
+in the parameter's `notes` so a later beat finds it stated rather than discovering it as a defect.
+Separately, DAP's **phosphate counter-anion is not in the balance at all** — D-178 measured malt
+phosphate as a near no-op at wort pH and refused it as beer's buffer, and that argument was never
+re-run for a *dosed* phosphate at wine pH.
+
+**`titratable_acidity` gets the nitrogen term in its pH solve but NOT in its equivalents sum**, the
+mirror image of D-182's carbonic asymmetry and deliberate for a different reason. Because t=0 is a
+re-allocation, `slot + nitrogen` equals the old slot exactly and a must's t=0 TA is **bitwise**
+unchanged — so passing the term to the solve adds nothing to a titration, it keeps the starting pH
+the one the state actually has as the pool drains. Leaving it out of the sum is the honest half: the
+term is a net charge per mole of nitrogen, not a count of titratable protons, and nothing here
+speciates the pool per molecule. D-182's docstring paragraph exists because such an asymmetry is
+"the kind of thing a later reader fixes"; this one now has its own.
+
 ### 9. What it costs wine, measured first and not scoped away
 
 Wine was priced **before** the term was allowed to help beer: scoping it beer-only to protect the
@@ -29513,6 +29554,13 @@ drivers, and D-18's `Byp` — the only one until now — is the **smaller**: 0.1
 ~0.06 is `Byp`. Decomposed exactly and without a second run, by re-reading the end state with `N`
 put back to its t=0 value, which makes the nitrogen term constant and so recovers the pre-D-209
 balance bit-for-bit.
+
+**And it moves wine's SO₂ readout, which is the non-obvious reach.** The molecular fraction is
+steeply pH-dependent near wine pH, so the −0.097 costs an anchored wine **molecular SO₂ 0.228 →
+0.284 mg/L, +24.7 %**, while free SO₂ moves 0.5 %: the pool is untouched, its speciation is not.
+Molecular SO₂ is the antimicrobial quantity a winemaking threshold is stated against, so anything
+scored against one reads differently since D-209. Pricing wine's cost in pH alone would have
+understated the term's reach; found in review, not by the suite.
 
 One wine arm was **discarded as an artefact rather than reported**: an unanchored wine (no
 `initial_ph`, cation 0) starts at pH 7.0 and finishes at 2.94, where this term is worth −0.41 pH.
@@ -29543,5 +29591,10 @@ the ceiling probe ran and before any composition table was opened), `peyer_full.
 thesis extracted in full, having been mined one chapter deep at D-178), and probes 1-8: the ceiling,
 the shape check, `z̄` from composition, the buffer/wine pricing, the anchored-wine correction, the
 final two-medium derivation, the shipped re-run with its anchor round trips, and the ramp sweep.
-Suite: `1774 passed, 3 xfailed` (from 1765 + 4 — one xfail flipped green and eight tests are new);
-`ruff` and `mypy` clean.
+Suite: **1776 passed, 3 xfailed** (from 1765 + 4 — one xfail flipped green and ten tests are new),
+`-m benchmark`'s 37 included and separately re-run green; `ruff` and `mypy` clean.
+
+**Three of this beat's findings came from review after the first green suite** — the negative cation
+slot (§8b), the SO₂ reach (§9) and the two scope lines (§8c). The first is the one that matters:
+a live defect that the beat's own anchor tests could not see, because they checked a *sum* while the
+error was in how that sum was *split*.

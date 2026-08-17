@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-17)
 M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-209**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1774 + 3 xfail**. **"Blocked on external sourcing" wrong 5× (D-191/196/199/208/209)**. D-202
+closed** (D-148/9). Suite **1776 + 3 xfail**. **"Blocked on external sourcing" wrong 5× (D-191/196/199/208/209)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **SEVEN** beats (D-178→D-183,

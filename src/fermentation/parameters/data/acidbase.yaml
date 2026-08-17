@@ -569,6 +569,17 @@ vant_hoff_co2_solubility:
 # K+/H+ antiport (yeast accumulates potassium; Peyer Table 2 gives wort K+ at 550 mg/L) and the
 # precipitation of buffering high-molecular protein as trub. A closure that credits all of the
 # measured acidification to this term alone would be over-claiming.
+#
+# SCOPE -- BOTH VALUES ARE MUST/WORT COMPOSITION AVERAGES AND DO NOT APPLY TO **DOSED** NITROGEN.
+# `add_dap` doses diammonium phosphate, in which EVERY nitrogen arrives as NH4+, so the correct
+# zbar for the dosed increment is exactly **+1.0** -- about 3x the wine average below. The model
+# charges dosed nitrogen at the average because the `N` slot is a single lumped pool with no way
+# to distinguish must nitrogen from supplement, so a DAP-dosed wine's acidification is
+# UNDERSTATED, by roughly 3x on the dosed fraction alone. Separately, DAP's phosphate
+# counter-anion is not in the charge balance at all (D-178 measured malt phosphate as a near
+# no-op at wort pH and refused it as beer's buffer; that argument was never re-run for a DOSED
+# phosphate at wine pH). Both are stated rather than built: splitting the pool is a state-vector
+# change, and it is named here so a later beat finds it recorded instead of discovering it.
 
 nitrogen_uptake_charge_beer:
   value: 0.1772

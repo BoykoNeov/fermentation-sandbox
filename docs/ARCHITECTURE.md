@@ -300,8 +300,20 @@ module:
   keeps `carbonic_molar` positional — an omitted nitrogen term would be invisible otherwise.
 - **It rides D-179's opt-in gate.** `charge_balance_is_populated` must be true, or an un-anchored
   beer's empty balance would get cation charge with no acid to meet it and read ~11 instead of 7.
+- **It moves wine's SO₂ readout**, which is the non-obvious downstream reach: the −0.097 pH costs
+  an anchored wine, molecular SO₂ rises **0.228 → 0.284 mg/L (+24.7 %)** while free SO₂ moves
+  0.5 % — the pool is unchanged, its speciation is not. Anything scored against a molecular-SO₂
+  threshold reads differently since D-209.
 - It is the **charge half only**: no medium models the pool per species, so uptake removes its
   charge but not its buffering, and that omitted half pushes the same way. A lower bound.
+- **`z̄` is a must/wort composition average and does NOT apply to dosed nitrogen.** `add_dap`
+  doses pure ammonium, whose true `z̄` is exactly +1, so a DAP-dosed wine is *understated* ~3× on
+  the dosed fraction; the `N` pool is lumped and cannot tell supplement from must nitrogen.
+  Stated, not built (splitting it is a state-vector change).
+- The **negative-slot guard** is `cation_slot_after_nitrogen`. The subtraction runs after
+  `solve_cation_charge`'s own negativity check and so escapes it; a high-YAN, low-acid,
+  low-`initial_ph` must could ship a negative cation slot while its anchor round trip still
+  passed. All three sites route through the guard.
 
 **Two pH frames, and which one a caller wants is not a detail (D-208).** `ph_of_state` is the pH
 *inside the vessel*, dissolved CO₂ included — the only frame a rate may read, and what every
