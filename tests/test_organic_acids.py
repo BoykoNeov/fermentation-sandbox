@@ -87,6 +87,7 @@ from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.media import beer_schema, get_medium, wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.parameters import default_data_dir, load_parameters
+from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 
 # --------------------------------------------------------------------------------------
@@ -1965,4 +1966,194 @@ def test_the_day_1_pH_miss_survives_the_timing_fix_and_has_CHANGED_SIDES():
         f"{fraction:.3f} of the nitrogen is drawn by 24 h; D-209 measured >0.99 and D-211's "
         "re-derived rate puts it at 0.363, inside Tyrell's measured 0.234-0.448 cell-count "
         "spread. That agreement is what makes the timing MEASURED rather than fitted"
+    )
+
+
+# ---------------------------------------------------------------------------------------
+# D-216 â€” the two anchors on beer's fermentation SPEED, and what they forbid
+# ---------------------------------------------------------------------------------------
+
+#: The ``q_sugar_max`` that reproduces Tyrell's day-2 extract fraction exactly (D-216 Â§3),
+#: found by bisection on the shipped model. It is INSIDE the parameter's own printed band
+#: (0.3-1.5), which is why this needs a test rather than a sentence: a future beat looking at
+#: :func:`test_the_model_ferments_tyrells_wort_on_tyrells_schedule` will find that the one knob
+#: that closes it is not even out of band. What stops it is the OTHER anchor, below.
+Q_SUGAR_MAX_MATCHING_TYRELL = 1.397
+
+#: ``K_repression`` removed entirely â€” not a candidate value, the unbounded LIMIT of the term
+#: that owns 79 % of the lag (D-216 Â§5). Used to make the refusal two-tier.
+K_REPRESSION_REMOVED = 1.0e6
+
+
+def _beer_days_to_target_gravity(q_sugar_max: float | None = None) -> float:
+    """Days for Â§2.2's 1.048 ale wort at 20 Â°C to reach 1.010 apparent, optionally re-rated.
+
+    Deliberately reuses the benchmark's own wort and gravity construction rather than
+    restating them, so this test cannot drift away from the anchor it is about.
+    """
+    from tests.benchmarks.test_milestone1 import (
+        _BEER_FERMENTABLE_S0,
+        _BEER_OG_SG,
+        TARGET_FG_SG,
+        _apparent_gravity_series,
+        _beer_scenario,
+    )
+
+    compiled = compile_scenario(_beer_scenario(duration_days=14.0))
+    params = dict(compiled.param_values)
+    if q_sugar_max is not None:
+        params["q_sugar_max"] = q_sugar_max
+    grid = np.linspace(0.0, compiled.t_span_h[1], int(compiled.t_span_h[1]) + 1)
+    traj = simulate(compiled.process_set, params, compiled.y0, compiled.t_span_h, t_eval=grid)
+    assert traj.success, traj.message
+    apparent = _apparent_gravity_series(traj, _BEER_OG_SG, _BEER_FERMENTABLE_S0)
+    reached = np.where(apparent <= TARGET_FG_SG)[0]
+    return float(traj.t[reached[0]] / 24.0) if reached.size else float("inf")
+
+
+def _tyrell_flux_fraction(days: int = 7, **overrides: float) -> dict[int, float]:
+    """Fraction of Tyrell's fermentable consumed per day, on a FIXED grid (D-214's lesson)."""
+    compiled = compile_scenario(
+        Scenario(
+            name="d216",
+            medium="beer",
+            initial=dict(TYRELL_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=float(days),
+        )
+    )
+    params = dict(compiled.param_values)
+    for name, value in overrides.items():
+        assert name in params, f"{name} is not a compiled parameter"
+        params[name] = value
+    grid = np.linspace(0.0, days * 24.0, days * 24 + 1)
+    traj = simulate(compiled.process_set, params, compiled.y0, compiled.t_span_h, t_eval=grid)
+    assert traj.success, traj.message
+    total = np.asarray(traj.y, dtype=float)[compiled.schema.slice("S"), :].sum(axis=0)
+    s0 = float(total[0])
+    return {d: float((s0 - total[d * 24]) / s0) for d in range(days + 1)}
+
+
+def test_matching_tyrells_extract_schedule_breaks_the_attenuation_benchmark():
+    """Why D-215's extract xfail cannot be closed on the uptake rate (D-216 Â§4).
+
+    The two anchors on beer's fermentation speed are not compatible under this rate law:
+
+    * **Tyrell's measured extract course** â€” their wort is 59.4 % fermented by day 2, where the
+      model books 21.2 % (``test_the_model_ferments_tyrells_wort_on_tyrells_schedule``);
+    * **Â§2.2's acceptance criterion** â€” a 1.048 ale wort at 20 Â°C reaching 1.010 apparent in
+      5-7 days (``test_beer_1048_og_attenuates_in_5_to_7_days``).
+
+    Beer's uptake is ``q_sugar_max Â· X Â· Monod(S)``, so one constant scales both. The value that
+    lands Tyrell's day 2 is 1.397 â€” **inside** the printed 0.3-1.5 band â€” and it takes the
+    benchmark to 2.71 d. The window is already violated at q â‰ˆ 0.6, having closed under a fifth
+    of the gap.
+
+    **The baseline is asserted first and deliberately.** A test that only showed the re-rated
+    arm failing would not distinguish "this override breaks the benchmark" from "the benchmark
+    is broken" [[feedback-pair-the-red-with-an-ordering-preserving-baseline]].
+    """
+    shipped = _beer_days_to_target_gravity()
+    assert 5.0 <= shipped <= 7.0, (
+        f"the benchmark wort attenuates in {shipped:.2f} d at the shipped q_sugar_max, outside "
+        "Â§2.2's 5-7 d window. The control failed, so nothing below is attributable to the "
+        "override â€” fix this before reading the arm"
+    )
+
+    matched = _beer_days_to_target_gravity(Q_SUGAR_MAX_MATCHING_TYRELL)
+    assert matched < 5.0, (
+        f"re-rated to the q_sugar_max that reproduces Tyrell's day-2 extract "
+        f"({Q_SUGAR_MAX_MATCHING_TYRELL}), the benchmark wort attenuates in {matched:.2f} d, "
+        "which is INSIDE Â§2.2's window. D-216 measured 2.71 d. If this is now inside, the two "
+        "anchors no longer conflict and D-215's extract xfail is closable on this knob â€” which "
+        "is a result, not a test failure: re-open D-216 Â§4"
+    )
+
+
+def test_removing_catabolite_repression_entirely_still_misses_tyrells_schedule():
+    """The refusal's second tier: not even the unbounded limit of the dominant term (D-216 Â§5).
+
+    ``K_repression`` = 2.0 g/L is tier ``speculative``, source *"author estimate"* â€” the
+    functional form is Gee & Ramirez's but ``beer_generic.yaml`` records that their numeric
+    constants were not accessible in-source. With glucose at 12.3 g/L it holds maltose at 14 %
+    of its rate on day 0 and maltotriose at 0.5 %, so the model's day 1 is essentially
+    glucose-only. It is by far the largest single contributor to the early-limb lag: removing it
+    takes day 2 from 0.212 to 0.514, **79 % of the gap**, and it has the right SHAPE (a brake
+    that vanishes as glucose clears, matching a lag that peaks at day 2 and closes by day 7).
+
+    So the obvious next move is to re-source that constant. **This test says it would not be
+    enough.** Removed ENTIRELY â€” not a candidate value, the limit â€” the model still falls short
+    of Tyrell's day 2, while putting the benchmark at 3.42 d. The refusal in D-216 Â§6 is
+    therefore not "no in-band point works" but the stronger "not even the unbounded limit of the
+    term that owns most of it".
+    """
+    unrepressed = _tyrell_flux_fraction(K_repression=K_REPRESSION_REMOVED)
+    measured_day2 = TYRELL_FLUX_FRACTION[2]
+    assert unrepressed[2] < measured_day2 - 0.05, (
+        f"with catabolite repression removed entirely the model ferments {unrepressed[2]:.1%} of "
+        f"Tyrell's wort by day 2 against their measured {measured_day2:.1%}. D-216 measured "
+        "51.4 %. If the limit now reaches the measurement, the lag IS the repression term and "
+        "re-sourcing K_repression becomes the beat â€” see D-216 Â§5"
+    )
+
+    shipped = _tyrell_flux_fraction()
+    closed = (unrepressed[2] - shipped[2]) / (measured_day2 - shipped[2])
+    assert closed == pytest.approx(0.79, abs=0.05), (
+        f"removing repression closes {closed:.0%} of the day-2 gap; D-216 measured 79 %. This "
+        "share is the reason the term is named as the dominant contributor, so it is pinned "
+        "rather than left as prose"
+    )
+
+
+def test_the_beer_ph_agreement_is_conditional_on_the_scenario_pitch():
+    """The pH course's 7/8 is scored on a pitch nothing independently sources (D-216 Â§8).
+
+    D-207/208/209/211 all score beer's pH on ``TYRELL_SCENARIO``, which pitches **1.0 g/L**
+    against Tyrell's stated 9.96e6 cells/mL â€” ``beer_generic.yaml`` already records that this
+    implies ~100 pg dry weight per cell, about **2Ã— the textbook 40-60 pg**. That note reads as
+    a caveat about a scenario detail. It is not: two published results are conditioned on it.
+
+    At a textbook-honest 0.5 g/L the day-1 miss D-211 pinned at **0.070 becomes 0.354** â€” five
+    times worse â€” day 2 falls out of its envelope as well, and D-211's measured attribution (the
+    nitrogen fraction drawn by 24 h, 0.363, "inside Tyrell's measured 0.234-0.448 spread") drops
+    to 0.181, **outside** that spread.
+
+    **This is not a claim that the pitch is wrong.** Read the other way, 1.0 g/L is the value at
+    which the model's biomass reproduces Tyrell's measured growth *timing* in the units that
+    drive the rate, and two independent observables endorse it against the per-cell arithmetic.
+    The extract lag gets **worse**, not better, at the honest pitch (2.81Ã— â†’ 3.51Ã—, D-216 Â§7).
+    What this test forbids is reading D-211's 0.070 as unconditional.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d216-pitch",
+            medium="beer",
+            initial={**TYRELL_SCENARIO, "pitch_gpl": 0.5},
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=14.0,
+        )
+    )
+    res = compiled.run()
+    params = compiled.parameters.resolve()
+    states = np.asarray(res.y, dtype=float)
+    t_h = np.asarray(res.t, dtype=float)
+
+    def ph_at(day: int) -> float:
+        y = np.array([np.interp(day * 24.0, t_h, states[i, :]) for i in range(states.shape[0])])
+        return float(acidbase.degassed_ph_of_state(y, compiled.schema, params))
+
+    day1_excess = ph_at(1) - TYRELL_PH_COURSE[1][1]
+    assert day1_excess == pytest.approx(0.354, abs=0.03), (
+        f"at a 0.5 g/L pitch day 1 reads {day1_excess:.4f} pH above Tyrell's envelope; D-216 "
+        "measured 0.354 against the 0.070 the shipped 1.0 g/L pitch gives. If these have "
+        "converged, the pH result no longer depends on the pitch and D-216 Â§8 is spent"
+    )
+
+    inside = [
+        band_lo - TYRELL_PH_READ_TOL <= ph_at(day) <= band_hi + TYRELL_PH_READ_TOL
+        for day, (band_lo, band_hi) in TYRELL_PH_COURSE.items()
+    ]
+    assert sum(inside) == 6, (
+        f"{sum(inside)}/8 days inside at the honest pitch; D-216 measured 6, against 7 at the "
+        "shipped pitch. The count is what says the agreement is conditional"
     )

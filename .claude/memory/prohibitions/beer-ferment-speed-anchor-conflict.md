@@ -1,0 +1,67 @@
+---
+name: beer-ferment-speed-anchor-conflict
+description: "D-216 - beer's early-limb ferment lag is REFUSED as a parameter fix: the knob is in band but a second anchor forbids it, not even removing repression reaches the measurement, and the pH agreement turns out conditional on the scenario pitch"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: f6587b9b-5f34-4f36-af85-d37c405530dc
+  modified: 2026-08-17T19:55:35.490Z
+---
+
+**Live prohibitions — beer's fermentation SPEED and the pitch its pH rides on (D-216).** Detail
+split out of `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by
+path. Read it before proposing anything about beer's uptake rate, catabolite repression, the
+§2.2 attenuation benchmark, or the pitch in `TYRELL_SCENARIO`. **If a prohibition looks
+unconvincing, go read D-216 — do not argue past it from this file.**
+
+**THE LAG IS NOT D-211'S DOING, AND NOT THE GROWTH EXTENT.**
+- Reverting `mu_max` to the pre-D-211 0.098 gives day 2 = **0.289** against a measured 0.594.
+  The lag **pre-dates D-211** — 2.05× before, 2.81× after. D-211 worsened an existing defect and
+  is **not impugned**; its fit was to measured cell counts. Never re-open `mu_max` for this.
+- Growth EXTENT owns **0.8 %**. Measured, not argued: the fold sits 6-7 % below Tyrell's
+  envelope at days 2-3 (D-211 called that "near"), and forcing it mid-envelope via YAN 255 moves
+  day-2 flux **0.212 → 0.215**. Do not re-run this as if it were open.
+
+**THE FIX IS REFUSED, AND THE REFUSAL IS TWO-TIER. Do not re-propose either knob.**
+- `q_sugar_max` = **1.397** reproduces Tyrell's day 2 and is **INSIDE** the printed 0.3-1.5 band
+  — so "the value is out of band" is NOT the reason. The reason is §2.2's benchmark, which the
+  same constant sets: it breaks at **q ≈ 0.6**, having closed under a fifth of the gap, and lands
+  **2.71 d** at 1.397. **No in-band (q, K_repression) pair satisfies both anchors**; best
+  benchmark-passing Tyrell day 2 is 0.269 against 0.594.
+- `K_repression` = 2.0 is `speculative`/"author estimate" and owns **79 %** of the lag (removing
+  it takes day 2 to 0.514) with the right SHAPE. **Re-sourcing it is still not enough** — the
+  unbounded LIMIT falls short of 0.594 and puts the benchmark at 3.42 d. This tier exists
+  precisely to kill *"re-source the constant and the lag goes away"*.
+- The generous corner (every rate parameter at its fastest in-band edge, benchmark held at
+  exactly 5.00 d) leaves **1.79×**, and that is a **lower bound**: it uses `E_a_uptake` = 30 kJ/mol,
+  the one lever that **decouples** the anchors (the benchmark runs at exactly `T_ref`, so its
+  Arrhenius factor is 1.0 by construction — free — while Tyrell at 15 °C is scaled, worth
+  2.81× → 2.41×). **That edge is REFUSED**: it is "retained from the now-debunked ~35 kJ/mol beer
+  figure" (D-19). Named, measured, not adopted.
+
+**THE PITCH IS LOAD-BEARING — NEVER "CORRECT" IT TO THE TEXTBOOK PER-CELL MASS.**
+- `TYRELL_SCENARIO` pitches **1.0 g/L** against Tyrell's 9.96e6 cells/mL (~100 pg/cell, ~2× the
+  textbook 40-60). At an "honest" 0.5 g/L the extract lag gets **WORSE (2.81× → 3.51×)** and the
+  pH course drops **7/8 → 6/8** days inside, with D-211's pinned day-1 miss going **0.070 → 0.354**
+  and its nitrogen attribution **0.363 → 0.181, outside** the 0.234-0.448 spread it cites as what
+  makes the timing "MEASURED rather than fitted". **D-211 is FLAGGED, not corrected** — two
+  observables endorse 1.0 g/L against the per-cell arithmetic. What is forbidden is reading
+  D-211's 0.070 as unconditional.
+
+**SCOPE, and what was NOT measured.** There is **no second measured beer extract curve on disk** —
+Zamudio Lara 2022 is cited all through `beer_generic.yaml` but is **not in the local corpus**. So
+nothing is claimed about worts other than Tyrell's and D-215's SCOPE paragraph stands. The frame
+was checked and is clean (the extract panel is *apparent* extract, already converted at D-183 §2).
+Days 3-4 of the measured course live in D-215's §4 table, **not** in the shipped constant.
+
+**What shipped: three tests, no `src/` or parameter change.** The pitch test is honestly a
+**conditional PIN, not a mechanism guard** — doubling `q_sugar_max` moves its number only
+0.354 → 0.323, so it fires on pin drift. Also learned: **a mutation arm must be IN BAND**, because
+the parameter store validates at load and an out-of-band arm dies in pydantic
+([[feedback-verify-an-xfail-fails-for-its-stated-reason]]).
+
+**OPEN, and the owner's call — not a default.** The two anchors conflict and the model sits at
+the one that is not a measurement: §2.2's 5-7 d window is an acceptance criterion from the
+handoff brief (which `CLAUDE.md` calls *"reference, not gospel"*), Tyrell's course is a published
+trial. Which one beer's kinetics should be calibrated against is **recorded, not taken**.
+[[feedback-a-gap-can-be-held-open-by-a-second-anchor]]
