@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-17T10:50:19.160Z
+  modified: 2026-08-17T12:43:18.784Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-209**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1776 + 3 xfail**. **"Blocked on external sourcing" wrong 5× (D-191/196/199/208/209)**. D-202
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-210**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1791 + 3 xfail**. **"Blocked on external sourcing" wrong 5× (D-191/196/199/208/209)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **SEVEN** beats (D-178→D-183,
@@ -184,6 +184,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   ~0.4 pH: `z̄` is DERIVED per ELEMENTAL N, never fit; symport is proton-NEUTRAL; t=0 is a RE-ALLOCATION;
   it rides D-179's gate. Day 1 got WORSE — the residue is UPTAKE TIMING, not acid-base.**
   → `.claude/memory/prohibitions/beer-acid-base.md`
+- **The nitrogen DOSE's charge (D-210)** — `add_dap` doses a **SALT** and BOTH ions are BUILT:
+  `phosphate` (diprotic, both registries, NOT D-178's malt phosphate) and `nitrogen_charge_excess`
+  (stores the EXCESS so 0.0 needs no sentinel; one slot, not a second N pool). **D-209 §8c sized
+  the WRONG half** — the ammonium moves a dry wine's endpoint by **0.0** and owns the excursion;
+  the phosphate owns all **−0.162 pH**. The 8 `N` inflows keep the average (88 % is an UN-DRAW).
+  Native phosphate is out on the ANCHOR, not smallness. `set_ph` MASKED the guard's message.
+  DAS and the arginine pool's own +1 stay unbuilt.
+  → `.claude/memory/prohibitions/nitrogen-dose-salt-charge.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
