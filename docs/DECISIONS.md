@@ -30144,6 +30144,32 @@ being unbuildable was that growth and attenuation are coupled through the biomas
 are — but nitrogen limitation makes the *ceiling* rate-independent, so the coupling has almost no
 purchase on the endpoint.
 
+### 13. Follow-up: three prose numbers this change made stale, found by asking what was CONDITIONED on the old rate
+
+Found in review, none of them assertable and therefore none of them catchable by a green suite —
+the same class as the D-183 units slip corrected above, and the pairing is the point.
+
+* **`q_sugar_max`'s band, in the same file as the value that moved.** Its high edge 1.5 is
+  `k_S * mu_max = 15.3 * 0.098`, and that 0.098 is **Zamudio's own** growth rate used to compute
+  **their** model's growth-coupled peak — external, unaffected, and the edge still stands. But the
+  arithmetic now traps a reader: `15.3 * 0.034 = 0.52` lands on the nominal 0.5 and invites
+  "correcting" a band edge that was never wrong. `q_sugar_max` is **banded and drawn**, so this is
+  a live sampling surface and not documentation. The `conditions:` line now says *whose* `mu_max`
+  it is. This block had been read early in the beat — as the **precedent** for the Droop→Monod
+  argument — and never revisited as a **dependent** of the number being changed.
+* **That block's own counterfactual**, *"the prior value 1.5 made a 1.048 wort attenuate in ~2 d"*,
+  was measured at the old growth rate. **Re-measured rather than date-stamped: 2.58 d.** D-15's
+  conclusion is unchanged — 1.5 still finishes far inside the 5–7 d window.
+* **`test_beer_temperature_response.py`'s docstring** put the engine's 10 °C attenuation midpoint
+  at ~6.2 d, ~2.9× slower than Speers' 2.1 d. Re-measured: **179.0 h (7.46 d), 3.55×**. That file
+  deliberately asserts nothing about the absolute value — which is precisely why it stayed green.
+  Its conclusion is unchanged and slightly stronger: the confounded gap it declines to guard got
+  **wider**, not narrower.
+
+A sweep of `src/` and `tests/` for prose numbers conditioned on beer growth or attenuation timing
+returns nothing else: the remaining `~20 h` and `0.098` mentions are all either explicitly framed
+as the retired behaviour or are the mutation arm that reproduces it.
+
 ### Receipts
 
 `M:\claud_projects\temp\ferment\d211-beer-uptake-timing\` — `PREREGISTER.md` (written before any

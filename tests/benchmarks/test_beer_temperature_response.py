@@ -27,11 +27,19 @@ obtained it may not be a clean controlled series.
 lager yeast (S. pastorianus) in a 14.1 °P industrial wort at 10 °C" conflates
 the Arrhenius temperature law with the organism + wort + pitch-rate difference.
 Concretely: the engine's low-pitch (0.6 g/L, homebrew-like) 10 °C run reaches
-its attenuation midpoint at ~6.2 d, ~2.9× SLOWER than Speers' ~2.1 d industrial
+its attenuation midpoint at ~7.5 d, ~3.6× SLOWER than Speers' ~2.1 d industrial
 midpoint — a gap dominated by pitch rate and organism, not the temperature
 model. Guarding that gap as a regression band would guard a confound. So this
 file does NOT assert the engine reproduces the 51 h midpoint; it deliberately
 misses it.
+
+(Those two figures were ~6.2 d and ~2.9× until D-211 re-derived beer's `mu_max`
+from Tyrell's measured cell counts, 0.098 → 0.034 /h. Re-measured, not
+re-estimated: 179.0 h at 10 °C, 80.0 h at 20 °C. They are prose, asserted
+nowhere — which is exactly why they went stale silently and why the correction
+is date-stamped here rather than quietly overwritten. The file's *conclusion* is
+unchanged and in fact stronger: the absolute-kinetics gap this file declines to
+guard got wider, not narrower.)
 
 **The confound-cancelling ratio test that WOULD have real signal is deferred.**
 A rate *ratio* across two temperatures cancels the absolute-kinetics difference
