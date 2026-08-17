@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e084eace-c954-47ae-9167-4bbeff335946
-  modified: 2026-08-17T08:36:09.926Z
+  modified: 2026-08-17T10:50:19.160Z
 ---
 
 **Fermentation Sandbox** — research-grade wine/beer fermentation simulation engine in Python (uv, scipy/numpy/pydantic). Repo: https://github.com/BoykoNeov/fermentation-sandbox (branch `main`).
@@ -30,13 +30,13 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **Milestone 3** (sensory/OAV + Tier-3 aging, D-66) at **D-208**; sensory 1a/1b + **D-139's
-leftovers ALL closed** (D-148/D-149). Suite **1765 + 4 xfail**. **"Blocked on external sourcing" wrong 4× (D-191/196/199/208)**.
-**D-202 ascorbate COMPLETED Fig 24.12's top group; D-203/205/206 REFUSED the sotolon ascorbate route, Pham's pH+ethanol
-terms and the Strecker split — "expressible" was never "identifiable"; D-204 shipped the pin it owed. Slot/Process/
-oxidative-set counts live in `docs/ARCHITECTURE.md` — never restate them here, that is what rotted it (D-184). Beer
-acid-base = SIX beats (D-178→D-183), all BUILT; `ACID_STATE` is NO LONGER medium-agnostic (D-179). Beer's pH
-validation HALVED at D-208 — the published number is DECARBONATED, model reaches 43-63 %, ~0.4 pH MISSING, no source.**
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-209**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1774 + 3 xfail**. **"Blocked on external sourcing" wrong 5× (D-191/196/199/208/209)**. D-202
+ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
+terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
+in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **SEVEN** beats (D-178→D-183,
+D-207→D-209) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179); **D-209 CLOSED beer's ~0.4 pH — `N` is CATION-side,
+days 2-7 now IN Tyrell's envelope, D-208's xfail XPASSED. Beer-pH's open question is UPTAKE TIMING (~20 h vs ~60 h).**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -176,12 +176,13 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the shipped 0.15) and its "queued as its own beat" clause is **deleted**. Also: a **reused**
   `CompiledScenario` inherits the previous run's enables (**+10.3 %**) — a CONTRACT, "fixing" it
   fails 26 tests. → `.claude/memory/prohibitions/strecker-methional-split.md`
-- **Beer acid-base — six beats, the pH CURVE, the FRAME (D-178 → D-183, D-207, D-208)** — beat COMPLETE,
-  beer's pH is a **PREDICTION**; malt phosphate REFUSED as the buffer; registries NEVER merged; the `CO2`
-  slot is NEVER dissolved; acetic's producer is growth-linked and the spike is NOT modelled. **Never call
-  the pH test a TRAJECTORY test** (D-207). **D-208 CLOSED the degassing fork on EBC 9.35's scope line:
-  a published pH is DECARBONATED, so never score `ph_of_state` against one — `degassed_ph_of_state` is
-  comparison-ONLY. Agreement 43-63 %, nothing reaches, ~0.4 pH MISSING; D-207's day-1 sign is REVERSED.**
+- **Beer acid-base — seven beats, the pH CURVE, the FRAME, the NITROGEN CHARGE (D-178 → D-183, D-207 →
+  D-209)** — beer's pH is a **PREDICTION** and it now **AGREES**; malt phosphate REFUSED as the buffer;
+  registries NEVER merged; the `CO2` slot is NEVER dissolved; acetic's producer is growth-linked, spike
+  NOT modelled. **Never call the pH test a TRAJECTORY test** (D-207). A published pH is **DECARBONATED**
+  — score only `degassed_ph_of_state` (D-208). **D-209 put the `N` pool on the CATION side and CLOSED the
+  ~0.4 pH: `z̄` is DERIVED per ELEMENTAL N, never fit; symport is proton-NEUTRAL; t=0 is a RE-ALLOCATION;
+  it rides D-179's gate. Day 1 got WORSE — the residue is UPTAKE TIMING, not acid-base.**
   → `.claude/memory/prohibitions/beer-acid-base.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
@@ -195,7 +196,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
 - **D-104's un-inversion** — scoped, UNSOURCED, not started, owner's call. D-116 moved its gate onto **in-situ [E]
   + de-novo-KIC + decarboxylase fluxes**; also prices D-103's leucine conflict.
 - Durable findings under `M:\claud_projects\temp\ferment\`: `_findings\`, `d13{5..9}-*\`, `d14{1..9}-*\`,
-  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d18{7,8,9}-*\`, `d19{0..9}-*\`, `d170-q10-generalise\`/`d171-ordering-guards\`/`d175-ellagitannin-joint\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
+  `d15{7,8,9}-*\`, `d16{0..8}-*\`, `d18{7,8,9}-*\`, `d19{0..9}-*\`, `d20{0..9}-*\` (**`d209-nitrogen-proton-exchange\` holds `peyer_full.txt`, the 243-page thesis extracted IN FULL after D-178 read one chapter of it**), `d170-q10-generalise\`/`d171-ordering-guards\`/`d175-ellagitannin-joint\` — incl. `d142-pulls\`+`d143-so2-binding\` (Miao **T2/3/4**), `d149-copper-refit\`
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 09a91935-982e-429a-ba2b-c094a06612d5
-  modified: 2026-08-17T08:32:47.404Z
+  modified: 2026-08-17T10:48:04.559Z
 ---
 
 **Live prohibitions — beer acid-base.** Detail split out of
@@ -13,6 +13,28 @@ metadata:
 path. Read it when working on this subject. Every bullet is *what it forbids* + the D-record
 to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue
 past it from this file.** **Never evict an old prohibition to buy a line.**
+
+**The ~0.4 pH is FOUND and BUILT (D-209): the `N` pool's own charge. Beer's pH now AGREES.**
+- **The `N` slot is on the CATION side** — ammonium plus charged amino acids, so uptake removes
+  charge. **NOT a rate law and NOT two fitted halves**: the Handbook Vol 1 §2.4.2 says the symport
+  proton is **re-exported by the ATPase**, so the cycle is proton-NEUTRAL and only the species' own
+  charge leaves. **D-208 §6's framing is CORRECTED.** `z̄` per mole of **ELEMENTAL** N (arginine =
+  +0.25, not +1); proline excluded on source both media. Beer **0.1772**, wine **0.3245**, DERIVED.
+  **Never fit it** — the closing value 0.150 was computed and NOT adopted; the amino-acid halves
+  cancel to +0.0395 so ~78 % is wort AMMONIUM, one table, and Peyer T2's units needed a cross-check
+  (an "as N" vs "as NH3 mass" fork is a **named alternative, never band width**).
+- **t=0 is a RE-ALLOCATION, not an addition** — `cation_charge` was back-solved and already held it
+  frozen; **all THREE anchor sites subtract**, must TA is bitwise unchanged. **Rides D-179's opt-in
+  gate** — ungated an un-anchored beer reads pH **~11**. `_cation` REQUIRES `params`. Tier
+  **plausible is load-bearing** (speculative would drag WINE's `ph_tier`). Days 2-7 now IN the
+  envelope, endpoint **49.8 % → 101.7-107.1 %**, D-208's xfail **XPASS**, its `<1.0` degassed guard
+  **INVERTED not deleted**. **Charge half ONLY ⇒ LOWER bound**; K⁺/H⁺ antiport + trub unbuilt.
+- **Day 1 got WORSE and the miss is UPTAKE TIMING** — 0.315 pH too acidic (was 0.186 too alkaline).
+  N empties in **~20 h**; a **60 h** ramp puts all 8 days in band (48 h and 72 h each miss one), so
+  it is measured, not slack. **The ramp is NOT a fix — nothing sources 60 h.** Next beer-pH beat is
+  a timing question. **The high `z̄` edge clears by 0.003 pH** — re-examine it before adding acid.
+  Every separately-measured term size is quoted **at the pH the model then reached**: D-181's base
+  went 0.2094 → 0.1417 CO₂-free, D-179's EtOAc lingering 2.03× → **1.38×**. Wine costs **−0.097**.
 
 **The FRAME is CLOSED and beer's pH validation HALVES (D-208). The term stays; the comparison moved.**
 - **Tyrell's pH is a DECARBONATED reading** — MEBAK II 2.14 is *"pH (EBC)"*, EBC 9.35's scope is
