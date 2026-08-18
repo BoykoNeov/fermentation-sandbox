@@ -128,6 +128,16 @@ TARGET_FG_SG = 1.010
 #: comfortably below the 1.010 target — so the *endpoint* falls out of the wort and
 #: the 1.010 crossing lands in the kinetic phase, not at a fragile asymptote (D-15).
 _BEER_OG_SG = 1.048
+
+#: The temperature §2.2's beer criterion is asserted at, RE-TEMPERATURED 20 -> 15 C at D-221.
+#: The handoff pairs a 5-7 d duration with 20 C; Foster et al. 2022's Supp. Fig. S1 puts the
+#: same three commercial ale controls at 5.06-6.26 d at 15 C and 2.91-3.77 d at 22 C, so the
+#: duration is real and the pairing is not. Kept in step with the spec's own ``conditions``
+#: string by :func:`test_the_beer_criterion_and_its_spec_agree_on_the_temperature`, because a
+#: silent drift between the two would leave the criterion asserting one frame and running
+#: another.
+_BEER_BENCH_CELSIUS = 15.0
+
 _BEER_WORT: dict[str, float] = {
     "glucose_gpl": 13.2,
     "maltose_gpl": 54.6,
@@ -140,12 +150,18 @@ _BEER_FERMENTABLE_S0 = (
 )
 
 
-def _beer_scenario(duration_days: float = 14.0) -> Scenario:
+def _beer_scenario(duration_days: float = 14.0, celsius: float = _BEER_BENCH_CELSIUS) -> Scenario:
+    """§2.2's beer criterion as a runnable scenario.
+
+    ``celsius`` defaults to the criterion's own temperature and is a parameter only so that
+    callers re-scoring a claim measured in the RETIRED 20 C frame can say so explicitly
+    (D-221). Nothing should pass 20.0 without stating which record's frame it is reading.
+    """
     return Scenario(
         name="beer-benchmark",
         medium="beer",
         initial=dict(_BEER_WORT),
-        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
         duration_days=duration_days,
     )
 
@@ -179,11 +195,58 @@ def _apparent_gravity_series(traj, og_sg: float, fermentable_s0_gpl: float):
     return np.array([apparent_gravity(float(re), oe_plato) for re in real_extract_plato])
 
 
+def test_the_beer_criterion_and_its_spec_agree_on_the_temperature():
+    """The runnable criterion and the spec that describes it must name one frame (D-221).
+
+    :data:`_BEER_BENCH_CELSIUS` is what actually gets integrated; the spec's ``conditions``
+    is what every reader and every provenance trail sees. D-221 moved both from 20 to 15 C,
+    and the failure mode this forbids is a later beat moving one of them. A RED here means
+    the criterion is being asserted at a temperature it is not being run at, which is the
+    exact defect D-221 was opened to repair.
+    """
+    spec = BENCHMARKS["beer_attenuation"]
+    assert f"{_BEER_BENCH_CELSIUS:.0f} C" in spec.conditions, (
+        f"the beer criterion runs at {_BEER_BENCH_CELSIUS:.0f} C but its spec conditions read "
+        f"{spec.conditions!r}"
+    )
+    assert "D-221" in spec.description and "Foster" in spec.source, (
+        "the re-temperaturing has lost its provenance; the 15 C frame is Foster et al. 2022's, "
+        "not the handoff's, and the spec must say so"
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="D-221: at the criterion's corrected 15 C the engine takes 9.00 d against 5-7",
+)
 def test_beer_1048_og_attenuates_in_5_to_7_days():
-    # A ~1.048 OG ale wort at 20 C must reach ~1.010 apparent gravity in 5-7 d.
-    # The wort spectrum and fermentability are sourced (see _BEER_WORT), not swept
-    # to fit; q_sugar_max was re-derived to a decoupled-equivalent rate (D-15), so
-    # the 5-7 d window falls out rather than being dialed.
+    """A ~1.048 OG ale wort must reach ~1.010 apparent gravity in 5-7 d — at 15 C (D-221).
+
+    **Why this is an xfail rather than a passing test or a moved window.** Until D-221 this
+    ran at the handoff's 20 C and PASSED at 6.08 d. D-220 recovered a second measured beer
+    course and it says the 5-7 d duration is a real brewing figure at 15 C, where the same
+    three commercial ale controls take 5.06-6.26 d, and that at 22 C they take 2.91-3.77 d —
+    so 20 C cannot take 5-7 d. The window is the handoff's own and is untouched; only the
+    temperature moved, and it moved to the reading GENEROUS to the model (Foster's measured
+    band is narrower than 5-7 and sits inside it).
+
+    What the pass was worth: a criterion calibrated to a cooler ferment was certifying a model
+    that is ~1.5x too slow at every temperature below 30 C (D-220 §4). Two errors of opposite
+    sign, one hiding the other. The engine's real deficit is the 9.00 d below.
+
+    **The miss is wide and it is not a reading artefact.** 9.00 d against a 7.0 d edge is
+    2.74 d clear of Foster's own conservative slow strain (6.26 d), and the 15 C duration is
+    the more grid-stable of the two frames — 0.0052 d across 1-8 points/h, against 0.0365 d
+    at the retired 20 C.
+
+    **What closes it, and why this beat does not.** ``q_sugar_max`` in [0.667, 1.017] satisfies
+    this criterion, and [0.763, 1.003] reproduces Foster's own measured 15 C course — both
+    inside the parameter's printed 0.3-1.5 band. D-216's Tyrell-matching 1.397 does NOT: it
+    gives 3.99 d here and stays outside across the ENTIRE printed ``E_a_uptake`` band. So the
+    two beer speed anchors now agree on DIRECTION (both demand a faster engine than ships) and
+    disagree only on magnitude, by ~1.37x. Choosing between them is D-216 §11's open question
+    and is not this beat's to spend.
+    """
     spec = BENCHMARKS["beer_attenuation"]
     _, traj = _simulate_beer(_beer_scenario())
     apparent_sg = _apparent_gravity_series(traj, _BEER_OG_SG, _BEER_FERMENTABLE_S0)

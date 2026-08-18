@@ -90,6 +90,7 @@ from fermentation.parameters import default_data_dir, load_parameters
 from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units import cells_per_ml_to_pitch_gpl
+from fermentation.validation import BENCHMARKS
 
 # --------------------------------------------------------------------------------------
 # Tyrell et al. (2013), BrewingScience 66:75-84 — the matched dataset. FIGURE READS; the
@@ -2004,11 +2005,20 @@ Q_SUGAR_MAX_MATCHING_TYRELL = 1.397
 K_REPRESSION_REMOVED = 1.0e6
 
 
-def _beer_days_to_target_gravity(q_sugar_max: float | None = None, **overrides: float) -> float:
-    """Days for §2.2's 1.048 ale wort at 20 °C to reach 1.010 apparent, optionally re-rated.
+def _beer_days_to_target_gravity(
+    q_sugar_max: float | None = None, *, celsius: float | None = None, **overrides: float
+) -> float:
+    """Days for §2.2's 1.048 ale wort to reach 1.010 apparent, optionally re-rated.
 
-    Deliberately reuses the benchmark's own wort and gravity construction rather than
-    restating them, so this test cannot drift away from the anchor it is about.
+    Deliberately reuses the benchmark's own wort, temperature and gravity construction rather
+    than restating them, so this test cannot drift away from the anchor it is about.
+
+    ``celsius`` defaults to the criterion's own temperature — **15 °C since D-221
+    re-temperatured it**, not the 20 °C every claim in sections 10-13 was originally measured
+    at. Pass 20.0 only to read a RETIRED frame deliberately, and say which record's frame it is.
+
+    The 40 d span is D-221's: at 15 °C the shipped engine needs 9.00 d and a slow arm needs more,
+    where the retired 20 °C frame fitted inside 14 d.
     """
     from tests.benchmarks.test_milestone1 import (
         _BEER_FERMENTABLE_S0,
@@ -2018,7 +2028,8 @@ def _beer_days_to_target_gravity(q_sugar_max: float | None = None, **overrides: 
         _beer_scenario,
     )
 
-    compiled = compile_scenario(_beer_scenario(duration_days=14.0))
+    kwargs = {} if celsius is None else {"celsius": celsius}
+    compiled = compile_scenario(_beer_scenario(duration_days=40.0, **kwargs))
     params = dict(compiled.param_values)
     if q_sugar_max is not None:
         params["q_sugar_max"] = q_sugar_max
@@ -2058,39 +2069,66 @@ def _tyrell_flux_fraction(
     return {d: float((s0 - total[d * 24]) / s0) for d in range(days + 1)}
 
 
-def test_matching_tyrells_extract_schedule_breaks_the_attenuation_benchmark():
-    """Why D-215's extract xfail cannot be closed on the uptake rate (D-216 §4).
+def test_matching_tyrells_extract_schedule_overshoots_the_attenuation_benchmark():
+    """Why D-215's extract xfail cannot be closed on the uptake rate (D-216 §4, D-221 §5).
 
-    The two anchors on beer's fermentation speed are not compatible under this rate law:
+    The two anchors on beer's fermentation speed are still not compatible under this rate law,
+    but **the shape of the incompatibility inverted at D-221** and the old form of this test
+    could not have seen it.
 
     * **Tyrell's measured extract course** — their wort is 59.4 % fermented by day 2, where the
       model books 21.2 % (``test_the_model_ferments_tyrells_wort_on_tyrells_schedule``);
-    * **§2.2's acceptance criterion** — a 1.048 ale wort at 20 °C reaching 1.010 apparent in
-      5-7 days (``test_beer_1048_og_attenuates_in_5_to_7_days``).
+    * **§2.2's acceptance criterion** — a 1.048 ale wort reaching 1.010 apparent in 5-7 days, at
+      **15 °C** since D-221 re-temperatured it (``test_beer_1048_og_attenuates_in_5_to_7_days``).
 
-    Beer's uptake is ``q_sugar_max · X · Monod(S)``, so one constant scales both. The value that
-    lands Tyrell's day 2 is 1.397 — **inside** the printed 0.3-1.5 band — and it takes the
-    benchmark to 2.71 d. The window is already violated at q ≈ 0.6, having closed under a fifth
-    of the gap.
+    Beer's uptake is ``q_sugar_max · X · Monod(S)``, so one constant scales both.
 
-    **The baseline is asserted first and deliberately.** A test that only showed the re-rated
-    arm failing would not distinguish "this override breaks the benchmark" from "the benchmark
-    is broken" [[feedback-pair-the-red-with-an-ordering-preserving-baseline]].
+    **What D-216 measured, and the frame it was measuring in.** At the criterion's old 20 °C the
+    shipped rate PASSED at 6.05 d and the admissible band was ``q`` in [0.425, 0.621]: the
+    criterion sat just above the shipped 0.5 and **forbade** a faster engine, breaking at
+    q ≈ 0.62 having closed under a fifth of Tyrell's gap. At the corrected 15 °C the admissible
+    band is [0.667, 1.017] — the shipped 0.5 falls **below** it, and the criterion now **demands**
+    a faster engine.
+
+    **So the two anchors agree on direction and disagree only on magnitude.** Both want the
+    engine faster than it ships; the criterion tops out at 1.017 and Tyrell wants 1.397, a factor
+    of ~1.37 apart. That is a far narrower conflict than D-216 recorded, and it is why D-216 §11's
+    open question is now about a magnitude rather than about a sign.
+
+    **The refusal survives the loss of its own premise.** D-216 refused 1.397 partly because the
+    criterion forbade it. The criterion no longer forbids faster rates in general — but it still
+    forbids THIS one: 1.397 gives 3.99 d here, and it stays outside across the ENTIRE printed
+    ``E_a_uptake`` band (30,000 -> 3.58 d, 63,000 -> 4.17 d), only reaching 5-7 d at ~120,000
+    J/mol, 1.9x the printed high edge. Nothing in D-221 licenses moving the rate.
+
+    **The baseline is asserted first and deliberately**, and it is no longer "the criterion
+    passes" — it cannot be, because D-221 established that it does not
+    [[feedback-pair-the-red-with-an-ordering-preserving-baseline]]. What replaces it is the
+    bracket: the shipped rate misses SLOW and the Tyrell rate misses FAST, so the override is
+    shown to CROSS the window rather than merely to sit outside it on the same side as its own
+    baseline, which would attribute nothing.
     """
     shipped = _beer_days_to_target_gravity()
-    assert 5.0 <= shipped <= 7.0, (
-        f"the benchmark wort attenuates in {shipped:.2f} d at the shipped q_sugar_max, outside "
-        "§2.2's 5-7 d window. The control failed, so nothing below is attributable to the "
-        "override — fix this before reading the arm"
+    assert shipped > 7.0, (
+        f"the benchmark wort attenuates in {shipped:.2f} d at the shipped q_sugar_max; D-221 "
+        "measured 9.00 d, SLOW-side outside §2.2's 5-7 d window at the corrected 15 °C. If this "
+        "is now inside, the engine has been re-rated and D-221's whole reading needs redoing"
     )
 
     matched = _beer_days_to_target_gravity(Q_SUGAR_MAX_MATCHING_TYRELL)
     assert matched < 5.0, (
         f"re-rated to the q_sugar_max that reproduces Tyrell's day-2 extract "
         f"({Q_SUGAR_MAX_MATCHING_TYRELL}), the benchmark wort attenuates in {matched:.2f} d, "
-        "which is INSIDE §2.2's window. D-216 measured 2.71 d. If this is now inside, the two "
-        "anchors no longer conflict and D-215's extract xfail is closable on this knob — which "
-        "is a result, not a test failure: re-open D-216 §4"
+        "which is INSIDE §2.2's window. D-221 measured 3.99 d at 15 °C (D-216 measured 2.71 d at "
+        "the retired 20 °C). If this is now inside, the two anchors no longer conflict and "
+        "D-215's extract xfail is closable on this knob — which is a result, not a test failure: "
+        "re-open D-216 §4"
+    )
+
+    assert matched < 5.0 and shipped > 7.0, (
+        f"the override must CROSS the window: shipped {shipped:.2f} d slow-side, re-rated "
+        f"{matched:.2f} d fast-side. If both now sit on one side, the bracket that makes this "
+        "attributable is gone"
     )
 
 
@@ -2192,48 +2230,130 @@ def test_the_beer_ph_agreement_is_conditional_on_the_scenario_pitch():
 # ======================================================================================
 
 
-def test_the_uptake_activation_energy_is_inert_at_the_attenuation_benchmark():
-    """§2.2's benchmark cannot see `E_a_uptake` at all, and that is exact (D-217 §1).
+def test_the_uptake_activation_energy_is_no_longer_inert_at_the_attenuation_benchmark():
+    """D-216 §6's decoupling lever is GONE, not weakened (D-217 §1, corrected at D-221 §6).
 
-    D-216 §6 named `E_a_uptake` as the only lever that decouples beer's two speed anchors,
-    on the grounds that the benchmark runs at exactly ``T_ref`` = 20 °C so its Arrhenius
-    factor is 1.0 by construction. That was inherited from a note in ``beer_generic.yaml``
-    and spot-checked at one band edge. This asserts it across the whole band and well
-    outside it, on both signs, because the argument the archive now rests on is not "the
-    benchmark barely moves" but "the benchmark does not move".
+    **What this test used to assert, and why it was true.** D-216 §6 named `E_a_uptake` as the
+    only lever that decouples beer's two speed anchors — the one knob that could move Tyrell's
+    15 °C course without moving §2.2 — on the grounds that the benchmark ran at exactly
+    ``T_ref`` = 20 °C, so its Arrhenius factor was 1.0 whatever ``E_a`` was. D-217 §1 asserted
+    that across the whole printed band and well outside it, on both signs, and measured it at
+    **exactly 0.0000 d**. That measurement was correct and is preserved below as a statement
+    about the retired frame.
 
-    The arm at −97,000 J/mol is de Andres-Toro's fitted sugar-uptake term, the one figure
-    that would nearly close Tyrell's gap; it is swept here to show that even a value of the
-    opposite SIGN leaves this anchor untouched. Nothing here endorses it.
+    **Why it stops being true.** The freedom was never a fact about yeast. It was an artefact of
+    the two anchors sitting at different temperatures, and §2.2's temperature was the one the
+    literature contradicts. D-221 re-temperatured the criterion to 15 °C — which is
+    :data:`TYRELL_TRIAL_CELSIUS` **exactly**. Both anchors now run at one temperature, so
+    ``E_a_uptake`` enters both through an identical Arrhenius factor and can no longer move
+    either one alone.
 
-    **A RED names a change to the frame, not to a rate.** The only way this fails is if the
-    benchmark stops running at ``T_ref``, or uptake stops being Arrhenius in it — either of
-    which silently converts D-216's refusal from "two anchors conflict" into "one knob
-    moves both", and would have to be priced before any of section 10 is read again.
+    **There is no magnitude argument to fall back on.** Across the printed 30,000-63,000 J/mol
+    band the criterion moves **1.75 d** — against a window only 2.0 d wide. The parameter went
+    from the criterion's most inert to one of its strongest levers in a single frame change.
+    D-216 §6's argument does not survive in a weaker form; it is spent.
+
+    The span is pinned on the criterion's own **1 h output grid**, whose quantum is 0.0417 d. On
+    a 4x grid D-221 measured 1.7708 d; the 0.0208 d difference is half that quantum and not a
+    model difference, so the tolerance below is set wider than one quantum deliberately
+    [[feedback-pin-tolerance-vs-solver-tolerance]].
+
+    **What is NOT affected.** D-217's refusal to re-source ``E_a_uptake`` rests on the corpus
+    having nothing, not on this lever, and is untouched. And the low band edge does not rescue
+    the criterion either: 30,000 J/mol gives 7.69 d, still outside 5-7.
+
+    **A RED names which half moved.** The 20 °C arm is a claim about arithmetic (at ``T_ref`` the
+    Arrhenius factor is 1.0 by construction) and can only fail if uptake stops being Arrhenius.
+    The 15 °C arm is a claim about the shipped frame and fails if the criterion is re-temperatured
+    again.
     """
-    baseline = _beer_days_to_target_gravity()
-    assert 5.0 <= baseline <= 7.0, (
-        f"the benchmark wort attenuates in {baseline:.2f} d at the shipped parameters, outside "
-        "§2.2's 5-7 d window. The control failed, so nothing below is attributable"
+    from tests.benchmarks.test_milestone1 import _BEER_BENCH_CELSIUS
+
+    assert _BEER_BENCH_CELSIUS == TYRELL_TRIAL_CELSIUS, (
+        f"the criterion runs at {_BEER_BENCH_CELSIUS} °C and Tyrell's trial at "
+        f"{TYRELL_TRIAL_CELSIUS} °C. D-221's whole finding is that these coincide, which is what "
+        "makes E_a_uptake degenerate between the two anchors. If they have separated again, the "
+        "decoupling lever may be back and D-216 §6 needs re-reading rather than citing"
     )
 
+    # The RETIRED 20 C frame: D-217's measurement, preserved as a claim about arithmetic.
+    retired = _beer_days_to_target_gravity(celsius=20.0)
     for e_a in (-97000.0, 0.0, 30000.0, 55100.0, 63000.0, 80000.0):
-        got = _beer_days_to_target_gravity(E_a_uptake=e_a)
-        assert got == baseline, (
-            f"E_a_uptake = {e_a:.0f} J/mol moves the benchmark to {got:.4f} d against a "
-            f"baseline of {baseline:.4f} d. D-216 §6's decoupling argument requires this to "
-            "be EXACTLY zero — the benchmark is supposed to sit at T_ref, where the Arrhenius "
-            "factor is 1.0 by construction"
+        got = _beer_days_to_target_gravity(celsius=20.0, E_a_uptake=e_a)
+        assert got == retired, (
+            f"at the RETIRED 20 °C frame E_a_uptake = {e_a:.0f} J/mol moves the criterion to "
+            f"{got:.4f} d against {retired:.4f} d. This must stay EXACTLY zero: 20 °C is T_ref, "
+            "where the Arrhenius factor is 1.0 by construction. A RED means uptake has stopped "
+            "being Arrhenius, not that the frame moved"
         )
+
+    # The LIVE 15 C criterion: the lever D-216 s6 relied on being absent.
+    lo = _beer_days_to_target_gravity(E_a_uptake=30000.0)
+    hi = _beer_days_to_target_gravity(E_a_uptake=63000.0)
+    span = hi - lo
+    assert span == pytest.approx(1.75, abs=0.05), (
+        f"across the printed E_a_uptake band the live criterion moves {span:.4f} d; D-221 "
+        f"measured 1.75 on this 1 h grid ({lo:.4f} -> {hi:.4f}), 1.7708 on a 4x grid. TWO "
+        "different changes land here and the endpoints above tell them apart. Collapsed toward "
+        "ZERO with both endpoints near each other: the criterion has drifted back to T_ref and "
+        "D-221 §6 needs redoing. Merely SMALLER with both endpoints faster: the uptake rate "
+        "moved, and a quicker engine spends less of the run in the temperature-sensitive limb — "
+        "check q_sugar_max before concluding anything about the frame"
+    )
+    window_width = BENCHMARKS["beer_attenuation"].high - BENCHMARKS["beer_attenuation"].low
+    assert span > 0.5 * window_width, (
+        f"the E_a_uptake band moves the criterion {span:.4f} d against a window {window_width:.1f} "
+        "d wide. D-216 §6's decoupling argument required this to be ZERO; D-221 records that it "
+        "is most of the window. A RED here would mean the lever is small enough to argue on "
+        "magnitude again, which is a result — re-open D-216 §6"
+    )
+    assert lo > BENCHMARKS["beer_attenuation"].high, (
+        f"the low E_a_uptake edge takes the criterion to {lo:.4f} d, INSIDE the window. That "
+        "would make E_a_uptake alone a route to closing D-221's miss without touching the rate, "
+        "which no record has priced"
+    )
+
+    # E_a_growth's note carried the same 20 C inertness claim and loses it the same way, but
+    # it is a much weaker lever and the numbers are asserted so the two notes cannot drift apart.
+    g_retired = {
+        e: _beer_days_to_target_gravity(celsius=20.0, E_a_growth=e) for e in (30000.0, 63000.0)
+    }
+    assert g_retired[30000.0] == g_retired[63000.0], (
+        f"at the RETIRED 20 °C frame E_a_growth spans {g_retired}. Like E_a_uptake this must be "
+        "exactly zero at T_ref; a RED means growth has stopped being Arrhenius"
+    )
+    g_span = _beer_days_to_target_gravity(E_a_growth=63000.0) - _beer_days_to_target_gravity(
+        E_a_growth=30000.0
+    )
+    assert g_span == pytest.approx(0.2917, abs=0.05), (
+        f"across its printed band E_a_growth moves the live criterion {g_span:.4f} d; D-221 "
+        "measured 0.2917. beer_generic.yaml's note for that parameter quotes this number"
+    )
+    assert g_span < 0.25 * span, (
+        f"E_a_growth moves the criterion {g_span:.4f} d against E_a_uptake's {span:.4f} d. The "
+        "file header's claim that growth is the weaker lever on attenuation is what makes the "
+        "two corrected notes consistent; if they have converged, both notes need re-reading"
+    )
 
 
 def test_the_uptake_activation_energy_is_a_lever_only_because_the_trial_ran_cool():
-    """The lever's whole size is Tyrell's distance from ``T_ref`` (D-217 §4).
+    """The lever's whole size is Tyrell's distance from ``T_ref`` (D-217 §4, D-221 §6).
 
-    `E_a_uptake` is free at the benchmark (test above), so it is the one parameter that can
-    move Tyrell without moving §2.2. That is true only because Tyrell's tube trial ran
-    *below* 20 °C. Had it run at ``T_ref``, both anchors would sit at an Arrhenius factor of
-    1.0 and the lever would not exist — sweeping the entire printed band would move nothing.
+    **The sentence this docstring used to open with is now false and is kept here as the
+    correction, not deleted.** It read: *"`E_a_uptake` is free at the benchmark, so it is the
+    one parameter that can move Tyrell without moving §2.2."* That was true only while the two
+    anchors sat at different temperatures, and the difference was an artefact — §2.2 was
+    asserted at a 20 °C the literature contradicts. D-221 re-temperatured it to 15 °C, which is
+    :data:`TYRELL_TRIAL_CELSIUS` exactly, so both anchors now take the SAME Arrhenius factor and
+    the parameter moves both together. At the live criterion the printed band is worth 1.75 d
+    against a 2.0 d window (see
+    ``test_the_uptake_activation_energy_is_no_longer_inert_at_the_attenuation_benchmark``).
+
+    What survives, and is what this test actually measures, is the arithmetic underneath: the
+    lever exists at all only because a trial runs away from ``T_ref``. Had Tyrell's tube run AT
+    ``T_ref``, sweeping the entire printed band would move nothing. That is still true, still
+    asserted below on both arms, and is now a statement about Arrhenius rather than about a
+    decoupling that no longer exists.
 
     Both arms are asserted because one alone would mislead. The 15 °C arm on its own reads
     as "there is a lever"; the 20 °C arm on its own reads as "there is no lever". Together
@@ -2378,12 +2498,34 @@ Q_SUGAR_MAX_UNREACHABLE_AT_18_PG = 1.5
 Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG = 0.8971
 
 #: What §2.2's benchmark then reads, per reading. Only one lands inside 5-7 d.
+#: What §2.2's criterion reads when the engine is re-rated to Foster's 72 h endpoint, per
+#: reading of the per-cell dry mass. **RE-MEASURED at D-221 against the criterion's corrected
+#: 15 °C**; the retired 20 °C figures D-218 measured are kept below because the two together
+#: are the finding — the surviving row moves from the RETIRED 100 pg reading to the SETTLED
+#: 40 pg one, so the temperature repair and the cell-mass settlement agree where the old
+#: pairing had them in conflict.
 HANDOFF_DAYS_AT_FOSTER_RATE: dict[float, float] = {
+    18.0: 3.8333,
+    40.0: 5.4167,
+    50.0: 5.9583,
+    100.0: 8.1667,
+}
+
+#: D-218's own figures at the criterion's retired 20 °C frame. Pinned, not deleted: a claim
+#: measured in a frame that has moved is still a true claim about that frame, and the inversion
+#: between these two dicts is what D-221 §7 asserts.
+HANDOFF_DAYS_AT_FOSTER_RATE_RETIRED_20C: dict[float, float] = {
     18.0: 2.5833,
     40.0: 3.6250,
     50.0: 4.0,
     100.0: 5.5,
 }
+
+#: The lowest ``E_a_uptake`` at which the SETTLED 40 pg row sits inside §2.2's window (D-221 §7).
+#: Below it the Foster-matching rate overshoots the criterion on the fast side, so the new
+#: compatibility is real but conditional: it holds over 69 % of the printed 30,000-63,000 band,
+#: and the shipped 55,100 is inside that part. Bisected, not read off a grid.
+E_A_UPTAKE_ADMITTING_FOSTER_AT_SETTLED_MASS = 40165.0
 
 
 def _foster_pitch_gpl(pg_per_cell: float) -> float:
@@ -2506,10 +2648,16 @@ def test_fosters_temperature_pair_cannot_discriminate_anywhere_in_the_uptake_ban
     becoming informative, which would be news and would license re-opening D-217's refusal.
     A RED on the control names the opposite: the predicate has gone slack.
     """
+    # The engine-state control. It used to read "§2.2 passes"; D-221 established that it does
+    # not, at the criterion's corrected 15 °C, so the control now asserts the state D-221
+    # measured. Its job is unchanged — to distinguish "the arms below say something" from "the
+    # engine is in an unexpected state" — but a control asserting something false attributes
+    # nothing at all.
     baseline = _beer_days_to_target_gravity()
-    assert 5.0 <= baseline <= 7.0, (
-        f"the benchmark wort attenuates in {baseline:.2f} d at the shipped parameters, outside "
-        "§2.2's 5-7 d window. The control failed, so nothing below is attributable"
+    assert baseline == pytest.approx(9.0, abs=0.1), (
+        f"the criterion wort attenuates in {baseline:.2f} d at the shipped parameters; D-221 "
+        "measured 9.00 d at the corrected 15 °C. The control failed, so nothing below is "
+        "attributable"
     )
 
     for e_a in (30000.0, 55100.0, 63000.0):
@@ -2630,42 +2778,56 @@ def test_the_beer_temperature_ratio_is_pitch_invariant_only_near_the_nominal(
     )
 
 
-def test_fosters_endpoint_breaks_the_handoff_window_at_every_reading_but_one():
-    """§2.2's 5-7 d window survives in ONE corner, and it is the doubtful one (D-218 §3).
+def test_fosters_endpoint_and_the_handoff_window_agree_at_the_settled_conversion():
+    """The two literature anchors stop conflicting once the criterion is re-temperatured
+    (D-218 §3, INVERTED at D-221 §7).
 
-    D-216 §11 asked which anchor to calibrate beer's speed against. Foster answers it on the
-    terms the brief itself sets — same target gravity, a wort within 0.003 SG — and the answer
-    is *faster than the brief*, at every reading. What stops that from being a verdict is that
-    the model needs Foster's cells/mL as a g/L, and the conversion is unsourced and internally
-    inconsistent (:data:`PER_CELL_DRY_MASS_PG`).
+    D-216 §11 asked which anchor to calibrate beer's speed against. D-218 answered *"Foster,
+    and the brief is wrong"* — because at the criterion's then-asserted 20 °C a rate reaching
+    Foster's 72 h endpoint took §2.2 to 3.63 d at the settled cell mass, well outside 5-7 d.
+    D-221 re-temperatured the criterion to 15 °C, and that reading inverts.
 
-    Each row: the ``q_sugar_max`` that puts the model on Foster's 72 h endpoint, and what
-    §2.2's benchmark then reads.
+    Each row: the ``q_sugar_max`` that puts the model on Foster's 72 h endpoint at one reading
+    of the per-cell dry mass, and what §2.2's criterion then reads in each frame.
 
-    ======================  =========  ===============  ==========
-    per-cell mass           pitch g/L  ``q_sugar_max``  §2.2 reads
-    ======================  =========  ===============  ==========
-    18 pg (retired)             0.216  1.5 = CEILING       2.58 d
-    40 pg (SETTLED, D-219)      0.480  0.924             **3.63 d**
-    50 pg                       0.600  0.818               4.00 d
-    100 pg (retired)            1.200  0.560               5.50 d
-    ======================  =========  ===============  ==========
+    ======================  =========  ===============  ==============  ==============
+    per-cell mass           pitch g/L  ``q_sugar_max``  §2.2 at 15 °C   §2.2 at 20 °C
+    ======================  =========  ===============  ==============  ==============
+    18 pg (retired)             0.216  1.5 = CEILING          3.83 d          2.58 d
+    40 pg (SETTLED, D-219)      0.480  0.924            **5.42 d IN**         3.63 d
+    50 pg                       0.600  0.818            **5.96 d IN**         4.00 d
+    100 pg (retired)            1.200  0.560                  8.17 d    5.50 d IN
+    ======================  =========  ===============  ==============  ==============
 
-    Only the last survives 5-7 d, and **D-219 retired it**: the settled conversion is 40
-    pg/cell, the row above it, so §2.2's window does not survive. When D-218 wrote this the
-    survivor was merely the doubtful corner; it is now the one reading known to be wrong.
+    **The survivor moves from the retired reading to the settled one.** At 20 °C exactly one
+    row sat inside the window and it was the 100 pg conversion D-219 retired — the survivor was
+    the reading known to be wrong. At 15 °C the surviving rows are the settled 40 pg one and its
+    neighbour, and the retired 100 pg row is the one that now fails. Two independent repairs —
+    D-219's cell-mass settlement and D-221's temperature correction — agree where the old
+    pairing had them in conflict.
 
-    **And it survives only because Foster's 3 d is read as exact.** Take the open
-    end of the sampling interval instead (d22 -> 2 d, still consistent with every word in the
-    paper) and the 100 pg row goes to 3.71 d: the window then breaks in all eight bracket
-    cells. That arm is asserted here because it is the whole difference between "one corner
-    survives" and "nothing does".
+    **The agreement is real but CONDITIONAL, and the sweep is why that is known.** D-221 measured
+    that the printed ``E_a_uptake`` band moves this criterion 1.75 d against a 2.0 d window, so
+    a single in-band reading proves nothing on its own
+    [[feedback-a-hit-can-be-two-errors-cancelling]]. Swept, the settled row sits inside the
+    window from :data:`E_A_UPTAKE_ADMITTING_FOSTER_AT_SETTLED_MASS` upward — 69 % of the printed
+    band, with the shipped 55,100 inside it — and overshoots on the fast side below that
+    (30,000 -> 4.71 d). The claim is *"compatible over most of the band including the shipped
+    value"*, never *"compatible"*.
 
-    **What this test does NOT do is retire the window.** §2.2's benchmark passes today at
-    6.08 d and is untouched. Retiring it means moving ``q_sugar_max``, which D-216 §4 already
-    priced: no value of it reproduces Tyrell's shape, so a rate that satisfies Foster still
-    misses the trajectory. A RED here names one of the pins moving, and the first thing to
-    check is whether the per-cell mass finally got sourced.
+    **D-218 §3's central caveat also inverts.** There the survivor held only because Foster's
+    3 d was read as exact; at the open end of the sampling interval the 100 pg row went to
+    3.71 d and the window broke in all eight bracket cells. At 15 °C that same open-end arm
+    reads 5.54 d — inside. The window's survival is no longer conditional on treating a 72 h
+    sample as an exact duration.
+
+    **What this test does NOT say is that the model passes.** All four rows are RE-RATED engines.
+    The shipped ``q_sugar_max`` = 0.5 takes the criterion to 9.00 d and that is D-221's headline
+    xfail. What inverts here is which *literature* anchors can be satisfied together, not whether
+    the engine satisfies them. Tyrell's extract schedule remains incompatible with both
+    (``test_matching_tyrells_extract_schedule_overshoots_the_attenuation_benchmark``).
+
+    A RED names one of the pins moving; check first whether the criterion's temperature moved.
     """
     from tests.benchmarks.test_milestone1 import TARGET_FG_SG
 
@@ -2707,10 +2869,31 @@ def test_fosters_endpoint_breaks_the_handoff_window_at_every_reading_but_one():
         )
         verdicts[pg] = 5.0 <= benchmark <= 7.0
 
-    assert verdicts == {18.0: False, 40.0: False, 50.0: False, 100.0: True}, (
-        f"the window's survival per per-cell reading is now {verdicts}. D-218 measured exactly "
-        "one survivor, at the 100 pg reading beer_generic.yaml calls ~2x textbook. A change here "
-        "is a change to the ANSWER of D-216 §11, not to a number"
+    assert verdicts == {18.0: False, 40.0: True, 50.0: True, 100.0: False}, (
+        f"the window's survival per per-cell reading is now {verdicts}. D-221 measured survivors "
+        "at the SETTLED 40 pg reading and its 50 pg neighbour, with the retired 100 pg reading "
+        "failing — the exact inverse of D-218's {18: F, 40: F, 50: F, 100: T} at the retired "
+        "20 °C. A change here is a change to the ANSWER of D-216 §11, not to a number"
+    )
+
+    # The agreement above is CONDITIONAL on E_a_uptake, and unswept it would be a coincidence
+    # wearing a result's clothes. [[feedback-a-hit-can-be-two-errors-cancelling]]
+    settled_q = Q_SUGAR_MAX_REACHING_FOSTER[40.0]
+    below = _beer_days_to_target_gravity(
+        q_sugar_max=settled_q, E_a_uptake=E_A_UPTAKE_ADMITTING_FOSTER_AT_SETTLED_MASS - 5000.0
+    )
+    above = _beer_days_to_target_gravity(
+        q_sugar_max=settled_q, E_a_uptake=E_A_UPTAKE_ADMITTING_FOSTER_AT_SETTLED_MASS + 5000.0
+    )
+    assert below < 5.0 <= above, (
+        f"the settled row reads {below:.4f} d below the crossing and {above:.4f} d above it; "
+        f"D-221 bisected the crossing at {E_A_UPTAKE_ADMITTING_FOSTER_AT_SETTLED_MASS:.0f} J/mol. "
+        "If it no longer straddles, the compatibility is either unconditional or gone, and "
+        "either way the docstring's '69 % of the band' is wrong"
+    )
+    assert _beer_days_to_target_gravity(q_sugar_max=settled_q, E_a_uptake=30000.0) < 5.0, (
+        "the settled row is inside the window at the LOW printed E_a_uptake edge too, so the "
+        "compatibility is unconditional and D-221 §7's careful hedge should be retired"
     )
 
     # The open end of Foster's sampling interval, on the one row that survived above.
@@ -2725,11 +2908,20 @@ def test_fosters_endpoint_breaks_the_handoff_window_at_every_reading_but_one():
         "reading the benchmark below"
     )
     open_end = _beer_days_to_target_gravity(q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG)
-    assert not 5.0 <= open_end <= 7.0 and open_end == pytest.approx(3.71, abs=0.05), (
+    assert 5.0 <= open_end <= 7.0 and open_end == pytest.approx(5.54, abs=0.05), (
         f"reading Foster's endpoint at the open end of its sampling interval takes §2.2 to "
-        f"{open_end:.4f} d; D-218 measured 3.71, outside 5-7. If this is now inside the window, "
-        "the single surviving corner in the table above is no longer conditional on treating a "
-        "72 h SAMPLE as an exact duration, and D-218 §3's central caveat is void"
+        f"{open_end:.4f} d; D-221 measured 5.54 at 15 °C, INSIDE 5-7, where D-218 measured 3.71 "
+        "at the retired 20 °C and outside. This is the assert that says D-218 §3's central "
+        "caveat inverted: the window's survival no longer depends on treating a 72 h SAMPLE as "
+        "an exact duration"
+    )
+    retired_open_end = _beer_days_to_target_gravity(
+        q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG, celsius=20.0
+    )
+    assert retired_open_end == pytest.approx(3.71, abs=0.05), (
+        f"D-218's own open-end figure re-reads as {retired_open_end:.4f} d in its own 20 °C "
+        "frame, not 3.71. That record's measurement must survive its frame being retired — a "
+        "RED here means the inversion above is an arithmetic change, not a frame change"
     )
 
 
@@ -2862,26 +3054,39 @@ def test_the_beer_scenario_carries_two_and_a_half_times_tyrells_counted_biomass(
     )
 
 
-def test_the_handoff_window_does_not_survive_the_settled_conversion():
-    """§2.2's 5-7 d window fails, and D-219 is what makes that a verdict (D-218 §4).
+def test_the_handoff_window_survives_the_settled_conversion_once_it_is_temperatured_right():
+    """§2.2's window is corroborated, not refuted — the refutation was the temperature
+    (D-218 §4, D-219 §5c, INVERTED at D-221 §7).
 
-    §12's fork table swept four readings of the per-cell mass and found the window surviving
-    in exactly one cell — the 100 pg reading. D-219 settles the conversion at **40 pg/cell**,
-    Coleman's own, which is a different row of that table: the Foster-matching rate takes the
-    benchmark to **3.63 d**. So the surviving corner is the retired reading, and the window
-    does not survive.
+    **This test previously asserted the opposite, and its own RED message named this outcome.**
+    It read: *"That reverses D-218 §4 and the brief's window would be corroborated by a
+    third-party trial rather than refuted by one."* That is precisely what happened, and it
+    happened without any rate moving.
+
+    §12's fork table sweeps four readings of the per-cell mass. At the criterion's asserted
+    20 °C the window survived in exactly one cell — the 100 pg reading D-219 retired — so the
+    verdict was *the window does not survive*. D-220 then recovered Foster's own course and
+    found the brief's 5-7 d duration real at **15 °C**, where the same three commercial ale
+    controls take 5.06-6.26 d, and impossible at 20 °C, where they take 2.91-3.77 d. D-221
+    re-temperatured the criterion accordingly, and at the settled **40 pg/cell** the
+    Foster-matching rate takes it to **5.42 d — inside**.
 
     Two separate things are asserted, and the order matters:
 
-    1. the settled reading is IN the swept bracket and its verdict is False — the sweep is
+    1. the settled reading is IN the swept bracket and its verdict is now True — the sweep is
        not being re-run here, it is being pointed at;
-    2. the one reading whose verdict is True is a RETIRED one.
+    2. the readings whose verdict is False now include the RETIRED 100 pg one, which is the
+       only cell that survived in the old frame.
 
-    **The window is still not retired in code, and that is not deference.** Retiring it means
-    moving ``q_sugar_max``, and D-216 §4 priced that: a rate satisfying Foster leaves the
-    model finishing a day early against both measured tails while still missing both measured
-    day 2s. Fitting an acceptance criterion the model passes today to a rate that fits the
-    data worse in SHAPE is not a fidelity gain. The verdict is recorded; the knob is not moved.
+    **What died is the PAIRING, not the duration.** D-218 §4 and D-219 §5c both concluded that
+    nothing supports 5-7 days. Corrected, the duration is supported and the 20 °C it was
+    asserted at is not — [[feedback-right-number-wrong-condition]] for the second time on this
+    same window.
+
+    **The window is still not something the engine passes.** These rows are re-rated engines;
+    the shipped rate takes the criterion to 9.00 d, which is D-221's xfail. Retiring or
+    satisfying the window means moving ``q_sugar_max``, and D-216 §4's shape objection is
+    untouched by any of this. The verdict is recorded; the knob is not moved.
 
     A RED here is a change to the ANSWER, not to a digit.
     """
@@ -2903,21 +3108,33 @@ def test_the_handoff_window_does_not_survive_the_settled_conversion():
 
     benchmark = _beer_days_to_target_gravity(q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER[40.0])
     assert benchmark == pytest.approx(HANDOFF_DAYS_AT_FOSTER_RATE[40.0], abs=0.05)
-    assert not (5.0 <= benchmark <= 7.0), (
+    assert 5.0 <= benchmark <= 7.0, (
         f"at the settled conversion the Foster-matching rate takes §2.2 to {benchmark:.4f} d, "
-        "which is now INSIDE the 5-7 d window. That reverses D-218 §4 and the brief's window "
-        "would be corroborated by a third-party trial rather than refuted by one"
+        "which is OUTSIDE the 5-7 d window. D-221 measured 5.42 d at the corrected 15 °C. If "
+        "this has fallen back outside, check the criterion's temperature before anything else"
+    )
+    retired_frame = _beer_days_to_target_gravity(
+        q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER[40.0], celsius=20.0
+    )
+    assert not (5.0 <= retired_frame <= 7.0) and retired_frame == pytest.approx(
+        HANDOFF_DAYS_AT_FOSTER_RATE_RETIRED_20C[40.0], abs=0.05
+    ), (
+        f"in the RETIRED 20 °C frame the same rate reads {retired_frame:.4f} d; D-218 measured "
+        f"{HANDOFF_DAYS_AT_FOSTER_RATE_RETIRED_20C[40.0]}, outside 5-7. Both halves are asserted "
+        "because the finding is the DIFFERENCE between the frames: if the retired frame now "
+        "agrees too, the inversion is not the temperature and D-221 §7 is misattributed"
     )
     survivors = {pg for pg, days in HANDOFF_DAYS_AT_FOSTER_RATE.items() if 5.0 <= days <= 7.0}
-    assert survivors <= set(RETIRED_READINGS_PG.values()), (
-        f"the readings at which §2.2's window survives are {sorted(survivors)}, and at least "
-        "one of them is NOT a retired reading. D-219's point is that the only corner the "
-        "window survives in belongs to a conversion now known to be wrong; if a live reading "
-        "has joined it, this record's §4 needs rewriting rather than citing"
+    assert 40.0 in survivors and not survivors & set(RETIRED_READINGS_PG.values()), (
+        f"the readings at which §2.2's window survives are {sorted(survivors)}. D-221 measured "
+        "{40.0, 50.0}: the SETTLED conversion must be among them and no RETIRED one may be. "
+        "At the criterion's old 20 °C this assert held the opposite — the sole survivor was the "
+        "retired 100 pg reading — so a RED here says the frames have swapped back and D-221 §7 "
+        "needs re-reading rather than citing"
     )
     assert survivors, (
         "no reading in the bracket survives 5-7 d at all. The verdict is unchanged but the "
-        "CONTRAST this test is built on is gone -- 'the survivor is the retired one' becomes "
+        "CONTRAST this test is built on is gone -- 'the settled reading is the survivor' becomes "
         "vacuous, and the guard would then pass on a broken sweep"
     )
 

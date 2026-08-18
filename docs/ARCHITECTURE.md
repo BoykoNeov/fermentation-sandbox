@@ -428,8 +428,13 @@ Two disciplines, both as code:
   `total_mass` weight each state variable using the shared stoichiometry in `core/chemistry.py`, so
   a check can never disagree with the kinetics it audits. Carbon and nitrogen are rigorous atom
   balances; mass is scoped to the abiotic `S + E + CO₂` conversion (D-8).
-- **Benchmark curves** — the §2.2 acceptance criteria are encoded as `BenchmarkSpec` data and
-  **pass**, gated behind the `benchmark` pytest marker (`uv run pytest -m benchmark`).
+- **Benchmark curves** — the §2.2 acceptance criteria are encoded as `BenchmarkSpec` data, gated
+  behind the `benchmark` pytest marker (`uv run pytest -m benchmark`). The wine and CO₂ criteria
+  **pass**; the **beer attenuation criterion is a strict `xfail` since D-221**, which
+  re-temperatured it from 20 to 15 °C on Foster 2022's measured course — the handoff's 5-7 d
+  duration is real at 15 °C and impossible at the 20 °C it was asserted at, and at the corrected
+  temperature the engine takes 9.00 d. Its 20 °C pass was a criterion calibrated to a cooler
+  ferment certifying a model that is ~1.5× too slow (D-220).
   `ReferenceSeries` + `compare_series` are the seam for scoring against real measured datasets.
 
 ## Testing & quality gates

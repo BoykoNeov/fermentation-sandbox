@@ -136,13 +136,25 @@ BENCHMARKS: dict[str, BenchmarkSpec] = {
     ),
     "beer_attenuation": BenchmarkSpec(
         key="beer_attenuation",
-        description="A ~1.048 OG ale wort at 20 C attenuates to roughly 1.010.",
+        description=(
+            "A ~1.048 OG ale wort attenuates to roughly 1.010 in 5-7 d. RE-TEMPERATURED at "
+            "decision D-221: the handoff asserts this duration at 20 C, and the duration is "
+            "real while that pairing is not. Foster et al. 2022's Supplementary Figure 1 runs "
+            "the same 1.010 target on a 1.045 wort at eight temperatures; its three commercial "
+            "ale controls take 5.06-6.26 d at 15 C and 2.91-3.77 d at 22 C, so 20 C cannot take "
+            "5-7 d. Only the CONDITIONS moved - the 5-7 d window is the handoff's own and is "
+            "wider than Foster's measured band, which is the reading generous to the model."
+        ),
         metric="days_to_target_gravity",
         low=5.0,
         high=7.0,
         unit="day",
-        conditions="OG 1.048 -> ~1.010, 20 C, single ale strain",
-        source="handoff section 2.2 (beer benchmark)",
+        conditions="OG 1.048 -> ~1.010, 15 C, single ale strain",
+        source=(
+            "handoff section 2.2 (beer benchmark), re-temperatured to Foster et al. 2022 "
+            "(Front. Microbiol. 13:747546, doi:10.3389/fmicb.2022.747546) Supp. Fig. S1 "
+            "(decision D-221); the 1.010 target is Parker 2008 in both sources"
+        ),
     ),
     "co2_peak_then_tail": BenchmarkSpec(
         key="co2_peak_then_tail",
