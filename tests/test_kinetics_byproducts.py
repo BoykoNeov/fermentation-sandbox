@@ -1120,6 +1120,18 @@ _BEER_AROMA_TARGETS_MGL = {
     "ethyl_acetate": 20.0,
     "isoamyl_acetate": 2.2,
 }
+#: How each target is SPELLED in its own parameter's `conditions:` field, so the numbers above
+#: can be checked against the sentence that specifies them rather than standing as a second,
+#: silently-divergent copy (the D-158 discipline: recompute from the seam, never re-transcribe).
+_BEER_AROMA_TARGET_LITERALS = {
+    "propanol": "10 mg/L",
+    "isobutanol": "9.6 mg/L",
+    "active_amyl_alcohol": "10.3 mg/L",
+    "isoamyl_alcohol": "30.0 mg/L",
+    "2_phenylethanol": "25.7 mg/L",
+    "ethyl_acetate": "20.0 mg/L",
+    "isoamyl_acetate": "2.2 mg/L",
+}
 #: The frame the constants are calibrated in, stated rather than implied. It is load-bearing:
 #: `E_a_esters` is 200 kJ/mol, so the same run at 15 C lands ethyl acetate at 6.10 mg/L, below
 #: its own 10 mg/L floor. 20 C is a typical ale ferment; the 15 C in the Sec 2.2 DURATION
@@ -1189,6 +1201,27 @@ def _beer_data_dir_at(tmp_path, **values: float):
     return dest
 
 
+def _band_edges(parameters, name: str, expected_low: float, expected_high: float):
+    """The parameter's own drawn band edges, plus a loud check that they are the ones measured.
+
+    Reading them keeps an "at the band edge" arm at the edge when the band moves; asserting the
+    values keeps the RATIOS this file pins meaningful, since they were measured at these edges.
+    A band that moves therefore fails here with its own name rather than quietly turning an edge
+    test into an interior one.
+    """
+    band = parameters[name].uncertainty
+    assert band is not None, name
+    assert band.low == pytest.approx(expected_low), (
+        f"{name}'s low edge is {band.low}, not the {expected_low} the ratios below were "
+        f"measured at -- re-measure them before re-pinning."
+    )
+    assert band.high == pytest.approx(expected_high), (
+        f"{name}'s high edge is {band.high}, not the {expected_high} the ratios below were "
+        f"measured at -- re-measure them before re-pinning."
+    )
+    return band.low, band.high
+
+
 def test_the_finished_beer_lands_the_aroma_levels_its_rate_constants_are_defined_by():
     """Every one of the seven lands the level its own provenance says the k was set for.
 
@@ -1197,6 +1230,18 @@ def test_the_finished_beer_lands_the_aroma_levels_its_rate_constants_are_defined
     currently produces: a snapshot re-pinned each time the engine moves records the drift instead
     of catching it.
     """
+    # First: the seven targets above are not a second copy of the spec, they ARE the spec --
+    # each one appears verbatim in its own parameter's `conditions:` field, so a re-sourcing that
+    # moves the sentence fails here instead of leaving two numbers to diverge.
+    beer = load_parameters(default_data_dir() / "beer_generic.yaml")
+    for pool, literal in _BEER_AROMA_TARGET_LITERALS.items():
+        conditions = beer[f"k_{pool}"].provenance.conditions
+        assert literal in conditions, (
+            f"k_{pool}'s `conditions:` no longer says it is set to land {literal}; the target in "
+            f"this file is now a transcription rather than a reading of the spec."
+        )
+        assert float(literal.split()[0]) == _BEER_AROMA_TARGETS_MGL[pool]
+
     levels = _beer_aroma_levels_mgl()
     for pool, target in _BEER_AROMA_TARGETS_MGL.items():
         assert levels[pool] == pytest.approx(target, rel=0.01), (
@@ -1236,9 +1281,16 @@ def test_each_drawn_speed_knob_moves_only_the_half_of_the_aroma_set_it_is_couple
     (feedback-pin-the-band-not-the-nominal, and D-223 Sec 9 committed exactly that defect).
     """
     nominal = _beer_aroma_levels_mgl()
+    # The edges are READ, never transcribed. Both bands were rebuilt inside the last three
+    # records -- D-222 rebuilt `mu_max`'s and D-223 rebuilt `q_sugar_max`'s -- so a literal here
+    # would silently become an INTERIOR point the next time either widens, while this test's name
+    # went on claiming the edge.
+    beer = load_parameters(default_data_dir() / "beer_generic.yaml")
+    mu_lo, mu_hi = _band_edges(beer, "mu_max", 0.053, 0.075)
+    q_lo, q_hi = _band_edges(beer, "q_sugar_max", 0.634, 0.818)
 
-    mu_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=0.053))
-    mu_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=0.075))
+    mu_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=mu_lo))
+    mu_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=mu_hi))
     for pool in _BEER_EHRLICH_POOLS:
         assert mu_slow[pool] / nominal[pool] == pytest.approx(1.094, abs=0.005), pool
         assert mu_fast[pool] / nominal[pool] == pytest.approx(0.774, abs=0.005), pool
@@ -1252,8 +1304,8 @@ def test_each_drawn_speed_knob_moves_only_the_half_of_the_aroma_set_it_is_couple
         0.789, abs=0.005
     )
 
-    q_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=0.634))
-    q_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=0.818))
+    q_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=q_lo))
+    q_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=q_hi))
     assert q_slow["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.111, abs=0.005)
     assert q_fast["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.897, abs=0.005)
     for pool in _BEER_EHRLICH_POOLS:
@@ -1322,22 +1374,71 @@ def test_the_five_ehrlich_bands_are_the_multiple_of_their_nominal_their_own_note
         assert param.uncertainty.high / param.value == pytest.approx(high_mult, rel=0.01), name
 
 
-def test_the_two_beer_ester_bands_are_rescalings_of_their_nominal_not_fixed_edges():
-    """The esters get the OPPOSITE treatment from the five Ehrlich k above, on purpose.
+def test_the_ethyl_acetate_band_spans_its_sourced_ale_range_and_its_top_reaches_the_threshold(
+    tmp_path,
+):
+    """The band is COMPUTED to span 10-30 mg/L, and the sensory consequence is pinned, not glossed.
 
-    Their band notes state a CONCENTRATION span and the rate is linear in k, so the D-97/D-99
-    convention is to rescale the edges with the nominal -- which pins the same span throughout
-    and is what D-224 did (x1.2636 and x1.2582). The Ehrlich five were corrected instead of
-    rescaled because their stated MULTIPLIER and their actual one disagreed by 2.05x with
-    nothing supporting the actual. Keeping the two rules straight is the point of this test.
+    This is the guard D-224 did not have when it first re-anchored `k_ethyl_acetate`. Rescaling
+    the pre-existing multipliers (x0.5/x1.5455) with the new nominal put the band top at 31.03
+    mg/L -- over this molecule's own sourced 10-30 ale range AND over the ~30 mg/L Meilgaard beer
+    threshold -- while the note beside it still made the OAV claim at the nominal ALONE. That is
+    the exact defect this beat's headline is about, committed inside the fix for it.
+
+    So the edges are computed from runs instead: they span 10.00-30.02 mg/L. The top therefore
+    touches OAV 1.001, which is CORRECT rather than tolerated -- the source says a sound ale sits
+    *at or below* the threshold, so the top of the molecule's own range should reach it. It is
+    still a change: before D-224 the band spanned 7.93-24.52 mg/L (top OAV 0.817) and could not
+    reach the threshold at all, because the nominal was 21 % low. Jointly with `q_sugar_max`'s
+    low edge the reachable maximum is 33.36 mg/L, OAV 1.112.
     """
     beer = load_parameters(default_data_dir() / "beer_generic.yaml")
+    band = beer["k_ethyl_acetate"].uncertainty
+    assert band is not None
+    threshold_mgl = (
+        load_parameters(default_data_dir() / "sensory.yaml").resolve()[
+            "threshold_ethyl_acetate_beer"
+        ]
+        / 1000.0
+    )
+
+    at_low = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, k_ethyl_acetate=band.low))
+    at_high = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, k_ethyl_acetate=band.high))
+    assert at_low["ethyl_acetate"] == pytest.approx(10.0, abs=0.05)
+    assert at_high["ethyl_acetate"] == pytest.approx(30.0, abs=0.05)
+
+    nominal = _beer_aroma_levels_mgl()
+    assert nominal["ethyl_acetate"] / threshold_mgl == pytest.approx(0.669, abs=0.01)
+    assert at_high["ethyl_acetate"] / threshold_mgl == pytest.approx(1.001, abs=0.01)
+
+    # The joint corner with the OTHER drawn knob this pool reads. Stated as a number so a future
+    # re-anchoring cannot quietly move it: a nominal-only OAV claim beside a drawn band is what
+    # D-224 exists to stop.
+    q_lo = _band_edges(beer, "q_sugar_max", 0.634, 0.818)[0]
+    corner = _beer_aroma_levels_mgl(
+        _beer_data_dir_at(tmp_path, k_ethyl_acetate=band.high, q_sugar_max=q_lo)
+    )
+    assert corner["ethyl_acetate"] / threshold_mgl == pytest.approx(1.112, abs=0.01)
+
+
+def test_the_isoamyl_acetate_band_is_rescaled_with_its_nominal_rather_than_recomputed():
+    """Its band gets the OPPOSITE treatment from ethyl acetate's, and from the Ehrlich five.
+
+    Three rules in one file, and keeping them straight is the point of this test and its two
+    siblings:
+
+    * the five Ehrlich `k` -- the stated MULTIPLIER (x0.3/x3) and the actual one (x0.145/x1.45)
+      disagreed by 2.05x with nothing supporting the actual, so the multiplier is CORRECTED;
+    * `k_ethyl_acetate` -- its band carries a sensory threshold at the top of its stated range,
+      so the edges are COMPUTED from runs to span exactly that range;
+    * `k_isoamyl_acetate` -- its stated span and its actual one agree, and its threshold is
+      crossed at the NOMINAL by design (the banana note is an ale signature), so there is no
+      nominal-below-threshold claim to protect. It is RESCALED with the nominal, the D-97/D-99
+      convention, and the band top moved DOWN at D-224 (5.87 -> 4.47 mg/L) rather than up.
+    """
+    beer = load_parameters(default_data_dir() / "beer_generic.yaml")
+    param = beer["k_isoamyl_acetate"]
+    assert param.uncertainty is not None
     # The multipliers D-96/D-97/D-99 shipped, carried through every re-anchoring since.
-    for name, low_mult, high_mult in (
-        ("k_ethyl_acetate", 0.5, 1.5455),
-        ("k_isoamyl_acetate", 0.3286, 2.0896),
-    ):
-        param = beer[name]
-        assert param.uncertainty is not None
-        assert param.uncertainty.low / param.value == pytest.approx(low_mult, rel=0.005), name
-        assert param.uncertainty.high / param.value == pytest.approx(high_mult, rel=0.005), name
+    assert param.uncertainty.low / param.value == pytest.approx(0.3286, rel=0.005)
+    assert param.uncertainty.high / param.value == pytest.approx(2.0896, rel=0.005)

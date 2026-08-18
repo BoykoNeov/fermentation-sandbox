@@ -65,10 +65,18 @@ isobutanol 32.997 against 33.0, 2-phenylethanol 28.713 against 28.7.
 
 `isoamyl_alcohol` is the **only** beer pool of the five with a sourced in-matrix threshold (Meilgaard
 1975, ~50 mg/L). The shipped model ran **48.261 mg/L, OAV 0.965** — within 3.6 % of claiming a solventy
-note the file says a sound ale must not have — and **over the threshold (52.809) at `mu_max`'s low
-edge**; 29 % of triangular draws on that `k` alone crossed it. **The repair moves the NOMINAL 0.965 →
-0.602. It does NOT move the tail** — the corrected band still crosses at its top (33 %), because ×3 the
-mean IS 90 mg/L and such ales exist. [[feedback-a-margin-is-a-claim-about-what-holds-it-open]]
+note the file says a sound ale must not have — and **over the threshold (52.809) at `mu_max`'s low edge**.
+
+**COUNT THE CROSSING JOINTLY, NEVER PER-PARAMETER** (512-member LHS, 75 sampled params, both arms):
+`isoamyl_alcohol` P(> 50 mg/L) **33.20 % → 33.98 %** — unchanged inside ±2.1 pp noise, so **the repair
+moves the NOMINAL (0.965 → 0.602) and NOT the tail**. `ethyl_acetate` P(> 30 mg/L) **3.52 % → 8.79 %** —
+this one DID move, 2.5×, because its band was corrected to span its whole sourced range.
+`isoamyl_acetate` P(> 1.2) 74.4 % → 80.9 % (crossed by design). The first draft used a per-parameter
+marginal (29 % → 33 %) and got the right conclusion for the wrong reason
+[[feedback-a-band-is-per-parameter-a-claim-is-joint]]. **Also: the ensemble MEDIAN higher-alcohol level
+is 40.9 mg/L against a 30.1 nominal** — the ×0.3/×3 band is right-skewed, so a drawn beer is typically
+a third fusel-ier than the nominal one. Never read an ensemble median as the model's answer.
+[[feedback-a-margin-is-a-claim-about-what-holds-it-open]]
 
 ## The band fork — the loser is named, do not re-argue it
 
@@ -78,10 +86,19 @@ birth (both halves landed at 955ebbc; checked with `git log -S`). [[feedback-pin
 
 * **SHIPPED:** edges = the stated multiple of the corrected nominal (isoamyl alcohol spans 9-90 mg/L).
 * **REJECTED:** rescale the shipped edges, preserving ×0.145/×1.45 — it puts Meilgaard's 50 mg/L
-  **outside the band entirely** (29 % → 0), i.e. asserts no ale can be fusel-y. Nothing sources that.
-* **The two ESTER bands get the OPPOSITE treatment on purpose** (rescaled with the nominal, the
-  D-97/D-99 convention) because their stated concentration span and their actual one agree. **Both rules
-  are now tests** — do not apply one where the other belongs.
+  **outside `k_isoamyl_alcohol`'s band entirely**, i.e. asserts no ale can be fusel-y. Nothing sources that.
+* **THREE rules, not two, and all three are tests** — do not apply one where another belongs.
+  `k_isoamyl_acetate` is **rescaled** with its nominal (D-97/D-99 convention: its stated span and its
+  actual one agree, and its threshold is crossed at the NOMINAL by design, so no claim to protect; its
+  band top moved DOWN 5.87 → 4.47 mg/L). **`k_ethyl_acetate` is COMPUTED, not rescaled**, band
+  `[6.93e-5, 2.08e-4]` spanning exactly its sourced **10.00-30.02 mg/L** ale range. The first pass of
+  D-224 rescaled it and put the top at 31.03 mg/L — **over the sourced range AND over Meilgaard's ~30
+  mg/L threshold (OAV 1.034)** beside a note still claiming OAV < 1 at the nominal alone. That is this
+  beat's own headline defect, committed inside the fix for it, and caught on review.
+  **The band top now reads OAV 1.001 where it read 0.817 before D-224 — a RESTORATION, not an
+  over-reach** (the source says a sound ale sits AT OR BELOW the threshold; the old band could not reach
+  it only because the nominal was 21 % low). Joint corner with `q_sugar_max`'s low edge: **33.36 mg/L,
+  OAV 1.112**, guarded and stated.
 
 ## The cost, and why the third ester option was refused
 
@@ -98,10 +115,17 @@ independent reason (that survey mean carries a sour-beer tail). **Never move eth
 
 `test_the_finished_beer_lands_the_aroma_levels_its_rate_constants_are_defined_by` (equality against the
 TARGET, never a snapshot), `..._each_drawn_speed_knob_moves_only_the_half_of_the_aroma_set_it_is_coupled_to`
-(at the drawn band EDGES), `..._isoamyl_alcohol_stays_below_its_only_sourced_threshold_across_the_growth_band`,
-and the two band-arithmetic tests. Falsified in 3 arms, designed GREEN in each, restore verified by
-SHA-256. **Arm A missed its prediction and the miss corrected an over-claim in a test written that
-hour** ("leaves ethyl acetate EXACTLY alone" → 0.03 %).
+(at the drawn band EDGES, **READ from the file** — both bands were rebuilt inside the last three records,
+so a literal would silently become an interior point), `..._isoamyl_alcohol_stays_below_its_only_sourced_threshold_across_the_growth_band`,
+and the three band rules. **The seven targets are asserted against the `conditions:` sentence that
+specifies them**, not transcribed — and that clause had to be ADDED to the two ester entries, which
+carried their level in `notes:` only. Falsified in 3 arms, designed GREEN in each, restore verified by
+SHA-256. **Two arms missed their predictions and both misses paid.** Arm A: reverting the Ehrlich `k`
+broke D-223's corner pin (the pools share `S`), correcting "leaves ethyl acetate EXACTLY alone" → 0.03 %.
+Arm B: the isoamyl-acetate band test stayed GREEN, because **a MULTIPLIER guard is invariant to a joint
+rescale of value and band by construction** — so of the two ester band rules the COMPUTED-edge one is
+strictly the stronger guard. Not fixed: a computed span for isoamyl acetate needs a stated range, and
+its note's "~0.7-4" disagrees with its own `source:` field's "~0.5-3". **Unresolved fork, not opened.**
 
 ## OPEN — named, not licensed
 
