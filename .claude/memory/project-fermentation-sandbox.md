@@ -29,9 +29,10 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-18)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-221**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1833 + 6 xfail** (3 D-188 Herzan; 2 D-215's own; **1 is §2.2's BEER criterion, D-221 — deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
+## Status (2026-08-19)
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-223**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1842 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
+again since D-223** — 6.04 d inside 5-7 — but the pass is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
@@ -248,7 +249,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   §3.2 **vindicates** it (its ⚠ is GROUNDS, not value) so **never "fix" it**; D-216's refusal STANDS.
   → `.claude/memory/prohibitions/beer-uptake-temperature-sensitivity.md`
 
-- **Which yardstick beer's SPEED is calibrated against (D-218)** — **SEARCHED AND ADJUDICATED, nothing built.**
+- **Which yardstick beer's SPEED is calibrated against (D-218 → ADJUDICATED AND BUILT at D-223).** Foster's measured
+  15 °C course + §2.2's window WIN and are ONE anchor; Tyrell's day-2 extract point LOSES. `q_sugar_max` 0.5 → **0.72**,
+  band 0.3-1.5 → **0.634-0.818**, and it is DRAWN. One rate fitted at 15 °C lands **0.945 / 1.030 / 0.973×** at
+  12 / 15 / 22 °C — 12 and 22 OUT OF SAMPLE — so D-220 §4's "level error, not a temperature-response one" was right and
+  D-217 stays refused. **The 30 °C column inverted to 0.659× (model too FAST) and is NOT repaired.** The faster engine
+  also exposed an ester formation half drawing acid from a pool that is 0 by construction; it is now funded.
+  → `.claude/memory/prohibitions/beer-ferment-speed-anchor-conflict.md` (D-223 block at the top)
+  **Everything below this line is the pre-D-223 state and is kept for the reasoning, not the numbers.**
   D-216 §11's open question is **answered on the literature and now open on a CONVERSION FACTOR.** Foster 2022
   (*Front. Microbiol.* 13:747546) is the first source carrying the whole tuple — 12.5 °P (within 0.003 SG of
   §2.2's wort), a **counted** pitch, two temps for the **same three Beer 1 strains**, same 1.010 target (Parker

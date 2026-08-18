@@ -215,39 +215,34 @@ def test_the_beer_criterion_and_its_spec_agree_on_the_temperature():
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="D-222: at the criterion's corrected 15 C the engine takes 8.50 d against 5-7",
-)
 def test_beer_1048_og_attenuates_in_5_to_7_days():
     """A ~1.048 OG ale wort must reach ~1.010 apparent gravity in 5-7 d — at 15 C (D-221).
 
-    **Why this is an xfail rather than a passing test or a moved window.** Until D-221 this
-    ran at the handoff's 20 C and PASSED at 6.08 d. D-220 recovered a second measured beer
-    course and it says the 5-7 d duration is a real brewing figure at 15 C, where the same
-    three commercial ale controls take 5.06-6.26 d, and that at 22 C they take 2.91-3.77 d —
-    so 20 C cannot take 5-7 d. The window is the handoff's own and is untouched; only the
-    temperature moved, and it moved to the reading GENEROUS to the model (Foster's measured
-    band is narrower than 5-7 and sits inside it).
+    **PASSES AGAIN SINCE D-223, and the pass is worth reading carefully.** This criterion has
+    been three different tests. It passed at the handoff's 20 C until D-220 recovered Foster
+    2022's measured course and showed 20 C cannot take 5-7 d (the same three commercial ale
+    controls take 5.06-6.26 d at 15 C and 2.91-3.77 d at 22 C). D-221 re-temperatured it to
+    15 C, where the engine took 9.00 d, and it became a strict ``xfail``; D-222 refit ``mu_max``
+    at Tyrell's counted pitch and it read 8.50 d, still outside. D-223 re-anchored
+    ``q_sugar_max`` to Foster's own measured 15 C course and it reads **6.08 d, inside**.
 
-    What the pass was worth: a criterion calibrated to a cooler ferment was certifying a model
-    that is ~1.5x too slow at every temperature below 30 C (D-220 §4). Two errors of opposite
-    sign, one hiding the other. The engine's real deficit is the 9.00 d below.
+    **The pass is PARTLY SELF-REFERENTIAL and must not be cited as third-party corroboration.**
+    The rate is fitted to Foster's 15 C course, and the temperature this criterion is asserted
+    at was itself set from Foster's course at D-221. Those are not two independent facts about
+    the model agreeing; they are one dataset entering twice. What the pass DOES establish is
+    non-trivial and is the reason D-223 shipped: the handoff brief's acceptance window and a
+    published third-party trial are **mutually satisfiable by one in-band rate**, which was an
+    open question from D-216 §11 through D-222 and was NOT guaranteed — the same question had
+    the opposite answer for the other candidate anchor. D-221 §8's caution against reading
+    Foster's temperatures as a test of this model's temperature RESPONSE applies here unchanged.
 
-    **The miss is wide and it is not a reading artefact.** D-221 measured 9.00 d against a 7.0 d
-    edge; D-222 refit ``mu_max`` at Tyrell's own counted pitch and it reads **8.50 d**, still
-    1.50 d outside the window and 2.24 d clear of Foster's own conservative slow strain
-    (6.26 d). The 15 C duration is the more grid-stable of the two frames — 0.0052 d across
-    1-8 points/h, against 0.0365 d at the retired 20 C.
-
-    **What closes it, and why neither beat does.** ``q_sugar_max`` in [0.667, 1.017] satisfied
-    this criterion at D-221's growth rate and [0.612, 0.891] does at D-222's — the band moves
-    with ``mu_max`` and is re-derived where it is used, never here. The Tyrell-matching rate does
-    NOT: D-222 re-bisected it to 2.3226 at Tyrell's counted pitch, which is 1.55x its own printed
-    high edge and stays outside this window across the ENTIRE printed ``E_a_uptake`` band. So the
-    two beer speed anchors agree on DIRECTION (both demand a faster engine than ships) and
-    disagree on magnitude by ~2.61x. Choosing between them is D-216 §11's open question and is
-    not either beat's to spend.
+    **What this test can still catch.** The window (5-7 d) and the target (1.010) are the
+    handoff's own numbers and are untouched by every beat above; only ``conditions`` moved.
+    ``q_sugar_max``'s admissible interval for this criterion is roughly [0.61, 0.89] at the
+    shipped ``mu_max``, so the shipped 0.72 sits inside it with room on both sides rather than
+    on an edge — a rate change of ~20 % in either direction turns this red. The losing anchor
+    still cannot: the Tyrell-matching rate is 2.3226, 1.55x its own printed high edge, and
+    reads 2.38 d here (D-222 §4).
     """
     spec = BENCHMARKS["beer_attenuation"]
     _, traj = _simulate_beer(_beer_scenario())

@@ -16,7 +16,10 @@ enable) is D-70; here the Process is exercised directly via a hand-built ``Proce
 D-64 loss-Process pattern), off the fermentation ProcessSet so isolability is preserved.
 """
 
+import re
+import shutil
 from collections.abc import Mapping
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -1151,21 +1154,25 @@ def test_beer_ethyl_acetate_equilibrium_is_not_wines(store):
     assert beer_eq < 0.0237
 
 
-def test_beer_hydrolysis_margin_survives_the_JOINT_band_corner():
-    # D-176 amendment. The guard above integrates ONE beer at NOMINAL parameters, and "beer
-    # hydrolyses" is a comparison between beer's packaged ester and an equilibrium that is a
-    # PRODUCT OF TWO BANDED quantities: `ethyl_acetate_eq` [0.035, 0.084] (D-158, deliberately
-    # never narrowed) and `acetic_acid_typical` [0.012, 0.155]. A claim verified at a point where
-    # the sampler reads a band is the archive's most repeated defect shape (D-118/D-154/D-155/
-    # D-157/D-170), so the JOINT worst case is taken here rather than assumed.
+def test_the_joint_band_corner_FORMS_since_D223_and_the_funding_constraint_holds_the_pool(tmp_path):
+    # D-176 amendment, REWRITTEN BY D-223 -- and the rewrite is the point, so what it used to say
+    # is quoted rather than deleted. It asserted that beer's packaged ester stays ABOVE its
+    # equilibrium across the whole joint band of `ethyl_acetate_eq` [0.035, 0.084] (D-158) x
+    # `acetic_acid_typical` [0.012, 0.155], i.e. that beer hydrolyses everywhere and so can never
+    # debit the empty `Byp` pool. That held with +0.741 mg/L of room and it was labelled a MARGIN,
+    # not an impossibility (feedback-a-margin-is-a-claim-about-what-holds-it-open).
     #
-    # It is a MARGIN, not an impossibility (feedback-a-margin-is-a-claim-about-what-holds-it-open):
-    # at the joint high corner the equilibrium reaches 20.581 mg/L against a packaged 21.322 mg/L
-    # -- only +0.741 mg/L of room, and the sign flips if beer's ethanol reaches 54.27 g/L (+3.60%).
-    # Measured over 180 ensemble members (3 seeds x 60) the pool never went negative and packaging
-    # ethanol never exceeded 52.30 g/L, so the corner is not REACHED; it is also not FORBIDDEN.
-    # This test pins the margin so that widening either band, or moving either anchor, goes RED
-    # here rather than silently re-opening the negative pool.
+    # D-223 SPENT THE MARGIN. Re-anchoring `q_sugar_max` to Foster 2022's measured 15 C course
+    # (0.5 -> 0.72 g/g/h) makes the engine faster, beer's ester pools are biomass-hour-linked
+    # rather than flux-linked, and the packaged ester falls 21.307 -> 15.866 mg/L. The corner
+    # equilibrium barely moves (20.560 -> 20.563 mg/L -- it reads ethanol, which is nearly
+    # unchanged), so the comparison INVERTS: -4.697 mg/L where it was +0.746.
+    #
+    # So this test now asserts the opposite fact, plus the invariant the old margin was standing
+    # in for. What makes the pool safe is no longer an accident of where two bands sit; it is
+    # `EthylAcetateEsterification`'s funding constraint (D-223), which scales the FORMATION half by
+    # how much acid the pool it debits actually holds. Measured at this corner: `Byp` reached
+    # -2.390 mg/L before the constraint and exactly 0.0 after it.
     beer_params = load_parameters(
         default_data_dir() / "beer_generic.yaml",
         default_data_dir() / "aging.yaml",
@@ -1205,18 +1212,250 @@ def test_beer_hydrolysis_margin_survives_the_JOINT_band_corner():
     ethanol = float(traj.series("E")[1])
 
     eq_corner = EthylAcetateEsterification.equilibrium(ethanol, corner)
-    # THE ASSERTION: even with both bands at their high edges, beer still hydrolyses.
-    assert eq_corner < packaged, (
-        f"joint band corner puts beer's equilibrium at {eq_corner * 1000:.3f} mg/L against a "
-        f"packaged {packaged * 1000:.3f} mg/L -- beer would FORM and drive Byp negative again"
+    # (1) THE FLIP IS REAL AND IS PINNED AS A NUMBER, not as a direction. Both sides are
+    # recomputed from the shipped seam, never transcribed (D-154/D-158), and both are pinned, so
+    # that a change restoring the margin goes RED here and gets READ rather than silently
+    # re-adopting D-176's retired argument.
+    assert packaged == pytest.approx(0.015866, abs=5e-6)  # 15.866 mg/L at the D-223 rate
+    assert eq_corner == pytest.approx(0.020563, abs=5e-6)  # 20.563 mg/L
+    assert eq_corner > packaged, (
+        f"the joint corner no longer FORMS: equilibrium {eq_corner * 1000:.3f} mg/L against a "
+        f"packaged {packaged * 1000:.3f} mg/L. D-223's funding constraint would then be "
+        f"load-bearing nowhere the suite can see; re-read D-223 before deleting either."
     )
-    # ...and the margin is small enough that it must be stated, not assumed: this pins the
-    # headroom itself, so a band edge creeping toward the flip is visible before it crosses.
-    assert 0.0 < (packaged - eq_corner) < 0.002  # g/L; measured +0.741 mg/L
-    # The nominal arm has ~20x that headroom -- which is exactly why a nominal-only guard
-    # would have reported this margin as comfortable.
+    assert (eq_corner - packaged) == pytest.approx(0.004697, abs=1e-5)  # g/L; -4.697 mg/L
+    # ...while the NOMINAL beer still hydrolyses comfortably, by +9.141 mg/L. That contrast is the
+    # whole reason this test exists: a nominal-only guard reports a healthy margin at the very
+    # parameters where 1 draw in 19 is in the opposite regime.
     eq_nominal = EthylAcetateEsterification.equilibrium(ethanol, resolved)
-    assert (packaged - eq_nominal) > 10.0 * (packaged - eq_corner)
+    assert (packaged - eq_nominal) == pytest.approx(0.009141, abs=1e-5)  # g/L
+
+    # (2) HOW MUCH of the joint band forms -- the quantity D-176's single corner could not give.
+    # Pure arithmetic on the equilibrium (no integration), so a fine grid is cheap. Both bands are
+    # DRAWN, so this fraction IS the per-draw probability of reaching the formation regime.
+    lo_eq, hi_eq = beer_params["ethyl_acetate_eq"].uncertainty.low, corner["ethyl_acetate_eq"]
+    lo_ac, hi_ac = beer_params["acetic_acid_typical"].uncertainty.low, corner["acetic_acid_typical"]
+    grid = 201
+    forms = 0
+    for a in np.linspace(lo_eq, hi_eq, grid):
+        for b in np.linspace(lo_ac, hi_ac, grid):
+            trial = dict(resolved)
+            trial["ethyl_acetate_eq"], trial["acetic_acid_typical"] = float(a), float(b)
+            if EthylAcetateEsterification.equilibrium(ethanol, trial) > packaged:
+                forms += 1
+    fraction = forms / (grid * grid)
+    # 5.37% at the shipped rate; it was 0.00% at the retired 0.5 and is 9.97% at the rate band's
+    # own high edge 0.818. Roughly 1 draw in 19.
+    assert fraction == pytest.approx(0.0537, abs=0.004), (
+        f"{fraction:.2%} of the joint band forms; D-223 measured 5.37%"
+    )
+
+    # (3) THE INVARIANT, integrated at the corner rather than argued. This is the arm the old test
+    # could not run: it compared two numbers and never asked what the solver does when the
+    # comparison goes the other way. Without D-223's funding constraint this run ends at
+    # Byp = -2.361 mg/L having reached -2.390.
+    corner_dir = _beer_data_dir_at_the_joint_ester_corner(tmp_path)
+    compiled_corner = compile_scenario(
+        Scenario(
+            name="d223-joint-corner-run",
+            medium="beer",
+            initial={
+                "glucose_gpl": 15.0,
+                "maltose_gpl": 70.0,
+                "maltotriose_gpl": 15.0,
+                "yan_mgl": 200.0,
+                "pitch_gpl": 1.0,
+            },
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+            interventions=[Intervention(day=14.0, action="begin_aging")],
+            duration_days=180.0,
+        ),
+        data_dir=corner_dir,
+    )
+    corner_traj = compiled_corner.run(t_eval=np.linspace(0.0, 180.0 * 24.0, 1801))
+    # atol is the solver noise floor, not room for a real excursion: the unguarded excursion is
+    # 2.4e-3 g/L, nine orders above it (feedback-pin-tolerance-vs-solver-tolerance).
+    assert_nonnegative(corner_traj, ("Byp",), atol=1e-12)
+    byp = np.asarray(corner_traj.series("Byp"), dtype=float)
+    ester = np.asarray(corner_traj.series("ethyl_acetate"), dtype=float)
+    # ...and it is non-negative for the RIGHT REASON. A constraint that simply switched the Process
+    # off in beer would also pass the line above. Here the pool is CREDITED first -- the only acid
+    # this beer ever forms from is acid it released itself by hydrolysing, which is what makes the
+    # formation half self-limiting by construction rather than by a margin -- and the ester rises
+    # only by what that funds: +0.048 mg/L over 166 d, against +4.608 mg/L unguarded.
+    assert float(byp[-1]) == pytest.approx(0.000694, abs=1e-4)  # g/L, ~0.69 mg/L released
+    packaged_idx = int(np.argmin(np.abs(np.asarray(corner_traj.t, dtype=float) - 14.0 * 24.0)))
+    assert 0.0 < float(ester[-1]) - float(ester[packaged_idx]) < 0.0005  # g/L; +0.048 mg/L
+
+
+def _beer_data_dir_at_the_joint_ester_corner(tmp_path: Path) -> Path:
+    """The packaged beer parameter dir with BOTH ester-equilibrium bands pinned at their high edge.
+
+    A copied dir rather than a resolved-map patch, for the D-214 reason the sibling helper in
+    ``test_organic_acids.py`` states: the corner has to be present at LOAD time so the compiled
+    ProcessSet carries it, and the ``Parameter`` schema rejects a value outside its own band, so a
+    loadable arm has to move ``value`` and ``uncertainty`` together.
+    """
+    dest = tmp_path / "beer_ester_corner"
+    shutil.copytree(default_data_dir(), dest)
+    # The two bands live in DIFFERENT files, which is itself worth stating: `acetic_acid_typical`
+    # is per-medium (beer_generic.yaml) and `ethyl_acetate_eq` is the shared aging anchor
+    # (aging.yaml, D-127/D-158). The joint corner therefore spans a medium file and a shared one.
+    for filename, name in (
+        ("beer_generic.yaml", "acetic_acid_typical"),
+        ("aging.yaml", "ethyl_acetate_eq"),
+    ):
+        path = dest / filename
+        text = path.read_text(encoding="utf-8")
+        block = re.search(rf"^{name}:\n(?:  [^\n]*\n)*", text, flags=re.MULTILINE)
+        assert block is not None, f"{name} is not a top-level block in {filename}"
+        high = re.search(r"high:\s*([-0-9.eE]+)", block.group(0))
+        assert high is not None, f"{name} has no high band edge"
+        patched, n = re.subn(
+            r"^(  value: )[-0-9.eE]+$",
+            r"\g<1>" + high.group(1),
+            block.group(0),
+            flags=re.MULTILINE,
+        )
+        assert n == 1, f"{name}'s value line moved; fix this helper"
+        path.write_text(text.replace(block.group(0), patched, 1), encoding="utf-8")
+    loaded = load_parameters(dest / "beer_generic.yaml", dest / "aging.yaml")
+    for name in ("acetic_acid_typical", "ethyl_acetate_eq"):
+        assert loaded[name].value == loaded[name].uncertainty.high
+    return dest
+
+
+@pytest.mark.parametrize(
+    ("pool_in_scales", "expected_share"),
+    [(0.0, 0.0), (0.25, 0.25), (0.5, 0.5), (1.0, 1.0), (10.0, 1.0)],
+)
+def test_the_ethyl_acetate_FORMATION_half_is_funded_by_the_pool_it_debits(
+    params, pool_in_scales, expected_share
+):
+    """D-223's constraint, pinned at derivative level over the whole shape of the factor.
+
+    Forming ethyl acetate DEBITS ``Byp``. Before D-223 it did so at a rate that never consulted
+    that pool, so a medium whose ``Byp`` is empty by construction -- beer, D-16 -- funded the
+    formation out of nothing and drove the pool negative. The Process now scales the formation half
+    by ``clip(Byp / acetic_acid_typical, 0, 1)``.
+
+    Five arms, one state with one number changed. The expected value is NOT the derivative at a
+    neighbouring ``Byp`` scaled by the share: ``Byp`` is the succinic **acid** stand-in, so it sits
+    in the charge balance and moving it moves ``ph_of_state`` and the ``h(pH)`` catalysis factor
+    with it -- across these arms that channel alone is worth 3.9 %, which would read as a throttle
+    shape that is not there. Each arm is instead compared against the Process's own closed form
+    reconstructed at THAT arm's pH, so the only thing under test is the funding factor
+    [[feedback-a-control-needs-mechanical-reach]].
+
+    That is what makes this a pin on the FACTOR rather than on a magnitude: deleting the factor
+    turns the 0.0/0.25/0.5 arms red; replacing the clip with a Monod turns the 1.0 and 10.0 arms
+    red (a Monod at its own saturation scale is 0.5, not 1.0); a step turns 0.25 and 0.5 red.
+    """
+    schema = wine_schema()
+    scale = params["acetic_acid_typical"]
+    below_eq = params["ethyl_acetate_eq"] * 0.5  # below equilibrium => the FORMATION half
+
+    y = _aged_wine(schema, ester=0.0, t=293.15, ethyl_acetate=below_eq, Byp=pool_in_scales * scale)
+    deriv = EthylAcetateEsterification().derivatives(0.0, y, schema, params)
+    gap = below_eq - EthylAcetateEsterification.equilibrium(float(schema.get(y, "E")), params)
+    assert gap < 0.0  # below equilibrium => forming, the half the constraint funds
+    unfunded = (
+        params["k_ethyl_acetate_esterification"]
+        * arrhenius_factor(293.15, params["E_a_ethyl_acetate_esterification"], params["T_ref"])
+        * 10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph_of_state(y, schema, params))
+        * gap
+    )
+    # d(ester)/dt = -rate, and the forming rate is negative, so the ester leg is +share*|unfunded|.
+    assert schema.get(deriv, "ethyl_acetate") == pytest.approx(
+        -expected_share * unfunded, rel=1e-12, abs=1e-18
+    ), (
+        f"funding {pool_in_scales}x the acid scale gave "
+        f"{schema.get(deriv, 'ethyl_acetate')!r}, expected {expected_share} x the unfunded "
+        f"{-unfunded!r}"
+    )
+    if pool_in_scales == 0.0:  # the beer case: exactly inert, not merely small
+        assert tuple(schema.get(deriv, v) for v in ("ethyl_acetate", "E", "Byp")) == (0.0, 0.0, 0.0)
+    else:  # ...and the other two legs stay in their fixed carbon ratio to the ester leg
+        assert schema.get(deriv, "E") < 0.0 and schema.get(deriv, "Byp") < 0.0
+
+
+def test_the_funding_constraint_is_ONE_SIDED_and_leaves_hydrolysis_alone(params):
+    """Hydrolysis CREDITS ``Byp`` -- it needs no acid and must not be throttled by an empty pool.
+
+    Otherwise a beer would freeze at its packaged ester instead of fading toward its equilibrium,
+    which is the "switch the Process off wherever Byp is 0" alternative the D-176 guard above also
+    warns against. So this arm has to show the fading rate is the FULL, unscaled one at ``Byp = 0``.
+
+    It cannot be shown by holding the state fixed and varying ``Byp``, the obvious design: ``Byp``
+    is the succinic **acid** stand-in and therefore sits in the charge balance, so moving it moves
+    ``ph_of_state`` and with it the ``h(pH)`` catalysis factor -- 0.0 vs 1.0 g/L differ by 1.9 %
+    through that channel alone, which would read as a throttle that is not there. The rate is
+    reconstructed from its own closed form at the state's OWN pH instead, which isolates the one
+    factor at issue [[feedback-a-control-needs-mechanical-reach]].
+    """
+    schema = wine_schema()
+    above_eq = EthylAcetateEsterification.equilibrium(100.0, params) * 2.0
+    y = _aged_wine(schema, ester=0.0, t=293.15, ethyl_acetate=above_eq, Byp=0.0)
+    deriv = EthylAcetateEsterification().derivatives(0.0, y, schema, params)
+    gap = above_eq - EthylAcetateEsterification.equilibrium(float(schema.get(y, "E")), params)
+    assert gap > 0.0  # above equilibrium => the fading half
+    expected = (
+        params["k_ethyl_acetate_esterification"]
+        * arrhenius_factor(293.15, params["E_a_ethyl_acetate_esterification"], params["T_ref"])
+        * 10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph_of_state(y, schema, params))
+        * gap
+    )
+    # THE ASSERTION: at an empty acid pool the fading rate is the full closed form, exactly. Apply
+    # the funding factor to both halves and this is 0.0.
+    assert schema.get(deriv, "ethyl_acetate") == pytest.approx(-expected, rel=1e-12)
+    assert schema.get(deriv, "E") > 0.0 and schema.get(deriv, "Byp") > 0.0  # both pools CREDITED
+
+
+def test_wine_is_untouched_by_the_funding_constraint_and_the_margin_says_why(params):
+    # The constraint's saturation scale is wine's own `acetic_acid_typical` (0.35 g/L, band high
+    # 0.60) and an aging wine carries Byp = 2.8615 g/L -- 4.77x clear of the clip at the WIDEST
+    # band edge. So `avail` is exactly 1.0 for wine and `rate *= 1.0` is an identity: wine's
+    # formation half, which is LIVE (a wine packages 41.3 mg/L against a 63.2 mg/L equilibrium and
+    # forms toward it), is bitwise unchanged. Asserted as a margin on the real integrated pool
+    # rather than as a claim, because "inert" is a statement about the frame and a frame can move
+    # [[feedback-a-freedom-can-be-an-artefact-of-the-frame]].
+    from fermentation.scenario import (
+        Intervention,
+        Scenario,
+        TemperaturePoint,
+        compile_scenario,
+    )
+
+    compiled = compile_scenario(
+        Scenario(
+            name="d223-wine-funding-margin",
+            medium="wine",
+            initial={"brix": 24.0, "yan_mgl": 200.0, "pitch_gpl": 0.25},
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=25.0)],
+            interventions=[Intervention(day=14.0, action="begin_aging")],
+            duration_days=180.0,
+        )
+    )
+    traj = compiled.run(t_eval=np.linspace(0.0, 180.0 * 24.0, 1801))
+    t_h = np.asarray(traj.t, dtype=float)
+    byp = np.asarray(traj.series("Byp"), dtype=float)
+    aging_min = float(byp[t_h >= 14.0 * 24.0].min())
+    wine_store = load_parameters(
+        default_data_dir() / "wine_generic.yaml",
+        default_data_dir() / "aging.yaml",
+        default_data_dir() / "acidbase.yaml",
+    )
+    band_high = wine_store["acetic_acid_typical"].uncertainty.high
+    assert aging_min == pytest.approx(2.8615, abs=0.01)  # g/L
+    assert aging_min / band_high > 4.0, (
+        f"wine's aging Byp floor is {aging_min:.4f} g/L against a {band_high} g/L acid scale -- "
+        f"the funding constraint has stopped being inert for wine and D-223 needs re-reading"
+    )
+    # ...and wine really is in the formation regime, so that inertness is worth something.
+    packaged = float(np.interp(14.0 * 24.0, t_h, np.asarray(traj.series("ethyl_acetate"), float)))
+    ethanol = float(np.interp(14.0 * 24.0, t_h, np.asarray(traj.series("E"), float)))
+    wine_params = wine_store.resolve()
+    assert EthylAcetateEsterification.equilibrium(ethanol, wine_params) > packaged
 
 
 def test_ethyl_acetate_wired_into_both_media():

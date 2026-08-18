@@ -423,6 +423,20 @@ def test_a_nominal_sitting_on_a_band_edge_cannot_be_classified_by_an_edge_screen
         duration_days=14.0,
     )
     beer_on_edge = _on_edge(beer)
+    # EXACT since D-223, matching wine's assert above. It was a SUBSET check, which could only
+    # see a member LEAVE - so a parameter whose band was re-derived onto its own nominal would
+    # have joined this set silently. D-223 re-anchored `q_sugar_max` and narrowed its band
+    # 4.0x -> 1.29x, which is precisely the edit a subset check cannot witness.
+    # [[feedback-a-nominal-on-a-band-edge-is-not-inertness]]
+    assert beer_on_edge == {
+        "Y_glycerol_sugar",
+        "Y_byproduct_sugar",
+        "bottling_burst_screwcap",
+        "copper_fining_residual_fraction",
+        "copper_h2s_binding",
+        "copper_mercaptan_binding",
+        "vant_hoff_co2_solubility",
+    }, f"the beer nominal-on-edge set changed: {sorted(beer_on_edge)}"
     assert {"Y_glycerol_sugar", "Y_byproduct_sugar"} <= beer_on_edge, (
         "the two zero-nominal yield bands no longer sit on their band's low edge; the "
         f"beer nominal-on-edge set is {sorted(beer_on_edge)}"

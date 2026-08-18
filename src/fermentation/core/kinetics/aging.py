@@ -1053,11 +1053,16 @@ class EthylAcetateEsterification(Process):
     core ``E`` slot (the :class:`EthylHexanoateHydrolysis` precedent), acetic acid the ``Byp``
     succinic stand-in.
 
-    **The isolation-at-zero exception — owner-accepted (D-127).** Every other ester Process is
-    ``max(0, ester - eq)`` and so is exactly inert on an empty pool; this one is **not** — at
-    ``ethyl_acetate = 0`` the term is ``-k*f*h*(0 - eq) > 0``, a *formation* flux from ``E`` +
-    ``Byp``. That is deliberate (a wine with no ethyl acetate really would form some toward
-    equilibrium), the reason this is the sim's only forming ester. It is still **isolable**
+    **The isolation-at-zero exception — owner-accepted (D-127), and CONDITIONAL since D-223.**
+    Every other ester Process is ``max(0, ester - eq)`` and so is exactly inert on an empty pool;
+    this one is **not** — at ``ethyl_acetate = 0`` the term is ``-k*f*h*(0 - eq) > 0``, a
+    *formation* flux from ``E`` + ``Byp``. That is deliberate (a wine with no ethyl acetate really
+    would form some toward equilibrium), the reason this is the sim's only forming ester. **What
+    D-223 withdraws is the word "unconditionally":** the exception now requires a funded ``Byp``,
+    and it is the ester pool being empty — never the ACID pool — that the exception was ever about.
+    A wine has both (2.8615 g/L of ``Byp`` in aging against a 0.60 g/L high band edge, 4.77x clear
+    of the clip), so for wine the exception is unchanged, bitwise. A beer has the ester and not the
+    acid, and there the Process is now exactly the sibling shape. It is still **isolable**
     (directive #3): like every aging Process it is *disabled at the compile seam* (D-70) unless
     ``begin_aging`` is scheduled, so the validated core and its conservation tests — which never
     schedule aging — never see it. ``total_carbon`` closes regardless of sign, so no carbon test is
@@ -1078,6 +1083,19 @@ class EthylAcetateEsterification(Process):
     acid × alcohol put its equilibrium BELOW its packaged ester level, so beer hydrolyses and
     ``Byp`` is credited. The guard is now a test, not an argument — the suite asserts
     ``Byp`` non-negative on a **beer** aging trajectory, which is where the claim actually binds.
+
+    **THAT CAUSE-REMOVAL WAS A MARGIN, AND D-223 SPENT IT.** D-176's "beer hydrolyses" is a
+    comparison between two banded quantities, and it held at the nominal by +0.741 mg/L and across
+    100 % of the joint ``ethyl_acetate_eq`` × ``acetic_acid_typical`` band only at the *then*
+    fermentation rate. D-223 re-anchored ``q_sugar_max`` to Foster 2022's measured 15 °C course
+    (0.5 → 0.72 g/g/h); beer's ester pools are biomass-hour-linked rather than flux-linked, so the
+    faster engine packages **less** ester — 21.307 → 15.866 mg/L — and the comparison flips across
+    **5.37 %** of that joint band, with the pool measured at **−2.39 mg/L** at the high corner.
+    Both bands are drawn, so that is ~1 draw in 19. The defect was **exposed, not created**, by the
+    rate: forming ester out of an acid pool that is empty by construction is unphysical at any
+    rate, and the slow engine was only hiding it behind a positive margin. So the pool IS floored
+    now — see ``availability`` in :meth:`derivatives` — and D-176's argument survives as what it
+    always was: the reason the FLIP is rare, not the reason the pool is safe.
 
     Off during the ferment (temperature-, pH-, and pool-driven, no fermentative-flux gate); enabled
     only in a post-fermentation aging segment (D-68/D-70). Tier **speculative** — the aging-axis
@@ -1113,6 +1131,11 @@ class EthylAcetateEsterification(Process):
     #: Berthelot coupling's three names. They MUST be declared: ``reads`` has two masters (D-160)
     #: and an undeclared read leaves the name out of the sampled set under every scenario — which
     #: would silently hide ``acetic_acid_typical``'s band, the one live band the coupling adds.
+    #: Since D-223 ``acetic_acid_typical`` is read TWICE and for two different jobs: as the acid
+    #: factor of the equilibrium POSITION, and as the saturation scale of the formation half's
+    #: funding constraint. The second use is one-sided — it can only ever slow formation, never
+    #: speed it — so widening that band cannot make the pool less safe, only the equilibrium
+    #: higher. No new name is introduced; that is the point of choosing this scale.
     reads: tuple[str, ...] = (
         "k_ethyl_acetate_esterification",
         "E_a_ethyl_acetate_esterification",
@@ -1146,7 +1169,12 @@ class EthylAcetateEsterification(Process):
         Steinhaus 2024, *J. Agric. Food Chem.*, Table 1, 32-study survey) — and funded the
         formation out of a ``Byp`` pool beer starts at exactly 0 with no producer, so the pool went
         negative and the *reported* pH went alkaline (10.5, measured). Coupled, beer's equilibrium
-        sits below its packaged level, so beer HYDROLYSES: ``Byp`` is credited, never debited.
+        sits below its packaged level at the nominal, so beer HYDROLYSES and ``Byp`` is credited.
+        **"never debited" was true of the nominal and not of the band, and D-223 measured where it
+        stops** (5.37 % of the joint band once the ferment runs at Foster's rate). The debit is
+        forbidden at its source now — :meth:`derivatives` funds the formation half out of the pool
+        it draws from — so this method states the equilibrium POSITION and no longer carries the
+        non-negativity argument on its own.
 
         Clamped ≥ 0: BDF's Jacobian probe can push ``E`` negative, and a negative equilibrium would
         flip the relaxation's sign mid-probe. Keeps the derivative a total, bounded function of
@@ -1195,6 +1223,38 @@ class EthylAcetateEsterification(Process):
             h_factor = float(10.0 ** (params["pH_ref_ethyl_acetate_esterification"] - ph))
         # Signed rate (g ethyl acetate/L/h): >0 hydrolysis (fade), <0 esterification (form).
         rate = params["k_ethyl_acetate_esterification"] * f_t * h_factor * gap
+
+        # THE FORMATION HALF IS FUNDED, NOT FREE (decision D-223). Forming EtOAc DEBITS ``Byp``,
+        # the pool that carries this Process's acid partner. Hydrolysis needs no acid and is
+        # untouched; formation is scaled by how much acid the funding pool actually holds:
+        #
+        #     avail = clip(Byp / acetic_acid_typical, 0, 1)
+        #
+        # This is a NON-NEGATIVITY CONSTRAINT ON THE POOL THAT FUNDS THE DRAW, not a claim that
+        # ``Byp`` *is* acetic acid — it is the succinic stand-in (D-16), and comparing the two as
+        # concentrations would be a category error. ``acetic_acid_typical`` serves only as the
+        # SATURATION SCALE, because it is the acid level the equilibrium's own claim is
+        # denominated in; the factor clips at 1, so the scale has content only near zero. Wine's
+        # aging ``Byp`` is 2.8615 g/L against a 0.60 g/L high band edge — 4.77x clear of the clip,
+        # so ``avail`` is exactly 1.0 and wine's live formation half is bitwise unchanged.
+        #
+        # Where the pool IS empty the Process degrades to the ``max(0, ester - eq)`` decay-only
+        # shape its two sibling esters already use, and the draw stays proportional to the pool it
+        # debits — the same argument :class:`SotolonAldolCondensation` makes for needing no clamp,
+        # no availability constant and no epsilon. Beer is that case: ``Byp`` is exactly 0 at
+        # packaging (D-16 gives beer no byproduct producer), so **beer can re-form ethyl acetate
+        # only out of acid it has itself
+        # released by hydrolysing some** — self-limiting by construction rather than by a margin.
+        # See the class docstring for why D-176's margin argument stopped holding.
+        if rate < 0.0:
+            acid_scale = params["acetic_acid_typical"]
+            acid_pool = max(0.0, float(y[schema.slice("Byp")][0]))
+            availability = min(1.0, acid_pool / acid_scale) if acid_scale > 0.0 else 0.0
+            if availability == 0.0:
+                return d
+            # Scale the RATE, not the Byp leg: carbon_moved below is derived from it, so all three
+            # legs stay proportional and total_carbon closes exactly, as for either sign before.
+            rate *= availability
 
         # Split the (signed) C4 carbon 2:2 and route via each partner pool's own carbon fraction,
         # so total_carbon closes to machine precision for EITHER sign (ethyl acetate C4 <=> ethanol

@@ -486,8 +486,30 @@ def test_warmer_ferment_is_cleaner_the_diacetyl_rest(medium, temps, days):
         f"{medium} final diacetyl should fall with T (warm rest cleaner): "
         f"{dict(zip(temps, finals, strict=True))} mg/L"
     )
-    # The cold run leaves a perceptible buttery note (above the ~0.1 mg/L lager threshold).
-    assert finals[0] > 0.1
+    # The cold run's ABSOLUTE level used to be asserted here as "perceptible", i.e. above the
+    # ~0.1 mg/L lager threshold, and D-223 retired that assert rather than re-pinning it in the
+    # same shape. Re-anchoring `q_sugar_max` to Foster 2022's measured course (0.5 -> 0.72 g/g/h,
+    # D-223) moved beer's whole VDK ladder down by about a third -- 0.1434/0.0341/0.0031 ->
+    # 0.0996/0.0225/0.0020 mg/L -- because the pools are biomass-hour-linked rather than
+    # flux-linked, exactly as beer's esters are. The cold run therefore lands 0.4 % BELOW the
+    # threshold instead of 43 % above it, and no model with a speculative-tier rate constant can
+    # adjudicate 0.4 % against a sensory threshold that is itself quoted as "~0.1". Asserting
+    # either side of it would be asserting precision the model does not have
+    # [[feedback-a-summary-statistic-is-not-the-curve]].
+    #
+    # What survives is the RELATIVE claim, which the model can resolve and which is what D-26 is
+    # about: the cold run strands ~50x the warm run's diacetyl, and it strands it AT the threshold
+    # rather than somewhere irrelevant. The level itself is pinned as a measurement so that a
+    # change moving it goes red and gets read.
+    if medium == "wine":  # unaffected by D-223: the rate that moved is beer's
+        assert finals[0] > 0.1
+    else:
+        assert finals[0] == pytest.approx(0.0996, rel=0.03)  # mg/L, measured
+        assert 0.5 < finals[0] / 0.1 < 2.0, (
+            f"beer's cold run no longer strands diacetyl AT the ~0.1 mg/L lager threshold "
+            f"({finals[0]:.4f} mg/L); the D-26 headline is about a rest that matters, and a cold "
+            f"run far from perceptibility would make it about nothing"
+        )
     # D-57 gave EthanolInactivation its (previously missing) real Coleman quadratic
     # temperature scaling, so warm ferments now correctly lose viable/reductase-capable
     # biomass faster than before (when death was silently frozen at the 20 C rate at

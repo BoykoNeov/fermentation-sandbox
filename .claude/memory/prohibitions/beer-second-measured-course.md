@@ -8,6 +8,37 @@ metadata:
   modified: 2026-08-18T11:12:37.113Z
 ---
 
+**SUPERSEDED IN PART BY D-223 — read this block first.** Beer's two speed anchors were
+ADJUDICATED and the rate MOVED. `q_sugar_max` 0.5 -> **0.72 g/g/h**, band 0.3-1.5 -> **0.634-0.818**
+(1.29x, and it is DRAWN, so every beer ensemble moved).
+1. **Foster's measured 15 C course + sec 2.2's window WIN; Tyrell's day-2 extract point LOSES.**
+   They are ONE anchor, not two: every rate reproducing Foster's course lands inside the
+   criterion's admissible interval and vice versa. The Tyrell-matching 2.3226 reads 2.38 d
+   against the criterion (outside, FAST) and is **2.839x** the re-derived printed high edge.
+2. **sec 2.2's criterion is 6.04 d, INSIDE 5-7 for the first time since D-221.** Its strict xfail
+   is gone. The pass is PARTLY SELF-REFERENTIAL (D-221 set the criterion's temperature from the
+   same paper the rate is fitted to) and must never be cited as third-party corroboration.
+3. **"The engine is uniformly ~1.4x too slow below 30 C" is DEAD.** One rate fitted at 15 C alone
+   lands **0.945 / 1.030 / 0.973x** at 12 / 15 / 22 C — and 12 and 22 were NOT fitted, so that is
+   an out-of-sample check of the temperature response. D-220 sec 4's reading was right and
+   D-217's refusal to re-source `E_a_uptake` still stands.
+4. **The 30 C column INVERTED**, 0.659x: the model is now 1.52x too FAST there. Real ale yeast
+   saturates above ~22 C and this model does not. That is the price the re-anchoring paid and it
+   is NOT repaired — do not "fix" a single column by inventing a saturation term.
+5. **Prices, measured:** day-7 pH margin 0.036 -> **0.0033**; affordable trub peptide loss
+   12.6 % -> **1.2 %**; beer's whole VDK ladder and both ester pools fall ~26-31 % (they are
+   biomass-hour-linked, not flux-linked). Tyrell's own day-7 attenuation IMPROVES 0.782 ->
+   **0.959** and his day-2 shortfall 4.21x -> **3.16x**; D-215's extract xfail stays xfail.
+6. **A defect the faster engine EXPOSED (not created):** `EthylAcetateEsterification`'s formation
+   half was funding itself out of beer's `Byp`, which is exactly 0 by construction (D-16). It now
+   scales that half by `clip(Byp / acetic_acid_typical, 0, 1)` — one-sided, wine bitwise
+   unchanged (4.77x clear of the clip). **Beer can re-form ester only from acid it released
+   itself.** D-176's "beer hydrolyses so the pool is safe" was a MARGIN and it is spent.
+**OPEN, and first in line:** beer's two ester calibrations now disagree about whether the faster
+engine is better — ethyl acetate moves AWAY from its published mean (21.3 -> 15.9 vs 23.7) while
+isoamyl acetate moves TOWARD its target (3.83 -> 2.80 vs ~2.2). Both `k`s were fitted at the
+retired rate; one is wrong and D-223 could not say which.
+
 **Live prohibitions — the SECOND measured beer course (D-220).** Detail split out of
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path and
 does **not** index it in `MEMORY.md`. Read it before proposing anything about beer's ferment
