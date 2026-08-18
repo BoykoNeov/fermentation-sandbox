@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-17)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-216**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1815 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-217**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1817 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
@@ -238,6 +238,15 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   Native phosphate is out on the ANCHOR, not smallness. `set_ph` MASKED the guard's message.
   DAS and the arginine pool's own +1 stay unbuilt.
   → `.claude/memory/prohibitions/nitrogen-dose-salt-charge.md`
+
+- **Beer's uptake TEMPERATURE sensitivity + Tyrell's FRAME (D-217)** — **MEASURED NULL, nothing built.** The
+  corpus **cannot** re-source `E_a_uptake`: 75 hits/26 files, then **28 more** for the two-temperature-pair shape
+  the first census *could not see* — all read, zero usable. **Never re-run without a NEW text**; never adopt the
+  30,000 edge; **never read de Andres-Toro's −97 kJ/mol as a fit** (wrong sign; degenerate with `q_sugar_max`).
+  Benchmark inertness is **EXACT (0.0000 d)**, so the lever's size **IS** the frame's distance from `T_ref`:
+  0.0449 at 15 °C, **exactly 0 at 20 °C**. Tyrell's tube temp is **NOT PRINTED** — a FILL temp D-207 promoted;
+  §3.2 **vindicates** it (its ⚠ is GROUNDS, not value) so **never "fix" it**; D-216's refusal STANDS.
+  → `.claude/memory/prohibitions/beer-uptake-temperature-sensitivity.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
