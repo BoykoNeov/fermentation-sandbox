@@ -187,12 +187,15 @@ def test_seeding_the_oxygen_is_a_solver_MESH_artifact_and_not_a_coupling():
     """
     loose, loose_slot = _worst_slot_difference(1e-6, 1e-9)
     tight, _ = _worst_slot_difference(1e-9, 1e-12)
-    # A sanity CEILING, not the discriminator: 1e-4 g/L is 0.1 mg/L, far below anything
-    # physically meaningful in any slot here, and comfortably below what a real O2->acid
-    # coupling would move (D-212 priced the day-1 acetic requirement at 6-14 mg/L, i.e. 1e-2
-    # g/L — two orders above this). The worst offender at the shipped tolerance is `S` at
-    # ~1.4e-5 g/L, which is 1.7e-7 of an 82 g/L sugar charge.
-    assert loose < 1e-4, f"{loose_slot} moved {loose:.2e} g/L even at the shipped tolerance"
+    # A sanity CEILING, not the discriminator: 1e-3 g/L is 1 mg/L, far below anything physically
+    # meaningful in any slot here, and still an order below what a real O2->acid coupling would
+    # move (D-212 priced the day-1 acetic requirement at 6-14 mg/L). The worst offender at the
+    # shipped tolerance is `S`, at ~1.4e-5 g/L when D-213 measured it and **1.3e-4** since D-222
+    # refit the growth rate at Tyrell's counted pitch — 1.6e-6 of an 82 g/L sugar charge. The
+    # ceiling moved with it, and the reason is worth stating rather than absorbing: a faster
+    # ferment has steeper gradients, so the same adaptive mesh straddles more per step. That is
+    # a statement about the mesh, and the CONVERGENCE assert below is what proves it is one.
+    assert loose < 1e-3, f"{loose_slot} moved {loose:.2e} g/L even at the shipped tolerance"
     # The decisive assertion: two decades of rtol must buy at least one decade of agreement.
     # A genuine coupling would flatten out instead.
     assert tight < loose / 10.0, (

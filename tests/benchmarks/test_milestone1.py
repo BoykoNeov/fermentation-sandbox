@@ -217,7 +217,7 @@ def test_the_beer_criterion_and_its_spec_agree_on_the_temperature():
 
 @pytest.mark.xfail(
     strict=True,
-    reason="D-221: at the criterion's corrected 15 C the engine takes 9.00 d against 5-7",
+    reason="D-222: at the criterion's corrected 15 C the engine takes 8.50 d against 5-7",
 )
 def test_beer_1048_og_attenuates_in_5_to_7_days():
     """A ~1.048 OG ale wort must reach ~1.010 apparent gravity in 5-7 d — at 15 C (D-221).
@@ -234,18 +234,20 @@ def test_beer_1048_og_attenuates_in_5_to_7_days():
     that is ~1.5x too slow at every temperature below 30 C (D-220 §4). Two errors of opposite
     sign, one hiding the other. The engine's real deficit is the 9.00 d below.
 
-    **The miss is wide and it is not a reading artefact.** 9.00 d against a 7.0 d edge is
-    2.74 d clear of Foster's own conservative slow strain (6.26 d), and the 15 C duration is
-    the more grid-stable of the two frames — 0.0052 d across 1-8 points/h, against 0.0365 d
-    at the retired 20 C.
+    **The miss is wide and it is not a reading artefact.** D-221 measured 9.00 d against a 7.0 d
+    edge; D-222 refit ``mu_max`` at Tyrell's own counted pitch and it reads **8.50 d**, still
+    1.50 d outside the window and 2.24 d clear of Foster's own conservative slow strain
+    (6.26 d). The 15 C duration is the more grid-stable of the two frames — 0.0052 d across
+    1-8 points/h, against 0.0365 d at the retired 20 C.
 
-    **What closes it, and why this beat does not.** ``q_sugar_max`` in [0.667, 1.017] satisfies
-    this criterion, and [0.763, 1.003] reproduces Foster's own measured 15 C course — both
-    inside the parameter's printed 0.3-1.5 band. D-216's Tyrell-matching 1.397 does NOT: it
-    gives 3.99 d here and stays outside across the ENTIRE printed ``E_a_uptake`` band. So the
-    two beer speed anchors now agree on DIRECTION (both demand a faster engine than ships) and
-    disagree only on magnitude, by ~1.37x. Choosing between them is D-216 §11's open question
-    and is not this beat's to spend.
+    **What closes it, and why neither beat does.** ``q_sugar_max`` in [0.667, 1.017] satisfied
+    this criterion at D-221's growth rate and [0.612, 0.891] does at D-222's — the band moves
+    with ``mu_max`` and is re-derived where it is used, never here. The Tyrell-matching rate does
+    NOT: D-222 re-bisected it to 2.3226 at Tyrell's counted pitch, which is 1.55x its own printed
+    high edge and stays outside this window across the ENTIRE printed ``E_a_uptake`` band. So the
+    two beer speed anchors agree on DIRECTION (both demand a faster engine than ships) and
+    disagree on magnitude by ~2.61x. Choosing between them is D-216 §11's open question and is
+    not either beat's to spend.
     """
     spec = BENCHMARKS["beer_attenuation"]
     _, traj = _simulate_beer(_beer_scenario())

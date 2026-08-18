@@ -14,6 +14,27 @@ path. Read it before proposing anything about beer's uptake rate, catabolite rep
 §2.2 attenuation benchmark, or the pitch in `TYRELL_SCENARIO`. **If a prohibition looks
 unconvincing, go read D-216 — do not argue past it from this file.**
 
+**SUPERSEDED IN PART BY D-222 — read this block first.** Three things below are now FALSE.
+1. **The pitch prohibition is SPENT and the pitch is CORRECTED.** `TYRELL_SCENARIO` now carries
+   Tyrell's own counted 9.96e6 cells/mL = **0.3984 g/L** through `cells_per_ml_to_pitch_gpl`.
+   The "two observables endorse 1.0 g/L" argument was measured **without refitting `mu_max`**,
+   which D-216 itself named as inherited: refit at the corrected pitch (0.034 → **0.058 /h**,
+   band 0.031-0.040 → **0.053-0.075**), the nitrogen attribution returns to 0.298 (inside
+   Tyrell's 0.234-0.448) and the pH course returns to **7 of 8** days inside. D-216's 6-of-8 was
+   measured at 0.5 g/L, a reading D-219 retired; at the counted pitch without a refit it is 5/8.
+2. **Growth EXTENT does NOT "own 0.8 %" and is not near.** That was a pitch-1.0 statement. The
+   gain is nitrogen-limited and therefore fixed in absolute terms (~1.75 g/L either way), so a
+   lighter inoculum multiplies further: **5.385× against a measured 2.92-3.48×, 1.55× above the
+   high edge**. No growth RATE can repair it (the fold moves 0.010 across the whole band) — the
+   candidates are the assumed 200 mg/L YAN and the single-lumped-pool assumption, neither
+   sourced. Do not re-run this as if D-211 had it right.
+3. **"1.397 is INSIDE the band so out-of-band is NOT the reason" is DEAD.** Re-bisected at the
+   counted pitch the Tyrell-matching `q_sugar_max` is **2.3226 = 1.55× the printed high edge**.
+   The refusal got SIMPLER: the knob is inadmissible on its own band before the second anchor is
+   consulted. The second tier moved the same way — removing `K_repression` entirely closes 46 %
+   of the day-2 gap (was 79 %) and puts the benchmark at 4.54 d.
+The day-2 shortfall is now **4.21×** and §2.2's criterion reads **8.50 d** at its corrected 15 °C.
+
 **THE LAG IS NOT D-211'S DOING, AND NOT THE GROWTH EXTENT.**
 - Reverting `mu_max` to the pre-D-211 0.098 gives day 2 = **0.289** against a measured 0.594.
   The lag **pre-dates D-211** — 2.05× before, 2.81× after. D-211 worsened an existing defect and
@@ -39,7 +60,8 @@ unconvincing, go read D-216 — do not argue past it from this file.**
   2.81× → 2.41×). **That edge is REFUSED**: it is "retained from the now-debunked ~35 kJ/mol beer
   figure" (D-19). Named, measured, not adopted.
 
-**THE PITCH IS LOAD-BEARING — NEVER "CORRECT" IT TO THE TEXTBOOK PER-CELL MASS.**
+**~~THE PITCH IS LOAD-BEARING — NEVER "CORRECT" IT~~ — RETIRED AT D-222, see the block at the
+top of this file. Kept because the reasoning is instructive, not because it is live.**
 - `TYRELL_SCENARIO` pitches **1.0 g/L** against Tyrell's 9.96e6 cells/mL (~100 pg/cell, ~2× the
   textbook 40-60). At an "honest" 0.5 g/L the extract lag gets **WORSE (2.81× → 3.51×)** and the
   pH course drops **7/8 → 6/8** days inside, with D-211's pinned day-1 miss going **0.070 → 0.354**

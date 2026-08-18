@@ -249,14 +249,40 @@ WORT_SEED_PARAMS = {
     "oxalic": "oxalic_typical_wort",
 }
 
+#: Tyrell's pitch, as they state it: a COUNT. Yeast was propagated, harvested at
+#: "Hochkräusen" and pitched by cell concentration (MEBAK III 10.4.3); the paper prints no
+#: pitch by weight, so this is the only pitch statement it makes. Fig. 4's cell-count panel
+#: reads 9.98-9.94 x10^6/mL at day 0 across the four strains — one wort, one pitching rate —
+#: and D-211 transcribed it as 9.96e6.
+TYRELL_PITCH_CELLS_PER_ML = 9.96e6
+
+#: What ``TYRELL_SCENARIO`` carried from D-178 to D-222: a flat 1.0 g/L, 2.51x Tyrell's counted
+#: biomass. Named rather than left as a literal because three tests read it as the RETIRED arm,
+#: and a retired value that survives only inside test bodies is one a later beat re-invents.
+TYRELL_SCENARIO_RETIRED_PITCH_GPL = 1.0
+
 #: Tyrell's wort as this engine states it: the derived fermentable extract split in the
 #: customary all-malt proportions, pitched at their 15 °C, anchored at their measured wort pH.
+#:
+#: **The pitch is Tyrell's own count, converted (D-222).** It carried a flat ``1.0`` from
+#: D-178 until D-222 — 2.51x the biomass Tyrell pitched, and a figure nothing sourced: D-219
+#: showed it is a RESIDUAL, back-computed cell mass (~100 pg/cell) rather than a chosen one,
+#: most likely the commercial dry-yeast dosing convention of a gram of PRODUCT per litre. It
+#: now comes through the same boundary conversion every other counted pitch in this repo does,
+#: so every Tyrell comparison in this file — pH course, acid courses, extract schedule,
+#: nitrogen timing — is scored at the trial's own inoculum.
+#:
+#: The correction is not free and the cost is recorded rather than absorbed: it inherits the
+#: ``mu_max`` refit D-219 §7 priced (0.034 -> 0.058 /h, D-211's method unchanged), the day-2
+#: extract shortfall goes 2.81x -> 4.21x, and day 7 attenuates 0.782 against a measured 0.997.
+#: What the refit buys back is D-211's nitrogen timing (0.298, inside Tyrell's spread) and the
+#: pH course (7 of 8 days inside, as before). See §13.
 TYRELL_SCENARIO = {
     "glucose_gpl": 0.15 * TYRELL_SUGAR_GPL,
     "maltose_gpl": 0.70 * TYRELL_SUGAR_GPL,
     "maltotriose_gpl": 0.15 * TYRELL_SUGAR_GPL,
     "yan_mgl": 200.0,
-    "pitch_gpl": 1.0,
+    "pitch_gpl": cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS_PER_ML),
     "initial_ph": TYRELL_WORT_PH,
 }
 
@@ -549,7 +575,13 @@ def _daily_ppm(res, slot: str, days: int = 7) -> dict[int, float]:
     return {d: float(series[d * 24]) for d in range(days + 1)}
 
 
-@pytest.mark.xfail(strict=True, reason="D-215: the model ferments this wort ~2.8x too slowly")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "D-215: the model ferments this wort too slowly - ~2.8x at day 2 when measured, ~4.2x "
+        "since D-222 put the scenario on Tyrell's own counted pitch"
+    ),
+)
 def test_the_model_ferments_tyrells_wort_on_tyrells_schedule():
     """The extract panel of Fig. 4, scored against the model for the first time (D-215).
 
@@ -558,17 +590,20 @@ def test_the_model_ferments_tyrells_wort_on_tyrells_schedule():
     idiom. A plain assert on the model's *current* fraction would encode the defect instead, which
     is exactly why D-207 shipped the pH course as data no assert read.
 
-    The gap is not subtle. Tyrell's wort is **59.4 %** fermented by day 2; this engine books
-    **~21 %**, and does not reach dryness until about day 10 where their extract curve is flat by
-    day 5. The tolerance below is ±0.10 of the fermentable — roughly five times any plausible read
-    error on the extract panel — so this cannot be argued down to a transcription quibble.
+    The gap is not subtle. Tyrell's wort is **59.4 %** fermented by day 2; this engine booked
+    **~21 %** when D-215 measured it and books **~14 %** since D-222 corrected the scenario's
+    pitch from 1.0 g/L to Tyrell's own counted 0.398, and it does not reach dryness until about
+    day 10 where their extract curve is flat by day 5. The tolerance below is ±0.10 of the
+    fermentable — roughly five times any plausible read error on the extract panel — so this
+    cannot be argued down to a transcription quibble.
 
     **This is upstream of every acid course.** The acids are produced as ``Y · ΔS``, so an extract
     curve that is too gradual makes every flux-linked acid too gradual with it. Fix this and the
     acid courses move without any rate law changing; fix the acid rate laws while this stands and
     they will be fitted to compensate for it [[feedback-a-margin-can-be-borrowed-from-a-defect]].
 
-    **SCOPE: this is measured on ONE scenario** — Tyrell's wort, 15 °C, YAN 200, pitch 1.0 g/L. It
+    **SCOPE: this is measured on ONE scenario** — Tyrell's wort, 15 °C, YAN 200, and (since
+    D-222) their own counted pitch of 0.398 g/L where it was 1.0. It
     is a statement about how this engine ferments *that* wort, NOT an established property of beer's
     kinetics in general; nothing here separates a scenario artefact (their EBC-tube trial, their
     pitch rate) from a general rate defect. D-211 measured total attenuation at 6.08 d inside §2.2's
@@ -810,10 +845,11 @@ def test_a_flux_linked_acetic_yield_puts_the_acid_where_the_source_says_it_is_no
     # a single threshold would let one hide the other: the ordering is D-183's verdict, the ratio
     # is how much of it survives. D-183 measured 0.528; D-211's re-derived growth rate cost it
     # ~0.10, which is the price this beat paid on a neighbouring claim and is recorded, not tuned.
-    assert shipped_rmse / flux_rmse == pytest.approx(0.624, abs=0.03), (
-        f"the shape-error ratio is {shipped_rmse / flux_rmse:.3f}; D-183 measured 0.528 before "
-        "D-211 slowed growth to Tyrell's measured rate and 0.624 after. A move here means the "
-        "growth path changed again"
+    assert shipped_rmse / flux_rmse == pytest.approx(0.581, abs=0.03), (
+        f"the shape-error ratio is {shipped_rmse / flux_rmse:.3f}; D-183 measured 0.528, D-211 "
+        "0.624 after slowing growth, and D-222 0.581 after correcting the scenario pitch to "
+        "Tyrell's own count and refitting the rate at it. A move here means the growth path "
+        "changed again"
     )
     # THE RESIDUAL D-211 EXPOSED, pinned where it was found. Acetic makes 86 % of its measured
     # rise by day 1; the model's growth-linked producer can only make as much as the crop has
@@ -830,11 +866,14 @@ def test_a_flux_linked_acetic_yield_puts_the_acid_where_the_source_says_it_is_no
     assert measured_share_day1 == pytest.approx(0.774, abs=0.01), (
         "the measured day-1 share of acetic's rise is a transcription, not a model output"
     )
-    assert measured_share_day1 / model_share_day1 == pytest.approx(2.15, abs=0.15), (
+    assert measured_share_day1 / model_share_day1 == pytest.approx(2.60, abs=0.15), (
         f"the model books {model_share_day1:.3f} of acetic's rise by day 1 against Tyrell's "
         f"{measured_share_day1:.3f}, a {measured_share_day1 / model_share_day1:.2f}x shortfall; "
-        "D-211 measured 2.15x once the growth rate was corrected. If it has closed, a producer "
-        "faster than growth has been built and D-183's growth-linked choice should be re-read"
+        "D-211 measured 2.15x once the growth rate was corrected and D-222 2.60x once the "
+        "scenario carried Tyrell's own counted pitch. The gap D-211 FLAGGED is wider, not "
+        "narrower: nothing in the file explains acetic's early rise, and the honest pitch makes "
+        "that more visible. If it has closed, a producer faster than growth has been built and "
+        "D-183's growth-linked choice should be re-read"
     )
     # THE HONEST CEILING, asserted so it cannot quietly be read as a transient: the shipped
     # curve is MONOTONE. It reaches its endpoint early and holds; it does not peak and fall.
@@ -1694,15 +1733,18 @@ def test_losing_wort_protein_acidifies_late_not_early():
     # tolerance here would let the two values drift far enough to break the ratio below while
     # both still "passed" [[feedback-pin-tolerance-vs-solver-tolerance]].
     early, late = base_1 - lost_1, base_7 - lost_7
-    assert early == pytest.approx(0.01725, abs=0.0005), (
-        f"a 20 % pre-pitch protein loss moves day 1 by {early:.6f} pH; D-214 measures 0.017252"
+    assert early == pytest.approx(0.008954, abs=0.0005), (
+        f"a 20 % pre-pitch protein loss moves day 1 by {early:.6f} pH; D-214 measured 0.017252 "
+        "and D-222 re-measured it at 0.008954, at Tyrell's own counted pitch"
     )
-    assert late == pytest.approx(0.05870, abs=0.0015), (
-        f"a 20 % pre-pitch protein loss moves day 7 by {late:.6f} pH; D-214 measures 0.058699"
+    assert late == pytest.approx(0.057136, abs=0.0015), (
+        f"a 20 % pre-pitch protein loss moves day 7 by {late:.6f} pH; D-214 measured 0.058699 "
+        "and D-222 0.057136"
     )
     assert late > 3.0 * early, (
-        f"buffer removal is supposed to be LATE-weighted (D-214 measures day 7 at 3.4x day 1); "
-        f"here day 7 is {late / early:.2f}x day 1. If this ratio has fallen below 3, the shape "
+        f"buffer removal is supposed to be LATE-weighted (D-214 measured day 7 at 3.4x day 1, "
+        f"D-222 at 6.4x); here day 7 is {late / early:.2f}x day 1. If this ratio has fallen "
+        "below 3, the shape "
         "argument that refuses trub settling as an answer to D-211 sec 9's brief no longer holds "
         "and the refusal needs re-measuring, not re-asserting."
     )
@@ -1713,37 +1755,53 @@ def test_the_trub_window_is_empty_at_the_edge_that_parks_it(tmp_path, beer_param
 
     D-210 parked trub settling on the HIGH ``nitrogen_uptake_charge_beer`` edge and D-211 sec 9
     re-priced it there, so the nominal cannot answer it [[feedback-pin-the-band-not-the-nominal]].
-    At that edge D-214 measures: day 1 needs a loss of **>= 27.6 %** to come inside its ceiling,
-    while day 7 can afford **<= 3.1 %** before falling through its floor. The window is empty by
-    about ninefold, so no protein-loss fraction satisfies both ends — which is why the refusal is
-    arithmetic rather than a judgement about how much trub a brewery carries over.
+    At that edge D-214 measured: day 1 needs a loss of **>= 27.6 %** to come inside its ceiling,
+    while day 7 can afford **<= 3.1 %** before falling through its floor — empty by about
+    ninefold, so no protein-loss fraction satisfies both ends.
 
-    This asserts the tight half: a 5 % loss, well below what day 1 would need, already takes day 7
-    out of the envelope.
+    **D-222 RE-MEASURED both ends at Tyrell's own counted pitch and the window is emptier, not
+    fuller.** Day 7 now affords **<= 12.6 %** (the course sits less acidic, so there is more
+    headroom above the floor), but day 1 is now **unreachable at any loss whatsoever**: removing
+    the ENTIRE peptide buffer leaves day 1 at 5.4448 against a 5.4010 ceiling. The refusal
+    therefore stops being an arithmetic near-miss and becomes a saturation — which is a stronger
+    form of the same verdict, and the reason this test asserts the 100 % arm rather than the old
+    5 % one. Both halves are asserted so that a later beat cannot read "day 7 affords more now"
+    as the window having opened.
 
-    **Both margins here are small, and that is stated rather than hidden.** The control passes by
-    **+0.0086** pH and the assertion fails the floor by **−0.0054**. The archive has reported that
-    control quantity two ways — D-211 §9 said 0.0082, D-214 §7 says 0.0086 — and the difference was
-    a read artefact, not a model change (`argmin` over the solver's adaptive output against
-    `np.interp` onto the exact hour; this helper uses the latter, which is why it should read
-    0.0086). So if this test ever fails on the CONTROL line, check the read before the model: the
-    pass margin is comparable to the size of that old disagreement
-    [[feedback-read-a-fast-curve-on-a-fixed-grid]].
+    The old margins were tight and D-214 said so; they are not any more, and that is a property
+    of the ferment's extent rather than of the reading. The control's headroom above the floor
+    goes +0.0086 to **+0.0358** pH. [[feedback-read-a-fast-curve-on-a-fixed-grid]] still applies
+    to how this helper reads the curve (``np.interp`` onto the exact hour, never ``argmin`` over
+    the solver's own output).
     """
     hi = beer_params["nitrogen_uptake_charge_beer"].uncertainty.high
     data_dir = _beer_data_dir_with_nitrogen_charge(tmp_path, hi)
     floor_7 = 4.804 - 0.024
+    ceiling_1 = TYRELL_PH_COURSE[1][1] + TYRELL_PH_READ_TOL
 
     assert _tyrell_ph_with_peptide_loss(data_dir, 0.0, 7.0) > floor_7, (
-        "the unmodified high edge should still be inside the day-7 envelope (D-211 sec 9 "
-        "measures 0.0086 pH of headroom on a fixed-grid read); if it is not, this test's "
-        "premise moved and the trub arithmetic below is scored against the wrong baseline"
+        "the unmodified high edge should still be inside the day-7 envelope (D-222 measures "
+        "0.0358 pH of headroom on a fixed-grid read, where D-214 measured 0.0086); if it is "
+        "not, this test's premise moved and the trub arithmetic below is scored against the "
+        "wrong baseline"
     )
-    with_loss_7 = _tyrell_ph_with_peptide_loss(data_dir, 0.05, 7.0)
-    assert with_loss_7 < floor_7, (
-        f"a 5 % pre-pitch protein loss puts day 7 at {with_loss_7:.4f}, which should be BELOW the "
-        f"admissible floor {floor_7:.4f}. D-214's refusal rests on day 7 affording only ~3 % while "
-        "day 1 needs ~28 %; if 5 % now fits, that window has opened and the refusal is stale."
+    # The end that CLOSES the window: day 1 cannot be reached at all, so no loss fraction can
+    # satisfy both ends however much room day 7 has gained.
+    day1_at_total_loss = _tyrell_ph_with_peptide_loss(data_dir, 1.0, 1.0)
+    assert day1_at_total_loss > ceiling_1, (
+        f"removing the ENTIRE peptide buffer leaves day 1 at {day1_at_total_loss:.4f}, at or "
+        f"below its {ceiling_1:.4f} ceiling. D-222 measures 5.4448 — unreachable. If a loss "
+        "fraction can now reach day 1, D-214's refusal is no longer a saturation and the "
+        "window has to be re-derived at both ends rather than cited"
+    )
+    # The end that is merely bounded: what day 7 can afford, bisected at D-222.
+    assert (
+        _tyrell_ph_with_peptide_loss(data_dir, 0.126, 7.0)
+        > floor_7
+        > (_tyrell_ph_with_peptide_loss(data_dir, 0.15, 7.0))
+    ), (
+        "day 7's affordable loss is no longer bracketed by [12.6 %, 15 %]; D-222 bisected it "
+        "at 12.6 %, where D-214 measured 3.1 % at the retired scenario pitch"
     )
 
 
@@ -1879,14 +1937,17 @@ def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_p
     [[feedback-pin-the-band-not-the-nominal]]. This runs the full model at the low, nominal and
     high edges of ``nitrogen_uptake_charge_beer`` and pins each day-7 pH separately.
 
-    **The finding this test exists to hold visible: the HIGH edge very nearly overshoots.** With
-    the envelope at 4.804-4.916 and a 0.024 pH read tolerance, the admissible window is
-    [4.780, 4.940]; the high edge lands at 4.783, a margin of 0.003 pH. So the derived band does
-    not merely reach the measurement, it straddles the point of going past it — which is the
-    honest statement about a term whose size was derived from published wort composition and
-    never fitted, and which is a LOWER bound besides (the buffer-removal half of nitrogen uptake
-    is inexpressible here, and it pushes the same way). A future beat that adds any further
-    acidification has to re-examine this edge rather than celebrate it.
+    **D-222 SPENT the finding this test was built to hold visible, and that is recorded rather
+    than deleted.** At the retired 1.0 g/L scenario pitch the high edge landed at 4.783 against
+    an admissible floor of 4.780 — a margin of 0.003 pH, i.e. the band straddled the point of
+    going past the measurement. At Tyrell's own counted pitch the engine attenuates less by day
+    7, so the whole course sits less acidic and the high edge now clears the floor by **0.036**,
+    twelvefold more room. The caution it was written for is therefore no longer live, and a beat
+    adding further acidification should re-measure this edge rather than cite either number: the
+    margin is a property of the ferment's extent, which is exactly what the pitch correction
+    moved. The term itself is still derived from published wort composition, never fitted, and
+    still a LOWER bound (the buffer-removal half of nitrogen uptake is inexpressible here and
+    pushes the same way).
     """
     param = beer_params["nitrogen_uptake_charge_beer"]
     lo_ph = _tyrell_degassed_ph_at_day(
@@ -1909,14 +1970,18 @@ def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_p
         )
     # Each edge pinned on its own, so a shift that moved them together could not hide inside a
     # single containment check.
-    assert lo_ph == pytest.approx(4.826, abs=0.01)
-    assert nom_ph == pytest.approx(4.804, abs=0.01)
-    assert hi_ph == pytest.approx(4.783, abs=0.01)
-    # ...and the high edge's margin, asserted as the small number it is rather than described.
-    assert 0.0 < hi_ph - window[0] < 0.01, (
+    assert lo_ph == pytest.approx(4.861, abs=0.01)
+    assert nom_ph == pytest.approx(4.838, abs=0.01)
+    assert hi_ph == pytest.approx(4.816, abs=0.01)
+    # ...and the high edge's margin, asserted as the number it is rather than described. It was
+    # 0.003 pH at the retired scenario pitch (D-209) and is 0.036 at Tyrell's counted one
+    # (D-222), because a less complete ferment finishes less acidic. Bounded ABOVE as well, so a
+    # further loss of acidification is still caught: the day-7 agreement is what pays for it.
+    assert 0.02 < hi_ph - window[0] < 0.06, (
         f"the high edge's margin to the bottom of the admissible window is {hi_ph - window[0]:.4f}"
-        " pH; D-209 measures 0.003. If this has grown, something reduced the model's "
-        "acidification and the day-7 agreement is no longer as tight as D-209 recorded"
+        " pH; D-209 measured 0.003 at the retired 1.0 g/L scenario pitch and D-222 0.036 at "
+        "Tyrell's counted 0.398. A move in either direction is a change to the model's day-7 "
+        "acidification and needs attributing before this number is re-pinned"
     )
 
 
@@ -1958,10 +2023,13 @@ def test_the_day_1_pH_miss_survives_the_timing_fix_and_has_CHANGED_SIDES():
         "ABOVE — too alkaline. If it is now inside, the last identified beer-pH gap has closed "
         "and the unbuilt buffer-removal half (D-209 section 8) needs re-pricing"
     )
-    assert day1 - hi == pytest.approx(0.070, abs=0.02), (
-        f"the day-1 miss is {day1 - hi:.4f} pH above the envelope; D-211 measures 0.070, where "
-        f"D-209 measured 0.315 BELOW and D-208 0.186 above. All three matter: the size and the "
-        "SIDE are what say whether a beat moved the timing or the arithmetic"
+    assert day1 - hi == pytest.approx(0.172, abs=0.02), (
+        f"the day-1 miss is {day1 - hi:.4f} pH above the envelope; D-208 measured 0.186 above, "
+        "D-209 0.315 BELOW, D-211 0.070 above, and D-222 0.172 above once the scenario carried "
+        "Tyrell's own counted pitch. All of them matter: the size and the SIDE are what say "
+        "whether a beat moved the timing or the arithmetic. D-222 is a SIZE cost paid for a "
+        "sourced inoculum — the side is unchanged, and the count is what sets the pitch, not "
+        "this number [[feedback-fit-the-observable-not-the-consequence]]"
     )
 
     # Every other measured day is inside. The claim is that ONE day is missed, not that the
@@ -1982,10 +2050,18 @@ def test_the_day_1_pH_miss_survives_the_timing_fix_and_has_CHANGED_SIDES():
     nitrogen = states[schema.slice("N").start, :]
     consumed_by_24h = float(np.interp(24.0, t_h, nitrogen[0] - nitrogen))
     fraction = consumed_by_24h / (nitrogen[0] - min(nitrogen))
-    assert fraction == pytest.approx(0.363, abs=0.03), (
-        f"{fraction:.3f} of the nitrogen is drawn by 24 h; D-209 measured >0.99 and D-211's "
-        "re-derived rate puts it at 0.363, inside Tyrell's measured 0.234-0.448 cell-count "
-        "spread. That agreement is what makes the timing MEASURED rather than fitted"
+    assert fraction == pytest.approx(0.298, abs=0.03), (
+        f"{fraction:.3f} of the nitrogen is drawn by 24 h; D-209 measured >0.99, D-211's "
+        "re-derived rate put it at 0.363 and D-222's refit at Tyrell's own counted pitch at "
+        "0.298. That agreement is what makes the timing MEASURED rather than fitted"
+    )
+    lo_spread, hi_spread = TYRELL_N_DRAWN_SPREAD
+    assert lo_spread <= fraction <= hi_spread, (
+        f"the drawn fraction {fraction:.3f} is outside Tyrell's measured {TYRELL_N_DRAWN_SPREAD} "
+        "cell-count spread. This is the assert that makes the pin above a MEASUREMENT: D-219 "
+        "priced the pitch correction as taking this to 0.145 and outside, and it is the "
+        "`mu_max` refit at the corrected pitch that keeps it inside. If it has left the spread, "
+        "the refit and the pitch have come apart"
     )
 
 
@@ -1993,15 +2069,30 @@ def test_the_day_1_pH_miss_survives_the_timing_fix_and_has_CHANGED_SIDES():
 # D-216 — the two anchors on beer's fermentation SPEED, and what they forbid
 # ---------------------------------------------------------------------------------------
 
-#: The ``q_sugar_max`` that reproduces Tyrell's day-2 extract fraction exactly (D-216 §3),
-#: found by bisection on the shipped model. It is INSIDE the parameter's own printed band
-#: (0.3-1.5), which is why this needs a test rather than a sentence: a future beat looking at
-#: :func:`test_the_model_ferments_tyrells_wort_on_tyrells_schedule` will find that the one knob
-#: that closes it is not even out of band. What stops it is the OTHER anchor, below.
-Q_SUGAR_MAX_MATCHING_TYRELL = 1.397
+#: The ``q_sugar_max`` that reproduces Tyrell's day-2 extract fraction exactly, found by
+#: bisection on the shipped model on the hourly grid.
+#:
+#: **RE-BISECTED at D-222, and it LEFT THE BAND.** D-216 measured 1.397 and built the first
+#: tier of its refusal on that value being INSIDE the parameter's printed 0.3-1.5 band —
+#: *"the value is out of band is NOT the reason"* was the whole point of it. That was measured
+#: against a scenario pitching 2.51x the biomass Tyrell counted. At Tyrell's own pitch the
+#: day-2 shortfall widens 2.81x -> 4.21x and the knob that closes it is **2.3226**, which is
+#: **1.55x the printed high edge**; the retired 1.397 now books 0.343 of the wort by day 2
+#: against the measured 0.594.
+#:
+#: D-216 §3's framing is therefore spent, and the refusal it supported got SIMPLER rather
+#: than weaker: the one knob that closes Tyrell's extract schedule is out of band on its own,
+#: before the other anchor is consulted at all.
+Q_SUGAR_MAX_MATCHING_TYRELL = 2.3226
 
-#: ``K_repression`` removed entirely — not a candidate value, the unbounded LIMIT of the term
-#: that owns 79 % of the lag (D-216 §5). Used to make the refusal two-tier.
+#: The band ``q_sugar_max`` is drawn from, as printed in ``beer_generic.yaml``. Named here
+#: because :data:`Q_SUGAR_MAX_MATCHING_TYRELL` having left it is a claim that must be RUN
+#: against the shipped file rather than written into a comment that cannot go stale loudly.
+Q_SUGAR_MAX_PRINTED_BAND = (0.3, 1.5)
+
+#: ``K_repression`` removed entirely — not a candidate value, the unbounded LIMIT of the
+#: term that owns most of the lag (79 % at the retired pitch, 46 % at Tyrell's counted one —
+#: D-216 §5, re-scored at D-222). Used to make the refusal two-tier.
 K_REPRESSION_REMOVED = 1.0e6
 
 
@@ -2077,7 +2168,8 @@ def test_matching_tyrells_extract_schedule_overshoots_the_attenuation_benchmark(
     could not have seen it.
 
     * **Tyrell's measured extract course** — their wort is 59.4 % fermented by day 2, where the
-      model books 21.2 % (``test_the_model_ferments_tyrells_wort_on_tyrells_schedule``);
+      model books 14.1 % (``test_the_model_ferments_tyrells_wort_on_tyrells_schedule``). It was
+      21.2 % until D-222 put the scenario on Tyrell's own counted pitch;
     * **§2.2's acceptance criterion** — a 1.048 ale wort reaching 1.010 apparent in 5-7 days, at
       **15 °C** since D-221 re-temperatured it (``test_beer_1048_og_attenuates_in_5_to_7_days``).
 
@@ -2086,20 +2178,31 @@ def test_matching_tyrells_extract_schedule_overshoots_the_attenuation_benchmark(
     **What D-216 measured, and the frame it was measuring in.** At the criterion's old 20 °C the
     shipped rate PASSED at 6.05 d and the admissible band was ``q`` in [0.425, 0.621]: the
     criterion sat just above the shipped 0.5 and **forbade** a faster engine, breaking at
-    q ≈ 0.62 having closed under a fifth of Tyrell's gap. At the corrected 15 °C the admissible
-    band is [0.667, 1.017] — the shipped 0.5 falls **below** it, and the criterion now **demands**
-    a faster engine.
+    q ≈ 0.62 having closed under a fifth of Tyrell's gap. At the corrected 15 °C the shipped 0.5
+    falls **below** the admissible band and the criterion now **demands** a faster engine —
+    [0.667, 1.017] as D-221 bisected it, [0.612, 0.891] since D-222 refit ``mu_max`` at Tyrell's
+    counted pitch. The band travels with the growth rate, so it is re-derived where it is used
+    and never carried here as a constant.
 
-    **So the two anchors agree on direction and disagree only on magnitude.** Both want the
-    engine faster than it ships; the criterion tops out at 1.017 and Tyrell wants 1.397, a factor
-    of ~1.37 apart. That is a far narrower conflict than D-216 recorded, and it is why D-216 §11's
-    open question is now about a magnitude rather than about a sign.
+    **The anchors agree on direction, and D-222 WIDENED their disagreement about magnitude.**
+    Both want the engine faster than it ships. D-221 read the gap as ~1.37x — the criterion
+    topping out at 1.017 against Tyrell's 1.397 — and called D-216 §11's open question a
+    magnitude rather than a sign. At the corrected pitch the criterion tops out at 0.891 and
+    Tyrell demands **2.3226**, a factor of **~2.61**. The narrowing D-221 recorded was itself
+    borrowed from the pitch excess.
+
+    **Tyrell's demand has left its own band, and that is a NEW reason rather than a louder one.**
+    D-216 §3's first tier was explicitly *"the value is INSIDE 0.3-1.5, so out-of-band is NOT
+    the reason"*. At Tyrell's counted pitch 2.3226 is **1.55x the printed high edge**, so the
+    knob that closes his extract schedule is inadmissible before the other anchor is consulted
+    at all. It is asserted below against the shipped parameter file rather than stated here, so
+    that a band edit can turn it red.
 
     **The refusal survives the loss of its own premise.** D-216 refused 1.397 partly because the
-    criterion forbade it. The criterion no longer forbids faster rates in general — but it still
-    forbids THIS one: 1.397 gives 3.99 d here, and it stays outside across the ENTIRE printed
-    ``E_a_uptake`` band (30,000 -> 3.58 d, 63,000 -> 4.17 d), only reaching 5-7 d at ~120,000
-    J/mol, 1.9x the printed high edge. Nothing in D-221 licenses moving the rate.
+    criterion forbade it. The criterion no longer forbids faster rates in general — but it
+    still forbids the Tyrell-matching one, and by more than before: 2.3226 gives 2.38 d here and
+    stays outside across the ENTIRE printed ``E_a_uptake`` band (30,000 -> 2.13 d, 63,000 ->
+    2.50 d). Nothing in D-221 or D-222 licenses moving the rate.
 
     **The baseline is asserted first and deliberately**, and it is no longer "the criterion
     passes" — it cannot be, because D-221 established that it does not
@@ -2111,18 +2214,39 @@ def test_matching_tyrells_extract_schedule_overshoots_the_attenuation_benchmark(
     shipped = _beer_days_to_target_gravity()
     assert shipped > 7.0, (
         f"the benchmark wort attenuates in {shipped:.2f} d at the shipped q_sugar_max; D-221 "
-        "measured 9.00 d, SLOW-side outside §2.2's 5-7 d window at the corrected 15 °C. If this "
-        "is now inside, the engine has been re-rated and D-221's whole reading needs redoing"
+        "measured 9.00 d and D-222 8.50 d after refitting `mu_max` at Tyrell's counted pitch, "
+        "SLOW-side outside §2.2's 5-7 d window at the corrected 15 °C. If this is now inside, "
+        "the engine has been re-rated and D-221's whole reading needs redoing"
     )
 
     matched = _beer_days_to_target_gravity(Q_SUGAR_MAX_MATCHING_TYRELL)
     assert matched < 5.0, (
         f"re-rated to the q_sugar_max that reproduces Tyrell's day-2 extract "
         f"({Q_SUGAR_MAX_MATCHING_TYRELL}), the benchmark wort attenuates in {matched:.2f} d, "
-        "which is INSIDE §2.2's window. D-221 measured 3.99 d at 15 °C (D-216 measured 2.71 d at "
-        "the retired 20 °C). If this is now inside, the two anchors no longer conflict and "
-        "D-215's extract xfail is closable on this knob — which is a result, not a test failure: "
-        "re-open D-216 §4"
+        "which is INSIDE §2.2's window. D-222 measured 2.38 d at 15 °C (D-221 measured 3.99 d "
+        "at the retired pitch's 1.397, D-216 2.71 d at the retired 20 °C). If this is now "
+        "inside, the two anchors no longer conflict and D-215's extract xfail is closable on "
+        "this knob — which is a result, not a test failure: re-open D-216 §4"
+    )
+
+    # D-222's own tier, run against the SHIPPED file so that a band edit turns it red. D-216
+    # §3 rested on this value being in band; at Tyrell's counted pitch it is not, and that is
+    # a reason of a different KIND from the one above.
+    # [[feedback-grep-finds-claims-not-guards]]
+    printed = load_parameters(default_data_dir() / "beer_generic.yaml")["q_sugar_max"]
+    assert (printed.uncertainty.low, printed.uncertainty.high) == Q_SUGAR_MAX_PRINTED_BAND, (
+        f"q_sugar_max's printed band is now ({printed.uncertainty.low}, "
+        f"{printed.uncertainty.high}); D-216 §3 and D-222 §4 both reason against "
+        f"{Q_SUGAR_MAX_PRINTED_BAND}, so re-read them before re-pinning this"
+    )
+    assert printed.uncertainty.high < Q_SUGAR_MAX_MATCHING_TYRELL, (
+        f"the Tyrell-matching q_sugar_max {Q_SUGAR_MAX_MATCHING_TYRELL} is back INSIDE its "
+        f"printed band (high edge {printed.uncertainty.high}). D-216 §3's *'out of band is NOT "
+        "the reason'* would then be live again and D-222 §4's simpler refusal would be gone"
+    )
+    ratio = Q_SUGAR_MAX_MATCHING_TYRELL / printed.uncertainty.high
+    assert ratio == pytest.approx(1.548, abs=0.02), (
+        f"the Tyrell-matching rate is {ratio:.3f}x the printed high edge; D-222 measured 1.548x"
     )
 
     assert matched < 5.0 and shipped > 7.0, (
@@ -2139,15 +2263,21 @@ def test_removing_catabolite_repression_entirely_still_misses_tyrells_schedule()
     functional form is Gee & Ramirez's but ``beer_generic.yaml`` records that their numeric
     constants were not accessible in-source. With glucose at 12.3 g/L it holds maltose at 14 %
     of its rate on day 0 and maltotriose at 0.5 %, so the model's day 1 is essentially
-    glucose-only. It is by far the largest single contributor to the early-limb lag: removing it
-    takes day 2 from 0.212 to 0.514, **79 % of the gap**, and it has the right SHAPE (a brake
-    that vanishes as glucose clears, matching a lag that peaks at day 2 and closes by day 7).
+    glucose-only. It is by far the largest single contributor to the early-limb lag, and it has
+    the right SHAPE (a brake that vanishes as glucose clears, matching a lag that peaks at day 2
+    and closes by day 7).
+
+    **What removing it buys, in both frames.** At the retired 1.0 g/L pitch it took day 2 from
+    0.212 to 0.514, **79 % of the gap** (D-216 §5). At Tyrell's own counted pitch it takes day 2
+    from 0.141 to 0.350, **46 %** — the term did not shrink, the gap grew, because D-222 widened
+    the day-2 shortfall 2.81x -> 4.21x.
 
     So the obvious next move is to re-source that constant. **This test says it would not be
-    enough.** Removed ENTIRELY — not a candidate value, the limit — the model still falls short
-    of Tyrell's day 2, while putting the benchmark at 3.42 d. The refusal in D-216 §6 is
-    therefore not "no in-band point works" but the stronger "not even the unbounded limit of the
-    term that owns most of it".
+    enough**, and says it more loudly than D-216 could. Removed ENTIRELY — not a candidate
+    value, the limit — the model still falls short of Tyrell's day 2, while putting the
+    benchmark at 4.54 d (3.42 d when D-216 measured it at the retired pitch), i.e. still on the
+    fast side of §2.2's window. The refusal in D-216 §6 is therefore not "no in-band point
+    works" but the stronger "not even the unbounded limit of the term that owns most of it".
     """
     unrepressed = _tyrell_flux_fraction(K_repression=K_REPRESSION_REMOVED)
     measured_day2 = TYRELL_FLUX_FRACTION[2]
@@ -2160,67 +2290,95 @@ def test_removing_catabolite_repression_entirely_still_misses_tyrells_schedule()
 
     shipped = _tyrell_flux_fraction()
     closed = (unrepressed[2] - shipped[2]) / (measured_day2 - shipped[2])
-    assert closed == pytest.approx(0.79, abs=0.05), (
-        f"removing repression closes {closed:.0%} of the day-2 gap; D-216 measured 79 %. This "
-        "share is the reason the term is named as the dominant contributor, so it is pinned "
-        "rather than left as prose"
+    assert closed == pytest.approx(0.46, abs=0.05), (
+        f"removing repression closes {closed:.0%} of the day-2 gap; D-216 measured 79 % at the "
+        "retired scenario pitch and D-222 46 % at Tyrell's counted one. The term is still the "
+        "largest single contributor and still falls short of the measurement, but it owns LESS "
+        "of a BIGGER gap: the honest pitch widened the day-2 shortfall 2.81x -> 4.21x, so the "
+        "unbounded limit closes under half of it. That strengthens the two-tier refusal rather "
+        "than weakening it"
     )
 
 
-def test_the_beer_ph_agreement_is_conditional_on_the_scenario_pitch():
-    """The pH course's 7/8 is scored on a pitch nothing independently sources (D-216 §8).
+def test_the_ph_course_endorses_NEITHER_pitch_and_the_count_is_what_decides():
+    """The pH course cannot be used to pick beer's pitch, in either direction (D-222 §6).
 
-    D-207/208/209/211 all score beer's pH on ``TYRELL_SCENARIO``, which pitches **1.0 g/L**
-    against Tyrell's stated 9.96e6 cells/mL — ``beer_generic.yaml`` already records that this
-    implies ~100 pg dry weight per cell, about **2× the textbook 40-60 pg**. That note reads as
-    a caveat about a scenario detail. It is not: two published results are conditioned on it.
+    **What this test asserted before, and why it is spent.** D-216 §8 found beer's published pH
+    agreement conditional on ``TYRELL_SCENARIO``'s 1.0 g/L — a figure nothing sourced — and read
+    it generously: *"1.0 g/L is the value at which the model's biomass reproduces Tyrell's
+    measured growth timing, and two independent observables endorse it against the per-cell
+    arithmetic"*. D-219 then showed the 1.0 was a RESIDUAL rather than a choice, and D-222 moved
+    the scenario onto Tyrell's own counted 9.96e6 cells/mL and refit ``mu_max`` there.
 
-    At a textbook-honest 0.5 g/L the day-1 miss D-211 pinned at **0.070 becomes 0.354** — five
-    times worse — day 2 falls out of its envelope as well, and D-211's measured attribution (the
-    nitrogen fraction drawn by 24 h, 0.363, "inside Tyrell's measured 0.234-0.448 spread") drops
-    to 0.181, **outside** that spread.
+    **At the refit rate that endorsement is FALSE, and this test is the measurement.** The day-1
+    miss does not merely shrink toward the retired pitch — it CROSSES ZERO between them:
 
-    **This is not a claim that the pitch is wrong.** Read the other way, 1.0 g/L is the value at
-    which the model's biomass reproduces Tyrell's measured growth *timing* in the units that
-    drive the rate, and two independent observables endorse it against the per-cell arithmetic.
-    The extract lag gets **worse**, not better, at the honest pitch — 2.81× → **5.31×** at
-    0.5 g/L. (D-216 §7 printed 3.51× there; that is wrong and D-219 corrects it. It is prose
-    only and was never asserted, and D-218 §5's own day-2 fraction at this pitch, 0.112,
-    gives 0.594/0.112 = 5.31×. At Tyrell's counted pitch of 0.398 g/L it is 6.58×.)
-    What this test forbids is reading D-211's 0.070 as unconditional.
+    ===================  ===============  ================
+    pitch                day-1 vs 5.377   days inside (/8)
+    ===================  ===============  ================
+    0.398 (counted)      +0.172 alkaline  7
+    0.5                  +0.072 alkaline  7
+    1.0 (retired)        -0.259 ACIDIC    7
+    ===================  ===============  ================
+
+    So the pH course has an optimum near ~0.55 g/L and neither the counted pitch nor the retired
+    one sits on it; the retired pitch is not "the value two observables endorse", it is a value
+    that overshoots on the other side. All three score 7 of 8 days, so the COUNT is what carries
+    the decision and the score cannot referee it
+    [[feedback-fit-the-observable-not-the-consequence]].
+
+    **What this forbids** is the obvious future move: "restore the pitch, the pH course scores
+    better". It does not, and a pitch chosen to zero a downstream residual would be booking every
+    unbuilt beer-acid term into an inoculum. D-209 §8's buffer-removal half is still unbuilt and
+    still pushes day 1 DOWN, which is the term the +0.172 leaves room for.
     """
-    compiled = compile_scenario(
-        Scenario(
-            name="d216-pitch",
-            medium="beer",
-            initial={**TYRELL_SCENARIO, "pitch_gpl": 0.5},
-            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
-            duration_days=14.0,
+
+    def score(pitch: float) -> tuple[float, int]:
+        compiled = compile_scenario(
+            Scenario(
+                name="d222-pitch",
+                medium="beer",
+                initial={**TYRELL_SCENARIO, "pitch_gpl": pitch},
+                temperature_schedule=[TemperaturePoint(day=0.0, celsius=TYRELL_TRIAL_CELSIUS)],
+                duration_days=14.0,
+            )
         )
+        res = compiled.run()
+        params = compiled.parameters.resolve()
+        states = np.asarray(res.y, dtype=float)
+        t_h = np.asarray(res.t, dtype=float)
+
+        def ph_at(day: int) -> float:
+            y = np.array([np.interp(day * 24.0, t_h, states[i, :]) for i in range(states.shape[0])])
+            return float(acidbase.degassed_ph_of_state(y, compiled.schema, params))
+
+        inside = sum(
+            band_lo - TYRELL_PH_READ_TOL <= ph_at(day) <= band_hi + TYRELL_PH_READ_TOL
+            for day, (band_lo, band_hi) in TYRELL_PH_COURSE.items()
+        )
+        return ph_at(1) - TYRELL_PH_COURSE[1][1], inside
+
+    counted_miss, counted_inside = score(TYRELL_SCENARIO["pitch_gpl"])
+    retired_miss, retired_inside = score(TYRELL_SCENARIO_RETIRED_PITCH_GPL)
+
+    assert counted_miss == pytest.approx(0.172, abs=0.03) and counted_miss > 0.0, (
+        f"at Tyrell's counted pitch day 1 misses by {counted_miss:+.4f} pH; D-222 measured "
+        "+0.172, on the alkaline side. The SIDE is what leaves room for D-209 §8's unbuilt "
+        "buffer-removal half, so a sign change here is a different finding, not a drift"
     )
-    res = compiled.run()
-    params = compiled.parameters.resolve()
-    states = np.asarray(res.y, dtype=float)
-    t_h = np.asarray(res.t, dtype=float)
-
-    def ph_at(day: int) -> float:
-        y = np.array([np.interp(day * 24.0, t_h, states[i, :]) for i in range(states.shape[0])])
-        return float(acidbase.degassed_ph_of_state(y, compiled.schema, params))
-
-    day1_excess = ph_at(1) - TYRELL_PH_COURSE[1][1]
-    assert day1_excess == pytest.approx(0.354, abs=0.03), (
-        f"at a 0.5 g/L pitch day 1 reads {day1_excess:.4f} pH above Tyrell's envelope; D-216 "
-        "measured 0.354 against the 0.070 the shipped 1.0 g/L pitch gives. If these have "
-        "converged, the pH result no longer depends on the pitch and D-216 §8 is spent"
+    assert retired_miss == pytest.approx(-0.259, abs=0.03) and retired_miss < 0.0, (
+        f"at the retired 1.0 g/L pitch day 1 misses by {retired_miss:+.4f} pH; D-222 measured "
+        "-0.259, on the ACIDIC side. If the retired pitch is back to being the better-scoring "
+        "one, D-216 §8's endorsement reading is live again and D-222 §6 needs re-measuring"
     )
-
-    inside = [
-        band_lo - TYRELL_PH_READ_TOL <= ph_at(day) <= band_hi + TYRELL_PH_READ_TOL
-        for day, (band_lo, band_hi) in TYRELL_PH_COURSE.items()
-    ]
-    assert sum(inside) == 6, (
-        f"{sum(inside)}/8 days inside at the honest pitch; D-216 measured 6, against 7 at the "
-        "shipped pitch. The count is what says the agreement is conditional"
+    assert counted_miss > 0.0 > retired_miss, (
+        "the day-1 miss no longer CROSSES ZERO between the two pitches. That crossing is the "
+        "whole claim: it is what makes the pH course unable to referee the pitch"
+    )
+    assert counted_inside == retired_inside == 7, (
+        f"days inside: {counted_inside} at the counted pitch, {retired_inside} at the retired "
+        "one; D-222 measured 7 at both. If they have separated, the count-vs-score argument "
+        "needs restating — one of them would then be scoring better on the coarse measure too"
     )
 
 
@@ -2325,9 +2483,10 @@ def test_the_uptake_activation_energy_is_no_longer_inert_at_the_attenuation_benc
     g_span = _beer_days_to_target_gravity(E_a_growth=63000.0) - _beer_days_to_target_gravity(
         E_a_growth=30000.0
     )
-    assert g_span == pytest.approx(0.2917, abs=0.05), (
+    assert g_span == pytest.approx(0.1667, abs=0.05), (
         f"across its printed band E_a_growth moves the live criterion {g_span:.4f} d; D-221 "
-        "measured 0.2917. beer_generic.yaml's note for that parameter quotes this number"
+        "measured 0.2917 and D-222 0.1667 at the refit growth rate. beer_generic.yaml's note "
+        "for that parameter quotes this number"
     )
     assert g_span < 0.25 * span, (
         f"E_a_growth moves the criterion {g_span:.4f} d against E_a_uptake's {span:.4f} d. The "
@@ -2362,8 +2521,9 @@ def test_the_uptake_activation_energy_is_a_lever_only_because_the_trial_ran_cool
     fermentation temperature.
 
     The span is small either way. Across the whole 30,000-63,000 band the day-2 fraction moves
-    0.045, taking D-215's 2.81× gap to 2.41× — under a fifth of it — which is why D-216
-    refused the low edge on provenance rather than on power.
+    0.027 at Tyrell's own counted pitch (0.045 at the retired 1.0 g/L one, which is what D-217
+    measured) — under a tenth of the gap — which is why D-216 refused the low edge on
+    provenance rather than on power.
     """
 
     def day2_span(celsius: float) -> tuple[float, float]:
@@ -2373,10 +2533,12 @@ def test_the_uptake_activation_energy_is_a_lever_only_because_the_trial_ran_cool
 
     cool_lo, cool_hi = day2_span(TYRELL_TRIAL_CELSIUS)
     span_cool = cool_lo - cool_hi
-    assert span_cool == pytest.approx(0.0449, abs=0.005), (
+    assert span_cool == pytest.approx(0.0267, abs=0.005), (
         f"at {TYRELL_TRIAL_CELSIUS:.0f} °C the printed E_a_uptake band moves Tyrell's day-2 "
-        f"fraction by {span_cool:.4f}; D-217 measured 0.0449. If this has collapsed, the lever "
-        "D-216 §6 named is gone and its refusal needs re-reading"
+        f"fraction by {span_cool:.4f}; D-217 measured 0.0449 at the retired scenario pitch and "
+        "D-222 0.0267 at Tyrell's counted one — the lever shrinks with the biomass it acts on. "
+        "If it has collapsed to zero the lever D-216 §6 named is gone and its refusal needs "
+        "re-reading"
     )
 
     ref_lo, ref_hi = day2_span(20.0)
@@ -2479,23 +2641,33 @@ PER_CELL_DRY_MASS_PG: dict[str, float] = {
 #: reading of the per-cell dry mass. Bisected on the shipped model on the hourly grid, and
 #: verified live by the test below rather than trusted.
 #:
-#: **18 pg/cell is deliberately NOT in here** — see
-#: :data:`Q_SUGAR_MAX_UNREACHABLE_AT_18_PG`. Every value in this dict is a crossing; a
-#: saturation in the same container would be a value a later beat could iterate over and
-#: read as fitted, which is D-177's lesson at the level of the data structure rather than
-#: the prose.
-Q_SUGAR_MAX_REACHING_FOSTER: dict[float, float] = {40.0: 0.9242, 50.0: 0.8176, 100.0: 0.5602}
+#: **RE-DERIVED at D-222** at the refit ``mu_max``: faster growth means more catalytic biomass
+#: earlier, so every row needs LESS uptake rate to reach the same endpoint. The retired values,
+#: measured at ``mu_max`` = 0.034, were {18: unreachable, 40: 0.9242, 50: 0.8176, 100: 0.5602}.
+#:
+#: **18 pg/cell is now IN here, and that is a retired claim rather than a new finding.** At the
+#: old growth rate the band's ceiling of 1.5 could not reach Foster's endpoint at that reading
+#: at all (3.04 d against a published <=3, a saturation); at the refit rate it reaches it at
+#: 1.0592 and the ceiling arrives in 2.38 d. The reading itself is still retired — D-219 settled
+#: the per-cell mass at 40 pg — and its §2.2 row is still outside the window, so nothing about
+#: the verdict moves. What moves is that every row is now a crossing.
+Q_SUGAR_MAX_REACHING_FOSTER: dict[float, float] = {
+    18.0: 1.0592,
+    40.0: 0.7886,
+    50.0: 0.7225,
+    100.0: 0.5314,
+}
 
-#: At 18 pg/cell — the repo's own wine conversion — **no in-band value reaches Foster's
-#: endpoint at all.** The printed band's CEILING of 1.5 still needs 3.04 d against a
-#: published ≤3, missing by 1.4 %. This is a saturation, not a crossing.
-Q_SUGAR_MAX_UNREACHABLE_AT_18_PG = 1.5
+#: What the band's CEILING reaches at 18 pg/cell, in days against a published <=3. At the
+#: retired growth rate this was 3.04 — a saturation, the reason that reading had no crossing.
+#: At the refit rate it is 2.38 and the row is an ordinary crossing above.
+FOSTER_DAYS_AT_BAND_CEILING_18PG = 2.3833
 
 #: The 2 d arm on the 100 pg row: the ``q_sugar_max`` reaching Foster's target at the OPEN
 #: end of its sampling interval (:data:`FOSTER_SAMPLE_HOURS`) rather than at 72 h. It is the
 #: whole difference between "one corner of the bracket survives" and "none does", so it is
 #: named here rather than left as a literal in the one test that reads it.
-Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG = 0.8971
+Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG = 0.8228
 
 #: What §2.2's benchmark then reads, per reading. Only one lands inside 5-7 d.
 #: What §2.2's criterion reads when the engine is re-rated to Foster's 72 h endpoint, per
@@ -2505,27 +2677,29 @@ Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG = 0.8971
 #: 40 pg one, so the temperature repair and the cell-mass settlement agree where the old
 #: pairing had them in conflict.
 HANDOFF_DAYS_AT_FOSTER_RATE: dict[float, float] = {
-    18.0: 3.8333,
-    40.0: 5.4167,
-    50.0: 5.9583,
-    100.0: 8.1667,
+    18.0: 4.3333,
+    40.0: 5.5833,
+    50.0: 6.0417,
+    100.0: 8.0,
 }
 
 #: D-218's own figures at the criterion's retired 20 °C frame. Pinned, not deleted: a claim
 #: measured in a frame that has moved is still a true claim about that frame, and the inversion
 #: between these two dicts is what D-221 §7 asserts.
 HANDOFF_DAYS_AT_FOSTER_RATE_RETIRED_20C: dict[float, float] = {
-    18.0: 2.5833,
-    40.0: 3.6250,
-    50.0: 4.0,
-    100.0: 5.5,
+    18.0: 2.9167,
+    40.0: 3.75,
+    50.0: 4.0833,
+    100.0: 5.375,
 }
 
-#: The lowest ``E_a_uptake`` at which the SETTLED 40 pg row sits inside §2.2's window (D-221 §7).
-#: Below it the Foster-matching rate overshoots the criterion on the fast side, so the new
-#: compatibility is real but conditional: it holds over 69 % of the printed 30,000-63,000 band,
-#: and the shipped 55,100 is inside that part. Bisected, not read off a grid.
-E_A_UPTAKE_ADMITTING_FOSTER_AT_SETTLED_MASS = 40165.0
+#: The lowest ``E_a_uptake`` at which the SETTLED 40 pg row sits inside §2.2's window (D-221 §7,
+#: re-bisected at D-222). Below it the Foster-matching rate overshoots the criterion on the fast
+#: side, so the compatibility is real but conditional. D-221 measured 40,165 J/mol — 69 % of the
+#: printed 30,000-63,000 band — and at the refit ``mu_max`` it is 36,623, i.e. **80 %** of the
+#: band, with the shipped 55,100 well inside. The conditionality LOOSENED; it did not go away,
+#: and the claim is still *"compatible over most of the band including the shipped value"*.
+E_A_UPTAKE_ADMITTING_FOSTER_AT_SETTLED_MASS = 36623.0
 
 
 def _foster_pitch_gpl(pg_per_cell: float) -> float:
@@ -2589,6 +2763,14 @@ def _foster_days_to_target_gravity(
 #: pitch the hourly grid's quantum on a duration RATIO is ~0.04, and the residual's distance
 #: from 1.0 at the band's high edge is 0.002.
 FOSTER_GRID_PER_HOUR = 10
+
+#: A finer grid for the ONE claim whose margin is smaller than the quantum above. D-222's refit
+#: moved the Arrhenius crossing toward the band's high edge, leaving a margin of 0.0027 against
+#: a 6-minute quantum of ~0.005 — unresolved. At 1 minute the quantum is ~0.0005 and the reading
+#: reproduces to five decimals against a 15-second one, so the value is the model's rather than
+#: the grid's. Used only by the crossing test; everything else stays commensurable on the coarse
+#: grid [[feedback-read-a-fast-curve-on-a-fixed-grid]].
+FOSTER_FINE_GRID_PER_HOUR = 60
 
 
 @pytest.fixture(scope="module")
@@ -2654,10 +2836,10 @@ def test_fosters_temperature_pair_cannot_discriminate_anywhere_in_the_uptake_ban
     # engine is in an unexpected state" — but a control asserting something false attributes
     # nothing at all.
     baseline = _beer_days_to_target_gravity()
-    assert baseline == pytest.approx(9.0, abs=0.1), (
+    assert baseline == pytest.approx(8.5, abs=0.1), (
         f"the criterion wort attenuates in {baseline:.2f} d at the shipped parameters; D-221 "
-        "measured 9.00 d at the corrected 15 °C. The control failed, so nothing below is "
-        "attributable"
+        "measured 9.00 d at the corrected 15 °C and D-222 8.50 d after refitting `mu_max` at "
+        "Tyrell's counted pitch. The control failed, so nothing below is attributable"
     )
 
     for e_a in (30000.0, 55100.0, 63000.0):
@@ -2706,35 +2888,60 @@ def test_the_apparent_arrhenius_identity_in_beers_temperature_response_is_a_cros
     so the crossing is unresolvable there however the assert is written. See
     :func:`foster_temperature_sweep`.
 
+    **D-222 moved the crossing and this test had to change its GRID, not its claim.** Refitting
+    ``mu_max`` at Tyrell's counted pitch pushed the crossing from ~58 to ~61.6 kJ/mol, so the
+    high-edge margin fell from 0.013 to **0.0027** — under the module fixture's 6-minute quantum
+    of ~0.005, where the same reading on a 1-minute grid resolves it at a quantum of ~0.0005 and
+    reproduces the value to five decimals (0.99733 against 0.99746). The edges are therefore
+    integrated HERE at :data:`FOSTER_FINE_GRID_PER_HOUR` rather than read off the shared fixture.
+    A margin shrinking toward the band edge is what a rate change does to a crossing; a margin
+    read below its own quantum is what a stale grid does to a test.
+
     Asserting the two ENDS is what makes the middle mean something. Without them,
     ``|residual - 1| < 0.02`` reads as "the model is a bare Arrhenius response"; with them it
     reads "the model is not, and this is where the two curves cross".
     """
     gas_constant = 8.314462618
     t_cold, t_hot = 273.15 + 12.0, 273.15 + 22.0
+    light_pitch = _foster_pitch_gpl(18.0)
 
-    def residual(e_a: float) -> float:
+    def residual(e_a: float, per_hour: int = FOSTER_FINE_GRID_PER_HOUR) -> float:
         arrhenius = float(np.exp((e_a / gas_constant) * (1.0 / t_cold - 1.0 / t_hot)))
-        return float(foster_temperature_sweep[(18.0, e_a)]) / arrhenius
+        hot = _foster_days_to_target_gravity(
+            light_pitch, 22.0, days=12.0, per_hour=per_hour, E_a_uptake=e_a
+        )
+        cold = _foster_days_to_target_gravity(
+            light_pitch, 12.0, days=25.0, per_hour=per_hour, E_a_uptake=e_a
+        )
+        return (cold / hot) / arrhenius
 
-    low, nominal, high = residual(30000.0), residual(55100.0), residual(63000.0)
+    low, high = residual(30000.0), residual(63000.0)
+    # The nominal keeps the shared fixture: its own claim carries a 0.02 tolerance, hundreds of
+    # times the coarse quantum, so paying for two more fine integrations would buy nothing.
+    nominal = float(foster_temperature_sweep[(18.0, 55100.0)]) / float(
+        np.exp((55100.0 / gas_constant) * (1.0 / t_cold - 1.0 / t_hot))
+    )
 
     assert low > 1.0 and high < 1.0, (
         f"the residual is {low:.4f} at the band's low edge and {high:.4f} at its high edge. "
-        "D-218 §3 measured 1.108 and 0.987 — a sweep that CROSSES 1.0 inside the band. If both "
-        "are now on one side there is no crossing, and the near-identity at the nominal below "
-        "would be a structural property of the rate law rather than a coincidence"
+        "D-218 §3 measured 1.108 and 0.987 and D-222 1.0686 and 0.9973 — a sweep that CROSSES "
+        "1.0 inside the band. If both are now on one side there is no crossing, and the "
+        "near-identity at the nominal below would be a structural property of the rate law "
+        "rather than a coincidence"
     )
-    assert min(low - 1.0, 1.0 - high) > 0.005, (
+    assert min(low - 1.0, 1.0 - high) > 0.002, (
         f"the crossing's margins are {low - 1.0:.4f} and {1.0 - high:.4f}; D-218 measured 0.108 "
-        "and 0.013. The 6-minute grid's quantum on this ratio is ~0.002, so a margin under "
-        "0.005 is not resolved and the "
-        "assert above would be reading the grid rather than the model"
+        f"and 0.013, D-222 0.0686 and 0.0027. The quantum on this ratio at "
+        f"{FOSTER_FINE_GRID_PER_HOUR}/h is ~0.0005, so a margin under 0.002 is not resolved by "
+        "a factor of four and the assert above would be reading the grid rather than the model. "
+        "The high-edge margin is the one that shrank: at 0.0027 it is ~6x its own quantum, and "
+        "a further rate increase would push the crossing past the band's high edge entirely"
     )
     assert abs(nominal - 1.0) < 0.02, (
-        f"at the shipped E_a_uptake the residual is {nominal:.4f}; D-218 measured 1.0119. The "
-        "nominal sitting within 1 % of the bare Arrhenius factor is what makes the model's "
-        "temperature ratio LOOK like an identity, and §3's finding is that it is a crossing"
+        f"at the shipped E_a_uptake the residual is {nominal:.4f}; D-218 measured 1.0119 and "
+        "D-222 1.0109. The nominal sitting within 1 % of the bare Arrhenius factor is what "
+        "makes the model's temperature ratio LOOK like an identity, and §3's finding is that "
+        "it is a crossing"
     )
 
 
@@ -2836,22 +3043,25 @@ def test_fosters_endpoint_and_the_handoff_window_agree_at_the_settled_conversion
         "2008). The comparison in this test is only sound while the two agree"
     )
 
-    # The saturated row first: it is the one that is NOT a crossing, and keeping it out of
-    # the loop below is what keeps that dict free of values a later beat could read as fitted.
+    # D-218's saturated row is GONE and the retirement is asserted rather than deleted: at the
+    # retired growth rate the band's ceiling of 1.5 could not reach Foster's endpoint at 18 pg
+    # at all (3.0417 d against <=3), which is why that row had no crossing. At D-222's refit
+    # rate the ceiling arrives in 2.38 d and the row bisects like every other. The reading is
+    # still retired and its §2.2 verdict is still OUT, so no conclusion moves.
     at_ceiling = _foster_days_to_target_gravity(
-        _foster_pitch_gpl(18.0), 22.0, days=12.0, q_sugar_max=Q_SUGAR_MAX_UNREACHABLE_AT_18_PG
+        _foster_pitch_gpl(18.0), 22.0, days=12.0, q_sugar_max=1.5
     )
-    assert at_ceiling > FOSTER_DAYS_TO_FG_AT_22C, (
-        f"at 18 pg/cell the band CEILING q = {Q_SUGAR_MAX_UNREACHABLE_AT_18_PG} now reaches "
-        f"Foster's endpoint in {at_ceiling:.4f} d. D-218 measured 3.0417 — a 1.4 % miss, which "
-        "is what makes this reading unreachable in band rather than merely expensive. If it is "
-        "reachable, 1.5 stops being a saturation and the row needs bisecting for a real crossing"
+    assert at_ceiling == pytest.approx(FOSTER_DAYS_AT_BAND_CEILING_18PG, abs=0.05), (
+        f"at 18 pg/cell the band CEILING q = 1.5 reaches Foster's endpoint in {at_ceiling:.4f} d; "
+        f"D-222 measured {FOSTER_DAYS_AT_BAND_CEILING_18PG} where D-218 measured 3.0417 at the "
+        "retired growth rate"
     )
-    verdicts = {
-        18.0: 5.0
-        <= _beer_days_to_target_gravity(q_sugar_max=Q_SUGAR_MAX_UNREACHABLE_AT_18_PG)
-        <= 7.0
-    }
+    assert at_ceiling < FOSTER_DAYS_TO_FG_AT_22C, (
+        f"the band ceiling at 18 pg is back to MISSING Foster's endpoint ({at_ceiling:.4f} d). "
+        "That row would then be a saturation again and it must come out of "
+        "Q_SUGAR_MAX_REACHING_FOSTER, which may hold crossings only"
+    )
+    verdicts = {}
 
     for pg, q in Q_SUGAR_MAX_REACHING_FOSTER.items():
         pitch = _foster_pitch_gpl(pg)
@@ -2908,9 +3118,10 @@ def test_fosters_endpoint_and_the_handoff_window_agree_at_the_settled_conversion
         "reading the benchmark below"
     )
     open_end = _beer_days_to_target_gravity(q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG)
-    assert 5.0 <= open_end <= 7.0 and open_end == pytest.approx(5.54, abs=0.05), (
+    assert 5.0 <= open_end <= 7.0 and open_end == pytest.approx(5.375, abs=0.05), (
         f"reading Foster's endpoint at the open end of its sampling interval takes §2.2 to "
-        f"{open_end:.4f} d; D-221 measured 5.54 at 15 °C, INSIDE 5-7, where D-218 measured 3.71 "
+        f"{open_end:.4f} d; D-221 measured 5.54 and D-222 5.375 at 15 °C, INSIDE 5-7, where "
+        "D-218 measured 3.71 "
         "at the retired 20 °C and outside. This is the assert that says D-218 §3's central "
         "caveat inverted: the window's survival no longer depends on treating a 72 h SAMPLE as "
         "an exact duration"
@@ -2918,10 +3129,19 @@ def test_fosters_endpoint_and_the_handoff_window_agree_at_the_settled_conversion
     retired_open_end = _beer_days_to_target_gravity(
         q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG, celsius=20.0
     )
-    assert retired_open_end == pytest.approx(3.71, abs=0.05), (
-        f"D-218's own open-end figure re-reads as {retired_open_end:.4f} d in its own 20 °C "
-        "frame, not 3.71. That record's measurement must survive its frame being retired — a "
-        "RED here means the inversion above is an arithmetic change, not a frame change"
+    # This is a LIVE reading of the CURRENT model in D-218's retired frame, not a replay of
+    # D-218's own number, and D-222 is where that distinction started to matter: the figure was
+    # 3.71 d when the growth rate was 0.034 and is 3.625 d at the refit 0.058. What has to
+    # survive is the SIDE — the open-end arm outside 5-7 at 20 C and inside at 15 C — because
+    # that is what makes the inversion a frame change rather than an arithmetic one.
+    assert retired_open_end == pytest.approx(3.625, abs=0.05), (
+        f"the open-end arm re-reads as {retired_open_end:.4f} d in D-218's retired 20 °C frame; "
+        "D-218 measured 3.71 at the growth rate of its day and D-222 3.625 at the refit one"
+    )
+    assert not (5.0 <= retired_open_end <= 7.0), (
+        f"the open-end arm now lands INSIDE 5-7 d at the retired 20 °C too ({retired_open_end:.4f}"
+        " d). The inversion above would then not be about the frame at all, and D-221 §7 would "
+        "need re-deriving rather than citing"
     )
 
 
@@ -2936,14 +3156,22 @@ def test_fosters_endpoint_and_the_handoff_window_agree_at_the_settled_conversion
 
 #: Tyrell's counted pitch as a ``pitch_gpl``, at the settled conversion. Not a literal:
 #: it comes through the same boundary function every other counted pitch does.
-TYRELL_COUNTED_PITCH_GPL = cells_per_ml_to_pitch_gpl(9.96e6)
+TYRELL_COUNTED_PITCH_GPL = cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS_PER_ML)
 
-#: What the scenario ships, over what Tyrell counted. D-219's headline for the beer side.
+#: What the scenario shipped from D-178 to D-222, over what Tyrell counted — D-219's headline
+#: for the beer side, and the gap D-222 closed. Kept because the RETIRED pitch is still read as
+#: an arm by three tests and the excess is what made it wrong.
 TYRELL_SCENARIO_BIOMASS_EXCESS = 2.51
 
-#: At Tyrell's counted pitch: the day-2 extract fraction, and the nitrogen drawn by 24 h.
-#: Both measured at D-219 on the hourly grid §12's flux helper uses.
-TYRELL_AT_COUNTED_PITCH = {"day2_fraction": 0.0903, "n_drawn_24h": 0.1446}
+#: At Tyrell's counted pitch, which is now the SHIPPED pitch: the day-2 and day-7 extract
+#: fractions and the nitrogen drawn by 24 h, on the hourly grid §12's flux helper uses.
+#: **Measured at D-222, with ``mu_max`` refit at that pitch.** D-219 measured the same three
+#: without the refit — 0.0903, 0.7010 and 0.1446 — which is what its price list quotes.
+TYRELL_AT_COUNTED_PITCH = {
+    "day2_fraction": 0.1411,
+    "day7_fraction": 0.7821,
+    "n_drawn_24h": 0.2978,
+}
 
 #: Tyrell's measured 24 h cell-count spread — the interval D-211 calls "what makes the
 #: timing MEASURED rather than fitted", and which the counted pitch falls outside.
@@ -2952,7 +3180,7 @@ TYRELL_N_DRAWN_SPREAD = (0.234, 0.448)
 #: The shipped model against Foster's endpoint at the SETTLED pitch, no knob touched.
 #: D-218 §4's cleanest line was "3.33 d against a published <=3, an 11 % miss" — true, and
 #: read on the 100 pg reading D-219 retires. These are the numbers that replace it.
-FOSTER_AT_SETTLED_PITCH = {"d22": 4.8375, "d12": 10.7417}
+FOSTER_AT_SETTLED_PITCH = {"d22": 4.4750, "d12": 9.9333}
 
 
 def _tyrell_at_pitch(pitch_gpl: float, days: int = 7) -> tuple[dict[int, float], float]:
@@ -2987,70 +3215,83 @@ def _tyrell_at_pitch(pitch_gpl: float, days: int = 7) -> tuple[dict[int, float],
     return frac, float((n[0] - n[24]) / n[0])
 
 
-def test_the_beer_scenario_carries_two_and_a_half_times_tyrells_counted_biomass():
-    """``TYRELL_SCENARIO`` pitches 1.0 g/L; Tyrell counted 0.398 g/L (D-219).
+def test_the_beer_scenario_now_carries_tyrells_own_counted_pitch():
+    """``TYRELL_SCENARIO`` pitches what Tyrell counted — corrected at D-222, measured at D-219.
 
-    The ~100 pg/cell the archive carried since D-216 was never a conversion anyone chose.
-    It is what you get by dividing this scenario's 1.0 g/L by Tyrell's counted
-    9.96e6 cells/mL, so it is a RESIDUAL — it absorbs the true cell mass *and* every error
-    in the model's per-gram uptake rate, which is why it came out three times any defensible
-    cell mass. At the settled conversion the counted pitch is 0.398 g/L and the scenario
-    carries **2.51x** the biomass Tyrell actually pitched.
+    **What this test asserted before.** D-219 measured the scenario carrying **2.51x** the
+    biomass Tyrell pitched and declined to correct it, because ``mu_max`` had been fitted at
+    1.0 g/L and moving the pitch inherited a refit. This test was where that refusal lived.
+    D-222 took the refit and the correction together, so the excess is now 1.000 by construction
+    and what needs guarding is the CONVERSION and the PRICE, not the gap.
 
-    **The pitch is deliberately NOT corrected, and this test is where that refusal lives.**
-    ``mu_max`` was fitted at 1.0 g/L against Tyrell's growth fraction, so moving the pitch
-    inherits a ``mu_max`` refit AND a broken extract calibration in the same beat (D-218 §7).
-    What ships is the measurement of what the excess is doing, which is large: the day-2
-    extract shortfall goes 2.81x at the shipped pitch to **6.58x** at the counted one, and
-    the nitrogen drawn by 24 h — D-211's own attribution for beer's pH timing — goes 0.360
-    to **0.145**, outside Tyrell's measured 0.234-0.448 spread.
+    **Why the correction and not the measurement.** The 1.0 g/L was never chosen by anyone: it
+    is what you get by dividing back from a pitch nobody sourced, so it absorbed the true cell
+    mass *and* every error in the model's per-gram rate — a residual, which is why it implied
+    ~100 pg/cell against a settled 40 (D-219 §1). Tyrell states a COUNT, 9.96e6 cells/mL, and
+    the engine's biomass gram is defined by a count (Coleman's 4e-11 g). So the pitch is now a
+    conversion of the paper's own number rather than a free parameter, and every Tyrell
+    comparison in this file is scored at the trial's own inoculum.
 
-    Note this is the SAME direction D-216 §7 reported and a bigger number than it printed:
-    that section says the 0.5 g/L shortfall is 3.51x where it is 5.31x (D-219 corrects it;
-    prose only, never asserted). Its conclusion is strengthened, not weakened.
+    **The price, asserted here so it cannot be quietly forgotten.** D-219's price list was
+    measured WITHOUT the refit and overstated the cost: it put the day-2 extract shortfall at
+    6.58x and the nitrogen drawn by 24 h at 0.145, outside Tyrell's spread. With ``mu_max``
+    refit at the corrected pitch by D-211's own method the shortfall is **4.21x** and the
+    nitrogen fraction is back **inside** the spread. What does not come back is attenuation:
+    day 7 reaches **0.782** of the fermentable extract against a measured 0.997, where the
+    excess pitch reached 0.931 — so the engine is now visibly slow against Tyrell's ENDPOINT
+    and not only its early limb, which is what D-220 measured independently against Foster.
 
-    A RED here is one of two things: the scenario pitch moved (in which case the ``mu_max``
-    refit above is now owed), or the conversion moved.
+    A RED here is the pitch or the conversion moving, and the two have very different causes.
     """
-    excess = TYRELL_SCENARIO["pitch_gpl"] / TYRELL_COUNTED_PITCH_GPL
-    assert excess == pytest.approx(TYRELL_SCENARIO_BIOMASS_EXCESS, abs=0.01), (
-        f"the beer scenario carries {excess:.3f}x Tyrell's counted biomass; D-219 measured "
-        f"{TYRELL_SCENARIO_BIOMASS_EXCESS}. Either the scenario pitch or the settled "
-        "conversion has moved, and the two have very different consequences"
+    assert TYRELL_SCENARIO["pitch_gpl"] == pytest.approx(TYRELL_COUNTED_PITCH_GPL, rel=1e-12), (
+        f"the beer scenario pitches {TYRELL_SCENARIO['pitch_gpl']:.4f} g/L against Tyrell's "
+        f"counted {TYRELL_COUNTED_PITCH_GPL:.4f}. D-222 corrected these to be the same number "
+        "through the boundary conversion; a difference means one of them was edited to a literal"
+    )
+    assert (
+        pytest.approx(TYRELL_SCENARIO_BIOMASS_EXCESS, abs=0.01)
+        == TYRELL_SCENARIO_RETIRED_PITCH_GPL / TYRELL_COUNTED_PITCH_GPL
+    ), (
+        "the RETIRED 1.0 g/L pitch no longer works out to D-219's measured 2.51x excess over "
+        "the counted pitch, so the settled conversion has moved and D-219 §1 needs re-reading"
     )
 
     counted, n_drawn = _tyrell_at_pitch(TYRELL_COUNTED_PITCH_GPL)
-    shipped, n_shipped = _tyrell_at_pitch(TYRELL_SCENARIO["pitch_gpl"])
+    retired, n_retired = _tyrell_at_pitch(TYRELL_SCENARIO_RETIRED_PITCH_GPL)
 
     assert counted[2] == pytest.approx(TYRELL_AT_COUNTED_PITCH["day2_fraction"], abs=0.005), (
         f"at Tyrell's counted pitch the model ferments {counted[2]:.4f} of the wort by day 2; "
-        f"D-219 measured {TYRELL_AT_COUNTED_PITCH['day2_fraction']}"
+        f"D-222 measured {TYRELL_AT_COUNTED_PITCH['day2_fraction']} at the refit growth rate "
+        "(D-219 measured 0.0903 before it)"
     )
     shortfall = TYRELL_FLUX_FRACTION[2] / counted[2]
-    assert shortfall == pytest.approx(6.58, abs=0.15), (
-        f"the day-2 shortfall at the counted pitch is {shortfall:.2f}x; D-219 measured 6.58. "
-        "This is the cost of the honest pitch and it is the reason the correction is a "
-        "measurement rather than a repair"
+    assert shortfall == pytest.approx(4.21, abs=0.15), (
+        f"the day-2 shortfall at the counted pitch is {shortfall:.2f}x; D-222 measured 4.21 "
+        "with the refit and D-219 6.58 without it. This is what the honest pitch costs on the "
+        "early limb and it is reported, not tuned"
     )
-    assert shortfall > TYRELL_FLUX_FRACTION[2] / shipped[2], (
-        "the lag no longer gets WORSE at the counted pitch. That reverses D-216 §7's "
-        "direction and would mean the biomass excess is masking a fast model, not a slow one"
+    assert shortfall > TYRELL_FLUX_FRACTION[2] / retired[2], (
+        "the lag no longer gets WORSE at the counted pitch than at the retired one. That "
+        "reverses D-216 §7's direction and would mean the biomass excess was masking a fast "
+        "model rather than a slow one"
+    )
+    assert counted[7] == pytest.approx(TYRELL_AT_COUNTED_PITCH["day7_fraction"], abs=0.01), (
+        f"day 7 reaches {counted[7]:.4f} of the fermentable extract against Tyrell's measured "
+        f"{TYRELL_FLUX_FRACTION[7]:.3f}; D-222 measured "
+        f"{TYRELL_AT_COUNTED_PITCH['day7_fraction']}. The ENDPOINT half of the slowness is the "
+        "part the excess pitch was hiding (it reached 0.931), and it is the half D-220 "
+        "measured independently against Foster's course"
     )
 
     assert n_drawn == pytest.approx(TYRELL_AT_COUNTED_PITCH["n_drawn_24h"], abs=0.01), (
-        f"nitrogen drawn by 24 h at the counted pitch is {n_drawn:.4f}; D-219 measured "
+        f"nitrogen drawn by 24 h at the counted pitch is {n_drawn:.4f}; D-222 measured "
         f"{TYRELL_AT_COUNTED_PITCH['n_drawn_24h']}"
     )
-    assert not (TYRELL_N_DRAWN_SPREAD[0] <= n_drawn <= TYRELL_N_DRAWN_SPREAD[1]), (
-        f"nitrogen drawn by 24 h at the counted pitch, {n_drawn:.4f}, is back inside Tyrell's "
-        f"measured {TYRELL_N_DRAWN_SPREAD} spread. D-211's attribution would then hold at the "
-        "honest pitch too, and D-216 §8's conditionality would be void"
-    )
-    # The designed contrast: the SHIPPED pitch is what lands inside that spread. Without
-    # this the assert above cannot tell "outside" from "the predicate never fires".
-    assert TYRELL_N_DRAWN_SPREAD[0] <= n_shipped <= TYRELL_N_DRAWN_SPREAD[1], (
-        f"at the shipped 1.0 g/L the nitrogen drawn by 24 h is {n_shipped:.4f}, already "
-        "outside Tyrell's spread. The contrast this test is built on has gone"
+    assert TYRELL_N_DRAWN_SPREAD[0] <= n_drawn <= TYRELL_N_DRAWN_SPREAD[1], (
+        f"nitrogen drawn by 24 h is {n_drawn:.4f}, outside Tyrell's measured "
+        f"{TYRELL_N_DRAWN_SPREAD} spread. D-219 priced the pitch correction as taking this to "
+        "0.145 and outside; the refit is what keeps it inside, so a RED means the two have "
+        "come apart and D-211's timing attribution no longer holds at the shipped pitch"
     )
 
 
@@ -3147,16 +3388,17 @@ def test_at_the_settled_conversion_the_shipped_model_is_slow_against_foster():
     <=3. An 11 % miss."* That was measured, and it was measured on the reading D-219 retires.
 
     At the settled 40 pg/cell — Foster's counted 1.2e7 cells/mL is **0.48 g/L**, not 1.2 —
-    the shipped model takes **4.84 d** against the same published <=3, a **1.61x** miss, and
-    it also misses the 12 C ceiling (10.74 d against <=10). Both halves of D-218's conclusion
-    therefore need restating rather than one: the brief's 5-7 d window is still refuted by
-    every third-party endpoint found, AND the model is ~1.6x slow on a third-party trial
-    rather than nearly right.
+    the shipped model took **4.84 d** against the same published <=3 (a **1.61x** miss) and also
+    missed the 12 C ceiling at 10.74 d. **D-222 re-measured both at the refit growth rate:
+    4.48 d, a 1.49x miss, and 9.93 d — inside the 12 C ceiling.** The verdict is unchanged and
+    smaller: the model is ~1.5x slow against a third-party endpoint rather than ~1.6x, and the
+    brief's 5-7 d window is still refuted by every third-party endpoint at 20 C.
 
     Read against §12's other guards this is consistent, not new: D-215 measured the same
     engine fermenting Tyrell's wort ~2.8x too slowly *at a pitch already carrying 2.51x the
     counted biomass*. Those two numbers COMPOUND — they are not two routes agreeing on one
-    figure — which is why the day-2 shortfall at the counted pitch is 6.58x and not 2.8x.
+    figure — which is why the day-2 shortfall at Tyrell's counted pitch was 6.58x before the
+    refit and 4.21x after it.
 
     Both durations run on the same 6-minute grid §12's temperature guards use, because a
     duration read off an hourly grid carries a quantum larger than the third digit here.
@@ -3173,16 +3415,30 @@ def test_at_the_settled_conversion_the_shipped_model_is_slow_against_foster():
     assert d12 == pytest.approx(FOSTER_AT_SETTLED_PITCH["d12"], abs=0.05)
 
     miss = d22 / FOSTER_DAYS_TO_FG_AT_22C
-    assert miss == pytest.approx(1.61, abs=0.03), (
+    assert miss == pytest.approx(1.49, abs=0.03), (
         f"the shipped model reaches Foster's endpoint in {d22:.4f} d against a published "
-        f"<={FOSTER_DAYS_TO_FG_AT_22C}, a {miss:.2f}x miss; D-219 measured 1.61. D-218 §4's "
-        "11 % was the same quantity at the retired 100 pg reading"
+        f"<={FOSTER_DAYS_TO_FG_AT_22C}, a {miss:.2f}x miss; D-219 measured 1.61 and D-222 1.49 "
+        "at the refit growth rate. D-218 §4's 11 % was the same quantity at the retired 100 pg "
+        "reading"
     )
-    assert d12 > FOSTER_CEILING_DAYS_AT_12C, (
-        f"the 12 C arm now finishes in {d12:.4f} d, inside Foster's {FOSTER_CEILING_DAYS_AT_12C} "
-        "d incubation ceiling. The cold arm was the one place the model was NOT clearly slow, "
-        "and if it now clears, the slowness is not uniform across temperature and D-217's "
-        "refusal on E_a_uptake is worth re-opening"
+    # D-222's refit CLEARS Foster's 12 C ceiling — 9.93 d against <=10 — and that is a weaker
+    # fact than it sounds, so the claim is re-anchored rather than relaxed. The ceiling is the
+    # INCUBATION LENGTH of a run whose 12 C strains had not finished inside it, i.e. a bound
+    # D-220's own recovered course superseded: measured there, the mean is 7.60 d and the model
+    # is still 1.31x slow. Uniformity across temperature is asserted in §14 on those ratios, not
+    # here on a ceiling, so clearing it does NOT license re-opening D-217.
+    assert d12 < FOSTER_CEILING_DAYS_AT_12C, (
+        f"the 12 C arm finishes in {d12:.4f} d, back OUTSIDE Foster's "
+        f"{FOSTER_CEILING_DAYS_AT_12C} d incubation ceiling; D-222 measured 9.93 d inside it. "
+        "D-219 measured 10.74 d at the retired growth rate, so a RED here means the refit has "
+        "come undone"
+    )
+    assert d12 / _foster_observed_mean(12) > 1.2, (
+        f"at 12 C the model takes {d12:.4f} d against D-220's measured mean of "
+        f"{_foster_observed_mean(12):.2f} d, a ratio of {d12 / _foster_observed_mean(12):.2f}x. "
+        "This is the bound that survived the ceiling: if the cold arm has stopped being slow "
+        "against the measured COURSE, the slowness is no longer uniform across temperature and "
+        "D-217's refusal on E_a_uptake is worth re-opening"
     )
 
 
@@ -3269,7 +3525,7 @@ FOSTER_DAYS_TO_TARGET = {
 #: about its own pitch test. This dict is the value at the time of writing and one test
 #: checks the live numbers against it, so a drift is still reported; but the ~1.5x claim is
 #: measured on every run.
-FOSTER_MODEL_DAYS_AS_RECORDED = {12: 10.7417, 15: 8.3792, 22: 4.8375, 30: 2.7167}
+FOSTER_MODEL_DAYS_AS_RECORDED = {12: 9.9333, 15: 7.75, 22: 4.4750, 30: 2.5167}
 
 #: How long each arm has to be integrated for the crossing to exist at all. The 12 C arm
 #: needs 30 d because the model takes 10.7 there; a shorter span returns ``inf`` and the
@@ -3371,7 +3627,7 @@ def test_fosters_recovered_course_is_internally_consistent():
     )
 
 
-def test_the_engine_is_half_again_too_slow_at_every_temperature_below_thirty(
+def test_the_engine_is_uniformly_too_slow_at_every_temperature_below_thirty(
     foster_model_days: dict[int, float],
 ):
     """The measurement this beat exists for, and the one D-218 could not make.
@@ -3379,7 +3635,10 @@ def test_the_engine_is_half_again_too_slow_at_every_temperature_below_thirty(
     D-218 had only ceilings, so it could say the model was slow at ONE reading of ONE
     temperature. With the course in hand the comparison runs at four temperatures against
     three strains, in Foster's own wort at Foster's counted pitch, and the answer is a level
-    error rather than a temperature-response one: **~1.4-1.5x too slow at 12, 15 and 22 C**.
+    error rather than a temperature-response one: D-220 measured **1.41 / 1.54 / 1.45x** at
+    12 / 15 / 22 C and D-222's growth refit narrowed it to **1.31 / 1.42 / 1.34x**. The
+    NEAR-CONSTANCY is the claim, not the size — a rate scale is what closes a level error, and
+    that is the ``q_sugar_max`` D-216 measured and refused.
 
     The 30 C column is the designed contrast, and it is what makes "the model is slow" a
     claim here instead of a predicate that always fires: there the model lands INSIDE the
@@ -3394,10 +3653,11 @@ def test_the_engine_is_half_again_too_slow_at_every_temperature_below_thirty(
         )
     ratios = {t: foster_model_days[t] / _foster_observed_mean(t) for t in (12, 15, 22, 30)}
     for temp in (12, 15, 22):
-        assert 1.30 <= ratios[temp] <= 1.70, (
+        assert 1.25 <= ratios[temp] <= 1.70, (
             f"at {temp} C the model takes {foster_model_days[temp]:.2f} d against a measured "
             f"mean of {_foster_observed_mean(temp):.2f} d, a ratio of {ratios[temp]:.2f}x, "
-            "outside the 1.30-1.70x this beat measured. The cold columns extrapolate past "
+            "outside the 1.25-1.70x D-220 and D-222 measured between them. The cold columns "
+            "extrapolate past "
             "120 h on a DECELERATING tail, so the measured means are lower bounds and these "
             "ratios can only grow -- a RED below 1.30 therefore means the model changed, not "
             "that the reading softened"
@@ -3409,6 +3669,14 @@ def test_the_engine_is_half_again_too_slow_at_every_temperature_below_thirty(
     )
     assert min(ratios[t] for t in (12, 15, 22)) > ratios[30], (
         "every sub-30 C ratio must exceed the 30 C one for the contrast to mean anything"
+    )
+    sub30 = [ratios[t] for t in (12, 15, 22)]
+    assert max(sub30) - min(sub30) < 0.25, (
+        f"the sub-30 C ratios span {max(sub30) - min(sub30):.3f} ({min(sub30):.2f}-"
+        f"{max(sub30):.2f}); D-220 measured 0.13 and D-222 0.11. NEAR-CONSTANCY across the "
+        "cold columns is what makes this a LEVEL error rather than a temperature-response one, "
+        "and it is why none of this re-opens D-217's refusal to re-source E_a_uptake. A RED "
+        "here is the finding, where a RED on a single ratio is a re-pin"
     )
 
 

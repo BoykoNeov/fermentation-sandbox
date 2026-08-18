@@ -20,6 +20,7 @@ from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
 from fermentation.scenario import CompiledScenario
+from fermentation.units import cells_per_ml_to_pitch_gpl
 from fermentation.validation import (
     assert_conserved,
     assert_nonnegative,
@@ -219,7 +220,11 @@ def _tyrell_beer_growth(
                 "maltose_gpl": 0.70 * TYRELL_CELL_SUGAR_GPL,
                 "maltotriose_gpl": 0.15 * TYRELL_CELL_SUGAR_GPL,
                 "yan_mgl": 200.0,
-                "pitch_gpl": 1.0,
+                # Tyrell's OWN counted pitch (D-222). It was a flat 1.0 g/L — 2.51x the
+                # biomass Tyrell pitched — until D-222 converted the paper's count through
+                # the settled 40 pg/cell. `mu_max` is fitted ON this curve, so the fit frame
+                # has to be the trial's own inoculum or the rate absorbs the pitch error.
+                "pitch_gpl": cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS * 1e6),
                 "initial_ph": 5.65,
             },
             temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
@@ -325,27 +330,78 @@ def test_the_retired_growth_rate_is_ruled_out_by_the_counts(tmp_path):
         f"at the retired 0.098/h the day-1 growth fraction is {day1:.4f}, which the counts' "
         f"{lo:.4f}-{hi:.4f} would ADMIT. D-211's re-derivation rests on it being ruled out"
     )
-    assert day1 == pytest.approx(1.0, abs=0.01), (
-        f"the retired rate should have the crop at its ceiling by day 1 ({day1:.4f}); that is "
-        "what put the whole nitrogen charge step before the day-1 pH reading (D-209 section 7)"
+    # RE-PINNED at D-222. "The crop is at its ceiling by day 1" was a pitch-1.0 statement:
+    # at Tyrell's own counted pitch the same retired rate has 69 % of the crop grown by day 1,
+    # because the ceiling is unchanged in ABSOLUTE terms while the fold is 2.51x larger. The
+    # ruling-out above is unaffected — 0.690 is still well above the measured 0.448 — and it is
+    # still most of the nitrogen charge step arriving before the day-1 pH reading (D-209 §7).
+    assert day1 == pytest.approx(0.690, abs=0.02), (
+        f"at the retired 0.098/h the day-1 growth fraction is {day1:.4f}; D-222 measured 0.690 "
+        "at Tyrell's counted pitch (it was 1.000, the ceiling, at the retired 1.0 g/L pitch)"
     )
 
 
 def test_the_measured_multiplication_is_not_reproduced_and_that_is_a_separate_defect():
-    # A RECORDED DEVIATION, pinned so it is not mistaken for something D-211 fixed.
-    # The beat corrected the RATE. The EXTENT is set by YAN / biomass_N_fraction and
-    # sits ~6 % below Tyrell's measured multiplication — and further below the "four-
-    # or fivefold" that The Chemistry of Beer states generically. It does not touch
-    # the timing conclusion, because the comparison above is normalised on each
-    # curve's own peak, which is exactly why that normalisation was chosen.
+    """A RECORDED DEVIATION, pinned so it is not mistaken for something a rate fixed.
+
+    **D-222 INVERTED THIS TEST'S SIGN, and that inversion is the beat.** D-211 measured the
+    model's multiplication at 2.75x against Tyrell's 2.92-3.48x and called the extent "right,
+    ~6 % low". That was measured at a 1.0 g/L pitch — 2.51x the biomass Tyrell counted — and
+    the fold is precisely what a pitch SETS. Beer's growth is nitrogen-limited, so the gain is
+    fixed in ABSOLUTE terms (``dX = YAN / biomass_N_fraction`` ~= 1.75 g/L at either pitch);
+    dividing the same gain by an inoculum 2.51x lighter gives 5.39x, **1.55x ABOVE** the
+    measured envelope's high edge. The old agreement was an artefact of the excess pitch.
+
+    **No growth RATE can repair it** — ``mu_max`` sets WHEN the ceiling is reached, not WHERE
+    it is; the test below runs that claim rather than asserting it. That is why D-222 refits
+    the rate and REPORTS the extent instead of tuning it, and why the timing comparison above
+    is normalised on each curve's own peak.
+
+    **What it would take, stated as a quantity rather than a mood.** Tyrell's counted growth is
+    (29.06-34.69) - 9.96 = 19.1-24.7 x10^6 cells/mL, i.e. 0.76-0.99 g/L at the settled 40 pg,
+    so at this file's ``biomass_N_fraction`` only 87-113 mg/L of nitrogen reached suspended
+    biomass — against the 200 mg/L the scenario assumes. Tyrell prints no FAN (the wort is a
+    dilution of Bavarian Pilsener malt extract; the strains' amino-acid profile is "data not
+    shown"), so nothing sources a repair, and the model's own assumption that one lumped pool
+    goes wholly into suspended biomass is the other candidate. Not entered at D-222.
+    """
     _, _, x, _ = _tyrell_beer_growth()
     model_fold = float(x.max() / x[0])
     meas_lo = TYRELL_CELL_COUNT[TYRELL_PEAK_DAY][0] / TYRELL_PITCH_CELLS
     meas_hi = TYRELL_CELL_COUNT[TYRELL_PEAK_DAY][1] / TYRELL_PITCH_CELLS
-    assert model_fold < meas_lo, (
-        f"model multiplication {model_fold:.3f}x is no longer BELOW Tyrell's measured "
-        f"{meas_lo:.3f}-{meas_hi:.3f}x; if the extent has been fixed, say so"
+    assert model_fold > meas_hi, (
+        f"model multiplication {model_fold:.3f}x is no longer ABOVE Tyrell's measured "
+        f"{meas_lo:.3f}-{meas_hi:.3f}x. D-222's finding is that the extent agreement D-211 "
+        "recorded belonged to the 2.51x pitch excess; if it is back, say which repair did it"
     )
-    assert model_fold / meas_lo == pytest.approx(0.937, abs=0.01), (
-        f"the extent shortfall is {1 - model_fold / meas_lo:.1%}; D-211 measured 6.3 %"
+    assert model_fold / meas_hi == pytest.approx(1.546, abs=0.02), (
+        f"the extent overshoot is {model_fold / meas_hi:.3f}x the measured high edge; D-222 "
+        "measured 1.546"
+    )
+
+
+def test_no_growth_rate_in_the_band_can_repair_the_extent(tmp_path):
+    """The mutation the claim above names: a RATE cannot move a nitrogen-limited CEILING.
+
+    Without this, "no growth rate can repair it" is a mechanism assertion resting on the
+    reader's agreement rather than on a run. Both re-constructed band edges are integrated and
+    the fold is read off each; a RED means growth has stopped being nitrogen-limited, which
+    would re-open D-211 §1 — the identity that makes the cell-count panel a nitrogen curve.
+    """
+    shipped = load_parameters(default_data_dir() / "beer_generic.yaml")["mu_max"]
+    meas_hi = TYRELL_CELL_COUNT[TYRELL_PEAK_DAY][1] / TYRELL_PITCH_CELLS
+    folds = []
+    for edge, val in (("low", shipped.uncertainty.low), ("high", shipped.uncertainty.high)):
+        dest = _beer_params_with_mu(tmp_path / f"params-{edge}", val)
+        _, _, x, _ = _tyrell_beer_growth(data_dir=dest)
+        folds.append(float(x.max() / x[0]))
+        assert folds[-1] > meas_hi, (
+            f"at the {edge} band edge mu_max={val} the multiplication is {folds[-1]:.3f}x, "
+            f"inside or below Tyrell's measured envelope (high edge {meas_hi:.3f}x). A rate "
+            "would then be a lever on the extent after all"
+        )
+    assert abs(folds[1] - folds[0]) < 0.05, (
+        f"the fold moves {abs(folds[1] - folds[0]):.3f} across the whole band ({folds[0]:.3f} "
+        f"to {folds[1]:.3f}); D-222 measured 0.010. A rate that moves the extent means growth "
+        "is no longer nitrogen-limited"
     )
