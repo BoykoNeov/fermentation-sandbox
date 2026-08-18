@@ -46,8 +46,11 @@ use. Assert it EXACTLY; an identity has no tolerance.
   1.0, with the excess already in. They **COMPOUND**: 6.58 ≈ 2.51 × 2.62.
 
 ## Wine call sites
-Both now convert 10⁶ cells/mL → **0.0400 g/L**. **All six Varela pins held unchanged** (the repair is
-nearly inert at a research pitch). **One Palma pin moved and the direction is a COST**: the
+Both now convert 10⁶ cells/mL → **0.0400 g/L**. All six Varela pins hold — **but that is about the ASSERTS,
+not the characterised quantity, and the gap WIDENED at both N levels**: 89→84 h at N=300 (1.910→2.024×),
+313→289 h at N=50 (2.236→2.422×), D-57's N50/N300 ratio 3.517→3.440 against Varela's 4.118. Uniformly
+FASTER — the direction the model was already wrong in. **No band widened**; D-219 named as the reason.
+**Do not call a repair "inert" because its asserts survived.** **One Palma pin moved and the direction is a COST**: the
 nitrogen-limited LF at 144 h goes 41.0 → 28.6 g/L against a measured ~80, so that shortfall goes
 ~2× → ~2.8×. Re-banded [35,48] → [24,33]. Two other Palma pins now sit near their floors (CF 128 h
 vs a 125 floor; gap 1.778 vs 1.7) and were **deliberately not re-centred**.

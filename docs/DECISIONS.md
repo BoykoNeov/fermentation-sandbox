@@ -31185,6 +31185,10 @@ Opened by the owner on D-218 §8, verbatim: *"source the per-cell dry mass. It i
 
 Working files: `M:\claud_projects\temp\ferment\d219-cell-dry-mass\` — `PREREGISTER.md`, `probe1.py` … `probe4.py`, `mutate.py`, `coleman_asm.html`, `full_suite.txt`.
 
+**Pre-registration, written before the first search** (`PREREGISTER.md`), scored honestly. Hits: neither shipped value would be in the band (P2); §2.2's window would not survive (P6); a band of 15-40 pg from the geometric route (P1 — the settlement landed at its top edge, and the "most likely 20-30 pg" inside it was low). Misses: the counted Tyrell pitch was predicted at ~0.25 g/L and a ~4.0× excess, against an actual 0.398 and **2.51×** (P4 — direction right, magnitude wrong).
+
+**And one prediction that "hit" for the wrong reason, which is the useful one.** P5 predicted the biomass-excess factor would land within ~1.5× of D-215's independently measured "~2.8× too slowly", and 2.51 does. The prediction was still wrong, because it expected two routes *agreeing on one quantity* — and they are not the same quantity. D-215's factor was measured **at pitch 1.0**, with the excess already in place, so the two **compound**: 6.58 ≈ 2.51 × 2.62. Had the prediction not been written down first, the near-landing would have read as corroboration. [[feedback-a-hit-can-be-two-errors-cancelling]]
+
 ### 1. The reframe: the two numbers were never rival estimates of one quantity
 
 D-218 §4 framed this as a fork between two conversions 5.6× apart. That framing is what kept it open, because the two are not the same kind of claim.
@@ -31234,7 +31238,16 @@ Invert his yield back to the quantity he actually measured, then price it with a
 
 ### 5. What it does — measured, in three places, with nothing recalibrated
 
-**(a) The wine call sites — repaired, and the repair is nearly inert.** Both go 0.018 → **0.0400 g/L** (10⁶ cells/mL, through the new boundary function). **All six of Varela's assertions held unchanged** across a 2.22× pitch change — 89 → 84 h at N=300, 313 → 289 h at N=50, biomass 3.382 → 3.404 and 1.400 → 1.422 g/L — which is the strongest evidence available that this is a repair and not a perturbation. The research-lab inoculum is swamped by growth, so it has almost no leverage.
+**(a) The wine call sites — repaired, inside every printed band, and NOT inert.** Both go 0.018 → **0.0400 g/L** (10⁶ cells/mL, through the new boundary function). All six of Varela's assertions hold unchanged across the 2.22× pitch change — but that is a statement about the *asserts*, not about the quantity they characterise, and that file's own docstring says a change which *"silently narrows OR widens"* its gap must be caught. **It widened, at both nitrogen levels:**
+
+| | 0.018 g/L | 0.0400 g/L | Varela |
+|---|---|---|---|
+| N=300 hours to dryness | 89 (1.910×) | **84 (2.024×)** | 170 |
+| N=50 hours to dryness | 313 (2.236×) | **289 (2.422×)** | 700 |
+| D-57's N50/N300 duration ratio | 3.517 | **3.440** | 4.118 |
+| biomass g/L, N=300 / N=50 | 3.382 / 1.400 | 3.404 / 1.422 | 5.8 / 1.5 |
+
+Every number moves 5-8 % and nothing fires, because a research-lab inoculum is swamped by growth. But the direction is uniformly **faster**, which is the direction the model was already wrong in, so D-57's characterised shortfall gets marginally worse rather than staying put. **No band is widened to absorb it** — D-219 is named as the reason it moved, which is what that docstring asks for. Reporting this as "inert" would have been the Palma mistake below, made silently on the arm where the asserts happened to survive.
 
 **One band did move, and the direction is a COST.** Palma's nitrogen-limited LF arm at 144 h goes 41.0 → **28.6 g/L** against Palma's measured ~80, so the N-sensitivity shortfall goes from ~2× to ~2.8×: **further from the measurement, not nearer.** Re-banded [35, 48] → [24, 33] with D-219 named. It has leverage there and nowhere else because at 90 mg N/L the ferment is nitrogen-starved and final biomass is inoculum-dominated. The old 41 was flattered by an inoculum 2.22× too light. Two other Palma pins (CF 138 → 128 h against a 125 floor; gap 1.917 → 1.778 against a 1.7 floor) are now near their floors and were deliberately **not** re-centred — a band moved to re-centre a passing number is a band fitted to the model.
 

@@ -98,10 +98,21 @@ _BRIX = _brix_for_sugar(_TARGET_SUGAR_GPL)
 #: every gram in their paper is a hemacytometer count times 4e-11 g, so the wine
 #: parameters this benchmark scores (Y_X/N, k'_d, mu_max) are all fitted in
 #: Coleman-grams; 18 pg fed the model a pitch in a unit its own parameters do not use.
-#: The correction is 2.22x heavier and it is a REPAIR, not a perturbation: all six
-#: assertions in this file held unchanged across it (170 h -> 89/84 h at N=300,
-#: 313/289 h at N=50; biomass 3.382 -> 3.404 and 1.400 -> 1.422 g/L). Nothing here was
-#: re-banded. See ``units.convert.cells_per_ml_to_pitch_gpl``.
+#: The correction is 2.22x heavier. All six assertions in this file held unchanged across
+#: it -- but that is a statement about the ASSERTS, and this module's docstring asks for
+#: something stricter: a change that "silently narrows OR widens" the characterized gap
+#: must be caught. **It widened, at both nitrogen levels**, and D-219 is named as the
+#: reason rather than any band being moved to absorb it:
+#:
+#:   N=300   89 -> 84 h   (gap to Varela's 170 h: 1.910x -> 2.024x)
+#:   N=50   313 -> 289 h  (gap to Varela's 700 h: 2.236x -> 2.422x)
+#:   D-57's N50/N300 duration ratio: 3.517 -> 3.440, against Varela's measured 4.118
+#:   biomass: 3.382 -> 3.404 and 1.400 -> 1.422 g/L
+#:
+#: Everything moves 5-8 % and nothing fires, because a research-lab inoculum is swamped by
+#: growth. The direction is uniformly FASTER, which is the direction this file already
+#: characterizes the model as wrong in, so D-57's shortfall gets marginally worse rather
+#: than staying put. See ``units.convert.cells_per_ml_to_pitch_gpl``.
 _PITCH_GPL_RESEARCH = cells_per_ml_to_pitch_gpl(1.0e6)
 
 #: Varela's measured endpoints (Table 1; 3 independent experiments each; mean +/- SD).

@@ -2351,7 +2351,7 @@ FOSTER_RATIO_BOUND_LOOSEST = FOSTER_CEILING_DAYS_AT_12C / 2.0
 PER_CELL_DRY_MASS_PG: dict[str, float] = {
     "retired: unsourced wine-benchmark assertion": 18.0,
     "SETTLED (Coleman 2007, D-219)": 40.0,
-    "textbook high": 60.0,
+    'retired: the unsourced upper end of D-216 §7\'s "textbook 40-60 pg"': 60.0,
     "retired: back-computed from the beer scenario pitch": 100.0,
 }
 
@@ -2891,8 +2891,10 @@ def test_the_handoff_window_does_not_survive_the_settled_conversion():
         pg for pg in PER_CELL_DRY_MASS_PG.values() if SETTLED_BAND_PG[0] <= pg <= SETTLED_BAND_PG[1]
     ]
     assert settled == [40.0], (
-        f"the swept bracket now has {settled} inside the settled band, not exactly [40.0]. "
-        "The verdict below reads one row of §12's table and needs that row to be unambiguous"
+        f"the swept bracket now has {settled} inside the settled band, not exactly [40.0]. The "
+        "verdict below reads ONE row of §12's table and needs that row to be unambiguous. The "
+        "likeliest cause is not the bracket but the BAND: widen biomass_N_fraction enough and the "
+        "60 pg reading enters it, so check tests/test_units.py first"
     )
     assert 40.0 in Q_SUGAR_MAX_REACHING_FOSTER, (
         "the settled reading is no longer one of the bisected rows, so §12's table no longer "

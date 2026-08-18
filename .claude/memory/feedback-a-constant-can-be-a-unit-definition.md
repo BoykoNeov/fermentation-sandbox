@@ -45,6 +45,9 @@ questions. Reframed as "what is the model's gram", it terminated in one paper al
 - Refuse to build a band from **product-dosing conventions** (g/hL of dried yeast ↔ cells/mL): the
   same book gave 100-200 pg and 25-50 pg, and that spread *is* the convention's looseness
   ([[feedback-a-units-fork-is-not-a-band]]).
-- A repair that is **inert on the well-fed case and costly on the starved one** is still a repair:
-  all six Varela pins held, one Palma nitrogen-limited pin moved *away* from the measurement. Say
-  which direction ([[feedback-conceded-caveats-are-not-coverage]]).
+- **Never call a repair "inert" because its asserts survived.** All six Varela pins held and I wrote
+  "held unchanged" — but the quantity they *characterise* widened at both nitrogen levels
+  (1.910→2.024× and 2.236→2.422×), in the direction the file's own docstring says must be caught.
+  Check whether the characterised number moved, not whether the assert passed. On the Palma arm I
+  did exactly that and reported the cost; on the arm where the asserts happened to survive I did
+  not ([[feedback-conceded-caveats-are-not-coverage]]).
