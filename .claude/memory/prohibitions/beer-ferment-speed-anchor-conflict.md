@@ -48,6 +48,13 @@ unconvincing, go read D-216 — do not argue past it from this file.**
   observables endorse 1.0 g/L against the per-cell arithmetic. What is forbidden is reading
   D-211's 0.070 as unconditional.
 
+**SUPERSEDED IN PART BY D-220 — read `beer-second-measured-course.md` before using this block.**
+Two claims below are now FALSE: there **IS** a second measured beer extract course on disk (Foster's
+Supp. Fig. S1, 8 temperatures), and §2.2's window is **not** simply "the anchor that is not a
+measurement" — the brief's DURATION is corroborated by a published trial at 15 °C, and it is the
+pairing with 20 °C that fails. **The refusal to move `q_sugar_max` STANDS** — it rests on the
+benchmark and on the shape objection, neither of which D-220 spends.
+
 **SCOPE, and what was NOT measured.** There is **no second measured beer extract curve on disk** —
 Zamudio Lara 2022 is cited all through `beer_generic.yaml` but is **not in the local corpus**. So
 nothing is claimed about worts other than Tyrell's and D-215's SCOPE paragraph stands. The frame
