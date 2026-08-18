@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-19)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-223**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1842 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-224**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1847 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
 again since D-223** — 6.04 d inside 5-7 — but the pass is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
@@ -300,6 +300,15 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   (q 0.425-0.621 → 0.667-1.017) — a MAGNITUDE question now, never a direction one. **D-216's refusal of 1.397 SURVIVES**
   (outside across the whole `E_a` band). D-218 §3 / D-219 §5c **INVERT**: the surviving corner moves to the SETTLED 40 pg
   (5.42 d), CONDITIONAL on `E_a` ≥ 40,165 (69 % of band). → `.claude/memory/prohibitions/beer-criterion-temperature.md`
+
+- **Beer's seven calibrated AROMA LEVELS (D-224)** — D-223 §8's "which ester calibration is wrong" is
+  **ANSWERED: NEITHER.** Isoamyl acetate is first-order in `isoamyl_alcohol` and inherited its **1.61×**
+  error; corrected, **both esters read 0.79×** — one factor. Quote the **3 %**, never the 0.4 % (a
+  cancellation). All 5 Ehrlich k + both ester k RE-ANCHORED onto their own stated targets, all in band;
+  the 5 Ehrlich BANDS corrected to the ×0.3/×3 their notes claimed since D-99. `mu_max` is the
+  higher-alcohol knob, `q_sugar_max` the ester knob — but they SHARE `S`, never "decoupled". Drift
+  entered at **D-211, unscored**. **Never move ethyl acetate to Wang's 23.7** (kills D-223's guard).
+  → `.claude/memory/prohibitions/beer-aroma-calibration-levels.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
