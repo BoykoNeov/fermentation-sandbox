@@ -2967,3 +2967,355 @@ def test_at_the_settled_conversion_the_shipped_model_is_slow_against_foster():
         "and if it now clears, the slowness is not uniform across temperature and D-217's "
         "refusal on E_a_uptake is worth re-opening"
     )
+
+
+# ======================================================================================
+# 14. The SECOND measured beer fermentation course, and what it says about the brief's
+#     window, the model's speed, and the 30 C agreement (decision D-220)
+# ======================================================================================
+
+#: Foster et al. 2022's **Supplementary Figure S1** -- the fermentation COURSE, recovered.
+#:
+#: §12 and §13 read this trial through main-text Figure 2, which is four timepoint panels
+#: with temperature on the x-axis. The underlying course was never seen, so every duration
+#: the archive took from Foster was a CEILING read off a sample (D-218's own caveat), and the
+#: archive had exactly ONE measured beer extract course on disk -- Tyrell's (D-216 scope
+#: note). Supp. Fig. S1 is *"the specific gravities of small-scale wort fermentations at
+#: eight different temperatures"*: **10 strains x 8 temperatures x 9 timepoints**, 0-120 h.
+#:
+#: **These values are a transcription, not a plot reading.** The supplementary figure is
+#: VECTOR (``pdfimages -list`` finds no raster), so every point below is a path vertex mapped
+#: through the axis tick labels' own coordinates -- the fixed-grid lesson does not bite here.
+#: The geometry also settles the layout rather than assuming it: the connecting polyline is
+#: drawn UNDODGED at the true x, so its vertices are the means, while the error bars are
+#: dodged per series. Receipts and the full 720-point extraction live in
+#: ``M:\claud_projects\temp\ferment\d220-second-beer-course\``.
+#:
+#: Only the four temperatures inside this engine's beer range are carried here, for the three
+#: **Beer 1** clade commercial ale controls. St. Lucifer is the Beer 2 control and *"never
+#: reached an FG < 1.01, regardless of temperature"*; the six kveik isolates are a different,
+#: admixed clade. Neither is what this engine models.
+FOSTER_COURSE_HOURS = (0, 6, 12, 24, 36, 48, 72, 96, 120)
+FOSTER_BEER1_STRAINS = ("Cali", "VT", "Kolsch")
+FOSTER_COURSE_SG: dict[tuple[str, int], tuple[float, ...]] = {
+    ("Cali", 12): (1.0430, 1.0407, 1.0411, 1.0405, 1.0387, 1.0367, 1.0311, 1.0252, 1.0192),
+    ("Cali", 15): (1.0429, 1.0417, 1.0416, 1.0395, 1.0363, 1.0321, 1.0238, 1.0156, 1.0116),
+    ("Cali", 22): (1.0420, 1.0397, 1.0368, 1.0293, 1.0220, 1.0173, 1.0111, 1.0077, 1.0065),
+    ("Cali", 30): (1.0420, 1.0383, 1.0341, 1.0246, 1.0192, 1.0148, 1.0094, 1.0067, 1.0064),
+    ("VT", 12): (1.0430, 1.0409, 1.0414, 1.0411, 1.0400, 1.0384, 1.0333, 1.0292, 1.0238),
+    ("VT", 15): (1.0429, 1.0421, 1.0419, 1.0407, 1.0379, 1.0346, 1.0262, 1.0191, 1.0143),
+    ("VT", 22): (1.0420, 1.0392, 1.0373, 1.0315, 1.0240, 1.0190, 1.0127, 1.0092, 1.0074),
+    ("VT", 30): (1.0420, 1.0382, 1.0336, 1.0233, 1.0180, 1.0147, 1.0103, 1.0072, 1.0069),
+    ("Kolsch", 12): (1.0430, 1.0415, 1.0418, 1.0414, 1.0403, 1.0379, 1.0344, 1.0297, 1.0256),
+    ("Kolsch", 15): (1.0429, 1.0415, 1.0413, 1.0391, 1.0358, 1.0313, 1.0227, 1.0150, 1.0102),
+    ("Kolsch", 22): (1.0420, 1.0398, 1.0366, 1.0293, 1.0208, 1.0151, 1.0095, 1.0070, 1.0061),
+    ("Kolsch", 30): (1.0420, 1.0371, 1.0317, 1.0192, 1.0141, 1.0110, 1.0073, 1.0061, 1.0064),
+    # 42 C is carried for ONE purpose: it is where the commercial ale controls stall, and
+    # that stall is the paper's own headline result. Without it nothing in this table pins
+    # the colour-to-temperature ordering the recovery had to assume -- 12/15/22/30 C alone
+    # are monotone, and a monotone series cannot distinguish an ascending palette from a
+    # rescaled one. No claim below reads it except the consistency check.
+    ("Cali", 42): (1.0448, 1.0421, 1.0406, 1.0384, 1.0374, 1.0365, 1.0358, 1.0353, 1.0356),
+    ("VT", 42): (1.0448, 1.0411, 1.0396, 1.0374, 1.0364, 1.0355, 1.0352, 1.0350, 1.0349),
+    ("Kolsch", 42): (1.0448, 1.0406, 1.0400, 1.0379, 1.0374, 1.0369, 1.0366, 1.0365, 1.0365),
+}
+
+#: Days for each Beer 1 control to reach the 1.010 target, from the course above.
+#:
+#: **The two cold columns EXTRAPOLATE past the 120 h end of the experiment, and the bias has
+#: a known SIGN.** The extrapolation runs on the 96-120 h slope, and that slope is already
+#: decelerating (Cali at 15 C falls 3.43 SG-points/h over 72-96 h and 1.67 over 96-120 h), so
+#: the true crossings are LATER than these numbers, never earlier. Every claim below is
+#: written to be strengthened, not weakened, by that. At 15 C the extrapolation is also short
+#: -- Kolsch is at 0.2378 extract fraction against a 0.2331 target at the last measured point.
+FOSTER_DAYS_TO_TARGET = {
+    ("Cali", 12): 6.54,
+    ("VT", 12): 7.53,
+    ("Kolsch", 12): 8.73,
+    ("Cali", 15): 5.39,
+    ("VT", 15): 5.91,
+    ("Kolsch", 15): 5.04,
+    ("Cali", 22): 3.33,
+    ("VT", 22): 3.76,
+    ("Kolsch", 22): 2.91,
+    ("Cali", 30): 2.89,
+    ("VT", 30): 3.10,
+    ("Kolsch", 30): 2.26,
+}
+
+#: The model at Foster's own wort and counted pitch, through §12's own helper so the numbers
+#: stay commensurable with everything §12 and §13 pin. Measured at D-220 on the 6-minute grid.
+#:
+#: **Recorded, but not what the tests below read.** The claims run off
+#: :func:`foster_model_days`, which integrates live, because a pinned duration cannot see a
+#: model change -- it fires on pin drift instead, which is precisely what D-216 conceded
+#: about its own pitch test. This dict is the value at the time of writing and one test
+#: checks the live numbers against it, so a drift is still reported; but the ~1.5x claim is
+#: measured on every run.
+FOSTER_MODEL_DAYS_AS_RECORDED = {12: 10.7417, 15: 8.3792, 22: 4.8375, 30: 2.7167}
+
+#: How long each arm has to be integrated for the crossing to exist at all. The 12 C arm
+#: needs 30 d because the model takes 10.7 there; a shorter span returns ``inf`` and the
+#: ratio silently becomes meaningless rather than red.
+FOSTER_ARM_DAYS = {12: 30.0, 15: 25.0, 22: 15.0, 30: 12.0}
+
+#: Apparent activation energy of the ENDPOINT, kJ/mol, over each measured temperature step.
+#: This is a lumped coefficient of the whole course, NOT a reading of ``E_a_uptake`` -- taking
+#: it for one is D-183's lesson and the exact error D-217 refused de Andres-Toro's -97 for.
+#: It is recorded because the model/measured DIVERGENCE across the two steps is the finding.
+FOSTER_APPARENT_EA_KJ = {
+    "model": {(15, 22): 55.5, (22, 30): 53.7},
+    "measured": {(15, 22): 49.5, (22, 30): 17.9},
+}
+
+
+@pytest.fixture(scope="module")
+def foster_model_days() -> dict[int, float]:
+    """Days to 1.010 at Foster's wort and counted pitch, integrated LIVE, per temperature.
+
+    Module-scoped because four tests read it and each entry is an integration (~0.8 s). The
+    grid is §12's own :data:`FOSTER_GRID_PER_HOUR`, so every duration here is commensurable
+    with the ones §12 and §13 pin rather than being a second, differently-quantised measure.
+    """
+    pitch = cells_per_ml_to_pitch_gpl(FOSTER_PITCH_CELLS_PER_ML)
+    return {
+        temp: _foster_days_to_target_gravity(
+            pitch, float(temp), days=span, per_hour=FOSTER_GRID_PER_HOUR
+        )
+        for temp, span in FOSTER_ARM_DAYS.items()
+    }
+
+
+def _foster_observed_days(temp_c: int) -> list[float]:
+    return [FOSTER_DAYS_TO_TARGET[(s, temp_c)] for s in FOSTER_BEER1_STRAINS]
+
+
+def _foster_observed_mean(temp_c: int) -> float:
+    days = _foster_observed_days(temp_c)
+    return sum(days) / len(days)
+
+
+def _apparent_ea_kj(t_cold: int, d_cold: float, t_hot: int, d_hot: float) -> float:
+    """Arrhenius activation energy implied by two endpoint DURATIONS, kJ/mol."""
+    inv = 1.0 / (t_cold + 273.15) - 1.0 / (t_hot + 273.15)
+    return float(np.log(d_cold / d_hot) * 8.314 / inv / 1000.0)
+
+
+def test_fosters_recovered_course_is_internally_consistent():
+    """The transcription's own consistency check, and it is not a restatement.
+
+    Foster ran ONE wort per temperature, so the t=0 gravity must be identical across every
+    strain panel of a given temperature -- and the recovered values agree to four decimals
+    without ever being told to. A calibration error, a mis-assigned panel or a mistyped row
+    would not reproduce that, because each panel's axis was fitted independently.
+
+    The rest is direction. Apparent gravity must not RISE (fermentation does not run
+    backwards), and the 120 h endpoint must be non-monotone in TEMPERATURE, because these ale
+    strains have an optimum near 22-30 C. That optimum is the paper's own headline result,
+    and it is what pins the colour-to-temperature ordering the recovery had to assume.
+    """
+    for temp in (12, 15, 22, 30):
+        ogs = {FOSTER_COURSE_SG[(s, temp)][0] for s in FOSTER_BEER1_STRAINS}
+        assert len(ogs) == 1, (
+            f"at {temp} C the three strain panels disagree about the wort they started from "
+            f"({sorted(ogs)}). Foster pitched one wort per temperature, so this is a "
+            "transcription or calibration fault, not a fact about the yeast"
+        )
+    for (strain, temp), course in FOSTER_COURSE_SG.items():
+        assert len(course) == len(FOSTER_COURSE_HOURS)
+        rises = [
+            (FOSTER_COURSE_HOURS[i], course[i], course[i + 1])
+            for i in range(len(course) - 1)
+            if course[i + 1] > course[i] + 0.0006
+        ]
+        assert not rises, (
+            f"{strain} at {temp} C has gravity RISING by more than the figure's own "
+            f"resolution at {rises}. Small rises inside 0.0006 are the plot's line width; a "
+            "larger one means two series were crossed during recovery"
+        )
+    endpoints = {
+        t: sum(FOSTER_COURSE_SG[(s, t)][-1] for s in FOSTER_BEER1_STRAINS) / 3
+        for t in (12, 15, 22, 30, 42)
+    }
+    assert endpoints[12] > endpoints[15] > endpoints[22], (
+        f"the 120 h endpoints {endpoints} no longer improve monotonically from 12 to 22 C"
+    )
+    assert endpoints[42] > endpoints[12], (
+        f"the 120 h endpoints {endpoints} do not TURN OVER at the hot end. 42 C must be the "
+        "worst column of all -- worse even than 12 C -- because the commercial ale controls "
+        "stall there while the kveik strains do not, which is the paper's own headline. That "
+        "turnover is the only thing in this table that pins the colour-to-temperature map; "
+        "12-30 C alone are monotone and cannot tell an ascending palette from a rescaled one"
+    )
+    assert abs(endpoints[22] - endpoints[30]) < 0.0005, (
+        f"22 and 30 C are no longer within the figure's resolution of each other "
+        f"({endpoints[22]:.5f} vs {endpoints[30]:.5f}). They are a TIE at 120 h, and no claim "
+        "in this section may order them -- the fermentations are simply both finished"
+    )
+
+
+def test_the_engine_is_half_again_too_slow_at_every_temperature_below_thirty(
+    foster_model_days: dict[int, float],
+):
+    """The measurement this beat exists for, and the one D-218 could not make.
+
+    D-218 had only ceilings, so it could say the model was slow at ONE reading of ONE
+    temperature. With the course in hand the comparison runs at four temperatures against
+    three strains, in Foster's own wort at Foster's counted pitch, and the answer is a level
+    error rather than a temperature-response one: **~1.4-1.5x too slow at 12, 15 and 22 C**.
+
+    The 30 C column is the designed contrast, and it is what makes "the model is slow" a
+    claim here instead of a predicate that always fires: there the model lands INSIDE the
+    measured spread. Why that is a crossing and not a validation is the next test's business.
+    """
+    for temp, recorded in FOSTER_MODEL_DAYS_AS_RECORDED.items():
+        assert foster_model_days[temp] == pytest.approx(recorded, abs=0.02), (
+            f"the model's {temp} C duration has moved from the recorded {recorded} d to "
+            f"{foster_model_days[temp]:.4f} d. That is not a failure by itself -- the ratio "
+            "asserts below are the claim -- but the record's numbers are now stale and the "
+            "D-220 entry should say so"
+        )
+    ratios = {t: foster_model_days[t] / _foster_observed_mean(t) for t in (12, 15, 22, 30)}
+    for temp in (12, 15, 22):
+        assert 1.30 <= ratios[temp] <= 1.70, (
+            f"at {temp} C the model takes {foster_model_days[temp]:.2f} d against a measured "
+            f"mean of {_foster_observed_mean(temp):.2f} d, a ratio of {ratios[temp]:.2f}x, "
+            "outside the 1.30-1.70x this beat measured. The cold columns extrapolate past "
+            "120 h on a DECELERATING tail, so the measured means are lower bounds and these "
+            "ratios can only grow -- a RED below 1.30 therefore means the model changed, not "
+            "that the reading softened"
+        )
+    assert 0.90 <= ratios[30] <= 1.10, (
+        f"the 30 C contrast now reads {ratios[30]:.2f}x. It is what makes the three claims "
+        "above measurements instead of a predicate that fires everywhere, so a RED here "
+        "costs the whole section its control"
+    )
+    assert min(ratios[t] for t in (12, 15, 22)) > ratios[30], (
+        "every sub-30 C ratio must exceed the 30 C one for the contrast to mean anything"
+    )
+
+
+def test_the_thirty_degree_agreement_is_a_crossing_of_two_errors(
+    foster_model_days: dict[int, float],
+):
+    """Why the 30 C match must never be cited as the model getting beer's speed right.
+
+    Real ale yeast SATURATES above ~22 C -- Foster's endpoints barely improve from 22 to
+    30 C, and the apparent activation energy of the measured endpoint collapses from ~50 to
+    ~18 kJ/mol across that step. The model has no such term and holds a near-constant
+    ~54-56 kJ/mol throughout. So the model runs down a straight line while the data flattens,
+    and 30 C is simply where the two cross.
+
+    A prediction that lands is evidence only if its inputs were, and here they demonstrably
+    are not.
+    """
+    for who, expected in FOSTER_APPARENT_EA_KJ.items():
+        for (cold, hot), pinned in expected.items():
+            if who == "model":
+                got = _apparent_ea_kj(cold, foster_model_days[cold], hot, foster_model_days[hot])
+            else:
+                got = _apparent_ea_kj(
+                    cold, _foster_observed_mean(cold), hot, _foster_observed_mean(hot)
+                )
+            assert got == pytest.approx(pinned, abs=0.6), (
+                f"the {who} apparent activation energy over {cold}-{hot} C is {got:.1f} "
+                f"kJ/mol against a pinned {pinned}"
+            )
+    measured = FOSTER_APPARENT_EA_KJ["measured"]
+    model = FOSTER_APPARENT_EA_KJ["model"]
+    assert measured[(22, 30)] < measured[(15, 22)] / 2.0, (
+        "the measured temperature response no longer COLLAPSES above 22 C, which is the "
+        "whole reason the 30 C agreement is a crossing rather than a validation"
+    )
+    assert abs(model[(22, 30)] - model[(15, 22)]) < 5.0, (
+        "the model's temperature response is no longer near-constant across the two steps. "
+        "If the model has acquired a saturating term, the 30 C agreement may have stopped "
+        "being a coincidence, and this section's reading of it needs redoing"
+    )
+
+
+def test_the_handoff_window_is_supported_at_fifteen_degrees_and_refuted_at_twenty(
+    foster_model_days: dict[int, float],
+):
+    """The correction to D-218 §4 and D-219 §5(c), and it cuts both ways.
+
+    Those records concluded, unconditionally, that *nothing found supports 5-7 days*. That
+    was read off timepoint panels dominated by the moderate and high temperatures. The
+    temperature-resolved course does not say it: at **15 C all three Beer 1 controls land
+    INSIDE 5-7 d** (5.04, 5.39, 5.91), and at 12 C two of the three are slower than the
+    window's slow edge. The brief's DURATION is a real brewing figure.
+
+    What the evidence refutes is that duration TOGETHER WITH §2.2's 20 C. Foster brackets
+    20 C, and the bracket alone settles it without needing an interpolation: at 22 C the same
+    strains take 2.91-3.76 d, so at 20 C they cannot take 5-7. §2.2 asserts both halves at
+    once, and only the pair is wrong.
+
+    The bracket is used rather than an Arrhenius interpolation on purpose -- interpolating
+    would put a hard-sounding point estimate on top of an input that is itself an
+    extrapolation.
+    """
+    at15 = _foster_observed_days(15)
+    assert all(5.0 <= d <= 7.0 for d in at15), (
+        f"the 15 C crossings are {at15}; the correction to D-218 §4 rests on all three "
+        "landing inside the brief's own 5-7 d window"
+    )
+    at22 = _foster_observed_days(22)
+    assert max(at22) < 5.0, (
+        f"the 22 C crossings are {at22}. The refutation of 5-7 d AT 20 C is a bracket "
+        "argument, and it needs the hot side clear of the window's fast edge"
+    )
+    assert max(at22) < min(at15), (
+        "the 15 C and 22 C crossing sets overlap, so 20 C is no longer bracketed and the "
+        "claim about §2.2's temperature would need an interpolation this section refuses"
+    )
+    assert foster_model_days[22] > max(at22) and foster_model_days[15] > max(at15), (
+        "the model is no longer slower than every measured strain at both bracketing "
+        "temperatures, which is what makes §2.2's window a criterion the model passes while "
+        "being ~1.5x slow, rather than an honest one"
+    )
+
+
+def test_the_measured_course_peaks_later_the_colder_it_runs():
+    """D-218's *"every measured course peaks on day 1-2"* is temperature-conditional.
+
+    That claim was assembled from Tyrell plus FITTED logistic curves and generalised into a
+    structural verdict on the model's day-4 peak. The independent course says the peak time
+    moves with temperature: the steepest interval ends at 24 h at 30 C, at 24-36 h at 22 C,
+    at 48-72 h at 15 C, and at 12 C the ferment has not peaked by the 120 h end of the run.
+
+    This does NOT rescue the model, and the section does not claim it does: run at Foster's
+    OWN conditions the engine peaks later still at every temperature. What changes is the
+    reason -- the defect is that the model is uniformly slow (test above), not that real
+    ferments universally peak on day 1-2 while this one does not.
+
+    Reported as a broad plateau rather than an argmax: at 15 C Cali's 36-48, 48-72 and
+    72-96 h intervals run 3.53 / 3.45 / 3.43 SG-points/h, and picking a winner out of those
+    is reading noise.
+    """
+    hours = FOSTER_COURSE_HOURS
+    peak = {}
+    for temp in (12, 15, 22, 30):
+        spans = []
+        for strain in FOSTER_BEER1_STRAINS:
+            course = FOSTER_COURSE_SG[(strain, temp)]
+            rates = [
+                (course[i] - course[i + 1]) / (hours[i + 1] - hours[i])
+                for i in range(len(course) - 1)
+            ]
+            best = max(rates[1:])  # the 0-6 h interval is start-up scatter, not fermentation
+            within = [hours[i + 1] for i, r in enumerate(rates) if i >= 1 and r >= 0.90 * best]
+            spans.append((min(within), max(within)))
+        peak[temp] = spans
+    assert all(lo >= 36 for lo, _ in peak[15]), (
+        f"at 15 C the measured plateau now starts before 36 h ({peak[15]}), which is the "
+        "reading that makes D-218's day-1-2 generalisation temperature-conditional"
+    )
+    assert all(hi <= 36 for _, hi in peak[30]), (
+        f"at 30 C the measured plateau now runs past 36 h ({peak[30]}); the ordering "
+        "cold-peaks-later is what this test asserts, and it needs the hot end to stay early"
+    )
+    assert all(hi >= 96 for _, hi in peak[12]), (
+        f"at 12 C the ferment now peaks before the run ends ({peak[12]}). The 12 C column is "
+        "the strongest form of the claim: not merely a later peak, but no peak inside five "
+        "days"
+    )

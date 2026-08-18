@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-18)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-218**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1821 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-220**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1833 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
@@ -274,6 +274,15 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   — but `q_sugar_max` NOT moved and `TYRELL_SCENARIO`'s **2.51×** excess NOT corrected (`mu_max` refit;
   6.58× day-2; pH 7/8→6/8). **2.51× and D-215's 2.8× COMPOUND, not corroborate.**
   [[feedback-a-constant-can-be-a-unit-definition]] → `.claude/memory/prohibitions/yeast-cell-dry-mass.md`
+
+- **The SECOND measured beer course (D-220)** — **MEASURED, 3 corrections, nothing built.** Foster's
+  **Supp. Fig. S1** (VECTOR ⇒ transcribed, never eye-read), in a paper mined TWICE: **D-216's "no second
+  beer course" is FALSE.** §2.2's window is **MIS-TEMPERATURED, not refuted** — all 3 ale strains INSIDE
+  5-7 d at **15 °C** but 2.91-3.76 d at 22 °C, so the duration is real and the **PAIR with 20 °C** is wrong
+  (a BRACKET; the 20 °C interpolation is asserted NOWHERE). Engine **1.41/1.54/1.45× slow at 12/15/22 °C**
+  = a **LEVEL** error ⇒ **D-217 VINDICATED**; §2.2 HIDES it. **30 °C is a CROSSING** (measured E_a collapses
+  49.5→17.9, model holds 55.5→53.7), never a validation nor a reading of `E_a_uptake`. D-218's day-1-2 peak
+  is **temperature-conditional** — model peaks later still. → `.claude/memory/prohibitions/beer-second-measured-course.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
