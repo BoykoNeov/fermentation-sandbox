@@ -31839,3 +31839,39 @@ Suite: **1842 passed, 5 xfailed**; ruff, ruff format and mypy clean.
 * **`acetic_acid_typical` is not made a state pool for beer.** That is D-16's byproduct-speciation question and it is what would make §5's constraint unnecessary rather than merely correct.
 * **`E_a_growth` and `E_a_uptake` are not re-fitted.** §3 is the argument that they should not be: a single rate scale closed the level error at three temperatures, so the response is not what was wrong.
 * **Beer's pH course is not retired as a price**, but P4 is the second consecutive beat measuring it as insensitive to a large change. If a third finds the same, it should stop being quoted.
+
+### 9. Three GREEN defects the sweep missed, caught on review and fixed in the same beat
+
+Everything in §7 was found by a test going red. These three were found by reading, because all
+three were **green** — which is the whole point of recording them.
+
+* **A test kept a name its own subject had retired.**
+  `test_the_thirty_degree_agreement_is_a_crossing_of_two_errors` asserts the DIVERGENCE of two
+  apparent activation energies, and that divergence is untouched, so it stayed green through the
+  entire beat. But there is no 30 °C agreement any more: the model reads 1.813 d against measured
+  crossings of 2.26-3.10 d, **outside the spread on the fast side**, where D-220's 2.517 d was
+  inside it. The rename discipline in §7 only looked at tests that went red, and a test whose
+  asserts are about a *mechanism* will not go red when the *observation* it is named for stops
+  being true. Renamed to
+  `test_the_thirty_degree_overshoot_is_the_saturation_term_the_model_does_not_have`, and the
+  overshoot itself is now pinned so the vanished agreement cannot quietly come back.
+* **A drawn parameter's guard was pinned at the nominal only.** §2.2's criterion was asserted at
+  `q_sugar_max` = 0.72 alone, while §2 of this record claims the whole band clears the window —
+  a claim living in prose next to a guard that could not see it. Both edges are now asserted:
+  **6.79 d at 0.634 and 5.42 d at 0.818**, the low edge tight at 0.21 d of room against the 7.0 d
+  ceiling. This file's own joint-corner test states the reason (a claim verified at a point where
+  the sampler reads a band is the archive's most repeated defect shape) and this beat committed it
+  anyway. [[feedback-grep-finds-claims-not-guards]]
+* **Two prohibition files were left asserting the retired band.** The §7 sweep updated three of
+  the seven memory files carrying beer-speed claims and judged the rest peripheral.
+  `beer-growth-rate-and-uptake-timing.md` says in bold that *"`q_sugar_max`'s high edge 1.5 is
+  STILL RIGHT"* and `beer-speed-yardstick.md`'s description says the brief is *"too slow at every
+  reading"* — both now the opposite of the shipped state, in files loaded to decide future work.
+  "Peripheral" was a judgement about how central the file felt, not about whether the sentence was
+  still true. [[feedback-check-the-blocker-is-still-blocking]]
+
+Also swept: `FOSTER_APPARENT_EA_KJ["model"]` still held 55.5 / 53.7 where §3 measured 55.4 / 54.1
+— the one fact table of four that was not re-pinned — and `beer_generic.yaml`'s note quoted 6.08 d
+(the unrounded strain mean's figure) for a shipped 0.72 that gives 6.042, and 1.28× for a
+narrowing that is 1.290×. Prose only, and in the field
+[[feedback-a-notes-field-is-unchecked-storage]] was written about.

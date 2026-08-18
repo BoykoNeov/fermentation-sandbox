@@ -2238,6 +2238,22 @@ def test_matching_tyrells_extract_schedule_overshoots_the_attenuation_benchmark(
         "side. If this is outside again the engine has been re-rated and D-223's adjudication "
         "of beer's two speed anchors needs redoing"
     )
+    # ...AT BOTH BAND EDGES, not only at the nominal. `q_sugar_max` is DRAWN, and this file's own
+    # joint-corner test states the reason: a claim verified at a point where the sampler reads a
+    # band is the archive's most repeated defect shape. D-223's record says the whole band clears
+    # the window; that is a claim, and this is the guard for it
+    # [[feedback-grep-finds-claims-not-guards]]. The LOW edge is the tight one -- 6.79 d against a
+    # 7.0 ceiling, 0.21 d of room -- so a band widened downward turns this red before a draw does.
+    edges = {q: _beer_days_to_target_gravity(q_sugar_max=q) for q in Q_SUGAR_MAX_PRINTED_BAND}
+    assert edges[Q_SUGAR_MAX_PRINTED_BAND[0]] == pytest.approx(6.79, abs=0.05)
+    assert edges[Q_SUGAR_MAX_PRINTED_BAND[1]] == pytest.approx(5.42, abs=0.05)
+    for q, days in edges.items():
+        assert 5.0 < days < 7.0, (
+            f"q_sugar_max = {q} (a printed band EDGE) attenuates the benchmark wort in "
+            f"{days:.2f} d, outside §2.2's 5-7 d window. D-223 measured the whole band inside "
+            "(6.79 -> 5.42 d), which is what makes the criterion a property of the parameter "
+            "rather than of the nominal the sampler happens to centre on"
+        )
 
     matched = _beer_days_to_target_gravity(Q_SUGAR_MAX_MATCHING_TYRELL)
     assert matched < 5.0, (
@@ -3597,7 +3613,7 @@ FOSTER_ARM_DAYS = {12: 30.0, 15: 25.0, 22: 15.0, 30: 12.0}
 #: it for one is D-183's lesson and the exact error D-217 refused de Andres-Toro's -97 for.
 #: It is recorded because the model/measured DIVERGENCE across the two steps is the finding.
 FOSTER_APPARENT_EA_KJ = {
-    "model": {(15, 22): 55.5, (22, 30): 53.7},
+    "model": {(15, 22): 55.4, (22, 30): 54.1},
     "measured": {(15, 22): 49.5, (22, 30): 17.9},
 }
 
@@ -3763,20 +3779,41 @@ def test_one_rate_scale_fitted_at_fifteen_closes_the_level_error_at_twelve_and_t
     )
 
 
-def test_the_thirty_degree_agreement_is_a_crossing_of_two_errors(
+def test_the_thirty_degree_overshoot_is_the_saturation_term_the_model_does_not_have(
     foster_model_days: dict[int, float],
 ):
-    """Why the 30 C match must never be cited as the model getting beer's speed right.
+    """The mechanism behind the hot column — and the reason this test was renamed at D-223.
 
-    Real ale yeast SATURATES above ~22 C -- Foster's endpoints barely improve from 22 to
-    30 C, and the apparent activation energy of the measured endpoint collapses from ~50 to
-    ~18 kJ/mol across that step. The model has no such term and holds a near-constant
-    ~54-56 kJ/mol throughout. So the model runs down a straight line while the data flattens,
-    and 30 C is simply where the two cross.
+    Real ale yeast SATURATES above ~22 C: Foster's endpoints barely improve from 22 to 30 C,
+    and the apparent activation energy of the measured endpoint collapses from ~50 to ~18
+    kJ/mol across that step. The model has no such term and holds a near-constant ~54-56
+    kJ/mol throughout, so it runs down a straight line while the data flattens.
 
-    A prediction that lands is evidence only if its inputs were, and here they demonstrably
-    are not.
+    **Through D-222 this test was called "the thirty degree AGREEMENT is a crossing of two
+    errors"**, and its job was to stop anyone citing a 30 C match as the model getting beer's
+    speed right: the model was ~1.4x slow everywhere below 30 C and landed inside the measured
+    spread at 30 C only because two errors cancelled there. D-223 removed the first error --
+    one rate fitted at 15 C closed 12 / 15 / 22 C to within 6 % — so the cancellation is gone
+    and what is left is the second error, undisguised: at 30 C the model now takes 1.81 d
+    against measured crossings of 2.26-3.10 d, i.e. it is **outside the spread on the FAST
+    side**. There is no agreement here to caveat any more; there is an overshoot to explain,
+    and the explanation is the same missing term it always was.
+
+    The asserts below did not change, because the mechanism did not: they compare the two
+    apparent activation energies, and it is their DIVERGENCE that is the claim. Only the name
+    and the reading moved [[feedback-a-hit-can-be-two-errors-cancelling]].
     """
+    # The overshoot itself, pinned — the fact that replaces the retired "agreement". The old
+    # name survived D-223's first sweep because this test stayed GREEN: its asserts were about
+    # the activation energies and never about where the model landed, so nothing went red when
+    # the thing in the title stopped being true.
+    at30 = _foster_observed_days(30)
+    assert foster_model_days[30] < min(at30), (
+        f"at 30 C the model takes {foster_model_days[30]:.2f} d against measured crossings "
+        f"{sorted(at30)}. D-223 measured it OUTSIDE the spread on the fast side (1.81 vs a "
+        "2.26 fastest strain). If it is back inside, the cancellation this test is named for "
+        "has returned and the reading has to be redone rather than cited"
+    )
     for who, expected in FOSTER_APPARENT_EA_KJ.items():
         for (cold, hot), pinned in expected.items():
             if who == "model":

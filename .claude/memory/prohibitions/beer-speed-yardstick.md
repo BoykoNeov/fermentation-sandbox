@@ -1,12 +1,23 @@
 ---
 name: beer-speed-yardstick
-description: "D-218 - the published trial adjudicating beer's two speed anchors finds the brief too slow at every reading, and the survival of the 5-7 d window turns on a per-cell dry mass this repo ships two values of, 5.6x apart"
+description: "D-218 - the published trial adjudicating beer's two speed anchors (the adjudication itself is D-223, which MOVED the rate); the survival of the 5-7 d window turns on a per-cell dry mass this repo ships two values of, 5.6x apart"
 metadata: 
   node_type: memory
   type: project
   originSessionId: bd744d4f-5794-466f-81ff-deb7e49f9bff
   modified: 2026-08-18T09:13:03.318Z
 ---
+
+**SUPERSEDED IN PART BY D-223 — read this before using any number below.** Beer's two speed
+anchors were ADJUDICATED and `q_sugar_max` MOVED: **0.5 -> 0.72 g/g/h, band 0.3-1.5 ->
+0.634-0.818**, source changed from Zamudio Lara 2022 (a magnitude transfer between two different
+rate laws) to a fit against Foster 2022's measured 15 C course. **Any statement here about the
+0.3-1.5 band, its 1.5 high edge, its `15.3 * 0.098` derivation, or about the engine being "slow
+at every reading" is about the RETIRED value and no longer describes the shipped model.** One
+rate fitted at 15 C alone now lands 0.945 / 1.030 / 0.973x the measured mean at 12 / 15 / 22 C
+(12 and 22 out of sample), sec 2.2's criterion is 6.04 d INSIDE 5-7, and the 30 C column has
+inverted to 0.659x (model too FAST). Full detail:
+`.claude/memory/prohibitions/beer-ferment-speed-anchor-conflict.md`, D-223 block at the top.
 
 **Live prohibitions — which yardstick beer's fermentation SPEED is calibrated against (D-218).**
 Detail split out of `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points

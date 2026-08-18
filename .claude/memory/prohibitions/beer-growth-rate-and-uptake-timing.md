@@ -8,6 +8,17 @@ metadata:
   modified: 2026-08-17T14:58:10.650Z
 ---
 
+**SUPERSEDED IN PART BY D-223 — read this before using any number below.** Beer's two speed
+anchors were ADJUDICATED and `q_sugar_max` MOVED: **0.5 -> 0.72 g/g/h, band 0.3-1.5 ->
+0.634-0.818**, source changed from Zamudio Lara 2022 (a magnitude transfer between two different
+rate laws) to a fit against Foster 2022's measured 15 C course. **Any statement here about the
+0.3-1.5 band, its 1.5 high edge, its `15.3 * 0.098` derivation, or about the engine being "slow
+at every reading" is about the RETIRED value and no longer describes the shipped model.** One
+rate fitted at 15 C alone now lands 0.945 / 1.030 / 0.973x the measured mean at 12 / 15 / 22 C
+(12 and 22 out of sample), sec 2.2's criterion is 6.04 d INSIDE 5-7, and the 30 C column has
+inverted to 0.659x (model too FAST). Full detail:
+`.claude/memory/prohibitions/beer-ferment-speed-anchor-conflict.md`, D-223 block at the top.
+
 **Live prohibitions — beer's growth RATE and uptake TIMING (D-211).** Detail split out of
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read
 it before proposing anything about beer's growth rate, nitrogen-uptake timing, or the two
@@ -70,8 +81,10 @@ wants **acidification early and none late** — a term with a **time profile**, 
 That is the brief for the next beer-pH beat.
 
 **Three prose numbers were conditioned on the old rate and are now fixed — do not "re-correct".**
-**`q_sugar_max`'s high edge 1.5 is STILL RIGHT**: its `15.3 * 0.098` uses **Zamudio's** growth
-rate for **their** peak, not this file's. `15.3 * 0.034 = 0.52` lands on the nominal 0.5 and is a
+~~**`q_sugar_max`'s high edge 1.5 is STILL RIGHT**~~ — **RETIRED AT D-223.** The whole Zamudio
+derivation is gone: the band is now 0.634-0.818, held by three strains x two readings of one
+measured trial. What was true and is kept for the reasoning: `15.3 * 0.098` used **Zamudio's**
+growth rate for **their** peak, not this file's. `15.3 * 0.034 = 0.52` lands on the nominal 0.5 and is a
 **trap**, not a discovery — and `q_sugar_max` is **banded and drawn**, so it is a live sampling
 surface. Its "1.5 attenuates a 1.048 wort in ~2 d" is **re-measured at 2.58 d** (D-15 unchanged).
 `test_beer_temperature_response.py`'s 10 °C midpoint is **7.46 d / 3.55×**, was 6.2 d / 2.9×.
