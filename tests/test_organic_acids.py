@@ -127,6 +127,24 @@ TYRELL_ACETIC_MEAN_PPM = {
 TYRELL_WORT_PH = 5.65
 TYRELL_BEER_PH = (4.78, 4.90)
 
+#: The temperature every Tyrell comparison in this file is scored at — and its provenance,
+#: written here ONCE because it was an inference for nine records (D-217).
+#:
+#: Tyrell ran **two** trials. §2.4.1's laboratory flasks are the ones with a printed
+#: fermentation temperature — *"Fermentation temperature was isothermal at 20 °C"* — and they
+#: are NOT the source of Fig. 4. Fig. 4 is §2.4.2's 2 L EBC tubes, the trial whose *"yeast
+#: concentration, pH and extract development was checked daily"*, and the only temperature the
+#: paper prints for it is the FILL: *"cooled down to 15 °C"*. D-178 transcribed that correctly
+#: as "pitched at 15 °C"; from D-207 on, the archive said "Tyrell ferments at 15 °C".
+#:
+#: The source does settle the direction, in §3.2's comparison of the two scales: *"higher oxygen
+#: intake, **higher fermentation temperature** and lower hydrostatic pressure of **lab scale**
+#: fermentation"*. The lab scale is the 20 °C one, so the tube trial ran BELOW 20 °C. 15 °C is
+#: the only value the paper offers for it, and it is now sourced in direction rather than
+#: assumed — but the exact value is still not printed, which is why the two tests in section 11
+#: pin what depends on it.
+TYRELL_TRIAL_CELSIUS = 15.0
+
 #: Fig. 4's pH panel as a COURSE — the four-strain envelope ``(low, high)`` per day, in the
 #: paper's own daily sampling ("yeast concentration, pH and extract development was checked
 #: daily", §2.4.2). D-207 transcribed it; D-180 had read this same panel for its two endpoints
@@ -1970,23 +1988,23 @@ def test_the_day_1_pH_miss_survives_the_timing_fix_and_has_CHANGED_SIDES():
 
 
 # ---------------------------------------------------------------------------------------
-# D-216 â€” the two anchors on beer's fermentation SPEED, and what they forbid
+# D-216 — the two anchors on beer's fermentation SPEED, and what they forbid
 # ---------------------------------------------------------------------------------------
 
-#: The ``q_sugar_max`` that reproduces Tyrell's day-2 extract fraction exactly (D-216 Â§3),
+#: The ``q_sugar_max`` that reproduces Tyrell's day-2 extract fraction exactly (D-216 §3),
 #: found by bisection on the shipped model. It is INSIDE the parameter's own printed band
 #: (0.3-1.5), which is why this needs a test rather than a sentence: a future beat looking at
 #: :func:`test_the_model_ferments_tyrells_wort_on_tyrells_schedule` will find that the one knob
 #: that closes it is not even out of band. What stops it is the OTHER anchor, below.
 Q_SUGAR_MAX_MATCHING_TYRELL = 1.397
 
-#: ``K_repression`` removed entirely â€” not a candidate value, the unbounded LIMIT of the term
-#: that owns 79 % of the lag (D-216 Â§5). Used to make the refusal two-tier.
+#: ``K_repression`` removed entirely — not a candidate value, the unbounded LIMIT of the term
+#: that owns 79 % of the lag (D-216 §5). Used to make the refusal two-tier.
 K_REPRESSION_REMOVED = 1.0e6
 
 
-def _beer_days_to_target_gravity(q_sugar_max: float | None = None) -> float:
-    """Days for Â§2.2's 1.048 ale wort at 20 Â°C to reach 1.010 apparent, optionally re-rated.
+def _beer_days_to_target_gravity(q_sugar_max: float | None = None, **overrides: float) -> float:
+    """Days for §2.2's 1.048 ale wort at 20 °C to reach 1.010 apparent, optionally re-rated.
 
     Deliberately reuses the benchmark's own wort and gravity construction rather than
     restating them, so this test cannot drift away from the anchor it is about.
@@ -2003,6 +2021,9 @@ def _beer_days_to_target_gravity(q_sugar_max: float | None = None) -> float:
     params = dict(compiled.param_values)
     if q_sugar_max is not None:
         params["q_sugar_max"] = q_sugar_max
+    for name, value in overrides.items():
+        assert name in params, f"{name} is not a compiled parameter"
+        params[name] = value
     grid = np.linspace(0.0, compiled.t_span_h[1], int(compiled.t_span_h[1]) + 1)
     traj = simulate(compiled.process_set, params, compiled.y0, compiled.t_span_h, t_eval=grid)
     assert traj.success, traj.message
@@ -2011,14 +2032,16 @@ def _beer_days_to_target_gravity(q_sugar_max: float | None = None) -> float:
     return float(traj.t[reached[0]] / 24.0) if reached.size else float("inf")
 
 
-def _tyrell_flux_fraction(days: int = 7, **overrides: float) -> dict[int, float]:
+def _tyrell_flux_fraction(
+    days: int = 7, *, celsius: float = TYRELL_TRIAL_CELSIUS, **overrides: float
+) -> dict[int, float]:
     """Fraction of Tyrell's fermentable consumed per day, on a FIXED grid (D-214's lesson)."""
     compiled = compile_scenario(
         Scenario(
             name="d216",
             medium="beer",
             initial=dict(TYRELL_SCENARIO),
-            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
             duration_days=float(days),
         )
     )
@@ -2035,18 +2058,18 @@ def _tyrell_flux_fraction(days: int = 7, **overrides: float) -> dict[int, float]
 
 
 def test_matching_tyrells_extract_schedule_breaks_the_attenuation_benchmark():
-    """Why D-215's extract xfail cannot be closed on the uptake rate (D-216 Â§4).
+    """Why D-215's extract xfail cannot be closed on the uptake rate (D-216 §4).
 
     The two anchors on beer's fermentation speed are not compatible under this rate law:
 
-    * **Tyrell's measured extract course** â€” their wort is 59.4 % fermented by day 2, where the
+    * **Tyrell's measured extract course** — their wort is 59.4 % fermented by day 2, where the
       model books 21.2 % (``test_the_model_ferments_tyrells_wort_on_tyrells_schedule``);
-    * **Â§2.2's acceptance criterion** â€” a 1.048 ale wort at 20 Â°C reaching 1.010 apparent in
+    * **§2.2's acceptance criterion** — a 1.048 ale wort at 20 °C reaching 1.010 apparent in
       5-7 days (``test_beer_1048_og_attenuates_in_5_to_7_days``).
 
-    Beer's uptake is ``q_sugar_max Â· X Â· Monod(S)``, so one constant scales both. The value that
-    lands Tyrell's day 2 is 1.397 â€” **inside** the printed 0.3-1.5 band â€” and it takes the
-    benchmark to 2.71 d. The window is already violated at q â‰ˆ 0.6, having closed under a fifth
+    Beer's uptake is ``q_sugar_max · X · Monod(S)``, so one constant scales both. The value that
+    lands Tyrell's day 2 is 1.397 — **inside** the printed 0.3-1.5 band — and it takes the
+    benchmark to 2.71 d. The window is already violated at q ≈ 0.6, having closed under a fifth
     of the gap.
 
     **The baseline is asserted first and deliberately.** A test that only showed the re-rated
@@ -2056,24 +2079,24 @@ def test_matching_tyrells_extract_schedule_breaks_the_attenuation_benchmark():
     shipped = _beer_days_to_target_gravity()
     assert 5.0 <= shipped <= 7.0, (
         f"the benchmark wort attenuates in {shipped:.2f} d at the shipped q_sugar_max, outside "
-        "Â§2.2's 5-7 d window. The control failed, so nothing below is attributable to the "
-        "override â€” fix this before reading the arm"
+        "§2.2's 5-7 d window. The control failed, so nothing below is attributable to the "
+        "override — fix this before reading the arm"
     )
 
     matched = _beer_days_to_target_gravity(Q_SUGAR_MAX_MATCHING_TYRELL)
     assert matched < 5.0, (
         f"re-rated to the q_sugar_max that reproduces Tyrell's day-2 extract "
         f"({Q_SUGAR_MAX_MATCHING_TYRELL}), the benchmark wort attenuates in {matched:.2f} d, "
-        "which is INSIDE Â§2.2's window. D-216 measured 2.71 d. If this is now inside, the two "
-        "anchors no longer conflict and D-215's extract xfail is closable on this knob â€” which "
-        "is a result, not a test failure: re-open D-216 Â§4"
+        "which is INSIDE §2.2's window. D-216 measured 2.71 d. If this is now inside, the two "
+        "anchors no longer conflict and D-215's extract xfail is closable on this knob — which "
+        "is a result, not a test failure: re-open D-216 §4"
     )
 
 
 def test_removing_catabolite_repression_entirely_still_misses_tyrells_schedule():
-    """The refusal's second tier: not even the unbounded limit of the dominant term (D-216 Â§5).
+    """The refusal's second tier: not even the unbounded limit of the dominant term (D-216 §5).
 
-    ``K_repression`` = 2.0 g/L is tier ``speculative``, source *"author estimate"* â€” the
+    ``K_repression`` = 2.0 g/L is tier ``speculative``, source *"author estimate"* — the
     functional form is Gee & Ramirez's but ``beer_generic.yaml`` records that their numeric
     constants were not accessible in-source. With glucose at 12.3 g/L it holds maltose at 14 %
     of its rate on day 0 and maltotriose at 0.5 %, so the model's day 1 is essentially
@@ -2082,8 +2105,8 @@ def test_removing_catabolite_repression_entirely_still_misses_tyrells_schedule()
     that vanishes as glucose clears, matching a lag that peaks at day 2 and closes by day 7).
 
     So the obvious next move is to re-source that constant. **This test says it would not be
-    enough.** Removed ENTIRELY â€” not a candidate value, the limit â€” the model still falls short
-    of Tyrell's day 2, while putting the benchmark at 3.42 d. The refusal in D-216 Â§6 is
+    enough.** Removed ENTIRELY — not a candidate value, the limit — the model still falls short
+    of Tyrell's day 2, while putting the benchmark at 3.42 d. The refusal in D-216 §6 is
     therefore not "no in-band point works" but the stronger "not even the unbounded limit of the
     term that owns most of it".
     """
@@ -2093,7 +2116,7 @@ def test_removing_catabolite_repression_entirely_still_misses_tyrells_schedule()
         f"with catabolite repression removed entirely the model ferments {unrepressed[2]:.1%} of "
         f"Tyrell's wort by day 2 against their measured {measured_day2:.1%}. D-216 measured "
         "51.4 %. If the limit now reaches the measurement, the lag IS the repression term and "
-        "re-sourcing K_repression becomes the beat â€” see D-216 Â§5"
+        "re-sourcing K_repression becomes the beat — see D-216 §5"
     )
 
     shipped = _tyrell_flux_fraction()
@@ -2106,22 +2129,22 @@ def test_removing_catabolite_repression_entirely_still_misses_tyrells_schedule()
 
 
 def test_the_beer_ph_agreement_is_conditional_on_the_scenario_pitch():
-    """The pH course's 7/8 is scored on a pitch nothing independently sources (D-216 Â§8).
+    """The pH course's 7/8 is scored on a pitch nothing independently sources (D-216 §8).
 
     D-207/208/209/211 all score beer's pH on ``TYRELL_SCENARIO``, which pitches **1.0 g/L**
-    against Tyrell's stated 9.96e6 cells/mL â€” ``beer_generic.yaml`` already records that this
-    implies ~100 pg dry weight per cell, about **2Ã— the textbook 40-60 pg**. That note reads as
+    against Tyrell's stated 9.96e6 cells/mL — ``beer_generic.yaml`` already records that this
+    implies ~100 pg dry weight per cell, about **2× the textbook 40-60 pg**. That note reads as
     a caveat about a scenario detail. It is not: two published results are conditioned on it.
 
-    At a textbook-honest 0.5 g/L the day-1 miss D-211 pinned at **0.070 becomes 0.354** â€” five
-    times worse â€” day 2 falls out of its envelope as well, and D-211's measured attribution (the
+    At a textbook-honest 0.5 g/L the day-1 miss D-211 pinned at **0.070 becomes 0.354** — five
+    times worse — day 2 falls out of its envelope as well, and D-211's measured attribution (the
     nitrogen fraction drawn by 24 h, 0.363, "inside Tyrell's measured 0.234-0.448 spread") drops
     to 0.181, **outside** that spread.
 
     **This is not a claim that the pitch is wrong.** Read the other way, 1.0 g/L is the value at
     which the model's biomass reproduces Tyrell's measured growth *timing* in the units that
     drive the rate, and two independent observables endorse it against the per-cell arithmetic.
-    The extract lag gets **worse**, not better, at the honest pitch (2.81Ã— â†’ 3.51Ã—, D-216 Â§7).
+    The extract lag gets **worse**, not better, at the honest pitch (2.81× → 3.51×, D-216 §7).
     What this test forbids is reading D-211's 0.070 as unconditional.
     """
     compiled = compile_scenario(
@@ -2146,7 +2169,7 @@ def test_the_beer_ph_agreement_is_conditional_on_the_scenario_pitch():
     assert day1_excess == pytest.approx(0.354, abs=0.03), (
         f"at a 0.5 g/L pitch day 1 reads {day1_excess:.4f} pH above Tyrell's envelope; D-216 "
         "measured 0.354 against the 0.070 the shipped 1.0 g/L pitch gives. If these have "
-        "converged, the pH result no longer depends on the pitch and D-216 Â§8 is spent"
+        "converged, the pH result no longer depends on the pitch and D-216 §8 is spent"
     )
 
     inside = [
@@ -2156,4 +2179,86 @@ def test_the_beer_ph_agreement_is_conditional_on_the_scenario_pitch():
     assert sum(inside) == 6, (
         f"{sum(inside)}/8 days inside at the honest pitch; D-216 measured 6, against 7 at the "
         "shipped pitch. The count is what says the agreement is conditional"
+    )
+
+
+# ======================================================================================
+# 11. The temperature sensitivity of uptake — the lever D-216 named, and what holds it
+#     open (decision D-217)
+# ======================================================================================
+
+
+def test_the_uptake_activation_energy_is_inert_at_the_attenuation_benchmark():
+    """§2.2's benchmark cannot see `E_a_uptake` at all, and that is exact (D-217 §1).
+
+    D-216 §6 named `E_a_uptake` as the only lever that decouples beer's two speed anchors,
+    on the grounds that the benchmark runs at exactly ``T_ref`` = 20 °C so its Arrhenius
+    factor is 1.0 by construction. That was inherited from a note in ``beer_generic.yaml``
+    and spot-checked at one band edge. This asserts it across the whole band and well
+    outside it, on both signs, because the argument the archive now rests on is not "the
+    benchmark barely moves" but "the benchmark does not move".
+
+    The arm at −97,000 J/mol is de Andres-Toro's fitted sugar-uptake term, the one figure
+    that would nearly close Tyrell's gap; it is swept here to show that even a value of the
+    opposite SIGN leaves this anchor untouched. Nothing here endorses it.
+
+    **A RED names a change to the frame, not to a rate.** The only way this fails is if the
+    benchmark stops running at ``T_ref``, or uptake stops being Arrhenius in it — either of
+    which silently converts D-216's refusal from "two anchors conflict" into "one knob
+    moves both", and would have to be priced before any of section 10 is read again.
+    """
+    baseline = _beer_days_to_target_gravity()
+    assert 5.0 <= baseline <= 7.0, (
+        f"the benchmark wort attenuates in {baseline:.2f} d at the shipped parameters, outside "
+        "§2.2's 5-7 d window. The control failed, so nothing below is attributable"
+    )
+
+    for e_a in (-97000.0, 0.0, 30000.0, 55100.0, 63000.0, 80000.0):
+        got = _beer_days_to_target_gravity(E_a_uptake=e_a)
+        assert got == baseline, (
+            f"E_a_uptake = {e_a:.0f} J/mol moves the benchmark to {got:.4f} d against a "
+            f"baseline of {baseline:.4f} d. D-216 §6's decoupling argument requires this to "
+            "be EXACTLY zero — the benchmark is supposed to sit at T_ref, where the Arrhenius "
+            "factor is 1.0 by construction"
+        )
+
+
+def test_the_uptake_activation_energy_is_a_lever_only_because_the_trial_ran_cool():
+    """The lever's whole size is Tyrell's distance from ``T_ref`` (D-217 §4).
+
+    `E_a_uptake` is free at the benchmark (test above), so it is the one parameter that can
+    move Tyrell without moving §2.2. That is true only because Tyrell's tube trial ran
+    *below* 20 °C. Had it run at ``T_ref``, both anchors would sit at an Arrhenius factor of
+    1.0 and the lever would not exist — sweeping the entire printed band would move nothing.
+
+    Both arms are asserted because one alone would mislead. The 15 °C arm on its own reads
+    as "there is a lever"; the 20 °C arm on its own reads as "there is no lever". Together
+    they say what is true: the lever is worth exactly what the frame is worth, and the frame
+    rests on §3.2's comparative sentence (see :data:`TYRELL_TRIAL_CELSIUS`), not on a printed
+    fermentation temperature.
+
+    The span is small either way. Across the whole 30,000-63,000 band the day-2 fraction moves
+    0.045, taking D-215's 2.81× gap to 2.41× — under a fifth of it — which is why D-216
+    refused the low edge on provenance rather than on power.
+    """
+
+    def day2_span(celsius: float) -> tuple[float, float]:
+        lo = _tyrell_flux_fraction(celsius=celsius, E_a_uptake=30000.0)[2]
+        hi = _tyrell_flux_fraction(celsius=celsius, E_a_uptake=63000.0)[2]
+        return lo, hi
+
+    cool_lo, cool_hi = day2_span(TYRELL_TRIAL_CELSIUS)
+    span_cool = cool_lo - cool_hi
+    assert span_cool == pytest.approx(0.0449, abs=0.005), (
+        f"at {TYRELL_TRIAL_CELSIUS:.0f} °C the printed E_a_uptake band moves Tyrell's day-2 "
+        f"fraction by {span_cool:.4f}; D-217 measured 0.0449. If this has collapsed, the lever "
+        "D-216 §6 named is gone and its refusal needs re-reading"
+    )
+
+    ref_lo, ref_hi = day2_span(20.0)
+    assert ref_lo == ref_hi, (
+        f"at T_ref the same band gives {ref_lo:.9f} and {ref_hi:.9f}. These must be identical: "
+        "at 20 °C the Arrhenius factor is 1.0 whatever E_a is, so the lever exists ONLY because "
+        "Tyrell's trial ran cooler — which the paper states comparatively (§3.2), never as a "
+        "printed temperature"
     )
