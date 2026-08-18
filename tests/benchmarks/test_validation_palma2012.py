@@ -122,7 +122,7 @@ import pytest
 from scipy.optimize import brentq
 
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
-from fermentation.units import brix_to_sugar_gpl
+from fermentation.units import brix_to_sugar_gpl, cells_per_ml_to_pitch_gpl
 
 pytestmark = pytest.mark.benchmark
 
@@ -149,10 +149,14 @@ def _brix_for_sugar(target_gpl: float) -> float:
 
 _BRIX = _brix_for_sugar(_TARGET_SUGAR_GPL)
 
-#: Palma pitched 10^6 CFU/mL -- identical research-lab dose to Varela's, converted via
-#: the same ~18 pg/cell S. cerevisiae dry-weight estimate documented in
-#: test_validation_varela2004.py (an order-of-magnitude conversion, not exact).
-_PITCH_GPL_RESEARCH = 0.018
+#: Palma pitched 10^6 CFU/mL -- identical research-lab dose to Varela's, and converted
+#: the same way: through ``fermentation.units`` at Coleman's 4e-11 g/cell (D-219). This
+#: line used to read 0.018 at an unsourced ~18 pg/cell; see the note in
+#: test_validation_varela2004.py for why that was the wrong unit rather than a loose one.
+#:
+#: **Unlike Varela's, one band here did have to move**, and the direction is a cost, not
+#: a win -- see ``test_palma2012_lf_far_from_dry_at_144h_characterized``.
+_PITCH_GPL_RESEARCH = cells_per_ml_to_pitch_gpl(1.0e6)
 
 #: Palma's fermentation temperature -- exactly the engine's/Coleman's T_ref, unlike
 #: Varela's 28 C: this comparison carries zero Arrhenius extrapolation uncertainty.
@@ -233,6 +237,12 @@ def test_palma2012_cf_duration_characterized():
     # ethanol-yield gap have different causes, deliberately not conflated). This is a
     # regression guard on the engine's OWN characterized behaviour, not a pass/fail
     # against Palma.
+    #
+    # D-219 NOTE, NOT re-banded: the pitch repair moved this 138 -> 128 h and the gap
+    # ratio 1.917 -> 1.778, both still inside their printed bands but now 3 h and 0.08
+    # from the FLOOR rather than mid-band. Left alone deliberately -- a band moved to
+    # re-centre a passing number is a band fitted to the model. Worth knowing that a
+    # further speed-up of a few hours fires two pins here at once.
     t_h, sugar = _run_palma_condition(320.0, duration_days=15.0)
     hours = _hours_to_dryness(t_h, sugar, 15.0)
     assert 125.0 <= hours <= 150.0, (
@@ -253,13 +263,24 @@ def test_palma2012_lf_far_from_dry_at_144h_characterized():
     # 90 mg N/L (nitrogen-limited, LF) -- Palma's real LF is only ~60% through its
     # glucose by 144 h (residual ~80 g/L) and still visibly decelerating, i.e. far from
     # dry but NOT a clean plateau (weaker than "arrested" -- D-58's overclaim lesson).
-    # The engine's LF is much further along at the same clock time: residual ~41 g/L,
-    # ~79% consumed. This is a regression guard on that engine value, characterizing
-    # (not closing) the same N-sensitivity shortfall test_palma2012_lf_vs_cf_progress_
-    # ratio_understates_palma below measures directly.
+    # The engine's LF is much further along at the same clock time. This is a regression
+    # guard on that engine value, characterizing (not closing) the same N-sensitivity
+    # shortfall test_palma2012_lf_vs_cf_progress_ratio_understates_palma measures directly.
+    #
+    # RE-BANDED AT D-219, [35, 48] -> [24, 33], AND THE DIRECTION IS A COST. Correcting
+    # this file's pitch conversion (~18 pg/cell -> Coleman's 40 pg/cell, 2.22x heavier)
+    # moves the engine's 144 h residual 41.0 -> 28.6 g/L against Palma's measured ~80, so
+    # the N-sensitivity shortfall goes from ~2x to ~2.8x: FURTHER from the measurement,
+    # not nearer. The old 41 was flattered by an inoculum 2.22x too light, and this is the
+    # one place in the two wine benchmarks where the unit repair costs fidelity rather
+    # than being inert (all six of Varela's assertions held unchanged). It has leverage
+    # HERE and nowhere else because at 90 mg N/L the ferment is nitrogen-starved, so final
+    # biomass is inoculum-dominated in a way it is not at Palma's 320 or Varela's 300.
+    # Re-banded because the pitch was wrong, NOT to make CI green -- if this number ever
+    # RISES to meet Palma's 80, that is the gap closing and it needs a new decision.
     t_h, sugar = _run_palma_condition(90.0, duration_days=20.0)
     s_144 = float(np.interp(144.0, t_h, sugar))
-    assert 35.0 <= s_144 <= 48.0, f"LF: S(144h)={s_144:.2f} g/L outside characterized [35, 48] g/L"
+    assert 24.0 <= s_144 <= 33.0, f"LF: S(144h)={s_144:.2f} g/L outside characterized [24, 33] g/L"
     # Sanity: the engine's LF should still be nowhere near Palma's LF residual (~80
     # g/L) -- if it ever rises to meet it, that's the N-sensitivity gap closing, worth
     # a new decision, not a silent re-band.

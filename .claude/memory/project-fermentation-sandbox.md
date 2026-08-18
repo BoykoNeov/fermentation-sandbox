@@ -262,8 +262,18 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   tails while still missing both day 2s (D-216 §4 unchanged). **Never cite Foster's pair as a temperature test**:
   the bound is cleared by the ENTIRE printed `E_a_uptake` band and first fires 1.43× out — so **D-217's refusal
   needs no re-opening**, and the near-equality of the ratio to the bare Arrhenius factor is a **CROSSING** at
-  ≈58 kJ/mol, not a law. **Next measurement = source the per-cell dry mass** (load-bearing in 3 places).
+  ≈58 kJ/mol, not a law. **The per-cell dry mass is SETTLED — next block.**
   → `.claude/memory/prohibitions/beer-speed-yardstick.md`
+
+- **D-219 — a cell's dry mass is a UNIT DEFINITION, not a literature question; §2.2's window FAILS.**
+  **4e-11 g/cell**: Coleman 2007 (wine's `Y_X/N`/`k'_d`/`mu_max` source) says *"assuming that each cell
+  weighs 4 × 10⁻¹¹ g"* and COUNTED cells — every gram of this engine's biomass is a count × that. **Assert
+  it EXACTLY; do not re-open as "which estimate".** Both old readings RETIRED: 18 pg unsourced, **~100 pg
+  BACK-COMPUTED** from `pitch_gpl = 1.0` (a residual, not a mass). **Never band it from dry-yeast DOSING
+  conventions.** **§2.2's 5-7 d does NOT survive** (3.63 d) and the model is **1.61× slow, not 11 % off**
+  — but `q_sugar_max` NOT moved and `TYRELL_SCENARIO`'s **2.51×** excess NOT corrected (`mu_max` refit;
+  6.58× day-2; pH 7/8→6/8). **2.51× and D-215's 2.8× COMPOUND, not corroborate.**
+  [[feedback-a-constant-can-be-a-unit-definition]] → `.claude/memory/prohibitions/yeast-cell-dry-mass.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

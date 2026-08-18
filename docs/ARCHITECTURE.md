@@ -244,6 +244,11 @@ Canonical internal units: concentration **g/L** (≡ SI kg/m³), temperature **K
 Industry units (°Brix, SG, °Plato, %ABV, °C, days) appear only on the far side of
 `fermentation.units` (D-3).
 
+A **counted pitch** (cells/mL, which is how the literature states one) crosses here too,
+via `cells_per_ml_to_pitch_gpl`. That one is not a convenience factor: it carries the
+per-cell dry mass defining the gram this engine's biomass is expressed in, so its
+docstring — not this page — is where the argument lives (D-219).
+
 ## Runtime
 
 `simulate(process_set, params, y0, t_span)` wraps `solve_ivp` with an implicit adaptive method

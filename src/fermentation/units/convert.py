@@ -192,3 +192,75 @@ def abv_from_ethanol(ethanol_gpl: float) -> float:
     """
     ethanol_ml_per_l = ethanol_gpl / _ETHANOL_DENSITY_GPML
     return ethanol_ml_per_l / 10.0
+
+
+# -- Counted pitch -> pitch_gpl (decision D-219) -------------------------------
+#
+# Yeast dry mass per cell, in grams. This is NOT one estimate among several: it is
+# the DEFINITION of the gram this engine's biomass state variable is expressed in.
+#
+# Coleman, Fish & Block 2007 (Appl. Environ. Microbiol. 73(18):5875-5884, doi:
+# 10.1128/aem.00670-07), Materials and Methods, "Viable and total cell concentration
+# procedures", VERBATIM:
+#
+#     "Each cell count was converted to grams per liter of cell mass, assuming that
+#      each cell weighs 4 x 10^-11 g and that the 25 squares in the hemacytometer
+#      grid were covered with 10 ul."
+#
+# Coleman measured CELLS with a hemacytometer and never weighed any. Every gram in
+# that paper -- and therefore every wine parameter this engine fits to it (X, X_A,
+# Y_X/N and its nitrogen regression, k'_d, mu_max) -- is a count multiplied by this
+# constant. So a counted pitch converted at any other figure enters the model in
+# units its own parameters do not use. That is the whole argument for this value;
+# it is an identity, not a literature preference.
+#
+# WHAT IT IS NOT. Coleman writes "assuming", so nothing in the chain is a weighing,
+# and the tier is plausible rather than validated. Do not let a later note turn this
+# into a measurement.
+#
+# THE INDEPENDENT CHECK, which is what says the unit is also physically honest and
+# fixes the frame Coleman left open (he says "cell mass", never "dry weight"):
+# invert his yield back to the quantity he actually measured, cells per gram of
+# nitrogen, and price it with an elemental composition he had no hand in.
+#
+#     Y_X/N(330 mg N/L) = exp(3.50 - 3.61e-3 * 330) = 10.06 g cell / g N   [his Fig. 4]
+#     cells per g N     = 10.06 / 4e-11            = 2.515e11
+#     dry mass per g N  = 1 / 0.114                = 8.77 g               [Roels
+#                         CH1.8O0.5N0.2, biomass_N_fraction, DRY basis]
+#     => dry mass per cell = 8.77 / 2.515e11       = 34.9 pg
+#
+# 34.9 against 40 is a 13 % agreement between an assumption made for a counting
+# chamber and the elemental formula, and it settles wet-vs-dry: read as a WET mass,
+# 40 pg would make yeast 33 % nitrogen on a dry basis, which is absurd against the
+# 7-12 % real range. The engine's biomass_C_fraction / biomass_N_fraction are
+# declared on dry cell weight in both medium files, so this is the frame they need.
+# A geometric cross-check agrees on magnitude: a 100-150 fL wine/ale cell at
+# rho ~ 1.11 g/mL and ~30 % dry matter is 30-57 pg.
+#
+# THE TWO READINGS THIS SUPERSEDES, and why each was what it was:
+#   * 18 pg -- asserted, unsourced, in test_validation_varela2004.py and
+#     test_validation_palma2012.py as "the standard ~18 pg/cell S. cerevisiae
+#     dry-weight figure". It implies a ~50 fL cell: a small lab haploid, not the
+#     diploid wine strain (EC1118) those very benchmarks run.
+#   * ~100 pg -- never chosen by anyone. BACK-COMPUTED from the beer scenario's
+#     pitch_gpl = 1.0 against Tyrell 2013's counted 9.96e6 cells/mL, so it is a
+#     residual absorbing the true cell mass AND every error in the model's
+#     per-gram uptake rate. It implies a ~300 fL cell, which no S. cerevisiae is.
+#
+# Band: 28-50 pg, the span the elemental route gives across biomass_N_fraction's own
+# 0.08-0.14 uncertainty. Both superseded readings sit OUTSIDE it.
+_YEAST_DRY_MASS_PER_CELL_G = 4.0e-11
+
+
+def cells_per_ml_to_pitch_gpl(cells_per_ml: float) -> float:
+    """A counted pitch [cells/mL] -> this engine's ``pitch_gpl`` [g/L dry biomass].
+
+        pitch [g/L] = cells/mL * 1e3 mL/L * 4e-11 g/cell
+
+    The literature states pitches as counts and this engine's state variable ``X``
+    is a mass, so every published trial crosses here. See the block above for why
+    the constant is Coleman's 4e-11 g and not a textbook cell weight: it is the
+    definition of the gram the wine parameters were fitted in, so converting at
+    anything else feeds the model a number in the wrong unit (decision D-219).
+    """
+    return cells_per_ml * 1e3 * _YEAST_DRY_MASS_PER_CELL_G

@@ -64,7 +64,7 @@ from scipy.optimize import brentq
 
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
-from fermentation.units import brix_to_sugar_gpl
+from fermentation.units import brix_to_sugar_gpl, cells_per_ml_to_pitch_gpl
 
 pytestmark = pytest.mark.benchmark
 
@@ -90,13 +90,19 @@ def _brix_for_sugar(target_gpl: float) -> float:
 
 _BRIX = _brix_for_sugar(_TARGET_SUGAR_GPL)
 
-#: Varela pitched 10^6 cells/mL (a research-lab dose, not a commercial pitch rate).
-#: Converted via the standard ~18 pg/cell S. cerevisiae dry-weight figure (consistent
-#: with the textbook ~1 OD600 ~ 3e7 cells/mL ~ 0.5 g/L DCW rule of thumb):
-#'   10^6 cells/mL = 10^9 cells/L * ~18 pg/cell ~= 0.018 g/L
-#: An order-of-magnitude conversion, not exact -- but the plausible range (~0.01-0.03
-#: g/L) cannot explain a 2-4x duration gap on its own (D-56).
-_PITCH_GPL_RESEARCH = 0.018
+#: Varela pitched 10^6 cells/mL (a research-lab dose, not a commercial pitch rate),
+#: converted through ``fermentation.units`` at Coleman's 4e-11 g/cell (decision D-219).
+#:
+#: **This line used to read 0.018, at "the standard ~18 pg/cell S. cerevisiae dry-weight
+#: figure" -- unsourced, and in the wrong unit.** Coleman, Fish & Block 2007 state that
+#: every gram in their paper is a hemacytometer count times 4e-11 g, so the wine
+#: parameters this benchmark scores (Y_X/N, k'_d, mu_max) are all fitted in
+#: Coleman-grams; 18 pg fed the model a pitch in a unit its own parameters do not use.
+#: The correction is 2.22x heavier and it is a REPAIR, not a perturbation: all six
+#: assertions in this file held unchanged across it (170 h -> 89/84 h at N=300,
+#: 313/289 h at N=50; biomass 3.382 -> 3.404 and 1.400 -> 1.422 g/L). Nothing here was
+#: re-banded. See ``units.convert.cells_per_ml_to_pitch_gpl``.
+_PITCH_GPL_RESEARCH = cells_per_ml_to_pitch_gpl(1.0e6)
 
 #: Varela's measured endpoints (Table 1; 3 independent experiments each; mean +/- SD).
 _VARELA_HOURS_TO_DRYNESS = {300.0: 170.0, 50.0: 700.0}
