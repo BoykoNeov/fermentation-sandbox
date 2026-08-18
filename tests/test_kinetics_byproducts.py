@@ -1094,3 +1094,250 @@ def test_banana_rate_is_first_order_in_the_fusel_pool(params):
     empty = rates(0.0)
     assert empty["isoamyl_acetate"] == 0.0, "no precursor alcohol => no acetylation => no banana"
     assert empty["ethyl_acetate"] > 0.0, "ethyl acetate does not depend on the fusel pool"
+
+
+# -- D-224: the finished beer's aroma LEVELS, which nothing in the suite pinned ------------
+#
+# Seven of beer's rate constants are DEFINED by a landing level -- their `conditions:` fields
+# say "k set to land finished X at ...". Nothing tested that they still do. Between D-211 and
+# D-223 three beats moved beer's growth rate and its sugar-uptake rate, and all seven levels
+# moved with them: the five Ehrlich higher alcohols by x2.87 and then back to x1.68, the two
+# esters by x0.79. The whole 1842-test suite went red ONCE in the process, and only because
+# D-223 had happened to pin a packaged ethyl-acetate number four commits earlier for an
+# unrelated reason. These guards are the durable half of D-224 -- the re-anchoring is the
+# cheap half.
+
+#: The landing level each constant's own `conditions:` field names, mg/L. Four are
+#: Wang/Frank/Steinhaus 2024 Table 1 beer means (n = 64-92 studies each); propan-1-ol is an
+#: author estimate (that survey omits it); the two esters are mid-band picks inside their own
+#: measured ale ranges (Meilgaard 1975: 10-30 and 0.5-3 mg/L).
+_BEER_AROMA_TARGETS_MGL = {
+    "propanol": 10.0,
+    "isobutanol": 9.6,
+    "active_amyl_alcohol": 10.3,
+    "isoamyl_alcohol": 30.0,
+    "2_phenylethanol": 25.7,
+    "ethyl_acetate": 20.0,
+    "isoamyl_acetate": 2.2,
+}
+#: The frame the constants are calibrated in, stated rather than implied. It is load-bearing:
+#: `E_a_esters` is 200 kJ/mol, so the same run at 15 C lands ethyl acetate at 6.10 mg/L, below
+#: its own 10 mg/L floor. 20 C is a typical ale ferment; the 15 C in the Sec 2.2 DURATION
+#: criterion is Foster 2022's cool trial (D-221), a different frame and not a competing one.
+_BEER_CALIBRATION_DAYS = 21.0
+_BEER_CALIBRATION_CELSIUS = 20.0
+
+#: The five Ehrlich pools, spelled out rather than derived, because the claim under test is
+#: exactly that these five move together and the two esters do not.
+_BEER_EHRLICH_POOLS = (
+    "propanol",
+    "isobutanol",
+    "active_amyl_alcohol",
+    "isoamyl_alcohol",
+    "2_phenylethanol",
+)
+
+
+def _beer_calibration_scenario(celsius: float = _BEER_CALIBRATION_CELSIUS) -> Scenario:
+    return Scenario(
+        name="beer-aroma-calibration",
+        medium="beer",
+        initial={
+            "glucose_gpl": 15.0,
+            "maltose_gpl": 70.0,
+            "maltotriose_gpl": 15.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 1.0,
+        },
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
+        duration_days=_BEER_CALIBRATION_DAYS,
+    )
+
+
+def _beer_aroma_levels_mgl(data_dir=None, celsius: float = _BEER_CALIBRATION_CELSIUS):
+    """The seven finished levels, mg/L, from one compiled run at the calibration frame."""
+    scenario = _beer_calibration_scenario(celsius)
+    compiled = (
+        compile_scenario(scenario, data_dir=data_dir)
+        if data_dir is not None
+        else compile_scenario(scenario)
+    )
+    traj = compiled.run(t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0]))
+    return {pool: float(traj.series(pool)[-1]) * 1000.0 for pool in _BEER_AROMA_TARGETS_MGL}
+
+
+def _beer_data_dir_at(tmp_path, **values: float):
+    """A copied parameter dir with named ``beer_generic.yaml`` values overridden.
+
+    A copied dir rather than a resolved-map patch, for the D-214/D-223 reason: the arm has to be
+    present at LOAD time so the compiled ProcessSet carries it. Every override here is a band
+    EDGE of the parameter it names, so the value stays inside its own ``uncertainty`` and the
+    ``Parameter`` schema accepts it without the band having to move too.
+    """
+    import re
+    import shutil
+
+    dest = tmp_path / ("beer_arm_" + "_".join(f"{k}{v}" for k, v in sorted(values.items())))
+    shutil.copytree(default_data_dir(), dest)
+    path = dest / "beer_generic.yaml"
+    text = path.read_text(encoding="utf-8")
+    for name, value in values.items():
+        match = re.search(rf"(^{name}:\n  value: )([0-9.eE+-]+)", text, re.MULTILINE)
+        assert match is not None, f"{name} not found in beer_generic.yaml"
+        text = text[: match.start(2)] + repr(float(value)) + text[match.end(2) :]
+    path.write_text(text, encoding="utf-8")
+    return dest
+
+
+def test_the_finished_beer_lands_the_aroma_levels_its_rate_constants_are_defined_by():
+    """Every one of the seven lands the level its own provenance says the k was set for.
+
+    This is the guard whose absence let three beats move seven calibrated levels in silence. It
+    is deliberately an equality against the TARGET rather than a snapshot of whatever the model
+    currently produces: a snapshot re-pinned each time the engine moves records the drift instead
+    of catching it.
+    """
+    levels = _beer_aroma_levels_mgl()
+    for pool, target in _BEER_AROMA_TARGETS_MGL.items():
+        assert levels[pool] == pytest.approx(target, rel=0.01), (
+            f"{pool} finishes at {levels[pool]:.3f} mg/L against the {target} mg/L its "
+            f"`conditions:` field says its k is set to land. Re-anchor the k (the rate is linear "
+            f"in it) -- do NOT relax this tolerance, and read D-224 before deciding the level is "
+            f"the thing that should move."
+        )
+
+
+def test_each_drawn_speed_knob_moves_only_the_half_of_the_aroma_set_it_is_coupled_to(tmp_path):
+    """The mechanism behind D-224, as a signature rather than an argument.
+
+    The two halves are coupled to DIFFERENT things and the band edges separate them cleanly:
+
+    * ``mu_max`` (growth) moves the five Ehrlich higher alcohols and leaves ethyl acetate
+      alone to within 0.03 %. The Ehrlich Process is gated on nitrogen (``N/(K_n+N)``) but
+      draws its carbon from ``S``, so its output is not BOUNDED by the nitrogen it is
+      nominally made from: a slower-growing yeast holds the gate open longer and makes more
+      higher alcohol out of the same YAN. Every run here ends at N ~ 0.
+
+      The separation is a property of the two KNOBS, not of the pools, and D-224's arm A
+      measured the difference: reverting the five Ehrlich ``k`` to their pre-D-224 values
+      (a 1.68x change, far larger than this band's 1.09/0.77) moves packaged ethyl acetate
+      0.077 %, because the higher alcohols draw their carbon out of the same ``S`` -- 0.28 %
+      of the sugar consumed rather than 0.19 % -- and ethyl acetate reads ``S/(K_su+S)``.
+      That is enough to break the D-223 joint-corner pin, whose tolerance is 0.025 %.
+    * ``q_sugar_max`` (uptake) moves ethyl acetate and leaves the higher alcohols alone. That
+      pool is biomass-hour-linked, so a faster ferment packages less of it at identical total
+      sugar.
+    * ``isoamyl_acetate`` reads BOTH, because it is first-order in the ``isoamyl_alcohol``
+      pool (D-97) on top of the shared flux shape. THAT is why beer's two ester calibrations
+      looked like they disagreed at D-223: this one inherited the higher alcohols' 1.61x error
+      and came out 1.27x ABOVE target while ethyl acetate sat 0.79x BELOW it.
+
+    Pinned at the drawn band EDGES, not at the nominal, because both knobs are sampled
+    (feedback-pin-the-band-not-the-nominal, and D-223 Sec 9 committed exactly that defect).
+    """
+    nominal = _beer_aroma_levels_mgl()
+
+    mu_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=0.053))
+    mu_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=0.075))
+    for pool in _BEER_EHRLICH_POOLS:
+        assert mu_slow[pool] / nominal[pool] == pytest.approx(1.094, abs=0.005), pool
+        assert mu_fast[pool] / nominal[pool] == pytest.approx(0.774, abs=0.005), pool
+    # ...and ethyl acetate does not read the growth rate AT ALL.
+    assert mu_slow["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.0, abs=1e-3)
+    assert mu_fast["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.0, abs=1e-3)
+    assert mu_slow["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(
+        1.085, abs=0.005
+    )
+    assert mu_fast["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(
+        0.789, abs=0.005
+    )
+
+    q_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=0.634))
+    q_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=0.818))
+    assert q_slow["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.111, abs=0.005)
+    assert q_fast["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.897, abs=0.005)
+    for pool in _BEER_EHRLICH_POOLS:
+        # <1 % either way: the higher alcohols do not read the uptake rate.
+        assert q_slow[pool] / nominal[pool] == pytest.approx(1.0, abs=0.01), pool
+        assert q_fast[pool] / nominal[pool] == pytest.approx(1.0, abs=0.01), pool
+    assert q_slow["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(1.120, abs=0.005)
+    assert q_fast["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(0.888, abs=0.005)
+
+
+def test_beers_isoamyl_alcohol_stays_below_its_only_sourced_threshold_across_the_growth_band(
+    tmp_path,
+):
+    """The SENSORY statement of what D-224 repaired, which is sharper than any of the means.
+
+    ``isoamyl_alcohol`` is the one beer pool of the five with a sourced in-matrix threshold
+    (Meilgaard 1975, ~50 mg/L, sensory.yaml), and beer_generic.yaml states the finished level
+    must read OAV ~0.6 against it, because fusel character is a DEFECT in beer at elevated
+    levels rather than a normal descriptor of it. The shipped model ran 48.261 mg/L -- OAV
+    0.965, within 3.6 % of reporting a solventy note this file says an ale must not have -- and
+    at ``mu_max``'s LOW edge it ran 52.809, i.e. over. That is a live descriptor defect, not a
+    calibration nicety, and it is what makes the re-anchoring a fix rather than a preference.
+    """
+    # ug/L in sensory.yaml, mg/L here -- read from the file rather than written as a literal,
+    # so a re-sourcing of the threshold moves this guard with it.
+    threshold_mgl = (
+        load_parameters(default_data_dir() / "sensory.yaml").resolve()[
+            "threshold_isoamyl_alcohol_beer"
+        ]
+        / 1000.0
+    )
+    assert threshold_mgl == pytest.approx(50.0)
+    for mu in (0.053, 0.058, 0.075):
+        arm = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=mu))
+        oav = arm["isoamyl_alcohol"] / threshold_mgl
+        assert oav < 1.0, (
+            f"at mu_max={mu} beer finishes {arm['isoamyl_alcohol']:.3f} mg/L isoamyl alcohol, "
+            f"OAV {oav:.3f} -- it is claiming a solventy/alcoholic note beer_generic.yaml says a "
+            f"sound ale does not have."
+        )
+    # The nominal reads the 0.6 the parameter file prints, not merely something under 1.0.
+    assert _beer_aroma_levels_mgl()["isoamyl_alcohol"] / threshold_mgl == pytest.approx(
+        0.602, abs=0.01
+    )
+
+
+def test_the_five_ehrlich_bands_are_the_multiple_of_their_nominal_their_own_notes_state():
+    """D-99 shipped five bands that are x0.3/x3 (x0.2/x5 for propanol) of a value 2.05x BELOW
+    the nominal shipped beside them -- x0.145/x1.45 of the value actually in force. One
+    draughting error across five entries: the nominal was fitted to land its target and the band
+    was left where it was. D-224 corrects both halves; this is the arithmetic that would have
+    caught it, and it is cheap enough that there was never a reason not to have it.
+    """
+    beer = load_parameters(default_data_dir() / "beer_generic.yaml")
+    stated = {
+        "k_propanol": (0.2, 5.0),
+        "k_isobutanol": (0.3, 3.0),
+        "k_active_amyl_alcohol": (0.3, 3.0),
+        "k_isoamyl_alcohol": (0.3, 3.0),
+        "k_2_phenylethanol": (0.3, 3.0),
+    }
+    for name, (low_mult, high_mult) in stated.items():
+        param = beer[name]
+        assert param.uncertainty is not None
+        assert param.uncertainty.low / param.value == pytest.approx(low_mult, rel=0.01), name
+        assert param.uncertainty.high / param.value == pytest.approx(high_mult, rel=0.01), name
+
+
+def test_the_two_beer_ester_bands_are_rescalings_of_their_nominal_not_fixed_edges():
+    """The esters get the OPPOSITE treatment from the five Ehrlich k above, on purpose.
+
+    Their band notes state a CONCENTRATION span and the rate is linear in k, so the D-97/D-99
+    convention is to rescale the edges with the nominal -- which pins the same span throughout
+    and is what D-224 did (x1.2636 and x1.2582). The Ehrlich five were corrected instead of
+    rescaled because their stated MULTIPLIER and their actual one disagreed by 2.05x with
+    nothing supporting the actual. Keeping the two rules straight is the point of this test.
+    """
+    beer = load_parameters(default_data_dir() / "beer_generic.yaml")
+    # The multipliers D-96/D-97/D-99 shipped, carried through every re-anchoring since.
+    for name, low_mult, high_mult in (
+        ("k_ethyl_acetate", 0.5, 1.5455),
+        ("k_isoamyl_acetate", 0.3286, 2.0896),
+    ):
+        param = beer[name]
+        assert param.uncertainty is not None
+        assert param.uncertainty.low / param.value == pytest.approx(low_mult, rel=0.005), name
+        assert param.uncertainty.high / param.value == pytest.approx(high_mult, rel=0.005), name

@@ -1216,19 +1216,28 @@ def test_the_joint_band_corner_FORMS_since_D223_and_the_funding_constraint_holds
     # recomputed from the shipped seam, never transcribed (D-154/D-158), and both are pinned, so
     # that a change restoring the margin goes RED here and gets READ rather than silently
     # re-adopting D-176's retired argument.
-    assert packaged == pytest.approx(0.015866, abs=5e-6)  # 15.866 mg/L at the D-223 rate
-    assert eq_corner == pytest.approx(0.020563, abs=5e-6)  # 20.563 mg/L
+    #
+    # D-224 RE-PINNED IT, and the direction is worth naming: D-223 dropped the packaged ester to
+    # 15.866 because beer's ester pools are biomass-hour-linked and its ferment got faster, and
+    # D-224 re-anchors `k_ethyl_acetate` x1.2636 to put the finished level back on the ~20 mg/L
+    # its own provenance says it is calibrated to. So the corner still FORMS, but by +0.518 mg/L
+    # rather than +4.697, and the joint-band flip fraction falls 5.37% -> 0.0767%, i.e. ~1 draw in
+    # 1300 instead of ~1 in 19. That is a real cost of the re-anchoring and it is recorded here
+    # rather than in prose: the funding constraint is exercised by a thinner slice of the band than
+    # D-223 measured, though it is still exercised, and it is what stops `Byp` going negative.
+    assert packaged == pytest.approx(0.020064, abs=5e-6)  # 20.064 mg/L at the D-224 calibration
+    assert eq_corner == pytest.approx(0.020582, abs=5e-6)  # 20.582 mg/L
     assert eq_corner > packaged, (
         f"the joint corner no longer FORMS: equilibrium {eq_corner * 1000:.3f} mg/L against a "
         f"packaged {packaged * 1000:.3f} mg/L. D-223's funding constraint would then be "
         f"load-bearing nowhere the suite can see; re-read D-223 before deleting either."
     )
-    assert (eq_corner - packaged) == pytest.approx(0.004697, abs=1e-5)  # g/L; -4.697 mg/L
-    # ...while the NOMINAL beer still hydrolyses comfortably, by +9.141 mg/L. That contrast is the
+    assert (eq_corner - packaged) == pytest.approx(0.000518, abs=1e-5)  # g/L; -0.518 mg/L
+    # ...while the NOMINAL beer still hydrolyses comfortably, by +13.332 mg/L. That contrast is the
     # whole reason this test exists: a nominal-only guard reports a healthy margin at the very
-    # parameters where 1 draw in 19 is in the opposite regime.
+    # parameters where the opposite regime is reachable.
     eq_nominal = EthylAcetateEsterification.equilibrium(ethanol, resolved)
-    assert (packaged - eq_nominal) == pytest.approx(0.009141, abs=1e-5)  # g/L
+    assert (packaged - eq_nominal) == pytest.approx(0.013332, abs=1e-5)  # g/L
 
     # (2) HOW MUCH of the joint band forms -- the quantity D-176's single corner could not give.
     # Pure arithmetic on the equilibrium (no integration), so a fine grid is cheap. Both bands are
@@ -1244,10 +1253,13 @@ def test_the_joint_band_corner_FORMS_since_D223_and_the_funding_constraint_holds
             if EthylAcetateEsterification.equilibrium(ethanol, trial) > packaged:
                 forms += 1
     fraction = forms / (grid * grid)
-    # 5.37% at the shipped rate; it was 0.00% at the retired 0.5 and is 9.97% at the rate band's
-    # own high edge 0.818. Roughly 1 draw in 19.
-    assert fraction == pytest.approx(0.0537, abs=0.004), (
-        f"{fraction:.2%} of the joint band forms; D-223 measured 5.37%"
+    # 0.0767% at the D-224 calibration (31 cells of 40401, ~1 draw in 1300). It was 5.37% at
+    # D-223's packaged 15.866 mg/L, 0.00% at the retired q_sugar_max 0.5, and would be 0.00% again
+    # if the ester were anchored at Wang's published 23.7 mg/L beer mean instead of the 10-30
+    # mid-band 20 -- which is one reason D-224 did not move it there (D-176 gives the other: that
+    # survey mean carries a sour-beer tail).
+    assert fraction == pytest.approx(0.000767, abs=0.0004), (
+        f"{fraction:.4%} of the joint band forms; D-224 measured 0.0767%"
     )
 
     # (3) THE INVARIANT, integrated at the corner rather than argued. This is the arm the old test
@@ -1282,10 +1294,11 @@ def test_the_joint_band_corner_FORMS_since_D223_and_the_funding_constraint_holds
     # off in beer would also pass the line above. Here the pool is CREDITED first -- the only acid
     # this beer ever forms from is acid it released itself by hydrolysing, which is what makes the
     # formation half self-limiting by construction rather than by a margin -- and the ester rises
-    # only by what that funds: +0.048 mg/L over 166 d, against +4.608 mg/L unguarded.
-    assert float(byp[-1]) == pytest.approx(0.000694, abs=1e-4)  # g/L, ~0.69 mg/L released
+    # only by what that funds: +0.004 mg/L over 166 d (+0.048 at D-223's slower engine), against
+    # +4.608 mg/L unguarded.
+    assert float(byp[-1]) == pytest.approx(0.000569, abs=1e-4)  # g/L, ~0.57 mg/L released
     packaged_idx = int(np.argmin(np.abs(np.asarray(corner_traj.t, dtype=float) - 14.0 * 24.0)))
-    assert 0.0 < float(ester[-1]) - float(ester[packaged_idx]) < 0.0005  # g/L; +0.048 mg/L
+    assert 0.0 < float(ester[-1]) - float(ester[packaged_idx]) < 0.0005  # g/L; +0.004 mg/L
 
 
 def _beer_data_dir_at_the_joint_ester_corner(tmp_path: Path) -> Path:
