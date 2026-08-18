@@ -2262,3 +2262,392 @@ def test_the_uptake_activation_energy_is_a_lever_only_because_the_trial_ran_cool
         "Tyrell's trial ran cooler — which the paper states comparatively (§3.2), never as a "
         "printed temperature"
     )
+
+
+# ======================================================================================
+# 12. The third-party yardstick for beer's SPEED, and the unsourced conversion that
+#     decides between it and the brief (decision D-218)
+# ======================================================================================
+
+#: Foster et al. 2022, *Kveik Brewing Yeasts Demonstrate Wide Flexibility in Beer
+#: Fermentation Temperature Tolerance and Exhibit Enhanced Trehalose Accumulation*,
+#: Front. Microbiol. 13:747546, doi:10.3389/fmicb.2022.747546 (PMC8966892).
+#:
+#: **Why this trial and not another.** D-216 §11 asked which of beer's two speed anchors to
+#: calibrate against — §2.2's 5-7 d acceptance criterion or Tyrell's measured course — and
+#: D-217 §8 left it open as the owner's call. This is the first third-party source the
+#: archive has that carries the whole tuple the question needs: a wort within 0.003 SG of
+#: §2.2's own, a **counted** pitch, two temperatures for the **same three strains**, and the
+#: **same** 1.010 target gravity (the paper takes it from Parker 2008, so the target §2.2
+#: asserts is independently sourced — that much of the brief is corroborated).
+#:
+#: *"The hopped wort was prepared using Canadian 2-row malt to an original gravity of
+#: 12.5°Plato (1.045 specific gravity)"*; *"inoculated at a rate of 1.2 x 10^7 cells/mL into
+#: 200 mL of sterilized wort in 250 mL glass bottles fitted with airlocks"*.
+FOSTER_OG_SG = 1.045
+
+#: Foster's fermentable extract in this file's units. 12.5 °P is ~128 g/L total extract at
+#: the same all-malt apparent-attenuable fraction §2.2's own wort is built on, which is what
+#: makes the two comparable at all.
+FOSTER_FERMENTABLE_GPL = 92.0
+
+#: The counted pitch. This is the number the whole beat turns on, because the engine works
+#: in g/L and the paper works in cells/mL — see :data:`PER_CELL_DRY_MASS_PG`.
+FOSTER_PITCH_CELLS_PER_ML = 1.2e7
+
+#: Gravity was sampled at these hours only (Fig. 2 panels A-D). **This is why Foster's
+#: "3 days" is a CEILING and not a duration:** the prose reads *"The Beer 1 control strains
+#: reached SG < 1.01 after only 3 days ... (Figure 2C)"* and Figure 2C **is** the 72 h panel.
+#: The strains were below target when someone next looked, not at 72 h exactly. If they were
+#: still above at 48 h — which the word *"only"* implies but does not state — the true
+#: endpoint is somewhere in (48, 72] h. Every use of it below is one-sided and says so.
+FOSTER_SAMPLE_HOURS = (12.0, 48.0, 72.0, 120.0)
+
+#: *"reached SG < 1.01 after only 3 days"* — at 22 °C, for the three **Beer 1** controls
+#: (Cali Ale, Vermont Ale, Kölsch; all *S. cerevisiae* ale strains). St. Lucifer is the
+#: Beer 2 control and *"never reached an FG < 1.01, regardless of temperature"*, so it is
+#: excluded from this figure and from the one below — the pair really is same-strain.
+FOSTER_DAYS_TO_FG_AT_22C = 3.0
+
+#: *"Hornindal1 was the only kveik strain that completed a 12°C fermentation within 10 days
+#: along with the Beer 1 controls"*. 10 days is the **incubation length** (*"Incubations were
+#: for 5 days, except for the 12°C fermentations (10 days)"*), so this is a ceiling by
+#: construction, not a measurement.
+FOSTER_CEILING_DAYS_AT_12C = 10.0
+
+#: The tightest reading of Foster's within-source duration ratio, and the loosest.
+#:
+#: Both endpoints above are ceilings, and that matters for the DIRECTION of the bound. An
+#: upper bound on ``d12 / d22`` needs an upper bound on ``d12`` (10 d, have it) and a LOWER
+#: bound on ``d22`` (do not have it). Taking 3 d as exact gives 10/3; taking the open end of
+#: the sampling interval, ``d22 > 2``, gives 10/2. The truth is in between and nothing in
+#: the paper narrows it further.
+FOSTER_RATIO_BOUND_TIGHTEST = FOSTER_CEILING_DAYS_AT_12C / FOSTER_DAYS_TO_FG_AT_22C
+FOSTER_RATIO_BOUND_LOOSEST = FOSTER_CEILING_DAYS_AT_12C / 2.0
+
+#: Yeast dry mass per cell, pg — the conversion that turns Foster's counted pitch into a
+#: ``pitch_gpl``, and (D-218 §3) the quantity that decides beer's whole speed question.
+#:
+#: **The repo already ships two of these, 5.6x apart.** ``test_validation_varela2004.py``
+#: and ``test_validation_palma2012.py`` convert wine pitches at *"the standard ~18 pg/cell
+#: S. cerevisiae dry-weight figure"*; ``beer_generic.yaml``'s ``mu_max`` note records that
+#: :data:`TYRELL_SCENARIO`'s 1.0 g/L against Tyrell's counted 9.96e6 cells/mL implies
+#: ~100 pg/cell. That note calls the discrepancy *"~2x the textbook 40-60 pg"*, which is true
+#: of the textbook range and understates it against the repo's own wine figure.
+PER_CELL_DRY_MASS_PG: dict[str, float] = {
+    "repo wine files (Varela, Palma)": 18.0,
+    "textbook low": 40.0,
+    "textbook high": 60.0,
+    "beer_generic.yaml implied by Tyrell": 100.0,
+}
+
+#: ``q_sugar_max`` that lands the model exactly on Foster's 72 h endpoint at 22 °C, per
+#: reading of the per-cell dry mass. Bisected on the shipped model on the hourly grid, and
+#: verified live by the test below rather than trusted.
+#:
+#: **1.5 is the printed band's CEILING, not a crossing** — at 18 pg/cell no in-band value
+#: reaches the endpoint at all (the ceiling gets to 3.04 d, missing by 1.4 %). Recorded as a
+#: saturation so a later beat cannot read it as a fitted value; cf. D-177.
+Q_SUGAR_MAX_REACHING_FOSTER: dict[float, float] = {
+    18.0: 1.5,
+    40.0: 0.9242,
+    50.0: 0.8176,
+    100.0: 0.5602,
+}
+
+#: What §2.2's benchmark then reads, per reading. Only one lands inside 5-7 d.
+HANDOFF_DAYS_AT_FOSTER_RATE: dict[float, float] = {
+    18.0: 2.5833,
+    40.0: 3.6250,
+    50.0: 4.0,
+    100.0: 5.5,
+}
+
+
+def _foster_pitch_gpl(pg_per_cell: float) -> float:
+    """Foster's counted pitch as a ``pitch_gpl``, at one reading of the per-cell dry mass."""
+    return FOSTER_PITCH_CELLS_PER_ML * pg_per_cell * 1e-9
+
+
+def _foster_days_to_target_gravity(
+    pitch_gpl: float, celsius: float, *, days: float = 30.0, **overrides: float
+) -> float:
+    """Days for Foster's 12.5 °P wort to reach 1.010 apparent, on a FIXED hourly grid.
+
+    Reuses the benchmark's own gravity construction and target, exactly as
+    :func:`_beer_days_to_target_gravity` does, so the two are commensurable.
+    """
+    from tests.benchmarks.test_milestone1 import TARGET_FG_SG, _apparent_gravity_series
+
+    s0 = FOSTER_FERMENTABLE_GPL
+    compiled = compile_scenario(
+        Scenario(
+            name="d218-foster",
+            medium="beer",
+            initial={
+                "glucose_gpl": s0 * 0.132 / 0.88,
+                "maltose_gpl": s0 * 0.546 / 0.88,
+                "maltotriose_gpl": s0 * 0.202 / 0.88,
+                "yan_mgl": 200.0,
+                "pitch_gpl": pitch_gpl,
+            },
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
+            duration_days=days,
+        )
+    )
+    params = dict(compiled.param_values)
+    for name, value in overrides.items():
+        assert name in params, f"{name} is not a compiled parameter"
+        params[name] = value
+    grid = np.linspace(0.0, compiled.t_span_h[1], int(compiled.t_span_h[1]) + 1)
+    traj = simulate(compiled.process_set, params, compiled.y0, compiled.t_span_h, t_eval=grid)
+    assert traj.success, traj.message
+    apparent = _apparent_gravity_series(traj, FOSTER_OG_SG, s0)
+    reached = np.where(apparent <= TARGET_FG_SG)[0]
+    return float(traj.t[reached[0]] / 24.0) if reached.size else float("inf")
+
+
+@pytest.fixture(scope="module")
+def foster_temperature_sweep() -> dict[float, float]:
+    """``E_a_uptake`` -> the model's 12 °C / 22 °C duration ratio on Foster's wort.
+
+    Module-scoped because two tests read it and each entry costs two integrations. The heavy
+    per-cell reading (1.2 g/L) is used throughout: it is the fastest to integrate, and the
+    pitch-invariance test below is what licenses reading one pitch for all of them.
+    """
+    pitch = _foster_pitch_gpl(100.0)
+    out = {}
+    for e_a in (30000.0, 55100.0, 63000.0, 90000.0):
+        hot = _foster_days_to_target_gravity(pitch, 22.0, days=12.0, E_a_uptake=e_a)
+        cold = _foster_days_to_target_gravity(pitch, 12.0, days=25.0, E_a_uptake=e_a)
+        out[e_a] = cold / hot
+    return out
+
+
+def test_fosters_temperature_pair_cannot_discriminate_anywhere_in_the_uptake_band(
+    foster_temperature_sweep,
+):
+    """Foster's two temperatures do NOT test this model's temperature response (D-218 §2).
+
+    This is the guard that stops the beat's most quotable line from being read as a pass.
+    Foster gives 3 d at 22 °C and <=10 d at 12 °C for the same three strains, the same wort
+    and the same pitch — a within-source ratio, immune to both the per-cell-mass fork and any
+    species confound, and the only such pair the archive has ever had. The model's ratio is
+    2.21, comfortably inside it, and an earlier draft of D-218 reported exactly that.
+
+    **It means nothing, and this test is why.** The bound is cleared at *every* printed value
+    of ``E_a_uptake``, from 1.59 at the low edge to 2.44 at the high — and cleared against the
+    TIGHTEST reading of the bound, the one that treats Foster's 3 d as exact. A test no
+    in-band configuration can fail is not evidence about the configuration that ships; D-216
+    §10 and D-217 §6 both record that an out-of-band arm tests nothing, and this is the same
+    fact stated about the *literature* rather than about a mutation.
+
+    The 90,000 J/mol arm is the **positive control**: it is out of band (1.43x the high edge)
+    and it DOES fire, which is what proves the predicate can distinguish anything at all.
+    Without it, "everything clears" would be indistinguishable from a broken predicate.
+
+    A RED on the in-band arms names the temperature response gaining reach — the bound
+    becoming informative, which would be news and would license re-opening D-217's refusal.
+    A RED on the control names the opposite: the predicate has gone slack.
+    """
+    baseline = _beer_days_to_target_gravity()
+    assert 5.0 <= baseline <= 7.0, (
+        f"the benchmark wort attenuates in {baseline:.2f} d at the shipped parameters, outside "
+        "§2.2's 5-7 d window. The control failed, so nothing below is attributable"
+    )
+
+    for e_a in (30000.0, 55100.0, 63000.0):
+        ratio = foster_temperature_sweep[e_a]
+        assert ratio < FOSTER_RATIO_BOUND_TIGHTEST, (
+            f"E_a_uptake = {e_a:.0f} J/mol gives a 12/22 °C duration ratio of {ratio:.3f}, which "
+            f"now EXCEEDS Foster's tightest bound of {FOSTER_RATIO_BOUND_TIGHTEST:.2f}. That "
+            "would make the pair discriminating for the first time — D-218 §2's whole point is "
+            "that it is not, and D-217's E_a refusal was left standing on that basis"
+        )
+
+    fires = foster_temperature_sweep[90000.0]
+    assert fires > FOSTER_RATIO_BOUND_TIGHTEST, (
+        f"the out-of-band control at 90,000 J/mol gives {fires:.3f}, which does NOT exceed "
+        f"{FOSTER_RATIO_BOUND_TIGHTEST:.2f}. The predicate can no longer distinguish anything, "
+        "so the 'every in-band value clears' result above is vacuous rather than measured"
+    )
+    assert fires < FOSTER_RATIO_BOUND_LOOSEST, (
+        f"{fires:.3f} exceeds even the LOOSEST reading of the bound "
+        f"({FOSTER_RATIO_BOUND_LOOSEST:.2f}, from d22 > 2 d). Recorded because it bounds what "
+        "the sampling-grid ambiguity in Foster's 3 d could ever be worth: not enough to make an "
+        "in-band value fire"
+    )
+
+
+def test_the_apparent_arrhenius_identity_in_beers_temperature_response_is_a_crossing(
+    foster_temperature_sweep,
+):
+    """The ratio equals the bare Arrhenius factor at the nominal BY COINCIDENCE (D-218 §2).
+
+    At the shipped ``E_a_uptake`` the model's cross-temperature duration ratio (2.212) sits
+    within 0.7 % of ``exp[(E_a/R)(1/T_12 - 1/T_22)]`` = 2.198 — the Arrhenius factor with no
+    model in it at all. That looks like a structural fact: duration inversely proportional to
+    uptake rate, the ferment uptake-limited end to end, nothing else with a temperature
+    dependence in the loop.
+
+    **It is not.** The residual ``ratio / arrhenius`` runs 1.104 -> 1.007 -> 0.986 across the
+    printed band and crosses 1.0 at roughly 58,000 J/mol. The nominal happens to sit 2,900
+    J/mol short of that crossing, which is 9 % of the band's width. So the near-identity is a
+    property of one value, not of the rate law, and a beat that pinned it as a law would be
+    pinning a coincidence — the same trap D-217 §2 named around -90,000 J/mol.
+
+    Asserting the two ENDS is what makes the middle mean something. Without them,
+    ``|residual - 1| < 0.02`` reads as "the model is a bare Arrhenius response"; with them it
+    reads "the model is not, and this is where the two curves cross".
+    """
+    gas_constant = 8.314462618
+    t_cold, t_hot = 273.15 + 12.0, 273.15 + 22.0
+
+    def residual(e_a: float) -> float:
+        arrhenius = float(np.exp((e_a / gas_constant) * (1.0 / t_cold - 1.0 / t_hot)))
+        return float(foster_temperature_sweep[e_a]) / arrhenius
+
+    low, nominal, high = residual(30000.0), residual(55100.0), residual(63000.0)
+
+    assert low > 1.0 and high < 1.0, (
+        f"the residual is {low:.4f} at the band's low edge and {high:.4f} at its high edge. "
+        "D-218 §2 measured 1.104 and 0.986 — a monotone sweep that CROSSES 1.0 inside the band. "
+        "If both are now on one side there is no crossing, and the near-identity at the nominal "
+        "below would be a structural property of the rate law rather than a coincidence"
+    )
+    assert abs(nominal - 1.0) < 0.02, (
+        f"at the shipped E_a_uptake the residual is {nominal:.4f}; D-218 measured 1.0067. The "
+        "nominal sitting within 1 % of the bare Arrhenius factor is what makes the model's "
+        "temperature ratio LOOK like an identity, and §2's finding is that it is a crossing"
+    )
+
+
+def test_the_beer_temperature_ratio_is_pitch_invariant_only_near_the_nominal():
+    """Pitch-invariance of the temperature ratio is local, not structural (D-218 §2).
+
+    Across a 5.6x pitch span — the full width of the per-cell-mass fork, 0.216 to 1.2 g/L —
+    the 12/22 °C duration ratio moves by 0.007 at the shipped ``E_a_uptake`` and by 0.10 at
+    the band's low edge. So the ferment is uptake-limited end to end *near the nominal* and
+    measurably not at the low edge, where the growth phase gets long enough to matter.
+
+    **This is recorded as a defect signature, not a pass.** Real ferments do show a
+    pitch-dependent temperature response; a model whose response is pitch-blind at its shipped
+    value is agreeing with the data for a reason the data does not have. It also bounds what
+    §3's fork can do: the fork moves the pitch 5.6x, and this says that move cannot rescue the
+    temperature response, only the durations.
+
+    Measured on the hourly grid throughout. The 0.007 at the nominal is small but resolved: on
+    a 6-minute grid it reads 0.0070 against the hourly grid's -0.0002, so the hourly reading of
+    *zero* was the quantum and the finer one is what this asserts against.
+    """
+    spans = {}
+    for e_a in (30000.0, 55100.0):
+        ratios = []
+        for pg in (18.0, 100.0):
+            pitch = _foster_pitch_gpl(pg)
+            hot = _foster_days_to_target_gravity(pitch, 22.0, days=12.0, E_a_uptake=e_a)
+            cold = _foster_days_to_target_gravity(pitch, 12.0, days=25.0, E_a_uptake=e_a)
+            ratios.append(cold / hot)
+        spans[e_a] = abs(ratios[0] - ratios[1])
+
+    assert spans[55100.0] < 0.02, (
+        f"at the shipped E_a_uptake a 5.6x pitch change moves the temperature ratio by "
+        f"{spans[55100.0]:.4f}; D-218 measured under 0.01. If this has grown, the response has "
+        "acquired a pitch dependence and §3's fork can no longer be read as moving durations "
+        "only"
+    )
+    assert spans[30000.0] > 0.05, (
+        f"the low band edge moves it by only {spans[30000.0]:.4f}; D-218 measured 0.10, against "
+        f"{spans[55100.0]:.4f} at the nominal. That contrast is what makes the invariance LOCAL. "
+        "If the edge has gone quiet too, the invariance is structural after all and the "
+        "defect-signature reading in this docstring is wrong"
+    )
+
+
+def test_fosters_endpoint_breaks_the_handoff_window_at_every_reading_but_one():
+    """§2.2's 5-7 d window survives in ONE corner, and it is the doubtful one (D-218 §3).
+
+    D-216 §11 asked which anchor to calibrate beer's speed against. Foster answers it on the
+    terms the brief itself sets — same target gravity, a wort within 0.003 SG — and the answer
+    is *faster than the brief*, at every reading. What stops that from being a verdict is that
+    the model needs Foster's cells/mL as a g/L, and the conversion is unsourced and internally
+    inconsistent (:data:`PER_CELL_DRY_MASS_PG`).
+
+    Each row: the ``q_sugar_max`` that puts the model on Foster's 72 h endpoint, and what
+    §2.2's benchmark then reads.
+
+    ======================  =========  ===============  ==========
+    per-cell mass           pitch g/L  ``q_sugar_max``  §2.2 reads
+    ======================  =========  ===============  ==========
+    18 pg (repo wine)           0.216  1.5 = CEILING       2.58 d
+    40 pg (textbook low)        0.480  0.924               3.63 d
+    50 pg                       0.600  0.818               4.00 d
+    100 pg (Tyrell implied)     1.200  0.560             **5.50 d**
+    ======================  =========  ===============  ==========
+
+    Only the last survives 5-7 d, and it is the reading ``beer_generic.yaml`` itself flags as
+    anomalous. **And it survives only because Foster's 3 d is read as exact.** Take the open
+    end of the sampling interval instead (d22 -> 2 d, still consistent with every word in the
+    paper) and the 100 pg row goes to 3.71 d: the window then breaks in all eight bracket
+    cells. That arm is asserted here because it is the whole difference between "one corner
+    survives" and "nothing does".
+
+    **What this test does NOT do is retire the window.** §2.2's benchmark passes today at
+    6.08 d and is untouched. Retiring it means moving ``q_sugar_max``, which D-216 §4 already
+    priced: no value of it reproduces Tyrell's shape, so a rate that satisfies Foster still
+    misses the trajectory. A RED here names one of the pins moving, and the first thing to
+    check is whether the per-cell mass finally got sourced.
+    """
+    from tests.benchmarks.test_milestone1 import TARGET_FG_SG
+
+    assert TARGET_FG_SG == 1.010, (
+        f"the benchmark's target gravity is {TARGET_FG_SG}; Foster's is 1.01 (they cite Parker "
+        "2008). The comparison in this test is only sound while the two agree"
+    )
+
+    verdicts = {}
+    for pg, q in Q_SUGAR_MAX_REACHING_FOSTER.items():
+        pitch = _foster_pitch_gpl(pg)
+        got = _foster_days_to_target_gravity(pitch, 22.0, days=12.0, q_sugar_max=q)
+        if pg == 18.0:
+            assert got > FOSTER_DAYS_TO_FG_AT_22C, (
+                f"at 18 pg/cell the band CEILING q = 1.5 now reaches Foster's endpoint in "
+                f"{got:.4f} d. D-218 measured 3.0417 — a 1.4 % miss, which is what makes this "
+                "reading unreachable in band rather than merely expensive. If it is reachable, "
+                "1.5 stops being a saturation and the row needs re-bisecting"
+            )
+        else:
+            assert got == pytest.approx(FOSTER_DAYS_TO_FG_AT_22C, abs=0.05), (
+                f"q = {q} at {pg:.0f} pg/cell reaches Foster's endpoint in {got:.4f} d, not "
+                f"{FOSTER_DAYS_TO_FG_AT_22C}. The pinned crossing has moved, so every §2.2 "
+                "reading below is against the wrong rate"
+            )
+
+        benchmark = _beer_days_to_target_gravity(q_sugar_max=q)
+        assert benchmark == pytest.approx(HANDOFF_DAYS_AT_FOSTER_RATE[pg], abs=0.05), (
+            f"at {pg:.0f} pg/cell the Foster-matching rate takes §2.2 to {benchmark:.4f} d; "
+            f"D-218 measured {HANDOFF_DAYS_AT_FOSTER_RATE[pg]}"
+        )
+        verdicts[pg] = 5.0 <= benchmark <= 7.0
+
+    assert verdicts == {18.0: False, 40.0: False, 50.0: False, 100.0: True}, (
+        f"the window's survival per per-cell reading is now {verdicts}. D-218 measured exactly "
+        "one survivor, at the 100 pg reading beer_generic.yaml calls ~2x textbook. A change here "
+        "is a change to the ANSWER of D-216 §11, not to a number"
+    )
+
+    # The open end of Foster's sampling interval, on the one row that survived above.
+    reached = _foster_days_to_target_gravity(
+        _foster_pitch_gpl(100.0), 22.0, days=12.0, q_sugar_max=0.8971
+    )
+    assert reached == pytest.approx(2.0, abs=0.05), (
+        f"the 2 d arm reaches Foster's target in {reached:.4f} d, not 2.0 — re-bisect before "
+        "reading the benchmark below"
+    )
+    open_end = _beer_days_to_target_gravity(q_sugar_max=0.8971)
+    assert not 5.0 <= open_end <= 7.0 and open_end == pytest.approx(3.71, abs=0.05), (
+        f"reading Foster's endpoint at the open end of its sampling interval takes §2.2 to "
+        f"{open_end:.4f} d; D-218 measured 3.71, outside 5-7. If this is now inside the window, "
+        "the single surviving corner in the table above is no longer conditional on treating a "
+        "72 h SAMPLE as an exact duration, and D-218 §3's central caveat is void"
+    )
