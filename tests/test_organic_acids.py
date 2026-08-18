@@ -2345,15 +2345,23 @@ PER_CELL_DRY_MASS_PG: dict[str, float] = {
 #: reading of the per-cell dry mass. Bisected on the shipped model on the hourly grid, and
 #: verified live by the test below rather than trusted.
 #:
-#: **1.5 is the printed band's CEILING, not a crossing** — at 18 pg/cell no in-band value
-#: reaches the endpoint at all (the ceiling gets to 3.04 d, missing by 1.4 %). Recorded as a
-#: saturation so a later beat cannot read it as a fitted value; cf. D-177.
-Q_SUGAR_MAX_REACHING_FOSTER: dict[float, float] = {
-    18.0: 1.5,
-    40.0: 0.9242,
-    50.0: 0.8176,
-    100.0: 0.5602,
-}
+#: **18 pg/cell is deliberately NOT in here** — see
+#: :data:`Q_SUGAR_MAX_UNREACHABLE_AT_18_PG`. Every value in this dict is a crossing; a
+#: saturation in the same container would be a value a later beat could iterate over and
+#: read as fitted, which is D-177's lesson at the level of the data structure rather than
+#: the prose.
+Q_SUGAR_MAX_REACHING_FOSTER: dict[float, float] = {40.0: 0.9242, 50.0: 0.8176, 100.0: 0.5602}
+
+#: At 18 pg/cell — the repo's own wine conversion — **no in-band value reaches Foster's
+#: endpoint at all.** The printed band's CEILING of 1.5 still needs 3.04 d against a
+#: published ≤3, missing by 1.4 %. This is a saturation, not a crossing.
+Q_SUGAR_MAX_UNREACHABLE_AT_18_PG = 1.5
+
+#: The 2 d arm on the 100 pg row: the ``q_sugar_max`` reaching Foster's target at the OPEN
+#: end of its sampling interval (:data:`FOSTER_SAMPLE_HOURS`) rather than at 72 h. It is the
+#: whole difference between "one corner of the bracket survives" and "none does", so it is
+#: named here rather than left as a literal in the one test that reads it.
+Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG = 0.8971
 
 #: What §2.2's benchmark then reads, per reading. Only one lands inside 5-7 d.
 HANDOFF_DAYS_AT_FOSTER_RATE: dict[float, float] = {
@@ -2370,12 +2378,24 @@ def _foster_pitch_gpl(pg_per_cell: float) -> float:
 
 
 def _foster_days_to_target_gravity(
-    pitch_gpl: float, celsius: float, *, days: float = 30.0, **overrides: float
+    pitch_gpl: float,
+    celsius: float,
+    *,
+    days: float = 30.0,
+    per_hour: int = 1,
+    **overrides: float,
 ) -> float:
-    """Days for Foster's 12.5 °P wort to reach 1.010 apparent, on a FIXED hourly grid.
+    """Days for Foster's 12.5 °P wort to reach 1.010 apparent, on a FIXED grid.
 
     Reuses the benchmark's own gravity construction and target, exactly as
     :func:`_beer_days_to_target_gravity` does, so the two are commensurable.
+
+    ``per_hour`` sets the grid's resolution, and it is load-bearing rather than cosmetic
+    (D-214's lesson, one turn on). The reported duration is quantised to ``1/(24*per_hour)``
+    days, so a RATIO of two durations carries a quantum of roughly
+    ``(1 + ratio) / (24 * per_hour * d_hot)``. On the hourly grid at the heavy pitch that is
+    ~0.04 — larger than several of the effects §12 measures. Each caller below states the
+    resolution its claim needs.
     """
     from tests.benchmarks.test_milestone1 import TARGET_FG_SG, _apparent_gravity_series
 
@@ -2399,7 +2419,8 @@ def _foster_days_to_target_gravity(
     for name, value in overrides.items():
         assert name in params, f"{name} is not a compiled parameter"
         params[name] = value
-    grid = np.linspace(0.0, compiled.t_span_h[1], int(compiled.t_span_h[1]) + 1)
+    steps = int(compiled.t_span_h[1] * per_hour)
+    grid = np.linspace(0.0, compiled.t_span_h[1], steps + 1)
     traj = simulate(compiled.process_set, params, compiled.y0, compiled.t_span_h, t_eval=grid)
     assert traj.success, traj.message
     apparent = _apparent_gravity_series(traj, FOSTER_OG_SG, s0)
@@ -2407,20 +2428,41 @@ def _foster_days_to_target_gravity(
     return float(traj.t[reached[0]] / 24.0) if reached.size else float("inf")
 
 
-@pytest.fixture(scope="module")
-def foster_temperature_sweep() -> dict[float, float]:
-    """``E_a_uptake`` -> the model's 12 °C / 22 °C duration ratio on Foster's wort.
+#: The grid the temperature guards run on. Six minutes, not an hour, and the difference
+#: decides whether two of the three claims below are measurements or noise: at the heavy
+#: pitch the hourly grid's quantum on a duration RATIO is ~0.04, and the residual's distance
+#: from 1.0 at the band's high edge is 0.002.
+FOSTER_GRID_PER_HOUR = 10
 
-    Module-scoped because two tests read it and each entry costs two integrations. The heavy
-    per-cell reading (1.2 g/L) is used throughout: it is the fastest to integrate, and the
-    pitch-invariance test below is what licenses reading one pitch for all of them.
+
+@pytest.fixture(scope="module")
+def foster_temperature_sweep() -> dict[tuple[float, float], float]:
+    """(pg/cell, ``E_a_uptake``) -> the model's 12 °C / 22 °C duration ratio on Foster's wort.
+
+    Module-scoped because three tests read it and each entry costs two integrations.
+
+    **Both per-cell readings are swept, and which one each claim is read on matters.** The
+    bound in §3 is cleared by ~0.9 at the heavy pitch, hundreds of times the grid quantum, so
+    it is safe anywhere. The residual crossing is not: at 1.2 g/L the residual only reaches
+    0.998 at the band's high edge — a margin of 0.002 against a 6-minute quantum of 0.004, so
+    the crossing is **not resolved at that pitch**. At 0.216 g/L the same edge reads 0.987
+    against a quantum of 0.002, and it is. The crossing test therefore runs on the light
+    pitch; it is the pitch where the claim can be measured rather than the pitch that is
+    cheapest.
     """
-    pitch = _foster_pitch_gpl(100.0)
     out = {}
-    for e_a in (30000.0, 55100.0, 63000.0, 90000.0):
-        hot = _foster_days_to_target_gravity(pitch, 22.0, days=12.0, E_a_uptake=e_a)
-        cold = _foster_days_to_target_gravity(pitch, 12.0, days=25.0, E_a_uptake=e_a)
-        out[e_a] = cold / hot
+    for pg in (18.0, 100.0):
+        pitch = _foster_pitch_gpl(pg)
+        for e_a in (30000.0, 55100.0, 63000.0, 90000.0):
+            if pg == 18.0 and e_a == 90000.0:
+                continue  # only the bound test reads the control arm, and it runs heavy
+            hot = _foster_days_to_target_gravity(
+                pitch, 22.0, days=12.0, per_hour=FOSTER_GRID_PER_HOUR, E_a_uptake=e_a
+            )
+            cold = _foster_days_to_target_gravity(
+                pitch, 12.0, days=25.0, per_hour=FOSTER_GRID_PER_HOUR, E_a_uptake=e_a
+            )
+            out[(pg, e_a)] = cold / hot
     return out
 
 
@@ -2457,7 +2499,7 @@ def test_fosters_temperature_pair_cannot_discriminate_anywhere_in_the_uptake_ban
     )
 
     for e_a in (30000.0, 55100.0, 63000.0):
-        ratio = foster_temperature_sweep[e_a]
+        ratio = foster_temperature_sweep[(100.0, e_a)]
         assert ratio < FOSTER_RATIO_BOUND_TIGHTEST, (
             f"E_a_uptake = {e_a:.0f} J/mol gives a 12/22 °C duration ratio of {ratio:.3f}, which "
             f"now EXCEEDS Foster's tightest bound of {FOSTER_RATIO_BOUND_TIGHTEST:.2f}. That "
@@ -2465,7 +2507,7 @@ def test_fosters_temperature_pair_cannot_discriminate_anywhere_in_the_uptake_ban
             "that it is not, and D-217's E_a refusal was left standing on that basis"
         )
 
-    fires = foster_temperature_sweep[90000.0]
+    fires = foster_temperature_sweep[(100.0, 90000.0)]
     assert fires > FOSTER_RATIO_BOUND_TIGHTEST, (
         f"the out-of-band control at 90,000 J/mol gives {fires:.3f}, which does NOT exceed "
         f"{FOSTER_RATIO_BOUND_TIGHTEST:.2f}. The predicate can no longer distinguish anything, "
@@ -2490,11 +2532,17 @@ def test_the_apparent_arrhenius_identity_in_beers_temperature_response_is_a_cros
     uptake rate, the ferment uptake-limited end to end, nothing else with a temperature
     dependence in the loop.
 
-    **It is not.** The residual ``ratio / arrhenius`` runs 1.104 -> 1.007 -> 0.986 across the
-    printed band and crosses 1.0 at roughly 58,000 J/mol. The nominal happens to sit 2,900
-    J/mol short of that crossing, which is 9 % of the band's width. So the near-identity is a
-    property of one value, not of the rate law, and a beat that pinned it as a law would be
-    pinning a coincidence — the same trap D-217 §2 named around -90,000 J/mol.
+    **It is not.** The residual ``ratio / arrhenius`` runs 1.108 -> 1.012 -> 0.987 across the
+    printed band and crosses 1.0 inside it. The nominal sits short of that crossing, so the
+    near-identity is a property of one value, not of the rate law, and a beat that pinned it
+    as a law would be pinning a coincidence — the same trap D-217 §2 named around -90,000
+    J/mol.
+
+    **Read at the LIGHT pitch, and that is not a free choice.** The crossing's location moves
+    with the pitch (~58 kJ/mol at 0.216 g/L, ~62 kJ/mol at 1.2 g/L), and at the heavy pitch
+    the residual only reaches 0.998 at the band's high edge — inside the grid's own quantum,
+    so the crossing is unresolvable there however the assert is written. See
+    :func:`foster_temperature_sweep`.
 
     Asserting the two ENDS is what makes the middle mean something. Without them,
     ``|residual - 1| < 0.02`` reads as "the model is a bare Arrhenius response"; with them it
@@ -2505,24 +2553,32 @@ def test_the_apparent_arrhenius_identity_in_beers_temperature_response_is_a_cros
 
     def residual(e_a: float) -> float:
         arrhenius = float(np.exp((e_a / gas_constant) * (1.0 / t_cold - 1.0 / t_hot)))
-        return float(foster_temperature_sweep[e_a]) / arrhenius
+        return float(foster_temperature_sweep[(18.0, e_a)]) / arrhenius
 
     low, nominal, high = residual(30000.0), residual(55100.0), residual(63000.0)
 
     assert low > 1.0 and high < 1.0, (
         f"the residual is {low:.4f} at the band's low edge and {high:.4f} at its high edge. "
-        "D-218 §2 measured 1.104 and 0.986 — a monotone sweep that CROSSES 1.0 inside the band. "
-        "If both are now on one side there is no crossing, and the near-identity at the nominal "
-        "below would be a structural property of the rate law rather than a coincidence"
+        "D-218 §3 measured 1.108 and 0.987 — a sweep that CROSSES 1.0 inside the band. If both "
+        "are now on one side there is no crossing, and the near-identity at the nominal below "
+        "would be a structural property of the rate law rather than a coincidence"
+    )
+    assert min(low - 1.0, 1.0 - high) > 0.005, (
+        f"the crossing's margins are {low - 1.0:.4f} and {1.0 - high:.4f}; D-218 measured 0.108 "
+        "and 0.013. The 6-minute grid's quantum on this ratio is ~0.002, so a margin under "
+        "0.005 is not resolved and the "
+        "assert above would be reading the grid rather than the model"
     )
     assert abs(nominal - 1.0) < 0.02, (
-        f"at the shipped E_a_uptake the residual is {nominal:.4f}; D-218 measured 1.0067. The "
+        f"at the shipped E_a_uptake the residual is {nominal:.4f}; D-218 measured 1.0119. The "
         "nominal sitting within 1 % of the bare Arrhenius factor is what makes the model's "
-        "temperature ratio LOOK like an identity, and §2's finding is that it is a crossing"
+        "temperature ratio LOOK like an identity, and §3's finding is that it is a crossing"
     )
 
 
-def test_the_beer_temperature_ratio_is_pitch_invariant_only_near_the_nominal():
+def test_the_beer_temperature_ratio_is_pitch_invariant_only_near_the_nominal(
+    foster_temperature_sweep,
+):
     """Pitch-invariance of the temperature ratio is local, not structural (D-218 §2).
 
     Across a 5.6x pitch span — the full width of the per-cell-mass fork, 0.216 to 1.2 g/L —
@@ -2536,24 +2592,20 @@ def test_the_beer_temperature_ratio_is_pitch_invariant_only_near_the_nominal():
     §3's fork can do: the fork moves the pitch 5.6x, and this says that move cannot rescue the
     temperature response, only the durations.
 
-    Measured on the hourly grid throughout. The 0.007 at the nominal is small but resolved: on
-    a 6-minute grid it reads 0.0070 against the hourly grid's -0.0002, so the hourly reading of
-    *zero* was the quantum and the finer one is what this asserts against.
+    **The hourly grid could not have measured this and an earlier draft tried.** On it the
+    nominal spread reads -0.0002, which is not a small number but a number below the quantum;
+    on the 6-minute grid this fixture uses it reads +0.007. A guard asserting "under 0.02" on
+    the hourly grid would have stayed green while the true spread grew past its own threshold.
     """
-    spans = {}
-    for e_a in (30000.0, 55100.0):
-        ratios = []
-        for pg in (18.0, 100.0):
-            pitch = _foster_pitch_gpl(pg)
-            hot = _foster_days_to_target_gravity(pitch, 22.0, days=12.0, E_a_uptake=e_a)
-            cold = _foster_days_to_target_gravity(pitch, 12.0, days=25.0, E_a_uptake=e_a)
-            ratios.append(cold / hot)
-        spans[e_a] = abs(ratios[0] - ratios[1])
+    spans = {
+        e_a: abs(foster_temperature_sweep[(18.0, e_a)] - foster_temperature_sweep[(100.0, e_a)])
+        for e_a in (30000.0, 55100.0)
+    }
 
     assert spans[55100.0] < 0.02, (
         f"at the shipped E_a_uptake a 5.6x pitch change moves the temperature ratio by "
-        f"{spans[55100.0]:.4f}; D-218 measured under 0.01. If this has grown, the response has "
-        "acquired a pitch dependence and §3's fork can no longer be read as moving durations "
+        f"{spans[55100.0]:.4f}; D-218 measured 0.007. If this has grown, the response has "
+        "acquired a pitch dependence and §4's fork can no longer be read as moving durations "
         "only"
     )
     assert spans[30000.0] > 0.05, (
@@ -2605,23 +2657,31 @@ def test_fosters_endpoint_breaks_the_handoff_window_at_every_reading_but_one():
         "2008). The comparison in this test is only sound while the two agree"
     )
 
-    verdicts = {}
+    # The saturated row first: it is the one that is NOT a crossing, and keeping it out of
+    # the loop below is what keeps that dict free of values a later beat could read as fitted.
+    at_ceiling = _foster_days_to_target_gravity(
+        _foster_pitch_gpl(18.0), 22.0, days=12.0, q_sugar_max=Q_SUGAR_MAX_UNREACHABLE_AT_18_PG
+    )
+    assert at_ceiling > FOSTER_DAYS_TO_FG_AT_22C, (
+        f"at 18 pg/cell the band CEILING q = {Q_SUGAR_MAX_UNREACHABLE_AT_18_PG} now reaches "
+        f"Foster's endpoint in {at_ceiling:.4f} d. D-218 measured 3.0417 — a 1.4 % miss, which "
+        "is what makes this reading unreachable in band rather than merely expensive. If it is "
+        "reachable, 1.5 stops being a saturation and the row needs bisecting for a real crossing"
+    )
+    verdicts = {
+        18.0: 5.0
+        <= _beer_days_to_target_gravity(q_sugar_max=Q_SUGAR_MAX_UNREACHABLE_AT_18_PG)
+        <= 7.0
+    }
+
     for pg, q in Q_SUGAR_MAX_REACHING_FOSTER.items():
         pitch = _foster_pitch_gpl(pg)
         got = _foster_days_to_target_gravity(pitch, 22.0, days=12.0, q_sugar_max=q)
-        if pg == 18.0:
-            assert got > FOSTER_DAYS_TO_FG_AT_22C, (
-                f"at 18 pg/cell the band CEILING q = 1.5 now reaches Foster's endpoint in "
-                f"{got:.4f} d. D-218 measured 3.0417 — a 1.4 % miss, which is what makes this "
-                "reading unreachable in band rather than merely expensive. If it is reachable, "
-                "1.5 stops being a saturation and the row needs re-bisecting"
-            )
-        else:
-            assert got == pytest.approx(FOSTER_DAYS_TO_FG_AT_22C, abs=0.05), (
-                f"q = {q} at {pg:.0f} pg/cell reaches Foster's endpoint in {got:.4f} d, not "
-                f"{FOSTER_DAYS_TO_FG_AT_22C}. The pinned crossing has moved, so every §2.2 "
-                "reading below is against the wrong rate"
-            )
+        assert got == pytest.approx(FOSTER_DAYS_TO_FG_AT_22C, abs=0.05), (
+            f"q = {q} at {pg:.0f} pg/cell reaches Foster's endpoint in {got:.4f} d, not "
+            f"{FOSTER_DAYS_TO_FG_AT_22C}. The pinned crossing has moved, so every §2.2 "
+            "reading below is against the wrong rate"
+        )
 
         benchmark = _beer_days_to_target_gravity(q_sugar_max=q)
         assert benchmark == pytest.approx(HANDOFF_DAYS_AT_FOSTER_RATE[pg], abs=0.05), (
@@ -2638,13 +2698,16 @@ def test_fosters_endpoint_breaks_the_handoff_window_at_every_reading_but_one():
 
     # The open end of Foster's sampling interval, on the one row that survived above.
     reached = _foster_days_to_target_gravity(
-        _foster_pitch_gpl(100.0), 22.0, days=12.0, q_sugar_max=0.8971
+        _foster_pitch_gpl(100.0),
+        22.0,
+        days=12.0,
+        q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG,
     )
     assert reached == pytest.approx(2.0, abs=0.05), (
         f"the 2 d arm reaches Foster's target in {reached:.4f} d, not 2.0 — re-bisect before "
         "reading the benchmark below"
     )
-    open_end = _beer_days_to_target_gravity(q_sugar_max=0.8971)
+    open_end = _beer_days_to_target_gravity(q_sugar_max=Q_SUGAR_MAX_REACHING_FOSTER_AT_2D_100PG)
     assert not 5.0 <= open_end <= 7.0 and open_end == pytest.approx(3.71, abs=0.05), (
         f"reading Foster's endpoint at the open end of its sampling interval takes §2.2 to "
         f"{open_end:.4f} d; D-218 measured 3.71, outside 5-7. If this is now inside the window, "

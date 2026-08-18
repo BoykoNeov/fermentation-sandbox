@@ -31086,16 +31086,23 @@ S1 gives the archive its first same-yeast two-temperature pair, the exact shape 
 
 | `E_a_uptake` | bare Arrhenius factor | model ratio @ 0.216 g/L | model ratio @ 1.2 g/L | vs the tightest bound (3.33) |
 |---|---|---|---|---|
-| 30,000 (low edge) | 1.535 | 1.695 | 1.593 | clears |
-| **55,100 (shipped)** | **2.198** | **2.212** | **2.213** | **clears** |
-| 63,000 (high edge) | 2.460 | 2.427 | 2.443 | clears |
-| 90,000 (out of band, 1.43×) | 3.619 | 3.335 | 3.526 | **fires** |
+| 30,000 (low edge) | 1.535 | 1.701 | 1.605 | clears |
+| **55,100 (shipped)** | **2.198** | **2.224** | **2.217** | **clears** |
+| 63,000 (high edge) | 2.460 | 2.429 | 2.456 | clears |
+| 90,000 (out of band, 1.43×) | 3.619 | 3.334 | 3.534 | **fires** |
+
+All on a **6-minute** grid, and that is not a detail. A duration read off a grid is quantised, so
+a *ratio* of two durations carries a quantum of about `(1 + ratio) / (24 · per_hour · d_hot)` —
+**~0.04 on an hourly grid at the heavy pitch**, which is larger than two of the three effects
+below. [[feedback-read-a-fast-curve-on-a-fixed-grid]]
 
 The first value that fires is **out of band**. D-216 §10 and D-217 §6 both record that an out-of-band mutation arm tests nothing; this is the same fact stated about the *literature*. And the bound is looser still than 3.33: by §2 both of S1's endpoints are ceilings, so an upper bound on `d12/d22` needs a **lower** bound on `d22`, which the paper does not give — take the open end of the sampling interval and the bound is 10/2 = 5.0. The 90,000 arm ships as the guard's **positive control**, because without it "everything clears" is indistinguishable from a broken predicate. [[feedback-a-null-result-needs-a-positive-control]]
 
 **So D-217's `E_a_uptake` refusal needs no re-opening**, and the earlier draft's contrary claim — that the error is monotone in temperature and the activation energy is therefore the defect — is **refuted, not softened**. It rested entirely on the withdrawn row.
 
-**The near-identity at the nominal is a crossing, not a law.** At the shipped value the ratio (2.212) sits within 0.7 % of the bare Arrhenius factor with no model in it (2.198), which reads as a structural fact: the ferment uptake-limited end to end, duration inversely proportional to rate. Sweeping shows otherwise — the residual `ratio / arrhenius` runs 1.104 → 1.069 → 1.029 → **1.007** → 0.996 → 0.986 and crosses 1.0 at ≈58,000 J/mol. The nominal sits 2,900 J/mol short of that crossing, 9 % of the band's width. Pinning the identity as a law would have pinned a coincidence — the same trap D-217 §2 named around −90,000 J/mol, one beat later and in the opposite direction.
+**The near-identity at the nominal is a crossing, not a law.** At the shipped value the ratio sits within ~1 % of the bare Arrhenius factor with no model in it, which reads as a structural fact: the ferment uptake-limited end to end, duration inversely proportional to rate. Sweeping shows otherwise. At **0.216 g/L** the residual `ratio / arrhenius` runs **1.108 → 1.012 → 0.987** across the printed band and crosses 1.0 at ≈58,000 J/mol, so the nominal sits short of a crossing rather than on a law. Pinning the identity would have pinned a coincidence — the same trap D-217 §2 named around −90,000 J/mol, one beat later and in the opposite direction.
+
+**Which pitch that series is read on is load-bearing, and a first draft of this record got it wrong.** The crossing *moves with the pitch* — ≈58 kJ/mol at 0.216 g/L, ≈62 kJ/mol at 1.2 g/L — and at the heavy pitch it is **not resolvable at all**: the residual only reaches 0.9982 at the band's high edge, a margin of 0.0018 against a 6-minute quantum of 0.0044. A guard asserting the crossing there would have been reading the grid. The shipped guard therefore runs on the **light** pitch, where the same edge reads 0.9874 against a quantum of 0.0024, and it asserts the margins exceed the quantum before it asserts the crossing. The earlier draft quoted the light-pitch series beside a heavy-pitch guard; both halves were real numbers and the pairing was not.
 
 **Pitch-invariance is local, and it is a defect signature rather than a pass.** Across the fork's full 5.6× pitch span the ratio moves 0.007 at the nominal and 0.10 at the low band edge. Real ferments do show a pitch-dependent temperature response; a model whose response is pitch-blind at its shipped value is agreeing with a bound for a reason the data does not have. **The apparent perfect invariance was the grid.** On the hourly grid the nominal spread reads −0.0002, which is below the 1/24 d quantum; on a 6-minute grid it reads +0.0070. The guard asserts the finer number. [[feedback-read-a-fast-curve-on-a-fixed-grid]]
 
@@ -31144,8 +31151,10 @@ Not the rate scale, and not the temperature response.
 | `E_a_uptake` → 60,000 | green | green | green | green |
 | `q_sugar_max` → 0.6 (**designed GREEN**) | green | green | green | green |
 | `E_a_growth` → 30,000 (low edge) | green | **RED** | **RED** | **RED** |
-| `mu_max` → 0.040 (high edge) | green | **RED** | green | **RED** |
+| `mu_max` → 0.040 (high edge) | green | green | green | **RED** |
 | `K_repression` → 5.0 (high edge) | green | green | green | **RED** |
+
+The `mu_max` row is worth one sentence because it **changed under review**. On the first draft's hourly grid it also reddened the crossing guard, which read as the growth rate having reach into the temperature response. On the 6-minute grid it does not: that RED was the quantum. A mutation matrix is only as trustworthy as the resolution it was run at, and a spurious RED is as misleading as a missing one — it invents a coupling for a later beat to chase.
 
 Every guard except the bound has a distinct RED signature, and the bound's column is empty **by construction** — that column *is* §3's finding, and its positive control lives inside the test. Two arms are worth reading rather than skipping. `E_a_uptake` → 60,000 moves nothing, which is D-217 §1's decoupling reappearing: S1's 22 °C is only 2 °C off `T_ref` and §2.2 sits exactly on it. And `E_a_growth` is the arm that breaks the crossing and the invariance while leaving the bound alone — so what holds those two properties in place is the **growth** term's temperature dependence, not uptake's. A first pass used `E_a_growth` → 0, which is out of band and died in pydantic before the model ran; that is the third time this harness fact has cost an arm (D-216 §10, D-217 §6), so it is repeated here rather than fixed silently.
 

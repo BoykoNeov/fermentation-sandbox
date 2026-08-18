@@ -29,9 +29,9 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-17)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-217**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1817 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
+## Status (2026-08-18)
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-218**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1821 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
@@ -247,6 +247,23 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   0.0449 at 15 °C, **exactly 0 at 20 °C**. Tyrell's tube temp is **NOT PRINTED** — a FILL temp D-207 promoted;
   §3.2 **vindicates** it (its ⚠ is GROUNDS, not value) so **never "fix" it**; D-216's refusal STANDS.
   → `.claude/memory/prohibitions/beer-uptake-temperature-sensitivity.md`
+
+- **Which yardstick beer's SPEED is calibrated against (D-218)** — **SEARCHED AND ADJUDICATED, nothing built.**
+  D-216 §11's open question is **answered on the literature and now open on a CONVERSION FACTOR.** Foster 2022
+  (*Front. Microbiol.* 13:747546) is the first source carrying the whole tuple — 12.5 °P (within 0.003 SG of
+  §2.2's wort), a **counted** pitch, two temps for the **same three Beer 1 strains**, same 1.010 target (Parker
+  2008 sources it, so the brief's **finish line** is corroborated; its **duration** is not). Every third-party
+  endpoint is at or faster than 5-7 d's fast edge. **THIS REPO SHIPS TWO PER-CELL DRY MASSES 5.6× APART** —
+  18 pg/cell in the wine validation files, ~100 pg implied by `beer_generic.yaml`; D-216 §7's "~2× textbook"
+  understates it (hence the **Flags**). Bracketed over both readings **and** both ends of Foster's sampling
+  interval: the window survives in **1 of 8 cells**, needing the anomalous reading **and** a 72 h SAMPLE read
+  as exact. At that reading the **shipped** model is **11 % off** a published endpoint, untouched.
+  **Do NOT retire §2.2's window on this** — a rate satisfying Foster finishes a day early against both measured
+  tails while still missing both day 2s (D-216 §4 unchanged). **Never cite Foster's pair as a temperature test**:
+  the bound is cleared by the ENTIRE printed `E_a_uptake` band and first fires 1.43× out — so **D-217's refusal
+  needs no re-opening**, and the near-equality of the ratio to the bare Arrhenius factor is a **CROSSING** at
+  ≈58 kJ/mol, not a law. **Next measurement = source the per-cell dry mass** (load-bearing in 3 places).
+  → `.claude/memory/prohibitions/beer-speed-yardstick.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
