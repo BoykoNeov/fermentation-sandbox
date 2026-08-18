@@ -30,8 +30,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-18)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-220**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1833 + 5 xfail** (3 are D-188 Herzan; **2 are D-215's own, deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-221**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1833 + 6 xfail** (3 D-188 Herzan; 2 D-215's own; **1 is §2.2's BEER criterion, D-221 — deliberate**). **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
 in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
@@ -283,6 +283,15 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   = a **LEVEL** error ⇒ **D-217 VINDICATED**; §2.2 HIDES it. **30 °C is a CROSSING** (measured E_a collapses
   49.5→17.9, model holds 55.5→53.7), never a validation nor a reading of `E_a_uptake`. D-218's day-1-2 peak
   is **temperature-conditional** — model peaks later still. → `.claude/memory/prohibitions/beer-second-measured-course.md`
+
+- **§2.2's BEER criterion is now 15 °C and an xfail (D-221)** — **SETTLED, no value moved.** The 5-7 d duration is REAL and
+  the 20 °C it was paired with is not, so only `conditions` moved; window untouched, Foster's band sits INSIDE it. Engine
+  **9.00 d**. **D-216 §6's decoupling lever is DEAD** — `E_a_uptake` was free only because the anchors sat at DIFFERENT
+  temperatures; 15 °C is Tyrell's exactly, so 0.0000 d → **1.75 d against a 2.0 d window** (growth 0.2917). No magnitude
+  argument survives. The conflict **INVERTS**: at 20 °C the criterion forbade a faster engine, at 15 °C it demands one
+  (q 0.425-0.621 → 0.667-1.017) — a MAGNITUDE question now, never a direction one. **D-216's refusal of 1.397 SURVIVES**
+  (outside across the whole `E_a` band). D-218 §3 / D-219 §5c **INVERT**: the surviving corner moves to the SETTLED 40 pg
+  (5.42 d), CONDITIONAL on `E_a` ≥ 40,165 (69 % of band). → `.claude/memory/prohibitions/beer-criterion-temperature.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
