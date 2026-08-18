@@ -31929,7 +31929,7 @@ Nine commits probed in git worktrees, same scenario, same probe, package importe
 
 Against Wang, Frank & Steinhaus 2024 Table 1's beer means — 30.0 (n=73), 9.6 (n=78), 10.3 (n=64), 25.7 (n=92) — **D-99 reproduced all four to within 0.5 %.** D-211 multiplied every one by 2.87, D-222 halved it back to 1.68, and neither record mentions higher alcohols at all (grepped, both). Ethyl acetate is untouched by both (21.32 → 21.28 → 21.31) and moves only at D-223.
 
-**The wine control**: `mu_max` is per medium, so wine never moved, and it still lands its own Wang means — isobutanol 32.997 against 33.0, 2-phenylethanol 28.713 against 28.7. That is what makes this a beer defect with a mechanism rather than a drift in the shared Process.
+**The wine control**, all five pools rather than the two the first draft scored: propan-1-ol 24.014 / 24.0, isobutanol 32.997 / 33.0, 2-methylbutan-1-ol 70.140 / 70.1, isoamyl alcohol 170.539 / 172.0, 2-phenylethanol 28.713 / 28.7 — every one inside 0.85 %. `mu_max` is per medium, so wine never moved, and it still lands its own Wang means. That is what makes this a beer defect with a mechanism rather than a drift in the shared Process, and it is now a test rather than a paragraph.
 
 ### 4. The mechanism, and why the two halves separate cleanly
 
@@ -31988,6 +31988,8 @@ Two things the joint count shows that no marginal could. First, **a third of dra
 
 D-99's five bands are ×0.3/×3 (propanol ×0.2/×5) of a centre 2.05× below the nominal shipped in the same commit — `8.4e-5/0.3 = 8.4e-4/3 = 2.8e-4` against a shipped `5.72e-4`, and the same arithmetic in all five entries. Both halves landed at 955ebbc (checked with `git log -S`), so this is not a later nominal moving away from its band; the band was drafted at one k, the nominal was then fitted to land its published mean, and the edges were left [[feedback-pin-the-band-not-the-nominal]]. The multipliers actually in force were ×0.145/×1.45.
 
+**Wine's five do NOT carry the error, and that was checked rather than assumed.** 955ebbc shipped both media's five constants in one commit with the same note text, and wine's levels being right says nothing about wine's multipliers — levels and multipliers are different claims. Measured: wine's are ×0.3/×3 (and ×0.2/×4 for its own propanol, which its note says), correct to 1.5 %. So this is **one draughting error in one file**, which is a stronger statement than the first draft could make, and the guard is parametrized over both media so the question cannot be re-asked by assumption [[feedback-grep-finds-claims-not-guards]].
+
 Two readings, and the loser is named rather than averaged in:
 
 * **SHIPPED — set the edges to the stated multiple of the corrected nominal.** The band then spans 0.3-3× the published mean, i.e. 9-90 mg/L for isoamyl alcohol, which is what the note has claimed since D-99. This is the only reading in which the shipped numbers and the shipped words agree.
@@ -32019,6 +32021,12 @@ Two hardenings the guards needed and did not have in the first pass, both the sa
 * **The band-edge arms READ their edges** from `beer_generic.yaml` instead of carrying `0.053` / `0.634` as literals. Both bands were rebuilt inside the last three records (D-222 rebuilt `mu_max`'s, D-223 rebuilt `q_sugar_max`'s), so a literal would silently become an *interior* point the next time either widened, while the test's name went on claiming the edge. The measured edges are still asserted, so a band that moves fails by name rather than quietly weakening the arm.
 * **The seven targets are checked against the sentence that specifies them.** Each appears verbatim in its own parameter's `conditions:` field and the test asserts that, rather than standing as a second copy free to diverge — the D-158 discipline of recomputing from the seam.
 
+And three more the follow-up added, each closing a surface the first pass could not see:
+
+* `test_the_ehrlich_bands_are_the_multiple_of_their_nominal_their_own_notes_state` is **parametrized over both media**, because a guard is only as broad as the registry it names.
+* `test_wine_also_lands_the_five_ehrlich_levels_its_constants_are_defined_by` — the control this record's argument rests on, as a guard rather than a paragraph, and over all five pools.
+* `test_beers_solventy_descriptor_axis_changed_owner_and_fell_at_d224` — §9's descriptor consequence.
+
 **Falsification: three arms, each with a designed GREEN, each arm's RED set written into the harness before it ran, restore verified by SHA-256 between arms** [[feedback-verify-the-restore-between-mutation-arms]].
 
 | arm | predicted RED | actual RED | |
@@ -32039,6 +32047,7 @@ Process note, stated because it is a rule this project has: there is **no `PRERE
 
 * **D-223's funding constraint is exercised by a much thinner slice of the band.** Its joint-corner flip fraction — the share of the `ethyl_acetate_eq` × `acetic_acid_typical` band where beer's equilibrium sits ABOVE its packaged ester, so the formation half runs and the constraint is what stops `Byp` going negative — falls **5.37 % → 0.0767 %**, about 1 draw in 1300 rather than 1 in 19. The corner still FORMS (+0.518 mg/L, where it was +4.697) so the guard still has something to hold, and the integrated corner arm still ends at `Byp` ≥ 0 with the ester rising only by what hydrolysis funded it (+0.004 mg/L over 166 d, where D-223 measured +0.048). **This is the reason the third ester option was refused**: anchoring ethyl acetate at Wang's published 23.7 mg/L beer mean instead of the 10-30 mid-band 20 takes the flip fraction to exactly **0.00 %** and would leave D-223's constraint invisible to the suite again — the failure its own §6 P5 recorded. D-176 gives the independent reason: that survey mean carries a sour-beer tail.
 * **The calibration frame's temperature is load-bearing and is now written down rather than implied.** `E_a_esters` is 200 kJ/mol, so the same run at 15 °C lands ethyl acetate at **6.10 mg/L, below its own 10 mg/L floor**, against 20.06 at 20 °C — a 3.3× swing over 5 °C. The higher alcohols barely move (30.1 → 27.9). 20 °C is a typical ale ferment; the 15 °C in §2.2's DURATION criterion is Foster 2022's cool trial (D-221) and is a different frame, not a competing one. Duration is irrelevant past dryness: 14 d and 21 d agree to 6 significant figures.
+* **Beer's `solventy` descriptor axis changes OWNER, and its magnitude falls 31 %.** Under the D-95 MAX rule an axis reads its loudest contributing pool, so which molecule owns it is a modelled claim about the beer and not an internal detail. Before: `isoamyl_alcohol` at OAV 0.9652 against `ethyl_acetate`'s 0.5289. After: **`ethyl_acetate` at 0.6688** against `isoamyl_alcohol`'s 0.6023 — the two crossed past each other. `fruity` keeps its owner (`isoamyl_acetate`) and falls 21 %, 2.3292 → 1.8404. **Both verdicts are unchanged and both are correct for a sound ale**: solventy stays below threshold, fruity stays above it, which is the banana-forward ale D-96 anchored for. This is the output-level statement of the whole beat and the first draft of this record did not contain it — the suite was green because nothing asserted a descriptor owner either.
 * **The trace carbon draw halves**, 0.28 % → 0.19 % of the sugar consumed. The header claiming "~0.3 %" is re-measured.
 
 **What did NOT move**, checked rather than assumed: wine is untouched in every pool (`mu_max`, the seven `k` and the two bands are all per-medium); beer's pH course, growth, nitrogen and attenuation are untouched; the whole suite is otherwise unchanged. **1847 passed, 5 xfailed**; ruff, ruff format and mypy clean.

@@ -59,7 +59,17 @@ break D-223's corner pin. Never say the pools are decoupled.
 D-99 reproduced **all four** Wang/Frank/Steinhaus 2024 Table 1 beer means to **<0.5 %**. **D-211's
 `mu_max` 0.098 → 0.034 multiplied every one by 2.87; D-222's → 0.058 halved it to 1.68. NEITHER RECORD
 MENTIONS HIGHER ALCOHOLS** (grepped). Wine is the control and never moved (`mu_max` is per medium):
-isobutanol 32.997 against 33.0, 2-phenylethanol 28.713 against 28.7.
+**all five** land inside 0.85 % (24.014/24.0, 32.997/33.0, 70.140/70.1, 170.539/172.0, 28.713/28.7),
+and that is now a test. **Wine's five BANDS are also correct** (×0.3/×3, ×0.2/×4 for its own propanol)
+even though 955ebbc shipped them in the same commit — so the draughting error is **beer-only**, and the
+band guard is parametrized over both media so nobody re-asks it by assumption.
+
+## The OUTPUT-level consequence — beer's solventy axis changed OWNER
+
+Under the D-95 MAX rule: **`isoamyl_alcohol` (OAV 0.9652) → `ethyl_acetate` (0.6688)**, magnitude down
+31 %. `fruity` keeps `isoamyl_acetate` and falls 21 % (2.3292 → 1.8404). **Both verdicts unchanged and
+correct**: solventy below threshold, fruity above it — the banana-forward ale D-96 anchored for. Pinned,
+because nothing asserted a descriptor's owner either.
 
 ## The sensory statement — this is why it is a DEFECT, not a preference
 

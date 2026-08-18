@@ -48,6 +48,8 @@ from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.sensory.descriptors import MaxRuleProjector
+from fermentation.sensory.oav import sensory_profile
 from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
 
 #: Representative species the pools book against (mirrors the Process constants).
@@ -1352,26 +1354,56 @@ def test_beers_isoamyl_alcohol_stays_below_its_only_sourced_threshold_across_the
     )
 
 
-def test_the_five_ehrlich_bands_are_the_multiple_of_their_nominal_their_own_notes_state():
-    """D-99 shipped five bands that are x0.3/x3 (x0.2/x5 for propanol) of a value 2.05x BELOW
+@pytest.mark.parametrize(
+    ("medium_file", "stated"),
+    [
+        (
+            "beer_generic.yaml",
+            {
+                "k_propanol": (0.2, 5.0),
+                "k_isobutanol": (0.3, 3.0),
+                "k_active_amyl_alcohol": (0.3, 3.0),
+                "k_isoamyl_alcohol": (0.3, 3.0),
+                "k_2_phenylethanol": (0.3, 3.0),
+            },
+        ),
+        (
+            "wine_generic.yaml",
+            {
+                "k_propanol": (0.2, 4.0),  # wine's propanol note says x0.2/x4, not beer's x0.2/x5
+                "k_isobutanol": (0.3, 3.0),
+                "k_active_amyl_alcohol": (0.3, 3.0),
+                "k_isoamyl_alcohol": (0.3, 3.0),
+                "k_2_phenylethanol": (0.3, 3.0),
+            },
+        ),
+    ],
+)
+def test_the_ehrlich_bands_are_the_multiple_of_their_nominal_their_own_notes_state(
+    medium_file, stated
+):
+    """D-99 shipped BEER's five bands as x0.3/x3 (x0.2/x5 for propanol) of a value 2.05x BELOW
     the nominal shipped beside them -- x0.145/x1.45 of the value actually in force. One
     draughting error across five entries: the nominal was fitted to land its target and the band
     was left where it was. D-224 corrects both halves; this is the arithmetic that would have
-    caught it, and it is cheap enough that there was never a reason not to have it.
+    caught it, and it is cheap enough that there was never a reason not to have had it.
+
+    **Both media, because a guard is only as broad as the registry it names.** 955ebbc shipped
+    wine's five in the same commit with the same note text, so the question "does wine carry the
+    same error" is not answered by wine's LEVELS being right -- levels say nothing about
+    multipliers. Measured at the follow-up: wine's five are CORRECT (x0.3/x3, and x0.2/x4 for its
+    own propanol), so the draughting error is beer-only. That is a finding, and it is the reason
+    this test is parametrized rather than left pointing at one file.
     """
-    beer = load_parameters(default_data_dir() / "beer_generic.yaml")
-    stated = {
-        "k_propanol": (0.2, 5.0),
-        "k_isobutanol": (0.3, 3.0),
-        "k_active_amyl_alcohol": (0.3, 3.0),
-        "k_isoamyl_alcohol": (0.3, 3.0),
-        "k_2_phenylethanol": (0.3, 3.0),
-    }
+    # rel=0.02: every value and edge in these files is rounded to 3 significant figures, so an
+    # exactly-stated multiplier lands within ~1.5 % of it (wine's isobutanol is the worst at
+    # 0.3037). The error this catches is 2.05x, two orders above the rounding.
+    parameters = load_parameters(default_data_dir() / medium_file)
     for name, (low_mult, high_mult) in stated.items():
-        param = beer[name]
+        param = parameters[name]
         assert param.uncertainty is not None
-        assert param.uncertainty.low / param.value == pytest.approx(low_mult, rel=0.01), name
-        assert param.uncertainty.high / param.value == pytest.approx(high_mult, rel=0.01), name
+        assert param.uncertainty.low / param.value == pytest.approx(low_mult, rel=0.02), name
+        assert param.uncertainty.high / param.value == pytest.approx(high_mult, rel=0.02), name
 
 
 def test_the_ethyl_acetate_band_spans_its_sourced_ale_range_and_its_top_reaches_the_threshold(
@@ -1442,3 +1474,88 @@ def test_the_isoamyl_acetate_band_is_rescaled_with_its_nominal_rather_than_recom
     # The multipliers D-96/D-97/D-99 shipped, carried through every re-anchoring since.
     assert param.uncertainty.low / param.value == pytest.approx(0.3286, rel=0.005)
     assert param.uncertainty.high / param.value == pytest.approx(2.0896, rel=0.005)
+
+
+# -- D-224 follow-up: the two surfaces the first pass of these guards could not see ---------
+
+
+def test_wine_also_lands_the_five_ehrlich_levels_its_constants_are_defined_by():
+    """The wine half of D-224's control, as a guard rather than a paragraph.
+
+    D-224's argument rests on wine being untouched -- ``mu_max`` lives per medium, so the beer
+    growth-rate changes that moved beer's higher alcohols by x2.87 could not reach wine, and wine
+    still landing its own published means is what makes the beer drift a defect with a mechanism
+    rather than a drift in the shared Process. That control was measured in two pools of five and
+    written into a record; here it is all five, read from the same ``conditions:`` sentences.
+    """
+    wine = load_parameters(default_data_dir() / "wine_generic.yaml")
+    # (value, the literal its own `conditions:` field spells it with)
+    targets = {
+        "propanol": (24.0, "24 mg/L"),
+        "isobutanol": (33.0, "33.0 mg/L"),
+        "active_amyl_alcohol": (70.1, "70.1 mg/L"),
+        "isoamyl_alcohol": (172.0, "172 mg/L"),
+        "2_phenylethanol": (28.7, "28.7 mg/L"),
+    }
+    for pool, (_, literal) in targets.items():
+        conditions = wine[f"k_{pool}"].provenance.conditions
+        assert literal in conditions, pool
+
+    scenario = Scenario(
+        name="wine-aroma-calibration",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.5},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=21.0,
+    )
+    traj = compile_scenario(scenario).run(t_eval=np.array([0.0, 21.0 * 24.0]))
+    for pool, (target, _) in targets.items():
+        level = float(traj.series(pool)[-1]) * 1000.0
+        assert level == pytest.approx(target, rel=0.02), (
+            f"wine's {pool} finishes at {level:.3f} mg/L against the {target} its k is set to "
+            f"land. If this fails alongside its beer twin, the drift is in the shared Process; "
+            f"if it fails alone, read D-224 -- wine being untouched is that record's control."
+        )
+
+
+def test_beers_solventy_descriptor_axis_changed_owner_and_fell_at_d224():
+    """The OUTPUT-level consequence of re-anchoring seven constants, which nothing else asserts.
+
+    Under the D-95 MAX rule a descriptor reads its loudest contributing pool, so *which molecule
+    owns an axis* is a modelled claim about the beer, not an internal detail. Re-anchoring moved
+    isoamyl alcohol down and ethyl acetate up past each other, so beer's ``solventy`` axis
+    **changed owner** -- ``isoamyl_alcohol`` at OAV 0.9652 before D-224, ``ethyl_acetate`` at
+    0.6688 after -- and its magnitude fell 31 %. ``fruity`` keeps its owner and falls 21 %
+    (2.3292 -> 1.8404). Both verdicts are unchanged and correct for a sound ale: solventy stays
+    below threshold, fruity stays above it, which is the banana-forward ale D-96 anchored for.
+
+    Pinned because a seven-value re-anchoring that silently swapped a descriptor's owner would
+    otherwise be visible nowhere -- the same class of blind spot as the levels themselves.
+    """
+    compiled = compile_scenario(_beer_calibration_scenario())
+    # simulate() rather than compiled.run(): this scenario has no scheduled events, so the two are
+    # the same integration, and `sensory_profile` takes a plain Trajectory.
+    traj = simulate(
+        compiled.process_set,
+        compiled.param_values,
+        compiled.y0,
+        compiled.t_span_h,
+        param_tiers=compiled.parameters.tier_map(),
+        t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0]),
+    )
+    profile = sensory_profile(traj, load_parameters(default_data_dir() / "sensory.yaml"))
+    descriptors = MaxRuleProjector().project(profile)
+
+    solventy = descriptors.readings["solventy"]
+    assert solventy.dominant == "ethyl_acetate", (
+        f"beer's solventy axis is owned by {solventy.dominant}; D-224 handed it from "
+        f"isoamyl_alcohol to ethyl_acetate and the hand-over is the output-level statement of "
+        f"that beat."
+    )
+    assert solventy.magnitude == pytest.approx(0.669, abs=0.01)
+    assert solventy.magnitude < 1.0, "a sound ale must not read a solventy note"
+
+    fruity = descriptors.readings["fruity"]
+    assert fruity.dominant == "isoamyl_acetate"
+    assert fruity.magnitude == pytest.approx(1.840, abs=0.01)
+    assert fruity.magnitude > 1.0, "an ale's banana note is above threshold (D-96)"
