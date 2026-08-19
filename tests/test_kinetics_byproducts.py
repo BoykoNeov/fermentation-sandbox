@@ -23,6 +23,8 @@ per-Process mechanics it rests on, plus the honest per-pool temperature directio
 (fusels rise with T; wine liquid esters fall, beer liquid esters rise).
 """
 
+import re
+
 import numpy as np
 import pytest
 
@@ -1559,3 +1561,222 @@ def test_beers_solventy_descriptor_axis_changed_owner_and_fell_at_d224():
     assert fruity.dominant == "isoamyl_acetate"
     assert fruity.magnitude == pytest.approx(1.840, abs=0.01)
     assert fruity.magnitude > 1.0, "an ale's banana note is above threshold (D-96)"
+
+
+# =====================================================================================
+# D-225: the aroma level guard, driven by the REGISTRY rather than by a list
+# =====================================================================================
+#: The frame each medium's aroma constants are calibrated in, EXCEPT the YAN, which is read
+#: per-parameter out of the `conditions:` sentence. Wine has TWO frames and that is the open
+#: question D-225 records rather than resolves: its three ester k reproduce their stated levels
+#: at YAN 80 and its five Ehrlich k at YAN 250, so a single wine frame would put one group or
+#: the other out. Beer's clauses state no YAN and its whole set shares one frame.
+_AROMA_FRAMES = {
+    "beer": {"days": 21.0, "celsius": 20.0, "default_yan": 200.0},
+    "wine": {"days": 21.0, "celsius": 20.0, "default_yan": 250.0},
+}
+#: "k set to land finished <molecule> at [~|the ]<n> mg/L". The target is PARSED, never
+#: transcribed -- a second copy in this file would be free to diverge from the spec (D-158).
+_LANDING_CLAUSE = re.compile(
+    r"set to land finished [a-z0-9 ,\-]*?at (?:~|the )?([0-9.]+) mg/L", re.IGNORECASE
+)
+#: The frame's YAN, where the clause names one. Only wine's three esters do, and for exactly one
+#: of them it is worth 1.65x.
+_FRAME_YAN = re.compile(r"\bat YAN ([0-9.]+)", re.IGNORECASE)
+
+
+def _aroma_k_params() -> tuple[str, ...]:
+    """Every aroma rate constant, ENUMERATED FROM THE REGISTRY rather than listed.
+
+    This function is the whole point of D-225. D-224 guarded seven aroma constants against a
+    hand-written dict of seven, and beer's eighth -- ``k_ethyl_hexanoate``, the third entry in
+    ``ESTER_SPECS`` -- was not in the dict, so it alone kept the full drift that record is about
+    (0.787x of its own stated level) while the guard suite looked complete. A literal list cannot
+    fail to be complete; a registry read can. Add a ninth ester tomorrow and it either carries a
+    landing clause and gets levelled, or the completeness test below goes red naming it.
+    """
+    # The two spec types are iterated separately rather than unpacked into one tuple: they are
+    # different dataclasses, so mypy joins them to `object` and loses `.k_param`.
+    return tuple([spec.k_param for spec in ESTER_SPECS] + [spec.k_param for spec in FUSEL_SPECS])
+
+
+def _aroma_spec(medium: str, k_param: str) -> tuple[float, float]:
+    """(target mg/L, frame YAN) read out of the parameter's own ``conditions:`` sentence."""
+    params = load_parameters(default_data_dir() / f"{medium}_generic.yaml")
+    conditions = params[k_param].provenance.conditions
+    match = _LANDING_CLAUSE.search(conditions)
+    assert match is not None, (
+        f"{medium}'s {k_param} states no landing level in its `conditions:` field. Every aroma "
+        f"rate constant in ESTER_SPECS/FUSEL_SPECS is defined by the level it lands, so the "
+        f"level belongs in the sentence that specifies the parameter -- not in `notes:`, where "
+        f"no test can read it. That is exactly how beer's k_ethyl_hexanoate hid through D-224."
+    )
+    yan_match = _FRAME_YAN.search(conditions)
+    yan = float(yan_match.group(1)) if yan_match else _AROMA_FRAMES[medium]["default_yan"]
+    return float(match.group(1)), yan
+
+
+def _aroma_level_mgl(medium: str, pool: str, yan: float) -> float:
+    frame = _AROMA_FRAMES[medium]
+    initial: dict[str, float] = {"yan_mgl": yan}
+    if medium == "beer":
+        initial.update(
+            {"glucose_gpl": 15.0, "maltose_gpl": 70.0, "maltotriose_gpl": 15.0, "pitch_gpl": 1.0}
+        )
+    else:
+        initial.update({"brix": 24.0, "pitch_gpl": 0.5})
+    scenario = Scenario(
+        name=f"{medium}-aroma-registry-census",
+        medium=medium,
+        initial=initial,
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=frame["celsius"])],
+        duration_days=frame["days"],
+    )
+    traj = compile_scenario(scenario).run(t_eval=np.array([0.0, frame["days"] * 24.0]))
+    return float(traj.series(pool)[-1]) * 1000.0
+
+
+@pytest.mark.parametrize("medium", ["beer", "wine"])
+def test_every_aroma_rate_constant_in_the_registry_declares_its_landing_level(medium):
+    """The COMPLETENESS half: no aroma constant may be defined by a level it does not state.
+
+    D-224's level guard could only check the constants someone had remembered to list. This one
+    cannot be incomplete, because it asks the registry what the population is. It is deliberately
+    separate from the level assertion below: a constant that states no target fails HERE, with a
+    message about provenance, rather than being silently skipped by a census that then reports
+    itself clean on a denominator it never measured.
+    """
+    for k_param in _aroma_k_params():
+        target, yan = _aroma_spec(medium, k_param)
+        assert target > 0.0, f"{medium}/{k_param} declares a non-positive target"
+        assert yan > 0.0
+
+
+@pytest.mark.parametrize("medium", ["beer", "wine"])
+def test_every_aroma_rate_constant_lands_the_level_it_declares(medium):
+    """The LEVEL half, over the registry: all eight constants in each medium, at their own frame.
+
+    Supersedes the coverage of the two hand-listed level guards above without replacing them --
+    those carry D-224's reasoning in their failure messages and pin its seven literals exactly.
+    What this adds is that the EIGHTH is checked, and that a ninth would be.
+
+    The frame's YAN is read from each constant's own `conditions:` sentence rather than fixed per
+    medium, because wine genuinely has two: its esters reproduce at YAN 80 and its Ehrlich
+    constants at YAN 250. That inconsistency is real and D-225 records it as open rather than
+    papering over it -- but it must be VISIBLE in the data, so the test reads it instead of
+    hard-coding one frame and quietly failing the other group.
+    """
+    specs: dict[str, str] = {spec.k_param: spec.pool for spec in ESTER_SPECS}
+    specs.update({spec.k_param: spec.pool for spec in FUSEL_SPECS})
+    for k_param in _aroma_k_params():
+        target, yan = _aroma_spec(medium, k_param)
+        level = _aroma_level_mgl(medium, specs[k_param], yan)
+        assert level == pytest.approx(target, rel=0.02), (
+            f"{medium}'s {specs[k_param]} finishes at {level:.4f} mg/L against the {target} mg/L "
+            f"its own `conditions:` field says {k_param} is set to land (frame YAN {yan:.0f}). "
+            f"The rate is linear in k, so re-anchor it -- do NOT relax this tolerance. Read "
+            f"D-224 and D-225 first: both exist because a level defined by an upstream speed "
+            f"drifts whenever anything upstream moves, and nothing noticed for three beats."
+        )
+
+
+def test_beers_apple_note_reaches_its_threshold_without_moving_any_descriptor_axis():
+    """D-225's output-level statement: the pool crosses 1.0, the axis it feeds does not move.
+
+    Re-anchoring ``k_ethyl_hexanoate`` x1.27 takes that pool's own OAV from 0.825 to 1.048, i.e.
+    across the detection line. The crossing is INTENDED -- ``beer_generic.yaml`` says this
+    molecule sits right at Meilgaard's ~0.21 mg/L threshold, and the pre-D-225 0.825 fell short
+    only because the level had drifted 21 % low. Scored rather than asserted, because D-224's own
+    follow-up exists for shipping seven values without scoring the axis they feed.
+
+    The axis does NOT move: under the D-95 MAX rule ``fruity`` reads its loudest contributor, and
+    isoamyl acetate at 1.840 outranks ethyl hexanoate at 1.048, so both the magnitude and the
+    owner are unchanged and ``above_threshold()`` is ``['fruity']`` either way. That is the honest
+    description -- the crossing is real at the pool and masked at the axis -- and pinning BOTH
+    halves is what stops a future re-anchoring from flipping the owner unseen.
+    """
+    compiled = compile_scenario(_beer_calibration_scenario())
+    traj = simulate(
+        compiled.process_set,
+        compiled.param_values,
+        compiled.y0,
+        compiled.t_span_h,
+        param_tiers=compiled.parameters.tier_map(),
+        t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0]),
+    )
+    profile = sensory_profile(traj, load_parameters(default_data_dir() / "sensory.yaml"))
+    descriptors = MaxRuleProjector().project(profile)
+
+    # The pool crosses its own threshold, and that is the point of the re-anchoring.
+    assert profile.readings["ethyl_hexanoate"].oav == pytest.approx(1.048, abs=0.01)
+    assert profile.readings["ethyl_hexanoate"].oav > 1.0, (
+        "beer_generic.yaml says ethyl hexanoate sits right at its ~0.21 mg/L threshold; an OAV "
+        "below 1.0 means the level has drifted low again (it read 0.825 before D-225)."
+    )
+    # ...and the axis is unmoved, because isoamyl acetate still shouts louder.
+    fruity = descriptors.readings["fruity"]
+    assert fruity.dominant == "isoamyl_acetate", (
+        f"fruity is now owned by {fruity.dominant}. D-225 measured that ethyl hexanoate crosses "
+        f"its threshold while isoamyl acetate keeps the axis at 1.840; a change of owner here is "
+        f"a different beer and needs its own record."
+    )
+    assert fruity.magnitude == pytest.approx(1.840, abs=0.01)
+    assert descriptors.above_threshold() == ["fruity"]
+
+
+def test_the_ethyl_hexanoate_band_spans_its_sourced_ale_range_computed_at_the_edges(tmp_path):
+    """D-225's band rule, in the COMPUTED form D-224 named the stronger of the two.
+
+    Owed to a mutation that came back GREEN: reverting this band to its pre-D-225 edges while
+    leaving the nominal alone broke nothing, because the level guards read the nominal and the
+    two hand-listed band-rule tests name only the five Ehrlich k and the two acetate esters. A
+    band nothing asserts is a band free to drift, and this one had drifted -- its stated span
+    "~0.05-0.6 mg/L" was a gloss that measured 0.0433-0.5052 at the drifted nominal.
+
+    Asserting landed CONCENTRATIONS rather than a multiplier is what makes this the stronger
+    form (D-224 Sec 8): a multiplier is invariant to a joint rescale of value and band, so it
+    stays green through exactly the re-anchoring this file keeps needing. These edges are
+    computed to span the molecule's own sourced ~0.1-0.5 mg/L ale range, so a drawn beer can
+    never sit outside the range its source reports -- which is why the rescale rule was
+    REFUSED here: rescaled, the top would have reached 0.6416 mg/L, 28 % above that range.
+    """
+    beer = load_parameters(default_data_dir() / "beer_generic.yaml")
+    lo, hi = _band_edges(beer, "k_ethyl_hexanoate", 6.93e-7, 3.46e-6)
+
+    def level_at(k_value: float) -> float:
+        # NOT `_beer_aroma_levels_mgl`: that helper returns only the SEVEN pools D-224 listed by
+        # hand, so it has no `ethyl_hexanoate` key -- the same incompleteness this beat is about,
+        # met inside the test written to fix it. That dict is deliberately left at seven so
+        # D-225's arm-A measurement (its guard stays GREEN on this defect) stays reproducible;
+        # coverage of all eight lives in the registry-driven tests below.
+        scenario = _beer_calibration_scenario()
+        compiled = compile_scenario(
+            scenario, data_dir=_beer_data_dir_at(tmp_path, k_ethyl_hexanoate=k_value)
+        )
+        traj = compiled.run(t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0]))
+        return float(traj.series("ethyl_hexanoate")[-1]) * 1000.0
+
+    low_level = level_at(lo)
+    high_level = level_at(hi)
+    assert low_level == pytest.approx(0.100, abs=0.002), (
+        f"the band's low edge lands {low_level:.4f} mg/L, not the 0.100 that is the floor of this "
+        f"molecule's sourced 0.1-0.5 ale range. The edges are COMPUTED to span that range; "
+        f"re-measure them rather than re-pinning this number."
+    )
+    assert high_level == pytest.approx(0.500, abs=0.005), (
+        f"the band's high edge lands {high_level:.4f} mg/L, not the 0.500 top of the sourced ale "
+        f"range. Above it, a drawn beer reports a concentration its own source rejects."
+    )
+
+    # The sensory reading at each edge, pinned because the nominal crossing IS the point here and
+    # a band that crosses needs its reach stated rather than claimed away (D-224 Sec 7).
+    threshold = (
+        load_parameters(default_data_dir() / "sensory.yaml")["threshold_ethyl_hexanoate_beer"].value
+        / 1000.0
+    )
+    assert low_level / threshold == pytest.approx(0.476, abs=0.01)
+    assert high_level / threshold == pytest.approx(2.381, abs=0.02)
+    # The nominal is above threshold by design; the band's FLOOR is the only place an ale reads
+    # no apple note at all, and that is a beer at the bottom of the molecule's reported range.
+    assert low_level / threshold < 1.0
+    assert high_level / threshold > 1.0
