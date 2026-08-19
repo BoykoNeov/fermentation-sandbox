@@ -1,6 +1,6 @@
 ---
 name: prohibition-beer-aroma-calibration-levels
-description: "D-224 — beer's seven calibrated aroma levels: what is settled, what must never be re-argued, and the one question left open"
+description: "D-224/D-225 — beer's EIGHT calibrated aroma levels: what is settled, what must never be re-argued, and the two questions left open"
 metadata: 
   node_type: memory
   type: project
@@ -8,9 +8,68 @@ metadata:
   modified: 2026-08-18T22:44:16.620Z
 ---
 
+# D-225 — THE EIGHTH CONSTANT, and why D-224's guard could not see it
+
+**Read this before trusting anything below about "the seven".** D-224 repaired seven aroma
+constants and its own mechanism condemned **eight**. `k_ethyl_hexanoate` (beer) shares
+`k_ethyl_acetate`'s rate law exactly and carried the whole drift unrepaired: **0.17321 mg/L
+against its stated 0.22 (0.787×), OAV 0.825** where the file says it sits AT Meilgaard's
+~0.21 threshold. Re-anchored **1.2e-6 → 1.524e-6 (×1.27)**, landing 0.21998.
+
+## What must never be re-argued
+
+* **The population is `ESTER_SPECS` + `FUSEL_SPECS`, never a list.** D-224's level guard read a
+  hand-written dict of seven, so it could not see the eighth — and it stayed **GREEN** when the
+  defect was put back (measured, mutation arm A). Guards are registry-driven now. **Do not add a
+  ninth entry to a literal dict**; that repeats the defect a fourth time.
+* **The census is closed and its denominator is printed.** 16 constants are defined by a landing
+  level; 12 state it in `conditions:`, 4 stated it only in `notes:`. **No other aroma pool is
+  level-defined at all** — not acetaldehyde, H₂S, DMS, diacetyl, methanethiol, the ethylphenols,
+  methional, sotolon, furaneol, vanillin, guaiacol, eugenol, whiskey lactone or the aldehydes.
+  Do not re-run this census; do not report a gap outside those 16.
+* **All three beer esters are MECHANICALLY LOCKED** — same rate law, same `E_a_esters`, same
+  stripping constant — so their ratios are exactly `k_i/k_j`, invariant to **7 significant
+  figures** across both speed knobs' band edges and a 15 °C run. Consequences: one pool's history
+  transfers to the others with **no old tree to check out**, and the next speed change moves all
+  three by one factor, guaranteed rather than probable.
+* **`k_ethyl_hexanoate`'s band is COMPUTED, not rescaled** — `[6.93e-7, 3.46e-6]`, spanning
+  exactly its sourced **0.100-0.500 mg/L** ale range. Rescaling ×1.27 agrees almost perfectly
+  with the note's stated "~0.05-0.6" (which is why ×1.27 is right for the NOMINAL) but its top
+  reaches **0.6416 mg/L, 28 % above the sourced range** — a value the source rejects, reachable
+  in a drawn ensemble. The "~0.05-0.6" gloss is the named LOSER. D-224 declined the computed form
+  for isoamyl acetate only because THAT span is forked; this one's is single.
+* **The OAV crossing is INTENDED and the axis does NOT move.** 0.825 → 1.048 at the pool;
+  `fruity` stays owned by isoamyl acetate at 1.840 under the MAX rule, `above_threshold()` is
+  `['fruity']` either way. Both halves are pinned.
+* **WINE: three ester constants, TWO frames, and NO value was moved.** Wine's esters reproduce
+  their stated levels at **YAN 80** (0.992-1.000×), its five Ehrlich constants at **YAN 250** —
+  and the one wine ester that reads its precursor is **1.65× apart** between them. At YAN 80 the
+  precursor sits at 100.84 mg/L against the **172 its own `conditions:` targets**. `sensory.yaml`'s
+  "lands ~25" OAV note is a YAN-80 reading (41.85 at YAN 250). **Do not "fix" this by re-anchoring
+  wine's `k_isoamyl_acetate`:** one constant cannot satisfy both frames (÷1.652 puts it at 0.456
+  at YAN 80, below the Guth assay it is anchored to), 0.76 IS Guth's assay, and **wine is D-224's
+  control**. The frames are now STATED in all three `conditions:` fields; the inconsistency is
+  **open**, and resolving it needs a sourced reason to prefer one frame.
+* **`aging.yaml`'s `ethyl_hexanoate_eq` is calibrated to WINE's finished level** as its young-wine
+  reference (agrees today: 0.3939 vs stated ~0.4). A wine re-anchoring stales it silently; the
+  dependency is now cross-referenced from the wine parameter that owns it.
+
+## Still open after D-225
+
+1. **The extent-coupling question** — unchanged from D-224 §11 and still the real one. New
+   evidence: the mechanical lock means all three beer esters drift **together, exactly**, so every
+   future speed change re-commits this. The registry guard catches it the day it happens; it does
+   not prevent it.
+2. **Wine's two calibration frames** (above).
+3. **The narrowing is itself a claim** — `k_ethyl_hexanoate`'s low edge moved from 2.3× below its
+   sourced ale floor to exactly on it. Justified by the band note claiming to BE the ale range,
+   but no band edge here is separately sourced.
+
+---
+
 # Beer's aroma calibration levels (D-224) — SETTLED
 
-Reached by path from the ledger in [[project-fermentation-sandbox]]. Full record: `docs/DECISIONS.md` D-224.
+Reached by path from the ledger in [[project-fermentation-sandbox]]. Full records: `docs/DECISIONS.md` D-224 and **D-225** (read the D-225 block above first — it corrects the scope of everything below).
 
 ## The verdict — do not re-open "which ester calibration is wrong"
 
