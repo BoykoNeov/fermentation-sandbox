@@ -29,9 +29,9 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-19)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-225**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1857 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
+## Status (2026-08-25)
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-226**; sensory 1a/1b + **D-139's leftovers ALL
+closed** (D-148/9). Suite **1858 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
 again since D-223** — 6.04 d inside 5-7 — but the pass is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
@@ -301,14 +301,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   (outside across the whole `E_a` band). D-218 §3 / D-219 §5c **INVERT**: the surviving corner moves to the SETTLED 40 pg
   (5.42 d), CONDITIONAL on `E_a` ≥ 40,165 (69 % of band). → `.claude/memory/prohibitions/beer-criterion-temperature.md`
 
-- **Beer's EIGHT calibrated AROMA LEVELS (D-224 + D-225)** — "which ester calibration is wrong" is
-  **ANSWERED: NEITHER** (isoamyl acetate inherited its precursor's 1.61×; corrected, both read 0.79×).
-  Quote the **3 %**, never 0.4 %. **D-225: it was EIGHT, not seven** — `k_ethyl_hexanoate` still ran
-  0.787× and D-224's guard stayed GREEN, because that guard was a hand-written LIST. Guards now read
-  `ESTER_SPECS`+`FUSEL_SPECS`; **never add a ninth entry to a literal dict.** Census CLOSED: 16
-  constants are level-defined, **no other aroma pool is**. All 3 beer esters are mechanically LOCKED.
-  **Never** move ethyl acetate to Wang's 23.7 (kills D-223's guard), **nor** re-anchor WINE's
-  `k_isoamyl_acetate` to reconcile its two frames — wine is D-224's control. → `prohibitions/beer-aroma-calibration-levels.md` (D-225 block FIRST)
+- **Beer's EIGHT AROMA LEVELS, and the COUPLING behind them (D-224/D-225/D-226 — SETTLED)** —
+  "which ester calibration is wrong" is **ANSWERED: NEITHER**; quote the **3 %**, never 0.4 %.
+  **D-226 CLOSED D-224/D-225 §11**: beer's pools ride growth EXTENT (`k·mu·X·f_growth`), the form
+  de Andrés-Toro + Ehrlich always stated, **beer only** — wine's `E_a_esters` is derived FROM the
+  flux form and wine is D-224's control. 5 higher alcohols now EXACTLY speed-invariant, 3 esters
+  only 2.5× better (the stripping sink still reads the flux). **Never re-propose** the coupling,
+  Luedeking-Piret (2 params, 1 observable), ethyl acetate at Wang's 23.7, or re-anchoring WINE's
+  `k_isoamyl_acetate`. → `prohibitions/beer-aroma-calibration-levels.md` (D-226 block FIRST)
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

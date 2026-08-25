@@ -8,6 +8,59 @@ metadata:
   modified: 2026-08-18T22:44:16.620Z
 ---
 
+# D-226 — THE COUPLING, ENTERED AND CLOSED FOR BEER. Read this before anything below.
+
+D-224 §11 / D-225 §11's "the extent-coupling question is still the real one and is still not
+entered" is **ENTERED AND ANSWERED**. Beer's aroma pools now ride growth EXTENT:
+`k · mu·X · f_growth(T) · arrh(E_a)`, via `EsterSynthesisGrowthCoupled` /
+`FuselAlcoholsEhrlichGrowthCoupled`, wired per medium in `media.py`.
+
+## What must never be re-argued
+
+* **The headline is FIDELITY, not drift.** Beer's esters were YAN-BLIND and slightly BACKWARDS
+  (4× wort nitrogen moved them 1.009 → 0.983); they are now proportional (0.491 → 2.072). D-97
+  found this and fixed it for isoamyl acetate ALONE. The five higher alcohols were already
+  YAN-proportional under both forms — **the YAN result is about the ESTERS only**.
+* **BEER ONLY, and it is sourced.** Wine's `E_a_esters` = 55,100 exists solely to make integrated
+  synthesis T-flat under the FLUX form; under extent coupling flatness needs ≈ 0. And
+  `wine_generic.yaml`'s own header says **no** value of it reproduces wine ester behaviour — wine's
+  flux form is a **documented stand-in**. Do not "finish the job" by converting wine.
+* **It is NOT full invariance and the notes say so.** 5 higher alcohols: **1.00000** at both speed
+  knobs' band edges AND their retired values (no stripping sink). 3 esters: **4.51 %**, sign
+  REVERSED, because `EsterVolatilization` still reads the flux. D-223's retired `q_sugar_max` 0.5
+  would still move them **13.9 %** (was 20.9 %). Never say "the drift is closed" without "for five
+  of eight".
+* **A CONSTANT LIVES IN ITS RATE LAW'S COORDINATES.** Under the flux form the observable's apparent
+  `E_a` was `E_a_esters − E_a_uptake` = 144,900, not the 200,000 printed; `E_a_fusels` printed
+  70,000 with a "Q10 ~ 2.6" note while the output ran **Q10 1.22**. Both re-anchored (152,000 /
+  14,100) to PRESERVE the measured spans, deliberately not to adopt the steeper reading — the
+  magnitude is unsourced either way and two changes at once are unattributable.
+* **D-19's ordering constraint is a property of the RATE LAW.** "`E_a` > `E_a_uptake`" is the FLUX
+  form of "output rises with T"; the extent form is "`E_a` > 0". Beer's `E_a_fusels` 14,100 is
+  BELOW `E_a_uptake` and that is correct. The test asserts per coupling AND asserts which coupling
+  each medium is wired to.
+* **`E_a_esters`'s low band edge is 87,000 and is MEASURED** (floor 84,890 at the joint stripping
+  corner), not the retired algebraic 118,000+2,000. **Do not cite the stripping-ordering floor as
+  the reason 152,000 sits below the cited 221-265k** — that floor constrains nothing now; what
+  holds it there is the preserved span plus the lumped-fit-artifact argument.
+* **Luedeking-Piret (`α·dX/dt + β·X`) is REFUSED, not overlooked**: two free parameters, one
+  observable, no ester time-course on disk. Unblocked only by a published beer ester time-course.
+* **PITCH is inert under BOTH forms** (1.000 across 0.25-4.0 g/L) and is not a discriminator.
+  Over-pitching does suppress esters in reality; neither form captures it. Never claim it.
+* **D-97's stranded-precursor objection is FALSE on today's tree** (precursor complete at
+  growth-stop, ratio 1.048) — do not raise it against extent coupling again.
+
+## Still open after D-226
+
+1. **The stripping sink reads the flux SHAPE, not evolved CO₂** — this is now the WHOLE of the
+   esters' residual speed sensitivity.
+2. **The growth Process's hard nitrogen cutoff**: growth stops day 0.92 with **81 % of the sugar
+   left**, so all ester is made in day 1 and only stripped after. Inherited, not introduced.
+3. **`E_a_fusels`'s magnitude** is unsourced in either coordinate system (1.22 shipped vs 2.66).
+4. **Wine's two calibration frames** (below) — untouched and still open.
+
+---
+
 # D-225 — THE EIGHTH CONSTANT, and why D-224's guard could not see it
 
 **Read this before trusting anything below about "the seven".** D-224 repaired seven aroma
