@@ -117,7 +117,7 @@ compose to a single scalar (D-10, D-11).
 | `mercaptans.py` | 1 | methanethiol — the last lumped aroma pool |
 | `amino_acids.py`, `amino_acid_pools.py` | 1 | the eight speciated amino-acid pools + ledger (D-100) |
 | `keto_acids.py` | 6 | pyruvate / α-ketoglutarate / α-ketobutyrate, excretion + reassimilation |
-| `carbon_routing.py` | — | shared carbon draw/refund helpers, ester and fusel route specs, label tracer |
+| `carbon_routing.py` | — | shared carbon draw/refund helpers, ester and fusel route specs, label tracer, and the shared fermentative rate law (per-slot uptake rates D-180, evolved-CO₂ rate D-227) that every Process reading the flux must call rather than re-derive |
 | `precursor_fates.py` | 1 | precursor partitioning |
 | `organic_acids.py` | 3 | beer's organic acids: excretion, acetic overflow, wort acid removal |
 | `wort_oxygen.py` | 1 | beer's wort aeration O₂, stripped by the yeast in the lag phase (D-213) |

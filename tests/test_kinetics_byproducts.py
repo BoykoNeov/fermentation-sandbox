@@ -34,6 +34,7 @@ from fermentation.core.chemistry import (
     M_ISOAMYL_ACETATE,
     M_ISOAMYL_OH,
     carbon_mass_fraction,
+    co2_yield,
 )
 from fermentation.core.kinetics import (
     EsterSynthesis,
@@ -43,7 +44,14 @@ from fermentation.core.kinetics import (
     SugarUptakeToEthanolCO2,
     arrhenius_factor,
 )
-from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
+from fermentation.core.kinetics.carbon_routing import (
+    ESTER_SPECS,
+    FUSEL_SPECS,
+    fermentative_co2_rate,
+    fermentative_flux_shape,
+    realised_yield_carbon_diversion,
+    realised_yield_scale,
+)
 from fermentation.core.media import beer_schema, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -378,13 +386,29 @@ def test_volatilization_metadata():
     }
     # Physical Henry model (D-21): gas-flow rides E_a_uptake, partition rides the sourced
     # ethyl-acetate enthalpy dH_ester_volatil — NOT a fudged per-medium E_a_ester_volatil.
+    #
+    # D-227 GREW THIS SET, and the growth is the change rather than bookkeeping. The driver
+    # stopped being a single-Monod stand-in for the CO2 stream and became the fermentative CO2
+    # rate itself, so this Process now reads the whole uptake rate law — including the speed
+    # knob `q_sugar_max`, which used to sit FOLDED INSIDE `k_ester_volatil` (that parameter's
+    # own unit comment said so) where nothing could see it move. `reads` has two masters, tier
+    # propagation AND sampler scope (D-160), so every one of them is declared.
     assert set(p.reads) == {
         "k_ester_volatil",
+        "q_sugar_max",
         "K_sugar_uptake",
+        "K_repression",
+        "Y_glycerol_sugar",
+        "Y_byproduct_sugar",
         "E_a_uptake",
         "dH_ester_volatil",
         "T_ref",
     }
+    # The four that D-227 added are exactly the uptake Process's own parameter list. Asserted
+    # as a relation rather than a second literal: if uptake's rate law gains a parameter and
+    # this sink does not declare it, the sink's tier and its sampler scope both go quietly
+    # wrong, and a hand-copied list is what would let that happen (D-225's rule).
+    assert set(SugarUptakeToEthanolCO2().reads) <= set(p.reads)
 
 
 def test_volatilization_derivative_matches_closed_form(params):
@@ -393,10 +417,23 @@ def test_volatilization_derivative_matches_closed_form(params):
     y = _wine_y0_with_ester(schema, ester=est, x=x, s=s, t=t)
     d = EsterVolatilization().derivatives(0.0, y, schema, params)
 
-    flux = x * (s / (params["K_sugar_uptake"] + s))
+    # D-227: the driver is the CO2 the ferment actually evolves, so the closed form carries
+    # `q_sugar_max` and `co2_yield` EXPLICITLY where they used to be folded into
+    # `k_ester_volatil`. Wine is one sugar slot, so there is no repression term to write.
+    monod = x * (s / (params["K_sugar_uptake"] + s))
+    diverted_c = realised_yield_carbon_diversion(params)
+    co2_rate = (
+        params["q_sugar_max"]
+        * monod
+        * co2_yield("glucose")
+        * realised_yield_scale("glucose", diverted_c)
+    )
     f_gas = arrhenius_factor(t, params["E_a_uptake"], params["T_ref"])  # CO2 gas flow
     f_part = arrhenius_factor(t, params["dH_ester_volatil"], params["T_ref"])  # partition
-    rate = params["k_ester_volatil"] * flux * f_gas * f_part * est
+    rate = params["k_ester_volatil"] * co2_rate * f_gas * f_part * est
+    # The retired driver, kept as an explicit NON-assertion: the two differ by the factor the
+    # re-anchoring absorbed, so a revert of the Process cannot pass this test by coincidence.
+    assert rate != pytest.approx(params["k_ester_volatil"] * monod * f_gas * f_part * est, rel=1e-3)
     # Liquid loses exactly what the headspace gains — a carbon-neutral transfer.
     assert schema.get(d, "ethyl_acetate") == pytest.approx(-rate)
     assert schema.get(d, "ethyl_acetate_gas") == pytest.approx(rate)
@@ -1366,24 +1403,37 @@ def test_no_drawn_speed_knob_moves_the_five_higher_alcohols_and_barely_moves_the
                 f"ratio is a conservation identity and should read 1.000000. If it does not, "
                 f"the producer is reading a speed knob again -- read D-226 before re-pinning."
             )
-        # The esters DO move, through the sink, and by how much is the claim.
-        assert levels["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.0, abs=0.05), (
-            arm
-        )
+        # The esters DO move, through the sink, and by how much is the claim. D-227 tightened
+        # this from 5 % to 0.7 %: the sink's driver became the evolving CO2 itself, whose
+        # integral to dryness is fixed by the sugar there was. The bound is set by the WORST
+        # band-edge arm, which is `mu_max` high at 0.543 % -- not by `q_sugar_max`, whose two
+        # edges now sit inside 0.33 %. That the surviving residue belongs to the GROWTH knob
+        # rather than the uptake knob is the mechanism showing through, and it is asserted
+        # pool-by-pool below rather than left to this blanket bound.
+        assert levels["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(
+            1.0, abs=0.007
+        ), arm
 
-    # The residue, pinned per edge and per pool. Sizes measured at D-226; the SIGN is reversed
-    # from D-224's (a slower ferment now packages LESS ester, because it strips for longer).
+    # The residue, pinned per edge and per pool. Sizes RE-MEASURED at D-227; the SIGN is
+    # still reversed from D-224's (a slower ferment packages LESS ester, because it strips for
+    # longer), but the size is now a seventh of what D-226 shipped.
     for pool in ("ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate"):
-        assert arms["q_sugar_max low"][pool] / nominal[pool] == pytest.approx(0.9549, abs=0.002), (
+        assert arms["q_sugar_max low"][pool] / nominal[pool] == pytest.approx(0.9970, abs=0.002), (
             f"{pool}'s residual q_sugar_max sensitivity is not the measured one. Under D-224's "
             f"flux coupling this edge read 1.111 (MORE ester from a slower beer); it now reads "
-            f"0.955 (LESS), because synthesis is speed-invariant and only the stripping sink "
-            f"still reads the flux."
+            f"0.997 (LESS), because synthesis is speed-invariant and the stripping sink now "
+            f"rides the CO2 the ferment evolves, whose integral to dryness is fixed by the "
+            f"sugar there was. D-226 shipped 0.955 here; if this reads that again, the sink "
+            f"has gone back to the flux SHAPE."
         )
-        assert arms["q_sugar_max high"][pool] / nominal[pool] == pytest.approx(1.0416, abs=0.002)
-        # mu_max is nearly inert on the esters too -- it never reached them under either coupling.
-        assert arms["mu_max low"][pool] / nominal[pool] == pytest.approx(1.003, abs=0.002)
-        assert arms["mu_max high"][pool] / nominal[pool] == pytest.approx(0.9922, abs=0.002)
+        assert arms["q_sugar_max high"][pool] / nominal[pool] == pytest.approx(1.0037, abs=0.002)
+        # mu_max is nearly inert on the esters too -- it never reached them under either
+        # coupling, and D-227 BARELY MOVES IT (1.003 -> 1.0025). That asymmetry is the point of
+        # the pair: `q_sugar_max` acted through the driver's SIZE, which the CO2 integral now
+        # fixes, while `mu_max` acts through its TIMING, which nothing here fixes. What is left
+        # of the residue is a timing residue, and it is now the larger of the two.
+        assert arms["mu_max low"][pool] / nominal[pool] == pytest.approx(1.0025, abs=0.002)
+        assert arms["mu_max high"][pool] / nominal[pool] == pytest.approx(0.9937, abs=0.002)
 
     # And the historical arms: what D-223's and D-211's re-anchorings WOULD have done to these
     # levels under this coupling. This is the beat's headline as a number.
@@ -1397,10 +1447,122 @@ def test_no_drawn_speed_knob_moves_the_five_higher_alcohols_and_barely_moves_the
         # D-211's mu_max change multiplied every one of these by 2.87 under the flux coupling.
         assert retired_mu[pool] / nominal[pool] == pytest.approx(1.0, abs=1e-4), pool
         assert retired_q[pool] / nominal[pool] == pytest.approx(1.0, abs=1e-4), pool
-    # D-223's q_sugar_max 0.5 -> 0.72 moved packaged ethyl acetate 20.9 % under the flux
-    # coupling. It would still move it 13.9 % here -- reduced, not eliminated, and the sink is why.
-    assert retired_q["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.861, abs=0.005)
-    assert retired_mu["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.987, abs=0.005)
+    # D-223's q_sugar_max 0.5 -> 0.72 moved packaged ethyl acetate 20.9 % under D-224's flux
+    # coupling and 13.9 % under D-226's. Under D-227 it moves it 0.73 %: a 19x reduction on the
+    # single largest historical drift this file records, and the reason it is nearly zero rather
+    # than merely smaller is that total evolved CO2 does not depend on how fast the sugar went.
+    assert retired_q["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.9927, abs=0.005)
+    # `mu_max`'s retired arm is UNIMPROVED (0.987 -> 0.990) and that is not a disappointment,
+    # it is the mechanism showing through: growth rate re-times the CO2 stream relative to when
+    # the ester is made, and a first-order sink integrated against a moving pool reads timing.
+    assert retired_mu["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(
+        0.9901, abs=0.005
+    )
+
+
+def test_the_co2_rate_helper_is_bitwise_the_uptake_processs_own_co2(params):
+    """The D-180 discipline, extended to the quantity D-227 added.
+
+    ``EsterVolatilization`` strips on the CO2 the ferment evolves; ``SugarUptakeToEthanolCO2``
+    books that same CO2 into the state. If the two ever computed it differently, the sink would
+    be riding a gas stream the solver never ran -- the identical failure mode D-106 caught for
+    the uptake RATES, with the identical absence of a symptom. So the helper is not "the same
+    formula written twice", it is the Process's own arithmetic called from one place, and this
+    is the test that says so.
+
+    BITWISE rather than to a tolerance, for the reason the sibling test in ``test_organic_acids``
+    gives: anything less than bit-equality means the arithmetic moved
+    [[feedback-pin-tolerance-vs-solver-tolerance]].
+    """
+    uptake = SugarUptakeToEthanolCO2()
+    for schema_fn, states in (
+        (wine_schema, ([200.0], [40.0], [0.0])),
+        (beer_schema, ([15.0, 70.0, 15.0], [0.0, 40.0, 12.0], [0.0, 0.0, 5.0], [0.0, 0.0, 0.0])),
+    ):
+        schema = schema_fn()
+        for sugars in states:
+            for x in (2.0, 0.0):
+                y = schema.zeros()
+                y[schema.slice("X")] = x
+                y[schema.slice("S")] = np.asarray(sugars, dtype=float)
+                y[schema.slice("T")] = 293.15
+                d = uptake.derivatives(0.0, y, schema, params)
+                assert fermentative_co2_rate(y, schema, params) == float(
+                    d[schema.slice("CO2")][0]
+                ), (
+                    f"the shared CO2-rate helper and the uptake Process disagree for "
+                    f"S={sugars}, X={x}: the ester sink is stripping on a gas stream the "
+                    f"ferment is not evolving"
+                )
+
+
+def test_the_ester_sink_rides_evolved_co2_and_not_the_flux_shape_that_stood_in_for_it(params):
+    """What D-227 changed, asserted as a PROPERTY of the two drivers rather than as a level.
+
+    Every aroma LEVEL guard in this file is blind to this change by construction: the beat
+    re-anchored ``k_ester_volatil`` so the calibration frame is unchanged, which is what makes
+    its other consequences attributable -- and which means a revert of the Process alone would
+    move the levels, but a revert of Process AND constant together would not. Only a test that
+    names the driver can see that. [[feedback-prefer-the-variant-your-guards-can-see]]
+
+    Two claims, and the second is the one that makes the change a mechanism rather than a rename:
+
+    * the sink's derivative is proportional to ``fermentative_co2_rate``, not to
+      ``fermentative_flux_shape``; and
+    * in BEER the two are not proportional to each other, because three sugars under sequential
+      catabolite repression evolve CO2 in a different shape from a single Monod on total sugar.
+      In WINE they ARE proportional -- one sugar, no repression -- which is why wine's
+      re-anchoring came out exactly equal to the analytic unfolding and beer's did not.
+    """
+    beer, wine = beer_schema(), wine_schema()
+    sink = EsterVolatilization()
+
+    # (a) the derivative tracks the CO2 rate, at a state where the two drivers DISAGREE.
+    y = beer.zeros()
+    y[beer.slice("X")] = 2.0
+    y[beer.slice("S")] = np.asarray([5.0, 70.0, 15.0], dtype=float)  # glucose nearly gone
+    y[beer.slice("T")] = 293.15
+    y[beer.slice("ethyl_acetate")] = 0.02
+    d = sink.derivatives(0.0, y, beer, params)
+    f_gas = arrhenius_factor(293.15, params["E_a_uptake"], params["T_ref"])
+    f_part = arrhenius_factor(293.15, params["dH_ester_volatil"], params["T_ref"])
+    co2_rate = fermentative_co2_rate(y, beer, params)
+    expected = params["k_ester_volatil"] * co2_rate * f_gas * f_part * 0.02
+    assert float(d[beer.slice("ethyl_acetate")][0]) == pytest.approx(-expected, rel=1e-12)
+
+    # (b) beer's two drivers are NOT proportional; wine's are. Measured as the spread of the
+    # ratio across states, so it cannot be satisfied by a single lucky point.
+    def ratios(schema: StateSchema, states: tuple[list[float], ...]) -> list[float]:
+        out = []
+        for sugars in states:
+            yy = schema.zeros()
+            yy[schema.slice("X")] = 2.0
+            yy[schema.slice("S")] = np.asarray(sugars, dtype=float)
+            yy[schema.slice("T")] = 293.15
+            shape = fermentative_flux_shape(yy, schema, params["K_sugar_uptake"])
+            out.append(fermentative_co2_rate(yy, schema, params) / shape)
+        return out
+
+    beer_r = ratios(beer, ([15.0, 70.0, 15.0], [0.5, 70.0, 15.0], [0.0, 5.0, 15.0]))
+    wine_r = ratios(wine, ([200.0], [50.0], [5.0]))
+    # 1.150 MEASURED across these three states, not a round number chosen to pass: the
+    # per-species CO2 yields alone span 1.071 (0.4886 glucose / 0.5235 maltotriose, the
+    # hydrolysis water) and sequential repression supplies the rest.
+    assert max(beer_r) / min(beer_r) == pytest.approx(1.150, abs=0.01), beer_r
+    assert max(beer_r) / min(beer_r) > 1.05, (
+        f"beer's CO2 rate and the retired flux shape came out proportional (ratios {beer_r}). "
+        f"They must not be: catabolite repression and the three sugars' different CO2 yields "
+        f"are what make D-227 a change of mechanism in beer rather than the pure "
+        f"reparameterisation it is in wine."
+    )
+    assert max(wine_r) / min(wine_r) == pytest.approx(1.0, abs=1e-12), (
+        f"wine's two drivers stopped being proportional (ratios {wine_r}). Wine has ONE sugar "
+        f"slot, so the ratio is the constant q_sugar_max*co2_yield*scale that D-227 unfolded "
+        f"out of k_ester_volatil -- and wine's re-anchoring factor was DERIVED from it."
+    )
+    # And that constant is the number wine's k moved by, which is what makes the wine half a
+    # derivation rather than a fit.
+    assert wine_r[0] == pytest.approx(1.0 / 2.5252809, rel=1e-6)
 
 
 def test_beers_aroma_temperature_response_is_the_one_its_activation_energies_were_solved_for():
@@ -1611,8 +1773,14 @@ def test_the_ethyl_acetate_band_spans_its_sourced_ale_range_and_its_top_reaches_
     # bad corner and it reached OAV 1.112 -- above the threshold, and reachable in a drawn
     # ensemble. Under growth-extent coupling synthesis is speed-invariant and only the stripping
     # sink still reads the flux, so a slower beer now strips MORE and packages LESS: the low edge
-    # falls to 0.955 and the worst corner is the HIGH edge instead, at 1.043. Both are asserted,
-    # because "the reachable maximum" is the claim and it changed which edge holds it.
+    # falls and the worst corner is the HIGH edge instead. Both are asserted, because "the
+    # reachable maximum" is the claim and D-226 changed which edge holds it.
+    #
+    # D-227 SHRANK THE WHOLE CORNER without moving its owner: the sink's driver became the
+    # evolving CO2, whose integral to dryness `q_sugar_max` cannot change, so the two edges
+    # close from 0.9555/1.0428 onto 0.9978/1.0039. The high edge still holds the maximum and it
+    # is still (just) over the threshold, which is the honest reading -- the source says a sound
+    # ale sits at or below it, and the top of this molecule's own range should reach it.
     q_lo, q_hi = _band_edges(beer, "q_sugar_max", 0.634, 0.818)
     slow = _beer_aroma_levels_mgl(
         _beer_data_dir_at(tmp_path, k_ethyl_acetate=band.high, q_sugar_max=q_lo)
@@ -1620,10 +1788,18 @@ def test_the_ethyl_acetate_band_spans_its_sourced_ale_range_and_its_top_reaches_
     fast = _beer_aroma_levels_mgl(
         _beer_data_dir_at(tmp_path, k_ethyl_acetate=band.high, q_sugar_max=q_hi)
     )
-    assert slow["ethyl_acetate"] / threshold_mgl == pytest.approx(0.9555, abs=0.01)
-    assert fast["ethyl_acetate"] / threshold_mgl == pytest.approx(1.0428, abs=0.01)
-    assert max(slow["ethyl_acetate"], fast["ethyl_acetate"]) / threshold_mgl < 1.112, (
-        "D-226 is supposed to have REDUCED the reachable ethyl-acetate maximum, not raised it."
+    assert slow["ethyl_acetate"] / threshold_mgl == pytest.approx(0.9978, abs=0.005)
+    assert fast["ethyl_acetate"] / threshold_mgl == pytest.approx(1.0039, abs=0.005)
+    assert max(slow["ethyl_acetate"], fast["ethyl_acetate"]) / threshold_mgl < 1.0428, (
+        "D-226 REDUCED the reachable ethyl-acetate maximum from 1.112 to 1.043 and D-227 "
+        "reduced it again to 1.004; a rise means the sink has stopped riding evolved CO2."
+    )
+    # The SPREAD between the two corners is the quantity D-227 acts on, and pinning it here
+    # rather than only the two endpoints is deliberate: two endpoint pins with a 0.005 tolerance
+    # would still pass if the band re-opened by 1 %, and the spread is what the beat claims.
+    assert abs(fast["ethyl_acetate"] - slow["ethyl_acetate"]) / threshold_mgl < 0.010, (
+        "the two q_sugar_max corners have re-opened; D-227 closed them from 0.087 to 0.006 "
+        "of a threshold by making the sink read evolved CO2 rather than the flux shape."
     )
 
 
@@ -1731,7 +1907,12 @@ def test_beers_solventy_descriptor_axis_changed_owner_and_fell_at_d224():
 
     fruity = descriptors.readings["fruity"]
     assert fruity.dominant == "isoamyl_acetate"
-    assert fruity.magnitude == pytest.approx(1.840, abs=0.01)
+    # D-227: 1.8333 -> 1.8294, the -0.22 % that beer's isoamyl acetate moved (it is the one
+    # ester reading its own precursor pool, so the k solve that holds the other two EXACTLY
+    # cannot hold it). Re-pinned to the value the engine returns, not to the 1.840 D-224 wrote:
+    # that pin was 0.36 % away from the 1.8333 it was pinning and only its 0.01 tolerance hid
+    # the gap [[feedback-pin-tolerance-vs-solver-tolerance]].
+    assert fruity.magnitude == pytest.approx(1.8294, abs=0.005)
     assert fruity.magnitude > 1.0, "an ale's banana note is above threshold (D-96)"
 
 
@@ -1892,7 +2073,12 @@ def test_beers_apple_note_reaches_its_threshold_without_moving_any_descriptor_ax
         f"its threshold while isoamyl acetate keeps the axis at 1.840; a change of owner here is "
         f"a different beer and needs its own record."
     )
-    assert fruity.magnitude == pytest.approx(1.840, abs=0.01)
+    # D-227: 1.8333 -> 1.8294, the -0.22 % that beer's isoamyl acetate moved (it is the one
+    # ester reading its own precursor pool, so the k solve that holds the other two EXACTLY
+    # cannot hold it). Re-pinned to the value the engine returns, not to the 1.840 D-224 wrote:
+    # that pin was 0.36 % away from the 1.8333 it was pinning and only its 0.01 tolerance hid
+    # the gap [[feedback-pin-tolerance-vs-solver-tolerance]].
+    assert fruity.magnitude == pytest.approx(1.8294, abs=0.005)
     assert descriptors.above_threshold() == ["fruity"]
 
 

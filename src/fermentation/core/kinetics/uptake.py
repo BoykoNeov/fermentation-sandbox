@@ -67,7 +67,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from fermentation.core.chemistry import (
-    carbon_mass_fraction,
     co2_yield,
     ethanol_yield,
     sugar_species,
@@ -75,14 +74,15 @@ from fermentation.core.chemistry import (
 from fermentation.core.kinetics.carbon_routing import (
     fermentative_uptake_rates as _fermentative_uptake_rates,
 )
+from fermentation.core.kinetics.carbon_routing import (
+    realised_yield_carbon_diversion as _realised_yield_carbon_diversion,
+)
+from fermentation.core.kinetics.carbon_routing import (
+    realised_yield_scale as _realised_yield_scale,
+)
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
-
-#: Representative species whose formula carbon-accounts each byproduct pool. The
-#: minor-byproduct lump (``Byp``) is booked as succinic acid (decision D-16).
-_GLYCEROL = "glycerol"
-_BYPRODUCT = "succinic_acid"
 
 
 class SugarUptakeToEthanolCO2(Process):
@@ -142,15 +142,13 @@ class SugarUptakeToEthanolCO2(Process):
         # the code it guards, so the two callers cannot guard differently.
 
         # Realised-yield byproduct diversion (decision D-16). Default 0 ⇒ the
-        # theoretical Gay-Lussac core (togglable off). ``.get`` keeps hand-built
-        # test param maps that predate these knobs working as the pure core.
+        # theoretical Gay-Lussac core (togglable off). The species choice and the
+        # carbon arithmetic moved to ``carbon_routing`` at D-227, because
+        # ``fermentative_co2_rate`` has to compute the SAME diversion this loop does
+        # and a second copy of it is the drift D-180's helper exists to prevent.
         y_gly = params.get("Y_glycerol_sugar", 0.0)
         y_byp = params.get("Y_byproduct_sugar", 0.0)
-        # Carbon [g C] diverted to byproducts per g sugar consumed — independent of
-        # which sugar, since it is booked against each pool's own carbon fraction.
-        diverted_c = y_gly * carbon_mass_fraction(_GLYCEROL) + y_byp * carbon_mass_fraction(
-            _BYPRODUCT
-        )
+        diverted_c = _realised_yield_carbon_diversion(params)
 
         e_slice = schema.slice("E")
         co2_slice = schema.slice("CO2")
@@ -176,13 +174,7 @@ class SugarUptakeToEthanolCO2(Process):
             d[s_slice.start + i] = -r_i
             if divert:
                 # Share of this sugar's carbon still fermented to ethanol+CO2.
-                scale = 1.0 - diverted_c / carbon_mass_fraction(sp)
-                if scale < 0.0:
-                    raise ValueError(
-                        f"byproduct yields divert more carbon ({diverted_c:.4g} g C/g) than "
-                        f"{sp} carries ({carbon_mass_fraction(sp):.4g} g C/g); reduce "
-                        "Y_glycerol_sugar/Y_byproduct_sugar"
-                    )
+                scale = _realised_yield_scale(sp, diverted_c)
                 d[gly_slice] += y_gly * r_i
                 d[byp_slice] += y_byp * r_i
             else:

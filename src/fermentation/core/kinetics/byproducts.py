@@ -168,6 +168,9 @@ from fermentation.core.kinetics.carbon_routing import (
     draw_carbon_from_sugar as _draw_carbon_from_sugar,
 )
 from fermentation.core.kinetics.carbon_routing import (
+    fermentative_co2_rate as _fermentative_co2_rate,
+)
+from fermentation.core.kinetics.carbon_routing import (
     fermentative_flux_shape as _fermentative_flux_shape,
 )
 from fermentation.core.kinetics.carbon_routing import (
@@ -1252,7 +1255,15 @@ class EsterVolatilization(Process):
     #: is the same physical mechanism in both media.
     reads: tuple[str, ...] = (
         "k_ester_volatil",
+        # D-227: the gas flow is now the fermentative CO2 rate, so this Process reads the
+        # whole uptake rate law rather than a Monod stand-in for it. ``reads`` has two
+        # masters — tier propagation AND sampler scope (D-160) — so every parameter that
+        # rate law consumes is declared here, exactly as the uptake Process declares them.
+        "q_sugar_max",
         "K_sugar_uptake",
+        "K_repression",
+        "Y_glycerol_sugar",
+        "Y_byproduct_sugar",
         "E_a_uptake",
         "dH_ester_volatil",
         "T_ref",
@@ -1262,8 +1273,10 @@ class EsterVolatilization(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
-        if flux <= 0.0:
+        # D-227: the driver is the CO2 the ferment is ACTUALLY evolving, from the shared
+        # helper the uptake Process books its own CO2 with — not a Monod stand-in for it.
+        co2_rate = _fermentative_co2_rate(y, schema, params)
+        if co2_rate <= 0.0:
             return d
         temp = float(y[schema.slice("T")][0])
         f_gas = arrhenius_factor(temp, params["E_a_uptake"], params["T_ref"])  # CO2 gas flow
@@ -1272,7 +1285,7 @@ class EsterVolatilization(Process):
             liquid = max(float(y[schema.slice(spec.pool)][0]), 0.0)
             if liquid <= 0.0:  # nothing in this liquid pool to strip
                 continue
-            rate = params["k_ester_volatil"] * flux * f_gas * f_part * liquid
+            rate = params["k_ester_volatil"] * co2_rate * f_gas * f_part * liquid
             # Liquid → its OWN headspace twin: the pair shares one molecule's carbon weight,
             # so each transfer is carbon-neutral independently (D-96).
             d[schema.slice(spec.pool)] = -rate

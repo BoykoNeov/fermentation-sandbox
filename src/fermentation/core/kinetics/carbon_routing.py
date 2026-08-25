@@ -25,7 +25,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from fermentation.core.chemistry import carbon_mass_fraction, sugar_species
+from fermentation.core.chemistry import carbon_mass_fraction, co2_yield, sugar_species
 from fermentation.core.state import FloatArray, StateSchema
 
 
@@ -675,6 +675,97 @@ def fermentative_uptake_rates(
             continue
         rates[i] = q_max * x * (s_i / (k_su + s_i)) * repression
     return rates
+
+
+#: Representative species whose formula carbon-accounts each realised-yield byproduct pool.
+#: The minor-byproduct lump (``Byp``) is booked as succinic acid (decision D-16). They live
+#: here rather than in ``uptake.py`` because :func:`fermentative_co2_rate` must compute the
+#: same diversion the uptake Process does, and a second copy of the species choice is exactly
+#: the drift this module exists to prevent (D-227).
+_GLYCEROL = "glycerol"
+_BYPRODUCT = "succinic_acid"
+
+
+def realised_yield_carbon_diversion(params: Mapping[str, float]) -> float:
+    """Carbon [g C per g sugar] diverted out of the ethanol+CO2 split (decision D-16).
+
+    ``Y_glycerol_sugar·c(glycerol) + Y_byproduct_sugar·c(succinic)``, independent of which
+    sugar is being fermented because each yield is booked against its own pool's carbon
+    fraction. Both yields default to 0 — at 0 this returns 0.0 and the fermentative split is
+    exactly theoretical Gay-Lussac, which is what keeps the validated core togglable.
+
+    ``.get`` rather than ``[]`` keeps hand-built test parameter maps that predate these two
+    knobs working as the pure core, which is the behaviour the uptake Process shipped with.
+    """
+    y_gly = params.get("Y_glycerol_sugar", 0.0)
+    y_byp = params.get("Y_byproduct_sugar", 0.0)
+    return y_gly * carbon_mass_fraction(_GLYCEROL) + y_byp * carbon_mass_fraction(_BYPRODUCT)
+
+
+def realised_yield_scale(species: str, diverted_carbon: float) -> float:
+    """Share of ``species``' carbon still fermented to ethanol+CO2 after the D-16 diversion.
+
+    ``1 - diverted_carbon / c(species)``. Raises when the yields would divert more carbon than
+    the sugar carries, which is a mis-parameterisation rather than a state the solver can reach.
+    """
+    if diverted_carbon <= 0.0:
+        return 1.0
+    carbon = carbon_mass_fraction(species)
+    scale = 1.0 - diverted_carbon / carbon
+    if scale < 0.0:
+        raise ValueError(
+            f"byproduct yields divert more carbon ({diverted_carbon:.4g} g C/g) than "
+            f"{species} carries ({carbon:.4g} g C/g); reduce "
+            "Y_glycerol_sugar/Y_byproduct_sugar"
+        )
+    return scale
+
+
+def fermentative_co2_rate(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+    """CO2 evolved by the fermentative flux [g CO2 /L/h] (decision D-227).
+
+    ``Σ_i co2_yield(species_i) · realised_yield_scale(species_i) · r_i`` over the per-slot
+    rates :func:`fermentative_uptake_rates` returns — that is, **the CO2 term of the uptake
+    Process, computed once and shared**, exactly as that helper shares the rates themselves.
+
+    **Why this exists.** :class:`~fermentation.core.kinetics.byproducts.EsterVolatilization`
+    strips liquid ester into the headspace on the rising CO2 stream, so the gas flow is its
+    driver. Until D-227 it used :func:`fermentative_flux_shape`, a single Monod on TOTAL sugar,
+    and ``k_ester_volatil``'s own unit comment recorded what that cost: it "folds
+    ``q_sugar_max*co2_yield*scale*(gas-volume/Henry-prefactor)`` into one constant". Folding a
+    ferment-SPEED knob into a stripping constant means the two must be re-anchored together,
+    and across four beats of ``q_sugar_max`` re-anchoring they never were. Unfolded, the
+    speed knob enters the sink through the flux where it belongs and the constant left behind
+    is the gas-volume/Henry prefactor its source actually describes.
+
+    **It is also a different quantity, not a rename** — beer's three sugars are consumed under
+    sequential repression, so ``Σ r_i`` and ``X·S_total/(K+S_total)`` differ in shape, and the
+    realised-yield diversion (wine) scales the CO2 but not the Monod. Measured on the beer
+    calibration run the two drivers' normalised cumulative curves differ by 6.24 % at the worst
+    point. The decisive property is integral rather than shape: total evolved CO2 to dryness is
+    fixed by the sugar there was, so it is invariant to ``q_sugar_max`` to six figures where
+    the retired shape spans 1.64× across that parameter's band plus its own retired value.
+
+    **What it deliberately EXCLUDES.** Fermentation is not the only CO2 source in the state —
+    Ehrlich decarboxylation, Brett and the oxidative/aging Strecker routes all write the
+    ``CO2`` slot. This returns the FERMENTATIVE term only, for two reasons: the Ehrlich CO2 is
+    co-produced with the very alcohols whose esters this sink strips, so reading the whole slot
+    would make the sink's rate law self-referential; and the aging routes run when there is no
+    gas stream at all. Sized rather than asserted at D-227 §4.
+
+    NB like :func:`fermentative_uptake_rates` these are the **UNMODIFIED** rates — the uptake
+    Arrhenius is a :class:`~fermentation.core.process.RateModifier` applied to the Process, not
+    to this helper. A caller that needs the realised gas flow must apply that factor itself, as
+    ``EsterVolatilization``'s ``f_gas`` does (the D-32 coupling, in the form it takes here).
+    """
+    rates = fermentative_uptake_rates(y, schema, params)
+    diverted_c = realised_yield_carbon_diversion(params)
+    total = 0.0
+    for species, r_i in zip(sugar_species(schema), rates, strict=True):
+        if r_i <= 0.0:
+            continue
+        total += co2_yield(species) * realised_yield_scale(species, diverted_c) * r_i
+    return total
 
 
 def fermentative_flux_shape(y: FloatArray, schema: StateSchema, k_sat: float) -> float:
