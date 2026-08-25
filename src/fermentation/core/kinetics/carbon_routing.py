@@ -757,6 +757,22 @@ def fermentative_co2_rate(y: FloatArray, schema: StateSchema, params: Mapping[st
     Arrhenius is a :class:`~fermentation.core.process.RateModifier` applied to the Process, not
     to this helper. A caller that needs the realised gas flow must apply that factor itself, as
     ``EsterVolatilization``'s ``f_gas`` does (the D-32 coupling, in the form it takes here).
+
+    **The two consumers of this helper reach that factor by DIFFERENT ROUTES, and the asymmetry
+    is deliberate rather than an oversight.**
+    :class:`~fermentation.core.kinetics.organic_acids.OrganicAcidExcretion` is named as an extra
+    target of ``ArrheniusTemperature.for_uptake``, so the modifier scales its whole derivative;
+    :class:`~fermentation.core.kinetics.byproducts.EsterVolatilization` is NOT a target and
+    multiplies by ``arrh(E_a_uptake)`` itself, because it needs a SECOND and independent
+    Arrhenius factor beside it (``dH_ester_volatil``, the Henry partition) and a modifier can
+    only contribute one. Measured through the assembled ``ProcessSet`` at 28 °C, both carry the
+    uptake factor **exactly 1.0000 times** — the routes are numerically identical and
+    ``test_both_consumers_of_the_flux_helper_carry_the_uptake_arrhenius_exactly_once`` pins that.
+    Adding the sink to ``for_uptake`` "for consistency" while keeping ``f_gas`` would DOUBLE the
+    factor; deleting ``f_gas`` would drop it. Both were run: the packaged 15/25 °C ester span
+    goes 6.8953 → 5.2784 and → 8.7751 respectively, so the beer temperature guard does catch
+    them — but it reports them against ``E_a_esters``, a parameter that did not move. The
+    exponent test exists to name the cause (D-227).
     """
     rates = fermentative_uptake_rates(y, schema, params)
     diverted_c = realised_yield_carbon_diversion(params)

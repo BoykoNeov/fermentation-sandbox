@@ -56,6 +56,14 @@ D-226's open item 1 is **ENTERED AND CLOSED**. `EsterVolatilization` now strips 
 * **Temperature is UNTOUCHED** (fusels 1.21822, esters 6.89570 vs D-226's solved 1.2182 / 6.8953),
   which is what makes the speed result attributable.
 
+* **The sink is NOT an `ArrheniusTemperature.for_uptake` target and `OrganicAcidExcretion` IS —
+  the asymmetry is DELIBERATE and measured at exactly 1.0000 factor each.** The sink applies
+  `arrh(E_a_uptake)` by hand because it needs a second independent Arrhenius (`dH_ester_volatil`)
+  and a modifier gives only one. **Never "wire both the same way"** — that DOUBLES it (span
+  6.8953→5.2784); deleting `f_gas` drops it (→8.7751). Both run. The temperature guard catches
+  both but blames `E_a_esters`, so the exponent test is for **ATTRIBUTION, not detection** — the
+  draft claim that it stayed GREEN was FALSE and was run rather than assumed.
+
 ## Still open after D-227
 
 1. **`mu_max`'s TIMING residue** — not fixable by a different driver; the gas really does arrive

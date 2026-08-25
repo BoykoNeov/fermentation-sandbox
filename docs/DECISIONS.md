@@ -32735,8 +32735,41 @@ it guards the helper's agreement with the uptake Process, which reverting the si
 * `test_no_drawn_speed_knob_moves_...` re-pinned per arm and per pool, with the blanket bound set by
   the WORST arm and that arm NAMED in the comment, so the owner change in §6 is asserted rather than
   described.
+* `test_both_consumers_of_the_flux_helper_carry_the_uptake_arrhenius_exactly_once` (NEW, §11).
 
-Suite **1860 passed, 5 xfailed** (was 1858 + 5); `ruff` and `mypy` clean.
+Suite **1861 passed, 5 xfailed** (was 1858 + 5); `ruff` and `mypy` clean.
+
+### 11. The hazard the shared helper's own docstring names, now that it has TWO consumers
+
+`fermentative_uptake_rates` returns UNMODIFIED rates and warns, in its own docstring, that
+*"every RateModifier that scales uptake must also name any Process built on this helper, or the
+acid yield would be taken against a flux the solver never ran"*. That warning was written for
+`OrganicAcidExcretion`. **This beat added the second consumer and the first draft of it did not
+check what the first consumer does.** Checked afterwards, the two are asymmetric:
+`OrganicAcidExcretion` IS an extra target of `ArrheniusTemperature.for_uptake`, and
+`EsterVolatilization` is NOT — it multiplies by `arrh(E_a_uptake)` itself.
+
+**Measured through the assembled `ProcessSet` at 28 °C, both carry the uptake factor exactly
+1.0000 times**, so the two routes are numerically identical and the shipped model is correct. The
+asymmetry is not arbitrary either: the sink needs a SECOND independent Arrhenius beside it (the
+Henry partition, `dH_ester_volatil`) and a modifier contributes only one. But it was an
+undocumented choice, so it is now in the helper's docstring and under a test that measures the
+EXPONENT rather than inspecting the wiring.
+
+**And the claim that test was first written to justify was false, which is why it was run.** Its
+draft docstring asserted that the beer temperature guard would stay GREEN through a doubling —
+an assumed GREEN, exactly the thing this archive keeps being caught by
+[[feedback-run-the-mutation-the-claim-names]]. Both mutations were then actually applied:
+
+| mutation | packaged 15/25 °C ester span | exponent | temperature guard |
+|---|---|---|---|
+| sink added to `for_uptake`, `f_gas` kept | 6.8953 → **5.2784** | 2.0000 | RED |
+| `f_gas` deleted | 6.8953 → **8.7751** | 0.0000 | RED |
+
+So the temperature guard *does* catch both. What it cannot do is say why: its message names
+`E_a_esters`, a parameter that did not move, and would send a reader to the wrong file. The new
+test's value is therefore **attribution rather than detection**, and the record says that rather
+than the stronger thing the draft claimed. Verified RED in both directions with the numbers above.
 
 ### 10. Scope not entered
 

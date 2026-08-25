@@ -31,7 +31,7 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
 
 ## Status (2026-08-25)
 M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-227**; sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1860 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
+closed** (D-148/9). Suite **1861 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
 again since D-223** — 6.04 d inside 5-7 — but the pass is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
 terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live

@@ -23,6 +23,7 @@ per-Process mechanics it rests on, plus the honest per-pool temperature directio
 (fusels rise with T; wine liquid esters fall, beer liquid esters rise).
 """
 
+import math
 import re
 from pathlib import Path
 
@@ -1563,6 +1564,83 @@ def test_the_ester_sink_rides_evolved_co2_and_not_the_flux_shape_that_stood_in_f
     # And that constant is the number wine's k moved by, which is what makes the wine half a
     # derivation rather than a fit.
     assert wine_r[0] == pytest.approx(1.0 / 2.5252809, rel=1e-6)
+
+
+def test_both_consumers_of_the_flux_helper_carry_the_uptake_arrhenius_exactly_once():
+    """The hazard `fermentative_uptake_rates`' own docstring names, now that it has two callers.
+
+    That helper returns UNMODIFIED rates, so anything built on it must acquire
+    ``arrh(E_a_uptake)`` somehow or it books its yield against a flux the solver never ran --
+    the D-32 coupling. Its two consumers acquire it by DIFFERENT routes:
+    ``OrganicAcidExcretion`` is an extra target of ``ArrheniusTemperature.for_uptake`` and has
+    its whole derivative scaled; ``EsterVolatilization`` is not a target and applies the factor
+    itself, because it needs a second independent Arrhenius (the Henry partition) beside it and
+    a modifier contributes only one.
+
+    **This guard is for ATTRIBUTION, not detection, and the difference was measured rather than
+    assumed.** The first draft of this docstring claimed the temperature guard would stay GREEN
+    through a doubling. Both mutations were then actually run, and it does NOT: adding the sink
+    to ``for_uptake`` while keeping ``f_gas`` takes the packaged 15/25 C ester span 6.8953 ->
+    5.2784, and deleting ``f_gas`` takes it to 8.7751; ``test_beers_aroma_temperature_response_...``
+    fails on both. What it CANNOT do is say why -- its message names ``E_a_esters`` and sends the
+    reader to a parameter that did not move. This test reports "carries arrh(E_a_uptake) 2.0000
+    times" and names the two edits that produce it. Verified RED in BOTH directions with those
+    exact numbers [[feedback-verify-an-xfail-fails-for-its-stated-reason]].
+
+    So the exponent is measured directly -- perturb ``E_a_uptake`` and read how many times the
+    factor appears -- rather than inferred from the wiring, which is what makes the message
+    specific enough to be worth having beside a guard that already goes red.
+    """
+    scenario = Scenario(
+        name="exposure",
+        medium="beer",
+        initial={
+            "glucose_gpl": 15.0,
+            "maltose_gpl": 70.0,
+            "maltotriose_gpl": 15.0,
+            "yan_mgl": 200.0,
+            "pitch_gpl": 1.0,
+        },
+        # Well off T_ref (20 C), or every Arrhenius factor is 1.0 and the exponent is undefined
+        # -- the same blind spot D-226 arm C found in the level guards.
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=28.0)],
+        duration_days=14.0,
+    )
+    compiled = compile_scenario(scenario)
+    schema = compiled.schema
+    y = compiled.y0.copy()
+    y[schema.slice("X")] = 2.0
+    y[schema.slice("S")] = np.asarray([10.0, 60.0, 14.0], dtype=float)
+    y[schema.slice("T")] = 28.0 + 273.15
+    y[schema.slice("ethyl_acetate")] = 0.02
+
+    base = compiled.param_values["E_a_uptake"]
+    t_ref = compiled.param_values["T_ref"]
+    temp = 28.0 + 273.15
+
+    def total_at(e_a: float) -> FloatArray:
+        params = dict(compiled.param_values)
+        params["E_a_uptake"] = e_a
+        return compiled.process_set.total_derivatives(0.0, y, params)
+
+    lo, hi = base * 0.9, base * 1.1
+    d_lo, d_hi = total_at(lo), total_at(hi)
+    one_factor = arrhenius_factor(temp, hi, t_ref) / arrhenius_factor(temp, lo, t_ref)
+    assert one_factor > 1.05  # the perturbation has to bite, or the test is vacuous
+
+    # `ethyl_acetate_gas` is the sink's OWN slot: the liquid pool is a net of synthesis and
+    # stripping and would report a blend, which is why the twin is read instead.
+    for label, slot in (
+        ("the ester sink", "ethyl_acetate_gas"),
+        ("the uptake Process itself", "CO2"),
+    ):
+        ratio = float(d_hi[schema.slice(slot)][0]) / float(d_lo[schema.slice(slot)][0])
+        exponent = math.log(ratio) / math.log(one_factor)
+        assert exponent == pytest.approx(1.0, abs=1e-3), (
+            f"{label} carries arrh(E_a_uptake) {exponent:.4f} times, not once. 2.0 means the "
+            f"sink was added to ArrheniusTemperature.for_uptake while keeping its own f_gas; "
+            f"0.0 means f_gas was deleted. Read D-227 and the helper's docstring."
+        )
 
 
 def test_beers_aroma_temperature_response_is_the_one_its_activation_energies_were_solved_for():
