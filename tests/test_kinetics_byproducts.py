@@ -24,6 +24,7 @@ per-Process mechanics it rests on, plus the honest per-pool temperature directio
 """
 
 import re
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -1182,18 +1183,59 @@ def _beer_aroma_levels_mgl(data_dir=None, celsius: float = _BEER_CALIBRATION_CEL
     return {pool: float(traj.series(pool)[-1]) * 1000.0 for pool in _BEER_AROMA_TARGETS_MGL}
 
 
-def _beer_data_dir_at(tmp_path, **values: float):
+def _beer_all_aroma_levels_mgl(data_dir: Path | None = None) -> dict[str, float]:
+    """All EIGHT beer aroma pools, enumerated from the REGISTRIES rather than a literal list.
+
+    ``_beer_aroma_levels_mgl`` above returns the seven pools D-224 hand-listed, and that dict is
+    deliberately frozen at seven so D-225's arm-A measurement stays reproducible. Anything that
+    needs the whole set -- like D-226's invariance guard -- must read
+    ``ESTER_SPECS``/``FUSEL_SPECS``, which is the rule D-225 exists to establish: a literal list
+    cannot fail to be complete, a registry read can.
+    """
+    scenario = _beer_calibration_scenario()
+    compiled = (
+        compile_scenario(scenario, data_dir=data_dir)
+        if data_dir is not None
+        else compile_scenario(scenario)
+    )
+    traj = compiled.run(t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0]))
+    pools = [spec.pool for spec in FUSEL_SPECS] + [spec.pool for spec in ESTER_SPECS]
+    return {pool: float(traj.series(pool)[-1]) * 1000.0 for pool in pools}
+
+
+def _beer_levels_at_celsius(celsius: float) -> dict[str, float]:
+    """All eight aroma pools at one isothermal temperature, registry-enumerated."""
+    traj = compile_scenario(_beer_calibration_scenario(celsius)).run(
+        t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0])
+    )
+    pools = [spec.pool for spec in FUSEL_SPECS] + [spec.pool for spec in ESTER_SPECS]
+    return {pool: float(traj.series(pool)[-1]) * 1000.0 for pool in pools}
+
+
+def _beer_data_dir_at(tmp_path, allow_out_of_band: bool = False, **values: float):
     """A copied parameter dir with named ``beer_generic.yaml`` values overridden.
 
     A copied dir rather than a resolved-map patch, for the D-214/D-223 reason: the arm has to be
     present at LOAD time so the compiled ProcessSet carries it. Every override here is a band
     EDGE of the parameter it names, so the value stays inside its own ``uncertainty`` and the
     ``Parameter`` schema accepts it without the band having to move too.
+
+    ``allow_out_of_band`` (D-226) widens the named parameter's own band to admit the value, and
+    is for ONE purpose: replaying a parameter's own RETIRED value, which by definition sits
+    outside the band that was narrowed after it was retired (``q_sugar_max`` 0.5 against today's
+    0.634-0.818, ``mu_max`` 0.098 against 0.053-0.075). It is not a way to reach a value the
+    file rejects -- the widened band travels with the arm and is discarded with it.
     """
     import re
     import shutil
 
-    dest = tmp_path / ("beer_arm_" + "_".join(f"{k}{v}" for k, v in sorted(values.items())))
+    dest = tmp_path / (
+        "beer_arm_"
+        + "_".join(f"{k}{v}" for k, v in sorted(values.items()))
+        + ("_oob" if allow_out_of_band else "")
+    )
+    if dest.exists():
+        return dest
     shutil.copytree(default_data_dir(), dest)
     path = dest / "beer_generic.yaml"
     text = path.read_text(encoding="utf-8")
@@ -1201,6 +1243,24 @@ def _beer_data_dir_at(tmp_path, **values: float):
         match = re.search(rf"(^{name}:\n  value: )([0-9.eE+-]+)", text, re.MULTILINE)
         assert match is not None, f"{name} not found in beer_generic.yaml"
         text = text[: match.start(2)] + repr(float(value)) + text[match.end(2) :]
+        if allow_out_of_band:
+            # Rebuild the edges by SLICE, never by str.replace on the parsed float: a YAML
+            # literal like `6.93e-5` round-trips through float() as `6.93e-05`, so a replace
+            # silently no-ops and the arm would load with its ORIGINAL band.
+            band = re.search(
+                rf"^{name}:\n(?:.*\n)*?  uncertainty: \{{ low: ([0-9.eE+-]+), high: ([0-9.eE+-]+)",
+                text,
+                re.MULTILINE,
+            )
+            assert band is not None, f"{name} has no uncertainty band to widen"
+            low, high = float(band.group(1)), float(band.group(2))
+            text = (
+                text[: band.start(1)]
+                + repr(min(low, value))
+                + text[band.end(1) : band.start(2)]
+                + repr(max(high, value))
+                + text[band.end(2) :]
+            )
     path.write_text(text, encoding="utf-8")
     return dest
 
@@ -1256,68 +1316,165 @@ def test_the_finished_beer_lands_the_aroma_levels_its_rate_constants_are_defined
         )
 
 
-def test_each_drawn_speed_knob_moves_only_the_half_of_the_aroma_set_it_is_coupled_to(tmp_path):
-    """The mechanism behind D-224, as a signature rather than an argument.
+def test_no_drawn_speed_knob_moves_the_five_higher_alcohols_and_barely_moves_the_esters(
+    tmp_path,
+):
+    """The property D-226 exists to buy, and the exact size of the half it does NOT buy.
 
-    The two halves are coupled to DIFFERENT things and the band edges separate them cleanly:
+    This REPLACES D-224's ``..._moves_only_the_half_of_the_aroma_set_it_is_coupled_to``, whose
+    whole premise was the defect: it asserted that ``mu_max`` moves the five Ehrlich alcohols
+    (x1.094/x0.774) and ``q_sugar_max`` moves ethyl acetate (x1.111/x0.897), and it was RIGHT
+    about the engine it was written for. Those sensitivities are what made four beats of
+    ferment-speed re-anchoring silently move eight calibrated aroma levels. Under the
+    growth-extent coupling neither knob reaches the synthesis term at all, because
+    ``int(mu*X*f_growth) dt`` is ``YAN / biomass_N_fraction`` -- a conservation identity, not an
+    approximation.
 
-    * ``mu_max`` (growth) moves the five Ehrlich higher alcohols and leaves ethyl acetate
-      alone to within 0.03 %. The Ehrlich Process is gated on nitrogen (``N/(K_n+N)``) but
-      draws its carbon from ``S``, so its output is not BOUNDED by the nitrogen it is
-      nominally made from: a slower-growing yeast holds the gate open longer and makes more
-      higher alcohol out of the same YAN. Every run here ends at N ~ 0.
+    **The five higher alcohols are EXACTLY invariant and the three esters are NOT, and the
+    difference is a sink rather than a source.** The alcohols have no volatilisation Process, so
+    nothing downstream re-introduces a speed dependence: they measure 1.00000 at both knobs' band
+    edges AND at their retired values. The esters are stripped by
+    :class:`~fermentation.core.kinetics.byproducts.EsterVolatilization`, which still rides the
+    fermentative flux -- a slower beer evolves its CO2 over more biomass-hours and strips more
+    away. That residue is REAL and is pinned here rather than rounded off, because a test named
+    for invariance that quietly tolerated 4.5 % would be the same defect in the other direction.
 
-      The separation is a property of the two KNOBS, not of the pools, and D-224's arm A
-      measured the difference: reverting the five Ehrlich ``k`` to their pre-D-224 values
-      (a 1.68x change, far larger than this band's 1.09/0.77) moves packaged ethyl acetate
-      0.077 %, because the higher alcohols draw their carbon out of the same ``S`` -- 0.28 %
-      of the sugar consumed rather than 0.19 % -- and ethyl acetate reads ``S/(K_su+S)``.
-      That is enough to break the D-223 joint-corner pin, whose tolerance is 0.025 %.
-    * ``q_sugar_max`` (uptake) moves ethyl acetate and leaves the higher alcohols alone. That
-      pool is biomass-hour-linked, so a faster ferment packages less of it at identical total
-      sugar.
-    * ``isoamyl_acetate`` reads BOTH, because it is first-order in the ``isoamyl_alcohol``
-      pool (D-97) on top of the shared flux shape. THAT is why beer's two ester calibrations
-      looked like they disagreed at D-223: this one inherited the higher alcohols' 1.61x error
-      and came out 1.27x ABOVE target while ethyl acetate sat 0.79x BELOW it.
-
-    Pinned at the drawn band EDGES, not at the nominal, because both knobs are sampled
-    (feedback-pin-the-band-not-the-nominal, and D-223 Sec 9 committed exactly that defect).
+    Both the retired values are included deliberately: they are what makes this a statement
+    about the drift that actually happened rather than about a band nobody moved.
     """
-    nominal = _beer_aroma_levels_mgl()
-    # The edges are READ, never transcribed. Both bands were rebuilt inside the last three
-    # records -- D-222 rebuilt `mu_max`'s and D-223 rebuilt `q_sugar_max`'s -- so a literal here
-    # would silently become an INTERIOR point the next time either widens, while this test's name
-    # went on claiming the edge.
+    nominal = _beer_all_aroma_levels_mgl()
+    # The edges are READ, never transcribed (D-224's hardening, kept).
     beer = load_parameters(default_data_dir() / "beer_generic.yaml")
     mu_lo, mu_hi = _band_edges(beer, "mu_max", 0.053, 0.075)
     q_lo, q_hi = _band_edges(beer, "q_sugar_max", 0.634, 0.818)
 
-    mu_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=mu_lo))
-    mu_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=mu_hi))
-    for pool in _BEER_EHRLICH_POOLS:
-        assert mu_slow[pool] / nominal[pool] == pytest.approx(1.094, abs=0.005), pool
-        assert mu_fast[pool] / nominal[pool] == pytest.approx(0.774, abs=0.005), pool
-    # ...and ethyl acetate does not read the growth rate AT ALL.
-    assert mu_slow["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.0, abs=1e-3)
-    assert mu_fast["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.0, abs=1e-3)
-    assert mu_slow["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(
-        1.085, abs=0.005
-    )
-    assert mu_fast["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(
-        0.789, abs=0.005
-    )
+    arms = {
+        "mu_max low": _beer_all_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=mu_lo)),
+        "mu_max high": _beer_all_aroma_levels_mgl(_beer_data_dir_at(tmp_path, mu_max=mu_hi)),
+        "q_sugar_max low": _beer_all_aroma_levels_mgl(
+            _beer_data_dir_at(tmp_path, q_sugar_max=q_lo)
+        ),
+        "q_sugar_max high": _beer_all_aroma_levels_mgl(
+            _beer_data_dir_at(tmp_path, q_sugar_max=q_hi)
+        ),
+    }
+    for arm, levels in arms.items():
+        for pool in _BEER_EHRLICH_POOLS:
+            assert levels[pool] / nominal[pool] == pytest.approx(1.0, abs=1e-4), (
+                f"{pool} moved {levels[pool] / nominal[pool]:.6f}x at {arm}. The five Ehrlich "
+                f"alcohols are coupled to growth EXTENT and have no stripping sink, so this "
+                f"ratio is a conservation identity and should read 1.000000. If it does not, "
+                f"the producer is reading a speed knob again -- read D-226 before re-pinning."
+            )
+        # The esters DO move, through the sink, and by how much is the claim.
+        assert levels["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.0, abs=0.05), (
+            arm
+        )
 
-    q_slow = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=q_lo))
-    q_fast = _beer_aroma_levels_mgl(_beer_data_dir_at(tmp_path, q_sugar_max=q_hi))
-    assert q_slow["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(1.111, abs=0.005)
-    assert q_fast["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.897, abs=0.005)
+    # The residue, pinned per edge and per pool. Sizes measured at D-226; the SIGN is reversed
+    # from D-224's (a slower ferment now packages LESS ester, because it strips for longer).
+    for pool in ("ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate"):
+        assert arms["q_sugar_max low"][pool] / nominal[pool] == pytest.approx(0.9549, abs=0.002), (
+            f"{pool}'s residual q_sugar_max sensitivity is not the measured one. Under D-224's "
+            f"flux coupling this edge read 1.111 (MORE ester from a slower beer); it now reads "
+            f"0.955 (LESS), because synthesis is speed-invariant and only the stripping sink "
+            f"still reads the flux."
+        )
+        assert arms["q_sugar_max high"][pool] / nominal[pool] == pytest.approx(1.0416, abs=0.002)
+        # mu_max is nearly inert on the esters too -- it never reached them under either coupling.
+        assert arms["mu_max low"][pool] / nominal[pool] == pytest.approx(1.003, abs=0.002)
+        assert arms["mu_max high"][pool] / nominal[pool] == pytest.approx(0.9922, abs=0.002)
+
+    # And the historical arms: what D-223's and D-211's re-anchorings WOULD have done to these
+    # levels under this coupling. This is the beat's headline as a number.
+    retired_q = _beer_all_aroma_levels_mgl(
+        _beer_data_dir_at(tmp_path, allow_out_of_band=True, q_sugar_max=0.5)
+    )
+    retired_mu = _beer_all_aroma_levels_mgl(
+        _beer_data_dir_at(tmp_path, allow_out_of_band=True, mu_max=0.098)
+    )
     for pool in _BEER_EHRLICH_POOLS:
-        # <1 % either way: the higher alcohols do not read the uptake rate.
-        assert q_slow[pool] / nominal[pool] == pytest.approx(1.0, abs=0.01), pool
-        assert q_fast[pool] / nominal[pool] == pytest.approx(1.0, abs=0.01), pool
-    assert q_slow["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(1.120, abs=0.005)
-    assert q_fast["isoamyl_acetate"] / nominal["isoamyl_acetate"] == pytest.approx(0.888, abs=0.005)
+        # D-211's mu_max change multiplied every one of these by 2.87 under the flux coupling.
+        assert retired_mu[pool] / nominal[pool] == pytest.approx(1.0, abs=1e-4), pool
+        assert retired_q[pool] / nominal[pool] == pytest.approx(1.0, abs=1e-4), pool
+    # D-223's q_sugar_max 0.5 -> 0.72 moved packaged ethyl acetate 20.9 % under the flux
+    # coupling. It would still move it 13.9 % here -- reduced, not eliminated, and the sink is why.
+    assert retired_q["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.861, abs=0.005)
+    assert retired_mu["ethyl_acetate"] / nominal["ethyl_acetate"] == pytest.approx(0.987, abs=0.005)
+
+
+def test_beers_aroma_temperature_response_is_the_one_its_activation_energies_were_solved_for():
+    """Beer's packaged 15/25 C spans — the ONLY axis `E_a_esters` and `E_a_fusels` control.
+
+    **This guard exists because a mutation came back GREEN.** D-226 arm C reverted both beer
+    activation energies (values AND bands) to their pre-D-226 values, which more than DOUBLES the
+    packaged ester temperature span, 6.90x -> 13.50x over 15-25 C. The full suite returned exactly
+    ONE failure, and it was a band-overlap assert on a different pair. Every level guard is blind
+    here by construction: the calibration frame is 20 C, which is `T_ref`, where both Arrhenius
+    factors are exactly 1.0. Wine has had `test_integrated_wine_aroma_temperature_directions` for
+    this since D-21; beer had nothing. A GREEN mutation is what owes a guard.
+
+    The two numbers asserted are not snapshots -- they are the quantities the two constants were
+    SOLVED to hold. D-226 changed what both parameters mean (under the retired flux coupling the
+    observable's apparent activation energy was `E_a - E_a_uptake`; under growth-extent coupling
+    the growth factor cancels against the nitrogen limit and it is `E_a` itself), and each value
+    was then bisected to reproduce the span the retired shape delivered, so that the temperature
+    axis is unchanged BY CONSTRUCTION and D-226's other consequences are attributable to the
+    coupling alone. If either span moves, that construction has been broken.
+
+    Read the fusel span off a pool the ester re-route does NOT debit. `isoamyl_alcohol` measures
+    1.0395x rather than 1.2182x because D-115's re-route spends it on isoamyl acetate, whose own
+    response is steep -- reading the span off that pool is how the first pass of this calibration
+    solved `E_a_fusels` to 4,707 J/mol instead of 14,100.
+    """
+    warm = {}
+    for celsius in (15.0, 20.0, 25.0):
+        warm[celsius] = _beer_levels_at_celsius(celsius)
+
+    def span(pool: str) -> float:
+        return warm[25.0][pool] / warm[15.0][pool]
+
+    # (1) DIRECTION -- the sourced claim (D-19/D-21): a warmer ale carries more of both families.
+    for pool in _BEER_EHRLICH_POOLS + ("ethyl_acetate", "isoamyl_acetate", "ethyl_hexanoate"):
+        assert warm[15.0][pool] < warm[20.0][pool], pool
+
+    # (2) MAGNITUDE -- the numbers the two activation energies were solved to reproduce.
+    # The four Ehrlich pools the ester re-route does not debit share one shape, so one number.
+    for pool in ("propanol", "isobutanol", "active_amyl_alcohol", "2_phenylethanol"):
+        assert span(pool) == pytest.approx(1.2182, rel=0.005), (
+            f"{pool}'s 15/25 C span is {span(pool):.4f}, not the 1.2182 `E_a_fusels` was solved "
+            f"to hold. That is the span the retired flux coupling delivered (E_a_fusels 70,000 "
+            f"minus E_a_uptake 55,100); D-226 re-anchored the parameter to 14,100 to preserve it. "
+            f"Read D-226 Sec 6 before re-pinning -- the parameter's own 'Q10 ~ 2.6' note describes "
+            f"the RATE CONSTANT, not this observable."
+        )
+    # The two mechanically-locked esters share `E_a_esters` and the stripping constant exactly.
+    assert span("ethyl_acetate") == pytest.approx(6.8953, rel=0.005), (
+        f"ethyl acetate's 15/25 C span is {span('ethyl_acetate'):.4f}. `E_a_esters` was solved "
+        f"(151,688, shipped 152,000) to hold the 6.8596 the retired biomass-hour coupling "
+        f"delivered; the shipped 6.8953 is that plus the 0.52 % rounding cost. Reverting the "
+        f"parameter to its retired 200,000 takes this to 13.50 -- which is precisely the mutation "
+        f"the whole suite failed to notice before this test existed."
+    )
+    assert span("ethyl_hexanoate") == pytest.approx(span("ethyl_acetate"), rel=1e-4), (
+        "the two esters are MECHANICALLY LOCKED (same rate law, same E_a_esters, same stripping "
+        "constant), so their temperature spans are equal by construction, not by calibration."
+    )
+    # Isoamyl acetate is steeper than either: it multiplies the ester shape by a precursor pool
+    # that is itself temperature-responsive.
+    assert span("isoamyl_acetate") == pytest.approx(7.6002, rel=0.005)
+    assert span("isoamyl_acetate") > span("ethyl_acetate")
+
+    # (3) THE OTHER SOURCED ORDERING (D-19): warmth shifts the balance TOWARD esters, so the
+    # ester/fusel ratio rises with temperature. Asserted as the ratio it is about, rather than as
+    # the `E_a_fusels < E_a_esters` inequality, which is the same claim in the parameters'
+    # coordinates and is guarded there.
+    cold_ratio = warm[15.0]["ethyl_acetate"] / warm[15.0]["propanol"]
+    hot_ratio = warm[25.0]["ethyl_acetate"] / warm[25.0]["propanol"]
+    assert hot_ratio > cold_ratio, (
+        f"the ester/fusel ratio FALLS with temperature ({cold_ratio:.4f} -> {hot_ratio:.4f}). "
+        f"beer_generic.yaml states the opposite as a sourced direction."
+    )
 
 
 def test_beers_isoamyl_alcohol_stays_below_its_only_sourced_threshold_across_the_growth_band(
@@ -1448,11 +1605,26 @@ def test_the_ethyl_acetate_band_spans_its_sourced_ale_range_and_its_top_reaches_
     # The joint corner with the OTHER drawn knob this pool reads. Stated as a number so a future
     # re-anchoring cannot quietly move it: a nominal-only OAV claim beside a drawn band is what
     # D-224 exists to stop.
-    q_lo = _band_edges(beer, "q_sugar_max", 0.634, 0.818)[0]
-    corner = _beer_aroma_levels_mgl(
+    #
+    # D-226 MOVED THIS CORNER AND REVERSED ITS DIRECTION, which is worth more than the number.
+    # Under the flux coupling a SLOWER beer made MORE ester, so `q_sugar_max`'s LOW edge was the
+    # bad corner and it reached OAV 1.112 -- above the threshold, and reachable in a drawn
+    # ensemble. Under growth-extent coupling synthesis is speed-invariant and only the stripping
+    # sink still reads the flux, so a slower beer now strips MORE and packages LESS: the low edge
+    # falls to 0.955 and the worst corner is the HIGH edge instead, at 1.043. Both are asserted,
+    # because "the reachable maximum" is the claim and it changed which edge holds it.
+    q_lo, q_hi = _band_edges(beer, "q_sugar_max", 0.634, 0.818)
+    slow = _beer_aroma_levels_mgl(
         _beer_data_dir_at(tmp_path, k_ethyl_acetate=band.high, q_sugar_max=q_lo)
     )
-    assert corner["ethyl_acetate"] / threshold_mgl == pytest.approx(1.112, abs=0.01)
+    fast = _beer_aroma_levels_mgl(
+        _beer_data_dir_at(tmp_path, k_ethyl_acetate=band.high, q_sugar_max=q_hi)
+    )
+    assert slow["ethyl_acetate"] / threshold_mgl == pytest.approx(0.9555, abs=0.01)
+    assert fast["ethyl_acetate"] / threshold_mgl == pytest.approx(1.0428, abs=0.01)
+    assert max(slow["ethyl_acetate"], fast["ethyl_acetate"]) / threshold_mgl < 1.112, (
+        "D-226 is supposed to have REDUCED the reachable ethyl-acetate maximum, not raised it."
+    )
 
 
 def test_the_isoamyl_acetate_band_is_rescaled_with_its_nominal_rather_than_recomputed():
@@ -1741,7 +1913,7 @@ def test_the_ethyl_hexanoate_band_spans_its_sourced_ale_range_computed_at_the_ed
     REFUSED here: rescaled, the top would have reached 0.6416 mg/L, 28 % above that range.
     """
     beer = load_parameters(default_data_dir() / "beer_generic.yaml")
-    lo, hi = _band_edges(beer, "k_ethyl_hexanoate", 6.93e-7, 3.46e-6)
+    lo, hi = _band_edges(beer, "k_ethyl_hexanoate", 7.76937e-5, 3.88467e-4)
 
     def level_at(k_value: float) -> float:
         # NOT `_beer_aroma_levels_mgl`: that helper returns only the SEVEN pools D-224 listed by

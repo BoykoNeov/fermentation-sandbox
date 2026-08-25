@@ -173,6 +173,7 @@ from fermentation.core.kinetics.carbon_routing import (
 from fermentation.core.kinetics.carbon_routing import (
     refund_carbon_to_sugar as _refund_carbon_to_sugar,
 )
+from fermentation.core.kinetics.growth import biomass_growth_rate
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -212,7 +213,13 @@ _FUSEL_SPEC_BY_POOL: dict[str, FuselSpec] = {spec.pool: spec for spec in FUSEL_S
 _CO2_PER_EHRLICH_ALCOHOL = float(CO2_PER_PRIMARY_EHRLICH_ALCOHOL)
 
 
-def fusel_rate_shape(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+def fusel_rate_shape(
+    y: FloatArray,
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    growth_coupled: bool = False,
+) -> float:
     """The Ehrlich rate shape SHARED by all five higher alcohols — everything but ``k`` [1/h].
 
     ``X·S_total/(K_sugar_uptake+S_total) · N/(K_n+N) · arrhenius(T, E_a_fusels, T_ref)``: the
@@ -230,6 +237,16 @@ def fusel_rate_shape(y: FloatArray, schema: StateSchema, params: Mapping[str, fl
     gates would make the composition dynamic and are deliberately NOT here: neither is sourced,
     and five author-estimated ``E_a``s would look like fidelity while adding only invention.
     """
+    if growth_coupled:
+        # D-226: the Ehrlich substrate is the amino acids growth assimilates, so the shape is
+        # the nitrogen DRAW itself — `biomass_growth_rate` already carries the same N/(K_n+N)
+        # Monod the flux form gates on, so the gate is not dropped, it is subsumed. This is the
+        # BASE rate; `ArrheniusTemperature.for_growth` scales the Process to the REALISED one.
+        base = biomass_growth_rate(y, schema, params)
+        if base <= 0.0:
+            return 0.0
+        temp = float(y[schema.slice("T")][0])
+        return float(base * arrhenius_factor(temp, params["E_a_fusels"], params["T_ref"]))
     flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
     if flux <= 0.0:
         return 0.0
@@ -243,7 +260,12 @@ def fusel_rate_shape(y: FloatArray, schema: StateSchema, params: Mapping[str, fl
 
 
 def fusel_production_rate(
-    y: FloatArray, schema: StateSchema, params: Mapping[str, float], spec: FuselSpec
+    y: FloatArray,
+    schema: StateSchema,
+    params: Mapping[str, float],
+    spec: FuselSpec,
+    *,
+    growth_coupled: bool = False,
 ) -> float:
     """One higher alcohol's production rate ``d(<spec.pool>)/dt`` [g/L/h].
 
@@ -251,13 +273,19 @@ def fusel_production_rate(
     distinguishes the five (decision D-99), and each is anchored independently to its own
     molecule's measured concentration — never a share of a lumped ``k_fusel``.
     """
-    shape = fusel_rate_shape(y, schema, params)
+    shape = fusel_rate_shape(y, schema, params, growth_coupled=growth_coupled)
     if shape <= 0.0:
         return 0.0
     return float(params[spec.k_param] * shape)
 
 
-def fusel_carbon_draw(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
+def fusel_carbon_draw(
+    y: FloatArray,
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    growth_coupled: bool = False,
+) -> float:
     """Total carbon [g C/L/h] the Ehrlich producer books out of sugar, across all five species.
 
     Each alcohol contributes ``rate_i · carbon_mass_fraction(species_i)`` — its own molecule's
@@ -272,11 +300,22 @@ def fusel_carbon_draw(y: FloatArray, schema: StateSchema, params: Mapping[str, f
     this helper makes that impossible (the shared ``biomass_growth_rate`` discipline of the
     D-32 swap, applied to fusels).
     """
-    return float(sum(carbon for _, carbon in fusel_carbon_draw_by_species(y, schema, params)))
+    return float(
+        sum(
+            carbon
+            for _, carbon in fusel_carbon_draw_by_species(
+                y, schema, params, growth_coupled=growth_coupled
+            )
+        )
+    )
 
 
 def fusel_carbon_draw_by_species(
-    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    y: FloatArray,
+    schema: StateSchema,
+    params: Mapping[str, float],
+    *,
+    growth_coupled: bool = False,
 ) -> list[tuple[FuselSpec, float]]:
     """Each higher alcohol's own carbon draw [g C/L/h], paired with its spec (decision D-100).
 
@@ -287,7 +326,7 @@ def fusel_carbon_draw_by_species(
     own precursor — leucine for isoamyl alcohol, valine for isobutanol, and so on
     (``spec.precursor_amino_acid``, documentation-only since D-99, becomes load-bearing here).
     """
-    shape = fusel_rate_shape(y, schema, params)
+    shape = fusel_rate_shape(y, schema, params, growth_coupled=growth_coupled)
     if shape <= 0.0:
         return []
     return [
@@ -637,11 +676,24 @@ class EsterSynthesis(Process):
         "T_ref",
     )
 
+    def coupling_shape(
+        self, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> float:
+        """The quantity ester synthesis rides — biomass-HOURS in this, the flux form.
+
+        A method rather than an inline expression because :class:`EsterSynthesisGrowthCoupled`
+        replaces exactly this and nothing else (decision D-226): the carbon draw, the D-115
+        re-route and the two label tracers are all strictly linear in the returned scalar, so
+        overriding it cannot silently change the ledger. It is the ONE line that differs
+        between beer's rate law and wine's.
+        """
+        return _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
+
     def derivatives(
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
+        flux = self.coupling_shape(y, schema, params)
         if flux <= 0.0:
             return d
         temp = float(y[schema.slice("T")][0])
@@ -720,6 +772,11 @@ class FuselAlcoholsEhrlich(Process):
 
     name = "fusel_alcohols_ehrlich"
     tier = Tier.SPECULATIVE
+    #: Whether this Process rides the nitrogen DRAW rather than biomass-hours (decision
+    #: D-226). False here — :class:`FuselAlcoholsEhrlichGrowthCoupled` flips it, and the flag
+    #: travels into the shared :func:`fusel_rate_shape` so the producer's rate and its carbon
+    #: draw cannot come from two different shapes.
+    growth_coupled: bool = False
     #: The five single-molecule pools of ``FUSEL_SPECS`` plus ``S`` (decision D-99), derived
     #: from the registry so a sixth alcohol cannot silently violate the `touches` contract.
     touches: tuple[str, ...] = (*(spec.pool for spec in FUSEL_SPECS), "S")
@@ -739,15 +796,180 @@ class FuselAlcoholsEhrlich(Process):
         self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
     ) -> FloatArray:
         d = schema.zeros()
-        shape = fusel_rate_shape(y, schema, params)
+        shape = fusel_rate_shape(y, schema, params, growth_coupled=self.growth_coupled)
         if shape <= 0.0:
             return d
         for spec in FUSEL_SPECS:
             d[schema.slice(spec.pool)] = params[spec.k_param] * shape
         # ONE draw for all five, each at its own molecule's carbon fraction — shared verbatim
         # with the re-route (D-33/D-99) so the draw and its refund can never disagree.
-        _draw_carbon_from_sugar(d, y, schema, fusel_carbon_draw(y, schema, params))
+        _draw_carbon_from_sugar(
+            d, y, schema, fusel_carbon_draw(y, schema, params, growth_coupled=self.growth_coupled)
+        )
         return d
+
+
+class EsterSynthesisGrowthCoupled(EsterSynthesis):
+    """Beer's esters, coupled to biomass FORMED rather than to biomass-hours (decision D-226).
+
+    Identical to :class:`EsterSynthesis` in every term except the one it rides::
+
+        d(ester)/dt = k * mu*X * f_growth(T) * arrhenius(T, E_a_esters, T_ref)
+
+    where ``mu*X`` is :func:`~fermentation.core.kinetics.growth.biomass_growth_rate` — the same
+    base rate the growth Process builds biomass at — and ``f_growth`` is supplied by
+    :meth:`~fermentation.core.kinetics.arrhenius.ArrheniusTemperature.for_growth`, which names
+    this Process as an extra target. Everything downstream of the rate (the per-molecule carbon
+    draw, the D-115 5:2-inverse re-route off the precursor alcohol, both valine label tracers)
+    is inherited unchanged, because all of it is strictly linear in ``rate``.
+
+    **This is the form its own source has always stated.** ``beer_generic.yaml``'s citation for
+    ethyl acetate is de Andrés-Toro *et al.* 1998, which forms it as ``Y_EA*mu_x*X_A`` —
+    proportional to biomass formed. The flux form transferred that source's temperature
+    ORDERING onto a shape the source does not use, and ``k_ethyl_acetate``'s own note said so
+    ("a growth coupling and unit system unlike our flux-coupled k"). D-224 §11 and D-225 §11
+    both name this as the open question behind four beats of re-anchoring; this is that beat.
+
+    **What it buys, measured, and the fidelity half comes first.** Beer's esters were
+    YAN-BLIND under the flux form and very slightly BACKWARDS: a 4x change in wort nitrogen
+    (100 -> 400 mg/L) moved packaged ethyl acetate 1.009 -> 0.983. Under this form they are
+    proportional to it (0.491 -> 2.072, i.e. 4.22x over 4x). Wort free amino nitrogen is a
+    primary brewing lever on ester formation, so that is a correspondence defect and not a
+    maintenance one. **D-97 already found this and fixed it for one pool by hand** — it coupled
+    isoamyl acetate to the ``isoamyl_alcohol`` pool precisely because "before D-97 the ester was
+    YAN-blind (flat ~0.758 mg/L across YAN 40-250 mg/L)". Ethyl acetate and ethyl hexanoate
+    were still YAN-blind. This is the general form of that fix; D-97's precursor term is kept,
+    because ATF1's first-order dependence on its alcohol substrate is a separate, sourced fact.
+
+    **And the drift stops, as an identity rather than a hope.** ``int(mu*X*f_growth) dt`` is
+    ``YAN / biomass_N_fraction`` — a conservation identity, not an approximation. Measured at
+    1.7544 g/L in all eight arms tried: the nominal, both speed knobs' band edges, and the
+    retired ``q_sugar_max`` 0.5 / ``mu_max`` 0.098 / ``mu_max`` 0.034. Over the same arms the
+    biomass-hour integral this replaces spans 149.9-245.2, a factor 1.64. That integral IS the
+    drift: it reproduces D-224's own reported factors (2.865 against its 2.87, 1.699 against
+    its 1.68) without reading D-224.
+
+    **Why the growth Arrhenius must be the REALISED one.** Only ``int(mu*X*f_growth) dt`` is the
+    conserved dX; the bare ``int(mu*X) dt`` runs 48.9 % higher at 15 °C and lower at 25 °C, so
+    reading the base helper alone would couple the ester to a growth the biomass never had and
+    would destroy the invariance above away from ``T_ref``. Hence the D-32 idiom: this Process
+    joins ``for_growth``'s targets rather than applying a growth factor of its own.
+
+    **The temperature bookkeeping changes coordinates, and ``E_a_esters`` changes with it.**
+    Integrated synthesis under the flux form scales as ``arrh(E_a_esters)/arrh(E_a_uptake)``
+    (the bare-flux integral to dryness is fixed by total sugar); under this form the growth
+    factor cancels against the nitrogen limit and it scales as ``arrh(E_a_esters)`` alone. So
+    the parameter now IS the apparent activation energy of ester formation — the quantity
+    de Andrés-Toro print — and it re-anchors 200 -> 152 kJ/mol to hold beer's measured packaged
+    15/25 °C ratio at the 6.86x the flux form delivered. See that parameter's own note for why
+    the band's low edge had to be re-derived rather than carried over.
+
+    **Two limitations, both inherited and both named rather than repaired.**
+    (i) Growth stops dead at nitrogen exhaustion (day 0.92) with 81 % of the sugar still to
+    ferment, so under this form all ester is made in the first day and only stripped
+    thereafter; the stripped share rises 15.25 % -> 26.64 % at 20 °C. A real ale's ester
+    formation tapers instead of stopping. That sharpness is a property of the GROWTH Process,
+    which this coupling makes visible in a new place rather than introduces — repairing it is
+    growth's beat. A Luedeking-Piret two-term form (``a*dX/dt + b*X``) is the obvious fix and
+    is deliberately NOT built: one observable (the landed level) cannot identify two free
+    parameters, and no ester time-course is on disk.
+    (ii) **Pitch remains inert**, 1.000 across 0.25-4.0 g/L, under this form AND the one it
+    replaces — dX is nitrogen-limited either way. Over-pitching does suppress esters in
+    practice; neither form captures that, and this record does not claim it does.
+
+    **Beer only, and the reason is sourced rather than tactical.** Wine keeps
+    :class:`EsterSynthesis`. Wine's ``E_a_esters`` = 55,100 exists solely to make integrated
+    synthesis temperature-flat under the flux form (its own note derives that mapping), and
+    under this form flatness would demand ~0 — outside its band and unphysical. The fair
+    objection is that ATF1 is the same enzyme in both media, so a per-medium rate law asserts a
+    mechanism difference that does not exist; the answer is that ``wine_generic.yaml``'s own
+    header already records that **no** value of ``E_a_esters`` reproduces wine ester behaviour,
+    because the physics that dominates it is not simulated. Wine's flux form is a documented
+    stand-in, and replacing one stand-in with a differently-wrong one buys nothing while
+    destroying the control D-224's argument rests on.
+    """
+
+    name = "ester_synthesis_growth_coupled"
+    #: ``mu_max``/``K_s``/``K_n`` replace ``K_sugar_uptake``: this Process reads the growth
+    #: rate's own Monod constants instead of the uptake flux's half-saturation. Their tiers cap
+    #: the ester pools' output tier by parameter-tier propagation (D-1) exactly as before.
+    reads: tuple[str, ...] = (
+        *(spec.k_param for spec in ESTER_SPECS),
+        "mu_max",
+        "K_s",
+        "K_n",
+        "E_a_esters",
+        "T_ref",
+    )
+
+    def coupling_shape(
+        self, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> float:
+        """``mu*X`` — the BASE growth rate, per :func:`biomass_growth_rate`'s own contract.
+
+        Base and not realised on purpose: ``ArrheniusTemperature.for_growth`` scales this whole
+        Process, so applying the growth factor here as well would square it. That is the same
+        arrangement the D-32 amino-acid swap uses, for the same reason.
+        """
+        return biomass_growth_rate(y, schema, params)
+
+
+class FuselAlcoholsEhrlichGrowthCoupled(FuselAlcoholsEhrlich):
+    """Beer's higher alcohols, bounded by the nitrogen consumed (decision D-226).
+
+    ``d(alcohol_i)/dt = k_i * mu*X * f_growth(T) * arrhenius(T, E_a_fusels, T_ref)``.
+    The Ehrlich pathway's substrate is amino acids, so its output should be BOUNDED by the
+    nitrogen it is made from. The flux form only *gated* on nitrogen while drawing its carbon
+    from ``S``, which is a different thing and is the defect D-224 §5 named in one sentence: "a
+    slower-growing yeast holds the gate open longer and makes more higher alcohol from the same
+    YAN". Every run ends at ``N ~ 0``, so the gate always eventually closes — but how much came
+    out before it did depended on ``mu_max``, which is why D-211's and D-222's growth-rate
+    refits multiplied all five constants by 2.87 and then 1.68 with no test seeing it.
+
+    **In beer the two halves of the aroma set are the same term, which is why one record covers
+    both.** Beer's ``amino_acids`` pool is untracked and
+    :class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation` is wired into wine
+    only, so beer's nitrogen is drawn by growth alone: nitrogen consumed *is* biomass formed x
+    ``biomass_N_fraction``. Coupling to ``mu*X`` therefore IS coupling to the amino acids
+    assimilated. :func:`biomass_growth_rate` already carries the same ``N/(K_n+N)`` Monod the
+    flux form gated on, so the nitrogen gate is subsumed, not dropped.
+
+    **The timing barely moves; only the magnitude's sensitivity does.** Because the flux form
+    was already nitrogen-gated, it already made essentially all of its output by day 1 (the
+    ``isoamyl_alcohol`` pool measures 31.55 mg/L at growth-stop against 30.12 mg/L finished).
+    So this half is close to a pure removal of a spurious ``mu_max`` dependence, and the
+    day-1 concentration limitation noted on :class:`EsterSynthesisGrowthCoupled` is not new here.
+
+    **``E_a_fusels`` changes coordinates with the form, and its note was wrong about the
+    observable.** Under the flux form, integrated fusel production scales as
+    ``arrh(E_a_fusels)/arrh(E_a_uptake)``, so beer's shipped 70,000 J/mol delivered an
+    *integrated* sensitivity of 14,900 J/mol — a Q10 of about 1.2, where the parameter's own
+    note claims "Q10 ~ 2.6". That note describes the rate constant and was read as though it
+    described the output. Under this form the growth factor cancels against the nitrogen limit
+    and the parameter becomes the apparent sensitivity directly, so it re-anchors to 14,900 to
+    hold the behaviour the engine actually shipped.
+
+    **A sourced ordering invariant changes with it, and that is a finding rather than a
+    casualty.** D-19's "each ``E_a`` must exceed ``E_a_uptake``" is the algebraic form, under
+    FLUX coupling, of the physical claim "output rises with temperature". Under extent coupling
+    the same physical claim reads ``E_a > 0``. The constraint is a property of the rate law, not
+    of the physics, so ``tests/test_sourced_ordering_invariants.py`` asserts it per coupling
+    rather than dropping it for beer.
+    """
+
+    name = "fusel_alcohols_ehrlich_growth_coupled"
+    growth_coupled: bool = True
+    #: As on the ester twin: the growth rate's Monod constants replace the uptake flux's
+    #: ``K_sugar_uptake``. ``K_n`` was already read (as the gate) and stays, now as part of the
+    #: growth rate itself.
+    reads: tuple[str, ...] = (
+        *(spec.k_param for spec in FUSEL_SPECS),
+        "mu_max",
+        "K_s",
+        "K_n",
+        "E_a_fusels",
+        "T_ref",
+    )
 
 
 class FuselAminoAcidReroute(Process):

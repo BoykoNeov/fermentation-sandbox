@@ -93,36 +93,67 @@ def _inverts(store, lo_name: str, hi_name: str) -> bool:
 # -- the sourced directions, at the nominal ------------------------------------
 
 
-def test_fusel_activation_energy_exceeds_uptake_at_the_nominal(wine, beer):
-    """`E_a_fusels > E_a_uptake` — the note's own "sourced, load-bearing constraint".
+def test_fusel_activation_energy_ordering_holds_in_each_mediums_own_coupling(wine, beer):
+    """ "Warmer makes more higher alcohols" — asserted in the coordinates each medium ferments in.
 
-    FORBIDS: nominal drift of either parameter, in wine and in beer.
-    DOES NOT FORBID: the joint-band inversion, which reaches **0.0051 %** of wine draws and
-    **0.0021 %** of beer draws (2e6 triangular samples). The joint-edge margin is
-    −3,000 J/mol: `E_a_fusels.low` 60,000 sits BELOW `E_a_uptake.high` 63,000.
+    RENAMED AND RESCOPED AT D-226, and the rename is the finding. Until D-226 both media
+    coupled fusel production to the fermentative flux, integrated production scaled as
+    ``arrh(E_a_fusels)/arrh(E_a_uptake)``, and the physical claim "total fusels rise with
+    temperature" was therefore the algebraic claim ``E_a_fusels > E_a_uptake``. That is what
+    this test asserted, for both media, and it was correct.
 
-    WHY A STORE-LEVEL ASSERT WHEN A CONSEQUENCE GUARD ALREADY EXISTS. It exists and it does
-    not fire. `test_kinetics_byproducts.py::test_integrated_wine_aroma_temperature_directions`
-    calls itself *"THE load-bearing regression guard for the per-pool E_a ordering"* and its
-    line 691 asserts the consequence, `cold[fusels] < warm[fusels]`, commented *"FUSELS rise
-    with T (E_a_fusels > E_a_uptake)"*. Setting the two to their worst joint draw —
-    `E_a_fusels` 60,000 against `E_a_uptake` 63,000, the ordering fully inverted — leaves
-    **line 691 passing**. The asserts that do fire (line 711's flat-total, and varela2004's
-    dryness window) reproduce bitwise-identically when `E_a_uptake` moves ALONE with the
-    ordering intact, so they are reacting to the magnitude, not the inversion.
+    Beer now rides growth EXTENT. The growth Arrhenius factor cancels against the nitrogen
+    limit (``int(mu*X*f_growth) dt = YAN / biomass_N_fraction``, a temperature-invariant
+    identity), and the five higher alcohols have no stripping sink, so integrated production
+    scales as ``arrh(E_a_fusels)`` alone and the SAME physical claim reads ``E_a_fusels > 0``.
+    Beer's value re-anchored 70,000 -> 14,100 to hold the 1.2183x rise over 15-25 C the engine
+    actually shipped, so it is now below ``E_a_uptake`` — and that is a change of coordinates,
+    not a violation.
 
-    A consequence guard whose sensitivity threshold sits above the breach its own bands
-    permit reads as coverage and is not. This assert is scoped to what it can actually see.
+    **D-19's ordering constraint is a property of the RATE LAW, not of the physics.** Asserting
+    the flux-form inequality against a medium that no longer uses the flux form would forbid a
+    correct value; deleting it for beer would leave the physical claim unguarded. So each medium
+    is asserted in its own coupling, and the coupling each one uses is asserted too — otherwise a
+    future re-wiring of beer back to the flux form would leave this test quietly checking the
+    wrong inequality.
+
+    FORBIDS: nominal drift of either parameter, in either coupling.
+    DOES NOT FORBID, for WINE: the joint-band inversion, which reaches **0.0051 %** of wine
+    draws (2e6 triangular samples); the joint-edge margin is -3,000 J/mol.
     """
-    for medium, store in (("wine", wine), ("beer", beer)):
-        assert store.value("E_a_fusels") > store.value("E_a_uptake"), medium
-        # The band-scoped half is NOT asserted — it is false. Recorded so a future edge move
-        # is a deliberate re-decision rather than a silent one.
-        assert _inverts(store, "E_a_uptake", "E_a_fusels"), (
-            f"{medium}: bands no longer overlap — a band edge moved. If that was deliberate "
-            "and citation-backed, promote this pair to the joint-edge assertion "
-            "(`E_a_fusels.uncertainty.low >= E_a_uptake.uncertainty.high`) and delete this line."
-        )
+    from fermentation.core.media import MEDIA
+
+    # The coupling is not assumed. If beer is ever re-wired to the flux producer, this fails
+    # here by name rather than leaving the inequality below silently checking the wrong thing.
+    beer_producers = {p.name for p in MEDIA["beer"].build_process_set().active}
+    wine_producers = {p.name for p in MEDIA["wine"].build_process_set().active}
+    assert "fusel_alcohols_ehrlich_growth_coupled" in beer_producers
+    assert "fusel_alcohols_ehrlich" in wine_producers
+
+    # WINE -- flux-coupled. Integrated production scales as arrh(E_a_fusels)/arrh(E_a_uptake).
+    assert wine.value("E_a_fusels") > wine.value("E_a_uptake"), "wine"
+    # The band-scoped half is NOT asserted -- it is false. Recorded so a future edge move is a
+    # deliberate re-decision rather than a silent one.
+    assert _inverts(wine, "E_a_uptake", "E_a_fusels"), (
+        "wine: bands no longer overlap - a band edge moved. If that was deliberate and "
+        "citation-backed, promote this pair to the joint-edge assertion "
+        "(`E_a_fusels.uncertainty.low >= E_a_uptake.uncertainty.high`) and delete this line."
+    )
+
+    # BEER -- growth-extent coupled (D-226). "Rises with T" is E_a_fusels > 0, and it holds
+    # across the WHOLE band rather than at the nominal alone, which the flux form never managed.
+    assert beer.value("E_a_fusels") > 0.0, "beer"
+    assert beer["E_a_fusels"].uncertainty.low > 0.0, "beer band floor"
+    # The OTHER sourced ordering this parameter carries -- fusels below esters, so the
+    # ester/fusel ratio rises with T -- is now band-scoped for beer where it was nominal-only:
+    # E_a_fusels' high edge 50,400 sits below E_a_esters' LOW edge 87,000, so no joint draw can
+    # invert it. Under the retired bands (250,000 against 120,000) it inverted on a real slice.
+    assert beer.value("E_a_fusels") < beer.value("E_a_esters"), "beer nominal"
+    assert not _inverts(beer, "E_a_fusels", "E_a_esters"), (
+        "beer: E_a_fusels' band now reaches E_a_esters' - a joint draw can make the higher "
+        "alcohols MORE temperature-sensitive than the esters, inverting the sourced claim that "
+        "warmth shifts the balance toward esters. D-226 made this pair band-safe; keep it so."
+    )
 
 
 def test_brett_dies_slower_than_o_oeni_at_the_same_molecular_so2(wine):

@@ -104,12 +104,14 @@ from fermentation.core.kinetics import (
     EllagitanninOxidation,
     EsterHydrolysis,
     EsterSynthesis,
+    EsterSynthesisGrowthCoupled,
     EsterVolatilization,
     EthanolInactivation,
     EthanolToleranceDeath,
     EthylAcetateEsterification,
     EthylHexanoateHydrolysis,
     FuselAlcoholsEhrlich,
+    FuselAlcoholsEhrlichGrowthCoupled,
     FuselAminoAcidReroute,
     GrowthNitrogenLimited,
     HydrogenSulfideProduction,
@@ -1657,10 +1659,34 @@ _OSMOTIC_INHIBITION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
 #: carbon-neutral (each pool and its twin book as the SAME one of the three D-96 ester
 #: molecules), so it is in this isolable tuple too and ``total_carbon`` still closes to
 #: machine precision.
-_BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (
+#: The MEDIUM-AGNOSTIC half: gas stripping is one physical mechanism in both beverages
+#: (D-20/D-21), so it is the only aroma Process both media share verbatim.
+_BYPRODUCT_PROCESSES: tuple[Callable[[], Process], ...] = (EsterVolatilization,)
+
+#: The two aroma PRODUCERS, wired per medium since **decision D-226** — the one place in this
+#: registry where the two beverages run different rate LAWS rather than different parameter
+#: values. Wine keeps the biomass-hour (fermentative-flux) coupling; beer rides growth EXTENT.
+#:
+#: Beer's is the form its own sources state: de Andrés-Toro 1998 form ethyl acetate as
+#: ``Y_EA*mu_x*X_A`` (biomass formed), and the Ehrlich pathway's substrate is the amino acids
+#: growth assimilates — which in beer is the same quantity, because beer's ``amino_acids`` pool
+#: is untracked and ``AminoAcidAssimilation`` is wine-only, so nitrogen is drawn by growth
+#: alone. Wine keeps the flux form because ``wine_generic.yaml``'s own header records that no
+#: value of ``E_a_esters`` reproduces wine ester behaviour (the dominant physics is not
+#: simulated): its flux form is a DOCUMENTED STAND-IN, and swapping one stand-in for a
+#: differently-wrong one would buy nothing while destroying D-224's control.
+#:
+#: **Both beer producers MUST be named in** :data:`_BEER_FERMENTATION_MODIFIERS`'s
+#: ``for_growth`` **call** — they read the BASE growth rate, so only that modifier makes them
+#: ride the REALISED one, and only the realised integral is the conserved dX the coupling
+#: exists to buy. A guard asserts that membership rather than trusting this comment.
+_WINE_AROMA_PRODUCERS: tuple[Callable[[], Process], ...] = (
     EsterSynthesis,
     FuselAlcoholsEhrlich,
-    EsterVolatilization,
+)
+_BEER_AROMA_PRODUCERS: tuple[Callable[[], Process], ...] = (
+    EsterSynthesisGrowthCoupled,
+    FuselAlcoholsEhrlichGrowthCoupled,
 )
 
 #: Vicinal-diketone (VDK / diacetyl) pathway (Milestone 2, decision D-26): the three-step
@@ -2444,7 +2470,14 @@ _BEER_WORT_OXYGEN_PROCESSES: tuple[Callable[[], Process], ...] = (WortOxygenUpta
 #: Beer wires no carrying-capacity modifier (wine-only), so these two are the complete list of
 #: things that scale growth.
 _BEER_FERMENTATION_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (
-    lambda: ArrheniusTemperature.for_growth(AceticAcidOverflow.name),
+    lambda: ArrheniusTemperature.for_growth(
+        AceticAcidOverflow.name,
+        # D-226: both aroma producers read the BASE growth rate, so this is what makes them
+        # ride the REALISED one. Without it their integral is not the conserved dX and the
+        # speed-invariance the coupling exists for holds only at T_ref.
+        EsterSynthesisGrowthCoupled.name,
+        FuselAlcoholsEhrlichGrowthCoupled.name,
+    ),
     lambda: ArrheniusTemperature.for_uptake(OrganicAcidExcretion.name),
     ColemanQuadraticDeathTemperature,
 )
@@ -2604,6 +2637,7 @@ def _build_media(
                 + _ETHANOL_CEILING_PROCESSES
                 + _TEMPERATURE_PROCESSES
                 + _BYPRODUCT_PROCESSES
+                + _WINE_AROMA_PRODUCERS
                 + _VDK_PROCESSES
                 + _ACETALDEHYDE_PROCESSES
                 + _KETO_ACID_PROCESSES
@@ -2644,6 +2678,7 @@ def _build_media(
                 + _ETHANOL_CEILING_PROCESSES
                 + _TEMPERATURE_PROCESSES
                 + _BYPRODUCT_PROCESSES
+                + _BEER_AROMA_PRODUCERS
                 + _VDK_PROCESSES
                 + _ACETALDEHYDE_PROCESSES
                 + _H2S_PROCESSES

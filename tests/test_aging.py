@@ -1225,19 +1225,26 @@ def test_the_joint_band_corner_FORMS_since_D223_and_the_funding_constraint_holds
     # 1300 instead of ~1 in 19. That is a real cost of the re-anchoring and it is recorded here
     # rather than in prose: the funding constraint is exercised by a thinner slice of the band than
     # D-223 measured, though it is still exercised, and it is what stops `Byp` going negative.
-    assert packaged == pytest.approx(0.020064, abs=5e-6)  # 20.064 mg/L at the D-224 calibration
+    #
+    # D-226 RE-PINS IT AGAIN, and the size is the reassuring part. Beer's esters now ride growth
+    # EXTENT rather than biomass-hours, and `k_ethyl_acetate` re-anchored x111.78 to hold the same
+    # 20 mg/L its provenance states. The packaged number therefore moves only 20.064 -> 20.000
+    # mg/L (-0.32 %), which is the residue of the calibration frame: the retired shape was still
+    # making a little ester after day 14, and the new one finished on day 1. The corner's
+    # DIRECTION is unchanged and the margin widens slightly, 0.518 -> 0.582 mg/L.
+    assert packaged == pytest.approx(0.0200000, abs=5e-6)  # 20.000 mg/L at the D-226 calibration
     assert eq_corner == pytest.approx(0.020582, abs=5e-6)  # 20.582 mg/L
     assert eq_corner > packaged, (
         f"the joint corner no longer FORMS: equilibrium {eq_corner * 1000:.3f} mg/L against a "
         f"packaged {packaged * 1000:.3f} mg/L. D-223's funding constraint would then be "
         f"load-bearing nowhere the suite can see; re-read D-223 before deleting either."
     )
-    assert (eq_corner - packaged) == pytest.approx(0.000518, abs=1e-5)  # g/L; -0.518 mg/L
+    assert (eq_corner - packaged) == pytest.approx(0.000582, abs=1e-5)  # g/L; -0.582 mg/L
     # ...while the NOMINAL beer still hydrolyses comfortably, by +13.332 mg/L. That contrast is the
     # whole reason this test exists: a nominal-only guard reports a healthy margin at the very
     # parameters where the opposite regime is reachable.
     eq_nominal = EthylAcetateEsterification.equilibrium(ethanol, resolved)
-    assert (packaged - eq_nominal) == pytest.approx(0.013332, abs=1e-5)  # g/L
+    assert (packaged - eq_nominal) == pytest.approx(0.013268, abs=1e-5)  # g/L
 
     # (2) HOW MUCH of the joint band forms -- the quantity D-176's single corner could not give.
     # Pure arithmetic on the equilibrium (no integration), so a fine grid is cheap. Both bands are

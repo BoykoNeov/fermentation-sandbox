@@ -110,7 +110,7 @@ compose to a single scalar (D-10, D-11).
 | `carrying_capacity.py` | 1 | biomass cap (modifier) |
 | `inactivation.py` | 2 | death, ethanol-tolerance death |
 | `autolysis.py` | 1 | autolysis → debris |
-| `byproducts.py` | 4 | glycerol and the realised-yield byproduct sinks |
+| `byproducts.py` | 4 | glycerol and the realised-yield byproduct sinks; the two aroma producers each have a growth-coupled beer subclass (below) |
 | `acetaldehyde.py` | 2 | the ethanol-carbon buffer intermediate (D-27) |
 | `vicinal_diketones.py` | 3 | α-acetolactate → diacetyl → butanediol |
 | `hydrogen_sulfide.py` | 3 | H₂S |
@@ -156,6 +156,27 @@ the run byte-for-byte unchanged.
 | beer | `direct` (default) | 28 | 3 |
 | beer | `cascade` | 29 | 3 |
 | beer | `direct_burst` | 28 | 3 |
+
+### The one place the media run different rate LAWS (D-226)
+
+Everywhere else, a per-medium difference is a *parameter value* or a *group membership*; no
+Process branches on a medium string. The aroma producers are the exception, and it is wired as
+membership so that it stays visible in this table rather than hiding inside a `derivatives`:
+
+| Group | wine | beer |
+|-------|------|------|
+| `_BYPRODUCT_PROCESSES` | `EsterVolatilization` | `EsterVolatilization` |
+| `_WINE_AROMA_PRODUCERS` | `EsterSynthesis`, `FuselAlcoholsEhrlich` | — |
+| `_BEER_AROMA_PRODUCERS` | — | `EsterSynthesisGrowthCoupled`, `FuselAlcoholsEhrlichGrowthCoupled` |
+
+Wine's two producers ride the fermentative flux (biomass-**hours**); beer's ride `mu·X` (biomass
+**formed**). The beer pair reads the *base* growth rate, so both are named as extra targets of
+`ArrheniusTemperature.for_growth` in `_BEER_FERMENTATION_MODIFIERS` — the D-32 idiom, and the
+condition for their integral to be the conserved ΔX. The totals in the table above are unchanged:
+each medium still wires three byproduct Processes.
+
+`DECISIONS.md` D-226 is the answer to *why* the two media differ; this table is only the answer to
+*where*.
 
 ### The three oxidative sets (D-141, extended D-147)
 

@@ -610,7 +610,16 @@ CEILING_PROCESSES = {"ethanol_tolerance_death"}
 # Processes plus the ester gas-stripping sink (ester_volatilization, D-20: liquid
 # esters → the esters_gas headspace pool). Wired in by default but isolable (prime
 # directive #3) — disabling them leaves the validated core byte-for-byte.
-BYPRODUCT_PROCESSES = {"ester_synthesis", "fusel_alcohols_ehrlich", "ester_volatilization"}
+#: Gas stripping is medium-agnostic; the two PRODUCERS are wired per medium since D-226 --
+#: wine keeps the biomass-hour (flux) coupling, beer rides growth EXTENT. This is the one place
+#: in the registry where the media run different rate LAWS rather than different values, so the
+#: expected sets below are per-medium rather than one shared literal.
+BYPRODUCT_PROCESSES = {"ester_volatilization"}
+WINE_AROMA_PRODUCERS = {"ester_synthesis", "fusel_alcohols_ehrlich"}
+BEER_AROMA_PRODUCERS = {
+    "ester_synthesis_growth_coupled",
+    "fusel_alcohols_ehrlich_growth_coupled",
+}
 # Vicinal-diketone (VDK / diacetyl) pathway (decision D-26): the three-step sugar →
 # α-acetolactate → diacetyl + CO2 → 2,3-butanediol chain. Diacetyl is intrinsic yeast
 # metabolism, so — unlike MLF — it is wired into BOTH media by default (isolable but always
@@ -920,6 +929,7 @@ EXPECTED_PROCESSES = {
         | CEILING_PROCESSES
         | TEMPERATURE_PROCESSES
         | BYPRODUCT_PROCESSES
+        | WINE_AROMA_PRODUCERS
         | VDK_PROCESSES
         | ACETALDEHYDE_PROCESSES
         | H2S_PROCESSES
@@ -954,6 +964,7 @@ EXPECTED_PROCESSES = {
         | CEILING_PROCESSES
         | TEMPERATURE_PROCESSES
         | BYPRODUCT_PROCESSES
+        | BEER_AROMA_PRODUCERS
         | VDK_PROCESSES
         | ACETALDEHYDE_PROCESSES
         | H2S_PROCESSES
