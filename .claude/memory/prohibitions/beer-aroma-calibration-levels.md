@@ -1,11 +1,69 @@
 ---
 name: prohibition-beer-aroma-calibration-levels
-description: "D-224/D-225 — beer's EIGHT calibrated aroma levels: what is settled, what must never be re-argued, and the two questions left open"
+description: "D-224 through D-227 — beer's aroma calibration: the eight level constants, the growth-extent coupling, and the NINTH constant (the stripping sink) none of the first three audits could see"
 metadata: 
   node_type: memory
   type: project
   originSessionId: f44fbd81-53a8-4e00-ac37-9275b8fd1ab0
   modified: 2026-08-18T22:44:16.620Z
+---
+
+# D-227 — THE STRIPPING SINK, and the NINTH constant the eight-constant audits could not see. Read this FIRST.
+
+D-226's open item 1 is **ENTERED AND CLOSED**. `EsterVolatilization` now strips on
+`fermentative_co2_rate` — the uptake Process's own CO₂ arithmetic, shared from `carbon_routing.py`
+(the D-180 discipline) — not on the `X·S/(K+S)` Monod its docstring called a "CO2-evolution proxy".
+
+## What must never be re-argued
+
+* **`k_ester_volatil` was a NINTH drift-prone constant and every audit missed it.** Both yaml files
+  said, in the unit comment, that it *"folds q_sugar_max*co2_yield*scale into one constant"* — a
+  ferment-SPEED knob inside a stripping constant, so the pair is LOCKED. D-223 moved
+  `q_sugar_max` 0.5 → 0.72 and the note still cited **0.5** four beats later.
+  **D-225's registry rule could not catch it: `ESTER_SPECS`/`FUSEL_SPECS` enumerate POOLS, and this
+  is ONE constant shared across three.** [[feedback-grep-finds-claims-not-guards]]
+* **Total evolved CO₂ is speed-invariant to 6 figures; the retired driver spans 1.64×** (across
+  `q_sugar_max`'s band AND the retired 0.5). It is a **WEAKER identity than D-226's** and must be
+  quoted as such: the alcohols' `YAN/biomass_N_fraction` holds at ANY horizon, evolved CO₂ only
+  **once the sugar is gone**. Say "speed-invariant wherever the ferment completes".
+* **Beer's largest historical aroma drift: 13.91 % → 0.73 % (19×).** Band edges 4.51 % → 0.33 %.
+  **The residue CHANGED OWNER — it is now `mu_max`'s (0.54 %), not `q_sugar_max`'s, and `mu_max`'s
+  arms barely improve.** That was PRE-REGISTERED, not a disappointment: the CO₂ integral fixes the
+  driver's SIZE, never its TIMING, and a first-order sink against a moving pool reads both.
+  **Never claim exact ester invariance.**
+* **WINE IS THE PROOF, and it is a DERIVATION not a fit.** Wine's re-anchor factor 2.52530 equals
+  the analytic `1/(q_sugar_max·co2_yield·scale)` = 2.5252809 to **six figures** — one sugar, no
+  repression, so in wine the beat is an EXACT reparameterisation and every wine level is unchanged
+  to 6 figures (wine stays D-224/D-226's control). **Beer's 3.34686 is 17.7 % off its analytic
+  2.84279, and THAT GAP IS the three-sugar catabolite repression + the per-species CO₂ yields
+  (0.4886/0.5143/0.5235).** Same edit: bookkeeping in one medium, physics in the other.
+* **Units changed with the rate law: `L/(g*h)` → `L/g`** (wine 1.26264e-2, beer 6.6937e-3). Bands
+  are **TRANSPORTED by the same factor, never re-sourced** — neither edge was ever sourced and the
+  transport does not make one so. `k_ester_volatil` is **still an author estimate in both media**;
+  what changed is it now holds only the gas-volume/Henry prefactor (wine:beer ratio 1.886, pure
+  prefactor, nothing to do with speed).
+* **The driver EXCLUDES non-fermentative CO₂ ON PURPOSE and it is SIZED: 0.0018 % (beer) /
+  0.635 % (wine).** Reading the whole `CO2` slot would make the sink self-referential — Ehrlich
+  decarboxylation co-produces the alcohols whose esters it strips
+  [[feedback-a-returned-intermediate-is-a-rate-law-change]]. Do not "complete" it.
+* **One level moved: beer's isoamyl acetate −0.216 %** (it alone reads its precursor pool, D-97, so
+  the k solve that holds the other two EXACTLY cannot hold it); `fruity` 1.8333 → 1.8294.
+  **D-224's `approx(1.840, abs=0.01)` was 0.36 % off the value it pinned** — re-pinned to measured.
+* **Every LEVEL guard is a designed GREEN under a full revert** (the re-anchor holds the calibration
+  frame by construction), which is why the beat ships a guard that names the **DRIVER**
+  [[feedback-prefer-the-variant-your-guards-can-see]]. Arm A predicted exactly 5 RED and got exactly
+  those 5, its corner RED reporting D-226's own 0.9555.
+* **Temperature is UNTOUCHED** (fusels 1.21822, esters 6.89570 vs D-226's solved 1.2182 / 6.8953),
+  which is what makes the speed result attributable.
+
+## Still open after D-227
+
+1. **`mu_max`'s TIMING residue** — not fixable by a different driver; the gas really does arrive
+   earlier in a faster beer. Needs a synthesis term that does not finish before the stream does.
+2. **The growth Process's hard nitrogen cutoff** (day 0.92, 81 % of sugar left) — unchanged.
+3. **`E_a_fusels`'s magnitude**, **wine's two calibration frames**, **Wang's Table 1** — unchanged.
+4. **`k_ester_volatil` is unsourced and both bands are transported, not measured.**
+
 ---
 
 # D-226 — THE COUPLING, ENTERED AND CLOSED FOR BEER. Read this before anything below.
@@ -52,8 +110,7 @@ entered" is **ENTERED AND ANSWERED**. Beer's aroma pools now ride growth EXTENT:
 
 ## Still open after D-226
 
-1. **The stripping sink reads the flux SHAPE, not evolved CO₂** — this is now the WHOLE of the
-   esters' residual speed sensitivity.
+1. ~~The stripping sink reads the flux SHAPE, not evolved CO₂~~ — **CLOSED at D-227, top block.**
 2. **The growth Process's hard nitrogen cutoff**: growth stops day 0.92 with **81 % of the sugar
    left**, so all ester is made in day 1 and only stripped after. Inherited, not introduced.
 3. **`E_a_fusels`'s magnitude** is unsourced in either coordinate system (1.22 shipped vs 2.66).
