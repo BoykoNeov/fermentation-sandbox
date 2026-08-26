@@ -78,7 +78,14 @@ beer's day-1 miss.**
   another door. After: **1.180000000** for all eight. All six D-239 names ship **PINNED**, so it
   is bit-identical today. **The ratios are a LOCKED PAIR with `nitrogen_uptake_charge_beer`'s band
   (2.61 %, shared ammonium denominator) — band one and you must band the others.**
-- **WINE IS UNTOUCHED and that is MEASURED, not preferred**: the same three species in a must are
-  **0.73 %** of its acid buffering vs beer's 6.7 %, and wine speciates amino acids as slots
-  already (D-100) while keeping them charge-inactive. Closing it there is a different act.
+- **WINE IS UNTOUCHED and that is MEASURED TWICE, not preferred**: the same three species in a
+  must are **0.73 %** of its acid buffering vs beer's 6.7 %, and wine speciates amino acids as
+  slots already (D-100) while keeping them charge-inactive. **`PH_SYSTEM_READS` grew, so a wine
+  ensemble's drawn set went 87 → 93** (D-179/D-160's union, on purpose) — but the order of shared
+  names is UNCHANGED, all six sit at their pinned nominal in every member, and six wine members'
+  full trajectories are **SHA-256 identical** before and after. The only shared value that moves
+  is `nitrogen_uptake_charge_beer`, which a wine balance never reads.
   The ionic-strength caveat on all three new pKas is **UNPRICED**.
+- **The day-7 guard names TWO causes and the FIRST is a beat succeeding**: an alkaline term built
+  (D-232's residue) puts that edge back inside, and the test going red is what paying this debt
+  looks like — re-pin it and say so, do not hunt a broken D-239.

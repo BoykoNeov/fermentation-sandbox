@@ -2405,9 +2405,14 @@ def test_the_nitrogen_charge_bands_high_edge_now_finishes_BELOW_tyrells_envelope
         )
     assert hi_ph < window[0], (
         f"the high edge finishes day 7 at {hi_ph:.4f}, INSIDE Tyrell's envelope. D-239 measures "
-        f"4.7625, {window[0] - hi_ph:.4f} below the {window[0]:.3f} floor. A return to the "
-        "inside means the amino-acid buffering has stopped reaching the day-7 course — check "
-        "that `_totals_molar` still carries the three side chains before re-pinning this"
+        f"4.7625, {window[0] - hi_ph:.4f} below the {window[0]:.3f} floor. TWO CAUSES, and the "
+        "FIRST is a beat succeeding rather than failing: (1) an ALKALINE term has been built and "
+        "this edge has come back inside — D-232's open growth-extent residue is the standing "
+        "candidate, and this test going red is what paying D-239's debt looks like, so re-pin it "
+        "and say so; (2) the amino-acid buffering has stopped reaching the day-7 course — check "
+        "`_totals_molar` still carries the three side chains before concluding the second. A "
+        "guard that named only (2) would send the next beat hunting a break it did not cause "
+        "[[feedback-a-rename-can-restore-green-without-the-claim]]"
     )
     # Each edge pinned on its own, so a shift that moved them together could not hide inside a
     # single containment check.
@@ -4615,6 +4620,30 @@ def test_wine_carries_no_wort_amino_buffer_and_its_balance_is_untouched():
     assert acidbase.ph_of_state(compiled.y0, compiled.schema, resolved) == pytest.approx(
         3.4, abs=1e-6
     ), "the wine anchor must be exactly what it was"
+
+    # A wine ensemble DOES draw all six D-239 names — `PH_SYSTEM_READS` is a union on purpose
+    # (D-179/D-160: a per-medium `reads` would narrow one medium's reported spread below what the
+    # balance depends on). What makes that harmless is that all six are PINNED, so every member
+    # carries the nominal and the draw consumes no randomness that could shift wine's sequence.
+    # Measured across the change rather than argued: the drawn names keep their ORDER, and six
+    # wine members' full trajectories are SHA-256 identical before and after D-239. This asserts
+    # the property that would have to break first [[feedback-a-parameter-can-be-pinned-and-drawn]].
+    ens = compiled.run_ensemble(n_members=4, seed=0)
+    six = (
+        *acidbase.AMINO_BUFFER_RATIO_PARAMS.values(),
+        *(n for spec in acidbase.AMINO_BUFFER_SPECS.values() for n in spec.pka_param_names),
+    )
+    assert set(six) <= set(ens.sampled_names), (
+        "a wine ensemble no longer declares the D-239 names; PH_SYSTEM_READS is a union ON "
+        "PURPOSE and narrowing it is D-160's silent band-narrowing"
+    )
+    for i in range(ens.n_succeeded):
+        for name in six:
+            assert ens.member_params[i][name] == resolved[name], (
+                f"wine member {i} drew {name} off its nominal. All six are pinned zero-width; a "
+                "member that moves one is drawing randomness a wine balance never reads, which "
+                "shifts every other wine draw with it"
+            )
 
 
 def test_an_unanchored_beer_gets_no_amino_buffer_either():

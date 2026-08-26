@@ -34266,3 +34266,25 @@ is a locked pair with `nitrogen_uptake_charge_beer`'s band and is stated, not ba
 Beer's day-1 miss is where D-222 left it, minus a candidate. Everything D-232 left open is where it
 left it, and the 0.020 pH this beat now owes at day 7 is most likely owed to the same three-way
 growth-extent residue.
+
+### 11. Amendment, same batch — two things the beat asserted and had not measured
+
+**(a) The day-7 guard named only one cause, and the other one is a beat SUCCEEDING.** §6's
+`assert hi_ph < window[0]` told a future reader that a return to the inside means the amino-acid
+buffering has stopped reaching the day-7 course. But §6 also names D-232's growth-extent residue
+as the standing candidate for the 0.020 pH now owed, and **building it is exactly what would put
+this edge back inside**. The message now names that cause FIRST, as the debt being paid, and the
+broken-term reading second. This archive has now been bitten three records running by a guard
+whose stated reason was wrong (D-236 §3, D-238 §5); the difference here is that it was caught
+before it fired.
+
+**(b) "Wine is untouched" was argued from the medium key, and is now measured.**
+`PH_SYSTEM_READS` gained three names, and D-179/D-160 record that this union *"shifts a wine
+ensemble's draw SEQUENCE"*. Measured across the change on one seeded wine ensemble: the drawn set
+goes **87 → 93 names** — the six D-239 names, every one at its pinned nominal in every member —
+the shared names keep their **ORDER**, and the only shared value that moves is
+`nitrogen_uptake_charge_beer` itself, by exactly the +0.05698 re-partition. A wine balance never
+reads that name (`NITROGEN_CHARGE_PARAM_NAMES` is medium-keyed), and the end-to-end check agrees:
+six wine members' full 97×200 trajectories are **SHA-256 identical** before and after, as is the
+compiled `y0`. The property that would have to break first — all six pinned in every wine member —
+is now a guard rather than a paragraph.
