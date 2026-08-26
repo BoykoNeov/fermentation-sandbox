@@ -34,6 +34,11 @@ do not argue past it from this file.**
   anchor was solved so the pH function returns `initial_ph`, so ANY nonzero t=0 spread is **100 %
   artefact** — no legitimate component to net out. At day 14 most of the spread is real physics.
   **Never argue this defect from a day-N band.**
+- **The day-14 per-member shift is CONVERGED, not mesh noise** — **0.032809 pH identical to six
+  decimal places at rtol 1e-6 / 1e-8 / 1e-9**, both arms on the shipped path. It HOLDS rather than
+  shrinking, so "per-member trajectory error" is MEASURED. **Do not re-open it as a mesh artefact**
+  [[feedback-separate-mesh-from-coupling-by-convergence]]. t=0 needs no such check — that side is a
+  closed form, so 2.3e-11 is `solve_ph`'s own residual.
 - **The re-anchor moves ONE slot and that is deliberate.** A full re-run of the initial builder was
   considered and **DECLINED** — it would move seeds the beat never measured (nitrogen-dependent
   yield, hop boil, every dosed inert slot). **Never "finish" it into a general y0 rebuild.**

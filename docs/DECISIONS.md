@@ -33499,6 +33499,20 @@ So `test_a_drawn_peptide_pka_carries_a_wort_that_is_not_peyers_1_18` **pins a de
 
 D-24 excluded an axis, and that exclusion **stands**: Brix, YAN and every other recipe input stay fixed across members, and this beat adds no way to vary them. The distinction it draws is between what a recipe **states** and what this engine **computes** from what the recipe states. `initial_ph` is stated; `cation_charge` is computed from it *through parameters that are sampled*. Re-deriving the second is sampling parameter uncertainty correctly — which is the axis D-24 is **for** — rather than widening it. A future beat that wants to vary a stated input still needs its own decision.
 
+### 11. The day-14 shift is CONVERGED, so "per-member trajectory error" is measured and not asserted
+
+§4's t=0 result needs no convergence check — `cation_charge_for_ph` is exact, so 2.30e-11 is `solve_ph`'s own closed-form residual. The **day-14** per-member shift does: it is a trajectory difference under BDF at `rtol=1e-6`, and this repo's own rule is that no threshold separates a small coupling from the adaptive mesh [[feedback-separate-mesh-from-coupling-by-convergence]].
+
+Both arms run the SHIPPED path (`run_ensemble` uses `kwargs.setdefault`, so an explicit `y0_for_member=None` reproduces the pre-D-233 behaviour exactly), 16 members, same seed and hypercube:
+
+| rtol | worst day-14 shift | median shift | t=0 miss, fixed → anchored |
+|---|---|---|---|
+| 1e-6 | 0.032809 | 0.007881 | 0.1476 → 2.18e-11 |
+| 1e-8 | 0.032809 | 0.007881 | 0.1476 → 2.18e-11 |
+| 1e-9 | 0.032809 | 0.007881 | 0.1476 → 2.18e-11 |
+
+**Identical to six decimal places across three orders of magnitude of solver tolerance.** It HOLDS rather than converging toward zero, so the shift is a real correction to each member's trajectory and not mesh noise. (0.032809 here against §4's 0.0346 is 16 members vs 32 — a different worst member, not a different result.) §4's number is therefore safe for a later beat to cite as physics.
+
 ### 10. Not covered
 
 The capacity half stands, measured and guarded (§8). The wider census this implies — **every** parameter read at compile time that is also in the sampled set — is **not** run here and is its own beat; D-206's `must_aa_fraction_methionine` and this anchor are two known members of a set nobody has enumerated, and `reanchor_for_member` deliberately repairs only the anchor, so any other member of that set is still live. Whether `pKa_peptide_buffer`'s band should be re-derived now that the anchor moves with it is untouched. Everything D-232 left open is where it left it: the three-way growth-extent residue, the missing settling Process, the buffer-removal half of D-209 §8, and wine's un-audited nitrogen budget.
