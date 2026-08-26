@@ -1704,9 +1704,10 @@ def _verb_add_dap(
     phosphate_slice = schema.slice("phosphate") if "phosphate" in schema else None
     excess_key = acidbase.NITROGEN_CHARGE_EXCESS_KEY
     excess_slice = schema.slice(excess_key) if excess_key in schema else None
-    param_values = parameters.resolve()
 
-    def mutate(mutate_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(
+        mutate_schema: StateSchema, y: FloatArray, params: Mapping[str, float]
+    ) -> FloatArray:
         out = y.copy()
         out[n_slice] += added_n_gpl
         # The two CHARGE writes are atomic and ride D-179's gate together (decision D-210). Both,
@@ -1716,13 +1717,21 @@ def _verb_add_dap(
             if excess_slice is not None:
                 # Re-mixed against the pool BEFORE the nitrogen lands — the weighting is
                 # pool-before against dose, so `y` and not `out`.
+                # The RUNNING map (decision D-235), not the compile-time one. This call reads
+                # `nitrogen_uptake_charge_<medium>` — the z̄ an excess is measured RELATIVE TO —
+                # and the charge balance reads the member's own z̄ back at every later step. A
+                # nominal z̄ here would store the pool's excess against one reference and have it
+                # read against another: 0.0108 pH at the dose on the worst of 24 members, ~7×
+                # smaller than `set_ph`'s and the same defect. `dosed_charge` stays compile-time
+                # on purpose — `dap_nitrogen_charge` is a property of the COMPOUND, is not in the
+                # sampled set (it reaches no Process's `reads`), and so has no member value.
                 out[excess_slice] = acidbase.remix_nitrogen_charge_excess(
                     float(y[n_slice][0]),
                     float(y[excess_slice][0]),
                     added_n_gpl,
                     float(dosed_charge),
                     mutate_schema.medium,
-                    param_values,
+                    params,
                 )
             if phosphate_slice is not None:
                 out[phosphate_slice] += added_phosphate_gpl
@@ -1757,7 +1766,7 @@ def _verb_add_so2(
     added_gpl = mgl_to_gpl(so2_mgl)
     so2_slice = schema.slice("so2_total")
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[so2_slice] += added_gpl
         return out
@@ -1915,7 +1924,7 @@ def _verb_add_copper(
     else:
         residual_fraction = 0.0
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         # 1. H₂S first (higher affinity). Clamp present ≥ 0 so a solver undershoot is not "removed".
         h2s_present = max(float(out[h2s_slice][0]), 0.0)
@@ -2000,7 +2009,7 @@ def _verb_add_oxygen(
     added_gpl = mgl_to_gpl(o2_mgl)
     o2_slice = schema.slice("o2")
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[o2_slice] += added_gpl
         return out
@@ -2052,7 +2061,7 @@ def _verb_add_ascorbate(
     added_gpl = mgl_to_gpl(ascorbate_mgl)
     ascorbate_slice = schema.slice("ascorbate")
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[ascorbate_slice] += added_gpl
         return out
@@ -2120,7 +2129,7 @@ def _verb_seal_bottle(
     added_gpl = _bottling_burst(scenario.closure, parameters)
     o2_slice = schema.slice("o2")
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[o2_slice] += added_gpl
         return out
@@ -2392,7 +2401,7 @@ def _verb_add_oak(
     slices = {name: schema.slice(name) for name in ceiling_deltas}
     ethanol_slice = schema.slice("E") if ethanol_soak_delta else None
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         for name, delta in ceiling_deltas.items():
             out[slices[name]] += delta  # += so a second oak charge raises the ceiling (refill)
@@ -2459,7 +2468,7 @@ def _verb_rack(iv: Intervention, schema: StateSchema, parameters: ParameterSet) 
     slices = [schema.slice(name) for name in _LEES_SLOTS if name in schema]
     retained = 1.0 - fraction
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         for sl in slices:
             out[sl] *= retained
@@ -2505,7 +2514,7 @@ def _verb_pitch_mlf(
     x_mlf_slice = schema.slice("X_mlf")
     gated_names = tuple(p.name for p in _MLF_GATED_PROCESSES)
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[x_mlf_slice] += pitch_gpl
         return out
@@ -2552,7 +2561,7 @@ def _verb_pitch_brett(
     x_brett_slice = schema.slice("X_brett")
     gated_names = tuple(p.name for p in _BRETT_GATED_PROCESSES)
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[x_brett_slice] += pitch_gpl
         return out
@@ -2606,7 +2615,7 @@ def _verb_add_acid(
         )
     acid_slice = schema.slice(acid)
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[acid_slice] += gpl
         return out
@@ -2679,16 +2688,18 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
     :func:`_compile_interventions` enforces that, and the reason differs per medium, so both
     are stated there rather than one covering for the other.
 
-    **Under an ensemble the anchor is NOMINAL-ONLY — measured, and shared with ``initial_ph``.**
-    The resolved parameter map is captured here at compile, and ``simulate_ensemble`` holds
-    ``y0`` and ``events`` fixed across members while each member re-integrates with its own drawn
-    pKa set. So an off-nominal member does not sit at ``ph`` after this event — exactly as it does
-    not sit at ``initial_ph`` at t=0, for the identical reason (a compile-time value is in no
-    Process's ``reads`` and is never drawn). Sized rather than asserted, 24 members: ``initial_ph``
-    spreads **0.1273** pH at t=0 and this verb **0.1292** after the event, a ratio of **1.015**, so
-    it is the same class as the anchor it extends and not a new weakness. The nominal run is exact
-    either way. **Do not "fix" this one anchor alone** — the two would then disagree about what a
-    member's pH means, and the state-level one would be the odd anchor out.
+    **Under an ensemble the anchor is PER-MEMBER, and so is ``initial_ph``'s (decision D-235).**
+    This verb's mutation re-solves the cation from the **running** parameter map that
+    ``simulate_scheduled`` hands it at the breakpoint, which under an ensemble is the member's own
+    draw — so a member sits
+    at ``ph`` after this event, not near it. That was not always so, and the history is the point:
+    D-186 measured the nominal-only anchor here (24 members spreading **0.1292** pH after the event
+    against ``initial_ph``'s **0.1273** at t=0, ratio **1.015**) and declined to repair it *alone*,
+    because a lone repair would leave the two anchors disagreeing about what a member's pH means.
+    D-233 then repaired the t=0 one and D-234 measured the asymmetry that produced (worst member
+    miss **0.07896**, spread **0.13202**, against **2.03e-11** at t=0). D-235 repairs this half, so
+    the pair agrees again — which is what D-186's instruction asked for, in the direction it did not
+    take. **Both anchors move together: a change to either is a change to the pair.**
     """
     _iv_check_keys(iv, frozenset({"ph"}), "set_ph")
     target_ph = _iv_float(iv, "ph", "set_ph")
@@ -2707,8 +2718,10 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
     try:
         # Evaluated for its KeyError, not its value: building the whole pKa lookup here makes a
         # missing acidbase.yaml a scenario error NOW rather than when the event fires (the
-        # add_dap/begin_aging discipline). The map itself is rebuilt inside the mutation, where
-        # it is one dict comprehension over parameters that cannot have changed since.
+        # add_dap/begin_aging discipline). The map the mutation actually uses is the RUNNING one
+        # handed to it at the breakpoint, which since D-235 CAN differ from this one — it is the
+        # member's draw. What this guard still establishes is that the NAMES are present, which
+        # is a property of the ParameterSet the sampler draws from and so holds for every member.
         acidbase.build_pka_map(resolved)
     except KeyError as exc:
         raise ValueError(
@@ -2732,10 +2745,14 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
     cation_slice = schema.slice("cation_charge")
     label = f"set_ph@{iv.day:g}d"
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, params: Mapping[str, float]) -> FloatArray:
+        # `params` — the RUNNING map — and never the compile-time `resolved` (decision D-235).
+        # Under an ensemble this is the member's own drawn pKa set, so the member re-anchors to
+        # its own numbers exactly as `reanchor_for_member` does at t=0. On a nominal run the two
+        # maps are the same object's resolve(), so the jump is bit-identical to what shipped.
         out = y.copy()
         try:
-            out[cation_slice] = acidbase.cation_charge_for_ph(y, schema, resolved, target_ph)
+            out[cation_slice] = acidbase.cation_charge_for_ph(y, schema, params, target_ph)
         except acidbase.NitrogenExceedsCationDemandError:
             # A DIFFERENT failure with a different remedy, so it passes through with its own
             # message (decision D-210). Rewriting it as the floor case below blamed the acid load
@@ -2748,7 +2765,10 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
             # solve_ph is total (D-46) so computing it cannot itself raise.
             floor_state = y.copy()
             floor_state[cation_slice] = 0.0
-            floor = acidbase.ph_of_state(floor_state, schema, resolved)
+            # The member's own map again: a floor computed at the nominal pKas would name a
+            # number this member's state does not have, which is the reported-value half of the
+            # very defect the line above repairs.
+            floor = acidbase.ph_of_state(floor_state, schema, params)
             raise ValueError(
                 f"intervention {label!r}: target pH {target_ph:g} is below this state's "
                 f"intrinsic pH {floor:.4f} — the acid load, plus whatever cation charge the "
@@ -2802,7 +2822,7 @@ def _verb_add_sugar(
     glucose_offset = species.index("glucose")
     glucose_index = schema.slice("S").start + glucose_offset
 
-    def mutate(_schema: StateSchema, y: FloatArray) -> FloatArray:
+    def mutate(_schema: StateSchema, y: FloatArray, _params: Mapping[str, float]) -> FloatArray:
         out = y.copy()
         out[glucose_index] += hexose_gpl
         return out

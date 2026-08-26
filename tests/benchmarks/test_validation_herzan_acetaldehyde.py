@@ -322,7 +322,7 @@ def test_the_two_dosing_paths_are_the_same_mutation():
 
     before = compiled.y0.copy()
     assert event.mutate is not None
-    after = np.asarray(event.mutate(compiled.schema, before))
+    after = np.asarray(event.mutate(compiled.schema, before, compiled.param_values))
 
     by_hand = before.copy()
     by_hand[compiled.schema.slice("so2_total")] += dose_mgl / 1000.0

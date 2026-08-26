@@ -712,12 +712,14 @@ def test_add_copper_removes_stoichiometric_h2s():
     # present ≫ capacity ⇒ partial removal of EXACTLY the capacity (copper is the limiting reagent)
     high = cs.y0.copy()
     high[h2s] = 1.0e-3  # 1 mg/L dissolved, far above capacity
-    assert float(ev.mutate(schema, high)[h2s][0]) == pytest.approx(1.0e-3 - capacity, rel=1e-12)
+    assert float(ev.mutate(schema, high, cs.param_values)[h2s][0]) == pytest.approx(
+        1.0e-3 - capacity, rel=1e-12
+    )
 
     # present < capacity ⇒ ALL of it removed, and no more (the pool floors at 0, not negative)
     low = cs.y0.copy()
     low[h2s] = 1.0e-5  # 10 µg/L, below capacity
-    assert float(ev.mutate(schema, low)[h2s][0]) == pytest.approx(0.0, abs=1e-18)
+    assert float(ev.mutate(schema, low, cs.param_values)[h2s][0]) == pytest.approx(0.0, abs=1e-18)
 
 
 def test_add_copper_does_not_strip_a_negative_undershoot():
@@ -729,7 +731,7 @@ def test_add_copper_does_not_strip_a_negative_undershoot():
     h2s = schema.slice("h2s")
     y = cs.y0.copy()
     y[h2s] = -1.0e-9
-    assert float(ev.mutate(schema, y)[h2s][0]) == pytest.approx(-1.0e-9, rel=1e-12)
+    assert float(ev.mutate(schema, y, cs.param_values)[h2s][0]) == pytest.approx(-1.0e-9, rel=1e-12)
 
 
 def test_add_copper_lands_on_h2s_and_copper_and_books_one_flow():
@@ -877,7 +879,7 @@ def test_add_copper_binds_h2s_first_then_mercaptans():
     y = cs.y0.copy()
     y[h2s] = 1.0e-5  # 10 µg/L H₂S, well under the ~268 µg/L H₂S capacity
     y[merc] = 1.0e-3  # 1 mg/L mercaptans, above the leftover-copper capacity
-    out = ev.mutate(schema, y)
+    out = ev.mutate(schema, y, cs.param_values)
     assert float(out[h2s][0]) == pytest.approx(0.0, abs=1e-18)  # all H₂S bound first
     copper_left = copper_gpl - 1.0e-5 / b_h2s  # copper after the (tiny) H₂S bind
     expected_merc_removed = copper_left * b_merc
@@ -893,7 +895,7 @@ def test_add_copper_h2s_consumes_copper_before_mercaptans():
     y = cs.y0.copy()
     y[h2s] = 1.0e-3  # 1 mg/L H₂S ≫ capacity ⇒ soaks all copper
     y[merc] = 1.0e-4
-    out = ev.mutate(schema, y)
+    out = ev.mutate(schema, y, cs.param_values)
     assert float(out[h2s][0]) < 1.0e-3  # some H₂S removed
     assert float(out[merc][0]) == pytest.approx(1.0e-4, abs=1e-18)  # mercaptans untouched
 

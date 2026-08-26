@@ -155,7 +155,9 @@ def test_state_mutation_jumps_the_trajectory_and_books_the_flow():
     y0 = schema.pack({"A": 10.0})
     grid = _grid(n=101)
 
-    def add_five_to_a(sch: StateSchema, state: FloatArray) -> FloatArray:
+    def add_five_to_a(
+        sch: StateSchema, state: FloatArray, _params: Mapping[str, float]
+    ) -> FloatArray:
         out = state.copy()
         out[sch.slice("A")] += 5.0
         return out

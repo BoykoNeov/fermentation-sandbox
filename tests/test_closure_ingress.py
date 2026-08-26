@@ -780,7 +780,7 @@ def _seal_dose(compiled) -> float:
     assert len(events) == 1, f"expected exactly one seal_bottle event, got {len(events)}"
     before = compiled.y0.copy()
     assert events[0].mutate is not None
-    after = events[0].mutate(compiled.schema, before)
+    after = events[0].mutate(compiled.schema, before, compiled.param_values)
     o2 = compiled.schema.slice("o2")
     return float(after[o2][0] - before[o2][0])
 
@@ -999,8 +999,8 @@ def test_seal_bottle_is_add_oxygen_with_the_number_taken_out_of_the_authors_hand
     assert a.mutate is not None and b.mutate is not None
     # Neither may reconfigure the Process set: this is a dose, not a phase change.
     assert a.reconfigure is None and b.reconfigure is None
-    ya = a.mutate(sealed.schema, sealed.y0.copy())
-    yb = b.mutate(dosed.schema, dosed.y0.copy())
+    ya = a.mutate(sealed.schema, sealed.y0.copy(), sealed.param_values)
+    yb = b.mutate(dosed.schema, dosed.y0.copy(), dosed.param_values)
     assert float(ya[o2][0]) == pytest.approx(float(yb[o2][0]), rel=1e-12)
     assert np.array_equal(np.delete(ya, o2), np.delete(yb, o2))
 
@@ -1015,7 +1015,9 @@ def test_a_hermetic_seal_is_byte_for_byte_inert():
     with_seal = compile_scenario(_scenario_sealed("hermetic"))
     event = [e for e in with_seal.events if e.label.startswith("seal_bottle@")][0]
     assert event.mutate is not None
-    assert np.array_equal(event.mutate(with_seal.schema, with_seal.y0.copy()), with_seal.y0)
+    assert np.array_equal(
+        event.mutate(with_seal.schema, with_seal.y0.copy(), with_seal.param_values), with_seal.y0
+    )
     assert np.array_equal(with_seal.y0, without.y0)
 
 

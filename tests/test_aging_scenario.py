@@ -421,7 +421,7 @@ def test_add_oxygen_doses_the_o2_slot():
     event = dose_events[0]
     assert event.reconfigure is None and event.mutate is not None
     before = cs.y0.copy()
-    after = event.mutate(cs.schema, before)
+    after = event.mutate(cs.schema, before, cs.param_values)
     # 40 mg/L O₂ = 0.04 g/L lands on the o2 slot; nothing else moves.
     assert cs.schema.get(after, "o2") - cs.schema.get(before, "o2") == pytest.approx(0.04)
 
@@ -1725,7 +1725,7 @@ def test_add_oak_sets_the_ceilings_from_toast_yields():
     )
     event = next(e for e in cs.events if e.label.startswith("add_oak"))
     assert event.reconfigure is None and event.mutate is not None  # dose only (begin_aging enables)
-    after = event.mutate(cs.schema, cs.y0.copy())
+    after = event.mutate(cs.schema, cs.y0.copy(), cs.param_values)
     for compound in _OAK_EXTRACTIVES:
         expected = 4.0 * cs.param_values[f"oak_yield_{compound}_medium"]
         assert cs.schema.get(after, f"{compound}_ceiling") == pytest.approx(expected)
@@ -1743,7 +1743,7 @@ def test_toast_selects_the_aroma_profile():
         )
         event = next(e for e in cs.events if e.label.startswith("add_oak"))
         assert event.mutate is not None
-        after = event.mutate(cs.schema, cs.y0.copy())
+        after = event.mutate(cs.schema, cs.y0.copy(), cs.param_values)
         return {c: float(cs.schema.get(after, f"{c}_ceiling")) for c in _OAK_EXTRACTIVES}
 
     light, medium, heavy = ceilings("light"), ceilings("medium"), ceilings("heavy")
@@ -1849,7 +1849,7 @@ def test_add_oak_sets_the_ellagitannin_ceiling_and_rate_params_ride_along():
         assert name in cs.parameters
     event = next(e for e in cs.events if e.label.startswith("add_oak"))
     assert event.mutate is not None
-    after = event.mutate(cs.schema, cs.y0.copy())
+    after = event.mutate(cs.schema, cs.y0.copy(), cs.param_values)
     expected = 4.0 * cs.param_values["oak_yield_ellagitannin_medium"]
     assert cs.schema.get(after, "ellagitannin_ceiling") == pytest.approx(expected)
     assert (
@@ -1869,7 +1869,7 @@ def test_ellagitannin_declines_with_toast():
         )
         event = next(e for e in cs.events if e.label.startswith("add_oak"))
         assert event.mutate is not None
-        after = event.mutate(cs.schema, cs.y0.copy())
+        after = event.mutate(cs.schema, cs.y0.copy(), cs.param_values)
         return float(cs.schema.get(after, "ellagitannin_ceiling"))
 
     assert ceiling("light") > ceiling("medium") > ceiling("heavy") > 0.0
@@ -1937,7 +1937,7 @@ def test_add_oak_rejects_unknown_toast_and_accepts_beer():
     cs = compile_scenario(_beer([_add_oak(14.0, 4.0, "medium")]))
     event = next(e for e in cs.events if e.label.startswith("add_oak"))
     assert event.mutate is not None  # dose only (a pure ceiling mutate, like the wine add_oak)
-    after = event.mutate(cs.schema, cs.y0.copy())
+    after = event.mutate(cs.schema, cs.y0.copy(), cs.param_values)
     # The medium-toast dose sets each ceiling to oak_gpl × oak_yield_<compound>_medium (> 0).
     for compound in (*_OAK_EXTRACTIVES, "ellagitannin"):
         assert float(cs.schema.get(after, f"{compound}_ceiling")) > 0.0
@@ -2040,8 +2040,8 @@ def test_fill_number_defaults_to_first_fill_byte_for_byte():
     ev_i = next(e for e in implicit.events if e.label.startswith("add_oak"))
     ev_e = next(e for e in explicit.events if e.label.startswith("add_oak"))
     assert ev_i.mutate is not None and ev_e.mutate is not None
-    after_i = ev_i.mutate(implicit.schema, implicit.y0.copy())
-    after_e = ev_e.mutate(explicit.schema, explicit.y0.copy())
+    after_i = ev_i.mutate(implicit.schema, implicit.y0.copy(), implicit.param_values)
+    after_e = ev_e.mutate(explicit.schema, explicit.y0.copy(), explicit.param_values)
     for compound in (*_OAK_EXTRACTIVES, "ellagitannin"):
         name = f"{compound}_ceiling"
         # byte-for-byte: explicit first-fill == implicit == the raw oak_gpl × yield (unscaled)
@@ -2067,7 +2067,7 @@ def test_higher_fill_number_geometrically_discounts_the_ceilings():
         )
         ev = next(e for e in cs.events if e.label.startswith("add_oak"))
         assert ev.mutate is not None
-        after = ev.mutate(cs.schema, cs.y0.copy())
+        after = ev.mutate(cs.schema, cs.y0.copy(), cs.param_values)
         return {
             c: float(cs.schema.get(after, f"{c}_ceiling"))
             for c in (*_OAK_EXTRACTIVES, "ellagitannin")
@@ -2145,8 +2145,8 @@ def test_spirit_soak_back_absent_leaves_ethanol_untouched_byte_for_byte():
     ev_p = next(e for e in plain.events if e.label.startswith("add_oak"))
     ev_b = next(e for e in bourbon.events if e.label.startswith("add_oak"))
     assert ev_p.mutate is not None and ev_b.mutate is not None
-    after_p = ev_p.mutate(plain.schema, plain.y0.copy())
-    after_b = ev_b.mutate(bourbon.schema, bourbon.y0.copy())
+    after_p = ev_p.mutate(plain.schema, plain.y0.copy(), plain.param_values)
+    after_b = ev_b.mutate(bourbon.schema, bourbon.y0.copy(), bourbon.param_values)
     # No spirit ⇒ E untouched by the dose (mutate only writes off-ledger ceilings).
     assert plain.schema.get(after_p, "E") == plain.schema.get(plain.y0, "E")
     # spirit does NOT touch the NON-soak ceilings (eugenol/clove + the ellagitannin taste tannin are
@@ -2169,7 +2169,7 @@ def test_bourbon_spirit_adds_the_full_first_fill_ethanol_bolus():
     )
     ev = next(e for e in cs.events if e.label.startswith("add_oak"))
     assert ev.mutate is not None
-    after = ev.mutate(cs.schema, cs.y0.copy())
+    after = ev.mutate(cs.schema, cs.y0.copy(), cs.param_values)
     delta_e = float(cs.schema.get(after, "E") - cs.schema.get(cs.y0, "E"))
     assert delta_e == pytest.approx(cs.param_values["spirit_soak_ethanol_bourbon"], rel=1e-12)
     assert delta_e > 0.0
@@ -2191,7 +2191,7 @@ def test_spirit_soak_back_depletes_geometrically_and_steeper_than_the_wood():
         )
         ev = next(e for e in cs.events if e.label.startswith("add_oak"))
         assert ev.mutate is not None
-        after = ev.mutate(cs.schema, cs.y0.copy())
+        after = ev.mutate(cs.schema, cs.y0.copy(), cs.param_values)
         return float(cs.schema.get(after, "E") - cs.schema.get(cs.y0, "E"))
 
     params = compile_scenario(_wine([])).param_values
@@ -2281,8 +2281,8 @@ def test_bourbon_aroma_bumps_the_signature_ceilings_by_exactly_the_spirit_soak()
     ev_p = next(e for e in plain.events if e.label.startswith("add_oak"))
     ev_b = next(e for e in bourbon.events if e.label.startswith("add_oak"))
     assert ev_p.mutate is not None and ev_b.mutate is not None
-    after_p = ev_p.mutate(plain.schema, plain.y0.copy())
-    after_b = ev_b.mutate(bourbon.schema, bourbon.y0.copy())
+    after_p = ev_p.mutate(plain.schema, plain.y0.copy(), plain.param_values)
+    after_b = ev_b.mutate(bourbon.schema, bourbon.y0.copy(), bourbon.param_values)
     for compound in _OAK_SPIRIT_AROMAS:
         name = f"{compound}_ceiling"
         bump = bourbon.param_values[f"spirit_soak_{compound}_bourbon"]
@@ -2314,7 +2314,7 @@ def test_bourbon_aroma_bump_depletes_geometrically_with_fill_number():
             )
             ev = next(e for e in cs.events if e.label.startswith("add_oak"))
             assert ev.mutate is not None
-            after = ev.mutate(cs.schema, cs.y0.copy())
+            after = ev.mutate(cs.schema, cs.y0.copy(), cs.param_values)
             return float(cs.schema.get(after, "vanillin_ceiling"))
 
         return ceil("bourbon") - ceil(None)

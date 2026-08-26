@@ -70,10 +70,18 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier, combine
 from fermentation.runtime.integrate import Trajectory, simulate
 
-#: A state mutation applied at a breakpoint: ``(schema, state) -> new_state``. Must
+#: A state mutation applied at a breakpoint: ``(schema, state, params) -> new_state``. Must
 #: return a fresh array of the same shape (the driver books ``new − old`` as the
 #: intervention's external flow), and must not mutate its argument in place.
-StateMutation = Callable[[StateSchema, FloatArray], FloatArray]
+#:
+#: ``params`` is the **running** parameter map in force at the breakpoint — the member's own
+#: draw under an ensemble, with every earlier ``param_update`` already merged (decision D-235).
+#: It exists because a mutation that back-solves state from parameters (``set_ph``) would
+#: otherwise close over the compile-time NOMINAL map and re-anchor every sampled member with
+#: somebody else's numbers, which is exactly the half-repair D-186 forbade and D-234 measured.
+#: A mutation whose jump is parameter-free (every dose verb: the gram-per-litre is a scenario
+#: input) ignores the argument and is byte-identical with or without it.
+StateMutation = Callable[[StateSchema, FloatArray, Mapping[str, float]], FloatArray]
 
 #: An in-place reconfiguration of the Process set at a breakpoint, e.g.
 #: ``lambda ps: ps.enable("malolactic_conversion")``. Applied to the *same* set that
@@ -240,7 +248,10 @@ def simulate_scheduled(
     def apply(event: ScheduledEvent) -> None:
         nonlocal current_y, current_params
         if event.mutate is not None:
-            new_y = np.asarray(event.mutate(schema, current_y), dtype=np.float64)
+            # `current_params` and NOT this event's own `param_update`: an update takes effect
+            # from `time_h` FORWARD, so the mutation sees the map the preceding segment ran
+            # under. No shipped verb carries both, and the ordering is stated so one can.
+            new_y = np.asarray(event.mutate(schema, current_y, current_params), dtype=np.float64)
             if new_y.shape != current_y.shape:
                 raise ValueError(
                     f"mutation for event {event.label!r} returned shape {new_y.shape}, "

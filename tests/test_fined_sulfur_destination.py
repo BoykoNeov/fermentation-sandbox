@@ -131,7 +131,7 @@ def test_the_free_pools_are_untouched_at_the_event():
     y = cs.y0.copy()
     y[schema.slice("h2s")] = 1.0e-3  # 1 mg/L, far above the dose's capacity
     y[schema.slice("methanethiol")] = 1.0e-3
-    out = ev.mutate(schema, y)
+    out = ev.mutate(schema, y, cs.param_values)
 
     capacity_h2s = (_DOSE_MGL / 1000.0) * cs.param_values["copper_h2s_binding"]
     assert float(out[schema.slice("h2s")][0]) == pytest.approx(1.0e-3 - capacity_h2s, rel=1e-12)
@@ -152,7 +152,7 @@ def test_a_negative_undershoot_transfers_nothing():
     y = cs.y0.copy()
     y[schema.slice("h2s")] = -1.0e-9
     before = float(y[schema.slice("bound_h2s")][0])
-    out = ev.mutate(schema, y)
+    out = ev.mutate(schema, y, cs.param_values)
     assert float(out[schema.slice("h2s")][0]) == pytest.approx(-1.0e-9, rel=1e-12)
     assert float(out[schema.slice("bound_h2s")][0]) == before
 

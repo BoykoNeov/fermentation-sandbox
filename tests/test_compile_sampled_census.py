@@ -28,11 +28,13 @@ battery (wine 29, beer 20, wine-with-overrides 30), and 21 of them — the 19 ``
 **The four verdicts, all measured.**
 
 * ``REPAIRED`` — the 19 ``pKa_*`` plus ``nitrogen_uptake_charge_<medium>`` in their *t=0 anchor*
-  role. ``CompiledScenario.reanchor_for_member`` re-solves the cation slot per member (D-233), and
-  :func:`test_set_ph_anchors_only_the_nominal_member` measures the result: t=0 spread 2.03e-11 pH.
-* ``LIVE`` — the same 19 ``pKa_*`` in their *second* compile role, ``_verb_set_ph``, whose event
-  closes over the compile-time resolved map. Members land up to 0.0790 pH from the target they
-  asked for and span 0.1320 (24 members, D-186's setting), against 2.03e-11 at t=0.
+  role. ``CompiledScenario.reanchor_for_member`` re-solves the cation slot per member (D-233):
+  t=0 spread 2.03e-11 pH.
+* ``REPAIRED`` — the same 19 ``pKa_*`` in their *second* compile role, ``_verb_set_ph``. Its event
+  closed over the compile-time resolved map until D-235 widened ``StateMutation`` to hand every
+  mutation the **running** map; members landed up to 0.07896 pH from the target they asked for and
+  spanned 0.13202 (24 members, D-186's setting), and now sit 1.98e-11 / 2.13e-11 — the t=0 anchor's
+  own class. ``add_dap``'s z̄ read moved with it (worst member 0.0108 pH at the dose).
 * ``LIVE`` — ``copper_typical``, which seeds the ``copper`` state slot at compile *and* is
   ``PhenolicBrowning``'s mean-centering reference at runtime, so ``f(Cu) == 1`` — the D-134 design
   invariant — holds only at the nominal draw.
@@ -48,9 +50,10 @@ battery (wine 29, beer 20, wine-with-overrides 30), and 21 of them — the 19 ``
 61-name-style totals is the vacuity D-159 refused, and it would go red on every new parameter. What
 is pinned is that **every member is classified**: a future compile-time read of a sampled parameter
 fails :func:`test_every_census_member_is_classified` by name, which is the only thing that stops
-this set growing silently again. The two ``LIVE`` rows additionally pin their defects on purpose,
-in the D-233 idiom — **a RED there means the defect was repaired: delete the guard and say so in
-the record, do not revert the repair.**
+this set growing silently again. The one surviving ``LIVE`` row additionally pins its defect on
+purpose, in the D-233 idiom — **a RED there means the defect was repaired: delete the guard and
+say so in the record, do not revert the repair.** The pH pair's pin went red exactly that way at
+D-235 and was replaced by :func:`test_set_ph_reproduces_its_target_for_every_member`.
 """
 
 from __future__ import annotations
@@ -286,9 +289,10 @@ WINE_BROWNING = Scenario(
 BATTERY = (WINE, BEER, WINE_OVERRIDES)
 
 #: The pH map, read at compile in TWO roles: the t=0 anchor back-solve (repaired per member by
-#: D-233's `reanchor_for_member`) and `_verb_set_ph`'s event, which still closes over the
-#: compile-time nominal map. Same names, two verdicts — which is why the registry is keyed by
-#: name and the verdict prose names the role.
+#: D-233's `reanchor_for_member`) and `_verb_set_ph`'s event (repaired by D-235, which hands the
+#: mutation the running map). Both roles now move with the member; the registry stays keyed by
+#: name with the role named in the prose, because that is what made the split legible when the
+#: two verdicts differed.
 _PKA_SPECS = (*acidbase.ALL_ACIDS.values(), acidbase.BYP_AS_SUCCINIC, acidbase.CARBONIC_AS_CO2)
 _PKA_MEMBERS = tuple(sorted({name for spec in _PKA_SPECS for name in spec.pka_param_names}))
 
@@ -296,12 +300,13 @@ _PKA_MEMBERS = tuple(sorted({name for spec in _PKA_SPECS for name in spec.pka_pa
 CENSUS: Mapping[str, str] = {
     **dict.fromkeys(
         _PKA_MEMBERS,
-        "REPAIRED at t=0 by reanchor_for_member (D-233); LIVE in _verb_set_ph's event, which "
-        "closes over the compile-time resolved map",
+        "REPAIRED in BOTH compile roles — the t=0 anchor by reanchor_for_member (D-233), and "
+        "_verb_set_ph's event by the running map it is handed at the breakpoint (D-235)",
     ),
     **dict.fromkeys(
         ("nitrogen_uptake_charge_wine", "nitrogen_uptake_charge_beer"),
-        "REPAIRED — cation_charge_for_ph reads it from the member's map",
+        "REPAIRED — cation_charge_for_ph reads it from the member's map, and since D-235 so do "
+        "_verb_set_ph's and _verb_add_dap's mutations",
     ),
     **{
         spec.fraction_param: "CLOSED at D-206 — the gate's f_i cancels; all eight measured there"
@@ -404,34 +409,29 @@ def test_the_census_and_the_drawability_surface_are_disjoint():
     assert "oak_yield_vanillin_medium" in (seen - members)
 
 
-# -- the two LIVE rows, pinned as defects ------------------------------------------------------
+# -- the pH pair (REPAIRED at D-235) and the one surviving LIVE row --------------------------
 
 
-def test_set_ph_anchors_only_the_nominal_member():
-    """PINS A DEFECT ON PURPOSE — a RED here means ``set_ph`` was made per-member.
+def test_set_ph_reproduces_its_target_for_every_member():
+    """The repaired half of the pH-anchor pair (decision D-235), in its positive form.
 
-    **If this goes red, delete it and say so in the record; do not revert the repair.**
+    **This replaces a guard that pinned the defect on purpose.** Until D-235 ``_verb_set_ph``'s
+    event closed over the compile-time resolved map, so a sampled member re-anchored with the
+    nominal's pKa set and landed up to 0.07896 pH from the target it asked for (spread 0.13202,
+    24 members, D-186's own setting) — against 2.03e-11 at t=0, which D-233 had just repaired.
+    D-186's docstring had named that exact configuration as the thing not to produce. The
+    mutation now reads the **running** map ``simulate_scheduled`` hands it, which under an
+    ensemble is the member's own draw, so both anchors are per-member and agree again.
 
-    ``initial_ph`` and ``set_ph`` make the same promise — the beverage sits at the pH you named —
-    and since D-233 only the first keeps it for a sampled member. D-186's own docstring forbade
-    exactly this state: *"Do not 'fix' this one anchor alone — the two would then disagree about
-    what a member's pH means, and the state-level one would be the odd anchor out."* D-233 fixed
-    the other one. So the configuration D-186 named as wrong is the one that ships, and it got
-    there by a beat that repaired the half it was looking at.
-
-    Measured on ONE ensemble so the two numbers are a comparison and not two records' figures:
-    at t=0 the members span 2.03e-11 pH about the anchor; 0.05 h after the ``set_ph`` event they
-    span 0.111 and miss the target by up to 0.058 (12 members; 0.132 / 0.079 at 24, which is
-    D-186's own setting). The nominal run is exact at both, which is why nothing else in the
-    suite sees this.
+    Measured AT the event, not after it. The driver emits every breakpoint post-mutation, so the
+    grid point at the event time IS the anchored state; the 0.05 h probe the old guard used
+    carries three minutes of ferment on top and reads 7.04e-07 for that reason alone, not because
+    the anchor is loose [[feedback-read-a-fast-curve-on-a-fixed-grid]].
     """
     compiled = compile_scenario(WINE_SET_PH)
-    probe_h = 24.0 * SET_PH_DAY + 0.05
-    ens = compiled.run_ensemble(n_members=12, seed=0, t_eval=np.array([0.0, probe_h]))
-    # The driver inserts EVERY breakpoint into the returned grid, so the requested index is not
-    # the returned index; look the time up rather than counting
-    # [[feedback-read-a-fast-curve-on-a-fixed-grid]].
-    post = int(np.flatnonzero(np.isclose(ens.t, probe_h))[0])
+    event_h = 24.0 * SET_PH_DAY
+    ens = compiled.run_ensemble(n_members=12, seed=0, t_eval=np.array([0.0, event_h]))
+    at_event = int(np.flatnonzero(np.isclose(ens.t, event_h))[0])
 
     def ph(member: int, t_index: int) -> float:
         return acidbase.ph_of_state(
@@ -441,29 +441,69 @@ def test_set_ph_anchors_only_the_nominal_member():
     n = ens.members.shape[0]
     assert n >= 2, "need at least two members for a spread"
     at_t0 = np.array([ph(i, 0) for i in range(n)])
-    after = np.array([ph(i, post) for i in range(n)])
+    after = np.array([ph(i, at_event) for i in range(n)])
 
-    # The repaired anchor, as the baseline that makes the second number mean something.
+    # The t=0 anchor (D-233), as the baseline that says what "per-member" costs here.
     assert np.abs(at_t0 - ANCHOR_PH).max() < 1e-9
 
-    # The unrepaired one. Pinned as a floor, not a band: the exact spread depends on the member
-    # count and the seed, and what is being asserted is that it is nowhere near the anchor's.
-    assert np.abs(after - SET_PH_TARGET).max() > 0.02, (
-        "set_ph now reproduces its target per member — the D-186 asymmetry is closed; delete "
-        "this guard and record it"
+    # The second anchor, now in the same class. Pinned as a CEILING three orders of magnitude
+    # below the 0.058 this scenario used to miss by at 12 members, and six above the root
+    # finder's own residual — a band, not the digits [[feedback-pin-the-band-not-the-nominal]].
+    assert np.abs(after - SET_PH_TARGET).max() < 1e-9, (
+        "set_ph no longer reproduces its target per member — the D-186 pair has come apart again"
     )
-    assert (after.max() - after.min()) > 1e6 * (at_t0.max() - at_t0.min())
+    assert (after.max() - after.min()) < 1e-9
 
-    # The nominal run must be exact at BOTH, or this is a different defect than the one claimed.
+    # The nominal run stays exact at both, which is what says the widening moved nothing that was
+    # already right: `run()` passes `param_values`, so the mutation reads the same numbers it read
+    # when it closed over `resolve()`.
     nominal = compiled.param_values
     assert acidbase.ph_of_state(ens.nominal[:, 0], ens.schema, nominal) == pytest.approx(
         ANCHOR_PH, abs=1e-9
     )
-    # 1e-6 rather than 1e-9 only because the probe sits 0.05 h AFTER the event and the wine
-    # keeps fermenting through those three minutes; the jump itself is exact.
-    assert acidbase.ph_of_state(ens.nominal[:, post], ens.schema, nominal) == pytest.approx(
-        SET_PH_TARGET, abs=1e-6
+    assert acidbase.ph_of_state(ens.nominal[:, at_event], ens.schema, nominal) == pytest.approx(
+        SET_PH_TARGET, abs=1e-9
     )
+
+
+def test_exactly_two_verbs_read_the_running_parameter_map():
+    """The blast-radius claim D-235 had to prove, pinned rather than asserted.
+
+    Widening :data:`~fermentation.runtime.schedule.StateMutation` handed every verb's mutation a
+    third argument. Two of the thirteen read it — ``set_ph`` (the pH anchor) and ``add_dap`` (the
+    z̄ a nitrogen pool's charge excess is measured relative to). The other eleven are byte-identical
+    with or without it, because their jump is a scenario input in grams and not a parameter.
+
+    Recorded rather than diffed: a numerical comparison under a perturbed map would call a verb a
+    reader only where the read happens to MOVE something, and would call ``dosed_charge``'s
+    compile-time read a non-read for the same reason. What is asserted is which names each
+    mutation actually looks up [[feedback-grep-finds-claims-not-guards]].
+    """
+    compiled = compile_scenario(WINE)
+    readers: dict[str, list[str]] = {}
+    n_mutations = 0
+    for event in compiled.events:
+        if event.mutate is None:
+            continue
+        n_mutations += 1
+        recording = _RecordingMap(compiled.param_values)
+        recording.seen = set()
+        event.mutate(compiled.schema, compiled.y0.copy(), recording)
+        if recording.seen:
+            readers[event.label.split("@")[0]] = sorted(recording.seen)
+
+    assert n_mutations >= 11, f"the battery stopped reaching the verbs: {n_mutations} mutations"
+    assert set(readers) == {"set_ph", "add_dap"}, (
+        f"the set of verbs reading the running map changed: {sorted(readers)}. A NEW reader is "
+        "not automatically wrong — it is a verb that became per-member — but it needs a measured "
+        "record like D-235's, and a removed one means a member is back on the nominal."
+    )
+    # add_dap reads exactly the medium's z̄. `dap_nitrogen_charge` is deliberately NOT here: it is
+    # a property of the compound, is in no Process's `reads`, and so has no member value.
+    assert readers["add_dap"] == ["nitrogen_uptake_charge_wine"]
+    # set_ph rebuilds the whole pKa map plus the CO2 solubility triple and the same z̄.
+    assert set(_PKA_MEMBERS) <= set(readers["set_ph"])
+    assert "nitrogen_uptake_charge_wine" in readers["set_ph"]
 
 
 def _with_value(params: ParameterSet, name: str, value: float) -> ParameterSet:

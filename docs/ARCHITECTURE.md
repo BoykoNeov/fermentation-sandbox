@@ -284,7 +284,10 @@ Two wrappers layer on top without changing the pure core:
   mutate-and-resume. It carries an external-flow ledger so conservation across a jump is
   `final == initial + Σ flows`, and min-combines the per-segment tier map. `events=()` is
   byte-for-byte plain `simulate`. Temperature scheduling and every discrete intervention verb ride
-  this one mechanism; `CompiledScenario.run()` always dispatches through it.
+  this one mechanism; `CompiledScenario.run()` always dispatches through it. A `mutate` is handed
+  the **running** parameter map at its breakpoint (`StateMutation` is `(schema, state, params) ->
+  state`, D-235), so a jump that back-solves state from parameters uses the member's own draw under
+  an ensemble; 2 of the 13 verbs read it (`set_ph`, `add_dap`) and the rest ignore it.
 - **Stochastic ensemble** (`simulate_ensemble`, D-24/25/37) — Monte-Carlo over the parameters'
   `Uncertainty` bands (triangular default; LHS/Sobol via `qmc`), scoped to the active Process set's
   reads, returning nominal + median + P5/P95 band and per-member conservation. Randomness lives
