@@ -194,18 +194,20 @@ INDEX_LOAD_LIMIT_BYTES = 24_986
 # one-line pointer in MEMORY.md"). A session following the harness verbatim regrows the index
 # by exactly the channel the split closed, so the write path needs a check and not a sentence.
 # Adding a genuinely always-on rule means adding it here: a deliberate act, which is the point.
-BOOT_ROWS = frozenset({
-    "user-boykoneov",
-    "project-fermentation-sandbox",
-    "reference-claude-best-practices",
-    "feedback-batch-end-ritual",
-    "feedback-always-commit-push",
-    "feedback-discuss-disagreements",
-    "feedback-closer-to-reality-decides",
-    "feedback-never-pipe-checks-to-tail",
-    "feedback-full-suite-before-green",
-    "feedback-verify-latest-state-not-breadcrumbs",
-})
+BOOT_ROWS = frozenset(
+    {
+        "user-boykoneov",
+        "project-fermentation-sandbox",
+        "reference-claude-best-practices",
+        "feedback-batch-end-ritual",
+        "feedback-always-commit-push",
+        "feedback-discuss-disagreements",
+        "feedback-closer-to-reality-decides",
+        "feedback-never-pipe-checks-to-tail",
+        "feedback-full-suite-before-green",
+        "feedback-verify-latest-state-not-breadcrumbs",
+    }
+)
 
 # One top-level block == one distilled record. Measured 2026-08-09 across the 49 bullets then
 # live: median 4 lines, 44 of 49 at or under 8. The five over were the five most recent beats
@@ -295,8 +297,11 @@ def block_findings(name: str, text: str, cap: int) -> list[Finding]:
 def index_findings(text: str, name: str = INDEX_NAME) -> list[Finding]:
     """Over-long rows, plus -- for MEMORY.md alone -- the byte total the harness truncates at."""
     findings = [
-        Finding(name, number, f"index row is {len(line.encode('utf-8'))} bytes "
-                              f"(cap {INDEX_ROW_CAP_BYTES})")
+        Finding(
+            name,
+            number,
+            f"index row is {len(line.encode('utf-8'))} bytes (cap {INDEX_ROW_CAP_BYTES})",
+        )
         for number, line in enumerate(text.splitlines(), 1)
         if line.startswith("- [") and len(line.encode("utf-8")) > INDEX_ROW_CAP_BYTES
     ]
@@ -304,17 +309,24 @@ def index_findings(text: str, name: str = INDEX_NAME) -> list[Finding]:
         for number, line in enumerate(text.splitlines(), 1):
             hit = re.match(r"- \[[^\]]*\]\((feedback-[a-z0-9-]+)\.md\)", line)
             if hit and hit.group(1) not in BOOT_ROWS:
-                findings.append(Finding(
-                    name, number,
-                    f"lesson row `{hit.group(1)}` is in the index, not in lessons/ -- row COUNT "
-                    "is the channel that overflowed this file twice; move it",
-                ))
+                findings.append(
+                    Finding(
+                        name,
+                        number,
+                        f"lesson row `{hit.group(1)}` is in the index, not in lessons/ -- "
+                        "row COUNT is the channel that overflowed this file twice; move it",
+                    )
+                )
 
     size = len(text.encode("utf-8"))
     if name == INDEX_NAME and size > INDEX_LOAD_LIMIT_BYTES:
         findings.append(
-            Finding(name, 1, f"file is {size} bytes, over the harness load limit of "
-                             f"{INDEX_LOAD_LIMIT_BYTES} -- it is being TRUNCATED at boot")
+            Finding(
+                name,
+                1,
+                f"file is {size} bytes, over the harness load limit of "
+                f"{INDEX_LOAD_LIMIT_BYTES} -- it is being TRUNCATED at boot",
+            )
         )
     return findings
 
@@ -331,14 +343,19 @@ def _shape(text: str, name: str = "") -> str:
     room = ""
     if name == INDEX_NAME:
         left = INDEX_LOAD_LIMIT_BYTES - size
-        room = (f", {left} bytes under the {INDEX_LOAD_LIMIT_BYTES} load limit" if left >= 0
-                else f", {-left} bytes OVER the {INDEX_LOAD_LIMIT_BYTES} load limit")
+        room = (
+            f", {left} bytes under the {INDEX_LOAD_LIMIT_BYTES} load limit"
+            if left >= 0
+            else f", {-left} bytes OVER the {INDEX_LOAD_LIMIT_BYTES} load limit"
+        )
     sizes = sorted(len(body) for _, body in block_spans(lines))
     if not sizes:
         return f"{len(lines)} lines, {size} bytes{room}"
     median = sizes[len(sizes) // 2]
-    return (f"{len(lines)} lines, {size} bytes{room}, "
-            f"{len(sizes)} blocks, median {median}, max {sizes[-1]}")
+    return (
+        f"{len(lines)} lines, {size} bytes{room}, "
+        f"{len(sizes)} blocks, median {median}, max {sizes[-1]}"
+    )
 
 
 def project_root(path: pathlib.Path) -> pathlib.Path | None:
