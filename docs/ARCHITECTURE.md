@@ -469,7 +469,7 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (80 test files; unit, integration, conservation, sampling-surface and
+`uv run pytest -n auto` (81 test files; unit, integration, conservation, sampling-surface and
 doc-consistency checks), `uv run ruff check .`, `uv run mypy` (strict on `src`). CI runs all three
 on Python 3.13 and 3.14. Two of the test files guard documentation rather than physics:
 `test_decisions_index.py` (the archive's generated index) and `test_memory_shape_hook.py`.
