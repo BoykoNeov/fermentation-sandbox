@@ -214,7 +214,7 @@ BOOT_ROWS = frozenset({
 #
 # It caps BLOCKS, not just "- " bullets: a cap that bound only bullets would let narrative
 # displace into a column-0 paragraph and escape, which is the same arbitrage as
-# INDEX_ROW_CHAR_CAP one level in. The 20 non-bullet paragraphs then live measured 6 lines at
+# INDEX_ROW_CAP_BYTES one level in. The 20 non-bullet paragraphs then live measured 6 lines at
 # most, so this costs prose nothing.
 #
 # This is now the ONLY threshold on the project memory. See the docstring for why the total

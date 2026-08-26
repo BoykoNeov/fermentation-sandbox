@@ -189,12 +189,44 @@ def test_guide_cap_still_trips_the_changelog_shape(hook: ModuleType) -> None:
 
 
 def test_index_row_cap_catches_a_displaced_status_paragraph(hook: ModuleType) -> None:
-    """The 950-char row: overflow squeezed out of the capped file into the uncapped one."""
+    """The 950-byte row: overflow squeezed out of the capped file into the uncapped one."""
     short = "- [Title](f.md) — hook"
-    long = "- [Project](p.md) — " + "x" * hook.INDEX_ROW_CHAR_CAP
+    long = "- [Project](p.md) — " + "x" * hook.INDEX_ROW_CAP_BYTES
     findings = hook.index_findings(f"# Index\n\n{short}\n{long}\n")
     assert len(findings) == 1
     assert findings[0].line == 4
+    assert findings[0].file == hook.INDEX_NAME
+
+
+def test_the_index_row_cap_counts_BYTES_and_not_CHARACTERS(hook: ModuleType) -> None:
+    """D-230, repairing D-229's own guard gap. The unit is the whole point of that record.
+
+    D-229 moved this cap from characters to bytes because **the harness loader counts bytes**
+    and the index had been silently truncated at boot. It renamed the constant
+    ``INDEX_ROW_CHAR_CAP`` -> ``INDEX_ROW_CAP_BYTES`` in the hook and did not rename it here, so
+    this module raised ``AttributeError`` from D-229 until D-230 — one failure plus nine fixture
+    errors, shipped red and carried for two records
+    [[feedback-full-suite-before-green]].
+
+    Renaming alone would have restored GREEN without restoring the CLAIM: every row these tests
+    build is ASCII, so ``len(row) == len(row.encode())`` and they pass identically under either
+    unit. A revert of D-229's substantive change — counting characters again — would have gone
+    undetected. This is the arm that sees it: a row of em-dashes that is comfortably UNDER the
+    cap in characters and comfortably OVER it in bytes.
+    """
+    cap = hook.INDEX_ROW_CAP_BYTES
+    # An em-dash is 3 bytes and 1 character, so 3/4 of a cap's worth of them is 0.75x the cap
+    # in chars and 2.25x in bytes. Any implementation counting characters reports nothing.
+    row = "- [P](p.md) " + "—" * ((cap * 3) // 4)
+    assert len(row) < cap, "the probe row must be UNDER the cap in characters"
+    assert len(row.encode("utf-8")) > cap, "the probe row must be OVER the cap in bytes"
+
+    findings = hook.index_findings(f"# Index\n\n{row}\n")
+    assert len(findings) == 1, (
+        f"a {len(row)}-character / {len(row.encode('utf-8'))}-byte index row did not fire "
+        f"against a cap of {cap}. The cap is counting CHARACTERS again, which is exactly the "
+        "defect D-229 shipped to fix: the harness loader counts bytes and truncates silently"
+    )
     assert findings[0].file == hook.INDEX_NAME
 
 
@@ -221,7 +253,7 @@ def repo(tmp_path: pathlib.Path, hook: ModuleType) -> pathlib.Path:
     (tmp_path / hook.GUIDE_NAME).write_text(_bullet(3), encoding="utf-8")
     (memory / hook.PROJECT_NAME).write_text(_bullet(21), encoding="utf-8")
     (memory / hook.INDEX_NAME).write_text(
-        "- [P](p.md) — " + "x" * hook.INDEX_ROW_CHAR_CAP, encoding="utf-8"
+        "- [P](p.md) — " + "x" * hook.INDEX_ROW_CAP_BYTES, encoding="utf-8"
     )
     return tmp_path
 
@@ -257,7 +289,22 @@ def test_a_clean_surface_still_reports_its_shape(
     (memory / hook.INDEX_NAME).write_text("- [P](p.md) — hook", encoding="utf-8")
     message = _emit(hook, monkeypatch, memory / hook.PROJECT_NAME)["systemMessage"]
     assert "clean" in message
-    assert "4 lines, 1 blocks" in message
+    # D-229 inserted a BYTE column between the two counts and this assert was a single literal
+    # substring, so it broke on the format rather than on the claim (D-230 found it behind the
+    # AttributeError above). Now stated as its three parts, with the byte figure checked
+    # AGAINST THE FILE rather than pinned -- the size report is the thing D-229 added, and
+    # nothing was verifying it was the real size.
+    line = next(ln for ln in message.splitlines() if hook.PROJECT_NAME in ln)
+    # DECODED bytes, not ``st_size``: the hook measures the text the loader ingests, so its
+    # figure is line-ending independent. On Windows this fixture writes CRLF and st_size runs
+    # 3 bytes high here -- measured, and the hook's convention is the right one, because the
+    # repo's memory files are LF and a CRLF checkout must not change the reported headroom.
+    size = len((memory / hook.PROJECT_NAME).read_text(encoding="utf-8").encode("utf-8"))
+    assert "4 lines" in line and "1 blocks" in line, line
+    assert f"{size} bytes" in line, (
+        f"the shape line reports a byte count that is not the file's own {size}: {line!r}. "
+        "D-229 added this column because the harness loader counts bytes"
+    )
 
 
 def test_a_guide_outside_a_project_is_out_of_scope(
