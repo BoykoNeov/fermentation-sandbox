@@ -87,6 +87,7 @@ from fermentation.core.kinetics.uptake import SugarUptakeToEthanolCO2
 from fermentation.core.media import beer_schema, get_medium, wine_schema
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.parameters import default_data_dir, load_parameters
+from fermentation.parameters.store import ParameterSet
 from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units import cells_per_ml_to_pitch_gpl
@@ -1598,6 +1599,54 @@ def test_removing_the_falling_acids_raises_the_finished_ph_by_the_predicted_amou
     )
 
 
+#: The eight wort acids Peyer's BC titration is computed on top of (decision D-181).
+_WORT_BC_SEEDS = {
+    "lactic": "lactic_typical_wort",
+    "acetic": "acetic_typical_wort",
+    "citrate": "citric_typical_wort",
+    "malic": "malic_typical_wort",
+    "succinic": "succinic_typical_wort",
+    "pyruvic": "pyruvic_typical_wort",
+    "formic": "formic_typical_wort",
+    "oxalic": "oxalic_typical_wort",
+}
+
+
+def _peyer_wort_bc(params: ParameterSet, capacity_gpl: float, pka_peptide: float) -> float:
+    """Peyer's fast buffering capacity for a wort carrying ``capacity_gpl`` at ``pka_peptide``.
+
+    His own protocol (thesis sec 5.3.4): 375 µL of 1 M HCl into 25 mL,
+    ``BC = log10[H+ added / H+ increase]``, reproduced on this engine's charge balance.
+    Factored out at D-233 so the round-trip below and the drawn-member guard beside it are
+    provably the SAME titration — two hand-copies would let one drift and still look agreed.
+    """
+    import math
+
+    v_in, v_acid, c_acid = 25.0, 0.375, 1.0
+    v_fin = v_in + v_acid
+    pka = dict(acidbase.build_pka_map(params.resolve()))
+    pka["peptide_buffer"] = (pka_peptide,)
+    totals = {
+        slot: params[p].value / acidbase.ALL_ACIDS[slot].molar_mass
+        for slot, p in _WORT_BC_SEEDS.items()
+    }
+    totals["peptide_buffer"] = capacity_gpl / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
+    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 5.5)
+    ph_in = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
+    f = v_in / v_fin
+    diluted = {k: v * f for k, v in totals.items()}
+    ph_fin = acidbase.solve_ph(diluted, cation * f - (v_acid * c_acid) / v_fin, 0.0, 0.0, pka)
+    h_inc = v_fin * 10.0 ** (-ph_fin) - v_in * 10.0 ** (-ph_in)
+    return math.log10((v_acid * c_acid) / h_inc)
+
+
+def _beer_acid_params() -> ParameterSet:
+    data = default_data_dir()
+    return load_parameters(
+        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    )
+
+
 def test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc():
     """The re-anchor is a round-trip, so the round-trip is a test.
 
@@ -1610,44 +1659,67 @@ def test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc():
     Two of the three stacked mismatches the capacity's own block admits to are untouched by
     this check and stay open: it is fitted at wort pH and applied across a traverse, and 1.18
     is a wort measurement with no published finished-beer counterpart.
-    """
-    import math
 
-    v_in, v_acid, c_acid = 25.0, 0.375, 1.0
-    v_fin = v_in + v_acid
-    data = default_data_dir()
-    params = load_parameters(
-        data / "beer_generic.yaml", data / "acidbase.yaml", data / "beer_acids.yaml"
+    **It scores the NOMINAL pKa only, and D-233 measured what that leaves uncovered** — see
+    the guard directly below.
+    """
+    params = _beer_acid_params()
+    bc = _peyer_wort_bc(
+        params,
+        params["peptide_buffer_capacity_beer"].value,
+        params["pKa_peptide_buffer"].value,
     )
-    pka = acidbase.build_pka_map(params.resolve())
-    seeds = {
-        "lactic": "lactic_typical_wort",
-        "acetic": "acetic_typical_wort",
-        "citrate": "citric_typical_wort",
-        "malic": "malic_typical_wort",
-        "succinic": "succinic_typical_wort",
-        "pyruvic": "pyruvic_typical_wort",
-        "formic": "formic_typical_wort",
-        "oxalic": "oxalic_typical_wort",
-    }
-    totals = {
-        slot: params[p].value / acidbase.ALL_ACIDS[slot].molar_mass for slot, p in seeds.items()
-    }
-    totals["peptide_buffer"] = (
-        params["peptide_buffer_capacity_beer"].value
-        / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
-    )
-    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 5.5)
-    ph_in = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
-    f = v_in / v_fin
-    diluted = {k: v * f for k, v in totals.items()}
-    ph_fin = acidbase.solve_ph(diluted, cation * f - (v_acid * c_acid) / v_fin, 0.0, 0.0, pka)
-    h_inc = v_fin * 10.0 ** (-ph_fin) - v_in * 10.0 ** (-ph_in)
-    bc = math.log10((v_acid * c_acid) / h_inc)
 
     assert bc == pytest.approx(1.18, abs=1e-9), (
         f"the shipped peptide capacity reproduces BC = {bc:.6f}, not Peyer's published 1.18. "
         "The wort acid table changed without the back-solve being re-run."
+    )
+
+
+def test_a_drawn_peptide_pka_carries_a_wort_that_is_not_peyers_1_18():
+    """A DEFECT is pinned here, on purpose. **A RED means it was FIXED** (D-214, D-233).
+
+    Read this before "repairing" a failure: the capacity is a COMPILE-time seed back-solved
+    OFFLINE at the nominal ``pKa_peptide_buffer``, while that pKa is read at RUNTIME and is in
+    the sampled set. So an ensemble member draws its own pKa and keeps a capacity fitted to
+    somebody else's — and the wort it carries no longer reproduces the published BC = 1.18
+    the capacity exists to reproduce.
+
+    D-214 measured this and deliberately did not fix it; D-233 re-measured rather than
+    inheriting the number, fixed the *anchor* half beside it, and left this half standing
+    because repairing it means running the BC back-solve per member — which means moving the
+    root-find into ``src``, and that would make the round-trip test above compare the
+    root-finder against itself.
+
+    **So if this test goes RED, the likely cause is that a later beat made the pair coherent.
+    Do not revert that beat. Delete this guard and say so in the record.**
+
+    The shape matters and is asserted, not just the span: BC is maximal AT the nominal by
+    construction and falls off on BOTH sides, so the low edge is not the only offender and a
+    one-sided claim about the band would be wrong.
+    """
+    params = _beer_acid_params()
+    shipped = params["peptide_buffer_capacity_beer"].value
+    unc = params["pKa_peptide_buffer"].uncertainty
+    nominal_pka = params["pKa_peptide_buffer"].value
+
+    at_low = _peyer_wort_bc(params, shipped, unc.low)
+    at_nominal = _peyer_wort_bc(params, shipped, nominal_pka)
+    at_high = _peyer_wort_bc(params, shipped, unc.high)
+
+    assert at_nominal == pytest.approx(1.18, abs=1e-9)
+    assert at_low == pytest.approx(1.116059, abs=1e-5), (
+        f"a member drawing pKa {unc.low} carries a wort at BC = {at_low:.6f}; D-233 measures "
+        "1.116059. If this moved because the pair was made coherent, delete this guard."
+    )
+    assert at_high == pytest.approx(1.145594, abs=1e-5), (
+        f"a member drawing pKa {unc.high} carries a wort at BC = {at_high:.6f}; D-233 measures "
+        "1.145594."
+    )
+    assert at_low < at_high < at_nominal, (
+        "BC is maximal at the NOMINAL pKa by construction and falls off on both sides. That "
+        "ordering is the reason D-214's '1.1161-1.180' is a span and not a direction: the low "
+        "edge is the worst point, but the high edge is wrong too."
     )
 
 

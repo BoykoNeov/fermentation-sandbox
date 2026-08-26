@@ -293,6 +293,15 @@ Two wrappers layer on top without changing the pure core:
 Note that `only=`/`exclude=` shift the draw sequence, so an arm and its baseline are two different
 random ensembles unless pinned to a fixed hypercube.
 
+`y0` is shared across members with one exception: the parts of it a **parameter derives**
+(D-233). `simulate_ensemble` takes an optional `y0_for_member` builder — omitted ⇒ the fixed
+array, so a direct caller is byte-identical — and `CompiledScenario.run_ensemble` supplies one
+via `CompiledScenario.reanchor_for_member()` whenever the scenario gave an `initial_ph`. That
+re-solves the `cation_charge` anchor under each member's own pKa draws, because the compile-seam
+back-solve reads the pKa map and every `pKa_*` is in the sampled set; without it a member starts
+at a pH the scenario never asked for. It re-anchors that one slot and nothing else — the
+scenario-input axis D-24 excluded (Brix, YAN) is unchanged.
+
 ## pH as a derived pure function
 
 pH is **not** integrated — there is no `dpH/dt`. Like `total_carbon` and ABV it is an

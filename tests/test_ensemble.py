@@ -14,6 +14,7 @@ from collections.abc import Mapping
 import numpy as np
 import pytest
 
+from fermentation.core import acidbase
 from fermentation.core.chemistry import CO2_PER_HEXOSE, ETHANOL_PER_HEXOSE
 from fermentation.core.process import Process, ProcessSet
 from fermentation.core.state import FloatArray, StateSchema, VarSpec
@@ -34,6 +35,7 @@ from fermentation.scenario import (
     TemperaturePoint,
     compile_scenario,
 )
+from fermentation.units import cells_per_ml_to_pitch_gpl
 from fermentation.validation import assert_conserved, total_carbon, total_mass, total_nitrogen
 
 # -- a toy that actually READS a sampled parameter ----------------------------
@@ -662,3 +664,205 @@ def test_scheduled_ensemble_isolates_members_from_each_others_reconfigure():
             t_eval=grid,
         )
         assert np.array_equal(ens.members[i], ref.y)  # a leaked prior-member enable breaks this
+
+
+# -- the pH anchor is parameter-DERIVED, so it must be re-derived per member (D-233) ---
+
+
+def _anchored(medium: str) -> tuple[Scenario, float]:
+    """A minimal anchored scenario per medium, plus the pH it anchors on."""
+    if medium == "wine":
+        initial = {
+            "brix": 24.0,
+            "yan_mgl": 250.0,
+            "pitch_gpl": 0.25,
+            "tartaric_gpl": 6.0,
+            "malic_gpl": 3.0,
+            "initial_ph": 3.50,
+        }
+        celsius = 25.0
+    else:
+        sugar = 82.2388545
+        initial = {
+            "glucose_gpl": 0.15 * sugar,
+            "maltose_gpl": 0.70 * sugar,
+            "maltotriose_gpl": 0.15 * sugar,
+            "yan_mgl": 200.0,
+            "pitch_gpl": cells_per_ml_to_pitch_gpl(9.96e6),
+            "initial_ph": 5.65,
+        }
+        celsius = 15.0
+    return (
+        Scenario(
+            name=f"d233-{medium}",
+            medium=medium,
+            initial=initial,
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
+            duration_days=14.0,
+        ),
+        float(initial["initial_ph"]),
+    )
+
+
+@pytest.mark.parametrize("medium", ["beer", "wine"])
+def test_every_sampled_member_starts_at_the_ph_the_scenario_anchored(medium):
+    """``initial_ph``'s contract is "reproduce this pH at t=0" — for MEMBERS too (D-233).
+
+    This is the guard the beat is for, and it was RED before the fix. ``cation_charge`` is
+    back-solved at compile from ``initial_ph`` **through the pKa map**, and every ``pKa_*``
+    is in the sampled set (they reach it via the ``reads`` of any active pH-reading Process,
+    D-160). So until D-233 a member drew its own pKas and then started from a cation fitted
+    to the *nominal* ones: beer members began at pH 5.5062-5.7778 against an anchor of 5.65
+    and wine at 3.4208-3.5780 against 3.50.
+
+    **t=0 is asserted rather than the band, and that is deliberate.** At t=0 the state IS
+    ``y0`` and the anchor was solved so the pH function returns ``initial_ph``, so ANY
+    nonzero spread here is 100 % artefact with no legitimate component to net out. The
+    day-14 *band* is NOT the case for this fix — it moves 1.008x, and the 1.287x figure from
+    a single-parameter sweep is ``pKa_peptide_buffer``'s own contribution, never the band's.
+
+    The tolerance is the closed form's, not a fudge: ``cation_charge_for_ph`` is exact
+    (no root-find on that side), so the residual is ``solve_ph``'s own convergence — measured
+    at 2.3e-11 across 32 members in both media.
+    """
+    scenario, anchor = _anchored(medium)
+    compiled = compile_scenario(scenario)
+    ens = compiled.run_ensemble(n_members=16, seed=20260826, sampler="lhs")
+    assert ens.n_succeeded >= 15, f"{ens.n_failed} members failed: {ens.failures[:3]}"
+
+    nominal = compiled.parameters.resolve()
+    worst = 0.0
+    for i in range(ens.n_succeeded):
+        values = dict(nominal)
+        values.update(ens.member_params[i])
+        y0 = np.asarray(ens.member_trajectory(i).y, dtype=float)[:, 0]
+        worst = max(worst, abs(acidbase.ph_of_state(y0, compiled.schema, values) - anchor))
+    assert worst < 1e-8, (
+        f"{medium}: the worst sampled member starts {worst:.4e} pH from the anchored "
+        f"{anchor}, and the anchor is an INPUT the model promises to reproduce at t=0. "
+        "`cation_charge` is derived from the pKa map, so it must be re-derived under each "
+        "member's own draws (decision D-233); a member left on the nominal seed is "
+        "answering a question the scenario never asked."
+    )
+
+
+@pytest.mark.parametrize("medium", ["beer", "wine"])
+def test_the_reanchor_reproduces_the_compiled_slot_at_the_nominal_draw(medium):
+    """The setting where the re-anchor must be a no-op is the control (D-233).
+
+    ``cation_charge_for_ph`` (D-186) and the compile seam's ``solve_cation_charge`` are two
+    code paths to one number: at t=0 ``Byp`` is 0 and no CO2 has evolved, so the state-level
+    inverse reduces term for term to the compile-seam one. If they disagree at the NOMINAL
+    draw then the re-anchor is not re-deriving the compiled anchor, it is *competing* with
+    it — and every member would inherit that offset while the t=0 test above still passed,
+    because that test scores each member against the anchor using the same path.
+
+    So this is the arm that separates "re-derived correctly" from "re-derived consistently
+    wrong", which the headline guard cannot see on its own.
+    """
+    scenario, _ = _anchored(medium)
+    compiled = compile_scenario(scenario)
+    build = compiled.reanchor_for_member()
+    assert build is not None, f"{medium}: an anchored scenario must offer a re-anchor builder"
+
+    rebuilt = build(compiled.parameters.resolve())
+    slot = compiled.schema.slice("cation_charge")
+    assert float(rebuilt[slot][0]) == pytest.approx(float(compiled.y0[slot][0]), rel=1e-12), (
+        f"{medium}: re-anchoring at the NOMINAL draw moved `cation_charge` from "
+        f"{float(compiled.y0[slot][0]):.12e} to {float(rebuilt[slot][0]):.12e}. The two paths "
+        "are meant to be one number at t=0; a disagreement here offsets every member."
+    )
+    keep = np.ones(len(compiled.y0), dtype=bool)
+    keep[slot] = False
+    assert np.array_equal(rebuilt[keep], compiled.y0[keep]), (
+        f"{medium}: the re-anchor touched a slot other than `cation_charge`. It re-derives "
+        "the anchor and nothing else — a full re-run of the initial builder would move seeds "
+        "D-233 never measured."
+    )
+
+
+def test_an_unanchored_scenario_gets_no_reanchor_builder():
+    """No ``initial_ph`` ⇒ no anchor ⇒ nothing parameter-derived to rebuild (D-233).
+
+    Without ``initial_ph`` the cation slot is 0 and every acid slot with it (the whole pH
+    system opts in together, D-179), so there is no back-solve for a member's draw to
+    invalidate. Returning a builder anyway would re-solve toward a pH the scenario never
+    named. Pinned because the ``None`` branch is what keeps every un-anchored ensemble in
+    the repo byte-identical across this beat.
+    """
+    scenario, _ = _anchored("wine")
+    bare = {k: v for k, v in scenario.initial.items() if k != "initial_ph"}
+    compiled = compile_scenario(
+        Scenario(
+            name="d233-unanchored",
+            medium="wine",
+            initial=bare,
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=25.0)],
+            duration_days=1.0,
+        )
+    )
+    assert compiled.reanchor_for_member() is None
+
+
+def test_simulate_ensemble_without_the_hook_is_unchanged():
+    """The low-level API default stays the fixed ``y0`` (D-233).
+
+    ``y0_for_member=None`` is not a convenience default — it is the compatibility contract:
+    every existing direct caller of :func:`simulate_ensemble` must be byte-identical across
+    this beat, with the re-anchor opted into by :meth:`CompiledScenario.run_ensemble` alone.
+    """
+    scenario, _ = _anchored("wine")
+    compiled = compile_scenario(scenario)
+    grid = np.linspace(0.0, 48.0, 12)
+    plain = simulate_ensemble(
+        compiled.process_set,
+        compiled.parameters,
+        compiled.y0,
+        (0.0, 48.0),
+        events=compiled.events,
+        n_members=8,
+        seed=4321,
+        sampler="lhs",
+        t_eval=grid,
+    )
+    explicit = simulate_ensemble(
+        compiled.process_set,
+        compiled.parameters,
+        compiled.y0,
+        (0.0, 48.0),
+        events=compiled.events,
+        n_members=8,
+        seed=4321,
+        sampler="lhs",
+        t_eval=grid,
+        y0_for_member=None,
+    )
+    assert np.array_equal(plain.members, explicit.members)
+
+
+def test_a_member_whose_anchor_cannot_be_solved_is_a_failure_not_a_fallback():
+    """An unsolvable member is counted, never quietly run on the nominal seed (D-233).
+
+    The survivorship accounting D-24 built exists so a caller can see how much of the
+    ensemble survived. A builder that swallowed its own failure and returned the nominal
+    ``y0`` would put an UNANCHORED member inside the reported spread while every count still
+    read clean — the silent-fallback failure this repo has on record elsewhere. So the
+    builder's exception is caught at the member loop and recorded like a solver failure.
+    """
+    scenario, _ = _anchored("wine")
+    compiled = compile_scenario(scenario)
+
+    def always_raises(_values: Mapping[str, float]) -> FloatArray:
+        raise ValueError("unreachable anchor for this draw")
+
+    with pytest.raises(RuntimeError, match="all 6 ensemble members failed"):
+        simulate_ensemble(
+            compiled.process_set,
+            compiled.parameters,
+            compiled.y0,
+            (0.0, 24.0),
+            n_members=6,
+            seed=99,
+            events=compiled.events,
+            y0_for_member=always_raises,
+        )

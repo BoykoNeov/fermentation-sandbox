@@ -22,7 +22,22 @@ floats).
 **Scope (decision D-24).**
 
 * *Parameter* uncertainty only. Scenario/initial-condition uncertainty (Brix, YAN)
-  is a separate axis and is **not** sampled here — ``y0`` is held fixed.
+  is a separate axis and is **not** sampled here.
+* **``y0`` is held fixed EXCEPT for the parts of it a parameter DERIVES** (decision
+  D-233, which corrects this bullet's original unconditional form). The distinction
+  D-24 drew is between what a recipe *states* and what this engine *computes* from it:
+  Brix and YAN are scenario inputs and stay fixed, but ``cation_charge`` is back-solved
+  at compile from ``initial_ph`` **through the pKa map** — and those pKas are sampled.
+  Leaving that seed at the nominal did not hold an initial condition fixed, it broke
+  ``initial_ph``'s own contract ("reproduce this pH at t=0"): measured across a 32-member
+  beer ensemble, members started at pH 5.5062-5.7778 against an anchor of 5.65, worst
+  miss **0.1438**, where the correct spread is **exactly zero**. Wine is the same shape
+  (3.4208-3.5780 against 3.50, worst 0.0792). Pass ``y0_for_member`` to re-derive such a
+  seed per member; :meth:`CompiledScenario.run_ensemble` supplies one automatically for an
+  anchored scenario. Omitted ⇒ the fixed array, so every direct caller is byte-identical.
+  This is **NOT** a licence to sample scenario inputs here — the axis D-24 excluded is
+  unchanged, and the reported *band* barely moves (1.008x); what it repairs is each
+  member's own trajectory.
 * Plain Monte Carlo (``sampler="mc"``, the method the handoff §1.6 names) by default.
   Latin-hypercube (``"lhs"``) and Sobol (``"sobol"``) low-discrepancy sequences are
   also available: they stratify the draws so a fixed member budget covers the band —
@@ -74,7 +89,7 @@ wants a strictly-ordered ensemble can ``exclude`` the offending names to pin the
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -462,6 +477,7 @@ def simulate_ensemble(
     param_tiers: Mapping[str, Tier] | None = None,
     max_failure_fraction: float = 0.5,
     events: Iterable[ScheduledEvent] = (),
+    y0_for_member: Callable[[Mapping[str, float]], FloatArray] | None = None,
     method: str = "BDF",
     rtol: float = 1e-6,
     atol: float = 1e-9,
@@ -527,12 +543,14 @@ def simulate_ensemble(
     # cannot leak an enable into one another (the isolation the shared-set ensemble needs).
     pristine = process_set.enabled_snapshot()
 
-    def run(values: Mapping[str, float]) -> ScheduledTrajectory:
+    def run(
+        values: Mapping[str, float], y0_member: FloatArray | None = None
+    ) -> ScheduledTrajectory:
         process_set.restore_enabled(pristine)
         return simulate_scheduled(
             process_set,
             values,
-            y0,
+            y0 if y0_member is None else y0_member,
             t_span,
             events=events,
             param_tiers=tiers,
@@ -563,7 +581,19 @@ def simulate_ensemble(
     failures: list[str] = []
     for values in samples:
         try:
-            traj = run(values)
+            # Re-derive this member's own y0 BEFORE integrating it (decision D-233). A
+            # parameter-derived seed left at the nominal is a defect, not a fixed initial
+            # condition: a member that draws its own pKas and keeps the nominal's anchored
+            # `cation_charge` starts at a pH the scenario never asked for. A builder that
+            # cannot solve this member's draw is a member FAILURE, recorded in `failures`
+            # with the other survivorship accounting — never a silent fall back to `y0`,
+            # which would put an unanchored member in the reported spread.
+            member_y0 = None if y0_for_member is None else y0_for_member(values)
+        except Exception as exc:
+            failures.append(f"y0: {exc}")
+            continue
+        try:
+            traj = run(values, member_y0)
         except Exception as exc:  # a sampled RHS can raise (uptake guard, etc.)
             failures.append(f"raised: {exc}")
             continue

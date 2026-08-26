@@ -335,6 +335,7 @@ class CompiledScenario:
         solver kwargs pass straight through.
         """
         kwargs.setdefault("param_tiers", self.parameters.tier_map())
+        kwargs.setdefault("y0_for_member", self.reanchor_for_member())
         return simulate_ensemble(
             self.process_set,
             self.parameters,
@@ -343,6 +344,67 @@ class CompiledScenario:
             events=self.events,
             **kwargs,  # type: ignore[arg-type]
         )
+
+    def reanchor_for_member(
+        self,
+    ) -> Callable[[Mapping[str, float]], FloatArray] | None:
+        """Per-member ``y0`` builder that re-solves this scenario's pH anchor (decision D-233).
+
+        ``None`` when there is nothing to re-anchor — no ``cation_charge`` slot, or a scenario
+        that gave no ``initial_ph`` (then the slot is 0, there is no anchor, and the seed is not
+        parameter-derived at all).
+
+        **Why this is needed, and why it is not "sampling the initial condition".**
+        ``initial_ph`` is an *input* and its contract is that the model reproduces it at t=0
+        (D-18 for wine, D-179/D-180 for beer). The engine honours it by back-solving
+        ``cation_charge`` at COMPILE — and that back-solve reads the **pKa map**, which the
+        ensemble samples (every ``pKa_*`` reaches the sampled set through the ``reads`` of any
+        active pH-reading Process, D-160). So a member drew its own pKas and then started from
+        a cation fitted to somebody else's: measured, beer members began at pH 5.5062-5.7778
+        against an anchor of 5.65 (worst miss **0.1438**), and wine at 3.4208-3.5780 against
+        3.50 (worst **0.0792**), where the correct spread is **exactly zero**. Re-solving
+        restores it to 2.3e-11 pH.
+
+        **Scope, stated because the number is smaller than it first looks.** The reported
+        *band* is essentially unchanged — 1.008x at day 14 across all 83 sampled parameters,
+        not the 1.287x a single-parameter sweep suggests (that figure is ``pKa_peptide_buffer``'s
+        own contribution with everything else nominal and must never be quoted as the band's).
+        What this repairs is each member's own trajectory: worst per-member day-14 shift 0.0346
+        pH. The case for it is the t=0 contract, never the spread.
+
+        **It re-anchors and nothing else.** :func:`~fermentation.core.acidbase.cation_charge_for_ph`
+        is the exact inverse of ``ph_of_state`` (D-186), and at t=0 — ``Byp`` 0, no evolved CO2 —
+        it reduces term for term to the compile seam's own ``solve_cation_charge``, so at the
+        nominal draw it reproduces the compiled slot rather than competing with it (pinned as a
+        test). The rest of ``y0`` is untouched: a full re-run of the initial builder would move
+        seeds this beat never measured, which is the trap D-233 declined.
+
+        **The capacity half is NOT repaired here.** ``peptide_buffer_capacity_beer`` is
+        back-solved OFFLINE at the nominal ``pKa_peptide_buffer`` and seeded as a constant, so a
+        member still carries a wort whose buffering capacity is 1.1161-1.180 rather than Peyer's
+        1.18 (D-214, re-measured at D-233: 0.0100 pH at day 14 on the low-pKa arm, 21 % of that
+        arm's defect). Repairing it means running the BC back-solve per member, which means
+        moving it into ``src`` — and that would make
+        ``test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc`` compare the
+        root-finder against itself. Left measured and guarded, deliberately.
+        """
+        if "cation_charge" not in self.schema:
+            return None
+        target = self.scenario.initial.get("initial_ph")
+        if target is None:
+            return None
+        slot = self.schema.slice("cation_charge")
+        base = self.y0
+        target_ph = float(target)
+
+        def build(values: Mapping[str, float]) -> FloatArray:
+            out = base.copy()
+            # Reads the acid slots off `base`, not the cation slot it is solving for, so
+            # seeding from the nominal array is not circular.
+            out[slot] = acidbase.cation_charge_for_ph(base, self.schema, values, target_ph)
+            return out
+
+        return build
 
 
 # -- initial-composition vocabulary (the industry-unit boundary) --------------
