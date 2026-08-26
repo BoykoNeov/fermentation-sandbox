@@ -62,8 +62,24 @@ were REPAIRED on 2026-08-26 (D-235 pH, D-236 copper); the census now has NO live
   reference). That is what D-164's in-band bound exists to keep well-formed. **D-24's surviving
   exclusion — scenario inputs are never sampled — is NOT breached**, and D-233 §9's warning
   against reading its correction as licence still stands.
-- **NOT covered, deliberately:** the cascade / `direct_burst` wirings are still an unmeasured
-  third battery member — but D-236's repair reaches them mechanically (it moves the SEED, so
-  `copper − copper_typical` is zero for every member under any wiring centred on the same
-  reference); that is an argument, not a measurement. `pKa_peptide_buffer`'s band re-derivation is
-  still untouched, and `peptide_buffer_capacity_beer` stays back-solved offline at the nominal.
+- **The wirings are MEASURED at D-237 — never re-propose them as uncovered.** The census is
+  **wiring-INVARIANT** (cascade and `direct_burst` add and remove nothing, on every battery member;
+  compile reads come from the seam and the verbs, which do not branch on the oxidative set). The
+  copper repair is **bit-identical under all three**: PRE 16.65 % (direct) / 15.38 % (cascade) /
+  16.73 % (burst), all to 0.0000 %. **D-234's "the cascade will WIDEN it" is WRONG in DIRECTION** —
+  it is the MILDEST arm: it moves **twice** the O₂ spread and LESS browning, because it multiplies
+  one shared gate every downstream sink splits. The expectation was derived on the O₂ channel and
+  reported on browning [[feedback-an-expectation-transfers-with-the-channel-not-the-subject]].
+  **Beer's burst set IS beer's direct set**, so a beer burst arm is a duplicate, not a number.
+- **NEW LIVE row, and it is the census's COMPLEMENT rather than a member (D-237):**
+  `burst_antioxidant_initial` is banded **0.0005–0.0033–0.025 (50×)**, seeds a live pool under the
+  one wiring where that pool is the whole substrate, and **no Process declares it** — so the
+  sampler can never draw it and its uncertainty is absent from every reported band. Three cells,
+  only two previously guarded: compile-read ∩ sampled (this file), banded ∩ drawn but inert
+  (drawability surface), banded ∩ live ∩ **never drawn** (nothing, until D-237). **PINNED, not
+  repaired** — wiring a seed into `reads` moves every burst ensemble. The census it implies is
+  NOT run.
+- **`peptide_buffer_capacity_beer` is NO LONGER back-solved offline at the nominal — BUILT at
+  D-238**; see `prohibitions/ensemble-anchor-reanchor.md`. `pKa_peptide_buffer`'s band
+  re-derivation is still untouched, and is now more clearly owed: **both** of its compile roles
+  move with the member, and the band was drawn when neither did.

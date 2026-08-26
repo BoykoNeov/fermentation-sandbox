@@ -52,12 +52,27 @@ do not argue past it from this file.**
   clean. Guarded.
 - **The peptide capacity half is MEASURED and GUARDED, NOT FIXED — and that is a decision.**
   D-214's **+0.0099 is CONFIRMED at 0.0100** (re-measured, not inherited); it is **21 %** of the
-  low-pKa arm's day-14 defect and **7 %** at t=0. **Never repair it by moving the BC back-solve
-  into `src`**: that would make the round-trip guard — the one that FORCED the D-180 and D-181
-  re-anchors by going red — compare the root-finder against itself.
-- **`test_a_drawn_peptide_pka_carries_a_wort_that_is_not_peyers_1_18` PINS A DEFECT ON PURPOSE.
-  A RED there means the pair was made COHERENT — do NOT revert that beat; delete the guard and say
-  so in the record.**
+  low-pKa arm's day-14 defect and **7 %** at t=0.
+- **BUILT at D-238 — rule 3 of `y0_for_member`, and it runs FIRST because `peptide_buffer` is an
+  acid slot the t=0 cation anchor reads** (rule 1 now reads the array under construction; a wrong
+  order turns the beer anchor guard red at **0.1534 pH — WORSE than the 0.1438 defect itself**).
+  Every member's wort reproduces Peyer's 1.18. Cost **0.0095 pH** at day 14, CONVERGED across rtol
+  1e-6/1e-8/1e-9, and **exactly 0.000000 at t=0** — the cation back-solve absorbs a capacity change
+  completely, so this half is the **mirror image** of the anchor half (100 % artefact at t=0,
+  washing out later). Two halves of one defect, out of phase: either measured alone at its own best
+  moment hides the other. The root uses the member's **WHOLE map**, not the peptide pKa alone —
+  the alternative was priced at **0.40 %** and refused, because filtering would ship a NEW
+  half-pinned read inside the fix for half-pinning.
+- **D-233's "never move the BC back-solve into `src`" is CORRECTED, not repealed.** It forbids
+  **deriving the SHIPPED CONSTANT** — that really would make the round-trip guard compare the
+  root-finder against itself. Re-rooting the per-member SEED is a different act: the YAML literal is
+  untouched and still scored against Peyer's published 1.18, and the guard's teeth are those two
+  literals, neither of which the solver produces [[feedback-a-guards-teeth-are-in-its-literals]].
+- **The defect pin STAYED GREEN through its own repair and was RE-SCOPED, not deleted** — renamed
+  `test_holding_the_capacity_fixed_while_the_pka_moves_costs_peyers_1_18`. Its arms score the
+  shipped CONSTANT, a path the fix never touches. **Do not obey a "a RED means it was fixed"
+  instruction — re-read the pin and trace what its arms drive** (second instance in three records,
+  after D-236's) [[feedback-a-defect-pin-can-outlive-its-defect-by-driving-another-path]].
 - **BC across the pKa band is a SPAN, not a direction.** Maximal AT the nominal by construction and
   falling off on BOTH sides: **1.116059 / 1.180 / 1.145594** at 3.86 / 4.25 / 4.50. The low edge is
   worst, but **the high edge is wrong too** — never read D-214's "1.1161-1.180" one-sidedly. The
@@ -65,7 +80,8 @@ do not argue past it from this file.**
 - **The `pKa_*` registry is sampled IFF a pH-reading Process is active** — they reach the sampled
   set through `acetaldehyde_reduction`'s `reads`, which D-160 added *because* `reads` scopes the
   sampler. That bounds the claim; the defect is absent otherwise.
-- **The compile-read-AND-sampled CENSUS is RUN (D-234) and both its LIVE rows are now REPAIRED** —
-  `set_ph`'s second pH anchor at D-235, `copper_typical`'s seed at D-236. **Never re-propose the
+- **The compile-read-AND-sampled CENSUS is RUN (D-234) and all three of its LIVE rows are now
+  REPAIRED** — `set_ph`'s second pH anchor at D-235, `copper_typical`'s seed at D-236, and
+  `pKa_peptide_buffer`'s THIRD compile role (the capacity back-solve) at D-238. **Never re-propose the
   census as unenumerated or either row as open**; detail in `prohibitions/compile-sampled-census.md`
   [[feedback-a-parameter-can-be-pinned-and-drawn]].

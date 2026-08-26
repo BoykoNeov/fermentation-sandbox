@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-26)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-236** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1895 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-238** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1909 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
@@ -330,9 +330,13 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   media: members began at 5.5062-5.7778 vs an anchor of 5.65 (beer) and 3.4208-3.5780 vs 3.50 (wine),
   now **2.3e-11**. **D-24's "y0 is held fixed" CORRECTED, not repealed** — scenario INPUTS still never
   sampled. **NEVER quote 1.287× as the band** (one parameter's own contribution; the band moves
-  **1.008×**) — a PER-MEMBER error, argued from **t=0 only**. Capacity half MEASURED not fixed
-  (D-214's +0.0099 confirmed at 0.0100); its guard **PINS A DEFECT — a RED means coherence ARRIVED:
-  delete it, never revert**. Renamed **`y0_for_member`** at D-236 (a second rule: wine's copper seed).
+  **1.008×**) — a PER-MEMBER error, argued from **t=0 only**. **Capacity half is BUILT at D-238**
+  (rule 3, running FIRST — it feeds the anchor): every member's wort reproduces Peyer's 1.18, cost
+  **0.0095 pH** day 14, CONVERGED, and **exactly 0 at t=0** (the cation solve absorbs it) — the
+  mirror image of the anchor half. D-233's "moving the root-find into src makes the guard circular"
+  **CORRECTED: it forbids DERIVING THE SHIPPED CONSTANT, which this does not.** Its defect pin
+  stayed **GREEN** and was re-scoped, **not deleted** — do not obey that instruction, re-read it.
+  Renamed **`y0_for_member`** at D-236 (rules: copper seed, then D-238's capacity).
   The census it left open is RUN at **D-234** and fully repaired by D-235/236 — see the next block.
   → `.claude/memory/prohibitions/ensemble-anchor-reanchor.md`
 - **The compile-read ∩ SAMPLED census (D-234/235/236)** — **RUN, CLASSIFIED and now with NO LIVE row.
@@ -343,7 +347,12 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   (exactly 2 of 13 verbs read it), and the priced radius missed **28** test CALL sites. **D-236** made
   `reanchor_for_member` → **`y0_for_member`**, per-slot RULES: copper **16.65 % → bit-identical**, and a
   wine NAMING `copper_gpl` is left alone (**14.34 %**, honest — re-seeding would breach D-24). Fractions
-  CLOSED at D-206; override knobs BY DESIGN (the MODE, D-164).
+  CLOSED at D-206; override knobs BY DESIGN (the MODE, D-164). **D-237: the census is WIRING-INVARIANT**
+  (cascade/burst add nothing) and the copper repair is bit-identical under all three — but **D-234's
+  "the cascade will WIDEN it" is WRONG in DIRECTION**: 15.38 % vs direct's 16.65 %, the mildest arm.
+  **NEW LIVE row, and it is the census's COMPLEMENT, not a member**: `burst_antioxidant_initial` is
+  banded **50×**, seeds a live pool, and NO Process declares it — the sampler can never draw it.
+  PINNED, not repaired; the census it implies (banded + compile-read + undeclared) is NOT run.
   → `.claude/memory/prohibitions/compile-sampled-census.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)

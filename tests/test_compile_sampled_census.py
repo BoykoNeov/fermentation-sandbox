@@ -344,8 +344,18 @@ _PKA_MEMBERS = tuple(sorted({name for spec in _PKA_SPECS for name in spec.pka_pa
 CENSUS: Mapping[str, str] = {
     **dict.fromkeys(
         _PKA_MEMBERS,
-        "REPAIRED in BOTH compile roles — the t=0 anchor by reanchor_for_member (D-233), and "
+        "REPAIRED in BOTH compile roles — the t=0 anchor by y0_for_member's rule 1 (D-233; the "
+        "method was `reanchor_for_member` until D-236 renamed it with its scope), and "
         "_verb_set_ph's event by the running map it is handed at the breakpoint (D-235)",
+    ),
+    # `pKa_peptide_buffer` overrides the blanket row above because it has a THIRD compile role the
+    # other eighteen do not: beer's peptide capacity is back-solved AT it. Written after the
+    # `fromkeys` spread so it wins, and written out rather than folded in because "BOTH roles" is
+    # exactly the kind of count that goes quietly wrong (D-238).
+    "pKa_peptide_buffer": (
+        "REPAIRED in ALL THREE compile roles — the two above, plus the peptide-capacity "
+        "back-solve, re-rooted per member by y0_for_member's rule 3 (D-238). That rule runs "
+        "BEFORE the anchor, because the slot it writes is one the anchor reads"
     ),
     **dict.fromkeys(
         ("nitrogen_uptake_charge_wine", "nitrogen_uptake_charge_beer"),
@@ -1018,7 +1028,7 @@ def test_the_census_itself_is_the_same_under_every_oxidative_wiring(scenario):
         assert members == baseline, (
             f"the census under {oxidative} differs from the direct wiring's by "
             f"{sorted(members ^ baseline)}. Every name here is half-pinned by construction, so a "
-            "new one is a new defect of D-206's class — classify it in `_VERDICTS` and measure it"
+            "new one is a new defect of D-206's class — classify it in `CENSUS` and measure it"
         )
 
 
@@ -1037,6 +1047,12 @@ def test_the_burst_seed_carries_a_fifty_fold_band_the_ensemble_never_draws():
     drawability surface is banded AND drawn but unable to move the run (D-157's oak yield). This
     is the third cell: banded, able to move the run, and never drawn. Nothing guarded it, which is
     why it took a wiring sweep to surface.
+
+    **It is not a counterexample** to
+    :func:`test_the_census_and_the_drawability_surface_are_disjoint`, nor to this module's
+    "disjoint by construction" claim. Both of those are about names that
+    ARE census members, and this name is in neither audit — that is the entire finding. The two
+    sets stay disjoint; what D-237 shows is that between them they do not cover the plane.
 
     **A RED means it was FIXED** — some Process now declares the seed, or the band was retired.
     Do not revert that beat; delete this guard and say so in the record. It is pinned rather than

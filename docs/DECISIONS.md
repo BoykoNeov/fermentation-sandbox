@@ -33929,7 +33929,10 @@ bit** — it re-derives the offline root rather than competing with it, exactly 
 The tempting narrower rule is to re-root on the member's **peptide pKa only**, holding every other
 pKa at the nominal. It was measured rather than argued: worst member **0.40 %** of the capacity
 across 12 members, spreads 0.84 % (pKa-only) against 0.93 % (full map). It does not collapse a
-channel; it barely moves one.
+channel; it barely moves one. **That 0.40 % is a FLOOR, not a bound** — one scenario, one seed,
+twelve members — and it is written as one in the YAML note a later beat will actually read, because
+this archive has quoted a single-configuration number as a general one before (D-233 §4's retracted
+1.287×).
 
 It was refused on two grounds, the second decisive:
 
