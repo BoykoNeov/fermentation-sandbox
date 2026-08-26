@@ -31,14 +31,12 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-26)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-229** (D-229 is memory infrastructure, not model); sensory 1a/1b + **D-139's leftovers ALL
-closed** (D-148/9). Suite **1861 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
-again since D-223** — 6.04 d inside 5-7 — but the pass is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
-ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
-terms and the Strecker split — "expressible" ≠ "identifiable"; D-204 shipped its pin. Slot/Process/oxidative counts live
-in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184). Beer acid-base = **EIGHT** beats (D-178→D-183,
-D-207→D-209, D-211) all BUILT, `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING — day-1 pH admits an
-acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms. D-213 BUILT beer's wort O₂ — sourced, and INERT.**
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-230**; sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1867 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — COLLECTED, not carried: the ledger read 1861 for two beats.
+**§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
+**D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
+Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
+Beer acid-base = **EIGHT** beats BUILT (D-178→D-183, D-207→D-209, D-211), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms.
+**D-213 BUILT beer's wort O₂ — sourced and INERT**, and its decline of the O₂→growth coupling rested on "none of the six predictions is reachable in the default set": **growth EXTENT now is** (D-230 §7). Owner's call to re-open, never a beat's.
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
