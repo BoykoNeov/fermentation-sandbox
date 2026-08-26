@@ -12,13 +12,12 @@ metadata:
 
 **Session-boot context: PROHIBITIONS and POINTERS only** — not a changelog. Every bullet is *what it forbids* +
 the D-record to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue past
-it from this file.** **Per-subject detail lives in `.claude/memory/prohibitions/` and is reached BY PATH from the
-ledger below — those files carry NO `MEMORY.md` row, so they cost nothing until read (D-185).**
-**Caps: 8 lines per BLOCK here, 14 per block in `CLAUDE.md`, 320 BYTES per index row (here,
-and in `lessons/` — chars until 2026-08-26, but the loader counts bytes) — and NO whole-file
-total, removed at D-177. `MEMORY.md`'s byte headroom against the harness load limit is
-REPORTED on every write; it truncates silently otherwise, which is how it ran over twice.** (`.claude/hooks/check_memory_size.py`;
-[[feedback-batch-end-ritual]]). Distil the NEW block; **never evict an old prohibition to buy a line.**
+it from this file.** **Detail lives in `prohibitions/` (per subject) and `lessons/` (epistemics), reached BY PATH —
+NO `MEMORY.md` row, so they cost nothing until read (D-185; lessons split the same way 2026-08-26).**
+**Caps: 8 lines per BLOCK here, 14 in `CLAUDE.md`, 320 BYTES per index row here and in `lessons/` (chars until
+2026-08-26 — the loader counts bytes) — and NO whole-file total, removed at D-177. `MEMORY.md`'s headroom against
+the harness load limit is REPORTED every write; it truncates SILENTLY, which is how it ran over twice.**
+(`.claude/hooks/check_memory_size.py`; [[feedback-batch-end-ritual]]). Distil the NEW block; **never evict an old prohibition to buy a line.**
 
 ## Where the records are
 - `docs/DECISIONS.md` — canonical archive, **tens of thousands of lines: never read it linearly.** Generated top block gives a

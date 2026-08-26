@@ -17,20 +17,27 @@ It keeps the repo, the docs, and cross-session memory in sync so the next sessio
 resumes cleanly. In the first session I completed docs+commit+push but initially
 forgot the memory step — don't repeat that.
 
-**How to apply:** at batch end, in order: (1) write/refresh memory files here +
-update `MEMORY.md`. **The full per-decision narrative goes in `docs/DECISIONS.md`
+**How to apply:** at batch end, in order: (1) write/refresh memory files here, then add the
+row. **A new epistemics lesson gets its row in `.claude/memory/lessons/<group>.md`, NOT in
+`MEMORY.md`** (2026-08-26 split). `MEMORY.md` keeps ten rows only: the user, the project
+ledger, and the workflow rules that fire every session — the hook's `BOOT_ROWS` is the list,
+and it flags a `feedback-*` row that lands in the index instead. **Note the harness's own
+memory instructions say "add a one-line pointer in MEMORY.md" — that is the pre-split rule and
+following it verbatim regrows the file; the hook exists because this sentence is not enough.** **The full per-decision narrative goes in `docs/DECISIONS.md`
 ONLY — memory gets a *distilled status update / pointer*, never a copy.** Do not
 append the batch write-up to [[project-fermentation-sandbox]] or to a `MEMORY.md`
 index line; instead update the project file's short status block and bump the
-current D-number. `MEMORY.md` index entries stay one line (~200 chars). This is
+current D-number. Index rows stay one line, 320 bytes hard. This is
 the guardrail that keeps memory from re-bloating — the decision log is the archive,
 memory is the boot context. **This rule as prose is NOT sufficient — it has already
 failed once.** It was added by `acd3ce1` (2026-07-02) claiming to fix "the cause, not
 just the symptom"; the project file still regrew 2.4KB → 277KB (**114×**, a full
 D-38→D-111 changelog in two formats) by 2026-07-17. The mechanism that now backs it:
 `.claude/hooks/check_memory_size.py`, a PostToolUse hook (project `.claude/settings.json`).
-It caps **per block** (8 lines in the project memory, 14 in `CLAUDE.md`, 320 chars per
-`MEMORY.md` row) and **REPORTS every surface's total without capping it** — the whole-file
+It caps **per block** (8 lines in the project memory, 14 in `CLAUDE.md`, 320 BYTES per index
+row in `MEMORY.md` *and* `lessons/`) and **REPORTS every surface's total without capping it**
+— including `MEMORY.md`'s headroom against the harness load limit, which it silently truncates
+at; that went unmeasured for months because the hook counted lines and the loader counts bytes — the whole-file
 cap was removed at **D-177** after being raised four times and re-pinned at each value; never
 put one back [[feedback-a-cap-being-written-to-cannot-be-raised]]. It *detects*; it cannot
 enforce distillation — that is still a judgement call at ritual time. If the warning fires,
@@ -43,7 +50,7 @@ used to prescribe is now a no-op that can only mask a real problem.) `git add .c
 still applies: the user asked on 2026-06-23 that memory be tracked *always, with the rest*,
 not a one-off snapshot, so it is committed alongside docs/code every checkpoint and behaves
 like any other tracked file; (2) update affected docs (`docs/ARCHITECTURE.md`,
-`docs/DECISIONS.md`, the `docs/plans/milestone-*.md` trio); (3) `git commit` with
+`docs/DECISIONS.md` — **never `docs/plans/milestone-*.md`, frozen logs since D-184**); (3) `git commit` with
 Conventional Commits; (4) `git push`. Run the ritual even when there is no code to
 push. See [[project-fermentation-sandbox]].
 
