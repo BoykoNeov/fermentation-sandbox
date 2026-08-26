@@ -1,0 +1,43 @@
+---
+name: lessons-guards
+description: "What a test actually catches: designing a mutation, reading what a RED names, pinning bands and tolerances, and the guards that quietly forbid nothing"
+metadata:
+  node_type: memory
+  type: feedback
+---
+
+**Lessons — Guards, tests & mutation arms.** Split out of `.claude/memory/MEMORY.md` on 2026-08-26; that file's
+index points here by path. These rows carry **no `MEMORY.md` row of their own**, so they cost
+nothing until this file is read — the same arrangement `prohibitions/` has had since D-185.
+
+**Read this file before you write the code, not after the review.** Each row is *the trap* +
+*what to do instead*; the measurement that earned it is in the linked file. If a row looks
+like pedantry, open its file — every one of them cost a beat.
+
+- [Check the schema, not the caller](../feedback-check-the-schema-not-the-caller.md) — "the model can't represent X" is a schema claim; one Process not reading X proves nothing, and false negatives are self-sealing
+- [Rejected values must be unreachable](../feedback-rejected-values-must-be-unreachable.md) — an unphysical value in a sampled field is a live defect a green suite won't catch
+- [Validate calibrations in the frame that binds](../feedback-validate-calibrations-in-the-frame-that-binds.md) — solved in isolation + tested in isolation is self-sealing; a constraint that only binds under competition dies when you remove it
+- [Name guards for what they forbid](../feedback-name-guards-for-what-they-forbid.md) — a guard mislabelled with a real mechanism invites a fair objection and gets argued away
+- [Mutate the premise before building the guard](../feedback-mutate-the-premise-before-building-the-guard.md) — break what the guard would protect and see if the suite already goes red; refused D-155, licensed D-156
+- [Verify the restore between mutation arms](../feedback-verify-the-restore-between-mutation-arms.md) — a silent restore failure makes every arm you expect RED confirm itself; always design one arm to be GREEN
+- [Conceded caveats aren't coverage](../feedback-conceded-caveats-are-not-coverage.md) — naming your own gap in prose doesn't discharge it; run the criterion on every branch or label it asserted
+- [A null result needs a positive control](../feedback-a-null-result-needs-a-positive-control.md) — "nothing moved" is not unreachability: five Process-read parameters froze too; pair the null with a mechanism-shaped consequential half
+- [Pair the arm with its baseline](../feedback-pair-the-arm-with-its-baseline.md) — `only=`/`exclude=` shift the RNG draw sequence, so an arm and its baseline are two different random ensembles; pair on a fixed LHS hypercube, and test inertness with `only=[name]`, never `exclude`
+- [Pin the band, not just the nominal](../feedback-pin-the-band-not-the-nominal.md) — a pinned nominal leaves the band edges unguarded (swapping one passed 1460 tests); mark each edge PRINTED vs CONSTRUCTED, and never compare bands built to different scopes
+- [Pin tolerance vs solver tolerance](../feedback-pin-tolerance-vs-solver-tolerance.md) — measure the noise floor; BDF runs at rtol=1e-6, and `approx` passes on EITHER bound
+- [Pair the RED with an ordering-preserving baseline](../feedback-pair-the-red-with-an-ordering-preserving-baseline.md) — a same-sized move WITHOUT the flip killed the identical tests; attribute at ASSERT granularity, and check what the RED names, not that it is red
+- [Grep finds claims, not guards](../feedback-grep-finds-claims-not-guards.md) — all 4 "expected red" hits were COMMENTS, so the red list read as coverage where there was none and the beat's only live defect lived in that gap; check each hit is an `assert`. A guard is only as broad as the registry it names
+- [A gate is a discontinuity the solver probes](../feedback-a-gate-is-a-discontinuity-the-solver-probes.md) — the gated arm broke 4 pins and the continuous one 18, and FEWER was worse: `num_jac` straddled the jump on 34950 of 63237 calls. Attribute the number before you design a guard around it
+- [A spread guard misses a shared input](../feedback-a-spread-guard-misses-a-shared-input.md) — a wrong SHARED input shifts the MEAN, not the spread: a defect throwing the nominal anchor 0.29 pH off moved the ratio only 0.988→1.119. Falsify a guard before shipping; green ⇒ ship the measurement, no guard (D-186)
+- [Prefer the variant your guards can see](../feedback-prefer-the-variant-your-guards-can-see.md) — of two versions of a fix, the one leaving the old assert GREEN is usually still carrying part of the bug; "the test needs strengthening anyway" is a verdict on the design. Visible variant cost 0.05 µg/L (D-193)
+- [A threshold can't separate same-sign regimes](../feedback-a-threshold-cannot-separate-same-sign-regimes.md) — `S > 50` witnessed "sweet wine" on an unfermented must, because broken and healthy move the number the SAME way. Assert counts predict nothing; a GREEN mutation is what OWES a guard (D-194)
+- [A control needs mechanical reach](../feedback-a-control-needs-mechanical-reach.md) — the control moved it 0.06% and proved NOTHING: a rate can't move a stoichiometric ratio in a supply-limited system. Use the SAME channel; and never CAPTURE a mutation baseline, it goes stale green (D-196)
+- [A ratio guard can't see a common factor](../feedback-a-ratio-guard-cannot-see-a-common-factor.md) — an exact 1e-12 assert ran GREEN on the term its own record named, since it scales both sides; a SUM guard is blind alike, so D-209's round trip passed on a NEGATIVE cation slot. Check what a RED names (D-198/209)
+- [Run the mutation the claim names](../feedback-run-the-mutation-the-claim-names.md) — "nothing sees this" was inferred from DELETION, never the INFLATION it named; run it — 3.00×, both existing tests green. Pin BOTH edges, one threshold per arm: a shared ceiling makes the tight pins decorative (D-204)
+- [Gate both halves of a pair](../feedback-gate-both-halves-of-a-pair.md) — the new half rode NO gate, so a dose booked the anion alone **and opened** the gate suppressing the cation (an acid slot is what it tests): 1.43 pH. Make the group atomic; a benchmark stayed green scoring something else (D-210)
+- [Mesh vs coupling: use convergence](../feedback-separate-mesh-from-coupling-by-convergence.md) — an inert slot moved `h2s` 3.3e-4 relative, 300× rtol; no threshold separates a small coupling from the adaptive mesh — tighten rtol, check it converges to zero. "Byte-for-byte" fits the derivative, not the trajectory
+- [A positive schema check is not a licence](../feedback-a-positive-schema-check-is-not-a-licence.md) — the slot existed, so trub "was expressible"; that pool is the anchor's counter-anion, so draining it hit pH 7.08. Ask WHO writes a slot and WHEN — a compile-time solve inverts a runtime term's sign (D-214)
+- [Verify an xfail fails for its stated reason](../feedback-verify-an-xfail-fails-for-its-stated-reason.md) — a strict xfail that dies on a typo renders identically to one catching the defect; mine was an `AttributeError` and would never have turned green. Re-run under `--runxfail` and read what the RED names
+- [Check the published test can fail](../feedback-check-the-published-test-can-fail.md) — I reported a pass on the archive's first confound-free bound; EVERY in-band value cleared it, and the bound itself was a 72 h figure panel read as an exact duration. Sweep the band and find where it first fires
+- [Verify the mutation applied, not just the restore](../feedback-verify-the-mutation-applied-not-just-the-restore.md) — `str.replace` on a parsed float silently no-ops (`6.93e-5` renders `6.93e-05`), so the arm loads its ORIGINAL value and reports success; edit by slice index; read it back through the real loader
+- [The exact setting is the control](../feedback-the-setting-where-a-change-is-exact-is-the-control.md) — wine's re-solve hit its closed form to 6 figures, turning "a speed knob is folded in here" from a comment into a measurement; beer's 17.7 % gap was then quotable as the physics

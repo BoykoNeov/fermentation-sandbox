@@ -108,9 +108,41 @@ was designed and REJECTED -- reading all 22, every one is a live prohibition, so
 measure settledness and the guard could never be satisfied. Granularity was the affordable fix;
 the tail is genuinely incompressible and is expected to keep growing.
 
+THE OPEN ROW-COUNT CHANNEL FIRED, AND WHY COMPRESSION COULD NOT CLOSE IT (2026-08-26)
+--------------------------------------------------------------------------------------
+The paragraph below used to end "MEMORY.md is capped per ROW, so row COUNT remains an open
+channel -- 5 rows at 2026-06-23, 40 at 2026-08-11, +1 per record." It fired. At 101 rows /
+25910 bytes the harness began TRUNCATING the file at load and said so in its own warning --
+the boot surface this hook exists to keep visible was partly invisible, and no check here
+could see it, because every number reported was a LINE count and the loader measures BYTES.
+
+The obvious repair was tried first and is on record as failing: 2026-08-19 trimmed 17 verbose
+rows, 25840 -> 24301 bytes, explicitly "back under the harness load limit". It was back over
+SEVEN DAYS later. Measured before repeating it a third time, the arithmetic says it can never
+be anything else: of 25533 chars, 9055 -- 35% -- are the "- [Title](slug.md)" titles and
+filenames, which no edit to the prose can shrink, and each new row adds ~90 such bytes
+whatever the hook discipline. Truncating EVERY hook to 80 chars (most say nothing at that
+length) still lands 16.6KB and buys ~47 sessions. This is D-177's arithmetic in a second
+place: a per-ROW cap bounds what each row ADDS and nothing bounds how many rows there are.
+
+So the fix is D-185's, applied one level up: the 91 epistemics lesson rows moved to
+`lessons/*.md`, five grouped files reached BY PATH from a five-row pointer block, carrying no
+MEMORY.md row of their own. MEMORY.md went 25805 -> 3669 bytes and, more to the point, STOPPED
+GROWING WITH RECORD COUNT -- a new lesson adds a row to a lessons file, not to boot. Ten rows
+remain: the user, the project ledger, and the eight workflow rules that fire every session
+regardless of task. Row text moved verbatim; nothing was compressed away, and nothing evicted.
+
+WHAT THAT COSTS, SAID PLAINLY: a lesson is no longer in front of the agent at session start.
+It is reached by opening its group file, which the index instructs in its first block, or by
+the recall path on each file's own `description:`. That is a real regression in opportunistic
+firing, accepted deliberately -- the alternative on offer was a flat list that silently drops
+its tail, which fires nothing at all and lies about it.
+
 STILL NOT COVERED: the global ~/.claude/CLAUDE.md is a fourth boot surface, lives outside the
-repo, and is deliberately out of scope here. MEMORY.md is capped per ROW, so row COUNT
-remains an open channel -- 5 rows at 2026-06-23, 40 at 2026-08-11, +1 per record.
+repo, and is deliberately out of scope here. And the row-count channel is closed for MEMORY.md
+only by CONVENTION -- nothing here forbids a new lesson row being added to the index instead
+of to a lessons file. The index says not to; that is a prose rule, and this docstring opens by
+noting a prose rule is not a mechanism.
 
 Reads the PostToolUse payload on stdin; emits hook JSON on stdout.
 """
@@ -133,6 +165,22 @@ MEMORY_DIR = (".claude", "memory")
 # from its ledger. Measured, but NOT a boot surface -- see the docstring.
 DETAIL_DIR = "prohibitions"
 
+# The epistemics lesson rows, split out of MEMORY.md on 2026-08-26 by the same move, for the
+# reason the docstring below had already named as this hook's open channel. Same status:
+# reached by path, never auto-loaded, measured but reported apart from the boot surfaces.
+LESSONS_DIR = "lessons"
+
+# What the harness truncates MEMORY.md at, in BYTES. Observed, not chosen: the loader warned
+# at 25910 bytes with "limit: 24.4KB". It is REPORTED as headroom on every write, and becomes
+# a finding only when actually exceeded -- at which point content is being silently dropped
+# from boot, which is a failure and not a tidiness preference.
+#
+# This is not the round-number target D-169 diagnosed. That failure needed a number the OWNER
+# picked and could write toward; this one is the harness's, and after the 2026-08-26 split
+# MEMORY.md no longer grows with record count at all -- a new lesson adds a row to a lessons
+# file, so there is nothing accumulating against this number to fill it.
+INDEX_LOAD_LIMIT_BYTES = 24_986
+
 # One top-level block == one distilled record. Measured 2026-08-09 across the 49 bullets then
 # live: median 4 lines, 44 of 49 at or under 8. The five over were the five most recent beats
 # (21, 14, 10, 10, 9) -- the recency skew that makes each new record eat the budget an older
@@ -153,10 +201,15 @@ BLOCK_LINE_CAP = 8
 # does NOT catch.
 GUIDE_BLOCK_LINE_CAP = 14
 
-# One "- [Title](file.md) -- hook" row in the index. Measured 2026-08-09: median 211 chars,
+# One "- [Title](file.md) -- hook" row in an index. Measured 2026-08-09: median 211 chars,
 # next-longest 308, and the project-memory row at 950 -- a status paragraph that had been
 # displaced out of the capped file into the uncapped one.
-INDEX_ROW_CHAR_CAP = 320
+#
+# Counted in BYTES, not characters (changed 2026-08-26). The rows are full of em dashes,
+# arrows and subscripts, so the two differ -- and the thing this guards against, the harness
+# dropping the file at a byte limit, is measured in bytes. A char cap on a multi-byte file
+# reports a number the loader does not use.
+INDEX_ROW_CAP_BYTES = 320
 
 MAX_REPORTED = 10
 
@@ -213,22 +266,43 @@ def block_findings(name: str, text: str, cap: int) -> list[Finding]:
     ]
 
 
-def index_findings(text: str) -> list[Finding]:
-    return [
-        Finding(INDEX_NAME, number, f"index row is {len(line)} chars (cap {INDEX_ROW_CHAR_CAP})")
+def index_findings(text: str, name: str = INDEX_NAME) -> list[Finding]:
+    """Over-long rows, plus -- for MEMORY.md alone -- the byte total the harness truncates at."""
+    findings = [
+        Finding(name, number, f"index row is {len(line.encode('utf-8'))} bytes "
+                              f"(cap {INDEX_ROW_CAP_BYTES})")
         for number, line in enumerate(text.splitlines(), 1)
-        if line.startswith("- [") and len(line) > INDEX_ROW_CHAR_CAP
+        if line.startswith("- [") and len(line.encode("utf-8")) > INDEX_ROW_CAP_BYTES
     ]
+    size = len(text.encode("utf-8"))
+    if name == INDEX_NAME and size > INDEX_LOAD_LIMIT_BYTES:
+        findings.append(
+            Finding(name, 1, f"file is {size} bytes, over the harness load limit of "
+                             f"{INDEX_LOAD_LIMIT_BYTES} -- it is being TRUNCATED at boot")
+        )
+    return findings
 
 
-def _shape(text: str) -> str:
-    """The reported totals: size with no threshold attached, so it cannot become a target."""
+def _shape(text: str, name: str = "") -> str:
+    """The reported totals: size with no threshold attached, so it cannot become a target.
+
+    Bytes are reported for every surface (added 2026-08-26) because that is the unit the
+    harness loads in, and for years this reported only lines -- so MEMORY.md crossing the
+    load limit was invisible to the one check that looks at it on every write.
+    """
     lines = text.splitlines()
+    size = len(text.encode("utf-8"))
+    room = ""
+    if name == INDEX_NAME:
+        left = INDEX_LOAD_LIMIT_BYTES - size
+        room = (f", {left} bytes under the {INDEX_LOAD_LIMIT_BYTES} load limit" if left >= 0
+                else f", {-left} bytes OVER the {INDEX_LOAD_LIMIT_BYTES} load limit")
     sizes = sorted(len(body) for _, body in block_spans(lines))
     if not sizes:
-        return f"{len(lines)} lines"
+        return f"{len(lines)} lines, {size} bytes{room}"
     median = sizes[len(sizes) // 2]
-    return f"{len(lines)} lines, {len(sizes)} blocks, median {median}, max {sizes[-1]}"
+    return (f"{len(lines)} lines, {size} bytes{room}, "
+            f"{len(sizes)} blocks, median {median}, max {sizes[-1]}")
 
 
 def project_root(path: pathlib.Path) -> pathlib.Path | None:
@@ -260,7 +334,7 @@ def collect(root: pathlib.Path) -> tuple[list[Finding], list[str]]:
         except OSError:
             continue
         findings.extend(block_findings(name, text, cap) if cap else index_findings(text))
-        reported.append(f"  {name}: {_shape(text)}")
+        reported.append(f"  {name}: {_shape(text, name)}")
 
     # Reported APART from the three above: these are reached by path, never auto-loaded, so
     # their lines are not boot cost. They still carry the block cap -- same content, and an
@@ -276,6 +350,24 @@ def collect(root: pathlib.Path) -> tuple[list[Finding], list[str]]:
         total += len(text.splitlines())
     if detail:
         reported.append(f"  {DETAIL_DIR}/: {len(detail)} files, {total} lines (by path, NOT boot)")
+
+    # The lesson rows, same status as prohibitions/: reached by path, never auto-loaded. They
+    # keep the index ROW cap they left MEMORY.md carrying -- an uncapped destination beside a
+    # capped source is the arbitrage this hook exists to close, and it is the whole reason the
+    # rows were affordable to move rather than delete.
+    lessons = sorted((memory / LESSONS_DIR).glob("*.md")) if (memory / LESSONS_DIR).is_dir() else []
+    rows = 0
+    for path in lessons:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        findings.extend(index_findings(text, f"{LESSONS_DIR}/{path.name}"))
+        rows += sum(1 for line in text.splitlines() if line.startswith("- ["))
+    if lessons:
+        reported.append(
+            f"  {LESSONS_DIR}/: {len(lessons)} files, {rows} lesson rows (by path, NOT boot)"
+        )
     return findings, reported
 
 

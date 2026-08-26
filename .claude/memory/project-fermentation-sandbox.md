@@ -14,8 +14,10 @@ metadata:
 the D-record to read for *why*. If a prohibition looks unconvincing, **go read its D-record — do not argue past
 it from this file.** **Per-subject detail lives in `.claude/memory/prohibitions/` and is reached BY PATH from the
 ledger below — those files carry NO `MEMORY.md` row, so they cost nothing until read (D-185).**
-**Caps: 8 lines per BLOCK here, 14 per block in `CLAUDE.md`, 320 chars per `MEMORY.md`
-index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_memory_size.py`;
+**Caps: 8 lines per BLOCK here, 14 per block in `CLAUDE.md`, 320 BYTES per index row (here,
+and in `lessons/` — chars until 2026-08-26, but the loader counts bytes) — and NO whole-file
+total, removed at D-177. `MEMORY.md`'s byte headroom against the harness load limit is
+REPORTED on every write; it truncates silently otherwise, which is how it ran over twice.** (`.claude/hooks/check_memory_size.py`;
 [[feedback-batch-end-ritual]]). Distil the NEW block; **never evict an old prohibition to buy a line.**
 
 ## Where the records are
