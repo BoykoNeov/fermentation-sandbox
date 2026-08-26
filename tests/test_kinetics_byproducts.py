@@ -1440,6 +1440,14 @@ def test_the_pitch_correction_leaves_every_calibrated_aroma_level_where_it_was(t
     Enumerated from the REGISTRIES (D-225's rule), not from a literal list -- a ninth pool must
     join this comparison the day it is added.
     """
+    # Without this the test is VACUOUS on a tree where the frame has been reverted: both arms
+    # would be the same run and it would pass on identity rather than on measurement, which is
+    # indistinguishable from passing on the real thing (feedback-verify-the-restore-between-
+    # mutation-arms). D-228's arm A is exactly that tree, and it passed there for this reason.
+    assert _BEER_CALIBRATION_PITCH_GPL != _BEER_CALIBRATION_RETIRED_PITCH_GPL, (
+        "the shipped frame and the retired arm are the same pitch, so the comparison below "
+        "measures nothing; the frame has been reverted -- see D-228"
+    )
     shipped = _beer_all_aroma_levels_mgl()
     retired = _beer_aroma_levels_at_pitch(_BEER_CALIBRATION_RETIRED_PITCH_GPL)
     assert set(shipped) == set(retired)

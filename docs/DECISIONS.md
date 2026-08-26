@@ -32926,6 +32926,12 @@ be fitted against nothing at all rather than against one landed level.
 ### 10. Falsification
 
 * **Arm A — revert the frame to 1.0 g/L.** Predicted: the two new frame guards RED, every level
-  guard GREEN. That asymmetry IS the beat: it is why the correction needed a guard of its own.
+  guard GREEN. Run: **2 failed, 59 passed**, exactly those two. That asymmetry IS the beat — it is
+  why the correction needed a guard of its own. **One of the two GREENs was vacuous and is now
+  not**: with the frame reverted, the invariance guard's two arms are the SAME pitch, so it passed
+  on identity rather than on measurement — a GREEN that proves nothing renders identically to one
+  that does ([[feedback-verify-the-restore-between-mutation-arms]]). It now asserts the two pitches
+  differ before comparing. Detection was never at risk (the other two guards fired), but the
+  guard's own claim was.
 * **Arm B — the invariance claim.** Predicted: a pitch anywhere in 0.25-4.0 g/L leaves the eight
   levels within 1e-5 relative. Run at 0.40 g/L and 0.48 g/L against 1.0: worst 6e-7.
