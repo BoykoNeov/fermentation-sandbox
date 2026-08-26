@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-26)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-232** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1872 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-233** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1880 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
@@ -325,6 +325,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   deciding it**: the day1-vs-day3 settling profile **flips SIGN** across `mu_max`'s band (not inert — 0.348 at
   day 1, 0.003 at day 3), and the pH clock only re-measures D-209 §8's **+0.162** day-1 miss (= 0.148, 70 % of
   the envelope). **Never** harmonise onto Coleman's Y_X/N (→ ~9×). → `prohibitions/beer-growth-extent.md`
+- **The per-member pH ANCHOR + the peptide pair (D-233)** — the anchor re-solve is **BUILT**, BOTH
+  media: members began at 5.5062-5.7778 vs an anchor of 5.65 (beer) and 3.4208-3.5780 vs 3.50 (wine),
+  now **2.3e-11**. **D-24's "y0 is held fixed" CORRECTED, not repealed** — scenario INPUTS still never
+  sampled. **NEVER quote 1.287× as the band** (one parameter's own contribution; the band moves
+  **1.008×**) — a PER-MEMBER error, argued from **t=0 only**. Capacity half MEASURED not fixed
+  (D-214's +0.0099 confirmed at 0.0100); its guard **PINS A DEFECT — a RED means coherence ARRIVED:
+  delete it, never revert**. Compile-read-AND-sampled census NOT run, its own beat.
+  → `.claude/memory/prohibitions/ensemble-anchor-reanchor.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
