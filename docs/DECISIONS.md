@@ -33216,7 +33216,7 @@ prints counts.
 
 ## D-231 — The memory-shape hook's own test module had been raising `AttributeError` since D-229 renamed the constant it imports, so the beat that fixed a silently-truncated index shipped one failure and nine fixture errors; and the rename alone would have restored GREEN without restoring the claim, because every row those tests build is ASCII
 
-**Corrects:** D-229 — it moved the index-row cap from CHARACTERS to BYTES and renamed `INDEX_ROW_CHAR_CAP` → `INDEX_ROW_CAP_BYTES` in `.claude/hooks/check_memory_size.py`, but `tests/test_memory_shape_hook.py` still referenced the old name and was last touched at D-185. It also inserted a byte column into the rendered shape line, which broke a second assert that pinned the surrounding text as one literal substring. Both shipped red and were carried for two records.
+**Corrects:** D-229 — **its GUARD, not its finding.** D-229's conclusion is intact and shipped: the hook counts BYTES, correctly, and this record does not touch that code. What was wrong is the test module that is supposed to hold it. D-229 renamed `INDEX_ROW_CHAR_CAP` → `INDEX_ROW_CAP_BYTES` in `.claude/hooks/check_memory_size.py` and left `tests/test_memory_shape_hook.py` — last touched at D-185 — importing the old name, so that module raised `AttributeError` (1 failure + 9 fixture errors) for two records; it also inserted a byte column into the rendered shape line, breaking a second assert that pinned the surrounding text as one literal substring. A reader arriving at D-229 should know its guard was blind and is not being told its result was overturned.
 
 ### 1. How it was found, and what that says
 
