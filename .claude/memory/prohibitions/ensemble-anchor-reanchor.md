@@ -16,8 +16,9 @@ forbids* + the record to read for *why*. **If a prohibition looks unconvincing, 
 do not argue past it from this file.**
 
 - **The anchor re-solve is BUILT — never re-propose it as unbuilt or as a known gap.**
-  `simulate_ensemble` takes `y0_for_member`; `CompiledScenario.reanchor_for_member()` supplies it
-  whenever the scenario gave an `initial_ph`. Members now start at the anchored pH to **2.3e-11**,
+  `simulate_ensemble` takes `y0_for_member`; **since D-236 the method is
+  `CompiledScenario.y0_for_member()`** (renamed with its scope: a list of per-slot RULES, the pH
+  anchor plus wine's `copper` seed) and supplies it whenever a rule applies. Members now start at the anchored pH to **2.3e-11**,
   where they used to span **5.5062-5.7778 against 5.65** (beer, worst miss 0.1438) and
   **3.4208-3.5780 against 3.50** (wine, worst 0.0792). **BOTH media, never beer-only.**
 - **D-24's "`y0` is held fixed" is CORRECTED, not repealed.** The excluded axis — scenario
@@ -39,9 +40,11 @@ do not argue past it from this file.**
   shrinking, so "per-member trajectory error" is MEASURED. **Do not re-open it as a mesh artefact**
   [[feedback-separate-mesh-from-coupling-by-convergence]]. t=0 needs no such check — that side is a
   closed form, so 2.3e-11 is `solve_ph`'s own residual.
-- **The re-anchor moves ONE slot and that is deliberate.** A full re-run of the initial builder was
-  considered and **DECLINED** — it would move seeds the beat never measured (nitrogen-dependent
-  yield, hop boil, every dosed inert slot). **Never "finish" it into a general y0 rebuild.**
+- **It moves ONLY slots a sampled parameter derives, and that is deliberate.** A full re-run of the
+  initial builder was considered and **DECLINED** — it would move seeds no beat has measured
+  (nitrogen-dependent yield, hop boil, every dosed inert slot). **Never "finish" it into a general
+  y0 rebuild**; D-236 added a second rule and did NOT re-open that. The nominal-draw control is now
+  scored over the WHOLE array, so a later rule is covered without editing the test.
   `cation_charge_for_ph` **already existed** (D-186, for `set_ph`) and at t=0 reduces term for term
   to the compile seam, which is what makes the nominal draw an EXACT control, not a tolerance.
 - **An unsolvable member is a FAILURE, never a fallback to the nominal `y0`.** A silent fallback
@@ -62,7 +65,7 @@ do not argue past it from this file.**
 - **The `pKa_*` registry is sampled IFF a pH-reading Process is active** — they reach the sampled
   set through `acetaldehyde_reduction`'s `reads`, which D-160 added *because* `reads` scopes the
   sampler. That bounds the claim; the defect is absent otherwise.
-- **The compile-read-AND-sampled CENSUS is NOT run and is its own beat.** D-206's
-  `must_aa_fraction_methionine` and this anchor are two known members of a set nobody has
-  enumerated. `reanchor_for_member` repairs **only** the anchor, so other members are still live —
-  do not read this beat as having closed the class [[feedback-a-parameter-can-be-pinned-and-drawn]].
+- **The compile-read-AND-sampled CENSUS is RUN (D-234) and both its LIVE rows are now REPAIRED** —
+  `set_ph`'s second pH anchor at D-235, `copper_typical`'s seed at D-236. **Never re-propose the
+  census as unenumerated or either row as open**; detail in `prohibitions/compile-sampled-census.md`
+  [[feedback-a-parameter-can-be-pinned-and-drawn]].

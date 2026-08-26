@@ -31,14 +31,14 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-26)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-234** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1892 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-236** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1895 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
 Beer acid-base = **EIGHT** beats BUILT (D-178→D-183, D-207→D-209, D-211), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms.
 **D-232 REFUSED BOTH ways of deciding D-230's residue** (a settling profile that flips SIGN across `mu_max`'s band; a pH clock that only re-measures a known +0.162 day-1 miss) and **ADDED a third branch** — it widened the ambiguity, never narrowed it.
 **D-213 BUILT beer's wort O₂ — sourced and INERT**, and its decline of the O₂→growth coupling rested on "none of the six predictions is reachable in the default set": **growth EXTENT now is** (D-230 §7). Owner's call to re-open, never a beat's.
-**D-234 RAN D-233's census (32 names) and found the repo in a state D-186's own docstring FORBADE** — `set_ph` still anchors the nominal member only, and `copper_typical`'s whole band share is artefact. Both repairs PRICED, not shipped: **owner's call**.
+**D-234 RAN D-233's census (32 names) and found the repo in a state D-186's own docstring FORBADE**; the owner called BOTH repairs and they SHIPPED — **D-235** (mutations get the RUNNING param map, so `set_ph` re-anchors per member: 0.07896 → 1.98e-11; it also exposed `add_dap` reading z̄ off the compile map, 0.0108 pH, repaired too) and **D-236** (`y0_for_member` re-seeds `copper` per member: 16.65 % browning spread → bit-identical, CONDITIONAL on the scenario not naming `copper_gpl`). **The census has NO LIVE row left.**
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
 [[feedback-verify-latest-state-not-breadcrumbs]]. **A D-record's own "Next:" is a breadcrumb list too** — D-156's
@@ -332,15 +332,18 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   sampled. **NEVER quote 1.287× as the band** (one parameter's own contribution; the band moves
   **1.008×**) — a PER-MEMBER error, argued from **t=0 only**. Capacity half MEASURED not fixed
   (D-214's +0.0099 confirmed at 0.0100); its guard **PINS A DEFECT — a RED means coherence ARRIVED:
-  delete it, never revert**. The census it left open is RUN at **D-234** — see the next block.
+  delete it, never revert**. Renamed **`y0_for_member`** at D-236 (a second rule: wine's copper seed).
+  The census it left open is RUN at **D-234** and fully repaired by D-235/236 — see the next block.
   → `.claude/memory/prohibitions/ensemble-anchor-reanchor.md`
-- **The compile-read ∩ SAMPLED census (D-234)** — **RUN and CLASSIFIED: 32 names, never re-propose it
-  as unenumerated.** Predicate is compile READ ∩ the sampler's own set — **disjoint by construction**
-  from D-153/156/157/159's drawability surface (pinned). **NEVER size it with a grep**: 26 hits, 21
-  invisible (`resolve()`-mediated); I predicted 12-20. **`set_ph` is LIVE** — members miss the target
-  by **0.07896** vs **2.03e-11** at t=0, the state **D-186's own docstring FORBADE** and D-233 created;
-  repair PRICED, not shipped. **`copper_typical` LIVE and 100 % ARTEFACT** (control **0.000000 %**,
-  sampler **−14.04 %**). Fractions CLOSED at D-206; override knobs BY DESIGN (the MODE, D-164).
+- **The compile-read ∩ SAMPLED census (D-234/235/236)** — **RUN, CLASSIFIED and now with NO LIVE row.
+  Never re-propose it as unenumerated or either repair as open.** Predicate is compile READ ∩ the
+  sampler's own set — **disjoint by construction** from D-153/156/157/159's drawability surface.
+  **NEVER size it with a grep**: 26 hits, 21 invisible; I predicted 12-20 and got 32. **D-235** widened
+  `StateMutation` to `(schema, state, params)`: `set_ph` 0.07896 → **1.98e-11**, `add_dap` **0.0108** pH
+  (exactly 2 of 13 verbs read it), and the priced radius missed **28** test CALL sites. **D-236** made
+  `reanchor_for_member` → **`y0_for_member`**, per-slot RULES: copper **16.65 % → bit-identical**, and a
+  wine NAMING `copper_gpl` is left alone (**14.34 %**, honest — re-seeding would breach D-24). Fractions
+  CLOSED at D-206; override knobs BY DESIGN (the MODE, D-164).
   → `.claude/memory/prohibitions/compile-sampled-census.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
@@ -363,7 +366,7 @@ the draining arithmetic is STRUCTURAL AND GENERAL to all three pools, so α-KG i
 inferred, not separately measured, and that is the only thing left open about it. Do not offer it as unbuilt; peptide pool; variety-specific DMSp;
 yeast-autolysate spectrum; re-anchor `f_methional` (**only from LITERATURE — deriving it from the
 model's own abundances is REFUSED at D-206, and so is re-banding it**); masking (cosα-blocked); D-55's stale Brett prose; **acetaldehyde
-in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145; ~~NEW at D-202: sotolon from ascorbate via 2-ketobutyrate~~ — **CLOSED at D-203, REFUSED on identifiability** (~10 % molar conversion is its target). This line said "new/open" for 4 records after its own refusal shipped; a **STALE-LIST instance**, cf. [[feedback-check-the-blocker-is-still-blocking]]. **NEW at D-233: the census of parameters read at COMPILE time that are ALSO in the sampled set** — `must_aa_fraction_methionine` (D-206) and the pH anchor (D-233, now fixed) are two known members of a set nobody has enumerated, and `reanchor_for_member` repairs ONLY the anchor, so any other member is still live [[feedback-a-parameter-can-be-pinned-and-drawn]].
+in maturation + the 0-vs-2.7 floor are NOT here any more — D-188 measured both**; ester `_eq` floors; pH factor for hexanoate/EtOAc (**sourcing-blocked: no per-pH series, and R&O's per-ester constants are isoamyl's**); `k_d2`; adduct release; closure OTR(T) (**the bottling burst is BUILT — D-187**); **residual copper is BUILT — D-191; osmotic inhibition BUILT — D-192; the post-Fenton O₂ draw is BUILT — D-196, and it rode this list for 20 records after its source was already on disk**; D-143/4 ← D-145; ~~NEW at D-202: sotolon from ascorbate via 2-ketobutyrate~~ — **CLOSED at D-203, REFUSED on identifiability** (~10 % molar conversion is its target). This line said "new/open" for 4 records after its own refusal shipped; a **STALE-LIST instance**, cf. [[feedback-check-the-blocker-is-still-blocking]]. ~~NEW at D-233: the census of parameters read at COMPILE time that are ALSO in the sampled set~~ — **CLOSED: RUN at D-234 (32 names, all classified) and both LIVE rows REPAIRED at D-235/D-236.** Do not re-open it from this line [[feedback-a-parameter-can-be-pinned-and-drawn]].
 
 ## Standing rule
 - **NEVER put a whole-file line cap back (D-177, corrects D-169).** Raised 4× (150→300), then **REMOVED, not

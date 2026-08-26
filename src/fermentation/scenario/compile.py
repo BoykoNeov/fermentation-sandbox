@@ -335,7 +335,7 @@ class CompiledScenario:
         solver kwargs pass straight through.
         """
         kwargs.setdefault("param_tiers", self.parameters.tier_map())
-        kwargs.setdefault("y0_for_member", self.reanchor_for_member())
+        kwargs.setdefault("y0_for_member", self.y0_for_member())
         return simulate_ensemble(
             self.process_set,
             self.parameters,
@@ -345,63 +345,109 @@ class CompiledScenario:
             **kwargs,  # type: ignore[arg-type]
         )
 
-    def reanchor_for_member(
+    def y0_for_member(
         self,
     ) -> Callable[[Mapping[str, float]], FloatArray] | None:
-        """Per-member ``y0`` builder that re-solves this scenario's pH anchor (decision D-233).
+        """Per-member ``y0`` builder for the parts of the seed a **parameter** derives.
 
-        ``None`` when there is nothing to re-anchor — no ``cation_charge`` slot, or a scenario
-        that gave no ``initial_ph`` (then the slot is 0, there is no anchor, and the seed is not
-        parameter-derived at all).
+        Was ``reanchor_for_member`` and did only the pH anchor (D-233); D-236 added the copper
+        seed and the name followed the scope. It is still **not** a re-run of the initial
+        builder: it rebuilds exactly the slots whose compile-time value is a sampled parameter,
+        one measured rule at a time, and leaves everything else at the compiled array. A full
+        rebuild would move seeds no beat has measured, which is the trap D-233 declined and this
+        one does not re-open.
 
-        **Why this is needed, and why it is not "sampling the initial condition".**
-        ``initial_ph`` is an *input* and its contract is that the model reproduces it at t=0
-        (D-18 for wine, D-179/D-180 for beer). The engine honours it by back-solving
-        ``cation_charge`` at COMPILE — and that back-solve reads the **pKa map**, which the
-        ensemble samples (every ``pKa_*`` reaches the sampled set through the ``reads`` of any
-        active pH-reading Process, D-160). So a member drew its own pKas and then started from
-        a cation fitted to somebody else's: measured, beer members began at pH 5.5062-5.7778
-        against an anchor of 5.65 (worst miss **0.1438**), and wine at 3.4208-3.5780 against
-        3.50 (worst **0.0792**), where the correct spread is **exactly zero**. Re-solving
-        restores it to 2.3e-11 pH.
+        ``None`` when no rule applies, so a caller stays byte-identical to the fixed-``y0`` path.
 
-        **Scope, stated because the number is smaller than it first looks.** The reported
-        *band* is essentially unchanged — 1.008x at day 14 across all 83 sampled parameters,
-        not the 1.287x a single-parameter sweep suggests (that figure is ``pKa_peptide_buffer``'s
-        own contribution with everything else nominal and must never be quoted as the band's).
-        What this repairs is each member's own trajectory: worst per-member day-14 shift 0.0346
-        pH. The case for it is the t=0 contract, never the spread.
+        **Rule 1 — the pH anchor (D-233).** Applies when the schema has ``cation_charge`` and the
+        scenario gave an ``initial_ph``. ``initial_ph`` is an *input* and its contract is that the
+        model reproduces it at t=0 (D-18 for wine, D-179/D-180 for beer). The engine honours it by
+        back-solving ``cation_charge`` at COMPILE — and that back-solve reads the **pKa map**,
+        which the ensemble samples (every ``pKa_*`` reaches the sampled set through the ``reads``
+        of any active pH-reading Process, D-160). So a member drew its own pKas and then started
+        from a cation fitted to somebody else's: measured, beer members began at pH 5.5062-5.7778
+        against an anchor of 5.65 (worst miss **0.1438**), and wine at 3.4208-3.5780 against 3.50
+        (worst **0.0792**), where the correct spread is **exactly zero**. Re-solving restores it
+        to 2.3e-11 pH. :func:`~fermentation.core.acidbase.cation_charge_for_ph` is the exact
+        inverse of ``ph_of_state`` (D-186), and at t=0 — ``Byp`` 0, no evolved CO2 — it reduces
+        term for term to the compile seam's own ``solve_cation_charge``, so at the nominal draw it
+        reproduces the compiled slot rather than competing with it (pinned as a test).
 
-        **It re-anchors and nothing else.** :func:`~fermentation.core.acidbase.cation_charge_for_ph`
-        is the exact inverse of ``ph_of_state`` (D-186), and at t=0 — ``Byp`` 0, no evolved CO2 —
-        it reduces term for term to the compile seam's own ``solve_cation_charge``, so at the
-        nominal draw it reproduces the compiled slot rather than competing with it (pinned as a
-        test). The rest of ``y0`` is untouched: a full re-run of the initial builder would move
-        seeds this beat never measured, which is the trap D-233 declined.
+        *Scope, stated because the number is smaller than it first looks.* The reported *band* is
+        essentially unchanged — 1.008x at day 14 across all 83 sampled parameters, not the 1.287x
+        a single-parameter sweep suggests (that figure is ``pKa_peptide_buffer``'s own
+        contribution with everything else nominal and must never be quoted as the band's). What it
+        repairs is each member's own trajectory: worst per-member day-14 shift 0.0346 pH. The case
+        for it is the t=0 contract, never the spread. The **second** pH anchor, ``set_ph``'s, is
+        not here at all — it is a mutation, repaired at D-235 by handing mutations the running map.
 
-        **The capacity half is NOT repaired here.** ``peptide_buffer_capacity_beer`` is
+        **Rule 2 — the copper seed (decision D-236).** Applies to a wine that did **not** name
+        ``copper_gpl``, where the seam seeds the ``copper`` slot from ``copper_typical`` itself.
+        D-134 made those two numerically identical on purpose so that ``PhenolicBrowning``'s
+        mean-centred ``f(Cu) = 1 + k·(copper − copper_typical)`` is **exactly** 1 for an
+        un-overridden wine. A drawn member moved the reference and not the seed, so the design
+        invariant held at the nominal draw and nowhere else: with ``copper_typical`` the only name
+        sampled, aged ``A420`` moved **16.65 %** across 12 members — and D-234 measured the
+        coherent channel of the same parameter at **exactly zero**, so every bit of that was the
+        broken cancellation, carrying the sign the parameter's name argues against (a wine whose
+        *typical* copper is drawn higher browned *less*). Re-seeding restores ``f(Cu) == 1`` per
+        member, and with it bit-identical members.
+
+        *Why the condition is a branch and not a blanket.* A scenario that names ``copper_gpl`` is
+        stating this wine's copper, which is a genuinely independent quantity from the reference
+        the multiplier is centred on — there, drawing the reference alone is **correct**, and
+        re-seeding would overwrite a scenario input and breach D-24's surviving exclusion. Both
+        halves of the branch are guarded. The condition is checked twice over, on the scenario key
+        *and* on the compiled slot still holding the nominal ``copper_typical``, so a future seam
+        that stops deriving this slot silently stops the rule instead of silently overwriting.
+
+        **The peptide capacity half is still NOT repaired.** ``peptide_buffer_capacity_beer`` is
         back-solved OFFLINE at the nominal ``pKa_peptide_buffer`` and seeded as a constant, so a
         member still carries a wort whose buffering capacity is 1.1161-1.180 rather than Peyer's
         1.18 (D-214, re-measured at D-233: 0.0100 pH at day 14 on the low-pKa arm, 21 % of that
-        arm's defect). Repairing it means running the BC back-solve per member, which means
-        moving it into ``src`` — and that would make
+        arm's defect). Repairing it means running the BC back-solve per member, which means moving
+        it into ``src`` — and that would make
         ``test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc`` compare the
         root-finder against itself. Left measured and guarded, deliberately.
         """
-        if "cation_charge" not in self.schema:
-            return None
-        target = self.scenario.initial.get("initial_ph")
-        if target is None:
-            return None
-        slot = self.schema.slice("cation_charge")
         base = self.y0
-        target_ph = float(target)
+        rules: list[Callable[[FloatArray, Mapping[str, float]], None]] = []
+
+        target = self.scenario.initial.get("initial_ph")
+        if "cation_charge" in self.schema and target is not None:
+            cation_slot = self.schema.slice("cation_charge")
+            target_ph = float(target)
+
+            def reanchor(out: FloatArray, values: Mapping[str, float]) -> None:
+                # Reads the acid slots off `base`, not the cation slot it is solving for, so
+                # seeding from the nominal array is not circular.
+                out[cation_slot] = acidbase.cation_charge_for_ph(
+                    base, self.schema, values, target_ph
+                )
+
+            rules.append(reanchor)
+
+        if (
+            "copper" in self.schema
+            and "copper_gpl" not in self.scenario.initial
+            and "copper_typical" in self.parameters
+        ):
+            copper_slot = self.schema.slice("copper")
+            seeded = float(base[copper_slot][0])
+            if seeded == self.parameters["copper_typical"].value:
+
+                def reseed_copper(out: FloatArray, values: Mapping[str, float]) -> None:
+                    out[copper_slot] = values["copper_typical"]
+
+                rules.append(reseed_copper)
+
+        if not rules:
+            return None
 
         def build(values: Mapping[str, float]) -> FloatArray:
             out = base.copy()
-            # Reads the acid slots off `base`, not the cation slot it is solving for, so
-            # seeding from the nominal array is not circular.
-            out[slot] = acidbase.cation_charge_for_ph(base, self.schema, values, target_ph)
+            for rule in rules:
+                rule(out, values)
             return out
 
         return build
@@ -2748,7 +2794,7 @@ def _verb_set_ph(iv: Intervention, schema: StateSchema, parameters: ParameterSet
     def mutate(_schema: StateSchema, y: FloatArray, params: Mapping[str, float]) -> FloatArray:
         # `params` — the RUNNING map — and never the compile-time `resolved` (decision D-235).
         # Under an ensemble this is the member's own drawn pKa set, so the member re-anchors to
-        # its own numbers exactly as `reanchor_for_member` does at t=0. On a nominal run the two
+        # its own numbers exactly as `y0_for_member`'s anchor rule does at t=0. On a nominal run
         # maps are the same object's resolve(), so the jump is bit-identical to what shipped.
         out = y.copy()
         try:

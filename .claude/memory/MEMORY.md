@@ -12,8 +12,8 @@ back over the limit in seven days. 35 % of the old file was link-and-title text 
 shrink, and every new row adds ~90 bytes of it whatever the prose discipline.
 
 ## Lessons — by path, not loaded at boot
-- [Guards, tests & mutation arms](lessons/guards.md) — What a test actually catches: designing a mutation, reading what a RED names, pinning bands and tolerances, and the guards that quietly forbid nothing (29 lessons)
-- [Measuring a run & attributing the number](lessons/measurement.md) — Reading a number off the model and deciding what caused it: baselines, controls, censuses, sampling grids, summary statistics and null results (23 lessons)
+- [Guards, tests & mutation arms](lessons/guards.md) — What a test actually catches: designing a mutation, reading what a RED names, pinning bands and tolerances, and the guards that quietly forbid nothing (30 lessons)
+- [Measuring a run & attributing the number](lessons/measurement.md) — Reading a number off the model and deciding what caused it: baselines, controls, censuses, sampling grids, summary statistics and null results (24 lessons)
 - [Parameters, bands, fits & identifiability](lessons/parameters.md) — Where a constant's freedom lives: per-parameter bands vs joint claims, calibrated levels that decay, rate-law coordinates, and fitting vs scoring (22 lessons)
 - [Sources, literature & transcription](lessons/sources.md) — Getting a number out of a paper intact: access, tables vs prose, units, measurement frames, the scope of a negative, and notes that drift from the source (14 lessons)
 - [Records, docs, memory & tooling](lessons/records.md) — The archive and the session-boot surfaces: stale breadcrumbs, refusals that read as gaps, doc rot, caps that become targets, and shell/commit mechanics (11 lessons)

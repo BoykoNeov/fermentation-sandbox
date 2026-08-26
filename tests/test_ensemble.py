@@ -748,7 +748,7 @@ def test_every_sampled_member_starts_at_the_ph_the_scenario_anchored(medium):
 
 @pytest.mark.parametrize("medium", ["beer", "wine"])
 def test_the_reanchor_reproduces_the_compiled_slot_at_the_nominal_draw(medium):
-    """The setting where the re-anchor must be a no-op is the control (D-233).
+    """The setting where the per-member seed must be a no-op is the control (D-233, D-236).
 
     ``cation_charge_for_ph`` (D-186) and the compile seam's ``solve_cation_charge`` are two
     code paths to one number: at t=0 ``Byp`` is 0 and no CO2 has evolved, so the state-level
@@ -759,11 +759,15 @@ def test_the_reanchor_reproduces_the_compiled_slot_at_the_nominal_draw(medium):
 
     So this is the arm that separates "re-derived correctly" from "re-derived consistently
     wrong", which the headline guard cannot see on its own.
+
+    Since D-236 the builder carries a second rule (wine's ``copper`` seed), and the claim below
+    is scored over the WHOLE array rather than over the one slot — every rule must reproduce the
+    compiled seed at the nominal draw, and a rule added later is covered without editing this.
     """
     scenario, _ = _anchored(medium)
     compiled = compile_scenario(scenario)
-    build = compiled.reanchor_for_member()
-    assert build is not None, f"{medium}: an anchored scenario must offer a re-anchor builder"
+    build = compiled.y0_for_member()
+    assert build is not None, f"{medium}: an anchored scenario must offer a per-member builder"
 
     rebuilt = build(compiled.parameters.resolve())
     slot = compiled.schema.slice("cation_charge")
@@ -772,23 +776,27 @@ def test_the_reanchor_reproduces_the_compiled_slot_at_the_nominal_draw(medium):
         f"{float(compiled.y0[slot][0]):.12e} to {float(rebuilt[slot][0]):.12e}. The two paths "
         "are meant to be one number at t=0; a disagreement here offsets every member."
     )
-    keep = np.ones(len(compiled.y0), dtype=bool)
-    keep[slot] = False
-    assert np.array_equal(rebuilt[keep], compiled.y0[keep]), (
-        f"{medium}: the re-anchor touched a slot other than `cation_charge`. It re-derives "
-        "the anchor and nothing else — a full re-run of the initial builder would move seeds "
-        "D-233 never measured."
+    assert np.array_equal(rebuilt, compiled.y0), (
+        f"{medium}: the per-member builder moved the seed at the NOMINAL draw. Every rule it "
+        "carries must reproduce the compiled array there — it rebuilds the slots a sampled "
+        "parameter derives, and a full re-run of the initial builder would move seeds no beat "
+        "has measured (the trap D-233 declined and D-236 did not re-open)."
     )
 
 
-def test_an_unanchored_scenario_gets_no_reanchor_builder():
-    """No ``initial_ph`` ⇒ no anchor ⇒ nothing parameter-derived to rebuild (D-233).
+def test_an_unanchored_scenario_gets_no_anchor_rule():
+    """No ``initial_ph`` ⇒ no anchor ⇒ nothing for the pH rule to rebuild (D-233).
 
     Without ``initial_ph`` the cation slot is 0 and every acid slot with it (the whole pH
     system opts in together, D-179), so there is no back-solve for a member's draw to
-    invalidate. Returning a builder anyway would re-solve toward a pH the scenario never
-    named. Pinned because the ``None`` branch is what keeps every un-anchored ensemble in
-    the repo byte-identical across this beat.
+    invalidate. Re-solving anyway would aim at a pH the scenario never named.
+
+    **The builder itself is no longer ``None`` here, and that is D-236, not a regression.**
+    A wine carries a ``copper`` slot seeded from ``copper_typical`` whether or not it opted
+    into the pH system, so the copper rule applies on its own. What is pinned is the thing
+    the old ``None`` stood for: the cation slot is untouched. Beer has no ``copper`` slot, so
+    an un-anchored beer still gets no builder at all — that is where the ``None`` branch now
+    lives, and it is what keeps a caller with no parameter-derived seed byte-identical.
     """
     scenario, _ = _anchored("wine")
     bare = {k: v for k, v in scenario.initial.items() if k != "initial_ph"}
@@ -801,7 +809,28 @@ def test_an_unanchored_scenario_gets_no_reanchor_builder():
             duration_days=1.0,
         )
     )
-    assert compiled.reanchor_for_member() is None
+    build = compiled.y0_for_member()
+    assert build is not None, "a wine's copper seed is parameter-derived even un-anchored"
+    slot = compiled.schema.slice("cation_charge")
+    assert float(compiled.y0[slot][0]) == 0.0
+    perturbed = dict(compiled.parameters.resolve())
+    perturbed["copper_typical"] = perturbed["copper_typical"] * 1.5
+    assert float(build(perturbed)[slot][0]) == 0.0, (
+        "the anchor rule fired on a scenario that named no `initial_ph`"
+    )
+
+    beer_scenario, _ = _anchored("beer")
+    beer_bare = {k: v for k, v in beer_scenario.initial.items() if k != "initial_ph"}
+    beer = compile_scenario(
+        Scenario(
+            name="d233-unanchored-beer",
+            medium="beer",
+            initial=beer_bare,
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=18.0)],
+            duration_days=1.0,
+        )
+    )
+    assert beer.y0_for_member() is None
 
 
 def test_simulate_ensemble_without_the_hook_is_unchanged():

@@ -35,9 +35,12 @@ battery (wine 29, beer 20, wine-with-overrides 30), and 21 of them — the 19 ``
   mutation the **running** map; members landed up to 0.07896 pH from the target they asked for and
   spanned 0.13202 (24 members, D-186's setting), and now sit 1.98e-11 / 2.13e-11 — the t=0 anchor's
   own class. ``add_dap``'s z̄ read moved with it (worst member 0.0108 pH at the dose).
-* ``LIVE`` — ``copper_typical``, which seeds the ``copper`` state slot at compile *and* is
+* ``REPAIRED`` — ``copper_typical``, which seeds the ``copper`` state slot at compile *and* is
   ``PhenolicBrowning``'s mean-centering reference at runtime, so ``f(Cu) == 1`` — the D-134 design
-  invariant — holds only at the nominal draw.
+  invariant — held only at the nominal draw. D-236 re-seeds the slot per member, taking aged
+  ``A420``'s spread from 16.65 % (all of it artefact: the coherent channel measured exactly zero)
+  to bit-identical. A wine that NAMES ``copper_gpl`` is deliberately left alone — there the
+  reference and the wine's copper are independent and drawing one is correct.
 * ``CLOSED`` — the eight ``must_aa_fraction_*``, measured across all eight at D-206 and reproduced
   here to the digit by :func:`test_the_amino_acid_gate_table_still_reproduces_d206`.
 * ``BY-DESIGN`` — ``biomass_carrying_capacity`` and ``k_autolysis`` under a scenario override. The
@@ -50,10 +53,14 @@ battery (wine 29, beer 20, wine-with-overrides 30), and 21 of them — the 19 ``
 61-name-style totals is the vacuity D-159 refused, and it would go red on every new parameter. What
 is pinned is that **every member is classified**: a future compile-time read of a sampled parameter
 fails :func:`test_every_census_member_is_classified` by name, which is the only thing that stops
-this set growing silently again. The one surviving ``LIVE`` row additionally pins its defect on
-purpose, in the D-233 idiom — **a RED there means the defect was repaired: delete the guard and
-say so in the record, do not revert the repair.** The pH pair's pin went red exactly that way at
-D-235 and was replaced by :func:`test_set_ph_reproduces_its_target_for_every_member`.
+this set growing silently again. **There are no ``LIVE`` rows left**: D-235 repaired the pH pair
+and D-236 the copper seed, and the two defect pins written in D-233's idiom were resolved in the
+two ways that idiom allows. ``set_ph``'s went RED and was deleted for the positive form
+(:func:`test_set_ph_reproduces_its_target_for_every_member`); copper's stayed GREEN, because its
+arms drive ``simulate_scheduled`` by hand and never reach ``y0_for_member`` — so it was
+**re-scoped**, not deleted, to pin the mechanism while
+:func:`test_the_copper_seed_moves_with_the_member` pins the repair. A guard that keeps passing
+across a repair is not evidence the repair was inert; read what path it drives.
 """
 
 from __future__ import annotations
@@ -286,6 +293,20 @@ WINE_BROWNING = Scenario(
 )
 
 
+#: The same wine, but STATING its copper. `copper_gpl` makes the wine's copper an independent
+#: quantity from the reference `f(Cu)` is centred on, so drawing the reference alone is CORRECT
+#: here and the seed must stay put — the arm that keeps D-236's repair from overwriting a
+#: scenario input and breaching D-24's exclusion.
+WINE_BROWNING_NAMED = Scenario(
+    name="census-browning-named-copper",
+    medium="wine",
+    initial={**WINE_BROWNING.initial, "copper_gpl": 5.0e-4},
+    temperature_schedule=WINE_BROWNING.temperature_schedule,
+    interventions=WINE_BROWNING.interventions,
+    duration_days=WINE_BROWNING.duration_days,
+)
+
+
 BATTERY = (WINE, BEER, WINE_OVERRIDES)
 
 #: The pH map, read at compile in TWO roles: the t=0 anchor back-solve (repaired per member by
@@ -312,7 +333,10 @@ CENSUS: Mapping[str, str] = {
         spec.fraction_param: "CLOSED at D-206 — the gate's f_i cancels; all eight measured there"
         for spec in AMINO_ACID_SPECS
     },
-    "copper_typical": "LIVE — seeds the `copper` slot at compile, mean-centers f(Cu) at runtime",
+    "copper_typical": (
+        "REPAIRED — y0_for_member re-seeds the `copper` slot per member (D-236), restoring "
+        "f(Cu) == 1; a scenario that NAMES copper_gpl is deliberately left alone"
+    ),
     "biomass_carrying_capacity": "BY-DESIGN — a scenario override is the MODE of the draw (D-164)",
     "k_autolysis": "BY-DESIGN — a scenario override is the MODE of the draw (D-164)",
 }
@@ -558,10 +582,17 @@ def _endpoint(compiled, slot: str, patch: dict[str, float] | None = None) -> flo
     return float(np.atleast_1d(out.y[compiled.schema.slice(slot), -1]).sum())
 
 
-def test_copper_typical_reaches_the_run_only_through_the_broken_cancellation():
-    """PINS A DEFECT ON PURPOSE — a RED here means the ``copper`` seed was made per-member.
+def test_a_hand_wired_run_on_a_patched_map_still_breaks_the_f_cu_cancellation():
+    """The MECHANISM, which survives the repair — and is why the repair had to live where it does.
 
-    **If this goes red, delete it and say so in the record; do not revert the repair.**
+    **This was the defect pin, and it did NOT go red at D-236**, which is the thing to read
+    carefully rather than as "the repair was inert". The arms below drive
+    :func:`~fermentation.runtime.simulate_scheduled` directly on ``compiled.y0`` with a patched
+    parameter map, so they never touch ``y0_for_member`` — the hook D-236's repair is made of.
+    Patching a map after compile still moves the reference and not the seed, exactly as it always
+    did; what changed is that an ENSEMBLE no longer does that, because it rebuilds the seed first.
+    So this test is re-scoped rather than deleted: it pins the mechanism that made the defect
+    possible, and :func:`test_the_copper_seed_moves_with_the_member` pins the repair.
 
     ``copper_typical`` has two roles that D-134 made numerically identical on purpose: it seeds
     the ``copper`` state slot at the compile seam (for a wine that does not name ``copper_gpl``),
@@ -572,9 +603,11 @@ def test_copper_typical_reaches_the_run_only_through_the_broken_cancellation():
 
     The consequence is the D-206 shape on a second member, and it is total rather than partial:
     the CONTROL arm is bit-identical to the baseline on ``A420``, so a coherent change to this
-    parameter contributes **exactly nothing** to the reported band, while the sampler arm moves
-    aged browning by ~14 % at the band top. Every bit of ``copper_typical``'s share of the spread
-    is the broken cancellation.
+    parameter contributes **exactly nothing** to the reported band, while the patched arm moves
+    aged browning by ~14 % at the band top. Before D-236 that patched arm was what an ensemble
+    member actually experienced, and every bit of ``copper_typical``'s share of the reported
+    spread was the broken cancellation (16.65 % across 12 members, with the coherent channel at
+    exactly zero). It is now what a hand-wired caller experiences, and nothing else.
     """
     baseline = _compiled_with(WINE_BROWNING)
     p = baseline.parameters["copper_typical"]
@@ -598,10 +631,92 @@ def test_copper_typical_reaches_the_run_only_through_the_broken_cancellation():
         "a coherent copper_typical now moves browning — the mean-centering is no longer exact; "
         "re-derive this guard rather than loosening it"
     )
-    # The sampler channel is not.
+    # The patched-map channel is not — and must stay so, because it is the mechanism whose
+    # reach into ensembles D-236 closed. A RED here means patching the map stopped moving
+    # browning at all, which would make the repair unfalsifiable rather than unnecessary.
     assert abs(a420_sampler - a420_base) / a420_base > 0.05, (
-        "the sampler no longer breaks the f(Cu) cancellation — the seed is per-member; delete "
-        "this guard and record it"
+        "patching `copper_typical` after compile no longer breaks the f(Cu) cancellation — the "
+        "seed moved with it, and the arms harness can no longer see the mechanism at all"
+    )
+
+
+def _seed_and_a420(compiled, n_members: int = 12):
+    """One ``only=['copper_typical']`` ensemble, reported as (per-member seed, per-member A420).
+
+    ``only=`` is the whole point: with a single name drawn, every member's RHS is identical to
+    the nominal's *wherever the mean-centring is intact*, so the A420 comparison below can be
+    exact equality rather than a tolerance — the same idiom as the control arm above
+    [[feedback-the-setting-where-a-change-is-exact-is-the-control]].
+    """
+    ens = compiled.run_ensemble(n_members=n_members, seed=0, only=["copper_typical"])
+    assert ens.sampled_names == ("copper_typical",), f"drew {ens.sampled_names}"
+    assert ens.n_succeeded >= 2, "need at least two members for a spread"
+    cu, a420 = ens.schema.slice("copper"), ens.schema.slice("A420")
+    seeds = [float(ens.members[i][cu, 0][0]) for i in range(ens.n_succeeded)]
+    drawn = [float(ens.member_params[i]["copper_typical"]) for i in range(ens.n_succeeded)]
+    endpoints = [float(ens.members[i][a420, -1][0]) for i in range(ens.n_succeeded)]
+    return seeds, drawn, endpoints, float(ens.nominal[a420, -1][0])
+
+
+def test_the_copper_seed_moves_with_the_member():
+    """The repair (decision D-236): a drawn ``copper_typical`` moves BOTH of its roles.
+
+    ``copper_typical`` seeds the ``copper`` slot at compile *and* is the reference
+    ``PhenolicBrowning`` mean-centres on, and D-134 made them numerically identical so that
+    ``f(Cu)`` is **exactly** 1 for an un-overridden wine. An ensemble used to move the reference
+    alone, so that invariant held at the nominal draw and nowhere else, and aged ``A420`` moved
+    **16.65 %** across 12 members — against a coherent channel of **exactly zero**, so all of it
+    was the broken cancellation, with the sign the parameter's name argues against.
+    ``CompiledScenario.y0_for_member`` now re-seeds the slot from the member's own draw.
+
+    The claim is exact equality, not a tolerance: with only this one name drawn and both roles
+    moving together, every member integrates the identical RHS as the nominal run, so the whole
+    aged endpoint is bit-identical. A tolerance here would pass on a repair that merely shrank
+    the artefact.
+    """
+    seeds, drawn, endpoints, nominal = _seed_and_a420(compile_scenario(WINE_BROWNING))
+    assert seeds == drawn, (
+        "a member's `copper` seed is not its own drawn `copper_typical` — the compile-time role "
+        "is pinned again and f(Cu) is 1 only at the nominal draw"
+    )
+    assert len(set(seeds)) == len(seeds), "the draw produced no spread; the arms are vacuous"
+    assert nominal > 0.0, "no browning in this scenario — the members would agree vacuously"
+    assert endpoints == [nominal] * len(endpoints), (
+        "aged A420 is not bit-identical across members. With `copper_typical` the only name "
+        "drawn and both of its roles moving, f(Cu) is exactly 1 for every member, so any spread "
+        "at all is a surviving half-pinned role — re-derive it, do not loosen this to a rel="
+    )
+
+
+def test_a_scenario_that_names_its_copper_is_not_re_seeded():
+    """The other half of D-236's branch — and D-24's exclusion, kept intact.
+
+    When a scenario states ``copper_gpl`` the wine's copper is a scenario INPUT and the reference
+    ``f(Cu)`` is centred on is a separate, sourced quantity. Drawing the reference alone is then
+    *correct*: a wine at 0.5 mg/L compared against a lower typical browns faster, and that is
+    physics rather than an artefact. Re-seeding here would overwrite an input with a parameter
+    draw, which is exactly what D-24 excludes and what D-234 §7 went out of its way to certify
+    intact — so the repair is conditional, and both halves of the condition are measured.
+
+    Guarded rather than trusted, because the branch is invisible from the repaired side: every
+    assertion in :func:`test_the_copper_seed_moves_with_the_member` would still pass if the rule
+    fired unconditionally.
+    """
+    compiled = compile_scenario(WINE_BROWNING_NAMED)
+    stated = float(WINE_BROWNING_NAMED.initial["copper_gpl"])
+    seeds, drawn, endpoints, nominal = _seed_and_a420(compiled)
+
+    assert float(compiled.y0[compiled.schema.slice("copper")][0]) == stated
+    assert seeds == [stated] * len(seeds), (
+        "the per-member builder overwrote a scenario input with a parameter draw — D-24's "
+        "exclusion (scenario inputs are never sampled) is breached"
+    )
+    assert len(set(drawn)) == len(drawn), "the draw produced no spread; the arm is vacuous"
+    # ...and the reference's own channel is genuinely live here, which is why the seed must not
+    # follow it. A member browns differently because its wine really does sit off the reference.
+    assert max(abs(e - nominal) for e in endpoints) / nominal > 0.05, (
+        "a drawn reference no longer moves browning for a wine that stated its copper — the "
+        "mean-centring has lost its physics, not just its artefact"
     )
 
 
