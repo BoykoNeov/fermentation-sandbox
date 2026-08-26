@@ -584,11 +584,47 @@ k_wort_acid_removal:
 # A pinned value takes no hypercube dimension and consumes no randomness (ensemble.py's
 # zero-width short-circuit), so this pin does NOT narrow the reported beer spread -- the pKa
 # band still moves it. Do not "restore" a band here without also making the pair sample jointly.
+#
+# THE PAIR NOW SAMPLES JOINTLY (decision D-238), and this pin is what makes that work rather
+# than something that survives it. The seam is CompiledScenario.y0_for_member's rule 3: an
+# ensemble member re-roots the capacity on its OWN drawn map, against the target in
+# wort_buffering_capacity_peyer above, and seeds the peptide_buffer slot with the result before
+# the t=0 cation anchor reads it. So the value below is the NOMINAL member's capacity -- still
+# the shipped root, still reproduced bit-for-bit by the runtime solver -- and the per-member
+# spread lives in the pKa band exactly as this block always said it should. A band HERE would
+# now be doubly wrong: it would sample a derived quantity independently of the thing it is
+# derived from.
+# The CALIBRATION TARGET the capacity below is back-solved against (decision D-238).
+#
+# Peyer's published buffering capacity for the CONTROL wort. It was prose inside the capacity's
+# own provenance block until D-238 needed it as a number: the back-solve now runs per ensemble
+# member (`CompiledScenario.y0_for_member`'s rule 3), so the target it roots on is a quantity the
+# engine READS rather than a constant somebody typed into a test. Prime directive 2 -- a number the
+# code consumes carries provenance.
+#
+# PINNED ZERO-WIDTH, and for a different reason than the capacity is. The capacity is pinned
+# because it is DERIVED (its uncertainty rides pKa_peptide_buffer). This is pinned because it is
+# the ANCHOR: banding it would let a member's wort be calibrated to a buffering capacity Peyer
+# never measured, which is the opposite of what the back-solve is for. Peyer's series does have a
+# spread -- 0.94 mash-in, 1.18 control wort, 1.21 post-boil, 1.24 with protease, 1.34 over the
+# proteolytic rest -- but those are DIFFERENT WORTS at different process stages, not a measurement
+# uncertainty on this one. Reading that series as a band would be the transcription error
+# [[feedback-a-series-of-conditions-is-not-an-error-bar]].
+wort_buffering_capacity_peyer:
+  value: 1.18
+  unit: "dimensionless"
+  tier: validated
+  uncertainty: { low: 1.18, high: 1.18, note: "PINNED zero-width -- see the block above. This is the anchor the peptide capacity is rooted on, not a free quantity: a band here would calibrate a member's wort against a BC nobody measured. Peyer's 0.94/1.18/1.21/1.24/1.34 series is five different worts across the mash-boil process, NOT an error bar on the control wort." }
+  provenance:
+    source: "Peyer, L. (2017), PhD thesis, University College Cork, CORA handle 10468/4694, section 5.3.4 (the BC definition and the fast-titration protocol) and sections 5.4.3 / abstract (the measured value: 1.18 for the control wort)."
+    conditions: "CONTROL wort, i.e. already boiled and with hot trub removed -- which is why the model carries protein precipitation at this anchor rather than as a fermentation-phase Process (D-214). Peyer's fast-BC protocol: 375 uL of 1 M HCl into 25 mL of sample, BC = log10(H+ added / H+ increase). Dimensionless as a log ratio."
+    notes: "tier=VALIDATED describes THIS NUMBER -- a directly published measurement -- not the use it is put to. The pairing it anchors is speculative for the reasons in peptide_buffer_capacity_beer's own header block (fitted at wort pH, applied across a traverse), and that tier is carried there. No Process declares this name, so it never enters a Process's tier derivation; it is read at compile only, by the back-solve."
+
 peptide_buffer_capacity_beer:
   value: 1.5480662315921656
   unit: "g/L"
   tier: speculative
-  uncertainty: { low: 1.5480662315921656, high: 1.5480662315921656, note: "PINNED zero-width, and deliberately -- see the block above. The capacity is DERIVED from pKa_peptide_buffer by the back-solve, not independently uncertain, so its uncertainty is carried by that pKa's band instead of duplicated here. The value is the 10.52 mM that pairs with the nominal pKa 4.25 on the EIGHT-acid wort table (D-181), converted at glutamate's 147.13 g/mol. Carried at FULL PRECISION on purpose: it is a root of the back-solve, and a rounded copy would make the BC = 1.18 round-trip test pass only to a tolerance rather than exactly (the D-154 '663 vs 662.802522' lesson)." }
+  uncertainty: { low: 1.5480662315921656, high: 1.5480662315921656, note: "PINNED zero-width, and deliberately -- see the block above. The capacity is DERIVED from pKa_peptide_buffer by the back-solve, not independently uncertain, so its uncertainty is carried by that pKa's band instead of duplicated here. SINCE D-238 that sentence describes a seam rather than an intention: y0_for_member re-roots the capacity per ensemble member, so a member's peptide_buffer SEED moves with its drawn pKa while this parameter stays pinned. What the seed's spread is made of is now slightly more than that pKa: the root is taken on the member's WHOLE map, so the other acids' drawn pKas feed it too -- measured at 0.40 % of this value on the worst of 12 members, against a peptide-pKa-only root. Small, but it is no longer only pKa_peptide_buffer's band. The value is the 10.52 mM that pairs with the nominal pKa 4.25 on the EIGHT-acid wort table (D-181), converted at glutamate's 147.13 g/mol. Carried at FULL PRECISION on purpose: it is a root of the back-solve, and a rounded copy would make the BC = 1.18 round-trip test pass only to a tolerance rather than exactly (the D-154 '663 vs 662.802522' lesson)." }
   provenance:
     source: "Back-solved against the published wort buffering capacity BC = 1.18 reported by Peyer, L. (2017), PhD thesis, University College Cork, CORA handle 10468/4694, sections 5.3.4 (the BC definition and titration protocol) and 5.4.3 / abstract (the measured values: 0.94 at mash-in, 1.18 control wort, 1.21 post-boil, 1.24 with added protease, 1.34 max over the proteolytic rest)."
     conditions: "back-solved at wort pH 5.5 on top of ALL EIGHT *_typical_wort organic acids above (decision D-181; five of them at D-180, the finished-beer table before that), using Peyer's own fast-BC protocol reproduced on this engine's charge balance. Applied from wort pH down through beer pH (~4.9-5.2), which SPANS rather than sits at the pH it was fitted at."

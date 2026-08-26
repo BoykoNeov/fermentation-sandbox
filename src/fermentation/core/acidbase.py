@@ -1254,6 +1254,109 @@ def cation_charge_for_ph(
     )
 
 
+#: Peyer's fast buffering-capacity protocol (2017 thesis §5.3.4), stated as the method's own
+#: DEFINITION rather than as a measurement of anything: 375 µL of 1 M HCl titrated into 25 mL of
+#: sample, and ``BC = log10(H⁺ added / H⁺ increase)``. These three numbers say what "BC" *means*
+#: here — change one and ``wort_buffering_capacity_peyer``'s 1.18 stops referring to the same
+#: quantity. They are code constants for the same reason :data:`ALL_ACIDS`' molar masses are:
+#: definitional, not empirical. Prime directive 2 governs the *measured* half, and that half is in
+#: YAML (``wort_buffering_capacity_peyer``, beer_acids.yaml).
+_PEYER_SAMPLE_ML = 25.0
+_PEYER_ACID_ML = 0.375
+_PEYER_ACID_MOLAR = 1.0
+
+#: The pH Peyer's control wort sits at, and so the pH its strong-cation content is inverse-solved
+#: from before the titration begins. The same 5.5 the shipped capacity was back-solved at (D-179).
+_PEYER_WORT_PH = 5.5
+
+
+def peyer_fast_bc(totals_molar: Mapping[str, float], pka: Mapping[str, tuple[float, ...]]) -> float:
+    """Peyer's fast buffering capacity of a wort, on this engine's charge balance (D-238).
+
+    His protocol (2017 thesis §5.3.4) reproduced term for term: inverse-solve the sample's
+    strong cation from :data:`_PEYER_WORT_PH`, dose 375 µL of 1 M HCl into 25 mL, and report
+    ``log10(H⁺ added / H⁺ increase)``. ``totals_molar`` is the sample's acid composition in
+    mol/L — including ``peptide_buffer``, which is the pool the capacity below moves.
+
+    **This is a method, not a rate**, so it is pure like everything else in this module and is
+    read at compile rather than by any Process. It exists in ``src`` because
+    :func:`peptide_capacity_for_wort_bc` roots on it per ensemble member; the test that scores
+    the SHIPPED capacity against Peyer's published 1.18 keeps its teeth regardless, because its
+    two anchors are the YAML literal and the published number, and neither is produced here.
+    """
+    v_in, v_acid, c_acid = _PEYER_SAMPLE_ML, _PEYER_ACID_ML, _PEYER_ACID_MOLAR
+    v_fin = v_in + v_acid
+    cation = solve_cation_charge(totals_molar, 0.0, 0.0, pka, _PEYER_WORT_PH)
+    ph_in = solve_ph(totals_molar, cation, 0.0, 0.0, pka)
+    dilution = v_in / v_fin
+    diluted = {k: v * dilution for k, v in totals_molar.items()}
+    ph_fin = solve_ph(diluted, cation * dilution - (v_acid * c_acid) / v_fin, 0.0, 0.0, pka)
+    h_increase = v_fin * 10.0 ** (-ph_fin) - v_in * 10.0 ** (-ph_in)
+    if h_increase <= 0.0:
+        raise ValueError(
+            "the titration did not lower the sample's pH — no buffering capacity is defined "
+            f"for this composition (H⁺ increase {h_increase:.3e})"
+        )
+    return math.log10((v_acid * c_acid) / h_increase)
+
+
+def peptide_capacity_for_wort_bc(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float], target_bc: float
+) -> float:
+    """Peptide-buffer capacity (g/L) that puts *this* wort at ``target_bc`` (decision D-238).
+
+    The runtime twin of the OFFLINE back-solve that produced the shipped
+    ``peptide_buffer_capacity_beer``, and the exact analogue of what
+    :func:`cation_charge_for_ph` is to the compile seam's ``solve_cation_charge``: it re-derives
+    the shipped root rather than competing with it. At the nominal ``pKa_peptide_buffer`` it
+    returns the shipped literal **bit-for-bit** (asserted as a test, not assumed).
+
+    **Why a member needs this at all.** The capacity was rooted at the *nominal* peptide pKa and
+    shipped as a constant, while that pKa is drawn per member. So an ensemble member carried a
+    wort whose buffering capacity was 1.1161–1.180 rather than the 1.18 the constant exists to
+    reproduce (D-214, re-measured at D-233: 0.0100 pH at day 14 on the low-pKa arm). The pair is
+    two properties of one species and the back-solve solved them together; sampling one alone is
+    what broke them apart.
+
+    **Scope, and it is deliberate.** Only the peptide pKa moves the answer here in practice — the
+    eight ``*_typical_wort`` acid LEVELS are not in the sampled set at all (measured: 0 of 8), so
+    a member's wort acids are the nominal wort's. The other acids' *pKas* are drawn, and this
+    function does see them through ``params``; that is a genuine second channel and it is
+    measured in the record rather than assumed away.
+
+    Reads the acid slots off ``y`` and overwrites only ``peptide_buffer`` with each trial, so it
+    never reads the quantity it is solving for. It does not touch ``cation_charge`` either — the
+    titration inverse-solves its own sample cation from :data:`_PEYER_WORT_PH` — which is what
+    lets a caller run this BEFORE the t=0 anchor on the same array.
+    """
+    totals = _totals_molar(y, schema)
+    if "peptide_buffer" not in totals:
+        raise ValueError(
+            f"schema {schema.medium!r} carries no `peptide_buffer` slot, so there is no "
+            "capacity to solve for"
+        )
+    molar_mass = ALL_ACIDS["peptide_buffer"].molar_mass
+    pka = build_pka_map(params)
+
+    def residual(capacity_gpl: float) -> float:
+        trial = dict(totals)
+        trial["peptide_buffer"] = capacity_gpl / molar_mass
+        return peyer_fast_bc(trial, pka) - target_bc
+
+    # The bracket is generous rather than tuned: the shipped root is ~1.55 g/L and the whole
+    # sourced pKa window moves it by 5 %, so anything that lands near an edge is a changed acid
+    # table rather than a near miss, and the raise is the right answer.
+    lo, hi = 1e-3, 20.0
+    try:
+        return float(brentq(residual, lo, hi, xtol=1e-15, rtol=8.881784197001252e-16))
+    except ValueError as exc:  # pragma: no cover - a wort this far off is a broken table
+        raise ValueError(
+            f"no peptide capacity in [{lo}, {hi}] g/L puts this wort at BC = {target_bc}; "
+            "the acid table or the pKa map has moved far enough that the back-solve no longer "
+            "brackets a root"
+        ) from exc
+
+
 def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
     """Titratable acidity [g/L tartaric-equivalent] — a second derived pure function.
 

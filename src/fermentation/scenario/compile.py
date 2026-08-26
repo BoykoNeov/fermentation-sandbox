@@ -351,7 +351,8 @@ class CompiledScenario:
         """Per-member ``y0`` builder for the parts of the seed a **parameter** derives.
 
         Was ``reanchor_for_member`` and did only the pH anchor (D-233); D-236 added the copper
-        seed and the name followed the scope. It is still **not** a re-run of the initial
+        seed and the name followed the scope, and D-238 the peptide buffer capacity. It is still
+        **not** a re-run of the initial
         builder: it rebuilds exactly the slots whose compile-time value is a sampled parameter,
         one measured rule at a time, and leaves everything else at the compiled array. A full
         rebuild would move seeds no beat has measured, which is the trap D-233 declined and this
@@ -401,28 +402,91 @@ class CompiledScenario:
         *and* on the compiled slot still holding the nominal ``copper_typical``, so a future seam
         that stops deriving this slot silently stops the rule instead of silently overwriting.
 
-        **The peptide capacity half is still NOT repaired.** ``peptide_buffer_capacity_beer`` is
-        back-solved OFFLINE at the nominal ``pKa_peptide_buffer`` and seeded as a constant, so a
-        member still carries a wort whose buffering capacity is 1.1161-1.180 rather than Peyer's
-        1.18 (D-214, re-measured at D-233: 0.0100 pH at day 14 on the low-pKa arm, 21 % of that
-        arm's defect). Repairing it means running the BC back-solve per member, which means moving
-        it into ``src`` — and that would make
+        **Rule 3 — the peptide buffer capacity (decision D-238), and it runs FIRST.**
+        ``peptide_buffer_capacity_beer`` is back-solved OFFLINE against Peyer's published wort
+        BC = 1.18 at the *nominal* ``pKa_peptide_buffer``, then shipped as a compile-time seed —
+        while that pKa is read at runtime and is drawn. So a member carried a wort whose buffering
+        capacity was 1.1161-1.180 rather than the 1.18 the constant exists to reproduce (D-214,
+        re-measured at D-233: 0.0100 pH at day 14 on the low-pKa arm, 21 % of that arm's defect).
+        :func:`~fermentation.core.acidbase.peptide_capacity_for_wort_bc` re-roots it on the
+        member's own map, and at the nominal draw it returns the shipped literal **bit-for-bit**.
+
+        *Why D-233's reason for declining this no longer applies.* It declined the repair because
+        moving the root-find into ``src`` would make
         ``test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc`` compare the
-        root-finder against itself. Left measured and guarded, deliberately.
+        root-finder against itself. That is true of *deriving the shipped constant*, and this does
+        not: the YAML literal is untouched and still scored against Peyer's published 1.18 by a
+        titration neither side produces. The teeth that forced the D-180 and D-181 re-anchors are
+        in those two literals, not in owning a second copy of the arithmetic.
+
+        *It runs before rule 1, and that ordering is load-bearing.* ``peptide_buffer`` is an acid
+        slot the t=0 cation back-solve reads, so an anchor solved against the *old* capacity would
+        put the member at a pH the scenario never asked for — the very defect rule 1 exists to
+        close. Rule 1 therefore reads the array under construction rather than the compiled one.
+        A wrong order needs no new guard: it turns
+        ``test_every_sampled_member_starts_at_the_ph_the_scenario_anchored[beer]`` red, with wine
+        (no peptide slot) staying green as the free control.
+
+        *The condition, and it is the same shape as rule 2's.* A scenario that names
+        ``peptide_buffer_gpl`` is stating this wort's buffering protein — a scenario INPUT, which
+        D-24 excludes from sampling — so the rule does not fire, and the compiled slot is checked
+        for the nominal capacity too so a future seam that stops deriving it stops the rule.
+
+        *Scope: the whole running map feeds the root, deliberately.* The eight ``*_typical_wort``
+        acid LEVELS are not in the sampled set at all (measured: 0 of 8), but the other acids'
+        **pKas** are, and they move the computed BC. They are fed in, because Peyer's 1.18 is a
+        measurement of a real wort and a back-solve against a measurement should see every constant
+        that enters it. Priced rather than assumed: worst member 0.40 % of the capacity against a
+        peptide-pKa-only root. Filtering the map would also have shipped a deliberately half-pinned
+        read *inside* the fix for half-pinning, which is this census's own defect class.
         """
         base = self.y0
         rules: list[Callable[[FloatArray, Mapping[str, float]], None]] = []
 
         target = self.scenario.initial.get("initial_ph")
+        if (
+            "peptide_buffer" in self.schema
+            and "peptide_buffer_gpl" not in self.scenario.initial
+            and "peptide_buffer_capacity_beer" in self.parameters
+            and "wort_buffering_capacity_peyer" in self.parameters
+            and "pKa_peptide_buffer" in self.parameters
+        ):
+            peptide_slot = self.schema.slice("peptide_buffer")
+            nominal_pka = self.parameters["pKa_peptide_buffer"].value
+            target_bc = self.parameters["wort_buffering_capacity_peyer"].value
+            if (
+                float(base[peptide_slot][0])
+                == self.parameters["peptide_buffer_capacity_beer"].value
+            ):
+
+                def recapacitate(out: FloatArray, values: Mapping[str, float]) -> None:
+                    # The exact-nominal skip is structural, not numerical. The root-find DOES
+                    # return the shipped literal bit-for-bit here (asserted as a test, and D-233
+                    # §1's one-ULP disagreement was a looser root, not a floor) — but resting
+                    # D-24's byte-for-byte nominal claim on a root-finder's tolerance surviving a
+                    # scipy upgrade is not the same as guaranteeing it.
+                    if values["pKa_peptide_buffer"] == nominal_pka:
+                        return
+                    # Reads the acid slots off `out` and overwrites only its own; the titration
+                    # inverse-solves its own sample cation, so this never reads `cation_charge`
+                    # and can safely run before the anchor below.
+                    out[peptide_slot] = acidbase.peptide_capacity_for_wort_bc(
+                        out, self.schema, values, target_bc
+                    )
+
+                rules.append(recapacitate)
+
         if "cation_charge" in self.schema and target is not None:
             cation_slot = self.schema.slice("cation_charge")
             target_ph = float(target)
 
             def reanchor(out: FloatArray, values: Mapping[str, float]) -> None:
-                # Reads the acid slots off `base`, not the cation slot it is solving for, so
-                # seeding from the nominal array is not circular.
+                # Reads the acid slots off `out` — the array RULE 3 has already re-capacitated —
+                # and never the cation slot it is solving for, so it is not circular. Reading
+                # `base` here (as this did before D-238) would anchor the member against a
+                # peptide pool it no longer carries.
                 out[cation_slot] = acidbase.cation_charge_for_ph(
-                    base, self.schema, values, target_ph
+                    out, self.schema, values, target_ph
                 )
 
             rules.append(reanchor)

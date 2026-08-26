@@ -1619,11 +1619,14 @@ def _peyer_wort_bc(params: ParameterSet, capacity_gpl: float, pka_peptide: float
     ``BC = log10[H+ added / H+ increase]``, reproduced on this engine's charge balance.
     Factored out at D-233 so the round-trip below and the drawn-member guard beside it are
     provably the SAME titration — two hand-copies would let one drift and still look agreed.
-    """
-    import math
 
-    v_in, v_acid, c_acid = 25.0, 0.375, 1.0
-    v_fin = v_in + v_acid
+    **Since D-238 the titration itself lives in ``src``** (:func:`acidbase.peyer_fast_bc`),
+    because ``y0_for_member`` roots on it per ensemble member. This wrapper stays because it
+    builds the sample from the *parameter table* while the production path builds it from the
+    *state*, and a test asserts those two agree. The round-trip below keeps its teeth either
+    way: its two anchors are the shipped YAML literal and Peyer's published 1.18, and the
+    solver produces neither.
+    """
     pka = dict(acidbase.build_pka_map(params.resolve()))
     pka["peptide_buffer"] = (pka_peptide,)
     totals = {
@@ -1631,13 +1634,7 @@ def _peyer_wort_bc(params: ParameterSet, capacity_gpl: float, pka_peptide: float
         for slot, p in _WORT_BC_SEEDS.items()
     }
     totals["peptide_buffer"] = capacity_gpl / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
-    cation = acidbase.solve_cation_charge(totals, 0.0, 0.0, pka, 5.5)
-    ph_in = acidbase.solve_ph(totals, cation, 0.0, 0.0, pka)
-    f = v_in / v_fin
-    diluted = {k: v * f for k, v in totals.items()}
-    ph_fin = acidbase.solve_ph(diluted, cation * f - (v_acid * c_acid) / v_fin, 0.0, 0.0, pka)
-    h_inc = v_fin * 10.0 ** (-ph_fin) - v_in * 10.0 ** (-ph_in)
-    return math.log10((v_acid * c_acid) / h_inc)
+    return acidbase.peyer_fast_bc(totals, pka)
 
 
 def _beer_acid_params() -> ParameterSet:
@@ -1676,27 +1673,32 @@ def test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc():
     )
 
 
-def test_a_drawn_peptide_pka_carries_a_wort_that_is_not_peyers_1_18():
-    """A DEFECT is pinned here, on purpose. **A RED means it was FIXED** (D-214, D-233).
+def test_holding_the_capacity_fixed_while_the_pka_moves_costs_peyers_1_18():
+    """The MECHANISM behind D-238's repair — and it was a defect pin that outlived its defect.
 
-    Read this before "repairing" a failure: the capacity is a COMPILE-time seed back-solved
-    OFFLINE at the nominal ``pKa_peptide_buffer``, while that pKa is read at RUNTIME and is in
-    the sampled set. So an ensemble member draws its own pKa and keeps a capacity fitted to
-    somebody else's — and the wort it carries no longer reproduces the published BC = 1.18
-    the capacity exists to reproduce.
+    This was ``test_a_drawn_peptide_pka_carries_a_wort_that_is_not_peyers_1_18``, written at
+    D-233 in the idiom *"a RED means it was FIXED — delete this guard and say so in the
+    record"*. **D-238 fixed it and this test stayed GREEN**, which was predicted in advance:
+    every number here is the SHIPPED CONSTANT scored through this file's own titration, and the
+    repair does not touch that constant. It re-roots the *seed* per ensemble member, on a path
+    this test never drives. That is D-236 §3's lesson arriving a second time — a defect pin is
+    a statement about which path its arms reach, not about whether the defect survives — so it
+    is re-scoped and renamed rather than deleted, exactly as copper's was.
 
-    D-214 measured this and deliberately did not fix it; D-233 re-measured rather than
-    inheriting the number, fixed the *anchor* half beside it, and left this half standing
-    because repairing it means running the BC back-solve per member — which means moving the
-    root-find into ``src``, and that would make the round-trip test above compare the
-    root-finder against itself.
-
-    **So if this test goes RED, the likely cause is that a later beat made the pair coherent.
-    Do not revert that beat. Delete this guard and say so in the record.**
+    What it pins now is why the pair has to move TOGETHER: hold the capacity at the value
+    rooted for pKa 4.25 and let the pKa go anywhere else in its sourced window, and the wort
+    stops reproducing the BC = 1.18 the capacity exists to reproduce. That is the argument for
+    rule 3 in ``CompiledScenario.y0_for_member``, and if these numbers move, that argument has
+    changed and the record's 0.0100 pH day-14 cost needs re-measuring.
 
     The shape matters and is asserted, not just the span: BC is maximal AT the nominal by
     construction and falls off on BOTH sides, so the low edge is not the only offender and a
     one-sided claim about the band would be wrong.
+
+    The repair itself is pinned by
+    :func:`test_every_sampled_member_carries_peyers_wort_bc`, which reads the member's SEEDED
+    SLOT — the parameter still holds the nominal after the repair, so a guard reading the
+    parameter would be vacuous.
     """
     params = _beer_acid_params()
     shipped = params["peptide_buffer_capacity_beer"].value
@@ -1709,8 +1711,9 @@ def test_a_drawn_peptide_pka_carries_a_wort_that_is_not_peyers_1_18():
 
     assert at_nominal == pytest.approx(1.18, abs=1e-9)
     assert at_low == pytest.approx(1.116059, abs=1e-5), (
-        f"a member drawing pKa {unc.low} carries a wort at BC = {at_low:.6f}; D-233 measures "
-        "1.116059. If this moved because the pair was made coherent, delete this guard."
+        f"holding the shipped capacity at pKa {unc.low} gives BC = {at_low:.6f}; D-233 "
+        "measures 1.116059. This is the shipped CONSTANT, which D-238's repair does not "
+        "touch — so a move here is the acid table or the pKa window, not the repair."
     )
     assert at_high == pytest.approx(1.145594, abs=1e-5), (
         f"a member drawing pKa {unc.high} carries a wort at BC = {at_high:.6f}; D-233 measures "
@@ -1720,6 +1723,206 @@ def test_a_drawn_peptide_pka_carries_a_wort_that_is_not_peyers_1_18():
         "BC is maximal at the NOMINAL pKa by construction and falls off on both sides. That "
         "ordering is the reason D-214's '1.1161-1.180' is a span and not a direction: the low "
         "edge is the worst point, but the high edge is wrong too."
+    )
+
+
+# -- the capacity/pKa pair, made coherent per member (decision D-238) ---------------------------
+#
+# D-233 §8 declined this repair because moving the BC back-solve into `src` "would make the
+# round-trip test above compare the root-finder against itself". That objection is against
+# DERIVING THE SHIPPED CONSTANT, and D-238 does not: the YAML literal is untouched and still
+# scored against Peyer's published 1.18 by a titration neither side produces. What moves is the
+# per-member SEED.
+
+#: A beer that STATES its buffering protein. `peptide_buffer_gpl` makes the pool a scenario INPUT,
+#: which D-24 excludes from sampling, so rule 3 must not fire — the branch is invisible from the
+#: repaired side, so it owes its own arm (D-236's Arm F lesson).
+TYRELL_NAMED_PEPTIDE_GPL = 1.4
+
+
+def _beer_ensemble(scenario_extra: dict[str, float] | None = None, n_members: int = 8):
+    """One beer ensemble over the peptide pair, returned with its compiled scenario.
+
+    ``only=["pKa_peptide_buffer"]`` — with a single name drawn, every member's wort differs from
+    the nominal's in exactly the quantity under test, so the per-member BC below is a statement
+    about the pair and not about eighty-two other draws.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d238-peptide-pair",
+            medium="beer",
+            initial={**TYRELL_SCENARIO, **(scenario_extra or {})},
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=2.0,
+        )
+    )
+    ens = compiled.run_ensemble(n_members=n_members, seed=0, only=["pKa_peptide_buffer"])
+    assert ens.sampled_names == ("pKa_peptide_buffer",), f"drew {ens.sampled_names}"
+    assert ens.n_succeeded >= 2, "need at least two members"
+    return compiled, ens
+
+
+def test_the_runtime_solver_reproduces_the_shipped_capacity_at_the_nominal():
+    """The control, and the reason the repair re-derives the shipped root rather than competing.
+
+    [[feedback-the-setting-where-a-change-is-exact-is-the-control]]. Two claims, and the second
+    is what makes the first mean anything:
+
+    * :func:`acidbase.peptide_capacity_for_wort_bc`, run on the compiled beer ``y0`` at the
+      nominal pKa, returns the shipped ``peptide_buffer_capacity_beer`` **bit for bit**. Not to a
+      tolerance — a tolerance would pass on a solver that merely landed nearby, and the whole
+      argument for rule 3 is that it reproduces the offline back-solve rather than replacing it.
+      (D-233 §1 reported these one ULP apart; that was a looser root-find, not a floor.)
+    * the state-built sample and the parameter-built sample are the SAME wort. The production
+      path reads the acid slots off ``y0``; this file's titration builds them from the
+      ``*_typical_wort`` parameters. Two ways of naming one composition is how they drift.
+
+    Note what is NOT asserted here: that the solver is right. That is
+    :func:`test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc`'s job, and it
+    scores the YAML literal against Peyer's published 1.18 — neither of which this produces.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d238-control",
+            medium="beer",
+            initial=dict(TYRELL_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=1.0,
+        )
+    )
+    resolved = compiled.parameters.resolve()
+    shipped = compiled.parameters["peptide_buffer_capacity_beer"].value
+    target = compiled.parameters["wort_buffering_capacity_peyer"].value
+
+    solved = acidbase.peptide_capacity_for_wort_bc(compiled.y0, compiled.schema, resolved, target)
+    assert solved == shipped, (
+        f"the runtime back-solve returns {solved!r} against the shipped {shipped!r}. It is meant "
+        "to RE-DERIVE the offline root, which is what makes the nominal member exact rather than "
+        "close — do not paper over this with a tolerance"
+    )
+
+    # ...and the two ways of building the sample agree, so the file's titration and the
+    # production path are titrating one wort rather than two that happen to look alike.
+    params = _beer_acid_params()
+    from_state = acidbase._totals_molar(compiled.y0, compiled.schema)
+    for slot, name in _WORT_BC_SEEDS.items():
+        expected = params[name].value / acidbase.ALL_ACIDS[slot].molar_mass
+        assert from_state[slot] == pytest.approx(expected, rel=1e-12), (
+            f"the compiled wort's {slot} is not its `{name}` seed; the state-built and "
+            "parameter-built samples have diverged and the control above is comparing two worts"
+        )
+
+
+def test_every_sampled_member_carries_peyers_wort_bc():
+    """The repair (decision D-238) — every member's wort reproduces Peyer's 1.18, not just one.
+
+    D-214 found the pair incoherent off-nominal and did not fix it; D-233 re-measured it (0.0100
+    pH at day 14 on the low-pKa arm, 21 % of that arm's whole defect) and left it, because the
+    fix looked like it would cost the round-trip guard its teeth. It does not — see this
+    section's header.
+
+    **Read the SEEDED SLOT, never the parameter.** ``peptide_buffer_capacity_beer`` still holds
+    the nominal literal after the repair, by design, so a guard that read the parameter would
+    pass identically before and after and pin nothing at all.
+
+    The tolerance is the root-finder's, not a physical allowance: every member is rooted to
+    ``xtol=1e-15`` on a target of exactly 1.18, so anything above 1e-9 is a wort that was never
+    re-solved rather than one solved imprecisely.
+    """
+    compiled, ens = _beer_ensemble()
+    peptide = ens.schema.slice("peptide_buffer")
+    target = compiled.parameters["wort_buffering_capacity_peyer"].value
+    molar_mass = acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
+
+    seeds = [float(ens.members[i][peptide, 0][0]) for i in range(ens.n_succeeded)]
+    assert len(set(seeds)) == len(seeds), (
+        "every member seeded the same capacity — either the draw is degenerate or rule 3 never "
+        "fired, and the per-member BC below would then be vacuously the nominal's"
+    )
+
+    for i in range(ens.n_succeeded):
+        values = ens.member_params[i]
+        totals = acidbase._totals_molar(ens.members[i][:, 0], ens.schema)
+        totals["peptide_buffer"] = seeds[i] / molar_mass
+        bc = acidbase.peyer_fast_bc(totals, acidbase.build_pka_map(values))
+        assert bc == pytest.approx(target, abs=1e-9), (
+            f"member {i} drew pKa {values['pKa_peptide_buffer']:.4f} and carries a wort at "
+            f"BC = {bc:.6f}, not Peyer's {target}. Its capacity was fitted to somebody else's "
+            "pKa — the pair is incoherent again (D-214, D-233 §1)"
+        )
+
+
+def test_the_nominal_member_keeps_the_compiled_capacity_exactly():
+    """The exact-nominal skip, which is what keeps D-24's byte-for-byte nominal claim structural.
+
+    Rule 3 returns without touching the array when the member's ``pKa_peptide_buffer`` is the
+    nominal one. The root-find *does* reproduce the shipped literal bit for bit (asserted
+    directly above), so this branch changes no number today — it exists so that the nominal run's
+    byte-for-byte reproducibility does not rest on a root-finder's tolerance surviving a SciPy
+    upgrade. A guard clause, deliberately, and never a tolerance on the equality.
+    """
+    compiled, ens = _beer_ensemble()
+    peptide = compiled.schema.slice("peptide_buffer")
+    shipped = compiled.parameters["peptide_buffer_capacity_beer"].value
+
+    builder = compiled.y0_for_member()
+    assert builder is not None, "beer with an `initial_ph` must get a per-member builder"
+    nominal = builder(compiled.parameters.resolve())
+
+    assert float(nominal[peptide][0]) == shipped, "the nominal member's capacity moved"
+    assert np.array_equal(nominal, compiled.y0), (
+        "the whole rebuilt array must equal the compiled one at the nominal draw — this covers "
+        "every present and future rule without being edited for each"
+    )
+    # ...and the ensemble's own nominal run is the compiled y0 too, not merely the builder's.
+    assert float(ens.nominal[peptide, 0][0]) == shipped
+
+
+def test_a_scenario_that_names_its_peptide_buffer_is_not_re_capacitated():
+    """The other half of rule 3's branch — D-24's exclusion, kept intact.
+
+    ``peptide_buffer_gpl`` states this wort's buffering protein. That is a scenario INPUT, and a
+    parameter draw may never overwrite one; it is also the seam
+    :func:`test_no_process_touches_the_peptide_buffer_pool` names as the RIGHT place to model
+    less buffering protein, so a rule that quietly re-solved it would break that route.
+
+    Guarded rather than trusted, because the branch is invisible from the repaired side: every
+    assertion in :func:`test_every_sampled_member_carries_peyers_wort_bc` would still pass if the
+    rule fired unconditionally (D-236's Arm F).
+
+    The consequence is stated as well as the mechanism: a stated pool is NOT re-solved, so its
+    members really do carry worts away from Peyer's 1.18 — and that is correct, because the
+    scenario asked for a wort Peyer did not measure.
+    """
+    compiled, ens = _beer_ensemble({"peptide_buffer_gpl": TYRELL_NAMED_PEPTIDE_GPL})
+    peptide = ens.schema.slice("peptide_buffer")
+    target = compiled.parameters["wort_buffering_capacity_peyer"].value
+    molar_mass = acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
+
+    seeds = [float(ens.members[i][peptide, 0][0]) for i in range(ens.n_succeeded)]
+    assert seeds == [TYRELL_NAMED_PEPTIDE_GPL] * len(seeds), (
+        "the per-member builder overwrote `peptide_buffer_gpl` with a back-solved capacity — "
+        "D-24's exclusion (scenario inputs are never sampled) is breached"
+    )
+    drawn = [float(ens.member_params[i]["pKa_peptide_buffer"]) for i in range(ens.n_succeeded)]
+    assert len(set(drawn)) == len(drawn), "the draw produced no spread; the arm is vacuous"
+
+    # The positive control the "not re-solved" claim owes: at a stated pool the members' worts
+    # genuinely do leave Peyer's target, which is what makes the assertion above a real branch
+    # rather than a wort that happens to sit at 1.18 anyway.
+    off = []
+    for i in range(ens.n_succeeded):
+        totals = acidbase._totals_molar(ens.members[i][:, 0], ens.schema)
+        totals["peptide_buffer"] = seeds[i] / molar_mass
+        off.append(
+            abs(
+                acidbase.peyer_fast_bc(totals, acidbase.build_pka_map(ens.member_params[i]))
+                - target
+            )
+        )
+    assert max(off) > 1e-3, (
+        "a stated peptide pool still lands on Peyer's BC for every member, so this arm cannot "
+        "tell a skipped rule from a fired one"
     )
 
 
@@ -1743,6 +1946,15 @@ def test_no_process_touches_the_peptide_buffer_pool():
 
     The pool being real state is exactly what makes this reachable — expressible is not buildable,
     which is D-205's lesson arriving from the other direction.
+
+    **Since D-238 something else writes this slot, and it is not a Process.**
+    ``CompiledScenario.y0_for_member``'s rule 3 re-solves the capacity per ensemble member and
+    seeds it BEFORE the cation anchor reads it — which is the pre-anchor seam this docstring
+    already names as the right place, reached from the parameter side rather than the scenario
+    key. It is not a counter-example to anything here: it moves the pool where the charge balance
+    still sees it, so no member is left with a cation balancing a pool that is gone. The
+    assertion below is unchanged and still means what it says — no *Process* drains this pool
+    mid-ferment.
     """
     beer = get_medium("beer").build_process_set(strict=True)
     touching = sorted(p.name for p in beer.active if "peptide_buffer" in p.touches)

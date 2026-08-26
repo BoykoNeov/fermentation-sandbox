@@ -30,6 +30,13 @@ battery (wine 29, beer 20, wine-with-overrides 30), and 21 of them — the 19 ``
 * ``REPAIRED`` — the 19 ``pKa_*`` plus ``nitrogen_uptake_charge_<medium>`` in their *t=0 anchor*
   role. ``CompiledScenario.reanchor_for_member`` re-solves the cation slot per member (D-233):
   t=0 spread 2.03e-11 pH.
+* ``REPAIRED`` — ``pKa_peptide_buffer`` in its **third** compile role (D-238), the one D-233 named
+  and declined: it is the pKa the beer peptide capacity was back-solved at OFFLINE, so a member
+  carried a wort at BC 1.1161-1.180 rather than the 1.18 the constant exists to reproduce.
+  ``y0_for_member``'s rule 3 re-roots the capacity on the member's own map and seeds it before the
+  anchor reads it. The cost is the mirror image of the anchor role's and the pair is worth reading
+  together: the anchor half is 100 % artefact at t=0 and washes out, this half is **exactly zero**
+  at t=0 (the cation back-solve absorbs it) and grows to 0.0095 pH by day 14, converged.
 * ``REPAIRED`` — the same 19 ``pKa_*`` in their *second* compile role, ``_verb_set_ph``. Its event
   closed over the compile-time resolved map until D-235 widened ``StateMutation`` to hand every
   mutation the **running** map; members landed up to 0.07896 pH from the target they asked for and
