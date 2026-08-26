@@ -31,11 +31,11 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-26)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-238** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1909 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-239** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1915 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
-Beer acid-base = **EIGHT** beats BUILT (D-178→D-183, D-207→D-209, D-211), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms.
+Beer acid-base = **NINE** beats BUILT (D-178→D-183, D-207→D-209, D-211, **D-239**), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms. **D-239 BUILT D-209 §8's buffer-removal half and its day-7 cost puts the high `z̄` edge OUTSIDE Tyrell's envelope ON PURPOSE — never xfail that edge.**
 **D-232 REFUSED BOTH ways of deciding D-230's residue** (a settling profile that flips SIGN across `mu_max`'s band; a pH clock that only re-measures a known +0.162 day-1 miss) and **ADDED a third branch** — it widened the ambiguity, never narrowed it.
 **D-213 BUILT beer's wort O₂ — sourced and INERT**, and its decline of the O₂→growth coupling rested on "none of the six predictions is reachable in the default set": **growth EXTENT now is** (D-230 §7). Owner's call to re-open, never a beat's.
 **D-234 RAN D-233's census (32 names) and found the repo in a state D-186's own docstring FORBADE**; the owner called BOTH repairs and they SHIPPED — **D-235** (mutations get the RUNNING param map, so `set_ph` re-anchors per member: 0.07896 → 1.98e-11; it also exposed `add_dap` reading z̄ off the compile map, 0.0108 pH, repaired too) and **D-236** (`y0_for_member` re-seeds `copper` per member: 16.65 % browning spread → bit-identical, CONDITIONAL on the scenario not naming `copper_gpl`). **The census has NO LIVE row left.**
@@ -354,6 +354,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   banded **50×**, seeds a live pool, and NO Process declares it — the sampler can never draw it.
   PINNED, not repaired; the census it implies (banded + compile-read + undeclared) is NOT run.
   → `.claude/memory/prohibitions/compile-sampled-census.md`
+- **The wort's free amino-acid buffering (D-239)** — **BUILT: D-209 §8's buffer-removal half is
+  no longer open.** Three Asp/Glu/His SIDE CHAINS at Peyer's printed pKas, read off `N` (no slot,
+  no Process, nothing on the nitrogen ledger). Charge is a **RE-PARTITION**: `z̄` 0.1772 →
+  **0.23418** (width unchanged), halves cancel at wort pH to **0.1772 exactly**; lump **1.54807 →
+  1.43506**, wort still 1.18. Cost **0 at t=0, +0.0023 day 1** (pool 70 % present — **CORRECTS
+  D-209 §8's same-sign claim**), **−0.0202 day 7** ⇒ high `z̄` edge **0.0203 BELOW** Tyrell's
+  floor, deliberately. **Day-1 miss now has NO named candidate.** Wine untouched, MEASURED 0.73 %.
+  → `.claude/memory/prohibitions/wort-amino-acid-buffering.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
