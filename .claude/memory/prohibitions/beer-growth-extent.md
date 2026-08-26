@@ -102,6 +102,14 @@ The owner authorised **measuring which branch the evidence favours**, explicitly
   headline **1.32-4.03×** across the regression's own credible regions; **1.45-1.73×** on the wrong
   (total-cell) convention. **The sign survives every band — nothing reaches 1.0.** But the Coleman
   side is **THIS REPO's fit**, so never call it two independent trials.
+* **D-219's 28-50 pg band UNDERSTATES ITSELF, and its "not near misses" line is WRONG.** The band
+  sweeps `biomass_N_fraction` (0.08-0.14) but holds `Y_X/N` at a POINT ESTIMATE — and that number is
+  this repo's fit, whose printed credible regions move it **6.52-15.38 g/g**. Propagating both gives
+  **18.6-76.7 pg**. **D-219's exclusion SURVIVES** (18 below, 100 above), so the settlement is
+  stronger than it knew — but **18 pg misses by 0.6 pg, ~3 %**, a near miss, not the "~50 fL lab
+  haploid" gulf that record prices. **Nothing was re-banded**: `SETTLED_BAND_PG` keeps its edges, a
+  guard pins the propagated width beside it. Widening it is D-219's settlement to re-open, not a
+  beat's. **Never cite "not a near miss" about 18 pg again.**
 * **Branch 1 cannot be SIZED, only signed.** Across `biomass_N_fraction`'s own band the demand is
   **58-131 pg**; wort nitrogen moves it 3-6 %. The lowest edge anywhere is **57.8 pg = 1.44×** the
   engine's 40, so it never collapses onto the gram either.

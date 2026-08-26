@@ -271,6 +271,79 @@ def test_both_readings_the_archive_shipped_are_outside_the_settled_band():
         )
 
 
+def test_the_settled_band_propagates_only_one_of_its_two_uncertain_inputs():
+    """D-232: the band above varies `f_N` and holds the OTHER input at a point estimate.
+
+    ``_elemental_pg_per_cell`` has two uncertain inputs, not one. The test above sweeps
+    ``biomass_N_fraction`` across its printed 0.08-0.14 and takes ``Y_X/N`` at
+    ``exp(a0 + a1·N)`` — a single number. But ``a0`` and ``a1`` are **this repo's fitted
+    regression** (D-13/D-14, with a published-typo correction to the slope exponent), and
+    they carry their own printed 5-95 % credible regions. Across those, ``Y_X/N`` at 330 mg
+    N/L runs **6.52-15.38 g/g** — a factor of 2.4 — and the band runs **18.6-76.7 pg**, not
+    28.4-49.7.
+
+    **D-219's conclusion SURVIVES this and is strengthened by it**: both retired readings
+    are still outside even the wider band, so the exclusion never depended on the narrower
+    one. **One of its characterisations does not.** D-219 says the two are *"not near
+    misses"*; against the propagated band the 18 pg reading misses the low edge by 0.6 pg —
+    about 3 % — which is a near miss by any reading, and nothing like the ~50 fL-cell gulf
+    that record describes. The 100 pg reading is still clear by 30 %.
+
+    Nothing is re-banded here. ``SETTLED_BAND_PG`` keeps its meaning and its narrower
+    edges; what this test adds is that the narrowness is a CHOICE of what to propagate, so
+    a later beat asking "is 20 pg admissible?" gets the honest answer instead of the
+    point-estimate one.
+    """
+    import itertools
+
+    from fermentation.parameters import default_data_dir, load_parameters
+
+    resolved = load_parameters(default_data_dir() / "wine_generic.yaml")
+    a0, a1 = resolved["biomass_N_yield_log_intercept"], resolved["biomass_N_yield_log_slope"]
+    spec = _biomass_n_fraction_spec()
+
+    def pg_at(a0v: float, a1v: float, fn: float) -> float:
+        y_x_n = math.exp(a0v + a1v * 330.0)
+        return (1.0 / fn) / (y_x_n / (40.0 * 1e-12)) * 1e12
+
+    propagated = [
+        pg_at(x, y, f)
+        for x, y, f in itertools.product(
+            (a0.uncertainty.low, a0.value, a0.uncertainty.high),
+            (a1.uncertainty.low, a1.value, a1.uncertainty.high),
+            (spec.uncertainty.low, spec.value, spec.uncertainty.high),
+        )
+    ]
+    lo, hi = min(propagated), max(propagated)
+    assert (lo, hi) == pytest.approx((18.6, 76.7), abs=0.5), (
+        f"propagating the regression's own credible regions gives {lo:.1f}-{hi:.1f} pg; "
+        "D-232 measured 18.6-76.7. This is the honest width of the elemental route"
+    )
+    assert hi / lo > 3.0 * (SETTLED_BAND_PG[1] / SETTLED_BAND_PG[0]) / 2.0, (
+        f"the propagated band ({hi / lo:.2f}x wide) has stopped being much wider than the "
+        f"shipped one ({SETTLED_BAND_PG[1] / SETTLED_BAND_PG[0]:.2f}x). If the regression's "
+        "credible regions have narrowed, D-219's band is no longer understating itself"
+    )
+
+    # D-219's exclusion holds on the WIDER band — that is what makes it robust, and it is
+    # asserted here so a future widening cannot quietly re-admit a retired reading.
+    for label, retired in RETIRED_READINGS_PG.items():
+        assert not (lo <= retired <= hi), (
+            f"the retired reading '{label}' ({retired} pg/cell) is inside the PROPAGATED "
+            f"band [{lo:.1f}, {hi:.1f}]. D-219's settlement survived D-232 only because "
+            "both readings stayed out of the wider band too; if one is back in, that "
+            "settlement re-opens on its own terms"
+        )
+    # ...but the 18 pg reading is a NEAR MISS against it, which D-219 explicitly denies.
+    near = RETIRED_READINGS_PG["unsourced wine-benchmark assertion"]
+    assert (lo - near) / lo < 0.05, (
+        f"the 18 pg reading now misses the propagated low edge {lo:.1f} by "
+        f"{(lo - near) / lo * 100:.1f} %; D-232 measured ~3 % and corrected D-219's "
+        "'neither is a near miss' on exactly this. A large gap here means the regression "
+        "moved and the correction should be restated"
+    )
+
+
 def test_the_published_pitches_convert_to_the_recorded_values():
     """Every counted pitch in the repo, through one conversion (D-219).
 
