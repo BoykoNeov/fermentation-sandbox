@@ -191,6 +191,14 @@ TYRELL_CELL_COUNT = {
 }
 TYRELL_PITCH_CELLS = 9.96
 TYRELL_PEAK_DAY = 3
+
+#: The wort nitrogen Tyrell's trial is modelled at, mg N/L. **An ASSUMPTION** - the paper prints
+#: none (the wort is a dilution of Bavarian Pilsener malt extract and the strains' amino-acid
+#: profile is "data not shown"). Named rather than left as a literal at D-230, so the guard that
+#: scores it against a sourced malt-wort composition reads the same object the run does. The
+#: aroma calibration frame in ``test_kinetics_byproducts`` assumes the same 200 for the same
+#: reason; D-230 checked the assumption and did NOT move it, in either frame.
+TYRELL_ASSUMED_YAN_MGL = 200.0
 TYRELL_CELL_SUGAR_GPL = 82.2388545
 
 
@@ -219,7 +227,7 @@ def _tyrell_beer_growth(
                 "glucose_gpl": 0.15 * TYRELL_CELL_SUGAR_GPL,
                 "maltose_gpl": 0.70 * TYRELL_CELL_SUGAR_GPL,
                 "maltotriose_gpl": 0.15 * TYRELL_CELL_SUGAR_GPL,
-                "yan_mgl": 200.0,
+                "yan_mgl": TYRELL_ASSUMED_YAN_MGL,
                 # Tyrell's OWN counted pitch (D-222). It was a flat 1.0 g/L — 2.51x the
                 # biomass Tyrell pitched — until D-222 converted the paper's count through
                 # the settled 40 pg/cell. `mu_max` is fitted ON this curve, so the fit frame
@@ -360,10 +368,16 @@ def test_the_measured_multiplication_is_not_reproduced_and_that_is_a_separate_de
     **What it would take, stated as a quantity rather than a mood.** Tyrell's counted growth is
     (29.06-34.69) - 9.96 = 19.1-24.7 x10^6 cells/mL, i.e. 0.76-0.99 g/L at the settled 40 pg,
     so at this file's ``biomass_N_fraction`` only 87-113 mg/L of nitrogen reached suspended
-    biomass — against the 200 mg/L the scenario assumes. Tyrell prints no FAN (the wort is a
-    dilution of Bavarian Pilsener malt extract; the strains' amino-acid profile is "data not
-    shown"), so nothing sources a repair, and the model's own assumption that one lumped pool
-    goes wholly into suspended biomass is the other candidate. Not entered at D-222.
+    biomass — against the 200 mg/L the scenario assumes.
+
+    **D-230 SETTLES WHICH CANDIDATE THAT IS, and it is neither of the two D-222 named.** Tyrell
+    still prints no FAN, but the repo already carries a sourced 10-12 degP malt-wort composition
+    (Peyer 2017, the source ``nitrogen_uptake_charge_beer`` is derived from) and it puts a malt
+    wort's ASSIMILABLE nitrogen at 189-194 mg N/L. The assumed 200 is 3-6 % above that envelope,
+    not 1.55x, so the nitrogen assumption cannot carry the gap and was NOT moved. The partition
+    candidate is refused by arithmetic rather than by sourcing: see the two tests below, which
+    show a nitrogen-budget repair would need cell nitrogen at 20-26 % of dry weight. The residue
+    is a frame ambiguity with both branches priced, not a defect in this Process.
     """
     _, _, x, _ = _tyrell_beer_growth()
     model_fold = float(x.max() / x[0])
@@ -404,4 +418,191 @@ def test_no_growth_rate_in_the_band_can_repair_the_extent(tmp_path):
         f"the fold moves {abs(folds[1] - folds[0]):.3f} across the whole band ({folds[0]:.3f} "
         f"to {folds[1]:.3f}); D-222 measured 0.010. A rate that moves the extent means growth "
         "is no longer nitrogen-limited"
+    )
+
+
+def test_the_assumed_wort_nitrogen_is_inside_a_sourced_malt_worts_envelope():
+    """D-222's FIRST extent candidate, scored and CLOSED (D-230).
+
+    ``yan_mgl = 200`` has been the beer scenarios' wort nitrogen since D-178 and had never been
+    checked against anything — Tyrell prints no FAN, and "nothing sources a repair" is what the
+    test above said for eight records. That was true about *Tyrell's* wort and false about *a*
+    wort: this repo transcribed a 10-12 degP malt wort's full free-amino-acid composition at
+    D-209 to derive ``nitrogen_uptake_charge_beer``, and the same table sizes the pool that
+    parameter is a charge per mole OF. Nobody had summed it.
+
+    **Why the sum is the assimilable pool with no correction owed.** Peyer's Table 16 has 18
+    amino acids and proline is not one of them, which is exactly the right scope: proline is
+    Jones & Pierce Group D, brewing yeast does not assimilate it, and the ``N`` slot is
+    assimilable nitrogen by definition. A FAN figure would have needed a proline subtraction and
+    this does not — that was the fork this test was written to resolve, because a FAN number
+    sitting in an assimilable-N slot would have been a real scope error worth perhaps 20-30 %.
+
+    **The verdict is that the assumption is sound, so nothing moves.** 200 sits 3.1-5.8 % above
+    the sourced envelope. Moving it would re-anchor all eight beer aroma constants (their
+    synthesis integral IS ``YAN / biomass_N_fraction``, D-226/D-228), ``Y_acetic_biomass_beer``
+    (whose denominator is literally the biomass this wort's nitrogen builds), and the pH course
+    (the ``N`` slot is the charge-balance cation seed) — to swap one wort's assumption for a
+    DIFFERENT wort's measurement. ``acidbase.yaml`` already records Peyer's wort as "a DIFFERENT
+    wort from Tyrell 2013's ... an accepted deviation, stated not tuned", and that is the right
+    call here too. **Do not re-propose this as a free win.**
+
+    **And the cascade is FIVE-way, not four — measured, and it was NOT predicted.** D-230's
+    falsification arm A set this constant to the 113 mg/L that would land Tyrell's counts and
+    pre-registered four REDs; it produced eight. The four unpredicted ones are every rate and
+    timing test in this file (``test_beer_growth_rate_matches_tyrells_measured_cell_counts``,
+    ``test_both_mu_max_band_edges_stay_inside_the_measured_spread``,
+    ``test_the_retired_growth_rate_is_ruled_out_by_the_counts``,
+    ``test_no_growth_rate_in_the_band_can_repair_the_extent``). The reason is structural: the
+    growth fraction ``mu_max`` is fitted on is normalised on the peak, and the peak IS the
+    nitrogen-limited ceiling, so wort nitrogen is not separable from the rate fit. Moving this
+    constant re-opens D-222's refit as well — **the wort-nitrogen candidate was never an
+    isolable knob**, which the arm establishes and the prediction missed.
+    """
+    from tests.conftest import (
+        PEYER_WORT_AMMONIUM_MG_N_PER_L,
+        peyer_wort_assimilable_nitrogen_mg_per_l,
+    )
+
+    low, high = peyer_wort_assimilable_nitrogen_mg_per_l()
+    assert (low, high) == pytest.approx((189.0, 194.0), abs=0.5), (
+        f"the sourced malt-wort envelope is {low:.1f}-{high:.1f} mg N/L; D-230 measured "
+        "189-194. Both edges are the AMMONIUM range alone (Peyer Table 2's printed 25-30) — "
+        "the amino-acid half is one composition column with no band of its own"
+    )
+    # The band is the ammonium row's width and nothing else, so it must be exactly that wide.
+    assert high - low == pytest.approx(
+        PEYER_WORT_AMMONIUM_MG_N_PER_L[1] - PEYER_WORT_AMMONIUM_MG_N_PER_L[0], abs=1e-9
+    )
+
+    excess = TYRELL_ASSUMED_YAN_MGL / high, TYRELL_ASSUMED_YAN_MGL / low
+    assert max(excess) < 1.10, (
+        f"the assumed {TYRELL_ASSUMED_YAN_MGL:.0f} mg N/L is {max(excess):.3f}x a sourced malt "
+        f"wort's assimilable nitrogen ({low:.1f}-{high:.1f}). D-230 measured 1.031-1.058 and "
+        "closed the wort-nitrogen candidate on it; above ~1.10 that closure stops holding and "
+        "the extent overshoot would have a nitrogen component again"
+    )
+    assert min(excess) > 1.0, (
+        "the assumption no longer sits ABOVE the sourced envelope. D-230's closure is that it "
+        "overstates by 3-6 %, which is the WRONG SIGN to be hiding under an extent overshoot "
+        "of 1.55x but the right sign to be honest about"
+    )
+
+
+def test_the_extent_overshoot_cannot_be_a_nitrogen_budget_error():
+    """D-222's SECOND candidate, REFUSED by arithmetic rather than parked (D-230).
+
+    The remaining candidate was "the model books one lumped N pool wholly into suspended
+    biomass". Stated as a partition fraction it is unbuildable — it invents the one constant
+    that sets the curve it would be fitted against, D-213 section 7's refusal. But it does not
+    need to be built to be scored, because the growth law is an identity: ``dX = YAN / f_N``,
+    with both inputs sourced. Invert it against Tyrell's counted crop and it prices ITSELF.
+
+    **At the settled 40 pg/cell, Tyrell's cells would have to be 20-26 % nitrogen by dry
+    weight.** Real yeast is 7-12 % and this engine's own ``biomass_N_fraction`` band tops out at
+    14 %. So no admissible partition of the nitrogen budget reproduces the counted crop: the
+    overshoot is not a nitrogen error, and a term draining nitrogen away from suspended biomass
+    would have to drain about half of it to a destination nothing in the corpus names.
+
+    The comparison is a RELATION to the shipped ``biomass_N_fraction`` and its band, not a
+    hardcoded 0.14, so a later change to that parameter moves this guard instead of silently
+    contradicting it (D-228's idiom for the pitch frame).
+    """
+    f_n = load_parameters(default_data_dir() / "beer_generic.yaml")["biomass_N_fraction"]
+    pitch_gpl = cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS * 1e6)
+    per_cell_g = pitch_gpl / (TYRELL_PITCH_CELLS * 1e6 * 1e3)  # the engine's gram, D-219
+
+    yan_gpl = TYRELL_ASSUMED_YAN_MGL / 1000.0
+    implied = []
+    for peak in TYRELL_CELL_COUNT[TYRELL_PEAK_DAY]:
+        counted_new_per_l = (peak - TYRELL_PITCH_CELLS) * 1e6 * 1e3
+        dx_counted = counted_new_per_l * per_cell_g  # g/L of new biomass, at the engine's gram
+        implied.append(yan_gpl / dx_counted)  # g N per g cell this would demand
+
+    assert min(implied) > f_n.uncertainty.high, (
+        f"reproducing Tyrell's counted crop at the engine's own per-cell mass demands cell "
+        f"nitrogen of {min(implied):.3f}-{max(implied):.3f} g N/g, and the shipped band's high "
+        f"edge is {f_n.uncertainty.high}. If this passes no longer, a nitrogen-budget repair "
+        "has become admissible and D-230's refusal of the partition candidate re-opens"
+    )
+    assert (min(implied), max(implied)) == pytest.approx((0.202, 0.262), abs=0.005), (
+        f"D-230 measured 0.202-0.262 g N/g cell; this run gives {min(implied):.3f}-"
+        f"{max(implied):.3f}. Both edges are Tyrell's peak-day strain spread at one assumed YAN"
+    )
+    assert min(implied) / f_n.value > 1.7, (
+        "the demanded nitrogen fraction is within 1.7x of the shipped one. D-230's refusal "
+        "rests on the demand being physically impossible (real yeast 7-12 % N), not merely high"
+    )
+
+
+def test_the_extent_residue_is_a_two_way_frame_ambiguity_and_both_branches_are_priced():
+    """What is LEFT once both nitrogen candidates are closed — and it is not one thing (D-230).
+
+    With ``YAN`` sourced and ``f_N`` pinned by chemistry, the only free quantity in
+    ``fold = (X0 + YAN/f_N) / X0`` is the count-to-gram conversion, and it enters twice: once
+    in ``X0`` and once in reading Tyrell's crop. Two DIFFERENT readings close the gap and this
+    beat cannot separate them, so both are pinned rather than one being chosen:
+
+    * **Tyrell's cells are heavier than the engine's gram** — the sourced nitrogen budget
+      demands 71-92 pg per counted new cell against the settled 40 (1.8-2.3x). Suggestive
+      rather than decisive: it is an INDEPENDENT third estimate (Peyer's wort nitrogen times the
+      Roels elemental fraction against Tyrell's own counts, with no Coleman input), and it lands
+      near the ~100 pg D-219 retired as a back-computed residual. That agreement is not evidence
+      the residual was right — it is a reason not to call this branch settled either.
+    * **Or 44-56 % of the crop had already left suspension at the day-3 peak**, so the counted
+      peak is not the cells made. No cell-mass change needed at all. This is consistent with
+      Tyrell's OWN next reading: their counts fall 22-45 % over the single following day
+      (``TYRELL_CELL_COUNT[4]``), a settling rate fast enough to have removed about half the
+      crop by day 3 if it began, as flocculation does, when the sugar ran down. That 22-45 % is
+      an ENVELOPE-EDGE fall (day 4's low edge against day 3's low edge, high against high), not
+      a per-strain one — Tyrell's figure does not identify which strain holds which edge on
+      which day, so it bounds the fall rather than measuring one strain's.
+
+    **Neither branch is built here.** The first would move ``cells_per_ml_to_pitch_gpl``, which
+    D-219 settled as the DEFINITION of this engine's biomass gram, on an inference rather than
+    on the count-plus-weighing that record says is what would settle it. The second is the
+    missing settling Process, whose rate this corpus does not print — the five beer texts
+    describe flocculation only qualitatively (trigger and strain-dependence, no constant).
+
+    What this test protects is the AMBIGUITY: a later beat that closes the extent gap must say
+    which branch it closed, because a repair that lands the fold without naming one has assumed
+    the other away.
+    """
+    f_n = load_parameters(default_data_dir() / "beer_generic.yaml")["biomass_N_fraction"].value
+    pitch_gpl = cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS * 1e6)
+    per_cell_g = pitch_gpl / (TYRELL_PITCH_CELLS * 1e6 * 1e3)
+    dx_gpl = (TYRELL_ASSUMED_YAN_MGL / 1000.0) / f_n  # what the nitrogen builds, in grams
+
+    counted_new = [
+        (peak - TYRELL_PITCH_CELLS) * 1e6 * 1e3 for peak in TYRELL_CELL_COUNT[TYRELL_PEAK_DAY]
+    ]
+    per_cell_demanded = sorted(dx_gpl / n * 1e12 for n in counted_new)  # pg
+    assert per_cell_demanded == pytest.approx([70.9, 91.9], abs=1.0), (
+        f"branch 1: the sourced nitrogen budget demands {per_cell_demanded[0]:.1f}-"
+        f"{per_cell_demanded[1]:.1f} pg per counted new cell; D-230 measured 70.9-91.9"
+    )
+    assert per_cell_demanded[0] / (per_cell_g * 1e12) > 1.5, (
+        "branch 1 has collapsed onto the engine's own gram, which would mean the extent gap is "
+        "gone. If a repair did that, D-230's ambiguity is resolved and this test should say how"
+    )
+
+    made = dx_gpl / per_cell_g  # cells/L the nitrogen builds AT the engine's gram
+    settled_share = sorted(1.0 - n / made for n in counted_new)
+    assert settled_share == pytest.approx([0.436, 0.565], abs=0.01), (
+        f"branch 2: closing the gap by settling alone needs {settled_share[0] * 100:.1f}-"
+        f"{settled_share[1] * 100:.1f} % of the crop already out of suspension at the peak; "
+        "D-230 measured 43.6-56.5 %"
+    )
+    # The consistency check that makes branch 2 a live alternative rather than an escape hatch:
+    # Tyrell's own day-3 -> day-4 fall must be of the same order as the share branch 2 needs.
+    day3, day4 = TYRELL_CELL_COUNT[3], TYRELL_CELL_COUNT[4]
+    one_day_fall = sorted((hi - lo) / hi for hi, lo in zip(day3, day4, strict=True))
+    assert one_day_fall == pytest.approx([0.224, 0.451], abs=0.01), (
+        f"Tyrell's measured one-day settling fall is {one_day_fall[0] * 100:.1f}-"
+        f"{one_day_fall[1] * 100:.1f} %; D-230 read 22.4-45.1 % off TYRELL_CELL_COUNT[4]"
+    )
+    assert max(one_day_fall) > min(settled_share) * 0.5, (
+        "the measured one-day fall is far too slow to have removed branch 2's share by day 3, "
+        "which would make the settling branch untenable and leave the cell-mass branch alone. "
+        "D-230's two-way ambiguity would then be a one-way finding"
     )

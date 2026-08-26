@@ -316,8 +316,16 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   invariant **6e-7** so no re-anchor, and the ONLY guard that can see it is the growth WINDOW
   (0.785→1.199 d). **D-226 §8 / D-227 §10's "still the thing that would fix the taper" is CORRECTED.**
   On Tyrell's counts the model is INSIDE the spread days 1-3 and peaks day 3 **when sampled DAILY**.
-  Taper stays REFUSED (no ester course); **1.55× extent overshoot stays D-222's** — the MEBAK count
-  can't settle it (X+X_dead 5.404 vs X 5.378). → `prohibitions/beer-growth-cutoff.md`
+  Taper stays REFUSED (no ester course); the **1.55× extent overshoot is CLOSED as a nitrogen
+  question at D-230** — see the next block. → `prohibitions/beer-growth-cutoff.md`
+- **Beer's growth EXTENT overshoot (D-230)** — **NOT a nitrogen error; both D-222 candidates CLOSED.**
+  Peyer T16 (transcribed at D-209 for its RATIOS) sums to **164 mg N/L + 25-30 NH4 = 189-194**, so the
+  assumed **200 is 1.03-1.06×** — and T16 has **no proline**, so NO FAN→YAN fix is owed. Partition
+  REFUSED by arithmetic: Tyrell's crop at 40 pg needs **20-26 % cell N** (band tops 0.14). `yan_mgl`
+  is **NOT isolable** — arm A predicted 4 REDs, got 8; the peak IS the ceiling `mu_max` normalises on.
+  Residue is a **TWO-WAY frame ambiguity**: cells **71-92 pg** OR **44-56 % already settled** at peak;
+  a beat closing it MUST say which. **No `Flags:` on D-219** (prose only). **Never** harmonise beer
+  onto Coleman's Y_X/N (→ ~9×). → `prohibitions/beer-growth-extent.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

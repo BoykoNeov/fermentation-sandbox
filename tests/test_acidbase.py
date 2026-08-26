@@ -31,6 +31,12 @@ from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.validation import assert_conserved, total_carbon
+from tests.conftest import (
+    AMINO_ACID_CHEMISTRY,
+    PEYER_WORT_AMINO_ACIDS_MGL,
+    PEYER_WORT_AMMONIUM_MG_N_PER_L,
+    PEYER_WORT_DILUTION,
+)
 
 #: Potassium molar mass [g/mol] — used only to state test 6's expected cation range
 #: from first principles (K⁺ 1–2 g/L is the physical wine range), NOT read by the solver.
@@ -624,60 +630,14 @@ def test_a_wine_moves_but_barely_and_the_geometry_is_why(params, pka):
 # the opt-in gate, and — the one that matters most — the DERIVATION, so the provenance in
 # ``acidbase.yaml`` is executable rather than merely written down.
 
-#: Peyer 2017 Table 16 control column, mg/L, the 18 free amino acids of a malt wort. Transcribed
-#: here so ``nitrogen_uptake_charge_beer`` can be re-derived from its own cited source rather than
-#: trusted as a literal [[feedback-transcribe-tables-not-prose]]. Proline is absent from that
-#: table, which is exactly right: it is Jones & Pierce Group D and brewing yeast does not
-#: assimilate it, so the ``N`` pool (assimilable nitrogen by definition) excludes it.
-_PEYER_WORT_AMINO_ACIDS_MGL = {
-    "alanine": 36.9,
-    "arginine": 47.6,
-    "asparagine": 32.0,
-    "aspartic": 27.5,
-    "glutamic": 22.2,
-    "glutamine": 41.5,
-    "glycine": 11.3,
-    "histidine": 22.0,
-    "isoleucine": 23.4,
-    "leucine": 50.7,
-    "lysine": 30.2,
-    "methionine": 10.2,
-    "phenylalanine": 41.7,
-    "serine": 23.6,
-    "threonine": 20.1,
-    "tryptophan": 14.0,
-    "tyrosine": 30.8,
-    "valine": 42.3,
-}
-#: ``(molar mass, nitrogen atoms, pKa_COOH, pKa_NH3, (side-chain pKa, sign) | None)``.
-#: The nitrogen COUNT is the load-bearing column: ``zbar``'s denominator is ELEMENTAL nitrogen
-#: because that is what the ``N`` slot holds, so arginine's +1 spreads over FOUR nitrogens and
-#: contributes +0.25 per mole N. Getting that convention backwards inflates the cationic half
-#: roughly fourfold, which is why it is asserted separately below.
-_AMINO_ACID_CHEMISTRY = {
-    "alanine": (89.09, 1, 2.34, 9.69, None),
-    "arginine": (174.20, 4, 2.17, 9.04, (12.48, +1)),
-    "asparagine": (132.12, 2, 2.02, 8.80, None),
-    "aspartic": (133.10, 1, 1.99, 9.90, (3.90, -1)),
-    "glutamic": (147.13, 1, 2.10, 9.47, (4.07, -1)),
-    "glutamine": (146.15, 2, 2.17, 9.13, None),
-    "glycine": (75.07, 1, 2.34, 9.60, None),
-    "histidine": (155.16, 3, 1.82, 9.17, (6.04, +1)),
-    "isoleucine": (131.17, 1, 2.36, 9.68, None),
-    "leucine": (131.17, 1, 2.36, 9.60, None),
-    "lysine": (146.19, 2, 2.18, 8.95, (10.53, +1)),
-    "methionine": (149.21, 1, 2.28, 9.21, None),
-    "phenylalanine": (165.19, 1, 1.83, 9.13, None),
-    "serine": (105.09, 1, 2.21, 9.15, None),
-    "threonine": (119.12, 1, 2.09, 9.10, None),
-    "tryptophan": (204.23, 2, 2.83, 9.39, None),
-    "tyrosine": (181.19, 1, 2.20, 9.11, (10.07, -1)),
-    "valine": (117.15, 1, 2.32, 9.62, None),
-}
+#: Peyer's wort composition and the amino-acid chemistry table MOVED to ``tests/conftest``
+#: at D-230, when growth's extent audit became a second consumer of the same transcription.
+#: The charge machinery below stays here — it is this module's use of a shared table, not a
+#: shared use. What the move must NOT change is the arginine convention the tests below
+#: assert: the denominator is ELEMENTAL nitrogen, and the shared table's nitrogen COUNT
+#: column is what carries it.
 _WORT_PH = 5.65
 _NH4_PKA = 9.25
-_PEYER_WORT_AMMONIUM_MG_N_PER_L = (25.0, 30.0)  # Peyer Table 2, read as mg N/L
-_PEYER_DILUTION = 2.0  # Table 16's wort is CW0.5, diluted 50:50 with water
 
 
 def _fraction_protonated(ph: float, pka: float) -> float:
@@ -685,7 +645,7 @@ def _fraction_protonated(ph: float, pka: float) -> float:
 
 
 def _amino_acid_charge(ph: float, name: str) -> float:
-    _, _, pka_cooh, pka_nh3, side = _AMINO_ACID_CHEMISTRY[name]
+    _, _, pka_cooh, pka_nh3, side = AMINO_ACID_CHEMISTRY[name]
     charge = -(1.0 - _fraction_protonated(ph, pka_cooh))  # alpha-COOH: -1 once deprotonated
     charge += _fraction_protonated(ph, pka_nh3)  # alpha-NH3+: +1 while protonated
     if side is not None:
@@ -700,9 +660,9 @@ def _amino_acid_charge(ph: float, name: str) -> float:
 def _wort_amino_acid_pool(ph: float) -> tuple[float, float]:
     """``(mmol elemental N, mmol charge)`` per litre of FULL-STRENGTH Peyer wort."""
     nitrogen = charge = 0.0
-    for name, mgl in _PEYER_WORT_AMINO_ACIDS_MGL.items():
-        molar_mass, n_atoms = _AMINO_ACID_CHEMISTRY[name][0], _AMINO_ACID_CHEMISTRY[name][1]
-        mmol = mgl / molar_mass * _PEYER_DILUTION
+    for name, mgl in PEYER_WORT_AMINO_ACIDS_MGL.items():
+        molar_mass, n_atoms = AMINO_ACID_CHEMISTRY[name][0], AMINO_ACID_CHEMISTRY[name][1]
+        mmol = mgl / molar_mass * PEYER_WORT_DILUTION
         nitrogen += mmol * n_atoms
         charge += mmol * _amino_acid_charge(ph, name)
     return nitrogen, charge
@@ -730,7 +690,7 @@ def test_the_beer_nitrogen_charge_is_reproduced_from_its_cited_composition(beer_
 
     param = beer_params["nitrogen_uptake_charge_beer"]
     edges = []
-    for ammonium_mg_n in _PEYER_WORT_AMMONIUM_MG_N_PER_L:
+    for ammonium_mg_n in PEYER_WORT_AMMONIUM_MG_N_PER_L:
         n_ammonium = ammonium_mg_n / M_NITROGEN
         total_n = nitrogen + n_ammonium
         total_charge = charge + n_ammonium * _fraction_protonated(_WORT_PH, _NH4_PKA)
@@ -762,7 +722,7 @@ def test_arginine_carries_four_nitrogens_per_unit_charge():
     Named separately from the derivation above because a reader changing the denominator would
     otherwise see only a band-edge mismatch, with nothing saying which convention is right.
     """
-    molar_mass, n_atoms = _AMINO_ACID_CHEMISTRY["arginine"][:2]
+    molar_mass, n_atoms = AMINO_ACID_CHEMISTRY["arginine"][:2]
     assert n_atoms == 4
     charge = _amino_acid_charge(_WORT_PH, "arginine")
     assert charge == pytest.approx(1.0, abs=0.01), "arginine is +1 at wort pH (guanidinium 12.48)"
