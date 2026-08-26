@@ -695,11 +695,65 @@ def test_the_beer_nitrogen_charge_is_reproduced_from_its_cited_composition(beer_
         total_n = nitrogen + n_ammonium
         total_charge = charge + n_ammonium * _fraction_protonated(_WORT_PH, _NH4_PKA)
         edges.append(total_charge / total_n)
-    assert min(edges) == pytest.approx(param.uncertainty.low, abs=5e-4)
-    assert max(edges) == pytest.approx(param.uncertainty.high, abs=5e-4)
-    assert param.value == pytest.approx(sum(edges) / 2.0, abs=5e-4), (
-        "the nominal must be the derivation's own midpoint, not a fitted value"
+
+    # D-239: the shipped parameter is no longer this pool's NET charge. Three side chains were
+    # split out into the charge balance itself, so what stays here is the net PLUS their
+    # dissociation at the wort pH — and the sum of the two halves has to come back to the net,
+    # which is the identity the whole decomposition rests on.
+    values = beer_params.resolve()
+    h_wort = 10.0 ** (-_WORT_PH)
+    adjustment = sum(
+        values[acidbase.AMINO_BUFFER_RATIO_PARAMS[species]]
+        * acidbase.mean_charge(h_wort, tuple(values[n] for n in spec.pka_param_names))
+        for species, spec in acidbase.AMINO_BUFFER_SPECS.items()
     )
+    assert min(edges) + adjustment == pytest.approx(param.uncertainty.low, abs=5e-4)
+    assert max(edges) + adjustment == pytest.approx(param.uncertainty.high, abs=5e-4)
+    assert param.value == pytest.approx(sum(edges) / 2.0 + adjustment, abs=5e-4), (
+        "the nominal must be the derivation's own midpoint plus the D-239 split, not a fitted "
+        "value"
+    )
+    # ...and the NET, which is the quantity comparable across D-209 and D-239 and the one a
+    # later reader will want when they find 0.234 under a name D-209 shipped at 0.177. If this
+    # drifts, the two halves have stopped being one calculation and the pool's charge is being
+    # counted twice (or not at all) somewhere in the balance.
+    assert param.value - adjustment == pytest.approx(0.1772, abs=5e-4), (
+        f"the pool's NET charge at wort pH is {param.value - adjustment:.4f} per mole N; D-209 "
+        "derived 0.1772 and D-239 only re-partitioned it. A move here is a double-count, not a "
+        "re-derivation"
+    )
+    # The band WIDTH is untouched by the split: both edges shift by the same constant, because
+    # the constant is a composition and the band is the ammonium range
+    # [[feedback-a-band-is-per-parameter-a-claim-is-joint]].
+    assert (param.uncertainty.high - param.uncertainty.low) == pytest.approx(
+        0.1880 - 0.1665, abs=1e-9
+    ), (
+        "D-239 re-partitioned the nominal; it must not have widened or narrowed the band. The "
+        "comparison is against D-209's SHIPPED width (0.1880 - 0.1665), not the re-derived one "
+        "above: those literals are the derivation rounded to four places, and rounding is why "
+        "the two differ by 2.2e-5. What must be exact is that both edges moved by the SAME "
+        "constant"
+    )
+
+    # The three ratios, re-derived from the SAME composition — their own provenance guard, and
+    # the reason it belongs in this test rather than beside it: they share a denominator with
+    # the parameter above, so a change to the pool definition has to break both or neither.
+    pool_n = nitrogen + (sum(PEYER_WORT_AMMONIUM_MG_N_PER_L) / 2.0) / M_NITROGEN
+    for species, source_name in (
+        ("aspartate_side_chain", "aspartic"),
+        ("glutamate_side_chain", "glutamic"),
+        ("histidine_side_chain", "histidine"),
+    ):
+        mgl = PEYER_WORT_AMINO_ACIDS_MGL[source_name]
+        expected = (
+            mgl / AMINO_ACID_CHEMISTRY[source_name][0] * PEYER_WORT_DILUTION
+        ) / pool_n
+        shipped = values[acidbase.AMINO_BUFFER_RATIO_PARAMS[species]]
+        assert shipped == pytest.approx(expected, rel=1e-9), (
+            f"{species} ships {shipped:.9f} mol per mole pool N but Peyer's Table 16 gives "
+            f"{expected:.9f}. The ratio and the charge above read ONE composition; they cannot "
+            "be re-derived from different worts"
+        )
 
     # THE NEAR-CANCELLATION, asserted because it is what makes this parameter essentially a
     # measurement of wort AMMONIUM. The cationic amino acids (arginine, lysine, histidine) and
@@ -797,7 +851,7 @@ def test_the_nitrogen_term_is_a_reallocation_so_the_anchor_is_untouched(medium, 
     # The cation SIDE, reconstructed: slot + nitrogen must equal what the acids alone demand.
     slot = float(y0[schema.slice("cation_charge")][0])
     demanded = acidbase.solve_cation_charge(
-        acidbase._totals_molar(y0, schema),
+        acidbase._totals_molar(y0, schema, params),
         acidbase._byp_succinic_molar(y0, schema),
         acidbase.dissolved_co2_molar(y0, schema, params),
         acidbase.build_pka_map(params),

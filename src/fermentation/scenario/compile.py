@@ -452,7 +452,32 @@ class CompiledScenario:
             and "pKa_peptide_buffer" in self.parameters
         ):
             peptide_slot = self.schema.slice("peptide_buffer")
-            nominal_pka = self.parameters["pKa_peptide_buffer"].value
+            # Every parameter the back-solve READS whose value a member can draw. Until D-239
+            # that was the peptide pKa alone; the three amino-buffer ratios and their three
+            # side-chain pKas now enter the same titration, so a skip keyed on the peptide pKa
+            # alone would let a member that drew one of THEM keep a capacity fitted to a
+            # different wort. Measured before it was closed: banding `wort_aspartate_per_n` by
+            # +-5 % and drawing it put eight members' worts at BC 1.1831-1.1883 instead of
+            # Peyer's 1.18, with every seed still at the nominal literal — D-233's own defect,
+            # re-entering through a door D-238 had not needed to lock.
+            #
+            # All six ship PINNED, so this tuple is bit-identical to the old single comparison
+            # today. It is written now because the cost is nothing now and the trap is silent
+            # [[feedback-a-parameter-can-be-pinned-and-drawn]].
+            back_solve_reads = (
+                "pKa_peptide_buffer",
+                *acidbase.AMINO_BUFFER_RATIO_PARAMS.values(),
+                *(
+                    name
+                    for spec in acidbase.AMINO_BUFFER_SPECS.values()
+                    for name in spec.pka_param_names
+                ),
+            )
+            nominal_back_solve = {
+                name: self.parameters[name].value
+                for name in back_solve_reads
+                if name in self.parameters
+            }
             target_bc = self.parameters["wort_buffering_capacity_peyer"].value
             if (
                 float(base[peptide_slot][0])
@@ -465,7 +490,9 @@ class CompiledScenario:
                     # §1's one-ULP disagreement was a looser root, not a floor) — but resting
                     # D-24's byte-for-byte nominal claim on a root-finder's tolerance surviving a
                     # scipy upgrade is not the same as guaranteeing it.
-                    if values["pKa_peptide_buffer"] == nominal_pka:
+                    if all(
+                        values[name] == nominal for name, nominal in nominal_back_solve.items()
+                    ):
                         return
                     # Reads the acid slots off `out` and overwrites only its own; the titration
                     # inverse-solves its own sample cation, so this never reads `cation_charge`
@@ -1088,6 +1115,14 @@ def _beer_cation(
     if "initial_ph" not in values:
         return 0.0
     totals_molar = {slot: gpl / acidbase.BEER_ACIDS[slot].molar_mass for slot, gpl in acids.items()}
+    # The three wort amino-acid side chains that buffer in beer's window (decision D-239). They
+    # hold no slot, so they cannot come from `acids`; they are a reading of the wort's nitrogen,
+    # and they are present at the anchor because a real wort has them. A species present at the
+    # anchor is absorbed into the fitted cation (D-178's phosphate result) — which is exactly
+    # what makes the t=0 pH unchanged while the finished pH moves as the pool is eaten.
+    totals_molar |= acidbase.amino_buffer_from_gpl(
+        mgl_to_gpl(_require(values, "yan_mgl", "beer")), "beer", parameters.resolve()
+    )
     try:
         # Wort nitrogen is on the cation side and present at the anchor, so its charge is
         # subtracted off the fitted slot (decision D-209) — the same correction wine's anchor

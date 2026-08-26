@@ -641,14 +641,14 @@ vant_hoff_co2_solubility:
 # each dose does what a second nitrogen pool would have.
 
 nitrogen_uptake_charge_beer:
-  value: 0.1772
+  value: 0.23418212124814006
   unit: "mol+/mol N"
   tier: plausible
-  uncertainty: { low: 0.1665, high: 0.1880, note: "BOTH EDGES DERIVED, and the band is the wort AMMONIUM range alone (Peyer Table 2's printed 25-30) -- the amino-acid contribution is a single composition column with no band of its own. The amino-acid half is +0.0395 of the nominal 0.1772, so ~78 % of this parameter is its ammonium term and the band is that term's width. A SCOPE ALTERNATIVE, deliberately NOT folded in as extra width: Table 2's column header says only 'mg/L', and reading its ammonia row as NH3 MASS rather than as N gives 20.6-24.7 mg N/L and hence zbar 0.1465-0.1651. The as-N reading is nominal because the same column's free-amino-acid row is demonstrably as-N (see notes), and mixing a units fork into a parameter band would disguise it as measurement error." }
+  uncertainty: { low: 0.22348212124814007, high: 0.24498212124814006, note: "BOTH EDGES DERIVED, and the band is the wort AMMONIUM range alone (Peyer Table 2's printed 25-30) -- the amino-acid contribution is a single composition column with no band of its own. A SCOPE ALTERNATIVE, deliberately NOT folded in as extra width: Table 2's column header says only 'mg/L', and reading its ammonia row as NH3 MASS rather than as N gives 20.6-24.7 mg N/L, which would move this by -0.0307. The as-N reading is nominal because the same column's free-amino-acid row is demonstrably as-N (see notes), and mixing a units fork into a parameter band would disguise it as measurement error. THE BAND WIDTH IS UNCHANGED BY D-239 (0.0215, both edges shifted by the same constant): the split below is a re-partition of the nominal, not new uncertainty." }
   provenance:
     source: "DERIVED. Amino-acid composition: Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), Table 16 control column -- 18 free amino acids in mg/L in a malt wort. Wort ammonium: the same thesis, Table 2 ('Malt wort nutrients (10-12 degP)'), row 'Ammonia 25-30', compiled there from Clapperton 1971, Jancar 1983, Lie 1974 and MEBAK 2011. Assimilated set (proline excluded) on Jones & Pierce's A-D uptake groups via Pelter & Hopkins, The Chemistry of Beer. Mechanism: Ribereau-Gayon, Handbook of Enology Vol 1 sec 2.4.2."
-    conditions: "malt wort at pH 5.65, charge-weighted over the 18 measured free amino acids plus ammonium, per mole of ELEMENTAL nitrogen. Table 16's wort is diluted 50:50 and citrate-buffered, so only its RATIOS are used -- the buffer is citric acid plus trisodium citrate and adds no nitrogen, and 169/78 mg/L FAN for the undiluted vs diluted wort (that thesis's Table 15) confirms the 2x scaling."
-    notes: "UNITS CROSS-CHECK, because Table 2's column is headed only 'mg/L': summing Table 16 as elemental nitrogen and scaling to full strength gives 164 mg N/L, INSIDE Table 2's printed 150-230 free-amino-acid figure, whereas the same amino acids as COMPOUND mass would be ~1037 mg/L, far outside it. So that column reads as mg N/L and the ammonia row two lines below it is read the same way. Composition is a DIFFERENT wort from Tyrell 2013's, which is what the acceptance test scores against -- an accepted deviation, stated not tuned. Per-species arithmetic: arginine +1 over 4 N = +0.25/N; lysine +1 over 2 N = +0.5/N; histidine +0.71 (imidazole pKa 6.04) over 3 N; aspartate and glutamate -1 over 1 N each; asparagine, glutamine and tryptophan are zwitterions with a non-ionisable second nitrogen, so 0. tier=plausible on the tiers.py definition (sound mechanism with literature support, hard to validate quantitatively) -- speculative would drag WINE's ph_tier down from plausible for a term wine's own inputs support just as well, which is the D-179 asymmetry in reverse."
+    conditions: "malt wort, charge-weighted over the 18 measured free amino acids plus ammonium, per mole of ELEMENTAL nitrogen. SINCE D-239 THIS IS NOT THE POOL'S WHOLE CHARGE: the side chains of aspartate, glutamate and histidine are carried by the charge balance itself (wort_aspartate_per_n and its two siblings), so what stays here is everything else PLUS those three counted at their FULLY PROTONATED charge. At the wort's pH 5.65 the two halves cancel term for term and the pool's net charge is 0.1772 per mole N, D-209's own number, EXACTLY -- asserted as a test rather than trusted. Away from 5.65 the net now MOVES, which is the point: 0.1772 at pH 5.65, 0.1877 at 4.86, 0.1988 at 4.30. D-209's scope line measured the real pool at +0.177 rising to +0.188 at pH 4.86 and called the frozen value an understatement; three species of it are no longer frozen. Table 16's wort is diluted 50:50 and citrate-buffered, so only its RATIOS are used -- the buffer is citric acid plus trisodium citrate and adds no nitrogen, and 169/78 mg/L FAN for the undiluted vs diluted wort (that thesis's Table 15) confirms the 2x scaling."
+    notes: "UNITS CROSS-CHECK, because Table 2's column is headed only 'mg/L': summing Table 16 as elemental nitrogen and scaling to full strength gives 164 mg N/L, INSIDE Table 2's printed 150-230 free-amino-acid figure, whereas the same amino acids as COMPOUND mass would be ~1037 mg/L, far outside it. So that column reads as mg N/L and the ammonia row two lines below it is read the same way. Composition is a DIFFERENT wort from Tyrell 2013's, which is what the acceptance test scores against -- an accepted deviation, stated not tuned. Per-species arithmetic: arginine +1 over 4 N = +0.25/N; lysine +1 over 2 N = +0.5/N; histidine +0.71 (imidazole pKa 6.04) over 3 N; aspartate and glutamate -1 over 1 N each; asparagine, glutamine and tryptophan are zwitterions with a non-ionisable second nitrogen, so 0. NEVER COMPARE THIS NUMBER TO D-209's 0.1772 AND CONCLUDE IT DRIFTED -- it is the same measurement in a different partition, and the +0.05698 difference is exactly the three side chains' dissociation at pH 5.65 (0.029747 aspartate + 0.021231 glutamate + 0.006005 histidine). The quantity that is comparable across the two records is the NET, and the test named in `conditions` is what holds it there. tier=plausible on the tiers.py definition (sound mechanism with literature support, hard to validate quantitatively) -- speculative would drag WINE's ph_tier down from plausible for a term wine's own inputs support just as well, which is the D-179 asymmetry in reverse."
 
 nitrogen_uptake_charge_wine:
   value: 0.3245
@@ -659,3 +659,109 @@ nitrogen_uptake_charge_wine:
     source: "DERIVED. Amino-acid composition: Huang, Z. & Ough, C. S. (1989) via Jackson (ed.), Concise Encyclopedia of Science and Technology of Wine, Table 3.8 -- the 1983 CHARDONNAY column (10 samples). Ammonium share and the assimilability of each fraction: Ribereau-Gayon et al., Handbook of Enology Vol 1: 'the ammonium cation (3-10% of total nitrogen), amino acids (25-30%), polypeptides (25-40%) and proteins (5-10%)', with the same source stating S. cerevisiae cannot hydrolyse polypeptides or proteins."
     conditions: "grape must at pH 3.4, charge-weighted over the 19 tabulated amino acids MINUS proline, plus ammonium, per mole of ELEMENTAL nitrogen. Assimilable pool = ammonium + amino acids - proline, on the Handbook's own statement about which fractions the yeast can use."
     notes: "TABLE SELF-CHECK, and it is why this column was chosen over the other four: its 19 printed values sum to 2153.9 against a printed total of 2258.0, and the table's own footnote says the total 'Includes ethanolamine, gamma-aminobutyric acid, beta-alanine but not ammonia' -- so the 104.1 residual is exactly those three named species. The 1984 columns have an OCR-dropped cell and cannot be reconciled that way, so they are not used [[feedback-a-notes-field-is-unchecked-storage]]. The excluded 104.1 mg/L (4.6 % of the total) contains ethanolamine, which is cationic, so omitting it understates this value slightly -- the same direction as every other simplification here. Ammonia is EXPLICITLY absent from this table, which is why its share comes from a second source rather than being read off the same column. Cystine is carried as the dimer (2 N, neutral); ornithine is 0.0 in this must. Wine is far better buffered than beer (measured local buffer capacity 48 vs 2-5 mEq/L/pH), so this larger zbar moves an anchored wine's finished pH only about -0.05, against beer's -0.4."
+
+# -- The three wort amino-acid SIDE CHAINS that buffer in beer's window -- decision D-239 ----
+#
+# WHAT THIS PAIR OF BLOCKS FIXES. `peptide_buffer_capacity_beer` is back-solved so the model's
+# wort reproduces Peyer's published buffering capacity of 1.18. That back-solve ran on eight
+# organic acids and the peptide lump and NOTHING ELSE, so the free amino acids' share of a real
+# wort's buffering had nowhere to go but into the lump. The lump is permanent; the amino acids
+# are eaten inside 24 h. So beer's wort buffered correctly at t=0 and went on buffering like a
+# wort for the rest of the ferment. D-239 splits the two fates apart. The TOTAL is unchanged --
+# the lump re-roots 1.5481 -> 1.4351 g/L and the wort still reproduces Peyer's 1.18 exactly --
+# which is why the t=0 anchored pH is bitwise what it was and only the LATER course moves.
+#
+# WHY THESE THREE AND NO OTHERS, and why one group each. Peyer sec 5.5, quoting Li et al. 2016:
+# "because of the very low or very high pKa values of the alpha-carboxylic acid group (range
+# 1.7-2.2) or alpha-amino group (range 8.8-10.6), respectively, most amino acids contribute only
+# poorly to the BC in the relevant pH range ... Little contribution to the wort buffer system is
+# made by aspartate (pKa 3.86), glutamic acid (pKa 4.25) and histidine (pKa 6.04), which account
+# for ca. 10 % of the total BC at a wort pH of 5.5." That sentence is D-178's phosphate refusal
+# in the source's own words. It is also the sentence M_GLUTAMIC's docstring has quoted since
+# D-179 as the reason the LUMP is peptides -- read then as a licence to omit free amino acids,
+# and it is equally a statement that 10 % of a wort's buffering sits in three species this model
+# did not carry. Computed off Peyer Table 16's own composition, this build's three side chains
+# are 6.7 % of the model wort's local buffering at pH 5.5 and add 11.5 % of 1.18 in Peyer's own
+# titration frame; the source does not say which frame its "ca. 10 %" is in, so both are quoted
+# and neither is called the reconciliation alone.
+#
+# The alpha groups are DECLINED, not deferred: the source prints them only as RANGES over "most
+# amino acids", and inventing a per-species value from a range is the transcription error. They
+# stay inside the lump, as do all fifteen other amino acids -- one rule applied uniformly.
+# Measured, carrying the three the textbook triprotic way instead moves the lump to 1.4207 g/L
+# and day 7 by a further 0.0026 pH.
+#
+# NOT A SECOND NITROGEN POOL. No state slot is added (beer has no amino-acid slots, D-32): the
+# concentrations are these ratios times the `N` slot, so the pool drains with uptake and no
+# nitrogen is stored twice. Proportional drawdown is D-210's own measurement (~88 % of the `N`
+# inflow is an un-draw, composition unchanged), the same fact `nitrogen_charge_excess` rests on.
+
+wort_aspartate_per_n:
+  value: 0.030228954594029078
+  unit: "mol aspartate / mol pool N"
+  tier: plausible
+  uncertainty: { low: 0.030228954594029078, high: 0.030228954594029078, note: "PINNED ZERO-WIDTH, and for the reason nitrogen_uptake_charge_beer gives for its own amino-acid half: Table 16's control column is ONE composition with no band of its own, so any width here would be invented. The one input that does move it is the ammonium share in the denominator (Peyer Table 2's printed 25-30 mg N/L), worth 2.61 % on all three ratios TOGETHER -- a LOCKED PAIR with that parameter's band, since both read the same printed range. An arm that moves zbar's edge without moving these three by 2.61 % in the opposite sense is incoherent [[feedback-a-locked-pair-repairs-or-drifts-together]]." }
+  provenance:
+    source: "DERIVED, from the SAME table as nitrogen_uptake_charge_beer: Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), Table 16 control column (aspartic acid 27.5 mg/L in a 50:50-diluted wort) over the assimilable pool's elemental nitrogen (Table 16 summed as N, x2 for the dilution, plus Table 2's ammonium at its 25-30 mg N/L midpoint)."
+    conditions: "malt wort, 10-12 degP. mol of the species per mole of ELEMENTAL pool nitrogen -- the same denominator nitrogen_uptake_charge_beer uses, because the N slot holds g N/L. Pool N = 13.670 mmol/L at the nominal ammonium."
+    notes: "Aspartate is the LARGEST of the three by concentration and the largest contributor to the shipped decomposition (0.029747 of the 0.056982 that moved out of zbar). Its side-chain pKa 3.86 is also the LOW EDGE of pKa_peptide_buffer's band -- the same literal in two places on purpose, because that band was built from these residues' own values when the lump was all this model had. Splitting them out does not make that band wrong: the lump still stands for the peptide-BOUND forms of the same residues."
+
+wort_glutamate_per_n:
+  value: 0.02207599206972906
+  unit: "mol glutamate / mol pool N"
+  tier: plausible
+  uncertainty: { low: 0.02207599206972906, high: 0.02207599206972906, note: "PINNED ZERO-WIDTH -- see wort_aspartate_per_n, which carries the full reasoning and the locked-pair warning about the ammonium denominator. Never band one of these three alone: they share a denominator, so a one-parameter sweep of any of them is a composition no wort has [[feedback-a-one-parameter-sweep-is-not-the-band]]." }
+  provenance:
+    source: "DERIVED. Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), Table 16 control column (glutamic acid 22.2 mg/L in a 50:50-diluted wort), over the same assimilable-pool nitrogen as wort_aspartate_per_n."
+    conditions: "malt wort, 10-12 degP. mol per mole of ELEMENTAL pool nitrogen."
+    notes: "Glutamate's side-chain pKa 4.25 is the NOMINAL of pKa_peptide_buffer, because the lump is read as glutamate-equivalent buffering sites (M_GLUTAMIC, D-179). So this species now appears twice in beer's balance in two roles -- free here, peptide-bound there -- and that is the split D-239 is: the free share leaves with the yeast, the bound share does not."
+
+wort_histidine_per_n:
+  value: 0.020744902585538905
+  unit: "mol histidine / mol pool N"
+  tier: plausible
+  uncertainty: { low: 0.020744902585538905, high: 0.020744902585538905, note: "PINNED ZERO-WIDTH -- see wort_aspartate_per_n for the reasoning and the locked-pair warning." }
+  provenance:
+    source: "DERIVED. Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), Table 16 control column (histidine 22.0 mg/L in a 50:50-diluted wort), over the same assimilable-pool nitrogen as wort_aspartate_per_n."
+    conditions: "malt wort, 10-12 degP. mol per mole of ELEMENTAL pool nitrogen."
+    notes: "Histidine is the one of the three whose group sits ABOVE beer's finished pH (6.04), so it is the biggest local buffer in the WORT (0.135 of the pool's 0.179 mEq/L/pH at pH 5.65) and nearly spent by day 7 (0.016 at pH 4.40), while aspartate and glutamate do the opposite. The three together are what make this term's cost grow through the ferment rather than land at t=0. Its imidazole pKa is also the +0.71-per-molecule figure inside nitrogen_uptake_charge_beer's own per-species arithmetic -- ONE number, two uses, and they must move together."
+
+pKa_aspartate_side_chain:
+  value: 3.86
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 3.86, high: 3.86, note: "PINNED ZERO-WIDTH because the source PRINTS ONE VALUE. That is a sourcing limit, not a claim of certainty: the same passage gives RANGES where it has them (alpha-COOH 1.7-2.2, alpha-amino 8.8-10.6), so a printed single value is the source declining to band it, and inventing one here would be the transcription error. The ionic-strength caveat pKa_citric_1 names (thermodynamic constant at 25 C, I=0; the apparent value shifts in beer) applies here too and is UNPRICED -- a real gap, and the honest place to record it is this note rather than a made-up width." }
+  provenance:
+    source: "Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), section 5.5, quoting Li et al. 2016 and Lundblad & MacDonald 2010: 'Little contribution to the wort buffer system is made by aspartate (pKa 3.86), glutamic acid (pKa 4.25) and histidine (pKa 6.04), which account for ca. 10% of the total BC at a wort pH of 5.5.'"
+    conditions: "wort, pH 5.5, side-chain (beta-carboxyl) group only. The alpha-carboxyl and alpha-amino groups of the same molecule are NOT modelled -- see this file's D-239 header."
+    notes: "MONOPROTIC ON PURPOSE, the CARBONIC_AS_CO2 / PHOSPHATE_AS_PHOSPHORIC idiom: what is modelled is the buffering GROUP, not the molecule. The molecule's constant charge -- the fully protonated form's +1 -- stays inside nitrogen_uptake_charge_beer, which is what makes the two halves cancel at wort pH. Same literal as pKa_peptide_buffer's LOW BAND EDGE, and that is not duplication to be collapsed: one is a free residue in the wort, the other the edge of a window over peptide-bound residues."
+
+pKa_glutamate_side_chain:
+  value: 4.25
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 4.25, high: 4.25, note: "PINNED ZERO-WIDTH -- see pKa_aspartate_side_chain for the reasoning and the unpriced ionic-strength caveat." }
+  provenance:
+    source: "Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), section 5.5, quoting Li et al. 2016 -- the same sentence as pKa_aspartate_side_chain, and restated in that section's discussion of glutamine deamination ('the side chain of glutamic acid (pKa = 4.25) increases the buffering capacity at pH values around 4.25')."
+    conditions: "wort, pH 5.5, side-chain (gamma-carboxyl) group only."
+    notes: "Same literal as pKa_peptide_buffer's NOMINAL, for the reason given in wort_glutamate_per_n's notes: the lump is glutamate-equivalent. A beat that re-anchors the lump's pKa must NOT drag this one with it -- the lump's window is a modelling choice over a mixture, this is a measured constant of one residue."
+
+pKa_histidine_side_chain:
+  value: 6.04
+  unit: "pH units"
+  tier: plausible
+  uncertainty: { low: 6.04, high: 6.04, note: "PINNED ZERO-WIDTH -- see pKa_aspartate_side_chain for the reasoning and the unpriced ionic-strength caveat." }
+  provenance:
+    source: "Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), section 5.5, quoting Li et al. 2016 -- the same sentence as pKa_aspartate_side_chain."
+    conditions: "wort, pH 5.5, side-chain (imidazole) group only."
+    notes: "THE SAME 6.04 already appears inside nitrogen_uptake_charge_beer's per-species arithmetic ('histidine +0.71 (imidazole pKa 6.04) over 3 N'), which is where this build's decomposition gets its consistency: the charge that parameter books for histidine and the dissociation this pKa drives are two halves of one calculation. Move one without the other and the pool's net charge at wort pH stops reproducing D-209's 0.1772."
+
+peyer_control_wort_yan_gpl:
+  value: 0.19147259991812246
+  unit: "g N/L"
+  tier: plausible
+  uncertainty: { low: 0.19147259991812246, high: 0.19147259991812246, note: "PINNED ZERO-WIDTH: it is a coordinate of the CALIBRATION WORT, not a free quantity. The ammonium range behind it (25-30 mg N/L) is already carried as nitrogen_uptake_charge_beer's band and as the 2.61 % locked-pair note on the three ratios; banding it here as well would count the same printed range a third time, and would let the wort the shipped capacity is rooted on differ from the wort its own ratios were derived on -- which is the one thing this parameter exists to prevent." }
+  provenance:
+    source: "DERIVED from the SAME two tables as nitrogen_uptake_charge_beer and the three wort_*_per_n ratios: Peyer, S. M. (2017), PhD thesis, University College Cork (CORA 10468/4694), Table 16 control column summed as elemental nitrogen and doubled for the 50:50 dilution (163.97 mg N/L), plus Table 2's ammonium at the midpoint of its printed 25-30 mg N/L (27.5)."
+    conditions: "malt wort, 10-12 degP, proline excluded on Jones & Pierce's uptake groups. The ASSIMILABLE pool only -- the same pool the N state slot represents."
+    notes: "NEW AT D-239, AND IT IS A COORDINATE THE CALIBRATION WORT DID NOT USED TO HAVE. Before D-239 the peptide capacity was rooted on eight organic-acid seeds and nothing else, so the wort it calibrated against had no nitrogen: any scenario's wort was the calibration wort. Now three of its species scale with N, so the shipped 1.435062034012772 is the capacity of a wort carrying THIS much assimilable nitrogen, and a wort at a different YAN legitimately roots elsewhere -- Tyrell's 200 mg/L gives 1.4300292930172551, 0.35 % lower, measured. That is not drift and must not be repaired by re-rooting the shipped literal at somebody else's YAN: y0_for_member's rule 3 already re-roots per member, which is exactly how a wort that is not Peyer's gets a capacity that still reproduces his 1.18."

@@ -424,6 +424,29 @@ M_GLUTAMINE = 5 * _M_C + 10 * _M_H + 2 * _M_N + 3 * _M_O
 #: there is no conserved quantity for it to perturb; the molar mass exists ONLY to convert the
 #: g/L state slot into the mol/L the charge balance needs.
 M_GLUTAMIC = 5 * _M_C + 9 * _M_H + 1 * _M_N + 4 * _M_O
+#: L-aspartic acid C4H7NO4 and L-histidine C6H9N3O2 — the other two residues that same
+#: sentence names, carried since **D-239 gave all three their own buffering** rather than
+#: leaving them inside the lump above.
+#:
+#: **The sentence quoted above was already on file and was read the other way round.** It says
+#: those three "account for ca. 10 % of the total BC", which is why the LUMP is peptides — and
+#: it is also a statement that a wort carries 10 % of its buffering in three species this model
+#: did not have. The lump absorbed that share at the back-solve, so beer's wort buffered
+#: correctly and then went on buffering after the yeast had eaten the amino acids. D-239 splits
+#: the two fates apart; the total the lump and these three carry is still Peyer's 1.18.
+#:
+#: **Nothing converts g/L with these two**, unlike every other molar mass in this module. Beer
+#: has no amino-acid state slots (D-32) and D-239 adds none: the three species are a *reading*
+#: of the ``N`` pool — a fixed composition ratio times that pool's nitrogen. They are here
+#: because ``AcidSpec`` takes a molar mass, and so a later beat that does give them slots finds
+#: the number derived rather than typed.
+#:
+#: **Deliberately absent from ``MOLAR_MASS`` / ``CARBON_ATOMS`` / ``NITROGEN_ATOMS``** — the
+#: ``M_FORMIC`` idiom, and here the ledger hazard is concrete rather than hypothetical: this
+#: nitrogen is already on the nitrogen ledger inside ``N``, so a producer that weighed these as
+#: pools would book the same nitrogen twice. A raise is the right answer.
+M_ASPARTIC = 4 * _M_C + 7 * _M_H + 1 * _M_N + 4 * _M_O
+M_HISTIDINE = 6 * _M_C + 9 * _M_H + 3 * _M_N + 2 * _M_O
 #: β-glucan / mannoprotein repeat unit, anhydroglucose C6H10O5 (glucose minus one water, the
 #: polysaccharide monomer) — the representative species for the non-assimilable cell-wall
 #: **debris** pool yeast autolysis leaves behind (decision D-34). Dead-cell biomass is C-rich

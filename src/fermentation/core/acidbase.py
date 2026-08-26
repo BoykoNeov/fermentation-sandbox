@@ -122,10 +122,12 @@ from fermentation.core.chemistry import (
     M_ACETALDEHYDE,
     M_ACETIC,
     M_ALPHA_KETOGLUTARATE,
+    M_ASPARTIC,
     M_CITRIC,
     M_CO2,
     M_FORMIC,
     M_GLUTAMIC,
+    M_HISTIDINE,
     M_LACTIC,
     M_MALIC,
     M_NITROGEN,
@@ -385,6 +387,53 @@ NITROGEN_CHARGE_PARAMS: tuple[str, ...] = (
     NITROGEN_CHARGE_PARAM_NAMES["wine"],
 )
 
+#: The three wort amino-acid SIDE CHAINS that buffer inside beer's pH window (decision D-239) —
+#: the **third** "include-by-reading" entry, after ``Byp`` (D-18) and ``carbonic`` (D-182).
+#: Keys in the pKa map that are members of no acid registry and hold no state slot.
+#:
+#: **Why these three and only these.** Peyer 2017 §5.5, quoting Li et al. 2016: *"because of the
+#: very low or very high pKa values of the α-carboxylic acid group (range 1.7-2.2) or α-amino
+#: group (range 8.8-10.6) … most amino acids contribute only poorly to the BC in the relevant pH
+#: range … Little contribution to the wort buffer system is made by aspartate (pKa 3.86),
+#: glutamic acid (pKa 4.25) and histidine (pKa 6.04), which account for ca. 10 % of the total BC
+#: at a wort pH of 5.5."* That is D-178's phosphate refusal in the source's own words, and it is
+#: what licenses a model of three MONOPROTIC side chains: the α groups of these three, and all
+#: fifteen other amino acids, stay inside the peptide lump exactly as they always have. One rule
+#: applied uniformly, and no pKa here that a text on disk does not print.
+#:
+#: **MONOPROTIC on purpose**, the ``CARBONIC_AS_CO2`` and ``PHOSPHATE_AS_PHOSPHORIC`` idiom. The
+#: α groups are not deferred, they are declined: the source prints them only as RANGES over
+#: "most amino acids", and a per-species value invented from a range is the transcription error
+#: [[feedback-a-units-fork-is-not-a-band]]. Measured, carrying them the textbook way moves the
+#: back-solved lump 1.4351 → 1.4207 g/L (0.14 pp of the shrink) and the day-7 pH by 0.0026.
+#:
+#: **These are a READING of the ``N`` pool, not a second pool** — see :func:`amino_buffer_molar`.
+#: Nothing on the nitrogen ledger changes, because no nitrogen is stored twice.
+AMINO_BUFFER_SPECS: dict[str, AcidSpec] = {
+    "aspartate_side_chain": AcidSpec(M_ASPARTIC, ("pKa_aspartate_side_chain",)),
+    "glutamate_side_chain": AcidSpec(M_GLUTAMIC, ("pKa_glutamate_side_chain",)),
+    "histidine_side_chain": AcidSpec(M_HISTIDINE, ("pKa_histidine_side_chain",)),
+}
+
+#: How much of each species the assimilable pool carries, as a parameter name — mol of the
+#: species per mole of **elemental** pool nitrogen, the same denominator
+#: :data:`NITROGEN_CHARGE_PARAM_NAMES` uses and for the same reason (the ``N`` slot holds g N/L).
+AMINO_BUFFER_RATIO_PARAMS: dict[str, str] = {
+    "aspartate_side_chain": "wort_aspartate_per_n",
+    "glutamate_side_chain": "wort_glutamate_per_n",
+    "histidine_side_chain": "wort_histidine_per_n",
+}
+
+#: Keyed by :attr:`StateSchema.medium` on the D-179 discipline, and **beer-only by
+#: measurement rather than by preference.** The ratios above are a malt wort's composition, so
+#: they cannot be read into a must; and the same three species in Huang & Ough's Chardonnay are
+#: worth **0.31 mEq/L/pH against must acids' 42.1 — 0.73 %** — where beer's are 6.7 %, because
+#: wine is an order of magnitude better buffered (D-209 §9's own 48 vs 2-5 mEq/L/pH). Wine also
+#: speciates its amino acids as STATE SLOTS already (D-100) while keeping them charge-inactive,
+#: so the same gap exists there in a different wiring and closing it is a different act.
+#: Priced BEFORE this term was allowed to help beer, which is the order D-209 §9 set.
+AMINO_BUFFER_MEDIA: frozenset[str] = frozenset({"beer"})
+
 
 def acid_registry(schema: StateSchema) -> dict[str, AcidSpec]:
     """The charge-active acid set for ``schema``'s medium (decision D-179).
@@ -431,6 +480,7 @@ PKA_PARAM_NAMES: tuple[str, ...] = tuple(
             *BEER_ACIDS.values(),
             BYP_AS_SUCCINIC,
             CARBONIC_AS_CO2,
+            *AMINO_BUFFER_SPECS.values(),
         )
         for name in spec.pka_param_names
     )
@@ -518,10 +568,17 @@ SO2_PKA_PARAM_NAMES: tuple[str, ...] = ("pKa_sulfurous_1", "pKa_sulfurous_2")
 #: of assimilable nitrogen — not a pKa either, and on the cation side of the balance rather
 #: than the anion side, so like the solubility trio it could not have arrived via
 #: :data:`PKA_PARAM_NAMES`.
+#: Since D-239 it also carries the three amino-buffer RATIOS. Their pKas arrive through
+#: :data:`PKA_PARAM_NAMES` (the specs are in its source tuple), but the ratios are neither
+#: pKas nor charges — they are a composition, the third kind of name to reach this balance
+#: without a registry to carry it. Union across media on purpose, like everything else here:
+#: a per-medium ``reads`` would narrow one medium's reported spread below what the balance
+#: depends on (D-160), and the ratios are pinned so no wine spread moves either way.
 PH_SYSTEM_READS: tuple[str, ...] = (
     *PKA_PARAM_NAMES,
     *CO2_SOLUBILITY_PARAMS,
     *NITROGEN_CHARGE_PARAMS,
+    *AMINO_BUFFER_RATIO_PARAMS.values(),
 )
 
 #: What a Process reads indirectly by calling the SO₂ speciation readouts
@@ -773,6 +830,12 @@ def build_pka_map(params: Mapping[str, float]) -> dict[str, tuple[float, ...]]:
     }
     out[BYP_KEY] = tuple(params[n] for n in BYP_AS_SUCCINIC.pka_param_names)
     out[CARBONIC_KEY] = tuple(params[n] for n in CARBONIC_AS_CO2.pka_param_names)
+    # The D-239 side chains, on the same "key without a registry" footing as the two above.
+    # Unconditional, like every other entry: which keys are CONSULTED is decided downstream by
+    # `_totals_molar`, which is medium-scoped, so a wine balance still reads exactly the entries
+    # it always read and stays bit-for-bit unchanged.
+    for name, spec in AMINO_BUFFER_SPECS.items():
+        out[name] = tuple(params[n] for n in spec.pka_param_names)
     return out
 
 
@@ -813,18 +876,30 @@ def co2_saturation_gpl(temp_k: float, params: Mapping[str, float]) -> float:
     return max(float(params["H_co2_beverage"] * math.exp(exponent)), 0.0)
 
 
-def _totals_molar(y: FloatArray, schema: StateSchema) -> dict[str, float]:
-    """Acid slot concentrations present in ``schema``, converted g/L → mol/L.
+def _totals_molar(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+) -> dict[str, float]:
+    """Everything on the anion side of ``schema``'s balance, in mol/L.
 
-    Iterates the medium's OWN registry (:func:`acid_registry`, D-179) — the one place the
-    wine/beer split actually bites, because wine and beer disagree about whether the
-    ``citrate`` slot they both carry belongs in the charge balance.
+    Acid *slots* come from the medium's OWN registry (:func:`acid_registry`, D-179) — the one
+    place the wine/beer split actually bites, because wine and beer disagree about whether the
+    ``citrate`` slot they both carry belongs in the charge balance. On top of those, the three
+    D-239 side chains, which hold no slot and are derived from ``N`` (:func:`amino_buffer_molar`).
+
+    **``params`` is REQUIRED rather than defaulted, and the churn that cost across the suite is
+    the point** — D-182 made the same call for dissolved CO₂ and for the same reason. A caller
+    holding a state vector must say which parameter set that state is being read under; a
+    default would make the omission invisible in exactly the callers most likely to get it
+    wrong, and an omitted amino-buffer term does not raise, it silently returns a wort that
+    buffers like a finished beer.
     """
-    return {
+    totals = {
         name: float(y[schema.slice(name)][0]) / spec.molar_mass
         for name, spec in acid_registry(schema).items()
         if name in schema
     }
+    totals.update(amino_buffer_molar(y, schema, params))
+    return totals
 
 
 def _byp_succinic_molar(y: FloatArray, schema: StateSchema) -> float:
@@ -1053,6 +1128,69 @@ def nitrogen_charge_from_gpl(
     return (float(params[name]) + excess) * (nitrogen_gpl / M_NITROGEN)
 
 
+def amino_buffer_from_gpl(
+    nitrogen_gpl: float, medium: str, params: Mapping[str, float]
+) -> dict[str, float]:
+    """The wort's three buffering side chains [mol/L] off a bare g N/L figure (decision D-239).
+
+    ``{species: ratio · [N]}`` over :data:`AMINO_BUFFER_SPECS`, where each ratio is mol of that
+    species per mole of **elemental** pool nitrogen (:data:`AMINO_BUFFER_RATIO_PARAMS`). The
+    compile-seam counterpart of :func:`amino_buffer_molar`, and the twin of
+    :func:`nitrogen_charge_from_gpl` for the same reason: the inverse anchor runs while the
+    initial state is still being assembled, so there is no vector to slice.
+
+    **Both anchors must add these to their totals map**, exactly as both subtract the nitrogen
+    charge. Omitting them at the anchor while the runtime balance carries them would move a
+    wort's t=0 pH off the ``initial_ph`` the scenario asked for — the failure mode D-238's rule
+    ordering was built to catch, arriving through a different door.
+
+    Returns ``{}`` for a medium outside :data:`AMINO_BUFFER_MEDIA` or when any ratio is missing
+    from ``params`` — ALL or NOTHING, never a partial pool: two of three species is not a
+    smaller version of this term, it is a different wort [[feedback-gate-both-halves-of-a-pair]].
+    """
+    if medium not in AMINO_BUFFER_MEDIA:
+        return {}
+    ratios = AMINO_BUFFER_RATIO_PARAMS
+    if any(p not in params for p in ratios.values()):
+        return {}
+    pool_molar = nitrogen_gpl / M_NITROGEN
+    return {name: float(params[p]) * pool_molar for name, p in ratios.items()}
+
+
+def amino_buffer_molar(
+    y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+) -> dict[str, float]:
+    """The wort's three buffering side chains [mol/L] from a state vector (decision D-239).
+
+    **A READING of the ``N`` slot, not a second pool.** Their concentration is a fixed
+    composition ratio times that slot's nitrogen, so the pool drains with uptake automatically
+    and nothing on the nitrogen ledger is stored twice — which is the whole reason this is not
+    three state slots. Proportional drawdown is not an assumption invented here either: D-210
+    measured that ~88 % of the ``N`` inflow is an **un-draw** rather than a deamination, leaving
+    the pool's composition unchanged, and that is the same fact
+    :data:`NITROGEN_CHARGE_EXCESS_KEY` rests on.
+
+    **The charge these carry is NOT new charge.** ``nitrogen_uptake_charge_beer`` already books
+    this pool's charge, and D-239 splits one species' worth of it in two: the constant part (the
+    fully-protonated form's charge) stays in that parameter, while the side chain's own
+    protonation is carried here by the ordinary acid machinery. At the wort pH the parameter was
+    re-derived at, the two halves cancel term for term and the balance is arithmetically what it
+    was at D-209 — asserted as a test, because a decomposition that did not cancel would be a
+    double-count wearing a new mechanism's clothes.
+
+    **Gated on :func:`charge_balance_is_populated`, and the gate is load-bearing** for exactly
+    the reason it is on :func:`nitrogen_charge_molar`: an un-anchored beer carries 200-odd mg/L
+    in ``N`` with every acid slot at 0, and handing that empty balance three anions with no
+    cation to meet them is the D-179 artefact in mirror image. Nitrogen is not pH information on
+    its own.
+    """
+    if NITROGEN_KEY not in schema or not charge_balance_is_populated(y, schema):
+        return {}
+    return amino_buffer_from_gpl(
+        float(y[schema.slice(NITROGEN_KEY)][0]), schema.medium, params
+    )
+
+
 def remix_nitrogen_charge_excess(
     pool_gpl: float,
     pool_excess: float,
@@ -1161,7 +1299,7 @@ def ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str, float])
     think to look at the temperature.
     """
     return solve_ph(
-        _totals_molar(y, schema),
+        _totals_molar(y, schema, params),
         _cation(y, schema, params),
         _byp_succinic_molar(y, schema),
         dissolved_co2_molar(y, schema, params),
@@ -1192,7 +1330,7 @@ def degassed_ph_of_state(y: FloatArray, schema: StateSchema, params: Mapping[str
     estimate. D-208 walks that family: no member of it reproduces Tyrell's measured course.
     """
     return solve_ph(
-        _totals_molar(y, schema),
+        _totals_molar(y, schema, params),
         _cation(y, schema, params),
         _byp_succinic_molar(y, schema),
         0.0,
@@ -1237,7 +1375,7 @@ def cation_charge_for_ph(
     always in the balance, just frozen inside the fitted constant.
     """
     total = solve_cation_charge(
-        _totals_molar(y, schema),
+        _totals_molar(y, schema, params),
         _byp_succinic_molar(y, schema),
         dissolved_co2_molar(y, schema, params),
         build_pka_map(params),
@@ -1329,7 +1467,7 @@ def peptide_capacity_for_wort_bc(
     titration inverse-solves its own sample cation from :data:`_PEYER_WORT_PH` — which is what
     lets a caller run this BEFORE the t=0 anchor on the same array.
     """
-    totals = _totals_molar(y, schema)
+    totals = _totals_molar(y, schema, params)
     if "peptide_buffer" not in totals:
         raise ValueError(
             f"schema {schema.medium!r} carries no `peptide_buffer` slot, so there is no "
@@ -1404,7 +1542,7 @@ def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, 
     value this function calls fidelity-grade.
     """
     pka_map = build_pka_map(params)
-    totals = _totals_molar(y, schema)
+    totals = _totals_molar(y, schema, params)
     cation = _cation(y, schema, params)
     byp = _byp_succinic_molar(y, schema)
     ph = solve_ph(totals, cation, byp, 0.0, pka_map)
@@ -1412,6 +1550,15 @@ def titratable_acidity(y: FloatArray, schema: StateSchema, params: Mapping[str, 
 
     eq_per_l = byp * (BYP_AS_SUCCINIC.protons - mean_charge(h, pka_map[BYP_KEY]))
     for name, conc in totals.items():
+        # The D-239 side chains are in the SOLVE and out of the SUM, the same asymmetry the
+        # nitrogen term has carried since D-209 §8c — and here the reason is arithmetic rather
+        # than a scruple. This sum's endpoint approximation is `protons - mean_charge`, i.e.
+        # every proton down to the fully dissociated species; on an amino acid that counts the
+        # α-amino proton at pKa 8.8-9.9, which does NOT come off before a titration's 8.2
+        # endpoint. Including them would invent equivalents, and this function's only
+        # fidelity-grade caller is a MUST, which carries none of them.
+        if name in AMINO_BUFFER_SPECS:
+            continue
         eq_per_l += conc * (ALL_ACIDS[name].protons - mean_charge(h, pka_map[name]))
     return eq_per_l * (M_TARTARIC / 2.0)
 
@@ -1456,6 +1603,18 @@ def ph_tier(params_tier_of: Mapping[str, Tier], schema: StateSchema | None = Non
         else (NITROGEN_CHARGE_PARAM_NAMES.get(schema.medium, ""),)
     )
     tiers += [params_tier_of[n] for n in n_names if n in params_tier_of]
+    # The D-239 side chains, on the same footing and with the same trap: they are registry
+    # members of nothing, so the derivation above would skip them, and they are genuinely
+    # per-medium (:data:`AMINO_BUFFER_MEDIA` is beer-only, so a wine pH tier must not see them
+    # any more than it sees beer's peptide lump — the D-179 asymmetry this function exists for).
+    # Their RATIOS are on the cation side of nothing and reach no pKa name either, so both
+    # halves are added by hand.
+    if schema is None or schema.medium in AMINO_BUFFER_MEDIA:
+        amino_names = [
+            *(n for spec in AMINO_BUFFER_SPECS.values() for n in spec.pka_param_names),
+            *AMINO_BUFFER_RATIO_PARAMS.values(),
+        ]
+        tiers += [params_tier_of[n] for n in amino_names if n in params_tier_of]
     return combine([*tiers, Tier.PLAUSIBLE])
 
 

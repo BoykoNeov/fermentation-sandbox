@@ -67,13 +67,19 @@ acids alone.
 
 import re
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from fermentation.core import acidbase
 from fermentation.core.acidbase import charge_balance_is_populated
-from fermentation.core.chemistry import M_NITROGEN, carbon_mass_fraction, sugar_species
+from fermentation.core.chemistry import (
+    M_NITROGEN,
+    M_TARTARIC,
+    carbon_mass_fraction,
+    sugar_species,
+)
 from fermentation.core.kinetics import (
     ACETIC_SLOT,
     ORGANIC_ACID_SPECS,
@@ -1070,6 +1076,14 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         seeded = dict(start_molar)
         for seed_slot, seed_param in WORT_SEED_PARAMS.items():
             seeded[seed_slot] = edge(seed_param, seed) / molar[seed_slot]
+        # D-239: the three free amino-acid side chains are in the wort too, and they are a
+        # READING of the nitrogen pool rather than a seed — so they enter at the run's own
+        # starting N and LEAVE with it. Both ends are built here rather than only the start,
+        # because the whole content of the term is that the wort buffers and the finished beer
+        # does not [[feedback-gate-both-halves-of-a-pair]].
+        amino_start = acidbase.amino_buffer_from_gpl(nitrogen_gpl_start, "beer", params)
+        amino_end = acidbase.amino_buffer_from_gpl(nitrogen_gpl_end, "beer", params)
+        seeded |= amino_start
         # D-209: the wort's assimilable nitrogen is itself on the cation side, so the anchored
         # total splits into a frozen slot plus a term that MOVES as the yeast takes the nitrogen
         # up. The anchor is unaffected (the start uses the total, exactly as before), which is
@@ -1086,6 +1100,7 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         )
         cation_end = cation - nitrogen_charge_lost
         end = dict(seeded)
+        end |= amino_end  # the pool the yeast ate is not in the finished beer (D-239)
         for spec in ORGANIC_ACID_SPECS:
             # Produced acids build on the RUN's seed, not the varied one: a yield is a measured
             # production and does not depend on how much of a DIFFERENT acid the wort carried.
@@ -1137,13 +1152,16 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     vessel_nominal = [f[1] for f in at_nominal]
     # BOTH edges pinned, not just the one a floor would guard: swapping a band edge for its
     # neighbour has passed a one-sided pin before [[feedback-pin-the-band-not-the-nominal]].
-    assert min(degassed_nominal) == pytest.approx(0.914, abs=0.005), (
+    assert min(degassed_nominal) == pytest.approx(0.941, abs=0.005), (
         f"the degassed prediction moved to {min(degassed_nominal):.1%} of Tyrell's measured "
-        "0.81 pH drop at nominal yields; D-209 measures 91.4-127.1 % across the pKa band, "
-        "against D-208's 43.2-62.9 % for the same arm before the nitrogen pool's charge was in "
-        "the balance. This is the number that compares with a published beer pH"
+        "0.81 pH drop at nominal yields; D-239 measures 94.1-129.2 % across the pKa band, "
+        "D-209 measured 91.4-127.1 % for the same arm before the wort's three free "
+        "amino-acid side chains were in the balance, and D-208 43.2-62.9 % before the "
+        "nitrogen pool's charge was. Every one of those beats moved this arm UP by adding "
+        "something the wort really has; none of them fitted it. This is the number that "
+        "compares with a published beer pH"
     )
-    assert max(degassed_nominal) == pytest.approx(1.271, abs=0.005), (
+    assert max(degassed_nominal) == pytest.approx(1.292, abs=0.005), (
         f"the degassed prediction's high edge moved to {max(degassed_nominal):.1%}; D-209 "
         "measures 127.1 %, so at this arm's DAY-14 endpoint the high edge of the peptide pKa "
         "band now OVERSHOOTS the measured drop. Two things keep that honest and neither is a "
@@ -1151,14 +1169,14 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "the model is still producing acid (the day-7 comparison is the acceptance test below, "
         "101.7-107.1 %); and z-bar is DERIVED from published wort composition, never fitted"
     )
-    assert min(vessel_nominal) == pytest.approx(1.068, abs=0.005), (
+    assert min(vessel_nominal) == pytest.approx(1.093, abs=0.005), (
         f"the IN-VESSEL fraction moved to {min(vessel_nominal):.1%}; D-209 measures 106.8 % "
         "(D-183's 77.8 %, D-182's 77.6 %, and D-181's 42.7 % was this same model with no "
         "dissolved CO2 in its charge balance). Pinned as a model property: no published beer pH "
         "is measured in this frame, so a change here is a change to the vessel's chemistry, not "
         "to an agreement"
     )
-    assert max(vessel_nominal) == pytest.approx(1.381, abs=0.005), (
+    assert max(vessel_nominal) == pytest.approx(1.401, abs=0.005), (
         f"the IN-VESSEL fraction's high edge moved to {max(vessel_nominal):.1%}; D-209 measures "
         "138.1 % against D-183's 97.3 %. It now exceeds 1: the in-vessel pH carries a term the "
         "measurement excludes AND the nitrogen charge, so it is expected to run above the "
@@ -1201,14 +1219,14 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
     degassed_joint = [f[0] for f in joint]
     vessel_joint = [f[1] for f in joint]
     # The measured frame first, because it is the one that compares with Tyrell (D-208).
-    assert min(degassed_joint) == pytest.approx(0.712, abs=0.02), (
+    assert min(degassed_joint) == pytest.approx(0.734, abs=0.02), (
         f"the degassed joint low corner moved to {min(degassed_joint):.1%}; D-209 measures "
         "71.2 %, against D-208's 8.3 % and D-181's pre-carbonic 7.6 %. The low corner moved "
         "further than the high one for the same reason it did at D-182: a member predicting "
         "little acidification finishes at a higher pH, and the nitrogen term is a fixed charge "
         "removal, so it buys the most where the acids buy the least"
     )
-    assert max(degassed_joint) == pytest.approx(1.401, abs=0.02), (
+    assert max(degassed_joint) == pytest.approx(1.425, abs=0.02), (
         f"the degassed joint high corner moved to {max(degassed_joint):.1%}; D-209 measures "
         "140.1 % (D-208's 82.7 %, D-181's pre-carbonic 82.2 %)"
     )
@@ -1225,7 +1243,7 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "or been re-scoped, and `test_the_model_reaches_tyrells_measured_beer_ph` should be the "
         "next thing looked at"
     )
-    assert min(vessel_joint) == pytest.approx(0.928, abs=0.02), (
+    assert min(vessel_joint) == pytest.approx(0.950, abs=0.02), (
         f"the joint low corner moved to {min(vessel_joint):.1%}; D-209 measures 92.8 % over "
         "ELEVEN dimensions, D-183 measured 64.0 % over TEN "
         "dimensions (D-182 measured 63.8 % over nine; D-181's was 7.6 %) — "
@@ -1242,7 +1260,7 @@ def test_the_predicted_ph_drop_over_the_joint_yield_and_pka_band(beer_params):
         "from a 74.6-point span to a 45.6-point one — this term is a stabiliser of the "
         "prediction, not just an offset to it."
     )
-    assert max(vessel_joint) == pytest.approx(1.495, abs=0.02), (
+    assert max(vessel_joint) == pytest.approx(1.517, abs=0.02), (
         f"the joint high corner moved to {max(vessel_joint):.1%}; D-209 measures 149.5 % over "
         "ELEVEN dimensions, D-183 measured 109.7 % over TEN "
         "dimensions (D-182 measured 109.4 % over nine; D-181's "
@@ -1570,7 +1588,7 @@ def test_removing_the_falling_acids_raises_the_finished_ph_by_the_predicted_amou
         params = compiled.parameters.resolve()
         y = res.y[:, -1]
         return acidbase.solve_ph(
-            acidbase._totals_molar(y, compiled.schema),
+            acidbase._totals_molar(y, compiled.schema, params),
             # ``params`` became required at D-209 (the nitrogen pool joined the cation side);
             # this is exactly ``degassed_ph_of_state``, kept spelled out because the point of
             # the arm is that only the carbonic argument differs from the shipped solve.
@@ -1627,13 +1645,21 @@ def _peyer_wort_bc(params: ParameterSet, capacity_gpl: float, pka_peptide: float
     way: its two anchors are the shipped YAML literal and Peyer's published 1.18, and the
     solver produces neither.
     """
-    pka = dict(acidbase.build_pka_map(params.resolve()))
+    values = params.resolve()
+    pka = dict(acidbase.build_pka_map(values))
     pka["peptide_buffer"] = (pka_peptide,)
     totals = {
         slot: params[p].value / acidbase.ALL_ACIDS[slot].molar_mass
         for slot, p in _WORT_BC_SEEDS.items()
     }
     totals["peptide_buffer"] = capacity_gpl / acidbase.ALL_ACIDS["peptide_buffer"].molar_mass
+    # D-239: Peyer titrated a real wort, so the sample carries the three free amino-acid side
+    # chains too — at the CALIBRATION wort's own assimilable nitrogen, which is a coordinate this
+    # sample did not have before (the eight organic-acid seeds are nitrogen-blind). Read from the
+    # parameter store rather than typed, because the shipped capacity is a root taken ON it.
+    totals |= acidbase.amino_buffer_from_gpl(
+        values["peyer_control_wort_yan_gpl"], "beer", values
+    )
     return acidbase.peyer_fast_bc(totals, pka)
 
 
@@ -1710,14 +1736,23 @@ def test_holding_the_capacity_fixed_while_the_pka_moves_costs_peyers_1_18():
     at_high = _peyer_wort_bc(params, shipped, unc.high)
 
     assert at_nominal == pytest.approx(1.18, abs=1e-9)
-    assert at_low == pytest.approx(1.116059, abs=1e-5), (
-        f"holding the shipped capacity at pKa {unc.low} gives BC = {at_low:.6f}; D-233 "
-        "measures 1.116059. This is the shipped CONSTANT, which D-238's repair does not "
-        "touch — so a move here is the acid table or the pKa window, not the repair."
+    assert at_low == pytest.approx(1.120250, abs=1e-5), (
+        f"holding the shipped capacity at pKa {unc.low} gives BC = {at_low:.6f}; D-239 measures "
+        "1.120250 and D-233 measured 1.116059 before the wort carried its three free amino-acid "
+        "side chains. This is the shipped CONSTANT, which D-238's repair does not touch — so a "
+        "move here is the acid table, the pKa window, or the D-239 split, never the repair."
     )
-    assert at_high == pytest.approx(1.145594, abs=1e-5), (
-        f"a member drawing pKa {unc.high} carries a wort at BC = {at_high:.6f}; D-233 measures "
-        "1.145594."
+    assert at_high == pytest.approx(1.148657, abs=1e-5), (
+        f"a member drawing pKa {unc.high} carries a wort at BC = {at_high:.6f}; D-239 measures "
+        "1.148657, D-233 measured 1.145594."
+    )
+    # Both edges moved TOWARD the nominal, and that direction is the D-239 split showing up
+    # where it should: 7.3 % of the wort's buffering left the lump, so the lump's pKa has less
+    # of the wort to mis-place. The pair is less sensitive than it was, not more — a move in the
+    # other direction would mean the split had added a second pKa-driven channel rather than
+    # taking one away.
+    assert (1.18 - at_low) < (1.18 - 1.116059), (
+        "the low-edge miss grew; the split should have shrunk the peptide pKa's leverage"
     )
     assert at_low < at_high < at_nominal, (
         "BC is maximal at the NOMINAL pKa by construction and falls off on both sides. That "
@@ -1768,11 +1803,20 @@ def test_the_runtime_solver_reproduces_the_shipped_capacity_at_the_nominal():
     [[feedback-the-setting-where-a-change-is-exact-is-the-control]]. Two claims, and the second
     is what makes the first mean anything:
 
-    * :func:`acidbase.peptide_capacity_for_wort_bc`, run on the compiled beer ``y0`` at the
-      nominal pKa, returns the shipped ``peptide_buffer_capacity_beer`` **bit for bit**. Not to a
-      tolerance — a tolerance would pass on a solver that merely landed nearby, and the whole
-      argument for rule 3 is that it reproduces the offline back-solve rather than replacing it.
-      (D-233 §1 reported these one ULP apart; that was a looser root-find, not a floor.)
+    * :func:`acidbase.peptide_capacity_for_wort_bc`, run on a compiled beer ``y0`` **at the
+      calibration wort's own assimilable nitrogen**, at the nominal pKa, returns the shipped
+      ``peptide_buffer_capacity_beer`` **bit for bit**. Not to a tolerance — a tolerance would
+      pass on a solver that merely landed nearby, and the whole argument for rule 3 is that it
+      reproduces the offline back-solve rather than replacing it. (D-233 §1 reported these one
+      ULP apart; that was a looser root-find, not a floor.)
+
+      **The nitrogen qualifier is new at D-239 and it is not a loosening.** Three of the wort's
+      buffering species now scale with ``N``, so the calibration wort acquired a coordinate it
+      never had: this control used to run on Tyrell's scenario because ANY wort was Peyer's
+      wort. Tyrell's 200 mg/L is 4.5 % more nitrogen than Peyer's control wort carries, and it
+      roots 0.35 % lower — pinned below as a measurement rather than absorbed, because a beat
+      that "fixed" it by re-rooting the shipped literal at Tyrell's YAN would be calibrating one
+      man's wort to another's nitrogen [[feedback-right-number-wrong-condition]].
     * the state-built sample and the parameter-built sample are the SAME wort. The production
       path reads the acid slots off ``y0``; this file's titration builds them from the
       ``*_typical_wort`` parameters. Two ways of naming one composition is how they drift.
@@ -1781,11 +1825,12 @@ def test_the_runtime_solver_reproduces_the_shipped_capacity_at_the_nominal():
     :func:`test_the_peptide_capacity_still_reproduces_peyers_published_wort_bc`'s job, and it
     scores the YAML literal against Peyer's published 1.18 — neither of which this produces.
     """
+    calibration_yan = _beer_acid_params()["peyer_control_wort_yan_gpl"].value
     compiled = compile_scenario(
         Scenario(
             name="d238-control",
             medium="beer",
-            initial=dict(TYRELL_SCENARIO),
+            initial={**TYRELL_SCENARIO, "yan_mgl": calibration_yan * 1000.0},
             temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
             duration_days=1.0,
         )
@@ -1801,10 +1846,38 @@ def test_the_runtime_solver_reproduces_the_shipped_capacity_at_the_nominal():
         "close — do not paper over this with a tolerance"
     )
 
+    # The YAN dependence itself, pinned — the price of the qualifier above. A wort that is not
+    # the calibration wort roots elsewhere, and the size of "elsewhere" is what says whether the
+    # coordinate matters. It is also the positive control on the line above: an implementation
+    # that ignored `N` in the titration would return the shipped literal for BOTH worts and this
+    # assert is the only thing that would notice
+    # [[feedback-a-non-vacuity-check-can-itself-be-vacuous]].
+    tyrell = compile_scenario(
+        Scenario(
+            name="d239-yan-dependence",
+            medium="beer",
+            initial=dict(TYRELL_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=1.0,
+        )
+    )
+    at_tyrell = acidbase.peptide_capacity_for_wort_bc(
+        tyrell.y0, tyrell.schema, tyrell.parameters.resolve(), target
+    )
+    assert at_tyrell == pytest.approx(1.4300292930172551, rel=1e-9), (
+        f"Tyrell's 200 mg/L wort roots at {at_tyrell!r}; D-239 measures 1.4300292930172551, "
+        "0.35 % below the calibration wort's. If this has collapsed onto the shipped literal, "
+        "the amino-buffer term has stopped reaching the titration"
+    )
+    assert at_tyrell < shipped, (
+        "more wort nitrogen means more free amino-acid buffering, so LESS peptide is needed to "
+        "reach Peyer's 1.18 — a root above the shipped literal has the sign backwards"
+    )
+
     # ...and the two ways of building the sample agree, so the file's titration and the
     # production path are titrating one wort rather than two that happen to look alike.
     params = _beer_acid_params()
-    from_state = acidbase._totals_molar(compiled.y0, compiled.schema)
+    from_state = acidbase._totals_molar(compiled.y0, compiled.schema, params.resolve())
     for slot, name in _WORT_BC_SEEDS.items():
         expected = params[name].value / acidbase.ALL_ACIDS[slot].molar_mass
         assert from_state[slot] == pytest.approx(expected, rel=1e-12), (
@@ -1842,7 +1915,7 @@ def test_every_sampled_member_carries_peyers_wort_bc():
 
     for i in range(ens.n_succeeded):
         values = ens.member_params[i]
-        totals = acidbase._totals_molar(ens.members[i][:, 0], ens.schema)
+        totals = acidbase._totals_molar(ens.members[i][:, 0], ens.schema, values)
         totals["peptide_buffer"] = seeds[i] / molar_mass
         bc = acidbase.peyer_fast_bc(totals, acidbase.build_pka_map(values))
         assert bc == pytest.approx(target, abs=1e-9), (
@@ -1912,7 +1985,7 @@ def test_a_scenario_that_names_its_peptide_buffer_is_not_re_capacitated():
     # rather than a wort that happens to sit at 1.18 anyway.
     off = []
     for i in range(ens.n_succeeded):
-        totals = acidbase._totals_molar(ens.members[i][:, 0], ens.schema)
+        totals = acidbase._totals_molar(ens.members[i][:, 0], ens.schema, ens.member_params[i])
         totals["peptide_buffer"] = seeds[i] / molar_mass
         off.append(
             abs(
@@ -2007,6 +2080,13 @@ def test_losing_wort_protein_acidifies_late_not_early():
 
     Pinning the ratio and not just the two deltas is the point: a beat that later proposes any
     buffer-removal term is answered by this test, whatever magnitude it picks.
+
+    **D-239 built a buffer-removal term and this test is what priced its shape in advance.** The
+    three free amino-acid side chains are a real, sourced buffer that really does leave, and they
+    land exactly where this test says such a term lands: 0.0038 pH at day 1 against 0.0202 at day
+    7, a ratio of 5.3. So the term shipped on fidelity while agreeing WORSE with the one day beer
+    misses [[feedback-closer-to-reality-decides]] — this test was never an argument that no such
+    term exists, only that none of them answers D-211 sec 9's brief.
     """
     data_dir = default_data_dir()
     base_1 = _tyrell_ph_with_peptide_loss(data_dir, 0.0, 1.0)
@@ -2019,18 +2099,21 @@ def test_losing_wort_protein_acidifies_late_not_early():
     # tolerance here would let the two values drift far enough to break the ratio below while
     # both still "passed" [[feedback-pin-tolerance-vs-solver-tolerance]].
     early, late = base_1 - lost_1, base_7 - lost_7
-    assert early == pytest.approx(0.009810, abs=0.0005), (
+    assert early == pytest.approx(0.008688, abs=0.0005), (
         f"a 20 % pre-pitch protein loss moves day 1 by {early:.6f} pH; D-214 measured 0.017252, "
-        "D-222 0.008954 at Tyrell's own counted pitch, and D-223 0.009810 at the re-anchored "
-        "uptake rate"
+        "D-222 0.008954 at Tyrell's own counted pitch, D-223 0.009810 at the re-anchored uptake "
+        "rate, and D-239 0.008688 once 7.3 % of the wort's buffering moved out of the peptide "
+        "pool and into three amino-acid side chains that leave with the yeast — a 20 % loss of "
+        "a SMALLER pool is a smaller loss"
     )
-    assert late == pytest.approx(0.059003, abs=0.0015), (
+    assert late == pytest.approx(0.058608, abs=0.0015), (
         f"a 20 % pre-pitch protein loss moves day 7 by {late:.6f} pH; D-214 measured 0.058699, "
-        "D-222 0.057136 and D-223 0.059003"
+        "D-222 0.057136, D-223 0.059003 and D-239 0.058608"
     )
     assert late > 3.0 * early, (
         f"buffer removal is supposed to be LATE-weighted (D-214 measured day 7 at 3.4x day 1, "
-        f"D-222 at 6.4x, D-223 at 6.0x); here day 7 is {late / early:.2f}x day 1. If this "
+        f"D-222 at 6.4x, D-223 at 6.0x, D-239 at 6.7x); here day 7 is {late / early:.2f}x day 1. "
+        "If this "
         "ratio has fallen below 3, the shape "
         "argument that refuses trub settling as an answer to D-211 sec 9's brief no longer holds "
         "and the refusal needs re-measuring, not re-asserting."
@@ -2057,24 +2140,52 @@ def test_the_trub_window_is_empty_at_the_edge_that_parks_it(tmp_path, beer_param
 
     The old margins were tight and D-214 said so; D-222 loosened them and **D-223 gave them
     straight back**: the control's headroom above the floor went +0.0086 (D-214) to +0.0358
-    (D-222) and is +0.0033 again now. A faster engine ferments more completely and finishes more
-    acidic, so the high nitrogen-charge edge is back on the envelope's floor. What that costs is
-    stated where it binds -- the affordable day-7 loss falls 12.6 % to 1.2 % below, an
-    order of magnitude, so D-214's refusal is tight at BOTH ends again.
+    (D-222) and +0.0033 at D-223. A faster engine ferments more completely and finishes more
+    acidic, so the high nitrogen-charge edge went back onto the envelope's floor.
+
+    **D-239 SPENT the last of it, and this test's premise moved with it.** The three free
+    amino-acid side chains cost the day-7 course 0.020 pH, so the high edge's baseline is now
+    **0.0176 BELOW** the floor rather than 0.0033 above it. The affordable further loss at that
+    edge is therefore not small, it does not exist — which is why the quantitative end of this
+    test moved to the NOMINAL edge, where a bracket still exists (1.72 %), and the high edge is
+    kept as the pinned statement of what D-239 spent. Reading a bracket off an arm whose
+    baseline is already outside would be scoring a margin against a deficit
+    [[feedback-a-margin-is-a-claim-about-what-holds-it-open]].
+
+    **The verdict is unchanged and is now stronger at both ends.** Day 1 stays a SATURATION at
+    every edge — removing the entire peptide buffer still leaves it above its ceiling — and day
+    7 affords 9.98 % / 1.72 % / nothing across the low, nominal and high edges. No protein-loss
+    fraction satisfies both ends anywhere in the band.
     [[feedback-read-a-fast-curve-on-a-fixed-grid]] still applies
     to how this helper reads the curve (``np.interp`` onto the exact hour, never ``argmin`` over
     the solver's own output).
     """
-    hi = beer_params["nitrogen_uptake_charge_beer"].uncertainty.high
+    param = beer_params["nitrogen_uptake_charge_beer"]
+    hi = param.uncertainty.high
     data_dir = _beer_data_dir_with_nitrogen_charge(tmp_path, hi)
+    nominal_dir = _beer_data_dir_with_nitrogen_charge(tmp_path, param.value)
     floor_7 = 4.804 - 0.024
     ceiling_1 = TYRELL_PH_COURSE[1][1] + TYRELL_PH_READ_TOL
 
-    assert _tyrell_ph_with_peptide_loss(data_dir, 0.0, 7.0) > floor_7, (
-        "the unmodified high edge should still be inside the day-7 envelope (D-223 measures "
-        "0.0033 pH of headroom on a fixed-grid read, where D-222 measured 0.0358 and D-214 "
-        "0.0086); if it is not, this test's premise moved and the trub arithmetic below is "
-        "scored against the wrong baseline"
+    high_baseline = _tyrell_ph_with_peptide_loss(data_dir, 0.0, 7.0)
+    assert high_baseline == pytest.approx(4.7624, abs=0.005), (
+        f"the high edge's day-7 baseline is {high_baseline:.4f}; D-239 measures 4.7624, which is "
+        f"{floor_7 - high_baseline:.4f} pH BELOW the {floor_7:.3f} floor. Its history is "
+        "+0.0086 headroom at D-214, +0.0358 at D-222, +0.0033 at D-223, and D-239's amino-acid "
+        "split spent the rest. If this is back above the floor, something has returned "
+        "buffering to the finished beer and the arithmetic below is scored against the wrong "
+        "baseline"
+    )
+    assert high_baseline < floor_7, (
+        "the high edge is expected OUTSIDE the day-7 envelope since D-239 — this is the cost "
+        "that beat priced, not a regression to repair by weakening the term"
+    )
+    nominal_baseline = _tyrell_ph_with_peptide_loss(nominal_dir, 0.0, 7.0)
+    assert nominal_baseline > floor_7, (
+        f"the NOMINAL edge's day-7 baseline is {nominal_baseline:.4f}, at or below the "
+        f"{floor_7:.3f} floor. D-239 measures 4.7846. The nominal is where this test's "
+        "bracket now lives, so if it too has gone outside there is no arm left to score a "
+        "window on and the refusal has to be re-derived rather than cited"
     )
     # The end that CLOSES the window: day 1 cannot be reached at all, so no loss fraction can
     # satisfy both ends however much room day 7 has gained.
@@ -2089,15 +2200,24 @@ def test_the_trub_window_is_empty_at_the_edge_that_parks_it(tmp_path, beer_param
     # is deliberately wider than the bisection's own precision (8.935 %): a tight bracket here
     # would go red on solver noise rather than on the quantity moving.
     assert (
-        _tyrell_ph_with_peptide_loss(data_dir, 0.010, 7.0)
+        _tyrell_ph_with_peptide_loss(nominal_dir, 0.015, 7.0)
         > floor_7
-        > (_tyrell_ph_with_peptide_loss(data_dir, 0.015, 7.0))
+        > (_tyrell_ph_with_peptide_loss(nominal_dir, 0.020, 7.0))
     ), (
-        "day 7's affordable loss is no longer bracketed by [1.0 %, 1.5 %]; D-223 bisected it at "
-        "1.2 %, where D-222 measured 12.6 % and D-214 3.1 % at the retired scenario pitch. The "
-        "window has narrowed by an order of magnitude because the re-anchored uptake rate "
-        "finishes the ferment more completely and therefore more acidic — D-214's refusal is "
-        "back to being tight at BOTH ends rather than closed only at day 1"
+        "day 7's affordable loss at the NOMINAL edge is no longer bracketed by [1.5 %, 2.0 %]; "
+        "D-239 bisects it at 1.72 %. The arm moved from the high edge to this one at D-239 "
+        "because the high edge's own baseline left the envelope, so the series to compare "
+        "against is this edge's: D-214 3.1 %, D-222 12.6 % and D-223 1.2 % were all read at the "
+        "HIGH edge and are NOT continuous with this number "
+        "[[feedback-right-number-wrong-condition]]"
+    )
+    # And the high edge stated as what it now is: nothing is affordable there, so the loss that
+    # would be needed to satisfy day 1 is refused by day 7 before it starts. Asserted rather
+    # than left implicit, because "the baseline is already out" is exactly the condition under
+    # which a bisection would return a meaningless bracket instead of raising.
+    assert _tyrell_ph_with_peptide_loss(data_dir, 0.001, 7.0) < floor_7, (
+        "a 0.1 % protein loss at the high edge is inside the day-7 envelope, which would mean "
+        "the baseline is back above the floor and the premise assert above is passing vacuously"
     )
 
 
@@ -2225,7 +2345,9 @@ def _tyrell_degassed_ph_at_day(data_dir, day: float) -> float:
     return float(acidbase.degassed_ph_of_state(y, compiled.schema, params))
 
 
-def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_path, beer_params):
+def test_the_nitrogen_charge_bands_high_edge_now_finishes_BELOW_tyrells_envelope(
+    tmp_path, beer_params
+):
     """BOTH band edges, one threshold each — not a shared floor the tight edge rides for free.
 
     ``test_the_model_reaches_tyrells_measured_beer_ph`` scores the NOMINAL value only, and a
@@ -2244,6 +2366,21 @@ def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_p
     moved. The term itself is still derived from published wort composition, never fitted, and
     still a LOWER bound (the buffer-removal half of nitrogen uptake is inexpressible here and
     pushes the same way).
+
+    **D-239 BUILT that buffer-removal half and this test's headline claim is what it cost.** The
+    wort's three free amino-acid side chains — the ones Peyer names and this model had never
+    carried — buffer at t=0 and leave with the yeast, worth 0.020 pH at day 7. The low and
+    nominal edges stay inside Tyrell's envelope; **the HIGH edge does not**, finishing 0.018
+    below the floor. The test is renamed for what it now forbids rather than what it used to
+    assert [[feedback-name-guards-for-what-they-forbid]], and it keeps its teeth in the form
+    that matters: each edge is still pinned separately, the ordering is still asserted, and the
+    high edge's miss is bounded ABOVE so a further slide is caught.
+
+    **This is not an xfail and must not be converted into one.** D-208's strict-xfail idiom is
+    for something TRUE of the source and FALSE of the model. Here the model became more faithful
+    and the AGREEMENT got worse, which is a statement that a different term is missing — most
+    likely on the alkaline side, and D-232's open growth-extent residue is the standing
+    candidate. Filing a correct beat as a defect is how a later reader reverts it.
     """
     param = beer_params["nitrogen_uptake_charge_beer"]
     lo_ph = _tyrell_degassed_ph_at_day(
@@ -2259,16 +2396,24 @@ def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_p
 
     lo_bound, hi_bound = TYRELL_PH_COURSE[7]
     window = (lo_bound - TYRELL_PH_READ_TOL, hi_bound + TYRELL_PH_READ_TOL)
-    for label, value in (("low", lo_ph), ("nominal", nom_ph), ("high", hi_ph)):
+    for label, value in (("low", lo_ph), ("nominal", nom_ph)):
         assert window[0] <= value <= window[1], (
             f"the {label} edge finishes day 7 at {value:.4f}, outside Tyrell's envelope "
-            f"{lo_bound:.3f}-{hi_bound:.3f} widened by the {TYRELL_PH_READ_TOL} read tolerance"
+            f"{lo_bound:.3f}-{hi_bound:.3f} widened by the {TYRELL_PH_READ_TOL} read tolerance. "
+            "Since D-239 only the HIGH edge is expected outside; if a second edge has followed "
+            "it, the term's cost has grown beyond what that beat priced"
         )
+    assert hi_ph < window[0], (
+        f"the high edge finishes day 7 at {hi_ph:.4f}, INSIDE Tyrell's envelope. D-239 measures "
+        f"4.7625, {window[0] - hi_ph:.4f} below the {window[0]:.3f} floor. A return to the "
+        "inside means the amino-acid buffering has stopped reaching the day-7 course — check "
+        "that `_totals_molar` still carries the three side chains before re-pinning this"
+    )
     # Each edge pinned on its own, so a shift that moved them together could not hide inside a
     # single containment check.
-    assert lo_ph == pytest.approx(4.8266, abs=0.01)
-    assert nom_ph == pytest.approx(4.8049, abs=0.01)
-    assert hi_ph == pytest.approx(4.7833, abs=0.01)
+    assert lo_ph == pytest.approx(4.8069, abs=0.01)
+    assert nom_ph == pytest.approx(4.7846, abs=0.01)
+    assert hi_ph == pytest.approx(4.7625, abs=0.01)
     # ...and the high edge's margin, asserted as the number it is rather than described. It was
     # 0.003 pH at the retired scenario pitch (D-209), 0.036 at Tyrell's counted one (D-222)
     # because a less complete ferment finishes less acidic, and D-223 gave the whole of that back
@@ -2276,11 +2421,20 @@ def test_both_edges_of_the_nitrogen_charge_band_keep_day_7_in_the_envelope(tmp_p
     # still INSIDE Tyrell's envelope; it is inside by three thousandths of a pH unit, which is
     # what this assert now says out loud. Bounded ABOVE as well, so a further loss of
     # acidification is still caught.
-    assert 0.001 < hi_ph - window[0] < 0.010, (
-        f"the high edge's margin to the bottom of the admissible window is {hi_ph - window[0]:.4f}"
-        " pH; D-209 measured 0.003 at the retired 1.0 g/L scenario pitch and D-222 0.036 at "
-        "Tyrell's counted 0.398. A move in either direction is a change to the model's day-7 "
-        "acidification and needs attributing before this number is re-pinned"
+    assert 0.010 < window[0] - hi_ph < 0.030, (
+        f"the high edge now sits {window[0] - hi_ph:.4f} pH BELOW the bottom of the admissible "
+        "window. Its whole history is a margin ABOVE that floor until this beat: 0.003 at the "
+        "retired 1.0 g/L scenario pitch (D-209), 0.036 at Tyrell's counted 0.398 (D-222), 0.0033 "
+        "once D-223 re-anchored the uptake rate, and D-239's amino-acid split spent it and 0.018 "
+        "more. Bounded on BOTH sides on purpose: a smaller miss means the term is not reaching "
+        "this edge, a larger one means something beyond D-239 is acidifying the day-7 course"
+    )
+    # The nominal's remaining headroom, pinned as the quantity a next beat has to work inside.
+    # It is what stops "the high edge is out" being read as "the band is out".
+    assert 0.001 < nom_ph - window[0] < 0.015, (
+        f"the nominal edge's headroom above the floor is {nom_ph - window[0]:.4f} pH; D-239 "
+        "measures 0.0046. This is the room any further same-sign term has at the NOMINAL, and "
+        "it is now smaller than the read tolerance the envelope was widened by"
     )
 
 
@@ -2659,8 +2813,11 @@ def test_the_ph_course_endorses_NEITHER_pitch_and_the_count_is_what_decides():
 
     **What this forbids** is the obvious future move: "restore the pitch, the pH course scores
     better". It does not, and a pitch chosen to zero a downstream residual would be booking every
-    unbuilt beer-acid term into an inoculum. D-209 §8's buffer-removal half is still unbuilt and
-    still pushes day 1 DOWN, which is the term the +0.172 leaves room for.
+    unbuilt beer-acid term into an inoculum. D-209 §8's buffer-removal half was the term the
+    +0.172 was said to leave room for; **D-239 built it, and it took only 0.008 of the 0.172**,
+    because a buffer that leaves with the yeast is late-weighted by construction (that shape is
+    pinned by ``test_losing_wort_protein_acidifies_late_not_early``). So the day-1 miss is still
+    open and it no longer has a named candidate.
     """
 
     def score(pitch: float) -> tuple[float, int]:
@@ -2691,12 +2848,14 @@ def test_the_ph_course_endorses_NEITHER_pitch_and_the_count_is_what_decides():
     counted_miss, counted_inside = score(TYRELL_SCENARIO["pitch_gpl"])
     retired_miss, retired_inside = score(TYRELL_SCENARIO_RETIRED_PITCH_GPL)
 
-    assert counted_miss == pytest.approx(0.172, abs=0.03) and counted_miss > 0.0, (
+    assert counted_miss == pytest.approx(0.164, abs=0.03) and counted_miss > 0.0, (
         f"at Tyrell's counted pitch day 1 misses by {counted_miss:+.4f} pH; D-222 measured "
-        "+0.172, on the alkaline side. The SIDE is what leaves room for D-209 §8's unbuilt "
-        "buffer-removal half, so a sign change here is a different finding, not a drift"
+        "+0.172 and D-239 +0.164, on the alkaline side. The SIDE is what D-222 said leaves room "
+        "for D-209 §8's buffer-removal half — D-239 BUILT that half and it bought 0.008 pH of "
+        "the 0.172, because the term is late-weighted by construction. A sign change here is a "
+        "different finding, not a drift"
     )
-    assert retired_miss == pytest.approx(-0.259, abs=0.03) and retired_miss < 0.0, (
+    assert retired_miss == pytest.approx(-0.278, abs=0.03) and retired_miss < 0.0, (
         f"at the retired 1.0 g/L pitch day 1 misses by {retired_miss:+.4f} pH; D-222 measured "
         "-0.259, on the ACIDIC side. If the retired pitch is back to being the better-scoring "
         "one, D-216 §8's endorsement reading is live again and D-222 §6 needs re-measuring"
@@ -2705,10 +2864,33 @@ def test_the_ph_course_endorses_NEITHER_pitch_and_the_count_is_what_decides():
         "the day-1 miss no longer CROSSES ZERO between the two pitches. That crossing is the "
         "whole claim: it is what makes the pH course unable to referee the pitch"
     )
-    assert counted_inside == retired_inside == 7, (
-        f"days inside: {counted_inside} at the counted pitch, {retired_inside} at the retired "
-        "one; D-222 measured 7 at both. If they have separated, the count-vs-score argument "
-        "needs restating — one of them would then be scoring better on the coarse measure too"
+    # D-239 SEPARATED them, which this assert's own message asked for as a restatement rather
+    # than a re-pin. The counted pitch keeps 7 of 8 days; the retired one drops to 5, losing days
+    # 6 and 7 through the FLOOR — a heavier pitch ferments further and finishes more acidic, and
+    # the amino-acid buffering that leaves with the yeast takes another 0.020 pH off the late
+    # course on top of that.
+    #
+    # **The restatement is narrow and the claim it protects is unchanged.** The pH course now
+    # agrees with the count instead of being neutral between the two pitches, so nothing about
+    # "restore the pitch, the pH course scores better" has become true — it has become MORE
+    # false. What is no longer available is the stronger form of D-222 §6's argument, that the
+    # course cannot referee the pitch AT ALL: on the coarse measure it now can, and it referees
+    # in favour of the counted inoculum. The reason that must not be read as an endorsement is
+    # the one D-222 gave and this test still asserts above: the day-1 miss CROSSES ZERO between
+    # them, so whichever pitch scores better on a day count is still choosing between two
+    # different WRONG signs [[feedback-a-summary-statistic-is-not-the-curve]].
+    assert counted_inside == 7, (
+        f"the counted pitch keeps {counted_inside} of 8 days inside; D-222 and D-239 both "
+        "measure 7, with day 1 the only miss"
+    )
+    assert retired_inside == 5, (
+        f"the retired 1.0 g/L pitch keeps {retired_inside} of 8 days; D-222 measured 7 and D-239 "
+        "measures 5, losing days 6 and 7 below the floor. If it is back to 7 the separation has "
+        "closed and D-222 §6's stronger claim is live again — restate it, do not re-pin this"
+    )
+    assert counted_inside > retired_inside, (
+        "the sourced inoculum must not score WORSE than the retired one on the coarse measure; "
+        "if it does, the count-vs-score argument is being asked to defend a losing arm"
     )
 
 
@@ -4217,3 +4399,352 @@ def test_the_measured_course_peaks_later_the_colder_it_runs():
         "the strongest form of the claim: not merely a later peak, but no peak inside five "
         "days"
     )
+
+
+# ======================================================================================
+# 12. The wort's free amino-acid side chains — the buffer that LEAVES with the yeast
+#     (decision D-239)
+# ======================================================================================
+#
+# `peptide_buffer_capacity_beer` is back-solved so the model's wort reproduces Peyer's published
+# BC = 1.18. Until D-239 that back-solve ran on eight organic acids and the peptide lump and
+# nothing else, so the free amino acids' share of a real wort's buffering had nowhere to go but
+# into the lump — and the lump is permanent while the amino acids are eaten inside 24 h. The
+# split holds the wort's TOTAL at 1.18 and gives the two halves their real fates.
+
+
+def _d239_data_dir_without_the_term(tmp_path: Path) -> Path:
+    """A parameter dir with D-239 UNWIRED — the pre-split model, reconstructed coherently.
+
+    Both halves have to move together or the arm is not the old model, it is a double-count:
+    zeroing the three ratios alone would leave `nitrogen_uptake_charge_beer` carrying the three
+    side chains at their FULLY PROTONATED charge with nothing subtracting their dissociation, so
+    the pool would shed 0.234 mol+ per mole N instead of 0.177 and the arm would be MORE acidic
+    than either model [[feedback-gate-both-halves-of-a-pair]].
+    """
+    dest = tmp_path / "d239_off"
+    shutil.copytree(default_data_dir(), dest)
+    path = dest / "acidbase.yaml"
+    text = path.read_text(encoding="utf-8")
+    for name in acidbase.AMINO_BUFFER_RATIO_PARAMS.values():
+        text, n = re.subn(
+            rf"^({name}:\n  value: )[-0-9.eE]+$", r"\g<1>0.0", text, flags=re.MULTILINE
+        )
+        assert n == 1, f"{name}'s block shape moved; fix this helper"
+        text, n = re.subn(
+            rf"^({name}:\n(?:  (?!uncertainty)[^\n]*\n)*  uncertainty: )\{{[^\n]*\}}$",
+            r'\g<1>{ low: 0.0, high: 0.0, note: "D-239 unwired" }',
+            text,
+            flags=re.MULTILINE,
+        )
+        assert n == 1, f"{name}'s band shape moved; fix this helper"
+    text, n = re.subn(
+        r"^(nitrogen_uptake_charge_beer:\n  value: )[-0-9.eE]+$",
+        r"\g<1>0.1772",
+        text,
+        flags=re.MULTILINE,
+    )
+    assert n == 1
+    text, n = re.subn(
+        r"^(nitrogen_uptake_charge_beer:\n(?:  (?!uncertainty)[^\n]*\n)*  uncertainty: )"
+        r"\{[^\n]*\}$",
+        r'\g<1>{ low: 0.1665, high: 0.1880, note: "D-239 unwired" }',
+        text,
+        flags=re.MULTILINE,
+    )
+    assert n == 1
+    path.write_text(text, encoding="utf-8")
+    # The capacity moves back too: the lump re-absorbs what the split took out of it.
+    cap = dest / "beer_acids.yaml"
+    cap_text = cap.read_text(encoding="utf-8")
+    cap_text = cap_text.replace("1.4350620340127729", "1.5480662315921656")
+    cap.write_text(cap_text, encoding="utf-8")
+    return dest
+
+
+def test_the_wort_amino_buffer_is_a_reading_of_the_nitrogen_pool_and_leaves_with_it():
+    """Proportional to ``N``, zero without it — the claim that makes this not a second pool.
+
+    The three side chains hold no state slot; their concentration is a composition ratio times
+    the ``N`` slot. Two consequences are asserted rather than assumed, because between them they
+    are the whole reason no nitrogen is booked twice and no Process is needed:
+
+    * doubling the wort's nitrogen doubles all three, EXACTLY (a ratio, not a fit);
+    * a finished beer, whose nitrogen the yeast has taken, carries none of it.
+
+    The second is the term's entire content. A guard that only checked the wort would pass on an
+    implementation that seeded the three species and then never drained them — which is the
+    permanent-lump defect this beat exists to fix, wearing the new term's name.
+    """
+    params = _beer_acid_params().resolve()
+    one = acidbase.amino_buffer_from_gpl(0.1, "beer", params)
+    two = acidbase.amino_buffer_from_gpl(0.2, "beer", params)
+    assert set(one) == set(acidbase.AMINO_BUFFER_SPECS), "all three species or none"
+    for name, conc in one.items():
+        assert two[name] == pytest.approx(2.0 * conc, rel=1e-15), (
+            f"{name} is not proportional to the nitrogen pool; it is a composition ratio times "
+            "`N`, so twice the nitrogen must be exactly twice the species"
+        )
+    assert acidbase.amino_buffer_from_gpl(0.0, "beer", params) == dict.fromkeys(
+        acidbase.AMINO_BUFFER_SPECS, 0.0
+    ), "a wort with no assimilable nitrogen carries none of these"
+
+    # ...and on a real ferment, which is where the claim actually bites.
+    compiled = compile_scenario(
+        Scenario(
+            name="d239-drains",
+            medium="beer",
+            initial=dict(TYRELL_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=14.0,
+        )
+    )
+    res = compiled.run()
+    resolved = compiled.parameters.resolve()
+    states = np.asarray(res.y, dtype=float)
+    t_h = np.asarray(res.t, dtype=float)
+    at_start = acidbase.amino_buffer_molar(states[:, 0], compiled.schema, resolved)
+    day7 = np.array([np.interp(7 * 24.0, t_h, states[i, :]) for i in range(states.shape[0])])
+    at_day7 = acidbase.amino_buffer_molar(day7, compiled.schema, resolved)
+    assert all(v > 1e-5 for v in at_start.values()), (
+        f"the WORT carries no amino buffering ({at_start}); the term is inert from the start "
+        "and every number this beat measured would be a null"
+    )
+    assert all(v < 1e-9 for v in at_day7.values()), (
+        f"day 7 still carries {at_day7}; the pool must leave with the yeast, and a term that "
+        "stays is the permanent-lump defect D-239 exists to remove"
+    )
+
+
+def test_the_amino_buffer_split_holds_the_pools_net_charge_where_D209_measured_it():
+    """The decomposition is exact at the wort pH — the guard against a silent double-count.
+
+    ``nitrogen_uptake_charge_beer`` now carries the three side chains at their fully-protonated
+    charge and the balance carries their dissociation. At the pH the parameter is defined at,
+    the two halves must cancel term for term and leave D-209's 0.1772 mol+ per mole N. Nothing
+    downstream would raise if they did not: the anchor would simply absorb the difference and
+    every beer would start at the right pH carrying the wrong charge, which is exactly the shape
+    of defect D-234 found by census rather than by a red test.
+
+    Asserted on a COMPILED state rather than on the parameters, because it is the balance's
+    arithmetic that has to cancel, not the YAML's.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d239-identity",
+            medium="beer",
+            initial=dict(TYRELL_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=1.0,
+        )
+    )
+    resolved = compiled.parameters.resolve()
+    schema = compiled.schema
+    nitrogen_molar = float(compiled.y0[schema.slice("N")][0]) / M_NITROGEN
+
+    cation_side = acidbase.nitrogen_charge_molar(compiled.y0, schema, resolved)
+    pka = acidbase.build_pka_map(resolved)
+    h_wort = 10.0 ** (-TYRELL_WORT_PH)
+    anion_side = sum(
+        conc * acidbase.mean_charge(h_wort, pka[name])
+        for name, conc in acidbase.amino_buffer_molar(compiled.y0, schema, resolved).items()
+    )
+    net_per_mole_n = (cation_side - anion_side) / nitrogen_molar
+    assert net_per_mole_n == pytest.approx(0.1772, abs=5e-4), (
+        f"the pool's NET charge at the wort pH is {net_per_mole_n:.6f} per mole N; D-209 derived "
+        "0.1772 and D-239 only re-partitioned it. A move here means the charge is being counted "
+        "twice on one side of the balance"
+    )
+    # And it MOVES away from the wort pH, which is the physics the split buys. Frozen at 0.1772
+    # before D-239; D-209 §8 measured the real pool at +0.188 by pH 4.86 and called the freeze an
+    # understatement.
+    h_beer = 10.0 ** (-4.86)
+    anion_beer = sum(
+        conc * acidbase.mean_charge(h_beer, pka[name])
+        for name, conc in acidbase.amino_buffer_molar(compiled.y0, schema, resolved).items()
+    )
+    net_at_beer_ph = (cation_side - anion_beer) / nitrogen_molar
+    assert net_at_beer_ph > net_per_mole_n, (
+        "the pool's charge must RISE as pH falls (its side chains re-protonate); if it does not, "
+        "the term has the wrong sign and is buffering the wrong way"
+    )
+    assert net_at_beer_ph == pytest.approx(0.1877, abs=5e-4), (
+        f"at pH 4.86 the pool carries {net_at_beer_ph:.4f} per mole N; D-209 §8 measured the "
+        "real 18-species pool at +0.188 there, so three species reproduce essentially all of a "
+        "drift that used to be quoted as evidence the frozen value understated"
+    )
+
+
+def test_wine_carries_no_wort_amino_buffer_and_its_balance_is_untouched():
+    """Beer-only, and the reason is measurement rather than scope convenience.
+
+    The ratios are a malt wort's composition, and the same three species in Huang & Ough's must
+    are worth 0.73 % of wine's own acid buffering against beer's 6.7 % — wine is an order of
+    magnitude better buffered (D-209 §9's 48 vs 2-5 mEq/L/pH). Wine also speciates its amino
+    acids as state slots already (D-100) while keeping them charge-inactive, so closing the same
+    gap there is a different act on a different wiring.
+
+    D-209 §9 priced wine BEFORE letting its term help beer; this asserts the structural half of
+    that, which a number cannot: no wine state can reach these species at all.
+    """
+    params = _beer_acid_params().resolve()
+    assert acidbase.amino_buffer_from_gpl(0.3, "wine", params) == {}, (
+        "a must must never carry the wort's amino-buffer ratios — they are a malt composition"
+    )
+    compiled = compile_scenario(
+        Scenario(
+            name="d239-wine",
+            medium="wine",
+            initial={
+                "brix": 22.0,
+                "yan_mgl": 250.0,
+                "initial_ph": 3.4,
+                "pitch_gpl": 0.25,
+                "tartaric_gpl": 6.0,
+            },
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+            duration_days=1.0,
+        )
+    )
+    resolved = compiled.parameters.resolve()
+    totals = acidbase._totals_molar(compiled.y0, compiled.schema, resolved)
+    assert not (set(totals) & set(acidbase.AMINO_BUFFER_SPECS)), (
+        f"a wine charge balance carries {set(totals) & set(acidbase.AMINO_BUFFER_SPECS)}; "
+        "D-239 is beer-only and a wine that reads these is a silently changed medium"
+    )
+    assert acidbase.ph_of_state(compiled.y0, compiled.schema, resolved) == pytest.approx(
+        3.4, abs=1e-6
+    ), "the wine anchor must be exactly what it was"
+
+
+def test_an_unanchored_beer_gets_no_amino_buffer_either():
+    """The D-179 gate, on the new term — an empty balance must stay empty.
+
+    An un-anchored beer carries 200-odd mg/L in ``N`` with every acid slot at 0 (``_beer_acids``
+    seeds them from ``initial_ph`` or not at all). ``nitrogen_charge_molar`` is gated on
+    :func:`acidbase.charge_balance_is_populated` because ungated it would hand that empty balance
+    +0.0025 mol/L of cation and answer pH ~11. The amino term is the mirror image — three ANIONS
+    with no cation to meet them — and needs the same gate for the same reason.
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d239-ungated",
+            medium="beer",
+            initial={k: v for k, v in TYRELL_SCENARIO.items() if k != "initial_ph"},
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=1.0,
+        )
+    )
+    resolved = compiled.parameters.resolve()
+    assert acidbase.amino_buffer_molar(compiled.y0, compiled.schema, resolved) == {}, (
+        "an un-anchored beer got amino buffering; nitrogen is not pH information on its own and "
+        "an unpopulated balance must not be fabricated from it"
+    )
+    assert acidbase.ph_of_state(compiled.y0, compiled.schema, resolved) == pytest.approx(
+        7.0, abs=1e-9
+    ), "an empty balance still reads 7.0, byte-for-byte the pre-D-179 beer"
+
+
+def test_the_amino_buffer_is_in_the_ph_solve_and_out_of_the_TA_equivalents_sum():
+    """D-209 §8c's asymmetry, extended — and here the reason is arithmetic, not a scruple.
+
+    :func:`acidbase.titratable_acidity` approximates each acid's contribution as
+    ``protons - mean_charge``, i.e. every proton down to the fully dissociated species. On an
+    amino acid that would count the α-amino proton at pKa 8.8-9.9, which does not come off before
+    a titration's 8.2 endpoint — so including these would invent equivalents. They stay in the
+    pH SOLVE, where they belong, and out of the SUM.
+
+    Checked by reconstructing the sum from the same state and the same pH: a test that merely
+    compared two TA numbers could not tell "excluded from the sum" from "worth very little".
+    """
+    compiled = compile_scenario(
+        Scenario(
+            name="d239-ta",
+            medium="beer",
+            initial=dict(TYRELL_SCENARIO),
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=1.0,
+        )
+    )
+    resolved = compiled.parameters.resolve()
+    schema = compiled.schema
+    shipped = acidbase.titratable_acidity(compiled.y0, schema, resolved)
+
+    pka = acidbase.build_pka_map(resolved)
+    totals = acidbase._totals_molar(compiled.y0, schema, resolved)
+    byp = acidbase._byp_succinic_molar(compiled.y0, schema)
+    ph = acidbase.solve_ph(
+        totals, acidbase._cation(compiled.y0, schema, resolved), byp, 0.0, pka
+    )
+    h = 10.0 ** (-ph)
+    rebuilt = byp * (acidbase.BYP_AS_SUCCINIC.protons - acidbase.mean_charge(h, pka["Byp"]))
+    with_them = rebuilt
+    for name, conc in totals.items():
+        if name in acidbase.AMINO_BUFFER_SPECS:
+            with_them += conc * (
+                acidbase.AMINO_BUFFER_SPECS[name].protons - acidbase.mean_charge(h, pka[name])
+            )
+            continue
+        term = conc * (acidbase.ALL_ACIDS[name].protons - acidbase.mean_charge(h, pka[name]))
+        rebuilt += term
+        with_them += term
+
+    assert shipped == pytest.approx(rebuilt * (M_TARTARIC / 2.0), rel=1e-12), (
+        "beer's TA is not the sum with the three side chains EXCLUDED; if they have joined the "
+        "equivalents sum, the endpoint approximation is inventing an α-amino proton that no "
+        "titration to pH 8.2 removes"
+    )
+    assert shipped != pytest.approx(with_them * (M_TARTARIC / 2.0), rel=1e-9), (
+        "including them would give the SAME answer, so this test cannot tell the two apart and "
+        "proves nothing [[feedback-a-non-vacuity-check-can-itself-be-vacuous]]"
+    )
+
+
+def test_the_amino_buffer_costs_the_day_7_course_and_almost_nothing_at_day_1(tmp_path):
+    """The term's own price, against the model it replaced — both halves unwired together.
+
+    The comparison arm restores `nitrogen_uptake_charge_beer` to D-209's 0.1772, zeroes the three
+    ratios and puts the peptide capacity back to its pre-split root. That is the ONLY coherent
+    way to switch this off: the split moved charge between two places, so unwiring one place
+    alone leaves the pool shedding 0.234 per mole N instead of 0.177.
+
+    The shape is the finding, and it is stronger than the shape
+    ``test_losing_wort_protein_acidifies_late_not_early`` predicted for any buffer-removal term
+    two records before this one was built. That test said such a term is worth little early and
+    much later. Measured, this one is worth **+0.0023 pH at day 1 — the OTHER SIGN** — and the
+    reason is a number this file already pins elsewhere: only **0.298** of the wort's nitrogen is
+    drawn by 24 h (``test_the_day_1_pH_miss_survives_the_timing_fix_and_has_CHANGED_SIDES``, and
+    it is inside Tyrell's own cell-count spread). So at day 1 the pool is still **70 % present**
+    and its three side chains are still buffering, while the share of the permanent lump they
+    replaced has already gone — the wort is briefly better buffered than before the split, not
+    worse. Only from day 2, when uptake has run (9.2 % of the pool left), does the sign settle
+    negative: -0.0140 at day 2, -0.0202 by day 7, flat after.
+
+    **This depends on the uptake calendar and would invert if that moved.** D-209 §7 measured
+    uptake as >99 % complete by 24 h, and on THAT calendar the pool would already be gone at day
+    1 and the early sign would be negative. D-211 and D-222 re-derived it to 0.298. A beat that
+    moves beer's uptake timing again must re-measure this sign rather than cite it
+    [[feedback-a-calibrated-level-decays-when-anything-upstream-moves]].
+
+    **So the term makes beer's one missed day slightly WORSE**, since day 1 misses on the
+    alkaline side. That is recorded here rather than buried in the record, because it is the
+    whole reason this beat shipped on fidelity rather than on agreement
+    [[feedback-closer-to-reality-decides]] — and because a later reader looking for the day-1
+    candidate D-222 reserved will find it spent, with the sign against them.
+    """
+    off = _d239_data_dir_without_the_term(tmp_path)
+    for day, expected in ((0.0, 0.0), (1.0, +0.0023), (2.0, -0.0140), (7.0, -0.0202)):
+        with_term = _tyrell_degassed_ph_at_day(default_data_dir(), day)
+        without = _tyrell_degassed_ph_at_day(off, day)
+        assert with_term - without == pytest.approx(expected, abs=0.0015), (
+            f"day {day:.0f}: the amino-buffer split moves the course by "
+            f"{with_term - without:+.4f} pH, D-239 measures {expected:+.4f}"
+        )
+    # Day 0 is EXACTLY zero, not merely small, and that is the structural claim: the t=0 cation
+    # back-solve absorbs a species that is present when the anchor is taken (D-178's phosphate
+    # result), so a re-partition of the wort cannot move the pH the scenario asked for. If this
+    # ever became non-zero the anchor would be absorbing the term only approximately, which is
+    # how a charge error hides [[feedback-the-setting-where-a-change-is-exact-is-the-control]].
+    assert _tyrell_degassed_ph_at_day(default_data_dir(), 0.0) == pytest.approx(
+        _tyrell_degassed_ph_at_day(off, 0.0), abs=1e-9
+    ), "the anchored t=0 pH must be identical with and without the split"

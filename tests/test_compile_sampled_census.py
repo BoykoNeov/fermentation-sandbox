@@ -370,6 +370,35 @@ CENSUS: Mapping[str, str] = {
         "REPAIRED — y0_for_member re-seeds the `copper` slot per member (D-236), restoring "
         "f(Cu) == 1; a scenario that NAMES copper_gpl is deliberately left alone"
     ),
+    # D-239's six: the three wort amino-buffer RATIOS and the three side-chain pKas. All six are
+    # read at compile (the t=0 anchor's totals, and beer's peptide back-solve, both now carry the
+    # three species) and at runtime (every `ph_of_state`), so they are census members by the
+    # predicate. All six are PINNED ZERO-WIDTH, which is why the row is conditional rather than
+    # clean: the repair is real, and today nothing exercises it.
+    **dict.fromkeys(
+        (
+            "wort_aspartate_per_n",
+            "wort_glutamate_per_n",
+            "wort_histidine_per_n",
+            "pKa_aspartate_side_chain",
+            "pKa_glutamate_side_chain",
+            "pKa_histidine_side_chain",
+        ),
+        "REPAIRED, and repaired AHEAD of the band rather than behind it (D-239) — y0_for_member's "
+        "rules 1 and 3 both hand the member's own map to cation_charge_for_ph and "
+        "peptide_capacity_for_wort_bc, and since D-239 both reach these six through "
+        "_totals_molar, so a drawn value moves every compile role. All six ship PINNED zero-width "
+        "(one composition column; printed pKas with no published spread), so no member draws one "
+        "today. Rule 3's exact-nominal skip WAS keyed on pKa_peptide_buffer alone, which would "
+        "have re-opened D-233's defect the moment any of these was banded: measured, banding "
+        "wort_aspartate_per_n by +-5 % and drawing it put eight members' worts at BC 1.1831-"
+        "1.1883 with every seed still at the nominal literal. The skip now compares EVERY name "
+        "the back-solve reads, and the same arm then returns BC 1.180000000 for all eight — "
+        "bit-identical while the six stay pinned, correct the moment one is not. ONE THING LEFT "
+        "BEFORE BANDING ANY OF THEM: the ratios share a denominator with "
+        "nitrogen_uptake_charge_beer's band, so they must move together or the pool's charge "
+        "stops reconciling [[feedback-a-locked-pair-repairs-or-drifts-together]]",
+    ),
     "biomass_carrying_capacity": "BY-DESIGN — a scenario override is the MODE of the draw (D-164)",
     "k_autolysis": "BY-DESIGN — a scenario override is the MODE of the draw (D-164)",
 }

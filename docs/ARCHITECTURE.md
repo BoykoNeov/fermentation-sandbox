@@ -359,6 +359,21 @@ module:
   keeps `carbonic_molar` positional — an omitted nitrogen term would be invisible otherwise.
 - **It rides D-179's opt-in gate.** `charge_balance_is_populated` must be true, or an un-anchored
   beer's empty balance would get cation charge with no acid to meet it and read ~11 instead of 7.
+- **Three of that pool's species are now on the ANION side too (D-239).** Peyer §5.5 puts
+  aspartate (pKa 3.86), glutamate (4.25) and histidine (6.04) at ~10 % of a wort's buffering
+  capacity, and beer carried none of them — the back-solved `peptide_buffer` lump absorbed their
+  share, and the lump is permanent while the amino acids are eaten. `acidbase.AMINO_BUFFER_SPECS`
+  is the **third "include-by-reading" entry** after `Byp` (D-18) and `carbonic` (D-182): keys in
+  the pKa map that belong to no acid registry and hold no state slot. Their concentration is
+  `ratio · [N]` (`wort_*_per_n`, all in `PH_SYSTEM_READS`), so the pool drains with uptake and no
+  nitrogen is booked twice. `z̄` above absorbed the split — it now carries the three at their
+  fully-protonated charge, and the two halves cancel at wort pH to D-209's own 0.1772 exactly.
+  **Beer-only**, measured not preferred: the same three in a must are worth 0.73 % of wine's acid
+  buffering against beer's 6.7 %, and wine speciates its amino acids as slots already (D-100).
+  `_totals_molar` therefore takes `params`, required, for the reason `_cation` does.
+  Cost: 0.000 pH at t=0, **+0.0023 at day 1** (the pool is still 70 % present), −0.0202 at day 7,
+  which takes the high edge of `nitrogen_uptake_charge_beer`'s band **outside** Tyrell's day-7
+  envelope. That is a priced worsening of agreement in exchange for fidelity, not a regression.
 - **It moves wine's SO₂ readout**, which is the non-obvious downstream reach: the −0.097 pH costs
   an anchored wine, molecular SO₂ rises **0.228 → 0.284 mg/L (+24.7 %)** while free SO₂ moves
   0.5 % — the pool is unchanged, its speciation is not. Anything scored against a molecular-SO₂
