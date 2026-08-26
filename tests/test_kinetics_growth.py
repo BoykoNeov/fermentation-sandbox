@@ -606,3 +606,282 @@ def test_the_extent_residue_is_a_two_way_frame_ambiguity_and_both_branches_are_p
         "which would make the settling branch untenable and leave the cell-mass branch alone. "
         "D-230's two-way ambiguity would then be a one-way finding"
     )
+
+
+# ---------------------------------------------------------------------------
+# D-232: the two candidate discriminators for D-230's frame ambiguity, both
+# measured and both REFUTED, plus the reframe that survives
+# ---------------------------------------------------------------------------
+
+
+def _tyrell_cells_per_gram_nitrogen(yan_mgl: float = TYRELL_ASSUMED_YAN_MGL) -> list[float]:
+    """Tyrell's counted NEW crop over the wort nitrogen that built it, cells per g N.
+
+    A raw counted ratio: no ``biomass_N_fraction``, no engine gram, no Process. New cells
+    rather than total, because the wort nitrogen builds only new biomass — the pitched
+    cells came from the propagator. The total-cell convention is scored as a sensitivity
+    in the guard below rather than left as an unexamined choice.
+    """
+    return sorted(
+        (peak - TYRELL_PITCH_CELLS) * 1e6 * 1e3 / (yan_mgl / 1000.0)
+        for peak in TYRELL_CELL_COUNT[TYRELL_PEAK_DAY]
+    )
+
+
+def test_the_per_day_settled_share_cannot_discriminate_the_two_branches(tmp_path):
+    """D-232's FIRST candidate discriminator, ruled out AS CIRCULAR — measured, not argued.
+
+    The obvious way to separate D-230's branches: flocculation is triggered by sugar
+    run-down, so branch 2's settling must be near zero early. Ask how much of the crop it
+    would need to have removed by day 1 against day 3, and if it needs MORE gone early than
+    late, flocculation-timed settling is impossible and branch 1 stands alone.
+
+    **It does not work, because the answer is chosen by ``mu_max`` rather than by the data.**
+    The model's cell count at day 1 is the fitted growth fraction times the extent, and
+    D-211 fitted that fraction ON this curve, NORMALISED ON THE PEAK — the same
+    non-separability D-230 §6 found for wort nitrogen. Here it bites harder than inertness
+    would: the required-share profile is not flat across the band, it **spans the SIGN of the
+    verdict**. At the low band edge day 1 needs LESS settled than day 3 (branch 2 survives);
+    at the high edge it needs MORE (branch 2 dies). A discriminator whose verdict is set by
+    where you stand inside a fitted parameter's own band is not evidence.
+
+    This is pinned so the next beat does not re-invent it. **Day 3 is inert by construction**
+    — it is the peak the fit normalises on — and that contrast is asserted too, because it is
+    what shows the movement at days 1-2 is the normalisation and not physics.
+    """
+    shipped = load_parameters(default_data_dir() / "beer_generic.yaml")["mu_max"]
+    pitch_gpl = cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS * 1e6)
+    per_cell_g = pitch_gpl / (TYRELL_PITCH_CELLS * 1e6 * 1e3)
+
+    def shares(data_dir: Path, day: int) -> list[float]:
+        _, t_h, x, _ = _tyrell_beer_growth(data_dir=data_dir)
+        made = (float(np.interp(day * 24.0, t_h, x)) - x[0]) / per_cell_g / 1e3
+        return sorted(1.0 - (c - TYRELL_PITCH_CELLS) * 1e6 / made for c in TYRELL_CELL_COUNT[day])
+
+    low = _beer_params_with_mu(tmp_path / "lo", shipped.uncertainty.low)
+    high = _beer_params_with_mu(tmp_path / "hi", shipped.uncertainty.high)
+
+    # The sign reversal IS the finding: day 1 vs day 3 flips across the band.
+    lo_d1, lo_d3 = shares(low, 1), shares(low, 3)
+    hi_d1, hi_d3 = shares(high, 1), shares(high, 3)
+    assert lo_d1[0] < lo_d3[0], (
+        f"at mu_max={shipped.uncertainty.low} day 1 needs {lo_d1[0]:.3f} settled against day "
+        f"3's {lo_d3[0]:.3f} — D-232 measured the LOW edge as the arm on which settling looks "
+        "possible. If both edges now agree, the discriminator has become usable and D-230's "
+        "ambiguity can be re-opened with it"
+    )
+    assert hi_d1[0] > hi_d3[0], (
+        f"at mu_max={shipped.uncertainty.high} day 1 needs {hi_d1[0]:.3f} settled against day "
+        f"3's {hi_d3[0]:.3f} — D-232 measured the HIGH edge as the arm on which settling is "
+        "impossible. The two edges disagreeing in SIGN is what rules this test out as evidence"
+    )
+    # Day 3 is pinned by the normalisation and must NOT move; day 1 must.
+    assert abs(hi_d3[0] - lo_d3[0]) < 0.02, (
+        f"the day-3 required share moved {abs(hi_d3[0] - lo_d3[0]):.4f} across the band; "
+        "D-232 measured 0.003. Day 3 is the peak the growth fit normalises on, so movement "
+        "there means the fit frame changed, not that this discriminator improved"
+    )
+    assert abs(hi_d1[0] - lo_d1[0]) > 0.15, (
+        f"the day-1 required share moved only {abs(hi_d1[0] - lo_d1[0]):.4f} across the band; "
+        "D-232 measured 0.348. If this has become small, the profile has stopped being driven "
+        "by the rate fit and the discriminator may be worth re-running"
+    )
+
+
+def test_the_ph_clock_measures_the_known_day_one_ph_miss_and_not_settling():
+    """D-232's SECOND candidate discriminator, ruled out by a defect ALREADY on record.
+
+    Tyrell Fig. 4 has three panels. The count panel measures biomass in SUSPENSION; the pH
+    panel measures nitrogen uptake — D-209's proton exchange — i.e. biomass MADE. That is a
+    genuinely independent clock: under branch 1 the two agree in shape before day 3, and
+    under late settling the counts are depressed late, so normalising them on day 3 inflates
+    their early fraction. ``mu_max`` does not enter, because the map inverted is a STATE
+    relation and not a time course.
+
+    **The clock's entire signal sits at day 1** — days 2 and 3 are both at nitrogen
+    saturation and carry no information — **and day 1 is exactly where the model's pH is
+    already known to be wrong.** D-222 recorded a +0.172 miss at Tyrell's counted pitch, on
+    the alkaline side, which is D-209 §8's unbuilt buffer-removal half. Converted into the
+    clock's own units that defect is worth ~0.15 in nitrogen fraction, against a signal of
+    +0.13 to +0.21. **It accounts for the whole of it.**
+
+    So the clock re-measures the pH gap. It is pinned here as a RATIO — defect against the
+    width of Tyrell's own day-1 count envelope — so that a beat which builds the missing
+    buffer removal turns this test red and gets told the clock has become usable.
+    """
+    from fermentation.core import acidbase
+    from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+    from tests.test_organic_acids import TYRELL_PH_COURSE
+
+    compiled = compile_scenario(
+        Scenario(
+            name="d232-ph-clock",
+            medium="beer",
+            initial={
+                "glucose_gpl": 0.15 * TYRELL_CELL_SUGAR_GPL,
+                "maltose_gpl": 0.70 * TYRELL_CELL_SUGAR_GPL,
+                "maltotriose_gpl": 0.15 * TYRELL_CELL_SUGAR_GPL,
+                "yan_mgl": TYRELL_ASSUMED_YAN_MGL,
+                "pitch_gpl": cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS * 1e6),
+                "initial_ph": 5.65,
+            },
+            temperature_schedule=[TemperaturePoint(day=0.0, celsius=15.0)],
+            duration_days=14.0,
+        )
+    )
+    res = compiled.run()
+    params = compiled.parameters.resolve()
+    y = np.asarray(res.y, dtype=float)
+    t_h = np.asarray(res.t, dtype=float)
+    n = y[compiled.schema.slice("N").start, :]
+    ph = np.array(
+        [acidbase.degassed_ph_of_state(y[:, i], compiled.schema, params) for i in range(y.shape[1])]
+    )
+    n_frac = (n[0] - n) / (n[0] - n.min())
+
+    model_ph_d1 = float(np.interp(24.0, t_h, ph))
+    meas_hi_d1 = TYRELL_PH_COURSE[1][1]
+    assert model_ph_d1 - meas_hi_d1 == pytest.approx(0.162, abs=0.03), (
+        f"the day-1 pH miss is {model_ph_d1 - meas_hi_d1:+.3f}; D-232 measured +0.162 and "
+        "D-222 recorded +0.172 in its own frame. If this has closed, the buffer-removal half "
+        "has been built and the pH clock is worth re-running as a discriminator"
+    )
+
+    # The same map, inverted at both pH values: the defect in nitrogen-fraction units.
+    order = np.argsort(ph)
+    defect = float(np.interp(meas_hi_d1, ph[order], n_frac[order])) - float(
+        np.interp(model_ph_d1, ph[order], n_frac[order])
+    )
+    envelope = (TYRELL_CELL_COUNT[1][1] - TYRELL_CELL_COUNT[1][0]) / (
+        (TYRELL_CELL_COUNT[3][0] + TYRELL_CELL_COUNT[3][1]) / 2.0 - TYRELL_PITCH_CELLS
+    )
+    assert defect == pytest.approx(0.148, abs=0.02), (
+        f"the known pH defect is worth {defect:.3f} in nitrogen fraction; D-232 measured 0.148"
+    )
+    assert defect > 0.6 * envelope, (
+        f"the pH defect ({defect:.3f}) has fallen below 60 % of the width of Tyrell's own "
+        f"day-1 count envelope ({envelope:.3f}). D-232's refusal rests on the defect being "
+        "the same size as anything the clock could report; if it is now small, the clock "
+        "separates branch 1 from branch 2 and D-230's ambiguity is decidable"
+    )
+
+
+def test_the_engines_wine_yield_read_as_a_count_disagrees_twofold_with_the_beer_trial():
+    """What survives when both discriminators fail — and it ADDS a branch rather than closing one.
+
+    ``biomass_N_fraction`` cancels exactly between the two routes (both go as 1/``f_N``), and
+    so does the engine's 4e-11 gram, because Coleman's ``Y_X/N`` is itself a COUNT times
+    4e-11 (D-219 §2, his Methods verbatim). Dividing it back out recovers a raw counted ratio
+    — cells per gram of assimilated nitrogen — on both sides.
+
+    **The two sides are NOT the same epistemic class and this test must not imply they are.**
+    Tyrell's is a figure transcription. The other is THIS REPO's fitted regression
+    (``biomass_N_yield_log_intercept``/``_slope``, D-13/D-14) evaluated at Coleman's 330 mg
+    N/L, carrying a published-typo correction to the slope exponent. Checked against
+    Coleman's full text: **"10.06" and "10.1" appear nowhere in it**, and his prose says only
+    that the yield *"can be estimated from the relationships shown in Fig. 4"*. So D-219's
+    table entry and this number are one regression evaluated twice, not two routes agreeing.
+    Stated as "the engine's own wine yield against the beer trial it is scored against".
+
+    **What it relocates.** The residue is not a defect in beer's growth Process and not a
+    beer-side modelling choice: it is a 2x disagreement about a ratio that was counted. And
+    it names a THIRD reading D-230 did not — different organism, different medium — which
+    would dissolve the two-way ambiguity rather than close either branch. **Half of that
+    third reading is refuted here**: the nitrogen-level half goes the WRONG WAY, deepening
+    the disagreement to 3.25-4.21x, which is D-230's own harmonisation fence arriving from
+    the count side. What is left of it is the organism/medium half, which nothing sources.
+    """
+    import math
+
+    wine = load_parameters(default_data_dir() / "wine_generic.yaml")
+    a0 = wine["biomass_N_yield_log_intercept"]
+    a1 = wine["biomass_N_yield_log_slope"]
+    gram = cells_per_ml_to_pitch_gpl(1e6) / (1e6 * 1e3)
+    coleman_n, tyrell = 330.0, _tyrell_cells_per_gram_nitrogen()
+
+    # **The gram here is COLEMAN's 4e-11, not the engine's — they are the same number only
+    # because D-219 adopted his.** Recovering his raw count means undoing the multiplication
+    # HIS Methods describe, so if a later beat ever moves the engine's gram this calculation
+    # must keep using his. Asserted rather than left as a comment, because the two silently
+    # coincide today and a divergence would corrupt the Coleman side with no symptom.
+    assert gram == pytest.approx(4e-11, rel=1e-12), (
+        f"the engine's gram is {gram:.3e} g/cell and no longer equals Coleman's own stated "
+        "4e-11. This test recovers his COUNT by dividing his yield by the figure he assumed; "
+        "at any other value it divides by the wrong one. Use 4e-11 explicitly here"
+    )
+
+    def factor(a0v: float, a1v: float, n_init: float, tyr: list[float] = tyrell) -> list[float]:
+        return sorted(math.exp(a0v + a1v * n_init) / gram / t for t in tyr)
+
+    central = factor(a0.value, a1.value, coleman_n)
+    assert central == pytest.approx([2.03, 2.63], abs=0.05), (
+        f"the central disagreement is {central[0]:.2f}-{central[1]:.2f}x; D-232 measured "
+        "2.03-2.63. Both edges are Tyrell's peak-day strain spread at one assumed YAN"
+    )
+
+    # The HEADLINE range is the regression's own 5-95 % credible regions, corner-swept. It is
+    # an over-wide rectangle on a correlated pair, so it BOUNDS the spread; it is used here
+    # precisely because it is the widest sensitivity and must not be quietly beaten by one.
+    corners = [
+        f
+        for a0v in (a0.uncertainty.low, a0.value, a0.uncertainty.high)
+        for a1v in (a1.uncertainty.low, a1.value, a1.uncertainty.high)
+        for f in factor(a0v, a1v, coleman_n)
+    ]
+    assert (min(corners), max(corners)) == pytest.approx((1.32, 4.03), abs=0.05), (
+        f"across the regression's own credible regions the factor is {min(corners):.2f}-"
+        f"{max(corners):.2f}x; D-232 measured 1.32-4.03 and made it the headline range"
+    )
+    assert min(corners) > 1.0, (
+        f"the disagreement's low edge is {min(corners):.2f}x — it no longer excludes 1.0, so "
+        "there may be no disagreement at all and D-232's whole reframe re-opens"
+    )
+
+    # The unfavourable convention, scored rather than left unexamined: counting Tyrell's
+    # TOTAL crop instead of the new cells the nitrogen actually built.
+    total = sorted(
+        peak * 1e6 * 1e3 / (TYRELL_ASSUMED_YAN_MGL / 1000.0)
+        for peak in TYRELL_CELL_COUNT[TYRELL_PEAK_DAY]
+    )
+    total_factor = factor(a0.value, a1.value, coleman_n, tyr=total)
+    assert total_factor == pytest.approx([1.45, 1.73], abs=0.05), (
+        f"on the total-cell convention the factor is {total_factor[0]:.2f}-"
+        f"{total_factor[1]:.2f}x; D-232 measured 1.45-1.73. It survives the wrong convention"
+    )
+
+    # D-230's fence, arriving from the count side: correcting for the nitrogen difference
+    # DEEPENS the disagreement instead of explaining it away.
+    at_tyrells_n = factor(a0.value, a1.value, TYRELL_ASSUMED_YAN_MGL)
+    assert at_tyrells_n[0] > central[1], (
+        f"evaluating the wine yield at Tyrell's own {TYRELL_ASSUMED_YAN_MGL:.0f} mg N/L gives "
+        f"{at_tyrells_n[0]:.2f}-{at_tyrells_n[1]:.2f}x against {central[0]:.2f}-"
+        f"{central[1]:.2f}x at Coleman's 330. D-232's point is that this is WORSE, which is "
+        "why the nitrogen-level reading is refused and D-230's harmonisation fence holds"
+    )
+    assert at_tyrells_n == pytest.approx([3.25, 4.21], abs=0.05), (
+        f"D-232 measured 3.25-4.21x at Tyrell's nitrogen; this run gives "
+        f"{at_tyrells_n[0]:.2f}-{at_tyrells_n[1]:.2f}"
+    )
+
+    # **The cancellation is RUN, not asserted in prose.** The docstring's whole claim to being
+    # model-free is that ``biomass_N_fraction`` drops out — both routes go as 1/f_N — so the
+    # same disagreement is re-derived through the per-cell-mass form at BOTH edges of that
+    # parameter's own band and must reproduce the count-route factor. Without this the guard
+    # would be a ratio pinned by a formula that simply omits f_N, which proves nothing about
+    # whether omitting it was legitimate.
+    f_n = load_parameters(default_data_dir() / "beer_generic.yaml")["biomass_N_fraction"]
+    for edge in (f_n.uncertainty.low, f_n.value, f_n.uncertainty.high):
+        dx_gpl = (TYRELL_ASSUMED_YAN_MGL / 1000.0) / edge
+        per_cell_tyrell = sorted(
+            dx_gpl / ((peak - TYRELL_PITCH_CELLS) * 1e6 * 1e3)
+            for peak in TYRELL_CELL_COUNT[TYRELL_PEAK_DAY]
+        )
+        per_cell_coleman = (1.0 / edge) / (math.exp(a0.value + a1.value * coleman_n) / gram)
+        via_mass = sorted(p / per_cell_coleman for p in per_cell_tyrell)
+        assert via_mass == pytest.approx(central, rel=1e-9), (
+            f"at biomass_N_fraction={edge} the per-cell-mass route gives {via_mass[0]:.3f}-"
+            f"{via_mass[1]:.3f}x against the count route's {central[0]:.3f}-{central[1]:.3f}x. "
+            "These must agree to machine precision at EVERY value: f_N appears in both "
+            "numerator and denominator and cancels. If they differ, one of the two routes has "
+            "stopped being 1/f_N and this test's model-free claim is void"
+        )

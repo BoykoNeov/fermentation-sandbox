@@ -1,6 +1,6 @@
 ---
 name: beer-growth-extent
-description: "D-230 — beer's 1.55x growth-extent overshoot is NOT a nitrogen error: both of D-222's candidates are closed, and what is left is a two-way frame ambiguity with both branches priced"
+description: "D-230/D-232 — beer's 1.55x growth-extent overshoot is NOT a nitrogen error; both D-222 candidates closed, BOTH ways of deciding the residue refused, and the residue is now THREE-way"
 metadata:
   node_type: memory
   type: project
@@ -73,9 +73,51 @@ single sourced copy (joining `BEER_COUNTED_PITCH_CELLS_PER_ML`, D-228). `test_ac
 charge machinery and reads the shared table; its zbar re-derivation passing unchanged is the proof
 the move preserved the table. **Do not re-transcribe either table anywhere else.**
 
-## Still open after D-230
+# D-232 — BOTH WAYS OF DECIDING THE RESIDUE ARE REFUSED, AND THERE IS NOW A THIRD BRANCH.
 
-1. **The extent gap itself** — attributed and bounded, NOT closed. Needs branch 1 or branch 2 named.
+The owner authorised **measuring which branch the evidence favours**, explicitly NOT moving
+`cells_per_ml_to_pitch_gpl`. Nothing moved. What must never be re-invented:
+
+* **The day-1-vs-day-3 settling profile is REFUSED — and NOT for being inert.** It **reverses its
+  verdict** across `mu_max`'s own band: at 0.053 day 1 needs LESS settled than day 3 (flocculation
+  possible), at 0.075 MORE (impossible). Span at day 1 is **0.348**; day 3 is inert at **0.0028**
+  because it is the peak the fit normalises on. **Inert would mean "no information"; flipping means
+  "information about the FIT".** Do not re-propose this test unless both band edges agree.
+* **The pH panel as an independent clock is REFUSED, by a defect already on record.** The count panel
+  measures biomass IN SUSPENSION, the pH panel measures nitrogen uptake = biomass MADE, and inverting
+  a STATE map keeps `mu_max` out. But the whole signal sits at **day 1** (days 2-3 are at saturation),
+  and day 1 carries the model's known **+0.162** alkaline miss — D-209 §8's unbuilt buffer-removal
+  half. In the clock's own units that defect is worth **0.148** in nitrogen fraction against a signal
+  of **+0.13 to +0.21**: it accounts for ALL of it, and is **70 %** of the width of Tyrell's own day-1
+  count envelope. **Re-runnable ONLY once buffer removal is built** — a guard says so.
+* **THERE IS A THIRD BRANCH and this beat ADDED it rather than closing one.** Wine yeast in must at
+  330 mg N/L and ale yeast in wort at ~190 are not the same organism in the same medium. **Its
+  nitrogen-level half is REFUSED and goes the WRONG WAY** — Coleman's own regression at 200 mg N/L
+  deepens the disagreement from **2.03-2.63× to 3.25-4.21×**, which is the harmonisation fence above
+  arriving from the count side on a quantity it was not derived from. The **organism/medium half is
+  untouched and unsourced**, and is the residue.
+* **The disagreement is best stated as a COUNT, and NOT as "two trials".** `biomass_N_fraction` and
+  the 4e-11 gram both cancel (Coleman's `Y_X/N` IS a count × 4e-11), leaving **cells per gram of
+  assimilated N**: engine-wine **2.515e11** vs Tyrell **0.955-1.236e11**. Central **2.03-2.63×**;
+  headline **1.32-4.03×** across the regression's own credible regions; **1.45-1.73×** on the wrong
+  (total-cell) convention. **The sign survives every band — nothing reaches 1.0.** But the Coleman
+  side is **THIS REPO's fit**, so never call it two independent trials.
+* **Branch 1 cannot be SIZED, only signed.** Across `biomass_N_fraction`'s own band the demand is
+  **58-131 pg**; wort nitrogen moves it 3-6 %. The lowest edge anywhere is **57.8 pg = 1.44×** the
+  engine's 40, so it never collapses onto the gram either.
+* **The gram is NOT isolable from the rate fit.** Falsification arm A doubled it: **4 REDs predicted,
+  10 got** — same structural reason `yan_mgl` isn't isolable. Restore SHA-256 verified, arm B green.
+* **Sourcing is EMPTY and the negative HAS A SCOPE.** Patterns run over all five beer texts AND
+  Peyer's 243-page thesis in full: `dry (cell )?weight`, `dry matter`, `g dry`, `per cell`,
+  `cells per g`, `cells/g`, `pg`, `10^1[0-2] cells`, `pitching rate`, `million cells`, `cells/mL`,
+  `g/hL`. Nothing. What turns up is a **third instance of the PRODUCT-dosing frame D-219 rejected**
+  (*Concepts in Wine Chemistry*: 20 g/hL ↔ 1e6 cells/cc ⇒ **200 pg**). It is not a rival reading.
+
+## Still open after D-232
+
+1. **The extent gap itself** — attributed and bounded, NOT closed, and now **THREE-way**. Both
+   published ways of deciding it are refused above.
 2. **No settling / flocculation Process**, in either medium (rate-blocked).
-3. `mu_max`'s timing residue, `E_a_fusels`, wine's two calibration frames, `k_ester_volatil`'s
+3. **D-209 §8's buffer-removal half** — unbuilt, and now also the gate on the pH clock.
+4. `mu_max`'s timing residue, `E_a_fusels`, wine's two calibration frames, `k_ester_volatil`'s
    sourcing — all where D-227/D-228 left them. Wine's nitrogen budget was never audited this way.

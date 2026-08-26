@@ -31,11 +31,12 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-26)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-230** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1868 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — COLLECTED, not carried: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-232** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1871 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
 Beer acid-base = **EIGHT** beats BUILT (D-178→D-183, D-207→D-209, D-211), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms.
+**D-232 REFUSED BOTH ways of deciding D-230's residue** (a settling profile that flips SIGN across `mu_max`'s band; a pH clock that only re-measures a known +0.162 day-1 miss) and **ADDED a third branch** — it widened the ambiguity, never narrowed it.
 **D-213 BUILT beer's wort O₂ — sourced and INERT**, and its decline of the O₂→growth coupling rested on "none of the six predictions is reachable in the default set": **growth EXTENT now is** (D-230 §7). Owner's call to re-open, never a beat's.
 
 ## Do NOT re-propose — I did, twice, from stale "Next:" breadcrumbs
@@ -316,14 +317,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   On Tyrell's counts the model is INSIDE the spread days 1-3 and peaks day 3 **when sampled DAILY**.
   Taper stays REFUSED (no ester course); the **1.55× extent overshoot is CLOSED as a nitrogen
   question at D-230** — see the next block. → `prohibitions/beer-growth-cutoff.md`
-- **Beer's growth EXTENT overshoot (D-230)** — **NOT a nitrogen error; both D-222 candidates CLOSED.**
-  Peyer T16 (transcribed at D-209 for its RATIOS) sums to **164 mg N/L + 25-30 NH4 = 189-194**, so the
-  assumed **200 is 1.03-1.06×** — and T16 has **no proline**, so NO FAN→YAN fix is owed. Partition
-  REFUSED by arithmetic: Tyrell's crop at 40 pg needs **20-26 % cell N** (band tops 0.14). `yan_mgl`
-  is **NOT isolable** — arm A predicted 4 REDs, got 8; the peak IS the ceiling `mu_max` normalises on.
-  Residue is a **TWO-WAY frame ambiguity**: cells **71-92 pg** OR **44-56 % already settled** at peak;
-  a beat closing it MUST say which. **No `Flags:` on D-219** (prose only). **Never** harmonise beer
-  onto Coleman's Y_X/N (→ ~9×). → `prohibitions/beer-growth-extent.md`
+- **Beer's growth EXTENT overshoot (D-230, D-232)** — **NOT a nitrogen error; both D-222 candidates CLOSED.**
+  Peyer T16 sums to **189-194 mg N/L** (assumed 200 = 1.03-1.06×) and has **no proline** — no FAN→YAN fix owed.
+  Partition REFUSED: Tyrell's crop at 40 pg needs **20-26 % cell N** (band tops 0.14). Neither `yan_mgl` nor the
+  **gram** is isolable from the rate fit (arms predicted 4 REDs, got 8 and 10). Residue is now **THREE-way** —
+  71-92 pg cells, OR 44-56 % settled at peak, OR a different organism/medium. **D-232 REFUSED BOTH ways of
+  deciding it**: the day1-vs-day3 settling profile **flips SIGN** across `mu_max`'s band (not inert — 0.348 at
+  day 1, 0.003 at day 3), and the pH clock only re-measures D-209 §8's **+0.162** day-1 miss (= 0.148, 70 % of
+  the envelope). **Never** harmonise onto Coleman's Y_X/N (→ ~9×). → `prohibitions/beer-growth-extent.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
