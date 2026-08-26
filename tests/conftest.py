@@ -50,6 +50,17 @@ def seed_amino_acids(
     return y
 
 
+#: A COUNTED beer pitching rate, cells/mL — the one sourced inoculum two test modules both
+#: need, kept here for the same reason :func:`seed_amino_acids` is (one statement, one means).
+#: Foster 2022 (*Front. Microbiol.* 13:747546) pitched 1.2e7 cells/mL of ale yeast into a
+#: 12.5 °P all-malt wort; ``test_organic_acids`` scores that trial's courses and
+#: ``test_kinetics_byproducts`` uses it as the aroma calibration frame's inoculum (D-228).
+#: Converted to the engine's g/L by :func:`fermentation.units.cells_per_ml_to_pitch_gpl`, the
+#: same boundary D-222 put Tyrell's count through — never by a flat gram-per-litre, which
+#: D-219 showed is a dry-yeast DOSING convention back-computed into a cell mass.
+BEER_COUNTED_PITCH_CELLS_PER_ML = 1.2e7
+
+
 # Gay-Lussac mass split: glucose -> 2 ethanol + 2 CO2. Derived from the shared
 # stoichiometry in fermentation.core.chemistry (single source of truth) so the
 # toy's flows close to machine precision against total_carbon / total_mass.

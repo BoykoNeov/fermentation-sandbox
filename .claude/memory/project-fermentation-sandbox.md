@@ -29,8 +29,8 @@ index row — and NO whole-file total, removed at D-177** (`.claude/hooks/check_
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-25)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-227**; sensory 1a/1b + **D-139's leftovers ALL
+## Status (2026-08-26)
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-228**; sensory 1a/1b + **D-139's leftovers ALL
 closed** (D-148/9). Suite **1861 + 5 xfail** (3 D-188 Herzan; 2 D-215's own). **§2.2's beer criterion is a PASSING test
 again since D-223** — 6.04 d inside 5-7 — but the pass is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)**. D-202
 ascorbate COMPLETED Fig 24.12's top group; **D-203/205/206 REFUSED** the sotolon ascorbate route, Pham's pH+ethanol
@@ -309,6 +309,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   constant. Drift 13.91 %→0.73 %, residue now `mu_max`'s TIMING; **never claim exact ester
   invariance**. **Never re-propose** the coupling, Luedeking-Piret, Wang's 23.7, or re-anchoring
   WINE's `k_isoamyl_acetate`. → `prohibitions/beer-aroma-calibration-levels.md` (D-227 block FIRST)
+- **The growth CUTOFF behind beer's aroma taper (D-228)** — it was the calibration frame's
+  **INOCULUM**, not the growth law: that frame pitched a flat **1.0 g/L** (2.5× a counted ale — the
+  residual D-219 retired and D-222 fixed only in Tyrell's scenario). Now COUNTED (1.2e7/mL); levels
+  invariant **6e-7** so no re-anchor, and the ONLY guard that can see it is the growth WINDOW
+  (0.785→1.199 d). **D-226 §8 / D-227 §10's "still the thing that would fix the taper" is CORRECTED.**
+  On Tyrell's counts the model is INSIDE the spread days 1-3 and peaks day 3 **when sampled DAILY**.
+  Taper stays REFUSED (no ester course); **1.55× extent overshoot stays D-222's** — the MEBAK count
+  can't settle it (X+X_dead 5.404 vs X 5.378). → `prohibitions/beer-growth-cutoff.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

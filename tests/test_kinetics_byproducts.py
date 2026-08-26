@@ -62,7 +62,9 @@ from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.sensory.descriptors import MaxRuleProjector
 from fermentation.sensory.oav import sensory_profile
+from fermentation.units import cells_per_ml_to_pitch_gpl
 from fermentation.validation import assert_conserved, assert_nonnegative, total_carbon
+from tests.conftest import BEER_COUNTED_PITCH_CELLS_PER_ML
 
 #: Representative species the pools book against (mirrors the Process constants).
 _ESTER_C = carbon_mass_fraction("ethyl_acetate")
@@ -1182,6 +1184,21 @@ _BEER_AROMA_TARGET_LITERALS = {
 _BEER_CALIBRATION_DAYS = 21.0
 _BEER_CALIBRATION_CELSIUS = 20.0
 
+#: The frame's INOCULUM, and it is a COUNT (D-228). It carried a flat 1.0 g/L from D-99 until
+#: D-228 — 2.5x a counted ale pitch, and the same back-computed residual D-219 retired and
+#: D-222 corrected in `TYRELL_SCENARIO`; this frame was simply never revisited. It is what made
+#: "growth stops dead at day 0.92 with 81 % of the sugar unfermented" (D-226 §8) TRUE HERE and
+#: nowhere the archive has counts: at 1.0 g/L the nitrogen ceiling is reached in 0.79 d and the
+#: five higher alcohols are at 99.99 % of their finished level by day 1, where at this counted
+#: pitch they are at 67 %. The eight calibrated LEVELS are invariant to the correction (6e-5 %,
+#: measured across both registries below), which is why it is free — and why it owes a guard
+#: that can see it, since no level guard can.
+_BEER_CALIBRATION_PITCH_GPL = cells_per_ml_to_pitch_gpl(BEER_COUNTED_PITCH_CELLS_PER_ML)
+
+#: What this frame carried before D-228, named rather than left in the history: the guards below
+#: run BOTH arms, so a value that is only mentioned in prose could not be one of them.
+_BEER_CALIBRATION_RETIRED_PITCH_GPL = 1.0
+
 #: The five Ehrlich pools, spelled out rather than derived, because the claim under test is
 #: exactly that these five move together and the two esters do not.
 _BEER_EHRLICH_POOLS = (
@@ -1202,7 +1219,7 @@ def _beer_calibration_scenario(celsius: float = _BEER_CALIBRATION_CELSIUS) -> Sc
             "maltose_gpl": 70.0,
             "maltotriose_gpl": 15.0,
             "yan_mgl": 200.0,
-            "pitch_gpl": 1.0,
+            "pitch_gpl": _BEER_CALIBRATION_PITCH_GPL,
         },
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=celsius)],
         duration_days=_BEER_CALIBRATION_DAYS,
@@ -1219,6 +1236,40 @@ def _beer_aroma_levels_mgl(data_dir=None, celsius: float = _BEER_CALIBRATION_CEL
     )
     traj = compiled.run(t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0]))
     return {pool: float(traj.series(pool)[-1]) * 1000.0 for pool in _BEER_AROMA_TARGETS_MGL}
+
+
+def _beer_aroma_levels_at_pitch(pitch_gpl: float) -> dict[str, float]:
+    """All eight pools' finished levels at one inoculum, everything else the shipped frame."""
+    frame = _beer_calibration_scenario()
+    scenario = Scenario(
+        name=frame.name,
+        medium=frame.medium,
+        initial={**frame.initial, "pitch_gpl": pitch_gpl},
+        temperature_schedule=frame.temperature_schedule,
+        duration_days=frame.duration_days,
+    )
+    compiled = compile_scenario(scenario)
+    traj = compiled.run(t_eval=np.array([0.0, _BEER_CALIBRATION_DAYS * 24.0]))
+    pools = [spec.pool for spec in FUSEL_SPECS] + [spec.pool for spec in ESTER_SPECS]
+    return {pool: float(traj.series(pool)[-1]) * 1000.0 for pool in pools}
+
+
+def _beer_growth_gain_time(pitch_gpl: float, fraction: float) -> float:
+    """Days for ``fraction`` of the biomass gain, on a FIXED one-minute grid."""
+    frame = _beer_calibration_scenario()
+    scenario = Scenario(
+        name=frame.name,
+        medium=frame.medium,
+        initial={**frame.initial, "pitch_gpl": pitch_gpl},
+        temperature_schedule=frame.temperature_schedule,
+        duration_days=5.0,
+    )
+    compiled = compile_scenario(scenario)
+    grid = np.linspace(0.0, 5.0 * 24.0, 5 * 24 * 60 + 1)
+    x = np.asarray(compiled.run(t_eval=grid).y, dtype=float)[compiled.schema.slice("X").start, :]
+    peak = int(np.argmax(x))
+    gain = (x[: peak + 1] - x[0]) / (x[peak] - x[0])
+    return float(np.interp(fraction, gain, grid[: peak + 1])) / 24.0
 
 
 def _beer_all_aroma_levels_mgl(data_dir: Path | None = None) -> dict[str, float]:
@@ -1352,6 +1403,79 @@ def test_the_finished_beer_lands_the_aroma_levels_its_rate_constants_are_defined
             f"in it) -- do NOT relax this tolerance, and read D-224 before deciding the level is "
             f"the thing that should move."
         )
+
+
+def test_the_beer_calibration_frames_inoculum_is_a_counted_pitch():
+    """D-222's boundary conversion, applied to the OTHER beer scenario (D-228).
+
+    The frame the eight aroma constants are defined in pitched a flat 1.0 g/L from D-99 until
+    D-228. That number is not a pitching rate anybody measured: D-219 showed it is a RESIDUAL,
+    a dry-yeast DOSING convention (a gram of product per litre) back-computed into ~100 pg/cell
+    against a settled 40. Every counted pitch in this repo goes through
+    :func:`~fermentation.units.cells_per_ml_to_pitch_gpl`, and this one now does too.
+
+    Asserted as a RELATION to the conversion rather than as the resulting float, so a change to
+    the settled per-cell mass moves the frame instead of silently contradicting it.
+    """
+    scenario = _beer_calibration_scenario()
+    assert scenario.initial["pitch_gpl"] == cells_per_ml_to_pitch_gpl(
+        BEER_COUNTED_PITCH_CELLS_PER_ML
+    ), (
+        "the aroma calibration frame's pitch is no longer the counted inoculum converted at the "
+        "boundary; if it is back to a flat gram-per-litre, read D-219 before re-introducing one"
+    )
+    assert scenario.initial["pitch_gpl"] != _BEER_CALIBRATION_RETIRED_PITCH_GPL
+
+
+def test_the_pitch_correction_leaves_every_calibrated_aroma_level_where_it_was(tmp_path):
+    """The measurement that LICENSES D-228, run rather than cited.
+
+    The correction is free only because the eight levels do not move, and that is not obvious:
+    the synthesis half is exactly pitch-invariant (``int(mu*X*f_growth) dt = YAN /
+    biomass_N_fraction`` does not mention the inoculum) but the three esters are STRIPPED by a
+    first-order sink integrating against a moving pool, and a lighter pitch spreads formation
+    over 1.5x more time. D-226 measured this invariance when the sink read the flux SHAPE;
+    D-227 moved the sink onto evolved CO2, so it is re-measured here on the shipped rate law.
+
+    Enumerated from the REGISTRIES (D-225's rule), not from a literal list -- a ninth pool must
+    join this comparison the day it is added.
+    """
+    shipped = _beer_all_aroma_levels_mgl()
+    retired = _beer_aroma_levels_at_pitch(_BEER_CALIBRATION_RETIRED_PITCH_GPL)
+    assert set(shipped) == set(retired)
+    worst = max(abs(retired[pool] / shipped[pool] - 1.0) for pool in shipped)
+    assert worst < 1e-5, (
+        f"the retired 1.0 g/L pitch and the counted one now disagree by {worst:.3e} relative "
+        f"across the eight pools; D-228 measured 6e-7 and shipped the correction BECAUSE it was "
+        f"invisible to every level. If this is real, the eight constants need re-anchoring and "
+        f"that is a beat, not a tolerance change."
+    )
+
+
+def test_the_calibration_frames_growth_window_is_no_longer_a_single_day():
+    """The claim D-228 corrects, measured on the frame that produced it.
+
+    D-226 §8 and D-227 §10 both name "growth stops dead at day 0.92 with 81 % of the sugar still
+    to ferment" as the inherited limitation behind beer's aroma taper, and the memory ledger
+    carries it as the next thing to fix. It is a statement about THIS frame's retired inoculum:
+    nitrogen-limited growth reaches a ceiling that is fixed in ABSOLUTE terms, so a heavier pitch
+    reaches it sooner. At the counted pitch the same wort takes 1.5x longer to get there.
+
+    Read on a FIXED grid, because the quantity is a time on a steep limb
+    (feedback-read-a-fast-curve-on-a-fixed-grid).
+    """
+    counted = _beer_growth_gain_time(_BEER_CALIBRATION_PITCH_GPL, 0.90)
+    retired = _beer_growth_gain_time(_BEER_CALIBRATION_RETIRED_PITCH_GPL, 0.90)
+    assert retired == pytest.approx(0.785, abs=0.01), (
+        f"at the RETIRED 1.0 g/L pitch 90 % of the growth takes {retired:.3f} d; D-228 measured "
+        f"0.785, which is the number D-226 §8 reported as 'day 0.92' (that is its 99 % point)"
+    )
+    assert counted > 1.15, (
+        f"at the counted pitch 90 % of the growth takes {counted:.3f} d, back inside the single "
+        f"day D-228 measured it out of (1.199). The window is what the correction buys -- the "
+        f"levels are invariant, so this is the only assert that can see the change"
+    )
+    assert counted / retired == pytest.approx(1.528, abs=0.03)
 
 
 def test_no_drawn_speed_knob_moves_the_five_higher_alcohols_and_barely_moves_the_esters(

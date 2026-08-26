@@ -91,6 +91,7 @@ from fermentation.runtime import simulate
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units import cells_per_ml_to_pitch_gpl
 from fermentation.validation import BENCHMARKS
+from tests.conftest import BEER_COUNTED_PITCH_CELLS_PER_ML
 
 # --------------------------------------------------------------------------------------
 # Tyrell et al. (2013), BrewingScience 66:75-84 — the matched dataset. FIGURE READS; the
@@ -2636,7 +2637,7 @@ FOSTER_FERMENTABLE_GPL = 92.0
 
 #: The counted pitch. This is the number the whole beat turns on, because the engine works
 #: in g/L and the paper works in cells/mL — see :data:`PER_CELL_DRY_MASS_PG`.
-FOSTER_PITCH_CELLS_PER_ML = 1.2e7
+FOSTER_PITCH_CELLS_PER_ML = BEER_COUNTED_PITCH_CELLS_PER_ML  # one copy, in tests/conftest.py
 
 #: Gravity was sampled at these hours only (Fig. 2 panels A-D). **This is why Foster's
 #: "3 days" is a CEILING and not a duration:** the prose reads *"The Beer 1 control strains
