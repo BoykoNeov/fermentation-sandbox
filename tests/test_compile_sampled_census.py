@@ -61,6 +61,22 @@ arms drive ``simulate_scheduled`` by hand and never reach ``y0_for_member`` — 
 **re-scoped**, not deleted, to pin the mechanism while
 :func:`test_the_copper_seed_moves_with_the_member` pins the repair. A guard that keeps passing
 across a repair is not evidence the repair was inert; read what path it drives.
+
+**The census is WIRING-INVARIANT (decision D-237).** D-234 scored it over the ``direct`` oxidative
+set only. Re-run against ``cascade`` and ``direct_burst`` on every battery member it is identical
+in both directions, because the three sets differ in which *Processes* are wired and a Process is a
+runtime consumer — compile-time reads come from the seam's seeding and the verbs, which do not
+branch on the oxidative set. The copper repair reaches every wiring bit-identically, which D-236 §5
+could only argue: PRE-repair 16.65 % (direct) / 15.38 % (cascade) / 16.73 % (burst), all to
+0.0000 %. The cascade is the *mildest* arm, not the widest as D-234 §9 expected — it moves twice
+the O₂ and less browning, because it multiplies one shared gate that every sink downstream splits.
+
+**The one LIVE row here is not a census member at all** — it is the census's *complement*, found by
+that widening: ``burst_antioxidant_initial`` is banded 50×, seeds a live pool, and no Process
+declares it, so the sampler can never reach it
+(:func:`test_the_burst_seed_carries_a_fifty_fold_band_the_ensemble_never_draws`). Three cells, and
+only two of them had a guard before D-237: compile-read AND sampled (here), banded AND drawn but
+inert (``test_drawability_surface.py``), banded and live and **never drawn** (nothing, until now).
 """
 
 from __future__ import annotations
@@ -830,3 +846,214 @@ def test_a_scenario_override_is_the_mode_of_the_draw_not_a_discarded_input():
             <= asked
             <= plain.parameters[name].uncertainty.high
         )
+
+
+# -- the alternate oxidative wirings, measured rather than argued (decision D-237) --------------
+#
+# D-234 §9 named the `oxidative="cascade"` / `"direct_burst"` sets an unmeasured third battery
+# member, "expected to widen §5's number". D-236 §5 then argued the copper repair reaches them for
+# free — it moves the SEED, and every consumer mean-centres on the same reference — and said in as
+# many words that this was "a mechanical argument, not a measurement". These are the measurement.
+
+#: The two non-default wirings. `direct` is not here because the tests above already are it, and
+#: beer is not here because `_OXIDATIVE_BURST_BEER == _OXIDATIVE_DIRECT_BEER` — a beer burst arm
+#: would be a duplicate rather than a third number, asserted below rather than assumed.
+_ALT_WIRINGS = ("cascade", "direct_burst")
+
+
+def _seed_and_a420_wired(scenario, oxidative: str, *, repaired: bool, n_members: int = 8):
+    """:func:`_seed_and_a420`'s arm, under a chosen wiring and with the repair on or off.
+
+    ``y0_for_member=None`` reproduces the pre-D-233 fixed-``y0`` path exactly (``run_ensemble``
+    uses ``kwargs.setdefault``), so the PRE arm here is the shipped code before the repair and
+    not a re-implementation of it — which is what lets it serve as this test's positive control
+    per wiring [[feedback-a-null-result-needs-a-positive-control]].
+
+    8 members rather than 12: the POST claim is exact equality, which does not get stronger with
+    more draws, and the PRE control clears 10 % at 8. The measurement in the record used 12.
+    """
+    compiled = compile_scenario(scenario, oxidative=oxidative)
+    kwargs = {} if repaired else {"y0_for_member": None}
+    ens = compiled.run_ensemble(n_members=n_members, seed=0, only=["copper_typical"], **kwargs)
+    assert ens.sampled_names == ("copper_typical",), f"drew {ens.sampled_names}"
+    assert ens.n_succeeded >= 2, "need at least two members for a spread"
+    cu, a420 = ens.schema.slice("copper"), ens.schema.slice("A420")
+    seeds = [float(ens.members[i][cu, 0][0]) for i in range(ens.n_succeeded)]
+    drawn = [float(ens.member_params[i]["copper_typical"]) for i in range(ens.n_succeeded)]
+    endpoints = [float(ens.members[i][a420, -1][0]) for i in range(ens.n_succeeded)]
+    return seeds, drawn, endpoints, float(ens.nominal[a420, -1][0])
+
+
+def test_beers_burst_set_is_beers_direct_set_so_it_is_not_a_third_number():
+    """Why the wiring sweep is wine-only — the identity is asserted, not assumed.
+
+    ``AntioxidantBurstOxidation`` is wine-only (Ferreira 2015's dataset is red wine and beer
+    carries no ``burst_antioxidant`` slot), so ``get_medium("beer", oxidative="direct_burst")``
+    is the direct beer build unchanged. Counting a beer burst arm as a third measurement would be
+    reporting the same number twice — the denominator hazard
+    [[feedback-count-and-print-your-skips]] in its quietest form, because nothing skips.
+    """
+    from fermentation.core.media import _OXIDATIVE_BURST_BEER, _OXIDATIVE_DIRECT_BEER
+
+    assert _OXIDATIVE_BURST_BEER == _OXIDATIVE_DIRECT_BEER, (
+        "beer's burst set has diverged from its direct set — a beer `direct_burst` arm is now a "
+        "genuinely third wiring and this sweep no longer covers it"
+    )
+
+
+@pytest.mark.parametrize("oxidative", _ALT_WIRINGS)
+def test_the_copper_repair_holds_under_every_oxidative_wiring(oxidative):
+    """D-236 §5's mechanical argument, turned into a measurement — and it holds.
+
+    Under every wiring ``copper_typical`` reaches the run only through a multiplier mean-centred
+    on itself: ``PhenolicBrowning``'s ``f(Cu)`` under the direct sets, and
+    :func:`~fermentation.core.kinetics.oxidative_cascade.activation_rate`'s re-homed copy of the
+    same D-134 term under the cascade (where ``PhenolicBrowning`` is absent and ``A420`` comes
+    from ``QuinonePolymerization`` instead). So re-seeding the slot restores ``f(Cu) == 1`` per
+    member whatever is wired downstream, and the aged endpoint is bit-identical.
+
+    The PRE arm is the control and it is not decoration: it is what makes the POST equality a
+    null result rather than a harness that perturbed nothing. Measured at 12 members —
+    cascade 15.38 %, direct_burst 16.73 % — both to 0.0000 %.
+    """
+    pre_seeds, drawn, pre_ends, pre_nominal = _seed_and_a420_wired(
+        WINE_BROWNING, oxidative, repaired=False
+    )
+    assert len(set(drawn)) == len(drawn), "the draw produced no spread; the arms are vacuous"
+    assert pre_nominal > 0.0, f"no browning under {oxidative} — the members would agree vacuously"
+    assert len(set(pre_seeds)) == 1, "the PRE arm is meant to pin the seed at the nominal"
+    pre_worst = max(abs(e - pre_nominal) for e in pre_ends) / pre_nominal
+    assert pre_worst > 0.10, (
+        f"under {oxidative} the un-repaired path moves aged A420 by only {pre_worst:.2%}; this "
+        "control is what stops the POST equality below from being satisfied by a dead harness"
+    )
+
+    seeds, drawn, endpoints, nominal = _seed_and_a420_wired(WINE_BROWNING, oxidative, repaired=True)
+    assert seeds == drawn, (
+        f"under {oxidative} a member's `copper` seed is not its own drawn `copper_typical`"
+    )
+    assert nominal == pre_nominal, "the nominal member must not depend on the repair"
+    assert endpoints == [nominal] * len(endpoints), (
+        f"aged A420 is not bit-identical across members under {oxidative}. D-236 §5 argued the "
+        "seed repair reaches every wiring because they all mean-centre on the same reference; a "
+        "RED here means some consumer reads `copper_typical` OUTSIDE that difference, and the "
+        "argument is false for this wiring — measure it, do not loosen this to a rel="
+    )
+
+
+@pytest.mark.parametrize("oxidative", _ALT_WIRINGS)
+def test_a_named_copper_survives_the_repair_under_every_oxidative_wiring(oxidative):
+    """The honest channel, checked under the alternate wirings too.
+
+    A wine that states ``copper_gpl`` must keep its seed and must keep browning differently as
+    the reference moves — that is physics, and D-24's exclusion says a parameter draw may never
+    overwrite it. The condition is invisible from the repaired side, so it owes its own arm under
+    every wiring the repaired side is claimed for. Measured at 12 members: cascade 13.05 %,
+    direct_burst 14.42 %, and the PRE/POST numbers are identical because the rule does not fire.
+    """
+    stated = float(WINE_BROWNING_NAMED.initial["copper_gpl"])
+    seeds, drawn, endpoints, nominal = _seed_and_a420_wired(
+        WINE_BROWNING_NAMED, oxidative, repaired=True
+    )
+    assert seeds == [stated] * len(seeds), (
+        f"under {oxidative} the per-member builder overwrote a scenario input with a parameter "
+        "draw — D-24's exclusion is breached"
+    )
+    assert len(set(drawn)) == len(drawn), "the draw produced no spread; the arm is vacuous"
+    assert max(abs(e - nominal) for e in endpoints) / nominal > 0.05, (
+        f"under {oxidative} a drawn reference no longer moves browning for a wine that stated "
+        "its copper — the mean-centring has lost its physics, not just its artefact"
+    )
+
+
+@pytest.mark.parametrize("scenario", BATTERY + (WINE_BROWNING,), ids=lambda s: s.name)
+def test_the_census_itself_is_the_same_under_every_oxidative_wiring(scenario):
+    """The census was scored over the DIRECT wiring only (D-234 §9). It is wiring-invariant.
+
+    This is the widest reading of "the alternate wiring is unmeasured": not just whether the
+    copper repair survives, but whether swapping the oxidative set puts any *new* name into the
+    compile-read-AND-sampled overlap. It does not, in either direction, on any battery member —
+    which is what makes D-234's 32-name census a statement about the engine rather than about
+    one of its three wirings.
+
+    The reason is structural and worth stating, because it is what a future beat would break:
+    the three sets differ in which **Processes** are wired, and a Process is a runtime consumer.
+    Compile-time reads come from the seam's seeding and the verbs, which do not branch on the
+    oxidative set. A wiring that ever seeds its own state from a parameter would land here.
+    """
+    baseline = _census(scenario)[1]
+    direct_names = set(compile_scenario(scenario).process_set.enabled_snapshot())
+    for oxidative in _ALT_WIRINGS:
+        with _recording() as seen:
+            compiled = compile_scenario(scenario, oxidative=oxidative)
+        members = seen & set(
+            _resolve_sample_names(
+                compiled.process_set, compiled.parameters, None, None, compiled.events
+            )
+        )
+        # An equality is satisfiable by a harness that changed nothing, and `oxidative=` is
+        # exactly the kind of argument that could be silently ignored. The wirings must really
+        # differ before "the census is invariant across them" says anything at all. Membership
+        # rather than `.active`: every oxidative Process is disabled until `begin_aging`, so at
+        # compile time the three wirings have identical ACTIVE sets and this check written the
+        # obvious way passes on all four scenarios while comparing nothing (it did). The one
+        # exemption is named rather than hidden: beer's burst set IS beer's direct set, asserted
+        # by `test_beers_burst_set_is_beers_direct_set_so_it_is_not_a_third_number`, so for beer
+        # that arm is a genuine identity and the beer census is still compared against a real
+        # difference by the cascade arm [[feedback-count-and-print-your-skips]].
+        identical_by_design = scenario.medium == "beer" and oxidative == "direct_burst"
+        assert (
+            identical_by_design or set(compiled.process_set.enabled_snapshot()) != direct_names
+        ), (
+            f"`oxidative={oxidative!r}` produced the direct wiring's Process set on "
+            f"{scenario.name} — this test is comparing the census against itself"
+        )
+        assert members == baseline, (
+            f"the census under {oxidative} differs from the direct wiring's by "
+            f"{sorted(members ^ baseline)}. Every name here is half-pinned by construction, so a "
+            "new one is a new defect of D-206's class — classify it in `_VERDICTS` and measure it"
+        )
+
+
+def test_the_burst_seed_carries_a_fifty_fold_band_the_ensemble_never_draws():
+    """A DEFECT is pinned here, on purpose — the census COMPLEMENT, found by widening to D-237.
+
+    ``burst_antioxidant_initial`` is read at compile on every wiring (it seeds the
+    ``burst_antioxidant`` pool under ``oxidative="direct_burst"`` and 0.0 otherwise) and its band
+    is **0.0005 - 0.0033 - 0.025 g/L, a 50x span**. No Process declares it in ``reads``:
+    ``AntioxidantBurstOxidation`` reads its rate constants, never its seed. So the sampler cannot
+    reach it, and under the one wiring where that pool is the whole substrate its uncertainty is
+    absent from every reported band.
+
+    **This is not the census predicate and not the drawability surface.** The census is
+    compile-read AND sampled — half-pinned, where the surviving half can carry a wrong sign. The
+    drawability surface is banded AND drawn but unable to move the run (D-157's oak yield). This
+    is the third cell: banded, able to move the run, and never drawn. Nothing guarded it, which is
+    why it took a wiring sweep to surface.
+
+    **A RED means it was FIXED** — some Process now declares the seed, or the band was retired.
+    Do not revert that beat; delete this guard and say so in the record. It is pinned rather than
+    repaired here because wiring a seed into ``reads`` changes what every burst ensemble reports,
+    and shipping unmeasured movement to close a gap found in passing is the trap D-233 §6 named.
+    """
+    compiled = compile_scenario(WINE_BROWNING, oxidative="direct_burst")
+    seed = compiled.parameters["burst_antioxidant_initial"]
+    sampled = set(
+        _resolve_sample_names(
+            compiled.process_set, compiled.parameters, None, None, compiled.events
+        )
+    )
+
+    assert seed.uncertainty.high / seed.uncertainty.low > 10.0, (
+        "the band narrowed; re-measure what this gap now costs before trusting the old number"
+    )
+    assert "burst_antioxidant_initial" not in sampled, (
+        "`burst_antioxidant_initial` is now drawn. If a beat wired the seed into a Process's "
+        "`reads`, that is the fix — delete this guard and record the band it opened."
+    )
+    # The positive control the "not in" owes: `sampled` is a real set, not an empty one, and it
+    # does contain a compile-read seed — so "never drawn" is this parameter's property and not
+    # the harness's [[feedback-a-null-result-needs-a-positive-control]].
+    assert "copper_typical" in sampled, "the sampler resolved nothing; the assertion above is void"
+    # ...and the pool it seeds really is live under this wiring, so the gap is not academic.
+    assert float(compiled.y0[compiled.schema.slice("burst_antioxidant")][0]) == seed.value
