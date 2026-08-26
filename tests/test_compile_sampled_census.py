@@ -260,6 +260,10 @@ WINE_SET_PH = Scenario(
 #: `phenolic_browning` is the only Process that reads `copper_typical`, it is disabled until
 #: `begin_aging`, and it returns zero without oxygen — so all three are required for the arms to
 #: be anything but vacuously equal.
+#:
+#: **Do not add `add_copper` here.** Nothing else writes the `copper` slot, which is what makes
+#: `copper - copper_typical` bit-zero at every step of the control arm and `f_copper` exactly
+#: 1.0. A dose would break that equality for a reason that has nothing to do with the defect.
 WINE_BROWNING = Scenario(
     name="census-browning",
     medium="wine",
@@ -371,8 +375,10 @@ def test_no_classified_member_has_gone_stale():
     stale = sorted(set(CENSUS) - union)
     assert not stale, (
         f"{len(stale)} classified name(s) are no longer read at compile, or no longer sampled: "
-        f"{stale}. Either the battery stopped reaching them or the defect was repaired — check "
-        "which before deleting the row."
+        f"{stale}. The battery stopped reaching them, or the seam stopped reading them — check "
+        "which before deleting the row. Note a REPAIR does not land here: a repaired member is "
+        "still compile-read and still sampled, only its verdict changes, and the two defect "
+        "pins are what go red."
     )
 
 
@@ -383,12 +389,19 @@ def test_the_census_and_the_drawability_surface_are_disjoint():
     oak yields, ``otr_*`` and ``bottling_burst_*`` are compile-consumed AND unreachable by the
     sampler; every census member is compile-consumed and reachable. Pinning the disjointness is
     what keeps the distinction from collapsing the next time either set is edited.
+
+    Scored PER SCENARIO, because that is the scope of the claim: membership is
+    scenario-conditional, so a name that is compile-read here and sampled only in some *other*
+    battery member is not a counterexample to anything — comparing this scenario's compile-only
+    set against the battery-wide registry would false-fail on exactly that case.
     """
+    for scenario in BATTERY:
+        seen, members = _census(scenario)
+        compile_only = seen - members
+        assert not (compile_only & members)
     seen, members = _census(WINE)
-    compile_only = seen - members
-    assert "otr_screwcap" in compile_only
-    assert "oak_yield_vanillin_medium" in compile_only
-    assert not (compile_only & set(CENSUS))
+    assert "otr_screwcap" in (seen - members)
+    assert "oak_yield_vanillin_medium" in (seen - members)
 
 
 # -- the two LIVE rows, pinned as defects ------------------------------------------------------
