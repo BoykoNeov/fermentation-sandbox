@@ -13,8 +13,10 @@ in some Process's ``reads`` and are merely *scenario*-inert — a 14th scenario 
 **What is pinned here, and what is deliberately not.**
 
 The census is *not* pinned. Deriving "structural" from the declarations and comparing it to
-what a run draws is vacuous: ``_resolve_sample_names`` narrows by ``_schedule_reads``, which
-is itself the union of declared ``reads``, so ``structural ⊆ undrawn`` is a theorem about
+what a run draws is vacuous: ``_resolve_sample_names`` narrows by ``_schedule_reads`` (since
+D-241, one of its two sources — the other is the compiled scenario's ``seed_reads``, which no
+name in this surface reaches), which is itself the union of declared ``reads``, so
+``structural ⊆ undrawn`` is a theorem about
 set arithmetic rather than a fact about the code (the D-108/D-109 shape). Freezing 61 names
 into the suite would also go red on every new parameter. Counts live in the D-159 record.
 

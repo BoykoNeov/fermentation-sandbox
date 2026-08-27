@@ -36,8 +36,12 @@ floats).
   seed per member; :meth:`CompiledScenario.run_ensemble` supplies one automatically for an
   anchored scenario. Omitted ⇒ the fixed array, so every direct caller is byte-identical.
   This is **NOT** a licence to sample scenario inputs here — the axis D-24 excluded is
-  unchanged, and the reported *band* barely moves (1.008x); what it repairs is each
-  member's own trajectory.
+  unchanged. **The 1.008x is D-233's own figure for the pH ANCHOR and must not be read as
+  this mechanism's**: that rule repairs each member's trajectory and barely moves the band,
+  but the rule family has since grown (D-236, D-238, D-241) and D-241's fallback seeds move
+  the band a great deal — `dms` **2.83x**, `methanethiol` 2.07x, `burst_antioxidant`
+  **6.97x** under the burst wiring. Which rules apply is per scenario; see
+  :meth:`CompiledScenario._member_seed_rules`.
 * Plain Monte Carlo (``sampler="mc"``, the method the handoff §1.6 names) by default.
   Latin-hypercube (``"lhs"``) and Sobol (``"sobol"``) low-discrepancy sequences are
   also available: they stratify the draws so a fixed member budget covers the band —
@@ -69,9 +73,18 @@ floats).
   provenance, which no code reads). Making that choice per-parameter needs a
   provenance-bearing shape field — agreed as the right end state, deliberately not
   shipped (D-165 §6), the same call D-164 §6 made on the admissible-range field.
-* By default only the parameters the **active** Process set ``reads`` are sampled
-  (the rest are no-ops on the trajectory), so the spread means "sensitivity of *this*
-  scenario". ``only`` overrides that set; ``exclude`` removes names from it.
+* By default the sampled set is the parameters the **active** Process set ``reads``,
+  **plus** the compiled scenario's ``seed_reads`` (decision D-241), so the spread means
+  "sensitivity of *this* scenario". ``only`` overrides the whole set; ``exclude`` removes
+  names from whichever set was chosen.
+
+  **The old parenthetical here said the rest are no-ops on the trajectory, and D-240
+  disproved it for one class.** A parameter the *compile seam* reads to build ``y0`` is a
+  no-op at runtime and anything but a no-op on the trajectory — it set the initial
+  condition. Eight such names were priced and three were worth more than the whole spread
+  the same ensemble published for the slot they seed. ``seed_reads`` is how they enter, and
+  it is derived from the ``y0`` rules so a name is drawable iff a rule re-seeds it. A direct
+  caller of this function passes no ``seed_reads`` and is unchanged.
 * The ensemble **median is not the nominal trajectory** (the median of nonlinear
   trajectories is not the trajectory of median parameters). Both are reported: the
   nominal is the deterministic reference, the median+band is the uncertainty summary.
