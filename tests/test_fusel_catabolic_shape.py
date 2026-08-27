@@ -432,7 +432,11 @@ def shipped_run():
 #: cap's bite shrinks 12.7 % -> 4.8 % without reaching the inertness D-120 measured. One leg
 #: back and one leg thinner is the honest statement, and it is why the de-novo-entry build is
 #: not simply re-refused here.
-_OVER_ATTRIBUTING = ()
+#:
+#: The ``_OVER_ATTRIBUTING`` tuple that used to select those marks is **deleted, not emptied**. An
+#: empty one would read to the next person as a live switch that currently selects nothing — the
+#: guards-that-quietly-forbid-nothing shape this suite exists to avoid — where the truth is that
+#: no alcohol needs a mark at all.
 
 
 @pytest.mark.parametrize(

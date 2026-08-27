@@ -280,9 +280,18 @@ def test_the_joint_nitrogen_refund_exceeds_growths_draw_at_pitch_and_that_is_dea
     #
     # D-32's docstring argues its N refund is "≤ f_N·base_dx (growth's nitrogen draw) for all
     # ψ·gate ≤ 1 — never over-refunds, so no deamination branch is needed in v1". That holds for
-    # the swap ALONE. With this sink on it is FALSE: at pitch (t=0, base_dx ~2.2e-2 g/L/h — a
-    # vigorously growing state, NOT a degenerate tail) the joint refund reaches **1.171x**
-    # (measured; it was 1.040x from D-104 until D-106).
+    # the swap ALONE. With this sink on it is FALSE: at a vigorously growing state (NOT a
+    # degenerate tail) the joint refund reaches **1.090x** (measured at D-248; it was 1.040x from
+    # D-104 to D-106 and **1.171x** from D-106 to D-248).
+    #
+    # **D-248 moved it 1.171 -> 1.090, and the direction matters more than the size.** Neither the
+    # swap nor the sink changed; what changed is the trajectory this peak is scanned over. Uptake
+    # keeps ammonium non-zero far longer, so growth runs at states it never used to reach and the
+    # worst-case ratio lands elsewhere. Note WHICH edge that consumes: the load-bearing bound here
+    # is the LOWER one (`> 1.0` is the claim — the joint refund really does exceed growth's draw,
+    # which IS the deamination), and its margin has HALVED, 0.171 -> 0.090. The ceiling is authored
+    # tripwire margin; the floor is the finding, and it is now the tighter of the two. The joint
+    # CARBON refund is unmoved at 0.5838x (measured at D-248 against the recorded 0.584).
     #
     # It is physical. The refund is always the drawn amino acid's own nitrogen; whether the NET
     # is negative (aa nitrogen spares ammonium growth would have drawn) or positive (the excess is
@@ -299,9 +308,10 @@ def test_the_joint_nitrogen_refund_exceeds_growths_draw_at_pitch_and_that_is_dea
     # independently established.
     #
     # **The qualitative call the tripwire exists to force**: is "slight deamination at pitch" still
-    # fair at 1.171x? Yes — it is the same story in degree, not in kind. The net ammonium release
-    # is 17% of growth's draw rather than 4%; the direction, the mechanism, and the conservation are
-    # unchanged, and 17% is nowhere near inverting the nitrogen story (which would need the
+    # fair at 1.090x? Yes — more comfortably than at the 1.171x it was asked of at D-106. The net
+    # ammonium release is 9% of growth's draw (17% at D-106, 4% at D-104); the direction, the
+    # mechanism, and the conservation are unchanged, and 9% is nowhere near inverting the nitrogen
+    # story (which would need the
     # precursors to become a dominant N SOURCE, i.e. multiples of growth's draw). The ceiling below
     # is AUTHORED, not sourced — its width is tripwire margin over the measured value, not physics.
     #
@@ -312,7 +322,11 @@ def test_the_joint_nitrogen_refund_exceeds_growths_draw_at_pitch_and_that_is_dea
     # here instead of quietly inverting the nitrogen story.
     traj, compiled = _run(amino_acids_gpl=1.0)
     worst_n, _ = _worst_joint_refund(traj, compiled)
-    assert 1.0 < worst_n < 1.20, f"joint N refund {worst_n:.3f}x — outside the documented band"
+    assert 1.0 < worst_n < 1.20, (
+        f"joint N refund {worst_n:.3f}x — outside the documented band. D-248 measured 1.090; the "
+        "LOWER edge is the one carrying the claim, so a value at or under 1.0 means the joint "
+        "refund no longer exceeds growth's draw and D-32's corrected docstring goes back"
+    )
 
 
 def test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable(full_params):
@@ -359,7 +373,11 @@ def test_the_de_novo_route_is_what_makes_the_sourced_lump_shippable(full_params)
     # monotonically in f, so the top of the band is the worst case and pinning it suffices.
     worst_n, worst_c = _worst_joint_refund(traj, compiled)
     assert worst_c < 1.0, f"joint C refund {worst_c:.3f}x at the shipped lump — creates sugar"
-    assert 1.0 < worst_n < 1.20, f"joint N refund {worst_n:.3f}x — outside the documented band"
+    assert 1.0 < worst_n < 1.20, (
+        f"joint N refund {worst_n:.3f}x — outside the documented band. D-248 measured 1.090; the "
+        "LOWER edge is the one carrying the claim, so a value at or under 1.0 means the joint "
+        "refund no longer exceeds growth's draw and D-32's corrected docstring goes back"
+    )
 
     # THE COUNTERFACTUAL: switch the de-novo route off and the SAME lump breaches again. This is
     # what makes the assertions above attributable to the route rather than to drift.
