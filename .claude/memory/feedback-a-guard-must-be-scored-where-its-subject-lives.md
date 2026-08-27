@@ -1,9 +1,11 @@
 ---
 name: feedback-a-guard-must-be-scored-where-its-subject-lives
 description: "A guard scored in the one configuration where its subject cannot exist forbids nothing, and passes hardest exactly when the thing it watches for happens"
-metadata:
+metadata: 
   node_type: memory
   type: feedback
+  originSessionId: ea3f3770-ac9d-4299-8476-1248aca8b862
+  modified: 2026-08-27T08:46:26.259Z
 ---
 
 A guard that watches for a change to some Process, wiring or medium must be **scored in a
@@ -27,3 +29,13 @@ test. And when an arm comes back **all-green where you predicted RED, suspect th
 prediction** — a passing mutation arm is usually the harness failing to reach, not the code being
 robust. Cf. [[feedback-a-defect-pin-can-outlive-its-defect-by-driving-another-path]], the same
 blindness arriving through the code path rather than the configuration.
+
+**It recurs one layer up, in the INSTRUMENT.** The same guard stayed green through D-241's actual
+repair, and this time the configuration was right: it called the resolver that decides what an
+ensemble samples, without the new argument that the repair added. So it measured the pre-repair
+scope — the one scope in which the fix is invisible — and forbade only the route anyone had
+imagined. Arm C was a guard scored in the wrong *configuration*; this was a guard scored through
+the wrong *instrument*, with the assertion itself perfectly correct. So the question to ask is not
+only "is the subject present here" but **"can the harness around this assertion see the subject
+change at all"** — and when a shared helper does the looking (a census, a recorder, a fixture),
+fix it there, because every test built on it inherits the blindness.

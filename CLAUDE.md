@@ -54,7 +54,8 @@ uv run pytest -n auto   # FULL suite in parallel — ~1.6 min vs ~11.5 min seria
 uv run pytest tests/test_<module>.py   # iteration loop: just the file you're editing (~2-5 s)
 uv run pytest -n auto --lf             # after a red run: re-run only what failed
 uv run pytest -m benchmark   # §2.2 acceptance benchmarks (skipped until kinetics)
-uv run ruff check .     # lint    (also: ruff format .)
+uv run ruff check .     # lint
+uv run ruff format --check .   # SEPARATE CI gate -- `ruff check` passing does not imply it
 uv run mypy             # types (strict on src; tests exempt from signature reqs)
 
 uv run python tools/nicepytest.py -n auto   # same, at BelowNormal — when sharing the box

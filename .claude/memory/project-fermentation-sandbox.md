@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-27)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-240** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1961 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-241** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1979 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
@@ -371,6 +371,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   beer **0.000**. Beer's 8 `*_typical_wort` **ABSORBED at t=0 (≤1.2e-13)**; `o2_wort_aeration_beer` worth **EXACTLY 0**
   (D-213); the 2 copper binding constants **lose a `min()`** (126-2200× excess) — pin the RATIO, never the zero.
   → `.claude/memory/prohibitions/banded-undrawn-census.md`
+- **Seed drawability REPAIRED (D-241)** — `CompiledScenario.seed_reads`, **derived from the `y0` rules** so a name is
+  drawable **iff** a rule re-seeds it; unioned into the DEFAULT branch only, BEFORE `exclude`. **6 of D-240's 8 live
+  seeds now DRAWN** (`burst_antioxidant_initial` under `direct_burst` ONLY — D-147 zeroes the slot elsewhere, whole `y0`
+  bit-identical, NOT a half-repair). **Tier half deliberately UNTOUCHED and still OPEN — never cite D-241 as settling it.**
+  Paired: `dms` **2.83×**, methanethiol **2.07×**, burst **6.97×**; beer **1.000** = the null control. The 2 Coleman
+  coefficients are **SUBSUMED** (the override they derive IS sampled, band 2.11× wider and containing theirs) — never
+  propose a `values_for_member` hook for them. D-240's undrawn pin **forbade nothing** against this route.
+  → `.claude/memory/prohibitions/seed-reads-repair.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

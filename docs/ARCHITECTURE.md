@@ -297,17 +297,39 @@ Note that `only=`/`exclude=` shift the draw sequence, so an arm and its baseline
 random ensembles unless pinned to a fixed hypercube.
 
 `y0` is shared across members with one exception: the parts of it a **parameter derives**
-(D-233, D-236). `simulate_ensemble` takes an optional `y0_for_member` builder — omitted ⇒ the fixed
-array, so a direct caller is byte-identical — and `CompiledScenario.run_ensemble` supplies one via
-`CompiledScenario.y0_for_member()`, which composes one rule per parameter-derived slot and returns
-`None` when none applies. Two rules ship: the `cation_charge` **pH anchor**, whenever the scenario
-gave an `initial_ph` (the compile-seam back-solve reads the pKa map and every `pKa_*` is sampled,
-so without it a member starts at a pH the scenario never asked for); and wine's **`copper` seed**,
-whenever the scenario did *not* name `copper_gpl` (the slot is seeded from `copper_typical`, which
-is also `PhenolicBrowning`'s mean-centring reference, so without it `f(Cu) == 1` holds at the
-nominal draw alone). It rebuilds those slots and nothing else — a full re-run of the initial
-builder would move seeds no beat has measured, and the scenario-input axis D-24 excluded (Brix,
-YAN, and a stated `copper_gpl`) is unchanged.
+(D-233, D-236, D-238, D-241). `simulate_ensemble` takes an optional `y0_for_member` builder —
+omitted ⇒ the fixed array, so a direct caller is byte-identical — and `CompiledScenario.run_ensemble`
+supplies one via `CompiledScenario.y0_for_member()`. That method composes the rules of
+`CompiledScenario._member_seed_rules()` and returns `None` when none applies. Four rule families
+ship, and they run in this order because rule 3 writes an acid slot rule 1 reads:
+
+1. **peptide buffer capacity** (beer, D-238) — re-rooted on the member's own map whenever the
+   scenario did not name `peptide_buffer_gpl`;
+2. **the `cation_charge` pH anchor** (D-233), whenever the scenario gave an `initial_ph` — the
+   compile-seam back-solve reads the pKa map and every `pKa_*` is sampled, so without it a member
+   starts at a pH the scenario never asked for;
+3. **wine's `copper` seed** (D-236), whenever the scenario did *not* name `copper_gpl` — the slot
+   is seeded from `copper_typical`, which is also `PhenolicBrowning`'s mean-centring reference, so
+   without it `f(Cu) == 1` holds at the nominal draw alone;
+4. **the D-45 fallback seeds** (D-241) — the `_SEED_FALLBACKS` table in `scenario/compile.py`
+   (`dms_potential`, `bound_h2s`, `bound_methanethiol`, `burst_antioxidant`, beer's wort `o2`)
+   plus `must_fermentable_fraction`'s `S[0]`. Each fires only while the compiled slot still holds
+   the parameter's own value, which refuses a scenario-stated level, stops silently if the seam
+   stops deriving the slot, and reproduces D-147's burst-wiring gate without knowing it exists.
+
+It rebuilds those slots and nothing else — a full re-run of the initial builder would move seeds no
+beat has measured, and the scenario-input axis D-24 excluded (Brix, YAN, a stated `copper_gpl`) is
+unchanged.
+
+**`CompiledScenario.seed_reads` is the sampling half of rule 4** (D-241). The sampler scopes itself
+by `Process.reads` (`_schedule_reads`), and a parameter the compile seam consumed is read by no
+Process at runtime — so it was invisible to every band the engine published. `seed_reads` is a
+`tuple[str, ...]` **derived from the rules themselves**, threaded to `simulate_ensemble` by
+`run_ensemble` and unioned in `_resolve_sample_names`: into the **default** branch only (`only=`
+stays exact) and **before** `exclude` (a seed can still be pinned). Because the draw and the
+re-seed come from one list, a name is drawable iff a rule re-seeds it. It carries **no tier claim**
+— `reads` has two masters (D-160) and this channel deliberately takes only the sampling one; what
+a seed's tier should do to a state slot is unmeasured.
 
 ## pH as a derived pure function
 
@@ -491,9 +513,12 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (82 test files; unit, integration, conservation, sampling-surface and
-doc-consistency checks), `uv run ruff check .`, `uv run mypy` (strict on `src`). CI runs all three
-on Python 3.13 and 3.14. Two of the test files guard documentation rather than physics:
+`uv run pytest -n auto` (83 test files; unit, integration, conservation, sampling-surface and
+doc-consistency checks), `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`
+(strict on `src`). CI runs all **four** on Python 3.13 and 3.14 — the format check is a separate
+gate from the lint check and fails independently of it, which is how four consecutive commits
+shipped red after D-239 (each run died in ~17 s at the format step, not in the ~13 min test
+step, which is what made the failures easy to misread). Two of the test files guard documentation rather than physics:
 `test_decisions_index.py` (the archive's generated index) and `test_memory_shape_hook.py`.
 
 ## Checking this document
