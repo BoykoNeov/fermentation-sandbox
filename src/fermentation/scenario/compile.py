@@ -40,6 +40,7 @@ from fermentation.core.kinetics import (
     AminoAcidAssimilation,
     AnthocyaninFading,
     AntioxidantBurstOxidation,
+    AssimilableNitrogenUptake,
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
     BiomassCarryingCapacity,
@@ -1069,6 +1070,8 @@ def _wine_initial(
         "T": temperature_k,
         "CO2": 0.0,
         "X_dead": 0.0,  # no inactivated biomass at pitch
+        # The D-248 amino-acid skeleton carbon-park: produced-only, empty at pitch.
+        "amino_acid_skeleton_carbon": 0.0,
         "Gly": 0.0,  # no byproducts at pitch (decision D-16)
         "Byp": 0.0,
         # Produced-only aroma pools, empty at pitch (decision D-19). The three ester pools and
@@ -3752,6 +3755,7 @@ def compile_scenario(
     if amino_acids_gpl <= 0.0:
         for aa_process in (
             AminoAcidAssimilation,
+            AssimilableNitrogenUptake,
             FuselAminoAcidReroute,
             PrecursorNonEhrlichFates,
         ):

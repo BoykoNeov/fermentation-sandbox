@@ -99,17 +99,27 @@ def test_growth_accelerates_conversion():
     # identical and the ONLY difference is bacterial growth — isolating the autocatalysis.
     grow = compile_scenario(_wine_scenario(mlf_pitch_gpl=0.05, amino_acids_gpl=2.0), strict=True)
     assert grow.process_set.is_enabled("malolactic_growth")
+    # D-248: the yeast's own uptake is now un-coupled from its growth demand, so it strips the
+    # shared identity-agnostic pool to ~0 during primary fermentation — the sourced behaviour
+    # (Crépin measures 0.2 % of the must's YAN left) but also a competitor that would leave this
+    # co-inoculated bacterium with nothing to grow on. Isolated in BOTH arms below, which is the
+    # same remedy the re-route already gets. The competition is REAL and is D-248's recorded
+    # residue: MLF draws only the amino-acid pair and cannot touch the `N` slot uptake fills, so
+    # the model over-states yeast/bacteria nitrogen competition. That is a bacterial-nitrogen
+    # beat, not a reason to hold the yeast side back.
     # Disable the benign senescence baseline (MLF v2, D-41) in BOTH runs: it erodes X_mlf on its own
     # slow timescale regardless of growth, which would confound this GROWTH-isolation contrast (the
     # fixed-X_mlf control below could no longer be exactly constant). Senescence is exercised on its
     # own in test_malolactic; here we isolate growth's autocatalysis (the control disables growth).
     grow.process_set.disable("malolactic_senescence")
+    grow.process_set.disable("assimilable_nitrogen_uptake")
     t_eval = np.linspace(0.0, 14.0 * 24.0, 400)
     t_on = simulate(grow.process_set, grow.param_values, grow.y0, grow.t_span_h, t_eval=t_eval)
 
     fixed = compile_scenario(_wine_scenario(mlf_pitch_gpl=0.05, amino_acids_gpl=2.0), strict=True)
     fixed.process_set.disable("malolactic_growth")  # fixed-X_mlf control
     fixed.process_set.disable("malolactic_senescence")  # ...held truly fixed (no baseline decay)
+    fixed.process_set.disable("assimilable_nitrogen_uptake")  # the D-248 competitor, both arms
     t_off = simulate(fixed.process_set, fixed.param_values, fixed.y0, fixed.t_span_h, t_eval=t_eval)
 
     # X_mlf multiplies several-fold under growth; constant in the control.
@@ -217,6 +227,12 @@ def test_mid_run_pitch_growth_is_emergently_gated_by_ethanol():
         # the shared amino-acid lump (D-100), pinned in tests/test_aging_scenario.py; this test
         # is about MLF's ethanol-gated growth window, so it isolates the competing consumer.
         cs.process_set.disable("fusel_amino_acid_reroute")
+        # D-248 adds the larger competitor for that same pool — the yeast's own uptake, now
+        # un-coupled from its growth demand, which strips the must to ~0.6 % as Crépin measures.
+        # Isolated here for the same reason, in BOTH arms so it cannot bias the difference. The
+        # competition is real and is D-248's recorded residue (MLF cannot draw the `N` slot the
+        # uptake fills), which is a bacterial-nitrogen beat rather than a defect in this test.
+        cs.process_set.disable("assimilable_nitrogen_uptake")
         if not growth:
             cs.process_set.disable("malolactic_growth")  # survives pitch_mlf (aa-gated, not pitch)
         tr = cs.run(t_eval=np.linspace(0.0, 21.0 * 24.0, 500))

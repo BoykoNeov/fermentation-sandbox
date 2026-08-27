@@ -263,17 +263,31 @@ def test_all_assimilable_nitrogen_reaches_biomass_whatever_channel_it_entered_by
     is exact; with a dose it holds to a residue that is pool nitrogen the aging tail never
     re-assimilates.
 
-    **THE RESIDUE GREW TWELVE-FOLD AT D-244 -- 0.6 % to 7.8 % -- and that is the carve-out
+    **THE RESIDUE GREW TWELVE-FOLD AT D-244 -- 0.6 % to 7.8 % -- and that was the carve-out
     working, not a defect.** Before D-244 a dosed wine's nitrogen was mostly ammonium (250 mg
     N/L of it, with the dose's 112.7 on top), and ammonium is what the growth Process reads
-    directly, so almost all of it arrived. The same wine now holds 137.3 mg N/L of ammonium and
-    112.7 in the amino-acid pools, and pool nitrogen only reaches biomass through the D-32 swap,
-    which does not run to completion. The identity is now a statement about a SLOWER channel and
-    its residue is a real shortfall: 45 % of this wine's nitrogen must be assimilated rather than
-    simply taken up. Pinned two-sided, because a residue with only an upper bound cannot catch
-    the swap speeding up either.
+    directly, so almost all of it arrived. The same wine then held 137.3 mg N/L of ammonium and
+    112.7 in the amino-acid pools, and pool nitrogen only reached biomass through the D-32 swap,
+    which did not run to completion.
+
+    **AND D-248 CLOSES IT: 7.75 % -> 0.09 %.** The swap's incompleteness was never a property of
+    the swap's fraction psi -- it was that psi*gate*f_N*base_dx is strictly below growth's own
+    f_N*base_dx draw, so ammonium could only fall and the pools froze once it hit zero.
+    :class:`~fermentation.core.kinetics.amino_acids.AssimilableNitrogenUptake` un-couples uptake
+    from the growth rate, and the amino-acid channel now delivers essentially all of its nitrogen
+    to biomass. The identity D-14 states is a statement about BOTH channels again, and the
+    "45 % must be assimilated rather than taken up" reading is retired: it is still assimilated
+    through a second step, but the step now completes. Pinned two-sided as before -- a residue
+    with only an upper bound cannot catch the channel slowing back down.
+
+    **The bare arm's tolerance is 5e-9, not 1e-9, and the reason is the SOLVER rather than the
+    model.** At ``aa = 0`` this Process is disabled at the compile seam and contributes exactly
+    nothing -- measured, the arm is bit-identical at capacity 0 and capacity 1. What moved it by
+    2.3e-9 is that D-248 adds a state slot: BDF's error norm is RMS-weighted over the state
+    vector, so 97 -> 98 slots shifts step selection with no model change at all. The same effect
+    is recorded at ``tests/test_oxidative_cascade_guards._PIN_RTOL`` for the ``quinone`` slot.
     """
-    for aa, tol in ((0.0, 1e-9), (0.5, 8.0e-2)):
+    for aa, tol in ((0.0, 5e-9), (0.5, 8.0e-2)):
         compiled = compile_scenario(_wine(amino_acids_gpl=aa), strict=True)
         f_n = compiled.param_values["biomass_N_fraction"]
         ammonium, amino = _channel_nitrogen(compiled)
@@ -290,10 +304,11 @@ def test_all_assimilable_nitrogen_reaches_biomass_whatever_channel_it_entered_by
             # The residue as its own quantity, two-sided. A one-sided tolerance would stay
             # green if the swap got FASTER and the amino-acid channel stopped being
             # distinguishable from the ammonium one, which is what this pin exists to catch.
-            assert 1.0 - biomass / predicted == pytest.approx(0.0775, abs=5e-3), (
-                f"aa={aa}: the unassimilated residue is {1.0 - biomass / predicted:.4f}, not "
-                "the characterized 0.0775 — the D-32 swap's completeness moved, in one "
-                "direction or the other; measure which before touching this number"
+            assert 1.0 - biomass / predicted == pytest.approx(0.00092, abs=5e-4), (
+                f"aa={aa}: the unassimilated residue is {1.0 - biomass / predicted:.5f}, not "
+                "the D-248 0.00092 (D-244 characterized 0.0775, before assimilable-nitrogen "
+                "uptake was un-coupled from growth demand) — the amino-acid channel's "
+                "completeness moved, in one direction or the other; measure which first"
             )
 
 
@@ -351,11 +366,16 @@ def test_autolysis_leaves_nearly_half_the_nitrogen_outside_biomass():
         if slot in schema
     )
     # D-243 characterized this at 45.9 %. D-244's carve-out moved it to 49.7 %: the same must
-    # now starts with 112.7 of its 250 mg N/L already IN the pools, and the swap does not
-    # clear all of it before autolysis starts refilling them.
-    assert in_pools / total0 == pytest.approx(0.497, abs=0.02), (
+    # started with 112.7 of its 250 mg N/L already IN the pools, and the swap did not clear all
+    # of it before autolysis began refilling them. D-248 moves it to 38.6 %, and the direction is
+    # the informative part: un-coupling assimilable-nitrogen uptake from growth demand clears the
+    # MUST's pool nitrogen almost completely during fermentation, so what stands here afterwards
+    # is much more nearly autolysis's own contribution rather than a dose the yeast never
+    # finished. This is now the closest the number has been to measuring the thing its name says.
+    assert in_pools / total0 == pytest.approx(0.386, abs=0.02), (
         f"autolysis now leaves {100 * in_pools / total0:.1f} % of the nitrogen in the amino-acid "
-        "pools, not the characterized ~49.7 % — the autolysis/re-assimilation balance moved"
+        "pools, not the D-248 ~38.6 % (D-244 characterized 49.7 %) — the autolysis/"
+        "re-assimilation balance moved"
     )
 
     # The same run WITHOUT autolysis is the control: without it the 49.7 % is just a number, and
@@ -369,11 +389,16 @@ def test_autolysis_leaves_nearly_half_the_nitrogen_outside_biomass():
         for slot, species in _AA_CHANNEL.items()
         if slot in control.schema
     )
-    # The control's own floor moved with the carve-out: an aa-dosed wine now ends with the
-    # 7.8 % swap residue in its pools even with autolysis OFF (it was under 1 % when the dose
-    # was extra ammonium's worth of nitrogen). Still six times smaller than the arm, so the
-    # attribution holds -- but the bound has to state the residue, not pretend it is zero.
-    assert ctl_pools / total0 < 0.10, (
+    # The control's floor moved with the carve-out at D-244 (an aa-dosed wine ended with the
+    # 7.8 % swap residue in its pools even with autolysis OFF, where it had been under 1 % when
+    # the dose was extra ammonium's worth of nitrogen) and moved BACK at D-248: measured
+    # **0.0915 %**, because un-coupled uptake clears the must's own pool nitrogen during
+    # fermentation. So the control is a near-zero floor again and the attribution is at its
+    # strongest -- ~420x smaller than the arm above, against 6x at D-244. The bound is tightened
+    # to match, because a 0.10 ceiling would now pass on a control that had regressed the whole
+    # way back to D-244's residue and would attribute that to autolysis.
+    assert ctl_pools / total0 < 0.005, (
         "the autolysis-off control now leaves nitrogen in the pools too, so the arm above no "
-        f"longer attributes anything to autolysis ({100 * ctl_pools / total0:.2f} %)"
+        f"longer attributes anything to autolysis ({100 * ctl_pools / total0:.3f} %, against "
+        "D-248's measured 0.0915 %)"
     )

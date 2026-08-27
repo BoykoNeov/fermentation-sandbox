@@ -131,7 +131,7 @@ from fermentation.core.tiers import Tier
 #: Re-exported for the consumers that named this module as the home of the representative
 #: species before D-100 moved the pool registry to
 #: :mod:`~fermentation.core.kinetics.amino_acid_pools`. The species itself is unchanged.
-__all__ = ["AMINO_ACID_SPECIES", "AminoAcidAssimilation"]
+__all__ = ["AMINO_ACID_SPECIES", "AminoAcidAssimilation", "AssimilableNitrogenUptake"]
 
 
 class AminoAcidAssimilation(Process):
@@ -205,4 +205,148 @@ class AminoAcidAssimilation(Process):
         # carbon-routing helper with the fusel re-route (D-33) so the draw and its inverse
         # can never drift apart (single source of truth, decision D-8).
         refund_carbon_to_sugar(d, y, schema, carbon)  # [g C/L/h]
+        return d
+
+
+class AssimilableNitrogenUptake(Process):
+    """Amino-acid nitrogen taken up *beyond* growth's anabolic demand (decision D-248).
+
+    **The gap this closes (D-246 §5 → D-247 §7).** Crépin *et al.* 2017's Data Set S1 measures
+    the residual as well as the initial amino acids of its synthetic must, and its yeast consumes
+    essentially all of the assimilable nitrogen — the end-of-fermentation block reads 0.0000 for
+    ammonium, arginine, glutamine and every precursor, with the YAN column falling 9.636 → ~0.02
+    mM (**0.2 % left**), exhausted at N_T ≈ 28 h. Reconstructed on that same must this model left
+    **40.8 %** standing, and held at 30 and 60 days instead of 14 the residual did not move in the
+    fourth decimal. It was never slowness.
+
+    **The arithmetic of the defect, which is what makes the repair structural rather than a knob.**
+    Before this Process the *only* route from the speciated pools into biomass nitrogen was
+    :class:`AminoAcidAssimilation`, whose rate is ``ψ·gate·f_N·base_dx`` — strictly **below**
+    growth's own draw ``f_N·base_dx`` for every ``ψ·gate ≤ 1``. So the net ammonium derivative
+    ``f_N·base_dx·(ψ·gate − 1)`` is negative at every state that has ever existed: ``N`` can only
+    fall. When it reaches zero growth's Monod term ``N/(K_n + N)`` shuts growth off, ``base_dx``
+    goes to zero, and the swap — being proportional to ``base_dx`` — stops with it. The amino-acid
+    pools then freeze wherever they stood. **Uptake could only ever consume what growth demanded,
+    and growth's nitrogen signal is the ammonium slot alone**, which the speciated pools are not
+    in. Real yeast over-accumulate assimilable nitrogen far past immediate anabolic need, storing
+    the surplus (vacuolar amino-acid pools) — the flux this model had no way to express.
+
+    **Two published anchors, and the load-bearing one is INTERNAL.** The compile seam already
+    overrides ``biomass_N_fraction`` to ``1/Y_X/N(N_init)`` from Coleman, Fish & Block (2007), for
+    the express purpose that biomass comes out at ``Y_X/N × N_init``
+    (:func:`~fermentation.scenario.compile._apply_nitrogen_dependent_yield`). **That identity holds
+    only under complete consumption.** Measured on Crépin's must: with all the nitrogen in the
+    ammonium slot the run reached 3.445 g/L against the fit's own 3.472 (0.8 %), and with the same
+    nitrogen speciated into pools it reached 2.12 — **61 % of a regression the model itself
+    compiles in**. That anchor is internal, already shipped and fitted to nothing here. Crépin's
+    0.2 % residual and 28 h exhaustion are the *independent* check, deliberately not the target.
+
+    **The rate, and why it is un-coupled.** ::
+
+        ρ_N = r · mu_max · f_N · X · gate(aa)              [g N / L / h]
+        gate(aa) = Σaa / (K_amino_acids·Σf + Σaa)          (the shared D-100 depletion gate)
+
+    ``mu_max · f_N`` is the *maximum specific* nitrogen demand of growth — nitrogen per gram of
+    cell per hour at the top of the growth curve — so ``r``
+    (``amino_acid_uptake_capacity_ratio``) is a dimensionless statement about transport
+    **capacity** relative to peak anabolic demand, and no new dimensional constant enters. The
+    un-coupling is that the rate reads ``mu_max``, a constant, and **not**
+    :func:`~fermentation.core.kinetics.growth.biomass_growth_rate`: transport scales with the
+    cells present, not with what they happen to need this instant, so it keeps running after
+    growth has stopped. That is the entire mechanism, stated as a rate law.
+
+    **The carbon does NOT go back to sugar, and that is the design's crux.** The D-32 swap may
+    refund its drawn carbon to ``S`` only because its rate is proportional to growth's own draw,
+    which is what bounds the refund at ``ψ·gate·(aa C:N)/(biomass C:N) ≈ 0.30·ψ·gate`` of the
+    carbon growth removed. A flux that is *not* proportional to ``base_dx`` has no such bound —
+    at ``base_dx = 0`` it would refund carbon against a draw of zero and **create hexose**, the
+    gluconeogenesis the whole D-32 design forbids and which no clamp fixes without a C⁰ kink for
+    the BDF solver. So the nitrogen is refunded to ``N`` and the skeleton is parked in
+    ``amino_acid_skeleton_carbon``, a carbon-only pool weighted 1.0 on ``total_carbon``.
+
+    That parking is a documented **stand-in**, in the D-19/D-31 tradition, and it is the
+    conservative direction: real yeast do route some of an assimilated amino acid's skeleton into
+    biomass and central metabolism, so booking none of it back to ``S`` slightly *over*-charges
+    sugar for biomass carbon. The magnitude is ~0.15 g C/L against ~96 g C/L of must carbon
+    (~0.16 %), i.e. immaterial to every carbon-ratio benchmark, and the error's sign cannot create
+    sugar or ethanol. What it must not be read as is a claim about where arginine's carbon goes.
+
+    **Scope: the identity-agnostic pair ONLY** (``amino_acids``/arginine and
+    ``amino_acids_generic``/glutamine), which is a measurement discipline and not a shortcut.
+    Those two are where the residual sits — measured at 61.4 % of their initial mass each while
+    every precursor pool was already at zero — so nothing is lost by the narrow scope. What the
+    scope *buys* is attributability: the six precursor pools are untouched, so this Process cannot
+    move a fusel's de-novo share through precursor starvation, and the only channel left to those
+    shares is the biomass denominator. A wider draw would move both at once and no result would be
+    nameable. It also keeps D-100's cross-subsystem starvation shut: the Ehrlich re-route still
+    touches no member of this pair.
+
+    **Isolability (prime directive #3).** The gate is exactly 0 on an empty pool and the compile
+    seam disables this Process along with the rest of the amino-acid ledger when
+    ``amino_acids_gpl <= 0``, so an undosed wine run is byte-for-byte the validated core and the
+    Coleman reconstruction is untouched. It is **not** a target of the growth Arrhenius or
+    carrying-capacity modifiers: the swap is scaled by them so its refunds track growth's realised
+    draw, and this Process has no draw to track — importing that scaling would re-introduce the
+    coupling the Process exists to remove. The consequence is that uptake carries **no temperature
+    dependence** in v1, a named simplification: a sourced activation energy for amino-acid
+    permease transport is not in hand, and borrowing ``E_a_growth`` would be an unsourced claim
+    dressed as fidelity (the D-98 trap).
+
+    Tier: **speculative** — the form is standard (biomass-proportional, saturable transport) but
+    ``r`` is an author estimate, the storage destination is a stand-in, and the surplus nitrogen
+    is booked as extracellular ammonium rather than an intracellular reserve.
+    """
+
+    name = "assimilable_nitrogen_uptake"
+    tier = Tier.SPECULATIVE
+    #: Debits the two identity-agnostic pools, refunds their nitrogen to ``N`` and parks their
+    #: carbon in ``amino_acid_skeleton_carbon``. Touches neither ``X`` (it funds no biomass of its
+    #: own — growth does that, out of the ammonium this fills) nor ``S`` (see the docstring: a
+    #: sugar refund here would create hexose) nor any of the six precursor pools.
+    touches = (*(spec.pool for spec in ASSIMILABLE_SPECS), "N", "amino_acid_skeleton_carbon")
+    #: ``mu_max`` and ``biomass_N_fraction`` set the *capacity scale* (peak specific nitrogen
+    #: demand) — read as constants, never as the instantaneous growth rate, which is the whole
+    #: point. ``K_amino_acids`` and the pair's two ``must_aa_fraction_*`` shares are the shared
+    #: D-100 depletion gate. ``ProcessSet.tier_of`` folds these into the output tier of ``N``,
+    #: the two pools and the skeleton pool when this Process is enabled (D-1).
+    reads: tuple[str, ...] = (
+        "mu_max",
+        "biomass_N_fraction",
+        "amino_acid_uptake_capacity_ratio",
+        "K_amino_acids",
+        *(spec.fraction_param for spec in ASSIMILABLE_SPECS),
+    )
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        d = schema.zeros()
+        if "amino_acid_skeleton_carbon" not in schema:
+            return d  # beer: the amino-acid ledger is wine-only (D-30/D-32)
+        x = float(y[schema.slice("X")][0])
+        if x <= 0.0:
+            return d  # no cells ⇒ no transport capacity
+        gate = depletion_gate(y, schema, params, ASSIMILABLE_SPECS)
+        if gate <= 0.0:
+            return d  # empty pool ⇒ nothing to take up (also the undosed no-op)
+
+        # The capacity, NOT the demand: mu_max·f_N is the maximum specific nitrogen draw of
+        # growth, so this is transport sized against peak anabolic need and scaled by the cells
+        # present. `biomass_growth_rate` is deliberately not called — reading it would restore
+        # exactly the coupling this Process removes.
+        nitrogen = (
+            params["amino_acid_uptake_capacity_ratio"]
+            * params["mu_max"]
+            * params["biomass_N_fraction"]
+            * x
+            * gate
+        )
+        # Split across {arginine, generic} in proportion to the nitrogen each holds (the shared
+        # D-100 idiom, so this and the swap can never drift apart on the arithmetic), and take
+        # the carbon that mass carried.
+        carbon = draw_assimilable_nitrogen(d, y, schema, nitrogen)
+        d[schema.slice("N")] = nitrogen  # surplus nitrogen into the assimilable ammonium pool
+        # Park the skeleton. NOT refunded to sugar — see the docstring: unbounded by growth's
+        # draw, a sugar refund would create hexose whenever growth is stopped.
+        d[schema.slice("amino_acid_skeleton_carbon")] = carbon
         return d

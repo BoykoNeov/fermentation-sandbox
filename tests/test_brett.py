@@ -484,18 +484,26 @@ def test_growth_accelerates_phenols():
     # `amino_acids` pool, and since D-99's honest (~3.8x higher) fusel levels the reroute empties
     # it before Brett can grow. That competition is a real known limitation (D-100), pinned in
     # tests/test_aging_scenario.py; this test is about Brett's autocatalysis, so it isolates it.
+    # D-248 adds the LARGER competitor for that same pool: AssimilableNitrogenUptake un-couples
+    # the yeast's own uptake from its growth demand, so the yeast now strips the must to ~0.6 %
+    # the way Crépin measures instead of stopping at 40.8 %. That is the sourced behaviour and it
+    # is NOT disabled globally — it is isolated here for exactly the reason the re-route is. The
+    # competition it creates is real and is recorded as D-248's own residue: Brett draws ONLY the
+    # amino-acid pair and cannot touch the `N` slot the uptake fills, so the model over-states
+    # yeast/bacteria nitrogen competition. Repairing that is a bacterial-nitrogen beat.
+    _ISOLATED = ("fusel_amino_acid_reroute", "assimilable_nitrogen_uptake")
     _, dynamic = _run(
         days=120.0,
         hydroxycinnamic_gpl=0.1,
         brett_pitch_gpl=0.05,
         amino_acids_gpl=1.0,
-        disable=("fusel_amino_acid_reroute",),
+        disable=_ISOLATED,
     )
     _, constant = _run(
         days=120.0,
         hydroxycinnamic_gpl=0.1,
         brett_pitch_gpl=0.05,
-        disable=("fusel_amino_acid_reroute",),
+        disable=_ISOLATED,
     )  # no aa ⇒ no growth
 
     assert dynamic.series("X_brett")[-1] > 2.0 * constant.series("X_brett")[-1]  # population grew
@@ -787,13 +795,19 @@ def test_so2_crashes_growing_brett_population():
     """
     dose_day = 40.0
     so2 = [Intervention(day=dose_day, action="add_so2", params={"so2_mgl": 80.0})]
+    # The yeast's own un-coupled uptake (D-248) is isolated out of BOTH arms: it strips the shared
+    # identity-agnostic pool before Brett can grow on it, which is the sourced behaviour but would
+    # leave this test measuring an un-grown population. See the growth test above for the full
+    # reason and for where the competition it creates is recorded as a residue.
+    _ISOLATED = ("assimilable_nitrogen_uptake",)
     _, sulfited = _run(
         days=140.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0,
-        interventions=so2,
+        interventions=so2, disable=_ISOLATED,
     )  # fmt: skip
     _, control = _run(
-        days=140.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0
-    )  # no SO₂: Brett keeps growing and spoiling
+        days=140.0, hydroxycinnamic_gpl=0.1, brett_pitch_gpl=0.05, amino_acids_gpl=1.0,
+        disable=_ISOLATED,
+    )  # fmt: skip  # no SO₂: Brett keeps growing and spoiling
 
     xb = sulfited.series("X_brett")
     xbd = sulfited.series("X_brett_dead")

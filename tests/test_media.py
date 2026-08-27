@@ -55,8 +55,12 @@ WINE_SO2_SLOTS = ("so2_total", "oxofructose")
 #: octanoic-equivalent pool that gates the malolactic rate (g_FA), then the catalyst pools.
 WINE_MLF_SLOTS = ("mcfa", "X_mlf", "X_mlf_dead")
 WINE_AMINO_ACID_SLOTS = ("amino_acids",)
-# The non-assimilable cell-wall debris pool yeast autolysis fills (D-34).
-WINE_DEBRIS_SLOTS = ("debris",)
+# The non-assimilable cell-wall debris pool yeast autolysis fills (D-34), and beside it the
+# carbon-park AssimilableNitrogenUptake fills with the skeletons of amino acids taken up beyond
+# growth's anabolic demand (D-248). The second is held as ELEMENTAL carbon (g C/L, weight 1.0 on
+# total_carbon) rather than as a representative molecule: the surplus is an arginine/glutamine
+# blend no single species stands for.
+WINE_DEBRIS_SLOTS = ("debris", "amino_acid_skeleton_carbon")
 # Brettanomyces volatile-phenol slots (decision D-40), appended last: the p-coumaric-branch
 # precursor/intermediate/readout (hydroxycinnamics/vinylphenols/ethylphenols), the ferulic-branch
 # precursor/intermediate/readout split out at decision D-55 (ferulic_acid/vinylguaiacols/
@@ -289,7 +293,8 @@ def test_wine_schema_has_single_sugar_slot():
     # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + 1 oxofructose botrytis
     # SO₂-binder must input (D-130) + 1 mcfa MLF-inhibitor must input (D-131) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
-    # (D-34) + 8 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols — the p-coumaric
+    # (D-34) + 1 amino_acid_skeleton_carbon slot (D-248)
+    # + 8 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols — the p-coumaric
     # branch, D-40; ferulic_acid, vinylguaiacols, ethylguaiacols — the ferulic branch, D-55;
     # X_brett, X_brett_dead) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate D-49,
     # alpha_ketoglutarate D-50) + 2 Strecker-aldehyde slots (methional, phenylacetaldehyde — D-75)
@@ -367,7 +372,9 @@ def test_wine_schema_has_single_sugar_slot():
     # and the excess slot records that a supplement's nitrogen is pure ammonium at +1/mol N. Off
     # every ledger — phosphoric acid carries neither carbon nor nitrogen, and the excess is a
     # ratio. The second pair, after ascorbate, that is inert by default STATE: 0 unless dosed).
-    assert schema.size == 97
+    # +1 for the D-248 amino_acid_skeleton_carbon park (98): the carbon of amino acids taken up
+    # beyond growth's anabolic demand, held as elemental carbon and ON total_carbon at weight 1.0.
+    assert schema.size == 98
 
 
 def test_beer_schema_has_three_sequential_sugars():
@@ -664,6 +671,10 @@ MLF_PROCESSES = {
 # seam when amino acids are undosed.
 AMINO_ACID_PROCESSES = {
     "amino_acid_assimilation",
+    # Assimilable-nitrogen uptake (D-248): the flux that is NOT proportional to growth's rate, so
+    # the pools drain past what growth demands and a must is consumed to ~0 the way Crepin's is.
+    # Rides the same dosed, wine-only gate; deliberately NOT a modifier target (see below).
+    "assimilable_nitrogen_uptake",
     "fusel_amino_acid_reroute",
     # The precursors' non-Ehrlich fates (D-104): the sink that stopped the re-route being each
     # precursor's ONLY consumer. Wired wine-only and disabled with the other two when un-dosed.

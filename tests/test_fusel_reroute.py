@@ -624,9 +624,15 @@ def test_the_ester_carries_valine_label_at_its_parent_alcohols_enrichment():
         "entered at D-244 - the re-route was supposed to cost the alcohol pool almost "
         "nothing (mass-negligible)"
     )
-    assert alcohol == pytest.approx(0.0264, abs=1e-3), (
-        f"alcohol enrichment {alcohol:.4f} moved off its D-244 position inside the band - "
-        "the band alone is 3.6x wide and would not notice"
+    # D-248 moves it back DOWN a little, 0.0264 -> 0.0251, and the direction is the mirror of
+    # D-244's: un-coupling assimilable-nitrogen uptake from growth demand consumes the whole must
+    # and so restores biomass that D-244's corrected yield had halved, which dilutes the valine
+    # label with more de-novo synthesis. It stays comfortably inside D-111's band, so the gain
+    # D-244 recorded is not undone -- the enrichment does not fall back toward the ~0.018 it sat
+    # at before, because the two moves are not the same size.
+    assert alcohol == pytest.approx(0.0251, abs=1e-3), (
+        f"alcohol enrichment {alcohol:.4f} moved off its D-248 position inside the band (D-244 "
+        "measured 0.0264) - the band alone is 3.6x wide and would not notice"
     )
 
 

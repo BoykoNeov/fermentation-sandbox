@@ -380,13 +380,22 @@ def test_dose_behaves_like_supplementary_yan():
     # pitch state is unchanged (it declares the total it always carried), but its yield fit is no
     # longer evaluated at 80 mg N/L — it reads 530.9, held at Coleman's 350 edge, so f_N goes
     # 0.0439 → 0.1068 and the same swapped nitrogen builds less than half the cells. The effect
-    # survives (the dose still adds biomass) at 1.044x where it used to clear 1.05x. Lowering the
-    # floor to 1.03 and stopping there would let the effect decay to nothing unnoticed, which is
-    # the whole claim, so the upper edge is pinned too.
+    # survived (the dose still added biomass) at 1.044x where it used to clear 1.05x.
+    #
+    # **D-248 RESTORES IT AND THEN SOME: 1.044x -> 2.324x, and this test's own name is the
+    # reason.** "Behaves like supplementary YAN" was only ever approximately true, because the
+    # swap is the sole route from the pools into biomass nitrogen and its rate sits strictly
+    # BELOW growth's own draw — so a 2.0 g/L dose delivered a few per cent of the biomass its
+    # nitrogen was worth. Un-coupling uptake from the growth rate makes the claim nearly literal:
+    # the dose's nitrogen now reaches biomass, and 2.0 g/L of amino acids on an 80 mg N/L must is
+    # a large fraction of that must's total nitrogen, so more than doubling the cells is the
+    # arithmetic rather than a surprise. Still pinned two-sided: a FALLING ratio means the
+    # channel has narrowed again, a rising one that it is over-delivering.
     peak_undosed = float(np.max(_run(80.0)[0].series("X")))
     peak_dosed = float(np.max(_run(80.0, amino_acids_gpl=2.0)[0].series("X")))
-    assert peak_dosed / peak_undosed == pytest.approx(1.044, abs=5e-3), (
+    assert peak_dosed / peak_undosed == pytest.approx(2.324, abs=2e-2), (
         f"the amino-acid dose now builds {peak_dosed / peak_undosed:.4f}x the undosed biomass, "
-        "not the characterized 1.044x — the D-32 swap's contribution to growth moved"
+        "not the D-248 2.324x (D-244 characterized 1.044x, before assimilable-nitrogen uptake "
+        "was un-coupled from growth demand) — the amino-acid channel's contribution moved"
     )
     assert peak_dosed > peak_undosed, "the dose no longer adds biomass at all — the swap is dead"

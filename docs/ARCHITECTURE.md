@@ -61,7 +61,7 @@ Current size, from `get_medium(...).schema`:
 
 | Medium | Named variables | Float slots | Sugar slots |
 |--------|-----------------|-------------|-------------|
-| wine   | 97 | 97 | 1 |
+| wine   | 98 | 98 | 1 |
 | beer   | 57 | 59 | 3 |
 
 Tier and uncertainty do **not** ride inside these floats — they are properties of Processes and
@@ -94,7 +94,7 @@ can never break conservation, and the `touches` contract still holds (scaling ze
 Modifiers toggle and feed `tier_of` exactly like Processes. Stacked modifiers on one Process
 compose to a single scalar (D-10, D-11).
 
-`core/kinetics/` holds **83** concrete `Process`/`RateModifier` implementations across 24 modules
+`core/kinetics/` holds **84** concrete `Process`/`RateModifier` implementations across 24 modules
 (the three base types live in `core/process.py`).
 
 ### Kinetics modules
@@ -115,7 +115,7 @@ compose to a single scalar (D-10, D-11).
 | `vicinal_diketones.py` | 3 | α-acetolactate → diacetyl → butanediol |
 | `hydrogen_sulfide.py` | 3 | H₂S |
 | `mercaptans.py` | 1 | methanethiol — the last lumped aroma pool |
-| `amino_acids.py`, `amino_acid_pools.py` | 1 | the eight speciated amino-acid pools + ledger (D-100) |
+| `amino_acids.py`, `amino_acid_pools.py` | 2 | the eight speciated amino-acid pools + ledger (D-100); assimilable-nitrogen uptake un-coupled from growth demand (D-248) |
 | `keto_acids.py` | 6 | pyruvate / α-ketoglutarate / α-ketobutyrate, excretion + reassimilation |
 | `carbon_routing.py` | — | shared carbon draw/refund helpers, ester and fusel route specs, label tracer, and the shared fermentative rate law (per-slot uptake rates D-180, evolved-CO₂ rate D-227) that every Process reading the flux must call rather than re-derive |
 | `precursor_fates.py` | 1 | precursor partitioning |
@@ -150,9 +150,9 @@ the run byte-for-byte unchanged.
 
 | Medium | Oxidative set | Processes | Modifiers |
 |--------|---------------|----------:|----------:|
-| wine | `direct` (default) | 62 | 5 |
-| wine | `cascade` | 66 | 5 |
-| wine | `direct_burst` | 63 | 5 |
+| wine | `direct` (default) | 63 | 5 |
+| wine | `cascade` | 67 | 5 |
+| wine | `direct_burst` | 64 | 5 |
 | beer | `direct` (default) | 28 | 3 |
 | beer | `cascade` | 29 | 3 |
 | beer | `direct_burst` | 28 | 3 |
@@ -224,6 +224,20 @@ Before D-244 the two channels *added*: a wine declaring 250 mg N/L and dosing 0.
 362.7 and said nothing (D-243 found it, D-244 repaired it). `amino_acid_dose_nitrogen_mgl` is the
 public migration aid — a pre-D-244 scenario adds its dose's nitrogen to its declared YAN and its
 pitch state is bit-identical.
+
+**And that nitrogen is now actually CONSUMED, because uptake is no longer proportional to
+growth's demand (D-248).** `AssimilableNitrogenUptake` (in `core/kinetics/amino_acids.py`,
+alongside the D-32 swap and gated with it on `amino_acids_gpl > 0`) draws the two
+identity-agnostic pools at `r·mu_max·f_N·X·gate(aa)` — a transport *capacity* scaled by the cells
+present, reading `mu_max` as a constant and never `biomass_growth_rate`. Before it, the swap was
+the only route from the pools into biomass nitrogen and its rate sat strictly below growth's own
+draw, so ammonium could only fall; when it hit zero, growth's Monod shut growth off and the swap
+stopped with it, freezing 40.8 % of a reconstructed Crépin must unconsumed against her measured
+0.2 %. The drawn nitrogen goes to `N` and the carbon skeleton is **parked** in the new
+`amino_acid_skeleton_carbon` slot — elemental carbon, weight 1.0 on `total_carbon`, the `N`-slot
+idiom rather than the `debris`/glucan one — because an un-coupled flux has no bound against
+growth's carbon draw and a sugar refund would create hexose at zero growth rate. Not a rate-
+modifier target, so it carries no temperature dependence (a named simplification).
 
 **Coleman's yield fit is evaluated at that total, and HELD at the domain it was fitted over
 (D-244).** `_apply_nitrogen_dependent_yield` computes `biomass_N_fraction` from
@@ -533,7 +547,7 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (85 test files; unit, integration, conservation, sampling-surface and
+`uv run pytest -n auto` (86 test files; unit, integration, conservation, sampling-surface and
 doc-consistency checks), `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`
 (strict on `src`). CI runs all **four** on Python 3.13 and 3.14 — the format check is a separate
 gate from the lint check and fails independently of it, which is how four consecutive commits

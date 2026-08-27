@@ -372,7 +372,17 @@ _WINE_PINS: dict[str, tuple[float, float]] = {
     "methional": (2.3951789206098536e-07, 5.089990907748021e-07),
     # D-244: 1.084038787891e-09, 2.302542270316e-09 at the pre-carve-out fit point -- the 97x
     # slot, and the one worth reading the header comment for.
-    "phenylacetaldehyde": (1.0551535973175389e-07, 2.2412978823174311e-07),
+    # D-248: 1.0551535973175389e-07, 2.2412978823174311e-07 before un-coupled nitrogen uptake.
+    # -15.9 % at both years, and ATTRIBUTED rather than absorbed: this Process draws no
+    # phenylalanine (its ``touches`` forbids it), but consuming the whole must builds ~60 % more
+    # biomass, the Ehrlich re-route and its D-104 sink scale with the fusel demand that biomass
+    # drives, and so MORE phenylalanine is spent during fermentation and less survives to be
+    # Strecker-degraded. Measured: phenylalanine at 1 y falls 1.665554e-04 -> 1.387776e-04
+    # (-16.7 %) against this slot's -15.9 %, i.e. the product tracks its precursor ~1:1. The
+    # CONTROL is in the same probe -- ``methionine`` is unmoved (+0.0000) and ``methional`` with
+    # it (-0.0000), because methionine has no Ehrlich alcohol to be pulled by a larger biomass.
+    # Direction-wise this deepens D-100/D-104's "silent without lees", it does not create it.
+    "phenylacetaldehyde": (8.875057290121246e-08, 1.8851745309259634e-07),
     # D-244: 4.364843106077e-05, 1.140357095547e-06 at the pre-carve-out fit point.
     "anthocyanin": (4.3645381603888625e-05, 1.14100858584033e-06),
     # Unmoved at D-244 (7.5e-07 relative), as is ellagitannin (9.2e-08) -- neither reads the

@@ -40,7 +40,10 @@ from fermentation.core.kinetics.aging import (
     TanninSelfPolymerization,
     ThermalAnthocyaninFade,
 )
-from fermentation.core.kinetics.amino_acids import AminoAcidAssimilation
+from fermentation.core.kinetics.amino_acids import (
+    AminoAcidAssimilation,
+    AssimilableNitrogenUptake,
+)
 from fermentation.core.kinetics.arrhenius import (
     ArrheniusTemperature,
     ColemanQuadraticDeathTemperature,
@@ -154,6 +157,7 @@ __all__ = [
     "AlphaKetoglutarateExcretion",
     "AlphaKetoglutarateReassimilation",
     "AminoAcidAssimilation",
+    "AssimilableNitrogenUptake",
     "AnthocyaninFading",
     "AntioxidantBurstOxidation",
     "OxygenActivation",

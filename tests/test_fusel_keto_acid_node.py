@@ -131,7 +131,19 @@ _SOURCED_FUSEL_SPECS = tuple(
 #: not "now lands on the anchor"). The surplus was de-novo, sugar-sourced carbon sitting in this
 #: ratio's denominator, so the floor was being cleared by an over-production rather than by the
 #: supply structure the guard names.
-_D245_DE_NOVO_FLOOR_GAP = (
+#: **CLOSED AT D-248 — kept as the history of a xfail that ran for four records, not as a live
+#: reason.** The gap was never a fusel parameter and never the availability gate: it was the
+#: BIOMASS DENOMINATOR. Assimilation's only route into biomass nitrogen ran at
+#: ``psi*gate*f_N*base_dx``, strictly below growth's own draw, so ammonium could only fall — and
+#: when it reached zero, growth's Monod shut growth off and the swap stopped with it, freezing the
+#: must with 40.8 % of its assimilable nitrogen unconsumed against Crepin's measured 0.2 %.
+#: Un-coupling uptake from the growth rate (D-248) builds 98.4 % of the Coleman yield the compile
+#: seam itself installs instead of 61.6 %, and propanol goes **0.7744 -> 0.8062** on this fixture
+#: and 0.7963 -> 0.8784 on Crepin's own must. Nothing about threonine moved: this Process draws no
+#: precursor at all. Retained verbatim below because the archive is append-only and because a
+#: future beat reading "we lack the medium" or "the gate is mis-scaled" in an old record needs to
+#: find where both were measured and set aside.
+_D245_DE_NOVO_FLOOR_GAP_CLOSED_AT_D248 = (
     "D-245 (measuring D-244): propanol draws 77.4 % of its carbon de novo against the sourced "
     "80 % floor. MEASURED cause, not asserted: the corrected yield evaluation point roughly "
     "halves biomass, the alcohol total halves with it, and the amino-acid draw does not move at "
@@ -161,7 +173,15 @@ _D245_DE_NOVO_FLOOR_GAP = (
 #: isoamyl now reads 5.42 % against her 5.34 % and isobutanol 9.47 % against her 8.78 %.
 #: Instrument: the cap was inert because phenylalanine exhausted with or without it, and it no
 #: longer does (12.8 % survives), so the shipped cap now moves 2-PE's realised share by 12.7 %.
-_D245_D120_LEGS_GONE = (
+#: **BOTH LEGS RE-MEASURED AT D-248, AND THE DIRECTION ONE IS BACK.** The two guards this reason
+#: xfailed are green again: isoamyl reads 0.873x and isobutanol 0.927x Minebois's in-study shares
+#: on this fixture (1.01x / 0.98x on her own must), so nothing over-attributes and D-120's refusal
+#: of a de-novo cap stands on its direction leg exactly as it originally did. The INSTRUMENT leg is
+#: thinner rather than restored: the cap's bite on 2-PE's realised share shrinks 12.7 % -> 4.8 %
+#: without reaching the inertness D-120 measured, so
+#: ``test_the_de_novo_cap_is_inert_where_the_precursor_exhausts`` remains a strict xfail. Kept
+#: verbatim as the history of what D-245 measured and D-248 undid.
+_D245_D120_LEGS_GONE_DIRECTION_BACK_AT_D248 = (
     "D-245: D-120's refusal of a de-novo cap rested on two measured legs and the corrected yield "
     "evaluation point removed both. (1) DIRECTION: the model under-attributed to amino acids "
     "against Minebois's in-study shares; it now over-attributes -- isoamyl 5.42 % vs 5.34 %, "
@@ -347,12 +367,20 @@ def test_the_excreted_pool_cannot_supply_propanol():
         "argument against re-basing it no longer holds and the design must be re-measured"
     )
     # THE MARGIN, re-recorded at D-245 (was > 2.0, measured 2.60, at the pre-D-244 evaluation
-    # point). Two-sided: a one-sided floor cannot catch the excretion flux growing toward the
-    # demand, which is precisely the direction that would re-open the design.
-    assert 1.30 < ratio < 1.42, (
-        f"propanol/α-KB demand ratio {ratio:.4f} left the D-245 band [1.30, 1.42] (measured "
-        f"1.358). The CLAIM above still holds — this is the margin it holds it by, and the "
-        "margin is thin: re-derive it rather than widening the band"
+    # point) and AGAIN at D-248. Two-sided: a one-sided floor cannot catch the excretion flux
+    # growing toward the demand, which is precisely the direction that would re-open the design.
+    #
+    # D-248 moves it BACK UP, 1.358 -> 1.599, and the direction is the good one. Propanol is made
+    # on the fermentative flux, which scales with biomass; un-coupling nitrogen uptake restores
+    # the biomass D-244's corrected yield had halved, while α-KB excretion barely moves (it is a
+    # per-flux yield on a pool with no biomass term of its own). So the headroom this supply
+    # argument rests on goes from 36 % back to 60 %. D-245's "honest downgrade" note above is
+    # therefore partly retired — but only partly, and it stays on the page: 60 % over an
+    # author-estimated excretion rate is still not the 160 % the claim originally had.
+    assert 1.52 < ratio < 1.68, (
+        f"propanol/α-KB demand ratio {ratio:.4f} left the D-248 band [1.52, 1.68] (measured "
+        f"1.599; D-245 measured 1.358 before nitrogen uptake was un-coupled). The CLAIM above "
+        "still holds — this is the margin it holds it by. Re-derive it rather than widening"
     )
 
 
@@ -471,11 +499,13 @@ def de_novo_share_of(traj, schema, params, spec, *, f_override: float | None = N
             # isobutanol is 90.5 % de novo — clear of the floor by ten points, and ≥ 89.6 % even
             # on the worst-case cap-window bound. Propanol's miss is the real one: threonine has
             # no second branch, so its 77.4 % was never touched by the defect.
-            marks=(
-                [pytest.mark.xfail(strict=True, reason=_D245_DE_NOVO_FLOOR_GAP)]
-                if s.pool == "propanol"
-                else []
-            ),
+            #
+            # AND PROPANOL'S XFAIL IS GONE AT D-248 — the parametrization now carries no marks at
+            # all. It read 0.7744 here from D-245 to D-247 and reads **0.8062**; the cause was the
+            # biomass denominator, not this alcohol's chemistry (see
+            # ``_D245_DE_NOVO_FLOOR_GAP_CLOSED_AT_D248`` above). The floor itself is untouched:
+            # ``_SOURCED_DE_NOVO_FLOOR`` is still 0.80 and was never lowered to meet the model,
+            # which is what makes the close worth having.
         )
         for s in _SOURCED_FUSEL_SPECS
     ],

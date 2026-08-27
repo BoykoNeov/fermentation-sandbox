@@ -87,6 +87,7 @@ from fermentation.core.kinetics import (
     AnthocyaninFading,
     AntioxidantBurstOxidation,
     ArrheniusTemperature,
+    AssimilableNitrogenUptake,
     AutolyticHydrogenSulfide,
     AutolyticMercaptan,
     BiomassCarryingCapacity,
@@ -669,6 +670,20 @@ def wine_schema() -> StateSchema:
             description="non-assimilable cell-wall debris (glucan/mannoprotein; produced-only). "
             "The carbon-rich remainder yeast autolysis leaves behind after releasing the "
             "nitrogen-rich amino acids — carbon-accounted as glucan, nitrogen-free (D-34)",
+        ),
+        VarSpec(
+            "amino_acid_skeleton_carbon",
+            "g C/L",
+            default=0.0,
+            description="carbon skeletons of amino acids taken up in excess of growth's "
+            "anabolic demand (produced-only; decision D-248). Held as ELEMENTAL CARBON, the "
+            "`N`-slot idiom rather than the debris/glucan one: the surplus is a blend of "
+            "arginine and glutamine skeletons and no single molecule represents it. "
+            "AssimilableNitrogenUptake parks it here because the nitrogen it came in with is "
+            "refunded to `N` while growth still draws every gram of biomass carbon from sugar — "
+            "so the skeleton is genuinely surplus and must NOT be credited back to `S` (that "
+            "would create hexose at zero growth rate, which the D-32 swap's bound forbids). "
+            "ON total_carbon at weight 1.0, nitrogen-free",
         ),
         VarSpec(
             "hydroxycinnamics",
@@ -2339,8 +2354,19 @@ _CARRYING_CAPACITY_MODIFIERS: tuple[Callable[[], RateModifier], ...] = (BiomassC
 #: documented and left out: before it, the re-route was each precursor's ONLY consumer, so 100% of
 #: consumed leucine was attributed to isoamyl alcohol where real yeast send 77–86% of it to
 #: protein. Disabled with the swap and the re-route when amino acids are un-dosed.
+#: :class:`AssimilableNitrogenUptake` (decision D-248) rides here as well, and it is the one
+#: member of this tuple that is deliberately **not** a modifier target — not for the re-route's
+#: reason (matching an unscaled producer) but for the opposite one. The swap is scaled by the
+#: growth Arrhenius and the carrying cap precisely so its refunds track growth's *realised* draw;
+#: this Process has no draw to track, and importing that scaling would re-introduce the coupling
+#: it exists to remove. Before it, the swap was the only route from the speciated pools into
+#: biomass nitrogen and its rate sat strictly below growth's own draw, so ammonium could only
+#: fall — and once it reached zero, growth's Monod shut growth off and the swap stopped with it,
+#: freezing the pools with 40.8 % of Crépin's assimilable nitrogen still in them against her
+#: measured 0.2 %. Disabled with the swap and the re-route when amino acids are un-dosed.
 _AMINO_ACID_PROCESSES: tuple[Callable[[], Process], ...] = (
     AminoAcidAssimilation,
+    AssimilableNitrogenUptake,
     FuselAminoAcidReroute,
     PrecursorNonEhrlichFates,
 )

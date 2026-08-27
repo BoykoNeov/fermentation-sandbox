@@ -8,10 +8,13 @@ re-inherit the stale story:
 1. **D-103's gate-shape SPREAD is absorbed by the D-104 non-Ehrlich sink** — it is large with the
    sink off (isoamyl ~6% vs propanol ~67%) and compresses to a uniform low band with it on. So the
    "minor alcohols are wildly over-attributed" defect is gone, and only isoamyl (UNDER) survives.
-   **The "uniform low band" half is an xfail since D-244** — propanol reads 0.2256 sink-on against
-   a 0.20 band that IS the sourced 80% floor written upside down; see
+   **The "uniform low band" half was an xfail from D-244 to D-247** — propanol read 0.2256
+   sink-on against a 0.20 band that IS the sourced 80% floor written upside down; see
    ``test_every_sink_on_share_sits_inside_rollers_low_band``, split out at D-245 so that failure
-   stops burying the compression assertion beside it. The compression itself still holds.
+   stopped burying the compression assertion beside it. **D-248 closed it at 0.1938 without
+   touching the 0.20**: un-coupling assimilable-nitrogen uptake from growth demand consumes the
+   whole must, which restores the biomass denominator every de-novo share is measured against.
+   The compression itself held throughout.
 2. **Isoamyl sits on its ``(1-f)`` mass-conservation ceiling**, which no sourcing-layer change —
    the keto-acid node included — can lift: a gate cap (the "obvious" fix) does not move it, because
    leucine is too scarce to persist under any draw rate. **The ``(1-f)`` here is leucine's and is
@@ -59,8 +62,7 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from tests.test_fusel_keto_acid_node import (
-    _D245_D120_LEGS_GONE,
-    _D245_DE_NOVO_FLOOR_GAP,
+    _D245_D120_LEGS_GONE_DIRECTION_BACK_AT_D248,
     _FERMENT_DAYS,
     _OTHER_PRECURSOR_CONSUMERS,
     _de_novo_share,
@@ -126,7 +128,6 @@ def test_the_d104_sink_absorbs_the_d103_gate_shape_spread():
     )
 
 
-@pytest.mark.xfail(strict=True, reason=_D245_DE_NOVO_FLOOR_GAP)
 def test_every_sink_on_share_sits_inside_rollers_low_band():
     """Sink ON, every alcohol compresses into Rollero's uniform low band (D-112 finding 1).
 
@@ -135,14 +136,19 @@ def test_every_sink_on_share_sits_inside_rollers_low_band():
 
     **The 0.20 here is NOT an independent threshold — it is the sourced 80 % de-novo floor written
     the other way up**, over all five alcohols instead of the four the floor's sources describe.
-    So this fails for the same reason and on the same number as
-    ``test_every_sourced_fusel_is_de_novo_dominated[propanol]``: propanol reads 0.2256 sink-on.
-    Raising 0.20 to admit it would be lowering the sourced floor under a different name, which is
-    why this is an xfail and not a re-pin. Rollero's own uniform range tops out at 17.3 %; the
-    0.20 was already margin above it.
+    That is why it failed for the same reason and on the same number as
+    ``test_every_sourced_fusel_is_de_novo_dominated[propanol]``: propanol read 0.2256 sink-on, and
+    raising 0.20 to admit it would have been lowering the sourced floor under a different name.
+
+    **XFAIL REMOVED AT D-248, and the threshold was never touched.** Propanol reads **0.1938**
+    sink-on, inside a 0.20 that is still the sourced floor inverted. What moved is the biomass
+    denominator: un-coupling assimilable-nitrogen uptake from growth demand consumes the whole
+    must, so more alcohol is made de novo off the sugar route against a precursor draw that was
+    already supply-limited. Rollero's own uniform range tops out at 17.3 %, so the model is now
+    inside the guard but still above the measurement it was drawn from — worth keeping in view.
 
     **Isobutanol is no longer the maximum and that is a D-245 repair, not a drift**: it read
-    0.2400 under the harness defect ``ehrlich_primary_share`` fixes and reads 0.0947 measured on
+    0.2400 under the harness defect ``ehrlich_primary_share`` fixes and reads 0.0814 measured on
     the residue the model actually routes.
     """
     on = {s.pool: 1.0 - _de_novo_share(s) for s in FUSEL_SPECS}
@@ -410,23 +416,29 @@ def shipped_run():
     return _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
 
 
-#: Marks per alcohol for the split below: 2-PE still under-attributes and is a live GREEN guard.
-_OVER_ATTRIBUTING = ("isoamyl_alcohol", "isobutanol")
+#: **D-120'S DIRECTION LEG IS BACK, AND THE MARKS ARE GONE (decision D-248).** D-245 measured
+#: isoamyl and isobutanol crossing from under- to over-attribution (1.015x and 1.079x Minebois's
+#: in-study shares) and xfailed them strictly; D-246 scored both on her OWN must and they roughly
+#: doubled, to 1.73x and 1.68x. Un-coupling assimilable-nitrogen uptake from growth demand puts
+#: them at **0.873x and 0.927x here, and 1.01x / 0.98x on her own must** — under the measurement
+#: on this fixture, and essentially ON it where the comparison is commensurate. So every alcohol
+#: is once again at or below Minebois, which is precisely the condition D-120 refused a de-novo
+#: cap on: a ``(1-f_de_novo)`` ceiling can only REDUCE amino-acid sourcing and would move all
+#: three the wrong way. Nothing was fitted to her: the uptake parameter sits at the bound where
+#: transport stops limiting and every number here is unmoved across a 200x sweep of it.
+#:
+#: What is NOT fully restored is D-120's second (instrument) leg — see
+#: :func:`test_the_de_novo_cap_now_bites_because_phenylalanine_no_longer_exhausts`, where the
+#: cap's bite shrinks 12.7 % -> 4.8 % without reaching the inertness D-120 measured. One leg
+#: back and one leg thinner is the honest statement, and it is why the de-novo-entry build is
+#: not simply re-refused here.
+_OVER_ATTRIBUTING = ()
 
 
 @pytest.mark.parametrize(
     ("pool", "measured"),
     [
-        pytest.param(
-            pool,
-            measured,
-            id=pool,
-            marks=(
-                [pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE)]
-                if pool in _OVER_ATTRIBUTING
-                else []
-            ),
-        )
+        pytest.param(pool, measured, id=pool)
         for pool, measured in _MINEBOIS_AMINO_ACID_SHARE.items()
     ],
 )
@@ -483,7 +495,7 @@ def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warrante
     )
 
 
-@pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE)
+@pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE_DIRECTION_BACK_AT_D248)
 def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts(shipped_run):
     """Why the cap is the wrong INSTRUMENT, not merely the wrong direction (decision D-120).
 
@@ -535,15 +547,26 @@ def test_the_de_novo_cap_now_bites_because_phenylalanine_no_longer_exhausts(ship
     exhaustion premise that D-244 falsified — so from D-244 until D-245 **it never ran**, and the
     inversion below went unmeasured while the record above it was being written.
 
-    Measured: phenylalanine survives at 12.8 % with the cap and exhausts without it, and the cap
-    moves the realised amino-acid share **1.603 % → 1.400 %, 12.7 % relative** — four orders of
-    magnitude past the old inertness threshold. Pinned two-sided, because both directions matter:
-    shrinking toward 0 means the supply-limited regime has returned and D-120's instrument argument
-    revives; growing means the cap is taking over the sourcing this fixture is supposed to measure.
+    Measured at D-245: phenylalanine survived at 12.8 % with the cap and exhausted without it, and
+    the cap moved the realised amino-acid share **1.603 % → 1.400 %, 12.7 % relative** — four
+    orders of magnitude past the old inertness threshold. Pinned two-sided, because both directions
+    matter: shrinking toward 0 means the supply-limited regime has returned and D-120's instrument
+    argument revives; growing means the cap is taking over the sourcing this fixture measures.
 
-    **This does not license building a cap for another alcohol** — it removes one of the two
-    measured legs D-120 declined on, and the other (direction) is the test above. The build still
-    needs a sourced ``f_de_novo_isoamyl``, which this repo does not hold (D-206).
+    **D-248 MOVED IT MOST OF THE WAY BACK, AND THE BAND IS RE-RECORDED RATHER THAN WIDENED.**
+    Un-coupling assimilable-nitrogen uptake from growth demand restores the biomass D-244's
+    corrected yield had halved, so 2-PE's draw rises again and phenylalanine goes from 12.8 % left
+    to **4.85 %** — much nearer exhaustion, though not at it. The cap's bite falls with it:
+    **1.3790 % → 1.3125 %, 4.82 % relative**. So the direction is *toward* D-120's inertness
+    without reaching it, which is why
+    :func:`test_the_de_novo_cap_is_inert_where_the_precursor_exhausts` is still a strict xfail and
+    this test is still a live guard rather than being retired into it.
+
+    **This does not license building a cap for another alcohol, and D-248 makes that stronger
+    rather than weaker.** D-245 removed both of D-120's measured legs; D-248 gives the DIRECTION
+    leg back outright — every alcohol is at or below Minebois again — and leaves this INSTRUMENT
+    leg thinner than D-120 measured but no longer four orders of magnitude away from it. The build
+    would still need a sourced ``f_de_novo_isoamyl``, which this repo does not hold (D-206).
     """
     shipped, schema = shipped_run
     uncapped, _ = _run(
@@ -566,9 +589,11 @@ def test_the_de_novo_cap_now_bites_because_phenylalanine_no_longer_exhausts(ship
         uncapped, schema, {**params, "f_de_novo_2_phenylethanol": 0.0}, "2_phenylethanol"
     )
     move = abs(with_cap - without) / without
-    assert 0.10 < move < 0.16, (
+    assert 0.030 < move < 0.070, (
         f"the de-novo cap moves 2-PE's realised amino-acid share {without:.4%} → {with_cap:.4%} "
-        f"({move:.1%} relative), outside the D-245 band [10 %, 16 %] (measured 12.7 %). It was "
-        "INERT at D-120 because phenylalanine exhausted either way; if it is inert again, D-120's "
-        "instrument argument has revived and D-245's Flags marker on it must be re-derived"
+        f"({move:.2%} relative), outside the D-248 band [3.0 %, 7.0 %] (measured 4.82 %; D-245 "
+        "measured 12.7 % before nitrogen uptake was un-coupled). Falling toward 0 means the "
+        "supply-limited regime has fully returned, D-120's instrument argument is whole again, "
+        "and the xfail above should be lifted; rising means the biomass denominator has moved "
+        "back. Either way this is a re-derivation, not a band to widen"
     )

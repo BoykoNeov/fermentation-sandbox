@@ -302,6 +302,16 @@ def total_carbon(
     # total_nitrogen. On an undosed / autolysis-off run the pool is empty (constant 0 term).
     if "debris" in schema:
         w[schema.slice("debris")] = carbon_mass_fraction("glucan")
+    # Amino-acid skeleton carbon-park (decision D-248): AssimilableNitrogenUptake debits the two
+    # identity-agnostic pools for nitrogen the cells take up beyond growth's anabolic demand,
+    # refunds that nitrogen to ``N`` and parks the skeleton here. Unlike ``debris`` this pool is
+    # held as ELEMENTAL carbon (g C/L, the ``N``-slot idiom) because the surplus is a blend of
+    # arginine and glutamine skeletons that no single molecule represents — so its weight is 1.0,
+    # not a species carbon fraction, and the aa → N + skeleton transfer closes exactly. It is
+    # deliberately NOT refunded to ``S``: that flux is not bounded by growth's draw, so a sugar
+    # refund would create hexose at zero growth rate (see the Process docstring).
+    if "amino_acid_skeleton_carbon" in schema:
+        w[schema.slice("amino_acid_skeleton_carbon")] = 1.0
     # Mercaptan (thiol) pool (decision D-45): AutolyticMercaptan draws carbon from the amino-acid
     # pool into this pool (deaminating the nitrogen to N), so — unlike the carbon-free h2s — it
     # carries carbon and must be weighted or that draw would read as carbon destroyed. Booked at

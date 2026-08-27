@@ -1350,6 +1350,14 @@ def test_the_reroute_no_longer_starves_maillard_now_that_precursors_are_speciate
                 duration_days=_FERMENT_DAYS + _SWEET_AGING_DAYS,
             )
         )
+        # D-248's un-coupled uptake is isolated from BOTH arms: it is a fermentation-phase
+        # consumer of the same identity-agnostic pool, and with it live arginine ends this run at
+        # ~0 in both arms, so the with-vs-without EQUALITY below — which is the whole claim, that
+        # the re-route cannot touch arginine — would be an equality of two numerical zeros. The
+        # claim is about the re-route; the isolation is what keeps it measurable. (That arginine
+        # IS fully consumed once uptake runs is the sourced behaviour and is asserted in
+        # ``tests/test_assimilable_nitrogen_uptake.py``, not silently relied on here.)
+        cs.process_set.disable("assimilable_nitrogen_uptake")
         if disable_reroute:
             cs.process_set.disable(FuselAminoAcidReroute.name)
         res = cs.run()
@@ -1629,6 +1637,18 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
     # a SIXTH, fermentation-phase process — not one of the five aging routes — so isolating it
     # neither removes a stressed route nor weakens the aging-phase carbon/nitrogen closure (it
     # is inactive during aging regardless). See _run_thermal_isolating_reroute + D-100.
+    #
+    # D-248's AssimilableNitrogenUptake is isolated for the IDENTICAL reason, and it qualifies on
+    # the identical three counts: it is a fermentation-phase process, it is not one of the five
+    # aging routes, and it is inert during aging (its gate reads an empty pool). It is also the
+    # bigger emptier of the two — un-coupled from growth demand, the yeast consumes the whole
+    # must, which is what Crépin measures. Without this isolation MaillardBrowning's N-bearing
+    # park comes out at EXACTLY 0.0 and four of the five "it fired" assertions below would be
+    # asserting on nothing. **That zero is a finding, not an accident**, and it is the same one
+    # D-100/D-104 already record for the six precursor pools: aging amino-acid chemistry in this
+    # model is autolysis-sourced, and a no-lees wine has no substrate for it. D-248 extends that
+    # from the precursors to the identity-agnostic pair. See ``test_thermal_aroma_from_drained_
+    # precursors_requires_autolysis``, which is where that claim is asserted rather than assumed.
     cs = compile_scenario(
         _wine(
             [_begin_aging(_FERMENT_DAYS), _add_oxygen(_FERMENT_DAYS, 60.0)],  # OXYGENATED
@@ -1639,6 +1659,7 @@ def test_thermal_and_oxidative_axes_coexist_and_close_end_to_end():
         )
     )
     cs.process_set.disable(FuselAminoAcidReroute.name)
+    cs.process_set.disable("assimilable_nitrogen_uptake")
     traj = cs.run()
     assert traj.success
     tj = traj.as_trajectory()

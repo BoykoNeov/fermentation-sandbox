@@ -79,15 +79,44 @@ TOTAL_DAYS = FERMENT_DAYS + 365.25 * YEARS
 # broke are restated, each one recorded old -> new in the D-182 record.
 # ======================================================================================
 
+# ======================================================================================
+# D-248 RE-PIN — o2 and A420 only, and the "did the burst leak?" reading is FALSIFIED first.
+#
+# This scenario doses ``amino_acids_gpl = 0.5``, so
+# :class:`~fermentation.core.kinetics.amino_acids.AssimilableNitrogenUptake` is live in it: the
+# yeast now consumes the must's assimilable nitrogen the way Crepin measures instead of stopping
+# at what growth demands, which builds more biomass, ferments slightly differently, and reaches
+# these aging slots. These tests state their own failure meaning — "the burst leaked into the
+# default build" — so that had to be FALSIFIED before a pin was touched:
+#
+#   * ``test_an_empty_burst_pool_reproduces_the_direct_trajectory_exactly`` — the bitwise
+#     isolability guard — still PASSES.
+#   * The move is attributed by RE-RUNNING AT ``amino_acid_uptake_capacity_ratio = 0``, which
+#     makes the new Process contribute exactly nothing while leaving the new state slot in the
+#     schema. Every entry then sits within **7.5e-5** relative of its old pin — inside the 1e-4
+#     tolerance, i.e. the extra schema dimension (which changes solve_ivp's RMS error norm and so
+#     its step selection) does NOT on its own break anything. What breaks them is the Process,
+#     and it moves them to **1.0-1.6e-4**. Small, one-sided, and confined to the two O2-driven
+#     slots.
+#   * ``so2_total`` is NOT re-pinned in either dict: it moved by 9e-6 to 2.1e-5, inside the
+#     tolerance, so its numbers are still D-140's and D-147's own. Only entries that actually
+#     broke are restated — the D-182 rule, applied again.
+#
+# The direct-vs-burst SEPARATION these pins exist to protect is intact: o2 37.22 -> 37.22 %,
+# A420 35.85 -> 35.85 % at 1 y.
+# ======================================================================================
+
 #: D-140's own pins on the DIRECT set (``test_oxidative_cascade_guards._WINE_PINS``), restated here
 #: as the baseline the burst set is measured AGAINST. Not re-derived — copied, so that if the
 #: direct set ever moves, this file goes red for the same reason that one does.
 DIRECT_PINS: dict[str, tuple[float, float]] = {
     # D-182: 1.444070363339e-05, 1.576919862838e-05 before the carbonic term.
-    "o2": (1.444363621566332e-05, 1.577233131562574e-05),
+    # D-248: 1.444363621566332e-05, 1.577233131562574e-05 before un-coupled nitrogen uptake.
+    "o2": (1.4445900427430e-05, 1.5774539402510e-05),
     "so2_total": (5.650150172989e-02, 5.286949820113e-02),
     # D-182: 1.517312917092e-03, 2.586921779751e-03 before the carbonic term.
-    "A420": (1.5176242482004844e-03, 2.5874482824764554e-03),
+    # D-248: 1.5176242482004844e-03, 2.5874482824764554e-03 before un-coupled nitrogen uptake.
+    "A420": (1.5178619521870e-03, 2.5878454466270e-03),
 }
 
 #: The same three slots under ``direct_burst``, measured at D-147 (``measure_burst.py``). The
@@ -96,10 +125,12 @@ DIRECT_PINS: dict[str, tuple[float, float]] = {
 #: asserted at 1e-4 while BDF runs at 1e-6 is not self-evidently above its own noise.
 BURST_PINS: dict[str, tuple[float, float]] = {
     # D-182: 9.066266268085e-06, 9.877702609069e-06 before the carbonic term.
-    "o2": (9.067499291264613e-06, 9.879107412627015e-06),
+    # D-248: 9.067499291264613e-06, 9.879107412627015e-06 before un-coupled nitrogen uptake.
+    "o2": (9.0684747808570e-06, 9.8801657996040e-06),
     "so2_total": (5.774665845617e-02, 5.536926474690e-02),
     # D-182: 9.734830029596e-04, 1.644029205926e-03 before the carbonic term.
-    "A420": (9.73614572391898e-04, 1.6442540384438962e-03),
+    # D-248: 9.73614572391898e-04, 1.6442540384438962e-03 before un-coupled nitrogen uptake.
+    "A420": (9.7371569923880e-04, 1.6444273374770e-03),
 }
 
 _PIN_RTOL = 1e-4
