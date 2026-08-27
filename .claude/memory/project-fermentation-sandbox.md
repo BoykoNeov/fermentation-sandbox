@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-27)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-243** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1985 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-244** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1980 + 11 xfail** (3 D-188 Herzan; 2 D-215's own; **6 NEW at D-244** — one cause, see its ledger row) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
@@ -387,14 +387,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the nearest real defect is **4.4 MILLION ULP** away, so never call that budget a loosening and never widen it past
   single digits — suspect the solver. Do NOT reorder the CI gates (tests first costs 15 min per lint slip).
   → `.claude/memory/prohibitions/seed-reads-repair.md`
-- **Wine's nitrogen budget (D-243)** — the D-232 item is **CLOSED: AUDITED, do not re-propose.** Numerator SOUND
-  (Varela print their OWN proline subtraction: 380/65 total → 300/50 assimilable). Growth is the EXACT identity
-  `X0 + YAN/f_N` (ratio 1.00000000) and the ledger closes to 3e-14 through all 12 N-writing sites — **not** a
-  conservation defect. **NEVER write the beer symmetry**: wine's demanded f_N sits BETWEEN the engine's own two
-  values, so a nitrogen-budget explanation is ADMISSIBLE here — the OPPOSITE of D-230. **OPEN, owner's call:**
-  `yan_mgl` and `amino_acids_gpl` ADD (250 declared → 362.7 actual) while the yield fit reads only the first.
-  Both repairs priced and BOTH bad — summing leaves Coleman's fitted range at the commonest dose. Flags D-32/D-14.
-  → `.claude/memory/prohibitions/wine-nitrogen-budget.md`
+- **Wine's nitrogen budget (D-243) → PARTITIONED (D-244)** — audit CLOSED and its one open item now SPENT:
+  `yan_mgl` is the must's **TOTAL** assimilable N, the amino-acid pools are CARVED OUT of it, and the fit is
+  evaluated there and **HELD** at Coleman's 350 edge (tier → SPECULATIVE; the hold is EPISTEMIC, never
+  saturation). Low edge deliberately unenforced — a low hold would move Varela's 50 arm. **Summing DOES NOT
+  RUN** (banded refusal above 444.0 mg N/L, 35 scenarios); never widen that bracket. Migrate by ADDING the
+  dose's N (`amino_acid_dose_nitrogen_mgl`) — pitch state bit-identical. **Six fusel guards are STRICT xfails**
+  (de-novo 76-77 % vs a sourced 80 %); the floor is NOT to be lowered. Both source-tied fixtures were running
+  at 2.25x/1.9x their papers' N. → `.claude/memory/prohibitions/wine-nitrogen-budget.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
@@ -411,6 +411,7 @@ uncharged; ester/alcohol ratio marginally >1; `acidbase.py` docstring concession
   (Nguyen **T3.1**), `d151-l16-ph\` (Carrasco-Quiroz **T1+2**), `d163-band-edges\`/`d165-wide-band\`/`d166-switch-census\`/`d167-edge-provenance\` (reusable harnesses); `_txt\carrascon-red-kinetics-2018.txt` = **Carrascón 2018 reds**.
 
 ## Not started (deferred tail; D-110's narrowing still unconfirmed by owner)
+**NEW at D-244, owner's call:** the fusel node's de-novo floor (**six STRICT xfails**, never lower it) and the two source-tied fixtures' missing must compositions — `prohibitions/wine-nitrogen-budget.md`.
 ~~growth-linked excretion (D-49 opt B)~~ — **NOT a candidate: α-KB REFUSED (D-189), PYRUVATE REFUSED (D-195), and
 the draining arithmetic is STRUCTURAL AND GENERAL to all three pools, so α-KG is refused BY IMPLICATION** —
 inferred, not separately measured, and that is the only thing left open about it. Do not offer it as unbuilt; peptide pool; variety-specific DMSp;

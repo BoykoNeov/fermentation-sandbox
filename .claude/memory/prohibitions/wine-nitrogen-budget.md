@@ -1,83 +1,84 @@
 ---
 name: wine-nitrogen-budget
-description: "D-243 — wine's nitrogen budget is AUDITED: numerator sourced, identity exact, ledger closed, the beer inadmissibility argument does NOT transfer, and the two-channel evaluation point is open on the owner's call"
+description: "D-243/D-244 — wine's nitrogen budget is AUDITED and its two channels now PARTITION: yan_mgl is the total, the yield fit is evaluated there and held at Coleman's edge, and six fusel guards are strict xfails naming the cost"
 metadata:
   node_type: memory
   type: project
 ---
 
-**Live prohibitions — wine's nitrogen budget (D-243).** Detail split out of
+**Live prohibitions — wine's nitrogen budget (D-243, REPAIRED at D-244).** Detail split out of
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read it
 before proposing anything about wine YAN, `yan_mgl`, `amino_acids_gpl`, `biomass_N_fraction`,
-Coleman's `Y_X/N` regression, the Varela comparison, or "the nitrogen budget is wrong". Every
-bullet is *what it forbids* + the record to read for *why*. **If a prohibition looks unconvincing,
-go read D-243 — do not argue past it from here.** Siblings: `seed-reads-repair.md` (D-241, whose
-SUBSUMED verdict this corrects the scope of), `banded-undrawn-census.md` (D-240).
+Coleman's `Y_X/N` regression, the fusel node's de-novo shares, or "the nitrogen budget is wrong".
+Every bullet is *what it forbids* + the record to read for *why*. **If a prohibition looks
+unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings:
+`seed-reads-repair.md` (D-241), `banded-undrawn-census.md` (D-240).
 
-- **The D-232 item is CLOSED — never re-propose "wine's nitrogen budget has not been audited".**
-  It rode the open list from D-232 through D-241 and is now done, both halves: the numerator is
-  sourced (§2) and the identity is inverted against a measured crop (§3), which is exactly what
-  D-230 did for beer. What remains open is ONE named design decision (below), not the audit.
+- **The evaluation point is CLOSED — never re-propose it as open.** D-243 found it and left it on
+  the owner's call; D-244 took the call. `yan_mgl` is the must's **TOTAL assimilable nitrogen** and
+  the eight amino-acid pools are **carved out of it**, implementing D-32's own premise. Both
+  records' "OPEN, owner's call" text is spent. `Corrects:` D-14 and D-32.
 
-- **The numerator is SOUND — do not re-check Varela's nitrogen for a proline subtraction.**
-  Varela print the subtraction themselves: 380 / 65 mg/L total, 300 / 50 **assimilable**, proline
-  (20.5 % wt/wt of their nitrogen mixture) excluded because it is not assimilable anaerobically.
-  Quoted verbatim in D-243 §2 and in the test module docstring. The timepoint is also checked and
-  benign (stationary-phase dry weights at 48 h / 72 h; the engine's biomass is flat from ~40 h),
-  and they report assimilable nitrogen **completely depleted** — the identity's own assumption.
+- **NEVER re-propose "sum the channels into the fit".** It does not merely extrapolate — it does
+  not RUN. `biomass_N_fraction` is built as a banded `Parameter` and is **refused above a total of
+  444.0 mg N/L**, so 35 suite scenarios stop compiling. The only way through is widening the
+  `[0.03, 0.15]` bracket, which `seed-reads-repair.md` forbids: it is what the ensemble draws for
+  the constant governing biomass. It was also rejected on principle — D-243's finding is a
+  *declaration* defect, and summing leaves `yan_mgl` named for a total it does not hold.
 
-- **NEVER write the beer symmetry.** The tempting record is "wine's demand is outside the
-  physiological range too, in the other direction". It is FALSE and was corrected before shipping.
-  Beer's demand (20.2–26.2 % N) was above a hard ceiling; wine has **no comparable floor** —
-  `wine_generic.yaml` calls 0.114 the *N-replete* reference that "drops under nitrogen limitation",
-  and the shipped regression already runs f_N = 0.0362 at YAN=50. The demanded 0.0521 at YAN=300
-  sits **between the engine's own two values**, so a nitrogen-budget explanation for wine is
-  **ADMISSIBLE**. Do not cite D-230's inadmissibility argument on the wine side.
+- **The high hold is EPISTEMIC. Never restate it as saturation.** Above
+  `biomass_N_yield_fit_yan_max` (350 mg N/L, Coleman's own top treatment) the fit is evaluated at
+  the edge and the derived tier drops to SPECULATIVE. No source here says `Y_X/N` plateaus; a first
+  draft justified the hold by an invented physiological ceiling on cell nitrogen and that is the
+  D-203/205/206 error. A sourced high-nitrogen yield curve would REPLACE the hold, not confirm it.
 
-- **This is NOT a conservation defect — do not open it as one.** The ledger closes to 3.1e-14
-  relative across all four sink arms, including autolysis and oxygen. The growth identity
-  `X0 + YAN/f_N` reproduces the simulated crop to ratio **1.00000000** at both Varela levels.
+- **The LOW edge is recorded and deliberately NOT enforced — do not "finish" it.** `f_N` is
+  monotone in YAN, so below the span it only falls, infimum `1/exp(3.50) = 0.0302`, inside the
+  bracket and inside physiology. A low hold would also move **Varela's 50 mg N/L arm** — the
+  project's only independent wine dataset, D-56's firewall. Guarded in both directions.
 
-- **The slope disagreement is a RE-EXPRESSION, not a finding.** Engine yield rises 2.466x from
-  N=300 to N=50, Varela's 1.521x. D-56 finding 3 already prints both endpoint magnitudes
-  (11.2 vs 19.3; 27.7 vs 30). Checked before writing, precisely because it is the shape a new
-  headline would take. Pursuing the mechanism needs a third dataset that does not exist.
+- **There is NO minimum-ammonium floor and adding one needs a source.** Real musts always carry
+  some ammonium; nothing states how much. An ammonium-poor must stays legal and its residual sugar
+  is the honest output. The refusal line is exactly `amino-acid N > yan_mgl`, never a clamp to zero.
 
-- **OPEN, and the OWNER'S CALL — the evaluation point.** `yan_mgl` seeds the `N` slot **and** is
-  where Coleman's regression is evaluated (D-14); `amino_acids_gpl` seeds eight pools also on the
-  nitrogen ledger (D-100). They **ADD**; they do not partition. At the suite's commonest 0.5 g/L
-  dose a wine declaring 250 mg N/L carries **362.7**, and the fit stays at 250 — more nitrogen and
-  a yield for a poorer must, compounding. D-32's own text says *"amino acids are part of YAN"*,
-  which the seam does not implement; D-243 `Flags:` D-32 and D-14 rather than repairing.
+- **Migrate a pre-D-244 scenario by ADDING its dose's nitrogen to its declared YAN** —
+  `amino_acid_dose_nitrogen_mgl` computes it and the pitch state comes out bit-identical. Do NOT
+  re-author a fixture's composition instead; a draft did, and produced a headline resting on a dose
+  nobody published [[feedback-migrate-a-fixture-by-its-state-not-its-intent]].
 
-- **Do NOT take the obvious repair without the owner.** Summing the channels into the fit leaves
-  Coleman's fitted 70–350 mg N/L range at that same 0.5 g/L dose and reaches f_N = 0.379 at 2 g/L
-  — cells 38 % nitrogen, three times anything physiological. It trades a wrong evaluation point
-  for an extrapolated one. The other route, making the channels partition, changes what every
-  dosed wine scenario in the suite means. Both are priced in D-243 §6; neither is free.
+- **The six fusel xfails are STRICT and the 80 % floor is NOT to be lowered.** De-novo synthesis is
+  growth-linked; the corrected yield roughly halves biomass, so propanol falls to 77.4 % and
+  isobutanol to 76.0 % against Crépin/Rollero's sourced floor, and isoamyl attributes 5.42 % to
+  amino acids against Minebois's 5.34 %. Closing that re-opens D-109's supply premise and the D-120
+  no-cap refusal — a fusel-node beat, on the owner's call, never absorbed into another.
 
-- **Do NOT tune anything against Varela, ever.** D-56 set the firewall: it is the project's only
-  independent wine dataset and is a validation set only while it is never a calibration set. D-243
-  fits nothing to it. Do not widen the Varela benchmark's characterized bands to absorb a change.
+- **Both source-commensurate fixtures were violating their own comments, and that is RECORDED not
+  repaired.** Crépin's probe ran at 405.4 mg N/L against a 180 mg N/L paper (2.25x) and Rollero's at
+  475.4 against 250 (1.9x), for the whole of D-109→D-115. Fixing it needs those papers' synthetic-
+  medium compositions; substituting a grape-must partition is a category error
+  [[feedback-a-generic-partition-is-not-a-defined-medium]].
 
-- **D-241 §2/§3's SUBSUMED verdict STANDS — its SCOPE was wrong.** Containment of the two Coleman
-  coefficients' implied range inside the sampled bracket holds only over **YAN 66.0–324.8 mg N/L**,
-  and the "2.11x wider" figure is 250 mg/L's value (7.16x at YAN=50, 1.22x at 350). The escapes
-  are small (4.6 % of the low tail at 50; 1.1159x over the high edge at 350) and the verdict is
-  right for the battery and every ensemble scenario here. **Do not restore a red by widening the
-  bracket literals** — that bracket is what the ensemble actually draws for the constant that
-  governs biomass. Guarded in both directions by
-  `test_the_subsumed_verdict_is_scoped_to_the_yan_interval_that_contains_it`.
+- **Re-recorded values are NOT free to re-tolerance.** `phenylacetaldehyde`'s 2 y pin moved **97x**
+  (2.30e-09 → 2.24e-07) — fewer cells drain less phenylalanine, so the aging Strecker route's pool
+  survives fermentation. `faded_anthocyanin` and `ellagitannin` did not move and are the controls.
+  The D-14 identity's residue grew 0.6 % → 7.8 %, autolysis leaves 49.7 % (was 45.9 %), the dry
+  sotolon arms rose 1.38-1.43x while the sweet one moved 1.005x, and **Rollero's isoamyl enrichment
+  ENTERED D-111's validated band** (0.018 → 0.0264). Never widen a band to swallow both readings.
 
-- **Do not re-run the sink census expecting the pre-registered answer.** A pre-registered "no
-  non-biomass sink over 5 %" was wrong by five times: with autolysis on, **45.9 %** of the nitrogen
-  ends in the amino-acid pools, because lees self-digestion returns it faster than anything
-  re-assimilates it post-dryness. Pinned with its autolysis-off control.
+- **Still true from D-243, unchanged:** the numerator is SOUND (Varela print their own proline
+  subtraction, 380/65 total → 300/50 assimilable) — do not re-check it. **NEVER write the beer
+  symmetry**: wine's demanded f_N sits between the engine's own two values, so a nitrogen-budget
+  explanation is ADMISSIBLE here, the OPPOSITE of D-230. It is **not** a conservation defect (the
+  ledger closes to 3e-14 through all 12 N-writing sites). The slope disagreement is a
+  RE-EXPRESSION of D-56 finding 3, not a finding. **Do NOT tune anything against Varela, ever.**
+  D-241 §2/§3's SUBSUMED verdict stands with its scope corrected to YAN 66.0-324.8.
 
-- **Untouched and named, not oversights:** the tier half of the two channels (pool provenance
-  tiers do not propagate into the biomass they become — same shape as D-241 §10's seed-tier gap),
-  and the mechanism behind the flatter measured nitrogen-dependence, which is D-232 §5's
-  "different organism / medium: untouched, unsourced" residue.
+- **Untouched and named, not oversights:** the tier half (the pools' provenance tiers still do not
+  propagate into the biomass they become — D-244 adds a third instance, closes none), and
+  `nitrogen_uptake_charge_wine`'s **proline tension** — its uncertainty note derives an
+  ammonium-to-amino ratio from the Handbook's raw 3-10 % / 25-30 % with no proline subtraction while
+  its own `conditions` field excludes proline. Pre-existing; found here, left where it was found.
 
-Measurements: `M:\claud_projects\temp\ferment\d243-wine-nitrogen-audit\` — `PREREGISTER.md`,
-`FINDINGS.md`, `probe1_identity.py` … `probe4_two_channels.py`, `mutate.py`, `mutate2.py`.
+Measurements: `M:\claud_projects\temp\ferment\d243-wine-nitrogen-audit\` and
+`d244-wine-n-evaluation-point\` — `FINDINGS-pre.md`, `probe_band.py`, `probe_ceiling.py`,
+`probe_partition_stall.py`, `probe_denovo2.py`, `probe_pins.py`, and the `patch*.py` migrations.
