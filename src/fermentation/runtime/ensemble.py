@@ -299,6 +299,7 @@ def _resolve_sample_names(
     only: Iterable[str] | None,
     exclude: Iterable[str] | None,
     events: Sequence[ScheduledEvent] = (),
+    seed_reads: Iterable[str] = (),
 ) -> tuple[str, ...]:
     """The sorted, deterministic set of parameter names to sample for this run.
 
@@ -310,8 +311,24 @@ def _resolve_sample_names(
     so the per-member draw order — and thus the seeded reproducibility — does not depend
     on set ordering. With ``events=()`` the schedule union is just the ``t0`` reads, so an
     un-scheduled run samples exactly the names it did before scheduling existed.
+
+    ``seed_reads`` (decision D-241) unions in the parameters the *compile seam* read to build
+    ``y0`` that no Process declares — a D-45 fallback level like ``dms_potential_initial``. Those
+    are invisible to ``_schedule_reads`` by construction, since nothing reads them at runtime, so
+    until D-241 their bands were uncertainty every published spread silently omitted. Two
+    properties keep this from being a second, looser ``reads``:
+
+    * it is unioned into the **default** branch only — an explicit ``only`` still means exactly
+      those names, so a caller pinning a sweep is not handed extra draws;
+    * it is unioned **before** ``exclude``, so pinning a seed remains possible.
+
+    It is a sampling-scope channel and carries no tier claim; see
+    :attr:`~fermentation.scenario.compile.CompiledScenario.seed_reads` for why that half is
+    deliberately left where it was, and why the names come from the ``y0`` rules themselves.
     """
-    chosen = set(only) if only is not None else _schedule_reads(process_set, events)
+    chosen = (
+        set(only) if only is not None else _schedule_reads(process_set, events) | set(seed_reads)
+    )
     chosen &= set(parameters.names)
     if exclude is not None:
         chosen -= set(exclude)
@@ -478,6 +495,7 @@ def simulate_ensemble(
     max_failure_fraction: float = 0.5,
     events: Iterable[ScheduledEvent] = (),
     y0_for_member: Callable[[Mapping[str, float]], FloatArray] | None = None,
+    seed_reads: Iterable[str] = (),
     method: str = "BDF",
     rtol: float = 1e-6,
     atol: float = 1e-9,
@@ -536,7 +554,9 @@ def simulate_ensemble(
     grid = np.linspace(t_span[0], t_span[1], 200) if t_eval is None else np.asarray(t_eval, float)
     tiers = parameters.tier_map() if param_tiers is None else param_tiers
     nominal_values = parameters.resolve()
-    sampled_names = _resolve_sample_names(process_set, parameters, only, exclude, events)
+    sampled_names = _resolve_sample_names(
+        process_set, parameters, only, exclude, events, seed_reads
+    )
 
     # A reconfigure event mutates process_set in place and does not restore it (D-35); the
     # pristine pre-run enable state is captured once and reset before every run so members

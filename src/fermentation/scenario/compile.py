@@ -124,6 +124,67 @@ from fermentation.units.convert import (
 #: ships the nitrogen-dependent biomass yield; gates the compile-time override.
 _N_YIELD_COEFFS = ("biomass_N_yield_log_intercept", "biomass_N_yield_log_slope")
 
+
+@dataclass(frozen=True)
+class _SeedFallback:
+    """One D-45 fallback seed: a slot the seam fills from a *sourced parameter level*.
+
+    Decision D-241. The D-45 shape is "absent does not mean zero" — a scenario that names no
+    ``dms_potential_ugl`` still carries the grape's DMS precursor, so the seam falls back to the
+    sourced ``dms_potential_initial`` rather than to 0. Every row here is that shape, and every
+    row was priced by D-240 §4: banded, able to move the run, and — until this record — drawn by
+    no ensemble, because the seed is baked into ``y0`` at compile and the sampler only re-draws
+    the *parameter map*.
+
+    ``slot``/``key``/``param`` are the state slot, the scenario key that overrides it, and the
+    parameter it falls back to; ``to_internal`` is the unit conversion the seam applied, held
+    here so the per-member rule reproduces the seam exactly rather than re-deriving it.
+
+    **The rule fires only when the compiled slot still holds ``to_internal(param.value)``.**
+    That is rule 2/3's own condition and it does three jobs at once: a scenario that named
+    ``key`` stated this batch's level and must not be overwritten (D-24's exclusion); a seam that
+    stops deriving the slot silently stops the rule instead of silently overwriting it; and — for
+    ``burst_antioxidant`` — it *is* D-147's wiring condition, because
+    :func:`_resolve_burst_antioxidant_seed` zeroes that slot wherever the consuming Process is
+    not wired. So the seed cannot be re-drawn into a build that cannot spend it, without the
+    table needing to know which oxidative set compiled.
+    """
+
+    slot: str
+    key: str
+    param: str
+    to_internal: Callable[[float], float]
+
+
+def _identity(x: float) -> float:
+    return x
+
+
+#: Every D-45 fallback seed the ensemble re-draws per member (decision D-241). These are six of
+#: D-240 §3's eight ``LIVE SEED, NEVER DRAWN`` rows; the two it leaves out are
+#: ``biomass_N_yield_log_intercept``/``_slope``, which seed no slot at all — they derive the
+#: ``biomass_N_fraction`` override, and *that* parameter is itself sampled over a band which
+#: strictly contains (and is 2.11x wider than) the range the two coefficients' own bands imply,
+#: so drawing them too would double-count one physical quantity. Measured, not assumed: D-241 §2.
+#:
+#: ``copper_typical`` is the seventh member of the same class and is NOT here — it kept D-236's
+#: hand-written rule, whose condition is a genuine branch on scenario intent rather than this
+#: table's uniform "did the seam derive it" test.
+_SEED_FALLBACKS: tuple[_SeedFallback, ...] = (
+    _SeedFallback("dms_potential", "dms_potential_ugl", "dms_potential_initial", ugl_to_gpl),
+    _SeedFallback("bound_h2s", "bound_h2s_ugl", "bound_h2s_initial", ugl_to_gpl),
+    _SeedFallback(
+        "bound_methanethiol",
+        "bound_methanethiol_ugl",
+        "bound_methanethiol_initial",
+        ugl_to_gpl,
+    ),
+    _SeedFallback(
+        "burst_antioxidant", "burst_antioxidant_gpl", "burst_antioxidant_initial", _identity
+    ),
+    _SeedFallback("o2", "o2_mgl", "o2_wort_aeration_beer", mgl_to_gpl),
+)
+
 #: The malolactic Processes gated on an *Oenococcus oeni* pitch (decisions D-23, D-31, D-39):
 #: malate→lactate conversion, the citrate co-metabolism feeding the diacetyl reservoir, the
 #: bacterial diacetyl reduction, and bacterial death/decay. They are wired into the wine medium
@@ -336,6 +397,9 @@ class CompiledScenario:
         """
         kwargs.setdefault("param_tiers", self.parameters.tier_map())
         kwargs.setdefault("y0_for_member", self.y0_for_member())
+        # The two halves of D-241's repair travel together and are derived from one source, so a
+        # caller cannot take the draw without the re-seed (or the re-seed without the draw).
+        kwargs.setdefault("seed_reads", self.seed_reads)
         return simulate_ensemble(
             self.process_set,
             self.parameters,
@@ -345,20 +409,70 @@ class CompiledScenario:
             **kwargs,  # type: ignore[arg-type]
         )
 
-    def y0_for_member(
+    def y0_for_member(self) -> Callable[[Mapping[str, float]], FloatArray] | None:
+        """Per-member ``y0`` builder — the rules of :meth:`_member_seed_rules`, applied in order.
+
+        ``None`` when no rule applies, so a caller stays byte-identical to the fixed-``y0`` path.
+        """
+        rules = self._member_seed_rules()
+        if not rules:
+            return None
+        base = self.y0
+
+        def build(values: Mapping[str, float]) -> FloatArray:
+            out = base.copy()
+            for _, rule in rules:
+                rule(out, values)
+            return out
+
+        return build
+
+    @property
+    def seed_reads(self) -> tuple[str, ...]:
+        """Parameter names this scenario's ``y0`` derives that no Process declares (D-241).
+
+        The ensemble unions these into its sampled set, which is what makes D-240 §3's
+        ``LIVE SEED, NEVER DRAWN`` class drawable at all: the sampler scopes itself by
+        ``Process.reads`` (``_schedule_reads``), and a seed the compile seam consumed is read by
+        no Process at runtime, so it was invisible to every band the engine published.
+
+        **It is derived from the rules themselves, and that is the whole safety argument.** A
+        name reaches this tuple only from a rule that re-seeds it, so the half-repair D-240 §10
+        warned about — *"the ensemble is drawing a name that cannot reach ``y0``, which is worse
+        than the gap"* — is unrepresentable here rather than merely guarded against.
+
+        **This channel carries no tier claim, deliberately.** ``reads`` has two masters (D-160):
+        it scopes the sampler *and* it propagates tiers through ``_reads_tier``. Declaring these
+        seeds on a Process would assert the second along with the first, and what a seed's tier
+        does to a *state slot* is unmeasured — which is exactly why D-237 and D-240 both declined
+        the repair. ``seed_reads`` is the sampling half alone. Stated rather than left implicit,
+        because a silent tier position is the omission D-160 corrected in the old pKa convention.
+
+        Rules 1-3 (the pH anchor, the peptide capacity, the copper seed) contribute nothing here:
+        every parameter they read already reaches the sampler through some active Process's
+        ``reads`` — the pKa map by D-160's repair, ``copper_typical`` by D-236's.
+        """
+        return tuple(sorted({name for names, _ in self._member_seed_rules() for name in names}))
+
+    def _member_seed_rules(
         self,
-    ) -> Callable[[Mapping[str, float]], FloatArray] | None:
-        """Per-member ``y0`` builder for the parts of the seed a **parameter** derives.
+    ) -> list[tuple[tuple[str, ...], Callable[[FloatArray, Mapping[str, float]], None]]]:
+        """Per-member ``y0`` rules, each with the parameter names it needs the sampler to draw.
 
         Was ``reanchor_for_member`` and did only the pH anchor (D-233); D-236 added the copper
-        seed and the name followed the scope, and D-238 the peptide buffer capacity. It is still
+        seed and the name followed the scope, and D-238 the peptide buffer capacity. D-241 added
+        the D-45 fallback seeds and split the names out alongside the rules, so
+        :attr:`seed_reads` cannot drift from what is actually re-seeded. It is still
         **not** a re-run of the initial
         builder: it rebuilds exactly the slots whose compile-time value is a sampled parameter,
         one measured rule at a time, and leaves everything else at the compiled array. A full
         rebuild would move seeds no beat has measured, which is the trap D-233 declined and this
         one does not re-open.
 
-        ``None`` when no rule applies, so a caller stays byte-identical to the fixed-``y0`` path.
+        Each rule ships with the names it needs *drawn*, which is only ever non-empty for rule 4:
+        rules 1-3 read parameters some active Process already declares, so the sampler reaches
+        them without help. See :attr:`seed_reads` for why that tuple is derived here and not
+        listed separately, and for the tier position it deliberately does not take.
 
         **Rule 1 — the pH anchor (D-233).** Applies when the schema has ``cation_charge`` and the
         scenario gave an ``initial_ph``. ``initial_ph`` is an *input* and its contract is that the
@@ -439,9 +553,33 @@ class CompiledScenario:
         that enters it. Priced rather than assumed: worst member 0.40 % of the capacity against a
         peptide-pKa-only root. Filtering the map would also have shipped a deliberately half-pinned
         read *inside* the fix for half-pinning, which is this census's own defect class.
+
+        **Rule 4 — the D-45 fallback seeds (decision D-241), and the sugar one below it.** The
+        five :data:`_SEED_FALLBACKS` rows plus ``must_fermentable_fraction``: parameters the seam
+        reads to fill a slot, that no Process reads at runtime, so no ensemble could draw them and
+        every published band silently omitted their uncertainty. D-240 priced them — three are
+        worth *more* than the spread the same ensemble already reports for the slot they seed
+        (``bound_methanethiol_initial`` 2.16x, ``dms_potential_initial`` 1.53x,
+        ``bound_h2s_initial`` 364x on its own pool), and ``must_fermentable_fraction``, the
+        narrowest band in the set at 1.06x, is worth 0.574 of the reported ethanol spread because
+        it multiplies the sugar every downstream number is a fraction of. Band width does not
+        order that list, which is why the rule is a sweep of the class and not of the wide bands.
+
+        These are the *only* rules that put a name into :attr:`seed_reads`; the sampler cannot
+        reach them any other way, and the coupling is structural (a name is drawable iff a rule
+        re-seeds it). ``o2_wort_aeration_beer`` is included although its price is **exactly zero**
+        — every beer O2 consumer is aging-gated (D-213, re-measured at D-240 §6) — precisely
+        because a repair that manufactures spread out of an inert seed would show up there first.
+        It is the null control, and it is asserted as one.
+
+        *The sugar rule is separate because it is not a slot fallback.*
+        ``must_fermentable_fraction`` scales ``brix_to_sugar_gpl(brix)`` into ``S[0]`` (D-16)
+        rather than standing in for an absent dose, so it has no scenario key to be absent and
+        its guard is the recomputation
+        itself: the rule fires only if the compiled slot still equals the nominal product.
         """
         base = self.y0
-        rules: list[Callable[[FloatArray, Mapping[str, float]], None]] = []
+        rules: list[tuple[tuple[str, ...], Callable[[FloatArray, Mapping[str, float]], None]]] = []
 
         target = self.scenario.initial.get("initial_ph")
         if (
@@ -490,9 +628,7 @@ class CompiledScenario:
                     # §1's one-ULP disagreement was a looser root, not a floor) — but resting
                     # D-24's byte-for-byte nominal claim on a root-finder's tolerance surviving a
                     # scipy upgrade is not the same as guaranteeing it.
-                    if all(
-                        values[name] == nominal for name, nominal in nominal_back_solve.items()
-                    ):
+                    if all(values[name] == nominal for name, nominal in nominal_back_solve.items()):
                         return
                     # Reads the acid slots off `out` and overwrites only its own; the titration
                     # inverse-solves its own sample cation, so this never reads `cation_charge`
@@ -501,7 +637,7 @@ class CompiledScenario:
                         out, self.schema, values, target_bc
                     )
 
-                rules.append(recapacitate)
+                rules.append(((), recapacitate))
 
         if "cation_charge" in self.schema and target is not None:
             cation_slot = self.schema.slice("cation_charge")
@@ -516,7 +652,7 @@ class CompiledScenario:
                     out, self.schema, values, target_ph
                 )
 
-            rules.append(reanchor)
+            rules.append(((), reanchor))
 
         if (
             "copper" in self.schema
@@ -530,18 +666,56 @@ class CompiledScenario:
                 def reseed_copper(out: FloatArray, values: Mapping[str, float]) -> None:
                     out[copper_slot] = values["copper_typical"]
 
-                rules.append(reseed_copper)
+                rules.append(((), reseed_copper))
 
-        if not rules:
-            return None
+        for row in _SEED_FALLBACKS:
+            if (
+                row.slot not in self.schema
+                or row.key in self.scenario.initial
+                or row.param not in self.parameters
+            ):
+                continue
+            slot = self.schema.slice(row.slot)
+            seeded = row.to_internal(self.parameters[row.param].value)
+            # The equality test IS the condition, in all three of its jobs (see `_SeedFallback`):
+            # it refuses a scenario-stated level, it stops silently if a future seam changes how
+            # the slot is derived, and for `burst_antioxidant` it reproduces D-147's wiring gate
+            # for free — that slot is zeroed wherever `AntioxidantBurstOxidation` is not wired, so
+            # a member cannot be handed a burst pool the compiled build has no way to spend.
+            if float(base[slot][0]) != seeded:
+                continue
 
-        def build(values: Mapping[str, float]) -> FloatArray:
-            out = base.copy()
-            for rule in rules:
-                rule(out, values)
-            return out
+            def reseed(
+                out: FloatArray,
+                values: Mapping[str, float],
+                _slot: slice = slot,
+                _row: _SeedFallback = row,
+            ) -> None:
+                out[_slot] = _row.to_internal(values[_row.param])
 
-        return build
+            rules.append(((row.param,), reseed))
+
+        if (
+            "S" in self.schema
+            and "brix" in self.scenario.initial
+            and "must_fermentable_fraction" in self.parameters
+        ):
+            sugar_slot = self.schema.slice("S")
+            neat_gpl = brix_to_sugar_gpl(float(self.scenario.initial["brix"]))
+            if float(base[sugar_slot][0]) == (
+                neat_gpl * self.parameters["must_fermentable_fraction"].value
+            ):
+
+                def reseed_sugar(out: FloatArray, values: Mapping[str, float]) -> None:
+                    # Writes element 0 only. Wine's `S` is one slot wide (beer's three never reach
+                    # here — beer states its sugars in g/L and has no `brix` key), so this is the
+                    # whole vector today; indexing rather than assigning the slice keeps it that
+                    # way if a medium ever gives a Brix must more than one sugar.
+                    out[sugar_slot.start] = neat_gpl * values["must_fermentable_fraction"]
+
+                rules.append((("must_fermentable_fraction",), reseed_sugar))
+
+        return rules
 
 
 # -- initial-composition vocabulary (the industry-unit boundary) --------------

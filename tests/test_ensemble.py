@@ -525,6 +525,14 @@ def test_scheduled_ensemble_conserves_across_jumps_per_member():
     # the run-wide identity final == initial + Σ external_flows for carbon AND nitrogen, read
     # with that member's OWN sampled accounting fractions. The flows are member-dependent (a
     # rack removes a fraction of the sampled lees mass), so they must be stored per member.
+    #
+    # BOTH ends of the identity are the member's own, and the `initial` half was a latent defect
+    # until D-241 (it read the COMPILED `cs.y0`). It stayed green through D-233/D-236 because the
+    # slots those re-seed per member — `cation_charge`, `copper` — carry neither carbon nor
+    # nitrogen, so a fixed initial and the member's own initial agreed to the bit. D-241 draws
+    # `must_fermentable_fraction`, which moves `S[0]` — the carbon denominator itself — and the
+    # mismatch surfaced at once: 99.043 against 97.834 g C/L, i.e. the whole sugar band read as a
+    # conservation breach. The model was never wrong here; the guard was comparing two members.
     cs = compile_scenario(_dap_rack_scenario())
     grid = np.linspace(0.0, cs.t_span_h[1], 30)
     ens = cs.run_ensemble(n_members=8, seed=0, t_eval=grid)
@@ -536,6 +544,7 @@ def test_scheduled_ensemble_conserves_across_jumps_per_member():
     nominal_fc = cs.parameters.value("biomass_C_fraction")
     nominal_fn = cs.parameters.value("biomass_N_fraction")
     rack_carbon = []
+    initial_carbon = []
     for i in range(ens.n_succeeded):
         fc = ens.member_params[i].get("biomass_C_fraction", nominal_fc)
         fn = ens.member_params[i].get("biomass_N_fraction", nominal_fn)
@@ -544,10 +553,17 @@ def test_scheduled_ensemble_conserves_across_jumps_per_member():
         traj = ens.member_trajectory(i)  # a ScheduledTrajectory carrying THIS member's flows
         for quantity, tol in ((c_of, 1e-6), (n_of, 1e-9)):
             injected = sum(quantity(f.delta) for f in traj.external_flows)
-            initial = quantity(cs.y0)
+            initial = quantity(traj.y[:, 0])  # this member's own seed, not the compiled one
             final = quantity(traj.y[:, -1])
             assert final == pytest.approx(initial + injected, abs=tol)
         rack_carbon.append(c_of(traj.external_flows[1].delta))  # flows[1] is the rack
+        initial_carbon.append(c_of(traj.y[:, 0]))
+
+    # Reading the member's own seed above is only a repair if the seeds actually differ; without
+    # this the line is indistinguishable from the compiled-`y0` read it replaced, which is how it
+    # survived two records that made it wrong [[feedback-a-control-needs-mechanical-reach]].
+    assert np.std(initial_carbon) > 0.0
+    assert c_of(cs.y0) not in initial_carbon  # …and no member is the compiled seed by accident
 
     # The rack removal is genuinely member-dependent — the lees mass at rack time varies with
     # the sampled death/growth kinetics, so storing one nominal ledger would have been wrong.
@@ -794,9 +810,14 @@ def test_an_unanchored_scenario_gets_no_anchor_rule():
     **The builder itself is no longer ``None`` here, and that is D-236, not a regression.**
     A wine carries a ``copper`` slot seeded from ``copper_typical`` whether or not it opted
     into the pH system, so the copper rule applies on its own. What is pinned is the thing
-    the old ``None`` stood for: the cation slot is untouched. Beer has no ``copper`` slot, so
-    an un-anchored beer still gets no builder at all — that is where the ``None`` branch now
-    lives, and it is what keeps a caller with no parameter-derived seed byte-identical.
+    the old ``None`` stood for: the cation slot is untouched.
+
+    **The beer half no longer asserts ``None`` either, and that is D-241.** It used to, on the
+    ground that beer has no ``copper`` slot -- but "no anchor rule" and "no rules at all" were
+    only ever the same sentence while the anchor and the copper seed were the whole registry.
+    An un-anchored beer still carries a wort-oxygen seed that a parameter derives, so it gets a
+    builder. The claim this test exists to make is unchanged and is now asserted directly on
+    both media: **the cation slot stays 0**.
     """
     scenario, _ = _anchored("wine")
     bare = {k: v for k, v in scenario.initial.items() if k != "initial_ph"}
@@ -830,7 +851,20 @@ def test_an_unanchored_scenario_gets_no_anchor_rule():
             duration_days=1.0,
         )
     )
-    assert beer.y0_for_member() is None
+    beer_build = beer.y0_for_member()
+    assert beer_build is not None, "an un-anchored beer still carries its wort-O2 seed"
+    beer_slot = beer.schema.slice("cation_charge")
+    assert float(beer.y0[beer_slot][0]) == 0.0
+    beer_perturbed = dict(beer.parameters.resolve())
+    beer_perturbed["o2_wort_aeration_beer"] *= 1.5
+    rebuilt = beer_build(beer_perturbed)
+    assert float(rebuilt[beer_slot][0]) == 0.0, (
+        "the anchor rule fired on a beer that named no `initial_ph`"
+    )
+    # ...and the rule that DID fire reached the slot it owns, so the line above is a measured
+    # silence rather than a builder that happens to do nothing at all.
+    o2_slot = beer.schema.slice("o2")
+    assert float(rebuilt[o2_slot][0]) != float(beer.y0[o2_slot][0])
 
 
 def test_simulate_ensemble_without_the_hook_is_unchanged():

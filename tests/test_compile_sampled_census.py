@@ -159,13 +159,24 @@ def _recording() -> Iterator[set[str]]:
         ParameterSet.__getitem__, ParameterSet.value, ParameterSet.resolve = _ORIG  # type: ignore[method-assign]
 
 
-def _census(scenario: Scenario) -> tuple[set[str], set[str]]:
+def _census(scenario: Scenario, oxidative: str = "direct") -> tuple[set[str], set[str]]:
     """``(compile-time reads, census members)`` for one scenario."""
     with _recording() as seen:
-        compiled = compile_scenario(scenario)
+        compiled = compile_scenario(scenario, oxidative=oxidative)
+    # `seed_reads` is part of the scope a REAL run draws (D-241): `run_ensemble` passes it,
+    # so a census that omitted it would measure a set no ensemble uses, and would report a
+    # repaired name as still-undrawn. That is exactly how the sibling module's
+    # `test_the_priced_names_are_still_undrawn` stayed GREEN through D-241's repair until
+    # this argument was added — the guard was scored against the one scope in which the fix
+    # is invisible [[feedback-a-guard-must-be-scored-where-its-subject-lives]].
     sampled = set(
         _resolve_sample_names(
-            compiled.process_set, compiled.parameters, None, None, compiled.events
+            compiled.process_set,
+            compiled.parameters,
+            None,
+            None,
+            compiled.events,
+            compiled.seed_reads,
         )
     )
     return seen, seen & sampled
@@ -399,6 +410,44 @@ CENSUS: Mapping[str, str] = {
         "nitrogen_uptake_charge_beer's band, so they must move together or the pool's charge "
         "stops reconciling [[feedback-a-locked-pair-repairs-or-drifts-together]]",
     ),
+    # D-241's six: the D-45 fallback seeds. They arrived here FROM
+    # `tests/test_banded_undrawn_census.py`, which is the migration its own staleness message
+    # prescribes ("a name that became DRAWABLE is a repair and belongs in CENSUS instead — move
+    # the row, do not delete it"). They are census members by the predicate now because
+    # `seed_reads` puts them in the sampled set, and they are NOT half-pinned — the half that
+    # used to be pinned is the one that got repaired.
+    **dict.fromkeys(
+        (
+            "dms_potential_initial",
+            "bound_h2s_initial",
+            "bound_methanethiol_initial",
+            "must_fermentable_fraction",
+        ),
+        "REPAIRED — a D-45 fallback seed, drawn since D-241 via seed_reads and re-seeded per "
+        "member by y0_for_member's rule 4. Paired on identical draws, the four together add "
+        "spread the shipped engine reported as EXACTLY zero: on the battery wine the reported "
+        "band widens 2.83x for `dms`, 2.07x for `methanethiol`, 1.36x for `bound_h2s`, 1.04x for "
+        "`E` — and a typical member's own DMS moves 50 % (worst 173 %). "
+        "`must_fermentable_fraction` "
+        "is the narrowest band in the set (1.06x) and the largest mover, because it scales the "
+        "sugar every downstream number is a fraction of: band WIDTH does not order this class",
+    ),
+    "o2_wort_aeration_beer": (
+        "REPAIRED, and the NULL CONTROL of that repair — same rule 4, same mechanism, and it "
+        "adds nothing: beer's whole reported band is unchanged to 1.000 on X, E, o2 and acetic, "
+        "worst per-member shift ~1e-8 relative. Every o2 consumer is aging-gated and begin_aging "
+        "DISABLES the Process that removes it (D-213, re-measured on the trajectory at D-240 §6). "
+        "It is repaired anyway, and kept in the registry precisely because it is zero: without a "
+        "row the mechanism cannot be shown to move a slot only when the slot is live"
+    ),
+    "burst_antioxidant_initial": (
+        'REPAIRED under `oxidative="direct_burst"` ONLY, and that is the D-147 condition rather '
+        "than a half-repair — elsewhere the slot is zeroed after the pack, so rule 4's equality "
+        "guard declines and the name stays in the sibling census with an INERT verdict (measured: "
+        "the entire y0 is bit-identical across its 50x band under `direct` and `cascade`). Where "
+        "it IS wired, the reported `burst_antioxidant` band widens 6.97x, aged `A420` 1.34x. This "
+        "is the row D-237 found in passing and pinned, and D-240 §4 priced at 0.738"
+    ),
     "biomass_carrying_capacity": "BY-DESIGN — a scenario override is the MODE of the draw (D-164)",
     "k_autolysis": "BY-DESIGN — a scenario override is the MODE of the draw (D-164)",
 }
@@ -460,9 +509,15 @@ def test_no_classified_member_has_gone_stale():
     membership is scenario-conditional — ``copper_typical`` is only a member once ``begin_aging``
     enables ``phenolic_browning``, and the two override knobs only once a scenario opts in.
     """
+    # …and scored across the WIRINGS too, since D-241: `burst_antioxidant_initial` is a member
+    # only under `direct_burst`, because D-147 zeroes the slot it seeds everywhere else and the
+    # seed rule therefore declines. A union over the battery alone would report that row as stale
+    # and invite its deletion — a registry has to be scored where its subjects live
+    # [[feedback-a-guard-must-be-scored-where-its-subject-lives]].
     union: set[str] = set()
     for scenario in BATTERY:
         union |= _census(scenario)[1]
+    union |= _census(WINE_BROWNING, oxidative="direct_burst")[1]
     stale = sorted(set(CENSUS) - union)
     assert not stale, (
         f"{len(stale)} classified name(s) are no longer read at compile, or no longer sampled: "
@@ -1034,7 +1089,12 @@ def test_the_census_itself_is_the_same_under_every_oxidative_wiring(scenario):
             compiled = compile_scenario(scenario, oxidative=oxidative)
         members = seen & set(
             _resolve_sample_names(
-                compiled.process_set, compiled.parameters, None, None, compiled.events
+                compiled.process_set,
+                compiled.parameters,
+                None,
+                None,
+                compiled.events,
+                compiled.seed_reads,
             )
         )
         # An equality is satisfiable by a harness that changed nothing, and `oxidative=` is
@@ -1054,58 +1114,80 @@ def test_the_census_itself_is_the_same_under_every_oxidative_wiring(scenario):
             f"`oxidative={oxidative!r}` produced the direct wiring's Process set on "
             f"{scenario.name} — this test is comparing the census against itself"
         )
-        assert members == baseline, (
+        # D-241 made the census wiring-dependent for exactly one name, and this test predicted
+        # it in its own docstring: "a wiring that ever seeds its own state from a parameter would
+        # land here". `burst_antioxidant_initial` is seeded from a parameter under
+        # `direct_burst` and zeroed under the other two (D-147), so it is drawable there and
+        # nowhere else. The exemption is one NAME, stated, not a widened tolerance — anything
+        # else differing is still the defect this guard was built for.
+        expected = {"burst_antioxidant_initial"} if oxidative == "direct_burst" else set()
+        differs = members ^ baseline
+        assert differs <= expected, (
             f"the census under {oxidative} differs from the direct wiring's by "
-            f"{sorted(members ^ baseline)}. Every name here is half-pinned by construction, so a "
+            f"{sorted(differs - expected)}. Every name here is half-pinned by construction, so a "
             "new one is a new defect of D-206's class — classify it in `CENSUS` and measure it"
         )
+        # …and where the exemption is expected it must actually be there, or this test would go
+        # quiet the day the repair was reverted.
+        if expected and "burst_antioxidant" in compiled.schema:
+            assert differs == expected, (
+                "the burst seed is no longer drawn under its own wiring — D-241's repair was "
+                "reverted, and the 50x band is back outside every reported spread"
+            )
 
 
-def test_the_burst_seed_carries_a_fifty_fold_band_the_ensemble_never_draws():
-    """A DEFECT is pinned here, on purpose — the census COMPLEMENT, found by widening to D-237.
+def test_the_burst_seed_the_ensemble_could_never_draw_is_drawn_now():
+    """Was ``..._carries_a_fifty_fold_band_the_ensemble_never_draws``; D-241 CLOSED that gap.
 
-    ``burst_antioxidant_initial`` is read at compile on every wiring (it seeds the
-    ``burst_antioxidant`` pool under ``oxidative="direct_burst"`` and 0.0 otherwise) and its band
-    is **0.0005 - 0.0033 - 0.025 g/L, a 50x span**. No Process declares it in ``reads``:
-    ``AntioxidantBurstOxidation`` reads its rate constants, never its seed. So the sampler cannot
-    reach it, and under the one wiring where that pool is the whole substrate its uncertainty is
-    absent from every reported band.
+    The old guard pinned a defect and said what to do when it went red: *"A RED means it was
+    FIXED — do not revert that beat; delete this guard and say so in the record."* This is that
+    deletion, rewritten to hold the repaired state so the closure cannot be silently undone.
 
-    **This is not the census predicate and not the drawability surface.** The census is
-    compile-read AND sampled — half-pinned, where the surviving half can carry a wrong sign. The
-    drawability surface is banded AND drawn but unable to move the run (D-157's oak yield). This
-    is the third cell: banded, able to move the run, and never drawn. Nothing guarded it, which is
-    why it took a wiring sweep to surface.
+    **What the gap was.** ``burst_antioxidant_initial`` is read at compile on every wiring — it
+    seeds the ``burst_antioxidant`` pool under ``oxidative="direct_burst"`` and 0.0 otherwise —
+    and its band is **0.0005 - 0.0033 - 0.025 g/L, a 50x span**. No Process declares it in
+    ``reads``: :class:`AntioxidantBurstOxidation` reads its rate constants, never its seed. So
+    under the one wiring where that pool is the whole substrate, its uncertainty was absent from
+    every reported band. D-237 found it in passing (D-140 had found the same shape in the same
+    parameter before that); D-240 §4 priced it at 0.738 of the aged-``A420`` spread the same
+    ensemble already published; D-241 drew it.
 
-    **It is not a counterexample** to
-    :func:`test_the_census_and_the_drawability_surface_are_disjoint`, nor to this module's
-    "disjoint by construction" claim. Both of those are about names that
-    ARE census members, and this name is in neither audit — that is the entire finding. The two
-    sets stay disjoint; what D-237 shows is that between them they do not cover the plane.
-
-    **A RED means it was FIXED** — some Process now declares the seed, or the band was retired.
-    Do not revert that beat; delete this guard and say so in the record. It is pinned rather than
-    repaired here because wiring a seed into ``reads`` changes what every burst ensemble reports,
-    and shipping unmeasured movement to close a gap found in passing is the trap D-233 §6 named.
+    **It was the third cell, and closing it did not merge the other two.** The census is
+    compile-read AND sampled; the drawability surface is banded AND drawn but unable to move the
+    run (D-157's oak yield). This was neither: banded, able to move the run, and never drawn —
+    which is why nothing guarded it and a wiring sweep had to surface it. The repair moves the
+    name INTO the census (it is now compile-read and sampled), so the two audits still do not
+    cover the plane; the third cell is smaller by six names, not gone.
     """
     compiled = compile_scenario(WINE_BROWNING, oxidative="direct_burst")
     seed = compiled.parameters["burst_antioxidant_initial"]
     sampled = set(
         _resolve_sample_names(
-            compiled.process_set, compiled.parameters, None, None, compiled.events
+            compiled.process_set,
+            compiled.parameters,
+            None,
+            None,
+            compiled.events,
+            compiled.seed_reads,
         )
     )
 
     assert seed.uncertainty.high / seed.uncertainty.low > 10.0, (
-        "the band narrowed; re-measure what this gap now costs before trusting the old number"
+        "the band narrowed; re-measure what this repair is now worth before quoting the old number"
     )
-    assert "burst_antioxidant_initial" not in sampled, (
-        "`burst_antioxidant_initial` is now drawn. If a beat wired the seed into a Process's "
-        "`reads`, that is the fix — delete this guard and record the band it opened."
+    assert "burst_antioxidant_initial" in sampled, (
+        "`burst_antioxidant_initial` is undrawn again. A 50x band on the whole substrate of the "
+        "burst wiring is back outside every reported spread — restore rule 4's row rather than "
+        "relaxing this."
     )
-    # The positive control the "not in" owes: `sampled` is a real set, not an empty one, and it
-    # does contain a compile-read seed — so "never drawn" is this parameter's property and not
-    # the harness's [[feedback-a-null-result-needs-a-positive-control]].
-    assert "copper_typical" in sampled, "the sampler resolved nothing; the assertion above is void"
-    # ...and the pool it seeds really is live under this wiring, so the gap is not academic.
-    assert float(compiled.y0[compiled.schema.slice("burst_antioxidant")][0]) == seed.value
+    # The half `sampled` alone cannot promise: the draw reaches `y0`. Without this the test would
+    # pass on the declaration-only state D-240 §10 calls worse than the gap.
+    build = compiled.y0_for_member()
+    assert build is not None
+    slot = compiled.schema.slice("burst_antioxidant")
+    edge = dict(compiled.parameters.resolve())
+    edge["burst_antioxidant_initial"] = seed.uncertainty.high
+    assert float(build(edge)[slot][0]) == seed.uncertainty.high
+    # …and the compiled nominal is still the sourced level, so the repair moved the member and
+    # not the baseline [[feedback-a-control-needs-mechanical-reach]].
+    assert float(compiled.y0[slot][0]) == seed.value

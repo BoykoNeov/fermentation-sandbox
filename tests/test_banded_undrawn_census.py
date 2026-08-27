@@ -28,14 +28,24 @@ answers nothing [[feedback-count-and-print-your-skips]] — the skip is stated h
 hidden, and a battery that ever reaches another variant goes red on
 :func:`test_every_banded_undrawn_name_is_classified` until its row is written.
 
-**Nothing is repaired here, and the reason is mechanical rather than cautious.** Drawing one of
-these names would not, on its own, do anything: the sampler re-draws the parameter map, but the
-seed is already baked into ``y0`` at compile. A repair is therefore two coupled changes — a
-``CompiledScenario.y0_for_member`` rule (D-236's machinery) *and* a declaration that puts the
-name into ``_schedule_reads`` — and the declaration half is a tier-propagation claim (``reads``
-has two masters, D-160) that no measurement here supports. D-237 declined exactly this for
-``burst_antioxidant_initial`` and said why. Every row is **pinned with its price**; which of them
-is worth the second beat is the owner's call.
+**Nothing was repaired here, and D-241 repaired six of them — read the two together.** The
+reason this record declined was mechanical: drawing one of these names would not, on its own,
+do anything, because the sampler re-draws the parameter map while the seed is already baked into
+``y0`` at compile. So a repair needs a ``y0_for_member`` rule (D-236's machinery) AND a way for
+the name to enter the sampled set — and the second half looked like a declaration on a Process,
+which is a tier-propagation claim (``reads`` has two masters, D-160) that no measurement here
+supports. D-241 took the other route: ``CompiledScenario.seed_reads``, a sampling-scope channel
+DERIVED from the ``y0`` rules, which carries no tier claim and cannot deliver either half of the
+repair without the other. Six rows left this census as a result; the two that stayed are
+:data:`_SUBSUMED_FIT`, and they stayed for a measured reason rather than the mechanical one.
+
+**A guard in this module forbade nothing against that route, and that is the part worth reading.**
+:func:`test_the_priced_names_are_still_undrawn` scored ``_resolve_sample_names`` without the new
+argument, so it kept reporting the repaired names as undrawn and stayed GREEN through the very
+event its error message describes. It was written against the one repair anyone had imagined —
+and a repair that arrived by another door walked straight past it. That is D-240's own Arm C
+lesson recurring one layer up [[feedback-a-guard-must-be-scored-where-its-subject-lives]]: the
+instrument, not just the assertion, has to be scored where the subject lives.
 
 Measurements: ``M:\\claud_projects\\temp\\ferment\\d240-banded-undeclared\\``.
 """
@@ -65,15 +75,31 @@ from tests.test_compile_sampled_census import BATTERY, BEER, WINE, _census
 #: rather than to 0, because "absent" does not mean "none". Every one of these seeds a live pool
 #: and none is drawn, so its band is uncertainty no ensemble reports. These are the rows the
 #: owner's "fix or pin" call is actually about.
-_LIVE_SEEDS = (
+#: **D-241 REPAIRED these six and they are no longer members of this census.** They are drawn
+#: now — `CompiledScenario.seed_reads` unions them into the sampled set, and a `y0_for_member`
+#: rule re-seeds the slot each one fills — so they moved to `test_compile_sampled_census.py`'s
+#: CENSUS, which is where a repaired name lives. Kept here as a NAMED tuple rather than deleted,
+#: because `test_the_six_repaired_seeds_really_are_drawn_now` is the mirror of the pin they used
+#: to sit under: same teeth, opposite sign. A RED there means the repair was reverted.
+_REPAIRED_AT_D241 = (
     "burst_antioxidant_initial",
     "dms_potential_initial",
     "bound_h2s_initial",
     "bound_methanethiol_initial",
     "must_fermentable_fraction",
+    "o2_wort_aeration_beer",
+)
+
+#: The two rows D-240 filed under LIVE SEED that D-241 did NOT repair, because they seed no slot
+#: at all: they derive the `biomass_N_fraction` override, and that parameter is itself sampled.
+#: Measured at D-241 §2 rather than argued — at the battery wine's YAN the two coefficients'
+#: own bands imply f_N in [0.051432, 0.108338], which sits STRICTLY INSIDE the override's own
+#: [0.03, 0.15] and is 0.474 as wide. Drawing them as well would put two bands on one physical
+#: quantity and report the wider one as narrower. Still undrawn, still pinned, now with a reason
+#: that is a measurement instead of "different mechanism".
+_SUBSUMED_FIT = (
     "biomass_N_yield_log_intercept",
     "biomass_N_yield_log_slope",
-    "o2_wort_aeration_beer",
 )
 
 #: Beer's eight wort organic-acid levels. They seed the acid slots — but the t=0 cation anchor is
@@ -134,13 +160,29 @@ VERDICTS: Mapping[str, str] = {
         "Process declares it. Nothing to repair: the slot it seeds is read by the Process whose "
         "absence is what put the name here"
     ),
+    # The second wiring-conditional row, and the exact mirror of `copper_typical` above: that
+    # name is a member HERE in the scenario where its reader is absent, and this one is a member
+    # here in the WIRING where its reader is absent. Both prove membership is a property of the
+    # configuration and not of the name.
+    "burst_antioxidant_initial": (
+        "WIRING-CONDITIONAL, and INERT in the wiring that puts it here — REPAIRED at D-241 under "
+        '`oxidative="direct_burst"`, where it is drawn and re-seeded per member (there its band '
+        "widens the reported `burst_antioxidant` spread 6.97x). Under the DEFAULT `direct` set "
+        "and under `cascade` it stays a member of this census, and there is nothing to repair: "
+        "D-147 zeroes the slot wherever AntioxidantBurstOxidation is not wired, so the seam reads "
+        "the value and discards it. Measured, not argued — across the whole 50x band the ENTIRE "
+        "y0 is bit-identical under both those wirings. The seed rule's equality guard declines "
+        "for exactly that reason, so D-147's condition is honoured without the table knowing it "
+        "exists"
+    ),
     **dict.fromkeys(
-        _LIVE_SEEDS,
-        "LIVE SEED, NEVER DRAWN — a D-45-shape fallback that seeds a live pool from a sourced "
-        "level. Priced at D-240 against the spread the same ensemble already reports for the "
-        "slot it seeds. PINNED, not repaired: drawing the name moves param_values and not y0, so "
-        "a repair needs a y0_for_member rule (D-236) AND a declaration (D-160's second master) "
-        "together",
+        _SUBSUMED_FIT,
+        "SUBSUMED — a live compile read that seeds NO slot: the two Coleman coefficients derive "
+        "the `biomass_N_fraction` override, and that parameter IS sampled, over a band which "
+        "strictly contains the range these two imply and is 2.11x wider (D-241 §2). So the "
+        "uncertainty is not omitted from the reported spread — it is already in it, under "
+        "another name and with margin. Drawing these too would double-count one quantity. This "
+        "is the one verdict in the registry that says the gap is APPARENT rather than real",
     ),
     **dict.fromkeys(
         _WORT_ACIDS,
@@ -630,7 +672,7 @@ def test_the_copper_binding_constants_lose_their_own_min_at_any_real_dose():
     assert lo == hi, "the whole band must be bit-identical while it loses the min"
 
 
-@pytest.mark.parametrize("name", _LIVE_SEEDS + _WORT_ACIDS + _DOSE_VERB)
+@pytest.mark.parametrize("name", _SUBSUMED_FIT + _WORT_ACIDS + _DOSE_VERB)
 def test_the_priced_names_are_still_undrawn(name):
     """A RED here means the gap was CLOSED — delete the row and say so in the record.
 
@@ -662,3 +704,88 @@ def test_the_priced_names_are_still_undrawn(name):
         "this row and record the movement. If only the declaration landed, the ensemble is now "
         "drawing a name that cannot reach y0, which is worse than the gap."
     )
+
+
+@pytest.mark.parametrize("name", _REPAIRED_AT_D241)
+def test_the_six_repaired_seeds_really_are_drawn_now(name):
+    """The mirror of :func:`test_the_priced_names_are_still_undrawn` — same teeth, opposite sign.
+
+    D-241 drew these six and gave each a ``y0_for_member`` rule. A RED here means one of them
+    went back to being invisible to the sampler, which would silently restore the defect D-240
+    priced: a banded seed whose uncertainty no reported spread contains.
+
+    **Scored under the name's OWN wiring**, for D-240 Arm C's reason. ``burst_antioxidant_initial``
+    is drawable only under ``oxidative="direct_burst"``: elsewhere
+    :func:`_resolve_burst_antioxidant_seed`
+    zeroes the slot, the seed rule's equality guard therefore declines, and the name correctly
+    stays out of ``seed_reads``. That is not a gap — it is the D-147 condition being honoured for
+    free, and a test that scored it under ``direct`` would report a repair that is working as a
+    repair that vanished.
+    """
+    scenario = BEER if name.endswith("_beer") or name.endswith("_wort") else WINE
+    oxidative = _SEEDED_SLOT.get(name, (None, None, "direct"))[2]
+    compiled = compile_scenario(scenario, oxidative=oxidative)
+    if name not in compiled.parameters:
+        pytest.skip(f"{name} is not in {scenario.medium}'s parameter set")
+
+    assert name in compiled.seed_reads, (
+        f"{name} is no longer in seed_reads, so no ensemble can draw it and no member re-seeds "
+        "the slot it fills. Both halves are derived from one list, so this is a reverted repair "
+        "rather than a half-repair — restore the y0_for_member rule."
+    )
+    sampled = set(
+        _resolve_sample_names(
+            compiled.process_set,
+            compiled.parameters,
+            None,
+            None,
+            compiled.events,
+            compiled.seed_reads,
+        )
+    )
+    assert name in sampled, f"{name} is in seed_reads but the resolver dropped it"
+    # …and the rule reaches y0, which is the half `seed_reads` alone cannot promise.
+    build = compiled.y0_for_member()
+    assert build is not None
+    values = dict(compiled.parameters.resolve())
+    values[name] = compiled.parameters[name].uncertainty.high
+    assert not np.array_equal(build(values), compiled.y0), (
+        f"{name} is drawn but a member at its band edge gets the compiled y0 — the declaration "
+        "half landed without the seed half, which D-240 §10 calls worse than the gap."
+    )
+
+
+@pytest.mark.parametrize("oxidative", ("direct", "cascade"))
+def test_the_burst_seed_is_inert_in_the_wirings_that_keep_it_in_this_census(oxidative):
+    """The measurement behind the WIRING-CONDITIONAL verdict, and the reason it is not a gap.
+
+    D-241 drew this seed under ``direct_burst`` and left it undrawn under the other two. That
+    looks like a half-repair and is not: where :class:`AntioxidantBurstOxidation` is not wired,
+    D-147 zeroes the slot after the pack, so the parameter is read at compile and its value is
+    thrown away. There is no uncertainty for a sampler to be missing.
+
+    Asserted on the WHOLE of ``y0`` rather than on the one slot, because the slot being 0 at both
+    edges is also what a seam that stopped reading the name entirely would produce, and the
+    stronger statement is the one that stays true: nothing about the compiled state depends on
+    this parameter here. The 50x band makes it a real test — a leak of any size fails it.
+    """
+    u = compile_scenario(WINE).parameters["burst_antioxidant_initial"].uncertainty
+    assert u.high / u.low > 10.0, (
+        "the band narrowed; this null is only interesting while it is wide"
+    )
+    lo = _compiled_with(WINE, "burst_antioxidant_initial", u.low, oxidative=oxidative)
+    hi = _compiled_with(WINE, "burst_antioxidant_initial", u.high, oxidative=oxidative)
+    assert np.array_equal(lo.y0, hi.y0), (
+        f"the burst seed now reaches y0 under `{oxidative}`. If a beat wired the burst Process "
+        "into this set, the name belongs in seed_reads here too — add the row and price it."
+    )
+    assert "burst_antioxidant_initial" not in lo.seed_reads, (
+        "the seed rule fired on a wiring whose slot D-147 zeroes, which would hand members a "
+        "burst pool the compiled build cannot spend"
+    )
+    # The positive control the two nulls owe: the SAME harness, same wiring, does move the state
+    # for a name that is genuinely live here [[feedback-a-null-result-needs-a-positive-control]].
+    v = compile_scenario(WINE).parameters["dms_potential_initial"].uncertainty
+    a = _compiled_with(WINE, "dms_potential_initial", v.low, oxidative=oxidative)
+    b = _compiled_with(WINE, "dms_potential_initial", v.high, oxidative=oxidative)
+    assert not np.array_equal(a.y0, b.y0), "the harness moved nothing at all; the nulls are void"
