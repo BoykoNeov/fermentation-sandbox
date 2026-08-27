@@ -157,9 +157,17 @@ def test_the_declared_yan_is_the_run_s_actual_assimilable_nitrogen_and_the_fit_p
     nitrogen and carves the amino-acid pools out of it, so all three numbers collapse onto each
     other: declared == actual == the point the fit is evaluated at.
 
-    A RED here means the carve-out broke. The three assertions fail for different causes and say
-    so: the ammonium remainder is wrong (``_wine_ammonium_gpl``), the channel census misses a
-    pool (see the census test), or the fit stopped reading the declared total.
+    A RED here means the carve-out broke. The assertions fail for different causes and say so: the
+    ammonium remainder is wrong (``_wine_ammonium_gpl``), the channel census misses a pool (see the
+    census test), or the fit stopped reading the declared total.
+
+    **The declared == actual assertion is an ARITHMETIC IDENTITY and is not the load-bearing one.**
+    ``N`` is seeded as ``declared - amino`` and :func:`_channel_nitrogen` adds ``N`` back to the
+    same pools at the same weights, so the sum closes whatever the must spectrum does. Measured:
+    mutating ``must_aa_fraction_arginine`` 0.380 -> 0.470 (inside its own [0.25, 0.48] band, so the
+    mutation RUNS rather than breaking ``load_parameters``) leaves it green and fires the two
+    HALF-pins below. Those halves are the content; the identity is here because it is the sentence
+    the repair claims, and a reader must not mistake it for the guard.
     """
     compiled = compile_scenario(_wine(amino_acids_gpl=0.5), strict=True)
     ammonium, amino = _channel_nitrogen(compiled)
