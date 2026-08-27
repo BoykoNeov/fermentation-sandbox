@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-27)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-241** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1979 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-242** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1979 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
@@ -378,6 +378,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   Paired: `dms` **2.83×**, methanethiol **2.07×**, burst **6.97×**; beer **1.000** = the null control. The 2 Coleman
   coefficients are **SUBSUMED** (the override they derive IS sampled, band 2.11× wider and containing theirs) — never
   propose a `values_for_member` hook for them. D-240's undrawn pin **forbade nothing** against this route.
+  → `.claude/memory/prohibitions/seed-reads-repair.md`
+- **CI gates & solver-output equality (D-242)** — CI runs FOUR gates and `ruff format --check` is SEPARATE from
+  `ruff check`; it was RED from D-239 for 4 commits and **MASKED a test failure** (a ~17 s red is a gate, a ~15 min
+  red is the suite — **read the duration**). The masked one: D-238 asserted the runtime capacity root equals the
+  shipped literal BIT-FOR-BIT — true on Windows (0 ULP), **1-3 ULP off on Linux**, so it pinned the platform and had
+  NEVER passed on CI. Restated on the **exact-nominal SKIP** (structural, an early `return`) + a **4 ULP** budget;
+  the nearest real defect is **4.4 MILLION ULP** away, so never call that budget a loosening and never widen it past
+  single digits — suspect the solver. Do NOT reorder the CI gates (tests first costs 15 min per lint slip).
   → `.claude/memory/prohibitions/seed-reads-repair.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
