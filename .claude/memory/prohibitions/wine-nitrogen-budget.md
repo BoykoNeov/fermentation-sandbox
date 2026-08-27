@@ -46,11 +46,16 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
   re-author a fixture's composition instead; a draft did, and produced a headline resting on a dose
   nobody published [[feedback-migrate-a-fixture-by-its-state-not-its-intent]].
 
-- **The six fusel xfails are STRICT and the 80 % floor is NOT to be lowered.** De-novo synthesis is
-  growth-linked; the corrected yield roughly halves biomass, so propanol falls to 77.4 % and
-  isobutanol to 76.0 % against Crépin/Rollero's sourced floor, and isoamyl attributes 5.42 % to
-  amino acids against Minebois's 5.34 %. Closing that re-opens D-109's supply premise and the D-120
-  no-cap refusal — a fusel-node beat, on the owner's call, never absorbed into another.
+- **The fusel xfails are now FOUR, and the 80 % floor is still NOT to be lowered (D-245 measured
+  what D-244 asserted).** One knob reproduces every crossing — hold the fixture and sweep only
+  `biomass_N_fraction` 0.0578 → 0.1068 — so the must's 2.25x nitrogen is a CONSTANT, not a cause.
+  **The leg that moved is the DENOMINATOR**: threonine/valine/leucine consumption is identical to
+  5 dp at every biomass (those pools exhaust either way), while the alcohols halve. The same fix
+  removed a **~2x over-production** (isoamyl 353.5 → 191.5 mg/L against a 172 anchor), so the floor
+  had been passing on inflated de-novo carbon. **Isobutanol's miss was a HARNESS BUG, not a model
+  gap** — the D-109 helper charged it valine carbon that becomes isoamyl (2.533x, live since
+  D-111); measured on the residue the model routes it is 90.5 % de novo and its guard is GREEN.
+  Propanol's 77.4 % is the real miss; closing it needs Crépin's medium.
 
 - **Both source-commensurate fixtures were violating their own comments, and that is RECORDED not
   repaired.** Crépin's probe ran at 405.4 mg N/L against a 180 mg N/L paper (2.25x) and Rollero's at

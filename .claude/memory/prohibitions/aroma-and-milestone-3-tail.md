@@ -1,6 +1,6 @@
 ---
 name: aroma-and-milestone-3-tail
-description: "Esters, fusels/2-PE, sulfides, closures and the Milestone-3 tail (D-117 to D-136, D-146, D-176)"
+description: "Esters, fusels/2-PE, sulfides, closures, the fusel NODE (D-245) and the Milestone-3 tail (D-117 to D-136, D-146, D-176)"
 metadata:
   node_type: memory
   type: project
@@ -50,3 +50,28 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
   corner of TWO bands** (flips at **+3.6 % ethanol**; 0 of 180 members reach it), **never an impossibility**;
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
+
+**Fusel node (D-245) — read before touching the de-novo helpers or citing D-120**
+- **`_de_novo_share` must use `ehrlich_primary_share`, never `(1-f)`.** Valine's Ehrlich carbon
+  splits AGAIN (0.15 isobutanol / 0.23 isoamyl via KIC), so `(1-f)=0.38` charges isobutanol with
+  isoamyl's carbon — **2.533x, live D-111→D-245**, and it read as a model defect the moment D-244
+  pushed it under the floor. **ONE helper, four callers**; the sibling had the rule right in a
+  comment the whole time. Its result is a **BOUND**: the `ehrlich_draws` headroom cap binds for
+  the first ~1.35 h (≤12.8 % of the valine pool), so isobutanol is ≥89.6 %, point estimate 90.5 %.
+  **Never "tighten" it by integrating the branch** — that is D-103's quadrature.
+- **D-120's no-cap refusal has LOST BOTH measured legs — but do NOT build the cap here.** Direction
+  flipped (isoamyl 5.42 vs 5.34 %, isobutanol 9.47 vs 8.78 %) and the instrument now bites (Phe
+  stops exhausting, 12.8 % left; the cap moves 2-PE's realised share 12.7 %). **The isoamyl trip is
+  inside the harness's own cap-window systematic (~5.30 %, i.e. UNDER) — never build on it**;
+  isobutanol's survives. A sourced `f_de_novo_isoamyl` does not exist here and the 2-PE closure
+  algebra re-run on the model's own abundances is **refused at D-206**. Sourcing beat.
+- **α-KB: the claim survives, the margin does not.** Propanol demand / α-KB throughput 2.60 → 1.358,
+  re-pinned two-sided [1.30, 1.42] with `> 1.0` asserted separately as the claim. **Do not restore
+  a one-sided floor** — it cannot catch the excretion flux growing toward the demand. The supply
+  argument now rests on 36 % headroom over an AUTHOR-ESTIMATED rate.
+- **Never mark a multi-assert test xfail whole** — D-244 did it twice and killed two live guards for
+  a record [[feedback-an-xfail-buries-the-asserts-after-it]]. **D-112 finding 4's mechanism is
+  CORRECTED** (the evaluation point, not "the dose's deamination-N sustaining the gate"); its
+  conclusion — `k_isoamyl_alcohol` is right — **stands**, and the undosed anchor test is the control
+  that proves it (bit-for-bit through D-244).
+
