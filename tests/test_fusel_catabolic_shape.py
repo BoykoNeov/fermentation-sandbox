@@ -8,9 +8,17 @@ re-inherit the stale story:
 1. **D-103's gate-shape SPREAD is absorbed by the D-104 non-Ehrlich sink** — it is large with the
    sink off (isoamyl ~6% vs propanol ~67%) and compresses to a uniform low band with it on. So the
    "minor alcohols are wildly over-attributed" defect is gone, and only isoamyl (UNDER) survives.
+   **The "uniform low band" half is an xfail since D-244** — propanol reads 0.2256 sink-on against
+   a 0.20 band that IS the sourced 80% floor written upside down; see
+   ``test_every_sink_on_share_sits_inside_rollers_low_band``, split out at D-245 so that failure
+   stops burying the compression assertion beside it. The compression itself still holds.
 2. **Isoamyl sits on its ``(1-f)`` mass-conservation ceiling**, which no sourcing-layer change —
    the keto-acid node included — can lift: a gate cap (the "obvious" fix) does not move it, because
-   leucine is too scarce to persist under any draw rate.
+   leucine is too scarce to persist under any draw rate. **The ``(1-f)`` here is leucine's and is
+   still literally right** — D-245 corrected that notation for VALINE alone, whose Ehrlich carbon
+   splits again between isobutanol and isoamyl (see
+   :func:`~tests.test_fusel_keto_acid_node.ehrlich_primary_share`). Finding 2 was audited against
+   that repair and does not move; the note is here because this is the line a reader will grep.
 3. **``k_isoamyl_alcohol`` is correctly calibrated** to the Wang 2024 172 mg/L anchor at typical
    must nitrogen with no amino-acid dose — so the ~2x isoamyl over-production in the D-109
    characterization must is the ``amino_acids_gpl=1.0`` dose (Finding 4), not a mis-set ``k``.
