@@ -29,10 +29,12 @@ flux-linked rate reads. See :func:`test_alpha_kb_production_is_exactly_threonine
 the mutation test is the only reason that write-up did not ship.
 
 **3. The promised payoff is REAL, and the number that kills the shortcut is the number that says
-so.** Propanol's molar demand is **~2.8× the total α-KB the pool ever excretes** — which is why it
-cannot be drawn from that pool (finding 1), and equally why a *correctly placed* node would matter:
-propanol's 2-KB demand is several times the **excretion flux itself**, so partitioning that flux
-honestly would couple propanol and sotolon **materially**. The item is not dissolved by this beat;
+so.** Propanol's molar demand is **1.36× the total α-KB the pool ever excretes** (D-245; it was
+~2.8× until D-244's corrected yield halved the biomass propanol rides on, and the re-record is in
+:func:`test_the_excreted_pool_cannot_supply_propanol`) — which is why it cannot be drawn from that
+pool (finding 1), and equally why a *correctly placed* node would matter: propanol's 2-KB demand
+still **exceeds the excretion flux itself**, so partitioning that flux honestly would couple
+propanol and sotolon **materially**. The item is not dissolved by this beat;
 it is **relocated** — off the excreted pool and onto the intracellular partition, where it needs
 the milestone rather than a shortcut. (Rests on ``k_alpha_kb_excretion``, an author estimate ⇒ an
 order-of-magnitude claim, not a calibration.)
@@ -65,7 +67,7 @@ from fermentation.core.chemistry import (
     M_PROPANOL,
     carbon_mass_fraction,
 )
-from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
+from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS, SECONDARY_FUSEL_ROUTES
 from fermentation.core.kinetics.precursor_fates import non_ehrlich_fraction_param
 from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate_scheduled
@@ -109,19 +111,55 @@ _SOURCED_FUSEL_SPECS = tuple(
     s for s in FUSEL_SPECS if s.precursor_amino_acid != _FLOOR_EXCLUDED_PRECURSOR
 )
 
-#: Why six guards in this file and its sibling are STRICT xfails since D-244.
-_D244_DE_NOVO_GAP = (
-    "D-244: the fusel node's de-novo dominance does not survive the corrected yield "
-    "evaluation point. These fixtures dose 1.0 g/L of amino acids, so before D-244 they "
-    "carried 405.4 mg N/L while Coleman's fit was evaluated at the declared 180 -- f_N "
-    "0.0578, roughly twice the biomass the same nitrogen builds when the fit reads the total "
-    "it actually holds (held at Coleman's 350 edge, f_N 0.1068). De-novo synthesis is "
-    "growth-linked and halves with it; the amino-acid draw does not, so its share rises. "
-    "Measured: propanol 77.4 %, isobutanol 76.0 % against the sourced 80 % floor; isoamyl "
-    "attributes 5.42 % to amino acids against Minebois's 5.34 %. STRICT: the floor is a "
-    "sourced target and is NOT to be lowered to fit the model -- this xfail is the visible "
-    "gap, and closing it is a fusel-node beat (it re-opens D-109's supply premise and the "
-    "D-120 no-cap refusal), not something D-244 may absorb."
+#: Why the sourced de-novo FLOOR is missed since D-244 -- the cause MEASURED at D-245, where
+#: D-244 could only assert it. One knob reproduces it: hold this fixture exactly as it is (same
+#: must, same 1.0 g/L dose, same declared 405.4 mg N/L total) and sweep ONLY
+#: ``biomass_N_fraction`` from the value the pre-D-244 evaluation point produced (0.0578, the fit
+#: read at the declared 180) to the shipped one (0.1068, the fit read at the total the must
+#: actually holds, held at Coleman's 350 edge). Every threshold crosses monotonically inside that
+#: sweep, so the must's 2.25x nitrogen richness is a CONSTANT here and not a cause.
+#:
+#: **Which leg moved: the DENOMINATOR.** Consumed threonine (0.06700), valine (0.03700) and
+#: leucine (0.03200) are identical to 5 dp at every f_N -- those pools exhaust whatever the
+#: biomass, so the amino-acid draw is supply-limited and PINNED. The alcohol totals halve with
+#: biomass, and the share rose entirely through its denominator.
+#:
+#: **And the same correction removed a ~2x OVER-production**, which is why this guard used to
+#: pass: propanol 49.8 -> 27.0, isobutanol 68.4 -> 37.1, isoamyl 353.5 -> 191.5, 2-PE 59.5 ->
+#: 32.3 mg/L, against per-molecule anchors of ~24 / 33.0 / 172 / 28.7 mg/L (those anchors describe
+#: a typical UNDOSED must, so they do not strictly apply here -- the move is ~2x -> ~1.1x them,
+#: not "now lands on the anchor"). The surplus was de-novo, sugar-sourced carbon sitting in this
+#: ratio's denominator, so the floor was being cleared by an over-production rather than by the
+#: supply structure the guard names.
+_D245_DE_NOVO_FLOOR_GAP = (
+    "D-245 (measuring D-244): propanol draws 77.4 % of its carbon de novo against the sourced "
+    "80 % floor. MEASURED cause, not asserted: the corrected yield evaluation point roughly "
+    "halves biomass, the alcohol total halves with it, and the amino-acid draw does not move at "
+    "all (threonine exhausts either way), so the share rises through its denominator. The same "
+    "correction removed a ~2x over-production that had been clearing this floor for the model. "
+    "STRICT: the floor is a sourced target (Crepin 81 % newly-synthesised 2-KB; Rollero >90 % "
+    "CCM) and is NOT to be lowered to fit the model. It is also scored on a must carrying 2.25x "
+    "its source's nitrogen, which D-244 section 6 recorded and declined to repair -- closing it "
+    "needs Crepin's own synthetic-medium composition, not a grape-must partition."
+)
+
+#: Why the two D-120 guards are STRICT xfails. Separate from the floor gap above because the
+#: content is different: D-120 refused a de-novo cap for isoamyl on TWO measured legs, and D-245
+#: measured both of them gone. Direction: every alcohol used to attribute LESS to amino acids
+#: than Minebois measures, so a one-directional ceiling would have moved all three the wrong way;
+#: isoamyl now reads 5.42 % against her 5.34 % and isobutanol 9.47 % against her 8.78 %.
+#: Instrument: the cap was inert because phenylalanine exhausted with or without it, and it no
+#: longer does (12.8 % survives), so the shipped cap now moves 2-PE's realised share by 12.7 %.
+_D245_D120_LEGS_GONE = (
+    "D-245: D-120's refusal of a de-novo cap rested on two measured legs and the corrected yield "
+    "evaluation point removed both. (1) DIRECTION: the model under-attributed to amino acids "
+    "against Minebois's in-study shares; it now over-attributes -- isoamyl 5.42 % vs 5.34 %, "
+    "isobutanol 9.47 % vs 8.78 %. (2) INSTRUMENT: the cap measured inert because phenylalanine "
+    "exhausted either way; it no longer exhausts (12.8 % left) and the shipped cap now moves "
+    "2-PE's realised share 1.603 % -> 1.400 %, a 12.7 % relative bite. STRICT: this is D-120's "
+    "own tripwire firing as written, so the de-novo-entry build genuinely re-opens -- but the "
+    "parameter it needs is unsourced for isoamyl, and deriving one from the model's own "
+    "abundances is refused (D-206). Sourcing beat, not a re-pin."
 )
 
 #: The routes that ALSO eat the speciated precursors. Disabled where the ``f : (1−f)`` split
@@ -230,7 +268,6 @@ def _end(traj, schema, name: str) -> float:
 # -- finding 1: the excreted pool cannot supply propanol (design A is INFEASIBLE) --------------
 
 
-@pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)
 def test_the_excreted_pool_cannot_supply_propanol():
     """Propanol's molar demand exceeds every gram of α-KB the pool ever carries (decision D-109).
 
@@ -238,7 +275,8 @@ def test_the_excreted_pool_cannot_supply_propanol():
     D-49's flux-intermediate-vs-excreted-residual test, applied symmetrically to the pool D-107
     selected for sotolon on exactly that test. This is the **arithmetic** that corroborates it, and
     it is the sharper statement: propanol is 1 mol 2-KB decarboxylated, so drawing it from this
-    pool needs 1 mol of pool per mol of alcohol — and the pool never holds a third of that.
+    pool needs 1 mol of pool per mol of alcohol — and the pool never holds three quarters of that
+    (74 % since D-245's re-record; 38 % at the pre-D-244 evaluation point).
 
     So the re-base does not merely mis-attribute the competition. It **cannot be built**: it would
     starve propanol (breaking its independently-anchored D-99 magnitude) *and* collapse sotolon's
@@ -247,14 +285,25 @@ def test_the_excreted_pool_cannot_supply_propanol():
 
     **THE SAME RATIO ARGUES BOTH WAYS, AND THAT IS THE BEAT'S RESULT.** Read as "can this pool
     supply propanol?" it is fatal to the shortcut. Read as "how big is propanol next to the
-    excretion flux?" it says propanol's 2-KB demand is several times that flux — so an honestly
-    partitioned intracellular node would couple propanol and sotolon materially. The promised
-    payoff is real; it is the *location* that was wrong. (Not "the node's dominant sink" — 2-KB's
-    committed route is isoleucine biosynthesis, which this model does not carry; see the module
-    docstring.)
+    excretion flux?" it says propanol's 2-KB demand exceeds that flux — so an honestly partitioned
+    intracellular node would couple propanol and sotolon materially. The promised payoff is real;
+    it is the *location* that was wrong. (Not "the node's dominant sink" — 2-KB's committed route
+    is isoleucine biosynthesis, which this model does not carry; see the module docstring.)
+
+    **RE-RECORDED AT D-245, OLD → NEW, BECAUSE THE MARGIN MOVED AND THE CLAIM DID NOT.** D-244's
+    corrected yield halves the biomass; propanol is produced on the fermentative flux and halves
+    with it, while α-KB excretion barely moves (throughput 0.3181 → 0.3304 mmol/L across the whole
+    biomass sweep), so the ratio falls **2.60 → 1.358**. The finding — *this pool cannot supply
+    propanol* — survives untouched and is asserted on its own line. What does not survive is the
+    ``> 2.0`` pin, which was a margin, not the claim; it is replaced by a two-sided record of the
+    margin the model now actually holds. **The honest downgrade is worth stating: the supply
+    argument now rests on 36 % headroom over an author-estimated excretion rate** (D-109's own
+    "order-of-magnitude claim, not a calibration"), where it used to rest on 160 %.
 
     TRIPWIRE, not a curiosity: if a future beat raises the excretion rate enough for the pool to
-    supply propanol, this fails, and the design question genuinely re-opens.
+    supply propanol, the first assertion fails and the design question genuinely re-opens. The
+    second fires on any move in either direction, which is the point of pinning it two-sided —
+    a one-sided floor cannot catch the excretion flux *growing* toward the demand.
     """
     base, schema = _run(aging=False)
     # Reassimilation OFF ⇒ the pool accumulates EVERY gram excreted and nothing removes it ⇒ the
@@ -273,14 +322,65 @@ def test_the_excreted_pool_cannot_supply_propanol():
 
     demand_mmol = propanol / M_PROPANOL * 1e3
     supply_mmol = throughput / M_ALPHA_KETOBUTYRATE * 1e3
-    assert demand_mmol / supply_mmol > 2.0, (
+    ratio = demand_mmol / supply_mmol
+    # THE CLAIM. Everything D-109 argues from this number needs only that it exceeds 1.
+    assert ratio > 1.0, (
         f"propanol demand {demand_mmol:.4f} mmol/L vs total α-KB ever excreted "
         f"{supply_mmol:.4f} mmol/L — if the pool can now supply propanol, D-109's supply "
         "argument against re-basing it no longer holds and the design must be re-measured"
     )
+    # THE MARGIN, re-recorded at D-245 (was > 2.0, measured 2.60, at the pre-D-244 evaluation
+    # point). Two-sided: a one-sided floor cannot catch the excretion flux growing toward the
+    # demand, which is precisely the direction that would re-open the design.
+    assert 1.30 < ratio < 1.42, (
+        f"propanol/α-KB demand ratio {ratio:.4f} left the D-245 band [1.30, 1.42] (measured "
+        f"1.358). The CLAIM above still holds — this is the margin it holds it by, and the "
+        "margin is thin: re-derive it rather than widening the band"
+    )
 
 
 # -- finding 2: the de-novo supply structure the node must preserve (SOURCED for four of five) --
+
+
+def ehrlich_primary_share(params, precursor: str, *, f_override: float | None = None) -> float:
+    """The fraction of CONSUMED ``precursor`` the model routes to its **primary** alcohol (D-245).
+
+    ``1 − f_non_ehrlich_<precursor> − Σ secondary shares``. For every precursor but valine the sum
+    is empty and this is the familiar ``(1 − f)``; **valine is the exception, and it is the whole
+    reason this helper exists.** Since D-111 valine's consumption splits three ways — 0.15 to
+    isobutanol (the residue this returns), 0.23 to isoamyl alcohol via α-ketoisocaproate, 0.62 to
+    the non-Ehrlich lump — and :func:`~fermentation.core.kinetics.byproducts.ehrlich_draws` sizes
+    the branches on exactly that residue (``consumed = primary.precursor_carbon / share_primary``).
+
+    **This is a repair, and the defect it repairs was invisible for the usual reason (D-245).**
+    :func:`_de_novo_share` used ``(1 − f) = 0.38`` for every precursor, which charges isobutanol
+    with the valine carbon that actually becomes *isoamyl alcohol* — an over-count of **2.533×**,
+    live from D-111 until D-245. It never failed a guard because isobutanol cleared the 80 % floor
+    even mis-measured, until D-244's corrected yield pushed the mis-measured number under it and
+    the miss read as a model defect. The sibling ``_amino_acid_share`` had the residue right and
+    said so in a comment; **the two callers of "the same" quantity disagreed and only one was
+    read** — the D-106 shared-helper failure exactly, one file over. Hence one helper, four
+    callers, and it lives here because this is the module the sibling already imports from.
+
+    **The residue is exact only outside the ``ehrlich_draws`` headroom-cap window, and the window
+    is measured rather than assumed.** That cap refuses to source the secondary branch from more
+    precursor than its alcohol is being made from; at t = 0 leucine's own gate is ≈1, leaving
+    isoamyl no headroom, so the cap binds and valine's realised primary share starts at 0.2642
+    instead of 0.15. Measured on a dense grid (0.024 h) it releases at t ≈ 1.35 h with **at most
+    12.8 % of the valine pool consumed**, and the share falls monotonically to 0.15 across the
+    window. So an isobutanol number computed from this residue is a **bound, not a point**: the
+    worst-case blend 0.128 × 0.2642 + 0.872 × 0.15 = 0.1646 puts the de-novo share at ≥ 89.6 %
+    against the 90.5 % this returns. Everything asserted against it clears both. Do not re-state
+    the 90.5 % as exact, and do not "fix" the gap by integrating the branch — that is the
+    quadrature D-103 forbids.
+    """
+    f = params[non_ehrlich_fraction_param(precursor)] if f_override is None else f_override
+    secondary = sum(
+        params[route.share_param]
+        for route in SECONDARY_FUSEL_ROUTES
+        if route.precursor == precursor
+    )
+    return float(1.0 - f - secondary)
 
 
 def _de_novo_share(spec, *, f_override: float | None = None) -> float:
@@ -289,14 +389,27 @@ def _de_novo_share(spec, *, f_override: float | None = None) -> float:
     The D-104 split invariant (consumed precursor splits exactly ``f : (1−f)`` between the
     non-Ehrlich lump and the alcohol) sizes the Ehrlich draw with no quadrature — D-103, where a
     nonlinear rate integrated over linearly-interpolated states overstated a draw 1.3–3.5×. The
-    other precursor consumers are disabled so that invariant is *exact* rather than nearly-true.
+    other precursor consumers are disabled so that invariant is *exact* rather than nearly-true —
+    verified rather than assumed at D-245: only ``fusel_amino_acid_reroute`` and
+    ``precursor_non_ehrlich_fates`` touch a speciated precursor pool on this run.
     ``n_alc/(n_alc+1)`` removes the D-106 decarboxylation CO₂: the draw is a full mole of precursor
     per mole of alcohol, of which one carbon leaves as CO₂ instead of reaching the alcohol.
+
+    **The Ehrlich side of that split is not one branch since D-111**, so the share going to *this*
+    alcohol is :func:`ehrlich_primary_share`, not ``(1 − f)`` — see that helper for the 2.533×
+    isobutanol over-count this line carried from D-111 to D-245, and for why its result is a bound
+    while the ``ehrlich_draws`` headroom cap binds.
 
     **One helper, two callers** — the sourced-floor test and the 2-PE exclusion must compute this
     the *same* way, or the exclusion could be argued from arithmetic the floor never used (the
     D-33/D-99/D-106 shared-helper discipline; D-106 is the beat where two callers "recomputing
     exactly the same thing" agreed **by luck** until one of them changed).
+
+    **This helper counts ``spec.precursor_amino_acid`` ONLY, and for isoamyl alcohol that omits a
+    real branch** — valine → KIC, which ``_amino_acid_share`` does count. The omission is
+    deliberate (it is the *primary*-route share) and is stated here rather than only in the
+    sibling, because a floor asserted against a primary-only number is the same class of thing
+    D-245 just repaired one alcohol over. Named so the next beat does not rediscover it as new.
     """
     precursor = spec.precursor_amino_acid
     param = non_ehrlich_fraction_param(precursor)
@@ -307,13 +420,10 @@ def _de_novo_share(spec, *, f_override: float | None = None) -> float:
     made = _end(traj, schema, spec.pool)
     assert consumed > 0.0 and made > 0.0, "vacuous: nothing consumed or nothing made"
 
-    f = (
-        compile_scenario(_scenario(aging=False)).param_values[param]
-        if f_override is None
-        else f_override
-    )
+    params = compile_scenario(_scenario(aging=False)).param_values
+    share = ehrlich_primary_share(params, precursor, f_override=f_override)
     n_alc = CARBON_ATOMS[spec.species]
-    draw_carbon = (1.0 - f) * consumed * carbon_mass_fraction(precursor)
+    draw_carbon = share * consumed * carbon_mass_fraction(precursor)
     alcohol_carbon_from_precursor = draw_carbon * n_alc / (n_alc + 1.0)
     total_alcohol_carbon = made * carbon_mass_fraction(spec.species)
     return 1.0 - alcohol_carbon_from_precursor / total_alcohol_carbon
@@ -325,9 +435,16 @@ def _de_novo_share(spec, *, f_override: float | None = None) -> float:
         pytest.param(
             s,
             id=s.pool,
+            # ISOBUTANOL IS NOT HERE, AND ITS REMOVAL IS NOT A WEAKENING (D-245). D-244 marked it
+            # alongside propanol at a measured 76.0 %; that number was the harness over-charging
+            # it 2.533× for valine carbon that becomes isoamyl alcohol (see
+            # :func:`ehrlich_primary_share`). Measured on the residue the model actually routes,
+            # isobutanol is 90.5 % de novo — clear of the floor by ten points, and ≥ 89.6 % even
+            # on the worst-case cap-window bound. Propanol's miss is the real one: threonine has
+            # no second branch, so its 77.4 % was never touched by the defect.
             marks=(
-                [pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)]
-                if s.pool in ("propanol", "isobutanol")
+                [pytest.mark.xfail(strict=True, reason=_D245_DE_NOVO_FLOOR_GAP)]
+                if s.pool == "propanol"
                 else []
             ),
         )

@@ -14,6 +14,13 @@ re-inherit the stale story:
 3. **``k_isoamyl_alcohol`` is correctly calibrated** to the Wang 2024 172 mg/L anchor at typical
    must nitrogen with no amino-acid dose — so the ~2x isoamyl over-production in the D-109
    characterization must is the ``amino_acids_gpl=1.0`` dose (Finding 4), not a mis-set ``k``.
+   **D-245 corrects the MECHANISM inside that finding, and only the mechanism.** The dose is still
+   the cause and ``k`` is still right (the undosed anchor test below is untouched by any of this),
+   but the route was never "the dose's deamination-N sustaining the fusel gate": the dose is what
+   made a scenario's declared YAN differ from the total it held, so Coleman's yield fit was read
+   at a poorer must than the one simulated and the model built ~2x the biomass. Measured on ONE
+   knob at D-245 — sweep ``biomass_N_fraction`` alone across this fixture and isoamyl runs 353.5
+   → 191.5 mg/L, the whole of the 2x. The over-production is gone as of D-244.
 
 All shares are measured from EXACT state differences (no quadrature — D-103's trapezoid error),
 reusing the vetted D-109 harness where possible.
@@ -39,19 +46,20 @@ from fermentation.core.kinetics.carbon_routing import (
     FUSEL_SPECS,
     ISOAMYL_ALCOHOL,
     SECONDARY_FUSEL_ROUTES,
-    non_ehrlich_fraction_param,
 )
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from tests.test_fusel_keto_acid_node import (
-    _D244_DE_NOVO_GAP,
+    _D245_D120_LEGS_GONE,
+    _D245_DE_NOVO_FLOOR_GAP,
     _FERMENT_DAYS,
     _OTHER_PRECURSOR_CONSUMERS,
     _de_novo_share,
     _end,
     _run,
     _scenario,
+    ehrlich_primary_share,
 )
 
 _SINK = "precursor_non_ehrlich_fates"
@@ -64,7 +72,9 @@ def _direct_catabolic_share_sink_off(spec) -> float:
     With the sink off the re-route is the precursor's ONLY consumer, so consumed precursor carbon
     times ``n/(n+1)`` (removing the D-106 decarboxylation CO2) is exactly the alcohol carbon sourced
     from it — an exact state difference, no quadrature. This is ~D-103's gate value; contrast with
-    :func:`_de_novo_share` (sink on), which yields the compressed ``(1-f)``-scaled share.
+    :func:`_de_novo_share` (sink on), which yields the share compressed by the precursor's
+    *primary* Ehrlich residue (``(1-f)`` for every precursor but valine — see
+    :func:`~tests.test_fusel_keto_acid_node.ehrlich_primary_share`).
     """
     prec = spec.precursor_amino_acid
     traj, schema = _run(aging=False, drop=(*_OTHER_PRECURSOR_CONSUMERS, _SINK))
@@ -75,16 +85,21 @@ def _direct_catabolic_share_sink_off(spec) -> float:
     return alc_from_prec / (made * carbon_mass_fraction(spec.species))
 
 
-@pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)
 def test_the_d104_sink_absorbs_the_d103_gate_shape_spread():
     """D-103's 11x catabolic spread is absorbed by the D-104 sink (decision D-112, finding 1).
 
     With the sink OFF the gate over-attributes minor alcohols exactly as D-103 diagnosed — propanol
     (small carbon draw against an abundant precursor) reads many times isoamyl (large draw, which
-    throttles its own gate). With the sink ON the ``(1-f)`` multiplier compresses every alcohol into
-    Rollero's uniform low band. So "minor alcohols are wildly over-attributed" is no longer true,
-    and the only survivor is isoamyl — which is UNDER, the opposite direction. If a future beat
-    re-widens the sink-on spread, the D-112 premise (the gate-shape defect is retired) has moved.
+    throttles its own gate). With the sink ON the ``(1-f)`` multiplier compresses propanol out of
+    the tens of percent. So "minor alcohols are wildly over-attributed" is no longer true.
+
+    **SPLIT AT D-245, AND THE SPLIT IS A REPAIR RATHER THAN A CONVENIENCE.** D-244 marked this
+    whole test ``xfail`` for its *middle* assertion (every alcohol inside Rollero's low band),
+    which left the third one — propanol's compression, the finding's own payoff — **dead behind
+    the failure**, never reached and never run. The band assertion now lives in
+    :func:`test_every_sink_on_share_sits_inside_rollers_low_band` carrying the xfail alone, and
+    the two assertions that still hold are guards again. Nothing is weakened: every assertion in
+    the D-112 original still runs somewhere, on the same numbers.
     """
     iso_off = _direct_catabolic_share_sink_off(ISOAMYL_ALCOHOL)
     prop_off = _direct_catabolic_share_sink_off(_PROPANOL)
@@ -94,11 +109,36 @@ def test_the_d104_sink_absorbs_the_d103_gate_shape_spread():
         "gate-shape spread is the thing D-112 says the sink absorbs; if it is gone with the sink "
         "off too, finding 1's baseline has moved"
     )
-    # Sink ON: every alcohol compresses to the low band (all five <= ~17%, Rollero's uniform range).
+    # And the compression is real: propanol specifically drops from tens-of-% to the low band.
+    # This is the assertion D-244's xfail buried; it passes, and it did throughout (D-245).
+    on_propanol = 1.0 - _de_novo_share(_PROPANOL)
+    assert on_propanol < 0.5 * prop_off, (
+        f"propanol's sink-ON share {on_propanol:.1%} is no longer half its sink-OFF "
+        f"{prop_off:.1%} — the compression IS finding 1, so this is the finding moving"
+    )
+
+
+@pytest.mark.xfail(strict=True, reason=_D245_DE_NOVO_FLOOR_GAP)
+def test_every_sink_on_share_sits_inside_rollers_low_band():
+    """Sink ON, every alcohol compresses into Rollero's uniform low band (D-112 finding 1).
+
+    Split out of :func:`test_the_d104_sink_absorbs_the_d103_gate_shape_spread` at D-245 so its
+    failure stops burying that test's third assertion.
+
+    **The 0.20 here is NOT an independent threshold — it is the sourced 80 % de-novo floor written
+    the other way up**, over all five alcohols instead of the four the floor's sources describe.
+    So this fails for the same reason and on the same number as
+    ``test_every_sourced_fusel_is_de_novo_dominated[propanol]``: propanol reads 0.2256 sink-on.
+    Raising 0.20 to admit it would be lowering the sourced floor under a different name, which is
+    why this is an xfail and not a re-pin. Rollero's own uniform range tops out at 17.3 %; the
+    0.20 was already margin above it.
+
+    **Isobutanol is no longer the maximum and that is a D-245 repair, not a drift**: it read
+    0.2400 under the harness defect ``ehrlich_primary_share`` fixes and reads 0.0947 measured on
+    the residue the model actually routes.
+    """
     on = {s.pool: 1.0 - _de_novo_share(s) for s in FUSEL_SPECS}
     assert max(on.values()) < 0.20, f"sink-on shares no longer compressed to the low band: {on}"
-    # And the compression is real: propanol specifically drops from tens-of-% to the low band.
-    assert on["propanol"] < 0.5 * prop_off
 
 
 def test_isoamyl_sits_on_the_one_minus_f_mass_conservation_ceiling(monkeypatch):
@@ -161,10 +201,17 @@ def test_k_isoamyl_alcohol_lands_the_wang_2024_anchor_at_typical_must_n(yan):
 
     The provenance sets ``k`` to land 3-methylbutan-1-ol at the Wang 2024 mean **172 mg/L**. With
     NO amino-acid dose, at typical must nitrogen (250-300 mgN/L) and ``T_ref = 20 °C``, the model
-    reproduce that mean — so the ~2x isoamyl over-production in the D-109 characterization must
-    (307 mg/L) is the ``amino_acids_gpl=1.0`` dose's deamination-N sustaining the fusel gate, NOT a
-    mis-set ``k``. This is what makes the isoamyl catabolic DENOMINATOR a probe artifact, not a
-    calibration bug: the ceiling comparison in finding 3 rests on the ``k`` being right here.
+    reproduces that mean — so the ~2x isoamyl over-production in the D-109 characterization must
+    was the ``amino_acids_gpl=1.0`` dose, NOT a mis-set ``k``. This is what makes the isoamyl
+    catabolic DENOMINATOR a probe artifact, not a calibration bug: the ceiling comparison in
+    finding 3 rests on the ``k`` being right here.
+
+    **THIS TEST IS THE CONTROL THAT SURVIVED D-244 UNMOVED, AND THAT IS WHY IT IS WORTH SAYING SO.**
+    It declares no amino-acid dose, so its declared YAN already WAS the total the must held and
+    D-244's re-reading of the yield fit changes nothing here — bit-for-bit. The dosed fixture next
+    door moved 2x on the same commit. The pair is the cleanest statement of what D-244 did.
+    D-245 corrects only the mechanism D-112 named for the dosed over-production ("the dose's
+    deamination-N sustaining the fusel gate"); see the module docstring, finding 3.
     """
     isoamyl = _isoamyl_no_dose(yan)
     assert 140.0 < isoamyl < 205.0, (
@@ -320,11 +367,10 @@ def _amino_acid_share(traj, schema, params, pool: str) -> float:
     precursor = spec.precursor_amino_acid
     # valine's (1−f) splits again between isobutanol (primary) and isoamyl (secondary), so the
     # primary share is NOT (1−f) for it — using (1−f) would double-count the isoamyl branch.
-    primary_share = (
-        1.0 - params[non_ehrlich_fraction_param("valine")] - share_val_iso
-        if precursor == "valine"
-        else 1.0 - params[non_ehrlich_fraction_param(precursor)]
-    )
+    # THIS FILE HAD IT RIGHT AND ITS SIBLING DID NOT, from D-111 to D-245: the same rule is now
+    # ONE helper both call, because two callers of one quantity disagreeing in prose while only
+    # one of them is read is the D-106 failure, and it cost isobutanol a false floor miss.
+    primary_share = ehrlich_primary_share(params, precursor)
     # ×n/(n+1) removes the D-106 decarboxylation CO₂: a full mole of precursor per mole of alcohol.
     total = (
         primary_share
@@ -344,7 +390,7 @@ def _amino_acid_share(traj, schema, params, pool: str) -> float:
     return float(total / alcohol_carbon)
 
 
-@pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)
+@pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE)
 def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warranted():
     """D-118's "class of error" hypothesis, tested across all three — and REFUTED (decision D-120).
 
@@ -361,6 +407,18 @@ def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warrante
 
     This is the tripwire for the refused build: if a future beat makes any alcohol over-attribute,
     the de-novo-entry question genuinely re-opens for that alcohol and this fails.
+
+    **IT FIRED, AS WRITTEN, AT D-244 — AND D-245 MEASURED WHICH ALCOHOLS AND BY HOW MUCH.**
+    Isoamyl reads 5.42 % against Minebois's 5.34 % and isobutanol 9.47 % against her 8.78 %; 2-PE
+    is still well under. Two things must be said about the size before anyone builds on it. The
+    **isoamyl trip is inside this harness's own systematic**: the ``ehrlich_draws`` headroom cap
+    binds over the first ~1.35 h (at most 12.8 % of the valine pool), during which valine's
+    isoamyl branch is roughly half its designed 0.23 share, so the honest estimate is ~5.30 % —
+    *under* the target, on a 1.5 % relative trip read off figure bars with mixed per-bar semantics
+    (D-119). **Isobutanol's is the one that survives that correction** — the cap moves its share
+    the other way, to ~10.4 % worst case, so the direction flip is real for it. Both are scored on
+    a must carrying 1.0 g/L of amino acids against Minebois's own stock, which is the same
+    commensurability caveat D-244 section 6 recorded and declined to repair.
     """
     traj, schema = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
     params = compile_scenario(_scenario(aging=False)).param_values
@@ -375,7 +433,7 @@ def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warrante
         )
 
 
-@pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)
+@pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE)
 def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts():
     """Why the cap is the wrong INSTRUMENT, not merely the wrong direction (decision D-120).
 
@@ -393,6 +451,18 @@ def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts():
     quantity from the integrated realised share. What does not survive is reading the route as the
     fix for the 18.9% over-attribution: at this dose that correction was delivered by
     ``f_non_ehrlich_phenylalanine`` (0.53 → 0.975), and the route is inert beside it.
+
+    **THE PREMISE IS NOW FALSE AND THE CONCLUSION WITH IT — MEASURED AT D-245, NOT INFERRED.**
+    D-244's corrected yield halves the biomass, so 2-PE's draw falls far enough that phenylalanine
+    stops exhausting: **12.8 % of the pool survives** with the cap on, against 0 % with it off.
+    The supply-limited regime this test names is simply gone, and the cap consequently **bites**:
+    2-PE's realised amino-acid share moves 1.603 % → 1.400 %, a **12.7 % relative** change against
+    a threshold of 0.1 %. This is *not* re-pinnable — the claim, "a rate knob cannot move a
+    supply-limited share", is true and no longer applies here. It stays a strict xfail because it
+    is the visible half of D-120's refusal losing its second measured leg (the first is the
+    direction flip in the test above), and because the build that would close it needs a sourced
+    ``f_de_novo_isoamyl``: the 2-PE closure algebra traces to one published Minebois number, and
+    re-running that shape on the model's own abundances instead is refused at D-206.
     """
     shipped, _ = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
     uncapped, schema = _run(
