@@ -23,7 +23,15 @@ a guard is exactly what the strict-xfail idiom exists to prevent, so the failure
 undoing its own purpose. Related: [[feedback-verify-an-xfail-fails-for-its-stated-reason]] — that
 one is "the RED is not the one you named", this one is "the GREENs behind it are not running".
 
-**How to apply:** before marking a test xfail, **count its assertions**. If more than one can fail
+**It happened a third time in the beat that named it, which is why the "how" below is a checklist
+and not a principle.** D-245's own first commit split two tests and then left a *loop* whole:
+`test_no_alcohol_over_attributes_...` iterated three alcohols in dict order, died on the first
+(which that record calls noise), and never evaluated the third — the one the record calls the real
+finding, and whose number the record stated while nothing in the suite computed it. **A loop over a
+registry is a multi-assertion test wearing one assert.** Parametrize it, so each member carries its
+own mark and the members that still pass stay green guards.
+
+**How to apply:** before marking a test xfail, **count its assertions — and expand its loops**. If more than one can fail
 independently, split the test so the mark carries the failing claim alone and the rest stay live
 guards — the split is a repair, not churn, and costs at most one extra fixture run. When you
 *inherit* an xfail, re-run it with `--runxfail` and check which assert the RED names: any assertion

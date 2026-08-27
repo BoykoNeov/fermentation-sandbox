@@ -46,7 +46,7 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
   re-author a fixture's composition instead; a draft did, and produced a headline resting on a dose
   nobody published [[feedback-migrate-a-fixture-by-its-state-not-its-intent]].
 
-- **The fusel xfails are now FOUR, and the 80 % floor is still NOT to be lowered (D-245 measured
+- **The fusel xfails are now FIVE (D-245 §8 corrects its own §6's "four"), and the 80 % floor is still NOT to be lowered (D-245 measured
   what D-244 asserted).** One knob reproduces every crossing — hold the fixture and sweep only
   `biomass_N_fraction` 0.0578 → 0.1068 — so the must's 2.25x nitrogen is a CONSTANT, not a cause.
   **The leg that moved is the DENOMINATOR**: threonine/valine/leucine consumption is identical to

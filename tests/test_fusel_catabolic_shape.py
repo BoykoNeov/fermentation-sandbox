@@ -390,9 +390,52 @@ def _amino_acid_share(traj, schema, params, pool: str) -> float:
     return float(total / alcohol_carbon)
 
 
-@pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE)
-def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warranted():
+@pytest.fixture(scope="module")
+def shipped_run():
+    """The dosed characterization run, other precursor consumers off — computed ONCE (D-245).
+
+    Three tests below read the same trajectory. Before D-245 they each paid their own
+    ``solve_ivp``; sharing it is what makes the per-alcohol split below cost nothing extra.
+    Module-scoped rather than session-scoped because ``--dist load`` hands a worker a contiguous
+    chunk, so one module's fixture is paid once per run (see ``CLAUDE.md`` on why not worksteal).
+    """
+    return _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
+
+
+#: Marks per alcohol for the split below: 2-PE still under-attributes and is a live GREEN guard.
+_OVER_ATTRIBUTING = ("isoamyl_alcohol", "isobutanol")
+
+
+@pytest.mark.parametrize(
+    ("pool", "measured"),
+    [
+        pytest.param(
+            pool,
+            measured,
+            id=pool,
+            marks=(
+                [pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE)]
+                if pool in _OVER_ATTRIBUTING
+                else []
+            ),
+        )
+        for pool, measured in _MINEBOIS_AMINO_ACID_SHARE.items()
+    ],
+)
+def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warranted(
+    pool, measured, shipped_run
+):
     """D-118's "class of error" hypothesis, tested across all three — and REFUTED (decision D-120).
+
+    **SPLIT PER ALCOHOL AT D-245, AND THE SPLIT IS THE POINT.** As one test with a loop this read
+    ``2-PE → isoamyl → isobutanol`` and died on isoamyl, so the two alcohols after it were never
+    evaluated — including **isobutanol, which is the leg D-245's record calls the real flip**
+    (9.47 % against Minebois's 8.78 %, and the one that survives the cap-window correction). The
+    leg that fired was the one the same record calls noise (isoamyl 5.42 vs 5.34 %, inside the
+    harness's own systematic). A finding sitting behind a failing assert is exactly what this beat
+    repaired twice elsewhere; it was live a third time in its own output
+    [[feedback-an-xfail-buries-the-asserts-after-it]]. Now each alcohol carries its own mark:
+    2-phenylethanol is a **green** guard again, and the two that trip say so independently.
 
     D-118 capped 2-phenylethanol's amino-acid sourcing and left "isoamyl's de-novo entry" as the
     next build, on the premise that all three alcohols are de-novo dominated in-study so the error
@@ -420,21 +463,20 @@ def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warrante
     a must carrying 1.0 g/L of amino acids against Minebois's own stock, which is the same
     commensurability caveat D-244 section 6 recorded and declined to repair.
     """
-    traj, schema = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
+    traj, schema = shipped_run
     params = compile_scenario(_scenario(aging=False)).param_values
 
-    for pool, measured in _MINEBOIS_AMINO_ACID_SHARE.items():
-        model = _amino_acid_share(traj, schema, params, pool)
-        assert 0.0 < model < measured, (
-            f"{pool}: model sources {model:.2%} of it from amino acids against Minebois's "
-            f"{measured:.2%}. D-120 refused a de-novo cap for isoamyl because a (1−f_de_novo) "
-            "ceiling can only REDUCE amino-acid sourcing and every alcohol was already under. If "
-            "this one now over-attributes, that refusal must be re-derived for it"
-        )
+    model = _amino_acid_share(traj, schema, params, pool)
+    assert 0.0 < model < measured, (
+        f"{pool}: model sources {model:.2%} of it from amino acids against Minebois's "
+        f"{measured:.2%}. D-120 refused a de-novo cap for isoamyl because a (1−f_de_novo) "
+        "ceiling can only REDUCE amino-acid sourcing and every alcohol was already under. If "
+        "this one now over-attributes, that refusal must be re-derived for it"
+    )
 
 
 @pytest.mark.xfail(strict=True, reason=_D245_D120_LEGS_GONE)
-def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts():
+def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts(shipped_run):
     """Why the cap is the wrong INSTRUMENT, not merely the wrong direction (decision D-120).
 
     The cap multiplies the availability gate, i.e. a RATE. Where a precursor is fully consumed the
@@ -452,26 +494,20 @@ def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts():
     fix for the 18.9% over-attribution: at this dose that correction was delivered by
     ``f_non_ehrlich_phenylalanine`` (0.53 → 0.975), and the route is inert beside it.
 
-    **THE PREMISE IS NOW FALSE AND THE CONCLUSION WITH IT — MEASURED AT D-245, NOT INFERRED.**
-    D-244's corrected yield halves the biomass, so 2-PE's draw falls far enough that phenylalanine
-    stops exhausting: **12.8 % of the pool survives** with the cap on, against 0 % with it off.
-    The supply-limited regime this test names is simply gone, and the cap consequently **bites**:
-    2-PE's realised amino-acid share moves 1.603 % → 1.400 %, a **12.7 % relative** change against
-    a threshold of 0.1 %. This is *not* re-pinnable — the claim, "a rate knob cannot move a
-    supply-limited share", is true and no longer applies here. It stays a strict xfail because it
-    is the visible half of D-120's refusal losing its second measured leg (the first is the
-    direction flip in the test above), and because the build that would close it needs a sourced
-    ``f_de_novo_isoamyl``: the 2-PE closure algebra traces to one published Minebois number, and
-    re-running that shape on the model's own abundances instead is refused at D-206.
-    """
-    shipped, _ = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS)
-    uncapped, schema = _run(
-        aging=False,
-        drop=_OTHER_PRECURSOR_CONSUMERS,
-        set_params={"f_de_novo_2_phenylethanol": 0.0},
-    )
-    params = compile_scenario(_scenario(aging=False)).param_values
+    **THE PREMISE IS NOW FALSE — MEASURED AT D-245, NOT INFERRED — AND THIS TEST IS NOW THAT
+    PREMISE ALONE.** D-244's corrected yield halves the biomass, so 2-PE's draw falls far enough
+    that phenylalanine stops exhausting: **12.8 % of the pool survives**. The supply-limited regime
+    this test names is simply gone, so its claim — "a rate knob cannot move a supply-limited
+    share" — is true and no longer *applies*, which is why this is an xfail and not a re-pin.
 
+    **Its second assertion has MOVED rather than died**, into
+    :func:`test_the_de_novo_cap_now_bites_because_phenylalanine_no_longer_exhausts`, because what
+    it now measures is a green fact about the shipped model and the receipt for D-245's
+    ``Flags: D-120``. Left here it would have sat behind this failing premise, never running —
+    which is the defect D-245 repaired twice elsewhere and shipped a third time in its own output
+    [[feedback-an-xfail-buries-the-asserts-after-it]].
+    """
+    shipped, schema = shipped_run
     initial = float(shipped.y[schema.slice("phenylalanine"), 0][0])
     left = _end(shipped, schema, "phenylalanine") / initial
     assert left < 0.01, (
@@ -479,12 +515,52 @@ def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts():
         "test has moved, and the cap may now bite on the realised share"
     )
 
+
+def test_the_de_novo_cap_now_bites_because_phenylalanine_no_longer_exhausts(shipped_run):
+    """The cap MOVES 2-PE's realised share — D-120's instrument leg, inverted and pinned (D-245).
+
+    **This is a re-record, not a new claim.** D-120 measured ``|with − without| < 1e-3 × without``
+    and read it as proof that a de-novo cap is the wrong *instrument*: it multiplies a rate, and
+    where a precursor is fully consumed the realised share sits on a mass-conservation ceiling no
+    rate can move. That assertion lived inside
+    :func:`test_the_de_novo_cap_is_inert_where_the_precursor_exhausts`, one line below an
+    exhaustion premise that D-244 falsified — so from D-244 until D-245 **it never ran**, and the
+    inversion below went unmeasured while the record above it was being written.
+
+    Measured: phenylalanine survives at 12.8 % with the cap and exhausts without it, and the cap
+    moves the realised amino-acid share **1.603 % → 1.400 %, 12.7 % relative** — four orders of
+    magnitude past the old inertness threshold. Pinned two-sided, because both directions matter:
+    shrinking toward 0 means the supply-limited regime has returned and D-120's instrument argument
+    revives; growing means the cap is taking over the sourcing this fixture is supposed to measure.
+
+    **This does not license building a cap for another alcohol** — it removes one of the two
+    measured legs D-120 declined on, and the other (direction) is the test above. The build still
+    needs a sourced ``f_de_novo_isoamyl``, which this repo does not hold (D-206).
+    """
+    shipped, schema = shipped_run
+    uncapped, _ = _run(
+        aging=False,
+        drop=_OTHER_PRECURSOR_CONSUMERS,
+        set_params={"f_de_novo_2_phenylethanol": 0.0},
+    )
+    params = compile_scenario(_scenario(aging=False)).param_values
+
+    # Anti-vacuity, and the mechanism in one line: the cap is what leaves phenylalanine standing.
+    initial = float(shipped.y[schema.slice("phenylalanine"), 0][0])
+    left_uncapped = _end(uncapped, schema, "phenylalanine") / initial
+    assert left_uncapped < 0.01, (
+        f"phenylalanine no longer exhausts even with the cap OFF ({left_uncapped:.2%} left) — the "
+        "counterfactual this test rests on has moved, so the bite below is not the cap's doing"
+    )
+
     with_cap = _amino_acid_share(shipped, schema, params, "2_phenylethanol")
     without = _amino_acid_share(
         uncapped, schema, {**params, "f_de_novo_2_phenylethanol": 0.0}, "2_phenylethanol"
     )
-    assert abs(with_cap - without) < 1e-3 * without, (
-        f"the de-novo cap moved 2-PE's realised amino-acid share {without:.4%} → {with_cap:.4%}. "
-        "It measured inert at D-120 because phenylalanine exhausts either way; if it now bites, "
-        "the argument that a cap cannot fix an under-attribution needs re-deriving"
+    move = abs(with_cap - without) / without
+    assert 0.10 < move < 0.16, (
+        f"the de-novo cap moves 2-PE's realised amino-acid share {without:.4%} → {with_cap:.4%} "
+        f"({move:.1%} relative), outside the D-245 band [10 %, 16 %] (measured 12.7 %). It was "
+        "INERT at D-120 because phenylalanine exhausted either way; if it is inert again, D-120's "
+        "instrument argument has revived and D-245's Flags marker on it must be re-derived"
     )

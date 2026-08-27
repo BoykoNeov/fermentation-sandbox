@@ -35242,7 +35242,7 @@ Neither guard is re-pinnable: the claims are not wrong, they no longer apply. Bo
 
 ### 6. What ships
 
-Six strict xfails become four, two guards are recovered, two dead assertions are revived and one helper is deduplicated. `test_every_sourced_fusel_is_de_novo_dominated[isobutanol]` passes at 90.5 %; `test_the_excreted_pool_cannot_supply_propanol` passes on a claim plus a re-recorded margin. The four that remain are propanol's floor miss, the band restating it, and D-120's two — each now carrying a measured attribution in place of D-244's asserted one.
+Two guards are recovered, three dead assertions are revived and one helper is deduplicated. `test_every_sourced_fusel_is_de_novo_dominated[isobutanol]` passes at 90.5 %; `test_the_excreted_pool_cannot_supply_propanol` passes on a claim plus a re-recorded margin. **Six strict xfails become five** — see §8, which corrects the "four" this section first claimed: splitting the Minebois guard per alcohol turned one hidden failure into two named ones and one green guard. What remains is propanol's floor miss, the band restating it, isoamyl and isobutanol as separate legs, and the exhaustion premise — each now carrying a measured attribution in place of D-244's asserted one.
 
 ### 7. Not covered
 
@@ -35251,3 +35251,15 @@ Six strict xfails become four, two guards are recovered, two dead assertions are
 **The commensurability violation of D-244 §6 is untouched and is the unlock for propanol.** The floor is scored on a must carrying 2.25x its source's nitrogen, and whether 77.4 % against Crépin's 19 %-exogenous is a model defect or the expected reading of a richer must cannot be settled without that paper's medium. Nothing here composes one.
 
 **Nothing was tuned.** No parameter file changed and no `src/` file changed; this record is entirely measurement, one test-harness repair, and re-recorded pins.
+
+### 8. Follow-up inside the beat: the record's own findings were sitting behind failing asserts
+
+The first commit repaired that defect twice and then shipped a third instance of it, in the output of the record naming it. Both were caught by re-running the four remaining xfails under `--runxfail` and reading which assertion each dies on — the check `feedback-verify-an-xfail-fails-for-its-stated-reason` prescribes, skipped after the edits because a plain `4 xfailed` looked like confirmation.
+
+**`test_no_alcohol_over_attributes_…` iterated `_MINEBOIS_AMINO_ACID_SHARE` in insertion order**, so it died on isoamyl — the leg §5 above calls *noise*, inside the harness's own cap-window systematic — and **isobutanol, the leg §5 calls the flip that survives, was never evaluated**. The record asserted 9.47 % against Minebois's 8.78 % while nothing in the suite computed it. Now parametrized per alcohol: 2-phenylethanol is a **green** guard again, and isoamyl and isobutanol each carry their own mark and their own message.
+
+**The 12.7 % cap bite had the same problem and it is a green fact, so it is now a green pin.** It lived as the second assertion of `test_the_de_novo_cap_is_inert_where_the_precursor_exhausts`, below the exhaustion premise D-244 falsified, so it had not run since D-244 — the inversion went unmeasured for a whole record while §5 was written about it. `test_the_de_novo_cap_now_bites_because_phenylalanine_no_longer_exhausts` pins it two-sided at `[10 %, 16 %]` with the counterfactual (phenylalanine exhausts with the cap off) as its anti-vacuity leg, and it is the executable receipt for this record's `Flags: D-120`. The premise test keeps the premise alone.
+
+**90.5 % is confirmed on the real path, not derived offline.** §3's figure came from stored `consumed`/`made` at a `set_params`-forced `biomass_N_fraction`; run through the repaired helper on the unmodified fixture it is **0.905254**, with the amino-acid share **0.094746**. The floor test only asserts `≥ 0.80`, so the number itself is stated by this record and witnessed by the sink-on band message, which now prints isobutanol at 0.0947 where it printed 0.2400.
+
+Three tests are added and one loop removed, so the **strict xfails across these two files go 6 → 5, not 6 → 4** as §6 first said: propanol's floor, the band restating it, isoamyl and isobutanol as separate legs, and the exhaustion premise. That is one more visible failure and two fewer hidden ones, which is the trade this beat exists to make.

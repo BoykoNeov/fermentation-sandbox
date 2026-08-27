@@ -69,8 +69,12 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
   re-pinned two-sided [1.30, 1.42] with `> 1.0` asserted separately as the claim. **Do not restore
   a one-sided floor** — it cannot catch the excretion flux growing toward the demand. The supply
   argument now rests on 36 % headroom over an AUTHOR-ESTIMATED rate.
-- **Never mark a multi-assert test xfail whole** — D-244 did it twice and killed two live guards for
-  a record [[feedback-an-xfail-buries-the-asserts-after-it]]. **D-112 finding 4's mechanism is
+- **Never mark a multi-assert test xfail whole, and never mark a LOOP over a registry whole** —
+  D-244 did it twice and D-245's own first commit did it a third time: the Minebois guard looped
+  2-PE → isoamyl → isobutanol, died on isoamyl (the leg the record calls NOISE) and never evaluated
+  **isobutanol, the leg it calls the real flip**. Split per member; the **12.7 % cap bite is a GREEN
+  pin** now ([10 %, 16 %], the receipt for `Flags: D-120`). Five xfails, not four
+  [[feedback-an-xfail-buries-the-asserts-after-it]]. **D-112 finding 4's mechanism is
   CORRECTED** (the evaluation point, not "the dose's deamination-N sustaining the gate"); its
   conclusion — `k_isoamyl_alcohol` is right — **stands**, and the undosed anchor test is the control
   that proves it (bit-for-bit through D-244).
