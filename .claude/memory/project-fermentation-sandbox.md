@@ -30,8 +30,8 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   change. `docs/plans/*.md` are **FROZEN LOGS, bannered as such — never read them for what is built/open/next**;
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
-## Status (2026-08-26)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-239** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1915 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+## Status (2026-08-27)
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-240** (D-231 is tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1961 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
@@ -362,6 +362,15 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   D-209 §8's same-sign claim**), **−0.0202 day 7** ⇒ high `z̄` edge **0.0203 BELOW** Tyrell's
   floor, deliberately. **Day-1 miss now has NO named candidate.** Wine untouched, MEASURED 0.73 %.
   → `.claude/memory/prohibitions/wort-amino-acid-buffering.md`
+
+- **The banded-and-NEVER-DRAWN census (D-240)** — **RUN, CLASSIFIED, PINNED; never re-propose as unenumerated.**
+  D-237 §6 CLOSED: **32** compile-read/drawn-nowhere, **28** banded per scenario, 5 classes. D-234's **COMPLEMENT**;
+  **OVERLAPS D-159** (11 of 28) — never call those two disjoint. `copper_typical` is in BOTH registries, correctly
+  (aging-gated reader) ⇒ score per SCENARIO. **NEVER quote the unpaired 1.672× widening — NOISE**; paired **0.323**,
+  and the *as-shipped* arm is **EXACTLY 0** everywhere. hidden/full: methanethiol **1.88**, dms 1.09, A420 **0.705**,
+  beer **0.000**. Beer's 8 `*_typical_wort` **ABSORBED at t=0 (≤1.2e-13)**; `o2_wort_aeration_beer` worth **EXACTLY 0**
+  (D-213); the 2 copper binding constants **lose a `min()`** (126-2200× excess) — pin the RATIO, never the zero.
+  → `.claude/memory/prohibitions/banded-undrawn-census.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
