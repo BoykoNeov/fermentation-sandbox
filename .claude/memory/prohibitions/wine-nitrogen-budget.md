@@ -84,6 +84,26 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
   ammonium-to-amino ratio from the Handbook's raw 3-10 % / 25-30 % with no proline subtraction while
   its own `conditions` field excludes proline. Pre-existing; found here, left where it was found.
 
+- **The availability gate's commensurability defect (D-246 §6 → D-247) — MEASURED and REFUSED, and
+  D-247 CORRECTS the record that proposed it.** `depletion_gate` scales its half-saturation by the
+  must-SPECTRUM share, and a per-species override breaks the premise that cancellation rests on —
+  a real defect. But the **composition-only** correction (each share re-referenced to the declared
+  must, `Σf` preserved so the level cannot move) is worth **0.796275 → 0.796017** on propanol:
+  6.9 % of the gap to the 0.80 floor, **in the wrong direction**, stable across rtol 1e-6→1e-10,
+  and ≤0.5 % on every fusel with all Processes live. D-246's probe cleared the floor only because
+  scaling `K_amino_acids` uniformly is a **LEVEL** change — the gate reads only the product
+  `K·f_i`, so it is bit-identical to scaling all eight shares, and it varied nothing *relative*.
+  **The residual propanol miss is therefore UNATTRIBUTED, not gate-attributed.** The gate's
+  reference is an unsourced modelling device either way — D-100 argued the spectrum scaling as
+  dynamic range with zero new parameters and declined per-species Michaelis constants as the D-98
+  trap — so **only literature half-saturations settle it: a sourcing ask, never a core change.**
+  Do not re-propose the repair. If it is ever revisited, D-247 §5 prices the compile seam: mint
+  gate-scale parameters, **never overwrite `must_aa_fraction_*`** (`spectrum_carbon_per_nitrogen`
+  reads those same shares and D-34's structurally-non-negative debris carbon leans on the ratio),
+  conditional on all eight pools being overridden so a "hold the must, spike the leucine" scenario
+  is untouched — and note that re-referencing erases, by construction, the very effect a spike
+  scenario exists to study. [[feedback-a-uniform-rescale-cannot-test-a-composition-claim]]
+
 Measurements: `M:\claud_projects\temp\ferment\d243-wine-nitrogen-audit\` and
 `d244-wine-n-evaluation-point\` — `FINDINGS-pre.md`, `probe_band.py`, `probe_ceiling.py`,
 `probe_partition_stall.py`, `probe_denovo2.py`, `probe_pins.py`, and the `patch*.py` migrations.

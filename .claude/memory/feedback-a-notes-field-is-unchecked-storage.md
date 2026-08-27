@@ -23,6 +23,8 @@ D-187 found **three wrong numbers in one sitting, every one in prose and none in
 - **Two of my own, written the same day**: "~2.7 years of steady ingress" that was actually **8.9**,
   and "both of P2's caliper means fall inside the band" when one falls **3.5 % outside**.
 
+**The same species of storage lives in tests: a docstring, and above all an xfail REASON STRING.** D-247 found three passing tests whose prose told a future reader that rescaling the availability gate "to the pool it actually gates carries propanol over the floor" — a claim that beat had just measured false. No assertion in any of them could ever have caught it: a reason string is read by humans and printed by pytest, and checked by nothing. Repair it in the beat that disproves it, not the next one.
+
 **Why:** a shipped `value` is pinned by a test, re-derived when a band moves, and re-read whenever a
 Process changes. The prose around it is written once, at the moment of most enthusiasm, and then
 quoted forward as if it had been checked. Its error rate is not lower than the value's — it is
