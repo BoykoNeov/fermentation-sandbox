@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-27)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-242** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1979 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-243** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **1985 + 5 xfail** (3 D-188 Herzan; 2 D-215's own) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats.
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
@@ -387,6 +387,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   the nearest real defect is **4.4 MILLION ULP** away, so never call that budget a loosening and never widen it past
   single digits — suspect the solver. Do NOT reorder the CI gates (tests first costs 15 min per lint slip).
   → `.claude/memory/prohibitions/seed-reads-repair.md`
+- **Wine's nitrogen budget (D-243)** — the D-232 item is **CLOSED: AUDITED, do not re-propose.** Numerator SOUND
+  (Varela print their OWN proline subtraction: 380/65 total → 300/50 assimilable). Growth is the EXACT identity
+  `X0 + YAN/f_N` (ratio 1.00000000) and the ledger closes to 3e-14 through all 12 N-writing sites — **not** a
+  conservation defect. **NEVER write the beer symmetry**: wine's demanded f_N sits BETWEEN the engine's own two
+  values, so a nitrogen-budget explanation is ADMISSIBLE here — the OPPOSITE of D-230. **OPEN, owner's call:**
+  `yan_mgl` and `amino_acids_gpl` ADD (250 declared → 362.7 actual) while the yield fit reads only the first.
+  Both repairs priced and BOTH bad — summing leaves Coleman's fitted range at the commonest dose. Flags D-32/D-14.
+  → `.claude/memory/prohibitions/wine-nitrogen-budget.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂
